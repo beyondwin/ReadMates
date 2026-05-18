@@ -31,8 +31,9 @@ export {
   NewHostSessionRoute,
 } from "@/features/host/route/host-session-editor-route";
 export {
-  hostSessionEditorActions,
-  hostSessionEditorLoader,
+  hostSessionEditorLoaderFactory,
+  hostSessionEditorPreviewActions,
+  type HostSessionEditorRouteData,
 } from "@/features/host/route/host-session-editor-data";
 export {
   HostMembersRoute,

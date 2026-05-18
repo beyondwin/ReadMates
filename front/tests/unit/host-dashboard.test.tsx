@@ -8,7 +8,7 @@ import {
   hostDashboardLoaderFactory,
   hostInvitationsLoaderFactory,
   hostMembersLoaderFactory,
-  hostSessionEditorLoader,
+  hostSessionEditorLoaderFactory,
 } from "@/features/host";
 import { QueryClient } from "@tanstack/react-query";
 import type {
@@ -19,6 +19,7 @@ import type {
   HostSessionListItem,
 } from "@/features/host/api/host-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import { hostSessionDetailContractFixture } from "./api-contract-fixtures";
 
 afterEach(() => {
   cleanup();
@@ -333,10 +334,10 @@ function hostDashboardLoaderForTest(args?: LoaderFunctionArgs) {
 }
 
 function hostSessionEditorLoaderForTest() {
-  return hostSessionEditorLoader({
+  return hostSessionEditorLoaderFactory(createTestQueryClient())({
     params: { sessionId: "session-7" },
     request: new Request("https://readmates.test/app/host/sessions/session-7/edit"),
-  } as unknown as Parameters<typeof hostSessionEditorLoader>[0]);
+  } as LoaderFunctionArgs);
 }
 
 const hostLoaderCases: Array<[string, () => Promise<unknown>, string]> = [
@@ -572,6 +573,45 @@ describe("HostDashboard", () => {
 
     const fetchedUrls = fetchMock.mock.calls.map(([url]) => String(url));
     expect(fetchedUrls.some((url) => url.includes("limit=50") && url.includes("clubSlug=reading-sai"))).toBe(true);
+  });
+
+  it("seeds host session editor detail and manual dispatches into the shared query client", async () => {
+    const client = createTestQueryClient();
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/bff/api/auth/me?clubSlug=reading-sai") return Promise.resolve(authResponse(hostAuth));
+      if (url === "/api/bff/api/host/sessions/session-7?clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse(hostSessionDetailContractFixture));
+      }
+      if (
+        url.includes("/api/bff/api/host/notifications/manual/dispatches") &&
+        url.includes("sessionId=session-7") &&
+        url.includes("limit=20") &&
+        url.includes("clubSlug=reading-sai")
+      ) {
+        return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
+      }
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await hostSessionEditorLoaderFactory(client)({
+      params: { clubSlug: "reading-sai", sessionId: "session-7" },
+      request: new Request("https://readmates.test/clubs/reading-sai/app/host/sessions/session-7/edit"),
+    } as LoaderFunctionArgs);
+
+    const { hostSessionDetailQuery, hostSessionManualDispatchesQuery } = await import(
+      "@/features/host/queries/host-session-queries"
+    );
+    expect(client.getQueryData(hostSessionDetailQuery("session-7", { clubSlug: "reading-sai" }).queryKey)).toEqual(
+      hostSessionDetailContractFixture,
+    );
+    expect(client.getQueryData(
+      hostSessionManualDispatchesQuery(
+        { sessionId: "session-7", page: { limit: 20 } },
+        { clubSlug: "reading-sai" },
+      ).queryKey,
+    )).toEqual({ items: [], nextCursor: null });
   });
 
   it("loads host notification status for the dashboard", async () => {

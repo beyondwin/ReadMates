@@ -1,48 +1,42 @@
+import type { QueryClient } from "@tanstack/react-query";
 import type { LoaderFunctionArgs } from "react-router-dom";
-import {
-  closeHostSession,
-  commitHostSessionImport,
-  createHostSession,
-  deleteHostSession,
-  fetchManualNotificationDispatches,
-  fetchHostSessionDeletionPreview,
-  fetchHostSessionDetail,
-  previewHostSessionImport,
-  publishHostSession,
-  saveHostSessionAttendance,
-  saveHostSessionPublication,
-  updateHostSession,
-} from "@/features/host/api/host-api";
+import { previewHostSessionImport } from "@/features/host/api/host-api";
 import type { HostSessionEditorActions } from "@/features/host/route/host-session-editor-actions";
+import {
+  hostSessionDetailQuery,
+  hostSessionManualDispatchesQuery,
+} from "@/features/host/queries/host-session-queries";
 import { requireHostLoaderAuth } from "./host-loader-auth";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 
-export async function hostSessionEditorLoader(args: LoaderFunctionArgs) {
-  const { params } = args;
-  await requireHostLoaderAuth(args);
-  const context = { clubSlug: clubSlugFromLoaderArgs({ params }) };
+const EDITOR_MANUAL_DISPATCH_PAGE_LIMIT = 20;
 
-  if (!params.sessionId) {
-    throw new Error("Missing host session id");
-  }
+export type HostSessionEditorRouteData = {
+  sessionId: string;
+};
 
-  const [session, notificationDispatches] = await Promise.all([
-    fetchHostSessionDetail(params.sessionId, context),
-    fetchManualNotificationDispatches(context, { sessionId: params.sessionId, page: { limit: 20 } }),
-  ]);
+export function hostSessionEditorLoaderFactory(client: QueryClient) {
+  return async (args: LoaderFunctionArgs): Promise<HostSessionEditorRouteData> => {
+    const { params } = args;
+    await requireHostLoaderAuth(args);
+    const context = { clubSlug: clubSlugFromLoaderArgs(args) };
 
-  return { session, notificationDispatches };
+    if (!params.sessionId) {
+      throw new Error("Missing host session id");
+    }
+
+    await Promise.all([
+      client.fetchQuery(hostSessionDetailQuery(params.sessionId, context)),
+      client.fetchQuery(hostSessionManualDispatchesQuery(
+        { sessionId: params.sessionId, page: { limit: EDITOR_MANUAL_DISPATCH_PAGE_LIMIT } },
+        context,
+      )),
+    ]);
+
+    return { sessionId: params.sessionId };
+  };
 }
 
-export const hostSessionEditorActions = {
-  loadDeletionPreview: fetchHostSessionDeletionPreview,
-  deleteSession: deleteHostSession,
-  closeSession: closeHostSession,
-  publishSession: publishHostSession,
-  saveSession: (sessionId, request) =>
-    sessionId === null ? createHostSession(request) : updateHostSession(sessionId, request),
-  savePublication: saveHostSessionPublication,
-  updateAttendance: saveHostSessionAttendance,
+export const hostSessionEditorPreviewActions = {
   previewSessionImport: previewHostSessionImport,
-  commitSessionImport: commitHostSessionImport,
-} satisfies HostSessionEditorActions;
+} satisfies Pick<HostSessionEditorActions, "previewSessionImport">;

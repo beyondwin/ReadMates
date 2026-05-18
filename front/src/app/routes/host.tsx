@@ -81,11 +81,11 @@ function hostAppRoutes(queryClient: QueryClient): RouteObject[] {
       errorElement: <HostRouteError />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="세션 문서 정보를 불러오는 중" variant="host" />,
       lazy: async () => {
-        const [{ EditHostSessionRouteElement }, { hostSessionEditorLoader }] = await Promise.all([
+        const [{ EditHostSessionRouteElement }, { hostSessionEditorLoaderFactory }] = await Promise.all([
           import("@/src/app/host-route-elements"),
           import("@/features/host/route/host-session-editor-data"),
         ]);
-        return { Component: EditHostSessionRouteElement, loader: hostSessionEditorLoader };
+        return { Component: EditHostSessionRouteElement, loader: hostSessionEditorLoaderFactory(queryClient) };
       },
     },
     {
