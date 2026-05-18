@@ -421,6 +421,64 @@ describe("HostNotificationsRoute", () => {
     expect(screen.getByRole("heading", { name: "최근 수동 발송" })).toBeInTheDocument();
     expect(screen.getAllByText("앱+이메일").length).toBeGreaterThan(0);
   });
+
+  it("refreshes manual dispatch ledger after confirm mutation invalidates query state", async () => {
+    const client = testQueryClient();
+    seedNotificationsRoute(client);
+    client.setQueryData(hostNotificationManualDispatchesQuery(
+      { page: { limit: 20 } },
+      { clubSlug: "reading-sai" },
+    ).queryKey, {
+      items: [],
+      nextCursor: null,
+    });
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+      if (url === "/api/bff/api/host/notifications/manual?clubSlug=reading-sai" && init?.method === "POST") {
+        return Promise.resolve(jsonResponse({
+          manualDispatchId: "dispatch-2",
+          eventId: "event-manual-2",
+          status: "PUBLISHED",
+          createdAt: "2026-05-18T00:00:00Z",
+          selection: {
+            sessionId: "session-1",
+            eventType: "SESSION_REMINDER_DUE",
+            audience: "ALL_ACTIVE_MEMBERS",
+            requestedChannels: "BOTH",
+            targetCount: 3,
+          },
+        }));
+      }
+      if (url === "/api/bff/api/host/notifications/summary?clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse(summary));
+      }
+      if (url === "/api/bff/api/host/notifications/events?limit=50&clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse({ items: [pendingEvent], nextCursor: null }));
+      }
+      if (url === "/api/bff/api/host/notifications/deliveries?limit=50&clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse({ items: [deadDelivery], nextCursor: null }));
+      }
+      if (url === "/api/bff/api/host/notifications/manual/options?sessionId=session-1&limit=50&clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse(manualOptionsFixture));
+      }
+      if (url === "/api/bff/api/host/notifications/manual/dispatches?limit=20&clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse({ items: [manualDispatch], nextCursor: null }));
+      }
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    }));
+
+    renderNotificationsRoute(client);
+    expect(await screen.findByRole("heading", { name: "새 알림 발송" })).toBeInTheDocument();
+
+    await client.invalidateQueries({
+      queryKey: hostNotificationManualDispatchesQuery(
+        { page: { limit: 20 } },
+        { clubSlug: "reading-sai" },
+      ).queryKey,
+    });
+
+    expect(await screen.findByText("Example Book")).toBeInTheDocument();
+  });
 });
 
 describe("HostNotificationsPage", () => {
@@ -822,5 +880,135 @@ describe("HostNotificationsPage", () => {
 
     expect(onSendTestMail).toHaveBeenCalledWith({ recipientEmail: "test@example.com" });
     expect(screen.getByText("t***@example.com")).toBeInTheDocument();
+  });
+
+  it("keeps manual preview visible while parent query props refresh", async () => {
+    const user = userEvent.setup();
+    const preview: ManualNotificationPreviewResponse = {
+      previewId: "preview-keep",
+      expiresAt: "2026-05-13T09:10:00Z",
+      template: {
+        eventType: "SESSION_REMINDER_DUE",
+        label: "모임 전날 리마인더",
+        subject: "모임 전날 리마인더",
+        bodyPreview: "모임 전 준비를 확인해 주세요.",
+      },
+      audience: {
+        baseGroup: "ALL_ACTIVE_MEMBERS",
+        baseCount: 3,
+        excludedCount: 0,
+        includedCount: 0,
+        finalTargetCount: 3,
+      },
+      channels: {
+        requested: "BOTH",
+        inAppEligibleCount: 3,
+        emailEligibleCount: 2,
+        emailSkippedByPreferenceCount: 1,
+        emailMissingCount: 0,
+      },
+      duplicates: {
+        requiresResendConfirmation: false,
+        recentDispatches: [],
+      },
+      warnings: [],
+    };
+    const onPreviewManual = vi.fn<[ManualNotificationPreviewRequest], Promise<ManualNotificationPreviewResponse>>()
+      .mockResolvedValue(preview);
+    const { rerender } = render(
+      <HostNotificationsPage
+        summary={summary}
+        events={[pendingEvent]}
+        deliveries={[deadDelivery]}
+        audit={[]}
+        hostSessions={[hostSessionCurrent, hostSessionDraft]}
+        manualOptions={manualOptionsFixture}
+        manualDispatches={[]}
+        initialManualSelection={{ sessionId: "session-1", eventType: null }}
+        onProcess={vi.fn()}
+        onRetry={vi.fn()}
+        onRestore={vi.fn()}
+        onSendTestMail={vi.fn()}
+        onPreviewManual={onPreviewManual}
+        onConfirmManual={vi.fn()}
+        onLoadManualOptions={vi.fn().mockResolvedValue(manualOptionsFixture)}
+        onLoadMoreManualMembers={vi.fn().mockResolvedValue(manualOptionsFixture)}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "미리보기" }));
+    expect(await screen.findByRole("heading", { name: "발송 전 확인" })).toBeInTheDocument();
+
+    rerender(
+      <HostNotificationsPage
+        summary={{ ...summary, sentLast24h: summary.sentLast24h + 1 }}
+        events={[{ ...pendingEvent, attemptCount: 2 }]}
+        deliveries={[deadDelivery]}
+        audit={[]}
+        hostSessions={[hostSessionCurrent, hostSessionDraft]}
+        manualOptions={{ ...manualOptionsFixture }}
+        manualDispatches={[manualDispatch]}
+        initialManualSelection={{ sessionId: "session-1", eventType: null }}
+        onProcess={vi.fn()}
+        onRetry={vi.fn()}
+        onRestore={vi.fn()}
+        onSendTestMail={vi.fn()}
+        onPreviewManual={onPreviewManual}
+        onConfirmManual={vi.fn()}
+        onLoadManualOptions={vi.fn().mockResolvedValue(manualOptionsFixture)}
+        onLoadMoreManualMembers={vi.fn().mockResolvedValue(manualOptionsFixture)}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "발송 전 확인" })).toBeInTheDocument();
+    expect(screen.getByText("모임 전 준비를 확인해 주세요.")).toBeInTheDocument();
+  });
+
+  it("blocks confirm until resend confirmation is selected when preview reports duplicates", async () => {
+    const user = userEvent.setup();
+    const duplicatePreview: ManualNotificationPreviewResponse = {
+      previewId: "preview-duplicate",
+      expiresAt: "2026-05-13T09:10:00Z",
+      template: {
+        eventType: "SESSION_REMINDER_DUE",
+        label: "모임 전날 리마인더",
+        subject: "모임 전날 리마인더",
+        bodyPreview: "모임 전 준비를 확인해 주세요.",
+      },
+      audience: {
+        baseGroup: "ALL_ACTIVE_MEMBERS",
+        baseCount: 3,
+        excludedCount: 0,
+        includedCount: 0,
+        finalTargetCount: 3,
+      },
+      channels: {
+        requested: "BOTH",
+        inAppEligibleCount: 3,
+        emailEligibleCount: 3,
+        emailSkippedByPreferenceCount: 0,
+        emailMissingCount: 0,
+      },
+      duplicates: {
+        requiresResendConfirmation: true,
+        recentDispatches: [manualDispatch],
+      },
+      warnings: [],
+    };
+    const onPreviewManual = vi.fn().mockResolvedValue(duplicatePreview);
+    const onConfirmManual = vi.fn().mockResolvedValue(undefined);
+
+    renderPage({ onPreviewManual, onConfirmManual });
+
+    await user.click(screen.getByRole("button", { name: "미리보기" }));
+    await screen.findByRole("heading", { name: "발송 전 확인" });
+
+    const confirmButton = screen.getByRole("button", { name: "발송 확인" });
+    expect(confirmButton).toBeDisabled();
+    await user.click(confirmButton);
+    expect(onConfirmManual).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("checkbox", { name: "재발송을 확인했습니다" }));
+    expect(confirmButton).toBeEnabled();
   });
 });
