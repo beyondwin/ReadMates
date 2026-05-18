@@ -6,18 +6,32 @@ base_ref="${READMATES_PRE_PUSH_BASE:-origin/main}"
 mode="standard"
 release_mode="auto"
 dry_run="${READMATES_PRE_PUSH_DRY_RUN:-false}"
+changelog_check="auto"
+changelog_file="${READMATES_PRE_PUSH_CHANGELOG:-CHANGELOG.md}"
+# READMATES_PRE_PUSH_RELEASE=true forces release mode without requiring --release.
+if [[ "${READMATES_PRE_PUSH_RELEASE:-false}" == "true" ]]; then
+  release_mode="always"
+fi
 
 usage() {
   cat <<'USAGE'
-Usage: ./scripts/pre-push-check.sh [--full] [--release|--no-release] [--dry-run]
+Usage: ./scripts/pre-push-check.sh [--full] [--release|--no-release] [--dry-run] [--no-changelog-check]
 
 Runs the CI gates that most often fail after pushing.
 
 Options:
-  --full        Also run backend integration tests and Playwright E2E.
-  --release     Always build and scan the public release candidate.
-  --no-release  Skip the public release candidate check.
-  --dry-run     Print commands without executing them.
+  --full                Also run backend integration tests and Playwright E2E.
+  --release             Always build and scan the public release candidate.
+  --no-release          Skip the public release candidate check.
+  --dry-run             Print commands without executing them.
+  --no-changelog-check  Skip the CHANGELOG Unreleased guard during release runs
+                        (emergency override; record reason in the bypass ledger).
+
+Release flag detection:
+  Set --release on the CLI or export READMATES_PRE_PUSH_RELEASE=true to force
+  release mode. The CHANGELOG Unreleased guard runs when release mode is active.
+  Override the inspected file with READMATES_PRE_PUSH_CHANGELOG (default:
+  CHANGELOG.md, resolved relative to the repo root).
 USAGE
 }
 
@@ -34,6 +48,9 @@ while (($# > 0)); do
       ;;
     --dry-run)
       dry_run="true"
+      ;;
+    --no-changelog-check)
+      changelog_check="never"
       ;;
     -h|--help)
       usage
@@ -93,6 +110,73 @@ check_whitespace() {
   git diff --cached --check -- "${pathspecs[@]}"
 }
 
+extract_unreleased_section() {
+  local path="$1"
+  awk '
+    /^## [Uu]nreleased[[:space:]]*$/ { capture=1; next }
+    capture && /^## / { exit }
+    capture { print }
+  ' "$path"
+}
+
+check_changelog_unreleased_guard() {
+  # The guard fails the push when the Unreleased section contains accumulated
+  # change entries that should have been promoted into a version section before
+  # tagging a release. The project convention keeps a single `### Highlights`
+  # subsection holding one meta-placeholder bullet (e.g. "다음 릴리즈 후보
+  # 변경을 이 섹션에 기록합니다."). Concrete category headers
+  # (### Added, ### Changed, ### Fixed, ### Engineering, ### Deployment Notes,
+  # ### Verification) and any bullet that looks like real content (markdown
+  # bold **, more than one bullet total, or any bullet under a forbidden
+  # category) indicate the section was not cleaned up before the tag.
+  local path="$changelog_file"
+  if [[ ! "$path" = /* ]]; then
+    path="$repo_root/$path"
+  fi
+
+  if [[ ! -f "$path" ]]; then
+    printf 'CHANGELOG guard: file not found at %s\n' "$path" >&2
+    return 1
+  fi
+
+  local section
+  section="$(extract_unreleased_section "$path")"
+
+  if [[ -z "$section" ]]; then
+    printf 'CHANGELOG guard: no "## Unreleased" section found in %s\n' "$path" >&2
+    return 1
+  fi
+
+  # Reject forbidden concrete-change category headers outright.
+  if printf '%s\n' "$section" | grep -Eq '^###[[:space:]]+(Added|Changed|Fixed|Engineering|Engineering Proof Portfolio|Deployment Notes|Verification|Removed|Security)[[:space:]]*$'; then
+    printf 'CHANGELOG Unreleased section is not empty. Move content into the version section before tagging.\n' >&2
+    printf 'Detected forbidden category header(s) under ## Unreleased in %s\n' "$path" >&2
+    return 1
+  fi
+
+  # Count real-looking bullets. Allow at most one placeholder bullet across the
+  # whole Unreleased section. Reject any bullet that looks like a real entry
+  # (markdown bold marker or backticks-with-content suggest a feature line).
+  local bullets bullet_count bold_count
+  bullets="$(printf '%s\n' "$section" | grep -E '^[[:space:]]*[-*][[:space:]]+' || true)"
+  bullet_count=$(printf '%s' "$bullets" | grep -cE '^[[:space:]]*[-*][[:space:]]+' || true)
+  bold_count=$(printf '%s' "$bullets" | grep -cE '\*\*' || true)
+
+  if (( bullet_count > 1 )); then
+    printf 'CHANGELOG Unreleased section is not empty. Move content into the version section before tagging.\n' >&2
+    printf 'Detected %d bullets under ## Unreleased; placeholder convention permits at most one.\n' "$bullet_count" >&2
+    return 1
+  fi
+
+  if (( bold_count > 0 )); then
+    printf 'CHANGELOG Unreleased section is not empty. Move content into the version section before tagging.\n' >&2
+    printf 'Detected feature-style bold marker (**) under ## Unreleased; that pattern is reserved for real release entries.\n' >&2
+    return 1
+  fi
+
+  return 0
+}
+
 should_run_public_release_check() {
   case "$release_mode" in
     always) return 0 ;;
@@ -101,6 +185,16 @@ should_run_public_release_check() {
 
   changed_paths | sort -u | grep -Eq '^(\.github/|deploy/|docs/|scripts/|AGENTS\.md|README\.md|\.env\.example|\.gitleaks\.toml)'
 }
+
+if [[ "$release_mode" == "always" && "$changelog_check" != "never" ]]; then
+  printf '\n==> CHANGELOG Unreleased guard\n'
+  printf '+ check_changelog_unreleased_guard\n'
+  # Guard runs in dry-run too — it is a fast local-file check.
+  check_changelog_unreleased_guard
+elif [[ "$release_mode" == "always" && "$changelog_check" == "never" ]]; then
+  printf '\n==> CHANGELOG Unreleased guard skipped (--no-changelog-check)\n'
+  printf 'Emergency override active. Record reason in the branch protection bypass ledger.\n'
+fi
 
 run_step "Git whitespace check" check_whitespace
 run_step "Frontend lint" pnpm --dir front lint
