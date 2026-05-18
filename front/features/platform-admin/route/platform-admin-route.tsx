@@ -1,39 +1,37 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useLoaderData } from "react-router-dom";
 import type { PlatformAdminRouteData } from "@/features/platform-admin/route/platform-admin-data";
 import { PlatformAdminDashboard } from "@/features/platform-admin/ui/platform-admin-dashboard";
-import {
-  checkPlatformAdminDomainProvisioning,
-  commitPlatformAdminOnboarding,
-  createSupportAccessGrant,
-  listSupportAccessGrantsByClub,
-  previewPlatformAdminOnboarding,
-  revokeSupportAccessGrant,
-  updatePlatformAdminClub,
-} from "@/features/platform-admin/api/platform-admin-api";
-import type {
-  CreateSupportAccessGrantRequest,
-  PlatformAdminClubListResponse,
-  PlatformAdminDomainResponse,
-  PlatformAdminSummaryResponse,
-  SupportAccessGrantResponse,
-} from "@/features/platform-admin/api/platform-admin-contracts";
+import { previewPlatformAdminOnboarding } from "@/features/platform-admin/api/platform-admin-api";
+import type { CreateSupportAccessGrantRequest } from "@/features/platform-admin/api/platform-admin-contracts";
 import {
   buildPlatformAdminWorkbench,
   type PlatformAdminWorkbenchInput,
 } from "@/features/platform-admin/model/platform-admin-workbench-model";
+import {
+  platformAdminClubsQuery,
+  platformAdminSummaryQuery,
+  platformAdminSupportGrantsQuery,
+  useCheckPlatformAdminDomainProvisioningMutation,
+  useCommitPlatformAdminOnboardingMutation,
+  useCreateSupportAccessGrantMutation,
+  useRevokeSupportAccessGrantMutation,
+  useUpdatePlatformAdminClubMutation,
+} from "@/features/platform-admin/queries/platform-admin-queries";
 import type { CreateSupportAccessGrantFields } from "@/features/platform-admin/ui/support-access-grants-panel";
 
 export function PlatformAdminRoute() {
   const data = useLoaderData() as PlatformAdminRouteData;
-  const [summary, setSummary] = useState(data.summary);
-  const [clubs, setClubs] = useState(data.clubs);
   const [checkingDomainIds, setCheckingDomainIds] = useState<ReadonlySet<string>>(new Set());
   const [checkErrorByDomainId, setCheckErrorByDomainId] = useState<Record<string, string>>({});
-  const [activeGrants, setActiveGrants] = useState<SupportAccessGrantResponse[]>([]);
   const [selectedClubId, setSelectedClubId] = useState<string | null>(null);
-  const [supportGrantLoadError, setSupportGrantLoadError] = useState<string | null>(null);
-  const [loadingSupportGrants, setLoadingSupportGrants] = useState(false);
+  const [supportGrantMutationError, setSupportGrantMutationError] = useState<string | null>(null);
+
+  const summaryQuery = useQuery(platformAdminSummaryQuery());
+  const clubsQuery = useQuery(platformAdminClubsQuery());
+  const summary = summaryQuery.data ?? data.summary;
+  const clubs = clubsQuery.data ?? data.clubs;
 
   const workbench = useMemo(() => {
     const input: PlatformAdminWorkbenchInput = {
@@ -48,39 +46,13 @@ export function PlatformAdminRoute() {
   }, [clubs.items, selectedClubId, summary]);
 
   const effectiveSelectedClubId = workbench.selectedClub?.clubId ?? null;
+  const supportGrantsQuery = useQuery(platformAdminSupportGrantsQuery(effectiveSelectedClubId));
 
-  useEffect(() => {
-    const clubId = effectiveSelectedClubId;
-    if (!clubId) {
-      return;
-    }
-
-    let cancelled = false;
-    const run = async () => {
-      setLoadingSupportGrants(true);
-      setSupportGrantLoadError(null);
-      try {
-        const grants = await listSupportAccessGrantsByClub(clubId);
-        if (!cancelled) {
-          setActiveGrants(grants);
-        }
-      } catch {
-        if (!cancelled) {
-          setActiveGrants([]);
-          setSupportGrantLoadError("지원 접근 권한을 불러오지 못했습니다.");
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingSupportGrants(false);
-        }
-      }
-    };
-    void run();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [effectiveSelectedClubId]);
+  const domainCheckMutation = useCheckPlatformAdminDomainProvisioningMutation();
+  const onboardingMutation = useCommitPlatformAdminOnboardingMutation();
+  const updateClubMutation = useUpdatePlatformAdminClubMutation();
+  const createGrantMutation = useCreateSupportAccessGrantMutation(effectiveSelectedClubId);
+  const revokeGrantMutation = useRevokeSupportAccessGrantMutation(effectiveSelectedClubId);
 
   async function handleCreateGrant(fields: CreateSupportAccessGrantFields) {
     const clubId = workbench.selectedClub?.clubId;
@@ -94,28 +66,40 @@ export function PlatformAdminRoute() {
       reason: fields.reason,
       expiresAt: fields.expiresAt,
     };
-    const grant = await createSupportAccessGrant(request);
-    setActiveGrants((current) => [grant, ...current]);
+    setSupportGrantMutationError(null);
+    try {
+      await createGrantMutation.mutateAsync(request);
+    } catch (error) {
+      setSupportGrantMutationError("지원 접근 권한을 만들지 못했습니다.");
+      throw error;
+    }
   }
 
   async function handleRevokeGrant(grantId: string) {
-    await revokeSupportAccessGrant(grantId);
-    setActiveGrants((current) => current.filter((g) => g.id !== grantId));
+    setSupportGrantMutationError(null);
+    try {
+      await revokeGrantMutation.mutateAsync(grantId);
+    } catch (error) {
+      setSupportGrantMutationError("지원 접근 권한을 회수하지 못했습니다.");
+      throw error;
+    }
   }
 
   return (
     <PlatformAdminDashboard
       workbench={workbench}
       selectedClubId={effectiveSelectedClubId}
-      onSelectClub={setSelectedClubId}
+      onSelectClub={(clubId) => {
+        setSupportGrantMutationError(null);
+        setSelectedClubId(clubId);
+      }}
       checkingDomainIds={checkingDomainIds}
       domainCheckErrors={checkErrorByDomainId}
       onCheckDomain={async (domainId) => {
         setCheckingDomainIds((current) => withSetValue(current, domainId));
         setCheckErrorByDomainId((current) => withoutKey(current, domainId));
         try {
-          const checkedDomain = await checkPlatformAdminDomainProvisioning(domainId);
-          setSummary((current) => summaryWithUpdatedDomain(current, checkedDomain));
+          await domainCheckMutation.mutateAsync(domainId);
         } catch {
           setCheckErrorByDomainId((current) => ({
             ...current,
@@ -127,118 +111,26 @@ export function PlatformAdminRoute() {
       }}
       onPreviewOnboarding={previewPlatformAdminOnboarding}
       onCommitOnboarding={async (request) => {
-        const result = await commitPlatformAdminOnboarding(request);
-        setClubs((current) => prependOrReplaceClub(current, result.club));
+        const result = await onboardingMutation.mutateAsync(request);
         setSelectedClubId(result.club.clubId);
-        if (result.domain) {
-          const domain = result.domain;
-          setSummary((current) => {
-            const alreadyTracked =
-              current.domains?.some((candidate) => candidate.id === domain.id) ?? false;
-            return {
-              ...current,
-              domains: prependOrReplaceDomain(current.domains, domain),
-              domainsRequiringAction:
-                domain.status === "ACTION_REQUIRED"
-                  ? prependOrReplaceDomain(current.domainsRequiringAction, domain)
-                  : current.domainsRequiringAction,
-              domainActionRequiredCount:
-                domain.status === "ACTION_REQUIRED" && !alreadyTracked
-                  ? current.domainActionRequiredCount + 1
-                  : current.domainActionRequiredCount,
-            };
-          });
-        }
         return result;
       }}
-      onUpdateClub={async (clubId, request) => {
-        const updated = await updatePlatformAdminClub(clubId, request);
-        setClubs((current) => replaceClub(current, updated));
-        return updated;
-      }}
+      onUpdateClub={async (clubId, request) => updateClubMutation.mutateAsync({ clubId, request })}
       onSetVisibility={async (publicVisibility) => {
         const clubId = workbench.selectedClub?.clubId;
         if (!clubId) return;
-        const updated = await updatePlatformAdminClub(clubId, { publicVisibility });
-        setClubs((current) => replaceClub(current, updated));
+        await updateClubMutation.mutateAsync({ clubId, request: { publicVisibility } });
       }}
-      activeGrants={activeGrants}
-      loadingSupportGrants={loadingSupportGrants}
-      supportGrantLoadError={supportGrantLoadError}
+      activeGrants={supportGrantsQuery.data ?? []}
+      loadingSupportGrants={supportGrantsQuery.isFetching}
+      supportGrantLoadError={
+        supportGrantMutationError ??
+        (supportGrantsQuery.isError ? "지원 접근 권한을 불러오지 못했습니다." : null)
+      }
       onCreateGrant={handleCreateGrant}
       onRevokeGrant={handleRevokeGrant}
     />
   );
-}
-
-function prependOrReplaceClub(
-  clubs: PlatformAdminClubListResponse,
-  club: PlatformAdminClubListResponse["items"][number],
-): PlatformAdminClubListResponse {
-  if (clubs.items.some((candidate) => candidate.clubId === club.clubId)) {
-    return replaceClub(clubs, club);
-  }
-  return { items: [club, ...clubs.items] };
-}
-
-function replaceClub(
-  clubs: PlatformAdminClubListResponse,
-  club: PlatformAdminClubListResponse["items"][number],
-): PlatformAdminClubListResponse {
-  return {
-    items: clubs.items.map((candidate) => (candidate.clubId === club.clubId ? club : candidate)),
-  };
-}
-
-function summaryWithUpdatedDomain(
-  summary: PlatformAdminSummaryResponse,
-  domain: PlatformAdminDomainResponse,
-): PlatformAdminSummaryResponse {
-  return {
-    ...summary,
-    domainActionRequiredCount: recomputeActionRequiredCount(summary, domain),
-    domains: replaceDomain(summary.domains ?? summary.domainsRequiringAction ?? [], domain),
-    domainsRequiringAction: replaceDomain(summary.domainsRequiringAction ?? [], domain)
-      .filter((candidate) => candidate.status === "ACTION_REQUIRED"),
-  };
-}
-
-function replaceDomain(domains: PlatformAdminDomainResponse[], domain: PlatformAdminDomainResponse) {
-  if (!domains.some((candidate) => candidate.id === domain.id)) {
-    return [domain, ...domains];
-  }
-
-  return domains.map((candidate) => (candidate.id === domain.id ? domain : candidate));
-}
-
-function recomputeActionRequiredCount(
-  summary: PlatformAdminSummaryResponse,
-  domain: PlatformAdminDomainResponse,
-) {
-  const currentDomain = (summary.domains ?? summary.domainsRequiringAction ?? [])
-    .find((candidate) => candidate.id === domain.id);
-  if (!currentDomain) {
-    return summary.domainActionRequiredCount;
-  }
-
-  if (currentDomain.status === "ACTION_REQUIRED" && domain.status !== "ACTION_REQUIRED") {
-    return Math.max(0, summary.domainActionRequiredCount - 1);
-  }
-  if (currentDomain.status !== "ACTION_REQUIRED" && domain.status === "ACTION_REQUIRED") {
-    return summary.domainActionRequiredCount + 1;
-  }
-  return summary.domainActionRequiredCount;
-}
-
-function prependOrReplaceDomain(
-  domains: PlatformAdminDomainResponse[] | undefined,
-  domain: PlatformAdminDomainResponse,
-): PlatformAdminDomainResponse[] {
-  const current = domains ?? [];
-  if (current.some((candidate) => candidate.id === domain.id)) {
-    return current.map((candidate) => (candidate.id === domain.id ? domain : candidate));
-  }
-  return [domain, ...current];
 }
 
 function withoutKey(record: Record<string, string>, key: string) {

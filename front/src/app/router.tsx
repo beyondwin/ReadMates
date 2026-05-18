@@ -9,7 +9,7 @@ import { createReadmatesQueryClient } from "@/src/app/query-client";
 export function buildRoutes(queryClient: QueryClient): RouteObject[] {
   return [
     publicRoutes(),
-    ...authRoutes(),
+    ...authRoutes(queryClient),
     ...memberRoutes(queryClient),
     ...hostRoutes(queryClient),
   ];

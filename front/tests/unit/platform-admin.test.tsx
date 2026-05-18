@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -5,10 +6,11 @@ import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router-d
 import { PlatformAdminDashboard } from "@/features/platform-admin/ui/platform-admin-dashboard";
 import { PlatformAdminOnboardingWizard } from "@/features/platform-admin/ui/platform-admin-onboarding-wizard";
 import { platformAdminLoader } from "@/features/platform-admin/route/platform-admin-data";
+import { platformAdminKeys } from "@/features/platform-admin/queries/platform-admin-queries";
 import { AuthContext, type AuthState } from "@/src/app/auth-state";
 import { AuthProvider } from "@/src/app/auth-context";
 import { RequirePlatformAdmin } from "@/src/app/route-guards";
-import { routes } from "@/src/app/router";
+import { buildRoutes, routes, routesQueryClient } from "@/src/app/router";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 
 const baseAuth: AuthMeResponse = {
@@ -54,8 +56,28 @@ function renderWithAuth(auth: AuthMeResponse) {
 
 afterEach(() => {
   cleanup();
+  routesQueryClient.clear();
   vi.unstubAllGlobals();
 });
+
+function renderAdminRouter(router: ReturnType<typeof createMemoryRouter>, queryClient = routesQueryClient) {
+  render(
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
+    </QueryClientProvider>,
+  );
+}
+
+function createRouteTestQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+}
 
 function installRouterRequestShim() {
   const NativeRequest = globalThis.Request;
@@ -363,11 +385,7 @@ describe("platform admin frontend shell", () => {
     const router = createMemoryRouter(routes, { initialEntries: ["/admin"] });
     const user = userEvent.setup();
 
-    render(
-      <AuthProvider>
-        <RouterProvider router={router} />
-      </AuthProvider>,
-    );
+    renderAdminRouter(router);
 
     await user.click(await screen.findByRole("button", { name: /상태 확인/ }));
 
@@ -566,11 +584,7 @@ describe("platform admin frontend shell", () => {
     const router = createMemoryRouter(routes, { initialEntries: ["/admin"] });
     const user = userEvent.setup();
 
-    render(
-      <AuthProvider>
-        <RouterProvider router={router} />
-      </AuthProvider>,
-    );
+    renderAdminRouter(router);
 
     await user.click(await screen.findByRole("button", { name: /둘째 클럽/ }));
 
@@ -623,14 +637,88 @@ describe("platform admin frontend shell", () => {
     installRouterRequestShim();
     const router = createMemoryRouter(routes, { initialEntries: ["/admin"] });
 
-    render(
-      <AuthProvider>
-        <RouterProvider router={router} />
-      </AuthProvider>,
-    );
+    renderAdminRouter(router);
 
     expect(await screen.findByRole("heading", { name: "플랫폼 관리" })).toBeInTheDocument();
     expect(screen.getByText("OWNER")).toBeInTheDocument();
+  });
+
+  it("seeds platform admin query cache from the app route loader", async () => {
+    const ownerAuth: AuthMeResponse = {
+      ...baseAuth,
+      platformAdmin: {
+        userId: "user-1",
+        email: "owner@example.com",
+        role: "OWNER",
+      },
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(new Response(JSON.stringify(ownerAuth), { status: 200 }));
+      }
+
+      if (url === "/api/bff/api/admin/summary") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              platformRole: "OWNER",
+              activeClubCount: 1,
+              domainActionRequiredCount: 0,
+              domains: [],
+              domainsRequiringAction: [],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+
+      if (url === "/api/bff/api/admin/clubs") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              items: [
+                {
+                  clubId: "club-1",
+                  slug: "reading-sai",
+                  name: "읽는사이",
+                  tagline: "함께 읽는 모임",
+                  about: "공개 소개",
+                  status: "ACTIVE",
+                  publicVisibility: "PUBLIC",
+                  domainCount: 0,
+                  domainActionRequiredCount: 0,
+                  firstHostOnboardingState: "ASSIGNED",
+                },
+              ],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+
+      if (url === "/api/bff/api/admin/support-access-grants?clubId=club-1") {
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      }
+
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
+    const queryClient = createRouteTestQueryClient();
+    const router = createMemoryRouter(buildRoutes(queryClient), { initialEntries: ["/admin"] });
+
+    renderAdminRouter(router, queryClient);
+
+    expect(await screen.findByRole("heading", { name: "플랫폼 관리" })).toBeInTheDocument();
+    expect(queryClient.getQueryData(platformAdminKeys.summary())).toMatchObject({
+      platformRole: "OWNER",
+      activeClubCount: 1,
+    });
+    expect(queryClient.getQueryData(platformAdminKeys.clubs())).toMatchObject({
+      items: [{ slug: "reading-sai" }],
+    });
   });
 
   it("selects the created club and shows returned domain after onboarding commit", async () => {
@@ -706,6 +794,44 @@ describe("platform admin frontend shell", () => {
         role: "OWNER",
       },
     };
+    const newClub = {
+      clubId: "club-new",
+      slug: "new-club",
+      name: "새 클럽",
+      tagline: "새 클럽 tagline",
+      about: "새 클럽 소개",
+      status: "SETUP_REQUIRED",
+      publicVisibility: "PRIVATE",
+      domainCount: 1,
+      domainActionRequiredCount: 1,
+      firstHostOnboardingState: "INVITED",
+    };
+    const newDomain = {
+      id: "domain-new",
+      clubId: "club-new",
+      hostname: "new-club.example.com",
+      kind: "SUBDOMAIN",
+      status: "ACTION_REQUIRED",
+      desiredState: "ENABLED",
+      manualAction: "CLOUDFLARE_PAGES_CUSTOM_DOMAIN",
+      errorCode: null,
+      isPrimary: false,
+      verifiedAt: null,
+      lastCheckedAt: null,
+    };
+    const onboardingResult = {
+      club: newClub,
+      hostOnboarding: {
+        kind: "INVITATION_CREATED",
+        email: "host@example.com",
+        userId: null,
+        invitationId: "invite-1",
+        acceptUrl: "https://readmates.example/invite/example",
+        emailDelivery: { status: "SENT" },
+      },
+      domain: newDomain,
+    };
+    let onboardingCommitted = false;
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = input.toString();
 
@@ -716,13 +842,23 @@ describe("platform admin frontend shell", () => {
       if (url === "/api/bff/api/admin/summary") {
         return Promise.resolve(
           new Response(
-            JSON.stringify({
-              platformRole: "OWNER",
-              activeClubCount: 0,
-              domainActionRequiredCount: 0,
-              domains: [],
-              domainsRequiringAction: [],
-            }),
+            JSON.stringify(
+              onboardingCommitted
+                ? {
+                    platformRole: "OWNER",
+                    activeClubCount: 1,
+                    domainActionRequiredCount: 1,
+                    domains: [newDomain],
+                    domainsRequiringAction: [newDomain],
+                  }
+                : {
+                    platformRole: "OWNER",
+                    activeClubCount: 0,
+                    domainActionRequiredCount: 0,
+                    domains: [],
+                    domainsRequiringAction: [],
+                  },
+            ),
             { status: 200, headers: { "Content-Type": "application/json" } },
           ),
         );
@@ -731,7 +867,7 @@ describe("platform admin frontend shell", () => {
       if (url === "/api/bff/api/admin/clubs") {
         return Promise.resolve(
           new Response(
-            JSON.stringify({ items: [] }),
+            JSON.stringify({ items: onboardingCommitted ? [newClub] : [] }),
             { status: 200, headers: { "Content-Type": "application/json" } },
           ),
         );
@@ -759,43 +895,10 @@ describe("platform admin frontend shell", () => {
 
       if (url === "/api/bff/api/admin/clubs/onboarding") {
         expect(init?.method).toBe("POST");
+        onboardingCommitted = true;
         return Promise.resolve(
           new Response(
-            JSON.stringify({
-              club: {
-                clubId: "club-new",
-                slug: "new-club",
-                name: "새 클럽",
-                tagline: "새 클럽 tagline",
-                about: "새 클럽 소개",
-                status: "SETUP_REQUIRED",
-                publicVisibility: "PRIVATE",
-                domainCount: 1,
-                domainActionRequiredCount: 1,
-                firstHostOnboardingState: "INVITED",
-              },
-              hostOnboarding: {
-                kind: "INVITATION_CREATED",
-                email: "host@example.com",
-                userId: null,
-                invitationId: "invite-1",
-                acceptUrl: "https://readmates.example/invite/example",
-                emailDelivery: { status: "SENT" },
-              },
-              domain: {
-                id: "domain-new",
-                clubId: "club-new",
-                hostname: "new-club.example.com",
-                kind: "SUBDOMAIN",
-                status: "ACTION_REQUIRED",
-                desiredState: "ENABLED",
-                manualAction: "CLOUDFLARE_PAGES_CUSTOM_DOMAIN",
-                errorCode: null,
-                isPrimary: false,
-                verifiedAt: null,
-                lastCheckedAt: null,
-              },
-            }),
+            JSON.stringify(onboardingResult),
             { status: 200, headers: { "Content-Type": "application/json" } },
           ),
         );
@@ -812,11 +915,7 @@ describe("platform admin frontend shell", () => {
     const router = createMemoryRouter(routes, { initialEntries: ["/admin"] });
     const user = userEvent.setup();
 
-    render(
-      <AuthProvider>
-        <RouterProvider router={router} />
-      </AuthProvider>,
-    );
+    renderAdminRouter(router);
 
     await user.click(await screen.findByRole("button", { name: "새 클럽" }));
     await user.type(screen.getByLabelText("클럽 이름"), "새 클럽");
