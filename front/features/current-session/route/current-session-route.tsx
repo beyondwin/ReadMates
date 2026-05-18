@@ -1,20 +1,22 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useLoaderData, useParams } from "react-router-dom";
-import { saveCheckin } from "@/features/current-session/actions/save-checkin";
-import { saveQuestions } from "@/features/current-session/actions/save-question";
-import { saveLongReview, saveOneLineReview } from "@/features/current-session/actions/save-review";
-import { updateRsvp } from "@/features/current-session/actions/update-rsvp";
+import {
+  currentSessionQuery,
+  useSaveCurrentSessionCheckinMutation,
+  useSaveCurrentSessionLongReviewMutation,
+  useSaveCurrentSessionOneLineReviewMutation,
+  useSaveCurrentSessionQuestionsMutation,
+  useUpdateCurrentSessionRsvpMutation,
+} from "@/features/current-session/queries/current-session-queries";
+import type { CurrentSessionRouteData } from "@/features/current-session/route/current-session-data";
 import { CurrentSessionPage, type CurrentSessionSaveActions } from "@/features/current-session/ui/current-session-page";
 import type { CurrentSessionInternalLinkProps, InternalLinkComponent } from "@/features/current-session/ui/current-session-types";
-import { loadCurrentSessionRouteData, type CurrentSessionRouteData } from "@/features/current-session/route/current-session-data";
+import type { ReadmatesApiContext } from "@/shared/api/client";
 import { RouteErrorBoundary } from "@/shared/ui/route-error";
 
-const READMATES_ROUTE_REFRESH_EVENT = "readmates:route-refresh";
-
-function requestCurrentSessionRouteRefresh() {
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event(READMATES_ROUTE_REFRESH_EVENT));
-  }
+function contextFromClubSlug(clubSlug?: string): ReadmatesApiContext | undefined {
+  return clubSlug ? { clubSlug } : undefined;
 }
 
 function AnchorInternalLink({ href, children, ...props }: CurrentSessionInternalLinkProps) {
@@ -25,22 +27,6 @@ function AnchorInternalLink({ href, children, ...props }: CurrentSessionInternal
   );
 }
 
-async function requireSuccessfulSave(responsePromise: Promise<Response>, message: string) {
-  const response = await responsePromise;
-
-  if (!response.ok) {
-    throw new Error(message);
-  }
-}
-
-const currentSessionSaveActions = {
-  updateRsvp: (status) => requireSuccessfulSave(updateRsvp(status), "RSVP update failed"),
-  saveCheckin: (readingProgress) => requireSuccessfulSave(saveCheckin(readingProgress), "Checkin save failed"),
-  saveQuestions: (questions) => requireSuccessfulSave(saveQuestions(questions), "Questions save failed"),
-  saveLongReview: (body) => requireSuccessfulSave(saveLongReview(body), "Long review save failed"),
-  saveOneLineReview: (text) => requireSuccessfulSave(saveOneLineReview(text), "One-line review save failed"),
-} satisfies CurrentSessionSaveActions;
-
 export function CurrentSessionRoute({
   internalLinkComponent = AnchorInternalLink,
 }: {
@@ -48,63 +34,37 @@ export function CurrentSessionRoute({
 }) {
   const loaderData = useLoaderData() as CurrentSessionRouteData;
   const params = useParams();
-  const clubSlug = params.clubSlug;
-  const [routeDataState, setRouteDataState] = useState(() => ({
-    loaderData,
-    routeData: loaderData,
-  }));
-  const refreshSequence = useRef(0);
+  const context = useMemo(() => contextFromClubSlug(params.clubSlug), [params.clubSlug]);
+  const currentQuery = useQuery(currentSessionQuery(context));
+  const updateRsvpMutation = useUpdateCurrentSessionRsvpMutation(context);
+  const saveCheckinMutation = useSaveCurrentSessionCheckinMutation(context);
+  const saveQuestionsMutation = useSaveCurrentSessionQuestionsMutation(context);
+  const saveLongReviewMutation = useSaveCurrentSessionLongReviewMutation(context);
+  const saveOneLineReviewMutation = useSaveCurrentSessionOneLineReviewMutation(context);
 
-  useLayoutEffect(() => {
-    const refresh = () => {
-      const requestSequence = refreshSequence.current + 1;
-      refreshSequence.current = requestSequence;
-
-      void loadCurrentSessionRouteData({ params: clubSlug ? { clubSlug } : {} })
-        .then((nextData) => {
-          if (refreshSequence.current === requestSequence) {
-            setRouteDataState((currentState) => {
-              if (currentState.loaderData !== loaderData) {
-                return currentState;
-              }
-
-              return { ...currentState, routeData: nextData };
-            });
-          }
-        })
-        .catch(() => {
-          // Keep showing the last successful loader data when a background refresh fails.
-        });
-    };
-
-    window.addEventListener(READMATES_ROUTE_REFRESH_EVENT, refresh);
-
-    return () => {
-      refreshSequence.current += 1;
-      window.removeEventListener(READMATES_ROUTE_REFRESH_EVENT, refresh);
-    };
-  }, [clubSlug, loaderData]);
-
-  if (routeDataState.loaderData !== loaderData) {
-    setRouteDataState({ loaderData, routeData: loaderData });
-    return (
-      <CurrentSessionPage
-        auth={loaderData.auth}
-        data={loaderData.current}
-        actions={currentSessionSaveActions}
-        internalLinkComponent={internalLinkComponent}
-        onSaveSuccess={requestCurrentSessionRouteRefresh}
-      />
-    );
-  }
+  const currentSessionSaveActions = useMemo<CurrentSessionSaveActions>(
+    () => ({
+      updateRsvp: (status) => updateRsvpMutation.mutateAsync(status),
+      saveCheckin: (readingProgress) => saveCheckinMutation.mutateAsync(readingProgress),
+      saveQuestions: (questions) => saveQuestionsMutation.mutateAsync(questions),
+      saveLongReview: (body) => saveLongReviewMutation.mutateAsync(body),
+      saveOneLineReview: (text) => saveOneLineReviewMutation.mutateAsync(text),
+    }),
+    [
+      saveCheckinMutation,
+      saveLongReviewMutation,
+      saveOneLineReviewMutation,
+      saveQuestionsMutation,
+      updateRsvpMutation,
+    ],
+  );
 
   return (
     <CurrentSessionPage
-      auth={routeDataState.routeData.auth}
-      data={routeDataState.routeData.current}
+      auth={loaderData.auth}
+      data={currentQuery.data ?? loaderData.current}
       actions={currentSessionSaveActions}
       internalLinkComponent={internalLinkComponent}
-      onSaveSuccess={requestCurrentSessionRouteRefresh}
     />
   );
 }

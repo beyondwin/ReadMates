@@ -1,26 +1,9 @@
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router-dom";
-import {
-  getCurrentSession,
-  saveCurrentSessionCheckin,
-  saveCurrentSessionLongReview,
-  saveCurrentSessionOneLineReview,
-  saveCurrentSessionQuestions,
-  updateCurrentSessionRsvp,
-} from "@/features/current-session/api/current-session-api";
-import type { RsvpStatus } from "@/features/current-session/api/current-session-contracts";
+import type { QueryClient } from "@tanstack/react-query";
+import type { LoaderFunctionArgs } from "react-router-dom";
+import { getCurrentSession } from "@/features/current-session/api/current-session-api";
+import { currentSessionQuery } from "@/features/current-session/queries/current-session-queries";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { clubSlugFromLoaderArgs, loadMemberAppAuth } from "@/shared/auth/member-app-loader";
-
-type CurrentSessionActionIntent = "rsvp" | "checkin" | "questions" | "longReview" | "oneLineReview";
-
-type CurrentSessionActionPayload = {
-  intent?: unknown;
-  status?: unknown;
-  readingProgress?: unknown;
-  questions?: unknown;
-  body?: unknown;
-  text?: unknown;
-};
 
 export type CurrentSessionRouteData = {
   auth: AuthMeResponse;
@@ -34,140 +17,27 @@ export async function loadCurrentSessionRouteData(args?: Pick<LoaderFunctionArgs
     return { auth, current: { currentSession: null } };
   }
 
-  const current = await getCurrentSession({ clubSlug: clubSlugFromLoaderArgs(args) });
+  const context = { clubSlug: clubSlugFromLoaderArgs(args) };
+  const current = await getCurrentSession(context);
 
   return { auth, current };
 }
 
-export async function currentSessionLoader(args?: LoaderFunctionArgs): Promise<CurrentSessionRouteData> {
-  return loadCurrentSessionRouteData(args);
-}
+export function currentSessionLoaderFactory(client: QueryClient) {
+  return async (args?: LoaderFunctionArgs): Promise<CurrentSessionRouteData> => {
+    const { auth, allowed } = await loadMemberAppAuth(args);
 
-function badRequest(message: string) {
-  return Response.json({ ok: false, message }, { status: 400 });
-}
-
-function mutationResponse(response: Response) {
-  if (!response.ok) {
-    return response;
-  }
-
-  return Response.json({ ok: true });
-}
-
-function isCurrentSessionActionIntent(intent: unknown): intent is CurrentSessionActionIntent {
-  return (
-    intent === "rsvp" ||
-    intent === "checkin" ||
-    intent === "questions" ||
-    intent === "longReview" ||
-    intent === "oneLineReview"
-  );
-}
-
-function isRsvpUpdateStatus(status: unknown): status is Exclude<RsvpStatus, "NO_RESPONSE"> {
-  return status === "GOING" || status === "MAYBE" || status === "DECLINED";
-}
-
-function stringValue(value: unknown) {
-  return typeof value === "string" ? value : "";
-}
-
-function numberValue(value: unknown) {
-  if (typeof value === "number") {
-    return value;
-  }
-
-  if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-
-  return null;
-}
-
-function questionPayload(value: unknown): Array<{ priority: number; text: string }> | null {
-  if (Array.isArray(value)) {
-    const questions = value
-      .filter((question): question is { text: unknown } => typeof question === "object" && question !== null && "text" in question)
-      .map((question, index) => ({
-        priority: typeof (question as { priority?: unknown }).priority === "number" ? (question as { priority: number }).priority : index + 1,
-        text: stringValue(question.text),
-      }));
-
-    return questions.length === value.length ? questions : null;
-  }
-
-  if (typeof value === "string") {
-    try {
-      return questionPayload(JSON.parse(value));
-    } catch {
-      return null;
+    if (!allowed) {
+      return { auth, current: { currentSession: null } };
     }
-  }
 
-  return null;
-}
+    const context = { clubSlug: clubSlugFromLoaderArgs(args) };
+    const current = await client.fetchQuery(currentSessionQuery(context));
 
-async function actionPayloadFromRequest(request: Request): Promise<CurrentSessionActionPayload> {
-  const contentType = request.headers.get("content-type") ?? "";
-
-  if (contentType.includes("application/json")) {
-    return (await request.json()) as CurrentSessionActionPayload;
-  }
-
-  const formData = await request.formData();
-  return {
-    intent: formData.get("intent"),
-    status: formData.get("status"),
-    readingProgress: formData.get("readingProgress"),
-    questions: formData.get("questions") ?? formData.getAll("question").map((question, index) => ({ priority: index + 1, text: question })),
-    body: formData.get("body"),
-    text: formData.get("text"),
+    return { auth, current };
   };
 }
 
-export async function currentSessionAction({ request }: ActionFunctionArgs) {
-  const payload = await actionPayloadFromRequest(request);
-
-  if (!isCurrentSessionActionIntent(payload.intent)) {
-    return badRequest("Unknown current session action.");
-  }
-
-  if (payload.intent === "rsvp") {
-    if (!isRsvpUpdateStatus(payload.status)) {
-      return badRequest("Invalid RSVP status.");
-    }
-
-    const response = await updateCurrentSessionRsvp(payload.status);
-    return mutationResponse(response);
-  }
-
-  if (payload.intent === "checkin") {
-    const readingProgress = numberValue(payload.readingProgress);
-    if (readingProgress === null) {
-      return badRequest("Invalid reading progress.");
-    }
-
-    const response = await saveCurrentSessionCheckin(readingProgress);
-    return mutationResponse(response);
-  }
-
-  if (payload.intent === "questions") {
-    const questions = questionPayload(payload.questions);
-    if (questions === null) {
-      return badRequest("Invalid questions payload.");
-    }
-
-    const response = await saveCurrentSessionQuestions(questions);
-    return mutationResponse(response);
-  }
-
-  if (payload.intent === "longReview") {
-    const response = await saveCurrentSessionLongReview(stringValue(payload.body));
-    return mutationResponse(response);
-  }
-
-  const response = await saveCurrentSessionOneLineReview(stringValue(payload.text));
-  return mutationResponse(response);
+export async function currentSessionLoader(args?: LoaderFunctionArgs): Promise<CurrentSessionRouteData> {
+  return loadCurrentSessionRouteData(args);
 }

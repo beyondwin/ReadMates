@@ -10,7 +10,7 @@ export function buildRoutes(queryClient: QueryClient): RouteObject[] {
   return [
     publicRoutes(),
     ...authRoutes(),
-    ...memberRoutes(),
+    ...memberRoutes(queryClient),
     ...hostRoutes(queryClient),
   ];
 }

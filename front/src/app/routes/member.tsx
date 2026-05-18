@@ -1,3 +1,4 @@
+import type { QueryClient } from "@tanstack/react-query";
 import type { RouteObject } from "react-router-dom";
 import type { InternalLinkComponent } from "@/features/current-session";
 import {
@@ -35,7 +36,7 @@ function memberHomeRoute(): RouteObject {
   };
 }
 
-function memberAppRoutes(options: { includeIndex?: boolean } = {}): RouteObject[] {
+function memberAppRoutes(queryClient: QueryClient, options: { includeIndex?: boolean } = {}): RouteObject[] {
   const { includeIndex = true } = options;
   return [
     ...(includeIndex ? [memberHomeRoute()] : []),
@@ -46,8 +47,7 @@ function memberAppRoutes(options: { includeIndex?: boolean } = {}): RouteObject[
         const {
           CurrentSessionRoute,
           CurrentSessionRouteError,
-          currentSessionAction,
-          currentSessionLoader,
+          currentSessionLoaderFactory,
         } = await import("@/features/current-session");
 
         function CurrentSessionRouteElement() {
@@ -57,8 +57,7 @@ function memberAppRoutes(options: { includeIndex?: boolean } = {}): RouteObject[
         return {
           Component: CurrentSessionRouteElement,
           ErrorBoundary: CurrentSessionRouteError,
-          action: currentSessionAction,
-          loader: currentSessionLoader,
+          loader: currentSessionLoaderFactory(queryClient),
         };
       },
     },
@@ -157,7 +156,7 @@ function memberAppRoutes(options: { includeIndex?: boolean } = {}): RouteObject[
   ];
 }
 
-export function memberRoutes(): RouteObject[] {
+export function memberRoutes(queryClient: QueryClient): RouteObject[] {
   return [
     {
       path: "/app",
@@ -191,7 +190,7 @@ export function memberRoutes(): RouteObject[] {
               <AppRouteLayout />
             </RequireMemberApp>
           ),
-          children: memberAppRoutes({ includeIndex: false }),
+          children: memberAppRoutes(queryClient, { includeIndex: false }),
         },
       ],
     },
@@ -206,7 +205,7 @@ export function memberRoutes(): RouteObject[] {
       loader: loadMemberAppAuth,
       errorElement: <RouteErrorBoundary variant="member" />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="멤버 공간을 불러오는 중" variant="member" />,
-      children: memberAppRoutes(),
+      children: memberAppRoutes(queryClient),
     },
   ];
 }

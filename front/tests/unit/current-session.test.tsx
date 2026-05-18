@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
@@ -12,7 +13,7 @@ import type {
   CurrentSessionInternalLinkProps,
   CurrentSessionPageData,
 } from "@/features/current-session/ui/current-session-types";
-import { CurrentSessionRoute, currentSessionLoader } from "@/features/current-session";
+import { CurrentSessionRoute, currentSessionLoader, currentSessionLoaderFactory } from "@/features/current-session";
 import type { CurrentSessionResponse } from "@/features/current-session/api/current-session-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { currentSessionContractFixture } from "./api-contract-fixtures";
@@ -91,14 +92,22 @@ function TestInternalLink({ href, children, ...props }: CurrentSessionInternalLi
   );
 }
 
-function CurrentSession({ auth, data }: { auth?: CurrentSessionAuth; data: CurrentSessionPageData }) {
+function CurrentSession({
+  auth,
+  data,
+  onSaveSuccess,
+}: {
+  auth?: CurrentSessionAuth;
+  data: CurrentSessionPageData;
+  onSaveSuccess?: () => void;
+}) {
   return (
     <CurrentSessionPage
       auth={auth}
       data={data}
       actions={currentSessionTestActions}
       internalLinkComponent={TestInternalLink}
-      onSaveSuccess={() => window.dispatchEvent(new Event("readmates:route-refresh"))}
+      onSaveSuccess={onSaveSuccess}
     />
   );
 }
@@ -148,6 +157,26 @@ function installRouterRequestShim() {
   );
 }
 
+function createCurrentSessionTestQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0, staleTime: 30_000 },
+      mutations: { retry: false },
+    },
+  });
+}
+
+function renderCurrentSessionRouter(
+  router: ReturnType<typeof createMemoryRouter>,
+  client = createCurrentSessionTestQueryClient(),
+) {
+  return render(
+    <QueryClientProvider client={client}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
+}
+
 describe("CurrentSession", () => {
   it("loads auth and current session data through the route loader", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
@@ -193,13 +222,13 @@ describe("CurrentSession", () => {
       { initialEntries: ["/"] },
     );
 
-    render(<RouterProvider router={router} />);
+    renderCurrentSessionRouter(router);
 
     expect((await screen.findAllByText("테스트 책")).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("button", { name: "참석" }).length).toBeGreaterThan(0);
   });
 
-  it("keeps current session content visible when a route refresh fails", async () => {
+  it("keeps current session content visible when a query refetch fails", async () => {
     installRouterRequestShim();
     let currentSessionRequests = 0;
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
@@ -222,12 +251,13 @@ describe("CurrentSession", () => {
       return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
     });
     vi.stubGlobal("fetch", fetchMock);
+    const client = createCurrentSessionTestQueryClient();
     const router = createMemoryRouter(
       [
         {
           path: "/",
           element: <CurrentSessionRoute />,
-          loader: currentSessionLoader,
+          loader: currentSessionLoaderFactory(client),
           errorElement: <div>route error</div>,
           hydrateFallbackElement: <div>세션을 불러오는 중</div>,
         },
@@ -235,21 +265,23 @@ describe("CurrentSession", () => {
       { initialEntries: ["/"] },
     );
 
-    render(<RouterProvider router={router} />);
+  renderCurrentSessionRouter(router, client);
 
-    expect((await screen.findAllByText("테스트 책")).length).toBeGreaterThan(0);
+  expect((await screen.findAllByText("테스트 책")).length).toBeGreaterThan(0);
+  const initialCurrentSessionRequestCount = currentSessionRequests;
+  expect(initialCurrentSessionRequestCount).toBeGreaterThan(0);
 
-    window.dispatchEvent(new Event("readmates:route-refresh"));
+  await client.invalidateQueries({ queryKey: ["current-session"] });
 
-    await waitFor(() => {
-      expect(currentSessionRequests).toBe(2);
-    });
+  await waitFor(() => {
+    expect(currentSessionRequests).toBe(initialCurrentSessionRequestCount + 1);
+  });
     expect(screen.queryByText("route error")).not.toBeInTheDocument();
     expect(screen.getAllByText("테스트 책").length).toBeGreaterThan(0);
     expect(screen.getAllByRole("button", { name: "참석" }).length).toBeGreaterThan(0);
   });
 
-  it("carries clubSlug through route refresh on a club-scoped path", async () => {
+  it("carries clubSlug through query refetch on a club-scoped path", async () => {
     installRouterRequestShim();
     const requestedUrls: string[] = [];
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
@@ -267,13 +299,14 @@ describe("CurrentSession", () => {
       return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
     });
     vi.stubGlobal("fetch", fetchMock);
+    const client = createCurrentSessionTestQueryClient();
 
     const router = createMemoryRouter(
       [
         {
           path: "/clubs/:clubSlug/app/session/current",
           element: <CurrentSessionRoute />,
-          loader: currentSessionLoader,
+          loader: currentSessionLoaderFactory(client),
           errorElement: <div>route error</div>,
           hydrateFallbackElement: <div>세션을 불러오는 중</div>,
         },
@@ -281,7 +314,7 @@ describe("CurrentSession", () => {
       { initialEntries: ["/clubs/reading-sai/app/session/current"] },
     );
 
-    render(<RouterProvider router={router} />);
+    renderCurrentSessionRouter(router, client);
 
     expect((await screen.findAllByText("테스트 책")).length).toBeGreaterThan(0);
 
@@ -294,9 +327,8 @@ describe("CurrentSession", () => {
       expect(url).toContain("clubSlug=reading-sai");
     }
 
-    // Save-triggered refresh must reuse the same slug.
     const initialSessionRequestCount = initialSessionRequests.length;
-    window.dispatchEvent(new Event("readmates:route-refresh"));
+    await client.invalidateQueries({ queryKey: ["current-session"] });
 
     await waitFor(() => {
       const sessionRequests = requestedUrls.filter((url) =>
@@ -305,19 +337,10 @@ describe("CurrentSession", () => {
       expect(sessionRequests.length).toBe(initialSessionRequestCount + 1);
     });
 
-    const sessionRequestsAfterRefresh = requestedUrls.filter((url) =>
+    const sessionRequestsAfterRefetch = requestedUrls.filter((url) =>
       url.startsWith("/api/bff/api/sessions/current"),
     );
-    for (const url of sessionRequestsAfterRefresh) {
-      expect(url).toContain("clubSlug=reading-sai");
-    }
-
-    // Auth refresh during route refresh must also carry the slug.
-    const authRequests = requestedUrls.filter((url) =>
-      url.startsWith("/api/bff/api/auth/me"),
-    );
-    expect(authRequests.length).toBeGreaterThan(1);
-    for (const url of authRequests) {
+    for (const url of sessionRequestsAfterRefetch) {
       expect(url).toContain("clubSlug=reading-sai");
     }
   });
@@ -782,20 +805,18 @@ describe("CurrentSession", () => {
     expect(screen.getByText("아직 공유된 기록이 없습니다.")).toBeInTheDocument();
   });
 
-  it("does not request a route refresh for pure shared board tab changes", async () => {
+  it("does not call save success for pure shared board tab changes", async () => {
     const user = userEvent.setup();
-    const refreshMock = vi.fn();
-    window.addEventListener("readmates:route-refresh", refreshMock);
+    const onSaveSuccess = vi.fn();
 
-    const { container } = render(<CurrentSession data={currentSessionData} />);
+    const { container } = render(<CurrentSession data={currentSessionData} onSaveSuccess={onSaveSuccess} />);
     const desktopScope = within(getDesktop(container));
     const mobileScope = within(await screen.findByTestId("current-session-mobile"));
 
     await user.click(desktopScope.getByRole("button", { name: /서평 · 1/ }));
     await user.click(mobileScope.getByRole("button", { name: "공동 보드" }));
 
-    expect(refreshMock).not.toHaveBeenCalled();
-    window.removeEventListener("readmates:route-refresh", refreshMock);
+    expect(onSaveSuccess).not.toHaveBeenCalled();
   });
 
   it("provides distinct accessible names for personal prep controls", () => {
@@ -1015,11 +1036,10 @@ describe("CurrentSession", () => {
   it("restores the previous RSVP state when saving RSVP fails", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn().mockResolvedValue({ ok: false });
-    const refreshMock = vi.fn();
+    const onSaveSuccess = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    window.addEventListener("readmates:route-refresh", refreshMock);
 
-    const { container } = render(<CurrentSession data={currentSessionData} />);
+    const { container } = render(<CurrentSession data={currentSessionData} onSaveSuccess={onSaveSuccess} />);
     const desktopScope = within(getDesktop(container));
 
     expect(desktopScope.getByText("현재 상태: 미응답")).toBeInTheDocument();
@@ -1035,18 +1055,16 @@ describe("CurrentSession", () => {
         method: "PATCH",
       }),
     );
-    expect(refreshMock).not.toHaveBeenCalled();
-    window.removeEventListener("readmates:route-refresh", refreshMock);
+    expect(onSaveSuccess).not.toHaveBeenCalled();
   });
 
-  it("refreshes the shared board data after saving prep items", async () => {
+  it("calls save success after saving prep items", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
-    const refreshMock = vi.fn();
+    const onSaveSuccess = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    window.addEventListener("readmates:route-refresh", refreshMock);
 
-    const { container } = render(<CurrentSession data={currentSessionData} />);
+    const { container } = render(<CurrentSession data={currentSessionData} onSaveSuccess={onSaveSuccess} />);
     const desktopScope = within(getDesktop(container));
 
     await user.click(desktopScope.getByRole("button", { name: "진행률 저장" }));
@@ -1055,7 +1073,6 @@ describe("CurrentSession", () => {
     await user.click(desktopScope.getByRole("button", { name: "질문 저장" }));
     await desktopScope.findByText("질문 저장됨");
 
-    expect(refreshMock).toHaveBeenCalledTimes(2);
-    window.removeEventListener("readmates:route-refresh", refreshMock);
+    expect(onSaveSuccess).toHaveBeenCalledTimes(2);
   });
 });
