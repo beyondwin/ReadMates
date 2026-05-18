@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { useInRouterContext, useLocation } from "react-router-dom";
 import type {
   HostDashboardResponse,
@@ -116,13 +116,15 @@ export default function HostDashboard({
     items: HostSessionListItem[];
     nextCursor: string | null;
   }>(null);
-  // Spec: appended page buffer is cleared when the base list invalidates and refetches,
-  // so a mutation-driven refetch does not leave stale appended rows. Render-time fallback
-  // on `appendedHostSessions?.base === hostSessions` covers the same frame; this effect
-  // also drops the in-memory state so it does not survive across renders.
-  useEffect(() => {
-    setAppendedHostSessions((current) => (current && current.base !== hostSessions ? null : current));
-  }, [hostSessions]);
+  // Spec contract: appended page buffer must not survive a mutation-driven refetch of
+  // the base list. The render-time `appendedHostSessions?.base === hostSessions`
+  // reference check below is the enforcement point — TanStack Query returns a fresh
+  // `data` reference whenever the underlying list changes (structuralSharing keeps the
+  // reference stable only when the deep contents are identical, which is what we want
+  // for a noop refetch). load-more's own setter also re-anchors `.base = hostSessions`
+  // so the buffer's items are dropped on the first render after the prop reference
+  // advances. Regression covered in host-dashboard.test.tsx ("drops the appended host
+  // sessions buffer when the base list reference advances").
   const [hostSessionVisibilityOverrides, setHostSessionVisibilityOverrides] = useState<Record<string, SessionRecordVisibility>>({});
   const [locallyOpenedSessionId, setLocallyOpenedSessionId] = useState<string | null>(null);
   const [pendingUpcomingAction, setPendingUpcomingAction] = useState<string | null>(null);
