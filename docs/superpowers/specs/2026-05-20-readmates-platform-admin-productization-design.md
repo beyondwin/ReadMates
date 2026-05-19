@@ -1,6 +1,7 @@
 # ReadMates Platform Admin Productization Design
 
 작성일: 2026-05-20
+최종 검토: 2026-05-20 (source re-audit)
 상태: APPROVED DESIGN SPEC
 
 ## 배경
@@ -166,6 +167,15 @@ Support access는 선택 club 기준으로만 동작한다.
 - expiresAt must not exceed the configured max support grant duration.
 - reason is required.
 
+### 클럽 상세 + 지원 접근 패널 분리 규칙
+
+`ClubOperationsBrief`는 현재 `클럽 상세` 영역에서 publish checklist, public info, domain panel, support access grants panel을 한 컴포넌트에서 함께 렌더링한다. 새 IA에서 `지원 접근`이 별도 탭이 되면서 다음 분리가 필요하다.
+
+- `클럽 상세` 탭은 publish checklist, public info, domain panel만 렌더링한다.
+- `지원 접근` 탭은 같은 selected club을 받지만 support access grants panel만 렌더링한다.
+- 분리는 `ClubOperationsBrief`의 새 `mode: "club" | "support"` prop으로 표현한다. default는 `"club"`이며, `support` 모드일 때는 publish/도메인 영역을 숨기고 SupportAccessGrantsPanel만 보여준다.
+- `지원 접근` 탭에서 selected club이 null이면 "클럽을 선택하세요" 빈 상태 surface만 보여준다.
+
 ### 새 클럽
 
 상단 `새 클럽` 버튼으로 panel 또는 drawer를 연다. 탭으로 만들지 않는다.
@@ -258,6 +268,19 @@ GET /api/admin/users/lookup?email=<email>
 - future expiresAt 확인.
 - max TTL 확인.
 - create/revoke audit event 유지.
+
+설정 키는 application.yml에 신규 추가한다.
+
+```yaml
+readmates:
+  platform-admin:
+    support-access:
+      max-grant-hours: 24
+```
+
+- 기본값 24시간.
+- 서비스는 `@Value("\${readmates.platform-admin.support-access.max-grant-hours:24}")`로 주입한다.
+- 24시간을 초과한 expiresAt은 `GRANT_EXPIRES_AT_TOO_LONG`로 거부한다.
 
 ### Local dev admin fixture
 
@@ -376,3 +399,15 @@ If only a smaller slice ships, run the narrow targeted checks first and report a
 - AI Ops supports status/error/club filtering and cursor load more.
 - Local dev can open `/admin` with a synthetic platform admin fixture.
 - Tests cover route shell, role affordances, support validation, and unsafe AI payload exclusion.
+
+## Audit Findings (2026-05-20 source re-read)
+
+이 섹션은 spec 승인 이후 진행한 코드 재감사 결과 중 design level에서 명시해야 하는 항목을 모아둔다. 구현 plan에는 별도 corrections 섹션을 만들었다.
+
+- **선택 클럽이 없는 상태:** `오늘 할 일`, `클럽 상세`, `지원 접근` 탭은 모두 selected club이 null이 될 수 있다. 빈 상태 surface는 탭별로 일관된 카피("운영할 클럽을 선택하세요")로 표시한다. `AI Ops`는 selected club과 독립적으로 동작한다.
+- **AI Ops disabled 상태의 정확한 책임:** `AI_DISABLED`는 (1) summary query 또는 jobs query가 `503 AI_DISABLED`로 응답할 때, (2) summary가 disabled 플래그를 명시할 때 두 경로 모두에서 인식한다. UI는 jobs ledger를 숨기고 disabled surface만 보여주며, force-cancel 버튼은 비활성화한다.
+- **혼합 큐 정렬 규칙:** 오늘 할 일 큐에서 club item이 먼저, AI item이 마지막 위치에 단일 entry로 등장한다. AI 항목은 disabled, attention, stable 중 하나의 상태만 가지며 club 항목과 같은 severity 토큰을 재사용한다.
+- **Support tab 진입 조건:** `OWNER`만 grant 생성/회수 UI를 본다. `OPERATOR`/`SUPPORT`는 현재 grant 목록만 본다. 이 규칙은 `permissions.canManageSupportAccess`로 통일한다.
+- **새 클럽 패널 트리거 위치:** 상단 status strip 우측 영역에 `새 클럽` 버튼을 배치하고, panel은 dashboard shell 위에 modal overlay로 띄운다. tab state와는 독립이다.
+- **Config property 신규 추가:** `readmates.platform-admin.support-access.max-grant-hours`는 spec 변경의 일부로 application.yml에 새로 정의되어야 한다.
+- **dev fixture 안전성:** dev seed `admin@example.com`은 prod profile에서 실행되는 마이그레이션이 아닌 dev-only seed로만 적용한다. 기존 `host@example.com` fixture는 platform admin 권한 없이 host-only 의미를 유지한다.

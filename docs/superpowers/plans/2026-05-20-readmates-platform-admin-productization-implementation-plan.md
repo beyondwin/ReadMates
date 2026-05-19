@@ -1,6 +1,8 @@
 # ReadMates Platform Admin Productization Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+>
+> **2026-05-20 audit applied.** 후반에 `Plan Audit Findings & Corrections (2026-05-20)` 섹션이 있다. 구현 전 반드시 그 섹션을 먼저 읽고, 본문 단계에서 audit 마크가 붙은 항목은 audit 섹션의 정정을 우선 따른다.
 
 **Goal:** Turn `/admin` into a product-grade platform operations ledger with task-oriented tabs, trustworthy action states, support access lookup, AI Ops controls, and a local dev admin login.
 
@@ -368,7 +370,42 @@ Replace the always-rendered console and AI sections with:
 ) : null}
 ```
 
-This step introduces a temporary `mode="support"` prop in `ClubOperationsBrief`; Task 5 finishes the support-only layout.
+**[audit fix]** `mode` prop은 현재 `ClubOperationsBrief`에 존재하지 않는다. Task 1에서 새 prop을 추가해야 한다.
+
+`front/features/platform-admin/ui/club-operations-brief.tsx`의 `Props` type에 다음을 추가하고, default를 `"club"`으로 설정한다.
+
+```tsx
+type ClubOperationsBriefMode = "club" | "support";
+
+type Props = {
+  // ...existing props
+  mode?: ClubOperationsBriefMode;
+};
+```
+
+컴포넌트 본문에서 분기한다.
+
+```tsx
+const renderMode = mode ?? "club";
+
+if (renderMode === "support") {
+  return (
+    <SupportAccessGrantsPanel
+      selectedClub={club}
+      grants={activeGrants}
+      loading={loadingSupportGrants}
+      loadError={supportGrantLoadError}
+      canCreateGrant={permissions.canManageSupportAccess}
+      canRevokeGrant={permissions.canManageSupportAccess}
+      onCreateGrant={onCreateGrant}
+      onRevokeGrant={onRevokeGrant}
+    />
+  );
+}
+// club 모드: 기존 checklist + public info + domain panel 렌더 그대로
+```
+
+Task 3과 Task 5에서는 이 prop을 추가 변경 없이 그대로 사용한다.
 
 - [ ] **Step 5: Add route-owned tab URL state**
 
@@ -1050,7 +1087,7 @@ In `front/features/platform-admin/ui/club-operations-brief.tsx`, update:
 />
 ```
 
-Ensure the support-only mode from Task 1 renders only `SupportAccessGrantsPanel`, while the default club mode renders checklist, public info, and domain provisioning.
+`mode` prop은 Task 1 Step 4에서 이미 도입했으므로 이 단계에서는 분기 로직을 새로 작성하지 않는다. 다만, club 모드 렌더 안에서 publish checklist → public info → domain panel 순서를 유지하고, support grants panel은 club 모드 렌더에서 제거됐는지 다시 한 번 확인한다 (support 패널은 오직 `mode === "support"` 분기에서만 렌더된다).
 
 - [ ] **Step 5: Run club detail tests**
 
@@ -1156,9 +1193,11 @@ fun `support grant create rejects past and overlong expirations`() {
     val owner = createPlatformAdminUser(role = "OWNER", status = "ACTIVE")
     val grantee = createPlatformAdminUser(role = "SUPPORT", status = "ACTIVE")
 
+    // [audit fix] max-grant-hours 기본 24h 기준으로 충분히 큰 마진(48h)을 둔다.
+    // 단순히 plusHours(25)는 테스트가 1분만 늦게 실행돼도 25:59가 되며 기준선과 너무 가깝다.
     for (expiresAt in listOf(
         OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(5),
-        OffsetDateTime.now(ZoneOffset.UTC).plusHours(25),
+        OffsetDateTime.now(ZoneOffset.UTC).plusHours(48),
     )) {
         mockMvc
             .post("/api/admin/support-access-grants") {
@@ -1753,25 +1792,40 @@ Set `submitDisabled` to:
 const submitDisabled = creating || !onCreateGrant || !canCreateGrant || resolvedGrantee == null;
 ```
 
-In `handleRevoke`, replace the silent catch with:
+**[audit fix]** `useState`는 컴포넌트 함수 본문 최상위에 선언해야 한다. 다음과 같이 두 단계로 적용한다.
+
+`SupportAccessGrantsPanel` 컴포넌트 본문 최상위(다른 `useState` 선언과 같은 위치)에 추가:
 
 ```tsx
 const [revokeError, setRevokeError] = useState<string | null>(null);
+```
 
-try {
-  await onRevokeGrant(grantId);
-} catch {
-  setRevokeError("지원 접근 권한을 회수하지 못했습니다.");
-} finally {
-  setRevokingIds((current) => {
-    const next = new Set(current);
-    next.delete(grantId);
-    return next;
-  });
+기존 `handleRevoke`의 silent catch 블록을 다음으로 교체한다. `useState` 호출을 함수 안으로 옮기지 않는다.
+
+```tsx
+async function handleRevoke(grantId: string) {
+  if (!onRevokeGrant) return;
+  setRevokingIds((current) => new Set(current).add(grantId));
+  setRevokeError(null);
+  try {
+    await onRevokeGrant(grantId);
+  } catch {
+    setRevokeError("지원 접근 권한을 회수하지 못했습니다.");
+  } finally {
+    setRevokingIds((current) => {
+      const next = new Set(current);
+      next.delete(grantId);
+      return next;
+    });
+  }
 }
 ```
 
-Render `revokeError` under the active grants list.
+활성 grants 목록 바로 아래 `revokeError`를 inline alert로 렌더한다.
+
+```tsx
+{revokeError ? <p className="tiny danger" role="alert">{revokeError}</p> : null}
+```
 
 - [ ] **Step 6: Wire lookup mutation from route**
 
@@ -1939,7 +1993,7 @@ Expected: FAIL because infinite query, filter props, detail panel, and disabled 
 
 - [ ] **Step 3: Add infinite query**
 
-In `platform-admin-ai-ops-queries.ts`, import `useInfiniteQuery` and add:
+In `platform-admin-ai-ops-queries.ts`, import `useInfiniteQuery` from `@tanstack/react-query` and add:
 
 ```ts
 export function usePlatformAdminAiOpsJobsInfiniteQuery(
@@ -1959,6 +2013,12 @@ export function usePlatformAdminAiOpsJobsInfiniteQuery(
   });
 }
 ```
+
+**[audit fix]** 현재 route는 `useQuery(platformAdminAiOpsJobsQuery())`를 직접 호출하고 `aiOpsJobs = aiOpsJobsQuery.data?.items ?? []` 형태로 소비한다. infinite query로 전환하면 `data.items`가 사라지고 `data.pages[]`가 되므로 다음 두 곳을 함께 바꿔야 한다.
+
+1. 기존 `platformAdminAiOpsJobsQuery()` based `useQuery` 호출은 route에서 완전히 제거한다.
+2. 기존 `useQuery` 결과 type을 참조하는 다른 호출자가 있는지 `rg "platformAdminAiOpsJobsQuery\\("`로 확인하고 모두 새 infinite query로 일원화한다.
+3. 기존 `useQuery` 형태의 export는 다른 호출자가 없다면 함께 제거한다 (no half-finished implementation).
 
 - [ ] **Step 4: Extend AI Ops component props and controls**
 
@@ -2107,6 +2167,18 @@ const aiOpsNextCursor = aiOpsJobsQuery.data?.pages.at(-1)?.nextCursor ?? null;
 ```
 
 Pass `filters`, `nextCursor`, `onFiltersChange`, `onLoadMore`, and `disabled` to `PlatformAdminAiOps`.
+
+`onLoadMore`은 다음과 같이 infinite query의 `fetchNextPage`에 연결한다.
+
+```tsx
+onLoadMore={
+  aiOpsJobsQuery.hasNextPage && !aiOpsJobsQuery.isFetchingNextPage
+    ? () => aiOpsJobsQuery.fetchNextPage()
+    : undefined
+}
+```
+
+`PlatformAdminAiOps`는 `onLoadMore`가 `undefined`이면 "더 불러오기" 버튼을 렌더하지 않는다.
 
 Keep generic `aiOpsError` null when `aiOpsDisabled` is true:
 
@@ -2264,21 +2336,23 @@ Expected: server test rejects `admin@example.com`; frontend test does not find t
 
 - [ ] **Step 3: Add admin fixture to dev seed**
 
-In `R__readmates_dev_seed.sql`, add user seed row:
+**[audit fix]** 기존 seed 파일의 CTE column shape에 맞춰 column 수와 alias를 정확히 일치시킨다. 적용 전 `R__readmates_dev_seed.sql`의 users / memberships CTE를 열어 column alias를 다시 확인하고 그 순서대로 row를 추가한다.
+
+In `R__readmates_dev_seed.sql`, users seed CTE의 마지막 `union all` 뒤에 admin row를 추가한다 (column 수와 순서는 기존 row와 정확히 동일하게).
 
 ```sql
 union all
 select 107, 'readmates-dev-google-admin', 'admin@example.com', '운영자', '운영자'
 ```
 
-Add membership seed row so dev login can resolve a `CurrentMember`:
+memberships seed CTE의 마지막 `union all` 뒤에 admin membership row를 추가한다 (column 수 일치 확인).
 
 ```sql
 union all
 select 207, 'admin@example.com', 'MEMBER'
 ```
 
-After the memberships insert, add:
+memberships insert 직후, 같은 파일의 idempotent 영역에 platform_admins seed를 추가한다.
 
 ```sql
 insert into platform_admins (user_id, role, status)
@@ -2289,6 +2363,8 @@ on duplicate key update
   role = values(role),
   status = values(status);
 ```
+
+검증: `./server/gradlew -p server bootRun --args='--spring.profiles.active=local'`로 한번 띄운 뒤 `select * from platform_admins where user_id in (select id from users where email = 'admin@example.com');`가 OWNER/ACTIVE 1행을 반환해야 한다 (수동 점검은 manual smoke 단계에서 수행).
 
 - [ ] **Step 4: Allow admin dev-login email**
 
@@ -2361,14 +2437,28 @@ test("platform admin opens the admin ledger and switches tabs", async ({ page })
 });
 ```
 
-If `devLoginAs` does not accept a return path in the current fixture, extend it with:
+**[audit fix]** `front/tests/e2e/aigen-test-fixtures.ts`는 현재 `devLoginAs`를 export하지 않는다. 새 helper로 추가한다.
+
+`aigen-test-fixtures.ts` 상단에 `import type { Page } from "@playwright/test";`가 있는지 확인한 뒤, 파일 끝에 다음을 export한다.
 
 ```ts
+const devLoginButtonByEmail: Record<string, RegExp> = {
+  "admin@example.com": /운영자\s*·\s*플랫폼/,
+  "host@example.com": /호스트/,
+};
+
 export async function devLoginAs(page: Page, email: string, returnTo = "/app") {
   await page.goto(`/login?returnTo=${encodeURIComponent(returnTo)}`);
-  await page.getByRole("button", { name: new RegExp(email === "admin@example.com" ? "운영자" : "호스트") }).click();
+  const pattern = devLoginButtonByEmail[email];
+  if (!pattern) {
+    throw new Error(`devLoginAs: no dev login button mapped for email ${email}`);
+  }
+  await page.getByRole("button", { name: pattern }).click();
+  await page.waitForURL((url) => url.pathname === returnTo || url.pathname.startsWith(returnTo));
 }
 ```
+
+기존 e2e가 다른 dev-login 호출 패턴을 쓰고 있다면 그쪽도 같은 helper로 일원화한다 (no parallel implementations).
 
 - [ ] **Step 2: Extend AI Ops E2E coverage**
 
@@ -2463,3 +2553,52 @@ Expected:
 - Spec coverage: tab shell, today queue, club detail action alignment, support email lookup, support grant validation, AI Ops filters/paging/detail/disabled state, dev admin login, and E2E coverage are each mapped to a task.
 - Public safety: examples use `example.com`, synthetic UUIDs, and local route names only. No real member data, private domains, deployment state, OCIDs, secrets, or token-shaped examples are introduced.
 - Type consistency: tab IDs are `today | club | ai | support`; support lookup response uses `platformAdminRole` and `platformAdminStatus`; support grant creation still sends `granteeUserId`.
+
+## Plan Audit Findings & Corrections (2026-05-20)
+
+이 섹션은 spec 승인 직후 진행한 소스 코드 재감사(`front/features/platform-admin/**`, `server/.../club/**`, dev seed, e2e fixtures)에서 발견된 결함과 보강을 모은다. 본문 단계의 `[audit fix]` 마크는 모두 이 섹션에서 도출된 수정이다.
+
+### 1. 결함 (defects)
+
+| # | 위치 | 결함 | 정정 적용처 |
+|---|------|------|------------|
+| D1 | Task 5 Step 5 | `useState`를 `handleRevoke` 함수 본문 안에 선언하는 코드. React Rules of Hooks 위반. | Task 5 Step 5 본문 `[audit fix]` |
+| D2 | Task 4 Step 7 / Step 1 | `OffsetDateTime.now(...).plusHours(25)`는 max 24h 경계와 단 1시간 차이라 테스트가 늦게 실행될 때 flaky. | Task 4 Step 1 / Step 7 본문 `[audit fix]` |
+| D3 | Task 1 Step 4 | `ClubOperationsBrief`에 존재하지 않는 `mode="support"` prop을 사용하면서, prop 자체를 정의하지 않음. | Task 1 Step 4 본문 `[audit fix]`로 prop signature 정의 명시 |
+| D4 | Task 8 Step 1 | `devLoginAs`는 `aigen-test-fixtures.ts`에서 export되지 않음. 조건부 확장 코드는 누가 책임지는지 불명확. | Task 8 Step 1 본문 `[audit fix]`로 helper 신규 정의 명시 |
+| D5 | Task 6 Step 3 | `useInfiniteQuery` 도입 후 route는 기존 `useQuery(platformAdminAiOpsJobsQuery())`를 그대로 둘 수 없음. 데이터 shape이 `.data?.items` → `.data?.pages`로 바뀌어 dual implementation이 생김. | Task 6 Step 3 본문 `[audit fix]` + Step 5 본문에 `fetchNextPage` 연결 명시 |
+| D6 | spec / plan 전체 | `readmates.platform-admin.support-access.max-grant-hours` 설정 키가 `application.yml`에 존재하지 않음. plan Task 4 Step 7만으로 `@Value` 주입이 가능한지 불명확. | Spec `Support grant validation` 섹션과 본 plan audit 표 항목 C1 |
+| D7 | Task 7 Step 3 | dev seed CTE의 column 구조에 대한 가정이 명시되지 않음. column 개수/순서가 맞지 않으면 마이그레이션이 즉시 깨짐. | Task 7 Step 3 본문 `[audit fix]` |
+| D8 | Task 1 Step 4 / 본 plan 전반 | `support` 탭 진입 시 `workbench.selectedClub`이 null이면 ClubOperationsBrief가 noop 카드가 되는데, plan에서 빈 상태 처리를 명시하지 않음. | Spec `클럽 상세 + 지원 접근 패널 분리 규칙`에서 빈 상태 카피 명시 |
+
+### 2. 보강 (clarifications)
+
+| # | 위치 | 보강 |
+|---|------|------|
+| C1 | application.yml | `readmates.platform-admin.support-access.max-grant-hours: 24` 키를 신규 추가한다. 위치는 기존 `readmates:` block 안. Task 4 Step 7에서 `@Value` 주입과 함께 같은 커밋에 포함시킨다. |
+| C2 | Test 가정 | `buildPlatformAdminWorkbench`, `baseInput`, `summary`, `runningJob`, `createWrapper`는 **모두 이미 존재**한다. plan에서 직접 import만 추가하면 된다 (정정: 초기 audit에서 missing으로 잘못 보고된 항목). |
+| C3 | route imports | `isReadmatesApiError`는 `front/shared/api/errors.ts`(또는 동등 경로)에 정의되어 있고 현재 route에는 import되어 있지 않다. Task 6 Step 5에서 명시적 import가 필요하다. |
+| C4 | dev seed 안전성 | `admin@example.com` seed는 dev profile 전용이다. prod / preview / staging migration path와 분리되어 있는지(어떤 R__ vs V__ vs profile-specific) Task 7 Step 3 작업자가 한번 더 확인한다. |
+| C5 | UI 권한 일원화 | `OWNER`/`OPERATOR`/`SUPPORT` permission gating은 `permissions.canManageSupportAccess`, `permissions.canUpdateClub`, `permissions.canSetClubVisibility` 등 model이 이미 노출하는 boolean을 그대로 쓴다. UI는 role string을 직접 비교하지 않는다. |
+| C6 | AI_DISABLED 인식 | summary query와 jobs query 모두에서 `AI_DISABLED` 응답 가능. Task 6 Step 5의 `aiOpsDisabled` 유도는 두 query를 모두 확인하는 OR 식으로 유지한다 (이미 plan 본문에 반영됨). |
+| C7 | infinite query queryKey | `platformAdminAiOpsKeys.jobs(filters)`는 cursor를 포함하지 않은 filters만 받아야 한다 (cursor가 들어가면 pagination 시 캐시 키가 매 페이지마다 달라져 무효). `Omit<PlatformAdminAiOpsFilters, "cursor">`로 명시한 점은 정상. |
+| C8 | seed ID 충돌 | users seed CTE 최댓값은 현재 106, memberships는 206. 따라서 plan이 추가하는 `107` / `207`은 충돌 없음. |
+
+### 3. 다시 확인된 spec 결정
+
+- `오늘 할 일`이 기본 탭이고, `새 클럽`은 상단 버튼으로만 노출한다. tab 자리수는 `today | club | ai | support` 네 개로 고정한다.
+- 클럽 공개/비공개 토글 경로는 publish readiness action rail 단일 경로다. `PlatformAdminClubDetail`의 직접 토글 버튼은 제거 대상이다.
+- AI Ops detail panel은 transcript / raw result JSON / instructions / feedback document body / provider raw response / provider raw error를 절대 노출하지 않는다. 표시 가능한 필드는 spec `AI Ops` 섹션의 "허용" 목록으로 제한된다.
+
+### 4. 실행 순서 권고
+
+1. 본 plan 진행 전 `application.yml`에 C1 키를 먼저 추가한다 (한 줄 추가, 별도 commit 또는 Task 4 Step 7에 포함).
+2. Task 1 Step 4의 `mode` prop 정의(D3)를 ClubOperationsBrief에 먼저 반영해야 Task 3과 Task 5의 club / support 분리가 깨지지 않는다.
+3. Task 6은 infinite query로 일원화하는 큰 변경이므로(D5), Task 6 commit 직후 `pnpm --dir front test`를 전체 실행해 다른 영역의 regression이 없는지 확인한다.
+4. Task 7 Step 3은 적용 직후 로컬 DB에서 `select user_id, role, status from platform_admins where user_id = (select id from users where email = 'admin@example.com')` 결과를 한 번 점검한다 (D7).
+5. Task 8 Step 1의 `devLoginAs`(D4)는 두 e2e spec에서 동일하게 사용되어야 하므로, 신규 export 후 기존 호출부도 같은 helper로 일원화한다.
+
+### 5. 알려진 비포함 / 후속 작업
+
+- `OPERATOR` 권한이 force-cancel을 보는지 여부는 spec에서 `OWNER`/`OPERATOR`만으로 명시되어 있다. 본 plan은 이 규칙을 그대로 따른다. 운영 도중 OPERATOR가 force-cancel을 트리거할 때의 audit trail까지 강화하는 작업은 별도 후속 plan에서 다룬다.
+- `새 클럽` 버튼이 dashboard shell에서 어떤 모달/drawer로 onboarding wizard를 띄우는지는 plan 본문이 OnboardingWizard를 직접 modify하지 않는 한 기존 동작을 유지한다. shell 리팩터에서 onboarding entrypoint가 깨지지 않도록 Task 1 Step 4에서 onboarding trigger 영역을 그대로 두는지 다시 확인한다.
