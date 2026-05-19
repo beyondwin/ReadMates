@@ -156,4 +156,6 @@ data class JobView(
     val costEstimateUsd: BigDecimal,
     val warnings: List<String>,
     val expiresAt: Instant,
+    val createdAt: Instant,
+    val lastUpdatedAt: Instant,
 )

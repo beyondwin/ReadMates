@@ -51,6 +51,16 @@ sealed class AiGenerationException(
         )
 
     /**
+     * Platform-admin AI Ops action failure with a safe, operator-facing code.
+     * Keeps Redis expiry/live-state distinctions visible without exposing raw
+     * Redis keys or payload details.
+     */
+    class SafeOpsError(
+        val jobId: UUID,
+        val code: String,
+    ) : AiGenerationException("AI Ops action for job $jobId failed with $code")
+
+    /**
      * Generic code-bearing variant — replaces the legacy adapter-package
      * `AiGenerationException(code, message)` for cap denials, schema parse errors and
      * other paths that already carry an [ErrorCode]. The handler maps via the existing

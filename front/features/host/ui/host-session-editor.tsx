@@ -127,6 +127,7 @@ export default function HostSessionEditor({
   LinkComponent = DefaultLinkComponent,
   hostDashboardReturnTarget = defaultHostDashboardReturnTarget,
   readmatesReturnState = defaultReadmatesReturnState,
+  onSessionRecordsChanged,
 }: {
   session?: HostSessionDetailResponse | null;
   notificationDispatches?: ManualNotificationDispatchListItem[];
@@ -136,6 +137,7 @@ export default function HostSessionEditor({
   LinkComponent?: HostSessionEditorLinkComponent;
   hostDashboardReturnTarget?: ReadmatesReturnTarget;
   readmatesReturnState?: (target: ReadmatesReturnTarget) => ReadmatesReturnState;
+  onSessionRecordsChanged?: (sessionId: string) => void | Promise<void>;
 }) {
   // ---------------------------------------------------------------------------
   // Form state (reducer)
@@ -206,14 +208,10 @@ export default function HostSessionEditor({
   }, [canShowImportModeToggle]);
 
   const handleAigenCommitted = useCallback(() => {
-    // After an AI commit the session document picks up the publication +
-    // feedback document the server wrote; the simplest correct refresh is a
-    // full reload (mirrors what the JSON commit flow effectively achieves by
-    // dispatching PUBLICATION_SAVED + FEEDBACK_DOCUMENT_UPDATED).
-    if (typeof window !== "undefined") {
-      window.location.reload();
+    if (sessionIdForAigen) {
+      void onSessionRecordsChanged?.(sessionIdForAigen);
     }
-  }, []);
+  }, [onSessionRecordsChanged, sessionIdForAigen]);
 
   // ---------------------------------------------------------------------------
   // Refs

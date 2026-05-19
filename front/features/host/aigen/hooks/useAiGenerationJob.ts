@@ -16,8 +16,8 @@
 
 import type { Query, UseQueryResult } from "@tanstack/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { getJob } from "@/features/host/aigen/api/aigen-api";
 import type { AiGenerationJobResponse } from "@/features/host/aigen/api/aigen-contracts";
+import { aiJobDetailQuery, aiJobKeys } from "@/features/host/aigen/queries/aigen-job-queries";
 
 const FIRST_POLL_MS = 2000;
 const SUBSEQUENT_POLL_MS = 4000;
@@ -28,12 +28,9 @@ const TERMINAL_STATUSES: ReadonlySet<AiGenerationJobResponse["status"]> = new Se
   "COMMITTED",
 ]);
 
-const JOBS_ROOT = ["host", "aigen", "jobs"] as const;
-
 export const aiGenerationJobKeys = {
-  all: JOBS_ROOT,
-  detail: (sessionId: string, jobId: string) =>
-    [...JOBS_ROOT, sessionId, jobId] as const,
+  all: aiJobKeys.all,
+  detail: aiJobKeys.detail,
 } as const;
 
 export type UseAiGenerationJobOptions = {
@@ -49,11 +46,7 @@ export function useAiGenerationJob(
   const enabled = enabledOption && typeof jobId === "string" && jobId.length > 0;
 
   return useQuery({
-    queryKey: aiGenerationJobKeys.detail(sessionId, jobId ?? ""),
-    queryFn: () => {
-      // Safe: `enabled` guarantees jobId is a non-empty string before queryFn runs.
-      return getJob(sessionId, jobId as string);
-    },
+    ...aiJobDetailQuery(sessionId, jobId ?? ""),
     enabled,
     refetchInterval: (query: Query<AiGenerationJobResponse, Error>) => {
       const status = query.state.data?.status;

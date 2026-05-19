@@ -1,9 +1,16 @@
 import { useLoaderData } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { publicClubQuery } from "@/features/public/queries/public-queries";
 import type { PublicClubRouteData } from "@/features/public/route/public-route-data";
 import PublicHome from "@/features/public/ui/public-home";
 
 export function PublicHomeRoute() {
   const data = useLoaderData() as PublicClubRouteData;
+  const clubQuery = useQuery(publicClubQuery(data.clubSlug));
 
-  return <PublicHome data={data} publicBasePath={data.publicBasePath} />;
+  if (!clubQuery.data) {
+    return null;
+  }
+
+  return <PublicHome data={clubQuery.data} publicBasePath={data.publicBasePath} />;
 }

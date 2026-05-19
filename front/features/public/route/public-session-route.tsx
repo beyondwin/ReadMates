@@ -1,4 +1,6 @@
 import { useLoaderData, useLocation } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { publicSessionQuery } from "@/features/public/queries/public-queries";
 import type { PublicSessionRouteData } from "@/features/public/route/public-route-data";
 import {
   publicRecordsReturnTarget,
@@ -9,6 +11,11 @@ import PublicSession from "@/features/public/ui/public-session";
 
 export function PublicSessionRoute() {
   const data = useLoaderData() as PublicSessionRouteData;
+  const sessionQuery = useQuery({
+    ...publicSessionQuery(data.clubSlug, data.sessionId ?? ""),
+    enabled: Boolean(data.sessionId),
+  });
+  const session = sessionQuery.data ?? null;
   const location = useLocation();
   const fallbackReturnTarget = {
     ...publicRecordsReturnTarget,
@@ -16,8 +23,8 @@ export function PublicSessionRoute() {
   };
   const returnTarget = readPublicReadmatesReturnTarget(location.state, fallbackReturnTarget);
 
-  return data.session ? (
-    <PublicSession session={data.session} returnTarget={returnTarget} />
+  return session ? (
+    <PublicSession session={session} returnTarget={returnTarget} />
   ) : (
     <PublicMissingSessionPage returnTarget={returnTarget} />
   );

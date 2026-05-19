@@ -1,7 +1,9 @@
 package com.readmates.aigen.adapter.out.redis
 
 import com.readmates.aigen.application.model.AuthorNameMode
+import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationItem
+import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelId
@@ -343,7 +345,76 @@ class RedisAiGenerationJobStoreTest(
         assertThat(second).isEqualTo(first)
     }
 
-    private fun newRecord(): JobRecord {
+    @Test
+    fun `save indexes recent and active jobs with TTL`() {
+        val record = newRecord(status = JobStatus.RUNNING, stage = JobStage.TRANSCRIPT_LOADED)
+
+        store.save(record)
+
+        assertThat(store.loadRecentForSession(record.sessionId).map { it.jobId }).containsExactly(record.jobId)
+        assertThat(store.findJobById(record.jobId)?.jobId).isEqualTo(record.jobId)
+        assertThat(store.loadActiveJobs().map { it.jobId }).contains(record.jobId)
+        assertThat(redisTemplate.getExpire("aigen:session:${record.sessionId}:jobs", TimeUnit.SECONDS))
+            .isBetween(properties.job.redisTtl.seconds - 30, properties.job.redisTtl.seconds + 30)
+        assertThat(redisTemplate.getExpire("aigen:jobs:active", TimeUnit.SECONDS))
+            .isBetween(properties.job.redisTtl.seconds - 30, properties.job.redisTtl.seconds + 30)
+        assertThat(redisTemplate.getExpire("aigen:club:${record.clubId}:jobs:active", TimeUnit.SECONDS))
+            .isBetween(properties.job.redisTtl.seconds - 30, properties.job.redisTtl.seconds + 30)
+    }
+
+    @Test
+    fun `terminal transition removes active indexes but keeps session recent lookup`() {
+        val record = newRecord(status = JobStatus.RUNNING, stage = JobStage.TRANSCRIPT_LOADED)
+        store.save(record)
+
+        store.transitionStatus(
+            jobId = record.jobId,
+            expected = setOf(JobStatus.RUNNING),
+            next = JobStatus.FAILED,
+            stage = null,
+            progressPct = 0,
+            error = GenerationError(ErrorCode.PROVIDER_UNAVAILABLE, "retry later"),
+        )
+
+        val recent = store.loadRecentForSession(record.sessionId)
+        assertThat(recent.map { it.jobId }).containsExactly(record.jobId)
+        assertThat(recent.single().status).isEqualTo(JobStatus.FAILED)
+        assertThat(store.loadActiveJobs().map { it.jobId }).doesNotContain(record.jobId)
+    }
+
+    @Test
+    fun `delete removes indexed job references`() {
+        val record = newRecord(status = JobStatus.RUNNING, stage = JobStage.TRANSCRIPT_LOADED)
+        store.save(record)
+
+        store.delete(record.jobId)
+
+        assertThat(store.loadRecentForSession(record.sessionId)).isEmpty()
+        assertThat(store.findJobById(record.jobId)).isNull()
+        assertThat(store.loadActiveJobs().map { it.jobId }).doesNotContain(record.jobId)
+    }
+
+    @Test
+    fun `load preserves createdAt and lastUpdatedAt stored on the hash`() {
+        val record =
+            newRecord(
+                createdAt = Instant.parse("2026-05-16T10:00:00Z"),
+                lastUpdatedAt = Instant.parse("2026-05-16T10:05:00Z"),
+            )
+        store.save(record)
+
+        val loaded = store.load(record.jobId)!!
+
+        assertThat(loaded.createdAt).isEqualTo(record.createdAt)
+        assertThat(loaded.lastUpdatedAt).isEqualTo(record.lastUpdatedAt)
+    }
+
+    private fun newRecord(
+        status: JobStatus = JobStatus.PENDING,
+        stage: JobStage? = JobStage.QUEUED,
+        createdAt: Instant = Instant.now(),
+        lastUpdatedAt: Instant = createdAt,
+    ): JobRecord {
         val ttl = properties.job.redisTtl
         val sessionId = UUID.randomUUID()
         val clubId = UUID.randomUUID()
@@ -367,14 +438,16 @@ class RedisAiGenerationJobStoreTest(
                     expectedAuthorNames = listOf("Alice", "Bob"),
                     authorNameMode = AuthorNameMode.REAL,
                 ),
-            status = JobStatus.PENDING,
-            stage = JobStage.QUEUED,
-            progressPct = 0,
+            status = status,
+            stage = stage,
+            progressPct = if (status == JobStatus.SUCCEEDED) 100 else 0,
             result = null,
             error = null,
             tokens = TokenUsage(0, 0, 0),
             costAccumulatedUsd = BigDecimal.ZERO,
             expiresAt = Instant.now().plusSeconds(ttl.seconds),
+            createdAt = createdAt,
+            lastUpdatedAt = lastUpdatedAt,
         )
     }
 

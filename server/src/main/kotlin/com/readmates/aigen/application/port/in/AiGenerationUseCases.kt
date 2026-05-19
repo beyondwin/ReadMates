@@ -48,6 +48,10 @@ interface GetJobUseCase {
     ): JobView
 }
 
+interface GetRecentSessionGenerationJobUseCase {
+    fun recent(sessionId: UUID): JobView?
+}
+
 interface RegenerateItemUseCase {
     fun regenerate(
         sessionId: UUID,

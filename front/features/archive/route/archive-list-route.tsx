@@ -1,24 +1,21 @@
-import { useCallback, useState } from "react";
-import { useLoaderData, useLocation, useParams, useSearchParams } from "react-router-dom";
-import {
-  fetchArchiveSessions,
-  fetchMyArchiveQuestions,
-  fetchMyArchiveReviews,
-  fetchMyFeedbackDocuments,
-} from "@/features/archive/api/archive-api";
+import { useCallback, useMemo } from "react";
+import { useLocation, useParams, useSearchParams } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { archiveViewFromSearchParam, type ArchiveView } from "@/features/archive/model/archive-model";
-import type { ArchiveListRouteData } from "@/features/archive/route/archive-list-data";
+import {
+  ARCHIVE_NEXT_PAGE_LIMIT,
+  archiveListQuery,
+  combineArchiveListPages,
+} from "@/features/archive/queries/archive-queries";
 import ArchivePage from "@/features/archive/ui/archive-page";
-import { combineCursorPages } from "@/shared/query/cursor-pagination";
-
-const ARCHIVE_NEXT_PAGE_LIMIT = 30;
 
 export function ArchiveListRoute({ reviewAuthorName = null }: { reviewAuthorName?: string | null }) {
-  const data = useLoaderData() as ArchiveListRouteData;
-  const [pageState, setPageState] = useState({ source: data, pages: data });
-  const pages = pageState.source === data ? pageState.pages : data;
+  const queryClient = useQueryClient();
   const location = useLocation();
   const { clubSlug } = useParams();
+  const context = useMemo(() => ({ clubSlug }), [clubSlug]);
+  const archiveQuery = useQuery(archiveListQuery(context));
+  const pages = archiveQuery.data;
   const [searchParams, setSearchParams] = useSearchParams();
   const initialView = archiveViewFromSearchParam(searchParams.get("view"));
 
@@ -28,86 +25,29 @@ export function ArchiveListRoute({ reviewAuthorName = null }: { reviewAuthorName
     },
     [setSearchParams],
   );
-  const loadMoreSessions = useCallback(async () => {
-    const cursor = pages.sessions.nextCursor;
+  const loadNext = useCallback(
+    async (surface: "sessions" | "questions" | "reviews" | "reports") => {
+      if (!pages) {
+        return;
+      }
 
-    if (!cursor) {
-      return;
-    }
+      const cursor = pages[surface].nextCursor;
 
-    const nextPage = await fetchArchiveSessions(clubSlug ? { clubSlug } : undefined, { limit: ARCHIVE_NEXT_PAGE_LIMIT, cursor });
-    setPageState((current) => {
-      const currentPages = current.source === data ? current.pages : data;
+      if (!cursor) {
+        return;
+      }
 
-      return {
-        source: data,
-        pages: {
-          ...currentPages,
-          sessions: combineCursorPages([currentPages.sessions, nextPage]),
-        },
-      };
-    });
-  }, [clubSlug, data, pages.sessions.nextCursor]);
-  const loadMoreQuestions = useCallback(async () => {
-    const cursor = pages.questions.nextCursor;
+      const nextPage = await queryClient.fetchQuery(
+        archiveListQuery(context, { limit: ARCHIVE_NEXT_PAGE_LIMIT, cursor }),
+      );
+      queryClient.setQueryData(archiveListQuery(context).queryKey, combineArchiveListPages([pages, nextPage]));
+    },
+    [context, pages, queryClient],
+  );
 
-    if (!cursor) {
-      return;
-    }
-
-    const nextPage = await fetchMyArchiveQuestions(clubSlug ? { clubSlug } : undefined, { limit: ARCHIVE_NEXT_PAGE_LIMIT, cursor });
-    setPageState((current) => {
-      const currentPages = current.source === data ? current.pages : data;
-
-      return {
-        source: data,
-        pages: {
-          ...currentPages,
-          questions: combineCursorPages([currentPages.questions, nextPage]),
-        },
-      };
-    });
-  }, [clubSlug, data, pages.questions.nextCursor]);
-  const loadMoreReviews = useCallback(async () => {
-    const cursor = pages.reviews.nextCursor;
-
-    if (!cursor) {
-      return;
-    }
-
-    const nextPage = await fetchMyArchiveReviews(clubSlug ? { clubSlug } : undefined, { limit: ARCHIVE_NEXT_PAGE_LIMIT, cursor });
-    setPageState((current) => {
-      const currentPages = current.source === data ? current.pages : data;
-
-      return {
-        source: data,
-        pages: {
-          ...currentPages,
-          reviews: combineCursorPages([currentPages.reviews, nextPage]),
-        },
-      };
-    });
-  }, [clubSlug, data, pages.reviews.nextCursor]);
-  const loadMoreReports = useCallback(async () => {
-    const cursor = pages.reports.nextCursor;
-
-    if (!cursor) {
-      return;
-    }
-
-    const nextPage = await fetchMyFeedbackDocuments(clubSlug ? { clubSlug } : undefined, { limit: ARCHIVE_NEXT_PAGE_LIMIT, cursor });
-    setPageState((current) => {
-      const currentPages = current.source === data ? current.pages : data;
-
-      return {
-        source: data,
-        pages: {
-          ...currentPages,
-          reports: combineCursorPages([currentPages.reports, nextPage]),
-        },
-      };
-    });
-  }, [clubSlug, data, pages.reports.nextCursor]);
+  if (!pages) {
+    return null;
+  }
 
   return (
     <ArchivePage
@@ -117,10 +57,10 @@ export function ArchiveListRoute({ reviewAuthorName = null }: { reviewAuthorName
       routePathname={location.pathname}
       routeSearch={location.search}
       reviewAuthorName={reviewAuthorName}
-      onLoadMoreSessions={loadMoreSessions}
-      onLoadMoreQuestions={loadMoreQuestions}
-      onLoadMoreReviews={loadMoreReviews}
-      onLoadMoreReports={loadMoreReports}
+      onLoadMoreSessions={() => loadNext("sessions")}
+      onLoadMoreQuestions={() => loadNext("questions")}
+      onLoadMoreReviews={() => loadNext("reviews")}
+      onLoadMoreReports={() => loadNext("reports")}
     />
   );
 }

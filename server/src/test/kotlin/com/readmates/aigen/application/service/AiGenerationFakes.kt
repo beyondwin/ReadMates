@@ -62,6 +62,23 @@ internal class FakeJobStore : AiGenerationJobStore {
 
     override fun load(jobId: UUID): JobRecord? = records[jobId]
 
+    override fun loadRecentForSession(
+        sessionId: UUID,
+        limit: Int,
+    ): List<JobRecord> =
+        records
+            .values
+            .filter { it.sessionId == sessionId }
+            .sortedByDescending { it.lastUpdatedAt }
+            .take(limit)
+
+    override fun loadActiveJobs(limit: Int): List<JobRecord> =
+        records
+            .values
+            .filter { it.status in ACTIVE_JOB_STATUSES }
+            .sortedByDescending { it.lastUpdatedAt }
+            .take(limit)
+
     override fun saveResult(
         jobId: UUID,
         result: SessionImportV1Snapshot,
@@ -194,6 +211,11 @@ internal class FakeJobStore : AiGenerationJobStore {
     override fun delete(jobId: UUID) {
         records.remove(jobId)
         deleted += jobId
+    }
+
+    private companion object {
+        val ACTIVE_JOB_STATUSES =
+            setOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCEEDED, JobStatus.COMMITTING)
     }
 }
 
@@ -539,6 +561,8 @@ internal object AiGenerationTestFixtures {
         transcript: String = "transcript text",
         sessionMeta: SessionMeta = sessionMeta(sessionId = sessionId, clubId = clubId),
         expiresAt: Instant = NOW.plusSeconds(21_600L),
+        createdAt: Instant = NOW,
+        lastUpdatedAt: Instant = createdAt,
     ): JobRecord =
         JobRecord(
             jobId = jobId,
@@ -558,6 +582,8 @@ internal object AiGenerationTestFixtures {
             tokens = TokenUsage(0, 0, 0),
             costAccumulatedUsd = BigDecimal.ZERO,
             expiresAt = expiresAt,
+            createdAt = createdAt,
+            lastUpdatedAt = lastUpdatedAt,
         )
 
     fun providerError(code: ErrorCode): GenerationError = GenerationError(code, code.name)

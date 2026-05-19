@@ -8,6 +8,7 @@ import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.port.`in`.CancelGenerationUseCase
 import com.readmates.aigen.application.port.`in`.CommitGenerationUseCase
 import com.readmates.aigen.application.port.`in`.GetJobUseCase
+import com.readmates.aigen.application.port.`in`.GetRecentSessionGenerationJobUseCase
 import com.readmates.aigen.application.port.`in`.RegenerateItemUseCase
 import com.readmates.aigen.application.port.`in`.StartGenerationCommand
 import com.readmates.aigen.application.port.`in`.StartGenerationUseCase
@@ -53,6 +54,7 @@ private const val MAX_TRANSCRIPT_BYTES: Int = 1024 * 1024
 class AiGenerationController(
     private val start: StartGenerationUseCase,
     private val getJob: GetJobUseCase,
+    private val recentJob: GetRecentSessionGenerationJobUseCase,
     private val regen: RegenerateItemUseCase,
     private val commitUc: CommitGenerationUseCase,
     private val cancel: CancelGenerationUseCase,
@@ -103,21 +105,18 @@ class AiGenerationController(
         ensureEnabled()
         auth.requireHostAccess(sessionId, member)
         val view = getJob.get(sessionId, jobId)
-        return JobStatusResponse(
-            jobId = view.jobId,
-            status = view.status.name,
-            stage = view.stage?.name,
-            progressPct = view.progressPct,
-            model = view.model.name,
-            result = view.result?.toJson(),
-            error = view.error?.let { GenerationErrorJson(it.code.name, it.message) },
-            tokens =
-                view.tokens?.let {
-                    TokenUsageJson(it.inputTokens, it.cachedInputTokens, it.outputTokens)
-                },
-            costEstimateUsd = view.costEstimateUsd.toPlainString(),
-            warnings = view.warnings,
-        )
+        return view.toStatusResponse()
+    }
+
+    @GetMapping("/jobs/recent")
+    fun getRecentJob(
+        @PathVariable sessionId: UUID,
+        member: CurrentMember,
+    ): ResponseEntity<RecentJobResponse> {
+        ensureEnabled()
+        auth.requireHostAccess(sessionId, member)
+        val view = recentJob.recent(sessionId) ?: return ResponseEntity.noContent().build()
+        return ResponseEntity.ok(view.toRecentJobResponse())
     }
 
     @PostMapping("/jobs/{jobId}/regenerate", consumes = [MediaType.APPLICATION_JSON_VALUE])

@@ -1,10 +1,11 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import PublicSession from "@/features/public/ui/public-session";
 import type { PublicSessionDetailResponse } from "@/features/public/api/public-contracts";
 import PublicSessionPage from "@/src/pages/public-session";
-import { publicSessionLoader } from "@/features/public/route/public-route-data";
+import { publicSessionLoaderFactory } from "@/features/public/route/public-route-data";
 import { PublicRouteError } from "@/features/public/route/public-route-state";
 
 function installRouterRequestShim() {
@@ -20,14 +21,25 @@ function installRouterRequestShim() {
   );
 }
 
+function createTestQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+}
+
 function renderPublicSessionRoute(sessionId: string, state?: Record<string, string>) {
   installRouterRequestShim();
+  const queryClient = createTestQueryClient();
   const router = createMemoryRouter(
     [
       {
         path: "/sessions/:sessionId",
         element: <PublicSessionPage />,
-        loader: publicSessionLoader,
+        loader: publicSessionLoaderFactory(queryClient),
         errorElement: <PublicRouteError />,
         hydrateFallbackElement: <div>공개 세션 기록을 불러오는 중</div>,
       },
@@ -35,7 +47,11 @@ function renderPublicSessionRoute(sessionId: string, state?: Record<string, stri
     { initialEntries: [state ? { pathname: `/sessions/${sessionId}`, state } : `/sessions/${sessionId}`] },
   );
 
-  render(<RouterProvider router={router} />);
+  render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
 }
 
 describe("PublicSessionPage", () => {

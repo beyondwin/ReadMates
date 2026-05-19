@@ -1,22 +1,34 @@
+import type { QueryClient } from "@tanstack/react-query";
 import type { LoaderFunctionArgs } from "react-router-dom";
-import { fetchFeedbackDocument, type FeedbackLoadResult } from "@/features/feedback/api/feedback-api";
+import type { FeedbackLoadResult } from "@/features/feedback/api/feedback-api";
+import { feedbackDocumentQuery } from "@/features/feedback/queries/feedback-queries";
 import { clubSlugFromLoaderArgs, loadMemberAppAuth } from "@/shared/auth/member-app-loader";
 
-export type FeedbackDocumentRouteData = FeedbackLoadResult;
+export type FeedbackDocumentRouteData = {
+  sessionId: string | null;
+  unavailableReason?: Extract<FeedbackLoadResult, { status: "unavailable" }>["reason"];
+};
 
-export async function feedbackDocumentLoader(args: LoaderFunctionArgs): Promise<FeedbackDocumentRouteData> {
-  const { params } = args;
-  const access = await loadMemberAppAuth(args);
+function contextFromArgs(args: LoaderFunctionArgs) {
+  return { clubSlug: clubSlugFromLoaderArgs(args) };
+}
 
-  if (!access.allowed) {
-    return { status: "unavailable", reason: "forbidden" };
-  }
+export function feedbackDocumentLoaderFactory(queryClient: QueryClient) {
+  return async function feedbackDocumentLoader(args: LoaderFunctionArgs): Promise<FeedbackDocumentRouteData> {
+    const { params } = args;
+    const access = await loadMemberAppAuth(args);
+    const sessionId = params.sessionId ?? null;
 
-  const sessionId = params.sessionId;
+    if (!access.allowed) {
+      return { sessionId, unavailableReason: "forbidden" };
+    }
 
-  if (!sessionId) {
-    return { status: "unavailable", reason: "missing" };
-  }
+    if (!sessionId) {
+      return { sessionId, unavailableReason: "missing" };
+    }
 
-  return fetchFeedbackDocument(sessionId, { clubSlug: clubSlugFromLoaderArgs({ params }) });
+    await queryClient.ensureQueryData(feedbackDocumentQuery(sessionId, contextFromArgs(args)));
+
+    return { sessionId };
+  };
 }

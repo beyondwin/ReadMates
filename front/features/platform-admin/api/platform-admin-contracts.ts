@@ -139,3 +139,50 @@ export type PlatformAdminOnboardingResultResponse = {
   };
   domain: PlatformAdminDomainResponse | null;
 };
+
+export type PlatformAdminAiOpsAction = "FORCE_CANCEL";
+
+export type PlatformAdminAiOpsSummaryResponse = {
+  activeJobCount: number;
+  failedLast24h: number;
+  monthToDateCostEstimateUsd: string;
+  failureCodes: Array<{ code: string; count: number }>;
+  providerCosts: Array<{ provider: string; model: string; costEstimateUsd: string }>;
+  staleCandidateCount: number;
+};
+
+export type PlatformAdminAiOpsJob = {
+  jobId: string;
+  club: { clubId: string; slug: string | null; name: string | null };
+  session: { sessionId: string; number: number | null; bookTitle: string | null };
+  status: string;
+  stage: string | null;
+  provider: string;
+  model: string;
+  errorCode: string | null;
+  safeErrorMessage: string | null;
+  costEstimateUsd: string;
+  createdAt: string;
+  lastUpdatedAt: string;
+  expiresAt: string | null;
+  staleCandidate: boolean;
+  availableActions: PlatformAdminAiOpsAction[];
+};
+
+export type PlatformAdminAiOpsJobListResponse = {
+  items: PlatformAdminAiOpsJob[];
+  nextCursor: string | null;
+};
+
+export type PlatformAdminAiOpsFilters = {
+  status?: string;
+  clubId?: string;
+  errorCode?: string;
+  cursor?: string;
+};
+
+export type PlatformAdminAiOpsActionResponse = {
+  jobId: string;
+  previousStatus: string;
+  nextStatus: string;
+};

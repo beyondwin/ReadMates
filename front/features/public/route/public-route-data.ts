@@ -1,16 +1,16 @@
+import type { QueryClient } from "@tanstack/react-query";
 import type { LoaderFunctionArgs } from "react-router-dom";
-import { fetchPublicClub, fetchPublicSession } from "@/features/public/api/public-api";
-import type { PublicClubResponse, PublicSessionDetailResponse } from "@/features/public/api/public-contracts";
 import { BASELINE_PUBLIC_CLUB_SLUG } from "@/features/public/model/public-url-policy";
+import { publicClubQuery, publicSessionQuery } from "@/features/public/queries/public-queries";
 
-export type PublicClubRouteData = PublicClubResponse & {
+export type PublicClubRouteData = {
   clubSlug: string;
   publicBasePath: string;
 };
 export type PublicSessionRouteData = {
   clubSlug: string;
   publicBasePath: string;
-  session: PublicSessionDetailResponse | null;
+  sessionId: string | null;
 };
 
 function publicRouteContext(params: LoaderFunctionArgs["params"]) {
@@ -20,21 +20,26 @@ function publicRouteContext(params: LoaderFunctionArgs["params"]) {
   return { clubSlug, publicBasePath };
 }
 
-export async function publicClubLoader({ params }: LoaderFunctionArgs): Promise<PublicClubRouteData> {
-  const context = publicRouteContext(params);
-  const club = await fetchPublicClub(context.clubSlug);
+export function publicClubLoaderFactory(queryClient: QueryClient) {
+  return async function publicClubLoader({ params }: LoaderFunctionArgs): Promise<PublicClubRouteData> {
+    const context = publicRouteContext(params);
+    await queryClient.ensureQueryData(publicClubQuery(context.clubSlug));
 
-  return { ...club, ...context };
+    return context;
+  };
 }
 
-export async function publicSessionLoader({ params }: LoaderFunctionArgs): Promise<PublicSessionRouteData> {
-  const sessionId = params.sessionId;
-  const context = publicRouteContext(params);
+export function publicSessionLoaderFactory(queryClient: QueryClient) {
+  return async function publicSessionLoader({ params }: LoaderFunctionArgs): Promise<PublicSessionRouteData> {
+    const sessionId = params.sessionId ?? null;
+    const context = publicRouteContext(params);
 
-  if (!sessionId) {
-    return { ...context, session: null };
-  }
+    if (!sessionId) {
+      return { ...context, sessionId: null };
+    }
 
-  const session = await fetchPublicSession(context.clubSlug, sessionId);
-  return { ...context, session };
+    await queryClient.ensureQueryData(publicSessionQuery(context.clubSlug, sessionId));
+
+    return { ...context, sessionId };
+  };
 }

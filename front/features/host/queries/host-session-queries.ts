@@ -183,6 +183,14 @@ async function invalidateSessionMutationSurfaces(
   ]);
 }
 
+export function invalidateHostSessionRecordSurfaces(
+  client: QueryClient,
+  sessionId: string,
+  context?: ReadmatesApiContext,
+) {
+  return invalidateSessionMutationSurfaces(client, sessionId, context, { manualDispatches: true });
+}
+
 export function useCreateHostSessionMutation(context?: ReadmatesApiContext) {
   const client = useQueryClient();
   return useMutation({

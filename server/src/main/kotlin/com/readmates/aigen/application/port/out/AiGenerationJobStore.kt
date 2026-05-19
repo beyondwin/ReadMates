@@ -24,6 +24,15 @@ interface AiGenerationJobStore {
 
     fun load(jobId: UUID): JobRecord?
 
+    fun findJobById(jobId: UUID): JobRecord? = load(jobId)
+
+    fun loadRecentForSession(
+        sessionId: UUID,
+        limit: Int = 20,
+    ): List<JobRecord>
+
+    fun loadActiveJobs(limit: Int = 100): List<JobRecord>
+
     fun saveResult(
         jobId: UUID,
         result: SessionImportV1Snapshot,
@@ -124,6 +133,8 @@ data class JobRecord(
     val tokens: TokenUsage,
     val costAccumulatedUsd: BigDecimal,
     val expiresAt: Instant,
+    val createdAt: Instant,
+    val lastUpdatedAt: Instant,
     /**
      * Running count of LLM calls attempted for this job (start + worker retries +
      * regenerations). Compared against

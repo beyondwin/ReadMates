@@ -12,6 +12,7 @@ import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.`in`.CancelGenerationUseCase
 import com.readmates.aigen.application.port.`in`.GetJobUseCase
+import com.readmates.aigen.application.port.`in`.GetRecentSessionGenerationJobUseCase
 import com.readmates.aigen.application.port.`in`.JobNotFoundException
 import com.readmates.aigen.application.port.`in`.JobSessionMismatchException
 import com.readmates.aigen.application.port.`in`.StartGenerationCommand
@@ -66,6 +67,7 @@ class AiGenerationOrchestrator(
     private val transitionPolicy: AiGenerationJobTransitionPolicy,
 ) : StartGenerationUseCase,
     GetJobUseCase,
+    GetRecentSessionGenerationJobUseCase,
     CancelGenerationUseCase {
     override fun start(command: StartGenerationCommand): StartGenerationResult {
         metrics.recordJobStarted()
@@ -104,6 +106,8 @@ class AiGenerationOrchestrator(
                 tokens = TokenUsage(0, 0, 0),
                 costAccumulatedUsd = BigDecimal.ZERO,
                 expiresAt = expiresAt,
+                createdAt = now,
+                lastUpdatedAt = now,
             )
         jobStore.save(record)
         try {
@@ -178,6 +182,16 @@ class AiGenerationOrchestrator(
         if (record.sessionId != sessionId) {
             throw JobSessionMismatchException(jobId, sessionId, record.sessionId)
         }
+        return toJobView(record)
+    }
+
+    override fun recent(sessionId: UUID): JobView? =
+        jobStore
+            .loadRecentForSession(sessionId)
+            .firstOrNull { record -> record.sessionId == sessionId && record.isRecoverableRecentJob() }
+            ?.let(::toJobView)
+
+    private fun toJobView(record: JobRecord): JobView {
         val warnings = mutableListOf<String>()
         val monthlyCost = costGuard.clubMonthlyCost(record.clubId)
         val threshold = properties.caps.clubMonthlyCostUsd.multiply(properties.caps.softWarningRatio)
@@ -199,8 +213,21 @@ class AiGenerationOrchestrator(
             costEstimateUsd = record.costAccumulatedUsd,
             warnings = warnings,
             expiresAt = record.expiresAt,
+            createdAt = record.createdAt,
+            lastUpdatedAt = record.lastUpdatedAt,
         )
     }
+
+    private fun JobRecord.isRecoverableRecentJob(): Boolean =
+        when (status) {
+            JobStatus.PENDING,
+            JobStatus.RUNNING,
+            JobStatus.SUCCEEDED,
+            JobStatus.COMMITTING -> true
+            JobStatus.FAILED -> error?.code in RETRY_SAFE_RECENT_FAILURES
+            JobStatus.COMMITTED,
+            JobStatus.CANCELLED -> false
+        }
 
     override fun cancel(
         sessionId: UUID,
@@ -360,5 +387,12 @@ class AiGenerationOrchestrator(
     private companion object {
         private const val SOFT_WARNING_CLUB_BUDGET_80PCT = "CLUB_BUDGET_80PCT"
         private val OPENAI_O_SERIES_REGEX = Regex("^o\\d.*")
+        private val RETRY_SAFE_RECENT_FAILURES =
+            setOf(
+                ErrorCode.PROVIDER_UNAVAILABLE,
+                ErrorCode.PROVIDER_RATE_LIMITED,
+                ErrorCode.QUEUE_UNAVAILABLE,
+                ErrorCode.RATE_LIMITED,
+            )
     }
 }

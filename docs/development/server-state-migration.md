@@ -4,13 +4,15 @@
 
 ## 이번 분기 진행 범위
 
-Engineering proof portfolio 분기에서는 아래 순서로 server state migration을 진행했고, 현재 `platform-admin`까지 완료했습니다.
+Engineering proof portfolio 분기에서는 아래 순서로 server state migration을 진행했고, 현재 `public` read path와 AI Ops surface까지 완료했습니다.
 
 1. `host/members` — 멤버 목록과 lifecycle/profile/viewer mutation을 Query invalidation 패턴으로 정리합니다.
 2. `host/notifications` — 수동 알림 options/preview/confirm/dispatch ledger를 route-owned state와 Query cache로 분리합니다.
 3. `host/sessions` — dashboard/session list, editor detail/manual dispatch read, session mutation을 Query cache로 옮깁니다.
 4. `current-session` — 멤버 현재 세션 read/mutation path를 Query loader seeding과 invalidation으로 정리하고 custom route refresh event를 제거합니다.
 5. `platform-admin` — summary, club directory/detail, support grants, onboarding/domain/club mutation cache ownership을 platform admin query module로 모읍니다.
+6. `archive` / `feedback` / `public` — 공개/멤버 read path를 Query loader seeding으로 이전하고 AI commit 후 scoped invalidation으로 갱신합니다.
+7. `platform-admin/ai-ops` — AI job 운영 요약과 ledger/action을 platform admin query module로 분리합니다.
 
 각 migration은 UI 컴포넌트가 API를 직접 호출하지 않는다는 route-first 경계를 유지해야 합니다.
 
@@ -21,6 +23,10 @@ Engineering proof portfolio 분기에서는 아래 순서로 server state migrat
 - `host/sessions` — dashboard current/session list, editor detail/manual dispatch reads, session mutations, loader seeding, and notification session-selector sharing
 - `current-session` — member current-session read path, RSVP/checkin/questions/review mutations, loader seeding, and query invalidation replacing the custom route refresh event
 - `platform-admin` — summary, clubs, selected-club support grants, domain check, onboarding commit, club update, and support grant mutation cache ownership
+- `archive` — list/detail reads, cursor pages, and session-record invalidation are Query-owned
+- `feedback` — feedback document reads and AI commit invalidation are Query-owned
+- `public` — club/session public reads use Query loader seeding with scoped invalidation
+- `platform-admin/ai-ops` — AI Ops summary/job ledger reads and force-cancel invalidation are Query-owned
 
 ## 패턴
 - query: `features/<feature>/queries/<area>-queries.ts` 에 `queryOptions` + `useXxxMutation` export
@@ -30,6 +36,5 @@ Engineering proof portfolio 분기에서는 아래 순서로 server state migrat
 - cursor pagination helper: `front/shared/query/cursor-pagination.ts`의 `normalizePageRequest`, `pageFromNormalizedPageRequest`, `appendCursor`, `pageRequests`, `combineCursorPages`를 사용해 query key page normalization과 appended page 조립을 공유합니다. Feature-specific nested page shape는 feature-local wrapper에서 조립합니다.
 
 ## 후속 후보 (우선순위)
-1. `archive`
-2. `feedback`
-3. `public`
+1. Design-system visual regression infrastructure
+2. Further server read-model query budget work

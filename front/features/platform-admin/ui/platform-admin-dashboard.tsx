@@ -1,7 +1,10 @@
 import { useState } from "react";
-import type {
-  PlatformAdminWorkbenchView,
-} from "@/features/platform-admin/model/platform-admin-workbench-model";
+import type { PlatformAdminWorkbenchView } from "@/features/platform-admin/model/platform-admin-workbench-model";
+import {
+  PlatformAdminAiOps,
+  type PlatformAdminAiOpsJobView,
+  type PlatformAdminAiOpsSummaryView,
+} from "@/features/platform-admin/ui/platform-admin-ai-ops";
 import type { PlatformAdminClubRegistryItem } from "@/features/platform-admin/ui/platform-admin-club-registry";
 import {
   PlatformAdminOnboardingWizard,
@@ -41,6 +44,11 @@ type PlatformAdminDashboardProps = {
   supportGrantLoadError?: string | null;
   onCreateGrant?: (fields: CreateSupportAccessGrantFields) => Promise<void>;
   onRevokeGrant?: (grantId: string) => Promise<void>;
+  aiOpsSummary?: PlatformAdminAiOpsSummaryView | null;
+  aiOpsJobs?: PlatformAdminAiOpsJobView[];
+  aiOpsLoading?: boolean;
+  aiOpsError?: string | null;
+  onForceCancelAiJob?: (jobId: string) => void;
 };
 
 export function PlatformAdminDashboard({
@@ -59,6 +67,11 @@ export function PlatformAdminDashboard({
   supportGrantLoadError = null,
   onCreateGrant,
   onRevokeGrant,
+  aiOpsSummary = null,
+  aiOpsJobs = [],
+  aiOpsLoading = false,
+  aiOpsError = null,
+  onForceCancelAiJob,
 }: PlatformAdminDashboardProps) {
   const [showOnboarding, setShowOnboarding] = useState(false);
 
@@ -104,6 +117,15 @@ export function PlatformAdminDashboard({
             onRevokeGrant={onRevokeGrant}
           />
         </div>
+
+        <PlatformAdminAiOps
+          role={workbench.metrics.platformRole}
+          summary={aiOpsSummary}
+          jobs={aiOpsJobs}
+          loading={aiOpsLoading}
+          error={aiOpsError}
+          onForceCancel={onForceCancelAiJob}
+        />
 
         {showOnboarding && onPreviewOnboarding != null && onCommitOnboarding != null ? (
           <PlatformAdminOnboardingWizard

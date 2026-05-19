@@ -21,13 +21,14 @@ import type {
   SessionImportV1,
   StartGenerationRequest,
 } from "@/features/host/aigen/api/aigen-contracts";
-import {
-  cancelGeneration,
-  commitGeneration,
-  getClubAiDefault,
-  startGeneration,
-} from "@/features/host/aigen/api/aigen-api";
+import { getClubAiDefault } from "@/features/host/aigen/api/aigen-api";
 import { useAiGenerationJob } from "@/features/host/aigen/hooks/useAiGenerationJob";
+import {
+  recentAiJobQuery,
+  useCancelAiJobMutation,
+  useCommitAiJobMutation,
+  useStartAiJobMutation,
+} from "@/features/host/aigen/queries/aigen-job-queries";
 import {
   clearAigenDraft,
   loadAigenDraft,
@@ -36,6 +37,7 @@ import {
 import { TranscriptUploadForm } from "./TranscriptUploadForm";
 import { GenerationProgressView } from "./GenerationProgressView";
 import { PreviewView } from "./PreviewView";
+import { AiRecoveryStrip } from "./AiRecoveryStrip";
 
 type Stage =
   | { tag: "idle"; startError: string | null }
@@ -66,6 +68,13 @@ export function AiGenerateTab({ sessionId, clubSlug, onCommitted }: AiGenerateTa
   const defaultModel = clubDefaultsQuery.data?.defaultModel ?? null;
 
   const activeJobId = stage.tag === "active" ? stage.jobId : null;
+  const startMutation = useStartAiJobMutation(sessionId);
+  const cancelMutation = useCancelAiJobMutation(sessionId);
+  const commitMutation = useCommitAiJobMutation(sessionId, activeJobId ?? "");
+  const recentJobQuery = useQuery({
+    ...recentAiJobQuery(sessionId),
+    enabled: stage.tag === "idle",
+  });
   const jobQuery = useAiGenerationJob(sessionId, activeJobId);
   const jobStatus = jobQuery.data?.status;
 
@@ -118,7 +127,7 @@ export function AiGenerateTab({ sessionId, clubSlug, onCommitted }: AiGenerateTa
       setSubmittingStart(true);
       setStage({ tag: "idle", startError: null });
       try {
-        const response = await startGeneration(sessionId, payload);
+        const response = await startMutation.mutateAsync(payload);
         adoptedForJobRef.current = null;
         setEditedSnapshot(null);
         setCommitError(null);
@@ -131,15 +140,13 @@ export function AiGenerateTab({ sessionId, clubSlug, onCommitted }: AiGenerateTa
         setSubmittingStart(false);
       }
     },
-    [sessionId],
+    [startMutation],
   );
 
-  const handleCancel = useCallback(async () => {
-    if (stage.tag !== "active") return;
-    const jobId = stage.jobId;
+  const handleCancelJob = useCallback(async (jobId: string) => {
     setStage({ tag: "active", jobId, cancelling: true });
     try {
-      await cancelGeneration(sessionId, jobId);
+      await cancelMutation.mutateAsync(jobId);
     } catch {
       // Surface no error — UX is to return to IDLE either way.
     }
@@ -147,7 +154,12 @@ export function AiGenerateTab({ sessionId, clubSlug, onCommitted }: AiGenerateTa
     adoptedForJobRef.current = null;
     setEditedSnapshot(null);
     setStage({ tag: "idle", startError: null });
-  }, [sessionId, stage]);
+  }, [cancelMutation]);
+
+  const handleCancel = useCallback(async () => {
+    if (stage.tag !== "active") return;
+    await handleCancelJob(stage.jobId);
+  }, [handleCancelJob, stage]);
 
   const handleSnapshotChange = useCallback((next: SessionImportV1) => {
     setCommitError(null);
@@ -163,7 +175,7 @@ export function AiGenerateTab({ sessionId, clubSlug, onCommitted }: AiGenerateTa
         recordVisibility,
         result: editedSnapshot,
       };
-      await commitGeneration(sessionId, stage.jobId, request);
+      await commitMutation.mutateAsync(request);
       clearAigenDraft(stage.jobId);
       adoptedForJobRef.current = null;
       setStage({ tag: "committed" });
@@ -175,7 +187,7 @@ export function AiGenerateTab({ sessionId, clubSlug, onCommitted }: AiGenerateTa
     } finally {
       setCommitting(false);
     }
-  }, [stage, editedSnapshot, recordVisibility, sessionId, onCommitted]);
+  }, [stage, editedSnapshot, recordVisibility, commitMutation, onCommitted]);
 
   const handleRetry = useCallback(() => {
     setStage({ tag: "idle", startError: null });
@@ -243,6 +255,14 @@ export function AiGenerateTab({ sessionId, clubSlug, onCommitted }: AiGenerateTa
 
   return (
     <div className="stack" style={{ "--stack": "12px" } as CSSProperties}>
+      <AiRecoveryStrip
+        job={recentJobQuery.data ?? null}
+        loading={recentJobQuery.isLoading}
+        onResumePolling={(jobId) => setStage({ tag: "active", jobId, cancelling: false })}
+        onCancel={handleCancelJob}
+        onCommitRetry={(jobId) => setStage({ tag: "active", jobId, cancelling: false })}
+        onStartNew={handleRetry}
+      />
       <TranscriptUploadForm
         defaultModel={defaultModel}
         loadingDefaults={clubDefaultsQuery.isLoading}

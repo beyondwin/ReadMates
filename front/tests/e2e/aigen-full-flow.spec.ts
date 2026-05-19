@@ -162,10 +162,19 @@ test("AI generation full flow: upload → poll → preview → commit", async ({
     "AI가 생성한 요약입니다.",
   );
 
+  let trackingCommitNavigation = false;
+  let mainFrameNavigationsAfterCommit = 0;
+  page.on("framenavigated", (frame) => {
+    if (trackingCommitNavigation && frame === page.mainFrame()) {
+      mainFrameNavigationsAfterCommit += 1;
+    }
+  });
+
   // Commit
+  trackingCommitNavigation = true;
   await page.getByRole("button", { name: /AI 기록 저장/ }).click();
 
-  // The host editor reloads on commit; assert the navigation/reload completed
-  // without a visible error and we are no longer in the PREVIEW state.
+  // Commit should refresh the editor through Query invalidation, not a full page reload.
   await expect(page.getByText(/AI 기록 저장을 완료했습니다|AI로 세션 기록 생성/)).toBeVisible({ timeout: 15000 });
+  await expect.poll(() => mainFrameNavigationsAfterCommit).toBe(0);
 });

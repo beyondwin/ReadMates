@@ -99,6 +99,37 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
+    fun `aigen ops web adapter keeps persistence out of controller boundary`() {
+        noClasses()
+            .that()
+            .haveSimpleName("AiGenerationOpsController")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage(
+                "org.springframework.jdbc..",
+                "..adapter.out.persistence..",
+                "..adapter.out.redis..",
+                "org.springframework.data.redis..",
+            ).check(importedClasses)
+    }
+
+    @Test
+    fun `aigen ops application service keeps adapter boundary`() {
+        noClasses()
+            .that()
+            .haveSimpleName("AiGenerationOpsService")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage(
+                "..adapter.in.web..",
+                "..adapter.out.persistence..",
+                "..adapter.out.redis..",
+                "org.springframework.jdbc..",
+                "org.springframework.data.redis..",
+            ).check(importedClasses)
+    }
+
+    @Test
     fun `notification application does not depend on legacy notification outbox port`() {
         noClasses()
             .that()

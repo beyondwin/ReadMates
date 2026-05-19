@@ -5,6 +5,7 @@ import {
   commitGeneration,
   getClubAiDefault,
   getJob,
+  getRecentJob,
   putClubAiDefault,
   regenerateItem,
   startGeneration,
@@ -136,6 +137,18 @@ describe("getJob", () => {
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit | undefined];
     expect(url).toBe("/api/bff/api/host/sessions/sid-1/ai-generate/jobs/job-1");
+    expect(init?.method ?? "GET").toBe("GET");
+  });
+});
+
+describe("getRecentJob", () => {
+  it("GETs the recent session AI job and normalizes 204 to null", async () => {
+    const fetchMock = captureFetch(new Response(null, { status: 204 }));
+
+    await expect(getRecentJob("session-1")).resolves.toBeNull();
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit | undefined];
+    expect(url).toBe("/api/bff/api/host/sessions/session-1/ai-generate/jobs/recent");
     expect(init?.method ?? "GET").toBe("GET");
   });
 });

@@ -82,11 +82,11 @@ function memberAppRoutes(queryClient: QueryClient, options: { includeIndex?: boo
       errorElement: <ArchiveRouteError />,
       hydrateFallbackElement: <ArchiveRouteLoading label="아카이브를 불러오는 중" />,
       lazy: async () => {
-        const [{ default: ArchiveRoutePage }, { archiveListLoader }] = await Promise.all([
+        const [{ default: ArchiveRoutePage }, { archiveListLoaderFactory }] = await Promise.all([
           import("@/src/pages/archive"),
           import("@/features/archive/route/archive-list-data"),
         ]);
-        return { Component: ArchiveRoutePage, loader: archiveListLoader };
+        return { Component: ArchiveRoutePage, loader: archiveListLoaderFactory(queryClient) };
       },
     },
     {
@@ -118,11 +118,11 @@ function memberAppRoutes(queryClient: QueryClient, options: { includeIndex?: boo
       errorElement: <ArchiveRouteError />,
       hydrateFallbackElement: <ArchiveRouteLoading label="지난 세션 기록을 불러오는 중" />,
       lazy: async () => {
-        const [{ default: MemberSessionDetailRoutePage }, { memberSessionDetailLoader }] = await Promise.all([
+        const [{ default: MemberSessionDetailRoutePage }, { memberSessionDetailLoaderFactory }] = await Promise.all([
           import("@/src/pages/member-session"),
           import("@/features/archive/route/member-session-detail-data"),
         ]);
-        return { Component: MemberSessionDetailRoutePage, loader: memberSessionDetailLoader };
+        return { Component: MemberSessionDetailRoutePage, loader: memberSessionDetailLoaderFactory(queryClient) };
       },
     },
     {
@@ -130,11 +130,11 @@ function memberAppRoutes(queryClient: QueryClient, options: { includeIndex?: boo
       errorElement: <FeedbackRouteError />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="피드백 문서를 불러오는 중" variant="member" />,
       lazy: async () => {
-        const [{ default: FeedbackDocumentRoutePage }, { feedbackDocumentLoader }] = await Promise.all([
+        const [{ default: FeedbackDocumentRoutePage }, { feedbackDocumentLoaderFactory }] = await Promise.all([
           import("@/src/pages/feedback-document"),
           import("@/features/feedback/route/feedback-document-data"),
         ]);
-        return { Component: FeedbackDocumentRoutePage, loader: feedbackDocumentLoader };
+        return { Component: FeedbackDocumentRoutePage, loader: feedbackDocumentLoaderFactory(queryClient) };
       },
     },
     {
@@ -142,11 +142,11 @@ function memberAppRoutes(queryClient: QueryClient, options: { includeIndex?: boo
       errorElement: <FeedbackRouteError />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="피드백 문서를 불러오는 중" variant="member" />,
       lazy: async () => {
-        const [{ default: FeedbackDocumentPrintRoutePage }, { feedbackDocumentLoader }] = await Promise.all([
+        const [{ default: FeedbackDocumentPrintRoutePage }, { feedbackDocumentLoaderFactory }] = await Promise.all([
           import("@/src/pages/feedback-print"),
           import("@/features/feedback/route/feedback-document-data"),
         ]);
-        return { Component: FeedbackDocumentPrintRoutePage, loader: feedbackDocumentLoader };
+        return { Component: FeedbackDocumentPrintRoutePage, loader: feedbackDocumentLoaderFactory(queryClient) };
       },
     },
     {

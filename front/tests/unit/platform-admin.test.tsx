@@ -631,6 +631,31 @@ describe("platform admin frontend shell", () => {
         );
       }
 
+      if (url === "/api/bff/api/admin/ai-generation/summary") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              activeJobCount: 1,
+              failedLast24h: 0,
+              monthToDateCostEstimateUsd: "0.0100",
+              failureCodes: [],
+              providerCosts: [],
+              staleCandidateCount: 0,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+
+      if (url === "/api/bff/api/admin/ai-generation/jobs") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ items: [], nextCursor: null }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+
       return Promise.reject(new Error(`Unexpected fetch: ${url}`));
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -640,7 +665,120 @@ describe("platform admin frontend shell", () => {
     renderAdminRouter(router);
 
     expect(await screen.findByRole("heading", { name: "플랫폼 관리" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "AI 운영" })).toBeInTheDocument();
+    expect(await screen.findByText("$0.0100")).toBeInTheDocument();
     expect(screen.getByText("OWNER")).toBeInTheDocument();
+  });
+
+  it("runs AI Ops force cancel from the platform admin route", async () => {
+    const ownerAuth: AuthMeResponse = {
+      ...baseAuth,
+      platformAdmin: {
+        userId: "user-1",
+        email: "owner@example.com",
+        role: "OWNER",
+      },
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(new Response(JSON.stringify(ownerAuth), { status: 200 }));
+      }
+
+      if (url === "/api/bff/api/admin/summary") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              platformRole: "OWNER",
+              activeClubCount: 0,
+              domainActionRequiredCount: 0,
+              domains: [],
+              domainsRequiringAction: [],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+
+      if (url === "/api/bff/api/admin/clubs") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ items: [] }), { status: 200, headers: { "Content-Type": "application/json" } }),
+        );
+      }
+
+      if (url === "/api/bff/api/admin/ai-generation/summary") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              activeJobCount: 1,
+              failedLast24h: 0,
+              monthToDateCostEstimateUsd: "0.1200",
+              failureCodes: [],
+              providerCosts: [{ provider: "OPENAI", model: "gpt-model", costEstimateUsd: "0.1200" }],
+              staleCandidateCount: 1,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+
+      if (url === "/api/bff/api/admin/ai-generation/jobs") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              items: [
+                {
+                  jobId: "job-1",
+                  club: { clubId: "club-1", slug: "reading-sai", name: "읽는사이" },
+                  session: { sessionId: "session-1", number: 7, bookTitle: "Book" },
+                  status: "RUNNING",
+                  stage: "GENERATING_SUMMARY",
+                  provider: "OPENAI",
+                  model: "gpt-model",
+                  errorCode: null,
+                  safeErrorMessage: null,
+                  costEstimateUsd: "0.1200",
+                  createdAt: "2026-05-18T00:00:00Z",
+                  lastUpdatedAt: "2026-05-18T00:01:00Z",
+                  expiresAt: "2026-05-18T06:00:00Z",
+                  staleCandidate: true,
+                  availableActions: ["FORCE_CANCEL"],
+                },
+              ],
+              nextCursor: null,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+
+      if (url === "/api/bff/api/admin/ai-generation/jobs/job-1/force-cancel") {
+        expect(init?.method).toBe("POST");
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ jobId: "job-1", previousStatus: "RUNNING", nextStatus: "CANCELLED" }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    installRouterRequestShim();
+    const router = createMemoryRouter(routes, { initialEntries: ["/admin"] });
+    const user = userEvent.setup();
+
+    renderAdminRouter(router);
+
+    await user.click(await screen.findByRole("button", { name: "Force cancel" }));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/admin/ai-generation/jobs/job-1/force-cancel",
+      expect.objectContaining({ method: "POST" }),
+    );
   });
 
   it("seeds platform admin query cache from the app route loader", async () => {

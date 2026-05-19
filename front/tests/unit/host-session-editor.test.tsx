@@ -4,8 +4,20 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HostSessionEditorActions } from "@/features/host/route/host-session-editor-actions";
 
 vi.mock("@/features/host/aigen/ui/AiGenerateTab", () => ({
-  AiGenerateTab: ({ sessionId, clubSlug }: { sessionId: string; clubSlug: string }) => (
-    <div data-testid="aigen-tab" data-session-id={sessionId} data-club-slug={clubSlug} />
+  AiGenerateTab: ({
+    sessionId,
+    clubSlug,
+    onCommitted,
+  }: {
+    sessionId: string;
+    clubSlug: string;
+    onCommitted: () => void;
+  }) => (
+    <div data-testid="aigen-tab" data-session-id={sessionId} data-club-slug={clubSlug}>
+      <button type="button" onClick={onCommitted}>
+        simulate AI commit
+      </button>
+    </div>
   ),
 }));
 
@@ -1475,6 +1487,34 @@ describe("HostSessionEditor", () => {
       const callArgs = replaceStateSpy.mock.calls[replaceStateSpy.mock.calls.length - 1];
       const urlArg = String(callArgs[2]);
       expect(urlArg).not.toMatch(/[?&]records=/);
+    });
+
+    it("notifies the route after AI commit without reloading the page", async () => {
+      stubLocationSearch("");
+      const user = userEvent.setup();
+      const reload = vi.fn();
+      const onSessionRecordsChanged = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        writable: true,
+        value: {
+          ...window.location,
+          reload,
+        },
+      });
+
+      render(
+        <HostSessionEditorForTest
+          session={session}
+          clubSlug="club-a"
+          onSessionRecordsChanged={onSessionRecordsChanged}
+        />,
+      );
+
+      await user.click(screen.getByRole("button", { name: "simulate AI commit" }));
+
+      expect(reload).not.toHaveBeenCalled();
+      expect(onSessionRecordsChanged).toHaveBeenCalledWith(session.sessionId);
     });
 
     it("does not render the toggle for a not-yet-created session", () => {

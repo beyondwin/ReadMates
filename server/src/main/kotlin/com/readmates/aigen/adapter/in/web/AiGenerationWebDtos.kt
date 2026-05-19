@@ -1,5 +1,7 @@
 package com.readmates.aigen.adapter.`in`.web
 
+import com.readmates.aigen.application.model.JobStatus
+import com.readmates.aigen.application.model.JobView
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.session.application.SessionRecordVisibility
 import java.time.LocalDate
@@ -64,6 +66,23 @@ data class JobStatusResponse(
     val tokens: TokenUsageJson?,
     val costEstimateUsd: String,
     val warnings: List<String>,
+    val expiresAt: String,
+    val createdAt: String,
+    val lastUpdatedAt: String,
+)
+
+data class RecentJobResponse(
+    val jobId: UUID,
+    val status: String,
+    val stage: String?,
+    val progressPct: Int,
+    val model: String,
+    val error: GenerationErrorJson?,
+    val costEstimateUsd: String,
+    val expiresAt: String,
+    val createdAt: String,
+    val lastUpdatedAt: String,
+    val availableActions: List<String>,
 )
 
 data class RegenerateRequest(
@@ -111,6 +130,49 @@ fun SessionImportV1Snapshot.toJson(): SessionImportV1Json =
         feedbackDocumentFileName = feedbackDocumentFileName,
         feedbackDocumentMarkdown = feedbackDocumentMarkdown,
     )
+
+fun JobView.toStatusResponse(): JobStatusResponse =
+    JobStatusResponse(
+        jobId = jobId,
+        status = status.name,
+        stage = stage?.name,
+        progressPct = progressPct,
+        model = model.name,
+        result = result?.toJson(),
+        error = error?.let { GenerationErrorJson(it.code.name, it.message) },
+        tokens = tokens?.let { TokenUsageJson(it.inputTokens, it.cachedInputTokens, it.outputTokens) },
+        costEstimateUsd = costEstimateUsd.toPlainString(),
+        warnings = warnings,
+        expiresAt = expiresAt.toString(),
+        createdAt = createdAt.toString(),
+        lastUpdatedAt = lastUpdatedAt.toString(),
+    )
+
+fun JobView.toRecentJobResponse(): RecentJobResponse =
+    RecentJobResponse(
+        jobId = jobId,
+        status = status.name,
+        stage = stage?.name,
+        progressPct = progressPct,
+        model = model.name,
+        error = error?.let { GenerationErrorJson(it.code.name, it.message) },
+        costEstimateUsd = costEstimateUsd.toPlainString(),
+        expiresAt = expiresAt.toString(),
+        createdAt = createdAt.toString(),
+        lastUpdatedAt = lastUpdatedAt.toString(),
+        availableActions = availableActions(),
+    )
+
+private fun JobView.availableActions(): List<String> =
+    when (status) {
+        JobStatus.PENDING,
+        JobStatus.RUNNING -> listOf("POLL", "CANCEL")
+        JobStatus.SUCCEEDED -> listOf("POLL", "COMMIT_RETRY", "CANCEL")
+        JobStatus.COMMITTING -> listOf("POLL")
+        JobStatus.FAILED -> listOf("START_NEW")
+        JobStatus.COMMITTED,
+        JobStatus.CANCELLED -> emptyList()
+    }
 
 fun SessionImportV1Json.toSnapshot(): SessionImportV1Snapshot =
     SessionImportV1Snapshot(

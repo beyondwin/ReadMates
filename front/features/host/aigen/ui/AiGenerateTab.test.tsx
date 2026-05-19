@@ -21,6 +21,7 @@ import type {
 vi.mock("@/features/host/aigen/api/aigen-api", () => ({
   startGeneration: vi.fn(),
   getJob: vi.fn(),
+  getRecentJob: vi.fn(),
   regenerateItem: vi.fn(),
   commitGeneration: vi.fn(),
   cancelGeneration: vi.fn(),
@@ -33,12 +34,14 @@ import {
   commitGeneration,
   getClubAiDefault,
   getJob,
+  getRecentJob,
   startGeneration,
 } from "@/features/host/aigen/api/aigen-api";
 import { AiGenerateTab } from "./AiGenerateTab";
 
 const mockedStart = vi.mocked(startGeneration);
 const mockedGetJob = vi.mocked(getJob);
+const mockedGetRecent = vi.mocked(getRecentJob);
 const mockedCommit = vi.mocked(commitGeneration);
 const mockedCancel = vi.mocked(cancelGeneration);
 const mockedClubDefault = vi.mocked(getClubAiDefault);
@@ -71,6 +74,16 @@ function jobResponse(status: AiGenerationStatus, opts: Partial<AiGenerationJobRe
     warnings: [],
     ...opts,
   };
+}
+
+function recentJobResponse(status: AiGenerationStatus) {
+  return {
+    ...jobResponse(status),
+    createdAt: "2026-05-18T00:00:00Z",
+    lastUpdatedAt: "2026-05-18T00:01:00Z",
+    expiresAt: "2026-05-18T06:00:00Z",
+    availableActions: ["POLL", "CANCEL", "COMMIT_RETRY"],
+  } as const;
 }
 
 function clubDefaultResponse(model: string | null = "claude-sonnet-4-6"): ClubAiDefaultResponse {
@@ -115,10 +128,12 @@ describe("AiGenerateTab", () => {
   beforeEach(() => {
     mockedStart.mockReset();
     mockedGetJob.mockReset();
+    mockedGetRecent.mockReset();
     mockedCommit.mockReset();
     mockedCancel.mockReset();
     mockedClubDefault.mockReset();
     mockedClubDefault.mockResolvedValue(clubDefaultResponse());
+    mockedGetRecent.mockResolvedValue(null);
     installFakeLocalStorage();
   });
 
@@ -136,6 +151,27 @@ describe("AiGenerateTab", () => {
 
     expect(await screen.findByText("AI로 세션 기록 생성")).toBeInTheDocument();
     expect(screen.getByLabelText(/대본 파일/)).toBeInTheDocument();
+  });
+
+  it("shows a recent recoverable job on idle render and resumes polling", async () => {
+    mockedGetRecent.mockResolvedValue(recentJobResponse("SUCCEEDED"));
+    mockedGetJob.mockResolvedValue(jobResponse("SUCCEEDED"));
+
+    const { Wrapper } = createWrapper();
+    render(
+      <Wrapper>
+        <AiGenerateTab sessionId="s1" clubSlug="club-a" onCommitted={() => {}} />
+      </Wrapper>,
+    );
+
+    expect(await screen.findByText("SUCCEEDED")).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Polling 재개" }));
+    });
+
+    await waitFor(() => {
+      expect(mockedGetJob).toHaveBeenCalledWith("s1", "job-1");
+    });
   });
 
   it("transitions IDLE → GENERATING when start succeeds", async () => {

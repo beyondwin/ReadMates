@@ -1,11 +1,12 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryRouter, RouterProvider, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MemberArchiveSessionDetailResponse } from "@/features/archive/api/archive-contracts";
 import {
   enrichSessionDetailHighlightAuthors,
-  memberSessionDetailLoader,
+  memberSessionDetailLoaderFactory,
 } from "@/features/archive/route/member-session-detail-data";
 import MemberSessionDetailPage from "@/features/archive/ui/member-session-detail-page";
 import MemberSessionDetailRoutePage from "@/src/pages/member-session";
@@ -46,6 +47,24 @@ function installRouterRequestShim() {
 
 function renderDetail(session: MemberArchiveSessionDetailResponse = readableSession) {
   return render(<MemberSessionDetailPage session={session} />);
+}
+
+function createTestQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+}
+
+function renderRouterWithQueryClient(router: ReturnType<typeof createMemoryRouter>, queryClient: QueryClient) {
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
 }
 
 function getDesktop(container: HTMLElement) {
@@ -102,10 +121,10 @@ describe("MemberSessionDetailPage", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     try {
-      await memberSessionDetailLoader({
+      await memberSessionDetailLoaderFactory(createTestQueryClient())({
         params: { clubSlug: "reading-sai", sessionId: "session-6" },
         request: new Request("https://app.readmates.example/clubs/reading-sai/app/sessions/session-6?from=email"),
-      } as Parameters<typeof memberSessionDetailLoader>[0]);
+      } as Parameters<ReturnType<typeof memberSessionDetailLoaderFactory>>[0]);
       throw new Error("Expected redirect");
     } catch (error) {
       expect(error).toBeInstanceOf(Response);
@@ -306,12 +325,13 @@ describe("MemberSessionDetailPage", () => {
       }),
     );
 
+    const queryClient = createTestQueryClient();
     const router = createMemoryRouter(
       [
         {
           path: "/app/sessions/:sessionId",
           element: <MemberSessionDetailRoutePage />,
-          loader: memberSessionDetailLoader,
+          loader: memberSessionDetailLoaderFactory(queryClient),
           hydrateFallbackElement: <div>지난 세션 기록을 불러오는 중</div>,
         },
       ],
@@ -327,7 +347,7 @@ describe("MemberSessionDetailPage", () => {
         ],
       },
     );
-    const { container } = render(<RouterProvider router={router} />);
+    const { container } = renderRouterWithQueryClient(router, queryClient);
 
     expect((await screen.findAllByText("팩트풀니스")).length).toBeGreaterThan(0);
     expect(getDesktop(container).queryByRole("link", { name: "아카이브로" })).not.toBeInTheDocument();
@@ -373,12 +393,13 @@ describe("MemberSessionDetailPage", () => {
       }),
     );
 
+    const queryClient = createTestQueryClient();
     const router = createMemoryRouter(
       [
         {
           path: "/app/sessions/:sessionId",
           element: <MemberSessionDetailRoutePage />,
-          loader: memberSessionDetailLoader,
+          loader: memberSessionDetailLoaderFactory(queryClient),
           hydrateFallbackElement: <div>지난 세션 기록을 불러오는 중</div>,
         },
         { path: "/app/feedback/:sessionId", element: <LocationStateEcho /> },
@@ -395,7 +416,7 @@ describe("MemberSessionDetailPage", () => {
         ],
       },
     );
-    const { container } = render(<RouterProvider router={router} />);
+    const { container } = renderRouterWithQueryClient(router, queryClient);
 
     expect((await screen.findAllByText("팩트풀니스")).length).toBeGreaterThan(0);
 

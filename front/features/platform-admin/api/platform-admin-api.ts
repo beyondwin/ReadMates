@@ -2,6 +2,10 @@ import { readmatesFetch } from "@/shared/api/client";
 import type {
   CreatePlatformAdminDomainRequest,
   CreateSupportAccessGrantRequest,
+  PlatformAdminAiOpsActionResponse,
+  PlatformAdminAiOpsFilters,
+  PlatformAdminAiOpsJobListResponse,
+  PlatformAdminAiOpsSummaryResponse,
   PlatformAdminClub,
   PlatformAdminClubListResponse,
   PlatformAdminDomainResponse,
@@ -96,6 +100,37 @@ export function listSupportAccessGrantsByClub(clubId: string) {
   return readmatesFetch<SupportAccessGrantResponse[]>(
     `/api/admin/support-access-grants?clubId=${encodeURIComponent(clubId)}`,
     undefined,
+    { clubSlug: undefined },
+  );
+}
+
+export function fetchPlatformAdminAiOpsSummary() {
+  return readmatesFetch<PlatformAdminAiOpsSummaryResponse>(
+    "/api/admin/ai-generation/summary",
+    undefined,
+    { clubSlug: undefined },
+  );
+}
+
+export function fetchPlatformAdminAiOpsJobs(filters: PlatformAdminAiOpsFilters = {}) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value) {
+      params.set(key, value);
+    }
+  }
+  const search = params.toString();
+  return readmatesFetch<PlatformAdminAiOpsJobListResponse>(
+    `/api/admin/ai-generation/jobs${search ? `?${search}` : ""}`,
+    undefined,
+    { clubSlug: undefined },
+  );
+}
+
+export function forceCancelPlatformAdminAiJob(jobId: string) {
+  return readmatesFetch<PlatformAdminAiOpsActionResponse>(
+    `/api/admin/ai-generation/jobs/${encodeURIComponent(jobId)}/force-cancel`,
+    { method: "POST" },
     { clubSlug: undefined },
   );
 }

@@ -114,6 +114,30 @@ export type AiGenerationJobResponse = {
   warnings: string[];
 };
 
+export type AiGenerationAvailableAction =
+  | "POLL"
+  | "CANCEL"
+  | "COMMIT_RETRY"
+  | "START_NEW";
+
+export type AiRecentJobResponse = {
+  jobId: string;
+  status: AiGenerationStatus;
+  stage: AiGenerationStage | null;
+  progressPct: number;
+  model: string;
+  error: AiGenerationError | null;
+  /** Decimal string (server uses BigDecimal.toPlainString). */
+  costEstimateUsd: string;
+  /** ISO instant, UTC. */
+  createdAt: string;
+  /** ISO instant, UTC. */
+  lastUpdatedAt: string;
+  /** ISO instant, UTC. */
+  expiresAt: string;
+  availableActions: AiGenerationAvailableAction[];
+};
+
 /** Item-specific shape of the regenerate response `value`. */
 export type RegenerateItemValue =
   | { summary: string }

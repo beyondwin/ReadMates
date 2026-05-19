@@ -1,9 +1,10 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryRouter, RouterProvider, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import PublicRecordsPage from "@/src/pages/public-records";
-import { publicClubLoader } from "@/features/public/route/public-route-data";
+import { publicClubLoaderFactory } from "@/features/public/route/public-route-data";
 import { PublicRouteError } from "@/features/public/route/public-route-state";
 
 const PUBLIC_RECORDS_SCROLL_KEY = "readmates:public-records-scroll";
@@ -33,14 +34,25 @@ function LocationStateEcho() {
   );
 }
 
+function createTestQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+}
+
 function renderRecordsRoute() {
   installRouterRequestShim();
+  const queryClient = createTestQueryClient();
   const router = createMemoryRouter(
     [
       {
         path: "/records",
         element: <PublicRecordsPage />,
-        loader: publicClubLoader,
+        loader: publicClubLoaderFactory(queryClient),
         errorElement: <PublicRouteError />,
         hydrateFallbackElement: <div>공개 기록을 불러오는 중</div>,
       },
@@ -50,7 +62,11 @@ function renderRecordsRoute() {
     { initialEntries: ["/records"] },
   );
 
-  render(<RouterProvider router={router} />);
+  render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
 }
 
 afterEach(() => {

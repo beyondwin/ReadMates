@@ -9,6 +9,7 @@ import { currentSessionContractFixture } from "./api-contract-fixtures";
 
 afterEach(() => {
   cleanup();
+  routesQueryClient.clear();
   vi.unstubAllGlobals();
   window.history.pushState({}, "", "/");
 });

@@ -18,6 +18,7 @@ private const val INTERNAL_ERROR_DETAIL = "internal error"
 private const val PROBLEM_JOB_NOT_FOUND = "/problems/aigen/job-not-found"
 private const val PROBLEM_JOB_SESSION_MISMATCH = "/problems/aigen/job-session-mismatch"
 private const val PROBLEM_ILLEGAL_GENERATION_STATE = "/problems/aigen/illegal-generation-state"
+private const val PROBLEM_AI_OPS_ACTION = "/problems/aigen/ops-action"
 
 /**
  * REST advice scoped to [AiGenerationController]. Translates domain
@@ -65,6 +66,15 @@ class AiGenerationErrorHandler {
             code = "ILLEGAL_GENERATION_STATE",
             detail = error.message,
             type = PROBLEM_ILLEGAL_GENERATION_STATE,
+        )
+
+    @ExceptionHandler(AiGenerationException.SafeOpsError::class)
+    fun handleSafeOpsError(error: AiGenerationException.SafeOpsError): ResponseEntity<ProblemDetail> =
+        problem(
+            status = if (error.code == "JOB_EXPIRED") HttpStatus.GONE else HttpStatus.CONFLICT,
+            code = error.code,
+            detail = "AI Ops action is not available for job ${error.jobId}",
+            type = PROBLEM_AI_OPS_ACTION,
         )
 
     @ExceptionHandler(AiGenerationJobPublishException::class)

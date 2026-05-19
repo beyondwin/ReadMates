@@ -305,9 +305,101 @@
 .platform-admin-work-queue,
 .platform-admin-brief,
 .platform-admin-publish-checklist,
-.platform-admin-support-grants {
+.platform-admin-support-grants,
+.platform-admin-ai-ops {
   display: grid;
   gap: 14px;
+}
+
+.platform-admin-ai-ops {
+  border-top: 1px solid var(--line);
+  padding-top: 4px;
+}
+
+.platform-admin-ai-ops__header,
+.platform-admin-ai-ops__job {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.platform-admin-ai-ops__header .h3 {
+  margin: 0;
+}
+
+.platform-admin-ai-ops__error,
+.platform-admin-ai-ops__job-error {
+  margin: 0;
+  color: var(--danger);
+}
+
+.platform-admin-ai-ops__metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.platform-admin-ai-ops__metric {
+  padding: 16px;
+}
+
+.platform-admin-ai-ops__metric-value {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.platform-admin-ai-ops__sidecars {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.platform-admin-ai-ops__small-list {
+  padding: 14px;
+}
+
+.platform-admin-ai-ops__small-list p {
+  margin: 0;
+}
+
+.platform-admin-ai-ops__small-list ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.platform-admin-ai-ops__jobs {
+  display: grid;
+  gap: 10px;
+}
+
+.platform-admin-ai-ops__job {
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  background: var(--surface);
+  padding: 14px;
+}
+
+.platform-admin-ai-ops__job-main {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.platform-admin-ai-ops__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.platform-admin-ai-ops__job-title {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-weight: 700;
 }
 
 .platform-admin-work-queue__row {
@@ -1373,6 +1465,15 @@
 
   .platform-admin-console {
     grid-template-columns: 1fr;
+  }
+
+  .platform-admin-ai-ops__metrics,
+  .platform-admin-ai-ops__sidecars {
+    grid-template-columns: 1fr;
+  }
+
+  .platform-admin-ai-ops__job {
+    display: grid;
   }
 
   .platform-admin-work-queue__row {

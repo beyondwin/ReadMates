@@ -15,6 +15,7 @@ import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.`in`.CancelGenerationUseCase
 import com.readmates.aigen.application.port.`in`.CommitGenerationUseCase
 import com.readmates.aigen.application.port.`in`.GetJobUseCase
+import com.readmates.aigen.application.port.`in`.GetRecentSessionGenerationJobUseCase
 import com.readmates.aigen.application.port.`in`.RegenerateItemUseCase
 import com.readmates.aigen.application.port.`in`.RegenerationResult
 import com.readmates.aigen.application.port.`in`.StartGenerationCommand
@@ -56,6 +57,8 @@ class AiGenerationControllerTest {
     private val hostUserId: UUID = UUID.fromString("00000000-0000-0000-0000-000000000030")
     private val jobId: UUID = UUID.fromString("00000000-0000-0000-0000-000000000040")
     private val expiresAt: Instant = Instant.parse("2026-05-17T10:00:00Z")
+    private val createdAt: Instant = Instant.parse("2026-05-17T09:00:00Z")
+    private val lastUpdatedAt: Instant = Instant.parse("2026-05-17T09:30:00Z")
 
     private val currentMember =
         CurrentMember(
@@ -84,6 +87,7 @@ class AiGenerationControllerTest {
 
     private val startUseCase = FakeStartUseCase()
     private val getJobUseCase = FakeGetJobUseCase()
+    private val recentJobUseCase = FakeRecentJobUseCase()
     private val regenerateUseCase = FakeRegenerateUseCase()
     private val commitUseCase = FakeCommitUseCase()
     private val cancelUseCase = FakeCancelUseCase()
@@ -102,6 +106,7 @@ class AiGenerationControllerTest {
                     AiGenerationController(
                         start = startUseCase,
                         getJob = getJobUseCase,
+                        recentJob = recentJobUseCase,
                         regen = regenerateUseCase,
                         commitUc = commitUseCase,
                         cancel = cancelUseCase,
@@ -157,6 +162,7 @@ class AiGenerationControllerTest {
                     AiGenerationController(
                         start = startUseCase,
                         getJob = getJobUseCase,
+                        recentJob = recentJobUseCase,
                         regen = regenerateUseCase,
                         commitUc = commitUseCase,
                         cancel = cancelUseCase,
@@ -235,6 +241,42 @@ class AiGenerationControllerTest {
                 jsonPath("$.result.bookTitle") { value("Title") }
                 jsonPath("$.costEstimateUsd") { value("0.12") }
                 jsonPath("$.tokens.input") { value(100) }
+            }
+    }
+
+    @Test
+    fun `GET recent job returns safe recoverable job metadata without generated result payload`() {
+        recentJobUseCase.view = sampleJobView()
+
+        mockMvc
+            .get("/api/host/sessions/$sessionId/ai-generate/jobs/recent") {
+                with(authedUser())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.jobId") { value(jobId.toString()) }
+                jsonPath("$.status") { value("SUCCEEDED") }
+                jsonPath("$.stage") { value("READY") }
+                jsonPath("$.model") { value("claude-sonnet-4-6") }
+                jsonPath("$.result") { doesNotExist() }
+                jsonPath("$.tokens") { doesNotExist() }
+                jsonPath("$.costEstimateUsd") { value("0.12") }
+                jsonPath("$.expiresAt") { value(expiresAt.toString()) }
+                jsonPath("$.createdAt") { value(createdAt.toString()) }
+                jsonPath("$.lastUpdatedAt") { value(lastUpdatedAt.toString()) }
+                jsonPath("$.availableActions[0]") { value("POLL") }
+                jsonPath("$.availableActions[1]") { value("COMMIT_RETRY") }
+            }
+    }
+
+    @Test
+    fun `GET recent job returns 204 when no recoverable job exists`() {
+        recentJobUseCase.view = null
+
+        mockMvc
+            .get("/api/host/sessions/$sessionId/ai-generate/jobs/recent") {
+                with(authedUser())
+            }.andExpect {
+                status { isNoContent() }
             }
     }
 
@@ -364,6 +406,8 @@ class AiGenerationControllerTest {
             costEstimateUsd = BigDecimal("0.12"),
             warnings = emptyList(),
             expiresAt = expiresAt,
+            createdAt = createdAt,
+            lastUpdatedAt = lastUpdatedAt,
         )
 
     private fun sampleCommitResult(): SessionImportCommitResult =
@@ -410,6 +454,12 @@ class AiGenerationControllerTest {
             sessionId: UUID,
             jobId: UUID,
         ): JobView = view
+    }
+
+    private class FakeRecentJobUseCase : GetRecentSessionGenerationJobUseCase {
+        var view: JobView? = null
+
+        override fun recent(sessionId: UUID): JobView? = view
     }
 
     private class FakeRegenerateUseCase : RegenerateItemUseCase {

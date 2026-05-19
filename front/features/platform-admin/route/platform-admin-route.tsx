@@ -19,6 +19,11 @@ import {
   useRevokeSupportAccessGrantMutation,
   useUpdatePlatformAdminClubMutation,
 } from "@/features/platform-admin/queries/platform-admin-queries";
+import {
+  platformAdminAiOpsJobsQuery,
+  platformAdminAiOpsSummaryQuery,
+  useForceCancelPlatformAdminAiJobMutation,
+} from "@/features/platform-admin/queries/platform-admin-ai-ops-queries";
 import type { CreateSupportAccessGrantFields } from "@/features/platform-admin/ui/support-access-grants-panel";
 
 export function PlatformAdminRoute() {
@@ -30,6 +35,8 @@ export function PlatformAdminRoute() {
 
   const summaryQuery = useQuery(platformAdminSummaryQuery());
   const clubsQuery = useQuery(platformAdminClubsQuery());
+  const aiOpsSummaryQuery = useQuery(platformAdminAiOpsSummaryQuery());
+  const aiOpsJobsQuery = useQuery(platformAdminAiOpsJobsQuery());
   const summary = summaryQuery.data ?? data.summary;
   const clubs = clubsQuery.data ?? data.clubs;
 
@@ -53,6 +60,7 @@ export function PlatformAdminRoute() {
   const updateClubMutation = useUpdatePlatformAdminClubMutation();
   const createGrantMutation = useCreateSupportAccessGrantMutation(effectiveSelectedClubId);
   const revokeGrantMutation = useRevokeSupportAccessGrantMutation(effectiveSelectedClubId);
+  const forceCancelAiJobMutation = useForceCancelPlatformAdminAiJobMutation();
 
   async function handleCreateGrant(fields: CreateSupportAccessGrantFields) {
     const clubId = workbench.selectedClub?.clubId;
@@ -129,6 +137,20 @@ export function PlatformAdminRoute() {
       }
       onCreateGrant={handleCreateGrant}
       onRevokeGrant={handleRevokeGrant}
+      aiOpsSummary={aiOpsSummaryQuery.data ?? null}
+      aiOpsJobs={aiOpsJobsQuery.data?.items ?? []}
+      aiOpsLoading={aiOpsSummaryQuery.isFetching || aiOpsJobsQuery.isFetching || forceCancelAiJobMutation.isPending}
+      aiOpsError={
+        aiOpsSummaryQuery.isError || aiOpsJobsQuery.isError || forceCancelAiJobMutation.isError
+          ? "AI Ops 데이터를 불러오거나 갱신하지 못했습니다."
+          : null
+      }
+      onForceCancelAiJob={async (jobId) => {
+        if (!window.confirm("AI job을 강제 취소할까요?")) {
+          return;
+        }
+        await forceCancelAiJobMutation.mutateAsync(jobId);
+      }}
     />
   );
 }

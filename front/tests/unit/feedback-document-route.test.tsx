@@ -1,10 +1,11 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryRouter, RouterProvider, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import FeedbackDocumentRoutePage from "@/src/pages/feedback-document";
 import FeedbackDocumentPrintRoutePage from "@/src/pages/feedback-print";
-import { feedbackDocumentLoader } from "@/features/feedback/route/feedback-document-data";
+import { feedbackDocumentLoaderFactory } from "@/features/feedback/route/feedback-document-data";
 import { FeedbackRouteError } from "@/features/feedback/route/feedback-route-state";
 
 function installRouterRequestShim() {
@@ -94,24 +95,35 @@ function setupBffAuth(body: unknown) {
   );
 }
 
+function createTestQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+}
+
 function renderFeedbackRoute(
   path: string | { pathname: string; state?: unknown },
   printMode = false,
 ) {
   installRouterRequestShim();
+  const queryClient = createTestQueryClient();
   const router = createMemoryRouter(
     [
       {
         path: "/app/feedback/:sessionId",
         element: printMode ? <FeedbackDocumentPrintRoutePage /> : <FeedbackDocumentRoutePage />,
-        loader: feedbackDocumentLoader,
+        loader: feedbackDocumentLoaderFactory(queryClient),
         errorElement: <FeedbackRouteError />,
         hydrateFallbackElement: <div>피드백 문서를 불러오는 중</div>,
       },
       {
         path: "/app/feedback/:sessionId/print",
         element: <FeedbackDocumentPrintRoutePage />,
-        loader: feedbackDocumentLoader,
+        loader: feedbackDocumentLoaderFactory(queryClient),
         errorElement: <FeedbackRouteError />,
         hydrateFallbackElement: <div>피드백 문서를 불러오는 중</div>,
       },
@@ -120,7 +132,11 @@ function renderFeedbackRoute(
     { initialEntries: [path] },
   );
 
-  render(<RouterProvider router={router} />);
+  render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
 }
 
 function LocationStateEcho() {
@@ -137,12 +153,13 @@ function LocationStateEcho() {
 
 function renderFeedbackReturnFlow(path: string | { pathname: string; state?: unknown }) {
   installRouterRequestShim();
+  const queryClient = createTestQueryClient();
   const router = createMemoryRouter(
     [
       {
         path: "/app/feedback/:sessionId",
         element: <FeedbackDocumentRoutePage />,
-        loader: feedbackDocumentLoader,
+        loader: feedbackDocumentLoaderFactory(queryClient),
         errorElement: <FeedbackRouteError />,
         hydrateFallbackElement: <div>피드백 문서를 불러오는 중</div>,
       },
@@ -151,7 +168,11 @@ function renderFeedbackReturnFlow(path: string | { pathname: string; state?: unk
     { initialEntries: [path] },
   );
 
-  render(<RouterProvider router={router} />);
+  render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
 }
 
 describe("Feedback document routes", () => {

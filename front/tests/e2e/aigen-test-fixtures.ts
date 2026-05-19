@@ -66,6 +66,10 @@ export async function routeHostEditorShell(page: Page, clubSlug: string): Promis
       body: JSON.stringify({ items: [], nextCursor: null }),
     });
   });
+
+  await page.route("**/api/bff/api/host/sessions/*/ai-generate/jobs/recent**", async (route) => {
+    await route.fulfill({ status: 204 });
+  });
 }
 
 export function hostSessionDetailResponse(sessionId: string): HostSessionDetailResponse {

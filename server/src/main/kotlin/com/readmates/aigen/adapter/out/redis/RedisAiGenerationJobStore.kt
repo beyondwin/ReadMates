@@ -66,6 +66,7 @@ class RedisAiGenerationJobStore(
                         java.time.Duration.ofSeconds(ttlSeconds),
                     )
             }
+            indexJob(job)
         }.onFailure { recordFailure("save") }.getOrThrow()
     }
 
@@ -87,6 +88,60 @@ class RedisAiGenerationJobStore(
             fromHash(jobId, hash, transcript.orEmpty(), result)
         }.onFailure { recordFailure("load") }.getOrNull()
 
+    override fun loadRecentForSession(
+        sessionId: UUID,
+        limit: Int,
+    ): List<JobRecord> =
+        runCatching {
+            if (limit <= 0) return@runCatching emptyList()
+            val key = sessionRecentKey(sessionId)
+            val ids =
+                redisTemplate
+                    .opsForZSet()
+                    .reverseRange(key, 0, (limit - 1).coerceAtLeast(0).toLong())
+                    .orEmpty()
+            ids.mapNotNull { id ->
+                val jobId = id.toUuidOrNull() ?: return@mapNotNull null
+                val record = load(jobId)
+                when {
+                    record == null -> {
+                        redisTemplate.opsForZSet().remove(key, id)
+                        null
+                    }
+                    record.sessionId != sessionId -> {
+                        redisTemplate.opsForZSet().remove(key, id)
+                        null
+                    }
+                    else -> record
+                }
+            }
+        }.onFailure { recordFailure("loadRecentForSession") }.getOrDefault(emptyList())
+
+    override fun loadActiveJobs(limit: Int): List<JobRecord> =
+        runCatching {
+            if (limit <= 0) return@runCatching emptyList()
+            val ids =
+                redisTemplate
+                    .opsForZSet()
+                    .reverseRange(activeJobsKey(), 0, (limit - 1).coerceAtLeast(0).toLong())
+                    .orEmpty()
+            ids.mapNotNull { id ->
+                val jobId = id.toUuidOrNull() ?: return@mapNotNull null
+                val record = load(jobId)
+                when {
+                    record == null -> {
+                        redisTemplate.opsForZSet().remove(activeJobsKey(), id)
+                        null
+                    }
+                    record.status !in ACTIVE_INDEX_STATUSES -> {
+                        removeFromActiveIndexes(record)
+                        null
+                    }
+                    else -> record
+                }
+            }
+        }.onFailure { recordFailure("loadActiveJobs") }.getOrDefault(emptyList())
+
     override fun saveResult(
         jobId: UUID,
         result: SessionImportV1Snapshot,
@@ -95,6 +150,7 @@ class RedisAiGenerationJobStore(
     ) {
         runCatching {
             val ttlSeconds = properties.job.redisTtl.seconds
+            val lastUpdatedAt = Instant.now()
             val resultJson = objectMapper.writeValueAsString(result)
             redisTemplate.execute(
                 PATCH_RESULT_SCRIPT,
@@ -104,8 +160,10 @@ class RedisAiGenerationJobStore(
                 usage.cachedInputTokens.toString(),
                 usage.outputTokens.toString(),
                 cost.toPlainString(),
+                lastUpdatedAt.toString(),
                 ttlSeconds.toString(),
             )
+            refreshIndexes(jobId)
         }.onFailure { recordFailure("saveResult") }.getOrThrow()
     }
 
@@ -118,6 +176,7 @@ class RedisAiGenerationJobStore(
     ) {
         runCatching {
             val ttlSeconds = properties.job.redisTtl.seconds
+            val lastUpdatedAt = Instant.now()
             // value contract: orchestrator passes the FULL patched SessionImportV1Snapshot.
             // We always re-serialize the snapshot — primitive/per-item values are not supported.
             require(value is SessionImportV1Snapshot) {
@@ -132,8 +191,10 @@ class RedisAiGenerationJobStore(
                 usage.cachedInputTokens.toString(),
                 usage.outputTokens.toString(),
                 cost.toPlainString(),
+                lastUpdatedAt.toString(),
                 ttlSeconds.toString(),
             )
+            refreshIndexes(jobId)
         }.onFailure { recordFailure("patchItem") }.getOrThrow()
     }
 
@@ -147,15 +208,19 @@ class RedisAiGenerationJobStore(
         runCatching {
             val hashKey = hashKey(jobId)
             val ops = redisTemplate.opsForHash<String, String>()
+            val lastUpdatedAt = Instant.now()
             ops.put(hashKey, "status", status.name)
             if (stage != null) ops.put(hashKey, "stage", stage.name) else ops.delete(hashKey, "stage")
             ops.put(hashKey, "progressPct", progressPct.toString())
+            ops.put(hashKey, "lastUpdatedAt", lastUpdatedAt.toString())
             if (error != null) {
                 ops.put(hashKey, "errorCode", error.code.name)
                 ops.put(hashKey, "errorMessage", error.message.take(MAX_ERROR_MESSAGE_LEN))
             } else {
                 ops.delete(hashKey, "errorCode", "errorMessage")
             }
+            redisTemplate.expire(hashKey, properties.job.redisTtl)
+            refreshIndexes(jobId)
         }.onFailure { recordFailure("updateStatus") }.getOrThrow()
     }
 
@@ -168,6 +233,7 @@ class RedisAiGenerationJobStore(
         error: GenerationError?,
     ): Boolean =
         runCatching {
+            val lastUpdatedAt = Instant.now()
             val result =
                 redisTemplate.execute(
                     TRANSITION_STATUS_SCRIPT,
@@ -178,8 +244,14 @@ class RedisAiGenerationJobStore(
                     progressPct.toString(),
                     error?.code?.name.orEmpty(),
                     error?.message?.take(MAX_ERROR_MESSAGE_LEN).orEmpty(),
+                    lastUpdatedAt.toString(),
+                    properties.job.redisTtl.seconds.toString(),
                 )
-            result == 1L
+            val changed = result == 1L
+            if (changed) {
+                refreshIndexes(jobId)
+            }
+            changed
         }.onFailure { recordFailure("transitionStatus") }.getOrThrow()
 
     override fun saveResultIfStatus(
@@ -191,6 +263,7 @@ class RedisAiGenerationJobStore(
     ): Boolean =
         runCatching {
             val ttlSeconds = properties.job.redisTtl.seconds
+            val lastUpdatedAt = Instant.now()
             val resultJson = objectMapper.writeValueAsString(result)
             val saved =
                 redisTemplate.execute(
@@ -202,9 +275,14 @@ class RedisAiGenerationJobStore(
                     usage.cachedInputTokens.toString(),
                     usage.outputTokens.toString(),
                     cost.toPlainString(),
+                    lastUpdatedAt.toString(),
                     ttlSeconds.toString(),
                 )
-            saved == 1L
+            val changed = saved == 1L
+            if (changed) {
+                refreshIndexes(jobId)
+            }
+            changed
         }.onFailure { recordFailure("saveResultIfStatus") }.getOrThrow()
 
     override fun deleteTransientPayload(jobId: UUID) {
@@ -213,6 +291,7 @@ class RedisAiGenerationJobStore(
                 DELETE_TRANSIENT_PAYLOAD_SCRIPT,
                 listOf(transcriptKey(jobId), resultKey(jobId)),
             )
+            refreshIndexes(jobId)
         }.onFailure { recordFailure("deleteTransientPayload") }.getOrThrow()
     }
 
@@ -235,9 +314,15 @@ class RedisAiGenerationJobStore(
 
     override fun delete(jobId: UUID) {
         runCatching {
+            val hash = redisTemplate.opsForHash<String, String>().entries(hashKey(jobId))
             redisTemplate.execute(
                 DELETE_JOB_SCRIPT,
                 listOf(hashKey(jobId), transcriptKey(jobId), resultKey(jobId)),
+            )
+            removeFromIndexes(
+                jobId = jobId,
+                sessionId = hash["sessionId"]?.let(UUID::fromString),
+                clubId = hash["clubId"]?.let(UUID::fromString),
             )
         }.onFailure { recordFailure("delete") }.getOrThrow()
     }
@@ -261,6 +346,8 @@ class RedisAiGenerationJobStore(
                 "costAccumulatedUsd" to job.costAccumulatedUsd.toPlainString(),
                 "llmCallCount" to job.llmCallCount.toString(),
                 "expiresAt" to job.expiresAt.toString(),
+                "createdAt" to job.createdAt.toString(),
+                "lastUpdatedAt" to job.lastUpdatedAt.toString(),
             )
         job.stage?.let { map["stage"] = it.name }
         job.instructions?.let { map["instructions"] = it }
@@ -281,6 +368,14 @@ class RedisAiGenerationJobStore(
             hash["expiresAt"]
                 ?.let { runCatching { Instant.parse(it) }.getOrNull() }
                 ?: Instant.now().plus(properties.job.redisTtl)
+        val createdAt =
+            hash["createdAt"]
+                ?.let { runCatching { Instant.parse(it) }.getOrNull() }
+                ?: expiresAt.minus(properties.job.redisTtl)
+        val lastUpdatedAt =
+            hash["lastUpdatedAt"]
+                ?.let { runCatching { Instant.parse(it) }.getOrNull() }
+                ?: createdAt
         return JobRecord(
             jobId = jobId,
             sessionId = UUID.fromString(hash.getValue("sessionId")),
@@ -314,9 +409,63 @@ class RedisAiGenerationJobStore(
                 ),
             costAccumulatedUsd = BigDecimal(hash.getValue("costAccumulatedUsd")),
             expiresAt = expiresAt,
+            createdAt = createdAt,
+            lastUpdatedAt = lastUpdatedAt,
             llmCallCount = hash["llmCallCount"]?.toIntOrNull() ?: 0,
         )
     }
+
+    private fun refreshIndexes(jobId: UUID) {
+        val record = load(jobId) ?: return
+        indexJob(record)
+    }
+
+    private fun indexJob(job: JobRecord) {
+        val id = job.jobId.toString()
+        val score = job.lastUpdatedAt.toEpochMilli().toDouble()
+        val ttl = properties.job.redisTtl
+        val zSet = redisTemplate.opsForZSet()
+
+        val sessionKey = sessionRecentKey(job.sessionId)
+        zSet.add(sessionKey, id, score)
+        redisTemplate.expire(sessionKey, ttl)
+
+        if (job.status in ACTIVE_INDEX_STATUSES) {
+            val activeKey = activeJobsKey()
+            val clubKey = activeClubJobsKey(job.clubId)
+            zSet.add(activeKey, id, score)
+            zSet.add(clubKey, id, score)
+            redisTemplate.expire(activeKey, ttl)
+            redisTemplate.expire(clubKey, ttl)
+        } else {
+            removeFromActiveIndexes(job)
+        }
+    }
+
+    private fun removeFromActiveIndexes(job: JobRecord) {
+        removeFromIndexes(job.jobId, sessionId = null, clubId = job.clubId)
+    }
+
+    private fun removeFromIndexes(
+        jobId: UUID,
+        sessionId: UUID?,
+        clubId: UUID?,
+    ) {
+        val id = jobId.toString()
+        val zSet = redisTemplate.opsForZSet()
+        zSet.remove(activeJobsKey(), id)
+        if (sessionId != null) {
+            zSet.remove(sessionRecentKey(sessionId), id)
+        }
+        if (clubId != null) {
+            zSet.remove(activeClubJobsKey(clubId), id)
+        }
+    }
+
+    private fun String.toUuidOrNull(): UUID? =
+        runCatching {
+            UUID.fromString(this)
+        }.getOrNull()
 
     private fun recordFailure(operation: String) {
         metrics.increment("readmates.redis.fallbacks", "feature", "aigen.job-store")
@@ -335,17 +484,27 @@ class RedisAiGenerationJobStore(
 
     private fun resultKey(jobId: UUID) = "aigen:job:$jobId:result"
 
+    private fun sessionRecentKey(sessionId: UUID) = "aigen:session:$sessionId:jobs"
+
+    private fun activeJobsKey() = "aigen:jobs:active"
+
+    private fun activeClubJobsKey(clubId: UUID) = "aigen:club:$clubId:jobs:active"
+
     private companion object {
         const val MAX_ERROR_MESSAGE_LEN = 512
 
         val PAYLOAD_OPTIONAL_STATUSES =
             setOf(JobStatus.COMMITTING, JobStatus.COMMITTED, JobStatus.CANCELLED, JobStatus.FAILED)
 
+        val ACTIVE_INDEX_STATUSES =
+            setOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCEEDED, JobStatus.COMMITTING)
+
         /**
          * KEYS[1]=hashKey
          * ARGV[1]=comma-separated expected statuses, ARGV[2]=next status,
          * ARGV[3]=stage or "", ARGV[4]=progressPct,
-         * ARGV[5]=errorCode or "", ARGV[6]=errorMessage or "".
+         * ARGV[5]=errorCode or "", ARGV[6]=errorMessage or "",
+         * ARGV[7]=lastUpdatedAt, ARGV[8]=ttlSeconds.
          */
         val TRANSITION_STATUS_SCRIPT: DefaultRedisScript<Long> =
             DefaultRedisScript(
@@ -365,12 +524,14 @@ class RedisAiGenerationJobStore(
                   redis.call('HSET', KEYS[1], 'stage', ARGV[3])
                 end
                 redis.call('HSET', KEYS[1], 'progressPct', ARGV[4])
+                redis.call('HSET', KEYS[1], 'lastUpdatedAt', ARGV[7])
                 if ARGV[5] == '' then
                   redis.call('HDEL', KEYS[1], 'errorCode', 'errorMessage')
                 else
                   redis.call('HSET', KEYS[1], 'errorCode', ARGV[5])
                   redis.call('HSET', KEYS[1], 'errorMessage', ARGV[6])
                 end
+                redis.call('EXPIRE', KEYS[1], ARGV[8])
                 return 1
                 """.trimIndent(),
                 Long::class.java,
@@ -379,7 +540,7 @@ class RedisAiGenerationJobStore(
         /**
          * KEYS[1]=hashKey, KEYS[2]=resultKey, KEYS[3]=transcriptKey
          * ARGV[1]=expected status, ARGV[2]=resultJson, ARGV[3..5]=token deltas,
-         * ARGV[6]=cost delta, ARGV[7]=ttlSeconds.
+         * ARGV[6]=cost delta, ARGV[7]=lastUpdatedAt, ARGV[8]=ttlSeconds.
          */
         val SAVE_RESULT_IF_STATUS_SCRIPT: DefaultRedisScript<Long> =
             DefaultRedisScript(
@@ -391,14 +552,15 @@ class RedisAiGenerationJobStore(
                   return 0
                 end
                 redis.call('SET', KEYS[2], ARGV[2])
-                redis.call('EXPIRE', KEYS[2], ARGV[7])
+                redis.call('EXPIRE', KEYS[2], ARGV[8])
                 redis.call('HINCRBY', KEYS[1], 'tokensInput', ARGV[3])
                 redis.call('HINCRBY', KEYS[1], 'tokensCached', ARGV[4])
                 redis.call('HINCRBY', KEYS[1], 'tokensOutput', ARGV[5])
                 redis.call('HINCRBYFLOAT', KEYS[1], 'costAccumulatedUsd', ARGV[6])
-                redis.call('EXPIRE', KEYS[1], ARGV[7])
+                redis.call('HSET', KEYS[1], 'lastUpdatedAt', ARGV[7])
+                redis.call('EXPIRE', KEYS[1], ARGV[8])
                 if redis.call('EXISTS', KEYS[3]) == 1 then
-                  redis.call('EXPIRE', KEYS[3], ARGV[7])
+                  redis.call('EXPIRE', KEYS[3], ARGV[8])
                 end
                 return 1
                 """.trimIndent(),
@@ -417,7 +579,7 @@ class RedisAiGenerationJobStore(
         /**
          * KEYS[1]=hashKey, KEYS[2]=resultKey, KEYS[3]=transcriptKey
          * ARGV[1]=resultJson, ARGV[2..4]=tokens (input,cached,output) delta,
-         * ARGV[5]=cost delta (decimal string), ARGV[6]=ttlSeconds
+         * ARGV[5]=cost delta (decimal string), ARGV[6]=lastUpdatedAt, ARGV[7]=ttlSeconds
          *
          * Atomically: SET resultJson; HINCRBY tokens; HINCRBYFLOAT cost; refresh TTL on
          * hash + result + (existing) transcript so all three expire together.
@@ -426,14 +588,15 @@ class RedisAiGenerationJobStore(
             DefaultRedisScript(
                 """
                 redis.call('SET', KEYS[2], ARGV[1])
-                redis.call('EXPIRE', KEYS[2], ARGV[6])
+                redis.call('EXPIRE', KEYS[2], ARGV[7])
                 redis.call('HINCRBY', KEYS[1], 'tokensInput', ARGV[2])
                 redis.call('HINCRBY', KEYS[1], 'tokensCached', ARGV[3])
                 redis.call('HINCRBY', KEYS[1], 'tokensOutput', ARGV[4])
                 redis.call('HINCRBYFLOAT', KEYS[1], 'costAccumulatedUsd', ARGV[5])
-                redis.call('EXPIRE', KEYS[1], ARGV[6])
+                redis.call('HSET', KEYS[1], 'lastUpdatedAt', ARGV[6])
+                redis.call('EXPIRE', KEYS[1], ARGV[7])
                 if redis.call('EXISTS', KEYS[3]) == 1 then
-                  redis.call('EXPIRE', KEYS[3], ARGV[6])
+                  redis.call('EXPIRE', KEYS[3], ARGV[7])
                 end
                 return nil
                 """.trimIndent(),

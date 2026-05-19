@@ -48,7 +48,9 @@ describe("aiGenerationJobKeys", () => {
       "host",
       "aigen",
       "jobs",
+      "session",
       "s1",
+      "detail",
       "j1",
     ]);
   });

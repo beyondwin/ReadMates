@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useLoaderData, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import HostSessionEditor, { type HostSessionEditorLinkComponent } from "@/features/host/ui/host-session-editor";
@@ -9,6 +9,7 @@ import { invalidateHostNotifications } from "@/features/host/queries/host-notifi
 import {
   hostSessionDeletionPreviewQuery,
   hostSessionDetailQuery,
+  invalidateHostSessionRecordSurfaces,
   hostSessionManualDispatchesQuery,
   useCloseHostSessionMutation,
   useCommitHostSessionImportMutation,
@@ -31,13 +32,22 @@ type HostSessionEditorRouteProps = {
   LinkComponent?: HostSessionEditorLinkComponent;
   hostDashboardReturnTarget?: ReadmatesReturnTarget;
   readmatesReturnState?: (target: ReadmatesReturnTarget) => ReadmatesReturnState;
+  onSessionRecordsChanged?: (event: HostSessionRecordsChangedEvent) => void | Promise<void>;
+};
+
+export type HostSessionRecordsChangedEvent = {
+  sessionId: string;
+  clubSlug?: string;
 };
 
 function contextFromClubSlug(clubSlug?: string): ReadmatesApiContext {
   return { clubSlug };
 }
 
-function useHostSessionEditorActions(context: ReadmatesApiContext): HostSessionEditorActions {
+function useHostSessionEditorActions(
+  context: ReadmatesApiContext,
+  onSessionRecordsChanged?: (sessionId: string) => void | Promise<void>,
+): HostSessionEditorActions {
   const queryClient = useQueryClient();
   const { mutateAsync: createSession } = useCreateHostSessionMutation(context);
   const { mutateAsync: updateSession } = useUpdateHostSessionMutation(context);
@@ -66,6 +76,7 @@ function useHostSessionEditorActions(context: ReadmatesApiContext): HostSessionE
     commitSessionImport: async (sessionId, request) => {
       const result = await commitImport({ sessionId, request });
       await invalidateHostNotifications(queryClient, context);
+      await onSessionRecordsChanged?.(sessionId);
       return result;
     },
   }), [
@@ -77,6 +88,7 @@ function useHostSessionEditorActions(context: ReadmatesApiContext): HostSessionE
     publishSession,
     queryClient,
     savePublication,
+    onSessionRecordsChanged,
     updateAttendance,
     updateSession,
   ]);
@@ -87,10 +99,21 @@ export function NewHostSessionRoute({
   LinkComponent,
   hostDashboardReturnTarget,
   readmatesReturnState,
+  onSessionRecordsChanged,
 }: HostSessionEditorRouteProps) {
   const { clubSlug } = useParams<{ clubSlug: string }>();
   const context = useMemo(() => contextFromClubSlug(clubSlug), [clubSlug]);
-  const actions = useHostSessionEditorActions(context);
+  const queryClient = useQueryClient();
+  const handleSessionRecordsChanged = useCallback(
+    async (sessionId: string) => {
+      await Promise.all([
+        invalidateHostSessionRecordSurfaces(queryClient, sessionId, context),
+        onSessionRecordsChanged?.({ sessionId, clubSlug }),
+      ]);
+    },
+    [clubSlug, context, onSessionRecordsChanged, queryClient],
+  );
+  const actions = useHostSessionEditorActions(context, handleSessionRecordsChanged);
   return (
     <HostSessionEditor
       returnTarget={returnTarget}
@@ -99,6 +122,7 @@ export function NewHostSessionRoute({
       LinkComponent={LinkComponent}
       hostDashboardReturnTarget={hostDashboardReturnTarget}
       readmatesReturnState={readmatesReturnState}
+      onSessionRecordsChanged={handleSessionRecordsChanged}
     />
   );
 }
@@ -108,12 +132,23 @@ export function EditHostSessionRoute({
   LinkComponent,
   hostDashboardReturnTarget,
   readmatesReturnState,
+  onSessionRecordsChanged,
 }: HostSessionEditorRouteProps) {
   const loaderData = useLoaderData() as HostSessionEditorRouteData;
   const { clubSlug, sessionId: routeSessionId } = useParams<{ clubSlug: string; sessionId: string }>();
   const sessionId = routeSessionId ?? loaderData.sessionId;
   const context = useMemo(() => contextFromClubSlug(clubSlug), [clubSlug]);
-  const actions = useHostSessionEditorActions(context);
+  const queryClient = useQueryClient();
+  const handleSessionRecordsChanged = useCallback(
+    async (changedSessionId: string) => {
+      await Promise.all([
+        invalidateHostSessionRecordSurfaces(queryClient, changedSessionId, context),
+        onSessionRecordsChanged?.({ sessionId: changedSessionId, clubSlug }),
+      ]);
+    },
+    [clubSlug, context, onSessionRecordsChanged, queryClient],
+  );
+  const actions = useHostSessionEditorActions(context, handleSessionRecordsChanged);
   const sessionQuery = useQuery(hostSessionDetailQuery(sessionId, context));
   const dispatchesQuery = useQuery(hostSessionManualDispatchesQuery(
     { sessionId, page: { limit: EDITOR_MANUAL_DISPATCH_PAGE_LIMIT } },
@@ -134,6 +169,7 @@ export function EditHostSessionRoute({
       LinkComponent={LinkComponent}
       hostDashboardReturnTarget={hostDashboardReturnTarget}
       readmatesReturnState={readmatesReturnState}
+      onSessionRecordsChanged={handleSessionRecordsChanged}
     />
   );
 }

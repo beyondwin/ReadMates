@@ -70,6 +70,7 @@ describe("EditHostSessionRoute query actions", () => {
 
   it("keeps editor rendering from query seeded data and invalidates notifications after import commit", async () => {
     const user = userEvent.setup();
+    const onSessionRecordsChanged = vi.fn().mockResolvedValue(undefined);
     const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
     client.setQueryData(
       hostSessionDetailQuery("session-7", { clubSlug: "reading-sai" }).queryKey,
@@ -87,7 +88,7 @@ describe("EditHostSessionRoute query actions", () => {
     render(
       <QueryClientProvider client={client}>
         <MemoryRouter>
-          <EditHostSessionRoute />
+          <EditHostSessionRoute onSessionRecordsChanged={onSessionRecordsChanged} />
         </MemoryRouter>
       </QueryClientProvider>,
     );
@@ -99,6 +100,10 @@ describe("EditHostSessionRoute query actions", () => {
     }));
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: hostNotificationKeys.scope({ clubSlug: "reading-sai" }),
+    });
+    expect(onSessionRecordsChanged).toHaveBeenCalledWith({
+      sessionId: "session-7",
+      clubSlug: "reading-sai",
     });
   });
 });

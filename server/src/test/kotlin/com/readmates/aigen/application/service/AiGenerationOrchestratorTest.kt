@@ -4,6 +4,7 @@ import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
 import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.ErrorCode
+import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.port.`in`.JobNotFoundException
@@ -203,6 +204,83 @@ class AiGenerationOrchestratorTest {
         val view = ctx.orchestrator.get(ctx.sessionId, record.jobId)
 
         assertThat(view.warnings).doesNotContain("CLUB_BUDGET_80PCT")
+    }
+
+    @Test
+    fun `recent skips unrecoverable jobs and returns latest recoverable job for session`() {
+        val ctx = TestContext()
+        val recoverable =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.clubId,
+                hostUserId = ctx.hostUserId,
+                status = JobStatus.SUCCEEDED,
+                stage = JobStage.READY,
+                result = AiGenerationTestFixtures.snapshot(),
+                createdAt = AiGenerationTestFixtures.NOW.plusSeconds(10),
+                lastUpdatedAt = AiGenerationTestFixtures.NOW.plusSeconds(10),
+            )
+        val committed =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.clubId,
+                hostUserId = ctx.hostUserId,
+                status = JobStatus.COMMITTED,
+                stage = null,
+                createdAt = AiGenerationTestFixtures.NOW.plusSeconds(20),
+                lastUpdatedAt = AiGenerationTestFixtures.NOW.plusSeconds(20),
+            )
+        val fatalFailure =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.clubId,
+                hostUserId = ctx.hostUserId,
+                status = JobStatus.FAILED,
+                stage = null,
+                error = GenerationError(ErrorCode.SCHEMA_INVALID, "not retryable"),
+                createdAt = AiGenerationTestFixtures.NOW.plusSeconds(30),
+                lastUpdatedAt = AiGenerationTestFixtures.NOW.plusSeconds(30),
+            )
+        val otherSession =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = UUID.randomUUID(),
+                clubId = ctx.clubId,
+                hostUserId = ctx.hostUserId,
+                status = JobStatus.RUNNING,
+                stage = JobStage.TRANSCRIPT_LOADED,
+                createdAt = AiGenerationTestFixtures.NOW.plusSeconds(40),
+                lastUpdatedAt = AiGenerationTestFixtures.NOW.plusSeconds(40),
+            )
+        listOf(recoverable, committed, fatalFailure, otherSession).forEach(ctx.jobStore::save)
+
+        val recent = ctx.orchestrator.recent(ctx.sessionId)
+
+        assertThat(recent).isNotNull
+        assertThat(recent!!.jobId).isEqualTo(recoverable.jobId)
+        assertThat(recent.createdAt).isEqualTo(recoverable.createdAt)
+        assertThat(recent.lastUpdatedAt).isEqualTo(recoverable.lastUpdatedAt)
+    }
+
+    @Test
+    fun `recent treats retry-safe failed job as recoverable`() {
+        val ctx = TestContext()
+        val retryable =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.clubId,
+                hostUserId = ctx.hostUserId,
+                status = JobStatus.FAILED,
+                stage = null,
+                error = GenerationError(ErrorCode.PROVIDER_RATE_LIMITED, "retry later"),
+                createdAt = AiGenerationTestFixtures.NOW.plusSeconds(10),
+                lastUpdatedAt = AiGenerationTestFixtures.NOW.plusSeconds(10),
+            )
+        ctx.jobStore.save(retryable)
+
+        val recent = ctx.orchestrator.recent(ctx.sessionId)
+
+        assertThat(recent?.jobId).isEqualTo(retryable.jobId)
+        assertThat(recent?.error?.code).isEqualTo(ErrorCode.PROVIDER_RATE_LIMITED)
     }
 
     @Test

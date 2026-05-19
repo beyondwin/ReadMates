@@ -14,6 +14,7 @@ import { saveAigenDraft } from "@/features/host/aigen/storage/aigen-draft-storag
 vi.mock("@/features/host/aigen/api/aigen-api", () => ({
   startGeneration: vi.fn(),
   getJob: vi.fn(),
+  getRecentJob: vi.fn(),
   regenerateItem: vi.fn(),
   commitGeneration: vi.fn(),
   cancelGeneration: vi.fn(),
@@ -24,12 +25,14 @@ vi.mock("@/features/host/aigen/api/aigen-api", () => ({
 import {
   getClubAiDefault,
   getJob,
+  getRecentJob,
   startGeneration,
 } from "@/features/host/aigen/api/aigen-api";
 import { AiGenerateTab } from "@/features/host/aigen/ui/AiGenerateTab";
 
 const mockedStart = vi.mocked(startGeneration);
 const mockedGetJob = vi.mocked(getJob);
+const mockedGetRecent = vi.mocked(getRecentJob);
 const mockedClubDefault = vi.mocked(getClubAiDefault);
 
 const PRESEEDED_JOB_ID = "job-with-draft";
@@ -105,8 +108,10 @@ describe("AiGenerateTab draft restoration (PREVIEW state machine)", () => {
   beforeEach(() => {
     mockedStart.mockReset();
     mockedGetJob.mockReset();
+    mockedGetRecent.mockReset();
     mockedClubDefault.mockReset();
     mockedClubDefault.mockResolvedValue(clubDefault());
+    mockedGetRecent.mockResolvedValue(null);
     installFakeLocalStorage();
   });
 

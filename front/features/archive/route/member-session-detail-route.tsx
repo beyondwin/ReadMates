@@ -1,4 +1,6 @@
-import { useLoaderData, useLocation } from "react-router-dom";
+import { useLoaderData, useLocation, useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { memberArchiveSessionQuery } from "@/features/archive/queries/archive-queries";
 import {
   archiveSessionsReturnTarget,
   readReadmatesReturnTarget,
@@ -9,7 +11,13 @@ import MemberSessionDetailPage, {
 } from "@/features/archive/ui/member-session-detail-page";
 
 export function MemberSessionDetailRoute() {
-  const session = useLoaderData() as MemberSessionDetailRouteData;
+  const { sessionId } = useLoaderData() as MemberSessionDetailRouteData;
+  const { clubSlug } = useParams();
+  const sessionQuery = useQuery({
+    ...memberArchiveSessionQuery(sessionId ?? "", { clubSlug }),
+    enabled: Boolean(sessionId),
+  });
+  const session = sessionQuery.data ?? null;
   const location = useLocation();
   const returnTarget = readReadmatesReturnTarget(location.state, archiveSessionsReturnTarget);
 

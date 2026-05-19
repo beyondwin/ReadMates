@@ -12,6 +12,7 @@ import { apiErrorFromResponse } from "@/shared/api/errors";
 import type {
   AiCommitResponse,
   AiGenerationJobResponse,
+  AiRecentJobResponse,
   ClubAiDefaultRequest,
   ClubAiDefaultResponse,
   CommitGenerationRequest,
@@ -67,6 +68,13 @@ export function getJob(
   jobId: string,
 ): Promise<AiGenerationJobResponse> {
   return readmatesFetch<AiGenerationJobResponse>(jobPath(sessionId, jobId));
+}
+
+export async function getRecentJob(sessionId: string): Promise<AiRecentJobResponse | null> {
+  const result = await readmatesFetch<AiRecentJobResponse | null | undefined>(
+    sessionsPath(sessionId, "/jobs/recent"),
+  );
+  return result ?? null;
 }
 
 export function regenerateItem(
