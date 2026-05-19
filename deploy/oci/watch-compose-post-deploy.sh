@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2029
+#
+# Manual repro: confirm parent attempt id wins over local ATTEMPT_ID env.
+#   VM_PUBLIC_IP=127.0.0.1 WATCH_DRY_RUN=true \
+#     READMATES_DEPLOY_ATTEMPT_ID=parent-id ATTEMPT_ID=local-id \
+#     bash deploy/oci/watch-compose-post-deploy.sh
+#   # expected output contains: attemptId=parent-id
+#
+# Automated guard test: deploy/oci/tests/watch-attempt-id.test.sh
 set -euo pipefail
 
 : "${VM_PUBLIC_IP:?VM_PUBLIC_IP 환경변수를 지정하세요}"
@@ -13,7 +21,14 @@ AUTH_BASE_URL="${READMATES_SMOKE_AUTH_BASE_URL:-$APP_BASE_URL}"
 AUTH_BASE_URL="${AUTH_BASE_URL%/}"
 SSH_STRICT_HOST_KEY_CHECKING="${SSH_STRICT_HOST_KEY_CHECKING:-accept-new}"
 REMOTE_LEDGER="${READMATES_DEPLOY_LEDGER:-/var/log/readmates/deploy-attempts.jsonl}"
-WATCH_ATTEMPT_ID="${READMATES_DEPLOY_ATTEMPT_ID:-unknown}"
+# Parent deploy attempt id wins; fall back to local ATTEMPT_ID; "unknown" only
+# as a last resort. See docs/operations/runbooks/deploy-attempts.md and ADR-0016.
+WATCH_ATTEMPT_ID="${READMATES_DEPLOY_ATTEMPT_ID:-${ATTEMPT_ID:-unknown}}"
+WATCH_DRY_RUN="${WATCH_DRY_RUN:-false}"
+if [ "$WATCH_DRY_RUN" = "true" ]; then
+  printf 'attemptId=%s\n' "$WATCH_ATTEMPT_ID"
+  exit 0
+fi
 WATCH_STARTED_EPOCH="$(date -u +%s)"
 WATCH_LEDGER_FORMAT="${READMATES_LEDGER_FORMAT:-both}"
 SSH_OPTIONS=(

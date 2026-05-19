@@ -171,6 +171,38 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식의 semantic version을 사용합니다.
 
    release body를 고친 뒤에는 `gh release view v1.2.0 --json body`로 공개 본문이 `CHANGELOG.md`의 같은 버전 섹션과 맞는지 확인합니다.
 
+## Branch protection bypass policy
+
+ReadMates `main` branch는 GitHub branch protection 대상이지만, 실무에서는 단일 운영자(solo admin)가 release commit을 직접 push해야 하는 경우가 있습니다. 이 절은 admin bypass를 허용할 수 있는 조건과 release PR을 강제해야 하는 조건을 구분합니다. v1.11.0 발행 시 57개 commit이 admin bypass로 직접 push된 사례를 추후 회고 가능하도록 정책을 명문화합니다.
+
+### 허용 조건 — admin bypass push
+
+아래 조건을 모두 만족할 때만 solo admin이 `main`에 직접 push할 수 있습니다.
+
+- Solo admin 한 사람만 commit author와 committer로 등장합니다.
+- Push 직전에 `./scripts/pre-push-check.sh` (또는 `--full --release`) 가 통과했습니다.
+- DB migration이 포함되어 있지 않습니다 (`server/src/main/resources/db/mysql/migration/` 변경 없음).
+- Auth, permission, RLS, BFF token, OAuth scope, role/visibility model을 건드리지 않습니다.
+
+### 비허용 조건 — release PR 필수
+
+다음 중 하나라도 해당하면 admin bypass를 사용하지 않고 release PR (review + branch protection 정상 흐름)을 만듭니다.
+
+- 복수 contributor의 commit이 섞여 있습니다 (`git log <prev-tag>..HEAD --format='%an'`로 확인).
+- DB migration이 포함되어 있습니다.
+- Auth/permission/RLS 변경 또는 supabase/Spring Security/BFF token 처리 변경이 있습니다.
+- Public API contract (route, request/response schema, error code) 가 바뀌었습니다.
+
+### Emergency bypass
+
+운영 incident 대응 등 위 조건과 무관하게 bypass가 필요한 경우, push 전 또는 직후에 [bypass ledger](../operations/runbooks/release-bypass-ledger.md) 또는 release note `Deployment Notes`에 다음을 기록합니다.
+
+- bypass 사유 (incident ID, on-call 결정 경위)
+- 우회한 검증 단계
+- 후속 보강 계획 (회귀 테스트, follow-up PR)
+
+`./scripts/pre-push-check.sh --release --no-changelog-check`로 emergency override 시에도 위 ledger 기록은 생략하지 않습니다.
+
 ## 운영 배포와 릴리즈 노트
 
 서버 API 또는 DB migration이 있는 릴리즈는 아래 내용을 `Deployment Notes`에 반드시 적습니다.

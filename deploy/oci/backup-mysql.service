@@ -1,0 +1,24 @@
+[Unit]
+Description=Readmates MySQL dump + upload to OCI Object Storage
+Documentation=https://github.com/readmates/web/blob/main/docs/operations/runbooks/db-backup.md
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+# Required env vars: READMATES_EXPORT_BUCKET, OCI_NAMESPACE, READMATES_DB_HOST.
+# Optional: READMATES_DB_NAME, READMATES_DB_USER, READMATES_EXPORT_DIR,
+# READMATES_MYSQL_DEFAULTS_FILE, READMATES_BACKUP_OBJECT_PREFIX.
+# These live in /etc/readmates/backup-mysql.env (chmod 600, root:root).
+EnvironmentFile=/etc/readmates/backup-mysql.env
+ExecStart=/opt/readmates/deploy/oci/backup-mysql-to-object-storage.sh
+# Best-effort hardening; daemon-reload required on edit.
+PrivateTmp=true
+ProtectSystem=full
+NoNewPrivileges=true
+# 30 min timeout — backup + upload of ~100KB usually completes in <60s.
+TimeoutStartSec=1800
+
+[Install]
+WantedBy=multi-user.target

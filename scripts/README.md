@@ -62,6 +62,31 @@ READMATES_SERVER_CI_CHECK_DRY_RUN=true ./scripts/server-ci-check.sh
 
 `--full`은 `./server/gradlew -p server integrationTest`와 `pnpm --dir front test:e2e`를 추가로 실행합니다. Docker, MySQL client, Playwright browser 의존성이 준비되지 않은 환경에서는 기본 pre-push hook보다 수동 릴리즈 점검으로 실행합니다.
 
+### Release-mode CHANGELOG guard
+
+`--release`(또는 환경 변수 `READMATES_PRE_PUSH_RELEASE=true`)로 release 모드를 강제하면 `CHANGELOG.md`의 `## Unreleased` 섹션이 placeholder 상태인지 확인하는 가드가 먼저 실행됩니다. v1.11.0에서 `Unreleased` 섹션이 수동 정리에 의존했던 회귀를 막기 위한 안전장치입니다.
+
+- 차단 조건: `### Added`, `### Changed`, `### Fixed`, `### Engineering`, `### Engineering Proof Portfolio`, `### Deployment Notes`, `### Verification`, `### Removed`, `### Security` 같은 구체적 카테고리 헤더가 남아 있거나, bullet이 두 개 이상이거나, bullet에 markdown bold(`**`) 마커가 포함된 경우.
+- 통과 조건: 비어 있는 placeholder (`_No unreleased changes._`, `<!-- placeholder -->`) 또는 ReadMates의 기존 convention인 `### Highlights` 아래 단일 meta-placeholder bullet (예: `다음 릴리즈 후보 변경을 이 섹션에 기록합니다.`).
+- Emergency override: `--no-changelog-check`로 가드를 건너뛸 수 있습니다. 이 경우 release-management `Branch protection bypass policy` 절에 따라 bypass 사유를 ledger에 기록해야 합니다.
+
+```bash
+# Release tag push 직전 표준 실행
+./scripts/pre-push-check.sh --release
+
+# CI 또는 자동화 컨텍스트에서 환경 변수로 release 모드 강제
+READMATES_PRE_PUSH_RELEASE=true ./scripts/pre-push-check.sh
+
+# CHANGELOG 경로를 override해서 fixture로 테스트
+READMATES_PRE_PUSH_CHANGELOG=/tmp/test-changelog-stale.md \
+  ./scripts/pre-push-check.sh --release
+
+# Emergency 우회 (사유 ledger 기록 필수)
+./scripts/pre-push-check.sh --release --no-changelog-check
+```
+
+Branch protection bypass 정책 전반은 [release-management.md#branch-protection-bypass-policy](../docs/development/release-management.md#branch-protection-bypass-policy)를 참조합니다.
+
 로컬 Git hook은 `.git/hooks/pre-push`에서 이 스크립트를 호출하도록 설치할 수 있습니다. Hook은 로컬 설정이므로 `--no-verify`로 우회할 수 있고 다른 clone에는 자동 전파되지 않습니다.
 
 ## `lint-grafana-dashboards.sh`

@@ -71,6 +71,8 @@ git push origin vX.Y.Z
 
 `main` push는 production 배포를 시작하지 않습니다. `v*` tag push가 production Cloudflare Pages 배포와 GHCR server image publish workflow를 시작합니다.
 
+Branch protection bypass 정책은 [release-management.md#branch-protection-bypass-policy](../development/release-management.md#branch-protection-bypass-policy)를 참조합니다. `main` direct push (admin bypass) 허용 조건, release PR 강제 조건, emergency bypass ledger 기록 기준이 그 절에 정리되어 있습니다. Release tag push 직전에는 `./scripts/pre-push-check.sh --release`를 실행해 `CHANGELOG Unreleased` 가드를 통과시키고, 통과가 어려운 emergency 상황에서만 `--no-changelog-check`로 우회합니다.
+
 ## GitHub Actions 확인
 
 Tag push 뒤 같은 tag의 배포 workflow를 확인합니다.

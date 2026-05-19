@@ -282,6 +282,7 @@ if [ "$READMATES_RUN_POST_DEPLOY_WATCH" = "true" ]; then
   SSH_KEY="$SSH_KEY" \
   REMOTE_USER="$REMOTE_USER" \
   SSH_STRICT_HOST_KEY_CHECKING="$SSH_STRICT_HOST_KEY_CHECKING" \
+  READMATES_DEPLOY_ATTEMPT_ID="$ATTEMPT_ID" \
   ./deploy/oci/watch-compose-post-deploy.sh
   remote_ledger_append "POST_DEPLOY_WATCH_PASSED" "RUNNING" "watch=true"
 else

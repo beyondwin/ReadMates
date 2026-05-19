@@ -1,0 +1,15 @@
+[Unit]
+Description=Run readmates MySQL backup daily at 04:15 UTC
+Documentation=https://github.com/readmates/web/blob/main/docs/operations/runbooks/db-backup.md
+
+[Timer]
+# 매일 04:15 UTC (KST 13:15) — 트래픽이 가장 낮은 시간대.
+OnCalendar=*-*-* 04:15:00 UTC
+# VM downtime 후에도 누락분을 한 번 실행.
+Persistent=true
+# 동일 시각 다중 host 충돌을 피하기 위한 jitter.
+RandomizedDelaySec=300
+Unit=backup-mysql.service
+
+[Install]
+WantedBy=timers.target
