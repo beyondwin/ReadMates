@@ -2,6 +2,29 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+```yaml waygent-task
+id: readmates_graphify_adoption
+title: Implement the ReadMates Graphify adoption plan in docs/superpowers/plans/2026-05-22-readmates-graphify-adoption.md using the approved spec at docs/superpowers/specs/2026-05-22-readmates-graphify-adoption-design.md. Do not create git commits from the task worktree; make only the docs/config file changes and leave generated graphify-out artifacts unstaged.
+dependencies: []
+file_claims:
+  - path: .graphifyignore
+    mode: owned
+  - path: .gitignore
+    mode: owned
+  - path: AGENTS.md
+    mode: owned
+  - path: docs/development/README.md
+    mode: owned
+  - path: docs/development/graphify.md
+    mode: owned
+risk: low
+verify:
+  - git diff --check -- .graphifyignore .gitignore AGENTS.md docs/development/graphify.md docs/development/README.md
+  - git check-ignore graphify-out/manifest.json graphify-out/cost.json graphify-out/cache/example graphify-out/.graphify_labels.json graphify-out/.graphify_root graphify-out/graph.json graphify-out/graph.html
+  - sh -c 'git check-ignore graphify-out/GRAPH_REPORT.md; test $? -eq 1'
+  - rg -n "graphify.md|Graphify" docs/development/README.md docs/development/graphify.md AGENTS.md
+```
+
 **Goal:** Add a public-safe Graphify workflow for ReadMates so agents can query the codebase graph locally while reviewed architecture evidence remains safe to publish.
 
 **Architecture:** Graphify is introduced as a docs/config workflow, not as a runtime dependency. `.graphifyignore` narrows extraction to current code, public-safe docs, scripts, and migrations; `.gitignore` keeps raw graph artifacts local; `docs/development/graphify.md` documents commands and safety review; `AGENTS.md` adds a short query-first discovery rule without bypassing existing surface guides.
@@ -143,6 +166,8 @@ Append this block after the local runtime artifact section or near the other loc
 graphify-out/manifest.json
 graphify-out/cost.json
 graphify-out/cache/
+graphify-out/.graphify_labels.json
+graphify-out/.graphify_root
 graphify-out/graph.json
 graphify-out/graph.html
 ```
@@ -154,15 +179,17 @@ Do not add `graphify-out/` as a whole-directory ignore. The implementation must 
 Run:
 
 ```bash
-git check-ignore graphify-out/manifest.json graphify-out/cost.json graphify-out/cache/example graphify-out/graph.json graphify-out/graph.html
+git check-ignore graphify-out/manifest.json graphify-out/cost.json graphify-out/cache/example graphify-out/.graphify_labels.json graphify-out/.graphify_root graphify-out/graph.json graphify-out/graph.html
 ```
 
-Expected output contains these five lines:
+Expected output contains these lines:
 
 ```text
 graphify-out/manifest.json
 graphify-out/cost.json
 graphify-out/cache/example
+graphify-out/.graphify_labels.json
+graphify-out/.graphify_root
 graphify-out/graph.json
 graphify-out/graph.html
 ```
@@ -285,6 +312,8 @@ Local-only 산출물:
 - `graphify-out/manifest.json`
 - `graphify-out/cost.json`
 - `graphify-out/cache/`
+- `graphify-out/.graphify_labels.json`
+- `graphify-out/.graphify_root`
 - `graphify-out/graph.json`
 - `graphify-out/graph.html`
 
@@ -303,7 +332,7 @@ Graphify 산출물을 커밋 후보로 올리기 전에 다음을 확인합니�
 ```bash
 scan_paths="docs/showcase docs/development"
 test -d graphify-out && scan_paths="graphify-out ${scan_paths}"
-rg -n "(sk-[A-Za-z0-9]|ghp_[A-Za-z0-9]|github_pat_[A-Za-z0-9_]+|AKIA[0-9A-Z]{16}|ocid1\\.|BEGIN (RSA|OPENSSH|PRIVATE) KEY|/Users/|/home/|\\.dev\\.vars|deploy-state)" ${scan_paths}
+rg -n "(^|[^A-Za-z0-9_])(sk-[A-Za-z0-9]|ghp_[A-Za-z0-9]|github_pat_[A-Za-z0-9_]+|AKIA[0-9A-Z]{16}|ocid1\\.|BEGIN (RSA|OPENSSH|PRIVATE) KEY|/[U]sers/|/[Hh]ome/[^[:space:]]+)" ${scan_paths}
 ```
 
 허용하지 않는 내용:
@@ -495,7 +524,7 @@ Expected: no output.
 Run:
 
 ```bash
-rg -n "(sk-[A-Za-z0-9]|ghp_[A-Za-z0-9]|github_pat_[A-Za-z0-9_]+|AKIA[0-9A-Z]{16}|ocid1\\.|BEGIN (RSA|OPENSSH|PRIVATE) KEY|/Users/|/home/|\\.dev\\.vars|deploy-state)" .graphifyignore .gitignore AGENTS.md docs/development/graphify.md docs/development/README.md
+rg -n "(^|[^A-Za-z0-9_])(sk-[A-Za-z0-9]|ghp_[A-Za-z0-9]|github_pat_[A-Za-z0-9_]+|AKIA[0-9A-Z]{16}|ocid1\\.|BEGIN (RSA|OPENSSH|PRIVATE) KEY|/[U]sers/|/[Hh]ome/[^[:space:]]+)" .graphifyignore .gitignore AGENTS.md docs/development/graphify.md docs/development/README.md
 ```
 
 Expected: no matches.

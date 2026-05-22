@@ -39,6 +39,15 @@ docs/private/
 .orchestrator/
 .codex-orchestrator/
 
+# Graphify local extraction artifacts
+graphify-out/manifest.json
+graphify-out/cost.json
+graphify-out/cache/
+graphify-out/.graphify_labels.json
+graphify-out/.graphify_root
+graphify-out/graph.json
+graphify-out/graph.html
+
 # Logs and local runtime artifacts
 *.log
 *.pid
