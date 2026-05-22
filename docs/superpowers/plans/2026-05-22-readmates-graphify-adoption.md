@@ -20,8 +20,7 @@ file_claims:
 risk: low
 verify:
   - git diff --check -- .graphifyignore .gitignore AGENTS.md docs/development/graphify.md docs/development/README.md
-  - git check-ignore graphify-out/manifest.json graphify-out/cost.json graphify-out/cache/example graphify-out/.graphify_labels.json graphify-out/.graphify_root graphify-out/graph.json graphify-out/graph.html
-  - sh -c 'git check-ignore graphify-out/GRAPH_REPORT.md; test $? -eq 1'
+  - git check-ignore graphify-out/manifest.json graphify-out/cost.json graphify-out/cache/example graphify-out/.graphify_labels.json graphify-out/.graphify_root graphify-out/GRAPH_REPORT.md graphify-out/graph.json graphify-out/graph.html
   - rg -n "graphify.md|Graphify" docs/development/README.md docs/development/graphify.md AGENTS.md
 ```
 
@@ -49,7 +48,7 @@ verify:
   - Excludes dependencies, generated output, private/local state, historical planning archive, and Graphify output.
 - Modify `.gitignore`
   - Owns Git tracking policy for Graphify output.
-  - Keeps raw graph/cost/cache/HTML artifacts local while allowing a reviewed `graphify-out/GRAPH_REPORT.md` or curated export to be added intentionally.
+  - Keeps raw graph/cost/cache/report/HTML artifacts local while allowing a reviewed curated export to be added intentionally under docs.
 - Create `docs/development/graphify.md`
   - Developer-facing workflow: purpose, scope, commands, query examples, export policy, safety checklist, troubleshooting.
 - Modify `docs/development/README.md`
@@ -168,18 +167,19 @@ graphify-out/cost.json
 graphify-out/cache/
 graphify-out/.graphify_labels.json
 graphify-out/.graphify_root
+graphify-out/GRAPH_REPORT.md
 graphify-out/graph.json
 graphify-out/graph.html
 ```
 
-Do not add `graphify-out/` as a whole-directory ignore. The implementation must allow a future reviewed `graphify-out/GRAPH_REPORT.md` or curated export to be committed intentionally.
+Do not add `graphify-out/` as a whole-directory ignore. Keep generated Graphify artifacts local-only by default; future reviewed exports should be curated into `docs/showcase` or `docs/development`.
 
 - [ ] **Step 4: Verify ignore behavior**
 
 Run:
 
 ```bash
-git check-ignore graphify-out/manifest.json graphify-out/cost.json graphify-out/cache/example graphify-out/.graphify_labels.json graphify-out/.graphify_root graphify-out/graph.json graphify-out/graph.html
+git check-ignore graphify-out/manifest.json graphify-out/cost.json graphify-out/cache/example graphify-out/.graphify_labels.json graphify-out/.graphify_root graphify-out/GRAPH_REPORT.md graphify-out/graph.json graphify-out/graph.html
 ```
 
 Expected output contains these lines:
@@ -190,17 +190,10 @@ graphify-out/cost.json
 graphify-out/cache/example
 graphify-out/.graphify_labels.json
 graphify-out/.graphify_root
+graphify-out/GRAPH_REPORT.md
 graphify-out/graph.json
 graphify-out/graph.html
 ```
-
-Run:
-
-```bash
-git check-ignore graphify-out/GRAPH_REPORT.md; test $? -eq 1
-```
-
-Expected: command exits `0`, proving `GRAPH_REPORT.md` is not ignored by Git.
 
 - [ ] **Step 5: Commit graph scope policy**
 
@@ -314,16 +307,16 @@ Local-only 산출물:
 - `graphify-out/cache/`
 - `graphify-out/.graphify_labels.json`
 - `graphify-out/.graphify_root`
+- `graphify-out/GRAPH_REPORT.md`
 - `graphify-out/graph.json`
 - `graphify-out/graph.html`
 
 Review-gated commit candidates:
 
-- public-safe `graphify-out/GRAPH_REPORT.md`
 - public-safe callflow or architecture export
 - curated markdown copied into `docs/showcase` or `docs/development`
 
-`graphify-out/graph.json`은 에이전트 질의 품질에는 유용하지만 공개 repo에 내부 연결과 문서 추출 결과를 과하게 남길 수 있습니다. 1차 도입에서는 local-only로 유지합니다.
+`graphify-out/GRAPH_REPORT.md`와 `graphify-out/graph.json`은 에이전트 질의 품질에는 유용하지만 공개 repo에 내부 연결과 문서 추출 결과를 과하게 남길 수 있습니다. 기본 생성물은 local-only로 유지하고, 공개 후보가 필요하면 검토한 내용을 `docs/showcase` 또는 `docs/development` 아래 curated 문서로 옮깁니다.
 
 ## Public-Safety Review
 
@@ -491,7 +484,7 @@ Run:
 git status --short --ignored graphify-out
 ```
 
-Expected: ignored raw artifacts such as `manifest.json`, `cost.json`, `cache/`, `graph.json`, or `graph.html` appear with `!!` when present. A reviewed `GRAPH_REPORT.md` may appear with Git's untracked status marker; do not stage it in this first implementation.
+Expected: ignored raw artifacts such as `manifest.json`, `cost.json`, `cache/`, `GRAPH_REPORT.md`, `graph.json`, or `graph.html` appear with `!!` when present.
 
 - [ ] **Step 5: Do not commit Graphify output**
 
@@ -501,7 +494,7 @@ Run:
 git status --short graphify-out
 ```
 
-Expected: either no output or untracked reviewed-candidate files under `graphify-out/`. Leave all `graphify-out/` files unstaged. This implementation commits only config and docs.
+Expected: no output. Generated `graphify-out/` files are local-only and should be ignored. This implementation commits only config and docs.
 
 ## Task 5: Final Verification And Handoff
 
@@ -557,7 +550,7 @@ If tasks 1-3 were committed separately, run:
 git status --short
 ```
 
-Expected: only local untracked or ignored `graphify-out/` artifacts remain. Do not stage `graphify-out/`.
+Expected: only ignored `graphify-out/` artifacts remain. Do not stage `graphify-out/`.
 
 If tasks 1-3 were not committed separately, run:
 

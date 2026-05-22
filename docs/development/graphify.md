@@ -87,16 +87,16 @@ Local-only 산출물:
 - `graphify-out/cache/`
 - `graphify-out/.graphify_labels.json`
 - `graphify-out/.graphify_root`
+- `graphify-out/GRAPH_REPORT.md`
 - `graphify-out/graph.json`
 - `graphify-out/graph.html`
 
 Review-gated commit candidates:
 
-- public-safe `graphify-out/GRAPH_REPORT.md`
 - public-safe callflow or architecture export
 - curated markdown copied into `docs/showcase` or `docs/development`
 
-`graphify-out/graph.json`은 에이전트 질의 품질에는 유용하지만 공개 repo에 내부 연결과 문서 추출 결과를 과하게 남길 수 있습니다. 1차 도입에서는 local-only로 유지합니다.
+`graphify-out/GRAPH_REPORT.md`와 `graphify-out/graph.json`은 에이전트 질의 품질에는 유용하지만 공개 repo에 내부 연결과 문서 추출 결과를 과하게 남길 수 있습니다. 기본 생성물은 local-only로 유지하고, 공개 후보가 필요하면 검토한 내용을 `docs/showcase` 또는 `docs/development` 아래 curated 문서로 옮깁니다.
 
 ## Public-Safety Review
 
