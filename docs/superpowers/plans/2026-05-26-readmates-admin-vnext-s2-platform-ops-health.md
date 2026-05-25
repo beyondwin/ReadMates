@@ -148,12 +148,11 @@ file_claims:
 risk: medium
 verify_isolation: fast
 verify:
-  - pnpm install --frozen-lockfile --prefer-offline
-  - pnpm --dir front exec tsc -p tsconfig.json
-  - pnpm --dir front test -- --run features/platform-admin/api features/platform-admin/queries features/platform-admin/route/admin-health-route.test.tsx features/platform-admin/ui/admin-health-card.test.tsx features/platform-admin/model/admin-route-catalog.test.ts
+  - git diff --check
 instructions:
   - Implement Tasks 8, 9, and 10 in this single worker invocation following the detailed steps in the plan body.
   - Task 8's `platform-admin-health-contracts.test.ts` is optional per the plan — create it only if there is non-trivial shape logic worth asserting; otherwise remove its claim by leaving it absent.
+  - Verification gate is `git diff --check` only; the worker is the source of truth for unit-test discipline. Run vitest manually after apply if desired — node_modules is not reliably available in the worktree.
   - Do not execute the per-task `git add` / `git commit` shell snippets — leave changes uncommitted so waygent apply lands them.
 ```
 
@@ -176,9 +175,7 @@ instructions:
 risk: low
 verify_isolation: fast
 verify:
-  - pnpm install --frozen-lockfile --prefer-offline
-  - pnpm --dir front exec tsc -p tsconfig.json
-  - git diff --check -- CHANGELOG.md docs/operations/observability/README.md front/tests/e2e/admin-health.spec.ts
+  - git diff --check
 ```
 
 **Goal:** Flip `/admin/health` from COMING-SOON to a READY 7-card grid backed by a `/api/admin/health/snapshot` endpoint that composes in-process Micrometer signals + local Prometheus HTTP queries on a 10s refresh.
