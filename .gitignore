@@ -70,3 +70,4 @@ replay_pid*
 # Local-only Spring profiles
 application-local.*
 application-*.local.*
+.waygent
