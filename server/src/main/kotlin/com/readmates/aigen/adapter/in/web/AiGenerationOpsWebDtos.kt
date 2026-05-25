@@ -34,8 +34,7 @@ data class AiOpsFailureCodeCountResponse(
     val count: Long,
 ) {
     companion object {
-        fun from(count: AiOpsFailureCodeCount): AiOpsFailureCodeCountResponse =
-            AiOpsFailureCodeCountResponse(count.code, count.count)
+        fun from(count: AiOpsFailureCodeCount): AiOpsFailureCodeCountResponse = AiOpsFailureCodeCountResponse(count.code, count.count)
     }
 }
 

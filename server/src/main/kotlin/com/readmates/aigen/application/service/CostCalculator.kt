@@ -16,14 +16,16 @@ import java.math.RoundingMode
  * `cost_estimate_usd DECIMAL(8,4)` audit column.
  */
 object CostCalculator {
-
     /** Pricing is quoted per *million* tokens, so usage * price is divided by this denominator. */
     private val TOKENS_PER_PRICING_UNIT: BigDecimal = BigDecimal(TOKENS_PER_PRICING_UNIT_LONG)
 
     private const val TOKENS_PER_PRICING_UNIT_LONG: Long = 1_000_000L
     private const val SCALE: Int = 4
 
-    fun estimate(usage: TokenUsage, pricing: ModelPricing): BigDecimal {
+    fun estimate(
+        usage: TokenUsage,
+        pricing: ModelPricing,
+    ): BigDecimal {
         val input = BigDecimal(usage.inputTokens).multiply(pricing.inputPerMTokenUsd)
         val cached = BigDecimal(usage.cachedInputTokens).multiply(pricing.cachedInputPerMTokenUsd)
         val output = BigDecimal(usage.outputTokens).multiply(pricing.outputPerMTokenUsd)

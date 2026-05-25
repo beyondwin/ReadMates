@@ -33,7 +33,10 @@ object LlmErrorMapper {
     private const val MSG_RATE_LIMITED = "provider returned 429"
     private const val MSG_UNKNOWN = "unknown provider error"
 
-    fun mapException(t: Throwable, provider: Provider): GenerationError {
+    fun mapException(
+        t: Throwable,
+        provider: Provider,
+    ): GenerationError {
         // Intentionally unused — provider is part of the signature for
         // future per-provider mapping refinements, but the message must
         // remain a fixed enum-like phrase regardless of provider.
@@ -41,8 +44,9 @@ object LlmErrorMapper {
         val ignored = provider
 
         val message = t.message.orEmpty()
-        val mentionsRateLimit = message.contains("rate_limit", ignoreCase = true) ||
-            FOUR_TWO_NINE_REGEX.containsMatchIn(message)
+        val mentionsRateLimit =
+            message.contains("rate_limit", ignoreCase = true) ||
+                FOUR_TWO_NINE_REGEX.containsMatchIn(message)
         val mentions5xx = FIVE_XX_REGEX.containsMatchIn(message)
         val isNetworkFault = t is IOException || t is SocketTimeoutException
 

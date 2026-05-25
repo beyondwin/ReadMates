@@ -42,12 +42,14 @@ class AiGenerationMetrics(
     private val meterRegistry: MeterRegistry,
 ) {
     private val queueDepthSupplier = AtomicReference<() -> Number>({ 0 })
+
     @Volatile
     private var queueDepthRegistered = false
 
     /** `readmates_aigen_jobs_total` — counter, no tags. */
     fun recordJobStarted() {
-        Counter.builder(NAME_JOBS)
+        Counter
+            .builder(NAME_JOBS)
             .description("Total AI generation jobs accepted by the orchestrator")
             .tags(aigenMeter())
             .register(meterRegistry)
@@ -64,7 +66,8 @@ class AiGenerationMetrics(
         model: ModelId,
         kind: JobKind,
     ) {
-        Counter.builder(NAME_JOBS_COMPLETED)
+        Counter
+            .builder(NAME_JOBS_COMPLETED)
             .description("AI generation jobs that reached a terminal status")
             .tags(
                 aigenMeter(
@@ -73,8 +76,7 @@ class AiGenerationMetrics(
                     MetricLabel.MODEL to model.name,
                     MetricLabel.KIND to kind.name,
                 ),
-            )
-            .register(meterRegistry)
+            ).register(meterRegistry)
             .increment()
     }
 
@@ -85,7 +87,8 @@ class AiGenerationMetrics(
         kind: JobKind,
         duration: Duration,
     ) {
-        Timer.builder(NAME_LATENCY)
+        Timer
+            .builder(NAME_LATENCY)
             .description("Wall-clock latency of an AI generation call")
             .publishPercentileHistogram()
             .tags(
@@ -94,8 +97,7 @@ class AiGenerationMetrics(
                     MetricLabel.MODEL to model.name,
                     MetricLabel.KIND to kind.name,
                 ),
-            )
-            .register(meterRegistry)
+            ).register(meterRegistry)
             .record(duration)
     }
 
@@ -109,7 +111,8 @@ class AiGenerationMetrics(
         direction: TokenDirection,
         count: Long,
     ) {
-        Counter.builder(NAME_TOKENS)
+        Counter
+            .builder(NAME_TOKENS)
             .description("Tokens consumed by AI generation calls, by direction")
             .tags(
                 aigenMeter(
@@ -117,8 +120,7 @@ class AiGenerationMetrics(
                     MetricLabel.MODEL to model.name,
                     MetricLabel.DIRECTION to direction.tagValue,
                 ),
-            )
-            .register(meterRegistry)
+            ).register(meterRegistry)
             .increment(count.toDouble())
     }
 
@@ -128,7 +130,8 @@ class AiGenerationMetrics(
         model: ModelId,
         amountUsd: BigDecimal,
     ) {
-        Counter.builder(NAME_COST_USD)
+        Counter
+            .builder(NAME_COST_USD)
             .description("Accumulated USD cost of AI generation calls")
             .baseUnit("usd")
             .tags(
@@ -136,8 +139,7 @@ class AiGenerationMetrics(
                     MetricLabel.PROVIDER to provider.name,
                     MetricLabel.MODEL to model.name,
                 ),
-            )
-            .register(meterRegistry)
+            ).register(meterRegistry)
             .increment(amountUsd.toDouble())
     }
 
@@ -148,7 +150,8 @@ class AiGenerationMetrics(
      * ONE_LINE_REVIEWS_DUPLICATE, FEEDBACK_TEMPLATE_INVALID).
      */
     fun recordValidationFailure(reason: ErrorCode) {
-        Counter.builder(NAME_VALIDATION_FAILURES)
+        Counter
+            .builder(NAME_VALIDATION_FAILURES)
             .description("AI generation outputs that failed validation")
             .tags(aigenMeter(MetricLabel.REASON to reason.name))
             .register(meterRegistry)
@@ -157,7 +160,8 @@ class AiGenerationMetrics(
 
     /** `readmates_aigen_cap_denials_total{reason}` — counter. */
     fun recordCapDenial(reason: CapDenialReason) {
-        Counter.builder(NAME_CAP_DENIALS)
+        Counter
+            .builder(NAME_CAP_DENIALS)
             .description("Cap-guard denials before invoking an AI provider")
             .tags(aigenMeter(MetricLabel.REASON to reason.name))
             .register(meterRegistry)
@@ -177,7 +181,8 @@ class AiGenerationMetrics(
     fun registerQueueDepthGauge(supplier: () -> Number) {
         queueDepthSupplier.set(supplier)
         if (!queueDepthRegistered) {
-            Gauge.builder(NAME_QUEUE_DEPTH) { queueDepthSupplier.get().invoke().toDouble() }
+            Gauge
+                .builder(NAME_QUEUE_DEPTH) { queueDepthSupplier.get().invoke().toDouble() }
                 .description("Pending AI generation jobs in the queue (consumer lag)")
                 .tags(aigenMeter())
                 .register(meterRegistry)
@@ -214,7 +219,9 @@ class AiGenerationMetrics(
  * clubId, email) are explicitly forbidden — for row-level audit use the
  * `ai_generation_audit_log` table instead.
  */
-enum class MetricLabel(val tagKey: String) {
+enum class MetricLabel(
+    val tagKey: String,
+) {
     PROVIDER("provider"),
     MODEL("model"),
     KIND("kind"),
@@ -227,7 +234,9 @@ enum class MetricLabel(val tagKey: String) {
  * Direction tag values for `readmates_aigen_tokens_total`. Emitted lowercase
  * (input / cached_input / output) per spec §11.1.
  */
-enum class TokenDirection(val tagValue: String) {
+enum class TokenDirection(
+    val tagValue: String,
+) {
     INPUT("input"),
     CACHED_INPUT("cached_input"),
     OUTPUT("output"),

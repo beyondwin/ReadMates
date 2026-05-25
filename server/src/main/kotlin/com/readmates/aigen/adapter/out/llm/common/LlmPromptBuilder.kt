@@ -19,7 +19,10 @@ object LlmPromptBuilder {
     private const val FEEDBACK_MARKER = "<!-- readmates-feedback:v1 -->"
     private val DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
-    fun buildFullSystemPrompt(meta: SessionMeta, instructions: String?): String {
+    fun buildFullSystemPrompt(
+        meta: SessionMeta,
+        instructions: String?,
+    ): String {
         val sb = StringBuilder()
         sb.append("당신은 ReadMates 독서모임 회차 콘텐츠 생성 어시스턴트입니다.\n")
         sb.append("녹취록을 분석하여 readmates-session-import:v1 JSON 형식을 생성해야 합니다.\n\n")
@@ -51,7 +54,10 @@ object LlmPromptBuilder {
         return sb.toString()
     }
 
-    private fun appendCoreRules(sb: StringBuilder, meta: SessionMeta) {
+    private fun appendCoreRules(
+        sb: StringBuilder,
+        meta: SessionMeta,
+    ) {
         sb.append("[Hallucination 방지 규칙]\n")
         sb.append("1. 녹취록에 없는 사실·평가·배경을 만들지 말 것.\n")
         sb.append("2. 참석자 이름은 정확히 다음 목록에서만 선택할 것: ")
@@ -74,27 +80,34 @@ object LlmPromptBuilder {
         sb.append(" tool 호출 형식으로만 출력하고, JSON Schema의 모든 필수 필드를 채워라.\n")
     }
 
-    private fun itemSpecificDirective(item: GenerationItem): String = when (item) {
-        GenerationItem.SUMMARY ->
-            "[재생성 항목]\n다음 항목만 다시 생성: summary (한 문단). 다른 필드는 출력하지 말 것."
-        GenerationItem.HIGHLIGHTS ->
-            "[재생성 항목]\n다음 항목만 다시 생성: highlights (1~6개). 다른 필드는 출력하지 말 것."
-        GenerationItem.ONE_LINE_REVIEWS ->
-            "[재생성 항목]\n다음 항목만 다시 생성: oneLineReviews (참석자별 1줄, 중복 금지). 다른 필드는 출력하지 말 것."
-        GenerationItem.FEEDBACK_DOCUMENT ->
-            "[재생성 항목]\n다음 항목만 다시 생성: feedbackDocumentMarkdown " +
-                "($FEEDBACK_MARKER 로 시작, `# 독서모임 N차 피드백` 헤더 포함). " +
-                "다른 필드는 출력하지 말 것."
-    }
+    private fun itemSpecificDirective(item: GenerationItem): String =
+        when (item) {
+            GenerationItem.SUMMARY ->
+                "[재생성 항목]\n다음 항목만 다시 생성: summary (한 문단). 다른 필드는 출력하지 말 것."
+            GenerationItem.HIGHLIGHTS ->
+                "[재생성 항목]\n다음 항목만 다시 생성: highlights (1~6개). 다른 필드는 출력하지 말 것."
+            GenerationItem.ONE_LINE_REVIEWS ->
+                "[재생성 항목]\n다음 항목만 다시 생성: oneLineReviews (참석자별 1줄, 중복 금지). 다른 필드는 출력하지 말 것."
+            GenerationItem.FEEDBACK_DOCUMENT ->
+                "[재생성 항목]\n다음 항목만 다시 생성: feedbackDocumentMarkdown " +
+                    "($FEEDBACK_MARKER 로 시작, `# 독서모임 N차 피드백` 헤더 포함). " +
+                    "다른 필드는 출력하지 말 것."
+        }
 
-    private fun appendCurrentSnapshotContext(sb: StringBuilder, snapshot: SessionImportV1Snapshot) {
+    private fun appendCurrentSnapshotContext(
+        sb: StringBuilder,
+        snapshot: SessionImportV1Snapshot,
+    ) {
         sb.append("[현재 결과 컨텍스트]\n")
         sb.append("회차: ").append(snapshot.sessionNumber).append("\n")
         sb.append("책 제목: ").append(snapshot.bookTitle).append("\n")
         sb.append("날짜: ").append(snapshot.meetingDate.format(DATE_FORMAT)).append("\n\n")
     }
 
-    private fun appendInstructions(sb: StringBuilder, instructions: String?) {
+    private fun appendInstructions(
+        sb: StringBuilder,
+        instructions: String?,
+    ) {
         if (!instructions.isNullOrBlank()) {
             sb.append("\n[추가 지시]\n")
             sb.append(instructions)

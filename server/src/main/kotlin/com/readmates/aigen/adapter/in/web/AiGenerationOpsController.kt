@@ -26,8 +26,7 @@ class AiGenerationOpsController(
     private val forceCancelUseCase: ForceCancelAiOpsJobUseCase,
 ) {
     @GetMapping("/summary")
-    fun summary(admin: CurrentPlatformAdmin): AiOpsSummaryResponse =
-        AiOpsSummaryResponse.from(summaryUseCase.summary(admin))
+    fun summary(admin: CurrentPlatformAdmin): AiOpsSummaryResponse = AiOpsSummaryResponse.from(summaryUseCase.summary(admin))
 
     @GetMapping("/jobs")
     fun jobs(
@@ -54,13 +53,11 @@ class AiGenerationOpsController(
     fun job(
         admin: CurrentPlatformAdmin,
         @PathVariable jobId: UUID,
-    ): AiOpsJobResponse =
-        AiOpsJobResponse.from(getUseCase.get(admin, jobId))
+    ): AiOpsJobResponse = AiOpsJobResponse.from(getUseCase.get(admin, jobId))
 
     @PostMapping("/jobs/{jobId}/force-cancel")
     fun forceCancel(
         admin: CurrentPlatformAdmin,
         @PathVariable jobId: UUID,
-    ): AiOpsAdminActionResponse =
-        AiOpsAdminActionResponse.from(forceCancelUseCase.forceCancel(admin, jobId))
+    ): AiOpsAdminActionResponse = AiOpsAdminActionResponse.from(forceCancelUseCase.forceCancel(admin, jobId))
 }

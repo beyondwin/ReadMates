@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { platformAdminClubsQuery } from "@/features/platform-admin/queries/platform-admin-queries";
-import { useAdminBreadcrumbExtra } from "./admin-breadcrumb-context";
+import { useAdminBreadcrumbExtra } from "./admin-breadcrumb-hook";
 
 export function AdminClubDetailRoute() {
   const { clubId = "" } = useParams<{ clubId: string }>();

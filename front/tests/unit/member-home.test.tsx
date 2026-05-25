@@ -187,6 +187,9 @@ describe("MemberHome", () => {
   });
 
   it("renders the mobile-first member home flow with real action links", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 3, 30));
+
     const { container } = render(
       <MemberHome auth={auth} current={current} noteFeedItems={noteFeedItems} upcomingSessions={[]} />,
     );
@@ -309,6 +312,9 @@ describe("MemberHome", () => {
   });
 
   it("shows the next gathering prep card", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 3, 30));
+
     const { container } = render(
       <MemberHome auth={auth} current={current} noteFeedItems={noteFeedItems} upcomingSessions={[]} />,
     );

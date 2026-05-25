@@ -33,16 +33,16 @@ import org.springframework.stereotype.Component
 class DefaultSessionImportV1Validator(
     private val metrics: AiGenerationMetrics,
 ) : SessionImportV1Validator {
-
     override fun validate(
         snapshot: SessionImportV1Snapshot,
         sessionMeta: SessionMeta,
     ): ValidationResult {
-        val violation = checkSchema(snapshot, sessionMeta)
-            ?: checkAuthorNames(snapshot, sessionMeta)
-            ?: checkHighlightsRange(snapshot)
-            ?: checkOneLineReviewDuplicates(snapshot)
-            ?: checkFeedbackTemplate(snapshot, sessionMeta)
+        val violation =
+            checkSchema(snapshot, sessionMeta)
+                ?: checkAuthorNames(snapshot, sessionMeta)
+                ?: checkHighlightsRange(snapshot)
+                ?: checkOneLineReviewDuplicates(snapshot)
+                ?: checkFeedbackTemplate(snapshot, sessionMeta)
         if (violation != null) {
             metrics.recordValidationFailure(violation.code)
             return violation
@@ -108,10 +108,11 @@ class DefaultSessionImportV1Validator(
         meta: SessionMeta,
     ): ValidationResult.Violation? {
         val expected = meta.expectedAuthorNames.toSet()
-        val offenders = (snapshot.highlights + snapshot.oneLineReviews)
-            .map { it.authorName }
-            .filter { it !in expected }
-            .distinct()
+        val offenders =
+            (snapshot.highlights + snapshot.oneLineReviews)
+                .map { it.authorName }
+                .filter { it !in expected }
+                .distinct()
         if (offenders.isNotEmpty()) {
             return ValidationResult.Violation(
                 ErrorCode.AUTHOR_NAME_MISMATCH,
@@ -133,11 +134,12 @@ class DefaultSessionImportV1Validator(
     }
 
     private fun checkOneLineReviewDuplicates(snapshot: SessionImportV1Snapshot): ValidationResult.Violation? {
-        val duplicates = snapshot.oneLineReviews
-            .groupingBy { it.authorName }
-            .eachCount()
-            .filterValues { it > 1 }
-            .keys
+        val duplicates =
+            snapshot.oneLineReviews
+                .groupingBy { it.authorName }
+                .eachCount()
+                .filterValues { it > 1 }
+                .keys
         if (duplicates.isNotEmpty()) {
             return ValidationResult.Violation(
                 ErrorCode.ONE_LINE_REVIEWS_DUPLICATE,
@@ -170,8 +172,7 @@ class DefaultSessionImportV1Validator(
         return violation
     }
 
-    private fun schemaInvalid(message: String): ValidationResult.Violation =
-        ValidationResult.Violation(ErrorCode.SCHEMA_INVALID, message)
+    private fun schemaInvalid(message: String): ValidationResult.Violation = ValidationResult.Violation(ErrorCode.SCHEMA_INVALID, message)
 
     private companion object {
         const val FORMAT_CONST = "readmates-session-import:v1"

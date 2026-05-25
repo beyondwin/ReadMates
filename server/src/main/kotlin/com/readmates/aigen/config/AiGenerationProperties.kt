@@ -11,7 +11,7 @@ private const val DEFAULT_NOTIFICATION_LATENCY_SECONDS = 60L
 data class AiGenerationProperties(
     val enabled: Boolean = false,
     val mock: Boolean = false,
-    val enabledProviders: Set<String> = emptySet(),     // "CLAUDE","OPENAI","GEMINI"
+    val enabledProviders: Set<String> = emptySet(), // "CLAUDE","OPENAI","GEMINI"
     val fallbackDefaultModel: String = "gpt-5.4-mini",
     val caps: Caps = Caps(),
     val job: Job = Job(),

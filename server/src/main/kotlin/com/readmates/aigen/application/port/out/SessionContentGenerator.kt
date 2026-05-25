@@ -6,5 +6,6 @@ import com.readmates.aigen.application.model.Provider
 
 interface SessionContentGenerator {
     val provider: Provider
+
     fun generateFull(input: GenerationInput): GenerationOutput
 }

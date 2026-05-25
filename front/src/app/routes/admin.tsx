@@ -113,9 +113,10 @@ function comingSoonChild(descriptor: AdminRouteDescriptor): RouteObject {
     path: descriptor.path,
     hydrateFallbackElement: adminChildHydrateFallback,
     lazy: async () => {
-      const { AdminComingSoonRoute, adminComingSoonLoader } = await import(
-        "@/features/platform-admin/route/admin-coming-soon-route"
-      );
+      const [{ AdminComingSoonRoute }, { adminComingSoonLoader }] = await Promise.all([
+        import("@/features/platform-admin/route/admin-coming-soon-route"),
+        import("@/features/platform-admin/route/admin-coming-soon-data"),
+      ]);
       return {
         Component: AdminComingSoonRoute,
         loader: adminComingSoonLoader(descriptor),

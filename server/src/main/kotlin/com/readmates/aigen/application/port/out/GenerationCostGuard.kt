@@ -10,9 +10,16 @@ import java.util.UUID
  * Soft-warning thresholds are computed by the orchestrator via [clubMonthlyCost].
  */
 interface GenerationCostGuard {
-    fun checkBeforeCall(hostId: UUID, clubId: UUID): GuardDecision
+    fun checkBeforeCall(
+        hostId: UUID,
+        clubId: UUID,
+    ): GuardDecision
 
-    fun recordUsage(hostId: UUID, clubId: UUID, cost: BigDecimal): Unit
+    fun recordUsage(
+        hostId: UUID,
+        clubId: UUID,
+        cost: BigDecimal,
+    ): Unit
 
     fun clubMonthlyCost(clubId: UUID): BigDecimal
 }
@@ -20,5 +27,7 @@ interface GenerationCostGuard {
 sealed class GuardDecision {
     object Allow : GuardDecision()
 
-    data class Deny(val code: ErrorCode) : GuardDecision()
+    data class Deny(
+        val code: ErrorCode,
+    ) : GuardDecision()
 }

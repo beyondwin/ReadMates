@@ -258,8 +258,7 @@ class JdbcAiGenerationOpsAuditRepository(
         )
     }
 
-    private fun ResultSet.getInstant(column: String): Instant =
-        getObject(column, LocalDateTime::class.java).toInstant(ZoneOffset.UTC)
+    private fun ResultSet.getInstant(column: String): Instant = getObject(column, LocalDateTime::class.java).toInstant(ZoneOffset.UTC)
 
     private fun JobStatus.toAuditStatus(): String =
         when (this) {

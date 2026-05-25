@@ -44,17 +44,21 @@ interface AiGenerationAuthorizationPolicy {
 class DefaultAiGenerationAuthorizationPolicy(
     private val jdbc: JdbcTemplate,
 ) : AiGenerationAuthorizationPolicy {
-
-    override fun requireHostAccess(sessionId: UUID, member: CurrentMember): SessionMeta {
-        val row = jdbc.queryForList(
-            """
-            select s.club_id, s.number, s.book_title, s.book_author, s.session_date
-            from sessions s
-            where s.id = ?
-            """.trimIndent(),
-            sessionId.toString(),
-        ).firstOrNull()
-            ?: throw AccessDeniedException("Session $sessionId not found")
+    override fun requireHostAccess(
+        sessionId: UUID,
+        member: CurrentMember,
+    ): SessionMeta {
+        val row =
+            jdbc
+                .queryForList(
+                    """
+                    select s.club_id, s.number, s.book_title, s.book_author, s.session_date
+                    from sessions s
+                    where s.id = ?
+                    """.trimIndent(),
+                    sessionId.toString(),
+                ).firstOrNull()
+                ?: throw AccessDeniedException("Session $sessionId not found")
 
         val clubId = UUID.fromString(row["club_id"] as String)
         if (clubId != member.clubId || member.role != MembershipRole.HOST) {
@@ -65,19 +69,20 @@ class DefaultAiGenerationAuthorizationPolicy(
         // Use users.name (the per-user display name) so the SessionImport validator,
         // which matches authorName == attendee.displayName (loaded from users.name in
         // JdbcSessionImportWriteAdapter), accepts what the LLM emits.
-        val expectedAuthorNames = jdbc.queryForList(
-            """
-            select u.name
-            from session_participants sp
-            join memberships m on m.id = sp.membership_id
-            join users u on u.id = m.user_id
-            where sp.session_id = ?
-              and sp.participation_status = 'ACTIVE'
-            order by sp.id
-            """.trimIndent(),
-            String::class.java,
-            sessionId.toString(),
-        )
+        val expectedAuthorNames =
+            jdbc.queryForList(
+                """
+                select u.name
+                from session_participants sp
+                join memberships m on m.id = sp.membership_id
+                join users u on u.id = m.user_id
+                where sp.session_id = ?
+                  and sp.participation_status = 'ACTIVE'
+                order by sp.id
+                """.trimIndent(),
+                String::class.java,
+                sessionId.toString(),
+            )
 
         return SessionMeta(
             sessionId = sessionId,

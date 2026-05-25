@@ -166,12 +166,14 @@ fun JobView.toRecentJobResponse(): RecentJobResponse =
 private fun JobView.availableActions(): List<String> =
     when (status) {
         JobStatus.PENDING,
-        JobStatus.RUNNING -> listOf("POLL", "CANCEL")
+        JobStatus.RUNNING,
+        -> listOf("POLL", "CANCEL")
         JobStatus.SUCCEEDED -> listOf("POLL", "COMMIT_RETRY", "CANCEL")
         JobStatus.COMMITTING -> listOf("POLL")
         JobStatus.FAILED -> listOf("START_NEW")
         JobStatus.COMMITTED,
-        JobStatus.CANCELLED -> emptyList()
+        JobStatus.CANCELLED,
+        -> emptyList()
     }
 
 fun SessionImportV1Json.toSnapshot(): SessionImportV1Snapshot =

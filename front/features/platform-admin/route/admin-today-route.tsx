@@ -21,7 +21,8 @@ export function AdminTodayRoute() {
   const summary = useQuery(platformAdminSummaryQuery()).data!;
   const clubs = useQuery(platformAdminClubsQuery()).data!;
   const aiSummary = useQuery(platformAdminAiOpsSummaryQuery()).data ?? null;
-  const aiJobs = useQuery(platformAdminAiOpsJobsQuery()).data?.items ?? [];
+  const aiJobsData = useQuery(platformAdminAiOpsJobsQuery()).data;
+  const aiJobs = useMemo(() => aiJobsData?.items ?? [], [aiJobsData]);
   const [searchParams] = useSearchParams();
   const filter = searchParams.get("filter");
   const [selectedClubId, setSelectedClubId] = useState<string | null>(searchParams.get("selected"));

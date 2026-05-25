@@ -16,7 +16,8 @@ import {
   commitPlatformAdminOnboarding,
   previewPlatformAdminOnboarding,
 } from "@/features/platform-admin/api/platform-admin-api";
-import { AdminBreadcrumbProvider, useAdminBreadcrumbExtra } from "./admin-breadcrumb-context";
+import { AdminBreadcrumbProvider } from "./admin-breadcrumb-context";
+import { useAdminBreadcrumbExtra } from "./admin-breadcrumb-hook";
 
 export function AdminShellLayout() {
   return (

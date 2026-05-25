@@ -6,5 +6,6 @@ import com.readmates.aigen.application.model.RegenerationOutput
 
 interface SessionContentRegenerator {
     val provider: Provider
+
     fun regenerateItem(input: RegenerationInput): RegenerationOutput
 }

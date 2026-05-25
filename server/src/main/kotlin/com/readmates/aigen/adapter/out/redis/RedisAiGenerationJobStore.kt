@@ -245,7 +245,8 @@ class RedisAiGenerationJobStore(
                     error?.code?.name.orEmpty(),
                     error?.message?.take(MAX_ERROR_MESSAGE_LEN).orEmpty(),
                     lastUpdatedAt.toString(),
-                    properties.job.redisTtl.seconds.toString(),
+                    properties.job.redisTtl.seconds
+                        .toString(),
                 )
             val changed = result == 1L
             if (changed) {

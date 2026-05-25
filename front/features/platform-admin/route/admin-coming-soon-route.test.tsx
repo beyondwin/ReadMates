@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { AdminRouteDescriptor } from "@/features/platform-admin/model/admin-route-catalog";
 import { AdminComingSoon } from "@/features/platform-admin/ui/admin-coming-soon";
-import { adminComingSoonLoader } from "./admin-coming-soon-route";
+import { adminComingSoonLoader } from "./admin-coming-soon-data";
 
 const descriptor: AdminRouteDescriptor = {
   path: "audit",

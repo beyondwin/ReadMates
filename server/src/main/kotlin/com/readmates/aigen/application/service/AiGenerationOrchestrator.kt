@@ -223,10 +223,12 @@ class AiGenerationOrchestrator(
             JobStatus.PENDING,
             JobStatus.RUNNING,
             JobStatus.SUCCEEDED,
-            JobStatus.COMMITTING -> true
+            JobStatus.COMMITTING,
+            -> true
             JobStatus.FAILED -> error?.code in RETRY_SAFE_RECENT_FAILURES
             JobStatus.COMMITTED,
-            JobStatus.CANCELLED -> false
+            JobStatus.CANCELLED,
+            -> false
         }
 
     override fun cancel(

@@ -12,11 +12,18 @@ import com.readmates.shared.security.CurrentMember
  * are exposed via the REST adapter at `/api/host/clubs/{clubSlug}/ai-defaults`.
  */
 interface GetClubAiDefaultsUseCase {
-    fun get(clubSlug: String, member: CurrentMember): ClubAiDefaultsView
+    fun get(
+        clubSlug: String,
+        member: CurrentMember,
+    ): ClubAiDefaultsView
 }
 
 interface UpdateClubAiDefaultsUseCase {
-    fun update(clubSlug: String, defaultModel: String, member: CurrentMember)
+    fun update(
+        clubSlug: String,
+        defaultModel: String,
+        member: CurrentMember,
+    )
 }
 
 /**
@@ -24,4 +31,6 @@ interface UpdateClubAiDefaultsUseCase {
  * allowlisted model name (e.g. `claude-sonnet-4-6`), or `null` when the
  * club has not chosen a default and the platform fallback applies.
  */
-data class ClubAiDefaultsView(val defaultModel: String?)
+data class ClubAiDefaultsView(
+    val defaultModel: String?,
+)

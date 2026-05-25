@@ -16,7 +16,10 @@ import com.readmates.aigen.application.model.SessionMeta
  * on this interface so they remain testable with a fake validator.
  */
 interface SessionImportV1Validator {
-    fun validate(snapshot: SessionImportV1Snapshot, sessionMeta: SessionMeta): ValidationResult
+    fun validate(
+        snapshot: SessionImportV1Snapshot,
+        sessionMeta: SessionMeta,
+    ): ValidationResult
 }
 
 sealed class ValidationResult {

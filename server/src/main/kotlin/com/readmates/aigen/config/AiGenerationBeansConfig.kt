@@ -29,17 +29,12 @@ import org.springframework.context.annotation.Configuration
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "readmates", name = ["aigen.enabled"], havingValue = "true")
 class AiGenerationBeansConfig {
-
     @Bean
-    fun sessionContentGeneratorsByProvider(
-        generators: List<SessionContentGenerator>,
-    ): Map<Provider, SessionContentGenerator> =
+    fun sessionContentGeneratorsByProvider(generators: List<SessionContentGenerator>): Map<Provider, SessionContentGenerator> =
         generators.associateBy { it.provider }
 
     @Bean
-    fun sessionContentRegeneratorsByProvider(
-        regenerators: List<SessionContentRegenerator>,
-    ): Map<Provider, SessionContentRegenerator> =
+    fun sessionContentRegeneratorsByProvider(regenerators: List<SessionContentRegenerator>): Map<Provider, SessionContentRegenerator> =
         regenerators.associateBy { it.provider }
 
     @Bean

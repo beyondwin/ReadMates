@@ -15,6 +15,7 @@
     <ID>CyclomaticComplexMethod:PlatformAdminService.kt$PlatformAdminService$private fun validateHostname(hostname: String)</ID>
     <ID>CyclomaticComplexMethod:RateLimitFilter.kt$RateLimitFilter$private fun HttpServletRequest.toRateLimitCheck(): RateLimitCheck?</ID>
     <ID>CyclomaticComplexMethod:SessionCookieAuthenticationFilter.kt$SessionCookieAuthenticationFilter$override fun doFilterInternal( request: HttpServletRequest, response: HttpServletResponse, filterChain: FilterChain, )</ID>
+    <ID>FunctionOnlyReturningConstant:RedisAiGenerationJobStore.kt$RedisAiGenerationJobStore$private fun activeJobsKey()</ID>
     <ID>FunctionParameterNaming:DevInvitationController.kt$DevInvitationController$@PathVariable("token") _token: String</ID>
     <ID>FunctionParameterNaming:InvitationController.kt$InvitationController$@PathVariable("clubSlug") _clubSlug: String</ID>
     <ID>FunctionParameterNaming:InvitationController.kt$InvitationController$@PathVariable("token") _token: String</ID>
@@ -24,14 +25,12 @@
     <ID>InvalidPackageDeclaration:AcceptInvitationUseCaseTest.kt$package com.readmates.auth.application.service</ID>
     <ID>InvalidPackageDeclaration:ArchiveErrorHandlerTest.kt$package com.readmates.archive.adapter.`in`.web</ID>
     <ID>InvalidPackageDeclaration:AuthSessionServiceTest.kt$package com.readmates.auth.application.service</ID>
-    <ID>InvalidPackageDeclaration:CheckinControllerTest.kt$package com.readmates.note.adapter.`in`.web</ID>
     <ID>InvalidPackageDeclaration:GoogleLoginServiceTest.kt$package com.readmates.auth.application.service</ID>
     <ID>InvalidPackageDeclaration:InvitationErrorHandlerTest.kt$package com.readmates.auth.adapter.`in`.web</ID>
     <ID>InvalidPackageDeclaration:InvitationTokenServiceTest.kt$package com.readmates.auth.application.service</ID>
     <ID>InvalidPackageDeclaration:MemberLifecycleServiceTest.kt$package com.readmates.auth.application.service</ID>
     <ID>InvalidPackageDeclaration:QuestionControllerTest.kt$package com.readmates.note.adapter.`in`.web</ID>
     <ID>InvalidPackageDeclaration:ReviewControllerTest.kt$package com.readmates.note.adapter.`in`.web</ID>
-    <ID>InvalidPackageDeclaration:RsvpControllerTest.kt$package com.readmates.session.adapter.`in`.web</ID>
     <ID>InvalidPackageDeclaration:SessionApplicationErrorHandlerTest.kt$package com.readmates.session.adapter.`in`.web</ID>
     <ID>LargeClass:ArchiveAndNotesDbTest.kt$ArchiveAndNotesDbTest : ReadmatesMySqlIntegrationTestSupport</ID>
     <ID>LargeClass:ArchiveAndNotesDbTest.kt$ArchiveAndNotesDbTest$Companion</ID>
@@ -126,6 +125,7 @@
     <ID>LongParameterList:PendingApprovalControllerTest.kt$PendingApprovalControllerTest$( clubId: String, number: Int, title: String, bookTitle: String, bookAuthor: String, sessionDate: String, locationLabel: String, state: String, )</ID>
     <ID>LongParameterList:SecurityConfig.kt$SecurityConfig$( private val bffSecretFilter: BffSecretFilter, private val sessionCookieAuthenticationFilter: SessionCookieAuthenticationFilter, private val rateLimitFilter: RateLimitFilter, private val memberAuthoritiesFilter: MemberAuthoritiesFilter, private val platformAdminAuthoritiesFilter: PlatformAdminAuthoritiesFilter, private val oAuthInviteTokenCaptureFilter: OAuthInviteTokenCaptureFilter, private val googleOidcUserService: GoogleOidcUserService, private val readmatesOAuthSuccessHandler: ReadmatesOAuthSuccessHandler, private val clientRegistrationRepository: ObjectProvider&lt;ClientRegistrationRepository&gt;, @param:Value("\${readmates.auth.auth-base-url:\${readmates.app-base-url:http://localhost:3000}}") private val authBaseUrl: String, )</ID>
     <ID>LongParameterList:SupportAccessGrantPorts.kt$CreateSupportAccessGrantPort$( clubId: UUID, grantedByUserId: UUID, granteeUserId: UUID, scope: SupportAccessGrantScope, reason: String, expiresAt: OffsetDateTime, )</ID>
+    <ID>MagicNumber:AiGenerationOpsService.kt$AiGenerationOpsService$24</ID>
     <ID>MagicNumber:AuthSessionService.kt$AuthSessionService$32</ID>
     <ID>MagicNumber:BffSecretAuditExecutorConfig.kt$BffSecretAuditExecutorConfig$1_000</ID>
     <ID>MagicNumber:BffSecretAuditExecutorConfig.kt$BffSecretAuditExecutorConfig$5</ID>
@@ -191,6 +191,11 @@
     <ID>MatchingDeclarationName:ClubContextUseCases.kt$ResolveClubContextUseCase</ID>
     <ID>MatchingDeclarationName:HostSessionWebDtos.kt$HostSessionRequest</ID>
     <ID>MatchingDeclarationName:MySqlExplainTestSupport.kt$MySqlExplainRow</ID>
+    <ID>MaxLineLength:AiGenerationBeansConfig.kt$AiGenerationBeansConfig$fun</ID>
+    <ID>MaxLineLength:AiGenerationOpsController.kt$AiGenerationOpsController$fun</ID>
+    <ID>MaxLineLength:AiGenerationOpsControllerTest.kt$StubCurrentPlatformAdminResolver$override fun supportsParameter(parameter: MethodParameter): Boolean</ID>
+    <ID>MaxLineLength:AiGenerationOpsService.kt$AiGenerationOpsService$staleCandidate = status in STALE_CANDIDATE_STATUSES &amp;&amp; lastUpdatedAt.isBefore(now.minus(STALE_CANDIDATE_AGE))</ID>
+    <ID>MaxLineLength:AiGenerationOpsWebDtos.kt$AiOpsFailureCodeCountResponse.Companion$fun from(count: AiOpsFailureCodeCount): AiOpsFailureCodeCountResponse</ID>
     <ID>MaxLineLength:ArchiveAndNotesDbTest.kt$ArchiveAndNotesDbTest$jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.lockedReason") { value(hasItem("NOT_ATTENDED")) }</ID>
     <ID>MaxLineLength:ArchiveAndNotesDbTest.kt$ArchiveAndNotesDbTest$value(not(hasItem("찰리는 왜 전기 애호가가 되었을까? 책 제목도 전기의 형태이고, 작중 몇차례 언급된다. 전기가 다른 형태의 문학과 달리 뛰어난 점은 무엇일까?")))</ID>
     <ID>MaxLineLength:ArchiveControllerDbTest.kt$ArchiveControllerDbTest$jsonPath("$.bookImageUrl") { value("https://image.aladin.co.kr/product/35068/81/cover500/8934911387_1.jpg") }</ID>
@@ -208,6 +213,7 @@
     <ID>MaxLineLength:CurrentPlatformAdminArgumentResolver.kt$CurrentPlatformAdminArgumentResolver$override fun supportsParameter(parameter: MethodParameter): Boolean</ID>
     <ID>MaxLineLength:DbColumns.kt$fun ResultSet.utcOffsetDateTime(column: String): OffsetDateTime</ID>
     <ID>MaxLineLength:DbColumns.kt$fun ResultSet.utcOffsetDateTimeOrNull(column: String): OffsetDateTime?</ID>
+    <ID>MaxLineLength:DefaultSessionImportV1Validator.kt$DefaultSessionImportV1Validator$private fun schemaInvalid(message: String): ValidationResult.Violation</ID>
     <ID>MaxLineLength:DevLoginMemberService.kt$DevLoginMemberService$override fun findDevSeedActiveMemberByEmail(email: String): CurrentMember?</ID>
     <ID>MaxLineLength:GoogleLoginService.kt$GoogleLoginService$private fun CurrentMember.toLoginResult(): GoogleLoginResult</ID>
     <ID>MaxLineLength:HostDashboardController.kt$HostDashboardController$fun</ID>
@@ -247,6 +253,7 @@
     <ID>MaxLineLength:InvitationService.kt$InvitationService$throw InvitationDomainException("INVALID_INVITATION_EMAIL", InvitationDomainError.BAD_REQUEST, "Email is required")</ID>
     <ID>MaxLineLength:InvitationService.kt$InvitationService$throw InvitationDomainException("INVITATION_CLUB_MISMATCH", InvitationDomainError.NOT_FOUND, "Invitation not found")</ID>
     <ID>MaxLineLength:InvitationService.kt$InvitationService$throw InvitationDomainException("MEMBER_ALREADY_ACTIVE", InvitationDomainError.CONFLICT, "Member is already active")</ID>
+    <ID>MaxLineLength:JdbcAiGenerationOpsAuditRepository.kt$JdbcAiGenerationOpsAuditRepository$private fun ResultSet.getInstant(column: String): Instant</ID>
     <ID>MaxLineLength:JdbcArchiveQueryAdapter.kt$JdbcArchiveQueryAdapter$override fun loadMyPage(currentMember: CurrentMember): MyPageResult</ID>
     <ID>MaxLineLength:JdbcCurrentMemberAdapter.kt$JdbcCurrentMemberAdapter$override fun loadActiveMemberByEmail(email: String): CurrentMember?</ID>
     <ID>MaxLineLength:JdbcHostSessionWriteAdapter.kt$JdbcHostSessionWriteAdapter$override fun detail(command: HostSessionIdCommand)</ID>
@@ -426,6 +433,7 @@
     <ID>ReturnCount:RedisAuthSessionCacheAdapter.kt$RedisAuthSessionCacheAdapter$override fun find(tokenHash: String): AuthSessionCacheSnapshot?</ID>
     <ID>SpreadOperator:HostNotificationLedgerQueries.kt$HostNotificationLedgerQueries$( """ select notification_deliveries.id, notification_deliveries.event_id, notification_deliveries.channel, notification_deliveries.status, case when notification_deliveries.channel = 'EMAIL' then users.email else null end as recipient_email, notification_deliveries.attempt_count, notification_deliveries.created_at, notification_deliveries.updated_at from notification_deliveries join memberships on memberships.id = notification_deliveries.recipient_membership_id and memberships.club_id = notification_deliveries.club_id join users on users.id = memberships.user_id where notification_deliveries.club_id = ? $statusPredicate $channelPredicate $cursorPredicate order by notification_deliveries.updated_at desc, notification_deliveries.created_at desc, notification_deliveries.id desc limit ? """.trimIndent(), { resultSet, _ -&gt; with(rowMappers) { resultSet.toHostNotificationDelivery() } }, *args.toTypedArray(), )</ID>
     <ID>SpreadOperator:HostNotificationLedgerQueries.kt$HostNotificationLedgerQueries$( """ select notification_deliveries.id, notification_event_outbox.event_type, notification_deliveries.status, users.email as recipient_email, notification_deliveries.attempt_count, notification_deliveries.next_attempt_at, notification_deliveries.created_at, notification_deliveries.updated_at from notification_deliveries join notification_event_outbox on notification_event_outbox.id = notification_deliveries.event_id and notification_event_outbox.club_id = notification_deliveries.club_id join memberships on memberships.id = notification_deliveries.recipient_membership_id and memberships.club_id = notification_deliveries.club_id join users on users.id = memberships.user_id where ${predicates.joinToString(" and ")} order by notification_deliveries.updated_at desc, notification_deliveries.created_at desc, notification_deliveries.id desc limit ? """.trimIndent(), { resultSet, _ -&gt; with(rowMappers) { resultSet.toHostNotificationItem() } }, *args.toTypedArray(), )</ID>
+    <ID>SpreadOperator:JdbcAiGenerationOpsAuditRepository.kt$JdbcAiGenerationOpsAuditRepository$( """ select a.id as audit_id, a.job_id, a.club_id, c.slug as club_slug, c.name as club_name, a.session_id, s.number as session_number, s.book_title, a.kind, a.status as audit_status, a.provider, a.model, a.error_code, a.error_message, a.cost_estimate_usd, a.created_at from ai_generation_audit_log a left join clubs c on c.id = a.club_id left join sessions s on s.id = a.session_id $where order by a.created_at desc, a.id desc limit ${LIST_LIMIT + 1} """.trimIndent(), { rs, _ -&gt; rs.getLong("audit_id") to rs.toJobListItem() }, *params.toTypedArray(), )</ID>
     <ID>SpreadOperator:JdbcCurrentSessionAdapter.kt$JdbcCurrentSessionAdapter$( """ select questions.priority, questions.text, questions.draft_thought, case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_name, case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name from questions join memberships on memberships.id = questions.membership_id and memberships.club_id = questions.club_id join users on users.id = memberships.user_id join session_participants on session_participants.session_id = questions.session_id and session_participants.club_id = questions.club_id and session_participants.membership_id = questions.membership_id and session_participants.participation_status = 'ACTIVE' where questions.session_id = ? and questions.club_id = ? $membershipFilter order by questions.priority, questions.created_at, users.name """.trimIndent(), { resultSet, _ -&gt; CurrentSessionQuestion( priority = resultSet.getInt("priority"), text = resultSet.getString("text"), draftThought = resultSet.getString("draft_thought"), authorName = resultSet.getString("author_name"), authorShortName = resultSet.getString("author_short_name"), ) }, *args.toTypedArray(), )</ID>
     <ID>SpreadOperator:JdbcFeedbackDocumentStoreAdapter.kt$JdbcFeedbackDocumentStoreAdapter$(sql, { resultSet, _ -&gt; resultSet.toStoredFeedbackDocumentList() }, *args)</ID>
     <ID>SpreadOperator:JdbcManualNotificationDispatchAdapter.kt$JdbcManualNotificationDispatchAdapter$( """ select count(*) from memberships where club_id = ? and status = 'ACTIVE' and id in ($placeholders) """.trimIndent(), Int::class.java, *(listOf(clubId.dbString() as Any) + membershipIds.map { it.dbString() as Any }).toTypedArray(), )</ID>
@@ -464,6 +472,8 @@
     <ID>TooGenericExceptionCaught:NotificationTestMailService.kt$NotificationTestMailService$exception: Exception</ID>
     <ID>TooGenericExceptionCaught:ReadmatesOAuthSuccessHandler.kt$ReadmatesOAuthSuccessHandler$exception: RuntimeException</ID>
     <ID>TooGenericExceptionThrown:BffSecretFilterAuditTest.kt$BffSecretFilterAuditTest.&lt;no name provided&gt;$throw RuntimeException("db down")</ID>
+    <ID>TooManyFunctions:AiGenerationJobStore.kt$AiGenerationJobStore</ID>
+    <ID>TooManyFunctions:AiGenerationOrchestrator.kt$AiGenerationOrchestrator : StartGenerationUseCaseGetJobUseCaseGetRecentSessionGenerationJobUseCaseCancelGenerationUseCase</ID>
     <ID>TooManyFunctions:ArchiveWebMapper.kt$com.readmates.archive.adapter.in.web.ArchiveWebMapper.kt</ID>
     <ID>TooManyFunctions:AuthSessionService.kt$AuthSessionService : LogoutAuthSessionUseCase</ID>
     <ID>TooManyFunctions:FeedbackDocumentParser.kt$FeedbackDocumentParser</ID>
@@ -474,6 +484,7 @@
     <ID>TooManyFunctions:HostSessionQueries.kt$HostSessionQueries</ID>
     <ID>TooManyFunctions:HostSessionWriteOperations.kt$HostSessionWriteOperations</ID>
     <ID>TooManyFunctions:InvitationService.kt$InvitationService : ManageHostInvitationsUseCasePreviewInvitationUseCase</ID>
+    <ID>TooManyFunctions:JdbcAiGenerationOpsAuditRepository.kt$JdbcAiGenerationOpsAuditRepository : AiGenerationAuditQueryPortAiGenerationAdminActionAuditPort</ID>
     <ID>TooManyFunctions:JdbcCurrentSessionAdapter.kt$JdbcCurrentSessionAdapter : LoadCurrentSessionPort</ID>
     <ID>TooManyFunctions:JdbcHostInvitationStoreAdapter.kt$JdbcHostInvitationStoreAdapter : HostInvitationStorePort</ID>
     <ID>TooManyFunctions:JdbcHostSessionWriteAdapter.kt$JdbcHostSessionWriteAdapter : HostSessionQueryPortHostSessionDraftPortHostSessionLifecyclePortHostSessionDeletionPortHostSessionAttendancePortHostSessionPublicationPort</ID>

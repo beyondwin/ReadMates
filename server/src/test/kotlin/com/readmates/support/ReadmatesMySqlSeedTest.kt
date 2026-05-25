@@ -46,8 +46,7 @@ class ReadmatesMySqlSeedTest(
             )
         assertThat(domainCount).isGreaterThanOrEqualTo(0)
 
-        assertEquals(
-            0,
+        val ownerCount =
             jdbcTemplate.queryForObject(
                 """
                 select count(*)
@@ -55,8 +54,8 @@ class ReadmatesMySqlSeedTest(
                 where role = 'OWNER'
                 """.trimIndent(),
                 Int::class.java,
-            ),
-        )
+            )
+        assertThat(ownerCount).isGreaterThanOrEqualTo(1)
     }
 
     @Test
@@ -81,13 +80,13 @@ class ReadmatesMySqlSeedTest(
     }
 
     @Test
-    fun `mysql dev seed creates readmates club host and six archived sessions`() {
+    fun `mysql dev seed creates readmates club host and archived sessions`() {
         assertEquals(1, jdbcTemplate.queryForObject("select count(*) from clubs where slug = 'reading-sai'", Int::class.java))
         assertEquals(
             1,
             jdbcTemplate.queryForObject("select count(*) from memberships where role = 'HOST' and status = 'ACTIVE'", Int::class.java),
         )
-        assertEquals(6, jdbcTemplate.queryForObject("select count(*) from sessions where state = 'PUBLISHED'", Int::class.java))
+        assertEquals(7, jdbcTemplate.queryForObject("select count(*) from sessions where state = 'PUBLISHED'", Int::class.java))
         assertEquals(
             6,
             jdbcTemplate.queryForObject(

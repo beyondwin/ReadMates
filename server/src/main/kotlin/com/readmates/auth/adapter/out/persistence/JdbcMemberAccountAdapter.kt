@@ -39,17 +39,18 @@ class JdbcMemberAccountAdapter(
 
     companion object {
         @JvmField
-        internal val DEV_SEED_EMAILS: Set<String> = setOf(
-            "host@example.com",
-            "member1@example.com",
-            "member2@example.com",
-            "member3@example.com",
-            "member4@example.com",
-            "member5@example.com",
-            "admin-owner@example.com",
-            "admin-operator@example.com",
-            "admin-support@example.com",
-        )
+        internal val DEV_SEED_EMAILS: Set<String> =
+            setOf(
+                "host@example.com",
+                "member1@example.com",
+                "member2@example.com",
+                "member3@example.com",
+                "member4@example.com",
+                "member5@example.com",
+                "admin-owner@example.com",
+                "admin-operator@example.com",
+                "admin-support@example.com",
+            )
     }
 
     override fun findActiveMemberByUserId(userId: String): CurrentMember? {

@@ -34,35 +34,38 @@ import org.springframework.stereotype.Component
 class YamlModelCatalog(
     private val properties: AiGenerationProperties,
 ) : ModelCatalog {
-
     private val log = LoggerFactory.getLogger(YamlModelCatalog::class.java)
 
-    private val enabledProviderSet: Set<Provider> = properties.enabledProviders
-        .mapNotNull { raw ->
-            runCatching { Provider.valueOf(raw.uppercase()) }
-                .onFailure { log.warn("Unknown provider in enabled-providers: {}", raw) }
-                .getOrNull()
-        }
-        .toSet()
+    private val enabledProviderSet: Set<Provider> =
+        properties.enabledProviders
+            .mapNotNull { raw ->
+                runCatching { Provider.valueOf(raw.uppercase()) }
+                    .onFailure { log.warn("Unknown provider in enabled-providers: {}", raw) }
+                    .getOrNull()
+            }.toSet()
 
     /** All pricing entries with a resolvable provider, regardless of enabledProviders. */
-    private val catalog: Map<ModelId, ModelPricing> = properties.pricing.mapNotNull { (name, p) ->
-        val provider = providerFromName(name)
-        if (provider == null) {
-            log.warn("Unknown model name prefix '{}' in readmates.aigen.pricing — skipping", name)
-            null
-        } else {
-            ModelId(provider, name) to ModelPricing(
-                inputPerMTokenUsd = p.inputPerMTokenUsd,
-                cachedInputPerMTokenUsd = p.cachedInputPerMTokenUsd,
-                outputPerMTokenUsd = p.outputPerMTokenUsd,
-            )
-        }
-    }.toMap()
+    private val catalog: Map<ModelId, ModelPricing> =
+        properties.pricing
+            .mapNotNull { (name, p) ->
+                val provider = providerFromName(name)
+                if (provider == null) {
+                    log.warn("Unknown model name prefix '{}' in readmates.aigen.pricing — skipping", name)
+                    null
+                } else {
+                    ModelId(provider, name) to
+                        ModelPricing(
+                            inputPerMTokenUsd = p.inputPerMTokenUsd,
+                            cachedInputPerMTokenUsd = p.cachedInputPerMTokenUsd,
+                            outputPerMTokenUsd = p.outputPerMTokenUsd,
+                        )
+                }
+            }.toMap()
 
-    private val allowlistedSet: Set<ModelId> = catalog.keys
-        .filter { it.provider in enabledProviderSet }
-        .toSet()
+    private val allowlistedSet: Set<ModelId> =
+        catalog.keys
+            .filter { it.provider in enabledProviderSet }
+            .toSet()
 
     private val allowlistedByName: Map<String, ModelId> = allowlistedSet.associateBy { it.name }
 
@@ -74,17 +77,17 @@ class YamlModelCatalog(
 
     override fun resolveAlias(alias: String): ModelId? = allowlistedByName[alias]
 
-    override fun isEnabled(id: ModelId): Boolean =
-        id in allowlistedSet && id.provider in enabledProviderSet
+    override fun isEnabled(id: ModelId): Boolean = id in allowlistedSet && id.provider in enabledProviderSet
 
-    private fun providerFromName(name: String): Provider? = when {
-        name.startsWith("claude-") -> Provider.CLAUDE
-        name.startsWith("gemini-") -> Provider.GEMINI
-        name.startsWith("gpt-") -> Provider.OPENAI
-        // OpenAI "o-series": o1, o1-mini, o3, o3-mini, o4, ...
-        OPENAI_O_SERIES_REGEX.matches(name) -> Provider.OPENAI
-        else -> null
-    }
+    private fun providerFromName(name: String): Provider? =
+        when {
+            name.startsWith("claude-") -> Provider.CLAUDE
+            name.startsWith("gemini-") -> Provider.GEMINI
+            name.startsWith("gpt-") -> Provider.OPENAI
+            // OpenAI "o-series": o1, o1-mini, o3, o3-mini, o4, ...
+            OPENAI_O_SERIES_REGEX.matches(name) -> Provider.OPENAI
+            else -> null
+        }
 
     private companion object {
         private val OPENAI_O_SERIES_REGEX = Regex("^o\\d.*")
