@@ -10,7 +10,14 @@ export type PlatformAdminDomainStatus =
   | "FAILED"
   | "DISABLED";
 
-export type WorkQueueSeverity = "blocked" | "attention" | "ready" | "stable";
+export type WorkQueueSeverity =
+  | "blocked"
+  | "attention"
+  | "ready"
+  | "stable"
+  | "critical"
+  | "warn"
+  | "info";
 // Filter chips are deferred (see spec Non-Goals); severity ordering covers triage for the first pass.
 // When added back, key filtering off typed signals (e.g., severity, a domainState field) — not badge strings.
 
@@ -41,6 +48,17 @@ export type PlatformAdminWorkbenchDomain = {
   lastCheckedAt: string | null;
 };
 
+export type PlatformAdminAiOpsJobInput = {
+  jobId: string;
+  clubId: string;
+  clubName: string;
+  sessionTitle: string;
+  status: string;
+  errorCode: string | null;
+  stale: boolean;
+  startedAt: string;
+};
+
 export type PlatformAdminWorkbenchInput = {
   role: PlatformAdminRole;
   activeClubCount: number;
@@ -48,6 +66,8 @@ export type PlatformAdminWorkbenchInput = {
   selectedClubId: string | null;
   clubs: PlatformAdminWorkbenchClub[];
   domains: PlatformAdminWorkbenchDomain[];
+  aiJobs?: ReadonlyArray<PlatformAdminAiOpsJobInput>;
+  aiDisabled?: boolean;
 };
 
 export type PlatformAdminPermissionView = {
@@ -81,6 +101,22 @@ export type PlatformAdminWorkQueueItem = {
   sortRank: number;
 };
 
+export type WorkbenchClubQueueItem = PlatformAdminWorkQueueItem & {
+  type?: "club";
+  id?: string;
+};
+
+export type WorkbenchAiQueueItem = PlatformAdminWorkQueueItem & {
+  type: "ai";
+  id: string;
+  jobId: string;
+  clubName: string;
+  sessionTitle: string;
+  label: string;
+};
+
+export type WorkbenchQueueItem = WorkbenchClubQueueItem | WorkbenchAiQueueItem;
+
 export type PlatformAdminSelectedClubBrief = PlatformAdminWorkbenchClub & {
   domains: PlatformAdminWorkbenchDomain[];
   publishChecklist: PublishChecklistItem[];
@@ -97,19 +133,24 @@ export type PlatformAdminWorkbenchView = {
     domainActionRequiredCount: number;
     publishReadyCount: number;
   };
-  queueItems: PlatformAdminWorkQueueItem[];
+  queueItems: WorkbenchQueueItem[];
   selectedClub: PlatformAdminSelectedClubBrief | null;
 };
 
 export function buildPlatformAdminWorkbench(input: PlatformAdminWorkbenchInput): PlatformAdminWorkbenchView {
   const domainsByClub = groupDomainsByClub(input.domains);
-  const queueItems = input.clubs
+  const clubItems: WorkbenchClubQueueItem[] = input.clubs
     .map((club) => buildQueueItem(club, domainsByClub.get(club.clubId) ?? []))
-    .sort((a, b) => a.sortRank - b.sortRank || a.name.localeCompare(b.name, "ko-KR"));
-  const selectedClubId = selectClubId(input.selectedClubId, queueItems);
+    .sort((a, b) => a.sortRank - b.sortRank || a.name.localeCompare(b.name, "ko-KR"))
+    .map((item) => ({ ...item, type: "club" as const, id: item.clubId }));
+  const aiItems: WorkbenchAiQueueItem[] = (input.aiJobs ?? []).map((job) =>
+    buildAiQueueItem(job, input.aiDisabled ?? false),
+  );
+  const queueItems: WorkbenchQueueItem[] = [...clubItems, ...aiItems];
+  const selectedClubId = selectClubId(input.selectedClubId, clubItems);
   const selectedClub = input.clubs.find((club) => club.clubId === selectedClubId) ?? null;
   const selectedDomains = selectedClub ? domainsByClub.get(selectedClub.clubId) ?? [] : [];
-  const selectedQueueItem = queueItems.find((item) => item.clubId === selectedClub?.clubId) ?? null;
+  const selectedQueueItem = clubItems.find((item) => item.clubId === selectedClub?.clubId) ?? null;
 
   return {
     permissions: permissionsForRole(input.role),
@@ -130,6 +171,42 @@ export function buildPlatformAdminWorkbench(input: PlatformAdminWorkbenchInput):
           queueItem: selectedQueueItem,
         }
       : null,
+  };
+}
+
+function buildAiQueueItem(
+  job: PlatformAdminAiOpsJobInput,
+  aiDisabled: boolean,
+): WorkbenchAiQueueItem {
+  const severity: WorkbenchAiQueueItem["severity"] = aiDisabled
+    ? "info"
+    : job.status === "FAILED"
+      ? "critical"
+      : job.stale
+        ? "warn"
+        : "info";
+  const label = aiDisabled
+    ? "AI 비활성"
+    : job.status === "FAILED"
+      ? "AI 실패"
+      : job.stale
+        ? "AI stale"
+        : "AI 진행";
+  return {
+    type: "ai",
+    id: `ai-${job.jobId}`,
+    jobId: job.jobId,
+    clubId: job.clubId,
+    clubName: job.clubName,
+    sessionTitle: job.sessionTitle,
+    slug: job.clubId,
+    name: job.clubName,
+    severity,
+    reason: `${job.clubName} · ${job.sessionTitle}`,
+    primaryActionLabel: label,
+    badges: [label],
+    sortRank: 25,
+    label,
   };
 }
 

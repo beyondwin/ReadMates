@@ -8,6 +8,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Highlights
 
+- **Admin vNext S1 IA Foundation**: `/admin` 단일 페이지를 9-라우트 lazy-split 패밀리로 분해했습니다. 공유 좌측 nav · 상단 status strip · 권한 매트릭스 · URL-state onboarding modal · 표준 "준비 중" empty state를 갖춘 `AdminShellLayout` 위에서 5개 READY 라우트(`today`·`clubs`·`clubs/:clubId`·`ai-ops`·`support`)와 4개 COMING-SOON 라우트(`health`·`notifications`·`audit`·`analytics`)가 `admin-route-catalog` SSOT로 구동됩니다. 후속 슬라이스는 자기 라우트를 `coming_soon → ready`로 토글하는 한 줄 변경으로 자기 자리를 채울 수 있습니다.
 - **AI 운영 콘솔 + 호스트 복구**: `/admin`에서 AI job 상태, 실패 코드, 비용 추정, stale 후보를 보는 AI Ops 표면을 추가하고, 호스트 세션 편집기에서 자기 세션의 in-flight AI job을 다시 찾아 안전하게 취소/재시도할 수 있게 했습니다.
 - **Query foundation 완주**: `archive`, `feedback`, `public` read path를 Query loader seeding으로 이전하고, AI commit 후 full page reload 대신 관련 Query cache invalidation으로 화면을 갱신합니다.
 - **운영 안전망 보강**: 일일 MySQL 백업 systemd timer와 복구 runbook, release-tag `Unreleased` guard(`--release` gated, `--no-changelog-check` 비상 우회), graphify 기반 코드베이스 탐색 워크플로를 도입했습니다.

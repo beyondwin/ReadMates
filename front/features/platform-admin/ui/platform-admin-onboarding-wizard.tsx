@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { PlatformAdminClubRegistryItem } from "@/features/platform-admin/ui/platform-admin-club-registry";
 
 export type PlatformAdminOnboardingRequest = {
@@ -59,9 +59,10 @@ type Props = {
   onPreview: (request: PlatformAdminOnboardingRequest) => Promise<PlatformAdminOnboardingPreviewResponse>;
   onCommit: (request: PlatformAdminOnboardingRequest) => Promise<PlatformAdminOnboardingResultResponse>;
   onCreated?: (result: PlatformAdminOnboardingResultResponse) => void;
+  onDirtyChange?: (isDirty: boolean) => void;
 };
 
-export function PlatformAdminOnboardingWizard({ onPreview, onCommit, onCreated }: Props) {
+export function PlatformAdminOnboardingWizard({ onPreview, onCommit, onCreated, onDirtyChange }: Props) {
   const [request, setRequest] = useState<PlatformAdminOnboardingRequest>({
     club: { name: "", slug: "", tagline: "", about: "" },
     firstHost: { email: "", name: "" },
@@ -70,6 +71,17 @@ export function PlatformAdminOnboardingWizard({ onPreview, onCommit, onCreated }
   const [confirmedExistingUser, setConfirmedExistingUser] = useState(false);
   const [result, setResult] = useState<PlatformAdminOnboardingResultResponse | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const isDirty =
+    request.club.name.length > 0 ||
+    request.club.slug.length > 0 ||
+    request.club.tagline.length > 0 ||
+    request.club.about.length > 0 ||
+    request.firstHost.email.length > 0 ||
+    request.firstHost.name.length > 0;
+  useEffect(() => {
+    onDirtyChange?.(isDirty && result === null);
+  }, [isDirty, result, onDirtyChange]);
 
   const existingUserConfirmation =
     confirmedExistingUser && preview?.firstHost.requiredConfirmation ? preview.firstHost.requiredConfirmation : undefined;

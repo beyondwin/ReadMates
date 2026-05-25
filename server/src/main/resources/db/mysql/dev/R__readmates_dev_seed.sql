@@ -2189,3 +2189,42 @@ select
 from resolved
 on duplicate key update
   reading_progress = values(reading_progress);
+
+-- Platform admin dev-login accounts (S1 IA Foundation).
+insert into users (id, google_subject_id, email, name, short_name, profile_image_url)
+with admin_seed as (
+  select 901 as id_suffix, 'readmates-dev-google-admin-owner'    as google_subject_id, 'admin-owner@example.com'    as email, '오너관리자' as name, '오너' as short_name
+  union all
+  select 902, 'readmates-dev-google-admin-operator', 'admin-operator@example.com', '운영관리자', '운영'
+  union all
+  select 903, 'readmates-dev-google-admin-support',  'admin-support@example.com',  '지원관리자', '지원'
+)
+select
+  concat('00000000-0000-0000-0000-', lpad(id_suffix, 12, '0')),
+  google_subject_id,
+  email,
+  name,
+  short_name,
+  null
+from admin_seed
+on duplicate key update
+  google_subject_id = values(google_subject_id),
+  name = values(name),
+  short_name = values(short_name),
+  profile_image_url = values(profile_image_url),
+  updated_at = utc_timestamp(6);
+
+insert into platform_admins (user_id, role, status)
+with admin_role_seed as (
+  select 'admin-owner@example.com'    as email, 'OWNER'    as role
+  union all
+  select 'admin-operator@example.com', 'OPERATOR'
+  union all
+  select 'admin-support@example.com',  'SUPPORT'
+)
+select users.id, admin_role_seed.role, 'ACTIVE'
+from admin_role_seed
+join users on users.email = admin_role_seed.email
+on duplicate key update
+  role = values(role),
+  status = 'ACTIVE';

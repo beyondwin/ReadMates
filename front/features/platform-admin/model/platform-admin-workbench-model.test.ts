@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildPlatformAdminWorkbench,
+  type PlatformAdminAiOpsJobInput,
   type PlatformAdminWorkbenchInput,
 } from "@/features/platform-admin/model/platform-admin-workbench-model";
 
@@ -143,5 +144,56 @@ describe("platform admin workbench model", () => {
   it("picks the first queue item when selectedClubId is null", () => {
     const workbench = buildPlatformAdminWorkbench({ ...baseInput, selectedClubId: null });
     expect(workbench.selectedClub?.clubId).toBe("club-host-missing");
+  });
+});
+
+describe("buildPlatformAdminWorkbench — AI item 합류", () => {
+  function aiJob(overrides: Partial<PlatformAdminAiOpsJobInput>): PlatformAdminAiOpsJobInput {
+    return {
+      jobId: "job-1",
+      clubId: "club-1",
+      clubName: "샘플 클럽",
+      sessionTitle: "1회차",
+      status: "FAILED",
+      errorCode: null,
+      stale: false,
+      startedAt: "2026-05-20T00:00:00Z",
+      ...overrides,
+    };
+  }
+
+  it("appends AI items as typed view models with severity", () => {
+    const result = buildPlatformAdminWorkbench({
+      role: "OWNER",
+      activeClubCount: 0,
+      domainActionRequiredCount: 0,
+      selectedClubId: null,
+      clubs: [],
+      domains: [],
+      aiJobs: [
+        aiJob({ jobId: "job-1", status: "FAILED", stale: false }),
+        aiJob({ jobId: "job-2", status: "RUNNING", stale: true }),
+      ],
+      aiDisabled: false,
+    });
+    const aiItems = result.queueItems.filter((item) => item.type === "ai");
+    expect(aiItems).toHaveLength(2);
+    expect(aiItems.find((item) => item.id === "ai-job-1")?.severity).toBe("critical");
+    expect(aiItems.find((item) => item.id === "ai-job-2")?.severity).toBe("warn");
+  });
+
+  it("uses 'info' severity for AI items when AI is disabled", () => {
+    const result = buildPlatformAdminWorkbench({
+      role: "OWNER",
+      activeClubCount: 0,
+      domainActionRequiredCount: 0,
+      selectedClubId: null,
+      clubs: [],
+      domains: [],
+      aiJobs: [aiJob({ jobId: "job-3", status: "FAILED", stale: false })],
+      aiDisabled: true,
+    });
+    const aiItem = result.queueItems.find((item) => item.id === "ai-job-3");
+    expect(aiItem?.severity).toBe("info");
   });
 });

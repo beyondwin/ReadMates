@@ -1,0 +1,56 @@
+import { render, screen, fireEvent } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { describe, expect, it } from "vitest";
+import { platformAdminClubsQuery } from "@/features/platform-admin/queries/platform-admin-queries";
+import { AdminClubsRoute } from "./admin-clubs-route";
+
+function renderRoute(items: Array<{
+  clubId: string; slug: string; name: string;
+  status: "ACTIVE" | "SETUP_REQUIRED" | "SUSPENDED" | "ARCHIVED";
+  publicVisibility: "PRIVATE" | "PUBLIC";
+  domainCount: number; domainActionRequiredCount: number;
+  firstHostOnboardingState: "MISSING" | "INVITED" | "ASSIGNED";
+  tagline: string; about: string;
+}>) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  queryClient.setQueryData(platformAdminClubsQuery().queryKey, { items });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={["/admin/clubs"]}>
+        <Routes>
+          <Route path="/admin/clubs" element={<AdminClubsRoute />} />
+          <Route path="/admin/clubs/:clubId" element={<div>club detail</div>} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+describe("AdminClubsRoute", () => {
+  it("renders a row per club with key columns", () => {
+    renderRoute([
+      {
+        clubId: "c-1", slug: "alpha", name: "Alpha", status: "ACTIVE",
+        publicVisibility: "PRIVATE", domainCount: 1, domainActionRequiredCount: 0,
+        firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
+      },
+    ]);
+    expect(screen.getByText("alpha")).toBeInTheDocument();
+    expect(screen.getByText("Alpha")).toBeInTheDocument();
+    expect(screen.getByText("ACTIVE")).toBeInTheDocument();
+    expect(screen.getByText("PRIVATE")).toBeInTheDocument();
+  });
+
+  it("navigates to club detail on row click", () => {
+    renderRoute([
+      {
+        clubId: "c-1", slug: "alpha", name: "Alpha", status: "ACTIVE",
+        publicVisibility: "PRIVATE", domainCount: 1, domainActionRequiredCount: 0,
+        firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
+      },
+    ]);
+    fireEvent.click(screen.getByRole("link", { name: /Alpha/ }));
+    expect(screen.getByText("club detail")).toBeInTheDocument();
+  });
+});

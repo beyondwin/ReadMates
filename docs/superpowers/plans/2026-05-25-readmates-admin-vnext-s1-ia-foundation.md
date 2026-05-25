@@ -2,6 +2,254 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+```yaml waygent-task
+id: phase_1_models
+title: Phase 1 — Implement Tasks 1-4 (permission matrix, admin-route-catalog SSOT, status strip metric derivation, workbench model AI-item merge). Do not create git commits from the task worktree.
+dependencies: []
+file_claims:
+  - path: front/features/platform-admin/model/platform-admin-permissions.ts
+    mode: owned
+  - path: front/features/platform-admin/model/platform-admin-permissions.test.ts
+    mode: owned
+  - path: front/features/platform-admin/route/admin-route-catalog.ts
+    mode: owned
+  - path: front/features/platform-admin/route/admin-route-catalog.test.ts
+    mode: owned
+  - path: front/features/platform-admin/model/admin-status-strip-model.ts
+    mode: owned
+  - path: front/features/platform-admin/model/admin-status-strip-model.test.ts
+    mode: owned
+  - path: front/features/platform-admin/model/platform-admin-workbench-model.ts
+    mode: owned
+  - path: front/features/platform-admin/model/platform-admin-workbench-model.test.ts
+    mode: owned
+risk: low
+verify_isolation: fast
+verify:
+  - pnpm install --frozen-lockfile --prefer-offline
+  - pnpm --dir front test -- --run features/platform-admin/model features/platform-admin/route/admin-route-catalog.test.ts
+  - pnpm --dir front lint
+instructions:
+  - Implement Tasks 1, 2, 3, and 4 in this single worker invocation following the detailed steps in the plan body below.
+  - Write the failing tests first, then implement, per the existing TDD steps.
+  - Do not execute the per-task `git add` / `git commit` shell snippets — leave changes uncommitted so waygent apply lands them.
+```
+
+```yaml waygent-task
+id: phase_2_server_seed
+title: Phase 2 — Implement Tasks 5-6 (SQL dev seed for admin accounts, dev-login adapter whitelist). Do not create git commits from the task worktree.
+dependencies: [phase_1_models]
+file_claims:
+  - path: server/src/main/resources/db/dev/R__readmates_dev_seed.sql
+    mode: owned
+  - path: server/src/main/resources/db/mysql/dev/R__readmates_dev_seed.sql
+    mode: owned
+  - path: server/src/main/kotlin/com/readmates/auth/adapter/out/persistence/JdbcMemberAccountAdapter.kt
+    mode: owned
+  - path: server/src/test/kotlin/com/readmates/auth/adapter/out/persistence/JdbcMemberAccountAdapterDevSeedTest.kt
+    mode: owned
+  - path: server/src/test/kotlin/com/readmates/auth/adapter/out/persistence/JdbcMemberAccountAdapterDevSeedAllowListTest.kt
+    mode: owned
+risk: medium
+verify_isolation: fast
+verify:
+  - ./gradlew :server:test --tests "com.readmates.auth.adapter.out.persistence.JdbcMemberAccountAdapterDevSeedTest" --tests "com.readmates.auth.adapter.out.persistence.JdbcMemberAccountAdapterDevSeedAllowListTest"
+instructions:
+  - Implement Tasks 5 and 6 in this single worker invocation following the detailed steps in the plan body below.
+  - Keep `Repeatable` SQL idempotent. Whitelist the three admin emails in the dev-login adapter behind the existing dev profile guard.
+  - Do not execute the per-task `git add` / `git commit` shell snippets — leave changes uncommitted so waygent apply lands them.
+```
+
+```yaml waygent-task
+id: phase_3_ui_components
+title: Phase 3 — Implement Tasks 7-11 (AdminComingSoon, AdminStatusStrip, AdminLayoutNav, AdminBreadcrumb, AdminOnboardingModal). Do not create git commits from the task worktree.
+dependencies: [phase_1_models]
+file_claims:
+  - path: front/features/platform-admin/ui/admin-coming-soon.tsx
+    mode: owned
+  - path: front/features/platform-admin/ui/admin-coming-soon.test.tsx
+    mode: owned
+  - path: front/features/platform-admin/ui/admin-status-strip.tsx
+    mode: owned
+  - path: front/features/platform-admin/ui/admin-status-strip.test.tsx
+    mode: owned
+  - path: front/features/platform-admin/ui/admin-layout-nav.tsx
+    mode: owned
+  - path: front/features/platform-admin/ui/admin-layout-nav.test.tsx
+    mode: owned
+  - path: front/features/platform-admin/ui/admin-breadcrumb.tsx
+    mode: owned
+  - path: front/features/platform-admin/ui/admin-breadcrumb.test.tsx
+    mode: owned
+  - path: front/features/platform-admin/ui/admin-onboarding-modal.tsx
+    mode: owned
+  - path: front/features/platform-admin/ui/admin-onboarding-modal.test.tsx
+    mode: owned
+risk: low
+verify_isolation: fast
+verify:
+  - pnpm install --frozen-lockfile --prefer-offline
+  - pnpm --dir front test -- --run features/platform-admin/ui
+  - pnpm --dir front lint
+instructions:
+  - Implement Tasks 7, 8, 9, 10, and 11 in this single worker invocation following the detailed steps in the plan body below.
+  - Build each component test-first. Korean copy is the default for user-facing strings.
+  - Do not execute the per-task `git add` / `git commit` shell snippets — leave changes uncommitted so waygent apply lands them.
+```
+
+```yaml waygent-task
+id: phase_4_route_shell
+title: Phase 4 — Implement Tasks 12-14 (AdminShellLayout loader + component + breadcrumb context, AdminComingSoonRoute). Do not create git commits from the task worktree.
+dependencies: [phase_3_ui_components]
+file_claims:
+  - path: front/features/platform-admin/route/admin-shell-data.ts
+    mode: owned
+  - path: front/features/platform-admin/route/admin-shell-layout.tsx
+    mode: owned
+  - path: front/features/platform-admin/route/admin-shell-layout.test.tsx
+    mode: owned
+  - path: front/features/platform-admin/route/admin-breadcrumb-context.tsx
+    mode: owned
+  - path: front/features/platform-admin/route/admin-coming-soon-route.tsx
+    mode: owned
+  - path: front/features/platform-admin/route/admin-coming-soon-route.test.tsx
+    mode: owned
+risk: low
+verify_isolation: fast
+verify:
+  - pnpm install --frozen-lockfile --prefer-offline
+  - pnpm --dir front test -- --run features/platform-admin/route/admin-shell-layout.test.tsx features/platform-admin/route/admin-coming-soon-route.test.tsx
+  - pnpm --dir front lint
+instructions:
+  - Implement Tasks 12, 13, and 14 in this single worker invocation following the detailed steps in the plan body below.
+  - The shell layout owns leftnav + status strip + breadcrumb + onboarding modal. Do not couple it to specific route loaders.
+  - Do not execute the per-task `git add` / `git commit` shell snippets — leave changes uncommitted so waygent apply lands them.
+```
+
+```yaml waygent-task
+id: phase_5_route_registration
+title: Phase 5 — Implement Tasks 15-16 (route module + wire into router; remove old /admin block). Do not create git commits from the task worktree.
+dependencies: [phase_4_route_shell]
+file_claims:
+  - path: front/src/app/routes/admin.tsx
+    mode: owned
+  - path: front/src/app/router.tsx
+    mode: owned
+  - path: front/src/app/routes/auth.tsx
+    mode: owned
+risk: medium
+verify_isolation: fast
+verify:
+  - pnpm install --frozen-lockfile --prefer-offline
+  - pnpm --dir front lint
+  - pnpm --dir front build
+instructions:
+  - Implement Tasks 15 and 16 in this single worker invocation following the detailed steps in the plan body below.
+  - Replace the single legacy /admin block in router.tsx with the new admin route family lazy-loaded from front/src/app/routes/admin.tsx.
+  - All READY route imports are placeholder-friendly — Phase 6 will fill in actual route files; ensure the registration compiles by referencing only modules that will exist.
+  - Do not execute the per-task `git add` / `git commit` shell snippets — leave changes uncommitted so waygent apply lands them.
+```
+
+```yaml waygent-task
+id: phase_6_ready_routes
+title: Phase 6 — Implement Tasks 17-21 (/admin/today, /admin/clubs, /admin/clubs/:clubId, /admin/ai-ops, /admin/support). Do not create git commits from the task worktree.
+dependencies: [phase_5_route_registration]
+file_claims:
+  - path: front/features/platform-admin/route/admin-today-route.tsx
+    mode: owned
+  - path: front/features/platform-admin/route/admin-today-data.ts
+    mode: owned
+  - path: front/features/platform-admin/route/admin-today-route.test.tsx
+    mode: owned
+  - path: front/features/platform-admin/route/admin-clubs-route.tsx
+    mode: owned
+  - path: front/features/platform-admin/route/admin-clubs-data.ts
+    mode: owned
+  - path: front/features/platform-admin/route/admin-clubs-route.test.tsx
+    mode: owned
+  - path: front/features/platform-admin/route/admin-club-detail-route.tsx
+    mode: owned
+  - path: front/features/platform-admin/route/admin-club-detail-data.ts
+    mode: owned
+  - path: front/features/platform-admin/route/admin-club-detail-route.test.tsx
+    mode: owned
+  - path: front/features/platform-admin/route/admin-ai-ops-route.tsx
+    mode: owned
+  - path: front/features/platform-admin/route/admin-ai-ops-data.ts
+    mode: owned
+  - path: front/features/platform-admin/route/admin-ai-ops-route.test.tsx
+    mode: owned
+  - path: front/features/platform-admin/route/admin-support-route.tsx
+    mode: owned
+  - path: front/features/platform-admin/route/admin-support-route.test.tsx
+    mode: owned
+  - path: front/features/platform-admin/queries/platform-admin-ai-ops-queries.ts
+    mode: owned
+risk: medium
+verify_isolation: fast
+verify:
+  - pnpm install --frozen-lockfile --prefer-offline
+  - pnpm --dir front test -- --run features/platform-admin/route
+  - pnpm --dir front lint
+  - pnpm --dir front build
+instructions:
+  - Implement Tasks 17, 18, 19, 20, and 21 in this single worker invocation following the detailed steps in the plan body below.
+  - Task 20 includes the AI_DISABLED 503 correction in `platform-admin-ai-ops-queries.ts`.
+  - Do not execute the per-task `git add` / `git commit` shell snippets — leave changes uncommitted so waygent apply lands them.
+```
+
+```yaml waygent-task
+id: phase_7_cleanup
+title: Phase 7 — Implement Task 22 (delete legacy single-page admin files). Do not create git commits from the task worktree.
+dependencies: [phase_6_ready_routes]
+file_claims:
+  - path: front/features/platform-admin/route/platform-admin-route.tsx
+    mode: owned
+  - path: front/features/platform-admin/route/platform-admin-data.ts
+    mode: owned
+  - path: front/features/platform-admin/ui/platform-admin-dashboard.tsx
+    mode: owned
+  - path: front/features/platform-admin/ui/platform-admin-overview-metrics.tsx
+    mode: owned
+risk: medium
+verify_isolation: fast
+verify:
+  - pnpm install --frozen-lockfile --prefer-offline
+  - pnpm --dir front lint
+  - pnpm --dir front test -- --run
+  - pnpm --dir front build
+instructions:
+  - Implement Task 22 in this single worker invocation following the detailed steps in the plan body below.
+  - Confirm no remaining references in front/ using ripgrep first; if any non-self references remain, stop and report instead of deleting.
+  - Delete the four listed files (plus any colocated test files that exist) using rm. These files are claimed `owned` by this task, so deletion is in scope.
+  - Do not execute the per-task `git add` / `git commit` shell snippets — leave changes uncommitted so waygent apply lands them.
+```
+
+```yaml waygent-task
+id: phase_8_e2e_docs
+title: Phase 8 — Implement Tasks 23-25 (Playwright admin shell E2E, README + showcase doc updates, CHANGELOG entry). Do not create git commits from the task worktree.
+dependencies: [phase_7_cleanup]
+file_claims:
+  - path: front/tests/e2e/admin-shell.spec.ts
+    mode: owned
+  - path: README.md
+    mode: owned
+  - path: docs/showcase/architecture-evidence.md
+    mode: owned
+  - path: CHANGELOG.md
+    mode: owned
+risk: low
+verify_isolation: fast
+verify:
+  - pnpm install --frozen-lockfile --prefer-offline
+  - pnpm --dir front lint
+  - pnpm --dir front build
+instructions:
+  - Implement Tasks 23, 24, and 25 in this single worker invocation following the detailed steps in the plan body below.
+  - Skip running the Playwright suite during verify — it requires a live server. Write the spec; humans run it post-apply.
+  - Do not execute the per-task `git add` / `git commit` shell snippets — leave changes uncommitted so waygent apply lands them.
+```
+
 **Goal:** Split `/admin` from a single 1,300-line page into a lazy-split 9-route family with shared leftnav + status strip + capability matrix + dev-login admin seed + URL-state onboarding modal + standard "준비 중" empty state.
 
 **Architecture:** A new `AdminShellLayout` owns leftnav + status strip + breadcrumb + onboarding modal. Five routes are READY (`today`, `clubs`, `clubs/:clubId`, `ai-ops`, `support`); four routes are COMING-SOON placeholders (`health`, `notifications`, `audit`, `analytics`). An `admin-route-catalog.ts` is the single source of truth that drives leftnav rendering, route registration, breadcrumb labels, and empty-state content. No new server endpoints. SQL dev seed adds 3 admin accounts.

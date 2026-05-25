@@ -1,5 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { createBrowserRouter, type RouteObject } from "react-router-dom";
+import { adminRoutes } from "@/src/app/routes/admin";
 import { authRoutes } from "@/src/app/routes/auth";
 import { hostRoutes } from "@/src/app/routes/host";
 import { memberRoutes } from "@/src/app/routes/member";
@@ -12,6 +13,7 @@ export function buildRoutes(queryClient: QueryClient): RouteObject[] {
     ...authRoutes(queryClient),
     ...memberRoutes(queryClient),
     ...hostRoutes(queryClient),
+    ...adminRoutes(queryClient),
   ];
 }
 

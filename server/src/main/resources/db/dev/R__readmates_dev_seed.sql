@@ -2019,3 +2019,37 @@ select
 from resolved
 on conflict (session_id, membership_id) do update set
   reading_progress = excluded.reading_progress;
+
+-- Platform admin dev-login accounts (S1 IA Foundation).
+with admin_seed(id_suffix, google_subject_id, email, name) as (
+  values
+    (901, 'readmates-dev-google-admin-owner',    'admin-owner@example.com',    '오너관리자'),
+    (902, 'readmates-dev-google-admin-operator', 'admin-operator@example.com', '운영관리자'),
+    (903, 'readmates-dev-google-admin-support',  'admin-support@example.com',  '지원관리자')
+)
+insert into users (id, google_subject_id, email, name, profile_image_url)
+select
+  ('00000000-0000-0000-0000-' || lpad(id_suffix::text, 12, '0'))::uuid,
+  google_subject_id,
+  email,
+  name,
+  null
+from admin_seed
+on conflict (email) do update set
+  google_subject_id = excluded.google_subject_id,
+  name = excluded.name,
+  profile_image_url = excluded.profile_image_url;
+
+with admin_role_seed(email, role) as (
+  values
+    ('admin-owner@example.com',    'OWNER'),
+    ('admin-operator@example.com', 'OPERATOR'),
+    ('admin-support@example.com',  'SUPPORT')
+)
+insert into platform_admins (user_id, role, status)
+select users.id, admin_role_seed.role, 'ACTIVE'
+from admin_role_seed
+join users on users.email = admin_role_seed.email
+on conflict (user_id) do update set
+  role = excluded.role,
+  status = 'ACTIVE';

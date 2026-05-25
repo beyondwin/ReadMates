@@ -25,6 +25,7 @@ Browser
 | Notifications use transactional outbox | Mutations do not block on SMTP/in-app delivery; retry and audit state are explicit. | `docs/case-studies/02-notification-pipeline-with-outbox.md` |
 | AI generation is feature-gated and audited | Transcript handling, provider calls, cost guard, kill switch, and PII policy are operational boundaries. | `docs/case-studies/04-pii-safe-ai-session-generation.md`, `docs/operations/runbooks/ai-session-generation.md`, `scripts/aigen-pii-check.sh` |
 | Public release safety is scripted | Public candidates are built and scanned before release assumptions are made. | `scripts/README.md`, `docs/deploy/security-public-repo.md` |
+| Admin IA Foundation (2026-05-25) | `/admin` 단일 페이지를 9-라우트 lazy-split 패밀리로 분해, `admin-route-catalog` 한 곳을 SSOT로 좌측 nav · 상단 status strip · empty state · 권한 매트릭스를 일관시켰다. 후속 슬라이스가 자기 라우트를 `coming_soon → ready`로 토글하는 한 줄 변경으로 자기 자리를 채울 수 있다. | `docs/superpowers/specs/2026-05-25-readmates-admin-vnext-s1-ia-foundation-design.md`, `front/features/platform-admin/model/admin-route-catalog.ts`, `front/src/app/routes/admin.tsx` |
 
 ## Request Flow
 
