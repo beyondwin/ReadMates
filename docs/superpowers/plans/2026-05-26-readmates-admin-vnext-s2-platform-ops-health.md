@@ -2,6 +2,185 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+```yaml waygent-task
+id: phase_1_backend_domain
+title: Phase 1 — Implement Task 1 (admin health domain types, outbound ports, HealthCardProvider interface). Do not create git commits from the task worktree.
+dependencies: []
+file_claims:
+  - path: server/src/main/kotlin/com/readmates/admin/health/application/model/HealthCardStatus.kt
+    mode: owned
+  - path: server/src/main/kotlin/com/readmates/admin/health/application/model/HealthCardSource.kt
+    mode: owned
+  - path: server/src/main/kotlin/com/readmates/admin/health/application/model/HealthCardDrill.kt
+    mode: owned
+  - path: server/src/main/kotlin/com/readmates/admin/health/application/model/HealthCard.kt
+    mode: owned
+  - path: server/src/main/kotlin/com/readmates/admin/health/application/model/DeployAttemptStripEntry.kt
+    mode: owned
+  - path: server/src/main/kotlin/com/readmates/admin/health/application/model/PlatformHealthSnapshot.kt
+    mode: owned
+  - path: server/src/main/kotlin/com/readmates/admin/health/application/port/out/PrometheusQueryPort.kt
+    mode: owned
+  - path: server/src/main/kotlin/com/readmates/admin/health/application/port/out/DeployLedgerPort.kt
+    mode: owned
+  - path: server/src/main/kotlin/com/readmates/admin/health/application/service/HealthCardProvider.kt
+    mode: owned
+risk: low
+verify_isolation: fast
+verify:
+  - ./server/gradlew -p server compileKotlin
+instructions:
+  - Implement Task 1 verbatim from the plan body — only the nine files in file_claims.
+  - Do not execute the per-task `git add` / `git commit` shell snippets — leave changes uncommitted so waygent apply lands them.
+```
+
+```yaml waygent-task
+id: phase_2_backend_providers
+title: Phase 2 — Implement Tasks 2, 3, 4 (in-process providers, Prometheus port + HTTP adapter + Prometheus-backed providers, deploy ledger port + adapter + strip provider, config wiring). Do not create git commits from the task worktree.
+dependencies: [phase_1_backend_domain]
+file_claims:
+  - path: server/src/main/kotlin/com/readmates/admin/health/application/service/providers/DbPoolHealthCardProvider.kt
+    mode: owned
+  - path: server/src/test/kotlin/com/readmates/admin/health/application/service/providers/DbPoolHealthCardProviderTest.kt
+    mode: owned
+  - path: server/src/main/kotlin/com/readmates/admin/health/application/service/providers/RedisHealthCardProvider.kt
+    mode: owned
+  - path: server/src/test/kotlin/com/readmates/admin/health/application/service/providers/RedisHealthCardProviderTest.kt
+    mode: owned
+  - path: server/src/main/kotlin/com/readmates/admin/health/application/service/providers/OutboxBacklogHealthCardProvider.kt
+    mode: owned
+  - path: server/src/test/kotlin/com/readmates/admin/health/application/service/providers/OutboxBacklogHealthCardProviderTest.kt
+    mode: owned
+  - path: server/src/main/kotlin/com/readmates/admin/health/adapter/out/prometheus/HttpPrometheusQueryAdapter.kt
+    mode: owned
+  - path: server/src/test/kotlin/com/readmates/admin/health/adapter/out/prometheus/HttpPrometheusQueryAdapterTest.kt
+    mode: owned
+  - path: server/src/main/kotlin/com/readmates/admin/health/application/service/providers/KafkaLagHealthCardProvider.kt
+    mode: owned
+  - path: server/src/test/kotlin/com/readmates/admin/health/application/service/providers/KafkaLagHealthCardProviderTest.kt
+    mode: owned
+  - path: server/src/main/kotlin/com/readmates/admin/health/application/service/providers/AiProviderAvailabilityCardProvider.kt
+    mode: owned
+  - path: server/src/test/kotlin/com/readmates/admin/health/application/service/providers/AiProviderAvailabilityCardProviderTest.kt
+    mode: owned
+  - path: server/src/main/kotlin/com/readmates/admin/health/application/service/providers/NotificationDispatchSuccessCardProvider.kt
+    mode: owned
+  - path: server/src/test/kotlin/com/readmates/admin/health/application/service/providers/NotificationDispatchSuccessCardProviderTest.kt
+    mode: owned
+  - path: server/src/main/kotlin/com/readmates/admin/health/config/PlatformAdminHealthConfig.kt
+    mode: owned
+  - path: server/src/main/kotlin/com/readmates/admin/health/adapter/out/persistence/JsonlDeployLedgerAdapter.kt
+    mode: owned
+  - path: server/src/test/kotlin/com/readmates/admin/health/adapter/out/persistence/JsonlDeployLedgerAdapterTest.kt
+    mode: owned
+  - path: server/src/main/kotlin/com/readmates/admin/health/application/service/providers/DeployAttemptsStripCardProvider.kt
+    mode: owned
+  - path: server/src/test/kotlin/com/readmates/admin/health/application/service/providers/DeployAttemptsStripCardProviderTest.kt
+    mode: owned
+risk: medium
+verify_isolation: fast
+verify:
+  - ./server/gradlew -p server test --tests "com.readmates.admin.health.application.service.providers.*Test" --tests "com.readmates.admin.health.adapter.out.prometheus.HttpPrometheusQueryAdapterTest" --tests "com.readmates.admin.health.adapter.out.persistence.JsonlDeployLedgerAdapterTest"
+instructions:
+  - Implement Tasks 2, 3, and 4 in this single worker invocation following the detailed steps in the plan body.
+  - PlatformAdminHealthConfig.kt is created in Task 3 and extended in Task 4 (DeployLedgerPort bean) — make sure the final file contains all beans from both tasks.
+  - Do not execute the per-task `git add` / `git commit` shell snippets — leave changes uncommitted so waygent apply lands them.
+```
+
+```yaml waygent-task
+id: phase_3_backend_service_web
+title: Phase 3 — Implement Tasks 5, 6, 7 (PlatformAdminHealthService composer + scheduler, web controller + permission gate, architecture test baseline). Do not create git commits from the task worktree.
+dependencies: [phase_2_backend_providers]
+file_claims:
+  - path: server/src/main/kotlin/com/readmates/admin/health/application/service/PlatformAdminHealthService.kt
+    mode: owned
+  - path: server/src/test/kotlin/com/readmates/admin/health/application/service/PlatformAdminHealthServiceTest.kt
+    mode: owned
+  - path: server/src/main/kotlin/com/readmates/admin/health/adapter/in/web/PlatformAdminHealthController.kt
+    mode: owned
+  - path: server/src/test/kotlin/com/readmates/admin/health/adapter/in/web/PlatformAdminHealthControllerTest.kt
+    mode: owned
+  - path: server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt
+    mode: owned
+risk: medium
+verify_isolation: fast
+verify:
+  - ./server/gradlew -p server test --tests "com.readmates.admin.health.application.service.PlatformAdminHealthServiceTest" --tests "com.readmates.admin.health.adapter.in.web.PlatformAdminHealthControllerTest" --tests "com.readmates.architecture.ServerArchitectureBoundaryTest"
+instructions:
+  - Implement Tasks 5, 6, and 7 in this single worker invocation.
+  - For Task 7, only add `com.readmates.admin` to the architecture allow list if the test fails without it — otherwise leave the file untouched.
+  - Do not execute the per-task `git add` / `git commit` shell snippets — leave changes uncommitted so waygent apply lands them.
+```
+
+```yaml waygent-task
+id: phase_4_frontend
+title: Phase 4 — Implement Tasks 8, 9, 10 (frontend API contracts + queries, route + UI grid/card components, toggle route catalog + wire ready route in app router). Do not create git commits from the task worktree.
+dependencies: [phase_3_backend_service_web]
+file_claims:
+  - path: front/features/platform-admin/api/platform-admin-health-contracts.ts
+    mode: owned
+  - path: front/features/platform-admin/api/platform-admin-health-api.ts
+    mode: owned
+  - path: front/features/platform-admin/queries/platform-admin-health-queries.ts
+    mode: owned
+  - path: front/features/platform-admin/api/platform-admin-health-contracts.test.ts
+    mode: owned
+  - path: front/features/platform-admin/route/admin-health-data.ts
+    mode: owned
+  - path: front/features/platform-admin/route/admin-health-route.tsx
+    mode: owned
+  - path: front/features/platform-admin/route/admin-health-route.test.tsx
+    mode: owned
+  - path: front/features/platform-admin/ui/admin-health-grid.tsx
+    mode: owned
+  - path: front/features/platform-admin/ui/admin-health-card.tsx
+    mode: owned
+  - path: front/features/platform-admin/ui/admin-health-card.test.tsx
+    mode: owned
+  - path: front/features/platform-admin/ui/admin-health-deploy-strip.tsx
+    mode: owned
+  - path: front/features/platform-admin/model/admin-route-catalog.ts
+    mode: owned
+  - path: front/features/platform-admin/model/admin-route-catalog.test.ts
+    mode: owned
+  - path: front/src/app/routes/admin.tsx
+    mode: owned
+risk: medium
+verify_isolation: fast
+verify:
+  - pnpm install --frozen-lockfile --prefer-offline
+  - pnpm --dir front exec tsc -p tsconfig.json
+  - pnpm --dir front test -- --run features/platform-admin/api features/platform-admin/queries features/platform-admin/route/admin-health-route.test.tsx features/platform-admin/ui/admin-health-card.test.tsx features/platform-admin/model/admin-route-catalog.test.ts
+instructions:
+  - Implement Tasks 8, 9, and 10 in this single worker invocation following the detailed steps in the plan body.
+  - Task 8's `platform-admin-health-contracts.test.ts` is optional per the plan — create it only if there is non-trivial shape logic worth asserting; otherwise remove its claim by leaving it absent.
+  - Do not execute the per-task `git add` / `git commit` shell snippets — leave changes uncommitted so waygent apply lands them.
+```
+
+```yaml waygent-task
+id: phase_5_e2e_docs
+title: Phase 5 — Implement Tasks 11, 12 (Playwright E2E happy path + docs/CHANGELOG entry). Do not create git commits from the task worktree.
+dependencies: [phase_4_frontend]
+file_claims:
+  - path: front/tests/e2e/admin-health.spec.ts
+    mode: owned
+  - path: CHANGELOG.md
+    mode: owned
+  - path: docs/operations/observability/README.md
+    mode: owned
+instructions:
+  - Implement Tasks 11 and 12 in this single worker invocation following the detailed steps in the plan body.
+  - Append CHANGELOG.md under `## Unreleased` → `### Engineering`; do not introduce duplicate `## Unreleased` headings.
+  - Append a single bullet to docs/operations/observability/README.md linking to `/admin/health`.
+  - Do not execute the per-task `git add` / `git commit` shell snippets — leave changes uncommitted so waygent apply lands them.
+risk: low
+verify_isolation: fast
+verify:
+  - pnpm install --frozen-lockfile --prefer-offline
+  - pnpm --dir front exec tsc -p tsconfig.json
+  - git diff --check -- CHANGELOG.md docs/operations/observability/README.md front/tests/e2e/admin-health.spec.ts
+```
+
 **Goal:** Flip `/admin/health` from COMING-SOON to a READY 7-card grid backed by a `/api/admin/health/snapshot` endpoint that composes in-process Micrometer signals + local Prometheus HTTP queries on a 10s refresh.
 
 **Architecture:** New backend package `com.readmates.admin.health` with controller + service + `HealthCardProvider` interface and seven implementations + two outbound ports (`PrometheusQueryPort`, `DeployLedgerPort`). Snapshot is computed every 10s by `@Scheduled` into an `AtomicReference<PlatformHealthSnapshot>`; requests read the cache lock-free. Per-card failures stay contained (one provider fails → that card only is `status=unknown`). Frontend ships a new `/admin/health` route + grid/card components + Playwright happy path; the route catalog and permission matrix get one-line toggles.
