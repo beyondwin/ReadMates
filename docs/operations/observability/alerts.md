@@ -42,7 +42,13 @@
 
 Per-club cost cap은 metric label에 `club_id`를 싣지 않는 정책 때문에 Prometheus alert가 아니라 application cap guard와 `ai_generation_audit_log` SQL drill-down으로 운영합니다.
 
-## 룰
+신규 dead-target watch는 `ops/prometheus/alerts/targets-rules.yml`의 `ScrapeTargetDown` (`up == 0` for 5m) 으로 모든 scrape target(`readmates-server`, `prometheus-self`, `alertmanager`)이 사라지면 critical alert를 띄웁니다.
+
+## 룰 (파일화 완료)
+
+본 문서의 후보 룰들은 모두 `ops/prometheus/alerts/{notification,http,jvm,security,redis,targets}-rules.yml`에
+파일화되어 Prometheus가 실제로 로드한다. 본 문서는 사람-읽기용 참고이며 SSOT는 rules 디렉토리다.
+새 alert 추가는 항상 rules 디렉토리 파일 PR로 한다 — docs는 그 PR과 함께 동기화한다.
 
 ```yaml
 groups:

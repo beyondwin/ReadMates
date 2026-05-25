@@ -1,0 +1,23 @@
+groups:
+  - name: readmates.redis
+    interval: 30s
+    rules:
+      - alert: RedisFallbacksHigh
+        expr: sum(rate(readmates_redis_fallbacks_total[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: redis
+        annotations:
+          summary: "Redis fallback 발생률 > 0.1/s (5분)"
+          description: "Redis 불안정 또는 연결 문제. Redis 자체 로그 + 노드 상태 확인."
+
+      - alert: RedisOperationErrors
+        expr: sum(rate(readmates_redis_operation_errors_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: redis
+        annotations:
+          summary: "Redis 명령 실행 오류율 > 0.05/s (5분)"
+          description: "특정 어댑터/명령에서 오류 지속. 영향 범위 파악."

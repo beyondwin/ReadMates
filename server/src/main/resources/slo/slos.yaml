@@ -1,27 +1,54 @@
-# Phase 0 카탈로그. PromQL은 *제안*이며 실제 metric 이름이 다르면 dashboard에서 NaN으로 노출된다.
-# metric 추가/이름 정리는 Phase 3 이전 별도 spec.
+# SSOT for SLO definitions. Docs at docs/operations/observability/slos.md
+# is a human-readable view; consistency enforced by SloCatalogDocsConsistencyTest.
 version: 1
 slos:
-  - id: notification_dispatch_success_ratio
-    description: 알림 outbox publish 성공률 (DEAD 미포함)
+  - id: api_availability
+    description: /api/** 5xx ratio (30d rolling)
     objective: 0.99
-    window: 7d
+    window: 30d
     sli:
       type: prometheus
-      query_good: sum(rate(readmates_outbox_publish_total{result="success"}[5m]))
-      query_total: sum(rate(readmates_outbox_publish_total[5m]))
+      query_good: sum(rate(http_server_requests_seconds_count{uri=~"/api/.*", status!~"5.."}[5m]))
+      query_total: sum(rate(http_server_requests_seconds_count{uri=~"/api/.*"}[5m]))
+
+  - id: api_read_latency_p95
+    description: GET /api/** p95 latency (30d rolling)
+    objective_ms: 500
+    window: 30d
+    sli:
+      type: prometheus
+      query_latency_p95: histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{uri=~"/api/.*", method="GET"}[5m]))) * 1000
+
   - id: bff_api_p95
-    description: BFF → Spring API 응답 p95 latency (ms)
+    description: BFF->Spring p95 latency (custom timer)
     objective_ms: 800
     window: 7d
     sli:
       type: prometheus
       query_latency_p95: histogram_quantile(0.95, sum(rate(readmates_bff_api_latency_seconds_bucket[5m])) by (le)) * 1000
+
   - id: login_success_ratio
-    description: Google OAuth 로그인 성공률
+    description: Google OAuth login success ratio
     objective: 0.99
     window: 7d
     sli:
       type: prometheus
       query_good: sum(rate(readmates_login_total{result="success"}[5m]))
       query_total: sum(rate(readmates_login_total[5m]))
+
+  - id: notification_dispatch_success_ratio
+    description: Outbox publish success ratio (DEAD excluded)
+    objective: 0.99
+    window: 7d
+    sli:
+      type: prometheus
+      query_good: sum(rate(readmates_outbox_publish_total{result="success"}[5m]))
+      query_total: sum(rate(readmates_outbox_publish_total[5m]))
+
+  - id: notification_delivery_latency_p95
+    description: notification_event_outbox row create -> PUBLISHED p95 (30d rolling)
+    objective_ms: 300000
+    window: 30d
+    sli:
+      type: prometheus
+      query_latency_p95: histogram_quantile(0.95, sum by (le) (rate(readmates_notifications_delivery_latency_seconds_bucket[5m]))) * 1000

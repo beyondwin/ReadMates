@@ -14,6 +14,7 @@ import com.readmates.notification.domain.NotificationEventOutboxStatus
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
@@ -29,7 +30,13 @@ class NotificationRelayServiceTest {
         val message = messageFor(item)
         val outbox = FakeEventOutbox(claimedItems = listOf(item), messages = mapOf(item.id to message))
         val publisher = RecordingPublisher()
-        val service = NotificationRelayService(outbox, publisher, maxAttempts = 5)
+        val service =
+            NotificationRelayService(
+                outbox,
+                publisher,
+                ReadmatesOperationalMetrics(SimpleMeterRegistry()),
+                maxAttempts = 5,
+            )
 
         val published =
             captureRelayLogs().use { logs ->
@@ -54,7 +61,13 @@ class NotificationRelayServiceTest {
         val message = messageFor(item)
         val outbox = FakeEventOutbox(claimedItems = listOf(item), messages = mapOf(item.id to message))
         val publisher = RecordingPublisher()
-        val service = NotificationRelayService(outbox, publisher, maxAttempts = 5)
+        val service =
+            NotificationRelayService(
+                outbox,
+                publisher,
+                ReadmatesOperationalMetrics(SimpleMeterRegistry()),
+                maxAttempts = 5,
+            )
 
         val published = service.publishPending(limit = 10)
 
@@ -67,7 +80,13 @@ class NotificationRelayServiceTest {
     fun `missing event message marks publish dead`() {
         val item = publishingItem()
         val outbox = FakeEventOutbox(claimedItems = listOf(item))
-        val service = NotificationRelayService(outbox, RecordingPublisher(), maxAttempts = 5)
+        val service =
+            NotificationRelayService(
+                outbox,
+                RecordingPublisher(),
+                ReadmatesOperationalMetrics(SimpleMeterRegistry()),
+                maxAttempts = 5,
+            )
 
         val published =
             captureRelayLogs().use { logs ->
@@ -90,7 +109,13 @@ class NotificationRelayServiceTest {
         val message = messageFor(item)
         val outbox = FakeEventOutbox(claimedItems = listOf(item), messages = mapOf(item.id to message))
         val publisher = RecordingPublisher(failure = IllegalStateException("broker unavailable"))
-        val service = NotificationRelayService(outbox, publisher, maxAttempts = 5)
+        val service =
+            NotificationRelayService(
+                outbox,
+                publisher,
+                ReadmatesOperationalMetrics(SimpleMeterRegistry()),
+                maxAttempts = 5,
+            )
 
         val published =
             captureRelayLogs().use { logs ->
@@ -112,7 +137,13 @@ class NotificationRelayServiceTest {
         val message = messageFor(item)
         val outbox = FakeEventOutbox(claimedItems = listOf(item), messages = mapOf(item.id to message))
         val publisher = RecordingPublisher(failure = IllegalStateException("broker unavailable"))
-        val service = NotificationRelayService(outbox, publisher, maxAttempts = 5)
+        val service =
+            NotificationRelayService(
+                outbox,
+                publisher,
+                ReadmatesOperationalMetrics(SimpleMeterRegistry()),
+                maxAttempts = 5,
+            )
 
         val published =
             captureRelayLogs().use { logs ->
@@ -131,7 +162,13 @@ class NotificationRelayServiceTest {
     @Test
     fun `non-positive limit does not claim events`() {
         val outbox = FakeEventOutbox()
-        val service = NotificationRelayService(outbox, RecordingPublisher(), maxAttempts = 5)
+        val service =
+            NotificationRelayService(
+                outbox,
+                RecordingPublisher(),
+                ReadmatesOperationalMetrics(SimpleMeterRegistry()),
+                maxAttempts = 5,
+            )
 
         val published = service.publishPending(limit = 0)
 
@@ -254,6 +291,7 @@ private fun publishingItem(
         kafkaKey = clubId.toString(),
         attemptCount = attemptCount,
         lockedAt = OffsetDateTime.parse("2026-04-29T00:00:00Z"),
+        createdAt = OffsetDateTime.parse("2026-04-29T00:00:00Z"),
         requestId = requestId,
     )
 

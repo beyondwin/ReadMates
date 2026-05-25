@@ -1,0 +1,28 @@
+groups:
+  - name: readmates.http
+    interval: 30s
+    rules:
+      - alert: HttpErrorRateHigh
+        expr: |
+          sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+            / clamp_min(sum(rate(http_server_requests_seconds_count[5m])), 1) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+          component: http
+        annotations:
+          summary: "HTTP 5xx ratio over 1% for 5 minutes"
+          description: "에러 폭증. 최근 배포 / 외부 의존 의심."
+
+      - alert: HttpLatencyP95High
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le, uri) (rate(http_server_requests_seconds_bucket{uri=~"/api/.*"}[5m])))
+            > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          component: http
+        annotations:
+          summary: "p95 latency over 500ms for 10 minutes"
+          description: "DB slow query, GC pause, Hikari 부족 등 의심."

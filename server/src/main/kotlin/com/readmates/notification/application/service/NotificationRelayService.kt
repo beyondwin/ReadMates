@@ -9,6 +9,8 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Service
+import java.time.Duration
+import java.time.Instant
 
 private const val MAX_PUBLISH_ERROR_LENGTH = 500
 private const val MISSING_EVENT_MESSAGE_ERROR = "Notification event message missing"
@@ -20,6 +22,7 @@ private val PUBLISH_RETRY_DELAYS_MINUTES = listOf(5L, 15L, 60L, 240L)
 class NotificationRelayService(
     private val notificationEventOutboxPort: NotificationEventOutboxPort,
     private val notificationEventPublisherPort: NotificationEventPublisherPort,
+    private val operationalMetrics: ReadmatesOperationalMetrics,
     @param:Value("\${readmates.notifications.kafka.max-publish-attempts:5}") private val maxAttempts: Int,
 ) : PublishNotificationEventsUseCase {
     override fun publishPending(limit: Int): Int {
@@ -47,7 +50,14 @@ class NotificationRelayService(
 
         try {
             notificationEventPublisherPort.publish(message, item.kafkaTopic, item.kafkaKey, item.requestId)
-            notificationEventOutboxPort.markPublished(item.id, item.lockedAt)
+            val publishedAt = Instant.now()
+            val publishedOk = notificationEventOutboxPort.markPublished(item.id, item.lockedAt)
+            if (publishedOk) {
+                operationalMetrics.recordDeliveryLatency(
+                    item.eventType,
+                    Duration.between(item.createdAt.toInstant(), publishedAt),
+                )
+            }
             logger.info(
                 "Notification event published eventId={} topic={} key={}",
                 item.id,

@@ -1,0 +1,13 @@
+groups:
+  - name: readmates.security
+    interval: 30s
+    rules:
+      - alert: RateLimitDenied
+        expr: sum(rate(readmates_rate_limit_denied_total{sensitive="true"}[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "민감 엔드포인트 rate-limit 차단 발생 (5m 평균 > 0.1/s)"
+          description: "지속적인 abuse 시도 가능. IP/계정 패턴 조사."

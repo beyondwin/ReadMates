@@ -6,16 +6,19 @@ import org.junit.jupiter.api.assertThrows
 
 class SloCatalogLoaderTest {
     @Test
-    fun `loads valid catalog with three SLOs`() {
+    fun `loads valid catalog with six SLOs`() {
         val catalog = SloCatalogLoader().loadFromClasspath("/slo/slos.yaml")
         assertEquals(1, catalog.version)
-        assertEquals(3, catalog.slos.size)
+        assertEquals(6, catalog.slos.size)
         val ids = catalog.slos.map { it.id }.toSet()
         assertEquals(
             setOf(
-                "notification_dispatch_success_ratio",
+                "api_availability",
+                "api_read_latency_p95",
                 "bff_api_p95",
                 "login_success_ratio",
+                "notification_dispatch_success_ratio",
+                "notification_delivery_latency_p95",
             ),
             ids,
         )

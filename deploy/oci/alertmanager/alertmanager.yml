@@ -1,0 +1,48 @@
+# ReadMates Alertmanager — single SMTP receiver, severity-aware grouping.
+# All identity/credential values come from env via `--config.file=` template substitution
+# at container start. Real values never appear in git.
+global:
+  smtp_smarthost: '${READMATES_ALERT_SMTP_HOST}:${READMATES_ALERT_SMTP_PORT}'
+  smtp_from: '${READMATES_ALERT_SMTP_FROM}'
+  smtp_auth_username: '${READMATES_ALERT_SMTP_USER}'
+  smtp_auth_password: '${READMATES_ALERT_SMTP_PASSWORD}'
+  smtp_require_tls: true
+  resolve_timeout: 5m
+
+route:
+  receiver: ops-email
+  group_by: ['alertname', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers:
+        - severity = "critical"
+      receiver: ops-email
+      group_wait: 10s
+      repeat_interval: 1h
+    - matchers:
+        - severity =~ "warn|warning"
+      receiver: ops-email
+      group_wait: 2m
+      repeat_interval: 12h
+    - matchers:
+        - severity = "info"
+      receiver: ops-email
+      group_wait: 10m
+      repeat_interval: 24h
+
+receivers:
+  - name: ops-email
+    email_configs:
+      - to: '${READMATES_ALERT_EMAIL_TO}'
+        send_resolved: true
+        headers:
+          Subject: '[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }})'
+
+inhibit_rules:
+  - source_matchers:
+      - severity = "critical"
+    target_matchers:
+      - severity =~ "warn|warning"
+    equal: ['alertname', 'component']

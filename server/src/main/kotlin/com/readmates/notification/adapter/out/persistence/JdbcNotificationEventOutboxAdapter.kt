@@ -174,7 +174,7 @@ class JdbcNotificationEventOutboxAdapter(
         return jdbcTemplate.query(
             """
             select id, club_id, event_type, aggregate_type, aggregate_id, payload_json,
-                   status, kafka_topic, kafka_key, attempt_count, locked_at, request_id
+                   status, kafka_topic, kafka_key, attempt_count, locked_at, created_at, request_id
             from notification_event_outbox
             where id in ($placeholders)
             order by field(id, $placeholders)
@@ -359,6 +359,7 @@ class JdbcNotificationEventOutboxAdapter(
             kafkaKey = getString("kafka_key"),
             attemptCount = getInt("attempt_count"),
             lockedAt = utcOffsetDateTime("locked_at"),
+            createdAt = utcOffsetDateTime("created_at"),
             requestId = getString("request_id"),
         )
 

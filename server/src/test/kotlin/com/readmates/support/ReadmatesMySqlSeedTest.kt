@@ -86,7 +86,13 @@ class ReadmatesMySqlSeedTest(
             1,
             jdbcTemplate.queryForObject("select count(*) from memberships where role = 'HOST' and status = 'ACTIVE'", Int::class.java),
         )
-        assertEquals(7, jdbcTemplate.queryForObject("select count(*) from sessions where state = 'PUBLISHED'", Int::class.java))
+        assertEquals(
+            7,
+            jdbcTemplate.queryForObject(
+                "select count(*) from sessions where state = 'PUBLISHED'",
+                Int::class.java,
+            ),
+        )
         assertEquals(
             6,
             jdbcTemplate.queryForObject(

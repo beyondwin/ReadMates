@@ -1,9 +1,7 @@
 package com.readmates.aigen.adapter.`in`.messaging
 
 import com.readmates.aigen.adapter.out.messaging.AiGenerationJobMessage
-import com.readmates.aigen.application.service.AiGenerationMetrics
 import com.readmates.aigen.application.service.AiGenerationWorker
-import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.kafka.annotation.KafkaListener
@@ -28,22 +26,8 @@ import org.springframework.stereotype.Component
 @ConditionalOnProperty(prefix = "readmates.aigen.kafka", name = ["enabled"], havingValue = "true")
 class AiGenerationJobConsumer(
     private val worker: AiGenerationWorker,
-    private val metrics: AiGenerationMetrics,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
-
-    /**
-     * Phase 6.1 ships the queue-depth gauge with a placeholder supplier returning 0.
-     * The Spring Kafka `MessageListenerContainer` does not expose per-listener consumer
-     * lag through a stable, in-process API; surfacing real lag here will require wiring
-     * either a `ConsumerSeekAware` callback that tracks (end-offset - committed-offset)
-     * per partition, or a side-channel JMX/admin-client poll. Tracked as
-     * pending_kafka_lag_wiring; out of scope for task 6.1.
-     */
-    @PostConstruct
-    fun registerQueueDepthGauge() {
-        metrics.registerQueueDepthGauge { 0L }
-    }
 
     @KafkaListener(
         topics = ["\${readmates.aigen.kafka.topic-jobs:readmates.aigen.jobs.v1}"],

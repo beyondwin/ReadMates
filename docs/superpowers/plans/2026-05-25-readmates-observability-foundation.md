@@ -2,6 +2,144 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+```yaml waygent-task
+id: phase_1_server_observability
+title: Phase 1 — Implement Tasks 1-4 (SLO catalog SSOT + docs consistency test, NotificationEventOutboxItem.createdAt + adapter mapping, readmates.notifications.delivery.latency Timer at PUBLISHED transition, readmates.aigen.queue.depth gauge bound to AiGenerationJobStore). Do not create git commits from the task worktree.
+dependencies: []
+file_claims:
+  - path: server/src/main/resources/slo/slos.yaml
+    mode: owned
+  - path: server/src/test/kotlin/com/readmates/shared/observability/slo/SloCatalogDocsConsistencyTest.kt
+    mode: owned
+  - path: server/src/test/kotlin/com/readmates/shared/observability/slo/SloCatalogLoaderTest.kt
+    mode: owned
+  - path: docs/operations/observability/slos.md
+    mode: owned
+  - path: server/src/main/kotlin/com/readmates/notification/application/model/NotificationModels.kt
+    mode: owned
+  - path: server/src/main/kotlin/com/readmates/notification/adapter/out/persistence/JdbcNotificationEventOutboxAdapter.kt
+    mode: owned
+  - path: server/src/main/kotlin/com/readmates/notification/application/service/ReadmatesOperationalMetrics.kt
+    mode: owned
+  - path: server/src/main/kotlin/com/readmates/notification/application/service/NotificationRelayService.kt
+    mode: owned
+  - path: server/src/test/kotlin/com/readmates/notification/application/service/ReadmatesOperationalMetricsTest.kt
+    mode: owned
+  - path: server/src/main/kotlin/com/readmates/aigen/application/service/AiGenerationQueueDepthGaugeBinder.kt
+    mode: owned
+  - path: server/src/test/kotlin/com/readmates/aigen/application/service/AiGenerationQueueDepthGaugeBinderTest.kt
+    mode: owned
+risk: medium
+verify_isolation: fast
+verify:
+  - ./server/gradlew -p server test --tests "com.readmates.shared.observability.slo.*" --tests "com.readmates.notification.*" --tests "*ReadmatesOperationalMetricsTest*" --tests "*AiGenerationQueueDepthGaugeBinderTest*"
+instructions:
+  - Implement Tasks 1, 2, 3, and 4 in this single worker invocation following the detailed steps in the plan body below.
+  - Write the failing tests first, then implement, per the existing TDD steps.
+  - When `NotificationEventOutboxItem` gains `createdAt`, update every direct constructor call site (test fixtures included) by compile-failing your way through them — do not introduce a default value to dodge the compiler.
+  - Do not execute the per-task `git add` / `git commit` shell snippets — leave changes uncommitted so waygent apply lands them.
+```
+
+```yaml waygent-task
+id: phase_2_prometheus_alertmanager_stack
+title: Phase 2 — Implement Tasks 5-8 (alert rule files for notification/http/jvm/security/redis/targets, Prometheus scrape config, Alertmanager SMTP config with severity routing, prometheus + alertmanager services in compose.infra.yml, and the three validate-* scripts). Do not create git commits from the task worktree.
+dependencies: [phase_1_server_observability]
+file_claims:
+  - path: ops/prometheus/alerts/notification-rules.yml
+    mode: owned
+  - path: ops/prometheus/alerts/http-rules.yml
+    mode: owned
+  - path: ops/prometheus/alerts/jvm-rules.yml
+    mode: owned
+  - path: ops/prometheus/alerts/security-rules.yml
+    mode: owned
+  - path: ops/prometheus/alerts/redis-rules.yml
+    mode: owned
+  - path: ops/prometheus/alerts/targets-rules.yml
+    mode: owned
+  - path: scripts/validate-prometheus-rules.sh
+    mode: owned
+  - path: scripts/validate-prometheus-config.sh
+    mode: owned
+  - path: scripts/validate-alertmanager-config.sh
+    mode: owned
+  - path: deploy/oci/prometheus/prometheus.yml
+    mode: owned
+  - path: deploy/oci/alertmanager/alertmanager.yml
+    mode: owned
+  - path: deploy/oci/compose.infra.yml
+    mode: owned
+risk: low
+verify_isolation: fast
+verify:
+  - bash -n scripts/validate-prometheus-rules.sh
+  - bash -n scripts/validate-prometheus-config.sh
+  - bash -n scripts/validate-alertmanager-config.sh
+  - python3 -c "import glob, yaml; [yaml.safe_load(open(p)) for p in sorted(glob.glob('ops/prometheus/alerts/*.yml')) + ['deploy/oci/prometheus/prometheus.yml', 'deploy/oci/alertmanager/alertmanager.yml']]"
+instructions:
+  - Implement Tasks 5, 6, 7, and 8 in this single worker invocation following the detailed steps in the plan body below.
+  - All target hostnames must use docker network DNS names (server:8081, alertmanager:9093). Never include a real IPv4 literal or real email domain.
+  - SMTP credentials and the operator recipient address are env-only — keep ${READMATES_ALERT_*} placeholders in alertmanager.yml exactly as written.
+  - chmod +x the three validate-* scripts after creation.
+  - For compose.infra.yml, append the prometheus + alertmanager services and named volumes inside the existing top-level blocks rather than introducing duplicate keys.
+  - Do not execute the per-task `git add` / `git commit` shell snippets — leave changes uncommitted so waygent apply lands them.
+```
+
+```yaml waygent-task
+id: phase_3_release_safety_and_runbooks
+title: Phase 3 — Implement Tasks 9, 10, 11 (public-release-check observability scan + security docs, observability-bootstrap + slo-monthly-report runbooks, alerts.md file-ization note + slos.md/observability README updates). Do not create git commits from the task worktree.
+dependencies: [phase_2_prometheus_alertmanager_stack]
+file_claims:
+  - path: scripts/public-release-check.sh
+    mode: owned
+  - path: docs/deploy/security-public-repo.md
+    mode: owned
+  - path: docs/operations/runbooks/observability-bootstrap.md
+    mode: owned
+  - path: docs/operations/runbooks/slo-monthly-report.md
+    mode: owned
+  - path: docs/operations/runbooks/README.md
+    mode: owned
+  - path: docs/operations/README.md
+    mode: owned
+  - path: docs/operations/observability/README.md
+    mode: owned
+  - path: docs/operations/observability/alerts.md
+    mode: owned
+risk: low
+verify_isolation: fast
+verify:
+  - bash -n scripts/public-release-check.sh
+  - git diff --check -- docs/operations/runbooks/observability-bootstrap.md docs/operations/runbooks/slo-monthly-report.md docs/operations/runbooks/README.md docs/operations/README.md docs/operations/observability/README.md docs/operations/observability/alerts.md docs/deploy/security-public-repo.md
+instructions:
+  - Implement Tasks 9, 10, and 11 in this single worker invocation following the detailed steps in the plan body below.
+  - Task 11 Step 1 (slos.md '미측정' → '측정 중' wedge) was already handled in Phase 1 alongside SLO catalog reconciliation — verify only and do not re-claim slos.md here.
+  - Match the existing scripts/public-release-check.sh style (set -euo pipefail, function layout) when adding the observability target scan.
+  - Korean copy is the default for user-facing strings in runbooks.
+  - Do not execute the per-task `git add` / `git commit` shell snippets — leave changes uncommitted so waygent apply lands them.
+```
+
+```yaml waygent-task
+id: phase_4_pre_push_and_changelog
+title: Phase 4 — Implement Tasks 12 and 13 (wire pre-push-check --full to invoke the three validate-* scripts, append Unreleased Engineering entry to CHANGELOG.md). Do not create git commits from the task worktree.
+dependencies: [phase_3_release_safety_and_runbooks]
+file_claims:
+  - path: scripts/pre-push-check.sh
+    mode: owned
+  - path: CHANGELOG.md
+    mode: owned
+risk: low
+verify_isolation: fast
+verify:
+  - bash -n scripts/pre-push-check.sh
+  - git diff --check -- CHANGELOG.md scripts/pre-push-check.sh
+instructions:
+  - Implement Tasks 12 and 13 in this single worker invocation following the detailed steps in the plan body below.
+  - Add the three validate-* invocations inside the existing --full branch of scripts/pre-push-check.sh, matching the surrounding style.
+  - Append to the existing `## Unreleased` → `### Engineering` section in CHANGELOG.md (do not introduce a new release header).
+  - Do not execute the per-task `git add` / `git commit` shell snippets — leave changes uncommitted so waygent apply lands them.
+```
+
 **Goal:** Wire Prometheus + Alertmanager onto the existing observability assets, reconcile `slos.yaml` ↔ `slos.md`, add the notification delivery latency histogram, and replace the AI gen queue depth placeholder with a Redis-job-state-backed gauge.
 
 **Architecture:** Two new containers (`prometheus`, `alertmanager`) in `deploy/oci/compose.infra.yml` scrape Spring actuator over the docker network. Alertmanager routes to a single SMTP receiver with severity-aware `group_wait`/`repeat_interval`. All secrets come from env. `slos.yaml` becomes SSOT enforced by a docs↔catalog consistency test. Two new metrics (`readmates.notifications.delivery.latency` Timer; real `readmates.aigen.queue.depth` gauge) close the spec's "implemented but placeholder" gap.
@@ -420,18 +558,14 @@ git commit -m "observability: record notification delivery latency histogram at 
 
 - [ ] **Step 1: Write failing test**
 
-Create `server/src/test/kotlin/com/readmates/aigen/application/service/AiGenerationQueueDepthGaugeBinderTest.kt`:
+Create `server/src/test/kotlin/com/readmates/aigen/application/service/AiGenerationQueueDepthGaugeBinderTest.kt`. Use the existing in-tree `FakeJobStore` and `AiGenerationTestFixtures.jobRecord(...)` from `AiGenerationFakes.kt` — **do not** introduce MockK; the project uses AssertJ + the in-tree fakes for application-service tests:
 
 ```kotlin
 package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.model.JobStatus
-import com.readmates.aigen.application.port.out.AiGenerationJobStore
-import com.readmates.aigen.application.port.out.JobRecord
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
-import io.mockk.every
-import io.mockk.mockk
-import org.junit.jupiter.api.Assertions.assertEquals
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
 class AiGenerationQueueDepthGaugeBinderTest {
@@ -439,25 +573,25 @@ class AiGenerationQueueDepthGaugeBinderTest {
     fun `gauge reflects PENDING plus RUNNING job count from job store`() {
         val registry = SimpleMeterRegistry()
         val metrics = AiGenerationMetrics(registry)
-        val store = mockk<AiGenerationJobStore>()
-        every { store.loadActiveJobs(any()) } returns listOf(
-            fakeJob(JobStatus.PENDING),
-            fakeJob(JobStatus.PENDING),
-            fakeJob(JobStatus.RUNNING),
-            fakeJob(JobStatus.SUCCEEDED),
-        )
+        val store = FakeJobStore()
+        store.save(AiGenerationTestFixtures.jobRecord(status = JobStatus.PENDING))
+        store.save(AiGenerationTestFixtures.jobRecord(status = JobStatus.PENDING))
+        store.save(AiGenerationTestFixtures.jobRecord(status = JobStatus.RUNNING))
+        store.save(AiGenerationTestFixtures.jobRecord(status = JobStatus.SUCCEEDED))
 
         AiGenerationQueueDepthGaugeBinder(metrics, store).bind()
 
         val gauge = registry.find("readmates.aigen.queue.depth").gauge()
-        assertEquals(3.0, gauge!!.value())
-    }
-
-    private fun fakeJob(status: JobStatus): JobRecord = mockk<JobRecord>(relaxed = true).also {
-        every { it.status } returns status
+        assertThat(gauge).isNotNull
+        assertThat(gauge!!.value()).isEqualTo(3.0)
     }
 }
 ```
+
+Notes for the worker:
+- `FakeJobStore` and `AiGenerationTestFixtures.jobRecord(...)` are `internal` symbols already defined in `server/src/test/kotlin/com/readmates/aigen/application/service/AiGenerationFakes.kt` — same package, so no extra imports are required.
+- `FakeJobStore.loadActiveJobs(limit)` already filters by `ACTIVE_JOB_STATUSES` (PENDING + RUNNING) and respects the limit, which is exactly what the binder needs to count against.
+- The `JobStatus.SUCCEEDED` row is intentionally there to prove the filter excludes terminal jobs.
 
 - [ ] **Step 2: Verify it fails**
 

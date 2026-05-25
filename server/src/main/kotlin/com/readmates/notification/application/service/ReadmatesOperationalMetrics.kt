@@ -5,9 +5,11 @@ import com.readmates.notification.domain.NotificationEventType
 import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.Timer
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
+import java.time.Duration
 
 @Service
 class ReadmatesOperationalMetrics(
@@ -122,6 +124,43 @@ class ReadmatesOperationalMetrics(
 
     private fun incrementFeedbackUpload(result: String) {
         meterRegistry.counter("readmates.feedback.uploads", "result", result).increment()
+    }
+
+    /**
+     * Records `readmates.notifications.delivery.latency` — time between
+     * notification_event_outbox row creation and the PUBLISHED transition.
+     *
+     * **Metric tag policy:** only enum / low-cardinality values are permitted as tag values.
+     * Never add high-cardinality identifiers such as `club_id`, `user_id`, `membership_id`,
+     * `recipient_email`, `event_id`, `delivery_id`, or `session_id` as tags. For row-level
+     * audit queries use the `notification_event_outbox` table instead.
+     */
+    fun recordDeliveryLatency(
+        eventType: NotificationEventType,
+        latency: Duration,
+    ) {
+        val timer =
+            Timer
+                .builder("readmates.notifications.delivery.latency")
+                .description("notification_event_outbox row create -> PUBLISHED transition latency")
+                .tag("event_type", eventType.name)
+                .publishPercentileHistogram(true)
+                .serviceLevelObjectives(
+                    Duration.ofSeconds(SLO_BUCKET_10_SECONDS),
+                    Duration.ofSeconds(SLO_BUCKET_30_SECONDS),
+                    Duration.ofMinutes(SLO_BUCKET_1_MINUTE),
+                    Duration.ofMinutes(SLO_BUCKET_5_MINUTES),
+                    Duration.ofMinutes(SLO_BUCKET_15_MINUTES),
+                ).register(meterRegistry)
+        timer.record(latency)
+    }
+
+    private companion object {
+        private const val SLO_BUCKET_10_SECONDS = 10L
+        private const val SLO_BUCKET_30_SECONDS = 30L
+        private const val SLO_BUCKET_1_MINUTE = 1L
+        private const val SLO_BUCKET_5_MINUTES = 5L
+        private const val SLO_BUCKET_15_MINUTES = 15L
     }
 
     private fun registerOutboxBacklogGauges() {

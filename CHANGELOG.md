@@ -19,6 +19,14 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - **deploy:** post-deploy watch가 부모 attempt id를 자식 attempt로 전파하도록 수정해 배포 ledger의 attempt 계보가 정확히 이어집니다 (`deploy/oci/watch-compose-post-deploy.sh`, `deploy/oci/tests/watch-attempt-id.test.sh`).
 - **scripts:** `scripts/pre-push-check.sh`에 `--release`/`READMATES_PRE_PUSH_RELEASE=true` 조건의 `CHANGELOG Unreleased` guard를 추가했습니다. concrete 카테고리 헤더, feature-style bold marker, 두 개 이상 placeholder를 거부합니다. `--no-changelog-check`로 비상 우회하며, branch protection bypass 정책은 [`docs/development/release-management.md`](docs/development/release-management.md)에 함께 문서화했습니다.
 - **docs:** graphify 채택 워크플로(`docs/development/graphify.md`, `.graphifyignore`, `graphify-out/` ignore)를 도입해 아키텍처 질문과 영향도 분석에 scoped graph 탐색을 사용할 수 있게 했습니다. 산출물은 공개 저장소에 push하지 않고 로컬 보조로만 사용합니다.
+- **observability:** wire Prometheus + Alertmanager into OCI compose with SMTP routing.
+  Adds `deploy/oci/prometheus/`, `deploy/oci/alertmanager/`, rule files mirroring
+  `docs/operations/observability/alerts.md` (notification/http/jvm/security/redis/targets).
+  Introduces `readmates.notifications.delivery.latency` histogram at the outbox
+  PUBLISHED transition and wires `readmates.aigen.queue.depth` to the Redis job
+  store (PENDING+RUNNING count). Reconciles `slos.yaml` as SSOT with `slos.md`
+  enforced by `SloCatalogDocsConsistencyTest`. Adds `observability-bootstrap` and
+  `slo-monthly-report` runbooks, and a public-release scan for observability dirs.
 
 ## v1.11.0 - 2026-05-18
 

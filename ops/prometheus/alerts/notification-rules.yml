@@ -1,0 +1,49 @@
+# Notification pipeline alert rules. Mirrors docs/operations/observability/alerts.md
+# §룰 readmates.notification group with critical severity escalation added.
+groups:
+  - name: readmates.notification
+    interval: 30s
+    rules:
+      - alert: NotificationOutboxBacklogHigh
+        expr: max(readmates_notifications_outbox_backlog{status="pending"}) > 100
+        for: 10m
+        labels:
+          severity: warning
+          component: notification
+        annotations:
+          summary: "Notification pending backlog over 100 for 10 minutes"
+          description: "Consumer가 처리 속도를 따라가지 못하거나 죽었을 가능성. consumer 로그 확인."
+          runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#notification-backlog"
+
+      - alert: NotificationOutboxBacklogCritical
+        expr: max(readmates_notifications_outbox_backlog{status="pending"}) > 1000
+        for: 5m
+        labels:
+          severity: critical
+          component: notification
+        annotations:
+          summary: "Notification pending backlog over 1000"
+          description: "Consumer가 죽었거나 의존 인프라가 unreachable. 즉시 조사."
+
+      - alert: NotificationFailRateHigh
+        expr: |
+          sum(rate(readmates_notifications_failed_total[5m]))
+            / clamp_min(sum(rate(readmates_notifications_sent_total[5m]))
+                       + sum(rate(readmates_notifications_failed_total[5m])), 1) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          component: notification
+        annotations:
+          summary: "Notification 실패율 5% 초과 (10분)"
+          description: "발송 실패가 지속. 외부 채널 장애 또는 payload 변경 의심."
+
+      - alert: NotificationDeadLetters
+        expr: increase(readmates_notifications_dead_total[1h]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          component: notification
+        annotations:
+          summary: "Notification dead-letter 발생 (1시간 내)"
+          description: "발송이 최종 포기된 알림. notification_deliveries.status='DEAD' 로우 조사."

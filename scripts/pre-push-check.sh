@@ -219,6 +219,9 @@ fi
 if [[ "$mode" == "full" ]]; then
   run_step "Backend integration tests" ./server/gradlew -p server integrationTest
   run_step "Playwright E2E" pnpm --dir front test:e2e
+  run_step "Validate Prometheus rules" ./scripts/validate-prometheus-rules.sh
+  run_step "Validate Prometheus config" ./scripts/validate-prometheus-config.sh
+  run_step "Validate Alertmanager config" ./scripts/validate-alertmanager-config.sh
 fi
 
 if [[ "$dry_run" == "true" ]]; then

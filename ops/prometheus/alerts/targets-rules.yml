@@ -1,0 +1,13 @@
+groups:
+  - name: readmates.targets
+    interval: 30s
+    rules:
+      - alert: ScrapeTargetDown
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: observability
+        annotations:
+          summary: "Prometheus target {{ $labels.job }} down for 5m"
+          description: "Scrape 실패 지속. compose ps + container logs 확인."

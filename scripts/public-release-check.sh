@@ -342,6 +342,35 @@ run_content_check() {
   fi
 }
 
+scan_observability_targets() {
+  # Observability secrets / placeholders — fail if real email domains, SMTP
+  # hosts, or IP literals appear in deploy/oci/{prometheus,alertmanager}/ or
+  # ops/prometheus/alerts/. Prometheus target hostnames must be docker
+  # service DNS names (e.g. `server:8081`), and alertmanager identity values
+  # must remain `${READMATES_ALERT_*}` placeholders.
+  local observability_targets=(
+    "$source_abs/deploy/oci/prometheus"
+    "$source_abs/deploy/oci/alertmanager"
+    "$source_abs/ops/prometheus/alerts"
+  )
+  local target rel
+
+  for target in "${observability_targets[@]}"; do
+    [[ -d "$target" ]] || continue
+    rel="${target#"$source_abs"/}"
+
+    if grep -REn '\b[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\b' "$target" 2>/dev/null \
+         | grep -vE '\b(127\.0\.0\.1|0\.0\.0\.0)\b' >/dev/null; then
+      record_finding "observability target $rel contains a real IPv4 literal — use docker service DNS names instead"
+    fi
+
+    if grep -REn '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' "$target" 2>/dev/null \
+         | grep -vE '@(example\.com|localhost)' >/dev/null; then
+      record_finding "observability target $rel contains a non-placeholder email address — use @example.com"
+    fi
+  done
+}
+
 run_targeted_content_checks() {
   run_content_check "private key block" '-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----'
   run_content_check "OCI OCID" 'ocid1[.][a-z0-9][a-z0-9._-]{16,}'
@@ -393,6 +422,7 @@ else
 fi
 
 run_targeted_content_checks
+scan_observability_targets
 run_gitleaks_or_fallback_notice
 
 if [[ -s "$findings" ]]; then

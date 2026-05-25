@@ -5,8 +5,10 @@ import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.application.port.out.NotificationEventPublisherPort
 import com.readmates.notification.application.service.NotificationRelayService
+import com.readmates.notification.application.service.ReadmatesOperationalMetrics
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -59,6 +61,7 @@ class CorrelationIdEndToEndTest(
             NotificationRelayService(
                 notificationEventOutboxPort = outboxAdapter,
                 notificationEventPublisherPort = capturingPublisher,
+                operationalMetrics = ReadmatesOperationalMetrics(SimpleMeterRegistry()),
                 maxAttempts = 5,
             )
 

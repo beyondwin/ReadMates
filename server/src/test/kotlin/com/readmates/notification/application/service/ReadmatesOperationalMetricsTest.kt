@@ -7,9 +7,12 @@ import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventType
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.data.Offset
 import org.junit.jupiter.api.Test
 import org.springframework.transaction.support.TransactionSynchronizationManager
+import java.time.Duration
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 class ReadmatesOperationalMetricsTest {
     @Test
@@ -94,6 +97,26 @@ class ReadmatesOperationalMetricsTest {
         }
 
         assertThat(registry.counter("readmates.feedback.uploads", "result", "success").count()).isEqualTo(1.0)
+    }
+
+    @Test
+    fun `recordDeliveryLatency emits histogram bucket for event_type`() {
+        val registry = SimpleMeterRegistry()
+        val metrics = ReadmatesOperationalMetrics(registry, cachedBacklogProvider = null)
+
+        metrics.recordDeliveryLatency(
+            NotificationEventType.NEXT_BOOK_PUBLISHED,
+            Duration.ofSeconds(42),
+        )
+
+        val timer =
+            registry
+                .find("readmates.notifications.delivery.latency")
+                .tag("event_type", "NEXT_BOOK_PUBLISHED")
+                .timer()
+        assertThat(timer).isNotNull
+        assertThat(timer!!.count()).isEqualTo(1L)
+        assertThat(timer.totalTime(TimeUnit.SECONDS)).isCloseTo(42.0, Offset.offset(0.001))
     }
 
     @Test

@@ -1,0 +1,25 @@
+groups:
+  - name: readmates.jvm
+    interval: 30s
+    rules:
+      - alert: HikariConnectionPoolPending
+        expr: hikaricp_connections_pending > 0
+        for: 2m
+        labels:
+          severity: warning
+          component: jvm
+        annotations:
+          summary: "Hikari connection pool에 대기 요청 누적 (2분)"
+          description: "Pool size 부족 또는 long-running query. slow query log 확인."
+
+      - alert: JvmHeapHigh
+        expr: |
+          jvm_memory_used_bytes{area="heap"}
+            / jvm_memory_max_bytes{area="heap"} > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          component: jvm
+        annotations:
+          summary: "JVM heap 사용률 85% 초과 (10분)"
+          description: "Memory leak 또는 GC 비효율. heap dump 검토 후보."

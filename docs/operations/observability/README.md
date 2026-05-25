@@ -2,6 +2,11 @@
 
 ReadMates의 메트릭/로그/트레이스/대시보드/알림 가이드입니다.
 
+## 운영 진입점
+
+- [Observability bootstrap runbook](../runbooks/observability-bootstrap.md) — OCI VM에서 Prometheus + Alertmanager 첫 bring-up과 smoke check.
+- [SLO monthly report runbook](../runbooks/slo-monthly-report.md) — 매월 첫 주 6개 SLO 측정·기록 절차.
+
 ## 현재 상태
 
 - Spring Boot Actuator + Micrometer + Prometheus registry가 server에 활성화되어 있습니다 (`/actuator/prometheus`).
