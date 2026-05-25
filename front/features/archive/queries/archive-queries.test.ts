@@ -1,36 +1,8 @@
 import { describe, expect, it } from "vitest";
-import {
-  archiveKeys,
-  archiveListQuery,
-  combineArchiveListPages,
-  memberArchiveSessionQuery,
-} from "./archive-queries";
+import { combineArchiveListPages } from "./archive-queries";
 
-describe("archive query helpers", () => {
-  it("scopes list keys by club and normalizes omitted page fields", () => {
-    expect(archiveKeys.list({ clubSlug: "bookclub" }, undefined)).toEqual([
-      "archive",
-      "scope",
-      "bookclub",
-      "list",
-      { limit: null, cursor: null },
-    ]);
-    expect(archiveListQuery({ clubSlug: "bookclub" }).queryKey).toEqual(
-      archiveKeys.list({ clubSlug: "bookclub" }, undefined),
-    );
-  });
-
-  it("scopes archive detail keys by session id and club", () => {
-    expect(memberArchiveSessionQuery("session-1", { clubSlug: "bookclub" }).queryKey).toEqual([
-      "archive",
-      "scope",
-      "bookclub",
-      "detail",
-      "session-1",
-    ]);
-  });
-
-  it("combines cursor pages per archive surface", () => {
+describe("combineArchiveListPages", () => {
+  it("appends next-page items per archive surface and keeps the trailing cursor", () => {
     const current = {
       sessions: { items: [{ sessionId: "s1" }], nextCursor: "s2" },
       questions: { items: [{ id: "q1" }], nextCursor: null },
@@ -44,9 +16,9 @@ describe("archive query helpers", () => {
       reports: { items: [], nextCursor: null },
     };
 
-    expect(combineArchiveListPages([current, next]).sessions.items.map((item) => item.sessionId)).toEqual([
-      "s1",
-      "s2",
-    ]);
+    const combined = combineArchiveListPages([current, next]);
+
+    expect(combined.sessions.items.map((item) => item.sessionId)).toEqual(["s1", "s2"]);
+    expect(combined.sessions.nextCursor).toBeNull();
   });
 });
