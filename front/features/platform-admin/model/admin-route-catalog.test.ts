@@ -55,6 +55,7 @@ describe("ADMIN_ROUTES catalog", () => {
     expect(ready.map((route) => route.path).sort()).toEqual([
       "ai-ops",
       "clubs",
+      "health",
       "support",
       "today",
     ]);

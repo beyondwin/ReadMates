@@ -103,6 +103,18 @@ function readyChild(route: AdminRouteDescriptor, queryClient: QueryClient): Rout
           return { Component: AdminSupportRoute };
         },
       };
+    case "health":
+      return {
+        path: "health",
+        hydrateFallbackElement: adminChildHydrateFallback,
+        lazy: async () => {
+          const [{ AdminHealthRoute }, { adminHealthLoaderFactory }] = await Promise.all([
+            import("@/features/platform-admin/route/admin-health-route"),
+            import("@/features/platform-admin/route/admin-health-data"),
+          ]);
+          return { Component: AdminHealthRoute, loader: adminHealthLoaderFactory(queryClient) };
+        },
+      };
     default:
       throw new Error(`No ready route wired for catalog path ${route.path}`);
   }

@@ -39,19 +39,8 @@ export const ADMIN_ROUTES: ReadonlyArray<AdminRouteDescriptor> = [
     group: "today",
     groupLabel: "오늘/헬스",
     slice: "S2",
-    status: "coming_soon",
+    status: "ready",
     requiredCapability: "view_health",
-    comingSoon: {
-      title: "Platform Ops Health",
-      summary: "DB, Redis, Kafka, AI provider, outbox, deploy 신호를 한 화면에서 봅니다.",
-      bullets: [
-        "서비스·큐·AI 가용성 카드 (unknown/ok/degraded/down 4-state)",
-        "Outbox backlog · 알림 발송 성공률",
-        "최근 deploy attempt 5건 ledger",
-        "각 카드의 last-checked + drill 링크",
-      ],
-      docHref: `${UMBRELLA_DOC}#s2--platform-ops-health--deploy-ledger`,
-    },
   },
   {
     path: "clubs",

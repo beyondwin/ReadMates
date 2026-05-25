@@ -27,6 +27,12 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
   store (PENDING+RUNNING count). Reconciles `slos.yaml` as SSOT with `slos.md`
   enforced by `SloCatalogDocsConsistencyTest`. Adds `observability-bootstrap` and
   `slo-monthly-report` runbooks, and a public-release scan for observability dirs.
+- **platform-admin:** introduce health snapshot route covering service, queue, AI, outbox, deploy signals.
+  `/admin/health` flips from COMING-SOON to READY with a 7-card grid backed by `/api/admin/health/snapshot`.
+  In-process Micrometer for DB pool, Redis, outbox backlog, and the deploy attempt tail; local Prometheus
+  HTTP for Kafka consumer lag, AI provider availability (`readmates_aigen_jobs_completed_total`), and
+  notification dispatch success ratio. 10-second `@Scheduled` refresh into an `AtomicReference` cache;
+  per-card failures stay isolated (one provider down → that card only is `status=unknown`).
 
 ## v1.11.0 - 2026-05-18
 
