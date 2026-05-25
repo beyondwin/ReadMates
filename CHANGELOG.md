@@ -10,6 +10,14 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - **AI 운영 콘솔 + 호스트 복구**: `/admin`에서 AI job 상태, 실패 코드, 비용 추정, stale 후보를 보는 AI Ops 표면을 추가하고, 호스트 세션 편집기에서 자기 세션의 in-flight AI job을 다시 찾아 안전하게 취소/재시도할 수 있게 했습니다.
 - **Query foundation 완주**: `archive`, `feedback`, `public` read path를 Query loader seeding으로 이전하고, AI commit 후 full page reload 대신 관련 Query cache invalidation으로 화면을 갱신합니다.
+- **운영 안전망 보강**: 일일 MySQL 백업 systemd timer와 복구 runbook, release-tag `Unreleased` guard(`--release` gated, `--no-changelog-check` 비상 우회), graphify 기반 코드베이스 탐색 워크플로를 도입했습니다.
+
+### Engineering
+
+- **deploy:** `deploy/oci/backup-mysql.service` + `backup-mysql.timer`를 추가해 04:15 UTC에 MySQL dump → OCI Object Storage 업로드를 자동화합니다. 복구·검증·보존(30/6/1) 절차는 [`docs/operations/runbooks/db-backup.md`](docs/operations/runbooks/db-backup.md)에 정리합니다.
+- **deploy:** post-deploy watch가 부모 attempt id를 자식 attempt로 전파하도록 수정해 배포 ledger의 attempt 계보가 정확히 이어집니다 (`deploy/oci/watch-compose-post-deploy.sh`, `deploy/oci/tests/watch-attempt-id.test.sh`).
+- **scripts:** `scripts/pre-push-check.sh`에 `--release`/`READMATES_PRE_PUSH_RELEASE=true` 조건의 `CHANGELOG Unreleased` guard를 추가했습니다. concrete 카테고리 헤더, feature-style bold marker, 두 개 이상 placeholder를 거부합니다. `--no-changelog-check`로 비상 우회하며, branch protection bypass 정책은 [`docs/development/release-management.md`](docs/development/release-management.md)에 함께 문서화했습니다.
+- **docs:** graphify 채택 워크플로(`docs/development/graphify.md`, `.graphifyignore`, `graphify-out/` ignore)를 도입해 아키텍처 질문과 영향도 분석에 scoped graph 탐색을 사용할 수 있게 했습니다. 산출물은 공개 저장소에 push하지 않고 로컬 보조로만 사용합니다.
 
 ## v1.11.0 - 2026-05-18
 

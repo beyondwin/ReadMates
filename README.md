@@ -227,6 +227,7 @@ pnpm --dir front dev
 | 개발자 문서 허브 | [docs/development/README.md](docs/development/README.md) |
 | 로컬 실행 | [docs/development/local-setup.md](docs/development/local-setup.md) |
 | 아키텍처 상세 | [docs/development/architecture.md](docs/development/architecture.md) |
+| 코드베이스 graph 탐색 | [docs/development/graphify.md](docs/development/graphify.md) |
 | 세션 기록 JSON 가져오기 | [docs/development/session-import-generator.md](docs/development/session-import-generator.md) |
 | 디자인 시스템 | [design/README.md](design/README.md) |
 | 주요 기술적 의사결정 | [docs/development/technical-decisions.md](docs/development/technical-decisions.md) |
@@ -242,6 +243,7 @@ pnpm --dir front dev
 | OCI MySQL HeatWave | [docs/deploy/oci-mysql-heatwave.md](docs/deploy/oci-mysql-heatwave.md) |
 | 공개 저장소 보안과 release safety | [docs/deploy/security-public-repo.md](docs/deploy/security-public-repo.md) |
 | 운영 runbook, observability, post-mortem | [docs/operations/README.md](docs/operations/README.md) |
+| DB backup, 복구, secrets/VM deploy key bootstrap | [docs/operations/runbooks/README.md](docs/operations/runbooks/README.md) |
 | Release helper scripts | [scripts/README.md](scripts/README.md) |
 
 README는 제품 개요와 핵심 설계 판단을 빠르게 파악하는 진입점으로 두고, 상세 로컬 실행 절차와 테스트, 아키텍처, 배포 runbook은 위 문서로 분리합니다.
