@@ -3,6 +3,7 @@ package com.readmates.aigen.application.service
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.port.out.AiGenerationJobStore
 import jakarta.annotation.PostConstruct
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean
 import org.springframework.stereotype.Component
 
 /**
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Component
  * earlier so this is safe in practice.
  */
 @Component
+@ConditionalOnBean(AiGenerationJobStore::class)
 class AiGenerationQueueDepthGaugeBinder(
     private val metrics: AiGenerationMetrics,
     private val jobStore: AiGenerationJobStore,
