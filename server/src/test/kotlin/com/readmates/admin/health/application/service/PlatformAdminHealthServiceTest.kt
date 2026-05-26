@@ -93,7 +93,13 @@ class PlatformAdminHealthServiceTest {
         flakyProvider.failNextCompletely = true
         service.scheduledRefresh()
 
-        assertThat(service.currentSnapshot().cards.first().id).isEqualTo("kafka_lag")
+        assertThat(
+            service
+                .currentSnapshot()
+                .cards
+                .first()
+                .id,
+        ).isEqualTo("kafka_lag")
         assertThat(service.currentSnapshot()).isNotSameAs(initial)
     }
 
@@ -149,7 +155,7 @@ class PlatformAdminHealthServiceTest {
 
         override fun compute(): HealthCard =
             if (failNextCompletely) {
-                throw IllegalStateException("flaky compute failure")
+                error("flaky compute failure")
             } else {
                 HealthCard(
                     id = cardId,

@@ -23,6 +23,7 @@ class PlatformAdminHealthService(
     }
 
     @Scheduled(fixedDelayString = "\${readmates.admin.health.refresh-interval-ms:10000}")
+    @Suppress("TooGenericExceptionCaught")
     fun scheduledRefresh() {
         try {
             refresh()
@@ -31,6 +32,7 @@ class PlatformAdminHealthService(
         }
     }
 
+    @Suppress("TooGenericExceptionCaught")
     fun refresh(): PlatformHealthSnapshot {
         val now = clock.instant()
         val cards =

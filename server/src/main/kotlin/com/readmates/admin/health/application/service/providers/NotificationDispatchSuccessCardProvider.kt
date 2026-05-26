@@ -20,11 +20,16 @@ class NotificationDispatchSuccessCardProvider(
 ) : HealthCardProvider {
     override val cardId: String = "notification_dispatch_success"
 
+    @Suppress("ReturnCount", "SwallowedException")
     override fun compute(): HealthCard {
         val now = clock.instant()
         val ratio =
             try {
-                prometheusQueryPort.query(PROMQL).values.firstOrNull()?.value
+                prometheusQueryPort
+                    .query(PROMQL)
+                    .values
+                    .firstOrNull()
+                    ?.value
             } catch (ex: PrometheusQueryException) {
                 return failure(now, "prometheus_unreachable")
             }
@@ -50,18 +55,20 @@ class NotificationDispatchSuccessCardProvider(
         )
     }
 
-    private fun failure(now: Instant, reason: String) =
-        HealthCard(
-            id = cardId,
-            title = "알림 발송 성공률",
-            status = HealthCardStatus.UNKNOWN,
-            metric = null,
-            thresholds = HealthCardThresholds(warn = WARN_THRESHOLD, crit = CRIT_THRESHOLD),
-            lastCheckedAt = now,
-            source = HealthCardSource.PROMETHEUS,
-            drill = DRILL,
-            reason = reason,
-        )
+    private fun failure(
+        now: Instant,
+        reason: String,
+    ) = HealthCard(
+        id = cardId,
+        title = "알림 발송 성공률",
+        status = HealthCardStatus.UNKNOWN,
+        metric = null,
+        thresholds = HealthCardThresholds(warn = WARN_THRESHOLD, crit = CRIT_THRESHOLD),
+        lastCheckedAt = now,
+        source = HealthCardSource.PROMETHEUS,
+        drill = DRILL,
+        reason = reason,
+    )
 
     private companion object {
         private const val WARN_THRESHOLD = 0.99

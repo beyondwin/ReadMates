@@ -13,7 +13,9 @@ import java.time.ZoneOffset
 class DeployAttemptsStripCardProviderTest {
     private val clock: Clock = Clock.fixed(Instant.parse("2026-05-26T00:00:00Z"), ZoneOffset.UTC)
 
-    private class FakeLedger(private val behaviour: () -> List<DeployAttemptStripEntry>) : DeployLedgerPort {
+    private class FakeLedger(
+        private val behaviour: () -> List<DeployAttemptStripEntry>,
+    ) : DeployLedgerPort {
         override fun tailLatestAttempts(limit: Int): List<DeployAttemptStripEntry> = behaviour()
     }
 

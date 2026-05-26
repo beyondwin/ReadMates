@@ -1,21 +1,24 @@
 package com.readmates.admin.health.adapter.out.prometheus
 
-import tools.jackson.databind.JsonNode
 import com.readmates.admin.health.application.port.out.PromInstantValue
 import com.readmates.admin.health.application.port.out.PromQueryResult
 import com.readmates.admin.health.application.port.out.PrometheusQueryPort
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientResponseException
+import tools.jackson.databind.JsonNode
 import java.time.Duration
 
-class PrometheusQueryException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
+class PrometheusQueryException(
+    message: String,
+    cause: Throwable? = null,
+) : RuntimeException(message, cause)
 
 class HttpPrometheusQueryAdapter(
     private val restClient: RestClient,
     @Suppress("UnusedPrivateProperty", "unused") private val requestTimeout: Duration,
 ) : PrometheusQueryPort {
-    override fun query(promql: String): PromQueryResult {
-        return try {
+    override fun query(promql: String): PromQueryResult =
+        try {
             val body =
                 restClient
                     .get()
@@ -43,5 +46,4 @@ class HttpPrometheusQueryAdapter(
         } catch (ex: RestClientResponseException) {
             throw PrometheusQueryException("prometheus http ${ex.statusCode.value()}", ex)
         }
-    }
 }

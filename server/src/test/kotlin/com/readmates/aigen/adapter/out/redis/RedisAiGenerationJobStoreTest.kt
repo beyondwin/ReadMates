@@ -2,8 +2,8 @@ package com.readmates.aigen.adapter.out.redis
 
 import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.ErrorCode
-import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.GenerationError
+import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelId

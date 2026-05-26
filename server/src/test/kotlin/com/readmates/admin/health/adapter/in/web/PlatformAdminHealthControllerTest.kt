@@ -1,3 +1,5 @@
+@file:Suppress("MaxLineLength")
+
 package com.readmates.admin.health.adapter.`in`.web
 
 import com.readmates.admin.health.application.model.HealthCard

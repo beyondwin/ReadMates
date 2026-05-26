@@ -22,9 +22,11 @@ class HttpPrometheusQueryAdapterTest {
             .andExpect(requestTo(org.hamcrest.Matchers.containsString("api/v1/query")))
             .andRespond(
                 withSuccess(
-                    """{"status":"success","data":{"resultType":"vector","result":[
+                    """
+                    {"status":"success","data":{"resultType":"vector","result":[
                        {"metric":{"provider":"CLAUDE"},"value":[1717000000,"0.97"]}
-                    ]}}""".trimIndent(),
+                    ]}}
+                    """.trimIndent(),
                     MediaType.APPLICATION_JSON,
                 ),
             )

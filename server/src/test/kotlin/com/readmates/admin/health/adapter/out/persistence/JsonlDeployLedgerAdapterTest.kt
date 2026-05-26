@@ -1,3 +1,5 @@
+@file:Suppress("MaxLineLength")
+
 package com.readmates.admin.health.adapter.out.persistence
 
 import com.readmates.admin.health.application.model.DeployAttemptFinalStatus

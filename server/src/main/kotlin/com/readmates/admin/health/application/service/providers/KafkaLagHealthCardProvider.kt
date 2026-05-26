@@ -19,6 +19,7 @@ class KafkaLagHealthCardProvider(
 ) : HealthCardProvider {
     override val cardId: String = "kafka_consumer_lag"
 
+    @Suppress("ReturnCount", "SwallowedException")
     override fun compute(): HealthCard {
         val now = clock.instant()
         val maxLag =
@@ -50,18 +51,20 @@ class KafkaLagHealthCardProvider(
         )
     }
 
-    private fun failure(now: Instant, reason: String) =
-        HealthCard(
-            id = cardId,
-            title = "Kafka consumer lag",
-            status = HealthCardStatus.UNKNOWN,
-            metric = null,
-            thresholds = THRESHOLDS,
-            lastCheckedAt = now,
-            source = HealthCardSource.PROMETHEUS,
-            drill = null,
-            reason = reason,
-        )
+    private fun failure(
+        now: Instant,
+        reason: String,
+    ) = HealthCard(
+        id = cardId,
+        title = "Kafka consumer lag",
+        status = HealthCardStatus.UNKNOWN,
+        metric = null,
+        thresholds = THRESHOLDS,
+        lastCheckedAt = now,
+        source = HealthCardSource.PROMETHEUS,
+        drill = null,
+        reason = reason,
+    )
 
     private companion object {
         private const val WARN_THRESHOLD = 50.0

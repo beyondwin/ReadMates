@@ -15,7 +15,9 @@ import java.time.ZoneOffset
 class NotificationDispatchSuccessCardProviderTest {
     private val clock: Clock = Clock.fixed(Instant.parse("2026-05-26T00:00:00Z"), ZoneOffset.UTC)
 
-    private class FakePrometheus(private val behaviour: () -> PromQueryResult) : PrometheusQueryPort {
+    private class FakePrometheus(
+        private val behaviour: () -> PromQueryResult,
+    ) : PrometheusQueryPort {
         override fun query(promql: String): PromQueryResult = behaviour()
     }
 

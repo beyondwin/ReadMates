@@ -393,4 +393,10 @@
     <file name="src/test/kotlin/com/readmates/shared/adapter/in/web/HealthControllerTest.kt">
         <error line="1" column="9" source="standard:package-name" />
     </file>
+    <file name="src/main/kotlin/com/readmates/admin/health/adapter/in/web/PlatformAdminHealthController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/admin/health/adapter/in/web/PlatformAdminHealthControllerTest.kt">
+        <error line="3" column="9" source="standard:package-name" />
+    </file>
 </baseline>

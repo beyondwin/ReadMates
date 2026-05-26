@@ -20,6 +20,7 @@ class AiProviderAvailabilityCardProvider(
 ) : HealthCardProvider {
     override val cardId: String = "ai_provider_availability"
 
+    @Suppress("ReturnCount", "SwallowedException")
     override fun compute(): HealthCard {
         val now = clock.instant()
         val minRatio =
@@ -51,18 +52,20 @@ class AiProviderAvailabilityCardProvider(
         )
     }
 
-    private fun failure(now: Instant, reason: String) =
-        HealthCard(
-            id = cardId,
-            title = "AI provider 가용성",
-            status = HealthCardStatus.UNKNOWN,
-            metric = null,
-            thresholds = HealthCardThresholds(warn = WARN_THRESHOLD, crit = CRIT_THRESHOLD),
-            lastCheckedAt = now,
-            source = HealthCardSource.PROMETHEUS,
-            drill = DRILL,
-            reason = reason,
-        )
+    private fun failure(
+        now: Instant,
+        reason: String,
+    ) = HealthCard(
+        id = cardId,
+        title = "AI provider 가용성",
+        status = HealthCardStatus.UNKNOWN,
+        metric = null,
+        thresholds = HealthCardThresholds(warn = WARN_THRESHOLD, crit = CRIT_THRESHOLD),
+        lastCheckedAt = now,
+        source = HealthCardSource.PROMETHEUS,
+        drill = DRILL,
+        reason = reason,
+    )
 
     private companion object {
         private const val WARN_THRESHOLD = 0.99

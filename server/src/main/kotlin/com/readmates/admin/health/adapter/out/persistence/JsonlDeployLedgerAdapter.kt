@@ -1,10 +1,10 @@
 package com.readmates.admin.health.adapter.out.persistence
 
-import tools.jackson.databind.JsonNode
-import tools.jackson.databind.ObjectMapper
 import com.readmates.admin.health.application.model.DeployAttemptFinalStatus
 import com.readmates.admin.health.application.model.DeployAttemptStripEntry
 import com.readmates.admin.health.application.port.out.DeployLedgerPort
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.ObjectMapper
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
@@ -19,12 +19,12 @@ class JsonlDeployLedgerAdapter(
 
         val grouped = LinkedHashMap<String, MutableList<JsonNode>>()
         Files.newBufferedReader(path).use { reader ->
-            reader.lineSequence()
+            reader
+                .lineSequence()
                 .mapNotNull { line ->
                     if (line.isBlank()) return@mapNotNull null
                     runCatching { objectMapper.readTree(line) }.getOrNull()
-                }
-                .forEach { event ->
+                }.forEach { event ->
                     val attemptId = event.path("attemptId").asText().ifBlank { return@forEach }
                     grouped.getOrPut(attemptId) { mutableListOf() }.add(event)
                 }

@@ -18,7 +18,8 @@ class OutboxBacklogHealthCardProviderTest {
     fun `status is OK and drill to admin notifications when backlog under warn`() {
         val registry = SimpleMeterRegistry()
         val backlog = AtomicLong(42L)
-        Gauge.builder("readmates.notifications.outbox.backlog", backlog) { it.get().toDouble() }
+        Gauge
+            .builder("readmates.notifications.outbox.backlog", backlog) { it.get().toDouble() }
             .tag("status", "pending")
             .register(registry)
 
@@ -34,7 +35,8 @@ class OutboxBacklogHealthCardProviderTest {
     fun `status is WARN at warn threshold and CRIT at crit threshold`() {
         val registry = SimpleMeterRegistry()
         val backlog = AtomicLong(0L)
-        Gauge.builder("readmates.notifications.outbox.backlog", backlog) { it.get().toDouble() }
+        Gauge
+            .builder("readmates.notifications.outbox.backlog", backlog) { it.get().toDouble() }
             .tag("status", "pending")
             .register(registry)
 

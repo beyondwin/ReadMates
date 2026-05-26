@@ -1,6 +1,5 @@
 package com.readmates.admin.health.config
 
-import tools.jackson.databind.ObjectMapper
 import com.readmates.admin.health.adapter.out.persistence.JsonlDeployLedgerAdapter
 import com.readmates.admin.health.adapter.out.prometheus.HttpPrometheusQueryAdapter
 import com.readmates.admin.health.application.port.out.DeployLedgerPort
@@ -9,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.web.client.RestClient
+import tools.jackson.databind.ObjectMapper
 import java.nio.file.Paths
 import java.time.Clock
 import java.time.Duration
