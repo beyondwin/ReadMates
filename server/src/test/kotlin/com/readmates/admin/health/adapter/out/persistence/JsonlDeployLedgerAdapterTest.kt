@@ -1,15 +1,16 @@
 package com.readmates.admin.health.adapter.out.persistence
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.readmates.admin.health.application.model.DeployAttemptFinalStatus
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import tools.jackson.databind.ObjectMapper
+import tools.jackson.databind.json.JsonMapper
 import java.nio.file.Files
 import java.nio.file.Path
 
 class JsonlDeployLedgerAdapterTest {
-    private val mapper = ObjectMapper()
+    private val mapper: ObjectMapper = JsonMapper.builder().findAndAddModules().build()
 
     @Test
     fun `groups events into attempts and returns latest first`(

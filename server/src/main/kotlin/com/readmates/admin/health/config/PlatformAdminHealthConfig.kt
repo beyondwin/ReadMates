@@ -1,6 +1,6 @@
 package com.readmates.admin.health.config
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import com.readmates.admin.health.adapter.out.persistence.JsonlDeployLedgerAdapter
 import com.readmates.admin.health.adapter.out.prometheus.HttpPrometheusQueryAdapter
 import com.readmates.admin.health.application.port.out.DeployLedgerPort
