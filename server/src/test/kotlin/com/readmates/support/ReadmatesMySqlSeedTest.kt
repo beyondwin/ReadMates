@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.TestPropertySource
+import org.springframework.test.context.jdbc.Sql
 
 @SpringBootTest
 @TestPropertySource(
@@ -16,6 +17,10 @@ import org.springframework.test.context.TestPropertySource
     ],
 )
 @Tag("integration")
+@Sql(
+    scripts = ["classpath:db/mysql/dev/R__readmates_dev_seed.sql"],
+    executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+)
 class ReadmatesMySqlSeedTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
 ) : ReadmatesMySqlIntegrationTestSupport() {
@@ -89,7 +94,14 @@ class ReadmatesMySqlSeedTest(
         assertEquals(
             7,
             jdbcTemplate.queryForObject(
-                "select count(*) from sessions where state = 'PUBLISHED'",
+                """
+                select count(*)
+                from sessions
+                join clubs on clubs.id = sessions.club_id
+                where clubs.slug = 'reading-sai'
+                  and sessions.state = 'PUBLISHED'
+                  and sessions.number in (1, 2, 3, 4, 5, 6, 7)
+                """.trimIndent(),
                 Int::class.java,
             ),
         )

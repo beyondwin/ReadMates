@@ -89,7 +89,7 @@ async function routePlatformAdminShell(page: Page, role: PlatformAdminRole): Pro
 test("platform support can read AI Ops but cannot force cancel", async ({ page }) => {
   await routePlatformAdminShell(page, "SUPPORT");
 
-  await page.goto("/admin");
+  await page.goto("/admin/ai-ops");
 
   await expect(page.getByRole("heading", { name: "AI 운영" })).toBeVisible();
   await expect(page.getByText("Book")).toBeVisible();
@@ -99,7 +99,7 @@ test("platform support can read AI Ops but cannot force cancel", async ({ page }
 test("platform owner sees AI Ops action affordance when job is actionable", async ({ page }) => {
   await routePlatformAdminShell(page, "OWNER");
 
-  await page.goto("/admin");
+  await page.goto("/admin/ai-ops");
 
   await expect(page.getByRole("heading", { name: "AI 운영" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Force cancel" })).toBeVisible();
