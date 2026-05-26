@@ -39,8 +39,8 @@ export function AdminHealthCard({ card }: { card: HealthCard }) {
         {card.reason ? <p className="admin-health-card__reason">{card.reason}</p> : null}
       </div>
       <footer className="admin-health-card__footer">
-        <time dateTime={card.last_checked_at} className="admin-health-card__time">
-          최근 확인 {relativeFromNow(card.last_checked_at)}
+        <time dateTime={card.lastCheckedAt} className="admin-health-card__time">
+          최근 확인 {relativeFromNow(card.lastCheckedAt)}
         </time>
         {card.drill ? (
           <Link to={card.drill.target} className="admin-health-card__drill">
@@ -59,9 +59,10 @@ function formatValue(value: number | null, unit: string): string {
 }
 
 function relativeFromNow(iso: string): string {
-  const now = Date.now();
   const ts = new Date(iso).getTime();
-  const seconds = Math.max(0, Math.round((now - ts) / 1000));
+  if (!Number.isFinite(ts)) return "확인 시각 없음";
+
+  const seconds = Math.max(0, Math.round((Date.now() - ts) / 1000));
   if (seconds < 60) return `${seconds}초 전`;
   if (seconds < 3600) return `${Math.round(seconds / 60)}분 전`;
   return `${Math.round(seconds / 3600)}시간 전`;

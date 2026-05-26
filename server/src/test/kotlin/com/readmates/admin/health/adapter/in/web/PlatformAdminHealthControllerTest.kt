@@ -2,6 +2,8 @@
 
 package com.readmates.admin.health.adapter.`in`.web
 
+import com.readmates.admin.health.application.model.DeployAttemptFinalStatus
+import com.readmates.admin.health.application.model.DeployAttemptStripEntry
 import com.readmates.admin.health.application.model.HealthCard
 import com.readmates.admin.health.application.model.HealthCardDrill
 import com.readmates.admin.health.application.model.HealthCardMetric
@@ -28,10 +30,12 @@ import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.UUID
+import java.util.concurrent.Executor
 
 class PlatformAdminHealthControllerTest {
     private val now: Instant = Instant.parse("2026-05-26T00:00:00Z")
     private val clock: Clock = Clock.fixed(now, ZoneOffset.UTC)
+    private val directExecutor = Executor { command -> command.run() }
 
     private val ownerAdmin =
         CurrentPlatformAdmin(
@@ -42,39 +46,7 @@ class PlatformAdminHealthControllerTest {
 
     @Test
     fun `snapshot returns schema generatedAt and all provider cards`() {
-        val service =
-            PlatformAdminHealthService(
-                providers =
-                    listOf(
-                        StaticCardProvider(
-                            HealthCard(
-                                id = "redis",
-                                title = "Redis",
-                                status = HealthCardStatus.OK,
-                                metric = HealthCardMetric(value = 0.0, unit = "ms", label = "ping"),
-                                thresholds = HealthCardThresholds(warn = 50.0, crit = 200.0),
-                                lastCheckedAt = now,
-                                source = HealthCardSource.IN_PROCESS,
-                                drill = null,
-                                reason = null,
-                            ),
-                        ),
-                        StaticCardProvider(
-                            HealthCard(
-                                id = "ai_provider_availability",
-                                title = "AI",
-                                status = HealthCardStatus.WARN,
-                                metric = HealthCardMetric(value = 0.97, unit = "ratio", label = "min"),
-                                thresholds = HealthCardThresholds(warn = 0.99, crit = 0.95),
-                                lastCheckedAt = now,
-                                source = HealthCardSource.PROMETHEUS,
-                                drill = HealthCardDrill.AdminRoute("/admin/ai-ops"),
-                                reason = null,
-                            ),
-                        ),
-                    ),
-                clock = clock,
-            )
+        val service = buildService(deployAttemptsCard(), aiProviderCard())
         val mockMvc = buildMockMvc(service, StubCurrentPlatformAdminResolver(ownerAdmin))
 
         mockMvc
@@ -84,12 +56,13 @@ class PlatformAdminHealthControllerTest {
                 jsonPath("$.schema") { value(PlatformHealthSnapshot.SCHEMA) }
                 jsonPath("$.generatedAt") { value("2026-05-26T00:00:00Z") }
                 jsonPath("$.cards.length()") { value(2) }
-                jsonPath("$.cards[0].id") { value("redis") }
+                jsonPath("$.cards[0].id") { value("deploy_attempts_strip") }
                 jsonPath("$.cards[0].status") { value("OK") }
-                jsonPath("$.cards[0].source") { value("IN_PROCESS") }
-                jsonPath("$.cards[0].metric.value") { value(0.0) }
-                jsonPath("$.cards[0].metric.unit") { value("ms") }
-                jsonPath("$.cards[0].thresholds.warn") { value(50.0) }
+                jsonPath("$.cards[0].source") { value("FILE") }
+                jsonPath("$.cards[0].lastCheckedAt") { value("2026-05-26T00:00:00Z") }
+                jsonPath("$.cards[0].deployStrip[0].attemptId") { value("deploy-dev-001") }
+                jsonPath("$.cards[0].deployStrip[0].finalStatus") { value("SUCCEEDED") }
+                jsonPath("$.cards[0].deployStrip[0].imageTag") { value("readmates-api:dev-20260526") }
                 jsonPath("$.cards[0].drill") { doesNotExist() }
                 jsonPath("$.cards[1].id") { value("ai_provider_availability") }
                 jsonPath("$.cards[1].status") { value("WARN") }
@@ -97,6 +70,50 @@ class PlatformAdminHealthControllerTest {
                 jsonPath("$.cards[1].drill.target") { value("/admin/ai-ops") }
             }
     }
+
+    private fun buildService(vararg cards: HealthCard): PlatformAdminHealthService =
+        PlatformAdminHealthService(
+            providers = cards.map(::StaticCardProvider),
+            clock = clock,
+            executor = directExecutor,
+        )
+
+    private fun deployAttemptsCard(): HealthCard =
+        HealthCard(
+            id = "deploy_attempts_strip",
+            title = "Deploy attempts",
+            status = HealthCardStatus.OK,
+            metric = null,
+            thresholds = null,
+            lastCheckedAt = now,
+            source = HealthCardSource.FILE,
+            drill = null,
+            reason = null,
+            deployStrip =
+                listOf(
+                    DeployAttemptStripEntry(
+                        attemptId = "deploy-dev-001",
+                        startedAt = now,
+                        endedAt = now.plusSeconds(120),
+                        finalStatus = DeployAttemptFinalStatus.SUCCEEDED,
+                        imageTag = "readmates-api:dev-20260526",
+                        durationSeconds = 120,
+                    ),
+                ),
+        )
+
+    private fun aiProviderCard(): HealthCard =
+        HealthCard(
+            id = "ai_provider_availability",
+            title = "AI",
+            status = HealthCardStatus.WARN,
+            metric = HealthCardMetric(value = 0.97, unit = "ratio", label = "min"),
+            thresholds = HealthCardThresholds(warn = 0.99, crit = 0.95),
+            lastCheckedAt = now,
+            source = HealthCardSource.PROMETHEUS,
+            drill = HealthCardDrill.AdminRoute("/admin/ai-ops"),
+            reason = null,
+        )
 
     @Test
     fun `provider throwing produces unknown card with provider_error reason in response`() {
@@ -120,6 +137,7 @@ class PlatformAdminHealthControllerTest {
                         ),
                     ),
                 clock = clock,
+                executor = directExecutor,
             )
         val mockMvc = buildMockMvc(service, StubCurrentPlatformAdminResolver(ownerAdmin))
 
@@ -138,7 +156,7 @@ class PlatformAdminHealthControllerTest {
 
     @Test
     fun `non-platform-admin caller receives 403 from the permission gate`() {
-        val service = PlatformAdminHealthService(providers = emptyList(), clock = clock)
+        val service = PlatformAdminHealthService(providers = emptyList(), clock = clock, executor = directExecutor)
         val mockMvc = buildMockMvc(service, ForbiddenCurrentPlatformAdminResolver())
 
         mockMvc

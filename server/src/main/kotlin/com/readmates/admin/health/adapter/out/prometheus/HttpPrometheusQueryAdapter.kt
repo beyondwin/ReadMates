@@ -4,6 +4,7 @@ import com.readmates.admin.health.application.port.out.PromInstantValue
 import com.readmates.admin.health.application.port.out.PromQueryResult
 import com.readmates.admin.health.application.port.out.PrometheusQueryPort
 import org.springframework.web.client.RestClient
+import org.springframework.web.client.RestClientException
 import org.springframework.web.client.RestClientResponseException
 import tools.jackson.databind.JsonNode
 import java.time.Duration
@@ -22,7 +23,7 @@ class HttpPrometheusQueryAdapter(
             val body =
                 restClient
                     .get()
-                    .uri { builder -> builder.path("api/v1/query").queryParam("query", promql).build() }
+                    .uri { builder -> builder.path("api/v1/query").queryParam("query", "{promql}").build(promql) }
                     .retrieve()
                     .body(JsonNode::class.java)
                     ?: throw PrometheusQueryException("empty body")
@@ -45,5 +46,7 @@ class HttpPrometheusQueryAdapter(
             PromQueryResult(values = values)
         } catch (ex: RestClientResponseException) {
             throw PrometheusQueryException("prometheus http ${ex.statusCode.value()}", ex)
+        } catch (ex: RestClientException) {
+            throw PrometheusQueryException("prometheus unavailable", ex)
         }
 }

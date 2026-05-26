@@ -44,7 +44,7 @@ class RedisHealthCardProvider(
             id = cardId,
             title = "Redis",
             status = status,
-            metric = HealthCardMetric(value = errorCount, unit = "errors", label = "since boot"),
+            metric = HealthCardMetric(value = errorCount, unit = "errors", label = "process lifetime"),
             thresholds = THRESHOLDS,
             lastCheckedAt = now,
             source = HealthCardSource.IN_PROCESS,

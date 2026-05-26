@@ -11,6 +11,7 @@ import org.springframework.test.web.client.match.MockRestRequestMatchers.request
 import org.springframework.test.web.client.response.MockRestResponseCreators.withStatus
 import org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess
 import org.springframework.web.client.RestClient
+import java.io.IOException
 import java.time.Duration
 
 class HttpPrometheusQueryAdapterTest {
@@ -57,6 +58,25 @@ class HttpPrometheusQueryAdapterTest {
     }
 
     @Test
+    fun `sends label selector braces as query value without template expansion`() {
+        val (adapter, server) = newAdapter()
+        server
+            .expect(method(HttpMethod.GET))
+            .andExpect(requestTo(org.hamcrest.Matchers.containsString("consumer_group")))
+            .andRespond(
+                withSuccess(
+                    """{"status":"success","data":{"resultType":"vector","result":[]}}""",
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        val result = adapter.query("""kafka_consumergroup_lag{consumer_group="readmates-aigen-worker"}""")
+
+        assertThat(result.values).isEmpty()
+        server.verify()
+    }
+
+    @Test
     fun `throws when prometheus returns non-200`() {
         val (adapter, server) = newAdapter()
         server
@@ -68,6 +88,22 @@ class HttpPrometheusQueryAdapterTest {
             throw AssertionError("expected exception")
         } catch (ex: PrometheusQueryException) {
             assertThat(ex.message).contains("500")
+        }
+        server.verify()
+    }
+
+    @Test
+    fun `wraps network failures`() {
+        val (adapter, server) = newAdapter()
+        server
+            .expect(method(HttpMethod.GET))
+            .andRespond { throw IOException("network down") }
+
+        try {
+            adapter.query("up")
+            throw AssertionError("expected exception")
+        } catch (ex: PrometheusQueryException) {
+            assertThat(ex.message).contains("prometheus unavailable")
         }
         server.verify()
     }

@@ -11,11 +11,11 @@ function card(overrides: Partial<HealthCard> = {}): HealthCard {
     status: "OK",
     metric: { value: 42, unit: "rows", label: "pending" },
     thresholds: { warn: 100, crit: 1000 },
-    last_checked_at: "2026-05-26T00:00:00Z",
+    lastCheckedAt: "2026-05-26T00:00:00Z",
     source: "IN_PROCESS",
-    drill: { kind: "admin_route", target: "/admin/notifications" },
+    drill: { kind: "ADMIN_ROUTE", target: "/admin/notifications" },
     reason: null,
-    deploy_strip: null,
+    deployStrip: null,
     ...overrides,
   };
 }
@@ -48,5 +48,15 @@ describe("AdminHealthCard", () => {
       </MemoryRouter>,
     );
     expect(screen.queryByRole("link", { name: /자세히/ })).toBeNull();
+  });
+
+  it("does not render NaN for invalid last checked timestamps", () => {
+    render(
+      <MemoryRouter>
+        <AdminHealthCard card={card({ lastCheckedAt: "not-a-date" })} />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByText(/NaN/)).toBeNull();
+    expect(screen.getByText(/확인 시각 없음/)).toBeInTheDocument();
   });
 });

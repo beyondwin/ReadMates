@@ -9,15 +9,21 @@ import org.junit.jupiter.api.Test
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executor
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 class PlatformAdminHealthServiceTest {
     private val now: Instant = Instant.parse("2026-05-26T00:00:00Z")
     private val clock: Clock = Clock.fixed(now, ZoneOffset.UTC)
+    private val directExecutor = Executor { command -> command.run() }
 
     @Test
     fun `currentSnapshot computes lazily on first call and caches result`() {
         val provider = CountingProvider("a")
-        val service = PlatformAdminHealthService(listOf(provider), clock)
+        val service = PlatformAdminHealthService(listOf(provider), clock, directExecutor)
 
         val first = service.currentSnapshot()
         val second = service.currentSnapshot()
@@ -37,6 +43,7 @@ class PlatformAdminHealthServiceTest {
                         StaticProvider("kafka_lag", HealthCardStatus.CRIT),
                     ),
                 clock = clock,
+                executor = directExecutor,
             )
 
         val snapshot = service.currentSnapshot()
@@ -57,6 +64,7 @@ class PlatformAdminHealthServiceTest {
                         StaticProvider("db_pool", HealthCardStatus.OK),
                     ),
                 clock = clock,
+                executor = directExecutor,
             )
 
         val snapshot = service.currentSnapshot()
@@ -74,7 +82,7 @@ class PlatformAdminHealthServiceTest {
     @Test
     fun `refresh recomputes and replaces cached snapshot`() {
         val provider = CountingProvider("redis")
-        val service = PlatformAdminHealthService(listOf(provider), clock)
+        val service = PlatformAdminHealthService(listOf(provider), clock, directExecutor)
 
         val first = service.currentSnapshot()
         val refreshed = service.refresh()
@@ -85,22 +93,76 @@ class PlatformAdminHealthServiceTest {
     }
 
     @Test
-    fun `scheduledRefresh swallows provider exceptions and preserves last snapshot`() {
+    fun `scheduledRefresh replaces cache with unknown card when provider throws`() {
         val flakyProvider = FlakyProvider("kafka_lag")
-        val service = PlatformAdminHealthService(listOf(flakyProvider), clock)
+        val service = PlatformAdminHealthService(listOf(flakyProvider), clock, directExecutor)
 
         val initial = service.currentSnapshot()
         flakyProvider.failNextCompletely = true
         service.scheduledRefresh()
 
-        assertThat(
-            service
-                .currentSnapshot()
-                .cards
-                .first()
-                .id,
-        ).isEqualTo("kafka_lag")
-        assertThat(service.currentSnapshot()).isNotSameAs(initial)
+        val refreshed = service.currentSnapshot()
+        assertThat(refreshed).isNotSameAs(initial)
+        assertThat(refreshed.cards.first().id).isEqualTo("kafka_lag")
+        assertThat(refreshed.cards.first().status).isEqualTo(HealthCardStatus.UNKNOWN)
+        assertThat(refreshed.cards.first().reason).isEqualTo("provider_error")
+    }
+
+    @Test
+    fun `refresh computes providers concurrently while preserving provider order`() {
+        val executor = Executors.newFixedThreadPool(2)
+        val bothStarted = CountDownLatch(2)
+        val release = CountDownLatch(1)
+        val service =
+            PlatformAdminHealthService(
+                providers =
+                    listOf(
+                        BlockingProvider("first", bothStarted, release),
+                        BlockingProvider("second", bothStarted, release),
+                    ),
+                clock = clock,
+                executor = executor,
+            )
+
+        try {
+            val refresh = CompletableFuture.supplyAsync { service.refresh() }
+
+            assertThat(bothStarted.await(1, TimeUnit.SECONDS)).isTrue()
+            release.countDown()
+
+            assertThat(refresh.get(1, TimeUnit.SECONDS).cards.map { it.id })
+                .containsExactly("first", "second")
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
+    @Test
+    fun `timed out provider becomes unknown card without blocking other providers`() {
+        val executor = Executors.newFixedThreadPool(2)
+        val release = CountDownLatch(1)
+        val service =
+            PlatformAdminHealthService(
+                providers =
+                    listOf(
+                        BlockingProvider("stuck", CountDownLatch(1), release),
+                        StaticProvider("redis", HealthCardStatus.OK),
+                    ),
+                clock = clock,
+                executor = executor,
+            )
+
+        try {
+            val snapshot = service.refresh()
+
+            assertThat(snapshot.cards.map { it.id }).containsExactly("stuck", "redis")
+            assertThat(snapshot.cards.first().status).isEqualTo(HealthCardStatus.UNKNOWN)
+            assertThat(snapshot.cards.first().reason).isEqualTo("provider_timeout")
+            assertThat(snapshot.cards[1].status).isEqualTo(HealthCardStatus.OK)
+        } finally {
+            release.countDown()
+            executor.shutdownNow()
+        }
     }
 
     private inner class CountingProvider(
@@ -169,5 +231,27 @@ class PlatformAdminHealthServiceTest {
                     reason = null,
                 )
             }
+    }
+
+    private inner class BlockingProvider(
+        override val cardId: String,
+        private val bothStarted: CountDownLatch,
+        private val release: CountDownLatch,
+    ) : HealthCardProvider {
+        override fun compute(): HealthCard {
+            bothStarted.countDown()
+            release.await()
+            return HealthCard(
+                id = cardId,
+                title = cardId,
+                status = HealthCardStatus.OK,
+                metric = null,
+                thresholds = null,
+                lastCheckedAt = now,
+                source = HealthCardSource.IN_PROCESS,
+                drill = null,
+                reason = null,
+            )
+        }
     }
 }

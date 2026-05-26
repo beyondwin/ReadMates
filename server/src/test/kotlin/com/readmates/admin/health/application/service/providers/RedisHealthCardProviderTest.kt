@@ -20,6 +20,7 @@ class RedisHealthCardProviderTest {
         assertThat(card.id).isEqualTo("redis")
         assertThat(card.status).isEqualTo(HealthCardStatus.OK)
         assertThat(card.metric?.value).isEqualTo(0.0)
+        assertThat(card.metric?.label).isEqualTo("process lifetime")
     }
 
     @Test

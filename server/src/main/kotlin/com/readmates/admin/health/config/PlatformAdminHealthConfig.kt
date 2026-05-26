@@ -12,11 +12,25 @@ import tools.jackson.databind.ObjectMapper
 import java.nio.file.Paths
 import java.time.Clock
 import java.time.Duration
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.ThreadFactory
+
+private const val HEALTH_EXECUTOR_THREADS = 4
 
 @Configuration
 class PlatformAdminHealthConfig {
     @Bean
     fun platformAdminHealthClock(): Clock = Clock.systemUTC()
+
+    @Bean(destroyMethod = "shutdown")
+    fun platformAdminHealthExecutor(): ExecutorService =
+        Executors.newFixedThreadPool(
+            HEALTH_EXECUTOR_THREADS,
+            ThreadFactory { runnable ->
+                Thread(runnable, "platform-admin-health").apply { isDaemon = true }
+            },
+        )
 
     @Bean
     fun prometheusQueryPort(

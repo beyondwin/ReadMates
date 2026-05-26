@@ -1,12 +1,18 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
-import * as api from "@/features/platform-admin/api/platform-admin-health-api";
-import { AdminHealthRoute } from "@/features/platform-admin/route/admin-health-route";
-import type { PlatformHealthSnapshotResponse } from "@/features/platform-admin/api/platform-admin-health-contracts";
+import type { PlatformHealthSnapshot } from "@/features/platform-admin/model/platform-admin-health-model";
+import { AdminHealthGrid } from "@/features/platform-admin/ui/admin-health-grid";
 
-const HEALTH_SNAPSHOT: PlatformHealthSnapshotResponse = {
+const readmatesFetchMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@/shared/api/client", () => ({
+  readmatesFetch: readmatesFetchMock,
+}));
+
+const HEALTH_SNAPSHOT: PlatformHealthSnapshot = {
   schema: "platform.health_snapshot.v1",
   generatedAt: "2026-05-26T00:00:00Z",
   cards: [
@@ -106,18 +112,37 @@ const HEALTH_SNAPSHOT: PlatformHealthSnapshotResponse = {
   ],
 };
 
-describe("AdminHealthRoute", () => {
-  it("renders the full health snapshot and deploy strip", async () => {
-    const fetchSpy = vi.spyOn(api, "fetchPlatformAdminHealthSnapshot").mockResolvedValueOnce(HEALTH_SNAPSHOT);
-    const client = new QueryClient();
-    render(
-      <QueryClientProvider client={client}>
-        <MemoryRouter>
-          <AdminHealthRoute />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-    expect(screen.getByRole("heading", { name: "Platform Health" })).toBeInTheDocument();
+function renderGrid() {
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: {
+        gcTime: Infinity,
+        retry: false,
+      },
+    },
+  });
+  render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter>
+        <AdminHealthGrid />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+  return client;
+}
+
+describe("AdminHealthGrid", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    readmatesFetchMock.mockReset();
+  });
+
+  it("renders six health cards plus a separate deploy strip from the seven-card snapshot", async () => {
+    readmatesFetchMock.mockResolvedValueOnce(HEALTH_SNAPSHOT);
+
+    renderGrid();
+
     expect(await screen.findByText("Outbox backlog")).toBeInTheDocument();
     expect(screen.getByText("Kafka consumer lag")).toBeInTheDocument();
     expect(screen.getByText("Redis")).toBeInTheDocument();
@@ -126,7 +151,41 @@ describe("AdminHealthRoute", () => {
     expect(screen.getByText("AI provider availability")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "최근 deploy" })).toBeInTheDocument();
     expect(screen.getByText(/readmates-api:dev-20260526/)).toBeInTheDocument();
-    expect(screen.queryByText(/NaN/)).toBeNull();
-    expect(fetchSpy).toHaveBeenCalled();
+  });
+
+  it("refresh button fetches a second snapshot", async () => {
+    readmatesFetchMock.mockResolvedValueOnce(HEALTH_SNAPSHOT).mockResolvedValueOnce(HEALTH_SNAPSHOT);
+    const user = userEvent.setup();
+
+    renderGrid();
+
+    await screen.findByText("Outbox backlog");
+    await user.click(screen.getByRole("button", { name: "새로고침" }));
+
+    await waitFor(() => expect(readmatesFetchMock).toHaveBeenCalledTimes(2));
+  });
+
+  it("marks the snapshot stale after thirty seconds", async () => {
+    vi.useFakeTimers({ now: new Date("2026-05-26T00:00:05Z") });
+    const fakeSetInterval = window.setInterval;
+    vi.spyOn(window, "setInterval").mockImplementation((handler, timeout, ...args) => {
+      if (timeout === 15_000) return 0;
+      return fakeSetInterval(handler, timeout, ...args);
+    });
+    readmatesFetchMock.mockResolvedValueOnce(HEALTH_SNAPSHOT);
+
+    renderGrid();
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(screen.getByText("최신")).toBeInTheDocument();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(31_000);
+    });
+
+    expect(screen.getByText("30초 이상 경과")).toBeInTheDocument();
   });
 });

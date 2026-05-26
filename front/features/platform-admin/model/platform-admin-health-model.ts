@@ -14,17 +14,17 @@ export type HealthCardThresholds = {
 };
 
 export type HealthCardDrill = {
-  kind: "admin_route";
+  kind: "ADMIN_ROUTE";
   target: string;
 };
 
 export type DeployAttemptStripEntry = {
-  attempt_id: string;
-  started_at: string;
-  ended_at: string | null;
-  final_status: DeployAttemptFinalStatus;
-  image_tag: string | null;
-  duration_seconds: number | null;
+  attemptId: string;
+  startedAt: string;
+  endedAt: string | null;
+  finalStatus: DeployAttemptFinalStatus;
+  imageTag: string | null;
+  durationSeconds: number | null;
 };
 
 export type HealthCard = {
@@ -33,15 +33,15 @@ export type HealthCard = {
   status: HealthCardStatus;
   metric: HealthCardMetric | null;
   thresholds: HealthCardThresholds | null;
-  last_checked_at: string;
+  lastCheckedAt: string;
   source: HealthCardSource;
   drill: HealthCardDrill | null;
   reason: string | null;
-  deploy_strip: DeployAttemptStripEntry[] | null;
+  deployStrip: DeployAttemptStripEntry[] | null;
 };
 
 export type PlatformHealthSnapshot = {
   schema: "platform.health_snapshot.v1";
-  generated_at: string;
+  generatedAt: string;
   cards: HealthCard[];
 };

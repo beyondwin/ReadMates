@@ -34,6 +34,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
   HTTP for Kafka consumer lag, AI provider availability (`readmates_aigen_jobs_completed_total`), and
   notification dispatch success ratio. 10-second `@Scheduled` refresh into an `AtomicReference` cache;
   per-card failures stay isolated (one provider down → that card only is `status=unknown`).
+- Hardened `/admin/health` with a pinned camelCase snapshot contract, seven-card fixture coverage, refresh/stale UI, deploy strip rendering, and isolated provider refresh behavior.
 
 ## v1.11.0 - 2026-05-18
 

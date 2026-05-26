@@ -53,7 +53,7 @@ async function routePlatformAdminShell(page: Page, role: PlatformAdminRole): Pro
 
 const HEALTH_SNAPSHOT: PlatformHealthSnapshotResponse = {
   schema: "platform.health_snapshot.v1",
-  generated_at: "2026-05-26T00:00:00Z",
+  generatedAt: "2026-05-26T00:00:00Z",
   cards: [
     {
       id: "outbox_backlog",
@@ -61,11 +61,11 @@ const HEALTH_SNAPSHOT: PlatformHealthSnapshotResponse = {
       status: "OK",
       metric: { value: 42, unit: "rows", label: "pending" },
       thresholds: { warn: 100, crit: 1000 },
-      last_checked_at: "2026-05-26T00:00:00Z",
+      lastCheckedAt: "2026-05-26T00:00:00Z",
       source: "IN_PROCESS",
-      drill: { kind: "admin_route", target: "/admin/notifications" },
+      drill: { kind: "ADMIN_ROUTE", target: "/admin/notifications" },
       reason: null,
-      deploy_strip: null,
+      deployStrip: null,
     },
     {
       id: "kafka_consumer_lag",
@@ -73,11 +73,11 @@ const HEALTH_SNAPSHOT: PlatformHealthSnapshotResponse = {
       status: "WARN",
       metric: { value: 75, unit: "records", label: "max across partitions" },
       thresholds: { warn: 50, crit: 500 },
-      last_checked_at: "2026-05-26T00:00:00Z",
+      lastCheckedAt: "2026-05-26T00:00:00Z",
       source: "PROMETHEUS",
       drill: null,
       reason: null,
-      deploy_strip: null,
+      deployStrip: null,
     },
     {
       id: "redis",
@@ -85,11 +85,76 @@ const HEALTH_SNAPSHOT: PlatformHealthSnapshotResponse = {
       status: "UNKNOWN",
       metric: null,
       thresholds: { warn: 1, crit: 50 },
-      last_checked_at: "2026-05-26T00:00:00Z",
+      lastCheckedAt: "2026-05-26T00:00:00Z",
       source: "IN_PROCESS",
       drill: null,
       reason: "redis_metrics_unavailable",
-      deploy_strip: null,
+      deployStrip: null,
+    },
+    {
+      id: "db_pool",
+      title: "DB pool",
+      status: "OK",
+      metric: { value: 3, unit: "connections", label: "active" },
+      thresholds: { warn: 8, crit: 12 },
+      lastCheckedAt: "2026-05-26T00:00:00Z",
+      source: "IN_PROCESS",
+      drill: null,
+      reason: null,
+      deployStrip: null,
+    },
+    {
+      id: "notification_dispatch_success",
+      title: "Notification dispatch success",
+      status: "OK",
+      metric: { value: 0.997, unit: "ratio", label: "last 5m" },
+      thresholds: { warn: 0.95, crit: 0.9 },
+      lastCheckedAt: "2026-05-26T00:00:00Z",
+      source: "PROMETHEUS",
+      drill: { kind: "ADMIN_ROUTE", target: "/admin/notifications" },
+      reason: null,
+      deployStrip: null,
+    },
+    {
+      id: "ai_provider_availability",
+      title: "AI provider availability",
+      status: "OK",
+      metric: { value: 1, unit: "ratio", label: "last 5m" },
+      thresholds: { warn: 0.98, crit: 0.9 },
+      lastCheckedAt: "2026-05-26T00:00:00Z",
+      source: "PROMETHEUS",
+      drill: { kind: "ADMIN_ROUTE", target: "/admin/ai-ops" },
+      reason: null,
+      deployStrip: null,
+    },
+    {
+      id: "deploy_attempts_strip",
+      title: "Deploy attempts",
+      status: "OK",
+      metric: null,
+      thresholds: null,
+      lastCheckedAt: "2026-05-26T00:00:00Z",
+      source: "FILE",
+      drill: null,
+      reason: null,
+      deployStrip: [
+        {
+          attemptId: "deploy-dev-001",
+          startedAt: "2026-05-26T00:00:00Z",
+          endedAt: "2026-05-26T00:02:00Z",
+          finalStatus: "SUCCEEDED",
+          imageTag: "readmates-api:dev-20260526",
+          durationSeconds: 120,
+        },
+        {
+          attemptId: "deploy-dev-000",
+          startedAt: "2026-05-25T23:00:00Z",
+          endedAt: "2026-05-25T23:01:30Z",
+          finalStatus: "FAILED",
+          imageTag: "readmates-api:previous",
+          durationSeconds: 90,
+        },
+      ],
     },
   ],
 };
@@ -106,8 +171,16 @@ test("operator views /admin/health grid", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Outbox backlog" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Kafka consumer lag" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Redis" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "DB pool" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Notification dispatch success" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "AI provider availability" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "최근 deploy" })).toBeVisible();
+  await expect(page.getByText("readmates-api:dev-20260526")).toBeVisible();
   await expect(page.getByText("redis_metrics_unavailable")).toBeVisible();
   await expect(
     page.locator("article", { hasText: "Outbox backlog" }).getByRole("link", { name: /자세히/ }),
   ).toHaveAttribute("href", "/admin/notifications");
+  await expect(page.getByRole("button", { name: "새로고침" })).toBeVisible();
+  await page.getByRole("button", { name: "새로고침" }).click();
+  await expect(page.getByText(/NaN/)).toHaveCount(0);
 });
