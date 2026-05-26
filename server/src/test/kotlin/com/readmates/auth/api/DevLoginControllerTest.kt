@@ -73,6 +73,24 @@ class DevLoginControllerTest(
     }
 
     @Test
+    fun `logs in seeded platform admin by email`() {
+        mockMvc
+            .post("/api/dev/login") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"admin-owner@example.com"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.authenticated") { value(true) }
+                jsonPath("$.email") { value("admin-owner@example.com") }
+                jsonPath("$.role") { value(null) }
+                jsonPath("$.membershipId") { value(null) }
+                jsonPath("$.platformAdmin.role") { value("OWNER") }
+                jsonPath("$.platformAdmin.email") { value("admin-owner@example.com") }
+                jsonPath("$.recommendedAppEntryUrl") { value("/admin") }
+            }
+    }
+
+    @Test
     fun `rejects unknown email`() {
         mockMvc
             .post("/api/dev/login") {
@@ -171,6 +189,55 @@ class DevLoginControllerTest(
                 jsonPath("$.displayName") { value("호스트") }
                 jsonPath("$.accountName") { value("김호스트") }
                 jsonPath("$.shortName") { doesNotExist() }
+            }
+    }
+
+    @Test
+    fun `persists platform admin dev login session for auth me`() {
+        val session =
+            mockMvc
+                .post("/api/dev/login") {
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"email":"admin-owner@example.com"}"""
+                }.andExpect {
+                    status { isOk() }
+                }.andReturn()
+                .request
+                .session as MockHttpSession
+
+        mockMvc
+            .get("/api/auth/me") {
+                this.session = session
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.authenticated") { value(true) }
+                jsonPath("$.email") { value("admin-owner@example.com") }
+                jsonPath("$.role") { value(null) }
+                jsonPath("$.membershipId") { value(null) }
+                jsonPath("$.platformAdmin.role") { value("OWNER") }
+                jsonPath("$.recommendedAppEntryUrl") { value("/admin") }
+            }
+    }
+
+    @Test
+    fun `platform admin dev login session can access admin api`() {
+        val session =
+            mockMvc
+                .post("/api/dev/login") {
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"email":"admin-owner@example.com"}"""
+                }.andExpect {
+                    status { isOk() }
+                }.andReturn()
+                .request
+                .session as MockHttpSession
+
+        mockMvc
+            .get("/api/admin/summary") {
+                this.session = session
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.platformRole") { value("OWNER") }
             }
     }
 

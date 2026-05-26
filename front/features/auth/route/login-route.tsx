@@ -5,6 +5,7 @@ import { oauthHrefForReturnTo, safeRelativeReturnTo } from "@/shared/auth/login-
 
 const devAccounts: DevAccount[] = [
   { label: "김호스트 · 호스트", email: "host@example.com" },
+  { label: "플랫폼 관리자 · OWNER", email: "admin-owner@example.com", defaultRedirectPath: "/admin" },
   { label: "안멤버1", email: "member1@example.com" },
   { label: "최멤버2", email: "member2@example.com" },
   { label: "김멤버3", email: "member3@example.com" },
@@ -42,14 +43,14 @@ function loginReturnTo(search: string) {
 
 export function LoginRouteContent() {
   const returnTo = loginReturnTo(globalThis.location.search);
-  const loginAsDevAccount = useCallback(async (email: string) => {
+  const loginAsDevAccount = useCallback(async (email: string, defaultRedirectPath?: string) => {
     const response = await submitDevLogin(email);
 
     if (!response.ok) {
       throw new Error(`Dev login failed: ${response.status}`);
     }
 
-    globalThis.location.assign(returnTo ?? "/app");
+    globalThis.location.assign(returnTo ?? defaultRedirectPath ?? "/app");
   }, [returnTo]);
 
   return (

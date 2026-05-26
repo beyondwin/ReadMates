@@ -65,8 +65,9 @@ describe("LoginRoute", () => {
     expect(screen.getByRole("link", { name: "시작하기" })).toBeInTheDocument();
     expect(screen.getByText("Local development only")).toBeInTheDocument();
     expect(screen.getByText("프로덕션 제외")).toBeInTheDocument();
-    expect(screen.getByText(/실제 멤버 로그인은 위 Google OAuth 경로를 사용합니다/)).toBeInTheDocument();
+    expect(screen.getByText(/실제 운영 로그인은 위 Google OAuth 경로를 사용합니다/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "김호스트 · 호스트" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "플랫폼 관리자 · OWNER" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "안멤버1" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "최멤버2" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "김멤버3" })).toBeInTheDocument();
@@ -103,6 +104,34 @@ describe("LoginRoute", () => {
     expect(headers).toBeInstanceOf(Headers);
     expect((headers as Headers).get("Content-Type")).toBe("application/json");
     expect(assignMock).toHaveBeenCalledWith("/clubs/reading-sai/app");
+  });
+
+  it("submits admin dev login and enters the admin console by default", async () => {
+    const user = userEvent.setup();
+    const assignMock = vi.fn();
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubEnv("VITE_ENABLE_DEV_LOGIN", "true");
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("location", {
+      assign: assignMock,
+      hash: "",
+      pathname: "/login",
+      search: "",
+    });
+
+    render(<LoginRoute />);
+
+    await user.click(screen.getByRole("button", { name: "플랫폼 관리자 · OWNER" }));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/dev/login",
+      expect.objectContaining({
+        body: JSON.stringify({ email: "admin-owner@example.com" }),
+        cache: "no-store",
+        method: "POST",
+      }),
+    );
+    expect(assignMock).toHaveBeenCalledWith("/admin");
   });
 
   it("shows a specific message when a left member returns from Google login", () => {

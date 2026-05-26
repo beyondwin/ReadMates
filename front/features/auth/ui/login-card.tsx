@@ -4,6 +4,7 @@ import { useState } from "react";
 export type DevAccount = {
   label: string;
   email: string;
+  defaultRedirectPath?: string;
 };
 
 export function LoginCard({
@@ -17,17 +18,17 @@ export function LoginCard({
   googleLoginHref?: string;
   initialError?: string | null;
   showDevLogin?: boolean;
-  onDevLogin?: (email: string) => Promise<void>;
+  onDevLogin?: (email: string, defaultRedirectPath?: string) => Promise<void>;
 }) {
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(initialError);
 
-  const loginAsDevAccount = async (email: string) => {
+  const loginAsDevAccount = async (account: DevAccount) => {
     setError(null);
-    setPendingEmail(email);
+    setPendingEmail(account.email);
 
     try {
-      await onDevLogin?.(email);
+      await onDevLogin?.(account.email, account.defaultRedirectPath);
     } catch {
       setError("로컬 테스트 로그인에 실패했습니다. 백엔드 dev 모드를 확인해 주세요.");
       setPendingEmail(null);
@@ -59,7 +60,7 @@ export function LoginCard({
             <span className="badge badge-warning">프로덕션 제외</span>
           </div>
           <p className="small auth-dev-panel__copy">
-            로컬 fixture 계정으로만 사용하는 개발용 shortcut입니다. 실제 멤버 로그인은 위 Google OAuth 경로를 사용합니다.
+            로컬 fixture 계정으로만 사용하는 개발용 shortcut입니다. 실제 운영 로그인은 위 Google OAuth 경로를 사용합니다.
           </p>
           <div className="auth-card__actions auth-dev-panel__actions">
             {devAccounts.map((account) => (
@@ -68,7 +69,7 @@ export function LoginCard({
                 className="btn btn-ghost btn-sm"
                 type="button"
                 disabled={pendingEmail !== null}
-                onClick={() => void loginAsDevAccount(account.email)}
+                onClick={() => void loginAsDevAccount(account)}
               >
                 {pendingEmail === account.email ? "로그인 중" : account.label}
               </button>

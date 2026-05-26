@@ -3,6 +3,7 @@ package com.readmates.auth.application.port.`in`
 import com.readmates.auth.application.HostMemberListItem
 import com.readmates.auth.application.MemberLifecycleRequest
 import com.readmates.auth.application.MemberLifecycleResponse
+import com.readmates.auth.application.model.DevSeedLoginIdentity
 import com.readmates.auth.application.service.HostInvitationResponse
 import com.readmates.auth.application.service.InvitationPreviewResponse
 import com.readmates.auth.application.service.PendingApprovalAppResponse
@@ -102,4 +103,6 @@ interface GetPendingApprovalUseCase {
 
 interface DevLoginMemberUseCase {
     fun findDevSeedActiveMemberByEmail(email: String): CurrentMember?
+
+    fun findDevSeedLoginIdentityByEmail(email: String): DevSeedLoginIdentity?
 }

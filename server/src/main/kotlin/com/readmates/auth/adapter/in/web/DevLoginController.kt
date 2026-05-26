@@ -1,6 +1,9 @@
 package com.readmates.auth.adapter.`in`.web
 
 import com.readmates.auth.application.port.`in`.DevLoginMemberUseCase
+import com.readmates.auth.domain.MembershipStatus
+import com.readmates.shared.security.CurrentMember
+import com.readmates.shared.security.CurrentUser
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.Valid
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -29,14 +32,23 @@ class DevLoginController(
         @Valid @RequestBody request: DevLoginRequest,
         httpRequest: HttpServletRequest,
     ): AuthMemberResponse {
-        val member =
-            devLoginMember.findDevSeedActiveMemberByEmail(request.email)
+        val identity =
+            devLoginMember.findDevSeedLoginIdentityByEmail(request.email)
                 ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unknown dev login email")
+        val member = identity.member
+        val principal = member ?: CurrentUser(userId = identity.userId, email = identity.email)
+        val authorities = mutableListOf<SimpleGrantedAuthority>()
+        if (member != null) {
+            authorities += SimpleGrantedAuthority(member.roleAuthority())
+        }
+        if (identity.platformAdmin != null) {
+            authorities += SimpleGrantedAuthority("ROLE_PLATFORM_ADMIN")
+        }
         val authentication =
             UsernamePasswordAuthenticationToken(
-                member.email,
+                principal,
                 "N/A",
-                listOf(SimpleGrantedAuthority("ROLE_${member.role}")),
+                authorities,
             )
         val securityContext = SecurityContextHolder.createEmptyContext()
         securityContext.authentication = authentication
@@ -46,7 +58,15 @@ class DevLoginController(
             securityContext,
         )
 
-        return AuthMemberResponse.from(member)
+        return if (member != null) {
+            AuthMemberResponse.from(member, platformAdmin = identity.platformAdmin)
+        } else {
+            AuthMemberResponse.authenticatedUser(
+                userId = identity.userId,
+                email = identity.email,
+                platformAdmin = identity.platformAdmin,
+            )
+        }
     }
 
     @PostMapping("/logout")
@@ -55,4 +75,11 @@ class DevLoginController(
         SecurityContextHolder.clearContext()
         httpRequest.getSession(false)?.invalidate()
     }
+
+    private fun CurrentMember.roleAuthority(): String =
+        if (membershipStatus == MembershipStatus.VIEWER) {
+            "ROLE_VIEWER"
+        } else {
+            "ROLE_$role"
+        }
 }

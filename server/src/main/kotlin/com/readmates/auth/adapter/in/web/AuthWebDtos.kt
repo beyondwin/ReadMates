@@ -51,7 +51,7 @@ data class AuthMemberResponse(
                 currentMembership = currentMembership,
                 joinedClubs = joined,
                 platformAdmin = platformAdmin?.let(AuthPlatformAdmin::from),
-                recommendedAppEntryUrl = recommendedAppEntryUrl(joined),
+                recommendedAppEntryUrl = recommendedAppEntryUrl(joined, platformAdmin),
                 approvalState = currentMembership.approvalState,
             )
         }
@@ -84,12 +84,18 @@ data class AuthMemberResponse(
                 currentMembership = null,
                 joinedClubs = joined,
                 platformAdmin = platformAdmin?.let(AuthPlatformAdmin::from),
-                recommendedAppEntryUrl = recommendedAppEntryUrl(joined),
+                recommendedAppEntryUrl = recommendedAppEntryUrl(joined, platformAdmin),
                 approvalState = ApprovalState.INACTIVE,
             )
         }
 
-        private fun recommendedAppEntryUrl(joinedClubs: List<AuthJoinedClub>): String? {
+        private fun recommendedAppEntryUrl(
+            joinedClubs: List<AuthJoinedClub>,
+            platformAdmin: CurrentPlatformAdmin?,
+        ): String? {
+            if (platformAdmin != null) {
+                return "/admin"
+            }
             val usable =
                 joinedClubs.filter {
                     it.status in setOf(MembershipStatus.VIEWER, MembershipStatus.ACTIVE, MembershipStatus.SUSPENDED)

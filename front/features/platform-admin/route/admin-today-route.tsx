@@ -37,6 +37,8 @@ export function AdminTodayRoute() {
         clubId: club.clubId,
         slug: club.slug,
         name: club.name,
+        tagline: club.tagline,
+        about: club.about,
         status: club.status,
         publicVisibility: club.publicVisibility,
         domainCount: club.domainCount,

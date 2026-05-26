@@ -1,5 +1,6 @@
 package com.readmates.auth.adapter.out.persistence
 
+import com.readmates.auth.application.model.DevSeedLoginIdentity
 import com.readmates.auth.application.port.out.DevSeedMemberLookupPort
 import com.readmates.auth.application.port.out.GoogleAccountStorePort
 import com.readmates.auth.application.port.out.MemberAccountDuplicateException
@@ -35,6 +36,40 @@ class JdbcMemberAccountAdapter(
             return null
         }
         return queryActiveMemberByEmail(normalizedEmail)
+    }
+
+    override fun findDevSeedLoginIdentityByEmail(email: String): DevSeedLoginIdentity? {
+        val normalizedEmail = email.trim().lowercase(Locale.ROOT)
+        if (normalizedEmail !in DEV_SEED_EMAILS) {
+            return null
+        }
+
+        val member = queryActiveMemberByEmail(normalizedEmail)
+        return member
+            ?.let {
+                DevSeedLoginIdentity(
+                    userId = it.userId,
+                    email = it.email,
+                    member = it,
+                    platformAdmin = findPlatformAdmin(it.userId),
+                )
+            }
+            ?: findDevSeedPlatformAdminIdentity(normalizedEmail)
+    }
+
+    private fun findDevSeedPlatformAdminIdentity(normalizedEmail: String): DevSeedLoginIdentity? {
+        val user = queryUserByEmail(normalizedEmail)
+        val platformAdmin = user?.let { findPlatformAdmin(it.userId) }
+        return if (user != null && platformAdmin != null) {
+            DevSeedLoginIdentity(
+                userId = user.userId,
+                email = user.email,
+                member = null,
+                platformAdmin = platformAdmin,
+            )
+        } else {
+            null
+        }
     }
 
     companion object {
@@ -500,6 +535,30 @@ class JdbcMemberAccountAdapter(
                 limit 1
                 """.trimIndent(),
                 { resultSet, _ -> resultSet.toCurrentMember() },
+                normalizedEmail,
+            ).firstOrNull()
+    }
+
+    private fun queryUserByEmail(email: String): CurrentUser? {
+        val normalizedEmail = email.trim().lowercase(Locale.ROOT)
+        if (normalizedEmail.isEmpty()) {
+            return null
+        }
+
+        return jdbcTemplate
+            .query(
+                """
+                select id, email
+                from users
+                where lower(email) = ?
+                limit 1
+                """.trimIndent(),
+                { resultSet, _ ->
+                    CurrentUser(
+                        userId = resultSet.uuid("id"),
+                        email = resultSet.getString("email").lowercase(Locale.ROOT),
+                    )
+                },
                 normalizedEmail,
             ).firstOrNull()
     }

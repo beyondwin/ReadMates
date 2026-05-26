@@ -19,6 +19,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - **deploy:** post-deploy watch가 부모 attempt id를 자식 attempt로 전파하도록 수정해 배포 ledger의 attempt 계보가 정확히 이어집니다 (`deploy/oci/watch-compose-post-deploy.sh`, `deploy/oci/tests/watch-attempt-id.test.sh`).
 - **scripts:** `scripts/pre-push-check.sh`에 `--release`/`READMATES_PRE_PUSH_RELEASE=true` 조건의 `CHANGELOG Unreleased` guard를 추가했습니다. concrete 카테고리 헤더, feature-style bold marker, 두 개 이상 placeholder를 거부합니다. `--no-changelog-check`로 비상 우회하며, branch protection bypass 정책은 [`docs/development/release-management.md`](docs/development/release-management.md)에 함께 문서화했습니다.
 - **docs:** graphify 채택 워크플로(`docs/development/graphify.md`, `.graphifyignore`, `graphify-out/` ignore)를 도입해 아키텍처 질문과 영향도 분석에 scoped graph 탐색을 사용할 수 있게 했습니다. 산출물은 공개 저장소에 push하지 않고 로컬 보조로만 사용합니다.
+- **auth/dev-login:** 로컬 로그인 패널에 platform admin OWNER fixture shortcut을 추가하고, admin-only 계정의 dev session이 `/admin` 진입·`/api/auth/me` 응답·admin API 권한을 모두 보존하도록 auth 응답과 통합 테스트를 보강했습니다. `/admin/today` loader는 AI Ops가 disabled 상태에서 503을 반환해도 나머지 운영 콘솔 데이터를 계속 렌더링합니다.
 - **observability:** wire Prometheus + Alertmanager into OCI compose with SMTP routing.
   Adds `deploy/oci/prometheus/`, `deploy/oci/alertmanager/`, rule files mirroring
   `docs/operations/observability/alerts.md` (notification/http/jvm/security/redis/targets).
