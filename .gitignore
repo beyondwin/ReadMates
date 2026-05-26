@@ -1,12 +1,28 @@
+# =============================================================================
+# OS / filesystem cruft
+# =============================================================================
 .DS_Store
-.worktrees/
-node_modules/
-# Tracked design-system source lives under /design.
-# Keep generated local design exports out of Git if a future task recreates them.
-/design/standalone/
-/design/docs/dist/
-/design/system/dist/
-recode
+**/.DS_Store
+Thumbs.db
+desktop.ini
+._*
+
+# =============================================================================
+# IDE / editor
+# =============================================================================
+.idea/
+*.iml
+.vscode/
+.fleet/
+.cursor/
+*.swp
+*.bak
+*.orig
+*.rej
+
+# =============================================================================
+# Secrets and credentials (never commit)
+# =============================================================================
 .env
 .env.*
 *.env
@@ -15,59 +31,91 @@ recode
 !*.env.example
 .dev.vars
 .dev.vars.*
-.playwright-cli
-output
-.superpowers/
-deploy/oci/.deploy-state
-deploy/oci/*.env
-deploy/oci/*.state
-deploy/cloudflare/.deploy-hook.env
 *.pem
 *.key
-*.sql.gz
-*.dump
-.wrangler
-.cloudflare
-.vercel
-.gstack/
-.tmp
-.idea
-.playwright-mcp
-docs/private/
-.server-config/
-.claude/
-.orchestrator/
-.codex-orchestrator/
 
-# Graphify local extraction artifacts
-graphify-out/manifest.json
-graphify-out/cost.json
-graphify-out/cache/
-graphify-out/.graphify_labels.json
-graphify-out/.graphify_root
-graphify-out/GRAPH_REPORT.md
-graphify-out/graph.json
-graphify-out/graph.html
-
-# Logs and local runtime artifacts
-*.log
-*.pid
+# =============================================================================
+# JVM / Gradle (root-level; submodules have their own .gitignore)
+# =============================================================================
+/.gradle/
 *.hprof
 hs_err_pid*
 replay_pid*
 
+# =============================================================================
+# Node / pnpm / front-end build artifacts (root-level safety net)
+# =============================================================================
+node_modules/
+*.tsbuildinfo
+
+# =============================================================================
+# Logs, PIDs, runtime artifacts
+# =============================================================================
+*.log
+*.pid
+
+# =============================================================================
 # Local databases and exports
+# =============================================================================
 *.db
 *.sqlite
 *.sqlite3
+*.sql.gz
+*.dump
 
+# =============================================================================
+# Tooling caches and worktrees
+# =============================================================================
+.worktrees/
+.tmp/
+.gstack/
+.playwright-cli/
+.playwright-mcp/
+.wrangler
+.cloudflare
+.vercel
+.superpowers/
+.claude/
+.orchestrator/
+.codex-orchestrator/
+.waygent/
+.server-config/
+output/
+recode
+
+# Graphify local extraction artifacts
+graphify-out/
+
+# =============================================================================
+# Design system — tracked source lives under /design; ignore local exports
+# =============================================================================
+/design/standalone/
+/design/docs/dist/
+/design/system/dist/
+
+# =============================================================================
+# Deploy state (never commit live infra state)
+# =============================================================================
+deploy/oci/.deploy-state
+deploy/oci/*.env
+deploy/oci/*.state
+deploy/cloudflare/.deploy-hook.env
+
+# =============================================================================
+# Docs — private working notes
+# =============================================================================
+docs/private/
+
+# =============================================================================
 # Local session import drafts
+# =============================================================================
 /readmates-session-*-import.json
 /readmates-session-*-import.txt
 /session-*-feedback.md
 /session-*-feedback.txt
 
+# =============================================================================
 # Local-only Spring profiles
+# =============================================================================
 application-local.*
 application-*.local.*
-.waygent

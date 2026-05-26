@@ -7,6 +7,8 @@ cd "$(git rev-parse --show-toplevel)"
 # without requiring real credentials.
 tmp="$(mktemp)"
 trap 'rm -f "$tmp"' EXIT
+# shellcheck disable=SC2016
+# Intentional: ${VAR} is literal sed search text, not a shell expansion.
 sed -e 's|\${READMATES_ALERT_SMTP_HOST}|smtp.example.com|g' \
     -e 's|\${READMATES_ALERT_SMTP_PORT}|587|g' \
     -e 's|\${READMATES_ALERT_SMTP_FROM}|alerts@example.com|g' \
