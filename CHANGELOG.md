@@ -36,6 +36,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
   notification dispatch success ratio. 10-second `@Scheduled` refresh into an `AtomicReference` cache;
   per-card failures stay isolated (one provider down → that card only is `status=unknown`).
 - Hardened `/admin/health` with a pinned camelCase snapshot contract, seven-card fixture coverage, refresh/stale UI, deploy strip rendering, and isolated provider refresh behavior.
+- **platform-admin:** ship `/admin/audit` as a read-only operating ledger over platform, club, notification replay, and AI audit sources. The route uses safe metadata projection, role-aware masking, cursor pagination, and S8-compatible filter vocabulary without exposing raw provider errors, email bodies, transcripts, or generated result JSON.
 - **platform-admin:** expand the operating console with notification operations, club operations, and support workbench slices.
   `/api/admin/notifications/*` adds read-only ledgers plus OWNER/OPERATOR two-step replay preview/confirm with an audit trail in Flyway V35.
   `/api/admin/clubs/{clubId}/operations` returns aggregate-only readiness, member/session, notification, and AI usage signals without raw member email/body fields.

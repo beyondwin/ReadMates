@@ -16,6 +16,7 @@ Engineering proof portfolio 분기에서는 아래 순서로 server state migrat
 8. `platform-admin/notifications` — 알림 운영 snapshot, event/delivery ledgers, replay preview/confirm mutation을 platform admin query module로 분리합니다.
 9. `platform-admin/club-operations` — 클럽 상세 운영 snapshot을 loader-seeded Query read model로 분리합니다.
 10. `platform-admin/support` — support search, grant ledger, grant create/revoke mutation cache ownership을 support route module로 분리합니다.
+11. `platform-admin/audit` — 통합 감사 ledger를 loader-seeded Query read model로 분리합니다. Filter URL state는 S8 analytics가 재사용할 date range, club scope, source slice, action category, actor role, outcome vocabulary를 따릅니다.
 
 각 migration은 UI 컴포넌트가 API를 직접 호출하지 않는다는 route-first 경계를 유지해야 합니다.
 
@@ -33,6 +34,7 @@ Engineering proof portfolio 분기에서는 아래 순서로 server state migrat
 - `platform-admin/notifications` — admin notification snapshot, event/delivery cursor ledgers, replay preview, and replay confirm are Query-owned
 - `platform-admin/club-operations` — selected club operations snapshot is loader-seeded and Query-owned
 - `platform-admin/support` — support search, active grant ledger, grant create, and revoke invalidation are Query-owned
+- `platform-admin/audit` — platform/club/notification replay/AI audit source를 Query-owned cursor ledger로 조회하고, route loader seeding과 safe metadata detail rendering을 적용합니다.
 
 ## 패턴
 - query: `features/<feature>/queries/<area>-queries.ts` 에 `queryOptions` + `useXxxMutation` export

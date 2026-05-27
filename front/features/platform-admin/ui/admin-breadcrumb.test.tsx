@@ -20,7 +20,7 @@ describe("AdminBreadcrumb", () => {
   });
 
   it("renders coming-soon route with '준비 중' suffix", () => {
-    render(<AdminBreadcrumb routePath="audit" />);
+    render(<AdminBreadcrumb routePath="analytics" />);
     expect(screen.getByText(/준비 중/)).toBeInTheDocument();
   });
 });
