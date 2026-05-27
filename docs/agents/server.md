@@ -37,6 +37,8 @@ Operational Flyway migrations live under `server/src/main/resources/db/mysql/mig
 
 CQRS read/write package split: write-side feature(`auth`, `club`, `session`, `notification`)는 entity와 도메인 invariant를 갖는 `domain/` 패키지와 트랜잭션 mutation을 수행하는 application service를 둡니다. Read-side feature(`note`, `publication`, `archive`)는 `domain/` 없이 `application/model/`의 read DTO와 `JdbcXxxAdapter` 직접 query만 두고, application service에 `@ReadOnlyApplicationService` 마커(`com.readmates.shared.architecture`)를 부착합니다. `feedback`은 문서 업로드 mutation + 조회를 함께 가진 mixed slice이고, `sessionimport`는 preview read path와 commit write path를 함께 가진 mixed slice입니다. 둘 다 read-only marker 미부착입니다. Read-only service는 mutation port(`*SavePort`/`*UpdatePort`/`*DeletePort`/`*WriterPort`/`*StorePort`/`*WritePort` suffix in `*.port.out.*`)와 `@Transactional`을 모두 금지합니다 — `ServerArchitectureBoundaryTest`가 강제합니다. 자세한 컨벤션은 [docs/development/architecture.md](../development/architecture.md)의 "CQRS Read vs Write Package Split" 섹션을 참고합니다.
 
+Recent architecture work classifies server slices as write-side, read-side, ops read-side, or workflow-side. `admin.audit` is read-side, `admin.health` is ops read-side, and `aigen` is workflow-side. Workflow-side slices may orchestrate transactions and side effects, but provider SDKs, Redis, JDBC, Kafka, and mail details stay behind outbound ports/adapters.
+
 Security boundaries:
 
 - Browser traffic should go through Cloudflare/Vite same-origin BFF routes.

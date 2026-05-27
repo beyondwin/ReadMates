@@ -22,12 +22,13 @@ ReadMates는 여러 정기 독서모임의 공개 소개, 멤버 세션 준비, 
 
 `shared/ui`는 재사용 가능한 presentation primitive만 소유하며 `src/app`, `src/pages`, `features`를 import하지 않습니다. Router, route continuity, provider context처럼 app이 소유한 의존성은 app/page/feature route composition에서 주입하거나 shared boundary 밖의 primitive로 옮긴 뒤 사용합니다.
 
-Feature는 가능한 범위에서 `api`, `model`, `route`, `ui`로 나눕니다.
+Feature는 가능한 범위에서 `api`, `queries`, `model`, `route`, `ui`로 나눕니다.
 
 - `features/<name>/api`는 해당 feature의 BFF endpoint 호출과 request/response contract만 담당합니다.
-- `features/<name>/model`은 React, React Router, API client를 import하지 않는 순수 화면 모델 계산만 둡니다.
-- `features/<name>/route`는 loader/action, route error/loading state, API/model 호출, UI props 조립을 담당합니다.
-- `features/<name>/ui`는 props와 callback으로만 렌더링하며 `fetch`, `shared/api`, feature API, route module을 직접 import하지 않습니다.
+- `features/<name>/queries`는 TanStack Query key, `queryOptions`, mutation hook, invalidation policy를 담당합니다. UI와 route module을 import하지 않습니다.
+- `features/<name>/model`은 React, React Router, TanStack Query, API client를 import하지 않는 순수 화면 모델 계산만 둡니다.
+- `features/<name>/route`는 loader/action, route error/loading state, query seeding, API/model 호출, UI props 조립을 담당합니다.
+- `features/<name>/ui`는 props와 callback으로만 렌더링하며 `fetch`, `shared/api`, feature API, feature queries, route module을 직접 import하지 않습니다.
 
 `shared/api/readmates` compatibility module은 제거되었고, feature route/page는 feature-owned API contract 또는 `shared/api` primitive를 사용해야 합니다. `features/*/components`는 `ui`로 이동하지 않은 legacy presentation surface에만 남길 수 있습니다. `ui` directory가 있는 feature에서는 외부 source가 `features/<name>/components`를 public surface처럼 import하지 않습니다. Host feature는 `features/host/ui`가 공개 presentation surface이며, host components legacy public surface는 없습니다.
 
@@ -118,7 +119,7 @@ adapter.in.web
   -> adapter.out.persistence
 ```
 
-현재 full port/outbound adapter chain을 따르는 범위는 `publication`, `archive`, `feedback`, `session`, `note`, `auth`의 운영 API surface, `notification` 운영 slice, `club`의 platform-admin 운영 slice, `admin.audit`의 platform-admin 감사 read slice입니다. Disabled password/password-reset/dev-invitation accept endpoint는 `410 Gone` stub으로 남습니다. Auth의 OAuth filter, success handler, cookie/session 보안 구성은 `auth.infrastructure.security`와 `auth.adapter.in.security`에 따로 둡니다.
+현재 full port/outbound adapter chain을 따르는 범위는 `publication`, `archive`, `feedback`, `session`, `note`, `auth`의 운영 API surface, `notification` 운영 slice, `club`의 platform-admin 운영 slice, `admin.audit`의 platform-admin 감사 read slice, `admin.health`의 ops read slice, `aigen`의 workflow slice입니다. Disabled password/password-reset/dev-invitation accept endpoint는 `410 Gone` stub으로 남습니다. Auth의 OAuth filter, success handler, cookie/session 보안 구성은 `auth.infrastructure.security`와 `auth.adapter.in.security`에 따로 둡니다.
 
 Notification slice는 MySQL `notification_event_outbox`를 이벤트 source of truth로 유지합니다. Relay scheduler가 publish 가능한 row를 Kafka topic `readmates.notification.events.v1`로 발행하고, 같은 Spring Boot 모듈의 Kafka consumer가 이벤트별 수신자를 계산해 멤버 선호도를 적용한 뒤 `notification_deliveries`와 `member_notifications`를 만듭니다. 이메일 발송은 `notification_deliveries`의 `EMAIL` row를 기준으로 재시도 가능한 side effect로 처리하고, in-app 알림은 `member_notifications`가 멤버 inbox source of truth입니다. 이벤트 발행 상태는 `notification_event_outbox`, 채널별 발송/skip 상태는 `notification_deliveries`, 멤버 inbox 상태는 `member_notifications`에 저장합니다.
 
@@ -141,12 +142,12 @@ notification
 
 | 영역 | 현재 패키지 | 역할 |
 | --- | --- | --- |
-| Web/scheduler/Kafka adapter | `publication.adapter.in.web`, `archive.adapter.in.web`, `feedback.adapter.in.web`, `session.adapter.in.web`, `sessionimport.adapter.in.web`, `note.adapter.in.web`, `auth.adapter.in.web`, `notification.adapter.in.web`, `notification.adapter.in.scheduler`, `notification.adapter.in.kafka`, `admin.audit.adapter.in.web`, `shared.adapter.in.web` | HTTP request validation, `CurrentMember` 주입, use case 호출, scheduler trigger, Kafka listener dispatch, response mapping; shared health endpoint |
+| Web/scheduler/Kafka adapter | `publication.adapter.in.web`, `archive.adapter.in.web`, `feedback.adapter.in.web`, `session.adapter.in.web`, `sessionimport.adapter.in.web`, `note.adapter.in.web`, `auth.adapter.in.web`, `notification.adapter.in.web`, `notification.adapter.in.scheduler`, `notification.adapter.in.kafka`, `admin.audit.adapter.in.web`, `admin.health.adapter.in.web`, `aigen.adapter.in.web`, `aigen.adapter.in.messaging`, `shared.adapter.in.web` | HTTP request validation, `CurrentMember` 주입, use case 호출, scheduler trigger, Kafka listener dispatch, response mapping; shared health endpoint |
 | Security adapter/infrastructure | `auth.adapter.in.security`, `auth.infrastructure.security` | Spring Security `Authentication` 해석, OAuth/session filter, cookie/security wiring |
-| Inbound port | `publication.application.port.in`, `archive.application.port.in`, `feedback.application.port.in`, `session.application.port.in`, `sessionimport.application.port.in`, `note.application.port.in`, `auth.application.port.in`, `notification.application.port.in`, `club.application.port.in`, `admin.audit.application.port.in` | controller나 scheduler가 의존하는 use case contract |
-| Application service | `publication.application.service`, `archive.application.service`, `feedback.application.service`, `session.application.service`, `sessionimport.application.service`, `note.application.service`, `auth.application`/`auth.application.service`, `notification.application.service`, `club.application.service`, `admin.audit.application.service` | command/query orchestration과 권한 확인, retryable side effect 처리 |
-| Outbound port | `publication.application.port.out`, `archive.application.port.out`, `feedback.application.port.out`, `session.application.port.out`, `sessionimport.application.port.out`, `note.application.port.out`, `auth.application.port.out`, `notification.application.port.out`, `club.application.port.out`, `admin.audit.application.port.out` | application service가 persistence/mail/HTTP 세부사항 없이 호출하는 contract |
-| Persistence/mail/Kafka/HTTP adapter | `publication.adapter.out.persistence`, `archive.adapter.out.persistence`, `feedback.adapter.out.persistence`, `session.adapter.out.persistence`, `sessionimport.adapter.out.persistence`, `note.adapter.out.persistence`, `auth.adapter.out.persistence`, `club.adapter.out.persistence`, `club.adapter.out.http`, `notification.adapter.out.persistence`, `notification.adapter.out.mail`, `notification.adapter.out.kafka`, `admin.audit.adapter.out.persistence` | JDBC query와 row mapping, domain marker HTTP check, 외부 mail delivery와 Kafka publish 세부 구현을 소유하는 outbound adapter |
+| Inbound port | `publication.application.port.in`, `archive.application.port.in`, `feedback.application.port.in`, `session.application.port.in`, `sessionimport.application.port.in`, `note.application.port.in`, `auth.application.port.in`, `notification.application.port.in`, `club.application.port.in`, `admin.audit.application.port.in`, `admin.health.application.port.in`, `aigen.application.port.in` | controller나 scheduler가 의존하는 use case contract |
+| Application service | `publication.application.service`, `archive.application.service`, `feedback.application.service`, `session.application.service`, `sessionimport.application.service`, `note.application.service`, `auth.application`/`auth.application.service`, `notification.application.service`, `club.application.service`, `admin.audit.application.service`, `admin.health.application.service`, `aigen.application.service` | command/query orchestration과 권한 확인, retryable side effect 처리 |
+| Outbound port | `publication.application.port.out`, `archive.application.port.out`, `feedback.application.port.out`, `session.application.port.out`, `sessionimport.application.port.out`, `note.application.port.out`, `auth.application.port.out`, `notification.application.port.out`, `club.application.port.out`, `admin.audit.application.port.out`, `admin.health.application.port.out`, `aigen.application.port.out` | application service가 persistence/mail/HTTP 세부사항 없이 호출하는 contract |
+| Persistence/mail/Kafka/HTTP adapter | `publication.adapter.out.persistence`, `archive.adapter.out.persistence`, `feedback.adapter.out.persistence`, `session.adapter.out.persistence`, `sessionimport.adapter.out.persistence`, `note.adapter.out.persistence`, `auth.adapter.out.persistence`, `club.adapter.out.persistence`, `club.adapter.out.http`, `notification.adapter.out.persistence`, `notification.adapter.out.mail`, `notification.adapter.out.kafka`, `admin.audit.adapter.out.persistence`, `admin.health.adapter.out`, `aigen.adapter.out.persistence`, `aigen.adapter.out.redis`, `aigen.adapter.out.messaging`, `aigen.adapter.out.llm` | JDBC query와 row mapping, domain marker HTTP check, 외부 provider/mail/Kafka publish 세부 구현을 소유하는 outbound adapter |
 | Redis adapter | `auth.adapter.out.redis`, `publication.adapter.out.redis`, `note.adapter.out.redis`, `aigen.adapter.out.redis`, `shared.adapter.out.redis` | 선택적 Redis rate limit/cache/invalidation, AI generation job handoff/cost counter 구현. application service는 Redis adapter가 아니라 port에만 의존 |
 
 전환된 controller는 legacy repository, `JdbcTemplate`, persistence adapter를 직접 주입받지 않습니다. 인증된 사용자는 controller method에서 `CurrentMember`로 받으며, resolver가 `ResolveCurrentMemberUseCase`를 통해 멤버 정보를 조회합니다.
@@ -155,7 +156,7 @@ notification
 
 Application package는 Spring Web/HTTP type, HTTP client, adapter 구현체에 의존하지 않습니다. Application service는 feature application error를 던지고, HTTP status와 response mapping은 `adapter.in.web`의 controller 또는 error handler가 맡습니다. 외부 HTTP가 필요한 기능은 application outbound port를 정의하고 `adapter.out.http` 구현으로 분리합니다.
 
-아키텍처 경계는 `ServerArchitectureBoundaryTest`에서 강제합니다 (ADR-0002). 이 테스트는 전환된 web adapter가 legacy repository, `JdbcTemplate`, outbound persistence/Redis adapter, Spring Data Redis에 직접 의존하지 않는지, `session`/`publication`/`archive`/`feedback`/`note`/`auth`/`notification`/`club` application package가 adapter, Spring JDBC, Spring DAO, Spring Data Redis, Spring Web/HTTP 세부사항에 의존하지 않는지, domain package가 web/JDBC/persistence 세부사항에 의존하지 않는지 확인합니다.
+아키텍처 경계는 `ServerArchitectureBoundaryTest`에서 강제합니다 (ADR-0002). 이 테스트는 slice registry로 `admin.audit`, `admin.health`, `aigen`을 포함한 전환 surface를 등록하고, 전환된 web adapter가 legacy repository, `JdbcTemplate`, outbound persistence/Redis adapter, Spring Data Redis에 직접 의존하지 않는지, application package가 adapter, Spring JDBC, Spring DAO, Spring Data Redis, Spring Web/HTTP 세부사항에 의존하지 않는지, `aigen.application`이 `CurrentMember` 같은 web/session carrier 대신 application-safe actor value를 사용하는지, domain package가 web/JDBC/persistence 세부사항에 의존하지 않는지 확인합니다.
 
 ## CQRS Read vs Write Package Split
 
@@ -173,9 +174,14 @@ ReadMates 서버는 도메인 패키지를 다음 두 형태로 운영합니다.
 - 도메인 엔티티 없이 query result 모델만 정의
 - `@ReadOnlyApplicationService` 마커로 식별 (`shared/architecture/`)
 
-### Mixed
-- `feedback` — 문서 업로드 mutation + 조회를 함께 보유. 향후 분리 후보지만 현재 단일 service에 응집.
+### Ops Read-side
+- `admin.health` — 운영 상태 snapshot과 deploy ledger를 provider/adapter에서 읽어 aggregate card model로 반환합니다.
+- Mutation surface가 아니며, application service는 provider 결과를 card-local failure로 격리합니다.
+
+### Mixed / Workflow-side
+- `feedback` — 문서 업로드 mutation + 조회를 함께 보유합니다.
 - `sessionimport` — 호스트 세션 편집기의 preview는 검증 전용 read path이고 commit은 공개 요약, 하이라이트, 한줄평, 피드백 문서를 같은 트랜잭션에서 교체하는 write path입니다. `domain/` 없이 application model과 write port로 응집합니다.
+- `aigen` — 외부 LLM provider, Redis job handoff, Kafka worker, commit/recovery orchestration을 포함합니다. Application layer는 provider SDK, Redis, JDBC, Kafka detail이 아니라 outbound port에 의존합니다.
 
 ### 강제 규칙
 - ArchUnit `ServerArchitectureBoundaryTest` 가 다음을 차단:

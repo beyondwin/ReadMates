@@ -25,6 +25,7 @@ Documentation rules:
 - Use placeholders such as `https://api.example.com`, `<db-password>`, and `host@example.com`.
 - Preserve the Korean-first documentation style in current docs.
 - Prefer small factual patches over broad rewrites unless the user asks for a rewrite.
+- Architecture flexibility changes should keep `docs/development/architecture.md`, ADR-0002, ADR-0003, `docs/agents/front.md`, and `docs/agents/server.md` aligned with the boundary tests that enforce the rule.
 - For CHANGELOG, release-readiness, or residual-risk review work, use `docs/development/release-readiness-review.md` and do not treat passing tests as sufficient evidence that release or operational risk is closed.
 - If docs describe frontend, server, or UI rules in detail, read the matching surface guide before changing those claims.
 - For unstable external facts such as product limits, pricing, APIs, laws, or platform behavior, verify against current official sources or clearly state that the fact was not revalidated.

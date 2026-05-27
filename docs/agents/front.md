@@ -27,9 +27,10 @@ src/app -> src/pages -> features -> shared
 - `src/app`: router, layouts, guards, providers, route continuity.
 - `src/pages`: thin route compatibility shells; delegate to feature route modules.
 - `features/<name>/api`: BFF calls and request/response contracts.
+- `features/<name>/queries`: TanStack Query keys, `queryOptions`, mutation hooks, and invalidation policy; do not import UI, route, app, or page modules.
 - `features/<name>/model`: pure calculation/mapping; no React, router, fetch, or API client imports.
 - `features/<name>/route`: loader/action behavior, API/model calls, route state, UI prop assembly.
-- `features/<name>/ui`: render from props/callbacks only; no `fetch`, `shared/api`, feature API, or route imports.
+- `features/<name>/ui`: render from props/callbacks only; no `fetch`, `shared/api`, feature API, feature queries, or route imports.
 - `shared`: reusable primitives; do not import feature/page/app code.
 - `functions`: Cloudflare Pages Functions for same-origin BFF and OAuth proxy routes; never expose BFF secrets through `VITE_*`.
 
