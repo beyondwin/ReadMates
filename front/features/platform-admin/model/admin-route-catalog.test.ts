@@ -54,6 +54,7 @@ describe("ADMIN_ROUTES catalog", () => {
     const ready = ADMIN_ROUTES.filter((route) => route.status === "ready");
     expect(ready.map((route) => route.path).sort()).toEqual([
       "ai-ops",
+      "audit",
       "clubs",
       "health",
       "notifications",

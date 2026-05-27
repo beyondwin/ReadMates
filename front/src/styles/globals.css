@@ -1055,6 +1055,121 @@
   overflow-wrap: anywhere;
 }
 
+.admin-audit {
+  display: grid;
+  gap: 24px;
+  max-width: 1160px;
+}
+
+.admin-audit__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.admin-audit__timestamp,
+.admin-audit__slice,
+.admin-audit__row-time {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.admin-audit__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-audit__partial,
+.admin-audit__error,
+.admin-audit__loading {
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  margin: 0;
+  padding: 14px 16px;
+}
+
+.admin-audit__partial,
+.admin-audit__loading {
+  background: var(--bg-sub);
+}
+
+.admin-audit__error {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.admin-audit__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.8fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.admin-audit__rows,
+.admin-audit__detail {
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  background: var(--bg);
+}
+
+.admin-audit__rows {
+  display: grid;
+  overflow: hidden;
+}
+
+.admin-audit__row {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 14px 16px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.admin-audit__row:hover,
+.admin-audit__row:focus-visible {
+  background: var(--bg-sub);
+}
+
+.admin-audit__row-main {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-audit__detail {
+  position: sticky;
+  top: 16px;
+  padding: 20px;
+}
+
+.admin-audit__metadata {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0 0;
+}
+
+.admin-audit__metadata div {
+  display: grid;
+  grid-template-columns: minmax(112px, 0.4fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.admin-audit__metadata dt {
+  color: var(--muted);
+}
+
+.admin-audit__metadata dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .admin-club-operations {
   display: grid;
   gap: 18px;
@@ -2308,6 +2423,23 @@
   .admin-notifications__row {
     grid-template-columns: 1fr;
     align-items: start;
+  }
+
+  .admin-audit__header {
+    display: grid;
+  }
+
+  .admin-audit__body {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-audit__row {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .admin-audit__detail {
+    position: static;
   }
 
   .admin-club-operations__header,

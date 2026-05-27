@@ -35,7 +35,9 @@ describe("AdminLayoutNav", () => {
   it("does not show 준비 중 pill on ready routes", () => {
     renderNav({});
     const todayLink = screen.getByRole("link", { name: /오늘/ });
+    const auditLink = screen.getByRole("link", { name: /감사/ });
     expect(todayLink.textContent).not.toContain("준비 중");
+    expect(auditLink.textContent).not.toContain("준비 중");
   });
 
   it("marks the active route with aria-current=page", () => {

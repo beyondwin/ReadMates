@@ -84,19 +84,8 @@ export const ADMIN_ROUTES: ReadonlyArray<AdminRouteDescriptor> = [
     group: "review",
     groupLabel: "감사/분석",
     slice: "S7",
-    status: "coming_soon",
+    status: "ready",
     requiredCapability: "view_audit",
-    comingSoon: {
-      title: "Audit / Activity ledger",
-      summary: "platform admin · OWNER · SUPPORT · 클럽 lifecycle · role transition 액션을 시간순 통합 뷰로 봅니다.",
-      bullets: [
-        "actor / club / action / outcome 통합 ledger",
-        "club · role · actor 필터",
-        "출처 slice 표기 (S2/S3/S4/S5 어떤 작업이었는지)",
-        "마스킹 정책 일관 적용",
-      ],
-      docHref: `${UMBRELLA_DOC}#s7--audit--activity-ledger-통합`,
-    },
   },
   {
     path: "analytics",
