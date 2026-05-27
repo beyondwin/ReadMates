@@ -1,12 +1,12 @@
 package com.readmates.sessionimport.application.model
 
 import com.readmates.session.application.SessionRecordVisibility
-import com.readmates.shared.security.CurrentMember
+import com.readmates.shared.security.AuthenticatedClubActor
 import java.time.LocalDate
 import java.util.UUID
 
 data class SessionImportCommand(
-    val host: CurrentMember,
+    val host: AuthenticatedClubActor,
     val sessionId: UUID,
     val recordVisibility: SessionRecordVisibility,
     val format: String,

@@ -1,13 +1,13 @@
 package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.AiGenerationException
+import com.readmates.aigen.application.model.AiGenerationActor
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.port.`in`.JobNotFoundException
 import com.readmates.aigen.application.port.out.AuditKind
 import com.readmates.aigen.application.port.out.AuditStatus
-import com.readmates.auth.domain.MembershipRole
 import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.sessionimport.application.model.SessionImportCommand
 import com.readmates.sessionimport.application.model.SessionImportCommitResult
@@ -18,7 +18,6 @@ import com.readmates.sessionimport.application.model.SessionImportPublicationPre
 import com.readmates.sessionimport.application.port.`in`.CommitValidatedSessionImportUseCase
 import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportInput
 import com.readmates.sessionimport.application.service.InvalidSessionImportException
-import com.readmates.shared.security.CurrentMember
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -400,16 +399,12 @@ class AiGenerationCommitServiceTest {
 
     private class TestContext {
         val sessionId: UUID = UUID.randomUUID()
-        val host: CurrentMember =
-            CurrentMember(
+        val host: AiGenerationActor =
+            AiGenerationActor(
                 userId = UUID.randomUUID(),
-                membershipId = UUID.randomUUID(),
                 clubId = UUID.randomUUID(),
                 clubSlug = "test-club",
-                email = "host@example.com",
-                displayName = "Host User",
-                accountName = "host",
-                role = MembershipRole.HOST,
+                isHost = true,
             )
 
         val jobStore = FakeJobStore()

@@ -1,6 +1,7 @@
 package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.AiGenerationException
+import com.readmates.aigen.application.model.AiGenerationActor
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
@@ -25,7 +26,6 @@ import com.readmates.sessionimport.application.model.SessionImportSessionCommand
 import com.readmates.sessionimport.application.port.`in`.CommitValidatedSessionImportUseCase
 import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportInput
 import com.readmates.sessionimport.application.service.InvalidSessionImportException
-import com.readmates.shared.security.CurrentMember
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
@@ -59,7 +59,7 @@ class AiGenerationCommitService(
 ) : CommitGenerationUseCase {
     @Suppress("SwallowedException")
     override fun commit(
-        host: CurrentMember,
+        host: AiGenerationActor,
         sessionId: UUID,
         jobId: UUID,
         recordVisibility: SessionRecordVisibility,
@@ -219,7 +219,7 @@ class AiGenerationCommitService(
     }
 
     private fun toSessionImportCommand(
-        host: CurrentMember,
+        host: AiGenerationActor,
         snapshot: SessionImportV1Snapshot,
         sessionId: UUID,
         visibility: SessionRecordVisibility,

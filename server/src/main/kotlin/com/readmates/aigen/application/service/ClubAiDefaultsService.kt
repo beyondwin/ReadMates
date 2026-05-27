@@ -1,6 +1,7 @@
 package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.AiGenerationException
+import com.readmates.aigen.application.model.AiGenerationActor
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
@@ -10,7 +11,6 @@ import com.readmates.aigen.application.port.`in`.UpdateClubAiDefaultsUseCase
 import com.readmates.aigen.application.port.out.AiGenerationClubDefaultPort
 import com.readmates.aigen.application.port.out.ModelCatalog
 import com.readmates.shared.security.AccessDeniedException
-import com.readmates.shared.security.CurrentMember
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Service
 
@@ -20,7 +20,7 @@ import org.springframework.stereotype.Service
  *
  * Authorization:
  *  - The caller must be an active HOST.
- *  - The caller's [CurrentMember.clubSlug] must match the path's `clubSlug`.
+ *  - The caller's actor club slug must match the path's `clubSlug`.
  * Both checks throw [AccessDeniedException], which the REST advice maps to
  * HTTP 403.
  *
@@ -39,19 +39,19 @@ class ClubAiDefaultsService(
     UpdateClubAiDefaultsUseCase {
     override fun get(
         clubSlug: String,
-        member: CurrentMember,
+        actor: AiGenerationActor,
     ): ClubAiDefaultsView {
-        requireHostOfClub(clubSlug, member)
-        val row = clubDefaultPort.load(member.clubId)
+        requireHostOfClub(clubSlug, actor)
+        val row = clubDefaultPort.load(actor.clubId)
         return ClubAiDefaultsView(defaultModel = row?.defaultModel)
     }
 
     override fun update(
         clubSlug: String,
         defaultModel: String,
-        member: CurrentMember,
+        actor: AiGenerationActor,
     ) {
-        requireHostOfClub(clubSlug, member)
+        requireHostOfClub(clubSlug, actor)
         val resolved =
             resolveAllowlistedModel(defaultModel)
                 ?: throw AiGenerationException.Coded(
@@ -59,17 +59,17 @@ class ClubAiDefaultsService(
                     "model '$defaultModel' is not allowlisted",
                 )
         clubDefaultPort.upsert(
-            clubId = member.clubId,
+            clubId = actor.clubId,
             defaultModel = resolved.name,
-            updatedBy = member.userId,
+            updatedBy = actor.userId,
         )
     }
 
     private fun requireHostOfClub(
         clubSlug: String,
-        member: CurrentMember,
+        actor: AiGenerationActor,
     ) {
-        if (member.clubSlug != clubSlug || !member.isHost) {
+        if (actor.clubSlug != clubSlug || !actor.isHost) {
             throw AccessDeniedException("Host of '$clubSlug' required")
         }
     }

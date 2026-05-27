@@ -1,7 +1,9 @@
 package com.readmates.aigen.adapter.`in`.web
 
 import com.readmates.aigen.application.AiGenerationException
+import com.readmates.aigen.application.model.AiGenerationActor
 import com.readmates.aigen.application.model.ErrorCode
+import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.port.`in`.ClubAiDefaultsView
 import com.readmates.aigen.application.port.`in`.GetClubAiDefaultsUseCase
 import com.readmates.aigen.application.port.`in`.UpdateClubAiDefaultsUseCase
@@ -59,6 +61,7 @@ class ClubAiDefaultsControllerTest {
                 ClubAiDefaultsController(
                     getUc = getUseCase,
                     updateUc = updateUseCase,
+                    auth = FakeAuthPolicy(),
                     props = props,
                 ),
             ).setControllerAdvice(AiGenerationErrorHandler())
@@ -182,7 +185,7 @@ class ClubAiDefaultsControllerTest {
 
         override fun get(
             clubSlug: String,
-            member: CurrentMember,
+            actor: AiGenerationActor,
         ): ClubAiDefaultsView {
             error?.let { throw it }
             return view
@@ -196,11 +199,18 @@ class ClubAiDefaultsControllerTest {
         override fun update(
             clubSlug: String,
             defaultModel: String,
-            member: CurrentMember,
+            actor: AiGenerationActor,
         ) {
             error?.let { throw it }
             calls += clubSlug to defaultModel
         }
+    }
+
+    private class FakeAuthPolicy : AiGenerationAuthorizationPolicy {
+        override fun requireHostAccess(
+            sessionId: UUID,
+            member: CurrentMember,
+        ): SessionMeta = error("Session authorization is not used by club defaults endpoints")
     }
 
     private class StubCurrentMemberResolver(

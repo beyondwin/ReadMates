@@ -161,7 +161,7 @@ class AiGenerationController(
         ensureEnabled()
         auth.requireHostAccess(sessionId, member)
         return commitUc.commit(
-            host = member,
+            host = auth.actor(member),
             sessionId = sessionId,
             jobId = jobId,
             recordVisibility = request.recordVisibility,

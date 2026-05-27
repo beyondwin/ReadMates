@@ -4,12 +4,12 @@ import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.sessionimport.application.model.SessionImportFeedbackDocumentCommand
 import com.readmates.sessionimport.application.model.SessionImportRecordPreview
 import com.readmates.sessionimport.application.model.SessionImportTarget
-import com.readmates.shared.security.CurrentMember
+import com.readmates.shared.security.AuthenticatedClubActor
 import java.util.UUID
 
 interface SessionImportWritePort {
     fun loadTarget(
-        host: CurrentMember,
+        host: AuthenticatedClubActor,
         sessionId: UUID,
     ): SessionImportTarget?
 
@@ -17,7 +17,7 @@ interface SessionImportWritePort {
 }
 
 data class SessionImportRecordReplacement(
-    val host: CurrentMember,
+    val host: AuthenticatedClubActor,
     val sessionId: UUID,
     val visibility: SessionRecordVisibility,
     val publicationSummary: String,

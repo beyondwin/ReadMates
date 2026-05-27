@@ -22,30 +22,115 @@ class ServerArchitectureBoundaryTest {
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
             .importPackages("com.readmates")
 
-    private val migratedWebAdapterPackages =
-        arrayOf(
-            "com.readmates.session.adapter.in.web..",
-            "com.readmates.note.adapter.in.web..",
-            "com.readmates.publication.adapter.in.web..",
-            "com.readmates.archive.adapter.in.web..",
-            "com.readmates.feedback.adapter.in.web..",
-            "com.readmates.auth.adapter.in.web..",
-            "com.readmates.notification.adapter.in.web..",
-            "com.readmates.shared.adapter.in.web..",
-            "com.readmates.club.adapter.in.web..",
+    private enum class ServerSliceType {
+        WRITE,
+        READ,
+        OPS_READ,
+        WORKFLOW,
+        SHARED,
+    }
+
+    private data class ServerSlice(
+        val name: String,
+        val type: ServerSliceType,
+        val webAdapterPackages: List<String> = emptyList(),
+        val applicationPackages: List<String> = emptyList(),
+    )
+
+    private val serverSlices =
+        listOf(
+            ServerSlice(
+                name = "session",
+                type = ServerSliceType.WRITE,
+                webAdapterPackages = listOf("com.readmates.session.adapter.in.web.."),
+                applicationPackages = listOf("com.readmates.session.application.."),
+            ),
+            ServerSlice(
+                name = "note",
+                type = ServerSliceType.READ,
+                webAdapterPackages = listOf("com.readmates.note.adapter.in.web.."),
+                applicationPackages = listOf("com.readmates.note.application.."),
+            ),
+            ServerSlice(
+                name = "publication",
+                type = ServerSliceType.READ,
+                webAdapterPackages = listOf("com.readmates.publication.adapter.in.web.."),
+                applicationPackages = listOf("com.readmates.publication.application.."),
+            ),
+            ServerSlice(
+                name = "archive",
+                type = ServerSliceType.READ,
+                webAdapterPackages = listOf("com.readmates.archive.adapter.in.web.."),
+                applicationPackages = listOf("com.readmates.archive.application.."),
+            ),
+            ServerSlice(
+                name = "feedback",
+                type = ServerSliceType.WORKFLOW,
+                webAdapterPackages = listOf("com.readmates.feedback.adapter.in.web.."),
+                applicationPackages = listOf("com.readmates.feedback.application.."),
+            ),
+            ServerSlice(
+                name = "auth",
+                type = ServerSliceType.WRITE,
+                webAdapterPackages = listOf("com.readmates.auth.adapter.in.web.."),
+                applicationPackages = listOf("com.readmates.auth.application.."),
+            ),
+            ServerSlice(
+                name = "notification",
+                type = ServerSliceType.WRITE,
+                webAdapterPackages = listOf("com.readmates.notification.adapter.in.web.."),
+                applicationPackages = listOf("com.readmates.notification.application.."),
+            ),
+            ServerSlice(
+                name = "club",
+                type = ServerSliceType.WRITE,
+                webAdapterPackages = listOf("com.readmates.club.adapter.in.web.."),
+                applicationPackages = listOf("com.readmates.club.application.."),
+            ),
+            ServerSlice(
+                name = "admin.audit",
+                type = ServerSliceType.READ,
+                webAdapterPackages = listOf("com.readmates.admin.audit.adapter.in.web.."),
+                applicationPackages = listOf("com.readmates.admin.audit.application.."),
+            ),
+            ServerSlice(
+                name = "admin.health",
+                type = ServerSliceType.OPS_READ,
+                webAdapterPackages = listOf("com.readmates.admin.health.adapter.in.web.."),
+                applicationPackages = listOf("com.readmates.admin.health.application.."),
+            ),
+            ServerSlice(
+                name = "aigen",
+                type = ServerSliceType.WORKFLOW,
+                webAdapterPackages = listOf("com.readmates.aigen.adapter.in.web.."),
+                applicationPackages = listOf("com.readmates.aigen.application.."),
+            ),
+            ServerSlice(
+                name = "shared",
+                type = ServerSliceType.SHARED,
+                webAdapterPackages = listOf("com.readmates.shared.adapter.in.web.."),
+            ),
         )
 
     private val migratedApplicationPackages =
-        arrayOf(
-            "com.readmates.session.application..",
-            "com.readmates.note.application..",
-            "com.readmates.publication.application..",
-            "com.readmates.archive.application..",
-            "com.readmates.feedback.application..",
-            "com.readmates.auth.application..",
-            "com.readmates.notification.application..",
-            "com.readmates.club.application..",
+        serverSlices
+            .flatMap(ServerSlice::applicationPackages)
+            .toTypedArray()
+
+    private val migratedWebAdapterPackages =
+        serverSlices
+            .flatMap(ServerSlice::webAdapterPackages)
+            .toTypedArray()
+
+    @Test
+    fun `server architecture registry includes recent admin and aigen slices`() {
+        val registered = serverSlices.map(ServerSlice::name).toSet()
+
+        assertTrue(
+            registered.containsAll(setOf("admin.audit", "admin.health", "aigen")),
+            "Server slice registry must include admin.audit, admin.health, and aigen.",
         )
+    }
 
     @Test
     fun `migrated web adapters do not depend on persistence or legacy repositories`() {
@@ -366,6 +451,39 @@ class ServerArchitectureBoundaryTest {
         assertTrue(
             violations.isEmpty(),
             "Application packages must not depend on Spring HTTP/Web/Security types:\n${violations.joinToString("\n")}",
+        )
+    }
+
+    @Test
+    fun `aigen application does not depend on web current member`() {
+        val violations =
+            sourceRoot()
+                .resolve("com/readmates/aigen/application")
+                .takeIf(Files::exists)
+                ?.let { root ->
+                    Files
+                        .walk(root)
+                        .use { paths ->
+                            paths
+                                .filter { it.name.endsWith(".kt") }
+                                .flatMap { sourceFile ->
+                                    sourceFile
+                                        .readLines()
+                                        .mapIndexedNotNull { index, line ->
+                                            if ("CurrentMember" in line) {
+                                                "${sourceFile.relativeTo(sourceRoot())}:${index + 1}: ${line.trim()}"
+                                            } else {
+                                                null
+                                            }
+                                        }.stream()
+                                }.toList()
+                        }
+                } ?: emptyList()
+
+        assertTrue(
+            violations.isEmpty(),
+            "Aigen application code must use application-safe actor values instead of CurrentMember:\n" +
+                violations.joinToString("\n"),
         )
     }
 
