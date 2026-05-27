@@ -1,4 +1,10 @@
 export type {
+  AdminAuditFilters,
+  AdminAuditLedgerItem,
+  AdminAuditLedgerPage,
+} from "@/features/platform-admin/model/platform-admin-audit-model";
+
+export type {
   AdminSupportGrantLedgerItem,
   AdminSupportGrantRequest,
   AdminSupportSearchResult,
