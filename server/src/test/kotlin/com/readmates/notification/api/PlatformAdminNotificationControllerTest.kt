@@ -12,6 +12,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
@@ -31,7 +32,11 @@ class PlatformAdminNotificationControllerTest(
     @AfterEach
     fun cleanup() {
         jdbcTemplate.update("delete from platform_audit_events where actor_user_id = ?", OWNER_USER_ID)
-        jdbcTemplate.update("delete from admin_notification_replay_previews where actor_user_id in (?, ?)", OWNER_USER_ID, SUPPORT_USER_ID)
+        jdbcTemplate.update(
+            "delete from admin_notification_replay_previews where actor_user_id in (?, ?)",
+            OWNER_USER_ID,
+            SUPPORT_USER_ID,
+        )
         jdbcTemplate.update("delete from notification_deliveries where event_id = ?", EVENT_ID)
         jdbcTemplate.update("delete from notification_event_outbox where id = ?", EVENT_ID)
         if (createdSessionTokenHashes.isNotEmpty()) {
@@ -48,6 +53,14 @@ class PlatformAdminNotificationControllerTest(
     fun `owner can inspect snapshot and replay failed delivery without raw recipient exposure`() {
         seedFailedDelivery()
 
+        assertSnapshotVisible()
+        assertDeliverySafe()
+        val replay = previewReplay()
+        confirmReplay(replay)
+        assertReplayWasAudited()
+    }
+
+    private fun assertSnapshotVisible() {
         mockMvc
             .get("/api/admin/notifications/snapshot") {
                 cookie(sessionCookieForUser(OWNER_USER_ID))
@@ -56,7 +69,9 @@ class PlatformAdminNotificationControllerTest(
                 jsonPath("$.generatedAt") { exists() }
                 jsonPath("$.clubHealth[0].slug") { exists() }
             }
+    }
 
+    private fun assertDeliverySafe() {
         mockMvc
             .get("/api/admin/notifications/deliveries?status=DEAD") {
                 cookie(sessionCookieForUser(OWNER_USER_ID))
@@ -71,7 +86,9 @@ class PlatformAdminNotificationControllerTest(
                 assertThat(body).doesNotContain("member1@example.com")
                 assertThat(body.lowercase()).doesNotContain("smtp")
             }
+    }
 
+    private fun previewReplay(): ReplayPreviewIds {
         val previewResult =
             mockMvc
                 .post("/api/admin/notifications/replay-preview") {
@@ -88,15 +105,18 @@ class PlatformAdminNotificationControllerTest(
                 }.andReturn()
         val previewId = previewResult.response.jsonPathValue<String>("$.previewId")
         val selectionHash = previewResult.response.jsonPathValue<String>("$.selectionHash")
+        return ReplayPreviewIds(previewId, selectionHash)
+    }
 
+    private fun confirmReplay(replay: ReplayPreviewIds) {
         mockMvc
             .post("/api/admin/notifications/replay-confirm") {
                 contentType = MediaType.APPLICATION_JSON
                 content =
                     """
                     {
-                      "previewId": "$previewId",
-                      "selectionHash": "$selectionHash",
+                      "previewId": "${replay.previewId}",
+                      "selectionHash": "${replay.selectionHash}",
                       "reason": "Retry failed delivery after provider recovery"
                     }
                     """.trimIndent()
@@ -106,11 +126,18 @@ class PlatformAdminNotificationControllerTest(
                 jsonPath("$.replayedCount") { value(1) }
                 jsonPath("$.skippedCount") { value(0) }
             }
+    }
 
+    private fun assertReplayWasAudited() {
         assertThat(deliveryStatus()).isEqualTo("PENDING")
         assertThat(
             jdbcTemplate.queryForObject(
-                "select count(*) from platform_audit_events where actor_user_id = ? and event_type = 'ADMIN_NOTIFICATION_REPLAY_CONFIRMED'",
+                """
+                select count(*)
+                from platform_audit_events
+                where actor_user_id = ?
+                  and event_type = 'ADMIN_NOTIFICATION_REPLAY_CONFIRMED'
+                """.trimIndent(),
                 Long::class.java,
                 OWNER_USER_ID,
             ),
@@ -200,6 +227,11 @@ class PlatformAdminNotificationControllerTest(
     }
 }
 
-private inline fun <reified T> org.springframework.mock.web.MockHttpServletResponse.jsonPathValue(expression: String): T =
+private data class ReplayPreviewIds(
+    val previewId: String,
+    val selectionHash: String,
+)
+
+private inline fun <reified T> MockHttpServletResponse.jsonPathValue(expression: String): T =
     com.jayway.jsonpath.JsonPath
         .read(contentAsString, expression)

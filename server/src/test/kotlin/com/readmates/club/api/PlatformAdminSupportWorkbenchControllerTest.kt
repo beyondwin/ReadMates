@@ -12,6 +12,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
@@ -132,6 +133,6 @@ class PlatformAdminSupportWorkbenchControllerTest(
     }
 }
 
-private inline fun <reified T> org.springframework.mock.web.MockHttpServletResponse.jsonPathValue(expression: String): T? =
+private inline fun <reified T> MockHttpServletResponse.jsonPathValue(expression: String): T? =
     com.jayway.jsonpath.JsonPath
         .read(contentAsString, expression)

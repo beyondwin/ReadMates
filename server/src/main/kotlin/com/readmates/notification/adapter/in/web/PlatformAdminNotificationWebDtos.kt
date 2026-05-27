@@ -10,7 +10,6 @@ import com.readmates.notification.application.model.AdminNotificationManualDispa
 import com.readmates.notification.application.model.AdminNotificationManualDispatchSummary
 import com.readmates.notification.application.model.AdminNotificationOperationsSnapshot
 import com.readmates.notification.application.model.AdminNotificationOutboxEvent
-import com.readmates.notification.application.model.AdminNotificationRelaySummary
 import com.readmates.notification.application.model.AdminNotificationReplayConfirmResult
 import com.readmates.notification.application.model.AdminNotificationReplayPreview
 import com.readmates.notification.application.model.AdminNotificationStatusSummary
@@ -139,10 +138,17 @@ fun AdminNotificationOperationsSnapshot.toResponse(): AdminNotificationOperation
         generatedAt = generatedAt.toString(),
         outboxSummary = outboxSummary,
         deliverySummary = deliverySummary,
-        relaySummary = relaySummary.toResponse(),
+        relaySummary =
+            AdminNotificationRelaySummaryResponse(
+                relaySummary.publishing,
+                relaySummary.sending,
+                relaySummary.stalePublishing,
+                relaySummary.staleSending,
+            ),
         failureClusters = failureClusters.map(AdminNotificationFailureCluster::toResponse),
         clubHealth = clubHealth.map(AdminNotificationClubHealth::toResponse),
-        recentManualDispatches = recentManualDispatches.map(AdminNotificationManualDispatchSummary::toResponse),
+        recentManualDispatches =
+            recentManualDispatches.map(AdminNotificationManualDispatchSummary::toResponse),
     )
 
 fun AdminNotificationOutboxEvent.toResponse(): AdminNotificationOutboxEventResponse =
@@ -188,14 +194,19 @@ fun AdminNotificationReplayPreview.toResponse(): AdminNotificationReplayPreviewR
 fun AdminNotificationReplayConfirmResult.toResponse(): AdminNotificationReplayConfirmResponse =
     AdminNotificationReplayConfirmResponse(replayedCount, skippedCount, selectionHash)
 
-private fun AdminNotificationRelaySummary.toResponse(): AdminNotificationRelaySummaryResponse =
-    AdminNotificationRelaySummaryResponse(publishing, sending, stalePublishing, staleSending)
-
 private fun AdminNotificationFailureCluster.toResponse(): AdminNotificationFailureClusterResponse =
     AdminNotificationFailureClusterResponse(safeErrorCode, status, count, latestAt?.toString())
 
 private fun AdminNotificationClubHealth.toResponse(): AdminNotificationClubHealthResponse =
-    AdminNotificationClubHealthResponse(clubId.toString(), slug, name, pending, failed, dead, lastSuccessAt?.toString())
+    AdminNotificationClubHealthResponse(
+        clubId.toString(),
+        slug,
+        name,
+        pending,
+        failed,
+        dead,
+        lastSuccessAt?.toString(),
+    )
 
 private fun AdminNotificationManualDispatchSummary.toResponse(): AdminNotificationManualDispatchSummaryResponse =
     AdminNotificationManualDispatchSummaryResponse(

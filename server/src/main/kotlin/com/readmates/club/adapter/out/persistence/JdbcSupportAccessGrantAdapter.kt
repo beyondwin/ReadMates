@@ -167,7 +167,7 @@ class JdbcSupportAccessGrantAdapter(
             clubId?.dbString(),
             granteeUserId?.dbString(),
             granteeUserId?.dbString(),
-            limit.coerceIn(1, 100),
+            limit.coerceIn(1, MAX_GRANT_LEDGER_LIMIT),
         )
 
     override fun hasActiveGrant(
@@ -205,43 +205,43 @@ class JdbcSupportAccessGrantAdapter(
                 ::mapGrant,
                 grantId.dbString(),
             ).firstOrNull()
-
-    private fun mapGrant(
-        rs: ResultSet,
-        @Suppress("UNUSED_PARAMETER") rowNum: Int,
-    ): SupportAccessGrant =
-        SupportAccessGrant(
-            id = rs.uuid("id"),
-            clubId = rs.uuid("club_id"),
-            grantedByUserId = rs.uuid("granted_by_user_id"),
-            granteeUserId = rs.uuid("grantee_user_id"),
-            scope = SupportAccessGrantScope.valueOf(rs.getString("scope")),
-            reason = rs.getString("reason"),
-            expiresAt = rs.utcOffsetDateTime("expires_at"),
-            revokedAt = rs.utcOffsetDateTimeOrNull("revoked_at"),
-            createdAt = rs.utcOffsetDateTime("created_at"),
-        )
-
-    private fun mapLedgerItem(
-        rs: ResultSet,
-        @Suppress("UNUSED_PARAMETER") rowNum: Int,
-    ): AdminSupportGrantLedgerItem =
-        AdminSupportGrantLedgerItem(
-            grantId = rs.uuid("id"),
-            clubId = rs.uuid("club_id"),
-            clubName = rs.getString("club_name"),
-            granteeUserId = rs.uuid("grantee_user_id"),
-            granteeDisplayName = rs.getString("grantee_display_name"),
-            granteeMaskedEmail = maskEmail(rs.getString("grantee_email")),
-            scope = SupportAccessGrantScope.valueOf(rs.getString("scope")),
-            reason = rs.getString("reason"),
-            expiresAt = rs.utcOffsetDateTime("expires_at"),
-            createdAt = rs.utcOffsetDateTime("created_at"),
-            revokedAt = rs.utcOffsetDateTimeOrNull("revoked_at"),
-            status = rs.getString("grant_status"),
-            createdByRole = rs.getString("created_by_role") ?: "UNKNOWN",
-        )
 }
+
+private fun mapGrant(
+    rs: ResultSet,
+    @Suppress("UNUSED_PARAMETER") rowNum: Int,
+): SupportAccessGrant =
+    SupportAccessGrant(
+        id = rs.uuid("id"),
+        clubId = rs.uuid("club_id"),
+        grantedByUserId = rs.uuid("granted_by_user_id"),
+        granteeUserId = rs.uuid("grantee_user_id"),
+        scope = SupportAccessGrantScope.valueOf(rs.getString("scope")),
+        reason = rs.getString("reason"),
+        expiresAt = rs.utcOffsetDateTime("expires_at"),
+        revokedAt = rs.utcOffsetDateTimeOrNull("revoked_at"),
+        createdAt = rs.utcOffsetDateTime("created_at"),
+    )
+
+private fun mapLedgerItem(
+    rs: ResultSet,
+    @Suppress("UNUSED_PARAMETER") rowNum: Int,
+): AdminSupportGrantLedgerItem =
+    AdminSupportGrantLedgerItem(
+        grantId = rs.uuid("id"),
+        clubId = rs.uuid("club_id"),
+        clubName = rs.getString("club_name"),
+        granteeUserId = rs.uuid("grantee_user_id"),
+        granteeDisplayName = rs.getString("grantee_display_name"),
+        granteeMaskedEmail = maskEmail(rs.getString("grantee_email")),
+        scope = SupportAccessGrantScope.valueOf(rs.getString("scope")),
+        reason = rs.getString("reason"),
+        expiresAt = rs.utcOffsetDateTime("expires_at"),
+        createdAt = rs.utcOffsetDateTime("created_at"),
+        revokedAt = rs.utcOffsetDateTimeOrNull("revoked_at"),
+        status = rs.getString("grant_status"),
+        createdByRole = rs.getString("created_by_role") ?: "UNKNOWN",
+    )
 
 private fun OffsetDateTime.toTimestamp(): Timestamp = Timestamp.from(toInstant())
 
@@ -251,3 +251,5 @@ private fun maskEmail(email: String): String {
     val head = parts[0].firstOrNull()?.toString() ?: "*"
     return "$head***@${parts[1]}"
 }
+
+private const val MAX_GRANT_LEDGER_LIMIT = 100

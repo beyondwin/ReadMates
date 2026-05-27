@@ -98,6 +98,14 @@ class PlatformAdminAuditControllerTest(
     }
 
     private fun seedAuditRows() {
+        seedNotificationReplayEvent()
+        seedSupportGrantEvent()
+        seedClubAuditEvent()
+        seedAiAuditEvent()
+        seedReplayPreview()
+    }
+
+    private fun seedNotificationReplayEvent() {
         jdbcTemplate.update(
             """
             insert into platform_audit_events (id, actor_user_id, actor_platform_role, target_user_id, event_type, metadata_json, created_at)
@@ -111,6 +119,9 @@ class PlatformAdminAuditControllerTest(
             PREVIEW_ID,
             "a".repeat(64),
         )
+    }
+
+    private fun seedSupportGrantEvent() {
         jdbcTemplate.update(
             """
             insert into platform_audit_events (id, actor_user_id, actor_platform_role, target_user_id, event_type, metadata_json, created_at)
@@ -124,6 +135,9 @@ class PlatformAdminAuditControllerTest(
             CLUB_ID,
             MEMBER_USER_ID,
         )
+    }
+
+    private fun seedClubAuditEvent() {
         jdbcTemplate.update(
             """
             insert into club_audit_events (id, actor_user_id, actor_platform_role, club_id, event_type, metadata_json, created_at)
@@ -133,6 +147,9 @@ class PlatformAdminAuditControllerTest(
             OWNER_USER_ID,
             CLUB_ID,
         )
+    }
+
+    private fun seedAiAuditEvent() {
         jdbcTemplate.update(
             """
             insert into ai_generation_audit_log (
@@ -147,6 +164,9 @@ class PlatformAdminAuditControllerTest(
             CLUB_ID,
             MEMBER_USER_ID,
         )
+    }
+
+    private fun seedReplayPreview() {
         jdbcTemplate.update(
             """
             insert into admin_notification_replay_previews (id, actor_user_id, filter_json, selection_hash, matched_count, expires_at, consumed_at, created_at)

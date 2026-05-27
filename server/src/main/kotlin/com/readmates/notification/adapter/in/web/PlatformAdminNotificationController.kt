@@ -27,7 +27,10 @@ class PlatformAdminNotificationController(
     private val useCase: ManageAdminNotificationOperationsUseCase,
 ) {
     @GetMapping("/snapshot")
-    fun snapshot(admin: CurrentPlatformAdmin): AdminNotificationOperationsSnapshotResponse = useCase.snapshot(admin).toResponse()
+    @Suppress("ktlint:standard:function-expression-body")
+    fun snapshot(admin: CurrentPlatformAdmin): AdminNotificationOperationsSnapshotResponse {
+        return useCase.snapshot(admin).toResponse()
+    }
 
     @GetMapping("/events")
     fun events(
@@ -45,6 +48,7 @@ class PlatformAdminNotificationController(
             ).mapItems(AdminNotificationOutboxEvent::toResponse)
 
     @GetMapping("/deliveries")
+    @Suppress("LongParameterList")
     fun deliveries(
         admin: CurrentPlatformAdmin,
         @RequestParam(required = false) clubId: UUID?,
@@ -56,7 +60,12 @@ class PlatformAdminNotificationController(
         useCase
             .listDeliveries(
                 admin = admin,
-                filter = AdminNotificationFilter(clubId = clubId, deliveryStatus = status, channel = channel),
+                filter =
+                    AdminNotificationFilter(
+                        clubId = clubId,
+                        deliveryStatus = status,
+                        channel = channel,
+                    ),
                 pageRequest = PageRequest.cursor(limit, cursor, defaultLimit = 50, maxLimit = 100),
             ).mapItems(AdminNotificationDelivery::toResponse)
 

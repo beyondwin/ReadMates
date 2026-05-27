@@ -49,8 +49,16 @@ class AdminAuditLedgerService(
         val unavailable = mutableListOf<AdminAuditSourceType>()
         val sourceRows =
             buildList {
-                addAll(readSource(unavailable, AdminAuditSourceType.PLATFORM) { readPort.listPlatformEvents(query.filter, sourcePage) })
-                addAll(readSource(unavailable, AdminAuditSourceType.CLUB) { readPort.listClubEvents(query.filter, sourcePage) })
+                addAll(
+                    readSource(unavailable, AdminAuditSourceType.PLATFORM) {
+                        readPort.listPlatformEvents(query.filter, sourcePage)
+                    },
+                )
+                addAll(
+                    readSource(unavailable, AdminAuditSourceType.CLUB) {
+                        readPort.listClubEvents(query.filter, sourcePage)
+                    },
+                )
                 addAll(
                     readSource(unavailable, AdminAuditSourceType.AI_GENERATION) {
                         readPort.listAiGenerationEvents(query.filter, sourcePage)
@@ -82,7 +90,10 @@ class AdminAuditLedgerService(
                 AdminAuditSummary(
                     visibleCount = visible.size,
                     sourceUnavailableCount = unavailable.size,
-                    metadataUnavailableCount = visible.count { it.metadataState == AdminAuditMetadataState.UNAVAILABLE },
+                    metadataUnavailableCount =
+                        visible.count {
+                            it.metadataState == AdminAuditMetadataState.UNAVAILABLE
+                        },
                     unavailableSources = unavailable,
                 ),
             items = visible,
@@ -267,10 +278,14 @@ class AdminAuditLedgerService(
             "ADMIN_NOTIFICATION_REPLAY_CONFIRMED" ->
                 listOfNotNull(
                     metadata.string("previewId")?.let { AdminAuditMetadata("previewId", it, "id") },
-                    metadata.string("selectionHash")?.take(8)?.let { AdminAuditMetadata("selectionHashPrefix", it, "fingerprint") },
+                    metadata.selectionHashPrefix(),
                     metadata.number("replayedCount")?.let { AdminAuditMetadata("replayedCount", it, "count") },
                     metadata.number("skippedCount")?.let { AdminAuditMetadata("skippedCount", it, "count") },
-                    AdminAuditMetadata("reasonPresent", metadata.string("reason")?.isNotBlank().toString(), "boolean"),
+                    AdminAuditMetadata(
+                        "reasonPresent",
+                        metadata.string("reason")?.isNotBlank().toString(),
+                        "boolean",
+                    ),
                 )
             else -> listOf(AdminAuditMetadata("eventType", actionType, "code"))
         }
@@ -281,7 +296,9 @@ class AdminAuditLedgerService(
     ): List<AdminAuditMetadata> =
         listOfNotNull(
             AdminAuditMetadata("eventType", actionType, "code"),
-            metadata.string("reason")?.let { AdminAuditMetadata("reasonPresent", it.isNotBlank().toString(), "boolean") },
+            metadata.string("reason")?.let {
+                AdminAuditMetadata("reasonPresent", it.isNotBlank().toString(), "boolean")
+            },
             metadata.string("trigger")?.let { AdminAuditMetadata("trigger", it, "code") },
         )
 
@@ -305,7 +322,7 @@ class AdminAuditLedgerService(
         } else {
             listOfNotNull(
                 metadata.number("matchedCount")?.let { AdminAuditMetadata("matchedCount", it, "count") },
-                metadata.string("selectionHash")?.take(8)?.let { AdminAuditMetadata("selectionHashPrefix", it, "fingerprint") },
+                metadata.selectionHashPrefix(),
                 metadata.string("expiresAt")?.let { AdminAuditMetadata("expiresAt", it, "time") },
                 metadata.string("consumedAt")?.let { AdminAuditMetadata("consumedAt", it, "time") },
             )
@@ -394,10 +411,19 @@ private fun Map<String, Any?>.string(key: String): String? = this[key]?.toString
 
 private fun Map<String, Any?>.number(key: String): String? = this[key]?.toString()?.takeIf { it.isNotBlank() }
 
-private fun Map<String, Any?>.uuid(key: String): UUID? = string(key)?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+@Suppress("ktlint:standard:function-expression-body")
+private fun Map<String, Any?>.uuid(key: String): UUID? {
+    return string(key)?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+}
+
+private fun Map<String, Any?>.selectionHashPrefix(): AdminAuditMetadata? =
+    string("selectionHash")
+        ?.take(SELECTION_HASH_PREFIX_LENGTH)
+        ?.let { AdminAuditMetadata("selectionHashPrefix", it, "fingerprint") }
 
 private fun expiryBucket(value: String): String = if (value.contains("T")) "configured" else "unknown"
 
 private const val MAX_LIMIT = 50
 private const val MAX_WINDOW_DAYS = 90L
 private const val UNKNOWN_SOURCE_RANK = 99
+private const val SELECTION_HASH_PREFIX_LENGTH = 8

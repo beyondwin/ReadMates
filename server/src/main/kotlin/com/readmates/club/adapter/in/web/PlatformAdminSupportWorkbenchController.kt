@@ -35,7 +35,10 @@ class PlatformAdminSupportWorkbenchController(
         admin: CurrentPlatformAdmin,
         @RequestParam query: String,
         @RequestParam(required = false) clubId: UUID?,
-    ): List<AdminSupportSearchResultResponse> = workbenchUseCase.search(admin, query, clubId).map(AdminSupportSearchResultResponse::from)
+    ): List<AdminSupportSearchResultResponse> =
+        workbenchUseCase
+            .search(admin, query, clubId)
+            .map(AdminSupportSearchResultResponse::from)
 
     @GetMapping("/grants")
     fun grants(

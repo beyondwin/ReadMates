@@ -53,31 +53,8 @@ class SupportAccessGrantService(
         admin: CurrentPlatformAdmin,
         command: CreateSupportAccessGrantCommand,
     ): SupportAccessGrant {
-        if (!admin.canManageSupportAccess) {
-            throw AccessDeniedException("Platform admin role cannot manage support access grants")
-        }
-        if (command.reason.isBlank()) {
-            throw PlatformAdminException(
-                PlatformAdminError.GRANT_REASON_REQUIRED,
-                "Reason is required to create a support access grant",
-            )
-        }
         val now = OffsetDateTime.now(ZoneOffset.UTC)
-        if (command.expiresAt <= now) {
-            throw PlatformAdminException(PlatformAdminError.GRANT_EXPIRY_IN_PAST, "Grant expiry must be in the future")
-        }
-        if (command.expiresAt > now.plusHours(24)) {
-            throw PlatformAdminException(PlatformAdminError.GRANT_EXPIRY_TOO_LONG, "Grant expiry must be within 24 hours")
-        }
-        if (!grantLedgerPort.isActivePlatformAdmin(command.granteeUserId)) {
-            throw PlatformAdminException(PlatformAdminError.SUPPORT_TARGET_NOT_ELIGIBLE, "Grantee must be an active platform admin")
-        }
-        if (!grantLedgerPort.isGrantEligibleClub(command.clubId)) {
-            throw PlatformAdminException(PlatformAdminError.SUPPORT_TARGET_NOT_FOUND, "Club is not grant eligible")
-        }
-        if (grantLedgerPort.hasActiveGrant(command.clubId, command.granteeUserId)) {
-            throw PlatformAdminException(PlatformAdminError.GRANT_DUPLICATE_ACTIVE, "Active grant already exists")
-        }
+        validateCreateGrant(admin, command, now)
 
         val grant =
             createGrantPort.createGrant(
@@ -106,6 +83,46 @@ class SupportAccessGrantService(
         )
 
         return grant
+    }
+
+    private fun validateCreateGrant(
+        admin: CurrentPlatformAdmin,
+        command: CreateSupportAccessGrantCommand,
+        now: OffsetDateTime,
+    ) {
+        if (!admin.canManageSupportAccess) {
+            denySupportGrantManagement()
+        }
+        if (command.reason.isBlank()) {
+            rejectGrant(
+                PlatformAdminError.GRANT_REASON_REQUIRED,
+                "Reason is required to create a support access grant",
+            )
+        }
+        if (command.expiresAt <= now) {
+            rejectGrant(
+                PlatformAdminError.GRANT_EXPIRY_IN_PAST,
+                "Grant expiry must be in the future",
+            )
+        }
+        if (command.expiresAt > now.plusHours(MAX_GRANT_EXPIRY_HOURS)) {
+            rejectGrant(
+                PlatformAdminError.GRANT_EXPIRY_TOO_LONG,
+                "Grant expiry must be within 24 hours",
+            )
+        }
+        if (!grantLedgerPort.isActivePlatformAdmin(command.granteeUserId)) {
+            rejectGrant(
+                PlatformAdminError.SUPPORT_TARGET_NOT_ELIGIBLE,
+                "Grantee must be an active platform admin",
+            )
+        }
+        if (!grantLedgerPort.isGrantEligibleClub(command.clubId)) {
+            rejectGrant(PlatformAdminError.SUPPORT_TARGET_NOT_FOUND, "Club is not grant eligible")
+        }
+        if (grantLedgerPort.hasActiveGrant(command.clubId, command.granteeUserId)) {
+            rejectGrant(PlatformAdminError.GRANT_DUPLICATE_ACTIVE, "Active grant already exists")
+        }
     }
 
     override fun revokeSupportAccessGrant(
@@ -145,3 +162,15 @@ class SupportAccessGrantService(
         granteeUserId: UUID,
     ): List<SupportAccessGrant> = loadGrantPort.loadActiveGrantsByGrantee(granteeUserId)
 }
+
+@Suppress("ktlint:standard:function-expression-body")
+private fun denySupportGrantManagement(): Nothing {
+    throw AccessDeniedException("Platform admin role cannot manage support access grants")
+}
+
+private fun rejectGrant(
+    error: PlatformAdminError,
+    message: String,
+): Nothing = throw PlatformAdminException(error, message)
+
+private const val MAX_GRANT_EXPIRY_HOURS = 24L

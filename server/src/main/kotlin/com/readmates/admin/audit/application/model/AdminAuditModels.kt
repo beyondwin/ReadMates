@@ -24,7 +24,7 @@ data class AdminAuditFilter(
     companion object {
         fun defaultNow(now: OffsetDateTime): AdminAuditFilter =
             AdminAuditFilter(
-                from = now.minusDays(7).utc(),
+                from = now.minusDays(DEFAULT_RANGE_DAYS).utc(),
                 to = now.utc(),
                 range = AdminAuditTimeRange.DAYS_7,
                 clubId = null,
@@ -36,7 +36,9 @@ data class AdminAuditFilter(
     }
 }
 
-enum class AdminAuditTimeRange(val wireValue: String) {
+enum class AdminAuditTimeRange(
+    val wireValue: String,
+) {
     HOURS_24("24h"),
     DAYS_7("7d"),
     DAYS_30("30d"),
@@ -89,10 +91,13 @@ enum class AdminAuditSourceType(
     val tableName: String,
     val rank: Int,
 ) {
-    PLATFORM("platform_audit_events", 10),
-    CLUB("club_audit_events", 20),
-    AI_GENERATION("ai_generation_audit_log", 30),
-    NOTIFICATION_REPLAY_PREVIEW("admin_notification_replay_previews", 40),
+    PLATFORM("platform_audit_events", PLATFORM_SOURCE_RANK),
+    CLUB("club_audit_events", CLUB_SOURCE_RANK),
+    AI_GENERATION("ai_generation_audit_log", AI_GENERATION_SOURCE_RANK),
+    NOTIFICATION_REPLAY_PREVIEW(
+        "admin_notification_replay_previews",
+        NOTIFICATION_REPLAY_PREVIEW_SOURCE_RANK,
+    ),
 }
 
 data class AdminAuditSourceRow(
@@ -161,3 +166,9 @@ data class AdminAuditMetadata(
 )
 
 fun OffsetDateTime.utc(): OffsetDateTime = withOffsetSameInstant(ZoneOffset.UTC)
+
+private const val DEFAULT_RANGE_DAYS = 7L
+private const val PLATFORM_SOURCE_RANK = 10
+private const val CLUB_SOURCE_RANK = 20
+private const val AI_GENERATION_SOURCE_RANK = 30
+private const val NOTIFICATION_REPLAY_PREVIEW_SOURCE_RANK = 40

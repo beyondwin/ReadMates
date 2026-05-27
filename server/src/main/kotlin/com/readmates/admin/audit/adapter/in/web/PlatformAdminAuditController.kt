@@ -36,6 +36,7 @@ class PlatformAdminAuditController(
     private val useCase: ListAdminAuditLedgerUseCase,
 ) {
     @GetMapping("/events")
+    @Suppress("LongParameterList")
     fun events(
         admin: CurrentPlatformAdmin,
         @RequestParam(required = false) from: OffsetDateTime?,
@@ -74,7 +75,13 @@ class PlatformAdminAuditController(
                             actionCategory = actionCategory,
                             outcome = outcome,
                         ),
-                    pageRequest = PageRequest.cursor(limit, cursor, defaultLimit = DEFAULT_LIMIT, maxLimit = MAX_LIMIT),
+                    pageRequest =
+                        PageRequest.cursor(
+                            limit,
+                            cursor,
+                            defaultLimit = DEFAULT_LIMIT,
+                            maxLimit = MAX_LIMIT,
+                        ),
                 ),
             ).toResponse()
     }
@@ -168,12 +175,16 @@ private fun String.toTimeRange(): AdminAuditTimeRange =
 
 private fun AdminAuditTimeRange.from(to: OffsetDateTime): OffsetDateTime =
     when (this) {
-        AdminAuditTimeRange.HOURS_24 -> to.minusHours(24)
-        AdminAuditTimeRange.DAYS_7 -> to.minusDays(7)
-        AdminAuditTimeRange.DAYS_30 -> to.minusDays(30)
-        AdminAuditTimeRange.DAYS_90 -> to.minusDays(90)
+        AdminAuditTimeRange.HOURS_24 -> to.minusHours(HOURS_IN_DAY)
+        AdminAuditTimeRange.DAYS_7 -> to.minusDays(DAYS_IN_WEEK)
+        AdminAuditTimeRange.DAYS_30 -> to.minusDays(DAYS_IN_MONTH)
+        AdminAuditTimeRange.DAYS_90 -> to.minusDays(DAYS_IN_QUARTER)
     }
 
 private const val DEFAULT_LIMIT = 25
 private const val MAX_LIMIT = 50
 private const val DEFAULT_RANGE_DAYS = 7L
+private const val HOURS_IN_DAY = 24L
+private const val DAYS_IN_WEEK = 7L
+private const val DAYS_IN_MONTH = 30L
+private const val DAYS_IN_QUARTER = 90L

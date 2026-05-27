@@ -71,8 +71,23 @@ class JdbcAdminClubOperationsAdapter(
     ): AdminClubReadinessSummary {
         val blockers = mutableListOf<String>()
         val activeHostCount =
-            scalarInt("select count(*) from memberships where club_id = ? and role = 'HOST' and status = 'ACTIVE'", clubId)
-        val domainActionCount = scalarInt("select count(*) from club_domains where club_id = ? and status = 'ACTION_REQUIRED'", clubId)
+            scalarInt(
+                """
+                select count(*)
+                from memberships
+                where club_id = ? and role = 'HOST' and status = 'ACTIVE'
+                """.trimIndent(),
+                clubId,
+            )
+        val domainActionCount =
+            scalarInt(
+                """
+                select count(*)
+                from club_domains
+                where club_id = ? and status = 'ACTION_REQUIRED'
+                """.trimIndent(),
+                clubId,
+            )
         if (activeHostCount == 0) blockers += "HOST_REQUIRED"
         if (domainActionCount > 0) blockers += "DOMAIN_ACTION_REQUIRED"
         if (club.status != "ACTIVE") blockers += "CLUB_NOT_ACTIVE"
@@ -135,14 +150,38 @@ class JdbcAdminClubOperationsAdapter(
         AdminClubNotificationHealth(
             pending =
                 scalarInt(
-                    "select count(*) from notification_deliveries where club_id = ? and status in ('PENDING', 'SENDING')",
+                    """
+                    select count(*)
+                    from notification_deliveries
+                    where club_id = ? and status in ('PENDING', 'SENDING')
+                    """.trimIndent(),
                     clubId,
                 ),
-            failed = scalarInt("select count(*) from notification_deliveries where club_id = ? and status = 'FAILED'", clubId),
-            dead = scalarInt("select count(*) from notification_deliveries where club_id = ? and status = 'DEAD'", clubId),
+            failed =
+                scalarInt(
+                    """
+                    select count(*)
+                    from notification_deliveries
+                    where club_id = ? and status = 'FAILED'
+                    """.trimIndent(),
+                    clubId,
+                ),
+            dead =
+                scalarInt(
+                    """
+                    select count(*)
+                    from notification_deliveries
+                    where club_id = ? and status = 'DEAD'
+                    """.trimIndent(),
+                    clubId,
+                ),
             lastSuccessAt =
                 jdbcTemplate.queryForObject(
-                    "select max(updated_at) as last_success_at from notification_deliveries where club_id = ? and status = 'SENT'",
+                    """
+                    select max(updated_at) as last_success_at
+                    from notification_deliveries
+                    where club_id = ? and status = 'SENT'
+                    """.trimIndent(),
                     { rs, _ -> rs.utcOffsetDateTimeOrNull("last_success_at") },
                     clubId.dbString(),
                 ),
@@ -168,7 +207,12 @@ class JdbcAdminClubOperationsAdapter(
             order by failure_count desc, safe_error_code asc
             limit 5
             """.trimIndent(),
-            { rs, _ -> AdminClubNotificationFailureCluster(rs.getString("safe_error_code"), rs.getInt("failure_count")) },
+            { rs, _ ->
+                AdminClubNotificationFailureCluster(
+                    rs.getString("safe_error_code"),
+                    rs.getInt("failure_count"),
+                )
+            },
             clubId.dbString(),
         ) ?: emptyList()
 
@@ -192,7 +236,12 @@ class JdbcAdminClubOperationsAdapter(
                     failedRecentJobs = failedRecentJobs,
                     staleCandidates = staleCandidates,
                     costEstimateUsd = rs.getBigDecimal("cost_estimate_usd").formatCost(),
-                    state = if (activeJobs + failedRecentJobs + staleCandidates == 0) "NO_RECENT_USAGE" else "HAS_ACTIVITY",
+                    state =
+                        if (activeJobs + failedRecentJobs + staleCandidates == 0) {
+                            "NO_RECENT_USAGE"
+                        } else {
+                            "HAS_ACTIVITY"
+                        },
                 )
             },
             clubId.dbString(),
@@ -204,4 +253,6 @@ class JdbcAdminClubOperationsAdapter(
     ): Int = jdbcTemplate.queryForObject(sql, Int::class.java, clubId.dbString()) ?: 0
 }
 
-private fun BigDecimal.formatCost(): String = setScale(4).toPlainString()
+private fun BigDecimal.formatCost(): String = setScale(COST_SCALE).toPlainString()
+
+private const val COST_SCALE = 4

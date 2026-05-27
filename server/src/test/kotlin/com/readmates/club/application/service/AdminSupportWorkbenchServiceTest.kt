@@ -66,7 +66,10 @@ class AdminSupportWorkbenchServiceTest {
         override fun isActivePlatformAdmin(userId: UUID): Boolean = true
     }
 
-    private fun admin(role: PlatformAdminRole): CurrentPlatformAdmin = CurrentPlatformAdmin(USER_ID, "support@example.com", role)
+    @Suppress("ktlint:standard:function-expression-body")
+    private fun admin(role: PlatformAdminRole): CurrentPlatformAdmin {
+        return CurrentPlatformAdmin(USER_ID, "support@example.com", role)
+    }
 
     private companion object {
         val USER_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000903")

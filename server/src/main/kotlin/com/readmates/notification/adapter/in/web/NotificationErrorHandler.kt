@@ -8,7 +8,11 @@ import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 
 @RestControllerAdvice(
-    assignableTypes = [MemberNotificationController::class, HostNotificationController::class, PlatformAdminNotificationController::class],
+    assignableTypes = [
+        MemberNotificationController::class,
+        HostNotificationController::class,
+        PlatformAdminNotificationController::class,
+    ],
 )
 class NotificationErrorHandler {
     @ExceptionHandler(NotificationApplicationException::class)

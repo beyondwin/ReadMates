@@ -35,22 +35,36 @@ class SupportAccessGrantServiceTest {
 
     @Test
     fun `past expiry is rejected`() {
-        assertError(validCommand(expiresAt = OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(1)), PlatformAdminError.GRANT_EXPIRY_IN_PAST)
+        assertError(
+            validCommand(expiresAt = OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(1)),
+            PlatformAdminError.GRANT_EXPIRY_IN_PAST,
+        )
     }
 
     @Test
     fun `expiry beyond 24 hours is rejected`() {
-        assertError(validCommand(expiresAt = OffsetDateTime.now(ZoneOffset.UTC).plusHours(25)), PlatformAdminError.GRANT_EXPIRY_TOO_LONG)
+        assertError(
+            validCommand(expiresAt = OffsetDateTime.now(ZoneOffset.UTC).plusHours(25)),
+            PlatformAdminError.GRANT_EXPIRY_TOO_LONG,
+        )
     }
 
     @Test
     fun `ineligible grantee is rejected`() {
-        assertError(validCommand(), PlatformAdminError.SUPPORT_TARGET_NOT_ELIGIBLE, ledger = FakeLedgerPort(activePlatformAdmin = false))
+        assertError(
+            validCommand(),
+            PlatformAdminError.SUPPORT_TARGET_NOT_ELIGIBLE,
+            ledger = FakeLedgerPort(activePlatformAdmin = false),
+        )
     }
 
     @Test
     fun `duplicate active grant is rejected`() {
-        assertError(validCommand(), PlatformAdminError.GRANT_DUPLICATE_ACTIVE, ledger = FakeLedgerPort(activeGrant = true))
+        assertError(
+            validCommand(),
+            PlatformAdminError.GRANT_DUPLICATE_ACTIVE,
+            ledger = FakeLedgerPort(activeGrant = true),
+        )
     }
 
     private fun assertError(
@@ -80,9 +94,18 @@ class SupportAccessGrantServiceTest {
         reason: String = "Ticket escalation",
         expiresAt: OffsetDateTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(2),
     ): CreateSupportAccessGrantCommand =
-        CreateSupportAccessGrantCommand(CLUB_ID, GRANTEE_ID, SupportAccessGrantScope.HOST_SUPPORT_READ, reason, expiresAt)
+        CreateSupportAccessGrantCommand(
+            CLUB_ID,
+            GRANTEE_ID,
+            SupportAccessGrantScope.HOST_SUPPORT_READ,
+            reason,
+            expiresAt,
+        )
 
-    private fun admin(role: PlatformAdminRole): CurrentPlatformAdmin = CurrentPlatformAdmin(OWNER_ID, "owner@example.com", role)
+    @Suppress("ktlint:standard:function-expression-body")
+    private fun admin(role: PlatformAdminRole): CurrentPlatformAdmin {
+        return CurrentPlatformAdmin(OWNER_ID, "owner@example.com", role)
+    }
 }
 
 private class FakeLedgerPort(

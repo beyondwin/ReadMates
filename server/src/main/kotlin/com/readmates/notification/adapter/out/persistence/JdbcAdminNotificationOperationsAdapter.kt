@@ -30,6 +30,8 @@ import com.readmates.shared.paging.CursorCodec
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.jdbc.core.PreparedStatementSetter
+import org.springframework.jdbc.core.RowMapper
 import org.springframework.stereotype.Repository
 import java.sql.ResultSet
 import java.time.LocalDateTime
@@ -43,20 +45,9 @@ class JdbcAdminNotificationOperationsAdapter(
 ) : AdminNotificationOperationsReadPort,
     AdminNotificationReplayPort,
     AdminNotificationAuditPort {
-    override fun snapshot(): AdminNotificationOperationsSnapshot =
-        AdminNotificationOperationsSnapshot(
-            generatedAt =
-                jdbcTemplate.queryForObject(
-                    "select utc_timestamp(6)",
-                    OffsetDateTimeRowMapper,
-                ) ?: OffsetDateTime.now(),
-            outboxSummary = outboxSummary(),
-            deliverySummary = deliverySummary(),
-            relaySummary = relaySummary(),
-            failureClusters = failureClusters(),
-            clubHealth = clubHealth(),
-            recentManualDispatches = recentManualDispatches(),
-        )
+    private val snapshotQueries = AdminNotificationSnapshotQueries(jdbcTemplate)
+
+    override fun snapshot(): AdminNotificationOperationsSnapshot = snapshotQueries.snapshot()
 
     override fun listEvents(
         filter: AdminNotificationFilter,
@@ -77,7 +68,8 @@ class JdbcAdminNotificationOperationsAdapter(
 
         val whereClause = predicates.whereClause()
         val rows =
-            jdbcTemplate.query(
+            JdbcArguments.query(
+                jdbcTemplate,
                 """
                 select
                   notification_event_outbox.id,
@@ -105,8 +97,8 @@ class JdbcAdminNotificationOperationsAdapter(
                 order by notification_event_outbox.updated_at desc, notification_event_outbox.created_at desc, notification_event_outbox.id desc
                 limit ?
                 """.trimIndent(),
+                args,
                 { resultSet, _ -> resultSet.toAdminNotificationOutboxEvent() },
-                *args.toTypedArray(),
             )
         return pageFromRows(rows, pageRequest.limit) { row ->
             updatedAtDescCursor(row.updatedAt, row.createdAt, row.eventId.toString())
@@ -135,7 +127,8 @@ class JdbcAdminNotificationOperationsAdapter(
         args += pageRequest.limit + 1
 
         val rows =
-            jdbcTemplate.query(
+            JdbcArguments.query(
+                jdbcTemplate,
                 """
                 select
                   notification_deliveries.id,
@@ -161,8 +154,8 @@ class JdbcAdminNotificationOperationsAdapter(
                 order by notification_deliveries.updated_at desc, notification_deliveries.created_at desc, notification_deliveries.id desc
                 limit ?
                 """.trimIndent(),
+                args,
                 { resultSet, _ -> resultSet.toAdminNotificationDelivery() },
-                *args.toTypedArray(),
             )
         return pageFromRows(rows, pageRequest.limit) { row ->
             updatedAtDescCursor(row.updatedAt, row.createdAt, row.deliveryId.toString())
@@ -172,15 +165,16 @@ class JdbcAdminNotificationOperationsAdapter(
     override fun estimateReplayableDeliveries(filter: AdminNotificationFilter): AdminNotificationReplayEstimate {
         val predicates = replayableDeliveryPredicates(filter)
         val rows =
-            jdbcTemplate.query(
+            JdbcArguments.query(
+                jdbcTemplate,
                 """
                 select status, count(*) as count
                 from notification_deliveries
                 ${predicates.sql}
                 group by status
                 """.trimIndent(),
+                predicates.args,
                 { resultSet, _ -> resultSet.getString("status") to resultSet.getInt("count") },
-                *predicates.args.toTypedArray(),
             )
         val byStatus = rows.associate { it.first to it.second }
         return AdminNotificationReplayEstimate(
@@ -248,7 +242,8 @@ class JdbcAdminNotificationOperationsAdapter(
 
     override fun replayDeadOrFailedDeliveries(filter: AdminNotificationFilter): Int {
         val predicates = replayableDeliveryPredicates(filter)
-        return jdbcTemplate.update(
+        return JdbcArguments.update(
+            jdbcTemplate,
             """
             update notification_deliveries
             set status = 'PENDING',
@@ -259,7 +254,7 @@ class JdbcAdminNotificationOperationsAdapter(
                 updated_at = utc_timestamp(6)
             ${predicates.sql}
             """.trimIndent(),
-            *predicates.args.toTypedArray(),
+            predicates.args,
         )
     }
 
@@ -280,6 +275,25 @@ class JdbcAdminNotificationOperationsAdapter(
             metadataJson,
         )
     }
+}
+
+private class AdminNotificationSnapshotQueries(
+    private val jdbcTemplate: JdbcTemplate,
+) {
+    fun snapshot(): AdminNotificationOperationsSnapshot =
+        AdminNotificationOperationsSnapshot(
+            generatedAt =
+                jdbcTemplate.queryForObject(
+                    "select utc_timestamp(6)",
+                    OffsetDateTimeRowMapper,
+                ) ?: OffsetDateTime.now(),
+            outboxSummary = outboxSummary(),
+            deliverySummary = deliverySummary(),
+            relaySummary = relaySummary(),
+            failureClusters = failureClusters(),
+            clubHealth = clubHealth(),
+            recentManualDispatches = recentManualDispatches(),
+        )
 
     private fun outboxSummary(): AdminNotificationStatusSummary =
         AdminNotificationStatusSummary(
@@ -371,8 +385,10 @@ class JdbcAdminNotificationOperationsAdapter(
                     count = grouped.size,
                     latestAt = grouped.maxOfOrNull { it.updatedAt },
                 )
-            }.sortedWith(compareByDescending<AdminNotificationFailureCluster> { it.count }.thenBy { it.safeErrorCode })
-            .take(12)
+            }.sortedWith(
+                compareByDescending<AdminNotificationFailureCluster> { it.count }
+                    .thenBy { it.safeErrorCode },
+            ).take(FAILURE_CLUSTER_LIMIT)
     }
 
     private fun clubHealth(): List<AdminNotificationClubHealth> =
@@ -452,7 +468,7 @@ class JdbcAdminNotificationOperationsAdapter(
         ) ?: 0
 }
 
-private object OffsetDateTimeRowMapper : org.springframework.jdbc.core.RowMapper<OffsetDateTime> {
+private object OffsetDateTimeRowMapper : RowMapper<OffsetDateTime> {
     override fun mapRow(
         rs: ResultSet,
         rowNum: Int,
@@ -463,6 +479,39 @@ private data class SqlPredicates(
     val sql: String,
     val args: List<Any>,
 )
+
+private object JdbcArguments {
+    fun <T> query(
+        jdbcTemplate: JdbcTemplate,
+        sql: String,
+        args: List<Any>,
+        mapper: (ResultSet, Int) -> T,
+    ): List<T> =
+        jdbcTemplate.query(
+            sql,
+            PreparedStatementSetter { statement -> bind(statement, args) },
+            RowMapper { resultSet, rowNum -> mapper(resultSet, rowNum) },
+        )
+
+    fun update(
+        jdbcTemplate: JdbcTemplate,
+        sql: String,
+        args: List<Any>,
+    ): Int =
+        jdbcTemplate.update(
+            sql,
+            PreparedStatementSetter { statement -> bind(statement, args) },
+        )
+
+    private fun bind(
+        statement: java.sql.PreparedStatement,
+        args: List<Any>,
+    ) {
+        args.forEachIndexed { index, arg ->
+            statement.setObject(index + 1, arg)
+        }
+    }
+}
 
 private fun replayableDeliveryPredicates(filter: AdminNotificationFilter): SqlPredicates {
     val predicates =
@@ -495,7 +544,12 @@ private fun ResultSet.toAdminNotificationOutboxEvent(): AdminNotificationOutboxE
         eventId = uuid("id"),
         club = adminClubRef(),
         eventType = NotificationEventType.valueOf(getString("event_type")),
-        source = if (getString("manual_dispatch_id") == null) NotificationDispatchSource.AUTOMATIC else NotificationDispatchSource.MANUAL,
+        source =
+            if (getString("manual_dispatch_id") == null) {
+                NotificationDispatchSource.AUTOMATIC
+            } else {
+                NotificationDispatchSource.MANUAL
+            },
         status = NotificationEventOutboxStatus.valueOf(getString("status")),
         attemptCount = getInt("attempt_count"),
         nextAttemptAt = utcOffsetDateTimeOrNull("next_attempt_at"),
@@ -611,10 +665,21 @@ private data class UpdatedAtDescCursor(
 ) {
     companion object {
         fun from(cursor: Map<String, String>): UpdatedAtDescCursor? {
-            val updatedAt = cursor["updatedAt"]?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() } ?: return null
-            val createdAt = cursor["createdAt"]?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() } ?: return null
-            val id = cursor["id"]?.takeIf { it.isNotBlank() } ?: return null
-            return UpdatedAtDescCursor(updatedAt, createdAt, id)
+            val updatedAt = cursor["updatedAt"]?.parseOffsetDateTime()
+            val createdAt = cursor["createdAt"]?.parseOffsetDateTime()
+            val id = cursor["id"]?.takeIf { it.isNotBlank() }
+            return if (updatedAt != null && createdAt != null && id != null) {
+                UpdatedAtDescCursor(updatedAt, createdAt, id)
+            } else {
+                null
+            }
+        }
+
+        @Suppress("ktlint:standard:function-expression-body")
+        private fun String.parseOffsetDateTime(): OffsetDateTime? {
+            return runCatching { OffsetDateTime.parse(this) }.getOrNull()
         }
     }
 }
+
+private const val FAILURE_CLUSTER_LIMIT = 12

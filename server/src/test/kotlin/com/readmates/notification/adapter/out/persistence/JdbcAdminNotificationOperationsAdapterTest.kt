@@ -50,7 +50,11 @@ class JdbcAdminNotificationOperationsAdapterTest(
         seedOperationsRows()
 
         val snapshot = adapter.snapshot()
-        val eventPage = adapter.listEvents(AdminNotificationFilter(), PageRequest.cursor(1, null, defaultLimit = 50, maxLimit = 100))
+        val eventPage =
+            adapter.listEvents(
+                AdminNotificationFilter(),
+                PageRequest.cursor(1, null, defaultLimit = 50, maxLimit = 100),
+            )
         val deliveryPage =
             adapter.listDeliveries(
                 AdminNotificationFilter(deliveryStatus = NotificationDeliveryStatus.DEAD),
@@ -73,6 +77,13 @@ class JdbcAdminNotificationOperationsAdapterTest(
     }
 
     private fun seedOperationsRows() {
+        seedSecondClubMember()
+        seedOutboxRows()
+        seedDeliveryRows()
+        seedManualDispatch()
+    }
+
+    private fun seedSecondClubMember() {
         jdbcTemplate.update(
             """
             insert into users (id, google_subject_id, email, name, short_name, auth_provider)
@@ -91,11 +102,43 @@ class JdbcAdminNotificationOperationsAdapterTest(
             SECOND_CLUB_ID.toString(),
             SECOND_USER_ID.toString(),
         )
-        insertEvent(FAILED_EVENT_ID, BASELINE_CLUB_ID, "FAILED", "SMTP 550 token=abc member1@example.com SQLSTATE 42S02")
+    }
+
+    private fun seedOutboxRows() {
+        insertEvent(
+            FAILED_EVENT_ID,
+            BASELINE_CLUB_ID,
+            "FAILED",
+            "SMTP 550 token=abc member1@example.com SQLSTATE 42S02",
+        )
         insertEvent(MANUAL_EVENT_ID, BASELINE_CLUB_ID, "PUBLISHED", null)
         insertEvent(SECOND_CLUB_EVENT_ID, SECOND_CLUB_ID, "FAILED", "mailbox unavailable")
-        insertDelivery(DEAD_DELIVERY_ID, FAILED_EVENT_ID, BASELINE_CLUB_ID, BASELINE_MEMBER_ID, "DEAD", "SMTP 550 member1@example.com")
-        insertDelivery(SECOND_DELIVERY_ID, SECOND_CLUB_EVENT_ID, SECOND_CLUB_ID, SECOND_MEMBERSHIP_ID, "DEAD", "provider timeout")
+    }
+
+    private fun seedDeliveryRows() {
+        insertDelivery(
+            DeliverySeed(
+                id = DEAD_DELIVERY_ID,
+                eventId = FAILED_EVENT_ID,
+                clubId = BASELINE_CLUB_ID,
+                membershipId = BASELINE_MEMBER_ID,
+                status = "DEAD",
+                lastError = "SMTP 550 member1@example.com",
+            ),
+        )
+        insertDelivery(
+            DeliverySeed(
+                id = SECOND_DELIVERY_ID,
+                eventId = SECOND_CLUB_EVENT_ID,
+                clubId = SECOND_CLUB_ID,
+                membershipId = SECOND_MEMBERSHIP_ID,
+                status = "DEAD",
+                lastError = "provider timeout",
+            ),
+        )
+    }
+
+    private fun seedManualDispatch() {
         jdbcTemplate.update(
             """
             insert into notification_manual_dispatches (
@@ -137,14 +180,7 @@ class JdbcAdminNotificationOperationsAdapterTest(
         )
     }
 
-    private fun insertDelivery(
-        id: UUID,
-        eventId: UUID,
-        clubId: UUID,
-        membershipId: UUID,
-        status: String,
-        lastError: String?,
-    ) {
+    private fun insertDelivery(seed: DeliverySeed) {
         jdbcTemplate.update(
             """
             insert into notification_deliveries (
@@ -153,16 +189,25 @@ class JdbcAdminNotificationOperationsAdapterTest(
             )
             values (?, ?, ?, ?, 'EMAIL', ?, ?, 2, ?, utc_timestamp(6), utc_timestamp(6))
             """.trimIndent(),
-            id.toString(),
-            eventId.toString(),
-            clubId.toString(),
-            membershipId.toString(),
-            status,
-            "admin-notification-operations-delivery-$id",
-            lastError,
+            seed.id.toString(),
+            seed.eventId.toString(),
+            seed.clubId.toString(),
+            seed.membershipId.toString(),
+            seed.status,
+            "admin-notification-operations-delivery-${seed.id}",
+            seed.lastError,
         )
     }
 }
+
+private data class DeliverySeed(
+    val id: UUID,
+    val eventId: UUID,
+    val clubId: UUID,
+    val membershipId: UUID,
+    val status: String,
+    val lastError: String?,
+)
 
 private val BASELINE_CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000001")
 private val SECOND_CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000002")

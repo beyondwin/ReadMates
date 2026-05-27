@@ -27,12 +27,20 @@ class AdminSupportWorkbenchService(
             throw PlatformAdminException(PlatformAdminError.SUPPORT_TARGET_NOT_FOUND, "Search query is required")
         }
         if (admin.role == PlatformAdminRole.SUPPORT) return emptyList()
-        return searchPort.search(trimmed, clubId, 10)
+        return searchPort.search(trimmed, clubId, SUPPORT_SEARCH_LIMIT)
     }
 
     override fun listGrantLedger(
         admin: CurrentPlatformAdmin,
         clubId: UUID?,
         granteeUserId: UUID?,
-    ): List<AdminSupportGrantLedgerItem> = grantLedgerPort.listLedger(clubId = clubId, granteeUserId = granteeUserId, limit = 50)
+    ): List<AdminSupportGrantLedgerItem> =
+        grantLedgerPort.listLedger(
+            clubId = clubId,
+            granteeUserId = granteeUserId,
+            limit = GRANT_LEDGER_LIMIT,
+        )
 }
+
+private const val SUPPORT_SEARCH_LIMIT = 10
+private const val GRANT_LEDGER_LIMIT = 50

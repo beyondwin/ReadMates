@@ -43,7 +43,7 @@ class JdbcAdminSupportSearchAdapter(
             like,
             clubId?.dbString(),
             clubId?.dbString(),
-            limit.coerceIn(1, 10),
+            limit.coerceIn(1, MAX_SUPPORT_SEARCH_LIMIT),
         )
     }
 
@@ -92,6 +92,8 @@ class JdbcAdminSupportSearchAdapter(
             clubId?.dbString(),
         )
 }
+
+private const val MAX_SUPPORT_SEARCH_LIMIT = 10
 
 private fun maskEmail(email: String): String {
     val parts = email.split("@", limit = 2)

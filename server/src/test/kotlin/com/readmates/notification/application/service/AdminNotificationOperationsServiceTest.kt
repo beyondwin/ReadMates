@@ -136,7 +136,13 @@ class AdminNotificationOperationsServiceTest {
         readPort: AdminNotificationOperationsReadPort = fakeReadPort(),
         replayPort: RecordingAdminNotificationReplayPort = RecordingAdminNotificationReplayPort(),
         auditPort: AdminNotificationAuditPort = RecordingAdminNotificationAuditPort(),
-    ): AdminNotificationOperationsService = AdminNotificationOperationsService(readPort, replayPort, auditPort, FixedAdminNotificationJson)
+    ): AdminNotificationOperationsService =
+        AdminNotificationOperationsService(
+            readPort,
+            replayPort,
+            auditPort,
+            FixedAdminNotificationJson,
+        )
 
     private fun platformAdmin(role: PlatformAdminRole): CurrentPlatformAdmin =
         CurrentPlatformAdmin(
@@ -256,7 +262,15 @@ private object FixedAdminNotificationJson : AdminNotificationJsonCodec {
         replayedCount: Int,
         skippedCount: Int,
     ): String =
-        """{"previewId":"$previewId","selectionHash":"$selectionHash","reason":"$reason","replayedCount":$replayedCount,"skippedCount":$skippedCount}"""
+        """
+        {
+          "previewId":"$previewId",
+          "selectionHash":"$selectionHash",
+          "reason":"$reason",
+          "replayedCount":$replayedCount,
+          "skippedCount":$skippedCount
+        }
+        """.trimIndent().replace("\n", "")
 }
 
 private fun adminSnapshot(): AdminNotificationOperationsSnapshot =

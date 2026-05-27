@@ -46,8 +46,7 @@ class AdminAuditLedgerServiceTest {
                             id = "support-create",
                             occurredAt = "2026-05-27T00:01:00Z",
                             eventType = "SUPPORT_ACCESS_GRANT_CREATED",
-                            metadataJson =
-                                """{"grantId":"grant-1","clubId":"00000000-0000-0000-0000-000000000001","granteeUserId":"00000000-0000-0000-0000-000000000202","scope":"METADATA_READ","expiresAt":"2026-05-28T00:00:00Z"}""",
+                            metadataJson = supportGrantMetadata(),
                         ),
                     ),
             )
@@ -87,13 +86,24 @@ class AdminAuditLedgerServiceTest {
     private fun query(limit: Int = 25): AdminAuditListQuery =
         AdminAuditListQuery(
             filter = AdminAuditFilter.defaultNow(now = NOW),
-            pageRequest = PageRequest.cursor(requestedLimit = limit, rawCursor = null, defaultLimit = 25, maxLimit = 50),
+            pageRequest =
+                PageRequest.cursor(
+                    requestedLimit = limit,
+                    rawCursor = null,
+                    defaultLimit = 25,
+                    maxLimit = 50,
+                ),
         )
 
-    private fun owner(): CurrentPlatformAdmin = CurrentPlatformAdmin(ADMIN_USER_ID, "owner@example.com", PlatformAdminRole.OWNER)
+    @Suppress("ktlint:standard:function-expression-body")
+    private fun owner(): CurrentPlatformAdmin {
+        return CurrentPlatformAdmin(ADMIN_USER_ID, "owner@example.com", PlatformAdminRole.OWNER)
+    }
 
-    private fun support(): CurrentPlatformAdmin =
-        CurrentPlatformAdmin(SUPPORT_USER_ID, "support@example.com", PlatformAdminRole.SUPPORT)
+    @Suppress("ktlint:standard:function-expression-body")
+    private fun support(): CurrentPlatformAdmin {
+        return CurrentPlatformAdmin(SUPPORT_USER_ID, "support@example.com", PlatformAdminRole.SUPPORT)
+    }
 }
 
 private class FakeAdminAuditLedgerReadPort(
@@ -127,7 +137,7 @@ private fun platformRow(
     id: String,
     occurredAt: String,
     eventType: String = "ADMIN_NOTIFICATION_REPLAY_CONFIRMED",
-    metadataJson: String = """{"previewId":"preview-1","selectionHash":"aaaaaaaa","reason":"provider recovered","replayedCount":2,"skippedCount":0}""",
+    metadataJson: String = replayConfirmedMetadata(),
 ): AdminAuditSourceRow =
     AdminAuditSourceRow(
         sourceType = AdminAuditSourceType.PLATFORM,
@@ -173,7 +183,7 @@ private fun aiRow(
         null,
         "AI_GENERATION_AUDIT",
         "SUCCEEDED",
-        """{"jobId":"$AI_JOB_ID","provider":"openai","model":"gpt-safe","status":"SUCCEEDED","costEstimateUsd":"0.0100","latencyMs":1200}""",
+        aiMetadata(),
     )
 
 private fun replayPreviewRow(
@@ -192,6 +202,42 @@ private fun replayPreviewRow(
         "PREPARED",
         """{"matchedCount":2,"selectionHash":"aaaaaaaa","expiresAt":"2026-05-27T00:10:00Z"}""",
     )
+
+private fun supportGrantMetadata(): String =
+    """
+    {
+      "grantId":"grant-1",
+      "clubId":"00000000-0000-0000-0000-000000000001",
+      "granteeUserId":"00000000-0000-0000-0000-000000000202",
+      "scope":"METADATA_READ",
+      "expiresAt":"2026-05-28T00:00:00Z"
+    }
+    """.compactJson()
+
+private fun replayConfirmedMetadata(): String =
+    """
+    {
+      "previewId":"preview-1",
+      "selectionHash":"aaaaaaaa",
+      "reason":"provider recovered",
+      "replayedCount":2,
+      "skippedCount":0
+    }
+    """.compactJson()
+
+private fun aiMetadata(): String =
+    """
+    {
+      "jobId":"$AI_JOB_ID",
+      "provider":"openai",
+      "model":"gpt-safe",
+      "status":"SUCCEEDED",
+      "costEstimateUsd":"0.0100",
+      "latencyMs":1200
+    }
+    """.compactJson()
+
+private fun String.compactJson(): String = trimIndent().replace("\n", "")
 
 private val NOW: OffsetDateTime = OffsetDateTime.parse("2026-05-27T00:05:00Z")
 private val ADMIN_USER_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000901")
