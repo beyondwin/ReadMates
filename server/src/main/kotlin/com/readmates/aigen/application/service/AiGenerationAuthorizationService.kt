@@ -18,8 +18,9 @@ class AiGenerationAuthorizationService(
         sessionId: UUID,
         actor: AiGenerationActor,
     ): SessionMeta {
-        val meta = sessionMetaPort.load(sessionId)
-            ?: throw AccessDeniedException("Session $sessionId not found")
+        val meta =
+            sessionMetaPort.load(sessionId)
+                ?: throw AccessDeniedException("Session $sessionId not found")
         if (meta.clubId != actor.clubId || !actor.isHost) {
             throw AccessDeniedException("Host access to session $sessionId is required")
         }

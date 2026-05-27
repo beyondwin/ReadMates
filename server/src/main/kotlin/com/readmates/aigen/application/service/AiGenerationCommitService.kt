@@ -57,7 +57,7 @@ class AiGenerationCommitService(
     private val clock: Clock,
     private val transitionPolicy: AiGenerationJobTransitionPolicy,
 ) : CommitGenerationUseCase {
-    @Suppress("SwallowedException")
+    @Suppress("LongMethod", "SwallowedException")
     override fun commit(
         host: AiGenerationActor,
         sessionId: UUID,

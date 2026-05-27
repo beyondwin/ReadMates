@@ -1,7 +1,7 @@
 package com.readmates.aigen.application.port.`in`
 
-import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.AiGenerationActor
+import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.JobView

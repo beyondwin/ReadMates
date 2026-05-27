@@ -2,8 +2,8 @@ package com.readmates.aigen.adapter.`in`.web
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.AiGenerationActor
+import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
