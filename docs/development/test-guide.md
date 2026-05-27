@@ -144,6 +144,12 @@ pnpm --dir front exec vitest run features/host/model/session-import-model.test.t
 pnpm --dir front test:e2e -- member-profile-permissions
 ```
 
+플랫폼 admin 첫 화면의 today operations ledger만 빠르게 확인하려면 아래 spec을 지정합니다. 이 spec은 public-safe BFF 응답을 route mock으로 고정해 OWNER가 queue/brief를 보는 흐름과 SUPPORT가 mutation CTA를 실행할 수 없는 흐름을 검증합니다.
+
+```bash
+pnpm --dir front test:e2e -- tests/e2e/admin-today.spec.ts
+```
+
 ## Backend
 
 Backend tests are expected to run on JDK 21. `server/build.gradle.kts` pins the Gradle `Test` JVM to the Java 21 toolchain so local shells using a newer current JVM do not change test runtime behavior. If Gradle cannot find a JDK 21 toolchain locally, install one or set `JAVA_HOME` to a JDK 21 installation before running backend tests.
