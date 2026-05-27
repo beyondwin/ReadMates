@@ -8,7 +8,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Highlights
 
-- **Admin vNext S1 IA Foundation**: `/admin` 단일 페이지를 9-라우트 lazy-split 패밀리로 분해했습니다. 공유 좌측 nav · 상단 status strip · 권한 매트릭스 · URL-state onboarding modal · 표준 "준비 중" empty state를 갖춘 `AdminShellLayout` 위에서 5개 READY 라우트(`today`·`clubs`·`clubs/:clubId`·`ai-ops`·`support`)와 4개 COMING-SOON 라우트(`health`·`notifications`·`audit`·`analytics`)가 `admin-route-catalog` SSOT로 구동됩니다. 후속 슬라이스는 자기 라우트를 `coming_soon → ready`로 토글하는 한 줄 변경으로 자기 자리를 채울 수 있습니다.
+- **Admin vNext S1 IA Foundation**: `/admin` 단일 페이지를 9-라우트 lazy-split 패밀리로 분해했습니다. 공유 좌측 nav · 상단 status strip · 권한 매트릭스 · URL-state onboarding modal · 표준 "준비 중" empty state를 갖춘 `AdminShellLayout` 위에서 8개 READY 라우트(`today`·`health`·`clubs`·`clubs/:clubId`·`notifications`·`ai-ops`·`support`·`audit`)와 1개 COMING-SOON 라우트(`analytics`)가 `admin-route-catalog` SSOT로 구동됩니다. 후속 슬라이스는 자기 라우트를 `coming_soon → ready`로 토글하는 한 줄 변경으로 자기 자리를 채울 수 있습니다.
 - **Admin vNext 운영 콘솔 확장**: `/admin/notifications`를 READY 라우트로 전환해 outbox, delivery, 실패 cluster, club별 알림 health와 two-step replay preview/confirm을 제공합니다. `/admin/clubs/:clubId`는 readiness, 멤버/세션/알림/AI 사용량을 하나의 운영 상세로 묶고, `/admin/support`는 사용자 검색 기반 grant 생성과 ledger/revoke 흐름을 제공합니다.
 - **AI 운영 콘솔 + 호스트 복구**: `/admin`에서 AI job 상태, 실패 코드, 비용 추정, stale 후보를 보는 AI Ops 표면을 추가하고, 호스트 세션 편집기에서 자기 세션의 in-flight AI job을 다시 찾아 안전하게 취소/재시도할 수 있게 했습니다.
 - **Query foundation 완주**: `archive`, `feedback`, `public` read path를 Query loader seeding으로 이전하고, AI commit 후 full page reload 대신 관련 Query cache invalidation으로 화면을 갱신합니다.
@@ -42,12 +42,14 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
   `/api/admin/clubs/{clubId}/operations` returns aggregate-only readiness, member/session, notification, and AI usage signals without raw member email/body fields.
   `/api/admin/support/*` adds masked user search, grant ledger, 24-hour maximum grant creation, duplicate-active protection, and revoke support.
 - **frontend/query:** move admin notification ledgers, club operations snapshots, and support search/grants into platform-admin Query modules with route loader seeding and focused invalidation. `/admin/health` outbox drilldowns now target `/admin/notifications?focus=...`.
+- **architecture:** server slice registry now covers `admin.audit`, `admin.health`, and `aigen`; `aigen` passes application-safe actor values instead of web/session carriers. Frontend boundary tests also enforce Query module imports, and `/admin/health` keeps data orchestration in the route layer with presentation-only UI components.
+- **public-release:** public release documentation now matches the helper scripts: `docs/superpowers/` remains a private historical archive outside the clean release candidate, while current source-of-truth material belongs in `docs/development/`, `docs/deploy/`, or `docs/operations/`.
 
 ### Deployment Notes
 
-- **DB migration**: Flyway V35 (`admin_notification_replay_previews`) creates the admin notification replay preview/audit table. It is additive; rollback leaves unused rows/table until a later cleanup migration.
-- **배포 순서**: server image를 먼저 배포해 V35와 새 `/api/admin/**` contract를 적용한 뒤 frontend를 배포합니다. 이전 frontend는 새 endpoint를 호출하지 않으므로 서버 선배포가 안전합니다.
-- **운영 확인**: OWNER 또는 OPERATOR 권한으로 `/admin/notifications`에서 replay preview가 10분 TTL과 selection hash를 반환하는지, confirm 후 audit row와 outbox replay 상태가 남는지 확인합니다. `/admin/support`에서는 grant 만료가 24시간 이내로 제한되고 masked email만 보이는지 확인합니다.
+- **DB migration**: Flyway V34 (`ai_generation_admin_action_audit` + `ai_generation_audit_log` indexes) supports AI Ops/audit lookups, and Flyway V35 (`admin_notification_replay_previews`) creates the admin notification replay preview/audit table. Both are additive; rollback leaves unused rows/tables until a later cleanup migration.
+- **배포 순서**: server image를 먼저 배포해 V34/V35와 새 `/api/admin/**` contract를 적용한 뒤 frontend를 배포합니다. 이전 frontend는 새 endpoint를 호출하지 않으므로 서버 선배포가 안전합니다.
+- **운영 확인**: OWNER 또는 OPERATOR 권한으로 `/admin/notifications`에서 replay preview가 10분 TTL과 selection hash를 반환하는지, confirm 후 audit row와 outbox replay 상태가 남는지 확인합니다. `/admin/support`에서는 grant 만료가 24시간 이내로 제한되고 masked email만 보이는지 확인합니다. AI generation이 켜진 환경에서는 `/admin/ai-ops` summary/job ledger와 `/admin/audit`의 AI source filter가 raw transcript나 provider error body 없이 렌더링되는지도 확인합니다.
 
 ## v1.11.0 - 2026-05-18
 

@@ -29,7 +29,6 @@ Active 또는 active 가능 secret이 발견되면 문서 수정으로 끝내지
 - `docs/deploy/`
 - `docs/development/`
 - `docs/operations/README.md`와 `docs/operations/runbooks/`
-- `docs/superpowers/`의 sanitized historical design and implementation records
 - 공개 릴리즈 후보 생성, 검사, fixture 검증, 배포 후 공개 연동 smoke용 `scripts/`
 
 공개 릴리즈 후보에서 제외하는 주요 경로:
@@ -38,6 +37,7 @@ Active 또는 active 가능 secret이 발견되면 문서 수정으로 끝내지
 - `.env`, `.env.*`, 단 `.env.example`은 예외
 - `.envrc`, `.envrc.*`
 - `front/.env*`
+- `docs/superpowers/`의 historical design/spec/implementation records
 - sanitization을 거치지 않은 private planning docs
 - 실제 멤버 데이터, 로컬 절대 경로, private domain, provider state, 실제 secret, token-shaped example, 개인 Gmail 주소가 남아 있는 historical planning docs
 - `design/`
@@ -164,7 +164,7 @@ gitleaks dir "$tmp" --config "$tmp/.gitleaks.toml" --no-banner --redact=100 --ve
 rm -rf "$tmp"
 ```
 
-`docs/superpowers/`는 sanitized historical documentation만 공개 후보에 포함할 수 있습니다. 이 경로를 포함하려면 current-tree scan과 candidate scan 모두에서 local path, private domain, Gmail address, provider token, real-looking secret assignment 검사를 통과해야 합니다. no-arg current-tree scan이 `docs/superpowers/`에서 실패하면 공개 후보를 만들기 전에 해당 문서를 먼저 정리합니다.
+`docs/superpowers/`는 historical design/spec/implementation record로 보관하되 clean 공개 릴리즈 후보에는 포함하지 않습니다. 현재 동작이나 운영 절차로 승격된 내용은 `docs/development/`, `docs/deploy/`, `docs/operations/` 중 적절한 source-of-truth 문서로 옮긴 뒤 공개 후보 scanner 대상에 둡니다. 현재 private tree에서 `docs/superpowers/` finding이 필요 이상으로 많다면 공개 후보 build/check 결과를 우선하고, 해당 historical 문서를 source-of-truth로 승격하지 않습니다.
 
 Git history까지 검사하는 `gitleaks detect --source .`는 이미 공개된 과거 commit의 redacted 예시나 fixture를 계속 보고할 수 있습니다. 현재 tree와 clean 후보가 `gitleaks dir` 및 public-release check를 통과하고 active secret이 아니라는 검토가 끝났다면 history rewrite를 기본 선택으로 삼지 않습니다. History rewrite, force-push, mirror push는 기존 fork, clone, cache, search index에 남은 흔적을 보장해서 제거하지 못하므로 active 또는 active 가능 secret이 확인되고 별도 승인이 있을 때만 검토합니다.
 
