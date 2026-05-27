@@ -14,12 +14,35 @@ type BoundaryRuleId =
   | "shared-boundary"
   | "feature-to-feature"
   | "feature-model"
+  | "feature-queries"
   | "feature-route"
   | "feature-ui"
   | "readmates-api-compat"
   | "feature-components-public";
 
-const legacyBoundaryExceptions = [] satisfies Array<{
+const legacyBoundaryExceptions = [
+  {
+    sourcePath: "features/host/queries/host-members-queries.ts",
+    importPath: "features/host/route/host-members-actions",
+    ruleId: "feature-queries",
+    reason: "Host member mutation queries still reuse route-owned action payload types from the pre-queries split.",
+    removeWhen: "Move host member action payload contracts into model or query-local contracts.",
+  },
+  {
+    sourcePath: "features/host/ui/host-invitations.tsx",
+    importPath: "features/host/queries/host-invitation-queries",
+    ruleId: "feature-ui",
+    reason: "Host invitations UI still owns query invalidation during the server-state migration.",
+    removeWhen: "Move host invitation query ownership to the route and pass props/callbacks into UI.",
+  },
+  {
+    sourcePath: "features/host/ui/host-members.tsx",
+    importPath: "features/host/queries/host-members-queries",
+    ruleId: "feature-ui",
+    reason: "Host members UI still owns query invalidation during the server-state migration.",
+    removeWhen: "Move host member query ownership to the route and pass props/callbacks into UI.",
+  },
+] satisfies Array<{
   sourcePath: string;
   importPath: string;
   ruleId: BoundaryRuleId;
@@ -236,6 +259,10 @@ function isFeatureModelFile(relativePath: string) {
   return /^features\/[^/]+\/model\//.test(relativePath);
 }
 
+function isFeatureQueriesFile(relativePath: string) {
+  return /^features\/[^/]+\/queries\//.test(relativePath);
+}
+
 function isFeatureComponentsFile(relativePath: string) {
   return /^features\/[^/]+\/components\//.test(relativePath);
 }
@@ -345,10 +372,24 @@ function isFeatureModelBoundaryImport(sourceFile: SourceFile, importSpecifier: I
   return (
     isSharedApiImport(importSpecifier.projectPath) ||
     isFeatureLayerImport(importSpecifier.projectPath, "api") ||
+    isFeatureLayerImport(importSpecifier.projectPath, "queries") ||
     isFeatureLayerImport(importSpecifier.projectPath, "route") ||
     isFeatureLayerImport(importSpecifier.projectPath, "ui") ||
     importSpecifier.projectPath.startsWith("src/pages/") ||
     importSpecifier.projectPath.startsWith("src/app/")
+  );
+}
+
+function isFeatureQueriesBoundaryImport(sourceFile: SourceFile, projectPath: string | null) {
+  if (!isFeatureQueriesFile(sourceFile.relativePath) || projectPath === null) {
+    return false;
+  }
+
+  return (
+    isFeatureLayerImport(projectPath, "ui") ||
+    isFeatureLayerImport(projectPath, "route") ||
+    projectPath.startsWith("src/pages/") ||
+    projectPath.startsWith("src/app/")
   );
 }
 
@@ -360,6 +401,7 @@ function isFeatureUiBoundaryImport(sourceFile: SourceFile, projectPath: string |
   return (
     isSharedApiImport(projectPath) ||
     isFeatureLayerImport(projectPath, "api") ||
+    isFeatureLayerImport(projectPath, "queries") ||
     isFeatureLayerImport(projectPath, "route") ||
     projectPath.startsWith("src/pages/") ||
     projectPath.startsWith("src/app/")
@@ -493,6 +535,22 @@ describe("frontend architecture boundaries", () => {
     }
   });
 
+  it("rejects query imports from UI and route modules", () => {
+    const sourceFile: SourceFile = {
+      absolutePath: "/unused/features/platform-admin/queries/platform-admin-health-queries.ts",
+      displayPath: "front/features/platform-admin/queries/platform-admin-health-queries.ts",
+      relativePath: "features/platform-admin/queries/platform-admin-health-queries.ts",
+    };
+
+    const uiImport = normalizeImportSpecifier(sourceFile, "@/features/platform-admin/ui/admin-health-grid");
+    const routeImport = normalizeImportSpecifier(sourceFile, "@/features/platform-admin/route/admin-health-route");
+    const apiImport = normalizeImportSpecifier(sourceFile, "@/features/platform-admin/api/platform-admin-health-api");
+
+    expect(isFeatureQueriesBoundaryImport(sourceFile, uiImport.projectPath)).toBe(true);
+    expect(isFeatureQueriesBoundaryImport(sourceFile, routeImport.projectPath)).toBe(true);
+    expect(isFeatureQueriesBoundaryImport(sourceFile, apiImport.projectPath)).toBe(false);
+  });
+
   it("keeps shared, feature route, feature model, and feature UI dependencies inside their allowed boundaries", () => {
     assertLegacyBoundaryExceptionsAreUnique();
 
@@ -531,6 +589,17 @@ describe("frontend architecture boundaries", () => {
             importSpecifier,
             "feature-model",
             "feature model files must stay framework-independent and must not import API clients.",
+          );
+        }
+
+        if (isFeatureQueriesBoundaryImport(sourceFile, importSpecifier.projectPath)) {
+          addImportViolation(
+            violations,
+            consumedLegacyExceptions,
+            sourceFile,
+            importSpecifier,
+            "feature-queries",
+            "feature query files must not import UI, route, app, or page modules.",
           );
         }
 
