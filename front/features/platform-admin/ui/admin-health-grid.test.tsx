@@ -1,16 +1,10 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import type { PlatformHealthSnapshot } from "@/features/platform-admin/model/platform-admin-health-model";
 import { AdminHealthGrid } from "@/features/platform-admin/ui/admin-health-grid";
-
-const readmatesFetchMock = vi.hoisted(() => vi.fn());
-
-vi.mock("@/shared/api/client", () => ({
-  readmatesFetch: readmatesFetchMock,
-}));
 
 const HEALTH_SNAPSHOT: PlatformHealthSnapshot = {
   schema: "platform.health_snapshot.v1",
@@ -112,38 +106,34 @@ const HEALTH_SNAPSHOT: PlatformHealthSnapshot = {
   ],
 };
 
-function renderGrid() {
-  const client = new QueryClient({
-    defaultOptions: {
-      queries: {
-        gcTime: Infinity,
-        retry: false,
-      },
-    },
-  });
+function renderGrid(
+  props: Partial<ComponentProps<typeof AdminHealthGrid>> = {},
+) {
+  const defaultProps: ComponentProps<typeof AdminHealthGrid> = {
+    snapshot: HEALTH_SNAPSHOT,
+    loading: false,
+    error: false,
+    fetching: false,
+    stale: false,
+    onRefresh: vi.fn(),
+  };
   render(
-    <QueryClientProvider client={client}>
-      <MemoryRouter>
-        <AdminHealthGrid />
-      </MemoryRouter>
-    </QueryClientProvider>,
+    <MemoryRouter>
+      <AdminHealthGrid {...defaultProps} {...props} />
+    </MemoryRouter>,
   );
-  return client;
+  return { onRefresh: defaultProps.onRefresh };
 }
 
 describe("AdminHealthGrid", () => {
   afterEach(() => {
-    vi.useRealTimers();
     vi.restoreAllMocks();
-    readmatesFetchMock.mockReset();
   });
 
-  it("renders six health cards plus a separate deploy strip from the seven-card snapshot", async () => {
-    readmatesFetchMock.mockResolvedValueOnce(HEALTH_SNAPSHOT);
-
+  it("renders six health cards plus a separate deploy strip from the seven-card snapshot", () => {
     renderGrid();
 
-    expect(await screen.findByText("Outbox backlog")).toBeInTheDocument();
+    expect(screen.getByText("Outbox backlog")).toBeInTheDocument();
     expect(screen.getByText("Kafka consumer lag")).toBeInTheDocument();
     expect(screen.getByText("Redis")).toBeInTheDocument();
     expect(screen.getByText("DB pool")).toBeInTheDocument();
@@ -153,38 +143,19 @@ describe("AdminHealthGrid", () => {
     expect(screen.getByText(/readmates-api:dev-20260526/)).toBeInTheDocument();
   });
 
-  it("refresh button fetches a second snapshot", async () => {
-    readmatesFetchMock.mockResolvedValueOnce(HEALTH_SNAPSHOT).mockResolvedValueOnce(HEALTH_SNAPSHOT);
+  it("calls the refresh callback", async () => {
     const user = userEvent.setup();
+    const onRefresh = vi.fn();
 
-    renderGrid();
+    renderGrid({ onRefresh });
 
-    await screen.findByText("Outbox backlog");
     await user.click(screen.getByRole("button", { name: "새로고침" }));
 
-    await waitFor(() => expect(readmatesFetchMock).toHaveBeenCalledTimes(2));
+    expect(onRefresh).toHaveBeenCalledTimes(1);
   });
 
-  it("marks the snapshot stale after thirty seconds", async () => {
-    vi.useFakeTimers({ now: new Date("2026-05-26T00:00:05Z") });
-    const fakeSetInterval = window.setInterval;
-    vi.spyOn(window, "setInterval").mockImplementation((handler, timeout, ...args) => {
-      if (timeout === 15_000) return 0;
-      return fakeSetInterval(handler, timeout, ...args);
-    });
-    readmatesFetchMock.mockResolvedValueOnce(HEALTH_SNAPSHOT);
-
-    renderGrid();
-
-    await act(async () => {
-      await Promise.resolve();
-      await Promise.resolve();
-      await vi.advanceTimersByTimeAsync(1);
-    });
-    expect(screen.getByText("최신")).toBeInTheDocument();
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(31_000);
-    });
+  it("marks the snapshot stale when the route says it is stale", () => {
+    renderGrid({ stale: true });
 
     expect(screen.getByText("30초 이상 경과")).toBeInTheDocument();
   });
