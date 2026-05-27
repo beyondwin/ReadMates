@@ -928,6 +928,275 @@
   font-size: 12px;
 }
 
+.admin-notifications {
+  display: grid;
+  gap: 24px;
+  max-width: 1160px;
+}
+
+.admin-notifications__header,
+.admin-notifications__panel-heading,
+.admin-notifications__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.admin-notifications__timestamp,
+.admin-notifications__safe-code {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.admin-notifications__focus,
+.admin-notifications__error,
+.admin-notifications__success,
+.admin-notifications__loading {
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  padding: 14px 16px;
+}
+
+.admin-notifications__focus,
+.admin-notifications__success {
+  background: var(--bg-sub);
+}
+
+.admin-notifications__error {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.admin-notifications__summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.admin-notifications__metric {
+  min-height: 94px;
+}
+
+.admin-notifications__metric strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 28px;
+}
+
+.admin-notifications__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.8fr);
+  gap: 18px;
+}
+
+.admin-notifications__panel,
+.admin-notifications__ledger {
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  background: var(--bg);
+  padding: 20px;
+}
+
+.admin-notifications__cluster-list,
+.admin-notifications__rows {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-notifications__cluster-list li,
+.admin-notifications__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 14px;
+  border-top: 1px solid var(--line);
+  padding: 14px 0;
+}
+
+.admin-notifications__cluster-list li:first-child,
+.admin-notifications__row:first-child {
+  border-top: 0;
+}
+
+.admin-notifications__cluster-list em {
+  color: var(--muted);
+  font-style: normal;
+  font-size: 13px;
+}
+
+.admin-notifications__preview {
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  padding: 14px;
+}
+
+.admin-notifications__reason {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.admin-notifications__reason span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.admin-notifications__reason textarea {
+  min-width: 0;
+  resize: vertical;
+}
+
+.admin-notifications__row-title {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-club-operations {
+  display: grid;
+  gap: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  padding: 20px;
+  background: var(--bg);
+}
+
+.admin-club-operations__header,
+.admin-club-operations__stat,
+.admin-club-operations__links {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.admin-club-operations__summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-club-operations__metric strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 24px;
+}
+
+.admin-club-operations__blockers,
+.admin-club-operations__links {
+  flex-wrap: wrap;
+}
+
+.admin-club-operations__blockers span,
+.admin-club-operations__link {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  padding: 6px 10px;
+  color: var(--text-2);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.admin-club-operations__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.admin-club-operations__panel {
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  padding: 16px;
+}
+
+.admin-club-operations__stats {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-club-operations__stat {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.admin-club-operations__stat:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.admin-club-operations__stat span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.admin-support-workbench {
+  display: grid;
+  gap: 18px;
+  max-width: 1040px;
+}
+
+.admin-support-workbench__header,
+.admin-support-workbench__search,
+.admin-support-workbench__ledger-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.admin-support-workbench__header .field-group {
+  min-width: min(320px, 100%);
+}
+
+.admin-support-workbench__panel,
+.admin-support-workbench__error {
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  padding: 18px;
+  background: var(--bg);
+}
+
+.admin-support-workbench__error {
+  color: var(--danger);
+}
+
+.admin-support-workbench__search .input {
+  flex: 1;
+}
+
+.admin-support-workbench__results,
+.admin-support-workbench__ledger {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-support-workbench__results button,
+.admin-support-workbench__ledger-row {
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  padding: 12px;
+  background: var(--bg-sub);
+  color: var(--text);
+  text-align: left;
+}
+
+.admin-support-workbench__results button {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-support-workbench__results em {
+  color: var(--muted);
+  font-style: normal;
+  font-size: 13px;
+}
+
 .rm-route-stage {
   min-height: inherit;
 }
@@ -2021,6 +2290,42 @@
 
   .admin-health-grid__refresh {
     width: 100%;
+  }
+
+  .admin-notifications__header,
+  .admin-notifications__panel-heading,
+  .admin-notifications__actions {
+    display: grid;
+    justify-items: stretch;
+  }
+
+  .admin-notifications__summary,
+  .admin-notifications__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-notifications__cluster-list li,
+  .admin-notifications__row {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .admin-club-operations__header,
+  .admin-club-operations__links {
+    display: grid;
+    justify-items: stretch;
+  }
+
+  .admin-club-operations__summary,
+  .admin-club-operations__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-support-workbench__header,
+  .admin-support-workbench__search,
+  .admin-support-workbench__ledger-row {
+    display: grid;
+    justify-items: stretch;
   }
 
   @media (max-width: 520px) {

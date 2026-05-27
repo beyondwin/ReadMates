@@ -14,7 +14,7 @@ ReadMates는 여러 정기 독서모임의 공개 소개, 멤버 세션 준비, 
 | 로그인 후 진입 | `/app`, `/clubs/:slug/app`, 등록된 club host의 `/app` | 로그인 사용자 | 가입 클럽이 하나면 해당 클럽 앱으로 이동하고, 여러 개면 클럽 선택 화면을 보여주며, 선택한 클럽 context로 앱에 진입 |
 | 멤버 앱 | `/clubs/:slug/app`, `/clubs/:slug/app/pending`, `/clubs/:slug/app/session/current`, `/clubs/:slug/app/notes`, `/clubs/:slug/app/archive`, `/clubs/:slug/app/sessions/:sessionId`, `/clubs/:slug/app/feedback/:sessionId`, `/clubs/:slug/app/feedback/:sessionId/print`, `/clubs/:slug/app/me`, `/clubs/:slug/app/notifications`, 등록된 club host의 `/app/**` | 둘러보기 멤버, 정식 멤버, 호스트 | 현재 세션 확인, 멤버 공개 예정 세션 확인, 둘러보기 멤버 안내, RSVP, 읽은 분량, 질문, 한줄평, 장문 서평, 아카이브, 참석 회차 피드백 문서, 본인 표시 이름과 알림 설정 변경, 클럽별 멤버 알림함 확인 |
 | 호스트 앱 | `/clubs/:slug/app/host`, `/clubs/:slug/app/host/notifications`, `/clubs/:slug/app/host/members`, `/clubs/:slug/app/host/invitations`, `/clubs/:slug/app/host/sessions/new`, `/clubs/:slug/app/host/sessions/:sessionId/edit`, 등록된 club host의 `/app/host/**` | 현재 클럽의 호스트 | 예정 세션 생성/수정, 공개 범위 설정, 현재 세션 시작, 참석 확정, 진행 세션 닫기, 닫힌 기록 발행, 세션 기록 완성(AI 생성 또는 외부 JSON 가져오기), 초대 관리, 멤버 상태와 표시 이름 관리, 세션 기록 패키지 저장, 알림 발송 운영 |
-| 플랫폼 관리 | `/admin` | platform admin | 클럽 생성, 클럽 목록 확인, 공개/비공개 상태 관리, 공개 소개 정보 관리, 등록형 domain alias 요청과 상태 확인, 첫 호스트 온보딩 상태 확인. 세션/멤버/알림 같은 클럽 내부 운영은 호스트 앱 책임 |
+| 플랫폼 관리 | `/admin`, `/admin/health`, `/admin/notifications`, `/admin/clubs/:clubId`, `/admin/support`, `/admin/ai-ops` | platform admin | 클럽 생성, 클럽 목록 확인, 공개/비공개 상태 관리, 공개 소개 정보 관리, 등록형 domain alias 요청과 상태 확인, 첫 호스트 온보딩 상태 확인, 운영 health와 알림 outbox/delivery 상태 확인, 클럽 운영 readiness 집계, 제한된 support access grant 관리, AI job 운영 조회. 세션/멤버/알림 발송 같은 클럽 내부 운영은 기본적으로 호스트 앱 책임이고, platform admin 표면은 aggregate/read-only 진단과 감사 가능한 복구 작업만 다룹니다. |
 
 ## 프런트엔드 route-first 경계
 
@@ -102,6 +102,8 @@ Platform admin의 domain 상태 확인은 `https://<hostname>/.well-known/readma
 
 사용자 역할은 club membership마다 독립적입니다. 현재 club membership role은 `HOST`와 `MEMBER`이고, platform admin 권한은 `platform_admins`의 `OWNER`, `OPERATOR`, `SUPPORT`로 별도 판정합니다. Platform `OPERATOR`는 club host가 아니며, 특정 클럽의 호스트 도구를 쓰려면 그 클럽 membership에서도 `HOST` 권한이 있어야 합니다.
 
+Platform admin club operations는 `/api/admin/clubs/{clubId}/operations`에서 현재 클럽의 readiness, lifecycle, host/member/session counts, notification health, AI usage summary를 aggregate-only read model로 반환합니다. Support workbench는 `/api/admin/support/search`, `/api/admin/support/grants`를 사용해 masked email 중심 사용자 검색, active grant ledger, grant create/revoke를 처리합니다. Support access grant 생성은 OWNER 권한, 활성 platform admin grantee, eligible club, 중복 active grant 없음, 24시간 이내 만료, non-blank reason을 모두 만족해야 합니다.
+
 Public cache, 멤버 알림 deep link, host 알림 운영 ledger는 club id 또는 club slug를 포함해 scope를 나눕니다. 공개 cache key는 club id 기준으로 분리하고, 알림 link는 `/clubs/:slug/app/**` canonical path를 사용해 로그인 후에도 원래 클럽 화면으로 복귀합니다.
 
 ## 서버 내부 구조
@@ -116,13 +118,15 @@ adapter.in.web
   -> adapter.out.persistence
 ```
 
-현재 full port/outbound adapter chain을 따르는 범위는 `publication`, `archive`, `feedback`, `session`, `note`, `auth`의 운영 API surface와 `notification` 운영 slice입니다. Disabled password/password-reset/dev-invitation accept endpoint는 `410 Gone` stub으로 남습니다. Auth의 OAuth filter, success handler, cookie/session 보안 구성은 `auth.infrastructure.security`와 `auth.adapter.in.security`에 따로 둡니다.
+현재 full port/outbound adapter chain을 따르는 범위는 `publication`, `archive`, `feedback`, `session`, `note`, `auth`의 운영 API surface, `notification` 운영 slice, `club`의 platform-admin 운영 slice입니다. Disabled password/password-reset/dev-invitation accept endpoint는 `410 Gone` stub으로 남습니다. Auth의 OAuth filter, success handler, cookie/session 보안 구성은 `auth.infrastructure.security`와 `auth.adapter.in.security`에 따로 둡니다.
 
 Notification slice는 MySQL `notification_event_outbox`를 이벤트 source of truth로 유지합니다. Relay scheduler가 publish 가능한 row를 Kafka topic `readmates.notification.events.v1`로 발행하고, 같은 Spring Boot 모듈의 Kafka consumer가 이벤트별 수신자를 계산해 멤버 선호도를 적용한 뒤 `notification_deliveries`와 `member_notifications`를 만듭니다. 이메일 발송은 `notification_deliveries`의 `EMAIL` row를 기준으로 재시도 가능한 side effect로 처리하고, in-app 알림은 `member_notifications`가 멤버 inbox source of truth입니다. 이벤트 발행 상태는 `notification_event_outbox`, 채널별 발송/skip 상태는 `notification_deliveries`, 멤버 inbox 상태는 `member_notifications`에 저장합니다.
 
 호스트 수동 알림도 같은 outbox 파이프라인에 들어갑니다. 호스트는 `/api/host/notifications/manual/options`에서 세션별 템플릿, 대상 멤버, 최근 수동 발송 이력을 읽고, `/api/host/notifications/manual/preview`로 대상 수와 이메일 선호도 skip/missing 경고를 확인한 뒤, `/api/host/notifications/manual`로 확정합니다. Preview는 selection hash와 10분 TTL을 가진 `notification_manual_dispatch_previews` row로 저장되고, 확정 시 `notification_manual_dispatches`와 `notification_event_outbox` row가 같은 트랜잭션에서 만들어집니다. 이미 같은 세션/템플릿으로 최근 수동 발송이 있으면 confirm은 명시적인 `resendConfirmed` 없이는 실패합니다. `NEXT_BOOK_PUBLISHED`, `SESSION_REMINDER_DUE`, `FEEDBACK_DOCUMENT_PUBLISHED`만 수동 템플릿으로 열리며, `REVIEW_PUBLISHED`는 사용자가 작성한 서평 이벤트에 묶인 자동 알림으로 유지합니다.
 
 `NotificationDeliveryEngine`은 claimed email delivery의 SMTP 전송, retry/dead 전환, redacted error 저장, metrics/logging을 한 곳에서 처리하고, automatic event dispatch path, manual event dispatch path, pending-delivery worker path가 같은 engine을 사용합니다. 이메일 copy는 `notification.application.model`의 순수 template helper가 in-app 제목/본문/deep link, 이메일 subject, plain text, HTML을 함께 렌더링하고, SMTP adapter는 HTML이 있으면 plain text fallback을 포함한 multipart MIME으로 발송합니다. 호스트 알림 상세 API는 subject, masked recipient, deep link, allowlist metadata만 노출하고 plain/HTML body는 노출하지 않습니다. 테스트 메일 audit은 별도 `notification_test_mail_audit` table에 masked email과 hash만 저장합니다. 발행 조건, 생성 시점, relay/consumer 주기, 재시도 정책은 [OCI backend runbook](../deploy/oci-backend.md#email-notification-operations)을 기준으로 운영합니다. 패키지 경계는 아래처럼 web/scheduler/Kafka inbound adapter, application service, outbound port, persistence/mail/Kafka adapter로 나눕니다.
+
+Platform admin 알림 운영은 `/api/admin/notifications/snapshot`, `/api/admin/notifications/events`, `/api/admin/notifications/deliveries`, `/api/admin/notifications/replay-preview`, `/api/admin/notifications/replay-confirm`을 사용합니다. Snapshot과 ledgers는 outbox/delivery 상태, relay lag, 실패 cluster, club별 health를 aggregate 중심으로 보여주며 raw email body나 원문 recipient를 노출하지 않습니다. Replay는 OWNER/OPERATOR만 사용할 수 있고 preview selection hash, actor, 10분 TTL, confirm reason을 확인한 뒤 감사 가능한 replay outbox row를 만듭니다. Preview/audit 저장소는 Flyway V35 `admin_notification_replay_previews` table입니다.
 
 ```text
 notification
@@ -296,7 +300,7 @@ ReadMates는 클럽별로 하나의 현재 `OPEN` 세션과 여러 개의 예정
 
 범위가 있는 목록 endpoint는 cursor 기반 page object를 반환합니다. 공통 응답 필드는 `{ "items": [...], "nextCursor": string | null }`이고, 다음 page가 없으면 `nextCursor`는 `null`입니다. Endpoint에 따라 `/api/me/notifications`의 `unreadCount`처럼 목록 전체 상태를 나타내는 추가 field가 붙을 수 있습니다. Request query는 endpoint별 기본값과 최대값을 둔 `limit`, `cursor`를 사용합니다.
 
-이 contract를 따르는 목록은 archive의 `/api/archive/sessions`, `/api/archive/me/questions`, `/api/archive/me/reviews`, notes의 `/api/notes/sessions`, `/api/notes/feed`, feedback의 `/api/feedback-documents/me`, host의 `/api/host/sessions`, `/api/host/members`, `/api/host/members/viewers`, `/api/host/members/pending-approvals`, `/api/host/invitations`, notification의 `/api/me/notifications`, `/api/host/notifications/items`, `/api/host/notifications/events`, `/api/host/notifications/deliveries`, `/api/host/notifications/manual/dispatches`, `/api/host/notifications/test-mail/audit`입니다. `GET /api/host/notifications/manual/options`도 멤버 선택 목록을 같은 cursor page shape로 반환합니다. 예를 들어 `GET /api/host/members/pending-approvals?limit=2`는 pending viewer approval 목록의 첫 page를 반환하고, 다음 page는 응답의 `nextCursor`를 `cursor` query로 넘겨 요청합니다.
+이 contract를 따르는 목록은 archive의 `/api/archive/sessions`, `/api/archive/me/questions`, `/api/archive/me/reviews`, notes의 `/api/notes/sessions`, `/api/notes/feed`, feedback의 `/api/feedback-documents/me`, host의 `/api/host/sessions`, `/api/host/members`, `/api/host/members/viewers`, `/api/host/members/pending-approvals`, `/api/host/invitations`, notification의 `/api/me/notifications`, `/api/host/notifications/items`, `/api/host/notifications/events`, `/api/host/notifications/deliveries`, `/api/host/notifications/manual/dispatches`, `/api/host/notifications/test-mail/audit`, platform admin의 `/api/admin/notifications/events`, `/api/admin/notifications/deliveries`입니다. `GET /api/host/notifications/manual/options`도 멤버 선택 목록을 같은 cursor page shape로 반환합니다. 예를 들어 `GET /api/host/members/pending-approvals?limit=2`는 pending viewer approval 목록의 첫 page를 반환하고, 다음 page는 응답의 `nextCursor`를 `cursor` query로 넘겨 요청합니다.
 
 위 scoped endpoint에는 legacy array response contract가 없습니다. 프런트엔드 loader와 route action은 `items`를 누적하고 `nextCursor`로 명시적인 더보기 control을 보여줘야 하며, 새 scoped 목록 API도 같은 공통 page field를 사용합니다.
 

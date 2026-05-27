@@ -17,6 +17,8 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import java.util.UUID
 
 @SpringBootTest(
@@ -71,7 +73,7 @@ class SupportAccessGrantControllerTest(
                           "granteeUserId": "$grantee",
                           "scope": "HOST_SUPPORT_READ",
                           "reason": "Customer escalation ticket #1234",
-                          "expiresAt": "2099-01-01T12:00:00Z"
+                          "expiresAt": "${expiresSoonJson()}"
                         }
                         """.trimIndent()
                     cookie(sessionCookieForUser(owner))
@@ -105,7 +107,7 @@ class SupportAccessGrantControllerTest(
                       "granteeUserId": "$grantee",
                       "scope": "HOST_SUPPORT_READ",
                       "reason": "",
-                      "expiresAt": "2099-01-01T12:00:00Z"
+                      "expiresAt": "${expiresSoonJson()}"
                     }
                     """.trimIndent()
                 cookie(sessionCookieForUser(owner))
@@ -130,7 +132,7 @@ class SupportAccessGrantControllerTest(
                           "granteeUserId": "$grantee",
                           "scope": "HOST_SUPPORT_READ",
                           "reason": "List test",
-                          "expiresAt": "2099-01-01T12:00:00Z"
+                          "expiresAt": "${expiresSoonJson()}"
                         }
                         """.trimIndent()
                     cookie(sessionCookieForUser(owner))
@@ -165,7 +167,7 @@ class SupportAccessGrantControllerTest(
                           "granteeUserId": "$grantee",
                           "scope": "HOST_SUPPORT_READ",
                           "reason": "Grantee list test",
-                          "expiresAt": "2099-01-01T12:00:00Z"
+                          "expiresAt": "${expiresSoonJson()}"
                         }
                         """.trimIndent()
                     cookie(sessionCookieForUser(owner))
@@ -200,7 +202,7 @@ class SupportAccessGrantControllerTest(
                           "granteeUserId": "$grantee",
                           "scope": "HOST_SUPPORT_READ",
                           "reason": "Revoke test",
-                          "expiresAt": "2099-01-01T12:00:00Z"
+                          "expiresAt": "${expiresSoonJson()}"
                         }
                         """.trimIndent()
                     cookie(sessionCookieForUser(owner))
@@ -244,7 +246,7 @@ class SupportAccessGrantControllerTest(
                           "granteeUserId": "$grantee",
                           "scope": "HOST_SUPPORT_READ",
                           "reason": "Active list after revoke test",
-                          "expiresAt": "2099-01-01T12:00:00Z"
+                          "expiresAt": "${expiresSoonJson()}"
                         }
                         """.trimIndent()
                     cookie(sessionCookieForUser(owner))
@@ -303,7 +305,7 @@ class SupportAccessGrantControllerTest(
                           "granteeUserId": "$grantee",
                           "scope": "HOST_SUPPORT_READ",
                           "reason": "Elevation test",
-                          "expiresAt": "2099-01-01T12:00:00Z"
+                          "expiresAt": "${expiresSoonJson()}"
                         }
                         """.trimIndent()
                     cookie(sessionCookieForUser(owner))
@@ -353,7 +355,7 @@ class SupportAccessGrantControllerTest(
                           "granteeUserId": "$grantee",
                           "scope": "HOST_SUPPORT_READ",
                           "reason": "Audit test",
-                          "expiresAt": "2099-01-01T12:00:00Z"
+                          "expiresAt": "${expiresSoonJson()}"
                         }
                         """.trimIndent()
                     cookie(sessionCookieForUser(owner))
@@ -386,7 +388,7 @@ class SupportAccessGrantControllerTest(
                           "granteeUserId": "$grantee",
                           "scope": "HOST_SUPPORT_READ",
                           "reason": "Support access for host endpoint test",
-                          "expiresAt": "2099-01-01T12:00:00Z"
+                          "expiresAt": "${expiresSoonJson()}"
                         }
                         """.trimIndent()
                     cookie(sessionCookieForUser(owner))
@@ -433,7 +435,7 @@ class SupportAccessGrantControllerTest(
                           "granteeUserId": "$grantee",
                           "scope": "HOST_SUPPORT_READ",
                           "reason": "Revoked grant host endpoint test",
-                          "expiresAt": "2099-01-01T12:00:00Z"
+                          "expiresAt": "${expiresSoonJson()}"
                         }
                         """.trimIndent()
                     cookie(sessionCookieForUser(owner))
@@ -487,7 +489,7 @@ class SupportAccessGrantControllerTest(
                       "granteeUserId": "$grantee",
                       "scope": "HOST_SUPPORT_READ",
                       "reason": "Customer escalation ticket #1234",
-                      "expiresAt": "2099-01-01T12:00:00Z"
+                      "expiresAt": "${expiresSoonJson()}"
                     }
                     """.trimIndent()
                 cookie(sessionCookieForUser(operator))
@@ -511,7 +513,7 @@ class SupportAccessGrantControllerTest(
                       "granteeUserId": "$grantee",
                       "scope": "HOST_SUPPORT_READ",
                       "reason": "Customer escalation ticket #1234",
-                      "expiresAt": "2099-01-01T12:00:00Z"
+                      "expiresAt": "${expiresSoonJson()}"
                     }
                     """.trimIndent()
                 cookie(sessionCookieForUser(support))
@@ -537,7 +539,7 @@ class SupportAccessGrantControllerTest(
                           "granteeUserId": "$grantee",
                           "scope": "HOST_SUPPORT_READ",
                           "reason": "Revoke permission test",
-                          "expiresAt": "2099-01-01T12:00:00Z"
+                          "expiresAt": "${expiresSoonJson()}"
                         }
                         """.trimIndent()
                     cookie(sessionCookieForUser(owner))
@@ -571,7 +573,7 @@ class SupportAccessGrantControllerTest(
                           "granteeUserId": "$grantee",
                           "scope": "HOST_SUPPORT_READ",
                           "reason": "Revoke audit test",
-                          "expiresAt": "2099-01-01T12:00:00Z"
+                          "expiresAt": "${expiresSoonJson()}"
                         }
                         """.trimIndent()
                     cookie(sessionCookieForUser(owner))
@@ -633,6 +635,8 @@ class SupportAccessGrantControllerTest(
         createdSessionTokenHashes += issuedSession.storedTokenHash
         return Cookie(AuthSessionService.COOKIE_NAME, issuedSession.rawToken)
     }
+
+    private fun expiresSoonJson(): String = OffsetDateTime.now(ZoneOffset.UTC).plusHours(2).toString()
 
     private fun deleteWhereIn(
         tableName: String,

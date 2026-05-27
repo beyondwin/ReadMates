@@ -62,6 +62,6 @@ class OutboxBacklogHealthCardProvider(
         private const val WARN_THRESHOLD = 100.0
         private const val CRIT_THRESHOLD = 1000.0
         private val THRESHOLDS = HealthCardThresholds(warn = WARN_THRESHOLD, crit = CRIT_THRESHOLD)
-        private val DRILL = HealthCardDrill.AdminRoute("/admin/notifications")
+        private val DRILL = HealthCardDrill.AdminRoute("/admin/notifications?focus=outbox_backlog")
     }
 }

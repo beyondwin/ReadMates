@@ -1,5 +1,6 @@
 package com.readmates.club.application.port.`in`
 
+import com.readmates.club.application.model.AdminClubOperationsSnapshot
 import com.readmates.club.application.model.CreateClubDomainCommand
 import com.readmates.club.application.model.PlatformAdminClubDomain
 import com.readmates.club.application.model.PlatformAdminClubList
@@ -55,4 +56,11 @@ interface CommitPlatformAdminClubOnboardingUseCase {
         admin: CurrentPlatformAdmin,
         command: PlatformAdminOnboardingCommand,
     ): PlatformAdminOnboardingResult
+}
+
+interface GetAdminClubOperationsUseCase {
+    fun operationsSnapshot(
+        admin: CurrentPlatformAdmin,
+        clubId: UUID,
+    ): AdminClubOperationsSnapshot
 }

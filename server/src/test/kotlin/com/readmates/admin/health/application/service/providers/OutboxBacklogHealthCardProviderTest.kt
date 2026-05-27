@@ -28,7 +28,7 @@ class OutboxBacklogHealthCardProviderTest {
         assertThat(card.id).isEqualTo("outbox_backlog")
         assertThat(card.status).isEqualTo(HealthCardStatus.OK)
         assertThat(card.metric?.value).isEqualTo(42.0)
-        assertThat(card.drill).isEqualTo(HealthCardDrill.AdminRoute("/admin/notifications"))
+        assertThat(card.drill).isEqualTo(HealthCardDrill.AdminRoute("/admin/notifications?focus=outbox_backlog"))
     }
 
     @Test

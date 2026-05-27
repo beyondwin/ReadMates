@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
     assignableTypes = [
         PlatformAdminController::class,
         PlatformAdminClubController::class,
+        PlatformAdminClubOperationsController::class,
+        PlatformAdminSupportWorkbenchController::class,
         SupportAccessGrantController::class,
     ],
 )
@@ -32,5 +34,11 @@ class PlatformAdminErrorHandler {
             PlatformAdminError.CLUB_DOMAIN_CONFLICT -> HttpStatus.CONFLICT
             PlatformAdminError.GRANT_NOT_FOUND -> HttpStatus.NOT_FOUND
             PlatformAdminError.GRANT_REASON_REQUIRED -> HttpStatus.BAD_REQUEST
+            PlatformAdminError.SUPPORT_TARGET_NOT_FOUND -> HttpStatus.BAD_REQUEST
+            PlatformAdminError.SUPPORT_TARGET_NOT_ELIGIBLE -> HttpStatus.BAD_REQUEST
+            PlatformAdminError.GRANT_EXPIRY_REQUIRED -> HttpStatus.BAD_REQUEST
+            PlatformAdminError.GRANT_EXPIRY_IN_PAST -> HttpStatus.BAD_REQUEST
+            PlatformAdminError.GRANT_EXPIRY_TOO_LONG -> HttpStatus.BAD_REQUEST
+            PlatformAdminError.GRANT_DUPLICATE_ACTIVE -> HttpStatus.CONFLICT
         }
 }

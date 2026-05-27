@@ -6,6 +6,7 @@ import {
   platformAdminClubsQuery,
   platformAdminSupportGrantsQuery,
 } from "@/features/platform-admin/queries/platform-admin-queries";
+import { platformAdminClubOperationsQuery } from "@/features/platform-admin/queries/platform-admin-club-operations-queries";
 import { AdminBreadcrumbProvider } from "./admin-breadcrumb-context";
 import { AdminClubDetailRoute } from "./admin-club-detail-route";
 
@@ -16,9 +17,20 @@ function renderRoute(clubId: string, clubs: Array<{
   domainCount: number; domainActionRequiredCount: number;
   firstHostOnboardingState: "MISSING" | "INVITED" | "ASSIGNED";
 }>) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
   queryClient.setQueryData(platformAdminClubsQuery().queryKey, { items: clubs });
   queryClient.setQueryData(platformAdminSupportGrantsQuery(clubId).queryKey, []);
+  queryClient.setQueryData(platformAdminClubOperationsQuery(clubId).queryKey, {
+    schema: "admin.club_operations_snapshot.v1",
+    generatedAt: "2026-05-27T00:00:00Z",
+    club: { clubId, slug: "alpha", name: "Alpha", status: "ACTIVE", publicVisibility: "PRIVATE" },
+    readiness: { state: "READY", blockingReasons: [], nextAction: null },
+    memberActivity: { activeCount: 1, dormantCount: 0, pendingViewerCount: 0, hostCount: 1 },
+    sessionProgress: { upcomingCount: 0, currentOpenCount: 0, closedCount: 0, publishedRecordCount: 0, incompleteRecordCount: 0 },
+    notificationHealth: { pending: 0, failed: 0, dead: 0, lastSuccessAt: null, failureClusters: [] },
+    aiUsage: { activeJobs: 0, failedRecentJobs: 0, staleCandidates: 0, costEstimateUsd: "0.0000", state: "NO_RECENT_USAGE" },
+    safeLinks: [],
+  });
   // Bypass loader by injecting loader data via a wrapper route element
   function Wrapper() {
     return <AdminClubDetailRoute />;
@@ -53,6 +65,7 @@ describe("AdminClubDetailRoute", () => {
       domainCount: 0, domainActionRequiredCount: 0, firstHostOnboardingState: "ASSIGNED",
     }]);
     expect(screen.getByRole("heading", { name: "Alpha" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Alpha 운영 스냅샷" })).toBeInTheDocument();
     expect(screen.getByText(/alpha/)).toBeInTheDocument();
   });
 });

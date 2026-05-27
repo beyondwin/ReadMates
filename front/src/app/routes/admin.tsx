@@ -97,10 +97,11 @@ function readyChild(route: AdminRouteDescriptor, queryClient: QueryClient): Rout
         path: "support",
         hydrateFallbackElement: adminChildHydrateFallback,
         lazy: async () => {
-          const { AdminSupportRoute } = await import(
-            "@/features/platform-admin/route/admin-support-route"
-          );
-          return { Component: AdminSupportRoute };
+          const [{ AdminSupportRoute }, { adminSupportLoaderFactory }] = await Promise.all([
+            import("@/features/platform-admin/route/admin-support-route"),
+            import("@/features/platform-admin/route/admin-support-data"),
+          ]);
+          return { Component: AdminSupportRoute, loader: adminSupportLoaderFactory(queryClient) };
         },
       };
     case "health":
@@ -113,6 +114,21 @@ function readyChild(route: AdminRouteDescriptor, queryClient: QueryClient): Rout
             import("@/features/platform-admin/route/admin-health-data"),
           ]);
           return { Component: AdminHealthRoute, loader: adminHealthLoaderFactory(queryClient) };
+        },
+      };
+    case "notifications":
+      return {
+        path: "notifications",
+        hydrateFallbackElement: adminChildHydrateFallback,
+        lazy: async () => {
+          const [{ AdminNotificationsRoute }, { adminNotificationsLoaderFactory }] = await Promise.all([
+            import("@/features/platform-admin/route/admin-notifications-route"),
+            import("@/features/platform-admin/route/admin-notifications-data"),
+          ]);
+          return {
+            Component: AdminNotificationsRoute,
+            loader: adminNotificationsLoaderFactory(queryClient),
+          };
         },
       };
     default:

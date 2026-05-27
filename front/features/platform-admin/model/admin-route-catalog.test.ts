@@ -56,6 +56,7 @@ describe("ADMIN_ROUTES catalog", () => {
       "ai-ops",
       "clubs",
       "health",
+      "notifications",
       "support",
       "today",
     ]);

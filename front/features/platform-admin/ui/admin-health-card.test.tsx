@@ -13,7 +13,7 @@ function card(overrides: Partial<HealthCard> = {}): HealthCard {
     thresholds: { warn: 100, crit: 1000 },
     lastCheckedAt: "2026-05-26T00:00:00Z",
     source: "IN_PROCESS",
-    drill: { kind: "ADMIN_ROUTE", target: "/admin/notifications" },
+    drill: { kind: "ADMIN_ROUTE", target: "/admin/notifications?focus=outbox_backlog" },
     reason: null,
     deployStrip: null,
     ...overrides,
@@ -29,7 +29,10 @@ describe("AdminHealthCard", () => {
     );
     expect(screen.getByText("Outbox backlog")).toBeInTheDocument();
     expect(screen.getByText(/42/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /자세히/ })).toHaveAttribute("href", "/admin/notifications");
+    expect(screen.getByRole("link", { name: /자세히/ })).toHaveAttribute(
+      "href",
+      "/admin/notifications?focus=outbox_backlog",
+    );
   });
 
   it("renders reason when status is UNKNOWN and metric is null", () => {

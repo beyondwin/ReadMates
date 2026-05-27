@@ -7,7 +7,9 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 
-@RestControllerAdvice(assignableTypes = [MemberNotificationController::class, HostNotificationController::class])
+@RestControllerAdvice(
+    assignableTypes = [MemberNotificationController::class, HostNotificationController::class, PlatformAdminNotificationController::class],
+)
 class NotificationErrorHandler {
     @ExceptionHandler(NotificationApplicationException::class)
     fun handleNotificationApplicationException(exception: NotificationApplicationException): ResponseEntity<Void> =
@@ -23,5 +25,9 @@ class NotificationErrorHandler {
             NotificationApplicationError.DUPLICATE_NOTIFICATION_DISPATCH -> HttpStatus.CONFLICT
             NotificationApplicationError.MANUAL_NOTIFICATION_PREVIEW_EXPIRED -> HttpStatus.CONFLICT
             NotificationApplicationError.MEMBERSHIP_NOT_ALLOWED -> HttpStatus.FORBIDDEN
+            NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_REASON_REQUIRED -> HttpStatus.BAD_REQUEST
+            NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_PREVIEW_EXPIRED -> HttpStatus.CONFLICT
+            NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_PREVIEW_NOT_FOUND -> HttpStatus.NOT_FOUND
+            NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_SELECTION_MISMATCH -> HttpStatus.CONFLICT
         }
 }

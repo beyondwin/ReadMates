@@ -1,6 +1,8 @@
 package com.readmates.club.adapter.out.persistence
 
+import com.readmates.club.application.model.AdminSupportGrantLedgerItem
 import com.readmates.club.application.model.SupportAccessGrant
+import com.readmates.club.application.port.out.AdminSupportGrantLedgerPort
 import com.readmates.club.application.port.out.CreateSupportAccessGrantPort
 import com.readmates.club.application.port.out.LoadSupportAccessGrantPort
 import com.readmates.club.application.port.out.RevokeSupportAccessGrantPort
@@ -23,7 +25,8 @@ class JdbcSupportAccessGrantAdapter(
     private val jdbcTemplate: JdbcTemplate,
 ) : CreateSupportAccessGrantPort,
     RevokeSupportAccessGrantPort,
-    LoadSupportAccessGrantPort {
+    LoadSupportAccessGrantPort,
+    AdminSupportGrantLedgerPort {
     @Transactional
     override fun createGrant(
         clubId: UUID,
@@ -125,6 +128,71 @@ class JdbcSupportAccessGrantAdapter(
                 clubId.dbString(),
             ).firstOrNull()
 
+    override fun listLedger(
+        clubId: UUID?,
+        granteeUserId: UUID?,
+        limit: Int,
+    ): List<AdminSupportGrantLedgerItem> =
+        jdbcTemplate.query(
+            """
+            select
+              sag.id,
+              sag.club_id,
+              clubs.name as club_name,
+              sag.grantee_user_id,
+              users.name as grantee_display_name,
+              users.email as grantee_email,
+              sag.scope,
+              sag.reason,
+              sag.expires_at,
+              sag.created_at,
+              sag.revoked_at,
+              case
+                when sag.revoked_at is not null then 'REVOKED'
+                when sag.expires_at <= utc_timestamp(6) then 'EXPIRED'
+                else 'ACTIVE'
+              end as grant_status,
+              pa.role as created_by_role
+            from support_access_grants sag
+            join clubs on clubs.id = sag.club_id
+            join users on users.id = sag.grantee_user_id
+            left join platform_admins pa on pa.user_id = sag.granted_by_user_id
+            where (? is null or sag.club_id = ?)
+              and (? is null or sag.grantee_user_id = ?)
+            order by sag.created_at desc
+            limit ?
+            """.trimIndent(),
+            ::mapLedgerItem,
+            clubId?.dbString(),
+            clubId?.dbString(),
+            granteeUserId?.dbString(),
+            granteeUserId?.dbString(),
+            limit.coerceIn(1, 100),
+        )
+
+    override fun hasActiveGrant(
+        clubId: UUID,
+        granteeUserId: UUID,
+    ): Boolean = loadActiveGrantByGranteeAndClub(granteeUserId, clubId) != null
+
+    override fun isGrantEligibleClub(clubId: UUID): Boolean =
+        (
+            jdbcTemplate.queryForObject(
+                "select count(*) from clubs where id = ? and status <> 'ARCHIVED'",
+                Int::class.java,
+                clubId.dbString(),
+            ) ?: 0
+        ) > 0
+
+    override fun isActivePlatformAdmin(userId: UUID): Boolean =
+        (
+            jdbcTemplate.queryForObject(
+                "select count(*) from platform_admins where user_id = ? and status = 'ACTIVE'",
+                Int::class.java,
+                userId.dbString(),
+            ) ?: 0
+        ) > 0
+
     private fun loadGrant(grantId: UUID): SupportAccessGrant? =
         jdbcTemplate
             .query(
@@ -153,6 +221,33 @@ class JdbcSupportAccessGrantAdapter(
             revokedAt = rs.utcOffsetDateTimeOrNull("revoked_at"),
             createdAt = rs.utcOffsetDateTime("created_at"),
         )
+
+    private fun mapLedgerItem(
+        rs: ResultSet,
+        @Suppress("UNUSED_PARAMETER") rowNum: Int,
+    ): AdminSupportGrantLedgerItem =
+        AdminSupportGrantLedgerItem(
+            grantId = rs.uuid("id"),
+            clubId = rs.uuid("club_id"),
+            clubName = rs.getString("club_name"),
+            granteeUserId = rs.uuid("grantee_user_id"),
+            granteeDisplayName = rs.getString("grantee_display_name"),
+            granteeMaskedEmail = maskEmail(rs.getString("grantee_email")),
+            scope = SupportAccessGrantScope.valueOf(rs.getString("scope")),
+            reason = rs.getString("reason"),
+            expiresAt = rs.utcOffsetDateTime("expires_at"),
+            createdAt = rs.utcOffsetDateTime("created_at"),
+            revokedAt = rs.utcOffsetDateTimeOrNull("revoked_at"),
+            status = rs.getString("grant_status"),
+            createdByRole = rs.getString("created_by_role") ?: "UNKNOWN",
+        )
 }
 
 private fun OffsetDateTime.toTimestamp(): Timestamp = Timestamp.from(toInstant())
+
+private fun maskEmail(email: String): String {
+    val parts = email.split("@", limit = 2)
+    if (parts.size != 2) return "***"
+    val head = parts[0].firstOrNull()?.toString() ?: "*"
+    return "$head***@${parts[1]}"
+}

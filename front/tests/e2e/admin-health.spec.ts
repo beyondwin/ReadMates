@@ -63,7 +63,7 @@ const HEALTH_SNAPSHOT: PlatformHealthSnapshotResponse = {
       thresholds: { warn: 100, crit: 1000 },
       lastCheckedAt: "2026-05-26T00:00:00Z",
       source: "IN_PROCESS",
-      drill: { kind: "ADMIN_ROUTE", target: "/admin/notifications" },
+      drill: { kind: "ADMIN_ROUTE", target: "/admin/notifications?focus=outbox_backlog" },
       reason: null,
       deployStrip: null,
     },
@@ -111,7 +111,7 @@ const HEALTH_SNAPSHOT: PlatformHealthSnapshotResponse = {
       thresholds: { warn: 0.95, crit: 0.9 },
       lastCheckedAt: "2026-05-26T00:00:00Z",
       source: "PROMETHEUS",
-      drill: { kind: "ADMIN_ROUTE", target: "/admin/notifications" },
+      drill: { kind: "ADMIN_ROUTE", target: "/admin/notifications?focus=notification_dispatch_success" },
       reason: null,
       deployStrip: null,
     },
@@ -164,6 +164,23 @@ test("operator views /admin/health grid", async ({ page }) => {
   await page.route("**/api/bff/api/admin/health/snapshot", async (route) => {
     await json(route, 200, HEALTH_SNAPSHOT);
   });
+  await page.route("**/api/bff/api/admin/notifications/snapshot", async (route) => {
+    await json(route, 200, {
+      generatedAt: "2026-05-26T00:00:00Z",
+      outboxSummary: { pending: 42, active: 0, failed: 1, dead: 0, sentOrPublishedLast24h: 3 },
+      deliverySummary: { pending: 0, active: 0, failed: 1, dead: 0, sentOrPublishedLast24h: 3 },
+      relaySummary: { publishing: 0, sending: 0, stalePublishing: 0, staleSending: 0 },
+      failureClusters: [{ safeErrorCode: "provider_timeout", status: "FAILED", count: 1, latestAt: "2026-05-26T00:00:00Z" }],
+      clubHealth: [],
+      recentManualDispatches: [],
+    });
+  });
+  await page.route("**/api/bff/api/admin/notifications/events**", async (route) => {
+    await json(route, 200, { items: [], nextCursor: null });
+  });
+  await page.route("**/api/bff/api/admin/notifications/deliveries**", async (route) => {
+    await json(route, 200, { items: [], nextCursor: null });
+  });
 
   await page.goto("/admin/health");
 
@@ -179,7 +196,11 @@ test("operator views /admin/health grid", async ({ page }) => {
   await expect(page.getByText("redis_metrics_unavailable")).toBeVisible();
   await expect(
     page.locator("article", { hasText: "Outbox backlog" }).getByRole("link", { name: /자세히/ }),
-  ).toHaveAttribute("href", "/admin/notifications");
+  ).toHaveAttribute("href", "/admin/notifications?focus=outbox_backlog");
+  await page.locator("article", { hasText: "Outbox backlog" }).getByRole("link", { name: /자세히/ }).click();
+  await expect(page).toHaveURL(/\/admin\/notifications\?focus=outbox_backlog/);
+  await expect(page.getByText(/Health outbox backlog/)).toBeVisible();
+  await page.goto("/admin/health");
   await expect(page.getByRole("button", { name: "새로고침" })).toBeVisible();
   await page.getByRole("button", { name: "새로고침" }).click();
   await expect(page.getByText(/NaN/)).toHaveCount(0);

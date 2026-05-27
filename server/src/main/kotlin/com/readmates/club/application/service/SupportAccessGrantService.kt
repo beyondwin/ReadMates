@@ -9,6 +9,7 @@ import com.readmates.club.application.port.`in`.CreateSupportAccessGrantUseCase
 import com.readmates.club.application.port.`in`.ListSupportAccessGrantsUseCase
 import com.readmates.club.application.port.`in`.RevokeSupportAccessGrantUseCase
 import com.readmates.club.application.port.`in`.SupportMemberSynthesis
+import com.readmates.club.application.port.out.AdminSupportGrantLedgerPort
 import com.readmates.club.application.port.out.CreateSupportAccessGrantPort
 import com.readmates.club.application.port.out.LoadSupportAccessGrantPort
 import com.readmates.club.application.port.out.RevokeSupportAccessGrantPort
@@ -26,6 +27,7 @@ class SupportAccessGrantService(
     private val createGrantPort: CreateSupportAccessGrantPort,
     private val revokeGrantPort: RevokeSupportAccessGrantPort,
     private val loadGrantPort: LoadSupportAccessGrantPort,
+    private val grantLedgerPort: AdminSupportGrantLedgerPort,
     private val auditEventPort: WritePlatformAuditEventPort,
     private val objectMapper: ObjectMapper,
 ) : CheckSupportAccessGrantUseCase,
@@ -59,6 +61,22 @@ class SupportAccessGrantService(
                 PlatformAdminError.GRANT_REASON_REQUIRED,
                 "Reason is required to create a support access grant",
             )
+        }
+        val now = OffsetDateTime.now(ZoneOffset.UTC)
+        if (command.expiresAt <= now) {
+            throw PlatformAdminException(PlatformAdminError.GRANT_EXPIRY_IN_PAST, "Grant expiry must be in the future")
+        }
+        if (command.expiresAt > now.plusHours(24)) {
+            throw PlatformAdminException(PlatformAdminError.GRANT_EXPIRY_TOO_LONG, "Grant expiry must be within 24 hours")
+        }
+        if (!grantLedgerPort.isActivePlatformAdmin(command.granteeUserId)) {
+            throw PlatformAdminException(PlatformAdminError.SUPPORT_TARGET_NOT_ELIGIBLE, "Grantee must be an active platform admin")
+        }
+        if (!grantLedgerPort.isGrantEligibleClub(command.clubId)) {
+            throw PlatformAdminException(PlatformAdminError.SUPPORT_TARGET_NOT_FOUND, "Club is not grant eligible")
+        }
+        if (grantLedgerPort.hasActiveGrant(command.clubId, command.granteeUserId)) {
+            throw PlatformAdminException(PlatformAdminError.GRANT_DUPLICATE_ACTIVE, "Active grant already exists")
         }
 
         val grant =

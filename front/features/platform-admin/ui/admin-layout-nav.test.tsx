@@ -26,10 +26,10 @@ describe("AdminLayoutNav", () => {
     }
   });
 
-  it("shows a 준비 중 · S5 pill on the notifications item", () => {
+  it("does not show 준비 중 pill on the notifications item", () => {
     renderNav({});
     const notificationsLink = screen.getByRole("link", { name: /알림/ });
-    expect(notificationsLink.textContent).toContain("준비 중 · S5");
+    expect(notificationsLink.textContent).not.toContain("준비 중");
   });
 
   it("does not show 준비 중 pill on ready routes", () => {

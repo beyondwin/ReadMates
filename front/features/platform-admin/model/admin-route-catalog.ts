@@ -66,19 +66,8 @@ export const ADMIN_ROUTES: ReadonlyArray<AdminRouteDescriptor> = [
     group: "ops",
     groupLabel: "운영",
     slice: "S5",
-    status: "coming_soon",
+    status: "ready",
     requiredCapability: "view_notifications",
-    comingSoon: {
-      title: "알림/Outbox 운영",
-      summary: "relay lag, dead letter, replay, 실패 cluster, 클럽별 성공률을 한 화면에서 봅니다.",
-      bullets: [
-        "Outbox state ledger와 dead letter 목록",
-        "수동 replay (dry-run → confirm 두 단계)",
-        "발송 실패 cluster (errorCode 그룹)",
-        "호스트 manual notification audit cross-cut",
-      ],
-      docHref: `${UMBRELLA_DOC}#s5--알림outbox-운영`,
-    },
   },
   {
     path: "ai-ops",

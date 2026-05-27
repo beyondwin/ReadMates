@@ -96,6 +96,10 @@ class SecurityConfig(
                     methodAndPath("POST", Regex("^/api/admin/clubs/onboarding$")),
                     methodAndPath("POST", Regex("^/api/admin/clubs/[^/]+/domains$")),
                     methodAndPath("POST", Regex("^/api/admin/domains/[^/]+/check$")),
+                    methodAndPath("POST", Regex("^/api/admin/notifications/replay-preview$")),
+                    methodAndPath("POST", Regex("^/api/admin/notifications/replay-confirm$")),
+                    methodAndPath("POST", Regex("^/api/admin/support/grants$")),
+                    methodAndPath("DELETE", Regex("^/api/admin/support/grants/[^/]+$")),
                     methodAndPath("POST", Regex("^/api/admin/support-access-grants$")),
                     methodAndPath("DELETE", Regex("^/api/admin/support-access-grants/[^/]+$")),
                 )
