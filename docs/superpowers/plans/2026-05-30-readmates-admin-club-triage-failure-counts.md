@@ -184,7 +184,7 @@ class JdbcPlatformAdminClubFailureCountsTest(
 }
 ```
 
-Note: `notification_deliveries.updated_at` has `on update current_timestamp(6)`, but an explicit value supplied at INSERT is honored (the trigger only fires on UPDATE). `ai_generation_audit_log` has no FK, so its `club_id`/`host_user_id` need not reference real rows — but we reuse the seeded ids for clarity. The `status` strings (`DEAD`/`FAILED`/`SENT`, `FAILED`/`SUCCEEDED`) match the values used elsewhere in the codebase.
+Note: `notification_deliveries.updated_at` has `on update current_timestamp(6)`, but an explicit value supplied at INSERT is honored (the trigger only fires on UPDATE). `ai_generation_audit_log` has no FK, so its `club_id`/`host_user_id` need not reference real rows — but we reuse the seeded ids for clarity. The `status` strings (`DEAD`/`FAILED`/`SENT`, `FAILED`/`SUCCESS`) match the values used elsewhere in the codebase (the `ai_generation_audit_log.status` column stores `'SUCCESS'` for the `JobStatus.SUCCEEDED` domain state).
 
 - [ ] **Step 2: Run the test to verify it fails to compile**
 

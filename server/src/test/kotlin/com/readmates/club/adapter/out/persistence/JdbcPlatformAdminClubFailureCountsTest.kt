@@ -63,6 +63,22 @@ class JdbcPlatformAdminClubFailureCountsTest(
         assertThat(club.aiFailureCount).isEqualTo(0)
     }
 
+    @Test
+    fun `listClubs returns the same failure counts as loadClub`() {
+        // Guards the residual risk that listClubs and loadClub share CLUB_BASE_SQL
+        // but only loadClub is covered: a future split of the SQL paths must not
+        // silently drop the failure-count aggregation from the list endpoint.
+        seedClubWithMember()
+        seedNotificationDeliveries()
+        seedAiAuditRows()
+
+        val listed = adapter.listClubs(limit = 500).firstOrNull { it.clubId == UUID.fromString(CLUB_ID) }
+
+        assertThat(listed).isNotNull
+        assertThat(listed!!.notificationFailureCount).isEqualTo(2)
+        assertThat(listed.aiFailureCount).isEqualTo(1)
+    }
+
     private fun seedClubWithMember() {
         jdbcTemplate.update(
             "insert into clubs (id, slug, name, tagline, about, status, public_visibility) " +
