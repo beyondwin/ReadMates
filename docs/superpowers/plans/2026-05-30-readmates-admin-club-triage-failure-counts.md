@@ -563,6 +563,22 @@ git commit -m "feat: fold club failure counts into triage severity"
 
 **Files:**
 - Modify: `front/features/platform-admin/route/admin-clubs-route.test.tsx:8-14` (factory type) and the `describe` body
+- Modify: `front/features/platform-admin/model/admin-status-strip-model.test.ts` (club factory/literal — add `notificationFailureCount: 0, aiFailureCount: 0`)
+- Modify: `front/features/platform-admin/queries/platform-admin-queries.test.tsx` (club literal ~line 45 — add the two fields)
+- Modify: `front/features/platform-admin/route/admin-club-detail-route.test.tsx` (club literal ~line 21 — add the two fields)
+- Modify: `front/features/platform-admin/route/admin-today-route.test.tsx` (club literal ~line 36 — add the two fields)
+
+> **Scope note (orchestrator, 2026-05-30):** Task 3's `PlatformAdminClub` type change added two required fields. `tsc --noEmit` confirms FIVE test files construct `PlatformAdminClub`-typed literals/factories and now fail to compile: `admin-clubs-route.test.tsx`, `admin-status-strip-model.test.ts`, `platform-admin-queries.test.tsx`, `admin-club-detail-route.test.tsx`, `admin-today-route.test.tsx`. The original plan only listed the first. All five must get `notificationFailureCount: 0, aiFailureCount: 0` safe defaults here so Task 5's full `pnpm --dir front test && build` regression passes. These are pure compile-fix defaults (value 0) — no behavioral change to those tests.
+
+- [ ] **Step 0: Add safe-default fields to the four sibling type-break test files**
+
+For each of these four files, locate the `PlatformAdminClub` object literal(s) or factory defaults and add `notificationFailureCount: 0, aiFailureCount: 0` next to `domainActionRequiredCount` (value 0, no behavior change):
+- `front/features/platform-admin/model/admin-status-strip-model.test.ts`
+- `front/features/platform-admin/queries/platform-admin-queries.test.tsx`
+- `front/features/platform-admin/route/admin-club-detail-route.test.tsx`
+- `front/features/platform-admin/route/admin-today-route.test.tsx`
+
+After editing, run `pnpm --dir front exec tsc --noEmit` and confirm none of these four files report `notificationFailureCount`/`aiFailureCount` missing-property errors. (The `admin-clubs-route.test.tsx` fix is handled in Step 1 below.)
 
 - [ ] **Step 1: Update the inline factory type and existing item literals**
 
@@ -616,7 +632,11 @@ Expected: PASS — the new reason renders and the failing club sorts above the h
 - [ ] **Step 4: Commit**
 
 ```bash
-git add front/features/platform-admin/route/admin-clubs-route.test.tsx
+git add front/features/platform-admin/route/admin-clubs-route.test.tsx \
+  front/features/platform-admin/model/admin-status-strip-model.test.ts \
+  front/features/platform-admin/queries/platform-admin-queries.test.tsx \
+  front/features/platform-admin/route/admin-club-detail-route.test.tsx \
+  front/features/platform-admin/route/admin-today-route.test.tsx
 git commit -m "test: cover club failure-count triage reason in clubs route"
 ```
 
