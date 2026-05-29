@@ -107,6 +107,8 @@ data class PlatformAdminClubResponse(
     val publicVisibility: String,
     val domainCount: Int,
     val domainActionRequiredCount: Int,
+    val notificationFailureCount: Int,
+    val aiFailureCount: Int,
     val firstHostOnboardingState: String,
 ) {
     companion object {
@@ -121,6 +123,8 @@ data class PlatformAdminClubResponse(
                 publicVisibility = item.publicVisibility.name,
                 domainCount = item.domainCount,
                 domainActionRequiredCount = item.domainActionRequiredCount,
+                notificationFailureCount = item.notificationFailureCount,
+                aiFailureCount = item.aiFailureCount,
                 firstHostOnboardingState = item.firstHostOnboardingState.name,
             )
     }
