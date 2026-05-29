@@ -75,7 +75,10 @@ node_modules/
 .cloudflare
 .vercel
 .superpowers/
-.claude/
+.claude/*
+!.claude/settings.json
+!.claude/commands/
+!.claude/commands/**
 .orchestrator/
 .codex-orchestrator/
 .waygent/

@@ -32,7 +32,7 @@ If a check is skipped, report the exact command and reason in the final response
 
 - 새 파일: `features/host/ui/host-foo.tsx` → `features/host/ui/host-foo.test.tsx`
 - 모듈 import: 동일 디렉토리이므로 `./host-foo` 로 import.
-- vitest.config.ts 가 두 위치 모두 매치하도록 `include` 패턴이 `tests/unit/**` + `**/*.test.{ts,tsx}` 를 모두 커버.
+- vitest.config.ts 의 node/jsdom 프로젝트 `include` 는 `tests/unit/**` 와 `src|features|shared/**/*.test.{ts,tsx}` 를 커버. co-location 은 이 세 루트(`src/`, `features/`, `shared/`)에서만 동작하며, `functions/` 등 다른 디렉토리에 co-locate 한 테스트는 실행되지 않으므로 해당 테스트는 `tests/unit/` 에 둔다.
 
 기존 `front/tests/unit/` 테스트는 fixture 공유를 위해 이동하지 않습니다. 서버 testcontainer가 `readmates.frontend.fixtures.dir` system property로 해당 경로를 참조합니다.
 
