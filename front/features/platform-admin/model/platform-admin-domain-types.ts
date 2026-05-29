@@ -75,6 +75,8 @@ export type PlatformAdminClub = {
   publicVisibility: PlatformAdminClubPublicVisibility;
   domainCount: number;
   domainActionRequiredCount: number;
+  notificationFailureCount: number;
+  aiFailureCount: number;
   firstHostOnboardingState: FirstHostOnboardingState;
 };
 

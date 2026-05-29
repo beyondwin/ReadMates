@@ -17,6 +17,12 @@ export const CLUB_TRIAGE_LABEL: Record<ClubTriageSeverity, string> = {
 
 export function clubTriageReasons(club: PlatformAdminClub): string[] {
   const reasons: string[] = [];
+  if (club.notificationFailureCount > 0) {
+    reasons.push(`알림 실패 ${club.notificationFailureCount}건`);
+  }
+  if (club.aiFailureCount > 0) {
+    reasons.push(`AI 실패 ${club.aiFailureCount}건`);
+  }
   if (club.domainActionRequiredCount > 0) {
     reasons.push("도메인 조치 필요");
   }
@@ -36,7 +42,13 @@ export function clubTriageReasons(club: PlatformAdminClub): string[] {
 }
 
 export function clubTriageSeverity(club: PlatformAdminClub): ClubTriageSeverity {
-  if (club.domainActionRequiredCount > 0 || club.status === "SUSPENDED" || club.status === "ARCHIVED") {
+  if (
+    club.notificationFailureCount > 0 ||
+    club.aiFailureCount > 0 ||
+    club.domainActionRequiredCount > 0 ||
+    club.status === "SUSPENDED" ||
+    club.status === "ARCHIVED"
+  ) {
     return "critical";
   }
   if (club.status === "SETUP_REQUIRED" || club.firstHostOnboardingState !== "ASSIGNED") {

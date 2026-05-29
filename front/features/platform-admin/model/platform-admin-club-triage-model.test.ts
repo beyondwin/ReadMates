@@ -19,6 +19,8 @@ function club(overrides: Partial<PlatformAdminClub>): PlatformAdminClub {
     publicVisibility: "PRIVATE",
     domainCount: 0,
     domainActionRequiredCount: 0,
+    notificationFailureCount: 0,
+    aiFailureCount: 0,
     firstHostOnboardingState: "ASSIGNED",
     ...overrides,
   };
@@ -43,6 +45,14 @@ describe("clubTriageSeverity", () => {
     expect(clubTriageSeverity(club({ firstHostOnboardingState: "MISSING" }))).toBe("attention");
     expect(clubTriageSeverity(club({ firstHostOnboardingState: "INVITED" }))).toBe("attention");
   });
+
+  it("is critical when there are recent notification failures", () => {
+    expect(clubTriageSeverity(club({ notificationFailureCount: 1 }))).toBe("critical");
+  });
+
+  it("is critical when there are recent ai failures", () => {
+    expect(clubTriageSeverity(club({ aiFailureCount: 2 }))).toBe("critical");
+  });
 });
 
 describe("clubTriageReasons", () => {
@@ -55,6 +65,14 @@ describe("clubTriageReasons", () => {
 
   it("is empty for a healthy club", () => {
     expect(clubTriageReasons(club({}))).toEqual([]);
+  });
+
+  it("lists failure counts first, ahead of domain and host reasons", () => {
+    expect(
+      clubTriageReasons(
+        club({ notificationFailureCount: 3, aiFailureCount: 1, domainActionRequiredCount: 1 }),
+      ),
+    ).toEqual(["알림 실패 3건", "AI 실패 1건", "도메인 조치 필요"]);
   });
 });
 
