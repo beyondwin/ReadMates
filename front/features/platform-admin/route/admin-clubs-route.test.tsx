@@ -10,6 +10,7 @@ function renderRoute(items: Array<{
   status: "ACTIVE" | "SETUP_REQUIRED" | "SUSPENDED" | "ARCHIVED";
   publicVisibility: "PRIVATE" | "PUBLIC";
   domainCount: number; domainActionRequiredCount: number;
+  notificationFailureCount: number; aiFailureCount: number;
   firstHostOnboardingState: "MISSING" | "INVITED" | "ASSIGNED";
   tagline: string; about: string;
 }>) {
@@ -33,6 +34,7 @@ describe("AdminClubsRoute", () => {
       {
         clubId: "c-1", slug: "alpha", name: "Alpha", status: "ACTIVE",
         publicVisibility: "PRIVATE", domainCount: 1, domainActionRequiredCount: 0,
+        notificationFailureCount: 0, aiFailureCount: 0,
         firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
       },
     ]);
@@ -47,6 +49,7 @@ describe("AdminClubsRoute", () => {
       {
         clubId: "c-1", slug: "alpha", name: "Alpha", status: "ACTIVE",
         publicVisibility: "PRIVATE", domainCount: 1, domainActionRequiredCount: 0,
+        notificationFailureCount: 0, aiFailureCount: 0,
         firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
       },
     ]);
@@ -59,11 +62,13 @@ describe("AdminClubsRoute", () => {
       {
         clubId: "ok-1", slug: "healthy", name: "Healthy", status: "ACTIVE",
         publicVisibility: "PUBLIC", domainCount: 1, domainActionRequiredCount: 0,
+        notificationFailureCount: 0, aiFailureCount: 0,
         firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
       },
       {
         clubId: "crit-1", slug: "broken", name: "Broken", status: "ACTIVE",
         publicVisibility: "PRIVATE", domainCount: 1, domainActionRequiredCount: 2,
+        notificationFailureCount: 0, aiFailureCount: 0,
         firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
       },
     ]);
@@ -77,6 +82,7 @@ describe("AdminClubsRoute", () => {
       {
         clubId: "crit-1", slug: "broken", name: "Broken", status: "ACTIVE",
         publicVisibility: "PRIVATE", domainCount: 1, domainActionRequiredCount: 2,
+        notificationFailureCount: 0, aiFailureCount: 0,
         firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
       },
     ]);
@@ -90,11 +96,13 @@ describe("AdminClubsRoute", () => {
       {
         clubId: "ok-1", slug: "healthy", name: "Healthy", status: "ACTIVE",
         publicVisibility: "PUBLIC", domainCount: 1, domainActionRequiredCount: 0,
+        notificationFailureCount: 0, aiFailureCount: 0,
         firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
       },
       {
         clubId: "crit-1", slug: "broken", name: "Broken", status: "SUSPENDED",
         publicVisibility: "PRIVATE", domainCount: 1, domainActionRequiredCount: 0,
+        notificationFailureCount: 0, aiFailureCount: 0,
         firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
       },
     ]);
@@ -108,10 +116,31 @@ describe("AdminClubsRoute", () => {
       {
         clubId: "ok-1", slug: "healthy", name: "Healthy", status: "ACTIVE",
         publicVisibility: "PUBLIC", domainCount: 1, domainActionRequiredCount: 0,
+        notificationFailureCount: 0, aiFailureCount: 0,
         firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
       },
     ]);
     fireEvent.click(screen.getByRole("button", { name: "긴급" }));
     expect(screen.getByText("선택한 필터에 해당하는 클럽이 없습니다.")).toBeInTheDocument();
+  });
+
+  it("shows a notification-failure reason and ranks the club critical", () => {
+    renderRoute([
+      {
+        clubId: "ok-1", slug: "healthy", name: "Healthy", status: "ACTIVE",
+        publicVisibility: "PUBLIC", domainCount: 1, domainActionRequiredCount: 0,
+        notificationFailureCount: 0, aiFailureCount: 0,
+        firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
+      },
+      {
+        clubId: "fail-1", slug: "failing", name: "Failing", status: "ACTIVE",
+        publicVisibility: "PRIVATE", domainCount: 1, domainActionRequiredCount: 0,
+        notificationFailureCount: 4, aiFailureCount: 0,
+        firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
+      },
+    ]);
+    const rows = screen.getAllByRole("row").slice(1);
+    expect(within(rows[0]).getByText("Failing")).toBeInTheDocument();
+    expect(screen.getByText("알림 실패 4건")).toBeInTheDocument();
   });
 });

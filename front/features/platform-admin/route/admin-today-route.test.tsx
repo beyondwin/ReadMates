@@ -43,6 +43,8 @@ function seededClient() {
       publicVisibility: "PRIVATE",
       domainCount: 0,
       domainActionRequiredCount: 0,
+      notificationFailureCount: 0,
+      aiFailureCount: 0,
       firstHostOnboardingState: "ASSIGNED",
     }],
   });

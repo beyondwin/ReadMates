@@ -15,6 +15,7 @@ function renderRoute(clubId: string, clubs: Array<{
   status: "ACTIVE" | "SETUP_REQUIRED" | "SUSPENDED" | "ARCHIVED";
   publicVisibility: "PRIVATE" | "PUBLIC";
   domainCount: number; domainActionRequiredCount: number;
+  notificationFailureCount: number; aiFailureCount: number;
   firstHostOnboardingState: "MISSING" | "INVITED" | "ASSIGNED";
 }>) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
@@ -62,7 +63,9 @@ describe("AdminClubDetailRoute", () => {
     renderRoute("c-1", [{
       clubId: "c-1", slug: "alpha", name: "Alpha", tagline: "", about: "",
       status: "ACTIVE", publicVisibility: "PRIVATE",
-      domainCount: 0, domainActionRequiredCount: 0, firstHostOnboardingState: "ASSIGNED",
+      domainCount: 0, domainActionRequiredCount: 0,
+      notificationFailureCount: 0, aiFailureCount: 0,
+      firstHostOnboardingState: "ASSIGNED",
     }]);
     expect(screen.getByRole("heading", { name: "Alpha" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Alpha 운영 스냅샷" })).toBeInTheDocument();
