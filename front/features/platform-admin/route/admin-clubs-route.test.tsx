@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { describe, expect, it } from "vitest";
@@ -52,5 +52,35 @@ describe("AdminClubsRoute", () => {
     ]);
     fireEvent.click(screen.getByRole("link", { name: /Alpha/ }));
     expect(screen.getByText("club detail")).toBeInTheDocument();
+  });
+
+  it("orders critical clubs before healthy clubs", () => {
+    renderRoute([
+      {
+        clubId: "ok-1", slug: "healthy", name: "Healthy", status: "ACTIVE",
+        publicVisibility: "PUBLIC", domainCount: 1, domainActionRequiredCount: 0,
+        firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
+      },
+      {
+        clubId: "crit-1", slug: "broken", name: "Broken", status: "ACTIVE",
+        publicVisibility: "PRIVATE", domainCount: 1, domainActionRequiredCount: 2,
+        firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
+      },
+    ]);
+    const rows = screen.getAllByRole("row").slice(1); // drop header row
+    expect(within(rows[0]).getByText("Broken")).toBeInTheDocument();
+    expect(within(rows[1]).getByText("Healthy")).toBeInTheDocument();
+  });
+
+  it("shows a severity badge and reason for an at-risk club", () => {
+    renderRoute([
+      {
+        clubId: "crit-1", slug: "broken", name: "Broken", status: "ACTIVE",
+        publicVisibility: "PRIVATE", domainCount: 1, domainActionRequiredCount: 2,
+        firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
+      },
+    ]);
+    expect(screen.getByText("긴급")).toBeInTheDocument();
+    expect(screen.getByText("도메인 조치 필요")).toBeInTheDocument();
   });
 });
