@@ -14,6 +14,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - **Query foundation 완주**: `archive`, `feedback`, `public` read path를 Query loader seeding으로 이전하고, AI commit 후 full page reload 대신 관련 Query cache invalidation으로 화면을 갱신합니다.
 - **운영 안전망 보강**: 일일 MySQL 백업 systemd timer와 복구 runbook, release-tag `Unreleased` guard(`--release` gated, `--no-changelog-check` 비상 우회), graphify 기반 코드베이스 탐색 워크플로를 도입했습니다.
 - `/admin/clubs`: triage list now orders clubs by operational severity (긴급/주의/정상), shows the blocking reasons inline, and adds a severity filter so operators see at-risk clubs first.
+- `/admin/clubs`: triage now counts each club's recent (7-day) notification-delivery and AI-generation failures, ranks any club with a failure as 긴급, and shows `알림 실패 N건` / `AI 실패 N건` as the leading reasons so operators see member-impacting failures first.
 
 ### Engineering
 

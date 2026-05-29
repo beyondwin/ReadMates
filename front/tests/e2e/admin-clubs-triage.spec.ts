@@ -45,12 +45,16 @@ async function routeAdminClubs(page: Page): Promise<void> {
         {
           clubId: "ok-club", slug: "healthy", name: "Healthy Club",
           tagline: "", about: "", status: "ACTIVE", publicVisibility: "PUBLIC",
-          domainCount: 1, domainActionRequiredCount: 0, firstHostOnboardingState: "ASSIGNED",
+          domainCount: 1, domainActionRequiredCount: 0,
+          notificationFailureCount: 0, aiFailureCount: 0,
+          firstHostOnboardingState: "ASSIGNED",
         },
         {
           clubId: "crit-club", slug: "broken", name: "Broken Club",
           tagline: "", about: "", status: "ACTIVE", publicVisibility: "PRIVATE",
-          domainCount: 1, domainActionRequiredCount: 2, firstHostOnboardingState: "ASSIGNED",
+          domainCount: 1, domainActionRequiredCount: 2,
+          notificationFailureCount: 2, aiFailureCount: 0,
+          firstHostOnboardingState: "ASSIGNED",
         },
       ],
     });
@@ -87,6 +91,9 @@ test.describe("admin clubs triage", () => {
     // Critical club sorts above the healthy one.
     const rows = page.locator(".admin-clubs__table tbody tr");
     await expect(rows.first()).toContainText("Broken Club");
+
+    // Recent notification failures surface as the leading triage reason.
+    await expect(page.getByText("알림 실패 2건")).toBeVisible();
 
     // Filtering to 긴급 keeps only the critical club.
     await page.getByRole("button", { name: "긴급" }).click();
