@@ -223,6 +223,8 @@ private class FakePlatformAdminOnboardingPorts :
             publicVisibility = ClubPublicVisibility.PRIVATE,
             domainCount = 0,
             domainActionRequiredCount = 0,
+            notificationFailureCount = 0,
+            aiFailureCount = 0,
             firstHostOnboardingState = FirstHostOnboardingState.MISSING,
         )
 }
