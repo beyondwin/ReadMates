@@ -80,7 +80,38 @@ describe("AdminClubsRoute", () => {
         firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
       },
     ]);
-    expect(screen.getByText("긴급")).toBeInTheDocument();
+    const rows = screen.getAllByRole("row").slice(1); // drop header row
+    expect(within(rows[0]).getByText("긴급")).toBeInTheDocument();
     expect(screen.getByText("도메인 조치 필요")).toBeInTheDocument();
+  });
+
+  it("filters the list to only critical clubs when the 긴급 filter is selected", () => {
+    renderRoute([
+      {
+        clubId: "ok-1", slug: "healthy", name: "Healthy", status: "ACTIVE",
+        publicVisibility: "PUBLIC", domainCount: 1, domainActionRequiredCount: 0,
+        firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
+      },
+      {
+        clubId: "crit-1", slug: "broken", name: "Broken", status: "SUSPENDED",
+        publicVisibility: "PRIVATE", domainCount: 1, domainActionRequiredCount: 0,
+        firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
+      },
+    ]);
+    fireEvent.click(screen.getByRole("button", { name: "긴급" }));
+    expect(screen.getByText("Broken")).toBeInTheDocument();
+    expect(screen.queryByText("Healthy")).not.toBeInTheDocument();
+  });
+
+  it("shows an empty hint when a filter matches no clubs", () => {
+    renderRoute([
+      {
+        clubId: "ok-1", slug: "healthy", name: "Healthy", status: "ACTIVE",
+        publicVisibility: "PUBLIC", domainCount: 1, domainActionRequiredCount: 0,
+        firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
+      },
+    ]);
+    fireEvent.click(screen.getByRole("button", { name: "긴급" }));
+    expect(screen.getByText("선택한 필터에 해당하는 클럽이 없습니다.")).toBeInTheDocument();
   });
 });

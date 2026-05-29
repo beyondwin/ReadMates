@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { platformAdminClubsQuery } from "@/features/platform-admin/queries/platform-admin-queries";
@@ -5,12 +6,21 @@ import {
   CLUB_TRIAGE_LABEL,
   clubTriageReasons,
   clubTriageSeverity,
+  filterClubsBySeverity,
   rankClubsByTriage,
+  type ClubTriageFilter,
 } from "@/features/platform-admin/model/platform-admin-club-triage-model";
+
+const FILTER_OPTIONS: ReadonlyArray<{ value: ClubTriageFilter; label: string }> = [
+  { value: "all", label: "전체" },
+  { value: "critical", label: "긴급" },
+  { value: "attention", label: "주의" },
+];
 
 export function AdminClubsRoute() {
   const clubs = useQuery(platformAdminClubsQuery()).data!;
-  const ordered = rankClubsByTriage(clubs.items);
+  const [filter, setFilter] = useState<ClubTriageFilter>("all");
+  const ordered = rankClubsByTriage(filterClubsBySeverity(clubs.items, filter));
   return (
     <section className="admin-clubs" aria-labelledby="admin-clubs-title">
       <header className="admin-clubs__header">
@@ -18,8 +28,23 @@ export function AdminClubsRoute() {
         <p className="body">플랫폼이 보유한 모든 클럽 목록입니다. 조치가 필요한 클럽이 위에 옵니다.</p>
         <Link to="?onboarding=1" className="btn btn-primary btn-sm">새 클럽</Link>
       </header>
-      {ordered.length === 0 ? (
+      <div className="admin-clubs__filters" role="group" aria-label="상태 신호 필터">
+        {FILTER_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            className={`btn btn-sm ${filter === option.value ? "btn-primary" : "btn-ghost"}`}
+            aria-pressed={filter === option.value}
+            onClick={() => setFilter(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+      {clubs.items.length === 0 ? (
         <p className="muted">클럽이 없습니다.</p>
+      ) : ordered.length === 0 ? (
+        <p className="muted">선택한 필터에 해당하는 클럽이 없습니다.</p>
       ) : (
         <table className="admin-clubs__table">
           <thead>
