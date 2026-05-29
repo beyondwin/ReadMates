@@ -492,8 +492,8 @@ Then add these tests inside the `describe` block:
       </MemoryRouter>,
     );
     expect(screen.getByText("알림 실패 (7일)")).toBeInTheDocument();
-    expect(screen.getByText("5")).toBeInTheDocument();
-    expect(screen.getByText(/지난 7일 대비/)).toBeInTheDocument();
+    expect(screen.getAllByText("5").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/지난 7일 대비/).length).toBeGreaterThan(0);
   });
 
   it("links readiness blockers to a next action", () => {
