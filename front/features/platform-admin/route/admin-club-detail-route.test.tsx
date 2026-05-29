@@ -28,8 +28,8 @@ function renderRoute(clubId: string, clubs: Array<{
     readiness: { state: "READY", blockingReasons: [], nextAction: null },
     memberActivity: { activeCount: 1, dormantCount: 0, pendingViewerCount: 0, hostCount: 1 },
     sessionProgress: { upcomingCount: 0, currentOpenCount: 0, closedCount: 0, publishedRecordCount: 0, incompleteRecordCount: 0 },
-    notificationHealth: { pending: 0, failed: 0, dead: 0, lastSuccessAt: null, failureClusters: [] },
-    aiUsage: { activeJobs: 0, failedRecentJobs: 0, staleCandidates: 0, costEstimateUsd: "0.0000", state: "NO_RECENT_USAGE" },
+    notificationHealth: { pending: 0, failed: 0, dead: 0, lastSuccessAt: null, failureClusters: [], recentFailed7d: 0, priorFailed7d: 0 },
+    aiUsage: { activeJobs: 0, failedRecentJobs: 0, staleCandidates: 0, costEstimateUsd: "0.0000", state: "NO_RECENT_USAGE", priorFailedJobs7d: 0 },
     safeLinks: [],
   });
   // Bypass loader by injecting loader data via a wrapper route element
