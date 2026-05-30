@@ -92,8 +92,9 @@ describe("PlatformAdminAiOps", () => {
         onClearFilter={onClearFilter}
       />,
     );
-    expect(screen.getByText(/PROVIDER_RATE_LIMITED/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "전체 보기" }));
+    const banner = screen.getByRole("status");
+    expect(within(banner).getByText(/PROVIDER_RATE_LIMITED/)).toBeInTheDocument();
+    await userEvent.click(within(banner).getByRole("button", { name: "전체 보기" }));
     expect(onClearFilter).toHaveBeenCalledTimes(1);
   });
 
