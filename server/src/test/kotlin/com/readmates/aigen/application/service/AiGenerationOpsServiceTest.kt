@@ -1,6 +1,7 @@
 package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.AiGenerationException
+import com.readmates.aigen.application.model.AiOpsAction
 import com.readmates.aigen.application.model.AiOpsCostWindow
 import com.readmates.aigen.application.model.AiOpsDeltaDirection
 import com.readmates.aigen.application.model.AiOpsFailureCodeCount
@@ -135,6 +136,27 @@ class AiGenerationOpsServiceTest {
             service.retryCommit(admin(PlatformAdminRole.OPERATOR), job.jobId)
         }.isInstanceOf(AiGenerationException.IllegalGenerationState::class.java)
         assertThat(actionAudit.entries).isEmpty()
+    }
+
+    @Test
+    fun `committing job lists both force-cancel and retry-commit actions`() {
+        val job = AiGenerationTestFixtures.jobRecord(status = JobStatus.COMMITTING, stage = JobStage.READY)
+        jobStore.save(job)
+
+        val item = service.list(admin(PlatformAdminRole.OWNER), AiOpsJobFilters(null, null, null, null)).items.single()
+
+        assertThat(item.availableActions)
+            .containsExactlyInAnyOrder(AiOpsAction.FORCE_CANCEL, AiOpsAction.RETRY_COMMIT)
+    }
+
+    @Test
+    fun `running job lists only force-cancel`() {
+        val job = AiGenerationTestFixtures.jobRecord(status = JobStatus.RUNNING, stage = JobStage.TRANSCRIPT_LOADED)
+        jobStore.save(job)
+
+        val item = service.list(admin(PlatformAdminRole.OWNER), AiOpsJobFilters(null, null, null, null)).items.single()
+
+        assertThat(item.availableActions).containsExactly(AiOpsAction.FORCE_CANCEL)
     }
 
     @Test

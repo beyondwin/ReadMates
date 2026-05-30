@@ -261,7 +261,11 @@ class AiGenerationOpsService(
             lastUpdatedAt = lastUpdatedAt,
             expiresAt = expiresAt,
             staleCandidate = status in STALE_CANDIDATE_STATUSES && lastUpdatedAt.isBefore(now.minus(STALE_CANDIDATE_AGE)),
-            availableActions = if (status in FORCE_CANCEL_STATUSES) setOf(AiOpsAction.FORCE_CANCEL) else emptySet(),
+            availableActions =
+                buildSet {
+                    if (status in FORCE_CANCEL_STATUSES) add(AiOpsAction.FORCE_CANCEL)
+                    if (status in RETRY_COMMIT_STATUSES) add(AiOpsAction.RETRY_COMMIT)
+                },
         )
 
     private companion object {
