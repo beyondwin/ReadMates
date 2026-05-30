@@ -6,6 +6,7 @@ import {
   platformAdminAiOpsJobsQuery,
   platformAdminAiOpsSummaryQuery,
   useForceCancelPlatformAdminAiJobMutation,
+  useRetryCommitPlatformAdminAiJobMutation,
 } from "@/features/platform-admin/queries/platform-admin-ai-ops-queries";
 import { platformAdminSummaryQuery } from "@/features/platform-admin/queries/platform-admin-queries";
 import {
@@ -24,6 +25,7 @@ export function AdminAiOpsRoute() {
   const summaryQuery = useQuery(platformAdminAiOpsSummaryQuery(window));
   const jobsQuery = useQuery(platformAdminAiOpsJobsQuery(aiOpsFilterToQuery(filter)));
   const forceCancel = useForceCancelPlatformAdminAiJobMutation();
+  const retryCommit = useRetryCommitPlatformAdminAiJobMutation();
 
   const disabled = summaryQuery.error instanceof Response && summaryQuery.error.status === 503;
 
@@ -49,6 +51,7 @@ export function AdminAiOpsRoute() {
         loading={summaryQuery.isLoading || jobsQuery.isLoading}
         error={summaryQuery.error instanceof Error ? summaryQuery.error.message : null}
         onForceCancel={(jobId) => forceCancel.mutate(jobId)}
+        onRetryCommit={(jobId) => retryCommit.mutate(jobId)}
         activeFilter={filter}
         onSelectFailureCode={(code) =>
           setSearchParams(aiOpsSearchFromFilter({ ...EMPTY_AI_OPS_FILTER, errorCode: code }))
