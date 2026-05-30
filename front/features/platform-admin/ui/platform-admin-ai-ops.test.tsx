@@ -66,4 +66,47 @@ describe("PlatformAdminAiOps", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("AI Ops 로딩 실패");
     expect(screen.getByText(/Book/)).toBeInTheDocument();
   });
+
+  it("renders failure codes as buttons and reports selection", async () => {
+    const onSelectFailureCode = vi.fn();
+    render(
+      <PlatformAdminAiOps
+        role="OWNER"
+        summary={summary}
+        jobs={[]}
+        onSelectFailureCode={onSelectFailureCode}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: /PROVIDER_RATE_LIMITED/ }));
+    expect(onSelectFailureCode).toHaveBeenCalledWith("PROVIDER_RATE_LIMITED");
+  });
+
+  it("shows an active-filter banner with a clear control", async () => {
+    const onClearFilter = vi.fn();
+    render(
+      <PlatformAdminAiOps
+        role="OWNER"
+        summary={summary}
+        jobs={[]}
+        activeFilter={{ errorCode: "PROVIDER_RATE_LIMITED", clubId: null }}
+        onClearFilter={onClearFilter}
+      />,
+    );
+    const banner = screen.getByRole("status");
+    expect(within(banner).getByText(/PROVIDER_RATE_LIMITED/)).toBeInTheDocument();
+    await userEvent.click(within(banner).getByRole("button", { name: "전체 보기" }));
+    expect(onClearFilter).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows an honest filtered empty state when a filter yields no jobs", () => {
+    render(
+      <PlatformAdminAiOps
+        role="OWNER"
+        summary={summary}
+        jobs={[]}
+        activeFilter={{ errorCode: "PROVIDER_RATE_LIMITED", clubId: null }}
+      />,
+    );
+    expect(screen.getByText("이 필터에 해당하는 AI job이 없습니다.")).toBeInTheDocument();
+  });
 });
