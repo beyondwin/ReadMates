@@ -53,7 +53,7 @@ data class AiOpsJobListItem(
     val availableActions: Set<AiOpsAction>,
 )
 
-enum class AiOpsAction { FORCE_CANCEL }
+enum class AiOpsAction { FORCE_CANCEL, RETRY_COMMIT }
 
 enum class AiOpsCostWindow(val days: Long, val wire: String) {
     LAST_7D(7, "7d"),
