@@ -102,6 +102,23 @@ async function routePlatformAdminShell(page: Page, role: PlatformAdminRole): Pro
           staleCandidate: true,
           availableActions: ["FORCE_CANCEL"],
         },
+        {
+          jobId: "job-2",
+          club: { clubId: "club-1", slug: "reading-sai", name: "읽는사이" },
+          session: { sessionId: "session-2", number: 8, bookTitle: "Stuck Volume" },
+          status: "COMMITTING",
+          stage: "READY",
+          provider: "OPENAI",
+          model: "gpt-model",
+          errorCode: null,
+          safeErrorMessage: null,
+          costEstimateUsd: "0.1500",
+          createdAt: "2026-05-18T00:00:00Z",
+          lastUpdatedAt: "2026-05-18T00:02:00Z",
+          expiresAt: "2026-05-18T06:00:00Z",
+          staleCandidate: true,
+          availableActions: ["RETRY_COMMIT"],
+        },
       ],
       nextCursor: null,
     });
@@ -125,6 +142,24 @@ test("platform owner sees AI Ops action affordance when job is actionable", asyn
 
   await expect(page.getByRole("heading", { name: "AI 운영" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Force cancel" })).toBeVisible();
+});
+
+test("platform owner sees retry-commit affordance on a committing job", async ({ page }) => {
+  await routePlatformAdminShell(page, "OWNER");
+
+  await page.goto("/admin/ai-ops");
+
+  await expect(page.getByText("Stuck Volume")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Retry commit" })).toBeVisible();
+});
+
+test("platform support cannot retry-commit", async ({ page }) => {
+  await routePlatformAdminShell(page, "SUPPORT");
+
+  await page.goto("/admin/ai-ops");
+
+  await expect(page.getByText("Stuck Volume")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Retry commit" })).toHaveCount(0);
 });
 
 test("cost window toggle updates the rendered trend", async ({ page }) => {

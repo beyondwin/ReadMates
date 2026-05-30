@@ -18,6 +18,7 @@ import com.readmates.aigen.application.port.`in`.ForceCancelAiOpsJobUseCase
 import com.readmates.aigen.application.port.`in`.GetAiOpsJobUseCase
 import com.readmates.aigen.application.port.`in`.GetAiOpsSummaryUseCase
 import com.readmates.aigen.application.port.`in`.ListAiOpsJobsUseCase
+import com.readmates.aigen.application.port.`in`.RetryAiOpsJobCommitUseCase
 import com.readmates.club.domain.PlatformAdminRole
 import com.readmates.shared.security.CurrentPlatformAdmin
 import org.assertj.core.api.Assertions.assertThat
@@ -41,6 +42,7 @@ class AiGenerationOpsControllerTest {
     private val list = FakeListUseCase()
     private val get = FakeGetUseCase()
     private val cancel = FakeForceCancelUseCase()
+    private val retry = FakeRetryCommitUseCase()
     private val admin =
         CurrentPlatformAdmin(
             userId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
@@ -60,6 +62,7 @@ class AiGenerationOpsControllerTest {
                         listUseCase = list,
                         getUseCase = get,
                         forceCancelUseCase = cancel,
+                        retryCommitUseCase = retry,
                     ),
                 ).setControllerAdvice(AiGenerationErrorHandler())
                 .setCustomArgumentResolvers(StubCurrentPlatformAdminResolver(admin))
@@ -176,6 +179,22 @@ class AiGenerationOpsControllerTest {
         assertThat(cancel.calls).containsExactly(admin to sampleJobId)
     }
 
+    @Test
+    fun `retry commit delegates to use case`() {
+        retry.result = AiOpsAdminActionResult(sampleJobId, JobStatus.COMMITTING, JobStatus.SUCCEEDED)
+
+        mockMvc
+            .post("/api/admin/ai-generation/jobs/$sampleJobId/retry-commit")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.jobId") { value(sampleJobId.toString()) }
+                jsonPath("$.previousStatus") { value("COMMITTING") }
+                jsonPath("$.nextStatus") { value("SUCCEEDED") }
+            }
+
+        assertThat(retry.calls).containsExactly(admin to sampleJobId)
+    }
+
     private companion object {
         val sampleJobId: UUID = UUID.fromString("00000000-0000-0000-0000-000000000010")
         val sampleClubId: UUID = UUID.fromString("00000000-0000-0000-0000-000000000020")
@@ -246,6 +265,19 @@ private class FakeForceCancelUseCase : ForceCancelAiOpsJobUseCase {
     val calls = mutableListOf<Pair<CurrentPlatformAdmin, UUID>>()
 
     override fun forceCancel(
+        admin: CurrentPlatformAdmin,
+        jobId: UUID,
+    ): AiOpsAdminActionResult {
+        calls += admin to jobId
+        return result
+    }
+}
+
+private class FakeRetryCommitUseCase : RetryAiOpsJobCommitUseCase {
+    lateinit var result: AiOpsAdminActionResult
+    val calls = mutableListOf<Pair<CurrentPlatformAdmin, UUID>>()
+
+    override fun retryCommit(
         admin: CurrentPlatformAdmin,
         jobId: UUID,
     ): AiOpsAdminActionResult {

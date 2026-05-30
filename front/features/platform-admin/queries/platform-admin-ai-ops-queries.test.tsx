@@ -11,18 +11,21 @@ vi.mock("@/features/platform-admin/api/platform-admin-api", () => ({
   fetchPlatformAdminAiOpsJobs: vi.fn(),
   fetchPlatformAdminAiOpsSummary: vi.fn(),
   forceCancelPlatformAdminAiJob: vi.fn(),
+  retryCommitPlatformAdminAiJob: vi.fn(),
 }));
 
 import {
   fetchPlatformAdminAiOpsJobs,
   fetchPlatformAdminAiOpsSummary,
   forceCancelPlatformAdminAiJob,
+  retryCommitPlatformAdminAiJob,
 } from "@/features/platform-admin/api/platform-admin-api";
 import {
   platformAdminAiOpsJobsQuery,
   platformAdminAiOpsKeys,
   platformAdminAiOpsSummaryQuery,
   useForceCancelPlatformAdminAiJobMutation,
+  useRetryCommitPlatformAdminAiJobMutation,
 } from "./platform-admin-ai-ops-queries";
 
 const summary: PlatformAdminAiOpsSummaryResponse = {
@@ -72,6 +75,7 @@ beforeEach(() => {
   vi.mocked(fetchPlatformAdminAiOpsSummary).mockReset();
   vi.mocked(fetchPlatformAdminAiOpsJobs).mockReset();
   vi.mocked(forceCancelPlatformAdminAiJob).mockReset();
+  vi.mocked(retryCommitPlatformAdminAiJob).mockReset();
 });
 
 describe("platform admin AI Ops query keys", () => {
@@ -125,6 +129,24 @@ describe("platform admin AI Ops mutation cache behavior", () => {
     });
 
     expect(forceCancelPlatformAdminAiJob).toHaveBeenCalledWith("job-1");
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: platformAdminAiOpsKeys.all });
+  });
+
+  it("invalidates summary and ledger queries after retry commit", async () => {
+    vi.mocked(retryCommitPlatformAdminAiJob).mockResolvedValue({
+      jobId: "job-1",
+      previousStatus: "COMMITTING",
+      nextStatus: "SUCCEEDED",
+    });
+    const { client, Wrapper } = createWrapper();
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    const { result } = renderHook(() => useRetryCommitPlatformAdminAiJobMutation(), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync("job-1");
+    });
+
+    expect(retryCommitPlatformAdminAiJob).toHaveBeenCalledWith("job-1");
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: platformAdminAiOpsKeys.all });
   });
 });

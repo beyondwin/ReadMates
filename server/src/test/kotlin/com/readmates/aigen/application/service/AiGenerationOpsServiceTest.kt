@@ -1,6 +1,7 @@
 package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.AiGenerationException
+import com.readmates.aigen.application.model.AiOpsAction
 import com.readmates.aigen.application.model.AiOpsCostWindow
 import com.readmates.aigen.application.model.AiOpsDeltaDirection
 import com.readmates.aigen.application.model.AiOpsFailureCodeCount
@@ -96,6 +97,66 @@ class AiGenerationOpsServiceTest {
         }.isInstanceOfSatisfying(AiGenerationException.SafeOpsError::class.java) {
             assertThat(it.code).isEqualTo("JOB_NOT_LIVE")
         }
+    }
+
+    @Test
+    fun `operator can retry-commit a stuck committing job back to succeeded`() {
+        val job = AiGenerationTestFixtures.jobRecord(status = JobStatus.COMMITTING, stage = JobStage.READY)
+        jobStore.save(job)
+
+        val result = service.retryCommit(admin(PlatformAdminRole.OPERATOR), job.jobId)
+
+        assertThat(result.previousStatus).isEqualTo(JobStatus.COMMITTING)
+        assertThat(result.nextStatus).isEqualTo(JobStatus.SUCCEEDED)
+        assertThat(jobStore.load(job.jobId)?.status).isEqualTo(JobStatus.SUCCEEDED)
+        assertThat(jobStore.transientPayloadDeleted).doesNotContain(job.jobId)
+        assertThat(actionAudit.entries.single().action).isEqualTo("RETRY_COMMIT")
+        assertThat(actionAudit.entries.single().previousStatus).isEqualTo("COMMITTING")
+        assertThat(actionAudit.entries.single().nextStatus).isEqualTo("SUCCEEDED")
+    }
+
+    @Test
+    fun `support admin cannot retry-commit`() {
+        val job = AiGenerationTestFixtures.jobRecord(status = JobStatus.COMMITTING, stage = JobStage.READY)
+        jobStore.save(job)
+
+        assertThatThrownBy {
+            service.retryCommit(admin(PlatformAdminRole.SUPPORT), job.jobId)
+        }.isInstanceOf(AccessDeniedException::class.java)
+        assertThat(jobStore.load(job.jobId)?.status).isEqualTo(JobStatus.COMMITTING)
+        assertThat(actionAudit.entries).isEmpty()
+    }
+
+    @Test
+    fun `retry-commit rejects a job that is not committing`() {
+        val job = AiGenerationTestFixtures.jobRecord(status = JobStatus.RUNNING, stage = JobStage.TRANSCRIPT_LOADED)
+        jobStore.save(job)
+
+        assertThatThrownBy {
+            service.retryCommit(admin(PlatformAdminRole.OPERATOR), job.jobId)
+        }.isInstanceOf(AiGenerationException.IllegalGenerationState::class.java)
+        assertThat(actionAudit.entries).isEmpty()
+    }
+
+    @Test
+    fun `committing job lists both force-cancel and retry-commit actions`() {
+        val job = AiGenerationTestFixtures.jobRecord(status = JobStatus.COMMITTING, stage = JobStage.READY)
+        jobStore.save(job)
+
+        val item = service.list(admin(PlatformAdminRole.OWNER), AiOpsJobFilters(null, null, null, null)).items.single()
+
+        assertThat(item.availableActions)
+            .containsExactlyInAnyOrder(AiOpsAction.FORCE_CANCEL, AiOpsAction.RETRY_COMMIT)
+    }
+
+    @Test
+    fun `running job lists only force-cancel`() {
+        val job = AiGenerationTestFixtures.jobRecord(status = JobStatus.RUNNING, stage = JobStage.TRANSCRIPT_LOADED)
+        jobStore.save(job)
+
+        val item = service.list(admin(PlatformAdminRole.OWNER), AiOpsJobFilters(null, null, null, null)).items.single()
+
+        assertThat(item.availableActions).containsExactly(AiOpsAction.FORCE_CANCEL)
     }
 
     @Test

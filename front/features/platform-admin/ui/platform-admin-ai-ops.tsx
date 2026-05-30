@@ -43,6 +43,7 @@ type PlatformAdminAiOpsProps = {
   loading?: boolean;
   error?: string | null;
   onForceCancel?: (jobId: string) => void;
+  onRetryCommit?: (jobId: string) => void;
   activeFilter?: { errorCode: string | null; clubId: string | null };
   onSelectFailureCode?: (code: string) => void;
   onClearFilter?: () => void;
@@ -57,6 +58,7 @@ export function PlatformAdminAiOps({
   loading = false,
   error = null,
   onForceCancel,
+  onRetryCommit,
   activeFilter,
   onSelectFailureCode,
   onClearFilter,
@@ -163,10 +165,19 @@ export function PlatformAdminAiOps({
                   </p>
                 ) : null}
               </div>
-              {canAct && job.availableActions.includes("FORCE_CANCEL") ? (
-                <button type="button" className="btn btn-quiet btn-sm" onClick={() => onForceCancel?.(job.jobId)}>
-                  Force cancel
-                </button>
+              {canAct ? (
+                <div className="platform-admin-ai-ops__job-actions">
+                  {job.availableActions.includes("FORCE_CANCEL") ? (
+                    <button type="button" className="btn btn-quiet btn-sm" onClick={() => onForceCancel?.(job.jobId)}>
+                      Force cancel
+                    </button>
+                  ) : null}
+                  {job.availableActions.includes("RETRY_COMMIT") ? (
+                    <button type="button" className="btn btn-quiet btn-sm" onClick={() => onRetryCommit?.(job.jobId)}>
+                      Retry commit
+                    </button>
+                  ) : null}
+                </div>
               ) : null}
             </article>
           ))

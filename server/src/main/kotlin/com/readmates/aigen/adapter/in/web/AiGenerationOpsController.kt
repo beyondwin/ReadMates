@@ -7,6 +7,7 @@ import com.readmates.aigen.application.port.`in`.ForceCancelAiOpsJobUseCase
 import com.readmates.aigen.application.port.`in`.GetAiOpsJobUseCase
 import com.readmates.aigen.application.port.`in`.GetAiOpsSummaryUseCase
 import com.readmates.aigen.application.port.`in`.ListAiOpsJobsUseCase
+import com.readmates.aigen.application.port.`in`.RetryAiOpsJobCommitUseCase
 import com.readmates.shared.security.CurrentPlatformAdmin
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.web.bind.annotation.GetMapping
@@ -25,6 +26,7 @@ class AiGenerationOpsController(
     private val listUseCase: ListAiOpsJobsUseCase,
     private val getUseCase: GetAiOpsJobUseCase,
     private val forceCancelUseCase: ForceCancelAiOpsJobUseCase,
+    private val retryCommitUseCase: RetryAiOpsJobCommitUseCase,
 ) {
     @GetMapping("/summary")
     fun summary(
@@ -64,4 +66,10 @@ class AiGenerationOpsController(
         admin: CurrentPlatformAdmin,
         @PathVariable jobId: UUID,
     ): AiOpsAdminActionResponse = AiOpsAdminActionResponse.from(forceCancelUseCase.forceCancel(admin, jobId))
+
+    @PostMapping("/jobs/{jobId}/retry-commit")
+    fun retryCommit(
+        admin: CurrentPlatformAdmin,
+        @PathVariable jobId: UUID,
+    ): AiOpsAdminActionResponse = AiOpsAdminActionResponse.from(retryCommitUseCase.retryCommit(admin, jobId))
 }

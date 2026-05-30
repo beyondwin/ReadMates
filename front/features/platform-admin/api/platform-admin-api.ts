@@ -135,3 +135,11 @@ export function forceCancelPlatformAdminAiJob(jobId: string) {
     { clubSlug: undefined },
   );
 }
+
+export function retryCommitPlatformAdminAiJob(jobId: string) {
+  return readmatesFetch<PlatformAdminAiOpsActionResponse>(
+    `/api/admin/ai-generation/jobs/${encodeURIComponent(jobId)}/retry-commit`,
+    { method: "POST" },
+    { clubSlug: undefined },
+  );
+}

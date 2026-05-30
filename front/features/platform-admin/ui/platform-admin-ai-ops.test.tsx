@@ -43,6 +43,14 @@ const runningJob: PlatformAdminAiOpsJobView = {
   availableActions: ["FORCE_CANCEL"],
 };
 
+const committingJob: PlatformAdminAiOpsJobView = {
+  ...runningJob,
+  jobId: "job-2",
+  status: "COMMITTING",
+  stage: "READY",
+  availableActions: ["FORCE_CANCEL", "RETRY_COMMIT"],
+};
+
 describe("PlatformAdminAiOps", () => {
   it("shows safe aggregate and job metadata without raw content fields", () => {
     render(<PlatformAdminAiOps role="SUPPORT" summary={summary} jobs={[runningJob]} />);
@@ -117,6 +125,31 @@ describe("PlatformAdminAiOps", () => {
       />,
     );
     expect(screen.getByText("이 필터에 해당하는 AI job이 없습니다.")).toBeInTheDocument();
+  });
+
+  it("lets owner and operator roles retry-commit a committing job", async () => {
+    const onRetryCommit = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <PlatformAdminAiOps role="OPERATOR" summary={summary} jobs={[committingJob]} onRetryCommit={onRetryCommit} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Retry commit" }));
+
+    expect(onRetryCommit).toHaveBeenCalledWith("job-2");
+  });
+
+  it("hides retry-commit from support role", () => {
+    render(<PlatformAdminAiOps role="SUPPORT" summary={summary} jobs={[committingJob]} />);
+
+    expect(screen.queryByRole("button", { name: "Retry commit" })).not.toBeInTheDocument();
+  });
+
+  it("does not show retry-commit when the job does not offer it", () => {
+    render(<PlatformAdminAiOps role="OWNER" summary={summary} jobs={[runningJob]} onRetryCommit={vi.fn()} />);
+
+    expect(screen.queryByRole("button", { name: "Retry commit" })).not.toBeInTheDocument();
   });
 
   it("shows the windowed cost trend with a delta direction", () => {

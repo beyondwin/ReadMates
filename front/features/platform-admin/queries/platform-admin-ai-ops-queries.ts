@@ -3,6 +3,7 @@ import {
   fetchPlatformAdminAiOpsJobs,
   fetchPlatformAdminAiOpsSummary,
   forceCancelPlatformAdminAiJob,
+  retryCommitPlatformAdminAiJob,
 } from "@/features/platform-admin/api/platform-admin-api";
 import type { PlatformAdminAiOpsFilters } from "@/features/platform-admin/api/platform-admin-contracts";
 
@@ -40,6 +41,14 @@ export function useForceCancelPlatformAdminAiJobMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (jobId: string) => forceCancelPlatformAdminAiJob(jobId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: platformAdminAiOpsKeys.all }),
+  });
+}
+
+export function useRetryCommitPlatformAdminAiJobMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (jobId: string) => retryCommitPlatformAdminAiJob(jobId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: platformAdminAiOpsKeys.all }),
   });
 }
