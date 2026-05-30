@@ -1,4 +1,4 @@
-import type { PlatformAdminAiOpsFilters } from "@/features/platform-admin/api/platform-admin-contracts";
+import type { PlatformAdminAiOpsFilters } from "@/features/platform-admin/model/platform-admin-domain-types";
 
 export type AiOpsJobFilter = {
   errorCode: string | null;
