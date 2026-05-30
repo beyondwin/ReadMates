@@ -61,7 +61,7 @@ S6 AI Ops Depth
 
 - `/admin/health`·`/admin/audit` AI 신호에서 `/admin/ai-ops`로 드릴다운 시 원인·조치가 이어진다.
 - admin write 조치는 originating 슬라이스에서 audit-ready다.
-- 공통 하드닝 게이트(§5) 통과.
+- 공통 하드닝 게이트(§6) 통과.
 
 ## 5. S9 — Host-surface Reinforcement
 
@@ -84,7 +84,7 @@ S3 `AdminClubOperationsSnapshot` 계약은 현재 platform-admin feature 소유(
 
 - 공유 계약이 admin·host 양쪽에서 import cycle 없이 동작(frontend boundary test 통과).
 - host와 admin이 동일 신호를 동일 의미로 표시.
-- 공통 하드닝 게이트(§5 = 본 charter §6) 통과.
+- 공통 하드닝 게이트(§6) 통과.
 
 ## 6. 공통 하드닝 게이트 (각 슬라이스 plan에 포함)
 
