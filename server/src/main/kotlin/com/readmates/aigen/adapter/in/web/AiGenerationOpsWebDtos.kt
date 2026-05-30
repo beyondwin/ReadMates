@@ -1,6 +1,7 @@
 package com.readmates.aigen.adapter.`in`.web
 
 import com.readmates.aigen.application.model.AiOpsAdminActionResult
+import com.readmates.aigen.application.model.AiOpsCostTrend
 import com.readmates.aigen.application.model.AiOpsFailureCodeCount
 import com.readmates.aigen.application.model.AiOpsJobList
 import com.readmates.aigen.application.model.AiOpsJobListItem
@@ -15,6 +16,7 @@ data class AiOpsSummaryResponse(
     val failureCodes: List<AiOpsFailureCodeCountResponse>,
     val providerCosts: List<AiOpsProviderCostResponse>,
     val staleCandidateCount: Int,
+    val costTrend: AiOpsCostTrendResponse,
 ) {
     companion object {
         fun from(summary: AiOpsSummary): AiOpsSummaryResponse =
@@ -25,6 +27,30 @@ data class AiOpsSummaryResponse(
                 failureCodes = summary.failureCodes.map(AiOpsFailureCodeCountResponse::from),
                 providerCosts = summary.providerCosts.map(AiOpsProviderCostResponse::from),
                 staleCandidateCount = summary.staleCandidateCount,
+                costTrend = AiOpsCostTrendResponse.from(summary.costTrend),
+            )
+    }
+}
+
+data class AiOpsCostTrendResponse(
+    val window: String,
+    val currentCostUsd: String,
+    val priorCostUsd: String,
+    val currentJobCount: Long,
+    val priorJobCount: Long,
+    val deltaDirection: String,
+    val availability: String,
+) {
+    companion object {
+        fun from(trend: AiOpsCostTrend): AiOpsCostTrendResponse =
+            AiOpsCostTrendResponse(
+                window = trend.window.wire,
+                currentCostUsd = trend.currentCostUsd.toPlainString(),
+                priorCostUsd = trend.priorCostUsd.toPlainString(),
+                currentJobCount = trend.currentJobCount,
+                priorJobCount = trend.priorJobCount,
+                deltaDirection = trend.deltaDirection.name,
+                availability = trend.availability.name,
             )
     }
 }

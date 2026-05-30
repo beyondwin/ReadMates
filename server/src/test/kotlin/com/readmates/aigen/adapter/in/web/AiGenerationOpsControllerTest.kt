@@ -100,6 +100,44 @@ class AiGenerationOpsControllerTest {
     }
 
     @Test
+    fun `admin summary parses window param and serializes cost trend`() {
+        summary.result =
+            AiOpsSummary(
+                activeJobCount = 2,
+                failedLast24h = 1,
+                monthToDateCostEstimateUsd = BigDecimal("0.2000"),
+                failureCodes = emptyList(),
+                providerCosts = emptyList(),
+                staleCandidateCount = 0,
+                costTrend =
+                    AiOpsCostTrend(
+                        window = AiOpsCostWindow.LAST_7D,
+                        currentCostUsd = BigDecimal("2.0000"),
+                        priorCostUsd = BigDecimal("1.0000"),
+                        currentJobCount = 5,
+                        priorJobCount = 4,
+                        deltaDirection = AiOpsDeltaDirection.UP,
+                        availability = AiOpsTrendAvailability.AVAILABLE,
+                    ),
+            )
+
+        mockMvc
+            .get("/api/admin/ai-generation/summary?window=7d")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.costTrend.window") { value("7d") }
+                jsonPath("$.costTrend.currentCostUsd") { value("2.0000") }
+                jsonPath("$.costTrend.priorCostUsd") { value("1.0000") }
+                jsonPath("$.costTrend.currentJobCount") { value(5) }
+                jsonPath("$.costTrend.priorJobCount") { value(4) }
+                jsonPath("$.costTrend.deltaDirection") { value("UP") }
+                jsonPath("$.costTrend.availability") { value("AVAILABLE") }
+            }
+
+        assertThat(summary.lastWindow).isEqualTo(AiOpsCostWindow.LAST_7D)
+    }
+
+    @Test
     fun `admin job list omits transcript result instructions and feedback body fields`() {
         list.result = AiOpsJobList(items = listOf(sampleJob()), nextCursor = null)
 
@@ -170,11 +208,15 @@ class AiGenerationOpsControllerTest {
 
 private class FakeSummaryUseCase : GetAiOpsSummaryUseCase {
     lateinit var result: AiOpsSummary
+    var lastWindow: AiOpsCostWindow? = null
 
     override fun summary(
         admin: CurrentPlatformAdmin,
         window: AiOpsCostWindow,
-    ): AiOpsSummary = result
+    ): AiOpsSummary {
+        lastWindow = window
+        return result
+    }
 }
 
 private class FakeListUseCase : ListAiOpsJobsUseCase {
