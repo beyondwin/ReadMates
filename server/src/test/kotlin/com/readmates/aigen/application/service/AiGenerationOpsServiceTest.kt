@@ -99,6 +99,45 @@ class AiGenerationOpsServiceTest {
     }
 
     @Test
+    fun `operator can retry-commit a stuck committing job back to succeeded`() {
+        val job = AiGenerationTestFixtures.jobRecord(status = JobStatus.COMMITTING, stage = JobStage.READY)
+        jobStore.save(job)
+
+        val result = service.retryCommit(admin(PlatformAdminRole.OPERATOR), job.jobId)
+
+        assertThat(result.previousStatus).isEqualTo(JobStatus.COMMITTING)
+        assertThat(result.nextStatus).isEqualTo(JobStatus.SUCCEEDED)
+        assertThat(jobStore.load(job.jobId)?.status).isEqualTo(JobStatus.SUCCEEDED)
+        assertThat(jobStore.transientPayloadDeleted).doesNotContain(job.jobId)
+        assertThat(actionAudit.entries.single().action).isEqualTo("RETRY_COMMIT")
+        assertThat(actionAudit.entries.single().previousStatus).isEqualTo("COMMITTING")
+        assertThat(actionAudit.entries.single().nextStatus).isEqualTo("SUCCEEDED")
+    }
+
+    @Test
+    fun `support admin cannot retry-commit`() {
+        val job = AiGenerationTestFixtures.jobRecord(status = JobStatus.COMMITTING, stage = JobStage.READY)
+        jobStore.save(job)
+
+        assertThatThrownBy {
+            service.retryCommit(admin(PlatformAdminRole.SUPPORT), job.jobId)
+        }.isInstanceOf(AccessDeniedException::class.java)
+        assertThat(jobStore.load(job.jobId)?.status).isEqualTo(JobStatus.COMMITTING)
+        assertThat(actionAudit.entries).isEmpty()
+    }
+
+    @Test
+    fun `retry-commit rejects a job that is not committing`() {
+        val job = AiGenerationTestFixtures.jobRecord(status = JobStatus.RUNNING, stage = JobStage.TRANSCRIPT_LOADED)
+        jobStore.save(job)
+
+        assertThatThrownBy {
+            service.retryCommit(admin(PlatformAdminRole.OPERATOR), job.jobId)
+        }.isInstanceOf(AiGenerationException.IllegalGenerationState::class.java)
+        assertThat(actionAudit.entries).isEmpty()
+    }
+
+    @Test
     fun `summary derives 30d cost trend up when current exceeds prior`() {
         val now = Instant.parse("2026-05-18T00:00:00Z")
         auditQuery.usageByStart[now.minusSeconds(30 * 86400)] = AiOpsWindowUsage(BigDecimal("2.0000"), 5)
