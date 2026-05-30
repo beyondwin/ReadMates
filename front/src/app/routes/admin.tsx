@@ -143,6 +143,18 @@ function readyChild(route: AdminRouteDescriptor, queryClient: QueryClient): Rout
           return { Component: AdminAuditRoute, loader: adminAuditLoaderFactory(queryClient) };
         },
       };
+    case "analytics":
+      return {
+        path: "analytics",
+        hydrateFallbackElement: adminChildHydrateFallback,
+        lazy: async () => {
+          const [{ AdminAnalyticsRoute }, { adminAnalyticsLoaderFactory }] = await Promise.all([
+            import("@/features/platform-admin/route/admin-analytics-route"),
+            import("@/features/platform-admin/route/admin-analytics-data"),
+          ]);
+          return { Component: AdminAnalyticsRoute, loader: adminAnalyticsLoaderFactory(queryClient) };
+        },
+      };
     default:
       throw new Error(`No ready route wired for catalog path ${route.path}`);
   }

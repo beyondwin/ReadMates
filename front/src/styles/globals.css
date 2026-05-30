@@ -3118,3 +3118,113 @@
   font-size: 0.72rem;
   color: var(--color-text-muted, #6b6b6b);
 }
+
+.admin-analytics {
+  display: grid;
+  gap: 24px;
+  max-width: 1160px;
+}
+
+.admin-analytics__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.admin-analytics__windows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-analytics__window {
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  padding: 6px 14px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.admin-analytics__window[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--bg-sub);
+}
+
+.admin-analytics__kpis {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.admin-analytics__kpi {
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  background: var(--bg);
+  padding: 16px;
+  display: grid;
+  gap: 6px;
+}
+
+.admin-analytics__kpi--empty {
+  background: var(--bg-sub);
+}
+
+.admin-analytics__kpi-label {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.admin-analytics__kpi-value {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.admin-analytics__kpi-delta {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.admin-analytics__benchmark {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.admin-analytics__benchmark th,
+.admin-analytics__benchmark td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.admin-analytics__benchmark-empty,
+.admin-analytics__error,
+.admin-analytics__loading {
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  margin: 0;
+  padding: 14px 16px;
+  background: var(--bg-sub);
+}
+
+.admin-analytics__error {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: transparent;
+}
+
+@media (max-width: 720px) {
+  .admin-analytics__benchmark {
+    display: block;
+    overflow-x: auto;
+  }
+}
