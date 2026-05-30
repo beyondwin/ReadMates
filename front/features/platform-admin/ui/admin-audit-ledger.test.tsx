@@ -1,6 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import type { AdminAuditLedgerPage } from "@/features/platform-admin/model/platform-admin-audit-model";
 import { AdminAuditLedger } from "./admin-audit-ledger";
 
@@ -78,5 +79,49 @@ describe("AdminAuditLedger", () => {
     );
 
     expect(screen.getByRole("status")).toHaveTextContent("일부 감사 source를 불러오지 못했습니다.");
+  });
+
+  it("links an AI_OPS row detail to the ai-ops club drilldown", async () => {
+    const user = userEvent.setup();
+    const aiPage: AdminAuditLedgerPage = {
+      ...page,
+      items: [
+        {
+          id: "platform_audit_events:event-ai",
+          occurredAt: "2026-05-31T00:00:00Z",
+          sourceSlice: "S6",
+          sourceTable: "platform_audit_events",
+          actionCategory: "AI_OPS",
+          actionType: "ADMIN_AI_OPS_RETRY_COMMIT",
+          outcome: "SUCCESS",
+          actor: { userId: "admin-1", role: "OWNER", displayLabel: "OWNER" },
+          target: { clubId: "club-7", userId: null, jobId: "job-1", eventId: null, label: "AI job" },
+          summary: "AI 커밋 재시도를 실행했습니다.",
+          safeMetadata: [],
+          metadataState: "AVAILABLE",
+        },
+      ],
+    };
+
+    render(
+      <MemoryRouter>
+        <AdminAuditLedger
+          page={aiPage}
+          filters={{ range: "7d" }}
+          loading={false}
+          error={null}
+          onFilterChange={vi.fn()}
+          onLoadMore={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("button", { name: /AI 커밋 재시도를 실행했습니다/ }));
+
+    const detail = screen.getByRole("region", { name: "감사 이벤트 상세" });
+    expect(within(detail).getByRole("link", { name: /AI Ops에서 보기/ })).toHaveAttribute(
+      "href",
+      "/admin/ai-ops?clubId=club-7",
+    );
   });
 });
