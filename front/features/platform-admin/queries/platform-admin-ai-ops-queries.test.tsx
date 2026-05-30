@@ -32,6 +32,15 @@ const summary: PlatformAdminAiOpsSummaryResponse = {
   failureCodes: [{ code: "PROVIDER_RATE_LIMITED", count: 2 }],
   providerCosts: [{ provider: "OPENAI", model: "gpt-model", costEstimateUsd: "0.2500" }],
   staleCandidateCount: 1,
+  costTrend: {
+    window: "30d",
+    currentCostUsd: "0.0000",
+    priorCostUsd: "0.0000",
+    currentJobCount: 0,
+    priorJobCount: 0,
+    deltaDirection: "NONE",
+    availability: "NOT_ENOUGH_DATA",
+  },
 };
 
 const jobs: PlatformAdminAiOpsJobListResponse = {

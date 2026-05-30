@@ -14,6 +14,15 @@ const summary: PlatformAdminAiOpsSummaryView = {
   failureCodes: [{ code: "PROVIDER_RATE_LIMITED", count: 1 }],
   providerCosts: [{ provider: "OPENAI", model: "gpt-model", costEstimateUsd: "0.2000" }],
   staleCandidateCount: 1,
+  costTrend: {
+    window: "30d",
+    currentCostUsd: "0.0000",
+    priorCostUsd: "0.0000",
+    currentJobCount: 0,
+    priorJobCount: 0,
+    deltaDirection: "NONE",
+    availability: "NOT_ENOUGH_DATA",
+  },
 };
 
 const runningJob: PlatformAdminAiOpsJobView = {
@@ -108,5 +117,62 @@ describe("PlatformAdminAiOps", () => {
       />,
     );
     expect(screen.getByText("이 필터에 해당하는 AI job이 없습니다.")).toBeInTheDocument();
+  });
+
+  it("shows the windowed cost trend with a delta direction", () => {
+    render(
+      <PlatformAdminAiOps
+        role="OWNER"
+        summary={{
+          activeJobCount: 0,
+          failedLast24h: 0,
+          monthToDateCostEstimateUsd: "1.0000",
+          failureCodes: [],
+          providerCosts: [],
+          staleCandidateCount: 0,
+          costTrend: {
+            window: "30d",
+            currentCostUsd: "2.0000",
+            priorCostUsd: "1.0000",
+            currentJobCount: 5,
+            priorJobCount: 4,
+            deltaDirection: "UP",
+            availability: "AVAILABLE",
+          },
+        }}
+        jobs={[]}
+        window="30d"
+      />,
+    );
+    expect(screen.getByText(/\$2\.0000/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/cost trend direction/i)).toHaveTextContent(/▲|UP/);
+  });
+
+  it("shows an honest empty state when the trend lacks prior data", () => {
+    render(
+      <PlatformAdminAiOps
+        role="OWNER"
+        summary={{
+          activeJobCount: 0,
+          failedLast24h: 0,
+          monthToDateCostEstimateUsd: "0.0000",
+          failureCodes: [],
+          providerCosts: [],
+          staleCandidateCount: 0,
+          costTrend: {
+            window: "7d",
+            currentCostUsd: "0.5000",
+            priorCostUsd: "0.0000",
+            currentJobCount: 3,
+            priorJobCount: 0,
+            deltaDirection: "NONE",
+            availability: "NOT_ENOUGH_DATA",
+          },
+        }}
+        jobs={[]}
+        window="7d"
+      />,
+    );
+    expect(screen.getByText("데이터 부족")).toBeInTheDocument();
   });
 });
