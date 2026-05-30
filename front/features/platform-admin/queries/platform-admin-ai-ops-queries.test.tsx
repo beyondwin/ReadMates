@@ -67,7 +67,13 @@ beforeEach(() => {
 
 describe("platform admin AI Ops query keys", () => {
   it("normalizes filters into stable query keys", () => {
-    expect(platformAdminAiOpsKeys.summary()).toEqual(["platform-admin", "ai-ops", "summary"]);
+    expect(platformAdminAiOpsKeys.summary()).toEqual(["platform-admin", "ai-ops", "summary", null]);
+    expect(platformAdminAiOpsKeys.summary("7d")).toEqual([
+      "platform-admin",
+      "ai-ops",
+      "summary",
+      "7d",
+    ]);
     expect(platformAdminAiOpsKeys.jobs({ status: "RUNNING" })).toEqual([
       "platform-admin",
       "ai-ops",
@@ -110,7 +116,6 @@ describe("platform admin AI Ops mutation cache behavior", () => {
     });
 
     expect(forceCancelPlatformAdminAiJob).toHaveBeenCalledWith("job-1");
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: platformAdminAiOpsKeys.summary() });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: platformAdminAiOpsKeys.all });
   });
 });
