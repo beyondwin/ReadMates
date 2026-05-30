@@ -71,7 +71,7 @@ S8은 이 흐름의 마지막 단계를 채운다. S6은 "원인 확인 → 조�
 
 ## 6. Slice Order
 
-### S8 — Analytics / Reporting Lite (먼저)
+### S8 — Analytics / Reporting Lite (먼저) — delivered 2026-05-30 (admin.analytics slice, plan 2026-05-30-admin-s8-analytics-reporting-lite.md)
 
 Purpose: 유일하게 남은 coming_soon 라우트(`/admin/analytics`)를 READY로 전환해 operating flow의 마지막 단계를 닫는다.
 
