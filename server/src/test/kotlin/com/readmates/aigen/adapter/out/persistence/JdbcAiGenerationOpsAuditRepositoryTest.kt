@@ -5,6 +5,7 @@ import com.readmates.aigen.application.port.out.AiGenerationAdminActionAuditEntr
 import com.readmates.club.domain.PlatformAdminRole
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -27,6 +28,12 @@ class JdbcAiGenerationOpsAuditRepositoryTest(
     @param:Autowired private val repository: JdbcAiGenerationOpsAuditRepository,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
 ) : ReadmatesMySqlIntegrationTestSupport() {
+    @BeforeEach
+    fun cleanAuditTables() {
+        jdbcTemplate.execute("delete from ai_generation_audit_log")
+        jdbcTemplate.execute("delete from ai_generation_admin_action_audit")
+    }
+
     @Test
     fun `repository aggregates provider costs from audit rows`() {
         val since = Instant.parse("2026-05-01T00:00:00Z")
