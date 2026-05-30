@@ -142,7 +142,7 @@ export type PlatformAdminOnboardingResultResponse = {
   domain: PlatformAdminDomainResponse | null;
 };
 
-export type PlatformAdminAiOpsAction = "FORCE_CANCEL";
+export type PlatformAdminAiOpsAction = "FORCE_CANCEL" | "RETRY_COMMIT";
 
 export type PlatformAdminAiOpsSummaryResponse = {
   activeJobCount: number;
