@@ -36,3 +36,10 @@ interface ForceCancelAiOpsJobUseCase {
         jobId: UUID,
     ): AiOpsAdminActionResult
 }
+
+interface RetryAiOpsJobCommitUseCase {
+    fun retryCommit(
+        admin: CurrentPlatformAdmin,
+        jobId: UUID,
+    ): AiOpsAdminActionResult
+}
