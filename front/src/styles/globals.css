@@ -524,6 +524,13 @@
   gap: 14px;
 }
 
+.platform-admin-ai-ops__job-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 .platform-admin-ai-ops__header .h3 {
   margin: 0;
 }
