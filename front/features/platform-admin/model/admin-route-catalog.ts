@@ -21,8 +21,6 @@ export type AdminRouteDescriptor = {
   };
 };
 
-const UMBRELLA_DOC = "/docs/superpowers/specs/2026-05-25-readmates-admin-vnext-roadmap-design.md";
-
 export const ADMIN_ROUTES: ReadonlyArray<AdminRouteDescriptor> = [
   {
     path: "today",
@@ -93,19 +91,8 @@ export const ADMIN_ROUTES: ReadonlyArray<AdminRouteDescriptor> = [
     group: "review",
     groupLabel: "감사/분석",
     slice: "S8",
-    status: "coming_soon",
+    status: "ready",
     requiredCapability: "view_analytics",
-    comingSoon: {
-      title: "분석/리포팅 lite",
-      summary: "클럽별 활성 멤버, 세션 완료율, RSVP rate, AI 비용/세션, 알림 도달률 트렌드.",
-      bullets: [
-        "7/30/90일 시계열",
-        "클럽 간 비교 (cross-club benchmark)",
-        "데이터 부족 시 정직한 empty state",
-        "fixture seed로 dev 환경에서도 의미 있는 차트",
-      ],
-      docHref: `${UMBRELLA_DOC}#s8--분석리포팅-lite`,
-    },
   },
 ];
 
