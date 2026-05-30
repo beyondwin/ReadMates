@@ -1,12 +1,16 @@
 package com.readmates.aigen.adapter.`in`.web
 
 import com.readmates.aigen.application.model.AiOpsAdminActionResult
+import com.readmates.aigen.application.model.AiOpsCostTrend
+import com.readmates.aigen.application.model.AiOpsCostWindow
+import com.readmates.aigen.application.model.AiOpsDeltaDirection
 import com.readmates.aigen.application.model.AiOpsFailureCodeCount
 import com.readmates.aigen.application.model.AiOpsJobFilters
 import com.readmates.aigen.application.model.AiOpsJobList
 import com.readmates.aigen.application.model.AiOpsJobListItem
 import com.readmates.aigen.application.model.AiOpsProviderCost
 import com.readmates.aigen.application.model.AiOpsSummary
+import com.readmates.aigen.application.model.AiOpsTrendAvailability
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.Provider
@@ -72,6 +76,16 @@ class AiGenerationOpsControllerTest {
                 failureCodes = listOf(AiOpsFailureCodeCount("PROVIDER_RATE_LIMITED", 1)),
                 providerCosts = listOf(AiOpsProviderCost(Provider.OPENAI, "gpt-model", BigDecimal("0.2000"))),
                 staleCandidateCount = 1,
+                costTrend =
+                    AiOpsCostTrend(
+                        window = AiOpsCostWindow.LAST_30D,
+                        currentCostUsd = BigDecimal.ZERO,
+                        priorCostUsd = BigDecimal.ZERO,
+                        currentJobCount = 0,
+                        priorJobCount = 0,
+                        deltaDirection = AiOpsDeltaDirection.NONE,
+                        availability = AiOpsTrendAvailability.NOT_ENOUGH_DATA,
+                    ),
             )
 
         mockMvc
@@ -157,7 +171,10 @@ class AiGenerationOpsControllerTest {
 private class FakeSummaryUseCase : GetAiOpsSummaryUseCase {
     lateinit var result: AiOpsSummary
 
-    override fun summary(admin: CurrentPlatformAdmin): AiOpsSummary = result
+    override fun summary(
+        admin: CurrentPlatformAdmin,
+        window: AiOpsCostWindow,
+    ): AiOpsSummary = result
 }
 
 private class FakeListUseCase : ListAiOpsJobsUseCase {

@@ -3,10 +3,14 @@ package com.readmates.aigen.application.service
 import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.AiOpsAction
 import com.readmates.aigen.application.model.AiOpsAdminActionResult
+import com.readmates.aigen.application.model.AiOpsCostTrend
+import com.readmates.aigen.application.model.AiOpsCostWindow
+import com.readmates.aigen.application.model.AiOpsDeltaDirection
 import com.readmates.aigen.application.model.AiOpsJobFilters
 import com.readmates.aigen.application.model.AiOpsJobList
 import com.readmates.aigen.application.model.AiOpsJobListItem
 import com.readmates.aigen.application.model.AiOpsSummary
+import com.readmates.aigen.application.model.AiOpsTrendAvailability
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.port.`in`.ForceCancelAiOpsJobUseCase
 import com.readmates.aigen.application.port.`in`.GetAiOpsJobUseCase
@@ -38,7 +42,10 @@ class AiGenerationOpsService(
     ListAiOpsJobsUseCase,
     GetAiOpsJobUseCase,
     ForceCancelAiOpsJobUseCase {
-    override fun summary(admin: CurrentPlatformAdmin): AiOpsSummary {
+    override fun summary(
+        admin: CurrentPlatformAdmin,
+        window: AiOpsCostWindow,
+    ): AiOpsSummary {
         val now = clock.instant()
         val activeJobs = jobStore.loadActiveJobs()
         val monthStart =
@@ -59,6 +66,38 @@ class AiGenerationOpsService(
                     it.status in STALE_CANDIDATE_STATUSES &&
                         it.lastUpdatedAt.isBefore(now.minus(STALE_CANDIDATE_AGE))
                 },
+            costTrend = costTrend(now, window),
+        )
+    }
+
+    private fun costTrend(
+        now: java.time.Instant,
+        window: AiOpsCostWindow,
+    ): AiOpsCostTrend {
+        val windowSeconds = Duration.ofDays(window.days)
+        val currentStart = now.minus(windowSeconds)
+        val priorStart = now.minus(windowSeconds.multipliedBy(2))
+        val current = auditQueryPort.windowUsageBetween(currentStart, now)
+        val prior = auditQueryPort.windowUsageBetween(priorStart, currentStart)
+        val available = prior.jobCount > 0
+        val direction =
+            if (!available) {
+                AiOpsDeltaDirection.NONE
+            } else {
+                when (current.costUsd.compareTo(prior.costUsd)) {
+                    1 -> AiOpsDeltaDirection.UP
+                    -1 -> AiOpsDeltaDirection.DOWN
+                    else -> AiOpsDeltaDirection.FLAT
+                }
+            }
+        return AiOpsCostTrend(
+            window = window,
+            currentCostUsd = current.costUsd,
+            priorCostUsd = prior.costUsd,
+            currentJobCount = current.jobCount,
+            priorJobCount = prior.jobCount,
+            deltaDirection = direction,
+            availability = if (available) AiOpsTrendAvailability.AVAILABLE else AiOpsTrendAvailability.NOT_ENOUGH_DATA,
         )
     }
 
