@@ -66,7 +66,7 @@ function job(overrides: Record<string, unknown>) {
 }
 
 async function routeAiOps(page: Page): Promise<void> {
-  await page.route("**/api/bff/api/admin/ai-generation/summary", async (route) => {
+  await page.route("**/api/bff/api/admin/ai-generation/summary**", async (route) => {
     await json(route, 200, {
       activeJobCount: 0,
       failedLast24h: 2,
@@ -74,6 +74,15 @@ async function routeAiOps(page: Page): Promise<void> {
       failureCodes: [{ code: "PROVIDER_RATE_LIMITED", count: 2 }],
       providerCosts: [],
       staleCandidateCount: 0,
+      costTrend: {
+        window: "30d",
+        currentCostUsd: "0.2000",
+        priorCostUsd: "0.1000",
+        currentJobCount: 2,
+        priorJobCount: 1,
+        deltaDirection: "UP",
+        availability: "AVAILABLE",
+      },
     });
   });
   await page.route("**/api/bff/api/admin/ai-generation/jobs**", async (route) => {
