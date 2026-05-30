@@ -70,8 +70,8 @@ async function routePlatformAdminShell(page: Page): Promise<void> {
       readiness: { state: "READY", blockingReasons: [], nextAction: null },
       memberActivity: { activeCount: 8, dormantCount: 1, pendingViewerCount: 2, hostCount: 1 },
       sessionProgress: { upcomingCount: 2, currentOpenCount: 1, closedCount: 5, publishedRecordCount: 4, incompleteRecordCount: 1 },
-      notificationHealth: { pending: 1, failed: 1, dead: 0, lastSuccessAt: null, failureClusters: [] },
-      aiUsage: { activeJobs: 0, failedRecentJobs: 1, staleCandidates: 0, costEstimateUsd: "0.1200", state: "HAS_ACTIVITY" },
+      notificationHealth: { pending: 1, failed: 1, dead: 0, lastSuccessAt: null, failureClusters: [], recentFailed7d: 4, priorFailed7d: 1 },
+      aiUsage: { activeJobs: 0, failedRecentJobs: 1, staleCandidates: 0, costEstimateUsd: "0.1200", state: "HAS_ACTIVITY", priorFailedJobs7d: 0 },
       safeLinks: [
         { label: "Host app", href: "/clubs/reading-sai/app", kind: "HOST_ROUTE" },
         { label: "알림 운영", href: `/admin/notifications?clubId=${CLUB_ID}`, kind: "ADMIN_ROUTE" },
@@ -92,5 +92,7 @@ test("owner views aggregate club operations without host-owned commands", async 
     "href",
     `/admin/notifications?clubId=${CLUB_ID}`,
   );
+  await expect(page.getByText("알림 실패 (7일)")).toBeVisible();
+  await expect(page.getByText(/지난 7일 대비/).first()).toBeVisible();
   await expect(page.getByRole("button", { name: /RSVP|출석|세션 편집|발행/ })).toHaveCount(0);
 });

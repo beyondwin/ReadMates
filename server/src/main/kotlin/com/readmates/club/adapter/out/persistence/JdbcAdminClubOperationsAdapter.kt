@@ -186,6 +186,27 @@ class JdbcAdminClubOperationsAdapter(
                     clubId.dbString(),
                 ),
             failureClusters = failureClusters(clubId),
+            recentFailed7d =
+                scalarInt(
+                    """
+                    select count(*)
+                    from notification_deliveries
+                    where club_id = ? and status in ('FAILED', 'DEAD')
+                      and updated_at >= utc_timestamp(6) - interval 7 day
+                    """.trimIndent(),
+                    clubId,
+                ),
+            priorFailed7d =
+                scalarInt(
+                    """
+                    select count(*)
+                    from notification_deliveries
+                    where club_id = ? and status in ('FAILED', 'DEAD')
+                      and updated_at >= utc_timestamp(6) - interval 14 day
+                      and updated_at < utc_timestamp(6) - interval 7 day
+                    """.trimIndent(),
+                    clubId,
+                ),
         )
 
     private fun failureClusters(clubId: UUID): List<AdminClubNotificationFailureCluster> =
@@ -203,6 +224,7 @@ class JdbcAdminClubOperationsAdapter(
             from notification_deliveries
             where club_id = ?
               and status in ('FAILED', 'DEAD')
+              and updated_at >= utc_timestamp(6) - interval 7 day
             group by safe_error_code
             order by failure_count desc, safe_error_code asc
             limit 5
@@ -222,6 +244,7 @@ class JdbcAdminClubOperationsAdapter(
             select
               sum(case when status in ('PENDING', 'RUNNING', 'COMMITTING') then 1 else 0 end) as active_jobs,
               sum(case when status = 'FAILED' and created_at >= timestampadd(day, -7, utc_timestamp(6)) then 1 else 0 end) as failed_recent_jobs,
+              sum(case when status = 'FAILED' and created_at >= timestampadd(day, -14, utc_timestamp(6)) and created_at < timestampadd(day, -7, utc_timestamp(6)) then 1 else 0 end) as prior_failed_jobs_7d,
               sum(case when status in ('PENDING', 'RUNNING') and created_at < timestampadd(hour, -6, utc_timestamp(6)) then 1 else 0 end) as stale_candidates,
               coalesce(sum(cost_estimate_usd), 0) as cost_estimate_usd
             from ai_generation_audit_log
@@ -231,6 +254,7 @@ class JdbcAdminClubOperationsAdapter(
                 val activeJobs = rs.getInt("active_jobs")
                 val failedRecentJobs = rs.getInt("failed_recent_jobs")
                 val staleCandidates = rs.getInt("stale_candidates")
+                val priorFailedJobs7d = rs.getInt("prior_failed_jobs_7d")
                 AdminClubAiUsage(
                     activeJobs = activeJobs,
                     failedRecentJobs = failedRecentJobs,
@@ -242,10 +266,11 @@ class JdbcAdminClubOperationsAdapter(
                         } else {
                             "HAS_ACTIVITY"
                         },
+                    priorFailedJobs7d = priorFailedJobs7d,
                 )
             },
             clubId.dbString(),
-        ) ?: AdminClubAiUsage(0, 0, 0, "0.0000", "NO_RECENT_USAGE")
+        ) ?: AdminClubAiUsage(0, 0, 0, "0.0000", "NO_RECENT_USAGE", 0)
 
     private fun scalarInt(
         sql: String,

@@ -50,6 +50,8 @@ data class AdminClubNotificationHealth(
     val dead: Int,
     val lastSuccessAt: OffsetDateTime?,
     val failureClusters: List<AdminClubNotificationFailureCluster>,
+    val recentFailed7d: Int = 0,
+    val priorFailed7d: Int = 0,
 )
 
 data class AdminClubNotificationFailureCluster(
@@ -63,6 +65,7 @@ data class AdminClubAiUsage(
     val staleCandidates: Int,
     val costEstimateUsd: String,
     val state: String,
+    val priorFailedJobs7d: Int = 0,
 )
 
 data class AdminClubSafeLink(
