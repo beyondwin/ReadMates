@@ -72,13 +72,17 @@ Slice D (S9)    Host-surface 보강 (공유 club-ops 계약)
 
 목표: admin 조치를 `FORCE_CANCEL` 단일에서 host의 cancel/retry와 일관된 조치로 강화한다(charter §4.2-3).
 
+> **재정의 노트 (2026-05-30, 코드 검증 후 확정)**: charter §4.2-3과 이 절의 초안은 "기존 host commit-retry use-case에 위임"을 전제했으나, **그런 서버 use-case는 존재하지 않는다**. host의 `COMMIT_RETRY`는 순수 프런트 액션(commit UI 재진입 후 host가 `recordVisibility`를 직접 골라 `POST /jobs/{jobId}/commit` 재호출)이다. admin이 이를 그대로 위임하면 (1) host의 member-facing `recordVisibility` 결정을 admin이 대신하고 (2) 생성 콘텐츠를 admin이 클럽 세션에 write 하게 되어 charter §5.3 non-goal("host가 admin 대체 금지"의 역방향)과 충돌한다. 따라서 admin `RETRY_COMMIT`의 의미를 **stuck `COMMITTING` 잡의 복구 전이**로 확정한다: `COMMITTING → SUCCEEDED`로 되돌려 host가 직접 재커밋할 수 있게 unblock 한다. 이 전이는 `AiGenerationCommitService`가 모든 내부 실패 경로에서 이미 쓰는 복구 전이(`COMMITTING → SUCCEEDED`)와 동일하다 — 새 terminal state·전이 의미를 도입하지 않는다.
+
 - **서버**
-  - `AiOpsAction`에 `RETRY_COMMIT` 추가. **기존 host commit-retry 전이/use-case에 위임**한다 — 새 terminal state나 전이 의미를 도입하지 않는다(charter §4.3 non-goal "상태머신 의미 변경 금지" 준수). admin 경로가 추가하는 것은 actor=admin과 admin audit 항목뿐이다.
-  - `availableActions`를 status별로 계산한다(retry 가능 status 집합을 `FORCE_CANCEL_STATUSES`처럼 정의). 새 use-case `RetryAiOpsJobCommitUseCase`(또는 동등)를 OWNER/OPERATOR로 role-gate하고 `adminActionAuditPort.record(...)`로 audit-ready로 만든다.
-  - worker 로직을 복제하지 않는다 — 기존 retry 경로에 위임한다.
+  - `AiOpsAction`에 `RETRY_COMMIT` 추가.
+  - 새 use-case `RetryAiOpsJobCommitUseCase.retryCommit(admin, jobId)`를 OWNER/OPERATOR로 role-gate한다(`ACTION_ROLES` 재사용).
+  - 동작: 라이브 잡을 로드해 status가 `COMMITTING`일 때만 `jobStore.transitionStatus(expected = {COMMITTING}, next = SUCCEEDED, stage = READY, progressPct = 100, error = null)`로 되돌린다. **transient payload는 삭제하지 않는다**(host가 재커밋하려면 result 스냅샷이 살아 있어야 한다 — force-cancel과의 핵심 차이). `adminActionAuditPort.record(...)`로 `action = "RETRY_COMMIT"`, `previousStatus = COMMITTING`, `nextStatus = SUCCEEDED` audit를 남긴다.
+  - `availableActions`를 status별로 계산한다: `RETRY_COMMIT_STATUSES = {COMMITTING}`. `COMMITTING` 잡은 `FORCE_CANCEL`과 `RETRY_COMMIT`를 모두 노출한다.
+  - worker/commit 로직을 복제하지 않는다 — 상태 전이만 수행하고 실제 재커밋은 host 경로에 맡긴다.
 - **프런트**
-  - `PlatformAdminAiOpsAction`에 `RETRY_COMMIT` 추가. ai-ops job 행/상세에서 `availableActions`에 따라 버튼 노출. two-step 또는 명시적 확인은 host 패턴과 톤을 맞춘다.
-- **Non-goals**: worker 로직 복제, provider raw error/transcript 노출, host 전용 액션을 admin에 그대로 복사(의미가 다르면 admin 시점으로 재정의).
+  - `PlatformAdminAiOpsAction`에 `RETRY_COMMIT` 추가. ai-ops job 행에서 `availableActions.includes("RETRY_COMMIT")`일 때 OWNER/OPERATOR에게 버튼 노출. 톤은 기존 force-cancel 버튼과 맞춘다.
+- **Non-goals**: worker/commit 로직 복제, admin이 콘텐츠를 직접 커밋(=host commit 대행), provider raw error/transcript 노출, transient payload 삭제.
 
 ### 5.3 Slice C — 표면 연결성 (S6-T4)
 
