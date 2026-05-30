@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  AI_OPS_DEFAULT_WINDOW,
   EMPTY_AI_OPS_FILTER,
   aiOpsFilterFromSearchParams,
   aiOpsFilterToQuery,
   aiOpsSearchFromFilter,
+  aiOpsWindowFromSearchParams,
   hasActiveAiOpsFilter,
 } from "./platform-admin-ai-ops-model";
 
@@ -35,5 +37,17 @@ describe("platform-admin ai-ops filter model", () => {
   it("maps filter to the API query shape, omitting nulls", () => {
     expect(aiOpsFilterToQuery({ errorCode: "X", clubId: null })).toEqual({ errorCode: "X" });
     expect(aiOpsFilterToQuery(EMPTY_AI_OPS_FILTER)).toEqual({});
+  });
+});
+
+describe("aiOpsWindowFromSearchParams", () => {
+  it("reads a valid window", () => {
+    expect(aiOpsWindowFromSearchParams(new URLSearchParams("window=7d"))).toBe("7d");
+    expect(aiOpsWindowFromSearchParams(new URLSearchParams("window=90d"))).toBe("90d");
+  });
+
+  it("falls back to the default for missing or unknown window", () => {
+    expect(aiOpsWindowFromSearchParams(new URLSearchParams())).toBe(AI_OPS_DEFAULT_WINDOW);
+    expect(aiOpsWindowFromSearchParams(new URLSearchParams("window=year"))).toBe(AI_OPS_DEFAULT_WINDOW);
   });
 });
