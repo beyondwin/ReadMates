@@ -1,5 +1,6 @@
 package com.readmates.aigen.adapter.`in`.web
 
+import com.readmates.aigen.application.model.AiOpsCostWindow
 import com.readmates.aigen.application.model.AiOpsJobFilters
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.port.`in`.ForceCancelAiOpsJobUseCase
@@ -26,7 +27,10 @@ class AiGenerationOpsController(
     private val forceCancelUseCase: ForceCancelAiOpsJobUseCase,
 ) {
     @GetMapping("/summary")
-    fun summary(admin: CurrentPlatformAdmin): AiOpsSummaryResponse = AiOpsSummaryResponse.from(summaryUseCase.summary(admin))
+    fun summary(
+        admin: CurrentPlatformAdmin,
+        @RequestParam(required = false) window: String?,
+    ): AiOpsSummaryResponse = AiOpsSummaryResponse.from(summaryUseCase.summary(admin, AiOpsCostWindow.fromWire(window)))
 
     @GetMapping("/jobs")
     fun jobs(

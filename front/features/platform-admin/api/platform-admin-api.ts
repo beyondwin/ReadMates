@@ -104,9 +104,10 @@ export function listSupportAccessGrantsByClub(clubId: string) {
   );
 }
 
-export function fetchPlatformAdminAiOpsSummary() {
+export function fetchPlatformAdminAiOpsSummary(window?: string) {
+  const search = window ? `?window=${encodeURIComponent(window)}` : "";
   return readmatesFetch<PlatformAdminAiOpsSummaryResponse>(
-    "/api/admin/ai-generation/summary",
+    `/api/admin/ai-generation/summary${search}`,
     undefined,
     { clubSlug: undefined },
   );

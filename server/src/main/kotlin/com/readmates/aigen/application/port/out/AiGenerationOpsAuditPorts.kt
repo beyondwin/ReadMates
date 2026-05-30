@@ -5,6 +5,7 @@ import com.readmates.aigen.application.model.AiOpsJobFilters
 import com.readmates.aigen.application.model.AiOpsJobList
 import com.readmates.aigen.application.model.AiOpsJobListItem
 import com.readmates.aigen.application.model.AiOpsProviderCost
+import com.readmates.aigen.application.model.AiOpsWindowUsage
 import com.readmates.club.domain.PlatformAdminRole
 import java.math.BigDecimal
 import java.time.Instant
@@ -14,6 +15,11 @@ interface AiGenerationAuditQueryPort {
     fun countFailuresSince(since: Instant): Long
 
     fun costSince(since: Instant): BigDecimal
+
+    fun windowUsageBetween(
+        start: Instant,
+        endExclusive: Instant,
+    ): AiOpsWindowUsage
 
     fun failureCodesSince(since: Instant): List<AiOpsFailureCodeCount>
 

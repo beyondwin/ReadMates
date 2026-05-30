@@ -7,6 +7,15 @@ export type PlatformAdminAiOpsSummaryView = {
   failureCodes: Array<{ code: string; count: number }>;
   providerCosts: Array<{ provider: string; model: string; costEstimateUsd: string }>;
   staleCandidateCount: number;
+  costTrend: {
+    window: "7d" | "30d" | "90d";
+    currentCostUsd: string;
+    priorCostUsd: string;
+    currentJobCount: number;
+    priorJobCount: number;
+    deltaDirection: "UP" | "DOWN" | "FLAT" | "NONE";
+    availability: "AVAILABLE" | "NOT_ENOUGH_DATA";
+  };
 };
 
 export type PlatformAdminAiOpsJobView = {
@@ -37,6 +46,8 @@ type PlatformAdminAiOpsProps = {
   activeFilter?: { errorCode: string | null; clubId: string | null };
   onSelectFailureCode?: (code: string) => void;
   onClearFilter?: () => void;
+  window?: "7d" | "30d" | "90d";
+  onSelectWindow?: (window: "7d" | "30d" | "90d") => void;
 };
 
 export function PlatformAdminAiOps({
@@ -49,6 +60,8 @@ export function PlatformAdminAiOps({
   activeFilter,
   onSelectFailureCode,
   onClearFilter,
+  window,
+  onSelectWindow,
 }: PlatformAdminAiOpsProps) {
   const canAct = role === "OWNER" || role === "OPERATOR";
   const filterActive = Boolean(activeFilter?.errorCode || activeFilter?.clubId);
@@ -76,6 +89,31 @@ export function PlatformAdminAiOps({
         <Metric label="Failed 24h" value={String(summary?.failedLast24h ?? 0)} />
         <Metric label="Cost MTD" value={`$${summary?.monthToDateCostEstimateUsd ?? "0.0000"}`} />
         <Metric label="Stale" value={String(summary?.staleCandidateCount ?? 0)} />
+      </div>
+
+      <div className="platform-admin-ai-ops__trend" aria-label="cost trend">
+        <div className="platform-admin-ai-ops__window" role="group" aria-label="cost window">
+          {(["7d", "30d", "90d"] as const).map((w) => (
+            <button
+              key={w}
+              type="button"
+              className="btn btn-quiet btn-sm"
+              aria-pressed={(window ?? summary?.costTrend.window) === w}
+              onClick={() => onSelectWindow?.(w)}
+            >
+              {w}
+            </button>
+          ))}
+        </div>
+        {summary && summary.costTrend.availability === "NOT_ENOUGH_DATA" ? (
+          <p className="small" style={{ color: "var(--text-3)" }}>데이터 부족</p>
+        ) : (
+          <p className="small">
+            <span>${summary?.costTrend.currentCostUsd ?? "0.0000"}</span>{" "}
+            <span aria-label="cost trend direction">{directionGlyph(summary?.costTrend.deltaDirection)}</span>{" "}
+            <span style={{ color: "var(--text-3)" }}>직전 ${summary?.costTrend.priorCostUsd ?? "0.0000"}</span>
+          </p>
+        )}
       </div>
 
       <div className="platform-admin-ai-ops__sidecars">
@@ -200,6 +238,19 @@ function SmallList({ title, items, emptyText }: { title: string; items: string[]
       )}
     </div>
   );
+}
+
+function directionGlyph(direction?: "UP" | "DOWN" | "FLAT" | "NONE"): string {
+  switch (direction) {
+    case "UP":
+      return "▲";
+    case "DOWN":
+      return "▼";
+    case "FLAT":
+      return "→";
+    default:
+      return "·";
+  }
 }
 
 function formatTimestamp(value: string) {

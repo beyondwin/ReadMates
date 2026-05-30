@@ -1,11 +1,15 @@
 package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.AiGenerationException
+import com.readmates.aigen.application.model.AiOpsCostWindow
+import com.readmates.aigen.application.model.AiOpsDeltaDirection
 import com.readmates.aigen.application.model.AiOpsFailureCodeCount
 import com.readmates.aigen.application.model.AiOpsJobFilters
 import com.readmates.aigen.application.model.AiOpsJobList
 import com.readmates.aigen.application.model.AiOpsJobListItem
 import com.readmates.aigen.application.model.AiOpsProviderCost
+import com.readmates.aigen.application.model.AiOpsTrendAvailability
+import com.readmates.aigen.application.model.AiOpsWindowUsage
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.port.out.AiGenerationAdminActionAuditEntry
@@ -94,6 +98,35 @@ class AiGenerationOpsServiceTest {
         }
     }
 
+    @Test
+    fun `summary derives 30d cost trend up when current exceeds prior`() {
+        val now = Instant.parse("2026-05-18T00:00:00Z")
+        auditQuery.usageByStart[now.minusSeconds(30 * 86400)] = AiOpsWindowUsage(BigDecimal("2.0000"), 5)
+        auditQuery.usageByStart[now.minusSeconds(60 * 86400)] = AiOpsWindowUsage(BigDecimal("1.0000"), 4)
+
+        val trend = service.summary(admin(PlatformAdminRole.OWNER)).costTrend
+
+        assertThat(trend.window).isEqualTo(AiOpsCostWindow.LAST_30D)
+        assertThat(trend.currentCostUsd).isEqualByComparingTo(BigDecimal("2.0000"))
+        assertThat(trend.priorCostUsd).isEqualByComparingTo(BigDecimal("1.0000"))
+        assertThat(trend.currentJobCount).isEqualTo(5L)
+        assertThat(trend.deltaDirection).isEqualTo(AiOpsDeltaDirection.UP)
+        assertThat(trend.availability).isEqualTo(AiOpsTrendAvailability.AVAILABLE)
+    }
+
+    @Test
+    fun `summary reports NOT_ENOUGH_DATA when prior window had no jobs`() {
+        val now = Instant.parse("2026-05-18T00:00:00Z")
+        auditQuery.usageByStart[now.minusSeconds(7 * 86400)] = AiOpsWindowUsage(BigDecimal("0.5000"), 3)
+        auditQuery.usageByStart[now.minusSeconds(14 * 86400)] = AiOpsWindowUsage(BigDecimal.ZERO, 0)
+
+        val trend = service.summary(admin(PlatformAdminRole.OWNER), AiOpsCostWindow.LAST_7D).costTrend
+
+        assertThat(trend.window).isEqualTo(AiOpsCostWindow.LAST_7D)
+        assertThat(trend.availability).isEqualTo(AiOpsTrendAvailability.NOT_ENOUGH_DATA)
+        assertThat(trend.deltaDirection).isEqualTo(AiOpsDeltaDirection.NONE)
+    }
+
     private fun admin(role: PlatformAdminRole): CurrentPlatformAdmin =
         CurrentPlatformAdmin(
             userId = UUID.randomUUID(),
@@ -104,6 +137,7 @@ class AiGenerationOpsServiceTest {
 
 private class EmptyAuditQueryPort : AiGenerationAuditQueryPort {
     var jobById: AiOpsJobListItem? = null
+    val usageByStart = mutableMapOf<Instant, AiOpsWindowUsage>()
 
     override fun countFailuresSince(since: Instant): Long = 0
 
@@ -112,6 +146,11 @@ private class EmptyAuditQueryPort : AiGenerationAuditQueryPort {
     override fun failureCodesSince(since: Instant): List<AiOpsFailureCodeCount> = emptyList()
 
     override fun providerCostsSince(since: Instant): List<AiOpsProviderCost> = emptyList()
+
+    override fun windowUsageBetween(
+        start: Instant,
+        endExclusive: Instant,
+    ): AiOpsWindowUsage = usageByStart[start] ?: AiOpsWindowUsage(BigDecimal.ZERO, 0)
 
     override fun listJobs(filters: AiOpsJobFilters): AiOpsJobList = AiOpsJobList(emptyList(), null)
 

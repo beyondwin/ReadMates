@@ -18,13 +18,22 @@ function renderRoute(initialEntry = "/admin/ai-ops") {
     domainActionRequiredCount: 0,
     domainsRequiringAction: [],
   });
-  queryClient.setQueryData(platformAdminAiOpsSummaryQuery().queryKey, {
+  queryClient.setQueryData(platformAdminAiOpsSummaryQuery("30d").queryKey, {
     activeJobCount: 0,
     failedLast24h: 0,
     monthToDateCostEstimateUsd: "0",
     failureCodes: [{ code: "PROVIDER_RATE_LIMITED", count: 2 }],
     providerCosts: [],
     staleCandidateCount: 0,
+    costTrend: {
+      window: "30d",
+      currentCostUsd: "0.0000",
+      priorCostUsd: "0.0000",
+      currentJobCount: 0,
+      priorJobCount: 0,
+      deltaDirection: "NONE",
+      availability: "NOT_ENOUGH_DATA",
+    },
   });
   queryClient.setQueryData(platformAdminAiOpsJobsQuery().queryKey, { items: [] });
   queryClient.setQueryData(

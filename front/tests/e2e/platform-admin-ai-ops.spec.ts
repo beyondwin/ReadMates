@@ -49,7 +49,28 @@ async function routePlatformAdminShell(page: Page, role: PlatformAdminRole): Pro
     await json(route, 200, { items: [] });
   });
 
-  await page.route("**/api/bff/api/admin/ai-generation/summary", async (route) => {
+  await page.route("**/api/bff/api/admin/ai-generation/summary**", async (route) => {
+    const requestedWindow = new URL(route.request().url()).searchParams.get("window");
+    const costTrend =
+      requestedWindow === "7d"
+        ? {
+            window: "7d",
+            currentCostUsd: "0.0000",
+            priorCostUsd: "0.0000",
+            currentJobCount: 0,
+            priorJobCount: 0,
+            deltaDirection: "NONE",
+            availability: "NOT_ENOUGH_DATA",
+          }
+        : {
+            window: "30d",
+            currentCostUsd: "2.0000",
+            priorCostUsd: "1.0000",
+            currentJobCount: 5,
+            priorJobCount: 4,
+            deltaDirection: "UP",
+            availability: "AVAILABLE",
+          };
     await json(route, 200, {
       activeJobCount: 1,
       failedLast24h: 0,
@@ -57,6 +78,7 @@ async function routePlatformAdminShell(page: Page, role: PlatformAdminRole): Pro
       failureCodes: [],
       providerCosts: [{ provider: "OPENAI", model: "gpt-model", costEstimateUsd: "0.1200" }],
       staleCandidateCount: 1,
+      costTrend,
     });
   });
 
@@ -103,4 +125,22 @@ test("platform owner sees AI Ops action affordance when job is actionable", asyn
 
   await expect(page.getByRole("heading", { name: "AI 운영" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Force cancel" })).toBeVisible();
+});
+
+test("cost window toggle updates the rendered trend", async ({ page }) => {
+  await routePlatformAdminShell(page, "SUPPORT");
+
+  await page.goto("/admin/ai-ops");
+
+  const windowGroup = page.getByRole("group", { name: "cost window" });
+  await expect(windowGroup).toBeVisible();
+
+  const trend = page.getByLabel("cost trend");
+  await expect(trend.getByText("$2.0000")).toBeVisible();
+  await expect(trend.getByLabel("cost trend direction")).toHaveText("▲");
+
+  await windowGroup.getByRole("button", { name: "7d" }).click();
+
+  await expect(page).toHaveURL(/window=7d/);
+  await expect(trend.getByText("데이터 부족")).toBeVisible();
 });

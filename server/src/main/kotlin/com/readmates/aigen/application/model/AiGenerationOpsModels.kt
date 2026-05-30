@@ -12,6 +12,7 @@ data class AiOpsSummary(
     val failureCodes: List<AiOpsFailureCodeCount>,
     val providerCosts: List<AiOpsProviderCost>,
     val staleCandidateCount: Int,
+    val costTrend: AiOpsCostTrend,
 )
 
 data class AiOpsFailureCodeCount(
@@ -53,6 +54,36 @@ data class AiOpsJobListItem(
 )
 
 enum class AiOpsAction { FORCE_CANCEL }
+
+enum class AiOpsCostWindow(val days: Long, val wire: String) {
+    LAST_7D(7, "7d"),
+    LAST_30D(30, "30d"),
+    LAST_90D(90, "90d"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): AiOpsCostWindow = entries.firstOrNull { it.wire == value } ?: LAST_30D
+    }
+}
+
+enum class AiOpsTrendAvailability { AVAILABLE, NOT_ENOUGH_DATA }
+
+enum class AiOpsDeltaDirection { UP, DOWN, FLAT, NONE }
+
+data class AiOpsWindowUsage(
+    val costUsd: BigDecimal,
+    val jobCount: Long,
+)
+
+data class AiOpsCostTrend(
+    val window: AiOpsCostWindow,
+    val currentCostUsd: BigDecimal,
+    val priorCostUsd: BigDecimal,
+    val currentJobCount: Long,
+    val priorJobCount: Long,
+    val deltaDirection: AiOpsDeltaDirection,
+    val availability: AiOpsTrendAvailability,
+)
 
 data class AiOpsJobFilters(
     val status: JobStatus?,

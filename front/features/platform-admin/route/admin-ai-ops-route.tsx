@@ -12,14 +12,16 @@ import {
   aiOpsFilterFromSearchParams,
   aiOpsFilterToQuery,
   aiOpsSearchFromFilter,
+  aiOpsWindowFromSearchParams,
   EMPTY_AI_OPS_FILTER,
 } from "@/features/platform-admin/model/platform-admin-ai-ops-model";
 
 export function AdminAiOpsRoute() {
   const [searchParams, setSearchParams] = useSearchParams();
   const filter = useMemo(() => aiOpsFilterFromSearchParams(searchParams), [searchParams]);
+  const window = useMemo(() => aiOpsWindowFromSearchParams(searchParams), [searchParams]);
   const role = useQuery(platformAdminSummaryQuery()).data!.platformRole;
-  const summaryQuery = useQuery(platformAdminAiOpsSummaryQuery());
+  const summaryQuery = useQuery(platformAdminAiOpsSummaryQuery(window));
   const jobsQuery = useQuery(platformAdminAiOpsJobsQuery(aiOpsFilterToQuery(filter)));
   const forceCancel = useForceCancelPlatformAdminAiJobMutation();
 
@@ -52,6 +54,12 @@ export function AdminAiOpsRoute() {
           setSearchParams(aiOpsSearchFromFilter({ ...EMPTY_AI_OPS_FILTER, errorCode: code }))
         }
         onClearFilter={() => setSearchParams(aiOpsSearchFromFilter(EMPTY_AI_OPS_FILTER))}
+        window={window}
+        onSelectWindow={(next) => {
+          const params = aiOpsSearchFromFilter(filter);
+          params.set("window", next);
+          setSearchParams(params);
+        }}
       />
     </section>
   );

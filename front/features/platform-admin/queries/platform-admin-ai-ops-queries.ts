@@ -17,15 +17,15 @@ function normalizeFilters(filters: PlatformAdminAiOpsFilters = {}) {
 
 export const platformAdminAiOpsKeys = {
   all: ["platform-admin", "ai-ops"] as const,
-  summary: () => [...platformAdminAiOpsKeys.all, "summary"] as const,
+  summary: (window?: string) => [...platformAdminAiOpsKeys.all, "summary", window ?? null] as const,
   jobs: (filters?: PlatformAdminAiOpsFilters) =>
     [...platformAdminAiOpsKeys.all, "jobs", normalizeFilters(filters)] as const,
 } as const;
 
-export function platformAdminAiOpsSummaryQuery() {
+export function platformAdminAiOpsSummaryQuery(window?: string) {
   return queryOptions({
-    queryKey: platformAdminAiOpsKeys.summary(),
-    queryFn: fetchPlatformAdminAiOpsSummary,
+    queryKey: platformAdminAiOpsKeys.summary(window),
+    queryFn: () => fetchPlatformAdminAiOpsSummary(window),
   });
 }
 
@@ -40,10 +40,6 @@ export function useForceCancelPlatformAdminAiJobMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (jobId: string) => forceCancelPlatformAdminAiJob(jobId),
-    onSuccess: () =>
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: platformAdminAiOpsKeys.summary() }),
-        queryClient.invalidateQueries({ queryKey: platformAdminAiOpsKeys.all }),
-      ]),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: platformAdminAiOpsKeys.all }),
   });
 }

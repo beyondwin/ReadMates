@@ -151,6 +151,15 @@ export type PlatformAdminAiOpsSummaryResponse = {
   failureCodes: Array<{ code: string; count: number }>;
   providerCosts: Array<{ provider: string; model: string; costEstimateUsd: string }>;
   staleCandidateCount: number;
+  costTrend: {
+    window: "7d" | "30d" | "90d";
+    currentCostUsd: string;
+    priorCostUsd: string;
+    currentJobCount: number;
+    priorJobCount: number;
+    deltaDirection: "UP" | "DOWN" | "FLAT" | "NONE";
+    availability: "AVAILABLE" | "NOT_ENOUGH_DATA";
+  };
 };
 
 export type PlatformAdminAiOpsJob = {

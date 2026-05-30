@@ -39,3 +39,14 @@ export function aiOpsFilterToQuery(filter: AiOpsJobFilter): PlatformAdminAiOpsFi
   }
   return query;
 }
+
+export type AiOpsCostWindow = "7d" | "30d" | "90d";
+
+export const AI_OPS_COST_WINDOWS: AiOpsCostWindow[] = ["7d", "30d", "90d"];
+
+export const AI_OPS_DEFAULT_WINDOW: AiOpsCostWindow = "30d";
+
+export function aiOpsWindowFromSearchParams(params: URLSearchParams): AiOpsCostWindow {
+  const raw = params.get("window");
+  return AI_OPS_COST_WINDOWS.includes(raw as AiOpsCostWindow) ? (raw as AiOpsCostWindow) : AI_OPS_DEFAULT_WINDOW;
+}
