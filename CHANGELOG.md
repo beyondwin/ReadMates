@@ -20,6 +20,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Engineering
 
+- **platform-admin:** `/admin/ai-ops` failure codes are now drilldown controls. Selecting a failure code filters the job list to the affected clubs/sessions and reflects the filter in URL state (`?errorCode=`), with a "전체 보기" control to clear it. Filtered empty states stay honest ("이 필터에 해당하는 AI job이 없습니다.") and no raw provider error/content fields are exposed.
 - **deploy:** `deploy/oci/backup-mysql.service` + `backup-mysql.timer`를 추가해 04:15 UTC에 MySQL dump → OCI Object Storage 업로드를 자동화합니다. 복구·검증·보존(30/6/1) 절차는 [`docs/operations/runbooks/db-backup.md`](docs/operations/runbooks/db-backup.md)에 정리합니다.
 - **deploy:** post-deploy watch가 부모 attempt id를 자식 attempt로 전파하도록 수정해 배포 ledger의 attempt 계보가 정확히 이어집니다 (`deploy/oci/watch-compose-post-deploy.sh`, `deploy/oci/tests/watch-attempt-id.test.sh`).
 - **scripts:** `scripts/pre-push-check.sh`에 `--release`/`READMATES_PRE_PUSH_RELEASE=true` 조건의 `CHANGELOG Unreleased` guard를 추가했습니다. concrete 카테고리 헤더, feature-style bold marker, 두 개 이상 placeholder를 거부합니다. `--no-changelog-check`로 비상 우회하며, branch protection bypass 정책은 [`docs/development/release-management.md`](docs/development/release-management.md)에 함께 문서화했습니다.
