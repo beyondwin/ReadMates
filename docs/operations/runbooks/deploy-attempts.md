@@ -94,7 +94,7 @@ jq -r 'select(.ts != null)' /var/log/readmates/deploy-attempts.jsonl
 
 v1.11.0 까지 post-deploy watch stage가 `READMATES_DEPLOY_ATTEMPT_ID`를 부모 프로세스로부터 상속받지 못해 `WATCH_STARTED`, `STAGE_STARTED` 등 일부 ledger 라인이 `"attemptId":"unknown"`으로 기록되었습니다.
 
-v1.11.1 (fix commit: `<TBD-after-merge>`) 이후로는:
+fix commit `b6e16f0d` 이후로는:
 
 - `05-deploy-compose-stack.sh`가 watch invocation에 `READMATES_DEPLOY_ATTEMPT_ID="$ATTEMPT_ID"`를 전달합니다.
 - `watch-compose-post-deploy.sh`가 `${READMATES_DEPLOY_ATTEMPT_ID:-${ATTEMPT_ID:-unknown}}` 순서로 id를 결정합니다 (부모 우선, 로컬 fallback, 최후의 `unknown`).

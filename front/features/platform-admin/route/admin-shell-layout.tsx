@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type MouseEvent, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -65,6 +65,9 @@ function AdminShellLayoutInner() {
 
   return (
     <div className="admin-shell">
+      <a href="#admin-main" className="admin-shell__skip-link" onClick={focusAdminMain}>
+        본문으로 건너뛰기
+      </a>
       <header className="admin-shell__header">
         <span className="admin-shell__wordmark">ReadMates Admin</span>
         <AdminBreadcrumb routePath={routePath} extra={extra} />
@@ -89,9 +92,9 @@ function AdminShellLayoutInner() {
       <AdminStatusStrip metrics={stripMetrics} error={stripError} />
       <div className="admin-shell__body">
         <aside className="admin-shell__nav">
-          <AdminLayoutNav role={role} />
+          <AdminLayoutNav role={role} ariaLabel="Admin 콘솔" />
         </aside>
-        <main className="admin-shell__main">
+        <main id="admin-main" className="admin-shell__main" tabIndex={-1}>
           <Outlet />
         </main>
       </div>
@@ -110,6 +113,13 @@ function AdminShellLayoutInner() {
       ) : null}
     </div>
   );
+}
+
+function focusAdminMain(event: MouseEvent<HTMLAnchorElement>) {
+  const main = document.getElementById("admin-main");
+  if (!main) return;
+  event.preventDefault();
+  main.focus();
 }
 
 function derivePathSegment(pathname: string): string {

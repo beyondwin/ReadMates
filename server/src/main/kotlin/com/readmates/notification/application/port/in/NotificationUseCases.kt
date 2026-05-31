@@ -1,5 +1,13 @@
 package com.readmates.notification.application.port.`in`
 
+import com.readmates.notification.application.model.AdminNotificationDelivery
+import com.readmates.notification.application.model.AdminNotificationFilter
+import com.readmates.notification.application.model.AdminNotificationOperationsSnapshot
+import com.readmates.notification.application.model.AdminNotificationOutboxEvent
+import com.readmates.notification.application.model.AdminNotificationReplayConfirmCommand
+import com.readmates.notification.application.model.AdminNotificationReplayConfirmResult
+import com.readmates.notification.application.model.AdminNotificationReplayPreview
+import com.readmates.notification.application.model.AdminNotificationReplayPreviewRequest
 import com.readmates.notification.application.model.HostNotificationDeliveryList
 import com.readmates.notification.application.model.HostNotificationDetail
 import com.readmates.notification.application.model.HostNotificationEventList
@@ -24,6 +32,7 @@ import com.readmates.notification.domain.NotificationEventType
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
+import com.readmates.shared.security.CurrentPlatformAdmin
 import java.time.LocalDate
 import java.util.UUID
 
@@ -123,6 +132,32 @@ interface ManageHostNotificationsUseCase {
         host: CurrentMember,
         id: UUID,
     ): HostNotificationDetail
+}
+
+interface ManageAdminNotificationOperationsUseCase {
+    fun snapshot(admin: CurrentPlatformAdmin): AdminNotificationOperationsSnapshot
+
+    fun listEvents(
+        admin: CurrentPlatformAdmin,
+        filter: AdminNotificationFilter,
+        pageRequest: PageRequest,
+    ): CursorPage<AdminNotificationOutboxEvent>
+
+    fun listDeliveries(
+        admin: CurrentPlatformAdmin,
+        filter: AdminNotificationFilter,
+        pageRequest: PageRequest,
+    ): CursorPage<AdminNotificationDelivery>
+
+    fun previewReplay(
+        admin: CurrentPlatformAdmin,
+        request: AdminNotificationReplayPreviewRequest,
+    ): AdminNotificationReplayPreview
+
+    fun confirmReplay(
+        admin: CurrentPlatformAdmin,
+        command: AdminNotificationReplayConfirmCommand,
+    ): AdminNotificationReplayConfirmResult
 }
 
 interface ManageManualHostNotificationsUseCase {

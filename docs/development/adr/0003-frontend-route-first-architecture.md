@@ -66,6 +66,7 @@ front/src/app/              — router 설정, layout, auth context, route guard
 front/src/pages/            — route 호환 shell (기존 경로 유지 shim 포함)
 front/features/<name>/      — 도메인 단위 feature
   api/                      — API 호출 함수, Zod schema, response type
+  queries/                  — TanStack Query key, queryOptions, mutation hook, invalidation policy
   model/                    — domain model, type, 순수 계산 함수
   route/                    — React Router route module (loader, action, component)
   ui/                       — presentational component (props + callback만)
@@ -83,6 +84,7 @@ front/shared/               — cross-cutting utilities
 - `shared/`는 `features/`, `src/app/`, `src/pages/`를 import할 수 없다.
 - `features/<A>/`는 `features/<B>/`를 직접 import할 수 없다.
 - `features/<name>/ui/`는 `features/<name>/api/` 또는 `shared/api/`를 import할 수 없다 (presentation이 API 호출 금지).
+- `features/<name>/queries/`는 API contract와 shared query primitive를 사용할 수 있지만 UI, route, app, page module을 import하지 않는다.
 - `features/<name>/model/`은 React, React Router, API client를 import하지 않는다 (순수 계산만).
 
 이 규칙은 `front/tests/unit/frontend-boundaries.test.ts`로 강제된다.
@@ -100,11 +102,11 @@ ReadMates의 화면은 세션 상태, 멤버십, 공개 범위 조합에 따라 
 
 ### feature 단위 cohesion
 
-feature 폴더 하나에 `api/model/route/ui`가 함께 있으면:
+feature 폴더 하나에 `api/queries/model/route/ui`가 함께 있으면:
 - 이 feature를 제거할 때 폴더 하나를 삭제하면 된다.
 - 신규 멤버가 "이 기능의 코드가 어디에 있는가"를 feature 이름으로 즉시 찾을 수 있다.
 - 동일 feature 내 파일들의 import 그래프가 feature 경계 안에서 닫힌다.
-- feature 별로 API 호출 함수와 Zod schema(`api/`), 도메인 모델(`model/`), route module(`route/`), 순수 UI(`ui/`)가 명확히 분리된다.
+- feature 별로 API 호출 함수와 Zod schema(`api/`), server-state freshness와 invalidation(`queries/`), 도메인 모델(`model/`), route module(`route/`), 순수 UI(`ui/`)가 명확히 분리된다.
 
 ### import 경계 자동화
 
@@ -113,6 +115,7 @@ feature 폴더 하나에 `api/model/route/ui`가 함께 있으면:
 특히 다음 패턴들이 강제된다:
 - shared-to-feature import 차단: `shared/ui/`가 `features/`를 import하면 테스트 실패
 - feature 간 직접 import 차단: `features/session/`에서 `features/host/`를 import하면 테스트 실패
+- query가 UI/route를 import하는 패턴 차단: `features/<name>/queries/`에서 `features/<name>/ui/` 또는 `features/<name>/route/`를 import하면 테스트 실패
 - presentation이 API 호출하는 패턴 차단: `features/<name>/ui/`에서 `shared/api/client`를 import하면 테스트 실패
 
 ### shared/의 역할 명확화
@@ -158,7 +161,7 @@ front/shared/       — api/, auth/, config/, ui/, model/, security/, routing/
 - `shared/` 경계가 명확해 cross-cutting utility(인증 상태, API client, URL helper)가 feature로 누수되지 않는다.
 
 부정적/감수한 비용:
-- 작은 feature에도 4개 하위 폴더(`api/model/route/ui`)를 만들어야 한다. 실용적 규칙: route 파일이 1개이고 API call이 없으면 폴더 구조 없이 `features/<name>/index.tsx` 단일 파일로 시작한다.
+- 작은 feature에도 5개 하위 폴더(`api/queries/model/route/ui`)를 만들어야 한다. 실용적 규칙: route 파일이 1개이고 API call이 없으면 폴더 구조 없이 `features/<name>/index.tsx` 단일 파일로 시작한다.
 - feature 간 공유가 필요한 UI 컴포넌트는 `shared/ui/`로 올려야 한다. 이 판단이 반복되면 `shared/ui/`가 비대해질 수 있다.
 - `features/` 간 직접 import 금지로 인해, 한 feature가 다른 feature의 상태를 알아야 할 때 URL state 또는 `shared/` 경유가 필요하다.
 - legacy `src/pages/` shim이 남아 있어 route URL과 feature 폴더 위치가 완전히 1:1로 대응되지 않는다. 점진적 제거 중.
@@ -196,7 +199,7 @@ pnpm --dir front test
 - feature 내 상태 관리 패턴 결정: URL state(React Router search params), URL-independent local state(useState), server state(loader data) 각각의 사용 기준을 명문화. 현재 암묵적 관례로만 유지.
 - feature 별 Zod schema와 `FrontendZodSchemaContractTest` 커버리지 확대 (ADR-0009 연계).
 - optimistic UI 패턴 표준화: React Router 7 action/fetcher API를 사용한 optimistic update가 어느 feature에 적용되었는지 목록화하고, 실패 시 rollback 패턴을 feature 간에 통일.
-- `frontend-boundaries.test.ts` 커버리지 확장: 현재 `shared`/`features` 간 import 방향만 검증한다. feature 내 `route/` 파일에서 `ui/` 파일이 `api/`를 import하는 패턴도 경계 검증으로 추가 가능.
+- `frontend-boundaries.test.ts` 커버리지 확장: 현재 `shared`/`features` 간 import 방향과 feature 내부 `model`/`queries`/`ui`/`route` 경계를 검증한다. route TSX render-only 예외를 더 줄이고, legacy host query/UI 예외를 제거하는 후속 migration이 필요하다.
 - feature 단위 번들 크기 모니터링: 각 feature route module의 chunk 크기를 빌드 산출물에서 추적해 의도치 않은 bundle bloat를 조기 발견하는 CI check 추가 검토.
 - shared/auth 세션 상태 갱신 전략: 멤버십 상태가 서버에서 변경된 경우 프런트엔드의 `shared/auth` 캐시된 세션 상태가 stale 될 수 있다. polling 또는 server-sent event로 갱신하는 패턴 결정 필요.
 - accessibility 표준화: feature 별 UI 컴포넌트가 WCAG 기준을 따르는지 검증. feature 아키텍처에서 `ui/` 컴포넌트가 독립적이어서 accessibility 테스트 대상이 명확하다.

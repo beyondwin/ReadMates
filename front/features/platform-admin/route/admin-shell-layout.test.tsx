@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { describe, expect, it } from "vitest";
@@ -10,6 +10,7 @@ import {
   platformAdminClubsQuery,
   platformAdminSummaryQuery,
 } from "@/features/platform-admin/queries/platform-admin-queries";
+import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
 import { AdminShellLayout } from "./admin-shell-layout";
 
 const summary: PlatformAdminSummaryResponse = {
@@ -60,5 +61,22 @@ describe("AdminShellLayout", () => {
   it("does not show the onboarding modal without the query param", () => {
     renderShell("/admin/today");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("exposes navigation and main landmarks with a skip link to main content", () => {
+    const { container } = renderShell("/admin/today");
+    expect(screen.getByRole("navigation", { name: "Admin 콘솔" })).toBeInTheDocument();
+    expect(screen.getAllByRole("navigation").map((nav) => nav.getAttribute("aria-label"))).toEqual([
+      "현재 위치",
+      "Admin 콘솔",
+    ]);
+    const main = screen.getByRole("main");
+    expect(main).toHaveAttribute("id", "admin-main");
+    expect(main).toHaveAttribute("tabindex", "-1");
+    const skipLink = screen.getByRole("link", { name: "본문으로 건너뛰기" });
+    expect(skipLink).toHaveAttribute("href", "#admin-main");
+    fireEvent.click(skipLink);
+    expect(main).toHaveFocus();
+    expect(findUnnamedInteractiveElements(container)).toEqual([]);
   });
 });

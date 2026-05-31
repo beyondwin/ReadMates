@@ -423,6 +423,7 @@ describe("HostDashboard", () => {
       data: dashboard,
       hostSessions: { items: [], nextCursor: null },
       notifications: notificationSummary,
+      clubOperations: null,
     });
 
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/auth/me", expect.objectContaining({ cache: "no-store" }));
@@ -433,6 +434,32 @@ describe("HostDashboard", () => {
       "/api/bff/api/host/notifications/summary",
       expect.objectContaining({ cache: "no-store" }),
     );
+  });
+
+  it("shows the host next action reading-loop state and bridge copy", () => {
+    const { container } = render(
+      <HostDashboardForTest
+        data={{
+          ...emptyDashboard,
+          currentSessionMissingMembers: [
+            {
+              membershipId: "membership-new",
+              displayName: "새 멤버",
+              email: "new-member@example.com",
+            },
+          ],
+        }}
+        current={current}
+        hostSessions={hostSessions}
+      />,
+    );
+
+    const desktop = getDesktopView(container);
+
+    expect(desktop.getByText("호스트 준비 필요")).toBeInTheDocument();
+    expect(
+      desktop.getByText("호스트가 세션 정보, 멤버 상태, 공개 범위, 운영 대기 항목을 먼저 닫아야 합니다."),
+    ).toBeInTheDocument();
   });
 
   it("does not use stale scoped browser location for unscoped host auth and data loaders", async () => {
@@ -465,7 +492,7 @@ describe("HostDashboard", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(hostDashboardLoaderForTest({ params: {}, request: new Request("https://readmates.test/app/host") } as LoaderFunctionArgs))
-      .resolves.toEqual({ current, data: dashboard, hostSessions: { items: [], nextCursor: null }, notifications: notificationSummary });
+      .resolves.toEqual({ current, data: dashboard, hostSessions: { items: [], nextCursor: null }, notifications: notificationSummary, clubOperations: null });
 
     expect(fetchMock.mock.calls.map(([url]) => String(url)).every((url) => !url.includes("clubSlug="))).toBe(true);
   });
@@ -508,6 +535,7 @@ describe("HostDashboard", () => {
       data: dashboard,
       hostSessions: { items: [], nextCursor: "cursor-1" },
       notifications: notificationSummary,
+      clubOperations: null,
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -649,6 +677,7 @@ describe("HostDashboard", () => {
       data: dashboard,
       hostSessions: { items: [], nextCursor: null },
       notifications: emptyNotificationSummary,
+      clubOperations: null,
     });
   });
 

@@ -14,6 +14,15 @@ const summary: PlatformAdminAiOpsSummaryView = {
   failureCodes: [{ code: "PROVIDER_RATE_LIMITED", count: 1 }],
   providerCosts: [{ provider: "OPENAI", model: "gpt-model", costEstimateUsd: "0.2000" }],
   staleCandidateCount: 1,
+  costTrend: {
+    window: "30d",
+    currentCostUsd: "0.0000",
+    priorCostUsd: "0.0000",
+    currentJobCount: 0,
+    priorJobCount: 0,
+    deltaDirection: "NONE",
+    availability: "NOT_ENOUGH_DATA",
+  },
 };
 
 const runningJob: PlatformAdminAiOpsJobView = {
@@ -32,6 +41,14 @@ const runningJob: PlatformAdminAiOpsJobView = {
   expiresAt: "2026-05-18T06:00:00Z",
   staleCandidate: true,
   availableActions: ["FORCE_CANCEL"],
+};
+
+const committingJob: PlatformAdminAiOpsJobView = {
+  ...runningJob,
+  jobId: "job-2",
+  status: "COMMITTING",
+  stage: "READY",
+  availableActions: ["FORCE_CANCEL", "RETRY_COMMIT"],
 };
 
 describe("PlatformAdminAiOps", () => {
@@ -65,5 +82,130 @@ describe("PlatformAdminAiOps", () => {
 
     expect(screen.getByRole("alert")).toHaveTextContent("AI Ops 로딩 실패");
     expect(screen.getByText(/Book/)).toBeInTheDocument();
+  });
+
+  it("renders failure codes as buttons and reports selection", async () => {
+    const onSelectFailureCode = vi.fn();
+    render(
+      <PlatformAdminAiOps
+        role="OWNER"
+        summary={summary}
+        jobs={[]}
+        onSelectFailureCode={onSelectFailureCode}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: /PROVIDER_RATE_LIMITED/ }));
+    expect(onSelectFailureCode).toHaveBeenCalledWith("PROVIDER_RATE_LIMITED");
+  });
+
+  it("shows an active-filter banner with a clear control", async () => {
+    const onClearFilter = vi.fn();
+    render(
+      <PlatformAdminAiOps
+        role="OWNER"
+        summary={summary}
+        jobs={[]}
+        activeFilter={{ errorCode: "PROVIDER_RATE_LIMITED", clubId: null }}
+        onClearFilter={onClearFilter}
+      />,
+    );
+    const banner = screen.getByRole("status");
+    expect(within(banner).getByText(/PROVIDER_RATE_LIMITED/)).toBeInTheDocument();
+    await userEvent.click(within(banner).getByRole("button", { name: "전체 보기" }));
+    expect(onClearFilter).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows an honest filtered empty state when a filter yields no jobs", () => {
+    render(
+      <PlatformAdminAiOps
+        role="OWNER"
+        summary={summary}
+        jobs={[]}
+        activeFilter={{ errorCode: "PROVIDER_RATE_LIMITED", clubId: null }}
+      />,
+    );
+    expect(screen.getByText("이 필터에 해당하는 AI job이 없습니다.")).toBeInTheDocument();
+  });
+
+  it("lets owner and operator roles retry-commit a committing job", async () => {
+    const onRetryCommit = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <PlatformAdminAiOps role="OPERATOR" summary={summary} jobs={[committingJob]} onRetryCommit={onRetryCommit} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Retry commit" }));
+
+    expect(onRetryCommit).toHaveBeenCalledWith("job-2");
+  });
+
+  it("hides retry-commit from support role", () => {
+    render(<PlatformAdminAiOps role="SUPPORT" summary={summary} jobs={[committingJob]} />);
+
+    expect(screen.queryByRole("button", { name: "Retry commit" })).not.toBeInTheDocument();
+  });
+
+  it("does not show retry-commit when the job does not offer it", () => {
+    render(<PlatformAdminAiOps role="OWNER" summary={summary} jobs={[runningJob]} onRetryCommit={vi.fn()} />);
+
+    expect(screen.queryByRole("button", { name: "Retry commit" })).not.toBeInTheDocument();
+  });
+
+  it("shows the windowed cost trend with a delta direction", () => {
+    render(
+      <PlatformAdminAiOps
+        role="OWNER"
+        summary={{
+          activeJobCount: 0,
+          failedLast24h: 0,
+          monthToDateCostEstimateUsd: "1.0000",
+          failureCodes: [],
+          providerCosts: [],
+          staleCandidateCount: 0,
+          costTrend: {
+            window: "30d",
+            currentCostUsd: "2.0000",
+            priorCostUsd: "1.0000",
+            currentJobCount: 5,
+            priorJobCount: 4,
+            deltaDirection: "UP",
+            availability: "AVAILABLE",
+          },
+        }}
+        jobs={[]}
+        window="30d"
+      />,
+    );
+    expect(screen.getByText(/\$2\.0000/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/cost trend direction/i)).toHaveTextContent(/▲|UP/);
+  });
+
+  it("shows an honest empty state when the trend lacks prior data", () => {
+    render(
+      <PlatformAdminAiOps
+        role="OWNER"
+        summary={{
+          activeJobCount: 0,
+          failedLast24h: 0,
+          monthToDateCostEstimateUsd: "0.0000",
+          failureCodes: [],
+          providerCosts: [],
+          staleCandidateCount: 0,
+          costTrend: {
+            window: "7d",
+            currentCostUsd: "0.5000",
+            priorCostUsd: "0.0000",
+            currentJobCount: 3,
+            priorJobCount: 0,
+            deltaDirection: "NONE",
+            availability: "NOT_ENOUGH_DATA",
+          },
+        }}
+        jobs={[]}
+        window="7d"
+      />,
+    );
+    expect(screen.getByText("데이터 부족")).toBeInTheDocument();
   });
 });

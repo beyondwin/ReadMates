@@ -1,6 +1,7 @@
 package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.AiGenerationException
+import com.readmates.aigen.application.model.AiGenerationActor
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.ModelPricing
@@ -8,10 +9,7 @@ import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.port.out.AiGenerationClubDefaultPort
 import com.readmates.aigen.application.port.out.ClubDefault
 import com.readmates.aigen.application.port.out.ModelCatalog
-import com.readmates.auth.domain.MembershipRole
-import com.readmates.auth.domain.MembershipStatus
 import com.readmates.shared.security.AccessDeniedException
-import com.readmates.shared.security.CurrentMember
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -27,21 +25,16 @@ class ClubAiDefaultsServiceTest {
 
     private val allowedClaude = ModelId(Provider.CLAUDE, "claude-sonnet-4-6")
 
-    private val hostMember =
-        CurrentMember(
+    private val hostActor =
+        AiGenerationActor(
             userId = hostUserId,
-            membershipId = UUID.fromString("00000000-0000-0000-0000-0000000000c0"),
             clubId = clubId,
             clubSlug = clubSlug,
-            email = "host@example.com",
-            displayName = "Host",
-            accountName = "Host",
-            role = MembershipRole.HOST,
-            membershipStatus = MembershipStatus.ACTIVE,
+            isHost = true,
         )
 
-    private val memberOfDifferentClub = hostMember.copy(clubId = otherClubId, clubSlug = "other")
-    private val nonHostMember = hostMember.copy(role = MembershipRole.MEMBER)
+    private val memberOfDifferentClub = hostActor.copy(clubId = otherClubId, clubSlug = "other")
+    private val nonHostMember = hostActor.copy(isHost = false)
 
     private val clubDefaultPort = FakeClubDefaultPort()
     private val modelCatalog = FakeModelCatalog(allowed = setOf(allowedClaude))
@@ -49,7 +42,7 @@ class ClubAiDefaultsServiceTest {
 
     @Test
     fun `get returns null defaultModel when no row exists`() {
-        val view = service.get(clubSlug, hostMember)
+        val view = service.get(clubSlug, hostActor)
         assertThat(view.defaultModel).isNull()
     }
 
@@ -64,7 +57,7 @@ class ClubAiDefaultsServiceTest {
             ),
         )
 
-        val view = service.get(clubSlug, hostMember)
+        val view = service.get(clubSlug, hostActor)
         assertThat(view.defaultModel).isEqualTo("claude-sonnet-4-6")
     }
 
@@ -82,7 +75,7 @@ class ClubAiDefaultsServiceTest {
 
     @Test
     fun `update with allowlisted model upserts via port`() {
-        service.update(clubSlug, "claude-sonnet-4-6", hostMember)
+        service.update(clubSlug, "claude-sonnet-4-6", hostActor)
 
         val saved = clubDefaultPort.load(clubId)
         assertThat(saved).isNotNull
@@ -93,7 +86,7 @@ class ClubAiDefaultsServiceTest {
     @Test
     fun `update with non-allowlisted model throws AI_DISABLED`() {
         // gpt model name prefix is known but the catalog hasn't allowed it.
-        assertThatThrownBy { service.update(clubSlug, "gpt-4o", hostMember) }
+        assertThatThrownBy { service.update(clubSlug, "gpt-4o", hostActor) }
             .isInstanceOfSatisfying(AiGenerationException.Coded::class.java) {
                 assertThat(it.code).isEqualTo(ErrorCode.AI_DISABLED)
             }
@@ -102,7 +95,7 @@ class ClubAiDefaultsServiceTest {
 
     @Test
     fun `update with unknown model name prefix throws AI_DISABLED`() {
-        assertThatThrownBy { service.update(clubSlug, "unknownmodel-1", hostMember) }
+        assertThatThrownBy { service.update(clubSlug, "unknownmodel-1", hostActor) }
             .isInstanceOfSatisfying(AiGenerationException.Coded::class.java) {
                 assertThat(it.code).isEqualTo(ErrorCode.AI_DISABLED)
             }

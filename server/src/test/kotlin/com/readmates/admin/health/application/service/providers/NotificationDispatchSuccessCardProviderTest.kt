@@ -30,7 +30,12 @@ class NotificationDispatchSuccessCardProviderTest {
             ).compute()
         assertThat(card.status).isEqualTo(HealthCardStatus.OK)
         assertThat(card.metric?.value).isEqualTo(0.999)
-        assertThat(card.drill).isEqualTo(HealthCardDrill.AdminRoute("/admin/notifications"))
+        assertThat(card.drill)
+            .isEqualTo(
+                HealthCardDrill.AdminRoute(
+                    "/admin/notifications?focus=notification_dispatch_success",
+                ),
+            )
     }
 
     @Test

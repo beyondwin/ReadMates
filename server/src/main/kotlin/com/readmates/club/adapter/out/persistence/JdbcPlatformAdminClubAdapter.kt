@@ -208,6 +208,8 @@ class JdbcPlatformAdminClubAdapter(
               clubs.public_visibility,
               coalesce(domain_counts.domain_count, 0) as domain_count,
               coalesce(domain_counts.action_required_count, 0) as domain_action_required_count,
+              coalesce(notification_failures.failure_count, 0) as notification_failure_count,
+              coalesce(ai_failures.failure_count, 0) as ai_failure_count,
               case
                 when exists (
                   select 1 from memberships
@@ -233,6 +235,20 @@ class JdbcPlatformAdminClubAdapter(
               from club_domains
               group by club_id
             ) domain_counts on domain_counts.club_id = clubs.id
+            left join (
+              select club_id, count(*) as failure_count
+              from notification_deliveries
+              where status in ('FAILED', 'DEAD')
+                and updated_at >= utc_timestamp(6) - interval 7 day
+              group by club_id
+            ) notification_failures on notification_failures.club_id = clubs.id
+            left join (
+              select club_id, count(*) as failure_count
+              from ai_generation_audit_log
+              where status = 'FAILED'
+                and created_at >= utc_timestamp(6) - interval 7 day
+              group by club_id
+            ) ai_failures on ai_failures.club_id = clubs.id
         """
 
         private const val CLUB_LIST_SQL = """
@@ -257,5 +273,7 @@ private fun mapPlatformAdminClub(
         publicVisibility = ClubPublicVisibility.valueOf(resultSet.getString("public_visibility")),
         domainCount = resultSet.getInt("domain_count"),
         domainActionRequiredCount = resultSet.getInt("domain_action_required_count"),
+        notificationFailureCount = resultSet.getInt("notification_failure_count"),
+        aiFailureCount = resultSet.getInt("ai_failure_count"),
         firstHostOnboardingState = FirstHostOnboardingState.valueOf(resultSet.getString("first_host_state")),
     )

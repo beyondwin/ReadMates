@@ -1,5 +1,7 @@
 package com.readmates.aigen.adapter.`in`.web
 
+import com.readmates.aigen.adapter.out.persistence.JdbcAiGenerationSessionMetaAdapter
+import com.readmates.aigen.application.service.AiGenerationAuthorizationService
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.shared.security.AccessDeniedException
@@ -71,7 +73,12 @@ private const val SEED_SQL = """
 class DefaultAiGenerationAuthorizationPolicyTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
 ) : ReadmatesMySqlIntegrationTestSupport() {
-    private val policy = DefaultAiGenerationAuthorizationPolicy(jdbcTemplate)
+    private val policy =
+        DefaultAiGenerationAuthorizationPolicy(
+            AiGenerationAuthorizationService(
+                JdbcAiGenerationSessionMetaAdapter(jdbcTemplate),
+            ),
+        )
 
     private fun hostMember(clubId: UUID = UUID.fromString(CLUB_ID)) =
         CurrentMember(
@@ -127,13 +134,13 @@ class DefaultAiGenerationAuthorizationPolicyTest(
 
         assertThatThrownBy { policy.requireHostAccess(UUID.fromString(SESSION_ID), otherClubHost) }
             .isInstanceOf(AccessDeniedException::class.java)
-            .hasMessageContaining("not a HOST")
+            .hasMessageContaining("Host access")
     }
 
     @Test
     fun `requireHostAccess throws AccessDeniedException when caller has the MEMBER role`() {
         assertThatThrownBy { policy.requireHostAccess(UUID.fromString(SESSION_ID), memberMember()) }
             .isInstanceOf(AccessDeniedException::class.java)
-            .hasMessageContaining("not a HOST")
+            .hasMessageContaining("Host access")
     }
 }

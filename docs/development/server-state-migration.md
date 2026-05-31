@@ -4,7 +4,7 @@
 
 ## 이번 분기 진행 범위
 
-Engineering proof portfolio 분기에서는 아래 순서로 server state migration을 진행했고, 현재 `public` read path와 AI Ops surface까지 완료했습니다.
+Engineering proof portfolio 분기에서는 아래 순서로 server state migration을 진행했고, 현재 `public` read path와 platform admin operating console surface까지 완료했습니다.
 
 1. `host/members` — 멤버 목록과 lifecycle/profile/viewer mutation을 Query invalidation 패턴으로 정리합니다.
 2. `host/notifications` — 수동 알림 options/preview/confirm/dispatch ledger를 route-owned state와 Query cache로 분리합니다.
@@ -13,6 +13,10 @@ Engineering proof portfolio 분기에서는 아래 순서로 server state migrat
 5. `platform-admin` — summary, club directory/detail, support grants, onboarding/domain/club mutation cache ownership을 platform admin query module로 모읍니다.
 6. `archive` / `feedback` / `public` — 공개/멤버 read path를 Query loader seeding으로 이전하고 AI commit 후 scoped invalidation으로 갱신합니다.
 7. `platform-admin/ai-ops` — AI job 운영 요약과 ledger/action을 platform admin query module로 분리합니다.
+8. `platform-admin/notifications` — 알림 운영 snapshot, event/delivery ledgers, replay preview/confirm mutation을 platform admin query module로 분리합니다.
+9. `platform-admin/club-operations` — 클럽 상세 운영 snapshot을 loader-seeded Query read model로 분리합니다.
+10. `platform-admin/support` — support search, grant ledger, grant create/revoke mutation cache ownership을 support route module로 분리합니다.
+11. `platform-admin/audit` — 통합 감사 ledger를 loader-seeded Query read model로 분리합니다. Filter URL state는 S8 analytics가 재사용할 date range, club scope, source slice, action category, actor role, outcome vocabulary를 따릅니다.
 
 각 migration은 UI 컴포넌트가 API를 직접 호출하지 않는다는 route-first 경계를 유지해야 합니다.
 
@@ -27,6 +31,10 @@ Engineering proof portfolio 분기에서는 아래 순서로 server state migrat
 - `feedback` — feedback document reads and AI commit invalidation are Query-owned
 - `public` — club/session public reads use Query loader seeding with scoped invalidation
 - `platform-admin/ai-ops` — AI Ops summary/job ledger reads and force-cancel invalidation are Query-owned
+- `platform-admin/notifications` — admin notification snapshot, event/delivery cursor ledgers, replay preview, and replay confirm are Query-owned
+- `platform-admin/club-operations` — selected club operations snapshot is loader-seeded and Query-owned
+- `platform-admin/support` — support search, active grant ledger, grant create, and revoke invalidation are Query-owned
+- `platform-admin/audit` — platform/club/notification replay/AI audit source를 Query-owned cursor ledger로 조회하고, route loader seeding과 safe metadata detail rendering을 적용합니다.
 
 ## 패턴
 - query: `features/<feature>/queries/<area>-queries.ts` 에 `queryOptions` + `useXxxMutation` export

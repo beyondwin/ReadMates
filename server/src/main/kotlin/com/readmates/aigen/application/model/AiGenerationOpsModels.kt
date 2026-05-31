@@ -5,6 +5,10 @@ import java.math.BigDecimal
 import java.time.Instant
 import java.util.UUID
 
+private const val AI_OPS_LAST_7D_DAYS = 7L
+private const val AI_OPS_LAST_30D_DAYS = 30L
+private const val AI_OPS_LAST_90D_DAYS = 90L
+
 data class AiOpsSummary(
     val activeJobCount: Int,
     val failedLast24h: Long,
@@ -12,6 +16,7 @@ data class AiOpsSummary(
     val failureCodes: List<AiOpsFailureCodeCount>,
     val providerCosts: List<AiOpsProviderCost>,
     val staleCandidateCount: Int,
+    val costTrend: AiOpsCostTrend,
 )
 
 data class AiOpsFailureCodeCount(
@@ -52,7 +57,40 @@ data class AiOpsJobListItem(
     val availableActions: Set<AiOpsAction>,
 )
 
-enum class AiOpsAction { FORCE_CANCEL }
+enum class AiOpsAction { FORCE_CANCEL, RETRY_COMMIT }
+
+enum class AiOpsCostWindow(
+    val days: Long,
+    val wire: String,
+) {
+    LAST_7D(AI_OPS_LAST_7D_DAYS, "7d"),
+    LAST_30D(AI_OPS_LAST_30D_DAYS, "30d"),
+    LAST_90D(AI_OPS_LAST_90D_DAYS, "90d"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): AiOpsCostWindow = entries.firstOrNull { it.wire == value } ?: LAST_30D
+    }
+}
+
+enum class AiOpsTrendAvailability { AVAILABLE, NOT_ENOUGH_DATA }
+
+enum class AiOpsDeltaDirection { UP, DOWN, FLAT, NONE }
+
+data class AiOpsWindowUsage(
+    val costUsd: BigDecimal,
+    val jobCount: Long,
+)
+
+data class AiOpsCostTrend(
+    val window: AiOpsCostWindow,
+    val currentCostUsd: BigDecimal,
+    val priorCostUsd: BigDecimal,
+    val currentJobCount: Long,
+    val priorJobCount: Long,
+    val deltaDirection: AiOpsDeltaDirection,
+    val availability: AiOpsTrendAvailability,
+)
 
 data class AiOpsJobFilters(
     val status: JobStatus?,

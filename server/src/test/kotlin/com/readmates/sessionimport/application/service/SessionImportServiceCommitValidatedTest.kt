@@ -16,6 +16,7 @@ import com.readmates.sessionimport.application.port.out.SessionImportRecordRepla
 import com.readmates.sessionimport.application.port.out.SessionImportStoredFeedbackDocument
 import com.readmates.sessionimport.application.port.out.SessionImportWritePort
 import com.readmates.shared.cache.ReadCacheInvalidationPort
+import com.readmates.shared.security.AuthenticatedClubActor
 import com.readmates.shared.security.CurrentMember
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -191,7 +192,7 @@ private class RecordingWritePort(
     var lastReplacement: SessionImportRecordReplacement? = null
 
     override fun loadTarget(
-        host: CurrentMember,
+        host: AuthenticatedClubActor,
         sessionId: UUID,
     ): SessionImportTarget = target
 

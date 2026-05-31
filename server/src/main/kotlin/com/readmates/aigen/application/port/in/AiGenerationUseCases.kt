@@ -1,5 +1,6 @@
 package com.readmates.aigen.application.port.`in`
 
+import com.readmates.aigen.application.model.AiGenerationActor
 import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.JobStatus
@@ -9,7 +10,6 @@ import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.sessionimport.application.model.SessionImportCommitResult
-import com.readmates.shared.security.CurrentMember
 import java.math.BigDecimal
 import java.time.Instant
 import java.util.UUID
@@ -72,7 +72,7 @@ data class RegenerationResult(
 
 interface CommitGenerationUseCase {
     fun commit(
-        host: CurrentMember,
+        host: AiGenerationActor,
         sessionId: UUID,
         jobId: UUID,
         recordVisibility: SessionRecordVisibility,

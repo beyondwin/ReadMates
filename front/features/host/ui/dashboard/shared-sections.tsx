@@ -171,11 +171,17 @@ export function NextActionCard({
       <div className="eyebrow" style={{ marginBottom: 8 }}>
         {HOST_DASHBOARD_LABELS.nextAction}
       </div>
+      <div style={{ marginBottom: 10 }}>
+        <span className="badge badge-accent badge-dot">{action.loopLabel}</span>
+      </div>
       <h2 className={mobile ? "h4 editorial" : "h3 editorial"} style={{ margin: 0 }}>
         {action.title}
       </h2>
       <p className="small" style={{ margin: "8px 0 0", color: "var(--text-2)" }}>
         {action.helper}
+      </p>
+      <p className="tiny" style={{ margin: "8px 0 0", color: "var(--text-3)" }}>
+        {action.loopBridge}
       </p>
       {action.label ? (
         <div style={{ marginTop: 14 }}>

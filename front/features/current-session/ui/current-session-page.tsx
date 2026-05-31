@@ -37,6 +37,7 @@ import {
   getCurrentSessionAccessState,
   getCurrentSessionBoardTabs,
   getCurrentSessionMemberNotice,
+  getCurrentSessionReadingLoopSummary,
   type CurrentSessionBoardTab,
 } from "@/features/current-session/model/current-session-view-model";
 import { BookCover } from "@/shared/ui/book-cover";
@@ -151,6 +152,15 @@ export function CurrentSessionBoard({
   const { isViewer, canWrite } = accessState;
   const memberNotice = getCurrentSessionMemberNotice(accessState);
   const boardTabs = getCurrentSessionBoardTabs(session.board);
+  const readingLoopSummary = getCurrentSessionReadingLoopSummary({
+    rsvp,
+    readingProgress,
+    writtenQuestionCount,
+    oneLineReview,
+    longReview,
+    canWrite,
+    sessionDate: session.date,
+  });
 
   const setSaveStatus = (scope: SaveScope, status: SaveState) => {
     setSaveStatuses((current) => ({ ...current, [scope]: status }));
@@ -368,6 +378,7 @@ export function CurrentSessionBoard({
         isViewer={isViewer}
         memberNotice={memberNotice}
         canWrite={canWrite}
+        readingLoopSummary={readingLoopSummary}
       />
 
       <main className="desktop-only rm-current-session-desktop">
@@ -404,6 +415,12 @@ export function CurrentSessionBoard({
               <p className="small" style={{ color: "var(--text-2)", margin: "6px 0 0" }}>
                 참석 여부, 읽은 분량, 질문을 모임 전에 정리합니다.
               </p>
+              <div className="surface-quiet" role="status" style={{ padding: "14px 16px", marginTop: "14px" }}>
+                <span className="badge badge-accent badge-dot">{readingLoopSummary.label}</span>
+                <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
+                  {readingLoopSummary.body}
+                </p>
+              </div>
             </div>
 
             <div className="ws-grid">

@@ -31,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController
 class ClubAiDefaultsController(
     private val getUc: GetClubAiDefaultsUseCase,
     private val updateUc: UpdateClubAiDefaultsUseCase,
+    private val auth: AiGenerationAuthorizationPolicy,
     private val props: AiGenerationProperties,
 ) {
     @GetMapping
@@ -39,7 +40,8 @@ class ClubAiDefaultsController(
         member: CurrentMember,
     ): ClubAiDefaultsResponse {
         ensureEnabled()
-        val view = getUc.get(clubSlug, member)
+        val actor = auth.actor(member)
+        val view = getUc.get(clubSlug, actor)
         return ClubAiDefaultsResponse(defaultModel = view.defaultModel)
     }
 
@@ -50,7 +52,8 @@ class ClubAiDefaultsController(
         member: CurrentMember,
     ) {
         ensureEnabled()
-        updateUc.update(clubSlug, body.defaultModel, member)
+        val actor = auth.actor(member)
+        updateUc.update(clubSlug, body.defaultModel, actor)
     }
 
     private fun ensureEnabled() {

@@ -9,19 +9,26 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser
 import java.util.Locale
 import java.util.UUID
 
+interface AuthenticatedClubActor {
+    val userId: UUID
+    val clubId: UUID
+    val clubSlug: String
+    val isHost: Boolean
+}
+
 data class CurrentMember(
-    val userId: UUID,
+    override val userId: UUID,
     val membershipId: UUID,
-    val clubId: UUID,
-    val clubSlug: String,
+    override val clubId: UUID,
+    override val clubSlug: String,
     val email: String,
     val displayName: String,
     val accountName: String,
     val role: MembershipRole,
     val membershipStatus: MembershipStatus = MembershipStatus.ACTIVE,
     val clubName: String = clubSlug,
-) {
-    val isHost: Boolean
+) : AuthenticatedClubActor {
+    override val isHost: Boolean
         get() = role == MembershipRole.HOST && membershipStatus == MembershipStatus.ACTIVE
     val isActive: Boolean
         get() = membershipStatus == MembershipStatus.ACTIVE

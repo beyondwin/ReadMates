@@ -75,6 +75,8 @@ export type PlatformAdminClub = {
   publicVisibility: PlatformAdminClubPublicVisibility;
   domainCount: number;
   domainActionRequiredCount: number;
+  notificationFailureCount: number;
+  aiFailureCount: number;
   firstHostOnboardingState: FirstHostOnboardingState;
 };
 
@@ -140,7 +142,7 @@ export type PlatformAdminOnboardingResultResponse = {
   domain: PlatformAdminDomainResponse | null;
 };
 
-export type PlatformAdminAiOpsAction = "FORCE_CANCEL";
+export type PlatformAdminAiOpsAction = "FORCE_CANCEL" | "RETRY_COMMIT";
 
 export type PlatformAdminAiOpsSummaryResponse = {
   activeJobCount: number;
@@ -149,6 +151,15 @@ export type PlatformAdminAiOpsSummaryResponse = {
   failureCodes: Array<{ code: string; count: number }>;
   providerCosts: Array<{ provider: string; model: string; costEstimateUsd: string }>;
   staleCandidateCount: number;
+  costTrend: {
+    window: "7d" | "30d" | "90d";
+    currentCostUsd: string;
+    priorCostUsd: string;
+    currentJobCount: number;
+    priorJobCount: number;
+    deltaDirection: "UP" | "DOWN" | "FLAT" | "NONE";
+    availability: "AVAILABLE" | "NOT_ENOUGH_DATA";
+  };
 };
 
 export type PlatformAdminAiOpsJob = {

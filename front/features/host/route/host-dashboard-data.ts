@@ -1,6 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { fetchHostNotificationSummary, submitHostMemberLifecycle } from "@/features/host/api/host-api";
+import { fetchHostClubOperations, fetchHostNotificationSummary, submitHostMemberLifecycle } from "@/features/host/api/host-api";
 import type { HostDashboardActions } from "@/features/host/route/host-dashboard-actions";
+import { hostClubOperationsQuery } from "@/features/host/queries/host-club-operations-queries";
 import { hostNotificationSummaryQuery } from "@/features/host/queries/host-notification-queries";
 import {
   DEFAULT_HOST_SESSION_LIST_LIMIT,
@@ -11,6 +12,7 @@ import {
 import { isReadmatesApiError } from "@/shared/api/errors";
 import type {
   CurrentSessionResponse,
+  HostClubOperationsResponse,
   HostDashboardResponse,
   HostNotificationSummary,
   HostSessionListPage,
@@ -32,6 +34,7 @@ export type HostDashboardRouteData = {
   data: HostDashboardResponse;
   hostSessions: HostSessionListPage;
   notifications: HostNotificationSummary;
+  clubOperations: HostClubOperationsResponse | null;
 };
 
 export function hostDashboardLoaderFactory(client: QueryClient) {
@@ -39,20 +42,26 @@ export function hostDashboardLoaderFactory(client: QueryClient) {
     await requireHostLoaderAuth(args);
     const context = { clubSlug: clubSlugFromLoaderArgs(args) };
 
-    const [current, data, hostSessions, notifications] = await Promise.all([
+    const [current, data, hostSessions, notifications, clubOperations] = await Promise.all([
       client.fetchQuery(hostCurrentSessionQuery(context)),
       client.fetchQuery(hostDashboardQuery(context)),
       client.fetchQuery(hostSessionListQuery({ limit: DEFAULT_HOST_SESSION_LIST_LIMIT }, context)),
       fetchHostNotificationSummary(context).catch(notificationSummaryFallback),
+      fetchHostClubOperations(context).catch(() => null),
     ]);
 
     client.setQueryData(hostNotificationSummaryQuery(context).queryKey, notifications);
+
+    if (clubOperations) {
+      client.setQueryData(hostClubOperationsQuery(context).queryKey, clubOperations);
+    }
 
     return {
       current,
       data,
       hostSessions,
       notifications,
+      clubOperations,
     };
   };
 }

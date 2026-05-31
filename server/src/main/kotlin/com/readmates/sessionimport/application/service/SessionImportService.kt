@@ -22,6 +22,7 @@ import com.readmates.sessionimport.application.port.out.SessionImportRecordRepla
 import com.readmates.sessionimport.application.port.out.SessionImportWritePort
 import com.readmates.shared.cache.ReadCacheInvalidationPort
 import com.readmates.shared.security.AccessDeniedException
+import com.readmates.shared.security.AuthenticatedClubActor
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -37,7 +38,7 @@ private fun isSafeFeedbackFileName(fileName: String): Boolean {
         (trimmed.endsWith(".md") || trimmed.endsWith(".txt"))
 }
 
-private fun requireHost(host: com.readmates.shared.security.CurrentMember) {
+private fun requireHost(host: AuthenticatedClubActor) {
     if (!host.isHost) {
         throw AccessDeniedException("Host role required")
     }

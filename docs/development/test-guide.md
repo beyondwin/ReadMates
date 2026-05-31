@@ -131,6 +131,12 @@ pnpm --dir front test:e2e
 
 예정 세션 흐름을 확인하는 `front/tests/e2e/dev-login-session-flow.spec.ts`는 호스트가 `DRAFT` 세션을 만들고, `MEMBER` 공개로 바꾼 뒤, 멤버 홈의 `/api/sessions/upcoming` 표시와 `OPEN` 전환을 함께 검증합니다. `CLOSED`/`PUBLISHED` 기록 lifecycle은 현재 backend DB test와 frontend unit test에서 더 촘촘히 검증합니다.
 
+Member/host reading-loop route smoke:
+
+```bash
+pnpm --dir front test:e2e -- tests/e2e/dev-login-session-flow.spec.ts
+```
+
 세션 기록 JSON 가져오기 흐름은 frontend model unit test와 backend DB integration test가 1차 검증합니다.
 
 ```bash
@@ -142,6 +148,12 @@ pnpm --dir front exec vitest run features/host/model/session-import-model.test.t
 
 ```bash
 pnpm --dir front test:e2e -- member-profile-permissions
+```
+
+플랫폼 admin 첫 화면의 today operations ledger만 빠르게 확인하려면 아래 spec을 지정합니다. 이 spec은 public-safe BFF 응답을 route mock으로 고정해 OWNER가 queue/brief를 보는 흐름과 SUPPORT가 mutation CTA를 실행할 수 없는 흐름을 검증합니다.
+
+```bash
+pnpm --dir front test:e2e -- tests/e2e/admin-today.spec.ts
 ```
 
 ## Backend

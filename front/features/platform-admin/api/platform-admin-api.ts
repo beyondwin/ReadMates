@@ -104,9 +104,10 @@ export function listSupportAccessGrantsByClub(clubId: string) {
   );
 }
 
-export function fetchPlatformAdminAiOpsSummary() {
+export function fetchPlatformAdminAiOpsSummary(window?: string) {
+  const search = window ? `?window=${encodeURIComponent(window)}` : "";
   return readmatesFetch<PlatformAdminAiOpsSummaryResponse>(
-    "/api/admin/ai-generation/summary",
+    `/api/admin/ai-generation/summary${search}`,
     undefined,
     { clubSlug: undefined },
   );
@@ -130,6 +131,14 @@ export function fetchPlatformAdminAiOpsJobs(filters: PlatformAdminAiOpsFilters =
 export function forceCancelPlatformAdminAiJob(jobId: string) {
   return readmatesFetch<PlatformAdminAiOpsActionResponse>(
     `/api/admin/ai-generation/jobs/${encodeURIComponent(jobId)}/force-cancel`,
+    { method: "POST" },
+    { clubSlug: undefined },
+  );
+}
+
+export function retryCommitPlatformAdminAiJob(jobId: string) {
+  return readmatesFetch<PlatformAdminAiOpsActionResponse>(
+    `/api/admin/ai-generation/jobs/${encodeURIComponent(jobId)}/retry-commit`,
     { method: "POST" },
     { clubSlug: undefined },
   );

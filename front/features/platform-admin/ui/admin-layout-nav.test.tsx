@@ -26,16 +26,18 @@ describe("AdminLayoutNav", () => {
     }
   });
 
-  it("shows a 준비 중 · S5 pill on the notifications item", () => {
+  it("does not show 준비 중 pill on the notifications item", () => {
     renderNav({});
     const notificationsLink = screen.getByRole("link", { name: /알림/ });
-    expect(notificationsLink.textContent).toContain("준비 중 · S5");
+    expect(notificationsLink.textContent).not.toContain("준비 중");
   });
 
   it("does not show 준비 중 pill on ready routes", () => {
     renderNav({});
     const todayLink = screen.getByRole("link", { name: /오늘/ });
+    const auditLink = screen.getByRole("link", { name: /감사/ });
     expect(todayLink.textContent).not.toContain("준비 중");
+    expect(auditLink.textContent).not.toContain("준비 중");
   });
 
   it("marks the active route with aria-current=page", () => {

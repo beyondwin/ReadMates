@@ -41,10 +41,10 @@ test.describe("/admin shell", () => {
     await expect(page.getByRole("heading", { name: /호스트님/ })).toBeVisible();
   });
 
-  test("coming-soon route renders the slice descriptor", async ({ page }) => {
+  test("analytics route renders the ready analytics overview", async ({ page }) => {
     await loginWithDevShortcut(page, "플랫폼 관리자 · OWNER");
-    await page.goto("/admin/notifications");
-    await expect(page.getByLabel("알림/Outbox 운영").getByText(/준비 중 · S5/)).toBeVisible();
-    await expect(page.getByRole("heading", { name: "알림/Outbox 운영" })).toBeVisible();
+    await page.goto("/admin/analytics");
+    await expect(page.getByRole("heading", { name: "분석" })).toBeVisible();
+    await expect(page.getByText(/준비 중 · S8/)).toHaveCount(0);
   });
 });

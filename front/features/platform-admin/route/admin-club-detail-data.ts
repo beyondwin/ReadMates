@@ -4,6 +4,7 @@ import {
   platformAdminClubsQuery,
   platformAdminSupportGrantsQuery,
 } from "@/features/platform-admin/queries/platform-admin-queries";
+import { platformAdminClubOperationsQuery } from "@/features/platform-admin/queries/platform-admin-club-operations-queries";
 
 export function adminClubDetailLoaderFactory(queryClient: QueryClient) {
   return async function loadAdminClubDetail(args: LoaderFunctionArgs) {
@@ -12,6 +13,7 @@ export function adminClubDetailLoaderFactory(queryClient: QueryClient) {
     await Promise.all([
       queryClient.fetchQuery(platformAdminClubsQuery()),
       queryClient.fetchQuery(platformAdminSupportGrantsQuery(clubId)),
+      queryClient.fetchQuery(platformAdminClubOperationsQuery(clubId)),
     ]);
     return { clubId };
   };

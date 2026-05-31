@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(pnpm --dir front lint:*)",
+      "Bash(pnpm --dir front test:*)",
+      "Bash(pnpm --dir front build:*)",
+      "Bash(pnpm --dir front test:e2e:*)",
+      "Bash(./server/gradlew:*)",
+      "Bash(./scripts/build-public-release-candidate.sh:*)",
+      "Bash(./scripts/public-release-check.sh:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)"
+    ]
+  }
+}

@@ -8,13 +8,33 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Highlights
 
-- **Admin vNext S1 IA Foundation**: `/admin` 단일 페이지를 9-라우트 lazy-split 패밀리로 분해했습니다. 공유 좌측 nav · 상단 status strip · 권한 매트릭스 · URL-state onboarding modal · 표준 "준비 중" empty state를 갖춘 `AdminShellLayout` 위에서 5개 READY 라우트(`today`·`clubs`·`clubs/:clubId`·`ai-ops`·`support`)와 4개 COMING-SOON 라우트(`health`·`notifications`·`audit`·`analytics`)가 `admin-route-catalog` SSOT로 구동됩니다. 후속 슬라이스는 자기 라우트를 `coming_soon → ready`로 토글하는 한 줄 변경으로 자기 자리를 채울 수 있습니다.
+- 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
+
+## v1.12.0 - 2026-05-31
+
+### Highlights
+
+- **Admin vNext route family**: `/admin` 단일 페이지를 9-라우트 lazy-split 패밀리로 분해했습니다. 공유 좌측 nav · 상단 status strip · 권한 매트릭스 · URL-state onboarding modal을 갖춘 `AdminShellLayout` 위에서 `today`·`health`·`clubs`·`clubs/:clubId`·`notifications`·`ai-ops`·`support`·`audit`·`analytics` 9개 READY 라우트가 `admin-route-catalog` SSOT로 구동됩니다.
+- **Admin vNext 운영 콘솔 확장**: `/admin/notifications`를 READY 라우트로 전환해 outbox, delivery, 실패 cluster, club별 알림 health와 two-step replay preview/confirm을 제공합니다. `/admin/clubs/:clubId`는 readiness, 멤버/세션/알림/AI 사용량을 하나의 운영 상세로 묶고, `/admin/support`는 사용자 검색 기반 grant 생성과 ledger/revoke 흐름을 제공합니다.
 - **AI 운영 콘솔 + 호스트 복구**: `/admin`에서 AI job 상태, 실패 코드, 비용 추정, stale 후보를 보는 AI Ops 표면을 추가하고, 호스트 세션 편집기에서 자기 세션의 in-flight AI job을 다시 찾아 안전하게 취소/재시도할 수 있게 했습니다.
 - **Query foundation 완주**: `archive`, `feedback`, `public` read path를 Query loader seeding으로 이전하고, AI commit 후 full page reload 대신 관련 Query cache invalidation으로 화면을 갱신합니다.
 - **운영 안전망 보강**: 일일 MySQL 백업 systemd timer와 복구 runbook, release-tag `Unreleased` guard(`--release` gated, `--no-changelog-check` 비상 우회), graphify 기반 코드베이스 탐색 워크플로를 도입했습니다.
+- `/admin/clubs`: triage list now orders clubs by operational severity (긴급/주의/정상), shows the blocking reasons inline, and adds a severity filter so operators see at-risk clubs first.
+- `/admin/clubs`: triage now counts each club's recent (7-day) notification-delivery and AI-generation failures, ranks any club with a failure as 긴급, and shows `알림 실패 N건` / `AI 실패 N건` as the leading reasons so operators see member-impacting failures first.
+- `/admin/clubs/:clubId`: 운영 스냅샷에 최근 7일 알림/AI 실패 추이(지난 7일 대비 델타)와 readiness 차단 신호별 next-action 링크를 추가하고, 플랫폼 운영/호스트 운영 섹션을 구분했습니다.
+- **Admin vNext S8 분석/리포팅 lite**: `/admin/analytics`를 마지막 COMING-SOON 라우트에서 READY로 전환했습니다. 7/30/90일 윈도우 선택(URL state)으로 활성 멤버·세션 완료율·RSVP 응답률·AI 비용/세션·알림 도달률을 현재-대비-직전 윈도우 델타로 보여주고, 클럽 간 비교(cross-club benchmark)를 제공합니다. 분모가 0인 지표는 차트를 지어내지 않고 "데이터 부족" empty state로 정직하게 표기합니다. 새 read-only 서버 슬라이스 `admin.analytics`(controller → service → JDBC adapter)가 클럽 전반의 원시 카운트를 집계하고, 비율·델타·가용성 파생은 순수 application service에서 단위 테스트로 검증합니다.
+- **member/host reading loop:** host dashboard의 다음 운영 행동과 member home/current-session의 다음 읽기 행동을 role-safe reading-loop 상태로 정렬했습니다. 공유 모델은 admin-only 신호를 노출하지 않고, showcase 문서는 private workflow를 guest에게 열지 않은 채 sanitized 테스트와 문서 evidence로 설명합니다.
 
 ### Engineering
 
+- **observability:** clarified `readmates.aigen.queue.depth` as Redis active AI job backlog (`PENDING` + `RUNNING`) rather than a placeholder or Kafka consumer-lag metric. Metrics catalog, dashboard copy, alert wording, runbook triage, and KDoc now use the same meaning without adding high-cardinality labels.
+- **release-readiness:** reclassified the v1.11.0 production OAuth and backup-timer residuals, then recorded both as closed after browser-profile OAuth return evidence, VM timer installation, and a manual Object Storage upload proof. The release-readiness checklist now distinguishes automated closure, manual operator evidence, and out-of-scope pre-existing risk.
+- **platform-admin/a11y:** admin 전 라우트와 host dashboard에 하드닝 베이스라인을 적용했습니다. admin shell에 skip-link와 라벨된 nav/main 랜드마크를 추가하고, 이름 없는 상호작용 요소를 막는 의존성 없는 테스트 가드(`findUnnamedInteractiveElements`)와 각 라우트 a11y 어서션을 도입했습니다. 색 대비·키보드 순서·모바일 360px는 `docs/development/admin-hardening-baseline.md` 의 수동 게이트로 문서화했습니다.
+- **host-surface:** club operations의 host-적절 신호(준비 상태·세션 진행·AI 사용량)를 중립 계약 `front/shared/model/club-operations.ts`로 분리해 admin·host가 공유합니다. host dashboard는 `/api/host/club-operations`(host 인증, 자기 클럽만)로 read-only 운영 신호 카드를 렌더합니다. admin 전용 신호(support grant, raw member email, notification replay, safeLinks)는 host projection에서 제외하며, admin↔host 직접 import는 경계 테스트로 차단합니다. host에 write 명령은 추가하지 않습니다.
+- **platform-admin:** `/admin/audit`의 AI 운영(AI_OPS) 감사 행 상세에 `/admin/ai-ops?clubId=…` 드릴다운 링크를 추가해, 운영자가 감사 신호에서 해당 클럽의 AI job 필터 뷰(원인→조치)로 바로 이동할 수 있게 했습니다. `/admin/health`의 AI provider 카드는 이미 `/admin/ai-ops`로 연결됩니다. 신규 서버 계약 없이 기존 `target.clubId`만 사용하며, P1 필터 모델(`?clubId=`/`?errorCode=`)을 SSOT로 재사용합니다. raw provider error/transcript는 노출하지 않습니다.
+- **platform-admin:** `/admin/ai-ops` now offers an OWNER/OPERATOR `Retry commit` action on jobs stuck in `COMMITTING`. It recovers the job to `SUCCEEDED` (reusing the commit service's existing recovery transition) so the host can re-commit, without admin writing any session content and without deleting the result snapshot. The action is audit-logged (`RETRY_COMMIT`, COMMITTING→SUCCEEDED) and SUPPORT is denied. No new generation state or transition semantics were introduced.
+- **platform-admin:** `/admin/ai-ops` summary now shows a 7/30/90-day cost/usage trend (`?window=`) with current-vs-prior delta. The JDBC adapter returns only raw window cost/count; the application service derives delta/availability (pure, unit-tested) and reports `NOT_ENOUGH_DATA` honestly when the prior window had no jobs. No charting library added; the month-to-date headline is unchanged. aigen-local window enum keeps the slice framework-independent.
+- **platform-admin:** `/admin/ai-ops` failure codes are now drilldown controls. Selecting a failure code filters the job list to the affected clubs/sessions and reflects the filter in URL state (`?errorCode=`), with a "전체 보기" control to clear it. Filtered empty states stay honest ("이 필터에 해당하는 AI job이 없습니다.") and no raw provider error/content fields are exposed.
 - **deploy:** `deploy/oci/backup-mysql.service` + `backup-mysql.timer`를 추가해 04:15 UTC에 MySQL dump → OCI Object Storage 업로드를 자동화합니다. 복구·검증·보존(30/6/1) 절차는 [`docs/operations/runbooks/db-backup.md`](docs/operations/runbooks/db-backup.md)에 정리합니다.
 - **deploy:** post-deploy watch가 부모 attempt id를 자식 attempt로 전파하도록 수정해 배포 ledger의 attempt 계보가 정확히 이어집니다 (`deploy/oci/watch-compose-post-deploy.sh`, `deploy/oci/tests/watch-attempt-id.test.sh`).
 - **scripts:** `scripts/pre-push-check.sh`에 `--release`/`READMATES_PRE_PUSH_RELEASE=true` 조건의 `CHANGELOG Unreleased` guard를 추가했습니다. concrete 카테고리 헤더, feature-style bold marker, 두 개 이상 placeholder를 거부합니다. `--no-changelog-check`로 비상 우회하며, branch protection bypass 정책은 [`docs/development/release-management.md`](docs/development/release-management.md)에 함께 문서화했습니다.
@@ -35,6 +55,43 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
   notification dispatch success ratio. 10-second `@Scheduled` refresh into an `AtomicReference` cache;
   per-card failures stay isolated (one provider down → that card only is `status=unknown`).
 - Hardened `/admin/health` with a pinned camelCase snapshot contract, seven-card fixture coverage, refresh/stale UI, deploy strip rendering, and isolated provider refresh behavior.
+- **platform-admin:** ship `/admin/audit` as a read-only operating ledger over platform, club, notification replay, and AI audit sources. The route uses safe metadata projection, role-aware masking, cursor pagination, and S8-compatible filter vocabulary without exposing raw provider errors, email bodies, transcripts, or generated result JSON.
+- **platform-admin:** `/admin/today` now shows an operations ledger that prioritizes club readiness, domain, notification, and AI Ops work.
+- **platform-admin:** expand the operating console with notification operations, club operations, and support workbench slices.
+  `/api/admin/notifications/*` adds read-only ledgers plus OWNER/OPERATOR two-step replay preview/confirm with an audit trail in Flyway V35.
+  `/api/admin/clubs/{clubId}/operations` returns aggregate-only readiness, member/session, notification, and AI usage signals without raw member email/body fields.
+  `/api/admin/support/*` adds masked user search, grant ledger, 24-hour maximum grant creation, duplicate-active protection, and revoke support.
+- **frontend/query:** move admin notification ledgers, club operations snapshots, and support search/grants into platform-admin Query modules with route loader seeding and focused invalidation. `/admin/health` outbox drilldowns now target `/admin/notifications?focus=...`.
+- **architecture:** server slice registry now covers `admin.audit`, `admin.health`, and `aigen`; `aigen` passes application-safe actor values instead of web/session carriers. Frontend boundary tests also enforce Query module imports, and `/admin/health` keeps data orchestration in the route layer with presentation-only UI components.
+- **public-release:** public release documentation now matches the helper scripts: `docs/superpowers/` remains a private historical archive outside the clean release candidate, while current source-of-truth material belongs in `docs/development/`, `docs/deploy/`, or `docs/operations/`.
+- **platform-admin:** add the read-only `admin.analytics` slice and `/admin/analytics` overview.
+  `GET /api/admin/analytics/overview?window=7d|30d|90d` aggregates raw counts across clubs over
+  current/prior windows; the application service derives rate/delta/availability (pure, unit-tested)
+  while the JDBC adapter returns only counts. Metric contract pinned as `admin.analytics_overview.v1`:
+  ACTIVE_MEMBERS, SESSION_COMPLETION, RSVP_RATE, AI_COST_PER_SESSION, NOTIFICATION_DELIVERY, with
+  `NOT_ENOUGH_DATA` when a denominator is 0 and numeric `deltaDirection` (UP/DOWN/FLAT/NONE) leaving
+  good/bad coloring to the UI. No charting library added — trend is current-vs-prior delta. Registered
+  in `ServerArchitectureBoundaryTest` and covered by service/adapter/controller and e2e tests asserting
+  no `@example.com` or raw JSON bodies leak.
+
+### Deployment Notes
+
+- **DB migration**: Flyway V34 (`ai_generation_admin_action_audit` + `ai_generation_audit_log` indexes) supports AI Ops/audit lookups, and Flyway V35 (`admin_notification_replay_previews`) creates the admin notification replay preview/audit table. Both are additive; rollback leaves unused rows/tables until a later cleanup migration.
+- **배포 순서**: server image를 먼저 배포해 V34/V35와 새 `/api/admin/**` contract를 적용한 뒤 frontend를 배포합니다. 이전 frontend는 새 endpoint를 호출하지 않으므로 서버 선배포가 안전합니다.
+- **운영 확인**: OWNER 또는 OPERATOR 권한으로 `/admin/notifications`에서 replay preview가 10분 TTL과 selection hash를 반환하는지, confirm 후 audit row와 outbox replay 상태가 남는지 확인합니다. `/admin/support`에서는 grant 만료가 24시간 이내로 제한되고 masked email만 보이는지 확인합니다. AI generation이 켜진 환경에서는 `/admin/ai-ops` summary/job ledger와 `/admin/audit`의 AI source filter가 raw transcript나 provider error body 없이 렌더링되는지도 확인합니다.
+- **Branch protection exception**: PR #10 was CI-green but blocked by a one-review/code-owner requirement in a single-collaborator repository, so the release uses an admin merge after documenting the exception in the release-readiness review. Before the next DB/API release, configure a non-author reviewer/code owner or adjust branch protection to avoid requiring an impossible self-review.
+
+### Verification
+
+- Local release preparation (2026-05-31): `git diff --check v1.11.0..HEAD -- . ':(exclude)docs/superpowers/**'` — pass.
+- Local release preparation (2026-05-31): `./scripts/pre-push-check.sh --release --dry-run` — pass; `CHANGELOG Unreleased` guard accepted the placeholder-only section and printed the release-mode command plan.
+- Local release preparation (2026-05-31): `pnpm --dir front lint` — pass.
+- Local release preparation (2026-05-31): `pnpm --dir front test` — pass (125 files, 1090 tests).
+- Local release preparation (2026-05-31): `pnpm --dir front build` — pass.
+- Local release preparation (2026-05-31): `./server/gradlew -p server clean test` — pass (Gradle build successful; `test` task skipped by current Gradle task selection/configuration).
+- Local release preparation (2026-05-31): `pnpm --dir front test:e2e` — pass (57/57).
+- Local release preparation (2026-05-31): `./scripts/build-public-release-candidate.sh` — pass.
+- Local release preparation (2026-05-31): `./scripts/public-release-check.sh .tmp/public-release-candidate` — pass; gitleaks scanned 8.06 MB and found no leaks.
 
 ## v1.11.0 - 2026-05-18
 

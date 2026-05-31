@@ -1,12 +1,19 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
-import { platformAdminClubsQuery } from "@/features/platform-admin/queries/platform-admin-queries";
+import {
+  platformAdminClubsQuery,
+  platformAdminSupportGrantsQuery,
+} from "@/features/platform-admin/queries/platform-admin-queries";
+import { platformAdminClubOperationsQuery } from "@/features/platform-admin/queries/platform-admin-club-operations-queries";
+import { AdminClubOperationsPage } from "@/features/platform-admin/ui/admin-club-operations-page";
 import { useAdminBreadcrumbExtra } from "./admin-breadcrumb-hook";
 
 export function AdminClubDetailRoute() {
   const { clubId = "" } = useParams<{ clubId: string }>();
   const clubs = useQuery(platformAdminClubsQuery()).data!;
+  const supportGrantsQuery = useQuery(platformAdminSupportGrantsQuery(clubId));
+  const operationsQuery = useQuery(platformAdminClubOperationsQuery(clubId));
   const club = clubs.items.find((entry) => entry.clubId === clubId) ?? null;
   const { setExtra } = useAdminBreadcrumbExtra();
 
@@ -41,6 +48,12 @@ export function AdminClubDetailRoute() {
           <h2 className="h3">소개</h2>
           <p className="body">{club.about}</p>
         </section>
+      ) : null}
+      {operationsQuery.data ? (
+        <AdminClubOperationsPage
+          snapshot={operationsQuery.data}
+          supportGrantCount={supportGrantsQuery.data?.length ?? 0}
+        />
       ) : null}
     </section>
   );

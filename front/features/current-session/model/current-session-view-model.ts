@@ -1,3 +1,11 @@
+import {
+  deriveReadingLoopState,
+  READING_LOOP_LABELS,
+  readingLoopDescription,
+  type ReadingLoopRsvpStatus,
+  type ReadingLoopState,
+} from "@/shared/model/reading-loop";
+
 export const SUSPENDED_MEMBER_NOTICE = "멤버십이 일시 정지되어 새 기록을 남길 수 없습니다.";
 export const VIEWER_MEMBER_NOTICE = "둘러보기 멤버입니다. 정식 멤버가 되면 RSVP와 질문 작성 기능이 열립니다.";
 export const VIEWER_MEMBER_SHORT_NOTICE = "정식 멤버가 되면 참여 기능과 작성 기능이 열립니다.";
@@ -17,6 +25,22 @@ export type CurrentSessionBoardTab = "questions" | "longReviews";
 
 export type CurrentSessionSaveScope = "rsvp" | "checkin" | "question" | "longReview" | "oneLineReview";
 export type CurrentSessionSaveState = "idle" | "saving" | "saved" | "error";
+export type CurrentSessionReadingLoopSummary = {
+  state: ReadingLoopState;
+  label: string;
+  body: string;
+};
+
+export type CurrentSessionReadingLoopSummaryInput = {
+  rsvp: ReadingLoopRsvpStatus;
+  readingProgress: number;
+  writtenQuestionCount: number;
+  oneLineReview: string;
+  longReview: string;
+  canWrite: boolean;
+  sessionDate: string | null;
+  today?: Date;
+};
 
 const saveScopeLabels: Record<CurrentSessionSaveScope, string> = {
   rsvp: "RSVP",
@@ -110,4 +134,62 @@ export function getCurrentSessionSaveStatusLabel(scope: CurrentSessionSaveScope,
   }
 
   return "";
+}
+
+export function getCurrentSessionReadingLoopSummary(
+  input: CurrentSessionReadingLoopSummaryInput,
+): CurrentSessionReadingLoopSummary {
+  if (!input.canWrite) {
+    const state = deriveReadingLoopState({
+      hasCurrentSession: true,
+      memberCanWrite: false,
+      memberRsvpStatus: input.rsvp,
+      memberHasCheckin: input.readingProgress > 0,
+      memberQuestionCount: input.writtenQuestionCount,
+      sessionDate: input.sessionDate,
+      today: input.today,
+      memberHasReflection: true,
+    });
+
+    return {
+      state,
+      label: READING_LOOP_LABELS[state],
+      body: "세션 내용을 읽고 공동 보드를 확인할 수 있습니다.",
+    };
+  }
+
+  const hasReflection = Boolean(input.oneLineReview.trim() || input.longReview.trim());
+  const state = deriveReadingLoopState({
+    hasCurrentSession: true,
+    memberCanWrite: true,
+    memberRsvpStatus: input.rsvp,
+    memberHasCheckin: input.readingProgress > 0,
+    memberQuestionCount: input.writtenQuestionCount,
+    minimumQuestionCount: 2,
+    sessionDate: input.sessionDate,
+    today: input.today,
+    memberHasReflection: hasReflection,
+  });
+
+  if (state === "MEMBER_PREP_REQUIRED") {
+    return {
+      state,
+      label: READING_LOOP_LABELS[state],
+      body: "RSVP, 읽기 진행률, 질문을 모임 전에 정리합니다.",
+    };
+  }
+
+  if (state === "REFLECTION_DUE") {
+    return {
+      state,
+      label: READING_LOOP_LABELS[state],
+      body: "모임 후 한줄평이나 서평을 남겨 다음 기록으로 이어갑니다.",
+    };
+  }
+
+  return {
+    state,
+    label: READING_LOOP_LABELS[state],
+    body: readingLoopDescription(state),
+  };
 }

@@ -1,103 +1,115 @@
-import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useSearchParams } from "react-router-dom";
-import { ClubOperationsBrief } from "@/features/platform-admin/ui/club-operations-brief";
-import { PlatformAdminWorkQueue } from "@/features/platform-admin/ui/platform-admin-work-queue";
+import { useSearchParams } from "react-router-dom";
+import { platformAdminAiOpsJobsQuery, platformAdminAiOpsSummaryQuery } from "@/features/platform-admin/queries/platform-admin-ai-ops-queries";
+import { platformAdminNotificationSnapshotQuery } from "@/features/platform-admin/queries/platform-admin-notifications-queries";
+import { platformAdminClubsQuery, platformAdminSummaryQuery } from "@/features/platform-admin/queries/platform-admin-queries";
 import {
   buildPlatformAdminWorkbench,
   type PlatformAdminWorkbenchInput,
   type WorkbenchQueueItem,
 } from "@/features/platform-admin/model/platform-admin-workbench-model";
-import {
-  platformAdminAiOpsJobsQuery,
-  platformAdminAiOpsSummaryQuery,
-} from "@/features/platform-admin/queries/platform-admin-ai-ops-queries";
-import {
-  platformAdminClubsQuery,
-  platformAdminSummaryQuery,
-} from "@/features/platform-admin/queries/platform-admin-queries";
+import { AdminTodayLedger } from "@/features/platform-admin/ui/admin-today-ledger";
+import { isReadmatesApiError } from "@/shared/api/errors";
 
 export function AdminTodayRoute() {
-  const summary = useQuery(platformAdminSummaryQuery()).data!;
-  const clubs = useQuery(platformAdminClubsQuery()).data!;
-  const aiSummary = useQuery(platformAdminAiOpsSummaryQuery()).data ?? null;
-  const aiJobsData = useQuery(platformAdminAiOpsJobsQuery()).data;
-  const aiJobs = useMemo(() => aiJobsData?.items ?? [], [aiJobsData]);
-  const [searchParams] = useSearchParams();
+  const summaryQuery = useQuery(platformAdminSummaryQuery());
+  const clubsQuery = useQuery(platformAdminClubsQuery());
+  const notificationQuery = useQuery(platformAdminNotificationSnapshotQuery());
+  const aiSummaryQuery = useQuery(platformAdminAiOpsSummaryQuery());
+  const aiJobsQuery = useQuery(platformAdminAiOpsJobsQuery());
+  const [searchParams, setSearchParams] = useSearchParams();
   const filter = searchParams.get("filter");
-  const [selectedClubId, setSelectedClubId] = useState<string | null>(searchParams.get("selected"));
+  const selectedItemId = searchParams.get("selected");
 
-  const workbench = useMemo(() => {
-    const input: PlatformAdminWorkbenchInput = {
-      role: summary.platformRole,
-      activeClubCount: summary.activeClubCount,
-      domainActionRequiredCount: summary.domainActionRequiredCount,
-      selectedClubId,
-      clubs: clubs.items.map((club) => ({
-        clubId: club.clubId,
-        slug: club.slug,
-        name: club.name,
-        tagline: club.tagline,
-        about: club.about,
-        status: club.status,
-        publicVisibility: club.publicVisibility,
-        domainCount: club.domainCount,
-        domainActionRequiredCount: club.domainActionRequiredCount,
-        firstHostOnboardingState: club.firstHostOnboardingState,
-      })),
-      domains: (summary.domains ?? summary.domainsRequiringAction ?? []).map((domain) => ({
-        clubId: domain.clubId,
-        hostname: domain.hostname,
-        status: domain.status,
-        manualAction: domain.manualAction,
-        isPrimary: domain.isPrimary,
-      })),
-      aiJobs: aiJobs.map((job) => ({
-        jobId: job.jobId,
-        clubId: job.club.clubId,
-        clubName: job.club.name ?? "—",
-        sessionTitle: job.session.bookTitle ?? "—",
-        status: job.status,
-        stale: job.staleCandidate,
-      })),
-      aiDisabled: false,
-    };
-    return buildPlatformAdminWorkbench(input);
-  }, [summary, clubs, aiJobs, selectedClubId]);
-  void aiSummary;
+  const summary = summaryQuery.data;
+  const clubs = clubsQuery.data;
 
-  const filteredItems = useMemo(
-    () => filterQueueItems(workbench.queueItems, filter),
-    [workbench.queueItems, filter],
-  );
+  if (summaryQuery.isLoading || clubsQuery.isLoading) {
+    return <p className="admin-today-ledger__loading">오늘 할 일을 불러오는 중입니다.</p>;
+  }
 
-  const clubItemsOnly = useMemo(
-    () => filteredItems.filter((item) => item.type !== "ai"),
-    [filteredItems],
-  );
+  if (summaryQuery.isError || clubsQuery.isError || !summary || !clubs) {
+    return (
+      <section className="admin-today-ledger" aria-labelledby="admin-today-title">
+        <h1 id="admin-today-title" className="h1 editorial">오늘 할 일</h1>
+        <p className="admin-today-ledger__error" role="alert">
+          플랫폼 작업 큐를 불러오지 못했습니다. 잠시 뒤 다시 시도해 주세요.
+        </p>
+      </section>
+    );
+  }
+
+  const aiDisabled = isReadmatesApiError(aiSummaryQuery.error) && aiSummaryQuery.error.status === 503;
+  const input: PlatformAdminWorkbenchInput = {
+    role: summary.platformRole,
+    activeClubCount: summary.activeClubCount,
+    domainActionRequiredCount: summary.domainActionRequiredCount,
+    selectedClubId: null,
+    selectedItemId,
+    clubs: clubs.items.map((club) => ({
+      clubId: club.clubId,
+      slug: club.slug,
+      name: club.name,
+      tagline: club.tagline,
+      about: club.about,
+      status: club.status,
+      publicVisibility: club.publicVisibility,
+      domainCount: club.domainCount,
+      domainActionRequiredCount: club.domainActionRequiredCount,
+      firstHostOnboardingState: club.firstHostOnboardingState,
+    })),
+    domains: (summary.domains ?? summary.domainsRequiringAction ?? []).map((domain) => ({
+      id: domain.id,
+      clubId: domain.clubId,
+      hostname: domain.hostname,
+      kind: domain.kind,
+      status: domain.status,
+      desiredState: domain.desiredState,
+      manualAction: domain.manualAction,
+      errorCode: domain.errorCode,
+      isPrimary: domain.isPrimary,
+      verifiedAt: domain.verifiedAt,
+      lastCheckedAt: domain.lastCheckedAt,
+    })),
+    notificationSnapshot: notificationQuery.data ?? null,
+    notificationUnavailable: notificationQuery.isError,
+    aiJobs: (aiJobsQuery.data?.items ?? []).map((job) => ({
+      jobId: job.jobId,
+      clubId: job.club.clubId,
+      clubName: job.club.name ?? job.club.slug ?? "클럽",
+      sessionTitle: job.session.bookTitle ?? "세션",
+      status: job.status,
+      errorCode: job.errorCode,
+      stale: job.staleCandidate,
+      startedAt: job.createdAt,
+    })),
+    aiDisabled,
+    aiUnavailable: (aiSummaryQuery.isError || aiJobsQuery.isError) && !aiDisabled,
+  };
+  const workbench = buildPlatformAdminWorkbench(input);
+  const filteredItems = filterQueueItems(workbench.queueItems, filter);
+  const filteredWorkbench = { ...workbench, queueItems: filteredItems };
+
+  function handleSelectItem(itemId: string) {
+    const next = new URLSearchParams(searchParams);
+    next.set("selected", itemId);
+    setSearchParams(next, { replace: true });
+  }
+
+  function clearFilter() {
+    const next = new URLSearchParams(searchParams);
+    next.delete("filter");
+    setSearchParams(next, { replace: true });
+  }
 
   return (
-    <section className="admin-today" aria-labelledby="admin-today-title">
-      <header className="admin-today__header">
-        <h1 id="admin-today-title" className="h1 editorial">오늘 할 일</h1>
-        {filter ? <FilterBanner filter={filter} /> : null}
-      </header>
-      <div className="admin-today__columns">
-        <section className="admin-today__queue" aria-label="작업 큐">
-          <PlatformAdminWorkQueue
-            items={clubItemsOnly}
-            selectedClubId={selectedClubId}
-            onSelectClub={setSelectedClubId}
-          />
-        </section>
-        <section className="admin-today__brief" aria-label="선택 항목 요약">
-          <ClubOperationsBrief
-            club={workbench.selectedClub}
-            permissions={workbench.permissions}
-          />
-        </section>
-      </div>
-    </section>
+    <AdminTodayLedger
+      workbench={filteredWorkbench}
+      selectedItemId={selectedItemId}
+      filterLabel={filter ? filterLabel(filter) : null}
+      onClearFilter={filter ? clearFilter : undefined}
+      onSelectItem={handleSelectItem}
+    />
   );
 }
 
@@ -107,23 +119,17 @@ function filterQueueItems(items: ReadonlyArray<WorkbenchQueueItem>, filter: stri
 }
 
 function matchesFilter(item: WorkbenchQueueItem, filter: string): boolean {
-  if (item.type === "ai") return false;
-  if (filter === "setup_required") return item.badges.some((b) => b === "SETUP_REQUIRED");
+  if (filter === "setup_required") return item.badges.some((badge) => badge === "SETUP_REQUIRED");
   if (filter === "ready_to_publish") return item.primaryActionLabel === "공개 전환";
-  if (filter === "domain_action") return item.badges.some((b) => b.startsWith("도메인") || b.includes("FAILED") || b.includes("ACTION_REQUIRED"));
+  if (filter === "domain_action") return item.badges.some((badge) => badge.includes("FAILED") || badge.includes("ACTION_REQUIRED"));
+  if (filter === "operations_warning") return item.severity === "critical" || item.severity === "warn";
   return true;
 }
 
-function FilterBanner({ filter }: { filter: string }) {
-  const label =
-    filter === "setup_required" ? "조치 필요"
-      : filter === "ready_to_publish" ? "공개 준비"
-      : filter === "domain_action" ? "도메인 조치"
-      : filter;
-  return (
-    <p className="admin-today__filter-banner">
-      필터: {label}
-      <Link to="/admin/today" className="admin-today__filter-clear"> · 해제</Link>
-    </p>
-  );
+function filterLabel(filter: string): string {
+  if (filter === "setup_required") return "조치 필요";
+  if (filter === "ready_to_publish") return "공개 준비";
+  if (filter === "domain_action") return "도메인 조치";
+  if (filter === "operations_warning") return "운영 경고";
+  return filter;
 }

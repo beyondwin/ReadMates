@@ -1,27 +1,30 @@
-import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { platformAdminHealthSnapshotQuery } from "@/features/platform-admin/queries/platform-admin-health-queries";
 import { AdminHealthCard } from "@/features/platform-admin/ui/admin-health-card";
 import { AdminHealthDeployStrip } from "@/features/platform-admin/ui/admin-health-deploy-strip";
+import type { PlatformHealthSnapshot } from "@/features/platform-admin/model/platform-admin-health-model";
 
-const STALE_AFTER_MS = 30_000;
+export type AdminHealthGridProps = {
+  snapshot: PlatformHealthSnapshot | null;
+  loading: boolean;
+  error: boolean;
+  fetching: boolean;
+  stale: boolean;
+  onRefresh: () => void;
+};
 
-export function AdminHealthGrid() {
-  const query = useQuery(platformAdminHealthSnapshotQuery());
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  if (query.isLoading) return <p className="admin-health-grid__loading">로딩 중...</p>;
-  if (query.isError || !query.data) {
+export function AdminHealthGrid({
+  snapshot,
+  loading,
+  error,
+  fetching,
+  stale,
+  onRefresh,
+}: AdminHealthGridProps) {
+  if (loading) return <p className="admin-health-grid__loading">로딩 중...</p>;
+  if (error || !snapshot) {
     return <p className="admin-health-grid__error">스냅샷을 불러오지 못했습니다.</p>;
   }
-  const stripCard = query.data.cards.find((c) => c.id === "deploy_attempts_strip");
-  const rest = query.data.cards.filter((c) => c.id !== "deploy_attempts_strip");
-  const isStale = query.dataUpdatedAt > 0 && now - query.dataUpdatedAt > STALE_AFTER_MS;
+  const stripCard = snapshot.cards.find((c) => c.id === "deploy_attempts_strip");
+  const rest = snapshot.cards.filter((c) => c.id !== "deploy_attempts_strip");
 
   return (
     <div className="admin-health-grid">
@@ -29,22 +32,22 @@ export function AdminHealthGrid() {
         <div>
           <p className="eyebrow">Snapshot</p>
           <p className="admin-health-grid__timestamp">
-            {query.data.schema} · 생성 {formatTimestamp(query.data.generatedAt)}
+            {snapshot.schema} · 생성 {formatTimestamp(snapshot.generatedAt)}
           </p>
         </div>
         <div className="admin-health-grid__toolbar-actions">
           <span
             className={
-              isStale ? "admin-health-grid__stale admin-health-grid__stale--warn" : "admin-health-grid__stale"
+              stale ? "admin-health-grid__stale admin-health-grid__stale--warn" : "admin-health-grid__stale"
             }
           >
-            {query.isFetching ? "갱신 중" : isStale ? "30초 이상 경과" : "최신"}
+            {fetching ? "갱신 중" : stale ? "30초 이상 경과" : "최신"}
           </span>
           <button
             type="button"
             className="admin-health-grid__refresh"
-            disabled={query.isFetching}
-            onClick={() => void query.refetch()}
+            disabled={fetching}
+            onClick={onRefresh}
           >
             새로고침
           </button>

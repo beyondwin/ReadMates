@@ -79,6 +79,8 @@ data class PlatformAdminClubListItem(
     val publicVisibility: ClubPublicVisibility,
     val domainCount: Int,
     val domainActionRequiredCount: Int,
+    val notificationFailureCount: Int,
+    val aiFailureCount: Int,
     val firstHostOnboardingState: FirstHostOnboardingState,
 )
 

@@ -403,6 +403,17 @@ describe("CurrentSession", () => {
     expect(within(desktop).queryByRole("button", { name: "한줄평 저장" })).not.toBeInTheDocument();
   });
 
+  it("shows the reading-loop summary on desktop and mobile current session", async () => {
+    const { container } = render(<CurrentSession data={currentSessionData} />);
+    const desktopScope = within(getDesktop(container));
+    const mobileScope = within(await screen.findByTestId("current-session-mobile"));
+
+    expect(desktopScope.getByText("멤버 준비 필요")).toBeVisible();
+    expect(desktopScope.getByText("RSVP, 읽기 진행률, 질문을 모임 전에 정리합니다.")).toBeVisible();
+    expect(mobileScope.getByText("멤버 준비 필요")).toBeVisible();
+    expect(mobileScope.getByText("RSVP, 읽기 진행률, 질문을 모임 전에 정리합니다.")).toBeVisible();
+  });
+
   it("disables personal save actions for suspended members", () => {
     const { container } = render(
       <CurrentSession
@@ -426,6 +437,8 @@ describe("CurrentSession", () => {
     const desktopScope = within(getDesktop(container));
 
     expect(desktopScope.getByText("둘러보기 멤버")).toBeVisible();
+    expect(desktopScope.getByText("세션 준비됨")).toBeVisible();
+    expect(desktopScope.getByText("세션 내용을 읽고 공동 보드를 확인할 수 있습니다.")).toBeVisible();
     expect(desktopScope.getByText("기록은 읽을 수 있고, 새 참여 기록은 정식 멤버만 남길 수 있습니다")).toBeVisible();
     expect(
       desktopScope.getByText(
@@ -471,6 +484,8 @@ describe("CurrentSession", () => {
     const mobileScope = within(await screen.findByTestId("current-session-mobile"));
 
     expect(mobileScope.getByText("둘러보기 멤버")).toBeVisible();
+    expect(mobileScope.getByText("세션 준비됨")).toBeVisible();
+    expect(mobileScope.getByText("세션 내용을 읽고 공동 보드를 확인할 수 있습니다.")).toBeVisible();
     expect(
       mobileScope.getByText("세션 기록은 읽을 수 있어요. RSVP, 진행률, 질문, 서평 작성은 정식 멤버에게 열립니다."),
     ).toBeVisible();

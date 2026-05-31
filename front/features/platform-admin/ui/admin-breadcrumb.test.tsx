@@ -19,8 +19,9 @@ describe("AdminBreadcrumb", () => {
     expect(screen.getByText(/샘플 클럽/)).toBeInTheDocument();
   });
 
-  it("renders coming-soon route with '준비 중' suffix", () => {
-    render(<AdminBreadcrumb routePath="notifications" />);
-    expect(screen.getByText(/준비 중/)).toBeInTheDocument();
+  it("renders the now-ready analytics route without a '준비 중' suffix", () => {
+    render(<AdminBreadcrumb routePath="analytics" />);
+    expect(screen.getByText("분석")).toBeInTheDocument();
+    expect(screen.queryByText(/준비 중/)).not.toBeInTheDocument();
   });
 });

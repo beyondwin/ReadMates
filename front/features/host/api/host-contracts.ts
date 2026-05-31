@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { HostClubOperationsSnapshot } from "@/shared/model/club-operations";
 import type { AttendanceStatus, RsvpStatus, SessionState } from "@/shared/model/readmates-types";
 import type { PagedResponse } from "@/shared/model/paging";
 export type { AttendanceStatus, RsvpStatus, SessionState } from "@/shared/model/readmates-types";
@@ -665,6 +666,8 @@ export type HostAttendanceUpdate = {
   membershipId: string;
   attendanceStatus: AttendanceStatus;
 };
+
+export type HostClubOperationsResponse = HostClubOperationsSnapshot;
 
 // ---------------------------------------------------------------------------
 // Zod runtime validators — DEV-only, tree-shaken from production bundle.

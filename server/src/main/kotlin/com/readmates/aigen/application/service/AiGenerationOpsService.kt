@@ -3,15 +3,21 @@ package com.readmates.aigen.application.service
 import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.AiOpsAction
 import com.readmates.aigen.application.model.AiOpsAdminActionResult
+import com.readmates.aigen.application.model.AiOpsCostTrend
+import com.readmates.aigen.application.model.AiOpsCostWindow
+import com.readmates.aigen.application.model.AiOpsDeltaDirection
 import com.readmates.aigen.application.model.AiOpsJobFilters
 import com.readmates.aigen.application.model.AiOpsJobList
 import com.readmates.aigen.application.model.AiOpsJobListItem
 import com.readmates.aigen.application.model.AiOpsSummary
+import com.readmates.aigen.application.model.AiOpsTrendAvailability
+import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.port.`in`.ForceCancelAiOpsJobUseCase
 import com.readmates.aigen.application.port.`in`.GetAiOpsJobUseCase
 import com.readmates.aigen.application.port.`in`.GetAiOpsSummaryUseCase
 import com.readmates.aigen.application.port.`in`.ListAiOpsJobsUseCase
+import com.readmates.aigen.application.port.`in`.RetryAiOpsJobCommitUseCase
 import com.readmates.aigen.application.port.out.AiGenerationAdminActionAuditEntry
 import com.readmates.aigen.application.port.out.AiGenerationAdminActionAuditPort
 import com.readmates.aigen.application.port.out.AiGenerationAuditQueryPort
@@ -37,8 +43,12 @@ class AiGenerationOpsService(
 ) : GetAiOpsSummaryUseCase,
     ListAiOpsJobsUseCase,
     GetAiOpsJobUseCase,
-    ForceCancelAiOpsJobUseCase {
-    override fun summary(admin: CurrentPlatformAdmin): AiOpsSummary {
+    ForceCancelAiOpsJobUseCase,
+    RetryAiOpsJobCommitUseCase {
+    override fun summary(
+        admin: CurrentPlatformAdmin,
+        window: AiOpsCostWindow,
+    ): AiOpsSummary {
         val now = clock.instant()
         val activeJobs = jobStore.loadActiveJobs()
         val monthStart =
@@ -59,6 +69,38 @@ class AiGenerationOpsService(
                     it.status in STALE_CANDIDATE_STATUSES &&
                         it.lastUpdatedAt.isBefore(now.minus(STALE_CANDIDATE_AGE))
                 },
+            costTrend = costTrend(now, window),
+        )
+    }
+
+    private fun costTrend(
+        now: java.time.Instant,
+        window: AiOpsCostWindow,
+    ): AiOpsCostTrend {
+        val windowSeconds = Duration.ofDays(window.days)
+        val currentStart = now.minus(windowSeconds)
+        val priorStart = now.minus(windowSeconds.multipliedBy(2))
+        val current = auditQueryPort.windowUsageBetween(currentStart, now)
+        val prior = auditQueryPort.windowUsageBetween(priorStart, currentStart)
+        val available = prior.jobCount > 0
+        val direction =
+            if (!available) {
+                AiOpsDeltaDirection.NONE
+            } else {
+                when (current.costUsd.compareTo(prior.costUsd)) {
+                    1 -> AiOpsDeltaDirection.UP
+                    -1 -> AiOpsDeltaDirection.DOWN
+                    else -> AiOpsDeltaDirection.FLAT
+                }
+            }
+        return AiOpsCostTrend(
+            window = window,
+            currentCostUsd = current.costUsd,
+            priorCostUsd = prior.costUsd,
+            currentJobCount = current.jobCount,
+            priorJobCount = prior.jobCount,
+            deltaDirection = direction,
+            availability = if (available) AiOpsTrendAvailability.AVAILABLE else AiOpsTrendAvailability.NOT_ENOUGH_DATA,
         )
     }
 
@@ -139,6 +181,55 @@ class AiGenerationOpsService(
         return AiOpsAdminActionResult(jobId, record.status, JobStatus.CANCELLED)
     }
 
+    override fun retryCommit(
+        admin: CurrentPlatformAdmin,
+        jobId: UUID,
+    ): AiOpsAdminActionResult {
+        if (admin.role !in ACTION_ROLES) {
+            throw AccessDeniedException("Platform admin role ${admin.role} cannot retry AI generation commits")
+        }
+        val record =
+            jobStore.findJobById(jobId)
+                ?: throw safeMissingLiveJob(jobId)
+        if (record.status !in RETRY_COMMIT_STATUSES) {
+            throw AiGenerationException.IllegalGenerationState(jobId, record.status.name, "admin retry-commit")
+        }
+        val reset =
+            jobStore.transitionStatus(
+                jobId = jobId,
+                expected = RETRY_COMMIT_STATUSES,
+                next = JobStatus.SUCCEEDED,
+                stage = JobStage.READY,
+                progressPct = 100,
+                error = null,
+            )
+        if (!reset) {
+            throw AiGenerationException.IllegalGenerationState(
+                jobId = jobId,
+                currentStatus = jobStore.load(jobId)?.status?.name ?: "MISSING",
+                attemptedAction = "admin retry-commit",
+            )
+        }
+        // Intentionally NOT calling deleteTransientPayload: the host needs the
+        // result snapshot to survive so it can re-commit the recovered job.
+        adminActionAuditPort.record(
+            AiGenerationAdminActionAuditEntry(
+                jobId = jobId,
+                clubId = record.clubId,
+                sessionId = record.sessionId,
+                adminUserId = admin.userId,
+                adminRole = admin.role,
+                action = AiOpsAction.RETRY_COMMIT.name,
+                previousStatus = record.status.name,
+                nextStatus = JobStatus.SUCCEEDED.name,
+                result = "SUCCESS",
+                safeErrorCode = null,
+                createdAt = clock.instant(),
+            ),
+        )
+        return AiOpsAdminActionResult(jobId, record.status, JobStatus.SUCCEEDED)
+    }
+
     private fun safeMissingLiveJob(jobId: UUID): AiGenerationException {
         val historical = auditQueryPort.findJobById(jobId) ?: return AiGenerationException.JobNotFound(jobId)
         val safeCode = if (historical.status in TERMINAL_STATUSES) "JOB_NOT_LIVE" else "JOB_EXPIRED"
@@ -170,13 +261,18 @@ class AiGenerationOpsService(
             lastUpdatedAt = lastUpdatedAt,
             expiresAt = expiresAt,
             staleCandidate = status in STALE_CANDIDATE_STATUSES && lastUpdatedAt.isBefore(now.minus(STALE_CANDIDATE_AGE)),
-            availableActions = if (status in FORCE_CANCEL_STATUSES) setOf(AiOpsAction.FORCE_CANCEL) else emptySet(),
+            availableActions =
+                buildSet {
+                    if (status in FORCE_CANCEL_STATUSES) add(AiOpsAction.FORCE_CANCEL)
+                    if (status in RETRY_COMMIT_STATUSES) add(AiOpsAction.RETRY_COMMIT)
+                },
         )
 
     private companion object {
         val ACTION_ROLES = setOf(PlatformAdminRole.OWNER, PlatformAdminRole.OPERATOR)
         val FORCE_CANCEL_STATUSES =
             setOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCEEDED, JobStatus.COMMITTING)
+        val RETRY_COMMIT_STATUSES = setOf(JobStatus.COMMITTING)
         val STALE_CANDIDATE_STATUSES = setOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.COMMITTING)
         val TERMINAL_STATUSES = setOf(JobStatus.COMMITTED, JobStatus.CANCELLED, JobStatus.FAILED)
         val STALE_CANDIDATE_AGE: Duration = Duration.ofMinutes(15)

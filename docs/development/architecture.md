@@ -14,7 +14,7 @@ ReadMates는 여러 정기 독서모임의 공개 소개, 멤버 세션 준비, 
 | 로그인 후 진입 | `/app`, `/clubs/:slug/app`, 등록된 club host의 `/app` | 로그인 사용자 | 가입 클럽이 하나면 해당 클럽 앱으로 이동하고, 여러 개면 클럽 선택 화면을 보여주며, 선택한 클럽 context로 앱에 진입 |
 | 멤버 앱 | `/clubs/:slug/app`, `/clubs/:slug/app/pending`, `/clubs/:slug/app/session/current`, `/clubs/:slug/app/notes`, `/clubs/:slug/app/archive`, `/clubs/:slug/app/sessions/:sessionId`, `/clubs/:slug/app/feedback/:sessionId`, `/clubs/:slug/app/feedback/:sessionId/print`, `/clubs/:slug/app/me`, `/clubs/:slug/app/notifications`, 등록된 club host의 `/app/**` | 둘러보기 멤버, 정식 멤버, 호스트 | 현재 세션 확인, 멤버 공개 예정 세션 확인, 둘러보기 멤버 안내, RSVP, 읽은 분량, 질문, 한줄평, 장문 서평, 아카이브, 참석 회차 피드백 문서, 본인 표시 이름과 알림 설정 변경, 클럽별 멤버 알림함 확인 |
 | 호스트 앱 | `/clubs/:slug/app/host`, `/clubs/:slug/app/host/notifications`, `/clubs/:slug/app/host/members`, `/clubs/:slug/app/host/invitations`, `/clubs/:slug/app/host/sessions/new`, `/clubs/:slug/app/host/sessions/:sessionId/edit`, 등록된 club host의 `/app/host/**` | 현재 클럽의 호스트 | 예정 세션 생성/수정, 공개 범위 설정, 현재 세션 시작, 참석 확정, 진행 세션 닫기, 닫힌 기록 발행, 세션 기록 완성(AI 생성 또는 외부 JSON 가져오기), 초대 관리, 멤버 상태와 표시 이름 관리, 세션 기록 패키지 저장, 알림 발송 운영 |
-| 플랫폼 관리 | `/admin` | platform admin | 클럽 생성, 클럽 목록 확인, 공개/비공개 상태 관리, 공개 소개 정보 관리, 등록형 domain alias 요청과 상태 확인, 첫 호스트 온보딩 상태 확인. 세션/멤버/알림 같은 클럽 내부 운영은 호스트 앱 책임 |
+| 플랫폼 관리 | `/admin`, `/admin/today`, `/admin/health`, `/admin/notifications`, `/admin/clubs`, `/admin/clubs/:clubId`, `/admin/support`, `/admin/ai-ops`, `/admin/audit`, `/admin/analytics` | platform admin | `/admin/today`의 운영 ledger에서 클럽 공개 readiness, domain action, 알림 실패, AI job 이상을 오늘 처리할 queue로 모아 보고, 클럽 생성, 클럽 목록 확인, 공개/비공개 상태 관리, 공개 소개 정보 관리, 등록형 domain alias 요청과 상태 확인, 첫 호스트 온보딩 상태 확인, 운영 health와 알림 outbox/delivery 상태 확인, 클럽 운영 readiness 집계, 제한된 support access grant 관리, AI job 운영 조회와 강제 취소, 통합 감사 ledger 조회를 수행합니다. `/admin/analytics`는 S8 coming-soon placeholder입니다. 세션/멤버/알림 발송 같은 클럽 내부 운영은 기본적으로 호스트 앱 책임이고, platform admin 표면은 aggregate/read-only 진단과 감사 가능한 복구 작업만 다룹니다. |
 
 ## 프런트엔드 route-first 경계
 
@@ -22,12 +22,13 @@ ReadMates는 여러 정기 독서모임의 공개 소개, 멤버 세션 준비, 
 
 `shared/ui`는 재사용 가능한 presentation primitive만 소유하며 `src/app`, `src/pages`, `features`를 import하지 않습니다. Router, route continuity, provider context처럼 app이 소유한 의존성은 app/page/feature route composition에서 주입하거나 shared boundary 밖의 primitive로 옮긴 뒤 사용합니다.
 
-Feature는 가능한 범위에서 `api`, `model`, `route`, `ui`로 나눕니다.
+Feature는 가능한 범위에서 `api`, `queries`, `model`, `route`, `ui`로 나눕니다.
 
 - `features/<name>/api`는 해당 feature의 BFF endpoint 호출과 request/response contract만 담당합니다.
-- `features/<name>/model`은 React, React Router, API client를 import하지 않는 순수 화면 모델 계산만 둡니다.
-- `features/<name>/route`는 loader/action, route error/loading state, API/model 호출, UI props 조립을 담당합니다.
-- `features/<name>/ui`는 props와 callback으로만 렌더링하며 `fetch`, `shared/api`, feature API, route module을 직접 import하지 않습니다.
+- `features/<name>/queries`는 TanStack Query key, `queryOptions`, mutation hook, invalidation policy를 담당합니다. UI와 route module을 import하지 않습니다.
+- `features/<name>/model`은 React, React Router, TanStack Query, API client를 import하지 않는 순수 화면 모델 계산만 둡니다.
+- `features/<name>/route`는 loader/action, route error/loading state, query seeding, API/model 호출, UI props 조립을 담당합니다.
+- `features/<name>/ui`는 props와 callback으로만 렌더링하며 `fetch`, `shared/api`, feature API, feature queries, route module을 직접 import하지 않습니다.
 
 `shared/api/readmates` compatibility module은 제거되었고, feature route/page는 feature-owned API contract 또는 `shared/api` primitive를 사용해야 합니다. `features/*/components`는 `ui`로 이동하지 않은 legacy presentation surface에만 남길 수 있습니다. `ui` directory가 있는 feature에서는 외부 source가 `features/<name>/components`를 public surface처럼 import하지 않습니다. Host feature는 `features/host/ui`가 공개 presentation surface이며, host components legacy public surface는 없습니다.
 
@@ -102,6 +103,10 @@ Platform admin의 domain 상태 확인은 `https://<hostname>/.well-known/readma
 
 사용자 역할은 club membership마다 독립적입니다. 현재 club membership role은 `HOST`와 `MEMBER`이고, platform admin 권한은 `platform_admins`의 `OWNER`, `OPERATOR`, `SUPPORT`로 별도 판정합니다. Platform `OPERATOR`는 club host가 아니며, 특정 클럽의 호스트 도구를 쓰려면 그 클럽 membership에서도 `HOST` 권한이 있어야 합니다.
 
+Platform admin today ledger는 `/admin/today` route에서 기존 admin summary, clubs, notification snapshot, AI Ops summary/jobs query를 조합해 클럽 공개 readiness, domain action, 알림 위험, AI job failure/stale 신호를 하나의 작업 queue와 선택 항목 brief로 계산합니다. Summary와 clubs query는 기본 queue를 만들기 위한 필수 데이터이고, notification/AI query 실패는 해당 운영 신호만 `확인 불가` 또는 disabled 상태로 격리해 클럽 readiness queue를 blank 처리하지 않습니다. Platform admin club operations는 `/api/admin/clubs/{clubId}/operations`에서 현재 클럽의 readiness, lifecycle, host/member/session counts, notification health, AI usage summary를 aggregate-only read model로 반환합니다. Support workbench는 `/api/admin/support/search`, `/api/admin/support/grants`를 사용해 masked email 중심 사용자 검색, active grant ledger, grant create/revoke를 처리합니다. Support access grant 생성은 OWNER 권한, 활성 platform admin grantee, eligible club, 중복 active grant 없음, 24시간 이내 만료, non-blank reason을 모두 만족해야 합니다.
+
+Platform admin AI Ops는 `readmates.aigen.enabled=true`일 때 `/api/admin/ai-generation/summary`, `/api/admin/ai-generation/jobs`, `/api/admin/ai-generation/jobs/{jobId}`, `/api/admin/ai-generation/jobs/{jobId}/force-cancel`을 사용합니다. 요약과 job ledger는 provider/model/status/error/cost 중심의 안전한 projection만 반환하고, force-cancel은 platform admin actor, 이전/다음 상태, 결과, 안전한 error code를 Flyway V34 `ai_generation_admin_action_audit`에 기록합니다.
+
 Public cache, 멤버 알림 deep link, host 알림 운영 ledger는 club id 또는 club slug를 포함해 scope를 나눕니다. 공개 cache key는 club id 기준으로 분리하고, 알림 link는 `/clubs/:slug/app/**` canonical path를 사용해 로그인 후에도 원래 클럽 화면으로 복귀합니다.
 
 ## 서버 내부 구조
@@ -116,13 +121,17 @@ adapter.in.web
   -> adapter.out.persistence
 ```
 
-현재 full port/outbound adapter chain을 따르는 범위는 `publication`, `archive`, `feedback`, `session`, `note`, `auth`의 운영 API surface와 `notification` 운영 slice입니다. Disabled password/password-reset/dev-invitation accept endpoint는 `410 Gone` stub으로 남습니다. Auth의 OAuth filter, success handler, cookie/session 보안 구성은 `auth.infrastructure.security`와 `auth.adapter.in.security`에 따로 둡니다.
+현재 full port/outbound adapter chain을 따르는 범위는 `publication`, `archive`, `feedback`, `session`, `note`, `auth`의 운영 API surface, `notification` 운영 slice, `club`의 platform-admin 운영 slice, `admin.audit`의 platform-admin 감사 read slice, `admin.health`의 ops read slice, `aigen`의 workflow slice입니다. Disabled password/password-reset/dev-invitation accept endpoint는 `410 Gone` stub으로 남습니다. Auth의 OAuth filter, success handler, cookie/session 보안 구성은 `auth.infrastructure.security`와 `auth.adapter.in.security`에 따로 둡니다.
 
 Notification slice는 MySQL `notification_event_outbox`를 이벤트 source of truth로 유지합니다. Relay scheduler가 publish 가능한 row를 Kafka topic `readmates.notification.events.v1`로 발행하고, 같은 Spring Boot 모듈의 Kafka consumer가 이벤트별 수신자를 계산해 멤버 선호도를 적용한 뒤 `notification_deliveries`와 `member_notifications`를 만듭니다. 이메일 발송은 `notification_deliveries`의 `EMAIL` row를 기준으로 재시도 가능한 side effect로 처리하고, in-app 알림은 `member_notifications`가 멤버 inbox source of truth입니다. 이벤트 발행 상태는 `notification_event_outbox`, 채널별 발송/skip 상태는 `notification_deliveries`, 멤버 inbox 상태는 `member_notifications`에 저장합니다.
 
 호스트 수동 알림도 같은 outbox 파이프라인에 들어갑니다. 호스트는 `/api/host/notifications/manual/options`에서 세션별 템플릿, 대상 멤버, 최근 수동 발송 이력을 읽고, `/api/host/notifications/manual/preview`로 대상 수와 이메일 선호도 skip/missing 경고를 확인한 뒤, `/api/host/notifications/manual`로 확정합니다. Preview는 selection hash와 10분 TTL을 가진 `notification_manual_dispatch_previews` row로 저장되고, 확정 시 `notification_manual_dispatches`와 `notification_event_outbox` row가 같은 트랜잭션에서 만들어집니다. 이미 같은 세션/템플릿으로 최근 수동 발송이 있으면 confirm은 명시적인 `resendConfirmed` 없이는 실패합니다. `NEXT_BOOK_PUBLISHED`, `SESSION_REMINDER_DUE`, `FEEDBACK_DOCUMENT_PUBLISHED`만 수동 템플릿으로 열리며, `REVIEW_PUBLISHED`는 사용자가 작성한 서평 이벤트에 묶인 자동 알림으로 유지합니다.
 
 `NotificationDeliveryEngine`은 claimed email delivery의 SMTP 전송, retry/dead 전환, redacted error 저장, metrics/logging을 한 곳에서 처리하고, automatic event dispatch path, manual event dispatch path, pending-delivery worker path가 같은 engine을 사용합니다. 이메일 copy는 `notification.application.model`의 순수 template helper가 in-app 제목/본문/deep link, 이메일 subject, plain text, HTML을 함께 렌더링하고, SMTP adapter는 HTML이 있으면 plain text fallback을 포함한 multipart MIME으로 발송합니다. 호스트 알림 상세 API는 subject, masked recipient, deep link, allowlist metadata만 노출하고 plain/HTML body는 노출하지 않습니다. 테스트 메일 audit은 별도 `notification_test_mail_audit` table에 masked email과 hash만 저장합니다. 발행 조건, 생성 시점, relay/consumer 주기, 재시도 정책은 [OCI backend runbook](../deploy/oci-backend.md#email-notification-operations)을 기준으로 운영합니다. 패키지 경계는 아래처럼 web/scheduler/Kafka inbound adapter, application service, outbound port, persistence/mail/Kafka adapter로 나눕니다.
+
+Platform admin 알림 운영은 `/api/admin/notifications/snapshot`, `/api/admin/notifications/events`, `/api/admin/notifications/deliveries`, `/api/admin/notifications/replay-preview`, `/api/admin/notifications/replay-confirm`을 사용합니다. Snapshot과 ledgers는 outbox/delivery 상태, relay lag, 실패 cluster, club별 health를 aggregate 중심으로 보여주며 raw email body나 원문 recipient를 노출하지 않습니다. Replay는 OWNER/OPERATOR만 사용할 수 있고 preview selection hash, actor, 10분 TTL, confirm reason을 확인한 뒤 감사 가능한 replay outbox row를 만듭니다. Preview/audit 저장소는 Flyway V35 `admin_notification_replay_previews` table입니다.
+
+Platform admin 감사 ledger는 `/api/admin/audit/events`와 `/admin/audit`에서 기존 `platform_audit_events`, `club_audit_events`, `ai_generation_audit_log`, `admin_notification_replay_previews`를 읽기 전용 cursor ledger로 통합합니다. Source별 allowlist projection만 응답하며 raw metadata JSON, provider raw error, email body, transcript, generated result JSON은 노출하지 않습니다. S8 analytics와 호환되도록 date range, club scope, source slice, action category, actor role, outcome 필터 이름을 고정합니다.
 
 ```text
 notification
@@ -135,12 +144,12 @@ notification
 
 | 영역 | 현재 패키지 | 역할 |
 | --- | --- | --- |
-| Web/scheduler/Kafka adapter | `publication.adapter.in.web`, `archive.adapter.in.web`, `feedback.adapter.in.web`, `session.adapter.in.web`, `sessionimport.adapter.in.web`, `note.adapter.in.web`, `auth.adapter.in.web`, `notification.adapter.in.web`, `notification.adapter.in.scheduler`, `notification.adapter.in.kafka`, `shared.adapter.in.web` | HTTP request validation, `CurrentMember` 주입, use case 호출, scheduler trigger, Kafka listener dispatch, response mapping; shared health endpoint |
+| Web/scheduler/Kafka adapter | `publication.adapter.in.web`, `archive.adapter.in.web`, `feedback.adapter.in.web`, `session.adapter.in.web`, `sessionimport.adapter.in.web`, `note.adapter.in.web`, `auth.adapter.in.web`, `notification.adapter.in.web`, `notification.adapter.in.scheduler`, `notification.adapter.in.kafka`, `admin.audit.adapter.in.web`, `admin.health.adapter.in.web`, `aigen.adapter.in.web`, `aigen.adapter.in.messaging`, `shared.adapter.in.web` | HTTP request validation, `CurrentMember` 주입, use case 호출, scheduler trigger, Kafka listener dispatch, response mapping; shared health endpoint |
 | Security adapter/infrastructure | `auth.adapter.in.security`, `auth.infrastructure.security` | Spring Security `Authentication` 해석, OAuth/session filter, cookie/security wiring |
-| Inbound port | `publication.application.port.in`, `archive.application.port.in`, `feedback.application.port.in`, `session.application.port.in`, `sessionimport.application.port.in`, `note.application.port.in`, `auth.application.port.in`, `notification.application.port.in`, `club.application.port.in` | controller나 scheduler가 의존하는 use case contract |
-| Application service | `publication.application.service`, `archive.application.service`, `feedback.application.service`, `session.application.service`, `sessionimport.application.service`, `note.application.service`, `auth.application`/`auth.application.service`, `notification.application.service`, `club.application.service` | command/query orchestration과 권한 확인, retryable side effect 처리 |
-| Outbound port | `publication.application.port.out`, `archive.application.port.out`, `feedback.application.port.out`, `session.application.port.out`, `sessionimport.application.port.out`, `note.application.port.out`, `auth.application.port.out`, `notification.application.port.out`, `club.application.port.out` | application service가 persistence/mail/HTTP 세부사항 없이 호출하는 contract |
-| Persistence/mail/Kafka/HTTP adapter | `publication.adapter.out.persistence`, `archive.adapter.out.persistence`, `feedback.adapter.out.persistence`, `session.adapter.out.persistence`, `sessionimport.adapter.out.persistence`, `note.adapter.out.persistence`, `auth.adapter.out.persistence`, `club.adapter.out.persistence`, `club.adapter.out.http`, `notification.adapter.out.persistence`, `notification.adapter.out.mail`, `notification.adapter.out.kafka` | JDBC query와 row mapping, domain marker HTTP check, 외부 mail delivery와 Kafka publish 세부 구현을 소유하는 outbound adapter |
+| Inbound port | `publication.application.port.in`, `archive.application.port.in`, `feedback.application.port.in`, `session.application.port.in`, `sessionimport.application.port.in`, `note.application.port.in`, `auth.application.port.in`, `notification.application.port.in`, `club.application.port.in`, `admin.audit.application.port.in`, `admin.health.application.port.in`, `aigen.application.port.in` | controller나 scheduler가 의존하는 use case contract |
+| Application service | `publication.application.service`, `archive.application.service`, `feedback.application.service`, `session.application.service`, `sessionimport.application.service`, `note.application.service`, `auth.application`/`auth.application.service`, `notification.application.service`, `club.application.service`, `admin.audit.application.service`, `admin.health.application.service`, `aigen.application.service` | command/query orchestration과 권한 확인, retryable side effect 처리 |
+| Outbound port | `publication.application.port.out`, `archive.application.port.out`, `feedback.application.port.out`, `session.application.port.out`, `sessionimport.application.port.out`, `note.application.port.out`, `auth.application.port.out`, `notification.application.port.out`, `club.application.port.out`, `admin.audit.application.port.out`, `admin.health.application.port.out`, `aigen.application.port.out` | application service가 persistence/mail/HTTP 세부사항 없이 호출하는 contract |
+| Persistence/mail/Kafka/HTTP adapter | `publication.adapter.out.persistence`, `archive.adapter.out.persistence`, `feedback.adapter.out.persistence`, `session.adapter.out.persistence`, `sessionimport.adapter.out.persistence`, `note.adapter.out.persistence`, `auth.adapter.out.persistence`, `club.adapter.out.persistence`, `club.adapter.out.http`, `notification.adapter.out.persistence`, `notification.adapter.out.mail`, `notification.adapter.out.kafka`, `admin.audit.adapter.out.persistence`, `admin.health.adapter.out`, `aigen.adapter.out.persistence`, `aigen.adapter.out.redis`, `aigen.adapter.out.messaging`, `aigen.adapter.out.llm` | JDBC query와 row mapping, domain marker HTTP check, 외부 provider/mail/Kafka publish 세부 구현을 소유하는 outbound adapter |
 | Redis adapter | `auth.adapter.out.redis`, `publication.adapter.out.redis`, `note.adapter.out.redis`, `aigen.adapter.out.redis`, `shared.adapter.out.redis` | 선택적 Redis rate limit/cache/invalidation, AI generation job handoff/cost counter 구현. application service는 Redis adapter가 아니라 port에만 의존 |
 
 전환된 controller는 legacy repository, `JdbcTemplate`, persistence adapter를 직접 주입받지 않습니다. 인증된 사용자는 controller method에서 `CurrentMember`로 받으며, resolver가 `ResolveCurrentMemberUseCase`를 통해 멤버 정보를 조회합니다.
@@ -149,7 +158,7 @@ notification
 
 Application package는 Spring Web/HTTP type, HTTP client, adapter 구현체에 의존하지 않습니다. Application service는 feature application error를 던지고, HTTP status와 response mapping은 `adapter.in.web`의 controller 또는 error handler가 맡습니다. 외부 HTTP가 필요한 기능은 application outbound port를 정의하고 `adapter.out.http` 구현으로 분리합니다.
 
-아키텍처 경계는 `ServerArchitectureBoundaryTest`에서 강제합니다 (ADR-0002). 이 테스트는 전환된 web adapter가 legacy repository, `JdbcTemplate`, outbound persistence/Redis adapter, Spring Data Redis에 직접 의존하지 않는지, `session`/`publication`/`archive`/`feedback`/`note`/`auth`/`notification`/`club` application package가 adapter, Spring JDBC, Spring DAO, Spring Data Redis, Spring Web/HTTP 세부사항에 의존하지 않는지, domain package가 web/JDBC/persistence 세부사항에 의존하지 않는지 확인합니다.
+아키텍처 경계는 `ServerArchitectureBoundaryTest`에서 강제합니다 (ADR-0002). 이 테스트는 slice registry로 `admin.audit`, `admin.health`, `aigen`을 포함한 전환 surface를 등록하고, 전환된 web adapter가 legacy repository, `JdbcTemplate`, outbound persistence/Redis adapter, Spring Data Redis에 직접 의존하지 않는지, application package가 adapter, Spring JDBC, Spring DAO, Spring Data Redis, Spring Web/HTTP 세부사항에 의존하지 않는지, `aigen.application`이 `CurrentMember` 같은 web/session carrier 대신 application-safe actor value를 사용하는지, domain package가 web/JDBC/persistence 세부사항에 의존하지 않는지 확인합니다.
 
 ## CQRS Read vs Write Package Split
 
@@ -162,14 +171,19 @@ ReadMates 서버는 도메인 패키지를 다음 두 형태로 운영합니다.
 - 트랜잭션 mutation을 수행
 
 ### Read-side (domain/ 없음)
-- `note`, `publication`, `archive`
+- `note`, `publication`, `archive`, `admin.audit`
 - `application/model/` 의 read DTO + `JdbcXxxAdapter` 직접 query
 - 도메인 엔티티 없이 query result 모델만 정의
 - `@ReadOnlyApplicationService` 마커로 식별 (`shared/architecture/`)
 
-### Mixed
-- `feedback` — 문서 업로드 mutation + 조회를 함께 보유. 향후 분리 후보지만 현재 단일 service에 응집.
+### Ops Read-side
+- `admin.health` — 운영 상태 snapshot과 deploy ledger를 provider/adapter에서 읽어 aggregate card model로 반환합니다.
+- Mutation surface가 아니며, application service는 provider 결과를 card-local failure로 격리합니다.
+
+### Mixed / Workflow-side
+- `feedback` — 문서 업로드 mutation + 조회를 함께 보유합니다.
 - `sessionimport` — 호스트 세션 편집기의 preview는 검증 전용 read path이고 commit은 공개 요약, 하이라이트, 한줄평, 피드백 문서를 같은 트랜잭션에서 교체하는 write path입니다. `domain/` 없이 application model과 write port로 응집합니다.
+- `aigen` — 외부 LLM provider, Redis job handoff, Kafka worker, commit/recovery orchestration을 포함합니다. Application layer는 provider SDK, Redis, JDBC, Kafka detail이 아니라 outbound port에 의존합니다.
 
 ### 강제 규칙
 - ArchUnit `ServerArchitectureBoundaryTest` 가 다음을 차단:
@@ -296,7 +310,7 @@ ReadMates는 클럽별로 하나의 현재 `OPEN` 세션과 여러 개의 예정
 
 범위가 있는 목록 endpoint는 cursor 기반 page object를 반환합니다. 공통 응답 필드는 `{ "items": [...], "nextCursor": string | null }`이고, 다음 page가 없으면 `nextCursor`는 `null`입니다. Endpoint에 따라 `/api/me/notifications`의 `unreadCount`처럼 목록 전체 상태를 나타내는 추가 field가 붙을 수 있습니다. Request query는 endpoint별 기본값과 최대값을 둔 `limit`, `cursor`를 사용합니다.
 
-이 contract를 따르는 목록은 archive의 `/api/archive/sessions`, `/api/archive/me/questions`, `/api/archive/me/reviews`, notes의 `/api/notes/sessions`, `/api/notes/feed`, feedback의 `/api/feedback-documents/me`, host의 `/api/host/sessions`, `/api/host/members`, `/api/host/members/viewers`, `/api/host/members/pending-approvals`, `/api/host/invitations`, notification의 `/api/me/notifications`, `/api/host/notifications/items`, `/api/host/notifications/events`, `/api/host/notifications/deliveries`, `/api/host/notifications/manual/dispatches`, `/api/host/notifications/test-mail/audit`입니다. `GET /api/host/notifications/manual/options`도 멤버 선택 목록을 같은 cursor page shape로 반환합니다. 예를 들어 `GET /api/host/members/pending-approvals?limit=2`는 pending viewer approval 목록의 첫 page를 반환하고, 다음 page는 응답의 `nextCursor`를 `cursor` query로 넘겨 요청합니다.
+이 contract를 따르는 목록은 archive의 `/api/archive/sessions`, `/api/archive/me/questions`, `/api/archive/me/reviews`, notes의 `/api/notes/sessions`, `/api/notes/feed`, feedback의 `/api/feedback-documents/me`, host의 `/api/host/sessions`, `/api/host/members`, `/api/host/members/viewers`, `/api/host/members/pending-approvals`, `/api/host/invitations`, notification의 `/api/me/notifications`, `/api/host/notifications/items`, `/api/host/notifications/events`, `/api/host/notifications/deliveries`, `/api/host/notifications/manual/dispatches`, `/api/host/notifications/test-mail/audit`, platform admin의 `/api/admin/notifications/events`, `/api/admin/notifications/deliveries`, `/api/admin/audit/events`입니다. `GET /api/host/notifications/manual/options`도 멤버 선택 목록을 같은 cursor page shape로 반환합니다. 예를 들어 `GET /api/host/members/pending-approvals?limit=2`는 pending viewer approval 목록의 첫 page를 반환하고, 다음 page는 응답의 `nextCursor`를 `cursor` query로 넘겨 요청합니다.
 
 위 scoped endpoint에는 legacy array response contract가 없습니다. 프런트엔드 loader와 route action은 `items`를 누적하고 `nextCursor`로 명시적인 더보기 control을 보여줘야 하며, 새 scoped 목록 API도 같은 공통 page field를 사용합니다.
 
@@ -437,9 +451,10 @@ ai_generation_audit_log row (PII-safe: provider/model/status/token/cost — no t
   - `aigen:cost:host:<userId>:<YYYY-MM>` (String, TTL 31d) — 호스트 월별 누적 비용 (감사 보조).
 - **Job state machine**: `PENDING -> RUNNING -> SUCCEEDED -> COMMITTING -> COMMITTED`가 정상 commit 경로입니다. `FAILED`와 `CANCELLED`는 terminal 상태입니다. Worker start/completion, regenerate, commit, cancel은 `AiGenerationJobTransitionPolicy`와 Redis Lua CAS(`transitionStatus`, `saveResultIfStatus`)로 현재 상태가 맞을 때만 진행합니다. Commit/cancel 이후에는 `:transcript`와 `:result` payload만 삭제하고 `aigen:job:<jobId>` hash는 terminal 상태 조회를 위해 TTL까지 남깁니다. Pre-terminal job에서 transcript key가 사라진 경우에는 stale job으로 보고 세 키를 모두 삭제합니다.
 - **LLM call cap**: `llmCallCount`는 full generation, provider retry, validation retry, regeneration 호출 전마다 Redis hash에서 원자 증가합니다. `readmates.aigen.job.max-llm-calls-per-job`를 넘으면 provider 호출 없이 `MAX_CALLS_EXCEEDED` typed error로 종료합니다.
-- **MySQL 테이블** (Flyway V30/V31):
+- **MySQL 테이블** (Flyway V30/V31/V34):
   - `ai_generation_audit_log` — job/session/club/host_user 인덱스 + provider/model/status/`input_tokens`/`cached_input_tokens`/`output_tokens`/`cost_estimate_usd`/`latency_ms`. **transcript 본문 컬럼 없음** (감사 invariant).
   - `ai_generation_club_defaults` — 클럽별 default provider/model. `clubs(id)` FK.
+  - `ai_generation_admin_action_audit` — platform admin AI Ops action ledger. `job_id`, `club_id`, `session_id`, `admin_user_id`, `admin_role`, action/result, 이전/다음 상태, safe error code만 저장합니다.
 - **Frontend 모듈**: `front/features/host/aigen/` — `api/` (BFF 호출 + DTO), `hooks/useAiGenerationJob.ts` (TanStack Query v5 adaptive polling), `ui/` (TranscriptUploadForm, GenerationProgressView, PreviewView + 4개 section, RegenerateModal), `storage/aigen-draft-storage.ts` (PREVIEW 수동 편집 localStorage 저장). Polling은 `COMMITTING` 동안 계속되고 `COMMITTED`/`FAILED`/`CANCELLED`에서 멈춥니다. 호스트 세션 편집기는 `세션 기록 완성` 패널에서 `AI로 생성` / `외부 JSON 가져오기` 모드로 같은 commit 경로를 분기합니다.
 - **운영 표면**: Micrometer meter는 `com.readmates.aigen.application.service.AiGenerationMetrics`의 8개 meter(`jobs`, `jobs.completed`, `latency`, `tokens`, `cost.usd`, `validation.failures`, `cap.denials`, `queue.depth`)를 노출합니다. `MetricLabel` allowlist가 `club_id`/`user_id` 같은 high-cardinality tag를 막습니다. Prometheus alert는 `ops/prometheus/alerts/aigen-rules.yml`, Grafana 대시보드는 `ops/grafana/dashboards/aigen.json`. 운영 절차와 alert response anchor는 [ai-session-generation runbook](../operations/runbooks/ai-session-generation.md).
 - **Kill switch**: `readmates.aigen.enabled=false`이면 `AiGenerationKillSwitchFilter`가 `/api/host/sessions/*/ai-generate/**`와 `/api/host/clubs/*/ai-defaults`를 503 + RFC 7807 `AI_DISABLED`로 응답합니다. Controller bean과 Kafka consumer도 `@ConditionalOnProperty`로 컨텍스트에서 빠집니다. `enabled-providers`에서 provider를 제외하면 catalog 단계에서 해당 provider 모델 전체가 사라집니다. 두 flag 모두 기본 off.

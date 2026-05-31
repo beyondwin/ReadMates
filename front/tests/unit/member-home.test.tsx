@@ -255,6 +255,52 @@ describe("MemberHome", () => {
     }
   });
 
+  it("uses role-safe reading loop copy for the desktop next action", () => {
+    const { container } = render(
+      <MemberHome
+        auth={auth}
+        current={{
+          currentSession: {
+            ...current.currentSession!,
+            myCheckin: {
+              readingProgress: 100,
+            },
+            myQuestions: [
+              {
+                priority: 1,
+                text: "첫 번째 질문입니다.",
+                draftThought: null,
+                authorName: "이멤버5",
+                authorShortName: "수",
+              },
+              {
+                priority: 2,
+                text: "두 번째 질문입니다.",
+                draftThought: null,
+                authorName: "이멤버5",
+                authorShortName: "수",
+              },
+            ],
+            myOneLineReview: {
+              text: "함께 읽은 뒤 남긴 회고입니다.",
+            },
+          },
+        }}
+        noteFeedItems={noteFeedItems}
+        upcomingSessions={[]}
+      />,
+    );
+    const desktop = getDesktopView(container);
+    const nextActionCopy = desktop.getByText("최근 보존된 기록을 이어 읽을 수 있어요.");
+    const nextActionCard = nextActionCopy.closest(".rm-home-answer-strip__item");
+
+    expect(nextActionCard).toHaveTextContent("다음 할 일");
+    expect(nextActionCard).not.toHaveTextContent("호스트가 세션 정보");
+    expect(nextActionCard).not.toHaveTextContent("공개 범위");
+    expect(nextActionCard).not.toHaveTextContent("운영 대기");
+    expect(desktop.queryByText(/admin/i)).not.toBeInTheDocument();
+  });
+
   it("renders the mobile session number before the days-until label", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 3, 30));
@@ -311,6 +357,26 @@ describe("MemberHome", () => {
     expect(mobile.queryByRole("link", { name: /질문 쓰기/ })).not.toBeInTheDocument();
   });
 
+  it("does not prompt suspended members to perform member write actions in the desktop next action", () => {
+    const suspendedAuth: AuthMeResponse = {
+      ...auth,
+      membershipStatus: "SUSPENDED",
+      approvalState: "SUSPENDED",
+    };
+
+    const { container } = render(
+      <MemberHome auth={suspendedAuth} current={current} noteFeedItems={[]} upcomingSessions={[]} />,
+    );
+    const desktop = getDesktopView(container);
+    const nextActionCopy = desktop.getByText("세션을 읽고 공동 보드를 확인할 수 있어요.");
+    const nextActionCard = nextActionCopy.closest(".rm-home-answer-strip__item");
+
+    expect(nextActionCard).toHaveTextContent("다음 할 일");
+    expect(nextActionCard).not.toHaveTextContent("RSVP를 먼저 선택해 주세요.");
+    expect(nextActionCard).not.toHaveTextContent("읽기 진행률을 남겨 주세요.");
+    expect(nextActionCard).not.toHaveTextContent("질문");
+  });
+
   it("shows the next gathering prep card", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 3, 30));
@@ -340,6 +406,9 @@ describe("MemberHome", () => {
   });
 
   it("does not require one-line review before marking home prep as ready", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 4, 19));
+
     const { container } = render(
       <MemberHome
         auth={auth}

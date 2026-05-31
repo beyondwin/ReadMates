@@ -8,13 +8,19 @@ import {
   type AdminRouteGroup,
 } from "@/features/platform-admin/model/admin-route-catalog";
 
-export function AdminLayoutNav({ role }: { role: PlatformAdminRole }) {
+export function AdminLayoutNav({
+  role,
+  ariaLabel = "플랫폼 관리 메뉴",
+}: {
+  role: PlatformAdminRole;
+  ariaLabel?: string;
+}) {
   const location = useLocation();
   const groups = useMemo(() => groupRoutes(ADMIN_ROUTES, role), [role]);
   const currentPath = location.pathname;
 
   return (
-    <nav className="admin-layout-nav" aria-label="플랫폼 관리 메뉴">
+    <nav className="admin-layout-nav" aria-label={ariaLabel}>
       {groups.map((group) => (
         <section key={group.id} className="admin-layout-nav__group">
           <header className="admin-layout-nav__group-header">{group.label}</header>

@@ -21,8 +21,6 @@ export type AdminRouteDescriptor = {
   };
 };
 
-const UMBRELLA_DOC = "/docs/superpowers/specs/2026-05-25-readmates-admin-vnext-roadmap-design.md";
-
 export const ADMIN_ROUTES: ReadonlyArray<AdminRouteDescriptor> = [
   {
     path: "today",
@@ -66,19 +64,8 @@ export const ADMIN_ROUTES: ReadonlyArray<AdminRouteDescriptor> = [
     group: "ops",
     groupLabel: "운영",
     slice: "S5",
-    status: "coming_soon",
+    status: "ready",
     requiredCapability: "view_notifications",
-    comingSoon: {
-      title: "알림/Outbox 운영",
-      summary: "relay lag, dead letter, replay, 실패 cluster, 클럽별 성공률을 한 화면에서 봅니다.",
-      bullets: [
-        "Outbox state ledger와 dead letter 목록",
-        "수동 replay (dry-run → confirm 두 단계)",
-        "발송 실패 cluster (errorCode 그룹)",
-        "호스트 manual notification audit cross-cut",
-      ],
-      docHref: `${UMBRELLA_DOC}#s5--알림outbox-운영`,
-    },
   },
   {
     path: "ai-ops",
@@ -95,19 +82,8 @@ export const ADMIN_ROUTES: ReadonlyArray<AdminRouteDescriptor> = [
     group: "review",
     groupLabel: "감사/분석",
     slice: "S7",
-    status: "coming_soon",
+    status: "ready",
     requiredCapability: "view_audit",
-    comingSoon: {
-      title: "Audit / Activity ledger",
-      summary: "platform admin · OWNER · SUPPORT · 클럽 lifecycle · role transition 액션을 시간순 통합 뷰로 봅니다.",
-      bullets: [
-        "actor / club / action / outcome 통합 ledger",
-        "club · role · actor 필터",
-        "출처 slice 표기 (S2/S3/S4/S5 어떤 작업이었는지)",
-        "마스킹 정책 일관 적용",
-      ],
-      docHref: `${UMBRELLA_DOC}#s7--audit--activity-ledger-통합`,
-    },
   },
   {
     path: "analytics",
@@ -115,19 +91,8 @@ export const ADMIN_ROUTES: ReadonlyArray<AdminRouteDescriptor> = [
     group: "review",
     groupLabel: "감사/분석",
     slice: "S8",
-    status: "coming_soon",
+    status: "ready",
     requiredCapability: "view_analytics",
-    comingSoon: {
-      title: "분석/리포팅 lite",
-      summary: "클럽별 활성 멤버, 세션 완료율, RSVP rate, AI 비용/세션, 알림 도달률 트렌드.",
-      bullets: [
-        "7/30/90일 시계열",
-        "클럽 간 비교 (cross-club benchmark)",
-        "데이터 부족 시 정직한 empty state",
-        "fixture seed로 dev 환경에서도 의미 있는 차트",
-      ],
-      docHref: `${UMBRELLA_DOC}#s8--분석리포팅-lite`,
-    },
   },
 ];
 

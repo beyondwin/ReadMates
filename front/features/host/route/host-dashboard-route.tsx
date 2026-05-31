@@ -14,6 +14,7 @@ import { ClubAiDefaultsSection } from "@/features/host/club/ui/ClubAiDefaultsSec
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
 import type { HostDashboardActions } from "@/features/host/route/host-dashboard-actions";
+import { hostClubOperationsQuery } from "@/features/host/queries/host-club-operations-queries";
 import { hostNotificationSummaryQuery } from "@/features/host/queries/host-notification-queries";
 import {
   DEFAULT_HOST_SESSION_LIST_LIMIT,
@@ -49,6 +50,7 @@ export function HostDashboardRoute({
   const dashboardQuery = useQuery(hostDashboardQuery(context));
   const sessionsQuery = useQuery(hostSessionListQuery({ limit: DEFAULT_HOST_SESSION_LIST_LIMIT }, context));
   const notificationsQuery = useQuery(hostNotificationSummaryQuery(context));
+  const clubOperationsQuery = useQuery(hostClubOperationsQuery(context));
   const visibilityMutation = useSaveHostSessionVisibilityMutation(context);
   const openMutation = useOpenHostSessionMutation(context);
 
@@ -77,6 +79,7 @@ export function HostDashboardRoute({
         data={dashboardQuery.data ?? loaderData.data}
         hostSessions={sessionsQuery.data ?? loaderData.hostSessions}
         notifications={notificationsQuery.data ?? loaderData.notifications}
+        clubOperations={clubOperationsQuery.data ?? loaderData.clubOperations}
         actions={actions}
         LinkComponent={LinkComponent}
         hostDashboardReturnTarget={hostDashboardReturnTarget}

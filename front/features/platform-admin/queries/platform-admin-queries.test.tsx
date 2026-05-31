@@ -52,6 +52,8 @@ const club: PlatformAdminClub = {
   publicVisibility: "PRIVATE",
   domainCount: 1,
   domainActionRequiredCount: 1,
+  notificationFailureCount: 0,
+  aiFailureCount: 0,
   firstHostOnboardingState: "ASSIGNED",
 };
 

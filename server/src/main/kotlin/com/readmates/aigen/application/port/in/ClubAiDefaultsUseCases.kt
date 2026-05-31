@@ -1,6 +1,6 @@
 package com.readmates.aigen.application.port.`in`
 
-import com.readmates.shared.security.CurrentMember
+import com.readmates.aigen.application.model.AiGenerationActor
 
 /**
  * Input ports for the per-club AI defaults flow (spec §7.6).
@@ -14,7 +14,7 @@ import com.readmates.shared.security.CurrentMember
 interface GetClubAiDefaultsUseCase {
     fun get(
         clubSlug: String,
-        member: CurrentMember,
+        actor: AiGenerationActor,
     ): ClubAiDefaultsView
 }
 
@@ -22,7 +22,7 @@ interface UpdateClubAiDefaultsUseCase {
     fun update(
         clubSlug: String,
         defaultModel: String,
-        member: CurrentMember,
+        actor: AiGenerationActor,
     )
 }
 

@@ -9,7 +9,7 @@ import com.readmates.sessionimport.application.port.out.SessionImportStoredFeedb
 import com.readmates.sessionimport.application.port.out.SessionImportWritePort
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.uuid
-import com.readmates.shared.security.CurrentMember
+import com.readmates.shared.security.AuthenticatedClubActor
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import java.nio.charset.StandardCharsets
@@ -21,7 +21,7 @@ class JdbcSessionImportWriteAdapter(
     private val jdbcTemplate: JdbcTemplate,
 ) : SessionImportWritePort {
     override fun loadTarget(
-        host: CurrentMember,
+        host: AuthenticatedClubActor,
         sessionId: UUID,
     ): SessionImportTarget? {
         val session =

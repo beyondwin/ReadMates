@@ -173,9 +173,10 @@ class AiGenerationMetrics(
      *
      * Calling this multiple times replaces the active supplier; the gauge itself
      * is registered exactly once with Micrometer so Prometheus retains a stable
-     * time series identity. Intended to be wired at consumer startup so the gauge
-     * reflects Kafka consumer lag. Phase 6.1 ships with a placeholder supplier
-     * returning 0 — wiring the real lag accessor is tracked separately.
+     * time series identity. `AiGenerationQueueDepthGaugeBinder` wires this to the
+     * Redis-backed active job count (`PENDING` + `RUNNING`). Kafka consumer group
+     * lag is a separate operational signal and should not be described with this
+     * metric name.
      */
     @Synchronized
     fun registerQueueDepthGauge(supplier: () -> Number) {
@@ -183,7 +184,7 @@ class AiGenerationMetrics(
         if (!queueDepthRegistered) {
             Gauge
                 .builder(NAME_QUEUE_DEPTH) { queueDepthSupplier.get().invoke().toDouble() }
-                .description("Pending AI generation jobs in the queue (consumer lag)")
+                .description("Active AI generation jobs in Redis job store")
                 .tags(aigenMeter())
                 .register(meterRegistry)
             queueDepthRegistered = true

@@ -1,12 +1,16 @@
 package com.readmates.aigen.adapter.`in`.web
 
 import com.readmates.aigen.application.model.AiOpsAdminActionResult
+import com.readmates.aigen.application.model.AiOpsCostTrend
+import com.readmates.aigen.application.model.AiOpsCostWindow
+import com.readmates.aigen.application.model.AiOpsDeltaDirection
 import com.readmates.aigen.application.model.AiOpsFailureCodeCount
 import com.readmates.aigen.application.model.AiOpsJobFilters
 import com.readmates.aigen.application.model.AiOpsJobList
 import com.readmates.aigen.application.model.AiOpsJobListItem
 import com.readmates.aigen.application.model.AiOpsProviderCost
 import com.readmates.aigen.application.model.AiOpsSummary
+import com.readmates.aigen.application.model.AiOpsTrendAvailability
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.Provider
@@ -14,6 +18,7 @@ import com.readmates.aigen.application.port.`in`.ForceCancelAiOpsJobUseCase
 import com.readmates.aigen.application.port.`in`.GetAiOpsJobUseCase
 import com.readmates.aigen.application.port.`in`.GetAiOpsSummaryUseCase
 import com.readmates.aigen.application.port.`in`.ListAiOpsJobsUseCase
+import com.readmates.aigen.application.port.`in`.RetryAiOpsJobCommitUseCase
 import com.readmates.club.domain.PlatformAdminRole
 import com.readmates.shared.security.CurrentPlatformAdmin
 import org.assertj.core.api.Assertions.assertThat
@@ -37,6 +42,7 @@ class AiGenerationOpsControllerTest {
     private val list = FakeListUseCase()
     private val get = FakeGetUseCase()
     private val cancel = FakeForceCancelUseCase()
+    private val retry = FakeRetryCommitUseCase()
     private val admin =
         CurrentPlatformAdmin(
             userId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
@@ -56,6 +62,7 @@ class AiGenerationOpsControllerTest {
                         listUseCase = list,
                         getUseCase = get,
                         forceCancelUseCase = cancel,
+                        retryCommitUseCase = retry,
                     ),
                 ).setControllerAdvice(AiGenerationErrorHandler())
                 .setCustomArgumentResolvers(StubCurrentPlatformAdminResolver(admin))
@@ -72,6 +79,16 @@ class AiGenerationOpsControllerTest {
                 failureCodes = listOf(AiOpsFailureCodeCount("PROVIDER_RATE_LIMITED", 1)),
                 providerCosts = listOf(AiOpsProviderCost(Provider.OPENAI, "gpt-model", BigDecimal("0.2000"))),
                 staleCandidateCount = 1,
+                costTrend =
+                    AiOpsCostTrend(
+                        window = AiOpsCostWindow.LAST_30D,
+                        currentCostUsd = BigDecimal.ZERO,
+                        priorCostUsd = BigDecimal.ZERO,
+                        currentJobCount = 0,
+                        priorJobCount = 0,
+                        deltaDirection = AiOpsDeltaDirection.NONE,
+                        availability = AiOpsTrendAvailability.NOT_ENOUGH_DATA,
+                    ),
             )
 
         mockMvc
@@ -83,6 +100,44 @@ class AiGenerationOpsControllerTest {
                 jsonPath("$.monthToDateCostEstimateUsd") { value("0.2000") }
                 jsonPath("$.providerCosts[0].model") { value("gpt-model") }
             }
+    }
+
+    @Test
+    fun `admin summary parses window param and serializes cost trend`() {
+        summary.result =
+            AiOpsSummary(
+                activeJobCount = 2,
+                failedLast24h = 1,
+                monthToDateCostEstimateUsd = BigDecimal("0.2000"),
+                failureCodes = emptyList(),
+                providerCosts = emptyList(),
+                staleCandidateCount = 0,
+                costTrend =
+                    AiOpsCostTrend(
+                        window = AiOpsCostWindow.LAST_7D,
+                        currentCostUsd = BigDecimal("2.0000"),
+                        priorCostUsd = BigDecimal("1.0000"),
+                        currentJobCount = 5,
+                        priorJobCount = 4,
+                        deltaDirection = AiOpsDeltaDirection.UP,
+                        availability = AiOpsTrendAvailability.AVAILABLE,
+                    ),
+            )
+
+        mockMvc
+            .get("/api/admin/ai-generation/summary?window=7d")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.costTrend.window") { value("7d") }
+                jsonPath("$.costTrend.currentCostUsd") { value("2.0000") }
+                jsonPath("$.costTrend.priorCostUsd") { value("1.0000") }
+                jsonPath("$.costTrend.currentJobCount") { value(5) }
+                jsonPath("$.costTrend.priorJobCount") { value(4) }
+                jsonPath("$.costTrend.deltaDirection") { value("UP") }
+                jsonPath("$.costTrend.availability") { value("AVAILABLE") }
+            }
+
+        assertThat(summary.lastWindow).isEqualTo(AiOpsCostWindow.LAST_7D)
     }
 
     @Test
@@ -124,6 +179,22 @@ class AiGenerationOpsControllerTest {
         assertThat(cancel.calls).containsExactly(admin to sampleJobId)
     }
 
+    @Test
+    fun `retry commit delegates to use case`() {
+        retry.result = AiOpsAdminActionResult(sampleJobId, JobStatus.COMMITTING, JobStatus.SUCCEEDED)
+
+        mockMvc
+            .post("/api/admin/ai-generation/jobs/$sampleJobId/retry-commit")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.jobId") { value(sampleJobId.toString()) }
+                jsonPath("$.previousStatus") { value("COMMITTING") }
+                jsonPath("$.nextStatus") { value("SUCCEEDED") }
+            }
+
+        assertThat(retry.calls).containsExactly(admin to sampleJobId)
+    }
+
     private companion object {
         val sampleJobId: UUID = UUID.fromString("00000000-0000-0000-0000-000000000010")
         val sampleClubId: UUID = UUID.fromString("00000000-0000-0000-0000-000000000020")
@@ -156,8 +227,15 @@ class AiGenerationOpsControllerTest {
 
 private class FakeSummaryUseCase : GetAiOpsSummaryUseCase {
     lateinit var result: AiOpsSummary
+    var lastWindow: AiOpsCostWindow? = null
 
-    override fun summary(admin: CurrentPlatformAdmin): AiOpsSummary = result
+    override fun summary(
+        admin: CurrentPlatformAdmin,
+        window: AiOpsCostWindow,
+    ): AiOpsSummary {
+        lastWindow = window
+        return result
+    }
 }
 
 private class FakeListUseCase : ListAiOpsJobsUseCase {
@@ -187,6 +265,19 @@ private class FakeForceCancelUseCase : ForceCancelAiOpsJobUseCase {
     val calls = mutableListOf<Pair<CurrentPlatformAdmin, UUID>>()
 
     override fun forceCancel(
+        admin: CurrentPlatformAdmin,
+        jobId: UUID,
+    ): AiOpsAdminActionResult {
+        calls += admin to jobId
+        return result
+    }
+}
+
+private class FakeRetryCommitUseCase : RetryAiOpsJobCommitUseCase {
+    lateinit var result: AiOpsAdminActionResult
+    val calls = mutableListOf<Pair<CurrentPlatformAdmin, UUID>>()
+
+    override fun retryCommit(
         admin: CurrentPlatformAdmin,
         jobId: UUID,
     ): AiOpsAdminActionResult {

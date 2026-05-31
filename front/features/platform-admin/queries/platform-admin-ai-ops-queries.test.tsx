@@ -11,18 +11,21 @@ vi.mock("@/features/platform-admin/api/platform-admin-api", () => ({
   fetchPlatformAdminAiOpsJobs: vi.fn(),
   fetchPlatformAdminAiOpsSummary: vi.fn(),
   forceCancelPlatformAdminAiJob: vi.fn(),
+  retryCommitPlatformAdminAiJob: vi.fn(),
 }));
 
 import {
   fetchPlatformAdminAiOpsJobs,
   fetchPlatformAdminAiOpsSummary,
   forceCancelPlatformAdminAiJob,
+  retryCommitPlatformAdminAiJob,
 } from "@/features/platform-admin/api/platform-admin-api";
 import {
   platformAdminAiOpsJobsQuery,
   platformAdminAiOpsKeys,
   platformAdminAiOpsSummaryQuery,
   useForceCancelPlatformAdminAiJobMutation,
+  useRetryCommitPlatformAdminAiJobMutation,
 } from "./platform-admin-ai-ops-queries";
 
 const summary: PlatformAdminAiOpsSummaryResponse = {
@@ -32,6 +35,15 @@ const summary: PlatformAdminAiOpsSummaryResponse = {
   failureCodes: [{ code: "PROVIDER_RATE_LIMITED", count: 2 }],
   providerCosts: [{ provider: "OPENAI", model: "gpt-model", costEstimateUsd: "0.2500" }],
   staleCandidateCount: 1,
+  costTrend: {
+    window: "30d",
+    currentCostUsd: "0.0000",
+    priorCostUsd: "0.0000",
+    currentJobCount: 0,
+    priorJobCount: 0,
+    deltaDirection: "NONE",
+    availability: "NOT_ENOUGH_DATA",
+  },
 };
 
 const jobs: PlatformAdminAiOpsJobListResponse = {
@@ -63,11 +75,18 @@ beforeEach(() => {
   vi.mocked(fetchPlatformAdminAiOpsSummary).mockReset();
   vi.mocked(fetchPlatformAdminAiOpsJobs).mockReset();
   vi.mocked(forceCancelPlatformAdminAiJob).mockReset();
+  vi.mocked(retryCommitPlatformAdminAiJob).mockReset();
 });
 
 describe("platform admin AI Ops query keys", () => {
   it("normalizes filters into stable query keys", () => {
-    expect(platformAdminAiOpsKeys.summary()).toEqual(["platform-admin", "ai-ops", "summary"]);
+    expect(platformAdminAiOpsKeys.summary()).toEqual(["platform-admin", "ai-ops", "summary", null]);
+    expect(platformAdminAiOpsKeys.summary("7d")).toEqual([
+      "platform-admin",
+      "ai-ops",
+      "summary",
+      "7d",
+    ]);
     expect(platformAdminAiOpsKeys.jobs({ status: "RUNNING" })).toEqual([
       "platform-admin",
       "ai-ops",
@@ -110,7 +129,24 @@ describe("platform admin AI Ops mutation cache behavior", () => {
     });
 
     expect(forceCancelPlatformAdminAiJob).toHaveBeenCalledWith("job-1");
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: platformAdminAiOpsKeys.summary() });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: platformAdminAiOpsKeys.all });
+  });
+
+  it("invalidates summary and ledger queries after retry commit", async () => {
+    vi.mocked(retryCommitPlatformAdminAiJob).mockResolvedValue({
+      jobId: "job-1",
+      previousStatus: "COMMITTING",
+      nextStatus: "SUCCEEDED",
+    });
+    const { client, Wrapper } = createWrapper();
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    const { result } = renderHook(() => useRetryCommitPlatformAdminAiJobMutation(), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync("job-1");
+    });
+
+    expect(retryCommitPlatformAdminAiJob).toHaveBeenCalledWith("job-1");
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: platformAdminAiOpsKeys.all });
   });
 });
