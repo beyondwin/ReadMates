@@ -2,7 +2,10 @@ import type { KeyboardEvent, ReactNode } from "react";
 import { Icon } from "@/features/current-session/ui/current-session-primitives";
 import type { QuestionInput } from "@/features/current-session/ui/current-session-question-editor";
 import type { CurrentSession, RsvpUpdateStatus, SaveState } from "@/features/current-session/ui/current-session-types";
-import type { getCurrentSessionMemberNotice } from "@/features/current-session/model/current-session-view-model";
+import type {
+  CurrentSessionReadingLoopSummary,
+  getCurrentSessionMemberNotice,
+} from "@/features/current-session/model/current-session-view-model";
 import { safeExternalHttpsUrl } from "@/shared/security/safe-external-url";
 import { BookCover } from "@/shared/ui/book-cover";
 import { formatDateLabel } from "@/shared/ui/readmates-display";
@@ -108,6 +111,7 @@ export function MobileCurrentSessionBoard({
   isViewer,
   memberNotice,
   canWrite,
+  readingLoopSummary,
 }: {
   session: CurrentSession;
   rsvp: CurrentSession["myRsvpStatus"];
@@ -135,6 +139,7 @@ export function MobileCurrentSessionBoard({
   isViewer: boolean;
   memberNotice: ReturnType<typeof getCurrentSessionMemberNotice>;
   canWrite: boolean;
+  readingLoopSummary: CurrentSessionReadingLoopSummary;
 }) {
   const tabs: Array<{ key: MobileSessionTab; label: string }> = [
     { key: "prep", label: "내 준비" },
@@ -173,6 +178,15 @@ export function MobileCurrentSessionBoard({
             ) : null}
           </a>
         ) : null}
+      </section>
+
+      <section className="m-sec" role="status">
+        <div className="m-card-quiet">
+          <div className="eyebrow">{readingLoopSummary.label}</div>
+          <p className="small" style={{ color: "var(--text-2)", margin: "6px 0 0" }}>
+            {readingLoopSummary.body}
+          </p>
+        </div>
       </section>
 
       <div className="rm-current-session-mobile__seg-wrap">
