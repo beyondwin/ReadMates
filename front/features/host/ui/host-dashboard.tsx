@@ -8,6 +8,8 @@ import type {
   SessionRecordVisibility,
 } from "@/features/host/model/host-view-types";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import type { HostClubOperationsSnapshot } from "@/shared/model/club-operations";
+import { HostClubOperationsCard } from "@/features/host/ui/host-club-operations-card";
 import {
   getHostDashboardChecklist,
   getHostDashboardNextOperationAction,
@@ -94,6 +96,7 @@ export default function HostDashboard({
   data,
   hostSessions,
   notifications = EMPTY_NOTIFICATION_SUMMARY,
+  clubOperations = null,
   actions,
   LinkComponent = DefaultLinkComponent,
   hostDashboardReturnTarget = defaultHostDashboardReturnTarget,
@@ -104,6 +107,7 @@ export default function HostDashboard({
   data: HostDashboardResponse;
   hostSessions: HostSessionListPage;
   notifications?: HostNotificationSummary;
+  clubOperations?: HostClubOperationsSnapshot | null;
   actions: HostDashboardActions;
   LinkComponent?: HostDashboardLinkComponent;
   hostDashboardReturnTarget?: ReadmatesReturnTarget;
@@ -513,6 +517,7 @@ export default function HostDashboard({
                 </section>
 
                 <PublicationFeedbackSection data={data} />
+                {clubOperations ? <HostClubOperationsCard snapshot={clubOperations} /> : null}
                 <HostNotificationLedger notifications={notifications} LinkComponent={LinkComponent} />
                 <InvitePipelineSection LinkComponent={LinkComponent} />
 
