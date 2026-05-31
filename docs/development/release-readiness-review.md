@@ -45,6 +45,14 @@ The v1.11.0 production OAuth and backup timer items are closed by 2026-05-31 ope
 - Closure evidence: `v1.12.1` `Deploy Server Image` passed image scan and release-tag promotion, `Deploy Front` passed, `READMATES_SERVER_IMAGE` repo variable was updated to the `v1.12.1` GHCR image, OCI compose was promoted to that image, the API container reported healthy, and post-deploy BFF/OAuth smoke passed.
 - Residual risk: no `v1.12.1` server-image scan, GHCR promotion, OCI compose promotion, or sanitized post-deploy smoke residual remains open. The branch-protection follow-up from `v1.12.0` remains a repository policy improvement before the next DB/API release.
 
+## 2026-05-31 solo-admin branch protection policy note
+
+- Scope reviewed: branch protection/code-owner operating policy for the current solo-admin repository.
+- Policy decision: keep required `Frontend` and `Backend` status checks; remove impossible required PR/code-owner self-review until a real non-author reviewer or team exists.
+- Executed: `gh api .../branches/main/protection` before and after the change, and `gh api -X DELETE .../protection/required_pull_request_reviews`.
+- Closure evidence: branch protection still requires strict `Frontend` and `Backend` checks, force pushes and branch deletion remain disabled, and `required_pull_request_reviews` is absent.
+- Residual risk: no impossible self-review blocker remains for solo-admin DB/API release PRs. High-control surfaces still require explicit release-readiness evidence and external review when a real reviewer is available.
+
 ## 2026-05-31 Ops Insight & Release Trust verification note
 
 - Scope reviewed: `origin/main..HEAD` (broad because local `main` is ahead of `origin/main` in this workspace).
