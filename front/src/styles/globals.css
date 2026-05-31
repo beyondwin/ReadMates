@@ -3231,6 +3231,21 @@
   color: var(--muted);
 }
 
+.admin-analytics__kpi-action {
+  align-self: flex-start;
+  color: #4f3f2b;
+  font-size: 0.84rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.admin-analytics__kpi-action:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid #6f5b3e;
+  outline-offset: 3px;
+}
+
 .admin-analytics__trend {
   display: grid;
   gap: 12px;

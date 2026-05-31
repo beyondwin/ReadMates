@@ -48,6 +48,9 @@ describe("AdminAnalyticsOverviewView", () => {
     expect(screen.getByRole("table", { name: "KPI 추세" })).toBeInTheDocument();
     expect(screen.getByText("2026-05-01")).toBeInTheDocument();
     expect(screen.getByText("75%")).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "클럽 운영 보기" }).at(0)).toHaveAttribute("href", "/admin/clubs");
+    expect(screen.getByRole("link", { name: "AI Ops 보기" })).toHaveAttribute("href", "/admin/ai-ops");
+    expect(screen.getByRole("link", { name: "알림 운영 보기" })).toHaveAttribute("href", "/admin/notifications");
     const exportLink = screen.getByRole("link", { name: "CSV 내려받기" });
     expect(exportLink).toHaveAttribute("download", "readmates-admin-analytics-30d-2026-05-30.csv");
     expect(exportLink.getAttribute("href")).toContain("data:text/csv");

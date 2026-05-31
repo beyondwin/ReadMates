@@ -1,4 +1,5 @@
 import {
+  analyticsActionForKpi,
   analyticsCsvFilename,
   analyticsCsvHref,
   deltaLabel,
@@ -77,12 +78,16 @@ export function AdminAnalyticsOverviewView({
 }
 
 function AdminAnalyticsKpiTile({ card }: { card: AdminAnalyticsKpiCard }) {
-  const unavailable = card.availability === "NOT_ENOUGH_DATA";
+  const unavailable = card.availability !== "AVAILABLE";
+  const action = analyticsActionForKpi(card.key);
   return (
     <li className={`admin-analytics__kpi${unavailable ? " admin-analytics__kpi--empty" : ""}`}>
       <span className="admin-analytics__kpi-label">{labelKpi(card.key)}</span>
       <span className="admin-analytics__kpi-value">{formatKpiValue(card)}</span>
       <span className="admin-analytics__kpi-delta">{deltaLabel(card)}</span>
+      <a className="admin-analytics__kpi-action" href={action.href}>
+        {action.label}
+      </a>
     </li>
   );
 }

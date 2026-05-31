@@ -110,6 +110,9 @@ test("owner reviews admin analytics overview and switches window", async ({ page
     "download",
     /readmates-admin-analytics-30d-2026-05-30\.csv/,
   );
+  await expect(page.getByRole("link", { name: "알림 운영 보기" })).toHaveAttribute("href", "/admin/notifications");
+  await expect(page.getByRole("link", { name: "AI Ops 보기" })).toHaveAttribute("href", "/admin/ai-ops");
+  await expect(page.getByRole("link", { name: "클럽 운영 보기" }).first()).toHaveAttribute("href", "/admin/clubs");
 
   await page.getByRole("button", { name: "최근 7일" }).click();
 

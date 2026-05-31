@@ -91,6 +91,23 @@ export function labelWindow(window: AnalyticsWindow): string {
   return WINDOW_LABELS[window];
 }
 
+export type AnalyticsKpiAction = {
+  label: string;
+  href: string;
+};
+
+const KPI_ACTIONS: Record<KpiKey, AnalyticsKpiAction> = {
+  ACTIVE_MEMBERS: { label: "클럽 운영 보기", href: "/admin/clubs" },
+  SESSION_COMPLETION: { label: "클럽 운영 보기", href: "/admin/clubs" },
+  RSVP_RATE: { label: "클럽 운영 보기", href: "/admin/clubs" },
+  AI_COST_PER_SESSION: { label: "AI Ops 보기", href: "/admin/ai-ops" },
+  NOTIFICATION_DELIVERY: { label: "알림 운영 보기", href: "/admin/notifications" },
+};
+
+export function analyticsActionForKpi(key: KpiKey): AnalyticsKpiAction {
+  return KPI_ACTIONS[key];
+}
+
 export function formatAvailabilityLabel(availability: Availability): string {
   switch (availability) {
     case "AVAILABLE":

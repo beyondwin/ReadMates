@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   analyticsCsvFilename,
+  analyticsActionForKpi,
   analyticsSearchFromWindow,
   analyticsWindowFromSearchParams,
   buildAnalyticsCsv,
@@ -50,6 +51,21 @@ describe("platform-admin-analytics-model", () => {
 
   it("labels each KPI in Korean", () => {
     expect(labelKpi("NOTIFICATION_DELIVERY")).toBe("알림 도달률");
+  });
+
+  it("maps KPI cards to operator drilldown routes", () => {
+    expect(analyticsActionForKpi("NOTIFICATION_DELIVERY")).toEqual({
+      label: "알림 운영 보기",
+      href: "/admin/notifications",
+    });
+    expect(analyticsActionForKpi("AI_COST_PER_SESSION")).toEqual({
+      label: "AI Ops 보기",
+      href: "/admin/ai-ops",
+    });
+    expect(analyticsActionForKpi("SESSION_COMPLETION")).toEqual({
+      label: "클럽 운영 보기",
+      href: "/admin/clubs",
+    });
   });
 
   it("formats trend point values and keeps unavailable buckets honest", () => {
