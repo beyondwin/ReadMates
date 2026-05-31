@@ -42,6 +42,21 @@ Host operating action
 
 The loop is private by permission. Public docs describe it through sanitized tests and source references rather than opening member or host routes to guests.
 
+## Analytics Confidence Evidence
+
+Admin analytics should prove both operator value and release confidence:
+
+```text
+Aggregate-only analytics contract
+  -> honest availability state
+  -> operator drilldown route
+  -> query budget guard
+  -> visual evidence artifact
+  -> public release safety scan when docs or public surfaces change
+```
+
+Analytics evidence must stay aggregate-only. It should not include real member data, private domains, raw provider errors, transcripts, generated session bodies, or deployment identifiers.
+
 ## Operating Principle
 
 Passing tests is evidence, not proof that release risk is closed. Release readiness review also checks changelog coverage, operator-facing behavior changes, CI/deploy script risks, security-code hygiene, architecture-test baselines, and public-release safety.

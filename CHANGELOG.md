@@ -9,6 +9,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 ### Highlights
 
 - **release policy:** solo-admin 운영 현실에 맞춰 `main` branch protection에서 불가능한 PR/code-owner self-review 요구를 제거하고, 필수 `Frontend`/`Backend` status check와 DB/API release-readiness evidence path는 유지하도록 문서와 CODEOWNERS 의미를 정렬했습니다.
+- **platform-admin analytics confidence:** `/admin/analytics`를 운영 판단 표면으로 심화하고, 데이터 부족과 측정 불가 상태를 구분하며, KPI별 운영 route drilldown, analytics query-budget guard, public-safe desktop/mobile visual evidence, showcase/release-readiness 문서 연결을 추가했습니다.
 
 ## v1.12.1 - 2026-05-31
 
