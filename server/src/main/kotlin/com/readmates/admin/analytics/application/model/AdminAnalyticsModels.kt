@@ -1,6 +1,7 @@
 package com.readmates.admin.analytics.application.model
 
 import java.math.BigDecimal
+import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -43,6 +44,7 @@ data class AdminAnalyticsRawAggregates(
     val notifTerminalPrior: Int,
     val notifSentPrior: Int,
     val benchmark: List<AdminAnalyticsBenchmarkRaw>,
+    val series: List<AdminAnalyticsSeriesRawPoint> = emptyList(),
 )
 
 data class AdminAnalyticsBenchmarkRaw(
@@ -59,12 +61,25 @@ data class AdminAnalyticsBenchmarkRaw(
     val notifSent: Int,
 )
 
+data class AdminAnalyticsSeriesRawPoint(
+    val bucketStart: LocalDate,
+    val sessions: Int,
+    val completedSessions: Int,
+    val participants: Int,
+    val goingMaybe: Int,
+    val activeMembers: Int,
+    val aiCost: BigDecimal,
+    val notifTerminal: Int,
+    val notifSent: Int,
+)
+
 data class AdminAnalyticsOverview(
     val schema: String = "admin.analytics_overview.v1",
     val generatedAt: OffsetDateTime,
     val window: AnalyticsWindow,
     val kpis: List<AdminAnalyticsKpiCard>,
     val clubBenchmark: AdminAnalyticsBenchmark,
+    val series: List<AdminAnalyticsKpiSeries> = emptyList(),
 )
 
 data class AdminAnalyticsKpiCard(
@@ -74,6 +89,18 @@ data class AdminAnalyticsKpiCard(
     val current: Double?,
     val prior: Double?,
     val deltaDirection: DeltaDirection,
+)
+
+data class AdminAnalyticsKpiSeries(
+    val key: KpiKey,
+    val unit: KpiUnit,
+    val points: List<AdminAnalyticsKpiSeriesPoint>,
+)
+
+data class AdminAnalyticsKpiSeriesPoint(
+    val bucketStart: LocalDate,
+    val availability: Availability,
+    val value: Double?,
 )
 
 data class AdminAnalyticsBenchmark(

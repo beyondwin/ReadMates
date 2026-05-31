@@ -4,8 +4,11 @@ import com.readmates.admin.analytics.application.model.AdminAnalyticsBenchmark
 import com.readmates.admin.analytics.application.model.AdminAnalyticsBenchmarkRaw
 import com.readmates.admin.analytics.application.model.AdminAnalyticsBenchmarkRow
 import com.readmates.admin.analytics.application.model.AdminAnalyticsKpiCard
+import com.readmates.admin.analytics.application.model.AdminAnalyticsKpiSeries
+import com.readmates.admin.analytics.application.model.AdminAnalyticsKpiSeriesPoint
 import com.readmates.admin.analytics.application.model.AdminAnalyticsOverview
 import com.readmates.admin.analytics.application.model.AdminAnalyticsRawAggregates
+import com.readmates.admin.analytics.application.model.AdminAnalyticsSeriesRawPoint
 import com.readmates.admin.analytics.application.model.AnalyticsWindow
 import com.readmates.admin.analytics.application.model.Availability
 import com.readmates.admin.analytics.application.model.DeltaDirection
@@ -35,6 +38,7 @@ class AdminAnalyticsService(
             window = window,
             kpis = kpis(raw),
             clubBenchmark = benchmark(raw),
+            series = series(raw.series),
         )
     }
 
@@ -97,6 +101,69 @@ class AdminAnalyticsService(
             rsvpRate = ratePercent(r.goingMaybe, r.participants),
             aiCostUsd = r.aiCost.setScale(COST_SCALE, RoundingMode.HALF_UP).toPlainString(),
             notificationDeliveryRate = ratePercent(r.notifSent, r.notifTerminal),
+        )
+
+    private fun series(points: List<AdminAnalyticsSeriesRawPoint>): List<AdminAnalyticsKpiSeries> =
+        listOf(
+            AdminAnalyticsKpiSeries(
+                key = KpiKey.ACTIVE_MEMBERS,
+                unit = KpiUnit.COUNT,
+                points = points.map { point ->
+                    AdminAnalyticsKpiSeriesPoint(
+                        bucketStart = point.bucketStart,
+                        availability = availability(point.sessions > 0),
+                        value = if (point.sessions > 0) point.activeMembers.toDouble() else null,
+                    )
+                },
+            ),
+            AdminAnalyticsKpiSeries(
+                key = KpiKey.SESSION_COMPLETION,
+                unit = KpiUnit.PERCENT,
+                points = points.map { point ->
+                    val value = ratePercent(point.completedSessions, point.sessions)
+                    AdminAnalyticsKpiSeriesPoint(
+                        bucketStart = point.bucketStart,
+                        availability = availability(value != null),
+                        value = value,
+                    )
+                },
+            ),
+            AdminAnalyticsKpiSeries(
+                key = KpiKey.RSVP_RATE,
+                unit = KpiUnit.PERCENT,
+                points = points.map { point ->
+                    val value = ratePercent(point.goingMaybe, point.participants)
+                    AdminAnalyticsKpiSeriesPoint(
+                        bucketStart = point.bucketStart,
+                        availability = availability(value != null),
+                        value = value,
+                    )
+                },
+            ),
+            AdminAnalyticsKpiSeries(
+                key = KpiKey.AI_COST_PER_SESSION,
+                unit = KpiUnit.USD,
+                points = points.map { point ->
+                    val value = perSession(point.aiCost, point.sessions)
+                    AdminAnalyticsKpiSeriesPoint(
+                        bucketStart = point.bucketStart,
+                        availability = availability(value != null),
+                        value = value,
+                    )
+                },
+            ),
+            AdminAnalyticsKpiSeries(
+                key = KpiKey.NOTIFICATION_DELIVERY,
+                unit = KpiUnit.PERCENT,
+                points = points.map { point ->
+                    val value = ratePercent(point.notifSent, point.notifTerminal)
+                    AdminAnalyticsKpiSeriesPoint(
+                        bucketStart = point.bucketStart,
+                        availability = availability(value != null),
+                        value = value,
+                    )
+                },
+            ),
         )
 
     private fun availability(hasData: Boolean): Availability =
