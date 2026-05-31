@@ -123,3 +123,29 @@ test("owner reviews admin analytics overview and switches window", async ({ page
   await expect(page.getByText("member1@example.com")).toHaveCount(0);
   await expect(page.getByText("{\"")).toHaveCount(0);
 });
+
+test("owner captures public-safe analytics visual evidence on desktop and mobile", async ({ page }, testInfo) => {
+  await routePlatformAdminShell(page, "OWNER");
+  await routeAnalytics(page);
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/admin/analytics");
+  await expect(page.getByRole("heading", { name: "분석" })).toBeVisible();
+  await expect(page.getByRole("table", { name: "KPI 추세" })).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("admin-analytics-desktop.png"),
+    fullPage: true,
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/admin/analytics");
+  await expect(page.getByRole("heading", { name: "분석" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "CSV 내려받기" })).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("admin-analytics-mobile.png"),
+    fullPage: true,
+  });
+
+  await expect(page.getByText("member1@example.com")).toHaveCount(0);
+  await expect(page.getByText("private.example.com")).toHaveCount(0);
+});
