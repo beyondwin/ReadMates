@@ -423,6 +423,7 @@ describe("HostDashboard", () => {
       data: dashboard,
       hostSessions: { items: [], nextCursor: null },
       notifications: notificationSummary,
+      clubOperations: null,
     });
 
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/auth/me", expect.objectContaining({ cache: "no-store" }));
@@ -465,7 +466,7 @@ describe("HostDashboard", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(hostDashboardLoaderForTest({ params: {}, request: new Request("https://readmates.test/app/host") } as LoaderFunctionArgs))
-      .resolves.toEqual({ current, data: dashboard, hostSessions: { items: [], nextCursor: null }, notifications: notificationSummary });
+      .resolves.toEqual({ current, data: dashboard, hostSessions: { items: [], nextCursor: null }, notifications: notificationSummary, clubOperations: null });
 
     expect(fetchMock.mock.calls.map(([url]) => String(url)).every((url) => !url.includes("clubSlug="))).toBe(true);
   });
@@ -508,6 +509,7 @@ describe("HostDashboard", () => {
       data: dashboard,
       hostSessions: { items: [], nextCursor: "cursor-1" },
       notifications: notificationSummary,
+      clubOperations: null,
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -649,6 +651,7 @@ describe("HostDashboard", () => {
       data: dashboard,
       hostSessions: { items: [], nextCursor: null },
       notifications: emptyNotificationSummary,
+      clubOperations: null,
     });
   });
 
