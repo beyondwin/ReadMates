@@ -14,7 +14,7 @@ ReadMates는 여러 정기 독서모임의 세션 준비, 참여 관리, 기록 
 
 처음 보는 리뷰어라면 아래 순서가 가장 빠릅니다.
 
-1. **제품 표면 확인** — 게스트로 공개 클럽 소개, 공개 기록, 공개 세션 상세를 확인합니다. 시작점은 [Guest-mode walkthrough](docs/showcase/guest-mode-walkthrough.md)입니다.
+1. **제품 표면 확인** — 게스트로 공개 클럽 소개, 공개 기록, 공개 세션 상세를 확인합니다. 멤버/호스트 reading loop는 권한상 비공개이므로 [Guest-mode walkthrough](docs/showcase/guest-mode-walkthrough.md)에서 public surface와 private workflow evidence를 함께 확인합니다.
 2. **아키텍처 판단** — Cloudflare Pages Functions BFF, Spring API, MySQL/Flyway, Redis/Kafka, AI generation, release safety가 어떻게 연결되는지 [Architecture evidence](docs/showcase/architecture-evidence.md)에서 봅니다.
 3. **유지보수 품질 확인** — frontend boundary, server ArchUnit, query budget, public release scan 같은 검증은 [Engineering confidence](docs/showcase/engineering-confidence.md)에 정리합니다.
 4. **운영 증거 확인** — release readiness, deploy runbook, post-deploy watch, postmortem 흐름은 [Operational proof](docs/showcase/operational-proof.md)에서 봅니다.

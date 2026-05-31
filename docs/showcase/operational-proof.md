@@ -27,6 +27,21 @@ Change
 | Post-deploy watch | `docs/operations/runbooks/post-deploy-watch.md` |
 | Incident learning | `docs/operations/postmortems/README.md` |
 
+## Product Loop Evidence
+
+Host/member reading-loop changes should close both product and evidence work:
+
+```text
+Host operating action
+  -> role-safe reading-loop state
+  -> member reading action
+  -> focused unit/route/E2E checks
+  -> showcase and changelog update
+  -> public release candidate scan when public-facing docs change
+```
+
+The loop is private by permission. Public docs describe it through sanitized tests and source references rather than opening member or host routes to guests.
+
 ## Operating Principle
 
 Passing tests is evidence, not proof that release risk is closed. Release readiness review also checks changelog coverage, operator-facing behavior changes, CI/deploy script risks, security-code hygiene, architecture-test baselines, and public-release safety.

@@ -17,6 +17,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - `/admin/clubs`: triage now counts each club's recent (7-day) notification-delivery and AI-generation failures, ranks any club with a failure as 긴급, and shows `알림 실패 N건` / `AI 실패 N건` as the leading reasons so operators see member-impacting failures first.
 - `/admin/clubs/:clubId`: 운영 스냅샷에 최근 7일 알림/AI 실패 추이(지난 7일 대비 델타)와 readiness 차단 신호별 next-action 링크를 추가하고, 플랫폼 운영/호스트 운영 섹션을 구분했습니다.
 - **Admin vNext S8 분석/리포팅 lite**: `/admin/analytics`를 마지막 COMING-SOON 라우트에서 READY로 전환했습니다. 7/30/90일 윈도우 선택(URL state)으로 활성 멤버·세션 완료율·RSVP 응답률·AI 비용/세션·알림 도달률을 현재-대비-직전 윈도우 델타로 보여주고, 클럽 간 비교(cross-club benchmark)를 제공합니다. 분모가 0인 지표는 차트를 지어내지 않고 "데이터 부족" empty state로 정직하게 표기합니다. 새 read-only 서버 슬라이스 `admin.analytics`(controller → service → JDBC adapter)가 클럽 전반의 원시 카운트를 집계하고, 비율·델타·가용성 파생은 순수 application service에서 단위 테스트로 검증합니다.
+- **member/host reading loop:** host dashboard의 다음 운영 행동과 member home/current-session의 다음 읽기 행동을 role-safe reading-loop 상태로 정렬했습니다. 공유 모델은 admin-only 신호를 노출하지 않고, showcase 문서는 private workflow를 guest에게 열지 않은 채 sanitized 테스트와 문서 evidence로 설명합니다.
 
 ### Engineering
 
