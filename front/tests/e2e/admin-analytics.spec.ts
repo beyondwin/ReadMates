@@ -56,8 +56,31 @@ function overview(windowValue: "7d" | "30d" | "90d") {
       { key: "AI_COST_PER_SESSION", unit: "USD", availability: "AVAILABLE", current: 1.5, prior: 1.2, deltaDirection: "UP" },
       { key: "NOTIFICATION_DELIVERY", unit: "PERCENT", availability: "AVAILABLE", current: 95, prior: 95, deltaDirection: "FLAT" },
     ],
-    clubBenchmark: { availability: "NOT_ENOUGH_DATA", rows: [] },
-    series: [],
+    clubBenchmark: {
+      availability: "AVAILABLE",
+      rows: [
+        {
+          clubId: "club-1",
+          slug: "fiction",
+          name: "Fiction Club",
+          activeMembers: 8,
+          sessionCompletionRate: 75,
+          rsvpRate: 90,
+          aiCostUsd: "1.0000",
+          notificationDeliveryRate: 95,
+        },
+      ],
+    },
+    series: [
+      {
+        key: "SESSION_COMPLETION",
+        unit: "PERCENT",
+        points: [
+          { bucketStart: "2026-05-01", availability: "AVAILABLE", value: windowValue === "7d" ? 65 : 75 },
+          { bucketStart: "2026-05-08", availability: "NOT_ENOUGH_DATA", value: null },
+        ],
+      },
+    ],
   };
 }
 
@@ -77,12 +100,22 @@ test("owner reviews admin analytics overview and switches window", async ({ page
 
   await expect(page.getByRole("heading", { name: "분석" })).toBeVisible();
   await expect(page.getByText("80%")).toBeVisible();
-  await expect(page.getByText("클럽 비교에 충분한 데이터가 없습니다.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "KPI 추세" })).toBeVisible();
+  const trendTable = page.getByRole("table", { name: "KPI 추세" });
+  await expect(trendTable).toBeVisible();
+  await expect(trendTable.getByText("2026-05-01")).toBeVisible();
+  await expect(trendTable.getByText("75%")).toBeVisible();
+  await expect(page.getByText("Fiction Club")).toBeVisible();
+  await expect(page.getByRole("link", { name: "CSV 내려받기" })).toHaveAttribute(
+    "download",
+    /readmates-admin-analytics-30d-2026-05-30\.csv/,
+  );
 
   await page.getByRole("button", { name: "최근 7일" }).click();
 
   await expect(page).toHaveURL(/window=7d/);
   await expect(page.getByText("70%")).toBeVisible();
+  await expect(trendTable.getByText("65%")).toBeVisible();
 
   await expect(page.getByText("member1@example.com")).toHaveCount(0);
   await expect(page.getByText("{\"")).toHaveCount(0);
