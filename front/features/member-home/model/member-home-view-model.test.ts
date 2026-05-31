@@ -67,7 +67,14 @@ const noteFeedItems: MemberHomeNoteFeedItemView[] = [
 
 describe("member-home view model", () => {
   it("uses the shared reading loop to guide prepared members toward archive and notes", () => {
-    expect(getMemberHomeNextReadingAction(session, false, noteFeedItems)).toMatchObject({
+    expect(
+      getMemberHomeNextReadingAction({
+        session,
+        isViewer: false,
+        canWrite: true,
+        noteFeedItems,
+      }),
+    ).toMatchObject({
       state: "ARCHIVE_AVAILABLE",
       label: "아카이브 연결",
       message: "최근 보존된 기록을 이어 읽을 수 있어요.",
@@ -78,18 +85,18 @@ describe("member-home view model", () => {
 
   it("prioritizes member prep actions before ready states", () => {
     expect(
-      getMemberHomeNextReadingAction(
-        {
+      getMemberHomeNextReadingAction({
+        session: {
           ...session,
           myRsvpStatus: "NO_RESPONSE",
           myCheckin: null,
           myQuestions: [],
           myOneLineReview: null,
         },
-        false,
-        [],
-        new Date(2026, 4, 19),
-      ),
+        isViewer: false,
+        canWrite: true,
+        today: new Date(2026, 4, 19),
+      }),
     ).toMatchObject({
       state: "MEMBER_PREP_REQUIRED",
       label: "멤버 준비 필요",
@@ -99,34 +106,34 @@ describe("member-home view model", () => {
     });
 
     expect(
-      getMemberHomeNextReadingAction(
-        {
+      getMemberHomeNextReadingAction({
+        session: {
           ...session,
           myCheckin: null,
           myOneLineReview: null,
         },
-        false,
-        [],
-        new Date(2026, 4, 19),
-      ).message,
+        isViewer: false,
+        canWrite: true,
+        today: new Date(2026, 4, 19),
+      }).message,
     ).toBe("읽기 진행률을 남겨 주세요.");
 
     expect(
-      getMemberHomeNextReadingAction(
-        {
+      getMemberHomeNextReadingAction({
+        session: {
           ...session,
           myQuestions: [],
           myOneLineReview: null,
         },
-        false,
-        [],
-        new Date(2026, 4, 19),
-      ).message,
+        isViewer: false,
+        canWrite: true,
+        today: new Date(2026, 4, 19),
+      }).message,
     ).toBe("질문 2개를 더 준비해 주세요.");
   });
 
   it("keeps no-session and viewer states read-safe", () => {
-    expect(getMemberHomeNextReadingAction(null, false, [])).toEqual({
+    expect(getMemberHomeNextReadingAction({ session: null, isViewer: false, canWrite: true })).toEqual({
       state: "NO_SESSION",
       label: "세션 대기",
       message: "호스트가 세션을 열면 준비를 시작합니다.",
@@ -134,7 +141,28 @@ describe("member-home view model", () => {
       ctaLabel: null,
     });
 
-    expect(getMemberHomeNextReadingAction(session, true, [])).toMatchObject({
+    expect(getMemberHomeNextReadingAction({ session, isViewer: true, canWrite: false })).toMatchObject({
+      state: "SESSION_READY",
+      label: "세션 준비됨",
+      message: "세션을 읽고 공동 보드를 확인할 수 있어요.",
+      href: "/app/session/current",
+      ctaLabel: "세션 읽기",
+    });
+  });
+
+  it("keeps suspended or approval-inactive members read-only even when they are not viewers", () => {
+    expect(
+      getMemberHomeNextReadingAction({
+        session: {
+          ...session,
+          myCheckin: null,
+          myOneLineReview: null,
+        },
+        isViewer: false,
+        canWrite: false,
+        today: new Date(2026, 4, 19),
+      }),
+    ).toMatchObject({
       state: "SESSION_READY",
       label: "세션 준비됨",
       message: "세션을 읽고 공동 보드를 확인할 수 있어요.",

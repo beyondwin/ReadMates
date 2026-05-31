@@ -357,6 +357,26 @@ describe("MemberHome", () => {
     expect(mobile.queryByRole("link", { name: /질문 쓰기/ })).not.toBeInTheDocument();
   });
 
+  it("does not prompt suspended members to perform member write actions in the desktop next action", () => {
+    const suspendedAuth: AuthMeResponse = {
+      ...auth,
+      membershipStatus: "SUSPENDED",
+      approvalState: "SUSPENDED",
+    };
+
+    const { container } = render(
+      <MemberHome auth={suspendedAuth} current={current} noteFeedItems={[]} upcomingSessions={[]} />,
+    );
+    const desktop = getDesktopView(container);
+    const nextActionCopy = desktop.getByText("세션을 읽고 공동 보드를 확인할 수 있어요.");
+    const nextActionCard = nextActionCopy.closest(".rm-home-answer-strip__item");
+
+    expect(nextActionCard).toHaveTextContent("다음 할 일");
+    expect(nextActionCard).not.toHaveTextContent("RSVP를 먼저 선택해 주세요.");
+    expect(nextActionCard).not.toHaveTextContent("읽기 진행률을 남겨 주세요.");
+    expect(nextActionCard).not.toHaveTextContent("질문");
+  });
+
   it("shows the next gathering prep card", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 3, 30));

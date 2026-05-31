@@ -110,19 +110,28 @@ export type MemberHomeNextReadingAction = {
   ctaLabel: string | null;
 };
 
+export type MemberHomeNextReadingActionInput = {
+  session: MemberHomeCurrentSessionView["currentSession"];
+  isViewer: boolean;
+  canWrite: boolean;
+  noteFeedItems?: MemberHomeNoteFeedItemView[];
+  today?: Date;
+};
+
 export function memberHomeViewFromRouteData(view: MemberHomeView): MemberHomeView {
   return view;
 }
 
-export function getMemberHomeNextReadingAction(
-  session: MemberHomeCurrentSessionView["currentSession"],
-  isViewer: boolean,
-  noteFeedItems: MemberHomeNoteFeedItemView[] = [],
-  today: Date = new Date(),
-): MemberHomeNextReadingAction {
+export function getMemberHomeNextReadingAction({
+  session,
+  isViewer,
+  canWrite,
+  noteFeedItems = [],
+  today = new Date(),
+}: MemberHomeNextReadingActionInput): MemberHomeNextReadingAction {
   const state = deriveReadingLoopState({
     hasCurrentSession: session !== null,
-    memberCanWrite: !isViewer,
+    memberCanWrite: canWrite,
     memberRsvpStatus: session?.myRsvpStatus,
     memberHasCheckin: session ? session.myCheckin !== null : undefined,
     memberQuestionCount: session?.myQuestions.length,
@@ -143,7 +152,7 @@ export function getMemberHomeNextReadingAction(
     };
   }
 
-  if (isViewer && state !== "ARCHIVE_AVAILABLE") {
+  if (!canWrite && state !== "ARCHIVE_AVAILABLE") {
     return {
       state,
       label: READING_LOOP_LABELS[state],

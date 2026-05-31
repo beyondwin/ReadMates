@@ -19,6 +19,7 @@ import {
   type MemberHomeNoteFeedItemView as NoteFeedItem,
   type MemberHomeUpcomingSessionView as MemberHomeUpcomingSession,
 } from "@/features/member-home/model/member-home-view-model";
+import { canWriteMemberActivity } from "@/shared/auth/member-app-access";
 import { formatMobileTodayLabel, rsvpLabel } from "@/shared/ui/readmates-display";
 import { SessionTimingIdentity } from "@/shared/ui/session-identity";
 
@@ -48,6 +49,7 @@ export default function MemberHome({
   const currentSession = current.currentSession;
   const memberName = auth.displayName ?? "멤버";
   const isViewer = auth.membershipStatus === "VIEWER";
+  const canWrite = canWriteMemberActivity(auth);
 
   return (
     <main>
@@ -79,7 +81,12 @@ export default function MemberHome({
 
             {isViewer ? <ViewerMemberHomeNotice /> : null}
 
-            <HomeAnswerStrip session={currentSession} noteFeedItems={noteFeedItems} isViewer={isViewer} />
+            <HomeAnswerStrip
+              session={currentSession}
+              noteFeedItems={noteFeedItems}
+              isViewer={isViewer}
+              canWrite={canWrite}
+            />
 
             <PrepCard
               session={currentSession}
@@ -123,14 +130,21 @@ function HomeAnswerStrip({
   session,
   noteFeedItems,
   isViewer,
+  canWrite,
 }: {
   session: CurrentSessionResponse["currentSession"];
   noteFeedItems: NoteFeedItem[];
   isViewer: boolean;
+  canWrite: boolean;
 }) {
   const preservedCount = noteFeedItems.length;
   const preservedKinds = new Set(noteFeedItems.map((item) => item.kind)).size;
-  const nextAction = getMemberHomeNextReadingAction(session, isViewer, noteFeedItems);
+  const nextAction = getMemberHomeNextReadingAction({
+    session,
+    isViewer,
+    canWrite,
+    noteFeedItems,
+  });
 
   return (
     <section className="rm-home-answer-strip" aria-label="홈 요약">
