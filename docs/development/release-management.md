@@ -173,33 +173,62 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식의 semantic version을 사용합니다.
 
 ## Branch protection bypass policy
 
-ReadMates `main` branch는 GitHub branch protection 대상이지만, 실무에서는 단일 운영자(solo admin)가 release commit을 직접 push해야 하는 경우가 있습니다. 이 절은 admin bypass를 허용할 수 있는 조건과 release PR을 강제해야 하는 조건을 구분합니다. v1.11.0 발행 시 57개 commit이 admin bypass로 직접 push된 사례를 추후 회고 가능하도록 정책을 명문화합니다.
+ReadMates `main` branch는 GitHub branch protection 대상입니다. 이 저장소는 단독 운영(solo admin)을 기본 운영 형태로 두므로, branch protection이 실제 reviewer가 없는 self-review를 요구하면 release PR이 구조적으로 막힐 수 있습니다. 정책의 목표는 review 요구를 형식적으로 유지하는 것이 아니라, CI와 release-readiness 증거를 통해 DB/API/auth/deploy 리스크를 추적 가능하게 닫는 것입니다.
 
-### 허용 조건 — admin bypass push
+### 기본 원칙
 
-아래 조건을 모두 만족할 때만 solo admin이 `main`에 직접 push할 수 있습니다.
+- `main`의 필수 CI status check는 유지합니다.
+- solo-admin release PR은 명시적인 release-readiness 증거를 남기면 유효한 review artifact로 봅니다.
+- branch protection은 실제 non-author reviewer가 없을 때 불가능한 code-owner self-review를 정상 경로로 요구하지 않습니다.
+- `.github/workflows/**`, deploy scripts, auth/permission, secret/session/token handling, branch protection 정책 변경은 external-review preferred 표면으로 분류합니다.
+- external reviewer가 없는 상태에서 high-control 변경을 ship해야 하면 admin bypass ledger와 release-readiness 증거를 남깁니다.
 
-- Solo admin 한 사람만 commit author와 committer로 등장합니다.
-- Push 직전에 `./scripts/pre-push-check.sh` (또는 `--full --release`) 가 통과했습니다.
-- DB migration이 포함되어 있지 않습니다 (`server/src/main/resources/db/mysql/migration/` 변경 없음).
-- Auth, permission, RLS, BFF token, OAuth scope, role/visibility model을 건드리지 않습니다.
+### Solo-admin evidence path
 
-### 비허용 조건 — release PR 필수
+아래 조건을 모두 만족하면 solo admin이 `main`에 직접 push하거나 solo-admin release PR을 admin merge할 수 있습니다.
 
-다음 중 하나라도 해당하면 admin bypass를 사용하지 않고 release PR (review + branch protection 정상 흐름)을 만듭니다.
+- 변경에 DB migration이 포함되지 않습니다 (`server/src/main/resources/db/mysql/migration/` 변경 없음).
+- Public API contract(route, request/response schema, error code)가 바뀌지 않습니다.
+- Auth, permission, BFF token, OAuth scope, role/visibility model, secret/session/token handling을 건드리지 않습니다.
+- Deploy workflow, release automation, branch protection, CODEOWNERS 정책을 바꾸지 않습니다.
+- Push 또는 merge 직전에 `./scripts/pre-push-check.sh` 또는 문서화된 release equivalent가 통과했습니다.
+- `CHANGELOG.md`와 release-readiness review가 사용자-facing, operator-facing, security posture, deploy behavior 변경을 기록합니다.
+- public release 또는 deploy 표면이면 public release candidate check와 post-deploy smoke 결과를 기록합니다.
+- 실행하지 못한 검증은 skipped validation과 residual risk로 기록합니다.
 
-- 복수 contributor의 commit이 섞여 있습니다 (`git log <prev-tag>..HEAD --format='%an'`로 확인).
-- DB migration이 포함되어 있습니다.
-- Auth/permission/RLS 변경 또는 supabase/Spring Security/BFF token 처리 변경이 있습니다.
-- Public API contract (route, request/response schema, error code) 가 바뀌었습니다.
+### DB/API release PR path
+
+DB migration 또는 public API contract 변경은 direct push 기본 경로가 아닙니다. Release PR을 만들고, CI와 release-readiness review를 통해 다음 증거를 남깁니다.
+
+- 변경된 Flyway migration 파일과 expected direction.
+- 변경된 public API route, request/response schema, error code.
+- frontend/server/E2E/public-release 검증 명령과 결과.
+- 서버 image, Cloudflare Pages, OCI compose promotion, post-deploy smoke 순서.
+- rollback 또는 forward-fix 고려사항.
+- normal review가 막혔다면 `POLICY_MISMATCH` 사유.
+
+branch protection이 reviewer 부재만으로 막히고 위 증거가 모두 충족되면 admin merge를 허용합니다. `CHECK_FAILURE` 또는 `MISSING_EVIDENCE` 상태에서는 incident 대응을 제외하고 merge하지 않습니다.
+
+### External-review preferred path
+
+다음 표면은 가능한 경우 실제 non-author reviewer를 붙입니다.
+
+- `.github/workflows/**`
+- branch protection 또는 CODEOWNERS 정책
+- deploy scripts와 release automation
+- auth, permission, OAuth, BFF shared secret handling, token/session handling
+- secret rotation과 production configuration sync
+
+실제 reviewer가 없고 변경이 필요하면 admin bypass ledger에 사유, 우회한 검증, 후속 보강 계획, release state 검증 위치를 기록합니다.
 
 ### Emergency bypass
 
 운영 incident 대응 등 위 조건과 무관하게 bypass가 필요한 경우, push 전 또는 직후에 [bypass ledger](../operations/runbooks/release-bypass-ledger.md) 또는 release note `Deployment Notes`에 다음을 기록합니다.
 
-- bypass 사유 (incident ID, on-call 결정 경위)
-- 우회한 검증 단계
-- 후속 보강 계획 (회귀 테스트, follow-up PR)
+- bypass 사유와 incident 맥락.
+- 실패했거나 우회한 검증 단계.
+- 후속 보강 계획.
+- 나중에 release state를 확인할 수 있는 위치.
 
 `./scripts/pre-push-check.sh --release --no-changelog-check`로 emergency override 시에도 위 ledger 기록은 생략하지 않습니다.
 
