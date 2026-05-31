@@ -1,3 +1,10 @@
+import type {
+  ClubAiUsageSummary,
+  ClubReadinessSummary,
+  ClubSessionProgress,
+} from "@/shared/model/club-operations";
+import { clubAiFailureDelta } from "@/shared/model/club-operations";
+
 export type AdminClubOperationsSnapshot = {
   schema: "admin.club_operations_snapshot.v1";
   generatedAt: string;
@@ -8,24 +15,14 @@ export type AdminClubOperationsSnapshot = {
     status: string;
     publicVisibility: string;
   };
-  readiness: {
-    state: string;
-    blockingReasons: string[];
-    nextAction: string | null;
-  };
+  readiness: ClubReadinessSummary;
   memberActivity: {
     activeCount: number;
     dormantCount: number;
     pendingViewerCount: number;
     hostCount: number;
   };
-  sessionProgress: {
-    upcomingCount: number;
-    currentOpenCount: number;
-    closedCount: number;
-    publishedRecordCount: number;
-    incompleteRecordCount: number;
-  };
+  sessionProgress: ClubSessionProgress;
   notificationHealth: {
     pending: number;
     failed: number;
@@ -35,14 +32,7 @@ export type AdminClubOperationsSnapshot = {
     recentFailed7d: number;
     priorFailed7d: number;
   };
-  aiUsage: {
-    activeJobs: number;
-    failedRecentJobs: number;
-    staleCandidates: number;
-    costEstimateUsd: string;
-    state: string;
-    priorFailedJobs7d: number;
-  };
+  aiUsage: ClubAiUsageSummary;
   safeLinks: Array<{
     label: string;
     href: string;
@@ -55,7 +45,7 @@ export function notificationFailureDelta(snapshot: AdminClubOperationsSnapshot):
 }
 
 export function aiFailureDelta(snapshot: AdminClubOperationsSnapshot): number {
-  return snapshot.aiUsage.failedRecentJobs - snapshot.aiUsage.priorFailedJobs7d;
+  return clubAiFailureDelta(snapshot.aiUsage);
 }
 
 export type ClubNextAction = { label: string; href: string; kind: "ADMIN_ROUTE" | "HOST_ROUTE" };
