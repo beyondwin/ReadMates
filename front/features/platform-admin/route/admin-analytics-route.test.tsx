@@ -18,6 +18,7 @@ function renderRoute(initialEntry = "/admin/analytics?window=7d") {
       { key: "SESSION_COMPLETION", unit: "PERCENT", availability: "AVAILABLE", current: 75, prior: 60, deltaDirection: "UP" },
     ],
     clubBenchmark: { availability: "NOT_ENOUGH_DATA", rows: [] },
+    series: [],
   });
 
   return render(
