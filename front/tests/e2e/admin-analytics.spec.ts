@@ -132,19 +132,21 @@ test("owner captures public-safe analytics visual evidence on desktop and mobile
   await page.goto("/admin/analytics");
   await expect(page.getByRole("heading", { name: "분석" })).toBeVisible();
   await expect(page.getByRole("table", { name: "KPI 추세" })).toBeVisible();
-  await page.screenshot({
+  const desktopScreenshot = await page.screenshot({
     path: testInfo.outputPath("admin-analytics-desktop.png"),
     fullPage: true,
   });
+  expect(desktopScreenshot.byteLength).toBeGreaterThan(10_000);
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/admin/analytics");
   await expect(page.getByRole("heading", { name: "분석" })).toBeVisible();
   await expect(page.getByRole("link", { name: "CSV 내려받기" })).toBeVisible();
-  await page.screenshot({
+  const mobileScreenshot = await page.screenshot({
     path: testInfo.outputPath("admin-analytics-mobile.png"),
     fullPage: true,
   });
+  expect(mobileScreenshot.byteLength).toBeGreaterThan(10_000);
 
   await expect(page.getByText("member1@example.com")).toHaveCount(0);
   await expect(page.getByText("private.example.com")).toHaveCount(0);

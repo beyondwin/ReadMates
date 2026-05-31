@@ -316,6 +316,53 @@ class MySqlQueryPlanTest(
     }
 
     @Test
+    fun `admin analytics benchmark query uses indexed access on operating tables`() {
+        val plan =
+            jdbcTemplate.explain(
+                """
+                select
+                  c.id as club_id, c.slug as slug, c.name as name,
+                  count(distinct sp.membership_id) as active_members,
+                  count(distinct s.id) as sessions,
+                  count(distinct case when s.state in ('CLOSED','PUBLISHED') then s.id end) as completed_sessions,
+                  count(sp.id) as participants,
+                  sum(case when sp.rsvp_status in ('GOING','MAYBE') then 1 else 0 end) as going_maybe,
+                  coalesce((
+                    select sum(a.cost_estimate_usd) from ai_generation_audit_log a
+                    where a.club_id = c.id and a.created_at >= utc_timestamp(6) - interval ? day
+                  ), 0) as ai_cost,
+                  coalesce((
+                    select count(*) from notification_deliveries n
+                    where n.club_id = c.id and n.status in ('SENT','FAILED','DEAD')
+                      and n.updated_at >= utc_timestamp(6) - interval ? day
+                  ), 0) as notif_terminal,
+                  coalesce((
+                    select count(*) from notification_deliveries n
+                    where n.club_id = c.id and n.status = 'SENT'
+                      and n.updated_at >= utc_timestamp(6) - interval ? day
+                  ), 0) as notif_sent
+                from clubs c
+                left join sessions s on s.club_id = c.id and s.session_date >= current_date() - interval ? day
+                left join session_participants sp force index (session_participants_session_club_fk)
+                  on sp.session_id = s.id and sp.club_id = s.club_id
+                group by c.id, c.slug, c.name
+                having sessions > 0
+                order by active_members desc, c.name asc
+                limit 20
+                """.trimIndent(),
+                30,
+                30,
+                30,
+                30,
+            )
+
+        plan.assertUsesIndexFor("s", "admin analytics benchmark session window")
+        plan.assertUsesIndexFor("sp", "admin analytics benchmark participant aggregation")
+        plan.assertUsesIndexFor("a", "admin analytics benchmark AI cost subquery")
+        plan.assertUsesIndexFor("n", "admin analytics benchmark notification subqueries")
+    }
+
+    @Test
     fun `public session detail query uses indexed access on public publication table`() {
         val plan =
             jdbcTemplate.explain(

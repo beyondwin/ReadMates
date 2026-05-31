@@ -105,7 +105,7 @@ private fun JdbcTemplate.participantCount(
         """
         select count(*)
         from session_participants sp
-        join sessions s on s.id = sp.session_id
+        join sessions s on s.id = sp.session_id and s.club_id = sp.club_id
         where ${sessionDatePredicate(prior).replace("session_date", "s.session_date")}$rsvpClause
         """.trimIndent(),
         sessionDateArgs(w, prior),
@@ -120,7 +120,7 @@ private fun JdbcTemplate.activeMemberCount(
         """
         select count(distinct sp.membership_id)
         from session_participants sp
-        join sessions s on s.id = sp.session_id
+        join sessions s on s.id = sp.session_id and s.club_id = sp.club_id
         where ${sessionDatePredicate(prior).replace("session_date", "s.session_date")}
         """.trimIndent(),
         sessionDateArgs(w, prior),
@@ -186,7 +186,8 @@ private fun JdbcTemplate.benchmark(w: Long): List<AdminAnalyticsBenchmarkRaw> =
           ), 0) as notif_sent
         from clubs c
         left join sessions s on s.club_id = c.id and s.session_date >= current_date() - interval ? day
-        left join session_participants sp on sp.session_id = s.id
+        left join session_participants sp force index (session_participants_session_club_fk)
+          on sp.session_id = s.id and sp.club_id = s.club_id
         group by c.id, c.slug, c.name
         having sessions > 0
         order by active_members desc, c.name asc
@@ -299,7 +300,7 @@ private fun JdbcTemplate.participantCountBetween(
         """
         select count(*)
         from session_participants sp
-        join sessions s on s.id = sp.session_id
+        join sessions s on s.id = sp.session_id and s.club_id = sp.club_id
         where s.session_date >= ? and s.session_date < ?$rsvpClause
         """.trimIndent(),
         sessionDateRangeArgs(startInclusive, endExclusive),
@@ -314,7 +315,7 @@ private fun JdbcTemplate.activeMemberCountBetween(
         """
         select count(distinct sp.membership_id)
         from session_participants sp
-        join sessions s on s.id = sp.session_id
+        join sessions s on s.id = sp.session_id and s.club_id = sp.club_id
         where s.session_date >= ? and s.session_date < ?
         """.trimIndent(),
         sessionDateRangeArgs(startInclusive, endExclusive),

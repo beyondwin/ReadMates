@@ -60,6 +60,15 @@ The v1.11.0 production OAuth and backup timer items are closed by 2026-05-31 ope
 - Skipped: none.
 - Residual risk: no v1.11.0 OAuth or backup timer residual remains open after the 2026-05-31 operational evidence recorded above.
 
+## 2026-06-01 Analytics confidence residual closure note
+
+- Scope reviewed: local `main..codex/2026-06-01-readmates-ops-depth-confidence-evidence-implementation-plan-20260601-010925`.
+- Closure evidence: admin analytics visual evidence is now a blocking Playwright check that captures desktop/mobile screenshots, asserts non-empty screenshot payloads, and checks public-safe mocked content for private-data sentinels.
+- Closure evidence: admin analytics SQL confidence now combines an authenticated query budget (`ServerQueryBudgetTest`) with an EXPLAIN guard (`MySqlQueryPlanTest`) over the benchmark query. The benchmark participant join uses the existing session/club FK index explicitly to avoid full participant scans as data grows.
+- Executed: focused analytics Vitest, admin analytics Playwright E2E, analytics service/controller tests, `ServerQueryBudgetTest`, `MySqlQueryPlanTest`, frontend lint/test/build, `architectureTest`, `git diff --check`, public release candidate build/check, and Graphify refresh.
+- Skipped: none.
+- Residual risk: no analytics confidence residual remains open for this branch. Future visual pixel-diff baselines can still be introduced separately after flake policy is defined, but the shipped branch now blocks on screenshot artifact creation and core layout/private-leak assertions.
+
 ## 기본 범위
 
 기본 범위는 현재 branch와 base branch의 차이입니다. 보통 `origin/main..HEAD`를 사용합니다.
