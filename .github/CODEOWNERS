@@ -1,2 +1,4 @@
-# CI/CD workflow changes are owned by @beyondwin; enforcement depends on branch protection.
+# CI/CD workflow changes are owned by @beyondwin.
+# In solo-admin mode, branch protection must not require impossible self-review.
+# Treat this as ownership/notification metadata unless a real non-author owner or team is added.
 .github/workflows/** @beyondwin
