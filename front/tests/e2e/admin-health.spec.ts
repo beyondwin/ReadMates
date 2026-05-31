@@ -203,5 +203,8 @@ test("operator views /admin/health grid", async ({ page }) => {
   await page.goto("/admin/health");
   await expect(page.getByRole("button", { name: "새로고침" })).toBeVisible();
   await page.getByRole("button", { name: "새로고침" }).click();
+  await expect(
+    page.locator("article", { hasText: "AI provider availability" }).getByRole("link", { name: /자세히/ }),
+  ).toHaveAttribute("href", "/admin/ai-ops");
   await expect(page.getByText(/NaN/)).toHaveCount(0);
 });

@@ -25,6 +25,11 @@ export function aiOpsSearchFromFilter(filter: AiOpsJobFilter): URLSearchParams {
   return params;
 }
 
+export function aiOpsPathFromFilter(filter: AiOpsJobFilter): string {
+  const search = aiOpsSearchFromFilter(filter).toString();
+  return search ? `/admin/ai-ops?${search}` : "/admin/ai-ops";
+}
+
 export function hasActiveAiOpsFilter(filter: AiOpsJobFilter): boolean {
   return Boolean(filter.errorCode || filter.clubId);
 }

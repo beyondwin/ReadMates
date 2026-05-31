@@ -1,3 +1,8 @@
+import {
+  EMPTY_AI_OPS_FILTER,
+  aiOpsPathFromFilter,
+} from "@/features/platform-admin/model/platform-admin-ai-ops-model";
+
 export type AdminAuditRange = "24h" | "7d" | "30d" | "90d";
 export type AdminAuditSourceSlice = "S3" | "S4" | "S5" | "S6" | "PLATFORM" | "CLUB";
 export type AdminAuditActionCategory =
@@ -144,6 +149,13 @@ export function shouldShowAdminAuditDetailValue(label: string, value: string): b
   if (value.includes("{") || value.includes("}")) return false;
   if (normalizedValue.includes("token=") || normalizedValue.includes("secret")) return false;
   return true;
+}
+
+export function aiOpsDrilldownForAuditItem(item: AdminAuditLedgerItem): string | null {
+  if (item.actionCategory !== "AI_OPS") return null;
+  const clubId = item.target.clubId;
+  if (!clubId) return null;
+  return aiOpsPathFromFilter({ ...EMPTY_AI_OPS_FILTER, clubId });
 }
 
 function enumParam<T extends string>(value: string | null, allowed: readonly T[]): T | null {

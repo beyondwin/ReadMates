@@ -4,6 +4,7 @@ import {
   EMPTY_AI_OPS_FILTER,
   aiOpsFilterFromSearchParams,
   aiOpsFilterToQuery,
+  aiOpsPathFromFilter,
   aiOpsSearchFromFilter,
   aiOpsWindowFromSearchParams,
   hasActiveAiOpsFilter,
@@ -49,5 +50,21 @@ describe("aiOpsWindowFromSearchParams", () => {
   it("falls back to the default for missing or unknown window", () => {
     expect(aiOpsWindowFromSearchParams(new URLSearchParams())).toBe(AI_OPS_DEFAULT_WINDOW);
     expect(aiOpsWindowFromSearchParams(new URLSearchParams("window=year"))).toBe(AI_OPS_DEFAULT_WINDOW);
+  });
+});
+
+describe("aiOpsPathFromFilter", () => {
+  it("returns the bare ai-ops path when no filter is active", () => {
+    expect(aiOpsPathFromFilter(EMPTY_AI_OPS_FILTER)).toBe("/admin/ai-ops");
+  });
+
+  it("appends clubId as ai-ops URL state", () => {
+    expect(aiOpsPathFromFilter({ errorCode: null, clubId: "club-1" })).toBe("/admin/ai-ops?clubId=club-1");
+  });
+
+  it("appends errorCode as ai-ops URL state", () => {
+    expect(aiOpsPathFromFilter({ errorCode: "PROVIDER_RATE_LIMITED", clubId: null })).toBe(
+      "/admin/ai-ops?errorCode=PROVIDER_RATE_LIMITED",
+    );
   });
 });
