@@ -3174,6 +3174,26 @@
   background: var(--bg-sub);
 }
 
+.admin-analytics__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.admin-analytics__export {
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  padding: 7px 14px;
+  color: inherit;
+  text-decoration: none;
+  background: var(--bg);
+}
+
+.admin-analytics__export:focus-visible,
+.admin-analytics__window:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .admin-analytics__kpis {
   list-style: none;
   margin: 0;
@@ -3209,6 +3229,37 @@
 .admin-analytics__kpi-delta {
   font-size: 13px;
   color: var(--muted);
+}
+
+.admin-analytics__trend {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-analytics__trend h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.admin-analytics__trend-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  background: var(--bg);
+}
+
+.admin-analytics__trend-table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: collapse;
+}
+
+.admin-analytics__trend-table th,
+.admin-analytics__trend-table td {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
 }
 
 .admin-analytics__benchmark {

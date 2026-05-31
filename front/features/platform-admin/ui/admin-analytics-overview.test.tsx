@@ -15,7 +15,16 @@ const overview: AdminAnalyticsOverview = {
     { key: "NOTIFICATION_DELIVERY", unit: "PERCENT", availability: "AVAILABLE", current: 95, prior: 95, deltaDirection: "FLAT" },
   ],
   clubBenchmark: { availability: "NOT_ENOUGH_DATA", rows: [] },
-  series: [],
+  series: [
+    {
+      key: "SESSION_COMPLETION",
+      unit: "PERCENT",
+      points: [
+        { bucketStart: "2026-05-01", availability: "AVAILABLE", value: 75 },
+        { bucketStart: "2026-05-08", availability: "NOT_ENOUGH_DATA", value: null },
+      ],
+    },
+  ],
 };
 
 describe("AdminAnalyticsOverviewView", () => {
@@ -31,9 +40,16 @@ describe("AdminAnalyticsOverviewView", () => {
     );
 
     expect(screen.getByRole("heading", { name: "분석" })).toBeInTheDocument();
-    expect(screen.getByText("세션 완료율")).toBeInTheDocument();
+    expect(screen.getAllByText("세션 완료율").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("80%")).toBeInTheDocument();
     expect(screen.getAllByText("데이터 부족").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("클럽 비교에 충분한 데이터가 없습니다.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "KPI 추세" })).toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "KPI 추세" })).toBeInTheDocument();
+    expect(screen.getByText("2026-05-01")).toBeInTheDocument();
+    expect(screen.getByText("75%")).toBeInTheDocument();
+    const exportLink = screen.getByRole("link", { name: "CSV 내려받기" });
+    expect(exportLink).toHaveAttribute("download", "readmates-admin-analytics-30d-2026-05-30.csv");
+    expect(exportLink.getAttribute("href")).toContain("data:text/csv");
   });
 });

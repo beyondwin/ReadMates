@@ -1,10 +1,14 @@
 import {
+  analyticsCsvFilename,
+  analyticsCsvHref,
   deltaLabel,
   formatKpiValue,
+  formatSeriesPointValue,
   labelKpi,
   labelWindow,
   type AdminAnalyticsBenchmarkRow,
   type AdminAnalyticsKpiCard,
+  type AdminAnalyticsKpiSeries,
   type AdminAnalyticsOverview,
   type AnalyticsWindow,
 } from "@/features/platform-admin/model/platform-admin-analytics-model";
@@ -50,11 +54,21 @@ export function AdminAnalyticsOverviewView({
 
       {overview ? (
         <>
+          <div className="admin-analytics__actions">
+            <a
+              className="admin-analytics__export"
+              href={analyticsCsvHref(overview)}
+              download={analyticsCsvFilename(overview)}
+            >
+              CSV 내려받기
+            </a>
+          </div>
           <ul className="admin-analytics__kpis" aria-label="핵심 지표">
             {overview.kpis.map((card) => (
               <AdminAnalyticsKpiTile key={card.key} card={card} />
             ))}
           </ul>
+          <AdminAnalyticsSeriesTable series={overview.series} />
           <AdminAnalyticsBenchmarkTable benchmark={overview.clubBenchmark} />
         </>
       ) : null}
@@ -70,6 +84,49 @@ function AdminAnalyticsKpiTile({ card }: { card: AdminAnalyticsKpiCard }) {
       <span className="admin-analytics__kpi-value">{formatKpiValue(card)}</span>
       <span className="admin-analytics__kpi-delta">{deltaLabel(card)}</span>
     </li>
+  );
+}
+
+function AdminAnalyticsSeriesTable({ series }: { series: AdminAnalyticsKpiSeries[] }) {
+  if (series.length === 0 || series.every((item) => item.points.length === 0)) {
+    return <p className="admin-analytics__benchmark-empty">KPI 추세를 만들 충분한 데이터가 없습니다.</p>;
+  }
+
+  const bucketStarts = series[0]?.points.map((point) => point.bucketStart) ?? [];
+
+  return (
+    <section className="admin-analytics__trend" aria-labelledby="admin-analytics-trends-heading">
+      <h2 id="admin-analytics-trends-heading">KPI 추세</h2>
+      <div className="admin-analytics__trend-scroll">
+        <table className="admin-analytics__trend-table" aria-label="KPI 추세">
+          <thead>
+            <tr>
+              <th scope="col">지표</th>
+              {bucketStarts.map((bucketStart) => (
+                <th key={bucketStart} scope="col">
+                  {bucketStart}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {series.map((item) => (
+              <tr key={item.key}>
+                <th scope="row">{labelKpi(item.key)}</th>
+                {bucketStarts.map((bucketStart) => {
+                  const point = item.points.find((candidate) => candidate.bucketStart === bucketStart);
+                  return (
+                    <td key={bucketStart}>
+                      {point ? formatSeriesPointValue(point, item.unit) : "데이터 부족"}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
