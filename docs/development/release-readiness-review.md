@@ -42,7 +42,8 @@ The v1.11.0 production OAuth and backup timer items are closed by 2026-05-31 ope
 - Root cause: Spring Boot 4.0.6 managed `tomcat-embed-core 11.0.21`; the image scan reported fixed HIGH/CRITICAL Tomcat findings with fixed version `11.0.22`.
 - Executed: `./server/gradlew -p server dependencyInsight --dependency tomcat-embed-core --configuration runtimeClasspath` and `./server/gradlew -p server check`.
 - Deployment constraint: this patch has no DB migration, API contract, auth, BFF token, or frontend behavior change. It is eligible for the documented solo-admin `main` push path after pre-push checks pass.
-- Residual risk: server image deployment and post-deploy smoke are not complete until the `v1.12.1` tag workflow succeeds and OCI compose is promoted to `ghcr.io/<owner>/<repo>/readmates-server:v1.12.1`.
+- Closure evidence: `v1.12.1` `Deploy Server Image` passed image scan and release-tag promotion, `Deploy Front` passed, `READMATES_SERVER_IMAGE` repo variable was updated to the `v1.12.1` GHCR image, OCI compose was promoted to that image, the API container reported healthy, and post-deploy BFF/OAuth smoke passed.
+- Residual risk: no `v1.12.1` server-image scan, GHCR promotion, OCI compose promotion, or sanitized post-deploy smoke residual remains open. The branch-protection follow-up from `v1.12.0` remains a repository policy improvement before the next DB/API release.
 
 ## 2026-05-31 Ops Insight & Release Trust verification note
 

@@ -25,6 +25,9 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - Local release repair (2026-05-31): `./server/gradlew -p server dependencyInsight --dependency tomcat-embed-core --configuration runtimeClasspath` — pass; `tomcat-embed-core` resolved to `11.0.22`.
 - Local release repair (2026-05-31): `./server/gradlew -p server check` — pass.
+- Production deployment (2026-05-31): `Deploy Server Image` for tag `v1.12.1` — pass; image scan and release-tag promotion completed.
+- Production deployment (2026-05-31): `Deploy Front` for tag `v1.12.1` — pass.
+- Production deployment (2026-05-31): `./deploy/oci/05-deploy-compose-stack.sh` with `READMATES_SERVER_IMAGE=ghcr.io/beyondwin/readmates/readmates-server:v1.12.1` — pass; compose API container reported healthy and post-deploy watch passed.
 
 ## v1.12.0 - 2026-05-31
 
