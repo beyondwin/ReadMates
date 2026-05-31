@@ -9,11 +9,21 @@
 - Task 1 (Redis aigen residual): 2026-05-18T12:12Z UTC, automated. Keys: 0. Action: no-op. Ledger event: AIGEN_RESIDUAL_VERIFIED.
 - Task 2 Step 1 (Local Playwright E2E): 2026-05-18T12:18Z UTC, automated. Specs: 17 pass / 0 fail (grep fallback `@aigen|host`; initial `@aigen|host session editor|platform-admin` matched 0 specs). Log: .tmp/v1.11.0-followups/playwright-e2e-output.log.
 - Task 2 Step 2-3 (Production host smoke): 2026-05-18T12:18Z UTC, MANUAL REQUIRED. Google OAuth automation blocked at https://accounts.google.com/v3/signin/identifier (no redirect back to readmates.pages.dev under automated browser, per spec S1.4.3).
-- [ ] [MANUAL REQUIRED] Task 2 production host smoke — Google OAuth automation blocked. Owner: kws. Target: within 7 days.
+- [ ] [MANUAL OPERATIONAL ACTION REMAINS] Task 2 production host smoke — Google OAuth automation remains blocked at the Google sign-in page under automated browsers. Owner: kws. Current action: manually sign in through the production host flow, confirm redirect back to ReadMates, and record the date/result in this section. This is not closed by local Playwright or unit tests.
 - Task 5 (OAuth happy path): 2026-05-18T12:24Z UTC, MANUAL REQUIRED. Playwright MCP redirect from https://readmates.pages.dev/login reached https://accounts.google.com/v3/signin/identifier; Google blocked credential entry under automated browser (spec §S1.4.3 escape hatch). Artifact: .tmp/v1.11.0-followups/oauth-flow-results.json.
-- [ ] [MANUAL REQUIRED] Task 5 OAuth happy-path — automation blocked at accounts.google.com/v3/signin/identifier. Owner: kws. Target: within 7 days.
+- [ ] [MANUAL OPERATIONAL ACTION REMAINS] Task 5 OAuth happy-path — automated checks can confirm redirect initiation, but credential entry remains blocked by Google automation controls. Owner: kws. Current action: manually verify `/login` -> Google -> ReadMates return on the production origin and record the concrete date/result here.
 - Task 3 (DB backup → Object Storage + daily timer): 2026-05-18T12:37Z UTC, partial. Object upload: automated via local OCI CLI fallback. Uploaded `mysql/readmates-pre-v1.11.0-20260518T113652Z.sql.gz` to bucket `readmates-db-exports` (namespace `ax5hfpscso8v`) with `opc-meta-sha256=4b6c36c237e94736574894065ceabaa08d7492469bc6d45f4600d67903c1c81a`, `opc-meta-tag=pre-v1.11.0`. Local unit files + runbook committed. Timer install on VM: BLOCKED (OCI CLI not installed on VM, ENV_BLOCKER per spec §S1.4.3). Artifact: .tmp/v1.11.0-followups/oci-object-head.json.
-- [ ] [MANUAL REQUIRED] Task 3 daily backup timer — VM lacks OCI CLI. Bootstrap per docs/deploy/oci-mysql-heatwave.md, populate /etc/readmates/backup-mysql.env, scp deploy/oci/backup-mysql.{service,timer} → /etc/systemd/system/, daemon-reload, enable --now. Owner: kws. Target: within 7 days.
+- [ ] [MANUAL OPERATIONAL ACTION REMAINS] Task 3 daily backup timer — local Object Storage upload and runbook evidence exist, but VM timer installation requires operator access. Owner: kws. Current action: bootstrap OCI CLI on the VM, install `backup-mysql.service` and `backup-mysql.timer`, run `systemctl list-timers backup-mysql.timer`, and record the sanitized result here.
+
+## 2026-05-31 Ops Insight & Release Trust residual policy
+
+For the Ops Insight & Release Trust branch, residuals are classified as:
+
+- **Closed by automated evidence** only when a repo command, script, test, or public-safe document proves the condition without private operator access.
+- **Manual operational action remains** when Google OAuth credential entry, production host access, VM access, or provider console access is required.
+- **Out of scope for this branch** when the item predates the branch and is not changed by analytics, observability, release-readiness, docs, scripts, or deploy behavior.
+
+The v1.11.0 production OAuth and backup timer items remain manual operational actions until a human records sanitized production evidence. Analytics v2 and observability truth cleanup do not close those items by themselves.
 
 ## 기본 범위
 
