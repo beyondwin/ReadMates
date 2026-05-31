@@ -27,7 +27,7 @@ enum class KpiKey { ACTIVE_MEMBERS, SESSION_COMPLETION, RSVP_RATE, AI_COST_PER_S
 
 enum class KpiUnit { COUNT, PERCENT, USD }
 
-enum class Availability { AVAILABLE, NOT_ENOUGH_DATA }
+enum class Availability { AVAILABLE, NOT_ENOUGH_DATA, MEASUREMENT_UNAVAILABLE }
 
 enum class DeltaDirection { UP, DOWN, FLAT, NONE }
 
@@ -80,7 +80,7 @@ data class AdminAnalyticsSeriesRawPoint(
 )
 
 data class AdminAnalyticsOverview(
-    val schema: String = "admin.analytics_overview.v1",
+    val schema: String = "admin.analytics_overview.v2",
     val generatedAt: OffsetDateTime,
     val window: AnalyticsWindow,
     val kpis: List<AdminAnalyticsKpiCard>,

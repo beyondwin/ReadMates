@@ -63,6 +63,26 @@ class AdminAnalyticsServiceTest {
     }
 
     @Test
+    fun `overview uses v2 schema and reserves measurement unavailable for failed measurement inputs`() {
+        val raw =
+            sample().copy(
+                notifTerminalCurrent = -1,
+                notifSentCurrent = -1,
+                notifTerminalPrior = -1,
+                notifSentPrior = -1,
+            )
+
+        val overview = service(raw).overview(admin, AnalyticsWindow.LAST_30D)
+        val notification = overview.kpis.first { it.key == KpiKey.NOTIFICATION_DELIVERY }
+
+        assertThat(overview.schema).isEqualTo("admin.analytics_overview.v2")
+        assertThat(notification.availability).isEqualTo(Availability.MEASUREMENT_UNAVAILABLE)
+        assertThat(notification.current).isNull()
+        assertThat(notification.prior).isNull()
+        assertThat(notification.deltaDirection).isEqualTo(DeltaDirection.NONE)
+    }
+
+    @Test
     fun `benchmark is not enough data when no rows`() {
         val overview = service(sample().copy(benchmark = emptyList())).overview(admin, AnalyticsWindow.LAST_30D)
         assertThat(overview.clubBenchmark.availability).isEqualTo(Availability.NOT_ENOUGH_DATA)

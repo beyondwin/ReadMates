@@ -4,6 +4,7 @@ import {
   analyticsSearchFromWindow,
   analyticsWindowFromSearchParams,
   buildAnalyticsCsv,
+  formatAvailabilityLabel,
   formatKpiValue,
   formatSeriesPointValue,
   labelKpi,
@@ -41,6 +42,12 @@ describe("platform-admin-analytics-model", () => {
     expect(formatKpiValue(card({ availability: "NOT_ENOUGH_DATA", current: null }))).toBe("데이터 부족");
   });
 
+  it("formats measurement unavailable separately from not enough data", () => {
+    expect(formatAvailabilityLabel("NOT_ENOUGH_DATA")).toBe("데이터 부족");
+    expect(formatAvailabilityLabel("MEASUREMENT_UNAVAILABLE")).toBe("측정 불가");
+    expect(formatKpiValue(card({ availability: "MEASUREMENT_UNAVAILABLE", current: null }))).toBe("측정 불가");
+  });
+
   it("labels each KPI in Korean", () => {
     expect(labelKpi("NOTIFICATION_DELIVERY")).toBe("알림 도달률");
   });
@@ -56,7 +63,7 @@ describe("platform-admin-analytics-model", () => {
 
   it("builds a CSV export from KPI series and club benchmark rows", () => {
     const overview: AdminAnalyticsOverview = {
-      schema: "admin.analytics_overview.v1",
+      schema: "admin.analytics_overview.v2",
       generatedAt: "2026-05-30T00:00:00Z",
       window: "30d",
       kpis: [card({ key: "SESSION_COMPLETION", unit: "PERCENT", current: 80, prior: 50 })],

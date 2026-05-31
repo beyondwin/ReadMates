@@ -6,7 +6,7 @@ export type KpiKey =
   | "AI_COST_PER_SESSION"
   | "NOTIFICATION_DELIVERY";
 export type KpiUnit = "COUNT" | "PERCENT" | "USD";
-export type Availability = "AVAILABLE" | "NOT_ENOUGH_DATA";
+export type Availability = "AVAILABLE" | "NOT_ENOUGH_DATA" | "MEASUREMENT_UNAVAILABLE";
 export type DeltaDirection = "UP" | "DOWN" | "FLAT" | "NONE";
 
 export type AdminAnalyticsKpiCard = {
@@ -47,7 +47,7 @@ export type AdminAnalyticsBenchmark = {
 };
 
 export type AdminAnalyticsOverview = {
-  schema: "admin.analytics_overview.v1";
+  schema: "admin.analytics_overview.v2";
   generatedAt: string;
   window: AnalyticsWindow;
   kpis: AdminAnalyticsKpiCard[];
@@ -91,9 +91,20 @@ export function labelWindow(window: AnalyticsWindow): string {
   return WINDOW_LABELS[window];
 }
 
+export function formatAvailabilityLabel(availability: Availability): string {
+  switch (availability) {
+    case "AVAILABLE":
+      return "측정됨";
+    case "NOT_ENOUGH_DATA":
+      return "데이터 부족";
+    case "MEASUREMENT_UNAVAILABLE":
+      return "측정 불가";
+  }
+}
+
 export function formatKpiValue(card: AdminAnalyticsKpiCard): string {
-  if (card.availability === "NOT_ENOUGH_DATA" || card.current === null) {
-    return "데이터 부족";
+  if (card.availability !== "AVAILABLE" || card.current === null) {
+    return formatAvailabilityLabel(card.availability);
   }
   switch (card.unit) {
     case "PERCENT":
@@ -106,8 +117,8 @@ export function formatKpiValue(card: AdminAnalyticsKpiCard): string {
 }
 
 export function formatSeriesPointValue(point: AdminAnalyticsKpiSeriesPoint, unit: KpiUnit): string {
-  if (point.availability === "NOT_ENOUGH_DATA" || point.value === null) {
-    return "데이터 부족";
+  if (point.availability !== "AVAILABLE" || point.value === null) {
+    return formatAvailabilityLabel(point.availability);
   }
   switch (unit) {
     case "PERCENT":

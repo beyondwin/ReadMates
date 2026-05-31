@@ -4,7 +4,7 @@ import type { AdminAnalyticsOverview } from "@/features/platform-admin/model/pla
 import { AdminAnalyticsOverviewView } from "./admin-analytics-overview";
 
 const overview: AdminAnalyticsOverview = {
-  schema: "admin.analytics_overview.v1",
+  schema: "admin.analytics_overview.v2",
   generatedAt: "2026-05-30T00:00:00Z",
   window: "30d",
   kpis: [

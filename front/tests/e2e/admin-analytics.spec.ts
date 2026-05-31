@@ -46,7 +46,7 @@ async function routePlatformAdminShell(page: Page, role: PlatformAdminRole): Pro
 
 function overview(windowValue: "7d" | "30d" | "90d") {
   return {
-    schema: "admin.analytics_overview.v1",
+    schema: "admin.analytics_overview.v2",
     generatedAt: "2026-05-30T00:00:00Z",
     window: windowValue,
     kpis: [

@@ -105,12 +105,18 @@ class AdminAnalyticsService(
         numPrior: Int,
         denPrior: Int,
     ): AdminAnalyticsKpiCard {
-        val cur = ratePercent(numCurrent, denCurrent)
-        val pri = ratePercent(numPrior, denPrior)
+        val measurementFailed = numCurrent < 0 || denCurrent < 0 || numPrior < 0 || denPrior < 0
+        val cur = if (measurementFailed) null else ratePercent(numCurrent, denCurrent)
+        val pri = if (measurementFailed) null else ratePercent(numPrior, denPrior)
         return AdminAnalyticsKpiCard(
             key = key,
             unit = KpiUnit.PERCENT,
-            availability = availability(denCurrent > 0),
+            availability =
+                when {
+                    measurementFailed -> Availability.MEASUREMENT_UNAVAILABLE
+                    denCurrent > 0 -> Availability.AVAILABLE
+                    else -> Availability.NOT_ENOUGH_DATA
+                },
             current = cur,
             prior = pri,
             deltaDirection = direction(cur, pri),

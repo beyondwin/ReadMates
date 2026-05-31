@@ -11,7 +11,7 @@ function renderRoute(initialEntry = "/admin/analytics?window=7d") {
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   });
   queryClient.setQueryData(platformAdminAnalyticsOverviewQuery("7d").queryKey, {
-    schema: "admin.analytics_overview.v1",
+    schema: "admin.analytics_overview.v2",
     generatedAt: "2026-05-30T00:00:00Z",
     window: "7d",
     kpis: [

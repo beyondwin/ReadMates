@@ -47,7 +47,7 @@ class PlatformAdminAnalyticsControllerTest(
                     cookie(sessionCookieForUser(OWNER_USER_ID))
                 }.andExpect {
                     status { isOk() }
-                    jsonPath("$.schema") { value("admin.analytics_overview.v1") }
+                    jsonPath("$.schema") { value("admin.analytics_overview.v2") }
                     jsonPath("$.window") { value("30d") }
                     jsonPath("$.kpis.length()") { value(5) }
                     jsonPath("$.kpis[0].key") { exists() }
