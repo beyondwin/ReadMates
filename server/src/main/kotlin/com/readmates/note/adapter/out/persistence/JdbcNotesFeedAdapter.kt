@@ -37,7 +37,7 @@ class JdbcNotesFeedAdapter(
                   sessions.session_date,
                   (
                     select count(*)
-                    from questions
+                    from questions force index (questions_club_session_created_idx)
                     where questions.club_id = sessions.club_id
                       and questions.session_id = sessions.id
                       and exists (
