@@ -13,6 +13,7 @@ group = "com.readmates"
 version = "0.0.1-SNAPSHOT"
 
 extra["netty.version"] = "4.2.13.Final"
+extra["tomcat.version"] = "11.0.22"
 
 java {
     toolchain {

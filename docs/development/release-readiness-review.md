@@ -35,6 +35,15 @@ The v1.11.0 production OAuth and backup timer items are closed by 2026-05-31 ope
 - Follow-up: before the next DB/API release, either add a non-author release reviewer/code owner or adjust branch protection so a solo-admin release PR cannot require an impossible self-review.
 - Residual risk: production deployment and smoke are not complete until the tag workflows succeed, OCI compose is promoted to `ghcr.io/<owner>/<repo>/readmates-server:v1.12.0`, and sanitized post-deploy BFF/OAuth/admin smoke checks pass.
 
+## 2026-05-31 v1.12.1 server image scan repair note
+
+- Scope reviewed: server dependency-management repair only (`server/build.gradle.kts`) plus release documentation.
+- Release classification: patch release (`v1.12.1`) because `v1.12.0` frontend deployment succeeded but `Deploy Server Image` failed at the Trivy vulnerability gate before release-tag promotion.
+- Root cause: Spring Boot 4.0.6 managed `tomcat-embed-core 11.0.21`; the image scan reported fixed HIGH/CRITICAL Tomcat findings with fixed version `11.0.22`.
+- Executed: `./server/gradlew -p server dependencyInsight --dependency tomcat-embed-core --configuration runtimeClasspath` and `./server/gradlew -p server check`.
+- Deployment constraint: this patch has no DB migration, API contract, auth, BFF token, or frontend behavior change. It is eligible for the documented solo-admin `main` push path after pre-push checks pass.
+- Residual risk: server image deployment and post-deploy smoke are not complete until the `v1.12.1` tag workflow succeeds and OCI compose is promoted to `ghcr.io/<owner>/<repo>/readmates-server:v1.12.1`.
+
 ## 2026-05-31 Ops Insight & Release Trust verification note
 
 - Scope reviewed: `origin/main..HEAD` (broad because local `main` is ahead of `origin/main` in this workspace).

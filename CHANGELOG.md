@@ -10,6 +10,22 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 
+## v1.12.1 - 2026-05-31
+
+### Fixed
+
+- **server security**: override Spring Boot's managed embedded Tomcat version to `11.0.22` so the release image no longer carries the `tomcat-embed-core 11.0.21` vulnerabilities reported by the `Deploy Server Image` Trivy gate.
+
+### Deployment Notes
+
+- Server-only patch release. No DB migration, API contract, auth, BFF token, or frontend behavior change is included.
+- `v1.12.0` frontend deployment succeeded, but the server image workflow stopped before release-tag promotion at the vulnerability scan step. Publish and deploy `v1.12.1` for the server image instead of promoting the failed `v1.12.0` image candidate.
+
+### Verification
+
+- Local release repair (2026-05-31): `./server/gradlew -p server dependencyInsight --dependency tomcat-embed-core --configuration runtimeClasspath` — pass; `tomcat-embed-core` resolved to `11.0.22`.
+- Local release repair (2026-05-31): `./server/gradlew -p server check` — pass.
+
 ## v1.12.0 - 2026-05-31
 
 ### Highlights
