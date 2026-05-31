@@ -9,9 +9,9 @@
 - Task 1 (Redis aigen residual): 2026-05-18T12:12Z UTC, automated. Keys: 0. Action: no-op. Ledger event: AIGEN_RESIDUAL_VERIFIED.
 - Task 2 Step 1 (Local Playwright E2E): 2026-05-18T12:18Z UTC, automated. Specs: 17 pass / 0 fail (grep fallback `@aigen|host`; initial `@aigen|host session editor|platform-admin` matched 0 specs). Log: .tmp/v1.11.0-followups/playwright-e2e-output.log.
 - Task 2 Step 2-3 (Production host smoke): 2026-05-18T12:18Z UTC, MANUAL REQUIRED. Google OAuth automation blocked at https://accounts.google.com/v3/signin/identifier (no redirect back to readmates.pages.dev under automated browser, per spec S1.4.3).
-- [ ] [MANUAL OPERATIONAL ACTION REMAINS] Task 2 production host smoke — Google OAuth automation remains blocked at the Google sign-in page under automated browsers. Owner: kws. Current action: manually sign in through the production host flow, confirm redirect back to ReadMates, and record the date/result in this section. This is not closed by local Playwright or unit tests.
+- [x] [CLOSED BY OPERATIONAL EVIDENCE] Task 2 production host smoke — 2026-05-31T12:17Z UTC, browser-profile OAuth smoke. Started from `https://readmates.pages.dev/login`, selected an existing Google account in Chrome, and confirmed redirect back to the ReadMates production origin at `/clubs/<slug>/app`. No credentials, cookies, or account identifiers were captured.
 - Task 5 (OAuth happy path): 2026-05-18T12:24Z UTC, MANUAL REQUIRED. Playwright MCP redirect from https://readmates.pages.dev/login reached https://accounts.google.com/v3/signin/identifier; Google blocked credential entry under automated browser (spec §S1.4.3 escape hatch). Artifact: .tmp/v1.11.0-followups/oauth-flow-results.json.
-- [ ] [MANUAL OPERATIONAL ACTION REMAINS] Task 5 OAuth happy-path — automated checks can confirm redirect initiation, but credential entry remains blocked by Google automation controls. Owner: kws. Current action: manually verify `/login` -> Google -> ReadMates return on the production origin and record the concrete date/result here.
+- [x] [CLOSED BY OPERATIONAL EVIDENCE] Task 5 OAuth happy-path — 2026-05-31T12:17Z UTC, same browser-profile OAuth smoke confirmed `/login` -> Google account chooser -> ReadMates production app return. CLI smoke also confirmed Google receives `redirect_uri=https://readmates.pages.dev/login/oauth2/code/google`.
 - Task 3 (DB backup → Object Storage + daily timer): 2026-05-18T12:37Z UTC, partial. Object upload: automated via local OCI CLI fallback. Uploaded `mysql/readmates-pre-v1.11.0-20260518T113652Z.sql.gz` to bucket `readmates-db-exports` (namespace `ax5hfpscso8v`) with `opc-meta-sha256=4b6c36c237e94736574894065ceabaa08d7492469bc6d45f4600d67903c1c81a`, `opc-meta-tag=pre-v1.11.0`. Local unit files + runbook committed. Timer install on VM: BLOCKED (OCI CLI not installed on VM, ENV_BLOCKER per spec §S1.4.3). Artifact: .tmp/v1.11.0-followups/oci-object-head.json.
 - [x] [CLOSED BY OPERATIONAL EVIDENCE] Task 3 daily backup timer — 2026-05-31T12:09Z UTC, automated with operator CLI. Installed backup scripts, backup env/defaults, OCI CLI, instance-principal Object Storage policy, `backup-mysql.service`, and `backup-mysql.timer` on the ReadMates VM. Verification: `backup-mysql.timer` is enabled/active with next run scheduled for 2026-06-01T04:19:30Z UTC, and a manual `backup-mysql.service` run uploaded both `mysql/readmates-20260531T120949Z.sql.gz` and `mysql/readmates-20260531T120949Z.sql.gz.sha256`.
 
@@ -23,14 +23,14 @@ For the Ops Insight & Release Trust branch, residuals are classified as:
 - **Manual operational action remains** when Google OAuth credential entry, production host access, VM access, or provider console access is required.
 - **Out of scope for this branch** when the item predates the branch and is not changed by analytics, observability, release-readiness, docs, scripts, or deploy behavior.
 
-The v1.11.0 production OAuth items remain manual operational actions until a human records sanitized production evidence. The backup timer is closed by 2026-05-31 operational evidence. Analytics v2 and observability truth cleanup do not close OAuth by themselves.
+The v1.11.0 production OAuth and backup timer items are closed by 2026-05-31 operational evidence. Analytics v2 and observability truth cleanup did not close those items by themselves; the closure evidence above came from browser-profile OAuth smoke, VM timer installation, and manual backup upload proof.
 
 ## 2026-05-31 Ops Insight & Release Trust verification note
 
 - Scope reviewed: `origin/main..HEAD` (broad because local `main` is ahead of `origin/main` in this workspace).
-- Executed: frontend lint/test/build, targeted admin analytics E2E, server clean test, public release candidate build, and public release safety scan.
+- Executed: frontend lint/test/build, targeted admin analytics E2E, server clean test, public release candidate build, public release safety scan, production OAuth browser-profile smoke, and backup timer/manual upload proof.
 - Skipped: none.
-- Residual risk: v1.11.0 production OAuth remains a manual operational action; the backup timer is closed by 2026-05-31 operational evidence.
+- Residual risk: no v1.11.0 OAuth or backup timer residual remains open after the 2026-05-31 operational evidence recorded above.
 
 ## 기본 범위
 
