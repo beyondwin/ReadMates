@@ -12,11 +12,12 @@ import {
   RosterSummary,
 } from "@/features/member-home/ui/member-home-records";
 import { PrepCard } from "@/features/member-home/ui/prep-card";
-import type {
-  MemberHomeAuth as AuthMeResponse,
-  MemberHomeCurrentSessionView as CurrentSessionResponse,
-  MemberHomeNoteFeedItemView as NoteFeedItem,
-  MemberHomeUpcomingSessionView as MemberHomeUpcomingSession,
+import {
+  getMemberHomeNextReadingAction,
+  type MemberHomeAuth as AuthMeResponse,
+  type MemberHomeCurrentSessionView as CurrentSessionResponse,
+  type MemberHomeNoteFeedItemView as NoteFeedItem,
+  type MemberHomeUpcomingSessionView as MemberHomeUpcomingSession,
 } from "@/features/member-home/model/member-home-view-model";
 import { formatMobileTodayLabel, rsvpLabel } from "@/shared/ui/readmates-display";
 import { SessionTimingIdentity } from "@/shared/ui/session-identity";
@@ -118,30 +119,6 @@ export default function MemberHome({
   );
 }
 
-function nextActionFor(session: NonNullable<CurrentSessionResponse["currentSession"]> | null, isViewer: boolean) {
-  if (!session) {
-    return isViewer ? "다음 세션이 열리면 읽기 전용으로 확인할 수 있어요." : "호스트가 세션을 열면 준비를 시작합니다.";
-  }
-
-  if (isViewer) {
-    return "세션을 읽고 공동 보드를 확인할 수 있어요.";
-  }
-
-  if (session.myRsvpStatus === "NO_RESPONSE") {
-    return "RSVP를 먼저 선택해 주세요.";
-  }
-
-  if (!session.myCheckin) {
-    return "읽기 진행률을 남겨 주세요.";
-  }
-
-  if (session.myQuestions.length < 2) {
-    return `질문 ${2 - session.myQuestions.length}개를 더 준비해 주세요.`;
-  }
-
-  return "준비가 정리되었습니다. 모임 전까지 수정할 수 있어요.";
-}
-
 function HomeAnswerStrip({
   session,
   noteFeedItems,
@@ -153,6 +130,7 @@ function HomeAnswerStrip({
 }) {
   const preservedCount = noteFeedItems.length;
   const preservedKinds = new Set(noteFeedItems.map((item) => item.kind)).size;
+  const nextAction = getMemberHomeNextReadingAction(session, isViewer, noteFeedItems);
 
   return (
     <section className="rm-home-answer-strip" aria-label="홈 요약">
@@ -168,7 +146,7 @@ function HomeAnswerStrip({
       <div className="surface-quiet rm-home-answer-strip__item">
         <div className="eyebrow">다음 할 일</div>
         <p className="body" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
-          {nextActionFor(session, isViewer)}
+          {nextAction.message}
         </p>
       </div>
       <div className="surface-quiet rm-home-answer-strip__item">
