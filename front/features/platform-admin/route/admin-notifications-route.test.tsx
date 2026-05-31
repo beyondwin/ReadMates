@@ -8,6 +8,7 @@ import {
   platformAdminNotificationEventsQuery,
   platformAdminNotificationSnapshotQuery,
 } from "@/features/platform-admin/queries/platform-admin-notifications-queries";
+import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
 import { AdminNotificationsRoute } from "@/features/platform-admin/route/admin-notifications-route";
 
 function renderRoute(initialEntry = "/admin/notifications?focus=outbox_backlog") {
@@ -43,8 +44,10 @@ function renderRoute(initialEntry = "/admin/notifications?focus=outbox_backlog")
 
 describe("AdminNotificationsRoute", () => {
   it("passes focus from URL into the page", () => {
-    renderRoute();
+    const { container } = renderRoute();
 
+    expect(screen.getAllByRole("heading").length).toBeGreaterThan(0);
+    expect(findUnnamedInteractiveElements(container)).toEqual([]);
     expect(screen.getByText(/Health outbox backlog/)).toBeInTheDocument();
   });
 });

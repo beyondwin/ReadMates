@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import * as api from "@/features/platform-admin/api/platform-admin-health-api";
 import { AdminHealthRoute } from "@/features/platform-admin/route/admin-health-route";
 import type { PlatformHealthSnapshotResponse } from "@/features/platform-admin/api/platform-admin-health-contracts";
+import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
 
 const HEALTH_SNAPSHOT: PlatformHealthSnapshotResponse = {
   schema: "platform.health_snapshot.v1",
@@ -110,7 +111,7 @@ describe("AdminHealthRoute", () => {
   it("renders the full health snapshot and deploy strip", async () => {
     const fetchSpy = vi.spyOn(api, "fetchPlatformAdminHealthSnapshot").mockResolvedValueOnce(HEALTH_SNAPSHOT);
     const client = new QueryClient();
-    render(
+    const { container } = render(
       <QueryClientProvider client={client}>
         <MemoryRouter>
           <AdminHealthRoute />
@@ -119,6 +120,8 @@ describe("AdminHealthRoute", () => {
     );
     expect(screen.getByRole("heading", { name: "Platform Health" })).toBeInTheDocument();
     expect(await screen.findByText("Outbox backlog")).toBeInTheDocument();
+    expect(screen.getAllByRole("heading").length).toBeGreaterThan(0);
+    expect(findUnnamedInteractiveElements(container)).toEqual([]);
     expect(screen.getByText("Kafka consumer lag")).toBeInTheDocument();
     expect(screen.getByText("Redis")).toBeInTheDocument();
     expect(screen.getByText("DB pool")).toBeInTheDocument();

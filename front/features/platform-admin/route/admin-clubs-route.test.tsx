@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { platformAdminClubsQuery } from "@/features/platform-admin/queries/platform-admin-queries";
+import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
 import { AdminClubsRoute } from "./admin-clubs-route";
 
 function renderRoute(items: Array<{
@@ -30,7 +31,7 @@ function renderRoute(items: Array<{
 
 describe("AdminClubsRoute", () => {
   it("renders a row per club with key columns", () => {
-    renderRoute([
+    const { container } = renderRoute([
       {
         clubId: "c-1", slug: "alpha", name: "Alpha", status: "ACTIVE",
         publicVisibility: "PRIVATE", domainCount: 1, domainActionRequiredCount: 0,
@@ -38,6 +39,8 @@ describe("AdminClubsRoute", () => {
         firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
       },
     ]);
+    expect(screen.getAllByRole("heading").length).toBeGreaterThan(0);
+    expect(findUnnamedInteractiveElements(container)).toEqual([]);
     expect(screen.getByText("alpha")).toBeInTheDocument();
     expect(screen.getByText("Alpha")).toBeInTheDocument();
     expect(screen.getByText("ACTIVE")).toBeInTheDocument();

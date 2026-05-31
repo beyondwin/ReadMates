@@ -135,6 +135,20 @@
   color: var(--text);
 }
 
+.admin-shell__skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 1000;
+}
+
+.admin-shell__skip-link:focus {
+  left: 0;
+  padding: 0.5rem 1rem;
+  background: var(--surface, #fff);
+  outline: 2px solid var(--focus, #2563eb);
+}
+
 .admin-shell__header {
   position: sticky;
   top: 0;

@@ -8,6 +8,7 @@ import {
   platformAdminAiOpsSummaryQuery,
 } from "@/features/platform-admin/queries/platform-admin-ai-ops-queries";
 import { platformAdminSummaryQuery } from "@/features/platform-admin/queries/platform-admin-queries";
+import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
 import { AdminAiOpsRoute } from "./admin-ai-ops-route";
 
 function renderRoute(initialEntry = "/admin/ai-ops") {
@@ -51,8 +52,10 @@ function renderRoute(initialEntry = "/admin/ai-ops") {
 
 describe("AdminAiOpsRoute", () => {
   it("renders the AI Ops heading and delegates to PlatformAdminAiOps", () => {
-    renderRoute();
+    const { container } = renderRoute();
     expect(screen.getByRole("heading", { name: /AI Ops/, level: 1 })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading").length).toBeGreaterThan(0);
+    expect(findUnnamedInteractiveElements(container)).toEqual([]);
   });
 
   it("selecting a failure code pushes the errorCode filter to the URL", async () => {

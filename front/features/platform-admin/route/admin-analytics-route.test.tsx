@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { platformAdminAnalyticsOverviewQuery } from "@/features/platform-admin/queries/platform-admin-analytics-queries";
+import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
 import { AdminAnalyticsRoute } from "./admin-analytics-route";
 
 function renderRoute(initialEntry = "/admin/analytics?window=7d") {
@@ -30,8 +31,10 @@ function renderRoute(initialEntry = "/admin/analytics?window=7d") {
 
 describe("AdminAnalyticsRoute", () => {
   it("renders the cached analytics overview from the URL window", () => {
-    renderRoute();
+    const { container } = renderRoute();
     expect(screen.getByRole("heading", { name: "분석" })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading").length).toBeGreaterThan(0);
+    expect(findUnnamedInteractiveElements(container)).toEqual([]);
     expect(screen.getByText("75%")).toBeInTheDocument();
   });
 });

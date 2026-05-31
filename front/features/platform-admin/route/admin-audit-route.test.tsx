@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { platformAdminAuditLedgerQuery } from "@/features/platform-admin/queries/platform-admin-audit-queries";
+import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
 import { AdminAuditRoute } from "./admin-audit-route";
 
 function renderRoute(initialEntry = "/admin/audit?sourceSlice=S5") {
@@ -43,9 +44,11 @@ function renderRoute(initialEntry = "/admin/audit?sourceSlice=S5") {
 
 describe("AdminAuditRoute", () => {
   it("renders cached audit ledger rows from URL filters", () => {
-    renderRoute();
+    const { container } = renderRoute();
 
     expect(screen.getByRole("heading", { name: "감사" })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading").length).toBeGreaterThan(0);
+    expect(findUnnamedInteractiveElements(container)).toEqual([]);
     expect(screen.getByRole("button", { name: /알림 재처리가 확정되었습니다/ })).toBeInTheDocument();
   });
 });

@@ -11,6 +11,7 @@ import {
   platformAdminClubsQuery,
   platformAdminSummaryQuery,
 } from "@/features/platform-admin/queries/platform-admin-queries";
+import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
 import { AdminTodayRoute } from "./admin-today-route";
 
 function renderRoute(client: QueryClient, initialEntry = "/admin/today") {
@@ -71,9 +72,11 @@ function seededClient() {
 
 describe("AdminTodayRoute", () => {
   it("renders the operations ledger from seeded admin queries", () => {
-    renderRoute(seededClient(), "/admin/today?selected=club-club-ready");
+    const { container } = renderRoute(seededClient(), "/admin/today?selected=club-club-ready");
 
     expect(screen.getByRole("heading", { name: "오늘 할 일" })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading").length).toBeGreaterThan(0);
+    expect(findUnnamedInteractiveElements(container)).toEqual([]);
     expect(screen.getByRole("region", { name: "운영 작업 큐" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "선택 항목 브리프" })).toBeInTheDocument();
     expect(screen.getAllByText("Ready Club").length).toBeGreaterThan(0);

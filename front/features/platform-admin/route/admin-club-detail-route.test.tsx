@@ -7,6 +7,7 @@ import {
   platformAdminSupportGrantsQuery,
 } from "@/features/platform-admin/queries/platform-admin-queries";
 import { platformAdminClubOperationsQuery } from "@/features/platform-admin/queries/platform-admin-club-operations-queries";
+import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
 import { AdminBreadcrumbProvider } from "./admin-breadcrumb-context";
 import { AdminClubDetailRoute } from "./admin-club-detail-route";
 
@@ -60,7 +61,7 @@ describe("AdminClubDetailRoute", () => {
   });
 
   it("renders club summary for a known club", () => {
-    renderRoute("c-1", [{
+    const { container } = renderRoute("c-1", [{
       clubId: "c-1", slug: "alpha", name: "Alpha", tagline: "", about: "",
       status: "ACTIVE", publicVisibility: "PRIVATE",
       domainCount: 0, domainActionRequiredCount: 0,
@@ -68,6 +69,8 @@ describe("AdminClubDetailRoute", () => {
       firstHostOnboardingState: "ASSIGNED",
     }]);
     expect(screen.getByRole("heading", { name: "Alpha" })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading").length).toBeGreaterThan(0);
+    expect(findUnnamedInteractiveElements(container)).toEqual([]);
     expect(screen.getByRole("heading", { name: "Alpha 운영 스냅샷" })).toBeInTheDocument();
     expect(screen.getByText(/alpha/)).toBeInTheDocument();
   });
