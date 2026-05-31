@@ -5,6 +5,10 @@ import java.math.BigDecimal
 import java.time.Instant
 import java.util.UUID
 
+private const val AI_OPS_LAST_7D_DAYS = 7L
+private const val AI_OPS_LAST_30D_DAYS = 30L
+private const val AI_OPS_LAST_90D_DAYS = 90L
+
 data class AiOpsSummary(
     val activeJobCount: Int,
     val failedLast24h: Long,
@@ -55,10 +59,13 @@ data class AiOpsJobListItem(
 
 enum class AiOpsAction { FORCE_CANCEL, RETRY_COMMIT }
 
-enum class AiOpsCostWindow(val days: Long, val wire: String) {
-    LAST_7D(7, "7d"),
-    LAST_30D(30, "30d"),
-    LAST_90D(90, "90d"),
+enum class AiOpsCostWindow(
+    val days: Long,
+    val wire: String,
+) {
+    LAST_7D(AI_OPS_LAST_7D_DAYS, "7d"),
+    LAST_30D(AI_OPS_LAST_30D_DAYS, "30d"),
+    LAST_90D(AI_OPS_LAST_90D_DAYS, "90d"),
     ;
 
     companion object {

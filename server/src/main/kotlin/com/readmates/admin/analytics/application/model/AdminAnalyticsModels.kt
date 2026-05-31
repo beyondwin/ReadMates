@@ -5,15 +5,21 @@ import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.util.UUID
 
-enum class AnalyticsWindow(val days: Long, val wire: String) {
-    LAST_7D(7, "7d"),
-    LAST_30D(30, "30d"),
-    LAST_90D(90, "90d"),
+private const val LAST_7D_DAYS = 7L
+private const val LAST_30D_DAYS = 30L
+private const val LAST_90D_DAYS = 90L
+
+enum class AnalyticsWindow(
+    val days: Long,
+    val wire: String,
+) {
+    LAST_7D(LAST_7D_DAYS, "7d"),
+    LAST_30D(LAST_30D_DAYS, "30d"),
+    LAST_90D(LAST_90D_DAYS, "90d"),
     ;
 
     companion object {
-        fun fromWire(value: String?): AnalyticsWindow =
-            entries.firstOrNull { it.wire == value } ?: LAST_30D
+        fun fromWire(value: String?): AnalyticsWindow = entries.firstOrNull { it.wire == value } ?: LAST_30D
     }
 }
 

@@ -17,11 +17,11 @@ class PlatformAdminAnalyticsController(
     private val useCase: GetAdminAnalyticsOverviewUseCase,
 ) {
     @GetMapping("/overview")
+    @Suppress("MaxLineLength")
     fun overview(
         admin: CurrentPlatformAdmin,
         @RequestParam(required = false) window: String?,
-    ): AdminAnalyticsOverviewResponse =
-        AdminAnalyticsOverviewResponse.from(useCase.overview(admin, AnalyticsWindow.fromWire(window)))
+    ): AdminAnalyticsOverviewResponse = AdminAnalyticsOverviewResponse.from(useCase.overview(admin, AnalyticsWindow.fromWire(window)))
 }
 
 data class AdminAnalyticsOverviewResponse(

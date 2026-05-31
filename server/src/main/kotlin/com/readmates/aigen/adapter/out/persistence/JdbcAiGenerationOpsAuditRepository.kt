@@ -55,24 +55,25 @@ class JdbcAiGenerationOpsAuditRepository(
         start: Instant,
         endExclusive: Instant,
     ): AiOpsWindowUsage =
-        jdbcTemplate.query(
-            """
-            select
-              coalesce(sum(cost_estimate_usd), 0) as cost,
-              count(*) as cnt
-            from ai_generation_audit_log
-            where created_at >= ?
-              and created_at < ?
-            """.trimIndent(),
-            { rs, _ ->
-                AiOpsWindowUsage(
-                    costUsd = rs.getBigDecimal("cost"),
-                    jobCount = rs.getLong("cnt"),
-                )
-            },
-            Timestamp.from(start),
-            Timestamp.from(endExclusive),
-        ).first()
+        jdbcTemplate
+            .query(
+                """
+                select
+                  coalesce(sum(cost_estimate_usd), 0) as cost,
+                  count(*) as cnt
+                from ai_generation_audit_log
+                where created_at >= ?
+                  and created_at < ?
+                """.trimIndent(),
+                { rs, _ ->
+                    AiOpsWindowUsage(
+                        costUsd = rs.getBigDecimal("cost"),
+                        jobCount = rs.getLong("cnt"),
+                    )
+                },
+                Timestamp.from(start),
+                Timestamp.from(endExclusive),
+            ).first()
 
     override fun failureCodesSince(since: Instant): List<AiOpsFailureCodeCount> =
         jdbcTemplate.query(

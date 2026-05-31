@@ -173,7 +173,7 @@ class JdbcPlatformAdminClubFailureCountsTest(
             values (?, ?, ?, ?, 'SESSION_RECORD', 'ANTHROPIC', 'claude-x', ?,
               0, 0, 0, 0, 0, utc_timestamp(6) - interval ? day)
             """.trimIndent(),
-            UUID.randomUUID().toString(),
+            UUID.nameUUIDFromBytes(jobSuffix.toByteArray()).toString(),
             CLUB_ID,
             CLUB_ID,
             USER_ID,

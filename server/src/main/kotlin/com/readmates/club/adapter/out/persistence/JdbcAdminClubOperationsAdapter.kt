@@ -21,6 +21,7 @@ import java.time.OffsetDateTime
 import java.util.UUID
 
 @Repository
+@Suppress("TooManyFunctions")
 class JdbcAdminClubOperationsAdapter(
     private val jdbcTemplate: JdbcTemplate,
     private val clock: Clock,
@@ -148,33 +149,9 @@ class JdbcAdminClubOperationsAdapter(
 
     private fun notificationHealth(clubId: UUID): AdminClubNotificationHealth =
         AdminClubNotificationHealth(
-            pending =
-                scalarInt(
-                    """
-                    select count(*)
-                    from notification_deliveries
-                    where club_id = ? and status in ('PENDING', 'SENDING')
-                    """.trimIndent(),
-                    clubId,
-                ),
-            failed =
-                scalarInt(
-                    """
-                    select count(*)
-                    from notification_deliveries
-                    where club_id = ? and status = 'FAILED'
-                    """.trimIndent(),
-                    clubId,
-                ),
-            dead =
-                scalarInt(
-                    """
-                    select count(*)
-                    from notification_deliveries
-                    where club_id = ? and status = 'DEAD'
-                    """.trimIndent(),
-                    clubId,
-                ),
+            pending = notificationStatusCount(clubId, "status in ('PENDING', 'SENDING')"),
+            failed = notificationStatusCount(clubId, "status = 'FAILED'"),
+            dead = notificationStatusCount(clubId, "status = 'DEAD'"),
             lastSuccessAt =
                 jdbcTemplate.queryForObject(
                     """
@@ -186,28 +163,46 @@ class JdbcAdminClubOperationsAdapter(
                     clubId.dbString(),
                 ),
             failureClusters = failureClusters(clubId),
-            recentFailed7d =
-                scalarInt(
-                    """
-                    select count(*)
-                    from notification_deliveries
-                    where club_id = ? and status in ('FAILED', 'DEAD')
-                      and updated_at >= utc_timestamp(6) - interval 7 day
-                    """.trimIndent(),
-                    clubId,
-                ),
-            priorFailed7d =
-                scalarInt(
-                    """
-                    select count(*)
-                    from notification_deliveries
-                    where club_id = ? and status in ('FAILED', 'DEAD')
-                      and updated_at >= utc_timestamp(6) - interval 14 day
-                      and updated_at < utc_timestamp(6) - interval 7 day
-                    """.trimIndent(),
-                    clubId,
-                ),
+            recentFailed7d = notificationFailureWindowCount(clubId, prior = false),
+            priorFailed7d = notificationFailureWindowCount(clubId, prior = true),
         )
+
+    private fun notificationStatusCount(
+        clubId: UUID,
+        statusPredicate: String,
+    ): Int =
+        scalarInt(
+            """
+            select count(*)
+            from notification_deliveries
+            where club_id = ? and $statusPredicate
+            """.trimIndent(),
+            clubId,
+        )
+
+    private fun notificationFailureWindowCount(
+        clubId: UUID,
+        prior: Boolean,
+    ): Int {
+        val windowPredicate =
+            if (prior) {
+                """
+                updated_at >= utc_timestamp(6) - interval 14 day
+                  and updated_at < utc_timestamp(6) - interval 7 day
+                """.trimIndent()
+            } else {
+                "updated_at >= utc_timestamp(6) - interval 7 day"
+            }
+        return scalarInt(
+            """
+            select count(*)
+            from notification_deliveries
+            where club_id = ? and status in ('FAILED', 'DEAD')
+              and $windowPredicate
+            """.trimIndent(),
+            clubId,
+        )
+    }
 
     private fun failureClusters(clubId: UUID): List<AdminClubNotificationFailureCluster> =
         jdbcTemplate.query(

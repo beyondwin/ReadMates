@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:package-name")
+
 package com.readmates.admin.analytics.adapter.`in`.web
 
 import com.readmates.auth.application.service.AuthSessionService

@@ -57,8 +57,9 @@ class HostClubOperationsServiceTest {
 
     @Test
     fun `projects own club snapshot to host subset`() {
-        val result = service(port { id -> if (id == clubId) snapshot() else null })
-            .hostOperationsSnapshot(host(MembershipRole.HOST))
+        val result =
+            service(port { id -> if (id == clubId) snapshot() else null })
+                .hostOperationsSnapshot(host(MembershipRole.HOST))
 
         assertThat(result.schema).isEqualTo("host.club_operations_snapshot.v1")
         assertThat(result.club.clubId).isEqualTo(clubId)

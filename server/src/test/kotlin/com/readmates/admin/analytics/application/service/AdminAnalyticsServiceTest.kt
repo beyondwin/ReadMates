@@ -26,17 +26,21 @@ class AdminAnalyticsServiceTest {
 
     private fun service(raw: AdminAnalyticsRawAggregates) =
         AdminAnalyticsService(
-            port = object : AdminAnalyticsAggregatePort {
-                override fun loadAggregates(window: AnalyticsWindow) = raw
-            },
+            port =
+                object : AdminAnalyticsAggregatePort {
+                    override fun loadAggregates(window: AnalyticsWindow) = raw
+                },
             clock = clock,
         )
 
     @Test
     fun `derives completion percent and upward delta`() {
         val raw = sample(sessionsCurrent = 10, completedCurrent = 8, sessionsPrior = 10, completedPrior = 5)
-        val card = service(raw).overview(admin, AnalyticsWindow.LAST_30D)
-            .kpis.first { it.key == KpiKey.SESSION_COMPLETION }
+        val card =
+            service(raw)
+                .overview(admin, AnalyticsWindow.LAST_30D)
+                .kpis
+                .first { it.key == KpiKey.SESSION_COMPLETION }
 
         assertThat(card.availability).isEqualTo(Availability.AVAILABLE)
         assertThat(card.current).isEqualTo(80.0)
@@ -47,8 +51,11 @@ class AdminAnalyticsServiceTest {
     @Test
     fun `marks not enough data when window has no sessions`() {
         val raw = sample(sessionsCurrent = 0, completedCurrent = 0, sessionsPrior = 0, completedPrior = 0)
-        val card = service(raw).overview(admin, AnalyticsWindow.LAST_7D)
-            .kpis.first { it.key == KpiKey.SESSION_COMPLETION }
+        val card =
+            service(raw)
+                .overview(admin, AnalyticsWindow.LAST_7D)
+                .kpis
+                .first { it.key == KpiKey.SESSION_COMPLETION }
 
         assertThat(card.availability).isEqualTo(Availability.NOT_ENOUGH_DATA)
         assertThat(card.current).isNull()
@@ -65,30 +72,31 @@ class AdminAnalyticsServiceTest {
     fun `derives KPI series with unavailable buckets kept honest`() {
         val raw =
             sample().copy(
-                series = listOf(
-                    AdminAnalyticsSeriesRawPoint(
-                        bucketStart = LocalDate.parse("2026-05-01"),
-                        sessions = 0,
-                        completedSessions = 0,
-                        participants = 0,
-                        goingMaybe = 0,
-                        activeMembers = 0,
-                        aiCost = BigDecimal.ZERO,
-                        notifTerminal = 0,
-                        notifSent = 0,
+                series =
+                    listOf(
+                        AdminAnalyticsSeriesRawPoint(
+                            bucketStart = LocalDate.parse("2026-05-01"),
+                            sessions = 0,
+                            completedSessions = 0,
+                            participants = 0,
+                            goingMaybe = 0,
+                            activeMembers = 0,
+                            aiCost = BigDecimal.ZERO,
+                            notifTerminal = 0,
+                            notifSent = 0,
+                        ),
+                        AdminAnalyticsSeriesRawPoint(
+                            bucketStart = LocalDate.parse("2026-05-08"),
+                            sessions = 4,
+                            completedSessions = 3,
+                            participants = 8,
+                            goingMaybe = 6,
+                            activeMembers = 5,
+                            aiCost = BigDecimal("2.0000"),
+                            notifTerminal = 10,
+                            notifSent = 9,
+                        ),
                     ),
-                    AdminAnalyticsSeriesRawPoint(
-                        bucketStart = LocalDate.parse("2026-05-08"),
-                        sessions = 4,
-                        completedSessions = 3,
-                        participants = 8,
-                        goingMaybe = 6,
-                        activeMembers = 5,
-                        aiCost = BigDecimal("2.0000"),
-                        notifTerminal = 10,
-                        notifSent = 9,
-                    ),
-                ),
             )
 
         val overview = service(raw).overview(admin, AnalyticsWindow.LAST_30D)
@@ -129,13 +137,21 @@ class AdminAnalyticsServiceTest {
         notifSentCurrent = 19,
         notifTerminalPrior = 20,
         notifSentPrior = 18,
-        benchmark = listOf(
-            AdminAnalyticsBenchmarkRaw(
-                clubId = UUID.randomUUID(), slug = "club-a", name = "Club A",
-                activeMembers = 5, sessions = 4, completedSessions = 2,
-                participants = 10, goingMaybe = 7, aiCost = BigDecimal("2.0000"),
-                notifTerminal = 20, notifSent = 19,
+        benchmark =
+            listOf(
+                AdminAnalyticsBenchmarkRaw(
+                    clubId = UUID.randomUUID(),
+                    slug = "club-a",
+                    name = "Club A",
+                    activeMembers = 5,
+                    sessions = 4,
+                    completedSessions = 2,
+                    participants = 10,
+                    goingMaybe = 7,
+                    aiCost = BigDecimal("2.0000"),
+                    notifTerminal = 20,
+                    notifSent = 19,
+                ),
             ),
-        ),
     )
 }

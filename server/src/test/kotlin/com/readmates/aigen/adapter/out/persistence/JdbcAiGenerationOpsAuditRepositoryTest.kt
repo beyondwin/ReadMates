@@ -52,11 +52,31 @@ class JdbcAiGenerationOpsAuditRepositoryTest(
         val start = Instant.parse("2026-05-10T00:00:00Z")
         val end = Instant.parse("2026-05-20T00:00:00Z")
         // in range
-        insertAuditRow(provider = "OPENAI", model = "gpt-model", cost = BigDecimal("0.1000"), createdAt = Instant.parse("2026-05-12T00:00:00Z"))
-        insertAuditRow(provider = "CLAUDE", model = "claude-model", cost = BigDecimal("0.0500"), createdAt = Instant.parse("2026-05-19T23:59:59Z"))
+        insertAuditRow(
+            provider = "OPENAI",
+            model = "gpt-model",
+            cost = BigDecimal("0.1000"),
+            createdAt = Instant.parse("2026-05-12T00:00:00Z"),
+        )
+        insertAuditRow(
+            provider = "CLAUDE",
+            model = "claude-model",
+            cost = BigDecimal("0.0500"),
+            createdAt = Instant.parse("2026-05-19T23:59:59Z"),
+        )
         // out of range: before start, and on the exclusive end boundary
-        insertAuditRow(provider = "OPENAI", model = "gpt-model", cost = BigDecimal("9.0000"), createdAt = Instant.parse("2026-05-09T23:59:59Z"))
-        insertAuditRow(provider = "OPENAI", model = "gpt-model", cost = BigDecimal("9.0000"), createdAt = end)
+        insertAuditRow(
+            provider = "OPENAI",
+            model = "gpt-model",
+            cost = BigDecimal("9.0000"),
+            createdAt = Instant.parse("2026-05-09T23:59:59Z"),
+        )
+        insertAuditRow(
+            provider = "OPENAI",
+            model = "gpt-model",
+            cost = BigDecimal("9.0000"),
+            createdAt = end,
+        )
 
         val usage = repository.windowUsageBetween(start, end)
 

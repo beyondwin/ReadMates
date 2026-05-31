@@ -111,7 +111,12 @@ class JdbcAdminClubOperationsTrendTest(
             values (?, ?, 'SESSION_REMINDER_DUE', 'SESSION', ?, json_object('sessionId', ?), 'PUBLISHED',
               ?, 1, null, ?, utc_timestamp(6), utc_timestamp(6))
             """.trimIndent(),
-            id, CLUB_ID, CLUB_ID, CLUB_ID, CLUB_ID, "ops-trend-outbox-$id",
+            id,
+            CLUB_ID,
+            CLUB_ID,
+            CLUB_ID,
+            CLUB_ID,
+            "ops-trend-outbox-$id",
         )
     }
 
@@ -129,7 +134,14 @@ class JdbcAdminClubOperationsTrendTest(
             values (?, ?, ?, ?, 'EMAIL', ?, ?, 1, 'smtp timeout',
               utc_timestamp(6) - interval ? day, utc_timestamp(6) - interval ? day)
             """.trimIndent(),
-            id, EVENT_ID, CLUB_ID, MEMBERSHIP_ID, status, "ops-trend-delivery-$id", daysAgo, daysAgo,
+            id,
+            EVENT_ID,
+            CLUB_ID,
+            MEMBERSHIP_ID,
+            status,
+            "ops-trend-delivery-$id",
+            daysAgo,
+            daysAgo,
         )
     }
 
@@ -146,7 +158,12 @@ class JdbcAdminClubOperationsTrendTest(
             values (?, ?, ?, ?, 'SESSION_RECORD', 'ANTHROPIC', 'claude-x', ?,
               0, 0, 0, 0, 0, utc_timestamp(6) - interval ? day)
             """.trimIndent(),
-            UUID.randomUUID().toString(), CLUB_ID, CLUB_ID, USER_ID, status, daysAgo,
+            UUID.randomUUID().toString(),
+            CLUB_ID,
+            CLUB_ID,
+            USER_ID,
+            status,
+            daysAgo,
         )
     }
 }

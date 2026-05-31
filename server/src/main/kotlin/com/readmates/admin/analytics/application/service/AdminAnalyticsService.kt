@@ -23,6 +23,10 @@ import java.math.RoundingMode
 import java.time.Clock
 import java.time.OffsetDateTime
 
+private const val COST_SCALE = 4
+private const val RATE_SCALE = 1
+private const val RATE_MULTIPLIER = 100.0
+
 @Service
 class AdminAnalyticsService(
     private val port: AdminAnalyticsAggregatePort,
@@ -46,43 +50,84 @@ class AdminAnalyticsService(
         listOf(
             count(
                 KpiKey.ACTIVE_MEMBERS,
-                hasCurrent = raw.sessionsCurrent > 0, hasPrior = raw.sessionsPrior > 0,
-                current = raw.activeMembersCurrent, prior = raw.activeMembersPrior,
+                hasCurrent = raw.sessionsCurrent > 0,
+                hasPrior = raw.sessionsPrior > 0,
+                current = raw.activeMembersCurrent,
+                prior = raw.activeMembersPrior,
             ),
             percent(
                 KpiKey.SESSION_COMPLETION,
-                numCurrent = raw.completedSessionsCurrent, denCurrent = raw.sessionsCurrent,
-                numPrior = raw.completedSessionsPrior, denPrior = raw.sessionsPrior,
+                numCurrent = raw.completedSessionsCurrent,
+                denCurrent = raw.sessionsCurrent,
+                numPrior = raw.completedSessionsPrior,
+                denPrior = raw.sessionsPrior,
             ),
             percent(
                 KpiKey.RSVP_RATE,
-                numCurrent = raw.goingMaybeCurrent, denCurrent = raw.participantsCurrent,
-                numPrior = raw.goingMaybePrior, denPrior = raw.participantsPrior,
+                numCurrent = raw.goingMaybeCurrent,
+                denCurrent = raw.participantsCurrent,
+                numPrior = raw.goingMaybePrior,
+                denPrior = raw.participantsPrior,
             ),
             costPerSession(raw),
             percent(
                 KpiKey.NOTIFICATION_DELIVERY,
-                numCurrent = raw.notifSentCurrent, denCurrent = raw.notifTerminalCurrent,
-                numPrior = raw.notifSentPrior, denPrior = raw.notifTerminalPrior,
+                numCurrent = raw.notifSentCurrent,
+                denCurrent = raw.notifTerminalCurrent,
+                numPrior = raw.notifSentPrior,
+                denPrior = raw.notifTerminalPrior,
             ),
         )
 
-    private fun count(key: KpiKey, hasCurrent: Boolean, hasPrior: Boolean, current: Int, prior: Int): AdminAnalyticsKpiCard {
+    private fun count(
+        key: KpiKey,
+        hasCurrent: Boolean,
+        hasPrior: Boolean,
+        current: Int,
+        prior: Int,
+    ): AdminAnalyticsKpiCard {
         val cur = if (hasCurrent) current.toDouble() else null
         val pri = if (hasPrior) prior.toDouble() else null
-        return AdminAnalyticsKpiCard(key, KpiUnit.COUNT, availability(hasCurrent), cur, pri, direction(cur, pri))
+        return AdminAnalyticsKpiCard(
+            key = key,
+            unit = KpiUnit.COUNT,
+            availability = availability(hasCurrent),
+            current = cur,
+            prior = pri,
+            deltaDirection = direction(cur, pri),
+        )
     }
 
-    private fun percent(key: KpiKey, numCurrent: Int, denCurrent: Int, numPrior: Int, denPrior: Int): AdminAnalyticsKpiCard {
+    private fun percent(
+        key: KpiKey,
+        numCurrent: Int,
+        denCurrent: Int,
+        numPrior: Int,
+        denPrior: Int,
+    ): AdminAnalyticsKpiCard {
         val cur = ratePercent(numCurrent, denCurrent)
         val pri = ratePercent(numPrior, denPrior)
-        return AdminAnalyticsKpiCard(key, KpiUnit.PERCENT, availability(denCurrent > 0), cur, pri, direction(cur, pri))
+        return AdminAnalyticsKpiCard(
+            key = key,
+            unit = KpiUnit.PERCENT,
+            availability = availability(denCurrent > 0),
+            current = cur,
+            prior = pri,
+            deltaDirection = direction(cur, pri),
+        )
     }
 
     private fun costPerSession(raw: AdminAnalyticsRawAggregates): AdminAnalyticsKpiCard {
         val cur = perSession(raw.aiCostCurrent, raw.sessionsCurrent)
         val pri = perSession(raw.aiCostPrior, raw.sessionsPrior)
-        return AdminAnalyticsKpiCard(KpiKey.AI_COST_PER_SESSION, KpiUnit.USD, availability(raw.sessionsCurrent > 0), cur, pri, direction(cur, pri))
+        return AdminAnalyticsKpiCard(
+            key = KpiKey.AI_COST_PER_SESSION,
+            unit = KpiUnit.USD,
+            availability = availability(raw.sessionsCurrent > 0),
+            current = cur,
+            prior = pri,
+            deltaDirection = direction(cur, pri),
+        )
     }
 
     private fun benchmark(raw: AdminAnalyticsRawAggregates): AdminAnalyticsBenchmark =
@@ -105,93 +150,80 @@ class AdminAnalyticsService(
 
     private fun series(points: List<AdminAnalyticsSeriesRawPoint>): List<AdminAnalyticsKpiSeries> =
         listOf(
-            AdminAnalyticsKpiSeries(
-                key = KpiKey.ACTIVE_MEMBERS,
-                unit = KpiUnit.COUNT,
-                points = points.map { point ->
-                    AdminAnalyticsKpiSeriesPoint(
-                        bucketStart = point.bucketStart,
-                        availability = availability(point.sessions > 0),
-                        value = if (point.sessions > 0) point.activeMembers.toDouble() else null,
-                    )
-                },
-            ),
-            AdminAnalyticsKpiSeries(
-                key = KpiKey.SESSION_COMPLETION,
-                unit = KpiUnit.PERCENT,
-                points = points.map { point ->
-                    val value = ratePercent(point.completedSessions, point.sessions)
-                    AdminAnalyticsKpiSeriesPoint(
-                        bucketStart = point.bucketStart,
-                        availability = availability(value != null),
-                        value = value,
-                    )
-                },
-            ),
-            AdminAnalyticsKpiSeries(
-                key = KpiKey.RSVP_RATE,
-                unit = KpiUnit.PERCENT,
-                points = points.map { point ->
-                    val value = ratePercent(point.goingMaybe, point.participants)
-                    AdminAnalyticsKpiSeriesPoint(
-                        bucketStart = point.bucketStart,
-                        availability = availability(value != null),
-                        value = value,
-                    )
-                },
-            ),
-            AdminAnalyticsKpiSeries(
-                key = KpiKey.AI_COST_PER_SESSION,
-                unit = KpiUnit.USD,
-                points = points.map { point ->
-                    val value = perSession(point.aiCost, point.sessions)
-                    AdminAnalyticsKpiSeriesPoint(
-                        bucketStart = point.bucketStart,
-                        availability = availability(value != null),
-                        value = value,
-                    )
-                },
-            ),
-            AdminAnalyticsKpiSeries(
-                key = KpiKey.NOTIFICATION_DELIVERY,
-                unit = KpiUnit.PERCENT,
-                points = points.map { point ->
-                    val value = ratePercent(point.notifSent, point.notifTerminal)
-                    AdminAnalyticsKpiSeriesPoint(
-                        bucketStart = point.bucketStart,
-                        availability = availability(value != null),
-                        value = value,
-                    )
-                },
-            ),
+            seriesFor(points, KpiKey.ACTIVE_MEMBERS, KpiUnit.COUNT) { point ->
+                if (point.sessions > 0) point.activeMembers.toDouble() else null
+            },
+            seriesFor(points, KpiKey.SESSION_COMPLETION, KpiUnit.PERCENT) { point ->
+                ratePercent(point.completedSessions, point.sessions)
+            },
+            seriesFor(points, KpiKey.RSVP_RATE, KpiUnit.PERCENT) { point ->
+                ratePercent(point.goingMaybe, point.participants)
+            },
+            seriesFor(points, KpiKey.AI_COST_PER_SESSION, KpiUnit.USD) { point ->
+                perSession(point.aiCost, point.sessions)
+            },
+            seriesFor(points, KpiKey.NOTIFICATION_DELIVERY, KpiUnit.PERCENT) { point ->
+                ratePercent(point.notifSent, point.notifTerminal)
+            },
         )
 
-    private fun availability(hasData: Boolean): Availability =
-        if (hasData) Availability.AVAILABLE else Availability.NOT_ENOUGH_DATA
-
-    private fun ratePercent(numerator: Int, denominator: Int): Double? =
-        if (denominator <= 0) {
-            null
-        } else {
-            BigDecimal(numerator * 100.0 / denominator).setScale(1, RoundingMode.HALF_UP).toDouble()
-        }
-
-    private fun perSession(cost: BigDecimal, sessions: Int): Double? =
-        if (sessions <= 0) {
-            null
-        } else {
-            cost.divide(BigDecimal(sessions), COST_SCALE, RoundingMode.HALF_UP).toDouble()
-        }
-
-    private fun direction(current: Double?, prior: Double?): DeltaDirection =
-        when {
-            current == null || prior == null -> DeltaDirection.NONE
-            current > prior -> DeltaDirection.UP
-            current < prior -> DeltaDirection.DOWN
-            else -> DeltaDirection.FLAT
-        }
-
-    private companion object {
-        const val COST_SCALE = 4
-    }
+    private fun seriesFor(
+        points: List<AdminAnalyticsSeriesRawPoint>,
+        key: KpiKey,
+        unit: KpiUnit,
+        valueOf: (AdminAnalyticsSeriesRawPoint) -> Double?,
+    ): AdminAnalyticsKpiSeries =
+        AdminAnalyticsKpiSeries(
+            key = key,
+            unit = unit,
+            points =
+                points.map { point ->
+                    val value = valueOf(point)
+                    AdminAnalyticsKpiSeriesPoint(
+                        bucketStart = point.bucketStart,
+                        availability = availability(value != null),
+                        value = value,
+                    )
+                },
+        )
 }
+
+private fun availability(hasData: Boolean): Availability =
+    if (hasData) {
+        Availability.AVAILABLE
+    } else {
+        Availability.NOT_ENOUGH_DATA
+    }
+
+private fun ratePercent(
+    numerator: Int,
+    denominator: Int,
+): Double? =
+    if (denominator <= 0) {
+        null
+    } else {
+        BigDecimal(numerator * RATE_MULTIPLIER / denominator)
+            .setScale(RATE_SCALE, RoundingMode.HALF_UP)
+            .toDouble()
+    }
+
+private fun perSession(
+    cost: BigDecimal,
+    sessions: Int,
+): Double? =
+    if (sessions <= 0) {
+        null
+    } else {
+        cost.divide(BigDecimal(sessions), COST_SCALE, RoundingMode.HALF_UP).toDouble()
+    }
+
+private fun direction(
+    current: Double?,
+    prior: Double?,
+): DeltaDirection =
+    when {
+        current == null || prior == null -> DeltaDirection.NONE
+        current > prior -> DeltaDirection.UP
+        current < prior -> DeltaDirection.DOWN
+        else -> DeltaDirection.FLAT
+    }

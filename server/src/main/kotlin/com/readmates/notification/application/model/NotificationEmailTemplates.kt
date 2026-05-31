@@ -262,69 +262,69 @@ object NotificationEmailTemplates {
             }
 
         return """
-                                                                                    <!doctype html>
-                                                                                    <html lang="ko">
-                                                                                      <body style="margin:0;padding:0;background:#f4efe6;color:#17233a;">
-                                                                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4efe6;padding:28px 12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-                                                                                          <tr>
-                                                                                            <td align="center">
-                                                                                              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#fffaf1;border:1px solid #d9cdbd;">
-                                                                                                <tr>
-                                                                                                  <td style="padding:32px 32px 34px;">
-                                                                                                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                                                                                                <!doctype html>
+                                                                                                <html lang="ko">
+                                                                                                  <body style="margin:0;padding:0;background:#f4efe6;color:#17233a;">
+                                                                                                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4efe6;padding:28px 12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
                                                                                                       <tr>
-                                                                                                        <td style="padding:0 0 18px;border-bottom:1px solid #e9ded0;">
-                                                                                                          <span style="font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:500;letter-spacing:0;color:#17233a;"><strong>${escapeHtml(
+                                                                                                        <td align="center">
+                                                                                                          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#fffaf1;border:1px solid #d9cdbd;">
+                                                                                                            <tr>
+                                                                                                              <td style="padding:32px 32px 34px;">
+                                                                                                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                                                                                                                  <tr>
+                                                                                                                    <td style="padding:0 0 18px;border-bottom:1px solid #e9ded0;">
+                                                                                                                      <span style="font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:500;letter-spacing:0;color:#17233a;"><strong>${escapeHtml(
             brandName,
         )}</strong></span>
-                                                                                                          <span style="float:right;color:#687084;font-size:11px;letter-spacing:.08em;text-transform:uppercase;">${escapeHtml(
+                                                                                                                      <span style="float:right;color:#687084;font-size:11px;letter-spacing:.08em;text-transform:uppercase;">${escapeHtml(
             label,
         )}</span>
-                                                                                                        </td>
-                                                                                                      </tr>
-                                                                                                      <tr>
-                                                                                                        <td style="padding:28px 0 0;color:#58634b;font-size:12px;letter-spacing:.08em;text-transform:uppercase;">${escapeHtml(
+                                                                                                                    </td>
+                                                                                                                  </tr>
+                                                                                                                  <tr>
+                                                                                                                    <td style="padding:28px 0 0;color:#58634b;font-size:12px;letter-spacing:.08em;text-transform:uppercase;">${escapeHtml(
             label,
         )}</td>
-                                                                                                      </tr>
-                                                                                                      <tr>
-                                                                                                        <td style="padding:10px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:28px;line-height:1.12;font-weight:500;color:#17233a;">${escapeHtml(
+                                                                                                                  </tr>
+                                                                                                                  <tr>
+                                                                                                                    <td style="padding:10px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:28px;line-height:1.12;font-weight:500;color:#17233a;">${escapeHtml(
             title,
         )}</td>
-                                                                                                      </tr>
-                                                                                                      <tr>
-                                                                                                        <td style="padding:22px 0 0;">
-                                                                                                          $greeting
-                                                                                                          <p style="margin:0;color:#2f3a4e;font-size:15px;line-height:1.78;">${escapeHtml(
+                                                                                                                  </tr>
+                                                                                                                  <tr>
+                                                                                                                    <td style="padding:22px 0 0;">
+                                                                                                                      $greeting
+                                                                                                                      <p style="margin:0;color:#2f3a4e;font-size:15px;line-height:1.78;">${escapeHtml(
             summary,
         )}</p>
-                                                                                                        </td>
-                                                                                                      </tr>
-                                                                                                      <tr>
-                                                                                                        <td style="padding:26px 0 0;">
-                                                                                                          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #d9cdbd;background:#fbf3e6;padding:8px 17px;">$rows</table>
-                                                                                                        </td>
-                                                                                                      </tr>
-                                                                                                      $cta
-                                                                                                      <tr>
-                                                                                                        <td style="padding:22px 0 0;color:#687084;font-size:13px;line-height:1.65;">${escapeHtml(
+                                                                                                                    </td>
+                                                                                                                  </tr>
+                                                                                                                  <tr>
+                                                                                                                    <td style="padding:26px 0 0;">
+                                                                                                                      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #d9cdbd;background:#fbf3e6;padding:8px 17px;">$rows</table>
+                                                                                                                    </td>
+                                                                                                                  </tr>
+                                                                                                                  $cta
+                                                                                                                  <tr>
+                                                                                                                    <td style="padding:22px 0 0;color:#687084;font-size:13px;line-height:1.65;">${escapeHtml(
             closing,
         )}</td>
-                                                                                                      </tr>
-                                                                                                      <tr>
-                                                                                                        <td style="padding:18px 0 0;border-top:1px solid #e9ded0;color:#747b8b;font-size:11px;line-height:1.5;">${escapeHtml(
+                                                                                                                  </tr>
+                                                                                                                  <tr>
+                                                                                                                    <td style="padding:18px 0 0;border-top:1px solid #e9ded0;color:#747b8b;font-size:11px;line-height:1.5;">${escapeHtml(
             footer,
         )}</td>
+                                                                                                                  </tr>
+                                                                                                                </table>
+                                                                                                              </td>
+                                                                                                            </tr>
+                                                                                                          </table>
+                                                                                                        </td>
                                                                                                       </tr>
                                                                                                     </table>
-                                                                                                  </td>
-                                                                                                </tr>
-                                                                                              </table>
-                                                                                            </td>
-                                                                                          </tr>
-                                                                                        </table>
-                                                                                      </body>
-                                                                                    </html>
+                                                                                                  </body>
+                                                                                                </html>
             """.trimIndent()
     }
 
