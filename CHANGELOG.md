@@ -8,7 +8,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Highlights
 
-- 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
+- **release policy:** solo-admin 운영 현실에 맞춰 `main` branch protection에서 불가능한 PR/code-owner self-review 요구를 제거하고, 필수 `Frontend`/`Backend` status check와 DB/API release-readiness evidence path는 유지하도록 문서와 CODEOWNERS 의미를 정렬했습니다.
 
 ## v1.12.1 - 2026-05-31
 
