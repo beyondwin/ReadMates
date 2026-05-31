@@ -79,6 +79,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - **DB migration**: Flyway V34 (`ai_generation_admin_action_audit` + `ai_generation_audit_log` indexes) supports AI Ops/audit lookups, and Flyway V35 (`admin_notification_replay_previews`) creates the admin notification replay preview/audit table. Both are additive; rollback leaves unused rows/tables until a later cleanup migration.
 - **배포 순서**: server image를 먼저 배포해 V34/V35와 새 `/api/admin/**` contract를 적용한 뒤 frontend를 배포합니다. 이전 frontend는 새 endpoint를 호출하지 않으므로 서버 선배포가 안전합니다.
 - **운영 확인**: OWNER 또는 OPERATOR 권한으로 `/admin/notifications`에서 replay preview가 10분 TTL과 selection hash를 반환하는지, confirm 후 audit row와 outbox replay 상태가 남는지 확인합니다. `/admin/support`에서는 grant 만료가 24시간 이내로 제한되고 masked email만 보이는지 확인합니다. AI generation이 켜진 환경에서는 `/admin/ai-ops` summary/job ledger와 `/admin/audit`의 AI source filter가 raw transcript나 provider error body 없이 렌더링되는지도 확인합니다.
+- **Branch protection exception**: PR #10 was CI-green but blocked by a one-review/code-owner requirement in a single-collaborator repository, so the release uses an admin merge after documenting the exception in the release-readiness review. Before the next DB/API release, configure a non-author reviewer/code owner or adjust branch protection to avoid requiring an impossible self-review.
 
 ### Verification
 
