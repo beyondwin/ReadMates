@@ -79,6 +79,14 @@ test("host creates member-visible upcoming session then starts it", async ({ pag
   await expect(
     page.locator(".rm-current-session-desktop").getByRole("heading", { level: 1, name: "E2E 예정 책" }),
   ).toBeVisible();
+
+  await loginAsDevAccount(page, /멤버1/);
+  await page.goto("/app");
+  await expect(page.locator(".rm-member-home-desktop").getByText("RSVP를 먼저 선택해 주세요.")).toBeVisible();
+  await page.goto("/app/session/current");
+  const currentSessionDesktop = page.locator(".rm-current-session-desktop");
+  await expect(currentSessionDesktop.getByText("멤버 준비 필요")).toBeVisible();
+  await expect(currentSessionDesktop.getByText("RSVP, 읽기 진행률, 질문을 모임 전에 정리합니다.")).toBeVisible();
 });
 
 test("host creates session seven and member sees current session", async ({ page }) => {
