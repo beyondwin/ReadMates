@@ -25,6 +25,13 @@ For the Ops Insight & Release Trust branch, residuals are classified as:
 
 The v1.11.0 production OAuth and backup timer items remain manual operational actions until a human records sanitized production evidence. Analytics v2 and observability truth cleanup do not close those items by themselves.
 
+## 2026-05-31 Ops Insight & Release Trust verification note
+
+- Scope reviewed: `origin/main..HEAD` (broad because local `main` is ahead of `origin/main` in this workspace).
+- Executed: frontend lint/test/build, targeted admin analytics E2E, server clean test, public release candidate build, and public release safety scan.
+- Skipped: none.
+- Residual risk: v1.11.0 production OAuth and backup timer remain manual operational actions; this branch does not claim to close them.
+
 ## 기본 범위
 
 기본 범위는 현재 branch와 base branch의 차이입니다. 보통 `origin/main..HEAD`를 사용합니다.
