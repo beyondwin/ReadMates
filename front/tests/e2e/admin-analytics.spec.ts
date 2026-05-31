@@ -57,6 +57,7 @@ function overview(windowValue: "7d" | "30d" | "90d") {
       { key: "NOTIFICATION_DELIVERY", unit: "PERCENT", availability: "AVAILABLE", current: 95, prior: 95, deltaDirection: "FLAT" },
     ],
     clubBenchmark: { availability: "NOT_ENOUGH_DATA", rows: [] },
+    series: [],
   };
 }
 

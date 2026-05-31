@@ -15,6 +15,7 @@ const overview: AdminAnalyticsOverview = {
     { key: "NOTIFICATION_DELIVERY", unit: "PERCENT", availability: "AVAILABLE", current: 95, prior: 95, deltaDirection: "FLAT" },
   ],
   clubBenchmark: { availability: "NOT_ENOUGH_DATA", rows: [] },
+  series: [],
 };
 
 describe("AdminAnalyticsOverviewView", () => {

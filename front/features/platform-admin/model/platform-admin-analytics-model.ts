@@ -18,6 +18,18 @@ export type AdminAnalyticsKpiCard = {
   deltaDirection: DeltaDirection;
 };
 
+export type AdminAnalyticsKpiSeriesPoint = {
+  bucketStart: string;
+  availability: Availability;
+  value: number | null;
+};
+
+export type AdminAnalyticsKpiSeries = {
+  key: KpiKey;
+  unit: KpiUnit;
+  points: AdminAnalyticsKpiSeriesPoint[];
+};
+
 export type AdminAnalyticsBenchmarkRow = {
   clubId: string;
   slug: string;
@@ -40,6 +52,7 @@ export type AdminAnalyticsOverview = {
   window: AnalyticsWindow;
   kpis: AdminAnalyticsKpiCard[];
   clubBenchmark: AdminAnalyticsBenchmark;
+  series: AdminAnalyticsKpiSeries[];
 };
 
 const WINDOWS: AnalyticsWindow[] = ["7d", "30d", "90d"];
@@ -90,6 +103,72 @@ export function formatKpiValue(card: AdminAnalyticsKpiCard): string {
     case "COUNT":
       return `${card.current}`;
   }
+}
+
+export function formatSeriesPointValue(point: AdminAnalyticsKpiSeriesPoint, unit: KpiUnit): string {
+  if (point.availability === "NOT_ENOUGH_DATA" || point.value === null) {
+    return "데이터 부족";
+  }
+  switch (unit) {
+    case "PERCENT":
+      return `${point.value}%`;
+    case "USD":
+      return `$${point.value.toFixed(4)}`;
+    case "COUNT":
+      return `${point.value}`;
+  }
+}
+
+export function analyticsCsvFilename(overview: AdminAnalyticsOverview): string {
+  const date = overview.generatedAt.slice(0, 10);
+  return `readmates-admin-analytics-${overview.window}-${date}.csv`;
+}
+
+export function analyticsCsvHref(overview: AdminAnalyticsOverview): string {
+  return `data:text/csv;charset=utf-8,${encodeURIComponent(buildAnalyticsCsv(overview))}`;
+}
+
+export function buildAnalyticsCsv(overview: AdminAnalyticsOverview): string {
+  const rows = [
+    ["section", "window", "kpi", "bucketStart", "value", "availability", "clubSlug", "clubName"],
+  ];
+
+  for (const series of overview.series) {
+    for (const point of series.points) {
+      rows.push([
+        "series",
+        overview.window,
+        labelKpi(series.key),
+        point.bucketStart,
+        formatSeriesPointValue(point, series.unit),
+        point.availability,
+        "",
+        "",
+      ]);
+    }
+  }
+
+  for (const row of overview.clubBenchmark.rows) {
+    rows.push([
+      "benchmark",
+      overview.window,
+      "",
+      "",
+      "",
+      overview.clubBenchmark.availability,
+      row.slug,
+      row.name,
+    ]);
+  }
+
+  return rows.map((row) => row.map(csvCell).join(",")).join("\n");
+}
+
+function csvCell(value: string): string {
+  if (/[",\n]/.test(value)) {
+    return `"${value.replaceAll("\"", "\"\"")}"`;
+  }
+  return value;
 }
 
 export function deltaLabel(card: AdminAnalyticsKpiCard): string {
