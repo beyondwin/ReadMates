@@ -265,6 +265,12 @@ Backend test suite에는 ArchUnit 기반 아키텍처 경계 테스트도 포함
 
 목록 조회, archive/notes/host/public detail query, 또는 cursor pagination SQL을 수정했다면 query budget과 EXPLAIN guardrail을 먼저 확인합니다. `ServerQueryBudgetTest`는 주요 HTTP flow의 query 수가 관찰된 budget을 넘지 않는지 확인하고, `MySqlQueryPlanTest`는 핵심 목록/detail SQL이 의도한 index plan을 유지하는지 확인합니다.
 
+Admin analytics overview도 query budget 대상입니다. `/api/admin/analytics/overview?window=30d`는 admin session validation과 운영 분석 aggregate/bucket query를 함께 지나는 authenticated request입니다. `ServerQueryBudgetTest`가 bounded query count를 핀해 accidental N+1 회귀를 막습니다.
+
+```bash
+./server/gradlew -p server integrationTest --tests com.readmates.performance.ServerQueryBudgetTest
+```
+
 ```bash
 ./server/gradlew -p server test \
   --tests com.readmates.performance.ServerQueryBudgetTest \

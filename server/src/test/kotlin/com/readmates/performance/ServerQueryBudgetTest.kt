@@ -1,9 +1,12 @@
 package com.readmates.performance
 
+import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.support.QueryCounter
 import com.readmates.support.QueryCountingDataSourcePostProcessor
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import jakarta.servlet.http.Cookie
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -17,6 +20,7 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import java.util.UUID
 
 private const val CLEANUP_QUERY_BUDGET_SESSION_SQL = """
     delete from feedback_reports where session_id = '00000000-0000-0000-0000-000000009777';
@@ -49,7 +53,23 @@ private const val CLEANUP_QUERY_BUDGET_SESSION_SQL = """
 class ServerQueryBudgetTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
+    @param:Autowired private val authSessionService: AuthSessionService,
 ) : ReadmatesMySqlIntegrationTestSupport() {
+    private val createdSessionTokenHashes = linkedSetOf<String>()
+
+    @AfterEach
+    fun cleanupAuthSessions() {
+        if (createdSessionTokenHashes.isEmpty()) {
+            return
+        }
+        val bindMarkers = createdSessionTokenHashes.joinToString(",") { "?" }
+        jdbcTemplate.update(
+            "delete from auth_sessions where session_token_hash in ($bindMarkers)",
+            *createdSessionTokenHashes.toTypedArray(),
+        )
+        createdSessionTokenHashes.clear()
+    }
+
     @Test
     fun `current session stays within observed empty-state query budget`() {
         assertQueryBudget(
@@ -113,6 +133,23 @@ class ServerQueryBudgetTest(
     }
 
     @Test
+    fun `admin analytics overview stays within aggregate query budget`() {
+        val ownerCookie = sessionCookieForUser(OWNER_USER_ID)
+
+        assertQueryBudget(
+            budget = 65,
+            reason = "admin analytics overview includes admin session validation plus aggregate and bounded bucket queries",
+        ) {
+            mockMvc
+                .get("/api/admin/analytics/overview?window=30d") {
+                    cookie(ownerCookie)
+                }.andExpect {
+                    status { isOk() }
+                }
+        }
+    }
+
+    @Test
     fun `host deletion preview stays within count-query budget`() {
         insertOpenSessionForDeletionPreview()
 
@@ -165,6 +202,21 @@ class ServerQueryBudgetTest(
             )
             """.trimIndent(),
         )
+    }
+
+    private fun sessionCookieForUser(userId: String): Cookie {
+        val issuedSession =
+            authSessionService.issueSession(
+                userId = UUID.fromString(userId).toString(),
+                userAgent = "ServerQueryBudgetTest",
+                ipAddress = "127.0.0.1",
+            )
+        createdSessionTokenHashes += issuedSession.storedTokenHash
+        return Cookie(AuthSessionService.COOKIE_NAME, issuedSession.rawToken)
+    }
+
+    private companion object {
+        private const val OWNER_USER_ID = "00000000-0000-0000-0000-000000000901"
     }
 
     @TestConfiguration
