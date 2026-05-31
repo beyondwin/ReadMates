@@ -1,3 +1,10 @@
+import {
+  READING_LOOP_LABELS,
+  deriveReadingLoopState,
+  readingLoopDescription,
+  type ReadingLoopState,
+} from "@/shared/model/reading-loop";
+
 export type HostDashboardRsvpStatus = "NO_RESPONSE" | "GOING" | "DECLINED" | "MAYBE";
 export type HostDashboardAlertTone = "warn" | "default" | "accent" | "ok";
 export type HostChecklistState = "complete" | "pending" | "guidance";
@@ -64,6 +71,9 @@ export type HostDashboardNextOperationAction = {
   title: string;
   helper: string;
   href: string | null;
+  loopState: ReadingLoopState;
+  loopLabel: string;
+  loopBridge: string;
   label?: string;
   unavailableReason?: string;
 };
@@ -214,76 +224,137 @@ export function getMissingCurrentSessionMembersSummary(
   };
 }
 
+function withReadingLoop(
+  action: Omit<HostDashboardNextOperationAction, "loopState" | "loopLabel" | "loopBridge">,
+  session: HostDashboardCurrentSession | null,
+  data: HostDashboardData,
+  missingMembers: MissingCurrentSessionMembersSummary | null,
+): HostDashboardNextOperationAction {
+  const loopState = deriveReadingLoopState({
+    hasCurrentSession: session !== null,
+    hostBlockerCount:
+      (missingMembers?.count ?? 0) +
+      nonNegativeDashboardCount(data.rsvpPending) +
+      nonNegativeDashboardCount(data.checkinMissing) +
+      nonNegativeDashboardCount(data.publishPending) +
+      nonNegativeDashboardCount(data.feedbackPending),
+    memberCanWrite: false,
+    sessionDate: session?.date,
+  });
+
+  return {
+    ...action,
+    loopState,
+    loopLabel: READING_LOOP_LABELS[loopState],
+    loopBridge: readingLoopDescription(loopState),
+  };
+}
+
 export function getHostDashboardNextOperationAction(
   session: HostDashboardCurrentSession | null,
   data: HostDashboardData,
   missingMembers: MissingCurrentSessionMembersSummary | null,
 ): HostDashboardNextOperationAction {
   if (missingMembers) {
-    return {
-      title: "새 멤버의 이번 세션 참여 여부 결정",
-      helper: "멤버 승인 직후 현재 세션 참석 명단과 비교해 확인된 항목입니다. 아래 알림에서 바로 처리할 수 있습니다.",
-      href: null,
-      label: "알림에서 처리",
-      unavailableReason: "아래 멤버별 버튼으로 처리하면 이 알림에서 사라집니다.",
-    };
+    return withReadingLoop(
+      {
+        title: "새 멤버의 이번 세션 참여 여부 결정",
+        helper: "멤버 승인 직후 현재 세션 참석 명단과 비교해 확인된 항목입니다. 아래 알림에서 바로 처리할 수 있습니다.",
+        href: null,
+        label: "알림에서 처리",
+        unavailableReason: "아래 멤버별 버튼으로 처리하면 이 알림에서 사라집니다.",
+      },
+      session,
+      data,
+      missingMembers,
+    );
   }
 
   if (!session) {
-    return {
-      title: "새 세션 문서 만들기",
-      helper: "운영을 시작하려면 책, 일정, 장소 또는 링크를 먼저 확정해야 합니다.",
-      href: null,
-      unavailableReason: "아래 세션 준비 문서에서 세션 문서 만들기를 사용하세요.",
-    };
+    return withReadingLoop(
+      {
+        title: "새 세션 문서 만들기",
+        helper: "운영을 시작하려면 책, 일정, 장소 또는 링크를 먼저 확정해야 합니다.",
+        href: null,
+        unavailableReason: "아래 세션 준비 문서에서 세션 문서 만들기를 사용하세요.",
+      },
+      session,
+      data,
+      missingMembers,
+    );
   }
 
   const rsvpPending = nonNegativeDashboardCount(data.rsvpPending);
   if (rsvpPending > 0) {
-    return {
-      title: "RSVP 미응답 확인",
-      helper: `아직 ${rsvpPending}명이 응답하지 않았습니다. 리마인더 자동 발송은 연결되지 않았으므로 멤버 상태를 수동 확인하세요.`,
-      href: hostSessionEditHref(session.sessionId),
-      label: "세션 문서 열기",
-    };
+    return withReadingLoop(
+      {
+        title: "RSVP 미응답 확인",
+        helper: `아직 ${rsvpPending}명이 응답하지 않았습니다. 리마인더 자동 발송은 연결되지 않았으므로 멤버 상태를 수동 확인하세요.`,
+        href: hostSessionEditHref(session.sessionId),
+        label: "세션 문서 열기",
+      },
+      session,
+      data,
+      missingMembers,
+    );
   }
 
   const checkinMissing = nonNegativeDashboardCount(data.checkinMissing);
   if (checkinMissing > 0) {
-    return {
-      title: "읽기 진행률과 질문 작성 현황 확인",
-      helper: `읽기 진행률 미작성 ${checkinMissing}명이 있습니다. 참석 명단과 질문 수를 같이 확인하세요.`,
-      href: hostSessionEditHref(session.sessionId),
-      label: "세션 문서 열기",
-    };
+    return withReadingLoop(
+      {
+        title: "읽기 진행률과 질문 작성 현황 확인",
+        helper: `읽기 진행률 미작성 ${checkinMissing}명이 있습니다. 참석 명단과 질문 수를 같이 확인하세요.`,
+        href: hostSessionEditHref(session.sessionId),
+        label: "세션 문서 열기",
+      },
+      session,
+      data,
+      missingMembers,
+    );
   }
 
   if (nonNegativeDashboardCount(data.publishPending) > 0) {
-    return {
-      title: "공개 요약 정리",
-      helper: "공개 대기 건수는 여러 세션을 합산한 값입니다. 현재 열린 세션으로 바로 이동하지 말고 세션 기록에서 정확한 회차를 선택하세요.",
-      href: null,
-      label: "세션 기록에서 선택",
-      unavailableReason: "대시보드는 집계 건수만 제공하므로 특정 세션 문서를 바로 열 수 없습니다.",
-    };
+    return withReadingLoop(
+      {
+        title: "공개 요약 정리",
+        helper: "공개 대기 건수는 여러 세션을 합산한 값입니다. 현재 열린 세션으로 바로 이동하지 말고 세션 기록에서 정확한 회차를 선택하세요.",
+        href: null,
+        label: "세션 기록에서 선택",
+        unavailableReason: "대시보드는 집계 건수만 제공하므로 특정 세션 문서를 바로 열 수 없습니다.",
+      },
+      session,
+      data,
+      missingMembers,
+    );
   }
 
   if (nonNegativeDashboardCount(data.feedbackPending) > 0) {
-    return {
-      title: "피드백 문서 등록",
-      helper: "피드백 문서 대기 건수는 여러 세션을 합산한 값입니다. 현재 열린 세션으로 바로 이동하지 말고 세션 기록에서 정확한 회차를 선택하세요.",
-      href: null,
-      label: "세션 기록에서 선택",
-      unavailableReason: "대시보드는 집계 건수만 제공하므로 특정 세션 문서를 바로 열 수 없습니다.",
-    };
+    return withReadingLoop(
+      {
+        title: "피드백 문서 등록",
+        helper: "피드백 문서 대기 건수는 여러 세션을 합산한 값입니다. 현재 열린 세션으로 바로 이동하지 말고 세션 기록에서 정확한 회차를 선택하세요.",
+        href: null,
+        label: "세션 기록에서 선택",
+        unavailableReason: "대시보드는 집계 건수만 제공하므로 특정 세션 문서를 바로 열 수 없습니다.",
+      },
+      session,
+      data,
+      missingMembers,
+    );
   }
 
-  return {
-    title: "대기 중인 운영 항목 없음",
-    helper: "현재 세션의 운영 흐름이 안정적입니다. 다음 변경은 세션 문서에서 기록하세요.",
-    href: hostSessionEditHref(session.sessionId),
-    label: "세션 문서 확인",
-  };
+  return withReadingLoop(
+    {
+      title: "대기 중인 운영 항목 없음",
+      helper: "현재 세션의 운영 흐름이 안정적입니다. 다음 변경은 세션 문서에서 기록하세요.",
+      href: hostSessionEditHref(session.sessionId),
+      label: "세션 문서 확인",
+    },
+    session,
+    data,
+    missingMembers,
+  );
 }
 
 export function getHostDashboardChecklist(
