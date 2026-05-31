@@ -37,7 +37,7 @@
 | `AiGenProviderErrorBurst` | warn | provider별 FAILED job ratio > 10% over 10m | `#provider-error-burst` |
 | `AiGenSchemaFailureSpike` | warn | `SCHEMA_INVALID` validation failure ratio > 20% over 1h | `#schema-failure-spike` |
 | `AiGenBudgetExhaustion` | info | aggregate 30d AI generation cost > $1000 | `#budget-exhaustion` |
-| `AiGenQueueLagHigh` | warn | `readmates_aigen_queue_depth > 50` for 5m | `#queue-lag-high` |
+| `AiGenQueueLagHigh` | warn | Redis active AI job backlog `readmates_aigen_queue_depth > 50` for 5m | `#queue-lag-high` |
 | `AiGenRedisDown` | critical | `redis_up == 0` and HTTP 5xx rate elevated | `#redis-down` |
 
 Per-club cost cap은 metric label에 `club_id`를 싣지 않는 정책 때문에 Prometheus alert가 아니라 application cap guard와 `ai_generation_audit_log` SQL drill-down으로 운영합니다.

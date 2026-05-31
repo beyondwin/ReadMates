@@ -289,9 +289,9 @@ GeminiApiClient: retention policy depends on Google AI Studio project tier — c
 
 ### <a id="queue-lag-high"></a> AiGenQueueLagHigh (warn)
 
-- **조건**: `readmates_aigen_queue_depth > 50` 5m 지속.
-- **현재 상태**: 이 gauge는 task 6.1 시점에 placeholder (항상 0)이며, Kafka consumer lag wiring이 들어올 때까지 alert가 실제 발화하지 않습니다. Pre-rollout 단계에서는 noisy alert로 간주하지 마십시오.
-- **즉시 triage (wiring 후)**: Kafka consumer group lag 확인 (`kafka-consumer-groups.sh --describe`), worker pool 메모리/CPU 점검, provider latency 동시 burst 여부 확인.
+- **조건**: Redis active AI job backlog `readmates_aigen_queue_depth > 50` 5m 지속. 이 gauge는 `PENDING` + `RUNNING` job 수를 `AiGenerationJobStore.loadActiveJobs()`에서 읽는다.
+- **즉시 triage**: `/admin/ai-ops`에서 `PENDING`/`RUNNING` job을 확인하고, worker 로그, Redis 연결 상태, provider latency burst를 순서대로 본다.
+- **Kafka 확인**: Kafka consumer group lag은 같은 증상의 원인일 수 있지만 이 metric 자체의 의미는 아니다. Kafka lag이 필요하면 별도 consumer lag metric 또는 broker 도구로 확인한다.
 - **에스컬레이션**: 실제 backlog면 worker 인스턴스 추가, provider 장애 동반이면 §7. Backbone 장애 의심이면 §8.
 - **연관 항목**: [§7 provider fallback](#7-provider-장애-임시-fallback), [§8 kill switch](#8-전체-disable-kill-switch).
 

@@ -40,7 +40,7 @@
 | `readmates.aigen.cost.usd` | counter | `provider`, `model` | USD | AI generation 누적 비용 추정치. | `server/.../aigen/application/service/AiGenerationMetrics.kt` | dashboards.md#ai-session-generation | alerts.md#aigenbudgetexhaustion |
 | `readmates.aigen.validation.failures` | counter | `reason` | 건수 | Validation class error로 실패한 AI output 수. | `server/.../aigen/application/service/AiGenerationMetrics.kt` | dashboards.md#ai-session-generation | alerts.md#aigenschemafailurespike |
 | `readmates.aigen.cap.denials` | counter | `reason` | 건수 | Provider 호출 전 cap guard가 거절한 요청 수. | `server/.../aigen/application/service/AiGenerationMetrics.kt` | dashboards.md#ai-session-generation | — |
-| `readmates.aigen.queue.depth` | gauge | (없음) | 건수 | AI generation queue depth. 현재는 consumer lag wiring 전 placeholder 0 gauge입니다. | `server/.../aigen/application/service/AiGenerationMetrics.kt` | dashboards.md#ai-session-generation | alerts.md#aigenqueuelaghigh |
+| `readmates.aigen.queue.depth` | gauge | (없음) | 건수 | Redis AI job store에서 `PENDING` + `RUNNING` active job 수를 scrape 시점에 읽은 backlog. `AiGenerationQueueDepthGaugeBinder`가 `AiGenerationJobStore.loadActiveJobs()`에 바인딩한다. | `server/src/main/kotlin/com/readmates/aigen/application/service/AiGenerationMetrics.kt`, `server/src/main/kotlin/com/readmates/aigen/application/service/AiGenerationQueueDepthGaugeBinder.kt` | dashboards.md#ai-session-generation | alerts.md#aigenqueuelaghigh |
 
 > **태그 정책**: enum/low-cardinality 값만 허용. `club_id`, `user_id`, `membership_id`, `email`, `delivery_id`, transcript 본문 등 고유 식별자나 민감 본문은 절대 태그로 사용하지 않는다. 행 단위 감사는 notification은 `notification_deliveries`, AI 생성은 `ai_generation_audit_log`를 사용한다. 근거: `server/.../ReadmatesOperationalMetrics.kt`, `server/.../aigen/application/service/AiGenerationMetrics.kt` KDoc 참조.
 
@@ -96,4 +96,4 @@
 - `bff_request_total` (counter, by `route`, `host`) — Cloudflare Worker analytics 의존. BFF layer에서 별도 계측 필요.
 - `frontend_route_load_seconds` (histogram) — RUM (Real User Monitoring) 도입 후 추가.
 - `readmates.redis.operation.errors` 세분화 — 현재 `feature`/`operation` 2개 태그로 충분하나, 향후 Redis Cluster 도입 시 `node` 태그 추가 검토.
-- `readmates.aigen.queue.depth` 실제 Kafka consumer lag wiring — 현재 gauge는 placeholder 0입니다.
+- Kafka consumer group lag을 별도 Prometheus metric으로 노출할지 검토 — 현재 `readmates.aigen.queue.depth`는 Redis active job backlog 의미로 고정합니다.
