@@ -13,7 +13,7 @@
 - Task 5 (OAuth happy path): 2026-05-18T12:24Z UTC, MANUAL REQUIRED. Playwright MCP redirect from https://readmates.pages.dev/login reached https://accounts.google.com/v3/signin/identifier; Google blocked credential entry under automated browser (spec §S1.4.3 escape hatch). Artifact: .tmp/v1.11.0-followups/oauth-flow-results.json.
 - [ ] [MANUAL OPERATIONAL ACTION REMAINS] Task 5 OAuth happy-path — automated checks can confirm redirect initiation, but credential entry remains blocked by Google automation controls. Owner: kws. Current action: manually verify `/login` -> Google -> ReadMates return on the production origin and record the concrete date/result here.
 - Task 3 (DB backup → Object Storage + daily timer): 2026-05-18T12:37Z UTC, partial. Object upload: automated via local OCI CLI fallback. Uploaded `mysql/readmates-pre-v1.11.0-20260518T113652Z.sql.gz` to bucket `readmates-db-exports` (namespace `ax5hfpscso8v`) with `opc-meta-sha256=4b6c36c237e94736574894065ceabaa08d7492469bc6d45f4600d67903c1c81a`, `opc-meta-tag=pre-v1.11.0`. Local unit files + runbook committed. Timer install on VM: BLOCKED (OCI CLI not installed on VM, ENV_BLOCKER per spec §S1.4.3). Artifact: .tmp/v1.11.0-followups/oci-object-head.json.
-- [ ] [MANUAL OPERATIONAL ACTION REMAINS] Task 3 daily backup timer — local Object Storage upload and runbook evidence exist, but VM timer installation requires operator access. Owner: kws. Current action: bootstrap OCI CLI on the VM, install `backup-mysql.service` and `backup-mysql.timer`, run `systemctl list-timers backup-mysql.timer`, and record the sanitized result here.
+- [x] [CLOSED BY OPERATIONAL EVIDENCE] Task 3 daily backup timer — 2026-05-31T12:09Z UTC, automated with operator CLI. Installed backup scripts, backup env/defaults, OCI CLI, instance-principal Object Storage policy, `backup-mysql.service`, and `backup-mysql.timer` on the ReadMates VM. Verification: `backup-mysql.timer` is enabled/active with next run scheduled for 2026-06-01T04:19:30Z UTC, and a manual `backup-mysql.service` run uploaded both `mysql/readmates-20260531T120949Z.sql.gz` and `mysql/readmates-20260531T120949Z.sql.gz.sha256`.
 
 ## 2026-05-31 Ops Insight & Release Trust residual policy
 
@@ -23,14 +23,14 @@ For the Ops Insight & Release Trust branch, residuals are classified as:
 - **Manual operational action remains** when Google OAuth credential entry, production host access, VM access, or provider console access is required.
 - **Out of scope for this branch** when the item predates the branch and is not changed by analytics, observability, release-readiness, docs, scripts, or deploy behavior.
 
-The v1.11.0 production OAuth and backup timer items remain manual operational actions until a human records sanitized production evidence. Analytics v2 and observability truth cleanup do not close those items by themselves.
+The v1.11.0 production OAuth items remain manual operational actions until a human records sanitized production evidence. The backup timer is closed by 2026-05-31 operational evidence. Analytics v2 and observability truth cleanup do not close OAuth by themselves.
 
 ## 2026-05-31 Ops Insight & Release Trust verification note
 
 - Scope reviewed: `origin/main..HEAD` (broad because local `main` is ahead of `origin/main` in this workspace).
 - Executed: frontend lint/test/build, targeted admin analytics E2E, server clean test, public release candidate build, and public release safety scan.
 - Skipped: none.
-- Residual risk: v1.11.0 production OAuth and backup timer remain manual operational actions; this branch does not claim to close them.
+- Residual risk: v1.11.0 production OAuth remains a manual operational action; the backup timer is closed by 2026-05-31 operational evidence.
 
 ## 기본 범위
 
