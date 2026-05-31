@@ -50,6 +50,9 @@ class PlatformAdminAnalyticsControllerTest(
                     jsonPath("$.kpis.length()") { value(5) }
                     jsonPath("$.kpis[0].key") { exists() }
                     jsonPath("$.clubBenchmark.availability") { exists() }
+                    jsonPath("$.series.length()") { value(5) }
+                    jsonPath("$.series[0].key") { exists() }
+                    jsonPath("$.series[0].points") { exists() }
                 }.andReturn()
                 .response
                 .contentAsString

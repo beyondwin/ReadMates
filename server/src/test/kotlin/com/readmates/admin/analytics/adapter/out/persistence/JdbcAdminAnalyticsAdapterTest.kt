@@ -26,5 +26,9 @@ class JdbcAdminAnalyticsAdapterTest(
         assertThat(raw.goingMaybeCurrent).isLessThanOrEqualTo(raw.participantsCurrent)
         assertThat(raw.notifSentCurrent).isLessThanOrEqualTo(raw.notifTerminalCurrent)
         raw.benchmark.forEach { assertThat(it.slug).isNotBlank() }
+
+        val monthlyRaw = adapter.loadAggregates(AnalyticsWindow.LAST_30D)
+        assertThat(monthlyRaw.series).isNotEmpty
+        assertThat(monthlyRaw.series).hasSizeLessThanOrEqualTo(5)
     }
 }

@@ -30,6 +30,7 @@ data class AdminAnalyticsOverviewResponse(
     val window: String,
     val kpis: Any,
     val clubBenchmark: Any,
+    val series: Any,
 ) {
     companion object {
         fun from(overview: AdminAnalyticsOverview): AdminAnalyticsOverviewResponse =
@@ -39,6 +40,7 @@ data class AdminAnalyticsOverviewResponse(
                 window = overview.window.wire,
                 kpis = overview.kpis,
                 clubBenchmark = overview.clubBenchmark,
+                series = overview.series,
             )
     }
 }
