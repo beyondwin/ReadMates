@@ -25,6 +25,14 @@ For the Ops Insight & Release Trust branch, residuals are classified as:
 
 The v1.11.0 production OAuth and backup timer items are closed by 2026-05-31 operational evidence. Analytics v2 and observability truth cleanup did not close those items by themselves; the closure evidence above came from browser-profile OAuth smoke, VM timer installation, and manual backup upload proof.
 
+## 2026-05-31 v1.12.0 release preparation note
+
+- Scope reviewed: `v1.11.0..HEAD`, with `origin/main..HEAD` also considered because this local `main` is ahead of the remote baseline.
+- Release classification: minor release (`v1.12.0`) because the branch adds platform-admin routes/contracts, host/member reading-loop changes, observability/deploy behavior, and additive Flyway migrations V34/V35.
+- Executed: `git diff --check v1.11.0..HEAD -- . ':(exclude)docs/superpowers/**'`, `./scripts/pre-push-check.sh --release --dry-run`, `pnpm --dir front lint`, `pnpm --dir front test`, `pnpm --dir front build`, `./server/gradlew -p server clean test`, `pnpm --dir front test:e2e`, `./scripts/build-public-release-candidate.sh`, and `./scripts/public-release-check.sh .tmp/public-release-candidate`.
+- Deployment constraint: direct `main` admin-bypass is not release-policy eligible for this version because DB migrations and public API contracts changed. Use a release PR, then create/push the annotated `v1.12.0` tag after merge so `Deploy Front` and `Deploy Server Image` run from the merged release commit.
+- Residual risk: production deployment and smoke are not complete until the tag workflows succeed, OCI compose is promoted to `ghcr.io/<owner>/<repo>/readmates-server:v1.12.0`, and sanitized post-deploy BFF/OAuth/admin smoke checks pass.
+
 ## 2026-05-31 Ops Insight & Release Trust verification note
 
 - Scope reviewed: `origin/main..HEAD` (broad because local `main` is ahead of `origin/main` in this workspace).
