@@ -1,18 +1,23 @@
 package com.readmates.contract
 
+import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import jakarta.servlet.http.Cookie
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
 import java.nio.file.Paths
+import java.util.UUID
 
 /**
  * Contract tests that verify server MockMvc responses match the top-level JSON key shapes
@@ -36,15 +41,32 @@ class FrontendZodSchemaContractTest
     constructor(
         private val mockMvc: MockMvc,
         private val objectMapper: ObjectMapper,
+        private val authSessionService: AuthSessionService,
+        private val jdbcTemplate: JdbcTemplate,
     ) : ReadmatesMySqlIntegrationTestSupport() {
         private val zodFixturesDir =
             Paths.get(
                 System.getProperty("readmates.frontend.zod.fixtures.dir")
                     ?: error("System property 'readmates.frontend.zod.fixtures.dir' is not set"),
             )
+        private val createdSessionTokenHashes = linkedSetOf<String>()
 
         // Seeded host session: session 1 (팩트풀니스), state=PUBLISHED, visibility=PUBLIC
         private val seededHostSessionId = "00000000-0000-0000-0000-000000000301"
+
+        @AfterEach
+        fun cleanupSessions() {
+            if (createdSessionTokenHashes.isEmpty()) {
+                return
+            }
+
+            val placeholders = createdSessionTokenHashes.joinToString(",") { "?" }
+            jdbcTemplate.update(
+                "delete from auth_sessions where session_token_hash in ($placeholders)",
+                *createdSessionTokenHashes.toTypedArray(),
+            )
+            createdSessionTokenHashes.clear()
+        }
 
         @Test
         fun `host session detail response matches zod schema fixture key set`() {
@@ -88,6 +110,45 @@ class FrontendZodSchemaContractTest
             assertTopLevelKeySetMatches(response, "host-invitation-list.json")
         }
 
+        @Test
+        fun `admin analytics overview response matches zod schema fixture key set`() {
+            val response =
+                mockMvc
+                    .get("/api/admin/analytics/overview?window=30d") {
+                        cookie(sessionCookieForUser(OWNER_USER_ID))
+                    }.andExpect {
+                        status { isOk() }
+                    }.andReturn()
+                    .response.contentAsString
+
+            assertTopLevelKeySetMatches(response, "admin-analytics-overview.json")
+        }
+
+        @Test
+        fun `current session response matches zod schema fixture key set`() {
+            val response =
+                mockMvc
+                    .get("/api/sessions/current") {
+                        cookie(sessionCookieForUser(MEMBER_USER_ID))
+                    }.andExpect {
+                        status { isOk() }
+                    }.andReturn()
+                    .response.contentAsString
+
+            assertTopLevelKeySetMatches(response, "current-session.json")
+        }
+
+        private fun sessionCookieForUser(userId: String): Cookie {
+            val issuedSession =
+                authSessionService.issueSession(
+                    userId = UUID.fromString(userId).toString(),
+                    userAgent = "FrontendZodSchemaContractTest",
+                    ipAddress = "127.0.0.1",
+                )
+            createdSessionTokenHashes += issuedSession.storedTokenHash
+            return Cookie(AuthSessionService.COOKIE_NAME, issuedSession.rawToken)
+        }
+
         private fun assertTopLevelKeySetMatches(
             actualJson: String,
             fixtureFileName: String,
@@ -112,5 +173,10 @@ class FrontendZodSchemaContractTest
                         "Keys in server response but not in zod fixture: ${actualKeys - expectedKeys}\n" +
                         "Keys in zod fixture but not in server response: ${expectedKeys - actualKeys}",
                 ).isEqualTo(expectedKeys)
+        }
+
+        private companion object {
+            private const val OWNER_USER_ID = "00000000-0000-0000-0000-000000000901"
+            private const val MEMBER_USER_ID = "00000000-0000-0000-0000-000000000106"
         }
     }

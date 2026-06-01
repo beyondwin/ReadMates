@@ -9,6 +9,7 @@
 | Frontend route-first architecture | `front/tests/unit/frontend-boundaries.test.ts` | shared가 app/page/feature를 거꾸로 import하거나 feature UI가 route/API를 직접 잡는 회귀 |
 | Server clean architecture | `ServerArchitectureBoundaryTest` | web adapter가 persistence/JDBC를 직접 잡거나 application package가 Spring Web/adapter에 의존하는 회귀 |
 | CQRS read/write convention | `@ReadOnlyApplicationService` + ArchUnit rules | read-only service가 mutation port나 write transaction을 갖는 회귀 |
+| Frontend/server response contracts | `pnpm --dir front zod:export-fixtures`, `FrontendZodSchemaContractTest` | frontend schema와 server MockMvc response의 top-level contract drift |
 | Host/member reading loop | `front/shared/model/reading-loop.test.ts`, member/host/current-session route tests, `dev-login-session-flow.spec.ts` | host 운영 상태와 member 읽기 상태가 다른 의미로 갈라지거나 admin-only 신호가 새는 회귀 |
 | Flyway migration compatibility | `MySqlFlywayMigrationTest` | MySQL-specific migration, collation, FK compatibility 회귀 |
 | Query budget | `ServerQueryBudgetTest` | 주요 화면의 accidental N+1 query 회귀 |

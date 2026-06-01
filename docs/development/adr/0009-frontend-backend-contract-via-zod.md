@@ -80,9 +80,9 @@ CI에서 `pnpm zod:export-fixtures && git diff --exit-code`로 fixture drift를 
 
 ### 서버 측
 
-`FrontendZodSchemaContractTest` (`server/src/test/kotlin/com/readmates/contract/FrontendZodSchemaContractTest.kt:34`)가 Spring MockMvc로 실제 API endpoint를 호출하고, 응답의 top-level key set을 fixture JSON과 비교한다.
+`FrontendZodSchemaContractTest` (`server/src/test/kotlin/com/readmates/contract/FrontendZodSchemaContractTest.kt`)가 Spring MockMvc로 실제 API endpoint를 호출하고, 응답의 top-level key set을 fixture JSON과 비교한다.
 
-시스템 프로퍼티 `readmates.frontend.zod.fixtures.dir`로 fixture 디렉토리를 주입받는다 (`FrontendZodSchemaContractTest.kt:39-40`):
+시스템 프로퍼티 `readmates.frontend.zod.fixtures.dir`로 fixture 디렉토리를 주입받는다:
 
 ```kotlin
 private val zodFixturesDir = Paths.get(
@@ -91,17 +91,21 @@ private val zodFixturesDir = Paths.get(
 )
 ```
 
-fixture 불일치 시 "Run `pnpm --dir front zod:export-fixtures`" 안내 메시지와 함께 실패한다 (`FrontendZodSchemaContractTest.kt:83-85`).
+fixture 불일치 시 "Run `pnpm --dir front zod:export-fixtures`" 안내 메시지와 함께 실패한다.
 
-3개 테스트 메서드:
+5개 테스트 메서드:
 - `host session detail response matches zod schema fixture key set` — `/api/host/sessions/{id}` 응답 vs `host-session-detail.json`
 - `host notification delivery list response matches zod schema fixture key set` — `/api/host/notifications/deliveries` 응답 vs `host-notification-delivery-list.json`
 - `host invitation list response matches zod schema fixture key set` — `/api/host/invitations` 응답 vs `host-invitation-list.json`
+- `admin analytics overview response matches zod schema fixture key set` — `/api/admin/analytics/overview?window=30d` 응답 vs `admin-analytics-overview.json`
+- `current session response matches zod schema fixture key set` — `/api/sessions/current` 응답 vs `current-session.json`
 
 현재 fixture 목록:
 - `front/tests/unit/__fixtures__/zod-schemas/host-invitation-list.json`
 - `front/tests/unit/__fixtures__/zod-schemas/host-notification-delivery-list.json`
 - `front/tests/unit/__fixtures__/zod-schemas/host-session-detail.json`
+- `front/tests/unit/__fixtures__/zod-schemas/admin-analytics-overview.json`
+- `front/tests/unit/__fixtures__/zod-schemas/current-session.json`
 
 ## 근거
 
@@ -171,7 +175,7 @@ export function parseHostSessionDetailResponse(value: unknown): HostSessionDetai
 - Schema 정의가 프런트엔드(TypeScript/Zod)에 위치한다. 서버는 "프런트엔드가 기대하는 schema"를 fixture 파일을 통해 간접적으로 알 뿐이다.
 - `pnpm zod:export-fixtures`를 직접 실행해야 fixture가 갱신된다. CI에서 `git diff --exit-code`로 방어하고 있으나, 로컬에서 fixture를 갱신하지 않고 PR을 올리면 CI에서 처음 발견된다.
 - Zod schema가 프런트엔드 코드에 분산되어 있다. 특정 endpoint의 contract를 찾으려면 해당 feature의 `api/` 디렉토리를 탐색해야 한다.
-- 현재 fixture는 host feature 3개에만 존재한다. 나머지 endpoint의 contract 커버리지가 없다. contract test 커버리지가 전체 API surface 대비 낮다.
+- 현재 fixture는 host session/notification/invitation, admin analytics overview, member current-session의 top-level response contract를 커버합니다. 모든 endpoint를 커버하지는 않으므로 신규 API contract를 추가할 때 fixture 후보에 포함할지 검토합니다.
 - top-level key set만 비교하므로, 중첩 객체의 필드 변경은 현재 테스트에서 감지되지 않는다. `attendees[0].rsvpStatus` 필드가 제거되어도 `attendees` 키 자체가 있으면 테스트는 통과한다.
 
 ## 검증
@@ -183,7 +187,7 @@ pnpm --dir front test
 
 서버 contract 테스트:
 ```bash
-./server/gradlew -p server test --tests "com.readmates.contract.FrontendZodSchemaContractTest"
+./server/gradlew -p server integrationTest --tests "com.readmates.contract.FrontendZodSchemaContractTest"
 ```
 
 fixture drift CI 검증:
@@ -199,7 +203,7 @@ contract 불일치 수동 시뮬레이션:
 
 ## 후속 작업
 
-- 모든 API endpoint에 Zod schema와 fixture 추가. 현재 host feature 3개만 커버됨.
+- 더 많은 핵심 API endpoint에 Zod schema와 fixture 추가. 현재는 host session/notification/invitation, admin analytics overview, member current-session을 우선 커버합니다.
 - CI에서 `zod:export-fixtures && git diff --exit-code`를 PR 필수 check로 자동화.
 - Nested field 검증으로 확장: top-level key set 비교 외에 중첩 객체/배열 element의 key set도 검증하는 deep contract test 추가.
 - schema를 OpenAPI로 양방향 export하는 자동화. Zod schema → OpenAPI spec 변환 도구(`zod-to-openapi` 등) 검토. 해외 협업 또는 API client 배포 시.
