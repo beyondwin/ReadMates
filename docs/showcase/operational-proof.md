@@ -42,6 +42,8 @@ Host operating action
 
 The loop is private by permission. Public docs describe it through sanitized tests and source references rather than opening member or host routes to guests.
 
+The host/member loop also has desktop/mobile screenshot evidence for host operating signals and member reading-prep states. Screenshots are generated from public-safe route mocks or dev fixtures and stay in Playwright output, not in the repository.
+
 ## Analytics Confidence Evidence
 
 Admin analytics should prove both operator value and release confidence:

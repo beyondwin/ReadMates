@@ -164,6 +164,15 @@ pnpm --dir front test:e2e -- tests/e2e/admin-analytics.spec.ts
 
 The spec captures desktop and mobile screenshots into Playwright `test-results` using public-safe mocked analytics data. Generated screenshots are evidence artifacts only and are not committed.
 
+Host/member visual evidence:
+
+```bash
+pnpm --dir front test:e2e -- tests/e2e/host-club-operations.spec.ts
+pnpm --dir front test:e2e -- tests/e2e/member-reading-momentum.spec.ts
+```
+
+These specs capture desktop and mobile screenshots into Playwright `test-results` using public-safe route mocks or dev fixtures. Generated screenshots are evidence artifacts only and are not committed.
+
 ## Backend
 
 Backend tests are expected to run on JDK 21. `server/build.gradle.kts` pins the Gradle `Test` JVM to the Java 21 toolchain so local shells using a newer current JVM do not change test runtime behavior. If Gradle cannot find a JDK 21 toolchain locally, install one or set `JAVA_HOME` to a JDK 21 installation before running backend tests.
