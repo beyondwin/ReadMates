@@ -13,9 +13,10 @@ const memberAuth: AuthMeResponse = {
   membershipStatus: "ACTIVE",
   approvalState: "ACTIVE",
   currentMembership: {
+    membershipId: "member-membership",
     clubId: "club-one",
-    clubName: "Club One",
     clubSlug: "club-one",
+    displayName: "멤버",
     role: "MEMBER",
     membershipStatus: "ACTIVE",
     approvalState: "ACTIVE",
