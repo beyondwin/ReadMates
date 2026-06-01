@@ -143,14 +143,13 @@ const current: CurrentSessionResponse = {
           authorShortName: "우",
         },
       ],
-      oneLineReviews: [
+      longReviews: [
         {
           authorName: "안멤버1",
           authorShortName: "멤버1",
-          text: "호스트 화면 계약용 한줄평",
+          body: "호스트 화면 계약용 서평",
         },
       ],
-      highlights: [],
     },
     attendees: [
       {

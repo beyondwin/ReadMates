@@ -1,8 +1,8 @@
 import { readmatesFetch, readmatesFetchResponse, type ReadmatesApiContext } from "@/shared/api/client";
+import type { CurrentSessionResponse } from "@/shared/model/current-session-contracts";
 import type {
   CreatedSessionResponse,
   CreateHostInvitationRequest,
-  CurrentSessionResponse,
   HostAttendanceUpdate,
   HostClubOperationsResponse,
   HostDashboardResponse,

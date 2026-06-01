@@ -26,7 +26,6 @@ export type HostDashboardCurrentSession = {
   }>;
   board: {
     questions: unknown[];
-    oneLineReviews: unknown[];
   };
 };
 

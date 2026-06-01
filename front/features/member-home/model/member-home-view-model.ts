@@ -1,74 +1,11 @@
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import type { CurrentSessionResponse } from "@/shared/model/current-session-contracts";
 import { READING_LOOP_LABELS, deriveReadingLoopState, type ReadingLoopState } from "@/shared/model/reading-loop";
-import type { AttendanceStatus, RsvpStatus } from "@/shared/model/readmates-types";
 
 export type MemberHomeAuth = AuthMeResponse;
-export type MemberHomeMemberRole = "HOST" | "MEMBER";
 export type MemberHomeMembershipStatus = "INVITED" | "VIEWER" | "ACTIVE" | "SUSPENDED" | "LEFT" | "INACTIVE";
-export type MemberHomeSessionParticipationStatus = "ACTIVE" | "REMOVED";
 
-export type MemberHomeCurrentSessionView = {
-  currentSession: null | {
-    sessionId: string;
-    sessionNumber: number;
-    title: string;
-    bookTitle: string;
-    bookAuthor: string;
-    bookLink: string | null;
-    bookImageUrl: string | null;
-    date: string;
-    startTime: string;
-    endTime: string;
-    locationLabel: string;
-    meetingUrl: string | null;
-    meetingPasscode: string | null;
-    questionDeadlineAt: string;
-    myRsvpStatus: RsvpStatus;
-    myCheckin: null | {
-      readingProgress: number;
-    };
-    myQuestions: Array<{
-      priority: number;
-      text: string;
-      draftThought: string | null;
-      authorName: string;
-      authorShortName: string;
-    }>;
-    myOneLineReview: null | {
-      text: string;
-    };
-    myLongReview: null | {
-      body: string;
-    };
-    board: {
-      questions: Array<{
-        priority: number;
-        text: string;
-        draftThought: string | null;
-        authorName: string;
-        authorShortName: string;
-      }>;
-      oneLineReviews: Array<{
-        authorName: string;
-        authorShortName: string;
-        text: string;
-      }>;
-      highlights: Array<{
-        text: string;
-        sortOrder: number;
-      }>;
-    };
-    attendees: Array<{
-      membershipId: string;
-      displayName: string;
-      accountName: string;
-      role: MemberHomeMemberRole;
-      rsvpStatus: RsvpStatus;
-      attendanceStatus: AttendanceStatus;
-      participationStatus?: MemberHomeSessionParticipationStatus;
-    }>;
-  };
-};
+export type MemberHomeCurrentSessionView = CurrentSessionResponse;
 
 export type MemberHomeNoteFeedItemView = {
   sessionId: string;

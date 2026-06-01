@@ -1,6 +1,7 @@
 import type { PagedResponse } from "@/shared/model/paging";
 import type { AttendanceStatus, RsvpStatus, SessionState } from "@/shared/model/readmates-types";
 
+export type { CurrentSessionResponse } from "@/shared/model/current-session-contracts";
 export type { AttendanceStatus } from "@/shared/model/readmates-types";
 
 export type MemberRole = "HOST" | "MEMBER";
@@ -26,38 +27,6 @@ export type FeedbackDocumentResponse = {
   date: string;
   fileName: string;
   uploadedAt: string;
-};
-
-export type CurrentSessionResponse = {
-  currentSession: null | {
-    sessionId: string;
-    sessionNumber: number;
-    title: string;
-    bookTitle: string;
-    bookAuthor: string;
-    bookLink: string | null;
-    bookImageUrl: string | null;
-    date: string;
-    startTime: string;
-    endTime: string;
-    locationLabel: string;
-    meetingUrl: string | null;
-    meetingPasscode: string | null;
-    questionDeadlineAt: string;
-    myRsvpStatus: RsvpStatus;
-    myCheckin: null | {
-      readingProgress: number;
-    };
-    attendees: Array<{
-      membershipId: string;
-      displayName: string;
-      accountName: string;
-      role: MemberRole;
-      rsvpStatus: RsvpStatus;
-      attendanceStatus: AttendanceStatus;
-      participationStatus?: SessionParticipationStatus;
-    }>;
-  };
 };
 
 export type HostInvitationListItem = {

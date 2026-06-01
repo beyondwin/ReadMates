@@ -53,8 +53,7 @@ const current: CurrentSessionResponse = {
     myLongReview: null,
     board: {
       questions: [],
-      oneLineReviews: [],
-      highlights: [],
+      longReviews: [],
     },
     attendees: [
       {

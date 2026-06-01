@@ -32,7 +32,6 @@ const currentSession = {
   ],
   board: {
     questions: [],
-    oneLineReviews: [],
   },
 } satisfies HostDashboardCurrentSession;
 

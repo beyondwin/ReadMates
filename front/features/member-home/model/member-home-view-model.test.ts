@@ -46,8 +46,7 @@ const session = {
   myLongReview: null,
   board: {
     questions: [],
-    oneLineReviews: [],
-    highlights: [],
+    longReviews: [],
   },
   attendees: [],
 } satisfies NonNullable<MemberHomeCurrentSessionView["currentSession"]>;
