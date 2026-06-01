@@ -409,9 +409,9 @@ describe("CurrentSession", () => {
     const mobileScope = within(await screen.findByTestId("current-session-mobile"));
 
     expect(desktopScope.getByText("멤버 준비 필요")).toBeVisible();
-    expect(desktopScope.getByText("RSVP, 읽기 진행률, 질문을 모임 전에 정리합니다.")).toBeVisible();
+    expect(desktopScope.getByText("RSVP를 먼저 선택하고, 읽기 진행률과 질문을 이어서 정리합니다.")).toBeVisible();
     expect(mobileScope.getByText("멤버 준비 필요")).toBeVisible();
-    expect(mobileScope.getByText("RSVP, 읽기 진행률, 질문을 모임 전에 정리합니다.")).toBeVisible();
+    expect(mobileScope.getByText("RSVP를 먼저 선택하고, 읽기 진행률과 질문을 이어서 정리합니다.")).toBeVisible();
   });
 
   it("disables personal save actions for suspended members", () => {

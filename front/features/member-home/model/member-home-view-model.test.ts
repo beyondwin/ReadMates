@@ -131,6 +131,48 @@ describe("member-home view model", () => {
     ).toBe("질문 2개를 더 준비해 주세요.");
   });
 
+  it("moves prepared members from current session to notes before generic ready copy", () => {
+    expect(
+      getMemberHomeNextReadingAction({
+        session: {
+          ...session,
+          myOneLineReview: { text: "짧은 회고입니다." },
+          myLongReview: { body: "긴 회고입니다." },
+        },
+        isViewer: false,
+        canWrite: true,
+        noteFeedItems,
+        today: new Date(2026, 4, 21),
+      }),
+    ).toMatchObject({
+      state: "ARCHIVE_AVAILABLE",
+      message: "최근 보존된 기록을 이어 읽을 수 있어요.",
+      href: "/app/notes",
+      ctaLabel: "노트 보기",
+    });
+  });
+
+  it("points post-session members at reflection before notes when reflection is missing", () => {
+    expect(
+      getMemberHomeNextReadingAction({
+        session: {
+          ...session,
+          myOneLineReview: null,
+          myLongReview: null,
+        },
+        isViewer: false,
+        canWrite: true,
+        noteFeedItems,
+        today: new Date(2026, 4, 21),
+      }),
+    ).toMatchObject({
+      state: "REFLECTION_DUE",
+      message: "모임 후 한줄평이나 서평을 남겨 주세요.",
+      href: "/app/session/current",
+      ctaLabel: "회고 남기기",
+    });
+  });
+
   it("keeps no-session and viewer states read-safe", () => {
     expect(getMemberHomeNextReadingAction({ session: null, isViewer: false, canWrite: true })).toEqual({
       state: "NO_SESSION",

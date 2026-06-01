@@ -258,10 +258,14 @@ export function MobileCurrentSessionCard({
 export function MobileTodayActions({
   session,
   isViewer = false,
+  canWrite = true,
+  nextActionMessage,
   LinkComponent = PlainMemberHomeLink,
 }: {
   session: CurrentSession | null;
   isViewer?: boolean;
+  canWrite?: boolean;
+  nextActionMessage?: string;
   LinkComponent?: MemberHomeLinkComponent;
 }) {
   if (!session) {
@@ -287,7 +291,7 @@ export function MobileTodayActions({
   const meetingHref = meetingUrl ?? "/app/session/current";
   const meetingSub = session.meetingPasscode ?? session.locationLabel;
 
-  if (isViewer) {
+  if (isViewer || !canWrite) {
     return (
       <section className="m-sec">
         <div className="m-eyebrow-row">
@@ -298,7 +302,7 @@ export function MobileTodayActions({
         </div>
         <div className="m-card-quiet" role="note" style={{ marginBottom: 10 }}>
           <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-            세션 기록은 읽을 수 있어요. 정식 멤버가 되면 참여 기능과 작성 기능이 열립니다.
+            {nextActionMessage ?? "세션 기록은 읽을 수 있어요. 정식 멤버가 되면 참여 기능과 작성 기능이 열립니다."}
           </p>
         </div>
         <div className="m-action-grid">
@@ -337,6 +341,13 @@ export function MobileTodayActions({
           3개
         </span>
       </div>
+      {nextActionMessage ? (
+        <div className="m-card-quiet" role="note" style={{ marginBottom: 10 }}>
+          <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
+            {nextActionMessage}
+          </p>
+        </div>
+      ) : null}
       <div className="m-action-grid">
         <MobileActionTile
           label="RSVP"

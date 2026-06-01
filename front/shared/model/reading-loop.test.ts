@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   READING_LOOP_LABELS,
   deriveReadingLoopState,
+  getReadingLoopNextAction,
   readingLoopDescription,
+  type ReadingLoopActionTarget,
 } from "./reading-loop";
 
 describe("reading-loop model", () => {
@@ -113,5 +115,40 @@ describe("reading-loop model", () => {
     expect(READING_LOOP_LABELS.MEMBER_PREP_REQUIRED).toBe("멤버 준비 필요");
     expect(readingLoopDescription("HOST_SETUP_REQUIRED")).toContain("호스트");
     expect(readingLoopDescription("ARCHIVE_AVAILABLE")).toContain("아카이브");
+  });
+
+  it("derives role-safe member next actions without admin-only targets", () => {
+    expect(
+      getReadingLoopNextAction({
+        state: "MEMBER_PREP_REQUIRED",
+        missing: "RSVP",
+      }),
+    ).toEqual({
+      label: "RSVP 하기",
+      href: "/app/session/current",
+      target: "current-session" satisfies ReadingLoopActionTarget,
+    });
+
+    expect(
+      getReadingLoopNextAction({
+        state: "REFLECTION_DUE",
+        missing: "REFLECTION",
+      }),
+    ).toEqual({
+      label: "회고 남기기",
+      href: "/app/session/current",
+      target: "current-session",
+    });
+
+    expect(
+      getReadingLoopNextAction({
+        state: "ARCHIVE_AVAILABLE",
+        missing: "ARCHIVE",
+      }),
+    ).toEqual({
+      label: "노트 보기",
+      href: "/app/notes",
+      target: "notes",
+    });
   });
 });

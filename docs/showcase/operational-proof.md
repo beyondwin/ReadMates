@@ -34,7 +34,8 @@ Host/member reading-loop changes should close both product and evidence work:
 ```text
 Host operating action
   -> role-safe reading-loop state
-  -> member reading action
+  -> member next reading action
+  -> current-session / notes / archive / feedback continuity
   -> focused unit/route/E2E checks
   -> showcase and changelog update
   -> public release candidate scan when public-facing docs change

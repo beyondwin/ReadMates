@@ -120,6 +120,7 @@ export default function MemberHome({
         upcomingSessions={upcomingSessions}
         memberName={memberName}
         isViewer={isViewer}
+        canWrite={canWrite}
         LinkComponent={LinkComponent}
       />
     </main>
@@ -182,6 +183,7 @@ function MobileMemberHome({
   upcomingSessions,
   memberName,
   isViewer,
+  canWrite,
   LinkComponent,
 }: {
   auth: AuthMeResponse;
@@ -190,9 +192,16 @@ function MobileMemberHome({
   upcomingSessions: MemberHomeUpcomingSession[];
   memberName: string;
   isViewer: boolean;
+  canWrite: boolean;
   LinkComponent: MemberHomeLinkComponent;
 }) {
   const session = current.currentSession;
+  const nextAction = getMemberHomeNextReadingAction({
+    session,
+    isViewer,
+    canWrite,
+    noteFeedItems,
+  });
 
   return (
     <div className="mobile-only rm-member-home-mobile m-body">
@@ -221,7 +230,13 @@ function MobileMemberHome({
         />
       </section>
 
-      <MobileTodayActions session={session} isViewer={isViewer} LinkComponent={LinkComponent} />
+      <MobileTodayActions
+        session={session}
+        isViewer={isViewer}
+        canWrite={canWrite}
+        nextActionMessage={nextAction.message}
+        LinkComponent={LinkComponent}
+      />
       <MobileUpcomingSessions upcomingSessions={upcomingSessions} />
       <MobileMemberActivity items={noteFeedItems.slice(0, 4)} LinkComponent={LinkComponent} />
       <MobileQuickLinks LinkComponent={LinkComponent} />

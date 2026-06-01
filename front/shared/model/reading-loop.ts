@@ -22,6 +22,21 @@ export type ReadingLoopInput = {
   archiveItemCount?: number;
 };
 
+export type ReadingLoopMissingWork = "NONE" | "RSVP" | "CHECKIN" | "QUESTION" | "REFLECTION" | "ARCHIVE";
+
+export type ReadingLoopActionTarget = "current-session" | "notes" | "archive" | "none";
+
+export type ReadingLoopNextActionInput = {
+  state: ReadingLoopState;
+  missing: ReadingLoopMissingWork;
+};
+
+export type ReadingLoopNextAction = {
+  label: string | null;
+  href: string | null;
+  target: ReadingLoopActionTarget;
+};
+
 export const READING_LOOP_LABELS: Record<ReadingLoopState, string> = {
   NO_SESSION: "세션 대기",
   HOST_SETUP_REQUIRED: "호스트 준비 필요",
@@ -74,6 +89,37 @@ export function deriveReadingLoopState(input: ReadingLoopInput): ReadingLoopStat
   }
 
   return "SESSION_READY";
+}
+
+export function getReadingLoopNextAction(input: ReadingLoopNextActionInput): ReadingLoopNextAction {
+  if (input.state === "NO_SESSION" || input.state === "HOST_SETUP_REQUIRED") {
+    return { label: null, href: null, target: "none" };
+  }
+
+  if (input.state === "MEMBER_PREP_REQUIRED") {
+    switch (input.missing) {
+      case "RSVP":
+        return { label: "RSVP 하기", href: "/app/session/current", target: "current-session" };
+      case "CHECKIN":
+        return { label: "진행률 남기기", href: "/app/session/current", target: "current-session" };
+      case "QUESTION":
+        return { label: "질문 쓰기", href: "/app/session/current", target: "current-session" };
+      case "NONE":
+      case "REFLECTION":
+      case "ARCHIVE":
+        return { label: "세션 열기", href: "/app/session/current", target: "current-session" };
+    }
+  }
+
+  if (input.state === "REFLECTION_DUE") {
+    return { label: "회고 남기기", href: "/app/session/current", target: "current-session" };
+  }
+
+  if (input.state === "ARCHIVE_AVAILABLE") {
+    return { label: "노트 보기", href: "/app/notes", target: "notes" };
+  }
+
+  return { label: "세션 열기", href: "/app/session/current", target: "current-session" };
 }
 
 function isAfterSessionDate(sessionDate: string | null | undefined, today: Date): boolean {

@@ -103,7 +103,9 @@ test("member current-session captures reading prep visual evidence", async ({ pa
   await page.goto("/app/session/current");
   const desktopSession = page.locator("main.rm-current-session-desktop");
   await expect(desktopSession.getByText("멤버 준비 필요")).toBeVisible();
-  await expect(desktopSession.getByText("RSVP, 읽기 진행률, 질문을 모임 전에 정리합니다.")).toBeVisible();
+  await expect(
+    desktopSession.getByText("RSVP를 먼저 선택하고, 읽기 진행률과 질문을 이어서 정리합니다."),
+  ).toBeVisible();
   await expectNoMemberPrivateSentinels(page);
   const desktopScreenshot = await page.screenshot({
     path: testInfo.outputPath("member-current-session-reading-prep-desktop.png"),
