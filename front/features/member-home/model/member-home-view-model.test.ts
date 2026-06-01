@@ -211,4 +211,27 @@ describe("member-home view model", () => {
       ctaLabel: "세션 읽기",
     });
   });
+
+  it("keeps read-only post-session members out of write-only reflection due state", () => {
+    const action = getMemberHomeNextReadingAction({
+      session: {
+        ...session,
+        myOneLineReview: null,
+        myLongReview: null,
+      },
+      isViewer: false,
+      canWrite: false,
+      today: new Date(2026, 4, 21),
+    });
+
+    expect(action).toMatchObject({
+      state: "SESSION_READY",
+      label: "세션 준비됨",
+      message: "세션을 읽고 공동 보드를 확인할 수 있어요.",
+      href: "/app/session/current",
+      ctaLabel: "세션 읽기",
+    });
+    expect(action.state).not.toBe("REFLECTION_DUE");
+    expect(action.label).not.toBe("회고 필요");
+  });
 });

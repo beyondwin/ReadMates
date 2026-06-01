@@ -103,7 +103,7 @@ export function getMemberHomeNextReadingAction({
     minimumQuestionCount: 2,
     sessionDate: session?.date,
     today,
-    memberHasReflection: session ? session.myOneLineReview !== null || session.myLongReview !== null : undefined,
+    memberHasReflection: session ? !canWrite || session.myOneLineReview !== null || session.myLongReview !== null : undefined,
     archiveItemCount: noteFeedItems.length,
   });
 
