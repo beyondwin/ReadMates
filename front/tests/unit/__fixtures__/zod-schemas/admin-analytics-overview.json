@@ -1,0 +1,43 @@
+{
+  "schema": "admin.analytics_overview.v2",
+  "generatedAt": "2026-05-30T00:00:00Z",
+  "window": "30d",
+  "kpis": [
+    {
+      "key": "SESSION_COMPLETION",
+      "unit": "PERCENT",
+      "availability": "AVAILABLE",
+      "current": 80,
+      "prior": 60,
+      "deltaDirection": "UP"
+    }
+  ],
+  "clubBenchmark": {
+    "availability": "AVAILABLE",
+    "rows": [
+      {
+        "clubId": "00000000-0000-0000-0000-000000000001",
+        "slug": "reading-sai",
+        "name": "Reading Sai",
+        "activeMembers": 6,
+        "sessionCompletionRate": 83,
+        "rsvpRate": 75,
+        "aiCostUsd": "1.2500",
+        "notificationDeliveryRate": 96
+      }
+    ]
+  },
+  "series": [
+    {
+      "key": "SESSION_COMPLETION",
+      "unit": "PERCENT",
+      "points": [
+        {
+          "bucketStart": "2026-05-01",
+          "availability": "AVAILABLE",
+          "value": 80
+        }
+      ]
+    }
+  ]
+}

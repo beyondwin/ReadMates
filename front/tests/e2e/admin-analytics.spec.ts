@@ -92,6 +92,13 @@ async function routeAnalytics(page: Page): Promise<void> {
   });
 }
 
+async function expectNoPrivateSentinels(page: Page): Promise<void> {
+  await expect(page.getByText("member1@example.com")).toHaveCount(0);
+  await expect(page.getByText("private.example.com")).toHaveCount(0);
+  await expect(page.getByText("ADMIN_ROUTE")).toHaveCount(0);
+  await expect(page.getByText("{\"")).toHaveCount(0);
+}
+
 test("owner reviews admin analytics overview and switches window", async ({ page }) => {
   await routePlatformAdminShell(page, "OWNER");
   await routeAnalytics(page);
@@ -120,8 +127,7 @@ test("owner reviews admin analytics overview and switches window", async ({ page
   await expect(page.getByText("70%")).toBeVisible();
   await expect(trendTable.getByText("65%")).toBeVisible();
 
-  await expect(page.getByText("member1@example.com")).toHaveCount(0);
-  await expect(page.getByText("{\"")).toHaveCount(0);
+  await expectNoPrivateSentinels(page);
 });
 
 test("owner captures public-safe analytics visual evidence on desktop and mobile", async ({ page }, testInfo) => {
@@ -148,6 +154,5 @@ test("owner captures public-safe analytics visual evidence on desktop and mobile
   });
   expect(mobileScreenshot.byteLength).toBeGreaterThan(10_000);
 
-  await expect(page.getByText("member1@example.com")).toHaveCount(0);
-  await expect(page.getByText("private.example.com")).toHaveCount(0);
+  await expectNoPrivateSentinels(page);
 });

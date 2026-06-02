@@ -3,6 +3,7 @@ import type { HostClubOperationsSnapshot } from "@/shared/model/club-operations"
 import type { AttendanceStatus, RsvpStatus, SessionState } from "@/shared/model/readmates-types";
 import type { PagedResponse } from "@/shared/model/paging";
 export type { AttendanceStatus, RsvpStatus, SessionState } from "@/shared/model/readmates-types";
+export type { CurrentSessionResponse } from "@/shared/model/current-session-contracts";
 
 export type MemberRole = "HOST" | "MEMBER";
 export type MembershipStatus = "INVITED" | "VIEWER" | "ACTIVE" | "SUSPENDED" | "LEFT" | "INACTIVE";
@@ -55,69 +56,6 @@ export type FeedbackDocumentResponse = {
       note: string;
     };
   }>;
-};
-
-export type CurrentSessionResponse = {
-  currentSession: null | {
-    sessionId: string;
-    sessionNumber: number;
-    title: string;
-    bookTitle: string;
-    bookAuthor: string;
-    bookLink: string | null;
-    bookImageUrl: string | null;
-    date: string;
-    startTime: string;
-    endTime: string;
-    locationLabel: string;
-    meetingUrl: string | null;
-    meetingPasscode: string | null;
-    questionDeadlineAt: string;
-    myRsvpStatus: RsvpStatus;
-    myCheckin: null | {
-      readingProgress: number;
-    };
-    myQuestions: Array<{
-      priority: number;
-      text: string;
-      draftThought: string | null;
-      authorName: string;
-      authorShortName: string;
-    }>;
-    myOneLineReview: null | {
-      text: string;
-    };
-    myLongReview: null | {
-      body: string;
-    };
-    board: {
-      questions: Array<{
-        priority: number;
-        text: string;
-        draftThought: string | null;
-        authorName: string;
-        authorShortName: string;
-      }>;
-      oneLineReviews: Array<{
-        authorName: string;
-        authorShortName: string;
-        text: string;
-      }>;
-      highlights: Array<{
-        text: string;
-        sortOrder: number;
-      }>;
-    };
-    attendees: Array<{
-      membershipId: string;
-      displayName: string;
-      accountName: string;
-      role: MemberRole;
-      rsvpStatus: RsvpStatus;
-      attendanceStatus: AttendanceStatus;
-      participationStatus?: SessionParticipationStatus;
-    }>;
-  };
 };
 
 export type HostInvitationListItem = {

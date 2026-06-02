@@ -17,8 +17,23 @@ describe("getCurrentSessionReadingLoopSummary", () => {
     ).toEqual({
       state: "MEMBER_PREP_REQUIRED",
       label: "멤버 준비 필요",
-      body: "RSVP, 읽기 진행률, 질문을 모임 전에 정리합니다.",
+      body: "RSVP를 먼저 선택하고, 읽기 진행률과 질문을 이어서 정리합니다.",
     });
+  });
+
+  it("names the first missing current-session action for active members", () => {
+    expect(
+      getCurrentSessionReadingLoopSummary({
+        rsvp: "NO_RESPONSE",
+        readingProgress: 0,
+        writtenQuestionCount: 0,
+        oneLineReview: "",
+        longReview: "",
+        canWrite: true,
+        sessionDate: "2026-06-04",
+        today: new Date(2026, 4, 31),
+      }).body,
+    ).toBe("RSVP를 먼저 선택하고, 읽기 진행률과 질문을 이어서 정리합니다.");
   });
 
   it("summarizes post-session reflection due when an active member has not written reviews", () => {

@@ -1,74 +1,17 @@
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
-import { READING_LOOP_LABELS, deriveReadingLoopState, type ReadingLoopState } from "@/shared/model/reading-loop";
-import type { AttendanceStatus, RsvpStatus } from "@/shared/model/readmates-types";
+import type { CurrentSessionResponse } from "@/shared/model/current-session-contracts";
+import {
+  READING_LOOP_LABELS,
+  deriveReadingLoopState,
+  getReadingLoopNextAction,
+  type ReadingLoopMissingWork,
+  type ReadingLoopState,
+} from "@/shared/model/reading-loop";
 
 export type MemberHomeAuth = AuthMeResponse;
-export type MemberHomeMemberRole = "HOST" | "MEMBER";
 export type MemberHomeMembershipStatus = "INVITED" | "VIEWER" | "ACTIVE" | "SUSPENDED" | "LEFT" | "INACTIVE";
-export type MemberHomeSessionParticipationStatus = "ACTIVE" | "REMOVED";
 
-export type MemberHomeCurrentSessionView = {
-  currentSession: null | {
-    sessionId: string;
-    sessionNumber: number;
-    title: string;
-    bookTitle: string;
-    bookAuthor: string;
-    bookLink: string | null;
-    bookImageUrl: string | null;
-    date: string;
-    startTime: string;
-    endTime: string;
-    locationLabel: string;
-    meetingUrl: string | null;
-    meetingPasscode: string | null;
-    questionDeadlineAt: string;
-    myRsvpStatus: RsvpStatus;
-    myCheckin: null | {
-      readingProgress: number;
-    };
-    myQuestions: Array<{
-      priority: number;
-      text: string;
-      draftThought: string | null;
-      authorName: string;
-      authorShortName: string;
-    }>;
-    myOneLineReview: null | {
-      text: string;
-    };
-    myLongReview: null | {
-      body: string;
-    };
-    board: {
-      questions: Array<{
-        priority: number;
-        text: string;
-        draftThought: string | null;
-        authorName: string;
-        authorShortName: string;
-      }>;
-      oneLineReviews: Array<{
-        authorName: string;
-        authorShortName: string;
-        text: string;
-      }>;
-      highlights: Array<{
-        text: string;
-        sortOrder: number;
-      }>;
-    };
-    attendees: Array<{
-      membershipId: string;
-      displayName: string;
-      accountName: string;
-      role: MemberHomeMemberRole;
-      rsvpStatus: RsvpStatus;
-      attendanceStatus: AttendanceStatus;
-      participationStatus?: MemberHomeSessionParticipationStatus;
-    }>;
-  };
-};
+export type MemberHomeCurrentSessionView = CurrentSessionResponse;
 
 export type MemberHomeNoteFeedItemView = {
   sessionId: string;
@@ -122,6 +65,28 @@ export function memberHomeViewFromRouteData(view: MemberHomeView): MemberHomeVie
   return view;
 }
 
+function missingWorkForMemberHome(
+  session: NonNullable<MemberHomeCurrentSessionView["currentSession"]>,
+): ReadingLoopMissingWork {
+  if (session.myRsvpStatus === "NO_RESPONSE") {
+    return "RSVP";
+  }
+
+  if (!session.myCheckin) {
+    return "CHECKIN";
+  }
+
+  if (session.myQuestions.length < 2) {
+    return "QUESTION";
+  }
+
+  if (!session.myOneLineReview && !session.myLongReview) {
+    return "REFLECTION";
+  }
+
+  return "ARCHIVE";
+}
+
 export function getMemberHomeNextReadingAction({
   session,
   isViewer,
@@ -138,7 +103,7 @@ export function getMemberHomeNextReadingAction({
     minimumQuestionCount: 2,
     sessionDate: session?.date,
     today,
-    memberHasReflection: session ? session.myOneLineReview !== null || session.myLongReview !== null : undefined,
+    memberHasReflection: session ? !canWrite || session.myOneLineReview !== null || session.myLongReview !== null : undefined,
     archiveItemCount: noteFeedItems.length,
   });
 
@@ -163,62 +128,71 @@ export function getMemberHomeNextReadingAction({
   }
 
   if (state === "MEMBER_PREP_REQUIRED") {
-    if (session.myRsvpStatus === "NO_RESPONSE") {
+    const missing = missingWorkForMemberHome(session);
+    const action = getReadingLoopNextAction({ state, missing });
+
+    if (missing === "RSVP") {
       return {
         state,
         label: READING_LOOP_LABELS[state],
         message: "RSVP를 먼저 선택해 주세요.",
-        href: "/app/session/current",
-        ctaLabel: "RSVP 하기",
+        href: action.href,
+        ctaLabel: action.label,
       };
     }
 
-    if (!session.myCheckin) {
+    if (missing === "CHECKIN") {
       return {
         state,
         label: READING_LOOP_LABELS[state],
         message: "읽기 진행률을 남겨 주세요.",
-        href: "/app/session/current",
-        ctaLabel: "진행률 남기기",
+        href: action.href,
+        ctaLabel: action.label,
       };
     }
 
-    if (session.myQuestions.length < 2) {
+    if (missing === "QUESTION") {
       return {
         state,
         label: READING_LOOP_LABELS[state],
         message: `질문 ${2 - session.myQuestions.length}개를 더 준비해 주세요.`,
-        href: "/app/session/current",
-        ctaLabel: "질문 쓰기",
+        href: action.href,
+        ctaLabel: action.label,
       };
     }
   }
 
   if (state === "REFLECTION_DUE") {
+    const action = getReadingLoopNextAction({ state, missing: "REFLECTION" });
+
     return {
       state,
       label: READING_LOOP_LABELS[state],
       message: "모임 후 한줄평이나 서평을 남겨 주세요.",
-      href: "/app/session/current",
-      ctaLabel: "회고 남기기",
+      href: action.href,
+      ctaLabel: action.label,
     };
   }
 
   if (state === "ARCHIVE_AVAILABLE") {
+    const action = getReadingLoopNextAction({ state, missing: "ARCHIVE" });
+
     return {
       state,
       label: READING_LOOP_LABELS[state],
       message: "최근 보존된 기록을 이어 읽을 수 있어요.",
-      href: "/app/notes",
-      ctaLabel: "노트 보기",
+      href: action.href,
+      ctaLabel: action.label,
     };
   }
+
+  const action = getReadingLoopNextAction({ state, missing: "NONE" });
 
   return {
     state,
     label: READING_LOOP_LABELS[state],
     message: "준비가 정리되었습니다. 모임 전까지 수정할 수 있어요.",
-    href: "/app/session/current",
-    ctaLabel: "세션 열기",
+    href: action.href,
+    ctaLabel: action.label,
   };
 }

@@ -53,8 +53,7 @@ const current: CurrentSessionResponse = {
     myLongReview: null,
     board: {
       questions: [],
-      oneLineReviews: [],
-      highlights: [],
+      longReviews: [],
     },
     attendees: [
       {
@@ -179,7 +178,17 @@ describe("MemberHome", () => {
 
   it("keeps upcoming empty state when there are no upcoming sessions", () => {
     const { container } = render(
-      <MemberHome auth={auth} current={current} noteFeedItems={noteFeedItems} upcomingSessions={[]} />,
+      <MemberHome
+        auth={auth}
+        current={{
+          currentSession: {
+            ...current.currentSession!,
+            myRsvpStatus: "NO_RESPONSE",
+          },
+        }}
+        noteFeedItems={noteFeedItems}
+        upcomingSessions={[]}
+      />,
     );
 
     const desktop = getDesktopView(container);
@@ -191,7 +200,17 @@ describe("MemberHome", () => {
     vi.setSystemTime(new Date(2026, 3, 30));
 
     const { container } = render(
-      <MemberHome auth={auth} current={current} noteFeedItems={noteFeedItems} upcomingSessions={[]} />,
+      <MemberHome
+        auth={auth}
+        current={{
+          currentSession: {
+            ...current.currentSession!,
+            myRsvpStatus: "NO_RESPONSE",
+          },
+        }}
+        noteFeedItems={noteFeedItems}
+        upcomingSessions={[]}
+      />,
     );
 
     const mobile = container.querySelector(".rm-member-home-mobile");
@@ -203,6 +222,8 @@ describe("MemberHome", () => {
     expect(mobileElement.querySelector(".m-eyebrow-row")).toHaveTextContent("이번 세션");
     expect(mobileView.getByRole("group", { name: /No\.07 · D-\d+ · 이번 세션/ })).toBeInTheDocument();
     expect(mobileView.getByText("오늘 할 일")).toBeInTheDocument();
+    expect(mobileView.getByText("RSVP를 먼저 선택해 주세요.")).toBeInTheDocument();
+    expect(mobileView.getByRole("link", { name: /RSVP/ })).toHaveAttribute("href", "/app/session/current");
     expect(mobileView.getByText("멤버 활동")).toBeInTheDocument();
     expect(mobileView.queryByText("내 통계")).not.toBeInTheDocument();
     expect(mobileView.getByText("바로가기")).toBeInTheDocument();
@@ -211,7 +232,6 @@ describe("MemberHome", () => {
     expect(mobileView.queryByText(/actions/i)).not.toBeInTheDocument();
     expect(mobileView.queryByText("current")).not.toBeInTheDocument();
 
-    expect(mobileView.getByRole("link", { name: /RSVP/ })).toHaveAttribute("href", "/app/session/current");
     expect(mobileView.getByRole("link", { name: /읽기 진행률/ })).toHaveAttribute("href", "/app/session/current");
     expect(mobileView.getByRole("link", { name: /질문 쓰기/ })).toHaveAttribute("href", "/app/session/current");
     expect(mobileView.queryByRole("link", { name: /한줄평/ })).not.toBeInTheDocument();

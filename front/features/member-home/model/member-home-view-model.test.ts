@@ -46,8 +46,7 @@ const session = {
   myLongReview: null,
   board: {
     questions: [],
-    oneLineReviews: [],
-    highlights: [],
+    longReviews: [],
   },
   attendees: [],
 } satisfies NonNullable<MemberHomeCurrentSessionView["currentSession"]>;
@@ -132,6 +131,48 @@ describe("member-home view model", () => {
     ).toBe("질문 2개를 더 준비해 주세요.");
   });
 
+  it("moves prepared members from current session to notes before generic ready copy", () => {
+    expect(
+      getMemberHomeNextReadingAction({
+        session: {
+          ...session,
+          myOneLineReview: { text: "짧은 회고입니다." },
+          myLongReview: { body: "긴 회고입니다." },
+        },
+        isViewer: false,
+        canWrite: true,
+        noteFeedItems,
+        today: new Date(2026, 4, 21),
+      }),
+    ).toMatchObject({
+      state: "ARCHIVE_AVAILABLE",
+      message: "최근 보존된 기록을 이어 읽을 수 있어요.",
+      href: "/app/notes",
+      ctaLabel: "노트 보기",
+    });
+  });
+
+  it("points post-session members at reflection before notes when reflection is missing", () => {
+    expect(
+      getMemberHomeNextReadingAction({
+        session: {
+          ...session,
+          myOneLineReview: null,
+          myLongReview: null,
+        },
+        isViewer: false,
+        canWrite: true,
+        noteFeedItems,
+        today: new Date(2026, 4, 21),
+      }),
+    ).toMatchObject({
+      state: "REFLECTION_DUE",
+      message: "모임 후 한줄평이나 서평을 남겨 주세요.",
+      href: "/app/session/current",
+      ctaLabel: "회고 남기기",
+    });
+  });
+
   it("keeps no-session and viewer states read-safe", () => {
     expect(getMemberHomeNextReadingAction({ session: null, isViewer: false, canWrite: true })).toEqual({
       state: "NO_SESSION",
@@ -169,5 +210,28 @@ describe("member-home view model", () => {
       href: "/app/session/current",
       ctaLabel: "세션 읽기",
     });
+  });
+
+  it("keeps read-only post-session members out of write-only reflection due state", () => {
+    const action = getMemberHomeNextReadingAction({
+      session: {
+        ...session,
+        myOneLineReview: null,
+        myLongReview: null,
+      },
+      isViewer: false,
+      canWrite: false,
+      today: new Date(2026, 4, 21),
+    });
+
+    expect(action).toMatchObject({
+      state: "SESSION_READY",
+      label: "세션 준비됨",
+      message: "세션을 읽고 공동 보드를 확인할 수 있어요.",
+      href: "/app/session/current",
+      ctaLabel: "세션 읽기",
+    });
+    expect(action.state).not.toBe("REFLECTION_DUE");
+    expect(action.label).not.toBe("회고 필요");
   });
 });

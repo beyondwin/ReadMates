@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import {
   cleanupGeneratedSessions,
   createOpenSessionFixture,
@@ -19,9 +19,7 @@ test.afterEach(() => {
   resetSeedGoogleLogins(["host@example.com"]);
 });
 
-test("host dashboard renders read-only operating-signal card without leaking admin-only signals", async ({ page }) => {
-  await loginWithGoogleFixture(page, "host@example.com");
-
+async function routeHostClubOperations(page: Page): Promise<void> {
   await page.route("**/api/bff/api/host/club-operations", async (route) => {
     await route.fulfill({
       status: 200,
@@ -31,22 +29,100 @@ test("host dashboard renders read-only operating-signal card without leaking adm
         generatedAt: "2026-05-31T00:00:00Z",
         club: { clubId: "club-1", slug: "club-one", name: "Club One" },
         readiness: { state: "READY", blockingReasons: [], nextAction: null },
-        sessionProgress: { upcomingCount: 1, currentOpenCount: 1, closedCount: 4, publishedRecordCount: 3, incompleteRecordCount: 1 },
-        aiUsage: { activeJobs: 1, failedRecentJobs: 3, staleCandidates: 0, costEstimateUsd: "0.5000", state: "DEGRADED", priorFailedJobs7d: 1 },
+        sessionProgress: {
+          upcomingCount: 1,
+          currentOpenCount: 1,
+          closedCount: 4,
+          publishedRecordCount: 3,
+          incompleteRecordCount: 1,
+        },
+        aiUsage: {
+          activeJobs: 1,
+          failedRecentJobs: 3,
+          staleCandidates: 0,
+          costEstimateUsd: "0.5000",
+          state: "DEGRADED",
+          priorFailedJobs7d: 1,
+        },
       }),
     });
   });
+}
+
+async function routeHostDashboardPublicSafe(page: Page): Promise<void> {
+  await page.route("**/api/bff/api/host/dashboard", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        rsvpPending: 0,
+        checkinMissing: 0,
+        publishPending: 0,
+        feedbackPending: 0,
+        currentSessionMissingMemberCount: 0,
+        currentSessionMissingMembers: [],
+      }),
+    });
+  });
+}
+
+async function expectNoHostPrivateSentinels(page: Page): Promise<void> {
+  await expect(page.getByText("member1@example.com")).toHaveCount(0);
+  await expect(page.getByText("ADMIN_ROUTE")).toHaveCount(0);
+  await expect(page.getByText("private.example.com")).toHaveCount(0);
+  await expect(page.getByText("{\"")).toHaveCount(0);
+}
+
+async function expectHostOperatingSignalCardPublicSafe(page: Page): Promise<void> {
+  const card = page.getByRole("region", { name: "운영 신호" });
+  await expect(card).toBeVisible();
+  await expect(card.getByText(/READY/)).toBeVisible();
+  await expect(card.getByText(/AI 실패/)).toBeVisible();
+  await expectNoHostPrivateSentinels(page);
+}
+
+async function expectHostMobileOperatingSummaryPublicSafe(page: Page): Promise<void> {
+  const mobileDashboard = page.locator("main.rm-host-dashboard-mobile");
+  await expect(mobileDashboard.getByRole("heading", { name: "모임 운영" })).toBeVisible();
+  await expect(mobileDashboard.getByText("오늘의 운영 판단")).toBeVisible();
+  await expect(mobileDashboard.getByText("RSVP 미응답")).toBeVisible();
+  await expect(mobileDashboard.getByText("공개 대기", { exact: true })).toBeVisible();
+  await expectNoHostPrivateSentinels(page);
+}
+
+test("host dashboard renders read-only operating-signal card without leaking admin-only signals", async ({ page }) => {
+  await loginWithGoogleFixture(page, "host@example.com");
+  await routeHostDashboardPublicSafe(page);
+  await routeHostClubOperations(page);
 
   await page.goto("/app/host");
   await expect(
     page.locator("main.rm-host-dashboard-desktop").getByRole("heading", { name: "모임 운영" }),
   ).toBeVisible();
 
-  const card = page.getByRole("region", { name: "운영 신호" });
-  await expect(card).toBeVisible();
-  await expect(card.getByText(/READY/)).toBeVisible();
-  await expect(card.getByText(/AI 실패/)).toBeVisible();
+  await expectHostOperatingSignalCardPublicSafe(page);
+});
 
-  await expect(card.getByText("@example.com")).toHaveCount(0);
-  await expect(card.getByText("ADMIN_ROUTE")).toHaveCount(0);
+test("host dashboard captures public-safe operating-signal visual evidence", async ({ page }, testInfo) => {
+  await loginWithGoogleFixture(page, "host@example.com");
+  await routeHostDashboardPublicSafe(page);
+  await routeHostClubOperations(page);
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/app/host");
+  await expectHostOperatingSignalCardPublicSafe(page);
+  const desktopScreenshot = await page.screenshot({
+    path: testInfo.outputPath("host-dashboard-operating-signal-desktop.png"),
+    fullPage: true,
+  });
+  expect(desktopScreenshot.byteLength).toBeGreaterThan(10_000);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/app/host");
+  await expectHostMobileOperatingSummaryPublicSafe(page);
+  const mobileScreenshot = await page.screenshot({
+    path: testInfo.outputPath("host-dashboard-operating-signal-mobile.png"),
+    fullPage: true,
+  });
+  expect(mobileScreenshot.byteLength).toBeGreaterThan(10_000);
 });

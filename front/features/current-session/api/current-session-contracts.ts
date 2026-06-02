@@ -1,66 +1,11 @@
-export type RsvpStatus = "NO_RESPONSE" | "GOING" | "MAYBE" | "DECLINED";
-export type AttendanceStatus = "UNKNOWN" | "ATTENDED" | "ABSENT";
-export type SessionParticipationStatus = "ACTIVE" | "REMOVED";
-export type CurrentSessionMemberRole = "HOST" | "MEMBER";
-
-export type CurrentSessionResponse = {
-  currentSession: null | {
-    sessionId: string;
-    sessionNumber: number;
-    title: string;
-    bookTitle: string;
-    bookAuthor: string;
-    bookLink: string | null;
-    bookImageUrl: string | null;
-    date: string;
-    startTime: string;
-    endTime: string;
-    locationLabel: string;
-    meetingUrl: string | null;
-    meetingPasscode: string | null;
-    questionDeadlineAt: string;
-    myRsvpStatus: RsvpStatus;
-    myCheckin: null | {
-      readingProgress: number;
-    };
-    myQuestions: Array<{
-      priority: number;
-      text: string;
-      draftThought: string | null;
-      authorName: string;
-      authorShortName: string;
-    }>;
-    myOneLineReview: null | {
-      text: string;
-    };
-    myLongReview: null | {
-      body: string;
-    };
-    board: {
-      questions: Array<{
-        priority: number;
-        text: string;
-        draftThought: string | null;
-        authorName: string;
-        authorShortName: string;
-      }>;
-      longReviews: Array<{
-        authorName: string;
-        authorShortName: string;
-        body: string;
-      }>;
-    };
-    attendees: Array<{
-      membershipId: string;
-      displayName: string;
-      accountName: string;
-      role: CurrentSessionMemberRole;
-      rsvpStatus: RsvpStatus;
-      attendanceStatus: AttendanceStatus;
-      participationStatus?: SessionParticipationStatus;
-    }>;
-  };
-};
+export type {
+  AttendanceStatus,
+  CurrentSessionMemberRole,
+  CurrentSessionResponse,
+  RsvpStatus,
+  SessionParticipationStatus,
+} from "@/shared/model/current-session-contracts";
+export { CurrentSessionResponseSchema } from "@/shared/model/current-session-contracts";
 
 export type UpdateRsvpRequest = {
   status: RsvpStatus;

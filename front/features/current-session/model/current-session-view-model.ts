@@ -172,10 +172,26 @@ export function getCurrentSessionReadingLoopSummary(
   });
 
   if (state === "MEMBER_PREP_REQUIRED") {
+    if (input.rsvp === "NO_RESPONSE") {
+      return {
+        state,
+        label: READING_LOOP_LABELS[state],
+        body: "RSVP를 먼저 선택하고, 읽기 진행률과 질문을 이어서 정리합니다.",
+      };
+    }
+
+    if (input.readingProgress <= 0) {
+      return {
+        state,
+        label: READING_LOOP_LABELS[state],
+        body: "읽기 진행률을 남긴 뒤 질문을 정리합니다.",
+      };
+    }
+
     return {
       state,
       label: READING_LOOP_LABELS[state],
-      body: "RSVP, 읽기 진행률, 질문을 모임 전에 정리합니다.",
+      body: "질문을 모임 전에 정리합니다.",
     };
   }
 

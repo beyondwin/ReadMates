@@ -34,13 +34,16 @@ Host/member reading-loop changes should close both product and evidence work:
 ```text
 Host operating action
   -> role-safe reading-loop state
-  -> member reading action
+  -> member next reading action
+  -> current-session / notes / archive / feedback continuity
   -> focused unit/route/E2E checks
   -> showcase and changelog update
   -> public release candidate scan when public-facing docs change
 ```
 
 The loop is private by permission. Public docs describe it through sanitized tests and source references rather than opening member or host routes to guests.
+
+The host/member loop also has desktop/mobile screenshot evidence for host operating signals and member reading-prep states. Screenshots are generated from public-safe route mocks or dev fixtures and stay in Playwright output, not in the repository.
 
 ## Analytics Confidence Evidence
 
