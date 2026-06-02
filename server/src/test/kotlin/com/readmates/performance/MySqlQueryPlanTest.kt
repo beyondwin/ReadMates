@@ -201,6 +201,26 @@ class MySqlQueryPlanTest(
     }
 
     @Test
+    fun `notes feed union branches use indexed access on every source table`() {
+        val plan =
+            jdbcTemplate.explain(
+                NOTES_FEED_PLAN_SQL,
+                READING_SAI_CLUB_ID,
+                READING_SAI_CLUB_ID,
+                READING_SAI_CLUB_ID,
+                READING_SAI_CLUB_ID,
+                31,
+            )
+
+        plan.assertUsesIndexFor("questions", "notes feed question branch")
+        plan.assertUsesIndexFor("long_reviews", "notes feed long-review branch")
+        plan.assertUsesIndexFor("one_line_reviews", "notes feed one-line review branch")
+        plan.assertUsesIndexFor("highlights", "notes feed highlight branch")
+        plan.assertUsesIndexFor("sessions", "notes feed session join")
+        plan.assertUsesIndexFor("session_participants", "notes feed active participant filter")
+    }
+
+    @Test
     fun `host member paged query uses indexed access on memberships`() {
         val plan =
             jdbcTemplate.explain(
@@ -402,5 +422,91 @@ class MySqlQueryPlanTest(
 
     companion object {
         private const val READING_SAI_CLUB_ID = "00000000-0000-0000-0000-000000000001"
+
+        private const val NOTES_FEED_PLAN_SQL = """
+            select id, session_id, session_number, book_title, session_date,
+                   author_name, author_short_name_source, kind, text, created_at, source_order, item_order
+            from (
+              select
+                questions.id as id, sessions.id as session_id, sessions.number as session_number,
+                sessions.book_title as book_title, sessions.session_date as session_date,
+                coalesce(memberships.short_name, users.name) as author_name,
+                coalesce(memberships.short_name, users.name) as author_short_name_source,
+                'QUESTION' as kind, questions.text as text, questions.created_at as created_at,
+                10 as source_order, questions.priority as item_order
+              from questions
+              join sessions on sessions.id = questions.session_id and sessions.club_id = questions.club_id
+              join memberships on memberships.id = questions.membership_id and memberships.club_id = questions.club_id
+              join users on users.id = memberships.user_id
+              join session_participants on session_participants.session_id = questions.session_id
+                and session_participants.club_id = questions.club_id
+                and session_participants.membership_id = questions.membership_id
+                and session_participants.participation_status = 'ACTIVE'
+              where questions.club_id = ?
+                and sessions.state = 'PUBLISHED' and sessions.visibility in ('MEMBER', 'PUBLIC')
+
+              union all
+
+              select
+                long_reviews.id as id, sessions.id as session_id, sessions.number as session_number,
+                sessions.book_title as book_title, sessions.session_date as session_date,
+                coalesce(memberships.short_name, users.name) as author_name,
+                coalesce(memberships.short_name, users.name) as author_short_name_source,
+                'LONG_REVIEW' as kind, long_reviews.body as text, long_reviews.created_at as created_at,
+                40 as source_order, 0 as item_order
+              from long_reviews
+              join sessions on sessions.id = long_reviews.session_id and sessions.club_id = long_reviews.club_id
+              join memberships on memberships.id = long_reviews.membership_id and memberships.club_id = long_reviews.club_id
+              join users on users.id = memberships.user_id
+              join session_participants on session_participants.session_id = long_reviews.session_id
+                and session_participants.club_id = long_reviews.club_id
+                and session_participants.membership_id = long_reviews.membership_id
+                and session_participants.participation_status = 'ACTIVE'
+              where long_reviews.club_id = ? and long_reviews.visibility = 'PUBLIC'
+                and sessions.state = 'PUBLISHED' and sessions.visibility in ('MEMBER', 'PUBLIC')
+
+              union all
+
+              select
+                one_line_reviews.id as id, sessions.id as session_id, sessions.number as session_number,
+                sessions.book_title as book_title, sessions.session_date as session_date,
+                coalesce(memberships.short_name, users.name) as author_name,
+                coalesce(memberships.short_name, users.name) as author_short_name_source,
+                'ONE_LINE_REVIEW' as kind, one_line_reviews.text as text, one_line_reviews.created_at as created_at,
+                30 as source_order, 0 as item_order
+              from one_line_reviews
+              join sessions on sessions.id = one_line_reviews.session_id and sessions.club_id = one_line_reviews.club_id
+              join memberships on memberships.id = one_line_reviews.membership_id and memberships.club_id = one_line_reviews.club_id
+              join users on users.id = memberships.user_id
+              join session_participants on session_participants.session_id = one_line_reviews.session_id
+                and session_participants.club_id = one_line_reviews.club_id
+                and session_participants.membership_id = one_line_reviews.membership_id
+                and session_participants.participation_status = 'ACTIVE'
+              where one_line_reviews.club_id = ? and one_line_reviews.visibility = 'PUBLIC'
+                and sessions.state = 'PUBLISHED' and sessions.visibility in ('MEMBER', 'PUBLIC')
+
+              union all
+
+              select
+                highlights.id as id, sessions.id as session_id, sessions.number as session_number,
+                sessions.book_title as book_title, sessions.session_date as session_date,
+                coalesce(memberships.short_name, users.name) as author_name,
+                coalesce(memberships.short_name, users.name) as author_short_name_source,
+                'HIGHLIGHT' as kind, highlights.text as text, highlights.created_at as created_at,
+                20 as source_order, highlights.sort_order as item_order
+              from highlights
+              join sessions on sessions.id = highlights.session_id and sessions.club_id = highlights.club_id
+              left join memberships on memberships.id = highlights.membership_id and memberships.club_id = highlights.club_id
+              left join users on users.id = memberships.user_id
+              left join session_participants on session_participants.session_id = highlights.session_id
+                and session_participants.club_id = highlights.club_id
+                and session_participants.membership_id = highlights.membership_id
+              where highlights.club_id = ?
+                and sessions.state = 'PUBLISHED' and sessions.visibility in ('MEMBER', 'PUBLIC')
+                and (highlights.membership_id is null or session_participants.participation_status = 'ACTIVE')
+            ) feed_items
+            order by created_at desc, source_order asc, session_number desc, item_order asc, id desc
+            limit ?
+        """
     }
 }
