@@ -92,7 +92,8 @@ class JdbcCurrentSessionAdapter(
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as account_name,
               memberships.role,
               session_participants.rsvp_status,
-              session_participants.attendance_status
+              session_participants.attendance_status,
+              session_participants.participation_status
             from session_participants
             join memberships on memberships.id = session_participants.membership_id
             join users on users.id = memberships.user_id
@@ -111,6 +112,7 @@ class JdbcCurrentSessionAdapter(
                     role = resultSet.getString("role"),
                     rsvpStatus = resultSet.getString("rsvp_status"),
                     attendanceStatus = resultSet.getString("attendance_status"),
+                    participationStatus = resultSet.getString("participation_status"),
                 )
             },
             sessionId.dbString(),

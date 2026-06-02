@@ -37,6 +37,7 @@ data class SessionAttendee(
     val role: String,
     val rsvpStatus: String,
     val attendanceStatus: String,
+    val participationStatus: String,
 )
 
 data class CurrentSessionCheckin(

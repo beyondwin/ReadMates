@@ -1,12 +1,13 @@
 /**
- * Writes sample valid JSON fixture files representing the top-level key shapes
+ * Writes sample valid JSON fixture files representing the key shapes
  * of zod-validated frontend API response schemas.
  *
  * Run via: pnpm zod:export-fixtures
  *
  * The fixtures are the source of truth for the server-side
  * FrontendZodSchemaContractTest, which verifies that server MockMvc responses
- * contain exactly the same top-level keys as these fixtures.
+ * contain the same recursive object keys and representative array element
+ * shapes as these fixtures.
  */
 import { writeFileSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -124,14 +125,50 @@ const currentSession = {
     questionDeadlineAt: "2025-11-25T14:59:00Z",
     myRsvpStatus: "GOING",
     myCheckin: { readingProgress: 100 },
-    myQuestions: [],
-    myOneLineReview: null,
-    myLongReview: null,
-    board: {
-      questions: [],
-      longReviews: [],
+    myQuestions: [
+      {
+        priority: 1,
+        text: "계약 테스트 질문",
+        draftThought: "계약 테스트 초안",
+        authorName: "멤버5",
+        authorShortName: "멤버5",
+      },
+    ],
+    myOneLineReview: {
+      text: "계약 테스트 한줄평",
     },
-    attendees: [],
+    myLongReview: {
+      body: "계약 테스트 내 서평",
+    },
+    board: {
+      questions: [
+        {
+          priority: 1,
+          text: "계약 테스트 질문",
+          draftThought: "계약 테스트 초안",
+          authorName: "멤버5",
+          authorShortName: "멤버5",
+        },
+      ],
+      longReviews: [
+        {
+          authorName: "멤버5",
+          authorShortName: "멤버5",
+          body: "계약 테스트 내 서평",
+        },
+      ],
+    },
+    attendees: [
+      {
+        membershipId: "00000000-0000-0000-0000-000000000201",
+        displayName: "호스트",
+        accountName: "김호스트",
+        role: "HOST",
+        rsvpStatus: "GOING",
+        attendanceStatus: "UNKNOWN",
+        participationStatus: "ACTIVE",
+      },
+    ],
   },
 };
 

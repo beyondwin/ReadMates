@@ -140,3 +140,11 @@ export const CurrentSessionResponseSchema = import.meta.env.DEV
         .nullable(),
     })
   : (null as never);
+
+export function parseCurrentSessionResponse(value: unknown): CurrentSessionResponse {
+  if (import.meta.env.DEV) {
+    return CurrentSessionResponseSchema.parse(value);
+  }
+
+  return value as CurrentSessionResponse;
+}

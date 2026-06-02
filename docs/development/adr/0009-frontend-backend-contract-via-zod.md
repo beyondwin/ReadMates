@@ -74,13 +74,13 @@ Zod schema는 production 빌드에서 tree-shaking된다. `import.meta.env.DEV` 
 
 `pnpm --dir front zod:export-fixtures` (`front/package.json:13` — `"zod:export-fixtures": "tsx scripts/export-zod-fixtures.ts"`)가 Zod schema의 valid fixture JSON을 `front/tests/unit/__fixtures__/zod-schemas/`에 내보낸다.
 
-`front/scripts/export-zod-fixtures.ts`가 각 schema의 top-level key set을 대표하는 샘플 fixture JSON을 작성한다. fixture는 실제 API 호출 결과가 아니라, "서버가 이 key set을 반환해야 한다"는 schema-driven 계약서다.
+`front/scripts/export-zod-fixtures.ts`가 각 schema의 key set을 대표하는 샘플 fixture JSON을 작성한다. fixture는 실제 API 호출 결과가 아니라, "서버가 이 key set을 반환해야 한다"는 schema-driven 계약서다. Drift 위험이 큰 배열은 public-safe 대표 element를 포함해 nested shape도 검증한다.
 
 CI에서 `pnpm zod:export-fixtures && git diff --exit-code`로 fixture drift를 차단한다.
 
 ### 서버 측
 
-`FrontendZodSchemaContractTest` (`server/src/test/kotlin/com/readmates/contract/FrontendZodSchemaContractTest.kt`)가 Spring MockMvc로 실제 API endpoint를 호출하고, 응답의 top-level key set을 fixture JSON과 비교한다.
+`FrontendZodSchemaContractTest` (`server/src/test/kotlin/com/readmates/contract/FrontendZodSchemaContractTest.kt`)가 Spring MockMvc로 실제 API endpoint를 호출하고, 응답의 recursive object key set과 대표 array element shape을 fixture JSON과 비교한다.
 
 시스템 프로퍼티 `readmates.frontend.zod.fixtures.dir`로 fixture 디렉토리를 주입받는다:
 
@@ -175,8 +175,8 @@ export function parseHostSessionDetailResponse(value: unknown): HostSessionDetai
 - Schema 정의가 프런트엔드(TypeScript/Zod)에 위치한다. 서버는 "프런트엔드가 기대하는 schema"를 fixture 파일을 통해 간접적으로 알 뿐이다.
 - `pnpm zod:export-fixtures`를 직접 실행해야 fixture가 갱신된다. CI에서 `git diff --exit-code`로 방어하고 있으나, 로컬에서 fixture를 갱신하지 않고 PR을 올리면 CI에서 처음 발견된다.
 - Zod schema가 프런트엔드 코드에 분산되어 있다. 특정 endpoint의 contract를 찾으려면 해당 feature의 `api/` 디렉토리를 탐색해야 한다.
-- 현재 fixture는 host session/notification/invitation, admin analytics overview, member current-session의 top-level response contract를 커버합니다. 모든 endpoint를 커버하지는 않으므로 신규 API contract를 추가할 때 fixture 후보에 포함할지 검토합니다.
-- top-level key set만 비교하므로, 중첩 객체의 필드 변경은 현재 테스트에서 감지되지 않는다. `attendees[0].rsvpStatus` 필드가 제거되어도 `attendees` 키 자체가 있으면 테스트는 통과한다.
+- 현재 fixture는 host session/notification/invitation, admin analytics overview, member current-session의 response contract를 커버합니다. 모든 endpoint를 커버하지는 않으므로 신규 API contract를 추가할 때 fixture 후보에 포함할지 검토합니다.
+- 서버 contract test는 fixture에 대표 object 또는 array element가 있는 범위에서 recursive key set을 비교한다. fixture array가 비어 있으면 해당 array element의 nested shape는 검증할 수 없으므로, drift 위험이 큰 endpoint는 fixture에 public-safe 대표 element를 포함한다.
 
 ## 검증
 
@@ -205,6 +205,6 @@ contract 불일치 수동 시뮬레이션:
 
 - 더 많은 핵심 API endpoint에 Zod schema와 fixture 추가. 현재는 host session/notification/invitation, admin analytics overview, member current-session을 우선 커버합니다.
 - CI에서 `zod:export-fixtures && git diff --exit-code`를 PR 필수 check로 자동화.
-- Nested field 검증으로 확장: top-level key set 비교 외에 중첩 객체/배열 element의 key set도 검증하는 deep contract test 추가.
+- 더 많은 fixture에 대표 nested element 추가: host notification/invitation list처럼 현재 비어 있는 list fixture도 drift 위험이 커지는 시점에 public-safe 대표 element를 추가한다.
 - schema를 OpenAPI로 양방향 export하는 자동화. Zod schema → OpenAPI spec 변환 도구(`zod-to-openapi` 등) 검토. 해외 협업 또는 API client 배포 시.
 - Production에서 Zod schema validation 선택적 활성화: 특정 endpoint에서만 production runtime validation을 켜는 feature flag.

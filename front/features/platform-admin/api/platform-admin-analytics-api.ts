@@ -1,4 +1,5 @@
 import { readmatesFetch } from "@/shared/api/client";
+import { parseAdminAnalyticsOverview } from "@/features/platform-admin/api/platform-admin-analytics-contracts";
 import {
   analyticsSearchFromWindow,
   type AdminAnalyticsOverview,
@@ -10,5 +11,5 @@ export function fetchAdminAnalyticsOverview(window: AnalyticsWindow) {
     `/api/admin/analytics/overview?${analyticsSearchFromWindow(window).toString()}`,
     undefined,
     { clubSlug: undefined },
-  );
+  ).then(parseAdminAnalyticsOverview);
 }

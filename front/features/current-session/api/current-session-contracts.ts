@@ -5,7 +5,7 @@ export type {
   RsvpStatus,
   SessionParticipationStatus,
 } from "@/shared/model/current-session-contracts";
-export { CurrentSessionResponseSchema } from "@/shared/model/current-session-contracts";
+export { CurrentSessionResponseSchema, parseCurrentSessionResponse } from "@/shared/model/current-session-contracts";
 
 export type UpdateRsvpRequest = {
   status: RsvpStatus;

@@ -1,9 +1,9 @@
 import { readmatesFetch, readmatesFetchResponse, type ReadmatesApiContext } from "@/shared/api/client";
-import type {
-  CheckinRequest,
-  CurrentSessionResponse,
-  CreateQuestionRequest,
-  RsvpStatus,
+import {
+  parseCurrentSessionResponse,
+  type CheckinRequest,
+  type CreateQuestionRequest,
+  type RsvpStatus,
 } from "@/features/current-session/api/current-session-contracts";
 
 type QuestionListItem = Pick<CreateQuestionRequest, "priority" | "text">;
@@ -17,7 +17,7 @@ function jsonRequest(init: Omit<RequestInit, "headers" | "body">, body: unknown)
 }
 
 export async function getCurrentSession(context?: ReadmatesApiContext) {
-  return readmatesFetch<CurrentSessionResponse>("/api/sessions/current", undefined, context);
+  return readmatesFetch<unknown>("/api/sessions/current", undefined, context).then(parseCurrentSessionResponse);
 }
 
 export async function updateCurrentSessionRsvp(status: RsvpStatus, context?: ReadmatesApiContext) {

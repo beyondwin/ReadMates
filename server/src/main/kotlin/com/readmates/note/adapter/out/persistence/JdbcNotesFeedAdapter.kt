@@ -161,7 +161,7 @@ class JdbcNotesFeedAdapter(
                     questions.created_at as created_at,
                     10 as source_order,
                     questions.priority as item_order
-                  from questions
+                  from questions force index (questions_club_session_created_idx)
                   join sessions on sessions.id = questions.session_id
                     and sessions.club_id = questions.club_id
                   join memberships on memberships.id = questions.membership_id

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { AdminAnalyticsOverview } from "@/features/platform-admin/model/platform-admin-analytics-model";
 
 export const AdminAnalyticsOverviewSchema = import.meta.env.DEV
   ? z.object({
@@ -57,3 +58,10 @@ export const AdminAnalyticsOverviewSchema = import.meta.env.DEV
       ),
     })
   : (null as never);
+
+export function parseAdminAnalyticsOverview(value: unknown): AdminAnalyticsOverview {
+  if (import.meta.env.DEV) {
+    return AdminAnalyticsOverviewSchema.parse(value) as AdminAnalyticsOverview;
+  }
+  return value as AdminAnalyticsOverview;
+}

@@ -195,6 +195,15 @@ Backend fast lanes:
 
 이 fast lane은 개발 중 빠른 피드백용이며 release baseline을 대체하지 않습니다. `unitTest`는 `integration`, `container`, `architecture` tag를 제외하고, `integrationTest`는 Spring/Testcontainers 성격 tag를 포함하며, `architectureTest`는 ArchUnit boundary만 실행합니다. Backend 변경을 ship하기 전에는 위 세 lane을 모두 실행합니다.
 
+`./server/gradlew -p server clean test` may be a no-op for integration-tagged confidence checks. For release-risk review that touches SQL plans, API contracts, or query budgets, run the targeted integration lane explicitly:
+
+```bash
+./server/gradlew -p server integrationTest \
+  --tests com.readmates.contract.FrontendZodSchemaContractTest \
+  --tests com.readmates.performance.ServerQueryBudgetTest \
+  --tests com.readmates.performance.MySqlQueryPlanTest
+```
+
 `:unitTest`는 JUnit5 클래스 단위 병렬 + Gradle `maxParallelForks=availableProcessors()/2`(기본)로 실행합니다. CI에서는 `READMATES_TEST_FORKS` env로 fork 수를 명시할 수 있고, sweep harness(`scripts/bench/sweep-forks.sh`)로 머신별 최적값을 측정할 수 있습니다.
 
 PR-level quality gate는 단일 `check` task로 통합되어 있습니다.
