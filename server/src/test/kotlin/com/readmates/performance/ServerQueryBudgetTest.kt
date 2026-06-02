@@ -137,8 +137,8 @@ class ServerQueryBudgetTest(
         val ownerCookie = sessionCookieForUser(OWNER_USER_ID)
 
         assertQueryBudget(
-            budget = 65,
-            reason = "admin analytics overview includes admin session validation plus aggregate and bounded bucket queries",
+            budget = 33,
+            reason = "admin analytics overview issues fixed aggregate plus one grouped query per series metric",
         ) {
             mockMvc
                 .get("/api/admin/analytics/overview?window=30d") {
