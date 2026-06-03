@@ -19,6 +19,10 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - **admin analytics series:** 시계열 KPI를 버킷마다 메트릭별 스칼라 쿼리로 조회하던 N+1 구조를, 버킷 인덱스로 `GROUP BY` 하는 메트릭당 단일 쿼리로 교체했습니다. 라운드트립이 버킷 수와 무관하게 고정되어 `/admin/analytics/overview`(30d) query budget이 65→33으로 줄었고, 윈도우 독립성과 버킷 분할 정합성을 통합 테스트로 고정했습니다.
 
+### Changed
+
+- **notes feed ordering:** 클럽 전체 notes feed를 회차(session) 우선으로 정렬하도록 바꿨습니다. 최신 회차가 먼저 묶여 보이고, 같은 회차 안에서는 작성 시각(`created_at`) 순으로 정렬되어, 오래된 회차에 더 나중에 작성된 기록이 마지막 회차 기록보다 앞에 끼어드는 일이 없어집니다. keyset pagination·EXPLAIN guard·통합 테스트를 새 정렬에 맞춰 고정했고, 단일 회차 feed의 keyset 로직도 같은 형태로 정렬해 두 경로의 분기를 없앴습니다. DB migration·API contract·auth/BFF 토큰 변경은 없습니다.
+
 ## v1.12.1 - 2026-05-31
 
 ### Fixed

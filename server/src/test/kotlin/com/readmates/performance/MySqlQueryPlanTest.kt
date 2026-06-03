@@ -505,7 +505,7 @@ class MySqlQueryPlanTest(
                 and sessions.state = 'PUBLISHED' and sessions.visibility in ('MEMBER', 'PUBLIC')
                 and (highlights.membership_id is null or session_participants.participation_status = 'ACTIVE')
             ) feed_items
-            order by created_at desc, source_order asc, session_number desc, item_order asc, id desc
+            order by session_number desc, created_at desc, source_order asc, item_order asc, id desc
             limit ?
         """
     }

@@ -286,8 +286,10 @@ class FrontendZodSchemaContractTest
 
                 if (!expected.isEmpty) {
                     assertThat(actual!!.isEmpty)
-                        .describedAs("JSON array at '$path' from '$fixtureFileName' must contain at least one representative item")
-                        .isFalse()
+                        .describedAs(
+                            "JSON array at '$path' from '$fixtureFileName' " +
+                                "must contain at least one representative item",
+                        ).isFalse()
 
                     for (index in 0 until actual.size()) {
                         assertJsonShapeMatches(
@@ -316,7 +318,8 @@ class FrontendZodSchemaContractTest
 
             assertThat(actualKeys)
                 .describedAs(
-                    "JSON object key set at '$path' from server response must match zod schema fixture '$fixtureFileName'.\n" +
+                    "JSON object key set at '$path' from server response " +
+                        "must match zod schema fixture '$fixtureFileName'.\n" +
                         "Keys in server response but not in zod fixture: ${actualKeys - expectedKeys}\n" +
                         "Keys in zod fixture but not in server response: ${expectedKeys - actualKeys}",
                 ).isEqualTo(expectedKeys)

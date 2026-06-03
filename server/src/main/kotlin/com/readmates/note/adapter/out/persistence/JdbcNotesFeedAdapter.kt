@@ -269,16 +269,16 @@ class JdbcNotesFeedAdapter(
                 ) feed_items
                 where (
                   ? is null
-                  or created_at < ?
-                  or (created_at = ? and source_order > ?)
-                  or (created_at = ? and source_order = ? and session_number < ?)
-                  or (created_at = ? and source_order = ? and session_number = ? and item_order > ?)
-                  or (created_at = ? and source_order = ? and session_number = ? and item_order = ? and id < ?)
+                  or session_number < ?
+                  or (session_number = ? and created_at < ?)
+                  or (session_number = ? and created_at = ? and source_order > ?)
+                  or (session_number = ? and created_at = ? and source_order = ? and item_order > ?)
+                  or (session_number = ? and created_at = ? and source_order = ? and item_order = ? and id < ?)
                 )
                 order by
+                  session_number desc,
                   created_at desc,
                   source_order asc,
-                  session_number desc,
                   item_order asc,
                   id desc
                 limit ?
@@ -289,19 +289,19 @@ class JdbcNotesFeedAdapter(
                 clubId.dbString(),
                 clubId.dbString(),
                 cursor?.createdAt?.toUtcLocalDateTime(),
+                cursor?.sessionNumber,
+                cursor?.sessionNumber,
                 cursor?.createdAt?.toUtcLocalDateTime(),
-                cursor?.createdAt?.toUtcLocalDateTime(),
-                cursor?.sourceOrder,
-                cursor?.createdAt?.toUtcLocalDateTime(),
-                cursor?.sourceOrder,
                 cursor?.sessionNumber,
                 cursor?.createdAt?.toUtcLocalDateTime(),
                 cursor?.sourceOrder,
                 cursor?.sessionNumber,
+                cursor?.createdAt?.toUtcLocalDateTime(),
+                cursor?.sourceOrder,
                 cursor?.itemOrder,
+                cursor?.sessionNumber,
                 cursor?.createdAt?.toUtcLocalDateTime(),
                 cursor?.sourceOrder,
-                cursor?.sessionNumber,
                 cursor?.itemOrder,
                 cursor?.id,
                 pageRequest.limit + 1,
@@ -447,16 +447,16 @@ class JdbcNotesFeedAdapter(
                 ) feed_items
                 where (
                   ? is null
-                  or created_at < ?
-                  or (created_at = ? and source_order > ?)
-                  or (created_at = ? and source_order = ? and session_number < ?)
-                  or (created_at = ? and source_order = ? and session_number = ? and item_order > ?)
-                  or (created_at = ? and source_order = ? and session_number = ? and item_order = ? and id < ?)
+                  or session_number < ?
+                  or (session_number = ? and created_at < ?)
+                  or (session_number = ? and created_at = ? and source_order > ?)
+                  or (session_number = ? and created_at = ? and source_order = ? and item_order > ?)
+                  or (session_number = ? and created_at = ? and source_order = ? and item_order = ? and id < ?)
                 )
                 order by
+                  session_number desc,
                   created_at desc,
                   source_order asc,
-                  session_number desc,
                   item_order asc,
                   id desc
                 limit ?
@@ -471,19 +471,19 @@ class JdbcNotesFeedAdapter(
                 clubId.dbString(),
                 sessionId.dbString(),
                 cursor?.createdAt?.toUtcLocalDateTime(),
+                cursor?.sessionNumber,
+                cursor?.sessionNumber,
                 cursor?.createdAt?.toUtcLocalDateTime(),
-                cursor?.createdAt?.toUtcLocalDateTime(),
-                cursor?.sourceOrder,
-                cursor?.createdAt?.toUtcLocalDateTime(),
-                cursor?.sourceOrder,
                 cursor?.sessionNumber,
                 cursor?.createdAt?.toUtcLocalDateTime(),
                 cursor?.sourceOrder,
                 cursor?.sessionNumber,
+                cursor?.createdAt?.toUtcLocalDateTime(),
+                cursor?.sourceOrder,
                 cursor?.itemOrder,
+                cursor?.sessionNumber,
                 cursor?.createdAt?.toUtcLocalDateTime(),
                 cursor?.sourceOrder,
-                cursor?.sessionNumber,
                 cursor?.itemOrder,
                 cursor?.id,
                 pageRequest.limit + 1,
@@ -552,8 +552,6 @@ class JdbcNotesFeedAdapter(
             nextCursor = if (rows.size > limit) visibleRows.lastOrNull()?.let(cursorFor) else null,
         )
     }
-
-    private fun <T> List<T>.toCursorPage(): CursorPage<T> = CursorPage(items = this, nextCursor = null)
 
     private data class NoteSessionCursor(
         val number: Int,

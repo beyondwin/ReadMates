@@ -795,25 +795,37 @@ class ArchiveAndNotesDbTest(
     @Test
     @Sql(
         statements = [
-            CLEANUP_LATEST_FEED_QUESTION_SQL,
-            INSERT_LATEST_FEED_QUESTION_SQL,
+            CLEANUP_LAST_SESSION_FIRST_FEED_SQL,
+            INSERT_LAST_SESSION_FIRST_FEED_SQL,
         ],
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
     )
     @Sql(
         statements = [
-            CLEANUP_LATEST_FEED_QUESTION_SQL,
+            CLEANUP_LAST_SESSION_FIRST_FEED_SQL,
         ],
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
-    fun `notes feed returns latest created item first`() {
+    fun `notes feed returns last session records before newer older-session records`() {
         mockMvc
             .get("/api/notes/feed") {
+                param("limit", "1")
                 with(user("member5@example.com"))
             }.andExpect {
                 status { isOk() }
-                jsonPath("$.items[0].kind") { value("QUESTION") }
-                jsonPath("$.items[0].text") { value(LATEST_FEED_QUESTION_TEXT) }
+                jsonPath("$.items.length()") { value(1) }
+                jsonPath("$.items[0].sessionNumber") { value(7) }
+                jsonPath("$.items[0].text") { value(not(NEWER_OLDER_SESSION_FEED_QUESTION_TEXT)) }
+            }
+
+        mockMvc
+            .get("/api/notes/feed") {
+                param("limit", "120")
+                with(user("member5@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items[*].text") { value(hasItem(LAST_SESSION_FEED_QUESTION_TEXT)) }
+                jsonPath("$.items[*].text") { value(hasItem(NEWER_OLDER_SESSION_FEED_QUESTION_TEXT)) }
             }
     }
 
@@ -1168,12 +1180,18 @@ class ArchiveAndNotesDbTest(
               and memberships.club_id = '00000000-0000-0000-0000-000000000001';
         """
 
-        private const val LATEST_FEED_QUESTION_TEXT = "2030년에 작성된 최신 피드 정렬 검증 질문"
-        private const val CLEANUP_LATEST_FEED_QUESTION_SQL = """
+        private const val LAST_SESSION_FEED_QUESTION_TEXT = "마지막 회차 기록이 클럽 흐름에서 먼저 보여야 합니다."
+        private const val NEWER_OLDER_SESSION_FEED_QUESTION_TEXT = "더 나중에 작성된 오래된 회차 기록은 뒤에 보여야 합니다."
+        private const val CLEANUP_LAST_SESSION_FIRST_FEED_SQL = """
             delete from questions
-            where id = '00000000-0000-0000-0000-000000008001';
+            where id in (
+              '00000000-0000-0000-0000-000000008001',
+              '00000000-0000-0000-0000-000000008002'
+            );
+            delete from session_participants
+            where id = '00000000-0000-0000-0000-000000008003';
         """
-        private const val INSERT_LATEST_FEED_QUESTION_SQL = """
+        private const val INSERT_LAST_SESSION_FIRST_FEED_SQL = """
             insert into questions (
               id,
               club_id,
@@ -1191,13 +1209,73 @@ class ArchiveAndNotesDbTest(
               sessions.id,
               memberships.id,
               5,
-              '2030년에 작성된 최신 피드 정렬 검증 질문',
+              '$NEWER_OLDER_SESSION_FEED_QUESTION_TEXT',
               null,
               '2030-01-01 00:00:00.000000',
               '2030-01-01 00:00:00.000000'
             from clubs
             join sessions on sessions.club_id = clubs.id
               and sessions.number = 1
+            join users on users.email = 'member5@example.com'
+            join memberships on memberships.club_id = clubs.id
+              and memberships.user_id = users.id
+            where clubs.id = '00000000-0000-0000-0000-000000000001';
+
+            insert into session_participants (
+              id,
+              club_id,
+              session_id,
+              membership_id,
+              rsvp_status,
+              attendance_status,
+              participation_status
+            )
+            select
+              '00000000-0000-0000-0000-000000008003',
+              sessions.club_id,
+              sessions.id,
+              memberships.id,
+              'GOING',
+              'UNKNOWN',
+              'ACTIVE'
+            from sessions
+            join users on users.email = 'member5@example.com'
+            join memberships on memberships.club_id = sessions.club_id
+              and memberships.user_id = users.id
+            where sessions.club_id = '00000000-0000-0000-0000-000000000001'
+              and sessions.number = 7
+              and not exists (
+                select 1
+                from session_participants existing
+                where existing.club_id = sessions.club_id
+                  and existing.session_id = sessions.id
+                  and existing.membership_id = memberships.id
+              );
+
+            insert into questions (
+              id,
+              club_id,
+              session_id,
+              membership_id,
+              priority,
+              text,
+              draft_thought,
+              created_at,
+              updated_at
+            )
+            select
+              '00000000-0000-0000-0000-000000008002',
+              clubs.id,
+              sessions.id,
+              memberships.id,
+              1,
+              '$LAST_SESSION_FEED_QUESTION_TEXT',
+              null,
+              '2029-01-01 00:00:00.000000',
+              '2029-01-01 00:00:00.000000'
+            from clubs
+            join sessions on sessions.club_id = clubs.id
+              and sessions.number = 7
             join users on users.email = 'member5@example.com'
             join memberships on memberships.club_id = clubs.id
               and memberships.user_id = users.id
