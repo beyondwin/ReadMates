@@ -110,7 +110,7 @@ const data: MyPageResponse = {
   joinedAt: "2025-11",
   sessionCount: 6,
   totalSessionCount: 13,
-  completedReadingCount: 0,
+  completedReadingCount: 4,
   recentAttendances: [
     { sessionNumber: 8, attended: true, readingProgress: 0 },
     { sessionNumber: 9, attended: true, readingProgress: 0 },
@@ -1086,12 +1086,11 @@ describe("MyPage", () => {
     const rhythmSection = scoped.getByRole("heading", { level: 2, name: "나의 리듬" }).closest("section");
     const rhythm = within(rhythmSection as HTMLElement);
 
-    expect(rhythm.getByText("참석")).toBeInTheDocument();
-    expect(rhythm.getByText("6")).toBeInTheDocument();
-    expect(rhythm.getByText("/13")).toBeInTheDocument();
-    expect(rhythm.getByText("완독률")).toBeInTheDocument();
+    expect(rhythm.getByText("참석률")).toBeInTheDocument();
     expect(rhythm.getByText("46")).toBeInTheDocument();
-    expect(rhythm.getByText("%")).toBeInTheDocument();
+    expect(rhythm.getByText("완독률")).toBeInTheDocument();
+    expect(rhythm.getByText("31")).toBeInTheDocument();
+    expect(rhythm.getAllByText("%").length).toBeGreaterThan(0);
     expect(rhythm.getByText("질문")).toBeInTheDocument();
     expect(rhythm.getByText("7")).toBeInTheDocument();
     expect(rhythm.getByText("개")).toBeInTheDocument();

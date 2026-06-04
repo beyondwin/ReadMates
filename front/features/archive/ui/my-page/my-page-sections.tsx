@@ -8,6 +8,7 @@ import {
   notificationEventLabels,
   notificationEventOrder,
 } from "@/features/archive/model/archive-model";
+import { readingCompletionRate } from "@/features/archive/model/reading-journey-model";
 import { Link } from "@/features/archive/ui/archive-link";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import type { LogoutControlComponent } from "./types";
@@ -111,12 +112,16 @@ export function RhythmSection({
   questionCount: string;
 }) {
   const summary = attendanceSummary(data);
+  const completionRate = readingCompletionRate({
+    completedReadingCount: data.completedReadingCount ?? 0,
+    totalSessionCount: data.totalSessionCount,
+  });
   const recentAttendances = data.recentAttendances ?? [];
   const firstRecent = recentAttendances.at(0)?.sessionNumber;
   const lastRecent = recentAttendances.at(-1)?.sessionNumber;
   const stats = [
-    { key: "참석", value: String(summary.attended), sub: `/${summary.total}` },
-    { key: "완독률", value: String(summary.rate), sub: "%" },
+    { key: "참석률", value: String(summary.rate), sub: "%" },
+    { key: "완독률", value: String(completionRate), sub: "%" },
     { key: "질문", value: String(questionCount), sub: "개" },
     { key: "서평", value: String(reviewCount), sub: "편" },
   ];
