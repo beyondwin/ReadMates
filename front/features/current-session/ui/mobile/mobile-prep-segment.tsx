@@ -1,4 +1,5 @@
 import { Icon, SaveFeedback } from "@/features/current-session/ui/current-session-primitives";
+import { ReadingPaceNote } from "@/features/current-session/ui/current-session-panels";
 import { QuestionEditor, type QuestionInput } from "@/features/current-session/ui/current-session-question-editor";
 import { MAX_QUESTION_INPUT_COUNT } from "@/features/current-session/model/current-session-form-model";
 import type { CurrentSession, RsvpUpdateStatus, SaveState } from "@/features/current-session/ui/current-session-types";
@@ -193,6 +194,7 @@ export function MobilePrepSegment({
             onChange={(event) => onReadingProgressChange(Number(event.target.value))}
             style={{ marginTop: 14 }}
           />
+          <ReadingPaceNote readingProgress={readingProgress} sessionDate={session.date} />
           <div className="rm-current-session-mobile__save-row">
             <span className="tiny" style={{ color: "var(--text-3)" }}>
               내 준비 상태와 호스트 운영 확인에 사용됩니다.

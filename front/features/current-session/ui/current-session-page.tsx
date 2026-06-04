@@ -454,6 +454,7 @@ export function CurrentSessionBoard({
                     </div>
                     <CheckinPanel
                       readingProgress={readingProgress}
+                      sessionDate={session.date}
                       saveStatus={saveStatuses.checkin}
                       onReadingProgressChange={handleReadingProgressChange}
                       onSave={handleSaveCheckin}

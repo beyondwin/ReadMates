@@ -1,5 +1,6 @@
 import { type CSSProperties } from "react";
 import {
+  MemberHomeNextActionPace,
   MobileCurrentSessionCard,
   MobileIcon,
   type MobileIconName,
@@ -163,6 +164,7 @@ function HomeAnswerStrip({
         <p className="body" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
           {nextAction.message}
         </p>
+        <MemberHomeNextActionPace pace={nextAction.pace} />
       </div>
       <div className="surface-quiet rm-home-answer-strip__item">
         <div className="eyebrow">이미 보존된 기록</div>
@@ -235,6 +237,7 @@ function MobileMemberHome({
         isViewer={isViewer}
         canWrite={canWrite}
         nextActionMessage={nextAction.message}
+        pace={nextAction.pace}
         LinkComponent={LinkComponent}
       />
       <MobileUpcomingSessions upcomingSessions={upcomingSessions} />

@@ -13,9 +13,52 @@ import {
   MAX_QUESTION_INPUT_COUNT,
 } from "@/features/current-session/model/current-session-form-model";
 import { getCurrentSessionFeedbackAccessState } from "@/features/current-session/model/current-session-view-model";
+import { deriveReadingPace, type ReadingPaceTier } from "@/shared/model/reading-pace";
 import { safeExternalHttpsUrl } from "@/shared/security/safe-external-url";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { formatDateLabel, formatDeadlineLabel, rsvpLabel } from "@/shared/ui/readmates-display";
+
+const READING_PACE_ACCENT: Record<ReadingPaceTier, string> = {
+  COMPLETED: "var(--ok)",
+  ON_TRACK: "var(--ok)",
+  AMPLE: "var(--accent)",
+  TIGHT: "var(--accent)",
+  URGENT: "var(--warn)",
+};
+
+export function ReadingPaceNote({
+  readingProgress,
+  sessionDate,
+}: {
+  readingProgress: number;
+  sessionDate: string | null | undefined;
+}) {
+  const pace = deriveReadingPace({ readingProgress, sessionDate });
+  const accent = READING_PACE_ACCENT[pace.tier];
+
+  return (
+    <div className="row" style={{ gap: "8px", marginTop: "10px", alignItems: "baseline" }}>
+      <span
+        className="tiny"
+        aria-label={`읽기 페이스: ${pace.label}`}
+        style={{
+          flexShrink: 0,
+          padding: "2px 8px",
+          borderRadius: "999px",
+          fontWeight: 600,
+          color: accent,
+          background: "var(--surface-quiet, var(--bg-sub))",
+          border: `1px solid ${accent}`,
+        }}
+      >
+        {pace.label}
+      </span>
+      <span className="tiny" style={{ color: "var(--text-3)" }}>
+        {pace.message}
+      </span>
+    </div>
+  );
+}
 
 const rsvpOptions: Array<{ status: RsvpUpdateStatus; label: string }> = [
   { status: "GOING", label: "참석" },
@@ -95,11 +138,13 @@ export function RsvpPanel({
 
 export function CheckinPanel({
   readingProgress,
+  sessionDate,
   saveStatus,
   onReadingProgressChange,
   onSave,
 }: {
   readingProgress: number;
+  sessionDate: string | null | undefined;
   saveStatus: SaveState;
   onReadingProgressChange: (value: number) => void;
   onSave: () => void;
@@ -133,6 +178,7 @@ export function CheckinPanel({
         onChange={(event) => onReadingProgressChange(Number(event.target.value))}
         style={{ width: "100%", accentColor: "var(--accent)" }}
       />
+      <ReadingPaceNote readingProgress={readingProgress} sessionDate={sessionDate} />
       <div className="row-between" style={{ marginTop: "12px" }}>
         <p className="marginalia" style={{ margin: 0 }}>
           진행률은 내 준비 상태와 호스트 운영 확인에 사용됩니다.

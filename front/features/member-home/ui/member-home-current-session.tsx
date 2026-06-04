@@ -1,6 +1,7 @@
 import { type CSSProperties } from "react";
 import { Link, PlainMemberHomeLink, type MemberHomeLinkComponent } from "@/features/member-home/ui/member-home-link";
 import type { MemberHomeCurrentSessionView as CurrentSessionResponse } from "@/features/member-home/model/member-home-view-model";
+import type { ReadingPace, ReadingPaceTier } from "@/shared/model/reading-pace";
 import { safeExternalHttpsUrl } from "@/shared/security/safe-external-url";
 import { BookCover } from "@/shared/ui/book-cover";
 import { displayText, formatDateLabel, formatDeadlineLabel, rsvpLabel } from "@/shared/ui/readmates-display";
@@ -9,6 +10,45 @@ import { SessionTimingIdentity } from "@/shared/ui/session-identity";
 type CurrentSession = NonNullable<CurrentSessionResponse["currentSession"]>;
 
 export type MobileIconName = "archive" | "arrow-right" | "arrow-up-right" | "book" | "check" | "host" | "link" | "notes" | "sparkle";
+
+const PACE_ACCENT: Record<ReadingPaceTier, string> = {
+  COMPLETED: "var(--ok)",
+  ON_TRACK: "var(--ok)",
+  AMPLE: "var(--accent)",
+  TIGHT: "var(--accent)",
+  URGENT: "var(--warn)",
+};
+
+export function MemberHomeNextActionPace({ pace }: { pace: ReadingPace | null }) {
+  if (!pace) {
+    return null;
+  }
+
+  const accent = PACE_ACCENT[pace.tier];
+
+  return (
+    <div className="m-row" style={{ gap: 8, marginTop: 8, alignItems: "baseline" }}>
+      <span
+        className="tiny"
+        aria-label={`읽기 페이스: ${pace.label}`}
+        style={{
+          flexShrink: 0,
+          padding: "2px 8px",
+          borderRadius: 999,
+          fontWeight: 600,
+          color: accent,
+          background: "var(--surface-quiet, var(--bg-sub))",
+          border: `1px solid ${accent}`,
+        }}
+      >
+        {pace.label}
+      </span>
+      <span className="tiny" style={{ color: "var(--text-3)" }}>
+        {pace.message}
+      </span>
+    </div>
+  );
+}
 
 function activeAttendees(session: CurrentSession) {
   return session.attendees.filter((attendee) => (attendee.participationStatus ?? "ACTIVE") === "ACTIVE");
@@ -260,12 +300,14 @@ export function MobileTodayActions({
   isViewer = false,
   canWrite = true,
   nextActionMessage,
+  pace = null,
   LinkComponent = PlainMemberHomeLink,
 }: {
   session: CurrentSession | null;
   isViewer?: boolean;
   canWrite?: boolean;
   nextActionMessage?: string;
+  pace?: ReadingPace | null;
   LinkComponent?: MemberHomeLinkComponent;
 }) {
   if (!session) {
@@ -346,6 +388,7 @@ export function MobileTodayActions({
           <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
             {nextActionMessage}
           </p>
+          <MemberHomeNextActionPace pace={pace} />
         </div>
       ) : null}
       <div className="m-action-grid">
