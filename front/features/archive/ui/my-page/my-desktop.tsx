@@ -1,15 +1,24 @@
 import type { CSSProperties } from "react";
-import type { FeedbackDocumentListItem, MyPageProfile, NotificationPreferences } from "@/features/archive/model/archive-model";
+import type {
+  ArchiveQuestionItem,
+  ArchiveReviewItem,
+  FeedbackDocumentListItem,
+  MyPageProfile,
+  NotificationPreferences,
+} from "@/features/archive/model/archive-model";
 import type { PagedResponse } from "@/shared/model/paging";
 import { DangerZone } from "./danger-zone";
 import { FeedbackReports } from "./feedback-reports";
 import { PreferencesSection } from "./preferences-section";
 import { AccountSection, NotificationsSection, RhythmSection, WritingSection } from "./my-page-sections";
+import { ReadingJourneySection } from "./reading-journey-section";
 import type { LogoutControlComponent, ProfileUpdateResult } from "./types";
 
 export function MyDesktop({
   data,
   reports,
+  questions,
+  reviews,
   reviewCount,
   questionCount,
   LogoutButtonComponent,
@@ -23,6 +32,8 @@ export function MyDesktop({
 }: {
   data: MyPageProfile;
   reports: PagedResponse<FeedbackDocumentListItem>;
+  questions: ArchiveQuestionItem[];
+  reviews: ArchiveReviewItem[];
   reviewCount: string;
   questionCount: string;
   LogoutButtonComponent: LogoutControlComponent;
@@ -56,6 +67,7 @@ export function MyDesktop({
             <AccountSection data={data} LogoutButtonComponent={LogoutButtonComponent} canEditProfile={canEditProfile} />
             <RhythmSection data={data} reviewCount={reviewCount} questionCount={questionCount} />
             <WritingSection reviewCount={reviewCount} questionCount={questionCount} />
+            <ReadingJourneySection questions={questions} reviews={reviews} />
             <FeedbackReports reports={reports} onLoadMoreReports={onLoadMoreReports} />
           </div>
 

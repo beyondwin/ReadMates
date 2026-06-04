@@ -1,5 +1,7 @@
 import { useState } from "react";
 import type {
+  ArchiveQuestionItem,
+  ArchiveReviewItem,
   FeedbackDocumentListItem,
   MyPageProfile,
   NotificationPreferences,
@@ -14,6 +16,8 @@ export type { LogoutControlComponent } from "./my-page/types";
 type MyPageProps = {
   data: MyPageProfile;
   reports: PagedResponse<FeedbackDocumentListItem>;
+  questions: PagedResponse<ArchiveQuestionItem>;
+  reviews: PagedResponse<ArchiveReviewItem>;
   reviewCount: string;
   questionCount: string;
   LogoutButtonComponent: LogoutControlComponent;
@@ -29,6 +33,8 @@ type MyPageProps = {
 export default function MyPage({
   data,
   reports,
+  questions,
+  reviews,
   reviewCount,
   questionCount,
   LogoutButtonComponent,
@@ -71,6 +77,8 @@ export default function MyPage({
         <MyDesktop
           data={profileData}
           reports={reports}
+          questions={questions.items}
+          reviews={reviews.items}
           reviewCount={reviewCount}
           questionCount={questionCount}
           LogoutButtonComponent={LogoutButtonComponent}
@@ -87,6 +95,8 @@ export default function MyPage({
         <MyMobile
           data={profileData}
           reports={reports}
+          questions={questions.items}
+          reviews={reviews.items}
           reviewCount={reviewCount}
           questionCount={questionCount}
           LogoutButtonComponent={LogoutButtonComponent}

@@ -48,9 +48,15 @@ export function groupHistoryByBook(
     return created;
   };
   for (const question of questions) {
+    if (!question) {
+      continue;
+    }
     ensure(question.sessionId, question.sessionNumber, question.bookTitle, question.date).questionCount += 1;
   }
   for (const review of reviews) {
+    if (!review) {
+      continue;
+    }
     ensure(review.sessionId, review.sessionNumber, review.bookTitle, review.date).reviewCount += 1;
   }
   return [...map.values()].sort((a, b) => b.sessionNumber - a.sessionNumber);
@@ -70,22 +76,26 @@ export function mergeActivityTimeline(
   reviews: JourneyReviewItem[],
 ): TimelineItem[] {
   const items: TimelineItem[] = [
-    ...questions.map((question) => ({
-      sessionId: question.sessionId,
-      sessionNumber: question.sessionNumber,
-      bookTitle: question.bookTitle,
-      date: question.date,
-      kind: "QUESTION" as const,
-      text: question.text,
-    })),
-    ...reviews.map((review) => ({
-      sessionId: review.sessionId,
-      sessionNumber: review.sessionNumber,
-      bookTitle: review.bookTitle,
-      date: review.date,
-      kind: "REVIEW" as const,
-      text: review.text,
-    })),
+    ...questions
+      .filter((question): question is JourneyQuestionItem => Boolean(question))
+      .map((question) => ({
+        sessionId: question.sessionId,
+        sessionNumber: question.sessionNumber,
+        bookTitle: question.bookTitle,
+        date: question.date,
+        kind: "QUESTION" as const,
+        text: question.text,
+      })),
+    ...reviews
+      .filter((review): review is JourneyReviewItem => Boolean(review))
+      .map((review) => ({
+        sessionId: review.sessionId,
+        sessionNumber: review.sessionNumber,
+        bookTitle: review.bookTitle,
+        date: review.date,
+        kind: "REVIEW" as const,
+        text: review.text,
+      })),
   ];
   return items.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.sessionNumber - a.sessionNumber));
 }

@@ -6,6 +6,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   FeedbackDocumentListItem,
   MemberProfileResponse,
+  MyArchiveQuestionItem,
+  MyArchiveReviewItem,
   MyPageResponse,
   NotificationPreferencesResponse,
 } from "@/features/archive/api/archive-contracts";
@@ -193,10 +195,19 @@ const reports: FeedbackDocumentListItem[] = [
 const reportPage = pageOf(reports);
 const reportReadLabel = "No.01 팩트풀니스 피드백 문서 읽기";
 
+const questionPage = pageOf<MyArchiveQuestionItem>([
+  { sessionId: "session-9", sessionNumber: 9, bookTitle: "여정질문책", date: "2026-02-10", priority: 1, text: "왜 우리는 세상을 더 나쁘게 볼까?", draftThought: null },
+]);
+const reviewPage = pageOf<MyArchiveReviewItem>([
+  { sessionId: "session-10", sessionNumber: 10, bookTitle: "여정서평책", date: "2026-03-12", kind: "LONG_REVIEW", text: "데이터로 세상을 다시 보게 한 책." },
+]);
+
 function renderMyPage(overrides: Partial<MyPageProps> = {}) {
   const props: MyPageProps = {
     data,
     reports: reportPage,
+    questions: questionPage,
+    reviews: reviewPage,
     reviewCount: "3",
     questionCount: "7",
     LogoutButtonComponent: TestLogoutButton,
@@ -213,6 +224,8 @@ function renderEditableMyPage(overrides: Partial<EditableMyPageProps> = {}) {
   const props: EditableMyPageProps = {
     data,
     reports: reportPage,
+    questions: questionPage,
+    reviews: reviewPage,
     reviewCount: "3",
     questionCount: "7",
     LogoutButtonComponent: TestLogoutButton,
@@ -659,6 +672,8 @@ describe("MyPage", () => {
         <MyPage
           data={data}
           reports={reportsPage}
+          questions={questionPage}
+          reviews={reviewPage}
           reviewCount="3"
           questionCount="7"
           LogoutButtonComponent={TestLogoutButton}
@@ -793,6 +808,8 @@ describe("MyPage", () => {
               <MyPage
                 data={data}
                 reports={reportPage}
+                questions={questionPage}
+                reviews={reviewPage}
                 reviewCount="3"
                 questionCount="7"
                 LogoutButtonComponent={TestLogoutButton}

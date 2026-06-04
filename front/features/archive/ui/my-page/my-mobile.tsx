@@ -1,5 +1,11 @@
 import type { CSSProperties } from "react";
-import type { FeedbackDocumentListItem, MyPageProfile, NotificationPreferences } from "@/features/archive/model/archive-model";
+import type {
+  ArchiveQuestionItem,
+  ArchiveReviewItem,
+  FeedbackDocumentListItem,
+  MyPageProfile,
+  NotificationPreferences,
+} from "@/features/archive/model/archive-model";
 import { clubDisplayName, formatJoinedMonth } from "@/features/archive/model/archive-model";
 import { Link } from "@/features/archive/ui/archive-link";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
@@ -9,11 +15,14 @@ import { MobileFeedbackReports } from "./feedback-reports";
 import { mobileMembershipStatusLabel } from "./my-page-helpers";
 import { NotificationsSection } from "./my-page-sections";
 import { ProfileNameEditor } from "./profile-name-editor";
+import { ReadingJourneySection } from "./reading-journey-section";
 import type { LogoutControlComponent, ProfileUpdateResult } from "./types";
 
 export function MyMobile({
   data,
   reports,
+  questions,
+  reviews,
   reviewCount,
   questionCount,
   LogoutButtonComponent,
@@ -27,6 +36,8 @@ export function MyMobile({
 }: {
   data: MyPageProfile;
   reports: PagedResponse<FeedbackDocumentListItem>;
+  questions: ArchiveQuestionItem[];
+  reviews: ArchiveReviewItem[];
   reviewCount: string;
   questionCount: string;
   LogoutButtonComponent: LogoutControlComponent;
@@ -106,6 +117,10 @@ export function MyMobile({
             })}
           </div>
         </div>
+      </section>
+
+      <section className="m-sec">
+        <ReadingJourneySection questions={questions} reviews={reviews} />
       </section>
 
       <MobileFeedbackReports reports={reports} onLoadMoreReports={onLoadMoreReports} />
