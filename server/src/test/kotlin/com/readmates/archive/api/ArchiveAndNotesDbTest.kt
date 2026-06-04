@@ -860,6 +860,39 @@ class ArchiveAndNotesDbTest(
     }
 
     @Test
+    @Sql(
+        statements = [
+            CLEANUP_MY_PAGE_READING_COMPLETION_SQL,
+            INSERT_MY_PAGE_READING_COMPLETION_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            CLEANUP_MY_PAGE_READING_COMPLETION_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `my page reports honest reading completion from reading checkins`() {
+        mockMvc
+            .get("/api/app/me") {
+                header("X-Readmates-Club-Slug", "sample-book-club")
+                with(user("member5@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.totalSessionCount") { value(2) }
+                jsonPath("$.completedReadingCount") { value(1) }
+                jsonPath("$.recentAttendances.length()") { value(2) }
+                jsonPath("$.recentAttendances[0].sessionNumber") { value(1) }
+                jsonPath("$.recentAttendances[0].attended") { value(true) }
+                jsonPath("$.recentAttendances[0].readingProgress") { value(100) }
+                jsonPath("$.recentAttendances[1].sessionNumber") { value(2) }
+                jsonPath("$.recentAttendances[1].attended") { value(false) }
+                jsonPath("$.recentAttendances[1].readingProgress") { value(40) }
+            }
+    }
+
+    @Test
     fun `public club endpoint resolves by slug`() {
         mockMvc
             .get("/api/public/clubs/reading-sai")
@@ -896,6 +929,85 @@ class ArchiveAndNotesDbTest(
 
     companion object {
         private fun removedJsonPath(vararg parts: String) = parts.joinToString(separator = "")
+
+        private const val CLEANUP_MY_PAGE_READING_COMPLETION_SQL = """
+            delete from reading_checkins
+            where membership_id = '00000000-0000-0000-0000-0000000092a0';
+            delete from session_participants
+            where membership_id = '00000000-0000-0000-0000-0000000092a0';
+            delete from sessions
+            where id in (
+              '00000000-0000-0000-0000-0000000092a1',
+              '00000000-0000-0000-0000-0000000092a2'
+            );
+            delete from memberships
+            where id = '00000000-0000-0000-0000-0000000092a0';
+        """
+
+        private const val INSERT_MY_PAGE_READING_COMPLETION_SQL = """
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+            select
+              '00000000-0000-0000-0000-0000000092a0',
+              clubs.id,
+              users.id,
+              'MEMBER',
+              'ACTIVE',
+              '2026-01-01 00:00:00.000000',
+              '완독멤버5'
+            from clubs
+            join users on users.email = 'member5@example.com'
+            where clubs.slug = 'sample-book-club';
+            insert into sessions (
+              id, club_id, number, title, book_title, book_author,
+              book_translator, book_link, book_image_url, session_date,
+              start_time, end_time, location_label, meeting_url,
+              meeting_passcode, question_deadline_at, state, visibility
+            )
+            values
+              (
+                '00000000-0000-0000-0000-0000000092a1',
+                '00000000-0000-0000-0000-000000000002',
+                1, '1회차 · 완독 집계 검증 책', '완독 집계 검증 책 1', '검증 저자',
+                null, null, null, '2026-11-01', '20:00:00', '22:00:00',
+                '온라인', null, null, '2026-10-31 14:59:00.000000',
+                'PUBLISHED', 'PUBLIC'
+              ),
+              (
+                '00000000-0000-0000-0000-0000000092a2',
+                '00000000-0000-0000-0000-000000000002',
+                2, '2회차 · 완독 집계 검증 책', '완독 집계 검증 책 2', '검증 저자',
+                null, null, null, '2026-12-01', '20:00:00', '22:00:00',
+                '온라인', null, null, '2026-11-30 14:59:00.000000',
+                'PUBLISHED', 'PUBLIC'
+              );
+            insert into session_participants (
+              id, club_id, session_id, membership_id,
+              rsvp_status, attendance_status, participation_status
+            )
+            values (
+              '00000000-0000-0000-0000-0000000092a3',
+              '00000000-0000-0000-0000-000000000002',
+              '00000000-0000-0000-0000-0000000092a1',
+              '00000000-0000-0000-0000-0000000092a0',
+              'GOING', 'ATTENDED', 'ACTIVE'
+            );
+            insert into reading_checkins (id, club_id, session_id, membership_id, reading_progress)
+            values
+              (
+                '00000000-0000-0000-0000-0000000092a4',
+                '00000000-0000-0000-0000-000000000002',
+                '00000000-0000-0000-0000-0000000092a1',
+                '00000000-0000-0000-0000-0000000092a0',
+                100
+              ),
+              (
+                '00000000-0000-0000-0000-0000000092a5',
+                '00000000-0000-0000-0000-000000000002',
+                '00000000-0000-0000-0000-0000000092a2',
+                '00000000-0000-0000-0000-0000000092a0',
+                40
+              );
+        """
 
         private const val CLEANUP_SAMPLE_CLUB_ARCHIVE_ISOLATION_SQL = """
             delete from public_session_publications
