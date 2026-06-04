@@ -173,6 +173,29 @@ describe("member-home view model", () => {
     });
   });
 
+  it("attaches reading pace when member can write and has a checkin", () => {
+    const action = getMemberHomeNextReadingAction({
+      session: {
+        ...session,
+        date: "2026-06-06",
+        myCheckin: { readingProgress: 30 },
+        myOneLineReview: null,
+        myLongReview: null,
+      },
+      isViewer: false,
+      canWrite: true,
+      today: new Date(2026, 5, 4),
+    });
+
+    expect(action.pace?.tier).toBe("URGENT");
+  });
+
+  it("leaves pace null when there is no session", () => {
+    const action = getMemberHomeNextReadingAction({ session: null, isViewer: false, canWrite: true });
+
+    expect(action.pace).toBeNull();
+  });
+
   it("keeps no-session and viewer states read-safe", () => {
     expect(getMemberHomeNextReadingAction({ session: null, isViewer: false, canWrite: true })).toEqual({
       state: "NO_SESSION",
@@ -180,6 +203,7 @@ describe("member-home view model", () => {
       message: "호스트가 세션을 열면 준비를 시작합니다.",
       href: null,
       ctaLabel: null,
+      pace: null,
     });
 
     expect(getMemberHomeNextReadingAction({ session, isViewer: true, canWrite: false })).toMatchObject({

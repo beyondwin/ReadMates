@@ -7,6 +7,7 @@ import {
   type ReadingLoopMissingWork,
   type ReadingLoopState,
 } from "@/shared/model/reading-loop";
+import { deriveReadingPace, type ReadingPace } from "@/shared/model/reading-pace";
 
 export type MemberHomeAuth = AuthMeResponse;
 export type MemberHomeMembershipStatus = "INVITED" | "VIEWER" | "ACTIVE" | "SUSPENDED" | "LEFT" | "INACTIVE";
@@ -51,6 +52,7 @@ export type MemberHomeNextReadingAction = {
   message: string;
   href: string | null;
   ctaLabel: string | null;
+  pace: ReadingPace | null;
 };
 
 export type MemberHomeNextReadingActionInput = {
@@ -107,6 +109,15 @@ export function getMemberHomeNextReadingAction({
     archiveItemCount: noteFeedItems.length,
   });
 
+  const pace =
+    session && canWrite && (state === "MEMBER_PREP_REQUIRED" || state === "SESSION_READY")
+      ? deriveReadingPace({
+          readingProgress: session.myCheckin?.readingProgress ?? 0,
+          sessionDate: session.date,
+          today,
+        })
+      : null;
+
   if (!session) {
     return {
       state,
@@ -114,6 +125,7 @@ export function getMemberHomeNextReadingAction({
       message: isViewer ? "다음 세션이 열리면 읽기 전용으로 확인할 수 있어요." : "호스트가 세션을 열면 준비를 시작합니다.",
       href: null,
       ctaLabel: null,
+      pace: null,
     };
   }
 
@@ -124,6 +136,7 @@ export function getMemberHomeNextReadingAction({
       message: "세션을 읽고 공동 보드를 확인할 수 있어요.",
       href: "/app/session/current",
       ctaLabel: "세션 읽기",
+      pace: null,
     };
   }
 
@@ -138,6 +151,7 @@ export function getMemberHomeNextReadingAction({
         message: "RSVP를 먼저 선택해 주세요.",
         href: action.href,
         ctaLabel: action.label,
+        pace,
       };
     }
 
@@ -148,6 +162,7 @@ export function getMemberHomeNextReadingAction({
         message: "읽기 진행률을 남겨 주세요.",
         href: action.href,
         ctaLabel: action.label,
+        pace,
       };
     }
 
@@ -158,6 +173,7 @@ export function getMemberHomeNextReadingAction({
         message: `질문 ${2 - session.myQuestions.length}개를 더 준비해 주세요.`,
         href: action.href,
         ctaLabel: action.label,
+        pace,
       };
     }
   }
@@ -171,6 +187,7 @@ export function getMemberHomeNextReadingAction({
       message: "모임 후 한줄평이나 서평을 남겨 주세요.",
       href: action.href,
       ctaLabel: action.label,
+      pace,
     };
   }
 
@@ -183,6 +200,7 @@ export function getMemberHomeNextReadingAction({
       message: "최근 보존된 기록을 이어 읽을 수 있어요.",
       href: action.href,
       ctaLabel: action.label,
+      pace,
     };
   }
 
@@ -194,5 +212,6 @@ export function getMemberHomeNextReadingAction({
     message: "준비가 정리되었습니다. 모임 전까지 수정할 수 있어요.",
     href: action.href,
     ctaLabel: action.label,
+    pace,
   };
 }
