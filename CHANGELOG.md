@@ -22,6 +22,15 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 ### Changed
 
 - **notes feed ordering:** 클럽 전체 notes feed를 회차(session) 우선으로 정렬하도록 바꿨습니다. 최신 회차가 먼저 묶여 보이고, 같은 회차 안에서는 작성 시각(`created_at`) 순으로 정렬되어, 오래된 회차에 더 나중에 작성된 기록이 마지막 회차 기록보다 앞에 끼어드는 일이 없어집니다. keyset pagination·EXPLAIN guard·통합 테스트를 새 정렬에 맞춰 고정했고, 단일 회차 feed의 keyset 로직도 같은 형태로 정렬해 두 경로의 분기를 없앴습니다. DB migration·API contract·auth/BFF 토큰 변경은 없습니다.
+- **member reading pace:** current-session과 member-home의 다음 행동 안내에 읽기 페이스 배지를 더했습니다. 마감까지 남은 일수와 읽기 진행률만으로 페이스(여유/적정/촉박/임박/완독)를 계산하므로 별도의 읽기 시작 앵커가 필요 없고, 배지는 색상에 더해 항상 텍스트 라벨과 `aria-label`을 함께 노출합니다. DB migration·auth/BFF 토큰 변경은 없습니다.
+
+### Fixed
+
+- **member my-page 완독률 정직성:** my-page에서 출석률을 "완독률"로 잘못 표기하던 오라벨을 바로잡았습니다. 이제 참석률(출석 기준)과 완독률(`reading_checkins.reading_progress`가 100%에 도달한 회차 기준)을 별도의 정직한 지표로 분리해 보여 줍니다. `MyPageResponse`에 `completedReadingCount`와 회차별 `readingProgress`가 추가됐고, DB migration·auth/BFF 토큰 변경은 없습니다.
+
+### Added
+
+- **member my-page 독서 여정:** my-page에 책별 히스토리(질문·서평 묶음)와 최근 활동 타임라인을 보여 주는 독서 여정 섹션을 더했습니다. 기록이 없을 때는 정직한 빈 상태를 노출하며, member 본인만 보는 표면 경계는 그대로 유지됩니다.
 
 ## v1.12.1 - 2026-05-31
 
