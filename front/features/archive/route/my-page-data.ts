@@ -46,6 +46,7 @@ function inactiveMyPageData(auth: AuthMeResponse): MyPageResponse {
     joinedAt: "",
     sessionCount: 0,
     totalSessionCount: 0,
+    completedReadingCount: 0,
     recentAttendances: [],
   };
 }

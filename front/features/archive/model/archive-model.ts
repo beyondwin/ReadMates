@@ -91,9 +91,11 @@ export type MyPageProfile = {
   joinedAt: string;
   sessionCount: number;
   totalSessionCount: number;
+  completedReadingCount: number;
   recentAttendances: Array<{
     sessionNumber: number;
     attended: boolean;
+    readingProgress: number;
   }>;
 };
 

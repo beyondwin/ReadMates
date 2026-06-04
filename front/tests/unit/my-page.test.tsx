@@ -110,13 +110,14 @@ const data: MyPageResponse = {
   joinedAt: "2025-11",
   sessionCount: 6,
   totalSessionCount: 13,
+  completedReadingCount: 0,
   recentAttendances: [
-    { sessionNumber: 8, attended: true },
-    { sessionNumber: 9, attended: true },
-    { sessionNumber: 10, attended: false },
-    { sessionNumber: 11, attended: true },
-    { sessionNumber: 12, attended: true },
-    { sessionNumber: 13, attended: true },
+    { sessionNumber: 8, attended: true, readingProgress: 0 },
+    { sessionNumber: 9, attended: true, readingProgress: 0 },
+    { sessionNumber: 10, attended: false, readingProgress: 0 },
+    { sessionNumber: 11, attended: true, readingProgress: 0 },
+    { sessionNumber: 12, attended: true, readingProgress: 0 },
+    { sessionNumber: 13, attended: true, readingProgress: 0 },
   ],
 };
 
