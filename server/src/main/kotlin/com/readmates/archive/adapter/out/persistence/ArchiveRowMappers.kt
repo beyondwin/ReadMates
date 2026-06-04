@@ -76,6 +76,7 @@ internal fun ResultSet.toMyRecentAttendanceResult() =
     MyRecentAttendanceResult(
         sessionNumber = getInt("session_number"),
         attended = getBoolean("attended"),
+        readingProgress = getInt("reading_progress"),
     )
 
 internal fun canReadArchiveFeedbackDocument(

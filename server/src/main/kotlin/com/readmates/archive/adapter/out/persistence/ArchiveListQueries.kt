@@ -197,15 +197,19 @@ internal class ArchiveListQueries {
         val recentAttendances =
             jdbcTemplate.query(
                 """
-                select session_number, attended
+                select session_number, attended, reading_progress
                 from (
                   select
                     sessions.number as session_number,
-                    coalesce(session_participants.attendance_status = 'ATTENDED', false) as attended
+                    coalesce(session_participants.attendance_status = 'ATTENDED', false) as attended,
+                    coalesce(reading_checkins.reading_progress, 0) as reading_progress
                   from sessions
                   left join session_participants on session_participants.session_id = sessions.id
                     and session_participants.club_id = sessions.club_id
                     and session_participants.membership_id = ?
+                  left join reading_checkins on reading_checkins.session_id = sessions.id
+                    and reading_checkins.club_id = sessions.club_id
+                    and reading_checkins.membership_id = ?
                   where sessions.club_id = ?
                     and sessions.state = 'PUBLISHED'
                   order by sessions.number desc
@@ -214,6 +218,7 @@ internal class ArchiveListQueries {
                 order by session_number asc
                 """.trimIndent(),
                 { resultSet, _ -> resultSet.toMyRecentAttendanceResult() },
+                currentMember.membershipId.dbString(),
                 currentMember.membershipId.dbString(),
                 currentMember.clubId.dbString(),
             )
@@ -239,7 +244,17 @@ internal class ArchiveListQueries {
                     from sessions
                     where sessions.club_id = memberships.club_id
                       and sessions.state = 'PUBLISHED'
-                  ) as total_session_count
+                  ) as total_session_count,
+                  (
+                    select count(*)
+                    from reading_checkins
+                    join sessions on sessions.id = reading_checkins.session_id
+                      and sessions.club_id = reading_checkins.club_id
+                    where reading_checkins.club_id = memberships.club_id
+                      and reading_checkins.membership_id = memberships.id
+                      and reading_checkins.reading_progress >= 100
+                      and sessions.state = 'PUBLISHED'
+                  ) as completed_reading_count
                 from memberships
                 join clubs on clubs.id = memberships.club_id
                 where memberships.id = ?
@@ -256,6 +271,7 @@ internal class ArchiveListQueries {
                         joinedAt = resultSet.getString("joined_at"),
                         sessionCount = resultSet.getInt("session_count"),
                         totalSessionCount = resultSet.getInt("total_session_count"),
+                        completedReadingCount = resultSet.getInt("completed_reading_count"),
                         recentAttendances = recentAttendances,
                     )
                 },
@@ -275,6 +291,7 @@ internal class ArchiveListQueries {
             joinedAt = "",
             sessionCount = 0,
             totalSessionCount = 0,
+            completedReadingCount = 0,
             recentAttendances = emptyList(),
         )
 }
