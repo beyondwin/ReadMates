@@ -131,10 +131,12 @@ data class MyPageResult(
     val joinedAt: String,
     val sessionCount: Int,
     val totalSessionCount: Int,
+    val completedReadingCount: Int,
     val recentAttendances: List<MyRecentAttendanceResult>,
 )
 
 data class MyRecentAttendanceResult(
     val sessionNumber: Int,
     val attended: Boolean,
+    val readingProgress: Int,
 )

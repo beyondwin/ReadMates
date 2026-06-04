@@ -119,10 +119,12 @@ data class MyPageResponse(
     val joinedAt: String,
     val sessionCount: Int,
     val totalSessionCount: Int,
+    val completedReadingCount: Int,
     val recentAttendances: List<MyRecentAttendanceItem>,
 )
 
 data class MyRecentAttendanceItem(
     val sessionNumber: Int,
     val attended: Boolean,
+    val readingProgress: Int,
 )

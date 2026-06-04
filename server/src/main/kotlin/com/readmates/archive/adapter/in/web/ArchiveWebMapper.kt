@@ -141,6 +141,7 @@ fun MyPageResult.toWebDto() =
         joinedAt = joinedAt,
         sessionCount = sessionCount,
         totalSessionCount = totalSessionCount,
+        completedReadingCount = completedReadingCount,
         recentAttendances = recentAttendances.map { it.toWebDto() },
     )
 
@@ -148,4 +149,5 @@ fun MyRecentAttendanceResult.toWebDto() =
     MyRecentAttendanceItem(
         sessionNumber = sessionNumber,
         attended = attended,
+        readingProgress = readingProgress,
     )
