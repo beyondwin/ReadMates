@@ -7,6 +7,7 @@ import {
   type MissingCurrentSessionMembersSummary as MissingCurrentSessionMembers,
 } from "@/features/host/model/host-dashboard-model";
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
+import type { HostPrepPace } from "@/features/host/model/host-prep-pace";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { formatDateOnlyLabel, formatMobileTodayLabel, hostAlertStateLabel } from "@/shared/ui/readmates-display";
 import { SessionTimingIdentity } from "@/shared/ui/session-identity";
@@ -39,6 +40,7 @@ export function MobileHostDashboard({
   onMissingMemberResolved,
   phase,
   nextAction,
+  prepPace,
   currentMembershipId,
   hasCurrentSession,
   upcomingSessions,
@@ -64,6 +66,7 @@ export function MobileHostDashboard({
   onMissingMemberResolved: (membershipId: string) => void;
   phase: SessionPhase;
   nextAction: NextOperationAction;
+  prepPace: HostPrepPace;
   currentMembershipId: string | null | undefined;
   hasCurrentSession: boolean;
   upcomingSessions: HostSessionListItem[];
@@ -144,6 +147,7 @@ export function MobileHostDashboard({
         </div>
         <NextActionCard
           action={nextAction}
+          pace={prepPace}
           mobile
           LinkComponent={LinkComponent}
           hostDashboardReturnTarget={hostDashboardReturnTarget}

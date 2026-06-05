@@ -38,4 +38,17 @@ describe("HostDashboard", () => {
     expect(screen.getAllByRole("heading").length).toBeGreaterThan(0);
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
   });
+
+  it("renders the session-prep pace badge", () => {
+    render(
+      <HostDashboard
+        data={dashboard}
+        current={{ currentSession: null }}
+        hostSessions={hostSessions}
+        actions={actions}
+      />,
+    );
+
+    expect(screen.getAllByLabelText(/준비 페이스:/).length).toBeGreaterThan(0);
+  });
 });

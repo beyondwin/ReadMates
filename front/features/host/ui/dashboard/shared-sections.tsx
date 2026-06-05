@@ -7,8 +7,10 @@ import {
   type MissingCurrentSessionMembersSummary as MissingCurrentSessionMembers,
 } from "@/features/host/model/host-dashboard-model";
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
+import type { HostPrepPace } from "@/features/host/model/host-prep-pace";
 import { HOST_DASHBOARD_LABELS } from "./constants";
 import { badgeClass } from "./dashboard-helpers";
+import { HostPrepPaceNote } from "./host-prep-pace-note";
 import type {
   HostDashboardActions,
   HostDashboardLinkComponent,
@@ -155,12 +157,14 @@ export function MissingCurrentSessionMembersAlert({
 
 export function NextActionCard({
   action,
+  pace,
   mobile = false,
   LinkComponent,
   hostDashboardReturnTarget,
   readmatesReturnState,
 }: {
   action: NextOperationAction;
+  pace: HostPrepPace;
   mobile?: boolean;
   LinkComponent: HostDashboardLinkComponent;
   hostDashboardReturnTarget: ReadmatesReturnTarget;
@@ -183,6 +187,7 @@ export function NextActionCard({
       <p className="tiny" style={{ margin: "8px 0 0", color: "var(--text-3)" }}>
         {action.loopBridge}
       </p>
+      <HostPrepPaceNote pace={pace} />
       {action.label ? (
         <div style={{ marginTop: 14 }}>
           {action.href ? (

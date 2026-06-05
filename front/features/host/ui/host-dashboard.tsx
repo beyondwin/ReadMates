@@ -18,6 +18,7 @@ import {
   getMissingCurrentSessionMembersSummary,
   hostSessionEditHref,
 } from "@/features/host/model/host-dashboard-model";
+import { deriveHostPrepPace, hostPrepPaceInputFrom } from "@/features/host/model/host-prep-pace";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { BookCover } from "@/shared/ui/book-cover";
 import { READMATES_NAV_LABELS } from "@/shared/ui/readmates-copy";
@@ -163,6 +164,7 @@ export default function HostDashboard({
   const missingMembers = getMissingCurrentSessionMembersSummary(data, resolvedMissingMemberIds);
   const phase = getHostDashboardSessionPhase(session);
   const nextAction = getHostDashboardNextOperationAction(session, data, missingMembers);
+  const prepPace = deriveHostPrepPace(hostPrepPaceInputFrom(session, data));
 
   const resolveMissingMember = (membershipId: string) => {
     setResolvedMissingMemberIdsByKey((current) => {
@@ -468,6 +470,7 @@ export default function HostDashboard({
               <aside className="stack" style={{ "--stack": "24px" } as CSSProperties}>
                 <NextActionCard
                   action={nextAction}
+                  pace={prepPace}
                   LinkComponent={LinkComponent}
                   hostDashboardReturnTarget={hostDashboardReturnTarget}
                   readmatesReturnState={readmatesReturnState}
@@ -561,6 +564,7 @@ export default function HostDashboard({
         onMissingMemberResolved={resolveMissingMember}
         phase={phase}
         nextAction={nextAction}
+        prepPace={prepPace}
         currentMembershipId={auth?.membershipId}
         hasCurrentSession={hasCurrentSession}
         upcomingSessions={upcomingSessions}
