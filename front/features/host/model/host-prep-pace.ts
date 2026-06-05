@@ -1,3 +1,5 @@
+import { nonNegativeDashboardCount, type HostDashboardCurrentSession, type HostDashboardData } from "./host-dashboard-model";
+
 export type HostPrepPaceTier = "STEADY" | "ON_TRACK" | "TIGHT" | "URGENT" | "OVERDUE";
 
 export type HostPrepPaceItemId = "session-basics" | "rsvp" | "checkin";
@@ -146,4 +148,31 @@ export function deriveHostPrepPace(input: HostPrepPaceInput): HostPrepPace {
     );
   }
   return result("ON_TRACK", daysRemaining, `${detail}이 남았지만 아직 여유 있어요.`, mostUrgent);
+}
+
+export function hostPrepPaceInputFrom(
+  session: HostDashboardCurrentSession | null,
+  data: HostDashboardData,
+  today?: Date,
+): HostPrepPaceInput {
+  const hasCoreSessionInfo = Boolean(
+    session &&
+      session.bookTitle.trim() &&
+      session.bookAuthor.trim() &&
+      session.date &&
+      session.startTime &&
+      session.locationLabel.trim() &&
+      session.meetingUrl?.trim(),
+  );
+
+  return {
+    hasSession: session !== null,
+    sessionDate: session?.date ?? null,
+    hasCoreSessionInfo,
+    rsvpPending: nonNegativeDashboardCount(data.rsvpPending),
+    checkinMissing: nonNegativeDashboardCount(data.checkinMissing),
+    publishPending: nonNegativeDashboardCount(data.publishPending),
+    feedbackPending: nonNegativeDashboardCount(data.feedbackPending),
+    today,
+  };
 }

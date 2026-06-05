@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { deriveHostPrepPace } from "./host-prep-pace";
+import { deriveHostPrepPace, hostPrepPaceInputFrom } from "./host-prep-pace";
+import type { HostDashboardCurrentSession, HostDashboardData } from "./host-dashboard-model";
 
 const today = new Date(2026, 5, 4); // 2026-06-04 local
 
@@ -88,5 +89,60 @@ describe("deriveHostPrepPace", () => {
     const pace = deriveHostPrepPace({ ...ready, sessionDate: "2026-06-05", rsvpPending: 2 });
     expect(pace.label).toBe("임박");
     expect(pace.message).toContain("RSVP 미응답 2명");
+  });
+});
+
+const baseData: HostDashboardData = {
+  rsvpPending: 0,
+  checkinMissing: 0,
+  publishPending: 0,
+  feedbackPending: 0,
+};
+
+const fullSession: HostDashboardCurrentSession = {
+  sessionId: "s1",
+  sessionNumber: 3,
+  bookTitle: "책",
+  bookAuthor: "저자",
+  date: "2026-06-10",
+  startTime: "19:00",
+  locationLabel: "온라인",
+  meetingUrl: "https://example.test/meet",
+  myCheckin: null,
+  attendees: [],
+  board: { questions: [] },
+};
+
+describe("hostPrepPaceInputFrom", () => {
+  it("reports no session and incomplete core info when session is null", () => {
+    const input = hostPrepPaceInputFrom(null, baseData);
+    expect(input.hasSession).toBe(false);
+    expect(input.hasCoreSessionInfo).toBe(false);
+    expect(input.sessionDate).toBeNull();
+  });
+
+  it("reports complete core info for a fully filled session", () => {
+    const input = hostPrepPaceInputFrom(fullSession, baseData);
+    expect(input.hasSession).toBe(true);
+    expect(input.hasCoreSessionInfo).toBe(true);
+    expect(input.sessionDate).toBe("2026-06-10");
+  });
+
+  it("treats a missing meeting URL as incomplete core info", () => {
+    const input = hostPrepPaceInputFrom({ ...fullSession, meetingUrl: null }, baseData);
+    expect(input.hasCoreSessionInfo).toBe(false);
+  });
+
+  it("clamps negative pending counts to zero", () => {
+    const input = hostPrepPaceInputFrom(fullSession, {
+      rsvpPending: -2,
+      checkinMissing: -1,
+      publishPending: -5,
+      feedbackPending: -3,
+    });
+    expect(input.rsvpPending).toBe(0);
+    expect(input.checkinMissing).toBe(0);
+    expect(input.publishPending).toBe(0);
+    expect(input.feedbackPending).toBe(0);
   });
 });
