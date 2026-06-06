@@ -9,6 +9,5 @@ object Sha256 {
 
     fun hex(value: String): String = hex(value.toByteArray(StandardCharsets.UTF_8))
 
-    fun hex(bytes: ByteArray): String =
-        HEX.formatHex(MessageDigest.getInstance("SHA-256").digest(bytes))
+    fun hex(bytes: ByteArray): String = HEX.formatHex(MessageDigest.getInstance("SHA-256").digest(bytes))
 }

@@ -24,7 +24,9 @@ class Sha256Test {
         val bytes = byteArrayOf(0, 1, 15, 16, -1, -128, 127)
         assertThat(Sha256.hex(bytes))
             .isEqualTo(
-                MessageDigest.getInstance("SHA-256").digest(bytes)
+                MessageDigest
+                    .getInstance("SHA-256")
+                    .digest(bytes)
                     .joinToString("") { "%02x".format(it) },
             )
     }
@@ -37,7 +39,8 @@ class Sha256Test {
     }
 
     private fun legacyHex(value: String): String =
-        MessageDigest.getInstance("SHA-256")
+        MessageDigest
+            .getInstance("SHA-256")
             .digest(value.toByteArray(StandardCharsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
 }
