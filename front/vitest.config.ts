@@ -31,11 +31,13 @@ export default defineConfig({
         "dist/**",
       ],
       // baseline: 현재 측정치 -2pp (정수 내림). 회귀 차단 게이트.
+      // vitest 4의 v8 커버리지는 AST 기반 리매핑이 기본이라 v3 대비 측정치가
+      // 더 정확(보수적)하게 낮아졌다. 테스트 수는 동일하며 baseline만 재보정함.
       thresholds: {
-        lines: 87,
-        statements: 87,
-        functions: 83,
-        branches: 84,
+        lines: 80,
+        statements: 79,
+        functions: 80,
+        branches: 75,
       },
     },
     projects: [
