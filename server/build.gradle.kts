@@ -69,6 +69,11 @@ dependencies {
     runtimeOnly("org.flywaydb:flyway-mysql")
     runtimeOnly("com.mysql:mysql-connector-j")
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
+    // Resilience4j CircuitBreaker for outbound adapters (resilience plan task 1).
+    // Core + micrometer only; the Spring Boot starter/annotations are intentionally
+    // unused so circuit-breaker types stay confined to adapter.out (ArchUnit task 7).
+    implementation("io.github.resilience4j:resilience4j-circuitbreaker:2.2.0")
+    implementation("io.github.resilience4j:resilience4j-micrometer:2.2.0")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
