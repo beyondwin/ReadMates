@@ -31,6 +31,9 @@ data class AuditLogEntry(
     val createdAt: Instant,
 ) {
     companion object {
+        // Mirrors the cohesive identity/context fields of a failed audit row; collapsing
+        // these into a parameter object is out of scope for this behavior-preserving change.
+        @Suppress("LongParameterList")
         fun failed(
             jobId: UUID,
             sessionId: UUID,

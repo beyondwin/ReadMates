@@ -26,7 +26,9 @@ class KafkaLagHealthCardProvider(
             try {
                 val result = prometheusQueryPort.query(PROMQL)
                 result.values.maxOfOrNull { it.value }
-            } catch (ex: PrometheusQueryException) {
+            } catch (ignored: PrometheusQueryException) {
+                // Health probes must never throw — a degraded metric source surfaces as
+                // an UNKNOWN card so one unreachable backend can't fail the dashboard.
                 return failure(now, reason = "prometheus_unreachable")
             }
         if (maxLag == null) {

@@ -136,7 +136,10 @@ class AiGenerationCommitService(
         val result =
             try {
                 commitDelegate.commitValidated(ValidatedSessionImportInput(command))
-            } catch (error: InvalidSessionImportException) {
+            } catch (ignored: InvalidSessionImportException) {
+                // Detail is intentionally dropped: the client already failed the trust
+                // boundary, so we restore the job to SUCCEEDED and surface a uniform
+                // SCHEMA_INVALID violation rather than leaking validator internals.
                 jobStore.transitionStatus(
                     jobId = record.jobId,
                     expected = setOf(JobStatus.COMMITTING),
@@ -153,6 +156,8 @@ class AiGenerationCommitService(
                     ),
                 )
             } catch (
+                // Catch all RuntimeExceptions so a commit-delegate failure can never strand
+                // the job in COMMITTING: restore SUCCEEDED and audit before rethrowing.
                 @Suppress("TooGenericExceptionCaught") error: RuntimeException,
             ) {
                 jobStore.transitionStatus(
