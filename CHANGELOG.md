@@ -34,6 +34,10 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - **member my-page 독서 여정:** my-page에 책별 히스토리(질문·서평 묶음)와 최근 활동 타임라인을 보여 주는 독서 여정 섹션을 더했습니다. 기록이 없을 때는 정직한 빈 상태를 노출하며, member 본인만 보는 표면 경계는 그대로 유지됩니다.
 - **host 회차 준비 페이스:** 호스트 대시보드의 다음 운영 행동에 회차 준비 페이스 배지를 더했습니다. 책 정보·RSVP·읽기 진행률 등 준비 항목을 기존 체크리스트의 D-7/D-3/D-1 마감창에 매핑해, 모임일까지 남은 일수 대비 가장 급한 항목과 전체 페이스(여유/적정/촉박/임박/마감 지남)를 한눈에 보여 줍니다. 배지는 색상에 더해 항상 텍스트 라벨과 `aria-label`을 노출합니다. DB migration·API contract·auth/BFF 토큰 변경은 없습니다.
 
+### Testing
+
+- **visual regression harness:** `shared/ui` primitive에 대한 Playwright 컴포넌트 단위 시각 회귀 하니스를 추가했습니다. baseline은 `mcr.microsoft.com/playwright:v1.60.0-jammy` 안에서만 생성해 CI 렌더러와 일치시키고, 스냅샷을 커밋 대상으로 관리합니다 (ReadmatesBrandMark / BookCover / AvatarChip 초기 커버리지). macOS 로컬에서는 Vite 8 네이티브 바인딩 부재로 Docker 경로만 사용합니다.
+
 ## v1.12.1 - 2026-05-31
 
 ### Fixed
