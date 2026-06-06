@@ -3,6 +3,8 @@ package com.readmates.club.adapter.out.http
 import com.readmates.club.application.model.ClubDomainActualCheckResult
 import com.readmates.club.application.port.out.CheckClubDomainActualStatePort
 import com.readmates.club.domain.ClubDomainStatus
+import com.readmates.shared.adapter.out.resilience.OutboundCircuitBreakers
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
@@ -29,6 +31,7 @@ class HttpClubDomainActualStateChecker
     constructor(
         @param:Value("\${readmates.club-domain-check.timeout:5s}")
         private val timeout: Duration,
+        private val circuitBreakers: OutboundCircuitBreakers,
     ) : CheckClubDomainActualStatePort {
         private val objectMapper = JsonMapper.builder().build()
         private val client: HttpClient =
@@ -44,7 +47,8 @@ class HttpClubDomainActualStateChecker
             timeout: Duration,
             addressResolver: (String) -> Array<InetAddress>,
             markerFetcher: (URI) -> MarkerHttpResult,
-        ) : this(timeout) {
+            circuitBreakers: OutboundCircuitBreakers,
+        ) : this(timeout, circuitBreakers) {
             this.addressResolver = addressResolver
             this.markerFetcher = markerFetcher
         }
@@ -63,10 +67,10 @@ class HttpClubDomainActualStateChecker
             }
 
             val marker =
-                try {
-                    markerFetcher(uri)
-                } catch (_: Exception) {
-                    return failed("DOMAIN_CHECK_UNREACHABLE")
+                when (val outcome = fetchMarkerResilient(uri)) {
+                    is MarkerOutcome.Ok -> outcome.result
+                    MarkerOutcome.CircuitOpen -> return failed("DOMAIN_CHECK_CIRCUIT_OPEN")
+                    MarkerOutcome.Failed -> return failed("DOMAIN_CHECK_UNREACHABLE")
                 }
 
             if (marker.statusCode in 300..399) {
@@ -85,6 +89,28 @@ class HttpClubDomainActualStateChecker
                 failed("DOMAIN_CHECK_MARKER_MISMATCH")
             }
         }
+
+        private sealed interface MarkerOutcome {
+            data class Ok(val result: MarkerHttpResult) : MarkerOutcome
+
+            data object CircuitOpen : MarkerOutcome
+
+            data object Failed : MarkerOutcome
+        }
+
+        private fun fetchMarkerResilient(uri: URI): MarkerOutcome =
+            circuitBreakers.execute(
+                name = CIRCUIT_BREAKER_NAME,
+                fallback = { error ->
+                    if (error is CallNotPermittedException) {
+                        MarkerOutcome.CircuitOpen
+                    } else {
+                        MarkerOutcome.Failed
+                    }
+                },
+            ) {
+                MarkerOutcome.Ok(markerFetcher(uri))
+            }
 
         private fun fetchMarker(uri: URI): MarkerHttpResult {
             val response =
@@ -156,6 +182,7 @@ class HttpClubDomainActualStateChecker
 
         companion object {
             const val MARKER_PATH = "/.well-known/readmates-domain-check.json"
+            const val CIRCUIT_BREAKER_NAME = "club-domain-check"
             private const val MAX_MARKER_BODY_BYTES = 4096
         }
     }

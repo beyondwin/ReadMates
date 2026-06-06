@@ -1,13 +1,18 @@
 package com.readmates.club.adapter.out.http
 
 import com.readmates.club.domain.ClubDomainStatus
+import com.readmates.shared.adapter.out.resilience.OutboundCircuitBreakers
+import com.readmates.shared.adapter.out.resilience.OutboundResilienceProperties
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.ObjectProvider
 import java.net.InetAddress
 import java.time.Duration
 
 class HttpClubDomainActualStateCheckerTest {
-    private val checker = HttpClubDomainActualStateChecker(timeout = Duration.ofMillis(100))
+    private val checker = HttpClubDomainActualStateChecker(timeout = Duration.ofMillis(100), circuitBreakers = breakers())
 
     @Test
     fun `rejects private or loopback addresses before fetching marker`() {
@@ -52,5 +57,25 @@ class HttpClubDomainActualStateCheckerTest {
             timeout = Duration.ofMillis(100),
             addressResolver = { arrayOf(InetAddress.getByName("93.184.216.34")) },
             markerFetcher = { result },
+            circuitBreakers = breakers(),
         )
+
+    private fun breakers(): OutboundCircuitBreakers =
+        OutboundCircuitBreakers(
+            properties = OutboundResilienceProperties(),
+            meterRegistryProvider = noopProvider(),
+        )
+
+    private fun noopProvider(): ObjectProvider<MeterRegistry> =
+        object : ObjectProvider<MeterRegistry> {
+            private val registry = SimpleMeterRegistry()
+
+            override fun getObject() = registry
+
+            override fun getObject(vararg args: Any?) = registry
+
+            override fun getIfAvailable() = registry
+
+            override fun getIfUnique() = registry
+        }
 }
