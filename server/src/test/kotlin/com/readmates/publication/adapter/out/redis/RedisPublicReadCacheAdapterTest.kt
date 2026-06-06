@@ -4,6 +4,9 @@ import com.readmates.publication.application.model.PublicClubResult
 import com.readmates.publication.application.model.PublicClubStatsResult
 import com.readmates.publication.application.model.PublicSessionDetailResult
 import com.readmates.publication.application.port.out.PublicReadCachePort
+import com.readmates.shared.adapter.out.resilience.OutboundCircuitBreakers
+import com.readmates.shared.adapter.out.resilience.OutboundResilienceConfiguration
+import com.readmates.shared.adapter.out.resilience.OutboundResilienceProperties
 import com.readmates.shared.cache.CacheJsonCodec
 import com.readmates.shared.cache.PublicCacheProperties
 import com.readmates.shared.cache.RedisCacheMetrics
@@ -205,6 +208,7 @@ class RedisPublicReadCacheAdapterTest(
                 codec = CacheJsonCodec(JsonMapper.builder().findAndAddModules().build()),
                 properties = PublicCacheProperties(enabled = true),
                 metrics = metrics(registry),
+                circuitBreakers = circuitBreakers(registry),
             )
 
         assertNull(adapter.getClub())
@@ -240,18 +244,30 @@ class RedisPublicReadCacheAdapterTest(
             override fun opsForValue() = throw IllegalStateException("redis unavailable")
         }
 
-    private fun metrics(meterRegistry: MeterRegistry) =
-        RedisCacheMetrics(
-            object : ObjectProvider<MeterRegistry> {
-                override fun getObject() = meterRegistry
+    private fun metrics(meterRegistry: MeterRegistry) = RedisCacheMetrics(provider(meterRegistry))
 
-                override fun getObject(vararg args: Any?) = meterRegistry
-
-                override fun getIfAvailable() = meterRegistry
-
-                override fun getIfUnique() = meterRegistry
-            },
+    private fun circuitBreakers(meterRegistry: MeterRegistry) =
+        OutboundCircuitBreakers(
+            properties =
+                OutboundResilienceProperties(
+                    slidingWindowSize = 2,
+                    minimumNumberOfCalls = 2,
+                    failureRateThreshold = 50f,
+                    waitDurationInOpenState = Duration.ofSeconds(60),
+                ),
+            meterRegistryProvider = provider(meterRegistry),
         )
+
+    private fun provider(meterRegistry: MeterRegistry): ObjectProvider<MeterRegistry> =
+        object : ObjectProvider<MeterRegistry> {
+            override fun getObject() = meterRegistry
+
+            override fun getObject(vararg args: Any?) = meterRegistry
+
+            override fun getIfAvailable() = meterRegistry
+
+            override fun getIfUnique() = meterRegistry
+        }
 
     companion object {
         private val BASELINE_CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000001")
@@ -273,6 +289,8 @@ private data class PublicReadCacheAdapterCase(
     RedisPublicReadCacheAdapter::class,
     NoopPublicReadCacheAdapter::class,
     RedisCacheMetrics::class,
+    OutboundCircuitBreakers::class,
+    OutboundResilienceConfiguration::class,
 )
 private class PublicReadCacheAdapterBeanTestConfiguration {
     @Bean

@@ -1,5 +1,6 @@
 package com.readmates.shared.adapter.out.redis
 
+import com.readmates.shared.adapter.out.resilience.OutboundCircuitBreakers
 import com.readmates.shared.cache.ReadCacheInvalidationPort
 import com.readmates.shared.cache.RedisCacheMetrics
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -13,6 +14,7 @@ import java.util.UUID
 class RedisReadCacheInvalidationAdapter(
     private val redisTemplate: StringRedisTemplate,
     private val metrics: RedisCacheMetrics,
+    private val circuitBreakers: OutboundCircuitBreakers,
 ) : ReadCacheInvalidationPort {
     override fun evictClubContent(clubId: UUID) {
         evictPublicContent(clubId)
@@ -20,18 +22,22 @@ class RedisReadCacheInvalidationAdapter(
     }
 
     private fun evictPublicContent(clubId: UUID) {
-        runCatching {
+        circuitBreakers.execute(
+            name = CIRCUIT_BREAKER_NAME,
+            fallback = { recordRedisFailure("evict-public-content") },
+        ) {
             val publicKeys = mutableSetOf("public:club:$clubId:home:v1")
             publicKeys.addAll(scanKeys("public:club:$clubId:session:*:v1"))
             delete(publicKeys)
             metrics.increment("readmates.public_cache.evicted", "scope", "club")
-        }.onFailure {
-            recordRedisFailure("evict-public-content")
         }
     }
 
     private fun evictNotesContent(clubId: UUID) {
-        runCatching {
+        circuitBreakers.execute(
+            name = CIRCUIT_BREAKER_NAME,
+            fallback = { recordRedisFailure("evict-notes-content") },
+        ) {
             val notesKeys =
                 mutableSetOf(
                     "notes:club:$clubId:feed:v1",
@@ -40,8 +46,6 @@ class RedisReadCacheInvalidationAdapter(
             notesKeys.addAll(scanKeys("notes:club:$clubId:session:*:feed:v1"))
             delete(notesKeys)
             metrics.increment("readmates.notes_cache.evicted", "scope", "club")
-        }.onFailure {
-            recordRedisFailure("evict-notes-content")
         }
     }
 
@@ -82,6 +86,8 @@ class RedisReadCacheInvalidationAdapter(
     }
 
     private companion object {
+        const val CIRCUIT_BREAKER_NAME = "redis-cache-invalidation"
+
         private const val SCAN_BATCH_SIZE = 256L
     }
 }

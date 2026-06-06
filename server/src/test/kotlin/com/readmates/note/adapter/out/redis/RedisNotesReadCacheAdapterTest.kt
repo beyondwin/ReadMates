@@ -3,6 +3,8 @@ package com.readmates.note.adapter.out.redis
 import com.readmates.note.application.model.NoteFeedResult
 import com.readmates.note.application.model.NoteSessionResult
 import com.readmates.note.application.port.out.NotesReadCachePort
+import com.readmates.shared.adapter.out.resilience.OutboundCircuitBreakers
+import com.readmates.shared.adapter.out.resilience.OutboundResilienceConfiguration
 import com.readmates.shared.cache.NotesCacheProperties
 import com.readmates.shared.cache.RedisCacheMetrics
 import com.readmates.support.ReadmatesRedisIntegrationTestSupport
@@ -214,6 +216,8 @@ private data class NotesReadCacheAdapterCase(
     RedisNotesReadCacheAdapter::class,
     NoopNotesReadCacheAdapter::class,
     RedisCacheMetrics::class,
+    OutboundCircuitBreakers::class,
+    OutboundResilienceConfiguration::class,
 )
 private class NotesReadCacheAdapterBeanTestConfiguration {
     @Bean

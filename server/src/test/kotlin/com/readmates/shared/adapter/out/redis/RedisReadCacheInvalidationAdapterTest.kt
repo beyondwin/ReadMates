@@ -1,5 +1,7 @@
 package com.readmates.shared.adapter.out.redis
 
+import com.readmates.shared.adapter.out.resilience.OutboundCircuitBreakers
+import com.readmates.shared.adapter.out.resilience.OutboundResilienceProperties
 import com.readmates.shared.cache.RedisCacheMetrics
 import com.readmates.support.ReadmatesRedisIntegrationTestSupport
 import io.micrometer.core.instrument.MeterRegistry
@@ -15,6 +17,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.data.redis.connection.RedisConnection
 import org.springframework.data.redis.core.RedisCallback
 import org.springframework.data.redis.core.StringRedisTemplate
+import java.time.Duration
 import java.util.UUID
 
 @SpringBootTest(
@@ -72,6 +75,7 @@ class RedisReadCacheInvalidationAdapterTest(
             RedisReadCacheInvalidationAdapter(
                 redisTemplate = failingRedisTemplate(),
                 metrics = metrics(registry),
+                circuitBreakers = circuitBreakers(registry),
             )
 
         adapter.evictClubContent(TARGET_CLUB_ID)
@@ -204,6 +208,27 @@ class RedisReadCacheInvalidationAdapterTest(
 
                 override fun getIfUnique() = meterRegistry
             },
+        )
+
+    private fun circuitBreakers(meterRegistry: MeterRegistry) =
+        OutboundCircuitBreakers(
+            properties =
+                OutboundResilienceProperties(
+                    slidingWindowSize = 2,
+                    minimumNumberOfCalls = 2,
+                    failureRateThreshold = 50f,
+                    waitDurationInOpenState = Duration.ofSeconds(60),
+                ),
+            meterRegistryProvider =
+                object : ObjectProvider<MeterRegistry> {
+                    override fun getObject() = meterRegistry
+
+                    override fun getObject(vararg args: Any?) = meterRegistry
+
+                    override fun getIfAvailable() = meterRegistry
+
+                    override fun getIfUnique() = meterRegistry
+                },
         )
 
     companion object {

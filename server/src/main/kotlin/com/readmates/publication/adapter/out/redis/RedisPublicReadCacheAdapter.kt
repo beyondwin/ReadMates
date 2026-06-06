@@ -5,6 +5,7 @@ import com.readmates.publication.application.model.LEGACY_PUBLIC_CLUB_SLUG
 import com.readmates.publication.application.model.PublicClubResult
 import com.readmates.publication.application.model.PublicSessionDetailResult
 import com.readmates.publication.application.port.out.PublicReadCachePort
+import com.readmates.shared.adapter.out.resilience.OutboundCircuitBreakers
 import com.readmates.shared.cache.CacheJsonCodec
 import com.readmates.shared.cache.PublicCacheProperties
 import com.readmates.shared.cache.RedisCacheMetrics
@@ -21,6 +22,7 @@ class RedisPublicReadCacheAdapter(
     private val codec: CacheJsonCodec,
     private val properties: PublicCacheProperties,
     private val metrics: RedisCacheMetrics,
+    private val circuitBreakers: OutboundCircuitBreakers,
 ) : PublicReadCachePort {
     override fun getClub(): PublicClubResult? = loadClubFromCache(clubKey(UUID.fromString(LEGACY_PUBLIC_CLUB_ID)))
 
@@ -29,27 +31,32 @@ class RedisPublicReadCacheAdapter(
     override fun getClub(clubId: UUID): PublicClubResult? = loadClubFromCache(clubKey(clubId))
 
     private fun loadClubFromCache(key: String): PublicClubResult? =
-        runCatching {
-            val raw =
-                redisTemplate.opsForValue().get(key) ?: run {
-                    recordCacheMiss("club")
-                    return null
-                }
-            val decoded = codec.decode(raw, PublicClubResult::class.java)
-            if (decoded == null) {
-                safeDelete(key)
+        circuitBreakers.execute(
+            name = CIRCUIT_BREAKER_NAME,
+            fallback = {
                 recordCacheMiss("club")
-                recordFallback("public-cache-decode")
-                recordOperationError("decode")
-                return null
+                recordFallback()
+                recordOperationError("get-club")
+                null
+            },
+        ) {
+            val raw = redisTemplate.opsForValue().get(key)
+            if (raw == null) {
+                recordCacheMiss("club")
+                null
+            } else {
+                val decoded = codec.decode(raw, PublicClubResult::class.java)
+                if (decoded == null) {
+                    safeDelete(key)
+                    recordCacheMiss("club")
+                    recordFallback("public-cache-decode")
+                    recordOperationError("decode")
+                    null
+                } else {
+                    recordCacheHit("club")
+                    decoded
+                }
             }
-            recordCacheHit("club")
-            decoded
-        }.getOrElse {
-            recordCacheMiss("club")
-            recordFallback()
-            recordOperationError("get-club")
-            null
         }
 
     override fun putClub(result: PublicClubResult) {
@@ -86,27 +93,32 @@ class RedisPublicReadCacheAdapter(
     ): PublicSessionDetailResult? = loadSessionFromCache(sessionKey(clubId, sessionId))
 
     private fun loadSessionFromCache(key: String): PublicSessionDetailResult? =
-        runCatching {
-            val raw =
-                redisTemplate.opsForValue().get(key) ?: run {
-                    recordCacheMiss("session")
-                    return null
-                }
-            val decoded = codec.decode(raw, PublicSessionDetailResult::class.java)
-            if (decoded == null) {
-                safeDelete(key)
+        circuitBreakers.execute(
+            name = CIRCUIT_BREAKER_NAME,
+            fallback = {
                 recordCacheMiss("session")
-                recordFallback("public-cache-decode")
-                recordOperationError("decode")
-                return null
+                recordFallback()
+                recordOperationError("get-session")
+                null
+            },
+        ) {
+            val raw = redisTemplate.opsForValue().get(key)
+            if (raw == null) {
+                recordCacheMiss("session")
+                null
+            } else {
+                val decoded = codec.decode(raw, PublicSessionDetailResult::class.java)
+                if (decoded == null) {
+                    safeDelete(key)
+                    recordCacheMiss("session")
+                    recordFallback("public-cache-decode")
+                    recordOperationError("decode")
+                    null
+                } else {
+                    recordCacheHit("session")
+                    decoded
+                }
             }
-            recordCacheHit("session")
-            decoded
-        }.getOrElse {
-            recordCacheMiss("session")
-            recordFallback()
-            recordOperationError("get-session")
-            null
         }
 
     override fun putSession(
@@ -142,19 +154,23 @@ class RedisPublicReadCacheAdapter(
         }
 
     private fun loadClubIdFromCache(key: String): UUID? =
-        runCatching {
-            val raw =
-                redisTemplate.opsForValue().get(key) ?: run {
-                    recordCacheMiss("club-id")
-                    return null
-                }
-            recordCacheHit("club-id")
-            UUID.fromString(raw)
-        }.getOrElse {
-            recordCacheMiss("club-id")
-            recordFallback()
-            recordOperationError("get-club-id")
-            null
+        circuitBreakers.execute(
+            name = CIRCUIT_BREAKER_NAME,
+            fallback = {
+                recordCacheMiss("club-id")
+                recordFallback()
+                recordOperationError("get-club-id")
+                null
+            },
+        ) {
+            val raw = redisTemplate.opsForValue().get(key)
+            if (raw == null) {
+                recordCacheMiss("club-id")
+                null
+            } else {
+                recordCacheHit("club-id")
+                UUID.fromString(raw)
+            }
         }
 
     override fun putClubId(
@@ -175,11 +191,14 @@ class RedisPublicReadCacheAdapter(
         if (ttl <= Duration.ZERO) {
             return
         }
-        runCatching {
+        circuitBreakers.execute(
+            name = CIRCUIT_BREAKER_NAME,
+            fallback = {
+                recordFallback()
+                recordOperationError(operation)
+            },
+        ) {
             redisTemplate.opsForValue().set(key, codec.encode(result), ttl)
-        }.onFailure {
-            recordFallback()
-            recordOperationError(operation)
         }
     }
 
@@ -192,11 +211,14 @@ class RedisPublicReadCacheAdapter(
         if (ttl <= Duration.ZERO) {
             return
         }
-        runCatching {
+        circuitBreakers.execute(
+            name = CIRCUIT_BREAKER_NAME,
+            fallback = {
+                recordFallback()
+                recordOperationError(operation)
+            },
+        ) {
             redisTemplate.opsForValue().set(key, value, ttl)
-        }.onFailure {
-            recordFallback()
-            recordOperationError(operation)
         }
     }
 
@@ -225,6 +247,8 @@ class RedisPublicReadCacheAdapter(
     }
 
     private companion object {
+        const val CIRCUIT_BREAKER_NAME = "redis-public-cache"
+
         fun clubKey(clubId: UUID) = "public:club:$clubId:home:v1"
 
         fun sessionKey(

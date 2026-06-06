@@ -3,6 +3,7 @@ package com.readmates.note.adapter.out.redis
 import com.readmates.note.application.model.NoteFeedResult
 import com.readmates.note.application.model.NoteSessionResult
 import com.readmates.note.application.port.out.NotesReadCachePort
+import com.readmates.shared.adapter.out.resilience.OutboundCircuitBreakers
 import com.readmates.shared.cache.NotesCacheProperties
 import com.readmates.shared.cache.RedisCacheMetrics
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -20,6 +21,7 @@ class RedisNotesReadCacheAdapter(
     private val objectMapper: ObjectMapper,
     private val properties: NotesCacheProperties,
     private val metrics: RedisCacheMetrics,
+    private val circuitBreakers: OutboundCircuitBreakers,
 ) : NotesReadCachePort {
     private val feedListType = objectMapper.typeFactory.constructCollectionType(List::class.java, NoteFeedResult::class.java)
     private val sessionListType = objectMapper.typeFactory.constructCollectionType(List::class.java, NoteSessionResult::class.java)
@@ -62,18 +64,22 @@ class RedisNotesReadCacheAdapter(
         scope: String,
         operation: String,
     ): List<T>? =
-        runCatching {
-            val raw =
-                redisTemplate.opsForValue().get(key) ?: run {
-                    recordCacheMiss(scope)
-                    return null
-                }
-            decodeList<T>(raw, type, key, scope) ?: return null
-        }.getOrElse {
-            recordCacheMiss(scope)
-            recordFallback()
-            recordOperationError(operation)
-            null
+        circuitBreakers.execute(
+            name = CIRCUIT_BREAKER_NAME,
+            fallback = {
+                recordCacheMiss(scope)
+                recordFallback()
+                recordOperationError(operation)
+                null
+            },
+        ) {
+            val raw = redisTemplate.opsForValue().get(key)
+            if (raw == null) {
+                recordCacheMiss(scope)
+                null
+            } else {
+                decodeList<T>(raw, type, key, scope)
+            }
         }
 
     private fun <T : Any> decodeList(
@@ -105,11 +111,14 @@ class RedisNotesReadCacheAdapter(
         if (properties.feedTtl <= Duration.ZERO) {
             return
         }
-        runCatching {
+        circuitBreakers.execute(
+            name = CIRCUIT_BREAKER_NAME,
+            fallback = {
+                recordFallback()
+                recordOperationError(operation)
+            },
+        ) {
             redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(result), properties.feedTtl)
-        }.onFailure {
-            recordFallback()
-            recordOperationError(operation)
         }
     }
 
@@ -138,6 +147,8 @@ class RedisNotesReadCacheAdapter(
     }
 
     private companion object {
+        const val CIRCUIT_BREAKER_NAME = "redis-notes-cache"
+
         fun feedKey(clubId: UUID) = "notes:club:$clubId:feed:v1"
 
         fun sessionFeedKey(
