@@ -15,6 +15,10 @@
 /test-results/
 /playwright-report/
 
+# Playwright component-test transient output (baselines under __screenshots__ are committed)
+/blob-report/
+/playwright/.cache/
+
 # next.js
 /.next/
 /out/
