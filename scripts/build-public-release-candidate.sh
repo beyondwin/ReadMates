@@ -399,6 +399,7 @@ copy_manifest() {
     --exclude='/dist/' \
     --exclude='/test-results/' \
     --exclude='/playwright-report/' \
+    --exclude='/__screenshots__/' \
     --exclude='/coverage/' \
     --exclude='/.nyc_output/'
 
