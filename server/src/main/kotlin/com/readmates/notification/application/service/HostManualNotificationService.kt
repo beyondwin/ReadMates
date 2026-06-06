@@ -33,9 +33,8 @@ import com.readmates.notification.domain.NotificationEventType
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
+import com.readmates.shared.security.Sha256
 import org.springframework.stereotype.Service
-import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.UUID
@@ -349,10 +348,7 @@ class HostManualNotificationService(
                 selection.includedMembershipIds.sorted(),
                 selection.sendMode,
             ).joinToString("|")
-        return MessageDigest
-            .getInstance("SHA-256")
-            .digest(raw.toByteArray(StandardCharsets.UTF_8))
-            .joinToString("") { "%02x".format(it) }
+        return Sha256.hex(raw)
     }
 
     private fun requireHost(host: CurrentMember): CurrentMember {

@@ -32,10 +32,10 @@ import com.readmates.aigen.application.port.out.JobKind
 import com.readmates.aigen.application.port.out.JobRecord
 import com.readmates.aigen.application.port.out.ModelCatalog
 import com.readmates.aigen.config.AiGenerationProperties
+import com.readmates.shared.security.Sha256
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
-import java.security.MessageDigest
 import java.time.Clock
 import java.util.UUID
 
@@ -161,7 +161,7 @@ class AiGenerationOrchestrator(
                 item = null,
                 provider = record.model.provider,
                 model = record.model.name,
-                transcriptSha256 = sha256(record.transcript),
+                transcriptSha256 = Sha256.hex(record.transcript),
                 usage = TokenUsage(0, 0, 0),
                 costEstimateUsd = BigDecimal.ZERO,
                 status = AuditStatus.FAILED,
@@ -326,7 +326,7 @@ class AiGenerationOrchestrator(
                 item = null,
                 provider = modelId.provider,
                 model = modelId.name,
-                transcriptSha256 = sha256(command.transcript),
+                transcriptSha256 = Sha256.hex(command.transcript),
                 usage = TokenUsage(0, 0, 0),
                 costEstimateUsd = BigDecimal.ZERO,
                 status = AuditStatus.FAILED,
@@ -367,7 +367,7 @@ class AiGenerationOrchestrator(
                 item = null,
                 provider = provider,
                 model = candidateModel,
-                transcriptSha256 = sha256(command.transcript),
+                transcriptSha256 = Sha256.hex(command.transcript),
                 usage = TokenUsage(0, 0, 0),
                 costEstimateUsd = BigDecimal.ZERO,
                 status = AuditStatus.FAILED,
@@ -378,12 +378,6 @@ class AiGenerationOrchestrator(
             ),
         )
         throw AiGenerationException.Coded(code, message)
-    }
-
-    private fun sha256(text: String): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        val bytes = digest.digest(text.toByteArray(Charsets.UTF_8))
-        return bytes.joinToString("") { "%02x".format(it) }
     }
 
     private companion object {

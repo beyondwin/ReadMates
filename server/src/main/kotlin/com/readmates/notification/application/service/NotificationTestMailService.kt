@@ -13,8 +13,8 @@ import com.readmates.notification.application.port.out.NotificationTestMailAudit
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
+import com.readmates.shared.security.Sha256
 import org.springframework.stereotype.Service
-import java.security.MessageDigest
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 
@@ -46,7 +46,7 @@ class NotificationTestMailService(
                 clubId = currentHost.clubId,
                 hostMembershipId = currentHost.membershipId,
                 recipientMaskedEmail = recipient.maskEmail(),
-                recipientEmailHash = sha256Hex(recipient),
+                recipientEmailHash = Sha256.hex(recipient),
                 cooldownStartedAfter = OffsetDateTime.now(ZoneOffset.UTC).minusSeconds(TEST_MAIL_COOLDOWN_SECONDS),
             ) ?: throw NotificationApplicationException(
                 NotificationApplicationError.TEST_MAIL_COOLDOWN,
@@ -99,10 +99,4 @@ class NotificationTestMailService(
             "${local.first()}***@$domain"
         }
     }
-
-    private fun sha256Hex(value: String): String =
-        MessageDigest
-            .getInstance("SHA-256")
-            .digest(value.toByteArray(Charsets.UTF_8))
-            .joinToString("") { "%02x".format(it) }
 }
