@@ -57,6 +57,9 @@ dist/
 coverage/
 test-results/
 playwright-report/
+# Playwright component-test build cache and dockerized pnpm store
+front/playwright/.cache/
+.pnpm-store/
 
 # =============================================================================
 # Logs, PIDs, runtime artifacts
