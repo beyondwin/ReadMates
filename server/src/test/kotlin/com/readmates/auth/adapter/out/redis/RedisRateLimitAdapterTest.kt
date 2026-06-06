@@ -2,6 +2,8 @@ package com.readmates.auth.adapter.out.redis
 
 import com.readmates.auth.application.port.out.RateLimitCheck
 import com.readmates.auth.application.port.out.RateLimitPort
+import com.readmates.shared.adapter.out.resilience.OutboundCircuitBreakers
+import com.readmates.shared.adapter.out.resilience.OutboundResilienceProperties
 import com.readmates.shared.cache.RateLimitProperties
 import com.readmates.shared.cache.RedisCacheMetrics
 import com.readmates.support.ReadmatesRedisIntegrationTestSupport
@@ -124,6 +126,7 @@ class RedisRateLimitAdapterTest(
                 redisTemplate = redisTemplate,
                 properties = RateLimitProperties(enabled = true),
                 metrics = noOpMetrics(),
+                circuitBreakers = noOpCircuitBreakers(),
             )
 
         val decision =
@@ -157,6 +160,7 @@ class RedisRateLimitAdapterTest(
                 redisTemplate = failingRedisTemplate(),
                 properties = RateLimitProperties(enabled = true, failClosedSensitive = true),
                 metrics = metrics(meterRegistry),
+                circuitBreakers = noOpCircuitBreakers(),
             )
 
         val decision =
@@ -192,6 +196,7 @@ class RedisRateLimitAdapterTest(
                 redisTemplate = failingRedisTemplate(),
                 properties = RateLimitProperties(enabled = true, failClosedSensitive = true),
                 metrics = noOpMetrics(),
+                circuitBreakers = noOpCircuitBreakers(),
             )
 
         val decision =
@@ -213,6 +218,12 @@ class RedisRateLimitAdapterTest(
         }
 
     private fun noOpMetrics() = RedisCacheMetrics(StaticApplicationContext().getBeanProvider(MeterRegistry::class.java))
+
+    private fun noOpCircuitBreakers() =
+        OutboundCircuitBreakers(
+            OutboundResilienceProperties(),
+            StaticApplicationContext().getBeanProvider(MeterRegistry::class.java),
+        )
 
     private fun metrics(meterRegistry: MeterRegistry) =
         RedisCacheMetrics(
@@ -241,11 +252,12 @@ private data class RateLimitAdapterCase(
 )
 
 @TestConfiguration(proxyBeanMethods = false)
-@EnableConfigurationProperties(RateLimitProperties::class)
+@EnableConfigurationProperties(RateLimitProperties::class, OutboundResilienceProperties::class)
 @Import(
     RedisRateLimitAdapter::class,
     NoopRateLimitAdapter::class,
     RedisCacheMetrics::class,
+    OutboundCircuitBreakers::class,
 )
 private class RateLimitAdapterBeanTestConfiguration {
     @Bean
