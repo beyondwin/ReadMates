@@ -31,14 +31,18 @@ class OutboundCircuitBreakers(
                 meterRegistryProvider.ifAvailable
                     ?.counter(
                         "readmates.resilience.state_transition",
-                        "name", breaker.name,
-                        "from", event.stateTransition.fromState.name,
-                        "to", event.stateTransition.toState.name,
+                        "name",
+                        breaker.name,
+                        "from",
+                        event.stateTransition.fromState.name,
+                        "to",
+                        event.stateTransition.toState.name,
                     )?.increment()
             }
         }
     }
 
+    @Suppress("TooGenericExceptionCaught")
     fun <T> execute(
         name: String,
         fallback: (Throwable) -> T,
@@ -60,8 +64,19 @@ class OutboundCircuitBreakers(
         }
     }
 
-    fun states(): Map<String, CircuitBreaker.State> =
-        registry.allCircuitBreakers.associate { breaker -> breaker.name to breaker.state }
+    fun states(): Map<String, CircuitBreaker.State> = registry.allCircuitBreakers.associate { it.name to it.state }
+
+    /**
+     * Boundary-safe view of how many circuits are tripped. Returning a plain Int
+     * lets application-layer observers (e.g. the admin health card) report circuit
+     * health without importing any resilience4j type, keeping the hexagonal
+     * boundary (ArchUnit `application packages do not depend on resilience4j types`)
+     * intact.
+     */
+    fun openCircuitCount(): Int =
+        states().values.count { state ->
+            state == CircuitBreaker.State.OPEN || state == CircuitBreaker.State.FORCED_OPEN
+        }
 
     private fun buildRegistry(): CircuitBreakerRegistry =
         CircuitBreakerRegistry.of(

@@ -21,7 +21,7 @@ class HttpClubDomainActualStateCheckerCircuitBreakerTest {
                 addressResolver = { arrayOf(InetAddress.getByName("93.184.216.34")) },
                 markerFetcher = {
                     fetchCalls++
-                    throw RuntimeException("connection refused")
+                    error("connection refused")
                 },
                 circuitBreakers = breakers(),
             )

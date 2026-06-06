@@ -40,15 +40,16 @@ class OutboundCircuitBreakersTest {
         repeat(2) {
             cb.execute("svc", fallback = { "fallback" }) {
                 blockInvocations++
-                throw IllegalStateException("boom")
+                error("boom")
             }
         }
         assertThat(cb.states()["svc"]).isEqualTo(CircuitBreaker.State.OPEN)
 
-        val result = cb.execute("svc", fallback = { "fallback" }) {
-            blockInvocations++
-            "should-not-run"
-        }
+        val result =
+            cb.execute("svc", fallback = { "fallback" }) {
+                blockInvocations++
+                "should-not-run"
+            }
 
         assertThat(result).isEqualTo("fallback")
         assertThat(blockInvocations).isEqualTo(2)

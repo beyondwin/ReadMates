@@ -24,7 +24,7 @@ class RedisReadCacheInvalidationAdapterCircuitBreakerTest {
                 @Suppress("ktlint:standard:function-expression-body")
                 override fun <T : Any?> execute(action: RedisCallback<T>): T? {
                     executeCalls.incrementAndGet()
-                    throw IllegalStateException("redis unavailable")
+                    error("redis unavailable")
                 }
             }
         val adapter =

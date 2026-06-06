@@ -91,7 +91,9 @@ class HttpClubDomainActualStateChecker
         }
 
         private sealed interface MarkerOutcome {
-            data class Ok(val result: MarkerHttpResult) : MarkerOutcome
+            data class Ok(
+                val result: MarkerHttpResult,
+            ) : MarkerOutcome
 
             data object CircuitOpen : MarkerOutcome
 

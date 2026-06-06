@@ -158,6 +158,8 @@ notification
 
 Application package는 Spring Web/HTTP type, HTTP client, adapter 구현체에 의존하지 않습니다. Application service는 feature application error를 던지고, HTTP status와 response mapping은 `adapter.in.web`의 controller 또는 error handler가 맡습니다. 외부 HTTP가 필요한 기능은 application outbound port를 정의하고 `adapter.out.http` 구현으로 분리합니다.
 
+Outbound adapter(외부 HTTP/Redis)는 `shared.adapter.out.resilience.OutboundCircuitBreakers`를 통해 Resilience4j CircuitBreaker로 감싼다. CircuitBreaker 타입은 `adapter.out` 안에만 존재하며(application/domain 의존 금지, ArchUnit `application packages do not depend on resilience4j types`로 강제), 회로가 열리면 기존 fail-open 결과를 반환한다. 상태 전이는 `readmates.resilience.state_transition` / `readmates.resilience.short_circuited` Micrometer 카운터와 `/admin/health`의 `outbound-resilience` 카드로 관측한다.
+
 아키텍처 경계는 `ServerArchitectureBoundaryTest`에서 강제합니다 (ADR-0002). 이 테스트는 slice registry로 `admin.audit`, `admin.health`, `aigen`을 포함한 전환 surface를 등록하고, 전환된 web adapter가 legacy repository, `JdbcTemplate`, outbound persistence/Redis adapter, Spring Data Redis에 직접 의존하지 않는지, application package가 adapter, Spring JDBC, Spring DAO, Spring Data Redis, Spring Web/HTTP 세부사항에 의존하지 않는지, `aigen.application`이 `CurrentMember` 같은 web/session carrier 대신 application-safe actor value를 사용하는지, domain package가 web/JDBC/persistence 세부사항에 의존하지 않는지 확인합니다.
 
 ## CQRS Read vs Write Package Split

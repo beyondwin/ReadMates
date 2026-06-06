@@ -31,7 +31,7 @@ class RedisRateLimitAdapterCircuitBreakerTest {
                 ),
             ).thenAnswer {
                 executeCalls.incrementAndGet()
-                throw IllegalStateException("redis down")
+                error("redis down")
             }
         val adapter =
             RedisRateLimitAdapter(

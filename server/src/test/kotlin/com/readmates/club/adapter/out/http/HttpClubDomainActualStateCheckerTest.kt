@@ -12,7 +12,11 @@ import java.net.InetAddress
 import java.time.Duration
 
 class HttpClubDomainActualStateCheckerTest {
-    private val checker = HttpClubDomainActualStateChecker(timeout = Duration.ofMillis(100), circuitBreakers = breakers())
+    private val checker =
+        HttpClubDomainActualStateChecker(
+            timeout = Duration.ofMillis(100),
+            circuitBreakers = breakers(),
+        )
 
     @Test
     fun `rejects private or loopback addresses before fetching marker`() {

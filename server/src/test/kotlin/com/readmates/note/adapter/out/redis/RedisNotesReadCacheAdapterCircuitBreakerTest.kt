@@ -24,7 +24,7 @@ class RedisNotesReadCacheAdapterCircuitBreakerTest {
             object : StringRedisTemplate() {
                 override fun opsForValue(): Nothing {
                     opsCalls.incrementAndGet()
-                    throw IllegalStateException("redis down")
+                    error("redis down")
                 }
             }
         val adapter =

@@ -176,6 +176,17 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
+    fun `application packages do not depend on resilience4j types`() {
+        noClasses()
+            .that()
+            .resideInAnyPackage(*migratedApplicationPackages)
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage("io.github.resilience4j..")
+            .check(importedClasses)
+    }
+
+    @Test
     fun `migrated application packages do not depend on jdbc or dao frameworks`() {
         noClasses()
             .that()

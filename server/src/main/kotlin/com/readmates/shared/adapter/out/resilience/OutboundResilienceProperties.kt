@@ -16,5 +16,9 @@ data class OutboundResilienceProperties(
     val slidingWindowSize: Int = 20,
     val minimumNumberOfCalls: Int = 10,
     val permittedCallsInHalfOpenState: Int = 3,
-    val waitDurationInOpenState: Duration = Duration.ofSeconds(30),
-)
+    val waitDurationInOpenState: Duration = DEFAULT_WAIT_DURATION_IN_OPEN_STATE,
+) {
+    companion object {
+        private val DEFAULT_WAIT_DURATION_IN_OPEN_STATE: Duration = Duration.ofSeconds(30)
+    }
+}
