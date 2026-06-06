@@ -29,7 +29,40 @@ data class AuditLogEntry(
     val errorMessage: String?,
     val latencyMs: Int,
     val createdAt: Instant,
-)
+) {
+    companion object {
+        fun failed(
+            jobId: UUID,
+            sessionId: UUID,
+            clubId: UUID,
+            hostUserId: UUID,
+            provider: Provider,
+            model: String,
+            transcriptSha256: String?,
+            errorCode: ErrorCode,
+            errorMessage: String,
+            createdAt: Instant,
+        ): AuditLogEntry =
+            AuditLogEntry(
+                jobId = jobId,
+                sessionId = sessionId,
+                clubId = clubId,
+                hostUserId = hostUserId,
+                kind = AuditKind.FULL,
+                item = null,
+                provider = provider,
+                model = model,
+                transcriptSha256 = transcriptSha256,
+                usage = TokenUsage(0, 0, 0),
+                costEstimateUsd = BigDecimal.ZERO,
+                status = AuditStatus.FAILED,
+                errorCode = errorCode,
+                errorMessage = errorMessage,
+                latencyMs = 0,
+                createdAt = createdAt,
+            )
+    }
+}
 
 enum class AuditKind { FULL, REGENERATE, COMMIT, CANCEL }
 

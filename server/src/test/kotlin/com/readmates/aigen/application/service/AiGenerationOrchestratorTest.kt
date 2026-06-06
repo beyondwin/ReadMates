@@ -7,6 +7,7 @@ import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
+import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.`in`.JobNotFoundException
 import com.readmates.aigen.application.port.`in`.JobSessionMismatchException
 import com.readmates.aigen.application.port.`in`.StartGenerationCommand
@@ -14,6 +15,7 @@ import com.readmates.aigen.application.port.out.AuditKind
 import com.readmates.aigen.application.port.out.AuditStatus
 import com.readmates.aigen.application.port.out.GuardDecision
 import com.readmates.aigen.application.port.out.JobKind
+import com.readmates.shared.security.Sha256
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -124,6 +126,30 @@ class AiGenerationOrchestratorTest {
         assertThat(audit.status).isEqualTo(AuditStatus.FAILED)
         assertThat(audit.errorCode).isEqualTo(ErrorCode.HOST_DAILY_CAP_EXCEEDED)
         assertThat(ctx.queue.published).isEmpty()
+    }
+
+    @Test
+    fun `failed start audit row pins the zero-value boilerplate fields`() {
+        // Locks the constant fields the AuditLogEntry.failed factory absorbs, so a
+        // future factory edit that drops or changes any of them is caught.
+        val ctx = TestContext(modelEnabled = emptySet())
+
+        assertThatThrownBy {
+            ctx.orchestrator.start(ctx.command(model = AiGenerationTestFixtures.CLAUDE_MODEL.name))
+        }.isInstanceOf(AiGenerationException.Coded::class.java)
+
+        val audit = ctx.auditPort.entries.single()
+        assertThat(audit.kind).isEqualTo(AuditKind.FULL)
+        assertThat(audit.status).isEqualTo(AuditStatus.FAILED)
+        assertThat(audit.item).isNull()
+        assertThat(audit.usage).isEqualTo(TokenUsage(0, 0, 0))
+        assertThat(audit.costEstimateUsd).isEqualTo(BigDecimal.ZERO)
+        assertThat(audit.latencyMs).isEqualTo(0)
+        assertThat(audit.transcriptSha256).isEqualTo(Sha256.hex("the transcript"))
+        assertThat(audit.sessionId).isEqualTo(ctx.sessionId)
+        assertThat(audit.clubId).isEqualTo(ctx.clubId)
+        assertThat(audit.hostUserId).isEqualTo(ctx.hostUserId)
+        assertThat(audit.createdAt).isEqualTo(AiGenerationTestFixtures.NOW)
     }
 
     @Test

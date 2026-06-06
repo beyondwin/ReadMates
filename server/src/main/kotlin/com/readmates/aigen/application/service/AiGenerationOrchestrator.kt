@@ -152,22 +152,16 @@ class AiGenerationOrchestrator(
             )
         }
         auditPort.insert(
-            AuditLogEntry(
+            AuditLogEntry.failed(
                 jobId = record.jobId,
                 sessionId = record.sessionId,
                 clubId = record.clubId,
                 hostUserId = record.hostUserId,
-                kind = AuditKind.FULL,
-                item = null,
                 provider = record.model.provider,
                 model = record.model.name,
                 transcriptSha256 = Sha256.hex(record.transcript),
-                usage = TokenUsage(0, 0, 0),
-                costEstimateUsd = BigDecimal.ZERO,
-                status = AuditStatus.FAILED,
                 errorCode = ErrorCode.QUEUE_UNAVAILABLE,
                 errorMessage = message,
-                latencyMs = 0,
                 createdAt = clock.instant(),
             ),
         )
@@ -317,22 +311,16 @@ class AiGenerationOrchestrator(
         message: String,
     ): Nothing {
         auditPort.insert(
-            AuditLogEntry(
+            AuditLogEntry.failed(
                 jobId = UUID.randomUUID(),
                 sessionId = command.sessionId,
                 clubId = command.clubId,
                 hostUserId = command.hostUserId,
-                kind = AuditKind.FULL,
-                item = null,
                 provider = modelId.provider,
                 model = modelId.name,
                 transcriptSha256 = Sha256.hex(command.transcript),
-                usage = TokenUsage(0, 0, 0),
-                costEstimateUsd = BigDecimal.ZERO,
-                status = AuditStatus.FAILED,
                 errorCode = code,
                 errorMessage = message,
-                latencyMs = 0,
                 createdAt = clock.instant(),
             ),
         )
@@ -358,22 +346,16 @@ class AiGenerationOrchestrator(
                 ?: modelCatalog.allowlisted().firstOrNull()?.provider
                 ?: Provider.CLAUDE
         auditPort.insert(
-            AuditLogEntry(
+            AuditLogEntry.failed(
                 jobId = UUID.randomUUID(),
                 sessionId = command.sessionId,
                 clubId = command.clubId,
                 hostUserId = command.hostUserId,
-                kind = AuditKind.FULL,
-                item = null,
                 provider = provider,
                 model = candidateModel,
                 transcriptSha256 = Sha256.hex(command.transcript),
-                usage = TokenUsage(0, 0, 0),
-                costEstimateUsd = BigDecimal.ZERO,
-                status = AuditStatus.FAILED,
                 errorCode = code,
                 errorMessage = message,
-                latencyMs = 0,
                 createdAt = clock.instant(),
             ),
         )
