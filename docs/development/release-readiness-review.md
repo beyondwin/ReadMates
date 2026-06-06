@@ -95,6 +95,18 @@ The v1.11.0 production OAuth and backup timer items are closed by 2026-05-31 ope
   - **resilience 튜닝 파라미터 운영 노트:** `readmates.resilience.*` 6개 속성은 안전한 기본값으로 별도 조작 없이 동작합니다. 튜닝이 필요하면 Spring relaxed binding 환경변수(`READMATES_RESILIENCE_*`)로 오버라이드할 수 있으며, 기본값 운영이 권장됩니다.
   - 프로덕션 deploy/tag smoke는 release-operation 단계로 남아 있으며 이 로컬 검토가 생성하는 증거가 아닙니다.
 
+## 2026-06-07 Effective Java / Clean Code 서버 위생 리팩터 리뷰 노트
+
+- Scope reviewed: `main..HEAD` (로컬 `main`에 머지 예정인 4개 refactor 커밋). `origin/main..HEAD`의 outbound resilience + 시각 회귀 작업은 위 2026-06-07 노트에서 이미 검토 완료되어 본 리뷰는 신규 EJ/CC 위생 변경만 다룹니다(사용자가 명시적으로 좁힘).
+- Release classification: 신규 DB migration 없음, public API contract 변경 없음(응답·라우트·스키마·인가 무변경), CI/deploy/scripts behavior 변경 없음. 동작 보존 내부 리팩터입니다.
+- Change scope: (1) SHA-256 hex 인코딩을 `shared/security/Sha256` 유틸로 통합(`AiGenerationOrchestrator`, 3개 notification service, `ClientIpHashing`), (2) 실패 audit 행 생성을 `AuditLogEntry.failed` 정적 팩터리로 일원화, (3) 광범위 catch/swallow 지점에 근거 주석 + `ignored` 네이밍 정렬.
+- Security hygiene: SHA-256 통합은 byte-identical입니다 — 기존 `joinToString("") { "%02x".format(it) }`와 JDK `HexFormat.of()` 모두 소문자·2자리 zero-pad·구분자 없음으로 동일하며, 음수 바이트(-1/-128) 엣지 케이스를 characterization 테스트로 고정했습니다. `ClientIpHashing`의 `.take(32)` 절단도 보존했습니다. 헬스 카드 provider의 swallow는 "health probe는 throw 금지" 근거 주석으로 의도를 명시했습니다.
+- Architecture/detekt: `architectureTest`(ArchUnit) 통과 — 신규 baseline·exception 부채 없음. `AuditLogEntry.failed`에 `@Suppress("LongParameterList")` 1개를 근거 주석과 함께 추가했으며(시그니처 변경은 plan이 회귀 위험으로 금지), 그 외 신규 suppress 없음.
+- Executed: `./server/gradlew -p server clean check architectureTest`(BUILD SUCCESSFUL, ktlint+detekt+unitTest+JaCoCo≥0.23 포함), `git diff --check main..HEAD`(clean), `./scripts/build-public-release-candidate.sh` + `./scripts/public-release-check.sh .tmp/public-release-candidate`(gitleaks: no leaks found — 64자 SHA-256 빈문자열 테스트 벡터 미플래그).
+- CHANGELOG: 사용자/운영자/보안 posture/CI/behavior 변경이 없는 순수 내부 위생 리팩터이므로 `## Unreleased` 항목을 추가하지 않았습니다(체크리스트의 CHANGELOG 기준 밖).
+- Skipped: 프로덕션 OAuth, VM, provider-console, tag/deploy smoke는 실행하지 않았습니다(변경 표면이 server-only 내부 리팩터로 deploy/tag 동작을 바꾸지 않음).
+- Residual risk: 본 로컬 리팩터 브랜치에 남은 release-readiness 리스크 없음. 프로덕션 deploy/tag smoke는 release-operation 단계로 남아 있으며 이 로컬 검토가 생성하는 증거가 아닙니다.
+
 ## 기본 범위
 
 기본 범위는 현재 branch와 base branch의 차이입니다. 보통 `origin/main..HEAD`를 사용합니다.
