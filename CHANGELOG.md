@@ -52,13 +52,13 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Verification
 
-- Local release readiness (2026-06-07): `git diff --check v1.12.1..HEAD` - pending in this remediation branch.
-- Local release readiness (2026-06-07): `pnpm --dir front lint` - pending in this remediation branch.
-- Local release readiness (2026-06-07): `pnpm --dir front test` - pending in this remediation branch.
-- Local release readiness (2026-06-07): `pnpm --dir front build` - pending in this remediation branch.
-- Local release readiness (2026-06-07): `./server/gradlew -p server clean check architectureTest integrationTest --tests RedisAiGenerationJobStoreTest` - pending in this remediation branch.
-- Local release readiness (2026-06-07): `pnpm --dir front test:e2e` - pending in this remediation branch.
-- Local release readiness (2026-06-07): `./scripts/build-public-release-candidate.sh` and `./scripts/public-release-check.sh .tmp/public-release-candidate` - pending in this remediation branch.
+- Local release readiness (2026-06-07): `git diff --check v1.12.1..HEAD` - pass.
+- Local release readiness (2026-06-07): `pnpm --dir front lint` - pass.
+- Local release readiness (2026-06-07): `pnpm --dir front test` - pass (134 files, 1142 tests).
+- Local release readiness (2026-06-07): `pnpm --dir front build` - pass.
+- Local release readiness (2026-06-07): `./server/gradlew -p server clean check architectureTest integrationTest --tests RedisAiGenerationJobStoreTest` - pass.
+- Local release readiness (2026-06-07): `pnpm --dir front test:e2e` - pass (61/61).
+- Local release readiness (2026-06-07): `./scripts/build-public-release-candidate.sh` and `./scripts/public-release-check.sh .tmp/public-release-candidate` - pass; gitleaks found no leaks.
 - Skipped before tag: production OAuth, VM, provider-console, release tag deploy smoke. These are release-operation steps after tag push, not local evidence.
 
 ## v1.12.1 - 2026-05-31

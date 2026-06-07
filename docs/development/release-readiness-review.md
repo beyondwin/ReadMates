@@ -130,7 +130,7 @@ The v1.11.0 production OAuth and backup timer items are closed by 2026-05-31 ope
 - Finding repaired: `Deploy Server Image` now runs `./server/gradlew -p server clean check bootJar`, aligning release-image build verification with the backend CI quality gate instead of the skipped `test` task.
 - Release classification: minor release (`v1.13.0`). No DB migration. Public API contract changes are additive, but server/API/frontend contract surfaces changed and require backend promotion before final frontend/admin smoke.
 - Required post-tag operations: confirm `Deploy Server Image`, promote OCI Compose backend to `ghcr.io/<owner>/<repo>/readmates-server:v1.13.0`, confirm `Deploy Front`, then run sanitized BFF/OAuth/admin analytics smoke.
-- Local verification: pending in this remediation branch; update this note after the release-readiness command set completes.
+- Local verification: `git diff --check v1.12.1..HEAD`, `pnpm --dir front lint`, `pnpm --dir front test` (134 files, 1142 tests), `pnpm --dir front build`, `./server/gradlew -p server clean check architectureTest integrationTest --tests RedisAiGenerationJobStoreTest`, `./scripts/build-public-release-candidate.sh`, `./scripts/public-release-check.sh .tmp/public-release-candidate`, and `pnpm --dir front test:e2e` (61/61) all passed. Public release check reported gitleaks no leaks.
 - Residual risk: production tag/deploy smoke remains open until the release operation runs. This local remediation does not prove production OAuth, VM health, provider-console state, or GHCR promotion.
 
 ## 기본 범위
