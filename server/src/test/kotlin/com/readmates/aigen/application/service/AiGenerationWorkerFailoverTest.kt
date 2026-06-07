@@ -58,7 +58,13 @@ class AiGenerationWorkerFailoverTest {
                 .getValue(record.jobId)
                 .status,
         ).isEqualTo(JobStatus.FAILED)
-        assertThat(h.auditPort.entries.count { it.status == AuditStatus.FAILED }).isEqualTo(2)
+        val failures = h.auditPort.entries.filter { it.status == AuditStatus.FAILED }
+        assertThat(failures).hasSize(2)
+        // First attempt failed on the primary (Claude); the final failure must be
+        // attributed to the failover provider (OpenAI), not the primary.
+        assertThat(failures[0].provider).isEqualTo(Provider.CLAUDE)
+        assertThat(failures[1].provider).isEqualTo(Provider.OPENAI)
+        assertThat(failures[1].model).isEqualTo(openaiModel.name)
     }
 
     @Test

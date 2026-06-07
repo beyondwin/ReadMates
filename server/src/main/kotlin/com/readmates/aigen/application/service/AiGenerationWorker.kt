@@ -101,7 +101,8 @@ class AiGenerationWorker(
         val generator = resolveGenerator(runningRecord, start) ?: return
         when (val outcome = runGenerationWithValidationRetry(runningRecord, generator)) {
             is Outcome.Success -> succeed(runningRecord, outcome.snapshot, outcome.usage, outcome.actualModel, start)
-            is Outcome.Failure -> failJob(runningRecord, outcome.error.code, outcome.error.message, start)
+            is Outcome.Failure ->
+                failJob(runningRecord, outcome.error.code, outcome.error.message, outcome.failedModel, start)
         }
     }
 
@@ -112,7 +113,13 @@ class AiGenerationWorker(
         val resolved: SessionContentGenerator? =
             when {
                 !modelCatalog.isEnabled(record.model) -> {
-                    failJob(record, ErrorCode.AI_DISABLED, "Model ${record.model.name} no longer enabled", start)
+                    failJob(
+                        record,
+                        ErrorCode.AI_DISABLED,
+                        "Model ${record.model.name} no longer enabled",
+                        record.model,
+                        start,
+                    )
                     null
                 }
                 else -> {
@@ -122,6 +129,7 @@ class AiGenerationWorker(
                             record,
                             ErrorCode.AI_DISABLED,
                             "No generator for provider ${record.model.provider}",
+                            record.model,
                             start,
                         )
                     }
@@ -144,6 +152,7 @@ class AiGenerationWorker(
 
         data class Fail(
             val error: GenerationError,
+            val failedModel: ModelId,
         ) : AttemptResult()
     }
 
@@ -156,6 +165,7 @@ class AiGenerationWorker(
 
         data class Failure(
             val error: GenerationError,
+            val failedModel: ModelId,
         ) : Outcome()
     }
 
@@ -172,7 +182,7 @@ class AiGenerationWorker(
             )
         val attempt =
             when (val first = callGeneratorWithRetry(record, generator, baseInput)) {
-                is AttemptResult.Fail -> return Outcome.Failure(first.error)
+                is AttemptResult.Fail -> return Outcome.Failure(first.error, first.failedModel)
                 is AttemptResult.Ok -> first.attempt
             }
         return when (val validation = validator.validate(attempt.output.result, baseInput.sessionMeta)) {
@@ -199,13 +209,14 @@ class AiGenerationWorker(
         val retry =
             when (val callResult = callGeneratorRaw(record, attempt.generator, strengthenedInput)) {
                 is CallResult.Success -> callResult.output
-                is CallResult.Failure -> return Outcome.Failure(callResult.error)
+                is CallResult.Failure -> return Outcome.Failure(callResult.error, attempt.actualModel)
             }
         return when (val validation = validator.validate(retry.result, baseInput.sessionMeta)) {
             is ValidationResult.Ok -> Outcome.Success(retry.result, retry.usage, attempt.actualModel)
             is ValidationResult.Violation ->
                 Outcome.Failure(
                     GenerationError(validation.code, validation.message),
+                    attempt.actualModel,
                 )
         }
     }
@@ -261,7 +272,7 @@ class AiGenerationWorker(
         val firstFailure = (first as CallResult.Failure).error
         val strategy =
             retryStrategyFor(firstFailure.code)
-                ?: return AttemptResult.Fail(firstFailure)
+                ?: return AttemptResult.Fail(firstFailure, record.model)
         // Per spec §9.2 ("각 호출은 audit log row 별도"): emit a FAILED audit row
         // for the first attempt before we retry, so the audit trail records both
         // the original failure code AND the retry. The first attempt ran on
@@ -279,7 +290,7 @@ class AiGenerationWorker(
             val failoverGenerator = generators.getValue(failover.provider)
             return when (val retry = callGeneratorRaw(record, failoverGenerator, baseInput.copy(model = failover))) {
                 is CallResult.Success -> AttemptResult.Ok(GenerationAttempt(retry.output, failover, failoverGenerator))
-                is CallResult.Failure -> AttemptResult.Fail(retry.error)
+                is CallResult.Failure -> AttemptResult.Fail(retry.error, failover)
             }
         }
 
@@ -296,7 +307,7 @@ class AiGenerationWorker(
             }
         return when (val retry = callGeneratorRaw(record, primaryGenerator, retryInput)) {
             is CallResult.Success -> AttemptResult.Ok(GenerationAttempt(retry.output, record.model, primaryGenerator))
-            is CallResult.Failure -> AttemptResult.Fail(retry.error)
+            is CallResult.Failure -> AttemptResult.Fail(retry.error, record.model)
         }
     }
 
@@ -437,6 +448,7 @@ class AiGenerationWorker(
         record: JobRecord,
         code: ErrorCode,
         message: String,
+        failedModel: ModelId,
         start: Instant,
     ) {
         val transitioned =
@@ -452,7 +464,9 @@ class AiGenerationWorker(
             return
         }
         // Validation-failure counter is emitted at the validator (single source of truth).
-        emitJobMetrics(JobStatus.FAILED, TokenUsage(0, 0, 0), BigDecimal.ZERO, start, record.model)
+        // Attribute the failed job to the model that actually produced the final
+        // failure (the failover target when one was used), per spec accounting.
+        emitJobMetrics(JobStatus.FAILED, TokenUsage(0, 0, 0), BigDecimal.ZERO, start, failedModel)
         auditPort.insert(
             AuditLogEntry(
                 jobId = record.jobId,
@@ -461,8 +475,8 @@ class AiGenerationWorker(
                 hostUserId = record.hostUserId,
                 kind = AuditKind.FULL,
                 item = null,
-                provider = record.model.provider,
-                model = record.model.name,
+                provider = failedModel.provider,
+                model = failedModel.name,
                 transcriptSha256 = null,
                 usage = TokenUsage(0, 0, 0),
                 costEstimateUsd = BigDecimal.ZERO,
