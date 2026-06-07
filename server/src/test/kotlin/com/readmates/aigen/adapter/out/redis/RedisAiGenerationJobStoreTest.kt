@@ -277,6 +277,60 @@ class RedisAiGenerationJobStoreTest(
     }
 
     @Test
+    fun `saveResultIfStatus persists actualModel and load round-trips it`() {
+        val record = newRecord()
+        store.save(record)
+        store.transitionStatus(
+            jobId = record.jobId,
+            expected = setOf(JobStatus.PENDING),
+            next = JobStatus.RUNNING,
+            stage = null,
+            progressPct = 0,
+            error = null,
+        )
+        val failoverModel = ModelId(Provider.OPENAI, "gpt-5.4-mini")
+
+        val saved =
+            store.saveResultIfStatus(
+                jobId = record.jobId,
+                expected = JobStatus.RUNNING,
+                result = snapshot(),
+                usage = TokenUsage(10, 0, 20),
+                cost = BigDecimal("0.01"),
+                actualModel = failoverModel,
+            )
+
+        val loaded = store.load(record.jobId)!!
+        assertThat(saved).isTrue()
+        assertThat(loaded.actualModel).isEqualTo(failoverModel)
+    }
+
+    @Test
+    fun `load returns null actualModel for a record saved without failover`() {
+        val record = newRecord()
+        store.save(record)
+        store.transitionStatus(
+            jobId = record.jobId,
+            expected = setOf(JobStatus.PENDING),
+            next = JobStatus.RUNNING,
+            stage = null,
+            progressPct = 0,
+            error = null,
+        )
+
+        store.saveResultIfStatus(
+            jobId = record.jobId,
+            expected = JobStatus.RUNNING,
+            result = snapshot(),
+            usage = TokenUsage(10, 0, 20),
+            cost = BigDecimal("0.01"),
+            actualModel = null,
+        )
+
+        assertThat(store.load(record.jobId)!!.actualModel).isNull()
+    }
+
+    @Test
     fun `deleteTransientPayload keeps terminal hash but removes transcript and result`() {
         val record = newRecord()
         store.save(record)
