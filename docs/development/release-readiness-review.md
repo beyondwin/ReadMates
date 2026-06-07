@@ -107,6 +107,21 @@ The v1.11.0 production OAuth and backup timer items are closed by 2026-05-31 ope
 - Skipped: 프로덕션 OAuth, VM, provider-console, tag/deploy smoke는 실행하지 않았습니다(변경 표면이 server-only 내부 리팩터로 deploy/tag 동작을 바꾸지 않음).
 - Residual risk: 본 로컬 리팩터 브랜치에 남은 release-readiness 리스크 없음. 프로덕션 deploy/tag smoke는 release-operation 단계로 남아 있으며 이 로컬 검토가 생성하는 증거가 아닙니다.
 
+## 2026-06-07 aigen provider failover 브랜치 리뷰 노트
+
+- Scope reviewed: `origin/main..HEAD` (6 commits, 16 files). 로컬 `main`이 `origin/main`과 동일 baseline이라 범위를 좁히지 않고 전체를 검토했습니다. 변경 표면은 server `aigen` 모듈(provider 가용성 failover) + CHANGELOG + plan/spec 문서뿐입니다.
+- Release classification: 신규 DB migration 없음, public API contract 변경 없음, CI/deploy/scripts behavior 변경 없음. additive server 동작 변경입니다.
+- API 영향 확인: `JobView.actualModel`은 내부 회계용(cost/audit/metrics)이며 `toStatusResponse`/`toRecentJobResponse` 어느 쪽도 노출하지 않습니다(둘 다 `model.name`만 emit). 따라서 frontend Zod contract 영향이 없습니다.
+- Persistence 확인: Redis hash에 `actualModelProvider`/`actualModelName`를 조건부로 쓰고 `fromHash`에서 복원하며, Lua `SAVE_RESULT_IF_STATUS_SCRIPT`는 ARGV가 빈 문자열이 아닐 때만 HSET 합니다. 빈 값(=failover 없음)은 null로 round-trip 됨을 통합 테스트로 고정했습니다.
+- Security/하이진: audit/metric silent-loss 없음 — 성공은 실제 생성 모델(`actualModel`) 기준으로 1행 SUCCESS audit + metrics를, availability 실패는 provider별 FAILED audit 행을 남깁니다(failover 후 양쪽 실패 시 FAILED audit 2행을 테스트로 고정). 호출 예산은 불변(job당 LLM 호출 ≤3, failover 깊이 1)이며 `call cap exhausted prevents failover call` 테스트로 고정. content 코드 실패(`SCHEMA_INVALID` 등)는 failover하지 않고 같은 provider strengthen/retry 경로를 유지합니다.
+- Architecture/detekt/ktlint: `architectureTest`(ArchUnit) 통과 — 신규 baseline·exception 부채 없음. `saveResultIfStatus`의 `LongParameterList`는 "각 파라미터가 result commit의 atomic write 필드"라는 근거를 KDoc에 남기고 `@Suppress` 1개만 추가했으며, 그 외 신규 suppress 없음.
+- 테스트 가시성 함정 회피: server `test` task는 비활성, `unitTest` 필터에 `excludeTestsMatching("*\$*")`가 있어 `@Nested` inner 테스트가 조용히 제외됩니다. failover 테스트는 `@Nested`가 아닌 top-level 클래스 `AiGenerationWorkerFailoverTest`로 작성해 실제로 수집·실행됨을 XML 리포트(`skipped=0`)로 확인했습니다.
+- Executed: `git diff --check origin/main..HEAD`(clean), `./server/gradlew -p server clean check`(BUILD SUCCESSFUL — ktlint+detekt+unitTest+JaCoCo+architectureTest), `./server/gradlew -p server integrationTest --tests RedisAiGenerationJobStoreTest`(22 pass, skipped=0, 신규 actualModel round-trip 2건 포함, Docker/Testcontainers), `./scripts/build-public-release-candidate.sh` + `./scripts/public-release-check.sh .tmp/public-release-candidate`(gitleaks: no leaks found).
+- Skipped: 프로덕션 OAuth, VM, provider-console, tag/deploy smoke는 실행하지 않았습니다(변경 표면이 server-only로 deploy/tag 동작을 바꾸지 않음). frontend lint/test/build·E2E는 frontend 변경이 없어 생략.
+- Residual risk:
+  - **운영 구성 노트:** `readmates.aigen.fallbackChain`은 기본 빈 리스트(기능 off, 동일 provider 재시도)입니다. failover를 켜려면 모델 alias 순서를 환경 구성으로 지정해야 하며, 해석 불가 alias는 시작 시 경고 로그 후 런타임에서 skip 됩니다. provider별 API 키/enable 구성이 선행되어야 실제 cross-provider 전환이 일어납니다.
+  - 프로덕션 deploy/tag smoke는 release-operation 단계로 남아 있으며 이 로컬 검토가 생성하는 증거가 아닙니다.
+
 ## 기본 범위
 
 기본 범위는 현재 branch와 base branch의 차이입니다. 보통 `origin/main..HEAD`를 사용합니다.
