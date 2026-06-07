@@ -16,6 +16,7 @@
 | `readmates.notifications.sent` | counter | `event_type` (NotificationEventType enum) | 건수 | 알림 발송 성공 건수. 트랜잭션 커밋 후 증가. | `server/.../ReadmatesOperationalMetrics.kt` | dashboards.md#notification-pipeline | — |
 | `readmates.notifications.failed` | counter | `event_type` (NotificationEventType enum) | 건수 | 알림 발송 실패(재시도 가능) 건수. | `server/.../ReadmatesOperationalMetrics.kt` | dashboards.md#notification-pipeline | alerts.md#notificationfailratehigh |
 | `readmates.notifications.dead` | counter | `event_type` (NotificationEventType enum) | 건수 | 알림 발송 포기(dead-letter) 건수. | `server/.../ReadmatesOperationalMetrics.kt` | dashboards.md#notification-pipeline | alerts.md#notificationdeadletters |
+| `readmates.notifications.delivery.latency` | timer/histogram | `event_type` (NotificationEventType enum) | 초 | notification_event_outbox row 생성 → `PUBLISHED` 전환까지 latency. SLO 버킷(10s/30s/1m/5m/15m) 포함. | `server/.../ReadmatesOperationalMetrics.kt` | dashboards.md#notification-pipeline | slos.md#notification_delivery_latency_p95 |
 | `readmates.feedback.uploads` | counter | `result` (`success` / `failure`) | 건수 | 피드백 파일 업로드 결과. success는 트랜잭션 커밋 후 증가. | `server/.../ReadmatesOperationalMetrics.kt` | — | — |
 | `readmates.notes_cache.hit` | counter | `scope` | 건수 | Notes Redis 캐시 적중 횟수. | `server/.../RedisNotesReadCacheAdapter.kt` | dashboards.md#redis-cache | — |
 | `readmates.notes_cache.miss` | counter | `scope` | 건수 | Notes Redis 캐시 미스 횟수. | `server/.../RedisNotesReadCacheAdapter.kt` | dashboards.md#redis-cache | — |
@@ -31,6 +32,8 @@
 | `readmates.rate_limit.denied` | counter | `sensitive` (`true` / `false`) | 건수 | Rate limit 차단 건수. | `server/.../RedisRateLimitAdapter.kt` | — | alerts.md#ratelimitdenied |
 | `readmates.redis.fallbacks` | counter | `feature` (`notes-cache` / `public-cache` / `auth-session` / `rate-limit` / `read-cache-invalidation`) | 건수 | Redis 오류 발생 시 graceful fallback 처리된 횟수. 증가 지속 시 Redis 불안정 신호. | `server/.../RedisCacheMetrics.kt` (다수 어댑터에서 호출) | dashboards.md#redis-cache | alerts.md#redisfallbackshigh |
 | `readmates.redis.operation.errors` | counter | `feature`, `operation` | 건수 | Redis 명령 실행 오류 횟수. `feature`는 어댑터별 식별자, `operation`은 명령 유형(예: `check`). | `server/.../RedisCacheMetrics.kt` (다수 어댑터에서 호출) | dashboards.md#redis-cache | alerts.md#redisoperationerrors |
+| `readmates.resilience.state_transition` | counter | `name`, `from`, `to` | 건수 | Outbound circuit breaker 상태 전이 횟수. `name`은 breaker 식별자, `from`/`to`는 CircuitBreaker state. | `server/.../shared/adapter/out/resilience/OutboundCircuitBreakers.kt` | — | — |
+| `readmates.resilience.short_circuited` | counter | `name` | 건수 | Circuit breaker가 OPEN 상태라 호출이 차단(fail-open fallback)된 횟수. | `server/.../shared/adapter/out/resilience/OutboundCircuitBreakers.kt` | — | — |
 | `bff.audit.shutdown.dropped` | counter | (없음) | 건수 | BFF audit 태스크가 executor 종료 또는 큐 포화로 폐기된 횟수. graceful shutdown 시 0이 정상. 지속 증가 시 audit 손실 신호. | `server/.../security/BffSecretAuditExecutorConfig.kt` | — | — |
 | `notification.dispatch.unknown_status` | counter | (없음) | 건수 | SMTP 발송 결과가 `UNKNOWN`이라 retryable로 처리한 이메일 deliveries 건수. 짧은 spike는 정상, 지속 증가 시 SMTP 응답 모호 또는 어댑터 상태 매핑 문제 신호. | `server/.../notification/application/service/NotificationDispatchService.kt` | dashboards.md#notification-pipeline | — |
 | `readmates.aigen.jobs` | counter | (없음) | 건수 | AI generation job accepted count. | `server/.../aigen/application/service/AiGenerationMetrics.kt` | dashboards.md#ai-session-generation | — |
@@ -92,7 +95,6 @@
 
 ## 후속 메트릭 후보 (현재 없음)
 
-- `notification_delivery_latency_seconds` (histogram) — outbox 생성 → `SENT` 상태 전환 latency. `notification_deliveries.created_at`과 `sent_at`으로 계산 가능하나 현재 Prometheus 메트릭으로 노출되지 않음.
 - `bff_request_total` (counter, by `route`, `host`) — Cloudflare Worker analytics 의존. BFF layer에서 별도 계측 필요.
 - `frontend_route_load_seconds` (histogram) — RUM (Real User Monitoring) 도입 후 추가.
 - `readmates.redis.operation.errors` 세분화 — 현재 `feature`/`operation` 2개 태그로 충분하나, 향후 Redis Cluster 도입 시 `node` 태그 추가 검토.

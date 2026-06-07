@@ -1,6 +1,6 @@
 # 알림 룰 후보
 
-본 문서는 Prometheus alertmanager rule 정의를 정리합니다. 일반 서비스 룰은 후보 정의이고, AI 세션 생성 룰은 `ops/prometheus/alerts/aigen-rules.yml`에 파일화되어 있습니다. 실 배포 여부는 운영 환경에서 별도 확인합니다.
+본 문서는 Prometheus alert rule 정의를 사람-읽기용으로 정리합니다. 모든 룰은 `ops/prometheus/alerts/{notification,http,jvm,security,redis,targets,aigen}-rules.yml`에 파일화되어 Prometheus가 실제로 로드하며, SSOT는 rules 디렉토리입니다(아래 "룰 (파일화 완료)" 참조). 실 배포 여부는 운영 환경에서 별도 확인합니다.
 
 ## 룰 작성 규약
 

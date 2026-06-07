@@ -60,7 +60,7 @@ READMATES_SERVER_CI_CHECK_DRY_RUN=true ./scripts/server-ci-check.sh
 ./scripts/pre-push-check.sh --full --release
 ```
 
-`--full`은 `./server/gradlew -p server integrationTest`와 `pnpm --dir front test:e2e`를 추가로 실행합니다. Docker, MySQL client, Playwright browser 의존성이 준비되지 않은 환경에서는 기본 pre-push hook보다 수동 릴리즈 점검으로 실행합니다.
+`--full`은 `./server/gradlew -p server integrationTest`, `pnpm --dir front test:e2e`, 그리고 관측 설정 검증(`validate-prometheus-rules.sh`, `validate-prometheus-config.sh`, `validate-alertmanager-config.sh`)을 추가로 실행합니다. Docker, MySQL client, Playwright browser 의존성이 준비되지 않은 환경에서는 기본 pre-push hook보다 수동 릴리즈 점검으로 실행합니다.
 
 ### Release-mode CHANGELOG guard
 
@@ -96,6 +96,18 @@ Branch protection bypass 정책 전반은 [release-management.md#branch-protecti
 ```bash
 ./scripts/lint-grafana-dashboards.sh
 ```
+
+## `validate-prometheus-rules.sh` / `validate-prometheus-config.sh` / `validate-alertmanager-config.sh`
+
+관측 설정 파일의 구조 유효성을 Docker 기반 `promtool`/`amtool`로 검사합니다. 로컬에 promtool/amtool을 설치하지 않아도 되도록 컨테이너 이미지(`prom/prometheus`, `prom/alertmanager`)로 실행하며, `pre-push-check.sh --full`이 릴리즈 직전에 함께 실행합니다.
+
+```bash
+./scripts/validate-prometheus-rules.sh    # ops/prometheus/alerts/*.yml rule 검사
+./scripts/validate-prometheus-config.sh   # deploy/oci/prometheus/prometheus.yml 검사
+./scripts/validate-alertmanager-config.sh # deploy/oci/alertmanager/alertmanager.yml 구조 검사
+```
+
+`validate-alertmanager-config.sh`는 `${READMATES_ALERT_*}` 환경 placeholder를 dummy 값으로 치환한 임시 파일을 lint하므로 실제 SMTP credential 없이 구조만 검증합니다. 치환 결과는 `.tmp` 아래 임시 디렉터리에 만들고 종료 시 삭제합니다.
 
 ## `aigen-pii-check.sh`
 

@@ -58,7 +58,7 @@ Coverage 게이트:
 pnpm --dir front test:coverage
 ```
 
-`@vitest/coverage-v8`로 측정하며, threshold는 현재 baseline에서 정수 -2pp floor로 고정합니다(lines/statements 87, functions 83, branches 84). CI front job은 `pnpm test:coverage`로 게이트를 강제하고 `front-coverage` 아티팩트를 always upload(14일 보존)합니다. Threshold를 올릴 때는 안정적으로 통과하는 측정치 -2pp(정수 floor)를 기준으로 갱신합니다.
+`@vitest/coverage-v8`로 측정하며, threshold는 현재 baseline에서 정수 -2pp floor로 고정합니다(lines 80, statements 79, functions 80, branches 75). vitest 4의 v8 coverage는 AST 기반 리매핑이 기본이라 v3 대비 측정치가 더 보수적으로 낮아져 baseline을 재보정했습니다. CI front job은 `pnpm test:coverage`로 게이트를 강제하고 `front-coverage` 아티팩트를 always upload(14일 보존)합니다. Threshold를 올릴 때는 안정적으로 통과하는 측정치 -2pp(정수 floor)를 기준으로 갱신합니다.
 
 Frontend unit suite에는 `front/tests/unit/frontend-boundaries.test.ts`도 포함됩니다. 이 테스트는 route-first 구조의 shared/feature/model/route/ui import 경계, `shared/ui`의 `src/app` import 금지, 제거된 `shared/api/readmates` compatibility import, `ui`가 있는 feature의 `components` public import 금지, route-owned action type 노출 여부를 확인합니다. Legacy boundary exception 목록은 비어 있어야 합니다.
 
