@@ -55,8 +55,8 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
 
-      - name: Test and build server jar
-        run: ./server/gradlew -p server clean test bootJar
+      - name: Server quality gate and build jar
+        run: ./server/gradlew -p server clean check bootJar
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
