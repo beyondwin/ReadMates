@@ -13,6 +13,9 @@ data class AiGenerationProperties(
     val mock: Boolean = false,
     val enabledProviders: Set<String> = emptySet(), // "CLAUDE","OPENAI","GEMINI"
     val fallbackDefaultModel: String = "gpt-5.4-mini",
+    // Ordered model aliases tried for cross-provider failover on availability
+    // failures. Empty = feature off (same-provider retry only).
+    val fallbackChain: List<String> = emptyList(),
     val caps: Caps = Caps(),
     val job: Job = Job(),
     val pricing: Map<String, Pricing> = emptyMap(),

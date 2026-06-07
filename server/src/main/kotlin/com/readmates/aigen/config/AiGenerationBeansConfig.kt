@@ -1,8 +1,10 @@
 package com.readmates.aigen.config
 
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.port.out.ModelCatalog
 import com.readmates.aigen.application.port.out.SessionContentGenerator
 import com.readmates.aigen.application.port.out.SessionContentRegenerator
+import com.readmates.aigen.application.service.ProviderFallbackChain
 import com.readmates.aigen.application.service.Sleeper
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Bean
@@ -36,6 +38,18 @@ class AiGenerationBeansConfig {
     @Bean
     fun sessionContentRegeneratorsByProvider(regenerators: List<SessionContentRegenerator>): Map<Provider, SessionContentRegenerator> =
         regenerators.associateBy { it.provider }
+
+    @Bean
+    fun providerFallbackChain(
+        sessionContentGeneratorsByProvider: Map<Provider, SessionContentGenerator>,
+        modelCatalog: ModelCatalog,
+        properties: AiGenerationProperties,
+    ): ProviderFallbackChain =
+        ProviderFallbackChain(
+            generators = sessionContentGeneratorsByProvider,
+            modelCatalog = modelCatalog,
+            properties = properties,
+        )
 
     @Bean
     fun aiGenerationSleeper(): Sleeper = Sleeper.Default
