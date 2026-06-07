@@ -48,6 +48,21 @@ describe("platform-admin analytics zod parser", () => {
     });
   });
 
+  it("normalizes an older overview payload without KPI series", async () => {
+    const { parseAdminAnalyticsOverview } = await import("./platform-admin-analytics-contracts");
+    const legacyPayload = {
+      ...validOverview,
+      schema: "admin.analytics_overview.v1",
+    };
+    delete (legacyPayload as { series?: unknown }).series;
+
+    expect(parseAdminAnalyticsOverview(legacyPayload)).toMatchObject({
+      schema: "admin.analytics_overview.v2",
+      series: [],
+      kpis: [{ key: "SESSION_COMPLETION" }],
+    });
+  });
+
   it("throws when a nested KPI delta direction is missing", async () => {
     const { parseAdminAnalyticsOverview } = await import("./platform-admin-analytics-contracts");
     const invalid = {
