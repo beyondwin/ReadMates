@@ -83,7 +83,7 @@ groups:
           summary: "AI generation aggregate 30d cost above $1000"
           description: >-
             Aggregate AI generation spend over the last 30 days is
-            ${{ $value | printf \"%.2f\" }} (threshold: $1000).
+            {{ printf "$%.2f" $value }} (threshold: $1000).
             Per-club budget enforcement (spec $20/club/month) lives in app
             code; this alert is the aggregate early warning. Drill down
             per-club via ai_generation_audit_log SQL query in runbook.

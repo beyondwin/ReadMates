@@ -6,9 +6,9 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ## Unreleased
 
-### Changed
+### Highlights
 
-- **host operations signal card:** 호스트 대시보드의 `운영 신호` 카드를 read-only 지표 목록에서 운영 판단 카드로 다듬었습니다. 준비 상태 배지, 상황 요약, 열린 세션/마감 대기/AI 실패/전주 대비 2x2 지표, 차단 사유, host-safe 세션 문서·알림 장부 링크를 보여 주며, 서버/API contract·auth/BFF token·DB migration 변경은 없습니다.
+- 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 
 ## v1.13.0 - 2026-06-07
 
@@ -29,10 +29,12 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - **notes feed ordering:** 클럽 전체 notes feed를 회차(session) 우선으로 정렬하도록 바꿨습니다. 최신 회차가 먼저 묶여 보이고, 같은 회차 안에서는 작성 시각(`created_at`) 순으로 정렬되어, 오래된 회차에 더 나중에 작성된 기록이 마지막 회차 기록보다 앞에 끼어드는 일이 없어집니다. keyset pagination·EXPLAIN guard·통합 테스트를 새 정렬에 맞춰 고정했고, 단일 회차 feed의 keyset 로직도 같은 형태로 정렬해 두 경로의 분기를 없앴습니다. DB migration·API contract·auth/BFF 토큰 변경은 없습니다.
 - **member reading pace:** current-session과 member-home의 다음 행동 안내에 읽기 페이스 배지를 더했습니다. 마감까지 남은 일수와 읽기 진행률만으로 페이스(여유/적정/촉박/임박/완독)를 계산하므로 별도의 읽기 시작 앵커가 필요 없고, 배지는 색상에 더해 항상 텍스트 라벨과 `aria-label`을 함께 노출합니다. DB migration·auth/BFF 토큰 변경은 없습니다.
+- **host operations signal card:** 호스트 대시보드의 `운영 신호` 카드를 read-only 지표 목록에서 운영 판단 카드로 다듬었습니다. 준비 상태 배지, 상황 요약, 열린 세션/마감 대기/AI 실패/전주 대비 2x2 지표, 차단 사유, host-safe 세션 문서·알림 장부 링크를 보여 주며, 서버/API contract·auth/BFF token·DB migration 변경은 없습니다.
 
 ### Fixed
 
 - **member my-page 완독률 정직성:** my-page에서 출석률을 "완독률"로 잘못 표기하던 오라벨을 바로잡았습니다. 이제 참석률(출석 기준)과 완독률(`reading_checkins.reading_progress`가 100%에 도달한 회차 기준)을 별도의 정직한 지표로 분리해 보여 줍니다. `MyPageResponse`에 `completedReadingCount`와 회차별 `readingProgress`가 추가됐고, DB migration·auth/BFF 토큰 변경은 없습니다.
+- **release validation scripts:** Docker 이미지 기본 entrypoint와 충돌하던 Prometheus/Alertmanager 검증 스크립트의 컨테이너 실행 방식을 고치고, `AiGenBudgetExhaustion` rule의 금액 템플릿을 `promtool` 유효 문법으로 바로잡아 `./scripts/pre-push-check.sh --full --release`가 관측 설정 검증까지 통과하도록 했습니다.
 
 ### Added
 
@@ -56,7 +58,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - Local release readiness (2026-06-07): `git diff --check v1.12.1..HEAD` - pass.
 - Local release readiness (2026-06-07): `pnpm --dir front lint` - pass.
-- Local release readiness (2026-06-07): `pnpm --dir front test` - pass (134 files, 1142 tests).
+- Local release readiness (2026-06-07): `pnpm --dir front test` - pass (134 files, 1145 tests).
 - Local release readiness (2026-06-07): `pnpm --dir front build` - pass.
 - Local release readiness (2026-06-07): `./server/gradlew -p server clean check architectureTest integrationTest --tests RedisAiGenerationJobStoreTest` - pass.
 - Local release readiness (2026-06-07): `pnpm --dir front test:e2e` - pass (61/61).
