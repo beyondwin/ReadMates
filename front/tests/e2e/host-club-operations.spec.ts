@@ -76,8 +76,14 @@ async function expectNoHostPrivateSentinels(page: Page): Promise<void> {
 async function expectHostOperatingSignalCardPublicSafe(page: Page): Promise<void> {
   const card = page.getByRole("region", { name: "운영 신호" });
   await expect(card).toBeVisible();
-  await expect(card.getByText(/READY/)).toBeVisible();
-  await expect(card.getByText(/AI 실패/)).toBeVisible();
+  await expect(card.getByRole("heading", { name: "운영 신호" })).toBeVisible();
+  await expect(card.getByText("READY")).toBeVisible();
+  await expect(card.getByText("마감 대기 중인 세션 기록이 있습니다. 공개 전 기록 완성을 먼저 확인하세요.")).toBeVisible();
+  await expect(card.getByText("열린 세션")).toBeVisible();
+  await expect(card.getByText("AI 실패", { exact: true })).toBeVisible();
+  await expect(card.getByText("전주 대비")).toBeVisible();
+  await expect(card.getByRole("link", { name: "세션 문서 열기" })).toBeVisible();
+  await expect(card.getByRole("link", { name: "알림 장부 보기" })).toBeVisible();
   await expectNoHostPrivateSentinels(page);
 }
 
