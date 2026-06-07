@@ -6,7 +6,9 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ## Unreleased
 
-(없음)
+### Changed
+
+- **host operations signal card:** 호스트 대시보드의 `운영 신호` 카드를 read-only 지표 목록에서 운영 판단 카드로 다듬었습니다. 준비 상태 배지, 상황 요약, 열린 세션/마감 대기/AI 실패/전주 대비 2x2 지표, 차단 사유, host-safe 세션 문서·알림 장부 링크를 보여 주며, 서버/API contract·auth/BFF token·DB migration 변경은 없습니다.
 
 ## v1.13.0 - 2026-06-07
 

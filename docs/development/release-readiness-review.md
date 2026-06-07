@@ -133,6 +133,17 @@ The v1.11.0 production OAuth and backup timer items are closed by 2026-05-31 ope
 - Local verification: `git diff --check v1.12.1..HEAD`, `pnpm --dir front lint`, `pnpm --dir front test` (134 files, 1142 tests), `pnpm --dir front build`, `./server/gradlew -p server clean check architectureTest integrationTest --tests RedisAiGenerationJobStoreTest`, `./scripts/build-public-release-candidate.sh`, `./scripts/public-release-check.sh .tmp/public-release-candidate`, and `pnpm --dir front test:e2e` (61/61) all passed. Public release check reported gitleaks no leaks.
 - Residual risk: production tag/deploy smoke remains open until the release operation runs. This local remediation does not prove production OAuth, VM health, provider-console state, or GHCR promotion.
 
+## 2026-06-07 Host operations signal card closeout note
+
+- Scope reviewed: local `main..HEAD` for the host operations signal card branch. `origin/main..HEAD` was also inspected and contains inherited local-main release work already covered by the earlier 2026-06-07 notes above.
+- Release classification: frontend host-surface polish only. No DB migration, public API contract change, auth/BFF token change, CI/deploy script change, server behavior change, or architecture-test baseline/exception change.
+- Finding repaired before merge: `CHANGELOG.md` `## Unreleased` still said `(없음)` even though the host dashboard visible behavior changed. The Unreleased section now records the host operations signal card change and explicitly notes unchanged server/API/auth/DB surfaces.
+- Public safety and security hygiene: production source does not contain `ADMIN_ROUTE`, private member email, private domain, raw JSON sentinel, secret, or token-shaped values. The sentinel strings remain only in tests that assert they are not rendered. The card exposes only host-safe links to `/app/host/sessions/new` and `/app/host/notifications`, and no mutation button or admin action.
+- Evidence: component RED/GREEN covered READY judgment, blocker priority, due-record priority, AI failure delta guidance, host-safe links, and no admin/mutation controls. Targeted Playwright E2E covered desktop card evidence, mobile host summary preservation, screenshot artifact creation, and public-safe sentinel checks.
+- Executed before local main merge: `pnpm --dir front test -- host-club-operations-card`, `pnpm --dir front test:e2e -- tests/e2e/host-club-operations.spec.ts`, `pnpm --dir front lint`, `pnpm --dir front test`, `pnpm --dir front build`, `pnpm --dir front test:e2e` (61/61), `git diff --check`, `./scripts/build-public-release-candidate.sh`, `./scripts/public-release-check.sh .tmp/public-release-candidate`, and `graphify update .`. `graphify-out/` is ignored, so no tracked graph output changed; after the docs-only closeout commit, Graphify reported no code-graph topology changes and left the ignored report at the previous code-change commit.
+- Skipped: production OAuth, VM, provider-console, tag/deploy smoke, and server Gradle checks. These are not local evidence for this frontend-only polish branch and the changed files do not touch server, deploy, auth, BFF, persistence, or release image behavior.
+- Residual risk: no known local release-readiness residual remains for this branch after the CHANGELOG repair and frontend/public-safety evidence above. Production deploy/tag smoke remains a release-operation step.
+
 ## 기본 범위
 
 기본 범위는 현재 branch와 base branch의 차이입니다. 보통 `origin/main..HEAD`를 사용합니다.
