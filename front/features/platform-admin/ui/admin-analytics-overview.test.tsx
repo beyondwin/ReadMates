@@ -55,4 +55,23 @@ describe("AdminAnalyticsOverviewView", () => {
     expect(exportLink).toHaveAttribute("download", "readmates-admin-analytics-30d-2026-05-30.csv");
     expect(exportLink.getAttribute("href")).toContain("data:text/csv");
   });
+
+  it("renders an honest empty trend state when KPI series are unavailable", () => {
+    render(
+      <AdminAnalyticsOverviewView
+        overview={{ ...overview, series: [] }}
+        window="30d"
+        loading={false}
+        error={null}
+        onWindowChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("KPI 추세를 만들 충분한 데이터가 없습니다.")).toBeInTheDocument();
+    expect(screen.queryByRole("table", { name: "KPI 추세" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "CSV 내려받기" })).toHaveAttribute(
+      "download",
+      "readmates-admin-analytics-30d-2026-05-30.csv",
+    );
+  });
 });

@@ -118,4 +118,35 @@ describe("platform-admin-analytics-model", () => {
     expect(csv).toContain("benchmark,30d,,,,AVAILABLE,fiction,Fiction Club");
     expect(analyticsCsvFilename(overview)).toBe("readmates-admin-analytics-30d-2026-05-30.csv");
   });
+
+  it("builds a CSV export when KPI series are unavailable", () => {
+    const overview: AdminAnalyticsOverview = {
+      schema: "admin.analytics_overview.v2",
+      generatedAt: "2026-05-30T00:00:00Z",
+      window: "30d",
+      kpis: [card({ key: "SESSION_COMPLETION", unit: "PERCENT", current: 80, prior: 50 })],
+      clubBenchmark: {
+        availability: "AVAILABLE",
+        rows: [
+          {
+            clubId: "club-1",
+            slug: "fiction",
+            name: "Fiction Club",
+            activeMembers: 8,
+            sessionCompletionRate: 75,
+            rsvpRate: 90,
+            aiCostUsd: "1.0000",
+            notificationDeliveryRate: 95,
+          },
+        ],
+      },
+      series: [],
+    };
+
+    const csv = buildAnalyticsCsv(overview);
+
+    expect(csv).toContain("section,window,kpi,bucketStart,value,availability,clubSlug,clubName");
+    expect(csv).not.toContain("series,30d");
+    expect(csv).toContain("benchmark,30d,,,,AVAILABLE,fiction,Fiction Club");
+  });
 });
