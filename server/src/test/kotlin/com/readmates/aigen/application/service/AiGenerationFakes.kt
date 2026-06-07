@@ -167,6 +167,7 @@ internal class FakeJobStore : AiGenerationJobStore {
         result: SessionImportV1Snapshot,
         usage: TokenUsage,
         cost: BigDecimal,
+        actualModel: ModelId?,
     ): Boolean {
         val current =
             when {
@@ -179,6 +180,7 @@ internal class FakeJobStore : AiGenerationJobStore {
         records[jobId] =
             current.copy(
                 result = result,
+                actualModel = actualModel ?: current.actualModel,
                 tokens =
                     TokenUsage(
                         current.tokens.inputTokens + usage.inputTokens,

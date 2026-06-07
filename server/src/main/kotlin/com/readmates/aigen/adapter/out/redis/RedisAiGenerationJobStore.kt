@@ -261,6 +261,7 @@ class RedisAiGenerationJobStore(
         result: SessionImportV1Snapshot,
         usage: TokenUsage,
         cost: BigDecimal,
+        actualModel: ModelId?,
     ): Boolean =
         runCatching {
             val ttlSeconds = properties.job.redisTtl.seconds
@@ -278,6 +279,8 @@ class RedisAiGenerationJobStore(
                     cost.toPlainString(),
                     lastUpdatedAt.toString(),
                     ttlSeconds.toString(),
+                    actualModel?.provider?.name.orEmpty(),
+                    actualModel?.name.orEmpty(),
                 )
             val changed = saved == 1L
             if (changed) {
@@ -350,6 +353,10 @@ class RedisAiGenerationJobStore(
                 "createdAt" to job.createdAt.toString(),
                 "lastUpdatedAt" to job.lastUpdatedAt.toString(),
             )
+        job.actualModel?.let {
+            map["actualModelProvider"] = it.provider.name
+            map["actualModelName"] = it.name
+        }
         job.stage?.let { map["stage"] = it.name }
         job.instructions?.let { map["instructions"] = it }
         job.error?.let {
@@ -412,6 +419,13 @@ class RedisAiGenerationJobStore(
             expiresAt = expiresAt,
             createdAt = createdAt,
             lastUpdatedAt = lastUpdatedAt,
+            actualModel =
+                hash["actualModelName"]?.let { name ->
+                    ModelId(
+                        provider = Provider.valueOf(hash.getValue("actualModelProvider")),
+                        name = name,
+                    )
+                },
             llmCallCount = hash["llmCallCount"]?.toIntOrNull() ?: 0,
         )
     }
@@ -541,7 +555,8 @@ class RedisAiGenerationJobStore(
         /**
          * KEYS[1]=hashKey, KEYS[2]=resultKey, KEYS[3]=transcriptKey
          * ARGV[1]=expected status, ARGV[2]=resultJson, ARGV[3..5]=token deltas,
-         * ARGV[6]=cost delta, ARGV[7]=lastUpdatedAt, ARGV[8]=ttlSeconds.
+         * ARGV[6]=cost delta, ARGV[7]=lastUpdatedAt, ARGV[8]=ttlSeconds,
+         * ARGV[9]=actualModelProvider or "", ARGV[10]=actualModelName or "".
          */
         val SAVE_RESULT_IF_STATUS_SCRIPT: DefaultRedisScript<Long> =
             DefaultRedisScript(
@@ -562,6 +577,10 @@ class RedisAiGenerationJobStore(
                 redis.call('EXPIRE', KEYS[1], ARGV[8])
                 if redis.call('EXISTS', KEYS[3]) == 1 then
                   redis.call('EXPIRE', KEYS[3], ARGV[8])
+                end
+                if ARGV[9] ~= '' then
+                  redis.call('HSET', KEYS[1], 'actualModelProvider', ARGV[9])
+                  redis.call('HSET', KEYS[1], 'actualModelName', ARGV[10])
                 end
                 return 1
                 """.trimIndent(),

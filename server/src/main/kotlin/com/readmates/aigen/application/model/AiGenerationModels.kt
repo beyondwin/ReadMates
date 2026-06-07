@@ -150,6 +150,7 @@ data class JobView(
     val stage: JobStage?,
     val progressPct: Int,
     val model: ModelId,
+    val actualModel: ModelId? = null,
     val result: SessionImportV1Snapshot?,
     val error: GenerationError?,
     val tokens: TokenUsage?,

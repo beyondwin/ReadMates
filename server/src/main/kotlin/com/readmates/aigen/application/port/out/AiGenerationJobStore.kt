@@ -97,6 +97,7 @@ interface AiGenerationJobStore {
         result: SessionImportV1Snapshot,
         usage: TokenUsage,
         cost: BigDecimal,
+        actualModel: ModelId? = null,
     ): Boolean
 
     /**
@@ -135,6 +136,12 @@ data class JobRecord(
     val expiresAt: Instant,
     val createdAt: Instant,
     val lastUpdatedAt: Instant,
+    /**
+     * The model that actually produced the result when cross-provider failover
+     * occurred. Null means no failover (actual == [model]). Used so cost/audit/
+     * metrics reflect the provider that really ran.
+     */
+    val actualModel: ModelId? = null,
     /**
      * Running count of LLM calls attempted for this job (start + worker retries +
      * regenerations). Compared against
