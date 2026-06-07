@@ -7,6 +7,7 @@ import com.readmates.aigen.application.model.GenerationInput
 import com.readmates.aigen.application.model.GenerationOutput
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
+import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.model.TokenUsage
@@ -72,6 +73,7 @@ class AiGenerationWorker(
     private val clock: Clock,
     private val metrics: AiGenerationMetrics,
     private val sleeper: Sleeper = Sleeper.Default,
+    private val fallbackChain: ProviderFallbackChain,
 ) {
     private val logger = LoggerFactory.getLogger(AiGenerationWorker::class.java)
 
@@ -98,7 +100,7 @@ class AiGenerationWorker(
             )
         val generator = resolveGenerator(runningRecord, start) ?: return
         when (val outcome = runGenerationWithValidationRetry(runningRecord, generator)) {
-            is Outcome.Success -> succeed(runningRecord, outcome.snapshot, outcome.usage, start)
+            is Outcome.Success -> succeed(runningRecord, outcome.snapshot, outcome.usage, outcome.actualModel, start)
             is Outcome.Failure -> failJob(runningRecord, outcome.error.code, outcome.error.message, start)
         }
     }
@@ -129,10 +131,27 @@ class AiGenerationWorker(
         return resolved
     }
 
+    private data class GenerationAttempt(
+        val output: GenerationOutput,
+        val actualModel: ModelId,
+        val generator: SessionContentGenerator,
+    )
+
+    private sealed class AttemptResult {
+        data class Ok(
+            val attempt: GenerationAttempt,
+        ) : AttemptResult()
+
+        data class Fail(
+            val error: GenerationError,
+        ) : AttemptResult()
+    }
+
     private sealed class Outcome {
         data class Success(
             val snapshot: SessionImportV1Snapshot,
             val usage: TokenUsage,
+            val actualModel: ModelId,
         ) : Outcome()
 
         data class Failure(
@@ -151,44 +170,39 @@ class AiGenerationWorker(
                 model = record.model,
                 instructions = record.instructions,
             )
-        // First generator attempt with provider-error retry.
-        val firstAttempt = callGeneratorWithRetry(record, generator, baseInput)
-        if (firstAttempt is CallResult.Failure) {
-            return Outcome.Failure(firstAttempt.error)
-        }
-        val successOutput = (firstAttempt as CallResult.Success).output
-        return when (val validation = validator.validate(successOutput.result, baseInput.sessionMeta)) {
-            is ValidationResult.Ok -> Outcome.Success(successOutput.result, successOutput.usage)
-            is ValidationResult.Violation ->
-                retryAfterValidationFailure(
-                    record = record,
-                    generator = generator,
-                    baseInput = baseInput,
-                    violation = validation,
-                )
+        val attempt =
+            when (val first = callGeneratorWithRetry(record, generator, baseInput)) {
+                is AttemptResult.Fail -> return Outcome.Failure(first.error)
+                is AttemptResult.Ok -> first.attempt
+            }
+        return when (val validation = validator.validate(attempt.output.result, baseInput.sessionMeta)) {
+            is ValidationResult.Ok -> Outcome.Success(attempt.output.result, attempt.output.usage, attempt.actualModel)
+            is ValidationResult.Violation -> retryAfterValidationFailure(record, attempt, baseInput, validation)
         }
     }
 
     private fun retryAfterValidationFailure(
         record: JobRecord,
-        generator: SessionContentGenerator,
+        attempt: GenerationAttempt,
         baseInput: GenerationInput,
         violation: ValidationResult.Violation,
     ): Outcome {
         // Audit the validator-driven retry attempt with the original violation
-        // code so the audit trail reflects each LLM call (spec §9.2).
-        auditRetryAttempt(record, GenerationError(violation.code, violation.message))
+        // code so the audit trail reflects each LLM call (spec §9.2). Stays on the
+        // model that actually produced the result (failover target if one was used).
+        auditRetryAttempt(record, attempt.actualModel, GenerationError(violation.code, violation.message))
         val strengthenedInput =
             baseInput.copy(
+                model = attempt.actualModel,
                 instructions = strengthenInstructions(baseInput.instructions, violation.code),
             )
         val retry =
-            when (val callResult = callGeneratorRaw(record, generator, strengthenedInput)) {
+            when (val callResult = callGeneratorRaw(record, attempt.generator, strengthenedInput)) {
                 is CallResult.Success -> callResult.output
                 is CallResult.Failure -> return Outcome.Failure(callResult.error)
             }
         return when (val validation = validator.validate(retry.result, baseInput.sessionMeta)) {
-            is ValidationResult.Ok -> Outcome.Success(retry.result, retry.usage)
+            is ValidationResult.Ok -> Outcome.Success(retry.result, retry.usage, attempt.actualModel)
             is ValidationResult.Violation ->
                 Outcome.Failure(
                     GenerationError(validation.code, validation.message),
@@ -237,35 +251,57 @@ class AiGenerationWorker(
     @Suppress("ReturnCount")
     private fun callGeneratorWithRetry(
         record: JobRecord,
-        generator: SessionContentGenerator,
+        primaryGenerator: SessionContentGenerator,
         baseInput: GenerationInput,
-    ): CallResult {
-        val first = callGeneratorRaw(record, generator, baseInput)
-        if (first is CallResult.Success) return first
+    ): AttemptResult {
+        val first = callGeneratorRaw(record, primaryGenerator, baseInput)
+        if (first is CallResult.Success) {
+            return AttemptResult.Ok(GenerationAttempt(first.output, record.model, primaryGenerator))
+        }
         val firstFailure = (first as CallResult.Failure).error
         val strategy =
             retryStrategyFor(firstFailure.code)
-                ?: return CallResult.Failure(firstFailure)
+                ?: return AttemptResult.Fail(firstFailure)
         // Per spec §9.2 ("각 호출은 audit log row 별도"): emit a FAILED audit row
         // for the first attempt before we retry, so the audit trail records both
-        // the original failure code AND the retry. Without this the terminal-only
-        // audit erases the first-attempt failure when the retry succeeds.
-        auditRetryAttempt(record, firstFailure)
+        // the original failure code AND the retry. The first attempt ran on
+        // record.model, so attribute the failure there.
+        auditRetryAttempt(record, record.model, firstFailure)
         sleeper.sleep(strategy.backoff)
+
+        // Availability failures (PROVIDER_UNAVAILABLE / PROVIDER_RATE_LIMITED)
+        // redirect the single retry to the next provider in the configured chain
+        // (failover depth 1, call budget unchanged). Empty chain / no candidate
+        // falls through to the same-provider retry below.
+        val failover =
+            if (isAvailabilityFailure(firstFailure.code)) fallbackChain.nextAfter(record.model) else null
+        if (failover != null) {
+            val failoverGenerator = generators.getValue(failover.provider)
+            return when (val retry = callGeneratorRaw(record, failoverGenerator, baseInput.copy(model = failover))) {
+                is CallResult.Success -> AttemptResult.Ok(GenerationAttempt(retry.output, failover, failoverGenerator))
+                is CallResult.Failure -> AttemptResult.Fail(retry.error)
+            }
+        }
+
         // Per §9.2: SCHEMA_INVALID / AUTHOR_NAME_MISMATCH /
         // HIGHLIGHTS_OUT_OF_RANGE / ONE_LINE_REVIEWS_DUPLICATE /
         // FEEDBACK_TEMPLATE_INVALID get a single retry with the prompt
         // augmented to "strictly adhere to the schema and constraints".
-        // Provider-side retries (PROVIDER_UNAVAILABLE / PROVIDER_RATE_LIMITED)
-        // re-send the same prompt unchanged.
+        // Provider-side retries with no failover candidate re-send unchanged.
         val retryInput =
             if (strategy.strengthen) {
                 baseInput.copy(instructions = strengthenInstructions(baseInput.instructions, firstFailure.code))
             } else {
                 baseInput
             }
-        return callGeneratorRaw(record, generator, retryInput)
+        return when (val retry = callGeneratorRaw(record, primaryGenerator, retryInput)) {
+            is CallResult.Success -> AttemptResult.Ok(GenerationAttempt(retry.output, record.model, primaryGenerator))
+            is CallResult.Failure -> AttemptResult.Fail(retry.error)
+        }
     }
+
+    private fun isAvailabilityFailure(code: ErrorCode): Boolean =
+        code == ErrorCode.PROVIDER_UNAVAILABLE || code == ErrorCode.PROVIDER_RATE_LIMITED
 
     private data class RetryStrategy(
         val backoff: Duration,
@@ -302,6 +338,7 @@ class AiGenerationWorker(
      */
     private fun auditRetryAttempt(
         record: JobRecord,
+        model: ModelId,
         previousError: GenerationError,
     ) {
         auditPort.insert(
@@ -312,8 +349,8 @@ class AiGenerationWorker(
                 hostUserId = record.hostUserId,
                 kind = AuditKind.FULL,
                 item = null,
-                provider = record.model.provider,
-                model = record.model.name,
+                provider = model.provider,
+                model = model.name,
                 transcriptSha256 = null,
                 usage = TokenUsage(0, 0, 0),
                 costEstimateUsd = BigDecimal.ZERO,
@@ -330,9 +367,10 @@ class AiGenerationWorker(
         record: JobRecord,
         snapshot: SessionImportV1Snapshot,
         usage: TokenUsage,
+        actualModel: ModelId,
         start: Instant,
     ) {
-        val cost = CostCalculator.estimate(usage, modelCatalog.pricing(record.model))
+        val cost = CostCalculator.estimate(usage, modelCatalog.pricing(actualModel))
         // Cost was incurred by the provider call regardless of cancel race.
         // Record BEFORE the CAS so cancel-during-running does not silently
         // drop club/host monthly accounting (spec §"비용 회계 정책").
@@ -348,7 +386,15 @@ class AiGenerationWorker(
                 failure,
             )
         }
-        val saved = jobStore.saveResultIfStatus(record.jobId, JobStatus.RUNNING, snapshot, usage, cost)
+        val saved =
+            jobStore.saveResultIfStatus(
+                record.jobId,
+                JobStatus.RUNNING,
+                snapshot,
+                usage,
+                cost,
+                actualModel.takeIf { it != record.model },
+            )
         if (!saved) {
             return // cancel/commit/another worker won the race
         }
@@ -363,7 +409,7 @@ class AiGenerationWorker(
         ) {
             return // cancel won the race
         }
-        emitJobMetrics(record, JobStatus.SUCCEEDED, usage, cost, start)
+        emitJobMetrics(JobStatus.SUCCEEDED, usage, cost, start, actualModel)
         auditPort.insert(
             AuditLogEntry(
                 jobId = record.jobId,
@@ -372,8 +418,8 @@ class AiGenerationWorker(
                 hostUserId = record.hostUserId,
                 kind = AuditKind.FULL,
                 item = null,
-                provider = record.model.provider,
-                model = record.model.name,
+                provider = actualModel.provider,
+                model = actualModel.name,
                 transcriptSha256 = null,
                 usage = usage,
                 costEstimateUsd = cost,
@@ -406,7 +452,7 @@ class AiGenerationWorker(
             return
         }
         // Validation-failure counter is emitted at the validator (single source of truth).
-        emitJobMetrics(record, JobStatus.FAILED, TokenUsage(0, 0, 0), BigDecimal.ZERO, start)
+        emitJobMetrics(JobStatus.FAILED, TokenUsage(0, 0, 0), BigDecimal.ZERO, start, record.model)
         auditPort.insert(
             AuditLogEntry(
                 jobId = record.jobId,
@@ -453,31 +499,31 @@ class AiGenerationWorker(
             .toInt()
 
     private fun emitJobMetrics(
-        record: JobRecord,
         status: JobStatus,
         usage: TokenUsage,
         cost: BigDecimal,
         start: Instant,
+        model: ModelId,
     ) {
         val elapsed = Duration.between(start, clock.instant())
-        metrics.recordJobCompleted(status, record.model.provider, record.model, JobKind.FULL)
-        metrics.recordLatency(record.model.provider, record.model, JobKind.FULL, elapsed)
+        metrics.recordJobCompleted(status, model.provider, model, JobKind.FULL)
+        metrics.recordLatency(model.provider, model, JobKind.FULL, elapsed)
         if (usage.inputTokens > 0) {
-            metrics.recordTokens(record.model.provider, record.model, TokenDirection.INPUT, usage.inputTokens)
+            metrics.recordTokens(model.provider, model, TokenDirection.INPUT, usage.inputTokens)
         }
         if (usage.cachedInputTokens > 0) {
             metrics.recordTokens(
-                record.model.provider,
-                record.model,
+                model.provider,
+                model,
                 TokenDirection.CACHED_INPUT,
                 usage.cachedInputTokens,
             )
         }
         if (usage.outputTokens > 0) {
-            metrics.recordTokens(record.model.provider, record.model, TokenDirection.OUTPUT, usage.outputTokens)
+            metrics.recordTokens(model.provider, model, TokenDirection.OUTPUT, usage.outputTokens)
         }
         if (cost > BigDecimal.ZERO) {
-            metrics.recordCost(record.model.provider, record.model, cost)
+            metrics.recordCost(model.provider, model, cost)
         }
     }
 }

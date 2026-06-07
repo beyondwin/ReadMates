@@ -90,13 +90,18 @@ interface AiGenerationJobStore {
     /**
      * Atomically save the full result only when the job is still in [expected].
      * Returns false when commit/cancel/another worker transition already won.
+     *
+     * Each parameter is one atomic write field of the result commit; grouping
+     * into a DTO would only hide the persisted columns behind another type.
      */
+    @Suppress("LongParameterList")
     fun saveResultIfStatus(
         jobId: UUID,
         expected: JobStatus,
         result: SessionImportV1Snapshot,
         usage: TokenUsage,
         cost: BigDecimal,
+        actualModel: ModelId? = null,
     ): Boolean
 
     /**
@@ -135,6 +140,12 @@ data class JobRecord(
     val expiresAt: Instant,
     val createdAt: Instant,
     val lastUpdatedAt: Instant,
+    /**
+     * The model that actually produced the result when cross-provider failover
+     * occurred. Null means no failover (actual == [model]). Used so cost/audit/
+     * metrics reflect the provider that really ran.
+     */
+    val actualModel: ModelId? = null,
     /**
      * Running count of LLM calls attempted for this job (start + worker retries +
      * regenerations). Compared against

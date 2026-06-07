@@ -201,6 +201,7 @@ class AiGenerationOrchestrator(
             stage = record.stage,
             progressPct = record.progressPct,
             model = record.model,
+            actualModel = record.actualModel,
             result = record.result,
             error = record.error,
             tokens = record.tokens,

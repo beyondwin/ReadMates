@@ -411,6 +411,12 @@ class AiGenerationWorkerTest {
                 clock = clock,
                 metrics = fakeMetrics(),
                 sleeper = sleeper,
+                fallbackChain =
+                    ProviderFallbackChain(
+                        generators = mapOf(Provider.CLAUDE to generator),
+                        modelCatalog = modelCatalog,
+                        properties = properties,
+                    ),
             )
 
         fun savedRecord(): com.readmates.aigen.application.port.out.JobRecord {
