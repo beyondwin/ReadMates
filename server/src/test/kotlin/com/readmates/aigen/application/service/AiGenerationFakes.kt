@@ -589,4 +589,9 @@ internal object AiGenerationTestFixtures {
         )
 
     fun providerError(code: ErrorCode): GenerationError = GenerationError(code, code.name)
+
+    fun snapshotOutput(
+        summary: String = "An interesting discussion.",
+        usage: TokenUsage = TokenUsage(inputTokens = 100, cachedInputTokens = 0, outputTokens = 200),
+    ): GenerationOutput = GenerationOutput(snapshot(summary), usage)
 }
