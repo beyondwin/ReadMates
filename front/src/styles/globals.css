@@ -1570,6 +1570,129 @@
   padding: 8px 0 20px;
 }
 
+.host-club-ops {
+  display: grid;
+  gap: 14px;
+  margin-top: 24px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  background: var(--bg-raised);
+}
+
+.host-club-ops__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.host-club-ops__header h2 {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--text-2);
+  text-transform: uppercase;
+}
+
+.host-club-ops__badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  max-width: 100%;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1.2;
+  font-weight: 700;
+  color: var(--text-2);
+  background: var(--bg-sub);
+  overflow-wrap: anywhere;
+}
+
+.host-club-ops__badge--ok {
+  border-color: color-mix(in oklch, var(--ok), var(--line) 48%);
+  color: var(--ok);
+  background: color-mix(in oklch, var(--ok), transparent 90%);
+}
+
+.host-club-ops__badge--warn {
+  border-color: color-mix(in oklch, var(--warn), var(--line) 42%);
+  color: var(--warn);
+  background: color-mix(in oklch, var(--warn), transparent 88%);
+}
+
+.host-club-ops__badge--neutral {
+  border-color: var(--line);
+  color: var(--text-2);
+  background: var(--bg-sub);
+}
+
+.host-club-ops__summary {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.host-club-ops__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.host-club-ops__metric {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-2);
+  background: var(--bg-sub);
+}
+
+.host-club-ops__metric dt {
+  color: var(--text-3);
+  font-size: 11.5px;
+  line-height: 1.25;
+  font-weight: 700;
+}
+
+.host-club-ops__metric dd {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--font-editorial);
+  font-size: 20px;
+  line-height: 1.15;
+}
+
+.host-club-ops__metric span {
+  color: var(--text-4);
+  font-size: 11.5px;
+  line-height: 1.3;
+}
+
+.host-club-ops__blockers {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 10px 0 0 18px;
+  border-top: 1px solid var(--line-soft);
+  color: var(--warn);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.host-club-ops__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .rm-host-invitations-content {
   padding: 8px 0 80px;
 }
