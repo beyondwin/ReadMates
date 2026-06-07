@@ -123,6 +123,16 @@ The v1.11.0 production OAuth and backup timer items are closed by 2026-05-31 ope
   - **운영 구성 노트:** `readmates.aigen.fallbackChain`은 기본 빈 리스트(기능 off, 동일 provider 재시도)입니다. failover를 켜려면 모델 alias 순서를 환경 구성으로 지정해야 하며, 해석 불가 alias는 시작 시 경고 로그 후 런타임에서 skip 됩니다. provider별 API 키/enable 구성이 선행되어야 실제 cross-provider 전환이 일어납니다.
   - 프로덕션 deploy/tag smoke는 release-operation 단계로 남아 있으며 이 로컬 검토가 생성하는 증거가 아닙니다.
 
+## 2026-06-07 v1.13.0 release-risk remediation note
+
+- Scope reviewed: `v1.12.1..HEAD`, with current local `main` ahead of `origin/main`.
+- Finding repaired: new frontend `/admin/analytics` can now normalize older `admin.analytics_overview.v1` or missing-`series` payloads into the v2 UI model with `series=[]`, avoiding a tag-push window where Cloudflare Pages deploys before OCI backend promotion.
+- Finding repaired: `Deploy Server Image` now runs `./server/gradlew -p server clean check bootJar`, aligning release-image build verification with the backend CI quality gate instead of the skipped `test` task.
+- Release classification: minor release (`v1.13.0`). No DB migration. Public API contract changes are additive, but server/API/frontend contract surfaces changed and require backend promotion before final frontend/admin smoke.
+- Required post-tag operations: confirm `Deploy Server Image`, promote OCI Compose backend to `ghcr.io/<owner>/<repo>/readmates-server:v1.13.0`, confirm `Deploy Front`, then run sanitized BFF/OAuth/admin analytics smoke.
+- Local verification: pending in this remediation branch; update this note after the release-readiness command set completes.
+- Residual risk: production tag/deploy smoke remains open until the release operation runs. This local remediation does not prove production OAuth, VM health, provider-console state, or GHCR promotion.
+
 ## 기본 범위
 
 기본 범위는 현재 branch와 base branch의 차이입니다. 보통 `origin/main..HEAD`를 사용합니다.

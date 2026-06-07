@@ -86,6 +86,8 @@ gh run watch <deploy-server-run-id> --exit-status
 
 `Deploy Front`는 `front/dist`와 `front/functions`를 Cloudflare Pages production에 배포합니다. `Deploy Server Image`는 scan candidate digest를 Trivy로 검사한 뒤 같은 digest를 `ghcr.io/<owner>/<repo>/readmates-server:vX.Y.Z`로 promote합니다.
 
+서버/API/frontend contract가 함께 바뀐 릴리스에서는 `Deploy Front` 성공만으로 final smoke를 끝내지 않습니다. `Deploy Server Image`가 같은 tag의 GHCR image를 promote하고, OCI Compose backend promotion이 끝난 뒤 frontend-facing smoke를 최종 판정으로 삼습니다. 새 frontend가 구 backend를 잠시 만날 수 있는 tag-push window는 frontend 하위호환 처리로 완화하되, release 완료 판정은 backend promotion 이후에만 내립니다.
+
 둘 중 하나가 실패하면 운영 배포를 진행하지 않습니다. 실패 원인은 GitHub Actions log와 artifact를 보고 수정한 뒤 새 patch tag로 다시 발행합니다. 이미 push된 tag를 force update하지 않습니다.
 
 ## GitHub Release 생성
@@ -109,6 +111,8 @@ gh release view vX.Y.Z --json tagName,name,url,publishedAt
 이미 release가 있으면 `gh release edit`로 body를 갱신합니다. Tag 존재만으로 GitHub Release가 생성됐다고 판단하지 않습니다.
 
 ## Frontend Smoke
+
+서버 코드, API contract, DB migration, BFF/auth, 또는 frontend가 소비하는 server response shape가 바뀐 릴리스는 `Backend OCI Promotion`을 먼저 완료한 뒤 이 섹션의 frontend smoke를 final smoke로 실행합니다. frontend-only 릴리스는 Cloudflare Pages 성공 뒤 바로 이 섹션을 실행할 수 있습니다.
 
 Cloudflare Pages 배포 workflow가 성공한 뒤 browser-facing origin을 확인합니다.
 
@@ -157,6 +161,8 @@ READMATES_SMOKE_AUTH_BASE_URL=https://readmates.pages.dev \
 DB migration이 있는 릴리즈는 Spring startup log 또는 Flyway schema history를 운영자 채널에서 확인합니다. 결과 전문이나 실제 DB identifier는 Git에 남기지 않습니다.
 
 알림/SMTP/Kafka가 바뀐 릴리즈는 호스트 알림 화면에서 preview/confirm, event ledger, pending/failed delivery 상태를 sanitized summary로 확인합니다. 실제 멤버 이메일, 알림 본문, club 운영 데이터는 release note에 쓰지 않습니다.
+
+서버/API/frontend contract가 함께 바뀐 platform-admin 릴리스는 OWNER 또는 OPERATOR 권한으로 `/admin/analytics`를 열어 KPI 카드와 trend table이 렌더링되는지 확인합니다. trend `series`가 충분하지 않은 환경에서는 빈 trend 상태가 렌더링되는지 확인하고, 실제 멤버 데이터나 운영 식별자는 기록하지 않습니다.
 
 ## Rollback 기준
 

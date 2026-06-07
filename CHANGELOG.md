@@ -6,6 +6,10 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ## Unreleased
 
+(없음)
+
+## v1.13.0 - 2026-06-07
+
 ### Highlights
 
 - **release policy:** solo-admin 운영 현실에 맞춰 `main` branch protection에서 불가능한 PR/code-owner self-review 요구를 제거하고, 필수 `Frontend`/`Backend` status check와 DB/API release-readiness evidence path는 유지하도록 문서와 CODEOWNERS 의미를 정렬했습니다.
@@ -38,6 +42,24 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 ### Testing
 
 - **visual regression harness:** `shared/ui` primitive에 대한 Playwright 컴포넌트 단위 시각 회귀 하니스를 추가했습니다. baseline은 `mcr.microsoft.com/playwright:v1.60.0-jammy` 안에서만 생성해 CI 렌더러와 일치시키고, 스냅샷을 커밋 대상으로 관리합니다 (ReadmatesBrandMark / BookCover / AvatarChip 초기 커버리지). macOS 로컬에서는 Vite 8 네이티브 바인딩 부재로 Docker 경로만 사용합니다.
+
+### Deployment Notes
+
+- Minor release. DB migration 없음. Auth/BFF token, OAuth scope, secret/session handling 변경 없음.
+- Public API contract는 additive입니다. `/api/admin/analytics/overview`는 `admin.analytics_overview.v2`로 KPI trend `series`를 포함하고, my-page 응답은 `completedReadingCount`와 최근 회차 `readingProgress`를 포함합니다.
+- 서버/API/frontend contract가 함께 바뀌므로 release tag push 후 `Deploy Server Image`가 GHCR `readmates-server:v1.13.0`을 scan/promote한 것을 먼저 확인하고, OCI Compose backend를 같은 image tag로 올린 뒤 final frontend/admin smoke를 수행합니다. Cloudflare Pages `Deploy Front`는 tag push로 독립 실행될 수 있으나, 새 frontend는 구 analytics 응답의 누락된 `series`를 빈 trend 상태로 normalize합니다.
+- 운영 smoke는 `/internal/health`, BFF auth, OAuth redirect, OWNER 또는 OPERATOR `/admin/analytics` 렌더링을 포함합니다. 실제 운영 domain, VM IP, member data, provider state, secret 값은 Git에 남기지 않습니다.
+
+### Verification
+
+- Local release readiness (2026-06-07): `git diff --check v1.12.1..HEAD` - pending in this remediation branch.
+- Local release readiness (2026-06-07): `pnpm --dir front lint` - pending in this remediation branch.
+- Local release readiness (2026-06-07): `pnpm --dir front test` - pending in this remediation branch.
+- Local release readiness (2026-06-07): `pnpm --dir front build` - pending in this remediation branch.
+- Local release readiness (2026-06-07): `./server/gradlew -p server clean check architectureTest integrationTest --tests RedisAiGenerationJobStoreTest` - pending in this remediation branch.
+- Local release readiness (2026-06-07): `pnpm --dir front test:e2e` - pending in this remediation branch.
+- Local release readiness (2026-06-07): `./scripts/build-public-release-candidate.sh` and `./scripts/public-release-check.sh .tmp/public-release-candidate` - pending in this remediation branch.
+- Skipped before tag: production OAuth, VM, provider-console, release tag deploy smoke. These are release-operation steps after tag push, not local evidence.
 
 ## v1.12.1 - 2026-05-31
 
