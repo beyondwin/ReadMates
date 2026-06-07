@@ -26,7 +26,8 @@ class ProviderFallbackChain(
             .filter { alias -> modelCatalog.resolveAlias(alias) == null }
             .forEach { alias ->
                 logger.warn(
-                    "readmates.aigen.fallbackChain entry '{}' does not resolve to an allowlisted model; it will be skipped.",
+                    "readmates.aigen.fallbackChain entry '{}' does not resolve to an " +
+                        "allowlisted model; it will be skipped.",
                     alias,
                 )
             }

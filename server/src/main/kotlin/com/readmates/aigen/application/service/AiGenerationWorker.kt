@@ -409,7 +409,7 @@ class AiGenerationWorker(
         ) {
             return // cancel won the race
         }
-        emitJobMetrics(record, JobStatus.SUCCEEDED, usage, cost, start, actualModel)
+        emitJobMetrics(JobStatus.SUCCEEDED, usage, cost, start, actualModel)
         auditPort.insert(
             AuditLogEntry(
                 jobId = record.jobId,
@@ -452,7 +452,7 @@ class AiGenerationWorker(
             return
         }
         // Validation-failure counter is emitted at the validator (single source of truth).
-        emitJobMetrics(record, JobStatus.FAILED, TokenUsage(0, 0, 0), BigDecimal.ZERO, start, record.model)
+        emitJobMetrics(JobStatus.FAILED, TokenUsage(0, 0, 0), BigDecimal.ZERO, start, record.model)
         auditPort.insert(
             AuditLogEntry(
                 jobId = record.jobId,
@@ -499,7 +499,6 @@ class AiGenerationWorker(
             .toInt()
 
     private fun emitJobMetrics(
-        record: JobRecord,
         status: JobStatus,
         usage: TokenUsage,
         cost: BigDecimal,

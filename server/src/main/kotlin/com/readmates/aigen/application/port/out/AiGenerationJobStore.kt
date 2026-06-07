@@ -90,7 +90,11 @@ interface AiGenerationJobStore {
     /**
      * Atomically save the full result only when the job is still in [expected].
      * Returns false when commit/cancel/another worker transition already won.
+     *
+     * Each parameter is one atomic write field of the result commit; grouping
+     * into a DTO would only hide the persisted columns behind another type.
      */
+    @Suppress("LongParameterList")
     fun saveResultIfStatus(
         jobId: UUID,
         expected: JobStatus,
