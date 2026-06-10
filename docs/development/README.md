@@ -9,7 +9,7 @@ ReadMates를 로컬에서 실행하고, 테스트하고, 구조를 이해하기 
 | 로컬 실행 | [local-setup.md](local-setup.md) |
 | 테스트, 공개 릴리즈, 배포 smoke 점검 | [test-guide.md](test-guide.md) |
 | 제품/기술 구조와 frontend route-first 경계 | [architecture.md](architecture.md) |
-| 주니어 인수인계 가이드 | [junior-onboarding-guide.md](junior-onboarding-guide.md) |
+| 신규 합류 개발자 온보딩 가이드 | [new-developer-onboarding-guide.md](new-developer-onboarding-guide.md) |
 | Cross-surface vertical slice 체크리스트 | [vertical-slice-checklist.md](vertical-slice-checklist.md) |
 | 코드베이스 graph 탐색 | [graphify.md](graphify.md) |
 | 세션 기록 JSON 생성과 가져오기 | [session-import-generator.md](session-import-generator.md) |
@@ -28,7 +28,7 @@ ReadMates를 로컬에서 실행하고, 테스트하고, 구조를 이해하기 
 
 ## 주요 구조 문서
 
-- 처음 프로젝트를 맡는 개발자는 [junior-onboarding-guide.md](junior-onboarding-guide.md)에서 제품 표면, 저장소 구조, 프론트엔드/BFF/백엔드/DB/Redis/Kafka 흐름, 기술 선택 이유, 작업 순서를 먼저 확인합니다.
+- 새로 합류했거나 처음 프로젝트를 맡는 개발자는 [new-developer-onboarding-guide.md](new-developer-onboarding-guide.md)에서 제품 표면, 저장소 구조, 프론트엔드/BFF/백엔드/DB/Redis/Kafka 흐름, 기술 선택 이유, 작업 순서를 먼저 확인합니다.
 - 프런트엔드 route-first 경계, feature `api/model/route/ui` 책임, legacy 예외 제거 기준은 [architecture.md](architecture.md)의 "프런트엔드 route-first 경계" 섹션을 기준으로 합니다.
 - frontend, BFF, server API, auth, persistence, public-safety를 함께 건드리는 변경은 [vertical-slice-checklist.md](vertical-slice-checklist.md)로 surface, server, BFF/auth, frontend, test 범위를 먼저 확인합니다.
 - 코드베이스 graph 탐색과 public-safe Graphify 산출물 정책은 [graphify.md](graphify.md)를 기준으로 합니다. Graphify 결과는 탐색 보조이며 현재 동작의 source of truth는 실제 코드, 테스트, migration, active docs입니다.
