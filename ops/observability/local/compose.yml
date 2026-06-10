@@ -1,0 +1,33 @@
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+    ports:
+      - "9090:9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../../prometheus/alerts:/etc/prometheus/alerts:ro
+      - readmates-local-prometheus:/prometheus
+
+  grafana:
+    image: grafana/grafana:11.5.1
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: readmates
+      GF_SECURITY_ADMIN_PASSWORD: readmates
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../../grafana/dashboards:/var/lib/grafana/dashboards/readmates:ro
+      - readmates-local-grafana:/var/lib/grafana
+
+volumes:
+  readmates-local-prometheus:
+  readmates-local-grafana:

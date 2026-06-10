@@ -250,7 +250,7 @@ class JdbcNotesFeedAdapter(
                     highlights.created_at as created_at,
                     20 as source_order,
                     highlights.sort_order as item_order
-                  from highlights
+                  from highlights force index (highlights_club_session_created_idx)
                   join sessions on sessions.id = highlights.session_id
                     and sessions.club_id = highlights.club_id
                   left join memberships on memberships.id = highlights.membership_id

@@ -15,6 +15,19 @@ READMATES_ALERT_SMTP_FROM=alerts@<운영 도메인>
 READMATES_ALERT_EMAIL_TO=<운영자 이메일>
 ```
 
+## 로컬 smoke
+
+운영 VM에 올리기 전에 로컬에서 dashboard/rule/provisioning이 깨지지 않았는지 확인합니다.
+
+```bash
+./scripts/lint-grafana-dashboards.sh
+./scripts/validate-prometheus-rules.sh
+./scripts/observability-local-smoke.sh
+```
+
+로컬 Spring Boot 서버가 `8081` management port를 열고 있으면 Prometheus target health까지 같이 확인합니다.
+서버가 떠 있지 않은 상태에서는 target presence까지만 확인하고 실제 scrape health는 운영 bring-up 단계에서 확인합니다.
+
 ## Bring-up
 
 ```bash

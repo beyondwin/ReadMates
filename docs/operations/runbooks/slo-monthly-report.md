@@ -4,28 +4,14 @@
 
 ## 절차
 
-1. `slos.yaml`의 6개 SLO 각각에 대해 Prometheus query 실행. 운영자 PC에서 `kubectl/ssh port-forward 9090` 후 브라우저 또는 `curl 'http://localhost:9090/api/v1/query?query=...'`.
-2. 결과를 아래 템플릿에 채워 `docs/operations/slo-reports/YYYY-MM.md`로 commit.
+1. 운영 Prometheus를 로컬에서 접근 가능한 주소로 연다. 예: SSH tunnel 또는 운영자가 승인한 port-forward.
+2. 아래 명령으로 markdown 초안을 생성한다.
 
-## 템플릿
-
-```
-# SLO Report YYYY-MM
-
-| SLO id | objective | measured | window | 위반 여부 |
-|--------|-----------|----------|--------|-----------|
-| api_availability | < 1% 5xx | __% | 30d | __ |
-| api_read_latency_p95 | < 500ms | __ms | 30d | __ |
-| bff_api_p95 | < 800ms | __ms | 7d | __ |
-| login_success_ratio | > 99% | __% | 7d | __ |
-| notification_dispatch_success_ratio | > 99% | __% | 7d | __ |
-| notification_delivery_latency_p95 | < 5m | __m | 30d | __ |
-
-## 비고
-- incident 발생: ...
-- 임계 재조정 필요: ...
+```bash
+python3 scripts/generate-slo-report.py \
+  --prometheus-url http://localhost:9090 \
+  --month 2026-06 > docs/operations/slo-reports/2026-06.md
 ```
 
-## 자동화 follow-up
-
-스크립트로 6개 query를 일괄 실행하여 markdown 생성하는 작업은 별도 spec.
+3. `CHECK` 행은 Prometheus target health, incident 기록, 배포 이력을 확인해 비고에 판단을 남긴다.
+4. 보고서에는 실제 운영 도메인, 수신자 이메일, 토큰, private endpoint를 쓰지 않는다.

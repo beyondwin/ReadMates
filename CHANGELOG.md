@@ -6,9 +6,9 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ## Unreleased
 
-### Highlights
+### Engineering
 
-- 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
+- Added Spring-course-inspired operations hardening evidence: local observability smoke tooling, SLO report draft generation, and large-fixture SQL performance guards for the notes feed.
 
 ## v1.13.0 - 2026-06-07
 

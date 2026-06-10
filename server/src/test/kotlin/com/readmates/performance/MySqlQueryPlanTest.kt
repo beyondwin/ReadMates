@@ -3,6 +3,7 @@ package com.readmates.performance
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import com.readmates.support.assertUsesIndexFor
 import com.readmates.support.explain
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -18,6 +19,13 @@ import org.springframework.jdbc.core.JdbcTemplate
 class MySqlQueryPlanTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
 ) : ReadmatesMySqlIntegrationTestSupport() {
+    private val largeFixture by lazy { LargeReadPathFixture(jdbcTemplate) }
+
+    @AfterEach
+    fun cleanupLargeFixture() {
+        largeFixture.cleanupNotesFeed()
+    }
+
     @Test
     fun `archive paged sessions query uses indexed access on sessions`() {
         val member5 = membershipIdFor("member5@example.com")
@@ -218,6 +226,26 @@ class MySqlQueryPlanTest(
         plan.assertUsesIndexFor("highlights", "notes feed highlight branch")
         plan.assertUsesIndexFor("sessions", "notes feed session join")
         plan.assertUsesIndexFor("session_participants", "notes feed active participant filter")
+    }
+
+    @Test
+    fun `notes feed large fixture keeps every union branch on indexed access`() {
+        largeFixture.seedNotesFeed(sessionCount = 80)
+
+        val plan =
+            jdbcTemplate.explain(
+                NOTES_FEED_PLAN_SQL,
+                READING_SAI_CLUB_ID,
+                READING_SAI_CLUB_ID,
+                READING_SAI_CLUB_ID,
+                READING_SAI_CLUB_ID,
+                61,
+            )
+        plan.assertUsesIndexFor("questions", "large notes feed question branch")
+        plan.assertUsesIndexFor("long_reviews", "large notes feed long-review branch")
+        plan.assertUsesIndexFor("one_line_reviews", "large notes feed one-line review branch")
+        plan.assertUsesIndexFor("highlights", "large notes feed highlight branch")
+        plan.assertUsesIndexFor("session_participants", "large notes feed active participant filter")
     }
 
     @Test
@@ -494,7 +522,7 @@ class MySqlQueryPlanTest(
                 coalesce(memberships.short_name, users.name) as author_short_name_source,
                 'HIGHLIGHT' as kind, highlights.text as text, highlights.created_at as created_at,
                 20 as source_order, highlights.sort_order as item_order
-              from highlights
+              from highlights force index (highlights_club_session_created_idx)
               join sessions on sessions.id = highlights.session_id and sessions.club_id = highlights.club_id
               left join memberships on memberships.id = highlights.membership_id and memberships.club_id = highlights.club_id
               left join users on users.id = memberships.user_id

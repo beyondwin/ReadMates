@@ -56,9 +56,11 @@ class ServerQueryBudgetTest(
     @param:Autowired private val authSessionService: AuthSessionService,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     private val createdSessionTokenHashes = linkedSetOf<String>()
+    private val largeFixture by lazy { LargeReadPathFixture(jdbcTemplate) }
 
     @AfterEach
     fun cleanupAuthSessions() {
+        largeFixture.cleanupNotesFeed()
         if (createdSessionTokenHashes.isEmpty()) {
             return
         }
@@ -165,6 +167,45 @@ class ServerQueryBudgetTest(
                     status { isOk() }
                 }
         }
+    }
+
+    @Test
+    fun `notes feed large fixture stays within fixed query budget`() {
+        largeFixture.seedNotesFeed(sessionCount = 80)
+
+        assertQueryBudget(
+            budget = 6,
+            reason = "notes feed should remain a bounded cursor query under large synthetic history",
+        ) {
+            mockMvc
+                .get("/api/notes/feed?limit=60") {
+                    with(user("member5@example.com"))
+                    header("X-Readmates-Bff-Secret", "test-bff-secret")
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.items.length()") { value(60) }
+                }
+        }
+    }
+
+    @Test
+    fun `notes feed large fixture returns first page under duration smoke threshold`() {
+        largeFixture.seedNotesFeed(sessionCount = 80)
+
+        val startedAt = System.nanoTime()
+        mockMvc
+            .get("/api/notes/feed?limit=60") {
+                with(user("member5@example.com"))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items.length()") { value(60) }
+            }
+        val elapsedMs = (System.nanoTime() - startedAt) / 1_000_000
+
+        assertThat(elapsedMs)
+            .describedAs("notes feed first page should stay below a local integration smoke threshold")
+            .isLessThan(1_500)
     }
 
     private fun assertQueryBudget(
