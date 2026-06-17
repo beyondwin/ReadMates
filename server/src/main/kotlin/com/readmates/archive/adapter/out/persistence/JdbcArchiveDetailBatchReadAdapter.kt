@@ -28,7 +28,7 @@ class JdbcArchiveDetailBatchReadAdapter(
     ): ArchiveDetailFragments {
         val publicRows = loadPublicBatch(currentMember.clubId, sessionId)
         val personalRows = loadPersonalBatch(currentMember, sessionId)
-        val feedbackDocument = loadFeedbackDocument(currentMember, sessionId, sessionNumber, myAttendanceStatus)
+        val feedbackDocument = loadFeedbackDocument(currentMember, sessionId, sessionNumber)
 
         val publicHighlights =
             publicRows
@@ -376,7 +376,6 @@ class JdbcArchiveDetailBatchReadAdapter(
         currentMember: CurrentMember,
         sessionId: UUID,
         sessionNumber: Int,
-        myAttendanceStatus: String?,
     ): MemberArchiveFeedbackDocumentStatusResult {
         val uploadedAt =
             jdbcTemplate
@@ -404,11 +403,11 @@ class JdbcArchiveDetailBatchReadAdapter(
             )
         }
 
-        val readable = canReadArchiveFeedbackDocument(currentMember, myAttendanceStatus)
+        val readable = canReadArchiveFeedbackDocument(currentMember)
         return MemberArchiveFeedbackDocumentStatusResult(
             available = true,
             readable = readable,
-            lockedReason = if (readable) null else "NOT_ATTENDED",
+            lockedReason = if (readable) null else "ACTIVE_MEMBERSHIP_REQUIRED",
             title = "독서모임 ${sessionNumber}차 피드백",
             uploadedAt = uploadedAt,
         )

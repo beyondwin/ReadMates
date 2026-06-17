@@ -19,11 +19,6 @@ interface FeedbackDocumentStorePort {
         sessionId: UUID,
     ): FeedbackDocumentSessionResult?
 
-    fun hasActiveAttendedSession(
-        currentMember: CurrentMember,
-        sessionId: UUID,
-    ): Boolean
-
     fun findLatestDocument(
         clubId: UUID,
         sessionId: UUID,

@@ -700,7 +700,7 @@ function ViewerSessionReadOnly({
       <section className="surface-quiet rm-locked-state" role="note" style={{ padding: "22px" }}>
         <div className="eyebrow">피드백 문서 접근</div>
         <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
-          피드백 문서는 참석한 정식 멤버에게 열립니다. 둘러보기 상태에서는 문서 등록 여부와 접근 제한만 확인할 수 있어요.
+          피드백 문서는 active 정식 멤버에게 열립니다. 둘러보기 상태에서는 문서 등록 여부와 접근 제한만 확인할 수 있어요.
         </p>
       </section>
     </div>

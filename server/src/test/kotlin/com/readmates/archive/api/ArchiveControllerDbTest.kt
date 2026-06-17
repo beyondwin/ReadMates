@@ -205,7 +205,7 @@ class ArchiveControllerDbTest(
     }
 
     @Test
-    fun `archive session detail locks feedback document for member who did not attend`() {
+    fun `archive session detail makes feedback document readable for active member who did not attend`() {
         mockMvc
             .get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
                 with(user("member1@example.com"))
@@ -213,23 +213,22 @@ class ArchiveControllerDbTest(
                 status { isOk() }
                 jsonPath("$.bookTitle") { value("가난한 찰리의 연감") }
                 jsonPath("$.feedbackDocument.available") { value(true) }
-                jsonPath("$.feedbackDocument.readable") { value(false) }
-                jsonPath("$.feedbackDocument.lockedReason") { value("NOT_ATTENDED") }
+                jsonPath("$.feedbackDocument.readable") { value(true) }
+                jsonPath("$.feedbackDocument.lockedReason") { value(null) }
                 jsonPath("$.feedbackDocument.sourceText") { doesNotExist() }
                 jsonPath("$.feedbackDocument.body") { doesNotExist() }
             }
     }
 
     @Test
-    fun `archive session list exposes locked feedback document for member who did not attend`() {
+    fun `archive session list exposes readable feedback document for active member who did not attend`() {
         mockMvc
             .get("/api/archive/sessions") {
                 with(user("member1@example.com"))
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.available") { value(hasItem(true)) }
-                jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.readable") { value(hasItem(false)) }
-                jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.lockedReason") { value(hasItem("NOT_ATTENDED")) }
+                jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.readable") { value(hasItem(true)) }
                 jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.title") { value(hasItem("독서모임 6차 피드백")) }
                 jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.uploadedAt") { exists() }
             }
@@ -338,7 +337,7 @@ class ArchiveControllerDbTest(
                 jsonPath("$.myAttendanceStatus") { value("ATTENDED") }
                 jsonPath("$.feedbackDocument.available") { value(true) }
                 jsonPath("$.feedbackDocument.readable") { value(false) }
-                jsonPath("$.feedbackDocument.lockedReason") { value("NOT_ATTENDED") }
+                jsonPath("$.feedbackDocument.lockedReason") { value("ACTIVE_MEMBERSHIP_REQUIRED") }
                 jsonPath("$.feedbackDocument.sourceText") { doesNotExist() }
                 jsonPath("$.feedbackDocument.body") { doesNotExist() }
             }
@@ -350,7 +349,9 @@ class ArchiveControllerDbTest(
                 status { isOk() }
                 jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.available") { value(hasItem(true)) }
                 jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.readable") { value(hasItem(false)) }
-                jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.lockedReason") { value(hasItem("NOT_ATTENDED")) }
+                jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.lockedReason") {
+                    value(hasItem("ACTIVE_MEMBERSHIP_REQUIRED"))
+                }
             }
     }
 

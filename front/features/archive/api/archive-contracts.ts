@@ -77,7 +77,7 @@ export type MemberArchiveLongReview = {
 export type MemberArchiveFeedbackDocumentStatus = {
   available: boolean;
   readable: boolean;
-  lockedReason: "NOT_AVAILABLE" | "NOT_ATTENDED" | null;
+  lockedReason: "NOT_AVAILABLE" | "ACTIVE_MEMBERSHIP_REQUIRED" | null;
   title: string | null;
   uploadedAt: string | null;
 };

@@ -444,20 +444,20 @@ describe("MemberSessionDetailPage", () => {
     expect(desktop.queryByRole("link", { name: "PDF 저장" })).not.toBeInTheDocument();
   });
 
-  it("shows locked feedback copy for non-attendees without feedback document links", () => {
+  it("shows locked feedback copy for non-active members without feedback document links", () => {
     const { container } = renderDetail({
       ...readableSession,
       myAttendanceStatus: "ABSENT",
       feedbackDocument: {
         available: true,
         readable: false,
-        lockedReason: "NOT_ATTENDED",
+        lockedReason: "ACTIVE_MEMBERSHIP_REQUIRED",
         title: "독서모임 1차 피드백",
         uploadedAt: "2026-04-20T09:00:00Z",
       },
     });
 
-    expect(screen.getAllByText("피드백 문서는 정식 멤버 중 이 회차 참석자로 확인된 계정에만 열립니다.").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("피드백 문서는 active 정식 멤버에게만 열립니다.").length).toBeGreaterThan(0);
     expect(screen.queryByRole("link", { name: "피드백 보기" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "PDF 저장" })).not.toBeInTheDocument();
     expect(container.querySelector('a[href="/app/feedback/00000000-0000-0000-0000-000000000301"]')).toBeNull();
@@ -481,7 +481,7 @@ describe("MemberSessionDetailPage", () => {
       },
     });
 
-    expect(screen.getAllByText("호스트가 문서를 등록하면 참석 기록과 함께 열람 가능 여부가 표시됩니다.").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("호스트가 문서를 등록하면 정식 멤버 열람 가능 여부가 표시됩니다.").length).toBeGreaterThan(0);
     expect(screen.queryByRole("link", { name: "피드백 보기" })).not.toBeInTheDocument();
 
     const readonlyBadges = Array.from(container.querySelectorAll(".badge")).filter((badge) => badge.textContent === "피드백 없음");

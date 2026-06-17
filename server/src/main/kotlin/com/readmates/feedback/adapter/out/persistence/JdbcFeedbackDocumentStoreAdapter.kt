@@ -29,113 +29,54 @@ class JdbcFeedbackDocumentStoreAdapter(
     ): CursorPage<StoredFeedbackDocumentListResult> {
         val cursor = FeedbackDocumentCursor.from(pageRequest.cursor)
         val sql =
-            if (currentMember.isHost) {
-                """
-                select *
-                from (
-                  select
-                    session_feedback_documents.id as document_id,
-                    session_feedback_documents.session_id,
-                    sessions.number as session_number,
-                    sessions.book_title,
-                    sessions.session_date,
-                    session_feedback_documents.document_title,
-                    case
-                      when session_feedback_documents.document_title is null then session_feedback_documents.source_text
-                      else null
-                    end as legacy_source_text,
-                    session_feedback_documents.file_name,
-                    session_feedback_documents.created_at,
-                    row_number() over (
-                      partition by session_feedback_documents.session_id
-                      order by session_feedback_documents.version desc, session_feedback_documents.created_at desc
-                    ) as document_rank
-                  from session_feedback_documents
-                  join sessions on sessions.id = session_feedback_documents.session_id
-                    and sessions.club_id = session_feedback_documents.club_id
-                  where session_feedback_documents.club_id = ?
-                    and sessions.state in ('CLOSED', 'PUBLISHED')
-                ) ranked_documents
-                where document_rank = 1
-                  and (
-                    ? is null
-                    or session_number < ?
-                    or (session_number = ? and created_at < ?)
-                    or (session_number = ? and created_at = ? and document_id < ?)
-                  )
-                order by session_number desc, created_at desc, document_id desc
-                limit ?
-                """.trimIndent()
-            } else {
-                """
-                select *
-                from (
-                  select
-                    session_feedback_documents.id as document_id,
-                    session_feedback_documents.session_id,
-                    sessions.number as session_number,
-                    sessions.book_title,
-                    sessions.session_date,
-                    session_feedback_documents.document_title,
-                    case
-                      when session_feedback_documents.document_title is null then session_feedback_documents.source_text
-                      else null
-                    end as legacy_source_text,
-                    session_feedback_documents.file_name,
-                    session_feedback_documents.created_at,
-                    row_number() over (
-                      partition by session_feedback_documents.session_id
-                      order by session_feedback_documents.version desc, session_feedback_documents.created_at desc
-                    ) as document_rank
-                  from session_feedback_documents
-                  join sessions on sessions.id = session_feedback_documents.session_id
-                    and sessions.club_id = session_feedback_documents.club_id
-                  join session_participants on session_participants.session_id = sessions.id
-                    and session_participants.club_id = sessions.club_id
-                    and session_participants.membership_id = ?
-                  where session_feedback_documents.club_id = ?
-                    and session_participants.attendance_status = 'ATTENDED'
-                    and session_participants.participation_status = 'ACTIVE'
-                    and sessions.state in ('CLOSED', 'PUBLISHED')
-                ) ranked_documents
-                where document_rank = 1
-                  and (
-                    ? is null
-                    or session_number < ?
-                    or (session_number = ? and created_at < ?)
-                    or (session_number = ? and created_at = ? and document_id < ?)
-                  )
-                order by session_number desc, created_at desc, document_id desc
-                limit ?
-                """.trimIndent()
-            }
+            """
+            select *
+            from (
+              select
+                session_feedback_documents.id as document_id,
+                session_feedback_documents.session_id,
+                sessions.number as session_number,
+                sessions.book_title,
+                sessions.session_date,
+                session_feedback_documents.document_title,
+                case
+                  when session_feedback_documents.document_title is null then session_feedback_documents.source_text
+                  else null
+                end as legacy_source_text,
+                session_feedback_documents.file_name,
+                session_feedback_documents.created_at,
+                row_number() over (
+                  partition by session_feedback_documents.session_id
+                  order by session_feedback_documents.version desc, session_feedback_documents.created_at desc
+                ) as document_rank
+              from session_feedback_documents
+              join sessions on sessions.id = session_feedback_documents.session_id
+                and sessions.club_id = session_feedback_documents.club_id
+              where session_feedback_documents.club_id = ?
+                and sessions.state in ('CLOSED', 'PUBLISHED')
+            ) ranked_documents
+            where document_rank = 1
+              and (
+                ? is null
+                or session_number < ?
+                or (session_number = ? and created_at < ?)
+                or (session_number = ? and created_at = ? and document_id < ?)
+              )
+            order by session_number desc, created_at desc, document_id desc
+            limit ?
+            """.trimIndent()
         val args =
-            if (currentMember.isHost) {
-                arrayOf<Any?>(
-                    currentMember.clubId.dbString(),
-                    cursor?.sessionNumber,
-                    cursor?.sessionNumber,
-                    cursor?.sessionNumber,
-                    cursor?.createdAt?.toUtcLocalDateTime(),
-                    cursor?.sessionNumber,
-                    cursor?.createdAt?.toUtcLocalDateTime(),
-                    cursor?.id,
-                    pageRequest.limit + 1,
-                )
-            } else {
-                arrayOf<Any?>(
-                    currentMember.membershipId.dbString(),
-                    currentMember.clubId.dbString(),
-                    cursor?.sessionNumber,
-                    cursor?.sessionNumber,
-                    cursor?.sessionNumber,
-                    cursor?.createdAt?.toUtcLocalDateTime(),
-                    cursor?.sessionNumber,
-                    cursor?.createdAt?.toUtcLocalDateTime(),
-                    cursor?.id,
-                    pageRequest.limit + 1,
-                )
-            }
+            arrayOf<Any?>(
+                currentMember.clubId.dbString(),
+                cursor?.sessionNumber,
+                cursor?.sessionNumber,
+                cursor?.sessionNumber,
+                cursor?.createdAt?.toUtcLocalDateTime(),
+                cursor?.sessionNumber,
+                cursor?.createdAt?.toUtcLocalDateTime(),
+                cursor?.id,
+                pageRequest.limit + 1,
+            )
 
         val rows =
             jdbcTemplate.query(sql, { resultSet, _ ->
@@ -161,26 +102,6 @@ class JdbcFeedbackDocumentStoreAdapter(
                 sessionId.dbString(),
                 clubId.dbString(),
             ).firstOrNull()
-
-    override fun hasActiveAttendedSession(
-        currentMember: CurrentMember,
-        sessionId: UUID,
-    ): Boolean =
-        jdbcTemplate.queryForObject(
-            """
-            select count(*)
-            from session_participants
-            where club_id = ?
-              and session_id = ?
-              and membership_id = ?
-              and attendance_status = 'ATTENDED'
-              and participation_status = 'ACTIVE'
-            """.trimIndent(),
-            Int::class.java,
-            currentMember.clubId.dbString(),
-            sessionId.dbString(),
-            currentMember.membershipId.dbString(),
-        ) == 1
 
     override fun findLatestDocument(
         clubId: UUID,

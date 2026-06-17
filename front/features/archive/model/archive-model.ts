@@ -17,7 +17,7 @@ export type NotificationPreferences = {
 export type ArchiveFeedbackDocumentStatus = {
   available: boolean;
   readable: boolean;
-  lockedReason: "NOT_AVAILABLE" | "NOT_ATTENDED" | null;
+  lockedReason: "NOT_AVAILABLE" | "ACTIVE_MEMBERSHIP_REQUIRED" | null;
   title: string | null;
   uploadedAt: string | null;
 };
@@ -390,7 +390,7 @@ export function selectedArchiveSectionMeta(view: ArchiveView) {
     return {
       title: "피드백 문서",
       contextLabel: "모임 뒤의 정리",
-      body: "참석한 회차의 운영 피드백 문서를 보존 문서로 열람합니다.",
+      body: "클럽의 운영 피드백 문서를 보존 문서로 열람합니다.",
     };
   }
 
@@ -431,14 +431,14 @@ export function feedbackStatusText(feedbackDocument: ArchiveFeedbackDocumentStat
 
 export function feedbackAccessCopy(feedback: ArchiveFeedbackDocumentStatus) {
   if (!feedback.available) {
-    return "호스트가 문서를 등록하면 참석 기록과 함께 열람 가능 여부가 표시됩니다.";
+    return "호스트가 문서를 등록하면 정식 멤버 열람 가능 여부가 표시됩니다.";
   }
 
   if (!feedback.readable) {
-    return "피드백 문서는 정식 멤버 중 이 회차 참석자로 확인된 계정에만 열립니다.";
+    return "피드백 문서는 active 정식 멤버에게만 열립니다.";
   }
 
-  return "이 회차 참석 기록이 확인되어 문서를 열람할 수 있습니다.";
+  return "정식 멤버 권한이 확인되어 문서를 열람할 수 있습니다.";
 }
 
 export function feedbackBadgeClass(feedbackDocument: ArchiveFeedbackDocumentStatus) {

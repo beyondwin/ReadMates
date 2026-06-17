@@ -67,10 +67,6 @@ class FeedbackDocumentService(
         requireReadableFeedbackMember(currentMember)
         val session = feedbackDocumentStorePort.findReadableSession(currentMember.clubId, sessionId) ?: return null
 
-        if (!currentMember.isHost && !feedbackDocumentStorePort.hasActiveAttendedSession(currentMember, sessionId)) {
-            throw AccessDeniedException("Feedback document access denied")
-        }
-
         val document = feedbackDocumentStorePort.findLatestDocument(currentMember.clubId, sessionId) ?: return null
         val parsedDocument = parseStoredDetailDocument(currentMember, document.sourceText)
         return document.toResponse(session, parsedDocument)

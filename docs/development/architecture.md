@@ -263,7 +263,7 @@ ReadMates의 사용자 상태는 club membership의 status와 role을 함께 봅
 | 상태/역할 | 의미 |
 | --- | --- |
 | `VIEWER` | Google 로그인은 했지만 정식 초대를 수락하지 않은 둘러보기 멤버입니다. 읽기 가능한 일부 멤버 화면과 멤버 공개 예정 세션은 볼 수 있지만 현재 세션 쓰기, 피드백 문서 열람, 호스트 도구는 제한됩니다. |
-| `ACTIVE` + `MEMBER` | 정식 멤버입니다. 현재 세션 참여, 멤버 공개 예정 세션 확인, RSVP, 체크인, 질문, 한줄평, 장문 서평, 본인이 참석한 회차의 피드백 문서 열람이 가능합니다. |
+| `ACTIVE` + `MEMBER` | 정식 멤버입니다. 현재 세션 참여, 멤버 공개 예정 세션 확인, RSVP, 체크인, 질문, 한줄평, 장문 서평, 클럽 피드백 문서 열람이 가능합니다. |
 | `ACTIVE` + `HOST` | 호스트입니다. 정식 멤버 권한에 운영 권한이 추가됩니다. |
 | `SUSPENDED` | 제한된 멤버 상태입니다. route guard와 API authorization에서 쓰기/운영 권한을 제한합니다. |
 | `LEFT`, `INACTIVE` | 떠났거나 비활성화된 계정 상태입니다. 멤버 앱과 쓰기 기능에서 제외됩니다. |
@@ -271,7 +271,7 @@ ReadMates의 사용자 상태는 club membership의 status와 role을 함께 봅
 
 같은 사용자라도 클럽마다 다른 role과 status를 가질 수 있습니다. 예를 들어 한 사용자는 `reading-sai`에서는 `HOST`, `sample-book-club`에서는 `MEMBER`일 수 있고, platform admin이라도 특정 클럽에서 호스트 API를 쓰려면 해당 클럽 membership 권한을 별도로 통과해야 합니다.
 
-현재 세션 참여 여부는 `session_participants`와 `SessionParticipationStatus`로 관리합니다. 호스트는 같은 클럽의 정식 멤버를 현재 세션에 추가하거나 제거할 수 있고, 참석 확정 후 피드백 문서 열람 경계에 영향을 줍니다.
+현재 세션 참여 여부는 `session_participants`와 `SessionParticipationStatus`로 관리합니다. 호스트는 같은 클럽의 정식 멤버를 현재 세션에 추가하거나 제거할 수 있고, 참석 확정 후 공개 기록과 멤버 활동 통계에 반영됩니다.
 
 ## 세션 lifecycle과 공개 범위
 
@@ -359,7 +359,7 @@ MySQL session_feedback_documents
   |
   | GET /api/sessions/{sessionId}/feedback-document
   v
-Readable response for host or attended full member
+Readable response for active full member or host
 ```
 
 호스트는 더 이상 피드백 문서만 별도로 업로드하지 않습니다. 새 피드백 문서는 AI 생성 또는 `readmates-session-import:v1` JSON import commit이 세션 기록 패키지를 저장할 때 함께 교체됩니다.
@@ -369,7 +369,7 @@ Readable response for host or attended full member
 열람 경계는 다음과 같습니다.
 
 - 호스트는 같은 club의 세션 피드백 문서 상태와 본문을 관리할 수 있습니다.
-- 정식 멤버는 본인이 `ATTENDED` 상태인 회차의 피드백 문서만 읽을 수 있습니다.
+- active 정식 멤버는 같은 club의 피드백 문서를 읽을 수 있습니다.
 - 둘러보기 멤버는 피드백 문서를 읽을 수 없습니다.
 - 문서가 없거나 권한이 없으면 UI는 locked 또는 unavailable state를 보여야 합니다.
 

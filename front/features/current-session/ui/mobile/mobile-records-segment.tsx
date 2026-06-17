@@ -68,7 +68,7 @@ export function MobileRecordsSegment({
         <div className={canWrite ? "m-card-quiet" : "m-card-quiet rm-locked-state"} role="note">
           <div className="eyebrow">피드백 문서 접근</div>
           <p className="small" style={{ color: "var(--text-2)", margin: "6px 0 0" }}>
-            {canWrite ? "세션 후 호스트가 피드백 문서를 업로드하면 참석자에게 열립니다." : feedbackAccess.body}
+            {canWrite ? "세션 후 호스트가 피드백 문서를 업로드하면 active 정식 멤버에게 열립니다." : feedbackAccess.body}
           </p>
         </div>
       </section>
@@ -113,7 +113,7 @@ export function MobileViewerRecordsSegment({ longReview, oneLineReview }: { long
         <div className="m-card-quiet rm-locked-state" role="note">
           <div className="eyebrow">피드백 문서 접근</div>
           <p className="small" style={{ color: "var(--text-2)", margin: "6px 0 0" }}>
-            피드백 문서는 참석한 정식 멤버에게 열립니다. 둘러보기 상태에서는 문서 등록 여부와 접근 제한만 확인할 수 있어요.
+            피드백 문서는 active 정식 멤버에게 열립니다. 둘러보기 상태에서는 문서 등록 여부와 접근 제한만 확인할 수 있어요.
           </p>
         </div>
       </section>

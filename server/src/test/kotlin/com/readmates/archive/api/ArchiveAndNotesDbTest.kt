@@ -152,7 +152,9 @@ class ArchiveAndNotesDbTest(
                 jsonPath("$.items[*].sessionNumber") { value(not(hasItem(999))) }
                 jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.available") { value(hasItem(true)) }
                 jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.readable") { value(hasItem(false)) }
-                jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.lockedReason") { value(hasItem("NOT_ATTENDED")) }
+                jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.lockedReason") {
+                    value(hasItem("ACTIVE_MEMBERSHIP_REQUIRED"))
+                }
             }
 
         mockMvc

@@ -143,5 +143,5 @@ test("uninvited google login becomes read-only viewer who can browse sessions", 
   expect(feedbackDocumentStatus).toBe(403);
 
   await page.goto(`/app/feedback/${seededFeedbackSessionId}`);
-  await expect(page.getByRole("heading", { name: "피드백 문서는 정식 멤버와 참석자에게만 열립니다." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "피드백 문서는 active 정식 멤버에게만 열립니다." })).toBeVisible();
 });

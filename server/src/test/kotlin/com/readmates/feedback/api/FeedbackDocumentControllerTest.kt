@@ -130,13 +130,13 @@ class FeedbackDocumentControllerTest(
     }
 
     @Test
-    fun `non attending member does not see session feedback document in list`() {
+    fun `active non attending member sees session feedback document in list`() {
         mockMvc
             .get("/api/feedback-documents/me") {
                 with(user("member2@example.com"))
             }.andExpect {
                 status { isOk() }
-                jsonPath("$.items[*].sessionNumber") { value(not(hasItem(1))) }
+                jsonPath("$.items[?(@.sessionNumber == 1)].sessionNumber") { value(hasItem(1)) }
             }
     }
 
@@ -230,20 +230,21 @@ class FeedbackDocumentControllerTest(
         ],
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
-    fun `removed attended member cannot list or read feedback document`() {
+    fun `active removed session participant can list and read feedback document`() {
         mockMvc
             .get("/api/feedback-documents/me") {
                 with(user("member5@example.com"))
             }.andExpect {
                 status { isOk() }
-                jsonPath("$.items[*].sessionNumber") { value(not(hasItem(1))) }
+                jsonPath("$.items[?(@.sessionNumber == 1)].sessionNumber") { value(hasItem(1)) }
             }
 
         mockMvc
             .get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
                 with(user("member5@example.com"))
             }.andExpect {
-                status { isForbidden() }
+                status { isOk() }
+                jsonPath("$.sessionNumber") { value(1) }
             }
     }
 
@@ -324,12 +325,13 @@ class FeedbackDocumentControllerTest(
     }
 
     @Test
-    fun `non attending member cannot read session feedback document`() {
+    fun `active non attending member can read session feedback document`() {
         mockMvc
             .get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
                 with(user("member2@example.com"))
             }.andExpect {
-                status { isForbidden() }
+                status { isOk() }
+                jsonPath("$.title") { value("독서모임 1차 피드백") }
             }
     }
 

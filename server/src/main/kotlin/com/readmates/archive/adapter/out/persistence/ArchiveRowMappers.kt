@@ -14,11 +14,10 @@ import java.time.LocalDate
 
 internal fun ResultSet.toArchiveSessionItem(currentMember: CurrentMember): ArchiveSessionResult {
     val sessionNumber = getInt("number")
-    val myAttendanceStatus = getString("my_attendance_status")
     val feedbackDocumentUploadedAt = utcOffsetDateTimeOrNull("feedback_document_uploaded_at")?.toString()
     val feedbackDocumentReadable =
         feedbackDocumentUploadedAt != null &&
-            canReadArchiveFeedbackDocument(currentMember, myAttendanceStatus)
+            canReadArchiveFeedbackDocument(currentMember)
 
     return ArchiveSessionResult(
         sessionId = uuid("id").toString(),
@@ -40,7 +39,7 @@ internal fun ResultSet.toArchiveSessionItem(currentMember: CurrentMember): Archi
                     when {
                         feedbackDocumentUploadedAt == null -> "NOT_AVAILABLE"
                         feedbackDocumentReadable -> null
-                        else -> "NOT_ATTENDED"
+                        else -> "ACTIVE_MEMBERSHIP_REQUIRED"
                     },
                 title = if (feedbackDocumentUploadedAt == null) null else "독서모임 ${sessionNumber}차 피드백",
                 uploadedAt = feedbackDocumentUploadedAt,
@@ -79,7 +78,4 @@ internal fun ResultSet.toMyRecentAttendanceResult() =
         readingProgress = getInt("reading_progress"),
     )
 
-internal fun canReadArchiveFeedbackDocument(
-    currentMember: CurrentMember,
-    myAttendanceStatus: String?,
-): Boolean = currentMember.isHost || (currentMember.isActive && myAttendanceStatus == "ATTENDED")
+internal fun canReadArchiveFeedbackDocument(currentMember: CurrentMember): Boolean = currentMember.isActive

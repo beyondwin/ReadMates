@@ -345,7 +345,7 @@ describe("ArchivePage", () => {
       feedbackDocument: {
         available: true,
         readable: false,
-        lockedReason: "NOT_ATTENDED",
+        lockedReason: "ACTIVE_MEMBERSHIP_REQUIRED",
         title: "독서모임 6차 피드백",
         uploadedAt: "2026-04-20T09:00:00Z",
       },
