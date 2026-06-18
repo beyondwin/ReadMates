@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getMemberHomeNextReadingAction,
+  getMemberHomeRecentRecordEntry,
   type MemberHomeCurrentSessionView,
   type MemberHomeNoteFeedItemView,
 } from "./member-home-view-model";
@@ -257,5 +258,22 @@ describe("member-home view model", () => {
     });
     expect(action.state).not.toBe("REFLECTION_DUE");
     expect(action.label).not.toBe("회고 필요");
+  });
+
+  it("derives the latest preserved record entry from note feed items", () => {
+    expect(getMemberHomeRecentRecordEntry(noteFeedItems)).toEqual({
+      sessionId: "session-6",
+      sessionNumber: 6,
+      bookTitle: "지난 책",
+      date: "2026-04-15",
+      kindLabels: ["한줄평"],
+      href: "/app/sessions/session-6",
+      feedbackHref: "/app/feedback/session-6",
+      summary: "지난 책의 보존된 기록을 이어 읽을 수 있어요.",
+    });
+  });
+
+  it("returns null when there is no preserved record entry", () => {
+    expect(getMemberHomeRecentRecordEntry([])).toBeNull();
   });
 });

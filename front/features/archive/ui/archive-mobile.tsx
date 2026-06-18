@@ -9,8 +9,7 @@ import type {
 import {
   archiveSummary,
   feedbackArchiveBadgeClass,
-  feedbackArchiveDescription,
-  feedbackArchiveLabel,
+  feedbackDocumentCopy,
   feedbackReportActionLabel,
   mobileArchiveTabs,
   publicationLabel,
@@ -198,45 +197,49 @@ function ArchiveMobileSessions({ sessions }: { sessions: ArchiveSessionRecord[] 
   return (
     <section className="m-sec">
       <div className="stack" style={{ "--stack": "10px" } as CSSProperties}>
-        {sessions.map((session) => (
-          <Link
-            key={session.id}
-            to={appSessionHref(session.id)}
-            state={archiveReturnState("sessions")}
-            className="rm-archive-session-card m-card"
-            style={{ display: "grid", gridTemplateColumns: "52px minmax(0, 1fr) 20px", gap: 10, alignItems: "center", width: "100%" }}
-            aria-label={`No.${session.number} ${session.book} 열기`}
-          >
-            <BookCover title={session.book} author={session.author} imageUrl={session.bookImageUrl} width={52} />
-            <div style={{ minWidth: 0 }}>
-              <div className="tiny mono" style={{ color: "var(--text-3)" }}>
-                No.{String(session.number).padStart(2, "0")} · {formatDateOnlyLabel(session.date)}
+        {sessions.map((session) => {
+          const feedbackCopy = feedbackDocumentCopy(session.feedbackDocument);
+
+          return (
+            <Link
+              key={session.id}
+              to={appSessionHref(session.id)}
+              state={archiveReturnState("sessions")}
+              className="rm-archive-session-card m-card"
+              style={{ display: "grid", gridTemplateColumns: "52px minmax(0, 1fr) 20px", gap: 10, alignItems: "center", width: "100%" }}
+              aria-label={`No.${session.number} ${session.book} 열기`}
+            >
+              <BookCover title={session.book} author={session.author} imageUrl={session.bookImageUrl} width={52} />
+              <div style={{ minWidth: 0 }}>
+                <div className="tiny mono" style={{ color: "var(--text-3)" }}>
+                  No.{String(session.number).padStart(2, "0")} · {formatDateOnlyLabel(session.date)}
+                </div>
+                <div className="editorial" style={{ fontSize: 16, margin: "6px 0 2px", lineHeight: 1.3 }}>
+                  {session.book}
+                </div>
+                <div className="tiny" style={{ color: "var(--text-3)" }}>
+                  {session.author}
+                </div>
+                <div className="m-row rm-archive-session-card__meta" style={{ marginTop: 10 }}>
+                  <span className="badge">
+                    {session.attendance}/{session.total} 참석
+                  </span>
+                  <span className={session.published ? "badge badge-ok badge-dot" : "badge badge-readonly badge-dot"}>
+                    {publicationLabel(session.published, "mobile")}
+                  </span>
+                  <span
+                    className={feedbackArchiveBadgeClass(session.feedbackDocument)}
+                    title={feedbackCopy.ariaLabel}
+                    aria-label={feedbackCopy.ariaLabel}
+                  >
+                    {feedbackCopy.badge}
+                  </span>
+                </div>
               </div>
-              <div className="editorial" style={{ fontSize: 16, margin: "6px 0 2px", lineHeight: 1.3 }}>
-                {session.book}
-              </div>
-              <div className="tiny" style={{ color: "var(--text-3)" }}>
-                {session.author}
-              </div>
-              <div className="m-row rm-archive-session-card__meta" style={{ marginTop: 10 }}>
-                <span className="badge">
-                  {session.attendance}/{session.total} 참석
-                </span>
-                <span className={session.published ? "badge badge-ok badge-dot" : "badge badge-readonly badge-dot"}>
-                  {publicationLabel(session.published, "mobile")}
-                </span>
-                <span
-                  className={feedbackArchiveBadgeClass(session.feedbackDocument)}
-                  title={feedbackArchiveDescription(session.feedbackDocument)}
-                  aria-label={feedbackArchiveDescription(session.feedbackDocument)}
-                >
-                  {feedbackArchiveLabel(session.feedbackDocument)}
-                </span>
-              </div>
-            </div>
-            <SessionAction />
-          </Link>
-        ))}
+              <SessionAction />
+            </Link>
+          );
+        })}
       </div>
     </section>
   );

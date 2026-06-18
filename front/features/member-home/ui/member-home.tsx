@@ -10,11 +10,14 @@ import { Link, PlainMemberHomeLink, type MemberHomeLinkComponent } from "@/featu
 import {
   ClubPulse,
   MobileMemberActivity,
+  MobileRecentRecordEntry,
+  RecentRecordEntry,
   RosterSummary,
 } from "@/features/member-home/ui/member-home-records";
 import { PrepCard } from "@/features/member-home/ui/prep-card";
 import {
   getMemberHomeNextReadingAction,
+  getMemberHomeRecentRecordEntry,
   type MemberHomeAuth as AuthMeResponse,
   type MemberHomeCurrentSessionView as CurrentSessionResponse,
   type MemberHomeNoteFeedItemView as NoteFeedItem,
@@ -51,6 +54,7 @@ export default function MemberHome({
   const memberName = auth.displayName ?? "멤버";
   const isViewer = auth.membershipStatus === "VIEWER";
   const canWrite = canWriteMemberActivity(auth);
+  const recentRecordEntry = getMemberHomeRecentRecordEntry(noteFeedItems);
 
   return (
     <main>
@@ -102,6 +106,7 @@ export default function MemberHome({
           <div className="container">
             <div className="home-grid">
               <div className="stack" style={{ "--stack": "40px" } as CSSProperties}>
+                <RecentRecordEntry entry={recentRecordEntry} LinkComponent={LinkComponent} />
                 <ClubPulse items={noteFeedItems.slice(0, 3)} LinkComponent={LinkComponent} />
               </div>
               <div className="stack" style={{ "--stack": "24px" } as CSSProperties}>
@@ -204,6 +209,7 @@ function MobileMemberHome({
     canWrite,
     noteFeedItems,
   });
+  const recentRecordEntry = getMemberHomeRecentRecordEntry(noteFeedItems);
 
   return (
     <div className="mobile-only rm-member-home-mobile m-body">
@@ -241,6 +247,7 @@ function MobileMemberHome({
         LinkComponent={LinkComponent}
       />
       <MobileUpcomingSessions upcomingSessions={upcomingSessions} />
+      <MobileRecentRecordEntry entry={recentRecordEntry} LinkComponent={LinkComponent} />
       <MobileMemberActivity items={noteFeedItems.slice(0, 4)} LinkComponent={LinkComponent} />
       <MobileQuickLinks LinkComponent={LinkComponent} />
     </div>

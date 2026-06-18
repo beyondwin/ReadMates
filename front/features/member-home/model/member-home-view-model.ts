@@ -63,6 +63,46 @@ export type MemberHomeNextReadingActionInput = {
   today?: Date;
 };
 
+export type MemberHomeRecentRecordEntry = {
+  sessionId: string;
+  sessionNumber: number;
+  bookTitle: string;
+  date: string;
+  kindLabels: string[];
+  href: string;
+  feedbackHref: string;
+  summary: string;
+};
+
+const NOTE_KIND_LABELS: Record<MemberHomeNoteFeedItemView["kind"], string> = {
+  QUESTION: "질문",
+  ONE_LINE_REVIEW: "한줄평",
+  HIGHLIGHT: "하이라이트",
+};
+
+export function getMemberHomeRecentRecordEntry(
+  noteFeedItems: MemberHomeNoteFeedItemView[],
+): MemberHomeRecentRecordEntry | null {
+  const first = noteFeedItems[0];
+  if (!first) {
+    return null;
+  }
+
+  const sameSessionItems = noteFeedItems.filter((item) => item.sessionId === first.sessionId);
+  const kindLabels = Array.from(new Set(sameSessionItems.map((item) => NOTE_KIND_LABELS[item.kind])));
+
+  return {
+    sessionId: first.sessionId,
+    sessionNumber: first.sessionNumber,
+    bookTitle: first.bookTitle,
+    date: first.date,
+    kindLabels,
+    href: `/app/sessions/${encodeURIComponent(first.sessionId)}`,
+    feedbackHref: `/app/feedback/${encodeURIComponent(first.sessionId)}`,
+    summary: `${first.bookTitle}의 보존된 기록을 이어 읽을 수 있어요.`,
+  };
+}
+
 export function memberHomeViewFromRouteData(view: MemberHomeView): MemberHomeView {
   return view;
 }

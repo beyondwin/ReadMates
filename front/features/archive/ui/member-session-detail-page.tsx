@@ -6,10 +6,8 @@ import type {
 } from "@/features/archive/model/archive-model";
 import {
   attendanceText,
-  feedbackAccessCopy,
   feedbackArchiveBadgeClass,
-  feedbackArchiveDescription,
-  feedbackArchiveLabel,
+  feedbackDocumentCopy,
   feedbackDocumentCardClassName,
   feedbackRailCardClassName,
   feedbackStatusText,
@@ -363,13 +361,15 @@ function SummaryBlock({ summary }: { summary: string | null }) {
 }
 
 function FeedbackMetaBadge({ feedbackDocument }: { feedbackDocument: MemberArchiveSessionDetailResponse["feedbackDocument"] }) {
+  const feedbackCopy = feedbackDocumentCopy(feedbackDocument);
+
   return (
     <span
       className={feedbackArchiveBadgeClass(feedbackDocument)}
-      title={feedbackArchiveDescription(feedbackDocument)}
-      aria-label={feedbackArchiveDescription(feedbackDocument)}
+      title={feedbackCopy.ariaLabel}
+      aria-label={feedbackCopy.ariaLabel}
     >
-      {feedbackArchiveLabel(feedbackDocument)}
+      {feedbackCopy.badge}
     </span>
   );
 }
@@ -707,6 +707,7 @@ function FeedbackStatusCard({
   mobile?: boolean;
 }) {
   const feedback = session.feedbackDocument;
+  const feedbackCopy = feedbackDocumentCopy(feedback);
   const className = mobile ? feedbackDocumentCardClassName({ feedback, compact: true, mobile }) : feedbackRailCardClassName(feedback);
   const style = mobile ? undefined : { padding: 18 };
   const feedbackReturnTarget: ReadmatesReturnTarget = {
@@ -730,9 +731,9 @@ function FeedbackStatusCard({
         </div>
       ) : null}
       <p className="tiny" style={{ margin: "10px 0 0", color: "var(--text-3)" }}>
-        {feedbackAccessCopy(feedback)}
+        {feedbackCopy.helper}
       </p>
-      {feedback.available && feedback.readable ? (
+      {feedback.readable ? (
         <Link
           to={appFeedbackHref(session.sessionId)}
           state={feedbackReturnState}

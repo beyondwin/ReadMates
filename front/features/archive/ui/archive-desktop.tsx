@@ -9,8 +9,7 @@ import type {
 import {
   archiveTabs,
   feedbackArchiveBadgeClass,
-  feedbackArchiveDescription,
-  feedbackArchiveLabel,
+  feedbackDocumentCopy,
   feedbackReportActionLabel,
   formatSessionMonthDayLabel,
   groupArchiveSessionsByYear,
@@ -222,60 +221,64 @@ function ArchiveSessions({ sessions }: { sessions: ArchiveSessionRecord[] }) {
             </span>
           </div>
           <div className="stack" style={{ "--stack": "0px" } as CSSProperties}>
-            {group.list.map((session) => (
-              <Link
-                key={session.id}
-                className="rm-record-row"
-                to={appSessionHref(session.id)}
-                state={archiveReturnState("sessions")}
-                aria-label={`No.${session.number} ${session.book} 열기`}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "64px minmax(0, 1fr) minmax(190px, auto) auto",
-                  gap: "28px",
-                  padding: "28px 0",
-                  alignItems: "center",
-                  color: "inherit",
-                  textDecoration: "none",
-                }}
-              >
-                <div aria-label={`${reportNumberLabel(session.number)} · ${formatSessionMonthDayLabel(session.date)}`}>
-                  <div className="tiny mono" style={{ color: "var(--text-3)" }}>
-                    {reportNumberLabel(session.number)}
-                  </div>
-                  <div className="tiny mono" style={{ color: "var(--text-4)", marginTop: "6px" }}>
-                    {formatSessionMonthDayLabel(session.date)}
-                  </div>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "46px minmax(0, 1fr)", gap: "14px", alignItems: "center" }}>
-                  <BookCover title={session.book} author={session.author} imageUrl={session.bookImageUrl} width={46} />
-                  <div style={{ minWidth: 0 }}>
-                    <h3 className="editorial" style={{ fontSize: "19px", margin: 0 }}>
-                      {session.book}
-                    </h3>
-                    <div className="small" style={{ marginTop: "4px" }}>
-                      {session.author}
+            {group.list.map((session) => {
+              const feedbackCopy = feedbackDocumentCopy(session.feedbackDocument);
+
+              return (
+                <Link
+                  key={session.id}
+                  className="rm-record-row"
+                  to={appSessionHref(session.id)}
+                  state={archiveReturnState("sessions")}
+                  aria-label={`No.${session.number} ${session.book} 열기`}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "64px minmax(0, 1fr) minmax(190px, auto) auto",
+                    gap: "28px",
+                    padding: "28px 0",
+                    alignItems: "center",
+                    color: "inherit",
+                    textDecoration: "none",
+                  }}
+                >
+                  <div aria-label={`${reportNumberLabel(session.number)} · ${formatSessionMonthDayLabel(session.date)}`}>
+                    <div className="tiny mono" style={{ color: "var(--text-3)" }}>
+                      {reportNumberLabel(session.number)}
+                    </div>
+                    <div className="tiny mono" style={{ color: "var(--text-4)", marginTop: "6px" }}>
+                      {formatSessionMonthDayLabel(session.date)}
                     </div>
                   </div>
-                </div>
-                <div className="row" style={{ gap: "10px", flexWrap: "wrap" }}>
-                  <span className="badge">
-                    참석 {session.attendance}/{session.total}
-                  </span>
-                  <span className={session.published ? "badge badge-ok badge-dot" : "badge badge-readonly badge-dot"}>
-                    {publicationLabel(session.published)}
-                  </span>
-                  <span
-                    className={feedbackArchiveBadgeClass(session.feedbackDocument)}
-                    title={feedbackArchiveDescription(session.feedbackDocument)}
-                    aria-label={feedbackArchiveDescription(session.feedbackDocument)}
-                  >
-                    {feedbackArchiveLabel(session.feedbackDocument)}
-                  </span>
-                </div>
-                <SessionAction />
-              </Link>
-            ))}
+                  <div style={{ display: "grid", gridTemplateColumns: "46px minmax(0, 1fr)", gap: "14px", alignItems: "center" }}>
+                    <BookCover title={session.book} author={session.author} imageUrl={session.bookImageUrl} width={46} />
+                    <div style={{ minWidth: 0 }}>
+                      <h3 className="editorial" style={{ fontSize: "19px", margin: 0 }}>
+                        {session.book}
+                      </h3>
+                      <div className="small" style={{ marginTop: "4px" }}>
+                        {session.author}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="row" style={{ gap: "10px", flexWrap: "wrap" }}>
+                    <span className="badge">
+                      참석 {session.attendance}/{session.total}
+                    </span>
+                    <span className={session.published ? "badge badge-ok badge-dot" : "badge badge-readonly badge-dot"}>
+                      {publicationLabel(session.published)}
+                    </span>
+                    <span
+                      className={feedbackArchiveBadgeClass(session.feedbackDocument)}
+                      title={feedbackCopy.ariaLabel}
+                      aria-label={feedbackCopy.ariaLabel}
+                    >
+                      {feedbackCopy.badge}
+                    </span>
+                  </div>
+                  <SessionAction />
+                </Link>
+              );
+            })}
           </div>
         </section>
       ))}

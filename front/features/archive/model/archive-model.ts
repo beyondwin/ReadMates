@@ -234,6 +234,36 @@ export function feedbackDocumentStatusFromList(
   };
 }
 
+export type ArchiveFeedbackDocumentCopy = {
+  badge: "피드백 O" | "피드백 잠김" | "피드백 없음";
+  ariaLabel: string;
+  helper: string;
+};
+
+export function feedbackDocumentCopy(status: ArchiveFeedbackDocumentStatus): ArchiveFeedbackDocumentCopy {
+  if (status.readable) {
+    return {
+      badge: "피드백 O",
+      ariaLabel: "열람 가능한 피드백 문서가 있습니다.",
+      helper: status.title ? `${status.title}을 열람할 수 있습니다.` : "피드백 문서를 열람할 수 있습니다.",
+    };
+  }
+
+  if (status.available && status.lockedReason === "ACTIVE_MEMBERSHIP_REQUIRED") {
+    return {
+      badge: "피드백 잠김",
+      ariaLabel: "등록된 피드백 문서가 있지만 이 계정에는 열람 권한이 없습니다.",
+      helper: "피드백 문서는 active 정식 멤버에게만 열립니다.",
+    };
+  }
+
+  return {
+    badge: "피드백 없음",
+    ariaLabel: "아직 열람 가능한 피드백 문서가 없습니다.",
+    helper: "호스트가 피드백 문서를 등록하면 이 회차에서 확인할 수 있습니다.",
+  };
+}
+
 export function toArchiveSessionRecord(
   session: ArchiveSessionItemLike,
   fallbackReadableReportAvailable: boolean,
@@ -334,27 +364,11 @@ export function publicationLabel(published: boolean, variant: "desktop" | "mobil
 }
 
 export function feedbackArchiveLabel(feedbackDocument: ArchiveFeedbackDocumentStatus) {
-  if (!feedbackDocument.available) {
-    return "피드백 X";
-  }
-
-  if (!feedbackDocument.readable) {
-    return "피드백 잠김";
-  }
-
-  return "피드백 O";
+  return feedbackDocumentCopy(feedbackDocument).badge;
 }
 
 export function feedbackArchiveDescription(feedbackDocument: ArchiveFeedbackDocumentStatus) {
-  if (!feedbackDocument.available) {
-    return "등록된 피드백 문서가 없습니다.";
-  }
-
-  if (!feedbackDocument.readable) {
-    return "등록된 피드백 문서가 있지만 이 계정에는 열람 권한이 없습니다.";
-  }
-
-  return "피드백 문서를 열람할 수 있습니다.";
+  return feedbackDocumentCopy(feedbackDocument).ariaLabel;
 }
 
 export function feedbackArchiveBadgeClass(feedbackDocument: ArchiveFeedbackDocumentStatus) {
@@ -418,27 +432,15 @@ export function attendanceText(status: AttendanceStatus | null) {
 }
 
 export function feedbackStatusText(feedbackDocument: ArchiveFeedbackDocumentStatus) {
-  if (!feedbackDocument.available) {
-    return "피드백 없음";
+  if (feedbackDocument.readable) {
+    return "피드백 공개";
   }
 
-  if (!feedbackDocument.readable) {
-    return "피드백 잠김";
-  }
-
-  return "피드백 공개";
+  return feedbackDocumentCopy(feedbackDocument).badge;
 }
 
 export function feedbackAccessCopy(feedback: ArchiveFeedbackDocumentStatus) {
-  if (!feedback.available) {
-    return "호스트가 문서를 등록하면 정식 멤버 열람 가능 여부가 표시됩니다.";
-  }
-
-  if (!feedback.readable) {
-    return "피드백 문서는 active 정식 멤버에게만 열립니다.";
-  }
-
-  return "정식 멤버 권한이 확인되어 문서를 열람할 수 있습니다.";
+  return feedbackDocumentCopy(feedback).helper;
 }
 
 export function feedbackBadgeClass(feedbackDocument: ArchiveFeedbackDocumentStatus) {

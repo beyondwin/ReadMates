@@ -481,12 +481,12 @@ describe("MemberSessionDetailPage", () => {
       },
     });
 
-    expect(screen.getAllByText("호스트가 문서를 등록하면 정식 멤버 열람 가능 여부가 표시됩니다.").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("호스트가 피드백 문서를 등록하면 이 회차에서 확인할 수 있습니다.").length).toBeGreaterThan(0);
     expect(screen.queryByRole("link", { name: "피드백 보기" })).not.toBeInTheDocument();
 
     const readonlyBadges = Array.from(container.querySelectorAll(".badge")).filter((badge) => badge.textContent === "피드백 없음");
-    expect(readonlyBadges).toHaveLength(0);
-    expect(screen.getAllByText("피드백 X").length).toBeGreaterThanOrEqual(2);
+    expect(readonlyBadges.length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText("피드백 X")).not.toBeInTheDocument();
     expect(container.querySelectorAll(".rm-empty-state.rm-state--readonly")).toHaveLength(1);
     expect(container.querySelector(".surface-quiet.rm-state--readonly")).toHaveTextContent("피드백 없음");
   });

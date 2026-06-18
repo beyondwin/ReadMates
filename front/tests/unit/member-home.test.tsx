@@ -275,6 +275,37 @@ describe("MemberHome", () => {
     }
   });
 
+  it("shows a recent preserved record entry on desktop and mobile", () => {
+    const { container } = render(
+      <MemberHome
+        auth={auth}
+        current={{ currentSession: null }}
+        noteFeedItems={[
+          {
+            sessionId: "session-6",
+            sessionNumber: 6,
+            bookTitle: "지난 책",
+            date: "2026-04-15",
+            authorName: "E2E 멤버",
+            authorShortName: "멤",
+            kind: "ONE_LINE_REVIEW",
+            text: "지난 세션 기록입니다.",
+          },
+        ]}
+        upcomingSessions={[]}
+      />,
+    );
+
+    const desktop = within(container.querySelector(".rm-member-home-desktop") as HTMLElement);
+    const mobile = within(container.querySelector(".rm-member-home-mobile") as HTMLElement);
+
+    expect(desktop.getByRole("region", { name: "최근 발행 기록" })).toBeInTheDocument();
+    expect(desktop.getByRole("link", { name: "기록 보기" })).toHaveAttribute("href", "/app/sessions/session-6");
+    expect(desktop.getByRole("link", { name: "피드백 보기" })).toHaveAttribute("href", "/app/feedback/session-6");
+    expect(mobile.getByRole("region", { name: "최근 발행 기록" })).toBeInTheDocument();
+    expect(screen.queryByText("PRIVATE_MEMBER_EMAIL")).not.toBeInTheDocument();
+  });
+
   it("uses role-safe reading loop copy for the desktop next action", () => {
     const { container } = render(
       <MemberHome

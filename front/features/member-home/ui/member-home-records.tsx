@@ -3,6 +3,7 @@ import { Link, PlainMemberHomeLink, type MemberHomeLinkComponent } from "@/featu
 import type {
   MemberHomeCurrentSessionView as CurrentSessionResponse,
   MemberHomeNoteFeedItemView as NoteFeedItem,
+  MemberHomeRecentRecordEntry,
 } from "@/features/member-home/model/member-home-view-model";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { rsvpLabel } from "@/shared/ui/readmates-display";
@@ -101,6 +102,79 @@ export function ClubPulse({
             </article>
           );
         })}
+      </div>
+    </section>
+  );
+}
+
+export function RecentRecordEntry({
+  entry,
+  LinkComponent = PlainMemberHomeLink,
+}: {
+  entry: MemberHomeRecentRecordEntry | null;
+  LinkComponent?: MemberHomeLinkComponent;
+}) {
+  if (!entry) {
+    return null;
+  }
+
+  return (
+    <section className="surface-quiet" aria-label="최근 발행 기록" style={{ padding: 20, overflowWrap: "anywhere" }}>
+      <div className="row-between" style={{ gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+        <div style={{ minWidth: 0 }}>
+          <div className="eyebrow">최근 발행 기록</div>
+          <h2 className="h3 editorial" style={{ margin: "6px 0 0" }}>
+            No.{String(entry.sessionNumber).padStart(2, "0")} · {entry.bookTitle}
+          </h2>
+          <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
+            {entry.summary}
+          </p>
+          <div className="tiny" style={{ color: "var(--text-3)", marginTop: 8 }}>
+            {entry.kindLabels.join(" · ")}
+          </div>
+        </div>
+        <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+          <Link to={entry.href} className="btn btn-primary btn-sm" LinkComponent={LinkComponent}>
+            기록 보기
+          </Link>
+          <Link to={entry.feedbackHref} className="btn btn-quiet btn-sm" LinkComponent={LinkComponent}>
+            피드백 보기
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function MobileRecentRecordEntry({
+  entry,
+  LinkComponent = PlainMemberHomeLink,
+}: {
+  entry: MemberHomeRecentRecordEntry | null;
+  LinkComponent?: MemberHomeLinkComponent;
+}) {
+  if (!entry) {
+    return null;
+  }
+
+  return (
+    <section className="m-sec" aria-label="최근 발행 기록">
+      <div className="m-card-quiet" style={{ overflowWrap: "anywhere" }}>
+        <div className="eyebrow">최근 발행 기록</div>
+        <div className="body editorial" style={{ fontSize: 15, marginTop: 6 }}>
+          No.{String(entry.sessionNumber).padStart(2, "0")} · {entry.bookTitle}
+        </div>
+        <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
+          {entry.summary}
+        </p>
+        <div className="m-row" style={{ gap: 8, marginTop: 12 }}>
+          <Link to={entry.href} className="btn btn-primary btn-sm" LinkComponent={LinkComponent}>
+            기록 보기
+          </Link>
+          <Link to={entry.feedbackHref} className="btn btn-quiet btn-sm" LinkComponent={LinkComponent}>
+            피드백 보기
+          </Link>
+        </div>
       </div>
     </section>
   );
