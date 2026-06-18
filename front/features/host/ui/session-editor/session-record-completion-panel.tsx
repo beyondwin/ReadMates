@@ -4,6 +4,7 @@ import type {
   SessionImportPreviewResponse,
   SessionRecordVisibility,
 } from "@/features/host/model/host-view-types";
+import type { SessionImportCommitResult } from "@/features/host/model/session-import-model";
 import type { ReadmatesReturnState } from "@/shared/routing/readmates-route-state";
 import { Panel } from "./session-editor-panel";
 import { SessionImportPanelBody } from "./session-import-panel";
@@ -34,6 +35,7 @@ type SessionRecordCompletionPanelProps = {
   LinkComponent: ComponentType<FeedbackPreviewLinkProps>;
   recordVisibility: SessionRecordVisibility;
   preview: SessionImportPreviewResponse | null;
+  commitResult: SessionImportCommitResult | null;
   status: "idle" | "previewing" | "ready" | "committing" | "error";
   error: string | null;
   onModeChange: (mode: SessionRecordCompletionMode) => void;
@@ -53,6 +55,7 @@ export function SessionRecordCompletionPanel({
   LinkComponent,
   recordVisibility,
   preview,
+  commitResult,
   status,
   error,
   onModeChange,
@@ -91,6 +94,7 @@ export function SessionRecordCompletionPanel({
             sessionId={sessionId}
             recordVisibility={recordVisibility}
             preview={preview}
+            commitResult={commitResult}
             status={status}
             error={error}
             onFileSelected={onFileSelected}

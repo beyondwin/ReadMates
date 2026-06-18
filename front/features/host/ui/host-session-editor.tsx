@@ -23,7 +23,12 @@ import {
   getDestructiveActionAvailability,
   questionDeadlineLabelForForm,
 } from "@/features/host/model/host-session-editor-model";
-import { buildSessionImportRequest } from "@/features/host/model/session-import-model";
+import {
+  buildSessionImportCommitResult,
+  buildSessionImportRequest,
+  sessionImportFailureMessage,
+  type SessionImportCommitResult,
+} from "@/features/host/model/session-import-model";
 import {
   hostSessionEditorReducer,
   initialHostSessionEditorState,
@@ -184,6 +189,7 @@ export default function HostSessionEditor({
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [sessionImportRequest, setSessionImportRequest] = useState<SessionImportRequest | null>(null);
   const [sessionImportPreview, setSessionImportPreview] = useState<SessionImportPreviewResponse | null>(null);
+  const [sessionImportCommitResult, setSessionImportCommitResult] = useState<SessionImportCommitResult | null>(null);
   const [sessionImportStatus, setSessionImportStatus] = useState<"idle" | "previewing" | "ready" | "committing" | "error">("idle");
   const [sessionImportError, setSessionImportError] = useState<string | null>(null);
   const [importMode, setImportMode] = useState<ImportMode>(() => readInitialImportMode());
@@ -279,6 +285,7 @@ export default function HostSessionEditor({
     dispatch({ type: "SET_RECORD_VISIBILITY", visibility });
     setSessionImportRequest(null);
     setSessionImportPreview(null);
+    setSessionImportCommitResult(null);
     setSessionImportError(null);
     setSessionImportStatus("idle");
   }, []);
@@ -665,6 +672,7 @@ export default function HostSessionEditor({
       setSessionImportError(null);
       setSessionImportPreview(null);
       setSessionImportRequest(null);
+      setSessionImportCommitResult(null);
 
       try {
         const sourceJson = await readTextFile(file);
@@ -674,7 +682,7 @@ export default function HostSessionEditor({
         setSessionImportPreview(preview);
         setSessionImportStatus(preview.valid ? "ready" : "error");
         if (!preview.valid) {
-          setSessionImportError("가져온 JSON에서 수정할 항목이 있습니다.");
+          setSessionImportError(sessionImportFailureMessage("preview"));
         }
       } catch (error) {
         setSessionImportError(error instanceof Error ? error.message : "가져온 JSON을 확인할 수 없습니다.");
@@ -693,9 +701,11 @@ export default function HostSessionEditor({
 
     setSessionImportStatus("committing");
     setSessionImportError(null);
+    setSessionImportCommitResult(null);
 
     try {
       const committed = await actions.commitSessionImport(session.sessionId, sessionImportRequest);
+      const commitResult = buildSessionImportCommitResult(committed, sessionImportRequest.recordVisibility);
       dispatch({
         type: "PUBLICATION_SAVED",
         publicSummary: committed.publication.summary,
@@ -712,10 +722,11 @@ export default function HostSessionEditor({
       setSessionImportStatus("idle");
       setSessionImportPreview(null);
       setSessionImportRequest(null);
+      setSessionImportCommitResult(commitResult);
       flash("가져온 세션 기록을 저장했습니다");
     } catch {
       setSessionImportStatus("error");
-      setSessionImportError("가져온 세션 기록 저장에 실패했습니다. 파일과 권한을 확인해 주세요.");
+      setSessionImportError(sessionImportFailureMessage("commit-network"));
     }
   }, [session, sessionImportRequest, sessionImportPreview, sessionImportStatus, actions, flash]);
 
@@ -902,6 +913,7 @@ export default function HostSessionEditor({
                 LinkComponent={LinkComponent}
                 recordVisibility={recordVisibility}
                 preview={sessionImportPreview}
+                commitResult={sessionImportCommitResult}
                 status={sessionImportStatus}
                 error={sessionImportError}
                 onModeChange={handleImportModeChange}

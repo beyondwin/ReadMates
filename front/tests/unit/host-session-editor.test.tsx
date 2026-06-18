@@ -524,7 +524,47 @@ describe("HostSessionEditor", () => {
     await user.click(await screen.findByRole("button", { name: "가져온 기록 저장" }));
 
     await waitFor(() => expect(commitSessionImport).toHaveBeenCalledTimes(1));
-    expect(screen.getByText(/가져온 세션 기록을 저장했습니다/)).toBeVisible();
+    expect(screen.getAllByText(/가져온 세션 기록을 저장했습니다/).length).toBeGreaterThan(0);
+  });
+
+  it("shows the session import commit result inside the import panel", async () => {
+    const user = userEvent.setup();
+    const commitSessionImport = vi.fn(async (sessionId: string, request: SessionImportRequest) => ({
+      sessionId,
+      publication: { summary: request.publication.summary },
+      highlights: [{ authorName: "호스트", text: "Import highlight.", authorMatched: true, membershipId: "membership-host" }],
+      oneLineReviews: [
+        { authorName: "호스트", text: "Import one line.", authorMatched: true, membershipId: "membership-host" },
+        { authorName: "멤버", text: "Import second line.", authorMatched: true, membershipId: "membership-member" },
+      ],
+      feedbackDocument: {
+        uploaded: true,
+        fileName: "PRIVATE_MEMBER_EMAIL-session-import.md",
+        title: "독서모임 7차 피드백",
+        uploadedAt: "2026-05-15T00:00:00Z",
+      },
+    }));
+
+    render(
+      <HostSessionEditorForTest
+        session={session}
+        actions={{ ...hostSessionEditorTestActions, commitSessionImport }}
+      />,
+    );
+
+    await user.upload(
+      screen.getByLabelText("AI 결과 JSON 가져오기"),
+      new File([sessionImportJson()], "session-import.json", { type: "application/json" }),
+    );
+    await user.click(await screen.findByRole("button", { name: "가져온 기록 저장" }));
+
+    const result = await screen.findByRole("region", { name: "세션 기록 저장 결과" });
+    expect(within(result).getByText("저장 완료")).toBeVisible();
+    expect(within(result).getByText(/외부 공개/)).toBeVisible();
+    expect(within(result).getByText("하이라이트 1개 저장")).toBeVisible();
+    expect(within(result).getByText("한줄평 2개 저장")).toBeVisible();
+    expect(within(result).getByText("피드백 문서 저장: 독서모임 7차 피드백")).toBeVisible();
+    expect(screen.queryByText("PRIVATE_MEMBER_EMAIL")).not.toBeInTheDocument();
   });
 
   it("posts a new session through the BFF and redirects to the created session editor", async () => {

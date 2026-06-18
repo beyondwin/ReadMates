@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { SessionImportPreviewResponse, SessionImportRecordPreview, SessionRecordVisibility } from "@/features/host/model/host-view-types";
+import type { SessionImportCommitResult } from "@/features/host/model/session-import-model";
 import { SessionImportPanelBody } from "./session-import-panel";
 
 describe("SessionImportPanelBody", () => {
@@ -59,15 +60,48 @@ describe("SessionImportPanelBody", () => {
     expect(screen.queryByText("{\"")).toBeNull();
     expect(screen.getByRole("button", { name: "가져온 기록 저장" })).toBeDisabled();
   });
+
+  it("renders the commit result ledger after a successful import", () => {
+    renderPanel({
+      preview: preview({ valid: true }),
+      commitResult: commitResult(),
+    });
+
+    const result = screen.getByRole("region", { name: "세션 기록 저장 결과" });
+    expect(within(result).getByText("저장 완료")).toBeInTheDocument();
+    expect(within(result).getByText("가져온 세션 기록을 저장했습니다.")).toBeInTheDocument();
+    expect(within(result).getByText(/멤버 공개/)).toBeInTheDocument();
+    expect(within(result).getByText("공개 요약 교체")).toBeInTheDocument();
+    expect(within(result).getByText("하이라이트 1개 저장")).toBeInTheDocument();
+    expect(within(result).getByText("한줄평 2개 저장")).toBeInTheDocument();
+    expect(within(result).getByText("피드백 문서 저장: 독서모임 7차 피드백")).toBeInTheDocument();
+    expect(within(result).getByText("멤버는 아카이브와 피드백 문서에서 이 기록을 이어 읽을 수 있습니다.")).toBeInTheDocument();
+  });
+
+  it("keeps commit result rendering public safe", () => {
+    renderPanel({
+      preview: preview({ valid: true }),
+      commitResult: {
+        ...commitResult(),
+        items: ["공개 요약 교체", "피드백 문서 저장: 독서모임 7차 피드백"],
+      },
+    });
+
+    expect(screen.getByRole("region", { name: "세션 기록 저장 결과" })).toBeInTheDocument();
+    expect(screen.queryByText("PRIVATE_MEMBER_EMAIL")).not.toBeInTheDocument();
+    expect(screen.queryByText("{\"raw\"")).not.toBeInTheDocument();
+  });
 });
 
 function renderPanel({
   preview,
   recordVisibility = "MEMBER",
+  commitResult = null,
   onCommit = vi.fn(),
 }: {
   preview: SessionImportPreviewResponse;
   recordVisibility?: SessionRecordVisibility;
+  commitResult?: SessionImportCommitResult | null;
   onCommit?: () => void;
 }) {
   render(
@@ -75,12 +109,29 @@ function renderPanel({
       sessionId="session-1"
       recordVisibility={recordVisibility}
       preview={preview}
+      commitResult={commitResult}
       status={preview.valid ? "ready" : "error"}
       error={preview.valid ? null : "가져온 JSON에서 수정할 항목이 있습니다."}
       onFileSelected={() => {}}
       onCommit={onCommit}
     />,
   );
+}
+
+function commitResult(): SessionImportCommitResult {
+  return {
+    tone: "success",
+    title: "저장 완료",
+    message: "가져온 세션 기록을 저장했습니다.",
+    visibilityLabel: "멤버 공개",
+    items: [
+      "공개 요약 교체",
+      "하이라이트 1개 저장",
+      "한줄평 2개 저장",
+      "피드백 문서 저장: 독서모임 7차 피드백",
+    ],
+    nextAction: "멤버는 아카이브와 피드백 문서에서 이 기록을 이어 읽을 수 있습니다.",
+  };
 }
 
 function preview({
