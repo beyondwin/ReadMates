@@ -208,6 +208,17 @@ The v1.11.0 production OAuth and backup timer items are closed by 2026-05-31 ope
 - Skipped: production OAuth, VM, provider-console, tag/deploy smoke. These require release-operation access after merge and are not local evidence for this branch.
 - Residual risk: no known local release-readiness residual remains after server, frontend, E2E, architecture, docs, Graphify freshness, and public-release evidence. Production deploy/tag smoke remains outside this local merge.
 
+## 2026-06-19 Platform admin closing projection closeout
+
+- Scope reviewed: local `main..HEAD` for the platform admin closing projection branch.
+- Release classification: additive server/admin frontend projection plus route-order fix. No DB migration, auth/BFF token change, deploy script change, CI workflow change, or platform-admin mutation was added.
+- Product evidence: `/admin/**` direct BrowserRouter entry now reaches the admin shell, and `/admin/clubs/:clubId` shows admin-safe session closing risk rows with host closing board drilldowns instead of only aggregate incomplete-record counts.
+- Public safety: closing risk projection contains session id, session number, book title, meeting date, safe state/blocker label, and host closing href only. It does not expose raw member data, feedback bodies, provider raw errors, raw JSON, private domains, or token-shaped values.
+- Local verification before merge: `git diff --check`, `pnpm --dir front lint`, `pnpm --dir front test` (146 files, 1189 tests), `pnpm --dir front build`, `pnpm --dir front test:e2e -- tests/e2e/admin-club-operations.spec.ts`, `./server/gradlew -p server check`, `./server/gradlew -p server architectureTest`, `./server/gradlew -p server integrationTest --tests JdbcAdminClubOperationsClosingRiskTest`, `./scripts/build-public-release-candidate.sh`, and `./scripts/public-release-check.sh .tmp/public-release-candidate` passed. `graphify update .` also ran; `graphify-out/` is ignored and the freshness audit reported no tracked output changes.
+- Release-readiness repair before closeout: first `./server/gradlew -p server check` failed on detekt style gates in the new closing-risk mapper and integration fixture, and a concurrent standalone `architectureTest` collided with `check` while writing XML test results. The branch split the mapper state calculation, introduced a test fixture value object, reran focused integration, then reran `check` and standalone `architectureTest` successfully.
+- Skipped: production OAuth, VM, provider-console, tag/deploy smoke. These require release-operation access after merge and are not local evidence for this branch.
+- Residual risk: no known local release-readiness residual remains after admin route, frontend, server, targeted E2E, architecture, Graphify, and public-release evidence. Production deploy/tag smoke remains outside this local merge.
+
 ## 기본 범위
 
 기본 범위는 현재 branch와 base branch의 차이입니다. 보통 `origin/main..HEAD`를 사용합니다.
