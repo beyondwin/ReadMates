@@ -241,6 +241,62 @@ export type HostNotificationDeliveryListResponse = {
   nextCursor: string | null;
 };
 
+export type HostSessionClosingOverallState = "NOT_STARTED" | "IN_PROGRESS" | "BLOCKED" | "READY" | "PUBLISHED";
+export type HostSessionClosingPrimaryAction =
+  | "CLOSE_SESSION"
+  | "IMPORT_RECORDS"
+  | "PUBLISH_RECORDS"
+  | "SEND_NOTIFICATION"
+  | "REVIEW_PUBLIC_PAGE"
+  | "NONE";
+export type HostSessionClosingChecklistId =
+  | "SESSION_CLOSED"
+  | "RECORD_PACKAGE_SAVED"
+  | "FEEDBACK_DOCUMENT_READY"
+  | "MEMBER_NOTIFICATION_SENT"
+  | "PUBLIC_RECORD_VISIBLE"
+  | "PUBLIC_SHOWCASE_READY";
+export type HostSessionClosingChecklistState = "DONE" | "ACTION_REQUIRED" | "BLOCKED" | "NOT_APPLICABLE";
+export type HostSessionClosingFeedbackDocumentState = "AVAILABLE" | "MISSING" | "LOCKED" | "INVALID";
+export type HostSessionClosingNotificationStatus = "PENDING" | "PUBLISHED" | "FAILED" | "DEAD";
+
+export type HostSessionClosingStatusResponse = {
+  schema: "host.session_closing_status.v1";
+  session: {
+    sessionId: string;
+    sessionNumber: number;
+    bookTitle: string;
+    meetingDate: string;
+    state: SessionState;
+    recordVisibility: "HOST_ONLY" | "MEMBER" | "PUBLIC";
+  };
+  overall: {
+    state: HostSessionClosingOverallState;
+    label: string;
+    primaryAction: HostSessionClosingPrimaryAction;
+  };
+  checklist: Array<{
+    id: HostSessionClosingChecklistId;
+    state: HostSessionClosingChecklistState;
+    label: string;
+    detail: string;
+    href: string | null;
+  }>;
+  evidence: {
+    summaryPublished: boolean;
+    highlightCount: number;
+    oneLinerCount: number;
+    feedbackDocumentState: HostSessionClosingFeedbackDocumentState;
+    latestNotificationEvent: {
+      eventType: "FEEDBACK_DOCUMENT_PUBLISHED" | "NEXT_BOOK_PUBLISHED";
+      status: HostSessionClosingNotificationStatus;
+      createdAt: string;
+    } | null;
+    publicRecordHref: string | null;
+    memberReflectionHref: string | null;
+  };
+};
+
 export type ManualNotificationTemplateOption = {
   eventType: HostNotificationEventType;
   label: string;

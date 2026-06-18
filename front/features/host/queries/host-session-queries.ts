@@ -7,6 +7,7 @@ import {
   deleteHostSession,
   fetchHostCurrentSession,
   fetchHostDashboard,
+  fetchHostSessionClosingStatus,
   fetchHostSessionDeletionPreview,
   fetchHostSessionDetail,
   fetchHostSessions,
@@ -22,6 +23,7 @@ import type {
   CurrentSessionResponse,
   HostAttendanceUpdate,
   HostDashboardResponse,
+  HostSessionClosingStatusResponse,
   HostSessionDetailResponse,
   HostSessionListPage,
   HostSessionPublicationRequest,
@@ -72,6 +74,8 @@ export const hostSessionKeys = {
     [...hostSessionKeys.lists(context), normalizePageRequest(page)] as const,
   detail: (sessionId: string, context?: ReadmatesApiContext) =>
     [...hostSessionKeys.scope(context), "detail", sessionId] as const,
+  closingStatus: (sessionId: string, context?: ReadmatesApiContext) =>
+    [...hostSessionKeys.scope(context), "closingStatus", sessionId] as const,
   current: (context?: ReadmatesApiContext) =>
     [...hostSessionKeys.scope(context), "current"] as const,
   dashboard: (context?: ReadmatesApiContext) =>
@@ -113,6 +117,13 @@ export function hostSessionDetailQuery(sessionId: string, context?: ReadmatesApi
   });
 }
 
+export function hostSessionClosingStatusQuery(sessionId: string, context?: ReadmatesApiContext) {
+  return queryOptions<HostSessionClosingStatusResponse>({
+    queryKey: hostSessionKeys.closingStatus(sessionId, context),
+    queryFn: () => fetchHostSessionClosingStatus(sessionId, context),
+  });
+}
+
 export function hostSessionDeletionPreviewQuery(sessionId: string, context?: ReadmatesApiContext) {
   // Each click currently issues a fresh request; opt out of result retention so the
   // delete-preview UX continues to reflect the server state at click time even after
@@ -148,6 +159,10 @@ export function invalidateHostSessionDetail(client: QueryClient, sessionId: stri
   return client.invalidateQueries({ queryKey: hostSessionKeys.detail(sessionId, context) });
 }
 
+export function invalidateHostSessionClosingStatus(client: QueryClient, sessionId: string, context?: ReadmatesApiContext) {
+  return client.invalidateQueries({ queryKey: hostSessionKeys.closingStatus(sessionId, context) });
+}
+
 export function invalidateHostCurrentSession(client: QueryClient, context?: ReadmatesApiContext) {
   return client.invalidateQueries({ queryKey: hostSessionKeys.current(context) });
 }
@@ -176,6 +191,7 @@ async function invalidateSessionMutationSurfaces(
 ) {
   await Promise.all([
     invalidateHostSessionDetail(client, sessionId, context),
+    invalidateHostSessionClosingStatus(client, sessionId, context),
     invalidateHostSessionLists(client, context),
     invalidateHostSessionDashboard(client, context),
     invalidateHostCurrentSession(client, context),

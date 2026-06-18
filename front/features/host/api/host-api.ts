@@ -19,6 +19,7 @@ import type {
   HostNotificationStatus,
   HostSessionDeletionPreviewResponse,
   HostSessionDeletionResponse,
+  HostSessionClosingStatusResponse,
   HostSessionDetailResponse,
   HostSessionListPage,
   HostSessionPublicationRequest,
@@ -201,6 +202,14 @@ export function fetchHostSessions(context?: ReadmatesApiContext, page?: PageRequ
 
 export function fetchHostSessionDetail(sessionId: string, context?: ReadmatesApiContext) {
   return readmatesFetch<HostSessionDetailResponse>(`/api/host/sessions/${encodeURIComponent(sessionId)}`, undefined, context).then(parseHostSessionDetailResponse);
+}
+
+export function fetchHostSessionClosingStatus(sessionId: string, context?: ReadmatesApiContext) {
+  return readmatesFetch<HostSessionClosingStatusResponse>(
+    `/api/host/sessions/${encodeURIComponent(sessionId)}/closing-status`,
+    undefined,
+    context,
+  );
 }
 
 export function createHostSession(request: HostSessionRequest) {
