@@ -129,9 +129,9 @@ describe("PublicRecordsPage", () => {
     expect(screen.queryByText("총 1개의 공개 기록")).not.toBeInTheDocument();
     const recordLink = screen.getByRole("link", { name: /가난한 찰리의 연감/ });
     expect(recordLink).toHaveAttribute("href", "/sessions/session-6");
-    expect(screen.getByText("하이라이트 3")).toBeInTheDocument();
-    expect(screen.getByText("한줄평 5")).toBeInTheDocument();
-    expect(recordLink.textContent).toMatch(/No\.6·2026\.04\.15하이라이트 3·한줄평 5/);
+    expect(screen.getByText("기록 준비됨")).toBeInTheDocument();
+    expect(screen.getByText("하이라이트 3 · 한줄평 5")).toBeInTheDocument();
+    expect(recordLink.textContent).toMatch(/No\.6·2026\.04\.15기록 준비됨하이라이트 3 · 한줄평 5/);
     expect(recordLink.textContent).toMatch(/찰리 멍거\s*찰리 멍거의 투자 원칙/);
   });
 

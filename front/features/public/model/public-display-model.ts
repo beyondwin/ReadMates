@@ -134,3 +134,30 @@ export function getPublicSessionDetailDisplay(session: PublicSessionDetailView) 
     summary: displayText(session.summary, "공개 요약이 아직 준비되지 않았습니다."),
   };
 }
+
+export function getPublicRecordShowcaseDisplay(session: PublicSessionListItemView) {
+  const display = getPublicSessionListItemDisplay(session);
+  const highlightCount = display.highlightCount;
+  const oneLinerCount = display.oneLinerCount;
+  const total = highlightCount + oneLinerCount;
+
+  return {
+    ...display,
+    recordDensityLabel: `하이라이트 ${highlightCount} · 한줄평 ${oneLinerCount}`,
+    showcaseStateLabel: total > 0 ? "기록 준비됨" : "요약 중심 기록",
+    summaryLead: total > 0 ? "함께 남긴 문장과 감상" : "공개 요약",
+  };
+}
+
+export function getPublicSessionShowcaseDisplay(session: PublicSessionDetailView) {
+  const display = getPublicSessionDetailDisplay(session);
+  const highlightCount = session.highlights.length;
+  const oneLinerCount = session.oneLiners.length;
+  const total = highlightCount + oneLinerCount;
+
+  return {
+    ...display,
+    recordDensityLabel: `하이라이트 ${highlightCount} · 한줄평 ${oneLinerCount}`,
+    showcaseStateLabel: total > 0 ? "기록 준비됨" : "요약 중심 기록",
+  };
+}

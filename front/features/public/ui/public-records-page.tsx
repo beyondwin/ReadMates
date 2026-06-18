@@ -2,12 +2,12 @@ import { useEffect } from "react";
 import { Link } from "@/features/public/ui/public-link";
 import { readmatesReturnState, restoreReadmatesPublicRecordsScroll } from "@/features/public/ui/public-route-continuity";
 import type { PublicClubView, PublicSessionListItemView } from "@/features/public/model/public-display-model";
-import { getPublicRecordsDisplay, getPublicSessionListItemDisplay } from "@/features/public/model/public-display-model";
+import { getPublicRecordShowcaseDisplay, getPublicRecordsDisplay } from "@/features/public/model/public-display-model";
 import { BookCover } from "@/shared/ui/book-cover";
 import { publicAboutHref, publicRecordsHref, publicSessionHref } from "@/features/public/model/public-paths";
 
 function PublicRecordIndexRow({ publicBasePath, session }: { publicBasePath: string; session: PublicSessionListItemView }) {
-  const display = getPublicSessionListItemDisplay(session);
+  const display = getPublicRecordShowcaseDisplay(session);
 
   return (
     <Link
@@ -23,9 +23,8 @@ function PublicRecordIndexRow({ publicBasePath, session }: { publicBasePath: str
           <span>{display.date}</span>
         </span>
         <span className="public-archive-row__counts public-record-index-row__counts">
-          <span>하이라이트 {display.highlightCount}</span>
-          <span aria-hidden="true">·</span>
-          <span>한줄평 {display.oneLinerCount}</span>
+          <span className="badge badge-dot">{display.showcaseStateLabel}</span>
+          <span>{display.recordDensityLabel}</span>
         </span>
         <span className="editorial public-record-index-row__title">{display.title}</span>
         <span className="small public-record-index-row__author" style={{ color: "var(--text-2)" }}>

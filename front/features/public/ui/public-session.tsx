@@ -4,7 +4,7 @@ import type { PublicSessionDetailView } from "@/features/public/model/public-dis
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { BookCover } from "@/shared/ui/book-cover";
 import { PublicGuestOnlyActions } from "@/shared/ui/public-auth-action";
-import { displayText, getPublicSessionDetailDisplay } from "@/features/public/model/public-display-model";
+import { displayText, getPublicSessionShowcaseDisplay } from "@/features/public/model/public-display-model";
 import { PUBLIC_MEMBERSHIP_NOTE } from "@/features/public/model/public-copy";
 
 type PublicSessionProps = {
@@ -13,7 +13,7 @@ type PublicSessionProps = {
 };
 
 export default function PublicSession({ session, returnTarget = publicRecordsReturnTarget }: PublicSessionProps) {
-  const { bookTitle, bookAuthor, dateLabel, summary } = getPublicSessionDetailDisplay(session);
+  const { bookTitle, bookAuthor, dateLabel, summary, recordDensityLabel, showcaseStateLabel } = getPublicSessionShowcaseDisplay(session);
   const highlightCount = session.highlights.length;
   const oneLinerCount = session.oneLiners.length;
 
@@ -50,6 +50,10 @@ export default function PublicSession({ session, returnTarget = publicRecordsRet
                 <h2 className="h2 editorial" style={{ margin: "8px 0 0" }}>
                   회차 기록
                 </h2>
+                <span className="badge badge-dot public-session-document__badge">{showcaseStateLabel}</span>
+                <p className="small muted" style={{ margin: "8px 0 0" }}>
+                  {recordDensityLabel}
+                </p>
               </div>
               <dl className="public-session-meta" aria-label="공개 세션 메타데이터">
                 <div>
