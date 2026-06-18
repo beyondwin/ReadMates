@@ -9,6 +9,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 ### Changed
 
 - **host session record preview:** 호스트 세션 편집기의 `외부 JSON 가져오기` 미리보기를 저장 전 검토 화면으로 확장했습니다. 회차·책·날짜, 작성자 매칭, 교체될 기록 항목, 피드백 문서 parser 상태, 저장 차단 사유를 한 화면에서 확인할 수 있고, desktop/mobile public-safe Playwright 증거를 추가했습니다. 서버/API contract, DB migration, auth/BFF token 변경은 없습니다.
+- **host-to-member record loop:** 호스트 세션 기록 가져오기 저장 후 교체된 항목을 결과 장부로 보여주고, 멤버 홈에서 최근 발행 기록과 피드백 문서로 이어지는 진입을 강화했습니다. 서버/API contract, DB migration, auth/BFF token 변경은 없습니다.
 
 ### Engineering
 

@@ -102,6 +102,75 @@ async function routeHostSessionEditor(page: Page): Promise<void> {
   await page.route(`**/api/bff/api/host/sessions/${SESSION_ID}/session-import/preview**`, async (route) => {
     await json(route, 200, previewResponse());
   });
+
+  await page.route(`**/api/bff/api/host/sessions/${SESSION_ID}/session-import/commit**`, async (route) => {
+    await json(route, 200, {
+      sessionId: SESSION_ID,
+      publication: { summary: "공개 가능한 세션 요약입니다." },
+      highlights: previewResponse().highlights,
+      oneLineReviews: previewResponse().oneLineReviews,
+      feedbackDocument: {
+        uploaded: true,
+        fileName: "session-7-feedback.md",
+        title: "독서모임 7차 피드백",
+        uploadedAt: "2026-05-16T12:00:00Z",
+      },
+    });
+  });
+}
+
+async function routeMemberHome(page: Page): Promise<void> {
+  await page.route("**/api/bff/api/auth/me**", async (route) => {
+    await json(route, 200, {
+      authenticated: true,
+      userId: "user-member-e2e",
+      membershipId: "member-a",
+      clubId: "club-a-id",
+      email: "member@example.com",
+      displayName: "E2E 멤버",
+      accountName: "E2E 멤버",
+      role: "MEMBER",
+      membershipStatus: "ACTIVE",
+      approvalState: "ACTIVE",
+      currentMembership: {
+        membershipId: "member-a",
+        clubId: "club-a-id",
+        clubSlug: CLUB_SLUG,
+        displayName: "E2E 멤버",
+        role: "MEMBER",
+        membershipStatus: "ACTIVE",
+        approvalState: "ACTIVE",
+      },
+      joinedClubs: [],
+      recommendedAppEntryUrl: `/clubs/${CLUB_SLUG}/app`,
+    });
+  });
+
+  await page.route("**/api/bff/api/sessions/current**", async (route) => {
+    await json(route, 200, { currentSession: null });
+  });
+
+  await page.route("**/api/bff/api/notes/feed**", async (route) => {
+    await json(route, 200, {
+      items: [
+        {
+          sessionId: SESSION_ID,
+          sessionNumber: 7,
+          bookTitle: "E2E 책",
+          date: "2026-05-16",
+          authorName: "독자B",
+          authorShortName: "B",
+          kind: "ONE_LINE_REVIEW",
+          text: "한줄평입니다.",
+        },
+      ],
+      nextCursor: null,
+    });
+  });
+
+  await page.route("**/api/bff/api/sessions/upcoming**", async (route) => {
+    await json(route, 200, []);
+  });
 }
 
 async function uploadSessionImportJson(page: Page): Promise<void> {
@@ -129,6 +198,16 @@ async function expectSessionRecordPreviewPublicSafe(page: Page): Promise<void> {
   await expect(page.getByText("{\"")).toHaveCount(0);
 }
 
+async function expectSessionImportCommitResultPublicSafe(page: Page): Promise<void> {
+  const commitResult = page.getByRole("region", { name: "세션 기록 저장 결과" });
+  await expect(commitResult).toBeVisible();
+  await expect(commitResult.getByText("저장 완료")).toBeVisible();
+  await expect(commitResult.getByText("피드백 문서 저장: 독서모임 7차 피드백")).toBeVisible();
+  await expect(page.getByText("member1@example.com")).toHaveCount(0);
+  await expect(page.getByText("private.example.com")).toHaveCount(0);
+  await expect(page.getByText("{\"")).toHaveCount(0);
+}
+
 test("host captures public-safe session record preview evidence on desktop and mobile", async ({ page }, testInfo) => {
   await routeHostSessionEditor(page);
 
@@ -143,6 +222,14 @@ test("host captures public-safe session record preview evidence on desktop and m
   await uploadSessionImportJson(page);
   expect((await previewPost).ok()).toBe(true);
   await expectSessionRecordPreviewPublicSafe(page);
+  const commitPost = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response.url().includes(`/api/bff/api/host/sessions/${SESSION_ID}/session-import/commit`),
+  );
+  await page.getByRole("button", { name: "가져온 기록 저장" }).click();
+  expect((await commitPost).ok()).toBe(true);
+  await expectSessionImportCommitResultPublicSafe(page);
   const desktopScreenshot = await page.screenshot({
     path: testInfo.outputPath("host-session-record-preview-desktop.png"),
     fullPage: true,
@@ -151,10 +238,27 @@ test("host captures public-safe session record preview evidence on desktop and m
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("tab", { name: "문서" }).click();
-  await expectSessionRecordPreviewPublicSafe(page);
+  await expectSessionImportCommitResultPublicSafe(page);
   const mobileScreenshot = await page.screenshot({
     path: testInfo.outputPath("host-session-record-preview-mobile.png"),
     fullPage: true,
   });
   expect(mobileScreenshot.byteLength).toBeGreaterThan(10_000);
+
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+  await routeMemberHome(page);
+  await page.goto(`/clubs/${CLUB_SLUG}/app`);
+  const recentRecord = page.getByRole("region", { name: "최근 발행 기록" });
+  await expect(recentRecord).toBeVisible();
+  await expect(recentRecord.getByText("No.07 · E2E 책")).toBeVisible();
+  await expect(recentRecord.getByRole("link", { name: "기록 보기" })).toHaveAttribute(
+    "href",
+    `/clubs/${CLUB_SLUG}/app/sessions/${SESSION_ID}`,
+  );
+  await expect(recentRecord.getByRole("link", { name: "피드백 보기" })).toHaveAttribute(
+    "href",
+    `/clubs/${CLUB_SLUG}/app/feedback/${SESSION_ID}`,
+  );
+  await expect(page.getByText("PRIVATE_MEMBER_EMAIL")).toHaveCount(0);
+  await expect(page.getByText("{\"")).toHaveCount(0);
 });
