@@ -155,6 +155,16 @@ The v1.11.0 production OAuth and backup timer items are closed by 2026-05-31 ope
 - Skipped: production OAuth, VM, provider-console, tag/deploy smoke. These require release-operation access after merge and are not local evidence for this frontend-only merge.
 - Residual risk: no known local release-readiness residual remains after frontend, full E2E, backend check, public-release, CHANGELOG, and Graphify evidence. Production deploy/tag smoke remains a release-operation step.
 
+## 2026-06-18 Member record reflection loop closeout
+
+- Scope reviewed: local `main..HEAD` for the member record reflection loop branch. `origin/main..HEAD` was considered, but local `main` already carries earlier local release work covered by the notes above; this closeout focuses on the 4 new reflection-loop commits plus this readiness note.
+- Release classification: frontend member-home/archive/feedback UX and test evidence only. No server production code, DB migration, public API contract, auth/BFF token, CI/deploy script, release-candidate scanner behavior, or architecture-test baseline changed.
+- Product/readiness evidence: member home now renders `지난 모임 회고`, groups the latest preserved record kinds by session, preserves record and feedback entry points, and keeps final feedback availability decisions inside existing archive/feedback routes.
+- Public safety: private-looking fixture strings remain only in tests that assert non-rendering. Public release candidate generation and scanner passed with gitleaks reporting no leaks. Broad changed-file sentinel scan found only those non-render assertions plus existing changelog history, not new production exposure.
+- Local verification before merge: `git diff --check main..HEAD`, `pnpm --dir front lint`, `pnpm --dir front test` (138 files, 1170 tests), `pnpm --dir front build`, `pnpm --dir front test:e2e -- tests/e2e/host-session-record-preview.spec.ts` (1/1), `pnpm --dir front test:e2e` (62/62), `./server/gradlew -p server clean check`, `./scripts/build-public-release-candidate.sh`, `./scripts/public-release-check.sh .tmp/public-release-candidate`, `graphify update .`, and graphify freshness audit passed.
+- Skipped: production OAuth, VM, provider-console, tag/deploy smoke. These require release-operation access after merge and are not local evidence for this frontend-only merge.
+- Residual risk: no known local release-readiness residual remains after frontend, full E2E, backend check, public-release, CHANGELOG, and Graphify evidence. Production deploy/tag smoke remains a release-operation step.
+
 ## 2026-06-07 v1.13.0 release-risk remediation note
 
 - Scope reviewed: `v1.12.1..HEAD`, with current local `main` ahead of `origin/main`.
