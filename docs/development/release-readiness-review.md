@@ -143,6 +143,18 @@ The v1.11.0 production OAuth and backup timer items are closed by 2026-05-31 ope
 - Skipped: `./server/gradlew -p server clean test`, production OAuth, VM, provider-console, tag/deploy smoke. Server checks are not required for this frontend-only branch; production/tag smoke remains a release-operation step and is not local merge evidence.
 - Residual risk: no known local release-readiness residual remains for this branch after frontend, E2E, public-release, artifact, and Graphify evidence. Production deploy/tag smoke remains outside this local merge.
 
+## 2026-06-18 Host-to-member session record loop closeout
+
+- Scope reviewed: local `main..HEAD` for the host-to-member session record loop branch. `origin/main..HEAD` was considered, but local `main` is 19 commits ahead of `origin/main`; inherited local-main work is covered by earlier readiness notes, so this closeout focuses on the 4 new feature commits plus this readiness note.
+- Release classification: frontend host/member/archive UX and test evidence only. No server production code, DB migration, public API contract, auth/BFF token, CI/deploy script, release-candidate scanner behavior, or architecture-test baseline changed.
+- Residual risk found before merge: the initial completion had skipped server validation because the branch was frontend-only. The closeout reran `./server/gradlew -p server clean test` and found the repo's `test` task is intentionally skipped, then ran `./server/gradlew -p server clean check` to execute ktlint, detekt, `unitTest`, JaCoCo verification, and `architectureTest` successfully.
+- Product/readiness evidence: host import commit now has a public-safe result ledger, member home has a recent preserved-record entry, archive/session feedback copy distinguishes readable, locked, and missing states, and the existing host session record Playwright spec now proves the host-to-member path through commit result and member-home entry.
+- CHANGELOG: `## Unreleased` records both the earlier host session record preview evidence and this host-to-member record loop behavior. No deploy/runbook or architecture doc update is required because server/API/auth/deploy boundaries are unchanged.
+- Public safety: private-looking sentinel strings remain only in tests that assert non-rendering. Public release candidate generation and scanner passed with gitleaks reporting no leaks. Broad sentinel scan found existing test fixtures and one old changelog regex false positive, not new production or public-doc exposure.
+- Local verification before merge: `git diff --check main..HEAD`, `pnpm --dir front lint`, `pnpm --dir front test` (135 files, 1163 tests), `pnpm --dir front build`, `pnpm --dir front test:e2e` (62/62), `./server/gradlew -p server clean test` (BUILD SUCCESSFUL, `test` task skipped by project configuration), `./server/gradlew -p server clean check` (BUILD SUCCESSFUL), `./scripts/build-public-release-candidate.sh`, `./scripts/public-release-check.sh .tmp/public-release-candidate`, `graphify update .`, and graphify freshness audit passed.
+- Skipped: production OAuth, VM, provider-console, tag/deploy smoke. These require release-operation access after merge and are not local evidence for this frontend-only merge.
+- Residual risk: no known local release-readiness residual remains after frontend, full E2E, backend check, public-release, CHANGELOG, and Graphify evidence. Production deploy/tag smoke remains a release-operation step.
+
 ## 2026-06-07 v1.13.0 release-risk remediation note
 
 - Scope reviewed: `v1.12.1..HEAD`, with current local `main` ahead of `origin/main`.
