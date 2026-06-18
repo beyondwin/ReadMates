@@ -6,6 +6,10 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ## Unreleased
 
+### Changed
+
+- **host session record preview:** 호스트 세션 편집기의 `외부 JSON 가져오기` 미리보기를 저장 전 검토 화면으로 확장했습니다. 회차·책·날짜, 작성자 매칭, 교체될 기록 항목, 피드백 문서 parser 상태, 저장 차단 사유를 한 화면에서 확인할 수 있고, desktop/mobile public-safe Playwright 증거를 추가했습니다. 서버/API contract, DB migration, auth/BFF token 변경은 없습니다.
+
 ### Engineering
 
 - Added Spring-course-inspired operations hardening evidence: local observability smoke tooling, SLO report draft generation, and large-fixture SQL performance guards for the notes feed.
