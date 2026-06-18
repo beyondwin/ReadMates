@@ -59,6 +59,15 @@ class JdbcSessionClosingStatusAdapterTest(
         )
 
     private fun seedClosedPublishedSession() {
+        insertSession()
+        insertPublication()
+        insertHighlights()
+        insertOneLineReview()
+        insertFeedbackDocument()
+        insertNotificationEvent()
+    }
+
+    private fun insertSession() {
         jdbcTemplate.update(
             """
             insert into sessions (
@@ -70,6 +79,9 @@ class JdbcSessionClosingStatusAdapterTest(
             """.trimIndent(),
             sessionId.toString(),
         )
+    }
+
+    private fun insertPublication() {
         jdbcTemplate.update(
             """
             insert into public_session_publications (
@@ -87,6 +99,9 @@ class JdbcSessionClosingStatusAdapterTest(
             """.trimIndent(),
             sessionId.toString(),
         )
+    }
+
+    private fun insertHighlights() {
         jdbcTemplate.update(
             """
             insert into highlights (id, club_id, session_id, text, sort_order)
@@ -101,6 +116,9 @@ class JdbcSessionClosingStatusAdapterTest(
             """.trimIndent(),
             sessionId.toString(),
         )
+    }
+
+    private fun insertOneLineReview() {
         jdbcTemplate.update(
             """
             insert into one_line_reviews (id, club_id, session_id, membership_id, text, visibility)
@@ -115,6 +133,9 @@ class JdbcSessionClosingStatusAdapterTest(
             """.trimIndent(),
             sessionId.toString(),
         )
+    }
+
+    private fun insertFeedbackDocument() {
         jdbcTemplate.update(
             """
             insert into session_feedback_documents (
@@ -133,6 +154,9 @@ class JdbcSessionClosingStatusAdapterTest(
             """.trimIndent(),
             sessionId.toString(),
         )
+    }
+
+    private fun insertNotificationEvent() {
         jdbcTemplate.update(
             """
             insert into notification_event_outbox (

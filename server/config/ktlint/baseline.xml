@@ -318,6 +318,15 @@
     <file name="src/main/kotlin/com/readmates/session/application/port/in/SessionMemberWriteUseCases.kt">
         <error line="1" column="9" source="standard:package-name" />
     </file>
+    <file name="src/main/kotlin/com/readmates/sessionclosing/adapter/in/web/HostSessionClosingController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/sessionclosing/adapter/in/web/SessionClosingWebDtos.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/sessionclosing/application/port/in/GetHostSessionClosingStatusUseCase.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
     <file name="src/main/kotlin/com/readmates/sessionimport/adapter/in/web/SessionImportController.kt">
         <error line="1" column="9" source="standard:package-name" />
     </file>
@@ -385,6 +394,9 @@
         <error line="1" column="9" source="standard:package-name" />
     </file>
     <file name="src/test/kotlin/com/readmates/session/api/SessionApplicationErrorHandlerTest.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/sessionclosing/adapter/in/web/HostSessionClosingControllerTest.kt">
         <error line="1" column="9" source="standard:package-name" />
     </file>
     <file name="src/test/kotlin/com/readmates/shared/adapter/in/web/ApiErrorResponseTest.kt">

@@ -41,10 +41,12 @@ class SessionClosingStatusServiceTest {
     fun `open session requires close session as primary action`() {
         port.snapshot =
             closedSessionSnapshot(
-                state = "OPEN",
-                summaryPublished = false,
-                highlightCount = 0,
-                oneLinerCount = 0,
+                SnapshotFixture(
+                    state = "OPEN",
+                    summaryPublished = false,
+                    highlightCount = 0,
+                    oneLinerCount = 0,
+                ),
             )
 
         val status = service.getHostSessionClosingStatus(host, sessionId)
@@ -59,10 +61,12 @@ class SessionClosingStatusServiceTest {
     fun `closed session without record package points to import records`() {
         port.snapshot =
             closedSessionSnapshot(
-                state = "CLOSED",
-                summaryPublished = false,
-                highlightCount = 0,
-                oneLinerCount = 0,
+                SnapshotFixture(
+                    state = "CLOSED",
+                    summaryPublished = false,
+                    highlightCount = 0,
+                    oneLinerCount = 0,
+                ),
             )
 
         val status = service.getHostSessionClosingStatus(host, sessionId)
@@ -75,7 +79,10 @@ class SessionClosingStatusServiceTest {
 
     @Test
     fun `invalid feedback document blocks closing`() {
-        port.snapshot = closedSessionSnapshot(feedbackDocumentState = FeedbackDocumentClosingState.INVALID)
+        port.snapshot =
+            closedSessionSnapshot(
+                SnapshotFixture(feedbackDocumentState = FeedbackDocumentClosingState.INVALID),
+            )
 
         val status = service.getHostSessionClosingStatus(host, sessionId)
 
@@ -88,16 +95,18 @@ class SessionClosingStatusServiceTest {
     fun `public published session with sent notification is published`() {
         port.snapshot =
             closedSessionSnapshot(
-                state = "PUBLISHED",
-                visibility = SessionRecordVisibility.PUBLIC,
-                publicVisible = true,
-                publicRecordHref = "/clubs/reading-sai/sessions/11111111-1111-1111-1111-111111111111",
-                latestNotificationEvent =
-                    NotificationClosingEvent(
-                        eventType = "FEEDBACK_DOCUMENT_PUBLISHED",
-                        status = NotificationClosingStatus.PUBLISHED,
-                        createdAt = OffsetDateTime.parse("2026-06-18T10:00:00Z"),
-                    ),
+                SnapshotFixture(
+                    state = "PUBLISHED",
+                    visibility = SessionRecordVisibility.PUBLIC,
+                    publicVisible = true,
+                    publicRecordHref = "/clubs/reading-sai/sessions/11111111-1111-1111-1111-111111111111",
+                    latestNotificationEvent =
+                        NotificationClosingEvent(
+                            eventType = "FEEDBACK_DOCUMENT_PUBLISHED",
+                            status = NotificationClosingStatus.PUBLISHED,
+                            createdAt = OffsetDateTime.parse("2026-06-18T10:00:00Z"),
+                        ),
+                ),
             )
 
         val status = service.getHostSessionClosingStatus(host, sessionId)
@@ -107,31 +116,34 @@ class SessionClosingStatusServiceTest {
         assertThat(status.evidence.publicRecordHref).isEqualTo("/clubs/reading-sai/sessions/$sessionId")
     }
 
-    private fun closedSessionSnapshot(
-        state: String = "CLOSED",
-        visibility: SessionRecordVisibility = SessionRecordVisibility.MEMBER,
-        summaryPublished: Boolean = true,
-        highlightCount: Int = 2,
-        oneLinerCount: Int = 3,
-        feedbackDocumentState: FeedbackDocumentClosingState = FeedbackDocumentClosingState.AVAILABLE,
-        latestNotificationEvent: NotificationClosingEvent? = null,
-        publicVisible: Boolean = false,
-        publicRecordHref: String? = null,
-    ) = SessionClosingSnapshot(
-        sessionId = sessionId,
-        sessionNumber = 7,
-        bookTitle = "Test Book",
-        meetingDate = LocalDate.parse("2026-06-18"),
-        state = state,
-        recordVisibility = visibility,
-        summaryPublished = summaryPublished,
-        highlightCount = highlightCount,
-        oneLinerCount = oneLinerCount,
-        feedbackDocumentState = feedbackDocumentState,
-        latestNotificationEvent = latestNotificationEvent,
-        publicVisible = publicVisible,
-        publicRecordHref = publicRecordHref,
-        memberReflectionHref = "/clubs/reading-sai/app/sessions/$sessionId",
+    private fun closedSessionSnapshot(fixture: SnapshotFixture = SnapshotFixture()) =
+        SessionClosingSnapshot(
+            sessionId = sessionId,
+            sessionNumber = 7,
+            bookTitle = "Test Book",
+            meetingDate = LocalDate.parse("2026-06-18"),
+            state = fixture.state,
+            recordVisibility = fixture.visibility,
+            summaryPublished = fixture.summaryPublished,
+            highlightCount = fixture.highlightCount,
+            oneLinerCount = fixture.oneLinerCount,
+            feedbackDocumentState = fixture.feedbackDocumentState,
+            latestNotificationEvent = fixture.latestNotificationEvent,
+            publicVisible = fixture.publicVisible,
+            publicRecordHref = fixture.publicRecordHref,
+            memberReflectionHref = "/clubs/reading-sai/app/sessions/$sessionId",
+        )
+
+    private data class SnapshotFixture(
+        val state: String = "CLOSED",
+        val visibility: SessionRecordVisibility = SessionRecordVisibility.MEMBER,
+        val summaryPublished: Boolean = true,
+        val highlightCount: Int = 2,
+        val oneLinerCount: Int = 3,
+        val feedbackDocumentState: FeedbackDocumentClosingState = FeedbackDocumentClosingState.AVAILABLE,
+        val latestNotificationEvent: NotificationClosingEvent? = null,
+        val publicVisible: Boolean = false,
+        val publicRecordHref: String? = null,
     )
 
     private fun member(role: MembershipRole) =

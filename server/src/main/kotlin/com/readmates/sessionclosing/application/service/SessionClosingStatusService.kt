@@ -41,68 +41,115 @@ class SessionClosingStatusService(
 }
 
 private fun SessionClosingSnapshot.toClosingStatus(): HostSessionClosingStatus {
-    val sessionClosed = state in setOf("CLOSED", "PUBLISHED")
-    val recordSaved = summaryPublished || highlightCount > 0 || oneLinerCount > 0
-    val feedbackReady = feedbackDocumentState == FeedbackDocumentClosingState.AVAILABLE
-    val feedbackBlocked = feedbackDocumentState == FeedbackDocumentClosingState.INVALID
-    val notificationSent = latestNotificationEvent?.status == NotificationClosingStatus.PUBLISHED
-    val publicApplicable = recordVisibility == SessionRecordVisibility.PUBLIC
-    val publicReady = publicApplicable && publicVisible && publicRecordHref != null
-
-    val overall =
-        when {
-            feedbackBlocked -> ClosingOverall(ClosingOverallState.BLOCKED, "Blocked", ClosingPrimaryAction.IMPORT_RECORDS)
-            !sessionClosed -> ClosingOverall(ClosingOverallState.IN_PROGRESS, "In progress", ClosingPrimaryAction.CLOSE_SESSION)
-            !recordSaved -> ClosingOverall(ClosingOverallState.IN_PROGRESS, "In progress", ClosingPrimaryAction.IMPORT_RECORDS)
-            !feedbackReady -> ClosingOverall(ClosingOverallState.IN_PROGRESS, "In progress", ClosingPrimaryAction.IMPORT_RECORDS)
-            !notificationSent -> ClosingOverall(ClosingOverallState.READY, "Ready", ClosingPrimaryAction.SEND_NOTIFICATION)
-            publicApplicable && !publicReady -> ClosingOverall(ClosingOverallState.READY, "Ready", ClosingPrimaryAction.PUBLISH_RECORDS)
-            publicReady -> ClosingOverall(ClosingOverallState.PUBLISHED, "Published", ClosingPrimaryAction.REVIEW_PUBLIC_PAGE)
-            else -> ClosingOverall(ClosingOverallState.READY, "Ready", ClosingPrimaryAction.NONE)
-        }
+    val signals = closingSignals()
 
     return HostSessionClosingStatus(
         session = ClosingSessionSummary(sessionId, sessionNumber, bookTitle, meetingDate, state, recordVisibility),
-        overall = overall,
-        checklist =
-            listOf(
-                checklist(
-                    id = ClosingChecklistId.SESSION_CLOSED,
-                    done = sessionClosed,
-                    label = "Session closed",
-                    detail = "The meeting status is closed.",
-                    href = "/app/host/sessions/$sessionId/edit",
-                ),
-                checklist(
-                    id = ClosingChecklistId.RECORD_PACKAGE_SAVED,
-                    done = recordSaved,
-                    label = "Record package saved",
-                    detail = "At least one summary, highlight, or one-liner is saved.",
-                    href = "/app/host/sessions/$sessionId/edit?records=json",
-                ),
-                feedbackChecklist(feedbackReady, feedbackBlocked, sessionId),
-                checklist(
-                    id = ClosingChecklistId.MEMBER_NOTIFICATION_SENT,
-                    done = notificationSent,
-                    label = "Member notification sent",
-                    detail = "Members have a notification path back into the reflection loop.",
-                    href = "/app/host/notifications",
-                ),
-                publicChecklist(ClosingChecklistId.PUBLIC_RECORD_VISIBLE, publicApplicable, publicReady, "Public record visible", publicRecordHref),
-                publicChecklist(ClosingChecklistId.PUBLIC_SHOWCASE_READY, publicApplicable, publicReady, "Public showcase ready", publicRecordHref),
-            ),
-        evidence =
-            ClosingEvidence(
-                summaryPublished = summaryPublished,
-                highlightCount = highlightCount.coerceAtLeast(0),
-                oneLinerCount = oneLinerCount.coerceAtLeast(0),
-                feedbackDocumentState = feedbackDocumentState,
-                latestNotificationEvent = latestNotificationEvent,
-                publicRecordHref = publicRecordHref,
-                memberReflectionHref = memberReflectionHref,
-            ),
+        overall = overall(signals),
+        checklist = checklistItems(signals),
+        evidence = evidence(),
     )
 }
+
+private data class ClosingSignals(
+    val sessionClosed: Boolean,
+    val recordSaved: Boolean,
+    val feedbackReady: Boolean,
+    val feedbackBlocked: Boolean,
+    val notificationSent: Boolean,
+    val publicApplicable: Boolean,
+    val publicReady: Boolean,
+)
+
+private fun SessionClosingSnapshot.closingSignals() =
+    ClosingSignals(
+        sessionClosed = state in setOf("CLOSED", "PUBLISHED"),
+        recordSaved = summaryPublished || highlightCount > 0 || oneLinerCount > 0,
+        feedbackReady = feedbackDocumentState == FeedbackDocumentClosingState.AVAILABLE,
+        feedbackBlocked = feedbackDocumentState == FeedbackDocumentClosingState.INVALID,
+        notificationSent = latestNotificationEvent?.status == NotificationClosingStatus.PUBLISHED,
+        publicApplicable = recordVisibility == SessionRecordVisibility.PUBLIC,
+        publicReady = recordVisibility == SessionRecordVisibility.PUBLIC && publicVisible && publicRecordHref != null,
+    )
+
+private fun overall(signals: ClosingSignals): ClosingOverall =
+    when {
+        signals.feedbackBlocked -> overall(ClosingOverallState.BLOCKED, ClosingPrimaryAction.IMPORT_RECORDS)
+        !signals.sessionClosed -> overall(ClosingOverallState.IN_PROGRESS, ClosingPrimaryAction.CLOSE_SESSION)
+        !signals.recordSaved -> overall(ClosingOverallState.IN_PROGRESS, ClosingPrimaryAction.IMPORT_RECORDS)
+        !signals.feedbackReady -> overall(ClosingOverallState.IN_PROGRESS, ClosingPrimaryAction.IMPORT_RECORDS)
+        !signals.notificationSent -> overall(ClosingOverallState.READY, ClosingPrimaryAction.SEND_NOTIFICATION)
+        signals.publicApplicable && !signals.publicReady ->
+            overall(ClosingOverallState.READY, ClosingPrimaryAction.PUBLISH_RECORDS)
+        signals.publicReady -> overall(ClosingOverallState.PUBLISHED, ClosingPrimaryAction.REVIEW_PUBLIC_PAGE)
+        else -> overall(ClosingOverallState.READY, ClosingPrimaryAction.NONE)
+    }
+
+private fun overall(
+    state: ClosingOverallState,
+    primaryAction: ClosingPrimaryAction,
+) = ClosingOverall(state, state.label, primaryAction)
+
+private val ClosingOverallState.label: String
+    get() =
+        when (this) {
+            ClosingOverallState.BLOCKED -> "Blocked"
+            ClosingOverallState.IN_PROGRESS -> "In progress"
+            ClosingOverallState.READY -> "Ready"
+            ClosingOverallState.PUBLISHED -> "Published"
+            ClosingOverallState.NOT_STARTED -> "Not started"
+        }
+
+private fun SessionClosingSnapshot.checklistItems(signals: ClosingSignals) =
+    listOf(
+        checklist(
+            id = ClosingChecklistId.SESSION_CLOSED,
+            done = signals.sessionClosed,
+            label = "Session closed",
+            detail = "The meeting status is closed.",
+            href = "/app/host/sessions/$sessionId/edit",
+        ),
+        checklist(
+            id = ClosingChecklistId.RECORD_PACKAGE_SAVED,
+            done = signals.recordSaved,
+            label = "Record package saved",
+            detail = "At least one summary, highlight, or one-liner is saved.",
+            href = "/app/host/sessions/$sessionId/edit?records=json",
+        ),
+        feedbackChecklist(signals.feedbackReady, signals.feedbackBlocked, sessionId),
+        checklist(
+            id = ClosingChecklistId.MEMBER_NOTIFICATION_SENT,
+            done = signals.notificationSent,
+            label = "Member notification sent",
+            detail = "Members have a notification path back into the reflection loop.",
+            href = "/app/host/notifications",
+        ),
+        publicChecklist(
+            id = ClosingChecklistId.PUBLIC_RECORD_VISIBLE,
+            applicable = signals.publicApplicable,
+            ready = signals.publicReady,
+            label = "Public record visible",
+            href = publicRecordHref,
+        ),
+        publicChecklist(
+            id = ClosingChecklistId.PUBLIC_SHOWCASE_READY,
+            applicable = signals.publicApplicable,
+            ready = signals.publicReady,
+            label = "Public showcase ready",
+            href = publicRecordHref,
+        ),
+    )
+
+private fun SessionClosingSnapshot.evidence() =
+    ClosingEvidence(
+        summaryPublished = summaryPublished,
+        highlightCount = highlightCount.coerceAtLeast(0),
+        oneLinerCount = oneLinerCount.coerceAtLeast(0),
+        feedbackDocumentState = feedbackDocumentState,
+        latestNotificationEvent = latestNotificationEvent,
+        publicRecordHref = publicRecordHref,
+        memberReflectionHref = memberReflectionHref,
+    )
 
 private fun checklist(
     id: ClosingChecklistId,
