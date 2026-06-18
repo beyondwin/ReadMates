@@ -79,4 +79,141 @@ describe("AdminClubOperationsPage", () => {
     expect(screen.getByRole("region", { name: "플랫폼 운영" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "호스트 운영" })).toBeInTheDocument();
   });
+
+  it("renders closing risks with safe state labels and host board links", () => {
+    render(
+      <MemoryRouter>
+        <AdminClubOperationsPage
+          snapshot={{
+            ...snapshot,
+            closingRisks: {
+              incompleteCount: 2,
+              blockedCount: 1,
+              readyCount: 1,
+              items: [
+                {
+                  sessionId: "session-7",
+                  sessionNumber: 7,
+                  bookTitle: "페인트",
+                  meetingDate: "2026-06-18",
+                  overallState: "BLOCKED",
+                  primaryBlocker: "FEEDBACK_DOCUMENT_INVALID",
+                  hostClosingHref: "/clubs/reading-sai/app/host/sessions/session-7/closing",
+                },
+                {
+                  sessionId: "session-8",
+                  sessionNumber: 8,
+                  bookTitle: "긴긴밤",
+                  meetingDate: "2026-06-25",
+                  overallState: "IN_PROGRESS",
+                  primaryBlocker: "RECORD_PACKAGE_REQUIRED",
+                  hostClosingHref: "/clubs/reading-sai/app/host/sessions/session-8/closing",
+                },
+                {
+                  sessionId: "session-9",
+                  sessionNumber: 9,
+                  bookTitle: "스토너",
+                  meetingDate: "2026-07-02",
+                  overallState: "READY",
+                  primaryBlocker: "MEMBER_NOTIFICATION_REQUIRED",
+                  hostClosingHref: "/clubs/reading-sai/app/host/sessions/session-9/closing",
+                },
+              ],
+            },
+          }}
+          supportGrantCount={0}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("heading", { name: "클로징 확인 필요" })).toBeInTheDocument();
+    expect(screen.getByText("미완료 2 · 차단 1 · 준비 1")).toBeInTheDocument();
+    expect(screen.getByText("No.07 · 페인트")).toBeInTheDocument();
+    expect(screen.getByText("차단")).toBeInTheDocument();
+    expect(screen.getByText("진행 중")).toBeInTheDocument();
+    expect(screen.getByText("확인 준비")).toBeInTheDocument();
+    expect(screen.getByText("피드백 문서 확인 필요")).toBeInTheDocument();
+    expect(screen.getByText("기록 패키지 필요")).toBeInTheDocument();
+    expect(screen.getByText("멤버 알림 확인")).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "호스트 클로징 보드" })[0]).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/sessions/session-7/closing",
+    );
+    expect(screen.queryByRole("button", { name: /발행|세션 종료|알림 발송|RSVP|출석/ })).not.toBeInTheDocument();
+  });
+
+  it("renders optional closing risks as an empty state", () => {
+    render(
+      <MemoryRouter>
+        <AdminClubOperationsPage snapshot={snapshot} supportGrantCount={0} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("heading", { name: "클로징 확인 필요" })).toBeInTheDocument();
+    expect(screen.getByText("확인 필요한 회차 없음")).toBeInTheDocument();
+  });
+
+  it("hides raw unknown closing risk codes behind safe fallback labels", () => {
+    render(
+      <MemoryRouter>
+        <AdminClubOperationsPage
+          snapshot={{
+            ...snapshot,
+            closingRisks: {
+              incompleteCount: 1,
+              blockedCount: 0,
+              readyCount: 0,
+              items: [
+                {
+                  sessionId: "session-10",
+                  sessionNumber: 10,
+                  bookTitle: "공개 금지 센티널",
+                  meetingDate: "2026-07-09",
+                  overallState: "RAW_INTERNAL_STATE",
+                  primaryBlocker: "PRIVATE_PROVIDER_STACK_TRACE_TOKEN_123",
+                  hostClosingHref: "/clubs/reading-sai/app/host/sessions/session-10/closing",
+                },
+              ],
+            },
+          }}
+          supportGrantCount={0}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getAllByText("확인 필요").length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText("RAW_INTERNAL_STATE")).not.toBeInTheDocument();
+    expect(screen.queryByText("PRIVATE_PROVIDER_STACK_TRACE_TOKEN_123")).not.toBeInTheDocument();
+  });
+
+  it("limits closing risk rows and renders overflow count", () => {
+    render(
+      <MemoryRouter>
+        <AdminClubOperationsPage
+          snapshot={{
+            ...snapshot,
+            closingRisks: {
+              incompleteCount: 6,
+              blockedCount: 1,
+              readyCount: 1,
+              items: Array.from({ length: 6 }, (_, index) => ({
+                sessionId: `session-${index + 1}`,
+                sessionNumber: index + 1,
+                bookTitle: `책 ${index + 1}`,
+                meetingDate: "2026-07-09",
+                overallState: "IN_PROGRESS",
+                primaryBlocker: "RECORD_PACKAGE_REQUIRED",
+                hostClosingHref: `/clubs/reading-sai/app/host/sessions/session-${index + 1}/closing`,
+              })),
+            },
+          }}
+          supportGrantCount={0}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("No.05 · 책 5")).toBeInTheDocument();
+    expect(screen.queryByText("No.06 · 책 6")).not.toBeInTheDocument();
+    expect(screen.getByText("외 1개 회차")).toBeInTheDocument();
+  });
 });

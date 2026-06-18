@@ -3,7 +3,11 @@ import type { ReactNode } from "react";
 import {
   aiFailureDelta,
   blockerNextAction,
+  closingRiskBlockerLabel,
+  closingRiskOverflowCount,
+  closingRiskStateLabel,
   notificationFailureDelta,
+  type AdminClubClosingRiskItem,
   type AdminClubOperationsSnapshot,
 } from "@/features/platform-admin/model/platform-admin-club-operations-model";
 
@@ -97,6 +101,7 @@ export function AdminClubOperationsPage({ snapshot, supportGrantCount }: AdminCl
             <Stat label="대기" value={snapshot.memberActivity.pendingViewerCount} />
           </Panel>
         </div>
+        <ClosingRiskPanel snapshot={snapshot} />
       </section>
 
       <div className="admin-club-operations__links">
@@ -141,5 +146,63 @@ function Stat({ label, value }: { label: string; value: number | string }) {
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
+  );
+}
+
+function ClosingRiskPanel({ snapshot }: { snapshot: AdminClubOperationsSnapshot }) {
+  const closingRisks = snapshot.closingRisks;
+  const visibleItems = closingRisks?.items.slice(0, 5) ?? [];
+  const overflowCount = closingRiskOverflowCount(snapshot);
+
+  return (
+    <section className="admin-club-operations__closing-risk" aria-labelledby="admin-club-closing-risk-title">
+      <div className="admin-club-operations__closing-risk-header">
+        <div>
+          <h4 id="admin-club-closing-risk-title" className="h5 editorial">
+            클로징 확인 필요
+          </h4>
+          <p className="tiny muted">
+            미완료 {closingRisks?.incompleteCount ?? 0} · 차단 {closingRisks?.blockedCount ?? 0} · 준비{" "}
+            {closingRisks?.readyCount ?? 0}
+          </p>
+        </div>
+      </div>
+
+      {visibleItems.length > 0 ? (
+        <div className="admin-club-operations__closing-risk-list">
+          {visibleItems.map((item) => (
+            <ClosingRiskRow key={item.sessionId} item={item} />
+          ))}
+        </div>
+      ) : (
+        <p className="admin-club-operations__closing-risk-empty muted">확인 필요한 회차 없음</p>
+      )}
+
+      {overflowCount > 0 ? (
+        <p className="admin-club-operations__closing-risk-overflow tiny muted">외 {overflowCount}개 회차</p>
+      ) : null}
+    </section>
+  );
+}
+
+function ClosingRiskRow({ item }: { item: AdminClubClosingRiskItem }) {
+  return (
+    <article className="admin-club-operations__closing-risk-row">
+      <div className="admin-club-operations__closing-risk-main">
+        <strong>
+          No.{String(item.sessionNumber).padStart(2, "0")} · {item.bookTitle}
+        </strong>
+        <span>{item.meetingDate}</span>
+      </div>
+      <span className="admin-club-operations__closing-risk-badge" data-state={item.overallState}>
+        {closingRiskStateLabel(item.overallState)}
+      </span>
+      <span className="admin-club-operations__closing-risk-blocker">
+        {closingRiskBlockerLabel(item.primaryBlocker)}
+      </span>
+      <Link className="btn btn-ghost btn-sm" to={item.hostClosingHref}>
+        호스트 클로징 보드
+      </Link>
+    </article>
   );
 }

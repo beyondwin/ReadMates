@@ -1467,6 +1467,87 @@
   font-size: 13px;
 }
 
+.admin-club-operations__closing-risk {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  padding: 16px;
+  background: var(--bg-sub);
+}
+
+.admin-club-operations__closing-risk-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.admin-club-operations__closing-risk-list {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-club-operations__closing-risk-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1.4fr) minmax(74px, auto) minmax(120px, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.admin-club-operations__closing-risk-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.admin-club-operations__closing-risk-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.admin-club-operations__closing-risk-main strong,
+.admin-club-operations__closing-risk-main span,
+.admin-club-operations__closing-risk-blocker {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-club-operations__closing-risk-main span,
+.admin-club-operations__closing-risk-blocker,
+.admin-club-operations__closing-risk-empty,
+.admin-club-operations__closing-risk-overflow {
+  font-size: 13px;
+}
+
+.admin-club-operations__closing-risk-badge {
+  justify-self: start;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 9px;
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.admin-club-operations__closing-risk-badge[data-state="BLOCKED"] {
+  border-color: color-mix(in srgb, var(--danger) 38%, var(--line));
+  color: var(--danger);
+}
+
+.admin-club-operations__closing-risk-badge[data-state="IN_PROGRESS"] {
+  border-color: color-mix(in srgb, var(--warning) 42%, var(--line));
+  color: var(--text-2);
+}
+
+.admin-club-operations__closing-risk-badge[data-state="READY"] {
+  border-color: color-mix(in srgb, var(--success) 42%, var(--line));
+  color: var(--success);
+}
+
 .admin-support-workbench {
   display: grid;
   gap: 18px;
