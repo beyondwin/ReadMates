@@ -299,10 +299,10 @@ describe("MemberHome", () => {
     const desktop = within(container.querySelector(".rm-member-home-desktop") as HTMLElement);
     const mobile = within(container.querySelector(".rm-member-home-mobile") as HTMLElement);
 
-    expect(desktop.getByRole("region", { name: "최근 발행 기록" })).toBeInTheDocument();
+    expect(desktop.getByRole("region", { name: "지난 모임 회고" })).toBeInTheDocument();
     expect(desktop.getByRole("link", { name: "기록 보기" })).toHaveAttribute("href", "/app/sessions/session-6");
     expect(desktop.getByRole("link", { name: "피드백 보기" })).toHaveAttribute("href", "/app/feedback/session-6");
-    expect(mobile.getByRole("region", { name: "최근 발행 기록" })).toBeInTheDocument();
+    expect(mobile.getByRole("region", { name: "지난 모임 회고" })).toBeInTheDocument();
     expect(screen.queryByText("PRIVATE_MEMBER_EMAIL")).not.toBeInTheDocument();
   });
 

@@ -46,6 +46,35 @@ function SectionHeader({
   );
 }
 
+function FeedbackAction({
+  entry,
+  LinkComponent,
+}: {
+  entry: MemberHomeRecentRecordEntry;
+  LinkComponent: MemberHomeLinkComponent;
+}) {
+  const canOpenFeedback = entry.feedbackState === "AVAILABLE" || entry.feedbackState === "UNKNOWN";
+
+  if (!canOpenFeedback) {
+    return (
+      <span className="small" style={{ color: "var(--text-2)" }}>
+        {entry.feedbackStatusLabel}
+      </span>
+    );
+  }
+
+  return (
+    <>
+      <Link to={entry.feedbackHref} className="btn btn-quiet btn-sm" LinkComponent={LinkComponent}>
+        피드백 보기
+      </Link>
+      <span className="tiny" style={{ color: "var(--text-3)", flexBasis: "100%" }}>
+        {entry.feedbackStatusLabel}
+      </span>
+    </>
+  );
+}
+
 export function ClubPulse({
   items,
   LinkComponent = PlainMemberHomeLink,
@@ -119,10 +148,10 @@ export function RecentRecordEntry({
   }
 
   return (
-    <section className="surface-quiet" aria-label="최근 발행 기록" style={{ padding: 20, overflowWrap: "anywhere" }}>
+    <section className="surface-quiet" aria-label="지난 모임 회고" style={{ padding: 20, overflowWrap: "anywhere" }}>
       <div className="row-between" style={{ gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
         <div style={{ minWidth: 0 }}>
-          <div className="eyebrow">최근 발행 기록</div>
+          <div className="eyebrow">지난 모임 회고</div>
           <h2 className="h3 editorial" style={{ margin: "6px 0 0" }}>
             No.{String(entry.sessionNumber).padStart(2, "0")} · {entry.bookTitle}
           </h2>
@@ -133,13 +162,11 @@ export function RecentRecordEntry({
             {entry.kindLabels.join(" · ")}
           </div>
         </div>
-        <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+        <div className="row" style={{ gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
           <Link to={entry.href} className="btn btn-primary btn-sm" LinkComponent={LinkComponent}>
             기록 보기
           </Link>
-          <Link to={entry.feedbackHref} className="btn btn-quiet btn-sm" LinkComponent={LinkComponent}>
-            피드백 보기
-          </Link>
+          <FeedbackAction entry={entry} LinkComponent={LinkComponent} />
         </div>
       </div>
     </section>
@@ -158,22 +185,23 @@ export function MobileRecentRecordEntry({
   }
 
   return (
-    <section className="m-sec" aria-label="최근 발행 기록">
+    <section className="m-sec" aria-label="지난 모임 회고">
       <div className="m-card-quiet" style={{ overflowWrap: "anywhere" }}>
-        <div className="eyebrow">최근 발행 기록</div>
+        <div className="eyebrow">지난 모임 회고</div>
         <div className="body editorial" style={{ fontSize: 15, marginTop: 6 }}>
           No.{String(entry.sessionNumber).padStart(2, "0")} · {entry.bookTitle}
         </div>
         <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
           {entry.summary}
         </p>
-        <div className="m-row" style={{ gap: 8, marginTop: 12 }}>
+        <div className="tiny" style={{ color: "var(--text-3)", marginTop: 8 }}>
+          {entry.kindLabels.join(" · ")}
+        </div>
+        <div className="m-row" style={{ gap: 8, marginTop: 12, flexWrap: "wrap" }}>
           <Link to={entry.href} className="btn btn-primary btn-sm" LinkComponent={LinkComponent}>
             기록 보기
           </Link>
-          <Link to={entry.feedbackHref} className="btn btn-quiet btn-sm" LinkComponent={LinkComponent}>
-            피드백 보기
-          </Link>
+          <FeedbackAction entry={entry} LinkComponent={LinkComponent} />
         </div>
       </div>
     </section>
