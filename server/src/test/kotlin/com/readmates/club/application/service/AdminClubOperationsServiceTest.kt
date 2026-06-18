@@ -3,6 +3,7 @@ package com.readmates.club.application.service
 import com.readmates.club.application.PlatformAdminError
 import com.readmates.club.application.PlatformAdminException
 import com.readmates.club.application.model.AdminClubAiUsage
+import com.readmates.club.application.model.AdminClubClosingRisks
 import com.readmates.club.application.model.AdminClubMemberActivity
 import com.readmates.club.application.model.AdminClubNotificationHealth
 import com.readmates.club.application.model.AdminClubOperationsClub
@@ -63,6 +64,7 @@ class AdminClubOperationsServiceTest {
             sessionProgress = AdminClubSessionProgress(1, 1, 0, 0, 0),
             notificationHealth = AdminClubNotificationHealth(0, 0, 0, null, emptyList()),
             aiUsage = AdminClubAiUsage(0, 0, 0, "0.0000", "NO_RECENT_USAGE"),
+            closingRisks = AdminClubClosingRisks(0, 0, 0, emptyList()),
             safeLinks = listOf(AdminClubSafeLink("Host app", "/clubs/reading-sai/app", "HOST_ROUTE")),
         )
 

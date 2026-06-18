@@ -1,5 +1,6 @@
 package com.readmates.club.application.model
 
+import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -12,6 +13,7 @@ data class AdminClubOperationsSnapshot(
     val sessionProgress: AdminClubSessionProgress,
     val notificationHealth: AdminClubNotificationHealth,
     val aiUsage: AdminClubAiUsage,
+    val closingRisks: AdminClubClosingRisks = AdminClubClosingRisks(0, 0, 0, emptyList()),
     val safeLinks: List<AdminClubSafeLink>,
 )
 
@@ -42,6 +44,23 @@ data class AdminClubSessionProgress(
     val closedCount: Int,
     val publishedRecordCount: Int,
     val incompleteRecordCount: Int,
+)
+
+data class AdminClubClosingRisks(
+    val incompleteCount: Int,
+    val blockedCount: Int,
+    val readyCount: Int,
+    val items: List<AdminClubClosingRiskItem>,
+)
+
+data class AdminClubClosingRiskItem(
+    val sessionId: UUID,
+    val sessionNumber: Int,
+    val bookTitle: String,
+    val meetingDate: LocalDate,
+    val overallState: String,
+    val primaryBlocker: String?,
+    val hostClosingHref: String,
 )
 
 data class AdminClubNotificationHealth(

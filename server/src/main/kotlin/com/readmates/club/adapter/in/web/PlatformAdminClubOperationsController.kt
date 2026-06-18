@@ -33,6 +33,7 @@ data class AdminClubOperationsSnapshotResponse(
     val sessionProgress: Any,
     val notificationHealth: Any,
     val aiUsage: Any,
+    val closingRisks: Any,
     val safeLinks: Any,
 ) {
     companion object {
@@ -46,6 +47,7 @@ data class AdminClubOperationsSnapshotResponse(
                 sessionProgress = snapshot.sessionProgress,
                 notificationHealth = snapshot.notificationHealth,
                 aiUsage = snapshot.aiUsage,
+                closingRisks = snapshot.closingRisks,
                 safeLinks = snapshot.safeLinks,
             )
     }
