@@ -3,7 +3,11 @@ import type {
   SessionImportPreviewResponse,
   SessionRecordVisibility,
 } from "@/features/host/model/host-view-types";
-import { sessionImportCanCommit, sessionImportReplacementWarning } from "@/features/host/model/session-import-model";
+import {
+  buildSessionImportReview,
+  sessionImportReplacementWarning,
+  type SessionImportReview,
+} from "@/features/host/model/session-import-model";
 import { Panel } from "./session-editor-panel";
 import type { MobileEditorSection } from "./mobile-editor-tabs";
 
@@ -26,7 +30,8 @@ export function SessionImportPanelBody({
   onFileSelected,
   onCommit,
 }: SessionImportPanelBodyProps) {
-  const canCommit = Boolean(sessionId) && status !== "committing" && sessionImportCanCommit(preview);
+  const review = preview ? buildSessionImportReview(preview, recordVisibility) : null;
+  const canCommit = Boolean(sessionId) && status !== "committing" && review?.canCommit === true;
 
   return (
     <div className="stack" style={{ "--stack": "14px" } as CSSProperties}>
@@ -53,40 +58,73 @@ export function SessionImportPanelBody({
           {error}
         </div>
       ) : null}
-      {preview ? (
-        <div className="surface-quiet" style={{ padding: 16 }}>
-          <div className="row-between" style={{ gap: 12, alignItems: "flex-start" }}>
-            <div>
-              <div className="eyebrow">미리보기</div>
-              <div className="small" style={{ marginTop: 6 }}>
-                {preview.session.sessionNumber ? `${preview.session.sessionNumber}회차 · ` : ""}
-                {preview.session.bookTitle ?? "책 제목 확인 필요"}
-              </div>
-            </div>
-            <span className={`rm-state ${preview.valid ? "rm-state--success" : "rm-state--danger"}`}>
-              {preview.valid ? "저장 가능" : "확인 필요"}
-            </span>
-          </div>
-          <p className="small" style={{ margin: "12px 0 0" }}>
-            {preview.publication.summary}
-          </p>
-          <div className="tiny" style={{ marginTop: 10 }}>
-            하이라이트 {preview.highlights.length}개 · 한줄평 {preview.oneLineReviews.length}개 · {preview.feedbackDocument.title ?? preview.feedbackDocument.fileName}
-          </div>
-          {preview.issues.length > 0 ? (
-            <ul className="small" style={{ margin: "10px 0 0", paddingLeft: 18, color: "var(--danger)" }}>
-              {preview.issues.map((issue) => (
-                <li key={`${issue.code}:${issue.message}`}>{issue.message}</li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-      ) : null}
+      {review && preview ? <SessionImportReviewCard review={review} summary={preview.publication.summary} /> : null}
       <button className="btn btn-primary" type="button" disabled={!canCommit} onClick={onCommit}>
         {status === "committing" ? "가져온 기록 저장 중" : "가져온 기록 저장"}
       </button>
       <div className="tiny">현재 선택한 공개 범위: {recordVisibility}</div>
     </div>
+  );
+}
+
+function SessionImportReviewCard({ review, summary }: { review: SessionImportReview; summary: string }) {
+  return (
+    <section
+      className="surface-quiet"
+      role="region"
+      aria-label="세션 기록 미리보기"
+      style={{ padding: 16, overflowWrap: "anywhere" }}
+    >
+      <div className="row-between" style={{ gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+        <div className="stack" style={{ "--stack": "6px", minWidth: 0 } as CSSProperties}>
+          <div className="eyebrow">미리보기</div>
+          <div className="small">{review.sessionLabel}</div>
+        </div>
+        <span className={`rm-state rm-state--${review.statusTone}`}>{review.statusLabel}</span>
+      </div>
+
+      <div className="stack" style={{ "--stack": "10px", marginTop: 14 } as CSSProperties}>
+        <p className="small" style={{ margin: 0 }}>
+          {summary}
+        </p>
+
+        <ul className="tiny" style={{ display: "grid", gap: 8, margin: 0, paddingLeft: 18 }}>
+          {review.replacementItems.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+
+        <div className="small">
+          <span>{review.authorStatusLabel}</span>
+          <span>
+            {" "}
+            · 매칭 {review.authorSummary.matchedCount}개 / 전체 {review.authorSummary.totalCount}개
+          </span>
+        </div>
+        {review.authorSummary.unmatchedAuthors.length > 0 ? (
+          <ul className="tiny" style={{ display: "grid", gap: 6, margin: 0, paddingLeft: 18 }}>
+            {review.authorSummary.unmatchedAuthors.map((author) => (
+              <li key={author}>{author}</li>
+            ))}
+          </ul>
+        ) : null}
+
+        <div className="small">
+          {review.feedbackDocumentStatusLabel}
+          <span className="tiny" style={{ display: "block", marginTop: 4, color: "var(--text-2)" }}>
+            {review.feedbackDocumentLabel}
+          </span>
+        </div>
+
+        {review.blockingMessages.length > 0 ? (
+          <ul className="small" style={{ display: "grid", gap: 6, margin: 0, paddingLeft: 18, color: "var(--danger)" }}>
+            {review.blockingMessages.map((message) => (
+              <li key={message}>{message}</li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+    </section>
   );
 }
 
