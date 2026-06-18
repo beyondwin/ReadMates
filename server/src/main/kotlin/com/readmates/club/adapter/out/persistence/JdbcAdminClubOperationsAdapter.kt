@@ -354,29 +354,8 @@ class JdbcAdminClubOperationsAdapter(
 private fun BigDecimal.formatCost(): String = setScale(COST_SCALE).toPlainString()
 
 private fun ResultSet.toClosingRiskCandidate(clubSlug: String): AdminClubClosingRiskItem? {
-    val state = getString("state")
-    val visibility = getString("visibility")
-    val summaryPublished = !getString("public_summary").isNullOrBlank()
-    val recordSaved = summaryPublished || getInt("highlight_count") > 0 || getInt("one_liner_count") > 0
-    val feedbackSourceText = getString("feedback_source_text")
-    val feedbackMissing = feedbackSourceText == null
-    val feedbackInvalid = feedbackSourceText != null && !feedbackSourceText.contains(FEEDBACK_DOCUMENT_MARKER)
-    val notificationSent = getString("latest_notification_status") in setOf("PUBLISHED", "SENT")
-    val publicVisible =
-        getBoolean("is_public") &&
-            getTimestamp("published_at") != null &&
-            getString("publication_visibility") == "PUBLIC"
-
-    val closingState =
-        when {
-            feedbackInvalid -> ClosingRiskState("BLOCKED", "FEEDBACK_DOCUMENT_INVALID")
-            !recordSaved -> ClosingRiskState("IN_PROGRESS", "RECORD_PACKAGE_REQUIRED")
-            feedbackMissing -> ClosingRiskState("IN_PROGRESS", "FEEDBACK_DOCUMENT_REQUIRED")
-            !notificationSent -> ClosingRiskState("READY", "MEMBER_NOTIFICATION_REQUIRED")
-            visibility == "PUBLIC" && !publicVisible -> ClosingRiskState("READY", "PUBLIC_RECORD_REQUIRED")
-            state == "PUBLISHED" || publicVisible -> null
-            else -> null
-        } ?: return null
+    val facts = toClosingRiskFacts()
+    val closingState = facts.toClosingRiskState() ?: return null
     val sessionId = uuid("id")
 
     return AdminClubClosingRiskItem(
@@ -389,6 +368,46 @@ private fun ResultSet.toClosingRiskCandidate(clubSlug: String): AdminClubClosing
         hostClosingHref = "/clubs/$clubSlug/app/host/sessions/$sessionId/closing",
     )
 }
+
+private fun ResultSet.toClosingRiskFacts(): ClosingRiskFacts {
+    val feedbackSourceText = getString("feedback_source_text")
+    return ClosingRiskFacts(
+        sessionState = getString("state"),
+        sessionVisibility = getString("visibility"),
+        recordSaved =
+            !getString("public_summary").isNullOrBlank() ||
+                getInt("highlight_count") > 0 ||
+                getInt("one_liner_count") > 0,
+        feedbackMissing = feedbackSourceText == null,
+        feedbackInvalid = feedbackSourceText != null && !feedbackSourceText.contains(FEEDBACK_DOCUMENT_MARKER),
+        notificationSent = getString("latest_notification_status") in setOf("PUBLISHED", "SENT"),
+        publicVisible =
+            getBoolean("is_public") &&
+                getTimestamp("published_at") != null &&
+                getString("publication_visibility") == "PUBLIC",
+    )
+}
+
+private fun ClosingRiskFacts.toClosingRiskState(): ClosingRiskState? =
+    when {
+        feedbackInvalid -> ClosingRiskState("BLOCKED", "FEEDBACK_DOCUMENT_INVALID")
+        !recordSaved -> ClosingRiskState("IN_PROGRESS", "RECORD_PACKAGE_REQUIRED")
+        feedbackMissing -> ClosingRiskState("IN_PROGRESS", "FEEDBACK_DOCUMENT_REQUIRED")
+        !notificationSent -> ClosingRiskState("READY", "MEMBER_NOTIFICATION_REQUIRED")
+        sessionVisibility == "PUBLIC" && !publicVisible -> ClosingRiskState("READY", "PUBLIC_RECORD_REQUIRED")
+        sessionState == "PUBLISHED" || publicVisible -> null
+        else -> null
+    }
+
+private data class ClosingRiskFacts(
+    val sessionState: String,
+    val sessionVisibility: String,
+    val recordSaved: Boolean,
+    val feedbackMissing: Boolean,
+    val feedbackInvalid: Boolean,
+    val notificationSent: Boolean,
+    val publicVisible: Boolean,
+)
 
 private data class ClosingRiskState(
     val overallState: String,

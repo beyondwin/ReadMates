@@ -88,7 +88,8 @@ class JdbcAdminClubOperationsClosingRiskTest(
         )
         jdbcTemplate.update(
             "insert into users (id, google_subject_id, email, name, short_name, auth_provider) " +
-                "values (?, 'admin-closing-risk-user', 'admin-closing-risk@example.com', 'Admin Closing', 'AC', 'GOOGLE')",
+                "values (?, 'admin-closing-risk-user', 'admin-closing-risk@example.com', " +
+                "'Admin Closing', 'AC', 'GOOGLE')",
             CLOSING_RISK_USER_ID,
         )
         jdbcTemplate.update(
@@ -101,7 +102,7 @@ class JdbcAdminClubOperationsClosingRiskTest(
     }
 
     private fun seedBlockedSession() {
-        insertSession(BLOCKED_SESSION_ID, 10, "Blocked Book", "2026-06-10", "CLOSED", "MEMBER")
+        insertSession(SessionSeed(BLOCKED_SESSION_ID, 10, "Blocked Book", "2026-06-10", "CLOSED", "MEMBER"))
         insertPublication("00000000-0000-0000-0000-0000000ce201", BLOCKED_SESSION_ID, false, "MEMBER")
         insertFeedbackDocument(
             "00000000-0000-0000-0000-0000000ce301",
@@ -111,11 +112,11 @@ class JdbcAdminClubOperationsClosingRiskTest(
     }
 
     private fun seedInProgressSession() {
-        insertSession(IN_PROGRESS_SESSION_ID, 11, "Missing Records Book", "2026-06-11", "CLOSED", "MEMBER")
+        insertSession(SessionSeed(IN_PROGRESS_SESSION_ID, 11, "Missing Records Book", "2026-06-11", "CLOSED", "MEMBER"))
     }
 
     private fun seedReadySession() {
-        insertSession(READY_SESSION_ID, 12, "Ready Book", "2026-06-12", "CLOSED", "MEMBER")
+        insertSession(SessionSeed(READY_SESSION_ID, 12, "Ready Book", "2026-06-12", "CLOSED", "MEMBER"))
         insertPublication("00000000-0000-0000-0000-0000000ce202", READY_SESSION_ID, false, "MEMBER")
         insertFeedbackDocument(
             "00000000-0000-0000-0000-0000000ce302",
@@ -125,7 +126,7 @@ class JdbcAdminClubOperationsClosingRiskTest(
     }
 
     private fun seedPublishedSession() {
-        insertSession(PUBLISHED_SESSION_ID, 13, "Published Book", "2026-06-13", "PUBLISHED", "PUBLIC")
+        insertSession(SessionSeed(PUBLISHED_SESSION_ID, 13, "Published Book", "2026-06-13", "PUBLISHED", "PUBLIC"))
         insertPublication("00000000-0000-0000-0000-0000000ce203", PUBLISHED_SESSION_ID, true, "PUBLIC")
         insertFeedbackDocument(
             "00000000-0000-0000-0000-0000000ce303",
@@ -135,14 +136,7 @@ class JdbcAdminClubOperationsClosingRiskTest(
         insertNotificationEvent(PUBLISHED_SESSION_ID)
     }
 
-    private fun insertSession(
-        id: String,
-        number: Int,
-        bookTitle: String,
-        sessionDate: String,
-        state: String,
-        visibility: String,
-    ) {
+    private fun insertSession(seed: SessionSeed) {
         jdbcTemplate.update(
             """
             insert into sessions (
@@ -152,15 +146,15 @@ class JdbcAdminClubOperationsClosingRiskTest(
             values (?, ?, ?, ?, ?, 'Author', ?, '19:30:00', '21:30:00', ?,
               'Online', ?, ?)
             """.trimIndent(),
-            id,
+            seed.id,
             CLOSING_RISK_CLUB_ID,
-            number,
-            "$number session",
-            bookTitle,
-            sessionDate,
-            "$sessionDate 12:00:00",
-            state,
-            visibility,
+            seed.number,
+            "${seed.number} session",
+            seed.bookTitle,
+            seed.sessionDate,
+            "${seed.sessionDate} 12:00:00",
+            seed.state,
+            seed.visibility,
         )
     }
 
@@ -237,3 +231,12 @@ class JdbcAdminClubOperationsClosingRiskTest(
         )
     }
 }
+
+private data class SessionSeed(
+    val id: String,
+    val number: Int,
+    val bookTitle: String,
+    val sessionDate: String,
+    val state: String,
+    val visibility: String,
+)
