@@ -8,6 +8,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Changed
 
+- **session closing flywheel:** 호스트가 회차별 클로징 상태를 별도 운영 보드에서 확인할 수 있게 하고, 멤버 알림의 지난 모임 회고 진입과 공개 기록 쇼케이스를 같은 회차 흐름으로 정리했습니다. 새 `sessionclosing` read model은 기존 세션·기록·피드백·알림·공개 기록 데이터를 host-safe projection으로 계산하며, DB migration은 없습니다.
 - **host session record preview:** 호스트 세션 편집기의 `외부 JSON 가져오기` 미리보기를 저장 전 검토 화면으로 확장했습니다. 회차·책·날짜, 작성자 매칭, 교체될 기록 항목, 피드백 문서 parser 상태, 저장 차단 사유를 한 화면에서 확인할 수 있고, desktop/mobile public-safe Playwright 증거를 추가했습니다. 서버/API contract, DB migration, auth/BFF token 변경은 없습니다.
 - **host-to-member record loop:** 호스트 세션 기록 가져오기 저장 후 교체된 항목을 결과 장부로 보여주고, 멤버 홈에서 최근 발행 기록과 피드백 문서로 이어지는 진입을 강화했습니다. 서버/API contract, DB migration, auth/BFF token 변경은 없습니다.
 - **member record reflection loop:** 멤버 홈의 최근 발행 기록을 `지난 모임 회고` 진입으로 정리하고, 기록 보기와 피드백 문서 상태를 같은 카드에서 이어 볼 수 있게 했습니다. 서버/API contract, DB migration, auth/BFF token 변경은 없습니다.
