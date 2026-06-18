@@ -1,5 +1,6 @@
 import type { MouseEvent } from "react";
 import { useInRouterContext, useLocation } from "react-router-dom";
+import { getMemberNotificationLinkView } from "@/features/notifications/model/notification-link-model";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 
 type NotificationEventType =
@@ -40,30 +41,6 @@ const eventLabels: Record<NotificationEventType, string> = {
   FEEDBACK_DOCUMENT_PUBLISHED: "피드백 문서",
   REVIEW_PUBLISHED: "서평",
 };
-
-function notificationHref(deepLinkPath: string) {
-  if (!deepLinkPath.startsWith("/") || deepLinkPath.startsWith("//")) {
-    return "/app/notifications";
-  }
-
-  if (deepLinkPath.startsWith("/app/")) {
-    return deepLinkPath;
-  }
-
-  if (deepLinkPath.startsWith("/sessions/")) {
-    return `/app${deepLinkPath}`;
-  }
-
-  if (deepLinkPath === "/feedback-documents") {
-    return "/app/archive?view=report";
-  }
-
-  if (deepLinkPath.startsWith("/notes")) {
-    return `/app${deepLinkPath}`;
-  }
-
-  return deepLinkPath;
-}
 
 function formatNotificationDate(value: string) {
   const date = new Date(value);
@@ -172,7 +149,8 @@ function MemberNotificationsPageContent({
             <div style={{ display: "grid", gap: 6 }}>
               {items.map((item) => {
                 const unread = item.readAt === null;
-                const href = scopedAppLinkTarget(routePathname, notificationHref(item.deepLinkPath));
+                const linkView = getMemberNotificationLinkView(item.deepLinkPath);
+                const href = scopedAppLinkTarget(routePathname, linkView.href);
                 const readPending = pendingReadIds.has(item.id) || markAllReadPending;
 
                 return (
@@ -244,6 +222,12 @@ function MemberNotificationsPageContent({
                       <p className="body muted" style={{ margin: "8px 0 0" }}>
                         {item.body}
                       </p>
+                      <div className="row wrap" style={{ gap: 8, marginTop: 10 }}>
+                        {linkView.reflectionLabel ? (
+                          <span className="badge badge-accent badge-dot">{linkView.reflectionLabel}</span>
+                        ) : null}
+                        <span className="tiny mono">{linkView.primaryActionLabel}</span>
+                      </div>
                     </div>
                     {unread ? (
                       <button
