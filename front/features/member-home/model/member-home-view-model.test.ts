@@ -269,7 +269,69 @@ describe("member-home view model", () => {
       kindLabels: ["한줄평"],
       href: "/app/sessions/session-6",
       feedbackHref: "/app/feedback/session-6",
-      summary: "지난 책의 보존된 기록을 이어 읽을 수 있어요.",
+      feedbackState: "UNKNOWN",
+      feedbackStatusLabel: "피드백 문서는 열람 화면에서 확인합니다.",
+      returnStateLabel: "지난 모임 회고",
+      summary: "지난 책의 기록과 피드백을 이어 읽을 수 있어요.",
+    });
+  });
+
+  it("groups the latest preserved record entry by first session and dedupes labels in display order", () => {
+    const items: MemberHomeNoteFeedItemView[] = [
+      {
+        sessionId: "session-8",
+        sessionNumber: 8,
+        bookTitle: "긴 제목의 다음 책",
+        date: "2026-06-18",
+        authorName: "이멤버5",
+        authorShortName: "수",
+        kind: "QUESTION",
+        text: "첫 질문입니다.",
+      },
+      {
+        sessionId: "session-8",
+        sessionNumber: 8,
+        bookTitle: "긴 제목의 다음 책",
+        date: "2026-06-18",
+        authorName: "이멤버5",
+        authorShortName: "수",
+        kind: "QUESTION",
+        text: "두 번째 질문입니다.",
+      },
+      {
+        sessionId: "session-8",
+        sessionNumber: 8,
+        bookTitle: "긴 제목의 다음 책",
+        date: "2026-06-18",
+        authorName: null,
+        authorShortName: null,
+        kind: "HIGHLIGHT",
+        text: "함께 남긴 하이라이트입니다.",
+      },
+      {
+        sessionId: "session-7",
+        sessionNumber: 7,
+        bookTitle: "이전 책",
+        date: "2026-05-16",
+        authorName: "이멤버4",
+        authorShortName: "사",
+        kind: "ONE_LINE_REVIEW",
+        text: "이전 세션 한줄평입니다.",
+      },
+    ];
+
+    expect(getMemberHomeRecentRecordEntry(items)).toEqual({
+      sessionId: "session-8",
+      sessionNumber: 8,
+      bookTitle: "긴 제목의 다음 책",
+      date: "2026-06-18",
+      kindLabels: ["질문", "하이라이트"],
+      href: "/app/sessions/session-8",
+      feedbackHref: "/app/feedback/session-8",
+      feedbackState: "UNKNOWN",
+      feedbackStatusLabel: "피드백 문서는 열람 화면에서 확인합니다.",
+      returnStateLabel: "지난 모임 회고",
+      summary: "긴 제목의 다음 책의 기록과 피드백을 이어 읽을 수 있어요.",
     });
   });
 

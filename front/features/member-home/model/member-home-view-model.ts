@@ -63,6 +63,8 @@ export type MemberHomeNextReadingActionInput = {
   today?: Date;
 };
 
+export type MemberHomeFeedbackState = "AVAILABLE" | "LOCKED" | "MISSING" | "UNKNOWN";
+
 export type MemberHomeRecentRecordEntry = {
   sessionId: string;
   sessionNumber: number;
@@ -71,6 +73,9 @@ export type MemberHomeRecentRecordEntry = {
   kindLabels: string[];
   href: string;
   feedbackHref: string;
+  feedbackState: MemberHomeFeedbackState;
+  feedbackStatusLabel: string;
+  returnStateLabel: string;
   summary: string;
 };
 
@@ -99,7 +104,10 @@ export function getMemberHomeRecentRecordEntry(
     kindLabels,
     href: `/app/sessions/${encodeURIComponent(first.sessionId)}`,
     feedbackHref: `/app/feedback/${encodeURIComponent(first.sessionId)}`,
-    summary: `${first.bookTitle}의 보존된 기록을 이어 읽을 수 있어요.`,
+    feedbackState: "UNKNOWN",
+    feedbackStatusLabel: "피드백 문서는 열람 화면에서 확인합니다.",
+    returnStateLabel: "지난 모임 회고",
+    summary: `${first.bookTitle}의 기록과 피드백을 이어 읽을 수 있어요.`,
   };
 }
 
