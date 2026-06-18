@@ -248,9 +248,12 @@ test("host captures public-safe session record preview evidence on desktop and m
   await page.unrouteAll({ behavior: "ignoreErrors" });
   await routeMemberHome(page);
   await page.goto(`/clubs/${CLUB_SLUG}/app`);
-  const recentRecord = page.getByRole("region", { name: "최근 발행 기록" });
+  const recentRecord = page.getByRole("region", { name: "지난 모임 회고" });
   await expect(recentRecord).toBeVisible();
   await expect(recentRecord.getByText("No.07 · E2E 책")).toBeVisible();
+  await expect(recentRecord.getByText("E2E 책의 기록과 피드백을 이어 읽을 수 있어요.")).toBeVisible();
+  await expect(recentRecord.getByText("한줄평")).toBeVisible();
+  await expect(recentRecord.getByText("피드백 문서는 열람 화면에서 확인합니다.")).toBeVisible();
   await expect(recentRecord.getByRole("link", { name: "기록 보기" })).toHaveAttribute(
     "href",
     `/clubs/${CLUB_SLUG}/app/sessions/${SESSION_ID}`,
