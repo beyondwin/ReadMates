@@ -40,6 +40,10 @@ function returnLinkAriaLabel(label: string) {
 }
 
 function sessionDetailBackLabel(returnTarget: ReadmatesReturnTarget) {
+  if (returnTarget.label === "지난 모임 회고") {
+    return "회고";
+  }
+
   if (returnTarget.href === "/app/me") {
     return "내 공간";
   }
