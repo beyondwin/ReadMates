@@ -1,10 +1,31 @@
 import type {
   SessionImportPreviewResponse,
   SessionImportRequest,
+  SessionImportRecordPreview,
   SessionRecordVisibility,
 } from "./host-view-types";
 
 type SessionImportFileRequest = Omit<SessionImportRequest, "recordVisibility">;
+
+export type SessionImportAuthorSummary = {
+  totalCount: number;
+  matchedCount: number;
+  unmatchedCount: number;
+  unmatchedAuthors: string[];
+};
+
+export type SessionImportReview = {
+  canCommit: boolean;
+  statusLabel: "저장 가능" | "확인 필요";
+  statusTone: "success" | "danger";
+  sessionLabel: string;
+  replacementItems: string[];
+  authorSummary: SessionImportAuthorSummary;
+  authorStatusLabel: string;
+  feedbackDocumentLabel: string;
+  feedbackDocumentStatusLabel: string;
+  blockingMessages: string[];
+};
 
 export function buildSessionImportRequest(sourceJson: string, recordVisibility: SessionRecordVisibility): SessionImportRequest {
   let parsed: unknown;
@@ -21,12 +42,69 @@ export function buildSessionImportRequest(sourceJson: string, recordVisibility: 
   };
 }
 
-export function sessionImportCanCommit(preview: SessionImportPreviewResponse | null): boolean {
-  return preview?.valid === true && preview.issues.length === 0;
+export function sessionImportCanCommit(
+  preview: SessionImportPreviewResponse | null,
+  recordVisibility: SessionRecordVisibility = "MEMBER",
+): boolean {
+  return preview?.valid === true && preview.issues.length === 0 && isSaveableVisibility(recordVisibility);
 }
 
 export function sessionImportReplacementWarning(): string {
   return "저장하면 이 회차의 요약, 하이라이트, 한줄평, 피드백 문서를 가져온 JSON 내용으로 교체합니다.";
+}
+
+export function summarizeAuthorMatches(records: SessionImportRecordPreview[]): SessionImportAuthorSummary {
+  const unmatchedAuthors = new Set<string>();
+  let matchedCount = 0;
+
+  for (const record of records) {
+    if (record.authorMatched) {
+      matchedCount += 1;
+    } else {
+      unmatchedAuthors.add(record.authorName);
+    }
+  }
+
+  return {
+    totalCount: records.length,
+    matchedCount,
+    unmatchedCount: records.length - matchedCount,
+    unmatchedAuthors: Array.from(unmatchedAuthors),
+  };
+}
+
+export function sessionImportReplacementSummary(preview: SessionImportPreviewResponse): string[] {
+  return [
+    "공개 요약 교체",
+    `하이라이트 ${preview.highlights.length}개`,
+    `한줄평 ${preview.oneLineReviews.length}개`,
+    preview.feedbackDocument.title ?? preview.feedbackDocument.fileName,
+  ];
+}
+
+export function buildSessionImportReview(
+  preview: SessionImportPreviewResponse,
+  recordVisibility: SessionRecordVisibility,
+): SessionImportReview {
+  const canCommit = sessionImportCanCommit(preview, recordVisibility);
+  const authorSummary = summarizeAuthorMatches([...preview.highlights, ...preview.oneLineReviews]);
+  const blockingMessages = buildSessionImportBlockingMessages(preview, recordVisibility);
+
+  return {
+    canCommit,
+    statusLabel: canCommit ? "저장 가능" : "확인 필요",
+    statusTone: buildSessionImportStatusTone(canCommit),
+    sessionLabel: buildSessionLabel(preview),
+    replacementItems: sessionImportReplacementSummary(preview),
+    authorSummary,
+    authorStatusLabel:
+      authorSummary.unmatchedCount === 0 ? "작성자 매칭 완료" : `작성자 ${authorSummary.unmatchedCount}개 확인 필요`,
+    feedbackDocumentLabel: preview.feedbackDocument.title ?? preview.feedbackDocument.fileName,
+    feedbackDocumentStatusLabel: preview.feedbackDocument.valid
+      ? "피드백 문서 구조 확인 완료"
+      : "피드백 문서 구조 확인 필요",
+    blockingMessages,
+  };
 }
 
 function parseSessionImportFileRequest(value: unknown): SessionImportFileRequest {
@@ -93,4 +171,40 @@ function requiredNumber(value: unknown, fieldName: string): number {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isSaveableVisibility(recordVisibility: SessionRecordVisibility): boolean {
+  return recordVisibility === "MEMBER" || recordVisibility === "PUBLIC";
+}
+
+function buildSessionImportStatusTone(canCommit: boolean): SessionImportReview["statusTone"] {
+  return canCommit ? "success" : "danger";
+}
+
+function buildSessionLabel(preview: SessionImportPreviewResponse): string {
+  const sessionNumber = preview.session.sessionNumber === null ? "회차 확인 필요" : `${preview.session.sessionNumber}회차`;
+  const bookTitle = preview.session.bookTitle ?? "책 제목 확인 필요";
+  const meetingDate = preview.session.meetingDate ?? "날짜 확인 필요";
+
+  return `${sessionNumber} · ${bookTitle} · ${meetingDate}`;
+}
+
+function buildSessionImportBlockingMessages(
+  preview: SessionImportPreviewResponse,
+  recordVisibility: SessionRecordVisibility,
+): string[] {
+  const messages: string[] = [];
+
+  if (!isSaveableVisibility(recordVisibility)) {
+    messages.push("기록 공개 범위를 MEMBER 또는 PUBLIC으로 바꾼 뒤 저장할 수 있습니다.");
+  }
+  if (!preview.feedbackDocument.valid) {
+    messages.push("피드백 문서 구조를 확인해 주세요.");
+  }
+
+  for (const issue of preview.issues) {
+    messages.push(issue.message);
+  }
+
+  return Array.from(new Set(messages));
 }
