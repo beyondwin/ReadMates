@@ -72,6 +72,31 @@ async function routePlatformAdminShell(page: Page): Promise<void> {
       sessionProgress: { upcomingCount: 2, currentOpenCount: 1, closedCount: 5, publishedRecordCount: 4, incompleteRecordCount: 1 },
       notificationHealth: { pending: 1, failed: 1, dead: 0, lastSuccessAt: null, failureClusters: [], recentFailed7d: 4, priorFailed7d: 1 },
       aiUsage: { activeJobs: 0, failedRecentJobs: 1, staleCandidates: 0, costEstimateUsd: "0.1200", state: "HAS_ACTIVITY", priorFailedJobs7d: 0 },
+      closingRisks: {
+        incompleteCount: 2,
+        blockedCount: 1,
+        readyCount: 1,
+        items: [
+          {
+            sessionId: "session-7",
+            sessionNumber: 7,
+            bookTitle: "페인트",
+            meetingDate: "2026-06-18",
+            overallState: "BLOCKED",
+            primaryBlocker: "FEEDBACK_DOCUMENT_INVALID",
+            hostClosingHref: "/clubs/reading-sai/app/host/sessions/session-7/closing",
+          },
+          {
+            sessionId: "RAW_MEMBER_EMAIL_SENTINEL PRIVATE_DOMAIN_SENTINEL RAW_JSON_SENTINEL ADMIN_ROUTE_SENTINEL",
+            sessionNumber: 8,
+            bookTitle: "긴긴밤",
+            meetingDate: "2026-06-25",
+            overallState: "RAW_JSON_SENTINEL",
+            primaryBlocker: "RAW_MEMBER_EMAIL_SENTINEL PRIVATE_DOMAIN_SENTINEL ADMIN_ROUTE_SENTINEL",
+            hostClosingHref: "/clubs/reading-sai/app/host/sessions/session-8/closing",
+          },
+        ],
+      },
       safeLinks: [
         { label: "Host app", href: "/clubs/reading-sai/app", kind: "HOST_ROUTE" },
         { label: "알림 운영", href: `/admin/notifications?clubId=${CLUB_ID}`, kind: "ADMIN_ROUTE" },
@@ -87,6 +112,15 @@ test("owner views aggregate club operations without host-owned commands", async 
 
   await expect(page.getByRole("heading", { name: "읽는사이", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "읽는사이 운영 스냅샷" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "클로징 확인 필요" })).toBeVisible();
+  await expect(page.getByText("미완료 2 · 차단 1 · 준비 1")).toBeVisible();
+  await expect(page.getByText("No.07 · 페인트")).toBeVisible();
+  await expect(page.getByText("2026-06-18")).toBeVisible();
+  await expect(page.getByText("피드백 문서 확인 필요")).toBeVisible();
+  await expect(page.getByRole("link", { name: "호스트 클로징 보드" }).first()).toHaveAttribute(
+    "href",
+    "/clubs/reading-sai/app/host/sessions/session-7/closing",
+  );
   await expect(page.getByText("지원 grant")).toBeVisible();
   await expect(page.getByRole("link", { name: "알림 ledger" })).toHaveAttribute(
     "href",
@@ -94,5 +128,8 @@ test("owner views aggregate club operations without host-owned commands", async 
   );
   await expect(page.getByText("알림 실패 (7일)")).toBeVisible();
   await expect(page.getByText(/지난 7일 대비/).first()).toBeVisible();
-  await expect(page.getByRole("button", { name: /RSVP|출석|세션 편집|발행/ })).toHaveCount(0);
+  await expect(
+    page.getByText(/RAW_MEMBER_EMAIL_SENTINEL|PRIVATE_DOMAIN_SENTINEL|RAW_JSON_SENTINEL|ADMIN_ROUTE_SENTINEL/),
+  ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /RSVP|출석|세션 편집|발행|세션 종료|알림 발송/ })).toHaveCount(0);
 });
