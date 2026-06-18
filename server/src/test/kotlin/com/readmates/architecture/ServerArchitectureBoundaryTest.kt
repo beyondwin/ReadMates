@@ -64,6 +64,12 @@ class ServerArchitectureBoundaryTest {
                 applicationPackages = listOf("com.readmates.archive.application.."),
             ),
             ServerSlice(
+                name = "sessionclosing",
+                type = ServerSliceType.READ,
+                webAdapterPackages = listOf("com.readmates.sessionclosing.adapter.in.web.."),
+                applicationPackages = listOf("com.readmates.sessionclosing.application.."),
+            ),
+            ServerSlice(
                 name = "feedback",
                 type = ServerSliceType.WORKFLOW,
                 webAdapterPackages = listOf("com.readmates.feedback.adapter.in.web.."),
@@ -129,12 +135,12 @@ class ServerArchitectureBoundaryTest {
             .toTypedArray()
 
     @Test
-    fun `server architecture registry includes recent admin and aigen slices`() {
+    fun `server architecture registry includes recent admin aigen and sessionclosing slices`() {
         val registered = serverSlices.map(ServerSlice::name).toSet()
 
         assertTrue(
-            registered.containsAll(setOf("admin.audit", "admin.health", "admin.analytics", "aigen")),
-            "Server slice registry must include admin.audit, admin.health, admin.analytics, and aigen.",
+            registered.containsAll(setOf("admin.audit", "admin.health", "admin.analytics", "aigen", "sessionclosing")),
+            "Server slice registry must include admin.audit, admin.health, admin.analytics, aigen, and sessionclosing.",
         )
     }
 
