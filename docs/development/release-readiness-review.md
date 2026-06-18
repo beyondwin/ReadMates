@@ -133,6 +133,16 @@ The v1.11.0 production OAuth and backup timer items are closed by 2026-05-31 ope
 - Release-candidate repair evidence: public release candidate generation now includes the local observability compose/provisioning files, dashboard JSON, Prometheus alert rules, and validation scripts required by `scripts/observability-local-smoke.sh`; the candidate-local smoke path was executed successfully.
 - Required local checks: `./scripts/lint-grafana-dashboards.sh`, `./scripts/validate-prometheus-rules.sh`, `./scripts/observability-local-smoke.sh`, `python3 scripts/generate-slo-report.py --prometheus-url http://localhost:9090 --month 2026-06`, and focused server integration tests.
 
+## 2026-06-18 Host session record preview evidence gate
+
+- Scope reviewed: local `main..HEAD` for the host session record preview branch. `origin/main..HEAD` was also considered, but local `main` is ahead of `origin/main`; older inherited commits are covered by earlier readiness notes, so this closure focuses on the 4 new preview commits plus this readiness note.
+- Release classification: frontend host-editor UX and test evidence only. No server production code, DB migration, public API contract, auth/BFF token, CI/deploy script, or release-candidate scanner behavior changed.
+- Residual risk found before merge: the initial implementation evidence stopped at a branch-ready state. This closeout reran release-readiness checks, verified screenshot/test-result artifacts are not tracked, and recorded this branch-specific readiness note before local `main` merge.
+- Public safety: private-looking fixture strings (`member1@example.com`, `private.example.com`, `ADMIN_ROUTE`, raw JSON sentinel) exist only in tests as non-render assertions. Production UI renders server issue messages, not issue codes or raw JSON.
+- Local verification before merge: `git diff --check main..HEAD`, `pnpm --dir front lint`, `pnpm --dir front test`, `pnpm --dir front build`, `pnpm --dir front test:e2e -- tests/e2e/host-session-record-preview.spec.ts`, `./scripts/build-public-release-candidate.sh`, `./scripts/public-release-check.sh .tmp/public-release-candidate`, `graphify update .`, and graphify freshness audit passed. Public release check reported gitleaks no leaks.
+- Skipped: `./server/gradlew -p server clean test`, production OAuth, VM, provider-console, tag/deploy smoke. Server checks are not required for this frontend-only branch; production/tag smoke remains a release-operation step and is not local merge evidence.
+- Residual risk: no known local release-readiness residual remains for this branch after frontend, E2E, public-release, artifact, and Graphify evidence. Production deploy/tag smoke remains outside this local merge.
+
 ## 2026-06-07 v1.13.0 release-risk remediation note
 
 - Scope reviewed: `v1.12.1..HEAD`, with current local `main` ahead of `origin/main`.
