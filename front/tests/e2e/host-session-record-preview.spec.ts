@@ -1,0 +1,160 @@
+import { expect, test, type Page, type Route } from "@playwright/test";
+import type { HostSessionDetailResponse, SessionImportPreviewResponse } from "@/features/host/model/host-view-types";
+import { fulfillHostAuth, hostSessionDetailResponse, routeHostEditorShell } from "./aigen-test-fixtures";
+
+const SESSION_ID = "11111111-1111-1111-1111-111111111111";
+const CLUB_SLUG = "club-a";
+
+async function json(route: Route, status: number, body: unknown): Promise<void> {
+  await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+}
+
+function sessionResponse(): HostSessionDetailResponse {
+  return {
+    ...hostSessionDetailResponse(SESSION_ID),
+    visibility: "MEMBER",
+    publication: {
+      publicSummary: "기존 공개 요약입니다.",
+      visibility: "MEMBER",
+    },
+    attendees: [
+      {
+        membershipId: "member-a",
+        displayName: "독자A",
+        accountName: "독자A",
+        rsvpStatus: "GOING",
+        attendanceStatus: "ATTENDED",
+        participationStatus: "ACTIVE",
+      },
+      {
+        membershipId: "member-b",
+        displayName: "독자B",
+        accountName: "독자B",
+        rsvpStatus: "GOING",
+        attendanceStatus: "ATTENDED",
+        participationStatus: "ACTIVE",
+      },
+    ],
+  };
+}
+
+function importJson() {
+  return {
+    format: "readmates-session-import:v1",
+    session: { number: 7, bookTitle: "E2E 책", meetingDate: "2026-05-16" },
+    publication: { summary: "공개 가능한 세션 요약입니다." },
+    highlights: [{ authorName: "독자A", text: "하이라이트입니다." }],
+    oneLineReviews: [{ authorName: "독자B", text: "한줄평입니다." }],
+    feedbackDocument: {
+      fileName: "session-7-feedback.md",
+      markdown: "<!-- readmates-feedback:v1 -->\n\n# 독서모임 7차 피드백\n\n## 참여자별 피드백",
+    },
+    ignoredRawJsonSentinel: "{\"member1@example.com\":\"private.example.com\"}",
+  };
+}
+
+function previewResponse(): SessionImportPreviewResponse {
+  return {
+    valid: true,
+    session: { sessionNumber: 7, bookTitle: "E2E 책", meetingDate: "2026-05-16" },
+    publication: { summary: "공개 가능한 세션 요약입니다." },
+    highlights: [
+      {
+        authorName: "독자A",
+        text: "하이라이트입니다.",
+        authorMatched: true,
+        membershipId: "member-a",
+      },
+    ],
+    oneLineReviews: [
+      {
+        authorName: "독자B",
+        text: "한줄평입니다.",
+        authorMatched: true,
+        membershipId: "member-b",
+      },
+    ],
+    feedbackDocument: {
+      fileName: "session-7-feedback.md",
+      title: "독서모임 7차 피드백",
+      valid: true,
+    },
+    issues: [],
+  };
+}
+
+async function routeHostSessionEditor(page: Page): Promise<void> {
+  await routeHostEditorShell(page, CLUB_SLUG);
+
+  await page.route("**/api/bff/api/auth/me**", async (route) => {
+    await fulfillHostAuth(route, CLUB_SLUG);
+  });
+
+  await page.route(`**/api/bff/api/host/sessions/${SESSION_ID}**`, async (route) => {
+    const url = route.request().url();
+    if (url.includes("/session-import/") || url.includes("/ai-generate")) {
+      await route.fallback();
+      return;
+    }
+    await json(route, 200, sessionResponse());
+  });
+
+  await page.route(`**/api/bff/api/host/sessions/${SESSION_ID}/session-import/preview**`, async (route) => {
+    await json(route, 200, previewResponse());
+  });
+}
+
+async function uploadSessionImportJson(page: Page): Promise<void> {
+  await page.locator("#session-import-json-file").setInputFiles({
+    name: "session-import.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(importJson())),
+  });
+}
+
+async function expectSessionRecordPreviewPublicSafe(page: Page): Promise<void> {
+  const review = page.getByRole("region", { name: "세션 기록 미리보기" });
+  await expect(review).toBeVisible();
+  await expect(review.getByText("저장 가능")).toBeVisible();
+  await expect(review.getByText("7회차 · E2E 책 · 2026-05-16")).toBeVisible();
+  await expect(review.getByText("공개 요약 교체")).toBeVisible();
+  await expect(review.getByText("하이라이트 1개")).toBeVisible();
+  await expect(review.getByText("한줄평 1개")).toBeVisible();
+  await expect(review.getByText("작성자 매칭 완료")).toBeVisible();
+  await expect(review.getByText("피드백 문서 구조 확인 완료")).toBeVisible();
+  await expect(page.getByRole("button", { name: "가져온 기록 저장" })).toBeEnabled();
+  await expect(page.getByText("member1@example.com")).toHaveCount(0);
+  await expect(page.getByText("private.example.com")).toHaveCount(0);
+  await expect(page.getByText("ADMIN_ROUTE")).toHaveCount(0);
+  await expect(page.getByText("{\"")).toHaveCount(0);
+}
+
+test("host captures public-safe session record preview evidence on desktop and mobile", async ({ page }, testInfo) => {
+  await routeHostSessionEditor(page);
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}/edit?records=json`);
+  await expect(page.getByLabel("AI 결과 JSON 가져오기")).toBeVisible({ timeout: 15000 });
+  const previewPost = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response.url().includes(`/api/bff/api/host/sessions/${SESSION_ID}/session-import/preview`),
+  );
+  await uploadSessionImportJson(page);
+  expect((await previewPost).ok()).toBe(true);
+  await expectSessionRecordPreviewPublicSafe(page);
+  const desktopScreenshot = await page.screenshot({
+    path: testInfo.outputPath("host-session-record-preview-desktop.png"),
+    fullPage: true,
+  });
+  expect(desktopScreenshot.byteLength).toBeGreaterThan(10_000);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("tab", { name: "문서" }).click();
+  await expectSessionRecordPreviewPublicSafe(page);
+  const mobileScreenshot = await page.screenshot({
+    path: testInfo.outputPath("host-session-record-preview-mobile.png"),
+    fullPage: true,
+  });
+  expect(mobileScreenshot.byteLength).toBeGreaterThan(10_000);
+});
