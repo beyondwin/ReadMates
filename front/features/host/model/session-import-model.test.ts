@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildSessionImportCommitResult,
   buildSessionImportReview,
   buildSessionImportRequest,
   sessionImportCanCommit,
+  sessionImportFailureMessage,
   sessionImportReplacementSummary,
   sessionImportReplacementWarning,
   summarizeAuthorMatches,
@@ -138,6 +140,79 @@ describe("session import model", () => {
       "한줄평 1개",
       "독서모임 7차 피드백",
     ]);
+  });
+
+  it("builds a commit result summary from committed import data", () => {
+    const result = buildSessionImportCommitResult(
+      {
+        sessionId: "session-7",
+        publication: { summary: "새 공개 요약입니다." },
+        highlights: [record({ authorName: "독자A", authorMatched: true })],
+        oneLineReviews: [
+          record({ authorName: "독자B", authorMatched: true }),
+          record({ authorName: "독자C", authorMatched: true }),
+        ],
+        feedbackDocument: {
+          uploaded: true,
+          fileName: "session-7-feedback.md",
+          title: "독서모임 7차 피드백",
+          uploadedAt: "2026-05-16T12:00:00Z",
+        },
+      },
+      "MEMBER",
+    );
+
+    expect(result).toEqual({
+      tone: "success",
+      title: "저장 완료",
+      message: "가져온 세션 기록을 저장했습니다.",
+      visibilityLabel: "멤버 공개",
+      items: [
+        "공개 요약 교체",
+        "하이라이트 1개 저장",
+        "한줄평 2개 저장",
+        "피드백 문서 저장: 독서모임 7차 피드백",
+      ],
+      nextAction: "멤버는 아카이브와 피드백 문서에서 이 기록을 이어 읽을 수 있습니다.",
+    });
+  });
+
+  it("keeps commit result summary public safe", () => {
+    const result = buildSessionImportCommitResult(
+      {
+        sessionId: "session-7",
+        publication: { summary: "{\"raw\":\"PRIVATE_MEMBER_EMAIL\"}" },
+        highlights: [],
+        oneLineReviews: [],
+        feedbackDocument: {
+          uploaded: true,
+          fileName: "PRIVATE_MEMBER_EMAIL-session.md",
+          title: "독서모임 7차 피드백",
+          uploadedAt: null,
+        },
+      },
+      "PUBLIC",
+    );
+
+    expect(result.items.join(" ")).not.toContain("PRIVATE_MEMBER_EMAIL");
+    expect(result.items.join(" ")).not.toContain("{\"raw\"");
+    expect(result.visibilityLabel).toBe("외부 공개");
+  });
+
+  it("classifies session import failure copy by stage", () => {
+    expect(sessionImportFailureMessage("preview")).toBe("가져온 JSON에서 수정할 항목이 있습니다.");
+    expect(sessionImportFailureMessage("commit-revalidation")).toBe(
+      "저장 전 검증 상태가 바뀌었습니다. 미리보기를 다시 실행한 뒤 저장해 주세요.",
+    );
+    expect(sessionImportFailureMessage("commit-permission")).toBe(
+      "가져온 세션 기록 저장에 실패했습니다. 현재 클럽과 호스트 권한을 확인해 주세요.",
+    );
+    expect(sessionImportFailureMessage("commit-network")).toBe(
+      "가져온 세션 기록 저장에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.",
+    );
+    expect(sessionImportFailureMessage("refresh")).toBe(
+      "저장은 완료되었을 수 있습니다. 세션 문서를 새로 불러와 저장 결과를 확인해 주세요.",
+    );
   });
 });
 

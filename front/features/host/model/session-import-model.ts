@@ -1,4 +1,5 @@
 import type {
+  SessionImportCommitResponse,
   SessionImportPreviewResponse,
   SessionImportRequest,
   SessionImportRecordPreview,
@@ -26,6 +27,22 @@ export type SessionImportReview = {
   feedbackDocumentStatusLabel: string;
   blockingMessages: string[];
 };
+
+export type SessionImportCommitResult = {
+  tone: "success";
+  title: "저장 완료";
+  message: string;
+  visibilityLabel: string;
+  items: string[];
+  nextAction: string;
+};
+
+export type SessionImportFailureStage =
+  | "preview"
+  | "commit-revalidation"
+  | "commit-permission"
+  | "commit-network"
+  | "refresh";
 
 export function buildSessionImportRequest(sourceJson: string, recordVisibility: SessionRecordVisibility): SessionImportRequest {
   let parsed: unknown;
@@ -80,6 +97,50 @@ export function sessionImportReplacementSummary(preview: SessionImportPreviewRes
     `한줄평 ${preview.oneLineReviews.length}개`,
     preview.feedbackDocument.title ?? preview.feedbackDocument.fileName,
   ];
+}
+
+export function buildSessionImportCommitResult(
+  committed: SessionImportCommitResponse,
+  recordVisibility: SessionRecordVisibility,
+): SessionImportCommitResult {
+  const feedbackDocumentLabel = committed.feedbackDocument.title.trim() || "피드백 문서";
+
+  return {
+    tone: "success",
+    title: "저장 완료",
+    message: "가져온 세션 기록을 저장했습니다.",
+    visibilityLabel: recordVisibilityLabel(recordVisibility),
+    items: [
+      "공개 요약 교체",
+      `하이라이트 ${committed.highlights.length}개 저장`,
+      `한줄평 ${committed.oneLineReviews.length}개 저장`,
+      `피드백 문서 저장: ${feedbackDocumentLabel}`,
+    ],
+    nextAction:
+      recordVisibility === "PUBLIC"
+        ? "멤버와 공개 기록 화면에서 이 기록을 이어 읽을 수 있습니다."
+        : "멤버는 아카이브와 피드백 문서에서 이 기록을 이어 읽을 수 있습니다.",
+  };
+}
+
+export function sessionImportFailureMessage(stage: SessionImportFailureStage): string {
+  if (stage === "preview") {
+    return "가져온 JSON에서 수정할 항목이 있습니다.";
+  }
+
+  if (stage === "commit-revalidation") {
+    return "저장 전 검증 상태가 바뀌었습니다. 미리보기를 다시 실행한 뒤 저장해 주세요.";
+  }
+
+  if (stage === "commit-permission") {
+    return "가져온 세션 기록 저장에 실패했습니다. 현재 클럽과 호스트 권한을 확인해 주세요.";
+  }
+
+  if (stage === "refresh") {
+    return "저장은 완료되었을 수 있습니다. 세션 문서를 새로 불러와 저장 결과를 확인해 주세요.";
+  }
+
+  return "가져온 세션 기록 저장에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.";
 }
 
 export function buildSessionImportReview(
@@ -175,6 +236,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isSaveableVisibility(recordVisibility: SessionRecordVisibility): boolean {
   return recordVisibility === "MEMBER" || recordVisibility === "PUBLIC";
+}
+
+function recordVisibilityLabel(recordVisibility: SessionRecordVisibility): string {
+  if (recordVisibility === "PUBLIC") {
+    return "외부 공개";
+  }
+
+  if (recordVisibility === "MEMBER") {
+    return "멤버 공개";
+  }
+
+  return "호스트 전용";
 }
 
 function buildSessionImportStatusTone(canCommit: boolean): SessionImportReview["statusTone"] {
