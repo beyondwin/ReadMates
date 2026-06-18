@@ -8,6 +8,7 @@ import { HostDashboardRoute } from "@/features/host/route/host-dashboard-route";
 import { HostInvitationsRoute } from "@/features/host/route/host-invitations-route";
 import { HostMembersRoute } from "@/features/host/route/host-members-route";
 import { HostNotificationsRoute } from "@/features/host/route/host-notifications-route";
+import { HostSessionClosingRoute } from "@/features/host/route/host-session-closing-route";
 import {
   EditHostSessionRoute,
   type HostSessionRecordsChangedEvent,
@@ -58,6 +59,10 @@ export function HostMembersRouteElement() {
 
 export function HostInvitationsRouteElement() {
   return <HostInvitationsRoute />;
+}
+
+export function HostSessionClosingRouteElement() {
+  return <HostSessionClosingRoute />;
 }
 
 export function NewHostSessionRouteElement() {

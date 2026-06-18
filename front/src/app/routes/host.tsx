@@ -77,6 +77,18 @@ function hostAppRoutes(queryClient: QueryClient): RouteObject[] {
       },
     },
     {
+      path: "sessions/:sessionId/closing",
+      errorElement: <HostRouteError />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="세션 클로징 상태를 불러오는 중" variant="host" />,
+      lazy: async () => {
+        const [{ HostSessionClosingRouteElement }, { hostSessionClosingLoaderFactory }] = await Promise.all([
+          import("@/src/app/host-route-elements"),
+          import("@/features/host/route/host-session-closing-data"),
+        ]);
+        return { Component: HostSessionClosingRouteElement, loader: hostSessionClosingLoaderFactory(queryClient) };
+      },
+    },
+    {
       path: "sessions/:sessionId/edit",
       errorElement: <HostRouteError />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="세션 문서 정보를 불러오는 중" variant="host" />,
