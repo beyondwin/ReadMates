@@ -26,7 +26,7 @@ class AdminClubOperationsService(
     ): AdminClubOperationsSnapshot {
         val snapshot =
             snapshotPort.loadSnapshot(clubId)
-            ?: throw PlatformAdminException(PlatformAdminError.CLUB_NOT_FOUND, "Club not found")
+                ?: throw PlatformAdminException(PlatformAdminError.CLUB_NOT_FOUND, "Club not found")
         return try {
             val sync = ledgerPort.syncClub(clubId, snapshot.closingRisks.items, snapshot.generatedAt)
             snapshot.copy(

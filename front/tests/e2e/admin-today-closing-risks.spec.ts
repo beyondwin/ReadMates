@@ -84,6 +84,7 @@ async function routeAdminTodayClosingRisks(page: Page): Promise<void> {
     await json(route, 200, {
       schema: "admin.today_closing_risks.v1",
       generatedAt: "2026-06-20T00:00:00Z",
+      trackingUnavailable: false,
       items: [{
         clubId: CLUB_ID,
         clubSlug: "ready-club",
@@ -92,8 +93,14 @@ async function routeAdminTodayClosingRisks(page: Page): Promise<void> {
         sessionNumber: 12,
         bookTitle: "모던 자바스크립트",
         meetingDate: "2026-06-20",
-        overallState: "RAW_PRIVATE_STATE",
-        primaryBlocker: "RAW_MEMBER_EMAIL_SENTINEL PRIVATE_DOMAIN_SENTINEL RAW_JSON_SENTINEL ADMIN_ROUTE_SENTINEL",
+        overallState: "BLOCKED",
+        primaryBlocker: "UNKNOWN_PRIVATE_BLOCKER_CODE",
+        firstDetectedAt: "2026-06-18T00:00:00Z",
+        lastSeenAt: "2026-06-21T00:00:00Z",
+        resolvedAt: null,
+        ageDays: 3,
+        occurrenceCount: 2,
+        ledgerState: "ACTIVE",
         hostClosingHref: `/clubs/ready-club/app/host/sessions/${SESSION_ID}/closing`,
       }],
     });
@@ -108,8 +115,9 @@ test("owner sees safe admin today closing risk row with host closing board link"
   await expect(page.getByRole("heading", { name: "오늘 할 일" })).toBeVisible();
   await expect(page.getByRole("button", { name: /모던 자바스크립트/ })).toBeVisible();
   await expect(page.getByText("확인 필요").first()).toBeVisible();
-  await expect(page.getByText(/RAW_MEMBER_EMAIL_SENTINEL|PRIVATE_DOMAIN_SENTINEL|RAW_JSON_SENTINEL|ADMIN_ROUTE_SENTINEL/))
-    .toHaveCount(0);
+  await expect(page.getByText("3일째 차단").first()).toBeVisible();
+  await expect(page.getByText("반복 2회").first()).toBeVisible();
+  await expect(page.getByText("UNKNOWN_PRIVATE_BLOCKER_CODE")).toHaveCount(0);
 
   const brief = page.getByRole("region", { name: "선택 항목 브리프" });
   await expect(brief.getByRole("heading", { name: "Ready Club · No.12" })).toBeVisible();

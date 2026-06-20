@@ -8,6 +8,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Changed
 
+- **platform admin closing risk aging ledger:** `/admin/today` and `/admin/clubs/:clubId` closing risks now carry durable first-detected, last-seen, occurrence, and resolved tracking so operators can distinguish persistent blockers from recently cleared sessions. The projection remains admin-safe and host-drilldown oriented.
 - **admin today closing risk recovery:** `/admin/today` now includes admin-safe session closing risk queue items that link to host-owned closing boards, and the host closing board primary actions now use Korean repair copy. The new `admin.today_closing_risks.v1` read endpoint is additive, read-only, migration-free, and does not add platform-admin session mutations or auth/BFF token changes.
 - **platform admin closing projection:** `/admin/clubs/:clubId` now shows admin-safe session closing risks with host closing board drilldowns, and `/admin/**` direct browser entry is routed through the admin shell instead of the public catch-all. The projection is additive on `admin.club_operations_snapshot.v1`, exposes only session-level safe fields, and does not add admin mutations, DB migrations, auth/BFF token changes, or deployment behavior changes.
 - **session closing flywheel:** 호스트가 회차별 클로징 상태를 별도 운영 보드에서 확인할 수 있게 하고, 멤버 알림의 지난 모임 회고 진입과 공개 기록 쇼케이스를 같은 회차 흐름으로 정리했습니다. 새 `sessionclosing` read model은 기존 세션·기록·피드백·알림·공개 기록 데이터를 host-safe projection으로 계산하며, DB migration은 없습니다.

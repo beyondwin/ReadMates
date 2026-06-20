@@ -54,8 +54,13 @@ class AdminClubOperationsServiceTest {
         val service =
             AdminClubOperationsService(
                 FakePort(snapshot()),
-                FakeTodayClosingRisksPort(AdminTodayClosingRiskSnapshot(generatedAt = GENERATED_AT, items = listOf(todayRisk()))),
-                FakeLedgerPort(todayItems = listOf(todayRisk().copy(ageDays = 3, occurrenceCount = 2, ledgerState = "ACTIVE"))),
+                FakeTodayClosingRisksPort(
+                    AdminTodayClosingRiskSnapshot(generatedAt = GENERATED_AT, items = listOf(todayRisk())),
+                ),
+                FakeLedgerPort(
+                    todayItems =
+                        listOf(todayRisk().copy(ageDays = 3, occurrenceCount = 2, ledgerState = "ACTIVE")),
+                ),
             )
 
         val result = service.todayClosingRisks(admin(PlatformAdminRole.OWNER))
@@ -71,7 +76,9 @@ class AdminClubOperationsServiceTest {
         val service =
             AdminClubOperationsService(
                 FakePort(snapshot()),
-                FakeTodayClosingRisksPort(AdminTodayClosingRiskSnapshot(generatedAt = GENERATED_AT, items = listOf(todayRisk()))),
+                FakeTodayClosingRisksPort(
+                    AdminTodayClosingRiskSnapshot(generatedAt = GENERATED_AT, items = listOf(todayRisk())),
+                ),
                 ThrowingLedgerPort(),
             )
 
@@ -94,11 +101,17 @@ class AdminClubOperationsServiceTest {
             )
 
         val result = service.operationsSnapshot(admin(PlatformAdminRole.OWNER), CLUB_ID)
+        val closingRisks = result.closingRisks
+        val activeItem = closingRisks.items.single()
+        val resolvedItem = closingRisks.recentlyResolvedItems.single()
 
-        assertThat(result.closingRisks.trackingUnavailable).isFalse()
-        assertThat(result.closingRisks.items.single().ledgerState).isEqualTo("ACTIVE")
-        assertThat(result.closingRisks.items.single().ageDays).isEqualTo(3)
-        assertThat(result.closingRisks.recentlyResolvedItems.single().ledgerState).isEqualTo("RESOLVED")
+        assertThat(closingRisks.trackingUnavailable).isFalse()
+        assertThat(activeItem.ledgerState)
+            .isEqualTo("ACTIVE")
+        assertThat(activeItem.ageDays)
+            .isEqualTo(3)
+        assertThat(resolvedItem.ledgerState)
+            .isEqualTo("RESOLVED")
     }
 
     @Test
@@ -111,11 +124,15 @@ class AdminClubOperationsServiceTest {
             )
 
         val result = service.operationsSnapshot(admin(PlatformAdminRole.OWNER), CLUB_ID)
+        val closingRisks = result.closingRisks
+        val activeItem = closingRisks.items.single()
 
-        assertThat(result.closingRisks.trackingUnavailable).isTrue()
-        assertThat(result.closingRisks.items.single().ledgerState).isEqualTo("UNTRACKED")
-        assertThat(result.closingRisks.items.single().ageDays).isNull()
-        assertThat(result.closingRisks.recentlyResolvedItems).isEmpty()
+        assertThat(closingRisks.trackingUnavailable).isTrue()
+        assertThat(activeItem.ledgerState)
+            .isEqualTo("UNTRACKED")
+        assertThat(activeItem.ageDays)
+            .isNull()
+        assertThat(closingRisks.recentlyResolvedItems).isEmpty()
     }
 
     private class FakePort(
@@ -156,13 +173,13 @@ class AdminClubOperationsServiceTest {
         override fun syncToday(
             items: List<AdminTodayClosingRiskItem>,
             observedAt: OffsetDateTime,
-        ): List<AdminTodayClosingRiskItem> = throw IllegalStateException("ledger unavailable")
+        ): List<AdminTodayClosingRiskItem> = error("ledger unavailable")
 
         override fun syncClub(
             clubId: UUID,
             items: List<AdminClubClosingRiskItem>,
             observedAt: OffsetDateTime,
-        ): AdminClubClosingRiskLedgerSync = throw IllegalStateException("ledger unavailable")
+        ): AdminClubClosingRiskLedgerSync = error("ledger unavailable")
     }
 
     private fun admin(role: PlatformAdminRole): CurrentPlatformAdmin =
@@ -172,7 +189,7 @@ class AdminClubOperationsServiceTest {
             role = role,
         )
 
-    private fun snapshot(closingRisks: AdminClubClosingRisks = AdminClubClosingRisks(0, 0, 0, emptyList())): AdminClubOperationsSnapshot =
+    private fun snapshot(closingRisks: AdminClubClosingRisks = EMPTY_CLOSING_RISKS): AdminClubOperationsSnapshot =
         AdminClubOperationsSnapshot(
             generatedAt = GENERATED_AT,
             club = AdminClubOperationsClub(CLUB_ID, "reading-sai", "읽는사이", "ACTIVE", "PUBLIC"),
@@ -214,5 +231,6 @@ class AdminClubOperationsServiceTest {
         val CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000001")
         val SESSION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000707")
         val GENERATED_AT: OffsetDateTime = OffsetDateTime.of(2026, 6, 21, 0, 0, 0, 0, ZoneOffset.UTC)
+        val EMPTY_CLOSING_RISKS: AdminClubClosingRisks = AdminClubClosingRisks(0, 0, 0, emptyList())
     }
 }

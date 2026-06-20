@@ -86,23 +86,24 @@ class JdbcAdminClosingRiskLedgerAdapterTest(
     }
 
     @Test
-    fun `resolves missing active rows and reopens them with incremented occurrence count`() {
+    fun `today empty snapshot resolves rows and reopens them with incremented occurrence count`() {
         seedClubAndSessions()
         val first = OffsetDateTime.of(2026, 6, 18, 0, 0, 0, 0, ZoneOffset.UTC)
         val resolved = OffsetDateTime.of(2026, 6, 20, 0, 0, 0, 0, ZoneOffset.UTC)
         val reopened = OffsetDateTime.of(2026, 6, 21, 0, 0, 0, 0, ZoneOffset.UTC)
 
-        adapter.syncClub(UUID.fromString(LEDGER_CLUB_ID), listOf(clubRisk()), first)
+        adapter.syncToday(listOf(todayRisk()), first)
+        adapter.syncToday(emptyList(), resolved)
         val resolvedSync = adapter.syncClub(UUID.fromString(LEDGER_CLUB_ID), emptyList(), resolved)
-        val reopenedSync = adapter.syncClub(UUID.fromString(LEDGER_CLUB_ID), listOf(clubRisk()), reopened)
+        val reopenedSync = adapter.syncToday(listOf(todayRisk()), reopened)
 
         assertThat(resolvedSync.activeItems).isEmpty()
         assertThat(resolvedSync.recentlyResolvedItems.single().ledgerState).isEqualTo("RESOLVED")
         assertThat(resolvedSync.recentlyResolvedItems.single().lastSeenAt).isEqualTo(first)
         assertThat(resolvedSync.recentlyResolvedItems.single().resolvedAt).isEqualTo(resolved)
-        assertThat(reopenedSync.activeItems.single().ledgerState).isEqualTo("ACTIVE")
-        assertThat(reopenedSync.activeItems.single().occurrenceCount).isEqualTo(2)
-        assertThat(reopenedSync.activeItems.single().resolvedAt).isNull()
+        assertThat(reopenedSync.single().ledgerState).isEqualTo("ACTIVE")
+        assertThat(reopenedSync.single().occurrenceCount).isEqualTo(2)
+        assertThat(reopenedSync.single().resolvedAt).isNull()
     }
 
     @Test
@@ -131,6 +132,24 @@ class JdbcAdminClosingRiskLedgerAdapterTest(
 
         adapter.syncToday(listOf(todayRisk(), secondTodayRisk()), first)
         adapter.syncToday(listOf(secondTodayRisk()), partial)
+        val synced = adapter.syncToday(listOf(todayRisk()), later)
+
+        assertThat(synced.single().ledgerState).isEqualTo("ACTIVE")
+        assertThat(synced.single().occurrenceCount).isEqualTo(1)
+        assertThat(synced.single().firstDetectedAt).isEqualTo(first)
+        assertThat(synced.single().resolvedAt).isNull()
+    }
+
+    @Test
+    fun `club sync does not resolve rows omitted by limited club detail snapshot`() {
+        seedClubAndSessions()
+        val first = OffsetDateTime.of(2026, 6, 18, 0, 0, 0, 0, ZoneOffset.UTC)
+        val partial = OffsetDateTime.of(2026, 6, 20, 0, 0, 0, 0, ZoneOffset.UTC)
+        val later = OffsetDateTime.of(2026, 6, 21, 0, 0, 0, 0, ZoneOffset.UTC)
+        val clubId = UUID.fromString(LEDGER_CLUB_ID)
+
+        adapter.syncToday(listOf(todayRisk(), secondTodayRisk()), first)
+        adapter.syncClub(clubId, listOf(secondClubRisk()), partial)
         val synced = adapter.syncToday(listOf(todayRisk()), later)
 
         assertThat(synced.single().ledgerState).isEqualTo("ACTIVE")
@@ -204,5 +223,13 @@ class JdbcAdminClosingRiskLedgerAdapterTest(
             overallState = "BLOCKED",
             primaryBlocker = "FEEDBACK_DOCUMENT_INVALID",
             hostClosingHref = "/clubs/ledger-club/app/host/sessions/$LEDGER_SESSION_ID/closing",
+        )
+
+    private fun secondClubRisk(): AdminClubClosingRiskItem =
+        clubRisk().copy(
+            sessionId = UUID.fromString(LEDGER_SECOND_SESSION_ID),
+            sessionNumber = 8,
+            bookTitle = "Second Ledger Book",
+            hostClosingHref = "/clubs/ledger-club/app/host/sessions/$LEDGER_SECOND_SESSION_ID/closing",
         )
 }

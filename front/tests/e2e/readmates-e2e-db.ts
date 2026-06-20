@@ -627,6 +627,13 @@ where session_id in (
     and number >= 7
 );
 
+delete from admin_closing_risk_ledger
+where session_id in (
+  select id from sessions
+  where club_id = ${sqlString(clubId)}
+    and number >= 7
+);
+
 delete from sessions
 where club_id = ${sqlString(clubId)}
   and number >= 7;

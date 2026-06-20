@@ -18,6 +18,7 @@ import java.time.temporal.ChronoUnit
 import java.util.UUID
 
 @Repository
+@Suppress("TooManyFunctions")
 class JdbcAdminClosingRiskLedgerAdapter(
     private val jdbcTemplate: JdbcTemplate,
 ) : AdminClosingRiskLedgerPort {
@@ -37,7 +38,6 @@ class JdbcAdminClosingRiskLedgerAdapter(
         observedAt: OffsetDateTime,
     ): AdminClubClosingRiskLedgerSync {
         upsertActiveClub(clubId, items, observedAt)
-        resolveMissingForClub(clubId, items.map { it.sessionId }.toSet(), observedAt)
         val rows = loadRowsForClub(clubId)
         val activeBySession = rows.filterNot { it.currentState == LEDGER_STATE_RESOLVED }.associateBy { it.sessionId }
         return AdminClubClosingRiskLedgerSync(
@@ -56,12 +56,14 @@ class JdbcAdminClosingRiskLedgerAdapter(
     ) {
         for (item in items) {
             upsertOne(
-                clubId = item.clubId,
-                sessionId = item.sessionId,
-                currentState = item.overallState,
-                primaryBlocker = item.primaryBlocker,
-                hostClosingHref = item.hostClosingHref,
-                observedAt = observedAt,
+                ActiveLedgerRisk(
+                    clubId = item.clubId,
+                    sessionId = item.sessionId,
+                    currentState = item.overallState,
+                    primaryBlocker = item.primaryBlocker,
+                    hostClosingHref = item.hostClosingHref,
+                    observedAt = observedAt,
+                ),
             )
         }
     }
@@ -73,65 +75,43 @@ class JdbcAdminClosingRiskLedgerAdapter(
     ) {
         for (item in items) {
             upsertOne(
-                clubId = clubId,
-                sessionId = item.sessionId,
-                currentState = item.overallState,
-                primaryBlocker = item.primaryBlocker,
-                hostClosingHref = item.hostClosingHref,
-                observedAt = observedAt,
+                ActiveLedgerRisk(
+                    clubId = clubId,
+                    sessionId = item.sessionId,
+                    currentState = item.overallState,
+                    primaryBlocker = item.primaryBlocker,
+                    hostClosingHref = item.hostClosingHref,
+                    observedAt = observedAt,
+                ),
             )
         }
     }
 
-    private fun upsertOne(
-        clubId: UUID,
-        sessionId: UUID,
-        currentState: String,
-        primaryBlocker: String?,
-        hostClosingHref: String,
-        observedAt: OffsetDateTime,
-    ) {
-        val existing = loadRows(setOf(sessionId)).firstOrNull()
-        if (existing == null) {
-            jdbcTemplate.update(
-                """
-                insert into admin_closing_risk_ledger (
-                  id, club_id, session_id, current_state, primary_blocker,
-                  first_detected_at, last_seen_at, resolved_at, occurrence_count, last_host_closing_href
-                )
-                values (?, ?, ?, ?, ?, ?, ?, null, 1, ?)
-                """.trimIndent(),
-                UUID.randomUUID().dbString(),
-                clubId.dbString(),
-                sessionId.dbString(),
-                currentState,
-                primaryBlocker,
-                observedAt.toUtcLocalDateTime(),
-                observedAt.toUtcLocalDateTime(),
-                hostClosingHref,
-            )
-            return
-        }
-
+    private fun upsertOne(risk: ActiveLedgerRisk) {
         jdbcTemplate.update(
             """
-            update admin_closing_risk_ledger
-            set current_state = ?,
-                primary_blocker = ?,
-                last_seen_at = ?,
-                resolved_at = null,
-                occurrence_count = occurrence_count + ?,
-                last_host_closing_href = ?
-            where club_id = ?
-              and session_id = ?
+            insert into admin_closing_risk_ledger (
+              id, club_id, session_id, current_state, primary_blocker,
+              first_detected_at, last_seen_at, resolved_at, occurrence_count, last_host_closing_href
+            )
+            values (?, ?, ?, ?, ?, ?, ?, null, 1, ?)
+            on duplicate key update
+              occurrence_count = occurrence_count + if(current_state = ?, 1, 0),
+              current_state = values(current_state),
+              primary_blocker = values(primary_blocker),
+              last_seen_at = values(last_seen_at),
+              resolved_at = null,
+              last_host_closing_href = values(last_host_closing_href)
             """.trimIndent(),
-            currentState,
-            primaryBlocker,
-            observedAt.toUtcLocalDateTime(),
-            if (existing.currentState == LEDGER_STATE_RESOLVED) 1 else 0,
-            hostClosingHref,
-            clubId.dbString(),
-            sessionId.dbString(),
+            UUID.randomUUID().dbString(),
+            risk.clubId.dbString(),
+            risk.sessionId.dbString(),
+            risk.currentState,
+            risk.primaryBlocker,
+            risk.observedAt.toUtcLocalDateTime(),
+            risk.observedAt.toUtcLocalDateTime(),
+            risk.hostClosingHref,
+            LEDGER_STATE_RESOLVED,
         )
     }
 
@@ -186,6 +166,7 @@ class JdbcAdminClosingRiskLedgerAdapter(
     private fun loadRows(sessionIds: Set<UUID>): List<LedgerRow> {
         if (sessionIds.isEmpty()) return emptyList()
         val placeholders = sessionIds.joinToString(",") { "?" }
+        @Suppress("SpreadOperator")
         return jdbcTemplate.query(
             """
             select l.*, s.number, s.book_title, s.session_date
@@ -299,6 +280,15 @@ class JdbcAdminClosingRiskLedgerAdapter(
         val resolvedAt: OffsetDateTime?,
         val occurrenceCount: Int,
         val hostClosingHref: String,
+    )
+
+    private data class ActiveLedgerRisk(
+        val clubId: UUID,
+        val sessionId: UUID,
+        val currentState: String,
+        val primaryBlocker: String?,
+        val hostClosingHref: String,
+        val observedAt: OffsetDateTime,
     )
 }
 
