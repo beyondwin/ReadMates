@@ -83,6 +83,12 @@ function seededClient() {
       overallState: "BLOCKED",
       primaryBlocker: "PRIVATE_SENTINEL_TOKEN",
       hostClosingHref: "/clubs/ready-club/app/host/sessions/session-risk-1/closing",
+      firstDetectedAt: "2026-06-18T00:00:00Z",
+      lastSeenAt: "2026-06-21T00:00:00Z",
+      resolvedAt: null,
+      ageDays: 3,
+      occurrenceCount: 2,
+      ledgerState: "ACTIVE",
     }],
   });
   return queryClient;
@@ -106,6 +112,8 @@ describe("AdminTodayRoute", () => {
     expect(screen.getByRole("region", { name: "운영 작업 큐" })).toBeInTheDocument();
     expect(screen.getAllByText(/모던 자바스크립트/).length).toBeGreaterThan(0);
     expect(screen.getAllByText("호스트 클로징 보드").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/3일째 차단/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/반복 2회/).length).toBeGreaterThan(0);
     expect(screen.getAllByText("확인 필요").length).toBeGreaterThan(0);
     expect(screen.queryByText("PRIVATE_SENTINEL_TOKEN")).not.toBeInTheDocument();
   });

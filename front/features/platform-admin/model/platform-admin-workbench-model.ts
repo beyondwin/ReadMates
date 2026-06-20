@@ -135,6 +135,9 @@ export type PlatformAdminClosingRiskBrief = {
   meetingDate: string;
   stateLabel: string;
   blockerLabel: string;
+  ageLabel: string | null;
+  occurrenceLabel: string | null;
+  trackingLabel: string;
 };
 
 export type PlatformAdminSelectedBrief = {
@@ -431,6 +434,11 @@ function buildClosingRiskQueueItems(
 ): WorkbenchQueueItem[] {
   const items = risks.map((risk): WorkbenchQueueItem => {
     const blockerLabel = closingRiskBlockerLabel(risk.primaryBlocker);
+    const ageLabel = closingRiskAgeLabel(risk);
+    const occurrenceLabel = closingRiskOccurrenceLabel(risk);
+    const reasonParts = [risk.bookTitle, blockerLabel, ageLabel, occurrenceLabel].filter(
+      (value): value is string => Boolean(value),
+    );
     return {
       id: closingRiskQueueId(risk.sessionId),
       type: "closing-risk",
@@ -438,9 +446,9 @@ function buildClosingRiskQueueItems(
       slug: risk.clubSlug,
       name: `${risk.clubName} · No.${risk.sessionNumber}`,
       severity: closingRiskSeverity(risk.overallState),
-      reason: `${risk.bookTitle} · ${blockerLabel}`,
+      reason: reasonParts.join(" · "),
       primaryActionLabel: risk.hostClosingHref ? "호스트 클로징 보드" : "클럽 운영 상세",
-      badges: [closingRiskStateLabel(risk.overallState), blockerLabel],
+      badges: closingRiskBadges(risk, blockerLabel),
       sortRank: closingRiskSortRank(risk.overallState),
       href: risk.hostClosingHref || `/admin/clubs/${risk.clubId}`,
     };
@@ -479,6 +487,9 @@ function buildClosingRiskBriefsByQueueId(
       meetingDate: risk.meetingDate,
       stateLabel: closingRiskStateLabel(risk.overallState),
       blockerLabel: closingRiskBlockerLabel(risk.primaryBlocker),
+      ageLabel: closingRiskAgeLabel(risk),
+      occurrenceLabel: closingRiskOccurrenceLabel(risk),
+      trackingLabel: closingRiskTrackingLabel(risk),
     });
   }
   return briefs;
@@ -503,6 +514,37 @@ function closingRiskBlockerLabel(blocker: string | null): string {
   if (blocker === "MEMBER_NOTIFICATION_REQUIRED") return "멤버 알림 확인";
   if (blocker === "PUBLIC_RECORD_REQUIRED") return "공개 기록 확인";
   return "확인 필요";
+}
+
+function closingRiskAgeLabel(risk: PlatformAdminTodayClosingRisk): string | null {
+  if (typeof risk.ageDays !== "number" || Number.isNaN(risk.ageDays)) return null;
+  const days = Math.max(0, Math.floor(risk.ageDays));
+  if (risk.overallState === "BLOCKED") return `${days}일째 차단`;
+  if (risk.overallState === "IN_PROGRESS") return `${days}일째 진행 중`;
+  if (risk.overallState === "READY") return `${days}일째 조치 대기`;
+  return `${days}일째 확인 필요`;
+}
+
+function closingRiskOccurrenceLabel(risk: PlatformAdminTodayClosingRisk): string | null {
+  const count = risk.occurrenceCount ?? 0;
+  return count > 1 ? `반복 ${count}회` : null;
+}
+
+function closingRiskTrackingLabel(risk: PlatformAdminTodayClosingRisk): string {
+  if (risk.ledgerState === "ACTIVE") return "추적 중";
+  if (risk.ledgerState === "RESOLVED") return "해소됨";
+  return "추적 상태 확인 불가";
+}
+
+function closingRiskBadges(risk: PlatformAdminTodayClosingRisk, blockerLabel: string): string[] {
+  const trackingLabel = closingRiskTrackingLabel(risk);
+  return [
+    closingRiskStateLabel(risk.overallState),
+    blockerLabel,
+    closingRiskAgeLabel(risk),
+    closingRiskOccurrenceLabel(risk),
+    trackingLabel === "추적 상태 확인 불가" ? trackingLabel : null,
+  ].filter((value): value is string => Boolean(value));
 }
 
 function closingRiskSeverity(state: string): WorkQueueSeverity {

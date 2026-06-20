@@ -39,6 +39,13 @@ export function AdminSelectedBrief({ brief }: Props) {
             <strong>{brief.closingRisk.stateLabel}</strong>
             <span>{brief.closingRisk.blockerLabel}</span>
           </div>
+          <div className="admin-selected-brief__check" data-state="blocked">
+            <strong>{brief.closingRisk.trackingLabel}</strong>
+            <span>
+              {[brief.closingRisk.ageLabel, brief.closingRisk.occurrenceLabel].filter(Boolean).join(" · ") ||
+                "추적 정보 없음"}
+            </span>
+          </div>
         </div>
       ) : null}
 

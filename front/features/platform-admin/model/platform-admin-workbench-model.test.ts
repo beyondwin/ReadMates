@@ -338,6 +338,69 @@ describe("buildPlatformAdminWorkbench — closing risk queue", () => {
     });
   });
 
+  it("adds age and repeat labels to closing-risk queue items", () => {
+    const result = buildPlatformAdminWorkbench({
+      role: "OWNER",
+      activeClubCount: 0,
+      domainActionRequiredCount: 0,
+      selectedClubId: null,
+      clubs: [],
+      domains: [],
+      closingRisks: [{
+        clubId: "club-1",
+        clubSlug: "reading-sai",
+        clubName: "읽는사이",
+        sessionId: "session-7",
+        sessionNumber: 7,
+        bookTitle: "페인트",
+        meetingDate: "2026-06-18",
+        overallState: "BLOCKED",
+        primaryBlocker: "FEEDBACK_DOCUMENT_INVALID",
+        hostClosingHref: "/clubs/reading-sai/app/host/sessions/session-7/closing",
+        ageDays: 3,
+        occurrenceCount: 2,
+        ledgerState: "ACTIVE",
+      }],
+    });
+
+    const item = result.queueItems.find((candidate) => candidate.id === "closing-risk-session-7");
+    expect(item?.reason).toBe("페인트 · 피드백 문서 다시 확인 · 3일째 차단 · 반복 2회");
+    expect(item?.badges).toContain("3일째 차단");
+    expect(result.selectedBrief?.closingRisk).toMatchObject({
+      ageLabel: "3일째 차단",
+      occurrenceLabel: "반복 2회",
+      trackingLabel: "추적 중",
+    });
+  });
+
+  it("adds tracking-unavailable copy without raw errors", () => {
+    const result = buildPlatformAdminWorkbench({
+      role: "OWNER",
+      activeClubCount: 0,
+      domainActionRequiredCount: 0,
+      selectedClubId: null,
+      clubs: [],
+      domains: [],
+      closingRisks: [{
+        clubId: "club-1",
+        clubSlug: "reading-sai",
+        clubName: "읽는사이",
+        sessionId: "session-7",
+        sessionNumber: 7,
+        bookTitle: "페인트",
+        meetingDate: "2026-06-18",
+        overallState: "BLOCKED",
+        primaryBlocker: "RAW_PRIVATE_STACK_TRACE",
+        hostClosingHref: "/clubs/reading-sai/app/host/sessions/session-7/closing",
+        ledgerState: "UNTRACKED",
+      }],
+      closingRisksUnavailable: true,
+    });
+
+    expect(result.queueItems.some((item) => item.reason.includes("RAW_PRIVATE_STACK_TRACE"))).toBe(false);
+    expect(result.queueItems.find((item) => item.id === "closing-risk-session-7")?.badges).toContain("추적 상태 확인 불가");
+  });
+
   it("uses safe fallback labels for unknown closing risk codes", () => {
     const result = buildPlatformAdminWorkbench({
       ...baseInput,

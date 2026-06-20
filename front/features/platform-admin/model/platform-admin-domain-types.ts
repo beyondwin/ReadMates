@@ -85,6 +85,7 @@ export type PlatformAdminClubListResponse = {
 };
 
 export type PlatformAdminTodayClosingRiskState = "BLOCKED" | "IN_PROGRESS" | "READY" | (string & {});
+export type PlatformAdminClosingRiskLedgerState = "ACTIVE" | "RESOLVED" | "UNTRACKED" | (string & {});
 
 export type PlatformAdminTodayClosingRisk = {
   clubId: string;
@@ -97,12 +98,19 @@ export type PlatformAdminTodayClosingRisk = {
   overallState: PlatformAdminTodayClosingRiskState;
   primaryBlocker: string | null;
   hostClosingHref: string | null;
+  firstDetectedAt?: string | null;
+  lastSeenAt?: string | null;
+  resolvedAt?: string | null;
+  ageDays?: number | null;
+  occurrenceCount?: number;
+  ledgerState?: PlatformAdminClosingRiskLedgerState;
 };
 
 export type PlatformAdminTodayClosingRisksResponse = {
   schema: "admin.today_closing_risks.v1";
   generatedAt: string;
   items: PlatformAdminTodayClosingRisk[];
+  trackingUnavailable?: boolean;
 };
 
 export type UpdatePlatformAdminClubRequest = {
