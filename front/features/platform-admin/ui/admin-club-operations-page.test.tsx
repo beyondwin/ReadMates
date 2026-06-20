@@ -142,6 +142,89 @@ describe("AdminClubOperationsPage", () => {
     expect(screen.queryByRole("button", { name: /발행|세션 종료|알림 발송|RSVP|출석/ })).not.toBeInTheDocument();
   });
 
+  it("renders closing risk tracking labels and recently resolved rows", () => {
+    render(
+      <MemoryRouter>
+        <AdminClubOperationsPage
+          snapshot={{
+            ...snapshot,
+            closingRisks: {
+              incompleteCount: 1,
+              blockedCount: 1,
+              readyCount: 0,
+              trackingUnavailable: true,
+              items: [
+                {
+                  sessionId: "session-7",
+                  sessionNumber: 7,
+                  bookTitle: "페인트",
+                  meetingDate: "2026-06-18",
+                  overallState: "BLOCKED",
+                  primaryBlocker: "FEEDBACK_DOCUMENT_INVALID",
+                  hostClosingHref: "/clubs/reading-sai/app/host/sessions/session-7/closing",
+                  firstDetectedAt: "2026-06-18T00:00:00Z",
+                  lastSeenAt: "2026-06-21T00:00:00Z",
+                  resolvedAt: null,
+                  ageDays: 3,
+                  occurrenceCount: 2,
+                  ledgerState: "ACTIVE",
+                },
+                {
+                  sessionId: "session-8",
+                  sessionNumber: 8,
+                  bookTitle: "비공개 코드 방어",
+                  meetingDate: "2026-06-25",
+                  overallState: "RAW_INTERNAL_STATE",
+                  primaryBlocker: "UNKNOWN_PRIVATE_BLOCKER_CODE",
+                  hostClosingHref: "/clubs/reading-sai/app/host/sessions/session-8/closing",
+                  ageDays: 2,
+                  occurrenceCount: 1,
+                  ledgerState: "UNTRACKED",
+                },
+              ],
+              recentlyResolvedItems: [
+                {
+                  sessionId: "session-5",
+                  sessionNumber: 5,
+                  bookTitle: "스토너",
+                  meetingDate: "2026-06-04",
+                  overallState: "RESOLVED",
+                  primaryBlocker: "RECORD_PACKAGE_REQUIRED",
+                  hostClosingHref: "/clubs/reading-sai/app/host/sessions/session-5/closing",
+                  firstDetectedAt: "2026-06-10T00:00:00Z",
+                  lastSeenAt: "2026-06-12T00:00:00Z",
+                  resolvedAt: "2026-06-20T09:00:00Z",
+                  ageDays: 10,
+                  occurrenceCount: 3,
+                  ledgerState: "RESOLVED",
+                },
+              ],
+            },
+          }}
+          supportGrantCount={0}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("추적 상태 확인 불가")).toBeInTheDocument();
+    expect(screen.getByText("3일째 차단")).toBeInTheDocument();
+    expect(screen.getByText("최초 감지 2026-06-18T00:00:00Z")).toBeInTheDocument();
+    expect(screen.getByText("최근 감지 2026-06-21T00:00:00Z")).toBeInTheDocument();
+    expect(screen.getByText("반복 2회")).toBeInTheDocument();
+    expect(screen.getByText("2일째 확인 필요")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "최근 해소됨" })).toBeInTheDocument();
+    expect(screen.getByText("No.05 · 스토너")).toBeInTheDocument();
+    expect(screen.getByText("해소됨")).toBeInTheDocument();
+    expect(screen.getByText("2026-06-20T09:00:00Z")).toBeInTheDocument();
+    expect(screen.getByText("반복 3회")).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "호스트 클로징 보드" })[2]).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/sessions/session-5/closing",
+    );
+    expect(screen.queryByText("RAW_INTERNAL_STATE")).not.toBeInTheDocument();
+    expect(screen.queryByText("UNKNOWN_PRIVATE_BLOCKER_CODE")).not.toBeInTheDocument();
+  });
+
   it("renders optional closing risks as an empty state", () => {
     render(
       <MemoryRouter>
@@ -170,7 +253,7 @@ describe("AdminClubOperationsPage", () => {
                   bookTitle: "공개 금지 센티널",
                   meetingDate: "2026-07-09",
                   overallState: "RAW_INTERNAL_STATE",
-                  primaryBlocker: "PRIVATE_PROVIDER_STACK_TRACE_TOKEN_123",
+                  primaryBlocker: "UNKNOWN_PRIVATE_BLOCKER_CODE",
                   hostClosingHref: "/clubs/reading-sai/app/host/sessions/session-10/closing",
                 },
               ],
@@ -183,7 +266,7 @@ describe("AdminClubOperationsPage", () => {
 
     expect(screen.getAllByText("확인 필요").length).toBeGreaterThanOrEqual(2);
     expect(screen.queryByText("RAW_INTERNAL_STATE")).not.toBeInTheDocument();
-    expect(screen.queryByText("PRIVATE_PROVIDER_STACK_TRACE_TOKEN_123")).not.toBeInTheDocument();
+    expect(screen.queryByText("UNKNOWN_PRIVATE_BLOCKER_CODE")).not.toBeInTheDocument();
   });
 
   it("limits closing risk rows and renders overflow count", () => {

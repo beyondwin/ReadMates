@@ -1517,9 +1517,22 @@
 
 .admin-club-operations__closing-risk-main span,
 .admin-club-operations__closing-risk-blocker,
+.admin-club-operations__closing-risk-age,
+.admin-club-operations__closing-risk-date,
+.admin-club-operations__closing-risk-repeat,
+.admin-club-operations__closing-risk-tracking,
 .admin-club-operations__closing-risk-empty,
 .admin-club-operations__closing-risk-overflow {
   font-size: 13px;
+}
+
+.admin-club-operations__closing-risk-age,
+.admin-club-operations__closing-risk-date,
+.admin-club-operations__closing-risk-repeat,
+.admin-club-operations__closing-risk-tracking {
+  min-width: 0;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
 }
 
 .admin-club-operations__closing-risk-badge {

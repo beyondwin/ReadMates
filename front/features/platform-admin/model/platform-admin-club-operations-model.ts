@@ -46,6 +46,8 @@ export type AdminClubClosingRisks = {
   blockedCount: number;
   readyCount: number;
   items: AdminClubClosingRiskItem[];
+  recentlyResolvedItems?: AdminClubClosingRiskItem[];
+  trackingUnavailable?: boolean;
 };
 
 export type AdminClubClosingRiskItem = {
@@ -56,6 +58,12 @@ export type AdminClubClosingRiskItem = {
   overallState: string;
   primaryBlocker: string | null;
   hostClosingHref: string;
+  firstDetectedAt?: string | null;
+  lastSeenAt?: string | null;
+  resolvedAt?: string | null;
+  ageDays?: number | null;
+  occurrenceCount?: number;
+  ledgerState?: "ACTIVE" | "RESOLVED" | "UNTRACKED" | (string & {});
 };
 
 export function notificationFailureDelta(snapshot: AdminClubOperationsSnapshot): number {
@@ -76,6 +84,8 @@ export function closingRiskStateLabel(state: string): string {
       return "진행 중";
     case "READY":
       return "확인 준비";
+    case "RESOLVED":
+      return "해소됨";
     default:
       return "확인 필요";
   }
@@ -100,6 +110,62 @@ export function closingRiskBlockerLabel(code: string | null): string {
     default:
       return "확인 필요";
   }
+}
+
+export function closingRiskSafeStateCode(state: string): string {
+  switch (state) {
+    case "BLOCKED":
+    case "IN_PROGRESS":
+    case "READY":
+    case "RESOLVED":
+      return state;
+    default:
+      return "UNKNOWN";
+  }
+}
+
+export function closingRiskAgeLabel(item: AdminClubClosingRiskItem): string | null {
+  if (typeof item.ageDays !== "number" || Number.isNaN(item.ageDays)) return null;
+
+  const days = Math.max(0, Math.floor(item.ageDays));
+  switch (item.overallState) {
+    case "BLOCKED":
+      return `${days}일째 차단`;
+    case "IN_PROGRESS":
+      return `${days}일째 진행 중`;
+    case "READY":
+      return `${days}일째 조치 대기`;
+    default:
+      return `${days}일째 확인 필요`;
+  }
+}
+
+export function closingRiskOccurrenceLabel(item: AdminClubClosingRiskItem): string | null {
+  const count = item.occurrenceCount ?? 0;
+  return count > 1 ? `반복 ${count}회` : null;
+}
+
+export function closingRiskTrackingLabel(item: AdminClubClosingRiskItem): string {
+  switch (item.ledgerState) {
+    case "ACTIVE":
+      return "추적 중";
+    case "RESOLVED":
+      return "해소됨";
+    default:
+      return "추적 상태 확인 불가";
+  }
+}
+
+export function closingRiskResolvedAtLabel(item: AdminClubClosingRiskItem): string | null {
+  return item.resolvedAt ?? null;
+}
+
+export function closingRiskFirstDetectedLabel(item: AdminClubClosingRiskItem): string | null {
+  return item.firstDetectedAt ? `최초 감지 ${item.firstDetectedAt}` : null;
+}
+
+export function closingRiskLastSeenLabel(item: AdminClubClosingRiskItem): string | null {
+  return item.lastSeenAt ? `최근 감지 ${item.lastSeenAt}` : null;
 }
 
 export function closingRiskOverflowCount(snapshot: AdminClubOperationsSnapshot): number {

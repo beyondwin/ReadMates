@@ -3,9 +3,16 @@ import type { ReactNode } from "react";
 import {
   aiFailureDelta,
   blockerNextAction,
+  closingRiskAgeLabel,
   closingRiskBlockerLabel,
+  closingRiskFirstDetectedLabel,
+  closingRiskLastSeenLabel,
+  closingRiskOccurrenceLabel,
   closingRiskOverflowCount,
+  closingRiskResolvedAtLabel,
+  closingRiskSafeStateCode,
   closingRiskStateLabel,
+  closingRiskTrackingLabel,
   notificationFailureDelta,
   type AdminClubClosingRiskItem,
   type AdminClubOperationsSnapshot,
@@ -152,6 +159,7 @@ function Stat({ label, value }: { label: string; value: number | string }) {
 function ClosingRiskPanel({ snapshot }: { snapshot: AdminClubOperationsSnapshot }) {
   const closingRisks = snapshot.closingRisks;
   const visibleItems = closingRisks?.items.slice(0, 5) ?? [];
+  const resolvedItems = closingRisks?.recentlyResolvedItems?.slice(0, 3) ?? [];
   const overflowCount = closingRiskOverflowCount(snapshot);
 
   return (
@@ -165,13 +173,20 @@ function ClosingRiskPanel({ snapshot }: { snapshot: AdminClubOperationsSnapshot 
             미완료 {closingRisks?.incompleteCount ?? 0} · 차단 {closingRisks?.blockedCount ?? 0} · 준비{" "}
             {closingRisks?.readyCount ?? 0}
           </p>
+          {closingRisks?.trackingUnavailable ? (
+            <p className="tiny muted">추적 상태 확인 불가</p>
+          ) : null}
         </div>
       </div>
 
       {visibleItems.length > 0 ? (
         <div className="admin-club-operations__closing-risk-list">
           {visibleItems.map((item) => (
-            <ClosingRiskRow key={item.sessionId} item={item} />
+            <ClosingRiskRow
+              key={item.sessionId}
+              item={item}
+              showUnavailableTracking={!closingRisks?.trackingUnavailable}
+            />
           ))}
         </div>
       ) : (
@@ -181,25 +196,66 @@ function ClosingRiskPanel({ snapshot }: { snapshot: AdminClubOperationsSnapshot 
       {overflowCount > 0 ? (
         <p className="admin-club-operations__closing-risk-overflow tiny muted">외 {overflowCount}개 회차</p>
       ) : null}
+
+      {resolvedItems.length > 0 ? (
+        <section className="admin-club-operations__closing-risk-resolved" aria-labelledby="admin-club-closing-risk-resolved-title">
+          <h5 id="admin-club-closing-risk-resolved-title" className="h6 editorial">
+            최근 해소됨
+          </h5>
+          <div className="admin-club-operations__closing-risk-list">
+            {resolvedItems.map((item) => (
+              <ClosingRiskRow key={item.sessionId} item={item} variant="resolved" />
+            ))}
+          </div>
+        </section>
+      ) : null}
     </section>
   );
 }
 
-function ClosingRiskRow({ item }: { item: AdminClubClosingRiskItem }) {
+function ClosingRiskRow({
+  item,
+  variant = "active",
+  showUnavailableTracking = true,
+}: {
+  item: AdminClubClosingRiskItem;
+  variant?: "active" | "resolved";
+  showUnavailableTracking?: boolean;
+}) {
+  const ageLabel = variant === "active" ? closingRiskAgeLabel(item) : null;
+  const occurrenceLabel = closingRiskOccurrenceLabel(item);
+  const trackingLabel = closingRiskTrackingLabel(item);
+  const shouldShowTrackingLabel =
+    variant === "active" && (trackingLabel !== "추적 상태 확인 불가" || showUnavailableTracking);
+  const resolvedAtLabel = variant === "resolved" ? closingRiskResolvedAtLabel(item) : null;
+  const firstDetectedLabel = variant === "active" ? closingRiskFirstDetectedLabel(item) : null;
+  const lastSeenLabel = variant === "active" ? closingRiskLastSeenLabel(item) : null;
+
   return (
     <article className="admin-club-operations__closing-risk-row">
       <div className="admin-club-operations__closing-risk-main">
         <strong>
           No.{String(item.sessionNumber).padStart(2, "0")} · {item.bookTitle}
         </strong>
-        <span>{item.meetingDate}</span>
+        <span>{resolvedAtLabel ?? item.meetingDate}</span>
       </div>
-      <span className="admin-club-operations__closing-risk-badge" data-state={item.overallState}>
+      <span className="admin-club-operations__closing-risk-badge" data-state={closingRiskSafeStateCode(item.overallState)}>
         {closingRiskStateLabel(item.overallState)}
       </span>
       <span className="admin-club-operations__closing-risk-blocker">
         {closingRiskBlockerLabel(item.primaryBlocker)}
       </span>
+      {ageLabel ? <span className="admin-club-operations__closing-risk-age">{ageLabel}</span> : null}
+      {firstDetectedLabel ? (
+        <span className="admin-club-operations__closing-risk-date">{firstDetectedLabel}</span>
+      ) : null}
+      {lastSeenLabel ? (
+        <span className="admin-club-operations__closing-risk-date">{lastSeenLabel}</span>
+      ) : null}
+      {occurrenceLabel ? <span className="admin-club-operations__closing-risk-repeat">{occurrenceLabel}</span> : null}
+      {shouldShowTrackingLabel ? (
+        <span className="admin-club-operations__closing-risk-tracking">{trackingLabel}</span>
+      ) : null}
       <Link className="btn btn-ghost btn-sm" to={item.hostClosingHref}>
         호스트 클로징 보드
       </Link>
