@@ -51,6 +51,8 @@ data class AdminClubClosingRisks(
     val blockedCount: Int,
     val readyCount: Int,
     val items: List<AdminClubClosingRiskItem>,
+    val recentlyResolvedItems: List<AdminClubClosingRiskItem> = emptyList(),
+    val trackingUnavailable: Boolean = false,
 )
 
 data class AdminClubClosingRiskItem(
@@ -61,12 +63,19 @@ data class AdminClubClosingRiskItem(
     val overallState: String,
     val primaryBlocker: String?,
     val hostClosingHref: String,
+    val firstDetectedAt: OffsetDateTime? = null,
+    val lastSeenAt: OffsetDateTime? = null,
+    val resolvedAt: OffsetDateTime? = null,
+    val ageDays: Long? = null,
+    val occurrenceCount: Int = 0,
+    val ledgerState: String = "UNTRACKED",
 )
 
 data class AdminTodayClosingRiskSnapshot(
     val schema: String = "admin.today_closing_risks.v1",
     val generatedAt: OffsetDateTime,
     val items: List<AdminTodayClosingRiskItem>,
+    val trackingUnavailable: Boolean = false,
 )
 
 data class AdminTodayClosingRiskItem(
@@ -80,6 +89,12 @@ data class AdminTodayClosingRiskItem(
     val overallState: String,
     val primaryBlocker: String?,
     val hostClosingHref: String,
+    val firstDetectedAt: OffsetDateTime? = null,
+    val lastSeenAt: OffsetDateTime? = null,
+    val resolvedAt: OffsetDateTime? = null,
+    val ageDays: Long? = null,
+    val occurrenceCount: Int = 0,
+    val ledgerState: String = "UNTRACKED",
 )
 
 data class AdminClubNotificationHealth(
