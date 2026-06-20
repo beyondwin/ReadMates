@@ -70,6 +70,7 @@ data class AdminTodayClosingRiskSnapshotResponse(
     val schema: String,
     val generatedAt: String,
     val items: List<AdminTodayClosingRiskItem>,
+    val trackingUnavailable: Boolean,
 ) {
     companion object {
         fun from(snapshot: AdminTodayClosingRiskSnapshot): AdminTodayClosingRiskSnapshotResponse =
@@ -77,6 +78,7 @@ data class AdminTodayClosingRiskSnapshotResponse(
                 schema = snapshot.schema,
                 generatedAt = snapshot.generatedAt.toString(),
                 items = snapshot.items,
+                trackingUnavailable = snapshot.trackingUnavailable,
             )
     }
 }

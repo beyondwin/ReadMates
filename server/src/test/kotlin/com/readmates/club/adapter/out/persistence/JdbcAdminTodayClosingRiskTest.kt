@@ -20,6 +20,7 @@ private const val TODAY_RISK_READY_SESSION_ID = "00000000-0000-0000-0000-0000000
 private const val TODAY_RISK_PUBLISHED_SESSION_ID = "00000000-0000-0000-0000-0000000cb104"
 
 private const val TODAY_RISK_CLEANUP_SQL = """
+    delete from admin_closing_risk_ledger where club_id in ('$TODAY_RISK_CLUB_ID', '$TODAY_RISK_LIMIT_CLUB_ID');
     delete from notification_event_outbox where club_id in ('$TODAY_RISK_CLUB_ID', '$TODAY_RISK_LIMIT_CLUB_ID');
     delete from session_feedback_documents where club_id in ('$TODAY_RISK_CLUB_ID', '$TODAY_RISK_LIMIT_CLUB_ID');
     delete from one_line_reviews where club_id in ('$TODAY_RISK_CLUB_ID', '$TODAY_RISK_LIMIT_CLUB_ID');

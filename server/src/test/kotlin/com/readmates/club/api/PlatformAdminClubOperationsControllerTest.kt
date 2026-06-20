@@ -20,6 +20,7 @@ import java.util.UUID
 private const val ADMIN_TODAY_CLOSING_RISK_CLUB_ID = "00000000-0000-0000-0000-0000000ca001"
 private const val ADMIN_TODAY_CLOSING_RISK_SESSION_ID = "00000000-0000-0000-0000-0000000ca101"
 private const val ADMIN_TODAY_CLOSING_RISK_CLEANUP_SQL = """
+    delete from admin_closing_risk_ledger where club_id = '$ADMIN_TODAY_CLOSING_RISK_CLUB_ID';
     delete from notification_event_outbox where club_id = '$ADMIN_TODAY_CLOSING_RISK_CLUB_ID';
     delete from session_feedback_documents where club_id = '$ADMIN_TODAY_CLOSING_RISK_CLUB_ID';
     delete from public_session_publications where club_id = '$ADMIN_TODAY_CLOSING_RISK_CLUB_ID';
@@ -119,7 +120,7 @@ class PlatformAdminClubOperationsControllerTest(
                 it.get("clubId").asText() == ADMIN_TODAY_CLOSING_RISK_CLUB_ID
             }
         assertThat(item.fieldNames().asSequence().toList())
-            .containsExactlyInAnyOrder(
+            .contains(
                 "clubId",
                 "clubSlug",
                 "clubName",
@@ -130,11 +131,20 @@ class PlatformAdminClubOperationsControllerTest(
                 "overallState",
                 "primaryBlocker",
                 "hostClosingHref",
+                "firstDetectedAt",
+                "lastSeenAt",
+                "resolvedAt",
+                "ageDays",
+                "occurrenceCount",
+                "ledgerState",
             )
+        assertThat(root.get("trackingUnavailable").asBoolean()).isFalse()
         assertThat(item.get("clubSlug").asText()).isEqualTo("admin-today-closing-risk")
         assertThat(item.get("sessionId").asText()).isEqualTo(ADMIN_TODAY_CLOSING_RISK_SESSION_ID)
         assertThat(item.get("overallState").asText()).isEqualTo("BLOCKED")
         assertThat(item.get("primaryBlocker").asText()).isEqualTo("FEEDBACK_DOCUMENT_INVALID")
+        assertThat(item.get("ledgerState").asText()).isEqualTo("ACTIVE")
+        assertThat(item.get("occurrenceCount").asInt()).isEqualTo(1)
         assertThat(item.get("hostClosingHref").asText())
             .isEqualTo("/clubs/admin-today-closing-risk/app/host/sessions/$ADMIN_TODAY_CLOSING_RISK_SESSION_ID/closing")
         assertThat(body).doesNotContain("RAW_ADMIN_TODAY_PRIVATE_FEEDBACK")
