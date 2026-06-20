@@ -11,7 +11,10 @@ import com.readmates.club.application.model.AdminClubOperationsSnapshot
 import com.readmates.club.application.model.AdminClubReadinessSummary
 import com.readmates.club.application.model.AdminClubSafeLink
 import com.readmates.club.application.model.AdminClubSessionProgress
+import com.readmates.club.application.model.AdminTodayClosingRiskItem
+import com.readmates.club.application.model.AdminTodayClosingRiskSnapshot
 import com.readmates.club.application.port.out.AdminClubOperationsSnapshotPort
+import com.readmates.club.application.port.out.AdminTodayClosingRisksPort
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.utcOffsetDateTimeOrNull
 import com.readmates.shared.db.uuid
@@ -29,7 +32,8 @@ import java.util.UUID
 class JdbcAdminClubOperationsAdapter(
     private val jdbcTemplate: JdbcTemplate,
     private val clock: Clock,
-) : AdminClubOperationsSnapshotPort {
+) : AdminClubOperationsSnapshotPort,
+    AdminTodayClosingRisksPort {
     override fun loadSnapshot(clubId: UUID): AdminClubOperationsSnapshot? {
         val club = loadClub(clubId) ?: return null
         return AdminClubOperationsSnapshot(
@@ -47,6 +51,22 @@ class JdbcAdminClubOperationsAdapter(
                     AdminClubSafeLink("알림 운영", "/admin/notifications?clubId=$clubId", "ADMIN_ROUTE"),
                     AdminClubSafeLink("AI Ops", "/admin/ai-ops?clubId=$clubId", "ADMIN_ROUTE"),
                 ),
+        )
+    }
+
+    override fun loadTodayClosingRisks(limit: Int): AdminTodayClosingRiskSnapshot {
+        val items =
+            jdbcTemplate
+                .query(
+                    TODAY_CLOSING_RISK_SQL,
+                ) { rs, _ -> rs.toTodayClosingRiskItem() }
+                .mapNotNull { it }
+                .sortedWith(TODAY_CLOSING_RISK_ORDER)
+                .take(limit.coerceAtLeast(0))
+
+        return AdminTodayClosingRiskSnapshot(
+            generatedAt = OffsetDateTime.now(clock),
+            items = items,
         )
     }
 
@@ -369,6 +389,26 @@ private fun ResultSet.toClosingRiskCandidate(clubSlug: String): AdminClubClosing
     )
 }
 
+private fun ResultSet.toTodayClosingRiskItem(): AdminTodayClosingRiskItem? {
+    val facts = toClosingRiskFacts()
+    val closingState = facts.toClosingRiskState() ?: return null
+    val sessionId = uuid("id")
+    val clubSlug = getString("club_slug")
+
+    return AdminTodayClosingRiskItem(
+        clubId = uuid("club_id"),
+        clubSlug = clubSlug,
+        clubName = getString("club_name"),
+        sessionId = sessionId,
+        sessionNumber = getInt("number"),
+        bookTitle = getString("book_title"),
+        meetingDate = getObject("session_date", LocalDate::class.java),
+        overallState = closingState.overallState,
+        primaryBlocker = closingState.primaryBlocker,
+        hostClosingHref = "/clubs/$clubSlug/app/host/sessions/$sessionId/closing",
+    )
+}
+
 private fun ResultSet.toClosingRiskFacts(): ClosingRiskFacts {
     val feedbackSourceText = getString("feedback_source_text")
     return ClosingRiskFacts(
@@ -399,6 +439,11 @@ private fun ClosingRiskFacts.toClosingRiskState(): ClosingRiskState? =
         else -> null
     }
 
+private val TODAY_CLOSING_RISK_ORDER: Comparator<AdminTodayClosingRiskItem> =
+    compareBy<AdminTodayClosingRiskItem> { CLOSING_RISK_STATE_RANK.getValue(it.overallState) }
+        .thenByDescending { it.meetingDate }
+        .thenByDescending { it.sessionNumber }
+
 private data class ClosingRiskFacts(
     val sessionState: String,
     val sessionVisibility: String,
@@ -417,4 +462,65 @@ private data class ClosingRiskState(
 private const val COST_SCALE = 4
 private const val CLOSING_RISK_ITEM_LIMIT = 5
 private const val CLOSING_RISK_SCAN_LIMIT = 50
+private const val TODAY_CLOSING_RISK_SCAN_LIMIT = 200
 private const val FEEDBACK_DOCUMENT_MARKER = "<!-- readmates-feedback:v1 -->"
+private const val TODAY_CLOSING_RISK_SQL = """
+select
+  clubs.id as club_id,
+  clubs.slug as club_slug,
+  clubs.name as club_name,
+  sessions.id,
+  sessions.number,
+  sessions.book_title,
+  sessions.session_date,
+  sessions.state,
+  sessions.visibility,
+  public_session_publications.public_summary,
+  public_session_publications.is_public,
+  public_session_publications.visibility as publication_visibility,
+  public_session_publications.published_at,
+  (
+    select count(*)
+    from highlights
+    where highlights.club_id = sessions.club_id
+      and highlights.session_id = sessions.id
+  ) as highlight_count,
+  (
+    select count(*)
+    from one_line_reviews
+    where one_line_reviews.club_id = sessions.club_id
+      and one_line_reviews.session_id = sessions.id
+  ) as one_liner_count,
+  (
+    select session_feedback_documents.source_text
+    from session_feedback_documents
+    where session_feedback_documents.club_id = sessions.club_id
+      and session_feedback_documents.session_id = sessions.id
+    order by session_feedback_documents.version desc, session_feedback_documents.created_at desc
+    limit 1
+  ) as feedback_source_text,
+  (
+    select notification_event_outbox.status
+    from notification_event_outbox
+    where notification_event_outbox.club_id = sessions.club_id
+      and notification_event_outbox.aggregate_id = sessions.id
+      and notification_event_outbox.event_type in ('FEEDBACK_DOCUMENT_PUBLISHED', 'NEXT_BOOK_PUBLISHED')
+    order by notification_event_outbox.created_at desc, notification_event_outbox.id desc
+    limit 1
+  ) as latest_notification_status
+from sessions
+join clubs on clubs.id = sessions.club_id
+left join public_session_publications
+  on public_session_publications.club_id = sessions.club_id
+ and public_session_publications.session_id = sessions.id
+where sessions.state in ('CLOSED', 'PUBLISHED')
+  and clubs.status = 'ACTIVE'
+order by sessions.session_date desc, sessions.number desc
+limit $TODAY_CLOSING_RISK_SCAN_LIMIT
+"""
+private val CLOSING_RISK_STATE_RANK =
+    mapOf(
+        "BLOCKED" to 0,
+        "IN_PROGRESS" to 1,
+        "READY" to 2,
+    )

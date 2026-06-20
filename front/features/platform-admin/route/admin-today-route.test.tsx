@@ -9,7 +9,9 @@ import {
 import { platformAdminNotificationSnapshotQuery } from "@/features/platform-admin/queries/platform-admin-notifications-queries";
 import {
   platformAdminClubsQuery,
+  platformAdminKeys,
   platformAdminSummaryQuery,
+  platformAdminTodayClosingRisksQuery,
 } from "@/features/platform-admin/queries/platform-admin-queries";
 import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
 import { AdminTodayRoute } from "./admin-today-route";
@@ -67,6 +69,22 @@ function seededClient() {
     staleCandidateCount: 0,
   });
   queryClient.setQueryData(platformAdminAiOpsJobsQuery().queryKey, { items: [], nextCursor: null });
+  queryClient.setQueryData(platformAdminTodayClosingRisksQuery().queryKey, {
+    schema: "admin.today_closing_risks.v1",
+    generatedAt: "2026-06-20T00:00:00Z",
+    items: [{
+      clubId: "club-ready",
+      clubSlug: "ready-club",
+      clubName: "Ready Club",
+      sessionId: "session-risk-1",
+      sessionNumber: 12,
+      bookTitle: "모던 자바스크립트",
+      meetingDate: "2026-06-20",
+      overallState: "BLOCKED",
+      primaryBlocker: "PRIVATE_SENTINEL_TOKEN",
+      hostClosingHref: "/clubs/ready-club/app/host/sessions/session-risk-1/closing",
+    }],
+  });
   return queryClient;
 }
 
@@ -80,6 +98,32 @@ describe("AdminTodayRoute", () => {
     expect(screen.getByRole("region", { name: "운영 작업 큐" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "선택 항목 브리프" })).toBeInTheDocument();
     expect(screen.getAllByText("Ready Club").length).toBeGreaterThan(0);
+  });
+
+  it("renders seeded closing-risk query data without leaking raw blocker codes", () => {
+    renderRoute(seededClient(), "/admin/today?selected=closing-risk-session-risk-1");
+
+    expect(screen.getByRole("region", { name: "운영 작업 큐" })).toBeInTheDocument();
+    expect(screen.getAllByText(/모던 자바스크립트/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("호스트 클로징 보드").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("확인 필요").length).toBeGreaterThan(0);
+    expect(screen.queryByText("PRIVATE_SENTINEL_TOKEN")).not.toBeInTheDocument();
+  });
+
+  it("renders a partial warning when the optional closing-risk query is unavailable", () => {
+    const client = seededClient();
+    client.setQueryData(platformAdminTodayClosingRisksQuery().queryKey, {
+      schema: "admin.today_closing_risks.v1",
+      generatedAt: "2026-06-20T00:00:00Z",
+      items: [],
+    });
+    client.setQueryData(platformAdminKeys.todayClosingRisksUnavailable(), true);
+
+    renderRoute(client);
+
+    expect(screen.getByRole("button", { name: /클로징 리스크/ })).toBeInTheDocument();
+    expect(screen.getByText("오늘 클로징 리스크 큐를 확인하지 못했습니다.")).toBeInTheDocument();
+    expect(screen.getByText("클로징 확인 불가")).toBeInTheDocument();
   });
 
   it("renders notification risk from the notification snapshot", () => {

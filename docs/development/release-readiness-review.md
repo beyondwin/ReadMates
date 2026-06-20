@@ -219,6 +219,17 @@ The v1.11.0 production OAuth and backup timer items are closed by 2026-05-31 ope
 - Skipped: production OAuth, VM, provider-console, tag/deploy smoke. These require release-operation access after merge and are not local evidence for this branch.
 - Residual risk: no known local release-readiness residual remains after admin route, frontend, server, targeted E2E, architecture, Graphify, and public-release evidence. Production deploy/tag smoke remains outside this local merge.
 
+## 2026-06-20 Admin today closing risk recovery closeout
+
+- Scope reviewed: local `main..HEAD` for the admin today closing risk recovery branch.
+- Release classification: additive server read API plus platform-admin frontend queue rendering and host board copy polish. No DB migration, auth/BFF token change, deploy script change, CI workflow change, or platform-admin session mutation was added.
+- Product evidence: `/api/admin/today/closing-risks` returns `admin.today_closing_risks.v1`, and `/admin/today` can render admin-safe session closing risk rows with host closing board links while keeping summary/clubs as the required workbench data.
+- Public safety: the today projection exposes only club/session ids, slug/name, session number, book title, meeting date, safe state/blocker codes, and a canonical host closing href. Raw feedback source, member data, provider errors, private domains, raw JSON, deployment identifiers, token-shaped values, and local paths are not rendered in production UI.
+- Local verification before merge: `./server/gradlew -p server integrationTest --tests PlatformAdminClubOperationsControllerTest --tests JdbcAdminTodayClosingRiskTest`, `./server/gradlew -p server check`, `./server/gradlew -p server architectureTest`, `./server/gradlew -p server clean test` (project `test` task skipped by configuration), `pnpm --dir front lint`, `pnpm --dir front test --reporter=dot` (146 files, 1200 tests), `pnpm --dir front build`, `pnpm --dir front test:e2e -- tests/e2e/admin-today.spec.ts tests/e2e/admin-today-closing-risks.spec.ts` (3/3), `pnpm --dir front test:e2e` (64/64), `./scripts/build-public-release-candidate.sh`, `./scripts/public-release-check.sh .tmp/public-release-candidate`, `git diff --check`, production-added-line sentinel scan, and `graphify update .` passed. `graphify-out/` is ignored.
+- Release-readiness repair before closeout: after adding `/admin/today` closing risk query wiring, the first full E2E run failed because the existing `admin-today.spec.ts` mock fixture did not handle the new optional closing-risk request. The fixture now returns an empty `admin.today_closing_risks.v1` payload, targeted admin-today E2E passed, and the full E2E suite passed on rerun. A later residual review found that first-load `ReadmatesApiError` fallback could hide the required partial-error queue item by replacing the query with an empty success response; the frontend loader now records a separate unavailable flag, route coverage asserts the partial warning, and the full frontend test count increased to 1200.
+- Skipped: production OAuth, VM, provider-console, tag/deploy smoke. These require release-operation access after merge and are not local evidence for this branch.
+- Residual risk: no known local release-readiness residual remains after server, frontend, E2E, architecture, Graphify, and public-release evidence. Production deploy/tag smoke remains outside this local merge.
+
 ## 기본 범위
 
 기본 범위는 현재 branch와 base branch의 차이입니다. 보통 `origin/main..HEAD`를 사용합니다.

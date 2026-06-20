@@ -298,3 +298,80 @@ describe("buildPlatformAdminWorkbench — operations ledger queue", () => {
     expect(result.selectedBrief?.primaryAction.disabled).toBe(true);
   });
 });
+
+describe("buildPlatformAdminWorkbench — closing risk queue", () => {
+  it("adds closing risk items ahead of notification warnings and below publish blockers", () => {
+    const result = buildPlatformAdminWorkbench({
+      ...baseInput,
+      selectedItemId: "closing-risk-session-1",
+      closingRisks: [{
+        clubId: "club-ready",
+        clubSlug: "ready-club",
+        clubName: "Ready Club",
+        sessionId: "session-1",
+        sessionNumber: 12,
+        bookTitle: "모던 자바스크립트",
+        meetingDate: "2026-06-20",
+        overallState: "BLOCKED",
+        primaryBlocker: "FEEDBACK_DOCUMENT_INVALID",
+        hostClosingHref: "/clubs/ready-club/app/host/sessions/session-1/closing",
+      }],
+      notificationSnapshot,
+    });
+
+    expect(result.queueItems.map((item) => item.id)).toContain("closing-risk-session-1");
+    expect(result.queueItems.find((item) => item.id === "closing-risk-session-1")).toMatchObject({
+      type: "closing-risk",
+      severity: "critical",
+      name: "Ready Club · No.12",
+      slug: "ready-club",
+      reason: "모던 자바스크립트 · 피드백 문서 다시 확인",
+      primaryActionLabel: "호스트 클로징 보드",
+      href: "/clubs/ready-club/app/host/sessions/session-1/closing",
+    });
+    expect(result.selectedBrief?.item.id).toBe("closing-risk-session-1");
+    expect(result.selectedBrief?.primaryAction.href).toBe("/clubs/ready-club/app/host/sessions/session-1/closing");
+    expect(result.selectedBrief?.closingRisk).toMatchObject({
+      sessionId: "session-1",
+      stateLabel: "차단",
+      blockerLabel: "피드백 문서 다시 확인",
+    });
+  });
+
+  it("uses safe fallback labels for unknown closing risk codes", () => {
+    const result = buildPlatformAdminWorkbench({
+      ...baseInput,
+      selectedItemId: "closing-risk-session-unknown",
+      closingRisks: [{
+        clubId: "club-ready",
+        clubSlug: "ready-club",
+        clubName: "Ready Club",
+        sessionId: "session-unknown",
+        sessionNumber: 13,
+        bookTitle: "Unknown Codes",
+        meetingDate: "2026-06-20",
+        overallState: "RAW_PRIVATE_STATE",
+        primaryBlocker: "RAW_PRIVATE_BLOCKER",
+        hostClosingHref: "/clubs/ready-club/app/host/sessions/session-unknown/closing",
+      }],
+    });
+
+    const serialized = JSON.stringify(result);
+    expect(serialized).toContain("확인 필요");
+    expect(serialized).not.toContain("RAW_PRIVATE_STATE");
+    expect(serialized).not.toContain("RAW_PRIVATE_BLOCKER");
+  });
+
+  it("adds a partial failure item when closing risk query cannot be read", () => {
+    const result = buildPlatformAdminWorkbench({
+      ...baseInput,
+      closingRisksUnavailable: true,
+    });
+
+    expect(result.queueItems.find((item) => item.id === "partial-closing-risks")).toMatchObject({
+      type: "partial-error",
+      severity: "warn",
+      primaryActionLabel: "클로징 확인 불가",
+    });
+  });
+});

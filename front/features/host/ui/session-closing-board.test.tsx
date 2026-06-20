@@ -8,7 +8,7 @@ const view: SessionClosingBoardView = {
   subtitle: "2026-06-18 · Public",
   statusLabel: "Ready",
   statusTone: "accent",
-  primaryAction: { label: "Check member notifications", href: "/app/host/notifications" },
+  primaryAction: { label: "멤버 알림 상태 확인", href: "/app/host/notifications" },
   checklist: [
     { id: "SESSION_CLOSED", label: "Session closed", detail: "Closed", state: "DONE", tone: "ok", href: "/app/host/sessions/s1/edit" },
     { id: "MEMBER_NOTIFICATION_SENT", label: "Member notification", detail: "Pending", state: "ACTION_REQUIRED", tone: "warn", href: "/app/host/notifications" },
@@ -29,7 +29,7 @@ describe("SessionClosingBoard", () => {
     render(<SessionClosingBoard view={view} />);
 
     expect(screen.getByRole("heading", { name: "No.07 · E2E Book" })).toBeVisible();
-    expect(screen.getByRole("link", { name: "Check member notifications" })).toHaveAttribute("href", "/app/host/notifications");
+    expect(screen.getByRole("link", { name: "멤버 알림 상태 확인" })).toHaveAttribute("href", "/app/host/notifications");
     expect(screen.getByText("Session closed")).toBeVisible();
     expect(screen.getByText("Host")).toBeVisible();
     expect(screen.getByText("Member")).toBeVisible();

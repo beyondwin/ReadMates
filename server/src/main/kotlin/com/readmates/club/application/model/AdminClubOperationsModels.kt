@@ -63,6 +63,25 @@ data class AdminClubClosingRiskItem(
     val hostClosingHref: String,
 )
 
+data class AdminTodayClosingRiskSnapshot(
+    val schema: String = "admin.today_closing_risks.v1",
+    val generatedAt: OffsetDateTime,
+    val items: List<AdminTodayClosingRiskItem>,
+)
+
+data class AdminTodayClosingRiskItem(
+    val clubId: UUID,
+    val clubSlug: String,
+    val clubName: String,
+    val sessionId: UUID,
+    val sessionNumber: Int,
+    val bookTitle: String,
+    val meetingDate: LocalDate,
+    val overallState: String,
+    val primaryBlocker: String?,
+    val hostClosingHref: String,
+)
+
 data class AdminClubNotificationHealth(
     val pending: Int,
     val failed: Int,

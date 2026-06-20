@@ -84,6 +84,27 @@ export type PlatformAdminClubListResponse = {
   items: PlatformAdminClub[];
 };
 
+export type PlatformAdminTodayClosingRiskState = "BLOCKED" | "IN_PROGRESS" | "READY" | (string & {});
+
+export type PlatformAdminTodayClosingRisk = {
+  clubId: string;
+  clubSlug: string;
+  clubName: string;
+  sessionId: string;
+  sessionNumber: number;
+  bookTitle: string;
+  meetingDate: string;
+  overallState: PlatformAdminTodayClosingRiskState;
+  primaryBlocker: string | null;
+  hostClosingHref: string | null;
+};
+
+export type PlatformAdminTodayClosingRisksResponse = {
+  schema: "admin.today_closing_risks.v1";
+  generatedAt: string;
+  items: PlatformAdminTodayClosingRisk[];
+};
+
 export type UpdatePlatformAdminClubRequest = {
   name?: string;
   tagline?: string;

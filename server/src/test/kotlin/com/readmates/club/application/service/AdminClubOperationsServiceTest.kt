@@ -11,7 +11,9 @@ import com.readmates.club.application.model.AdminClubOperationsSnapshot
 import com.readmates.club.application.model.AdminClubReadinessSummary
 import com.readmates.club.application.model.AdminClubSafeLink
 import com.readmates.club.application.model.AdminClubSessionProgress
+import com.readmates.club.application.model.AdminTodayClosingRiskSnapshot
 import com.readmates.club.application.port.out.AdminClubOperationsSnapshotPort
+import com.readmates.club.application.port.out.AdminTodayClosingRisksPort
 import com.readmates.club.domain.PlatformAdminRole
 import com.readmates.shared.security.CurrentPlatformAdmin
 import org.assertj.core.api.Assertions.assertThat
@@ -24,7 +26,7 @@ import java.util.UUID
 class AdminClubOperationsServiceTest {
     @Test
     fun `support can read operations snapshot`() {
-        val service = AdminClubOperationsService(FakePort(snapshot()))
+        val service = AdminClubOperationsService(FakePort(snapshot()), FakeTodayClosingRisksPort())
 
         val result = service.operationsSnapshot(admin(PlatformAdminRole.SUPPORT), CLUB_ID)
 
@@ -34,7 +36,7 @@ class AdminClubOperationsServiceTest {
 
     @Test
     fun `not found maps to platform admin club not found`() {
-        val service = AdminClubOperationsService(FakePort(null))
+        val service = AdminClubOperationsService(FakePort(null), FakeTodayClosingRisksPort())
 
         assertThatThrownBy { service.operationsSnapshot(admin(PlatformAdminRole.OWNER), CLUB_ID) }
             .isInstanceOfSatisfying(PlatformAdminException::class.java) { error ->
@@ -46,6 +48,14 @@ class AdminClubOperationsServiceTest {
         private val snapshot: AdminClubOperationsSnapshot?,
     ) : AdminClubOperationsSnapshotPort {
         override fun loadSnapshot(clubId: UUID): AdminClubOperationsSnapshot? = snapshot
+    }
+
+    private class FakeTodayClosingRisksPort : AdminTodayClosingRisksPort {
+        override fun loadTodayClosingRisks(limit: Int): AdminTodayClosingRiskSnapshot =
+            AdminTodayClosingRiskSnapshot(
+                generatedAt = OffsetDateTime.of(2026, 5, 27, 0, 0, 0, 0, ZoneOffset.UTC),
+                items = emptyList(),
+            )
     }
 
     private fun admin(role: PlatformAdminRole): CurrentPlatformAdmin =

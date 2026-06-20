@@ -1,6 +1,7 @@
 package com.readmates.club.application.port.`in`
 
 import com.readmates.club.application.model.AdminClubOperationsSnapshot
+import com.readmates.club.application.model.AdminTodayClosingRiskSnapshot
 import com.readmates.club.application.model.CreateClubDomainCommand
 import com.readmates.club.application.model.PlatformAdminClubDomain
 import com.readmates.club.application.model.PlatformAdminClubList
@@ -63,4 +64,8 @@ interface GetAdminClubOperationsUseCase {
         admin: CurrentPlatformAdmin,
         clubId: UUID,
     ): AdminClubOperationsSnapshot
+}
+
+interface ListAdminTodayClosingRisksUseCase {
+    fun todayClosingRisks(admin: CurrentPlatformAdmin): AdminTodayClosingRiskSnapshot
 }

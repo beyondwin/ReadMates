@@ -29,6 +29,19 @@ export function AdminSelectedBrief({ brief }: Props) {
         <p className="admin-selected-brief__notice">{brief.permissionNote}</p>
       ) : null}
 
+      {brief.closingRisk ? (
+        <div className="admin-selected-brief__checklist" aria-label="클로징 리스크">
+          <div className="admin-selected-brief__check" data-state="blocked">
+            <strong>No.{brief.closingRisk.sessionNumber} · {brief.closingRisk.bookTitle}</strong>
+            <span>{brief.closingRisk.meetingDate}</span>
+          </div>
+          <div className="admin-selected-brief__check" data-state="blocked">
+            <strong>{brief.closingRisk.stateLabel}</strong>
+            <span>{brief.closingRisk.blockerLabel}</span>
+          </div>
+        </div>
+      ) : null}
+
       {brief.publishChecklist.length > 0 ? (
         <div className="admin-selected-brief__checklist" aria-label="공개 준비 체크리스트">
           {brief.publishChecklist.map((item) => (

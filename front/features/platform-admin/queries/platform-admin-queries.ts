@@ -1,4 +1,5 @@
 import { queryOptions, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import * as platformAdminApi from "@/features/platform-admin/api/platform-admin-api";
 import {
   checkPlatformAdminDomainProvisioning,
   commitPlatformAdminOnboarding,
@@ -16,6 +17,7 @@ import type {
   PlatformAdminDomainResponse,
   PlatformAdminOnboardingRequest,
   PlatformAdminSummaryResponse,
+  PlatformAdminTodayClosingRisksResponse,
   SupportAccessGrantResponse,
   UpdatePlatformAdminClubRequest,
 } from "@/features/platform-admin/api/platform-admin-contracts";
@@ -26,6 +28,8 @@ export const platformAdminKeys = {
   all: ["platform-admin"] as const,
   summary: () => [...platformAdminKeys.all, "summary"] as const,
   clubs: () => [...platformAdminKeys.all, "clubs"] as const,
+  todayClosingRisks: () => [...platformAdminKeys.all, "today", "closing-risks"] as const,
+  todayClosingRisksUnavailable: () => [...platformAdminKeys.todayClosingRisks(), "unavailable"] as const,
   supportGrantsRoot: () => [...platformAdminKeys.all, "support-grants"] as const,
   supportGrants: (clubId: string | null) => [...platformAdminKeys.supportGrantsRoot(), clubId] as const,
 } as const;
@@ -41,6 +45,13 @@ export function platformAdminClubsQuery() {
   return queryOptions({
     queryKey: platformAdminKeys.clubs(),
     queryFn: fetchPlatformAdminClubs,
+  });
+}
+
+export function platformAdminTodayClosingRisksQuery() {
+  return queryOptions<PlatformAdminTodayClosingRisksResponse>({
+    queryKey: platformAdminKeys.todayClosingRisks(),
+    queryFn: () => platformAdminApi.fetchPlatformAdminTodayClosingRisks(),
   });
 }
 

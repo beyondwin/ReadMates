@@ -118,17 +118,17 @@ export function getSessionClosingBoardView(status: SessionClosingStatusInput): S
 function primaryAction(status: SessionClosingStatusInput) {
   switch (status.overall.primaryAction) {
     case "CLOSE_SESSION":
-      return { label: "Review session close", href: `/app/host/sessions/${status.session.sessionId}/edit` };
+      return { label: "세션 종료 확인", href: `/app/host/sessions/${status.session.sessionId}/edit` };
     case "IMPORT_RECORDS":
-      return { label: "Review record package", href: `/app/host/sessions/${status.session.sessionId}/edit?records=json` };
+      return { label: "기록 패키지 검토", href: `/app/host/sessions/${status.session.sessionId}/edit?records=json` };
     case "PUBLISH_RECORDS":
-      return { label: "Review publication", href: `/app/host/sessions/${status.session.sessionId}/edit` };
+      return { label: "기록 공개 설정 확인", href: `/app/host/sessions/${status.session.sessionId}/edit` };
     case "SEND_NOTIFICATION":
-      return { label: "Check member notifications", href: "/app/host/notifications" };
+      return { label: "멤버 알림 상태 확인", href: "/app/host/notifications" };
     case "REVIEW_PUBLIC_PAGE":
-      return { label: "Open public record", href: status.evidence.publicRecordHref };
+      return { label: "공개 기록 확인", href: status.evidence.publicRecordHref };
     case "NONE":
-      return { label: "No action needed", href: null };
+      return { label: "추가 조치 없음", href: null };
   }
 }
 

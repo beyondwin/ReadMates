@@ -124,6 +124,14 @@ async function routePlatformAdminToday(page: Page, role: PlatformAdminRole): Pro
     });
   });
 
+  await page.route("**/api/bff/api/admin/today/closing-risks", async (route) => {
+    await json(route, 200, {
+      schema: "admin.today_closing_risks.v1",
+      generatedAt: "2026-06-20T00:00:00Z",
+      items: [],
+    });
+  });
+
   await page.route("**/api/bff/api/admin/ai-generation/summary", async (route) => {
     await json(route, 200, {
       activeJobCount: 0,

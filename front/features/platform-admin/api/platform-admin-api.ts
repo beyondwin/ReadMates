@@ -13,6 +13,7 @@ import type {
   PlatformAdminOnboardingRequest,
   PlatformAdminOnboardingResultResponse,
   PlatformAdminSummaryResponse,
+  PlatformAdminTodayClosingRisksResponse,
   SupportAccessGrantResponse,
   UpdatePlatformAdminClubRequest,
 } from "@/features/platform-admin/api/platform-admin-contracts";
@@ -23,6 +24,14 @@ export function fetchPlatformAdminSummary() {
 
 export function fetchPlatformAdminClubs() {
   return readmatesFetch<PlatformAdminClubListResponse>("/api/admin/clubs", undefined, { clubSlug: undefined });
+}
+
+export function fetchPlatformAdminTodayClosingRisks() {
+  return readmatesFetch<PlatformAdminTodayClosingRisksResponse>(
+    "/api/admin/today/closing-risks",
+    undefined,
+    { clubSlug: undefined },
+  );
 }
 
 export function updatePlatformAdminClub(clubId: string, request: UpdatePlatformAdminClubRequest) {

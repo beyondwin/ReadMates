@@ -49,7 +49,7 @@ describe("getSessionClosingBoardView", () => {
 
     expect(view.title).toBe("No.07 · E2E Book");
     expect(view.statusTone).toBe("accent");
-    expect(view.primaryAction.label).toBe("Check member notifications");
+    expect(view.primaryAction.label).toBe("멤버 알림 상태 확인");
     expect(view.surfaces.map((surface) => surface.id)).toEqual(["HOST", "MEMBER", "PUBLIC"]);
     expect(JSON.stringify(view)).not.toContain("member1@example.com");
     expect(JSON.stringify(view)).not.toContain("ADMIN_ROUTE");
@@ -65,4 +65,23 @@ describe("getSessionClosingBoardView", () => {
     expect(view.statusTone).toBe("danger");
     expect(view.evidence.find((item) => item.label === "Feedback document")?.value).toBe("Needs review");
   });
+
+  it.each([
+    ["CLOSE_SESSION", "세션 종료 확인"],
+    ["IMPORT_RECORDS", "기록 패키지 검토"],
+    ["PUBLISH_RECORDS", "기록 공개 설정 확인"],
+    ["SEND_NOTIFICATION", "멤버 알림 상태 확인"],
+    ["REVIEW_PUBLIC_PAGE", "공개 기록 확인"],
+    ["NONE", "추가 조치 없음"],
+  ] satisfies Array<[SessionClosingStatusInput["overall"]["primaryAction"], string]>)(
+    "maps %s to Korean repair copy",
+    (primaryAction, label) => {
+      const view = getSessionClosingBoardView({
+        ...baseStatus,
+        overall: { ...baseStatus.overall, primaryAction },
+      });
+
+      expect(view.primaryAction.label).toBe(label);
+    },
+  );
 });

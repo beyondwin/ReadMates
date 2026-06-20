@@ -3,7 +3,10 @@
 package com.readmates.club.adapter.`in`.web
 
 import com.readmates.club.application.model.AdminClubOperationsSnapshot
+import com.readmates.club.application.model.AdminTodayClosingRiskItem
+import com.readmates.club.application.model.AdminTodayClosingRiskSnapshot
 import com.readmates.club.application.port.`in`.GetAdminClubOperationsUseCase
+import com.readmates.club.application.port.`in`.ListAdminTodayClosingRisksUseCase
 import com.readmates.shared.security.CurrentPlatformAdmin
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -22,6 +25,16 @@ class PlatformAdminClubOperationsController(
         @PathVariable clubId: UUID,
     ): AdminClubOperationsSnapshotResponse =
         AdminClubOperationsSnapshotResponse.from(getAdminClubOperationsUseCase.operationsSnapshot(admin, clubId))
+}
+
+@RestController
+@RequestMapping("/api/admin/today")
+class PlatformAdminTodayClosingRisksController(
+    private val listAdminTodayClosingRisksUseCase: ListAdminTodayClosingRisksUseCase,
+) {
+    @GetMapping("/closing-risks")
+    fun closingRisks(admin: CurrentPlatformAdmin): AdminTodayClosingRiskSnapshotResponse =
+        AdminTodayClosingRiskSnapshotResponse.from(listAdminTodayClosingRisksUseCase.todayClosingRisks(admin))
 }
 
 data class AdminClubOperationsSnapshotResponse(
@@ -49,6 +62,21 @@ data class AdminClubOperationsSnapshotResponse(
                 aiUsage = snapshot.aiUsage,
                 closingRisks = snapshot.closingRisks,
                 safeLinks = snapshot.safeLinks,
+            )
+    }
+}
+
+data class AdminTodayClosingRiskSnapshotResponse(
+    val schema: String,
+    val generatedAt: String,
+    val items: List<AdminTodayClosingRiskItem>,
+) {
+    companion object {
+        fun from(snapshot: AdminTodayClosingRiskSnapshot): AdminTodayClosingRiskSnapshotResponse =
+            AdminTodayClosingRiskSnapshotResponse(
+                schema = snapshot.schema,
+                generatedAt = snapshot.generatedAt.toString(),
+                items = snapshot.items,
             )
     }
 }

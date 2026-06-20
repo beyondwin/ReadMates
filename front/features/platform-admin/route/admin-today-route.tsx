@@ -1,11 +1,15 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { platformAdminAiOpsJobsQuery, platformAdminAiOpsSummaryQuery } from "@/features/platform-admin/queries/platform-admin-ai-ops-queries";
 import { platformAdminNotificationSnapshotQuery } from "@/features/platform-admin/queries/platform-admin-notifications-queries";
-import { platformAdminClubsQuery, platformAdminSummaryQuery } from "@/features/platform-admin/queries/platform-admin-queries";
+import {
+  platformAdminClubsQuery,
+  platformAdminKeys,
+  platformAdminSummaryQuery,
+  platformAdminTodayClosingRisksQuery,
+} from "@/features/platform-admin/queries/platform-admin-queries";
 import {
   buildPlatformAdminWorkbench,
-  type PlatformAdminWorkbenchInput,
   type WorkbenchQueueItem,
 } from "@/features/platform-admin/model/platform-admin-workbench-model";
 import { AdminTodayLedger } from "@/features/platform-admin/ui/admin-today-ledger";
@@ -17,6 +21,8 @@ export function AdminTodayRoute() {
   const notificationQuery = useQuery(platformAdminNotificationSnapshotQuery());
   const aiSummaryQuery = useQuery(platformAdminAiOpsSummaryQuery());
   const aiJobsQuery = useQuery(platformAdminAiOpsJobsQuery());
+  const closingRisksQuery = useQuery(platformAdminTodayClosingRisksQuery());
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const filter = searchParams.get("filter");
   const selectedItemId = searchParams.get("selected");
@@ -40,7 +46,11 @@ export function AdminTodayRoute() {
   }
 
   const aiDisabled = isReadmatesApiError(aiSummaryQuery.error) && aiSummaryQuery.error.status === 503;
-  const input: PlatformAdminWorkbenchInput = {
+  const closingRisksUnavailable =
+    closingRisksQuery.isError ||
+    closingRisksQuery.isRefetchError ||
+    queryClient.getQueryData<boolean>(platformAdminKeys.todayClosingRisksUnavailable()) === true;
+  const input = {
     role: summary.platformRole,
     activeClubCount: summary.activeClubCount,
     domainActionRequiredCount: summary.domainActionRequiredCount,
@@ -85,6 +95,8 @@ export function AdminTodayRoute() {
     })),
     aiDisabled,
     aiUnavailable: (aiSummaryQuery.isError || aiJobsQuery.isError) && !aiDisabled,
+    closingRisks: closingRisksQuery.data?.items ?? [],
+    closingRisksUnavailable,
   };
   const workbench = buildPlatformAdminWorkbench(input);
   const filteredItems = filterQueueItems(workbench.queueItems, filter);

@@ -1,4 +1,5 @@
 import type { AdminNotificationOperationsSnapshot } from "@/features/platform-admin/model/platform-admin-notifications-model";
+import type { PlatformAdminTodayClosingRisk } from "@/features/platform-admin/model/platform-admin-domain-types";
 
 export type PlatformAdminRole = "OWNER" | "OPERATOR" | "SUPPORT";
 export type PlatformAdminClubStatus = "SETUP_REQUIRED" | "ACTIVE" | "SUSPENDED" | "ARCHIVED";
@@ -74,6 +75,8 @@ export type PlatformAdminWorkbenchInput = {
   aiJobs?: ReadonlyArray<PlatformAdminAiOpsJobInput>;
   aiDisabled?: boolean;
   aiUnavailable?: boolean;
+  closingRisks?: ReadonlyArray<PlatformAdminTodayClosingRisk>;
+  closingRisksUnavailable?: boolean;
 };
 
 export type PlatformAdminPermissionView = {
@@ -99,6 +102,7 @@ export type SelectedAdminAction = {
     | "check-domain"
     | "open-notifications"
     | "open-ai-ops"
+    | "open-host-closing"
     | "open-detail"
     | "none";
   label: string;
@@ -107,7 +111,7 @@ export type SelectedAdminAction = {
   reason: string | null;
 };
 
-export type WorkbenchQueueItemType = "club" | "notification" | "ai" | "partial-error";
+export type WorkbenchQueueItemType = "club" | "notification" | "ai" | "closing-risk" | "partial-error";
 
 export type WorkbenchQueueItem = {
   id: string;
@@ -123,9 +127,20 @@ export type WorkbenchQueueItem = {
   href: string;
 };
 
+export type PlatformAdminClosingRiskBrief = {
+  kind: "closing-risk";
+  sessionId: string;
+  sessionNumber: number;
+  bookTitle: string;
+  meetingDate: string;
+  stateLabel: string;
+  blockerLabel: string;
+};
+
 export type PlatformAdminSelectedBrief = {
   item: WorkbenchQueueItem;
   club: PlatformAdminWorkbenchClub | null;
+  closingRisk: PlatformAdminClosingRiskBrief | null;
   domains: PlatformAdminWorkbenchDomain[];
   publishChecklist: PublishChecklistItem[];
   primaryAction: SelectedAdminAction;
@@ -167,10 +182,12 @@ export function buildPlatformAdminWorkbench(input: PlatformAdminWorkbenchInput):
     disabled: input.aiDisabled ?? false,
     unavailable: input.aiUnavailable ?? false,
   });
-  const queueItems = [...clubItems, ...notificationItems, ...aiItems].sort(compareQueueItems);
+  const closingRiskItems = buildClosingRiskQueueItems(input.closingRisks ?? [], input.closingRisksUnavailable ?? false);
+  const closingRiskBriefsByQueueId = buildClosingRiskBriefsByQueueId(input.closingRisks ?? []);
+  const queueItems = [...clubItems, ...notificationItems, ...aiItems, ...closingRiskItems].sort(compareQueueItems);
   const selectedItem = selectQueueItem(input.selectedItemId, input.selectedClubId, queueItems);
   const selectedBrief = selectedItem
-    ? buildSelectedBrief(selectedItem, input.clubs, domainsByClub, permissions)
+    ? buildSelectedBrief(selectedItem, input.clubs, domainsByClub, permissions, closingRiskBriefsByQueueId)
     : null;
 
   return {
@@ -408,6 +425,98 @@ function buildAiQueueItems(
   return items;
 }
 
+function buildClosingRiskQueueItems(
+  risks: ReadonlyArray<PlatformAdminTodayClosingRisk>,
+  unavailable: boolean,
+): WorkbenchQueueItem[] {
+  const items = risks.map((risk): WorkbenchQueueItem => {
+    const blockerLabel = closingRiskBlockerLabel(risk.primaryBlocker);
+    return {
+      id: closingRiskQueueId(risk.sessionId),
+      type: "closing-risk",
+      clubId: risk.clubId,
+      slug: risk.clubSlug,
+      name: `${risk.clubName} · No.${risk.sessionNumber}`,
+      severity: closingRiskSeverity(risk.overallState),
+      reason: `${risk.bookTitle} · ${blockerLabel}`,
+      primaryActionLabel: risk.hostClosingHref ? "호스트 클로징 보드" : "클럽 운영 상세",
+      badges: [closingRiskStateLabel(risk.overallState), blockerLabel],
+      sortRank: closingRiskSortRank(risk.overallState),
+      href: risk.hostClosingHref || `/admin/clubs/${risk.clubId}`,
+    };
+  });
+
+  if (!unavailable) return items;
+
+  return [
+    ...items,
+    {
+      id: "partial-closing-risks",
+      type: "partial-error",
+      clubId: null,
+      slug: "platform",
+      name: "클로징 리스크",
+      severity: "warn",
+      reason: "오늘 클로징 리스크 큐를 확인하지 못했습니다.",
+      primaryActionLabel: "클로징 확인 불가",
+      badges: ["closing risks unavailable"],
+      sortRank: 33,
+      href: "/admin/today",
+    },
+  ];
+}
+
+function buildClosingRiskBriefsByQueueId(
+  risks: ReadonlyArray<PlatformAdminTodayClosingRisk>,
+): Map<string, PlatformAdminClosingRiskBrief> {
+  const briefs = new Map<string, PlatformAdminClosingRiskBrief>();
+  for (const risk of risks) {
+    briefs.set(closingRiskQueueId(risk.sessionId), {
+      kind: "closing-risk",
+      sessionId: risk.sessionId,
+      sessionNumber: risk.sessionNumber,
+      bookTitle: risk.bookTitle,
+      meetingDate: risk.meetingDate,
+      stateLabel: closingRiskStateLabel(risk.overallState),
+      blockerLabel: closingRiskBlockerLabel(risk.primaryBlocker),
+    });
+  }
+  return briefs;
+}
+
+function closingRiskQueueId(sessionId: string): string {
+  return `closing-risk-${sessionId}`;
+}
+
+function closingRiskStateLabel(state: string): string {
+  if (state === "BLOCKED") return "차단";
+  if (state === "IN_PROGRESS") return "진행 중";
+  if (state === "READY") return "확인 준비";
+  return "확인 필요";
+}
+
+function closingRiskBlockerLabel(blocker: string | null): string {
+  if (blocker === "FEEDBACK_DOCUMENT_INVALID") return "피드백 문서 다시 확인";
+  if (blocker === "SESSION_CLOSE_REQUIRED") return "세션 종료 필요";
+  if (blocker === "RECORD_PACKAGE_REQUIRED") return "기록 패키지 필요";
+  if (blocker === "FEEDBACK_DOCUMENT_REQUIRED") return "피드백 문서 필요";
+  if (blocker === "MEMBER_NOTIFICATION_REQUIRED") return "멤버 알림 확인";
+  if (blocker === "PUBLIC_RECORD_REQUIRED") return "공개 기록 확인";
+  return "확인 필요";
+}
+
+function closingRiskSeverity(state: string): WorkQueueSeverity {
+  if (state === "BLOCKED") return "critical";
+  if (state === "IN_PROGRESS") return "warn";
+  return "attention";
+}
+
+function closingRiskSortRank(state: string): number {
+  if (state === "BLOCKED") return 25;
+  if (state === "IN_PROGRESS") return 35;
+  return 45;
+}
+
 function permissionsForRole(role: PlatformAdminRole): PlatformAdminPermissionView {
   const canOperate = role === "OWNER" || role === "OPERATOR";
   return {
@@ -425,14 +534,17 @@ function buildSelectedBrief(
   clubs: PlatformAdminWorkbenchClub[],
   domainsByClub: Map<string, PlatformAdminWorkbenchDomain[]>,
   permissions: PlatformAdminPermissionView,
+  closingRiskBriefsByQueueId: Map<string, PlatformAdminClosingRiskBrief>,
 ): PlatformAdminSelectedBrief {
   const club = item.clubId ? clubs.find((candidate) => candidate.clubId === item.clubId) ?? null : null;
   const domains = club ? domainsByClub.get(club.clubId) ?? [] : [];
-  const publishChecklist = club ? buildPublishChecklist(club, domains) : [];
+  const closingRisk = item.type === "closing-risk" ? closingRiskBriefsByQueueId.get(item.id) ?? null : null;
+  const publishChecklist = club && !closingRisk ? buildPublishChecklist(club, domains) : [];
   const primaryAction = buildSelectedAction(item, club, domains, permissions);
   return {
     item,
     club,
+    closingRisk,
     domains,
     publishChecklist,
     primaryAction,
@@ -471,6 +583,16 @@ function buildSelectedAction(
     return {
       kind: "open-ai-ops",
       label: "AI Ops 열기",
+      href: item.href,
+      disabled: false,
+      reason: null,
+    };
+  }
+
+  if (item.type === "closing-risk") {
+    return {
+      kind: item.primaryActionLabel === "호스트 클로징 보드" ? "open-host-closing" : "open-detail",
+      label: item.primaryActionLabel,
       href: item.href,
       disabled: false,
       reason: null,
@@ -547,6 +669,9 @@ function buildDrillLinks(
   }
   if (item.type === "ai") {
     links.push({ label: "AI Ops", href: item.href });
+  }
+  if (item.type === "closing-risk") {
+    links.push({ label: item.primaryActionLabel, href: item.href });
   }
   links.push({ label: "감사 로그", href: club ? `/admin/audit?clubId=${club.clubId}` : "/admin/audit" });
   return links;
