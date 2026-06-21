@@ -240,6 +240,15 @@ The v1.11.0 production OAuth and backup timer items are closed by 2026-05-31 ope
 - Local verification before merge: `git diff --check 7f871b9e..HEAD`, `pnpm --dir front lint`, `pnpm --dir front test` (146 files, 1203 tests), `pnpm --dir front build` (passed after retry; existing chunk-size warning), `./server/gradlew -p server clean test` (BUILD SUCCESSFUL, project `test` task skipped by configuration), `./server/gradlew -p server check`, `./server/gradlew -p server architectureTest`, `pnpm --dir front test:e2e -- tests/e2e/admin-today-closing-risks.spec.ts` (1/1), `pnpm --dir front test:e2e` (64/64), `./scripts/build-public-release-candidate.sh`, `./scripts/public-release-check.sh .tmp/public-release-candidate`, `graphify update .`, Graphify freshness audit, and CPE prompt-cache audit passed. Public release check reported gitleaks no leaks.
 - Residual risk: no known local release-readiness residual remains after server, frontend, targeted/full E2E, Graphify, prompt-cache, CHANGELOG, and public-release evidence. Production deploy/tag smoke remains outside this local branch.
 
+## 2026-06-21 v1.14.1 server image scan repair
+
+- Scope reviewed: `v1.14.0..HEAD` after the `v1.14.0` release operation.
+- Release classification: patch release (`v1.14.1`) because `v1.14.0` `Deploy Front` passed, but `Deploy Server Image` failed before release-tag promotion at the Trivy vulnerability gate. No DB migration, public API contract, auth/BFF token, OAuth scope, frontend behavior, or deploy workflow behavior is changed by this repair.
+- Root cause: the release image scan found fixed HIGH findings in the Ubuntu 22.04 base layer (`libssl3`/`openssl` fixed in `3.0.2-0ubuntu1.25`) and Java runtime dependencies (`io.netty:netty-handler` / `io.netty:netty-resolver-dns` fixed in `4.2.15.Final`, `org.springframework.kafka:spring-kafka` fixed in `4.0.6`).
+- Repair plan: release Docker image builds now apply Ubuntu package upgrades before installing runtime tools, and Gradle runtime dependency management overrides Netty and Spring Kafka to the fixed versions reported by the failed scan.
+- Local verification before tag: dependency insight selected Netty `4.2.15.Final` and Spring Kafka `4.0.6`; `./server/gradlew -p server clean check bootJar` passed; `docker build -f server/Dockerfile.release server -t readmates-server:v1.14.1-local` passed; the built image reports `libssl3`/`openssl` `3.0.2-0ubuntu1.25` and contains the fixed Netty/Spring Kafka jars; local Trivy `0.70.0` scan with `--severity HIGH,CRITICAL --ignore-unfixed --scanners vuln` passed with 0 Ubuntu and Java findings.
+- Required post-tag operations: publish `v1.14.1` instead of force-updating `v1.14.0`, confirm `Deploy Server Image` scan/promote, promote OCI Compose backend to `ghcr.io/<owner>/<repo>/readmates-server:v1.14.1`, then run sanitized BFF/OAuth/admin/host smoke checks. `Deploy Front` will rerun from the patch tag, but final release completion depends on backend promotion and smoke.
+
 ## 기본 범위
 
 기본 범위는 현재 branch와 base branch의 차이입니다. 보통 `origin/main..HEAD`를 사용합니다.

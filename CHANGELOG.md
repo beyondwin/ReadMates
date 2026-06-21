@@ -10,6 +10,24 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 
+## v1.14.1 - 2026-06-21
+
+### Fixed
+
+- **server release image security:** `v1.14.0`의 frontend 배포는 성공했지만 `Deploy Server Image`가 Trivy gate에서 fixed HIGH 취약점을 발견해 GHCR release tag promotion 전에 멈췄습니다. Release image build가 Ubuntu security updates를 적용하도록 하고, runtime dependency override를 Netty `4.2.15.Final`과 Spring Kafka `4.0.6`으로 올려 server image scan blocker를 닫습니다.
+
+### Deployment Notes
+
+- Server release repair. DB migration, public API contract, auth/BFF token, OAuth scope, frontend behavior, and deploy workflow behavior are unchanged from `v1.14.0`.
+- Do not force-update `v1.14.0`. Publish `v1.14.1`, confirm `Deploy Server Image` scan/promote, promote OCI Compose backend to `ghcr.io/<owner>/<repo>/readmates-server:v1.14.1`, then run sanitized BFF/OAuth/admin/host smoke checks. `Deploy Front` will also rerun from the patch tag.
+
+### Verification
+
+- `v1.14.0` release operation (2026-06-21): `Deploy Front` passed for tag `v1.14.0`; `Deploy Server Image` failed before release-tag promotion at Trivy scan on Ubuntu `libssl3`/`openssl`, Netty, and Spring Kafka fixed HIGH findings.
+- Local dependency verification (2026-06-21): `./server/gradlew -p server dependencyInsight --dependency netty-handler --configuration runtimeClasspath` selected Netty `4.2.15.Final`; `./server/gradlew -p server dependencyInsight --dependency spring-kafka --configuration runtimeClasspath` selected Spring Kafka `4.0.6`.
+- Local server/image verification (2026-06-21): `./server/gradlew -p server clean check bootJar` passed; `docker build -f server/Dockerfile.release server -t readmates-server:v1.14.1-local` passed; the local image reports `libssl3`/`openssl` `3.0.2-0ubuntu1.25` and contains `netty-handler-4.2.15.Final`, `netty-resolver-dns-4.2.15.Final`, and `spring-kafka-4.0.6`.
+- Local vulnerability verification (2026-06-21): `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.70.0 image --severity HIGH,CRITICAL --ignore-unfixed --scanners vuln readmates-server:v1.14.1-local` passed with 0 Ubuntu and Java HIGH/CRITICAL findings.
+
 ## v1.14.0 - 2026-06-21
 
 ### Highlights
