@@ -251,6 +251,13 @@ The v1.11.0 production OAuth and backup timer items are closed by 2026-05-31 ope
 - OCI backend promotion evidence: `deploy/oci/05-deploy-compose-stack.sh` promoted the Compose stack to `ghcr.io/beyondwin/readmates/readmates-server:v1.14.1`; `readmates-api` reported healthy liveness; post-deploy watch passed VM compose health, Cloudflare BFF auth smoke, OAuth redirect smoke, Pages marker smoke, and recent backend error scan.
 - Residual risk: no `v1.14.1` server image scan, GHCR promotion, OCI Compose promotion, or sanitized post-deploy watch residual remains open. GitHub still reports unrelated Dependabot vulnerability alerts on the default branch; handle those as dependency-maintenance follow-up rather than a blocker for this server-image scan repair release.
 
+## 2026-06-22 Dependabot toolchain residual closure
+
+- Scope reviewed: open GitHub Dependabot alerts on the default branch after `v1.14.1` deployment. All open alerts were npm toolchain findings for Vite `>= 8.0.0, <= 8.0.15` across `front/package.json`, `design/docs/package.json`, `design/system/package.json`, and `pnpm-lock.yaml`, plus the lockfile-only `esbuild >= 0.27.3, < 0.28.1` finding. During remediation, local `pnpm audit --audit-level low` also exposed dev/test transitive findings for `ws`, `js-yaml`, and `@babel/core`; those are included in this closure.
+- Release classification: dev/build toolchain security maintenance. No frontend route behavior, UI workflow, server API contract, DB migration, auth/BFF token, OAuth scope, release image, or deploy workflow behavior changes.
+- Repair evidence: `front`, `design/docs`, and `design/system` now pin Vite `8.0.16`; root pnpm overrides map only vulnerable ranges to patched versions: `esbuild@>=0.27.3 <0.28.1` to `0.28.1`, `ws@>=8.0.0 <8.21.0` to `8.21.0`, `js-yaml@<=4.1.1` to `4.2.0`, and `@babel/core@<=7.29.0` to `7.29.6`. `pnpm list vite esbuild ws js-yaml @babel/core --depth 10 -r` shows the Vite 8 path on `vite@8.0.16` and `esbuild@0.28.1`, `jsdom` on `ws@8.21.0`, ESLint on `js-yaml@4.2.0`, and Playwright CT React tooling on `@babel/core@7.29.6`; the Playwright CT Vite 6 path remains on `esbuild@0.25.12`, outside the vulnerable range.
+- Residual risk: local dependency evidence shows no vulnerable Vite `8.0.9`, `esbuild@0.28.0`, `ws@8.20.1`, `js-yaml@4.1.1`, or `@babel/core@7.29.0` path remains in the workspace dependency tree, and `pnpm audit --audit-level low` reports no known vulnerabilities. GitHub Dependabot alert closure still depends on rescanning the pushed default branch.
+
 ## 기본 범위
 
 기본 범위는 현재 branch와 base branch의 차이입니다. 보통 `origin/main..HEAD`를 사용합니다.
