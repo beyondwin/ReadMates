@@ -6,6 +6,18 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ## Unreleased
 
+### Highlights
+
+- 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
+
+## v1.14.0 - 2026-06-21
+
+### Highlights
+
+- **session closing operations:** 호스트 회차 클로징 보드, 멤버 회고 진입, 공개 기록 쇼케이스, 플랫폼 관리자 클로징 리스크 큐를 하나의 운영 흐름으로 정리했습니다. 관리자는 `/admin/today`와 `/admin/clubs/:clubId`에서 host-owned repair link를 따라가며, 호스트는 실제 기록 보강을 계속 소유합니다.
+- **closing risk ledger:** Flyway V36으로 admin closing risk ledger를 추가해 first-detected, last-seen, occurrence count, recently resolved 상태를 추적합니다. 공개/관리자 표면에는 세션 단위 safe metadata만 노출하고 raw member data, feedback body, provider raw error, token-shaped value는 노출하지 않습니다.
+- **host record preview loop:** 호스트 세션 편집기의 외부 JSON 가져오기 미리보기를 저장 전 검토 화면으로 확장하고, 저장 후 결과 장부와 멤버 홈/피드백 문서 진입을 보강했습니다.
+
 ### Changed
 
 - **platform admin closing risk aging ledger:** `/admin/today` and `/admin/clubs/:clubId` closing risks now carry durable first-detected, last-seen, occurrence, and resolved tracking so operators can distinguish persistent blockers from recently cleared sessions. The projection remains admin-safe and host-drilldown oriented.
@@ -19,6 +31,22 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 ### Engineering
 
 - Added Spring-course-inspired operations hardening evidence: local observability smoke tooling, SLO report draft generation, and large-fixture SQL performance guards for the notes feed.
+
+### Deployment Notes
+
+- Minor release. Flyway V36 (`admin_closing_risk_ledger`) is additive and stores only admin-safe session-level closing risk metadata. Rollback should use a forward-fix migration rather than editing the applied migration.
+- Public API contracts are additive: host session closing status and platform-admin closing risk/readiness responses add read-only fields and routes. Older clients ignore the new fields, while the new frontend treats missing ledger fields as untracked.
+- Auth/BFF token, OAuth scope, secret/session handling, and deploy workflow behavior are unchanged.
+- Deployment order: push `main`, push annotated tag `v1.14.0`, confirm `Deploy Server Image` scan/promote, promote OCI Compose backend to the same `v1.14.0` image, confirm `Deploy Front`, then run sanitized BFF/OAuth/admin/host smoke checks.
+
+### Verification
+
+- Local pre-push readiness (2026-06-21): `./scripts/pre-push-check.sh --full --release` - pass. Covered CHANGELOG release guard, whitespace, frontend lint, frontend coverage tests (146 files, 1203 tests), frontend build, Zod fixture export/diff, backend `check`, public release candidate build/check, backend integration tests, Playwright E2E (64/64), Prometheus rule/config validation, and Alertmanager config validation.
+- CI scripts job parity (2026-06-21): `bash -n scripts/*.sh deploy/oci/*.sh`, `shellcheck scripts/*.sh deploy/oci/*.sh`, and `bash scripts/aigen-pii-check.sh` - pass.
+- Design system CI parity (2026-06-21): `pnpm design:check` - pass.
+- Backend CI parity (2026-06-21): `./scripts/lint-grafana-dashboards.sh` - pass.
+- Deploy workflow parity (2026-06-21): `pnpm --dir front test` - pass (146 files, 1203 tests); `./server/gradlew -p server clean check bootJar` - pass.
+- Skipped before push: production OAuth, VM/provider-console checks, GitHub Actions status, release tag deploy workflows, OCI Compose promotion, GitHub Release publication, and post-deploy smoke. These require pushed `main`/tag or operator production access.
 
 ## v1.13.0 - 2026-06-07
 

@@ -420,6 +420,13 @@ class CurrentSessionControllerDbTest(
         """
 
         private const val CLEANUP_GENERATED_SESSIONS_SQL = """
+            delete from admin_closing_risk_ledger
+            where club_id = '00000000-0000-0000-0000-000000000001'
+              and session_id in (
+                select id from sessions
+                where club_id = '00000000-0000-0000-0000-000000000001'
+                  and number >= 7
+            );
             delete from feedback_reports
             where session_id in (
               select id from sessions

@@ -113,6 +113,19 @@ class FrontendZodSchemaContractTest
         }
 
         @Test
+        @Sql(
+            statements = [
+                CLEANUP_CONTRACT_ADMIN_ANALYTICS_SQL,
+                INSERT_CONTRACT_ADMIN_ANALYTICS_SESSION_SQL,
+            ],
+            executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+        )
+        @Sql(
+            statements = [
+                CLEANUP_CONTRACT_ADMIN_ANALYTICS_SQL,
+            ],
+            executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+        )
         fun `admin analytics overview response matches zod schema fixture key set`() {
             val response =
                 mockMvc
@@ -354,6 +367,29 @@ class FrontendZodSchemaContractTest
                 where session_id = '00000000-0000-0000-0000-000000000977';
                 delete from sessions
                 where id = '00000000-0000-0000-0000-000000000977';
+            """
+
+            private const val CLEANUP_CONTRACT_ADMIN_ANALYTICS_SQL = """
+                delete from admin_closing_risk_ledger
+                where session_id = '00000000-0000-0000-0000-000000000976';
+                delete from session_participants
+                where session_id = '00000000-0000-0000-0000-000000000976';
+                delete from sessions
+                where id = '00000000-0000-0000-0000-000000000976';
+            """
+
+            private const val INSERT_CONTRACT_ADMIN_ANALYTICS_SESSION_SQL = """
+                insert into sessions (
+                  id, club_id, number, title, book_title, book_author, book_translator, book_link,
+                  session_date, start_time, end_time, location_label, question_deadline_at, state
+                )
+                values (
+                  '00000000-0000-0000-0000-000000000976',
+                  '00000000-0000-0000-0000-000000000001',
+                  976, '976회차 · 분석 계약 테스트 책', '분석 계약 테스트 책', '분석 계약 테스트 저자', null, null,
+                  current_date() - interval 1 day, '20:00', '22:00', '온라인',
+                  timestamp(current_date() - interval 2 day, '14:59:00'), 'CLOSED'
+                );
             """
 
             private const val INSERT_CONTRACT_CURRENT_SESSION_SQL = """
