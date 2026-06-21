@@ -27,6 +27,8 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - Local dependency verification (2026-06-21): `./server/gradlew -p server dependencyInsight --dependency netty-handler --configuration runtimeClasspath` selected Netty `4.2.15.Final`; `./server/gradlew -p server dependencyInsight --dependency spring-kafka --configuration runtimeClasspath` selected Spring Kafka `4.0.6`.
 - Local server/image verification (2026-06-21): `./server/gradlew -p server clean check bootJar` passed; `docker build -f server/Dockerfile.release server -t readmates-server:v1.14.1-local` passed; the local image reports `libssl3`/`openssl` `3.0.2-0ubuntu1.25` and contains `netty-handler-4.2.15.Final`, `netty-resolver-dns-4.2.15.Final`, and `spring-kafka-4.0.6`.
 - Local vulnerability verification (2026-06-21): `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.70.0 image --severity HIGH,CRITICAL --ignore-unfixed --scanners vuln readmates-server:v1.14.1-local` passed with 0 Ubuntu and Java HIGH/CRITICAL findings.
+- Release operation (2026-06-21): `Deploy Front` passed for tag `v1.14.1`; `Deploy Server Image` passed, scanned `ghcr.io/beyondwin/readmates/readmates-server@sha256:9254b7ff380b6fa869ec6694acc8ea2a13010940445b52a595968712030e528f`, and promoted the same digest to `ghcr.io/beyondwin/readmates/readmates-server:v1.14.1`.
+- OCI backend promotion (2026-06-21): `deploy/oci/05-deploy-compose-stack.sh` promoted the Compose stack to `ghcr.io/beyondwin/readmates/readmates-server:v1.14.1`; `readmates-api` reported healthy liveness; post-deploy watch passed VM compose health, Cloudflare BFF auth smoke, OAuth redirect smoke, Pages marker smoke, and recent backend error scan.
 
 ## v1.14.0 - 2026-06-21
 
