@@ -1,6 +1,7 @@
 import type { MouseEvent } from "react";
 import { useInRouterContext, useLocation } from "react-router-dom";
 import { getMemberNotificationLinkView } from "@/features/notifications/model/notification-link-model";
+import type { ReadmatesReturnState } from "@/shared/routing/readmates-route-state";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 
 type NotificationEventType =
@@ -29,7 +30,7 @@ interface MemberNotificationsPageProps {
   actionError?: string | null;
   onMarkRead: (id: string) => void;
   onMarkAllRead: () => void;
-  onOpenNotification?: (id: string, href: string) => void;
+  onOpenNotification?: (id: string, href: string, state?: ReadmatesReturnState) => void;
   onLoadMore?: () => void;
 }
 
@@ -149,9 +150,26 @@ function MemberNotificationsPageContent({
             <div style={{ display: "grid", gap: 6 }}>
               {items.map((item) => {
                 const unread = item.readAt === null;
-                const linkView = getMemberNotificationLinkView(item.deepLinkPath);
+                const linkView = getMemberNotificationLinkView({
+                  eventType: item.eventType,
+                  deepLinkPath: item.deepLinkPath,
+                });
                 const href = scopedAppLinkTarget(routePathname, linkView.href);
+                const state = linkView.state
+                  ? {
+                      ...linkView.state,
+                      readmatesReturnTo: scopedAppLinkTarget(routePathname, linkView.state.readmatesReturnTo),
+                    }
+                  : undefined;
                 const readPending = pendingReadIds.has(item.id) || markAllReadPending;
+                const openNotification = () => {
+                  if (state) {
+                    onOpenNotification?.(item.id, href, state);
+                    return;
+                  }
+
+                  onOpenNotification?.(item.id, href);
+                };
 
                 return (
                   <article
@@ -185,7 +203,7 @@ function MemberNotificationsPageContent({
                               if (isInteractiveTarget(event.target)) {
                                 return;
                               }
-                              onOpenNotification(item.id, href);
+                              openNotification();
                             }
                           : undefined
                       }
@@ -212,7 +230,7 @@ function MemberNotificationsPageContent({
                                 }
 
                                 event.preventDefault();
-                                onOpenNotification(item.id, href);
+                                openNotification();
                               }
                             : undefined
                         }

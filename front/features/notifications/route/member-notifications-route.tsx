@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { useLoaderData, useNavigate, useRevalidator } from "react-router-dom";
+import type { ReadmatesReturnState } from "@/shared/routing/readmates-route-state";
 import { MemberNotificationsPage } from "../ui/member-notifications-page";
 import { memberNotificationsActions, type MemberNotificationsRouteData } from "./member-notifications-data";
 
@@ -76,10 +77,10 @@ export function MemberNotificationsRoute() {
     }
   };
 
-  const openNotification = (id: string, href: string) => {
+  const openNotification = (id: string, href: string, state?: ReadmatesReturnState) => {
     void (async () => {
       if (await markRead(id)) {
-        await navigate(href);
+        await navigate(href, { state });
       }
     })();
   };
