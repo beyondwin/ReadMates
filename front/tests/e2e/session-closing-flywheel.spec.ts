@@ -210,10 +210,9 @@ test("session closing flywheel links host member and public surfaces", async ({ 
   await expect(page.getByRole("link", { name: "피드백 보기" })).toBeVisible();
   await page.getByRole("link", { name: "피드백 보기" }).click();
   await expect(page).toHaveURL(new RegExp(`/clubs/${CLUB_SLUG}/app/feedback/${SESSION_ID}$`));
-  await expect(page.getByRole("link", { name: "세션으로 돌아가기" })).toBeVisible();
-  await page.getByRole("link", { name: "세션으로 돌아가기" }).click();
-  await expect(page).toHaveURL(new RegExp(`/clubs/${CLUB_SLUG}/app/sessions/${SESSION_ID}$`));
   await expect(page.getByRole("link", { name: "지난 모임 회고 돌아가기" })).toBeVisible();
+  await page.getByRole("link", { name: "지난 모임 회고 돌아가기" }).click();
+  await expect(page).toHaveURL(new RegExp(`/clubs/${CLUB_SLUG}/app/notifications$`));
   await expect(page.getByText("member1@example.com")).toHaveCount(0);
   await expect(page.getByText("ADMIN_ROUTE")).toHaveCount(0);
   await expect(page.getByText("{\"")).toHaveCount(0);

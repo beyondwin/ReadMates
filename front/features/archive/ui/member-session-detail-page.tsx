@@ -714,11 +714,14 @@ function FeedbackStatusCard({
   const feedbackCopy = feedbackDocumentCopy(feedback);
   const className = mobile ? feedbackDocumentCardClassName({ feedback, compact: true, mobile }) : feedbackRailCardClassName(feedback);
   const style = mobile ? undefined : { padding: 18 };
-  const feedbackReturnTarget: ReadmatesReturnTarget = {
-    href: appSessionHref(session.sessionId),
-    label: "세션으로 돌아가기",
-    state: readmatesReturnState(returnTarget),
-  };
+  const feedbackReturnTarget: ReadmatesReturnTarget =
+    returnTarget.label === "지난 모임 회고"
+      ? returnTarget
+      : {
+          href: appSessionHref(session.sessionId),
+          label: "세션으로 돌아가기",
+          state: readmatesReturnState(returnTarget),
+        };
   const feedbackReturnState = readmatesReturnState(feedbackReturnTarget);
 
   return (
