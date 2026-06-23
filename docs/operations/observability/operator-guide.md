@@ -1,6 +1,6 @@
-# ReadMates Observability Lecture Guide
+# ReadMates Observability Operator Guide
 
-이 문서는 로그/메트릭/Actuator/Prometheus/Grafana/ELK 강의 개념을 ReadMates 코드 기준으로 다시 설명합니다.
+이 문서는 로그/메트릭/Actuator/Prometheus/Grafana/ELK 개념을 ReadMates 코드와 운영 흐름 기준으로 설명합니다.
 
 ## 한 줄 구분
 
@@ -14,7 +14,7 @@
 
 ## 1. Logback
 
-강의에서 Logback은 Spring Boot가 로그를 쓰는 도구입니다. ReadMates에서는 `server/src/main/resources/logback-spring.xml`이 기준입니다.
+Logback은 Spring Boot가 로그를 쓰는 도구입니다. ReadMates에서는 `server/src/main/resources/logback-spring.xml`이 기준입니다.
 
 확인 명령:
 
@@ -38,7 +38,7 @@ journalctl -u readmates-server --since "10 min ago" | jq 'select(.requestId == "
 
 ## 2. MDC And Request ID
 
-강의의 `MdcLoggingFilter로 UUID 부여하기`는 ReadMates에서 `RequestIdFilter`로 구현됩니다.
+ReadMates의 요청 correlation은 `RequestIdFilter`가 담당합니다.
 
 확인 명령:
 
@@ -135,7 +135,7 @@ sed -n '1,160p' docs/operations/observability/slos.md
 
 ## 7. ELK/Kibana
 
-강의에서 ELK는 로그를 중앙 수집, 저장, 검색, 시각화하는 스택입니다.
+ELK는 로그를 중앙 수집, 저장, 검색, 시각화하는 스택입니다.
 
 ReadMates의 현재 결정:
 

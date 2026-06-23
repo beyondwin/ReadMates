@@ -117,7 +117,7 @@ In the incident note or release evidence, explicitly record:
 
 ## Related Docs
 
-- [ReadMates observability lecture guide](../observability/lecture-guide.md)
+- [ReadMates observability operator guide](../observability/operator-guide.md)
 - [Deploy observability check](deploy-observability-check.md)
 - [Metrics catalog](../observability/metrics-catalog.md)
 - [Alerts](../observability/alerts.md)

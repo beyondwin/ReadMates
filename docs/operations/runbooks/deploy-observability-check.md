@@ -101,7 +101,7 @@ Use explicit language: "local provisioning passed" is different from "production
 
 ## Related Docs
 
-- [ReadMates observability lecture guide](../observability/lecture-guide.md)
+- [ReadMates observability operator guide](../observability/operator-guide.md)
 - [Correlation ID lookup](correlation-id-lookup.md)
 - [Observability bootstrap](observability-bootstrap.md)
 - [SLO monthly report](slo-monthly-report.md)
