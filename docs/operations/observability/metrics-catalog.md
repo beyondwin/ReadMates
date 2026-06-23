@@ -1,5 +1,7 @@
 # 메트릭 카탈로그
 
+> 운영 흐름으로 읽으려면 [Observability README](README.md)에서 시작하고, 배포 전후 검증은 [Deploy observability check](../runbooks/deploy-observability-check.md)를 기준으로 기록합니다.
+
 ## 노출 endpoint
 
 `GET http://<server-host>:8081/actuator/prometheus` — Prometheus exposition 형식.

@@ -1,5 +1,7 @@
 # 권장 대시보드
 
+> 운영 흐름으로 읽으려면 [Observability README](README.md)에서 시작하고, 배포 전후 검증은 [Deploy observability check](../runbooks/deploy-observability-check.md)를 기준으로 기록합니다.
+
 본 문서는 Grafana(또는 호환 도구)에서 구성할 패널과 PromQL 쿼리를 정리합니다. 일부 대시보드는 이미 JSON으로 커밋되어 있으며(`ops/grafana/dashboards/`: `aigen.json`=AI Session Generation, `notification-dispatch.json`=Notification Dispatch, `bff-api-latency.json`=BFF → API Latency), 나머지 패널은 도구 도입 후 export 권장. 커밋된 JSON은 `scripts/lint-grafana-dashboards.sh`로 검증한다.
 
 ## Dashboard 1 — Service Health

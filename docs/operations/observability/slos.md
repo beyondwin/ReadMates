@@ -1,5 +1,7 @@
 # SLO
 
+> 운영 흐름으로 읽으려면 [Observability README](README.md)에서 시작하고, 배포 전후 검증은 [Deploy observability check](../runbooks/deploy-observability-check.md)를 기준으로 기록합니다.
+
 ReadMates의 운영 목표와 측정 방법을 정의합니다. 본 문서는 `server/src/main/resources/slo/slos.yaml`의 사람 읽기용 view이며,
 ID/PromQL 일관성은 `SloCatalogDocsConsistencyTest`가 강제합니다.
 
