@@ -79,14 +79,26 @@ export type MemberHomeRecentRecordEntry = {
   summary: string;
 };
 
+export type MemberHomeRecentRecordEntryOptions = {
+  feedbackStates?: ReadonlyMap<string, MemberHomeFeedbackState>;
+};
+
 const NOTE_KIND_LABELS: Record<MemberHomeNoteFeedItemView["kind"], string> = {
   QUESTION: "질문",
   ONE_LINE_REVIEW: "한줄평",
   HIGHLIGHT: "하이라이트",
 };
 
+const MEMBER_HOME_FEEDBACK_STATUS_LABELS: Record<MemberHomeFeedbackState, string> = {
+  AVAILABLE: "피드백 문서를 바로 열 수 있습니다.",
+  MISSING: "아직 열람 가능한 피드백 문서가 없습니다.",
+  LOCKED: "참석 멤버에게만 피드백 문서가 열립니다.",
+  UNKNOWN: "피드백 문서는 열람 화면에서 확인합니다.",
+};
+
 export function getMemberHomeRecentRecordEntry(
   noteFeedItems: MemberHomeNoteFeedItemView[],
+  options: MemberHomeRecentRecordEntryOptions = {},
 ): MemberHomeRecentRecordEntry | null {
   const first = noteFeedItems[0];
   if (!first) {
@@ -95,6 +107,7 @@ export function getMemberHomeRecentRecordEntry(
 
   const sameSessionItems = noteFeedItems.filter((item) => item.sessionId === first.sessionId);
   const kindLabels = Array.from(new Set(sameSessionItems.map((item) => NOTE_KIND_LABELS[item.kind])));
+  const feedbackState = options.feedbackStates?.get(first.sessionId) ?? "UNKNOWN";
 
   return {
     sessionId: first.sessionId,
@@ -104,8 +117,8 @@ export function getMemberHomeRecentRecordEntry(
     kindLabels,
     href: `/app/sessions/${encodeURIComponent(first.sessionId)}`,
     feedbackHref: `/app/feedback/${encodeURIComponent(first.sessionId)}`,
-    feedbackState: "UNKNOWN",
-    feedbackStatusLabel: "피드백 문서는 열람 화면에서 확인합니다.",
+    feedbackState,
+    feedbackStatusLabel: MEMBER_HOME_FEEDBACK_STATUS_LABELS[feedbackState],
     returnStateLabel: "지난 모임 회고",
     summary: `${first.bookTitle}의 기록과 피드백을 이어 읽을 수 있어요.`,
   };

@@ -276,6 +276,41 @@ describe("member-home view model", () => {
     });
   });
 
+  it("uses available feedback state when provided for the recent reflection session", () => {
+    expect(
+      getMemberHomeRecentRecordEntry(noteFeedItems, {
+        feedbackStates: new Map([["session-6", "AVAILABLE"]]),
+      }),
+    ).toMatchObject({
+      feedbackState: "AVAILABLE",
+      feedbackStatusLabel: "피드백 문서를 바로 열 수 있습니다.",
+    });
+  });
+
+  it("uses missing and locked feedback states without changing record hrefs", () => {
+    expect(
+      getMemberHomeRecentRecordEntry(noteFeedItems, {
+        feedbackStates: new Map([["session-6", "MISSING"]]),
+      }),
+    ).toMatchObject({
+      href: "/app/sessions/session-6",
+      feedbackHref: "/app/feedback/session-6",
+      feedbackState: "MISSING",
+      feedbackStatusLabel: "아직 열람 가능한 피드백 문서가 없습니다.",
+    });
+
+    expect(
+      getMemberHomeRecentRecordEntry(noteFeedItems, {
+        feedbackStates: new Map([["session-6", "LOCKED"]]),
+      }),
+    ).toMatchObject({
+      href: "/app/sessions/session-6",
+      feedbackHref: "/app/feedback/session-6",
+      feedbackState: "LOCKED",
+      feedbackStatusLabel: "참석 멤버에게만 피드백 문서가 열립니다.",
+    });
+  });
+
   it("groups the latest preserved record entry by first session and dedupes labels in display order", () => {
     const items: MemberHomeNoteFeedItemView[] = [
       {

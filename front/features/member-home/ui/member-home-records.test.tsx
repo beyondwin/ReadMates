@@ -47,6 +47,21 @@ describe("member home record reflection cards", () => {
     expect(screen.queryByRole("link", { name: "피드백 보기" })).not.toBeInTheDocument();
   });
 
+  it("renders missing feedback state without a feedback action", () => {
+    render(
+      <RecentRecordEntry
+        entry={{
+          ...entry,
+          feedbackState: "MISSING",
+          feedbackStatusLabel: "아직 열람 가능한 피드백 문서가 없습니다.",
+        }}
+      />,
+    );
+
+    expect(screen.getByText("아직 열람 가능한 피드백 문서가 없습니다.")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "피드백 보기" })).not.toBeInTheDocument();
+  });
+
   it("renders the mobile reflection card with the same core labels", () => {
     render(<MobileRecentRecordEntry entry={entry} />);
 
