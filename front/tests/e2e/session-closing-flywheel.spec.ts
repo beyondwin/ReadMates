@@ -49,6 +49,7 @@ async function routeHostClosing(page: Page): Promise<void> {
 }
 
 async function routeMemberNotifications(page: Page): Promise<void> {
+  await page.unroute("**/api/bff/api/auth/me**");
   await page.route("**/api/bff/api/auth/me**", async (route) => {
     await json(route, 200, {
       authenticated: true,
@@ -89,6 +90,61 @@ async function routeMemberNotifications(page: Page): Promise<void> {
           createdAt: "2026-06-18T10:00:00Z",
         },
       ],
+    });
+  });
+  await page.route("**/api/bff/api/me/notifications/notification-1/read**", async (route) => {
+    await json(route, 200, {});
+  });
+}
+
+async function routeMemberReflectionSurfaces(page: Page): Promise<void> {
+  await page.route(`**/api/bff/api/archive/sessions/${SESSION_ID}**`, async (route) => {
+    await json(route, 200, {
+      sessionId: SESSION_ID,
+      sessionNumber: 7,
+      title: "7회차 모임 · E2E 책",
+      bookTitle: "E2E 책",
+      bookAuthor: "저자",
+      bookImageUrl: null,
+      date: "2026-06-18",
+      state: "CLOSED",
+      locationLabel: "온라인",
+      attendance: 2,
+      total: 2,
+      myAttendanceStatus: "ATTENDED",
+      isHost: false,
+      publicSummary: "멤버가 다시 읽을 수 있는 기록입니다.",
+      publicHighlights: [],
+      clubQuestions: [],
+      clubOneLiners: [],
+      publicOneLiners: [],
+      myQuestions: [],
+      myCheckin: { readingProgress: 100 },
+      myOneLineReview: null,
+      myLongReview: null,
+      feedbackDocument: {
+        available: true,
+        readable: true,
+        lockedReason: null,
+        title: "독서모임 7차 피드백",
+        uploadedAt: "2026-06-18T10:00:00Z",
+      },
+    });
+  });
+
+  await page.route(`**/api/bff/api/sessions/${SESSION_ID}/feedback-document**`, async (route) => {
+    await json(route, 200, {
+      sessionId: SESSION_ID,
+      sessionNumber: 7,
+      title: "독서모임 7차 피드백",
+      subtitle: "E2E 책",
+      bookTitle: "E2E 책",
+      date: "2026-06-18",
+      fileName: "session-7-feedback.md",
+      uploadedAt: "2026-06-18T10:00:00Z",
+      metadata: [],
+      observerNotes: ["공개-safe 피드백입니다."],
+      participants: [],
     });
   });
 }
@@ -144,9 +200,23 @@ test("session closing flywheel links host member and public surfaces", async ({ 
   expect(screenshot.byteLength).toBeGreaterThan(10_000);
 
   await routeMemberNotifications(page);
+  await routeMemberReflectionSurfaces(page);
   await page.goto(`/clubs/${CLUB_SLUG}/app/notifications`);
   await expect(page.getByText("Past session reflection")).toBeVisible();
   await expect(page.getByText("View record")).toBeVisible();
+  await page.getByRole("link", { name: "No.07 모임 기록이 준비되었습니다 열기" }).click();
+  await expect(page).toHaveURL(new RegExp(`/clubs/${CLUB_SLUG}/app/sessions/${SESSION_ID}$`));
+  await expect(page.getByRole("link", { name: "지난 모임 회고 돌아가기" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "피드백 보기" })).toBeVisible();
+  await page.getByRole("link", { name: "피드백 보기" }).click();
+  await expect(page).toHaveURL(new RegExp(`/clubs/${CLUB_SLUG}/app/feedback/${SESSION_ID}$`));
+  await expect(page.getByRole("link", { name: "세션으로 돌아가기" })).toBeVisible();
+  await page.getByRole("link", { name: "세션으로 돌아가기" }).click();
+  await expect(page).toHaveURL(new RegExp(`/clubs/${CLUB_SLUG}/app/sessions/${SESSION_ID}$`));
+  await expect(page.getByRole("link", { name: "지난 모임 회고 돌아가기" })).toBeVisible();
+  await expect(page.getByText("member1@example.com")).toHaveCount(0);
+  await expect(page.getByText("ADMIN_ROUTE")).toHaveCount(0);
+  await expect(page.getByText("{\"")).toHaveCount(0);
 
   await routePublicRecords(page);
   await page.goto(`/clubs/${CLUB_SLUG}/records`);
