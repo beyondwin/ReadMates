@@ -97,6 +97,8 @@ Branch protection bypass 정책 전반은 [release-management.md#branch-protecti
 ./scripts/lint-grafana-dashboards.sh
 ```
 
+배포 전후 어떤 증거로 해석해야 하는지는 [Deploy observability check runbook](../docs/operations/runbooks/deploy-observability-check.md)을 기준으로 기록합니다.
+
 ## `validate-prometheus-rules.sh` / `validate-prometheus-config.sh` / `validate-alertmanager-config.sh`
 
 관측 설정 파일의 구조 유효성을 Docker 기반 `promtool`/`amtool`로 검사합니다. 로컬에 promtool/amtool을 설치하지 않아도 되도록 컨테이너 이미지(`prom/prometheus`, `prom/alertmanager`)로 실행하며, `pre-push-check.sh --full`이 릴리즈 직전에 함께 실행합니다.
@@ -106,6 +108,8 @@ Branch protection bypass 정책 전반은 [release-management.md#branch-protecti
 ./scripts/validate-prometheus-config.sh   # deploy/oci/prometheus/prometheus.yml 검사
 ./scripts/validate-alertmanager-config.sh # deploy/oci/alertmanager/alertmanager.yml 구조 검사
 ```
+
+배포 전후 어떤 증거로 해석해야 하는지는 [Deploy observability check runbook](../docs/operations/runbooks/deploy-observability-check.md)을 기준으로 기록합니다.
 
 `validate-alertmanager-config.sh`는 `${READMATES_ALERT_*}` 환경 placeholder를 dummy 값으로 치환한 임시 파일을 lint하므로 실제 SMTP credential 없이 구조만 검증합니다. 치환 결과는 `.tmp` 아래 임시 디렉터리에 만들고 종료 시 삭제합니다.
 
@@ -118,6 +122,8 @@ Branch protection bypass 정책 전반은 [release-management.md#branch-protecti
 ./scripts/validate-prometheus-rules.sh
 ./scripts/observability-local-smoke.sh
 ```
+
+배포 전후 어떤 증거로 해석해야 하는지는 [Deploy observability check runbook](../docs/operations/runbooks/deploy-observability-check.md)을 기준으로 기록합니다.
 
 로컬 Spring Boot 서버가 `8081` management port로 `/actuator/prometheus`를 노출 중이면 target health까지 함께 확인할 수 있습니다. 서버가 떠 있지 않으면 이 smoke는 target presence와 provisioning 확인까지만 로컬 증거로 사용하고, scrape health는 운영 bring-up에서 확인합니다.
 
