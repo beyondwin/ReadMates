@@ -10,6 +10,10 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 
+### Changed
+
+- **observability operator docs:** 관측성 README, operator guide, correlation lookup, deploy observability check runbook, and script index now give operators a repo-native path for request tracing, deploy-time observability evidence, Prometheus/Grafana validation, and explicit evidence limits. No runtime topology, alert threshold, metric label, auth/BFF, DB migration, or deploy workflow behavior changes are included.
+
 ### Security
 
 - **toolchain vulnerability cleanup:** Frontend and design workspaces now use Vite `8.0.16`, and root pnpm overrides constrain only vulnerable build/test dependency ranges to patched versions: `esbuild` `0.28.1`, `ws` `8.21.0`, `js-yaml` `4.2.0`, and `@babel/core` `7.29.6`. This closes the remaining Dependabot alerts for CVE-2026-53571, CVE-2026-53632, and GHSA-g7r4-m6w7-qqqr, plus the additional low-and-above `pnpm audit` findings found during remediation. This changes build/dev tooling only; app routes, API contracts, auth/BFF tokens, DB migrations, and deploy workflow behavior are unchanged.

@@ -275,15 +275,15 @@ fixture 검증도 GitHub 게시, 저장소 공개 설정 변경, secret rotation
 배포 후 Cloudflare Pages marker와 Google OAuth start redirect를 확인합니다. Secret을 요구하지 않으며, 실제 운영 결과는 공개 문서나 Git에 붙이지 않습니다.
 
 ```bash
-READMATES_SMOKE_BASE_URL=https://readmates.pages.dev \
-READMATES_SMOKE_AUTH_BASE_URL=https://readmates.pages.dev \
+READMATES_SMOKE_BASE_URL=https://app.example.com \
+READMATES_SMOKE_AUTH_BASE_URL=https://app.example.com \
 ./scripts/smoke-production-integrations.sh
 ```
 
 등록된 club host까지 확인할 때는 `READMATES_SMOKE_CLUB_HOST`를 추가합니다.
 
 ```bash
-READMATES_SMOKE_BASE_URL=https://readmates.pages.dev \
+READMATES_SMOKE_BASE_URL=https://app.example.com \
 READMATES_SMOKE_AUTH_BASE_URL=https://<primary-domain> \
 READMATES_SMOKE_CLUB_HOST=https://<registered-club-host> \
 ./scripts/smoke-production-integrations.sh
