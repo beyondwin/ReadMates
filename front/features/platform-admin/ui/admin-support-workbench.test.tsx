@@ -25,6 +25,7 @@ function renderWorkbench(overrides: Partial<ComponentProps<typeof AdminSupportWo
       query=""
       results={[]}
       selectedResult={null}
+      hasSearched={false}
       ledger={[]}
       reason=""
       expiresAt="2026-05-27T11:00"
@@ -45,6 +46,27 @@ function renderWorkbench(overrides: Partial<ComponentProps<typeof AdminSupportWo
 }
 
 describe("AdminSupportWorkbench", () => {
+  it("shows an initial search prompt before the first submitted search", () => {
+    renderWorkbench({ hasSearched: false, results: [], busy: false });
+
+    expect(screen.getByText("이름 또는 이메일로 지원 대상을 검색하세요.")).toBeInTheDocument();
+    expect(screen.queryByText("검색 결과가 없습니다.")).not.toBeInTheDocument();
+  });
+
+  it("shows no-results copy only after a submitted search returns no results", () => {
+    renderWorkbench({ hasSearched: true, query: "없는 사용자", results: [], busy: false });
+
+    expect(screen.getByText("검색 결과가 없습니다.")).toBeInTheDocument();
+    expect(screen.queryByText("이름 또는 이메일로 지원 대상을 검색하세요.")).not.toBeInTheDocument();
+  });
+
+  it("shows a loading state while a submitted search is running", () => {
+    renderWorkbench({ hasSearched: true, query: "지원", results: [], busy: true });
+
+    expect(screen.getByText("지원 대상을 검색하는 중입니다.")).toBeInTheDocument();
+    expect(screen.queryByText("검색 결과가 없습니다.")).not.toBeInTheDocument();
+  });
+
   it("renders search before grant form", () => {
     renderWorkbench();
 

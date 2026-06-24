@@ -35,5 +35,7 @@ describe("AdminSupportRoute", () => {
     expect(screen.getAllByRole("heading").length).toBeGreaterThan(0);
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
     expect(screen.getByRole("heading", { name: "지원 대상 검색" })).toBeInTheDocument();
+    expect(screen.getByText("이름 또는 이메일로 지원 대상을 검색하세요.")).toBeInTheDocument();
+    expect(screen.queryByText("검색 결과가 없습니다.")).not.toBeInTheDocument();
   });
 });

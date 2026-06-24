@@ -18,6 +18,7 @@ export type AdminSupportWorkbenchProps = {
   query: string;
   results: AdminSupportSearchResult[];
   selectedResult: AdminSupportSearchResult | null;
+  hasSearched: boolean;
   ledger: AdminSupportGrantLedgerItem[];
   reason: string;
   expiresAt: string;
@@ -84,7 +85,9 @@ export function AdminSupportWorkbench(props: AdminSupportWorkbenchProps) {
             검색
           </button>
         </form>
-        {props.results.length > 0 ? (
+        {props.busy && props.hasSearched ? (
+          <p className="muted">지원 대상을 검색하는 중입니다.</p>
+        ) : props.results.length > 0 ? (
           <div className="admin-support-workbench__results">
             {props.results.map((result) => (
               <button key={result.subjectId} type="button" onClick={() => props.onSelectResult(result)}>
@@ -94,8 +97,10 @@ export function AdminSupportWorkbench(props: AdminSupportWorkbenchProps) {
               </button>
             ))}
           </div>
-        ) : (
+        ) : props.hasSearched ? (
           <p className="muted">검색 결과가 없습니다.</p>
+        ) : (
+          <p className="muted">이름 또는 이메일로 지원 대상을 검색하세요.</p>
         )}
       </section>
 

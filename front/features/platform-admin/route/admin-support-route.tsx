@@ -22,6 +22,7 @@ export function AdminSupportRoute() {
   const [query, setQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
   const [selectedResult, setSelectedResult] = useState<AdminSupportSearchResult | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
   const [reason, setReason] = useState("");
   const [expiresAt, setExpiresAt] = useState(defaultExpiresAt);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +38,7 @@ export function AdminSupportRoute() {
   async function search() {
     setError(null);
     setSelectedResult(null);
+    setHasSearched(true);
     setSubmittedQuery(query.trim());
   }
 
@@ -74,6 +76,7 @@ export function AdminSupportRoute() {
       query={query}
       results={searchQuery.data ?? []}
       selectedResult={selectedResult}
+      hasSearched={hasSearched}
       ledger={ledgerQuery.data ?? []}
       reason={reason}
       expiresAt={expiresAt}
