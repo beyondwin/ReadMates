@@ -30,10 +30,28 @@ describe("router route order", () => {
     expect(order.indexOf("app-admin")).toBeLessThan(order.indexOf("public-catch-all-tree"));
   });
 
+  it("composes host route trees before member route trees", () => {
+    const order = topLevelRouteOrder();
+    expect(order.indexOf("app-host")).toBeLessThan(order.indexOf("/app"));
+    expect(order.indexOf("club-app-host")).toBeLessThan(order.indexOf("club-app"));
+  });
+
   it("matches admin routes before the public catch-all", () => {
     expect(routeIdsFor("/admin/today")).toContain("app-admin");
     expect(routeIdsFor("/admin/clubs/club-1")).toContain("app-admin");
     expect(routePathsFor("/admin/today")).not.toEqual(expect.arrayContaining(["*"]));
+  });
+
+  it("matches unscoped host routes before the member wildcard", () => {
+    expect(routeIdsFor("/app/host")).toContain("app-host");
+    expect(routeIdsFor("/app/host/members")).toContain("app-host");
+    expect(routePathsFor("/app/host/members")).not.toEqual(expect.arrayContaining(["*"]));
+  });
+
+  it("matches club-scoped host routes before the member wildcard", () => {
+    expect(routeIdsFor("/clubs/reading-sai/app/host")).toContain("club-app-host");
+    expect(routeIdsFor("/clubs/reading-sai/app/host/members")).toContain("club-app-host");
+    expect(routePathsFor("/clubs/reading-sai/app/host/members")).not.toEqual(expect.arrayContaining(["*"]));
   });
 
   it("keeps public unknown routes on the public not-found branch", () => {
