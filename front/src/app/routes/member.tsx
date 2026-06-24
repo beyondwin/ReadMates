@@ -7,7 +7,7 @@ import {
 } from "@/features/archive/route/archive-route-state";
 import { FeedbackRouteError } from "@/features/feedback/route/feedback-route-state";
 import { loadMemberAppAuth } from "@/shared/auth/member-app-loader";
-import { AppRouteLayout } from "@/src/app/layouts";
+import { AppRouteLayout } from "@/src/app/layouts/app-route-layout";
 import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
 import { RequireAuth, RequireMemberApp } from "@/src/app/route-guards";
 import { Link } from "@/src/app/router-link";

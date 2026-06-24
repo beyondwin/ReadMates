@@ -1,7 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { RouteObject } from "react-router-dom";
 import { PublicRouteError } from "@/features/public/route/public-route-state";
-import { PublicRouteLayout } from "@/src/app/layouts";
+import { PublicRouteLayout } from "@/src/app/layouts/public-route-layout";
 import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
 

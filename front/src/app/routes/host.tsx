@@ -2,7 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { RouteObject } from "react-router-dom";
 import { requireHostLoaderAuth } from "@/features/host/route/host-loader-auth";
 import { HostRouteError } from "@/features/host/route/host-route-error";
-import { AppRouteLayout } from "@/src/app/layouts";
+import { AppRouteLayout } from "@/src/app/layouts/app-route-layout";
 import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
 import { RequireHost } from "@/src/app/route-guards";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
