@@ -36,6 +36,17 @@ The v1.11.0 production OAuth and backup timer items are closed by 2026-05-31 ope
 - Skipped: production OAuth, VM, provider-console, tag/deploy smoke, and server Gradle checks. These are not local evidence for this frontend-only route/UI polish branch and the changed files do not touch server, deploy, auth, BFF, persistence, or release image behavior.
 - Residual risk: no known local release-readiness residual remains after CHANGELOG repair, frontend unit/E2E/build evidence, public-safe browser evidence, Graphify freshness, and public release safety checks. Production deploy/tag smoke remains outside this local merge.
 
+## 2026-06-25 Lighthouse diagnostic harness closeout
+
+- Scope reviewed: local `main..codex/2026-06-25-readmates-lighthouse-diagnostic-20260625-060445`.
+- Release classification: frontend dev/test tooling and docs only. No app runtime route behavior, server API contract, DB migration, auth/BFF token, OAuth scope, CI/deploy workflow, or release image behavior change.
+- Product evidence: `pnpm --dir front lighthouse:diagnose` inventories public/member/host/admin dev-seed routes, runs local Lighthouse through a browser adapter, writes `.tmp/lighthouse/` JSON/HTML/Markdown reports, classifies repeated findings, and reports route entry failures separately from Lighthouse scores.
+- Risk repaired before merge: the first public smoke exposed a false route-entry failure when the expected brand text appeared more than once. The runner now waits on the first visible text match, and the regression test covers repeated route markers.
+- Public safety: generated reports stay under ignored `.tmp/lighthouse/`; docs and scripts do not include real member data, private domains, deployment state, local absolute paths, secrets, or token-shaped examples.
+- Local verification before merge: `git diff --check main..HEAD`, `pnpm --dir front exec vitest run tests/lighthouse`, `pnpm --dir front lint`, `pnpm --dir front test`, `pnpm --dir front build`, local `pnpm --dir front lighthouse:diagnose -- --group public --limit 2` smoke with failed route count 0, `./scripts/build-public-release-candidate.sh`, `./scripts/public-release-check.sh .tmp/public-release-candidate`, `graphify update .`, and Graphify freshness audit passed.
+- Skipped: production OAuth, VM, provider-console, tag/deploy smoke, E2E, and server Gradle checks. These are not local evidence for this frontend diagnostics branch and the changed files do not touch app runtime, server, deploy, auth, BFF, persistence, or release image behavior.
+- Residual risk: no known local release-readiness residual remains after route-smoke, frontend, public-release, CHANGELOG, and Graphify evidence. Production deploy/tag smoke remains outside this local merge.
+
 ## 2026-05-31 v1.12.0 release preparation note
 
 - Scope reviewed: `v1.11.0..HEAD`, with `origin/main..HEAD` also considered because this local `main` is ahead of the remote baseline.
