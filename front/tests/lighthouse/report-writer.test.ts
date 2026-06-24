@@ -68,4 +68,34 @@ describe("writeLighthouseDiagnosticReport", () => {
     const findingsJson = JSON.parse(await readFile(join(outputDir, "findings.json"), "utf8"));
     expect(findingsJson[0].findings[0].bucket).toBe("bundle_js_cost");
   });
+
+  it("separates local-dev diagnostic noise from release-actionable repeated causes", async () => {
+    await writeLighthouseDiagnosticReport({
+      outputDir,
+      runContext: {
+        commit: "abc123",
+        timestamp: "2026-06-25T00:00:00.000Z",
+        deviceProfile: "desktop-chromium",
+        serverProfile: "local-dev",
+      },
+      results: [
+        {
+          ...result,
+          findings: [
+            {
+              auditId: "unminified-javascript",
+              title: "JavaScript is not minified",
+              score: 0,
+              numericValue: null,
+              bucket: "local_dev_noise",
+            },
+          ],
+        },
+      ],
+    });
+
+    const summary = await readFile(join(outputDir, "summary.md"), "utf8");
+    expect(summary).toContain("| none | none | no release-actionable failed Lighthouse audits | keep baseline |");
+    expect(summary).toContain("| local_dev_noise | public-home | Lighthouse audit findings | local-dev diagnostic only |");
+  });
 });

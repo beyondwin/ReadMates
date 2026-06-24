@@ -44,6 +44,9 @@ function repeatedCauseRows(results: NormalizedLighthouseResult[]) {
   const byBucket = new Map<string, Set<string>>();
   for (const result of results) {
     for (const finding of result.findings) {
+      if (finding.bucket === "local_dev_noise") {
+        continue;
+      }
       const routes = byBucket.get(finding.bucket) ?? new Set<string>();
       routes.add(result.routeId);
       byBucket.set(finding.bucket, routes);
@@ -55,11 +58,31 @@ function repeatedCauseRows(results: NormalizedLighthouseResult[]) {
     .map(([bucket, routes]) => `| ${bucket} | ${Array.from(routes).join(", ")} | Lighthouse audit findings | Create a scoped goal from affected routes |`);
 }
 
+function localDevNoiseRows(results: NormalizedLighthouseResult[]) {
+  const byBucket = new Map<string, Set<string>>();
+  for (const result of results) {
+    for (const finding of result.findings) {
+      if (finding.bucket !== "local_dev_noise") {
+        continue;
+      }
+      const routes = byBucket.get(finding.bucket) ?? new Set<string>();
+      routes.add(result.routeId);
+      byBucket.set(finding.bucket, routes);
+    }
+  }
+
+  return Array.from(byBucket.entries())
+    .sort((a, b) => b[1].size - a[1].size || a[0].localeCompare(b[0]))
+    .map(([bucket, routes]) => `| ${bucket} | ${Array.from(routes).join(", ")} | Lighthouse audit findings | local-dev diagnostic only |`);
+}
+
 function buildSummary(input: WriteReportInput) {
   const failedRoutes = input.results.filter((result) => result.status !== "passed");
   const matrixRows = input.results.map((result) => `| ${routeMatrixRow(result)} |`);
   const causeRows = repeatedCauseRows(input.results);
-  const causeLines = causeRows.length ? causeRows : ["| none | none | no failed Lighthouse audits | keep baseline |"];
+  const causeLines = causeRows.length ? causeRows : ["| none | none | no release-actionable failed Lighthouse audits | keep baseline |"];
+  const noiseRows = localDevNoiseRows(input.results);
+  const noiseLines = noiseRows.length ? noiseRows : ["| none | none | no local-dev-only Lighthouse findings | keep baseline |"];
 
   return [
     "# ReadMates Lighthouse Diagnostic",
@@ -85,6 +108,11 @@ function buildSummary(input: WriteReportInput) {
     "| cause | affected routes | evidence | safe improvement direction |",
     "| --- | --- | --- | --- |",
     ...causeLines,
+    "",
+    "## Local Dev Noise",
+    "| cause | affected routes | evidence | interpretation |",
+    "| --- | --- | --- | --- |",
+    ...noiseLines,
     "",
     "## Suggested Goal Prompts",
     "- Goal: Improve ReadMates affected routes for the top repeated page-quality cause without changing product behavior.",

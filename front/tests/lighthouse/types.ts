@@ -11,6 +11,7 @@ export type LighthouseCauseBucket =
   | "security_best_practices"
   | "route_data_failure"
   | "external_asset_noise"
+  | "local_dev_noise"
   | "audit_failure";
 
 export type LighthouseRouteDefinition = {

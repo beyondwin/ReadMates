@@ -173,7 +173,7 @@ export default function PublicClub({ data, publicBasePath = "" }: PublicClubProp
               </h2>
             </div>
             <Link to={publicRecordsHref(publicBasePath)} className="public-records-link">
-              전체 보기
+              공개 기록 전체 보기
             </Link>
           </div>
 

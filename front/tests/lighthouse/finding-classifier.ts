@@ -17,7 +17,21 @@ type RawLhr = {
 };
 
 const auditBuckets: Record<string, LighthouseCauseBucket> = {
-  "unused-javascript": "bundle_js_cost",
+  "first-contentful-paint": "local_dev_noise",
+  "largest-contentful-paint": "local_dev_noise",
+  "speed-index": "local_dev_noise",
+  interactive: "local_dev_noise",
+  "unminified-css": "local_dev_noise",
+  "unminified-javascript": "local_dev_noise",
+  "unused-css-rules": "local_dev_noise",
+  "unused-javascript": "local_dev_noise",
+  "total-byte-weight": "local_dev_noise",
+  "robots-txt": "local_dev_noise",
+  "duplicated-javascript-insight": "local_dev_noise",
+  "image-delivery-insight": "local_dev_noise",
+  "lcp-discovery-insight": "local_dev_noise",
+  "modern-http-insight": "local_dev_noise",
+  "network-dependency-tree-insight": "local_dev_noise",
   "legacy-javascript": "bundle_js_cost",
   "bootup-time": "bundle_js_cost",
   "mainthread-work-breakdown": "bundle_js_cost",

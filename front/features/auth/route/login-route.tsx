@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { submitDevLogin } from "@/features/auth/api/auth-api";
 import { LoginCard, type DevAccount } from "@/features/auth/ui/login-card";
 import { oauthHrefForReturnTo, safeRelativeReturnTo } from "@/shared/auth/login-return";
+import { PageMetadataHead } from "@/shared/ui/page-metadata-head";
 
 const devAccounts: DevAccount[] = [
   { label: "김호스트 · 호스트", email: "host@example.com" },
@@ -66,8 +67,16 @@ export function LoginRouteContent() {
 
 export function LoginRoute() {
   return (
-    <main className="auth-shell container">
-      <LoginRouteContent />
-    </main>
+    <>
+      <PageMetadataHead
+        metadata={{
+          title: "로그인 | ReadMates",
+          description: "Google 계정으로 ReadMates 독서 모임에 들어가고, 초대받은 클럽의 멤버 공간으로 안전하게 이동합니다.",
+        }}
+      />
+      <main className="auth-shell container">
+        <LoginRouteContent />
+      </main>
+    </>
   );
 }

@@ -6,9 +6,26 @@ import ResetPasswordPage from "@/src/pages/reset-password";
 
 afterEach(() => {
   cleanup();
+  document.head.querySelectorAll("[data-readmates-page-head]").forEach((node) => node.remove());
+  document.title = "";
 });
 
 describe("PasswordResetCard", () => {
+  it("sets retired password route metadata for Lighthouse and browser tabs", () => {
+    render(
+      <MemoryRouter initialEntries={["/reset-password/page-token"]}>
+        <Routes>
+          <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(document.title).toBe("비밀번호 경로 종료 | ReadMates");
+    expect(document.head.querySelector('meta[name="description"]')?.getAttribute("content")).toBe(
+      "ReadMates 비밀번호 로그인과 재설정 경로는 종료되었습니다. 기존 멤버는 Google 계정으로 계속 입장합니다.",
+    );
+  });
+
   it("shows a Google-only legacy password endpoint is gone 안내 page", () => {
     render(<PasswordResetCard token="reset-token" />);
 

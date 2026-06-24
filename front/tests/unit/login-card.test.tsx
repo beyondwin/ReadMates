@@ -5,12 +5,23 @@ import { LoginRoute } from "@/features/auth/route/login-route";
 
 afterEach(() => {
   cleanup();
+  document.head.querySelectorAll("[data-readmates-page-head]").forEach((node) => node.remove());
+  document.title = "";
   window.history.pushState({}, "", "/");
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
 });
 
 describe("LoginRoute", () => {
+  it("sets public-safe page metadata for Lighthouse and browser tabs", () => {
+    render(<LoginRoute />);
+
+    expect(document.title).toBe("로그인 | ReadMates");
+    expect(document.head.querySelector('meta[name="description"]')?.getAttribute("content")).toBe(
+      "Google 계정으로 ReadMates 독서 모임에 들어가고, 초대받은 클럽의 멤버 공간으로 안전하게 이동합니다.",
+    );
+  });
+
   it("shows only the Google login action outside dev login mode", () => {
     render(<LoginRoute />);
 

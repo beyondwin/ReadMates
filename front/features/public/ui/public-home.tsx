@@ -63,7 +63,7 @@ function LatestRecordFeature({ publicBasePath, session }: { publicBasePath: stri
   const display = sessionDisplay(session);
 
   return (
-    <Link to={publicSessionHref(session, publicBasePath)} className="rm-document-panel public-latest-record" aria-label={`최근 공개 기록 ${display.title} 보기`}>
+    <Link to={publicSessionHref(session, publicBasePath)} className="rm-document-panel public-latest-record">
       <div className="public-latest-record__cover">
         <BookCover title={display.title} author={display.author} imageUrl={session.bookImageUrl} width={132} />
       </div>
@@ -337,7 +337,7 @@ export default function PublicHome({ data, publicBasePath = "" }: PublicHomeProp
               </h2>
             </div>
             <Link to={publicRecordsHref(publicBasePath)} className="public-records-link">
-              전체 보기
+              공개 기록 전체 보기
             </Link>
           </div>
           {publicRecordPreviewSessions.length > 0 ? (

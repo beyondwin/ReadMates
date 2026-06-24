@@ -5,7 +5,7 @@ export function PasswordResetCard({ token }: { token: string }) {
   void token;
 
   return (
-    <section className="auth-shell">
+    <main className="auth-shell">
       <div className="container" style={{ maxWidth: 520 }}>
         <Link to="/login" className="btn btn-quiet btn-sm auth-back-link">
           ← 로그인으로
@@ -42,6 +42,6 @@ export function PasswordResetCard({ token }: { token: string }) {
           </p>
         </div>
       </div>
-    </section>
+    </main>
   );
 }

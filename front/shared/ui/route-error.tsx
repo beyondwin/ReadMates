@@ -1,5 +1,6 @@
 import { isRouteErrorResponse, Link, useRouteError } from "react-router-dom";
 import { isReadmatesApiError } from "@/shared/api/errors";
+import { PageMetadataHead, type PageMetadata } from "@/shared/ui/page-metadata-head";
 
 export type RouteErrorVariant = "public" | "member" | "host" | "auth";
 
@@ -102,26 +103,41 @@ function statusFromRouteError(error: unknown) {
   return 500;
 }
 
+function metadataForRouteError(variant: RouteErrorVariant, status: number): PageMetadata | null {
+  if (variant === "public" && status === 404) {
+    return {
+      title: "페이지를 찾을 수 없습니다 | ReadMates",
+      description: "요청한 ReadMates 공개 페이지를 찾을 수 없습니다. 공개 홈에서 클럽 소개와 기록을 다시 확인해 주세요.",
+    };
+  }
+
+  return null;
+}
+
 export function RouteErrorPage({ variant, status }: { variant: RouteErrorVariant; status: number }) {
   const view = classifyStatus(status, variant);
+  const metadata = metadataForRouteError(variant, status);
 
   return (
-    <main className="container">
-      <section className="surface" style={{ margin: "48px 0", padding: 28 }}>
-        <p className="eyebrow">{view.eyebrow}</p>
-        <h1 className="h2 editorial" style={{ margin: "8px 0 0" }}>
-          {view.heading}
-        </h1>
-        <p className="body" style={{ color: "var(--text-2)" }}>
-          {view.body}
-        </p>
-        <div className="auth-card__actions auth-card__actions--primary">
-          <Link className="btn btn-primary" to={view.actionHref}>
-            {view.actionLabel}
-          </Link>
-        </div>
-      </section>
-    </main>
+    <>
+      {metadata ? <PageMetadataHead metadata={metadata} /> : null}
+      <main className="container">
+        <section className="surface" style={{ margin: "48px 0", padding: 28 }}>
+          <p className="eyebrow">{view.eyebrow}</p>
+          <h1 className="h2 editorial" style={{ margin: "8px 0 0" }}>
+            {view.heading}
+          </h1>
+          <p className="body" style={{ color: "var(--text-2)" }}>
+            {view.body}
+          </p>
+          <div className="auth-card__actions auth-card__actions--primary">
+            <Link className="btn btn-primary" to={view.actionHref}>
+              {view.actionLabel}
+            </Link>
+          </div>
+        </section>
+      </main>
+    </>
   );
 }
 

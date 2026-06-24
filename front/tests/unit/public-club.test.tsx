@@ -112,7 +112,7 @@ describe("PublicClub", () => {
     expect(screen.getByText("함께 읽기")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "기록은 누구나 읽고, 참여는 초대받은 멤버가 합니다" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "시작하기" })).toHaveAttribute("href", "/login");
-    expect(screen.getByRole("link", { name: "전체 보기" })).toHaveAttribute("href", "/records");
+    expect(screen.getByRole("link", { name: "공개 기록 전체 보기" })).toHaveAttribute("href", "/records");
     expect(screen.queryByText("멤버십")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "정식 멤버만 참여할 수 있습니다" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /초대 수락하기/ })).not.toBeInTheDocument();
@@ -146,7 +146,7 @@ describe("PublicClub", () => {
   it("keeps public record links inside the scoped club route when provided", () => {
     render(<PublicClub data={publicClubFixture} publicBasePath="/clubs/reading-sai" />);
 
-    expect(screen.getByRole("link", { name: "전체 보기" })).toHaveAttribute("href", "/clubs/reading-sai/records");
+    expect(screen.getByRole("link", { name: "공개 기록 전체 보기" })).toHaveAttribute("href", "/clubs/reading-sai/records");
     expect(screen.getByRole("link", { name: /가난한 찰리의 연감/ })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/sessions/00000000-0000-0000-0000-000000000306",
@@ -163,7 +163,7 @@ describe("PublicClub", () => {
 
     expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute("href", "https://reading-sai.example.test/about");
     expect(document.querySelector('meta[name="robots"]')).toHaveAttribute("content", "noindex");
-    expect(screen.getByRole("link", { name: "전체 보기" })).toHaveAttribute("href", "/clubs/reading-sai/records");
+    expect(screen.getByRole("link", { name: "공개 기록 전체 보기" })).toHaveAttribute("href", "/clubs/reading-sai/records");
   });
 
   it("replaces public head tags when the public route changes", () => {

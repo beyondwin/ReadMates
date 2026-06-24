@@ -13,7 +13,8 @@ const route: LighthouseRouteDefinition = {
 
 describe("classifyAuditId", () => {
   it.each([
-    ["unused-javascript", "bundle_js_cost"],
+    ["unused-javascript", "local_dev_noise"],
+    ["legacy-javascript", "bundle_js_cost"],
     ["uses-responsive-images", "image_media"],
     ["cumulative-layout-shift", "layout_stability"],
     ["button-name", "accessibility"],
@@ -60,7 +61,7 @@ describe("summarizeLhr", () => {
         title: "Reduce unused JavaScript",
         score: 0,
         numericValue: 1234,
-        bucket: "bundle_js_cost",
+        bucket: "local_dev_noise",
       },
     ]);
   });

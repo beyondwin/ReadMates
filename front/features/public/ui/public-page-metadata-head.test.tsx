@@ -4,7 +4,7 @@ import { PublicPageMetadataHead } from "./public-page-metadata-head";
 
 afterEach(() => {
   cleanup();
-  document.head.querySelectorAll("[data-readmates-public-page-head]").forEach((node) => node.remove());
+  document.head.querySelectorAll("[data-readmates-page-head]").forEach((node) => node.remove());
   document.title = "";
 });
 
