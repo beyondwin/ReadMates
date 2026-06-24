@@ -158,6 +158,66 @@ export function aiOpsDrilldownForAuditItem(item: AdminAuditLedgerItem): string |
   return aiOpsPathFromFilter({ ...EMPTY_AI_OPS_FILTER, clubId });
 }
 
+export type AdminAuditOperationState = "NEEDS_REVIEW" | "RECORDED" | "FOLLOW_UP_AVAILABLE" | "LIMITED_DETAIL";
+
+export type AdminAuditOperationSummary = {
+  state: AdminAuditOperationState;
+  label: string;
+  detail: string;
+  nextHref: string | null;
+  nextLabel: string | null;
+};
+
+export function buildAdminAuditOperationSummary(item: AdminAuditLedgerItem): AdminAuditOperationSummary {
+  const nextHref = aiOpsDrilldownForAuditItem(item);
+  const nextLabel = nextHref ? "AI Ops에서 보기" : null;
+
+  if (item.metadataState === "UNAVAILABLE") {
+    return {
+      state: "LIMITED_DETAIL",
+      label: "세부 정보 제한",
+      detail: "안전 정책 또는 source 상태 때문에 세부 정보를 표시하지 않습니다.",
+      nextHref,
+      nextLabel,
+    };
+  }
+
+  if (item.outcome === "FAILED" || item.outcome === "DENIED" || item.outcome === "UNKNOWN") {
+    return {
+      state: "NEEDS_REVIEW",
+      label: "확인 필요",
+      detail: `${labelAdminAuditSourceSlice(item.sourceSlice)} 이벤트 결과가 ${labelAdminAuditOutcome(item.outcome)} 상태입니다.`,
+      nextHref,
+      nextLabel,
+    };
+  }
+
+  if (nextHref) {
+    return {
+      state: "FOLLOW_UP_AVAILABLE",
+      label: "후속 화면 있음",
+      detail: "AI 운영 화면에서 같은 클럽 범위로 이어서 확인할 수 있습니다.",
+      nextHref,
+      nextLabel,
+    };
+  }
+
+  const visibleMetadataCount = item.safeMetadata.filter((entry) =>
+    shouldShowAdminAuditDetailValue(entry.label, entry.value),
+  ).length;
+
+  return {
+    state: "RECORDED",
+    label: "기록 보존",
+    detail:
+      visibleMetadataCount > 0
+        ? `${labelAdminAuditSourceSlice(item.sourceSlice)} 이벤트가 감사 가능한 안전한 메타데이터와 함께 기록되었습니다.`
+        : `${labelAdminAuditSourceSlice(item.sourceSlice)} 이벤트가 감사 ledger에 기록되었습니다.`,
+    nextHref: null,
+    nextLabel: null,
+  };
+}
+
 function enumParam<T extends string>(value: string | null, allowed: readonly T[]): T | null {
   return value && allowed.includes(value as T) ? (value as T) : null;
 }
