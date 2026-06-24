@@ -73,7 +73,7 @@ async function routeAudit(page: Page): Promise<void> {
           sourceTable: "platform_audit_events",
           actionCategory: "SUPPORT",
           actionType: "SUPPORT_ACCESS_GRANT_CREATED",
-          outcome: "SUCCESS",
+          outcome: "FAILED",
           actor: { userId: "platform-owner-user", role: "OWNER", displayLabel: "OWNER" },
           target: { clubId: "club-1", userId: null, jobId: null, eventId: null, label: "사용자 숨김" },
           summary: "support grant가 생성되었습니다.",
@@ -97,4 +97,38 @@ test("owner reviews admin audit ledger without raw private fields", async ({ pag
   await expect(page.getByLabel("감사 이벤트 목록").getByText("support grant가 생성되었습니다.")).toBeVisible();
   await expect(page.getByText("member1@example.com")).toHaveCount(0);
   await expect(page.getByText("{\"")).toHaveCount(0);
+});
+
+async function expectNoAuditPrivateSentinels(page: Page): Promise<void> {
+  await expect(page.getByText("member1@example.com")).toHaveCount(0);
+  await expect(page.getByText("private.example.com")).toHaveCount(0);
+  await expect(page.getByText("{\"")).toHaveCount(0);
+}
+
+test("owner captures audit operation summary visual evidence on desktop and mobile", async ({ page }, testInfo) => {
+  await routePlatformAdminShell(page, "OWNER");
+  await routeAudit(page);
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/admin/audit");
+  await expect(page.getByRole("heading", { name: "감사" })).toBeVisible();
+  await expect(page.getByText("운영 판단")).toBeVisible();
+  await expectNoAuditPrivateSentinels(page);
+  const desktopScreenshot = await page.screenshot({
+    path: testInfo.outputPath("admin-audit-desktop.png"),
+    fullPage: true,
+  });
+  expect(desktopScreenshot.byteLength).toBeGreaterThan(10_000);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/admin/audit");
+  await expect(page.getByRole("heading", { name: "감사" })).toBeVisible();
+  await page.getByRole("button", { name: /support grant가 생성되었습니다/ }).click();
+  await expect(page.getByText("확인 필요")).toBeVisible();
+  await expectNoAuditPrivateSentinels(page);
+  const mobileScreenshot = await page.screenshot({
+    path: testInfo.outputPath("admin-audit-mobile.png"),
+    fullPage: true,
+  });
+  expect(mobileScreenshot.byteLength).toBeGreaterThan(10_000);
 });

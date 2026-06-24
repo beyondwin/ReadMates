@@ -112,8 +112,48 @@ test("owner searches support subject then creates and revokes grant", async ({ p
   await expect(page.getByText("admin-support@example.com")).toHaveCount(0);
 
   await page.getByRole("button", { name: /지원관리자/ }).click();
-  await page.getByLabel("사유").fill("ticket");
+  await page.getByRole("textbox", { name: "사유" }).fill("ticket");
   await page.getByRole("button", { name: "발급" }).click();
   await expect(page.getByRole("button", { name: "권한 취소" })).toBeVisible();
   await page.getByRole("button", { name: "권한 취소" }).click();
+});
+
+async function expectNoSupportPrivateSentinels(page: Page): Promise<void> {
+  await expect(page.getByText("member1@example.com")).toHaveCount(0);
+  await expect(page.getByText("private.example.com")).toHaveCount(0);
+  await expect(page.getByText("{\"")).toHaveCount(0);
+}
+
+test("owner captures support grant risk visual evidence on desktop and mobile", async ({ page }, testInfo) => {
+  await routeSupport(page);
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`/admin/support?clubId=${CLUB_ID}`);
+  await page.getByPlaceholder("이름 또는 이메일").fill("admin-support@example.com");
+  await page.getByRole("button", { name: "검색" }).click();
+  await page.getByRole("button", { name: /지원관리자/ }).click();
+  await expect(page.getByRole("heading", { name: "지원 접근 검토" })).toBeVisible();
+  await page.getByRole("button", { name: "고객 문의 재현 지원" }).click();
+  await expect(page.getByText("지원 접근 권한을 발급할 준비가 되었습니다.")).toBeVisible();
+  await expectNoSupportPrivateSentinels(page);
+  const desktopScreenshot = await page.screenshot({
+    path: testInfo.outputPath("admin-support-desktop.png"),
+    fullPage: true,
+  });
+  expect(desktopScreenshot.byteLength).toBeGreaterThan(10_000);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/admin/support?clubId=${CLUB_ID}`);
+  await page.getByPlaceholder("이름 또는 이메일").fill("admin-support@example.com");
+  await page.getByRole("button", { name: "검색" }).click();
+  await page.getByRole("button", { name: /지원관리자/ }).click();
+  await expect(page.getByRole("heading", { name: "지원 접근 검토" })).toBeVisible();
+  await page.getByRole("button", { name: "고객 문의 재현 지원" }).click();
+  await expect(page.getByText("지원 접근 권한을 발급할 준비가 되었습니다.")).toBeVisible();
+  await expectNoSupportPrivateSentinels(page);
+  const mobileScreenshot = await page.screenshot({
+    path: testInfo.outputPath("admin-support-mobile.png"),
+    fullPage: true,
+  });
+  expect(mobileScreenshot.byteLength).toBeGreaterThan(10_000);
 });
