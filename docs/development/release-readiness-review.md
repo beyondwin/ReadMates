@@ -25,6 +25,17 @@ For the Ops Insight & Release Trust branch, residuals are classified as:
 
 The v1.11.0 production OAuth and backup timer items are closed by 2026-05-31 operational evidence. Analytics v2 and observability truth cleanup did not close those items by themselves; the closure evidence above came from browser-profile OAuth smoke, VM timer installation, and manual backup upload proof.
 
+## 2026-06-25 Host/admin member defect polish closeout
+
+- Scope reviewed: local `main..codex/2026-06-25-readmates-host-admin-member-defect-polish-20260625-045334`.
+- Release classification: frontend-only route/UI defect polish. No server API contract, DB migration, auth/BFF token, OAuth scope, CI/deploy script behavior, or platform-admin permission/capability change.
+- Product evidence: `/app/host/**` and `/clubs/:slug/app/host/**` are composed before the member wildcard route tree; `/admin/clubs/:clubId` closing-risk rows collapse to a one-column mobile layout without document overflow; `/admin/support` now distinguishes initial, loading, no-result, result, and selected-result search states.
+- Public safety: browser-visible fixture data remains public-safe. The branch does not add real member data, private domains, local paths, secrets, token-shaped values, screenshot artifacts, or deployment identifiers. `graphify-out/`, `front/dist/`, and `front/node_modules` remain ignored/generated outputs.
+- Local verification before merge: `git diff --check main..HEAD`, `pnpm --dir front test -- router-route-order`, `pnpm --dir front test -- admin-support`, `pnpm --dir front test -- admin-club-operations`, `pnpm --dir front test:e2e -- tests/e2e/admin-club-operations.spec.ts`, `pnpm --dir front lint`, `pnpm --dir front test`, `pnpm --dir front build`, public-safe Playwright browser evidence for host/admin routes, `graphify update .`, Graphify freshness audit, CPE prompt-cache audit, CPE reconcile, and CPE state validation passed.
+- Release-readiness repair before closeout: CHANGELOG `Unreleased` now records the frontend-only operator/host polish, and this closeout note records the evidence boundary. The Vite build still emits the existing large-chunk warning, but the build exits 0 and the branch does not add new large route chunks beyond the touched frontend polish.
+- Skipped: production OAuth, VM, provider-console, tag/deploy smoke, and server Gradle checks. These are not local evidence for this frontend-only route/UI polish branch and the changed files do not touch server, deploy, auth, BFF, persistence, or release image behavior.
+- Residual risk: no known local release-readiness residual remains after CHANGELOG repair, frontend unit/E2E/build evidence, public-safe browser evidence, Graphify freshness, and public release safety checks. Production deploy/tag smoke remains outside this local merge.
+
 ## 2026-05-31 v1.12.0 release preparation note
 
 - Scope reviewed: `v1.11.0..HEAD`, with `origin/main..HEAD` also considered because this local `main` is ahead of the remote baseline.
