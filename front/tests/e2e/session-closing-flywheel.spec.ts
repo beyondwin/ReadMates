@@ -191,9 +191,23 @@ test("session closing flywheel links host member and public surfaces", async ({ 
   await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}/closing`);
   await expect(page.getByRole("heading", { name: "No.07 · E2E 책" })).toBeVisible();
   await expect(page.getByText("발행 완료")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Host" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Member" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Public" })).toBeVisible();
+  await expect(page.getByText("이번 회차 다음 조치")).toBeVisible();
+  await expect(page.getByLabel("이번 회차 다음 조치").getByRole("link", { name: "공개 기록 확인" })).toHaveAttribute(
+    "href",
+    `/clubs/${CLUB_SLUG}/sessions/${SESSION_ID}`,
+  );
+  await expect(page.getByText("공개 표면에 발행된 기록이 의도대로 보이는지 최종 확인합니다.")).toBeVisible();
+  await expect(page.getByText("마감 단계")).toBeVisible();
+  await expect(page.getByText("호스트 문서 / 멤버 회고 / 공개 기록")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "호스트 문서" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "멤버 회고" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "공개 기록" })).toBeVisible();
+  const surfaceStatus = page.getByLabel("호스트 멤버 공개 표면 상태");
+  await expect(surfaceStatus.getByRole("link", { name: "호스트 문서 확인" })).toHaveAttribute("href", `/app/host/sessions/${SESSION_ID}/edit`);
+  await expect(surfaceStatus.getByRole("link", { name: "멤버 회고 확인" })).toHaveAttribute("href", `/clubs/${CLUB_SLUG}/app/sessions/${SESSION_ID}`);
+  await expect(surfaceStatus.getByRole("link", { name: "공개 기록 확인" })).toHaveAttribute("href", `/clubs/${CLUB_SLUG}/sessions/${SESSION_ID}`);
+  await expect(page.getByText("마감 증거")).toBeVisible();
+  await expect(page.getByText("최근 멤버 알림")).toBeVisible();
   await expect(page.getByText("member1@example.com")).toHaveCount(0);
   await expect(page.getByText("ADMIN_ROUTE")).toHaveCount(0);
   const screenshot = await page.screenshot({ path: testInfo.outputPath("session-closing-board.png"), fullPage: true });

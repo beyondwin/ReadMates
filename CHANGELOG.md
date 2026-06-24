@@ -12,6 +12,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Changed
 
+- **host closing board:** The host session closing board now reads as a Korean operating board with a clear next action, reason, closing checklist states, host/member/public surface status, and safe evidence ledger. This is a frontend host UX change only; server API contract, DB migrations, auth/BFF tokens, OAuth scopes, notification event types, and deploy workflow behavior are unchanged.
 - **member reflection notifications:** 멤버 알림에서 지난 모임 기록/피드백으로 들어갈 때 회고 return state를 보존하고, 멤버 홈 회고 카드의 피드백 상태 모델을 `AVAILABLE`/`MISSING`/`LOCKED`/`UNKNOWN`으로 명시했습니다. 권한 모델, notification event type, auth/BFF token, OAuth scope, DB migration은 변경하지 않습니다.
 - **observability operator docs:** 관측성 README, operator guide, correlation lookup, deploy observability check runbook, and script index now give operators a repo-native path for request tracing, deploy-time observability evidence, Prometheus/Grafana validation, and explicit evidence limits. No runtime topology, alert threshold, metric label, auth/BFF, DB migration, or deploy workflow behavior changes are included.
 
