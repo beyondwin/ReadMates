@@ -258,6 +258,16 @@ The v1.11.0 production OAuth and backup timer items are closed by 2026-05-31 ope
 - Repair evidence: `front`, `design/docs`, and `design/system` now pin Vite `8.0.16`; root pnpm overrides map only vulnerable ranges to patched versions: `esbuild@>=0.27.3 <0.28.1` to `0.28.1`, `ws@>=8.0.0 <8.21.0` to `8.21.0`, `js-yaml@<=4.1.1` to `4.2.0`, and `@babel/core@<=7.29.0` to `7.29.6`. `pnpm list vite esbuild ws js-yaml @babel/core --depth 10 -r` shows the Vite 8 path on `vite@8.0.16` and `esbuild@0.28.1`, `jsdom` on `ws@8.21.0`, ESLint on `js-yaml@4.2.0`, and Playwright CT React tooling on `@babel/core@7.29.6`; the Playwright CT Vite 6 path remains on `esbuild@0.25.12`, outside the vulnerable range.
 - Residual risk: local dependency evidence shows no vulnerable Vite `8.0.9`, `esbuild@0.28.0`, `ws@8.20.1`, `js-yaml@4.1.1`, or `@babel/core@7.29.0` path remains in the workspace dependency tree, and `pnpm audit --audit-level low` reports no known vulnerabilities. GitHub Dependabot alert closure still depends on rescanning the pushed default branch.
 
+## 2026-06-24 Host closing board productization closeout
+
+- Scope reviewed: local `main..HEAD` for the host closing board productization branch.
+- Release classification: frontend host UX only. No server API contract, DB migration, auth/BFF token, OAuth scope, notification event type, deploy workflow, CI script, or release image behavior changed.
+- Product evidence: `/clubs/:slug/app/host/sessions/:sessionId/closing` now reads as a Korean operating board with a clear next action, reason, closing checklist state labels, host/member/public surface status, and safe evidence ledger. Member/public links remain derived from `host.session_closing_status.v1` and remain host/member/public-safe.
+- Public safety: changed production UI and tests do not render private member email, `ADMIN_ROUTE`, raw JSON markers, token-shaped values, private domains, deployment identifiers, OCIDs, or local paths. The E2E fixture keeps these values as non-rendering sentinels only.
+- Local verification before merge: `git diff --check main..HEAD`, `pnpm --dir front lint`, `pnpm --dir front test` (147 files, 1217 tests), `pnpm --dir front build` (exit 0 with existing Vite chunk-size warning), `pnpm --dir front test:e2e -- tests/e2e/session-closing-flywheel.spec.ts`, full `pnpm --dir front test:e2e`, `./scripts/build-public-release-candidate.sh`, `./scripts/public-release-check.sh .tmp/public-release-candidate`, public-safety sentinel scan over changed files, and `graphify update .` passed. `graphify-out/` is ignored, so Graphify freshness is command evidence rather than tracked output.
+- Skipped: server Gradle checks, production OAuth, VM, provider-console, release tag, deploy workflow, OCI compose promotion, GitHub Release publication, and post-deploy smoke. Server checks are not local evidence for this frontend-only branch because no server, persistence, auth, BFF, deploy, or release-image files changed; production/tag/deploy smoke requires release-operation access after merge.
+- Residual risk: no known local release-readiness residual remains after frontend, targeted/full E2E, CHANGELOG, Graphify, and public-release evidence. Production deploy/tag smoke remains outside this local merge.
+
 ## 기본 범위
 
 기본 범위는 현재 branch와 base branch의 차이입니다. 보통 `origin/main..HEAD`를 사용합니다.
