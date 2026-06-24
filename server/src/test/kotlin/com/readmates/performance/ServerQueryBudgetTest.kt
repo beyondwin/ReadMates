@@ -170,6 +170,24 @@ class ServerQueryBudgetTest(
     }
 
     @Test
+    fun `host session closing status stays within read-model query budget`() {
+        assertQueryBudget(
+            budget = 6,
+            reason = "host closing status should stay a small bounded read model without accidental N+1 queries",
+        ) {
+            mockMvc
+                .get("/api/host/sessions/00000000-0000-0000-0000-000000000306/closing-status") {
+                    with(user("host@example.com"))
+                    header("X-Readmates-Bff-Secret", "test-bff-secret")
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.schema") { value("host.session_closing_status.v1") }
+                    jsonPath("$.session.sessionId") { value("00000000-0000-0000-0000-000000000306") }
+                }
+        }
+    }
+
+    @Test
     fun `notes feed large fixture stays within fixed query budget`() {
         largeFixture.seedNotesFeed(sessionCount = 80)
 
