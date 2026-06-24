@@ -25,6 +25,15 @@ For the Ops Insight & Release Trust branch, residuals are classified as:
 
 The v1.11.0 production OAuth and backup timer items are closed by 2026-05-31 operational evidence. Analytics v2 and observability truth cleanup did not close those items by themselves; the closure evidence above came from browser-profile OAuth smoke, VM timer installation, and manual backup upload proof.
 
+## 2026-06-25 Lighthouse public improvements closeout
+
+- Scope reviewed: local public route metadata and public initial loading-cost review only.
+- Release classification: frontend public-route metadata and route-layout boundary refinement. No server API contract, DB migration, auth/BFF token, OAuth scope, CI/deploy workflow, or release image behavior change.
+- Product evidence: public route titles and descriptions now derive from public club/session route data; canonical and robots behavior remains in the existing public URL policy boundary.
+- Local Lighthouse evidence: pre-change and post-change `pnpm --dir front lighthouse:diagnose -- --group public` reports were compared from `.tmp/lighthouse/`; post-change route entry failures stayed at 0 and SEO metadata findings decreased from 11 to 3.
+- Public safety: generated reports stay under ignored `.tmp/lighthouse/`; docs and code do not add real member data, private domains, local paths, secrets, token-shaped examples, screenshot artifacts, or deployment identifiers.
+- Remaining follow-up boundary: `unused-javascript`, `total-byte-weight`, `link-text`, and local-dev best-practice findings remain; login, retired reset-password, and public not-found routes still carry `meta-description` findings outside this club/session metadata pass.
+
 ## 2026-06-25 Host/admin member defect polish closeout
 
 - Scope reviewed: local `main..codex/2026-06-25-readmates-host-admin-member-defect-polish-20260625-045334`.
