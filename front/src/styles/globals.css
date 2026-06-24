@@ -3080,6 +3080,36 @@
     grid-template-columns: 1fr;
   }
 
+  .admin-club-operations__closing-risk-header {
+    display: grid;
+    justify-items: stretch;
+  }
+
+  .admin-club-operations__closing-risk-row {
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 8px;
+  }
+
+  .admin-club-operations__closing-risk-main {
+    max-width: 100%;
+  }
+
+  .admin-club-operations__closing-risk-badge,
+  .admin-club-operations__closing-risk-blocker,
+  .admin-club-operations__closing-risk-age,
+  .admin-club-operations__closing-risk-date,
+  .admin-club-operations__closing-risk-repeat,
+  .admin-club-operations__closing-risk-tracking {
+    justify-self: start;
+    max-width: 100%;
+  }
+
+  .admin-club-operations__closing-risk-row .btn {
+    justify-self: stretch;
+    width: 100%;
+  }
+
   .admin-support-workbench__header,
   .admin-support-workbench__search,
   .admin-support-workbench__ledger-row {

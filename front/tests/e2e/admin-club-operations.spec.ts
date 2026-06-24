@@ -133,3 +133,18 @@ test("owner views aggregate club operations without host-owned commands", async 
   ).toHaveCount(0);
   await expect(page.getByRole("button", { name: /RSVP|출석|세션 편집|발행|세션 종료|알림 발송/ })).toHaveCount(0);
 });
+
+test("owner views club operations closing risks without mobile horizontal overflow", async ({ page }) => {
+  await routePlatformAdminShell(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  await page.goto(`/admin/clubs/${CLUB_ID}`);
+  await expect(page.getByRole("heading", { name: "클로징 확인 필요" })).toBeVisible();
+  await expect(page.getByText("No.07 · 페인트")).toBeVisible();
+
+  const width = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  expect(width.scrollWidth).toBeLessThanOrEqual(width.clientWidth);
+});
