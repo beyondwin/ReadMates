@@ -17,7 +17,7 @@ describe("runRouteDiagnostic", () => {
     const page = {
       goto: vi.fn(),
       waitForLoadState: vi.fn(),
-      getByText: vi.fn(() => ({ waitFor: vi.fn().mockRejectedValue(new Error("missing text")) })),
+      getByText: vi.fn(() => ({ first: vi.fn(() => ({ waitFor: vi.fn().mockRejectedValue(new Error("missing text")) })) })),
     };
     const lighthouse = vi.fn();
 
@@ -40,7 +40,7 @@ describe("runRouteDiagnostic", () => {
     const page = {
       goto: vi.fn(),
       waitForLoadState: vi.fn(),
-      getByText: vi.fn(() => ({ waitFor: vi.fn().mockResolvedValue(undefined) })),
+      getByText: vi.fn(() => ({ first: vi.fn(() => ({ waitFor: vi.fn().mockResolvedValue(undefined) })) })),
     };
     const lighthouse = vi.fn().mockResolvedValue({
       lhr: {
@@ -69,5 +69,39 @@ describe("runRouteDiagnostic", () => {
     expect(lighthouse).toHaveBeenCalledWith("http://localhost:3100/", route);
     expect(result.status).toBe("passed");
     expect(result.scores.performance).toBe(0.9);
+  });
+
+  it("allows expected text to match more than one visible element", async () => {
+    const first = vi.fn(() => ({ waitFor: vi.fn().mockResolvedValue(undefined) }));
+    const page = {
+      goto: vi.fn(),
+      waitForLoadState: vi.fn(),
+      getByText: vi.fn(() => ({ first })),
+    };
+    const lighthouse = vi.fn().mockResolvedValue({
+      lhr: {
+        categories: {
+          performance: { score: 1 },
+          accessibility: { score: 1 },
+          "best-practices": { score: 1 },
+          seo: { score: 1 },
+        },
+        audits: {},
+      },
+      report: ["{}", "<html></html>"],
+    });
+
+    const result = await runRouteDiagnostic(
+      {
+        baseUrl: "http://localhost:3100",
+        page,
+        lighthouse,
+        outputDir: ".tmp/lighthouse/test",
+      },
+      route,
+    );
+
+    expect(first).toHaveBeenCalled();
+    expect(result.status).toBe("passed");
   });
 });

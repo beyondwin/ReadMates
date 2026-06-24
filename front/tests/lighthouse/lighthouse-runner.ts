@@ -93,7 +93,7 @@ export async function runRouteDiagnostic(
     await context.page.goto(url);
     await context.page.waitForLoadState("networkidle");
     if (route.expectedText) {
-      await context.page.getByText(route.expectedText, { exact: false }).waitFor({ timeout: 15_000 });
+      await context.page.getByText(route.expectedText, { exact: false }).first().waitFor({ timeout: 15_000 });
     }
   } catch (error) {
     return routeFailure(route, error instanceof Error ? error.message : String(error));
