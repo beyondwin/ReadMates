@@ -268,6 +268,13 @@ The v1.11.0 production OAuth and backup timer items are closed by 2026-05-31 ope
 - Skipped: server Gradle checks, production OAuth, VM, provider-console, release tag, deploy workflow, OCI compose promotion, GitHub Release publication, and post-deploy smoke. Server checks are not local evidence for this frontend-only branch because no server, persistence, auth, BFF, deploy, or release-image files changed; production/tag/deploy smoke requires release-operation access after merge.
 - Residual risk: no known local release-readiness residual remains after frontend, targeted/full E2E, CHANGELOG, Graphify, and public-release evidence. Production deploy/tag smoke remains outside this local merge.
 
+## 2026-06-25 Host Closing Board Confidence Gates
+
+- Scope: host closing status read-model confidence only. No API response schema, DB migration, auth/BFF token, notification event type, platform-admin mutation, or deploy workflow behavior changed.
+- Evidence added: `/api/host/sessions/{sessionId}/closing-status` is covered by `ServerQueryBudgetTest`; `JdbcSessionClosingStatusAdapter` base and notification SQL are covered by `MySqlQueryPlanTest`; `SessionClosingBoard` blocked/action-required state has a Docker-generated Playwright CT baseline.
+- Local verification: `./server/gradlew -p server integrationTest --tests com.readmates.performance.ServerQueryBudgetTest --tests com.readmates.performance.MySqlQueryPlanTest`, Docker CT with `mcr.microsoft.com/playwright:v1.60.0-jammy`, and `git diff --check` over changed docs/tests. `pnpm --dir front test:ct` was run locally and failed only because the macOS renderer geometry differs from the committed Linux/Docker CT baseline.
+- Residual risk: these gates prove the host closing board surface has bounded local SQL and committed component visual coverage. They do not prove production deploy health, provider health, or all release risk is closed.
+
 ## 기본 범위
 
 기본 범위는 현재 branch와 base branch의 차이입니다. 보통 `origin/main..HEAD`를 사용합니다.
