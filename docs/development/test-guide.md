@@ -196,11 +196,13 @@ These specs capture desktop and mobile screenshots into Playwright `test-results
 
 **목적:** `shared/ui` primitive의 렌더링 회귀를 화면 흐름 E2E와 분리해, 컴포넌트 단위 스냅샷으로 빠르게 잡습니다. 위의 host/member/admin visual evidence가 화면 흐름 증거(커밋하지 않는 산출물)인 것과 달리, 컴포넌트 하니스의 baseline 스냅샷은 Git에 커밋해 회귀 게이트로 사용합니다.
 
+**Route-critical UI coverage:** shared primitive baseline은 작은 UI 부품을 보호하고, feature-level CT baseline은 route에서 반복적으로 깨지기 쉬운 운영/공개 UI 조각을 보호합니다. 현재 feature-level 후보는 host closing board, platform admin support/audit 판단 패널, public records/session 카드처럼 props만으로 렌더링할 수 있고 API/BFF/auth 흐름을 직접 검증하지 않아도 되는 presentation surface입니다. Route loader, auth guard, BFF proxy, BrowserRouter ordering은 CT가 아니라 route test 또는 E2E로 확인합니다.
+
 **설정 파일:** `front/playwright-ct.config.ts`. E2E용 `front/playwright.config.ts`와 별개이며, backend나 frontend dev server를 띄우지 않습니다(`@playwright/experimental-ct-react`가 컴포넌트를 직접 렌더).
 
 **테스트 위치:** `front/shared/ui/**/*.ct.tsx`로 source 옆에 co-locate합니다. `.ct.tsx` 확장자라 Vitest `*.test.{ts,tsx}`나 E2E `tests/e2e/**`와 충돌하지 않습니다.
 
-**스냅샷 경로:** baseline은 `front/__screenshots__/shared/ui/<test>.ct.tsx/<name>.png`에 생성되며 커밋 대상입니다(`testDir="."`). 초기 커버리지는 ReadmatesBrandMark, BookCover(이미지 없는 fallback), AvatarChip입니다.
+**스냅샷 경로:** baseline은 `front/__screenshots__/shared/ui/` 또는 `front/__screenshots__/features/` 아래에 생성되며 커밋 대상입니다(`testDir="."`). Shared primitive 초기 커버리지는 ReadmatesBrandMark, BookCover(이미지 없는 fallback), AvatarChip이고, feature-level baseline은 host/admin/public route-critical UI 조각으로 확장합니다.
 
 **명령:**
 
@@ -217,6 +219,13 @@ pnpm --dir front test:ct:update:docker
 **darwin(macOS) 제약:** macOS에서는 Vite 8의 `@rolldown/binding-darwin-arm64` 네이티브 바인딩이 없어 CT suite가 로컬에서 부팅조차 되지 않습니다. 따라서 macOS에서는 검증과 baseline 생성 모두 **Docker 경로만** 사용합니다. 로컬(특히 Apple Silicon)에서 `test:ct`가 부팅에 실패하면 `test:ct:update:docker`(또는 동일 이미지의 Docker 실행)로 진행합니다. macOS 로컬에서 생성한 baseline은 폰트 렌더링 차이로 CI를 깨뜨리므로 절대 커밋하지 않습니다.
 
 **flake 정책:** 애니메이션과 caret을 끄고, 고정 viewport `480x360`, `maxDiffPixelRatio: 0.02`로 픽셀 노이즈를 흡수합니다. darwin 로컬에서 생성한 baseline은 커밋하지 않습니다.
+
+**Public release safety:** `front/__screenshots__`는 repo에 커밋되는 regression baseline이지만 clean public release candidate에는 포함하지 않습니다. CT baseline 경로, release candidate copy rule, public scanner rule을 바꾸면 아래 명령으로 screenshot exclusion이 유지되는지 확인합니다.
+
+```bash
+./scripts/build-public-release-candidate.sh
+./scripts/public-release-check.sh .tmp/public-release-candidate
+```
 
 **experimental API 주의:** `@playwright/experimental-ct-react`는 experimental이고 Vite 8 / React 19 조합은 bleeding-edge입니다. 부팅이 실패하면 임시 우회를 강제하지 말고 이슈로 기록한 뒤 진행합니다.
 
