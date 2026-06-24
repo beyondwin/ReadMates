@@ -334,6 +334,19 @@ Admin analytics overview도 query budget 대상입니다. `/api/admin/analytics/
 ./server/gradlew -p server integrationTest --tests com.readmates.performance.ServerQueryBudgetTest
 ```
 
+Host closing board confidence:
+
+`/api/host/sessions/{sessionId}/closing-status`, `sessionclosing`, host closing board UI, or admin closing-risk repair links changed면 query budget, EXPLAIN guard, and component visual baseline을 함께 확인합니다. 이 lane은 host closing board가 커질 때 accidental N+1, lost index, and layout/copy regression을 잡기 위한 좁은 confidence gate입니다.
+
+```bash
+./server/gradlew -p server integrationTest \
+  --tests com.readmates.performance.ServerQueryBudgetTest \
+  --tests com.readmates.performance.MySqlQueryPlanTest
+pnpm --dir front test:ct
+```
+
+`front/test-results/**`의 E2E screenshot은 release evidence artifact이고 commit하지 않습니다. `front/__screenshots__/features/host/ui/session-closing-board.ct.tsx/host-closing-board-blocked.png` 같은 CT baseline은 Docker renderer로 생성한 뒤 commit하는 regression gate입니다.
+
 ```bash
 ./server/gradlew -p server test \
   --tests com.readmates.performance.ServerQueryBudgetTest \
