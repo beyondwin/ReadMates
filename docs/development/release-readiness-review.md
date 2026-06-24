@@ -25,6 +25,18 @@ For the Ops Insight & Release Trust branch, residuals are classified as:
 
 The v1.11.0 production OAuth and backup timer items are closed by 2026-05-31 operational evidence. Analytics v2 and observability truth cleanup did not close those items by themselves; the closure evidence above came from browser-profile OAuth smoke, VM timer installation, and manual backup upload proof.
 
+## 2026-06-25 Route UI visual regression gate closeout
+
+- Scope reviewed: local `main..codex/2026-06-25-readmates-route-ui-visual-regression-gate-20260625-083423`.
+- Release classification: frontend component-test coverage and contributor docs only. No production route composition, route loader, auth/BFF proxy, server API contract, DB migration, OAuth scope, CI/deploy workflow, or release image behavior changed.
+- Product evidence: route-critical presentation fixtures now cover host closing board published state, platform-admin support grant risk review, and public records index copy/wrapping. Fixtures use deterministic public-safe Korean sample values and placeholder UUIDs only.
+- Renderer-risk closure: local macOS `pnpm --dir front test:ct` can still report feature-level pixel diffs against Docker-generated baselines, so the release gate uses the documented canonical `pnpm --dir front test:ct:update:docker` path. The Docker CT run passed all shared and feature baselines.
+- Public safety: `front/__screenshots__` remains committed regression evidence but is excluded from the clean public release candidate. Generated CT cache/test-result artifacts are ignored and must be cleaned before public-candidate scans if they were produced locally.
+- Local verification before merge: focused RED checks proved each new baseline was initially missing, `pnpm --dir front test:ct:update:docker`, focused admin/public Vitest checks, `pnpm --dir front lint`, `pnpm --dir front test`, `pnpm --dir front build`, `pnpm --dir front test:e2e`, `./server/gradlew -p server clean test`, `./scripts/build-public-release-candidate.sh`, `./scripts/public-release-check.sh .tmp/public-release-candidate`, `graphify update .`, Graphify freshness audit, CPE prompt-cache audit, CPE reconcile, and CPE state validation passed. The project `test` task is skipped by Gradle configuration; no server source changed.
+- CHANGELOG: `## Unreleased` now records the route-critical visual-regression gate under Testing.
+- Skipped before merge: production OAuth, VM, provider-console, and tag/deploy smoke. These require release-operation access after merge and are not local evidence for this frontend test/docs branch; the changed files do not touch server, deploy, auth, BFF, persistence, or release image behavior.
+- Residual risk: no known local release-readiness residual remains after CHANGELOG repair, canonical Docker CT evidence, frontend lint/unit/build evidence, public-release safety checks, Graphify freshness, and CPE validation. Production deploy/tag smoke remains outside this local merge.
+
 ## 2026-06-25 Lighthouse public improvements closeout
 
 - Scope reviewed: local public route metadata and public initial loading-cost review only.

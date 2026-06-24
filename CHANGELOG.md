@@ -20,6 +20,10 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - **member reflection notifications:** 멤버 알림에서 지난 모임 기록/피드백으로 들어갈 때 회고 return state를 보존하고, 멤버 홈 회고 카드의 피드백 상태 모델을 `AVAILABLE`/`MISSING`/`LOCKED`/`UNKNOWN`으로 명시했습니다. 권한 모델, notification event type, auth/BFF token, OAuth scope, DB migration은 변경하지 않습니다.
 - **observability operator docs:** 관측성 README, operator guide, correlation lookup, deploy observability check runbook, and script index now give operators a repo-native path for request tracing, deploy-time observability evidence, Prometheus/Grafana validation, and explicit evidence limits. No runtime topology, alert threshold, metric label, auth/BFF, DB migration, or deploy workflow behavior changes are included.
 
+### Testing
+
+- **route-critical visual regression:** Playwright component-test baselines now cover host closing board published state, platform-admin support grant review, and public records index UI. Baselines are generated with the canonical Docker renderer and remain excluded from clean public release candidates. This is frontend test coverage and documentation only; route loaders, auth/BFF behavior, server API contracts, DB migrations, OAuth scopes, and deploy workflow behavior are unchanged.
+
 ### Security
 
 - **toolchain vulnerability cleanup:** Frontend and design workspaces now use Vite `8.0.16`, and root pnpm overrides constrain only vulnerable build/test dependency ranges to patched versions: `esbuild` `0.28.1`, `ws` `8.21.0`, `js-yaml` `4.2.0`, and `@babel/core` `7.29.6`. This closes the remaining Dependabot alerts for CVE-2026-53571, CVE-2026-53632, and GHSA-g7r4-m6w7-qqqr, plus the additional low-and-above `pnpm audit` findings found during remediation. This changes build/dev tooling only; app routes, API contracts, auth/BFF tokens, DB migrations, and deploy workflow behavior are unchanged.
