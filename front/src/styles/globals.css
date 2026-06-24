@@ -1746,17 +1746,21 @@
 }
 
 .rm-host-closing-board__primary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: flex-start;
+  display: grid;
   gap: 16px;
-  flex-wrap: wrap;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   padding: 20px;
   margin-bottom: 16px;
 }
 
-.rm-host-closing-board__primary .h3 {
-  margin-top: 8px;
+.rm-host-closing-board__primary-copy {
+  min-width: 0;
+}
+
+.rm-host-closing-board__primary-copy .body {
+  margin: 8px 0 0;
+  max-width: 720px;
 }
 
 .rm-host-closing-board__section {
@@ -1776,8 +1780,20 @@
 
 .rm-host-closing-board__checklist-row,
 .rm-host-closing-board__surface-row {
-  align-items: baseline;
+  align-items: flex-start;
   gap: 12px;
+}
+
+.rm-host-closing-board__checklist-item,
+.rm-host-closing-board__surface {
+  min-width: 0;
+}
+
+.rm-host-closing-board__checklist-item strong,
+.rm-host-closing-board__surface h2,
+.rm-host-closing-board__surface p,
+.rm-host-closing-board__evidence dd {
+  overflow-wrap: anywhere;
 }
 
 .rm-host-closing-board__checklist-item .small {
@@ -1886,6 +1902,14 @@
 }
 
 @media (max-width: 768px) {
+  .rm-host-closing-board__primary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rm-host-closing-board__primary .btn {
+    width: 100%;
+  }
+
   .rm-host-closing-board__surfaces,
   .rm-host-closing-board__evidence {
     grid-template-columns: 1fr;
