@@ -29,3 +29,31 @@ export type LighthouseRouteFilters = {
   routeId?: string;
   limit?: number;
 };
+
+export type LighthouseCategoryScores = {
+  performance: number | null;
+  accessibility: number | null;
+  bestPractices: number | null;
+  seo: number | null;
+};
+
+export type LighthouseFinding = {
+  auditId: string;
+  title: string;
+  score: number | null;
+  numericValue: number | null;
+  bucket: LighthouseCauseBucket;
+};
+
+export type NormalizedLighthouseResult = {
+  routeId: string;
+  group: LighthouseRouteGroup;
+  path: string;
+  mode: LighthouseRouteMode;
+  status: "passed" | "route_failure" | "audit_failure";
+  scores: LighthouseCategoryScores;
+  findings: LighthouseFinding[];
+  reportJsonPath?: string;
+  reportHtmlPath?: string;
+  failureReason?: string;
+};
