@@ -87,6 +87,25 @@ Production build:
 pnpm --dir front build
 ```
 
+## Lighthouse Diagnostic
+
+The local Lighthouse diagnostic is a non-gating quality baseline for public, member, host, and platform-admin dev-seed routes. It writes artifacts under `.tmp/lighthouse/` and separates route entry failures from Lighthouse findings.
+
+Run a small smoke first:
+
+```bash
+pnpm --dir front lighthouse:diagnose -- --group public --limit 2
+pnpm --dir front lighthouse:diagnose -- --group member --limit 1
+```
+
+Run the full desktop baseline after the local MySQL, Spring dev profile, and Vite server path used by Playwright E2E is healthy:
+
+```bash
+pnpm --dir front lighthouse:diagnose
+```
+
+Do not treat the first baseline as a CI gate. Use `summary.md` and `findings.json` to create scoped follow-up goals.
+
 ## Playwright E2E
 
 ```bash
