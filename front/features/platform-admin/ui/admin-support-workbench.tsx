@@ -1,6 +1,10 @@
-import type {
+import {
+  SUPPORT_REASON_PRESETS,
+  buildSupportGrantRiskSummary,
   AdminSupportGrantLedgerItem,
   AdminSupportSearchResult,
+  type SupportGrantRiskItemState,
+  type SupportGrantRiskSummary,
 } from "@/features/platform-admin/model/platform-admin-support-model";
 
 export type AdminSupportWorkbenchClub = {
@@ -31,7 +35,15 @@ export type AdminSupportWorkbenchProps = {
 };
 
 export function AdminSupportWorkbench(props: AdminSupportWorkbenchProps) {
+  const riskSummary = buildSupportGrantRiskSummary({
+    selectedResult: props.selectedResult,
+    selectedClubId: props.selectedClubId,
+    canCreateGrant: props.canCreateGrant,
+    reason: props.reason,
+    expiresAt: props.expiresAt,
+  });
   const createDisabled =
+    riskSummary.status === "BLOCKED" ||
     !props.selectedResult?.grantEligible ||
     !props.selectedClubId ||
     !props.reason.trim() ||
@@ -93,6 +105,19 @@ export function AdminSupportWorkbench(props: AdminSupportWorkbenchProps) {
           <p className="tiny muted">
             대상: {props.selectedResult.displayName} · {props.selectedResult.maskedEmail}
           </p>
+          <SupportRiskSummaryView summary={riskSummary} />
+          <div className="admin-support-workbench__presets" aria-label="지원 사유 프리셋">
+            {SUPPORT_REASON_PRESETS.map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                className="btn btn-quiet btn-sm"
+                onClick={() => props.onReasonChange(preset)}
+              >
+                {preset}
+              </button>
+            ))}
+          </div>
           {!props.canCreateGrant ? <p className="muted">현재 역할은 지원 접근 권한을 발급할 수 없습니다.</p> : null}
           {props.selectedResult.grantBlockedReason ? <p className="muted">{props.selectedResult.grantBlockedReason}</p> : null}
           <label className="field-group">
@@ -138,4 +163,46 @@ export function AdminSupportWorkbench(props: AdminSupportWorkbenchProps) {
       </section>
     </section>
   );
+}
+
+function SupportRiskSummaryView({ summary }: { summary: SupportGrantRiskSummary }) {
+  return (
+    <section className="admin-support-risk" aria-labelledby="support-risk-title">
+      <div className="admin-support-risk__header">
+        <h3 id="support-risk-title" className="h3 editorial">
+          지원 접근 검토
+        </h3>
+        <span className={supportRiskBadgeClass(summary.status)}>{summary.primaryMessage}</span>
+      </div>
+      <dl className="admin-support-risk__items">
+        {summary.items.map((item) => (
+          <div key={item.id}>
+            <dt>
+              {item.label}
+              <span className={supportRiskItemClass(item.state)}>{supportRiskItemLabel(item.state)}</span>
+            </dt>
+            <dd>{item.detail}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
+function supportRiskBadgeClass(status: SupportGrantRiskSummary["status"]) {
+  if (status === "READY") return "badge badge-ok badge-dot";
+  if (status === "WARNING") return "badge badge-warn badge-dot";
+  return "badge badge-danger badge-dot";
+}
+
+function supportRiskItemClass(state: SupportGrantRiskItemState) {
+  if (state === "PASS") return "badge badge-ok badge-dot";
+  if (state === "WARNING") return "badge badge-warn badge-dot";
+  return "badge badge-danger badge-dot";
+}
+
+function supportRiskItemLabel(state: SupportGrantRiskItemState) {
+  if (state === "PASS") return "확인";
+  if (state === "WARNING") return "검토";
+  return "차단";
 }

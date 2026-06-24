@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  aiOpsDrilldownForAuditItem,
+  buildAdminAuditOperationSummary,
   labelAdminAuditOutcome,
   labelAdminAuditSourceSlice,
   shouldShowAdminAuditDetailValue,
@@ -109,13 +109,23 @@ function AuditDetail({ item }: { item: AdminAuditLedgerItem | null }) {
     );
   }
   const safeMetadata = item.safeMetadata.filter((entry) => shouldShowAdminAuditDetailValue(entry.label, entry.value));
-  const aiOpsPath = aiOpsDrilldownForAuditItem(item);
+  const operationSummary = buildAdminAuditOperationSummary(item);
   return (
     <aside className="admin-audit__detail" aria-label="감사 이벤트 상세" role="region">
       <h2 className="h3 editorial">{item.summary}</h2>
       <p className="tiny muted">
         {item.sourceTable} · {item.actionType}
       </p>
+      <div className={`admin-audit__operation admin-audit__operation--${operationSummary.state.toLowerCase()}`}>
+        <p className="eyebrow">운영 판단</p>
+        <strong>{operationSummary.label}</strong>
+        <p className="small muted">{operationSummary.detail}</p>
+        {operationSummary.nextHref ? (
+          <Link to={operationSummary.nextHref} className="admin-audit__drill">
+            {operationSummary.nextLabel}
+          </Link>
+        ) : null}
+      </div>
       {safeMetadata.length > 0 ? (
         <dl className="admin-audit__metadata">
           {safeMetadata.map((entry) => (
@@ -128,11 +138,6 @@ function AuditDetail({ item }: { item: AdminAuditLedgerItem | null }) {
       ) : null}
       {item.metadataState === "UNAVAILABLE" ? <p className="muted">세부 정보를 안전하게 표시할 수 없습니다.</p> : null}
       {item.metadataState === "EMPTY" ? <p className="muted">세부 정보 숨김</p> : null}
-      {aiOpsPath ? (
-        <Link to={aiOpsPath} className="admin-audit__drill">
-          AI Ops에서 보기 →
-        </Link>
-      ) : null}
     </aside>
   );
 }

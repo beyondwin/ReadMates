@@ -92,4 +92,33 @@ describe("AdminSupportWorkbench", () => {
 
     expect(onRevokeGrant).toHaveBeenCalledWith("grant-1");
   });
+
+  it("renders support risk summary and reason presets for a selected result", async () => {
+    const onReasonChange = vi.fn();
+    const user = userEvent.setup();
+    renderWorkbench({ selectedResult: result, onReasonChange });
+
+    expect(screen.getByRole("heading", { name: "지원 접근 검토" })).toBeInTheDocument();
+    expect(screen.getByText("지원 사유를 입력하세요.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "고객 문의 재현 지원" }));
+
+    expect(onReasonChange).toHaveBeenCalledWith("고객 문의 재현 지원");
+  });
+
+  it("keeps grant creation disabled when the risk summary is blocked", () => {
+    renderWorkbench({ selectedResult: result, reason: "", expiresAt: "2026-05-27T11:00" });
+
+    expect(screen.getByText("지원 사유를 입력하세요.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "발급" })).toBeDisabled();
+  });
+
+  it("shows ready risk summary when reason and expiry are valid", () => {
+    const oneHourFromNowDate = new Date(Date.now() + 60 * 60 * 1000);
+    const pad = (value: number) => String(value).padStart(2, "0");
+    const oneHourFromNow = `${oneHourFromNowDate.getFullYear()}-${pad(oneHourFromNowDate.getMonth() + 1)}-${pad(oneHourFromNowDate.getDate())}T${pad(oneHourFromNowDate.getHours())}:${pad(oneHourFromNowDate.getMinutes())}`;
+    renderWorkbench({ selectedResult: result, reason: "고객 문의 재현 지원", expiresAt: oneHourFromNow });
+
+    expect(screen.getByText("지원 접근 권한을 발급할 준비가 되었습니다.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "발급" })).not.toBeDisabled();
+  });
 });

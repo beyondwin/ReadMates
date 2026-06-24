@@ -64,6 +64,8 @@ describe("AdminAuditLedger", () => {
     const detail = screen.getByRole("region", { name: "감사 이벤트 상세" });
     expect(within(detail).getByText("selectionHashPrefix")).toBeInTheDocument();
     expect(detail.textContent).not.toContain("{");
+    expect(within(detail).getByText("운영 판단")).toBeInTheDocument();
+    expect(within(detail).getByText("기록 보존")).toBeInTheDocument();
   });
 
   it("shows partial source unavailable state", () => {
@@ -119,9 +121,37 @@ describe("AdminAuditLedger", () => {
     await user.click(screen.getByRole("button", { name: /AI 커밋 재시도를 실행했습니다/ }));
 
     const detail = screen.getByRole("region", { name: "감사 이벤트 상세" });
+    expect(within(detail).getByText("후속 화면 있음")).toBeInTheDocument();
     expect(within(detail).getByRole("link", { name: /AI Ops에서 보기/ })).toHaveAttribute(
       "href",
       "/admin/ai-ops?clubId=club-7",
     );
+  });
+
+  it("shows limited detail when metadata is unavailable", () => {
+    render(
+      <AdminAuditLedger
+        page={{
+          ...page,
+          items: [
+            {
+              ...page.items[0],
+              metadataState: "UNAVAILABLE",
+              safeMetadata: [{ label: "rawJson", value: "{\"secret\":\"value\"}", kind: "json" }],
+            },
+          ],
+        }}
+        filters={{ range: "7d" }}
+        loading={false}
+        error={null}
+        onFilterChange={vi.fn()}
+        onLoadMore={vi.fn()}
+      />,
+    );
+
+    const detail = screen.getByRole("region", { name: "감사 이벤트 상세" });
+    expect(within(detail).getByText("세부 정보 제한")).toBeInTheDocument();
+    expect(detail.textContent).not.toContain("secret");
+    expect(detail.textContent).not.toContain("{");
   });
 });

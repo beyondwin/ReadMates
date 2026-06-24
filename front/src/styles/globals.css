@@ -1387,6 +1387,19 @@
   overflow-wrap: anywhere;
 }
 
+.admin-audit__operation {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: var(--surface);
+}
+
+.admin-audit__operation strong {
+  color: var(--text);
+}
+
 .admin-club-operations {
   display: grid;
   gap: 18px;
@@ -1621,6 +1634,50 @@
   color: var(--muted);
   font-style: normal;
   font-size: 13px;
+}
+
+.admin-support-risk {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  background: var(--surface);
+}
+
+.admin-support-risk__header,
+.admin-support-risk__items dt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-support-risk__items {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 0;
+}
+
+.admin-support-risk__items div {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-support-risk__items dt {
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.admin-support-risk__items dd {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 0.9rem;
+}
+
+.admin-support-workbench__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .rm-route-stage {
