@@ -1,5 +1,6 @@
 package com.readmates.performance
 
+import com.readmates.sessionclosing.adapter.out.persistence.SessionClosingStatusSql
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import com.readmates.support.assertUsesIndexFor
 import com.readmates.support.explain
@@ -432,6 +433,31 @@ class MySqlQueryPlanTest(
             )
 
         plan.assertUsesIndexFor("public_session_publications", "public session detail")
+    }
+
+    @Test
+    fun `host closing status queries use indexed access on operating tables`() {
+        val basePlan =
+            jdbcTemplate.explain(
+                SessionClosingStatusSql.CLOSING_BASE,
+                "00000000-0000-0000-0000-000000000306",
+                READING_SAI_CLUB_ID,
+            )
+
+        basePlan.assertUsesIndexFor("sessions", "host closing base session lookup")
+        basePlan.assertUsesIndexFor("public_session_publications", "host closing public publication join")
+        basePlan.assertUsesIndexFor("session_feedback_documents", "host closing feedback existence check")
+        basePlan.assertUsesIndexFor("highlights", "host closing highlight count")
+        basePlan.assertUsesIndexFor("one_line_reviews", "host closing one-line review count")
+
+        val notificationPlan =
+            jdbcTemplate.explain(
+                SessionClosingStatusSql.LATEST_NOTIFICATION_EVENT,
+                READING_SAI_CLUB_ID,
+                "00000000-0000-0000-0000-000000000306",
+            )
+
+        notificationPlan.assertUsesIndexFor("notification_event_outbox", "host closing latest notification event")
     }
 
     private fun membershipIdFor(email: String): String =

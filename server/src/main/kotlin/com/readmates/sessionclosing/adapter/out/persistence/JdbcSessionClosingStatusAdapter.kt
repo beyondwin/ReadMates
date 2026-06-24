@@ -15,6 +15,57 @@ import java.sql.ResultSet
 import java.time.LocalDate
 import java.util.UUID
 
+internal object SessionClosingStatusSql {
+    val CLOSING_BASE =
+        """
+        select
+          sessions.id,
+          sessions.number,
+          sessions.book_title,
+          sessions.session_date,
+          sessions.state,
+          sessions.visibility,
+          public_session_publications.public_summary,
+          public_session_publications.is_public,
+          public_session_publications.published_at,
+          exists (
+            select 1
+            from session_feedback_documents
+            where session_feedback_documents.club_id = sessions.club_id
+              and session_feedback_documents.session_id = sessions.id
+          ) as feedback_uploaded,
+          (
+            select count(*)
+            from highlights
+            where highlights.club_id = sessions.club_id
+              and highlights.session_id = sessions.id
+          ) as highlight_count,
+          (
+            select count(*)
+            from one_line_reviews
+            where one_line_reviews.club_id = sessions.club_id
+              and one_line_reviews.session_id = sessions.id
+          ) as one_liner_count
+        from sessions
+        left join public_session_publications
+          on public_session_publications.club_id = sessions.club_id
+         and public_session_publications.session_id = sessions.id
+        where sessions.id = ?
+          and sessions.club_id = ?
+        """.trimIndent()
+
+    val LATEST_NOTIFICATION_EVENT =
+        """
+        select event_type, status, created_at
+        from notification_event_outbox
+        where club_id = ?
+          and aggregate_id = ?
+          and event_type in ('FEEDBACK_DOCUMENT_PUBLISHED', 'NEXT_BOOK_PUBLISHED')
+        order by created_at desc, id desc
+        limit 1
+        """.trimIndent()
+}
+
 @Component
 class JdbcSessionClosingStatusAdapter(
     private val jdbcTemplate: JdbcTemplate,
@@ -26,42 +77,7 @@ class JdbcSessionClosingStatusAdapter(
         val base =
             jdbcTemplate
                 .query(
-                    """
-                    select
-                      sessions.id,
-                      sessions.number,
-                      sessions.book_title,
-                      sessions.session_date,
-                      sessions.state,
-                      sessions.visibility,
-                      public_session_publications.public_summary,
-                      public_session_publications.is_public,
-                      public_session_publications.published_at,
-                      exists (
-                        select 1
-                        from session_feedback_documents
-                        where session_feedback_documents.club_id = sessions.club_id
-                          and session_feedback_documents.session_id = sessions.id
-                      ) as feedback_uploaded,
-                      (
-                        select count(*)
-                        from highlights
-                        where highlights.club_id = sessions.club_id
-                          and highlights.session_id = sessions.id
-                      ) as highlight_count,
-                      (
-                        select count(*)
-                        from one_line_reviews
-                        where one_line_reviews.club_id = sessions.club_id
-                          and one_line_reviews.session_id = sessions.id
-                      ) as one_liner_count
-                    from sessions
-                    left join public_session_publications
-                      on public_session_publications.club_id = sessions.club_id
-                     and public_session_publications.session_id = sessions.id
-                    where sessions.id = ?
-                      and sessions.club_id = ?
-                    """.trimIndent(),
+                    SessionClosingStatusSql.CLOSING_BASE,
                     { rs, _ -> rs.toClosingBase(host.clubSlug) },
                     sessionId.dbString(),
                     host.clubId.dbString(),
@@ -77,15 +93,7 @@ class JdbcSessionClosingStatusAdapter(
     ): NotificationClosingEvent? =
         jdbcTemplate
             .query(
-                """
-                select event_type, status, created_at
-                from notification_event_outbox
-                where club_id = ?
-                  and aggregate_id = ?
-                  and event_type in ('FEEDBACK_DOCUMENT_PUBLISHED', 'NEXT_BOOK_PUBLISHED')
-                order by created_at desc, id desc
-                limit 1
-                """.trimIndent(),
+                SessionClosingStatusSql.LATEST_NOTIFICATION_EVENT,
                 { rs, _ ->
                     NotificationClosingEvent(
                         eventType = rs.getString("event_type"),
