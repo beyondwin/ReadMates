@@ -14,6 +14,8 @@
 | Flyway migration compatibility | `MySqlFlywayMigrationTest` | MySQL-specific migration, collation, FK compatibility 회귀 |
 | Query budget | `ServerQueryBudgetTest` | 주요 화면의 accidental N+1 query 회귀 |
 | Admin/host/member visual evidence | `front/tests/e2e/admin-analytics.spec.ts`, `front/tests/e2e/host-club-operations.spec.ts`, `front/tests/e2e/member-reading-momentum.spec.ts` | desktop/mobile layout drift and private-data leakage in mocked operating and reading views |
+| Route-critical component visual regression | `pnpm --dir front test:ct:update:docker`, `front/__screenshots__/features/**` | host closing board, platform-admin support, public records 같은 반복 UI 조각의 pixel drift |
+| Lighthouse diagnostic | `pnpm --dir front lighthouse:diagnose` | public/member/host/admin dev-seed route의 entry failure와 release-actionable quality finding 누락 |
 | Public release safety | `scripts/build-public-release-candidate.sh`, `scripts/public-release-check.sh` | public candidate에 private state, local path, secret-shaped data가 포함되는 회귀 |
 
 ## Frontend Server-State Migration
@@ -44,6 +46,8 @@ Frontend:
 pnpm --dir front lint
 pnpm --dir front test
 pnpm --dir front build
+pnpm --dir front lighthouse:diagnose -- --group public --limit 2
+pnpm --dir front test:ct:update:docker
 ```
 
 Server:

@@ -8,6 +8,7 @@ ReadMates를 로컬에서 실행하고, 테스트하고, 구조를 이해하기 
 | --- | --- |
 | 로컬 실행 | [local-setup.md](local-setup.md) |
 | 테스트, 공개 릴리즈, 배포 smoke 점검 | [test-guide.md](test-guide.md) |
+| Lighthouse 진단과 route-critical 시각 회귀 baseline | [test-guide.md#lighthouse-diagnostic](test-guide.md#lighthouse-diagnostic), [test-guide.md#시각-회귀-컴포넌트-하니스](test-guide.md#시각-회귀-컴포넌트-하니스) |
 | 제품/기술 구조와 frontend route-first 경계 | [architecture.md](architecture.md) |
 | 신규 합류 개발자 온보딩 가이드 | [new-developer-onboarding-guide.md](new-developer-onboarding-guide.md) |
 | Cross-surface vertical slice 체크리스트 | [vertical-slice-checklist.md](vertical-slice-checklist.md) |
@@ -30,6 +31,7 @@ ReadMates를 로컬에서 실행하고, 테스트하고, 구조를 이해하기 
 
 - 새로 합류했거나 처음 프로젝트를 맡는 개발자는 [new-developer-onboarding-guide.md](new-developer-onboarding-guide.md)에서 제품 표면, 저장소 구조, 프론트엔드/BFF/백엔드/DB/Redis/Kafka 흐름, 기술 선택 이유, 작업 순서를 먼저 확인합니다.
 - 프런트엔드 route-first 경계, feature `api/model/route/ui` 책임, legacy 예외 제거 기준은 [architecture.md](architecture.md)의 "프런트엔드 route-first 경계" 섹션을 기준으로 합니다.
+- Lighthouse diagnostic은 public/member/host/admin dev-seed route의 비차단 품질 baseline입니다. Route-critical component visual regression은 host closing board, platform admin support/audit 판단 패널, public records/session 카드처럼 props만으로 검증 가능한 UI 조각을 Docker renderer baseline으로 관리합니다. 명령과 macOS 제약은 [test-guide.md](test-guide.md)의 해당 섹션을 기준으로 합니다.
 - frontend, BFF, server API, auth, persistence, public-safety를 함께 건드리는 변경은 [vertical-slice-checklist.md](vertical-slice-checklist.md)로 surface, server, BFF/auth, frontend, test 범위를 먼저 확인합니다.
 - 코드베이스 graph 탐색과 public-safe Graphify 산출물 정책은 [graphify.md](graphify.md)를 기준으로 합니다. Graphify 결과는 탐색 보조이며 현재 동작의 source of truth는 실제 코드, 테스트, migration, active docs입니다.
 - 서버 current member 해석, OAuth/login return 경계, optional Redis 계층, 멀티 클럽 context/domain model, 현재/예정 세션 조회, `DRAFT -> OPEN -> CLOSED -> PUBLISHED` lifecycle, 멤버 세션 쓰기, 호스트 세션 쓰기, 세션/기록 공개 범위, 세션 기록 JSON 가져오기와 in-app AI 세션 생성, 이메일 템플릿과 멤버 알림 설정/알림함, 호스트 알림 운영과 수동 발송, 멤버 프로필/표시 이름 경계는 [architecture.md](architecture.md)의 "멀티 클럽 context와 도메인 모델", "서버 내부 구조", "Optional Redis 계층", "세션 lifecycle과 공개 범위", "세션 기록 JSON 가져오기", "AI-assisted 콘텐츠 운영", "이메일 알림, 멤버 알림함, 호스트 운영", "멤버 프로필과 표시 이름" 섹션을 기준으로 합니다.

@@ -7,6 +7,7 @@
 ```text
 Change
   -> targeted local checks
+  -> Lighthouse / route-critical visual evidence when route UI quality changes
   -> release readiness review
   -> public release candidate build/check
   -> changelog/release note update
@@ -24,6 +25,7 @@ Change
 | Public repository safety | `docs/deploy/security-public-repo.md` |
 | Deploy runbooks | `docs/deploy/README.md`, `docs/deploy/release-publish-runbook.md` |
 | Observability | `docs/operations/observability/README.md` |
+| Lighthouse and route UI visual evidence | `docs/development/test-guide.md#lighthouse-diagnostic`, `docs/development/test-guide.md#시각-회귀-컴포넌트-하니스` |
 | Post-deploy watch | `docs/operations/runbooks/post-deploy-watch.md` |
 | Incident learning | `docs/operations/postmortems/README.md` |
 
