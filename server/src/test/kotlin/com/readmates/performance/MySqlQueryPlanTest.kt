@@ -24,7 +24,7 @@ class MySqlQueryPlanTest(
 
     @AfterEach
     fun cleanupLargeFixture() {
-        largeFixture.cleanupNotesFeed()
+        largeFixture.cleanupAllPerformanceFixtures()
     }
 
     @Test
@@ -247,6 +247,124 @@ class MySqlQueryPlanTest(
         plan.assertUsesIndexFor("one_line_reviews", "large notes feed one-line review branch")
         plan.assertUsesIndexFor("highlights", "large notes feed highlight branch")
         plan.assertUsesIndexFor("session_participants", "large notes feed active participant filter")
+    }
+
+    @Test
+    fun `archive session detail queries use indexed access on hydrated detail tables`() {
+        largeFixture.seedArchiveSessionDetail(artifactCount = 40)
+
+        val headerPlan =
+            jdbcTemplate.explain(
+                """
+                select
+                  sessions.id,
+                  sessions.number,
+                  sessions.title,
+                  sessions.book_title,
+                  sessions.book_author,
+                  sessions.book_image_url,
+                  sessions.session_date,
+                  sessions.state,
+                  sessions.location_label,
+                  (
+                    select count(*)
+                    from session_participants
+                    where session_participants.session_id = sessions.id
+                      and session_participants.club_id = sessions.club_id
+                      and session_participants.attendance_status = 'ATTENDED'
+                      and session_participants.participation_status = 'ACTIVE'
+                  ) as attendance,
+                  (
+                    select count(*)
+                    from session_participants
+                    where session_participants.session_id = sessions.id
+                      and session_participants.club_id = sessions.club_id
+                      and session_participants.participation_status = 'ACTIVE'
+                  ) as total,
+                  current_participant.attendance_status as my_attendance_status,
+                  case
+                    when public_session_publications.visibility in ('MEMBER', 'PUBLIC')
+                      then public_session_publications.public_summary
+                    else null
+                  end as public_summary
+                from sessions
+                left join session_participants current_participant on current_participant.session_id = sessions.id
+                  and current_participant.club_id = sessions.club_id
+                  and current_participant.membership_id = ?
+                  and current_participant.participation_status = 'ACTIVE'
+                left join public_session_publications on public_session_publications.session_id = sessions.id
+                  and public_session_publications.club_id = sessions.club_id
+                where sessions.id = ?
+                  and sessions.club_id = ?
+                  and sessions.state in ('CLOSED', 'PUBLISHED')
+                  and sessions.visibility in ('MEMBER', 'PUBLIC')
+                """.trimIndent(),
+                MEMBER_5_ID,
+                largeFixture.archiveDetailSessionId(),
+                READING_SAI_CLUB_ID,
+            )
+
+        headerPlan.assertUsesIndexFor("sessions", "archive detail session lookup")
+        headerPlan.assertUsesIndexFor("current_participant", "archive detail current participant join")
+        headerPlan.assertUsesIndexFor("public_session_publications", "archive detail publication join")
+        headerPlan.assertUsesIndexFor("session_participants", "archive detail attendance subqueries")
+
+        val publicBatchPlan =
+            jdbcTemplate.explain(
+                ARCHIVE_DETAIL_PUBLIC_BATCH_PLAN_SQL,
+                READING_SAI_CLUB_ID,
+                largeFixture.archiveDetailSessionId(),
+                READING_SAI_CLUB_ID,
+                largeFixture.archiveDetailSessionId(),
+                READING_SAI_CLUB_ID,
+                largeFixture.archiveDetailSessionId(),
+                READING_SAI_CLUB_ID,
+                largeFixture.archiveDetailSessionId(),
+            )
+
+        publicBatchPlan.assertUsesIndexFor("highlights", "archive detail public highlights")
+        publicBatchPlan.assertUsesIndexFor("questions", "archive detail club questions")
+        publicBatchPlan.assertUsesIndexFor("one_line_reviews", "archive detail one-line sections")
+        publicBatchPlan.assertUsesIndexFor("session_participants", "archive detail active participant filters")
+
+        val personalBatchPlan =
+            jdbcTemplate.explain(
+                ARCHIVE_DETAIL_PERSONAL_BATCH_PLAN_SQL,
+                READING_SAI_CLUB_ID,
+                largeFixture.archiveDetailSessionId(),
+                MEMBER_5_ID,
+                READING_SAI_CLUB_ID,
+                largeFixture.archiveDetailSessionId(),
+                MEMBER_5_ID,
+                READING_SAI_CLUB_ID,
+                largeFixture.archiveDetailSessionId(),
+                MEMBER_5_ID,
+                READING_SAI_CLUB_ID,
+                largeFixture.archiveDetailSessionId(),
+                MEMBER_5_ID,
+            )
+
+        personalBatchPlan.assertUsesIndexFor("questions", "archive detail personal questions")
+        personalBatchPlan.assertUsesIndexFor("reading_checkins", "archive detail personal checkin")
+        personalBatchPlan.assertUsesIndexFor("one_line_reviews", "archive detail personal one-line review")
+        personalBatchPlan.assertUsesIndexFor("long_reviews", "archive detail personal long review")
+        personalBatchPlan.assertUsesIndexFor("session_participants", "archive detail personal active participant filters")
+
+        val feedbackPlan =
+            jdbcTemplate.explain(
+                """
+                select created_at
+                from session_feedback_documents
+                where club_id = ?
+                  and session_id = ?
+                order by version desc, created_at desc
+                limit 1
+                """.trimIndent(),
+                READING_SAI_CLUB_ID,
+                largeFixture.archiveDetailSessionId(),
+            )
+
+        feedbackPlan.assertUsesIndexFor("session_feedback_documents", "archive detail feedback document lookup")
     }
 
     @Test
@@ -476,6 +594,182 @@ class MySqlQueryPlanTest(
 
     companion object {
         private const val READING_SAI_CLUB_ID = "00000000-0000-0000-0000-000000000001"
+        private const val MEMBER_5_ID = "00000000-0000-0000-0000-000000000206"
+
+        private const val ARCHIVE_DETAIL_PUBLIC_BATCH_PLAN_SQL = """
+            select 'HIGHLIGHT' as section,
+              highlights.sort_order,
+              null as priority,
+              highlights.text,
+              null as draft_thought,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_name,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name
+            from highlights
+            left join memberships on memberships.id = highlights.membership_id
+              and memberships.club_id = highlights.club_id
+            left join users on users.id = memberships.user_id
+            left join session_participants on session_participants.session_id = highlights.session_id
+              and session_participants.club_id = highlights.club_id
+              and session_participants.membership_id = highlights.membership_id
+            where highlights.club_id = ?
+              and highlights.session_id = ?
+              and (
+                highlights.membership_id is null
+                or session_participants.participation_status = 'ACTIVE'
+              )
+
+            UNION ALL
+
+            select 'CLUB_QUESTION' as section,
+              null as sort_order,
+              questions.priority,
+              questions.text,
+              questions.draft_thought,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_name,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name
+            from questions
+            join memberships on memberships.id = questions.membership_id
+              and memberships.club_id = questions.club_id
+            join users on users.id = memberships.user_id
+            join session_participants on session_participants.session_id = questions.session_id
+              and session_participants.club_id = questions.club_id
+              and session_participants.membership_id = questions.membership_id
+              and session_participants.participation_status = 'ACTIVE'
+            where questions.club_id = ?
+              and questions.session_id = ?
+
+            UNION ALL
+
+            select 'CLUB_ONE_LINER' as section,
+              null as sort_order,
+              null as priority,
+              one_line_reviews.text,
+              null as draft_thought,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_name,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name
+            from one_line_reviews
+            join memberships on memberships.id = one_line_reviews.membership_id
+              and memberships.club_id = one_line_reviews.club_id
+            join users on users.id = memberships.user_id
+            join session_participants on session_participants.session_id = one_line_reviews.session_id
+              and session_participants.club_id = one_line_reviews.club_id
+              and session_participants.membership_id = one_line_reviews.membership_id
+              and session_participants.participation_status = 'ACTIVE'
+            where one_line_reviews.club_id = ?
+              and one_line_reviews.session_id = ?
+              and one_line_reviews.visibility in ('SESSION', 'PUBLIC')
+
+            UNION ALL
+
+            select 'PUBLIC_ONE_LINER' as section,
+              null as sort_order,
+              null as priority,
+              one_line_reviews.text,
+              null as draft_thought,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_name,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name
+            from one_line_reviews
+            join memberships on memberships.id = one_line_reviews.membership_id
+              and memberships.club_id = one_line_reviews.club_id
+            join users on users.id = memberships.user_id
+            join session_participants on session_participants.session_id = one_line_reviews.session_id
+              and session_participants.club_id = one_line_reviews.club_id
+              and session_participants.membership_id = one_line_reviews.membership_id
+              and session_participants.participation_status = 'ACTIVE'
+            where one_line_reviews.club_id = ?
+              and one_line_reviews.session_id = ?
+              and one_line_reviews.visibility = 'PUBLIC'
+        """
+
+        private const val ARCHIVE_DETAIL_PERSONAL_BATCH_PLAN_SQL = """
+            select 'MY_QUESTION' as section,
+              questions.priority,
+              questions.text,
+              questions.draft_thought,
+              null as reading_progress,
+              null as body,
+              coalesce(memberships.short_name, users.name) as author_name,
+              CASE WHEN memberships.status = 'LEFT' THEN '탈퇴한 멤버' ELSE coalesce(memberships.short_name, users.name) END as author_short_name
+            from questions
+            join memberships on memberships.id = questions.membership_id
+              and memberships.club_id = questions.club_id
+            join users on users.id = memberships.user_id
+            join session_participants on session_participants.session_id = questions.session_id
+              and session_participants.club_id = questions.club_id
+              and session_participants.membership_id = questions.membership_id
+              and session_participants.participation_status = 'ACTIVE'
+            where questions.club_id = ?
+              and questions.session_id = ?
+              and questions.membership_id = ?
+
+            UNION ALL
+
+            select 'MY_CHECKIN' as section,
+              null as priority,
+              null as text,
+              null as draft_thought,
+              reading_checkins.reading_progress,
+              null as body,
+              null as author_name,
+              null as author_short_name
+            from reading_checkins
+            join session_participants on session_participants.session_id = reading_checkins.session_id
+              and session_participants.club_id = reading_checkins.club_id
+              and session_participants.membership_id = reading_checkins.membership_id
+              and session_participants.participation_status = 'ACTIVE'
+            where reading_checkins.club_id = ?
+              and reading_checkins.session_id = ?
+              and reading_checkins.membership_id = ?
+
+            UNION ALL
+
+            select 'MY_ONE_LINE_REVIEW' as section,
+              null as priority,
+              one_line_reviews.text,
+              null as draft_thought,
+              null as reading_progress,
+              null as body,
+              coalesce(memberships.short_name, users.name) as author_name,
+              CASE WHEN memberships.status = 'LEFT' THEN '탈퇴한 멤버' ELSE coalesce(memberships.short_name, users.name) END as author_short_name
+            from one_line_reviews
+            join memberships on memberships.id = one_line_reviews.membership_id
+              and memberships.club_id = one_line_reviews.club_id
+            join users on users.id = memberships.user_id
+            where one_line_reviews.club_id = ?
+              and one_line_reviews.session_id = ?
+              and one_line_reviews.membership_id = ?
+              and exists (
+                select 1
+                from session_participants
+                where session_participants.session_id = one_line_reviews.session_id
+                  and session_participants.club_id = one_line_reviews.club_id
+                  and session_participants.membership_id = one_line_reviews.membership_id
+                  and session_participants.participation_status = 'ACTIVE'
+              )
+
+            UNION ALL
+
+            select 'MY_LONG_REVIEW' as section,
+              null as priority,
+              null as text,
+              null as draft_thought,
+              null as reading_progress,
+              long_reviews.body,
+              null as author_name,
+              null as author_short_name
+            from long_reviews
+            where long_reviews.club_id = ?
+              and long_reviews.session_id = ?
+              and long_reviews.membership_id = ?
+              and exists (
+                select 1
+                from session_participants
+                where session_participants.session_id = long_reviews.session_id
+                  and session_participants.club_id = long_reviews.club_id
+                  and session_participants.membership_id = long_reviews.membership_id
+                  and session_participants.participation_status = 'ACTIVE'
+              )
+        """
 
         private const val NOTES_FEED_PLAN_SQL = """
             select id, session_id, session_number, book_title, session_date,

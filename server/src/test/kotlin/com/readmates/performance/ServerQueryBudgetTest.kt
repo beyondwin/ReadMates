@@ -128,6 +128,29 @@ class ServerQueryBudgetTest(
     }
 
     @Test
+    fun `archive session detail large fixture stays within hydrated-detail query budget`() {
+        largeFixture.seedArchiveSessionDetail(artifactCount = 40)
+
+        assertQueryBudget(
+            budget = 14,
+            reason = "archive detail hydrates header, public sections, personal sections, and feedback document with fixed query count",
+        ) {
+            mockMvc
+                .get("/api/archive/sessions/${largeFixture.archiveDetailSessionId()}") {
+                    with(user("member5@example.com"))
+                    header("X-Readmates-Bff-Secret", "test-bff-secret")
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.sessionId") { value(largeFixture.archiveDetailSessionId()) }
+                    jsonPath("$.publicHighlights.length()") { value(40) }
+                    jsonPath("$.clubQuestions.length()") { value(10) }
+                    jsonPath("$.feedbackDocument.available") { value(true) }
+                    jsonPath("$.feedbackDocument.readable") { value(true) }
+                }
+        }
+    }
+
+    @Test
     fun `public club page stays within summary query budget`() {
         assertQueryBudget(
             budget = 5,
