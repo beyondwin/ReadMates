@@ -12,6 +12,7 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:ct": "playwright test --config=playwright-ct.config.ts",
+    "test:ct:docker": "docker run --rm --ipc=host -e CI=true -v \"$PWD/..\":/work -w /work/front mcr.microsoft.com/playwright:v1.60.0-jammy /bin/sh -lc 'corepack enable && pnpm install --frozen-lockfile=false && pnpm exec playwright test --config=playwright-ct.config.ts'",
     "test:ct:update": "playwright test --config=playwright-ct.config.ts --update-snapshots",
     "test:ct:update:docker": "docker run --rm --ipc=host -e CI=true -v \"$PWD/..\":/work -w /work/front mcr.microsoft.com/playwright:v1.60.0-jammy /bin/sh -lc 'corepack enable && pnpm install --frozen-lockfile=false && pnpm exec playwright test --config=playwright-ct.config.ts --update-snapshots'",
     "test:watch": "vitest",
