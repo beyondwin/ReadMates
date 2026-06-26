@@ -25,6 +25,17 @@ For the Ops Insight & Release Trust branch, residuals are classified as:
 
 The v1.11.0 production OAuth and backup timer items are closed by 2026-05-31 operational evidence. Analytics v2 and observability truth cleanup did not close those items by themselves; the closure evidence above came from browser-profile OAuth smoke, VM timer installation, and manual backup upload proof.
 
+## 2026-06-26 Server read-model performance confidence v2 closeout
+
+- Scope reviewed: local `main..codex/readmates-server-read-model-performance-confidence-v2-20260626-175248`.
+- Release classification: server integration-test confidence and contributor showcase docs. No production server code, DB migration, public API contract, auth/BFF token, frontend route/UI behavior, CI/deploy workflow, or release image behavior changed.
+- Product evidence: `current-session` and `archive` session detail now have deterministic public-safe large-fixture query-budget guards. Archive session detail also has MySQL EXPLAIN evidence for header, public batch, personal batch, and feedback document lookup access paths.
+- CHANGELOG: no entry added because this branch changes test evidence and engineering confidence docs only; it does not change user-visible behavior, operator behavior, security posture, deploy behavior, or runtime API behavior.
+- Public safety: fixture data uses deterministic placeholder UUIDs and public-safe synthetic book/session/member text only. No real member data, private domains, local absolute paths, secrets, token-shaped values, OCIDs, deployment state, screenshot artifacts, or provider identifiers were added.
+- Local verification before merge: `git diff --check main...HEAD`, targeted `ServerQueryBudgetTest` and `MySqlQueryPlanTest`, `architectureTest`, `check`, docs whitespace checks, public release candidate build/check, `graphify update .`, and Graphify freshness audit passed.
+- Skipped: frontend lint/test/build/E2E, production OAuth, VM, provider-console, and tag/deploy smoke. The branch does not change frontend, BFF, auth, deploy, API response shape, or production runtime behavior; production/tag smoke remains release-operation evidence outside this local merge.
+- Residual risk: no known local release-readiness residual remains after query-budget, EXPLAIN, server quality, public-release, docs, and Graphify evidence. Duration smoke remains diagnostic only; query count and EXPLAIN guards are the release-relevant evidence.
+
 ## 2026-06-25 Route UI visual regression gate closeout
 
 - Scope reviewed: local `main..codex/2026-06-25-readmates-route-ui-visual-regression-gate-20260625-083423`.
