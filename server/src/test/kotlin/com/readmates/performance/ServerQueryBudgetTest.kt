@@ -60,7 +60,7 @@ class ServerQueryBudgetTest(
 
     @AfterEach
     fun cleanupAuthSessions() {
-        largeFixture.cleanupNotesFeed()
+        largeFixture.cleanupAllPerformanceFixtures()
         if (createdSessionTokenHashes.isEmpty()) {
             return
         }
@@ -84,6 +84,29 @@ class ServerQueryBudgetTest(
                     header("X-Readmates-Bff-Secret", "test-bff-secret")
                 }.andExpect {
                     status { isOk() }
+                }
+        }
+    }
+
+    @Test
+    fun `current session large fixture stays within bounded read-model query budget`() {
+        largeFixture.seedCurrentSession()
+
+        assertQueryBudget(
+            budget = 14,
+            reason = "current-session hydrates session, requester state, board artifacts, and attendees as a bounded read model",
+        ) {
+            mockMvc
+                .get("/api/sessions/current") {
+                    with(user("member5@example.com"))
+                    header("X-Readmates-Bff-Secret", "test-bff-secret")
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.currentSession.sessionId") { value(largeFixture.currentSessionId()) }
+                    jsonPath("$.currentSession.attendees.length()") { value(2) }
+                    jsonPath("$.currentSession.myCheckin.readingProgress") { value(67) }
+                    jsonPath("$.currentSession.board.questions.length()") { value(4) }
+                    jsonPath("$.currentSession.board.longReviews.length()") { value(1) }
                 }
         }
     }

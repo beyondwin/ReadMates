@@ -375,8 +375,8 @@ internal class LargeReadPathFixture(
     private fun insertCurrentSessionReadingArtifacts() {
         jdbcTemplate.update(
             """
-            insert into reading_checkins (id, club_id, session_id, membership_id, reading_progress, note)
-            values (?, ?, ?, ?, 67, 'Current fixture reading note')
+            insert into reading_checkins (id, club_id, session_id, membership_id, reading_progress)
+            values (?, ?, ?, ?, 67)
             """.trimIndent(),
             currentCheckinId(1),
             CLUB_ID,
@@ -507,8 +507,8 @@ internal class LargeReadPathFixture(
     private fun insertArchiveDetailArtifacts(artifactCount: Int) {
         jdbcTemplate.update(
             """
-            insert into reading_checkins (id, club_id, session_id, membership_id, reading_progress, note)
-            values (?, ?, ?, ?, 100, 'Archive detail fixture reading note')
+            insert into reading_checkins (id, club_id, session_id, membership_id, reading_progress)
+            values (?, ?, ?, ?, 100)
             """.trimIndent(),
             archiveCheckinId(1),
             CLUB_ID,
