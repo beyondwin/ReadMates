@@ -2,6 +2,17 @@
 
 남은 리스크, release readiness, merge 후 안전성, ship 가능 여부를 확인할 때 사용하는 체크리스트입니다. 구현 계획의 완료 여부와 테스트 통과 여부만으로 release risk가 닫혔다고 판단하지 않습니다.
 
+## 2026-06-27 CT visual regression CI gate closeout
+
+- Scope reviewed: local `main..HEAD` after adding the CI visual-regression job, Docker CT validation script, and contributor docs.
+- Release classification: CI/test tooling and contributor documentation. No production route composition, route loader, auth/BFF proxy, server API contract, DB migration, OAuth scope, release image, or deploy workflow behavior changed.
+- Product evidence: existing Playwright CT baselines for shared UI, host closing board, platform-admin support, and public records are now verified by a dedicated GitHub Actions job without snapshot updates.
+- Renderer-risk closure: baseline creation remains Docker-only through `pnpm --dir front test:ct:update:docker`; local macOS developers can validate without snapshot updates through `pnpm --dir front test:ct:docker`.
+- Public safety: `front/__screenshots__` remains committed visual-regression evidence but is excluded from `.tmp/public-release-candidate`; public release scan passed after the CI/doc changes.
+- Local verification before merge: `pnpm --dir front test:ct:docker`, `pnpm --dir front lint`, `pnpm --dir front test`, `pnpm --dir front build`, `./scripts/build-public-release-candidate.sh`, `./scripts/public-release-check.sh .tmp/public-release-candidate`, `find .tmp/public-release-candidate -path '*__screenshots__*' -print`, and `git diff --check` passed.
+- Skipped before merge: production OAuth, VM, provider-console, release tag, deploy workflow execution, OCI compose promotion, GitHub Release publication, and post-deploy smoke. These require release-operation access after merge and are not local evidence for this CI/docs branch.
+- Residual risk: no known local release-readiness residual remains after CT, frontend, public-release, docs, and screenshot-exclusion evidence. First GitHub Actions run on the pushed branch remains remote CI evidence outside the local working tree.
+
 ## v1.11.0 post-release smoke
 
 > 자동 실행 출처: [docs/superpowers/plans/2026-05-18-readmates-v1-11-0-followups-autonomous-implementation-plan.md](../superpowers/plans/2026-05-18-readmates-v1-11-0-followups-autonomous-implementation-plan.md).
