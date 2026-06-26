@@ -253,6 +253,15 @@ class MySqlQueryPlanTest(
     fun `archive session detail queries use indexed access on hydrated detail tables`() {
         largeFixture.seedArchiveSessionDetail(artifactCount = 40)
 
+        val sessionId = largeFixture.archiveDetailSessionId()
+
+        assertArchiveDetailHeaderPlan(sessionId)
+        assertArchiveDetailPublicBatchPlan(sessionId)
+        assertArchiveDetailPersonalBatchPlan(sessionId)
+        assertArchiveDetailFeedbackPlan(sessionId)
+    }
+
+    private fun assertArchiveDetailHeaderPlan(sessionId: String) {
         val headerPlan =
             jdbcTemplate.explain(
                 """
@@ -300,7 +309,7 @@ class MySqlQueryPlanTest(
                   and sessions.visibility in ('MEMBER', 'PUBLIC')
                 """.trimIndent(),
                 MEMBER_5_ID,
-                largeFixture.archiveDetailSessionId(),
+                sessionId,
                 READING_SAI_CLUB_ID,
             )
 
@@ -308,39 +317,43 @@ class MySqlQueryPlanTest(
         headerPlan.assertUsesIndexFor("current_participant", "archive detail current participant join")
         headerPlan.assertUsesIndexFor("public_session_publications", "archive detail publication join")
         headerPlan.assertUsesIndexFor("session_participants", "archive detail attendance subqueries")
+    }
 
+    private fun assertArchiveDetailPublicBatchPlan(sessionId: String) {
         val publicBatchPlan =
             jdbcTemplate.explain(
                 ARCHIVE_DETAIL_PUBLIC_BATCH_PLAN_SQL,
                 READING_SAI_CLUB_ID,
-                largeFixture.archiveDetailSessionId(),
+                sessionId,
                 READING_SAI_CLUB_ID,
-                largeFixture.archiveDetailSessionId(),
+                sessionId,
                 READING_SAI_CLUB_ID,
-                largeFixture.archiveDetailSessionId(),
+                sessionId,
                 READING_SAI_CLUB_ID,
-                largeFixture.archiveDetailSessionId(),
+                sessionId,
             )
 
         publicBatchPlan.assertUsesIndexFor("highlights", "archive detail public highlights")
         publicBatchPlan.assertUsesIndexFor("questions", "archive detail club questions")
         publicBatchPlan.assertUsesIndexFor("one_line_reviews", "archive detail one-line sections")
         publicBatchPlan.assertUsesIndexFor("session_participants", "archive detail active participant filters")
+    }
 
+    private fun assertArchiveDetailPersonalBatchPlan(sessionId: String) {
         val personalBatchPlan =
             jdbcTemplate.explain(
                 ARCHIVE_DETAIL_PERSONAL_BATCH_PLAN_SQL,
                 READING_SAI_CLUB_ID,
-                largeFixture.archiveDetailSessionId(),
+                sessionId,
                 MEMBER_5_ID,
                 READING_SAI_CLUB_ID,
-                largeFixture.archiveDetailSessionId(),
+                sessionId,
                 MEMBER_5_ID,
                 READING_SAI_CLUB_ID,
-                largeFixture.archiveDetailSessionId(),
+                sessionId,
                 MEMBER_5_ID,
                 READING_SAI_CLUB_ID,
-                largeFixture.archiveDetailSessionId(),
+                sessionId,
                 MEMBER_5_ID,
             )
 
@@ -348,8 +361,13 @@ class MySqlQueryPlanTest(
         personalBatchPlan.assertUsesIndexFor("reading_checkins", "archive detail personal checkin")
         personalBatchPlan.assertUsesIndexFor("one_line_reviews", "archive detail personal one-line review")
         personalBatchPlan.assertUsesIndexFor("long_reviews", "archive detail personal long review")
-        personalBatchPlan.assertUsesIndexFor("session_participants", "archive detail personal active participant filters")
+        personalBatchPlan.assertUsesIndexFor(
+            "session_participants",
+            "archive detail personal active participant filters",
+        )
+    }
 
+    private fun assertArchiveDetailFeedbackPlan(sessionId: String) {
         val feedbackPlan =
             jdbcTemplate.explain(
                 """
@@ -361,7 +379,7 @@ class MySqlQueryPlanTest(
                 limit 1
                 """.trimIndent(),
                 READING_SAI_CLUB_ID,
-                largeFixture.archiveDetailSessionId(),
+                sessionId,
             )
 
         feedbackPlan.assertUsesIndexFor("session_feedback_documents", "archive detail feedback document lookup")

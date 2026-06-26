@@ -94,7 +94,9 @@ class ServerQueryBudgetTest(
 
         assertQueryBudget(
             budget = 14,
-            reason = "current-session hydrates session, requester state, board artifacts, and attendees as a bounded read model",
+            reason =
+                "current-session hydrates session, requester state, board artifacts, " +
+                    "and attendees as a bounded read model",
         ) {
             mockMvc
                 .get("/api/sessions/current") {
@@ -133,7 +135,9 @@ class ServerQueryBudgetTest(
 
         assertQueryBudget(
             budget = 14,
-            reason = "archive detail hydrates header, public sections, personal sections, and feedback document with fixed query count",
+            reason =
+                "archive detail hydrates header, public sections, personal sections, " +
+                    "and feedback document with fixed query count",
         ) {
             mockMvc
                 .get("/api/archive/sessions/${largeFixture.archiveDetailSessionId()}") {

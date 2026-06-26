@@ -645,9 +645,14 @@ internal class LargeReadPathFixture(
 
     private fun archiveCheckinId(offset: Int) = "10000000-0000-0000-0206-${offset.toString().padStart(12, '0')}"
 
-    private fun archiveFeedbackDocumentId(offset: Int) = "10000000-0000-0000-0207-${offset.toString().padStart(12, '0')}"
+    private fun archiveFeedbackDocumentId(offset: Int) = fixtureId("0207", offset)
 
     private fun archivePublicationId(offset: Int) = "10000000-0000-0000-0209-${offset.toString().padStart(12, '0')}"
+
+    private fun fixtureId(
+        group: String,
+        offset: Int,
+    ) = "10000000-0000-0000-$group-${offset.toString().padStart(12, '0')}"
 
     private companion object {
         private const val CLUB_ID = "00000000-0000-0000-0000-000000000001"
