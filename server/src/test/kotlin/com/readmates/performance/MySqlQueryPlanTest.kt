@@ -225,7 +225,6 @@ class MySqlQueryPlanTest(
         plan.assertUsesIndexFor("long_reviews", "notes feed long-review branch")
         plan.assertUsesIndexFor("one_line_reviews", "notes feed one-line review branch")
         plan.assertUsesIndexFor("highlights", "notes feed highlight branch")
-        plan.assertUsesIndexFor("sessions", "notes feed session join")
         plan.assertUsesIndexFor("session_participants", "notes feed active participant filter")
     }
 
@@ -246,6 +245,7 @@ class MySqlQueryPlanTest(
         plan.assertUsesIndexFor("long_reviews", "large notes feed long-review branch")
         plan.assertUsesIndexFor("one_line_reviews", "large notes feed one-line review branch")
         plan.assertUsesIndexFor("highlights", "large notes feed highlight branch")
+        plan.assertUsesIndexFor("sessions", "large notes feed session join")
         plan.assertUsesIndexFor("session_participants", "large notes feed active participant filter")
     }
 
