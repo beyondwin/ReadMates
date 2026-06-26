@@ -22,15 +22,11 @@
 
 Current source: `docs/development/server-state-migration.md`
 
-Completed:
+The major TanStack Query migration surfaces are complete through public read paths and platform-admin operating console surfaces. New server state should continue to follow the route-owned loader/action pattern and feature-owned `queries` modules, but the active confidence follow-up is no longer another frontend migration slice.
 
-- `host/invitations` — list query, create/revoke mutation, loader handoff
+Active follow-up:
 
-Next candidates:
-
-1. `host/members`
-2. `host/notifications`
-3. `host/sessions`
+1. Server read-model performance confidence v2 — large-fixture query budget and EXPLAIN guards for `current-session` and `archive` session detail.
 
 Migration rule: route modules own loader/action coordination, UI components stay prop/callback driven, and new Query helpers live under `front/features/<feature>/queries/`.
 
