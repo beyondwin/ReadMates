@@ -22,6 +22,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Testing
 
+- **frontend performance budget:** Production build asset sizes are now reported as local JSON/Markdown evidence, with split vendor and host-route chunks tracked against explicit budgets. Preview-based Lighthouse diagnostics can run against Vite production build output, while global CSS size remains measured-only pending a dedicated CSS boundary design. Runtime routes, server API contracts, DB migrations, auth/BFF tokens, OAuth scopes, and deploy workflow behavior are unchanged.
 - **visual regression CI:** GitHub Actions now runs a dedicated `Frontend visual regression` job for Playwright component-test baselines. The job validates existing `front/__screenshots__` baselines without updating snapshots and uploads Playwright reports on failure. Baseline updates remain Docker-only through `pnpm --dir front test:ct:update:docker`, and clean public release candidates still exclude committed screenshot baselines.
 - **route-critical visual regression:** Playwright component-test baselines now cover host closing board published state, platform-admin support grant review, and public records index UI. Baselines are generated with the canonical Docker renderer and remain excluded from clean public release candidates. This is frontend test coverage and documentation only; route loaders, auth/BFF behavior, server API contracts, DB migrations, OAuth scopes, and deploy workflow behavior are unchanged.
 
