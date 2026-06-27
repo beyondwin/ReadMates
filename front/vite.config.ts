@@ -20,7 +20,19 @@ export default defineConfig({
         codeSplitting: {
           groups: [
             {
-              name: "vendor",
+              name: "vendor-react",
+              test: /node_modules[\\/](react|react-dom)[\\/]/,
+            },
+            {
+              name: "vendor-router",
+              test: /node_modules[\\/](react-router|react-router-dom)[\\/]/,
+            },
+            {
+              name: "vendor-query",
+              test: /node_modules[\\/]@tanstack[\\/]react-query[\\/]/,
+            },
+            {
+              name: "vendor-misc",
               test: /node_modules/,
             },
           ],
