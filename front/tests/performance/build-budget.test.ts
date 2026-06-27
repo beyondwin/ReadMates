@@ -11,6 +11,7 @@ const assets: BuildAssetInput[] = [
   { fileName: "vendor-react-abc.js", bytes: 140_000, gzipBytes: 45_000 },
   { fileName: "vendor-misc-def.js", bytes: 220_000, gzipBytes: 72_000 },
   { fileName: "host-dashboard-route-aaa.js", bytes: 118_000, gzipBytes: 36_000 },
+  { fileName: "dashboard-route-element-aaa.js", bytes: 53_000, gzipBytes: 14_000 },
   { fileName: "host-session-editor-route-bbb.js", bytes: 135_000, gzipBytes: 41_000 },
   { fileName: "public-home-ccc.js", bytes: 31_000, gzipBytes: 10_000 },
   { fileName: "index-entry.js", bytes: 73_000, gzipBytes: 18_000 },
@@ -29,6 +30,7 @@ describe("build budget analyzer", () => {
       ["host-dashboard-route-aaa.js", "host-route"],
       ["index-style.css", "css-global"],
       ["index-entry.js", "app-entry"],
+      ["dashboard-route-element-aaa.js", "host-route"],
       ["public-home-ccc.js", "route"],
       ["unexpected-worker.js", "uncategorized"],
     ]);

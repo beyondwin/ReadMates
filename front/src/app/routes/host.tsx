@@ -16,7 +16,7 @@ function hostAppRoutes(queryClient: QueryClient): RouteObject[] {
       hydrateFallbackElement: <ReadmatesRouteLoading label="모임 운영 화면을 불러오는 중" variant="host" />,
       lazy: async () => {
         const [{ HostDashboardRouteElement }, { hostDashboardLoaderFactory }] = await Promise.all([
-          import("@/src/app/host-route-elements"),
+          import("@/src/app/host-routes/dashboard-route-element"),
           import("@/features/host/route/host-dashboard-data"),
         ]);
         return { Component: HostDashboardRouteElement, loader: hostDashboardLoaderFactory(queryClient) };
@@ -28,7 +28,7 @@ function hostAppRoutes(queryClient: QueryClient): RouteObject[] {
       hydrateFallbackElement: <ReadmatesRouteLoading label="멤버 목록을 불러오는 중" variant="host" />,
       lazy: async () => {
         const [{ HostMembersRouteElement }, { hostMembersLoaderFactory }] = await Promise.all([
-          import("@/src/app/host-route-elements"),
+          import("@/src/app/host-routes/members-route-element"),
           import("@/features/host/route/host-members-data"),
         ]);
         return {
@@ -43,7 +43,7 @@ function hostAppRoutes(queryClient: QueryClient): RouteObject[] {
       hydrateFallbackElement: <ReadmatesRouteLoading label="초대 목록을 불러오는 중" variant="host" />,
       lazy: async () => {
         const [{ HostInvitationsRouteElement }, { hostInvitationsLoaderFactory }] = await Promise.all([
-          import("@/src/app/host-route-elements"),
+          import("@/src/app/host-routes/invitations-route-element"),
           import("@/features/host/route/host-invitations-data"),
         ]);
         return {
@@ -58,7 +58,7 @@ function hostAppRoutes(queryClient: QueryClient): RouteObject[] {
       hydrateFallbackElement: <ReadmatesRouteLoading label="알림 발송 장부를 불러오는 중" variant="host" />,
       lazy: async () => {
         const [{ HostNotificationsRouteElement }, { hostNotificationsLoaderFactory }] = await Promise.all([
-          import("@/src/app/host-route-elements"),
+          import("@/src/app/host-routes/notifications-route-element"),
           import("@/features/host/route/host-notifications-data"),
         ]);
         return {
@@ -72,7 +72,7 @@ function hostAppRoutes(queryClient: QueryClient): RouteObject[] {
       errorElement: <HostRouteError />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="세션 편집 화면을 불러오는 중" variant="host" />,
       lazy: async () => {
-        const { NewHostSessionRouteElement } = await import("@/src/app/host-route-elements");
+        const { NewHostSessionRouteElement } = await import("@/src/app/host-routes/new-session-route-element");
         return { Component: NewHostSessionRouteElement };
       },
     },
@@ -82,7 +82,7 @@ function hostAppRoutes(queryClient: QueryClient): RouteObject[] {
       hydrateFallbackElement: <ReadmatesRouteLoading label="세션 클로징 상태를 불러오는 중" variant="host" />,
       lazy: async () => {
         const [{ HostSessionClosingRouteElement }, { hostSessionClosingLoaderFactory }] = await Promise.all([
-          import("@/src/app/host-route-elements"),
+          import("@/src/app/host-routes/session-closing-route-element"),
           import("@/features/host/route/host-session-closing-data"),
         ]);
         return { Component: HostSessionClosingRouteElement, loader: hostSessionClosingLoaderFactory(queryClient) };
@@ -94,7 +94,7 @@ function hostAppRoutes(queryClient: QueryClient): RouteObject[] {
       hydrateFallbackElement: <ReadmatesRouteLoading label="세션 문서 정보를 불러오는 중" variant="host" />,
       lazy: async () => {
         const [{ EditHostSessionRouteElement }, { hostSessionEditorLoaderFactory }] = await Promise.all([
-          import("@/src/app/host-route-elements"),
+          import("@/src/app/host-routes/edit-session-route-element"),
           import("@/features/host/route/host-session-editor-data"),
         ]);
         return { Component: EditHostSessionRouteElement, loader: hostSessionEditorLoaderFactory(queryClient) };

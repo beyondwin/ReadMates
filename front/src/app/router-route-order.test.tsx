@@ -54,6 +54,22 @@ describe("router route order", () => {
     expect(routePathsFor("/clubs/reading-sai/app/host/members")).not.toEqual(expect.arrayContaining(["*"]));
   });
 
+  it("matches host session detail routes before host and member wildcards", () => {
+    const hostPaths = [
+      { pathname: "/app/host/sessions/new", routeId: "app-host" },
+      { pathname: "/app/host/sessions/session-7/edit", routeId: "app-host" },
+      { pathname: "/app/host/sessions/session-7/closing", routeId: "app-host" },
+      { pathname: "/clubs/reading-sai/app/host/sessions/new", routeId: "club-app-host" },
+      { pathname: "/clubs/reading-sai/app/host/sessions/session-7/edit", routeId: "club-app-host" },
+      { pathname: "/clubs/reading-sai/app/host/sessions/session-7/closing", routeId: "club-app-host" },
+    ];
+
+    for (const { pathname, routeId } of hostPaths) {
+      expect(routeIdsFor(pathname)).toEqual(expect.arrayContaining([routeId]));
+      expect(routePathsFor(pathname)).not.toEqual(expect.arrayContaining(["*"]));
+    }
+  });
+
   it("keeps public unknown routes on the public not-found branch", () => {
     expect(routeIdsFor("/unknown-public-route")).not.toContain("app-admin");
     expect(routePathsFor("/unknown-public-route")).toEqual(expect.arrayContaining(["*"]));

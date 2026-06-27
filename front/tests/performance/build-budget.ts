@@ -60,7 +60,6 @@ const routeChunkPrefixes = [
   "admin-",
   "auth-",
   "feedback-",
-  "host-",
   "member-",
   "notes-",
   "public-",
@@ -68,11 +67,24 @@ const routeChunkPrefixes = [
   "session-",
 ];
 
+const hostRouteChunkPrefixes = [
+  "dashboard-route-element-",
+  "edit-session-route-element-",
+  "host-",
+  "invitations-route-element-",
+  "members-route-element-",
+  "new-session-route-element-",
+  "notifications-route-element-",
+  "session-closing-route-element-",
+];
+
 function classifyAsset(fileName: string): BudgetBucket {
   if (fileName.endsWith(".css")) return "css-global";
   if (/^vendor-(react|router|query|framework)/.test(fileName)) return "vendor-framework";
   if (/^vendor-/.test(fileName)) return "vendor-misc";
-  if (/^host-/.test(fileName) || /host.*route/.test(fileName)) return "host-route";
+  if (hostRouteChunkPrefixes.some((prefix) => fileName.startsWith(prefix)) || /host.*route/.test(fileName)) {
+    return "host-route";
+  }
   if (/^index-/.test(fileName)) return "app-entry";
   if (routeChunkPrefixes.some((prefix) => fileName.startsWith(prefix))) return "route";
   return "uncategorized";
