@@ -60,7 +60,10 @@ function parseCliOptions(): CliOptions {
     group: parseGroup(stringArg("--group")),
     routeId: stringArg("--route"),
     limit: parseLimit(stringArg("--limit")),
-    outputDir: stringArg("--output") ?? resolve(process.cwd(), "..", ".tmp", "lighthouse", timestampSlug()),
+    outputDir:
+      stringArg("--output") ??
+      process.env.LIGHTHOUSE_OUTPUT_DIR ??
+      resolve(process.cwd(), "..", ".tmp", "lighthouse", timestampSlug()),
     baseUrl: process.env.LIGHTHOUSE_BASE_URL ?? `http://localhost:${process.env.PLAYWRIGHT_PORT ?? "3100"}`,
   };
 }
@@ -151,7 +154,7 @@ async function run() {
         commit: process.env.GITHUB_SHA ?? "local",
         timestamp: new Date().toISOString(),
         deviceProfile: "desktop-chromium",
-        serverProfile: "local-dev",
+        serverProfile: process.env.LIGHTHOUSE_SERVER_PROFILE ?? "local-dev",
       },
       results,
     });

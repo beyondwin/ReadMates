@@ -98,4 +98,20 @@ describe("writeLighthouseDiagnosticReport", () => {
     expect(summary).toContain("| none | none | no release-actionable failed Lighthouse audits | keep baseline |");
     expect(summary).toContain("| local_dev_noise | public-home | Lighthouse audit findings | local-dev diagnostic only |");
   });
+
+  it("records preview server profile distinctly from local dev diagnostics", async () => {
+    await writeLighthouseDiagnosticReport({
+      outputDir,
+      runContext: {
+        commit: "abc123",
+        timestamp: "2026-06-28T00:00:00.000Z",
+        deviceProfile: "desktop-chromium",
+        serverProfile: "vite-preview",
+      },
+      results: [result],
+    });
+
+    const summary = await readFile(join(outputDir, "summary.md"), "utf8");
+    expect(summary).toContain("- server profile: vite-preview");
+  });
 });

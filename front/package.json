@@ -9,6 +9,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "lint": "eslint .",
     "lighthouse:diagnose": "tsx scripts/lighthouse-diagnostic.ts",
+    "lighthouse:preview": "tsx scripts/lighthouse-preview.ts",
     "performance:budget": "pnpm build && pnpm build:budget",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",

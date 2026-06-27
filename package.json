@@ -19,6 +19,7 @@
     "front:build": "pnpm --dir front build",
     "front:performance-budget": "pnpm --dir front performance:budget",
     "front:lighthouse": "pnpm --dir front lighthouse:diagnose",
+    "front:lighthouse:preview": "pnpm --dir front lighthouse:preview",
     "design-system:build": "pnpm --filter @readmates/design-system build",
     "design-system:test": "pnpm --filter @readmates/design-system test",
     "design-docs:build": "pnpm --filter @readmates/design-system-docs build",
