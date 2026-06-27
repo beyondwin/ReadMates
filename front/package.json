@@ -5,9 +5,11 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
+    "build:budget": "tsx scripts/build-budget.ts",
     "preview": "vite preview --host 0.0.0.0",
     "lint": "eslint .",
     "lighthouse:diagnose": "tsx scripts/lighthouse-diagnostic.ts",
+    "performance:budget": "pnpm build && pnpm build:budget",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",

@@ -48,6 +48,7 @@ export default defineConfig({
           environment: "node",
           include: [
             "tests/lighthouse/**/*.test.ts",
+            "tests/performance/**/*.test.ts",
             "tests/unit/**/*.test.ts",
             "src/**/*.test.ts",
             "features/**/*.test.ts",
