@@ -9,13 +9,15 @@
 - `v1.15.0` release operation status: `Deploy Front` passed for tag `v1.15.0`; `Deploy Server Image` built and pushed a scan candidate but failed before release-tag promotion. Therefore `ghcr.io/<owner>/<repo>/readmates-server:v1.15.0` was not promoted by the deploy workflow.
 - Root cause: Trivy found four fixed HIGH Jackson databind findings in the scan candidate: CVE-2026-54512 and CVE-2026-54513 in `com.fasterxml.jackson.core:jackson-databind 2.21.2`, plus the same CVEs in `tools.jackson.core:jackson-databind 3.1.2`.
 - Server impact: runtime dependency resolution now forces `com.fasterxml.jackson.core:jackson-databind` to `2.21.4` and `tools.jackson.core` modules to `3.1.4`; `jackson-annotations` is constrained to published `2.21` because `2.21.4` is not available.
+- Remote CI impact found during publication: `main` CI run `28338937980` passed Scripts, Public release safety, Design system, Frontend, Frontend visual regression, Backend, and all E2E shards, but `Backend Integration` failed in two `MySqlQueryPlanTest` cases. The failing EXPLAIN plans used full scans on `sessions` only because the shallow dev seed made MySQL's cost model prefer a tiny-table scan. The affected tests now seed the existing large read-path fixture before checking the session cursor plans, keeping the index-use contract while removing small-cardinality optimizer noise.
 - Local dependency verification before publication: `./server/gradlew -p server dependencyInsight --dependency jackson-databind --configuration runtimeClasspath` selected `com.fasterxml.jackson.core:jackson-databind 2.21.4` and `tools.jackson.core:jackson-databind 3.1.4`.
 - Local server/image verification before publication:
   - `./server/gradlew -p server clean check bootJar` - pass.
   - `./server/gradlew -p server integrationTest` - pass.
+  - `./server/gradlew -p server integrationTest --tests com.readmates.performance.MySqlQueryPlanTest` - pass after remote CI EXPLAIN fixture repair.
   - `docker build -f server/Dockerfile.release server -t readmates-server:v1.15.1-local` - pass.
   - `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.70.0 image --severity HIGH,CRITICAL --ignore-unfixed --scanners vuln readmates-server:v1.15.1-local` - pass, 0 Ubuntu and Java HIGH/CRITICAL findings.
-  - `git diff --check -- server/build.gradle.kts CHANGELOG.md docs/development/release-readiness-review.md` - pass.
+  - `git diff --check -- server/build.gradle.kts server/src/test/kotlin/com/readmates/performance/MySqlQueryPlanTest.kt CHANGELOG.md docs/development/release-readiness-review.md` - pass.
   - `./scripts/build-public-release-candidate.sh` and `./scripts/public-release-check.sh .tmp/public-release-candidate` - pass; gitleaks reported no leaks.
 - Release plan: do not force-update `v1.15.0`; publish `v1.15.1`, confirm tag-triggered `Deploy Front` and `Deploy Server Image`, promote OCI Compose backend to `ghcr.io/<owner>/<repo>/readmates-server:v1.15.1`, create the GitHub Release, then run sanitized BFF/OAuth/admin/host smoke checks.
 - Residual risk: remote server image Trivy pass, GHCR release-tag promotion, OCI backend promotion, GitHub Release publication, and post-deploy smoke remain pending until the pushed `v1.15.1` tag workflows and production promotion complete.

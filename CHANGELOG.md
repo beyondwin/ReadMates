@@ -15,6 +15,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 ### Fixed
 
 - **server release image security:** `v1.15.0`의 `Deploy Front`는 통과했지만 `Deploy Server Image`가 GHCR release tag promotion 전에 Trivy HIGH gate에서 멈췄습니다. Runtime classpath를 Jackson fixed patch line으로 정렬해 `com.fasterxml.jackson.core:jackson-databind`를 `2.21.4`, `tools.jackson.core:jackson-databind`를 `3.1.4`로 올리고, `jackson-annotations`는 공개된 `2.21` artifact로 고정했습니다.
+- **server CI query-plan gate:** `main`의 `Backend Integration` 원격 CI가 작은 dev seed row count에서 MySQL optimizer의 full-scan 선택으로 `MySqlQueryPlanTest` 2건을 실패시켰습니다. 운영 SQL/마이그레이션은 유지하고, 해당 read-path EXPLAIN 테스트가 기존 large read-path fixture를 사용해 실제 규모에서 세션 인덱스 계약을 검증하도록 안정화했습니다.
 
 ### Deployment Notes
 
@@ -26,8 +27,9 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - `v1.15.0` release operation (2026-06-29): `Deploy Front` passed for tag `v1.15.0`; `Deploy Server Image` built and pushed a scan candidate but failed before release-tag promotion because Trivy found four fixed HIGH Jackson databind findings: CVE-2026-54512 and CVE-2026-54513 in `com.fasterxml.jackson.core:jackson-databind 2.21.2`, and the same CVEs in `tools.jackson.core:jackson-databind 3.1.2`.
 - Local dependency verification (2026-06-29): `./server/gradlew -p server dependencyInsight --dependency jackson-databind --configuration runtimeClasspath` selected `com.fasterxml.jackson.core:jackson-databind 2.21.4` and `tools.jackson.core:jackson-databind 3.1.4`.
 - Local server/image verification (2026-06-29): `./server/gradlew -p server clean check bootJar` passed; `./server/gradlew -p server integrationTest` passed; `docker build -f server/Dockerfile.release server -t readmates-server:v1.15.1-local` passed.
+- Remote CI repair (2026-06-29): `main` CI run `28338937980` passed Scripts, Public release safety, Design system, Frontend, Frontend visual regression, Backend, and E2E shards 1/3 through 3/3, but `Backend Integration` failed only in `MySqlQueryPlanTest` because tiny fixture cardinality let MySQL choose a full scan for `sessions`. The affected tests now seed the existing large read-path fixture; `./server/gradlew -p server integrationTest --tests com.readmates.performance.MySqlQueryPlanTest` passed locally.
 - Local vulnerability verification (2026-06-29): `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.70.0 image --severity HIGH,CRITICAL --ignore-unfixed --scanners vuln readmates-server:v1.15.1-local` passed with 0 Ubuntu and Java HIGH/CRITICAL findings.
-- Public safety: `git diff --check -- server/build.gradle.kts CHANGELOG.md docs/development/release-readiness-review.md`, `./scripts/build-public-release-candidate.sh`, and `./scripts/public-release-check.sh .tmp/public-release-candidate` passed; gitleaks reported no leaks.
+- Public safety: `git diff --check -- server/build.gradle.kts server/src/test/kotlin/com/readmates/performance/MySqlQueryPlanTest.kt CHANGELOG.md docs/development/release-readiness-review.md`, `./scripts/build-public-release-candidate.sh`, and `./scripts/public-release-check.sh .tmp/public-release-candidate` passed; gitleaks reported no leaks.
 
 ## v1.15.0 - 2026-06-29
 

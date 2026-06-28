@@ -29,6 +29,8 @@ class MySqlQueryPlanTest(
 
     @Test
     fun `archive paged sessions query uses indexed access on sessions`() {
+        largeFixture.seedNotesFeed(sessionCount = 80)
+
         val member5 = membershipIdFor("member5@example.com")
         val plan =
             jdbcTemplate.explain(
@@ -112,6 +114,8 @@ class MySqlQueryPlanTest(
 
     @Test
     fun `notes paged session query uses indexed access on sessions`() {
+        largeFixture.seedNotesFeed(sessionCount = 80)
+
         val plan =
             jdbcTemplate.explain(
                 """
