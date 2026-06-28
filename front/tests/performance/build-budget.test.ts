@@ -15,7 +15,7 @@ const assets: BuildAssetInput[] = [
   { fileName: "host-session-editor-route-bbb.js", bytes: 135_000, gzipBytes: 41_000 },
   { fileName: "public-home-ccc.js", bytes: 31_000, gzipBytes: 10_000 },
   { fileName: "index-entry.js", bytes: 73_000, gzipBytes: 18_000 },
-  { fileName: "index-style.css", bytes: 104_000, gzipBytes: 18_000 },
+  { fileName: "index-style.css", bytes: 114_000, gzipBytes: 18_000 },
   { fileName: "unexpected-worker.js", bytes: 12_000, gzipBytes: 4_000 },
 ];
 
@@ -36,7 +36,7 @@ describe("build budget analyzer", () => {
     ]);
   });
 
-  it("fails hard-gated buckets and leaves measured CSS as a warning", () => {
+  it("fails hard-gated buckets including global CSS", () => {
     const report = analyzeBuildAssets(assets, defaultBudgetRules);
 
     expect(report.status).toBe("failed");
@@ -49,17 +49,16 @@ describe("build budget analyzer", () => {
         limitBytes: 120_000,
         severity: "error",
       },
-    ]);
-    expect(report.warnings).toEqual([
       {
         bucket: "css-global",
         fileName: "index-style.css",
-        bytes: 104_000,
+        bytes: 114_000,
         gzipBytes: 18_000,
-        limitBytes: 100_000,
-        severity: "warn",
+        limitBytes: 110_000,
+        severity: "error",
       },
     ]);
+    expect(report.warnings).toEqual([]);
   });
 
   it("renders a markdown report with largest assets and budget results", () => {
@@ -70,7 +69,7 @@ describe("build budget analyzer", () => {
     expect(markdown).toContain(
       "| host-route | host-session-editor-route-bbb.js | 135.0 kB | 41.0 kB | 120.0 kB | error |",
     );
-    expect(markdown).toContain("| css-global | index-style.css | 104.0 kB | 18.0 kB | 100.0 kB | warn |");
+    expect(markdown).toContain("| css-global | index-style.css | 114.0 kB | 18.0 kB | 110.0 kB | error |");
     expect(markdown).toContain("unexpected-worker.js");
   });
 

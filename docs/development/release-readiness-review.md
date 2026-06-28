@@ -6,22 +6,22 @@
 
 - Scope reviewed: local frontend build tooling, Vite chunk grouping, host route entry splitting, preview Lighthouse diagnostic path, and docs.
 - Release classification: frontend build/test tooling plus route-entry chunk refactor. No server API contract, DB migration, auth/BFF token, OAuth scope, Cloudflare Pages Functions behavior, release image behavior, or deploy workflow behavior changed.
-- Product evidence: production build assets are reported under `.tmp/performance/build-budget.*`; split vendor and host route chunks stay within hard-gated JS budgets; global CSS remains measured-only.
-- Lighthouse evidence: preview mode runs against Vite production build output and records `server profile: vite-preview`, separating route entry failures from Lighthouse findings. Final preview smoke wrote `.tmp/performance/lighthouse-preview/2026-06-27T17-28-15-833Z/summary.md` with route count 2 and failed route count 0.
+- Product evidence: production build assets are reported under `.tmp/performance/build-budget.*`; split vendor, host route chunks, app entry, and global CSS stay within hard-gated budgets. The current global CSS bundle is about 104.5 kB against a 110 kB hard gate.
+- Lighthouse evidence: preview mode runs against Vite production build output, points the Vite proxy at a local public-safe API mock upstream, records `server profile: vite-preview`, and separates route entry failures from Lighthouse findings. Final preview smoke wrote `.tmp/performance/lighthouse-preview/2026-06-27T17-40-38-784Z/summary.md` with route count 2 and failed route count 0, without local backend proxy `ECONNREFUSED` or preview shutdown failure noise.
 - Public safety: generated `.tmp/performance/` artifacts are ignored/local-only and public release candidate checks passed without adding build, Lighthouse, screenshot, secret, private-domain, local-path, OCID, deployment-state, or token-shaped artifacts.
 - Local verification before merge:
   - `npx --yes pnpm@10.33.0 --dir front lint` - pass.
-  - `npx --yes pnpm@10.33.0 --dir front test` - pass, 157 files and 1278 tests.
+  - `npx --yes pnpm@10.33.0 --dir front test` - pass, 157 files and 1280 tests.
   - `npx --yes pnpm@10.33.0 --dir front build` - pass, with the previous Vite 350 kB chunk warning gone.
-  - `npx --yes pnpm@10.33.0 --dir front build:budget` - pass, hard-gated JS budgets passed and CSS remained warn-only.
-  - `npx --yes pnpm@10.33.0 --dir front exec vitest run tests/performance tests/lighthouse/report-writer.test.ts` - pass, 3 files and 9 tests.
+  - `npx --yes pnpm@10.33.0 --dir front build:budget` - pass, hard-gated JS and CSS budgets passed.
+  - `npx --yes pnpm@10.33.0 --dir front exec vitest run tests/performance/build-budget.test.ts tests/performance/lighthouse-preview.test.ts` - pass, 2 files and 8 tests.
   - `npx --yes pnpm@10.33.0 --dir front test:e2e -- tests/e2e/session-closing-flywheel.spec.ts tests/e2e/manual-notifications.spec.ts tests/e2e/host-club-operations.spec.ts` - pass, 9 Playwright tests.
-  - `npx --yes pnpm@10.33.0 --dir front lighthouse:preview -- --group public --limit 2` - pass; Vite preview logged local backend proxy `ECONNREFUSED 127.0.0.1:18080` and shutdown `ELIFECYCLE 143` noise after the report was written, but the command exited 0 and the summary recorded failed route count 0.
+  - `npx --yes pnpm@10.33.0 --dir front lighthouse:preview -- --group public --limit 2` - pass; wrote `.tmp/performance/lighthouse-preview/2026-06-27T17-40-38-784Z/summary.md`, route count 2, failed route count 0, with a local API mock upstream and clean preview cleanup.
   - `git diff --check -- CHANGELOG.md docs/development/performance-budget.md docs/development/release-readiness-review.md` - pass.
   - `./scripts/build-public-release-candidate.sh` - pass.
   - `./scripts/public-release-check.sh .tmp/public-release-candidate` - pass.
 - Skipped before merge: production OAuth, VM, provider-console, release tag workflow, OCI compose promotion, GitHub Release publication, and post-deploy smoke. These require release-operation access after merge and are not local evidence for this frontend tooling branch.
-- Residual risk: the Vite 350 kB warning is gone. No hard-gated JS budget residual remains; global CSS is still measured-only at about 104.5 kB and needs a separate CSS boundary design before it becomes a hard gate.
+- Residual risk: the Vite 350 kB warning is gone. No known local build-budget or preview-Lighthouse residual remains after the CSS hard gate and local preview API mock. Production OAuth, VM/provider-console checks, release tag workflows, OCI compose promotion, GitHub Release publication, and post-deploy smoke remain release-operation evidence after merge/deploy, not local evidence for this frontend tooling branch.
 
 ## 2026-06-27 CT visual regression CI gate closeout
 

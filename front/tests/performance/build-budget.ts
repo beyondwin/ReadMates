@@ -52,7 +52,7 @@ export const defaultBudgetRules: BudgetRule[] = [
   { bucket: "host-route", limitBytes: 120_000, severity: "error" },
   { bucket: "route", limitBytes: 80_000, severity: "warn" },
   { bucket: "app-entry", limitBytes: jsChunkLimit, severity: "error" },
-  { bucket: "css-global", limitBytes: 100_000, severity: "warn" },
+  { bucket: "css-global", limitBytes: 110_000, severity: "error" },
   { bucket: "uncategorized", limitBytes: jsChunkLimit, severity: "measure" },
 ];
 

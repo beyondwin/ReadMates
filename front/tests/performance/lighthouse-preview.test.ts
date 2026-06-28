@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPreviewCommand, previewOutputDir } from "./lighthouse-preview";
+import { buildPreviewCommand, buildPreviewServerEnv, isExpectedPreviewShutdown, previewOutputDir } from "./lighthouse-preview";
 
 describe("lighthouse preview helpers", () => {
   it("creates a stable output directory under tmp performance", () => {
@@ -25,5 +25,18 @@ describe("lighthouse preview helpers", () => {
         LIGHTHOUSE_SERVER_PROFILE: "vite-preview",
       },
     });
+  });
+
+  it("builds preview server env with a local API mock upstream", () => {
+    expect(buildPreviewServerEnv({ apiBaseUrl: "http://127.0.0.1:5137" })).toEqual({
+      READMATES_API_BASE_URL: "http://127.0.0.1:5137",
+    });
+  });
+
+  it("treats SIGTERM from preview shutdown as expected cleanup", () => {
+    expect(isExpectedPreviewShutdown({ code: null, signal: "SIGTERM" })).toBe(true);
+    expect(isExpectedPreviewShutdown({ code: 0, signal: null })).toBe(true);
+    expect(isExpectedPreviewShutdown({ code: 143, signal: null })).toBe(true);
+    expect(isExpectedPreviewShutdown({ code: 1, signal: null })).toBe(false);
   });
 });
