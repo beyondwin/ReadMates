@@ -26,6 +26,23 @@ repositories {
     mavenCentral()
 }
 
+configurations.configureEach {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "com.fasterxml.jackson.core" && requested.name == "jackson-databind") {
+            useVersion("2.21.4")
+            because("Trivy flags CVE-2026-54512 and CVE-2026-54513 in jackson-databind 2.21.2.")
+        }
+        if (requested.group == "com.fasterxml.jackson.core" && requested.name == "jackson-annotations") {
+            useVersion("2.21")
+            because("jackson-databind 2.21.4 requests a non-published annotations 2.21.4 artifact.")
+        }
+        if (requested.group == "tools.jackson.core") {
+            useVersion("3.1.4")
+            because("Trivy flags CVE-2026-54512 and CVE-2026-54513 in tools.jackson databind 3.1.2.")
+        }
+    }
+}
+
 dependencies {
     constraints {
         implementation("org.lz4:lz4-java:1.8.1") {
@@ -39,6 +56,12 @@ dependencies {
         }
         implementation("tools.jackson.core:jackson-core:3.1.2") {
             because("Trivy flags jackson-core 3.0.2 for high severity parser issues.")
+        }
+        implementation("com.fasterxml.jackson.core:jackson-databind:2.21.4") {
+            because("Trivy flags CVE-2026-54512 and CVE-2026-54513 in jackson-databind 2.21.2.")
+        }
+        implementation("tools.jackson.core:jackson-databind:3.1.4") {
+            because("Trivy flags CVE-2026-54512 and CVE-2026-54513 in tools.jackson databind 3.1.2.")
         }
         implementation("io.netty:netty-codec-dns:4.2.15.Final") {
             because("Trivy flags Netty DNS/handler CVEs before 4.2.15.Final.")

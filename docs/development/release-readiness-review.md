@@ -2,6 +2,24 @@
 
 남은 리스크, release readiness, merge 후 안전성, ship 가능 여부를 확인할 때 사용하는 체크리스트입니다. 구현 계획의 완료 여부와 테스트 통과 여부만으로 release risk가 닫혔다고 판단하지 않습니다.
 
+## 2026-06-29 v1.15.1 server image repair readiness
+
+- Scope reviewed: `v1.15.0` tag operation, failed `Deploy Server Image` run `28338469979`, and local server runtime dependency graph before publishing `v1.15.1`.
+- Release classification: patch release to unblock server release-image Trivy gate. No Flyway migration, public API contract, auth/BFF token handling, OAuth scope, Pages Functions behavior, frontend behavior, secret/session handling, or deploy workflow trigger change is included.
+- `v1.15.0` release operation status: `Deploy Front` passed for tag `v1.15.0`; `Deploy Server Image` built and pushed a scan candidate but failed before release-tag promotion. Therefore `ghcr.io/<owner>/<repo>/readmates-server:v1.15.0` was not promoted by the deploy workflow.
+- Root cause: Trivy found four fixed HIGH Jackson databind findings in the scan candidate: CVE-2026-54512 and CVE-2026-54513 in `com.fasterxml.jackson.core:jackson-databind 2.21.2`, plus the same CVEs in `tools.jackson.core:jackson-databind 3.1.2`.
+- Server impact: runtime dependency resolution now forces `com.fasterxml.jackson.core:jackson-databind` to `2.21.4` and `tools.jackson.core` modules to `3.1.4`; `jackson-annotations` is constrained to published `2.21` because `2.21.4` is not available.
+- Local dependency verification before publication: `./server/gradlew -p server dependencyInsight --dependency jackson-databind --configuration runtimeClasspath` selected `com.fasterxml.jackson.core:jackson-databind 2.21.4` and `tools.jackson.core:jackson-databind 3.1.4`.
+- Local server/image verification before publication:
+  - `./server/gradlew -p server clean check bootJar` - pass.
+  - `./server/gradlew -p server integrationTest` - pass.
+  - `docker build -f server/Dockerfile.release server -t readmates-server:v1.15.1-local` - pass.
+  - `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.70.0 image --severity HIGH,CRITICAL --ignore-unfixed --scanners vuln readmates-server:v1.15.1-local` - pass, 0 Ubuntu and Java HIGH/CRITICAL findings.
+  - `git diff --check -- server/build.gradle.kts CHANGELOG.md docs/development/release-readiness-review.md` - pass.
+  - `./scripts/build-public-release-candidate.sh` and `./scripts/public-release-check.sh .tmp/public-release-candidate` - pass; gitleaks reported no leaks.
+- Release plan: do not force-update `v1.15.0`; publish `v1.15.1`, confirm tag-triggered `Deploy Front` and `Deploy Server Image`, promote OCI Compose backend to `ghcr.io/<owner>/<repo>/readmates-server:v1.15.1`, create the GitHub Release, then run sanitized BFF/OAuth/admin/host smoke checks.
+- Residual risk: remote server image Trivy pass, GHCR release-tag promotion, OCI backend promotion, GitHub Release publication, and post-deploy smoke remain pending until the pushed `v1.15.1` tag workflows and production promotion complete.
+
 ## 2026-06-29 v1.15.0 pre-release readiness
 
 - Scope reviewed: local `v1.14.1..HEAD` and `main...origin/main` before publishing `v1.15.0`.

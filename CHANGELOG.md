@@ -10,6 +10,25 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 
+## v1.15.1 - 2026-06-29
+
+### Fixed
+
+- **server release image security:** `v1.15.0`의 `Deploy Front`는 통과했지만 `Deploy Server Image`가 GHCR release tag promotion 전에 Trivy HIGH gate에서 멈췄습니다. Runtime classpath를 Jackson fixed patch line으로 정렬해 `com.fasterxml.jackson.core:jackson-databind`를 `2.21.4`, `tools.jackson.core:jackson-databind`를 `3.1.4`로 올리고, `jackson-annotations`는 공개된 `2.21` artifact로 고정했습니다.
+
+### Deployment Notes
+
+- Patch release for server image scan repair. DB migration, public API contract, auth/BFF token handling, OAuth scope, frontend behavior, Pages Functions behavior, and deploy workflow triggers are unchanged from `v1.15.0`.
+- Do not force-update `v1.15.0`. Publish `v1.15.1`, confirm `Deploy Front` and `Deploy Server Image`, promote OCI Compose backend to `ghcr.io/<owner>/<repo>/readmates-server:v1.15.1`, create the GitHub Release, then run sanitized BFF/OAuth/admin/host smoke checks.
+
+### Verification
+
+- `v1.15.0` release operation (2026-06-29): `Deploy Front` passed for tag `v1.15.0`; `Deploy Server Image` built and pushed a scan candidate but failed before release-tag promotion because Trivy found four fixed HIGH Jackson databind findings: CVE-2026-54512 and CVE-2026-54513 in `com.fasterxml.jackson.core:jackson-databind 2.21.2`, and the same CVEs in `tools.jackson.core:jackson-databind 3.1.2`.
+- Local dependency verification (2026-06-29): `./server/gradlew -p server dependencyInsight --dependency jackson-databind --configuration runtimeClasspath` selected `com.fasterxml.jackson.core:jackson-databind 2.21.4` and `tools.jackson.core:jackson-databind 3.1.4`.
+- Local server/image verification (2026-06-29): `./server/gradlew -p server clean check bootJar` passed; `./server/gradlew -p server integrationTest` passed; `docker build -f server/Dockerfile.release server -t readmates-server:v1.15.1-local` passed.
+- Local vulnerability verification (2026-06-29): `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.70.0 image --severity HIGH,CRITICAL --ignore-unfixed --scanners vuln readmates-server:v1.15.1-local` passed with 0 Ubuntu and Java HIGH/CRITICAL findings.
+- Public safety: `git diff --check -- server/build.gradle.kts CHANGELOG.md docs/development/release-readiness-review.md`, `./scripts/build-public-release-candidate.sh`, and `./scripts/public-release-check.sh .tmp/public-release-candidate` passed; gitleaks reported no leaks.
+
 ## v1.15.0 - 2026-06-29
 
 ### Highlights
@@ -53,6 +72,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - Public safety: `./scripts/build-public-release-candidate.sh` and `./scripts/public-release-check.sh .tmp/public-release-candidate` passed; gitleaks reported no leaks in the candidate.
 - Local environment note: after Docker CT recreated host-mounted `node_modules` with Linux optional dependencies, the first preview Lighthouse attempt failed on a missing macOS Rolldown native binding. `CI=true npx --yes pnpm@10.33.0 install --frozen-lockfile` restored host dependencies, and the same preview Lighthouse command then passed.
 - Remote CI repair before tag: the first pushed `main` CI run failed only in `Frontend visual regression` because the new job ran host `pnpm test:ct` on `ubuntu-24.04` while the committed baselines are Docker-rendered. The workflow now runs `pnpm test:ct:docker`, matching the documented baseline renderer and the local passing gate.
+- Release operation: `Deploy Front` passed for tag `v1.15.0`; `Deploy Server Image` failed before release-tag promotion at Trivy scan on Jackson databind fixed HIGH findings. The release is rolled forward through `v1.15.1`; do not force-update `v1.15.0`.
 - Skipped before tag push: GitHub Actions status, `Deploy Front`, `Deploy Server Image`, OCI Compose backend promotion, GitHub Release publication, production OAuth, provider-console checks, and post-deploy smoke. These require pushed `main`/tag or production operator access and are release-operation steps after publication.
 
 ## v1.14.1 - 2026-06-21
