@@ -10,6 +10,14 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 
+## v1.15.0 - 2026-06-29
+
+### Highlights
+
+- **reader and host workflow polish:** Public pages, host closing boards, member reflection links, and platform-admin support/audit screens now carry clearer route-owned metadata, safer operating copy, and stronger desktop/mobile evidence around the existing reading-club flows.
+- **release confidence tooling:** Local Lighthouse diagnostics, production build budgets, route-critical visual regression baselines, and a dedicated GitHub Actions visual-regression job make frontend quality drift visible before release.
+- **operator documentation and security cleanup:** Observability runbooks now describe repo-native tracing and deploy checks, while patched frontend/design toolchain dependencies close the remaining recorded Dependabot findings without changing runtime API/auth behavior.
+
 ### Changed
 
 - **public page quality:** Public club, records, session, login, retired reset-password, and public not-found routes now set page titles and meta descriptions from route-owned public-safe copy. Public latest-record cards and archive links also use descriptive accessible names, and the local Lighthouse diagnostic separates dev-server-only bundle/minify/robots noise from release-actionable repeated causes. Server API contracts, auth/BFF behavior, DB migrations, OAuth scopes, and deploy workflow behavior are unchanged.
@@ -29,6 +37,22 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 ### Security
 
 - **toolchain vulnerability cleanup:** Frontend and design workspaces now use Vite `8.0.16`, and root pnpm overrides constrain only vulnerable build/test dependency ranges to patched versions: `esbuild` `0.28.1`, `ws` `8.21.0`, `js-yaml` `4.2.0`, and `@babel/core` `7.29.6`. This closes the remaining Dependabot alerts for CVE-2026-53571, CVE-2026-53632, and GHSA-g7r4-m6w7-qqqr, plus the additional low-and-above `pnpm audit` findings found during remediation. This changes build/dev tooling only; app routes, API contracts, auth/BFF tokens, DB migrations, and deploy workflow behavior are unchanged.
+
+### Deployment Notes
+
+- Minor release. No Flyway migration is included in this release candidate, and the only server production-code change is SQL constant extraction in the existing session-closing persistence adapter.
+- Public API contracts, auth/BFF token handling, OAuth scopes, secret/session handling, Pages Functions behavior, and deploy workflow triggers are unchanged.
+- CI behavior changes: `main` pushes and pull requests now include a `Frontend visual regression` job that installs Chromium and runs `pnpm test:ct` against committed component-test baselines.
+- Deployment order: push `main`, push annotated tag `v1.15.0`, confirm `Deploy Front` and `Deploy Server Image` workflows for the tag, promote OCI Compose backend to `ghcr.io/<owner>/<repo>/readmates-server:v1.15.0`, create or update the GitHub Release, then run sanitized BFF/OAuth/admin/host smoke checks.
+
+### Verification
+
+- Local pre-release readiness (2026-06-29): release guard dry-run, whitespace checks, frontend lint, frontend tests, frontend coverage tests, frontend build, Zod fixture export/diff, backend `check`, backend `clean check bootJar`, backend `integrationTest`, full Playwright E2E, public release candidate build/check, ShellCheck, aigen PII check, Grafana dashboard lint, Prometheus rule/config validation, Alertmanager config validation, design system/docs check, Docker component visual regression, build budget, and preview Lighthouse smoke all passed.
+- Frontend verification details: `npx --yes pnpm@10.33.0 --dir front test` and `test:coverage` both passed with 157 files and 1280 tests; `build` passed without the previous large-chunk warning; `test:e2e` passed 67 Playwright tests.
+- Visual/performance evidence: Docker component visual regression passed 7 Playwright CT tests; `build:budget` wrote `.tmp/performance/build-budget.md`; `lighthouse:preview -- --group public --limit 2` wrote `.tmp/performance/lighthouse-preview/2026-06-28T22-24-42-078Z/summary.md` with route count 2 and failed route count 0.
+- Public safety: `./scripts/build-public-release-candidate.sh` and `./scripts/public-release-check.sh .tmp/public-release-candidate` passed; gitleaks reported no leaks in the candidate.
+- Local environment note: after Docker CT recreated host-mounted `node_modules` with Linux optional dependencies, the first preview Lighthouse attempt failed on a missing macOS Rolldown native binding. `CI=true npx --yes pnpm@10.33.0 install --frozen-lockfile` restored host dependencies, and the same preview Lighthouse command then passed.
+- Skipped before tag push: GitHub Actions status, `Deploy Front`, `Deploy Server Image`, OCI Compose backend promotion, GitHub Release publication, production OAuth, provider-console checks, and post-deploy smoke. These require pushed `main`/tag or production operator access and are release-operation steps after publication.
 
 ## v1.14.1 - 2026-06-21
 

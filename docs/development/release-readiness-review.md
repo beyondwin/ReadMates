@@ -2,6 +2,43 @@
 
 남은 리스크, release readiness, merge 후 안전성, ship 가능 여부를 확인할 때 사용하는 체크리스트입니다. 구현 계획의 완료 여부와 테스트 통과 여부만으로 release risk가 닫혔다고 판단하지 않습니다.
 
+## 2026-06-29 v1.15.0 pre-release readiness
+
+- Scope reviewed: local `v1.14.1..HEAD` and `main...origin/main` before publishing `v1.15.0`.
+- Release classification: minor frontend/operator workflow, frontend quality tooling, CI visual-regression gate, observability documentation, and build/dev dependency security cleanup. No Flyway migration, auth/BFF token handling, OAuth scope, Pages Functions behavior, secret/session handling, or deploy workflow trigger change is included.
+- Server impact: production server code change is limited to extracting session-closing SQL strings into constants in `JdbcSessionClosingStatusAdapter`; server performance fixture/query-plan tests also changed. No DB migration or public API contract change was found.
+- CI/CD impact: `.github/workflows/ci.yml` now adds the `Frontend visual regression` job that installs Chromium and runs `pnpm test:ct`; tag-triggered `Deploy Front` and `Deploy Server Image` workflows are unchanged.
+- Local verification before publication:
+  - `git diff --check origin/main...HEAD -- . ':(exclude)docs/superpowers/**'` - pass.
+  - `git diff --check -- . ':(exclude)docs/superpowers/**'` - pass.
+  - `git diff --cached --check -- . ':(exclude)docs/superpowers/**'` - pass.
+  - `bash -n scripts/*.sh deploy/oci/*.sh` - pass.
+  - `shellcheck scripts/*.sh deploy/oci/*.sh` - pass.
+  - `bash scripts/aigen-pii-check.sh` - pass, 5 invariants.
+  - `npx --yes pnpm@10.33.0 --dir front lint` - pass.
+  - `npx --yes pnpm@10.33.0 --dir front test` - pass, 157 files and 1280 tests.
+  - `npx --yes pnpm@10.33.0 --dir front test:coverage` - pass, 157 files and 1280 tests.
+  - `npx --yes pnpm@10.33.0 --dir front build` - pass, no large-chunk warning.
+  - `npx --yes pnpm@10.33.0 --dir front zod:export-fixtures` plus `git diff --exit-code front/tests/unit/__fixtures__/zod-schemas/` - pass.
+  - `./server/gradlew -p server check` - pass.
+  - `./server/gradlew -p server clean check bootJar` - pass.
+  - `./server/gradlew -p server integrationTest` - pass.
+  - `npx --yes pnpm@10.33.0 --dir front test:e2e` - pass, 67 Playwright tests.
+  - `./scripts/build-public-release-candidate.sh` - pass.
+  - `./scripts/public-release-check.sh .tmp/public-release-candidate` - pass; gitleaks reported no leaks.
+  - `./scripts/lint-grafana-dashboards.sh` - pass, 3 dashboards.
+  - `./scripts/validate-prometheus-rules.sh` - pass, 17 rules across 7 files.
+  - `./scripts/validate-prometheus-config.sh` - pass.
+  - `./scripts/validate-alertmanager-config.sh` - pass.
+  - `npx --yes pnpm@10.33.0 design:check` - pass, design system 7 files/13 tests and design docs 1 file/2 tests.
+  - `npx --yes pnpm@10.33.0 --dir front test:ct:docker` - pass, 7 Playwright CT tests.
+  - `npx --yes pnpm@10.33.0 --dir front build:budget` - pass; wrote `.tmp/performance/build-budget.md`.
+  - `npx --yes pnpm@10.33.0 --dir front lighthouse:preview -- --group public --limit 2` - pass after host dependency restoration; wrote `.tmp/performance/lighthouse-preview/2026-06-28T22-24-42-078Z/summary.md`, route count 2, failed route count 0.
+- Local environment repair: Docker CT intentionally runs inside the Playwright Linux image and recreated the host-mounted workspace `node_modules` with Linux optional dependencies. The first preview Lighthouse run then failed on missing macOS Rolldown bindings. `CI=true npx --yes pnpm@10.33.0 install --frozen-lockfile` restored host dependencies, and the unchanged Lighthouse command passed afterward.
+- Public safety: the clean public release candidate excludes generated dist, reports, screenshot artifacts, local `.tmp` outputs, design workspace outputs, and private/deployment-shaped files. The scanner passed on the candidate.
+- Skipped before publication: GitHub Actions status, tag-triggered `Deploy Front`, tag-triggered `Deploy Server Image`, OCI Compose backend promotion, GitHub Release publication, production OAuth, provider-console checks, and post-deploy smoke. These require pushed `main`/tag or production operator access.
+- Residual risk: no known local release-readiness blocker remains after local CI/CD parity, public-release safety, CT, E2E, and release documentation checks. Operational release risk remains until the pushed tag workflows, backend promotion, GitHub Release, and sanitized production smoke checks succeed for `v1.15.0`.
+
 ## 2026-06-28 Frontend performance budget and bundle diet closeout
 
 - Scope reviewed: local frontend build tooling, Vite chunk grouping, host route entry splitting, preview Lighthouse diagnostic path, and docs.
