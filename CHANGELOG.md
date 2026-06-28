@@ -31,7 +31,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 ### Testing
 
 - **frontend performance budget:** Production build asset sizes are now reported as local JSON/Markdown evidence, with split vendor, host-route chunks, and global CSS tracked against explicit hard budgets. Preview-based Lighthouse diagnostics run against Vite production build output with a local public-safe API mock upstream, so the smoke no longer depends on a local Spring server. Runtime routes, server API contracts, DB migrations, auth/BFF tokens, OAuth scopes, and deploy workflow behavior are unchanged.
-- **visual regression CI:** GitHub Actions now runs a dedicated `Frontend visual regression` job for Playwright component-test baselines. The job validates existing `front/__screenshots__` baselines without updating snapshots and uploads Playwright reports on failure. Baseline updates remain Docker-only through `pnpm --dir front test:ct:update:docker`, and clean public release candidates still exclude committed screenshot baselines.
+- **visual regression CI:** GitHub Actions now runs a dedicated `Frontend visual regression` job for Playwright component-test baselines. The job validates existing `front/__screenshots__` baselines through the canonical Docker renderer without updating snapshots and uploads Playwright reports on failure. Baseline updates remain Docker-only through `pnpm --dir front test:ct:update:docker`, and clean public release candidates still exclude committed screenshot baselines.
 - **route-critical visual regression:** Playwright component-test baselines now cover host closing board published state, platform-admin support grant review, and public records index UI. Baselines are generated with the canonical Docker renderer and remain excluded from clean public release candidates. This is frontend test coverage and documentation only; route loaders, auth/BFF behavior, server API contracts, DB migrations, OAuth scopes, and deploy workflow behavior are unchanged.
 
 ### Security
@@ -42,7 +42,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - Minor release. No Flyway migration is included in this release candidate, and the only server production-code change is SQL constant extraction in the existing session-closing persistence adapter.
 - Public API contracts, auth/BFF token handling, OAuth scopes, secret/session handling, Pages Functions behavior, and deploy workflow triggers are unchanged.
-- CI behavior changes: `main` pushes and pull requests now include a `Frontend visual regression` job that installs Chromium and runs `pnpm test:ct` against committed component-test baselines.
+- CI behavior changes: `main` pushes and pull requests now include a `Frontend visual regression` job that runs `pnpm test:ct:docker` against committed component-test baselines so CI uses the same canonical renderer as baseline generation.
 - Deployment order: push `main`, push annotated tag `v1.15.0`, confirm `Deploy Front` and `Deploy Server Image` workflows for the tag, promote OCI Compose backend to `ghcr.io/<owner>/<repo>/readmates-server:v1.15.0`, create or update the GitHub Release, then run sanitized BFF/OAuth/admin/host smoke checks.
 
 ### Verification
@@ -52,6 +52,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - Visual/performance evidence: Docker component visual regression passed 7 Playwright CT tests; `build:budget` wrote `.tmp/performance/build-budget.md`; `lighthouse:preview -- --group public --limit 2` wrote `.tmp/performance/lighthouse-preview/2026-06-28T22-24-42-078Z/summary.md` with route count 2 and failed route count 0.
 - Public safety: `./scripts/build-public-release-candidate.sh` and `./scripts/public-release-check.sh .tmp/public-release-candidate` passed; gitleaks reported no leaks in the candidate.
 - Local environment note: after Docker CT recreated host-mounted `node_modules` with Linux optional dependencies, the first preview Lighthouse attempt failed on a missing macOS Rolldown native binding. `CI=true npx --yes pnpm@10.33.0 install --frozen-lockfile` restored host dependencies, and the same preview Lighthouse command then passed.
+- Remote CI repair before tag: the first pushed `main` CI run failed only in `Frontend visual regression` because the new job ran host `pnpm test:ct` on `ubuntu-24.04` while the committed baselines are Docker-rendered. The workflow now runs `pnpm test:ct:docker`, matching the documented baseline renderer and the local passing gate.
 - Skipped before tag push: GitHub Actions status, `Deploy Front`, `Deploy Server Image`, OCI Compose backend promotion, GitHub Release publication, production OAuth, provider-console checks, and post-deploy smoke. These require pushed `main`/tag or production operator access and are release-operation steps after publication.
 
 ## v1.14.1 - 2026-06-21

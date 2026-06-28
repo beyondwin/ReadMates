@@ -148,11 +148,8 @@ jobs:
         working-directory: .
         run: pnpm install --frozen-lockfile
 
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
-
       - name: Run component visual regression tests
-        run: pnpm test:ct
+        run: pnpm test:ct:docker
 
       - name: Upload visual regression reports
         if: failure()
