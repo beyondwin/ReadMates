@@ -2,6 +2,20 @@
 
 남은 리스크, release readiness, merge 후 안전성, ship 가능 여부를 확인할 때 사용하는 체크리스트입니다. 구현 계획의 완료 여부와 테스트 통과 여부만으로 release risk가 닫혔다고 판단하지 않습니다.
 
+## 2026-06-30 observability stack production deploy repair
+
+- Scope reviewed: `deploy/oci/06-deploy-observability-stack.sh`, production Prometheus startup logs, and the production observability stack deployment path for Prometheus and Grafana.
+- Root cause: macOS tar emitted AppleDouble `._*.yml` files into the alert archive. Local `promtool` validated the real rule files, but production Prometheus loaded `/etc/prometheus/alerts/*.yml` and rejected the generated `._aigen-rules.yml` metadata file.
+- Repair: observability archive creation now disables macOS copyfile metadata and excludes `._*` and `.DS_Store`; VM installation also deletes stale metadata files from Prometheus alerts, Grafana provisioning, and Grafana dashboard directories before compose startup.
+- Additional production intake repair: Spring Security now treats `POST /api/observability/frontend-events` like other trusted BFF mutation paths for CSRF and authorization, while `BffSecretFilter` still requires the BFF secret and allowed origin. Without this, the endpoint returned `403` after BFF secret/origin validation because it fell through to the generic member-session `/api/**` rule.
+- Public safety: the repair does not add credentials, domains, host identifiers, alert recipients, provider IDs, deployment state, or token-shaped values to the repo. Grafana credentials remain VM-local runtime environment only.
+- Local verification:
+  - `bash -n deploy/oci/06-deploy-observability-stack.sh scripts/public-release-check.sh` - pass.
+  - `shellcheck deploy/oci/06-deploy-observability-stack.sh` - pass.
+  - `git diff --check -- deploy/oci/06-deploy-observability-stack.sh CHANGELOG.md docs/development/release-readiness-review.md` - pass.
+  - `./server/gradlew -p server integrationTest --tests com.readmates.observability.adapter.in.web.FrontendObservabilityBffSecurityTest` - pass.
+- Verification plan: publish `v1.16.2`, promote the backend image, redeploy Prometheus/Grafana on the production VM, then verify Prometheus readiness, `readmates-server` scrape target, Grafana health, and the frontend telemetry metrics after a production BFF smoke.
+
 ## 2026-06-30 v1.16.1 frontend observability intake repair
 
 - Scope reviewed: production `v1.16.0` frontend observability smoke, Pages BFF telemetry function, Spring `BffSecretFilter`, and the existing BFF secret diagnostic route.

@@ -10,6 +10,23 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 
+## v1.16.2 - 2026-06-30
+
+### Fixed
+
+- **frontend observability server intake:** Spring Security now exempts `POST /api/observability/frontend-events` from CSRF and member-session authorization while still requiring the existing BFF secret and allowed-origin filter. Production telemetry can now be accepted as an unauthenticated same-origin BFF side path.
+- **observability deployment hygiene:** OCI observability stack deployment now excludes macOS AppleDouble metadata files from transferred archives and removes stale metadata files on the VM before starting Prometheus, preventing non-rule `._*.yml` files from breaking production Prometheus rule loading.
+
+### Deployment Notes
+
+- Patch release for the frontend observability production intake path and observability stack deploy helper. No DB migration, public product API contract, OAuth scope, auth cookie format, or BFF secret format change is included.
+- Publish `v1.16.2`, confirm `Deploy Front` and `Deploy Server Image`, promote OCI Compose backend to `ghcr.io/<owner>/<repo>/readmates-server:v1.16.2`, redeploy the observability stack, then verify frontend telemetry through Pages BFF and production Prometheus/Grafana.
+
+### Verification
+
+- Local targeted server repair verification (2026-06-30): `./server/gradlew -p server integrationTest --tests com.readmates.observability.adapter.in.web.FrontendObservabilityBffSecurityTest` passed.
+- Local observability deploy script verification (2026-06-30): `bash -n deploy/oci/06-deploy-observability-stack.sh scripts/public-release-check.sh`, `shellcheck deploy/oci/06-deploy-observability-stack.sh`, and `git diff --check -- deploy/oci/06-deploy-observability-stack.sh CHANGELOG.md docs/development/release-readiness-review.md` passed.
+
 ## v1.16.1 - 2026-06-30
 
 ### Fixed

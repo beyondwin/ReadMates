@@ -105,6 +105,7 @@ class SecurityConfig(
                     methodAndPath("DELETE", Regex("^/api/admin/support/grants/[^/]+$")),
                     methodAndPath("POST", Regex("^/api/admin/support-access-grants$")),
                     methodAndPath("DELETE", Regex("^/api/admin/support-access-grants/[^/]+$")),
+                    methodAndPath("POST", Regex("^/api/observability/frontend-events$")),
                 )
             }.authorizeHttpRequests {
                 it
@@ -131,6 +132,8 @@ class SecurityConfig(
                     .requestMatchers(methodAndPath("POST", Regex("^/api/clubs/[^/]+/invitations/[^/]+/accept$")))
                     .permitAll()
                     .requestMatchers(methodAndPath("POST", Regex("^/api/dev/invitations/[^/]+/accept$")))
+                    .permitAll()
+                    .requestMatchers(methodAndPath("POST", Regex("^/api/observability/frontend-events$")))
                     .permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/sessions/current")
                     .hasRole("VIEWER")

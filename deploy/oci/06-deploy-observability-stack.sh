@@ -134,6 +134,16 @@ write_grafana_dummy_env() {
   } > "$target"
 }
 
+create_clean_archive() {
+  local source_dir="$1"
+  local target="$2"
+  COPYFILE_DISABLE=1 tar \
+    --exclude='._*' \
+    --exclude='.DS_Store' \
+    -C "$source_dir" \
+    -czf "$target" .
+}
+
 echo "==> [1/7] 필수 파일 확인"
 require_file "$COMPOSE_INFRA_FILE"
 require_file "$PROMETHEUS_FILE"
@@ -188,13 +198,13 @@ echo "==> [4/7] 관측성 파일 전송"
 scp "${SSH_OPTIONS[@]}" "$COMPOSE_INFRA_FILE" "${REMOTE_USER}@${VM_PUBLIC_IP}:/tmp/readmates-compose.infra.yml"
 scp "${SSH_OPTIONS[@]}" "$PROMETHEUS_FILE" "${REMOTE_USER}@${VM_PUBLIC_IP}:/tmp/readmates-prometheus.yml"
 scp "${SSH_OPTIONS[@]}" "$ALERTMANAGER_FILE" "${REMOTE_USER}@${VM_PUBLIC_IP}:/tmp/readmates-alertmanager.yml"
-tar -C "$ALERT_RULES_DIR" -czf "$tmpdir/prometheus-alerts.tgz" .
+create_clean_archive "$ALERT_RULES_DIR" "$tmpdir/prometheus-alerts.tgz"
 scp "${SSH_OPTIONS[@]}" "$tmpdir/prometheus-alerts.tgz" "${REMOTE_USER}@${VM_PUBLIC_IP}:/tmp/readmates-prometheus-alerts.tgz"
 scp "${SSH_OPTIONS[@]}" "$tmpdir/alertmanager.env" "${REMOTE_USER}@${VM_PUBLIC_IP}:/tmp/readmates-alertmanager.env"
 scp "${SSH_OPTIONS[@]}" "$tmpdir/grafana.env" "${REMOTE_USER}@${VM_PUBLIC_IP}:/tmp/readmates-grafana.env"
 if service_enabled grafana; then
-  tar -C "$GRAFANA_PROVISIONING_DIR" -czf "$tmpdir/grafana-provisioning.tgz" .
-  tar -C "$GRAFANA_DASHBOARDS_DIR" -czf "$tmpdir/grafana-dashboards.tgz" .
+  create_clean_archive "$GRAFANA_PROVISIONING_DIR" "$tmpdir/grafana-provisioning.tgz"
+  create_clean_archive "$GRAFANA_DASHBOARDS_DIR" "$tmpdir/grafana-dashboards.tgz"
   scp "${SSH_OPTIONS[@]}" "$tmpdir/grafana-provisioning.tgz" "${REMOTE_USER}@${VM_PUBLIC_IP}:/tmp/readmates-grafana-provisioning.tgz"
   scp "${SSH_OPTIONS[@]}" "$tmpdir/grafana-dashboards.tgz" "${REMOTE_USER}@${VM_PUBLIC_IP}:/tmp/readmates-grafana-dashboards.tgz"
 fi
@@ -224,6 +234,12 @@ if printf '%s\n' "$services" | grep -Eq '(^|[[:space:]])grafana([[:space:]]|$)';
   sudo tar -xzf /tmp/readmates-grafana-dashboards.tgz -C "$remote_dir/ops/grafana/dashboards"
   sudo rm -f /tmp/readmates-grafana-provisioning.tgz /tmp/readmates-grafana-dashboards.tgz
 fi
+
+for cleanup_dir in "$remote_dir/ops/prometheus/alerts" "$remote_dir/deploy/oci/grafana/provisioning" "$remote_dir/ops/grafana/dashboards"; do
+  if [ -d "$cleanup_dir" ]; then
+    sudo find "$cleanup_dir" \( -name '._*' -o -name '.DS_Store' \) -delete
+  fi
+done
 
 sudo chown -R readmates:readmates "$remote_dir/deploy/oci" "$remote_dir/ops/prometheus/alerts" "$remote_dir/ops/grafana/dashboards"
 cd "$remote_dir/deploy/oci"
