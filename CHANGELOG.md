@@ -9,10 +9,25 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 ### Highlights
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
+
+## v1.16.3 - 2026-06-30
+
+### Fixed
+
 - **observability deploy log hygiene:** OCI observability archives now suppress macOS extended-attribute headers in addition to AppleDouble files, keeping production deploy logs clean while preserving the same Prometheus/Grafana payload.
 - **observability partial-stack target health:** Prometheus+Grafana-only deployments now ship a Prometheus config without Alertmanager scrape/alertmanager targets, so production target health reflects only services that are intentionally running.
 - **observability config apply:** OCI observability deploys now restart Prometheus after `compose up`, ensuring changed scrape/rule config takes effect even when the container is already running.
 - **Grafana credential apply:** OCI observability deploys now reset the Grafana admin password after startup and verify authenticated dashboard search so regenerated VM-local env credentials match the persisted Grafana database.
+
+### Deployment Notes
+
+- Patch release for the OCI observability deployment helper and public runbook. No DB migration, frontend route, server API contract, OAuth scope, auth cookie format, or runtime secret format change is included.
+- Publish `v1.16.3`, confirm `Deploy Front` and `Deploy Server Image`, then use the checked-in `deploy/oci/06-deploy-observability-stack.sh` to redeploy the production Prometheus/Grafana partial stack.
+
+### Verification
+
+- Local deploy helper verification (2026-06-30): `bash -n deploy/oci/06-deploy-observability-stack.sh scripts/validate-prometheus-config.sh`, `shellcheck deploy/oci/06-deploy-observability-stack.sh scripts/validate-prometheus-config.sh`, `./scripts/validate-prometheus-config.sh deploy/oci/prometheus/prometheus.yml`, `./scripts/validate-prometheus-config.sh deploy/oci/prometheus/prometheus.no-alertmanager.yml`, and targeted `git diff --check` passed.
+- Production observability verification (2026-06-30): Prometheus/Grafana partial-stack redeploy passed; Prometheus targets were `prometheus-self=up` and `readmates-server=up`; Grafana authenticated `Frontend Runtime` dashboard search passed; frontend smoke metrics were queryable in Prometheus.
 
 ## v1.16.2 - 2026-06-30
 
