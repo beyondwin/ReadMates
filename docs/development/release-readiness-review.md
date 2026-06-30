@@ -2,6 +2,25 @@
 
 남은 리스크, release readiness, merge 후 안전성, ship 가능 여부를 확인할 때 사용하는 체크리스트입니다. 구현 계획의 완료 여부와 테스트 통과 여부만으로 release risk가 닫혔다고 판단하지 않습니다.
 
+## 2026-06-30 production observability bootstrap closeout
+
+- Scope reviewed: local `main..codex/2026-06-30-readmates-production-observability-v1-20260630-040540` before merge, covering OCI observability deploy helper values, Grafana provisioning/runbook closure, alert triage docs, and public-release scanner docs.
+- Release classification: operator-facing deployment/runbook and public-release safety documentation. No Flyway migration, public API contract, auth/BFF token handling, OAuth scope, Pages Functions behavior, frontend route behavior, secret/session handling, or production server code behavior is included.
+- CI/deploy impact: `deploy/oci/06-deploy-observability-stack.sh` keeps the same manual VM deployment entry point and now uses public-safe dummy env values when Alertmanager or Grafana is intentionally not selected. The script still requires private operator env before production deployment.
+- Public safety: Grafana admin credentials and Alertmanager SMTP values remain VM-local env only. Docs use `example.com` and shell env guards instead of VM IPs, private domains, SMTP credentials, OCIDs, deployment state, or token-shaped examples.
+- Local verification before merge:
+  - `bash -n deploy/oci/06-deploy-observability-stack.sh scripts/public-release-check.sh scripts/validate-prometheus-config.sh scripts/validate-prometheus-rules.sh scripts/validate-alertmanager-config.sh` - pass.
+  - `./scripts/lint-grafana-dashboards.sh` - pass, 3 dashboards.
+  - `./scripts/validate-prometheus-rules.sh` - pass, 17 rules across 7 files.
+  - `./scripts/validate-prometheus-config.sh` - pass.
+  - `./scripts/validate-alertmanager-config.sh` - pass.
+  - Generated placeholder `alertmanager.env` and `grafana.env` plus `docker compose -f compose.infra.yml config` - pass, with `grafana` and `127.0.0.1:3001:3000` present.
+  - `git diff --check --` changed deploy/docs files - pass.
+  - `./scripts/build-public-release-candidate.sh` and `./scripts/public-release-check.sh .tmp/public-release-candidate` - pass; gitleaks reported no leaks.
+  - `graphify update .` plus CPE Graphify freshness audit - pass; `graphify-out/` remains ignored and evidence is command-based.
+- Skipped before merge: production metrics/dashboard deploy, full Alertmanager deploy, Grafana SSH tunnel login, controlled inbox alert, production OAuth/provider-console/tag workflows. These require operator-provided VM, SSH, Grafana password, SMTP, browser, or release-operation access and are not local merge evidence.
+- Residual risk: no known local release-readiness blocker remains after static, compose, observability, public-release, Graphify, CHANGELOG, and closeout-doc evidence. Same-VM observability still cannot report a total VM outage, and production proof remains an operator deployment step after private env is available.
+
 ## 2026-06-29 v1.15.1 server image repair readiness
 
 - Scope reviewed: `v1.15.0` tag operation, failed `Deploy Server Image` run `28338469979`, and local server runtime dependency graph before publishing `v1.15.1`.
