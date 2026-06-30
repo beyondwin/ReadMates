@@ -24,8 +24,17 @@ class FrontendObservabilityController(
         @RequestBody request: FrontendObservabilityRequest,
     ): FrontendObservabilityResponse {
         val events = request.events.take(MAX_EVENTS)
-        val mapped = events.mapNotNull(FrontendObservabilityEventRequest::toApplicationEvent)
-        val dropped = events.size - mapped.size
+        val mapped = mutableListOf<FrontendObservabilityEvent>()
+        var dropped = 0
+        for (event in events) {
+            val mappedEvent = event.toApplicationEvent()
+            if (mappedEvent == null) {
+                dropped += 1
+                recordFrontendObservability.recordDropped(event.dropReason())
+            } else {
+                mapped += mappedEvent
+            }
+        }
         if (mapped.isEmpty()) {
             return FrontendObservabilityResponse(accepted = 0, dropped = dropped)
         }
@@ -87,6 +96,13 @@ data class FrontendObservabilityEventRequest(
         val code = errorCode?.takeIf(::isSafeCode) ?: return null
         return FrontendApiFailureEvent(safeRoute, group, status, code)
     }
+
+    fun dropReason(): String =
+        if (routePattern?.let(::isSafeRoutePattern) == false) {
+            "invalid_route_pattern"
+        } else {
+            "invalid_event"
+        }
 }
 
 data class FrontendObservabilityResponse(

@@ -55,4 +55,21 @@ class FrontendObservabilityServiceTest {
                 ).count(),
         ).isEqualTo(1.0)
     }
+
+    @Test
+    fun `records dropped frontend observability events`() {
+        val registry = SimpleMeterRegistry()
+        val service = FrontendObservabilityService(FrontendObservabilityMetrics(registry))
+
+        service.recordDropped("invalid_route_pattern")
+
+        assertThat(
+            registry
+                .counter(
+                    "readmates.frontend.observability.dropped",
+                    "reason",
+                    "invalid_route_pattern",
+                ).count(),
+        ).isEqualTo(1.0)
+    }
 }

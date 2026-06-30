@@ -5,4 +5,6 @@ import com.readmates.observability.application.model.FrontendObservabilityResult
 
 interface RecordFrontendObservabilityUseCase {
     fun record(events: List<FrontendObservabilityEvent>): FrontendObservabilityResult
+
+    fun recordDropped(reason: String)
 }

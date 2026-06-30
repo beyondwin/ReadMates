@@ -34,4 +34,8 @@ class FrontendObservabilityService(
         }
         return FrontendObservabilityResult(accepted = accepted, dropped = 0)
     }
+
+    override fun recordDropped(reason: String) {
+        metrics.recordDropped(reason)
+    }
 }

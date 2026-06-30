@@ -73,5 +73,7 @@ class FrontendObservabilityControllerTest {
                 jsonPath("$.accepted") { value(0) }
                 jsonPath("$.dropped") { value(1) }
             }
+
+        verify(useCase).recordDropped("invalid_route_pattern")
     }
 }
