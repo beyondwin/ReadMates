@@ -82,8 +82,30 @@ services:
       retries: 5
       start_period: 15s
 
+  grafana:
+    image: grafana/grafana:11.5.1
+    restart: unless-stopped
+    env_file:
+      - ./grafana.env
+    ports:
+      - "127.0.0.1:3001:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../../ops/grafana/dashboards:/var/lib/grafana/dashboards/readmates:ro
+      - readmates_grafana_data:/var/lib/grafana
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
 volumes:
   readmates-redis-data:
   readmates-redpanda-data:
   readmates_prom_data:
   readmates_alertmanager_data:
+  readmates_grafana_data:

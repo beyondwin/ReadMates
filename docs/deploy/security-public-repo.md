@@ -208,7 +208,7 @@ Git ignore 대상 파일이라도 실제 secret을 담고 있으면 위험합니
 
 ## Observability secrets
 
-Prometheus/Alertmanager 자체는 자격증명을 git에 두지 않는다. SMTP receiver는 env 6개로만 주입된다.
+Prometheus/Alertmanager/Grafana 자체는 자격증명을 git에 두지 않는다. SMTP receiver와 Grafana admin credential은 env로만 주입된다.
 
 | 변수 | 의미 | placeholder 예시 |
 |------|------|------------------|
@@ -218,5 +218,7 @@ Prometheus/Alertmanager 자체는 자격증명을 git에 두지 않는다. SMTP 
 | `READMATES_ALERT_SMTP_PASSWORD` | SMTP password | — |
 | `READMATES_ALERT_SMTP_FROM` | sender address | `alerts@example.com` |
 | `READMATES_ALERT_EMAIL_TO` | operator recipient(들) | `ops@example.com` |
+| `READMATES_GRAFANA_ADMIN_USER` | Grafana admin user | `readmates` |
+| `READMATES_GRAFANA_ADMIN_PASSWORD` | Grafana admin password | — |
 
-`scripts/public-release-check.sh`가 `deploy/oci/{prometheus,alertmanager}/`, `ops/prometheus/alerts/`에 placeholder 아닌 이메일 도메인이나 IPv4 literal이 들어오면 fail시킨다. Prometheus target은 docker network DNS(`readmates-api:8081`, `alertmanager:9093`)만 사용한다.
+`scripts/public-release-check.sh`가 `deploy/oci/{prometheus,alertmanager,grafana}/`, `ops/prometheus/alerts/`에 placeholder 아닌 이메일 도메인이나 IPv4 literal이 들어오면 fail시킨다. Prometheus target은 docker network DNS(`readmates-api:8081`, `alertmanager:9093`)만 사용한다. Grafana는 운영 VM의 `127.0.0.1:3001`에만 바인딩하고 SSH tunnel로 접근한다.

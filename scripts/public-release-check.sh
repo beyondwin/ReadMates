@@ -344,13 +344,14 @@ run_content_check() {
 
 scan_observability_targets() {
   # Observability secrets / placeholders — fail if real email domains, SMTP
-  # hosts, or IP literals appear in deploy/oci/{prometheus,alertmanager}/ or
+  # hosts, or IP literals appear in deploy/oci/{prometheus,alertmanager,grafana}/ or
   # ops/prometheus/alerts/. Prometheus target hostnames must be docker
   # service DNS names (e.g. `readmates-api:8081`), and alertmanager identity values
   # must remain `${READMATES_ALERT_*}` placeholders.
   local observability_targets=(
     "$source_abs/deploy/oci/prometheus"
     "$source_abs/deploy/oci/alertmanager"
+    "$source_abs/deploy/oci/grafana"
     "$source_abs/ops/prometheus/alerts"
   )
   local target rel
