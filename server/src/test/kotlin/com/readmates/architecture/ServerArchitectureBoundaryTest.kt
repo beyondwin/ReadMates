@@ -148,7 +148,7 @@ class ServerArchitectureBoundaryTest {
             registered.containsAll(
                 setOf("admin.audit", "admin.health", "admin.analytics", "aigen", "sessionclosing", "observability"),
             ),
-            "Server slice registry must include admin.audit, admin.health, admin.analytics, aigen, sessionclosing, and observability.",
+            "Server slice registry must include recent migrated slices.",
         )
     }
 

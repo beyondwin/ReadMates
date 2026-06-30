@@ -16,6 +16,7 @@
   - `npx --yes pnpm@10.33.0 --dir front lighthouse:preview -- --group public --limit 2` - pass; route count 2, failed route count 0, summary `.tmp/performance/lighthouse-preview/2026-06-30T05-47-44-735Z/summary.md`.
   - `./server/gradlew -p server unitTest --tests 'com.readmates.observability.*'` - pass.
   - `./server/gradlew -p server clean test` - pass.
+  - `./server/gradlew -p server check architectureTest` - pass.
   - `./server/gradlew -p server architectureTest` - pass.
   - `./scripts/lint-grafana-dashboards.sh` - pass.
   - `./scripts/validate-prometheus-rules.sh` - pass.

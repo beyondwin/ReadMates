@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:package-name")
+
 package com.readmates.observability.adapter.`in`.web
 
 import com.readmates.observability.application.model.FrontendApiFailureEvent
@@ -12,6 +14,10 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import java.time.Duration
+
+private const val MAX_DURATION_MS = 60_000L
+private val uuidLikeValue = Regex("[0-9a-f]{8}-[0-9a-f-]{27}", RegexOption.IGNORE_CASE)
+private val rawClubSlugPath = Regex("/clubs/(?!:slug(?:/|$))[^/]+")
 
 @RestController
 @RequestMapping("/api/observability/frontend-events")
@@ -85,24 +91,36 @@ data class FrontendObservabilityEventRequest(
     }
 
     private fun routeLoadEvent(safeRoute: String): FrontendRouteLoadEvent? {
-        val duration = durationMs?.takeIf { it in 0..60_000 } ?: return null
-        val nav = navigationType?.takeIf { it in allowedNavigationTypes } ?: return null
-        val outcome = result?.takeIf { it in allowedRouteLoadResults } ?: return null
-        return FrontendRouteLoadEvent(safeRoute, Duration.ofMillis(duration), nav, outcome)
+        val duration = durationMs?.takeIf { it in 0..MAX_DURATION_MS }
+        val nav = navigationType?.takeIf { it in allowedNavigationTypes }
+        val outcome = result?.takeIf { it in allowedRouteLoadResults }
+        return if (duration != null && nav != null && outcome != null) {
+            FrontendRouteLoadEvent(safeRoute, Duration.ofMillis(duration), nav, outcome)
+        } else {
+            null
+        }
     }
 
     private fun runtimeErrorEvent(safeRoute: String): FrontendRuntimeErrorEvent? {
-        val kind = errorKind?.takeIf { it in allowedRuntimeKinds } ?: return null
-        val code = errorCode?.takeIf(::isSafeCode) ?: return null
-        val level = severity?.takeIf { it in allowedSeverities } ?: return null
-        return FrontendRuntimeErrorEvent(safeRoute, kind, code, level)
+        val kind = errorKind?.takeIf { it in allowedRuntimeKinds }
+        val code = errorCode?.takeIf(::isSafeCode)
+        val level = severity?.takeIf { it in allowedSeverities }
+        return if (kind != null && code != null && level != null) {
+            FrontendRuntimeErrorEvent(safeRoute, kind, code, level)
+        } else {
+            null
+        }
     }
 
     private fun apiFailureEvent(safeRoute: String): FrontendApiFailureEvent? {
-        val group = apiGroup?.takeIf { it in allowedApiGroups } ?: return null
-        val status = statusClass?.takeIf { it in allowedStatusClasses } ?: return null
-        val code = errorCode?.takeIf(::isSafeCode) ?: return null
-        return FrontendApiFailureEvent(safeRoute, group, status, code)
+        val group = apiGroup?.takeIf { it in allowedApiGroups }
+        val status = statusClass?.takeIf { it in allowedStatusClasses }
+        val code = errorCode?.takeIf(::isSafeCode)
+        return if (group != null && status != null && code != null) {
+            FrontendApiFailureEvent(safeRoute, group, status, code)
+        } else {
+            null
+        }
     }
 
     fun dropReason(): String =
@@ -145,10 +163,12 @@ private val allowedApiGroups =
 
 private fun isSafeCode(value: String): Boolean = Regex("^[A-Z][A-Z0-9_]{1,63}$").matches(value)
 
-private fun isSafeRoutePattern(value: String): Boolean {
-    if (value == "unknown") return true
-    if (!value.startsWith("/") || value.contains("?") || value.contains("#")) return false
-    if (Regex("[0-9a-f]{8}-[0-9a-f-]{27}", RegexOption.IGNORE_CASE).containsMatchIn(value)) return false
-    if (Regex("/clubs/(?!:slug(?:/|$))[^/]+").containsMatchIn(value)) return false
-    return true
-}
+private fun isSafeRoutePattern(value: String): Boolean =
+    value == "unknown" ||
+        (
+            value.startsWith("/") &&
+                !value.contains("?") &&
+                !value.contains("#") &&
+                !uuidLikeValue.containsMatchIn(value) &&
+                !rawClubSlugPath.containsMatchIn(value)
+        )

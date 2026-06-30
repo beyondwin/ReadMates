@@ -23,6 +23,7 @@ private val AI_GENERATE_MUTATION_PATH =
     Regex("^/api/host/sessions/[^/]+/ai-generate/jobs/[^/]+/(regenerate|commit)$")
 
 @Configuration
+@Suppress("LongParameterList")
 class SecurityConfig(
     private val bffSecretFilter: BffSecretFilter,
     private val sessionCookieAuthenticationFilter: SessionCookieAuthenticationFilter,

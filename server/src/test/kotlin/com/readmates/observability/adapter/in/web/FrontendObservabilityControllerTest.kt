@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:package-name")
+
 package com.readmates.observability.adapter.`in`.web
 
 import com.readmates.observability.application.model.FrontendObservabilityResult

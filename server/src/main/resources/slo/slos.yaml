@@ -27,6 +27,23 @@ slos:
       type: prometheus
       query_latency_p95: histogram_quantile(0.95, sum(rate(readmates_bff_api_latency_seconds_bucket[5m])) by (le)) * 1000
 
+  - id: frontend_route_load_p95
+    description: Browser route load p95 latency
+    objective_ms: 1500
+    window: 7d
+    sli:
+      type: prometheus
+      query_latency_p95: histogram_quantile(0.95, sum by (le) (rate(readmates_frontend_route_load_seconds_bucket[5m]))) * 1000
+
+  - id: frontend_runtime_error_ratio
+    description: Browser runtime error ratio over route loads
+    objective: 0.99
+    window: 7d
+    sli:
+      type: prometheus
+      query_good: sum(rate(readmates_frontend_route_load_seconds_count[5m])) - sum(rate(readmates_frontend_runtime_errors_total[5m]))
+      query_total: sum(rate(readmates_frontend_route_load_seconds_count[5m]))
+
   - id: login_success_ratio
     description: Google OAuth login success ratio
     objective: 0.99

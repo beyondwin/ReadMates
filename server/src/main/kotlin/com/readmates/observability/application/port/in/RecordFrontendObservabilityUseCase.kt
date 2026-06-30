@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:package-name")
+
 package com.readmates.observability.application.port.`in`
 
 import com.readmates.observability.application.model.FrontendObservabilityEvent
