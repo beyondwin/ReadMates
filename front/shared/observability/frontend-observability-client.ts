@@ -1,0 +1,69 @@
+import {
+  type FrontendObservabilityEvent,
+  sanitizeFrontendObservabilityBatch,
+} from "./frontend-observability-contracts";
+
+export type FrontendObservabilityClient = {
+  record(event: FrontendObservabilityEvent): void;
+  flush(): Promise<void>;
+  pendingCount(): number;
+};
+
+export type FrontendObservabilityClientOptions = {
+  endpoint?: string;
+  sendBeacon?: ((url: string, data: string) => boolean) | undefined;
+  fetchImpl?: typeof fetch | undefined;
+};
+
+const DEFAULT_ENDPOINT = "/api/bff/observability/frontend-events";
+const MAX_QUEUE_SIZE = 60;
+
+export function createFrontendObservabilityClient(
+  options: FrontendObservabilityClientOptions = {},
+): FrontendObservabilityClient {
+  const endpoint = options.endpoint ?? DEFAULT_ENDPOINT;
+  const queue: FrontendObservabilityEvent[] = [];
+  const sendBeacon =
+    options.sendBeacon ??
+    (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function"
+      ? (url: string, data: string) => navigator.sendBeacon(url, data)
+      : undefined);
+  const fetchImpl = options.fetchImpl ?? (typeof fetch === "function" ? fetch : undefined);
+
+  function record(event: FrontendObservabilityEvent) {
+    const safe = sanitizeFrontendObservabilityBatch([event]).events[0];
+    if (!safe) return;
+    queue.push(safe);
+    if (queue.length > MAX_QUEUE_SIZE) {
+      queue.splice(0, queue.length - MAX_QUEUE_SIZE);
+    }
+  }
+
+  async function flush() {
+    if (queue.length === 0) return;
+    const batch = sanitizeFrontendObservabilityBatch(queue.splice(0, queue.length));
+    if (batch.events.length === 0) return;
+    const body = JSON.stringify(batch);
+
+    try {
+      if (sendBeacon?.(endpoint, body)) return;
+      if (fetchImpl) {
+        await fetchImpl(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body,
+          keepalive: true,
+          cache: "no-store",
+        });
+      }
+    } catch {
+      // Telemetry is fail-open and must never affect product flows.
+    }
+  }
+
+  return {
+    record,
+    flush,
+    pendingCount: () => queue.length,
+  };
+}

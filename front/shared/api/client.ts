@@ -1,6 +1,7 @@
 import { apiErrorFromResponse } from "@/shared/api/errors";
 import { parseReadmatesResponse } from "@/shared/api/response";
 import { currentRelativeReturnTo, loginPathForReturnTo } from "@/shared/auth/login-return";
+import { recordFrontendApiFailure } from "@/shared/observability/frontend-observability";
 
 export class ReadMatesSessionExpiredError extends Error {
   constructor() {
@@ -77,7 +78,9 @@ export async function readmatesFetch<T>(path: string, init?: RequestInit, contex
   const response = await readmatesFetchResponse(path, init, context);
 
   if (!response.ok) {
-    throw await apiErrorFromResponse(response);
+    const error = await apiErrorFromResponse(response);
+    recordFrontendApiFailure({ path, status: error.status, errorCode: error.code });
+    throw error;
   }
 
   return parseReadmatesResponse<T>(response);

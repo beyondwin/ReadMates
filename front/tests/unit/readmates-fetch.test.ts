@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readmatesApiPath, readmatesFetch, readmatesFetchResponse, ReadMatesSessionExpiredError, __resetRedirectGuardForTest } from "@/shared/api/client";
 import { isReadmatesApiError } from "@/shared/api/errors";
+import { frontendObservability } from "@/shared/observability/frontend-observability";
 import { normalizedClubSlug } from "@/shared/security/club-slug";
 
 afterEach(() => {
@@ -211,6 +212,33 @@ describe("readmatesFetchResponse", () => {
       code: "INTERNAL_ERROR",
       fallback: true,
     });
+  });
+
+  it("records frontend API failure telemetry with safe path grouping", async () => {
+    const recordSpy = vi.spyOn(frontendObservability, "record");
+    const flushSpy = vi.spyOn(frontendObservability, "flush").mockResolvedValue(undefined);
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ code: "INTERNAL_ERROR", message: "server failed", status: 500 }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(readmatesFetch("/api/host/sessions/session-7?clubSlug=reading-sai")).rejects.toMatchObject({
+      code: "INTERNAL_ERROR",
+    });
+
+    expect(recordSpy).toHaveBeenCalledWith({
+      type: "API_FAILURE",
+      routePattern: expect.any(String),
+      apiGroup: "host-session",
+      statusClass: "5xx",
+      errorCode: "INTERNAL_ERROR",
+    });
+    expect(JSON.stringify(recordSpy.mock.calls)).not.toContain("reading-sai");
+    expect(JSON.stringify(recordSpy.mock.calls)).not.toContain("session-7");
+    expect(flushSpy).toHaveBeenCalled();
   });
 
   it("throws API errors with safe fallback body when body status disagrees with HTTP status", async () => {
