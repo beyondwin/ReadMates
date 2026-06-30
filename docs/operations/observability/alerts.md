@@ -8,7 +8,7 @@
 
 - severity: `critical` | `warning` 또는 `warn` | `info`. 기존 후보 룰은 `warning`, 파일화된 AI 세션 생성 룰은 현재 `warn` label을 씁니다.
 - `for:`로 일시적 spike 무시.
-- annotations에 runbook 링크 (runbook 미작성 시 `TBD`).
+- annotations에는 가능한 경우 `runbook_url`을 둔다. runbook이 없는 alert는 운영 알림으로 승격하기 전에 이 문서나 `docs/operations/runbooks/`에 triage 절차를 먼저 추가한다.
 - prod-only로 적용 가정. dev/staging은 룰 별도 set.
 - 메트릭 이름은 Prometheus exposition 형식 (Micrometer의 dot → underscore, counter에 `_total` 접미).
 
@@ -66,7 +66,7 @@ groups:
         annotations:
           summary: "Notification pending backlog over 100 for 10 minutes"
           description: "Consumer가 처리 속도를 따라가지 못하거나 죽었을 가능성. consumer 로그 확인."
-          runbook: "TBD - docs/operations/runbooks/notification-backlog.md"
+          runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#notification-backlog"
 
       - alert: NotificationOutboxBacklogCritical
         expr: max(readmates_notifications_outbox_backlog{status="pending"}) > 1000
@@ -77,7 +77,7 @@ groups:
         annotations:
           summary: "Notification pending backlog over 1000"
           description: "Consumer가 죽었거나 의존 인프라가 unreachable. 즉시 조사."
-          runbook: "TBD"
+          runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#notification-backlog"
 
       - alert: NotificationFailRateHigh
         expr: |
@@ -91,7 +91,7 @@ groups:
         annotations:
           summary: "Notification 실패율 5% 초과 (10분)"
           description: "발송 실패가 지속. 외부 채널(예: FCM) 장애 또는 payload 변경 의심."
-          runbook: "TBD"
+          runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#notification-backlog"
 
       - alert: NotificationDeadLetters
         expr: increase(readmates_notifications_dead_total[1h]) > 0
@@ -102,7 +102,7 @@ groups:
         annotations:
           summary: "Notification dead-letter 발생 (1시간 내)"
           description: "발송이 최종 포기된 알림이 있습니다. notification_deliveries.status='DEAD' 로우 조사."
-          runbook: "TBD"
+          runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#notification-backlog"
 
   - name: readmates.http
     interval: 30s
@@ -118,7 +118,7 @@ groups:
         annotations:
           summary: "HTTP 5xx ratio over 1% for 5 minutes"
           description: "에러 폭증. 최근 배포 / 외부 의존 의심."
-          runbook: "TBD"
+          runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#http-error-or-latency"
 
       - alert: HttpLatencyP95High
         expr: |
@@ -132,6 +132,7 @@ groups:
         annotations:
           summary: "p95 latency over 500ms for 10 minutes"
           description: "DB slow query, GC pause, Hikari 부족 등 의심. Service Health dashboard 확인."
+          runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#http-error-or-latency"
 
   - name: readmates.jvm
     interval: 30s
@@ -145,6 +146,7 @@ groups:
         annotations:
           summary: "Hikari connection pool에 대기 요청 누적 (2분)"
           description: "Pool size 부족 또는 long-running query. slow query log 확인."
+          runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#jvm-and-db-pool"
 
       - alert: JvmHeapHigh
         expr: |
@@ -157,6 +159,7 @@ groups:
         annotations:
           summary: "JVM heap 사용률 85% 초과 (10분)"
           description: "Memory leak 또는 GC 비효율. heap dump 검토 후보."
+          runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#jvm-and-db-pool"
 
   - name: readmates.security
     interval: 30s
@@ -170,7 +173,7 @@ groups:
         annotations:
           summary: "민감 엔드포인트 rate-limit 차단 발생 (5m 평균 > 0.1/s)"
           description: "지속적인 abuse 시도 가능. IP/계정 패턴 조사."
-          runbook: "TBD"
+          runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#http-error-or-latency"
 
   - name: readmates.redis
     interval: 30s
@@ -184,7 +187,7 @@ groups:
         annotations:
           summary: "Redis fallback 발생률 > 0.1/s (5분)"
           description: "Redis 불안정 또는 연결 문제. Redis 자체 로그 + 노드 상태 확인."
-          runbook: "TBD"
+          runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#redis-instability"
 
       - alert: RedisOperationErrors
         expr: sum(rate(readmates_redis_operation_errors_total[5m])) > 0.05
@@ -195,7 +198,7 @@ groups:
         annotations:
           summary: "Redis 명령 실행 오류율 > 0.05/s (5분)"
           description: "특정 어댑터/명령에서 오류 지속. 영향 범위 파악."
-          runbook: "TBD"
+          runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#redis-instability"
 ```
 
 ## DB 기반 알림 (Prometheus 외)
@@ -213,6 +216,6 @@ count > 0이면 운영자에게 알림 (이메일 또는 in-app).
 
 ## 후속
 
-- 위 룰을 `prometheus/rules/`에 yaml로 commit + alertmanager 설정 plan.
-- 알림 채널 (이메일, Slack, Telegram 등) 설정.
-- Runbook 작성 (각 alert별 대응 절차).
+- Alertmanager receiver를 운영 SMTP 또는 팀 알림 채널에 연결한다.
+- 한 달치 production data가 쌓이면 false positive와 threshold를 조정한다.
+- `node-exporter`, `cadvisor`, `blackbox-exporter`는 production v1 이후 별도 계획으로 추가한다.

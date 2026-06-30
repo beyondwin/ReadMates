@@ -94,14 +94,14 @@ write_alert_env() {
   } > "$target"
 }
 
-write_alert_placeholder_env() {
+write_alert_dummy_env() {
   local target="$1"
   umask 077
   {
     printf 'READMATES_ALERT_SMTP_HOST=smtp.example.com\n'
     printf 'READMATES_ALERT_SMTP_PORT=587\n'
-    printf 'READMATES_ALERT_SMTP_USER=placeholder\n'
-    printf 'READMATES_ALERT_SMTP_PASSWORD=placeholder\n'
+    printf 'READMATES_ALERT_SMTP_USER=example-user\n'
+    printf 'READMATES_ALERT_SMTP_PASSWORD=example-password\n'
     printf 'READMATES_ALERT_SMTP_FROM=alerts@example.com\n'
     printf 'READMATES_ALERT_EMAIL_TO=ops@example.com\n'
   } > "$target"
@@ -121,12 +121,12 @@ write_grafana_env() {
   } > "$target"
 }
 
-write_grafana_placeholder_env() {
+write_grafana_dummy_env() {
   local target="$1"
   umask 077
   {
     printf 'GF_SECURITY_ADMIN_USER=readmates\n'
-    printf 'GF_SECURITY_ADMIN_PASSWORD=placeholder\n'
+    printf 'GF_SECURITY_ADMIN_PASSWORD=example-long-random-password\n'
     printf 'GF_AUTH_ANONYMOUS_ENABLED=false\n'
     printf 'GF_USERS_ALLOW_SIGN_UP=false\n'
     printf 'GF_ANALYTICS_REPORTING_ENABLED=false\n'
@@ -172,12 +172,12 @@ trap cleanup EXIT
 if service_enabled alertmanager; then
   write_alert_env "$tmpdir/alertmanager.env"
 else
-  write_alert_placeholder_env "$tmpdir/alertmanager.env"
+  write_alert_dummy_env "$tmpdir/alertmanager.env"
 fi
 if service_enabled grafana; then
   write_grafana_env "$tmpdir/grafana.env" "$READMATES_GRAFANA_ADMIN_PASSWORD"
 else
-  write_grafana_placeholder_env "$tmpdir/grafana.env"
+  write_grafana_dummy_env "$tmpdir/grafana.env"
 fi
 
 echo "==> [3/7] VM Docker/Compose 확인"
