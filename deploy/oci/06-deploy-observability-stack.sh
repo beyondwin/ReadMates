@@ -257,6 +257,11 @@ echo "==> [6/7] Prometheus/Alertmanager/Grafana 시작"
 ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
   "cd $(shell_quote "$REMOTE_DIR/deploy/oci") && sudo docker compose -p $(shell_quote "$COMPOSE_PROJECT") -f compose.infra.yml up -d ${SERVICES}"
 
+if service_enabled prometheus; then
+  ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
+    "cd $(shell_quote "$REMOTE_DIR/deploy/oci") && sudo docker compose -p $(shell_quote "$COMPOSE_PROJECT") -f compose.infra.yml exec -T prometheus wget -qO- --post-data='' http://localhost:9090/-/reload >/dev/null"
+fi
+
 echo "==> [7/7] 관측성 smoke"
 ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
   "sudo bash -s -- $(shell_quote "$REMOTE_DIR") $(shell_quote "$COMPOSE_PROJECT") $(shell_quote "$SERVICES")" <<'EOF'
