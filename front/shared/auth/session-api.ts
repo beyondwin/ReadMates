@@ -1,5 +1,9 @@
-import { readmatesFetchResponse } from "@/shared/api/client";
+import { readmatesApiPath } from "@/shared/api/client";
 
 export function logoutCurrentSession() {
-  return readmatesFetchResponse("/api/auth/logout", { method: "POST" }, { clubSlug: undefined });
+  return fetch(`/api/bff${readmatesApiPath("/api/auth/logout", { clubSlug: undefined })}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+  });
 }
