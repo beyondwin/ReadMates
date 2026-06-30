@@ -54,7 +54,7 @@ READMATES_OBSERVABILITY_SERVICES="prometheus grafana" \
 ./deploy/oci/06-deploy-observability-stack.sh
 ```
 
-이 모드에서는 Prometheus가 `readmates-api` metric을 긁고 Grafana dashboard를 볼 수 있다. Alertmanager container는 아직 없으므로 Prometheus target 목록에서 `alertmanager`가 down으로 보일 수 있다. Email alert까지 운영하려면 SMTP env를 채운 뒤 full stack으로 다시 실행한다.
+이 모드에서는 배포 스크립트가 `deploy/oci/prometheus/prometheus.no-alertmanager.yml`을 전송한다. Prometheus는 `readmates-api`와 `prometheus-self`만 target으로 잡고 Grafana dashboard를 볼 수 있다. Email alert까지 운영하려면 SMTP env를 채운 뒤 full stack으로 다시 실행한다.
 
 VM 안에서 직접 compose를 실행하는 경우:
 
@@ -74,7 +74,7 @@ ssh -i "$HOME/.ssh/readmates_oci" -L 13001:127.0.0.1:3001 ubuntu@"$VM_PUBLIC_IP"
 
 ## Smoke check
 
-1. Target healthy: `docker compose -p readmates -f compose.infra.yml exec -T prometheus wget -qO- http://localhost:9090/api/v1/targets | grep -c '"health":"up"'` — full stack 기준 3 이상이어야 (readmates-api, prometheus-self, alertmanager). Prometheus + Grafana만 먼저 올린 경우에는 readmates-api와 prometheus-self가 up인지 확인한다.
+1. Target healthy: `docker compose -p readmates -f compose.infra.yml exec -T prometheus wget -qO- http://localhost:9090/api/v1/targets | grep -c '"health":"up"'` — full stack 기준 3 이상이어야 (readmates-api, prometheus-self, alertmanager). Prometheus + Grafana만 먼저 올린 경우에는 2 이상이어야 하며 `alertmanager` target은 없어야 한다.
 2. Alertmanager ready: `docker compose -p readmates -f compose.infra.yml exec -T alertmanager wget -qO- http://localhost:9093/-/ready` — 200 OK.
 3. Grafana ready: `docker compose -p readmates -f compose.infra.yml exec -T grafana wget -qO- http://localhost:3000/api/health` — 200 OK.
 4. Rule load: `docker compose -p readmates -f compose.infra.yml exec -T prometheus wget -qO- http://localhost:9090/api/v1/rules | grep -c '"name"'` — 최소 6 그룹.

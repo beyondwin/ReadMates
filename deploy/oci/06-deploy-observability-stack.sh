@@ -18,7 +18,8 @@ SKIP_VALIDATE="${READMATES_SKIP_OBSERVABILITY_VALIDATE:-false}"
 GRAFANA_ADMIN_USER="${READMATES_GRAFANA_ADMIN_USER:-readmates}"
 
 COMPOSE_INFRA_FILE="deploy/oci/compose.infra.yml"
-PROMETHEUS_FILE="deploy/oci/prometheus/prometheus.yml"
+PROMETHEUS_FILE_WITH_ALERTMANAGER="deploy/oci/prometheus/prometheus.yml"
+PROMETHEUS_FILE_WITHOUT_ALERTMANAGER="deploy/oci/prometheus/prometheus.no-alertmanager.yml"
 ALERTMANAGER_FILE="deploy/oci/alertmanager/alertmanager.yml"
 ALERT_RULES_DIR="ops/prometheus/alerts"
 GRAFANA_PROVISIONING_DIR="deploy/oci/grafana/provisioning"
@@ -145,6 +146,11 @@ create_clean_archive() {
     -czf "$target" .
 }
 
+PROMETHEUS_FILE="$PROMETHEUS_FILE_WITH_ALERTMANAGER"
+if ! service_enabled alertmanager; then
+  PROMETHEUS_FILE="$PROMETHEUS_FILE_WITHOUT_ALERTMANAGER"
+fi
+
 echo "==> [1/7] 필수 파일 확인"
 require_file "$COMPOSE_INFRA_FILE"
 require_file "$PROMETHEUS_FILE"
@@ -163,7 +169,7 @@ fi
 if [ "$SKIP_VALIDATE" != "true" ]; then
   echo "==> [2/7] 관측 설정 로컬 검증"
   ./scripts/validate-prometheus-rules.sh
-  ./scripts/validate-prometheus-config.sh
+  ./scripts/validate-prometheus-config.sh "$PROMETHEUS_FILE"
   if service_enabled alertmanager; then
     ./scripts/validate-alertmanager-config.sh
   fi

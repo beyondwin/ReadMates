@@ -10,6 +10,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 - **observability deploy log hygiene:** OCI observability archives now suppress macOS extended-attribute headers in addition to AppleDouble files, keeping production deploy logs clean while preserving the same Prometheus/Grafana payload.
+- **observability partial-stack target health:** Prometheus+Grafana-only deployments now ship a Prometheus config without Alertmanager scrape/alertmanager targets, so production target health reflects only services that are intentionally running.
 
 ## v1.16.2 - 2026-06-30
 

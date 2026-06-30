@@ -1,0 +1,21 @@
+# ReadMates Prometheus scrape + rule config for Prometheus/Grafana-only bring-up.
+# Target hostnames are docker network DNS names — no real OCI hostnames here.
+global:
+  scrape_interval: 30s
+  scrape_timeout: 10s
+  evaluation_interval: 30s
+  external_labels:
+    app: readmates
+
+rule_files:
+  - /etc/prometheus/alerts/*.yml
+
+scrape_configs:
+  - job_name: readmates-server
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["readmates-api:8081"]
+
+  - job_name: prometheus-self
+    static_configs:
+      - targets: ["localhost:9090"]
