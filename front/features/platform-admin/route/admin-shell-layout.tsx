@@ -1,7 +1,6 @@
 import { type MouseEvent, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { logout } from "@/features/auth/api/auth-api";
 import {
   adminOtherAccountLoginPath,
   adminWorkspaceAccountLabel,
@@ -24,6 +23,7 @@ import {
   previewPlatformAdminOnboarding,
 } from "@/features/platform-admin/api/platform-admin-api";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import { logoutCurrentSession } from "@/shared/auth/session-api";
 import { AdminBreadcrumbProvider } from "./admin-breadcrumb-context";
 import { useAdminBreadcrumbExtra } from "./admin-breadcrumb-hook";
 
@@ -75,7 +75,7 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
   }
 
   async function otherAccountLogin() {
-    const response = await logout();
+    const response = await logoutCurrentSession();
     if (response.ok || response.status === 401) {
       window.location.assign(otherAccountLoginPath);
       return true;

@@ -13,11 +13,11 @@ import {
 } from "@/features/platform-admin/queries/platform-admin-queries";
 import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
 
-vi.mock("@/features/auth/api/auth-api", () => ({
-  logout: vi.fn(),
+vi.mock("@/shared/auth/session-api", () => ({
+  logoutCurrentSession: vi.fn(),
 }));
 
-import { logout } from "@/features/auth/api/auth-api";
+import { logoutCurrentSession } from "@/shared/auth/session-api";
 import { AdminShellLayout } from "./admin-shell-layout";
 
 const summary: PlatformAdminSummaryResponse = {
@@ -76,7 +76,7 @@ function renderShell(initialEntry: string, opts: { auth?: typeof auth | null } =
 
 describe("AdminShellLayout", () => {
   beforeEach(() => {
-    vi.mocked(logout).mockReset();
+    vi.mocked(logoutCurrentSession).mockReset();
   });
 
   afterEach(() => {
@@ -139,7 +139,7 @@ describe("AdminShellLayout", () => {
   });
 
   it("sends other-account login through logout and a safe admin return path", async () => {
-    vi.mocked(logout).mockResolvedValue(new Response(null, { status: 204 }));
+    vi.mocked(logoutCurrentSession).mockResolvedValue(new Response(null, { status: 204 }));
     const assign = vi.fn();
     vi.stubGlobal("location", { assign });
 
@@ -148,7 +148,7 @@ describe("AdminShellLayout", () => {
     fireEvent.click(screen.getByRole("button", { name: "다른 계정으로 로그인" }));
 
     await waitFor(() => {
-      expect(logout).toHaveBeenCalledTimes(1);
+      expect(logoutCurrentSession).toHaveBeenCalledTimes(1);
       expect(assign).toHaveBeenCalledWith("/login?returnTo=%2Fadmin%2Fclubs%3Ffilter%3Dready%23top");
     });
   });

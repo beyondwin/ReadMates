@@ -4,6 +4,7 @@ import {
   readmatesFetchResponse,
   type ReadmatesApiContext,
 } from "@/shared/api/client";
+import { logoutCurrentSession } from "@/shared/auth/session-api";
 
 function readmatesFetchRawResponse(path: string, init?: RequestInit, context?: ReadmatesApiContext) {
   const headers = new Headers(init?.headers);
@@ -48,5 +49,5 @@ export async function parseInvitationPreview(response: Response): Promise<Invita
 }
 
 export function logout() {
-  return readmatesFetchRawResponse("/api/auth/logout", { method: "POST" });
+  return logoutCurrentSession();
 }
