@@ -7,11 +7,13 @@
 - Scope reviewed: frontend runtime telemetry contracts, BFF telemetry intake, Spring `readmates.frontend.*` Micrometer metrics, Grafana dashboard JSON, and observability docs.
 - Release classification: operational observability side path. No DB migration, product API response contract, OAuth scope, auth cookie contract, user-facing route behavior, or deploy workflow behavior changes are included.
 - Public safety: browser telemetry sends normalized route patterns, enum-like API groups, status classes, safe error codes, and optional short hash prefixes only. Raw URL, query string, club slug value, UUID, email, display name, account name, membership/user id, stack trace, request/response body, token, private domain, OCID, VM IP, and deployment state are prohibited.
+- Risk repair before merge: the BFF sanitizer now forwards safe `droppedReasons` for rejected telemetry events so normal browser traffic increments `readmates.frontend.observability.dropped` instead of silently losing validation failures.
 - Local verification before merge:
   - `npx --yes pnpm@10.33.0 --dir front test -- observability route-observability readmates-fetch frontend-observability-bff` - pass.
   - `npx --yes pnpm@10.33.0 --dir front lint` - pass.
   - `npx --yes pnpm@10.33.0 --dir front test` - pass.
   - `npx --yes pnpm@10.33.0 --dir front build` - pass.
+  - `npx --yes pnpm@10.33.0 --dir front lighthouse:preview -- --group public --limit 2` - pass; route count 2, failed route count 0, summary `.tmp/performance/lighthouse-preview/2026-06-30T05-47-44-735Z/summary.md`.
   - `./server/gradlew -p server unitTest --tests 'com.readmates.observability.*'` - pass.
   - `./server/gradlew -p server clean test` - pass.
   - `./server/gradlew -p server architectureTest` - pass.
@@ -19,8 +21,8 @@
   - `./scripts/validate-prometheus-rules.sh` - pass.
   - `./scripts/build-public-release-candidate.sh` and `./scripts/public-release-check.sh .tmp/public-release-candidate` - pass.
   - `graphify update .` plus CPE Graphify freshness audit - pass.
-- Skipped before merge: production scrape, dashboard data confirmation, external blackbox checks, production OAuth/provider-console/tag workflows, and frontend E2E. Production checks require traffic or operator access; E2E is not local evidence for this side-path branch because user-facing route behavior and auth flow semantics are unchanged.
-- Residual risk: total frontend script-load failure can still be invisible until external synthetic monitoring is added. Frontend SLOs start in measurement mode and should not page until baseline data exists.
+- Skipped before merge: production scrape, dashboard data confirmation, production external blackbox monitor installation, production OAuth/provider-console/tag workflows, and frontend E2E. Production checks require traffic or operator access; E2E is not local evidence for this side-path branch because user-facing route behavior and auth flow semantics are unchanged.
+- Residual risk: no known local release-readiness blocker remains after dropped-metric repair, local production-build Lighthouse preview smoke, frontend/server/observability checks, public-release scan, and Graphify freshness. Production scrape/dashboard data and an always-on external synthetic monitor remain post-deploy operational evidence, not local merge evidence.
 
 ## 2026-06-30 production observability bootstrap closeout
 

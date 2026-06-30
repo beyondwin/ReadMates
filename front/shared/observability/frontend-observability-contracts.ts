@@ -46,6 +46,12 @@ export type FrontendObservabilityBatch = {
   events: FrontendObservabilityEvent[];
 };
 
+export type FrontendObservabilityDropReason = "invalid_route_pattern" | "invalid_event" | "batch_limit";
+
+export type SanitizedFrontendObservabilityBatch = FrontendObservabilityBatch & {
+  droppedReasons: FrontendObservabilityDropReason[];
+};
+
 const navigationTypes = new Set<FrontendNavigationType>(["LOAD", "PUSH", "POP", "REPLACE"]);
 const routeResults = new Set<FrontendRouteLoadResult>(["success", "error"]);
 const runtimeKinds = new Set<FrontendRuntimeErrorKind>(["render", "unhandled-rejection", "unknown"]);
@@ -81,6 +87,14 @@ function safeRoutePattern(value: unknown): FrontendRoutePattern | null {
   if (!value.includes(":") && /[0-9a-f]{8}-[0-9a-f-]{27}/i.test(value)) return null;
   if (/\/clubs\/(?!:slug(?:\/|$))[^/]+/.test(value)) return null;
   return value;
+}
+
+function dropReason(event: unknown): FrontendObservabilityDropReason {
+  const record = asRecord(event);
+  if (record?.routePattern !== undefined && safeRoutePattern(record.routePattern) === null) {
+    return "invalid_route_pattern";
+  }
+  return "invalid_event";
 }
 
 function safeCode(value: unknown): string | null {
@@ -135,11 +149,21 @@ export function sanitizeFrontendObservabilityEvent(event: unknown): FrontendObse
 }
 
 export function sanitizeFrontendObservabilityBatch(events: unknown[]): FrontendObservabilityBatch {
+  return { events: sanitizeFrontendObservabilityBatchWithDropped(events).events };
+}
+
+export function sanitizeFrontendObservabilityBatchWithDropped(events: unknown[]): SanitizedFrontendObservabilityBatch {
   const sanitized: FrontendObservabilityEvent[] = [];
+  const droppedReasons: FrontendObservabilityDropReason[] = [];
   for (const event of events) {
     const safe = sanitizeFrontendObservabilityEvent(event);
-    if (safe) sanitized.push(safe);
-    if (sanitized.length >= FRONTEND_OBSERVABILITY_MAX_EVENTS) break;
+    if (!safe) {
+      droppedReasons.push(dropReason(event));
+    } else if (sanitized.length < FRONTEND_OBSERVABILITY_MAX_EVENTS) {
+      sanitized.push(safe);
+    } else {
+      droppedReasons.push("batch_limit");
+    }
   }
-  return { events: sanitized };
+  return { events: sanitized, droppedReasons };
 }

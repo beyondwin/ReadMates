@@ -6,7 +6,7 @@ import {
   requestIdForUpstream,
   READMATES_REQUEST_ID_HEADER,
 } from "../../../_shared/proxy";
-import { sanitizeFrontendObservabilityBatch } from "../../../../shared/observability/frontend-observability-contracts";
+import { sanitizeFrontendObservabilityBatchWithDropped } from "../../../../shared/observability/frontend-observability-contracts";
 
 type Env = {
   READMATES_API_BASE_URL: string;
@@ -59,7 +59,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     parsed && typeof parsed === "object" && Array.isArray((parsed as { events?: unknown }).events)
       ? (parsed as { events: unknown[] }).events
       : [];
-  const sanitized = sanitizeFrontendObservabilityBatch(rawEvents);
+  const sanitized = sanitizeFrontendObservabilityBatchWithDropped(rawEvents);
 
   const upstreamUrl = new URL("/api/observability/frontend-events", apiBaseUrlFromEnv(context.env));
   const headers = new Headers();

@@ -5,6 +5,7 @@ import com.readmates.observability.application.port.`in`.RecordFrontendObservabi
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.anyList
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.http.MediaType
@@ -75,5 +76,32 @@ class FrontendObservabilityControllerTest {
             }
 
         verify(useCase).recordDropped("invalid_route_pattern")
+    }
+
+    @Test
+    fun `records dropped reasons reported by trusted BFF sanitizer`() {
+        mockMvc
+            .post("/api/observability/frontend-events") {
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "events": [],
+                      "droppedReasons": [
+                        "invalid_route_pattern",
+                        "invalid_event",
+                        "private_member_value"
+                      ]
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isAccepted() }
+                jsonPath("$.accepted") { value(0) }
+                jsonPath("$.dropped") { value(2) }
+            }
+
+        verify(useCase).recordDropped("invalid_route_pattern")
+        verify(useCase).recordDropped("invalid_event")
+        verify(useCase, times(0)).recordDropped("private_member_value")
     }
 }

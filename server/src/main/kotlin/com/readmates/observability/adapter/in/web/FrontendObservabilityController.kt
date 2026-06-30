@@ -26,6 +26,12 @@ class FrontendObservabilityController(
         val events = request.events.take(MAX_EVENTS)
         val mapped = mutableListOf<FrontendObservabilityEvent>()
         var dropped = 0
+        for (reason in request.droppedReasons.orEmpty().take(MAX_DROPPED_REASONS)) {
+            if (reason in allowedDroppedReasons) {
+                dropped += 1
+                recordFrontendObservability.recordDropped(reason)
+            }
+        }
         for (event in events) {
             val mappedEvent = event.toApplicationEvent()
             if (mappedEvent == null) {
@@ -47,11 +53,13 @@ class FrontendObservabilityController(
 
     private companion object {
         const val MAX_EVENTS = 20
+        const val MAX_DROPPED_REASONS = 60
     }
 }
 
 data class FrontendObservabilityRequest(
     val events: List<FrontendObservabilityEventRequest> = emptyList(),
+    val droppedReasons: List<String>? = null,
 )
 
 data class FrontendObservabilityEventRequest(
@@ -115,6 +123,7 @@ private val allowedRouteLoadResults = setOf("success", "error")
 private val allowedRuntimeKinds = setOf("render", "unhandled-rejection", "unknown")
 private val allowedSeverities = setOf("warn", "error")
 private val allowedStatusClasses = setOf("4xx", "5xx", "network", "unknown")
+private val allowedDroppedReasons = setOf("invalid_route_pattern", "invalid_event", "batch_limit")
 private val allowedApiGroups =
     setOf(
         "admin-ai",

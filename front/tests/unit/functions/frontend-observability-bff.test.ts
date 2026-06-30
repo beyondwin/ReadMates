@@ -83,6 +83,56 @@ describe("frontend observability BFF endpoint", () => {
     expect(JSON.parse(init?.body as string).events).toHaveLength(1);
   });
 
+  it("forwards sanitized drop reasons for events removed by the BFF", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ accepted: 1, dropped: 1 }), {
+        status: 202,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await onRequest(
+      context(
+        new Request("https://readmates.example.com/api/bff/observability/frontend-events", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            events: [
+              {
+                type: "ROUTE_LOAD",
+                routePattern: "/clubs/raw-club/app",
+                durationMs: 100,
+                navigationType: "LOAD",
+                result: "success",
+              },
+              {
+                type: "ROUTE_LOAD",
+                routePattern: "/clubs/:slug/app",
+                durationMs: 100,
+                navigationType: "LOAD",
+                result: "success",
+              },
+            ],
+          }),
+        }),
+      ),
+    );
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(JSON.parse(init?.body as string)).toEqual({
+      events: [
+        {
+          type: "ROUTE_LOAD",
+          routePattern: "/clubs/:slug/app",
+          durationMs: 100,
+          navigationType: "LOAD",
+          result: "success",
+        },
+      ],
+      droppedReasons: ["invalid_route_pattern"],
+    });
+  });
+
   it("returns 413 for oversized payloads before forwarding", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 202 }));
     const response = await onRequest(
