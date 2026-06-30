@@ -19,7 +19,7 @@ scrape_configs:
   - job_name: readmates-server
     metrics_path: /actuator/prometheus
     static_configs:
-      - targets: ["server:8081"]
+      - targets: ["readmates-api:8081"]
 
   - job_name: prometheus-self
     static_configs:

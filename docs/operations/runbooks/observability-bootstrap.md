@@ -32,19 +32,19 @@ READMATES_ALERT_EMAIL_TO=<운영자 이메일>
 
 ```bash
 cd /opt/readmates/deploy/oci
-docker compose -f compose.infra.yml up -d prometheus alertmanager
+docker compose -p readmates -f compose.infra.yml up -d prometheus alertmanager
 ```
 
 ## Smoke check
 
-1. Target healthy: `docker exec readmates-prometheus wget -qO- http://localhost:9090/api/v1/targets | grep -c '"health":"up"'` — 3 이상이어야 (server, prometheus-self, alertmanager).
-2. Alertmanager ready: `docker exec readmates-alertmanager wget -qO- http://localhost:9093/-/ready` — 200 OK.
-3. Rule load: `docker exec readmates-prometheus wget -qO- http://localhost:9090/api/v1/rules | grep -c '"name"'` — 최소 6 그룹.
+1. Target healthy: `docker compose -p readmates -f compose.infra.yml exec -T prometheus wget -qO- http://localhost:9090/api/v1/targets | grep -c '"health":"up"'` — 3 이상이어야 (readmates-api, prometheus-self, alertmanager).
+2. Alertmanager ready: `docker compose -p readmates -f compose.infra.yml exec -T alertmanager wget -qO- http://localhost:9093/-/ready` — 200 OK.
+3. Rule load: `docker compose -p readmates -f compose.infra.yml exec -T prometheus wget -qO- http://localhost:9090/api/v1/rules | grep -c '"name"'` — 최소 6 그룹.
 4. Test alert: Prometheus expr 브라우저에서 `vector(1)`로 임시 룰 추가 또는 alertmanager API에 `amtool alert add` — 운영자 inbox 수신 확인. (구체 절차는 alertmanager 공식 docs 참조.)
 
 ## Trouble
 
-- `up{job="readmates-server"} == 0`: app container가 `READMATES_MANAGEMENT_ADDRESS=0.0.0.0` 설정인지, docker network에 같이 떠 있는지 확인.
+- `up{job="readmates-server"} == 0`: app container가 `READMATES_MANAGEMENT_ADDRESS=0.0.0.0` 설정인지, `readmates-api` service와 같은 compose project/network에 떠 있는지 확인.
 - SMTP 실패: `docker logs readmates-alertmanager | grep 'failed to send email'`. SMTP 자격증명 / smarthost 확인.
 - Notification backlog alert: §`notification-backlog` 참고 — outbox 직접 SQL drill-down.
 

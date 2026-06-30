@@ -2,6 +2,7 @@ package com.readmates.shared.adapter.`in`.web
 
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.flywaydb.core.Flyway
+import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -11,6 +12,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.ApplicationContext
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.request.RequestPostProcessor
 import javax.sql.DataSource
 
 @SpringBootTest(
@@ -49,4 +51,23 @@ class HealthControllerTest(
                 status { isUnauthorized() }
             }
     }
+
+    @Test
+    fun `allows actuator health on management port without authentication`() {
+        mockMvc
+            .get("/actuator/health") {
+                with(managementPort())
+            }.andExpect {
+                jsonPath("$.status") { exists() }
+            }.andReturn()
+            .also { result ->
+                assertNotEquals(401, result.response.status)
+            }
+    }
 }
+
+private fun managementPort(): RequestPostProcessor =
+    RequestPostProcessor { request ->
+        request.localPort = 8081
+        request
+    }

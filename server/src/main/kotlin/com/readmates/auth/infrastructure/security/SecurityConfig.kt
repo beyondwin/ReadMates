@@ -35,6 +35,8 @@ class SecurityConfig(
     private val clientRegistrationRepository: ObjectProvider<ClientRegistrationRepository>,
     @param:Value("\${readmates.auth.auth-base-url:\${readmates.app-base-url:http://localhost:3000}}")
     private val authBaseUrl: String,
+    @param:Value("\${management.server.port:8081}")
+    private val managementPort: Int,
 ) {
     private val oAuthForwardedHeaderFilter = ForwardedHeaderFilter()
 
@@ -115,6 +117,8 @@ class SecurityConfig(
                         "/oauth2/**",
                         "/login/oauth2/**",
                     ).permitAll()
+                    .requestMatchers(managementEndpointOnConfiguredPort(managementPort))
+                    .permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/auth/me")
                     .permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/public/**")
@@ -207,3 +211,13 @@ private fun methodAndPath(
     method: String,
     pathPattern: Regex,
 ): RequestMatcher = RequestMatcher { request -> request.method == method && pathPattern.matches(request.requestURI) }
+
+private fun managementEndpointOnConfiguredPort(managementPort: Int): RequestMatcher =
+    RequestMatcher { request ->
+        if (request.method != "GET" || request.localPort != managementPort) {
+            return@RequestMatcher false
+        }
+        request.requestURI == "/actuator/prometheus" ||
+            request.requestURI == "/actuator/health" ||
+            request.requestURI.startsWith("/actuator/health/")
+    }

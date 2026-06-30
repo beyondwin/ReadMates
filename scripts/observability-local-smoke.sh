@@ -3,6 +3,10 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 compose_file="$repo_root/ops/observability/local/compose.yml"
+prometheus_port="${READMATES_LOCAL_PROMETHEUS_PORT:-9090}"
+grafana_port="${READMATES_LOCAL_GRAFANA_PORT:-3001}"
+prometheus_url="http://localhost:${prometheus_port}"
+grafana_url="http://localhost:${grafana_port}"
 
 cd "$repo_root"
 
@@ -55,9 +59,9 @@ require_cmd jq
 
 docker compose -f "$compose_file" up -d prometheus grafana
 
-wait_http "Prometheus ready" "http://localhost:9090/-/ready"
-wait_http "Grafana ready" "http://localhost:3001/api/health"
+wait_http "Prometheus ready" "${prometheus_url}/-/ready"
+wait_http "Grafana ready" "${grafana_url}/api/health"
 
-wait_json_count "Prometheus loaded rule group(s):" "http://localhost:9090/api/v1/rules" '.data.groups | length' 1
-wait_json_count "Prometheus readmates-server target(s):" "http://localhost:9090/api/v1/targets" '[.data.activeTargets[] | select(.labels.job == "readmates-server")] | length' 1
-wait_json_count "Grafana provisioned dashboard(s):" "http://localhost:3001/api/search?type=dash-db" 'length' 3
+wait_json_count "Prometheus loaded rule group(s):" "${prometheus_url}/api/v1/rules" '.data.groups | length' 1
+wait_json_count "Prometheus readmates-server target(s):" "${prometheus_url}/api/v1/targets" '[.data.activeTargets[] | select(.labels.job == "readmates-server")] | length' 1
+wait_json_count "Grafana provisioned dashboard(s):" "${grafana_url}/api/search?type=dash-db" 'length' 3

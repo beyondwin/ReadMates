@@ -219,4 +219,4 @@ Prometheus/Alertmanager 자체는 자격증명을 git에 두지 않는다. SMTP 
 | `READMATES_ALERT_SMTP_FROM` | sender address | `alerts@example.com` |
 | `READMATES_ALERT_EMAIL_TO` | operator recipient(들) | `ops@example.com` |
 
-`scripts/public-release-check.sh`가 `deploy/oci/{prometheus,alertmanager}/`, `ops/prometheus/alerts/`에 placeholder 아닌 이메일 도메인이나 IPv4 literal이 들어오면 fail시킨다. Prometheus target은 docker network DNS(`server:8081`, `alertmanager:9093`)만 사용한다.
+`scripts/public-release-check.sh`가 `deploy/oci/{prometheus,alertmanager}/`, `ops/prometheus/alerts/`에 placeholder 아닌 이메일 도메인이나 IPv4 literal이 들어오면 fail시킨다. Prometheus target은 docker network DNS(`readmates-api:8081`, `alertmanager:9093`)만 사용한다.

@@ -6,7 +6,7 @@ services:
       - "--storage.tsdb.path=/prometheus"
       - "--web.enable-lifecycle"
     ports:
-      - "9090:9090"
+      - "${READMATES_LOCAL_PROMETHEUS_PORT:-9090}:9090"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -17,7 +17,7 @@ services:
   grafana:
     image: grafana/grafana:11.5.1
     ports:
-      - "3001:3000"
+      - "${READMATES_LOCAL_GRAFANA_PORT:-3001}:3000"
     environment:
       GF_SECURITY_ADMIN_USER: readmates
       GF_SECURITY_ADMIN_PASSWORD: readmates

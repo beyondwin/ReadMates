@@ -1,5 +1,9 @@
-# Transition-only helper for running Redis and Redpanda beside the legacy host JAR deployment.
-# The final OCI runtime uses deploy/oci/compose.yml, which also includes Caddy and readmates-api.
+name: readmates
+
+# Transition/operations helper for infra services that run beside the main
+# compose stack. The final OCI runtime uses deploy/oci/compose.yml for Caddy,
+# readmates-api, Redis, and Redpanda; this file adds observability services to
+# the same Docker Compose project/network.
 services:
   redis:
     image: redis:7.4-alpine

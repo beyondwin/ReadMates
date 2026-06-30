@@ -346,7 +346,7 @@ scan_observability_targets() {
   # Observability secrets / placeholders — fail if real email domains, SMTP
   # hosts, or IP literals appear in deploy/oci/{prometheus,alertmanager}/ or
   # ops/prometheus/alerts/. Prometheus target hostnames must be docker
-  # service DNS names (e.g. `server:8081`), and alertmanager identity values
+  # service DNS names (e.g. `readmates-api:8081`), and alertmanager identity values
   # must remain `${READMATES_ALERT_*}` placeholders.
   local observability_targets=(
     "$source_abs/deploy/oci/prometheus"
