@@ -332,6 +332,8 @@ if printf '%s\n' "$services" | grep -Eq '(^|[[:space:]])grafana([[:space:]]|$)';
     fi
     sleep 2
   done
+  sudo docker compose -p "$compose_project" -f compose.infra.yml exec -T grafana \
+    sh -lc '/usr/share/grafana/bin/grafana-cli admin reset-admin-password "$GF_SECURITY_ADMIN_PASSWORD" >/tmp/readmates-grafana-password-reset.log'
 fi
 
 sudo docker compose -p "$compose_project" -f compose.infra.yml ps
