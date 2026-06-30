@@ -2,6 +2,26 @@
 
 남은 리스크, release readiness, merge 후 안전성, ship 가능 여부를 확인할 때 사용하는 체크리스트입니다. 구현 계획의 완료 여부와 테스트 통과 여부만으로 release risk가 닫혔다고 판단하지 않습니다.
 
+## 2026-06-30 frontend observability v2 closeout
+
+- Scope reviewed: frontend runtime telemetry contracts, BFF telemetry intake, Spring `readmates.frontend.*` Micrometer metrics, Grafana dashboard JSON, and observability docs.
+- Release classification: operational observability side path. No DB migration, product API response contract, OAuth scope, auth cookie contract, user-facing route behavior, or deploy workflow behavior changes are included.
+- Public safety: browser telemetry sends normalized route patterns, enum-like API groups, status classes, safe error codes, and optional short hash prefixes only. Raw URL, query string, club slug value, UUID, email, display name, account name, membership/user id, stack trace, request/response body, token, private domain, OCID, VM IP, and deployment state are prohibited.
+- Local verification before merge:
+  - `npx --yes pnpm@10.33.0 --dir front test -- observability route-observability readmates-fetch frontend-observability-bff` - pass.
+  - `npx --yes pnpm@10.33.0 --dir front lint` - pass.
+  - `npx --yes pnpm@10.33.0 --dir front test` - pass.
+  - `npx --yes pnpm@10.33.0 --dir front build` - pass.
+  - `./server/gradlew -p server unitTest --tests 'com.readmates.observability.*'` - pass.
+  - `./server/gradlew -p server clean test` - pass.
+  - `./server/gradlew -p server architectureTest` - pass.
+  - `./scripts/lint-grafana-dashboards.sh` - pass.
+  - `./scripts/validate-prometheus-rules.sh` - pass.
+  - `./scripts/build-public-release-candidate.sh` and `./scripts/public-release-check.sh .tmp/public-release-candidate` - pass.
+  - `graphify update .` plus CPE Graphify freshness audit - pass.
+- Skipped before merge: production scrape, dashboard data confirmation, external blackbox checks, production OAuth/provider-console/tag workflows, and frontend E2E. Production checks require traffic or operator access; E2E is not local evidence for this side-path branch because user-facing route behavior and auth flow semantics are unchanged.
+- Residual risk: total frontend script-load failure can still be invisible until external synthetic monitoring is added. Frontend SLOs start in measurement mode and should not page until baseline data exists.
+
 ## 2026-06-30 production observability bootstrap closeout
 
 - Scope reviewed: local `main..codex/2026-06-30-readmates-production-observability-v1-20260630-040540` before merge, covering OCI observability deploy helper values, Grafana provisioning/runbook closure, alert triage docs, and public-release scanner docs.

@@ -2,7 +2,7 @@
 
 > 운영 흐름으로 읽으려면 [Observability README](README.md)에서 시작하고, 배포 전후 검증은 [Deploy observability check](../runbooks/deploy-observability-check.md)를 기준으로 기록합니다.
 
-본 문서는 Grafana(또는 호환 도구)에서 구성할 패널과 PromQL 쿼리를 정리합니다. 일부 대시보드는 이미 JSON으로 커밋되어 있으며(`ops/grafana/dashboards/`: `aigen.json`=AI Session Generation, `notification-dispatch.json`=Notification Dispatch, `bff-api-latency.json`=BFF → API Latency), 나머지 패널은 도구 도입 후 export 권장. 커밋된 JSON은 `scripts/lint-grafana-dashboards.sh`로 검증한다.
+본 문서는 Grafana(또는 호환 도구)에서 구성할 패널과 PromQL 쿼리를 정리합니다. 일부 대시보드는 이미 JSON으로 커밋되어 있으며(`ops/grafana/dashboards/`: `aigen.json`=AI Session Generation, `notification-dispatch.json`=Notification Dispatch, `bff-api-latency.json`=BFF → API Latency, `frontend-runtime.json`=Frontend Runtime), 나머지 패널은 도구 도입 후 export 권장. 커밋된 JSON은 `scripts/lint-grafana-dashboards.sh`로 검증한다.
 
 ## Dashboard 1 — Service Health
 <a id="service-health"></a>
@@ -168,7 +168,44 @@
   ```
 - 임계 (참고): > 100ms 지속 시 조사.
 
-## Dashboard 4 — Redis Cache
+## Dashboard 4 — Frontend Runtime
+<a id="frontend-runtime"></a>
+
+실제 dashboard JSON은 `ops/grafana/dashboards/frontend-runtime.json`(title: "Frontend Runtime")입니다.
+
+### Panel: Frontend route load p95
+- 목적: Browser SPA route transition latency를 route pattern별로 확인한다.
+- 메트릭: `readmates_frontend_route_load_seconds_bucket`
+- PromQL:
+  ```promql
+  histogram_quantile(0.95, sum by (le, route_pattern) (rate(readmates_frontend_route_load_seconds_bucket[5m])))
+  ```
+
+### Panel: Frontend runtime errors
+- 목적: React route error, window error, unhandled rejection을 raw message 없이 route/error code로 묶어 본다.
+- 메트릭: `readmates_frontend_runtime_errors_total`
+- PromQL:
+  ```promql
+  sum by (route_pattern, error_code) (increase(readmates_frontend_runtime_errors_total[15m]))
+  ```
+
+### Panel: Frontend API failures
+- 목적: Browser가 본 API 실패를 API group/status class/error code로 확인한다.
+- 메트릭: `readmates_frontend_api_failures_total`
+- PromQL:
+  ```promql
+  sum by (api_group, status_class, error_code) (increase(readmates_frontend_api_failures_total[15m]))
+  ```
+
+### Panel: Dropped frontend telemetry
+- 목적: 수집기가 유효하지 않은 값을 버리는지, 또는 route pattern allowlist가 누락됐는지 확인한다.
+- 메트릭: `readmates_frontend_observability_dropped_total`
+- PromQL:
+  ```promql
+  sum by (reason) (increase(readmates_frontend_observability_dropped_total[15m]))
+  ```
+
+## Dashboard 5 — Redis Cache
 <a id="redis-cache"></a>
 
 ### Panel: Notes cache hit/miss ratio
@@ -231,7 +268,7 @@
   ```
 - 임계 (참고): `sensitive="true"` baseline 대비 큰 변화 시 조사.
 
-## Dashboard 5 — AI Session Generation
+## Dashboard 6 — AI Session Generation
 <a id="ai-session-generation"></a>
 
 실제 dashboard JSON은 `ops/grafana/dashboards/aigen.json`입니다. 패널은 `readmates_aigen_*` meter와 audit-log drill-down 안내를 함께 보여줍니다.

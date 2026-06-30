@@ -57,6 +57,33 @@ ID/PromQL 일관성은 `SloCatalogDocsConsistencyTest`가 강제합니다.
 - **근거**: BFF는 사용자 액션 → 서버 응답 사이에 추가 hop을 만들기 때문에 서버 p95(500ms)보다 살짝 느슨한 800ms로 설정.
 - **현재**: 측정 중 (Prometheus 스크래퍼 배포 완료, 첫 측정은 `docs/operations/slo-reports/2026-06.md` 참조).
 
+## `frontend_route_load_p95`
+
+- **정의**: 7일 rolling window에서 browser route load p95 < 1500ms.
+- **측정**:
+  ```promql
+  histogram_quantile(0.95,
+    sum by (le) (rate(readmates_frontend_route_load_seconds_bucket[5m]))) * 1000
+  ```
+- **에러 예산**: 측정 시작 단계. 첫 production baseline이 쌓일 때까지 release hard gate로 쓰지 않는다.
+- **위반 시 행동**: frontend bundle/chunk 변화, route lazy loading, CDN/cache, API failure panel, browser console reproduction 순서로 확인한다.
+- **근거**: 서버 read p95보다 느슨한 browser route-level threshold로 초기 baseline을 잡는다.
+- **현재**: 측정 중.
+
+## `frontend_runtime_error_ratio`
+
+- **정의**: 7일 rolling window에서 route load 대비 runtime error 비율 < 1%.
+- **측정**:
+  ```promql
+  sum(rate(readmates_frontend_runtime_errors_total[5m]))
+    /
+  sum(rate(readmates_frontend_route_load_seconds_count[5m]))
+  ```
+- **에러 예산**: 측정 시작 단계. 반복 error code와 route pattern이 보이면 우선 triage한다.
+- **위반 시 행동**: 최근 frontend deploy, route error boundary, API failure panel, user-visible route fallback을 확인한다.
+- **근거**: 서버 5xx가 없어도 사용자가 흰 화면이나 route fallback을 겪는 blind spot을 닫기 위한 baseline.
+- **현재**: 측정 중.
+
 ## `login_success_ratio`
 
 - **정의**: 7일 rolling window에서 Google OAuth 로그인 성공률 > 99% (objective 0.99).
@@ -112,5 +139,5 @@ ID/PromQL 일관성은 `SloCatalogDocsConsistencyTest`가 강제합니다.
 
 ## 후속
 
-- Frontend 측 SLO (route load time) — RUM 도입 후.
+- External blackbox/synthetic checks for full script-load failure.
 - SLO 위반 시 자동 post-mortem trigger.

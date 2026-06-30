@@ -7,6 +7,8 @@ Use this before and after a release when docs, scripts, dashboards, alert rules,
 - Prometheus rule files are syntactically valid.
 - Grafana dashboard JSON files are structurally valid.
 - The local Prometheus/Grafana provisioning stack can load configured rules and dashboards when Docker is available.
+- Frontend runtime dashboard JSON can be loaded by Grafana provisioning checks.
+- Frontend route-load/error metrics are documented as measurement-start signals; absence of data before production traffic is not proof of no frontend runtime errors.
 - Targeted request correlation tests still match documented `RequestIdFilter` and Logback behavior when server behavior docs changed.
 
 ## What This Runbook Does Not Prove

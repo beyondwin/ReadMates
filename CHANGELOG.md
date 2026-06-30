@@ -9,6 +9,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 ### Highlights
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
+- **frontend observability v2:** Browser route-load, runtime-error, and API-failure signals now flow through a same-origin BFF telemetry endpoint into Spring Micrometer metrics and Grafana docs, using normalized route patterns and low-cardinality labels only.
 - **platform admin workspace switcher:** 플랫폼 관리자 헤더에 현재 계정의 멤버/호스트 워크스페이스로 이동하는 `내 공간` 메뉴를 추가하고, 다른 계정 로그인을 선택하면 현재 BFF 세션 정리 후 admin return path로 이동합니다. Frontend-only UX 변경이며 server API contract, DB migration, OAuth scope, auth token format, deploy workflow behavior는 변경하지 않습니다.
 - **production observability bootstrap:** OCI compose 관측성 stack에 Grafana provisioning/runbook closure를 맞추고, Alertmanager/Grafana env placeholder와 public-release scan 문서를 정리했습니다. Operator-facing deploy/runbook change이며 DB migration, public API contract, auth/BFF token, OAuth scope, Pages Functions behavior, frontend route behavior는 변경하지 않습니다.
 

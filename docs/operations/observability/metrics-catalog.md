@@ -46,6 +46,10 @@
 | `readmates.aigen.validation.failures` | counter | `reason` | 건수 | Validation class error로 실패한 AI output 수. | `server/.../aigen/application/service/AiGenerationMetrics.kt` | dashboards.md#ai-session-generation | alerts.md#aigenschemafailurespike |
 | `readmates.aigen.cap.denials` | counter | `reason` | 건수 | Provider 호출 전 cap guard가 거절한 요청 수. | `server/.../aigen/application/service/AiGenerationMetrics.kt` | dashboards.md#ai-session-generation | — |
 | `readmates.aigen.queue.depth` | gauge | (없음) | 건수 | Redis AI job store에서 `PENDING` + `RUNNING` active job 수를 scrape 시점에 읽은 backlog. `AiGenerationQueueDepthGaugeBinder`가 `AiGenerationJobStore.loadActiveJobs()`에 바인딩한다. | `server/src/main/kotlin/com/readmates/aigen/application/service/AiGenerationMetrics.kt`, `server/src/main/kotlin/com/readmates/aigen/application/service/AiGenerationQueueDepthGaugeBinder.kt` | dashboards.md#ai-session-generation | alerts.md#aigenqueuelaghigh |
+| `readmates.frontend.route_load` | timer/histogram | `route_pattern`, `result`, `navigation_type` | 초 | Browser route transition duration. Route values are normalized patterns only. | `server/.../FrontendObservabilityMetrics.kt` | dashboards.md#frontend-runtime | slos.md#frontend_route_load_p95 |
+| `readmates.frontend.runtime_errors` | counter | `route_pattern`, `error_kind`, `error_code`, `severity` | 건수 | Browser runtime and route-boundary errors grouped without raw messages or stack traces. | `server/.../FrontendObservabilityMetrics.kt` | dashboards.md#frontend-runtime | slos.md#frontend_runtime_error_ratio |
+| `readmates.frontend.api_failures` | counter | `route_pattern`, `api_group`, `status_class`, `error_code` | 건수 | Frontend-observed API failures after safe API error conversion. | `server/.../FrontendObservabilityMetrics.kt` | dashboards.md#frontend-runtime | — |
+| `readmates.frontend.observability.dropped` | counter | `reason` | 건수 | Dropped frontend telemetry events due to validation, size, unsupported value, or rate-limit policy. | `server/.../FrontendObservabilityMetrics.kt` | dashboards.md#frontend-runtime | — |
 
 > **태그 정책**: enum/low-cardinality 값만 허용. `club_id`, `user_id`, `membership_id`, `email`, `delivery_id`, transcript 본문 등 고유 식별자나 민감 본문은 절대 태그로 사용하지 않는다. 행 단위 감사는 notification은 `notification_deliveries`, AI 생성은 `ai_generation_audit_log`를 사용한다. 근거: `server/.../ReadmatesOperationalMetrics.kt`, `server/.../aigen/application/service/AiGenerationMetrics.kt` KDoc 참조.
 
@@ -98,6 +102,6 @@
 ## 후속 메트릭 후보 (현재 없음)
 
 - `bff_request_total` (counter, by `route`, `host`) — Cloudflare Worker analytics 의존. BFF layer에서 별도 계측 필요.
-- `frontend_route_load_seconds` (histogram) — RUM (Real User Monitoring) 도입 후 추가.
+- External blackbox/synthetic checks for full script-load failure remain a future candidate. The in-app route-load metric starts only after the SPA executes enough JavaScript to emit telemetry.
 - `readmates.redis.operation.errors` 세분화 — 현재 `feature`/`operation` 2개 태그로 충분하나, 향후 Redis Cluster 도입 시 `node` 태그 추가 검토.
 - Kafka consumer group lag을 별도 Prometheus metric으로 노출할지 검토 — 현재 `readmates.aigen.queue.depth`는 Redis active job backlog 의미로 고정합니다.
