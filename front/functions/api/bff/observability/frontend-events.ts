@@ -65,6 +65,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const headers = new Headers();
   headers.set("Content-Type", "application/json");
   headers.set(READMATES_REQUEST_ID_HEADER, requestIdForUpstream(context.request));
+  for (const name of ["Origin", "Referer"]) {
+    const value = context.request.headers.get(name);
+    if (value) {
+      headers.set(name, value);
+    }
+  }
 
   const bffSecret = bffSecretFromEnv(context.env);
   if (bffSecret) {

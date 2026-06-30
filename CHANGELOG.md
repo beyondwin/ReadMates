@@ -10,6 +10,23 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 
+## v1.16.1 - 2026-06-30
+
+### Fixed
+
+- **frontend observability BFF production intake:** `/api/bff/observability/frontend-events` now forwards the browser `Origin` and `Referer` headers to Spring, matching the existing mutating-request BFF security boundary. Without this, production telemetry POSTs reached the server with a valid BFF secret but were rejected by the server origin guard.
+
+### Deployment Notes
+
+- Patch release for the frontend observability production intake path. No DB migration, public product API contract, OAuth scope, auth cookie format, BFF secret format, or backend behavior change is included.
+- `Deploy Front` must succeed for tag `v1.16.1` before frontend runtime telemetry is considered live. `Deploy Server Image` may rebuild from the same tag for release consistency, but the server runtime behavior is unchanged from `v1.16.0`.
+- Do not force-update `v1.16.0`. Publish `v1.16.1`, confirm the tag workflows, keep or promote the OCI backend to the matching release image tag after scan success, then run the frontend observability smoke through the public Pages BFF and verify the resulting `readmates.frontend.*` metrics in production Prometheus.
+
+### Verification
+
+- Production root cause found during `v1.16.0` release operation: a public telemetry smoke with the same-origin BFF path returned `403` from `/api/observability/frontend-events`. Pages and Spring BFF secret fingerprints matched, so the failure was not secret drift; the telemetry-specific BFF function was missing the origin headers required by `BffSecretFilter` for mutating API requests.
+- Local repair verification (2026-06-30): `npx --yes pnpm@10.33.0 --dir front test -- --run tests/unit/functions/frontend-observability-bff.test.ts` passed and covered the new upstream `Origin` forwarding assertion.
+
 ## v1.16.0 - 2026-06-30
 
 ### Highlights

@@ -2,6 +2,16 @@
 
 남은 리스크, release readiness, merge 후 안전성, ship 가능 여부를 확인할 때 사용하는 체크리스트입니다. 구현 계획의 완료 여부와 테스트 통과 여부만으로 release risk가 닫혔다고 판단하지 않습니다.
 
+## 2026-06-30 v1.16.1 frontend observability intake repair
+
+- Scope reviewed: production `v1.16.0` frontend observability smoke, Pages BFF telemetry function, Spring `BffSecretFilter`, and the existing BFF secret diagnostic route.
+- Release classification: patch release. The change is limited to Pages Functions forwarding of safe request metadata for the frontend telemetry intake. No DB migration, server API response contract, OAuth scope, auth cookie format, BFF secret format, backend runtime behavior, or deploy workflow trigger change is included.
+- Root cause: `POST /api/bff/observability/frontend-events` sanitized and forwarded telemetry plus the BFF secret, but did not forward browser `Origin` or `Referer`. Spring correctly rejects mutating `/api/**` requests that have a valid BFF secret but no allowed origin evidence, so production telemetry was blocked with `403`.
+- Public safety: the repair forwards only `Origin` and `Referer`, which are already part of the established BFF security boundary. It does not forward browser-supplied `X-Readmates-Bff-Secret`, club headers, cookies beyond the existing path behavior, raw URLs, request bodies beyond sanitized telemetry, stack traces, member identifiers, private domains, OCIDs, VM IPs, or deployment state.
+- Local repair verification before publication:
+  - `npx --yes pnpm@10.33.0 --dir front test -- --run tests/unit/functions/frontend-observability-bff.test.ts` - pass, 164 files and 1306 tests under the project Vitest task.
+- Residual release-operation risk: tag workflows, Cloudflare Pages production deployment, GitHub Release publication, OCI backend tag consistency, production telemetry smoke, and production Prometheus/Grafana confirmation remain pending until `v1.16.1` is published and deployed.
+
 ## 2026-06-30 v1.16.0 pre-release readiness
 
 - Scope reviewed: `v1.15.1..HEAD` on local `main`, covering frontend runtime observability v2, same-origin BFF telemetry intake, Spring frontend observability metrics/SLOs, frontend-runtime Grafana dashboard, production observability bootstrap docs/scripts, and the platform-admin workspace switcher.

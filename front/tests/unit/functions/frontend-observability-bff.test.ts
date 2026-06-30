@@ -79,6 +79,7 @@ describe("frontend observability BFF endpoint", () => {
     const headers = init?.headers as Headers;
     expect(headers.get("X-Readmates-Bff-Secret")).toBe("test-bff-secret");
     expect(headers.get("X-Readmates-Club-Slug")).toBeNull();
+    expect(headers.get("Origin")).toBe("https://readmates.example.com");
     expect(init?.method).toBe("POST");
     expect(JSON.parse(init?.body as string).events).toHaveLength(1);
   });
