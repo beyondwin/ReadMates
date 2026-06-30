@@ -11,7 +11,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 - **observability deploy log hygiene:** OCI observability archives now suppress macOS extended-attribute headers in addition to AppleDouble files, keeping production deploy logs clean while preserving the same Prometheus/Grafana payload.
 - **observability partial-stack target health:** Prometheus+Grafana-only deployments now ship a Prometheus config without Alertmanager scrape/alertmanager targets, so production target health reflects only services that are intentionally running.
-- **observability config apply:** OCI observability deploys now trigger a Prometheus lifecycle reload after `compose up`, ensuring changed scrape/rule config takes effect even when the container is already running.
+- **observability config apply:** OCI observability deploys now restart Prometheus after `compose up`, ensuring changed scrape/rule config takes effect even when the container is already running.
 - **Grafana credential apply:** OCI observability deploys now reset the Grafana admin password after startup so regenerated VM-local env credentials match the persisted Grafana database.
 
 ## v1.16.2 - 2026-06-30

@@ -259,7 +259,7 @@ ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
 
 if service_enabled prometheus; then
   ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
-    "cd $(shell_quote "$REMOTE_DIR/deploy/oci") && sudo docker compose -p $(shell_quote "$COMPOSE_PROJECT") -f compose.infra.yml exec -T prometheus wget -qO- --post-data='' http://localhost:9090/-/reload >/dev/null"
+    "cd $(shell_quote "$REMOTE_DIR/deploy/oci") && sudo docker compose -p $(shell_quote "$COMPOSE_PROJECT") -f compose.infra.yml restart prometheus >/dev/null"
 fi
 
 echo "==> [7/7] 관측성 smoke"
@@ -333,7 +333,7 @@ if printf '%s\n' "$services" | grep -Eq '(^|[[:space:]])grafana([[:space:]]|$)';
     sleep 2
   done
   sudo docker compose -p "$compose_project" -f compose.infra.yml exec -T grafana \
-    sh -lc '/usr/share/grafana/bin/grafana-cli admin reset-admin-password "$GF_SECURITY_ADMIN_PASSWORD" >/tmp/readmates-grafana-password-reset.log'
+    sh -lc '/usr/share/grafana/bin/grafana cli --homepath /usr/share/grafana --config /etc/grafana/grafana.ini admin reset-admin-password "$GF_SECURITY_ADMIN_PASSWORD" >/tmp/readmates-grafana-password-reset.log'
 fi
 
 sudo docker compose -p "$compose_project" -f compose.infra.yml ps
