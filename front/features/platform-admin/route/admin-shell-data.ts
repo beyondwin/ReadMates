@@ -8,11 +8,11 @@ import { requirePlatformAdminLoaderAuth } from "@/shared/auth/platform-admin-loa
 
 export function adminShellLoaderFactory(queryClient: QueryClient) {
   return async function loadAdminShell(args?: LoaderFunctionArgs) {
-    await requirePlatformAdminLoaderAuth(args);
+    const auth = await requirePlatformAdminLoaderAuth(args);
     await Promise.all([
       queryClient.fetchQuery(platformAdminSummaryQuery()),
       queryClient.fetchQuery(platformAdminClubsQuery()),
     ]);
-    return null;
+    return auth;
   };
 }

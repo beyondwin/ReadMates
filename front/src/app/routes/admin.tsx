@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { Navigate, type RouteObject } from "react-router-dom";
+import { Navigate, type RouteObject, useLoaderData } from "react-router-dom";
 import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
 import { RequirePlatformAdmin } from "@/src/app/route-guards";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
@@ -9,6 +9,7 @@ import {
   ADMIN_ROUTES,
   type AdminRouteDescriptor,
 } from "@/features/platform-admin/model/admin-route-catalog";
+import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 
 export function adminRoutes(queryClient: QueryClient): RouteObject[] {
   return [
@@ -23,9 +24,10 @@ export function adminRoutes(queryClient: QueryClient): RouteObject[] {
           "@/features/platform-admin/route/admin-shell-layout"
         );
         function AdminShellElement() {
+          const auth = useLoaderData() as AuthMeResponse;
           return (
             <RequirePlatformAdmin>
-              <AdminShellLayout />
+              <AdminShellLayout auth={auth} />
             </RequirePlatformAdmin>
           );
         }

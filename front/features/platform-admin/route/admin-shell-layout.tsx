@@ -1,6 +1,12 @@
 import { type MouseEvent, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { logout } from "@/features/auth/api/auth-api";
+import {
+  adminOtherAccountLoginPath,
+  adminWorkspaceAccountLabel,
+  deriveAdminWorkspaceDestinations,
+} from "@/features/platform-admin/model/admin-workspace-switcher-model";
 import {
   platformAdminClubsQuery,
   platformAdminSummaryQuery,
@@ -11,23 +17,25 @@ import { AdminBreadcrumb } from "@/features/platform-admin/ui/admin-breadcrumb";
 import { AdminLayoutNav } from "@/features/platform-admin/ui/admin-layout-nav";
 import { AdminOnboardingModal } from "@/features/platform-admin/ui/admin-onboarding-modal";
 import { AdminStatusStrip } from "@/features/platform-admin/ui/admin-status-strip";
+import { AdminWorkspaceSwitcher } from "@/features/platform-admin/ui/admin-workspace-switcher";
 import { PlatformAdminOnboardingWizard } from "@/features/platform-admin/ui/platform-admin-onboarding-wizard";
 import {
   commitPlatformAdminOnboarding,
   previewPlatformAdminOnboarding,
 } from "@/features/platform-admin/api/platform-admin-api";
+import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { AdminBreadcrumbProvider } from "./admin-breadcrumb-context";
 import { useAdminBreadcrumbExtra } from "./admin-breadcrumb-hook";
 
-export function AdminShellLayout() {
+export function AdminShellLayout({ auth = null }: { auth?: AuthMeResponse | null }) {
   return (
     <AdminBreadcrumbProvider>
-      <AdminShellLayoutInner />
+      <AdminShellLayoutInner auth={auth} />
     </AdminBreadcrumbProvider>
   );
 }
 
-function AdminShellLayoutInner() {
+function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
   const summaryQuery = useQuery(platformAdminSummaryQuery());
   const clubsQuery = useQuery(platformAdminClubsQuery());
   const location = useLocation();
@@ -35,6 +43,9 @@ function AdminShellLayoutInner() {
   const [searchParams] = useSearchParams();
   const { extra } = useAdminBreadcrumbExtra();
   const [isWizardDirty, setIsWizardDirty] = useState(false);
+  const workspaceDestinations = deriveAdminWorkspaceDestinations(auth);
+  const workspaceAccountLabel = adminWorkspaceAccountLabel(auth);
+  const otherAccountLoginPath = adminOtherAccountLoginPath(location.pathname, location.search, location.hash);
 
   const summary = summaryQuery.data;
   const clubs = clubsQuery.data;
@@ -63,6 +74,15 @@ function AdminShellLayoutInner() {
     setIsWizardDirty(false);
   }
 
+  async function otherAccountLogin() {
+    const response = await logout();
+    if (response.ok || response.status === 401) {
+      window.location.assign(otherAccountLoginPath);
+      return true;
+    }
+    return false;
+  }
+
   return (
     <div className="admin-shell">
       <a href="#admin-main" className="admin-shell__skip-link" onClick={focusAdminMain}>
@@ -84,9 +104,11 @@ function AdminShellLayoutInner() {
             </Link>
           ) : null}
           <span className="admin-shell__role-badge">{role}</span>
-          <Link to="/app" className="btn btn-ghost btn-sm">
-            → 멤버 공간
-          </Link>
+          <AdminWorkspaceSwitcher
+            accountLabel={workspaceAccountLabel}
+            destinations={workspaceDestinations}
+            onOtherAccountLogin={otherAccountLogin}
+          />
         </div>
       </header>
       <AdminStatusStrip metrics={stripMetrics} error={stripError} />
