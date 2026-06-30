@@ -138,6 +138,7 @@ create_clean_archive() {
   local source_dir="$1"
   local target="$2"
   COPYFILE_DISABLE=1 tar \
+    --no-xattrs \
     --exclude='._*' \
     --exclude='.DS_Store' \
     -C "$source_dir" \

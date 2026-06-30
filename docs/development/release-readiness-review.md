@@ -6,7 +6,7 @@
 
 - Scope reviewed: `deploy/oci/06-deploy-observability-stack.sh`, production Prometheus startup logs, and the production observability stack deployment path for Prometheus and Grafana.
 - Root cause: macOS tar emitted AppleDouble `._*.yml` files into the alert archive. Local `promtool` validated the real rule files, but production Prometheus loaded `/etc/prometheus/alerts/*.yml` and rejected the generated `._aigen-rules.yml` metadata file.
-- Repair: observability archive creation now disables macOS copyfile metadata and excludes `._*` and `.DS_Store`; VM installation also deletes stale metadata files from Prometheus alerts, Grafana provisioning, and Grafana dashboard directories before compose startup.
+- Repair: observability archive creation now disables macOS copyfile metadata, suppresses extended-attribute headers, and excludes `._*` and `.DS_Store`; VM installation also deletes stale metadata files from Prometheus alerts, Grafana provisioning, and Grafana dashboard directories before compose startup.
 - Additional production intake repair: Spring Security now treats `POST /api/observability/frontend-events` like other trusted BFF mutation paths for CSRF and authorization, while `BffSecretFilter` still requires the BFF secret and allowed origin. Without this, the endpoint returned `403` after BFF secret/origin validation because it fell through to the generic member-session `/api/**` rule.
 - Public safety: the repair does not add credentials, domains, host identifiers, alert recipients, provider IDs, deployment state, or token-shaped values to the repo. Grafana credentials remain VM-local runtime environment only.
 - Local verification:
