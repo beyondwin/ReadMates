@@ -14,6 +14,7 @@
   - `npx --yes pnpm@10.33.0 --dir front test` - pass.
   - `npx --yes pnpm@10.33.0 --dir front build` - pass.
   - `npx --yes pnpm@10.33.0 --dir front lighthouse:preview -- --group public --limit 2` - pass; route count 2, failed route count 0, summary `.tmp/performance/lighthouse-preview/2026-06-30T05-47-44-735Z/summary.md`.
+  - `npx --yes pnpm@10.33.0 --dir front test:e2e` - pass, 68 Playwright tests.
   - `./server/gradlew -p server unitTest --tests 'com.readmates.observability.*'` - pass.
   - `./server/gradlew -p server clean test` - pass.
   - `./server/gradlew -p server check architectureTest` - pass.
@@ -22,7 +23,7 @@
   - `./scripts/validate-prometheus-rules.sh` - pass.
   - `./scripts/build-public-release-candidate.sh` and `./scripts/public-release-check.sh .tmp/public-release-candidate` - pass.
   - `graphify update .` plus CPE Graphify freshness audit - pass.
-- Skipped before merge: production scrape, dashboard data confirmation, production external blackbox monitor installation, production OAuth/provider-console/tag workflows, and frontend E2E. Production checks require traffic or operator access; E2E is not local evidence for this side-path branch because user-facing route behavior and auth flow semantics are unchanged.
+- Skipped before merge: production scrape, dashboard data confirmation, production external blackbox monitor installation, and production OAuth/provider-console/tag workflows. These require traffic or operator access and are not local merge evidence.
 - Residual risk: no known local release-readiness blocker remains after dropped-metric repair, local production-build Lighthouse preview smoke, frontend/server/observability checks, public-release scan, and Graphify freshness. Production scrape/dashboard data and an always-on external synthetic monitor remain post-deploy operational evidence, not local merge evidence.
 
 ## 2026-06-30 production observability bootstrap closeout
