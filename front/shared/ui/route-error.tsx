@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { isRouteErrorResponse, Link, useRouteError } from "react-router-dom";
 import { isReadmatesApiError } from "@/shared/api/errors";
+import { recordFrontendRuntimeError } from "@/shared/observability/frontend-observability";
 import { PageMetadataHead, type PageMetadata } from "@/shared/ui/page-metadata-head";
 
 export type RouteErrorVariant = "public" | "member" | "host" | "auth";
@@ -143,8 +145,18 @@ export function RouteErrorPage({ variant, status }: { variant: RouteErrorVariant
 
 export function RouteErrorBoundary({ variant }: { variant: RouteErrorVariant }) {
   const error = useRouteError();
+  const status = statusFromRouteError(error);
 
-  return <RouteErrorPage variant={variant} status={statusFromRouteError(error)} />;
+  useEffect(() => {
+    recordFrontendRuntimeError({
+      errorKind: "render",
+      errorCode: status >= 500 ? "REACT_ROUTE_ERROR" : "ROUTE_ERROR_RESPONSE",
+      severity: status >= 500 ? "error" : "warn",
+      message: error instanceof Error ? error.message : undefined,
+    });
+  }, [error, status]);
+
+  return <RouteErrorPage variant={variant} status={status} />;
 }
 
 export function NotFoundRoute({ variant }: { variant: RouteErrorVariant }) {

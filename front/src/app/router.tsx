@@ -6,6 +6,7 @@ import { hostRoutes } from "@/src/app/routes/host";
 import { memberRoutes } from "@/src/app/routes/member";
 import { publicRoutes } from "@/src/app/routes/public";
 import { createReadmatesQueryClient } from "@/src/app/query-client";
+import { attachRouteObservability, installGlobalRuntimeErrorObservers } from "@/src/app/route-observability";
 
 export function buildRoutes(queryClient: QueryClient): RouteObject[] {
   return [
@@ -20,8 +21,15 @@ export function buildRoutes(queryClient: QueryClient): RouteObject[] {
 export const routesQueryClient = createReadmatesQueryClient();
 export const routes: RouteObject[] = buildRoutes(routesQueryClient);
 
+let runtimeObserversInstalled = false;
+
 export function createReadmatesRouter() {
   const queryClient = createReadmatesQueryClient();
   const router = createBrowserRouter(buildRoutes(queryClient));
+  attachRouteObservability(router);
+  if (!runtimeObserversInstalled && typeof globalThis.addEventListener === "function") {
+    installGlobalRuntimeErrorObservers();
+    runtimeObserversInstalled = true;
+  }
   return { router, queryClient };
 }
