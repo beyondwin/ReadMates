@@ -333,7 +333,17 @@ if printf '%s\n' "$services" | grep -Eq '(^|[[:space:]])grafana([[:space:]]|$)';
     sleep 2
   done
   sudo docker compose -p "$compose_project" -f compose.infra.yml exec -T grafana \
-    sh -lc '/usr/share/grafana/bin/grafana cli --homepath /usr/share/grafana --config /etc/grafana/grafana.ini admin reset-admin-password "$GF_SECURITY_ADMIN_PASSWORD" >/tmp/readmates-grafana-password-reset.log'
+    sh -lc '
+      /usr/share/grafana/bin/grafana cli --homepath /usr/share/grafana --config /etc/grafana/grafana.ini admin reset-admin-password "$GF_SECURITY_ADMIN_PASSWORD" >/tmp/readmates-grafana-password-reset.log
+      auth=$(printf "%s:%s" "$GF_SECURITY_ADMIN_USER" "$GF_SECURITY_ADMIN_PASSWORD" | base64 | tr -d "\n")
+      for i in $(seq 1 10); do
+        if wget -qO- --header "Authorization: Basic $auth" "http://localhost:3000/api/search?query=Frontend" >/dev/null; then
+          exit 0
+        fi
+        sleep 1
+      done
+      exit 1
+    '
 fi
 
 sudo docker compose -p "$compose_project" -f compose.infra.yml ps
