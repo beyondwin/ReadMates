@@ -2,6 +2,30 @@
 
 남은 리스크, release readiness, merge 후 안전성, ship 가능 여부를 확인할 때 사용하는 체크리스트입니다. 구현 계획의 완료 여부와 테스트 통과 여부만으로 release risk가 닫혔다고 판단하지 않습니다.
 
+## 2026-06-30 v1.16.0 pre-release readiness
+
+- Scope reviewed: `v1.15.1..HEAD` on local `main`, covering frontend runtime observability v2, same-origin BFF telemetry intake, Spring frontend observability metrics/SLOs, frontend-runtime Grafana dashboard, production observability bootstrap docs/scripts, and the platform-admin workspace switcher.
+- Release classification: minor release. The release adds operator observability and frontend/admin UX behavior, plus additive server telemetry intake. No Flyway migration, OAuth scope change, auth cookie format change, BFF secret format change, or deploy workflow trigger change is included.
+- Deployment impact: tag push must run both `Deploy Front` and `Deploy Server Image`. Because server runtime code and Pages Functions both changed, release completion requires OCI Compose backend promotion to `ghcr.io/<owner>/<repo>/readmates-server:v1.16.0` after the server image workflow promotes that tag.
+- Public safety: telemetry remains a fail-open side path and uses only normalized route patterns, enum-like API groups, status classes, safe error codes, severity/result/navigation type, and allowlisted dropped reasons. Raw URL, query string, club slug value, UUID, email, display name, member/user identifier, stack trace, request/response body, cookie, OAuth code, token, private domain, OCID, VM IP, and deployment state are prohibited.
+- Local merged-main verification before publication:
+  - `git diff --check -- front server ops docs CHANGELOG.md` - pass.
+  - `npx --yes pnpm@10.33.0 --dir front lint` - pass.
+  - `npx --yes pnpm@10.33.0 --dir front test` - pass, 164 files and 1306 tests.
+  - `npx --yes pnpm@10.33.0 --dir front build` - pass.
+  - `npx --yes pnpm@10.33.0 --dir front test:e2e` - pass, 68 Playwright tests.
+  - `./server/gradlew -p server check architectureTest` - pass.
+  - `./scripts/lint-grafana-dashboards.sh` - pass.
+  - `./scripts/validate-prometheus-rules.sh` - pass.
+  - `./scripts/build-public-release-candidate.sh` and `./scripts/public-release-check.sh .tmp/public-release-candidate` - pass; gitleaks reported no leaks.
+  - `graphify update .` plus freshness audit - pass for commit `f1f7382f`.
+- Additional local observability evidence:
+  - `npx --yes pnpm@10.33.0 --dir front test -- observability route-observability readmates-fetch frontend-observability-bff` - pass.
+  - `./server/gradlew -p server unitTest --tests 'com.readmates.observability.*'` - pass.
+  - `npx --yes pnpm@10.33.0 --dir front lighthouse:preview -- --group public --limit 2` - pass; route count 2, failed route count 0.
+- Skipped before publication: tag-triggered `Deploy Front`, tag-triggered `Deploy Server Image`, GitHub Release creation, OCI Compose backend promotion, production scrape/dashboard data confirmation, external synthetic monitor setup, production OAuth/provider-console checks, and post-deploy smoke. These require pushed `main`/tag or production operator access.
+- Residual risk: no known local release-readiness blocker remains. Release-operation risk remains until the pushed tag workflows pass, the backend is promoted to the same image tag, GitHub Release exists, BFF/OAuth smoke passes, and production Prometheus/Grafana shows the new frontend telemetry metrics after real browser traffic or an explicit production telemetry smoke.
+
 ## 2026-06-30 frontend observability v2 closeout
 
 - Scope reviewed: frontend runtime telemetry contracts, BFF telemetry intake, Spring `readmates.frontend.*` Micrometer metrics, Grafana dashboard JSON, and observability docs.

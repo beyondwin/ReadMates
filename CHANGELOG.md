@@ -9,9 +9,43 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 ### Highlights
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
+
+## v1.16.0 - 2026-06-30
+
+### Highlights
+
 - **frontend observability v2:** Browser route-load, runtime-error, and API-failure signals now flow through a same-origin BFF telemetry endpoint into Spring Micrometer metrics and Grafana docs, using normalized route patterns and low-cardinality labels only.
-- **platform admin workspace switcher:** 플랫폼 관리자 헤더에 현재 계정의 멤버/호스트 워크스페이스로 이동하는 `내 공간` 메뉴를 추가하고, 다른 계정 로그인을 선택하면 현재 BFF 세션 정리 후 admin return path로 이동합니다. Frontend-only UX 변경이며 server API contract, DB migration, OAuth scope, auth token format, deploy workflow behavior는 변경하지 않습니다.
-- **production observability bootstrap:** OCI compose 관측성 stack에 Grafana provisioning/runbook closure를 맞추고, Alertmanager/Grafana env placeholder와 public-release scan 문서를 정리했습니다. Operator-facing deploy/runbook change이며 DB migration, public API contract, auth/BFF token, OAuth scope, Pages Functions behavior, frontend route behavior는 변경하지 않습니다.
+- **production observability bootstrap:** OCI compose observability provisioning now has production-shaped Grafana/Prometheus wiring, public-safe dummy env fallbacks, and release/runbook closure so operators can verify dashboards and rules without committing private deployment state.
+- **platform admin workspace switcher:** 플랫폼 관리자 헤더에서 현재 계정의 멤버/호스트 워크스페이스로 이동하는 `내 공간` 메뉴를 사용할 수 있고, 다른 계정 로그인은 현재 BFF 세션 정리 후 admin return path로 돌아갑니다.
+
+### Added
+
+- Frontend runtime telemetry records SPA route load duration, route-boundary/runtime errors, and frontend-observed API failures through `/api/bff/observability/frontend-events`.
+- Spring records the new frontend telemetry as `readmates.frontend.*` Micrometer metrics and exposes SLO catalog entries for frontend route-load p95 and runtime error ratio.
+- Grafana dashboard source `ops/grafana/dashboards/frontend-runtime.json` tracks route load p95, runtime errors, API failures, and dropped frontend telemetry.
+- OCI observability deployment helpers now include Grafana provisioning and Prometheus datasource/dashboard wiring for the committed dashboard set.
+- Platform admin shell UI now shows a workspace switcher for returning to member or host workspaces from admin context.
+
+### Changed
+
+- Frontend API failure handling now emits safe observability events after `ReadmatesApiError` conversion without exposing raw URLs, query strings, request/response bodies, cookies, tokens, emails, user identifiers, stack traces, club slugs, or deployment identifiers.
+- The BFF telemetry sanitizer forwards safe dropped-event reasons to Spring so invalid browser telemetry increments `readmates.frontend.observability.dropped` instead of being silently lost at the edge.
+- Observability runbooks, dashboard docs, metrics catalog, SLO docs, and release-readiness notes now distinguish local provisioning evidence from production scrape/dashboard evidence.
+
+### Deployment Notes
+
+- Minor release. No Flyway migration is included.
+- Server runtime code changed for additive frontend observability intake and Micrometer metrics. Deploy the backend image after `Deploy Server Image` promotes `ghcr.io/<owner>/<repo>/readmates-server:v1.16.0`.
+- Frontend runtime and Pages Functions changed. `Deploy Front` must succeed for tag `v1.16.0` before final browser-facing smoke is considered complete.
+- Public API product contracts, OAuth scopes, auth cookie format, BFF secret format, and deployment workflow triggers are unchanged. The new telemetry endpoint is a fail-open same-origin side path.
+- Completion order: push `main`, push annotated tag `v1.16.0`, confirm `Deploy Front` and `Deploy Server Image`, promote OCI Compose backend to the same image tag, create the GitHub Release, then run sanitized BFF/OAuth/frontend-observability smoke checks and production dashboard scrape checks.
+
+### Verification
+
+- Local merged-main verification (2026-06-30): `git diff --check -- front server ops docs CHANGELOG.md`, `npx --yes pnpm@10.33.0 --dir front lint`, `npx --yes pnpm@10.33.0 --dir front test`, `npx --yes pnpm@10.33.0 --dir front build`, `npx --yes pnpm@10.33.0 --dir front test:e2e`, `./server/gradlew -p server check architectureTest`, `./scripts/lint-grafana-dashboards.sh`, `./scripts/validate-prometheus-rules.sh`, `./scripts/build-public-release-candidate.sh`, and `./scripts/public-release-check.sh .tmp/public-release-candidate` passed.
+- Focused observability verification (2026-06-30): frontend observability client/contracts/BFF tests, route observability tests, `ReadmatesApiError` API-failure tests, Spring frontend observability controller/service/metrics tests, SLO catalog docs consistency, Grafana dashboard lint, Prometheus rule validation, and preview Lighthouse public smoke passed.
+- Public safety: clean public release candidate passed gitleaks and scanner checks. Telemetry labels are normalized route patterns, enum-like API groups, status classes, safe error codes, severity, navigation type, result, and allowlisted dropped reasons only.
+- Skipped before tag push: tag-triggered `Deploy Front`, tag-triggered `Deploy Server Image`, OCI Compose backend promotion, GitHub Release publication, production scrape/dashboard data confirmation, external synthetic monitor setup, production OAuth/provider-console checks, and post-deploy smoke. These require pushed `main`/tag or production operator access and are release-operation evidence after publication.
 
 ## v1.15.1 - 2026-06-29
 
