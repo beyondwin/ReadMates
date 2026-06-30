@@ -106,6 +106,12 @@ class ServerArchitectureBoundaryTest {
                 applicationPackages = listOf("com.readmates.admin.health.application.."),
             ),
             ServerSlice(
+                name = "observability",
+                type = ServerSliceType.OPS_READ,
+                webAdapterPackages = listOf("com.readmates.observability.adapter.in.web.."),
+                applicationPackages = listOf("com.readmates.observability.application.."),
+            ),
+            ServerSlice(
                 name = "admin.analytics",
                 type = ServerSliceType.READ,
                 webAdapterPackages = listOf("com.readmates.admin.analytics.adapter.in.web.."),
@@ -139,8 +145,10 @@ class ServerArchitectureBoundaryTest {
         val registered = serverSlices.map(ServerSlice::name).toSet()
 
         assertTrue(
-            registered.containsAll(setOf("admin.audit", "admin.health", "admin.analytics", "aigen", "sessionclosing")),
-            "Server slice registry must include admin.audit, admin.health, admin.analytics, aigen, and sessionclosing.",
+            registered.containsAll(
+                setOf("admin.audit", "admin.health", "admin.analytics", "aigen", "sessionclosing", "observability"),
+            ),
+            "Server slice registry must include admin.audit, admin.health, admin.analytics, aigen, sessionclosing, and observability.",
         )
     }
 
