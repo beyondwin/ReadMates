@@ -28,7 +28,7 @@ describe("AdminHealthCard", () => {
       </MemoryRouter>,
     );
     expect(screen.getByText("Outbox backlog")).toBeInTheDocument();
-    expect(screen.getByText(/42/)).toBeInTheDocument();
+    expect(screen.getByText("42 rows")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /자세히/ })).toHaveAttribute(
       "href",
       "/admin/notifications?focus=outbox_backlog",
