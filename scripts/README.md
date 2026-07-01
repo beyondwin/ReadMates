@@ -40,10 +40,10 @@ READMATES_SERVER_CI_CHECK_DRY_RUN=true ./scripts/server-ci-check.sh
 기본 실행 범위는 다음과 같습니다.
 
 - `git diff --check`
-- `pnpm --dir front lint`
-- `pnpm --dir front test:coverage`
-- `pnpm --dir front build`
-- `pnpm --dir front zod:export-fixtures`
+- `npx --yes pnpm@10.33.0 --dir front lint`
+- `npx --yes pnpm@10.33.0 --dir front test:coverage`
+- `npx --yes pnpm@10.33.0 --dir front build`
+- `npx --yes pnpm@10.33.0 --dir front zod:export-fixtures`
 - `git diff --exit-code front/tests/unit/__fixtures__/zod-schemas/`
 - `./server/gradlew -p server check`
 
@@ -60,7 +60,7 @@ READMATES_SERVER_CI_CHECK_DRY_RUN=true ./scripts/server-ci-check.sh
 ./scripts/pre-push-check.sh --full --release
 ```
 
-`--full`은 `./server/gradlew -p server integrationTest`, `pnpm --dir front test:e2e`, 그리고 관측 설정 검증(`validate-prometheus-rules.sh`, `validate-prometheus-config.sh`, `validate-alertmanager-config.sh`)을 추가로 실행합니다. Docker, MySQL client, Playwright browser 의존성이 준비되지 않은 환경에서는 기본 pre-push hook보다 수동 릴리즈 점검으로 실행합니다.
+`--full`은 `./server/gradlew -p server integrationTest`, `npx --yes pnpm@10.33.0 --dir front test:e2e`, 그리고 관측 설정 검증(`validate-prometheus-rules.sh`, `validate-prometheus-config.sh`, `validate-alertmanager-config.sh`)을 추가로 실행합니다. Docker, MySQL client, Playwright browser 의존성이 준비되지 않은 환경에서는 기본 pre-push hook보다 수동 릴리즈 점검으로 실행합니다.
 
 ### Release-mode CHANGELOG guard
 

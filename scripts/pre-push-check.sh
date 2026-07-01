@@ -8,6 +8,7 @@ release_mode="auto"
 dry_run="${READMATES_PRE_PUSH_DRY_RUN:-false}"
 changelog_check="auto"
 changelog_file="${READMATES_PRE_PUSH_CHANGELOG:-CHANGELOG.md}"
+pnpm_cmd=(npx --yes pnpm@10.33.0)
 # READMATES_PRE_PUSH_RELEASE=true forces release mode without requiring --release.
 if [[ "${READMATES_PRE_PUSH_RELEASE:-false}" == "true" ]]; then
   release_mode="always"
@@ -197,10 +198,10 @@ elif [[ "$release_mode" == "always" && "$changelog_check" == "never" ]]; then
 fi
 
 run_step "Git whitespace check" check_whitespace
-run_step "Frontend lint" pnpm --dir front lint
-run_step "Frontend unit tests with coverage" pnpm --dir front test:coverage
-run_step "Frontend build" pnpm --dir front build
-run_step "Export Zod fixtures" pnpm --dir front zod:export-fixtures
+run_step "Frontend lint" "${pnpm_cmd[@]}" --dir front lint
+run_step "Frontend unit tests with coverage" "${pnpm_cmd[@]}" --dir front test:coverage
+run_step "Frontend build" "${pnpm_cmd[@]}" --dir front build
+run_step "Export Zod fixtures" "${pnpm_cmd[@]}" --dir front zod:export-fixtures
 run_step "Check Zod fixtures are committed" git diff --exit-code front/tests/unit/__fixtures__/zod-schemas/
 run_step "Backend CI quality gate" ./server/gradlew -p server check
 
@@ -218,7 +219,7 @@ fi
 
 if [[ "$mode" == "full" ]]; then
   run_step "Backend integration tests" ./server/gradlew -p server integrationTest
-  run_step "Playwright E2E" pnpm --dir front test:e2e
+  run_step "Playwright E2E" "${pnpm_cmd[@]}" --dir front test:e2e
   run_step "Validate Prometheus rules" ./scripts/validate-prometheus-rules.sh
   run_step "Validate Prometheus config" ./scripts/validate-prometheus-config.sh
   run_step "Validate Alertmanager config" ./scripts/validate-alertmanager-config.sh

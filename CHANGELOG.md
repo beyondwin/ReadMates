@@ -10,6 +10,10 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 
+### Fixed
+
+- **pre-push pnpm parity:** pre-push checks now run frontend commands through `pnpm@10.33.0`, matching CI and avoiding local failures when another pnpm major version is first on `PATH`.
+
 ## v1.16.3 - 2026-06-30
 
 ### Fixed
