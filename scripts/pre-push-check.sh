@@ -8,7 +8,6 @@ release_mode="auto"
 dry_run="${READMATES_PRE_PUSH_DRY_RUN:-false}"
 changelog_check="auto"
 changelog_file="${READMATES_PRE_PUSH_CHANGELOG:-CHANGELOG.md}"
-pnpm_cmd=(npx --yes pnpm@10.33.0)
 # READMATES_PRE_PUSH_RELEASE=true forces release mode without requiring --release.
 if [[ "${READMATES_PRE_PUSH_RELEASE:-false}" == "true" ]]; then
   release_mode="always"
@@ -67,6 +66,27 @@ while (($# > 0)); do
 done
 
 cd "$repo_root"
+
+package_manager="$(node -p "require('./package.json').packageManager || ''")"
+if [[ ! "$package_manager" =~ ^pnpm@[^[:space:]]+$ ]]; then
+  printf 'Expected root package.json packageManager to match pnpm@version, got: %s\n' "$package_manager" >&2
+  exit 1
+fi
+
+if command -v corepack >/dev/null 2>&1; then
+  corepack_cmd=(corepack)
+else
+  corepack_cmd=(npx --yes corepack@0.35.0)
+fi
+
+pnpm_cmd=("${corepack_cmd[@]}" pnpm)
+
+activate_repo_pnpm() {
+  printf 'Using package manager from root package.json: %s\n' "$package_manager"
+  "${corepack_cmd[@]}" enable
+  "${corepack_cmd[@]}" prepare "$package_manager" --activate
+  "${pnpm_cmd[@]}" --version
+}
 
 run_step() {
   local label="$1"
@@ -197,6 +217,7 @@ elif [[ "$release_mode" == "always" && "$changelog_check" == "never" ]]; then
   printf 'Emergency override active. Record reason in the branch protection bypass ledger.\n'
 fi
 
+run_step "Activate repo package manager" activate_repo_pnpm
 run_step "Git whitespace check" check_whitespace
 run_step "Frontend lint" "${pnpm_cmd[@]}" --dir front lint
 run_step "Frontend unit tests with coverage" "${pnpm_cmd[@]}" --dir front test:coverage
