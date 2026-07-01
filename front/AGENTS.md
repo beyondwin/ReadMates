@@ -1,5 +1,7 @@
 # ReadMates Frontend
 
+This package-local guide adds to the root `../AGENTS.md`.
+
 Before editing frontend code, read `../docs/agents/front.md`.
 
 For UI, layout, copy, or visual polish, also read `../docs/agents/design.md`.
@@ -7,6 +9,8 @@ For UI, layout, copy, or visual polish, also read `../docs/agents/design.md`.
 This package is the Vite React SPA plus Cloudflare Pages Functions BFF/OAuth proxy routes.
 
 Successful frontend work preserves route-first boundaries, keeps BFF secrets out of browser-exposed configuration, and leaves the touched route usable across desktop and mobile.
+
+For `functions/` changes, treat the code as browser-facing BFF security surface: do not pass browser-supplied trusted headers through, do not introduce `VITE_*` secret configuration, and also read `../docs/agents/server.md` if Spring auth/API behavior changes.
 
 Do not add Next/React Server Component directives such as `"use client"` to Vite source files.
 
