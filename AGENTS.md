@@ -23,6 +23,8 @@ Package-local instructions add to this router. When working inside `front/`, rea
 
 Keep changes scoped to the touched feature and follow `docs/development/architecture.md` when boundaries are unclear.
 
+For architecture questions, impact analysis, or first-pass orientation across multiple surfaces, use `docs/development/project-map.md` as a navigation aid, then verify against the current code, tests, migrations, scripts, and `docs/development/architecture.md`.
+
 Public repo safety matters: do not add real member data, secrets, deployment state, local absolute paths, private domains, OCIDs, or token-shaped examples. You may inspect local env or generated files when needed, but do not quote or persist their private values in docs, tests, commits, or final responses.
 
 Graphify is available as a local codebase discovery aid. For architecture questions, impact analysis, or cross-surface work, use a scoped `graphify query` when the local graph is available, then verify findings against current code, tests, migrations, scripts, and active docs. Graphify does not replace the guide selection above, `docs/development/architecture.md`, or release-readiness review rules below.

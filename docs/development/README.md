@@ -6,6 +6,7 @@ ReadMates를 로컬에서 실행하고, 테스트하고, 구조를 이해하기 
 
 | 목적 | 문서 |
 | --- | --- |
+| 프로젝트 지형과 변경 유형별 읽는 순서 | [project-map.md](project-map.md) |
 | 로컬 실행 | [local-setup.md](local-setup.md) |
 | 테스트, 공개 릴리즈, 배포 smoke 점검 | [test-guide.md](test-guide.md) |
 | Lighthouse 진단과 route-critical 시각 회귀 baseline | [test-guide.md#lighthouse-diagnostic](test-guide.md#lighthouse-diagnostic), [test-guide.md#시각-회귀-컴포넌트-하니스](test-guide.md#시각-회귀-컴포넌트-하니스) |
@@ -29,6 +30,7 @@ ReadMates를 로컬에서 실행하고, 테스트하고, 구조를 이해하기 
 
 ## 주요 구조 문서
 
+- 처음 작업 표면을 고르는 에이전트나 개발자는 [project-map.md](project-map.md)에서 source of truth 우선순위, 코드/문서 지형, 변경 유형별 읽는 순서, 검증 선택표를 먼저 확인합니다.
 - 새로 합류했거나 처음 프로젝트를 맡는 개발자는 [new-developer-onboarding-guide.md](new-developer-onboarding-guide.md)에서 제품 표면, 저장소 구조, 프론트엔드/BFF/백엔드/DB/Redis/Kafka 흐름, 기술 선택 이유, 작업 순서를 먼저 확인합니다.
 - 프런트엔드 route-first 경계, feature `api/model/route/ui` 책임, legacy 예외 제거 기준은 [architecture.md](architecture.md)의 "프런트엔드 route-first 경계" 섹션을 기준으로 합니다.
 - Lighthouse diagnostic은 public/member/host/admin dev-seed route의 비차단 품질 baseline입니다. Route-critical component visual regression은 host closing board, platform admin support/audit 판단 패널, public records/session 카드처럼 props만으로 검증 가능한 UI 조각을 Docker renderer baseline으로 관리합니다. 명령과 macOS 제약은 [test-guide.md](test-guide.md)의 해당 섹션을 기준으로 합니다.

@@ -27,6 +27,7 @@ Documentation rules:
 - Prefer small factual patches over broad rewrites unless the user asks for a rewrite.
 - Architecture flexibility changes should keep `docs/development/architecture.md`, ADR-0002, ADR-0003, `docs/agents/front.md`, and `docs/agents/server.md` aligned with the boundary tests that enforce the rule.
 - Agent instruction changes should keep `AGENTS.md`, package-local `AGENTS.md` files, `docs/agents/*.md`, and lightweight tool entrypoints such as `CLAUDE.md` aligned. Do not duplicate large rule blocks into `CLAUDE.md`; keep it as a pointer unless the tool cannot resolve `AGENTS.md`.
+- If documentation entrypoints, documentation IA, or agent-routing guidance changes, keep `docs/development/project-map.md`, `README.md`, `docs/README.md`, and `docs/development/README.md` aligned without duplicating large rule blocks.
 - If a doc changes Graphify usage, keep `docs/development/graphify.md` aligned and preserve the rule that Graphify is discovery support, not source of truth.
 - For CHANGELOG, release-readiness, or residual-risk review work, use `docs/development/release-readiness-review.md` and do not treat passing tests as sufficient evidence that release or operational risk is closed.
 - If docs describe frontend, server, or UI rules in detail, read the matching surface guide before changing those claims.
