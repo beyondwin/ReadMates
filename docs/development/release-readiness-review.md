@@ -2,6 +2,13 @@
 
 남은 리스크, release readiness, merge 후 안전성, ship 가능 여부를 확인할 때 사용하는 체크리스트입니다. 구현 계획의 완료 여부와 테스트 통과 여부만으로 release risk가 닫혔다고 판단하지 않습니다.
 
+## 2026-07-01 pnpm Corepack standardization
+
+- Scope: package-manager activation only. pnpm stays at `10.33.0`; no lockfile migration or pnpm 11 upgrade was included.
+- Local verification: Corepack resolution used `npx --yes corepack@0.35.0` on the local machine because `corepack` was not on PATH. `prepare "$(node -p "require('./package.json').packageManager")" --activate`, `pnpm --version` (`10.33.0`), `pnpm install --frozen-lockfile`, `pnpm --dir front lint`, `pnpm --dir front test:coverage` (164 files, 1306 tests), `pnpm --dir front build`, `pnpm --dir front zod:export-fixtures`, `git diff --exit-code front/tests/unit/__fixtures__/zod-schemas/`, `./scripts/pre-push-check.sh --no-release`, `./scripts/build-public-release-candidate.sh`, and `./scripts/public-release-check.sh .tmp/public-release-candidate` passed.
+- Targeted scans: `.github`, `scripts`, `AGENTS.md`, `docs/agents`, `scripts/README.md`, `package.json`, `front/package.json`, and `pnpm-lock.yaml` had no `npm install --global pnpm@` or `pnpm@11` matches. The only `npx --yes pnpm@10.33.0` match in that targeted surface is the explicit fallback sentence in `AGENTS.md`, not primary CI/pre-push behavior.
+- Residual risk: pnpm 11 migration remains a separate Phase 2. Docker-based Playwright CT scripts still rely on container Corepack behavior and should be reviewed during the Phase 2 migration.
+
 ## 2026-06-30 observability stack production deploy repair
 
 - Scope reviewed: `deploy/oci/06-deploy-observability-stack.sh`, production Prometheus startup logs, and the production observability stack deployment path for Prometheus and Grafana.
