@@ -40,12 +40,15 @@ READMATES_SERVER_CI_CHECK_DRY_RUN=true ./scripts/server-ci-check.sh
 기본 실행 범위는 다음과 같습니다.
 
 - `git diff --check`
-- `npx --yes pnpm@10.33.0 --dir front lint`
-- `npx --yes pnpm@10.33.0 --dir front test:coverage`
-- `npx --yes pnpm@10.33.0 --dir front build`
-- `npx --yes pnpm@10.33.0 --dir front zod:export-fixtures`
+- `corepack pnpm --dir front lint`
+- `npx --yes corepack@0.35.0 pnpm --dir front lint` (`corepack`이 PATH에 없을 때)
+- `corepack pnpm --dir front test:coverage`
+- `corepack pnpm --dir front build`
+- `corepack pnpm --dir front zod:export-fixtures`
 - `git diff --exit-code front/tests/unit/__fixtures__/zod-schemas/`
 - `./server/gradlew -p server check`
+
+`pre-push-check.sh`는 루트 `package.json`의 `packageManager`를 읽고 해당 pnpm을 Corepack으로 활성화한 뒤, 해석된 Corepack launcher로 frontend checks를 실행합니다. 로컬 Node 설치가 `corepack`을 PATH에 노출하지 않으면 스크립트는 `npx --yes corepack@0.35.0`을 사용합니다. 다른 major version의 globally installed pnpm으로 우회하지 않습니다.
 
 `docs/`, `scripts/`, `deploy/`, `.github/`, 공개 release 설정 파일처럼 공개 후보에 영향을 주는 경로가 바뀌면 clean 후보를 만들고 public-release scanner도 실행합니다. Historical 작업 기록인 `docs/superpowers/` 하위 문서는 현재 동작의 source of truth가 아니므로 whitespace gate에서 제외합니다.
 
@@ -60,7 +63,7 @@ READMATES_SERVER_CI_CHECK_DRY_RUN=true ./scripts/server-ci-check.sh
 ./scripts/pre-push-check.sh --full --release
 ```
 
-`--full`은 `./server/gradlew -p server integrationTest`, `npx --yes pnpm@10.33.0 --dir front test:e2e`, 그리고 관측 설정 검증(`validate-prometheus-rules.sh`, `validate-prometheus-config.sh`, `validate-alertmanager-config.sh`)을 추가로 실행합니다. Docker, MySQL client, Playwright browser 의존성이 준비되지 않은 환경에서는 기본 pre-push hook보다 수동 릴리즈 점검으로 실행합니다.
+`--full`은 `./server/gradlew -p server integrationTest`, Corepack launcher를 통한 `pnpm --dir front test:e2e`, 그리고 관측 설정 검증(`validate-prometheus-rules.sh`, `validate-prometheus-config.sh`, `validate-alertmanager-config.sh`)을 추가로 실행합니다. Docker, MySQL client, Playwright browser 의존성이 준비되지 않은 환경에서는 기본 pre-push hook보다 수동 릴리즈 점검으로 실행합니다.
 
 ### Release-mode CHANGELOG guard
 

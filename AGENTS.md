@@ -41,6 +41,6 @@ Run the smallest relevant checks before finishing:
 - Public release checks: `./scripts/build-public-release-candidate.sh` then `./scripts/public-release-check.sh .tmp/public-release-candidate`
 - Docs-only: `git diff --check -- <changed-docs>` plus targeted link/safety scans. For public release work, run the public release candidate checks above.
 
-The pinned package manager is `pnpm@10.33.0`. If local `pnpm` behavior differs, a lockfile/install/build check is involved, or CI parity matters, run the frontend command through `npx --yes pnpm@10.33.0 --dir front ...` and report the exact command.
+The pinned package manager is the root `package.json` `packageManager` value (`pnpm@10.33.0` in the current tree). If local `pnpm` behavior differs, a lockfile/install/build check is involved, or CI parity matters, activate the repo-defined package manager through Corepack and run the frontend command through the resolved Corepack launcher, such as `corepack pnpm --dir front ...` or `npx --yes corepack@0.35.0 pnpm --dir front ...` when `corepack` is not on PATH. Report the exact command. Use `npx --yes pnpm@10.33.0 ...` only as an explicit fallback when Corepack itself is unavailable and call that out.
 
 Final responses should name the changed surface, list the checks actually run, and call out any remaining risk or skipped validation.
