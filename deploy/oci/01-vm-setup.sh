@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 01-vm-setup.sh — VM 최초 세팅 (Java 21 + Caddy + 유저 생성)
+# 01-vm-setup.sh — VM 최초 세팅 (Java 25 + Caddy + 유저 생성)
 # 실행: ssh -i ~/.ssh/readmates_oci ubuntu@<VM_PUBLIC_IP> 'bash -s' < deploy/oci/01-vm-setup.sh
 set -euo pipefail
 
@@ -7,8 +7,15 @@ echo "==> [1/4] 시스템 업데이트"
 sudo apt-get update -y
 sudo apt-get upgrade -y
 
-echo "==> [2/4] Java 21 + 운영 도구 설치"
-sudo apt-get install -y openjdk-21-jre-headless jq
+echo "==> [2/4] Java 25 + 운영 도구 설치"
+sudo apt-get install -y wget apt-transport-https gpg jq
+wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public \
+  | gpg --dearmor \
+  | sudo tee /etc/apt/trusted.gpg.d/adoptium.gpg >/dev/null
+echo "deb https://packages.adoptium.net/artifactory/deb $(awk -F= '/^VERSION_CODENAME/{print$2}' /etc/os-release) main" \
+  | sudo tee /etc/apt/sources.list.d/adoptium.list >/dev/null
+sudo apt-get update -y
+sudo apt-get install -y temurin-25-jre-headless
 java -version
 
 echo "==> [3/4] Caddy 설치"

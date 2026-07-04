@@ -190,7 +190,7 @@ READMATES_SMOKE_AUTH_BASE_URL=https://readmates.pages.dev \
 
 필수 도구:
 
-- `JDK 21`
+- `JDK 25 LTS`
 - `Node.js 24` 권장
 - `pnpm`
 - `Docker Compose` 또는 `MySQL 8` compatible database

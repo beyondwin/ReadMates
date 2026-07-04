@@ -141,6 +141,7 @@ if uses_registry_image; then
 else
   IMAGE_SOURCE="local"
   echo "==> [2/11] Docker image build: ${IMAGE_TAG}"
+  ./server/gradlew -p server bootJar
   docker build -t "${IMAGE_TAG}" server
   docker save "${IMAGE_TAG}" -o "${IMAGE_ARCHIVE}"
 fi

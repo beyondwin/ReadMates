@@ -1,5 +1,6 @@
 package com.readmates.club.api
 
+import com.jayway.jsonpath.JsonPath
 import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.club.application.model.ClubDomainActualCheckResult
 import com.readmates.club.application.port.out.CheckClubDomainActualStatePort
@@ -19,6 +20,7 @@ import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
@@ -615,6 +617,7 @@ class PlatformAdminControllerTest(
     private fun membershipIdsForClub(clubId: String): Set<String> =
         jdbcTemplate
             .queryForList("select id from memberships where club_id = ?", String::class.java, clubId)
+            .filterNotNull()
             .toSet()
 
     private fun sessionCookieForUser(userId: String): Cookie {
@@ -648,8 +651,8 @@ class PlatformAdminControllerTest(
     }
 }
 
-private inline fun <reified T> org.springframework.mock.web.MockHttpServletResponse.jsonPathValue(expression: String): T? =
-    com.jayway.jsonpath.JsonPath
+private inline fun <reified T> MockHttpServletResponse.jsonPathValue(expression: String): T? =
+    JsonPath
         .read(contentAsString, expression)
 
 @TestConfiguration

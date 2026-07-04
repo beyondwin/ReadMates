@@ -28,19 +28,20 @@ class JdbcAiGenerationSessionMetaAdapter(
                 ?: return null
 
         val expectedAuthorNames =
-            jdbc.queryForList(
-                """
-                select u.name
-                from session_participants sp
-                join memberships m on m.id = sp.membership_id
-                join users u on u.id = m.user_id
-                where sp.session_id = ?
-                  and sp.participation_status = 'ACTIVE'
-                order by sp.id
-                """.trimIndent(),
-                String::class.java,
-                sessionId.toString(),
-            )
+            jdbc
+                .queryForList(
+                    """
+                    select u.name
+                    from session_participants sp
+                    join memberships m on m.id = sp.membership_id
+                    join users u on u.id = m.user_id
+                    where sp.session_id = ?
+                      and sp.participation_status = 'ACTIVE'
+                    order by sp.id
+                    """.trimIndent(),
+                    String::class.java,
+                    sessionId.toString(),
+                ).filterNotNull()
 
         return SessionMeta(
             sessionId = sessionId,

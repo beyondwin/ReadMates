@@ -1,11 +1,11 @@
 plugins {
-    kotlin("jvm") version "2.2.0"
-    kotlin("plugin.spring") version "2.2.0"
+    kotlin("jvm") version "2.4.0"
+    kotlin("plugin.spring") version "2.4.0"
     id("org.springframework.boot") version "4.0.6"
     id("io.spring.dependency-management") version "1.1.7"
     id("org.flywaydb.flyway") version "11.7.2"
     id("org.jlleitschuh.gradle.ktlint") version "12.1.1"
-    id("io.gitlab.arturbosch.detekt") version "1.23.7"
+    id("dev.detekt") version "2.0.0-alpha.5"
     id("jacoco")
 }
 
@@ -18,7 +18,13 @@ extra["tomcat.version"] = "11.0.22"
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(21))
+        languageVersion.set(JavaLanguageVersion.of(25))
+    }
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_25)
     }
 }
 
@@ -108,7 +114,7 @@ dependencies {
     testImplementation("org.springframework.security:spring-security-test")
     testImplementation("org.testcontainers:testcontainers-kafka:2.0.2")
     testImplementation("org.testcontainers:testcontainers-mysql:2.0.2")
-    testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
+    testImplementation("com.tngtech.archunit:archunit-junit5:1.3.2")
 }
 
 tasks.named<org.gradle.jvm.tasks.Jar>("jar") {
@@ -128,7 +134,7 @@ val colimaDockerSocket = file("${System.getProperty("user.home")}/.colima/defaul
 
 val serverTestJavaLauncher =
     javaToolchains.launcherFor {
-        languageVersion.set(JavaLanguageVersion.of(21))
+        languageVersion.set(JavaLanguageVersion.of(25))
     }
 
 val testSourceSet = sourceSets.named("test")
@@ -139,6 +145,10 @@ fun Test.configureReadmatesTestRuntime() {
     filter {
         excludeTestsMatching("*\$*")
     }
+    maxHeapSize =
+        (project.findProperty("testMaxHeap") as String?)
+            ?: System.getenv("READMATES_TEST_MAX_HEAP")
+            ?: "1536m"
     jvmArgs("-Xshare:off")
     systemProperty(
         "readmates.frontend.fixtures.dir",
@@ -235,29 +245,12 @@ ktlint {
 }
 
 detekt {
-    toolVersion = "1.23.7"
     config.setFrom(files("$rootDir/config/detekt/detekt.yml"))
     buildUponDefaultConfig = true
     autoCorrect = false
     parallel = true
     source.setFrom(files("src/main/kotlin", "src/test/kotlin"))
     baseline = file("$rootDir/config/detekt/baseline.xml")
-}
-
-configurations.matching { it.name == "detekt" }.all {
-    resolutionStrategy.eachDependency {
-        if (requested.group == "org.jetbrains.kotlin") {
-            useVersion("2.0.10")
-        }
-    }
-}
-
-tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
-    jvmTarget = "21"
-}
-
-tasks.withType<io.gitlab.arturbosch.detekt.DetektCreateBaselineTask>().configureEach {
-    jvmTarget = "21"
 }
 
 tasks.named("check") {
@@ -267,7 +260,7 @@ tasks.named("check") {
 }
 
 jacoco {
-    toolVersion = "0.8.12"
+    toolVersion = "0.8.14"
 }
 
 val unitTestTask = tasks.named<Test>("unitTest")

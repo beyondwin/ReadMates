@@ -1,10 +1,10 @@
-FROM eclipse-temurin:21-jre-jammy AS layers
+FROM eclipse-temurin:25-jre-jammy AS layers
 
 WORKDIR /layers
 COPY build/libs/readmates-server-0.0.1-SNAPSHOT.jar readmates-server.jar
 RUN java -Djarmode=layertools -jar readmates-server.jar extract
 
-FROM eclipse-temurin:21-jre-jammy
+FROM eclipse-temurin:25-jre-jammy
 
 RUN apt-get update \
     && apt-get upgrade -y \

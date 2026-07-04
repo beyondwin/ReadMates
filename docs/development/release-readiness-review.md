@@ -2,6 +2,24 @@
 
 남은 리스크, release readiness, merge 후 안전성, ship 가능 여부를 확인할 때 사용하는 체크리스트입니다. 구현 계획의 완료 여부와 테스트 통과 여부만으로 release risk가 닫혔다고 판단하지 않습니다.
 
+## 2026-07-04 backend Java 25 Kotlin migration closeout
+
+- Scope reviewed: backend Gradle/Kotlin toolchain, test JVM launcher, detekt/Jacoco/ArchUnit gates, GitHub Actions Java setup, server Docker runtime packaging, legacy OCI Java setup, active setup/test/deploy docs, CHANGELOG, and public-release scanner behavior.
+- Runtime/tooling change: server compile/test/runtime now targets Java 25 with Kotlin 2.4.0. detekt moved from `io.gitlab.arturbosch.detekt` 1.23.7 to `dev.detekt` 2.0.0-alpha.5 because the stable 1.23.x line failed under a Java 25 Gradle daemon; `server/config/detekt/baseline.xml` was regenerated against detekt 2 rule ids. JaCoCo moved to 0.8.14 and ArchUnit to 1.3.2 for Java 25 class files.
+- Docker/deploy repair: local `server/Dockerfile` now packages the already verified `bootJar` output, matching the release workflow shape, because compiling Kotlin inside a 2GB Docker daemon repeatedly killed the Gradle daemon. `deploy/oci/05-deploy-compose-stack.sh` now runs `./server/gradlew -p server bootJar` before local image packaging. `server/Dockerfile.release` remains the GHCR release workflow path.
+- Local verification:
+  - `./server/gradlew -p server clean check` - pass.
+  - `./server/gradlew -p server integrationTest` - pass after adding configurable backend `Test` JVM heap default `1536m`; the first run failed with `Java heap space`.
+  - `./server/gradlew -p server bootJar`, `./server/gradlew -p server -version`, and `./server/gradlew -p server dependencyInsight --dependency kotlin-stdlib --configuration runtimeClasspath` - pass; Kotlin stdlib selected `2.4.0` and Gradle daemon used Java 25.
+  - `./server/gradlew -p server bootJar && docker build -t readmates-server:java25-local -f server/Dockerfile server && docker run --rm --entrypoint java readmates-server:java25-local -version` - pass; image reports Temurin Java 25.
+  - `docker build -t readmates-server:java25-release-local -f server/Dockerfile.release server && docker run --rm --entrypoint java readmates-server:java25-release-local -version` - pass; image reports Temurin Java 25.
+  - `npx --yes corepack@0.35.0 pnpm install --frozen-lockfile` and `npx --yes corepack@0.35.0 pnpm --dir front test:e2e` - pass, 68 Playwright tests.
+  - `bash -n deploy/oci/01-vm-setup.sh deploy/oci/05-deploy-compose-stack.sh scripts/build-public-release-candidate.sh scripts/public-release-check.sh`, `shellcheck deploy/oci/01-vm-setup.sh deploy/oci/05-deploy-compose-stack.sh`, targeted `git diff --check`, and targeted public-safety scan - pass.
+  - `./scripts/build-public-release-candidate.sh` and `./scripts/public-release-check.sh .tmp/public-release-candidate` - pass; gitleaks reported no leaks.
+  - `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.70.0 image --severity HIGH,CRITICAL --ignore-unfixed --scanners vuln readmates-server:java25-release-local` - pass, 0 Ubuntu and Java HIGH/CRITICAL findings.
+- Active-pin scan: no previous Java baseline, previous Kotlin plugin baseline, old detekt stable line, old JaCoCo baseline, or old ArchUnit baseline pins remain in active README/development/deploy/CI/server/deploy/script surfaces; remaining matches are historical CHANGELOG release entries.
+- Residual risk: no known local release-readiness blocker remains. Production/tag workflows, GHCR multi-arch buildx behavior, OCI promotion, and post-deploy smoke remain release-operation evidence outside the local merge.
+
 ## 2026-07-02 CT Docker Corepack path
 
 - Scope: frontend Playwright component-test Docker command path only. No UI baseline expansion, route behavior, server API contract, DB migration, auth/BFF behavior, release image workflow, or deploy behavior changed.

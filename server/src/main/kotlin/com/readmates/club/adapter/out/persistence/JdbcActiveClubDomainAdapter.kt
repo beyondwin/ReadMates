@@ -33,7 +33,8 @@ class JdbcActiveClubDomainAdapter(
                 .queryForList(
                     "SELECT hostname FROM club_domains WHERE status = 'ACTIVE'",
                     String::class.java,
-                ).toSet()
+                ).filterNotNull()
+                .toSet()
         cache.set(Pair(clock.instant(), refreshed))
         return refreshed
     }
