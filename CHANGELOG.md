@@ -14,6 +14,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - **pre-push pnpm parity:** pre-push checks now run frontend commands through `pnpm@10.33.0`, matching CI and avoiding local failures when another pnpm major version is first on `PATH`.
 - **Tooling:** CI/deploy and pre-push package-manager setup now activate the root `packageManager` through Corepack, reducing pnpm version drift between local checks and GitHub Actions.
+- **CT Docker Corepack path:** Playwright component visual-regression Docker commands now run through a shared helper that activates the repo-defined pnpm with Corepack, verifies the container pnpm version, and isolates CT `node_modules` in Docker volumes so the host install is not rewritten by Linux optional dependencies.
 
 ## v1.16.3 - 2026-06-30
 

@@ -214,15 +214,21 @@ pnpm --dir front test:ct:update:docker
 ```
 
 - `test:ct`는 Linux CI와 로컬 Linux에서 committed baseline과 현재 렌더 결과를 비교하는 검증 명령입니다. snapshot update flag를 사용하지 않습니다.
-- `test:ct:docker`는 macOS/renderer drift 회피용 검증 명령입니다. Docker `mcr.microsoft.com/playwright:v1.60.0-jammy` 안에서 snapshot update 없이 baseline drift만 확인합니다.
+- `test:ct:docker`는 macOS/renderer drift 회피용 검증 명령입니다. `front/scripts/run-ct-docker.ts`가 루트 `package.json`의 `packageManager`를 읽고 Docker 컨테이너 안에서 Corepack으로 같은 pnpm을 활성화한 뒤 Playwright CT를 실행합니다. 이 명령은 snapshot을 갱신하지 않습니다.
 - `test:ct:update`는 로컬 baseline 갱신용이지만, macOS나 CI 기준과 다른 렌더러에서 생성한 결과는 커밋하지 않습니다.
-- `test:ct:update:docker`가 baseline 생성의 **유일한 정규 경로**입니다. `mcr.microsoft.com/playwright:v1.60.0-jammy` 이미지 안에서(`CI=true`) 실행해 CI 렌더러와 일치시킵니다.
+- `test:ct:update:docker`가 baseline 생성의 **유일한 정규 경로**입니다. 같은 helper에 `--update`를 넘겨 `mcr.microsoft.com/playwright:v1.60.0-jammy` 이미지 안에서 실행합니다.
+
+Docker CT는 repository를 `/work`에 mount하되 root `node_modules`, `front/node_modules`, pnpm store를 Docker named volume으로 분리합니다. 그래서 Linux optional dependency install이 host `node_modules`를 덮어쓰는 일을 피합니다. Docker volume이 오래되어 의존성 상태가 의심되면 다음처럼 CT 전용 volume만 지웁니다.
+
+```bash
+docker volume rm readmates-ct-root-node-modules readmates-ct-front-node-modules readmates-ct-pnpm-store
+```
 
 **darwin(macOS) 제약:** macOS에서는 Vite 8의 `@rolldown/binding-darwin-arm64` 네이티브 바인딩이 없어 CT suite가 로컬에서 부팅조차 되지 않습니다. 따라서 macOS에서는 검증과 baseline 생성 모두 **Docker 경로만** 사용합니다. 로컬(특히 Apple Silicon)에서 `test:ct`가 부팅에 실패하면 `test:ct:update:docker`(또는 동일 이미지의 Docker 실행)로 진행합니다. macOS 로컬에서 생성한 baseline은 폰트 렌더링 차이로 CI를 깨뜨리므로 절대 커밋하지 않습니다.
 
 **flake 정책:** 애니메이션과 caret을 끄고, 고정 viewport `480x360`, `maxDiffPixelRatio: 0.02`로 픽셀 노이즈를 흡수합니다. darwin 로컬에서 생성한 baseline은 커밋하지 않습니다.
 
-**CI gate:** `.github/workflows/ci.yml`의 `frontend-visual-regression` job은 pull request와 `main` push에서 `pnpm --dir front test:ct`를 실행합니다. 이 job은 baseline을 갱신하지 않고 drift만 검증하며, 실패 시 `front/test-results`와 `front/playwright-report`를 artifact로 업로드합니다. 의도한 UI 변경이면 먼저 product diff를 리뷰한 뒤 Docker update command로 PNG baseline을 갱신하고, 의도하지 않은 diff면 UI/fixture를 고칩니다.
+**CI gate:** `.github/workflows/ci.yml`의 `frontend-visual-regression` job은 pull request와 `main` push에서 `pnpm test:ct:docker`를 실행합니다. 이 job은 baseline을 갱신하지 않고 drift만 검증하며, 실패 시 `front/test-results`와 `front/playwright-report`를 artifact로 업로드합니다. 의도한 UI 변경이면 먼저 product diff를 리뷰한 뒤 Docker update command로 PNG baseline을 갱신하고, 의도하지 않은 diff면 UI/fixture를 고칩니다.
 
 **Public release safety:** `front/__screenshots__`는 repo에 커밋되는 regression baseline이지만 clean public release candidate에는 포함하지 않습니다. CT baseline 경로, release candidate copy rule, public scanner rule을 바꾸면 아래 명령으로 screenshot exclusion이 유지되는지 확인합니다.
 
