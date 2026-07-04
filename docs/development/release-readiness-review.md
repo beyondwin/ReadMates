@@ -2,6 +2,15 @@
 
 남은 리스크, release readiness, merge 후 안전성, ship 가능 여부를 확인할 때 사용하는 체크리스트입니다. 구현 계획의 완료 여부와 테스트 통과 여부만으로 release risk가 닫혔다고 판단하지 않습니다.
 
+## 2026-07-02 CT Docker Corepack path
+
+- Scope: frontend Playwright component-test Docker command path only. No UI baseline expansion, route behavior, server API contract, DB migration, auth/BFF behavior, release image workflow, or deploy behavior changed.
+- Tooling change: `front/package.json` now routes `test:ct:docker` and `test:ct:update:docker` through `front/scripts/run-ct-docker.ts`. The helper reads root `package.json` `packageManager`, activates that pnpm inside `mcr.microsoft.com/playwright:v1.60.0-jammy` with Corepack, verifies the resolved pnpm version, and separates verification from snapshot update mode.
+- Host dependency safety: Docker CT mounts root `node_modules`, `front/node_modules`, and pnpm store as CT-specific Docker named volumes so Linux optional dependency installs do not replace the host install.
+- Local verification: `pnpm --dir front exec vitest run tests/performance/ct-docker.test.ts` passed; `pnpm --dir front test:ct:docker` passed against the committed CT baselines with 7 Playwright component tests; `pnpm --dir front test:ct:update:docker` passed and left `front/__screenshots__` unchanged; `pnpm --dir front lint`, `pnpm --dir front test` (165 files, 1310 tests), and `pnpm --dir front build` passed; `./scripts/build-public-release-candidate.sh` and `./scripts/public-release-check.sh .tmp/public-release-candidate` passed; `find .tmp/public-release-candidate -path '*__screenshots__*' -print` produced no output.
+- Graphify evidence: `graphify update .` ran after the code/docs changes. `graphify-out/` is ignored, so the completion evidence is command output plus CPE freshness audit rather than tracked graph artifacts.
+- Residual risk: Docker CT remains a heavy renderer-specific check, and pnpm 11 migration remains separate. No known local release-readiness blocker remains after helper tests, Docker CT verification/update idempotence, frontend checks, public-release candidate checks, and Graphify freshness pass.
+
 ## 2026-07-01 pnpm Corepack standardization
 
 - Scope: package-manager activation only. pnpm stays at `10.33.0`; no lockfile migration or pnpm 11 upgrade was included.
