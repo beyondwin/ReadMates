@@ -15,6 +15,7 @@
 - Keep host UI files free of direct `@tanstack/react-query`, host query key, and invalidation helper imports.
 - Keep host query modules free of imports from `features/host/route/*`.
 - Remove the three known legacy boundary exceptions instead of replacing them with new exceptions.
+- Keep the ownership model obvious to new developers and AI agents: `ui` owns presentation state, `route/data` owns loader/action/refresh, `queries` owns query keys/cache policy, and `model` owns neutral shared contracts.
 - Preserve existing Korean user-facing copy unless a message would become false after ownership moves.
 - Use the repo package manager policy from root `package.json`: `pnpm@10.33.0`.
 
@@ -1132,6 +1133,7 @@ git commit -m "docs: record host server-state boundary cleanup"
 - `pnpm --dir front test` passes.
 - `pnpm --dir front build` passes.
 - `docs/development/server-state-migration.md` describes the closed host members/invitations boundary debt.
+- A new worker can infer host members/invitations responsibility from file placement without reading exception notes: UI is presentation-only, route/data owns refresh, queries own cache policy, and neutral action contracts live in model.
 - No server API, DB migration, BFF/auth, OAuth, deploy workflow, release image, or route URL change is present.
 
 ## Spec Coverage Self-Review
@@ -1140,6 +1142,7 @@ git commit -m "docs: record host server-state boundary cleanup"
 - Spec goal "UI does not import Query hooks, keys, invalidation": Tasks 2 and 3 remove those imports and add focused checks.
 - Spec goal "queries do not import route": Task 1 moves member action contracts to `model`.
 - Spec goal "route/data owns refresh": Tasks 2 and 3 add QueryClient-backed action factories.
+- Spec goal "AI/new developer can predict responsibility boundaries": the global constraints and final acceptance explicitly require the UI/route-data/queries/model ownership split to be exception-free.
 - Spec goal "pagination and user copy stay stable": Tasks 2 and 3 preserve local appended rows and existing safe messages.
 - Spec goal "docs reflect actual state": Task 4 updates `server-state-migration.md`.
 - Placeholder scan: no placeholder markers, deferred implementation phrases, or unspecified test command remains.
