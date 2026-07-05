@@ -4,17 +4,19 @@
 상태: APPROVED DESIGN SPEC
 대상 표면: frontend host members/invitations routes, host query ownership, frontend boundary tests, server-state migration docs
 
+이 문서는 설계 승인 시점의 의사결정과 acceptance gate를 기록한다. 구현 이후 현재 동작은 실제 코드, tests, `docs/development/architecture.md`, `docs/development/server-state-migration.md`를 다시 확인한다.
+
 ## 1. 배경
 
 ReadMates frontend는 route-first 경계를 따른다. Feature는 `api`, `queries`, `model`, `route`, `ui`로 나누고, `ui`는 presentation surface로서 props와 callback만 받아 렌더링하는 것이 목표다. Server state는 route/queries layer가 소유하고, UI가 TanStack Query client, query key, invalidation policy를 직접 알지 않게 한다.
 
-현재 `docs/development/server-state-migration.md`는 `host/invitations`와 `host/members` migration을 완료 항목으로 기록한다. 하지만 실제 boundary test에는 아직 다음 legacy exception 3개가 남아 있다.
+설계 시점의 `docs/development/server-state-migration.md`는 `host/invitations`와 `host/members` migration을 완료 항목으로 기록했다. 하지만 당시 실제 boundary test에는 다음 legacy exception 3개가 남아 있었다.
 
 - `features/host/ui/host-invitations.tsx` -> `features/host/queries/host-invitation-queries`
 - `features/host/ui/host-members.tsx` -> `features/host/queries/host-members-queries`
 - `features/host/queries/host-members-queries.ts` -> `features/host/route/host-members-actions`
 
-코드도 같은 상태를 보여준다.
+설계 시점의 코드도 같은 상태를 보여줬다.
 
 - `host-invitations.tsx`는 `useQuery`, `useMutation`, `useQueryClient`, `hostInvitationListQuery`, `invalidateHostInvitations`를 직접 import한다.
 - `host-members.tsx`는 `useQuery`, `useQueryClient`, `hostMemberListQuery`, `hostMemberKeys`를 직접 import한다.
@@ -22,6 +24,8 @@ ReadMates frontend는 route-first 경계를 따른다. Feature는 `api`, `querie
 - `host-members-data.ts`와 `host-invitations-data.ts`는 이미 loader seeding과 action object를 갖고 있으므로, ownership을 route/data layer로 완전히 옮길 자연스러운 자리도 존재한다.
 
 이번 고도화는 새 사용자 기능이 아니라 문서상 완료된 server-state migration의 남은 boundary debt를 닫는 작업이다.
+
+AI 에이전트 관점에서 이 debt는 작지 않다. 문서가 "완료"라고 말하는 표면에 test exception과 역방향 import가 남아 있으면, 다음 작업자는 `ui`, `route`, `queries`, `model` 중 어디가 server state를 소유하는지 추론하기 위해 여러 파일을 더 읽어야 한다. 이번 정리는 경계를 코드와 테스트에서 일치시켜, 새 작업자가 파일 위치만 보고도 책임을 예측할 수 있게 만드는 구조 개선이다.
 
 ## 2. 목표
 
@@ -32,6 +36,7 @@ ReadMates frontend는 route-first 경계를 따른다. Feature는 `api`, `querie
 - `front/features/host/queries/host-members-queries.ts`가 `features/host/route/*`를 import하지 않는다.
 - Loader seeding, mutation 후 invalidation, canonical query refresh는 route/data/queries layer가 소유한다.
 - UI는 initial page, local appended page state, action callbacks, visible status/error state만 소유한다.
+- AI나 새 개발자가 host members/invitations 작업을 시작할 때 `ui = presentation`, `route/data = loader/action/refresh`, `queries = query key/cache policy`, `model = neutral contract`라는 책임 구분을 예외 없이 적용할 수 있다.
 - `docs/development/server-state-migration.md`는 host members/invitations migration 완료 상태와 이번 boundary cleanup 사실을 일관되게 설명한다.
 - 서버 API, DB migration, BFF/auth, route URL 구조, product behavior는 변경하지 않는다.
 
