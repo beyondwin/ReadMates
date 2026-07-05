@@ -47,6 +47,8 @@ READMATES_SERVER_IMAGE='ghcr.io/<owner>/<repo>/readmates-server:vX.Y.Z' VM_PUBLI
 
 완료 기준은 script가 끝까지 성공하고, `readmates-stack` systemd unit이 active 상태이며, compose `readmates-api` health, Cloudflare BFF auth smoke, production integration smoke가 모두 통과하는 것입니다. Redis/Kafka 기능 flag는 별도 rollout 전에는 켜지지 않은 상태로 둡니다.
 
+앱 compose 배포는 `--remove-orphans`를 사용하지 않습니다. 같은 VM에서 관측 stack이 동일한 Compose project/network에 붙어 실행될 수 있으므로, 앱 배포가 Prometheus/Grafana/Alertmanager를 orphan으로 오인해 삭제하면 안 됩니다. 제거가 필요한 legacy 컨테이너는 운영자가 현재 `compose.yml`/`compose.infra.yml`과 `docker compose ps -a`를 대조한 뒤 명시적으로 정리합니다.
+
 ## Deploy Attempt Ledger
 
 `05-deploy-compose-stack.sh`는 운영 VM의 `/var/log/readmates/deploy-attempts.jsonl`에 배포 attempt를 JSONL로 기록합니다. 이 ledger는 자동 rollback이나 재시도 트리거가 아니라, 실패 stage와 근거를 남겨 운영자가 rollback, 재시도, 조사를 판단하기 위한 기록입니다. 상태 모델과 stage별 대응은 [Deploy Attempts](../operations/runbooks/deploy-attempts.md)를 기준으로 합니다.

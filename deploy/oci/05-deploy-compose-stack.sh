@@ -231,7 +231,7 @@ ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" "sudo bash -s" <<EOF
 set -euo pipefail
 sudo systemctl enable readmates-stack
 cd ${REMOTE_DIR}
-sudo docker compose -f compose.yml up -d --remove-orphans
+sudo docker compose -f compose.yml up -d
 sudo systemctl start readmates-stack
 sudo docker compose -f compose.yml ps
 EOF
