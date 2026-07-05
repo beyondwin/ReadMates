@@ -10,6 +10,23 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 
+## v1.17.2 - 2026-07-05
+
+### Fixed
+
+- **frontend observability beacon upload:** browser telemetry now sends the `sendBeacon` payload as an `application/json` Blob, preventing `/api/bff/observability/frontend-events` from rejecting valid frontend event batches with `415 Unsupported Media Type`.
+
+### Deployment Notes
+
+- Patch release over `v1.17.1` for a frontend telemetry transport regression. No server API contract, Pages Functions route behavior, DB migration, OAuth scope, auth cookie, runtime secret, or production config change is included.
+- Publish `v1.17.2`, confirm tag-triggered `Deploy Front` and `Deploy Server Image` workflows, then run browser-facing production smoke. The OCI backend can be promoted to the same image tag for version alignment, but the frontend fix does not require a server schema or API cutover.
+
+### Verification
+
+- Local frontend gates (2026-07-05): `npx --yes corepack@0.35.0 pnpm --dir front lint`, `npx --yes corepack@0.35.0 pnpm --dir front test -- frontend-observability-client --reporter=dot`, `npx --yes corepack@0.35.0 pnpm --dir front test --reporter=dot`, and `npx --yes corepack@0.35.0 pnpm --dir front build` passed.
+- Local release safety (2026-07-05): `./scripts/build-public-release-candidate.sh` and `./scripts/public-release-check.sh .tmp/public-release-candidate` passed.
+- Full local release gate (2026-07-05): `./scripts/pre-push-check.sh --release` passed, including frontend lint, frontend coverage (165 files, 1311 tests), frontend build, zod fixture export/diff, backend check, public release candidate build, and public release check with gitleaks no leaks.
+
 ## v1.17.1 - 2026-07-05
 
 ### Fixed

@@ -2,6 +2,23 @@
 
 남은 리스크, release readiness, merge 후 안전성, ship 가능 여부를 확인할 때 사용하는 체크리스트입니다. 구현 계획의 완료 여부와 테스트 통과 여부만으로 release risk가 닫혔다고 판단하지 않습니다.
 
+## 2026-07-05 v1.17.2 frontend observability beacon upload repair
+
+- Scope reviewed: `v1.17.1..HEAD`, covering the frontend observability client transport, its unit test, CHANGELOG, release workflow impact, and public-release safety surface.
+- Root cause: the browser telemetry client used `navigator.sendBeacon(endpoint, body)` with a raw JSON string. Browser implementations can send that payload without an `application/json` content type, so the BFF frontend observability endpoint can reject otherwise valid event batches with `415 Unsupported Media Type`.
+- Fix: the sendBeacon path now wraps the sanitized JSON batch in a `Blob` with `type: "application/json"` and falls back to the existing `fetch` path when `Blob` or sendBeacon delivery is unavailable.
+- Release classification: patch release over `v1.17.1`; frontend runtime telemetry transport fix only. No server API contract, Pages Functions route behavior, DB migration, OAuth scope, auth cookie, runtime secret, or production config change is included.
+- Deployment impact: publish `v1.17.2`, confirm tag-triggered `Deploy Front` and `Deploy Server Image`, then run browser-facing production smoke. OCI backend promotion to the same image tag is allowed for version alignment, but no server schema/API cutover is required for this fix.
+- Local verification before push:
+  - `npx --yes corepack@0.35.0 pnpm --dir front lint` - pass.
+  - `npx --yes corepack@0.35.0 pnpm --dir front test -- frontend-observability-client --reporter=dot` - pass.
+  - `npx --yes corepack@0.35.0 pnpm --dir front test --reporter=dot` - pass.
+  - `npx --yes corepack@0.35.0 pnpm --dir front build` - pass.
+  - `./scripts/build-public-release-candidate.sh` and `./scripts/public-release-check.sh .tmp/public-release-candidate` - pass.
+  - `./scripts/pre-push-check.sh --release` - pass, including frontend lint, frontend coverage, frontend build, zod fixture export/diff, backend check, public release candidate build, and public release check with gitleaks no leaks.
+- Skipped before tag push: tag-triggered `Deploy Front`, tag-triggered `Deploy Server Image`, GitHub Release publication, OCI Compose backend promotion, production OAuth/provider-console checks, and post-deploy smoke. These require pushed `main`/tag or production operator access and must be closed as release-operation evidence after publication.
+- Residual risk: no known local release-readiness blocker remains after frontend checks and public-release candidate checks. Release-operation risk remains until tag workflows pass, GitHub Release exists, optional backend version alignment is applied if desired, and sanitized production smoke checks pass.
+
 ## 2026-07-05 v1.17.1 server image publication repair
 
 - Scope reviewed: `v1.17.0..HEAD`, covering the tag-triggered `Deploy Server Image` failure, server release/local Dockerfiles, OCI Compose health checks, deploy/watch/collect scripts, active deploy docs, and CHANGELOG.

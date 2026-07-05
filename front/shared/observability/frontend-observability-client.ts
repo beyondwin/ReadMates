@@ -11,7 +11,7 @@ export type FrontendObservabilityClient = {
 
 export type FrontendObservabilityClientOptions = {
   endpoint?: string;
-  sendBeacon?: ((url: string, data: string) => boolean) | undefined;
+  sendBeacon?: ((url: string, data: BodyInit) => boolean) | undefined;
   fetchImpl?: typeof fetch | undefined;
 };
 
@@ -26,7 +26,7 @@ export function createFrontendObservabilityClient(
   const sendBeacon =
     options.sendBeacon ??
     (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function"
-      ? (url: string, data: string) => navigator.sendBeacon(url, data)
+      ? (url: string, data: BodyInit) => navigator.sendBeacon(url, data)
       : undefined);
   const fetchImpl = options.fetchImpl ?? (typeof fetch === "function" ? fetch : undefined);
 
@@ -44,9 +44,10 @@ export function createFrontendObservabilityClient(
     const batch = sanitizeFrontendObservabilityBatch(queue.splice(0, queue.length));
     if (batch.events.length === 0) return;
     const body = JSON.stringify(batch);
+    const beaconBody = typeof Blob === "function" ? new Blob([body], { type: "application/json" }) : undefined;
 
     try {
-      if (sendBeacon?.(endpoint, body)) return;
+      if (beaconBody && sendBeacon?.(endpoint, beaconBody)) return;
       if (fetchImpl) {
         await fetchImpl(endpoint, {
           method: "POST",

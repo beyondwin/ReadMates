@@ -27,7 +27,9 @@ describe("frontend observability client", () => {
     expect(sendBeacon).toHaveBeenCalledTimes(1);
     const [url, body] = sendBeacon.mock.calls[0];
     expect(url).toBe("/api/bff/observability/frontend-events");
-    expect(JSON.parse(body as string)).toEqual({
+    expect(body).toBeInstanceOf(Blob);
+    expect((body as Blob).type).toBe("application/json");
+    expect(JSON.parse(await (body as Blob).text())).toEqual({
       events: [
         {
           type: "ROUTE_LOAD",
