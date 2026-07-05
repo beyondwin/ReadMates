@@ -40,8 +40,10 @@ export function hostMembersLoaderFactory(client: QueryClient) {
 export function createHostMembersActions(client: QueryClient): HostMembersActions {
   const markMembersStale = () => invalidateHostMembers(client);
   const refreshMembers = async () => {
-    await client.fetchQuery(hostMemberListQuery({ limit: HOST_MEMBERS_PAGE_LIMIT }));
+    const page = await fetchHostMembers(undefined, { limit: HOST_MEMBERS_PAGE_LIMIT });
+    client.setQueryData(hostMemberListQuery({ limit: HOST_MEMBERS_PAGE_LIMIT }).queryKey, page);
     await markMembersStale();
+    return page;
   };
 
   return {

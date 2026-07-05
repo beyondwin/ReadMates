@@ -127,7 +127,7 @@ const activeHostAuth: AuthMeResponse = {
 
 const noopHostMembersActions = {
   loadMembers: vi.fn(async () => []),
-  refreshMembers: vi.fn(async () => undefined),
+  refreshMembers: vi.fn(async () => ({ items: [], nextCursor: null })),
   submitLifecycle: vi.fn(async () => lifecycleResponse(members[0])),
   submitViewerAction: vi.fn(async () => members[0]),
   submitProfile: vi.fn(async () => memberListItemResponse(members[0])),
@@ -558,7 +558,7 @@ describe("HostMembersPage", () => {
     const actions = {
       ...noopHostMembersActions,
       loadMembers: vi.fn(async () => ({ items: [nextMember], nextCursor: null })),
-      refreshMembers: vi.fn(async () => undefined),
+      refreshMembers: vi.fn(async () => ({ items: [], nextCursor: null })),
     } satisfies HostMembersActions;
 
     render(
@@ -713,7 +713,7 @@ describe("HostMembersPage", () => {
     expect(suspendedRow.getByText("이 멤버는 현재 정책상 복구할 수 없습니다.")).toBeInTheDocument();
   });
 
-  it("dispatches a route-owned refresh after activating a viewer member", async () => {
+  it("refreshes the hub after activating a viewer member", async () => {
     const user = userEvent.setup();
     const approvedMember = {
       ...members[1],
@@ -744,6 +744,10 @@ describe("HostMembersPage", () => {
       "/api/bff/api/host/members?limit=50",
       expect.objectContaining({ cache: "no-store" }),
     );
+
+    await user.click(screen.getByRole("tab", { name: "활성 멤버" }));
+    expect(screen.getByText("둘")).toBeInTheDocument();
+    expect(screen.getByText("viewer@example.com · 정식 멤버")).toBeInTheDocument();
   });
 
   it("keeps local viewer removals independent from refresh response ordering", async () => {
@@ -759,11 +763,13 @@ describe("HostMembersPage", () => {
     } satisfies HostMemberListItem;
     const initialPendingMembers = [members[1], secondPending];
     const staleRefresh = deferred<Response>();
+    const latestRefresh = deferred<Response>();
     const fetchMock = renderHostMembersPage(
       [
         new Response(JSON.stringify({ status: "ACTIVE" }), { status: 200, headers: { "Content-Type": "application/json" } }),
         staleRefresh.promise,
         new Response(JSON.stringify({ status: "ACTIVE" }), { status: 200, headers: { "Content-Type": "application/json" } }),
+        latestRefresh.promise,
       ],
       initialPendingMembers,
     );
@@ -781,9 +787,15 @@ describe("HostMembersPage", () => {
         name: "정식 멤버로 전환",
       }),
     );
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(6));
 
     expect(screen.getByText("둘러보기 멤버가 없습니다.")).toBeInTheDocument();
+
+    await act(async () => {
+      latestRefresh.resolve(memberListResponse([]));
+      await latestRefresh.promise;
+      await Promise.resolve();
+    });
 
     await act(async () => {
       staleRefresh.resolve(memberListResponse(initialPendingMembers));
@@ -796,7 +808,7 @@ describe("HostMembersPage", () => {
     expect(screen.queryByText("두번째 둘러보기")).not.toBeInTheDocument();
   });
 
-  it("dispatches a route-owned refresh after deactivating a viewer member", async () => {
+  it("refreshes the hub after deactivating a viewer member", async () => {
     const user = userEvent.setup();
     const rejectedMember = {
       ...members[1],
@@ -822,6 +834,13 @@ describe("HostMembersPage", () => {
       "/api/bff/api/host/members?limit=50",
       expect.objectContaining({ cache: "no-store" }),
     );
+
+    await user.click(screen.getByRole("tab", { name: "탈퇴/비활성" }));
+    expect(screen.getByText("둘")).toBeInTheDocument();
+    expect(screen.getByText("viewer@example.com · 요청 2026.04.20")).toBeInTheDocument();
+    const inactiveViewerRow = within(screen.getByText("둘").closest("article") as HTMLElement);
+    expect(inactiveViewerRow.getByText("기록 보존")).toBeInTheDocument();
+    expect(inactiveViewerRow.queryByText("이번 세션 미포함")).not.toBeInTheDocument();
   });
 
   it("removes the viewer row locally when activation succeeds but list refresh fails", async () => {

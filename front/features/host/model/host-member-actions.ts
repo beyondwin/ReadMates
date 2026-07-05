@@ -15,7 +15,7 @@ export type JsonResponse<T> = Response & { json(): Promise<T> };
 
 export type HostMembersActions = {
   loadMembers: (page?: PageRequest) => Promise<HostMemberListPage>;
-  refreshMembers: () => Promise<void>;
+  refreshMembers: () => Promise<HostMemberListPage>;
   submitLifecycle: (
     membershipId: string,
     path: HostMemberLifecyclePath,

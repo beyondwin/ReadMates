@@ -2,6 +2,24 @@
 
 남은 리스크, release readiness, merge 후 안전성, ship 가능 여부를 확인할 때 사용하는 체크리스트입니다. 구현 계획의 완료 여부와 테스트 통과 여부만으로 release risk가 닫혔다고 판단하지 않습니다.
 
+## 2026-07-05 host server-state boundary cleanup closeout
+
+- Scope reviewed: local `main..codex/readmates-host-server-state-boundary-cleanup-20260705-133050`, covering host members and invitations route/data actions, host member action contracts, host UI state handoff, frontend boundary tests, host unit tests, migration status docs, CHANGELOG, and release-readiness notes.
+- Release classification: frontend architecture/internal server-state ownership cleanup plus docs. No Spring API contract, Pages Functions BFF/auth behavior, OAuth scope, auth cookie format, Flyway/DB migration, deploy workflow, runtime secret, route URL, or public release scanner behavior change is included.
+- Risk repair before merge: full E2E initially caught a host viewer activation regression where the mutation succeeded but the active-member tab could still show stale state. The repair keeps the refresh owned by the route/data action, bypasses the fresh Query cache for the post-mutation host member list, returns the canonical page to the UI, and filters completed viewer rows so stale out-of-order refreshes cannot reintroduce removed viewer requests.
+- Local verification before merge:
+  - `npx --yes corepack@0.35.0 pnpm --dir front test -- frontend-boundaries host-members host-invitations --reporter=dot` - pass, 165 files and 1311 tests.
+  - `npx --yes corepack@0.35.0 pnpm --dir front lint` - pass.
+  - `npx --yes corepack@0.35.0 pnpm --dir front test --reporter=dot` - pass, 165 files and 1311 tests.
+  - `npx --yes corepack@0.35.0 pnpm --dir front build` - pass.
+  - `npx --yes corepack@0.35.0 pnpm --dir front test:e2e -- tests/e2e/public-auth-member-host.spec.ts` - pass, 2 Playwright tests after the repair.
+  - `npx --yes corepack@0.35.0 pnpm --dir front test:e2e` - pass, 68 Playwright tests.
+  - `./scripts/build-public-release-candidate.sh` and `./scripts/public-release-check.sh .tmp/public-release-candidate` - pass; gitleaks reported no leaks.
+  - `git diff --check` on the changed code/docs surfaces and targeted public-safety scan - pass.
+  - `graphify update .` plus CPE Graphify freshness audit - pass. `graphify-out/` is ignored, so the completion evidence is command output and freshness audit output rather than tracked graph artifacts.
+- Skipped before merge: server/DB/BFF/deploy-specific local gates were not run because no server, Flyway, Pages Functions, auth, secret, deploy, CI, or scanner implementation files changed. Tag-triggered workflows, production OAuth/provider-console checks, and post-deploy smoke remain release-operation evidence outside the local merge.
+- Residual risk: no known local release-readiness blocker remains after the E2E repair, frontend checks, public-release candidate checks, docs safety scan, and Graphify freshness. Production/tag/deploy smoke remains a release-operation confirmation step.
+
 ## 2026-07-04 backend Java 25 Kotlin migration closeout
 
 - Scope reviewed: backend Gradle/Kotlin toolchain, test JVM launcher, detekt/Jacoco/ArchUnit gates, GitHub Actions Java setup, server Docker runtime packaging, legacy OCI Java setup, active setup/test/deploy docs, CHANGELOG, and public-release scanner behavior.

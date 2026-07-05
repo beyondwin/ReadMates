@@ -108,6 +108,7 @@ export default function HostMembers({ initialMembers, actions, LinkComponent = D
   const [pendingActions, setPendingActions] = useState<Set<string>>(() => new Set());
   const [message, setMessage] = useState<null | { kind: "alert" | "status"; text: string }>(null);
   const pendingActionsRef = useRef<Set<string>>(new Set());
+  const completedViewerMembershipIdsRef = useRef<Set<string>>(new Set());
   const dialogTriggerRef = useRef<HTMLElement | null>(null);
 
   const setMembers = (update: MemberRowsUpdate) => {
@@ -116,6 +117,18 @@ export default function HostMembers({ initialMembers, actions, LinkComponent = D
       const nextMembers = typeof update === "function" ? update(activeState.members) : update;
 
       return { ...activeState, members: nextMembers };
+    });
+  };
+  const replaceMembersFromPage = (page: HostMemberListPage | HostMemberListItem[]) => {
+    const nextPage = normalizeMemberPage(page);
+    const completedViewerMembershipIds = completedViewerMembershipIdsRef.current;
+
+    setMemberRowsState({
+      source: initialMembersItems,
+      members: nextPage.items.filter(
+        (item) => item.status !== "VIEWER" || !completedViewerMembershipIds.has(item.membershipId),
+      ),
+      nextCursor: nextPage.nextCursor,
     });
   };
 
@@ -244,11 +257,12 @@ export default function HostMembers({ initialMembers, actions, LinkComponent = D
     try {
       await actions.submitViewerAction(member.membershipId, action);
 
+      completedViewerMembershipIdsRef.current.add(member.membershipId);
       setMembers((current) => current.filter((item) => item.membershipId !== member.membershipId));
       setMessage({ kind: "status", text: successMessage });
 
       try {
-        await refreshMembers();
+        replaceMembersFromPage(await refreshMembers());
       } catch {
         setMessage({ kind: "alert", text: "처리는 완료됐지만 멤버 목록 새로고침에 실패했습니다. 새로고침해서 최신 상태를 확인해 주세요." });
       }

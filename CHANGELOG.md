@@ -12,6 +12,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Fixed
 
+- **Host server-state boundary:** host members and invitations now keep query ownership in route/data actions, removing the remaining frontend boundary exceptions without changing the server API, BFF/auth behavior, DB migrations, deploy workflow, or route URLs.
 - **Backend Java 25 runtime:** backend Gradle toolchains, GitHub Actions setup-java jobs, Docker runtime images, legacy OCI VM setup, and active development/deploy docs now use Java 25 LTS with Kotlin 2.4.0 bytecode targeting Java 25.
 - **pre-push pnpm parity:** pre-push checks now run frontend commands through `pnpm@10.33.0`, matching CI and avoiding local failures when another pnpm major version is first on `PATH`.
 - **Tooling:** CI/deploy and pre-push package-manager setup now activate the root `packageManager` through Corepack, reducing pnpm version drift between local checks and GitHub Actions.
