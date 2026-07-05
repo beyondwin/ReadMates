@@ -46,7 +46,7 @@ export {
   HostInvitationsRoute,
 } from "@/features/host/route/host-invitations-route";
 export {
-  hostInvitationsActions,
+  createHostInvitationsActions,
   hostInvitationsLoaderFactory,
 } from "@/features/host/route/host-invitations-data";
 export {

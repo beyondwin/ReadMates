@@ -22,13 +22,6 @@ type BoundaryRuleId =
 
 const legacyBoundaryExceptions = [
   {
-    sourcePath: "features/host/ui/host-invitations.tsx",
-    importPath: "features/host/queries/host-invitation-queries",
-    ruleId: "feature-ui",
-    reason: "Host invitations UI still owns query invalidation during the server-state migration.",
-    removeWhen: "Move host invitation query ownership to the route and pass props/callbacks into UI.",
-  },
-  {
     sourcePath: "features/host/ui/host-members.tsx",
     importPath: "features/host/queries/host-members-queries",
     ruleId: "feature-ui",

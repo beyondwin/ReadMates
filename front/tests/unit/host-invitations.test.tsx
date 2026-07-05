@@ -1,10 +1,9 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { HostInvitationsActions } from "@/features/host/route/host-invitations-actions";
+import type { HostInvitationsActions } from "@/features/host/model/host-invitation-actions";
 import HostInvitations from "@/features/host/ui/host-invitations";
-import { hostInvitationsActions } from "@/features/host";
+import { createHostInvitationsActions } from "@/features/host";
 import type { HostInvitationListItem, HostInvitationListPage } from "@/features/host/api/host-contracts";
 import { createTestQueryWrapper } from "./helpers/query-test-wrapper";
 
@@ -53,6 +52,10 @@ const hostInvitationsTestActions = {
       method: "POST",
       cache: "no-store",
     }),
+  refreshInvitations: async (page) => {
+    const response = await hostInvitationsTestActions.listInvitations(page);
+    return hostInvitationsTestActions.parseInvitationList(response);
+  },
   parseInvitation: async (response) => response.json(),
   parseInvitationList: async (response) => response.json(),
 } satisfies HostInvitationsActions;
@@ -63,17 +66,7 @@ function HostInvitationsForTest({
   actions,
   ...props
 }: Omit<HostInvitationsProps, "actions"> & { actions?: HostInvitationsActions }) {
-  const client = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false, staleTime: Number.POSITIVE_INFINITY, gcTime: 0 },
-      mutations: { retry: false },
-    },
-  });
-  return (
-    <QueryClientProvider client={client}>
-      <HostInvitations {...props} actions={actions ?? hostInvitationsTestActions} />
-    </QueryClientProvider>
-  );
+  return <HostInvitations {...props} actions={actions ?? hostInvitationsTestActions} />;
 }
 
 function deferred<T>() {
@@ -94,30 +87,11 @@ afterEach(() => {
 });
 
 describe("HostInvitations", () => {
-  it("loads invitation list via useQuery (override queryFn)", async () => {
-    const { Wrapper } = createTestQueryWrapper();
-    const listInvitations = vi.fn(
-      () => Promise.resolve(new Response(JSON.stringify({ items: invitations, nextCursor: null }), { status: 200 })),
-    );
-    const parseInvitationList = vi.fn(
-      async (response: Response) => (await response.json()) as HostInvitationListPage,
-    );
-    const actions = {
-      listInvitations,
-      createInvitation: vi.fn(),
-      revokeInvitation: vi.fn(),
-      parseInvitation: vi.fn(),
-      parseInvitationList,
-    };
-    render(
-      <HostInvitations
-        initialInvitations={{ items: [], nextCursor: null }}
-        actions={actions as unknown as HostInvitationsActions}
-      />,
-      { wrapper: Wrapper },
-    );
-    await screen.findByText("대기 멤버");
-    expect(listInvitations).toHaveBeenCalled();
+  it("renders the loader-provided invitation page without a Query provider", () => {
+    render(<HostInvitationsForTest initialInvitations={{ items: invitations, nextCursor: null }} />);
+
+    expect(screen.getByText("대기 멤버")).toBeInTheDocument();
+    expect(screen.getByText("수락 멤버")).toBeInTheDocument();
   });
 
   it("renders invitation list statuses and actions", () => {
@@ -148,6 +122,7 @@ describe("HostInvitations", () => {
     const actions = {
       ...hostInvitationsTestActions,
       listInvitations: vi.fn(async () => new Response(JSON.stringify({ items: [nextInvitation], nextCursor: null }))),
+      refreshInvitations: vi.fn(async () => ({ items: [], nextCursor: null })),
     } satisfies HostInvitationsActions;
 
     render(
@@ -167,8 +142,9 @@ describe("HostInvitations", () => {
   it("keeps load-more pagination on the route action URL", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ items: [], nextCursor: null })));
     vi.stubGlobal("fetch", fetchMock);
+    const { client } = createTestQueryWrapper();
 
-    await hostInvitationsActions.listInvitations({ limit: 50, cursor: "cursor-1" });
+    await createHostInvitationsActions(client).listInvitations({ limit: 50, cursor: "cursor-1" });
 
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/bff/api/host/invitations?limit=50&cursor=cursor-1",
@@ -538,8 +514,7 @@ describe("HostInvitations", () => {
     expect(screen.queryByRole("button", { name: "초대 링크 복사" })).not.toBeInTheDocument();
   });
 
-  it("invalidates list after successful revoke", async () => {
-    const { Wrapper } = createTestQueryWrapper();
+  it("refreshes the first invitation page after successful revoke", async () => {
     const pendingInvitation: HostInvitationListItem = {
       invitationId: "invite-revoke-1",
       email: "revoke-target@example.com",
@@ -554,46 +529,26 @@ describe("HostInvitations", () => {
       canReissue: true,
       applyToCurrentSession: true,
     };
-    const listInvitations = vi.fn(
-      () =>
-        Promise.resolve(
-          new Response(JSON.stringify({ items: [pendingInvitation], nextCursor: null }), { status: 200 }),
-        ),
+    const refreshedPage = { items: [], nextCursor: null } satisfies HostInvitationListPage;
+    const revokeInvitation = vi.fn(async () =>
+      new Response(JSON.stringify({ ...pendingInvitation, status: "REVOKED", effectiveStatus: "REVOKED" }), { status: 200 }),
     );
-    const revokeInvitation = vi.fn(
-      () =>
-        Promise.resolve(
-          new Response(JSON.stringify({ ...pendingInvitation, status: "REVOKED", effectiveStatus: "REVOKED" }), {
-            status: 200,
-          }),
-        ),
-    );
-    const parseInvitationList = vi.fn(async (response: Response) => (await response.json()) as HostInvitationListPage);
-    const parseInvitation = vi.fn(async (response: Response) => response.json());
+    const refreshInvitations = vi.fn(async () => refreshedPage);
     const actions = {
-      listInvitations,
-      createInvitation: vi.fn(),
+      ...hostInvitationsTestActions,
       revokeInvitation,
-      parseInvitation,
-      parseInvitationList,
-    };
+      refreshInvitations,
+    } satisfies HostInvitationsActions;
 
-    render(
-      <HostInvitations
-        initialInvitations={{ items: [pendingInvitation], nextCursor: null }}
-        actions={actions as unknown as HostInvitationsActions}
-      />,
-      { wrapper: Wrapper },
-    );
-
-    const baselineListCalls = listInvitations.mock.calls.length;
+    render(<HostInvitationsForTest initialInvitations={{ items: [pendingInvitation], nextCursor: null }} actions={actions} />);
 
     await userEvent.click(
       screen.getByRole("button", { name: "revoke-target@example.com 초대 취소" }),
     );
 
     await waitFor(() => expect(revokeInvitation).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(listInvitations.mock.calls.length).toBeGreaterThan(baselineListCalls));
+    expect(refreshInvitations).toHaveBeenCalledWith({ limit: 50 });
+    await waitFor(() => expect(screen.queryByText("취소 대상")).not.toBeInTheDocument());
   });
 
   it("refreshes invitations after reissue and keeps historical rows", async () => {

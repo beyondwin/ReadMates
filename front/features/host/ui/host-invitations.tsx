@@ -1,6 +1,4 @@
-
-import { type CSSProperties, type FormEvent, type InvalidEvent, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type CSSProperties, type FormEvent, type InvalidEvent, useEffect, useMemo, useRef, useState } from "react";
 import type {
   CreateHostInvitationRequest,
   HostInvitationListPage,
@@ -8,8 +6,7 @@ import type {
   HostInvitationResponse,
   InvitationStatus,
 } from "@/features/host/model/host-view-types";
-import { hostInvitationListQuery, invalidateHostInvitations } from "@/features/host/queries/host-invitation-queries";
-import type { PageRequest } from "@/shared/model/paging";
+import type { HostInvitationsActions } from "@/features/host/model/host-invitation-actions";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 
 const statusLabels: Record<InvitationStatus, string> = {
@@ -32,14 +29,6 @@ type HostMessage = {
 };
 
 type PendingRowAction = "revoke" | "reissue";
-
-type HostInvitationsActions = {
-  listInvitations: (page?: PageRequest) => Promise<Response>;
-  createInvitation: (request: CreateHostInvitationRequest) => Promise<Response>;
-  revokeInvitation: (invitationId: string) => Promise<Response>;
-  parseInvitation: (response: Response) => Promise<HostInvitationResponse>;
-  parseInvitationList: (response: Response) => Promise<HostInvitationListPage>;
-};
 
 function inviteStatusClass(status: InvitationStatus) {
   if (status === "PENDING") {
@@ -73,55 +62,47 @@ export default function HostInvitations({
   initialInvitations: HostInvitationListPage | HostInvitationListItem[];
   actions: HostInvitationsActions;
 }) {
-  const initialPage = normalizeInvitationPage(initialInvitations);
+  const initialPage = useMemo(() => normalizeInvitationPage(initialInvitations), [initialInvitations]);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [applyToCurrentSession, setApplyToCurrentSession] = useState(true);
-  const queryClient = useQueryClient();
-  const listQuery = useQuery({
-    ...hostInvitationListQuery({ limit: 50 }),
-    queryFn: async () => {
-      const response = await actions.listInvitations({ limit: 50 });
-      if (!response.ok) {
-        throw new Error("Failed to load invitation list");
-      }
-      return normalizeInvitationPage(await actions.parseInvitationList(response));
-    },
-    initialData: initialPage,
-  });
-  const queryItems = listQuery.data?.items ?? [];
+  const [basePage, setBasePage] = useState<HostInvitationListPage>(() => initialPage);
   const [nextCursor, setNextCursor] = useState(initialPage.nextCursor);
   const [appendedInvitations, setAppendedInvitations] = useState<HostInvitationListItem[]>([]);
-  const resetPagination = (page?: HostInvitationListPage | null) => {
+
+  useEffect(() => {
+    setBasePage(initialPage);
     setAppendedInvitations([]);
-    setNextCursor(page?.nextCursor ?? null);
+    setNextCursor(initialPage.nextCursor);
+  }, [initialPage]);
+
+  const queryItems = basePage.items;
+  const resetPagination = (page?: HostInvitationListPage | HostInvitationListItem[] | null) => {
+    const nextPage = page ? normalizeInvitationPage(page) : basePage;
+    setBasePage(nextPage);
+    setAppendedInvitations([]);
+    setNextCursor(nextPage.nextCursor);
   };
-  const createMutation = useMutation({
-    mutationFn: async (request: CreateHostInvitationRequest) => {
-      const response = await actions.createInvitation(request);
-      if (!response.ok) {
-        const error = new Error("create-failed") as Error & { status?: number };
-        error.status = response.status;
-        throw error;
-      }
-      return actions.parseInvitation(response);
-    },
-    onSuccess: async () => {
-      await invalidateHostInvitations(queryClient);
-    },
-  });
-  const revokeMutation = useMutation({
-    mutationFn: async (invitationId: string) => {
-      const response = await actions.revokeInvitation(invitationId);
-      if (!response.ok) {
-        throw new Error("revoke-failed");
-      }
-      return actions.parseInvitation(response);
-    },
-    onSuccess: async () => {
-      await invalidateHostInvitations(queryClient);
-    },
-  });
+  const createInvitation = async (request: CreateHostInvitationRequest) => {
+    const response = await actions.createInvitation(request);
+    if (!response.ok) {
+      const error = new Error("create-failed") as Error & { status?: number };
+      error.status = response.status;
+      throw error;
+    }
+    const created = await actions.parseInvitation(response);
+    const refreshed = await actions.refreshInvitations({ limit: 50 });
+    return { created, refreshed };
+  };
+  const revokeInvitation = async (invitationId: string) => {
+    const response = await actions.revokeInvitation(invitationId);
+    if (!response.ok) {
+      throw new Error("revoke-failed");
+    }
+    const revoked = await actions.parseInvitation(response);
+    const refreshed = await actions.refreshInvitations({ limit: 50 });
+    return { revoked, refreshed };
+  };
   const invitations = appendedInvitations.length > 0 ? [...queryItems, ...appendedInvitations] : queryItems;
   const [lastCreated, setLastCreated] = useState<HostInvitationResponse | null>(null);
   const [message, setMessage] = useState<HostMessage | null>(null);
@@ -213,14 +194,14 @@ export default function HostInvitations({
     setIsCreating(true);
 
     try {
-      const created = await createMutation.mutateAsync({
+      const { created, refreshed } = await createInvitation({
         email: trimmedEmail,
         name: trimmedName,
         applyToCurrentSession,
       });
       if (requestId === lastCreatedRequestRef.current) {
         setLastCreated(created);
-        resetPagination(listQuery.data);
+        resetPagination(refreshed);
         setName("");
         setEmail("");
         setNameTouched(false);
@@ -268,9 +249,9 @@ export default function HostInvitations({
     setMessage(null);
     setRowPending(invitation.invitationId, "revoke");
     try {
-      await revokeMutation.mutateAsync(invitation.invitationId);
+      const { refreshed } = await revokeInvitation(invitation.invitationId);
       setLastCreated((current) => (current?.invitationId === invitation.invitationId ? null : current));
-      resetPagination(listQuery.data);
+      resetPagination(refreshed);
     } catch {
       showAlert("초대 취소에 실패했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요.");
     } finally {
@@ -292,14 +273,14 @@ export default function HostInvitations({
     const requestId = ++lastCreatedRequestRef.current;
 
     try {
-      const created = await createMutation.mutateAsync({
+      const { created, refreshed } = await createInvitation({
         email: invitation.email,
         name: invitation.name,
         applyToCurrentSession: invitation.applyToCurrentSession,
       });
       if (requestId === lastCreatedRequestRef.current) {
         setLastCreated(created);
-        resetPagination(listQuery.data);
+        resetPagination(refreshed);
       }
     } catch {
       showAlert("새 링크 발급에 실패했습니다. 대상 이메일을 확인한 뒤 다시 시도해 주세요.");

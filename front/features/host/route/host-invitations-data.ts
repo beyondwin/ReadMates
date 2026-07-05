@@ -8,8 +8,8 @@ import {
   parseHostInvitationResponse,
   revokeHostInvitation,
 } from "@/features/host/api/host-api";
-import type { HostInvitationsActions } from "@/features/host/route/host-invitations-actions";
-import { hostInvitationListQuery } from "@/features/host/queries/host-invitation-queries";
+import type { HostInvitationsActions } from "@/features/host/model/host-invitation-actions";
+import { hostInvitationListQuery, invalidateHostInvitations } from "@/features/host/queries/host-invitation-queries";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 import { requireHostLoaderAuth } from "./host-loader-auth";
 
@@ -33,10 +33,19 @@ export function hostInvitationsLoaderFactory(client: QueryClient) {
   };
 }
 
-export const hostInvitationsActions = {
-  listInvitations: (page) => listHostInvitationsResponse(undefined, page),
-  createInvitation: createHostInvitation,
-  revokeInvitation: revokeHostInvitation,
-  parseInvitation: parseHostInvitationResponse,
-  parseInvitationList: parseHostInvitationListResponse,
-} satisfies HostInvitationsActions;
+export function createHostInvitationsActions(client: QueryClient): HostInvitationsActions {
+  const refreshInvitations = async (page: Parameters<HostInvitationsActions["refreshInvitations"]>[0]) => {
+    const nextPage = await client.fetchQuery(hostInvitationListQuery(page));
+    await invalidateHostInvitations(client);
+    return nextPage;
+  };
+
+  return {
+    listInvitations: (page) => listHostInvitationsResponse(undefined, page),
+    refreshInvitations,
+    createInvitation: createHostInvitation,
+    revokeInvitation: revokeHostInvitation,
+    parseInvitation: parseHostInvitationResponse,
+    parseInvitationList: parseHostInvitationListResponse,
+  };
+}
