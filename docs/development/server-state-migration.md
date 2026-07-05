@@ -21,8 +21,8 @@ Engineering proof portfolio 분기에서는 아래 순서로 server state migrat
 각 migration은 UI 컴포넌트가 API를 직접 호출하지 않는다는 route-first 경계를 유지해야 합니다.
 
 ## 완료
-- `host/invitations` — list query + create/revoke mutation + loader hand-off
-- `host/members` — list query + lifecycle/profile/viewer mutation refresh + loader hand-off
+- `host/invitations` — list query + create/revoke mutation + loader hand-off; UI no longer imports host query keys or invalidation helpers.
+- `host/members` — list query + lifecycle/profile/viewer mutation refresh + loader hand-off; host member action contracts now live outside `route` so query modules do not import route-owned types.
 - `host/notifications` — summary, event/delivery/audit ledgers, manual options, preview/confirm, and manual dispatch ledger query ownership + loader hand-off
 - `host/sessions` — dashboard current/session list, editor detail/manual dispatch reads, session mutations, loader seeding, and notification session-selector sharing
 - `current-session` — member current-session read path, RSVP/checkin/questions/review mutations, loader seeding, and query invalidation replacing the custom route refresh event
