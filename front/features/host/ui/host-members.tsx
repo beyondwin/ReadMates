@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useMemo, useRef, useState } from "react";
 import { useInRouterContext, useLocation } from "react-router-dom";
 import type {
   CurrentSessionPolicy,
@@ -65,6 +65,7 @@ function DefaultLinkComponent(props: HostMembersLinkProps) {
 type MemberRowsState = {
   source: HostMemberListItem[];
   members: HostMemberListItem[];
+  nextCursor: HostMemberListPage["nextCursor"];
 };
 type MemberRowsUpdate = HostMemberListItem[] | ((current: HostMemberListItem[]) => HostMemberListItem[]);
 
@@ -85,14 +86,20 @@ async function hostProfileErrorCodeFromResponse(response: Response): Promise<Hos
 
 export default function HostMembers({ initialMembers, actions, LinkComponent = DefaultLinkComponent }: HostMembersProps) {
   const initialPage = useMemo(() => normalizeMemberPage(initialMembers), [initialMembers]);
-  const [memberRowsState, setMemberRowsState] = useState<MemberRowsState>(() => ({
-    source: initialPage.items,
-    members: initialPage.items,
-  }));
   const initialMembersItems = initialPage.items;
-  const members = memberRowsState.source === initialMembersItems ? memberRowsState.members : initialMembersItems;
-  const [nextCursor, setNextCursor] = useState(initialPage.nextCursor);
-  const visibleNextCursor = memberRowsState.source === initialMembersItems ? nextCursor : initialPage.nextCursor;
+  const initialRowsState = (): MemberRowsState => ({
+    source: initialMembersItems,
+    members: initialMembersItems,
+    nextCursor: initialPage.nextCursor,
+  });
+  const [memberRowsState, setMemberRowsState] = useState<MemberRowsState>(() => ({
+    source: initialMembersItems,
+    members: initialMembersItems,
+    nextCursor: initialPage.nextCursor,
+  }));
+  const visibleRowsState = memberRowsState.source === initialMembersItems ? memberRowsState : initialRowsState();
+  const members = visibleRowsState.members;
+  const visibleNextCursor = visibleRowsState.nextCursor;
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [activeTab, setActiveTab] = useState<MemberTab>("active");
   const [dialog, setDialog] = useState<LifecycleDialog>(null);
@@ -103,18 +110,12 @@ export default function HostMembers({ initialMembers, actions, LinkComponent = D
   const pendingActionsRef = useRef<Set<string>>(new Set());
   const dialogTriggerRef = useRef<HTMLElement | null>(null);
 
-  useEffect(() => {
-    setMemberRowsState({ source: initialPage.items, members: initialPage.items });
-    setNextCursor(initialPage.nextCursor);
-  }, [initialPage]);
-
   const setMembers = (update: MemberRowsUpdate) => {
     setMemberRowsState((current) => {
-      const source = current.source === initialMembersItems ? current.source : initialMembersItems;
-      const currentMembers = current.source === initialMembersItems ? current.members : initialMembersItems;
-      const nextMembers = typeof update === "function" ? update(currentMembers) : update;
+      const activeState = current.source === initialMembersItems ? current : initialRowsState();
+      const nextMembers = typeof update === "function" ? update(activeState.members) : update;
 
-      return { source, members: nextMembers };
+      return { ...activeState, members: nextMembers };
     });
   };
 
@@ -186,8 +187,15 @@ export default function HostMembers({ initialMembers, actions, LinkComponent = D
     setMessage(null);
     try {
       const page = normalizeMemberPage(await actions.loadMembers({ limit: 50, cursor: visibleNextCursor }));
-      setMembers((current) => [...current, ...page.items]);
-      setNextCursor(page.nextCursor);
+      setMemberRowsState((current) => {
+        const activeState = current.source === initialMembersItems ? current : initialRowsState();
+
+        return {
+          ...activeState,
+          members: [...activeState.members, ...page.items],
+          nextCursor: page.nextCursor,
+        };
+      });
     } catch {
       setMessage({ kind: "alert", text: "멤버 목록을 더 불러오지 못했습니다." });
     } finally {

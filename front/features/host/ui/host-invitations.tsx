@@ -1,4 +1,4 @@
-import { type CSSProperties, type FormEvent, type InvalidEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type FormEvent, type InvalidEvent, useMemo, useRef, useState } from "react";
 import type {
   CreateHostInvitationRequest,
   HostInvitationListPage,
@@ -29,6 +29,12 @@ type HostMessage = {
 };
 
 type PendingRowAction = "revoke" | "reissue";
+type InvitationListState = {
+  source: HostInvitationListItem[];
+  basePage: HostInvitationListPage;
+  appendedInvitations: HostInvitationListItem[];
+  nextCursor: HostInvitationListPage["nextCursor"];
+};
 
 function inviteStatusClass(status: InvitationStatus) {
   if (status === "PENDING") {
@@ -63,25 +69,29 @@ export default function HostInvitations({
   actions: HostInvitationsActions;
 }) {
   const initialPage = useMemo(() => normalizeInvitationPage(initialInvitations), [initialInvitations]);
+  const initialPageItems = initialPage.items;
+  const initialListState = (): InvitationListState => ({
+    source: initialPageItems,
+    basePage: initialPage,
+    appendedInvitations: [],
+    nextCursor: initialPage.nextCursor,
+  });
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [applyToCurrentSession, setApplyToCurrentSession] = useState(true);
-  const [basePage, setBasePage] = useState<HostInvitationListPage>(() => initialPage);
-  const [nextCursor, setNextCursor] = useState(initialPage.nextCursor);
-  const [appendedInvitations, setAppendedInvitations] = useState<HostInvitationListItem[]>([]);
-
-  useEffect(() => {
-    setBasePage(initialPage);
-    setAppendedInvitations([]);
-    setNextCursor(initialPage.nextCursor);
-  }, [initialPage]);
-
-  const queryItems = basePage.items;
+  const [listState, setListState] = useState<InvitationListState>(() => initialListState());
+  const visibleListState = listState.source === initialPageItems ? listState : initialListState();
+  const queryItems = visibleListState.basePage.items;
+  const appendedInvitations = visibleListState.appendedInvitations;
+  const nextCursor = visibleListState.nextCursor;
   const resetPagination = (page?: HostInvitationListPage | HostInvitationListItem[] | null) => {
-    const nextPage = page ? normalizeInvitationPage(page) : basePage;
-    setBasePage(nextPage);
-    setAppendedInvitations([]);
-    setNextCursor(nextPage.nextCursor);
+    const nextPage = page ? normalizeInvitationPage(page) : visibleListState.basePage;
+    setListState({
+      source: initialPageItems,
+      basePage: nextPage,
+      appendedInvitations: [],
+      nextCursor: nextPage.nextCursor,
+    });
   };
   const createInvitation = async (request: CreateHostInvitationRequest) => {
     const response = await actions.createInvitation(request);
@@ -164,8 +174,15 @@ export default function HostInvitations({
         return;
       }
       const page = normalizeInvitationPage(await actions.parseInvitationList(response));
-      setAppendedInvitations((current) => [...current, ...page.items]);
-      setNextCursor(page.nextCursor);
+      setListState((current) => {
+        const activeState = current.source === initialPageItems ? current : initialListState();
+
+        return {
+          ...activeState,
+          appendedInvitations: [...activeState.appendedInvitations, ...page.items],
+          nextCursor: page.nextCursor,
+        };
+      });
     } catch {
       showAlert("초대 목록을 더 불러오지 못했습니다.");
     } finally {
