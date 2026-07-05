@@ -260,7 +260,7 @@ ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" "sudo bash -s" <<EOF
 set -euo pipefail
 cd ${REMOTE_DIR}
 for i in \$(seq 1 40); do
-  if sudo docker compose -f compose.yml exec -T readmates-api curl -fsS http://127.0.0.1:8080/internal/health; then
+  if sudo docker compose -f compose.yml exec -T readmates-api /app/bin/readmates-http-get 127.0.0.1 8080 /internal/health; then
     exit 0
   fi
   sleep 3
@@ -296,5 +296,5 @@ trap - ERR
 
 echo ""
 echo "Compose stack 배포 완료"
-echo "VM health: ssh -i ${SSH_KEY} ${REMOTE_USER}@${VM_PUBLIC_IP} 'cd ${REMOTE_DIR} && sudo docker compose -f compose.yml exec -T readmates-api curl -fsS http://127.0.0.1:8080/internal/health'"
+echo "VM health: ssh -i ${SSH_KEY} ${REMOTE_USER}@${VM_PUBLIC_IP} 'cd ${REMOTE_DIR} && sudo docker compose -f compose.yml exec -T readmates-api /app/bin/readmates-http-get 127.0.0.1 8080 /internal/health'"
 echo "Logs: ssh -i ${SSH_KEY} ${REMOTE_USER}@${VM_PUBLIC_IP} 'sudo docker compose -f ${REMOTE_DIR}/compose.yml logs -f --tail=200'"

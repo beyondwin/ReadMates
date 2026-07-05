@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+host="${1:-127.0.0.1}"
+port="${2:-8080}"
+path="${3:-/internal/health}"
+
+exec 3<>"/dev/tcp/${host}/${port}"
+printf 'GET %s HTTP/1.0\r\nHost: %s\r\nConnection: close\r\n\r\n' "$path" "$host" >&3
+
+IFS= read -r status <&3
+status="${status%$'\r'}"
+case "$status" in
+  HTTP/1.0\ 2*|HTTP/1.1\ 2*) ;;
+  *)
+    printf '%s\n' "$status" >&2
+    exit 1
+    ;;
+esac
+
+while IFS= read -r header <&3; do
+  header="${header%$'\r'}"
+  [ -n "$header" ] || break
+done
+
+cat <&3

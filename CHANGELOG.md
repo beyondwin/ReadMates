@@ -10,6 +10,25 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 
+## v1.17.1 - 2026-07-05
+
+### Fixed
+
+- **Server image publication:** release Docker images no longer run `apt-get` during `linux/arm64` Buildx publication. The Java 25 Temurin Jammy image now keeps the same JRE baseline, creates the runtime user without package-manager mutation, and uses the checked-in `/app/bin/readmates-http-get` helper for container-internal health/readiness calls.
+- **OCI Compose health probes:** production compose health checks, deploy smoke, post-deploy watch, and collect diagnostics now call the image-owned HTTP helper instead of assuming `curl` is installed inside the server container.
+
+### Deployment Notes
+
+- Patch release over `v1.17.0` because the `v1.17.0` tag-triggered `Deploy Server Image` workflow passed Gradle quality gates but failed during the Buildx image layer. No application API, DB migration, frontend route, BFF/auth, OAuth scope, auth cookie, runtime secret, or production config change is included.
+- Publish `v1.17.1`, confirm `Deploy Front` and `Deploy Server Image` for the same tag, then promote OCI Compose backend to `ghcr.io/<owner>/<repo>/readmates-server:v1.17.1`.
+
+### Verification
+
+- Local helper and script gates (2026-07-05): `server/docker/readmates-http-get` was verified against a local HTTP server for 2xx success and 404 failure behavior; `bash -n server/docker/readmates-http-get deploy/oci/05-deploy-compose-stack.sh deploy/oci/watch-compose-post-deploy.sh deploy/oci/readmates-collect.sh`, `shellcheck server/docker/readmates-http-get deploy/oci/05-deploy-compose-stack.sh deploy/oci/watch-compose-post-deploy.sh deploy/oci/readmates-collect.sh`, targeted `git diff --check`, and targeted deploy-doc `curl` assumption scan passed.
+- Local backend and image gates (2026-07-05): `./server/gradlew -p server clean check bootJar`, `docker build --platform linux/arm64 --no-cache -t readmates-server:v1.17.1-arm64-local -f server/Dockerfile.release server`, image sanity check for Java 25 plus `/app/bin/readmates-http-get`, and local Trivy `0.70.0` HIGH/CRITICAL scan passed with 0 Ubuntu and Java findings. Local amd64 image reproduction was skipped because this machine's Docker installation lacks the Buildx plugin and the legacy builder reused the arm64 platform cache incorrectly; the release workflow remains `linux/arm64`.
+- Full local release gate (2026-07-05): `./scripts/pre-push-check.sh --release` passed, including frontend lint, frontend coverage (165 files, 1311 tests), frontend build, zod fixture export/diff, backend check, public release candidate build, and public release check with gitleaks no leaks.
+- Graphify discovery was used for release impact orientation and pointed back to CHANGELOG, release readiness, OCI backend, compose stack, release publish runbook, and deploy docs surfaces.
+
 ## v1.17.0 - 2026-07-05
 
 ### Highlights

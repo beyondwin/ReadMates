@@ -2,6 +2,26 @@
 
 남은 리스크, release readiness, merge 후 안전성, ship 가능 여부를 확인할 때 사용하는 체크리스트입니다. 구현 계획의 완료 여부와 테스트 통과 여부만으로 release risk가 닫혔다고 판단하지 않습니다.
 
+## 2026-07-05 v1.17.1 server image publication repair
+
+- Scope reviewed: `v1.17.0..HEAD`, covering the tag-triggered `Deploy Server Image` failure, server release/local Dockerfiles, OCI Compose health checks, deploy/watch/collect scripts, active deploy docs, and CHANGELOG.
+- Root cause: the `v1.17.0` server image workflow built `linux/arm64` through QEMU on a GitHub-hosted amd64 runner. The Dockerfile release layer ran `apt-get update && apt-get upgrade && apt-get install curl`; package installation reached `libc-bin` triggers under QEMU and exited with signal 11 / dpkg status 139, so the image was never scanned or promoted.
+- Fix: keep the Java 25 Temurin Jammy runtime baseline but remove package-manager mutation from both server Dockerfiles. Container-internal health/readiness/probe calls now use `/app/bin/readmates-http-get`, a small bash `/dev/tcp` helper shipped in the image, so OCI Compose no longer depends on `curl` being apt-installed inside the server container.
+- Release classification: patch release over `v1.17.0`; deployment infrastructure repair only. No Flyway migration, API contract change, BFF/auth behavior change, OAuth scope change, auth cookie format change, runtime secret change, frontend route change, or production config change is included.
+- Deployment impact: publish `v1.17.1`, confirm tag-triggered `Deploy Front` and `Deploy Server Image`, then promote OCI Compose backend to `ghcr.io/<owner>/<repo>/readmates-server:v1.17.1`.
+- Local verification before push:
+  - `server/docker/readmates-http-get` against a local HTTP server - pass for 2xx body output and 404 non-zero exit.
+  - `bash -n server/docker/readmates-http-get deploy/oci/05-deploy-compose-stack.sh deploy/oci/watch-compose-post-deploy.sh deploy/oci/readmates-collect.sh` - pass.
+  - `shellcheck server/docker/readmates-http-get deploy/oci/05-deploy-compose-stack.sh deploy/oci/watch-compose-post-deploy.sh deploy/oci/readmates-collect.sh` - pass.
+  - Targeted `git diff --check` and active deploy-doc scan for container-internal `curl` assumptions - pass.
+  - `./server/gradlew -p server clean check bootJar` - pass.
+  - `docker build --platform linux/arm64 --no-cache -t readmates-server:v1.17.1-arm64-local -f server/Dockerfile.release server` - pass.
+  - `docker run --rm --platform linux/arm64 --entrypoint /usr/bin/bash readmates-server:v1.17.1-arm64-local -lc 'test -x /app/bin/readmates-http-get && ! command -v curl >/dev/null && java -version 2>&1 | head -n 1'` - pass; image reports Java 25.
+  - `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.70.0 image --severity HIGH,CRITICAL --ignore-unfixed --scanners vuln readmates-server:v1.17.1-arm64-local` - pass, 0 Ubuntu and Java HIGH/CRITICAL findings.
+  - `./scripts/pre-push-check.sh --release` - pass, including frontend lint/coverage/build, zod fixture export/diff, backend check, public release candidate build, and public release check with gitleaks no leaks.
+- Local skipped verification: `linux/amd64` image build could not be reproduced on this machine because Docker lacks the Buildx plugin and the legacy builder reused the arm64 platform cache incorrectly. The deploy workflow builds `linux/arm64`, matching the OCI target and the repaired local image verification above.
+- Graphify evidence: a scoped `graphify query` for the server image publication repair pointed back to release readiness, CHANGELOG, OCI backend, compose stack, release publish runbook, and deploy docs surfaces.
+
 ## 2026-07-05 v1.17.0 pre-release readiness
 
 - Scope reviewed: `v1.16.3..HEAD`, covering backend Java 25/Kotlin 2.4 runtime and deploy image baseline, CI/deploy Corepack package-manager activation, pre-push pnpm parity, Playwright CT Docker helper, host members/invitations server-state boundary cleanup, active docs, CHANGELOG, and public-release candidate behavior.

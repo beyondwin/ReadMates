@@ -137,7 +137,7 @@ remote_dir="$1"
 cd "$remote_dir"
 sudo systemctl status readmates-stack --no-pager -l >/dev/null
 sudo docker compose -f compose.yml ps
-sudo docker compose -f compose.yml exec -T readmates-api curl -fsS --max-time 5 http://127.0.0.1:8080/internal/health >/dev/null
+sudo docker compose -f compose.yml exec -T readmates-api /app/bin/readmates-http-get 127.0.0.1 8080 /internal/health >/dev/null
 EOF
 watch_ledger_emit "VM_HEALTH_PASSED" "RUNNING" "endpoint=/internal/health"
 

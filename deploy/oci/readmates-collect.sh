@@ -46,21 +46,21 @@ compose_or_note "caddy logs 10m" logs --since 10m --tail 120 caddy
 section "readmates-api internal health"
 if [ -f "$COMPOSE_FILE" ]; then
   sudo docker compose -f "$COMPOSE_FILE" exec -T readmates-api \
-    curl -fsS --max-time 5 http://127.0.0.1:8080/internal/health 2>&1 \
+    /app/bin/readmates-http-get 127.0.0.1 8080 /internal/health 2>&1 \
     || printf '[readmates-collect] internal health unavailable\n'
 fi
 
 section "readmates-api readiness"
 if [ -f "$COMPOSE_FILE" ]; then
   sudo docker compose -f "$COMPOSE_FILE" exec -T readmates-api \
-    curl -fsS --max-time 5 http://127.0.0.1:8081/actuator/health/readiness 2>&1 \
+    /app/bin/readmates-http-get 127.0.0.1 8081 /actuator/health/readiness 2>&1 \
     || printf '[readmates-collect] readiness unavailable\n'
 fi
 
 section "prometheus metric summary"
 if [ -f "$COMPOSE_FILE" ]; then
   sudo docker compose -f "$COMPOSE_FILE" exec -T readmates-api \
-    sh -c "curl -fsS --max-time 5 http://127.0.0.1:8081/actuator/prometheus | grep -E '^(http_server_requests_seconds_count|jvm_memory_used_bytes|hikaricp_connections_active|hikaricp_connections_pending|readmates_notifications_outbox_backlog)' | head -80" 2>&1 \
+    sh -c "/app/bin/readmates-http-get 127.0.0.1 8081 /actuator/prometheus | grep -E '^(http_server_requests_seconds_count|jvm_memory_used_bytes|hikaricp_connections_active|hikaricp_connections_pending|readmates_notifications_outbox_backlog)' | head -80" 2>&1 \
     || printf '[readmates-collect] prometheus summary unavailable\n'
 fi
 

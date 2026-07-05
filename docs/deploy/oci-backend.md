@@ -351,7 +351,7 @@ sudo systemctl status readmates-stack --no-pager
 cd /opt/readmates
 sudo docker compose -f compose.yml ps
 sudo docker compose -f compose.yml logs --tail=120 readmates-api
-sudo docker compose -f compose.yml exec -T readmates-api curl -fsS http://127.0.0.1:8080/internal/health
+sudo docker compose -f compose.yml exec -T readmates-api /app/bin/readmates-http-get 127.0.0.1 8080 /internal/health
 ```
 
 Cloudflare 경유:
@@ -372,10 +372,10 @@ Metrics:
 
 ```bash
 cd /opt/readmates
-sudo docker compose -f compose.yml exec -T readmates-api curl -sS http://127.0.0.1:8081/actuator/prometheus | grep readmates_notifications
+sudo docker compose -f compose.yml exec -T readmates-api /app/bin/readmates-http-get 127.0.0.1 8081 /actuator/prometheus | grep readmates_notifications
 ```
 
-`readmates_notifications` meter는 알림 처리 뒤 노출됩니다. 신규 배포 직후에는 먼저 compose 내부에서 `curl -sS http://127.0.0.1:8081/actuator/prometheus`로 endpoint reachability를 확인하고, 알림 처리 뒤 위 grep으로 counter 노출을 확인합니다.
+`readmates_notifications` meter는 알림 처리 뒤 노출됩니다. 신규 배포 직후에는 먼저 compose 내부에서 `/app/bin/readmates-http-get 127.0.0.1 8081 /actuator/prometheus`로 endpoint reachability를 확인하고, 알림 처리 뒤 위 grep으로 counter 노출을 확인합니다.
 
 Compose stack에서는 management endpoint를 container 내부 `0.0.0.0:8081`에 바인딩하지만 host port로 publish하지 않습니다. Legacy host JAR rollback에서는 `READMATES_MANAGEMENT_ADDRESS=127.0.0.1`과 `READMATES_MANAGEMENT_PORT=8081`을 사용합니다.
 
