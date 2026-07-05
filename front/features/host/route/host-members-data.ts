@@ -7,8 +7,8 @@ import {
   submitHostViewerAction,
 } from "@/features/host/api/host-api";
 import type { HostMemberListItem, HostMemberListPage } from "@/features/host/api/host-contracts";
-import { hostMemberListQuery } from "@/features/host/queries/host-members-queries";
-import type { HostMembersActions } from "@/features/host/route/host-members-actions";
+import type { HostMembersActions } from "@/features/host/model/host-member-actions";
+import { hostMemberListQuery, invalidateHostMembers } from "@/features/host/queries/host-members-queries";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 import { requireHostLoaderAuth } from "./host-loader-auth";
 
@@ -37,9 +37,30 @@ export function hostMembersLoaderFactory(client: QueryClient) {
   };
 }
 
-export const hostMembersActions = {
-  loadMembers: (page) => fetchHostMembers(undefined, page),
-  submitLifecycle: submitHostMemberLifecycle,
-  submitProfile: submitHostMemberProfile,
-  submitViewerAction: submitHostViewerAction,
-} satisfies HostMembersActions;
+export function createHostMembersActions(client: QueryClient): HostMembersActions {
+  const markMembersStale = () => invalidateHostMembers(client);
+  const refreshMembers = async () => {
+    await client.fetchQuery(hostMemberListQuery({ limit: HOST_MEMBERS_PAGE_LIMIT }));
+    await markMembersStale();
+  };
+
+  return {
+    loadMembers: (page) => fetchHostMembers(undefined, page),
+    refreshMembers,
+    submitLifecycle: async (membershipId, path, body) => {
+      const response = await submitHostMemberLifecycle(membershipId, path, body);
+      if (response.ok) {
+        await markMembersStale();
+      }
+      return response;
+    },
+    submitProfile: async (membershipId, displayName) => {
+      const response = await submitHostMemberProfile(membershipId, displayName);
+      if (response.ok) {
+        await markMembersStale();
+      }
+      return response;
+    },
+    submitViewerAction: submitHostViewerAction,
+  };
+}

@@ -1,6 +1,5 @@
-import { type CSSProperties, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { useInRouterContext, useLocation } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   CurrentSessionPolicy,
   HostMemberProfileErrorCode,
@@ -9,13 +8,8 @@ import type {
   HostMemberListItem,
   MemberLifecycleRequest,
   MemberLifecycleResponse,
-  ViewerMember,
 } from "@/features/host/model/host-view-types";
-import {
-  hostMemberKeys,
-  hostMemberListQuery,
-} from "@/features/host/queries/host-members-queries";
-import type { PageRequest } from "@/shared/model/paging";
+import type { HostMembersActions } from "@/features/host/model/host-member-actions";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 import { LifecyclePolicyDialog } from "./members/member-approval-actions";
 import { actionKey, disabledProfileReason, isMembershipPending } from "./members/member-action-rules";
@@ -35,19 +29,6 @@ import type {
   ProfileDialog,
 } from "./members/types";
 export type { HostMembersLinkComponent } from "./members/types";
-
-type JsonResponse<T> = Response & { json(): Promise<T> };
-
-type HostMembersActions = {
-  loadMembers: (page?: PageRequest) => Promise<HostMemberListPage>;
-  submitLifecycle: (
-    membershipId: string,
-    path: HostMemberLifecyclePath,
-    body?: MemberLifecycleRequest,
-  ) => Promise<JsonResponse<MemberLifecycleResponse>>;
-  submitProfile: (membershipId: string, displayName: string) => Promise<JsonResponse<HostMemberProfileResponse>>;
-  submitViewerAction: (membershipId: string, action: HostViewerAction) => Promise<ViewerMember>;
-};
 
 type HostMembersProps = {
   initialMembers: HostMemberListPage | HostMemberListItem[];
@@ -86,8 +67,6 @@ type MemberRowsState = {
   members: HostMemberListItem[];
 };
 type MemberRowsUpdate = HostMemberListItem[] | ((current: HostMemberListItem[]) => HostMemberListItem[]);
-type ViewerAction = HostViewerAction;
-
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -105,31 +84,7 @@ async function hostProfileErrorCodeFromResponse(response: Response): Promise<Hos
 }
 
 export default function HostMembers({ initialMembers, actions, LinkComponent = DefaultLinkComponent }: HostMembersProps) {
-  const propPage = normalizeMemberPage(initialMembers);
-  const queryClient = useQueryClient();
-  const listQuery = useQuery({
-    ...hostMemberListQuery({ limit: 50 }),
-    queryFn: async () => normalizeMemberPage(await actions.loadMembers({ limit: 50 })),
-    initialData: propPage,
-  });
-  // Track the prop and query page identities we have already consumed. When
-  // either changes identity we move the source-of-truth forward.
-  const queryPage = listQuery.data ?? propPage;
-  const [seen, setSeen] = useState<{ prop: HostMemberListItem[]; query: HostMemberListItem[]; active: HostMemberListPage }>(() => ({
-    prop: propPage.items,
-    query: queryPage.items,
-    active: queryPage,
-  }));
-  let nextSeen = seen;
-  if (propPage.items !== seen.prop) {
-    nextSeen = { prop: propPage.items, query: queryPage.items, active: propPage };
-  } else if (queryPage.items !== seen.query) {
-    nextSeen = { prop: propPage.items, query: queryPage.items, active: queryPage };
-  }
-  if (nextSeen !== seen) {
-    setSeen(nextSeen);
-  }
-  const initialPage = nextSeen.active;
+  const initialPage = useMemo(() => normalizeMemberPage(initialMembers), [initialMembers]);
   const [memberRowsState, setMemberRowsState] = useState<MemberRowsState>(() => ({
     source: initialPage.items,
     members: initialPage.items,
@@ -137,6 +92,7 @@ export default function HostMembers({ initialMembers, actions, LinkComponent = D
   const initialMembersItems = initialPage.items;
   const members = memberRowsState.source === initialMembersItems ? memberRowsState.members : initialMembersItems;
   const [nextCursor, setNextCursor] = useState(initialPage.nextCursor);
+  const visibleNextCursor = memberRowsState.source === initialMembersItems ? nextCursor : initialPage.nextCursor;
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [activeTab, setActiveTab] = useState<MemberTab>("active");
   const [dialog, setDialog] = useState<LifecycleDialog>(null);
@@ -146,6 +102,11 @@ export default function HostMembers({ initialMembers, actions, LinkComponent = D
   const [message, setMessage] = useState<null | { kind: "alert" | "status"; text: string }>(null);
   const pendingActionsRef = useRef<Set<string>>(new Set());
   const dialogTriggerRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setMemberRowsState({ source: initialPage.items, members: initialPage.items });
+    setNextCursor(initialPage.nextCursor);
+  }, [initialPage]);
 
   const setMembers = (update: MemberRowsUpdate) => {
     setMemberRowsState((current) => {
@@ -214,22 +175,17 @@ export default function HostMembers({ initialMembers, actions, LinkComponent = D
     dialogTriggerRef.current = null;
   };
 
-  const refreshMembers = async () => {
-    await queryClient.invalidateQueries(
-      { queryKey: hostMemberKeys.all },
-      { throwOnError: true },
-    );
-  };
+  const refreshMembers = () => actions.refreshMembers();
 
   const loadMoreMembers = async () => {
-    if (!nextCursor || isLoadingMore) {
+    if (!visibleNextCursor || isLoadingMore) {
       return;
     }
 
     setIsLoadingMore(true);
     setMessage(null);
     try {
-      const page = normalizeMemberPage(await actions.loadMembers({ limit: 50, cursor: nextCursor }));
+      const page = normalizeMemberPage(await actions.loadMembers({ limit: 50, cursor: visibleNextCursor }));
       setMembers((current) => [...current, ...page.items]);
       setNextCursor(page.nextCursor);
     } catch {
@@ -266,7 +222,7 @@ export default function HostMembers({ initialMembers, actions, LinkComponent = D
     }
   }
 
-  const submitViewerAction = async (member: HostMemberListItem, action: ViewerAction) => {
+  const submitViewerAction = async (member: HostMemberListItem, action: HostViewerAction) => {
     if (isMembershipPending(member.membershipId, pendingActionsRef.current)) {
       return;
     }
@@ -383,7 +339,7 @@ export default function HostMembers({ initialMembers, actions, LinkComponent = D
         suspendedMembers={suspendedMembers}
         inactiveMembers={inactiveMembers}
         pendingActions={pendingActions}
-        nextCursor={nextCursor}
+        nextCursor={visibleNextCursor}
         isLoadingMore={isLoadingMore}
         LinkComponent={LinkComponent}
         renderProfileAction={renderProfileAction}

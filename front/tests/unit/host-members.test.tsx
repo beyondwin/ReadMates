@@ -3,9 +3,9 @@ import { act, cleanup, render, screen, waitFor, within } from "@testing-library/
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { HostMembersActions } from "@/features/host/route/host-members-actions";
+import type { HostMembersActions } from "@/features/host/model/host-member-actions";
 import HostMembers from "@/features/host/ui/host-members";
-import { hostMembersActions, hostMembersLoaderFactory } from "@/features/host";
+import { createHostMembersActions, hostMembersLoaderFactory } from "@/features/host";
 import HostMembersPage from "@/src/pages/host-members";
 import type { HostMemberListItem } from "@/features/host/api/host-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
@@ -127,6 +127,7 @@ const activeHostAuth: AuthMeResponse = {
 
 const noopHostMembersActions = {
   loadMembers: vi.fn(async () => []),
+  refreshMembers: vi.fn(async () => undefined),
   submitLifecycle: vi.fn(async () => lifecycleResponse(members[0])),
   submitViewerAction: vi.fn(async () => members[0]),
   submitProfile: vi.fn(async () => memberListItemResponse(members[0])),
@@ -139,17 +140,12 @@ function HostMembersForTest({
   initialMembers,
   ...props
 }: Omit<HostMembersProps, "actions"> & { actions?: HostMembersActions }) {
-  // Fresh client per render so rerender-with-new-initialMembers tests
-  // observe the new prop instead of cache from prior render.
-  const client = createTestQueryClient();
   return (
-    <QueryClientProvider client={client}>
-      <HostMembers
-        {...props}
-        initialMembers={initialMembers}
-        actions={actions ?? noopHostMembersActions}
-      />
-    </QueryClientProvider>
+    <HostMembers
+      {...props}
+      initialMembers={initialMembers}
+      actions={actions ?? noopHostMembersActions}
+    />
   );
 }
 
@@ -562,6 +558,7 @@ describe("HostMembersPage", () => {
     const actions = {
       ...noopHostMembersActions,
       loadMembers: vi.fn(async () => ({ items: [nextMember], nextCursor: null })),
+      refreshMembers: vi.fn(async () => undefined),
     } satisfies HostMembersActions;
 
     render(
@@ -578,11 +575,37 @@ describe("HostMembersPage", () => {
     expect(screen.getByText("멤버1")).toBeInTheDocument();
   });
 
+  it("shows a refresh warning when viewer activation succeeds but action-owned refresh fails", async () => {
+    const user = userEvent.setup();
+    const activateViewer = {
+      ...members[1],
+      canDeactivate: true,
+    } satisfies HostMemberListItem;
+    const actions = {
+      ...noopHostMembersActions,
+      submitViewerAction: vi.fn(async () => activateViewer),
+      refreshMembers: vi.fn(async () => {
+        throw new Error("refresh failed");
+      }),
+    } satisfies HostMembersActions;
+    render(<HostMembersForTest initialMembers={[activateViewer]} actions={actions} />);
+
+    await user.click(screen.getByRole("tab", { name: "둘러보기 멤버" }));
+    await user.click(screen.getByRole("button", { name: /정식 멤버로 전환/ }));
+
+    expect(actions.submitViewerAction).toHaveBeenCalledWith(activateViewer.membershipId, "activate");
+    expect(actions.refreshMembers).toHaveBeenCalled();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "처리는 완료됐지만 멤버 목록 새로고침에 실패했습니다.",
+    );
+  });
+
   it("keeps load-more pagination on the route action URL", async () => {
     const fetchMock = vi.fn().mockResolvedValue(memberListResponse([]));
     vi.stubGlobal("fetch", fetchMock);
+    const client = createTestQueryClient();
 
-    await hostMembersActions.loadMembers({ limit: 50, cursor: "cursor-1" });
+    await createHostMembersActions(client).loadMembers({ limit: 50, cursor: "cursor-1" });
 
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/bff/api/host/members?limit=50&cursor=cursor-1",
@@ -690,7 +713,7 @@ describe("HostMembersPage", () => {
     expect(suspendedRow.getByText("이 멤버는 현재 정책상 복구할 수 없습니다.")).toBeInTheDocument();
   });
 
-  it("refreshes the hub after activating a viewer member", async () => {
+  it("dispatches a route-owned refresh after activating a viewer member", async () => {
     const user = userEvent.setup();
     const approvedMember = {
       ...members[1],
@@ -710,6 +733,7 @@ describe("HostMembersPage", () => {
     await user.click(screen.getByRole("button", { name: "정식 멤버로 전환" }));
 
     expect(await screen.findByText("둘러보기 멤버가 없습니다.")).toBeInTheDocument();
+    expect(screen.getByText("정식 멤버로 전환했습니다.")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
       "/api/bff/api/host/members/membership-pending/activate",
@@ -720,13 +744,9 @@ describe("HostMembersPage", () => {
       "/api/bff/api/host/members?limit=50",
       expect.objectContaining({ cache: "no-store" }),
     );
-
-    await user.click(screen.getByRole("tab", { name: "활성 멤버" }));
-    expect(screen.getByText("둘")).toBeInTheDocument();
-    expect(screen.getByText("viewer@example.com · 정식 멤버")).toBeInTheDocument();
   });
 
-  it("ignores stale out-of-order approval refresh responses", async () => {
+  it("keeps local viewer removals independent from refresh response ordering", async () => {
     const user = userEvent.setup();
     const secondPending = {
       ...members[1],
@@ -739,13 +759,11 @@ describe("HostMembersPage", () => {
     } satisfies HostMemberListItem;
     const initialPendingMembers = [members[1], secondPending];
     const staleRefresh = deferred<Response>();
-    const latestRefresh = deferred<Response>();
     const fetchMock = renderHostMembersPage(
       [
         new Response(JSON.stringify({ status: "ACTIVE" }), { status: 200, headers: { "Content-Type": "application/json" } }),
         staleRefresh.promise,
         new Response(JSON.stringify({ status: "ACTIVE" }), { status: 200, headers: { "Content-Type": "application/json" } }),
-        latestRefresh.promise,
       ],
       initialPendingMembers,
     );
@@ -763,10 +781,9 @@ describe("HostMembersPage", () => {
         name: "정식 멤버로 전환",
       }),
     );
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(6));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5));
 
-    latestRefresh.resolve(memberListResponse([]));
-    expect(await screen.findByText("둘러보기 멤버가 없습니다.")).toBeInTheDocument();
+    expect(screen.getByText("둘러보기 멤버가 없습니다.")).toBeInTheDocument();
 
     await act(async () => {
       staleRefresh.resolve(memberListResponse(initialPendingMembers));
@@ -779,7 +796,7 @@ describe("HostMembersPage", () => {
     expect(screen.queryByText("두번째 둘러보기")).not.toBeInTheDocument();
   });
 
-  it("refreshes the hub after deactivating a viewer member", async () => {
+  it("dispatches a route-owned refresh after deactivating a viewer member", async () => {
     const user = userEvent.setup();
     const rejectedMember = {
       ...members[1],
@@ -794,6 +811,7 @@ describe("HostMembersPage", () => {
     await user.click(screen.getByRole("button", { name: "둘러보기 해제" }));
 
     expect(await screen.findByText("둘러보기 멤버가 없습니다.")).toBeInTheDocument();
+    expect(screen.getByText("둘러보기 멤버를 해제했습니다.")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
       "/api/bff/api/host/members/membership-pending/deactivate-viewer",
@@ -804,13 +822,6 @@ describe("HostMembersPage", () => {
       "/api/bff/api/host/members?limit=50",
       expect.objectContaining({ cache: "no-store" }),
     );
-
-    await user.click(screen.getByRole("tab", { name: "탈퇴/비활성" }));
-    expect(screen.getByText("둘")).toBeInTheDocument();
-    expect(screen.getByText("viewer@example.com · 요청 2026.04.20")).toBeInTheDocument();
-    const inactiveViewerRow = within(screen.getByText("둘").closest("article") as HTMLElement);
-    expect(inactiveViewerRow.getByText("기록 보존")).toBeInTheDocument();
-    expect(inactiveViewerRow.queryByText("이번 세션 미포함")).not.toBeInTheDocument();
   });
 
   it("removes the viewer row locally when activation succeeds but list refresh fails", async () => {

@@ -1,10 +1,14 @@
+import { useMemo } from "react";
 import { useLoaderData } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import type { HostMemberListPage } from "@/features/host/api/host-contracts";
 import HostMembers, { type HostMembersLinkComponent } from "@/features/host/ui/host-members";
-import { hostMembersActions } from "./host-members-data";
+import { createHostMembersActions } from "./host-members-data";
 
 export function HostMembersRoute({ LinkComponent }: { LinkComponent?: HostMembersLinkComponent }) {
   const members = useLoaderData() as HostMemberListPage;
+  const queryClient = useQueryClient();
+  const actions = useMemo(() => createHostMembersActions(queryClient), [queryClient]);
 
   return (
     <main className="rm-host-members-page">
@@ -20,7 +24,7 @@ export function HostMembersRoute({ LinkComponent }: { LinkComponent?: HostMember
         </div>
       </section>
       <section className="container rm-host-members-page__body">
-        <HostMembers initialMembers={members} actions={hostMembersActions} LinkComponent={LinkComponent} />
+        <HostMembers initialMembers={members} actions={actions} LinkComponent={LinkComponent} />
       </section>
     </main>
   );

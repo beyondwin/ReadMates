@@ -20,15 +20,7 @@ type BoundaryRuleId =
   | "readmates-api-compat"
   | "feature-components-public";
 
-const legacyBoundaryExceptions = [
-  {
-    sourcePath: "features/host/ui/host-members.tsx",
-    importPath: "features/host/queries/host-members-queries",
-    ruleId: "feature-ui",
-    reason: "Host members UI still owns query invalidation during the server-state migration.",
-    removeWhen: "Move host member query ownership to the route and pass props/callbacks into UI.",
-  },
-] satisfies Array<{
+const legacyBoundaryExceptions = [] satisfies Array<{
   sourcePath: string;
   importPath: string;
   ruleId: BoundaryRuleId;
