@@ -13,7 +13,7 @@ import type {
 import type {
   HostMemberLifecyclePath,
   HostViewerAction,
-} from "@/features/host/route/host-members-actions";
+} from "@/features/host/model/host-member-actions";
 import type { ReadmatesApiContext } from "@/shared/api/client";
 import type { PageRequest } from "@/shared/model/paging";
 

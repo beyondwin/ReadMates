@@ -22,13 +22,6 @@ type BoundaryRuleId =
 
 const legacyBoundaryExceptions = [
   {
-    sourcePath: "features/host/queries/host-members-queries.ts",
-    importPath: "features/host/route/host-members-actions",
-    ruleId: "feature-queries",
-    reason: "Host member mutation queries still reuse route-owned action payload types from the pre-queries split.",
-    removeWhen: "Move host member action payload contracts into model or query-local contracts.",
-  },
-  {
     sourcePath: "features/host/ui/host-invitations.tsx",
     importPath: "features/host/queries/host-invitation-queries",
     ruleId: "feature-ui",
