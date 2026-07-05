@@ -2,6 +2,33 @@
 
 남은 리스크, release readiness, merge 후 안전성, ship 가능 여부를 확인할 때 사용하는 체크리스트입니다. 구현 계획의 완료 여부와 테스트 통과 여부만으로 release risk가 닫혔다고 판단하지 않습니다.
 
+## 2026-07-05 v1.17.0 pre-release readiness
+
+- Scope reviewed: `v1.16.3..HEAD`, covering backend Java 25/Kotlin 2.4 runtime and deploy image baseline, CI/deploy Corepack package-manager activation, pre-push pnpm parity, Playwright CT Docker helper, host members/invitations server-state boundary cleanup, active docs, CHANGELOG, and public-release candidate behavior.
+- Release classification: minor release because the production backend runtime and release image baseline move to Java 25. No Flyway migration, public API contract break, auth/BFF secret handling change, OAuth scope change, auth cookie format change, route URL change, or deploy workflow trigger change is included.
+- Deployment impact: push `main`, push annotated tag `v1.17.0`, confirm tag-triggered `Deploy Front` and `Deploy Server Image`, then promote OCI Compose backend to `ghcr.io/<owner>/<repo>/readmates-server:v1.17.0` after the server image scan/promote workflow passes.
+- Local verification before push:
+  - `bash -n scripts/*.sh deploy/oci/*.sh` - pass.
+  - `shellcheck scripts/*.sh deploy/oci/*.sh` - pass.
+  - `bash scripts/aigen-pii-check.sh` - pass, 5 invariants.
+  - `git diff --check -- . ':(exclude)docs/superpowers/**'` - pass.
+  - `npx --yes corepack@0.35.0 pnpm --dir front lint` - pass.
+  - `npx --yes corepack@0.35.0 pnpm --dir front test:coverage` - pass, 165 files and 1311 tests.
+  - `npx --yes corepack@0.35.0 pnpm --dir front build` - pass.
+  - `npx --yes corepack@0.35.0 pnpm --dir front zod:export-fixtures` plus `git diff --exit-code front/tests/unit/__fixtures__/zod-schemas/` - pass.
+  - `npx --yes corepack@0.35.0 pnpm --dir front test:e2e` - pass, 68 Playwright tests.
+  - `npx --yes corepack@0.35.0 pnpm --dir front test:ct:docker` - pass, 7 Playwright CT tests.
+  - `npx --yes corepack@0.35.0 pnpm design:check` - pass.
+  - `./server/gradlew -p server clean check bootJar` - pass.
+  - `./server/gradlew -p server unitTest integrationTest architectureTest --rerun-tasks` - pass.
+  - `./server/gradlew -p server bootJar` - pass.
+  - `docker build -t readmates-server:v1.17.0-local -f server/Dockerfile.release server` - pass.
+  - `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.70.0 image --severity HIGH,CRITICAL --ignore-unfixed --scanners vuln readmates-server:v1.17.0-local` - pass, 0 Ubuntu and Java HIGH/CRITICAL findings.
+  - `./scripts/build-public-release-candidate.sh` and `./scripts/public-release-check.sh .tmp/public-release-candidate` - pass; gitleaks reported no leaks.
+- Graphify evidence: a scoped `graphify query` was used for release impact orientation and pointed back to release/docs/host boundary surfaces. `graphify-out/` remains ignored and is not a release artifact.
+- Skipped before tag push: tag-triggered `Deploy Front`, tag-triggered `Deploy Server Image`, GitHub Release publication, OCI Compose backend promotion, production OAuth/provider-console checks, and post-deploy smoke. These require pushed `main`/tag or production operator access and must be closed as release-operation evidence after publication.
+- Residual risk: no known local release-readiness blocker remains. Operational release risk remains until the pushed tag workflows pass, the backend image is promoted to OCI Compose, GitHub Release exists, and sanitized production smoke checks pass.
+
 ## 2026-07-05 host server-state boundary cleanup closeout
 
 - Scope reviewed: local `main..codex/readmates-host-server-state-boundary-cleanup-20260705-133050`, covering host members and invitations route/data actions, host member action contracts, host UI state handoff, frontend boundary tests, host unit tests, migration status docs, CHANGELOG, and release-readiness notes.

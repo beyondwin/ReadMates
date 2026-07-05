@@ -10,6 +10,21 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 
+## v1.17.0 - 2026-07-05
+
+### Highlights
+
+- **Java 25 production runtime:** backend build, test, release image, CI, and OCI deploy paths now run on Java 25 with Kotlin 2.4.0, keeping local and GitHub Actions runtime expectations aligned.
+- **Release-tooling parity:** frontend, deploy, pre-push, and Playwright CT paths now activate the repo-pinned `pnpm@10.33.0` through Corepack, reducing local/CI drift before production tags are pushed.
+- **Host server-state boundary cleanup:** host members and invitations now keep query ownership in route/data actions, closing the remaining frontend boundary exceptions without changing server APIs.
+
+### Changed
+
+- Backend Gradle toolchains, GitHub Actions Java setup, Docker runtime images, legacy OCI VM setup, and active development/deploy docs now use Java 25 LTS with Kotlin 2.4.0 bytecode targeting Java 25.
+- CI/deploy and pre-push package-manager setup now activate the root `packageManager` through Corepack. The pinned frontend package manager remains `pnpm@10.33.0`.
+- Playwright component visual-regression Docker commands now run through a shared helper that activates the repo-defined pnpm with Corepack, verifies the container pnpm version, and isolates CT `node_modules` in Docker volumes so the host install is not rewritten by Linux optional dependencies.
+- Host members and invitations route/data actions now own query refresh and action handoff, while host UI components receive canonical state from route-owned data.
+
 ### Fixed
 
 - **Host server-state boundary:** host members and invitations now keep query ownership in route/data actions, removing the remaining frontend boundary exceptions without changing the server API, BFF/auth behavior, DB migrations, deploy workflow, or route URLs.
@@ -17,6 +32,21 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - **pre-push pnpm parity:** pre-push checks now run frontend commands through `pnpm@10.33.0`, matching CI and avoiding local failures when another pnpm major version is first on `PATH`.
 - **Tooling:** CI/deploy and pre-push package-manager setup now activate the root `packageManager` through Corepack, reducing pnpm version drift between local checks and GitHub Actions.
 - **CT Docker Corepack path:** Playwright component visual-regression Docker commands now run through a shared helper that activates the repo-defined pnpm with Corepack, verifies the container pnpm version, and isolates CT `node_modules` in Docker volumes so the host install is not rewritten by Linux optional dependencies.
+
+### Deployment Notes
+
+- Minor release because the backend production runtime and release image baseline move to Java 25. No Flyway migration is included.
+- Public API contracts, Pages Functions BFF/auth behavior, OAuth scopes, auth cookie format, runtime secret format, route URLs, and deploy workflow triggers are unchanged.
+- Push `main`, push annotated tag `v1.17.0`, confirm `Deploy Front` and `Deploy Server Image` workflows for the same tag, then promote OCI Compose backend to `ghcr.io/<owner>/<repo>/readmates-server:v1.17.0`.
+- `Deploy Server Image` must pass the Trivy HIGH/CRITICAL scan before OCI promotion. The backend promotion should be followed by `/internal/health`, BFF auth, OAuth redirect, and production smoke checks.
+
+### Verification
+
+- Local script and public-safety gates (2026-07-05): `bash -n scripts/*.sh deploy/oci/*.sh`, `shellcheck scripts/*.sh deploy/oci/*.sh`, `bash scripts/aigen-pii-check.sh`, `git diff --check -- . ':(exclude)docs/superpowers/**'`, `./scripts/build-public-release-candidate.sh`, and `./scripts/public-release-check.sh .tmp/public-release-candidate` passed; gitleaks reported no leaks in the public release candidate.
+- Local frontend and design gates (2026-07-05): `npx --yes corepack@0.35.0 pnpm --dir front lint`, `npx --yes corepack@0.35.0 pnpm --dir front test:coverage` (165 files, 1311 tests), `npx --yes corepack@0.35.0 pnpm --dir front build`, `npx --yes corepack@0.35.0 pnpm --dir front zod:export-fixtures` plus fixture diff check, `npx --yes corepack@0.35.0 pnpm --dir front test:e2e` (68 Playwright tests), `npx --yes corepack@0.35.0 pnpm --dir front test:ct:docker` (7 CT tests), and `npx --yes corepack@0.35.0 pnpm design:check` passed.
+- Local backend and release-image gates (2026-07-05): `./server/gradlew -p server clean check bootJar`, `./server/gradlew -p server unitTest integrationTest architectureTest --rerun-tasks`, `./server/gradlew -p server bootJar`, `docker build -t readmates-server:v1.17.0-local -f server/Dockerfile.release server`, and `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.70.0 image --severity HIGH,CRITICAL --ignore-unfixed --scanners vuln readmates-server:v1.17.0-local` passed with 0 Ubuntu and Java HIGH/CRITICAL findings.
+- Graphify discovery was used for release impact orientation and confirmed the touched release/docs/host boundary surfaces; `graphify-out/` remains ignored and is not a release artifact.
+- Skipped before tag push: tag-triggered `Deploy Front`, tag-triggered `Deploy Server Image`, OCI Compose backend promotion, GitHub Release publication, production OAuth/provider-console checks, and post-deploy smoke. These require pushed `main`/tag or production operator access and are the next release-operation steps.
 
 ## v1.16.3 - 2026-06-30
 
