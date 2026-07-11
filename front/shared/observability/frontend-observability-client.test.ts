@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createFrontendObservabilityClient } from "./frontend-observability-client";
+import { FRONTEND_OBSERVABILITY_BROWSER_PATH } from "./frontend-observability-paths";
 
 describe("frontend observability client", () => {
   beforeEach(() => {
@@ -10,7 +11,6 @@ describe("frontend observability client", () => {
   it("flushes sanitized batches with sendBeacon", async () => {
     const sendBeacon = vi.fn(() => true);
     const client = createFrontendObservabilityClient({
-      endpoint: "/api/bff/observability/frontend-events",
       sendBeacon,
       fetchImpl: vi.fn(),
     });
@@ -26,7 +26,7 @@ describe("frontend observability client", () => {
 
     expect(sendBeacon).toHaveBeenCalledTimes(1);
     const [url, body] = sendBeacon.mock.calls[0];
-    expect(url).toBe("/api/bff/observability/frontend-events");
+    expect(url).toBe(FRONTEND_OBSERVABILITY_BROWSER_PATH);
     expect(body).toBeInstanceOf(Blob);
     expect((body as Blob).type).toBe("application/json");
     expect(JSON.parse(await (body as Blob).text())).toEqual({

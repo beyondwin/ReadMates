@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { onRequest } from "../../../functions/api/bff/observability/frontend-events";
+import { FRONTEND_OBSERVABILITY_UPSTREAM_PATH } from "../../../shared/observability/frontend-observability-paths";
 
 const env = {
   READMATES_API_BASE_URL: "https://api.example.com",
@@ -75,7 +76,9 @@ describe("frontend observability BFF endpoint", () => {
     expect(response.headers.get("X-Readmates-Club-Slug")).toBeNull();
 
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url.toString()).toBe("https://api.example.com/api/observability/frontend-events");
+    expect(url.toString()).toBe(
+      `https://api.example.com${FRONTEND_OBSERVABILITY_UPSTREAM_PATH}`,
+    );
     const headers = init?.headers as Headers;
     expect(headers.get("X-Readmates-Bff-Secret")).toBe("test-bff-secret");
     expect(headers.get("X-Readmates-Club-Slug")).toBeNull();

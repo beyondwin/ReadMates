@@ -2,6 +2,7 @@ import {
   type FrontendObservabilityEvent,
   sanitizeFrontendObservabilityBatch,
 } from "./frontend-observability-contracts";
+import { FRONTEND_OBSERVABILITY_BROWSER_PATH } from "./frontend-observability-paths";
 
 export type FrontendObservabilityClient = {
   record(event: FrontendObservabilityEvent): void;
@@ -15,7 +16,7 @@ export type FrontendObservabilityClientOptions = {
   fetchImpl?: typeof fetch | undefined;
 };
 
-const DEFAULT_ENDPOINT = "/api/bff/observability/frontend-events";
+const DEFAULT_ENDPOINT = FRONTEND_OBSERVABILITY_BROWSER_PATH;
 const MAX_QUEUE_SIZE = 60;
 
 export function createFrontendObservabilityClient(
