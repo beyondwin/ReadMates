@@ -12,6 +12,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Fixed
 
+- **Local frontend observability BFF parity:** the Vite dev proxy now maps `/api/bff/observability/frontend-events` to Spring's `/api/observability/frontend-events` while preserving the production browser contract and the existing general `/api/bff/api/**` rewrite, preventing route navigation from emitting telemetry 403 noise locally.
 - **OCI Compose backend deploy:** 앱 stack 시작 경로에서 `--remove-orphans`를 제거해 같은 Compose project/network에 붙은 Prometheus/Grafana/Alertmanager가 백엔드 배포 중 orphan으로 삭제되지 않게 했습니다.
 - **Frontend tooling security:** `@opentelemetry/core` 간접 의존성을 patched `2.8.0`으로 고정해 Dependabot moderate advisory `GHSA-8988-4f7v-96qf`를 닫을 수 있게 했습니다.
 
