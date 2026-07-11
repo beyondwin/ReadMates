@@ -1,4 +1,4 @@
-import { expect, test, type Locator } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { loginWithGoogleFixture, resetSeedGoogleLogins } from "./readmates-e2e-db";
 
 async function expectPracticalTapTarget(locator: Locator) {
@@ -6,6 +6,47 @@ async function expectPracticalTapTarget(locator: Locator) {
   expect(box).not.toBeNull();
   expect(box!.height).toBeGreaterThanOrEqual(44);
   expect(box!.width).toBeGreaterThanOrEqual(44);
+}
+
+async function expectPublicRecordMetadataLayout(page: Page, width: number, stacked: boolean) {
+  await page.setViewportSize({ width, height: 900 });
+
+  const row = page.locator(".public-record-index-row").first();
+  await expect(row).toBeVisible();
+
+  const layout = await row.evaluate((element) => {
+    const body = element.querySelector<HTMLElement>(".public-record-index-row__body")!;
+    const meta = element.querySelector<HTMLElement>(".public-record-index-row__meta")!;
+    const counts = element.querySelector<HTMLElement>(".public-record-index-row__counts")!;
+    const rect = (target: HTMLElement) => {
+      const box = target.getBoundingClientRect();
+      return { left: box.left, right: box.right, top: box.top, bottom: box.bottom };
+    };
+
+    return {
+      body: { clientWidth: body.clientWidth, scrollWidth: body.scrollWidth },
+      row: { clientWidth: element.clientWidth, scrollWidth: element.scrollWidth },
+      meta: rect(meta),
+      counts: rect(counts),
+    };
+  });
+
+  const overlaps =
+    layout.meta.left < layout.counts.right &&
+    layout.meta.right > layout.counts.left &&
+    layout.meta.top < layout.counts.bottom &&
+    layout.meta.bottom > layout.counts.top;
+
+  expect(overlaps, `${width}px metadata must not overlap`).toBe(false);
+  expect(layout.body.scrollWidth, `${width}px body must not overflow`).toBeLessThanOrEqual(layout.body.clientWidth);
+  expect(layout.row.scrollWidth, `${width}px row must not overflow`).toBeLessThanOrEqual(layout.row.clientWidth);
+
+  if (stacked) {
+    expect(layout.counts.top).toBeGreaterThanOrEqual(layout.meta.bottom);
+  } else {
+    const sharedRowHeight = Math.min(layout.meta.bottom, layout.counts.bottom) - Math.max(layout.meta.top, layout.counts.top);
+    expect(sharedRowHeight).toBeGreaterThan(0);
+  }
 }
 
 const memberMobileTabs = ["홈", "이번 세션", "클럽 노트", "아카이브", "알림", "내 공간"];
@@ -66,6 +107,18 @@ test("desktop public and host pages show the expected top navigation", async ({ 
 
   await page.getByRole("link", { name: "멤버 화면으로" }).first().click();
   await expect(page).toHaveURL(new RegExp(`${baselineClubAppPath}$`));
+});
+
+test("public record metadata adapts without overlap from mobile to desktop", async ({ page }) => {
+  await page.goto("/records");
+
+  for (const width of [320, 390, 520]) {
+    await expectPublicRecordMetadataLayout(page, width, true);
+  }
+
+  for (const width of [540, 768, 1024, 1366]) {
+    await expectPublicRecordMetadataLayout(page, width, false);
+  }
 });
 
 test("mobile public pages hide app tabs and host app pages show mobile chrome", async ({ page }) => {

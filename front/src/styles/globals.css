@@ -3595,6 +3595,27 @@
   }
 }
 
+@media (max-width: 520px) {
+  .public-record-index-row__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .public-record-index-row__meta {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+  }
+
+  .public-record-index-row__counts {
+    grid-column: 1;
+    grid-row: 2;
+    justify-self: start;
+    flex-wrap: wrap;
+    white-space: normal;
+    text-align: left;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rm-route-reveal {
     animation: none !important;

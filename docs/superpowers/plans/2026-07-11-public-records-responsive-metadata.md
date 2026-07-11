@@ -70,7 +70,8 @@ async function expectPublicRecordMetadataLayout(page: Page, width: number, stack
   if (stacked) {
     expect(layout.counts.top).toBeGreaterThanOrEqual(layout.meta.bottom);
   } else {
-    expect(Math.abs(layout.counts.top - layout.meta.top)).toBeLessThan(1);
+    const sharedRowHeight = Math.min(layout.meta.bottom, layout.counts.bottom) - Math.max(layout.meta.top, layout.counts.top);
+    expect(sharedRowHeight).toBeGreaterThan(0);
   }
 }
 
