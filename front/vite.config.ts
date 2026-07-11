@@ -1,6 +1,7 @@
 import path from "node:path";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import { rewriteFrontendObservabilityProxyPath } from "./shared/observability/frontend-observability-paths";
 import { normalizedClubSlug } from "./shared/security/club-slug";
 
 function normalizedClubSlugFromProxyPath(proxyPath: string | undefined) {
@@ -61,7 +62,9 @@ export default defineConfig({
             }
           });
         },
-        rewrite: (proxyPath) => proxyPath.replace(/^\/api\/bff/, ""),
+        rewrite: (proxyPath) =>
+          rewriteFrontendObservabilityProxyPath(proxyPath) ??
+          proxyPath.replace(/^\/api\/bff/, ""),
       },
       "/oauth2/authorization": {
         target: process.env.READMATES_API_BASE_URL ?? "http://127.0.0.1:18080",
