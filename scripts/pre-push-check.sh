@@ -217,7 +217,7 @@ elif [[ "$release_mode" == "always" && "$changelog_check" == "never" ]]; then
   printf 'Emergency override active. Record reason in the branch protection bypass ledger.\n'
 fi
 
-if [[ -f "AGENTS.md" ]]; then
+if [[ -f "AGENTS.md" || -f "scripts/check-agent-guidance.py" ]]; then
   run_step "Agent guidance contract" python3 scripts/check-agent-guidance.py
 else
   printf '\n==> Agent guidance contract skipped (public candidate excludes private guidance)\n'
