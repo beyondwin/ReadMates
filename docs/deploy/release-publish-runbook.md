@@ -1,6 +1,6 @@
 # 새 버전 발행과 운영 배포 Runbook
 
-검토일: 2026-05-15
+검토일: 2026-07-12
 
 이 문서는 ReadMates 새 제품 버전을 발행하고, 같은 tag로 Cloudflare Pages 프론트엔드와 OCI Compose 백엔드를 운영에 반영하는 절차입니다. 세부 설정 기준은 [Cloudflare Pages](cloudflare-pages.md), [OCI Compose Stack](compose-stack.md), [버저닝](../development/versioning.md)을 우선합니다.
 

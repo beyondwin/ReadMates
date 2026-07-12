@@ -10,6 +10,13 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 
+## v1.17.3 - 2026-07-12
+
+### Highlights
+
+- 공개 기록 화면의 좁은 viewport metadata가 서로 겹치지 않고 읽히며, 로컬 개발 환경의 frontend observability가 운영과 같은 BFF 경로 계약을 사용합니다.
+- OCI 앱 배포가 같은 Compose project/network의 관측 서비스를 보존하고, CI와 pre-push가 같은 agent guidance 및 server quality 계약을 검증합니다.
+
 ### Changed
 
 - **Agent guidance contract:** CI와 pre-push가 agent router, active guide link, canonical server/Corepack command, instruction-chain size, release-checklist size, Graphify local-state exclusion, public-safety invariants를 하나의 저장소 검사기로 검증하며, server quality gate는 `./scripts/server-ci-check.sh`로 통일되었습니다.
@@ -18,8 +25,32 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 ### Fixed
 
 - **Local frontend observability BFF parity:** the Vite dev proxy now maps `/api/bff/observability/frontend-events` to Spring's `/api/observability/frontend-events` while preserving the production browser contract and the existing general `/api/bff/api/**` rewrite, preventing route navigation from emitting telemetry 403 noise locally.
+- **Responsive public record metadata:** 좁은 화면에서 공개 기록의 날짜와 작성자 metadata가 겹치지 않도록 줄바꿈 가능한 레이아웃과 회귀 검증을 추가했습니다.
 - **OCI Compose backend deploy:** 앱 stack 시작 경로에서 `--remove-orphans`를 제거해 같은 Compose project/network에 붙은 Prometheus/Grafana/Alertmanager가 백엔드 배포 중 orphan으로 삭제되지 않게 했습니다.
 - **Frontend tooling security:** `@opentelemetry/core` 간접 의존성을 patched `2.8.0`으로 고정해 Dependabot moderate advisory `GHSA-8988-4f7v-96qf`를 닫을 수 있게 했습니다.
+
+### Deployment Notes
+
+- `v1.17.2` 위 patch release입니다. Spring application source, public API contract, DB migration, OAuth scope, auth cookie, BFF secret, runtime secret 변경은 없습니다.
+- Annotated tag `v1.17.3`을 발행해 `Deploy Front`와 `Deploy Server Image`를 같은 commit에서 실행합니다. Cloudflare Pages 배포와 GHCR image scan/promote가 모두 성공한 뒤 OCI Compose backend를 `ghcr.io/<owner>/<repo>/readmates-server:v1.17.3`으로 올립니다.
+- OCI promotion은 업데이트된 `05-deploy-compose-stack.sh`를 사용해 app stack만 새 image tag로 전환하고, 같은 Compose project/network의 Prometheus/Grafana/Alertmanager는 유지해야 합니다. DB migration은 없으므로 Flyway schema 변화는 기대하지 않습니다.
+- 배포 후 Cloudflare Pages app, anonymous BFF auth, OAuth redirect, production integration smoke, Spring `/internal/health`, post-deploy watch를 확인합니다. 실제 운영 host, credential, member data, smoke 전문은 Git에 기록하지 않습니다.
+
+### Verification
+
+- Full local release gate (2026-07-12): `./scripts/pre-push-check.sh --full --release` passed. It covered the agent guidance contract, frontend lint, 166 frontend test files with 1,314 tests and coverage (81.82% statements, 77.8% branches, 82.44% functions, 82.53% lines), production build, Zod fixture freshness, backend `check`, Testcontainers integration lane, 70 Playwright E2E tests, public release candidate build/gitleaks scan, Prometheus rules/config, and Alertmanager config.
+- Public release safety (2026-07-12): the generated `.tmp/public-release-candidate` passed `./scripts/public-release-check.sh` with no gitleaks findings.
+
+### Release bypass
+
+- Classification: POLICY_MISMATCH
+- Release/commit: `v1.17.3` release commit
+- Reason: solo-admin repository with no available non-author reviewer for the accumulated CI contract change; all executable release gates run locally before direct `main` publication.
+- Affected high-control surfaces: `.github/workflows/ci.yml`, `scripts/pre-push-check.sh`, `scripts/server-ci-check.sh`, and the OCI Compose deploy helper/unit.
+- Checks completed: `./scripts/pre-push-check.sh --full --release` and its frontend, backend, E2E, integration, observability-config, and public-release safety lanes.
+- Checks skipped or failed: none before publication.
+- Follow-up owner and deadline: repository operator, 2026-07-19, confirm the tag-triggered workflows, OCI promotion, production smoke, and whether branch protection should require the CI workflow.
+- Closure evidence: GitHub Release `v1.17.3`, tag-triggered workflow runs, and the sanitized final deployment report.
 
 ## v1.17.2 - 2026-07-05
 
