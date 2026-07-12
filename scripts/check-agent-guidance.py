@@ -86,10 +86,16 @@ GUIDANCE_PATHS = tuple(
 )
 LINK_CHECK_PATHS = tuple(
     relative
-    for relative in REQUIRED_PATHS
+    for relative in GUIDANCE_PATHS
     if relative.endswith(".md")
     and relative != "docs/reports/2026-07-11-release-readiness-history.md"
 )
+KNOWN_BROKEN_LINKS = {
+    (
+        "docs/development/release-management.md",
+        "../operations/runbooks/release-bypass-ledger.md",
+    ),
+}
 
 
 def write(root: Path, relative: str, content: str) -> None:
@@ -138,6 +144,7 @@ def check_required_paths(root: Path) -> list[str]:
 
 def check_markdown_links(root: Path) -> list[str]:
     errors: list[str] = []
+    repository_root = root.resolve()
     for relative in LINK_CHECK_PATHS:
         source = root / relative
         if not source.is_file() or source.suffix != ".md":
@@ -147,7 +154,15 @@ def check_markdown_links(root: Path) -> list[str]:
             if not target or target.startswith("#") or SCHEME_RE.match(target):
                 continue
             target_path = target.split("#", 1)[0]
-            if target_path and not (source.parent / target_path).resolve().exists():
+            if not target_path or (relative, target_path) in KNOWN_BROKEN_LINKS:
+                continue
+            resolved = (source.parent / target_path).resolve()
+            try:
+                resolved.relative_to(repository_root)
+            except ValueError:
+                errors.append(f"link outside repository: {relative} -> {target_path}")
+                continue
+            if not resolved.exists():
                 errors.append(f"broken link: {relative} -> {target_path}")
     return errors
 
@@ -175,7 +190,10 @@ def check_normative_commands(root: Path) -> list[str]:
     errors: list[str] = []
     for relative in NORMATIVE_COMMAND_PATHS:
         path = root / relative
-        if path.is_file() and STALE_SERVER_COMMAND in fenced_lines(path.read_text(encoding="utf-8")):
+        if path.is_file() and any(
+            STALE_SERVER_COMMAND in line
+            for line in fenced_lines(path.read_text(encoding="utf-8"))
+        ):
             errors.append(f"stale server command in runnable block: {relative}")
     for relative in DIRECT_PNPM_FORBIDDEN_PATHS:
         path = root / relative
@@ -276,7 +294,24 @@ class GuidanceCheckerTests(unittest.TestCase):
         )
         self.assertTrue(any("broken link" in error for error in errors), errors)
 
-    def test_command_only_file_does_not_expand_link_scope(self) -> None:
+    def test_broken_link_in_active_guidance_fails(self) -> None:
+        errors = self.check_fixture(
+            lambda root: write(root, "docs/development/local-setup.md", "[missing](missing.md)\n")
+        )
+        self.assertTrue(any("broken link" in error for error in errors), errors)
+
+    def test_link_outside_repository_fails(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="readmates-guidance-link-test-") as raw:
+            parent = Path(raw)
+            root = parent / "repo"
+            root.mkdir()
+            make_valid_fixture(root)
+            write(parent, "outside.md", "# Outside\n")
+            write(root, "docs/development/project-map.md", "[outside](../../../outside.md)\n")
+            errors = run_checks(root, run_public_scan=False)
+            self.assertTrue(any("outside repository" in error for error in errors), errors)
+
+    def test_active_command_policy_file_links_are_checked(self) -> None:
         errors = self.check_fixture(
             lambda root: write(
                 root,
@@ -284,7 +319,7 @@ class GuidanceCheckerTests(unittest.TestCase):
                 f"[unrelated missing reference](missing.md)\n{CANONICAL_SERVER_COMMAND}\n",
             )
         )
-        self.assertFalse(any("broken link" in error for error in errors), errors)
+        self.assertTrue(any("broken link" in error for error in errors), errors)
 
     def test_runnable_clean_test_fails(self) -> None:
         errors = self.check_fixture(
@@ -292,6 +327,16 @@ class GuidanceCheckerTests(unittest.TestCase):
                 root,
                 "docs/development/project-map.md",
                 f"```bash\n{STALE_SERVER_COMMAND}\n```\n{CANONICAL_SERVER_COMMAND}\n",
+            )
+        )
+        self.assertTrue(any("stale server command" in error for error in errors), errors)
+
+    def test_runnable_clean_test_with_arguments_fails(self) -> None:
+        errors = self.check_fixture(
+            lambda root: write(
+                root,
+                "docs/development/project-map.md",
+                f"```bash\n{STALE_SERVER_COMMAND} --info\n```\n{CANONICAL_SERVER_COMMAND}\n",
             )
         )
         self.assertTrue(any("stale server command" in error for error in errors), errors)
