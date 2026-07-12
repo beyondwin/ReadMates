@@ -14,6 +14,8 @@ Agent router, active guide links, instruction-chain size, canonical server/Corep
 
 The checker stages only tracked guidance into a temporary directory and delegates content safety to `public-release-check.sh`; it does not maintain a second secret-pattern engine or inspect user-local Codex configuration.
 
+The private/source tree always contains `AGENTS.md`, so CI and pre-push run this checker there. The clean public candidate intentionally excludes private agent guidance and skips this private guidance-only gate; its public files remain covered by `public-release-check.sh`.
+
 ## `server-ci-check.sh`
 
 서버 코드를 수정한 뒤 GitHub Actions Backend job과 같은 품질 게이트를 로컬에서 먼저 확인합니다.

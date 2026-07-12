@@ -217,7 +217,11 @@ elif [[ "$release_mode" == "always" && "$changelog_check" == "never" ]]; then
   printf 'Emergency override active. Record reason in the branch protection bypass ledger.\n'
 fi
 
-run_step "Agent guidance contract" python3 scripts/check-agent-guidance.py
+if [[ -f "AGENTS.md" ]]; then
+  run_step "Agent guidance contract" python3 scripts/check-agent-guidance.py
+else
+  printf '\n==> Agent guidance contract skipped (public candidate excludes private guidance)\n'
+fi
 run_step "Activate repo package manager" activate_repo_pnpm
 run_step "Git whitespace check" check_whitespace
 run_step "Frontend lint" "${pnpm_cmd[@]}" --dir front lint
