@@ -47,23 +47,23 @@ Task dependency order is `1 -> 2 -> 3 -> 4 -> 5`. Task 4 intentionally comes aft
 
 **Files:**
 
-- Modify: `scripts/server-ci-check.sh:23-27`
-- Modify: `scripts/README.md:11-30`
-- Modify: `.github/workflows/ci.yml:244-247`
-- Modify: `scripts/pre-push-check.sh:220-229`
-- Modify: `AGENTS.md:35-44`
-- Modify: `README.md:146-176`
-- Modify: `docs/agents/server.md:56-76`
-- Modify: `docs/development/new-developer-onboarding-guide.md:298-321`
-- Modify: `docs/development/project-map.md:54-75`
-- Modify: `docs/development/test-guide.md:249-280`
-- Modify: `docs/development/technical-decisions.md:68-78`
-- Modify: `docs/development/release-management.md:84-100`
-- Modify: `docs/development/adr/0002-server-clean-architecture-with-archunit.md:169-187`
-- Modify: `docs/development/adr/0007-mysql-with-flyway-over-alternatives.md:184-197`
-- Modify: `docs/deploy/README.md:165-178`
-- Modify: `docs/deploy/compose-stack.md:37-48`
-- Modify: `docs/deploy/release-publish-runbook.md:38-53`
+- Modify: `scripts/server-ci-check.sh`
+- Modify: `scripts/README.md`
+- Modify: `.github/workflows/ci.yml`
+- Modify: `scripts/pre-push-check.sh`
+- Modify: `AGENTS.md`
+- Modify: `README.md`
+- Modify: `docs/agents/server.md`
+- Modify: `docs/development/new-developer-onboarding-guide.md`
+- Modify: `docs/development/project-map.md`
+- Modify: `docs/development/test-guide.md`
+- Modify: `docs/development/technical-decisions.md`
+- Modify: `docs/development/release-management.md`
+- Modify: `docs/development/adr/0002-server-clean-architecture-with-archunit.md`
+- Modify: `docs/development/adr/0007-mysql-with-flyway-over-alternatives.md`
+- Modify: `docs/deploy/README.md`
+- Modify: `docs/deploy/compose-stack.md`
+- Modify: `docs/deploy/release-publish-runbook.md`
 
 **Interfaces:**
 
@@ -175,11 +175,12 @@ State that `check` already runs `unitTest`, `architectureTest`, ktlint, detekt, 
 Run:
 
 ```bash
+set -e
 READMATES_SERVER_CI_CHECK_DRY_RUN=true ./scripts/server-ci-check.sh
 bash -n scripts/server-ci-check.sh scripts/pre-push-check.sh
 shellcheck scripts/server-ci-check.sh scripts/pre-push-check.sh
 ./scripts/server-ci-check.sh
-rg -n -F './server/gradlew -p server clean test' \
+if rg -n -F './server/gradlew -p server clean test' \
   AGENTS.md \
   README.md \
   docs/agents/server.md \
@@ -188,11 +189,14 @@ rg -n -F './server/gradlew -p server clean test' \
   docs/deploy/release-publish-runbook.md \
   docs/development/adr/0002-server-clean-architecture-with-archunit.md \
   docs/development/adr/0007-mysql-with-flyway-over-alternatives.md \
-  docs/development/new-developer-onboarding-guide.md \
   docs/development/project-map.md \
   docs/development/release-management.md \
-  docs/development/technical-decisions.md \
-  docs/development/test-guide.md
+  docs/development/technical-decisions.md; then
+  exit 1
+fi
+rg -n -F './server/gradlew -p server clean test' \
+  docs/development/new-developer-onboarding-guide.md \
+  docs/development/test-guide.md || true
 ```
 
 Expected:
@@ -232,14 +236,16 @@ git commit -m "fix: align canonical server verification"
 
 **Files:**
 
-- Modify: `AGENTS.md:7-34`
-- Modify: `.claude/commands/release-readiness.md:1-19`
-- Modify: `docs/development/project-map.md:52-91`
-- Modify: `docs/development/vertical-slice-checklist.md:1-47`
-- Modify: `docs/development/local-setup.md:10-30`
-- Modify: `docs/development/performance-budget.md:1-25`
-- Modify: `.graphifyignore:20-40`
-- Modify: `docs/development/graphify.md:14-80`
+- Modify: `AGENTS.md`
+- Modify: `.claude/commands/release-readiness.md`
+- Modify: `docs/development/project-map.md`
+- Modify: `docs/development/vertical-slice-checklist.md`
+- Modify: `docs/development/local-setup.md`
+- Modify: `docs/development/performance-budget.md`
+- Modify: `.graphifyignore`
+- Modify: `docs/development/graphify.md`
+
+Depends on: Task 1
 
 **Interfaces:**
 
@@ -366,6 +372,7 @@ Update `docs/development/graphify.md` to name `.waygent/` as local orchestration
 Run:
 
 ```bash
+set -e
 if rg -n 'clean test|pnpm --dir front|build-public-release-candidate' .claude/commands/release-readiness.md; then
   exit 1
 fi
@@ -418,8 +425,10 @@ git commit -m "docs: consolidate project agent guidance"
 **Files:**
 
 - Create: `docs/reports/2026-07-11-release-readiness-history.md`
-- Modify: `docs/development/release-readiness-review.md:1-726`
-- Modify: `docs/reports/README.md:1-24`
+- Modify: `docs/development/release-readiness-review.md`
+- Modify: `docs/reports/README.md`
+
+Depends on: Task 2
 
 **Interfaces:**
 
@@ -492,9 +501,13 @@ Add this row to `docs/reports/README.md`:
 Run:
 
 ```bash
-diff -u \
-  <(git show HEAD:docs/development/release-readiness-review.md | sed -n '3,632p') \
-  <(sed -n '5,$p' docs/reports/2026-07-11-release-readiness-history.md)
+set -e
+expected_history=$(mktemp)
+actual_history=$(mktemp)
+trap 'rm -f "$expected_history" "$actual_history"' EXIT
+git show e967b232596f4f04fe9ad304e704624f70fd29ba:docs/development/release-readiness-review.md | sed -n '3,632p' > "$expected_history"
+sed -n '5,$p' docs/reports/2026-07-11-release-readiness-history.md > "$actual_history"
+diff -u "$expected_history" "$actual_history"
 test "$(wc -c < docs/development/release-readiness-review.md)" -lt 20480
 rg -n '^## 기본 범위$|^## 필수 확인 항목$|^## DB/API 릴리즈 추가 체크리스트$|^## 권장 명령$|^## 출력 형식$|^## 완료 기준$' \
   docs/development/release-readiness-review.md
@@ -528,6 +541,8 @@ git commit -m "docs: separate release checklist from history"
 **Files:**
 
 - Create: `scripts/check-agent-guidance.py`
+
+Depends on: Task 3
 
 **Interfaces:**
 
@@ -733,6 +748,7 @@ if __name__ == "__main__":
 Run:
 
 ```bash
+set -e
 python3 scripts/check-agent-guidance.py --self-test
 ```
 
@@ -923,6 +939,7 @@ if __name__ == "__main__":
 Run:
 
 ```bash
+set -e
 python3 scripts/check-agent-guidance.py --self-test
 python3 scripts/check-agent-guidance.py
 python3 -m py_compile scripts/check-agent-guidance.py
@@ -948,9 +965,11 @@ git commit -m "test: enforce agent guidance consistency"
 
 **Files:**
 
-- Modify: `.github/workflows/ci.yml:15-39`
-- Modify: `scripts/pre-push-check.sh:210-229`
-- Modify: `scripts/README.md:1-40`
+- Modify: `.github/workflows/ci.yml`
+- Modify: `scripts/pre-push-check.sh`
+- Modify: `scripts/README.md`
+
+Depends on: Task 4
 
 **Interfaces:**
 
@@ -994,6 +1013,7 @@ The checker stages only tracked guidance into a temporary directory and delegate
 Run:
 
 ```bash
+set -e
 python3 scripts/check-agent-guidance.py --self-test
 python3 scripts/check-agent-guidance.py
 python3 -m py_compile scripts/check-agent-guidance.py
@@ -1070,9 +1090,10 @@ git commit -m "ci: check agent guidance consistency"
 
 - [ ] **Step 8: Final verification after the last commit**
 
-Run fresh:
+Verification:
 
 ```bash
+set -e
 python3 scripts/check-agent-guidance.py --self-test
 python3 scripts/check-agent-guidance.py
 ./scripts/server-ci-check.sh
