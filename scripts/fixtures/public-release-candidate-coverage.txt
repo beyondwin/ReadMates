@@ -7,5 +7,7 @@ deploy
 docs
 front
 README.md
+PRODUCT.md
+ops
 scripts
 server

@@ -27,7 +27,8 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - **Local frontend observability BFF parity:** the Vite dev proxy now maps `/api/bff/observability/frontend-events` to Spring's `/api/observability/frontend-events` while preserving the production browser contract and the existing general `/api/bff/api/**` rewrite, preventing route navigation from emitting telemetry 403 noise locally.
 - **Responsive public record metadata:** 좁은 화면에서 공개 기록의 날짜와 작성자 metadata가 겹치지 않도록 줄바꿈 가능한 레이아웃과 회귀 검증을 추가했습니다.
 - **OCI Compose backend deploy:** 앱 stack 시작 경로에서 `--remove-orphans`를 제거해 같은 Compose project/network에 붙은 Prometheus/Grafana/Alertmanager가 백엔드 배포 중 orphan으로 삭제되지 않게 했습니다.
-- **Frontend tooling security:** `@opentelemetry/core` 간접 의존성을 patched `2.8.0`으로 고정해 Dependabot moderate advisory `GHSA-8988-4f7v-96qf`를 닫을 수 있게 했습니다.
+- **Frontend tooling security:** Lighthouse의 Sentry runtime을 OpenTelemetry 2.x를 지원하는 `@sentry/node` 10.x 계열로 맞추고 `@opentelemetry/core`를 patched 2.8.0 이상으로 해석해 Dependabot moderate advisory `GHSA-8988-4f7v-96qf`를 닫으면서 runtime import 호환성도 유지합니다.
+- **Public release coverage:** 새 root product contract인 `PRODUCT.md`와 기존 `ops/` tree가 clean public release candidate의 명시적 top-level coverage fixture 및 gitleaks scan 범위에 포함됩니다.
 
 ### Deployment Notes
 
@@ -38,7 +39,8 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Verification
 
-- Full local release gate (2026-07-12): `./scripts/pre-push-check.sh --full --release` passed. It covered the agent guidance contract, frontend lint, 166 frontend test files with 1,314 tests and coverage (81.82% statements, 77.8% branches, 82.44% functions, 82.53% lines), production build, Zod fixture freshness, backend `check`, Testcontainers integration lane, 70 Playwright E2E tests, public release candidate build/gitleaks scan, Prometheus rules/config, and Alertmanager config.
+- Full local release gate (2026-07-12): `./scripts/pre-push-check.sh --full --release` passed. It covered the agent guidance contract, frontend lint, 167 frontend test files with 1,315 tests and coverage (81.82% statements, 77.8% branches, 82.44% functions, 82.53% lines), production build, Zod fixture freshness, backend `check`, Testcontainers integration lane, 70 Playwright E2E tests, public release candidate build/gitleaks scan, Prometheus rules/config, and Alertmanager config.
+- Dependency safety (2026-07-12): `pnpm audit --json` reported zero known vulnerabilities, and the Lighthouse package-context Sentry runtime regression test passed with the patched dependency graph.
 - Public release safety (2026-07-12): the generated `.tmp/public-release-candidate` passed `./scripts/public-release-check.sh` with no gitleaks findings.
 
 ### Release bypass

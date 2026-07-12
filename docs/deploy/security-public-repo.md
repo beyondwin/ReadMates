@@ -21,7 +21,7 @@ Active 또는 active 가능 secret이 발견되면 문서 수정으로 끝내지
 - `.gitignore`
 - `.gitleaks.toml`, 파일이 있을 때만 포함
 - `.env.example`
-- `README.md`
+- `README.md`, `PRODUCT.md`
 - `compose.yml`
 - `front/`
 - `server/`

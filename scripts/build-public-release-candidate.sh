@@ -391,6 +391,7 @@ copy_manifest() {
   copy_optional_file ".gitleaks.toml"
   copy_required_file ".env.example"
   copy_required_file "README.md"
+  copy_required_file "PRODUCT.md"
   copy_required_file "compose.yml"
 
   copy_dir "front" \
