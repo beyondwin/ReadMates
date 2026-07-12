@@ -10,6 +10,11 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 
+### Changed
+
+- **Agent guidance contract:** CI와 pre-push가 agent router, active guide link, canonical server/Corepack command, instruction-chain size, release-checklist size, Graphify local-state exclusion, public-safety invariants를 하나의 저장소 검사기로 검증하며, server quality gate는 `./scripts/server-ci-check.sh`로 통일되었습니다.
+- **Release bypass evidence:** solo-admin 또는 incident branch-protection bypass는 공개 안전 템플릿, 생략 검증, 후속 owner/deadline, closure evidence를 갖춘 release bypass ledger 절차를 따릅니다.
+
 ### Fixed
 
 - **Local frontend observability BFF parity:** the Vite dev proxy now maps `/api/bff/observability/frontend-events` to Spring's `/api/observability/frontend-events` while preserving the production browser contract and the existing general `/api/bff/api/**` rewrite, preventing route navigation from emitting telemetry 403 noise locally.

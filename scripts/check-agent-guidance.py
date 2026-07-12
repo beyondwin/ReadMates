@@ -90,14 +90,6 @@ LINK_CHECK_PATHS = tuple(
     if relative.endswith(".md")
     and relative != "docs/reports/2026-07-11-release-readiness-history.md"
 )
-KNOWN_BROKEN_LINKS = {
-    (
-        "docs/development/release-management.md",
-        "../operations/runbooks/release-bypass-ledger.md",
-    ),
-}
-
-
 def write(root: Path, relative: str, content: str) -> None:
     path = root / relative
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -154,7 +146,7 @@ def check_markdown_links(root: Path) -> list[str]:
             if not target or target.startswith("#") or SCHEME_RE.match(target):
                 continue
             target_path = target.split("#", 1)[0]
-            if not target_path or (relative, target_path) in KNOWN_BROKEN_LINKS:
+            if not target_path:
                 continue
             resolved = (source.parent / target_path).resolve()
             try:
@@ -320,6 +312,17 @@ class GuidanceCheckerTests(unittest.TestCase):
             )
         )
         self.assertTrue(any("broken link" in error for error in errors), errors)
+
+    def test_missing_release_bypass_ledger_fails(self) -> None:
+        errors = self.check_fixture(
+            lambda root: write(
+                root,
+                "docs/development/release-management.md",
+                "[bypass ledger](../operations/runbooks/release-bypass-ledger.md)\n"
+                f"{CANONICAL_SERVER_COMMAND}\n",
+            )
+        )
+        self.assertTrue(any("release-bypass-ledger.md" in error for error in errors), errors)
 
     def test_runnable_clean_test_fails(self) -> None:
         errors = self.check_fixture(
