@@ -23,6 +23,5 @@ run_step() {
 cd "$repo_root"
 
 run_step "Server CI quality gate" ./server/gradlew -p server check
-run_step "Server architecture boundary tests" ./server/gradlew -p server architectureTest
 
 printf '\nServer CI checks passed.\n'

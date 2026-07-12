@@ -190,7 +190,8 @@ migration 통합 테스트:
 
 전체 서버 테스트 (Testcontainers MySQL 포함):
 ```bash
-./server/gradlew -p server clean test
+./scripts/server-ci-check.sh
+./server/gradlew -p server integrationTest
 ```
 
 기대: V1~V28 (21개) migration이 순서대로 적용되고 schema constraint 검증 통과.

@@ -217,6 +217,7 @@ elif [[ "$release_mode" == "always" && "$changelog_check" == "never" ]]; then
   printf 'Emergency override active. Record reason in the branch protection bypass ledger.\n'
 fi
 
+run_step "Agent guidance contract" python3 scripts/check-agent-guidance.py
 run_step "Activate repo package manager" activate_repo_pnpm
 run_step "Git whitespace check" check_whitespace
 run_step "Frontend lint" "${pnpm_cmd[@]}" --dir front lint
@@ -224,7 +225,7 @@ run_step "Frontend unit tests with coverage" "${pnpm_cmd[@]}" --dir front test:c
 run_step "Frontend build" "${pnpm_cmd[@]}" --dir front build
 run_step "Export Zod fixtures" "${pnpm_cmd[@]}" --dir front zod:export-fixtures
 run_step "Check Zod fixtures are committed" git diff --exit-code front/tests/unit/__fixtures__/zod-schemas/
-run_step "Backend CI quality gate" ./server/gradlew -p server check
+run_step "Backend CI quality gate" ./scripts/server-ci-check.sh
 
 if should_run_public_release_check; then
   run_step "Build public release candidate" ./scripts/build-public-release-candidate.sh

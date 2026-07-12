@@ -25,6 +25,8 @@ Keep changes scoped to the touched feature and follow `docs/development/architec
 
 For architecture questions, impact analysis, or first-pass orientation across multiple surfaces, use `docs/development/project-map.md` as a navigation aid, then verify against the current code, tests, migrations, scripts, and `docs/development/architecture.md`.
 
+For spec or implementation-plan work, read `docs/development/project-map.md` and `docs/development/vertical-slice-checklist.md` before handing tasks to any executor.
+
 Public repo safety matters: do not add real member data, secrets, deployment state, local absolute paths, private domains, OCIDs, or token-shaped examples. You may inspect local env or generated files when needed, but do not quote or persist their private values in docs, tests, commits, or final responses.
 
 Graphify is available as a local codebase discovery aid. For architecture questions, impact analysis, or cross-surface work, use a scoped `graphify query` when the local graph is available, then verify findings against current code, tests, migrations, scripts, and active docs. Graphify does not replace the guide selection above, `docs/development/architecture.md`, or release-readiness review rules below.
@@ -33,10 +35,13 @@ Ask before editing when the request needs private data, conflicts with the archi
 
 Residual risk and release readiness reviews: when asked to check remaining risk, release readiness, or whether a branch is safe after merge, do not limit the review to the latest implementation plan unless the user explicitly says so. Review the current branch against its base, usually `origin/main..HEAD`, and use `docs/development/release-readiness-review.md` to check CHANGELOG/Unreleased, CI/deploy scripts, operator-facing behavior changes, security-code hygiene, architecture-test baselines/exceptions, and public-release safety. Passing tests is evidence, not proof that no operational or release risk remains.
 
+Release tags in `vMAJOR.MINOR.PATCH` format remain the authoritative product version; do not introduce a new `VERSION` file.
+
 Run the smallest relevant checks before finishing:
 
 - Frontend: `pnpm --dir front lint`, `pnpm --dir front test`, `pnpm --dir front build`
-- Server: `./server/gradlew -p server clean test`
+- Server PR-level: `./scripts/server-ci-check.sh`
+- Server full Testcontainers: `./server/gradlew -p server integrationTest`
 - End-to-end or auth/BFF changes: `pnpm --dir front test:e2e`
 - Public release checks: `./scripts/build-public-release-candidate.sh` then `./scripts/public-release-check.sh .tmp/public-release-candidate`
 - Docs-only: `git diff --check -- <changed-docs>` plus targeted link/safety scans. For public release work, run the public release candidate checks above.

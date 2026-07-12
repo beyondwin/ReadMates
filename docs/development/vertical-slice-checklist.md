@@ -2,6 +2,14 @@
 
 Use this checklist when a change crosses frontend, BFF, server API, auth, persistence, or public-safety boundaries.
 
+## 0. Handoff
+
+- Requirement마다 구현 task와 acceptance evidence가 연결되어 있습니다.
+- Task dependency와 예상 수정 파일이 명시되어 있습니다.
+- Parallel task는 같은 파일, database, container, fixture directory, build output을 공유하지 않습니다.
+- Executor-specific state, 개인 경로, model/auth/MCP 설정이 제품 계약에 포함되지 않습니다.
+- Non-goal, skipped validation, deploy 이후 operator follow-up이 구분되어 있습니다.
+
 ## 1. Surface
 
 - Product surface is one of public, member, host, platform admin, auth, BFF, or operations.

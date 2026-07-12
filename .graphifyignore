@@ -28,6 +28,7 @@ front/.wrangler/
 .cloudflare/
 .vercel/
 .gstack/
+.waygent/
 .idea/
 .playwright-cli/
 .playwright-mcp/

@@ -305,16 +305,15 @@ host transcript upload
 | 변경 표면 | 명령 |
 | --- | --- |
 | Frontend | `pnpm --dir front lint`, `pnpm --dir front test`, `pnpm --dir front build` |
-| Server full backend | `./server/gradlew -p server clean unitTest architectureTest integrationTest` |
+| PR-level backend quality | `./scripts/server-ci-check.sh` |
+| Server full Testcontainers | `./server/gradlew -p server integrationTest` |
 | API/auth/BFF/user-flow | `pnpm --dir front test:e2e` |
-| Server architecture boundary | `./server/gradlew -p server architectureTest` |
-| PR-level backend quality | `./server/gradlew -p server check` |
 | Public release candidate | `./scripts/build-public-release-candidate.sh`, `./scripts/public-release-check.sh .tmp/public-release-candidate` |
 | Docs-only | `git diff --check -- <changed-docs>` |
 
 테스트가 통과했다는 사실은 release risk가 없다는 증명이 아닙니다. release readiness를 물어보는 작업에서는 [release-readiness-review.md](release-readiness-review.md)를 별도로 따라야 합니다.
 
-Backend의 기본 `test` task는 중복 실행을 피하기 위해 비활성화되어 있습니다. 서버 변경을 검증할 때 `./server/gradlew -p server clean test`만 실행하면 충분한 신호가 아닐 수 있으므로, 위 표의 explicit test lane이나 `check` task를 사용합니다.
+Backend의 기본 Gradle `test` task는 중복 선택을 피하기 위해 비활성화되어 있습니다. 따라서 `./server/gradlew -p server clean test`만 실행하는 것은 의미 있는 검증 근거가 아니며, 위 표의 PR-level wrapper와 필요한 explicit integration lane을 사용합니다.
 
 ## 절대 문서에 넣지 않는 값
 

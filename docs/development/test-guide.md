@@ -2,7 +2,7 @@
 
 ReadMates의 테스트는 frontend lint/unit/build, Playwright E2E, backend Gradle test, 공개 릴리즈 후보 점검, 배포 연동 smoke로 나뉩니다.
 
-GitHub Actions CI는 frontend job에서 Node.js 24와 `pnpm@10.33.0`을 사용해 lint, coverage 포함 unit test, build, Zod fixture freshness check를 실행하고, design-system job에서 `pnpm design:check`를 실행합니다. Backend job은 JDK 25로 `./gradlew check`를 실행하며, `check` 안에서 unit test, architectureTest, ktlint, detekt, JaCoCo가 함께 돕니다. Testcontainers 기반 integration suite는 별도 `backend-integration` job의 `./gradlew integrationTest`로 병렬 실행합니다. E2E job은 MySQL service를 띄운 뒤 Playwright suite를 3개 shard로 나눠 실행합니다.
+GitHub Actions CI는 frontend job에서 Node.js 24와 `pnpm@10.33.0`을 사용해 lint, coverage 포함 unit test, build, Zod fixture freshness check를 실행하고, design-system job에서 `pnpm design:check`를 실행합니다. Backend job은 JDK 25로 `./scripts/server-ci-check.sh`를 실행하며, wrapper의 `check` 안에서 unit test, architectureTest, ktlint, detekt, JaCoCo가 함께 실행됩니다. Testcontainers 기반 integration suite는 별도 `backend-integration` job의 `./gradlew integrationTest`로 병렬 실행합니다. E2E job은 MySQL service를 띄운 뒤 Playwright suite를 3개 shard로 나눠 실행합니다.
 
 검증은 변경 surface와 위험도에 맞춰 고릅니다. 완료 보고에는 실행한 명령, 실패 또는 스킵한 명령과 이유, 남은 리스크를 함께 남깁니다. 실패한 검증을 무시하고 완료로 표시하지 않습니다.
 
@@ -243,13 +243,14 @@ docker volume rm readmates-ct-root-node-modules readmates-ct-front-node-modules 
 
 Backend tests are expected to run on JDK 25. `server/build.gradle.kts` pins the Gradle `Test` JVM to the Java 25 toolchain so local shells using a different current JVM do not change test runtime behavior. If Gradle cannot find a JDK 25 toolchain locally, install one or set `JAVA_HOME` to a JDK 25 installation before running backend tests.
 
-전체 backend test (단위 + 아키텍처 + integration 묶음):
+Backend PR-level gate와 full Testcontainers lane:
 
 ```bash
-./server/gradlew -p server clean unitTest architectureTest integrationTest
+./scripts/server-ci-check.sh
+./server/gradlew -p server integrationTest
 ```
 
-기본 `:test` task는 비활성화되어 있습니다 — 태그 필터가 없어 `:unitTest`, `:integrationTest`, `:architectureTest`와 동일 테스트를 중복 실행하기 때문입니다. `./gradlew check`는 `:unitTest + :architectureTest + :detekt + JaCoCo`를 의존성으로 한 번씩만 실행하며, integration은 Docker가 필요해 명시적으로 호출할 때만 돕니다.
+기본 Gradle `test` task는 태그 필터가 없어 `unitTest`, `integrationTest`, `architectureTest`와 같은 테스트를 중복 선택하므로 비활성화되어 있습니다. 따라서 `./server/gradlew -p server clean test`만 실행하는 것은 의미 있는 검증 근거가 아닙니다. Wrapper의 `check`는 `unitTest + architectureTest + detekt + JaCoCo`를 의존성으로 한 번씩만 실행하며, integration은 Docker가 필요해 명시적으로 호출할 때만 돕니다.
 
 Backend fast lanes:
 
@@ -259,9 +260,9 @@ Backend fast lanes:
 ./server/gradlew -p server architectureTest
 ```
 
-이 fast lane은 개발 중 빠른 피드백용이며 release baseline을 대체하지 않습니다. `unitTest`는 `integration`, `container`, `architecture` tag를 제외하고, `integrationTest`는 Spring/Testcontainers 성격 tag를 포함하며, `architectureTest`는 ArchUnit boundary만 실행합니다. Backend 변경을 ship하기 전에는 위 세 lane을 모두 실행합니다.
+이 fast lane은 개발 중 빠른 피드백용이며 release baseline을 대체하지 않습니다. `unitTest`는 `integration`, `container`, `architecture` tag를 제외하고, `integrationTest`는 Spring/Testcontainers 성격 tag를 포함하며, `architectureTest`는 ArchUnit boundary만 실행합니다. Backend 변경을 ship하기 전에는 PR-level wrapper를 실행하고, Testcontainers evidence가 필요한 변경에서는 integration lane도 별도로 실행합니다.
 
-`./server/gradlew -p server clean test` may be a no-op for integration-tagged confidence checks. For release-risk review that touches SQL plans, API contracts, or query budgets, run the targeted integration lane explicitly:
+For release-risk review that touches SQL plans, API contracts, or query budgets, run the targeted integration lane explicitly:
 
 ```bash
 ./server/gradlew -p server integrationTest \
@@ -275,7 +276,7 @@ Backend fast lanes:
 PR-level quality gate는 단일 `check` task로 통합되어 있습니다.
 
 ```bash
-./server/gradlew -p server check
+./scripts/server-ci-check.sh
 ```
 
 `check`는 다음 게이트를 한 번에 검증합니다.
@@ -284,11 +285,11 @@ PR-level quality gate는 단일 `check` task로 통합되어 있습니다.
 - **detekt baseline gate**: detekt 2.0.0-alpha.5 + `server/config/detekt/detekt.yml`. 기존 위반은 `server/config/detekt/baseline.xml`로 grandfather. detekt 1.23.x는 Java 25 daemon에서 동작하지 않아 Java 25/Kotlin 2.4/Gradle 9.x 검증 범위에 있는 detekt 2.x line으로 올렸고, baseline은 detekt 2 rule id 기준으로 재생성했습니다.
 - **JaCoCo line coverage gate**: `unitTest`의 `JacocoTaskExtension`이 `build/jacoco/unitTest.exec`를 생성하고, `jacocoTestCoverageVerification`이 LINE `COVEREDRATIO` 최소 0.23(측정치 -2pp)을 강제합니다. `Application`/`dto`/`config`는 report에서 제외합니다. Threshold를 올릴 때는 측정치 -2pp baseline rule을 유지합니다.
 
-CI backend job은 `./gradlew check` 단일 호출로 구성되어 있습니다 — `check`가 `:unitTest + :architectureTest + :detekt + :jacoco*`를 모두 의존하므로 별도 architectureTest step은 불필요(2026-05-16 제거). ktlint/detekt/JaCoCo report 아티팩트는 `if: always()`로 항상 업로드합니다(실패시 `backend-reports` 별도 업로드 유지).
+CI backend job은 `./scripts/server-ci-check.sh` 단일 호출로 구성되어 있습니다 — wrapper가 실행하는 `check`는 `:unitTest + :architectureTest + :detekt + :jacoco*`를 모두 의존하므로 별도 architectureTest step은 불필요합니다. ktlint/detekt/JaCoCo report 아티팩트는 `if: always()`로 항상 업로드합니다(실패시 `backend-reports` 별도 업로드 유지).
 
 Backend test suite에는 MySQL 기반 persistence adapter/controller 검증이 포함되어 있습니다. `server/build.gradle.kts`는 `org.testcontainers:testcontainers-mysql`을 사용하고, Docker가 필요합니다. Colima를 쓰는 로컬 환경에서는 기본 Docker socket env가 비어 있고 Colima socket이 있으면 Gradle test task가 `DOCKER_HOST`와 `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE`를 설정합니다.
 
-Backend Gradle test는 Testcontainers가 필요한 MySQL lifecycle을 직접 관리합니다. 로컬 `compose.yml`의 MySQL은 서버를 수동으로 띄우거나 Playwright E2E database를 준비할 때 쓰며, `./server/gradlew -p server clean test`를 실행하기 전에 `docker compose up`을 먼저 실행할 필요는 없습니다.
+Backend `integrationTest`는 Testcontainers가 필요한 MySQL lifecycle을 직접 관리합니다. 로컬 `compose.yml`의 MySQL은 서버를 수동으로 띄우거나 Playwright E2E database를 준비할 때 쓰며, integration lane을 실행하기 전에 `docker compose up`을 먼저 실행할 필요는 없습니다.
 
 로컬 image 재현성 검증은 `./server/gradlew -p server bootJar` 후 `docker build -t readmates-server:local server`를 사용하며, 이 명령은 `server/Dockerfile`을 사용합니다. Release workflow는 CI가 jar를 빌드한 뒤 `server/Dockerfile.release`로 이미지를 만들고, 같은 digest를 scan한 다음 promote합니다.
 
@@ -316,7 +317,8 @@ Refs: `docs/superpowers/specs/2026-05-16-readmates-build-test-speed-spec.md` §4
 ./server/gradlew -p server test --tests 'com.readmates.notification.kafka.*'
 ./server/gradlew -p server test --tests 'com.readmates.notification.*'
 ./server/gradlew -p server test --tests com.readmates.archive.api.MemberArchiveReviewControllerTest
-./server/gradlew -p server clean test
+./scripts/server-ci-check.sh
+./server/gradlew -p server integrationTest
 pnpm --dir front exec vitest run tests/unit/host-dashboard.test.tsx
 pnpm --dir front exec vitest run tests/unit/host-notifications.test.tsx
 pnpm --dir front exec vitest run tests/unit/host-session-notifications.test.tsx
@@ -336,7 +338,8 @@ pnpm --dir front test:e2e -- manual-notifications
 Redis-backed 기능은 Redis가 꺼진 기본 상태와 Redis가 켜진 adapter test 양쪽에서 확인합니다.
 
 ```bash
-./server/gradlew -p server clean test
+./scripts/server-ci-check.sh
+./server/gradlew -p server integrationTest
 pnpm --dir front test:e2e
 ```
 
@@ -488,7 +491,8 @@ pnpm --dir front test:e2e
 Backend API, authorization, database 변경:
 
 ```bash
-./server/gradlew -p server clean test
+./scripts/server-ci-check.sh
+./server/gradlew -p server integrationTest
 pnpm --dir front test:e2e
 ```
 
@@ -502,7 +506,8 @@ pnpm --dir front test:e2e
 Release baseline:
 
 ```bash
-./server/gradlew -p server clean test
+./scripts/server-ci-check.sh
+./server/gradlew -p server integrationTest
 pnpm --dir front lint
 pnpm --dir front test
 pnpm --dir front build

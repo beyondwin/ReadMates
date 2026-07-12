@@ -44,7 +44,8 @@ git diff --name-only <previous-tag>..HEAD -- server/src/main/resources/db/mysql/
 pnpm --dir front lint
 pnpm --dir front test
 pnpm --dir front build
-./server/gradlew -p server clean test
+./scripts/server-ci-check.sh
+./server/gradlew -p server integrationTest
 ./scripts/build-public-release-candidate.sh
 ./scripts/public-release-check.sh .tmp/public-release-candidate
 ```

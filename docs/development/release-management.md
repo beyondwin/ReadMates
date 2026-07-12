@@ -90,7 +90,8 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식의 semantic version을 사용합니다.
    Server:
 
    ```bash
-   ./server/gradlew -p server clean test
+   ./scripts/server-ci-check.sh
+   ./server/gradlew -p server integrationTest
    ```
 
    API, auth, BFF, DB migration, 사용자 흐름 변경:

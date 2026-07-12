@@ -160,7 +160,8 @@ pnpm --dir front test
 pnpm --dir front build
 pnpm --dir front test:e2e
 pnpm --dir front lighthouse:diagnose -- --group public --limit 2
-./server/gradlew -p server clean test
+./scripts/server-ci-check.sh
+./server/gradlew -p server integrationTest
 ```
 
 Route-critical UI baseline을 갱신할 때는 macOS 로컬 렌더러가 아니라 Docker 경로를 사용합니다.

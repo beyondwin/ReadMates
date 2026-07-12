@@ -7,20 +7,20 @@ ReadMates tracks production-build asset size as local release-readiness evidence
 Run the production build and budget report:
 
 ```bash
-npx --yes pnpm@10.33.0 --dir front build
-npx --yes pnpm@10.33.0 --dir front build:budget
+corepack pnpm --dir front build
+corepack pnpm --dir front build:budget
 ```
 
 Run the combined alias:
 
 ```bash
-npx --yes pnpm@10.33.0 --dir front performance:budget
+corepack pnpm --dir front performance:budget
 ```
 
 Run Lighthouse against production build output through Vite preview:
 
 ```bash
-npx --yes pnpm@10.33.0 --dir front lighthouse:preview -- --group public --limit 2
+corepack pnpm --dir front lighthouse:preview -- --group public --limit 2
 ```
 
 ## Artifacts

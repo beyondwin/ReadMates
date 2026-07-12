@@ -57,22 +57,18 @@ Ask before editing if the required authorization boundary, migration behavior, o
 Checks:
 
 ```bash
-./server/gradlew -p server clean test
+./scripts/server-ci-check.sh
 ```
 
-PR-level quality gate(ktlint baseline + detekt baseline + tests + JaCoCo line coverage ≥ 0.23)는 `check` task로 통합되어 있고 CI backend job이 이를 호출합니다. 정적 분석/coverage가 영향받는 변경에서는 로컬에서도 함께 실행합니다. ArchUnit boundary는 별도 fast lane으로 분리되어 있습니다.
+PR-level quality gate(ktlint baseline + detekt baseline + unit tests + architecture tests + JaCoCo line coverage ≥ 0.23)는 `check` task로 통합되어 있고 wrapper와 CI backend job이 이를 호출합니다. 정적 분석/coverage가 영향받는 변경에서도 같은 wrapper를 실행합니다.
+
+Docker/Testcontainers 기반 MySQL, Flyway, API contract, query budget evidence가 필요하면 integration lane을 별도로 실행합니다.
 
 ```bash
-./server/gradlew -p server check
-./server/gradlew -p server architectureTest
-```
-
-개발 중 빠른 피드백이 필요하면 fast lane을 사용할 수 있습니다 (release baseline을 대체하지 않음).
-
-```bash
-./server/gradlew -p server unitTest
 ./server/gradlew -p server integrationTest
 ```
+
+개발 중에는 `unitTest`, `architectureTest`, 또는 `integrationTest --tests ...` focused lane을 사용할 수 있지만 PR-level wrapper를 대체하지 않습니다.
 
 For API, auth, BFF, or user-flow changes, also run:
 

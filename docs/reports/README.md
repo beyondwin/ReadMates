@@ -14,6 +14,7 @@
 
 | 작성일 | 파일 | 내용 |
 | --- | --- | --- |
+| 2026-07-11 | [`2026-07-11-release-readiness-history.md`](2026-07-11-release-readiness-history.md) | 2026-07-11 이전 release-readiness closeout evidence snapshot; 현재 절차는 development checklist를 사용 |
 | 2026-05-08 | [`2026-05-08-improvements-v1.md`](2026-05-08-improvements-v1.md) | v1.5.2 기준 1차 개선 분석 (보안 history, 거대 파일 분해, CI 가드) |
 | 2026-05-08 | [`2026-05-08-improvements-v2.md`](2026-05-08-improvements-v2.md) | v1.5.2 기준 2차 개선 분석 (도메인 모델 진화, 관측성, 운영 메트릭) |
 | 2026-05-08 | [`2026-05-08-implementation-plan-v1.md`](2026-05-08-implementation-plan-v1.md) | improvements-v1을 PR 단위 36개 태스크로 분해한 실행 계획 |

@@ -18,7 +18,13 @@
 ## 의존성 설치
 
 ```bash
-pnpm install --frozen-lockfile
+corepack pnpm install --frozen-lockfile
+```
+
+`corepack`이 `PATH`에 없으면 새 wrapper를 추가하지 않고 기존 fallback을 사용합니다.
+
+```bash
+npx --yes corepack@0.35.0 pnpm install --frozen-lockfile
 ```
 
 이 명령은 `front`, `design/system`, `design/docs` workspace 의존성을 루트 `pnpm-lock.yaml` 기준으로 설치합니다.

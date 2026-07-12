@@ -73,7 +73,7 @@
 
 **Trade-off:** route별 조회 조건이 복잡해집니다. Public surface, member archive, notes feed, upcoming sessions가 각각 다른 상태와 공개 범위를 사용하므로 서버 contract와 프론트엔드 모델을 같이 맞춰야 합니다.
 
-**관련 문서와 검증:** [architecture.md](architecture.md#세션-lifecycle과-공개-범위), `pnpm --dir front test`, `./server/gradlew -p server clean test`
+**관련 문서와 검증:** [architecture.md](architecture.md#세션-lifecycle과-공개-범위), `pnpm --dir front test`, `./scripts/server-ci-check.sh`, `./server/gradlew -p server integrationTest`
 
 ---
 

@@ -8,6 +8,12 @@
 
 `gitleaks` 미설치 fallback이나 current-tree historical finding처럼 검증 강도가 낮거나 해석이 필요한 경우에는 그 한계를 결과에 남깁니다. 이 스크립트 통과만으로 secret rotation, GitHub 공개 전환, branch protection 설정, production 배포가 끝났다고 판단하지 않습니다.
 
+## `check-agent-guidance.py`
+
+Agent router, active guide links, instruction-chain size, canonical server/Corepack commands, release-checklist size, Graphify local-state exclusion, and tracked-guidance public safety are checked with `python3 scripts/check-agent-guidance.py`. Run `python3 scripts/check-agent-guidance.py --self-test` for the temporary positive/negative fixtures.
+
+The checker stages only tracked guidance into a temporary directory and delegates content safety to `public-release-check.sh`; it does not maintain a second secret-pattern engine or inspect user-local Codex configuration.
+
 ## `server-ci-check.sh`
 
 서버 코드를 수정한 뒤 GitHub Actions Backend job과 같은 품질 게이트를 로컬에서 먼저 확인합니다.
@@ -19,9 +25,8 @@
 실행 순서는 다음과 같습니다.
 
 - `./server/gradlew -p server check`
-- `./server/gradlew -p server architectureTest`
 
-`check`는 ktlint baseline, detekt baseline, 서버 테스트, JaCoCo coverage를 함께 실행합니다. `architectureTest`는 CI처럼 별도 단계로 실행해 clean architecture boundary 회귀를 확인합니다.
+`check`는 `unitTest`, `architectureTest`, ktlint, detekt, JaCoCo verification을 함께 실행합니다. Docker/Testcontainers가 필요한 `integrationTest`는 의도적으로 별도 lane으로 유지합니다.
 
 스크립트 자체나 문서 변경만 빠르게 검증할 때는 dry-run으로 실행 명령만 확인할 수 있습니다.
 
@@ -39,6 +44,7 @@ READMATES_SERVER_CI_CHECK_DRY_RUN=true ./scripts/server-ci-check.sh
 
 기본 실행 범위는 다음과 같습니다.
 
+- `python3 scripts/check-agent-guidance.py`
 - `git diff --check`
 - `corepack pnpm --dir front lint`
 - `npx --yes corepack@0.35.0 pnpm --dir front lint` (`corepack`이 PATH에 없을 때)
@@ -46,7 +52,7 @@ READMATES_SERVER_CI_CHECK_DRY_RUN=true ./scripts/server-ci-check.sh
 - `corepack pnpm --dir front build`
 - `corepack pnpm --dir front zod:export-fixtures`
 - `git diff --exit-code front/tests/unit/__fixtures__/zod-schemas/`
-- `./server/gradlew -p server check`
+- `./scripts/server-ci-check.sh`
 
 `pre-push-check.sh`는 루트 `package.json`의 `packageManager`를 읽고 해당 pnpm을 Corepack으로 활성화한 뒤, 해석된 Corepack launcher로 frontend checks를 실행합니다. 로컬 Node 설치가 `corepack`을 PATH에 노출하지 않으면 스크립트는 `npx --yes corepack@0.35.0`을 사용합니다. 다른 major version의 globally installed pnpm으로 우회하지 않습니다.
 

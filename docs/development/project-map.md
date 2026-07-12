@@ -55,10 +55,23 @@
 | --- | --- | --- |
 | UI/frontend | `AGENTS.md` -> `front/AGENTS.md` -> `docs/agents/front.md` -> 필요 시 `docs/agents/design.md` | `pnpm --dir front lint`, `pnpm --dir front test`, `pnpm --dir front build` 중 영향 표면에 맞게 선택합니다. |
 | BFF/auth/API | `AGENTS.md` -> `docs/agents/front.md` -> `docs/agents/server.md` -> `docs/development/architecture.md` | BFF unit tests, server auth/API tests, 필요 시 `pnpm --dir front test:e2e`를 선택합니다. |
-| Server/persistence/migration | `AGENTS.md` -> `docs/agents/server.md` -> `docs/development/architecture.md` -> migration/test docs | focused server tests와 `./server/gradlew -p server clean test` 범위를 판단합니다. |
+| Server/persistence/migration | `AGENTS.md` -> `docs/agents/server.md` -> `docs/development/architecture.md` -> migration/test docs | `./scripts/server-ci-check.sh`와, MySQL/Flyway evidence가 필요할 때 별도 `integrationTest` 범위를 판단합니다. |
 | Deploy/public-release/security | `AGENTS.md` -> `docs/agents/docs.md` -> deploy docs -> scripts/workflows 직접 확인 | public release candidate checks와 targeted safety scans를 우선합니다. |
 | Docs-only | `AGENTS.md` -> `docs/agents/docs.md` -> 관련 active docs | `git diff --check -- <changed-docs>`와 targeted public-safety scan을 실행합니다. |
 | Release readiness/residual risk | `AGENTS.md` -> `docs/development/release-readiness-review.md` -> branch diff | 테스트 통과만으로 닫지 않고 CHANGELOG, CI/deploy, operator-facing change, public safety를 함께 봅니다. |
+
+## 계획에서 실행으로 넘길 때
+
+사용하는 planning 또는 execution tool과 무관하게 ReadMates handoff에는 다음을 남깁니다.
+
+- requirement와 task의 대응 관계;
+- task dependency와 예상 수정 파일;
+- frontend, BFF, server, migration, deploy, public-safety 중 실제 영향 표면;
+- focused acceptance command와 PR-level evidence;
+- non-goal, skipped validation, release-operation 후속 작업;
+- 병렬 작업의 file ownership과 shared DB/container/build-output 충돌 여부.
+
+Executor 이름, 개인 skill 경로, model, auth, MCP 상태는 plan source of truth로 기록하지 않습니다.
 
 ## 검증 선택표
 
@@ -67,12 +80,13 @@
 | 표면 | 대표 명령 |
 | --- | --- |
 | Frontend | `pnpm --dir front lint`, `pnpm --dir front test`, `pnpm --dir front build` |
-| Server | `./server/gradlew -p server clean test` |
+| Server PR-level | `./scripts/server-ci-check.sh` |
+| Server full Testcontainers | `./server/gradlew -p server integrationTest` |
 | E2E/auth/BFF | `pnpm --dir front test:e2e` |
 | Public release | `./scripts/build-public-release-candidate.sh`, `./scripts/public-release-check.sh .tmp/public-release-candidate` |
 | Docs-only | `git diff --check -- <changed-docs>` plus targeted safety scan |
 
-`pnpm` 실행이 lockfile, install, build, CI parity와 관련되면 repo 규칙에 따라 `npx --yes pnpm@10.33.0 --dir front ...` 형태를 사용하고 최종 응답에 정확한 명령을 적습니다.
+Lockfile, install, build, or CI-parity work uses the root `packageManager` through Corepack. Use `corepack pnpm ...`; if `corepack` is not on `PATH`, use `npx --yes corepack@0.35.0 pnpm ...` and report the exact fallback command.
 
 ## 멈춤 조건
 

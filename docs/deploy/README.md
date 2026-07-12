@@ -170,7 +170,8 @@ Cloudflare Pages:
 OCI backend Compose stack:
 
 ```bash
-./server/gradlew -p server clean test
+./scripts/server-ci-check.sh
+./server/gradlew -p server integrationTest
 READMATES_SERVER_IMAGE='ghcr.io/<owner>/<repo>/readmates-server:vX.Y.Z' VM_PUBLIC_IP='<vm-public-ip>' CADDY_SITE=api.example.com ./deploy/oci/05-deploy-compose-stack.sh
 ```
 
