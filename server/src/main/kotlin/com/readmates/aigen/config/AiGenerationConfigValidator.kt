@@ -46,8 +46,8 @@ class AiGenerationConfigValidator(
         check(grounded.reservedOutputTokens in 1..MAX_RESERVED_OUTPUT_TOKENS) {
             "readmates.aigen.grounded.reserved-output-tokens must be between 1 and $MAX_RESERVED_OUTPUT_TOKENS"
         }
-        check(grounded.safetyMarginTokens >= 0) {
-            "readmates.aigen.grounded.safety-margin-tokens must not be negative"
+        check(grounded.safetyMarginTokens > 0) {
+            "readmates.aigen.grounded.safety-margin-tokens must be positive"
         }
         grounded.capabilities.forEach { (model, capability) ->
             check(capability.contextWindowTokens > 0 && capability.maxOutputTokens > 0) {

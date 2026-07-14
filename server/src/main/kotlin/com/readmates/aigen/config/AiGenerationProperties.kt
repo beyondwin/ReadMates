@@ -26,6 +26,7 @@ data class AiGenerationProperties(
     data class Grounded(
         val reservedOutputTokens: Long = 16_384,
         val safetyMarginTokens: Long = 8_192,
+        // Explicit mode-specific allowlist: legacy pricing entries do not become grounded-capable implicitly.
         val capabilities: Map<String, Capability> = emptyMap(),
     )
 

@@ -59,6 +59,55 @@ class AiGenerationConfigValidatorTest {
     }
 
     @Test
+    fun `rejects zero safety margin`() {
+        val properties = validProperties().copy(grounded = validProperties().grounded.copy(safetyMarginTokens = 0))
+
+        assertThatThrownBy {
+            AiGenerationConfigValidator(true, queueBeanFactory(), properties).validate()
+        }.isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("safety-margin-tokens")
+    }
+
+    @Test
+    fun `rejects non-positive capability limits`() {
+        listOf(
+            AiGenerationProperties.Capability(0, 128_000, true),
+            AiGenerationProperties.Capability(400_000, -1, true),
+        ).forEach { invalidCapability ->
+            val base = validProperties()
+            val properties =
+                base.copy(
+                    grounded = base.grounded.copy(capabilities = mapOf("gpt-5.4-mini" to invalidCapability)),
+                )
+
+            assertThatThrownBy {
+                AiGenerationConfigValidator(true, queueBeanFactory(), properties).validate()
+            }.isInstanceOf(IllegalStateException::class.java)
+                .hasMessageContaining("limits must be positive")
+        }
+    }
+
+    @Test
+    fun `rejects reservation above model output limit`() {
+        val base = validProperties(reservedOutputTokens = 100)
+        val properties =
+            base.copy(
+                grounded =
+                    base.grounded.copy(
+                        capabilities =
+                            mapOf(
+                                "gpt-5.4-mini" to AiGenerationProperties.Capability(400_000, 99, true),
+                            ),
+                    ),
+            )
+
+        assertThatThrownBy {
+            AiGenerationConfigValidator(true, queueBeanFactory(), properties).validate()
+        }.isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("exceeds max-output-tokens")
+    }
+
+    @Test
     fun `rejects capability entry without separate pricing`() {
         val properties = validProperties().copy(pricing = emptyMap())
 
@@ -66,6 +115,28 @@ class AiGenerationConfigValidatorTest {
             AiGenerationConfigValidator(true, queueBeanFactory(), properties).validate()
         }.isInstanceOf(IllegalStateException::class.java)
             .hasMessageContaining("pricing")
+    }
+
+    @Test
+    fun `legacy priced model does not implicitly become grounded enabled`() {
+        val base = validProperties()
+        val properties =
+            base.copy(
+                enabledProviders = setOf("OPENAI"),
+                pricing =
+                    base.pricing +
+                        mapOf(
+                            "gpt-legacy" to
+                                AiGenerationProperties.Pricing(
+                                    BigDecimal.ONE,
+                                    outputPerMTokenUsd = BigDecimal.ONE,
+                                ),
+                        ),
+            )
+
+        assertThatCode {
+            AiGenerationConfigValidator(true, queueBeanFactory(), properties).validate()
+        }.doesNotThrowAnyException()
     }
 
     @Test

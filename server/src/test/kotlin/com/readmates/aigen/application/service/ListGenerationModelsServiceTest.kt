@@ -34,39 +34,52 @@ class ListGenerationModelsServiceTest {
         assertThat(models.single { it.isDefault }.id).isEqualTo(openAi.name)
     }
 
-    private fun service(defaultModel: String?) =
-        ListGenerationModelsService(
-            clubDefaultPort =
-                object : AiGenerationClubDefaultPort {
-                    override fun load(clubId: UUID): ClubDefault? =
-                        defaultModel?.let {
-                            ClubDefault(clubId, it, Instant.EPOCH, UUID.randomUUID())
-                        }
+    @Test
+    fun `excludes model when structured output capability is false`() {
+        val models = service(defaultModel = null, structuredUnsupported = setOf(gemini)).list(sessionId, clubId)
 
-                    override fun upsert(
-                        clubId: UUID,
-                        defaultModel: String,
-                        updatedBy: UUID,
-                    ) = Unit
-                },
-            modelCatalog =
-                object : ModelCatalog {
-                    override fun allowlisted(): List<ModelId> = listOf(claude, unverified, gemini, openAi)
+        assertThat(models.map { it.id }).containsExactly(openAi.name, claude.name)
+    }
 
-                    override fun pricing(id: ModelId): ModelPricing = unitPricing
+    private fun service(
+        defaultModel: String?,
+        structuredUnsupported: Set<ModelId> = emptySet(),
+    ) = ListGenerationModelsService(
+        clubDefaultPort =
+            object : AiGenerationClubDefaultPort {
+                override fun load(clubId: UUID): ClubDefault? =
+                    defaultModel?.let {
+                        ClubDefault(clubId, it, Instant.EPOCH, UUID.randomUUID())
+                    }
 
-                    override fun resolveAlias(alias: String): ModelId? = allowlisted().find { it.name == alias }
+                override fun upsert(
+                    clubId: UUID,
+                    defaultModel: String,
+                    updatedBy: UUID,
+                ) = Unit
+            },
+        modelCatalog =
+            object : ModelCatalog {
+                override fun allowlisted(): List<ModelId> = listOf(claude, unverified, gemini, openAi)
 
-                    override fun isEnabled(id: ModelId): Boolean = id in allowlisted()
-                },
-            capabilityCatalog =
-                ModelCapabilityCatalog { model ->
-                    if (model == unverified) null else ModelCapability(1_000_000, 64_000, true)
-                },
-            properties =
-                AiGenerationProperties(
-                    fallbackDefaultModel = openAi.name,
-                    grounded = AiGenerationProperties.Grounded(reservedOutputTokens = 16_384),
-                ),
-        )
+                override fun pricing(id: ModelId): ModelPricing = unitPricing
+
+                override fun resolveAlias(alias: String): ModelId? = allowlisted().find { it.name == alias }
+
+                override fun isEnabled(id: ModelId): Boolean = id in allowlisted()
+            },
+        capabilityCatalog =
+            ModelCapabilityCatalog { model ->
+                if (model == unverified) {
+                    null
+                } else {
+                    ModelCapability(1_000_000, 64_000, model !in structuredUnsupported)
+                }
+            },
+        properties =
+            AiGenerationProperties(
+                fallbackDefaultModel = openAi.name,
+                grounded = AiGenerationProperties.Grounded(reservedOutputTokens = 16_384),
+            ),
+    )
 }
