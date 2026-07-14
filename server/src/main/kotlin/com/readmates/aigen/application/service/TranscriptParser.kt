@@ -14,8 +14,9 @@ class TranscriptParser {
         rejectUnsupportedControls(normalized)
 
         val lines = normalized.split('\n')
-        val firstTurnLine = findFirstTurnLine(lines)
-        val turns = parseTurns(lines, firstTurnLine)
+        val preamble = findPreamble(lines)
+        val turns = parseTurns(lines, preamble.firstTurnLine)
+        validatePreambleParticipants(preamble.participantNames, turns)
         return ParsedTranscript(normalizedTranscript = normalized, turns = turns)
     }
 
@@ -24,18 +25,25 @@ class TranscriptParser {
             .removePrefix(BYTE_ORDER_MARK)
             .replace("\r\n", "\n")
             .replace('\r', '\n')
+            .split('\n')
+            .joinToString("\n") { line -> line.trimEnd() }
             .trim('\n')
 
     private fun rejectUnsupportedControls(transcript: String) {
-        if (transcript.any { character -> character != '\n' && character != '\t' && character.isISOControl() }) {
+        val unsafe =
+            transcript.codePoints().anyMatch { codePoint ->
+                (codePoint != NEWLINE && codePoint != TAB && Character.isISOControl(codePoint)) ||
+                    Character.getType(codePoint) == Character.FORMAT.toInt()
+            }
+        if (unsafe) {
             fail(ErrorCode.TRANSCRIPT_FORMAT_INVALID, "UNSUPPORTED_CONTROL")
         }
     }
 
-    private fun findFirstTurnLine(lines: List<String>): Int {
+    private fun findPreamble(lines: List<String>): Preamble {
         val first = lines.indexOfFirst { it.isNotBlank() }
         if (first < 0) fail(ErrorCode.TRANSCRIPT_EMPTY, "EMPTY")
-        if (TURN_HEADER.matches(lines[first])) return first
+        if (TURN_HEADER.matches(lines[first])) return Preamble(first, null)
 
         val title = lines[first]
         if (title.codePointCount() > MAX_TITLE_CODE_POINTS) {
@@ -47,9 +55,14 @@ class TranscriptParser {
         }
 
         var cursor = dateLine + 1
+        var participantNames: List<String>? = null
         if (cursor in lines.indices && lines[cursor].isNotBlank() && !TURN_HEADER.matches(lines[cursor])) {
             if (lines[cursor].codePointCount() > MAX_PARTICIPANT_CODE_POINTS) {
                 fail(ErrorCode.TRANSCRIPT_FORMAT_INVALID, "PARTICIPANTS_TOO_LONG", cursor + 1)
+            }
+            participantNames = lines[cursor].split(',').map(String::trim)
+            if (participantNames.any { it.isEmpty() || it.codePointCount() > MAX_TITLE_CODE_POINTS }) {
+                fail(ErrorCode.TRANSCRIPT_FORMAT_INVALID, "INVALID_PARTICIPANT_LIST", cursor + 1)
             }
             cursor += 1
         }
@@ -57,7 +70,18 @@ class TranscriptParser {
         if (cursor !in lines.indices || !TURN_HEADER.matches(lines[cursor])) {
             fail(ErrorCode.TRANSCRIPT_FORMAT_INVALID, "MISSING_FIRST_TURN", cursor.coerceAtMost(lines.size - 1) + 1)
         }
-        return cursor
+        return Preamble(cursor, participantNames)
+    }
+
+    private fun validatePreambleParticipants(
+        participantNames: List<String>?,
+        turns: List<ParsedTranscriptTurn>,
+    ) {
+        if (participantNames == null) return
+        val participants = participantNames.toSet()
+        if (turns.any { it.speakerName.trim() !in participants }) {
+            fail(ErrorCode.TRANSCRIPT_FORMAT_INVALID, "PARTICIPANT_LIST_MISMATCH")
+        }
     }
 
     private fun parseTurns(
@@ -139,7 +163,11 @@ class TranscriptParser {
     private fun String.codePointCount(): Int = codePointCount(0, length)
 
     private fun String.hasMeaningfulContent(): Boolean =
-        codePoints().anyMatch { codePoint -> !Character.isWhitespace(codePoint) && !Character.isISOControl(codePoint) }
+        codePoints().anyMatch { codePoint ->
+            !Character.isWhitespace(codePoint) &&
+                !Character.isISOControl(codePoint) &&
+                Character.getType(codePoint) != Character.FORMAT.toInt()
+        }
 
     private fun fail(
         code: ErrorCode,
@@ -155,6 +183,8 @@ class TranscriptParser {
         const val MAX_TIMESTAMP_SECONDS = 10_800
         const val MAX_TITLE_CODE_POINTS = 200
         const val MAX_PARTICIPANT_CODE_POINTS = 500
+        const val NEWLINE = '\n'.code
+        const val TAB = '\t'.code
         const val SPEAKER_GROUP = 1
         const val MINUTES_GROUP = 2
         const val SECONDS_GROUP = 3
@@ -173,5 +203,10 @@ class TranscriptParser {
     private data class TurnHeader(
         val speaker: String,
         val timestamp: Int,
+    )
+
+    private data class Preamble(
+        val firstTurnLine: Int,
+        val participantNames: List<String>?,
     )
 }

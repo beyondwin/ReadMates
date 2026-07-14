@@ -43,6 +43,14 @@ class TranscriptParserTest {
     }
 
     @Test
+    fun `normalizes trailing whitespace while preserving paragraph breaks`() {
+        val parsed = parser.parse("가람 00:00   \r\n첫 줄입니다.   \r\n\t\r\n둘째 줄입니다.\t")
+
+        assertThat(parsed.normalizedTranscript).isEqualTo("가람 00:00\n첫 줄입니다.\n\n둘째 줄입니다.")
+        assertThat(parsed.turns.single().text).isEqualTo("첫 줄입니다.\n\n둘째 줄입니다.")
+    }
+
+    @Test
     fun `accepts a turn at exactly three hours`() {
         val parsed = parser.parse("가람 180:00\n경계 시각의 공개 테스트 발언입니다.")
 
@@ -66,7 +74,9 @@ class TranscriptParserTest {
                 "가람 00:02\n첫 발언입니다.\n\n나래 00:01\n감소한 시각입니다.",
                 "${"제".repeat(201)}\n2026. 7. 14. 오후 7:30 · 58분 12초\n가람 00:00\n발언입니다.",
                 "모임\n2026. 7. 14. 오후 7:30 · 58분 12초\n${"가".repeat(501)}\n가람 00:00\n발언입니다.",
+                "모임\n2026. 7. 14. 오후 7:30 · 58분 12초\n임의 메모\n가람 00:00\n발언입니다.",
                 "가람 00:00\n\u0000\u0007",
+                "가람 00:00\n\u200B\u202E\uFEFF",
             )
 
         cases.forEach { transcript ->
