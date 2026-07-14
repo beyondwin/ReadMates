@@ -43,6 +43,7 @@ class AiGenerationOpsServiceTest {
             NoReceiptPersistence(),
             AiGenerationPostCommitCleanupService(jobStore, ReadCacheInvalidationPort.Noop()),
             clock,
+            fakeMetrics(),
         )
     private val service =
         AiGenerationOpsService(

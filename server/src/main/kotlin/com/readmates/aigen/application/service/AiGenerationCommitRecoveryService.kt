@@ -5,6 +5,7 @@ import com.readmates.aigen.application.port.out.AiGenerationCommitPersistencePor
 import com.readmates.aigen.application.port.out.AiGenerationJobStore
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Service
+import org.slf4j.LoggerFactory
 import java.time.Clock
 import java.util.UUID
 
@@ -21,6 +22,7 @@ class AiGenerationCommitRecoveryService(
     private val persistence: AiGenerationCommitPersistencePort,
     private val cleanupService: AiGenerationPostCommitCleanupService,
     private val clock: Clock,
+    private val metrics: AiGenerationMetrics,
 ) {
     @Suppress("ReturnCount")
     fun recover(jobId: UUID): AiGenerationCommitRecoveryResult {
@@ -51,6 +53,21 @@ class AiGenerationCommitRecoveryService(
 
     fun recoverBatch(limit: Int = 50): List<AiGenerationCommitRecoveryResult> =
         jobStore.loadCommitRecoveryJobs(limit).mapNotNull { record ->
-            runCatching { recover(record.jobId) }.getOrNull()
+            try {
+                recover(record.jobId)
+            } catch (@Suppress("TooGenericExceptionCaught") error: RuntimeException) {
+                metrics.recordCommitRecoveryFailure()
+                log.warn(
+                    "AI generation commit recovery failed jobId={} status={} errorType={}",
+                    record.jobId,
+                    record.status,
+                    error::class.simpleName ?: "RuntimeException",
+                )
+                null
+            }
         }
+
+    private companion object {
+        val log = LoggerFactory.getLogger(AiGenerationCommitRecoveryService::class.java)
+    }
 }

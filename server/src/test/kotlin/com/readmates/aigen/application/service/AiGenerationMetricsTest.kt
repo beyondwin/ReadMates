@@ -35,6 +35,17 @@ class AiGenerationMetricsTest {
     }
 
     @Test
+    fun `recordCommitRecoveryFailure increments a no-tag counter`() {
+        metrics.recordCommitRecoveryFailure()
+        metrics.recordCommitRecoveryFailure()
+
+        val counter = registry.find("readmates.aigen.commit.recovery.failures").counter()
+        assertThat(counter).isNotNull
+        assertThat(counter!!.count()).isEqualTo(2.0)
+        assertThat(counter.id.tags).isEmpty()
+    }
+
+    @Test
     fun `recordJobCompleted increments completed counter with status provider model kind tags`() {
         metrics.recordJobCompleted(JobStatus.SUCCEEDED, Provider.CLAUDE, model, JobKind.FULL)
 

@@ -40,6 +40,7 @@ import java.util.concurrent.atomic.AtomicReference
  * @see <a href="../../../../../../../../../../docs/development/aigen/aigen-spec.md">aigen-spec §11.1</a>
  */
 @Component
+@Suppress("TooManyFunctions")
 class AiGenerationMetrics(
     private val meterRegistry: MeterRegistry,
 ) {
@@ -53,6 +54,16 @@ class AiGenerationMetrics(
         Counter
             .builder(NAME_JOBS)
             .description("Total AI generation jobs accepted by the orchestrator")
+            .tags(aigenMeter())
+            .register(meterRegistry)
+            .increment()
+    }
+
+    /** Commit recovery failures — counter, no tags to keep cardinality bounded. */
+    fun recordCommitRecoveryFailure() {
+        Counter
+            .builder(NAME_COMMIT_RECOVERY_FAILURES)
+            .description("AI generation commit recovery attempts that failed")
             .tags(aigenMeter())
             .register(meterRegistry)
             .increment()
@@ -227,6 +238,7 @@ class AiGenerationMetrics(
 
     private companion object {
         const val NAME_JOBS = "readmates.aigen.jobs"
+        const val NAME_COMMIT_RECOVERY_FAILURES = "readmates.aigen.commit.recovery.failures"
         const val NAME_JOBS_COMPLETED = "readmates.aigen.jobs.completed"
         const val NAME_LATENCY = "readmates.aigen.latency"
         const val NAME_TOKENS = "readmates.aigen.tokens"

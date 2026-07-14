@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
 import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
 import java.util.UUID
 
 class AiGenerationErrorHandlerTest {
@@ -29,6 +30,7 @@ class AiGenerationErrorHandlerTest {
             )
 
         assertThat(response.statusCode).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY)
+        assertThat(response.headers.contentType).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON)
         assertThat(response.body!!.code).isEqualTo("TRANSCRIPT_SPEAKER_NOT_MEMBER")
         assertThat(response.body!!.invalidSpeakerLabels).containsExactly("없는이름", "화자 1")
         assertThat(response.body!!.detail).doesNotContain("membershipId", "clubId")
@@ -46,6 +48,7 @@ class AiGenerationErrorHandlerTest {
             )
 
         assertThat(response.statusCode).isEqualTo(expectedStatus)
+        assertThat(response.headers.contentType).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON)
         val body = response.body!!
         assertThat(body.code).isEqualTo(code.name)
         assertThat(body.status).isEqualTo(expectedStatus.value())
@@ -89,6 +92,7 @@ class AiGenerationErrorHandlerTest {
                 ),
             )
         assertThat(response.statusCode).isEqualTo(HttpStatus.CONFLICT)
+        assertThat(response.headers.contentType).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON)
         assertThat(response.body!!.code).isEqualTo("ILLEGAL_GENERATION_STATE")
         assertThat(response.body!!.type).isEqualTo("/problems/aigen/illegal-generation-state")
     }
@@ -100,6 +104,7 @@ class AiGenerationErrorHandlerTest {
                 AiGenerationJobPublishException("boom", RuntimeException("inner")),
             )
         assertThat(response.statusCode).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE)
+        assertThat(response.headers.contentType).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON)
         assertThat(response.body!!.code).isEqualTo(ErrorCode.QUEUE_UNAVAILABLE.name)
     }
 
