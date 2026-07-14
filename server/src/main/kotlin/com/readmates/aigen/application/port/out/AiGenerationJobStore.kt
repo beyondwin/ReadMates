@@ -1,5 +1,6 @@
 package com.readmates.aigen.application.port.out
 
+import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.GenerationItem
@@ -9,6 +10,7 @@ import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
+import com.readmates.aigen.application.model.ValidatedTranscriptTurn
 import java.math.BigDecimal
 import java.time.Instant
 import java.util.UUID
@@ -153,6 +155,8 @@ data class JobRecord(
      * to enforce the spec §9.2 hard cap.
      */
     val llmCallCount: Int = 0,
+    val pipelineMode: AiGenerationPipelineMode = AiGenerationPipelineMode.LEGACY,
+    val validatedTurns: List<ValidatedTranscriptTurn> = emptyList(),
 ) {
     /**
      * The [SessionMeta] for downstream generator / regenerator prompts and validator

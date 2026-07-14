@@ -40,6 +40,14 @@ data class ParsedTranscript(
     val turns: List<ParsedTranscriptTurn>,
 )
 
+data class ValidatedTranscriptTurn(
+    val turnId: String,
+    val speakerName: String,
+    val speakerMembershipId: UUID,
+    val startSeconds: Int,
+    val text: String,
+)
+
 data class TokenUsage(
     val inputTokens: Long,
     val cachedInputTokens: Long,
@@ -148,6 +156,8 @@ enum class ErrorCode {
     TRANSCRIPT_FORMAT_INVALID,
     TRANSCRIPT_EMPTY,
     TRANSCRIPT_DURATION_EXCEEDED,
+    TRANSCRIPT_SPEAKER_NOT_MEMBER,
+    TRANSCRIPT_SPEAKER_AMBIGUOUS,
 
     /**
      * The per-job hard cap on LLM calls (start + validation retry + regenerations) has

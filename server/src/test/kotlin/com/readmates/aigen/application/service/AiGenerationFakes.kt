@@ -268,11 +268,15 @@ internal class FakeCostGuard(
     var clubMonthly: BigDecimal = BigDecimal.ZERO,
 ) : GenerationCostGuard {
     val recorded: MutableList<Triple<UUID, UUID, BigDecimal>> = mutableListOf()
+    val checked: MutableList<Pair<UUID, UUID>> = mutableListOf()
 
     override fun checkBeforeCall(
         hostId: UUID,
         clubId: UUID,
-    ): GuardDecision = decision
+    ): GuardDecision {
+        checked += hostId to clubId
+        return decision
+    }
 
     override fun recordUsage(
         hostId: UUID,

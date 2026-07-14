@@ -18,6 +18,22 @@ import java.util.UUID
 class AiGenerationErrorHandlerTest {
     private val handler = AiGenerationErrorHandler()
 
+    @Test
+    fun `maps invalid transcript speakers to safe 422 labels only`() {
+        val response =
+            handler.handleInvalidTranscriptSpeakers(
+                AiGenerationException.InvalidTranscriptSpeakers(
+                    ErrorCode.TRANSCRIPT_SPEAKER_NOT_MEMBER,
+                    listOf("없는이름", "화자 1"),
+                ),
+            )
+
+        assertThat(response.statusCode).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY)
+        assertThat(response.body!!.code).isEqualTo("TRANSCRIPT_SPEAKER_NOT_MEMBER")
+        assertThat(response.body!!.invalidSpeakerLabels).containsExactly("없는이름", "화자 1")
+        assertThat(response.body!!.detail).doesNotContain("membershipId", "clubId")
+    }
+
     @ParameterizedTest
     @MethodSource("errorCodeToStatus")
     fun `maps each AiGenerationException Coded error code to expected HTTP status and problem detail`(
@@ -172,6 +188,8 @@ class AiGenerationErrorHandlerTest {
                 arrayOf(ErrorCode.TRANSCRIPT_FORMAT_INVALID, HttpStatus.UNPROCESSABLE_ENTITY),
                 arrayOf(ErrorCode.TRANSCRIPT_EMPTY, HttpStatus.UNPROCESSABLE_ENTITY),
                 arrayOf(ErrorCode.TRANSCRIPT_DURATION_EXCEEDED, HttpStatus.UNPROCESSABLE_ENTITY),
+                arrayOf(ErrorCode.TRANSCRIPT_SPEAKER_NOT_MEMBER, HttpStatus.UNPROCESSABLE_ENTITY),
+                arrayOf(ErrorCode.TRANSCRIPT_SPEAKER_AMBIGUOUS, HttpStatus.UNPROCESSABLE_ENTITY),
                 arrayOf(ErrorCode.UNKNOWN, HttpStatus.INTERNAL_SERVER_ERROR),
             )
     }

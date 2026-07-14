@@ -124,6 +124,7 @@ data class ProblemDetail(
     val status: Int,
     val detail: String?,
     val code: String,
+    val invalidSpeakerLabels: List<String>? = null,
 )
 
 private val MEETING_DATE_FORMATTER: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE

@@ -364,7 +364,7 @@ git commit -m "feat(aigen): parse supported transcript exports"
 - Produces HTTP 422 with `code=TRANSCRIPT_SPEAKER_NOT_MEMBER` or `TRANSCRIPT_SPEAKER_AMBIGUOUS` and `invalidSpeakerLabels` only.
 - Guarantees validation failure calls none of job store, queue, provider, or cost guard.
 
-- [ ] **Step 1: Write validator truth-table tests**
+- [x] **Step 1: Write validator truth-table tests**
 
 Cover the approved exact-match semantics:
 
@@ -384,7 +384,7 @@ fun `rejects duplicate active member names after normalization`() { /* ambiguity
 
 The adapter test must prove the SQL is scoped by `club_id` and active membership status and does not derive candidates from `session_participants`.
 
-- [ ] **Step 2: Write the no-side-effect orchestrator test**
+- [x] **Step 2: Write the no-side-effect orchestrator test**
 
 ```kotlin
 @Test
@@ -399,7 +399,7 @@ fun `invalid speaker rejects before Redis Kafka provider or cost work`() {
 }
 ```
 
-- [ ] **Step 3: Run focused tests and verify RED**
+- [x] **Step 3: Run focused tests and verify RED**
 
 ```bash
 ./server/gradlew -p server unitTest --tests '*TranscriptMembershipValidatorTest' --tests '*JdbcAiGenerationClubMembersAdapterTest' --tests '*AiGenerationOrchestratorTest'
@@ -407,7 +407,7 @@ fun `invalid speaker rejects before Redis Kafka provider or cost work`() {
 
 Expected: FAIL because membership lookup/validation and the new exception do not exist.
 
-- [ ] **Step 4: Implement member lookup and exact normalized matching**
+- [x] **Step 4: Implement member lookup and exact normalized matching**
 
 Use explicit active-member records:
 
@@ -428,7 +428,7 @@ data class ValidatedTranscriptTurn(
 
 Normalize with `Normalizer.normalize(value.trim(), Normalizer.Form.NFC)`. Reject empty normalized values and generic speaker patterns such as `화자`, `화자 1`, `speaker`, `speaker 1`, and `unknown` before lookup. Build the active-name multimap; any duplicate normalized key is an ambiguity error even when only one matching speaker occurs.
 
-- [ ] **Step 5: Wire parse and membership preflight before job creation**
+- [x] **Step 5: Wire parse and membership preflight before job creation**
 
 For `GROUNDED_WHOLE_TRANSCRIPT`, order `start` exactly as:
 
@@ -445,7 +445,7 @@ authorization/session metadata already obtained by controller
 
 Keep the legacy path behavior intact. Persist the validated speaker membership identity in the Redis turns payload, never in Kafka.
 
-- [ ] **Step 6: Add the typed safe 422 response**
+- [x] **Step 6: Add the typed safe 422 response**
 
 ```kotlin
 data class AiGenerationProblemResponse(
@@ -457,7 +457,7 @@ data class AiGenerationProblemResponse(
 
 Return a stable correction message asking the host to fix the transcript and upload again. De-duplicate labels in first-seen order. Do not return candidate member names, IDs, status, club details, or transcript excerpts.
 
-- [ ] **Step 7: Rerun focused tests and controller regression tests**
+- [x] **Step 7: Rerun focused tests and controller regression tests**
 
 ```bash
 ./server/gradlew -p server unitTest --tests '*TranscriptMembershipValidatorTest' --tests '*JdbcAiGenerationClubMembersAdapterTest' --tests '*AiGenerationOrchestratorTest' --tests '*AiGenerationControllerTest' --tests '*AiGenerationErrorHandlerTest'
@@ -465,7 +465,7 @@ Return a stable correction message asking the host to fix the transcript and upl
 
 Expected: PASS, including the zero-side-effect verification.
 
-- [ ] **Step 8: Commit the membership preflight slice**
+- [x] **Step 8: Commit the membership preflight slice**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/aigen server/src/test/kotlin/com/readmates/aigen

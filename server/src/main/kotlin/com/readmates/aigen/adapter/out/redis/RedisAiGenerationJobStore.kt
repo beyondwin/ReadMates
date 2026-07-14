@@ -1,5 +1,6 @@
 package com.readmates.aigen.adapter.out.redis
 
+import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
@@ -11,6 +12,7 @@ import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
+import com.readmates.aigen.application.model.ValidatedTranscriptTurn
 import com.readmates.aigen.application.port.out.AiGenerationJobStore
 import com.readmates.aigen.application.port.out.JobRecord
 import com.readmates.aigen.config.AiGenerationProperties
@@ -49,6 +51,7 @@ class RedisAiGenerationJobStore(
             val ttlSeconds = properties.job.redisTtl.seconds
             val hashKey = hashKey(job.jobId)
             val transcriptKey = transcriptKey(job.jobId)
+            val turnsKey = turnsKey(job.jobId)
             val resultKey = resultKey(job.jobId)
 
             val hash = toHash(job)
@@ -56,6 +59,16 @@ class RedisAiGenerationJobStore(
             redisTemplate.expire(hashKey, java.time.Duration.ofSeconds(ttlSeconds))
 
             redisTemplate.opsForValue().set(transcriptKey, job.transcript, java.time.Duration.ofSeconds(ttlSeconds))
+            if (job.pipelineMode == AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT) {
+                require(job.validatedTurns.isNotEmpty()) { "Grounded job requires validated transcript turns" }
+                redisTemplate
+                    .opsForValue()
+                    .set(
+                        turnsKey,
+                        objectMapper.writeValueAsString(job.validatedTurns),
+                        java.time.Duration.ofSeconds(ttlSeconds),
+                    )
+            }
 
             if (job.result != null) {
                 redisTemplate
@@ -77,6 +90,8 @@ class RedisAiGenerationJobStore(
             if (hash.isEmpty()) return@runCatching null
 
             val status = hash["status"]?.let { JobStatus.valueOf(it) }
+            val pipelineMode =
+                hash["pipelineMode"]?.let(AiGenerationPipelineMode::valueOf) ?: AiGenerationPipelineMode.LEGACY
             val transcript = redisTemplate.opsForValue().get(transcriptKey(jobId))
             if (transcript == null && status !in PAYLOAD_OPTIONAL_STATUSES) {
                 return@runCatching deleteStaleJob(jobId)
@@ -84,8 +99,20 @@ class RedisAiGenerationJobStore(
             val resultJson = redisTemplate.opsForValue().get(resultKey(jobId))
             val result =
                 resultJson?.let { objectMapper.readValue(it, SessionImportV1Snapshot::class.java) }
+            val turnsJson = redisTemplate.opsForValue().get(turnsKey(jobId))
+            if (
+                pipelineMode == AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT &&
+                turnsJson == null &&
+                status !in PAYLOAD_OPTIONAL_STATUSES
+            ) {
+                return@runCatching deleteStaleJob(jobId)
+            }
+            val validatedTurns: List<ValidatedTranscriptTurn> =
+                turnsJson
+                    ?.let { objectMapper.readValue(it, Array<ValidatedTranscriptTurn>::class.java).toList() }
+                    .orEmpty()
 
-            fromHash(jobId, hash, transcript.orEmpty(), result)
+            fromHash(jobId, hash, transcript.orEmpty(), result, validatedTurns)
         }.onFailure { recordFailure("load") }.getOrNull()
 
     override fun loadRecentForSession(
@@ -154,7 +181,7 @@ class RedisAiGenerationJobStore(
             val resultJson = objectMapper.writeValueAsString(result)
             redisTemplate.execute(
                 PATCH_RESULT_SCRIPT,
-                listOf(hashKey(jobId), resultKey(jobId), transcriptKey(jobId)),
+                listOf(hashKey(jobId), resultKey(jobId), transcriptKey(jobId), turnsKey(jobId)),
                 resultJson,
                 usage.inputTokens.toString(),
                 usage.cachedInputTokens.toString(),
@@ -185,7 +212,7 @@ class RedisAiGenerationJobStore(
             val newResultJson = objectMapper.writeValueAsString(value)
             redisTemplate.execute(
                 PATCH_RESULT_SCRIPT,
-                listOf(hashKey(jobId), resultKey(jobId), transcriptKey(jobId)),
+                listOf(hashKey(jobId), resultKey(jobId), transcriptKey(jobId), turnsKey(jobId)),
                 newResultJson,
                 usage.inputTokens.toString(),
                 usage.cachedInputTokens.toString(),
@@ -270,7 +297,7 @@ class RedisAiGenerationJobStore(
             val saved =
                 redisTemplate.execute(
                     SAVE_RESULT_IF_STATUS_SCRIPT,
-                    listOf(hashKey(jobId), resultKey(jobId), transcriptKey(jobId)),
+                    listOf(hashKey(jobId), resultKey(jobId), transcriptKey(jobId), turnsKey(jobId)),
                     expected.name,
                     resultJson,
                     usage.inputTokens.toString(),
@@ -293,7 +320,7 @@ class RedisAiGenerationJobStore(
         runCatching {
             redisTemplate.execute(
                 DELETE_TRANSIENT_PAYLOAD_SCRIPT,
-                listOf(transcriptKey(jobId), resultKey(jobId)),
+                listOf(transcriptKey(jobId), resultKey(jobId), turnsKey(jobId)),
             )
             refreshIndexes(jobId)
         }.onFailure { recordFailure("deleteTransientPayload") }.getOrThrow()
@@ -321,7 +348,7 @@ class RedisAiGenerationJobStore(
             val hash = redisTemplate.opsForHash<String, String>().entries(hashKey(jobId))
             redisTemplate.execute(
                 DELETE_JOB_SCRIPT,
-                listOf(hashKey(jobId), transcriptKey(jobId), resultKey(jobId)),
+                listOf(hashKey(jobId), transcriptKey(jobId), resultKey(jobId), turnsKey(jobId)),
             )
             removeFromIndexes(
                 jobId = jobId,
@@ -341,6 +368,7 @@ class RedisAiGenerationJobStore(
                 "modelProvider" to job.model.provider.name,
                 "modelName" to job.model.name,
                 "authorNameMode" to job.authorNameMode.name,
+                "pipelineMode" to job.pipelineMode.name,
                 "sessionMeta" to objectMapper.writeValueAsString(job.sessionMeta),
                 "status" to job.status.name,
                 "progressPct" to job.progressPct.toString(),
@@ -371,6 +399,7 @@ class RedisAiGenerationJobStore(
         hash: Map<String, String>,
         transcript: String,
         result: SessionImportV1Snapshot?,
+        validatedTurns: List<ValidatedTranscriptTurn>,
     ): JobRecord {
         val expiresAt =
             hash["expiresAt"]
@@ -419,16 +448,22 @@ class RedisAiGenerationJobStore(
             expiresAt = expiresAt,
             createdAt = createdAt,
             lastUpdatedAt = lastUpdatedAt,
-            actualModel =
-                hash["actualModelName"]?.let { name ->
-                    ModelId(
-                        provider = Provider.valueOf(hash.getValue("actualModelProvider")),
-                        name = name,
-                    )
-                },
+            actualModel = readActualModel(hash),
             llmCallCount = hash["llmCallCount"]?.toIntOrNull() ?: 0,
+            pipelineMode =
+                hash["pipelineMode"]?.let(AiGenerationPipelineMode::valueOf)
+                    ?: AiGenerationPipelineMode.LEGACY,
+            validatedTurns = validatedTurns,
         )
     }
+
+    private fun readActualModel(hash: Map<String, String>): ModelId? =
+        hash["actualModelName"]?.let { name ->
+            ModelId(
+                provider = Provider.valueOf(hash.getValue("actualModelProvider")),
+                name = name,
+            )
+        }
 
     private fun refreshIndexes(jobId: UUID) {
         val record = load(jobId) ?: return
@@ -497,6 +532,8 @@ class RedisAiGenerationJobStore(
 
     private fun transcriptKey(jobId: UUID) = "aigen:job:$jobId:transcript"
 
+    private fun turnsKey(jobId: UUID) = "aigen:job:$jobId:turns"
+
     private fun resultKey(jobId: UUID) = "aigen:job:$jobId:result"
 
     private fun sessionRecentKey(sessionId: UUID) = "aigen:session:$sessionId:jobs"
@@ -553,7 +590,7 @@ class RedisAiGenerationJobStore(
             )
 
         /**
-         * KEYS[1]=hashKey, KEYS[2]=resultKey, KEYS[3]=transcriptKey
+         * KEYS[1]=hashKey, KEYS[2]=resultKey, KEYS[3]=transcriptKey, KEYS[4]=turnsKey
          * ARGV[1]=expected status, ARGV[2]=resultJson, ARGV[3..5]=token deltas,
          * ARGV[6]=cost delta, ARGV[7]=lastUpdatedAt, ARGV[8]=ttlSeconds,
          * ARGV[9]=actualModelProvider or "", ARGV[10]=actualModelName or "".
@@ -578,6 +615,9 @@ class RedisAiGenerationJobStore(
                 if redis.call('EXISTS', KEYS[3]) == 1 then
                   redis.call('EXPIRE', KEYS[3], ARGV[8])
                 end
+                if redis.call('EXISTS', KEYS[4]) == 1 then
+                  redis.call('EXPIRE', KEYS[4], ARGV[8])
+                end
                 if ARGV[9] ~= '' then
                   redis.call('HSET', KEYS[1], 'actualModelProvider', ARGV[9])
                   redis.call('HSET', KEYS[1], 'actualModelName', ARGV[10])
@@ -587,17 +627,17 @@ class RedisAiGenerationJobStore(
                 Long::class.java,
             )
 
-        /** KEYS[1]=transcriptKey, KEYS[2]=resultKey; deletes transient payload only. */
+        /** KEYS[1]=transcriptKey, KEYS[2]=resultKey, KEYS[3]=turnsKey; deletes transient payload only. */
         val DELETE_TRANSIENT_PAYLOAD_SCRIPT: DefaultRedisScript<Long> =
             DefaultRedisScript(
                 """
-                return redis.call('DEL', KEYS[1], KEYS[2])
+                return redis.call('DEL', KEYS[1], KEYS[2], KEYS[3])
                 """.trimIndent(),
                 Long::class.java,
             )
 
         /**
-         * KEYS[1]=hashKey, KEYS[2]=resultKey, KEYS[3]=transcriptKey
+         * KEYS[1]=hashKey, KEYS[2]=resultKey, KEYS[3]=transcriptKey, KEYS[4]=turnsKey
          * ARGV[1]=resultJson, ARGV[2..4]=tokens (input,cached,output) delta,
          * ARGV[5]=cost delta (decimal string), ARGV[6]=lastUpdatedAt, ARGV[7]=ttlSeconds
          *
@@ -618,16 +658,19 @@ class RedisAiGenerationJobStore(
                 if redis.call('EXISTS', KEYS[3]) == 1 then
                   redis.call('EXPIRE', KEYS[3], ARGV[7])
                 end
+                if redis.call('EXISTS', KEYS[4]) == 1 then
+                  redis.call('EXPIRE', KEYS[4], ARGV[7])
+                end
                 return nil
                 """.trimIndent(),
                 Void::class.java,
             )
 
-        /** KEYS[1]=hash, KEYS[2]=transcript, KEYS[3]=result; deletes all three atomically. */
+        /** KEYS[1]=hash, KEYS[2]=transcript, KEYS[3]=result, KEYS[4]=turns; deletes all atomically. */
         val DELETE_JOB_SCRIPT: DefaultRedisScript<Long> =
             DefaultRedisScript(
                 """
-                return redis.call('DEL', KEYS[1], KEYS[2], KEYS[3])
+                return redis.call('DEL', KEYS[1], KEYS[2], KEYS[3], KEYS[4])
                 """.trimIndent(),
                 Long::class.java,
             )

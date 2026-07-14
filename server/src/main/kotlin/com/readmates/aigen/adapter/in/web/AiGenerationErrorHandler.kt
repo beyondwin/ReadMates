@@ -32,6 +32,16 @@ private const val PROBLEM_AI_OPS_ACTION = "/problems/aigen/ops-action"
 @Order(0)
 @Suppress("TooManyFunctions")
 class AiGenerationErrorHandler {
+    @ExceptionHandler(AiGenerationException.InvalidTranscriptSpeakers::class)
+    @Suppress("MaxLineLength")
+    fun handleInvalidTranscriptSpeakers(error: AiGenerationException.InvalidTranscriptSpeakers): ResponseEntity<ProblemDetail> =
+        problem(
+            status = HttpStatus.UNPROCESSABLE_ENTITY,
+            code = error.code.name,
+            detail = "대본의 화자명을 활성 회원 이름과 맞춘 뒤 다시 업로드하세요.",
+            invalidSpeakerLabels = error.invalidSpeakerLabels,
+        )
+
     @ExceptionHandler(AiGenerationException.Coded::class)
     fun handleCoded(error: AiGenerationException.Coded): ResponseEntity<ProblemDetail> {
         val status = error.code.toHttpStatus()
@@ -126,6 +136,7 @@ class AiGenerationErrorHandler {
         code: String,
         detail: String?,
         type: String = "about:blank",
+        invalidSpeakerLabels: List<String>? = null,
     ): ResponseEntity<ProblemDetail> =
         ResponseEntity
             .status(status)
@@ -136,6 +147,7 @@ class AiGenerationErrorHandler {
                     status = status.value(),
                     detail = detail,
                     code = code,
+                    invalidSpeakerLabels = invalidSpeakerLabels,
                 ),
             )
 }
@@ -161,6 +173,8 @@ internal fun ErrorCode.toHttpStatus(): HttpStatus =
         ErrorCode.TRANSCRIPT_FORMAT_INVALID,
         ErrorCode.TRANSCRIPT_EMPTY,
         ErrorCode.TRANSCRIPT_DURATION_EXCEEDED,
+        ErrorCode.TRANSCRIPT_SPEAKER_NOT_MEMBER,
+        ErrorCode.TRANSCRIPT_SPEAKER_AMBIGUOUS,
         -> HttpStatus.UNPROCESSABLE_ENTITY
         ErrorCode.UNKNOWN -> HttpStatus.INTERNAL_SERVER_ERROR
     }

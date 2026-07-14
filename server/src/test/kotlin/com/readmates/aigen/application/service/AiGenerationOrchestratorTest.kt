@@ -2,6 +2,7 @@ package com.readmates.aigen.application.service
 
 import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
 import com.readmates.aigen.application.AiGenerationException
+import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
@@ -11,10 +12,12 @@ import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.`in`.JobNotFoundException
 import com.readmates.aigen.application.port.`in`.JobSessionMismatchException
 import com.readmates.aigen.application.port.`in`.StartGenerationCommand
+import com.readmates.aigen.application.port.out.ActiveClubMember
 import com.readmates.aigen.application.port.out.AuditKind
 import com.readmates.aigen.application.port.out.AuditStatus
 import com.readmates.aigen.application.port.out.GuardDecision
 import com.readmates.aigen.application.port.out.JobKind
+import com.readmates.aigen.application.port.out.LoadAiGenerationClubMembersPort
 import com.readmates.shared.security.Sha256
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -23,6 +26,42 @@ import java.math.BigDecimal
 import java.util.UUID
 
 class AiGenerationOrchestratorTest {
+    @Test
+    fun `invalid grounded speaker rejects before Redis Kafka cost or audit work`() {
+        val ctx =
+            TestContext(
+                pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
+                activeMembers = emptyList(),
+            )
+
+        assertThatThrownBy {
+            ctx.orchestrator.start(ctx.commandWithSpeaker("외부인"))
+        }.isInstanceOf(AiGenerationException.InvalidTranscriptSpeakers::class.java)
+
+        assertThat(ctx.jobStore.records).isEmpty()
+        assertThat(ctx.queue.published).isEmpty()
+        assertThat(ctx.costGuard.checked).isEmpty()
+        assertThat(ctx.auditPort.entries).isEmpty()
+    }
+
+    @Test
+    fun `grounded start binds membership identity before saving job`() {
+        val membershipId = UUID.randomUUID()
+        val ctx =
+            TestContext(
+                pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
+                activeMembers = listOf(ActiveClubMember(membershipId, "가람")),
+            )
+
+        ctx.orchestrator.start(ctx.commandWithSpeaker("가람"))
+
+        val savedJobs = ctx.jobStore.records.values
+        val savedJob = savedJobs.single()
+        val savedTurn = savedJob.validatedTurns.single()
+        assertThat(savedTurn.speakerMembershipId).isEqualTo(membershipId)
+        assertThat(savedTurn.speakerName).isEqualTo("가람")
+    }
+
     @Test
     fun `start uses club default when command omits model`() {
         val ctx = TestContext()
@@ -377,6 +416,8 @@ class AiGenerationOrchestratorTest {
     private class TestContext(
         modelEnabled: Set<com.readmates.aigen.application.model.ModelId> =
             setOf(AiGenerationTestFixtures.CLAUDE_MODEL, AiGenerationTestFixtures.CLAUDE_FALLBACK),
+        pipelineMode: AiGenerationPipelineMode = AiGenerationPipelineMode.LEGACY,
+        activeMembers: List<ActiveClubMember> = emptyList(),
     ) {
         val sessionId: UUID = UUID.randomUUID()
         val clubId: UUID = UUID.randomUUID()
@@ -388,8 +429,9 @@ class AiGenerationOrchestratorTest {
         val costGuard = FakeCostGuard()
         val clubDefaults = FakeClubDefaultPort()
         val modelCatalog = AiGenerationTestFixtures.defaultModelCatalog(enabled = modelEnabled)
-        val properties = AiGenerationTestFixtures.defaultProperties()
+        val properties = AiGenerationTestFixtures.defaultProperties().copy(pipelineMode = pipelineMode)
         val clock = FakeClock(AiGenerationTestFixtures.NOW)
+        val memberDirectory = LoadAiGenerationClubMembersPort { activeMembers }
 
         val orchestrator =
             AiGenerationOrchestrator(
@@ -403,6 +445,12 @@ class AiGenerationOrchestratorTest {
                 clock = clock,
                 metrics = fakeMetrics(),
                 transitionPolicy = AiGenerationJobTransitionPolicy(),
+                groundedPreflightService =
+                    GroundedTranscriptPreflightService(
+                        TranscriptParser(),
+                        memberDirectory,
+                        TranscriptMembershipValidator(),
+                    ),
             )
 
         fun command(model: String?): StartGenerationCommand =
@@ -415,6 +463,11 @@ class AiGenerationOrchestratorTest {
                 authorNameMode = AuthorNameMode.REAL,
                 instructions = null,
                 sessionMeta = AiGenerationTestFixtures.sessionMeta(sessionId = sessionId, clubId = clubId),
+            )
+
+        fun commandWithSpeaker(speaker: String): StartGenerationCommand =
+            command(model = AiGenerationTestFixtures.CLAUDE_MODEL.name).copy(
+                transcript = "$speaker 00:00\n공개 테스트 발언입니다.",
             )
     }
 }

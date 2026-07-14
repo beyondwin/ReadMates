@@ -2,8 +2,10 @@ package com.readmates.aigen.adapter.`in`.web
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.AiGenerationActor
 import com.readmates.aigen.application.model.AuthorNameMode
+import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
@@ -290,6 +292,23 @@ class AiGenerationControllerTest {
     }
 
     @Test
+    fun `POST jobs returns typed invalid speaker labels without member candidates`() {
+        startUseCase.error =
+            AiGenerationException.InvalidTranscriptSpeakers(
+                ErrorCode.TRANSCRIPT_SPEAKER_NOT_MEMBER,
+                listOf("없는이름"),
+            )
+
+        postTranscript("public-fixture.txt", "없는이름 00:00\n공개 테스트 발언입니다.".toByteArray()).andExpect {
+            status { isUnprocessableEntity() }
+            jsonPath("$.code") { value("TRANSCRIPT_SPEAKER_NOT_MEMBER") }
+            jsonPath("$.invalidSpeakerLabels[0]") { value("없는이름") }
+            jsonPath("$.membershipId") { doesNotExist() }
+            jsonPath("$.candidateMembers") { doesNotExist() }
+        }
+    }
+
+    @Test
     fun `GET jobs jobId returns JobStatusResponse JSON`() {
         getJobUseCase.view = sampleJobView()
 
@@ -542,9 +561,11 @@ class AiGenerationControllerTest {
                 expiresAt = Instant.EPOCH,
             )
         val commands = mutableListOf<StartGenerationCommand>()
+        var error: RuntimeException? = null
 
         override fun start(command: StartGenerationCommand): StartGenerationResult {
             commands += command
+            error?.let { throw it }
             return result
         }
     }

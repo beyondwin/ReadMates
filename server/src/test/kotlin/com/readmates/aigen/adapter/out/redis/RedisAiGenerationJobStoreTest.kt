@@ -1,6 +1,7 @@
 package com.readmates.aigen.adapter.out.redis
 
 import com.readmates.aigen.application.model.AuthorNameMode
+import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.GenerationItem
@@ -11,6 +12,7 @@ import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
+import com.readmates.aigen.application.model.ValidatedTranscriptTurn
 import com.readmates.aigen.application.port.out.AiGenerationJobQueue
 import com.readmates.aigen.application.port.out.AiGenerationJobStore
 import com.readmates.aigen.application.port.out.JobRecord
@@ -50,6 +52,34 @@ class RedisAiGenerationJobStoreTest(
     @Suppress("UnusedPrivateProperty")
     @MockitoBean
     private lateinit var jobQueue: AiGenerationJobQueue
+
+    @Test
+    fun `grounded save persists validated membership turns in dedicated TTL payload`() {
+        val membershipId = UUID.randomUUID()
+        val turn =
+            ValidatedTranscriptTurn(
+                turnId = "t000001",
+                speakerName = "가람",
+                speakerMembershipId = membershipId,
+                startSeconds = 0,
+                text = "공개 테스트 발언입니다.",
+            )
+        val record =
+            newRecord(
+                pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
+                validatedTurns = listOf(turn),
+            )
+
+        store.save(record)
+
+        val turnsKey = "aigen:job:${record.jobId}:turns"
+        assertThat(redisTemplate.hasKey(turnsKey)).isTrue()
+        assertThat(redisTemplate.getExpire(turnsKey, TimeUnit.SECONDS))
+            .isBetween(properties.job.redisTtl.seconds - 30, properties.job.redisTtl.seconds + 30)
+        val loaded = store.load(record.jobId)!!
+        assertThat(loaded.pipelineMode).isEqualTo(AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT)
+        assertThat(loaded.validatedTurns).containsExactly(turn)
+    }
 
     @Test
     fun `save stores hash, transcript, result keys with 6h TTL`() {
@@ -468,6 +498,8 @@ class RedisAiGenerationJobStoreTest(
         stage: JobStage? = JobStage.QUEUED,
         createdAt: Instant = Instant.now(),
         lastUpdatedAt: Instant = createdAt,
+        pipelineMode: AiGenerationPipelineMode = AiGenerationPipelineMode.LEGACY,
+        validatedTurns: List<ValidatedTranscriptTurn> = emptyList(),
     ): JobRecord {
         val ttl = properties.job.redisTtl
         val sessionId = UUID.randomUUID()
@@ -502,6 +534,8 @@ class RedisAiGenerationJobStoreTest(
             expiresAt = Instant.now().plusSeconds(ttl.seconds),
             createdAt = createdAt,
             lastUpdatedAt = lastUpdatedAt,
+            pipelineMode = pipelineMode,
+            validatedTurns = validatedTurns,
         )
     }
 

@@ -60,6 +60,12 @@ sealed class AiGenerationException(
         val code: String,
     ) : AiGenerationException("AI Ops action for job $jobId failed with $code")
 
+    /** Safe upload-preflight failure. Labels are returned only to the authenticated host and never logged. */
+    class InvalidTranscriptSpeakers(
+        val code: ErrorCode,
+        val invalidSpeakerLabels: List<String>,
+    ) : AiGenerationException("Transcript membership validation failed")
+
     /**
      * Generic code-bearing variant — replaces the legacy adapter-package
      * `AiGenerationException(code, message)` for cap denials, schema parse errors and

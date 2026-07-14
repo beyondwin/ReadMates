@@ -2,6 +2,7 @@ package com.readmates.aigen.application.service
 
 import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
 import com.readmates.aigen.application.AiGenerationException
+import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.JobStage
@@ -37,6 +38,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
 import java.time.Clock
+import java.time.Instant
 import java.util.UUID
 
 /**
@@ -65,11 +67,18 @@ class AiGenerationOrchestrator(
     private val clock: Clock,
     private val metrics: AiGenerationMetrics,
     private val transitionPolicy: AiGenerationJobTransitionPolicy,
+    private val groundedPreflightService: GroundedTranscriptPreflightService,
 ) : StartGenerationUseCase,
     GetJobUseCase,
     GetRecentSessionGenerationJobUseCase,
     CancelGenerationUseCase {
     override fun start(command: StartGenerationCommand): StartGenerationResult {
+        val groundedPreflight =
+            if (properties.pipelineMode == AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT) {
+                groundedPreflightService.preflight(command.clubId, command.transcript)
+            } else {
+                null
+            }
         metrics.recordJobStarted()
         val modelId =
             resolveModelId(command.model, command.clubId)
@@ -88,26 +97,13 @@ class AiGenerationOrchestrator(
         val jobId = UUID.randomUUID()
         val expiresAt = now.plus(properties.job.redisTtl)
         val record =
-            JobRecord(
-                jobId = jobId,
-                sessionId = command.sessionId,
-                clubId = command.clubId,
-                hostUserId = command.hostUserId,
-                model = modelId,
-                authorNameMode = command.authorNameMode,
-                instructions = command.instructions,
-                transcript = command.transcript,
-                sessionMeta = command.sessionMeta.copy(authorNameMode = command.authorNameMode),
-                status = JobStatus.PENDING,
-                stage = JobStage.QUEUED,
-                progressPct = 0,
-                result = null,
-                error = null,
-                tokens = TokenUsage(0, 0, 0),
-                costAccumulatedUsd = BigDecimal.ZERO,
-                expiresAt = expiresAt,
-                createdAt = now,
-                lastUpdatedAt = now,
+            command.toJobRecord(
+                jobId,
+                modelId,
+                groundedPreflight,
+                properties.pipelineMode,
+                now,
+                expiresAt,
             )
         jobStore.save(record)
         try {
@@ -375,3 +371,36 @@ class AiGenerationOrchestrator(
             )
     }
 }
+
+@Suppress("LongParameterList")
+private fun StartGenerationCommand.toJobRecord(
+    jobId: UUID,
+    modelId: ModelId,
+    groundedPreflight: GroundedTranscriptPreflight?,
+    pipelineMode: AiGenerationPipelineMode,
+    now: Instant,
+    expiresAt: Instant,
+): JobRecord =
+    JobRecord(
+        jobId = jobId,
+        sessionId = sessionId,
+        clubId = clubId,
+        hostUserId = hostUserId,
+        model = modelId,
+        authorNameMode = authorNameMode,
+        instructions = instructions,
+        transcript = groundedPreflight?.normalizedTranscript ?: transcript,
+        sessionMeta = sessionMeta.copy(authorNameMode = authorNameMode),
+        status = JobStatus.PENDING,
+        stage = JobStage.QUEUED,
+        progressPct = 0,
+        result = null,
+        error = null,
+        tokens = TokenUsage(0, 0, 0),
+        costAccumulatedUsd = BigDecimal.ZERO,
+        expiresAt = expiresAt,
+        createdAt = now,
+        lastUpdatedAt = now,
+        pipelineMode = pipelineMode,
+        validatedTurns = groundedPreflight?.validatedTurns.orEmpty(),
+    )
