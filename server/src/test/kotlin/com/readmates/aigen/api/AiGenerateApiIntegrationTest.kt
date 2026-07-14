@@ -342,6 +342,15 @@ class AiGenerateApiIntegrationTest(
                 jsonPath("$.groundingStatus") { value("VALID") }
                 jsonPath("$.result.summary") { value("Public-safe grounded summary.") }
                 jsonPath("$.evidence[0].turnId") { value("t000001") }
+                jsonPath("$.evidence[0].targetId") { value("r1:SUMMARY:0") }
+                jsonPath("$.sectionReviewStatuses.SUMMARY") { value("PENDING_REVIEW") }
+                jsonPath("$.sectionReviewStatuses.HIGHLIGHTS") { value("PENDING_REVIEW") }
+                jsonPath("$.sectionReviewStatuses.ONE_LINE_REVIEWS") { value("PENDING_REVIEW") }
+                jsonPath("$.sectionReviewStatuses.FEEDBACK_DOCUMENT") { value("PENDING_REVIEW") }
+                jsonPath("$.transcript") { doesNotExist() }
+                jsonPath("$.validatedTurns") { doesNotExist() }
+                jsonPath("$.groundedDraft") { doesNotExist() }
+                jsonPath("$.instructions") { doesNotExist() }
             }
 
         mockMvc

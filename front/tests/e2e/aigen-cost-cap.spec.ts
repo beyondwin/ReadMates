@@ -12,7 +12,7 @@ import type {
   AiProblemDetail,
   ClubAiDefaultResponse,
 } from "@/features/host/aigen/api/aigen-contracts";
-import { hostSessionDetailResponse, routeHostEditorShell } from "./aigen-test-fixtures";
+import { groundedTranscript, hostSessionDetailResponse, routeHostEditorShell } from "./aigen-test-fixtures";
 
 const SESSION_ID = "11111111-1111-1111-1111-111111111111";
 const CLUB_SLUG = "club-a";
@@ -71,7 +71,7 @@ test("cost cap exceeded on start surfaces an explanatory message and stays on ID
   await page.getByLabel(/대본 파일/).setInputFiles({
     name: "transcript.txt",
     mimeType: "text/plain",
-    buffer: Buffer.from("hi"),
+    buffer: Buffer.from(groundedTranscript([{ speaker: "공개 회원 A", at: "00:00", text: "합성 테스트 발언입니다." }])),
   });
   await page.getByRole("button", { name: /생성 시작/ }).click();
 

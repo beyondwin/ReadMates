@@ -1,4 +1,5 @@
 import type { Page, Route } from "@playwright/test";
+import type { AiGenerationJobResponse, SessionImportV1 } from "@/features/host/aigen/api/aigen-contracts";
 import type { HostSessionDetailResponse } from "@/features/host/api/host-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 
@@ -70,6 +71,80 @@ export async function routeHostEditorShell(page: Page, clubSlug: string): Promis
   await page.route("**/api/bff/api/host/sessions/*/ai-generate/jobs/recent**", async (route) => {
     await route.fulfill({ status: 204 });
   });
+
+  await page.route("**/api/bff/api/host/sessions/*/ai-generate/models**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        models: [{ id: "claude-sonnet-4-6", provider: "CLAUDE", isDefault: true }],
+      }),
+    });
+  });
+}
+
+export function groundedTranscript(
+  turns: Array<{ speaker: string; at: string; text: string }>,
+): string {
+  return [
+    "공개 테스트 독서모임",
+    "2026. 7. 14. 오후 7:30 · 42분 10초",
+    [...new Set(turns.map((turn) => turn.speaker))].join(", "),
+    "",
+    ...turns.flatMap((turn) => [
+      `${turn.speaker} ${turn.at}`,
+      turn.text,
+      "",
+    ]),
+  ].join("\n");
+}
+
+export function groundedSnapshot(summary = "공개 합성 요약입니다."): SessionImportV1 {
+  return {
+    format: "readmates.session.v1",
+    sessionNumber: 7,
+    bookTitle: "공개 테스트 책",
+    meetingDate: "2026-07-14",
+    summary,
+    highlights: [{ authorName: "공개 회원 A", text: "공개 합성 하이라이트입니다." }],
+    oneLineReviews: [{ authorName: "공개 회원 B", text: "공개 합성 한줄평입니다." }],
+    feedbackDocumentFileName: "session-7-feedback.md",
+    feedbackDocumentMarkdown: "# 공개 합성 피드백\n\n안전한 테스트 내용입니다.",
+  };
+}
+
+export function groundedSucceededJob(jobId: string, revision = 1): AiGenerationJobResponse {
+  const target = (section: "SUMMARY" | "HIGHLIGHTS" | "ONE_LINE_REVIEWS" | "FEEDBACK_DOCUMENT") => ({
+    section,
+    targetId: `r${revision}:${section}:0`,
+    ordinal: 0,
+    turnId: section === "ONE_LINE_REVIEWS" ? "turn-2" : "turn-1",
+    startSeconds: section === "ONE_LINE_REVIEWS" ? 45 : 0,
+    speakerName: section === "ONE_LINE_REVIEWS" ? "공개 회원 B" : "공개 회원 A",
+    excerpt: "공개 합성 근거 발언입니다.",
+    truncated: section === "SUMMARY",
+  });
+  return {
+    jobId,
+    status: "SUCCEEDED",
+    stage: "READY",
+    progressPct: 100,
+    model: "claude-sonnet-4-6",
+    result: groundedSnapshot(),
+    error: null,
+    tokens: { input: 1000, cachedInput: 0, output: 500 },
+    costEstimateUsd: "0.12",
+    warnings: [],
+    revision,
+    groundingStatus: "VALID",
+    evidence: [target("SUMMARY"), target("HIGHLIGHTS"), target("ONE_LINE_REVIEWS"), target("FEEDBACK_DOCUMENT")],
+    sectionReviewStatuses: {
+      SUMMARY: "PENDING_REVIEW",
+      HIGHLIGHTS: "PENDING_REVIEW",
+      ONE_LINE_REVIEWS: "PENDING_REVIEW",
+      FEEDBACK_DOCUMENT: "PENDING_REVIEW",
+    },
+  };
 }
 
 export function hostSessionDetailResponse(sessionId: string): HostSessionDetailResponse {

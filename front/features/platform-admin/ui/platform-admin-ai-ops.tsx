@@ -33,6 +33,8 @@ export type PlatformAdminAiOpsJobView = {
   lastUpdatedAt: string;
   expiresAt: string | null;
   staleCandidate: boolean;
+  revision?: number | null;
+  cleanupPending?: boolean;
   availableActions: string[];
 };
 
@@ -159,6 +161,11 @@ export function PlatformAdminAiOps({
                 <p className="tiny muted">
                   {job.provider} / {job.model} · ${job.costEstimateUsd} · {formatTimestamp(job.lastUpdatedAt)}
                 </p>
+                {job.revision != null ? (
+                  <p className="tiny muted">
+                    revision {job.revision} · {job.cleanupPending ? "cleanup pending" : "cleanup complete"}
+                  </p>
+                ) : null}
                 {job.errorCode ? (
                   <p className="platform-admin-ai-ops__job-error">
                     {job.errorCode}: {job.safeErrorMessage ?? "safe error"}

@@ -9,6 +9,7 @@ import com.readmates.aigen.application.service.AiGenerationMetrics
 import com.readmates.aigen.application.service.AiGenerationWorker
 import com.readmates.aigen.config.AiGenerationKafkaConfig
 import com.readmates.aigen.config.AiGenerationKafkaProperties
+import com.readmates.aigen.support.AiGenerationTestModels
 import com.readmates.support.KafkaTestContainer
 import org.apache.kafka.clients.admin.AdminClient
 import org.apache.kafka.clients.admin.AdminClientConfig
@@ -68,7 +69,7 @@ class AiGenerationJobConsumerIntegrationTest(
                 clubId = clubId,
                 hostUserId = hostUserId,
                 provider = Provider.CLAUDE,
-                model = "claude-sonnet-4-6",
+                model = AiGenerationTestModels.CLAUDE_DEFAULT,
                 kind = JobKind.FULL,
             ),
         )
@@ -101,7 +102,7 @@ class AiGenerationJobConsumerIntegrationTest(
                 clubId = clubId,
                 hostUserId = hostUserId,
                 provider = Provider.CLAUDE,
-                model = "claude-sonnet-4-6",
+                model = AiGenerationTestModels.CLAUDE_DEFAULT,
                 kind = JobKind.FULL,
             ),
         )
@@ -114,11 +115,30 @@ class AiGenerationJobConsumerIntegrationTest(
     }
 
     @Test
-    fun `AiGenerationJobMessage payload has no transcript field as a structural PII guarantee`() {
+    fun `AiGenerationJobMessage payload contains only routing metadata as a structural PII guarantee`() {
         val fields =
             AiGenerationJobMessage::class.java.declaredFields.map { it.name }
 
-        assertThat(fields).doesNotContain("transcript")
+        assertThat(fields).containsExactlyInAnyOrder(
+            "jobId",
+            "sessionId",
+            "clubId",
+            "hostUserId",
+            "provider",
+            "model",
+            "kind",
+        )
+        assertThat(fields).doesNotContain(
+            "transcript",
+            "turns",
+            "speakerName",
+            "result",
+            "evidence",
+            "excerpt",
+            "instructions",
+            "prompt",
+            "providerResponse",
+        )
     }
 
     private fun waitForListenerAssignment() {

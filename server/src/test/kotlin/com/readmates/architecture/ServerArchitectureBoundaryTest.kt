@@ -246,6 +246,17 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
+    fun `aigen application does not depend on messaging adapters`() {
+        noClasses()
+            .that()
+            .resideInAnyPackage("com.readmates.aigen.application..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage("com.readmates.aigen.adapter.out.messaging..")
+            .check(importedClasses)
+    }
+
+    @Test
     fun `notification application does not depend on legacy notification outbox port`() {
         noClasses()
             .that()

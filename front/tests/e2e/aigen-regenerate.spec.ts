@@ -12,10 +12,15 @@ import type {
   ClubAiDefaultResponse,
   RegenerateRequest,
   RegenerateResponse,
-  SessionImportV1,
   StartGenerationResponse,
 } from "@/features/host/aigen/api/aigen-contracts";
-import { hostSessionDetailResponse, routeHostEditorShell } from "./aigen-test-fixtures";
+import {
+  groundedSnapshot,
+  groundedSucceededJob,
+  groundedTranscript,
+  hostSessionDetailResponse,
+  routeHostEditorShell,
+} from "./aigen-test-fixtures";
 
 const SESSION_ID = "11111111-1111-1111-1111-111111111111";
 const JOB_ID = "22222222-2222-2222-2222-222222222222";
@@ -29,33 +34,9 @@ function startBody(): StartGenerationResponse {
   return { jobId: JOB_ID, status: "PENDING", expiresAt: "2099-01-01T00:00:00Z" };
 }
 
-function snapshot(summary: string): SessionImportV1 {
-  return {
-    format: "readmates.session.v1",
-    sessionNumber: 1,
-    bookTitle: "E2E 책",
-    meetingDate: "2026-05-16",
-    summary,
-    highlights: [{ authorName: "독자A", text: "h" }],
-    oneLineReviews: [{ authorName: "독자B", text: "r" }],
-    feedbackDocumentFileName: "session-1-feedback.md",
-    feedbackDocumentMarkdown: "# 피드백",
-  };
-}
-
 function succeededJob(summary: string): AiGenerationJobResponse {
-  return {
-    jobId: JOB_ID,
-    status: "SUCCEEDED",
-    stage: "READY",
-    progressPct: 100,
-    model: "claude-sonnet-4-6",
-    result: snapshot(summary),
-    error: null,
-    tokens: null,
-    costEstimateUsd: "0.10",
-    warnings: [],
-  };
+  const response = groundedSucceededJob(JOB_ID, 1);
+  return { ...response, result: groundedSnapshot(summary) };
 }
 
 async function json(route: Route, status: number, body: unknown): Promise<void> {
@@ -116,10 +97,30 @@ test("regenerate summary: modal payload uses UPPER_SNAKE item and updates PREVIE
             tokens: { input: 100, cachedInput: 0, output: 50 },
             costEstimateUsd: "0.02",
             warnings: [],
+            revision: 2,
+            result: groundedSnapshot("재생성된 요약 내용"),
+            evidence: groundedSucceededJob(JOB_ID, 2).evidence,
+            sectionReviewStatuses: {
+              SUMMARY: "PENDING_REVIEW",
+              HIGHLIGHTS: "PENDING_REVIEW",
+              ONE_LINE_REVIEWS: "PENDING_REVIEW",
+              FEEDBACK_DOCUMENT: "PENDING_REVIEW",
+            },
           };
           await json(route, 200, responseBody);
           return;
         }
+      }
+      if (url.includes("/commit") && method === "POST") {
+        await json(route, 409, {
+          type: "about:blank",
+          title: "Stale generation revision",
+          status: 409,
+          code: "STALE_GENERATION_REVISION",
+          detail: "최신 revision을 확인해 주세요.",
+          currentRevision: 3,
+        });
+        return;
       }
       if (method === "GET") {
         await json(route, 200, succeededJob("초기 요약"));
@@ -134,13 +135,16 @@ test("regenerate summary: modal payload uses UPPER_SNAKE item and updates PREVIE
   await page.getByLabel(/대본 파일/).setInputFiles({
     name: "transcript.txt",
     mimeType: "text/plain",
-    buffer: Buffer.from("hi"),
+    buffer: Buffer.from(groundedTranscript([{ speaker: "공개 회원 A", at: "00:00", text: "합성 테스트 발언입니다." }])),
   });
   await page.getByRole("button", { name: /생성 시작/ }).click();
 
   // PREVIEW loaded with initial summary
   const summaryField = page.locator("textarea#aigen-summary-field");
   await expect(summaryField).toHaveValue("초기 요약", { timeout: 15000 });
+
+  for (const button of await page.getByRole("button", { name: "AI 근거 검토 완료" }).all()) await button.click();
+  await expect(page.getByText("4/4 검토 완료")).toBeVisible();
 
   // Click ✨ regenerate on the summary
   await page.getByRole("button", { name: /요약 재생성/ }).click();
@@ -150,6 +154,16 @@ test("regenerate summary: modal payload uses UPPER_SNAKE item and updates PREVIE
 
   // Assert the new summary replaced the old one.
   await expect(summaryField).toHaveValue("재생성된 요약 내용", { timeout: 10000 });
+  await expect(page.getByText("0/4 검토 완료")).toBeVisible();
+  await expect(page.getByRole("button", { name: "AI 기록 저장" })).toBeDisabled();
+
+  await summaryField.fill("revision 2 호스트 공개 합성 초안");
+  await page.getByRole("button", { name: "직접 수정 내용 확인" }).click();
+  for (const button of await page.getByRole("button", { name: "AI 근거 검토 완료" }).all()) await button.click();
+  await page.getByRole("button", { name: "AI 기록 저장" }).click();
+  await expect(page.getByRole("alert")).toContainText("현재 편집은 자동으로 덮어쓰지 않았습니다");
+  await expect(summaryField).toHaveValue("revision 2 호스트 공개 합성 초안");
+  await expect(page.getByRole("button", { name: "AI 기록 저장" })).toBeDisabled();
 
   // The regenerate request must have used UPPER_SNAKE_CASE per the
   // documented server defect workaround.

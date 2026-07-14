@@ -206,6 +206,8 @@ export type PlatformAdminAiOpsJob = {
   lastUpdatedAt: string;
   expiresAt: string | null;
   staleCandidate: boolean;
+  revision?: number | null;
+  cleanupPending?: boolean;
   availableActions: PlatformAdminAiOpsAction[];
 };
 

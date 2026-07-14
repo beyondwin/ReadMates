@@ -15,7 +15,7 @@ import type {
   SessionImportV1,
   StartGenerationResponse,
 } from "@/features/host/aigen/api/aigen-contracts";
-import { hostSessionDetailResponse, routeHostEditorShell } from "./aigen-test-fixtures";
+import { groundedTranscript, hostSessionDetailResponse, routeHostEditorShell } from "./aigen-test-fixtures";
 
 const SESSION_ID = "11111111-1111-1111-1111-111111111111";
 const JOB_ID = "22222222-2222-2222-2222-222222222222";
@@ -40,8 +40,8 @@ function snapshot(): SessionImportV1 {
     bookTitle: "E2E 책",
     meetingDate: "2026-05-16",
     summary: "AI가 생성한 요약입니다.",
-    highlights: [{ authorName: "독자A", text: "하이라이트" }],
-    oneLineReviews: [{ authorName: "독자B", text: "좋아요" }],
+    highlights: [{ authorName: "공개 회원 A", text: "공개 합성 하이라이트" }],
+    oneLineReviews: [{ authorName: "공개 회원 B", text: "공개 합성 한줄평" }],
     feedbackDocumentFileName: "session-7-feedback.md",
     feedbackDocumentMarkdown: "# 피드백 문서",
   };
@@ -150,7 +150,7 @@ test("AI generation full flow: upload → poll → preview → commit", async ({
   await fileChooser.setInputFiles({
     name: "transcript.txt",
     mimeType: "text/plain",
-    buffer: Buffer.from("e2e transcript content"),
+    buffer: Buffer.from(groundedTranscript([{ speaker: "공개 회원 A", at: "00:00", text: "합성 테스트 발언입니다." }])),
   });
 
   await page.getByRole("button", { name: /생성 시작/ }).click();

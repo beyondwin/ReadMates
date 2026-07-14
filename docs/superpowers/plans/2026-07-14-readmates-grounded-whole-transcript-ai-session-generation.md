@@ -1710,7 +1710,7 @@ git commit -m "feat(aigen): add grounded host review workspace"
 - E2E proves correction-before-job, grounded review, user edit confirmation, regeneration revision reset, participant upsert, and idempotent recovery.
 - Legacy JSON upload remains unaffected.
 
-- [ ] **Step 1: Replace all unstructured AI test transcripts**
+- [x] **Step 1: Replace all unstructured AI test transcripts**
 
 Create one public-safe helper:
 
@@ -1734,7 +1734,7 @@ export function groundedTranscript(
 
 Use invented fixture names consistently with seeded active club members. Scan fixture output to ensure no locally inspected data appears.
 
-- [ ] **Step 2: Add the server vertical integration scenario**
+- [x] **Step 2: Add the server vertical integration scenario**
 
 Exercise:
 
@@ -1753,7 +1753,7 @@ same commit repeated -> recovered/idempotent response
 
 Add rollback coverage for a forced import/receipt failure.
 
-- [ ] **Step 3: Add early invalid-speaker E2E**
+- [x] **Step 3: Add early invalid-speaker E2E**
 
 Intercept or query server state to prove:
 
@@ -1762,19 +1762,19 @@ Intercept or query server state to prove:
 - no recent job appears for the session;
 - correcting the file and explicitly resubmitting starts the job.
 
-- [ ] **Step 4: Add grounded evidence/review E2E**
+- [x] **Step 4: Add grounded evidence/review E2E**
 
 Prove all four section ledger entries, evidence selection, bounded expansion, unchanged review confirmation, one direct edit disabling its evidence, edited confirmation, and successful commit. Assert the final session editor displays the imported data and participant attendance state.
 
-- [ ] **Step 5: Add regeneration/revision and recovery E2E**
+- [x] **Step 5: Add regeneration/revision and recovery E2E**
 
 Prove regeneration resets every review state and stale commit returns conflict without overwriting the new draft. Deactivate or rename a matched membership after generation and verify commit returns `MEMBERSHIP_CHANGED` without content writes; restore it and retry. Simulate a receipt-backed Redis finalization gap through the test-only backend fixture and verify the UI converges from `COMMIT_RETRY` to committed. Exercise the existing platform-admin retry surface and assert it exposes status/revision/cleanup metadata only.
 
-- [ ] **Step 6: Add mobile evidence E2E**
+- [x] **Step 6: Add mobile evidence E2E**
 
 At a supported mobile viewport, verify no horizontal overflow, evidence drawer open/close/focus behavior, editable result controls, ledger visibility, and commit gate.
 
-- [ ] **Step 7: Run focused server integration and BFF tests**
+- [x] **Step 7: Run focused server integration and BFF tests**
 
 ```bash
 ./server/gradlew -p server unitTest --tests '*ServerArchitectureBoundaryTest'
@@ -1784,7 +1784,7 @@ npx --yes corepack@0.35.0 pnpm --dir front exec vitest run tests/unit/cloudflare
 
 Expected: PASS.
 
-- [ ] **Step 8: Run the focused AI E2E matrix**
+- [x] **Step 8: Run the focused AI E2E matrix**
 
 ```bash
 npx --yes corepack@0.35.0 pnpm --dir front exec playwright test \
@@ -1797,7 +1797,7 @@ npx --yes corepack@0.35.0 pnpm --dir front exec playwright test \
 
 Expected: PASS on configured desktop and mobile projects. If the repo config names projects explicitly, use those existing project names rather than adding a duplicate browser matrix.
 
-- [ ] **Step 9: Run the complete existing AI E2E group**
+- [x] **Step 9: Run the complete existing AI E2E group**
 
 ```bash
 npx --yes corepack@0.35.0 pnpm --dir front exec playwright test tests/e2e/aigen-*.spec.ts
@@ -1805,7 +1805,7 @@ npx --yes corepack@0.35.0 pnpm --dir front exec playwright test tests/e2e/aigen-
 
 Expected: PASS, including JSON upload coexistence, cancel, expiration, and cost cap.
 
-- [ ] **Step 10: Commit the vertical verification slice**
+- [x] **Step 10: Commit the vertical verification slice**
 
 ```bash
 git add server/src/test/kotlin/com/readmates/aigen server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt front/tests/e2e front/tests/unit/cloudflare-bff.test.ts

@@ -49,6 +49,8 @@ const committingJob: PlatformAdminAiOpsJobView = {
   status: "COMMITTING",
   stage: "READY",
   availableActions: ["FORCE_CANCEL", "RETRY_COMMIT"],
+  revision: 2,
+  cleanupPending: true,
 };
 
 describe("PlatformAdminAiOps", () => {
@@ -64,6 +66,17 @@ describe("PlatformAdminAiOps", () => {
     expect(section.textContent).not.toContain("transcript");
     expect(section.textContent).not.toContain("feedbackDocumentMarkdown");
     expect(section.textContent).not.toContain("instructions");
+  });
+
+  it("shows recovery revision and cleanup state without exposing generation content", () => {
+    render(<PlatformAdminAiOps role="OWNER" summary={summary} jobs={[committingJob]} />);
+
+    const section = screen.getByRole("region", { name: "AI 운영" });
+    expect(within(section).getByText(/revision 2/)).toBeInTheDocument();
+    expect(within(section).getByText(/cleanup pending/)).toBeInTheDocument();
+    expect(section.textContent).not.toContain("transcript");
+    expect(section.textContent).not.toContain("evidence");
+    expect(section.textContent).not.toContain("result");
   });
 
   it("lets owner and operator roles force cancel actionable jobs", async () => {

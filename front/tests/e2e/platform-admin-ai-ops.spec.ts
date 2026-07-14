@@ -117,6 +117,8 @@ async function routePlatformAdminShell(page: Page, role: PlatformAdminRole): Pro
           lastUpdatedAt: "2026-05-18T00:02:00Z",
           expiresAt: "2026-05-18T06:00:00Z",
           staleCandidate: true,
+          revision: 2,
+          cleanupPending: true,
           availableActions: ["RETRY_COMMIT"],
         },
       ],
@@ -150,6 +152,7 @@ test("platform owner sees retry-commit affordance on a committing job", async ({
   await page.goto("/admin/ai-ops");
 
   await expect(page.getByText("Stuck Volume")).toBeVisible();
+  await expect(page.getByText("revision 2 · cleanup pending")).toBeVisible();
   await expect(page.getByRole("button", { name: "Retry commit" })).toBeVisible();
 });
 
