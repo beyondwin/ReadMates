@@ -12,6 +12,11 @@ import { saveAigenDraft } from "@/features/host/aigen/storage/aigen-draft-storag
 import { aiJobKeys } from "@/features/host/aigen/queries/aigen-job-queries";
 
 vi.mock("@/features/host/aigen/api/aigen-api", () => ({
+  AiGenerationApiError: class AiGenerationApiError extends Error {
+    constructor(readonly status: number, readonly problem: { code: string; detail: string }) {
+      super(problem.detail);
+    }
+  },
   startGeneration: vi.fn(),
   getJob: vi.fn(),
   getRecentJob: vi.fn(),

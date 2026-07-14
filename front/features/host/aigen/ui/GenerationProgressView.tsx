@@ -36,7 +36,7 @@ export function GenerationProgressView({ job, cancelling, onCancel }: Generation
     return () => window.clearInterval(handle);
   }, []);
 
-  const stageText = job?.stage ? STAGE_LABEL[job.stage] : "준비 중";
+  const stageText = job?.stage ? STAGE_LABEL[job.stage] ?? "생성 진행 중" : "준비 중";
   const progressPct = job?.progressPct ?? 0;
 
   return (

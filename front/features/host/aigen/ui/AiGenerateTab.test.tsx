@@ -44,6 +44,7 @@ import {
   startGeneration,
 } from "@/features/host/aigen/api/aigen-api";
 import { AiGenerateTab } from "./AiGenerateTab";
+import { draftStorageKey, saveAigenDraft } from "../storage/aigen-draft-storage";
 
 const mockedStart = vi.mocked(startGeneration);
 const mockedGetJob = vi.mocked(getJob);
@@ -364,6 +365,71 @@ describe("AiGenerateTab", () => {
       expect(screen.getByText(/LLM이 응답하지 않았습니다/)).toBeInTheDocument();
     });
     expect(screen.getByRole("button", { name: /다시 시도/ })).toBeInTheDocument();
+    expect(window.localStorage.getItem(draftStorageKey("job-1"))).toBeNull();
+  });
+
+  it("coalesces draft persistence and flushes the latest edit on pagehide", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mockedStart.mockResolvedValue({
+      jobId: "job-1",
+      status: "PENDING",
+      expiresAt: "2026-07-15T06:00:00Z",
+    });
+    mockedGetJob.mockResolvedValue(groundedJob());
+    const setItem = vi.spyOn(window.localStorage, "setItem");
+    const { Wrapper } = createWrapper();
+    render(<Wrapper><AiGenerateTab sessionId="s1" clubSlug="club-a" onCommitted={() => {}} /></Wrapper>);
+
+    fireEvent.change(await screen.findByLabelText(/대본 파일/), {
+      target: { files: [new File(["공개 회원 00:00\n합성 대화"], "transcript.txt")] },
+    });
+    const start = screen.getByRole("button", { name: /생성 시작/ });
+    await waitFor(() => expect(start).toBeEnabled());
+    fireEvent.click(start);
+    const summary = await screen.findByLabelText("요약");
+    setItem.mockClear();
+
+    fireEvent.change(summary, { target: { value: "첫 편집" } });
+    fireEvent.change(summary, { target: { value: "둘째 편집" } });
+    fireEvent.change(summary, { target: { value: "최종 편집" } });
+
+    expect(setItem).not.toHaveBeenCalled();
+    fireEvent(window, new Event("pagehide"));
+    expect(setItem).toHaveBeenCalledTimes(1);
+    expect(window.localStorage.getItem(draftStorageKey("job-1"))).toContain("최종 편집");
+    vi.useRealTimers();
+  });
+
+  it("clears a saved draft when polling reports JOB_EXPIRED", async () => {
+    saveAigenDraft({
+      version: 2,
+      jobId: "job-1",
+      revision: 3,
+      serverSnapshot: sampleSnapshot(),
+      draft: { ...sampleSnapshot(), summary: "만료될 편집" },
+      sectionReviews: {
+        SUMMARY: "USER_EDITED_REVIEW_REQUIRED",
+        HIGHLIGHTS: "PENDING",
+        ONE_LINE_REVIEWS: "PENDING",
+        FEEDBACK_DOCUMENT: "PENDING",
+      },
+    });
+    mockedStart.mockResolvedValue({ jobId: "job-1", status: "PENDING", expiresAt: "2026-07-15T06:00:00Z" });
+    mockedGetJob.mockRejectedValue(
+      new AiGenerationApiError(410, { code: "JOB_EXPIRED", detail: "작업이 만료되었습니다." }),
+    );
+    const { Wrapper } = createWrapper();
+    render(<Wrapper><AiGenerateTab sessionId="s1" clubSlug="club-a" onCommitted={() => {}} /></Wrapper>);
+
+    fireEvent.change(await screen.findByLabelText(/대본 파일/), {
+      target: { files: [new File(["공개 회원 00:00\n합성 대화"], "transcript.txt")] },
+    });
+    const start = screen.getByRole("button", { name: /생성 시작/ });
+    await waitFor(() => expect(start).toBeEnabled());
+    fireEvent.click(start);
+
+    await waitFor(() => expect(mockedGetJob).toHaveBeenCalled());
+    await waitFor(() => expect(window.localStorage.getItem(draftStorageKey("job-1"))).toBeNull());
   });
 
   it("transitions GENERATING → IDLE when poll returns CANCELLED", async () => {

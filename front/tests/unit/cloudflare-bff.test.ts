@@ -765,6 +765,34 @@ describe("stripCookieDomain", () => {
     expect(response.status).toBe(202);
   });
 
+  it("rejects an oversized AI transcript multipart request before buffering", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const request = new Request(
+      "https://readmates.pages.dev/api/bff/api/host/sessions/12345/ai-generate/jobs",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "multipart/form-data; boundary=ai",
+          "Content-Length": String(2 * 1024 * 1024 + 1),
+          Origin: "https://readmates.pages.dev",
+        },
+        body: new Uint8Array([1]),
+      },
+    );
+    const arrayBuffer = vi.spyOn(request, "arrayBuffer");
+
+    const response = await onRequest(
+      context(request, {
+        path: ["api", "host", "sessions", "12345", "ai-generate", "jobs"],
+      }),
+    );
+
+    await expectApiErrorBody(response, { status: 413, code: "REQUEST_TOO_LARGE" });
+    expect(arrayBuffer).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("forwards GET /api/host/sessions/{id}/ai-generate/jobs/{jobId} unchanged", async () => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);

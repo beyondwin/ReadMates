@@ -12,11 +12,14 @@ export const REVIEW_SECTIONS = [
   "FEEDBACK_DOCUMENT",
 ] as const satisfies readonly ReviewSection[];
 
-export type SectionReviewState =
-  | "PENDING"
-  | "AI_GROUNDED_REVIEWED"
-  | "USER_EDITED_REVIEW_REQUIRED"
-  | "USER_EDITED_CONFIRMED";
+export const SECTION_REVIEW_STATES = [
+  "PENDING",
+  "AI_GROUNDED_REVIEWED",
+  "USER_EDITED_REVIEW_REQUIRED",
+  "USER_EDITED_CONFIRMED",
+] as const;
+
+export type SectionReviewState = (typeof SECTION_REVIEW_STATES)[number];
 
 export type AiGenerationReviewState = {
   revision: number;

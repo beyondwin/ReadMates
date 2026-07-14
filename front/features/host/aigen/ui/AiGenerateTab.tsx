@@ -32,7 +32,9 @@ import {
 import {
   clearAigenDraft,
   loadAigenDraft,
+  purgeAigenDrafts,
   saveAigenDraft,
+  type AiGenerationDraftEnvelope,
 } from "@/features/host/aigen/storage/aigen-draft-storage";
 import { AiRecoveryStrip } from "./AiRecoveryStrip";
 import { GenerationProgressView } from "./GenerationProgressView";
@@ -173,6 +175,8 @@ export function AiGenerateTab({ sessionId, onCommitted }: AiGenerateTabProps) {
   const [commitError, setCommitError] = useState<string | null>(null);
   const [revisionConflict, setRevisionConflict] = useState<AiGenerationProblem | null>(null);
   const adoptedRevisionRef = useRef<string | null>(null);
+  const pendingDraftRef = useRef<AiGenerationDraftEnvelope | null>(null);
+  const draftTimerRef = useRef<number | null>(null);
 
   const modelsQuery = useQuery(availableAiModelsQuery(sessionId));
   const activeJobId = stage.tag === "active" ? stage.jobId : null;
@@ -182,6 +186,31 @@ export function AiGenerateTab({ sessionId, onCommitted }: AiGenerateTabProps) {
   const recentJobQuery = useQuery({ ...recentAiJobQuery(sessionId), enabled: stage.tag === "idle" });
   const jobQuery = useAiGenerationJob(sessionId, activeJobId);
   const jobStatus = jobQuery.data?.status;
+  const jobProblemCode = jobQuery.error instanceof AiGenerationApiError
+    ? jobQuery.error.problem.code
+    : null;
+
+  const discardPendingDraft = useCallback(() => {
+    pendingDraftRef.current = null;
+    if (draftTimerRef.current !== null) {
+      window.clearTimeout(draftTimerRef.current);
+      draftTimerRef.current = null;
+    }
+  }, []);
+
+  const flushPendingDraft = useCallback((updateWarning: boolean) => {
+    if (draftTimerRef.current !== null) {
+      window.clearTimeout(draftTimerRef.current);
+      draftTimerRef.current = null;
+    }
+    const pending = pendingDraftRef.current;
+    if (!pending) return;
+    pendingDraftRef.current = null;
+    const saved = saveAigenDraft(pending);
+    if (updateWarning) {
+      setStorageWarning((current) => current === !saved ? current : !saved);
+    }
+  }, []);
 
   const clearWorkspace = useCallback(() => {
     setServerSnapshot(null);
@@ -218,42 +247,63 @@ export function AiGenerateTab({ sessionId, onCommitted }: AiGenerateTabProps) {
 
   useEffect(() => {
     if (stage.tag !== "active" || jobStatus !== "CANCELLED") return;
+    discardPendingDraft();
     clearAigenDraft(stage.jobId);
     adoptedRevisionRef.current = null;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- terminal server event resets local workspace
     clearWorkspace();
     setStage({ tag: "idle", startError: null });
-  }, [stage, jobStatus, clearWorkspace]);
+  }, [stage, jobStatus, clearWorkspace, discardPendingDraft]);
 
   useEffect(() => {
     if (stage.tag !== "active" || !serverSnapshot || !editedSnapshot || !reviewState) return;
-    const saved = saveAigenDraft({
+    pendingDraftRef.current = {
       version: 2,
       jobId: stage.jobId,
       revision: reviewState.revision,
       serverSnapshot,
       draft: editedSnapshot,
       sectionReviews: reviewState.sectionReviews,
-    });
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- storage outcome is external browser state
-    setStorageWarning(!saved);
-  }, [stage, serverSnapshot, editedSnapshot, reviewState]);
+    };
+    if (draftTimerRef.current !== null) window.clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = window.setTimeout(() => flushPendingDraft(true), 250);
+  }, [stage, serverSnapshot, editedSnapshot, reviewState, flushPendingDraft]);
+
+  useEffect(() => {
+    const handlePageHide = () => flushPendingDraft(false);
+    window.addEventListener("pagehide", handlePageHide);
+    return () => {
+      window.removeEventListener("pagehide", handlePageHide);
+      flushPendingDraft(false);
+    };
+  }, [flushPendingDraft]);
+
+  useEffect(() => {
+    if (
+      stage.tag !== "active" ||
+      (jobStatus !== "FAILED" && jobProblemCode !== "JOB_EXPIRED")
+    ) return;
+    discardPendingDraft();
+    clearAigenDraft(stage.jobId);
+  }, [stage, jobStatus, jobProblemCode, discardPendingDraft]);
 
   useEffect(() => {
     if (stage.tag !== "active" || jobStatus !== "COMMITTED") return;
+    discardPendingDraft();
     clearAigenDraft(stage.jobId);
     adoptedRevisionRef.current = null;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- committed server event clears local draft state
     clearWorkspace();
     setStage({ tag: "committed", result: null });
     onCommitted();
-  }, [stage, jobStatus, onCommitted, clearWorkspace]);
+  }, [stage, jobStatus, onCommitted, clearWorkspace, discardPendingDraft]);
 
   const handleStart = useCallback(async (payload: StartGenerationRequest) => {
     setSubmittingStart(true);
     setStage({ tag: "idle", startError: null });
     try {
       const response = await startMutation.mutateAsync(payload);
+      purgeAigenDrafts(response.jobId);
       adoptedRevisionRef.current = null;
       clearWorkspace();
       setStage({ tag: "active", jobId: response.jobId, cancelling: false });
@@ -270,11 +320,12 @@ export function AiGenerateTab({ sessionId, onCommitted }: AiGenerateTabProps) {
   const handleCancelJob = useCallback(async (jobId: string) => {
     setStage({ tag: "active", jobId, cancelling: true });
     try { await cancelMutation.mutateAsync(jobId); } catch { /* Return to safe idle even if already terminal. */ }
+    discardPendingDraft();
     clearAigenDraft(jobId);
     adoptedRevisionRef.current = null;
     clearWorkspace();
     setStage({ tag: "idle", startError: null });
-  }, [cancelMutation, clearWorkspace]);
+  }, [cancelMutation, clearWorkspace, discardPendingDraft]);
 
   const handleSnapshotChange = useCallback((next: SessionImportV1, section?: ReviewSection) => {
     setCommitError(null);
@@ -326,6 +377,7 @@ export function AiGenerateTab({ sessionId, onCommitted }: AiGenerateTabProps) {
         ...(grounded ? { expectedRevision: reviewState.revision, sectionReviews: sectionReviews! } : {}),
       };
       const result = await commitMutation.mutateAsync(request);
+      discardPendingDraft();
       clearAigenDraft(stage.jobId);
       adoptedRevisionRef.current = null;
       clearWorkspace();
@@ -341,7 +393,7 @@ export function AiGenerateTab({ sessionId, onCommitted }: AiGenerateTabProps) {
     } finally {
       setCommitting(false);
     }
-  }, [stage, editedSnapshot, reviewState, serverSnapshot, recordVisibility, commitMutation, onCommitted, clearWorkspace, jobQuery]);
+  }, [stage, editedSnapshot, reviewState, serverSnapshot, recordVisibility, commitMutation, onCommitted, clearWorkspace, jobQuery, discardPendingDraft]);
 
   const handleReloadRevision = useCallback(async () => {
     if (stage.tag !== "active") return;

@@ -1,13 +1,12 @@
 import type { ReviewSection, SessionImportV1Snapshot } from "../api/aigen-contracts";
-import type { SectionReviewState } from "../model/aigen-review-state";
+import {
+  REVIEW_SECTIONS,
+  SECTION_REVIEW_STATES,
+  type SectionReviewState,
+} from "../model/aigen-review-state";
 
 const KEY_PREFIX = "aigen-draft:";
-const REVIEW_SECTIONS: ReviewSection[] = [
-  "SUMMARY", "HIGHLIGHTS", "ONE_LINE_REVIEWS", "FEEDBACK_DOCUMENT",
-];
-const REVIEW_STATES: SectionReviewState[] = [
-  "PENDING", "AI_GROUNDED_REVIEWED", "USER_EDITED_REVIEW_REQUIRED", "USER_EDITED_CONFIRMED",
-];
+export const AIGEN_DRAFT_TTL_MS = 6 * 60 * 60 * 1000;
 
 export interface AiGenerationDraftEnvelope {
   version: 2;
@@ -17,6 +16,10 @@ export interface AiGenerationDraftEnvelope {
   draft: SessionImportV1Snapshot;
   sectionReviews: Record<ReviewSection, SectionReviewState>;
 }
+
+type StoredAiGenerationDraftEnvelope = AiGenerationDraftEnvelope & {
+  savedAtEpochMs: number;
+};
 
 export function draftStorageKey(jobId: string): string {
   return `${KEY_PREFIX}${jobId}`;
@@ -47,10 +50,11 @@ function safeSnapshot(snapshot: SessionImportV1Snapshot): SessionImportV1Snapsho
 export function saveAigenDraft(envelope: AiGenerationDraftEnvelope): boolean {
   const store = storage();
   if (!store) return false;
-  const safe: AiGenerationDraftEnvelope = {
+  const safe: StoredAiGenerationDraftEnvelope = {
     version: 2,
     jobId: envelope.jobId,
     revision: envelope.revision,
+    savedAtEpochMs: Date.now(),
     serverSnapshot: safeSnapshot(envelope.serverSnapshot),
     draft: safeSnapshot(envelope.draft),
     sectionReviews: { ...envelope.sectionReviews },
@@ -89,12 +93,14 @@ function isAuthoredText(value: unknown): value is { authorName: string; text: st
   return typeof candidate.authorName === "string" && typeof candidate.text === "string";
 }
 
-function isEnvelope(value: unknown): value is AiGenerationDraftEnvelope {
+function isEnvelope(value: unknown): value is StoredAiGenerationDraftEnvelope {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<AiGenerationDraftEnvelope>;
   return (
     candidate.version === 2 &&
     typeof candidate.jobId === "string" &&
+    typeof (candidate as Partial<StoredAiGenerationDraftEnvelope>).savedAtEpochMs === "number" &&
+    Number.isSafeInteger((candidate as Partial<StoredAiGenerationDraftEnvelope>).savedAtEpochMs) &&
     typeof candidate.revision === "number" &&
     Number.isSafeInteger(candidate.revision) &&
     isSnapshot(candidate.serverSnapshot) &&
@@ -103,28 +109,75 @@ function isEnvelope(value: unknown): value is AiGenerationDraftEnvelope {
     !Array.isArray(candidate.sectionReviews) &&
     Object.keys(candidate.sectionReviews as object).length === REVIEW_SECTIONS.length &&
     REVIEW_SECTIONS.every((section) =>
-      REVIEW_STATES.includes(candidate.sectionReviews?.[section] as SectionReviewState),
+      SECTION_REVIEW_STATES.includes(candidate.sectionReviews?.[section] as SectionReviewState),
     )
   );
+}
+
+function isExpired(envelope: StoredAiGenerationDraftEnvelope, now = Date.now()): boolean {
+  return now - envelope.savedAtEpochMs >= AIGEN_DRAFT_TTL_MS || envelope.savedAtEpochMs > now;
+}
+
+function publicEnvelope(envelope: StoredAiGenerationDraftEnvelope): AiGenerationDraftEnvelope {
+  return {
+    version: envelope.version,
+    jobId: envelope.jobId,
+    revision: envelope.revision,
+    serverSnapshot: envelope.serverSnapshot,
+    draft: envelope.draft,
+    sectionReviews: envelope.sectionReviews,
+  };
+}
+
+function readStoredEnvelope(store: Storage, key: string): StoredAiGenerationDraftEnvelope | null {
+  try {
+    const raw = store.getItem(key);
+    if (raw === null) return null;
+    const value: unknown = JSON.parse(raw);
+    return isEnvelope(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+export function purgeAigenDrafts(activeJobId?: string): void {
+  const store = storage();
+  if (!store) return;
+  const keys = Array.from({ length: store.length }, (_, index) => store.key(index))
+    .filter((key): key is string => key?.startsWith(KEY_PREFIX) === true);
+  for (const key of keys) {
+    const envelope = readStoredEnvelope(store, key);
+    const keyJobId = key.slice(KEY_PREFIX.length);
+    if (
+      !envelope ||
+      envelope.jobId !== keyJobId ||
+      isExpired(envelope) ||
+      (activeJobId !== undefined && envelope.jobId !== activeJobId)
+    ) {
+      try {
+        store.removeItem(key);
+      } catch {
+        // Cleanup is best effort; no content is copied elsewhere.
+      }
+    }
+  }
 }
 
 export function loadAigenDraft(jobId: string, revision: number): AiGenerationDraftEnvelope | null {
   const store = storage();
   if (!store) return null;
-  let value: unknown;
-  try {
-    const raw = store.getItem(draftStorageKey(jobId));
-    if (raw === null) return null;
-    value = JSON.parse(raw);
-  } catch {
-    return null;
-  }
-  if (!isEnvelope(value) || value.jobId !== jobId) {
+  purgeAigenDrafts();
+  const value = readStoredEnvelope(store, draftStorageKey(jobId));
+  if (!value || value.jobId !== jobId) {
     clearAigenDraft(jobId);
     return null;
   }
-  if (value.revision !== revision) return null;
-  return value;
+  if (value.revision < revision) {
+    clearAigenDraft(jobId);
+    return null;
+  }
+  if (value.revision > revision) return null;
+  return publicEnvelope(value);
 }
 
 export function clearAigenDraft(jobId: string): void {

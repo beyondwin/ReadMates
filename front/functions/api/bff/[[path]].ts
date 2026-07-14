@@ -29,6 +29,15 @@ type PagesFunction<Env> = (context: {
 }) => Response | Promise<Response>;
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const MAX_AI_GENERATION_MULTIPART_BYTES = 2 * 1024 * 1024;
+
+function isAiGenerationTranscriptUpload(method: string, path: string, contentType: string | null) {
+  return (
+    method === "POST" &&
+    /^\/api\/host\/sessions\/[^/]+\/ai-generate\/jobs$/.test(path) &&
+    contentType?.toLowerCase().startsWith("multipart/form-data;") === true
+  );
+}
 
 function pathSegments(path: string | string[] | undefined) {
   if (Array.isArray(path)) {
@@ -135,6 +144,13 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const headers = new Headers();
   const contentType = context.request.headers.get("content-type");
   const cookie = context.request.headers.get("cookie");
+
+  if (isAiGenerationTranscriptUpload(context.request.method, upstreamPath, contentType)) {
+    const contentLength = Number(context.request.headers.get("content-length"));
+    if (Number.isSafeInteger(contentLength) && contentLength > MAX_AI_GENERATION_MULTIPART_BYTES) {
+      return bffErrorResponse(413, "REQUEST_TOO_LARGE", "업로드 요청이 너무 큽니다.");
+    }
+  }
 
   if (contentType) {
     headers.set("Content-Type", contentType);

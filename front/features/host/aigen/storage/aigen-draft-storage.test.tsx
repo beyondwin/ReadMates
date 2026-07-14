@@ -2,9 +2,11 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import type { ReviewSection, SessionImportV1 } from "../api/aigen-contracts";
 import type { SectionReviewState } from "../model/aigen-review-state";
 import {
+  AIGEN_DRAFT_TTL_MS,
   clearAigenDraft,
   draftStorageKey,
   loadAigenDraft,
+  purgeAigenDrafts,
   saveAigenDraft,
   type AiGenerationDraftEnvelope,
 } from "./aigen-draft-storage";
@@ -56,8 +58,16 @@ function envelope(): AiGenerationDraftEnvelope {
 
 describe("aigen-draft-storage v2", () => {
   beforeAll(installFakeLocalStorage);
-  beforeEach(() => window.localStorage.clear());
-  afterEach(() => { vi.restoreAllMocks(); window.localStorage.clear(); });
+  beforeEach(() => {
+    window.localStorage.clear();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-15T00:00:00.000Z"));
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+    window.localStorage.clear();
+  });
 
   it("stores only the versioned browser review envelope", () => {
     expect(saveAigenDraft(envelope())).toBe(true);
@@ -72,6 +82,35 @@ describe("aigen-draft-storage v2", () => {
     saveAigenDraft(envelope());
     expect(loadAigenDraft("job-1", 3)).toBeNull();
     expect(loadAigenDraft("job-1", 4)).toEqual(envelope());
+  });
+
+  it("purges a stored draft after the server-aligned six-hour TTL", () => {
+    saveAigenDraft(envelope());
+    vi.setSystemTime(Date.now() + AIGEN_DRAFT_TTL_MS + 1);
+
+    expect(loadAigenDraft("job-1", 4)).toBeNull();
+    expect(window.localStorage.getItem(draftStorageKey("job-1"))).toBeNull();
+  });
+
+  it("purges an older revision when the current server revision is newer", () => {
+    saveAigenDraft(envelope());
+
+    expect(loadAigenDraft("job-1", 5)).toBeNull();
+    expect(window.localStorage.getItem(draftStorageKey("job-1"))).toBeNull();
+  });
+
+  it("purges malformed and inactive job drafts when a new job starts", () => {
+    saveAigenDraft(envelope());
+    saveAigenDraft({ ...envelope(), jobId: "job-current" });
+    window.localStorage.setItem(draftStorageKey("malformed"), "{bad-json");
+    window.localStorage.setItem("unrelated", "keep");
+
+    purgeAigenDrafts("job-current");
+
+    expect(window.localStorage.getItem(draftStorageKey("job-1"))).toBeNull();
+    expect(window.localStorage.getItem(draftStorageKey("malformed"))).toBeNull();
+    expect(loadAigenDraft("job-current", 4)).toEqual({ ...envelope(), jobId: "job-current" });
+    expect(window.localStorage.getItem("unrelated")).toBe("keep");
   });
 
   it("rejects malformed and legacy unversioned data", () => {
