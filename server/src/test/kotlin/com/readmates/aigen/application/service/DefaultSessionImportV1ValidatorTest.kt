@@ -112,14 +112,10 @@ class DefaultSessionImportV1ValidatorTest {
     }
 
     @Test
-    fun `highlights count below three returns HIGHLIGHTS_OUT_OF_RANGE`() {
+    fun `empty highlights returns HIGHLIGHTS_OUT_OF_RANGE`() {
         val snapshot =
             validSnapshot().copy(
-                highlights =
-                    listOf(
-                        SessionImportV1Snapshot.AuthoredText("Alice", "1"),
-                        SessionImportV1Snapshot.AuthoredText("Bob", "2"),
-                    ),
+                highlights = emptyList(),
             )
 
         val result = validator.validate(snapshot, validMeta())
@@ -128,11 +124,11 @@ class DefaultSessionImportV1ValidatorTest {
     }
 
     @Test
-    fun `highlights count above ten returns HIGHLIGHTS_OUT_OF_RANGE`() {
+    fun `highlights count above six returns HIGHLIGHTS_OUT_OF_RANGE`() {
         val snapshot =
             validSnapshot().copy(
                 highlights =
-                    (1..11).map {
+                    (1..7).map {
                         SessionImportV1Snapshot.AuthoredText("Alice", "highlight $it")
                     },
             )

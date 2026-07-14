@@ -369,6 +369,7 @@ class RedisAiGenerationJobStore(
                 "modelName" to job.model.name,
                 "authorNameMode" to job.authorNameMode.name,
                 "pipelineMode" to job.pipelineMode.name,
+                "eligibleFallbackModels" to objectMapper.writeValueAsString(job.eligibleFallbackModels),
                 "sessionMeta" to objectMapper.writeValueAsString(job.sessionMeta),
                 "status" to job.status.name,
                 "progressPct" to job.progressPct.toString(),
@@ -454,6 +455,10 @@ class RedisAiGenerationJobStore(
                 hash["pipelineMode"]?.let(AiGenerationPipelineMode::valueOf)
                     ?: AiGenerationPipelineMode.LEGACY,
             validatedTurns = validatedTurns,
+            eligibleFallbackModels =
+                hash["eligibleFallbackModels"]
+                    ?.let { objectMapper.readValue(it, Array<ModelId>::class.java).toList() }
+                    .orEmpty(),
         )
     }
 

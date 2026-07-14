@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ReadMates grounded whole-transcript generation v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "sessionNumber",
+    "bookTitle",
+    "meetingDate",
+    "summaryBlocks",
+    "highlights",
+    "oneLineReviews",
+    "feedbackDocumentFileName",
+    "feedbackSections"
+  ],
+  "properties": {
+    "format": { "type": "string", "const": "readmates-grounded-generation:v2" },
+    "sessionNumber": { "type": "integer", "minimum": 1 },
+    "bookTitle": { "type": "string", "minLength": 1 },
+    "meetingDate": { "type": "string", "format": "date" },
+    "summaryBlocks": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/textBlock" }
+    },
+    "highlights": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 6,
+      "items": { "$ref": "#/$defs/authoredText" }
+    },
+    "oneLineReviews": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/authoredText" }
+    },
+    "feedbackDocumentFileName": { "type": "string", "minLength": 1 },
+    "feedbackSections": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/feedbackSection" }
+    }
+  },
+  "$defs": {
+    "turnIds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^t[0-9]{6}$" }
+    },
+    "textBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "evidenceTurnIds"],
+      "properties": {
+        "text": { "type": "string", "minLength": 1 },
+        "evidenceTurnIds": { "$ref": "#/$defs/turnIds" }
+      }
+    },
+    "authoredText": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authorName", "text", "evidenceTurnIds"],
+      "properties": {
+        "authorName": { "type": "string", "minLength": 1 },
+        "text": { "type": "string", "minLength": 1 },
+        "evidenceTurnIds": { "$ref": "#/$defs/turnIds" }
+      }
+    },
+    "feedbackSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["heading", "markdown", "evidenceTurnIds"],
+      "properties": {
+        "heading": { "type": "string", "minLength": 1 },
+        "markdown": { "type": "string", "minLength": 1 },
+        "evidenceTurnIds": { "$ref": "#/$defs/turnIds" }
+      }
+    }
+  }
+}

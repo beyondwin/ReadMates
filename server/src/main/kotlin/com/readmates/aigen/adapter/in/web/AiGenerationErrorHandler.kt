@@ -162,6 +162,7 @@ internal fun ErrorCode.toHttpStatus(): HttpStatus =
         ErrorCode.RATE_LIMITED -> HttpStatus.TOO_MANY_REQUESTS
         ErrorCode.MAX_CALLS_EXCEEDED -> HttpStatus.TOO_MANY_REQUESTS
         ErrorCode.QUEUE_UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE
+        ErrorCode.MODEL_CAPABILITY_UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE
         ErrorCode.PROVIDER_UNAVAILABLE,
         ErrorCode.PROVIDER_RATE_LIMITED,
         -> HttpStatus.BAD_GATEWAY
@@ -175,6 +176,7 @@ internal fun ErrorCode.toHttpStatus(): HttpStatus =
         ErrorCode.TRANSCRIPT_DURATION_EXCEEDED,
         ErrorCode.TRANSCRIPT_SPEAKER_NOT_MEMBER,
         ErrorCode.TRANSCRIPT_SPEAKER_AMBIGUOUS,
+        ErrorCode.TRANSCRIPT_TOO_LONG_FOR_MODEL,
         -> HttpStatus.UNPROCESSABLE_ENTITY
         ErrorCode.UNKNOWN -> HttpStatus.INTERNAL_SERVER_ERROR
     }

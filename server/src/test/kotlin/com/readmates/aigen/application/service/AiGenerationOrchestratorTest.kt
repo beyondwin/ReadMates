@@ -8,6 +8,7 @@ import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
+import com.readmates.aigen.application.model.ModelCapability
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.`in`.JobNotFoundException
 import com.readmates.aigen.application.port.`in`.JobSessionMismatchException
@@ -15,9 +16,12 @@ import com.readmates.aigen.application.port.`in`.StartGenerationCommand
 import com.readmates.aigen.application.port.out.ActiveClubMember
 import com.readmates.aigen.application.port.out.AuditKind
 import com.readmates.aigen.application.port.out.AuditStatus
+import com.readmates.aigen.application.port.out.GroundedRequestRenderer
 import com.readmates.aigen.application.port.out.GuardDecision
 import com.readmates.aigen.application.port.out.JobKind
 import com.readmates.aigen.application.port.out.LoadAiGenerationClubMembersPort
+import com.readmates.aigen.application.port.out.ModelCapabilityCatalog
+import com.readmates.aigen.application.port.out.RenderedGroundedRequest
 import com.readmates.shared.security.Sha256
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -60,6 +64,63 @@ class AiGenerationOrchestratorTest {
         val savedTurn = savedJob.validatedTurns.single()
         assertThat(savedTurn.speakerMembershipId).isEqualTo(membershipId)
         assertThat(savedTurn.speakerName).isEqualTo("가람")
+    }
+
+    @Test
+    fun `grounded start stores only whole-request-compatible fallback models`() {
+        val ctx =
+            TestContext(
+                pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
+                activeMembers = listOf(ActiveClubMember(UUID.randomUUID(), "가람")),
+                fallbackChain = listOf(AiGenerationTestFixtures.CLAUDE_FALLBACK.name),
+            )
+
+        ctx.orchestrator.start(ctx.commandWithSpeaker("가람"))
+
+        val savedJob =
+            ctx.jobStore.records.values
+                .single()
+        assertThat(savedJob.eligibleFallbackModels).containsExactly(AiGenerationTestFixtures.CLAUDE_FALLBACK)
+    }
+
+    @Test
+    fun `unknown grounded capability rejects before Redis Kafka cost or audit work`() {
+        val ctx =
+            TestContext(
+                pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
+                activeMembers = listOf(ActiveClubMember(UUID.randomUUID(), "가람")),
+                capabilities = emptyMap(),
+            )
+
+        assertThatThrownBy { ctx.orchestrator.start(ctx.commandWithSpeaker("가람")) }
+            .isInstanceOfSatisfying(AiGenerationException.Coded::class.java) {
+                assertThat(it.code).isEqualTo(ErrorCode.MODEL_CAPABILITY_UNAVAILABLE)
+            }
+
+        assertThat(ctx.jobStore.records).isEmpty()
+        assertThat(ctx.queue.published).isEmpty()
+        assertThat(ctx.costGuard.checked).isEmpty()
+        assertThat(ctx.auditPort.entries).isEmpty()
+    }
+
+    @Test
+    fun `oversized grounded request rejects before Redis Kafka cost or audit work`() {
+        val ctx =
+            TestContext(
+                pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
+                activeMembers = listOf(ActiveClubMember(UUID.randomUUID(), "가람")),
+                capabilities = mapOf(AiGenerationTestFixtures.CLAUDE_MODEL to ModelCapability(24_576, 16_384, true)),
+            )
+
+        assertThatThrownBy { ctx.orchestrator.start(ctx.commandWithSpeaker("가람")) }
+            .isInstanceOfSatisfying(AiGenerationException.Coded::class.java) {
+                assertThat(it.code).isEqualTo(ErrorCode.TRANSCRIPT_TOO_LONG_FOR_MODEL)
+            }
+
+        assertThat(ctx.jobStore.records).isEmpty()
+        assertThat(ctx.queue.published).isEmpty()
+        assertThat(ctx.costGuard.checked).isEmpty()
+        assertThat(ctx.auditPort.entries).isEmpty()
     }
 
     @Test
@@ -418,6 +479,8 @@ class AiGenerationOrchestratorTest {
             setOf(AiGenerationTestFixtures.CLAUDE_MODEL, AiGenerationTestFixtures.CLAUDE_FALLBACK),
         pipelineMode: AiGenerationPipelineMode = AiGenerationPipelineMode.LEGACY,
         activeMembers: List<ActiveClubMember> = emptyList(),
+        capabilities: Map<com.readmates.aigen.application.model.ModelId, ModelCapability>? = null,
+        fallbackChain: List<String> = emptyList(),
     ) {
         val sessionId: UUID = UUID.randomUUID()
         val clubId: UUID = UUID.randomUUID()
@@ -429,7 +492,11 @@ class AiGenerationOrchestratorTest {
         val costGuard = FakeCostGuard()
         val clubDefaults = FakeClubDefaultPort()
         val modelCatalog = AiGenerationTestFixtures.defaultModelCatalog(enabled = modelEnabled)
-        val properties = AiGenerationTestFixtures.defaultProperties().copy(pipelineMode = pipelineMode)
+        val properties =
+            AiGenerationTestFixtures.defaultProperties().copy(
+                pipelineMode = pipelineMode,
+                fallbackChain = fallbackChain,
+            )
         val clock = FakeClock(AiGenerationTestFixtures.NOW)
         val memberDirectory = LoadAiGenerationClubMembersPort { activeMembers }
 
@@ -450,6 +517,22 @@ class AiGenerationOrchestratorTest {
                         TranscriptParser(),
                         memberDirectory,
                         TranscriptMembershipValidator(),
+                    ),
+                groundedInputBudgetGuard =
+                    GroundedInputBudgetGuard(
+                        renderer =
+                            GroundedRequestRenderer {
+                                RenderedGroundedRequest("system", "user", "schema", 16_384)
+                            },
+                        capabilityCatalog =
+                            ModelCapabilityCatalog { model ->
+                                if (capabilities == null) {
+                                    ModelCapability(1_000_000, 64_000, true)
+                                } else {
+                                    capabilities[model]
+                                }
+                            },
+                        properties = properties,
                     ),
             )
 

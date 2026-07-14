@@ -28,6 +28,7 @@ import com.readmates.aigen.application.port.out.AuditKind
 import com.readmates.aigen.application.port.out.AuditLogEntry
 import com.readmates.aigen.application.port.out.AuditStatus
 import com.readmates.aigen.application.port.out.GenerationCostGuard
+import com.readmates.aigen.application.port.out.GroundedRenderRequest
 import com.readmates.aigen.application.port.out.GuardDecision
 import com.readmates.aigen.application.port.out.JobKind
 import com.readmates.aigen.application.port.out.JobRecord
@@ -55,7 +56,7 @@ import java.util.UUID
  */
 @Service
 @ConditionalOnProperty(prefix = "readmates", name = ["aigen.enabled"], havingValue = "true")
-@Suppress("LongParameterList")
+@Suppress("LongParameterList", "TooManyFunctions")
 class AiGenerationOrchestrator(
     private val jobStore: AiGenerationJobStore,
     private val queue: AiGenerationJobQueue,
@@ -68,6 +69,7 @@ class AiGenerationOrchestrator(
     private val metrics: AiGenerationMetrics,
     private val transitionPolicy: AiGenerationJobTransitionPolicy,
     private val groundedPreflightService: GroundedTranscriptPreflightService,
+    private val groundedInputBudgetGuard: GroundedInputBudgetGuard,
 ) : StartGenerationUseCase,
     GetJobUseCase,
     GetRecentSessionGenerationJobUseCase,
@@ -79,7 +81,6 @@ class AiGenerationOrchestrator(
             } else {
                 null
             }
-        metrics.recordJobStarted()
         val modelId =
             resolveModelId(command.model, command.clubId)
                 ?: failStart(command, ErrorCode.AI_DISABLED, "Requested model is not enabled")
@@ -87,6 +88,9 @@ class AiGenerationOrchestrator(
         if (!modelCatalog.isEnabled(modelId)) {
             failStart(command, modelId, ErrorCode.AI_DISABLED, "Model not enabled")
         }
+
+        val groundedBudget = runGroundedBudgetPreflight(command, groundedPreflight, modelId)
+        metrics.recordJobStarted()
 
         when (val decision = costGuard.checkBeforeCall(command.hostUserId, command.clubId)) {
             is GuardDecision.Allow -> Unit
@@ -101,6 +105,7 @@ class AiGenerationOrchestrator(
                 jobId,
                 modelId,
                 groundedPreflight,
+                groundedBudget,
                 properties.pipelineMode,
                 now,
                 expiresAt,
@@ -301,6 +306,29 @@ class AiGenerationOrchestrator(
             else -> null
         }
 
+    private fun resolveEnabledFallbackModels(): List<ModelId> =
+        properties.fallbackChain
+            .mapNotNull(modelCatalog::resolveAlias)
+            .filter(modelCatalog::isEnabled)
+
+    private fun runGroundedBudgetPreflight(
+        command: StartGenerationCommand,
+        preflight: GroundedTranscriptPreflight?,
+        modelId: ModelId,
+    ): GroundedBudgetDecision? =
+        preflight?.let {
+            groundedInputBudgetGuard.evaluate(
+                request =
+                    GroundedRenderRequest(
+                        sessionMeta = command.sessionMeta.copy(authorNameMode = command.authorNameMode),
+                        turns = it.validatedTurns,
+                        hostInstructions = command.instructions,
+                    ),
+                selectedModel = modelId,
+                fallbackModels = resolveEnabledFallbackModels(),
+            )
+        }
+
     private fun failStart(
         command: StartGenerationCommand,
         modelId: ModelId,
@@ -377,6 +405,7 @@ private fun StartGenerationCommand.toJobRecord(
     jobId: UUID,
     modelId: ModelId,
     groundedPreflight: GroundedTranscriptPreflight?,
+    groundedBudget: GroundedBudgetDecision?,
     pipelineMode: AiGenerationPipelineMode,
     now: Instant,
     expiresAt: Instant,
@@ -403,4 +432,5 @@ private fun StartGenerationCommand.toJobRecord(
         lastUpdatedAt = now,
         pipelineMode = pipelineMode,
         validatedTurns = groundedPreflight?.validatedTurns.orEmpty(),
+        eligibleFallbackModels = groundedBudget?.eligibleFallbackModels.orEmpty(),
     )

@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component
  *                                metadata consistency (sessionNumber/bookTitle/meetingDate)
  *   2. AUTHOR_NAME_MISMATCH   — every authorName in highlights/oneLineReviews must be
  *                                present in [SessionMeta.expectedAuthorNames]
- *   3. HIGHLIGHTS_OUT_OF_RANGE — highlights size must be in 3..10 (inclusive)
+ *   3. HIGHLIGHTS_OUT_OF_RANGE — highlights size must be in 1..6 (inclusive)
  *   4. ONE_LINE_REVIEWS_DUPLICATE — no duplicate authorName among one-line reviews
  *   5. FEEDBACK_TEMPLATE_INVALID — markdown must start with `<!-- readmates-feedback:v1 -->`
  *                                   AND contain `# 독서모임 {sessionNumber}차 피드백`
@@ -177,6 +177,6 @@ class DefaultSessionImportV1Validator(
     private companion object {
         const val FORMAT_CONST = "readmates-session-import:v1"
         const val FEEDBACK_MARKER = "<!-- readmates-feedback:v1 -->"
-        val HIGHLIGHTS_RANGE = 3..10
+        val HIGHLIGHTS_RANGE = 1..6
     }
 }

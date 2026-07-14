@@ -48,6 +48,35 @@ data class ValidatedTranscriptTurn(
     val text: String,
 )
 
+data class GroundedGenerationDraft(
+    val format: String,
+    val sessionNumber: Int,
+    val bookTitle: String,
+    val meetingDate: LocalDate,
+    val summaryBlocks: List<GroundedTextBlock>,
+    val highlights: List<GroundedAuthoredText>,
+    val oneLineReviews: List<GroundedAuthoredText>,
+    val feedbackDocumentFileName: String,
+    val feedbackSections: List<GroundedFeedbackSection>,
+)
+
+data class GroundedTextBlock(
+    val text: String,
+    val evidenceTurnIds: List<String>,
+)
+
+data class GroundedAuthoredText(
+    val authorName: String,
+    val text: String,
+    val evidenceTurnIds: List<String>,
+)
+
+data class GroundedFeedbackSection(
+    val heading: String,
+    val markdown: String,
+    val evidenceTurnIds: List<String>,
+)
+
 data class TokenUsage(
     val inputTokens: Long,
     val cachedInputTokens: Long,
@@ -158,6 +187,8 @@ enum class ErrorCode {
     TRANSCRIPT_DURATION_EXCEEDED,
     TRANSCRIPT_SPEAKER_NOT_MEMBER,
     TRANSCRIPT_SPEAKER_AMBIGUOUS,
+    MODEL_CAPABILITY_UNAVAILABLE,
+    TRANSCRIPT_TOO_LONG_FOR_MODEL,
 
     /**
      * The per-job hard cap on LLM calls (start + validation retry + regenerations) has

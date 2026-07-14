@@ -157,6 +157,8 @@ data class JobRecord(
     val llmCallCount: Int = 0,
     val pipelineMode: AiGenerationPipelineMode = AiGenerationPipelineMode.LEGACY,
     val validatedTurns: List<ValidatedTranscriptTurn> = emptyList(),
+    /** Ordered availability fallback IDs already proven to fit the exact whole request. */
+    val eligibleFallbackModels: List<ModelId> = emptyList(),
 ) {
     /**
      * The [SessionMeta] for downstream generator / regenerator prompts and validator

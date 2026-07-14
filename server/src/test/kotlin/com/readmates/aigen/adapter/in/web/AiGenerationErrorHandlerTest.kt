@@ -190,6 +190,8 @@ class AiGenerationErrorHandlerTest {
                 arrayOf(ErrorCode.TRANSCRIPT_DURATION_EXCEEDED, HttpStatus.UNPROCESSABLE_ENTITY),
                 arrayOf(ErrorCode.TRANSCRIPT_SPEAKER_NOT_MEMBER, HttpStatus.UNPROCESSABLE_ENTITY),
                 arrayOf(ErrorCode.TRANSCRIPT_SPEAKER_AMBIGUOUS, HttpStatus.UNPROCESSABLE_ENTITY),
+                arrayOf(ErrorCode.MODEL_CAPABILITY_UNAVAILABLE, HttpStatus.SERVICE_UNAVAILABLE),
+                arrayOf(ErrorCode.TRANSCRIPT_TOO_LONG_FOR_MODEL, HttpStatus.UNPROCESSABLE_ENTITY),
                 arrayOf(ErrorCode.UNKNOWN, HttpStatus.INTERNAL_SERVER_ERROR),
             )
     }

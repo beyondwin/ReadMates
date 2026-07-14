@@ -498,7 +498,7 @@ git commit -m "feat(aigen): reject transcript speakers outside active membership
 - Produces an ordered, precomputed list of whole-request-compatible fallback models.
 - Rejects unknown capabilities with 503 `MODEL_CAPABILITY_UNAVAILABLE` and oversized input with 422 `TRANSCRIPT_TOO_LONG_FOR_MODEL` before side effects.
 
-- [ ] **Step 1: Write the grounded schema contract test**
+- [x] **Step 1: Write the grounded schema contract test**
 
 Assert required roots and cardinalities without provider-specific transformations:
 
@@ -543,7 +543,7 @@ data class GroundedFeedbackSection(
 )
 ```
 
-- [ ] **Step 2: Write exact renderer and budget tests**
+- [x] **Step 2: Write exact renderer and budget tests**
 
 Pin the same rendered bytes on both call sites and the conservative fallback:
 
@@ -565,7 +565,7 @@ fun `oversized primary and every fallback fails before queueing`() { /* 422 */ }
 fun `fallback list contains only models that fit the entire request`() { /* ordered subset */ }
 ```
 
-- [ ] **Step 3: Run the focused tests and verify RED**
+- [x] **Step 3: Run the focused tests and verify RED**
 
 ```bash
 ./server/gradlew -p server unitTest --tests '*GroundedGenerationSchemaResourceTest' --tests '*DefaultGroundedRequestRendererTest' --tests '*GroundedInputBudgetGuardTest'
@@ -573,7 +573,7 @@ fun `fallback list contains only models that fit the entire request`() { /* orde
 
 Expected: FAIL because the schema, renderer, and guard do not exist.
 
-- [ ] **Step 4: Implement an injection-safe request renderer**
+- [x] **Step 4: Implement an injection-safe request renderer**
 
 The renderer must include:
 
@@ -597,7 +597,7 @@ data class RenderedGroundedRequest(
 
 Do not log this object or include it in exceptions.
 
-- [ ] **Step 5: Implement conservative local budgeting**
+- [x] **Step 5: Implement conservative local budgeting**
 
 Without adding a tokenizer dependency, use the total UTF-8 byte count of the exact system text, user text, and provider-specific serialized schema directly as the conservative token upper bound (one byte budgeted as at most one token). Cover this named fallback with boundary tests and do not call any provider endpoint. Require:
 
@@ -609,15 +609,15 @@ structuredOutputSupported == true
 
 The result stores the selected model and the already-filtered eligible fallback IDs so the worker never discovers an incompatible fallback after dequeue. A valid primary may start with no eligible fallback; an availability failure then ends as `PROVIDER_UNAVAILABLE` without truncation or an incompatible call. Preserve the existing fallback depth of one.
 
-- [ ] **Step 6: Wire capability and budget checks into preflight**
+- [x] **Step 6: Wire capability and budget checks into preflight**
 
 Run after speaker validation but before `jobStore.save`. Map unknown capability to HTTP 503 and no-fit input to HTTP 422. Add orchestrator interaction assertions proving job store, cost, and queue are untouched for both failures.
 
-- [ ] **Step 7: Align the legacy import validator's highlight cardinality**
+- [x] **Step 7: Align the legacy import validator's highlight cardinality**
 
 Change the existing validator from the divergent `3..10` check to the canonical `1..6` schema contract and update its tests. This prevents the grounded projector from producing a snapshot that one layer accepts and another rejects.
 
-- [ ] **Step 8: Run focused and orchestrator regression tests**
+- [x] **Step 8: Run focused and orchestrator regression tests**
 
 ```bash
 ./server/gradlew -p server unitTest --tests '*GroundedGenerationSchemaResourceTest' --tests '*DefaultGroundedRequestRendererTest' --tests '*GroundedInputBudgetGuardTest' --tests '*DefaultSessionImportV1ValidatorTest' --tests '*AiGenerationOrchestratorTest'
@@ -625,7 +625,7 @@ Change the existing validator from the divergent `3..10` check to the canonical 
 
 Expected: PASS and no network access in any budget test.
 
-- [ ] **Step 9: Commit the request-contract slice**
+- [x] **Step 9: Commit the request-contract slice**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/aigen server/src/main/resources/aigen server/src/test/kotlin/com/readmates/aigen
