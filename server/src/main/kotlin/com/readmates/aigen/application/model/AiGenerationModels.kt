@@ -77,6 +77,41 @@ data class GroundedFeedbackSection(
     val evidenceTurnIds: List<String>,
 )
 
+enum class GroundingFailureReason {
+    SESSION_METADATA_MISMATCH,
+    SOURCE_TURNS_INVALID,
+    SECTION_EMPTY,
+    HIGHLIGHTS_OUT_OF_RANGE,
+    ONE_LINE_AUTHOR_SET_MISMATCH,
+    AUTHOR_NOT_ALLOWED,
+    EVIDENCE_REQUIRED,
+    EVIDENCE_TURN_NOT_FOUND,
+    AUTHOR_EVIDENCE_MISMATCH,
+    FEEDBACK_TEMPLATE_INVALID,
+    PII_DETECTED,
+}
+
+data class GroundedEvidenceTarget(
+    val targetId: String,
+    val section: GenerationItem,
+    val ordinal: Int,
+    val turnIds: List<String>,
+)
+
+data class GroundedEvidenceExcerpt(
+    val turnId: String,
+    val speakerName: String,
+    val startSeconds: Int,
+    val excerpt: String,
+    val truncated: Boolean,
+)
+
+data class GroundedEvidenceBundle(
+    val revision: Long,
+    val targets: List<GroundedEvidenceTarget>,
+    val excerpts: List<GroundedEvidenceExcerpt>,
+)
+
 data class TokenUsage(
     val inputTokens: Long,
     val cachedInputTokens: Long,

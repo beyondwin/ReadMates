@@ -44,7 +44,7 @@ class TranscriptMembershipValidator {
             val member = membersByName.getValue(normalize(turn.speakerName)).single()
             ValidatedTranscriptTurn(
                 turnId = turn.turnId,
-                speakerName = member.displayName.trim(),
+                speakerName = normalize(member.displayName),
                 speakerMembershipId = member.membershipId,
                 startSeconds = turn.startSeconds,
                 text = turn.text,

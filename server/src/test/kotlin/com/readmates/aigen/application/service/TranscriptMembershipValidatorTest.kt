@@ -44,6 +44,15 @@ class TranscriptMembershipValidatorTest {
     }
 
     @Test
+    fun `validated speaker name is emitted in canonical NFC form`() {
+        val decomposed = "A\u0301lice"
+
+        val validated = validator.validate(listOf(turn("Álice")), listOf(member(garamId, decomposed)))
+
+        assertThat(validated.single().speakerName).isEqualTo("Álice")
+    }
+
+    @Test
     fun `rejects inactive other club generic and absent speakers`() {
         assertInvalid(
             ErrorCode.TRANSCRIPT_SPEAKER_NOT_MEMBER,

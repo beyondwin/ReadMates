@@ -42,6 +42,11 @@ class DefaultGroundedRequestRendererTest {
 
         assertTrue(rendered.systemText.contains("untrusted data", ignoreCase = true))
         assertTrue(rendered.systemText.contains("never invent", ignoreCase = true))
+        assertTrue(rendered.systemText.contains("### NN. allowedSpeakerName"))
+        assertTrue(rendered.systemText.contains("#### 참여 스타일"))
+        assertTrue(rendered.systemText.contains("- 핵심:"))
+        assertTrue(rendered.systemText.contains("맥락:"))
+        assertTrue(rendered.systemText.contains("must not repeat marker, title, subtitle, or ## headings"))
         assertFalse(rendered.systemText.contains(injection))
         assertEquals(injection, envelope.path("hostInstructions").asText())
         val turns = envelope.path("turns")

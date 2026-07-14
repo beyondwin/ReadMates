@@ -115,6 +115,27 @@ class DefaultGroundedRequestRenderer(
             Follow the supplied JSON schema exactly. Use only allowed real speaker names.
             Cite supporting source turns by turnId for every block. Never invent turn IDs and never return excerpts;
             the server resolves excerpts from the original turns. Do not include content unsupported by cited turns.
+            feedbackSections must contain exactly two ordered top-level sections named 관찰자 노트 and 참여자별 피드백.
+            Each section markdown must not repeat marker, title, subtitle, or ## headings.
+            In 참여자별 피드백 markdown, emit each allowed speaker exactly once in allowedSpeakerNames order,
+            numbered from 01. Repeat this exact skeleton for every speaker and fill every placeholder with grounded text:
+            ### NN. allowedSpeakerName
+            역할: grounded role
+            #### 참여 스타일
+            grounded paragraph
+            #### 실질 기여
+            - grounded contribution
+            #### 문제점과 자기모순
+            ##### 1. grounded problem title
+            - 핵심: grounded core
+            - 근거: grounded evidence description
+            - 해석: grounded interpretation
+            #### 실천 과제
+            1. grounded action
+            #### 드러난 한 문장
+            > grounded revealing quote
+            맥락: grounded context
+            주석: grounded note
             In repair or regeneration mode, change only requestedSection while preserving the rest of currentDraft.
             """.trimIndent()
     }

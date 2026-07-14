@@ -761,7 +761,7 @@ git commit -m "feat(aigen): add grounded whole transcript providers"
 - Produces an existing `SessionImportV1Snapshot` plus `GroundedEvidenceBundle` only when every section is valid.
 - Produces exactly one safe invalid-section classification for the worker's one repair opportunity.
 
-- [ ] **Step 1: Write validator truth-table tests**
+- [x] **Step 1: Write validator truth-table tests**
 
 Cover:
 
@@ -775,7 +775,7 @@ Cover:
 - deterministic rejection of email, phone, and resident-registration-number patterns in generated text;
 - multiple invalid sections produce a terminal validation failure rather than multiple repairs.
 
-- [ ] **Step 2: Write evidence projection boundary tests**
+- [x] **Step 2: Write evidence projection boundary tests**
 
 ```kotlin
 @Test
@@ -792,7 +792,7 @@ fun `model supplied text cannot become an evidence excerpt`() { /* source turn w
 
 Also test emoji/supplementary-plane truncation, control-character removal, duplicate evidence ID de-duplication, invalid turn IDs, and stable first-seen ordering.
 
-- [ ] **Step 3: Run validator/projector suites and verify RED**
+- [x] **Step 3: Run validator/projector suites and verify RED**
 
 ```bash
 ./server/gradlew -p server unitTest --tests '*GroundedGenerationValidatorTest' --tests '*GroundedEvidenceProjectorTest'
@@ -800,7 +800,7 @@ Also test emoji/supplementary-plane truncation, control-character removal, dupli
 
 Expected: FAIL because validator/projector do not exist.
 
-- [ ] **Step 4: Implement validation as a pure service**
+- [x] **Step 4: Implement validation as a pure service**
 
 Return a sealed result rather than throwing during intermediate classification:
 
@@ -826,11 +826,11 @@ Reason values are safe enums suitable for aggregate audit/metrics. Never carry g
 
 Keep deterministic PII checks centralized and test boundary/nonmatch cases. Start with explicit patterns equivalent to email `(?i)\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b`, Korean phone `(?<!\\d)(?:01[016789]|0[2-6][1-5]?)[ -]?\\d{3,4}[ -]?\\d{4}(?!\\d)`, and resident-registration number `(?<!\\d)\\d{6}[ -]?[1-4]\\d{6}(?!\\d)`. Do not echo the matched value in errors.
 
-- [ ] **Step 5: Build final snapshot content on the server**
+- [x] **Step 5: Build final snapshot content on the server**
 
 Join summary blocks with stable paragraph separators. Construct feedback markdown with the existing required marker/header and validated section headings rather than trusting a model-supplied complete document. Preserve the existing `SessionImportV1Snapshot` boundary for downstream commit compatibility.
 
-- [ ] **Step 6: Implement evidence targets and excerpts**
+- [x] **Step 6: Implement evidence targets and excerpts**
 
 ```kotlin
 data class EvidenceTarget(
@@ -851,7 +851,7 @@ data class EvidenceExcerpt(
 
 Use `offsetByCodePoints` or an equivalent code-point-safe helper. Default excerpts are 240 code points; longer expansion is handled by the API task and still resolves from the source turn.
 
-- [ ] **Step 7: Rerun the focused suites**
+- [x] **Step 7: Rerun the focused suites**
 
 ```bash
 ./server/gradlew -p server unitTest --tests '*GroundedGenerationValidatorTest' --tests '*GroundedEvidenceProjectorTest' --tests '*DefaultSessionImportV1ValidatorTest'
@@ -859,7 +859,7 @@ Use `offsetByCodePoints` or an equivalent code-point-safe helper. Default excerp
 
 Expected: PASS and every failure report contains safe enums only.
 
-- [ ] **Step 8: Commit the grounding slice**
+- [x] **Step 8: Commit the grounding slice**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/aigen server/src/test/kotlin/com/readmates/aigen
