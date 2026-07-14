@@ -1,5 +1,26 @@
 package com.readmates.aigen.api
 
+import com.readmates.aigen.application.model.AiGenerationPipelineMode
+import com.readmates.aigen.application.model.AuthorNameMode
+import com.readmates.aigen.application.model.GenerationItem
+import com.readmates.aigen.application.model.GroundedAuthoredText
+import com.readmates.aigen.application.model.GroundedEvidenceBundle
+import com.readmates.aigen.application.model.GroundedEvidenceExcerpt
+import com.readmates.aigen.application.model.GroundedEvidenceTarget
+import com.readmates.aigen.application.model.GroundedFeedbackSection
+import com.readmates.aigen.application.model.GroundedGenerationDraft
+import com.readmates.aigen.application.model.GroundedTextBlock
+import com.readmates.aigen.application.model.GroundingStatus
+import com.readmates.aigen.application.model.JobStage
+import com.readmates.aigen.application.model.JobStatus
+import com.readmates.aigen.application.model.ModelId
+import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.model.SessionImportV1Snapshot
+import com.readmates.aigen.application.model.SessionMeta
+import com.readmates.aigen.application.model.TokenUsage
+import com.readmates.aigen.application.model.ValidatedTranscriptTurn
+import com.readmates.aigen.application.port.out.AiGenerationJobStore
+import com.readmates.aigen.application.port.out.JobRecord
 import com.readmates.support.KafkaTestContainer
 import com.readmates.support.ReadmatesRedisIntegrationTestSupport
 import org.apache.kafka.clients.admin.AdminClient
@@ -26,7 +47,10 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.multipart
 import org.springframework.test.web.servlet.post
+import java.math.BigDecimal
 import java.time.Duration
+import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
@@ -108,10 +132,11 @@ class AiGenerateApiIntegrationTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val redis: StringRedisTemplate,
+    @param:Autowired private val jobStore: AiGenerationJobStore,
 ) : ReadmatesRedisIntegrationTestSupport() {
     @Test
     fun `full generation lifecycle - start, poll until SUCCEEDED, commit, then Redis payload cleaned`() {
-        val jobId = startJob("claude-sonnet-4-6", "Stub transcript content for the integration test.")
+        val jobId = startJob("claude-sonnet-4-6", "AiGenHost 00:00\nPublic-safe integration statement.")
 
         // Wait for the Kafka consumer to dispatch to the worker and the stub to drive
         // the snapshot through the validator + Redis result update.
@@ -135,7 +160,7 @@ class AiGenerateApiIntegrationTest(
                 "transcript",
                 "transcript.txt",
                 "text/plain",
-                "Another stub transcript.".toByteArray(),
+                "AiGenHost 00:00\nAnother public-safe statement.".toByteArray(),
             )
         val body =
             MockMultipartFile(
@@ -185,7 +210,7 @@ class AiGenerateApiIntegrationTest(
     @ParameterizedTest(name = "full generation lifecycle - provider {0}")
     @ValueSource(strings = ["claude-sonnet-4-6", "gpt-5.4-mini"])
     fun `full generation lifecycle - provider matrix`(model: String) {
-        val jobId = startJob(model, "Stub transcript for provider matrix ($model).")
+        val jobId = startJob(model, "AiGenHost 00:00\nPublic-safe provider statement for $model.")
         awaitSucceeded(jobId)
 
         assertThat(redis.hasKey("aigen:job:$jobId:result")).isTrue()
@@ -205,7 +230,7 @@ class AiGenerateApiIntegrationTest(
                 "transcript",
                 "transcript.txt",
                 "text/plain",
-                "Another stub transcript ($model).".toByteArray(),
+                "AiGenHost 00:00\nAnother public-safe provider statement for $model.".toByteArray(),
             )
         val body =
             MockMultipartFile(
@@ -256,7 +281,7 @@ class AiGenerateApiIntegrationTest(
                 "transcript",
                 "transcript.txt",
                 "text/plain",
-                "Stub transcript content.".toByteArray(),
+                "AiGenHost 00:00\nPublic-safe unknown-model statement.".toByteArray(),
             )
         val body =
             MockMultipartFile(
@@ -274,13 +299,79 @@ class AiGenerateApiIntegrationTest(
             }.andExpect {
                 status { isServiceUnavailable() }
                 jsonPath("$.code") { value("AI_DISABLED") }
-                jsonPath("$.detail") { value("Requested model is not enabled") }
+                jsonPath("$.detail") { value("AI generation request could not be completed") }
+            }
+    }
+
+    @Test
+    fun `explicit alias mode is rejected before transcript decoding and job side effects`() {
+        val before = redis.keys("aigen:job:*")
+        val transcript = MockMultipartFile("transcript", "public-fixture.txt", "text/plain", byteArrayOf(0xFF.toByte()))
+        val body =
+            MockMultipartFile(
+                "body",
+                "body.json",
+                "application/json",
+                """{"model":null,"authorNameMode":"alias","instructions":null}""".toByteArray(),
+            )
+
+        mockMvc
+            .multipart("/api/host/sessions/$SESSION_ID/ai-generate/jobs") {
+                file(transcript)
+                file(body)
+                with(user(HOST_EMAIL))
+            }.andExpect {
+                status { isUnprocessableEntity() }
+                jsonPath("$.code") { value("TRANSCRIPT_ALIAS_MODE_UNSUPPORTED") }
+            }
+
+        assertThat(redis.keys("aigen:job:*")).isEqualTo(before)
+    }
+
+    @Test
+    fun `grounded poll and evidence expansion expose only current referenced turn`() {
+        val record = groundedSucceededRecord()
+        jobStore.save(record)
+
+        mockMvc
+            .get("/api/host/sessions/$SESSION_ID/ai-generate/jobs/${record.jobId}") {
+                with(user(HOST_EMAIL))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.revision") { value(1) }
+                jsonPath("$.groundingStatus") { value("VALID") }
+                jsonPath("$.result.summary") { value("Public-safe grounded summary.") }
+                jsonPath("$.evidence[0].turnId") { value("t000001") }
+            }
+
+        mockMvc
+            .get("/api/host/sessions/$SESSION_ID/ai-generate/jobs/${record.jobId}/evidence/t000001?revision=1") {
+                with(user(HOST_EMAIL))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.text") { value("A complete public-safe source statement.") }
+            }
+
+        mockMvc
+            .get("/api/host/sessions/$SESSION_ID/ai-generate/jobs/${record.jobId}/evidence/t000002?revision=1") {
+                with(user(HOST_EMAIL))
+            }.andExpect {
+                status { isGone() }
+                jsonPath("$.code") { value("JOB_EXPIRED") }
+            }
+
+        mockMvc
+            .get("/api/host/sessions/$SESSION_ID/ai-generate/jobs/${record.jobId}/evidence/t000001?revision=0") {
+                with(user(HOST_EMAIL))
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.currentRevision") { value(1) }
             }
     }
 
     @Test
     fun `commit override with unknown author returns typed author name mismatch problem`() {
-        val jobId = startJob("claude-sonnet-4-6", "Stub transcript for override test.")
+        val jobId = startJob("claude-sonnet-4-6", "AiGenHost 00:00\nPublic-safe override statement.")
         awaitSucceeded(jobId)
 
         // Override result with an author not present in the seeded session's
@@ -295,9 +386,7 @@ class AiGenerateApiIntegrationTest(
             }.andExpect {
                 status { isUnprocessableEntity() }
                 jsonPath("$.code") { value("AUTHOR_NAME_MISMATCH") }
-                jsonPath("$.detail") {
-                    value(org.hamcrest.Matchers.startsWith("Unknown authorName(s) not in expectedAuthorNames:"))
-                }
+                jsonPath("$.detail") { value("AI generation request could not be completed") }
             }
     }
 
@@ -307,6 +396,108 @@ class AiGenerateApiIntegrationTest(
                 with(user(HOST_EMAIL))
             }.andReturn()
             .response.contentAsString
+
+    @Suppress("LongMethod")
+    private fun groundedSucceededRecord(): JobRecord {
+        val now = Instant.now()
+        val sessionId = UUID.fromString(SESSION_ID)
+        val clubId = UUID.fromString(CLUB_ID)
+        val hostUserId = UUID.fromString(HOST_USER_ID)
+        val snapshot =
+            SessionImportV1Snapshot(
+                format = "readmates-session-import:v1",
+                sessionNumber = 8861,
+                bookTitle = "AI Gen Book",
+                meetingDate = LocalDate.of(2026, 5, 14),
+                summary = "Public-safe grounded summary.",
+                highlights = listOf(SessionImportV1Snapshot.AuthoredText("AiGenHost", "Public-safe highlight.")),
+                oneLineReviews = listOf(SessionImportV1Snapshot.AuthoredText("AiGenHost", "Public-safe review.")),
+                feedbackDocumentFileName = "session-feedback.md",
+                feedbackDocumentMarkdown = "# Public-safe feedback",
+            )
+        val draft =
+            GroundedGenerationDraft(
+                format = "readmates-grounded-generation:v2",
+                sessionNumber = 8861,
+                bookTitle = "AI Gen Book",
+                meetingDate = LocalDate.of(2026, 5, 14),
+                summaryBlocks = listOf(GroundedTextBlock(snapshot.summary, listOf("t000001"))),
+                highlights = listOf(GroundedAuthoredText("AiGenHost", "Public-safe highlight.", listOf("t000001"))),
+                oneLineReviews = listOf(GroundedAuthoredText("AiGenHost", "Public-safe review.", listOf("t000001"))),
+                feedbackDocumentFileName = "session-feedback.md",
+                feedbackSections =
+                    listOf(GroundedFeedbackSection("Public-safe feedback", "A grounded section.", listOf("t000001"))),
+            )
+        val turns =
+            listOf(
+                ValidatedTranscriptTurn(
+                    "t000001",
+                    "AiGenHost",
+                    UUID.fromString(HOST_MEMBERSHIP_ID),
+                    0,
+                    "A complete public-safe source statement.",
+                ),
+                ValidatedTranscriptTurn(
+                    "t000002",
+                    "AiGenHost",
+                    UUID.fromString(HOST_MEMBERSHIP_ID),
+                    30,
+                    "An unreferenced public-safe source statement.",
+                ),
+            )
+        return JobRecord(
+            jobId = UUID.randomUUID(),
+            sessionId = sessionId,
+            clubId = clubId,
+            hostUserId = hostUserId,
+            model = ModelId(Provider.CLAUDE, "claude-sonnet-4-6"),
+            authorNameMode = AuthorNameMode.REAL,
+            instructions = null,
+            transcript = "AiGenHost 00:00\nA complete public-safe source statement.",
+            sessionMeta =
+                SessionMeta(
+                    sessionId,
+                    clubId,
+                    8861,
+                    "AI Gen Book",
+                    "Book Author",
+                    LocalDate.of(2026, 5, 14),
+                    listOf("AiGenHost"),
+                    AuthorNameMode.REAL,
+                ),
+            status = JobStatus.SUCCEEDED,
+            stage = JobStage.READY,
+            progressPct = 100,
+            result = snapshot,
+            groundedDraft = draft,
+            error = null,
+            tokens = TokenUsage(10, 0, 10),
+            costAccumulatedUsd = BigDecimal("0.01"),
+            expiresAt = now.plus(Duration.ofHours(6)),
+            createdAt = now,
+            lastUpdatedAt = now,
+            actualModel = ModelId(Provider.CLAUDE, "claude-sonnet-4-6"),
+            llmCallCount = 1,
+            pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
+            validatedTurns = turns,
+            revision = 1,
+            groundingStatus = GroundingStatus.VALID,
+            evidence =
+                GroundedEvidenceBundle(
+                    1,
+                    listOf(GroundedEvidenceTarget("r1:SUMMARY:0", GenerationItem.SUMMARY, 0, listOf("t000001"))),
+                    listOf(
+                        GroundedEvidenceExcerpt(
+                            "t000001",
+                            "AiGenHost",
+                            0,
+                            "A complete public-safe source statement.",
+                            false,
+                        ),
+                    ),
+                ),
+        )
+    }
 
     private fun startJob(
         model: String,

@@ -51,6 +51,7 @@ class AiGenerationErrorHandlerTest {
         assertThat(body.status).isEqualTo(expectedStatus.value())
         assertThat(body.type).isEqualTo("about:blank")
         assertThat(body.title).isNotBlank()
+        assertThat(body.detail).doesNotContain("context message")
     }
 
     @Test
@@ -110,6 +111,7 @@ class AiGenerationErrorHandlerTest {
             )
         assertThat(response.statusCode).isEqualTo(HttpStatus.BAD_GATEWAY)
         assertThat(response.body!!.code).isEqualTo(ErrorCode.PROVIDER_UNAVAILABLE.name)
+        assertThat(response.body!!.detail).doesNotContain("provider down")
     }
 
     @Test
@@ -167,6 +169,22 @@ class AiGenerationErrorHandlerTest {
         assertThat(body.code).isEqualTo("AI_DISABLED")
     }
 
+    @Test
+    fun `stale revision returns only safe current revision metadata`() {
+        val response =
+            handler.handleCoded(
+                AiGenerationException.Coded(
+                    ErrorCode.STALE_GENERATION_REVISION,
+                    "private draft mismatch",
+                    currentRevision = 7,
+                ),
+            )
+
+        assertThat(response.statusCode).isEqualTo(HttpStatus.CONFLICT)
+        assertThat(response.body!!.currentRevision).isEqualTo(7)
+        assertThat(response.body!!.detail).isEqualTo("Generation revision is stale")
+    }
+
     companion object {
         @JvmStatic
         fun errorCodeToStatus(): List<Array<Any>> =
@@ -192,6 +210,9 @@ class AiGenerationErrorHandlerTest {
                 arrayOf(ErrorCode.TRANSCRIPT_SPEAKER_AMBIGUOUS, HttpStatus.UNPROCESSABLE_ENTITY),
                 arrayOf(ErrorCode.MODEL_CAPABILITY_UNAVAILABLE, HttpStatus.SERVICE_UNAVAILABLE),
                 arrayOf(ErrorCode.TRANSCRIPT_TOO_LONG_FOR_MODEL, HttpStatus.UNPROCESSABLE_ENTITY),
+                arrayOf(ErrorCode.TRANSCRIPT_ALIAS_MODE_UNSUPPORTED, HttpStatus.UNPROCESSABLE_ENTITY),
+                arrayOf(ErrorCode.STALE_GENERATION_REVISION, HttpStatus.CONFLICT),
+                arrayOf(ErrorCode.MEMBERSHIP_CHANGED, HttpStatus.CONFLICT),
                 arrayOf(ErrorCode.UNKNOWN, HttpStatus.INTERNAL_SERVER_ERROR),
             )
     }

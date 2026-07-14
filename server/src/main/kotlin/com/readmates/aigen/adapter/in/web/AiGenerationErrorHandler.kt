@@ -8,6 +8,7 @@ import com.readmates.shared.security.AccessDeniedException
 import org.springframework.core.annotation.Order
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.web.bind.annotation.ControllerAdvice
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
@@ -45,7 +46,7 @@ class AiGenerationErrorHandler {
     @ExceptionHandler(AiGenerationException.Coded::class)
     fun handleCoded(error: AiGenerationException.Coded): ResponseEntity<ProblemDetail> {
         val status = error.code.toHttpStatus()
-        return problem(status, error.code.name, error.message)
+        return problem(status, error.code.name, error.code.safeDetail(), currentRevision = error.currentRevision)
     }
 
     @ExceptionHandler(AiGenerationException.JobNotFound::class)
@@ -96,8 +97,14 @@ class AiGenerationErrorHandler {
     @ExceptionHandler(LlmGenerationException::class)
     fun handleLlmGeneration(error: LlmGenerationException): ResponseEntity<ProblemDetail> {
         val status = error.error.code.toHttpStatus()
-        return problem(status, error.error.code.name, error.error.message)
+        return problem(status, error.error.code.name, error.error.code.safeDetail())
     }
+
+    @ExceptionHandler(HttpMessageNotReadableException::class)
+    fun handleUnreadableRequest(
+        @Suppress("UNUSED_PARAMETER") error: HttpMessageNotReadableException,
+    ): ResponseEntity<ProblemDetail> =
+        problem(HttpStatus.UNPROCESSABLE_ENTITY, ErrorCode.SCHEMA_INVALID.name, ErrorCode.SCHEMA_INVALID.safeDetail())
 
     @ExceptionHandler(AccessDeniedException::class)
     fun handleAccessDenied(
@@ -123,10 +130,9 @@ class AiGenerationErrorHandler {
                 "Unhandled AI generation exception. issueCount={}, issueCodes={}",
                 error.issues.size,
                 issueCodes,
-                error,
             )
         } else {
-            log.error("Unhandled AI generation exception", error)
+            log.error("Unhandled AI generation exception. errorType={}", error::class.simpleName)
         }
         return problem(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.UNKNOWN.name, INTERNAL_ERROR_DETAIL)
     }
@@ -137,6 +143,7 @@ class AiGenerationErrorHandler {
         detail: String?,
         type: String = "about:blank",
         invalidSpeakerLabels: List<String>? = null,
+        currentRevision: Long? = null,
     ): ResponseEntity<ProblemDetail> =
         ResponseEntity
             .status(status)
@@ -148,6 +155,7 @@ class AiGenerationErrorHandler {
                     detail = detail,
                     code = code,
                     invalidSpeakerLabels = invalidSpeakerLabels,
+                    currentRevision = currentRevision,
                 ),
             )
 }
@@ -177,7 +185,25 @@ internal fun ErrorCode.toHttpStatus(): HttpStatus =
         ErrorCode.TRANSCRIPT_SPEAKER_NOT_MEMBER,
         ErrorCode.TRANSCRIPT_SPEAKER_AMBIGUOUS,
         ErrorCode.TRANSCRIPT_TOO_LONG_FOR_MODEL,
+        ErrorCode.TRANSCRIPT_ALIAS_MODE_UNSUPPORTED,
         -> HttpStatus.UNPROCESSABLE_ENTITY
-        ErrorCode.STALE_GENERATION_REVISION -> HttpStatus.CONFLICT
+        ErrorCode.STALE_GENERATION_REVISION,
+        ErrorCode.MEMBERSHIP_CHANGED,
+        -> HttpStatus.CONFLICT
         ErrorCode.UNKNOWN -> HttpStatus.INTERNAL_SERVER_ERROR
+    }
+
+internal fun ErrorCode.safeDetail(): String =
+    when (this) {
+        ErrorCode.MODEL_CAPABILITY_UNAVAILABLE -> "Requested model capability is unavailable"
+        ErrorCode.JOB_EXPIRED -> "Generation job expired"
+        ErrorCode.STALE_GENERATION_REVISION -> "Generation revision is stale"
+        ErrorCode.MEMBERSHIP_CHANGED -> "Club membership changed during review"
+        ErrorCode.TRANSCRIPT_SPEAKER_NOT_MEMBER,
+        ErrorCode.TRANSCRIPT_SPEAKER_AMBIGUOUS,
+        -> "Transcript speakers must match active club members"
+        ErrorCode.PROVIDER_UNAVAILABLE,
+        ErrorCode.PROVIDER_RATE_LIMITED,
+        -> "Generation provider is temporarily unavailable"
+        else -> "AI generation request could not be completed"
     }

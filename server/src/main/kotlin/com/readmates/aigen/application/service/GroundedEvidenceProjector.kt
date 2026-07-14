@@ -61,7 +61,7 @@ class GroundedEvidenceProjector {
     }
 
     private fun excerpt(turn: ValidatedTranscriptTurn): GroundedEvidenceExcerpt {
-        val sanitized = removeControlCharacters(turn.text)
+        val sanitized = sanitizeEvidenceText(turn.text)
         val codePointCount = sanitized.codePointCount(0, sanitized.length)
         val truncated = codePointCount > MAX_EXCERPT_CODE_POINTS
         val excerpt =
@@ -80,22 +80,23 @@ class GroundedEvidenceProjector {
         )
     }
 
-    private fun removeControlCharacters(value: String): String =
-        buildString(value.length) {
-            var index = 0
-            while (index < value.length) {
-                val codePoint = value.codePointAt(index)
-                when {
-                    codePoint == '\n'.code || codePoint == '\r'.code || codePoint == '\t'.code -> append(' ')
-                    !Character.isISOControl(codePoint) -> appendCodePoint(codePoint)
-                }
-                index += Character.charCount(codePoint)
-            }
-        }.replace(WHITESPACE, " ").trim()
-
     private companion object {
         const val MAX_EXCERPT_CODE_POINTS = 240
         const val ELLIPSIS = "…"
-        val WHITESPACE = Regex("\\s+")
     }
 }
+
+internal fun sanitizeEvidenceText(value: String): String =
+    buildString(value.length) {
+        var index = 0
+        while (index < value.length) {
+            val codePoint = value.codePointAt(index)
+            when {
+                codePoint == '\n'.code || codePoint == '\r'.code || codePoint == '\t'.code -> append(' ')
+                !Character.isISOControl(codePoint) -> appendCodePoint(codePoint)
+            }
+            index += Character.charCount(codePoint)
+        }
+    }.replace(EVIDENCE_WHITESPACE, " ").trim()
+
+private val EVIDENCE_WHITESPACE = Regex("\\s+")

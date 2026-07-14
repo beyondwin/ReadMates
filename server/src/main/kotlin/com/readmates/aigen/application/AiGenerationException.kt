@@ -75,5 +75,6 @@ sealed class AiGenerationException(
     class Coded(
         val code: ErrorCode,
         detailMessage: String? = null,
+        val currentRevision: Long? = null,
     ) : AiGenerationException(detailMessage ?: code.name)
 }

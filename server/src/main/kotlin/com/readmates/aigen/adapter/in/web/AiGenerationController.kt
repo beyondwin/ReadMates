@@ -7,10 +7,12 @@ import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.port.`in`.CancelGenerationUseCase
 import com.readmates.aigen.application.port.`in`.CommitGenerationUseCase
+import com.readmates.aigen.application.port.`in`.ExpandGenerationEvidenceUseCase
 import com.readmates.aigen.application.port.`in`.GetJobUseCase
 import com.readmates.aigen.application.port.`in`.GetRecentSessionGenerationJobUseCase
 import com.readmates.aigen.application.port.`in`.ListGenerationModelsUseCase
 import com.readmates.aigen.application.port.`in`.RegenerateItemUseCase
+import com.readmates.aigen.application.port.`in`.RegenerationResult
 import com.readmates.aigen.application.port.`in`.StartGenerationCommand
 import com.readmates.aigen.application.port.`in`.StartGenerationUseCase
 import com.readmates.aigen.config.AiGenerationProperties
@@ -26,6 +28,7 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RequestPart
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
@@ -55,10 +58,11 @@ private const val MAX_TRANSCRIPT_BYTES: Int = 1024 * 1024
 @RestController
 @RequestMapping("/api/host/sessions/{sessionId}/ai-generate")
 @ConditionalOnProperty(prefix = "readmates.aigen", name = ["enabled"], havingValue = "true")
-@Suppress("LongParameterList")
+@Suppress("LongParameterList", "TooManyFunctions")
 class AiGenerationController(
     private val start: StartGenerationUseCase,
     private val getJob: GetJobUseCase,
+    private val evidenceExpansion: ExpandGenerationEvidenceUseCase,
     private val recentJob: GetRecentSessionGenerationJobUseCase,
     private val regen: RegenerateItemUseCase,
     private val commitUc: CommitGenerationUseCase,
@@ -79,9 +83,10 @@ class AiGenerationController(
     ): StartGenerationResponse {
         ensureEnabled()
         val meta = auth.requireHostAccess(sessionId, member)
+        val request = bodyMapper.readValue(body.bytes, StartGenerationRequest::class.java)
+        val authorNameMode = parseAuthorNameMode(request.authorNameMode)
         transcript.requireTxtFileName()
         val decodedTranscript = transcript.readTranscriptBytes().decodeUtf8()
-        val request = bodyMapper.readValue(body.bytes, StartGenerationRequest::class.java)
         val command =
             StartGenerationCommand(
                 sessionId = sessionId,
@@ -89,7 +94,7 @@ class AiGenerationController(
                 hostUserId = member.userId,
                 transcript = decodedTranscript,
                 model = request.model,
-                authorNameMode = parseAuthorNameMode(request.authorNameMode),
+                authorNameMode = authorNameMode,
                 instructions = request.instructions,
                 sessionMeta = meta,
             )
@@ -111,6 +116,25 @@ class AiGenerationController(
         auth.requireHostAccess(sessionId, member)
         val view = getJob.get(sessionId, jobId)
         return view.toStatusResponse()
+    }
+
+    @GetMapping("/jobs/{jobId}/evidence/{turnId}")
+    fun expandEvidence(
+        @PathVariable sessionId: UUID,
+        @PathVariable jobId: UUID,
+        @PathVariable turnId: String,
+        @RequestParam revision: Long,
+        member: CurrentMember,
+    ): ExpandedEvidenceTurnResponse {
+        ensureEnabled()
+        auth.requireHostAccess(sessionId, member)
+        val expanded = evidenceExpansion.expand(sessionId, jobId, turnId, revision)
+        return ExpandedEvidenceTurnResponse(
+            turnId = expanded.turnId,
+            speakerName = expanded.speakerName,
+            startSeconds = expanded.startSeconds,
+            text = expanded.text,
+        )
     }
 
     @GetMapping("/jobs/recent")
@@ -143,6 +167,7 @@ class AiGenerationController(
                 instructions = request.instructions,
                 expectedRevision = request.expectedRevision,
             )
+        requireCompleteGroundedRegeneration(outcome)
         return RegenerateResponse(
             item = outcome.item.name,
             value = outcome.value,
@@ -154,6 +179,11 @@ class AiGenerationController(
                 ),
             costEstimateUsd = outcome.costEstimateUsd.toPlainString(),
             warnings = outcome.warnings,
+            revision = outcome.revision,
+            result = outcome.result?.toJson(),
+            evidence = outcome.evidence?.toResponse(),
+            sectionReviewStatuses =
+                outcome.revision?.let { GenerationItem.entries.associateWith { "PENDING_REVIEW" } },
         )
     }
 
@@ -166,12 +196,15 @@ class AiGenerationController(
     ): SessionImportCommitResult {
         ensureEnabled()
         auth.requireHostAccess(sessionId, member)
+        validateReviewContract(request)
         return commitUc.commit(
             host = auth.actor(member),
             sessionId = sessionId,
             jobId = jobId,
             recordVisibility = request.recordVisibility,
             overrideResult = request.result?.toSnapshot(),
+            expectedRevision = request.expectedRevision,
+            sectionReviews = request.sectionReviews,
         )
     }
 
@@ -213,15 +246,34 @@ class AiGenerationController(
         }
     }
 
-    private fun parseAuthorNameMode(value: String): AuthorNameMode =
-        when (value.lowercase()) {
+    private fun parseAuthorNameMode(value: String?): AuthorNameMode =
+        when (value?.lowercase()) {
+            null -> AuthorNameMode.REAL
             "real" -> AuthorNameMode.REAL
-            "alias" -> AuthorNameMode.ALIAS
+            "alias" -> throw AiGenerationException.Coded(ErrorCode.TRANSCRIPT_ALIAS_MODE_UNSUPPORTED)
             else -> throw AiGenerationException.Coded(
-                ErrorCode.SCHEMA_INVALID,
-                "Unknown authorNameMode: $value",
+                ErrorCode.TRANSCRIPT_FORMAT_INVALID,
             )
         }
+
+    private fun validateReviewContract(request: CommitRequest) {
+        val hasGroundedFields = request.expectedRevision != null || request.sectionReviews != null
+        if (!hasGroundedFields) return
+        if (
+            request.expectedRevision == null ||
+            request.result == null ||
+            request.sectionReviews?.keys != GenerationItem.entries.toSet()
+        ) {
+            throw AiGenerationException.Coded(ErrorCode.SCHEMA_INVALID)
+        }
+    }
+
+    private fun requireCompleteGroundedRegeneration(outcome: RegenerationResult) {
+        val revision = outcome.revision ?: return
+        if (outcome.result == null || outcome.evidence?.revision != revision) {
+            throw AiGenerationException.Coded(ErrorCode.JOB_EXPIRED)
+        }
+    }
 
     private fun parseGenerationItem(value: String): GenerationItem =
         runCatching { GenerationItem.valueOf(value.uppercase()) }

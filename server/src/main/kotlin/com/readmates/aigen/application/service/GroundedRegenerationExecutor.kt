@@ -111,7 +111,7 @@ class DefaultGroundedRegenerationExecutor(
                     selectedModel,
                 ),
             )
-        if (!saved) staleRevision()
+        if (!saved) staleRevision(jobStore.load(record.jobId)?.revision)
         auditSuccess(record, item, selectedModel, repair.usage, cost)
         emitMetrics(item, selectedModel, repair.usage, cost)
         return RegenerationResult(
@@ -154,7 +154,7 @@ class DefaultGroundedRegenerationExecutor(
         record: JobRecord,
         expectedRevision: Long,
     ): GroundedGenerationDraft {
-        if (record.revision != expectedRevision) staleRevision()
+        if (record.revision != expectedRevision) staleRevision(record.revision)
         if (record.result == null || record.evidence == null) expiredResult()
         return record.groundedDraft ?: expiredResult()
     }
@@ -180,7 +180,7 @@ class DefaultGroundedRegenerationExecutor(
         when (jobStore.reserveLlmCall(record.jobId, JobStatus.SUCCEEDED, properties.job.maxLlmCallsPerJob)) {
             LlmCallReservation.RESERVED -> Unit
             LlmCallReservation.CAP_EXCEEDED -> throw AiGenerationException.Coded(ErrorCode.MAX_CALLS_EXCEEDED)
-            LlmCallReservation.STATE_CHANGED -> staleRevision()
+            LlmCallReservation.STATE_CHANGED -> staleRevision(jobStore.load(record.jobId)?.revision)
         }
         return generator.repair(model, item, request)
     }
@@ -198,7 +198,8 @@ class DefaultGroundedRegenerationExecutor(
         throw AiGenerationException.Coded(ErrorCode.SCHEMA_INVALID)
     }
 
-    private fun staleRevision(): Nothing = throw AiGenerationException.Coded(ErrorCode.STALE_GENERATION_REVISION)
+    private fun staleRevision(currentRevision: Long? = null): Nothing =
+        throw AiGenerationException.Coded(ErrorCode.STALE_GENERATION_REVISION, currentRevision = currentRevision)
 
     private fun expiredResult(): Nothing = throw AiGenerationException.Coded(ErrorCode.JOB_EXPIRED)
 

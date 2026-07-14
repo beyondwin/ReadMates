@@ -133,6 +133,8 @@ enum class JobStatus {
 
 enum class GroundingStatus { PENDING, VALID, INVALID }
 
+enum class SectionReviewStatus { AI_GROUNDED_REVIEWED, USER_EDITED_CONFIRMED }
+
 enum class JobStage {
     QUEUED,
     PREPARING_TRANSCRIPT,
@@ -231,7 +233,9 @@ enum class ErrorCode {
     TRANSCRIPT_SPEAKER_AMBIGUOUS,
     MODEL_CAPABILITY_UNAVAILABLE,
     TRANSCRIPT_TOO_LONG_FOR_MODEL,
+    TRANSCRIPT_ALIAS_MODE_UNSUPPORTED,
     STALE_GENERATION_REVISION,
+    MEMBERSHIP_CHANGED,
 
     /**
      * The per-job hard cap on LLM calls (start + validation retry + regenerations) has
@@ -266,4 +270,8 @@ data class JobView(
     val expiresAt: Instant,
     val createdAt: Instant,
     val lastUpdatedAt: Instant,
+    val pipelineMode: AiGenerationPipelineMode = AiGenerationPipelineMode.LEGACY,
+    val revision: Long = 0,
+    val groundingStatus: GroundingStatus? = null,
+    val evidence: GroundedEvidenceBundle? = null,
 )

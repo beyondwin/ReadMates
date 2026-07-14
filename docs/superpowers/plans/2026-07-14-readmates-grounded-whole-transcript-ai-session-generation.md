@@ -1137,7 +1137,7 @@ git commit -m "feat(aigen): run grounded generation with one repair"
 - Regenerate/commit requests carry `expectedRevision`.
 - Start errors preserve safe `invalidSpeakerLabels`; all other errors remain content-free.
 
-- [ ] **Step 1: Write the status response contract tests**
+- [x] **Step 1: Write the status response contract tests**
 
 Use the following browser-facing structure:
 
@@ -1154,7 +1154,7 @@ data class GroundedJobResultResponse(
 
 Assert result/evidence are absent in PENDING/RUNNING/FAILED and present together in SUCCEEDED. Grounded responses use `PENDING`, `VALID`, or `INVALID` grounding status and initialize all four server review statuses to `PENDING_REVIEW` for each new revision; the browser overlays its local review state but the server never trusts that overlay. A missing evidence payload for a grounded SUCCEEDED job is `JOB_EXPIRED`, not a partially reviewable success.
 
-- [ ] **Step 2: Write evidence expansion authorization and scope tests**
+- [x] **Step 2: Write evidence expansion authorization and scope tests**
 
 Proposed endpoint:
 
@@ -1164,7 +1164,7 @@ GET /api/host/sessions/{sessionId}/ai-generate/jobs/{jobId}/evidence/{turnId}?re
 
 Assert host/session ownership, current revision equality, SUCCEEDED state, and the turn ID's presence in at least one current evidence target. Reject arbitrary current turns, previous-revision turns, and unknown turns. Return a bounded expanded excerpt rather than the whole transcript.
 
-- [ ] **Step 3: Write typed error status tests**
+- [x] **Step 3: Write typed error status tests**
 
 Pin:
 
@@ -1175,7 +1175,7 @@ Pin:
 - `JOB_EXPIRED` -> 410;
 - no response contains member candidates, provider bodies, transcript snippets, or internal exception text.
 
-- [ ] **Step 4: Run controller/error tests and verify RED**
+- [x] **Step 4: Run controller/error tests and verify RED**
 
 ```bash
 ./server/gradlew -p server unitTest --tests '*AiGenerationControllerTest' --tests '*AiGenerationErrorHandlerTest'
@@ -1183,7 +1183,7 @@ Pin:
 
 Expected: FAIL because grounded DTOs and evidence endpoint are incomplete.
 
-- [ ] **Step 5: Add review and commit input models**
+- [x] **Step 5: Add review and commit input models**
 
 ```kotlin
 enum class SectionReviewStatus {
@@ -1201,19 +1201,19 @@ data class CommitGenerationRequest(
 
 Require exactly the four `GenerationItem` keys. Do not accept `PENDING`, missing, or unknown review values.
 
-- [ ] **Step 6: Implement safe evidence expansion**
+- [x] **Step 6: Implement safe evidence expansion**
 
 Use an application use case so the controller never reads Redis directly. Resolve and return the full sanitized text of that one referenced source turn; the 1 MiB upload limit is the outer response bound. Do not return neighboring turns or accept a caller-selected range/limit. Record only an aggregate counter if observability is needed.
 
-- [ ] **Step 7: Remove alias acceptance**
+- [x] **Step 7: Remove alias acceptance**
 
 Keep multipart `authorNameMode` optional/defaulted to `REAL` only if old clients require compatibility. An explicit `ALIAS` value returns `TRANSCRIPT_ALIAS_MODE_UNSUPPORTED` before parsing or side effects. Update controller and integration tests accordingly.
 
-- [ ] **Step 8: Update public-safe API integration coverage**
+- [x] **Step 8: Update public-safe API integration coverage**
 
 Replace old unstructured test transcripts with synthetic supported exports. Add assertions for valid start, invalid-speaker early 422/no job, grounded successful poll response, expansion scope, stale revision, and real-name-only behavior.
 
-- [ ] **Step 9: Run web and integration gates**
+- [x] **Step 9: Run web and integration gates**
 
 ```bash
 ./server/gradlew -p server unitTest --tests '*AiGenerationControllerTest' --tests '*AiGenerationErrorHandlerTest'
@@ -1222,7 +1222,7 @@ Replace old unstructured test transcripts with synthetic supported exports. Add 
 
 Expected: PASS with no private data in fixtures or test output.
 
-- [ ] **Step 10: Commit the grounded HTTP contract slice**
+- [x] **Step 10: Commit the grounded HTTP contract slice**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/aigen server/src/test/kotlin/com/readmates/aigen

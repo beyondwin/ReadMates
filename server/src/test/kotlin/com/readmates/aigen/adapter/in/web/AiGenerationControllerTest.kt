@@ -4,20 +4,29 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.AiGenerationActor
+import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.ErrorCode
+import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.GenerationItem
+import com.readmates.aigen.application.model.GroundedEvidenceBundle
+import com.readmates.aigen.application.model.GroundedEvidenceExcerpt
+import com.readmates.aigen.application.model.GroundedEvidenceTarget
+import com.readmates.aigen.application.model.GroundingStatus
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.JobView
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.model.SectionReviewStatus
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.`in`.AvailableGenerationModel
 import com.readmates.aigen.application.port.`in`.CancelGenerationUseCase
 import com.readmates.aigen.application.port.`in`.CommitGenerationUseCase
+import com.readmates.aigen.application.port.`in`.ExpandGenerationEvidenceUseCase
+import com.readmates.aigen.application.port.`in`.ExpandedEvidenceTurn
 import com.readmates.aigen.application.port.`in`.GetJobUseCase
 import com.readmates.aigen.application.port.`in`.GetRecentSessionGenerationJobUseCase
 import com.readmates.aigen.application.port.`in`.ListGenerationModelsUseCase
@@ -38,6 +47,8 @@ import com.readmates.shared.security.CurrentMember
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.EnumSource
 import org.springframework.core.MethodParameter
 import org.springframework.mock.web.MockMultipartFile
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
@@ -57,6 +68,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
 
+@Suppress("LargeClass")
 class AiGenerationControllerTest {
     private val sessionId: UUID = UUID.fromString("00000000-0000-0000-0000-000000000010")
     private val clubId: UUID = UUID.fromString("00000000-0000-0000-0000-000000000020")
@@ -93,6 +105,7 @@ class AiGenerationControllerTest {
 
     private val startUseCase = FakeStartUseCase()
     private val getJobUseCase = FakeGetJobUseCase()
+    private val evidenceUseCase = FakeExpandEvidenceUseCase()
     private val recentJobUseCase = FakeRecentJobUseCase()
     private val regenerateUseCase = FakeRegenerateUseCase()
     private val commitUseCase = FakeCommitUseCase()
@@ -113,6 +126,7 @@ class AiGenerationControllerTest {
                     AiGenerationController(
                         start = startUseCase,
                         getJob = getJobUseCase,
+                        evidenceExpansion = evidenceUseCase,
                         recentJob = recentJobUseCase,
                         regen = regenerateUseCase,
                         commitUc = commitUseCase,
@@ -162,6 +176,56 @@ class AiGenerationControllerTest {
     }
 
     @Test
+    fun `POST jobs rejects explicit alias mode before starting a job`() {
+        mockMvc
+            .multipart("/api/host/sessions/$sessionId/ai-generate/jobs") {
+                file(MockMultipartFile("transcript", "public-fixture.txt", "text/plain", byteArrayOf(0xFF.toByte())))
+                file(
+                    MockMultipartFile(
+                        "body",
+                        "body.json",
+                        "application/json",
+                        """{"model":null,"authorNameMode":"alias","instructions":null}""".toByteArray(),
+                    ),
+                )
+                with(authedUser())
+            }.andExpect {
+                status { isUnprocessableEntity() }
+                jsonPath("$.code") { value("TRANSCRIPT_ALIAS_MODE_UNSUPPORTED") }
+            }
+
+        assertThat(startUseCase.commands).isEmpty()
+    }
+
+    @Test
+    fun `POST jobs defaults omitted author name mode to real for compatibility`() {
+        mockMvc
+            .multipart("/api/host/sessions/$sessionId/ai-generate/jobs") {
+                file(
+                    MockMultipartFile(
+                        "transcript",
+                        "public-fixture.txt",
+                        "text/plain",
+                        "Alice 00:00\nHello".toByteArray(),
+                    ),
+                )
+                file(
+                    MockMultipartFile(
+                        "body",
+                        "body.json",
+                        "application/json",
+                        """{"model":null,"instructions":null}""".toByteArray(),
+                    ),
+                )
+                with(authedUser())
+            }.andExpect {
+                status { isAccepted() }
+            }
+
+        assertThat(startUseCase.commands.single().authorNameMode).isEqualTo(AuthorNameMode.REAL)
+    }
+
+    @Test
     fun `POST jobs when kill switch off returns 503 AI_DISABLED`() {
         // override properties to disabled
         mockMvc =
@@ -170,6 +234,7 @@ class AiGenerationControllerTest {
                     AiGenerationController(
                         start = startUseCase,
                         getJob = getJobUseCase,
+                        evidenceExpansion = evidenceUseCase,
                         recentJob = recentJobUseCase,
                         regen = regenerateUseCase,
                         commitUc = commitUseCase,
@@ -287,7 +352,7 @@ class AiGenerationControllerTest {
         postTranscript("public-fixture.txt", byteArrayOf(0xC3.toByte(), 0x28)).andExpect {
             status { isUnprocessableEntity() }
             jsonPath("$.code") { value("TRANSCRIPT_FORMAT_INVALID") }
-            jsonPath("$.detail") { value("reason=UTF8_REQUIRED") }
+            jsonPath("$.detail") { value("AI generation request could not be completed") }
         }
 
         assertThat(startUseCase.commands).isEmpty()
@@ -334,6 +399,120 @@ class AiGenerationControllerTest {
                 jsonPath("$.result.bookTitle") { value("Title") }
                 jsonPath("$.costEstimateUsd") { value("0.12") }
                 jsonPath("$.tokens.input") { value(100) }
+            }
+    }
+
+    @Test
+    fun `GET grounded success returns revisioned result evidence and pending review ledger`() {
+        getJobUseCase.view = groundedJobView()
+
+        mockMvc
+            .get("/api/host/sessions/$sessionId/ai-generate/jobs/$jobId") {
+                with(authedUser())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.revision") { value(1) }
+                jsonPath("$.groundingStatus") { value("VALID") }
+                jsonPath("$.result.summary") { value("Summary") }
+                jsonPath("$.evidence[0].targetId") { value("r1:SUMMARY:0") }
+                jsonPath("$.evidence[0].turnId") { value("t000001") }
+                jsonPath("$.evidence[0].excerpt") { value("Public-safe source excerpt.") }
+                jsonPath("$.sectionReviewStatuses.SUMMARY") { value("PENDING_REVIEW") }
+                jsonPath("$.sectionReviewStatuses.HIGHLIGHTS") { value("PENDING_REVIEW") }
+                jsonPath("$.sectionReviewStatuses.ONE_LINE_REVIEWS") { value("PENDING_REVIEW") }
+                jsonPath("$.sectionReviewStatuses.FEEDBACK_DOCUMENT") { value("PENDING_REVIEW") }
+            }
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = JobStatus::class, names = ["PENDING", "RUNNING", "FAILED"])
+    fun `GET incomplete grounded states never expose partial result or evidence`(status: JobStatus) {
+        val expectedGrounding = if (status == JobStatus.FAILED) GroundingStatus.INVALID else GroundingStatus.PENDING
+        getJobUseCase.view =
+            groundedJobView().copy(
+                status = status,
+                revision = 0,
+                groundingStatus = expectedGrounding,
+            )
+
+        mockMvc
+            .get("/api/host/sessions/$sessionId/ai-generate/jobs/$jobId") {
+                with(authedUser())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.result") { doesNotExist() }
+                jsonPath("$.evidence") { doesNotExist() }
+                jsonPath("$.sectionReviewStatuses") { doesNotExist() }
+                jsonPath("$.groundingStatus") { value(expectedGrounding.name) }
+            }
+    }
+
+    @Test
+    fun `GET job polling never exposes persisted internal error message`() {
+        getJobUseCase.view =
+            sampleJobView().copy(
+                status = JobStatus.FAILED,
+                result = null,
+                error =
+                    GenerationError(
+                        ErrorCode.AUTHOR_NAME_MISMATCH,
+                        "Private Member Name and provider detail",
+                    ),
+            )
+
+        mockMvc
+            .get("/api/host/sessions/$sessionId/ai-generate/jobs/$jobId") {
+                with(authedUser())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.error.code") { value("AUTHOR_NAME_MISMATCH") }
+                jsonPath("$.error.message") { value("AI generation request could not be completed") }
+            }
+    }
+
+    @Test
+    fun `GET grounded success with missing evidence expires instead of partial exposure`() {
+        getJobUseCase.view = groundedJobView().copy(evidence = null)
+
+        mockMvc
+            .get("/api/host/sessions/$sessionId/ai-generate/jobs/$jobId") {
+                with(authedUser())
+            }.andExpect {
+                status { isGone() }
+                jsonPath("$.code") { value("JOB_EXPIRED") }
+                jsonPath("$.result") { doesNotExist() }
+            }
+    }
+
+    @Test
+    fun `GET evidence expands only the use-case authorized current turn`() {
+        mockMvc
+            .get("/api/host/sessions/$sessionId/ai-generate/jobs/$jobId/evidence/t000001?revision=1") {
+                with(authedUser())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.turnId") { value("t000001") }
+                jsonPath("$.speakerName") { value("Alice") }
+                jsonPath("$.text") { value("Expanded public-safe turn.") }
+            }
+    }
+
+    @Test
+    fun `GET evidence returns safe revision conflict metadata`() {
+        evidenceUseCase.error =
+            AiGenerationException.Coded(
+                ErrorCode.STALE_GENERATION_REVISION,
+                currentRevision = 2,
+            )
+
+        mockMvc
+            .get("/api/host/sessions/$sessionId/ai-generate/jobs/$jobId/evidence/t000001?revision=1") {
+                with(authedUser())
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("STALE_GENERATION_REVISION") }
+                jsonPath("$.currentRevision") { value(2) }
+                jsonPath("$.detail") { value("Generation revision is stale") }
             }
     }
 
@@ -437,6 +616,63 @@ class AiGenerationControllerTest {
     }
 
     @Test
+    fun `POST grounded regenerate returns full replacement and resets review ledger`() {
+        val grounded = groundedJobView()
+        regenerateUseCase.result =
+            RegenerationResult(
+                item = GenerationItem.SUMMARY,
+                value = "Summary",
+                tokens = TokenUsage(50, 0, 25),
+                costEstimateUsd = BigDecimal("0.05"),
+                warnings = emptyList(),
+                revision = 2,
+                result = grounded.result,
+                evidence = grounded.evidence?.copy(revision = 2),
+            )
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/ai-generate/jobs/$jobId/regenerate") {
+                contentType = org.springframework.http.MediaType.APPLICATION_JSON
+                content = """{"item":"SUMMARY","expectedRevision":1,"model":null,"instructions":null}"""
+                with(authedUser())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.revision") { value(2) }
+                jsonPath("$.result.summary") { value("Summary") }
+                jsonPath("$.evidence[0].turnId") { value("t000001") }
+                jsonPath("$.sectionReviewStatuses.SUMMARY") { value("PENDING_REVIEW") }
+            }
+        assertThat(regenerateUseCase.lastExpectedRevision).isEqualTo(1)
+    }
+
+    @Test
+    fun `POST grounded regenerate rejects partial result without matching evidence`() {
+        val grounded = groundedJobView()
+        regenerateUseCase.result =
+            RegenerationResult(
+                item = GenerationItem.SUMMARY,
+                value = "Summary",
+                tokens = TokenUsage(50, 0, 25),
+                costEstimateUsd = BigDecimal("0.05"),
+                warnings = emptyList(),
+                revision = 2,
+                result = grounded.result,
+                evidence = null,
+            )
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/ai-generate/jobs/$jobId/regenerate") {
+                contentType = org.springframework.http.MediaType.APPLICATION_JSON
+                content = """{"item":"SUMMARY","expectedRevision":1,"model":null,"instructions":null}"""
+                with(authedUser())
+            }.andExpect {
+                status { isGone() }
+                jsonPath("$.code") { value("JOB_EXPIRED") }
+                jsonPath("$.result") { doesNotExist() }
+            }
+    }
+
+    @Test
     fun `POST commit without override result delegates without override`() {
         commitUseCase.result = sampleCommitResult()
 
@@ -484,6 +720,56 @@ class AiGenerationControllerTest {
         assert(override != null) { "expected override snapshot, was null" }
         assert(override!!.bookTitle == "Override Title")
         assert(commitUseCase.lastVisibility == SessionRecordVisibility.PUBLIC)
+    }
+
+    @Test
+    fun `POST grounded commit passes exact revision and four review states`() {
+        commitUseCase.result = sampleCommitResult()
+        val reviewJson = GenerationItem.entries.joinToString(",") { "\"${it.name}\":\"AI_GROUNDED_REVIEWED\"" }
+        val resultJson = mapper.writeValueAsString(sampleJobView().result!!.toJson())
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/ai-generate/jobs/$jobId/commit") {
+                contentType = org.springframework.http.MediaType.APPLICATION_JSON
+                content =
+                    """{"recordVisibility":"MEMBER","result":$resultJson,"expectedRevision":3,"sectionReviews":{$reviewJson}}"""
+                with(authedUser())
+            }.andExpect {
+                status { isOk() }
+            }
+
+        assertThat(commitUseCase.lastExpectedRevision).isEqualTo(3)
+        assertThat(commitUseCase.lastSectionReviews?.keys).containsExactlyInAnyOrderElementsOf(GenerationItem.entries)
+    }
+
+    @Test
+    fun `POST grounded commit rejects incomplete section review map`() {
+        mockMvc
+            .post("/api/host/sessions/$sessionId/ai-generate/jobs/$jobId/commit") {
+                contentType = org.springframework.http.MediaType.APPLICATION_JSON
+                content =
+                    """{"recordVisibility":"MEMBER","result":null,"expectedRevision":3,"sectionReviews":{"SUMMARY":"AI_GROUNDED_REVIEWED"}}"""
+                with(authedUser())
+            }.andExpect {
+                status { isUnprocessableEntity() }
+                jsonPath("$.code") { value("SCHEMA_INVALID") }
+            }
+    }
+
+    @Test
+    fun `POST grounded commit rejects missing submitted result`() {
+        val reviewJson = GenerationItem.entries.joinToString(",") { "\"${it.name}\":\"AI_GROUNDED_REVIEWED\"" }
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/ai-generate/jobs/$jobId/commit") {
+                contentType = org.springframework.http.MediaType.APPLICATION_JSON
+                content =
+                    """{"recordVisibility":"MEMBER","result":null,"expectedRevision":3,"sectionReviews":{$reviewJson}}"""
+                with(authedUser())
+            }.andExpect {
+                status { isUnprocessableEntity() }
+                jsonPath("$.code") { value("SCHEMA_INVALID") }
+            }
     }
 
     @Test
@@ -539,6 +825,36 @@ class AiGenerationControllerTest {
             expiresAt = expiresAt,
             createdAt = createdAt,
             lastUpdatedAt = lastUpdatedAt,
+        )
+
+    private fun groundedJobView(): JobView =
+        sampleJobView().copy(
+            pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
+            revision = 1,
+            groundingStatus = GroundingStatus.VALID,
+            evidence =
+                GroundedEvidenceBundle(
+                    revision = 1,
+                    targets =
+                        listOf(
+                            GroundedEvidenceTarget(
+                                targetId = "r1:SUMMARY:0",
+                                section = GenerationItem.SUMMARY,
+                                ordinal = 0,
+                                turnIds = listOf("t000001"),
+                            ),
+                        ),
+                    excerpts =
+                        listOf(
+                            GroundedEvidenceExcerpt(
+                                turnId = "t000001",
+                                speakerName = "Alice",
+                                startSeconds = 0,
+                                excerpt = "Public-safe source excerpt.",
+                                truncated = false,
+                            ),
+                        ),
+                ),
         )
 
     private fun sampleCommitResult(): SessionImportCommitResult =
@@ -615,6 +931,7 @@ class AiGenerationControllerTest {
     private class FakeRegenerateUseCase : RegenerateItemUseCase {
         lateinit var result: RegenerationResult
         var lastItem: GenerationItem? = null
+        var lastExpectedRevision: Long? = null
 
         override fun regenerate(
             sessionId: UUID,
@@ -625,6 +942,7 @@ class AiGenerationControllerTest {
             expectedRevision: Long?,
         ): RegenerationResult {
             lastItem = item
+            lastExpectedRevision = expectedRevision
             return result
         }
     }
@@ -633,6 +951,8 @@ class AiGenerationControllerTest {
         lateinit var result: SessionImportCommitResult
         var lastOverride: SessionImportV1Snapshot? = null
         var lastVisibility: SessionRecordVisibility? = null
+        var lastExpectedRevision: Long? = null
+        var lastSectionReviews: Map<GenerationItem, SectionReviewStatus>? = null
 
         override fun commit(
             host: AiGenerationActor,
@@ -640,9 +960,28 @@ class AiGenerationControllerTest {
             jobId: UUID,
             recordVisibility: SessionRecordVisibility,
             overrideResult: SessionImportV1Snapshot?,
+            expectedRevision: Long?,
+            sectionReviews: Map<GenerationItem, SectionReviewStatus>?,
         ): SessionImportCommitResult {
             lastOverride = overrideResult
             lastVisibility = recordVisibility
+            lastExpectedRevision = expectedRevision
+            lastSectionReviews = sectionReviews
+            return result
+        }
+    }
+
+    private class FakeExpandEvidenceUseCase : ExpandGenerationEvidenceUseCase {
+        var result = ExpandedEvidenceTurn("t000001", "Alice", 0, "Expanded public-safe turn.")
+        var error: RuntimeException? = null
+
+        override fun expand(
+            sessionId: UUID,
+            jobId: UUID,
+            turnId: String,
+            revision: Long,
+        ): ExpandedEvidenceTurn {
+            error?.let { throw it }
             return result
         }
     }

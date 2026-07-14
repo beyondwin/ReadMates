@@ -1,7 +1,14 @@
 package com.readmates.aigen.adapter.`in`.web
 
+import com.readmates.aigen.application.AiGenerationException
+import com.readmates.aigen.application.model.AiGenerationPipelineMode
+import com.readmates.aigen.application.model.ErrorCode
+import com.readmates.aigen.application.model.GenerationItem
+import com.readmates.aigen.application.model.GroundedEvidenceBundle
+import com.readmates.aigen.application.model.GroundingStatus
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.JobView
+import com.readmates.aigen.application.model.SectionReviewStatus
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.session.application.SessionRecordVisibility
 import java.time.LocalDate
@@ -17,7 +24,7 @@ import java.util.UUID
 
 data class StartGenerationRequest(
     val model: String?,
-    val authorNameMode: String, // "real" | "alias"
+    val authorNameMode: String? = null,
     val instructions: String?,
 )
 
@@ -79,6 +86,28 @@ data class JobStatusResponse(
     val expiresAt: String,
     val createdAt: String,
     val lastUpdatedAt: String,
+    val revision: Long? = null,
+    val groundingStatus: String? = null,
+    val evidence: List<EvidenceTargetResponse>? = null,
+    val sectionReviewStatuses: Map<GenerationItem, String>? = null,
+)
+
+data class EvidenceTargetResponse(
+    val section: GenerationItem,
+    val targetId: String,
+    val ordinal: Int,
+    val turnId: String,
+    val startSeconds: Int,
+    val speakerName: String,
+    val excerpt: String,
+    val truncated: Boolean,
+)
+
+data class ExpandedEvidenceTurnResponse(
+    val turnId: String,
+    val speakerName: String,
+    val startSeconds: Int,
+    val text: String,
 )
 
 data class RecentJobResponse(
@@ -108,11 +137,17 @@ data class RegenerateResponse(
     val tokens: TokenUsageJson,
     val costEstimateUsd: String,
     val warnings: List<String>,
+    val revision: Long? = null,
+    val result: SessionImportV1Json? = null,
+    val evidence: List<EvidenceTargetResponse>? = null,
+    val sectionReviewStatuses: Map<GenerationItem, String>? = null,
 )
 
 data class CommitRequest(
     val recordVisibility: SessionRecordVisibility,
     val result: SessionImportV1Json?,
+    val expectedRevision: Long? = null,
+    val sectionReviews: Map<GenerationItem, SectionReviewStatus>? = null,
 )
 
 /**
@@ -126,6 +161,7 @@ data class ProblemDetail(
     val detail: String?,
     val code: String,
     val invalidSpeakerLabels: List<String>? = null,
+    val currentRevision: Long? = null,
 )
 
 private val MEETING_DATE_FORMATTER: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE
@@ -143,22 +179,61 @@ fun SessionImportV1Snapshot.toJson(): SessionImportV1Json =
         feedbackDocumentMarkdown = feedbackDocumentMarkdown,
     )
 
-fun JobView.toStatusResponse(): JobStatusResponse =
-    JobStatusResponse(
+fun JobView.toStatusResponse(): JobStatusResponse {
+    val grounded = pipelineMode == AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT
+    val groundedSucceeded = grounded && status == JobStatus.SUCCEEDED
+    val completeGroundedPayload =
+        result != null && evidence?.revision == revision && groundingStatus == GroundingStatus.VALID
+    if (groundedSucceeded && !completeGroundedPayload) {
+        throw AiGenerationException.Coded(ErrorCode.JOB_EXPIRED)
+    }
+    val visibleResult = if (grounded && !groundedSucceeded) null else result
+    val visibleEvidence = if (groundedSucceeded) evidence?.toResponse() else null
+    val reviewStatuses =
+        if (groundedSucceeded) {
+            GenerationItem.entries.associateWith { PENDING_REVIEW }
+        } else {
+            null
+        }
+    return JobStatusResponse(
         jobId = jobId,
         status = status.name,
         stage = stage?.name,
         progressPct = progressPct,
         model = model.name,
-        result = result?.toJson(),
-        error = error?.let { GenerationErrorJson(it.code.name, it.message) },
+        result = visibleResult?.toJson(),
+        error = error?.let { GenerationErrorJson(it.code.name, it.code.safeDetail()) },
         tokens = tokens?.let { TokenUsageJson(it.inputTokens, it.cachedInputTokens, it.outputTokens) },
         costEstimateUsd = costEstimateUsd.toPlainString(),
         warnings = warnings,
         expiresAt = expiresAt.toString(),
         createdAt = createdAt.toString(),
         lastUpdatedAt = lastUpdatedAt.toString(),
+        revision = revision.takeIf { grounded },
+        groundingStatus = groundingStatus?.name.takeIf { grounded },
+        evidence = visibleEvidence,
+        sectionReviewStatuses = reviewStatuses,
     )
+}
+
+fun GroundedEvidenceBundle.toResponse(): List<EvidenceTargetResponse> {
+    val excerptsByTurnId = excerpts.associateBy { it.turnId }
+    return targets.flatMap { target ->
+        target.turnIds.map { turnId ->
+            val excerpt = excerptsByTurnId[turnId] ?: throw AiGenerationException.Coded(ErrorCode.JOB_EXPIRED)
+            EvidenceTargetResponse(
+                section = target.section,
+                targetId = target.targetId,
+                ordinal = target.ordinal,
+                turnId = excerpt.turnId,
+                startSeconds = excerpt.startSeconds,
+                speakerName = excerpt.speakerName,
+                excerpt = excerpt.excerpt,
+                truncated = excerpt.truncated,
+            )
+        }
+    }
+}
 
 fun JobView.toRecentJobResponse(): RecentJobResponse =
     RecentJobResponse(
@@ -167,7 +242,7 @@ fun JobView.toRecentJobResponse(): RecentJobResponse =
         stage = stage?.name,
         progressPct = progressPct,
         model = model.name,
-        error = error?.let { GenerationErrorJson(it.code.name, it.message) },
+        error = error?.let { GenerationErrorJson(it.code.name, it.code.safeDetail()) },
         costEstimateUsd = costEstimateUsd.toPlainString(),
         expiresAt = expiresAt.toString(),
         createdAt = createdAt.toString(),
@@ -201,3 +276,5 @@ fun SessionImportV1Json.toSnapshot(): SessionImportV1Snapshot =
         feedbackDocumentFileName = feedbackDocumentFileName,
         feedbackDocumentMarkdown = feedbackDocumentMarkdown,
     )
+
+private const val PENDING_REVIEW = "PENDING_REVIEW"

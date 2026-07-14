@@ -7,6 +7,7 @@ import com.readmates.aigen.application.model.GroundedEvidenceBundle
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.JobView
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.model.SectionReviewStatus
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
@@ -67,6 +68,22 @@ interface GetRecentSessionGenerationJobUseCase {
     fun recent(sessionId: UUID): JobView?
 }
 
+interface ExpandGenerationEvidenceUseCase {
+    fun expand(
+        sessionId: UUID,
+        jobId: UUID,
+        turnId: String,
+        revision: Long,
+    ): ExpandedEvidenceTurn
+}
+
+data class ExpandedEvidenceTurn(
+    val turnId: String,
+    val speakerName: String,
+    val startSeconds: Int,
+    val text: String,
+)
+
 interface RegenerateItemUseCase {
     fun regenerate(
         sessionId: UUID,
@@ -96,6 +113,8 @@ interface CommitGenerationUseCase {
         jobId: UUID,
         recordVisibility: SessionRecordVisibility,
         overrideResult: SessionImportV1Snapshot?,
+        expectedRevision: Long? = null,
+        sectionReviews: Map<GenerationItem, SectionReviewStatus>? = null,
     ): SessionImportCommitResult
 }
 

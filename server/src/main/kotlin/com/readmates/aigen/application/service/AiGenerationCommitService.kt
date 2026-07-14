@@ -3,8 +3,10 @@ package com.readmates.aigen.application.service
 import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.AiGenerationActor
 import com.readmates.aigen.application.model.ErrorCode
+import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
+import com.readmates.aigen.application.model.SectionReviewStatus
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.`in`.CommitGenerationUseCase
@@ -64,6 +66,8 @@ class AiGenerationCommitService(
         jobId: UUID,
         recordVisibility: SessionRecordVisibility,
         overrideResult: SessionImportV1Snapshot?,
+        expectedRevision: Long?,
+        sectionReviews: Map<GenerationItem, SectionReviewStatus>?,
     ): SessionImportCommitResult {
         val record = jobStore.load(jobId) ?: throw JobNotFoundException(jobId)
         if (record.sessionId != sessionId) {

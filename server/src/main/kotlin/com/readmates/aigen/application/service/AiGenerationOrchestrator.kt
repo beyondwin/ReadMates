@@ -211,6 +211,10 @@ class AiGenerationOrchestrator(
             expiresAt = record.expiresAt,
             createdAt = record.createdAt,
             lastUpdatedAt = record.lastUpdatedAt,
+            pipelineMode = record.pipelineMode,
+            revision = record.revision,
+            groundingStatus = record.groundingStatus,
+            evidence = record.evidence,
         )
     }
 
