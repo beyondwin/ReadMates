@@ -59,7 +59,7 @@ redis-cli -h <host> -a <password> --no-auth-warning TTL "aigen:job:<jobId>:trans
 
 ### Rollout과 rollback
 
-- 기본값은 `READMATES_AIGEN_PIPELINE_MODE=LEGACY`입니다. 환경별 mock/public-safe 검증, provider retention 검토, 별도 승인을 끝낸 제한된 환경에서만 `GROUNDED_WHOLE_TRANSCRIPT`로 변경하고 재배포합니다.
+- 기본값은 `READMATES_AIGEN_PIPELINE_MODE=LEGACY`입니다. 환경별 mock/public-safe 검증, provider retention 검토, 별도 승인을 끝낸 제한된 환경에서만 GitHub Repository Variable을 `GROUNDED_WHOLE_TRANSCRIPT`로 변경하고 `sync-config` 후 재배포합니다. `READMATES_AIGEN_GROUNDED_RESERVED_OUTPUT_TOKENS`도 같은 경로로 전달되며 기본값과 상한은 `16384`입니다.
 - Rollback은 같은 환경의 mode를 `LEGACY`로 되돌린 뒤 재배포하는 것입니다. 장애 중인 grounded job을 legacy result로 fallback하거나 Redis payload를 변환하지 않습니다. 보안·비용 사건은 mode rollback과 더불어 `READMATES_AIGEN_ENABLED=false` kill switch를 사용합니다.
 - Global kill switch와 `enabled-providers` allowlist가 pipeline mode보다 우선합니다. Grounded mode에서 schema/grounding 실패를 legacy ungrounded generation으로 우회하지 않습니다.
 

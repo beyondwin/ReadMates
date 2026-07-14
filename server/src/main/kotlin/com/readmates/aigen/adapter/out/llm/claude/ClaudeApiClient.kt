@@ -34,7 +34,7 @@ import org.springframework.stereotype.Component
  *    `putAdditionalProperty` so the on-wire JSON exactly mirrors the
  *    incoming schema).
  *  - `tool_choice = { type: "tool", name: toolName }` forces a single
- *    `tool_use` block in the response.
+ *    `tool_use` block and `strict = true` constrains its input to the schema.
  *
  * Provider exceptions are NOT caught here — callers
  * ([ClaudeContentGenerator] / [ClaudeContentRegenerator]) wrap them via
@@ -123,7 +123,7 @@ open class ClaudeApiClient : ClaudeApiPort {
         return ClaudeToolResult(input = inputObject, usage = tokenUsage)
     }
 
-    private fun buildTool(
+    internal fun buildTool(
         toolName: String,
         toolSchema: ObjectNode,
     ): Tool {
@@ -141,6 +141,7 @@ open class ClaudeApiClient : ClaudeApiPort {
             .builder()
             .name(toolName)
             .inputSchema(inputSchemaBuilder.build())
+            .strict(true)
             .build()
     }
 

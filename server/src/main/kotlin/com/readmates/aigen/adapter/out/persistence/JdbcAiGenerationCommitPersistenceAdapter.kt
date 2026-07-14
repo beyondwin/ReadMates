@@ -32,7 +32,8 @@ class JdbcAiGenerationCommitPersistenceAdapter(
         val speakers = speakersByMembership.values.map { it.first() }
         val activeMembers = lockActiveClubMemberships(clubId)
         val activeNames = activeMembers.groupBy { it.displayName.normalized() }
-        if (activeNames.values.any { it.size != 1 }) {
+        val requestedNames = speakers.map { it.speakerName.normalized() }.toSet()
+        if (activeNames.filterKeys { it in requestedNames }.values.any { it.size != 1 }) {
             throw AiGenerationMembershipChangedException()
         }
         val verifiedSpeakers =

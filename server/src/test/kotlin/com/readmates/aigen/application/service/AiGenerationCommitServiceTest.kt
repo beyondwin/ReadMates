@@ -89,6 +89,27 @@ class AiGenerationCommitServiceTest {
     }
 
     @Test
+    fun `grounded receipt and success audit are written in the same database transaction`() {
+        val ctx = GroundedContext()
+        val record = ctx.record()
+        ctx.jobStore.save(record)
+        ctx.auditPort.onInsert = { assertThat(ctx.transactionManager.active).isTrue() }
+
+        ctx.service.commit(
+            ctx.host,
+            ctx.sessionId,
+            record.jobId,
+            SessionRecordVisibility.MEMBER,
+            record.result,
+            record.revision,
+            groundedReviews(),
+        )
+
+        assertThat(ctx.auditPort.entries).hasSize(1)
+        assertThat(ctx.persistence.receipt).isNotNull()
+    }
+
+    @Test
     fun `grounded rejects false review claims and missing sections before lease`() {
         listOf(
             groundedReviews().toMutableMap().apply { this[GenerationItem.SUMMARY] = SectionReviewStatus.USER_EDITED_CONFIRMED },
@@ -633,6 +654,7 @@ class AiGenerationCommitServiceTest {
         val validator = FakeValidator()
         val delegate = FakeCommitValidatedUseCase()
         val persistence = RecordingCommitPersistence()
+        val transactionManager = RecordingTransactionManager()
         private val cleanup = AiGenerationPostCommitCleanupService(jobStore, ReadCacheInvalidationPort.Noop())
         val service =
             AiGenerationCommitService(
@@ -643,7 +665,7 @@ class AiGenerationCommitServiceTest {
                 FakeClock(AiGenerationTestFixtures.NOW),
                 AiGenerationJobTransitionPolicy(),
                 persistence,
-                TransactionTemplate(NoOpTransactionManager()),
+                TransactionTemplate(transactionManager),
                 cleanup,
             )
 
@@ -694,16 +716,24 @@ class AiGenerationCommitServiceTest {
         }
     }
 
-    private class NoOpTransactionManager : AbstractPlatformTransactionManager() {
+    private class RecordingTransactionManager : AbstractPlatformTransactionManager() {
+        var active = false
+
         override fun doGetTransaction(): Any = Any()
 
         override fun doBegin(
             transaction: Any,
             definition: org.springframework.transaction.TransactionDefinition,
-        ) = Unit
+        ) {
+            active = true
+        }
 
-        override fun doCommit(status: DefaultTransactionStatus) = Unit
+        override fun doCommit(status: DefaultTransactionStatus) {
+            active = false
+        }
 
-        override fun doRollback(status: DefaultTransactionStatus) = Unit
+        override fun doRollback(status: DefaultTransactionStatus) {
+            active = false
+        }
     }
 }

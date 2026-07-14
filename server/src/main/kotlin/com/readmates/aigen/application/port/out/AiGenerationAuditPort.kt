@@ -52,6 +52,10 @@ data class AuditLogEntry(
             errorCode: ErrorCode,
             errorMessage: String,
             createdAt: Instant,
+            pipelineVersion: String? = null,
+            inputTurnCount: Int? = null,
+            speakerCount: Int? = null,
+            groundingStatus: String? = null,
         ): AuditLogEntry =
             AuditLogEntry(
                 jobId = jobId,
@@ -70,6 +74,10 @@ data class AuditLogEntry(
                 errorMessage = errorMessage,
                 latencyMs = 0,
                 createdAt = createdAt,
+                pipelineVersion = pipelineVersion,
+                inputTurnCount = inputTurnCount,
+                speakerCount = speakerCount,
+                groundingStatus = groundingStatus,
             )
     }
 }

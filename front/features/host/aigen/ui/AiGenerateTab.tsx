@@ -172,7 +172,7 @@ export function AiGenerateTab({ sessionId, onCommitted }: AiGenerateTabProps) {
   const [committing, setCommitting] = useState(false);
   const [commitError, setCommitError] = useState<string | null>(null);
   const [revisionConflict, setRevisionConflict] = useState<AiGenerationProblem | null>(null);
-  const adoptedForJobRef = useRef<string | null>(null);
+  const adoptedRevisionRef = useRef<string | null>(null);
 
   const modelsQuery = useQuery(availableAiModelsQuery(sessionId));
   const activeJobId = stage.tag === "active" ? stage.jobId : null;
@@ -205,20 +205,21 @@ export function AiGenerateTab({ sessionId, onCommitted }: AiGenerateTabProps) {
     setEvidence(currentEvidence);
     setReviewState(restoredReviewState(revision, data.result, draft, currentEvidence, restored));
     setRevisionConflict(null);
-    adoptedForJobRef.current = jobId;
+    adoptedRevisionRef.current = `${jobId}:${revision}`;
     return true;
   }, []);
 
   useEffect(() => {
     if (stage.tag !== "active" || jobStatus !== "SUCCEEDED" || !jobQuery.data) return;
-    if (adoptedForJobRef.current === stage.jobId) return;
+    const revision = typeof jobQuery.data.revision === "number" ? jobQuery.data.revision : 0;
+    if (adoptedRevisionRef.current === `${stage.jobId}:${revision}`) return;
     adoptJob(stage.jobId, jobQuery.data);
   }, [stage, jobStatus, jobQuery.data, adoptJob]);
 
   useEffect(() => {
     if (stage.tag !== "active" || jobStatus !== "CANCELLED") return;
     clearAigenDraft(stage.jobId);
-    adoptedForJobRef.current = null;
+    adoptedRevisionRef.current = null;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- terminal server event resets local workspace
     clearWorkspace();
     setStage({ tag: "idle", startError: null });
@@ -241,7 +242,7 @@ export function AiGenerateTab({ sessionId, onCommitted }: AiGenerateTabProps) {
   useEffect(() => {
     if (stage.tag !== "active" || jobStatus !== "COMMITTED") return;
     clearAigenDraft(stage.jobId);
-    adoptedForJobRef.current = null;
+    adoptedRevisionRef.current = null;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- committed server event clears local draft state
     clearWorkspace();
     setStage({ tag: "committed", result: null });
@@ -253,7 +254,7 @@ export function AiGenerateTab({ sessionId, onCommitted }: AiGenerateTabProps) {
     setStage({ tag: "idle", startError: null });
     try {
       const response = await startMutation.mutateAsync(payload);
-      adoptedForJobRef.current = null;
+      adoptedRevisionRef.current = null;
       clearWorkspace();
       setStage({ tag: "active", jobId: response.jobId, cancelling: false });
     } catch (caught) {
@@ -270,7 +271,7 @@ export function AiGenerateTab({ sessionId, onCommitted }: AiGenerateTabProps) {
     setStage({ tag: "active", jobId, cancelling: true });
     try { await cancelMutation.mutateAsync(jobId); } catch { /* Return to safe idle even if already terminal. */ }
     clearAigenDraft(jobId);
-    adoptedForJobRef.current = null;
+    adoptedRevisionRef.current = null;
     clearWorkspace();
     setStage({ tag: "idle", startError: null });
   }, [cancelMutation, clearWorkspace]);
@@ -326,7 +327,7 @@ export function AiGenerateTab({ sessionId, onCommitted }: AiGenerateTabProps) {
       };
       const result = await commitMutation.mutateAsync(request);
       clearAigenDraft(stage.jobId);
-      adoptedForJobRef.current = null;
+      adoptedRevisionRef.current = null;
       clearWorkspace();
       setStage({ tag: "committed", result });
       onCommitted();

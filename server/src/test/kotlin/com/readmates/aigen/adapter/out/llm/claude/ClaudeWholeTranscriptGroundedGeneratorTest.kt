@@ -18,6 +18,17 @@ import java.io.IOException
 @Suppress("MaxLineLength")
 class ClaudeWholeTranscriptGroundedGeneratorTest {
     @Test
+    fun `live client marks the forced tool schema strict`() {
+        val schema =
+            ObjectMapper().readTree(GroundedProviderTestFixture.request().schemaJson)
+                as com.fasterxml.jackson.databind.node.ObjectNode
+
+        val tool = ClaudeApiClient().buildTool("grounded_generation", schema)
+
+        assertThat(tool.strict()).contains(true)
+    }
+
+    @Test
     fun `rejects a model owned by another provider before API work`() {
         val fake = FakeClaudeApi(ClaudeToolResult(GroundedProviderTestFixture.draftNode(), usage()))
         val generator = ClaudeWholeTranscriptGroundedGenerator(fake, GroundedDraftJsonCodec())

@@ -400,8 +400,10 @@ internal class FakeJobQueue : AiGenerationJobQueue {
 
 internal class FakeAuditPort : AiGenerationAuditPort {
     val entries: MutableList<AuditLogEntry> = mutableListOf()
+    var onInsert: ((AuditLogEntry) -> Unit)? = null
 
     override fun insert(entry: AuditLogEntry) {
+        onInsert?.invoke(entry)
         entries += entry
     }
 }

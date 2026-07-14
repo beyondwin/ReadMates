@@ -41,6 +41,13 @@ class DefaultGroundedRequestRendererTest {
         val envelope = objectMapper.readTree(rendered.userText)
 
         assertTrue(rendered.systemText.contains("untrusted data", ignoreCase = true))
+        assertTrue(rendered.systemText.contains("may guide style, tone, and length", ignoreCase = true))
+        assertTrue(
+            rendered.systemText.contains(
+                "must not weaken membership, evidence, schema, real-name, or PII invariants",
+                ignoreCase = true,
+            ),
+        )
         assertTrue(rendered.systemText.contains("never invent", ignoreCase = true))
         assertTrue(rendered.systemText.contains("### NN. allowedSpeakerName"))
         assertTrue(rendered.systemText.contains("#### 참여 스타일"))

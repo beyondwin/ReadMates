@@ -282,6 +282,40 @@ describe("getJob", () => {
       evidence: [],
     });
   });
+
+  it("retains a legacy result when server-shaped grounded fields are null", async () => {
+    const result = {
+      format: "readmates-session-import:v1",
+      sessionNumber: 1,
+      bookTitle: "합성 책",
+      meetingDate: "2026-07-14",
+      summary: "레거시 결과",
+      highlights: [],
+      oneLineReviews: [],
+      feedbackDocumentFileName: "feedback.md",
+      feedbackDocumentMarkdown: "# 결과",
+    };
+    captureFetch(jsonResponse({
+      jobId: "legacy-job",
+      status: "SUCCEEDED",
+      stage: "READY",
+      progressPct: 100,
+      model: "gpt-5.4-mini",
+      result,
+      error: null,
+      tokens: null,
+      costEstimateUsd: "0.00",
+      warnings: [],
+      revision: null,
+      groundingStatus: null,
+      evidence: null,
+      sectionReviewStatuses: null,
+    }));
+
+    await expect(getJob("sid-1", "legacy-job")).resolves.toMatchObject({
+      result: { summary: "레거시 결과" },
+    });
+  });
 });
 
 describe("getRecentJob", () => {

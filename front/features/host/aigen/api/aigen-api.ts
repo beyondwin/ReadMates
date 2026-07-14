@@ -96,10 +96,10 @@ async function aiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
 function sanitizeJob(response: AiGenerationJobResponse): AiGenerationJobResponse {
   const grounded =
-    response.revision !== undefined ||
-    response.groundingStatus !== undefined ||
-    response.evidence !== undefined ||
-    response.sectionReviewStatuses !== undefined;
+    response.revision != null ||
+    response.groundingStatus != null ||
+    response.evidence != null ||
+    response.sectionReviewStatuses != null;
   if (!grounded) return response;
   const complete =
     response.status === "SUCCEEDED" &&

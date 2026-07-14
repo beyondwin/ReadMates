@@ -80,4 +80,20 @@ describe("EvidencePanel", () => {
     expect(screen.getByText("직접 수정됨 — AI 근거 비활성")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "전체 발언 보기" })).not.toBeInTheDocument();
   });
+
+  it("uses unique heading ids when desktop and mobile panels are mounted together", () => {
+    const { container } = render(
+      <>
+        <EvidencePanel targetId="highlight-0" targetLabel="데스크톱" evidence={evidence} revision={7} invalidated={false} onExpand={vi.fn()} />
+        <EvidencePanel targetId="highlight-0" targetLabel="모바일" evidence={evidence} revision={7} invalidated={false} onExpand={vi.fn()} />
+      </>,
+    );
+    const sections = Array.from(container.querySelectorAll("section[aria-labelledby]"));
+    const ids = sections.map((section) => section.getAttribute("aria-labelledby"));
+
+    expect(ids).toHaveLength(2);
+    expect(new Set(ids).size).toBe(2);
+    const headingIds = Array.from(container.querySelectorAll("h2[id]")).map((heading) => heading.id);
+    expect(headingIds).toEqual(ids);
+  });
 });

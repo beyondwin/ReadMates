@@ -191,6 +191,25 @@ class AiGenerationOrchestratorTest {
     }
 
     @Test
+    fun `grounded queue failure audit stores only aggregate metadata`() {
+        val ctx =
+            TestContext(
+                pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
+                activeMembers = listOf(ActiveClubMember(UUID.randomUUID(), "가람")),
+            )
+        ctx.queue.throwOnPublish = RuntimeException("kafka down")
+
+        assertThatThrownBy { ctx.orchestrator.start(ctx.commandWithSpeaker("가람")) }
+            .isInstanceOf(LlmGenerationException::class.java)
+
+        val audit = ctx.auditPort.entries.single()
+        assertThat(audit.transcriptSha256).isNull()
+        assertThat(audit.pipelineVersion).isEqualTo("GROUNDED_WHOLE_TRANSCRIPT")
+        assertThat(audit.inputTurnCount).isEqualTo(1)
+        assertThat(audit.speakerCount).isEqualTo(1)
+    }
+
+    @Test
     fun `start publishes job-routing message without transcript`() {
         val ctx = TestContext()
 

@@ -76,6 +76,35 @@ class JdbcAiGenerationCommitPersistenceAdapterTest(
     }
 
     @Test
+    fun `upsert ignores duplicate active display names that are not transcript speakers`() {
+        val fixture = fixture()
+        repeat(2) { index ->
+            val userId = UUID.randomUUID()
+            val membershipId = UUID.randomUUID()
+            val rawName = if (index == 0) "무관동명이인" else " 무관동명이인"
+            jdbc.update(
+                "insert into users (id,email,name,short_name,auth_provider) values (?,?,?,?,'PASSWORD')",
+                userId.toString(),
+                "unrelated-$index-${userId.toString().take(8)}@example.com",
+                rawName,
+                rawName,
+            )
+            jdbc.update(
+                "insert into memberships (id,club_id,user_id,role,status,short_name,joined_at) values (?,?,?,'MEMBER','ACTIVE',?,utc_timestamp(6))",
+                membershipId.toString(),
+                fixture.clubId.toString(),
+                userId.toString(),
+                rawName,
+            )
+        }
+
+        assertThat(
+            adapter.upsertTranscriptSpeakersAsParticipants(fixture.clubId, fixture.sessionId, listOf(fixture.turn)),
+        ).isEqualTo(1)
+        assertParticipant(fixture, 1)
+    }
+
+    @Test
     fun `receipt is content free and duplicate job revision is detectable`() {
         val fixture = fixture()
         val receipt =

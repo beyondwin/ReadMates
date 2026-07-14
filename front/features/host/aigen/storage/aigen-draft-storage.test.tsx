@@ -68,10 +68,10 @@ describe("aigen-draft-storage v2", () => {
     expect(raw).not.toContain("transcript");
   });
 
-  it("discards another job or revision instead of restoring stale review state", () => {
+  it("preserves a newer stored revision when an older cached response is inspected", () => {
     saveAigenDraft(envelope());
-    expect(loadAigenDraft("job-1", 5)).toBeNull();
-    expect(window.localStorage.getItem(draftStorageKey("job-1"))).toBeNull();
+    expect(loadAigenDraft("job-1", 3)).toBeNull();
+    expect(loadAigenDraft("job-1", 4)).toEqual(envelope());
   });
 
   it("rejects malformed and legacy unversioned data", () => {

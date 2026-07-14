@@ -334,6 +334,7 @@ class AiGenerationCommitService(
                             AiGenerationCommitReceipt(record.jobId, revision, record.sessionId, record.clubId, clock.instant()),
                         ),
                     ) { "Grounded commit receipt already exists" }
+                    writeCommitAudit(record, sectionReviews.orEmpty(), AuditStatus.SUCCESS, null)
                     participantUpdates
                 }
             } catch (error: RuntimeException) {
@@ -354,7 +355,6 @@ class AiGenerationCommitService(
             }
 
         finalizeGroundedCommit(record, revision, cleanup)
-        writeCommitAudit(record, sectionReviews.orEmpty(), AuditStatus.SUCCESS, null)
         return CommitGenerationResult(record.sessionId, JobStatus.COMMITTED, recovered = false, participantUpdatesCount = transactionResult)
     }
 

@@ -160,10 +160,19 @@ class AiGenerationOrchestrator(
                 hostUserId = record.hostUserId,
                 provider = record.model.provider,
                 model = record.model.name,
-                transcriptSha256 = Sha256.hex(record.transcript),
+                transcriptSha256 = record.auditTranscriptSha256(),
                 errorCode = ErrorCode.QUEUE_UNAVAILABLE,
                 errorMessage = message,
                 createdAt = clock.instant(),
+                pipelineVersion = record.pipelineMode.name,
+                inputTurnCount = record.validatedTurns.size.takeIf { record.isGrounded() },
+                speakerCount =
+                    record.validatedTurns
+                        .map { it.speakerMembershipId }
+                        .distinct()
+                        .size
+                        .takeIf { record.isGrounded() },
+                groundingStatus = record.groundingStatus?.name,
             ),
         )
         throw LlmGenerationException(error, failure)
@@ -349,10 +358,11 @@ class AiGenerationOrchestrator(
                 hostUserId = command.hostUserId,
                 provider = modelId.provider,
                 model = modelId.name,
-                transcriptSha256 = Sha256.hex(command.transcript),
+                transcriptSha256 = command.auditTranscriptSha256(),
                 errorCode = code,
                 errorMessage = message,
                 createdAt = clock.instant(),
+                pipelineVersion = properties.pipelineMode.name,
             ),
         )
         throw AiGenerationException.Coded(code, message)
@@ -384,10 +394,11 @@ class AiGenerationOrchestrator(
                 hostUserId = command.hostUserId,
                 provider = provider,
                 model = candidateModel,
-                transcriptSha256 = Sha256.hex(command.transcript),
+                transcriptSha256 = command.auditTranscriptSha256(),
                 errorCode = code,
                 errorMessage = message,
                 createdAt = clock.instant(),
+                pipelineVersion = properties.pipelineMode.name,
             ),
         )
         throw AiGenerationException.Coded(code, message)
@@ -404,6 +415,17 @@ class AiGenerationOrchestrator(
                 ErrorCode.RATE_LIMITED,
             )
     }
+
+    private fun JobRecord.isGrounded(): Boolean = pipelineMode == AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT
+
+    private fun JobRecord.auditTranscriptSha256(): String? = if (isGrounded()) null else Sha256.hex(transcript)
+
+    private fun StartGenerationCommand.auditTranscriptSha256(): String? =
+        if (properties.pipelineMode == AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT) {
+            null
+        } else {
+            Sha256.hex(transcript)
+        }
 }
 
 @Suppress("LongParameterList")

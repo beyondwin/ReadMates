@@ -21,7 +21,7 @@ import com.readmates.aigen.application.port.out.StructuredGenerationRequest
  *   caching for the long transcript.
  * - `toolName` + `toolSchema` define a single registered tool with
  *   `input_schema = toolSchema` and `tool_choice = { type: "tool", name: toolName }`,
- *   forcing the model to invoke exactly that tool.
+ *   forcing the model to invoke exactly that tool with `strict = true` schema validation.
  * - `maxOutputTokens` is always explicit: legacy callers pass 4,096 and grounded callers pass 16,384.
  * - The returned [ClaudeToolResult] carries the parsed tool input
  *   (Jackson 2 `ObjectNode`, matching [com.readmates.aigen.adapter.out.llm.common.SessionImportSchemaResource])

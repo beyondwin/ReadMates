@@ -119,10 +119,11 @@ export function loadAigenDraft(jobId: string, revision: number): AiGenerationDra
   } catch {
     return null;
   }
-  if (!isEnvelope(value) || value.jobId !== jobId || value.revision !== revision) {
+  if (!isEnvelope(value) || value.jobId !== jobId) {
     clearAigenDraft(jobId);
     return null;
   }
+  if (value.revision !== revision) return null;
   return value;
 }
 

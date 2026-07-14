@@ -9,6 +9,7 @@ import type {
   StartGenerationResponse,
 } from "@/features/host/aigen/api/aigen-contracts";
 import { saveAigenDraft } from "@/features/host/aigen/storage/aigen-draft-storage";
+import { aiJobKeys } from "@/features/host/aigen/queries/aigen-job-queries";
 
 vi.mock("@/features/host/aigen/api/aigen-api", () => ({
   startGeneration: vi.fn(),
@@ -173,5 +174,57 @@ describe("AiGenerateTab draft restoration (PREVIEW state machine)", () => {
 
     expect(screen.getByDisplayValue("사용자가 편집한 요약")).toBeInTheDocument();
     expect(screen.queryByDisplayValue("서버가 생성한 요약")).not.toBeInTheDocument();
+  });
+
+  it("adopts a fresh revision after cached success without deleting its newer local draft", async () => {
+    const newerServer = { ...serverSnapshot(), summary: "새 revision 서버 요약" };
+    const newerDraft = { ...newerServer, summary: "새 revision 사용자 편집" };
+    saveAigenDraft({
+      version: 2,
+      jobId: PRESEEDED_JOB_ID,
+      revision: 4,
+      serverSnapshot: newerServer,
+      draft: newerDraft,
+      sectionReviews: {
+        SUMMARY: "USER_EDITED_REVIEW_REQUIRED",
+        HIGHLIGHTS: "PENDING",
+        ONE_LINE_REVIEWS: "PENDING",
+        FEEDBACK_DOCUMENT: "PENDING",
+      },
+    });
+    mockedStart.mockResolvedValue({
+      jobId: PRESEEDED_JOB_ID,
+      status: "PENDING",
+      expiresAt: "2026-05-16T18:00:00Z",
+    });
+    mockedGetJob.mockResolvedValue({
+      ...jobResponse(),
+      revision: 4,
+      groundingStatus: "VALID",
+      evidence: [],
+      result: newerServer,
+    });
+
+    const { client, Wrapper } = createWrapper();
+    client.setQueryData(aiJobKeys.detail("s1", PRESEEDED_JOB_ID), {
+      ...jobResponse(),
+      revision: 3,
+      groundingStatus: "VALID",
+      evidence: [],
+    });
+    render(
+      <Wrapper>
+        <AiGenerateTab sessionId="s1" clubSlug="club-a" onCommitted={() => {}} />
+      </Wrapper>,
+    );
+
+    fireEvent.change(await screen.findByLabelText(/대본 파일/), {
+      target: { files: [new File(["t"], "transcript.txt", { type: "text/plain" })] },
+    });
+    const submit = screen.getByRole("button", { name: /생성 시작/ });
+    await waitFor(() => expect(submit).toBeEnabled());
+    fireEvent.click(submit);
+
+    expect(await screen.findByDisplayValue("새 revision 사용자 편집")).toBeInTheDocument();
   });
 });

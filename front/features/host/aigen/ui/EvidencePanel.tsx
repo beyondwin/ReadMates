@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useId, useState, type CSSProperties } from "react";
 import type {
   AiEvidenceExcerpt,
   ExpandedEvidenceTurn,
@@ -29,6 +29,7 @@ export function EvidencePanel({
 }: EvidencePanelProps) {
   const [expanded, setExpanded] = useState<Record<string, ExpandedEvidenceTurn>>({});
   const [errorTurnId, setErrorTurnId] = useState<string | null>(null);
+  const headingId = useId();
 
   if (!targetId || !targetLabel) {
     return <p className="small" style={{ color: "var(--text-2)" }}>확인할 결과 블록을 선택해 주세요.</p>;
@@ -46,9 +47,9 @@ export function EvidencePanel({
 
   const selected = evidence.filter((item) => item.targetId === targetId);
   return (
-    <section aria-labelledby="aigen-evidence-heading" className="stack" style={{ "--stack": "10px" } as CSSProperties}>
+    <section aria-labelledby={headingId} className="stack" style={{ "--stack": "10px" } as CSSProperties}>
       <header>
-        <h2 id="aigen-evidence-heading" className="eyebrow" style={{ margin: 0 }}>근거 · {targetLabel}</h2>
+        <h2 id={headingId} className="eyebrow" style={{ margin: 0 }}>근거 · {targetLabel}</h2>
         <p className="tiny" style={{ color: "var(--text-2)", margin: "6px 0 0" }}>
           연결된 발언은 출처를 확인하기 위한 정보입니다. 호스트가 결과 문장을 의미상 뒷받침하는지 판단해 주세요.
         </p>
