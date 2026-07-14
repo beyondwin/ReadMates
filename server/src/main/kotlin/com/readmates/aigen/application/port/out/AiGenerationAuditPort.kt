@@ -29,6 +29,13 @@ data class AuditLogEntry(
     val errorMessage: String?,
     val latencyMs: Int,
     val createdAt: Instant,
+    val pipelineVersion: String? = null,
+    val inputTurnCount: Int? = null,
+    val speakerCount: Int? = null,
+    val groundingStatus: String? = null,
+    val groundingWarningCount: Int = 0,
+    val reviewedSectionCount: Int = 0,
+    val userEditedSectionCount: Int = 0,
 ) {
     companion object {
         // Mirrors the cohesive identity/context fields of a failed audit row; collapsing

@@ -160,6 +160,7 @@ is_forbidden_path() {
     .env*|*.env|*.pem|*.key|*.p8|*.p12|*.pfx|*.jks|id_rsa*|id_ed25519*|id_ecdsa*|id_dsa*) return 0 ;;
     *.sql.gz|*.dump|*.db|*.sqlite|*.sqlite3|*.bak) return 0 ;;
     *.tfstate|*.tfstate.*|*.state) return 0 ;;
+    *.tsbuildinfo) return 0 ;;
   esac
 
   case "$lower" in

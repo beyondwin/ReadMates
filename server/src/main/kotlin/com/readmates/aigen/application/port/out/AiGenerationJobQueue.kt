@@ -7,7 +7,7 @@ import java.util.UUID
  * Outbound port for publishing AI generation jobs to an async queue (Kafka in production).
  *
  * Per spec §7.1, the start endpoint:
- *  1. Stores the transcript in Redis under `aigen:job:{jobId}:transcript`
+ *  1. Stores the transcript in the Redis adapter's short-lived transcript payload
  *  2. Publishes ONLY the [AiGenerationJobPublishCommand.jobId] and routing metadata
  *     (sessionId/provider/model/kind) to the queue — the message body MUST NOT
  *     contain the transcript itself.

@@ -354,7 +354,7 @@ class AiGenerationCommitService(
             }
 
         finalizeGroundedCommit(record, revision, cleanup)
-        writeCommitAudit(record, AuditStatus.SUCCESS, null)
+        writeCommitAudit(record, sectionReviews.orEmpty(), AuditStatus.SUCCESS, null)
         return CommitGenerationResult(record.sessionId, JobStatus.COMMITTED, recovered = false, participantUpdatesCount = transactionResult)
     }
 
@@ -421,6 +421,7 @@ class AiGenerationCommitService(
 
     private fun writeCommitAudit(
         record: JobRecord,
+        sectionReviews: Map<GenerationItem, SectionReviewStatus>,
         status: AuditStatus,
         errorCode: ErrorCode?,
     ) {
@@ -442,6 +443,16 @@ class AiGenerationCommitService(
                 errorMessage = null,
                 latencyMs = 0,
                 createdAt = clock.instant(),
+                pipelineVersion = record.pipelineMode.name,
+                inputTurnCount = record.validatedTurns.size,
+                speakerCount =
+                    record.validatedTurns
+                        .map { it.speakerMembershipId }
+                        .distinct()
+                        .size,
+                groundingStatus = record.groundingStatus?.name,
+                reviewedSectionCount = sectionReviews.size,
+                userEditedSectionCount = sectionReviews.values.count { it == SectionReviewStatus.USER_EDITED_CONFIRMED },
             ),
         )
     }

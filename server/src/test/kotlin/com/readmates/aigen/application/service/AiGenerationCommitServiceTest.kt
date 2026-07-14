@@ -80,6 +80,12 @@ class AiGenerationCommitServiceTest {
         ctx.service.commit(ctx.host, ctx.sessionId, record.jobId, SessionRecordVisibility.MEMBER, edited, 2, reviews)
 
         assertThat(ctx.jobStore.load(record.jobId)?.result).isNull()
+        val audit = ctx.auditPort.entries.single()
+        assertThat(audit.pipelineVersion).isEqualTo("GROUNDED_WHOLE_TRANSCRIPT")
+        assertThat(audit.reviewedSectionCount).isEqualTo(4)
+        assertThat(audit.userEditedSectionCount).isEqualTo(1)
+        assertThat(audit.inputTurnCount).isEqualTo(2)
+        assertThat(audit.speakerCount).isEqualTo(2)
     }
 
     @Test

@@ -134,6 +134,15 @@ if ./scripts/public-release-check.sh "$artifact_fixture" > "$artifact_fixture.ou
 fi
 assert_file_contains "$artifact_fixture.err" "forbidden candidate path: front/test-results/.last-run.json"
 
+tsbuildinfo_fixture="$fixture_root/tsbuildinfo-path"
+mkdir -p "$tsbuildinfo_fixture/front"
+printf '{"diagnostics":"generated compiler state"}\n' > "$tsbuildinfo_fixture/front/tsconfig.tsbuildinfo"
+
+if ./scripts/public-release-check.sh "$tsbuildinfo_fixture" > "$tsbuildinfo_fixture.out" 2> "$tsbuildinfo_fixture.err"; then
+  fail "public release check should reject generated TypeScript build metadata"
+fi
+assert_file_contains "$tsbuildinfo_fixture.err" "forbidden candidate path: front/tsconfig.tsbuildinfo"
+
 candidate_dir="$repo_abs/.tmp/public-release-candidate"
 coverage_fixture="$repo_abs/scripts/fixtures/public-release-candidate-coverage.txt"
 

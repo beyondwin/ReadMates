@@ -1,7 +1,7 @@
 package com.readmates.aigen.api
 
-import com.fasterxml.jackson.databind.json.JsonMapper
 import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.json.JsonMapper
 import com.readmates.aigen.application.model.AiGenerationActor
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.port.out.AiGenerationCommitPersistencePort
@@ -9,8 +9,6 @@ import com.readmates.aigen.application.port.out.AiGenerationCommitReceipt
 import com.readmates.aigen.application.port.out.AiGenerationJobStore
 import com.readmates.aigen.support.AiGenerationTestModels
 import com.readmates.aigen.support.SyntheticTranscriptTurn
-import com.readmates.support.KafkaTestContainer
-import com.readmates.support.ReadmatesRedisIntegrationTestSupport
 import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.sessionimport.application.model.SessionImportCommand
 import com.readmates.sessionimport.application.model.SessionImportFeedbackDocumentCommand
@@ -19,6 +17,8 @@ import com.readmates.sessionimport.application.model.SessionImportRecordCommand
 import com.readmates.sessionimport.application.model.SessionImportSessionCommand
 import com.readmates.sessionimport.application.port.`in`.CommitValidatedSessionImportUseCase
 import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportInput
+import com.readmates.support.KafkaTestContainer
+import com.readmates.support.ReadmatesRedisIntegrationTestSupport
 import org.apache.kafka.clients.admin.AdminClient
 import org.apache.kafka.clients.admin.AdminClientConfig
 import org.apache.kafka.clients.admin.NewTopic
@@ -213,8 +213,13 @@ class AiGenerateGroundedCommitIntegrationTest(
                 GROUNDED_SESSION_ID,
             ),
         ).isEqualTo("unchanged placeholder")
-        assertThat(jdbc.queryForObject("select count(*) from highlights where session_id=?", Int::class.java, GROUNDED_SESSION_ID))
-            .isZero()
+        assertThat(
+            jdbc.queryForObject(
+                "select count(*) from highlights where session_id=?",
+                Int::class.java,
+                GROUNDED_SESSION_ID,
+            ),
+        ).isZero()
         assertThat(receiptCount(jobId)).isZero()
     }
 
@@ -263,7 +268,12 @@ class AiGenerateGroundedCommitIntegrationTest(
                     sessionId = UUID.fromString(GROUNDED_SESSION_ID),
                     recordVisibility = SessionRecordVisibility.MEMBER,
                     format = snapshot.format,
-                    session = SessionImportSessionCommand(snapshot.sessionNumber, snapshot.bookTitle, snapshot.meetingDate),
+                    session =
+                        SessionImportSessionCommand(
+                            snapshot.sessionNumber,
+                            snapshot.bookTitle,
+                            snapshot.meetingDate,
+                        ),
                     publication = SessionImportPublicationCommand(snapshot.summary),
                     highlights = snapshot.highlights.map { SessionImportRecordCommand(it.authorName, it.text) },
                     oneLineReviews = snapshot.oneLineReviews.map { SessionImportRecordCommand(it.authorName, it.text) },
@@ -404,10 +414,20 @@ class AiGenerateGroundedCommitIntegrationTest(
                 GROUNDED_SESSION_ID,
             ),
         ).isEqualTo("A public-safe grounded summary.")
-        assertThat(jdbc.queryForObject("select count(*) from highlights where session_id=?", Int::class.java, GROUNDED_SESSION_ID))
-            .isEqualTo(2)
-        assertThat(jdbc.queryForObject("select count(*) from one_line_reviews where session_id=?", Int::class.java, GROUNDED_SESSION_ID))
-            .isEqualTo(2)
+        assertThat(
+            jdbc.queryForObject(
+                "select count(*) from highlights where session_id=?",
+                Int::class.java,
+                GROUNDED_SESSION_ID,
+            ),
+        ).isEqualTo(2)
+        assertThat(
+            jdbc.queryForObject(
+                "select count(*) from one_line_reviews where session_id=?",
+                Int::class.java,
+                GROUNDED_SESSION_ID,
+            ),
+        ).isEqualTo(2)
         assertThat(
             jdbc.queryForObject(
                 "select count(*) from session_feedback_documents where session_id=?",
@@ -433,10 +453,20 @@ class AiGenerateGroundedCommitIntegrationTest(
                 GROUNDED_SESSION_ID,
             ),
         ).isEqualTo("unchanged placeholder")
-        assertThat(jdbc.queryForObject("select count(*) from highlights where session_id=?", Int::class.java, GROUNDED_SESSION_ID))
-            .isZero()
-        assertThat(jdbc.queryForObject("select count(*) from one_line_reviews where session_id=?", Int::class.java, GROUNDED_SESSION_ID))
-            .isZero()
+        assertThat(
+            jdbc.queryForObject(
+                "select count(*) from highlights where session_id=?",
+                Int::class.java,
+                GROUNDED_SESSION_ID,
+            ),
+        ).isZero()
+        assertThat(
+            jdbc.queryForObject(
+                "select count(*) from one_line_reviews where session_id=?",
+                Int::class.java,
+                GROUNDED_SESSION_ID,
+            ),
+        ).isZero()
         assertThat(
             jdbc.queryForObject(
                 "select count(*) from session_feedback_documents where session_id=?",
@@ -451,10 +481,20 @@ class AiGenerateGroundedCommitIntegrationTest(
         assertThat(receiptCount(jobId)).isEqualTo(1)
         val columns =
             jdbc.queryForList(
-                "select column_name from information_schema.columns where table_schema=database() and table_name='ai_generation_commit_receipts'",
+                """
+                select column_name from information_schema.columns
+                where table_schema=database() and table_name='ai_generation_commit_receipts'
+                """.trimIndent(),
                 String::class.java,
             )
-        assertThat(columns).containsExactlyInAnyOrder("id", "job_id", "revision", "session_id", "club_id", "committed_at")
+        assertThat(columns).containsExactlyInAnyOrder(
+            "id",
+            "job_id",
+            "revision",
+            "session_id",
+            "club_id",
+            "committed_at",
+        )
     }
 
     private fun assertTransientPayloadsRemoved(jobId: UUID) {

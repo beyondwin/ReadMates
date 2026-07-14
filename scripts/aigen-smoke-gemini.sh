@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
 # scripts/aigen-smoke-gemini.sh — manual smoke for Gemini provider end-to-end
-# Spec: docs/superpowers/specs/2026-05-16-readmates-in-app-ai-session-generation-design.md §7
-# Plan: docs/superpowers/plans/2026-05-16-readmates-in-app-ai-session-generation-implementation-plan.md task 5.4
+# Spec: docs/superpowers/specs/2026-07-14-readmates-grounded-whole-transcript-ai-session-generation-design.md
+# Plan: docs/superpowers/plans/2026-07-14-readmates-grounded-whole-transcript-ai-session-generation.md task 14
 #
 # Required env:
 #   READMATES_AIGEN_GEMINI_API_KEY  — Gemini API key (live billing implications)
 #   READMATES_SMOKE_BASE_URL        — defaults https://readmates.pages.dev
 #   READMATES_SMOKE_SESSION_ID      — session UUID owned by an active host
 #   READMATES_SMOKE_HOST_COOKIE     — readmates.sid value for the host (browser DevTools)
-#   READMATES_SMOKE_TRANSCRIPT      — path to a .txt transcript (≤ 1 MB)
+#
+# The script creates its own public-safe supported TXT fixture. The target
+# session must belong to a dedicated smoke club with one ACTIVE membership
+# whose display name is exactly `공개 회원 A`; never substitute private data.
 #
 # Retention contract (spec §5.7): the server-side GeminiApiClient MUST send
 # `disablePromptLogging=true` on every request so transcripts are not retained
@@ -16,33 +19,34 @@
 #
 # Note: requires server-side `readmates.aigen.enabled=true`, `enabled-providers`
 # including GEMINI, and the model name below to be present in the YAML pricing
-# table (current key: `gemini-3-flash`).
+# table (current key: `gemini-3-flash-preview`).
 #
-# OPERATOR CAVEAT: as of task_5_3 the live Gemini SDK call throws
-# NotImplementedError — the provider adapter is wired but the SDK invocation
-# has not landed yet. This smoke script will therefore fail at the LLM call
-# until the live wiring is merged. Run it post-merge of the live-call task.
-#
-# Live execution is currently waived (orchestrator directive: missing
-# READMATES_AIGEN_GEMINI_API_KEY in headless env); this script is the manual
-# operator runbook for when the key is available post-merge.
+# Live execution requires separate operator authorization and a retention-
+# reviewed environment. Normal CI validates syntax only and never runs this.
 set -euo pipefail
 
 BASE_URL="${READMATES_SMOKE_BASE_URL:-https://readmates.pages.dev}"
 SESSION_ID="${READMATES_SMOKE_SESSION_ID:?READMATES_SMOKE_SESSION_ID required}"
 COOKIE="${READMATES_SMOKE_HOST_COOKIE:?READMATES_SMOKE_HOST_COOKIE required (readmates.sid value)}"
-TRANSCRIPT="${READMATES_SMOKE_TRANSCRIPT:?READMATES_SMOKE_TRANSCRIPT required (path to .txt)}"
-MODEL="${READMATES_SMOKE_GEMINI_MODEL:-gemini-3-flash}"
+MODEL="${READMATES_SMOKE_GEMINI_MODEL:-gemini-3-flash-preview}"
 
-if [[ ! -f "$TRANSCRIPT" ]]; then
-  echo "Transcript file not found at $TRANSCRIPT" >&2
-  exit 2
-fi
-size=$(wc -c <"$TRANSCRIPT")
-if (( size > 1048576 )); then
-  echo "Transcript exceeds 1 MB (size=$size)" >&2
-  exit 2
-fi
+SMOKE_DIR=$(mktemp -d)
+TRANSCRIPT="$SMOKE_DIR/readmates-public-safe-smoke.txt"
+cleanup_smoke_fixture() {
+  rm -f "$TRANSCRIPT"
+  rmdir "$SMOKE_DIR" 2>/dev/null || true
+}
+trap cleanup_smoke_fixture EXIT
+printf '%s\n' \
+  '공개 안전 합성 독서 모임' \
+  '2026. 7. 14. 오후 7:00 · 1분 0초' \
+  '공개 회원 A' \
+  '' \
+  '공개 회원 A 00:00' \
+  '이 문장은 공개 안전 합성 AI 세션 smoke 입력입니다.' \
+  '' \
+  '공개 회원 A 00:25' \
+  '첫 발언의 핵심을 다시 확인합니다.' >"$TRANSCRIPT"
 
 if [[ -z "${READMATES_AIGEN_GEMINI_API_KEY:-}" ]]; then
   echo "READMATES_AIGEN_GEMINI_API_KEY not set in environment of the *server* process; the smoke will 503 or fail at LLM call. Ensure the server has the key before running." >&2
@@ -61,7 +65,7 @@ api() {
 
 START_PATH="/api/host/sessions/$SESSION_ID/ai-generate/jobs"
 echo "→ POST $START_PATH (model=$MODEL)"
-BODY_JSON=$(printf '{"model":"%s","authorNameMode":"real","instructions":null}' "$MODEL")
+BODY_JSON=$(printf '{"model":"%s","instructions":null}' "$MODEL")
 RESPONSE=$(curl -fsS --max-time 60 -X POST \
   -b "readmates.sid=$COOKIE" \
   -H "Origin: $BASE_URL" -H "Referer: $BASE_URL/" \

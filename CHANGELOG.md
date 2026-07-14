@@ -8,7 +8,23 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Highlights
 
-- 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
+- **근거 기반 전체 대본 AI 세션 기록:** 호스트가 지원 TXT를 업로드하면 provider 호출 전에 모든 화자를 같은 클럽의 활성 회원과 정확히 맞추고, 전체 대본 한 번의 structured generation으로 네 섹션과 근거 turn ID를 만듭니다. 호스트는 desktop/mobile 근거 panel과 네 섹션 review ledger를 모두 확인한 뒤에만 저장할 수 있습니다.
+
+### Changed
+
+- **호스트 TXT 워크플로:** UTF-8/BOM `.txt`, `화자명 MM:SS`, 1 MiB/3시간 한도를 적용합니다. 비회원·비활성·generic·중복 화자는 job/Redis/Kafka/provider/cost side effect 없이 거절하고 real-name 수정 안내만 제공합니다. 수동 편집은 해당 근거/review를 무효화하고 regeneration은 revision과 전체 review를 초기화합니다.
+- **Provider 계약:** grounded model ID를 OpenAI `gpt-5.4-mini`, Claude `claude-sonnet-4-6`, Gemini `gemini-3-flash-preview`로 정렬하고 pricing과 별도인 capability catalog, 16,384-token output reserve, network-call-free request budget guard를 추가했습니다. Capability drift는 503, request budget 초과는 422로 fail closed합니다.
+- **공개 릴리스 안전:** TypeScript incremental build metadata(`*.tsbuildinfo`)를 공개 릴리스 후보에서 제외하고 검사기와 fixture로 로컬 빌드 경로 재유입을 차단합니다.
+
+### Database
+
+- **Flyway V37:** content-free `ai_generation_commit_receipts`(`job_id + revision` unique)를 추가하고 `ai_generation_audit_log`에 pipeline/turn/speaker/grounding/review aggregate column을 추가했습니다. 기존 `gemini-3-flash` 클럽 기본값은 `gemini-3-flash-preview`로 이관하며 transcript, member name, result, evidence/excerpt를 MySQL에 저장하지 않습니다.
+
+### Deployment Notes
+
+- Pipeline 기본값은 `LEGACY`로 유지됩니다. `GROUNDED_WHOLE_TRANSCRIPT`는 public-safe mock/E2E, provider capability·retention, 별도 private live-evaluation 승인을 확인한 제한된 환경에서만 활성화하고 이상 시 `LEGACY`로 rollback합니다.
+- Transcript/turns/result/evidence는 6시간 Redis payload로만 유지하고 commit/cancel 후 삭제합니다. MySQL receipt와 Redis revision/lease로 crash window를 복구하며 `COMMITTED + cleanupPending`은 DB write를 반복하지 않고 cleanup만 재시도합니다. Platform admin은 metadata-only 복구만 수행합니다.
+- Private transcript를 live provider로 보내는 품질 평가, production mode 변경, deploy는 별도 명시 승인 없이 실행하지 않습니다.
 
 ## v1.17.3 - 2026-07-12
 

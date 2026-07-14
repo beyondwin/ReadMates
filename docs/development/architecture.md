@@ -406,14 +406,14 @@ Commit은 활성 호스트만 사용할 수 있고, `HOST_ONLY` 공개 범위에
 
 ## AI-assisted 콘텐츠 운영
 
-ReadMates 호스트 세션 편집기는 세션 기록을 채우는 두 가지 모드를 같은 commit 경로(`SessionImportService.commitValidated`)로 흘려 보냅니다.
+ReadMates 호스트 세션 편집기는 세션 기록을 채우는 두 가지 입력을 같은 validation/commit 경계(`SessionImportService.commitValidated`)로 흘려 보냅니다.
 
 | 모드 | 입력 | LLM 호출 위치 | 운영 게이트 |
 | --- | --- | --- | --- |
 | 외부 정리된 산출물 (legacy) | 호스트가 앱 밖에서 정리한 `readmates-session-import:v1` JSON | 앱 외부 | 항상 사용 가능 |
-| In-app AI 생성 | 호스트가 업로드한 transcript (.txt ≤ 1 MB) + 모델 선택 | 서버 측 provider adapter | `readmates.aigen.enabled` + `enabled-providers` + provider API key |
+| In-app AI 생성 | 호스트가 업로드한 UTF-8/BOM TXT(≤ 1 MiB, ≤ 3시간) + 모델 선택 | 서버 측 provider adapter | kill switch + provider allowlist + `pipeline-mode` + provider API key |
 
-외부 JSON 흐름은 [세션 기록 JSON 가져오기](#세션-기록-json-가져오기) 섹션에서 설명하고, in-app AI 생성의 컴포넌트와 데이터 경계는 다음 [In-app AI 세션 생성 컴포넌트](#in-app-ai-세션-생성-컴포넌트) 섹션에서 다룹니다. 운영 절차는 [docs/operations/runbooks/ai-session-generation.md](../operations/runbooks/ai-session-generation.md), 설계 spec은 [in-app AI session generation design](../superpowers/specs/2026-05-16-readmates-in-app-ai-session-generation-design.md)입니다.
+외부 JSON 흐름은 [세션 기록 JSON 가져오기](#세션-기록-json-가져오기) 섹션에서 설명하고, in-app AI 생성의 컴포넌트와 데이터 경계는 다음 [In-app AI 세션 생성 컴포넌트](#in-app-ai-세션-생성-컴포넌트) 섹션에서 다룹니다. 운영 절차는 [AI 세션 생성 runbook](../operations/runbooks/ai-session-generation.md), 근거 기반 계약은 [grounded whole-transcript design](../superpowers/specs/2026-07-14-readmates-grounded-whole-transcript-ai-session-generation-design.md)입니다.
 
 ## In-app AI 세션 생성 컴포넌트
 
@@ -421,47 +421,63 @@ In-app AI 생성은 `com.readmates.aigen` feature 모듈에 응집됩니다. 다
 
 ```text
 Browser (host editor AI 모드)
-  | multipart POST /api/host/sessions/{id}/ai-generate/jobs
+  | multipart TXT + server-provided model ID
   v
 Cloudflare Pages BFF (forward, multipart preserved)
   v
-Spring  com.readmates.aigen.adapter.in.web.AiGenerationController
+AiGenerationController
   v
-AiGenerationOrchestrator (cap check → Redis job create → Kafka publish)
-  |                                                      |
-  v                                                      v
-Redis  aigen:job:<jobId>            Kafka  readmates.aigen.jobs.v1
-  ^                                                      |
-  |                                                      v
-AiGenerationCommitService          AiGenerationJobConsumer
-       |                                  v
-       v                          AiGenerationWorker
-SessionImportService                |
-.commitValidated(...)               |  provider adapter selection by ModelCatalog
-       |                            v
-       v                  adapter.out.llm.{claude,openai,gemini}
-MySQL publication / highlights / one-line reviews / feedback
-       |
-       v
-ai_generation_audit_log row (PII-safe: provider/model/status/token/cost — no transcript body)
+TranscriptPreflightService
+  |-- host/session authorization
+  |-- parse + exact ACTIVE membership binding
+  |-- canonical render + local capability/input budget guard
+  |-- reject: typed 422/503, no job/Redis/Kafka/provider/cost side effect
+  v
+AiGenerationOrchestrator
+  |-- Redis metadata hash + transcript/turns payload
+  `-- Kafka AiGenerationJobMessage { jobId, sessionId, clubId, hostUserId, provider, model, kind }
+          |
+          v
+AiGenerationWorker -> WholeTranscriptGroundedGenerator
+  |-- one primary structured-output call with the whole transcript
+  |-- at most one same-provider section repair with whole context
+  v
+GroundingValidator -> server-owned result/evidence projection -> Redis
+  |
+  v
+Host review ledger (four sections + revision-scoped evidence)
+  |
+  v
+AiGenerationCommitService
+  |-- Redis revision CAS + bounded COMMITTING lease
+  `-- one MySQL transaction
+       |-- ACTIVE membership revalidation + participant upsert
+       |-- SessionImportService.commitValidated(...)
+       `-- content-free job_id + revision receipt
+  v
+COMMITTED -> cache invalidation + four-payload cleanup
 ```
 
 - **Feature module 위치**: `server/src/main/kotlin/com/readmates/aigen/`. 도메인 model, port, service, controller, Redis/JDBC adapter, Kafka adapter, LLM adapter가 한 패키지 트리 안에 있습니다.
-- **Provider adapter (3종)**: `adapter.out.llm.claude.ClaudeContentGenerator/Regenerator`, `adapter.out.llm.openai.OpenAiContentGenerator/Regenerator`, `adapter.out.llm.gemini.GeminiContentGenerator/Regenerator`. 모두 `SessionContentGenerator`/`SessionContentRegenerator` outbound port를 구현하고, `LlmPromptBuilder`로 동일한 system + USER_PRELUDE를 만들며, `LlmErrorMapper`로 provider 예외를 사용자 안전 메시지로 마스킹합니다. 등록은 `AiGenerationBeansConfig`의 `associateBy { it.provider }` 패턴으로 자동 와이어링됩니다.
-- **Kafka topic**: `readmates.aigen.jobs.v1` (partition key=`clubId`, payload=`AiGenerationJobMessage{jobId, sessionId, clubId, hostUserId, provider, model, kind}`). Transcript 본문은 페이로드에 절대 포함되지 않습니다 (PII invariant; `scripts/aigen-pii-check.sh`로 PR마다 검증).
+- **Provider adapter**: legacy `SessionContentGenerator`/`SessionContentRegenerator`와 grounded `WholeTranscriptGroundedGenerator`를 별도 provider map으로 등록합니다. Grounded adapter는 OpenAI, Claude, Gemini 모두 같은 `GroundedRequestRenderer`의 system/schema/ordered turn bytes와 explicit max output를 사용합니다. 대본의 명령은 data delimiter 안에 남고 host instructions은 membership/evidence/schema/PII invariant를 완화할 수 없습니다. `LlmErrorMapper`는 provider raw error를 content-free typed error로 바꿉니다.
+- **Model trust gate**: pricing catalog과 grounded capability catalog은 별도입니다. `GroundedInputBudgetGuard`는 provider call 전에 실제 renderer request와 16,384 output reserve, safety margin, context/output capability를 검증합니다. Capability 불명은 503, request budget 초과는 422이며 chunking하지 않습니다. Browser model list도 서버 catalog에서 받습니다.
+- **Kafka topic**: `readmates.aigen.jobs.v1` message는 `AiGenerationJobMessage{jobId, sessionId, clubId, hostUserId, provider, model, kind}`의 routing metadata만 저장합니다. Transcript, turns, member/display name, prompt/instructions, result, evidence/excerpt는 Kafka와 notification payload에 들어가지 않습니다.
 - **Redis 키**:
-  - `aigen:job:<jobId>` (Hash, TTL 6h) — job state, provider/model, session metadata, token/cost 누적값, `llmCallCount`. Transcript 본문은 이 hash에 넣지 않습니다.
-  - `aigen:job:<jobId>:transcript` (String, TTL 6h) — raw transcript body. Kafka/MySQL/metrics로 보내지 않고 worker/regeneration이 Redis에서만 rehydrate합니다. Commit/cancel 성공 후에는 transient payload로 삭제됩니다.
-  - `aigen:job:<jobId>:result` (String, TTL 6h) — validated `SessionImportV1Snapshot` JSON.
+  - `aigen:job:<jobId>` (Hash, TTL 6h) — status/stage/revision, provider/model, counters, safe grounding status, commit lease, `cleanupPending` 같은 content-free metadata.
+  - `aigen:job:<jobId>:transcript` (String, TTL 6h) — normalized raw transcript.
+  - `aigen:job:<jobId>:turns` (String, TTL 6h) — membership에 bind된 parsed turn/source context.
+  - `aigen:job:<jobId>:result` (String, TTL 6h) — validated `SessionImportV1Snapshot`.
+  - `aigen:job:<jobId>:evidence` (String, TTL 6h) — revision-scoped target/turn mapping과 서버가 만든 excerpt.
   - `aigen:cost:club:<clubId>:<YYYY-MM>` (String, TTL 31d) — 월별 클럽 누적 비용 BigDecimal scale=4 USD.
   - `aigen:cost:host:<userId>:<YYYY-MM-DD>` (String, TTL 24h) — 호스트 일일 생성 횟수 카운터.
   - `aigen:cost:host:<userId>:<YYYY-MM>` (String, TTL 31d) — 호스트 월별 누적 비용 (감사 보조).
-- **Job state machine**: `PENDING -> RUNNING -> SUCCEEDED -> COMMITTING -> COMMITTED`가 정상 commit 경로입니다. `FAILED`와 `CANCELLED`는 terminal 상태입니다. Worker start/completion, regenerate, commit, cancel은 `AiGenerationJobTransitionPolicy`와 Redis Lua CAS(`transitionStatus`, `saveResultIfStatus`)로 현재 상태가 맞을 때만 진행합니다. Commit/cancel 이후에는 `:transcript`와 `:result` payload만 삭제하고 `aigen:job:<jobId>` hash는 terminal 상태 조회를 위해 TTL까지 남깁니다. Pre-terminal job에서 transcript key가 사라진 경우에는 stale job으로 보고 세 키를 모두 삭제합니다.
-- **LLM call cap**: `llmCallCount`는 full generation, provider retry, validation retry, regeneration 호출 전마다 Redis hash에서 원자 증가합니다. `readmates.aigen.job.max-llm-calls-per-job`를 넘으면 provider 호출 없이 `MAX_CALLS_EXCEEDED` typed error로 종료합니다.
-- **MySQL 테이블** (Flyway V30/V31/V34):
-  - `ai_generation_audit_log` — job/session/club/host_user 인덱스 + provider/model/status/`input_tokens`/`cached_input_tokens`/`output_tokens`/`cost_estimate_usd`/`latency_ms`. **transcript 본문 컬럼 없음** (감사 invariant).
+- **Job state machine**: 정상 commit은 `PENDING -> RUNNING -> SUCCEEDED -> COMMITTING -> COMMITTED`입니다. Redis revision CAS가 worker save/regeneration/commit 경합을 막습니다. Receipt 없는 DB 실패 또는 만료 `COMMITTING` lease는 `COMMIT_RETRY`로 복구하고, receipt가 있으면 DB write 없이 `COMMITTED`로 수렴합니다. Commit/cancel은 네 payload를 지우고 terminal hash만 TTL까지 남깁니다. DB commit 후 cleanup 실패는 `COMMITTED + cleanupPending`이며 DB write를 반복하지 않습니다.
+- **LLM call cap**: primary, availability fallback, 한 section repair, regeneration은 같은 atomic `llmCallCount`와 cost cap을 사용합니다. Primary와 repair는 모두 전체 ordered transcript를 유지하며 invalid draft는 Redis result/evidence나 browser에 저장하지 않습니다.
+- **MySQL 테이블** (Flyway V30/V31/V34/V37):
+  - `ai_generation_audit_log` — provider/model/status/token/cost/latency와 pipeline version, turn/speaker/grounding warning/review/user-edited aggregate count만 저장합니다. Transcript, name, prompt, result, evidence, excerpt 컬럼은 없습니다.
+  - `ai_generation_commit_receipts` — unique `job_id + revision`, `session_id`, `club_id`, `committed_at`만 저장하는 cross-store recovery source of truth입니다. Participant upsert, session import, receipt insert는 하나의 MySQL transaction입니다.
   - `ai_generation_club_defaults` — 클럽별 default provider/model. `clubs(id)` FK.
   - `ai_generation_admin_action_audit` — platform admin AI Ops action ledger. `job_id`, `club_id`, `session_id`, `admin_user_id`, `admin_role`, action/result, 이전/다음 상태, safe error code만 저장합니다.
-- **Frontend 모듈**: `front/features/host/aigen/` — `api/` (BFF 호출 + DTO), `hooks/useAiGenerationJob.ts` (TanStack Query v5 adaptive polling), `ui/` (TranscriptUploadForm, GenerationProgressView, PreviewView + 4개 section, RegenerateModal), `storage/aigen-draft-storage.ts` (PREVIEW 수동 편집 localStorage 저장). Polling은 `COMMITTING` 동안 계속되고 `COMMITTED`/`FAILED`/`CANCELLED`에서 멈춥니다. 호스트 세션 편집기는 `세션 기록 완성` 패널에서 `AI로 생성` / `외부 JSON 가져오기` 모드로 같은 commit 경로를 분기합니다.
-- **운영 표면**: Micrometer meter는 `com.readmates.aigen.application.service.AiGenerationMetrics`의 8개 meter(`jobs`, `jobs.completed`, `latency`, `tokens`, `cost.usd`, `validation.failures`, `cap.denials`, `queue.depth`)를 노출합니다. `MetricLabel` allowlist가 `club_id`/`user_id` 같은 high-cardinality tag를 막습니다. Prometheus alert는 `ops/prometheus/alerts/aigen-rules.yml`, Grafana 대시보드는 `ops/grafana/dashboards/aigen.json`. 운영 절차와 alert response anchor는 [ai-session-generation runbook](../operations/runbooks/ai-session-generation.md).
-- **Kill switch**: `readmates.aigen.enabled=false`이면 `AiGenerationKillSwitchFilter`가 `/api/host/sessions/*/ai-generate/**`와 `/api/host/clubs/*/ai-defaults`를 503 + RFC 7807 `AI_DISABLED`로 응답합니다. Controller bean과 Kafka consumer도 `@ConditionalOnProperty`로 컨텍스트에서 빠집니다. `enabled-providers`에서 provider를 제외하면 catalog 단계에서 해당 provider 모델 전체가 사라집니다. 두 flag 모두 기본 off.
+- **Frontend 모듈**: `front/features/host/aigen/` 안의 API/query/model/route/UI 경계를 유지합니다. Grounded draft는 revision을 포함한 local recovery envelope로만 저장하고 evidence/transcript를 localStorage에 넣지 않습니다. Review ledger의 네 section이 모두 `AI_GROUNDED_REVIEWED` 또는 편집 후 `USER_EDITED_CONFIRMED`일 때만 expected revision/result와 함께 commit합니다. Evidence 확장은 현재 revision이 참조한 단일 turn만 허용하며 transcript search/download API는 없습니다.
+- **운영 표면**: Micrometer meter는 `com.readmates.aigen.application.service.AiGenerationMetrics`의 8개 기존 meter(`jobs`, `jobs.completed`, `latency`, `tokens`, `cost.usd`, `validation.failures`, `cap.denials`, `queue.depth`)와 bounded section repair 결과 meter(`grounding.repairs{status}`)를 노출합니다. `MetricLabel` allowlist가 `club_id`/`user_id` 같은 high-cardinality tag를 막습니다. Prometheus alert는 `ops/prometheus/alerts/aigen-rules.yml`, Grafana 대시보드는 `ops/grafana/dashboards/aigen.json`. 운영 절차와 alert response anchor는 [ai-session-generation runbook](../operations/runbooks/ai-session-generation.md).
+- **운영·권한 경계**: `readmates.aigen.enabled`, `enabled-providers`, `pipeline-mode`이 서버 실행 경계입니다. Pipeline 기본값은 `LEGACY`이고 grounded는 환경별 rollout 검증 후에만 `GROUNDED_WHOLE_TRANSCRIPT`로 활성화합니다. Platform admin은 transcript/name/result/evidence를 보거나 편집/commit하지 않고 safe metadata로 cancel, commit-recovery, cleanup retry만 수행합니다. 세부 절차는 [AI 세션 생성 runbook](../operations/runbooks/ai-session-generation.md)을 따릅니다.

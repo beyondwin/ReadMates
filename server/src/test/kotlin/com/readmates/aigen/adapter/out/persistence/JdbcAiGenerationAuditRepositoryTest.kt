@@ -121,6 +121,33 @@ class JdbcAiGenerationAuditRepositoryTest(
     }
 
     @Test
+    fun `grounded aggregate metadata is persisted without content columns`() {
+        val jobId = UUID.randomUUID()
+        adapter.insert(
+            sampleEntry(
+                jobId = jobId,
+                pipelineVersion = "GROUNDED_WHOLE_TRANSCRIPT",
+                inputTurnCount = 14,
+                speakerCount = 2,
+                groundingStatus = "VALID",
+                groundingWarningCount = 1,
+                reviewedSectionCount = 4,
+                userEditedSectionCount = 1,
+            ),
+        )
+
+        val row = jdbcTemplate.queryForMap("select * from ai_generation_audit_log where job_id=?", jobId.toString())
+        assertThat(row["pipeline_version"]).isEqualTo("GROUNDED_WHOLE_TRANSCRIPT")
+        assertThat((row["input_turn_count"] as Number).toInt()).isEqualTo(14)
+        assertThat((row["speaker_count"] as Number).toInt()).isEqualTo(2)
+        assertThat(row["grounding_status"]).isEqualTo("VALID")
+        assertThat((row["grounding_warning_count"] as Number).toInt()).isEqualTo(1)
+        assertThat((row["reviewed_section_count"] as Number).toInt()).isEqualTo(4)
+        assertThat((row["user_edited_section_count"] as Number).toInt()).isEqualTo(1)
+        assertThat(row.keys).doesNotContain("transcript", "turns", "result", "evidence", "excerpt", "instructions")
+    }
+
+    @Test
     fun `insert truncates error message to 512 chars`() {
         val jobId = UUID.randomUUID()
         val longErrorMessage = "x".repeat(700)
@@ -239,6 +266,13 @@ class JdbcAiGenerationAuditRepositoryTest(
         errorMessage: String? = null,
         latencyMs: Int = 0,
         createdAt: Instant = Instant.parse("2026-05-16T08:00:00Z"),
+        pipelineVersion: String? = null,
+        inputTurnCount: Int? = null,
+        speakerCount: Int? = null,
+        groundingStatus: String? = null,
+        groundingWarningCount: Int = 0,
+        reviewedSectionCount: Int = 0,
+        userEditedSectionCount: Int = 0,
     ): AuditLogEntry =
         AuditLogEntry(
             jobId = jobId,
@@ -257,5 +291,12 @@ class JdbcAiGenerationAuditRepositoryTest(
             errorMessage = errorMessage,
             latencyMs = latencyMs,
             createdAt = createdAt,
+            pipelineVersion = pipelineVersion,
+            inputTurnCount = inputTurnCount,
+            speakerCount = speakerCount,
+            groundingStatus = groundingStatus,
+            groundingWarningCount = groundingWarningCount,
+            reviewedSectionCount = reviewedSectionCount,
+            userEditedSectionCount = userEditedSectionCount,
         )
 }

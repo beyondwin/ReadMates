@@ -18,7 +18,8 @@ import java.time.Duration
 import java.util.concurrent.atomic.AtomicReference
 
 /**
- * Encapsulates the 8 Prometheus meters specified in AI Generation spec §11.1.
+ * Encapsulates the 8 Prometheus meters specified in AI Generation spec §11.1
+ * plus the bounded grounded-section repair outcome counter.
  *
  * **Label allowlist policy.** Only the 6 enum-valued tag keys defined in
  * [MetricLabel] (`provider`, `model`, `kind`, `status`, `reason`, `direction`)
@@ -170,6 +171,16 @@ class AiGenerationMetrics(
         }
     }
 
+    /** Repair outcome counter used to observe the bounded single-repair success rate. */
+    fun recordGroundingRepairOutcome(outcome: GroundingRepairOutcome) {
+        Counter
+            .builder(NAME_GROUNDING_REPAIRS)
+            .description("Grounded generation section repair outcomes")
+            .tags(aigenMeter(MetricLabel.STATUS to outcome.name))
+            .register(meterRegistry)
+            .increment()
+    }
+
     /** `readmates_aigen_cap_denials_total{reason}` — counter. */
     fun recordCapDenial(reason: CapDenialReason) {
         Counter
@@ -221,10 +232,13 @@ class AiGenerationMetrics(
         const val NAME_TOKENS = "readmates.aigen.tokens"
         const val NAME_COST_USD = "readmates.aigen.cost.usd"
         const val NAME_VALIDATION_FAILURES = "readmates.aigen.validation.failures"
+        const val NAME_GROUNDING_REPAIRS = "readmates.aigen.grounding.repairs"
         const val NAME_CAP_DENIALS = "readmates.aigen.cap.denials"
         const val NAME_QUEUE_DEPTH = "readmates.aigen.queue.depth"
     }
 }
+
+enum class GroundingRepairOutcome { SUCCEEDED, FAILED }
 
 /**
  * The 6 enum-valued Prometheus tag keys permitted on any `readmates.aigen.*` meter

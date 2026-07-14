@@ -217,7 +217,7 @@ data class JobRecord(
     val model: ModelId,
     val authorNameMode: AuthorNameMode,
     val instructions: String?,
-    /** Transcript body. Persisted under the separate `aigen:job:{jobId}:transcript` key, never in the hash. */
+    /** Transcript body. Persisted under the Redis adapter's short-lived transcript payload, never in the hash. */
     val transcript: String,
     /**
      * The session metadata the host supplied at job start, used by the Worker to drive

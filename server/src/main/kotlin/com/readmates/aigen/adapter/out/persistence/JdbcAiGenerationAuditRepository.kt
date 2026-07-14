@@ -34,9 +34,16 @@ class JdbcAiGenerationAuditRepository(
               error_code,
               error_message,
               latency_ms,
-              created_at
+              created_at,
+              pipeline_version,
+              input_turn_count,
+              speaker_count,
+              grounding_status,
+              grounding_warning_count,
+              reviewed_section_count,
+              user_edited_section_count
             )
-            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent(),
             entry.jobId.dbString(),
             entry.sessionId.dbString(),
@@ -56,6 +63,13 @@ class JdbcAiGenerationAuditRepository(
             entry.errorMessage?.take(ERROR_MESSAGE_MAX_LENGTH),
             entry.latencyMs,
             Timestamp.from(entry.createdAt),
+            entry.pipelineVersion,
+            entry.inputTurnCount,
+            entry.speakerCount,
+            entry.groundingStatus,
+            entry.groundingWarningCount,
+            entry.reviewedSectionCount,
+            entry.userEditedSectionCount,
         )
     }
 

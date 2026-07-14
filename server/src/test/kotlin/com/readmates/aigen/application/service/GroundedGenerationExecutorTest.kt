@@ -50,6 +50,11 @@ class GroundedGenerationExecutorTest {
         assertThat(saved.evidence?.revision).isEqualTo(1)
         assertThat(saved.groundedDraft).isEqualTo(validDraft())
         assertThat(request.turns).containsExactlyElementsOf(context.turns)
+        val audit = context.auditPort.entries.single()
+        assertThat(audit.pipelineVersion).isEqualTo("GROUNDED_WHOLE_TRANSCRIPT")
+        assertThat(audit.inputTurnCount).isEqualTo(1)
+        assertThat(audit.speakerCount).isEqualTo(1)
+        assertThat(audit.groundingStatus).isEqualTo("VALID")
     }
 
     @Test
@@ -68,6 +73,11 @@ class GroundedGenerationExecutorTest {
         assertThat(repairRequest.requestedSection).isEqualTo(GenerationItem.SUMMARY)
         assertThat(saved.status).isEqualTo(JobStatus.SUCCEEDED)
         assertThat(saved.tokens).isEqualTo(USAGE + REPAIR_USAGE)
+        assertThat(
+            context.auditPort.entries
+                .last()
+                .groundingWarningCount,
+        ).isEqualTo(1)
     }
 
     @Test
@@ -210,6 +220,7 @@ class GroundedGenerationExecutorTest {
         val claude = FakeGroundedGenerator(Provider.CLAUDE)
         val openai = FakeGroundedGenerator(Provider.OPENAI)
         val renderer = RecordingRenderer()
+        val auditPort = FakeAuditPort()
         private val generators = mapOf(Provider.CLAUDE to claude, Provider.OPENAI to openai)
         private val modelCatalog =
             AiGenerationTestFixtures.defaultModelCatalog(
@@ -236,7 +247,7 @@ class GroundedGenerationExecutorTest {
                 ),
                 GroundedGenerationValidator(GroundedEvidenceProjector()),
                 modelCatalog,
-                FakeAuditPort(),
+                auditPort,
                 FakeCostGuard(),
                 FakeLatencyNotification(),
                 properties,

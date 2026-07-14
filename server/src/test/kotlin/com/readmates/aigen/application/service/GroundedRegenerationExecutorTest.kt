@@ -53,6 +53,11 @@ class GroundedRegenerationExecutorTest {
         assertThat(result.evidence?.targets).allSatisfy { target -> assertThat(target.targetId).startsWith("r2:") }
         assertThat(saved.revision).isEqualTo(2)
         assertThat(saved.result?.highlights).isEqualTo(context.record.result?.highlights)
+        val audit = context.auditPort.entries.single()
+        assertThat(audit.pipelineVersion).isEqualTo("GROUNDED_WHOLE_TRANSCRIPT")
+        assertThat(audit.inputTurnCount).isEqualTo(1)
+        assertThat(audit.speakerCount).isEqualTo(1)
+        assertThat(audit.groundingStatus).isEqualTo("VALID")
     }
 
     @Test
@@ -110,6 +115,7 @@ class GroundedRegenerationExecutorTest {
         val renderer = RecordingRenderer()
         val generator = FakeRepairGenerator()
         val costGuard = FakeCostGuard()
+        val auditPort = FakeAuditPort()
         val record =
             AiGenerationTestFixtures
                 .jobRecord(
@@ -137,7 +143,7 @@ class GroundedRegenerationExecutorTest {
                 ),
                 validator,
                 modelCatalog,
-                FakeAuditPort(),
+                auditPort,
                 costGuard,
                 properties,
                 FakeClock(AiGenerationTestFixtures.NOW),

@@ -1,6 +1,7 @@
 package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.model.ErrorCode
+import com.readmates.aigen.application.model.GroundingFailureReason
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
@@ -13,8 +14,9 @@ import java.time.Duration
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * Validates that AiGenerationMetrics emits the 8 spec §11.1 meters with the
- * correct tag keys. Tag values are intentionally NOT asserted exhaustively here;
+ * Validates that AiGenerationMetrics emits the 8 spec §11.1 meters and the
+ * bounded grounded-section repair counter with the correct tag keys. Tag values
+ * are intentionally NOT asserted exhaustively here;
  * the [MetricLabelsTest] covers allowlist enforcement across the full surface.
  */
 class AiGenerationMetricsTest {
@@ -150,6 +152,27 @@ class AiGenerationMetricsTest {
     }
 
     @Test
+    fun `recordGroundingRepairOutcome uses only the bounded status label`() {
+        metrics.recordGroundingRepairOutcome(GroundingRepairOutcome.SUCCEEDED)
+        metrics.recordGroundingRepairOutcome(GroundingRepairOutcome.FAILED)
+
+        assertThat(
+            registry
+                .find("readmates.aigen.grounding.repairs")
+                .tag("status", "SUCCEEDED")
+                .counter()
+                ?.count(),
+        ).isEqualTo(1.0)
+        assertThat(
+            registry
+                .find("readmates.aigen.grounding.repairs")
+                .tag("status", "FAILED")
+                .counter()
+                ?.count(),
+        ).isEqualTo(1.0)
+    }
+
+    @Test
     fun `registerQueueDepthGauge registers gauge whose value tracks supplier`() {
         val depth = AtomicLong(7L)
         metrics.registerQueueDepthGauge { depth.get() }
@@ -160,5 +183,34 @@ class AiGenerationMetricsTest {
 
         depth.set(42L)
         assertThat(gauge.value()).isEqualTo(42.0)
+    }
+
+    @Test
+    fun `all AI metric tags stay on the low cardinality allowlist and never carry content`() {
+        metrics.recordJobCompleted(JobStatus.SUCCEEDED, Provider.CLAUDE, model, JobKind.FULL)
+        metrics.recordGroundingValidationFailure(setOf(GroundingFailureReason.EVIDENCE_REQUIRED))
+        metrics.recordTokens(Provider.CLAUDE, model, TokenDirection.INPUT, 5)
+
+        val allowed = MetricLabel.entries.map { it.tagKey }.toSet()
+        registry.meters.filter { it.id.name.startsWith("readmates.aigen.") }.forEach { meter ->
+            assertThat(meter.id.tags.map { it.key }).allMatch(allowed::contains)
+            assertThat(meter.id.tags.map { it.key }).doesNotContain(
+                "transcript",
+                "turn",
+                "speaker",
+                "name",
+                "result",
+                "evidence",
+                "excerpt",
+                "prompt",
+                "instruction",
+            )
+            val serialized = meter.id.tags.joinToString("|") { "${it.key}=${it.value}" }
+            assertThat(serialized).doesNotContain(
+                "SECRET-TRANSCRIPT-MARKER",
+                "PublicMemberA",
+                "public-safe grounded summary",
+            )
+        }
     }
 }

@@ -8,7 +8,7 @@ import java.util.UUID
  * Kafka payload for an AI generation job (spec §8.1).
  *
  * IMPORTANT — this class intentionally has NO `transcript` field. The transcript
- * is stored in Redis under `aigen:job:{jobId}:transcript` at start-time, and the
+ * is stored in the Redis adapter's short-lived transcript payload at start-time, and the
  * worker rehydrates it via the job store. The shape of this data class is the
  * structural guarantee that no transcript bytes leave the producer-side memory
  * through Kafka. A reflection-based test pins this invariant.

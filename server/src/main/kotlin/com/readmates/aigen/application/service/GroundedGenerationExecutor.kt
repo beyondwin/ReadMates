@@ -163,6 +163,7 @@ class DefaultGroundedGenerationExecutor(
                 is GroundedRepairCall.Success -> call.output
                 GroundedRepairCall.StateChanged -> return
                 is GroundedRepairCall.Failure -> {
+                    metrics.recordGroundingRepairOutcome(GroundingRepairOutcome.FAILED)
                     fail(record, call.error.code, attempt.model, call.error.message, start, groundingInvalid = true)
                     return
                 }
@@ -177,15 +178,24 @@ class DefaultGroundedGenerationExecutor(
                 record.revision + 1,
             )
         when (validation) {
-            is GroundedValidationResult.Valid ->
+            is GroundedValidationResult.Valid -> {
+                metrics.recordGroundingRepairOutcome(GroundingRepairOutcome.SUCCEEDED)
                 persistValid(
                     record,
                     attempt.copy(output = GroundedGenerationOutput(merged, attempt.output.usage + repaired.usage)),
                     validation,
                     start,
+                    groundingWarningCount = 1,
                 )
-            is GroundedValidationResult.Repairable -> failValidation(record, attempt.model, validation.reasons, start)
-            is GroundedValidationResult.Invalid -> failValidation(record, attempt.model, validation.reasons, start)
+            }
+            is GroundedValidationResult.Repairable -> {
+                metrics.recordGroundingRepairOutcome(GroundingRepairOutcome.FAILED)
+                failValidation(record, attempt.model, validation.reasons, start)
+            }
+            is GroundedValidationResult.Invalid -> {
+                metrics.recordGroundingRepairOutcome(GroundingRepairOutcome.FAILED)
+                failValidation(record, attempt.model, validation.reasons, start)
+            }
         }
     }
 
@@ -194,6 +204,7 @@ class DefaultGroundedGenerationExecutor(
         attempt: GroundedAttempt,
         valid: GroundedValidationResult.Valid,
         start: Instant,
+        groundingWarningCount: Int = 0,
     ) {
         val cost = CostCalculator.estimate(attempt.output.usage, modelCatalog.pricing(attempt.model))
         recordUsage(record, cost)
@@ -213,7 +224,17 @@ class DefaultGroundedGenerationExecutor(
             )
         if (!saved) return
         emitMetrics(JobStatus.SUCCEEDED, attempt.model, attempt.output.usage, cost, start)
-        audit(record, attempt.model, AuditStatus.SUCCESS, null, null, attempt.output.usage, cost, start)
+        audit(
+            record,
+            attempt.model,
+            AuditStatus.SUCCESS,
+            null,
+            null,
+            attempt.output.usage,
+            cost,
+            start,
+            groundingWarningCount,
+        )
         maybeNotifyLong(record, start)
     }
 
@@ -248,7 +269,18 @@ class DefaultGroundedGenerationExecutor(
             )
         if (transitioned) {
             emitMetrics(JobStatus.FAILED, model, TokenUsage(0, 0, 0), BigDecimal.ZERO, start)
-            audit(record, model, AuditStatus.FAILED, code, safeMessage, TokenUsage(0, 0, 0), BigDecimal.ZERO, start)
+            audit(
+                record,
+                model,
+                AuditStatus.FAILED,
+                code,
+                safeMessage,
+                TokenUsage(0, 0, 0),
+                BigDecimal.ZERO,
+                start,
+                groundingStatus =
+                    if (groundingInvalid || code == ErrorCode.SCHEMA_INVALID) GroundingStatus.INVALID else null,
+            )
             maybeNotifyLong(record, start)
         }
         return null
@@ -360,7 +392,12 @@ class DefaultGroundedGenerationExecutor(
         usage: TokenUsage,
         cost: BigDecimal,
         start: Instant,
+        groundingWarningCount: Int = 0,
+        groundingStatus: GroundingStatus? = null,
     ) {
+        val auditedGroundingStatus =
+            groundingStatus?.name
+                ?: if (status == AuditStatus.SUCCESS) GroundingStatus.VALID.name else record.groundingStatus?.name
         auditPort.insert(
             AuditLogEntry(
                 record.jobId,
@@ -379,6 +416,15 @@ class DefaultGroundedGenerationExecutor(
                 errorMessage,
                 elapsedMillis(start),
                 clock.instant(),
+                pipelineVersion = record.pipelineMode.name,
+                inputTurnCount = record.validatedTurns.size,
+                speakerCount =
+                    record.validatedTurns
+                        .map { it.speakerMembershipId }
+                        .distinct()
+                        .size,
+                groundingStatus = auditedGroundingStatus,
+                groundingWarningCount = groundingWarningCount,
             ),
         )
     }

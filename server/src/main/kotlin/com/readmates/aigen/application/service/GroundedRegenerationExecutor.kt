@@ -5,6 +5,7 @@ import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.GroundedGenerationDraft
 import com.readmates.aigen.application.model.GroundingFailureReason
+import com.readmates.aigen.application.model.GroundingStatus
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
@@ -246,6 +247,14 @@ class DefaultGroundedRegenerationExecutor(
                 null,
                 0,
                 clock.instant(),
+                pipelineVersion = record.pipelineMode.name,
+                inputTurnCount = record.validatedTurns.size,
+                speakerCount =
+                    record.validatedTurns
+                        .map { it.speakerMembershipId }
+                        .distinct()
+                        .size,
+                groundingStatus = GroundingStatus.VALID.name,
             ),
         )
     }
