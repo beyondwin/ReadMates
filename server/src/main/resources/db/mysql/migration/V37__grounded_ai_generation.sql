@@ -19,6 +19,6 @@ ALTER TABLE ai_generation_audit_log
   ADD COLUMN reviewed_section_count INT NOT NULL DEFAULT 0,
   ADD COLUMN user_edited_section_count INT NOT NULL DEFAULT 0;
 
-UPDATE ai_generation_club_defaults
-SET default_model = 'gemini-3-flash-preview'
-WHERE default_model = 'gemini-3-flash';
+-- Keep existing gemini-3-flash defaults unchanged during the expand phase so the previous
+-- application version can still read them during a rolling deploy. The new model catalog
+-- resolves that legacy value to gemini-3-flash-preview without exposing it as a provider model.

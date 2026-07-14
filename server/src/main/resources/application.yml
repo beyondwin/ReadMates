@@ -109,7 +109,7 @@ readmates:
           structured-output-supported: true
         claude-sonnet-4-6:
           context-window-tokens: 1000000
-          max-output-tokens: 64000
+          max-output-tokens: 128000
           structured-output-supported: true
         "[gemini-3-flash-preview]":
           context-window-tokens: 1048576

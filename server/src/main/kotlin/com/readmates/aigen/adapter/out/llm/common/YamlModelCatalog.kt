@@ -25,9 +25,11 @@ import org.springframework.stereotype.Component
  * [AiGenerationProperties.enabledProviders] (compared case-insensitively to [Provider.name]).
  * An empty `enabledProviders` set acts as a kill switch — [allowlisted] returns empty.
  *
- * Alias handling for v1: there is no explicit alias map yet. [resolveAlias] treats the given
- * alias as a literal model name and returns the [ModelId] iff that model is allowlisted, else
- * null. A future iteration may add an explicit alias-to-canonical map.
+ * [resolveAlias] accepts canonical allowlisted names plus the narrow compatibility aliases in
+ * [COMPATIBILITY_ALIASES]. Compatibility aliases never become catalog or pricing entries, and
+ * resolve only while their canonical target is allowlisted. This lets a newly deployed server
+ * accept defaults cached or stored by the previous version without ever calling a provider with
+ * the obsolete identifier.
  */
 @Component
 @ConditionalOnProperty(prefix = "readmates", name = ["aigen.enabled"], havingValue = "true")
@@ -75,7 +77,9 @@ class YamlModelCatalog(
         catalog[id]
             ?: error("No pricing entry for model $id; not in readmates.aigen.pricing catalog")
 
-    override fun resolveAlias(alias: String): ModelId? = allowlistedByName[alias]
+    override fun resolveAlias(alias: String): ModelId? =
+        allowlistedByName[alias]
+            ?: COMPATIBILITY_ALIASES[alias]?.takeIf { it in allowlistedSet }
 
     override fun isEnabled(id: ModelId): Boolean = id in allowlistedSet && id.provider in enabledProviderSet
 
@@ -91,5 +95,10 @@ class YamlModelCatalog(
 
     private companion object {
         private val OPENAI_O_SERIES_REGEX = Regex("^o\\d.*")
+
+        private val COMPATIBILITY_ALIASES =
+            mapOf(
+                "gemini-3-flash" to ModelId(Provider.GEMINI, "gemini-3-flash-preview"),
+            )
     }
 }

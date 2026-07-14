@@ -65,7 +65,7 @@ class AiGenerationPropertiesTest {
         val capabilities = loadProperties().grounded.capabilities
 
         assertEquals(128_000L, capabilities["gpt-5.4-mini"]?.maxOutputTokens)
-        assertEquals(64_000L, capabilities["claude-sonnet-4-6"]?.maxOutputTokens)
+        assertEquals(128_000L, capabilities["claude-sonnet-4-6"]?.maxOutputTokens)
         assertEquals(65_536L, capabilities["gemini-3-flash-preview"]?.maxOutputTokens)
         assertTrue(capabilities.values.all { it.structuredOutputSupported })
     }

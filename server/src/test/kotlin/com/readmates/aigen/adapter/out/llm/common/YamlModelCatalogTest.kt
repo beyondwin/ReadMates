@@ -191,6 +191,44 @@ class YamlModelCatalogTest {
     }
 
     @Test
+    fun `legacy Gemini alias resolves to enabled canonical preview model only`() {
+        val canonical = ModelId(Provider.GEMINI, "gemini-3-flash-preview")
+        val props =
+            AiGenerationProperties(
+                enabledProviders = setOf("GEMINI"),
+                pricing =
+                    mapOf(
+                        canonical.name to pricing("0.50", "0.05", "3.00"),
+                    ),
+            )
+
+        val catalog = YamlModelCatalog(props)
+
+        assertEquals(canonical, catalog.resolveAlias("gemini-3-flash"))
+        assertEquals(listOf(canonical), catalog.allowlisted())
+        assertThrows(IllegalStateException::class.java) {
+            catalog.pricing(ModelId(Provider.GEMINI, "gemini-3-flash"))
+        }
+    }
+
+    @Test
+    fun `legacy Gemini alias fails closed when canonical preview model is disabled`() {
+        val props =
+            AiGenerationProperties(
+                enabledProviders = setOf("CLAUDE"),
+                pricing =
+                    mapOf(
+                        "gemini-3-flash-preview" to pricing("0.50", "0.05", "3.00"),
+                    ),
+            )
+
+        val catalog = YamlModelCatalog(props)
+
+        assertNull(catalog.resolveAlias("gemini-3-flash"))
+        assertTrue(catalog.allowlisted().isEmpty())
+    }
+
+    @Test
     fun `resolveAlias returns null when alias not allowlisted`() {
         val props =
             AiGenerationProperties(

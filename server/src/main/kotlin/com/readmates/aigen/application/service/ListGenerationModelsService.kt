@@ -1,5 +1,6 @@
 package com.readmates.aigen.application.service
 
+import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.port.`in`.AvailableGenerationModel
 import com.readmates.aigen.application.port.`in`.ListGenerationModelsUseCase
@@ -34,8 +35,8 @@ class ListGenerationModelsService(
                 }.sortedWith(compareBy({ PROVIDER_ORDER.getValue(it.provider) }, { it.name }))
         val storedDefault = clubDefaultPort.load(clubId)?.defaultModel
         val defaultName =
-            storedDefault?.takeIf { candidate -> eligible.any { it.name == candidate } }
-                ?: properties.fallbackDefaultModel.takeIf { candidate -> eligible.any { it.name == candidate } }
+            storedDefault?.let { candidate -> eligibleName(candidate, eligible) }
+                ?: eligibleName(properties.fallbackDefaultModel, eligible)
                 ?: eligible.firstOrNull()?.name
 
         return eligible.map { model ->
@@ -45,6 +46,14 @@ class ListGenerationModelsService(
                 isDefault = model.name == defaultName,
             )
         }
+    }
+
+    private fun eligibleName(
+        candidate: String,
+        eligible: List<ModelId>,
+    ): String? {
+        val canonical = modelCatalog.resolveAlias(candidate)?.name ?: candidate
+        return canonical.takeIf { name -> eligible.any { it.name == name } }
     }
 
     private companion object {

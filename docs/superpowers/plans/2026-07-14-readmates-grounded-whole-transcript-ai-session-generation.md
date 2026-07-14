@@ -196,7 +196,7 @@ readmates:
           structured-output-supported: true
         claude-sonnet-4-6:
           context-window-tokens: 1000000
-          max-output-tokens: 64000
+          max-output-tokens: 128000
           structured-output-supported: true
         gemini-3-flash-preview:
           context-window-tokens: 1048576
@@ -228,7 +228,7 @@ Do not expose pricing, API keys, internal fallback order, or capability token co
 
 - [x] **Step 5: Replace the stale Gemini identifier in configuration-level defaults**
 
-Use `gemini-3-flash-preview` in `application.yml`, properties tests, and model-list tests. Database-stored defaults and smoke scripts are migrated in Task 10 and Task 14 so each change lands with its own regression coverage.
+Use `gemini-3-flash-preview` in `application.yml`, properties tests, and model-list tests. Preserve database-stored `gemini-3-flash` defaults through the rolling-deploy expand phase and resolve that exact legacy value server-side to the enabled canonical preview model; do not expose the alias in model-list or pricing responses. Smoke scripts are updated in Task 14.
 
 - [x] **Step 6: Rerun the focused tests and config regression gate**
 
@@ -1283,7 +1283,7 @@ CREATE TABLE ai_generation_commit_receipts (
 
 Add nullable/defaulted aggregate columns to `ai_generation_audit_log`: `pipeline_version`, `input_turn_count`, `speaker_count`, `grounding_status`, `grounding_warning_count`, `reviewed_section_count`, and `user_edited_section_count`. Do not add transcript/result/evidence/name columns.
 
-Migrate stored `ai_generation_club_defaults.default_model = 'gemini-3-flash'` to `gemini-3-flash-preview` in the same migration.
+Do not rewrite stored `ai_generation_club_defaults.default_model = 'gemini-3-flash'` values in this expand migration: the previous application version still reads that identifier literally during a rolling deploy. Add a narrow catalog compatibility alias from that exact legacy value to `gemini-3-flash-preview`, conditional on the canonical model being enabled, and keep the alias out of model-list and pricing surfaces. A later contract migration may rewrite stored values only after the previous server version is outside the rollback window.
 
 - [x] **Step 2: Write persistence adapter tests**
 

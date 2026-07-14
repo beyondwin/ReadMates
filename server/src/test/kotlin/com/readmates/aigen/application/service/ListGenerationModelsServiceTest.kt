@@ -41,6 +41,14 @@ class ListGenerationModelsServiceTest {
         assertThat(models.map { it.id }).containsExactly(openAi.name, claude.name)
     }
 
+    @Test
+    fun `marks canonical model default when stored default uses rolling compatibility alias`() {
+        val models = service(defaultModel = "gemini-3-flash").list(sessionId, clubId)
+
+        assertThat(models.map { it.id }).doesNotContain("gemini-3-flash")
+        assertThat(models.single { it.isDefault }.id).isEqualTo(gemini.name)
+    }
+
     private fun service(
         defaultModel: String?,
         structuredUnsupported: Set<ModelId> = emptySet(),
@@ -64,7 +72,9 @@ class ListGenerationModelsServiceTest {
 
                 override fun pricing(id: ModelId): ModelPricing = unitPricing
 
-                override fun resolveAlias(alias: String): ModelId? = allowlisted().find { it.name == alias }
+                override fun resolveAlias(alias: String): ModelId? =
+                    allowlisted().find { it.name == alias }
+                        ?: gemini.takeIf { alias == "gemini-3-flash" }
 
                 override fun isEnabled(id: ModelId): Boolean = id in allowlisted()
             },
