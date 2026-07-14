@@ -2,6 +2,7 @@ package com.readmates.aigen.application.service
 
 import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
 import com.readmates.aigen.application.AiGenerationException
+import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.JobStatus
@@ -70,6 +71,7 @@ class AiGenerationRegenerationService(
     private val metrics: AiGenerationMetrics,
     private val sleeper: Sleeper = Sleeper.Default,
     private val transitionPolicy: AiGenerationJobTransitionPolicy,
+    private val groundedRegenerationExecutor: GroundedRegenerationExecutor = GroundedRegenerationExecutor.Disabled,
 ) : RegenerateItemUseCase {
     override fun regenerate(
         sessionId: UUID,
@@ -77,12 +79,22 @@ class AiGenerationRegenerationService(
         item: GenerationItem,
         model: String?,
         instructions: String?,
+        expectedRevision: Long?,
     ): RegenerationResult {
         val record = jobStore.load(jobId) ?: throw JobNotFoundException(jobId)
         if (record.sessionId != sessionId) {
             throw JobSessionMismatchException(jobId, sessionId, record.sessionId)
         }
         transitionPolicy.requireRegenerate(record.status, record.jobId)
+        if (record.pipelineMode == AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT) {
+            return groundedRegenerationExecutor.regenerate(
+                record,
+                item,
+                expectedRevision ?: throw AiGenerationException.Coded(ErrorCode.STALE_GENERATION_REVISION),
+                model,
+                instructions,
+            )
+        }
         val currentSnapshot =
             record.result
                 ?: throw AiGenerationException.IllegalGenerationState(

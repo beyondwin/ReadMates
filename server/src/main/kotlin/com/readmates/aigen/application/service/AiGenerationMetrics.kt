@@ -1,6 +1,7 @@
 package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.model.ErrorCode
+import com.readmates.aigen.application.model.GroundingFailureReason
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
@@ -156,6 +157,17 @@ class AiGenerationMetrics(
             .tags(aigenMeter(MetricLabel.REASON to reason.name))
             .register(meterRegistry)
             .increment()
+    }
+
+    fun recordGroundingValidationFailure(reasons: Set<GroundingFailureReason>) {
+        reasons.forEach { reason ->
+            Counter
+                .builder(NAME_VALIDATION_FAILURES)
+                .description("AI generation outputs that failed validation")
+                .tags(aigenMeter(MetricLabel.REASON to reason.name))
+                .register(meterRegistry)
+                .increment()
+        }
     }
 
     /** `readmates_aigen_cap_denials_total{reason}` — counter. */

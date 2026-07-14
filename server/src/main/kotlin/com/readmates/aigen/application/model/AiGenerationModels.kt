@@ -135,6 +135,10 @@ enum class GroundingStatus { PENDING, VALID, INVALID }
 
 enum class JobStage {
     QUEUED,
+    PREPARING_TRANSCRIPT,
+    GENERATING_RECORD,
+    VALIDATING_GROUNDING,
+    REPAIRING_RECORD,
     TRANSCRIPT_LOADED,
     GENERATING_SUMMARY,
     GENERATING_HIGHLIGHTS,
@@ -227,6 +231,7 @@ enum class ErrorCode {
     TRANSCRIPT_SPEAKER_AMBIGUOUS,
     MODEL_CAPABILITY_UNAVAILABLE,
     TRANSCRIPT_TOO_LONG_FOR_MODEL,
+    STALE_GENERATION_REVISION,
 
     /**
      * The per-job hard cap on LLM calls (start + validation retry + regenerations) has

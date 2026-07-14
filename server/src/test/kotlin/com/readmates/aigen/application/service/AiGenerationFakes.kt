@@ -29,6 +29,7 @@ import com.readmates.aigen.application.port.out.GenerationCostGuard
 import com.readmates.aigen.application.port.out.GuardDecision
 import com.readmates.aigen.application.port.out.JobKind
 import com.readmates.aigen.application.port.out.JobRecord
+import com.readmates.aigen.application.port.out.LlmCallReservation
 import com.readmates.aigen.application.port.out.ModelCatalog
 import com.readmates.aigen.application.port.out.SaveGroundedResultCommand
 import com.readmates.aigen.application.port.out.SessionContentGenerator
@@ -57,6 +58,7 @@ internal class FakeJobStore : AiGenerationJobStore {
      */
     val mutationOrder: MutableList<String> = mutableListOf()
     var failNextConditionalSave: Boolean = false
+    var beforeReserveLlmCall: (() -> Unit)? = null
 
     override fun save(job: JobRecord) {
         records[job.jobId] = job
@@ -149,6 +151,7 @@ internal class FakeJobStore : AiGenerationJobStore {
         stage: JobStage?,
         progressPct: Int,
         error: GenerationError?,
+        groundingStatus: com.readmates.aigen.application.model.GroundingStatus?,
     ): Boolean {
         val current = records[jobId]?.takeIf { it.status in expected } ?: return false
         records[jobId] =
@@ -157,6 +160,7 @@ internal class FakeJobStore : AiGenerationJobStore {
                 stage = stage,
                 progressPct = progressPct,
                 error = error,
+                groundingStatus = groundingStatus ?: current.groundingStatus,
             )
         statusTransitions += Triple(jobId, current.status, next)
         mutationOrder += "transition:${next.name}"
@@ -196,8 +200,15 @@ internal class FakeJobStore : AiGenerationJobStore {
 
     override fun saveGroundedResult(command: SaveGroundedResultCommand): Boolean {
         val current =
-            records[command.jobId]?.takeIf {
-                it.status == command.expectedStatus && it.revision == command.expectedRevision
+            when {
+                failNextConditionalSave -> {
+                    failNextConditionalSave = false
+                    null
+                }
+                else ->
+                    records[command.jobId]?.takeIf {
+                        it.status == command.expectedStatus && it.revision == command.expectedRevision
+                    }
             } ?: return false
         records[command.jobId] =
             current.copy(
@@ -205,6 +216,7 @@ internal class FakeJobStore : AiGenerationJobStore {
                 stage = JobStage.READY,
                 progressPct = 100,
                 result = command.result,
+                groundedDraft = command.draft,
                 evidence = command.evidence,
                 revision = current.revision + 1,
                 groundingStatus = com.readmates.aigen.application.model.GroundingStatus.VALID,
@@ -296,6 +308,23 @@ internal class FakeJobStore : AiGenerationJobStore {
         val next = current.llmCallCount + 1
         records[jobId] = current.copy(llmCallCount = next)
         return next
+    }
+
+    override fun reserveLlmCall(
+        jobId: UUID,
+        expectedStatus: JobStatus,
+        maxCalls: Int,
+    ): LlmCallReservation {
+        beforeReserveLlmCall?.also { beforeReserveLlmCall = null }?.invoke()
+        val current = records[jobId]
+        return when {
+            current == null || current.status != expectedStatus -> LlmCallReservation.STATE_CHANGED
+            current.llmCallCount >= maxCalls -> LlmCallReservation.CAP_EXCEEDED
+            else -> {
+                records[jobId] = current.copy(llmCallCount = current.llmCallCount + 1)
+                LlmCallReservation.RESERVED
+            }
+        }
     }
 
     override fun delete(jobId: UUID) {

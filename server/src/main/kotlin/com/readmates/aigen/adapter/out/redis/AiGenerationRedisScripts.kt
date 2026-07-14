@@ -3,6 +3,20 @@ package com.readmates.aigen.adapter.out.redis
 import org.springframework.data.redis.core.script.DefaultRedisScript
 
 internal object AiGenerationRedisScripts {
+    val reserveLlmCall: DefaultRedisScript<Long> =
+        DefaultRedisScript(
+            """
+            if redis.call('EXISTS', KEYS[1]) == 0 then return 0 end
+            if redis.call('HGET', KEYS[1], 'status') ~= ARGV[1] then return 0 end
+            local current = tonumber(redis.call('HGET', KEYS[1], 'llmCallCount') or '0')
+            if current >= tonumber(ARGV[2]) then return -1 end
+            redis.call('HINCRBY', KEYS[1], 'llmCallCount', 1)
+            redis.call('EXPIRE', KEYS[1], ARGV[3])
+            return 1
+            """.trimIndent(),
+            Long::class.java,
+        )
+
     val transitionStatus: DefaultRedisScript<Long> =
         DefaultRedisScript(
             """
@@ -24,6 +38,7 @@ internal object AiGenerationRedisScripts {
               redis.call('HSET', KEYS[1], 'errorCode', ARGV[5])
               redis.call('HSET', KEYS[1], 'errorMessage', ARGV[6])
             end
+            if ARGV[9] ~= '' then redis.call('HSET', KEYS[1], 'groundingStatus', ARGV[9]) end
             redis.call('EXPIRE', KEYS[1], ARGV[8])
             return 1
             """.trimIndent(),

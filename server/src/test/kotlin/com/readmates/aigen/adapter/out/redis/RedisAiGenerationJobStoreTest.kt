@@ -8,6 +8,7 @@ import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.GroundedEvidenceBundle
 import com.readmates.aigen.application.model.GroundedEvidenceExcerpt
 import com.readmates.aigen.application.model.GroundedEvidenceTarget
+import com.readmates.aigen.application.model.GroundedGenerationDraft
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelId
@@ -587,10 +588,24 @@ class RedisAiGenerationJobStoreTest(
             expectedStatus = expectedStatus,
             expectedRevision = expectedRevision,
             result = snapshot(),
+            draft = groundedDraft(),
             evidence = evidence(expectedRevision + 1),
             usage = TokenUsage(10, 0, 20),
             cost = BigDecimal("0.01"),
             actualModel = record.model,
+        )
+
+    private fun groundedDraft(): GroundedGenerationDraft =
+        GroundedGenerationDraft(
+            "readmates-grounded-generation:v2",
+            7,
+            "Test Book",
+            LocalDate.of(2026, 5, 16),
+            emptyList(),
+            emptyList(),
+            emptyList(),
+            "feedback.md",
+            emptyList(),
         )
 
     private fun evidence(revision: Long): GroundedEvidenceBundle =

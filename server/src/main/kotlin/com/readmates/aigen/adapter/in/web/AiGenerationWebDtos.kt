@@ -99,6 +99,7 @@ data class RegenerateRequest(
     val item: String,
     val model: String?,
     val instructions: String?,
+    val expectedRevision: Long? = null,
 )
 
 data class RegenerateResponse(

@@ -5,6 +5,7 @@ import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.GroundedEvidenceBundle
+import com.readmates.aigen.application.model.GroundedGenerationDraft
 import com.readmates.aigen.application.model.GroundingStatus
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
@@ -82,6 +83,13 @@ interface AiGenerationJobStore {
      */
     fun incrementLlmCallCount(jobId: UUID): Int
 
+    /** Atomically reserve one provider call only while the job remains in [expectedStatus]. */
+    fun reserveLlmCall(
+        jobId: UUID,
+        expectedStatus: JobStatus,
+        maxCalls: Int,
+    ): LlmCallReservation
+
     /**
      * Atomically change status only when the current status belongs to [expected].
      * Returns false when the job is missing or a competing transition already won.
@@ -93,6 +101,7 @@ interface AiGenerationJobStore {
         stage: JobStage?,
         progressPct: Int,
         error: GenerationError?,
+        groundingStatus: GroundingStatus? = null,
     ): Boolean
 
     /**
@@ -151,11 +160,23 @@ data class SaveGroundedResultCommand(
     val expectedStatus: JobStatus,
     val expectedRevision: Long,
     val result: SessionImportV1Snapshot,
+    val draft: GroundedGenerationDraft,
     val evidence: GroundedEvidenceBundle,
     val usage: TokenUsage,
     val cost: BigDecimal,
     val actualModel: ModelId,
 )
+
+data class GroundedResultPayload(
+    val result: SessionImportV1Snapshot,
+    val draft: GroundedGenerationDraft,
+)
+
+enum class LlmCallReservation {
+    RESERVED,
+    STATE_CHANGED,
+    CAP_EXCEEDED,
+}
 
 sealed interface CommitLeaseResult {
     data class Acquired(
@@ -199,6 +220,8 @@ data class JobRecord(
     val stage: JobStage?,
     val progressPct: Int,
     val result: SessionImportV1Snapshot?,
+    /** Provider-neutral validated draft retained only in the grounded Redis result payload for regeneration. */
+    val groundedDraft: GroundedGenerationDraft? = null,
     val error: GenerationError?,
     val tokens: TokenUsage,
     val costAccumulatedUsd: BigDecimal,

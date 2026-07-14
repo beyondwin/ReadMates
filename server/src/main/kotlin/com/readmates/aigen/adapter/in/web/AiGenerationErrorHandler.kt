@@ -178,5 +178,6 @@ internal fun ErrorCode.toHttpStatus(): HttpStatus =
         ErrorCode.TRANSCRIPT_SPEAKER_AMBIGUOUS,
         ErrorCode.TRANSCRIPT_TOO_LONG_FOR_MODEL,
         -> HttpStatus.UNPROCESSABLE_ENTITY
+        ErrorCode.STALE_GENERATION_REVISION -> HttpStatus.CONFLICT
         ErrorCode.UNKNOWN -> HttpStatus.INTERNAL_SERVER_ERROR
     }

@@ -11,8 +11,10 @@ import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.out.AiGenerationJobStore
 import com.readmates.aigen.application.port.out.CommitLeaseResult
+import com.readmates.aigen.application.port.out.GroundedResultPayload
 import com.readmates.aigen.application.port.out.GroundedSourceContext
 import com.readmates.aigen.application.port.out.JobRecord
+import com.readmates.aigen.application.port.out.LlmCallReservation
 import com.readmates.aigen.application.port.out.SaveGroundedResultCommand
 import com.readmates.aigen.config.AiGenerationProperties
 import com.readmates.shared.cache.RedisCacheMetrics
@@ -40,7 +42,7 @@ private class MissingGroundedPayloadException : RuntimeException("Grounded job p
  */
 @Component
 @ConditionalOnProperty(prefix = "readmates", name = ["redis.enabled", "aigen.enabled"], havingValue = "true")
-@Suppress("TooManyFunctions")
+@Suppress("LargeClass", "TooManyFunctions")
 class RedisAiGenerationJobStore(
     private val redisTemplate: StringRedisTemplate,
     private val properties: AiGenerationProperties,
@@ -78,11 +80,17 @@ class RedisAiGenerationJobStore(
             }
 
             if (job.result != null) {
+                val payload =
+                    if (job.pipelineMode == AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT) {
+                        GroundedResultPayload(job.result, requireNotNull(job.groundedDraft))
+                    } else {
+                        job.result
+                    }
                 redisTemplate
                     .opsForValue()
                     .set(
                         resultKey,
-                        objectMapper.writeValueAsString(job.result),
+                        objectMapper.writeValueAsString(payload),
                         java.time.Duration.ofSeconds(ttlSeconds),
                     )
             }
@@ -133,6 +141,7 @@ class RedisAiGenerationJobStore(
                 hash = hash,
                 transcript = "",
                 result = null,
+                groundedDraft = null,
                 sourceContext = null,
                 evidence = null,
                 includeSensitiveHashFields = false,
@@ -192,10 +201,10 @@ class RedisAiGenerationJobStore(
             } else {
                 null
             }
-        val result =
+        val resultPayload =
             if (status in GROUNDED_REVIEW_PAYLOAD_STATUSES) {
                 val resultJson = requirePayload(resultKey(jobId))
-                objectMapper.readValue(resultJson, SessionImportV1Snapshot::class.java)
+                objectMapper.readValue(resultJson, GroundedResultPayload::class.java)
             } else {
                 null
             }
@@ -206,7 +215,15 @@ class RedisAiGenerationJobStore(
             } else {
                 null
             }
-        return recordCodec.fromHash(jobId, hash, transcript, result, sourceContext, evidence)
+        return recordCodec.fromHash(
+            jobId,
+            hash,
+            transcript,
+            resultPayload?.result,
+            resultPayload?.draft,
+            sourceContext,
+            evidence,
+        )
     }
 
     private fun requirePayload(key: String): String =
@@ -229,7 +246,7 @@ class RedisAiGenerationJobStore(
                 .opsForValue()
                 .get(resultKey(jobId))
                 ?.let { objectMapper.readValue(it, SessionImportV1Snapshot::class.java) }
-        return recordCodec.fromHash(jobId, hash, transcript.orEmpty(), result, null, null)
+        return recordCodec.fromHash(jobId, hash, transcript.orEmpty(), result, null, null, null)
     }
 
     override fun loadRecentForSession(
@@ -367,6 +384,7 @@ class RedisAiGenerationJobStore(
         stage: JobStage?,
         progressPct: Int,
         error: GenerationError?,
+        groundingStatus: com.readmates.aigen.application.model.GroundingStatus?,
     ): Boolean =
         runCatching {
             val lastUpdatedAt = Instant.now()
@@ -383,6 +401,7 @@ class RedisAiGenerationJobStore(
                     lastUpdatedAt.toString(),
                     properties.job.redisTtl.seconds
                         .toString(),
+                    groundingStatus?.name.orEmpty(),
                 )
             val changed = result == 1L
             if (changed) {
@@ -443,7 +462,7 @@ class RedisAiGenerationJobStore(
                     ),
                     command.expectedStatus.name,
                     command.expectedRevision.toString(),
-                    objectMapper.writeValueAsString(command.result),
+                    objectMapper.writeValueAsString(GroundedResultPayload(command.result, command.draft)),
                     objectMapper.writeValueAsString(command.evidence),
                     command.usage.inputTokens.toString(),
                     command.usage.cachedInputTokens.toString(),
@@ -577,6 +596,31 @@ class RedisAiGenerationJobStore(
             refreshTransientPayloadTtls(jobId)
             next.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
         }.onFailure { recordFailure("incrementLlmCallCount") }.getOrThrow()
+
+    override fun reserveLlmCall(
+        jobId: UUID,
+        expectedStatus: JobStatus,
+        maxCalls: Int,
+    ): LlmCallReservation =
+        runCatching {
+            val result =
+                redisTemplate.execute(
+                    AiGenerationRedisScripts.reserveLlmCall,
+                    listOf(hashKey(jobId)),
+                    expectedStatus.name,
+                    maxCalls.toString(),
+                    properties.job.redisTtl.seconds
+                        .toString(),
+                )
+            when (result) {
+                1L -> {
+                    refreshTransientPayloadTtls(jobId)
+                    LlmCallReservation.RESERVED
+                }
+                -1L -> LlmCallReservation.CAP_EXCEEDED
+                else -> LlmCallReservation.STATE_CHANGED
+            }
+        }.onFailure { recordFailure("reserveLlmCall") }.getOrThrow()
 
     private fun deleteStaleJob(jobId: UUID): JobRecord? {
         delete(jobId)

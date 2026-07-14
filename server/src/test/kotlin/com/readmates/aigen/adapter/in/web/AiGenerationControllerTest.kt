@@ -622,6 +622,7 @@ class AiGenerationControllerTest {
             item: GenerationItem,
             model: String?,
             instructions: String?,
+            expectedRevision: Long?,
         ): RegenerationResult {
             lastItem = item
             return result

@@ -1,6 +1,7 @@
 package com.readmates.aigen.application.service
 
 import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
+import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.GenerationInput
@@ -74,6 +75,7 @@ class AiGenerationWorker(
     private val metrics: AiGenerationMetrics,
     private val sleeper: Sleeper = Sleeper.Default,
     private val fallbackChain: ProviderFallbackChain,
+    private val groundedExecutor: GroundedGenerationExecutor = GroundedGenerationExecutor.Disabled,
 ) {
     private val logger = LoggerFactory.getLogger(AiGenerationWorker::class.java)
 
@@ -81,11 +83,17 @@ class AiGenerationWorker(
     fun process(jobId: UUID) {
         val record = jobStore.load(jobId) ?: return // expired / already cleaned
         val start = clock.instant()
+        val initialStage =
+            if (record.pipelineMode == AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT) {
+                JobStage.PREPARING_TRANSCRIPT
+            } else {
+                JobStage.TRANSCRIPT_LOADED
+            }
         if (!jobStore.transitionStatus(
                 jobId = record.jobId,
                 expected = setOf(JobStatus.PENDING),
                 next = JobStatus.RUNNING,
-                stage = JobStage.TRANSCRIPT_LOADED,
+                stage = initialStage,
                 progressPct = PROGRESS_PROVIDER_RUNNING_PCT,
                 error = null,
             )
@@ -95,9 +103,13 @@ class AiGenerationWorker(
         val runningRecord =
             record.copy(
                 status = JobStatus.RUNNING,
-                stage = JobStage.TRANSCRIPT_LOADED,
+                stage = initialStage,
                 progressPct = PROGRESS_PROVIDER_RUNNING_PCT,
             )
+        if (runningRecord.pipelineMode == AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT) {
+            groundedExecutor.process(runningRecord, start)
+            return
+        }
         val generator = resolveGenerator(runningRecord, start) ?: return
         when (val outcome = runGenerationWithValidationRetry(runningRecord, generator)) {
             is Outcome.Success -> succeed(runningRecord, outcome.snapshot, outcome.usage, outcome.actualModel, start)

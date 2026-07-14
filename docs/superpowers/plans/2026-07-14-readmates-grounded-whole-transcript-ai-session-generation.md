@@ -1007,7 +1007,7 @@ git commit -m "feat(aigen): persist grounded jobs with revision CAS"
 - Availability/rate-limit failover may retry only the precomputed full-context-compatible model list and always sends the full transcript.
 - Regeneration requires `expectedRevision`, regenerates one section using full transcript/current draft, and atomically increments revision.
 
-- [ ] **Step 1: Write the worker call-count and exposure tests**
+- [x] **Step 1: Write the worker call-count and exposure tests**
 
 ```kotlin
 @Test
@@ -1025,11 +1025,11 @@ fun `two invalid sections fail without repair`() { /* only primary call */ }
 
 Also pin cancellation races before call, after call, and before result CAS.
 
-- [ ] **Step 2: Write failover tests using precomputed candidates**
+- [x] **Step 2: Write failover tests using precomputed candidates**
 
 Prove an unavailable primary retries only an eligible candidate, preserves the exact rendered full transcript, attributes actual model/cost correctly, and fails safely without consulting newly enabled/unverified models after dequeue.
 
-- [ ] **Step 3: Write revision-aware regeneration tests**
+- [x] **Step 3: Write revision-aware regeneration tests**
 
 Assert:
 
@@ -1039,7 +1039,7 @@ Assert:
 - every section review confirmation is reset client-side by the returned revision contract;
 - max-call cap and cost guard still apply.
 
-- [ ] **Step 4: Run worker/regeneration tests and verify RED**
+- [x] **Step 4: Run worker/regeneration tests and verify RED**
 
 ```bash
 ./server/gradlew -p server unitTest --tests '*AiGenerationWorkerTest' --tests '*AiGenerationWorkerFailoverTest' --tests '*AiGenerationRegenerationServiceTest' --tests '*AiGenerationOrchestratorTest'
@@ -1047,7 +1047,7 @@ Assert:
 
 Expected: FAIL because grounded dispatch and revision-aware operations are not wired.
 
-- [ ] **Step 5: Dispatch workers by persisted pipeline mode**
+- [x] **Step 5: Dispatch workers by persisted pipeline mode**
 
 Keep the legacy algorithm in a named method/service and add a grounded branch. Do not infer mode from result shape or current environment after dequeue; use the mode persisted in the job.
 
@@ -1072,11 +1072,11 @@ If availability fallback produced the draft, run any validation repair on that s
 
 Add grounded stages `PREPARING_TRANSCRIPT`, `GENERATING_RECORD`, `VALIDATING_GROUNDING`, and `REPAIRING_RECORD`, then finish at the existing `READY`. Keep every legacy `JobStage` enum value deserializable until all six-hour Redis jobs created by the previous release have expired; the browser must render unknown future values as generic progress.
 
-- [ ] **Step 6: Preserve strict failure and privacy behavior**
+- [x] **Step 6: Preserve strict failure and privacy behavior**
 
 Map invalid final output to `SCHEMA_INVALID` plus aggregate reason labels. Do not save partial provider output. Do not include draft text, turn IDs, speaker names, or provider response bodies in error/audit/metric fields.
 
-- [ ] **Step 7: Implement revision-aware regeneration**
+- [x] **Step 7: Implement revision-aware regeneration**
 
 Extend the input contract:
 
@@ -1102,7 +1102,7 @@ data class RegenerationResult(
 
 Use the store CAS from Task 7. Return the full new result/evidence so the browser cannot merge incompatible revisions.
 
-- [ ] **Step 8: Rerun unit and consumer integration tests**
+- [x] **Step 8: Rerun unit and consumer integration tests**
 
 ```bash
 ./server/gradlew -p server unitTest --tests '*AiGenerationWorkerTest' --tests '*AiGenerationWorkerFailoverTest' --tests '*AiGenerationRegenerationServiceTest' --tests '*AiGenerationOrchestratorTest'
@@ -1111,7 +1111,7 @@ Use the store CAS from Task 7. Return the full new result/evidence so the browse
 
 Expected: PASS; legacy worker/regeneration tests stay green under default `LEGACY`.
 
-- [ ] **Step 9: Commit the pipeline execution slice**
+- [x] **Step 9: Commit the pipeline execution slice**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/aigen server/src/test/kotlin/com/readmates/aigen

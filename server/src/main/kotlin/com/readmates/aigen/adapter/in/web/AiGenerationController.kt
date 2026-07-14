@@ -141,6 +141,7 @@ class AiGenerationController(
                 item = item,
                 model = request.model,
                 instructions = request.instructions,
+                expectedRevision = request.expectedRevision,
             )
         return RegenerateResponse(
             item = outcome.item.name,

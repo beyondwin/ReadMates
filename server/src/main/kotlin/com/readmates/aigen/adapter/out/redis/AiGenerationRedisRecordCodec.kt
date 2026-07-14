@@ -5,6 +5,7 @@ import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.GroundedEvidenceBundle
+import com.readmates.aigen.application.model.GroundedGenerationDraft
 import com.readmates.aigen.application.model.GroundingStatus
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
@@ -78,6 +79,7 @@ internal class AiGenerationRedisRecordCodec(
         hash: Map<String, String>,
         transcript: String,
         result: SessionImportV1Snapshot?,
+        groundedDraft: GroundedGenerationDraft?,
         sourceContext: GroundedSourceContext?,
         evidence: GroundedEvidenceBundle?,
         includeSensitiveHashFields: Boolean = true,
@@ -97,6 +99,7 @@ internal class AiGenerationRedisRecordCodec(
             stage = hash["stage"]?.let(JobStage::valueOf),
             progressPct = hash.getValue("progressPct").toInt(),
             result = result,
+            groundedDraft = groundedDraft,
             error = readError(hash),
             tokens = readTokens(hash),
             costAccumulatedUsd = BigDecimal(hash.getValue("costAccumulatedUsd")),

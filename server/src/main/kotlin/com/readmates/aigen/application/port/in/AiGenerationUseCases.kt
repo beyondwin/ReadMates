@@ -3,6 +3,7 @@ package com.readmates.aigen.application.port.`in`
 import com.readmates.aigen.application.model.AiGenerationActor
 import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.GenerationItem
+import com.readmates.aigen.application.model.GroundedEvidenceBundle
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.JobView
 import com.readmates.aigen.application.model.Provider
@@ -73,6 +74,7 @@ interface RegenerateItemUseCase {
         item: GenerationItem,
         model: String?,
         instructions: String?,
+        expectedRevision: Long? = null,
     ): RegenerationResult
 }
 
@@ -82,6 +84,9 @@ data class RegenerationResult(
     val tokens: TokenUsage,
     val costEstimateUsd: BigDecimal,
     val warnings: List<String>,
+    val revision: Long? = null,
+    val result: SessionImportV1Snapshot? = null,
+    val evidence: GroundedEvidenceBundle? = null,
 )
 
 interface CommitGenerationUseCase {

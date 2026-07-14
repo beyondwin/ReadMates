@@ -1,7 +1,9 @@
 package com.readmates.aigen.application.service
 
+import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationOutput
+import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.model.TokenUsage
@@ -375,11 +377,53 @@ class AiGenerationWorkerTest {
         assertThat(ctx.auditPort.entries).isEmpty()
     }
 
+    @Test
+    fun `worker dispatches persisted grounded pipeline without invoking legacy generator`() {
+        val processed = mutableListOf<com.readmates.aigen.application.port.out.JobRecord>()
+        val context =
+            TestContext(
+                groundedExecutor = GroundedGenerationExecutor { record, _ -> processed += record },
+            )
+        val record = context.savedRecord().copy(pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT)
+        context.jobStore.save(record)
+
+        context.worker.process(record.jobId)
+
+        assertThat(processed).hasSize(1)
+        assertThat(processed.single().pipelineMode).isEqualTo(AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT)
+        assertThat(processed.single().stage).isEqualTo(JobStage.PREPARING_TRANSCRIPT)
+        assertThat(context.generator.calls).isEmpty()
+    }
+
+    @Test
+    fun `cancelled grounded job is rejected before grounded executor call`() {
+        val processed = mutableListOf<com.readmates.aigen.application.port.out.JobRecord>()
+        val context =
+            TestContext(
+                groundedExecutor = GroundedGenerationExecutor { record, _ -> processed += record },
+            )
+        val record =
+            context
+                .savedRecord()
+                .copy(
+                    pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
+                    status = JobStatus.CANCELLED,
+                    stage = null,
+                )
+        context.jobStore.save(record)
+
+        context.worker.process(record.jobId)
+
+        assertThat(processed).isEmpty()
+        assertThat(context.generator.calls).isEmpty()
+    }
+
     private class TestContext(
         modelEnabled: Set<com.readmates.aigen.application.model.ModelId> =
             setOf(AiGenerationTestFixtures.CLAUDE_MODEL, AiGenerationTestFixtures.CLAUDE_FALLBACK),
         val clock: FakeClock = FakeClock(AiGenerationTestFixtures.NOW),
         notificationThreshold: Duration = Duration.ofSeconds(60),
+        groundedExecutor: GroundedGenerationExecutor = GroundedGenerationExecutor.Disabled,
     ) {
         val sessionId: UUID = UUID.randomUUID()
         val clubId: UUID = UUID.randomUUID()
@@ -417,6 +461,7 @@ class AiGenerationWorkerTest {
                         modelCatalog = modelCatalog,
                         properties = properties,
                     ),
+                groundedExecutor = groundedExecutor,
             )
 
         fun savedRecord(): com.readmates.aigen.application.port.out.JobRecord {

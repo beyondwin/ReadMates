@@ -4,6 +4,7 @@ import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.port.out.ModelCatalog
 import com.readmates.aigen.application.port.out.SessionContentGenerator
+import com.readmates.aigen.application.port.out.WholeTranscriptGroundedGenerator
 import com.readmates.aigen.config.AiGenerationProperties
 import org.slf4j.LoggerFactory
 
@@ -42,4 +43,13 @@ class ProviderFallbackChain(
                     modelCatalog.isEnabled(candidate) &&
                     generators.containsKey(candidate.provider)
             }
+
+    fun nextEligibleGrounded(
+        failed: ModelId,
+        persistedCandidates: List<ModelId>,
+        groundedGenerators: Map<Provider, WholeTranscriptGroundedGenerator>,
+    ): ModelId? =
+        persistedCandidates.firstOrNull { candidate ->
+            candidate.provider != failed.provider && groundedGenerators.containsKey(candidate.provider)
+        }
 }

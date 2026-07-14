@@ -6,6 +6,7 @@ import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.GroundedEvidenceBundle
 import com.readmates.aigen.application.model.GroundedEvidenceExcerpt
 import com.readmates.aigen.application.model.GroundedEvidenceTarget
+import com.readmates.aigen.application.model.GroundedGenerationDraft
 import com.readmates.aigen.application.model.GroundingStatus
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
@@ -19,6 +20,7 @@ import com.readmates.aigen.application.port.out.AiGenerationJobQueue
 import com.readmates.aigen.application.port.out.AiGenerationJobStore
 import com.readmates.aigen.application.port.out.CommitLeaseResult
 import com.readmates.aigen.application.port.out.JobRecord
+import com.readmates.aigen.application.port.out.LlmCallReservation
 import com.readmates.aigen.application.port.out.SaveGroundedResultCommand
 import com.readmates.aigen.config.AiGenerationProperties
 import com.readmates.support.ReadmatesRedisIntegrationTestSupport
@@ -93,6 +95,22 @@ class RedisGroundedAiGenerationJobStoreTest(
         assertThat(loaded.revision).isEqualTo(1)
         assertThat(loaded.result).isEqualTo(snapshot())
         assertThat(loaded.evidence).isEqualTo(evidence(1))
+    }
+
+    @Test
+    fun `call reservation is atomic with running status and hard cap`() {
+        val record = groundedRecord(JobStatus.RUNNING, JobStage.GENERATING_RECORD)
+        store.save(record)
+
+        assertThat(store.reserveLlmCall(record.jobId, JobStatus.RUNNING, 1))
+            .isEqualTo(LlmCallReservation.RESERVED)
+        assertThat(store.reserveLlmCall(record.jobId, JobStatus.RUNNING, 1))
+            .isEqualTo(LlmCallReservation.CAP_EXCEEDED)
+        assertThat(store.transitionStatus(record.jobId, setOf(JobStatus.RUNNING), JobStatus.CANCELLED, null, 0, null))
+            .isTrue()
+        assertThat(store.reserveLlmCall(record.jobId, JobStatus.RUNNING, 3))
+            .isEqualTo(LlmCallReservation.STATE_CHANGED)
+        assertThat(store.load(record.jobId)?.llmCallCount).isEqualTo(1)
     }
 
     @Test
@@ -342,10 +360,24 @@ class RedisGroundedAiGenerationJobStoreTest(
             expectedStatus,
             expectedRevision,
             snapshot(),
+            groundedDraft(),
             evidence(expectedRevision + 1),
             TokenUsage(10, 0, 20),
             BigDecimal("0.01"),
             record.model,
+        )
+
+    private fun groundedDraft(): GroundedGenerationDraft =
+        GroundedGenerationDraft(
+            "readmates-grounded-generation:v2",
+            7,
+            "Public Test Book",
+            LocalDate.of(2026, 7, 14),
+            emptyList(),
+            emptyList(),
+            emptyList(),
+            "feedback.md",
+            emptyList(),
         )
 
     private fun evidence(revision: Long): GroundedEvidenceBundle =
