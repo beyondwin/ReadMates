@@ -2,6 +2,7 @@ import { useState, type CSSProperties } from "react";
 import type {
   AiGenerationItem,
   AiRecordVisibility,
+  AvailableGenerationModel,
   RegenerateResponse,
   SessionImportV1,
 } from "@/features/host/aigen/api/aigen-contracts";
@@ -18,6 +19,8 @@ export type PreviewViewProps = {
   recordVisibility: AiRecordVisibility;
   committing: boolean;
   commitError: string | null;
+  models?: AvailableGenerationModel[];
+  revision?: number;
   onSnapshotChange: (next: SessionImportV1) => void;
   onVisibilityChange: (next: AiRecordVisibility) => void;
   onCommit: () => void;
@@ -30,6 +33,8 @@ export function PreviewView({
   recordVisibility,
   committing,
   commitError,
+  models = [],
+  revision,
   onSnapshotChange,
   onVisibilityChange,
   onCommit,
@@ -141,6 +146,8 @@ export function PreviewView({
           sessionId={sessionId}
           jobId={jobId}
           item={regenItem}
+          models={models}
+          expectedRevision={revision}
           onClose={() => setRegenItem(null)}
           onSuccess={handleRegenSuccess}
         />

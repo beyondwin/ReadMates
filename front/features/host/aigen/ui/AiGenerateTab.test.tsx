@@ -13,26 +13,31 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   AiGenerationJobResponse,
   AiGenerationStatus,
-  ClubAiDefaultResponse,
   SessionImportV1,
   StartGenerationResponse,
 } from "@/features/host/aigen/api/aigen-contracts";
 
 vi.mock("@/features/host/aigen/api/aigen-api", () => ({
+  AiGenerationApiError: class AiGenerationApiError extends Error {
+    constructor(readonly status: number, readonly problem: { code: string; detail: string; invalidSpeakerLabels?: string[] }) {
+      super(problem.detail);
+    }
+  },
   startGeneration: vi.fn(),
   getJob: vi.fn(),
   getRecentJob: vi.fn(),
   regenerateItem: vi.fn(),
   commitGeneration: vi.fn(),
   cancelGeneration: vi.fn(),
-  getClubAiDefault: vi.fn(),
+  getAvailableModels: vi.fn(),
   putClubAiDefault: vi.fn(),
 }));
 
 import {
   cancelGeneration,
   commitGeneration,
-  getClubAiDefault,
+  AiGenerationApiError,
+  getAvailableModels,
   getJob,
   getRecentJob,
   startGeneration,
@@ -44,7 +49,7 @@ const mockedGetJob = vi.mocked(getJob);
 const mockedGetRecent = vi.mocked(getRecentJob);
 const mockedCommit = vi.mocked(commitGeneration);
 const mockedCancel = vi.mocked(cancelGeneration);
-const mockedClubDefault = vi.mocked(getClubAiDefault);
+const mockedModels = vi.mocked(getAvailableModels);
 
 function sampleSnapshot(): SessionImportV1 {
   return {
@@ -76,18 +81,14 @@ function jobResponse(status: AiGenerationStatus, opts: Partial<AiGenerationJobRe
   };
 }
 
-function recentJobResponse(status: AiGenerationStatus) {
+function recentJobResponse(status: AiGenerationStatus): import("@/features/host/aigen/api/aigen-contracts").AiRecentJobResponse {
   return {
     ...jobResponse(status),
     createdAt: "2026-05-18T00:00:00Z",
     lastUpdatedAt: "2026-05-18T00:01:00Z",
     expiresAt: "2026-05-18T06:00:00Z",
     availableActions: ["POLL", "CANCEL", "COMMIT_RETRY"],
-  } as const;
-}
-
-function clubDefaultResponse(model: string | null = "claude-sonnet-4-6"): ClubAiDefaultResponse {
-  return { defaultModel: model };
+  };
 }
 
 function createWrapper() {
@@ -131,8 +132,10 @@ describe("AiGenerateTab", () => {
     mockedGetRecent.mockReset();
     mockedCommit.mockReset();
     mockedCancel.mockReset();
-    mockedClubDefault.mockReset();
-    mockedClubDefault.mockResolvedValue(clubDefaultResponse());
+    mockedModels.mockReset();
+    mockedModels.mockResolvedValue({
+      models: [{ id: "claude-sonnet-4-6", provider: "CLAUDE", isDefault: true }],
+    });
     mockedGetRecent.mockResolvedValue(null);
     installFakeLocalStorage();
   });
@@ -151,6 +154,60 @@ describe("AiGenerateTab", () => {
 
     expect(await screen.findByText("AI로 세션 기록 생성")).toBeInTheDocument();
     expect(screen.getByLabelText(/대본 파일/)).toBeInTheDocument();
+    expect(mockedModels).toHaveBeenCalledWith("s1");
+  });
+
+  it("keeps the upload form mounted and shows safe invalid speaker correction", async () => {
+    mockedStart.mockRejectedValue(
+      new AiGenerationApiError(422, {
+        code: "TRANSCRIPT_SPEAKER_NOT_MEMBER",
+        detail: "대본의 화자 이름을 확인해 주세요.",
+        invalidSpeakerLabels: ["확인 필요"],
+      }),
+    );
+    const { Wrapper } = createWrapper();
+    render(
+      <Wrapper>
+        <AiGenerateTab sessionId="s1" clubSlug="club-a" onCommitted={() => {}} />
+      </Wrapper>,
+    );
+
+    const file = new File(["확인 필요 00:00\n안녕하세요"], "transcript.txt", {
+      type: "text/plain",
+    });
+    fireEvent.change(await screen.findByLabelText(/대본 파일/), { target: { files: [file] } });
+    const submit = screen.getByRole("button", { name: /생성 시작/ });
+    await waitFor(() => expect(submit).toBeEnabled());
+    fireEvent.click(submit);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/확인 필요/);
+    expect(screen.getByLabelText(/대본 파일/)).toBeInTheDocument();
+  });
+
+  it("shows COMMIT_RETRY as receipt recovery without exposing preview or cancel", async () => {
+    mockedStart.mockResolvedValue({
+      jobId: "job-1",
+      status: "PENDING",
+      expiresAt: "2026-05-16T18:00:00Z",
+    });
+    mockedGetJob.mockResolvedValue(jobResponse("COMMIT_RETRY", { result: null }));
+    const { Wrapper } = createWrapper();
+    render(
+      <Wrapper>
+        <AiGenerateTab sessionId="s1" clubSlug="club-a" onCommitted={() => {}} />
+      </Wrapper>,
+    );
+
+    fireEvent.change(await screen.findByLabelText(/대본 파일/), {
+      target: { files: [new File(["회원 00:00\n본문"], "transcript.txt")] },
+    });
+    const submit = screen.getByRole("button", { name: /생성 시작/ });
+    await waitFor(() => expect(submit).toBeEnabled());
+    fireEvent.click(submit);
+
+    expect(await screen.findByText("커밋 확인 중")).toBeInTheDocument();
+    expect(screen.queryByText(/AI가 생성한 기록 미리보기/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^취소$/ })).not.toBeInTheDocument();
   });
 
   it("shows a recent recoverable job on idle render and resumes polling", async () => {
@@ -466,9 +523,9 @@ describe("AiGenerateTab", () => {
     expect(onCommitted).toHaveBeenCalledTimes(1);
   });
 
-  it("shows an unavailable state when club AI defaults cannot be loaded", async () => {
-    mockedClubDefault.mockReset();
-    mockedClubDefault.mockRejectedValueOnce(new Error("AI generation is disabled"));
+  it("keeps submit disabled and exposes retry when session models cannot be loaded", async () => {
+    mockedModels.mockReset();
+    mockedModels.mockRejectedValue(new Error("AI generation is disabled"));
 
     const { Wrapper } = createWrapper();
     render(
@@ -477,8 +534,9 @@ describe("AiGenerateTab", () => {
       </Wrapper>,
     );
 
-    expect(await screen.findByRole("status")).toHaveTextContent("AI 생성을 사용할 수 없습니다");
-    expect(screen.queryByRole("button", { name: "생성 시작" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent("사용 가능한 모델을 불러오지 못했습니다");
+    expect(screen.getByRole("button", { name: "생성 시작" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "모델 다시 불러오기" })).toBeInTheDocument();
   });
 
   it("returns ERROR → IDLE when retry is clicked", async () => {

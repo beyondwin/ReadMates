@@ -2,7 +2,7 @@
  * Tests for ClubAiDefaultsSection (task 7.1).
  *
  * The section reads the club's default AI model from the host backend,
- * lets the host pick a new model from the shared `AIGEN_MODEL_OPTIONS`
+ * lets the host pick a new model from the club administration allowlist
  * allowlist, and saves the change via `putClubAiDefault`. Spec wording
  * for the post-save notice is fixed: "변경 사항은 새 generation 부터
  * 적용됩니다." (Korean per task spec).
@@ -16,9 +16,9 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  AIGEN_GEMINI_DEFAULT_MODEL_ID,
-  AIGEN_OPENAI_DEFAULT_MODEL_ID,
-} from "@/features/host/aigen/ui/aigen-model-options";
+  CLUB_AI_GEMINI_DEFAULT_MODEL_ID,
+  CLUB_AI_OPENAI_DEFAULT_MODEL_ID,
+} from "./club-ai-model-options";
 
 vi.mock("@/features/host/aigen/api/aigen-api", () => ({
   getClubAiDefault: vi.fn(),
@@ -64,7 +64,7 @@ describe("ClubAiDefaultsSection", () => {
   }
 
   it("renders the current default model from the GET response", async () => {
-    mockedGet.mockResolvedValue({ defaultModel: AIGEN_OPENAI_DEFAULT_MODEL_ID });
+    mockedGet.mockResolvedValue({ defaultModel: CLUB_AI_OPENAI_DEFAULT_MODEL_ID });
     const { Wrapper } = createWrapper();
 
     render(
@@ -75,7 +75,7 @@ describe("ClubAiDefaultsSection", () => {
 
     const select = await findModelSelect();
     await waitFor(() => {
-      expect(select.value).toBe(AIGEN_OPENAI_DEFAULT_MODEL_ID);
+      expect(select.value).toBe(CLUB_AI_OPENAI_DEFAULT_MODEL_ID);
     });
   });
 
@@ -96,7 +96,7 @@ describe("ClubAiDefaultsSection", () => {
 
     const select = await findModelSelect();
     await act(async () => {
-      fireEvent.change(select, { target: { value: AIGEN_OPENAI_DEFAULT_MODEL_ID } });
+      fireEvent.change(select, { target: { value: CLUB_AI_OPENAI_DEFAULT_MODEL_ID } });
     });
 
     expect(saveBtn).not.toBeDisabled();
@@ -115,7 +115,7 @@ describe("ClubAiDefaultsSection", () => {
 
     const select = await findModelSelect();
     await act(async () => {
-      fireEvent.change(select, { target: { value: AIGEN_GEMINI_DEFAULT_MODEL_ID } });
+      fireEvent.change(select, { target: { value: CLUB_AI_GEMINI_DEFAULT_MODEL_ID } });
     });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /저장/ }));
@@ -123,7 +123,7 @@ describe("ClubAiDefaultsSection", () => {
 
     await waitFor(() => {
       expect(mockedPut).toHaveBeenCalledWith("club-a", {
-        defaultModel: AIGEN_GEMINI_DEFAULT_MODEL_ID,
+        defaultModel: CLUB_AI_GEMINI_DEFAULT_MODEL_ID,
       });
     });
   });
@@ -141,7 +141,7 @@ describe("ClubAiDefaultsSection", () => {
 
     const select = await findModelSelect();
     await act(async () => {
-      fireEvent.change(select, { target: { value: AIGEN_OPENAI_DEFAULT_MODEL_ID } });
+      fireEvent.change(select, { target: { value: CLUB_AI_OPENAI_DEFAULT_MODEL_ID } });
     });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /저장/ }));
@@ -173,7 +173,7 @@ describe("ClubAiDefaultsSection", () => {
 
     const select = await findModelSelect();
     await act(async () => {
-      fireEvent.change(select, { target: { value: AIGEN_OPENAI_DEFAULT_MODEL_ID } });
+      fireEvent.change(select, { target: { value: CLUB_AI_OPENAI_DEFAULT_MODEL_ID } });
     });
 
     const saveBtn = screen.getByRole("button", { name: /저장/ }) as HTMLButtonElement;
@@ -204,7 +204,7 @@ describe("ClubAiDefaultsSection", () => {
 
     const select = await findModelSelect();
     await act(async () => {
-      fireEvent.change(select, { target: { value: AIGEN_OPENAI_DEFAULT_MODEL_ID } });
+      fireEvent.change(select, { target: { value: CLUB_AI_OPENAI_DEFAULT_MODEL_ID } });
     });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /저장/ }));

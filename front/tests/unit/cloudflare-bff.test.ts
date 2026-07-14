@@ -300,6 +300,65 @@ describe("Cloudflare BFF function", () => {
     expect(response.headers.get("x-readmates-club-host")).toBeNull();
   });
 
+  it("preserves AI transcript multipart bytes and bounded 422 problem details without logging", async () => {
+    const payload = new Uint8Array([0x2d, 0x2d, 0x61, 0x69, 0x0d, 0x0a, 0xef, 0xbb, 0xbf]);
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    let forwardedInit: RequestInit | undefined;
+    const problem = {
+      type: "about:blank",
+      title: "Unprocessable Entity",
+      status: 422,
+      detail: "대본의 화자 이름을 확인해 주세요.",
+      code: "TRANSCRIPT_SPEAKER_NOT_MEMBER",
+      invalidSpeakerLabels: ["화자 하나"],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input, init) => {
+        forwardedInit = init;
+        return new Response(JSON.stringify(problem), {
+          status: 422,
+          headers: {
+            "Content-Type": "application/problem+json",
+            "X-Readmates-Request-Id": "request-safe-1",
+          },
+        });
+      }),
+    );
+
+    const response = await onRequest(
+      context(
+        new Request(
+          "https://readmates.pages.dev/api/bff/api/host/sessions/session-1/ai-generate/jobs",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "multipart/form-data; boundary=ai",
+              Origin: "https://readmates.pages.dev",
+              Cookie: "readmates.sid=current",
+              "X-Readmates-Request-Id": "request-safe-1",
+            },
+            body: payload,
+          },
+        ),
+        { path: ["api", "host", "sessions", "session-1", "ai-generate", "jobs"] },
+      ),
+    );
+
+    expect(new Uint8Array(forwardedInit?.body as ArrayBuffer)).toEqual(payload);
+    expect((forwardedInit?.headers as Headers).get("Content-Type")).toBe(
+      "multipart/form-data; boundary=ai",
+    );
+    expect((forwardedInit?.headers as Headers).get("X-Readmates-Bff-Secret")).toBe("secret");
+    expect((forwardedInit?.headers as Headers).get("X-Readmates-Request-Id")).toBe(
+      "request-safe-1",
+    );
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toEqual(problem);
+    expect(response.headers.get("X-Readmates-Request-Id")).toBe("request-safe-1");
+    expect(consoleSpy).not.toHaveBeenCalled();
+  });
+
   it("forwards multiple logout Set-Cookie headers", async () => {
     vi.stubGlobal(
       "fetch",

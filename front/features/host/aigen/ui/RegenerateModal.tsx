@@ -2,16 +2,18 @@ import { useState, type CSSProperties } from "react";
 import { regenerateItem } from "@/features/host/aigen/api/aigen-api";
 import type {
   AiGenerationItem,
+  AvailableGenerationModel,
   RegenerateRequest,
   RegenerateResponse,
 } from "@/features/host/aigen/api/aigen-contracts";
-import { AIGEN_MODEL_OPTIONS } from "./aigen-model-options";
 
 export type RegenerateModalProps = {
   open: boolean;
   sessionId: string;
   jobId: string;
   item: AiGenerationItem;
+  models?: AvailableGenerationModel[];
+  expectedRevision?: number;
   onClose: () => void;
   onSuccess: (response: RegenerateResponse) => void;
 };
@@ -39,6 +41,8 @@ export function RegenerateModal({
   sessionId,
   jobId,
   item,
+  models = [],
+  expectedRevision,
   onClose,
   onSuccess,
 }: RegenerateModalProps) {
@@ -59,6 +63,7 @@ export function RegenerateModal({
         item: ITEM_TO_SNAKE[item] as unknown as AiGenerationItem,
         ...(model ? { model } : {}),
         ...(instructions.trim() ? { instructions } : {}),
+        ...(expectedRevision !== undefined ? { expectedRevision } : {}),
       } satisfies RegenerateRequest;
       const response = await regenerateItem(sessionId, jobId, request);
       onSuccess(response);
@@ -123,9 +128,9 @@ export function RegenerateModal({
               style={{ width: "100%" }}
             >
               <option value="">기본 모델 사용</option>
-              {AIGEN_MODEL_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
+              {models.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.provider} · {option.id}
                 </option>
               ))}
             </select>

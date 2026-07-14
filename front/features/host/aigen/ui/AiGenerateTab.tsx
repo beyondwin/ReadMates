@@ -16,15 +16,17 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type {
+  AiGenerationProblem,
   AiRecordVisibility,
   CommitGenerationRequest,
   SessionImportV1,
   StartGenerationRequest,
 } from "@/features/host/aigen/api/aigen-contracts";
-import { getClubAiDefault } from "@/features/host/aigen/api/aigen-api";
+import { AiGenerationApiError } from "@/features/host/aigen/api/aigen-api";
 import { useAiGenerationJob } from "@/features/host/aigen/hooks/useAiGenerationJob";
 import {
   recentAiJobQuery,
+  availableAiModelsQuery,
   useCancelAiJobMutation,
   useCommitAiJobMutation,
   useStartAiJobMutation,
@@ -40,7 +42,7 @@ import { PreviewView } from "./PreviewView";
 import { AiRecoveryStrip } from "./AiRecoveryStrip";
 
 type Stage =
-  | { tag: "idle"; startError: string | null }
+  | { tag: "idle"; startError: AiGenerationProblem | null }
   | { tag: "active"; jobId: string; cancelling: boolean }
   | { tag: "committed" };
 
@@ -50,7 +52,7 @@ export type AiGenerateTabProps = {
   onCommitted: () => void;
 };
 
-export function AiGenerateTab({ sessionId, clubSlug, onCommitted }: AiGenerateTabProps) {
+export function AiGenerateTab({ sessionId, onCommitted }: AiGenerateTabProps) {
   const [stage, setStage] = useState<Stage>({ tag: "idle", startError: null });
   const [recordVisibility, setRecordVisibility] = useState<AiRecordVisibility>("MEMBER");
   const [submittingStart, setSubmittingStart] = useState(false);
@@ -61,11 +63,7 @@ export function AiGenerateTab({ sessionId, clubSlug, onCommitted }: AiGenerateTa
   // server overwrites don't clobber manual edits.
   const adoptedForJobRef = useRef<string | null>(null);
 
-  const clubDefaultsQuery = useQuery({
-    queryKey: ["host", "aigen", "club-ai-default", clubSlug],
-    queryFn: () => getClubAiDefault(clubSlug),
-  });
-  const defaultModel = clubDefaultsQuery.data?.defaultModel ?? null;
+  const modelsQuery = useQuery(availableAiModelsQuery(sessionId));
 
   const activeJobId = stage.tag === "active" ? stage.jobId : null;
   const startMutation = useStartAiJobMutation(sessionId);
@@ -133,9 +131,11 @@ export function AiGenerateTab({ sessionId, clubSlug, onCommitted }: AiGenerateTa
         setCommitError(null);
         setStage({ tag: "active", jobId: response.jobId, cancelling: false });
       } catch (caught) {
-        const message =
-          caught instanceof Error ? caught.message : "생성 시작에 실패했습니다.";
-        setStage({ tag: "idle", startError: message });
+        const problem =
+          caught instanceof AiGenerationApiError
+            ? caught.problem
+            : { code: "AI_GENERATION_REQUEST_FAILED", detail: "생성 시작에 실패했습니다." };
+        setStage({ tag: "idle", startError: problem });
       } finally {
         setSubmittingStart(false);
       }
@@ -212,6 +212,16 @@ export function AiGenerateTab({ sessionId, clubSlug, onCommitted }: AiGenerateTa
         </div>
       );
     }
+    if (jobStatus === "COMMIT_RETRY") {
+      return (
+        <div className="stack" style={{ "--stack": "8px" } as CSSProperties} role="status">
+          <h2 style={{ margin: 0 }}>커밋 확인 중</h2>
+          <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
+            기록 저장 영수증을 확인하고 있습니다. 페이지를 유지하면 안전하게 다시 확인합니다.
+          </p>
+        </div>
+      );
+    }
     if (jobStatus === "FAILED") {
       const message = jobQuery.data?.error?.message ?? "AI 생성에 실패했습니다.";
       return <ErrorState message={message} onRetry={handleRetry} />;
@@ -225,6 +235,8 @@ export function AiGenerateTab({ sessionId, clubSlug, onCommitted }: AiGenerateTa
           recordVisibility={recordVisibility}
           committing={committing}
           commitError={commitError}
+          models={modelsQuery.data?.models ?? []}
+          revision={jobQuery.data?.revision ?? undefined}
           onSnapshotChange={handleSnapshotChange}
           onVisibilityChange={setRecordVisibility}
           onCommit={handleCommit}
@@ -240,19 +252,6 @@ export function AiGenerateTab({ sessionId, clubSlug, onCommitted }: AiGenerateTa
     );
   }
 
-  if (clubDefaultsQuery.isError) {
-    return (
-      <div className="stack" style={{ "--stack": "8px" } as CSSProperties}>
-        <p className="small" role="status" style={{ color: "var(--text-2)", margin: 0 }}>
-          AI 생성을 사용할 수 없습니다. 외부 JSON 가져오기로 세션 기록을 저장할 수 있습니다.
-        </p>
-        <p className="tiny" style={{ color: "var(--text-3)", margin: 0 }}>
-          모델 설정, provider 상태, 비용 한도, 운영 kill switch를 확인하세요.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className="stack" style={{ "--stack": "12px" } as CSSProperties}>
       <AiRecoveryStrip
@@ -264,16 +263,14 @@ export function AiGenerateTab({ sessionId, clubSlug, onCommitted }: AiGenerateTa
         onStartNew={handleRetry}
       />
       <TranscriptUploadForm
-        defaultModel={defaultModel}
-        loadingDefaults={clubDefaultsQuery.isLoading}
+        models={modelsQuery.data?.models ?? []}
+        loadingModels={modelsQuery.isLoading}
+        modelError={modelsQuery.isError}
+        startProblem={stage.startError}
         submitting={submittingStart}
+        onRetryModels={() => void modelsQuery.refetch()}
         onSubmit={handleStart}
       />
-      {stage.startError ? (
-        <div className="small" role="alert" style={{ color: "var(--danger)" }}>
-          {stage.startError}
-        </div>
-      ) : null}
     </div>
   );
 }

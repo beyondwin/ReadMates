@@ -14,7 +14,7 @@
  * safe to mount before the job has been created.
  */
 
-import type { Query, UseQueryResult } from "@tanstack/react-query";
+import type { UseQueryResult } from "@tanstack/react-query";
 import { useQuery } from "@tanstack/react-query";
 import type { AiGenerationJobResponse } from "@/features/host/aigen/api/aigen-contracts";
 import { aiJobDetailQuery, aiJobKeys } from "@/features/host/aigen/queries/aigen-job-queries";
@@ -23,6 +23,7 @@ const FIRST_POLL_MS = 2000;
 const SUBSEQUENT_POLL_MS = 4000;
 
 const TERMINAL_STATUSES: ReadonlySet<AiGenerationJobResponse["status"]> = new Set([
+  "SUCCEEDED",
   "FAILED",
   "CANCELLED",
   "COMMITTED",
@@ -48,7 +49,7 @@ export function useAiGenerationJob(
   return useQuery({
     ...aiJobDetailQuery(sessionId, jobId ?? ""),
     enabled,
-    refetchInterval: (query: Query<AiGenerationJobResponse, Error>) => {
+    refetchInterval: (query) => {
       const status = query.state.data?.status;
       if (status && TERMINAL_STATUSES.has(status)) {
         return false;

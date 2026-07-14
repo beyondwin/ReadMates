@@ -11,7 +11,6 @@ vi.mock("@/features/host/aigen/api/aigen-api", () => ({
 }));
 
 import { regenerateItem } from "@/features/host/aigen/api/aigen-api";
-import { AIGEN_OPENAI_DEFAULT_MODEL_ID } from "./aigen-model-options";
 import { RegenerateModal } from "./RegenerateModal";
 
 const mockedRegenerate = vi.mocked(regenerateItem);
@@ -32,6 +31,7 @@ describe("RegenerateModal", () => {
         sessionId="s1"
         jobId="j1"
         item="summary"
+        models={[{ id: "gpt-5.4-mini", provider: "OPENAI", isDefault: true }]}
         onClose={() => {}}
         onSuccess={() => {}}
       />,
@@ -89,6 +89,7 @@ describe("RegenerateModal", () => {
         sessionId="s1"
         jobId="j1"
         item="summary"
+        models={[{ id: "gpt-5.4-mini", provider: "OPENAI", isDefault: true }]}
         onClose={() => {}}
         onSuccess={() => {}}
       />,
@@ -101,7 +102,7 @@ describe("RegenerateModal", () => {
     });
     await act(async () => {
       fireEvent.change(screen.getByLabelText(/모델 변경/), {
-        target: { value: AIGEN_OPENAI_DEFAULT_MODEL_ID },
+        target: { value: "gpt-5.4-mini" },
       });
     });
     await act(async () => {
@@ -113,7 +114,7 @@ describe("RegenerateModal", () => {
     });
     const req = mockedRegenerate.mock.calls[0][2];
     expect(req.item).toBe("SUMMARY");
-    expect(req.model).toBe(AIGEN_OPENAI_DEFAULT_MODEL_ID);
+    expect(req.model).toBe("gpt-5.4-mini");
     expect(req.instructions).toBe("더 짧게");
   });
 

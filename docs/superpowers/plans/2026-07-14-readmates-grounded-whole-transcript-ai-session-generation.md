@@ -1419,7 +1419,7 @@ git commit -m "feat(aigen): recover grounded session commits"
 - A dedicated AI API error preserves `code`, safe `detail`, invalid speaker labels, and current revision where applicable.
 - Polling recognizes grounded `revision`, result/evidence, and `COMMIT_RETRY` without exposing partial drafts.
 
-- [ ] **Step 1: Write TypeScript contract fixtures first**
+- [x] **Step 1: Write TypeScript contract fixtures first**
 
 Define discriminated types:
 
@@ -1448,7 +1448,7 @@ export interface AiGenerationProblem {
 
 Add `revision`, evidence target/excerpt, review state, grounded warnings, content-free commit result, and dynamic model-list contracts. Keep nullable fields aligned with server status invariants.
 
-- [ ] **Step 2: Write API client tests and verify typed failures**
+- [x] **Step 2: Write API client tests and verify typed failures**
 
 Assert:
 
@@ -1460,7 +1460,7 @@ Assert:
 - regeneration and commit serialize `expectedRevision`;
 - evidence expansion path URL-encodes IDs and revision.
 
-- [ ] **Step 3: Write BFF preservation regression tests**
+- [x] **Step 3: Write BFF preservation regression tests**
 
 Extend `front/tests/unit/cloudflare-bff.test.ts` to prove the current proxy:
 
@@ -1471,7 +1471,7 @@ Extend `front/tests/unit/cloudflare-bff.test.ts` to prove the current proxy:
 
 No production BFF change is expected unless this test exposes an actual contract loss.
 
-- [ ] **Step 4: Run frontend API/BFF tests and verify RED**
+- [x] **Step 4: Run frontend API/BFF tests and verify RED**
 
 ```bash
 npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/host/aigen/api/aigen-api.test.ts tests/unit/cloudflare-bff.test.ts --reporter=dot
@@ -1479,7 +1479,7 @@ npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/host/aigen/a
 
 Expected: FAIL because the grounded contracts and model list are not implemented.
 
-- [ ] **Step 5: Implement the AI-specific safe error class**
+- [x] **Step 5: Implement the AI-specific safe error class**
 
 Do not broaden the generic `ReadmatesApiError` with feature-specific data unless other consumers genuinely need it:
 
@@ -1496,11 +1496,11 @@ export class AiGenerationApiError extends Error {
 
 Validate response shape before trusting it. Cap invalid label count and individual label length defensively in the client even though the server already bounds them.
 
-- [ ] **Step 6: Replace hard-coded model options with the server list**
+- [x] **Step 6: Replace hard-coded model options with the server list**
 
 Fetch on tab entry after session authorization. Show a retryable model-list error without enabling submit. Use the returned default, preserve the host's current choice while still present, and stop calling the separate club-default query from `AiGenerateTab` because the session-scoped model response already carries the authorized default. Keep the club-default administration endpoint itself intact. Remove `aigen-model-options.ts` only after no imports remain.
 
-- [ ] **Step 7: Make upload correction explicit**
+- [x] **Step 7: Make upload correction explicit**
 
 The form accepts `.txt` only and communicates the supported `이름 MM:SS` shape. On invalid speakers, render a concise error panel:
 
@@ -1511,11 +1511,11 @@ The form accepts `.txt` only and communicates the supported `이름 MM:SS` shape
 
 Do not suggest fuzzy candidates or expose the club roster. Keep the selected file local; do not auto-resubmit after correction.
 
-- [ ] **Step 8: Update progress/recovery states**
+- [x] **Step 8: Update progress/recovery states**
 
 Handle `COMMIT_RETRY` as a visible “커밋 확인 중” recoverable state with poll/retry guidance, not a generation failure. Keep invalid or partial result fields inaccessible. Existing recent-job recovery must use persisted revision and grounded status.
 
-- [ ] **Step 9: Rerun frontend feature tests**
+- [x] **Step 9: Rerun frontend feature tests**
 
 ```bash
 npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/host/aigen tests/unit/cloudflare-bff.test.ts --reporter=dot
@@ -1523,7 +1523,7 @@ npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/host/aigen t
 
 Expected: PASS; no hard-coded Gemini ID or alias UI remains.
 
-- [ ] **Step 10: Commit the browser upload/API slice**
+- [x] **Step 10: Commit the browser upload/API slice**
 
 ```bash
 git add front/features/host/aigen front/tests/unit/cloudflare-bff.test.ts

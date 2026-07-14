@@ -9,10 +9,13 @@
 
 import { readmatesFetch, readmatesFetchResponse } from "@/shared/api/client";
 import { apiErrorFromResponse } from "@/shared/api/errors";
+import { parseReadmatesResponse } from "@/shared/api/response";
 import type {
+  AiGenerationProblem,
   AiCommitResponse,
   AiGenerationJobResponse,
   AiRecentJobResponse,
+  AvailableGenerationModelsResponse,
   ClubAiDefaultRequest,
   ClubAiDefaultResponse,
   CommitGenerationRequest,
@@ -21,7 +24,92 @@ import type {
   StartGenerationBody,
   StartGenerationRequest,
   StartGenerationResponse,
+  ExpandedEvidenceTurn,
 } from "./aigen-contracts";
+
+const GENERIC_AI_PROBLEM: AiGenerationProblem = {
+  code: "AI_GENERATION_REQUEST_FAILED",
+  detail: "AI 요청을 처리할 수 없습니다.",
+};
+const MAX_INVALID_SPEAKER_LABELS = 20;
+const MAX_INVALID_SPEAKER_LABEL_CODE_POINTS = 120;
+
+export class AiGenerationApiError extends Error {
+  constructor(
+    readonly status: number,
+    readonly problem: AiGenerationProblem,
+  ) {
+    super(problem.detail);
+    this.name = "AiGenerationApiError";
+  }
+}
+
+function boundedLabel(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  return Array.from(value).slice(0, MAX_INVALID_SPEAKER_LABEL_CODE_POINTS).join("");
+}
+
+function parseAiProblem(value: unknown, responseStatus: number): AiGenerationProblem | null {
+  if (!value || typeof value !== "object") return null;
+  const body = value as Record<string, unknown>;
+  if (
+    body.status !== responseStatus ||
+    typeof body.code !== "string" ||
+    typeof body.detail !== "string" ||
+    body.detail.length > 500
+  ) {
+    return null;
+  }
+  const labels = Array.isArray(body.invalidSpeakerLabels)
+    ? body.invalidSpeakerLabels
+        .slice(0, MAX_INVALID_SPEAKER_LABELS)
+        .map(boundedLabel)
+        .filter((label): label is string => label !== null)
+    : undefined;
+  const revision =
+    typeof body.currentRevision === "number" &&
+    Number.isSafeInteger(body.currentRevision) &&
+    body.currentRevision >= 0
+      ? body.currentRevision
+      : undefined;
+  return {
+    code: body.code,
+    detail: body.detail,
+    ...(labels?.length ? { invalidSpeakerLabels: labels } : {}),
+    ...(revision !== undefined ? { currentRevision: revision } : {}),
+  };
+}
+
+async function aiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await readmatesFetchResponse(path, init);
+  if (!response.ok) {
+    let problem: AiGenerationProblem | null = null;
+    try {
+      problem = parseAiProblem(await response.clone().json(), response.status);
+    } catch {
+      // Untrusted or non-JSON upstream errors use the content-free fallback.
+    }
+    throw new AiGenerationApiError(response.status, problem ?? GENERIC_AI_PROBLEM);
+  }
+  return parseReadmatesResponse<T>(response);
+}
+
+function sanitizeJob(response: AiGenerationJobResponse): AiGenerationJobResponse {
+  const grounded =
+    response.revision !== undefined ||
+    response.groundingStatus !== undefined ||
+    response.evidence !== undefined ||
+    response.sectionReviewStatuses !== undefined;
+  if (!grounded) return response;
+  const complete =
+    response.status === "SUCCEEDED" &&
+    Number.isSafeInteger(response.revision) &&
+    response.groundingStatus === "VALID" &&
+    response.result !== null &&
+    Array.isArray(response.evidence);
+  if (complete) return response;
+  return { ...response, result: null, evidence: null, sectionReviewStatuses: null };
+}
 
 function sessionsPath(sessionId: string, suffix = ""): string {
   return `/api/host/sessions/${encodeURIComponent(sessionId)}/ai-generate${suffix}`;
@@ -39,9 +127,7 @@ export function startGeneration(
   sessionId: string,
   payload: StartGenerationRequest,
 ): Promise<StartGenerationResponse> {
-  const body: StartGenerationBody = {
-    authorNameMode: payload.authorNameMode,
-  };
+  const body: StartGenerationBody = {};
   if (payload.model !== undefined) {
     body.model = payload.model;
   }
@@ -57,21 +143,37 @@ export function startGeneration(
   );
 
   // Leave Content-Type unset so the browser fills in the multipart boundary.
-  return readmatesFetch<StartGenerationResponse>(sessionsPath(sessionId, "/jobs"), {
+  return aiFetch<StartGenerationResponse>(sessionsPath(sessionId, "/jobs"), {
     method: "POST",
     body: form,
   });
 }
 
-export function getJob(
+export async function getJob(
   sessionId: string,
   jobId: string,
 ): Promise<AiGenerationJobResponse> {
-  return readmatesFetch<AiGenerationJobResponse>(jobPath(sessionId, jobId));
+  return sanitizeJob(await aiFetch<AiGenerationJobResponse>(jobPath(sessionId, jobId)));
+}
+
+export function getAvailableModels(
+  sessionId: string,
+): Promise<AvailableGenerationModelsResponse> {
+  return aiFetch<AvailableGenerationModelsResponse>(sessionsPath(sessionId, "/models"));
+}
+
+export function expandEvidence(
+  sessionId: string,
+  jobId: string,
+  turnId: string,
+  revision: number,
+): Promise<ExpandedEvidenceTurn> {
+  const suffix = `/evidence/${encodeURIComponent(turnId)}?revision=${encodeURIComponent(revision)}`;
+  return aiFetch<ExpandedEvidenceTurn>(jobPath(sessionId, jobId, suffix));
 }
 
 export async function getRecentJob(sessionId: string): Promise<AiRecentJobResponse | null> {
-  const result = await readmatesFetch<AiRecentJobResponse | null | undefined>(
+  const result = await aiFetch<AiRecentJobResponse | null | undefined>(
     sessionsPath(sessionId, "/jobs/recent"),
   );
   return result ?? null;
@@ -82,7 +184,7 @@ export function regenerateItem(
   jobId: string,
   request: RegenerateRequest,
 ): Promise<RegenerateResponse> {
-  return readmatesFetch<RegenerateResponse>(jobPath(sessionId, jobId, "/regenerate"), {
+  return aiFetch<RegenerateResponse>(jobPath(sessionId, jobId, "/regenerate"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
@@ -94,7 +196,7 @@ export function commitGeneration(
   jobId: string,
   request: CommitGenerationRequest,
 ): Promise<AiCommitResponse> {
-  return readmatesFetch<AiCommitResponse>(jobPath(sessionId, jobId, "/commit"), {
+  return aiFetch<AiCommitResponse>(jobPath(sessionId, jobId, "/commit"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),

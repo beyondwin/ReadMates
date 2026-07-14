@@ -8,10 +8,6 @@
  * server uses `Enum.name` for stage/status/item).
  */
 
-import type { SessionImportCommitResponse } from "@/features/host/api/host-contracts";
-
-export type AiAuthorNameMode = "real" | "alias";
-
 export type AiRecordVisibility = "MEMBER" | "PUBLIC";
 
 export type AiGenerationStatus =
@@ -19,12 +15,17 @@ export type AiGenerationStatus =
   | "RUNNING"
   | "SUCCEEDED"
   | "COMMITTING"
+  | "COMMIT_RETRY"
   | "COMMITTED"
   | "FAILED"
   | "CANCELLED";
 
 export type AiGenerationStage =
   | "QUEUED"
+  | "PREPARING_TRANSCRIPT"
+  | "GENERATING_RECORD"
+  | "VALIDATING_GROUNDING"
+  | "REPAIRING_RECORD"
   | "TRANSCRIPT_LOADED"
   | "GENERATING_SUMMARY"
   | "GENERATING_HIGHLIGHTS"
@@ -78,18 +79,79 @@ export type SessionImportV1 = {
   feedbackDocumentMarkdown: string;
 };
 
+export type SessionImportV1Snapshot = SessionImportV1;
+
+export type AiGenerationErrorCode =
+  | "TRANSCRIPT_SPEAKER_NOT_MEMBER"
+  | "TRANSCRIPT_SPEAKER_AMBIGUOUS"
+  | "TRANSCRIPT_FORMAT_INVALID"
+  | "TRANSCRIPT_EMPTY"
+  | "TRANSCRIPT_DURATION_EXCEEDED"
+  | "TRANSCRIPT_TOO_LONG_FOR_MODEL"
+  | "TRANSCRIPT_ALIAS_MODE_UNSUPPORTED"
+  | "MODEL_CAPABILITY_UNAVAILABLE"
+  | "STALE_GENERATION_REVISION"
+  | "MEMBERSHIP_CHANGED"
+  | "JOB_EXPIRED"
+  | (string & {});
+
+export interface AiGenerationProblem {
+  code: AiGenerationErrorCode;
+  detail: string;
+  invalidSpeakerLabels?: string[];
+  currentRevision?: number;
+}
+
+export type ReviewSection =
+  | "SUMMARY"
+  | "HIGHLIGHTS"
+  | "ONE_LINE_REVIEWS"
+  | "FEEDBACK_DOCUMENT";
+
+export type ServerSectionReviewStatus =
+  | "AI_GROUNDED_REVIEWED"
+  | "USER_EDITED_CONFIRMED";
+
+export type GroundingStatus = "PENDING" | "VALID" | "INVALID";
+
+export type AiEvidenceExcerpt = {
+  section: ReviewSection;
+  targetId: string;
+  ordinal: number;
+  turnId: string;
+  startSeconds: number;
+  speakerName: string;
+  excerpt: string;
+  truncated: boolean;
+};
+
+export type ExpandedEvidenceTurn = {
+  turnId: string;
+  speakerName: string;
+  startSeconds: number;
+  text: string;
+};
+
+export type AvailableGenerationModel = {
+  id: string;
+  provider: string;
+  isDefault: boolean;
+};
+
+export type AvailableGenerationModelsResponse = {
+  models: AvailableGenerationModel[];
+};
+
 /** Multipart fields for POST /jobs (spec §7.1). */
 export type StartGenerationRequest = {
   transcript: File;
   model?: string;
-  authorNameMode: AiAuthorNameMode;
   instructions?: string;
 };
 
 /** JSON sub-body for the `body` part of the multipart upload. */
 export type StartGenerationBody = {
   model?: string;
-  authorNameMode: AiAuthorNameMode;
   instructions?: string;
 };
 
@@ -112,6 +174,13 @@ export type AiGenerationJobResponse = {
   /** Decimal string (server uses BigDecimal.toPlainString). */
   costEstimateUsd: string;
   warnings: string[];
+  expiresAt?: string;
+  createdAt?: string;
+  lastUpdatedAt?: string;
+  revision?: number | null;
+  groundingStatus?: GroundingStatus | null;
+  evidence?: AiEvidenceExcerpt[] | null;
+  sectionReviewStatuses?: Partial<Record<ReviewSection, string>> | null;
 };
 
 export type AiGenerationAvailableAction =
@@ -149,6 +218,7 @@ export type RegenerateRequest = {
   item: AiGenerationItem;
   model?: string;
   instructions?: string;
+  expectedRevision?: number;
 };
 
 export type RegenerateResponse = {
@@ -157,16 +227,27 @@ export type RegenerateResponse = {
   tokens: AiTokenUsage;
   costEstimateUsd: string;
   warnings: string[];
+  revision?: number | null;
+  result?: SessionImportV1 | null;
+  evidence?: AiEvidenceExcerpt[] | null;
+  sectionReviewStatuses?: Partial<Record<ReviewSection, string>> | null;
 };
 
 export type CommitGenerationRequest = {
   recordVisibility: AiRecordVisibility;
   /** Optional override sent when the host edited the PREVIEW manually. */
   result?: SessionImportV1;
+  expectedRevision?: number;
+  sectionReviews?: Record<ReviewSection, ServerSectionReviewStatus>;
 };
 
-/** Re-exported for callers — commit returns the standard session-import shape. */
-export type AiCommitResponse = SessionImportCommitResponse;
+/** Content-free commit receipt. It deliberately contains no generated content. */
+export type AiCommitResponse = {
+  sessionId: string;
+  status: "COMMITTED";
+  recovered: boolean;
+  participantUpdatesCount: number | null;
+};
 
 export type ClubAiDefaultResponse = {
   defaultModel: string | null;

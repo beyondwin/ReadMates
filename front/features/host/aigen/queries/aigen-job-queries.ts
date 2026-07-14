@@ -2,6 +2,7 @@ import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query
 import {
   cancelGeneration,
   commitGeneration,
+  getAvailableModels,
   getJob,
   getRecentJob,
   regenerateItem,
@@ -22,6 +23,7 @@ export const aiJobKeys = {
   recent: (sessionId: string) => [...aiJobKeys.session(sessionId), "recent"] as const,
   detail: (sessionId: string, jobId: string) =>
     [...aiJobKeys.session(sessionId), "detail", jobId] as const,
+  models: (sessionId: string) => [...aiJobKeys.session(sessionId), "models"] as const,
 } as const;
 
 const RECENT_JOB_POLL_INTERVAL_MS = 4000;
@@ -49,6 +51,13 @@ export function aiJobDetailQuery(sessionId: string, jobId: string) {
   return queryOptions({
     queryKey: aiJobKeys.detail(sessionId, jobId),
     queryFn: () => getJob(sessionId, jobId),
+  });
+}
+
+export function availableAiModelsQuery(sessionId: string) {
+  return queryOptions({
+    queryKey: aiJobKeys.models(sessionId),
+    queryFn: () => getAvailableModels(sessionId),
   });
 }
 

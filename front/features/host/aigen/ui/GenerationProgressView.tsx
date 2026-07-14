@@ -6,6 +6,10 @@ import type {
 
 const STAGE_LABEL: Record<AiGenerationStage, string> = {
   QUEUED: "대기 중",
+  PREPARING_TRANSCRIPT: "대본 준비 중",
+  GENERATING_RECORD: "전체 기록 생성 중",
+  VALIDATING_GROUNDING: "근거 연결 검증 중",
+  REPAIRING_RECORD: "결과 보정 중",
   TRANSCRIPT_LOADED: "대본 분석",
   GENERATING_SUMMARY: "요약 생성 중",
   GENERATING_HIGHLIGHTS: "하이라이트 생성 중",

@@ -99,20 +99,21 @@ describe("useAiGenerationJob", () => {
   });
 
   it("stops polling when status is SUCCEEDED", async () => {
+    vi.useFakeTimers();
     mockedGetJob.mockResolvedValue(jobResponse("SUCCEEDED"));
     const { Wrapper } = createWrapper();
     const { result } = renderHook(() => useAiGenerationJob("s1", "j1"), {
       wrapper: Wrapper,
     });
 
-    await waitFor(() => {
-      expect(result.current.data?.status).toBe("SUCCEEDED");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
     });
-
-    const callsAfterSettle = mockedGetJob.mock.calls.length;
-    // Wait longer than any expected interval to confirm no more polls happen.
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(mockedGetJob.mock.calls.length).toBe(callsAfterSettle);
+    await vi.waitFor(() => expect(result.current.data?.status).toBe("SUCCEEDED"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(mockedGetJob).toHaveBeenCalledTimes(1);
   });
 
   it("stops polling when status is FAILED", async () => {
@@ -158,6 +159,22 @@ describe("useAiGenerationJob", () => {
     });
     await vi.waitFor(() => expect(mockedGetJob).toHaveBeenCalledTimes(1));
 
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2500);
+    });
+    await vi.waitFor(() => expect(mockedGetJob).toHaveBeenCalledTimes(2));
+  });
+
+  it("continues polling while a COMMIT_RETRY receipt is being recovered", async () => {
+    vi.useFakeTimers();
+    mockedGetJob.mockResolvedValue(jobResponse("COMMIT_RETRY"));
+    const { Wrapper } = createWrapper();
+    renderHook(() => useAiGenerationJob("s1", "j1"), { wrapper: Wrapper });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await vi.waitFor(() => expect(mockedGetJob).toHaveBeenCalledTimes(1));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2500);
     });

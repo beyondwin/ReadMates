@@ -6,14 +6,16 @@ vi.mock("@/features/host/aigen/api/aigen-api", () => ({
   commitGeneration: vi.fn(),
   getJob: vi.fn(),
   getRecentJob: vi.fn(),
+  getAvailableModels: vi.fn(),
   regenerateItem: vi.fn(),
   startGeneration: vi.fn(),
 }));
 
-import { getJob, getRecentJob } from "@/features/host/aigen/api/aigen-api";
+import { getAvailableModels, getJob, getRecentJob } from "@/features/host/aigen/api/aigen-api";
 import {
   aiJobDetailQuery,
   aiJobKeys,
+  availableAiModelsQuery,
   recentAiJobQuery,
 } from "./aigen-job-queries";
 
@@ -59,17 +61,28 @@ describe("AI job query helpers", () => {
       "detail",
       "job-1",
     ]);
+    expect(aiJobKeys.models("session-1")).toEqual([
+      "host", "aigen", "jobs", "session", "session-1", "models",
+    ]);
   });
 
   it("query functions call host AI API wrappers", async () => {
     vi.mocked(getRecentJob).mockResolvedValue(null);
-    vi.mocked(getJob).mockResolvedValue(recentJob("RUNNING"));
+    vi.mocked(getJob).mockResolvedValue({
+      ...recentJob("RUNNING"),
+      result: null,
+      tokens: null,
+      warnings: [],
+    });
+    vi.mocked(getAvailableModels).mockResolvedValue({ models: [] });
 
     await runQuery(recentAiJobQuery("session-1"));
     await runQuery(aiJobDetailQuery("session-1", "job-1"));
+    await runQuery(availableAiModelsQuery("session-1"));
 
     expect(getRecentJob).toHaveBeenCalledWith("session-1");
     expect(getJob).toHaveBeenCalledWith("session-1", "job-1");
+    expect(getAvailableModels).toHaveBeenCalledWith("session-1");
   });
 
   it("polls recent recoverable jobs until the server stops returning one", () => {

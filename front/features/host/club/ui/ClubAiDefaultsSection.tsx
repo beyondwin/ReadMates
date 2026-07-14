@@ -3,7 +3,7 @@
  * default AI model used by the session-generation flows (spec task 7.1).
  *
  * Reads the current default via `getClubAiDefault`, lets the host pick
- * a different model from the shared `AIGEN_MODEL_OPTIONS` allowlist,
+ * a different model from the club administration allowlist,
  * and persists the change via `putClubAiDefault`. The post-save notice
  * is fixed copy ("새 generation 부터 적용됩니다.") per the task spec —
  * already-in-flight jobs keep their own model, only new generations
@@ -17,9 +17,9 @@ import {
   putClubAiDefault,
 } from "@/features/host/aigen/api/aigen-api";
 import {
-  AIGEN_DEFAULT_MODEL,
-  AIGEN_MODEL_OPTIONS,
-} from "@/features/host/aigen/ui/aigen-model-options";
+  CLUB_AI_MODEL_OPTIONS,
+  CLUB_AI_OPENAI_DEFAULT_MODEL_ID,
+} from "./club-ai-model-options";
 
 export type ClubAiDefaultsSectionProps = {
   clubSlug: string;
@@ -66,7 +66,7 @@ export function ClubAiDefaultsSection({ clubSlug }: ClubAiDefaultsSectionProps) 
     },
   });
 
-  const effectiveSelected = selected ?? serverModel ?? AIGEN_DEFAULT_MODEL;
+  const effectiveSelected = selected ?? serverModel ?? CLUB_AI_OPENAI_DEFAULT_MODEL_ID;
   const isLoading = defaultsQuery.isLoading;
   const loadError = defaultsQuery.error;
   const isPending = mutation.isPending;
@@ -120,7 +120,7 @@ export function ClubAiDefaultsSection({ clubSlug }: ClubAiDefaultsSectionProps) 
           disabled={isLoading || isPending}
           style={{ width: "100%" }}
         >
-          {AIGEN_MODEL_OPTIONS.map((option) => (
+          {CLUB_AI_MODEL_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>

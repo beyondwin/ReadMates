@@ -1,42 +1,56 @@
 import { useState, type ChangeEvent, type CSSProperties } from "react";
 import type {
-  AiAuthorNameMode,
+  AiGenerationProblem,
+  AvailableGenerationModel,
   StartGenerationRequest,
 } from "@/features/host/aigen/api/aigen-contracts";
-import { AIGEN_MODEL_OPTIONS } from "./aigen-model-options";
 
-const MAX_TRANSCRIPT_BYTES = 1 * 1024 * 1024;
-const ACCEPTED_EXTENSION = ".txt";
+const MAX_TRANSCRIPT_BYTES = 1024 * 1024;
 
 export type TranscriptUploadFormProps = {
-  /** Pre-selected model from the club default. May be null until loaded. */
-  defaultModel: string | null;
-  loadingDefaults: boolean;
+  models: AvailableGenerationModel[];
+  loadingModels: boolean;
+  modelError: boolean;
+  startProblem: AiGenerationProblem | null;
   submitting: boolean;
+  onRetryModels: () => void;
   onSubmit: (payload: StartGenerationRequest) => void;
 };
 
+function preferredModel(models: AvailableGenerationModel[]): string {
+  return models.find((model) => model.isDefault)?.id ?? models[0]?.id ?? "";
+}
+
 export function TranscriptUploadForm({
-  defaultModel,
-  loadingDefaults,
+  models,
+  loadingModels,
+  modelError,
+  startProblem,
   submitting,
+  onRetryModels,
   onSubmit,
 }: TranscriptUploadFormProps) {
   const [transcript, setTranscript] = useState<File | null>(null);
-  // Track the user's explicit override separately from the club default so
-  // we can derive the active model without a setState-in-effect cascade.
   const [modelOverride, setModelOverride] = useState<string | null>(null);
-  const [authorNameMode, setAuthorNameMode] = useState<AiAuthorNameMode>("alias");
   const [instructions, setInstructions] = useState("");
   const [fileError, setFileError] = useState<string | null>(null);
 
-  const model = modelOverride ?? defaultModel ?? "";
+  const fallbackModel = preferredModel(models);
+  const model =
+    modelOverride && models.some((candidate) => candidate.id === modelOverride)
+      ? modelOverride
+      : fallbackModel;
 
   const handleFile = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
     if (!file) {
       setTranscript(null);
       setFileError(null);
+      return;
+    }
+    if (!file.name.toLocaleLowerCase("en-US").endsWith(".txt")) {
+      setTranscript(null);
+      setFileError("대본은 .txt 파일만 업로드할 수 있습니다.");
       return;
     }
     if (file.size > MAX_TRANSCRIPT_BYTES) {
@@ -51,26 +65,32 @@ export function TranscriptUploadForm({
   const canSubmit =
     Boolean(transcript) &&
     Boolean(model) &&
-    !loadingDefaults &&
+    !loadingModels &&
+    !modelError &&
     !submitting &&
     !fileError;
 
   const handleSubmit = () => {
     if (!transcript || !model) return;
-    const payload: StartGenerationRequest = {
+    onSubmit({
       transcript,
       model,
-      authorNameMode,
       ...(instructions.trim() ? { instructions } : {}),
-    };
-    onSubmit(payload);
+    });
   };
+
+  const invalidLabels =
+    startProblem?.code === "TRANSCRIPT_SPEAKER_NOT_MEMBER" ||
+    startProblem?.code === "TRANSCRIPT_SPEAKER_AMBIGUOUS"
+      ? startProblem.invalidSpeakerLabels
+      : undefined;
 
   return (
     <div className="stack" style={{ "--stack": "14px" } as CSSProperties}>
       <h2 style={{ margin: 0 }}>AI로 세션 기록 생성</h2>
       <p className="small" style={{ color: "var(--text-2)" }}>
-        모임 대본(.txt, 1 MB 이하)을 업로드하면 요약·하이라이트·한줄평·피드백 문서를 자동으로 만듭니다.
+        UTF-8 대본(.txt, 1 MB 이하)을 업로드해 호스트 검토용 기록을 만듭니다. 각 발화는
+        현재 활성 멤버의 이름과 정확히 같은 <code>이름 MM:SS</code> 줄로 시작해야 합니다.
       </p>
 
       <div>
@@ -80,7 +100,7 @@ export function TranscriptUploadForm({
         <input
           id="aigen-transcript-file"
           type="file"
-          accept={`${ACCEPTED_EXTENSION},text/plain`}
+          accept=".txt,text/plain"
           onChange={handleFile}
           disabled={submitting}
         />
@@ -100,43 +120,27 @@ export function TranscriptUploadForm({
           className="input"
           value={model}
           onChange={(event) => setModelOverride(event.target.value)}
-          disabled={submitting || loadingDefaults}
+          disabled={submitting || loadingModels || modelError}
           style={{ width: "100%" }}
         >
           {!model ? <option value="">모델 선택</option> : null}
-          {AIGEN_MODEL_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
+          {models.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.provider} · {option.id}
             </option>
           ))}
         </select>
+        {modelError ? (
+          <div className="row" role="alert" style={{ gap: 8, marginTop: 8 }}>
+            <span className="small" style={{ color: "var(--danger)" }}>
+              사용 가능한 모델을 불러오지 못했습니다.
+            </span>
+            <button type="button" className="btn btn-quiet btn-sm" onClick={onRetryModels}>
+              모델 다시 불러오기
+            </button>
+          </div>
+        ) : null}
       </div>
-
-      <fieldset className="stack" style={{ "--stack": "6px", border: "none", padding: 0, margin: 0 } as CSSProperties}>
-        <legend className="field-label">발화자 이름 표시</legend>
-        <label className="small">
-          <input
-            type="radio"
-            name="aigen-author-mode"
-            value="alias"
-            checked={authorNameMode === "alias"}
-            onChange={() => setAuthorNameMode("alias")}
-            disabled={submitting}
-          />{" "}
-          닉네임 (별칭) 사용
-        </label>
-        <label className="small">
-          <input
-            type="radio"
-            name="aigen-author-mode"
-            value="real"
-            checked={authorNameMode === "real"}
-            onChange={() => setAuthorNameMode("real")}
-            disabled={submitting}
-          />{" "}
-          실명 표시
-        </label>
-      </fieldset>
 
       <div>
         <label className="field-label" htmlFor="aigen-instructions">
@@ -152,6 +156,19 @@ export function TranscriptUploadForm({
           style={{ width: "100%" }}
         />
       </div>
+
+      {invalidLabels?.length ? (
+        <div className="surface-quiet small" role="alert" style={{ padding: 12 }}>
+          <strong>멤버로 확인되지 않은 화자가 있습니다: {invalidLabels.join(", ")}</strong>
+          <div style={{ marginTop: 4 }}>
+            텍스트의 화자 이름을 현재 활성 멤버 이름과 같게 수정한 뒤 다시 업로드해 주세요.
+          </div>
+        </div>
+      ) : startProblem ? (
+        <div className="small" role="alert" style={{ color: "var(--danger)" }}>
+          {startProblem.detail}
+        </div>
+      ) : null}
 
       <button type="button" className="btn btn-primary" disabled={!canSubmit} onClick={handleSubmit}>
         {submitting ? "시작 중…" : "생성 시작"}

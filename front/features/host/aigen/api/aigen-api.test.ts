@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AIGEN_OPENAI_DEFAULT_MODEL_ID } from "../ui/aigen-model-options";
 import {
+  AiGenerationApiError,
   cancelGeneration,
   commitGeneration,
+  expandEvidence,
+  getAvailableModels,
   getClubAiDefault,
   getJob,
   getRecentJob,
@@ -48,7 +50,6 @@ describe("startGeneration", () => {
     const result = await startGeneration("sid-1", {
       transcript,
       model: "claude-sonnet-4-6",
-      authorNameMode: "alias",
       instructions: "be brief",
     });
 
@@ -71,11 +72,10 @@ describe("startGeneration", () => {
     const bodyText = await (body as Blob).text();
     const parsed = JSON.parse(bodyText) as {
       model: string;
-      authorNameMode: string;
       instructions: string;
     };
     expect(parsed.model).toBe("claude-sonnet-4-6");
-    expect(parsed.authorNameMode).toBe("alias");
+    expect(parsed).not.toHaveProperty("authorNameMode");
     expect(parsed.instructions).toBe("be brief");
   });
 
@@ -86,14 +86,13 @@ describe("startGeneration", () => {
 
     await startGeneration("sid-9", {
       transcript: new File(["t"], "t.txt", { type: "text/plain" }),
-      authorNameMode: "real",
     });
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const form = init.body as FormData;
     const bodyText = await (form.get("body") as Blob).text();
     const parsed = JSON.parse(bodyText) as Record<string, unknown>;
-    expect(parsed.authorNameMode).toBe("real");
+    expect(parsed).not.toHaveProperty("authorNameMode");
     expect(parsed).not.toHaveProperty("model");
     expect(parsed).not.toHaveProperty("instructions");
   });
@@ -105,11 +104,79 @@ describe("startGeneration", () => {
 
     await startGeneration("sid with space", {
       transcript: new File(["t"], "t.txt", { type: "text/plain" }),
-      authorNameMode: "real",
     });
 
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("/api/bff/api/host/sessions/sid%20with%20space/ai-generate/jobs");
+  });
+});
+
+describe("getAvailableModels", () => {
+  it("loads the authorized session-scoped model list", async () => {
+    const fetchMock = captureFetch(
+      jsonResponse({
+        models: [
+          { id: "claude-sonnet-4-6", provider: "CLAUDE", isDefault: true },
+        ],
+      }),
+    );
+
+    await expect(getAvailableModels("sid /1")).resolves.toMatchObject({
+      models: [{ id: "claude-sonnet-4-6", isDefault: true }],
+    });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "/api/bff/api/host/sessions/sid%20%2F1/ai-generate/models",
+    );
+  });
+});
+
+describe("AI-specific problem details", () => {
+  it("retains bounded safe invalid speaker labels from a trusted 422 response", async () => {
+    captureFetch(
+      jsonResponse(
+        {
+          type: "about:blank",
+          title: "Unprocessable Entity",
+          status: 422,
+          detail: "대본의 화자 이름을 확인해 주세요.",
+          code: "TRANSCRIPT_SPEAKER_NOT_MEMBER",
+          invalidSpeakerLabels: ["화자 하나", "화자 둘"],
+        },
+        422,
+      ),
+    );
+
+    const error = await startGeneration("sid-1", {
+      transcript: new File(["화자 하나 00:00\n안녕하세요"], "transcript.txt", {
+        type: "text/plain",
+      }),
+    }).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(AiGenerationApiError);
+    expect(error).toMatchObject({
+      status: 422,
+      problem: {
+        code: "TRANSCRIPT_SPEAKER_NOT_MEMBER",
+        detail: "대본의 화자 이름을 확인해 주세요.",
+        invalidSpeakerLabels: ["화자 하나", "화자 둘"],
+      },
+    });
+  });
+
+  it("does not trust non-JSON upstream failures", async () => {
+    captureFetch(new Response("provider secret shaped failure", { status: 502 }));
+
+    const error = await getJob("sid-1", "job-1").catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(AiGenerationApiError);
+    expect(error).toMatchObject({
+      status: 502,
+      problem: {
+        code: "AI_GENERATION_REQUEST_FAILED",
+        detail: "AI 요청을 처리할 수 없습니다.",
+      },
+    });
   });
 });
 
@@ -139,6 +206,82 @@ describe("getJob", () => {
     expect(url).toBe("/api/bff/api/host/sessions/sid-1/ai-generate/jobs/job-1");
     expect(init?.method ?? "GET").toBe("GET");
   });
+
+  it("keeps grounded drafts inaccessible until result, valid grounding, revision, and evidence are complete", async () => {
+    const leakedResult = {
+      format: "readmates-session-import:v1",
+      sessionNumber: 1,
+      bookTitle: "합성 책",
+      meetingDate: "2026-07-14",
+      summary: "노출되면 안 되는 초안",
+      highlights: [],
+      oneLineReviews: [],
+      feedbackDocumentFileName: "feedback.md",
+      feedbackDocumentMarkdown: "# 초안",
+    };
+    captureFetch(
+      jsonResponse({
+        jobId: "job-1",
+        status: "RUNNING",
+        stage: "VALIDATING_GROUNDING",
+        progressPct: 90,
+        model: "gpt-5.4-mini",
+        result: leakedResult,
+        error: null,
+        tokens: null,
+        costEstimateUsd: "0.00",
+        warnings: [],
+        revision: 1,
+        groundingStatus: "PENDING",
+        evidence: [],
+        sectionReviewStatuses: { SUMMARY: "PENDING_REVIEW" },
+      }),
+    );
+
+    await expect(getJob("sid-1", "job-1")).resolves.toMatchObject({
+      result: null,
+      evidence: null,
+      sectionReviewStatuses: null,
+    });
+  });
+
+  it("retains only a complete grounded success payload", async () => {
+    const result = {
+      format: "readmates-session-import:v1",
+      sessionNumber: 1,
+      bookTitle: "합성 책",
+      meetingDate: "2026-07-14",
+      summary: "검증된 결과",
+      highlights: [],
+      oneLineReviews: [],
+      feedbackDocumentFileName: "feedback.md",
+      feedbackDocumentMarkdown: "# 결과",
+    };
+    captureFetch(
+      jsonResponse({
+        jobId: "job-1",
+        status: "SUCCEEDED",
+        stage: "READY",
+        progressPct: 100,
+        model: "gpt-5.4-mini",
+        result,
+        error: null,
+        tokens: null,
+        costEstimateUsd: "0.00",
+        warnings: [],
+        revision: 2,
+        groundingStatus: "VALID",
+        evidence: [],
+        sectionReviewStatuses: { SUMMARY: "PENDING_REVIEW" },
+      }),
+    );
+
+    await expect(getJob("sid-1", "job-1")).resolves.toMatchObject({
+      revision: 2,
+      result: { summary: "검증된 결과" },
+      evidence: [],
+    });
+  });
 });
 
 describe("getRecentJob", () => {
@@ -167,8 +310,9 @@ describe("regenerateItem", () => {
 
     const result = await regenerateItem("sid-1", "job-1", {
       item: "summary",
-      model: AIGEN_OPENAI_DEFAULT_MODEL_ID,
+      model: "gpt-5.4-mini",
       instructions: "tighter",
+      expectedRevision: 7,
     });
     expect(result.item).toBe("summary");
 
@@ -181,8 +325,9 @@ describe("regenerateItem", () => {
     const parsed = JSON.parse(init.body as string) as Record<string, unknown>;
     expect(parsed).toEqual({
       item: "summary",
-      model: AIGEN_OPENAI_DEFAULT_MODEL_ID,
+      model: "gpt-5.4-mini",
       instructions: "tighter",
+      expectedRevision: 7,
     });
   });
 });
@@ -204,14 +349,23 @@ describe("commitGeneration", () => {
       }),
     );
 
-    await commitGeneration("sid-1", "job-1", { recordVisibility: "MEMBER" });
+    await commitGeneration("sid-1", "job-1", {
+      recordVisibility: "MEMBER",
+      expectedRevision: 3,
+      sectionReviews: {
+        SUMMARY: "AI_GROUNDED_REVIEWED",
+        HIGHLIGHTS: "AI_GROUNDED_REVIEWED",
+        ONE_LINE_REVIEWS: "AI_GROUNDED_REVIEWED",
+        FEEDBACK_DOCUMENT: "AI_GROUNDED_REVIEWED",
+      },
+    });
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("/api/bff/api/host/sessions/sid-1/ai-generate/jobs/job-1/commit");
     expect(init.method).toBe("POST");
     expect((init.headers as Headers).get("Content-Type")).toBe("application/json");
     const parsed = JSON.parse(init.body as string) as Record<string, unknown>;
-    expect(parsed).toEqual({ recordVisibility: "MEMBER" });
+    expect(parsed).toMatchObject({ recordVisibility: "MEMBER", expectedRevision: 3 });
   });
 
   it("forwards the optional overridden result", async () => {
@@ -250,6 +404,20 @@ describe("commitGeneration", () => {
       result: { sessionNumber: number };
     };
     expect(parsed.result.sessionNumber).toBe(3);
+  });
+});
+
+describe("expandEvidence", () => {
+  it("URL-encodes job/turn IDs and sends the current revision", async () => {
+    const fetchMock = captureFetch(
+      jsonResponse({ turnId: "turn /1", speakerName: "회원", startSeconds: 3, text: "전문" }),
+    );
+
+    await expandEvidence("sid-1", "job /1", "turn /1", 9);
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "/api/bff/api/host/sessions/sid-1/ai-generate/jobs/job%20%2F1/evidence/turn%20%2F1?revision=9",
+    );
   });
 });
 
@@ -293,13 +461,13 @@ describe("putClubAiDefault", () => {
   it("PUTs JSON to /api/host/clubs/{slug}/ai-defaults", async () => {
     const fetchMock = captureFetch(new Response(null, { status: 200 }));
 
-    await putClubAiDefault("my-club", { defaultModel: AIGEN_OPENAI_DEFAULT_MODEL_ID });
+    await putClubAiDefault("my-club", { defaultModel: "gpt-5.4-mini" });
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("/api/bff/api/host/clubs/my-club/ai-defaults");
     expect(init.method).toBe("PUT");
     expect((init.headers as Headers).get("Content-Type")).toBe("application/json");
     const parsed = JSON.parse(init.body as string) as Record<string, unknown>;
-    expect(parsed).toEqual({ defaultModel: AIGEN_OPENAI_DEFAULT_MODEL_ID });
+    expect(parsed).toEqual({ defaultModel: "gpt-5.4-mini" });
   });
 });

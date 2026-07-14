@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
   AiGenerationJobResponse,
-  ClubAiDefaultResponse,
   SessionImportV1,
   StartGenerationResponse,
 } from "@/features/host/aigen/api/aigen-contracts";
@@ -18,12 +17,12 @@ vi.mock("@/features/host/aigen/api/aigen-api", () => ({
   regenerateItem: vi.fn(),
   commitGeneration: vi.fn(),
   cancelGeneration: vi.fn(),
-  getClubAiDefault: vi.fn(),
+  getAvailableModels: vi.fn(),
   putClubAiDefault: vi.fn(),
 }));
 
 import {
-  getClubAiDefault,
+  getAvailableModels,
   getJob,
   getRecentJob,
   startGeneration,
@@ -33,7 +32,7 @@ import { AiGenerateTab } from "@/features/host/aigen/ui/AiGenerateTab";
 const mockedStart = vi.mocked(startGeneration);
 const mockedGetJob = vi.mocked(getJob);
 const mockedGetRecent = vi.mocked(getRecentJob);
-const mockedClubDefault = vi.mocked(getClubAiDefault);
+const mockedModels = vi.mocked(getAvailableModels);
 
 const PRESEEDED_JOB_ID = "job-with-draft";
 
@@ -64,10 +63,6 @@ function jobResponse(): AiGenerationJobResponse {
     costEstimateUsd: "0.12",
     warnings: [],
   };
-}
-
-function clubDefault(): ClubAiDefaultResponse {
-  return { defaultModel: "claude-sonnet-4-6" };
 }
 
 function createWrapper() {
@@ -109,8 +104,10 @@ describe("AiGenerateTab draft restoration (PREVIEW state machine)", () => {
     mockedStart.mockReset();
     mockedGetJob.mockReset();
     mockedGetRecent.mockReset();
-    mockedClubDefault.mockReset();
-    mockedClubDefault.mockResolvedValue(clubDefault());
+    mockedModels.mockReset();
+    mockedModels.mockResolvedValue({
+      models: [{ id: "claude-sonnet-4-6", provider: "CLAUDE", isDefault: true }],
+    });
     mockedGetRecent.mockResolvedValue(null);
     installFakeLocalStorage();
   });
