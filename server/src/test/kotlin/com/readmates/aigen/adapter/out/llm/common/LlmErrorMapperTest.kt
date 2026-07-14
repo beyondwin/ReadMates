@@ -50,6 +50,19 @@ class LlmErrorMapperTest {
     }
 
     @Test
+    fun `malformed structured output maps to SCHEMA_INVALID with fixed safe message`() {
+        val err =
+            LlmErrorMapper.mapException(
+                LlmStructuredOutputException(IllegalArgumentException("private sentinel")),
+                Provider.GEMINI,
+            )
+
+        assertEquals(ErrorCode.SCHEMA_INVALID, err.code)
+        assertEquals("provider returned invalid structured output", err.message)
+        assertFalse(err.message.contains("private sentinel"))
+    }
+
+    @Test
     fun `PII invariant - error message never contains sentinel from upstream exception`() {
         val sentinel = "UNIQUE-SENTINEL-12345"
         val ex = RuntimeException("error around transcript $sentinel occurred")

@@ -8,6 +8,7 @@ import com.google.genai.types.GenerateContentConfig
 import com.google.genai.types.HttpOptions
 import com.google.genai.types.Part
 import com.google.genai.types.Schema
+import com.readmates.aigen.adapter.out.llm.common.StructuredOutputJson
 import com.readmates.aigen.application.model.TokenUsage
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -33,7 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  *    [ObjectNode] piped through `Schema.fromJson(...)` for
  *    `responseSchema` (Gemini's OpenAPI 3.0 subset — the schema is
  *    pre-adapted upstream by `GeminiSchemaCompatAdapter`).
- *  - `maxOutputTokens = 4096`, matching the Claude/OpenAI ceiling.
+ *  - `maxOutputTokens` is supplied by the caller (4,096 legacy; 16,384 grounded).
  *
  * Retention contract (spec §5.7 — "retention 최소 옵션을 강제한다"):
  *  - The PRIMARY retention mechanism for the public Gemini Developer
@@ -88,6 +89,7 @@ open class GeminiApiClient : GeminiApiPort {
         userText: String,
         transcriptText: String,
         responseSchema: ObjectNode,
+        maxOutputTokens: Int,
     ): GeminiToolResult {
         val apiKey = System.getenv(API_KEY_ENV)
         check(!apiKey.isNullOrBlank()) {
@@ -117,7 +119,7 @@ open class GeminiApiClient : GeminiApiPort {
             .httpOptions(httpOptions)
             .build()
             .use { client ->
-                val config = buildConfig(systemPrompt, responseSchema)
+                val config = buildConfig(systemPrompt, responseSchema, maxOutputTokens)
                 val contents = buildContents(userText, transcriptText)
                 val response = client.models.generateContent(model, contents, config)
                 parseResponse(response, model)
@@ -127,16 +129,14 @@ open class GeminiApiClient : GeminiApiPort {
     private fun buildConfig(
         systemPrompt: String,
         responseSchema: ObjectNode,
+        maxOutputTokens: Int,
     ): GenerateContentConfig =
         GenerateContentConfig
             .builder()
             .systemInstruction(Content.fromParts(Part.fromText(systemPrompt)))
             .responseMimeType("application/json")
             .responseSchema(Schema.fromJson(responseSchema.toString()))
-            // Follow-up: move maxOutputTokens to AiGenerationProperties when a
-            // per-call budget knob is introduced. 4096 mirrors the Claude/OpenAI
-            // ceiling for the structured JSON payload.
-            .maxOutputTokens(DEFAULT_MAX_OUTPUT_TOKENS)
+            .maxOutputTokens(maxOutputTokens)
             .build()
 
     private fun buildContents(
@@ -164,9 +164,7 @@ open class GeminiApiClient : GeminiApiPort {
         check(!text.isNullOrBlank()) {
             "Gemini response had no text; model=$model"
         }
-        val parsed =
-            (objectMapper.readTree(text) as? ObjectNode)
-                ?: error("Gemini response content was not a JSON object; model=$model")
+        val parsed = StructuredOutputJson.parseObject(text, objectMapper)
 
         val usage =
             response.usageMetadata().orElseThrow {
@@ -191,7 +189,6 @@ open class GeminiApiClient : GeminiApiPort {
 
     companion object {
         const val API_KEY_ENV: String = "READMATES_AIGEN_GEMINI_API_KEY"
-        private const val DEFAULT_MAX_OUTPUT_TOKENS: Int = 4096
         private const val USER_ROLE: String = "user"
         private const val DATA_POLICY_HEADER: String = "x-goog-data-policy"
         private const val DATA_POLICY_NO_RETENTION: String = "no-retention"

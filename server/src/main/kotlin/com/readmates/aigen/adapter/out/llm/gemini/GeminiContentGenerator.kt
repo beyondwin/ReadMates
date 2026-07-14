@@ -65,6 +65,7 @@ class GeminiContentGenerator(
                     userText = USER_PRELUDE,
                     transcriptText = input.transcript,
                     responseSchema = geminiSchema,
+                    maxOutputTokens = 4096,
                 )
                 // Catching Throwable intentionally — any provider-side failure must be
                 // funnelled through LlmErrorMapper so the surfaced message never echoes

@@ -1,9 +1,11 @@
 package com.readmates.aigen.config
 
+import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.port.out.ModelCatalog
 import com.readmates.aigen.application.port.out.SessionContentGenerator
 import com.readmates.aigen.application.port.out.SessionContentRegenerator
+import com.readmates.aigen.application.port.out.WholeTranscriptGroundedGenerator
 import com.readmates.aigen.application.service.ProviderFallbackChain
 import com.readmates.aigen.application.service.Sleeper
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -50,6 +52,21 @@ class AiGenerationBeansConfig {
             modelCatalog = modelCatalog,
             properties = properties,
         )
+
+    @Bean
+    fun wholeTranscriptGroundedGeneratorsByProvider(
+        generators: List<WholeTranscriptGroundedGenerator>,
+        properties: AiGenerationProperties,
+    ): Map<Provider, WholeTranscriptGroundedGenerator> {
+        val byProvider = generators.associateBy { it.provider }
+        if (properties.pipelineMode == AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT) {
+            val enabledProviders = properties.enabledProviders.map(Provider::valueOf).toSet()
+            require(byProvider.keys.containsAll(enabledProviders)) {
+                "Grounded generator missing for an enabled provider"
+            }
+        }
+        return byProvider
+    }
 
     @Bean
     fun aiGenerationSleeper(): Sleeper = Sleeper.Default

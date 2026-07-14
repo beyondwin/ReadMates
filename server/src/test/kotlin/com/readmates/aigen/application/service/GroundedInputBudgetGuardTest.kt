@@ -26,6 +26,7 @@ class GroundedInputBudgetGuardTest {
     private val tooSmall = ModelId(Provider.GEMINI, "small-model")
     private val request =
         GroundedRenderRequest(
+            provider = Provider.OPENAI,
             sessionMeta =
                 SessionMeta(
                     UUID.randomUUID(),

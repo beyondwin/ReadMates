@@ -1,9 +1,12 @@
 package com.readmates.aigen.adapter.out.llm.common
 
 import com.readmates.aigen.application.model.AuthorNameMode
+import com.readmates.aigen.application.model.GenerationItem
+import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.ValidatedTranscriptTurn
 import com.readmates.aigen.application.port.out.GroundedRenderRequest
+import com.readmates.aigen.application.port.out.GroundedRequestMode
 import com.readmates.aigen.config.AiGenerationProperties
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -24,6 +27,10 @@ class DefaultGroundedRequestRendererTest {
                     AiGenerationProperties.Grounded(
                         reservedOutputTokens = 16_384,
                     ),
+            ),
+            com.readmates.aigen.adapter.out.llm.gemini.GeminiSchemaCompatAdapter(
+                com.readmates.aigen.adapter.out.llm.common
+                    .SessionImportSchemaResource(),
             ),
         )
 
@@ -56,8 +63,53 @@ class DefaultGroundedRequestRendererTest {
         assertEquals(renderer.render(request), renderer.render(request))
     }
 
+    @Test
+    fun `repair keeps whole context and narrows schema to the requested section`() {
+        val draft = GroundedDraftJsonCodec().draft(GroundedProviderTestFixture.draftNode())
+        val rendered =
+            renderer.render(
+                request().copy(
+                    mode = GroundedRequestMode.REPAIR,
+                    currentDraft = draft,
+                    requestedSection = GenerationItem.HIGHLIGHTS,
+                ),
+            )
+        val schema = objectMapper.readTree(rendered.schemaJson)
+        val envelope = objectMapper.readTree(rendered.userText)
+
+        assertEquals(1, schema.path("required").size())
+        assertEquals("highlights", schema.path("required").get(0).asText())
+        assertEquals(
+            listOf("highlights"),
+            schema
+                .path("properties")
+                .propertyNames()
+                .asSequence()
+                .toList(),
+        )
+        assertEquals(2, envelope.path("turns").size())
+        assertEquals("HIGHLIGHTS", envelope.path("requestedSection").asText())
+        assertEquals("readmates-grounded-generation:v2", envelope.at("/currentDraft/format").asText())
+    }
+
+    @Test
+    fun `gemini rendering budgets the compatible inlined schema bytes`() {
+        val rendered = renderer.render(request().copy(provider = Provider.GEMINI))
+
+        assertFalse(rendered.schemaJson.contains("\$ref"))
+        assertFalse(rendered.schemaJson.contains("\$defs"))
+        assertTrue(rendered.schemaJson.contains("evidenceTurnIds"))
+        assertEquals(
+            rendered.systemText.toByteArray().size +
+                rendered.userText.toByteArray().size +
+                rendered.schemaJson.toByteArray().size,
+            rendered.estimatedInputTokens().toInt(),
+        )
+    }
+
     private fun request(instructions: String? = null): GroundedRenderRequest =
         GroundedRenderRequest(
+            provider = Provider.OPENAI,
             sessionMeta =
                 SessionMeta(
                     sessionId = UUID.fromString("00000000-0000-0000-0000-000000000001"),

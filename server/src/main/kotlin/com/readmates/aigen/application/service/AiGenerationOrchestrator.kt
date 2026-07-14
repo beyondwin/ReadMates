@@ -320,6 +320,7 @@ class AiGenerationOrchestrator(
             groundedInputBudgetGuard.evaluate(
                 request =
                     GroundedRenderRequest(
+                        provider = modelId.provider,
                         sessionMeta = command.sessionMeta.copy(authorNameMode = command.authorNameMode),
                         turns = it.validatedTurns,
                         hostInstructions = command.instructions,

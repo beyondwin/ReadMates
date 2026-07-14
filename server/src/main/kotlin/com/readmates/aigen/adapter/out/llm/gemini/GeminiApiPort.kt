@@ -1,7 +1,9 @@
 package com.readmates.aigen.adapter.out.llm.gemini
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.readmates.aigen.application.model.TokenUsage
+import com.readmates.aigen.application.port.out.StructuredGenerationRequest
 
 /**
  * Outbound port abstracting the Google GenAI Java SDK call for a single
@@ -20,6 +22,7 @@ import com.readmates.aigen.application.model.TokenUsage
  *   AFTER having been converted to Gemini's OpenAPI 3.0 subset via
  *   [GeminiSchemaCompatAdapter]. The request MUST also set
  *   `generationConfig.responseMimeType = "application/json"`.
+ * - `maxOutputTokens` is always explicit: legacy callers pass 4,096 and grounded callers pass 16,384.
  *
  * Retention contract (spec §5.7):
  * - The spec requirement is "retention 최소 옵션을 강제한다" — no
@@ -51,6 +54,16 @@ import com.readmates.aigen.application.model.TokenUsage
  * mask PII itself.
  */
 interface GeminiApiPort {
+    fun callStructuredResponseSchema(request: StructuredGenerationRequest): GeminiToolResult =
+        callResponseSchema(
+            model = request.model,
+            systemPrompt = request.systemText,
+            userText = request.userText,
+            transcriptText = "",
+            responseSchema = ObjectMapper().readTree(request.schemaJson) as ObjectNode,
+            maxOutputTokens = request.maxOutputTokens,
+        )
+
     // Long parameter list intentional — each field is a named, type-safe slice of
     // the Gemini generateContent request that test fakes record individually.
     @Suppress("LongParameterList")
@@ -60,6 +73,7 @@ interface GeminiApiPort {
         userText: String,
         transcriptText: String,
         responseSchema: ObjectNode,
+        maxOutputTokens: Int,
     ): GeminiToolResult
 }
 

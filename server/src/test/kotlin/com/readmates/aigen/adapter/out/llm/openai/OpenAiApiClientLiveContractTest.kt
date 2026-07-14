@@ -56,6 +56,7 @@ class OpenAiApiClientLiveContractTest {
                 transcriptText = "(smoke transcript — irrelevant content)",
                 schemaName = "smoke_test",
                 schema = schema,
+                maxOutputTokens = 4096,
             )
 
         assertNotNull(result)

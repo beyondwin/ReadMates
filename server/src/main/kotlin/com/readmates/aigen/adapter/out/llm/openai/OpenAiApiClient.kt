@@ -7,6 +7,7 @@ import com.openai.client.okhttp.OpenAIOkHttpClient
 import com.openai.core.JsonValue
 import com.openai.models.ResponseFormatJsonSchema
 import com.openai.models.chat.completions.ChatCompletionCreateParams
+import com.readmates.aigen.adapter.out.llm.common.StructuredOutputJson
 import com.readmates.aigen.application.model.TokenUsage
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
@@ -57,6 +58,7 @@ open class OpenAiApiClient : OpenAiApiPort {
         transcriptText: String,
         schemaName: String,
         schema: ObjectNode,
+        maxOutputTokens: Int,
     ): OpenAiToolResult {
         val apiKey = System.getenv(API_KEY_ENV)
         check(!apiKey.isNullOrBlank()) {
@@ -75,11 +77,7 @@ open class OpenAiApiClient : OpenAiApiPort {
             ChatCompletionCreateParams
                 .builder()
                 .model(model)
-                // Follow-up: move maxCompletionTokens to AiGenerationProperties
-                // when a per-call budget knob is introduced. No existing config
-                // today; 4096 is a conservative ceiling for the structured
-                // JSON Schema payload (matches Claude DEFAULT_MAX_TOKENS).
-                .maxCompletionTokens(DEFAULT_MAX_COMPLETION_TOKENS)
+                .maxCompletionTokens(maxOutputTokens.toLong())
                 // spec §9.1 / §9.3: OpenAI must not retain prompt or
                 // completion data — set store=false on every request.
                 .store(false)
@@ -104,9 +102,7 @@ open class OpenAiApiClient : OpenAiApiPort {
                     )
                 }
 
-        val parsed =
-            (objectMapper.readTree(content) as? ObjectNode)
-                ?: error("OpenAI response content was not a JSON object; model=$model schema=$schemaName")
+        val parsed = StructuredOutputJson.parseObject(content, objectMapper)
 
         val usage =
             completion.usage().orElseThrow {
@@ -160,6 +156,5 @@ open class OpenAiApiClient : OpenAiApiPort {
 
     companion object {
         const val API_KEY_ENV: String = "READMATES_AIGEN_OPENAI_API_KEY"
-        private const val DEFAULT_MAX_COMPLETION_TOKENS: Long = 4096L
     }
 }

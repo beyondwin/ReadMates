@@ -93,6 +93,7 @@ class ClaudeContentGeneratorTest {
         assertEquals(100, output.usage.inputTokens)
         assertEquals(50, output.usage.cachedInputTokens)
         assertEquals(200, output.usage.outputTokens)
+        assertEquals(4096, fake.lastMaxOutputTokens)
     }
 
     @Test

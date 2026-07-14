@@ -55,6 +55,7 @@ class GeminiApiClientLiveContractTest {
                 userText = "Please respond with value=\"ok\".",
                 transcriptText = "(smoke transcript — irrelevant content)",
                 responseSchema = schema,
+                maxOutputTokens = 4096,
             )
 
         assertNotNull(result)

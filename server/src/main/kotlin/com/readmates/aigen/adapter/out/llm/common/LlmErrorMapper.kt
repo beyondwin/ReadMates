@@ -21,6 +21,7 @@ import java.net.SocketTimeoutException
  * Mapping (per spec §9.2):
  * - IOException / SocketTimeoutException / message containing 5xx → PROVIDER_UNAVAILABLE
  * - message containing "rate_limit" (case-insensitive) or "429" → PROVIDER_RATE_LIMITED
+ * - malformed/non-object structured output → SCHEMA_INVALID
  * - otherwise → UNKNOWN
  *
  * Pure / stateless / deterministic.
@@ -32,6 +33,7 @@ object LlmErrorMapper {
     private const val MSG_UNAVAILABLE = "provider returned 5xx or timed out"
     private const val MSG_RATE_LIMITED = "provider returned 429"
     private const val MSG_UNKNOWN = "unknown provider error"
+    private const val MSG_SCHEMA_INVALID = "provider returned invalid structured output"
 
     fun mapException(
         t: Throwable,
@@ -51,6 +53,7 @@ object LlmErrorMapper {
         val isNetworkFault = t is IOException || t is SocketTimeoutException
 
         return when {
+            t is LlmStructuredOutputException -> GenerationError(ErrorCode.SCHEMA_INVALID, MSG_SCHEMA_INVALID)
             mentionsRateLimit -> GenerationError(ErrorCode.PROVIDER_RATE_LIMITED, MSG_RATE_LIMITED)
             isNetworkFault || mentions5xx -> GenerationError(ErrorCode.PROVIDER_UNAVAILABLE, MSG_UNAVAILABLE)
             else -> GenerationError(ErrorCode.UNKNOWN, MSG_UNKNOWN)

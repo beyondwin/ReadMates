@@ -32,7 +32,7 @@ class GroundedInputBudgetGuard(
         selectedModel: ModelId,
         fallbackModels: List<ModelId>,
     ): GroundedBudgetDecision {
-        val rendered = renderer.render(request)
+        val rendered = renderer.render(request.copy(provider = selectedModel.provider))
         val estimatedInputTokens = rendered.estimatedInputTokens()
         val selectedCapability = requireSupportedCapability(selectedModel)
         if (!fits(selectedCapability, estimatedInputTokens)) {
@@ -45,7 +45,11 @@ class GroundedInputBudgetGuard(
                 .distinct()
                 .filter { candidate ->
                     capabilityCatalog.find(candidate)?.let { capability ->
-                        supportsGroundedRequest(capability) && fits(capability, estimatedInputTokens)
+                        val fallbackInputTokens =
+                            renderer
+                                .render(request.copy(provider = candidate.provider))
+                                .estimatedInputTokens()
+                        supportsGroundedRequest(capability) && fits(capability, fallbackInputTokens)
                     } ?: false
                 }.take(MAX_FALLBACK_DEPTH)
                 .toList()

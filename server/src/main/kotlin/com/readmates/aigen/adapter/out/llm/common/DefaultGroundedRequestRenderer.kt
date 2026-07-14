@@ -1,5 +1,10 @@
 package com.readmates.aigen.adapter.out.llm.common
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.readmates.aigen.adapter.out.llm.gemini.GeminiSchemaCompatAdapter
+import com.readmates.aigen.application.model.GenerationItem
+import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.port.out.GroundedRenderRequest
 import com.readmates.aigen.application.port.out.GroundedRequestMode
 import com.readmates.aigen.application.port.out.GroundedRequestRenderer
@@ -17,6 +22,7 @@ class DefaultGroundedRequestRenderer(
     private val objectMapper: ObjectMapper,
     private val schemaResource: GroundedGenerationSchemaResource,
     private val properties: AiGenerationProperties,
+    private val geminiSchemaCompatAdapter: GeminiSchemaCompatAdapter,
 ) : GroundedRequestRenderer {
     override fun render(request: GroundedRenderRequest): RenderedGroundedRequest {
         require(request.turns.isNotEmpty()) { "Grounded request requires at least one validated turn" }
@@ -53,9 +59,51 @@ class DefaultGroundedRequestRenderer(
         return RenderedGroundedRequest(
             systemText = SYSTEM_TEXT,
             userText = objectMapper.writeValueAsString(envelope),
-            schemaJson = schemaResource.schemaAsString(),
+            schemaJson = schemaFor(request),
             maxOutputTokens = properties.grounded.reservedOutputTokens.toInt(),
         )
+    }
+
+    private fun schemaFor(request: GroundedRenderRequest): String {
+        val fullSchema = schemaResource.schema()
+        val requestedSchema =
+            if (request.mode == GroundedRequestMode.PRIMARY) {
+                fullSchema
+            } else {
+                requireNotNull(request.requestedSection)
+                repairSchema(fullSchema, request.requestedSection)
+            }
+        return if (request.provider == Provider.GEMINI) {
+            geminiSchemaCompatAdapter.convert(requestedSchema).toString()
+        } else {
+            requestedSchema.toString()
+        }
+    }
+
+    private fun repairSchema(
+        fullSchema: ObjectNode,
+        section: GenerationItem,
+    ): ObjectNode {
+        val propertyNames =
+            when (section) {
+                GenerationItem.SUMMARY -> listOf("summaryBlocks")
+                GenerationItem.HIGHLIGHTS -> listOf("highlights")
+                GenerationItem.ONE_LINE_REVIEWS -> listOf("oneLineReviews")
+                GenerationItem.FEEDBACK_DOCUMENT ->
+                    listOf("feedbackDocumentFileName", "feedbackSections")
+            }
+        val properties = fullSchema.objectNode()
+        propertyNames.forEach { name ->
+            properties.set<JsonNode>(name, fullSchema.at("/properties/$name"))
+        }
+        return fullSchema.objectNode().apply {
+            put("type", "object")
+            put("additionalProperties", false)
+            val required = fullSchema.arrayNode().addAll(propertyNames.map(fullSchema::textNode))
+            set<JsonNode>("required", required)
+            set<JsonNode>("properties", properties)
+            set<JsonNode>("\$defs", fullSchema.path("\$defs"))
+        }
     }
 
     private companion object {

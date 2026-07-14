@@ -31,6 +31,8 @@ class FakeClaudeApi(
         private set
     var lastExpectCacheControl: Boolean? = null
         private set
+    var lastMaxOutputTokens: Int? = null
+        private set
 
     override fun callTool(
         model: String,
@@ -40,6 +42,7 @@ class FakeClaudeApi(
         toolName: String,
         toolSchema: ObjectNode,
         expectCacheControl: Boolean,
+        maxOutputTokens: Int,
     ): ClaudeToolResult {
         lastModel = model
         lastSystemPrompt = systemPrompt
@@ -48,6 +51,7 @@ class FakeClaudeApi(
         lastToolName = toolName
         lastToolSchema = toolSchema.deepCopy()
         lastExpectCacheControl = expectCacheControl
+        lastMaxOutputTokens = maxOutputTokens
         throwException?.let { throw it }
         return result
     }

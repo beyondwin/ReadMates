@@ -11,6 +11,7 @@ import com.anthropic.models.messages.Tool
 import com.anthropic.models.messages.ToolChoiceTool
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
+import com.readmates.aigen.adapter.out.llm.common.StructuredOutputJson
 import com.readmates.aigen.application.model.TokenUsage
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
@@ -59,6 +60,7 @@ open class ClaudeApiClient : ClaudeApiPort {
         toolName: String,
         toolSchema: ObjectNode,
         expectCacheControl: Boolean,
+        maxOutputTokens: Int,
     ): ClaudeToolResult {
         val apiKey = System.getenv(API_KEY_ENV)
         check(!apiKey.isNullOrBlank()) {
@@ -78,10 +80,7 @@ open class ClaudeApiClient : ClaudeApiPort {
             MessageCreateParams
                 .builder()
                 .model(model)
-                // Follow-up: move maxTokens to AiGenerationProperties when a per-call
-                // budget knob is introduced. No existing config today; 4096 is a
-                // conservative ceiling for the structured tool_use payload.
-                .maxTokens(DEFAULT_MAX_TOKENS)
+                .maxTokens(maxOutputTokens.toLong())
                 .system(systemPrompt)
                 .addUserMessageOfBlockParams(userBlocks)
                 .addTool(tool)
@@ -101,9 +100,7 @@ open class ClaudeApiClient : ClaudeApiPort {
                 ?: error("Claude response did not contain a tool_use block; tool=$toolName")
 
         val inputNode = objectMapper.valueToTree<com.fasterxml.jackson.databind.JsonNode>(toolUse._input())
-        val inputObject =
-            (inputNode as? ObjectNode)
-                ?: error("Claude tool_use input was not a JSON object; tool=$toolName")
+        val inputObject = StructuredOutputJson.requireObject(inputNode)
 
         val usage = message.usage()
         // Per Anthropic billing model: `input_tokens` is the count of non-cached
@@ -172,6 +169,5 @@ open class ClaudeApiClient : ClaudeApiPort {
 
     companion object {
         const val API_KEY_ENV: String = "READMATES_AIGEN_ANTHROPIC_API_KEY"
-        private const val DEFAULT_MAX_TOKENS: Long = 4096L
     }
 }

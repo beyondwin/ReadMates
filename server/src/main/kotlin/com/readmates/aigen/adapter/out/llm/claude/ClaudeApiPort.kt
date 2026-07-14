@@ -1,7 +1,9 @@
 package com.readmates.aigen.adapter.out.llm.claude
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.readmates.aigen.application.model.TokenUsage
+import com.readmates.aigen.application.port.out.StructuredGenerationRequest
 
 /**
  * Outbound port abstracting the Anthropic Java SDK call for a single
@@ -20,6 +22,7 @@ import com.readmates.aigen.application.model.TokenUsage
  * - `toolName` + `toolSchema` define a single registered tool with
  *   `input_schema = toolSchema` and `tool_choice = { type: "tool", name: toolName }`,
  *   forcing the model to invoke exactly that tool.
+ * - `maxOutputTokens` is always explicit: legacy callers pass 4,096 and grounded callers pass 16,384.
  * - The returned [ClaudeToolResult] carries the parsed tool input
  *   (Jackson 2 `ObjectNode`, matching [com.readmates.aigen.adapter.out.llm.common.SessionImportSchemaResource])
  *   and the token usage breakdown.
@@ -29,6 +32,21 @@ import com.readmates.aigen.application.model.TokenUsage
  * mask PII itself.
  */
 interface ClaudeApiPort {
+    fun callStructuredTool(
+        request: StructuredGenerationRequest,
+        toolName: String,
+    ): ClaudeToolResult =
+        callTool(
+            model = request.model,
+            systemPrompt = request.systemText,
+            userText = "",
+            transcriptText = request.userText,
+            toolName = toolName,
+            toolSchema = ObjectMapper().readTree(request.schemaJson) as ObjectNode,
+            expectCacheControl = true,
+            maxOutputTokens = request.maxOutputTokens,
+        )
+
     // Long parameter list intentional — each field is a named, type-safe slice of
     // the Anthropic messages.create request that test fakes record individually.
     // Wrapping them in a struct would add ceremony without improving readability
@@ -42,6 +60,7 @@ interface ClaudeApiPort {
         toolName: String,
         toolSchema: ObjectNode,
         expectCacheControl: Boolean,
+        maxOutputTokens: Int,
     ): ClaudeToolResult
 }
 

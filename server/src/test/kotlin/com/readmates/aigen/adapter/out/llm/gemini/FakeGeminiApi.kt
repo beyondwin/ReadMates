@@ -27,6 +27,8 @@ class FakeGeminiApi(
         private set
     var lastResponseSchema: ObjectNode? = null
         private set
+    var lastMaxOutputTokens: Int? = null
+        private set
 
     override fun callResponseSchema(
         model: String,
@@ -34,12 +36,14 @@ class FakeGeminiApi(
         userText: String,
         transcriptText: String,
         responseSchema: ObjectNode,
+        maxOutputTokens: Int,
     ): GeminiToolResult {
         lastModel = model
         lastSystemPrompt = systemPrompt
         lastUserText = userText
         lastTranscriptText = transcriptText
         lastResponseSchema = responseSchema.deepCopy()
+        lastMaxOutputTokens = maxOutputTokens
         throwException?.let { throw it }
         return result
     }

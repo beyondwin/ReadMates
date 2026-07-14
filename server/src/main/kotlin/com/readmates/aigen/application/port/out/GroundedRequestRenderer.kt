@@ -2,6 +2,7 @@ package com.readmates.aigen.application.port.out
 
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.GroundedGenerationDraft
+import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.ValidatedTranscriptTurn
 import java.nio.charset.StandardCharsets
@@ -10,6 +11,7 @@ import java.security.MessageDigest
 enum class GroundedRequestMode { PRIMARY, REPAIR, REGENERATE_SECTION }
 
 data class GroundedRenderRequest(
+    val provider: Provider,
     val sessionMeta: SessionMeta,
     val turns: List<ValidatedTranscriptTurn>,
     val hostInstructions: String? = null,

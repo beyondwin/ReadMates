@@ -662,7 +662,7 @@ git commit -m "feat(aigen): guard grounded whole transcript requests"
 - Keeps legacy `SessionContentGenerator` and `SessionContentRegenerator` beans operational under `LEGACY`.
 - Passes `maxOutputTokens=16_384` through every provider client instead of the existing hard-coded 4,096.
 
-- [ ] **Step 1: Define and test the provider-neutral grounded port**
+- [x] **Step 1: Define and test the provider-neutral grounded port**
 
 ```kotlin
 interface WholeTranscriptGroundedGenerator {
@@ -683,7 +683,7 @@ interface WholeTranscriptGroundedGenerator {
 
 The repair output type must make it impossible to replace a different section accidentally.
 
-- [ ] **Step 2: Write one contract-equivalent adapter suite per provider**
+- [x] **Step 2: Write one contract-equivalent adapter suite per provider**
 
 For OpenAI, Claude, and Gemini assert:
 
@@ -698,7 +698,7 @@ For OpenAI, Claude, and Gemini assert:
 - a raw provider failure containing a transcript snippet is removed by `LlmErrorMapper` before any wire/audit value;
 - no prompt/transcript value is included in thrown messages.
 
-- [ ] **Step 3: Run all three new suites and verify RED**
+- [x] **Step 3: Run all three new suites and verify RED**
 
 ```bash
 ./server/gradlew -p server unitTest --tests '*WholeTranscriptGroundedGeneratorTest'
@@ -706,7 +706,7 @@ For OpenAI, Claude, and Gemini assert:
 
 Expected: FAIL because the new port and adapters do not exist.
 
-- [ ] **Step 4: Extend API ports with explicit output limits**
+- [x] **Step 4: Extend API ports with explicit output limits**
 
 Use a parameter object where provider signatures would otherwise diverge:
 
@@ -722,15 +722,15 @@ data class StructuredGenerationRequest(
 
 Update legacy callers to pass their previous effective 4,096 behavior so legacy output does not silently change. Grounded callers pass 16,384.
 
-- [ ] **Step 5: Implement separate grounded adapters**
+- [x] **Step 5: Implement separate grounded adapters**
 
 Deserialize with the shared Jackson configuration. Apply `GeminiSchemaCompatAdapter` to the grounded schema only at the Gemini boundary; do not change the source schema or the renderer's budgeted bytes after the budget check. If the compatibility transformation changes request size materially, expose the provider-specific serialized schema from the renderer before budgeting so the exact-byte invariant remains true.
 
-- [ ] **Step 6: Register provider maps by mode**
+- [x] **Step 6: Register provider maps by mode**
 
 Wire `Map<Provider, WholeTranscriptGroundedGenerator>` separately from the existing legacy maps. Startup validation must fail when grounded mode enables a provider without a grounded generator bean.
 
-- [ ] **Step 7: Run provider and legacy regressions**
+- [x] **Step 7: Run provider and legacy regressions**
 
 ```bash
 ./server/gradlew -p server unitTest --tests '*WholeTranscriptGroundedGeneratorTest' --tests '*ContentGeneratorTest' --tests '*ContentRegeneratorTest' --tests '*GeminiSchemaCompatAdapterTest'
@@ -738,7 +738,7 @@ Wire `Map<Provider, WholeTranscriptGroundedGenerator>` separately from the exist
 
 Expected: PASS for all grounded and legacy adapters; live-contract tests remain opt-in and are not run without provider keys.
 
-- [ ] **Step 8: Commit the provider adapter slice**
+- [x] **Step 8: Commit the provider adapter slice**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/aigen server/src/test/kotlin/com/readmates/aigen

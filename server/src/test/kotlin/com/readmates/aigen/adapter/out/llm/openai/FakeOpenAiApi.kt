@@ -29,6 +29,8 @@ class FakeOpenAiApi(
         private set
     var lastSchema: ObjectNode? = null
         private set
+    var lastMaxOutputTokens: Int? = null
+        private set
 
     override fun callJsonSchema(
         model: String,
@@ -37,6 +39,7 @@ class FakeOpenAiApi(
         transcriptText: String,
         schemaName: String,
         schema: ObjectNode,
+        maxOutputTokens: Int,
     ): OpenAiToolResult {
         lastModel = model
         lastSystemPrompt = systemPrompt
@@ -44,6 +47,7 @@ class FakeOpenAiApi(
         lastTranscriptText = transcriptText
         lastSchemaName = schemaName
         lastSchema = schema.deepCopy()
+        lastMaxOutputTokens = maxOutputTokens
         throwException?.let { throw it }
         return result
     }

@@ -39,8 +39,31 @@ class GeminiSchemaCompatAdapter(
      */
     fun convert(node: ObjectNode): ObjectNode {
         val copy = node.deepCopy()
+        inlineLocalReferences(copy, copy)
         transformInPlace(copy)
         return copy
+    }
+
+    private fun inlineLocalReferences(
+        node: JsonNode,
+        root: ObjectNode,
+    ) {
+        when (node) {
+            is ObjectNode -> {
+                val reference = node.path("\$ref").takeIf(JsonNode::isTextual)?.asText()
+                if (reference != null && reference.startsWith("#/")) {
+                    val target = root.at(reference.removePrefix("#"))
+                    require(target is ObjectNode) { "Unsupported Gemini schema reference" }
+                    node.removeAll()
+                    node.setAll<ObjectNode>(target.deepCopy())
+                    inlineLocalReferences(node, root)
+                } else {
+                    node.properties().map { it.value }.forEach { inlineLocalReferences(it, root) }
+                }
+            }
+            is ArrayNode -> node.forEach { inlineLocalReferences(it, root) }
+            else -> Unit
+        }
     }
 
     private fun transformInPlace(node: JsonNode) {

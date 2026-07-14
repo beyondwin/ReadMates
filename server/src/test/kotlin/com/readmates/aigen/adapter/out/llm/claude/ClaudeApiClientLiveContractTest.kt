@@ -54,6 +54,7 @@ class ClaudeApiClientLiveContractTest {
                 toolName = "report_value",
                 toolSchema = schema,
                 expectCacheControl = false,
+                maxOutputTokens = 4096,
             )
 
         assertNotNull(result)

@@ -1,7 +1,9 @@
 package com.readmates.aigen.adapter.out.llm.openai
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.readmates.aigen.application.model.TokenUsage
+import com.readmates.aigen.application.port.out.StructuredGenerationRequest
 
 /**
  * Outbound port abstracting the OpenAI Java SDK call for a single
@@ -24,6 +26,7 @@ import com.readmates.aigen.application.model.TokenUsage
  *   request MUST set `strict = true`.
  * - The implementation MUST set `store = false` so OpenAI does not
  *   retain prompt/completion data (spec §9.1, §9.3 — PII protection).
+ * - `maxOutputTokens` is always explicit: legacy callers pass 4,096 and grounded callers pass 16,384.
  * - The returned [OpenAiToolResult] carries the parsed JSON object
  *   (Jackson 2 `ObjectNode`, matching
  *   [com.readmates.aigen.adapter.out.llm.common.SessionImportSchemaResource])
@@ -34,6 +37,20 @@ import com.readmates.aigen.application.model.TokenUsage
  * mask PII itself.
  */
 interface OpenAiApiPort {
+    fun callStructuredJsonSchema(
+        request: StructuredGenerationRequest,
+        schemaName: String,
+    ): OpenAiToolResult =
+        callJsonSchema(
+            model = request.model,
+            systemPrompt = request.systemText,
+            userText = request.userText,
+            transcriptText = "",
+            schemaName = schemaName,
+            schema = ObjectMapper().readTree(request.schemaJson) as ObjectNode,
+            maxOutputTokens = request.maxOutputTokens,
+        )
+
     // Long parameter list intentional — each field is a named, type-safe slice of
     // the OpenAI chat.completions.create request that test fakes record individually.
     @Suppress("LongParameterList")
@@ -44,6 +61,7 @@ interface OpenAiApiPort {
         transcriptText: String,
         schemaName: String,
         schema: ObjectNode,
+        maxOutputTokens: Int,
     ): OpenAiToolResult
 }
 
