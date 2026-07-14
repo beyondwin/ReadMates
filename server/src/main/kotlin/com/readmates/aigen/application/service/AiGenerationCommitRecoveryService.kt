@@ -3,9 +3,9 @@ package com.readmates.aigen.application.service
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.port.out.AiGenerationCommitPersistencePort
 import com.readmates.aigen.application.port.out.AiGenerationJobStore
+import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Service
-import org.slf4j.LoggerFactory
 import java.time.Clock
 import java.util.UUID
 
@@ -55,7 +55,9 @@ class AiGenerationCommitRecoveryService(
         jobStore.loadCommitRecoveryJobs(limit).mapNotNull { record ->
             try {
                 recover(record.jobId)
-            } catch (@Suppress("TooGenericExceptionCaught") error: RuntimeException) {
+            } catch (
+                @Suppress("TooGenericExceptionCaught") error: RuntimeException,
+            ) {
                 metrics.recordCommitRecoveryFailure()
                 log.warn(
                     "AI generation commit recovery failed jobId={} status={} errorType={}",
