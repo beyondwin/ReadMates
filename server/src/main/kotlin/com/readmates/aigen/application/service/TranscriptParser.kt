@@ -57,13 +57,7 @@ class TranscriptParser {
         var cursor = dateLine + 1
         var participantNames: List<String>? = null
         if (cursor in lines.indices && lines[cursor].isNotBlank() && !TURN_HEADER.matches(lines[cursor])) {
-            if (lines[cursor].codePointCount() > MAX_PARTICIPANT_CODE_POINTS) {
-                fail(ErrorCode.TRANSCRIPT_FORMAT_INVALID, "PARTICIPANTS_TOO_LONG", cursor + 1)
-            }
-            participantNames = lines[cursor].split(',').map(String::trim)
-            if (participantNames.any { it.isEmpty() || it.codePointCount() > MAX_TITLE_CODE_POINTS }) {
-                fail(ErrorCode.TRANSCRIPT_FORMAT_INVALID, "INVALID_PARTICIPANT_LIST", cursor + 1)
-            }
+            participantNames = parseParticipantNames(lines[cursor], cursor + 1)
             cursor += 1
         }
         while (cursor in lines.indices && lines[cursor].isBlank()) cursor += 1
@@ -71,6 +65,20 @@ class TranscriptParser {
             fail(ErrorCode.TRANSCRIPT_FORMAT_INVALID, "MISSING_FIRST_TURN", cursor.coerceAtMost(lines.size - 1) + 1)
         }
         return Preamble(cursor, participantNames)
+    }
+
+    private fun parseParticipantNames(
+        line: String,
+        lineNumber: Int,
+    ): List<String> {
+        if (line.codePointCount() > MAX_PARTICIPANT_CODE_POINTS) {
+            fail(ErrorCode.TRANSCRIPT_FORMAT_INVALID, "PARTICIPANTS_TOO_LONG", lineNumber)
+        }
+        val names = line.split(',').map(String::trim)
+        if (names.any { it.isEmpty() || it.codePointCount() > MAX_TITLE_CODE_POINTS }) {
+            fail(ErrorCode.TRANSCRIPT_FORMAT_INVALID, "INVALID_PARTICIPANT_LIST", lineNumber)
+        }
+        return names
     }
 
     private fun validatePreambleParticipants(
@@ -160,15 +168,6 @@ class TranscriptParser {
         return text to cursor
     }
 
-    private fun String.codePointCount(): Int = codePointCount(0, length)
-
-    private fun String.hasMeaningfulContent(): Boolean =
-        codePoints().anyMatch { codePoint ->
-            !Character.isWhitespace(codePoint) &&
-                !Character.isISOControl(codePoint) &&
-                Character.getType(codePoint) != Character.FORMAT.toInt()
-        }
-
     private fun fail(
         code: ErrorCode,
         reason: String,
@@ -210,3 +209,12 @@ class TranscriptParser {
         val participantNames: List<String>?,
     )
 }
+
+private fun String.codePointCount(): Int = codePointCount(0, length)
+
+private fun String.hasMeaningfulContent(): Boolean =
+    codePoints().anyMatch { codePoint ->
+        !Character.isWhitespace(codePoint) &&
+            !Character.isISOControl(codePoint) &&
+            Character.getType(codePoint) != Character.FORMAT.toInt()
+    }
