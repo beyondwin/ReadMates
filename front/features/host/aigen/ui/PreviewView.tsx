@@ -144,28 +144,38 @@ export function PreviewView(props: PreviewViewProps) {
     document.getElementById(SECTION_ID[section])?.scrollIntoView({ block: "start" });
   };
 
-  const evidenceControls = (section: ReviewSection) => {
+  const evidenceControl = (section: ReviewSection, ordinal: number, itemLabel: string) => {
     if (!grounded || !reviewState || !onReviewStateChange) return null;
-    const sectionTargets = targets.get(section) ?? [];
+    const target = (targets.get(section) ?? []).find((candidate) => candidate.ordinal === ordinal);
+    if (!target) return null;
+    const invalidated = reviewState.invalidatedTargetIds.includes(target.targetId);
     return (
-      <div className="row" style={{ gap: 6, flexWrap: "wrap", marginTop: 10 }} aria-label={`${SECTION_LABEL[section]} 근거`}>
-        {sectionTargets.map((target) => {
-          const invalidated = reviewState.invalidatedTargetIds.includes(target.targetId);
-          return (
-            <button
-              type="button"
-              className="btn btn-quiet btn-sm"
-              key={target.targetId}
-              disabled={invalidated}
-              onClick={() => {
-                setCurrentSection(section);
-                onReviewStateChange(selectEvidenceTarget(reviewState, target.targetId));
-              }}
-            >
-              {invalidated ? "직접 수정됨 — AI 근거 비활성" : `근거 ${target.ordinal + 1}`}
-            </button>
-          );
-        })}
+      <button
+        type="button"
+        className="btn btn-quiet btn-sm aigen-block-evidence-control"
+        disabled={invalidated}
+        onClick={() => {
+          setCurrentSection(section);
+          onReviewStateChange(selectEvidenceTarget(reviewState, target.targetId));
+          if (window.matchMedia?.("(max-width: 768px)").matches) setDrawerOpen(true);
+        }}
+      >
+        {invalidated ? `${itemLabel}: 직접 수정됨 — AI 근거 비활성` : `${itemLabel} 근거 보기`}
+      </button>
+    );
+  };
+
+  const sectionEvidenceControls = (section: ReviewSection, itemLabel: string) => {
+    const sectionTargets = targets.get(section) ?? [];
+    if (sectionTargets.length === 0) return null;
+    return (
+      <div className="stack" style={{ "--stack": "6px", marginTop: 10 } as CSSProperties} aria-label={`${SECTION_LABEL[section]} 근거 연결`}>
+        {sectionTargets.map((target) => (
+          <div className="row-between" key={target.targetId} style={{ gap: 8 }}>
+            <span className="tiny" style={{ color: "var(--text-2)" }}>{itemLabel} {target.ordinal + 1}</span>
+            {evidenceControl(section, target.ordinal, `${itemLabel} ${target.ordinal + 1}`)}
+          </div>
+        ))}
       </div>
     );
   };
@@ -223,50 +233,54 @@ export function PreviewView(props: PreviewViewProps) {
         결과는 항상 호스트 검토 초안입니다. 검토가 끝나기 전에는 저장되거나 공개되지 않습니다.
       </p>
 
-      {grounded && reviewState ? (
-        <ReviewLedger
-          states={reviewState.sectionReviews}
-          currentSection={currentSection}
-          onNavigate={navigate}
-        />
-      ) : null}
-
       <div className={grounded ? "aigen-review-workspace" : undefined}>
+        {grounded && reviewState ? (
+          <aside className="aigen-review-ledger-column">
+            <ReviewLedger
+              states={reviewState.sectionReviews}
+              currentSection={currentSection}
+              onNavigate={navigate}
+            />
+          </aside>
+        ) : null}
         <div className="stack aigen-review-editor" style={{ "--stack": "14px" } as CSSProperties}>
-          <div>
+          <div onFocusCapture={() => setCurrentSection("SUMMARY")}>
             <SummarySection
               sectionId={SECTION_ID.SUMMARY}
               value={snapshot.summary}
               onChange={(summary) => updateSection("SUMMARY", { ...snapshot, summary })}
               onRegenerate={() => setRegenItem("summary")}
               disabled={committing}
-              evidenceControls={evidenceControls("SUMMARY")}
+              regenerateDisabled={Boolean(revisionConflict)}
+              evidenceControls={sectionEvidenceControls("SUMMARY", "요약 문단")}
             />
             {reviewAction("SUMMARY")}
           </div>
-          <div>
+          <div onFocusCapture={() => setCurrentSection("HIGHLIGHTS")}>
             <HighlightsSection
               sectionId={SECTION_ID.HIGHLIGHTS}
               items={snapshot.highlights}
               onChange={(highlights) => updateSection("HIGHLIGHTS", { ...snapshot, highlights })}
               onRegenerate={() => setRegenItem("highlights")}
               disabled={committing}
-              evidenceControls={evidenceControls("HIGHLIGHTS")}
+              regenerateDisabled={Boolean(revisionConflict)}
+              evidenceControlAt={(index) => evidenceControl("HIGHLIGHTS", index, `하이라이트 ${index + 1}`)}
             />
             {reviewAction("HIGHLIGHTS")}
           </div>
-          <div>
+          <div onFocusCapture={() => setCurrentSection("ONE_LINE_REVIEWS")}>
             <OneLineReviewsSection
               sectionId={SECTION_ID.ONE_LINE_REVIEWS}
               items={snapshot.oneLineReviews}
               onChange={(oneLineReviews) => updateSection("ONE_LINE_REVIEWS", { ...snapshot, oneLineReviews })}
               onRegenerate={() => setRegenItem("oneLineReviews")}
               disabled={committing}
-              evidenceControls={evidenceControls("ONE_LINE_REVIEWS")}
+              regenerateDisabled={Boolean(revisionConflict)}
+              evidenceControlAt={(index) => evidenceControl("ONE_LINE_REVIEWS", index, `한줄평 ${index + 1}`)}
             />
             {reviewAction("ONE_LINE_REVIEWS")}
           </div>
-          <div>
+          <div onFocusCapture={() => setCurrentSection("FEEDBACK_DOCUMENT")}>
             <FeedbackDocumentSection
               sectionId={SECTION_ID.FEEDBACK_DOCUMENT}
               fileName={snapshot.feedbackDocumentFileName}
@@ -280,7 +294,8 @@ export function PreviewView(props: PreviewViewProps) {
               }
               onRegenerate={() => setRegenItem("feedbackDocument")}
               disabled={committing}
-              evidenceControls={evidenceControls("FEEDBACK_DOCUMENT")}
+              regenerateDisabled={Boolean(revisionConflict)}
+              evidenceControls={sectionEvidenceControls("FEEDBACK_DOCUMENT", "피드백 블록")}
             />
             {reviewAction("FEEDBACK_DOCUMENT")}
           </div>
@@ -288,11 +303,6 @@ export function PreviewView(props: PreviewViewProps) {
         {grounded ? <aside className="surface aigen-evidence-panel" style={{ padding: 14 }}>{evidencePanel}</aside> : null}
       </div>
 
-      {grounded && selectedLabel ? (
-        <button type="button" className="btn btn-quiet aigen-evidence-drawer-trigger" onClick={() => setDrawerOpen(true)}>
-          {selectedLabel} 근거 열기
-        </button>
-      ) : null}
       {grounded && selectedLabel ? (
         <EvidenceDrawer open={drawerOpen} targetLabel={selectedLabel} onClose={() => setDrawerOpen(false)}>
           {evidencePanel}
@@ -313,7 +323,7 @@ export function PreviewView(props: PreviewViewProps) {
         </div>
       ) : null}
       {commitError ? <div className="small" role="alert" style={{ color: "var(--danger)" }}>{commitError}</div> : null}
-      <button type="button" className="btn btn-primary" onClick={onCommit} disabled={committing || (grounded && !commitEnabled)}>
+      <button type="button" className="btn btn-primary" onClick={onCommit} disabled={committing || Boolean(revisionConflict) || (grounded && !commitEnabled)}>
         {committing ? "저장 중…" : "AI 기록 저장"}
       </button>
 

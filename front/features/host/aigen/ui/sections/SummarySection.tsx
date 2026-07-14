@@ -5,11 +5,12 @@ export type SummarySectionProps = {
   onChange: (next: string) => void;
   onRegenerate: () => void;
   disabled?: boolean;
+  regenerateDisabled?: boolean;
   sectionId?: string;
   evidenceControls?: ReactNode;
 };
 
-export function SummarySection({ value, onChange, onRegenerate, disabled, sectionId, evidenceControls }: SummarySectionProps) {
+export function SummarySection({ value, onChange, onRegenerate, disabled, regenerateDisabled, sectionId, evidenceControls }: SummarySectionProps) {
   return (
     <section id={sectionId} className="surface-quiet" style={{ padding: 16 } as CSSProperties}>
       <header className="row-between" style={{ marginBottom: 10 }}>
@@ -18,7 +19,7 @@ export function SummarySection({ value, onChange, onRegenerate, disabled, sectio
           type="button"
           className="btn btn-ghost btn-sm"
           onClick={onRegenerate}
-          disabled={disabled}
+          disabled={disabled || regenerateDisabled}
           aria-label="요약 재생성"
         >
           ✨ 재생성

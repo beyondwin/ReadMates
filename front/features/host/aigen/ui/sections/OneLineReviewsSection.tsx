@@ -6,11 +6,12 @@ export type OneLineReviewsSectionProps = {
   onChange: (next: SessionImportAuthoredText[]) => void;
   onRegenerate: () => void;
   disabled?: boolean;
+  regenerateDisabled?: boolean;
   sectionId?: string;
-  evidenceControls?: ReactNode;
+  evidenceControlAt?: (index: number) => ReactNode;
 };
 
-export function OneLineReviewsSection({ items, onChange, onRegenerate, disabled, sectionId, evidenceControls }: OneLineReviewsSectionProps) {
+export function OneLineReviewsSection({ items, onChange, onRegenerate, disabled, regenerateDisabled, sectionId, evidenceControlAt }: OneLineReviewsSectionProps) {
   const updateAt = (index: number, patch: Partial<SessionImportAuthoredText>) => {
     const next = items.map((item, i) => (i === index ? { ...item, ...patch } : item));
     onChange(next);
@@ -24,7 +25,7 @@ export function OneLineReviewsSection({ items, onChange, onRegenerate, disabled,
           type="button"
           className="btn btn-ghost btn-sm"
           onClick={onRegenerate}
-          disabled={disabled}
+          disabled={disabled || regenerateDisabled}
           aria-label="한줄평 재생성"
         >
           ✨ 재생성
@@ -54,10 +55,10 @@ export function OneLineReviewsSection({ items, onChange, onRegenerate, disabled,
               aria-label={`한줄평 ${index + 1} 내용`}
               style={{ width: "100%" }}
             />
+            {evidenceControlAt?.(index)}
           </li>
         ))}
       </ul>
-      {evidenceControls}
     </section>
   );
 }

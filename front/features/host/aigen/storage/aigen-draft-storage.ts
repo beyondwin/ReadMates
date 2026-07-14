@@ -69,14 +69,24 @@ function isSnapshot(value: unknown): value is SessionImportV1Snapshot {
   return (
     typeof candidate.format === "string" &&
     typeof candidate.sessionNumber === "number" &&
+    Number.isSafeInteger(candidate.sessionNumber) &&
+    candidate.sessionNumber > 0 &&
     typeof candidate.bookTitle === "string" &&
     typeof candidate.meetingDate === "string" &&
     typeof candidate.summary === "string" &&
     Array.isArray(candidate.highlights) &&
+    candidate.highlights.every(isAuthoredText) &&
     Array.isArray(candidate.oneLineReviews) &&
+    candidate.oneLineReviews.every(isAuthoredText) &&
     typeof candidate.feedbackDocumentFileName === "string" &&
     typeof candidate.feedbackDocumentMarkdown === "string"
   );
+}
+
+function isAuthoredText(value: unknown): value is { authorName: string; text: string } {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as { authorName?: unknown; text?: unknown };
+  return typeof candidate.authorName === "string" && typeof candidate.text === "string";
 }
 
 function isEnvelope(value: unknown): value is AiGenerationDraftEnvelope {
@@ -90,6 +100,8 @@ function isEnvelope(value: unknown): value is AiGenerationDraftEnvelope {
     isSnapshot(candidate.serverSnapshot) &&
     isSnapshot(candidate.draft) &&
     Boolean(candidate.sectionReviews) &&
+    !Array.isArray(candidate.sectionReviews) &&
+    Object.keys(candidate.sectionReviews as object).length === REVIEW_SECTIONS.length &&
     REVIEW_SECTIONS.every((section) =>
       REVIEW_STATES.includes(candidate.sectionReviews?.[section] as SectionReviewState),
     )

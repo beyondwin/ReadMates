@@ -6,6 +6,7 @@ export type FeedbackDocumentSectionProps = {
   onChange: (next: { fileName: string; markdown: string }) => void;
   onRegenerate: () => void;
   disabled?: boolean;
+  regenerateDisabled?: boolean;
   sectionId?: string;
   evidenceControls?: ReactNode;
 };
@@ -16,6 +17,7 @@ export function FeedbackDocumentSection({
   onChange,
   onRegenerate,
   disabled,
+  regenerateDisabled,
   sectionId,
   evidenceControls,
 }: FeedbackDocumentSectionProps) {
@@ -27,7 +29,7 @@ export function FeedbackDocumentSection({
           type="button"
           className="btn btn-ghost btn-sm"
           onClick={onRegenerate}
-          disabled={disabled}
+          disabled={disabled || regenerateDisabled}
           aria-label="피드백 문서 재생성"
         >
           ✨ 재생성

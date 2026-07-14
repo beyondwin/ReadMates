@@ -6,11 +6,12 @@ export type HighlightsSectionProps = {
   onChange: (next: SessionImportAuthoredText[]) => void;
   onRegenerate: () => void;
   disabled?: boolean;
+  regenerateDisabled?: boolean;
   sectionId?: string;
-  evidenceControls?: ReactNode;
+  evidenceControlAt?: (index: number) => ReactNode;
 };
 
-export function HighlightsSection({ items, onChange, onRegenerate, disabled, sectionId, evidenceControls }: HighlightsSectionProps) {
+export function HighlightsSection({ items, onChange, onRegenerate, disabled, regenerateDisabled, sectionId, evidenceControlAt }: HighlightsSectionProps) {
   const updateAt = (index: number, patch: Partial<SessionImportAuthoredText>) => {
     const next = items.map((item, i) => (i === index ? { ...item, ...patch } : item));
     onChange(next);
@@ -24,7 +25,7 @@ export function HighlightsSection({ items, onChange, onRegenerate, disabled, sec
           type="button"
           className="btn btn-ghost btn-sm"
           onClick={onRegenerate}
-          disabled={disabled}
+          disabled={disabled || regenerateDisabled}
           aria-label="하이라이트 재생성"
         >
           ✨ 재생성
@@ -54,10 +55,10 @@ export function HighlightsSection({ items, onChange, onRegenerate, disabled, sec
               aria-label={`하이라이트 ${index + 1} 내용`}
               style={{ width: "100%" }}
             />
+            {evidenceControlAt?.(index)}
           </li>
         ))}
       </ul>
-      {evidenceControls}
     </section>
   );
 }

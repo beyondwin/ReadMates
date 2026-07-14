@@ -3633,17 +3633,19 @@
 
 .aigen-review-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr) minmax(220px, 300px);
   gap: 16px;
   align-items: start;
   min-width: 0;
 }
 
 .aigen-review-editor,
+.aigen-review-ledger-column,
 .aigen-evidence-panel {
   min-width: 0;
 }
 
+.aigen-review-ledger-column,
 .aigen-evidence-panel {
   position: sticky;
   top: 16px;
@@ -3651,21 +3653,20 @@
   overflow: auto;
 }
 
-.aigen-evidence-drawer-trigger {
-  display: none;
-}
-
 @media (max-width: 768px) {
   .aigen-review-workspace {
     display: block;
   }
 
-  .aigen-evidence-panel {
-    display: none;
+  .aigen-review-ledger-column {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    margin-bottom: 14px;
   }
 
-  .aigen-evidence-drawer-trigger {
-    display: inline-flex;
+  .aigen-evidence-panel {
+    display: none;
   }
 }
 

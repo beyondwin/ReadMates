@@ -279,7 +279,7 @@ export function AiGenerateTab({ sessionId, onCommitted }: AiGenerateTabProps) {
     setCommitError(null);
     setRevisionConflict(null);
     setEditedSnapshot(next);
-    if (!section || !serverSnapshot || evidence.length === 0) return;
+    if (!section || !serverSnapshot) return;
     setReviewState((current) => current ? applySectionEdit(current, {
       section,
       serverSnapshot,

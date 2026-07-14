@@ -7,7 +7,7 @@
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -555,6 +555,46 @@ describe("AiGenerateTab", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/현재 편집은 자동으로 덮어쓰지 않았습니다/);
     expect(screen.getByDisplayValue("호스트가 직접 수정한 요약")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "최신 revision 다시 불러오기" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "AI 기록 저장" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "요약 재생성" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "AI 기록 저장" }));
+    expect(mockedCommit).toHaveBeenCalledTimes(1);
+  });
+
+  it("invalidates an edited grounded section even when the provider returned no evidence blocks", async () => {
+    mockedStart.mockResolvedValue({ jobId: "job-1", status: "PENDING", expiresAt: "2026-07-14T12:00:00Z" });
+    mockedGetJob.mockResolvedValue({ ...groundedJob(), evidence: [] });
+    const { Wrapper } = createWrapper();
+    render(<Wrapper><AiGenerateTab sessionId="s1" clubSlug="club-a" onCommitted={() => {}} /></Wrapper>);
+    fireEvent.change(await screen.findByLabelText(/대본 파일/), {
+      target: { files: [new File(["공개 회원 00:00\n합성 대화"], "transcript.txt")] },
+    });
+    const start = screen.getByRole("button", { name: /생성 시작/ });
+    await waitFor(() => expect(start).toBeEnabled());
+    fireEvent.click(start);
+
+    fireEvent.change(await screen.findByLabelText("요약"), { target: { value: "직접 수정한 요약" } });
+    expect(screen.getByRole("button", { name: "직접 수정 내용 확인" })).toBeInTheDocument();
+  });
+
+  it("associates each authored list item with its own evidence control", async () => {
+    mockedStart.mockResolvedValue({ jobId: "job-1", status: "PENDING", expiresAt: "2026-07-14T12:00:00Z" });
+    mockedGetJob.mockResolvedValue(groundedJob());
+    const { Wrapper } = createWrapper();
+    render(<Wrapper><AiGenerateTab sessionId="s1" clubSlug="club-a" onCommitted={() => {}} /></Wrapper>);
+    fireEvent.change(await screen.findByLabelText(/대본 파일/), {
+      target: { files: [new File(["공개 회원 00:00\n합성 대화"], "transcript.txt")] },
+    });
+    const start = screen.getByRole("button", { name: /생성 시작/ });
+    await waitFor(() => expect(start).toBeEnabled());
+    fireEvent.click(start);
+
+    const highlightRow = (await screen.findByLabelText("하이라이트 1 내용")).closest("li");
+    expect(highlightRow).not.toBeNull();
+    expect(within(highlightRow!).getByRole("button", { name: "하이라이트 1 근거 보기" })).toBeInTheDocument();
+    const oneLineRow = screen.getByLabelText("한줄평 1 내용").closest("li");
+    expect(oneLineRow).not.toBeNull();
+    expect(within(oneLineRow!).getByRole("button", { name: "한줄평 1 근거 보기" })).toBeInTheDocument();
   });
 
   it("replaces the full grounded result and resets all reviews on regeneration", async () => {

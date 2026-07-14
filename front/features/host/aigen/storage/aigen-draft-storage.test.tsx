@@ -81,6 +81,23 @@ describe("aigen-draft-storage v2", () => {
     expect(loadAigenDraft("legacy", 1)).toBeNull();
   });
 
+  it("rejects malformed authored text, unsafe session numbers, and extra review keys", () => {
+    const malformed = envelope() as unknown as Record<string, unknown>;
+    malformed.draft = { ...snapshot(), highlights: [{ authorName: "공개 회원", text: 42 }] };
+    window.localStorage.setItem(draftStorageKey("job-1"), JSON.stringify(malformed));
+    expect(loadAigenDraft("job-1", 4)).toBeNull();
+
+    const unsafeSession = envelope();
+    unsafeSession.draft = { ...unsafeSession.draft, sessionNumber: Number.NaN };
+    window.localStorage.setItem(draftStorageKey("job-1"), JSON.stringify(unsafeSession));
+    expect(loadAigenDraft("job-1", 4)).toBeNull();
+
+    const extraReview = envelope() as AiGenerationDraftEnvelope & { sectionReviews: Record<string, SectionReviewState> };
+    extraReview.sectionReviews.EXTRA = "PENDING";
+    window.localStorage.setItem(draftStorageKey("job-1"), JSON.stringify(extraReview));
+    expect(loadAigenDraft("job-1", 4)).toBeNull();
+  });
+
   it("returns false on storage failure so the UI can warn without losing memory state", () => {
     vi.spyOn(window.localStorage, "setItem").mockImplementation(() => {
       throw new Error("QuotaExceededError");
