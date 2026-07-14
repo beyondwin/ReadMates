@@ -32,6 +32,7 @@ describe("RegenerateModal", () => {
         jobId="j1"
         item="summary"
         models={[{ id: "gpt-5.4-mini", provider: "OPENAI", isDefault: true }]}
+        expectedRevision={7}
         onClose={() => {}}
         onSuccess={() => {}}
       />,
@@ -90,6 +91,7 @@ describe("RegenerateModal", () => {
         jobId="j1"
         item="summary"
         models={[{ id: "gpt-5.4-mini", provider: "OPENAI", isDefault: true }]}
+        expectedRevision={7}
         onClose={() => {}}
         onSuccess={() => {}}
       />,
@@ -116,6 +118,7 @@ describe("RegenerateModal", () => {
     expect(req.item).toBe("SUMMARY");
     expect(req.model).toBe("gpt-5.4-mini");
     expect(req.instructions).toBe("더 짧게");
+    expect(req.expectedRevision).toBe(7);
   });
 
   it("surfaces error message without closing on failure", async () => {

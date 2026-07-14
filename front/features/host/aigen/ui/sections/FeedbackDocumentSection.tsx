@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 export type FeedbackDocumentSectionProps = {
   fileName: string;
@@ -6,6 +6,8 @@ export type FeedbackDocumentSectionProps = {
   onChange: (next: { fileName: string; markdown: string }) => void;
   onRegenerate: () => void;
   disabled?: boolean;
+  sectionId?: string;
+  evidenceControls?: ReactNode;
 };
 
 export function FeedbackDocumentSection({
@@ -14,9 +16,11 @@ export function FeedbackDocumentSection({
   onChange,
   onRegenerate,
   disabled,
+  sectionId,
+  evidenceControls,
 }: FeedbackDocumentSectionProps) {
   return (
-    <section className="surface-quiet" style={{ padding: 16 } as CSSProperties}>
+    <section id={sectionId} className="surface-quiet" style={{ padding: 16 } as CSSProperties}>
       <header className="row-between" style={{ marginBottom: 10 }}>
         <h3 className="eyebrow" style={{ margin: 0 }}>회차 피드백 문서</h3>
         <button
@@ -53,6 +57,7 @@ export function FeedbackDocumentSection({
         disabled={disabled}
         style={{ width: "100%" }}
       />
+      {evidenceControls}
     </section>
   );
 }

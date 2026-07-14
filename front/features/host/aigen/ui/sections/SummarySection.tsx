@@ -1,15 +1,17 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 export type SummarySectionProps = {
   value: string;
   onChange: (next: string) => void;
   onRegenerate: () => void;
   disabled?: boolean;
+  sectionId?: string;
+  evidenceControls?: ReactNode;
 };
 
-export function SummarySection({ value, onChange, onRegenerate, disabled }: SummarySectionProps) {
+export function SummarySection({ value, onChange, onRegenerate, disabled, sectionId, evidenceControls }: SummarySectionProps) {
   return (
-    <section className="surface-quiet" style={{ padding: 16 } as CSSProperties}>
+    <section id={sectionId} className="surface-quiet" style={{ padding: 16 } as CSSProperties}>
       <header className="row-between" style={{ marginBottom: 10 }}>
         <h3 className="eyebrow" style={{ margin: 0 }}>요약</h3>
         <button
@@ -34,6 +36,7 @@ export function SummarySection({ value, onChange, onRegenerate, disabled }: Summ
         disabled={disabled}
         style={{ width: "100%" }}
       />
+      {evidenceControls}
     </section>
   );
 }

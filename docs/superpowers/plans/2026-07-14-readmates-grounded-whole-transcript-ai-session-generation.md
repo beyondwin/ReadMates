@@ -1562,7 +1562,7 @@ git commit -m "feat(aigen): add validated transcript upload flow"
 - Pure review state derives changed sections from immutable server snapshot versus current draft.
 - Commit is enabled only when all four section review states satisfy the server contract for the current revision.
 
-- [ ] **Step 1: Write the pure review state-machine tests**
+- [x] **Step 1: Write the pure review state-machine tests**
 
 Model the four sections explicitly:
 
@@ -1592,7 +1592,7 @@ Tests must prove:
 - section equality is based on canonical field structure, not rendered HTML or object identity;
 - commit payload has exactly four server enum keys.
 
-- [ ] **Step 2: Write ledger/evidence component tests**
+- [x] **Step 2: Write ledger/evidence component tests**
 
 Assert keyboard and screen-reader behavior along with visuals:
 
@@ -1604,7 +1604,7 @@ Assert keyboard and screen-reader behavior along with visuals:
 - no evidence target shows a generic empty state rather than implying grounding;
 - mobile drawer traps/restores focus, closes with Escape/backdrop, and labels its source target.
 
-- [ ] **Step 3: Run state/component tests and verify RED**
+- [x] **Step 3: Run state/component tests and verify RED**
 
 ```bash
 npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/host/aigen/model/aigen-review-state.test.ts features/host/aigen/ui/ReviewLedger.test.tsx features/host/aigen/ui/EvidencePanel.test.tsx features/host/aigen/ui/EvidenceDrawer.test.tsx --reporter=dot
@@ -1612,7 +1612,7 @@ npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/host/aigen/m
 
 Expected: FAIL because the review model and components do not exist.
 
-- [ ] **Step 4: Implement canonical section diffing**
+- [x] **Step 4: Implement canonical section diffing**
 
 Use field-level canonical values:
 
@@ -1635,15 +1635,15 @@ function sectionValue(
 
 Compare strings and ordered arrays structurally with normalized browser-owned values only; do not trim or case-normalize author names because the server contract is exact.
 
-- [ ] **Step 5: Integrate target selection into each section**
+- [x] **Step 5: Integrate target selection into each section**
 
 Map summary evidence per paragraph, highlights/one-line reviews per row, and feedback evidence per top-level section. Keep `targetId` server-owned. Diff stable row/section ordinals against the immutable server snapshot to maintain `invalidatedTargetIds`. When a changed block is selected, close that selection and render the edited-state explanation; unchanged sibling evidence remains available. If paragraph count/order or feedback section parsing no longer maps deterministically, invalidate all targets in that section rather than attaching stale evidence.
 
-- [ ] **Step 6: Implement responsive review layout**
+- [x] **Step 6: Implement responsive review layout**
 
 Use existing design tokens and page primitives. At desktop widths, keep a bounded-width ledger and evidence panel alongside the editor without horizontal page scroll. At mobile widths, ledger remains in document flow and evidence opens in a bottom/side drawer. Do not introduce a new global design system or dependency.
 
-- [ ] **Step 7: Extend draft storage safely**
+- [x] **Step 7: Extend draft storage safely**
 
 Persist only browser-local review state:
 
@@ -1660,15 +1660,15 @@ interface AiGenerationDraftEnvelope {
 
 On storage quota/failure, keep the in-memory draft and show a nonblocking “이 브라우저에서 임시저장되지 않음” warning. On load, discard envelopes whose job/revision no longer matches the server. Never persist evidence excerpts or transcript turns in local storage.
 
-- [ ] **Step 8: Enforce the commit gate and revision conflict flow**
+- [x] **Step 8: Enforce the commit gate and revision conflict flow**
 
 Enable commit only when every unchanged section is grounded-reviewed and every changed section is user-edited-confirmed. Send current draft, four review enums, and current revision. On success, show the content-free participant update count when present; for receipt-based recovery show a generic completion summary that still makes participant attendance synchronization visible. On 409, refetch the job; do not automatically overwrite local edits. Present a safe choice to reload current server revision after warning that local review state must restart.
 
-- [ ] **Step 9: Wire regeneration reset behavior**
+- [x] **Step 9: Wire regeneration reset behavior**
 
 Send `expectedRevision`. Replace the entire result/evidence response on success, set the returned revision, clear selected evidence, and reset all review states. A stale response or request cancellation must not merge into a newer local revision.
 
-- [ ] **Step 10: Run the complete feature suite and frontend boundaries**
+- [x] **Step 10: Run the complete feature suite and frontend boundaries**
 
 ```bash
 npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/host/aigen tests/unit/frontend-boundaries.test.ts --reporter=dot
@@ -1676,7 +1676,7 @@ npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/host/aigen t
 
 Expected: PASS with review logic under `model/`, networking under `api/queries`, and UI free of direct fetch calls.
 
-- [ ] **Step 11: Commit the grounded review UI slice**
+- [x] **Step 11: Commit the grounded review UI slice**
 
 ```bash
 git add front/features/host/aigen front/tests/unit/frontend-boundaries.test.ts

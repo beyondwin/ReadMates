@@ -40,6 +40,7 @@ import {
   getAvailableModels,
   getJob,
   getRecentJob,
+  regenerateItem,
   startGeneration,
 } from "@/features/host/aigen/api/aigen-api";
 import { AiGenerateTab } from "./AiGenerateTab";
@@ -49,6 +50,7 @@ const mockedGetJob = vi.mocked(getJob);
 const mockedGetRecent = vi.mocked(getRecentJob);
 const mockedCommit = vi.mocked(commitGeneration);
 const mockedCancel = vi.mocked(cancelGeneration);
+const mockedRegenerate = vi.mocked(regenerateItem);
 const mockedModels = vi.mocked(getAvailableModels);
 
 function sampleSnapshot(): SessionImportV1 {
@@ -79,6 +81,25 @@ function jobResponse(status: AiGenerationStatus, opts: Partial<AiGenerationJobRe
     warnings: [],
     ...opts,
   };
+}
+
+function groundedJob(): AiGenerationJobResponse {
+  return jobResponse("SUCCEEDED", {
+    revision: 3,
+    groundingStatus: "VALID",
+    evidence: [
+      { section: "SUMMARY", targetId: "r3:SUMMARY:0", ordinal: 0, turnId: "turn-1", startSeconds: 0, speakerName: "공개 회원", excerpt: "합성 근거", truncated: false },
+      { section: "HIGHLIGHTS", targetId: "r3:HIGHLIGHTS:0", ordinal: 0, turnId: "turn-1", startSeconds: 0, speakerName: "공개 회원", excerpt: "합성 근거", truncated: false },
+      { section: "ONE_LINE_REVIEWS", targetId: "r3:ONE_LINE_REVIEWS:0", ordinal: 0, turnId: "turn-1", startSeconds: 0, speakerName: "공개 회원", excerpt: "합성 근거", truncated: false },
+      { section: "FEEDBACK_DOCUMENT", targetId: "r3:FEEDBACK_DOCUMENT:0", ordinal: 0, turnId: "turn-1", startSeconds: 0, speakerName: "공개 회원", excerpt: "합성 근거", truncated: false },
+    ],
+    sectionReviewStatuses: {
+      SUMMARY: "PENDING_REVIEW",
+      HIGHLIGHTS: "PENDING_REVIEW",
+      ONE_LINE_REVIEWS: "PENDING_REVIEW",
+      FEEDBACK_DOCUMENT: "PENDING_REVIEW",
+    },
+  });
 }
 
 function recentJobResponse(status: AiGenerationStatus): import("@/features/host/aigen/api/aigen-contracts").AiRecentJobResponse {
@@ -132,6 +153,7 @@ describe("AiGenerateTab", () => {
     mockedGetRecent.mockReset();
     mockedCommit.mockReset();
     mockedCancel.mockReset();
+    mockedRegenerate.mockReset();
     mockedModels.mockReset();
     mockedModels.mockResolvedValue({
       models: [{ id: "claude-sonnet-4-6", provider: "CLAUDE", isDefault: true }],
@@ -460,6 +482,128 @@ describe("AiGenerateTab", () => {
       expect(mockedCommit).toHaveBeenCalledTimes(1);
       expect(onCommitted).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it("blocks grounded commit until all four sections are reviewed and sends exact revision reviews", async () => {
+    mockedStart.mockResolvedValue({ jobId: "job-1", status: "PENDING", expiresAt: "2026-07-14T12:00:00Z" });
+    mockedGetJob.mockResolvedValue(groundedJob());
+    mockedCommit.mockResolvedValue({
+      sessionId: "s1",
+      status: "COMMITTED",
+      recovered: false,
+      participantUpdatesCount: 2,
+    });
+    const { Wrapper } = createWrapper();
+    render(<Wrapper><AiGenerateTab sessionId="s1" clubSlug="club-a" onCommitted={() => {}} /></Wrapper>);
+
+    fireEvent.change(await screen.findByLabelText(/대본 파일/), {
+      target: { files: [new File(["공개 회원 00:00\n합성 대화"], "transcript.txt")] },
+    });
+    const start = screen.getByRole("button", { name: /생성 시작/ });
+    await waitFor(() => expect(start).toBeEnabled());
+    fireEvent.click(start);
+
+    const commit = await screen.findByRole("button", { name: "AI 기록 저장" });
+    expect(commit).toBeDisabled();
+    for (const button of screen.getAllByRole("button", { name: "AI 근거 검토 완료" })) {
+      fireEvent.click(button);
+    }
+    await waitFor(() => expect(commit).toBeEnabled());
+    fireEvent.click(commit);
+
+    await waitFor(() => expect(mockedCommit).toHaveBeenCalledTimes(1));
+    expect(mockedCommit.mock.calls[0]?.[2]).toMatchObject({
+      expectedRevision: 3,
+      sectionReviews: {
+        SUMMARY: "AI_GROUNDED_REVIEWED",
+        HIGHLIGHTS: "AI_GROUNDED_REVIEWED",
+        ONE_LINE_REVIEWS: "AI_GROUNDED_REVIEWED",
+        FEEDBACK_DOCUMENT: "AI_GROUNDED_REVIEWED",
+      },
+    });
+    expect(await screen.findByRole("status")).toHaveTextContent("참여 상태 2건을 동기화했습니다");
+  });
+
+  it("preserves local edits on a stale revision and offers an explicit review reset", async () => {
+    mockedStart.mockResolvedValue({ jobId: "job-1", status: "PENDING", expiresAt: "2026-07-14T12:00:00Z" });
+    mockedGetJob.mockResolvedValue(groundedJob());
+    mockedCommit.mockRejectedValue(
+      new AiGenerationApiError(409, {
+        code: "STALE_GENERATION_REVISION",
+        detail: "최신 revision을 확인해 주세요.",
+        currentRevision: 4,
+      }),
+    );
+    const { Wrapper } = createWrapper();
+    render(<Wrapper><AiGenerateTab sessionId="s1" clubSlug="club-a" onCommitted={() => {}} /></Wrapper>);
+    fireEvent.change(await screen.findByLabelText(/대본 파일/), {
+      target: { files: [new File(["공개 회원 00:00\n합성 대화"], "transcript.txt")] },
+    });
+    const start = screen.getByRole("button", { name: /생성 시작/ });
+    await waitFor(() => expect(start).toBeEnabled());
+    fireEvent.click(start);
+    const summary = await screen.findByLabelText("요약");
+    fireEvent.change(summary, { target: { value: "호스트가 직접 수정한 요약" } });
+    for (const button of screen.getAllByRole("button", { name: "AI 근거 검토 완료" })) {
+      fireEvent.click(button);
+    }
+    fireEvent.click(screen.getByRole("button", { name: "직접 수정 내용 확인" }));
+    const commit = screen.getByRole("button", { name: "AI 기록 저장" });
+    await waitFor(() => expect(commit).toBeEnabled());
+    fireEvent.click(commit);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/현재 편집은 자동으로 덮어쓰지 않았습니다/);
+    expect(screen.getByDisplayValue("호스트가 직접 수정한 요약")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "최신 revision 다시 불러오기" })).toBeInTheDocument();
+  });
+
+  it("replaces the full grounded result and resets all reviews on regeneration", async () => {
+    mockedStart.mockResolvedValue({ jobId: "job-1", status: "PENDING", expiresAt: "2026-07-14T12:00:00Z" });
+    mockedGetJob.mockResolvedValue(groundedJob());
+    const regenerated = sampleSnapshot();
+    regenerated.summary = "revision 4 합성 요약";
+    mockedRegenerate.mockResolvedValue({
+      item: "summary",
+      value: { summary: regenerated.summary },
+      tokens: { input: 10, cachedInput: 0, output: 5 },
+      costEstimateUsd: "0.01",
+      warnings: [],
+      revision: 4,
+      result: regenerated,
+      evidence: groundedJob().evidence?.map((item) => ({
+        ...item,
+        targetId: item.targetId.replace("r3:", "r4:"),
+      })),
+      sectionReviewStatuses: {
+        SUMMARY: "PENDING_REVIEW",
+        HIGHLIGHTS: "PENDING_REVIEW",
+        ONE_LINE_REVIEWS: "PENDING_REVIEW",
+        FEEDBACK_DOCUMENT: "PENDING_REVIEW",
+      },
+    });
+    const { Wrapper } = createWrapper();
+    render(<Wrapper><AiGenerateTab sessionId="s1" clubSlug="club-a" onCommitted={() => {}} /></Wrapper>);
+    fireEvent.change(await screen.findByLabelText(/대본 파일/), {
+      target: { files: [new File(["공개 회원 00:00\n합성 대화"], "transcript.txt")] },
+    });
+    const start = screen.getByRole("button", { name: /생성 시작/ });
+    await waitFor(() => expect(start).toBeEnabled());
+    fireEvent.click(start);
+    for (const button of await screen.findAllByRole("button", { name: "AI 근거 검토 완료" })) {
+      fireEvent.click(button);
+    }
+    expect(screen.getByRole("button", { name: "AI 기록 저장" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "요약 재생성" }));
+    fireEvent.click(screen.getByRole("button", { name: "확인" }));
+
+    await waitFor(() => expect(mockedRegenerate).toHaveBeenCalledTimes(1));
+    expect(mockedRegenerate.mock.calls[0]?.[2]).toMatchObject({
+      item: "SUMMARY",
+      expectedRevision: 3,
+    });
+    expect(await screen.findByDisplayValue("revision 4 합성 요약")).toBeInTheDocument();
+    expect(screen.getByText("0/4 검토 완료")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "AI 기록 저장" })).toBeDisabled();
   });
 
   it("shows saving state when poll returns COMMITTING", async () => {

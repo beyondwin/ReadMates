@@ -3631,6 +3631,44 @@
   }
 }
 
+.aigen-review-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+  gap: 16px;
+  align-items: start;
+  min-width: 0;
+}
+
+.aigen-review-editor,
+.aigen-evidence-panel {
+  min-width: 0;
+}
+
+.aigen-evidence-panel {
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+}
+
+.aigen-evidence-drawer-trigger {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .aigen-review-workspace {
+    display: block;
+  }
+
+  .aigen-evidence-panel {
+    display: none;
+  }
+
+  .aigen-evidence-drawer-trigger {
+    display: inline-flex;
+  }
+}
+
 .admin-clubs__filters {
   display: flex;
   gap: 0.5rem;

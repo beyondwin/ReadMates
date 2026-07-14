@@ -122,7 +122,19 @@ describe("AiGenerateTab draft restoration (PREVIEW state machine)", () => {
       summary: "사용자가 편집한 요약",
       highlights: [{ authorName: "독자A", text: "편집된 하이라이트" }],
     };
-    saveAigenDraft(PRESEEDED_JOB_ID, draft);
+    saveAigenDraft({
+      version: 2,
+      jobId: PRESEEDED_JOB_ID,
+      revision: 0,
+      serverSnapshot: serverSnapshot(),
+      draft,
+      sectionReviews: {
+        SUMMARY: "PENDING",
+        HIGHLIGHTS: "PENDING",
+        ONE_LINE_REVIEWS: "PENDING",
+        FEEDBACK_DOCUMENT: "PENDING",
+      },
+    });
 
     mockedStart.mockResolvedValue({
       jobId: PRESEEDED_JOB_ID,

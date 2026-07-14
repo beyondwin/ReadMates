@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { SessionImportAuthoredText } from "@/features/host/aigen/api/aigen-contracts";
 
 export type OneLineReviewsSectionProps = {
@@ -6,16 +6,18 @@ export type OneLineReviewsSectionProps = {
   onChange: (next: SessionImportAuthoredText[]) => void;
   onRegenerate: () => void;
   disabled?: boolean;
+  sectionId?: string;
+  evidenceControls?: ReactNode;
 };
 
-export function OneLineReviewsSection({ items, onChange, onRegenerate, disabled }: OneLineReviewsSectionProps) {
+export function OneLineReviewsSection({ items, onChange, onRegenerate, disabled, sectionId, evidenceControls }: OneLineReviewsSectionProps) {
   const updateAt = (index: number, patch: Partial<SessionImportAuthoredText>) => {
     const next = items.map((item, i) => (i === index ? { ...item, ...patch } : item));
     onChange(next);
   };
 
   return (
-    <section className="surface-quiet" style={{ padding: 16 } as CSSProperties}>
+    <section id={sectionId} className="surface-quiet" style={{ padding: 16 } as CSSProperties}>
       <header className="row-between" style={{ marginBottom: 10 }}>
         <h3 className="eyebrow" style={{ margin: 0 }}>한줄평</h3>
         <button
@@ -55,6 +57,7 @@ export function OneLineReviewsSection({ items, onChange, onRegenerate, disabled 
           </li>
         ))}
       </ul>
+      {evidenceControls}
     </section>
   );
 }

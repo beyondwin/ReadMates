@@ -1,19 +1,22 @@
-/**
- * localStorage-backed draft storage for the AI generation PREVIEW (spec §10).
- *
- * Manual edits to the snapshot are kept in client state only; this helper
- * mirrors the snapshot under `aigen-draft:{jobId}` so a reload does not
- * destroy in-progress edits. The parent component is expected to call
- * `clearAigenDraft` on commit or cancel.
- *
- * All access is wrapped in try/catch — private browsing modes, disabled
- * storage, and quota errors are tolerated by silently dropping the write
- * or returning `null` on read.
- */
-
-import type { SessionImportV1 } from "@/features/host/aigen/api/aigen-contracts";
+import type { ReviewSection, SessionImportV1Snapshot } from "../api/aigen-contracts";
+import type { SectionReviewState } from "../model/aigen-review-state";
 
 const KEY_PREFIX = "aigen-draft:";
+const REVIEW_SECTIONS: ReviewSection[] = [
+  "SUMMARY", "HIGHLIGHTS", "ONE_LINE_REVIEWS", "FEEDBACK_DOCUMENT",
+];
+const REVIEW_STATES: SectionReviewState[] = [
+  "PENDING", "AI_GROUNDED_REVIEWED", "USER_EDITED_REVIEW_REQUIRED", "USER_EDITED_CONFIRMED",
+];
+
+export interface AiGenerationDraftEnvelope {
+  version: 2;
+  jobId: string;
+  revision: number;
+  serverSnapshot: SessionImportV1Snapshot;
+  draft: SessionImportV1Snapshot;
+  sectionReviews: Record<ReviewSection, SectionReviewState>;
+}
 
 export function draftStorageKey(jobId: string): string {
   return `${KEY_PREFIX}${jobId}`;
@@ -27,31 +30,88 @@ function storage(): Storage | null {
   }
 }
 
-export function saveAigenDraft(jobId: string, snapshot: SessionImportV1): void {
+function safeSnapshot(snapshot: SessionImportV1Snapshot): SessionImportV1Snapshot {
+  return {
+    format: snapshot.format,
+    sessionNumber: snapshot.sessionNumber,
+    bookTitle: snapshot.bookTitle,
+    meetingDate: snapshot.meetingDate,
+    summary: snapshot.summary,
+    highlights: snapshot.highlights.map(({ authorName, text }) => ({ authorName, text })),
+    oneLineReviews: snapshot.oneLineReviews.map(({ authorName, text }) => ({ authorName, text })),
+    feedbackDocumentFileName: snapshot.feedbackDocumentFileName,
+    feedbackDocumentMarkdown: snapshot.feedbackDocumentMarkdown,
+  };
+}
+
+export function saveAigenDraft(envelope: AiGenerationDraftEnvelope): boolean {
   const store = storage();
-  if (!store) return;
+  if (!store) return false;
+  const safe: AiGenerationDraftEnvelope = {
+    version: 2,
+    jobId: envelope.jobId,
+    revision: envelope.revision,
+    serverSnapshot: safeSnapshot(envelope.serverSnapshot),
+    draft: safeSnapshot(envelope.draft),
+    sectionReviews: { ...envelope.sectionReviews },
+  };
   try {
-    store.setItem(draftStorageKey(jobId), JSON.stringify(snapshot));
+    store.setItem(draftStorageKey(envelope.jobId), JSON.stringify(safe));
+    return true;
   } catch {
-    // Quota exceeded, private mode, etc. — drop the write silently.
+    return false;
   }
 }
 
-export function loadAigenDraft(jobId: string): SessionImportV1 | null {
+function isSnapshot(value: unknown): value is SessionImportV1Snapshot {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<SessionImportV1Snapshot>;
+  return (
+    typeof candidate.format === "string" &&
+    typeof candidate.sessionNumber === "number" &&
+    typeof candidate.bookTitle === "string" &&
+    typeof candidate.meetingDate === "string" &&
+    typeof candidate.summary === "string" &&
+    Array.isArray(candidate.highlights) &&
+    Array.isArray(candidate.oneLineReviews) &&
+    typeof candidate.feedbackDocumentFileName === "string" &&
+    typeof candidate.feedbackDocumentMarkdown === "string"
+  );
+}
+
+function isEnvelope(value: unknown): value is AiGenerationDraftEnvelope {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<AiGenerationDraftEnvelope>;
+  return (
+    candidate.version === 2 &&
+    typeof candidate.jobId === "string" &&
+    typeof candidate.revision === "number" &&
+    Number.isSafeInteger(candidate.revision) &&
+    isSnapshot(candidate.serverSnapshot) &&
+    isSnapshot(candidate.draft) &&
+    Boolean(candidate.sectionReviews) &&
+    REVIEW_SECTIONS.every((section) =>
+      REVIEW_STATES.includes(candidate.sectionReviews?.[section] as SectionReviewState),
+    )
+  );
+}
+
+export function loadAigenDraft(jobId: string, revision: number): AiGenerationDraftEnvelope | null {
   const store = storage();
   if (!store) return null;
-  let raw: string | null;
+  let value: unknown;
   try {
-    raw = store.getItem(draftStorageKey(jobId));
+    const raw = store.getItem(draftStorageKey(jobId));
+    if (raw === null) return null;
+    value = JSON.parse(raw);
   } catch {
     return null;
   }
-  if (raw === null) return null;
-  try {
-    return JSON.parse(raw) as SessionImportV1;
-  } catch {
+  if (!isEnvelope(value) || value.jobId !== jobId || value.revision !== revision) {
+    clearAigenDraft(jobId);
     return null;
   }
+  return value;
 }
 
 export function clearAigenDraft(jobId: string): void {
@@ -60,6 +120,6 @@ export function clearAigenDraft(jobId: string): void {
   try {
     store.removeItem(draftStorageKey(jobId));
   } catch {
-    // Tolerate failure — best-effort cleanup.
+    // Cleanup is best effort; no content is copied elsewhere.
   }
 }
