@@ -7,6 +7,8 @@ import java.util.UUID
 
 enum class Provider { CLAUDE, OPENAI, GEMINI }
 
+enum class AiGenerationPipelineMode { LEGACY, GROUNDED_WHOLE_TRANSCRIPT }
+
 data class ModelId(
     val provider: Provider,
     val name: String,
@@ -18,6 +20,12 @@ data class ModelPricing(
     val inputPerMTokenUsd: BigDecimal,
     val cachedInputPerMTokenUsd: BigDecimal,
     val outputPerMTokenUsd: BigDecimal,
+)
+
+data class ModelCapability(
+    val contextWindowTokens: Long,
+    val maxOutputTokens: Long,
+    val structuredOutputSupported: Boolean,
 )
 
 data class TokenUsage(

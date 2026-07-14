@@ -27,6 +27,16 @@ data class StartGenerationResponse(
     val expiresAt: String,
 )
 
+data class AvailableGenerationModelResponse(
+    val id: String,
+    val provider: String,
+    val isDefault: Boolean,
+)
+
+data class AvailableGenerationModelsResponse(
+    val models: List<AvailableGenerationModelResponse>,
+)
+
 data class SessionImportV1Json(
     val format: String,
     val sessionNumber: Int,

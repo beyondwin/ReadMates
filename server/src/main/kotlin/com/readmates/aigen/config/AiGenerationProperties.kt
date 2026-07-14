@@ -1,5 +1,6 @@
 package com.readmates.aigen.config
 
+import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import org.springframework.boot.context.properties.ConfigurationProperties
 import java.math.BigDecimal
 import java.time.Duration
@@ -16,10 +17,24 @@ data class AiGenerationProperties(
     // Ordered model aliases tried for cross-provider failover on availability
     // failures. Empty = feature off (same-provider retry only).
     val fallbackChain: List<String> = emptyList(),
+    val pipelineMode: AiGenerationPipelineMode = AiGenerationPipelineMode.LEGACY,
+    val grounded: Grounded = Grounded(),
     val caps: Caps = Caps(),
     val job: Job = Job(),
     val pricing: Map<String, Pricing> = emptyMap(),
 ) {
+    data class Grounded(
+        val reservedOutputTokens: Long = 16_384,
+        val safetyMarginTokens: Long = 8_192,
+        val capabilities: Map<String, Capability> = emptyMap(),
+    )
+
+    data class Capability(
+        val contextWindowTokens: Long,
+        val maxOutputTokens: Long,
+        val structuredOutputSupported: Boolean = false,
+    )
+
     data class Caps(
         val hostDailyCalls: Int = 10,
         val clubMonthlyCostUsd: BigDecimal = BigDecimal("20.00"),

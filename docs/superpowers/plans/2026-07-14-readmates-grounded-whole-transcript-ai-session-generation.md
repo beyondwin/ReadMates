@@ -133,7 +133,7 @@
 - Produces `GET /api/host/sessions/{sessionId}/ai-generate/models` returning only enabled, priced, capable models and the club default.
 - Consumes canonical provider model IDs and a 16,384-token application output reservation.
 
-- [ ] **Step 1: Write failing capability and model-list tests**
+- [x] **Step 1: Write failing capability and model-list tests**
 
 Pin fail-closed behavior and exact public contract:
 
@@ -154,7 +154,7 @@ fun `grounded model list excludes models without verified structured output capa
 }
 ```
 
-- [ ] **Step 2: Run the focused tests and verify RED**
+- [x] **Step 2: Run the focused tests and verify RED**
 
 ```bash
 ./server/gradlew -p server unitTest --tests '*YamlModelCapabilityCatalogTest' --tests '*AiGenerationControllerTest'
@@ -162,7 +162,7 @@ fun `grounded model list excludes models without verified structured output capa
 
 Expected: FAIL because the capability port, pipeline mode, and model-list endpoint do not exist.
 
-- [ ] **Step 3: Add the domain and configuration contracts**
+- [x] **Step 3: Add the domain and configuration contracts**
 
 Use explicit types; do not infer context from pricing:
 
@@ -196,7 +196,7 @@ readmates:
           structured-output-supported: true
         claude-sonnet-4-6:
           context-window-tokens: 1000000
-          max-output-tokens: 128000
+          max-output-tokens: 64000
           structured-output-supported: true
         gemini-3-flash-preview:
           context-window-tokens: 1048576
@@ -208,7 +208,7 @@ These values and canonical IDs were verified on 2026-07-14 against the official 
 
 The config validator must reject non-positive limits, an application output reservation above 16,384 or above a model's maximum, capability entries without pricing, and grounded enabled/default models without capability entries.
 
-- [ ] **Step 4: Add the host model-list use case and endpoint**
+- [x] **Step 4: Add the host model-list use case and endpoint**
 
 Authorize against the requested session and return safe metadata only:
 
@@ -226,11 +226,11 @@ interface ListGenerationModelsUseCase {
 
 Do not expose pricing, API keys, internal fallback order, or capability token counts to the browser.
 
-- [ ] **Step 5: Replace the stale Gemini identifier in configuration-level defaults**
+- [x] **Step 5: Replace the stale Gemini identifier in configuration-level defaults**
 
 Use `gemini-3-flash-preview` in `application.yml`, properties tests, and model-list tests. Database-stored defaults and smoke scripts are migrated in Task 10 and Task 14 so each change lands with its own regression coverage.
 
-- [ ] **Step 6: Rerun the focused tests and config regression gate**
+- [x] **Step 6: Rerun the focused tests and config regression gate**
 
 ```bash
 ./server/gradlew -p server unitTest --tests '*YamlModelCapabilityCatalogTest' --tests '*AiGenerationPropertiesTest' --tests '*AiGenerationConfigValidatorTest' --tests '*AiGenerationControllerTest'
@@ -238,7 +238,7 @@ Use `gemini-3-flash-preview` in `application.yml`, properties tests, and model-l
 
 Expected: PASS; the app still starts in `LEGACY` unless the environment explicitly selects the grounded mode.
 
-- [ ] **Step 7: Commit the capability slice**
+- [x] **Step 7: Commit the capability slice**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/aigen server/src/main/resources/application.yml server/src/test/kotlin/com/readmates/aigen

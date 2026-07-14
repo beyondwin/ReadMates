@@ -1,5 +1,6 @@
 package com.readmates.aigen.config
 
+import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -8,6 +9,7 @@ import org.springframework.boot.context.properties.bind.Binder
 import org.springframework.boot.context.properties.source.ConfigurationPropertySources
 import org.springframework.boot.env.YamlPropertySourceLoader
 import org.springframework.core.env.MutablePropertySources
+import org.springframework.mock.env.MockEnvironment
 import java.math.BigDecimal
 
 /**
@@ -16,6 +18,21 @@ import java.math.BigDecimal
  * and structurally identical to existing Claude entries.
  */
 class AiGenerationPropertiesTest {
+    private fun loadProperties(): AiGenerationProperties {
+        val resource =
+            org.springframework.core.io.FileSystemResource(
+                java.io.File("src/main/resources/application.yml"),
+            )
+        check(resource.exists()) { "application.yml not found" }
+        val sources = YamlPropertySourceLoader().load("application.yml", resource)
+        val environment = MockEnvironment()
+        sources.reversed().forEach { environment.propertySources.addFirst(it) }
+        return Binder
+            .get(environment)
+            .bind("readmates.aigen", AiGenerationProperties::class.java)
+            .get()
+    }
+
     private fun loadPricing(): Map<String, AiGenerationProperties.Pricing> {
         // Load the production application.yml directly from the source tree (not the test
         // classpath, which has its own shadowing application.yml without aigen config).
@@ -32,6 +49,25 @@ class AiGenerationPropertiesTest {
             org.springframework.boot.context.properties.bind.Bindable
                 .mapOf(String::class.java, AiGenerationProperties.Pricing::class.java)
         return binder.bind("readmates.aigen.pricing", pricingTarget).get()
+    }
+
+    @Test
+    fun `application yml keeps legacy default and binds grounded reservation`() {
+        val properties = loadProperties()
+
+        assertEquals(AiGenerationPipelineMode.LEGACY, properties.pipelineMode)
+        assertEquals(16_384L, properties.grounded.reservedOutputTokens)
+        assertEquals(8_192L, properties.grounded.safetyMarginTokens)
+    }
+
+    @Test
+    fun `application yml binds verified grounded capabilities`() {
+        val capabilities = loadProperties().grounded.capabilities
+
+        assertEquals(128_000L, capabilities["gpt-5.4-mini"]?.maxOutputTokens)
+        assertEquals(64_000L, capabilities["claude-sonnet-4-6"]?.maxOutputTokens)
+        assertEquals(65_536L, capabilities["gemini-3-flash-preview"]?.maxOutputTokens)
+        assertTrue(capabilities.values.all { it.structuredOutputSupported })
     }
 
     @Test
@@ -57,8 +93,8 @@ class AiGenerationPropertiesTest {
     fun `application_yml binds Gemini pricing entries with input cached and output rates`() {
         val pricing = loadPricing()
 
-        val geminiFlash = pricing["gemini-3-flash"]
-        assertNotNull(geminiFlash, "gemini-3-flash pricing must be present in application.yml")
+        val geminiFlash = pricing["gemini-3-flash-preview"]
+        assertNotNull(geminiFlash, "gemini-3-flash-preview pricing must be present in application.yml")
         assertEquals(0, BigDecimal("0.50").compareTo(geminiFlash!!.inputPerMTokenUsd))
         assertEquals(0, BigDecimal("0.05").compareTo(geminiFlash.cachedInputPerMTokenUsd))
         assertEquals(0, BigDecimal("3.00").compareTo(geminiFlash.outputPerMTokenUsd))

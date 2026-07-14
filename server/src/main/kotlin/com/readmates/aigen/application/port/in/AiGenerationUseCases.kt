@@ -5,6 +5,7 @@ import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.JobView
+import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
@@ -22,6 +23,19 @@ import java.util.UUID
  */
 interface StartGenerationUseCase {
     fun start(command: StartGenerationCommand): StartGenerationResult
+}
+
+data class AvailableGenerationModel(
+    val id: String,
+    val provider: Provider,
+    val isDefault: Boolean,
+)
+
+interface ListGenerationModelsUseCase {
+    fun list(
+        sessionId: UUID,
+        clubId: UUID,
+    ): List<AvailableGenerationModel>
 }
 
 data class StartGenerationCommand(

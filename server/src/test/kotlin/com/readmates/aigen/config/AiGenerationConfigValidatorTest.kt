@@ -1,5 +1,6 @@
 package com.readmates.aigen.config
 
+import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.port.out.AiGenerationJobPublishCommand
 import com.readmates.aigen.application.port.out.AiGenerationJobQueue
 import org.assertj.core.api.Assertions.assertThatCode
@@ -7,6 +8,7 @@ import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.support.DefaultListableBeanFactory
 import org.springframework.beans.factory.support.RootBeanDefinition
+import java.math.BigDecimal
 
 class AiGenerationConfigValidatorTest {
     @Test
@@ -43,6 +45,67 @@ class AiGenerationConfigValidatorTest {
             .hasMessageContaining("AiGenerationJobQueue")
             .hasMessageContaining("READMATES_AIGEN_KAFKA_ENABLED")
     }
+
+    @Test
+    fun `rejects grounded output reservation above application ceiling`() {
+        assertThatThrownBy {
+            AiGenerationConfigValidator(
+                aigenEnabled = true,
+                beanFactory = queueBeanFactory(),
+                properties = validProperties(reservedOutputTokens = 16_385),
+            ).validate()
+        }.isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("reserved-output-tokens")
+    }
+
+    @Test
+    fun `rejects capability entry without separate pricing`() {
+        val properties = validProperties().copy(pricing = emptyMap())
+
+        assertThatThrownBy {
+            AiGenerationConfigValidator(true, queueBeanFactory(), properties).validate()
+        }.isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("pricing")
+    }
+
+    @Test
+    fun `rejects grounded default without verified capability`() {
+        val properties =
+            validProperties().copy(
+                pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
+                fallbackDefaultModel = "future-model",
+            )
+
+        assertThatThrownBy {
+            AiGenerationConfigValidator(true, queueBeanFactory(), properties).validate()
+        }.isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("fallback-default-model")
+    }
+
+    private fun validProperties(reservedOutputTokens: Long = 16_384): AiGenerationProperties =
+        AiGenerationProperties(
+            fallbackDefaultModel = "gpt-5.4-mini",
+            pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
+            grounded =
+                AiGenerationProperties.Grounded(
+                    reservedOutputTokens = reservedOutputTokens,
+                    capabilities =
+                        mapOf(
+                            "gpt-5.4-mini" to
+                                AiGenerationProperties.Capability(400_000, 128_000, true),
+                        ),
+                ),
+            pricing =
+                mapOf(
+                    "gpt-5.4-mini" to
+                        AiGenerationProperties.Pricing(BigDecimal("0.75"), outputPerMTokenUsd = BigDecimal("4.50")),
+                ),
+        )
+
+    private fun queueBeanFactory(): DefaultListableBeanFactory =
+        DefaultListableBeanFactory().also { factory ->
+            factory.registerBeanDefinition("noopQueue", RootBeanDefinition(NoopQueue::class.java))
+        }
 
     private fun emptyBeanFactory(): DefaultListableBeanFactory = DefaultListableBeanFactory()
 

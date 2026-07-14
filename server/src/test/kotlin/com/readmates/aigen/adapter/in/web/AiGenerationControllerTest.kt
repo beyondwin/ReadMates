@@ -13,10 +13,12 @@ import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
+import com.readmates.aigen.application.port.`in`.AvailableGenerationModel
 import com.readmates.aigen.application.port.`in`.CancelGenerationUseCase
 import com.readmates.aigen.application.port.`in`.CommitGenerationUseCase
 import com.readmates.aigen.application.port.`in`.GetJobUseCase
 import com.readmates.aigen.application.port.`in`.GetRecentSessionGenerationJobUseCase
+import com.readmates.aigen.application.port.`in`.ListGenerationModelsUseCase
 import com.readmates.aigen.application.port.`in`.RegenerateItemUseCase
 import com.readmates.aigen.application.port.`in`.RegenerationResult
 import com.readmates.aigen.application.port.`in`.StartGenerationCommand
@@ -92,6 +94,7 @@ class AiGenerationControllerTest {
     private val regenerateUseCase = FakeRegenerateUseCase()
     private val commitUseCase = FakeCommitUseCase()
     private val cancelUseCase = FakeCancelUseCase()
+    private val listModelsUseCase = FakeListModelsUseCase()
     private val authPolicy = FakeAuthPolicy(sessionMeta)
     private val properties = AiGenerationProperties(enabled = true)
 
@@ -111,6 +114,7 @@ class AiGenerationControllerTest {
                         regen = regenerateUseCase,
                         commitUc = commitUseCase,
                         cancel = cancelUseCase,
+                        listModels = listModelsUseCase,
                         auth = authPolicy,
                         props = properties,
                     ),
@@ -167,6 +171,7 @@ class AiGenerationControllerTest {
                         regen = regenerateUseCase,
                         commitUc = commitUseCase,
                         cancel = cancelUseCase,
+                        listModels = listModelsUseCase,
                         auth = authPolicy,
                         props = AiGenerationProperties(enabled = false),
                     ),
@@ -242,6 +247,28 @@ class AiGenerationControllerTest {
                 jsonPath("$.result.bookTitle") { value("Title") }
                 jsonPath("$.costEstimateUsd") { value("0.12") }
                 jsonPath("$.tokens.input") { value(100) }
+            }
+    }
+
+    @Test
+    fun `grounded model list returns only safe enabled capable models and default`() {
+        listModelsUseCase.models =
+            listOf(
+                AvailableGenerationModel("gpt-5.4-mini", Provider.OPENAI, true),
+                AvailableGenerationModel("claude-sonnet-4-6", Provider.CLAUDE, false),
+                AvailableGenerationModel("gemini-3-flash-preview", Provider.GEMINI, false),
+            )
+
+        mockMvc
+            .get("/api/host/sessions/$sessionId/ai-generate/models") {
+                with(authedUser())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.models[0].id") { value("gpt-5.4-mini") }
+                jsonPath("$.models[0].provider") { value("OPENAI") }
+                jsonPath("$.models[0].default") { value(true) }
+                jsonPath("$.models[1].id") { value("claude-sonnet-4-6") }
+                jsonPath("$.models[2].id") { value("gemini-3-flash-preview") }
             }
     }
 
@@ -507,6 +534,15 @@ class AiGenerationControllerTest {
         ) {
             calls += Triple(sessionId, jobId, hostUserId)
         }
+    }
+
+    private class FakeListModelsUseCase : ListGenerationModelsUseCase {
+        var models: List<AvailableGenerationModel> = emptyList()
+
+        override fun list(
+            sessionId: UUID,
+            clubId: UUID,
+        ): List<AvailableGenerationModel> = models
     }
 
     private class FakeAuthPolicy(

@@ -9,6 +9,7 @@ import com.readmates.aigen.application.port.`in`.CancelGenerationUseCase
 import com.readmates.aigen.application.port.`in`.CommitGenerationUseCase
 import com.readmates.aigen.application.port.`in`.GetJobUseCase
 import com.readmates.aigen.application.port.`in`.GetRecentSessionGenerationJobUseCase
+import com.readmates.aigen.application.port.`in`.ListGenerationModelsUseCase
 import com.readmates.aigen.application.port.`in`.RegenerateItemUseCase
 import com.readmates.aigen.application.port.`in`.StartGenerationCommand
 import com.readmates.aigen.application.port.`in`.StartGenerationUseCase
@@ -58,6 +59,7 @@ class AiGenerationController(
     private val regen: RegenerateItemUseCase,
     private val commitUc: CommitGenerationUseCase,
     private val cancel: CancelGenerationUseCase,
+    private val listModels: ListGenerationModelsUseCase,
     private val auth: AiGenerationAuthorizationPolicy,
     private val props: AiGenerationProperties,
 ) {
@@ -180,6 +182,25 @@ class AiGenerationController(
         auth.requireHostAccess(sessionId, member)
         cancel.cancel(sessionId, jobId, member.userId)
         return ResponseEntity.noContent().build()
+    }
+
+    @GetMapping("/models")
+    fun listAvailableModels(
+        @PathVariable sessionId: UUID,
+        member: CurrentMember,
+    ): AvailableGenerationModelsResponse {
+        ensureEnabled()
+        val meta = auth.requireHostAccess(sessionId, member)
+        return AvailableGenerationModelsResponse(
+            models =
+                listModels.list(sessionId, meta.clubId).map { model ->
+                    AvailableGenerationModelResponse(
+                        id = model.id,
+                        provider = model.provider.name,
+                        isDefault = model.isDefault,
+                    )
+                },
+        )
     }
 
     private fun ensureEnabled() {

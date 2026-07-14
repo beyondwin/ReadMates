@@ -98,6 +98,23 @@ readmates:
     # Canonical provider names: CLAUDE, OPENAI, GEMINI. Empty default = kill switch.
     enabled-providers: ${READMATES_AIGEN_ENABLED_PROVIDERS:}
     fallback-default-model: ${READMATES_AIGEN_FALLBACK_DEFAULT_MODEL:gpt-5.4-mini}
+    pipeline-mode: ${READMATES_AIGEN_PIPELINE_MODE:LEGACY}
+    grounded:
+      reserved-output-tokens: ${READMATES_AIGEN_GROUNDED_RESERVED_OUTPUT_TOKENS:16384}
+      safety-margin-tokens: ${READMATES_AIGEN_GROUNDED_SAFETY_MARGIN_TOKENS:8192}
+      capabilities:
+        "[gpt-5.4-mini]":
+          context-window-tokens: 400000
+          max-output-tokens: 128000
+          structured-output-supported: true
+        claude-sonnet-4-6:
+          context-window-tokens: 1000000
+          max-output-tokens: 64000
+          structured-output-supported: true
+        "[gemini-3-flash-preview]":
+          context-window-tokens: 1048576
+          max-output-tokens: 65536
+          structured-output-supported: true
     caps:
       host-daily-calls: ${READMATES_AIGEN_HOST_DAILY_CALLS:10}
       club-monthly-cost-usd: ${READMATES_AIGEN_CLUB_MONTHLY_COST_USD:20.00}
@@ -125,10 +142,10 @@ readmates:
         output-per-m-token-usd: 4.50
       # Gemini public API pricing (3 Flash, per-million-token, USD).
       # Source: ai.google.dev/gemini-api/docs/pricing (verified 2026-05-17, standard tier).
-      # NOTE: gemini-3-flash is currently a Preview model — pricing and endpoint
+      # NOTE: gemini-3-flash-preview is currently a Preview model — pricing and endpoint
       # may change before GA. Track via release notes; bump pricing/version when
       # GA lands. gemini-2.x flash retires 2026-06-01.
-      "[gemini-3-flash]":
+      "[gemini-3-flash-preview]":
         input-per-m-token-usd: 0.50
         cached-input-per-m-token-usd: 0.05
         output-per-m-token-usd: 3.00
