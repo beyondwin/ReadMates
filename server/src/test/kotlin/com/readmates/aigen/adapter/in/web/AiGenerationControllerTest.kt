@@ -33,6 +33,7 @@ import com.readmates.sessionimport.application.model.SessionImportCommittedFeedb
 import com.readmates.sessionimport.application.model.SessionImportPublicationPreview
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.core.MethodParameter
@@ -229,7 +230,63 @@ class AiGenerationControllerTest {
                 with(authedUser())
             }.andExpect {
                 status { isBadRequest() }
+                jsonPath("$.code") { value("TRANSCRIPT_TOO_LARGE") }
             }
+        assertThat(startUseCase.commands).isEmpty()
+    }
+
+    @Test
+    fun `POST jobs accepts case insensitive txt suffix and exact one MiB`() {
+        val prefix = "가람 00:00\n".toByteArray()
+        val exactLimit = prefix + ByteArray(1024 * 1024 - prefix.size) { 'a'.code.toByte() }
+
+        postTranscript("public-fixture.TXT", exactLimit).andExpect { status { isAccepted() } }
+
+        val submittedCommand = startUseCase.commands.single()
+        val submittedBytes = submittedCommand.transcript.toByteArray()
+        assertThat(submittedBytes).hasSize(1024 * 1024)
+    }
+
+    @Test
+    fun `POST jobs rejects missing or other suffix regardless of claimed MIME type`() {
+        listOf(null, "public-fixture", "public-fixture.json").forEach { filename ->
+            postTranscript(filename, "공개 테스트".toByteArray(), "text/plain").andExpect {
+                status { isUnprocessableEntity() }
+                jsonPath("$.code") { value("TRANSCRIPT_FORMAT_INVALID") }
+            }
+        }
+
+        assertThat(startUseCase.commands).isEmpty()
+    }
+
+    @Test
+    fun `POST jobs rejects empty upload before starting a job`() {
+        postTranscript("public-fixture.txt", byteArrayOf()).andExpect {
+            status { isUnprocessableEntity() }
+            jsonPath("$.code") { value("TRANSCRIPT_EMPTY") }
+        }
+
+        assertThat(startUseCase.commands).isEmpty()
+    }
+
+    @Test
+    fun `POST jobs rejects malformed UTF-8 without echoing bytes`() {
+        postTranscript("public-fixture.txt", byteArrayOf(0xC3.toByte(), 0x28)).andExpect {
+            status { isUnprocessableEntity() }
+            jsonPath("$.code") { value("TRANSCRIPT_FORMAT_INVALID") }
+            jsonPath("$.detail") { value("reason=UTF8_REQUIRED") }
+        }
+
+        assertThat(startUseCase.commands).isEmpty()
+    }
+
+    @Test
+    fun `POST jobs strictly decodes BOM and CRLF UTF-8 input`() {
+        val raw = "\uFEFF가람 00:00\r\n공개 테스트 발언입니다."
+
+        postTranscript("public-fixture.txt", raw.toByteArray()).andExpect { status { isAccepted() } }
+
+        assertThat(startUseCase.commands.single().transcript).isEqualTo(raw)
     }
 
     @Test
@@ -459,6 +516,23 @@ class AiGenerationControllerTest {
                 UsernamePasswordAuthenticationToken(currentMember.email, "password", emptyList())
             request
         }
+
+    private fun postTranscript(
+        filename: String?,
+        bytes: ByteArray,
+        contentType: String = "application/octet-stream",
+    ) = mockMvc.multipart("/api/host/sessions/$sessionId/ai-generate/jobs") {
+        file(MockMultipartFile("transcript", filename, contentType, bytes))
+        file(
+            MockMultipartFile(
+                "body",
+                "body.json",
+                "application/json",
+                """{"model":null,"authorNameMode":"real","instructions":null}""".toByteArray(),
+            ),
+        )
+        with(authedUser())
+    }
 
     private class FakeStartUseCase : StartGenerationUseCase {
         var result: StartGenerationResult =

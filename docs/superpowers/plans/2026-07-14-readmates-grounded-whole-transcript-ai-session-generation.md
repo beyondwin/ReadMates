@@ -262,7 +262,7 @@ git commit -m "feat(aigen): add grounded model capability catalog"
 - Produces `ParsedTranscript(normalizedTranscript, turns)` with `t000001`-style IDs.
 - Rejects unsupported encoding, malformed/unknown preambles, empty turns, decreasing timestamps, missing speaker turns, and timestamps above 10,800 seconds.
 
-- [ ] **Step 1: Add public-safe parser fixtures and failing tests**
+- [x] **Step 1: Add public-safe parser fixtures and failing tests**
 
 Keep fixture strings synthetic and embedded in tests:
 
@@ -290,7 +290,7 @@ fun `parses BOM export header and multiline turns with stable ids`() {
 
 Add parameterized rejection cases for arbitrary preamble, `화자 1`, missing text, duplicate header without text, `03:00:00`, `180:01`, equal/decreasing timestamps, a title over 200 characters, and a participant line over 500 characters. Controller tests must cover case-insensitive `.txt` suffix acceptance, missing/other suffix rejection regardless of claimed MIME type, empty upload, exact 1 MiB acceptance, one-byte-over rejection, malformed UTF-8, BOM, and CRLF.
 
-- [ ] **Step 2: Run the parser test and verify RED**
+- [x] **Step 2: Run the parser test and verify RED**
 
 ```bash
 ./server/gradlew -p server unitTest --tests '*TranscriptParserTest'
@@ -298,7 +298,7 @@ Add parameterized rejection cases for arbitrary preamble, `화자 1`, missing te
 
 Expected: FAIL because `TranscriptParser` and parsed turn models do not exist.
 
-- [ ] **Step 3: Implement strict parsing and normalized text output**
+- [x] **Step 3: Implement strict parsing and normalized text output**
 
 Use a single anchored header regex and deterministic IDs:
 
@@ -320,11 +320,11 @@ data class ParsedTranscriptTurn(
 
 Accept either no preamble or the bounded 2–3 line export header: title, strict date/time/duration line, and optional participant list. Strip one leading BOM, normalize CRLF/CR to LF, preserve paragraph line breaks inside a turn, reject control-only text, and require strictly increasing timestamps. Do not normalize speaker names inside the parser; membership validation owns NFC/trim semantics.
 
-- [ ] **Step 4: Map parser failures to safe typed errors**
+- [x] **Step 4: Map parser failures to safe typed errors**
 
 Add `TRANSCRIPT_FORMAT_INVALID`, `TRANSCRIPT_EMPTY`, and `TRANSCRIPT_DURATION_EXCEEDED` to `ErrorCode` and the application exception hierarchy. Decode UTF-8 with a strict `CharsetDecoder` that reports malformed/unmappable bytes; map an invalid byte sequence to `TRANSCRIPT_FORMAT_INVALID` with a safe encoding reason. Errors may include a safe 1-based line number and reason enum but never the rejected transcript line.
 
-- [ ] **Step 5: Rerun parser and exception tests**
+- [x] **Step 5: Rerun parser and exception tests**
 
 ```bash
 ./server/gradlew -p server unitTest --tests '*TranscriptParserTest' --tests '*AiGenerationErrorHandlerTest'
@@ -332,7 +332,7 @@ Add `TRANSCRIPT_FORMAT_INVALID`, `TRANSCRIPT_EMPTY`, and `TRANSCRIPT_DURATION_EX
 
 Expected: PASS with no transcript text printed by assertion messages or exception serialization.
 
-- [ ] **Step 6: Commit the parser slice**
+- [x] **Step 6: Commit the parser slice**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/aigen/application server/src/test/kotlin/com/readmates/aigen/application

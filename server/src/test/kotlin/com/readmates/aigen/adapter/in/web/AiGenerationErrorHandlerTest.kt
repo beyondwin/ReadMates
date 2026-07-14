@@ -169,6 +169,9 @@ class AiGenerationErrorHandlerTest {
                 arrayOf(ErrorCode.HIGHLIGHTS_OUT_OF_RANGE, HttpStatus.UNPROCESSABLE_ENTITY),
                 arrayOf(ErrorCode.ONE_LINE_REVIEWS_DUPLICATE, HttpStatus.UNPROCESSABLE_ENTITY),
                 arrayOf(ErrorCode.FEEDBACK_TEMPLATE_INVALID, HttpStatus.UNPROCESSABLE_ENTITY),
+                arrayOf(ErrorCode.TRANSCRIPT_FORMAT_INVALID, HttpStatus.UNPROCESSABLE_ENTITY),
+                arrayOf(ErrorCode.TRANSCRIPT_EMPTY, HttpStatus.UNPROCESSABLE_ENTITY),
+                arrayOf(ErrorCode.TRANSCRIPT_DURATION_EXCEEDED, HttpStatus.UNPROCESSABLE_ENTITY),
                 arrayOf(ErrorCode.UNKNOWN, HttpStatus.INTERNAL_SERVER_ERROR),
             )
     }

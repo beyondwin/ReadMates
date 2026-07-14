@@ -158,6 +158,9 @@ internal fun ErrorCode.toHttpStatus(): HttpStatus =
         ErrorCode.HIGHLIGHTS_OUT_OF_RANGE,
         ErrorCode.ONE_LINE_REVIEWS_DUPLICATE,
         ErrorCode.FEEDBACK_TEMPLATE_INVALID,
+        ErrorCode.TRANSCRIPT_FORMAT_INVALID,
+        ErrorCode.TRANSCRIPT_EMPTY,
+        ErrorCode.TRANSCRIPT_DURATION_EXCEEDED,
         -> HttpStatus.UNPROCESSABLE_ENTITY
         ErrorCode.UNKNOWN -> HttpStatus.INTERNAL_SERVER_ERROR
     }

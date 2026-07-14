@@ -30,6 +30,10 @@ import org.springframework.web.bind.annotation.RequestPart
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.multipart.MultipartFile
+import java.nio.ByteBuffer
+import java.nio.charset.CharacterCodingException
+import java.nio.charset.CodingErrorAction
+import java.nio.charset.StandardCharsets
 import java.util.UUID
 
 private const val MAX_TRANSCRIPT_BYTES: Int = 1024 * 1024
@@ -74,9 +78,8 @@ class AiGenerationController(
         member: CurrentMember,
     ): StartGenerationResponse {
         ensureEnabled()
-        if (transcript.size > MAX_TRANSCRIPT_BYTES) {
-            throw TranscriptTooLargeException()
-        }
+        transcript.requireTxtFileName()
+        val decodedTranscript = transcript.readTranscriptBytes().decodeUtf8()
         val meta = auth.requireHostAccess(sessionId, member)
         val request = bodyMapper.readValue(body.bytes, StartGenerationRequest::class.java)
         val command =
@@ -84,7 +87,7 @@ class AiGenerationController(
                 sessionId = sessionId,
                 clubId = meta.clubId,
                 hostUserId = member.userId,
-                transcript = transcript.bytes.toString(Charsets.UTF_8),
+                transcript = decodedTranscript,
                 model = request.model,
                 authorNameMode = parseAuthorNameMode(request.authorNameMode),
                 instructions = request.instructions,
@@ -234,3 +237,28 @@ class AiGenerationController(
  * The error handler maps this to 400.
  */
 class TranscriptTooLargeException : RuntimeException("Transcript exceeds 1MB limit")
+
+private fun MultipartFile.requireTxtFileName() {
+    if (originalFilename?.endsWith(".txt", ignoreCase = true) != true) {
+        throw AiGenerationException.Coded(ErrorCode.TRANSCRIPT_FORMAT_INVALID, "reason=TXT_SUFFIX_REQUIRED")
+    }
+}
+
+private fun MultipartFile.readTranscriptBytes(): ByteArray {
+    if (size > MAX_TRANSCRIPT_BYTES) throw TranscriptTooLargeException()
+    val content = bytes
+    if (content.isEmpty()) throw AiGenerationException.Coded(ErrorCode.TRANSCRIPT_EMPTY, "reason=EMPTY")
+    return content
+}
+
+private fun ByteArray.decodeUtf8(): String =
+    try {
+        StandardCharsets.UTF_8
+            .newDecoder()
+            .onMalformedInput(CodingErrorAction.REPORT)
+            .onUnmappableCharacter(CodingErrorAction.REPORT)
+            .decode(ByteBuffer.wrap(this))
+            .toString()
+    } catch (_: CharacterCodingException) {
+        throw AiGenerationException.Coded(ErrorCode.TRANSCRIPT_FORMAT_INVALID, "reason=UTF8_REQUIRED")
+    }

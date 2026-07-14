@@ -28,6 +28,18 @@ data class ModelCapability(
     val structuredOutputSupported: Boolean,
 )
 
+data class ParsedTranscriptTurn(
+    val turnId: String,
+    val speakerName: String,
+    val startSeconds: Int,
+    val text: String,
+)
+
+data class ParsedTranscript(
+    val normalizedTranscript: String,
+    val turns: List<ParsedTranscriptTurn>,
+)
+
 data class TokenUsage(
     val inputTokens: Long,
     val cachedInputTokens: Long,
@@ -133,6 +145,9 @@ enum class ErrorCode {
     AI_DISABLED,
     JOB_EXPIRED,
     QUEUE_UNAVAILABLE,
+    TRANSCRIPT_FORMAT_INVALID,
+    TRANSCRIPT_EMPTY,
+    TRANSCRIPT_DURATION_EXCEEDED,
 
     /**
      * The per-job hard cap on LLM calls (start + validation retry + regenerations) has
