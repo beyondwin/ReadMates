@@ -8,8 +8,10 @@ import com.readmates.aigen.application.port.out.AiGenerationCommitReceipt
 import com.readmates.aigen.application.port.out.AiGenerationMembershipChangedException
 import com.readmates.shared.db.dbString
 import org.springframework.dao.DuplicateKeyException
+import org.springframework.jdbc.core.BatchPreparedStatementSetter
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
+import java.sql.PreparedStatement
 import java.text.Normalizer
 import java.time.LocalDateTime
 import java.time.ZoneOffset
@@ -49,25 +51,30 @@ class JdbcAiGenerationCommitPersistenceAdapter(
                 }
                 turn
             }
-        var changedCount = 0
-        verifiedSpeakers.forEach { turn ->
-            if (!participantIsAlreadySynchronized(sessionId, turn.speakerMembershipId)) {
-                changedCount += 1
-            }
-            jdbc.update(
-                """
-                insert into session_participants
-                  (id, club_id, session_id, membership_id, rsvp_status, attendance_status, participation_status)
-                values (?, ?, ?, ?, 'GOING', 'ATTENDED', 'ACTIVE')
-                on duplicate key update
-                  rsvp_status = 'GOING', attendance_status = 'ATTENDED', participation_status = 'ACTIVE'
-                """.trimIndent(),
-                UUID.randomUUID().dbString(),
-                clubId.dbString(),
-                sessionId.dbString(),
-                turn.speakerMembershipId.dbString(),
-            )
-        }
+        val synchronizedMemberships = lockSynchronizedParticipants(sessionId, verifiedSpeakers.map { it.speakerMembershipId })
+        val changedCount = verifiedSpeakers.count { it.speakerMembershipId !in synchronizedMemberships }
+        jdbc.batchUpdate(
+            """
+            insert into session_participants
+              (id, club_id, session_id, membership_id, rsvp_status, attendance_status, participation_status)
+            values (?, ?, ?, ?, 'GOING', 'ATTENDED', 'ACTIVE')
+            on duplicate key update
+              rsvp_status = 'GOING', attendance_status = 'ATTENDED', participation_status = 'ACTIVE'
+            """.trimIndent(),
+            object : BatchPreparedStatementSetter {
+                override fun getBatchSize(): Int = verifiedSpeakers.size
+
+                override fun setValues(
+                    statement: PreparedStatement,
+                    index: Int,
+                ) {
+                    statement.setString(1, UUID.randomUUID().dbString())
+                    statement.setString(2, clubId.dbString())
+                    statement.setString(SESSION_ID_PARAMETER_INDEX, sessionId.dbString())
+                    statement.setString(MEMBERSHIP_ID_PARAMETER_INDEX, verifiedSpeakers[index].speakerMembershipId.dbString())
+                }
+            },
+        )
         return changedCount
     }
 
@@ -159,26 +166,33 @@ class JdbcAiGenerationCommitPersistenceAdapter(
                 membershipId.dbString(),
             ).firstOrNull()
 
-    private fun participantIsAlreadySynchronized(
+    private fun lockSynchronizedParticipants(
         sessionId: UUID,
-        membershipId: UUID,
-    ): Boolean =
-        jdbc
+        membershipIds: List<UUID>,
+    ): Set<UUID> {
+        if (membershipIds.isEmpty()) return emptySet()
+        val placeholders = membershipIds.joinToString(",") { "?" }
+        val parameters = arrayOf(sessionId.dbString(), *membershipIds.map { it.dbString() }.toTypedArray())
+        return jdbc
             .query(
                 """
-                select rsvp_status, attendance_status, participation_status
+                select membership_id, rsvp_status, attendance_status, participation_status
                 from session_participants
-                where session_id = ? and membership_id = ?
+                where session_id = ? and membership_id in ($placeholders)
                 for update
                 """.trimIndent(),
                 { rs, _ ->
-                    rs.getString("rsvp_status") == "GOING" &&
-                        rs.getString("attendance_status") == "ATTENDED" &&
-                        rs.getString("participation_status") == "ACTIVE"
+                    UUID.fromString(rs.getString("membership_id")) to
+                        (
+                            rs.getString("rsvp_status") == "GOING" &&
+                                rs.getString("attendance_status") == "ATTENDED" &&
+                                rs.getString("participation_status") == "ACTIVE"
+                        )
                 },
-                sessionId.dbString(),
-                membershipId.dbString(),
-            ).firstOrNull() ?: false
+                *parameters,
+            ).filter { it.second }
+            .mapTo(linkedSetOf()) { it.first }
+    }
 
     private fun String.normalized(): String = Normalizer.normalize(trim(), Normalizer.Form.NFC)
 
@@ -191,5 +205,7 @@ class JdbcAiGenerationCommitPersistenceAdapter(
 
     private companion object {
         const val ACTIVE = "ACTIVE"
+        const val SESSION_ID_PARAMETER_INDEX = 3
+        const val MEMBERSHIP_ID_PARAMETER_INDEX = 4
     }
 }

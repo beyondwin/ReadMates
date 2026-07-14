@@ -414,10 +414,15 @@ internal class FakeCostGuard(
 ) : GenerationCostGuard {
     val recorded: MutableList<Triple<UUID, UUID, BigDecimal>> = mutableListOf()
     val checked: MutableList<Pair<UUID, UUID>> = mutableListOf()
+    val released: MutableList<Triple<UUID, UUID, UUID>> = mutableListOf()
+    val renewed: MutableList<Triple<UUID, UUID, UUID>> = mutableListOf()
+    val renewDecisions: ArrayDeque<Boolean> = ArrayDeque()
+    var renewAllowed: Boolean = true
 
     override fun checkBeforeCall(
         hostId: UUID,
         clubId: UUID,
+        admissionId: UUID,
     ): GuardDecision {
         checked += hostId to clubId
         return decision
@@ -426,9 +431,27 @@ internal class FakeCostGuard(
     override fun recordUsage(
         hostId: UUID,
         clubId: UUID,
+        admissionId: UUID,
         cost: BigDecimal,
     ) {
         recorded += Triple(hostId, clubId, cost)
+    }
+
+    override fun releaseAdmission(
+        hostId: UUID,
+        clubId: UUID,
+        admissionId: UUID,
+    ) {
+        released += Triple(hostId, clubId, admissionId)
+    }
+
+    override fun renewAdmission(
+        hostId: UUID,
+        clubId: UUID,
+        admissionId: UUID,
+    ): Boolean {
+        renewed += Triple(hostId, clubId, admissionId)
+        return renewDecisions.removeFirstOrNull() ?: renewAllowed
     }
 
     override fun clubMonthlyCost(clubId: UUID): BigDecimal = clubMonthly

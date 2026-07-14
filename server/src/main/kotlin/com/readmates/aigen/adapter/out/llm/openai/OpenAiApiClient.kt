@@ -11,6 +11,7 @@ import com.readmates.aigen.adapter.out.llm.common.StructuredOutputJson
 import com.readmates.aigen.application.model.TokenUsage
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
+import java.time.Duration
 
 /**
  * Live [OpenAiApiPort] adapter backed by `com.openai:openai-java`.
@@ -69,6 +70,8 @@ open class OpenAiApiClient : OpenAiApiPort {
             OpenAIOkHttpClient
                 .builder()
                 .apiKey(apiKey)
+                .timeout(PROVIDER_TIMEOUT)
+                .maxRetries(SDK_MAX_RETRIES)
                 .build()
 
         val responseFormat = buildResponseFormat(schemaName, schema)
@@ -156,5 +159,7 @@ open class OpenAiApiClient : OpenAiApiPort {
 
     companion object {
         const val API_KEY_ENV: String = "READMATES_AIGEN_OPENAI_API_KEY"
+        internal const val SDK_MAX_RETRIES: Int = 0
+        private val PROVIDER_TIMEOUT: Duration = Duration.ofMinutes(4)
     }
 }

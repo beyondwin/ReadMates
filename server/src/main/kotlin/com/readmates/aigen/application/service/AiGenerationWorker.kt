@@ -254,21 +254,32 @@ class AiGenerationWorker(
         generator: SessionContentGenerator,
         input: GenerationInput,
     ): CallResult {
-        val cap = properties.job.maxLlmCallsPerJob
-        val next = jobStore.incrementLlmCallCount(record.jobId)
-        if (next > cap) {
+        if (!costGuard.renewAdmission(record.hostUserId, record.clubId, record.jobId)) {
             return CallResult.Failure(
                 GenerationError(
-                    ErrorCode.MAX_CALLS_EXCEEDED,
-                    "Per-job LLM call cap exceeded ($next > $cap)",
+                    ErrorCode.RATE_LIMITED,
+                    "Provider admission expired before call",
                 ),
             )
         }
-        return try {
-            CallResult.Success(generator.generateFull(input))
-        } catch (failure: LlmGenerationException) {
-            CallResult.Failure(failure.error)
-        }
+        val cap = properties.job.maxLlmCallsPerJob
+        val next = jobStore.incrementLlmCallCount(record.jobId)
+        val callResult =
+            if (next > cap) {
+                CallResult.Failure(
+                    GenerationError(
+                        ErrorCode.MAX_CALLS_EXCEEDED,
+                        "Per-job LLM call cap exceeded ($next > $cap)",
+                    ),
+                )
+            } else {
+                try {
+                    CallResult.Success(generator.generateFull(input))
+                } catch (failure: LlmGenerationException) {
+                    CallResult.Failure(failure.error)
+                }
+            }
+        return callResult
     }
 
     @Suppress("ReturnCount")
@@ -399,7 +410,7 @@ class AiGenerationWorker(
         // drop club/host monthly accounting (spec §"비용 회계 정책").
         // recordUsage failures must not fail the job — log and swallow.
         try {
-            costGuard.recordUsage(record.hostUserId, record.clubId, cost)
+            costGuard.recordUsage(record.hostUserId, record.clubId, record.jobId, cost)
         } catch (
             @Suppress("TooGenericExceptionCaught") failure: RuntimeException,
         ) {

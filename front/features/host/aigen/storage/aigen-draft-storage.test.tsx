@@ -86,9 +86,27 @@ describe("aigen-draft-storage v2", () => {
 
   it("purges a stored draft after the server-aligned six-hour TTL", () => {
     saveAigenDraft(envelope());
-    vi.setSystemTime(Date.now() + AIGEN_DRAFT_TTL_MS + 1);
+    vi.advanceTimersByTime(AIGEN_DRAFT_TTL_MS);
+
+    expect(window.localStorage.getItem(draftStorageKey("job-1"))).toBeNull();
+    expect(loadAigenDraft("job-1", 4)).toBeNull();
+  });
+
+  it("does not extend the fixed six-hour retention anchor on autosave", () => {
+    saveAigenDraft(envelope());
+    vi.setSystemTime(Date.now() + AIGEN_DRAFT_TTL_MS - 1_000);
+    saveAigenDraft({ ...envelope(), draft: snapshot("만료 직전 수정") });
+    vi.setSystemTime(Date.now() + 1_001);
 
     expect(loadAigenDraft("job-1", 4)).toBeNull();
+    expect(window.localStorage.getItem(draftStorageKey("job-1"))).toBeNull();
+  });
+
+  it("refuses to rewrite a physically expired revision", () => {
+    saveAigenDraft(envelope());
+    vi.setSystemTime(Date.now() + AIGEN_DRAFT_TTL_MS + 1);
+
+    expect(saveAigenDraft({ ...envelope(), draft: snapshot("만료 후 수정") })).toBe(false);
     expect(window.localStorage.getItem(draftStorageKey("job-1"))).toBeNull();
   });
 

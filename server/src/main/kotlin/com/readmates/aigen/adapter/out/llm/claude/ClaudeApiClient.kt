@@ -15,6 +15,7 @@ import com.readmates.aigen.adapter.out.llm.common.StructuredOutputJson
 import com.readmates.aigen.application.model.TokenUsage
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
+import java.time.Duration
 
 /**
  * Live [ClaudeApiPort] adapter backed by `com.anthropic:anthropic-java`.
@@ -71,6 +72,8 @@ open class ClaudeApiClient : ClaudeApiPort {
             AnthropicOkHttpClient
                 .builder()
                 .apiKey(apiKey)
+                .timeout(PROVIDER_TIMEOUT)
+                .maxRetries(SDK_MAX_RETRIES)
                 .build()
 
         val tool = buildTool(toolName, toolSchema)
@@ -170,5 +173,7 @@ open class ClaudeApiClient : ClaudeApiPort {
 
     companion object {
         const val API_KEY_ENV: String = "READMATES_AIGEN_ANTHROPIC_API_KEY"
+        internal const val SDK_MAX_RETRIES: Int = 0
+        private val PROVIDER_TIMEOUT: Duration = Duration.ofMinutes(4)
     }
 }

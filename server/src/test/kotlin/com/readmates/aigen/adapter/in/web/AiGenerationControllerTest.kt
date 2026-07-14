@@ -530,7 +530,8 @@ class AiGenerationControllerTest {
                 status { isOk() }
                 jsonPath("$.models[0].id") { value("gpt-5.4-mini") }
                 jsonPath("$.models[0].provider") { value("OPENAI") }
-                jsonPath("$.models[0].default") { value(true) }
+                jsonPath("$.models[0].isDefault") { value(true) }
+                jsonPath("$.models[0].default") { doesNotExist() }
                 jsonPath("$.models[1].id") { value("claude-sonnet-4-6") }
                 jsonPath("$.models[2].id") { value("gemini-3-flash-preview") }
             }

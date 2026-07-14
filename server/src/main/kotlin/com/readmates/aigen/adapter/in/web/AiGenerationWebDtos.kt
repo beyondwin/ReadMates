@@ -1,5 +1,6 @@
 package com.readmates.aigen.adapter.`in`.web
 
+import com.fasterxml.jackson.annotation.JsonProperty
 import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.ErrorCode
@@ -37,6 +38,7 @@ data class StartGenerationResponse(
 data class AvailableGenerationModelResponse(
     val id: String,
     val provider: String,
+    @get:JsonProperty("isDefault")
     val isDefault: Boolean,
 )
 

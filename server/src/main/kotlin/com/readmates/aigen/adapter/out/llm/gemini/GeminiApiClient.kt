@@ -111,6 +111,7 @@ open class GeminiApiClient : GeminiApiPort {
                 // contract and MAY be silently dropped today, so it does NOT
                 // replace the tier requirement.
                 .headers(mapOf(DATA_POLICY_HEADER to DATA_POLICY_NO_RETENTION))
+                .timeout(PROVIDER_TIMEOUT_MS)
                 .build()
 
         return Client
@@ -196,6 +197,7 @@ open class GeminiApiClient : GeminiApiPort {
             "GeminiApiClient: retention policy depends on Google AI Studio project tier — " +
                 "confirm paid-tier provisioning; see " +
                 "docs/operations/runbooks/ai-session-generation.md"
+        private const val PROVIDER_TIMEOUT_MS: Int = 240_000
         private val logger = LoggerFactory.getLogger(GeminiApiClient::class.java)
     }
 }

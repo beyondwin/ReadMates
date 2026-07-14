@@ -482,9 +482,13 @@ typed upload/preflight errors:
 revision: number
 groundingStatus: PENDING | VALID | INVALID
 sectionReviewStatuses: Record<GenerationItem, ReviewStatus>
-evidenceRefs: GroundedEvidenceRef[]
+evidence: GroundedEvidenceRef[]
 warnings: string[]
 ```
+
+wire field는 구현 계획과 기존 frontend naming에 맞춰 `evidence`로 고정한다. 이 배열은 transcript
+원문이 아니라 server가 검증된 `turnId`에서 만든 제한된 reference/excerpt이며, 전체 발언은 아래
+revision-scoped 단건 endpoint에서만 확장한다.
 
 server response의 section status는 새 generation revision마다 `PENDING_REVIEW`로 초기화된다. frontend는
 현재 tab의 확인/편집 상태를 job revision과 함께 localStorage에 overlay하지만 server는 이 client

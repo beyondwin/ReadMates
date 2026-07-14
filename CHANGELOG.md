@@ -15,10 +15,11 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - **호스트 TXT 워크플로:** UTF-8/BOM `.txt`, `화자명 MM:SS`, 1 MiB/3시간 한도를 적용합니다. 비회원·비활성·generic·중복 화자는 job/Redis/Kafka/provider/cost side effect 없이 거절하고 real-name 수정 안내만 제공합니다. 수동 편집은 해당 근거/review를 무효화하고 regeneration은 revision과 전체 review를 초기화합니다.
 - **Provider 계약:** grounded model ID를 OpenAI `gpt-5.4-mini`, Claude `claude-sonnet-4-6`, Gemini `gemini-3-flash-preview`로 정렬하고 pricing과 별도인 capability catalog, 16,384-token output reserve, network-call-free request budget guard를 추가했습니다. Capability drift는 503, request budget 초과는 422로 fail closed합니다.
 - **공개 릴리스 안전:** TypeScript incremental build metadata(`*.tsbuildinfo`)를 공개 릴리스 후보에서 제외하고 검사기와 fixture로 로컬 빌드 경로 재유입을 차단합니다.
+- **AI 경계 강화:** 비용 admission을 Redis Lua로 원자화하고 AI 전용 분당 한도와 fail-closed 동작을 적용했습니다. Retry/repair/regeneration을 포함한 각 provider network call 직전에 5분 owner lease를 갱신하고 SDK timeout을 4분으로 제한하며 OpenAI/Claude SDK 내부 retry를 꺼, queue 지연·stale worker·숨은 network attempt가 동시 비용 및 job call cap을 우회하지 못합니다. Problem 응답은 RFC 7807 media type을 사용하며, browser draft는 고정 6시간 TTL/예약 삭제/만료 후 재저장 차단으로 제한되고 BFF는 과대 multipart body를 buffering 전에 거절합니다. Frontend Zod fixture와 server 직렬화 계약 검증이 model default, job/evidence, regeneration, commit receipt, problem shape drift를 막습니다.
 
 ### Database
 
-- **Flyway V37:** content-free `ai_generation_commit_receipts`(`job_id + revision` unique)를 추가하고 `ai_generation_audit_log`에 pipeline/turn/speaker/grounding/review aggregate column을 추가했습니다. 기존 `gemini-3-flash` 클럽 기본값은 `gemini-3-flash-preview`로 이관하며 transcript, member name, result, evidence/excerpt를 MySQL에 저장하지 않습니다.
+- **Flyway V37:** content-free `ai_generation_commit_receipts`(`job_id + revision` unique)를 추가하고 `ai_generation_audit_log`에 pipeline/turn/speaker/grounding/review aggregate column을 추가했습니다. Rolling deploy 동안 구 server가 읽지 못하는 값으로 기존 row를 재작성하지 않으며, 새 server가 저장된 `gemini-3-flash` 기본값을 canonical `gemini-3-flash-preview`로 해석합니다. Transcript, member name, result, evidence/excerpt는 MySQL에 저장하지 않습니다.
 
 ### Deployment Notes
 

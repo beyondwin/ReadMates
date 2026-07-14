@@ -21,6 +21,55 @@ import java.util.UUID
 
 class AiGenerationRegenerationServiceTest {
     @Test
+    fun `expired admission blocks first regeneration provider call without consuming call budget`() {
+        val ctx = TestContext()
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.clubId,
+                hostUserId = ctx.hostUserId,
+                status = JobStatus.SUCCEEDED,
+                result = AiGenerationTestFixtures.snapshot(),
+            )
+        ctx.jobStore.save(record)
+        ctx.costGuard.renewAllowed = false
+
+        assertThatThrownBy {
+            ctx.service.regenerate(ctx.sessionId, record.jobId, GenerationItem.SUMMARY, null, null)
+        }.isInstanceOfSatisfying(AiGenerationException.Coded::class.java) { failure ->
+            assertThat(failure.code).isEqualTo(ErrorCode.RATE_LIMITED)
+        }
+
+        assertThat(ctx.regenerator.calls).isEmpty()
+        assertThat(ctx.jobStore.load(record.jobId)!!.llmCallCount).isEqualTo(record.llmCallCount)
+    }
+
+    @Test
+    fun `expired admission blocks regeneration retry before its provider call`() {
+        val ctx = TestContext()
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.clubId,
+                hostUserId = ctx.hostUserId,
+                status = JobStatus.SUCCEEDED,
+                result = AiGenerationTestFixtures.snapshot(),
+            )
+        ctx.jobStore.save(record)
+        ctx.regenerator.enqueueFailure(AiGenerationTestFixtures.providerError(ErrorCode.PROVIDER_UNAVAILABLE))
+        ctx.costGuard.renewDecisions.addAll(listOf(true, false))
+
+        assertThatThrownBy {
+            ctx.service.regenerate(ctx.sessionId, record.jobId, GenerationItem.SUMMARY, null, null)
+        }.isInstanceOfSatisfying(AiGenerationException.Coded::class.java) { failure ->
+            assertThat(failure.code).isEqualTo(ErrorCode.RATE_LIMITED)
+        }
+
+        assertThat(ctx.regenerator.calls).hasSize(1)
+        assertThat(ctx.jobStore.load(record.jobId)!!.llmCallCount).isEqualTo(record.llmCallCount + 1)
+    }
+
+    @Test
     fun `regenerate happy path patches snapshot and writes SUCCESS audit row`() {
         val ctx = TestContext()
         val record =

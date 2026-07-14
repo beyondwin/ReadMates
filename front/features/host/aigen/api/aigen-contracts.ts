@@ -8,6 +8,8 @@
  * server uses `Enum.name` for stage/status/item).
  */
 
+import { z } from "zod";
+
 export type AiRecordVisibility = "MEMBER" | "PUBLIC";
 
 export type AiGenerationStatus =
@@ -256,6 +258,166 @@ export type ClubAiDefaultResponse = {
 export type ClubAiDefaultRequest = {
   defaultModel: string;
 };
+
+// DEV-only runtime validators. Keeping each zod expression behind the static
+// Vite DEV flag lets production builds tree-shake the validator dependency,
+// while local/tests fail immediately when the Kotlin wire contract drifts.
+const TokenUsageSchema = import.meta.env.DEV
+  ? z.object({
+      input: z.number().int().nonnegative(),
+      cachedInput: z.number().int().nonnegative(),
+      output: z.number().int().nonnegative(),
+    })
+  : (null as never);
+const AuthoredTextSchema = import.meta.env.DEV
+  ? z.object({ authorName: z.string(), text: z.string() })
+  : (null as never);
+const SessionImportSchema = import.meta.env.DEV
+  ? z.object({
+      format: z.string(),
+      sessionNumber: z.number().int(),
+      bookTitle: z.string(),
+      meetingDate: z.string(),
+      summary: z.string(),
+      highlights: z.array(AuthoredTextSchema),
+      oneLineReviews: z.array(AuthoredTextSchema),
+      feedbackDocumentFileName: z.string(),
+      feedbackDocumentMarkdown: z.string(),
+    })
+  : (null as never);
+const EvidenceSchema = import.meta.env.DEV
+  ? z.object({
+      section: z.enum(["SUMMARY", "HIGHLIGHTS", "ONE_LINE_REVIEWS", "FEEDBACK_DOCUMENT"]),
+      targetId: z.string(),
+      ordinal: z.number().int().nonnegative(),
+      turnId: z.string(),
+      startSeconds: z.number().int().nonnegative(),
+      speakerName: z.string(),
+      excerpt: z.string(),
+      truncated: z.boolean(),
+    })
+  : (null as never);
+
+export const AiGenerationJobResponseSchema = import.meta.env.DEV
+  ? z.object({
+      jobId: z.string(),
+      status: z.string(),
+      stage: z.string().nullable(),
+      progressPct: z.number().int(),
+      model: z.string(),
+      result: SessionImportSchema.nullable(),
+      error: z.object({ code: z.string(), message: z.string() }).nullable(),
+      tokens: TokenUsageSchema.nullable(),
+      costEstimateUsd: z.string(),
+      warnings: z.array(z.string()),
+      expiresAt: z.string().optional(),
+      createdAt: z.string().optional(),
+      lastUpdatedAt: z.string().optional(),
+      revision: z.number().int().nonnegative().nullable().optional(),
+      groundingStatus: z.string().nullable().optional(),
+      evidence: z.array(EvidenceSchema).nullable().optional(),
+      sectionReviewStatuses: z.record(z.string(), z.string()).nullable().optional(),
+    })
+  : (null as never);
+
+export const AvailableGenerationModelsResponseSchema = import.meta.env.DEV
+  ? z.object({
+      models: z.array(
+        z.object({ id: z.string(), provider: z.string(), isDefault: z.boolean() }),
+      ),
+    })
+  : (null as never);
+
+export const RegenerateResponseSchema = import.meta.env.DEV
+  ? z.object({
+      item: z.string(),
+      value: z.unknown(),
+      tokens: TokenUsageSchema,
+      costEstimateUsd: z.string(),
+      warnings: z.array(z.string()),
+      revision: z.number().int().nonnegative().nullable().optional(),
+      result: SessionImportSchema.nullable().optional(),
+      evidence: z.array(EvidenceSchema).nullable().optional(),
+      sectionReviewStatuses: z.record(z.string(), z.string()).nullable().optional(),
+    })
+  : (null as never);
+
+export const ExpandedEvidenceTurnSchema = import.meta.env.DEV
+  ? z.object({
+      turnId: z.string(),
+      speakerName: z.string(),
+      startSeconds: z.number().int().nonnegative(),
+      text: z.string(),
+    })
+  : (null as never);
+
+export const AiCommitResponseSchema = import.meta.env.DEV
+  ? z.object({
+      sessionId: z.string(),
+      status: z.literal("COMMITTED"),
+      recovered: z.boolean(),
+      participantUpdatesCount: z.number().int().nonnegative().nullable(),
+    })
+  : (null as never);
+
+export const StartGenerationResponseSchema = import.meta.env.DEV
+  ? z.object({ jobId: z.string(), status: z.string(), expiresAt: z.string() })
+  : (null as never);
+
+export const AiRecentJobResponseSchema = import.meta.env.DEV
+  ? z.object({
+      jobId: z.string(),
+      status: z.string(),
+      stage: z.string().nullable(),
+      progressPct: z.number().int(),
+      model: z.string(),
+      error: z.object({ code: z.string(), message: z.string() }).nullable(),
+      costEstimateUsd: z.string(),
+      createdAt: z.string(),
+      lastUpdatedAt: z.string(),
+      expiresAt: z.string(),
+      availableActions: z.array(z.string()),
+    })
+  : (null as never);
+
+export const ClubAiDefaultResponseSchema = import.meta.env.DEV
+  ? z.object({ defaultModel: z.string().nullable() })
+  : (null as never);
+
+export const AiGenerationProblemSchema = import.meta.env.DEV
+  ? z.object({
+      type: z.string(),
+      title: z.string(),
+      status: z.number().int(),
+      detail: z.string().nullable(),
+      code: z.string(),
+      invalidSpeakerLabels: z.array(z.string()).nullable().optional(),
+      currentRevision: z.number().int().nonnegative().nullable().optional(),
+    })
+  : (null as never);
+
+function parseDev<T>(schema: z.ZodType<T>, value: unknown): T {
+  return import.meta.env.DEV ? schema.parse(value) : (value as T);
+}
+
+export const parseAiGenerationJobResponse = (value: unknown): AiGenerationJobResponse =>
+  parseDev(AiGenerationJobResponseSchema, value) as AiGenerationJobResponse;
+export const parseAvailableGenerationModelsResponse = (
+  value: unknown,
+): AvailableGenerationModelsResponse =>
+  parseDev(AvailableGenerationModelsResponseSchema, value) as AvailableGenerationModelsResponse;
+export const parseRegenerateResponse = (value: unknown): RegenerateResponse =>
+  parseDev(RegenerateResponseSchema, value) as RegenerateResponse;
+export const parseExpandedEvidenceTurn = (value: unknown): ExpandedEvidenceTurn =>
+  parseDev(ExpandedEvidenceTurnSchema, value) as ExpandedEvidenceTurn;
+export const parseAiCommitResponse = (value: unknown): AiCommitResponse =>
+  parseDev(AiCommitResponseSchema, value) as AiCommitResponse;
+export const parseStartGenerationResponse = (value: unknown): StartGenerationResponse =>
+  parseDev(StartGenerationResponseSchema, value) as StartGenerationResponse;
+export const parseAiRecentJobResponse = (value: unknown): AiRecentJobResponse =>
+  parseDev(AiRecentJobResponseSchema, value) as AiRecentJobResponse;
+export const parseClubAiDefaultResponse = (value: unknown): ClubAiDefaultResponse =>
+  parseDev(ClubAiDefaultResponseSchema, value) as ClubAiDefaultResponse;
 
 /** RFC 7807 problem detail used by the AI generation error handler. */
 export type AiProblemDetail = {

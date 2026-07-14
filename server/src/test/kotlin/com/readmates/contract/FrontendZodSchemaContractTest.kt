@@ -1,5 +1,20 @@
 package com.readmates.contract
 
+import com.readmates.aigen.adapter.`in`.web.AvailableGenerationModelResponse
+import com.readmates.aigen.adapter.`in`.web.AvailableGenerationModelsResponse
+import com.readmates.aigen.adapter.`in`.web.ClubAiDefaultsResponse
+import com.readmates.aigen.adapter.`in`.web.EvidenceTargetResponse
+import com.readmates.aigen.adapter.`in`.web.ExpandedEvidenceTurnResponse
+import com.readmates.aigen.adapter.`in`.web.JobStatusResponse
+import com.readmates.aigen.adapter.`in`.web.ProblemDetail
+import com.readmates.aigen.adapter.`in`.web.RecentJobResponse
+import com.readmates.aigen.adapter.`in`.web.RegenerateResponse
+import com.readmates.aigen.adapter.`in`.web.SessionImportV1Json
+import com.readmates.aigen.adapter.`in`.web.StartGenerationResponse
+import com.readmates.aigen.adapter.`in`.web.TokenUsageJson
+import com.readmates.aigen.application.model.GenerationItem
+import com.readmates.aigen.application.model.JobStatus
+import com.readmates.aigen.application.port.`in`.CommitGenerationResult
 import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
@@ -170,6 +185,142 @@ class FrontendZodSchemaContractTest
                     .response.contentAsString
 
             assertJsonShapeMatches(response, "current-session.json")
+        }
+
+        @Test
+        @Suppress("LongMethod")
+        fun `grounded AI response DTOs match zod schema fixture key sets`() {
+            val result =
+                SessionImportV1Json(
+                    format = "readmates-session-import:v1",
+                    sessionNumber = 1,
+                    bookTitle = "공개 합성 도서",
+                    meetingDate = "2026-07-14",
+                    summary = "공개 합성 요약",
+                    highlights = listOf(SessionImportV1Json.AuthoredTextJson("가람", "공개 합성 하이라이트")),
+                    oneLineReviews = listOf(SessionImportV1Json.AuthoredTextJson("가람", "공개 합성 한줄평")),
+                    feedbackDocumentFileName = "synthetic-feedback.md",
+                    feedbackDocumentMarkdown = "# 공개 합성 피드백",
+                )
+            val evidence =
+                listOf(
+                    EvidenceTargetResponse(
+                        GenerationItem.SUMMARY,
+                        "summary-0",
+                        0,
+                        "t000001",
+                        0,
+                        "가람",
+                        "공개 합성 발언",
+                        false,
+                    ),
+                )
+            assertJsonShapeMatches(
+                objectMapper.writeValueAsString(
+                    JobStatusResponse(
+                        UUID.fromString("00000000-0000-0000-0000-000000000401"),
+                        "SUCCEEDED",
+                        "READY",
+                        100,
+                        "gpt-5.4-mini",
+                        result,
+                        null,
+                        TokenUsageJson(100, 0, 50),
+                        "0.0010",
+                        emptyList(),
+                        "2026-07-14T12:00:00Z",
+                        "2026-07-14T06:00:00Z",
+                        "2026-07-14T06:01:00Z",
+                        1,
+                        "VALID",
+                        evidence,
+                        mapOf(GenerationItem.SUMMARY to "PENDING_REVIEW"),
+                    ),
+                ),
+                "aigen-job.json",
+            )
+            assertJsonShapeMatches(
+                objectMapper.writeValueAsString(
+                    AvailableGenerationModelsResponse(
+                        listOf(AvailableGenerationModelResponse("gpt-5.4-mini", "OPENAI", true)),
+                    ),
+                ),
+                "aigen-models.json",
+            )
+            assertJsonShapeMatches(
+                objectMapper.writeValueAsString(
+                    RegenerateResponse(
+                        "summary",
+                        mapOf("summary" to "공개 합성 재생성 요약"),
+                        TokenUsageJson(100, 0, 20),
+                        "0.0010",
+                        emptyList(),
+                        2,
+                        result,
+                        evidence,
+                        mapOf(GenerationItem.SUMMARY to "PENDING_REVIEW"),
+                    ),
+                ),
+                "aigen-regeneration.json",
+            )
+            assertJsonShapeMatches(
+                objectMapper.writeValueAsString(ExpandedEvidenceTurnResponse("t000001", "가람", 0, "공개 합성 전체 발언")),
+                "aigen-expanded-evidence.json",
+            )
+            assertJsonShapeMatches(
+                objectMapper.writeValueAsString(
+                    CommitGenerationResult(
+                        UUID.fromString("00000000-0000-0000-0000-000000000301"),
+                        JobStatus.COMMITTED,
+                        false,
+                        1,
+                    ),
+                ),
+                "aigen-commit-receipt.json",
+            )
+            assertJsonShapeMatches(
+                objectMapper.writeValueAsString(
+                    ProblemDetail(
+                        title = "Unprocessable Entity",
+                        status = 422,
+                        detail = "공개 합성 검증 오류",
+                        code = "TRANSCRIPT_FORMAT_INVALID",
+                    ),
+                ),
+                "aigen-problem.json",
+            )
+            assertJsonShapeMatches(
+                objectMapper.writeValueAsString(
+                    StartGenerationResponse(
+                        UUID.fromString("00000000-0000-0000-0000-000000000401"),
+                        "PENDING",
+                        "2026-07-14T12:00:00Z",
+                    ),
+                ),
+                "aigen-start.json",
+            )
+            assertJsonShapeMatches(
+                objectMapper.writeValueAsString(
+                    RecentJobResponse(
+                        UUID.fromString("00000000-0000-0000-0000-000000000401"),
+                        "RUNNING",
+                        "GENERATING_RECORD",
+                        50,
+                        "gpt-5.4-mini",
+                        null,
+                        "0.0000",
+                        "2026-07-14T12:00:00Z",
+                        "2026-07-14T06:00:00Z",
+                        "2026-07-14T06:01:00Z",
+                        listOf("POLL", "CANCEL"),
+                    ),
+                ),
+                "aigen-recent-job.json",
+            )
+            assertJsonShapeMatches(
+                objectMapper.writeValueAsString(ClubAiDefaultsResponse("gemini-3-flash-preview")),
+                "aigen-club-default.json",
+            )
         }
 
         @Test

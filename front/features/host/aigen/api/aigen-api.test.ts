@@ -181,6 +181,24 @@ describe("AI-specific problem details", () => {
 });
 
 describe("getJob", () => {
+  it("rejects a malformed success payload in development instead of trusting an unchecked cast", async () => {
+    captureFetch(
+      jsonResponse({
+        jobId: "job-1",
+        status: "RUNNING",
+        stage: "GENERATING_SUMMARY",
+        progressPct: 42,
+        model: "claude-sonnet-4-6",
+        result: null,
+        error: null,
+        tokens: null,
+        costEstimateUsd: "0.01",
+      }),
+    );
+
+    await expect(getJob("sid-1", "job-1")).rejects.toThrow();
+  });
+
   it("GETs /api/host/sessions/{sid}/ai-generate/jobs/{jobId}", async () => {
     const fetchMock = captureFetch(
       jsonResponse({
@@ -328,6 +346,29 @@ describe("getRecentJob", () => {
     expect(url).toBe("/api/bff/api/host/sessions/session-1/ai-generate/jobs/recent");
     expect(init?.method ?? "GET").toBe("GET");
   });
+
+  it("validates and returns recent job metadata", async () => {
+    captureFetch(
+      jsonResponse({
+        jobId: "job-1",
+        status: "FAILED",
+        stage: null,
+        progressPct: 0,
+        model: "gpt-5.4-mini",
+        error: { code: "PROVIDER_UNAVAILABLE", message: "safe" },
+        costEstimateUsd: "0.0000",
+        createdAt: "2026-07-14T00:00:00Z",
+        lastUpdatedAt: "2026-07-14T00:01:00Z",
+        expiresAt: "2026-07-14T06:00:00Z",
+        availableActions: ["START_NEW"],
+      }),
+    );
+
+    await expect(getRecentJob("session-1")).resolves.toMatchObject({
+      jobId: "job-1",
+      availableActions: ["START_NEW"],
+    });
+  });
 });
 
 describe("regenerateItem", () => {
@@ -371,15 +412,9 @@ describe("commitGeneration", () => {
     const fetchMock = captureFetch(
       jsonResponse({
         sessionId: "sid-1",
-        publication: { summary: "s" },
-        highlights: [],
-        oneLineReviews: [],
-        feedbackDocument: {
-          uploaded: true,
-          fileName: "f.md",
-          title: "t",
-          uploadedAt: null,
-        },
+        status: "COMMITTED",
+        recovered: false,
+        participantUpdatesCount: 1,
       }),
     );
 
@@ -406,15 +441,9 @@ describe("commitGeneration", () => {
     const fetchMock = captureFetch(
       jsonResponse({
         sessionId: "sid-1",
-        publication: { summary: "s" },
-        highlights: [],
-        oneLineReviews: [],
-        feedbackDocument: {
-          uploaded: true,
-          fileName: "f.md",
-          title: "t",
-          uploadedAt: null,
-        },
+        status: "COMMITTED",
+        recovered: false,
+        participantUpdatesCount: 1,
       }),
     );
 
@@ -488,6 +517,14 @@ describe("getClubAiDefault", () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit | undefined];
     expect(url).toBe("/api/bff/api/host/clubs/my-club/ai-defaults");
     expect(init?.method ?? "GET").toBe("GET");
+  });
+
+  it("normalizes the rolling-deploy Gemini alias for the canonical dropdown", async () => {
+    captureFetch(jsonResponse({ defaultModel: "gemini-3-flash" }));
+
+    await expect(getClubAiDefault("my-club")).resolves.toEqual({
+      defaultModel: "gemini-3-flash-preview",
+    });
   });
 });
 

@@ -188,6 +188,7 @@ class AiGenerationOrchestratorTest {
         val audit = ctx.auditPort.entries.single()
         assertThat(audit.status).isEqualTo(AuditStatus.FAILED)
         assertThat(audit.errorCode).isEqualTo(ErrorCode.QUEUE_UNAVAILABLE)
+        assertThat(ctx.costGuard.released).hasSize(1)
     }
 
     @Test

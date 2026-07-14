@@ -468,9 +468,10 @@ COMMITTED -> cache invalidation + four-payload cleanup
   - `aigen:job:<jobId>:turns` (String, TTL 6h) — membership에 bind된 parsed turn/source context.
   - `aigen:job:<jobId>:result` (String, TTL 6h) — validated `SessionImportV1Snapshot`.
   - `aigen:job:<jobId>:evidence` (String, TTL 6h) — revision-scoped target/turn mapping과 서버가 만든 excerpt.
-  - `aigen:cost:club:<clubId>:<YYYY-MM>` (String, TTL 31d) — 월별 클럽 누적 비용 BigDecimal scale=4 USD.
-  - `aigen:cost:host:<userId>:<YYYY-MM-DD>` (String, TTL 24h) — 호스트 일일 생성 횟수 카운터.
-  - `aigen:cost:host:<userId>:<YYYY-MM>` (String, TTL 31d) — 호스트 월별 누적 비용 (감사 보조).
+  - `aigen:club:<clubId>:monthly_cost_usd` (String, sliding TTL 31d) — 클럽 누적 비용 BigDecimal USD.
+  - `aigen:host:<userId>:daily` (String, sliding TTL 24h) — 호스트 일일 provider admission 횟수.
+  - `aigen:host:<userId>:minute` (String, TTL 60s) — AI endpoint 전용 분당 admission 횟수.
+  - `aigen:club:<clubId>:provider_admission` (String, TTL 5m) — 비용 check/record 사이 동시 요청을 직렬화하는 owner-token lease. Worker와 regeneration은 retry/repair를 포함한 각 실제 provider network call 직전에 owner가 일치할 때만 lease를 5분으로 갱신하고, 갱신 실패 시 호출을 시작하지 않는다. Provider SDK HTTP timeout은 4분으로 고정해 갱신된 lease보다 짧고 OpenAI/Claude SDK 자체 retry는 0회라 애플리케이션 call counter가 유일한 재시도 예산이다. Usage/rollback은 owner가 일치할 때만 해제하고 crash/error 시 TTL이 backstop이다. Lua admission은 이 네 상태를 원자적으로 검사하며 Redis 오류에는 fail closed한다.
 - **Job state machine**: 정상 commit은 `PENDING -> RUNNING -> SUCCEEDED -> COMMITTING -> COMMITTED`입니다. Redis revision CAS가 worker save/regeneration/commit 경합을 막습니다. Receipt 없는 DB 실패 또는 만료 `COMMITTING` lease는 `COMMIT_RETRY`로 복구하고, receipt가 있으면 DB write 없이 `COMMITTED`로 수렴합니다. Commit/cancel은 네 payload를 지우고 terminal hash만 TTL까지 남깁니다. DB commit 후 cleanup 실패는 `COMMITTED + cleanupPending`이며 DB write를 반복하지 않습니다.
 - **LLM call cap**: primary, availability fallback, 한 section repair, regeneration은 같은 atomic `llmCallCount`와 cost cap을 사용합니다. Primary와 repair는 모두 전체 ordered transcript를 유지하며 invalid draft는 Redis result/evidence나 browser에 저장하지 않습니다.
 - **MySQL 테이블** (Flyway V30/V31/V34/V37):

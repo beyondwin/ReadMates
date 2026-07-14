@@ -126,8 +126,9 @@ test("AI generation full flow: upload → poll → preview → commit", async ({
         if (method === "POST") {
           await fulfillJson(route, 200, {
             sessionId: SESSION_ID,
-            publicationId: "p-1",
-            feedbackDocumentFileName: snapshot().feedbackDocumentFileName,
+            status: "COMMITTED",
+            recovered: false,
+            participantUpdatesCount: 2,
           });
           return;
         }

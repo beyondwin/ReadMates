@@ -1,0 +1,9 @@
+{
+  "type": "about:blank",
+  "title": "Unprocessable Entity",
+  "status": 422,
+  "detail": "공개 합성 검증 오류",
+  "code": "TRANSCRIPT_FORMAT_INVALID",
+  "invalidSpeakerLabels": null,
+  "currentRevision": null
+}

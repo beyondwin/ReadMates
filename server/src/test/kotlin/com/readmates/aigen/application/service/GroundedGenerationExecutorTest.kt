@@ -34,6 +34,20 @@ import java.util.UUID
 
 class GroundedGenerationExecutorTest {
     @Test
+    fun `expired provider admission fails closed before grounded provider call`() {
+        val context = Context()
+        context.costGuard.renewAllowed = false
+
+        context.executor.process(context.record, AiGenerationTestFixtures.NOW)
+
+        val saved = context.jobStore.load(context.record.jobId)!!
+        assertThat(saved.status).isEqualTo(JobStatus.FAILED)
+        assertThat(saved.error!!.code).isEqualTo(ErrorCode.RATE_LIMITED)
+        assertThat(context.claude.generateCalls).isZero()
+        assertThat(saved.llmCallCount).isZero()
+    }
+
+    @Test
     fun `valid grounded draft uses one provider call and saves all sections with evidence`() {
         val context = Context()
         context.claude.generations += GroundedGenerationOutput(validDraft(), USAGE)
@@ -221,6 +235,7 @@ class GroundedGenerationExecutorTest {
         val openai = FakeGroundedGenerator(Provider.OPENAI)
         val renderer = RecordingRenderer()
         val auditPort = FakeAuditPort()
+        val costGuard = FakeCostGuard()
         private val generators = mapOf(Provider.CLAUDE to claude, Provider.OPENAI to openai)
         private val modelCatalog =
             AiGenerationTestFixtures.defaultModelCatalog(
@@ -248,7 +263,7 @@ class GroundedGenerationExecutorTest {
                 GroundedGenerationValidator(GroundedEvidenceProjector()),
                 modelCatalog,
                 auditPort,
-                FakeCostGuard(),
+                costGuard,
                 FakeLatencyNotification(),
                 properties,
                 FakeClock(AiGenerationTestFixtures.NOW),

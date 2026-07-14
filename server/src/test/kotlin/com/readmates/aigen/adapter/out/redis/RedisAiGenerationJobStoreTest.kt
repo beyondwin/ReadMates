@@ -129,6 +129,29 @@ class RedisAiGenerationJobStoreTest(
     }
 
     @Test
+    fun `load treats a pre-grounded raw hash as a legacy job`() {
+        val record = newRecord()
+        store.save(record)
+        val hashKey = "aigen:job:${record.jobId}"
+
+        redisTemplate.opsForHash<String, String>().delete(
+            hashKey,
+            "pipelineMode",
+            "revision",
+            "eligibleFallbackModels",
+            "cleanupPending",
+        )
+
+        val loaded = store.load(record.jobId)!!
+
+        assertThat(loaded.pipelineMode).isEqualTo(AiGenerationPipelineMode.LEGACY)
+        assertThat(loaded.revision).isZero()
+        assertThat(loaded.eligibleFallbackModels).isEmpty()
+        assertThat(loaded.cleanupPending).isFalse()
+        assertThat(loaded.transcript).isEqualTo(record.transcript)
+    }
+
+    @Test
     fun `load returns null when job does not exist`() {
         val loaded = store.load(UUID.randomUUID())
 

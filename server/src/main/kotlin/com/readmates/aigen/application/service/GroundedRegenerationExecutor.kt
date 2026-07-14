@@ -33,6 +33,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
 import java.time.Clock
+import java.util.UUID
 
 fun interface GroundedRegenerationExecutor {
     fun regenerate(
@@ -78,10 +79,11 @@ class DefaultGroundedRegenerationExecutor(
     ): RegenerationResult {
         val currentDraft = requireCurrentDraft(record, expectedRevision)
         val selectedModel = resolveModel(model, record)
-        requireCostAllowance(record)
         val generator = requireGenerator(selectedModel)
         val rendered = renderRegeneration(record, selectedModel, instructions, currentDraft, item)
-        val repair = callRepair(record, generator, selectedModel, item, rendered)
+        val admissionId = UUID.randomUUID()
+        requireCostAllowance(record, admissionId)
+        val repair = callRepair(record, generator, selectedModel, item, rendered, admissionId)
         val merged = mergeGroundedRepair(currentDraft, item, repair)
         val nextRevision = expectedRevision + 1
         val valid =
@@ -99,7 +101,7 @@ class DefaultGroundedRegenerationExecutor(
                 is GroundedValidationResult.Invalid -> invalidRegeneration(validation.reasons)
             }
         val cost = CostCalculator.estimate(repair.usage, modelCatalog.pricing(selectedModel))
-        costGuard.recordUsage(record.hostUserId, record.clubId, cost)
+        costGuard.recordUsage(record.hostUserId, record.clubId, admissionId, cost)
         val saved =
             jobStore.saveGroundedResult(
                 SaveGroundedResultCommand(
@@ -162,8 +164,11 @@ class DefaultGroundedRegenerationExecutor(
         return record.groundedDraft ?: expiredResult()
     }
 
-    private fun requireCostAllowance(record: JobRecord) {
-        when (val decision = costGuard.checkBeforeCall(record.hostUserId, record.clubId)) {
+    private fun requireCostAllowance(
+        record: JobRecord,
+        admissionId: UUID,
+    ) {
+        when (val decision = costGuard.checkBeforeCall(record.hostUserId, record.clubId, admissionId)) {
             is GuardDecision.Allow -> Unit
             is GuardDecision.Deny -> throw AiGenerationException.Coded(decision.code)
         }
@@ -179,7 +184,11 @@ class DefaultGroundedRegenerationExecutor(
         model: ModelId,
         item: GenerationItem,
         request: com.readmates.aigen.application.port.out.RenderedGroundedRequest,
+        admissionId: UUID,
     ): com.readmates.aigen.application.port.out.GroundedSectionRepairOutput {
+        if (!costGuard.renewAdmission(record.hostUserId, record.clubId, admissionId)) {
+            throw AiGenerationException.Coded(ErrorCode.RATE_LIMITED)
+        }
         when (jobStore.reserveLlmCall(record.jobId, JobStatus.SUCCEEDED, properties.job.maxLlmCallsPerJob)) {
             LlmCallReservation.RESERVED -> Unit
             LlmCallReservation.CAP_EXCEEDED -> throw AiGenerationException.Coded(ErrorCode.MAX_CALLS_EXCEEDED)

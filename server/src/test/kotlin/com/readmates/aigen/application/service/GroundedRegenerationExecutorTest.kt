@@ -34,6 +34,21 @@ import java.util.UUID
 
 class GroundedRegenerationExecutorTest {
     @Test
+    fun `expired admission blocks grounded regeneration provider call without consuming call budget`() {
+        val context = Context()
+        context.costGuard.renewAllowed = false
+
+        assertThatThrownBy {
+            context.executor.regenerate(context.record, GenerationItem.SUMMARY, 1, null, null)
+        }.isInstanceOfSatisfying(AiGenerationException.Coded::class.java) { failure ->
+            assertThat(failure.code).isEqualTo(ErrorCode.RATE_LIMITED)
+        }
+
+        assertThat(context.generator.calls).isZero()
+        assertThat(context.jobStore.load(context.record.jobId)!!.llmCallCount).isEqualTo(1)
+    }
+
+    @Test
     fun `matching revision regenerates one section with whole transcript and increments revision`() {
         val context = Context()
         context.generator.repairOutput =

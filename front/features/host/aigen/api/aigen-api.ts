@@ -26,6 +26,16 @@ import type {
   StartGenerationResponse,
   ExpandedEvidenceTurn,
 } from "./aigen-contracts";
+import {
+  parseAiCommitResponse,
+  parseAiGenerationJobResponse,
+  parseAiRecentJobResponse,
+  parseAvailableGenerationModelsResponse,
+  parseClubAiDefaultResponse,
+  parseExpandedEvidenceTurn,
+  parseRegenerateResponse,
+  parseStartGenerationResponse,
+} from "./aigen-contracts";
 
 const GENERIC_AI_PROBLEM: AiGenerationProblem = {
   code: "AI_GENERATION_REQUEST_FAILED",
@@ -33,6 +43,8 @@ const GENERIC_AI_PROBLEM: AiGenerationProblem = {
 };
 const MAX_INVALID_SPEAKER_LABELS = 20;
 const MAX_INVALID_SPEAKER_LABEL_CODE_POINTS = 120;
+const LEGACY_GEMINI_MODEL_ID = "gemini-3-flash";
+const CANONICAL_GEMINI_MODEL_ID = "gemini-3-flash-preview";
 
 export class AiGenerationApiError extends Error {
   constructor(
@@ -143,23 +155,27 @@ export function startGeneration(
   );
 
   // Leave Content-Type unset so the browser fills in the multipart boundary.
-  return aiFetch<StartGenerationResponse>(sessionsPath(sessionId, "/jobs"), {
+  return aiFetch<unknown>(sessionsPath(sessionId, "/jobs"), {
     method: "POST",
     body: form,
-  });
+  }).then(parseStartGenerationResponse);
 }
 
 export async function getJob(
   sessionId: string,
   jobId: string,
 ): Promise<AiGenerationJobResponse> {
-  return sanitizeJob(await aiFetch<AiGenerationJobResponse>(jobPath(sessionId, jobId)));
+  return sanitizeJob(
+    parseAiGenerationJobResponse(await aiFetch<unknown>(jobPath(sessionId, jobId))),
+  );
 }
 
 export function getAvailableModels(
   sessionId: string,
 ): Promise<AvailableGenerationModelsResponse> {
-  return aiFetch<AvailableGenerationModelsResponse>(sessionsPath(sessionId, "/models"));
+  return aiFetch<unknown>(sessionsPath(sessionId, "/models")).then(
+    parseAvailableGenerationModelsResponse,
+  );
 }
 
 export function expandEvidence(
@@ -169,14 +185,14 @@ export function expandEvidence(
   revision: number,
 ): Promise<ExpandedEvidenceTurn> {
   const suffix = `/evidence/${encodeURIComponent(turnId)}?revision=${encodeURIComponent(revision)}`;
-  return aiFetch<ExpandedEvidenceTurn>(jobPath(sessionId, jobId, suffix));
+  return aiFetch<unknown>(jobPath(sessionId, jobId, suffix)).then(parseExpandedEvidenceTurn);
 }
 
 export async function getRecentJob(sessionId: string): Promise<AiRecentJobResponse | null> {
-  const result = await aiFetch<AiRecentJobResponse | null | undefined>(
+  const result = await aiFetch<unknown>(
     sessionsPath(sessionId, "/jobs/recent"),
   );
-  return result ?? null;
+  return result == null ? null : parseAiRecentJobResponse(result);
 }
 
 export function regenerateItem(
@@ -184,11 +200,11 @@ export function regenerateItem(
   jobId: string,
   request: RegenerateRequest,
 ): Promise<RegenerateResponse> {
-  return aiFetch<RegenerateResponse>(jobPath(sessionId, jobId, "/regenerate"), {
+  return aiFetch<unknown>(jobPath(sessionId, jobId, "/regenerate"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
-  });
+  }).then(parseRegenerateResponse);
 }
 
 export function commitGeneration(
@@ -196,11 +212,11 @@ export function commitGeneration(
   jobId: string,
   request: CommitGenerationRequest,
 ): Promise<AiCommitResponse> {
-  return aiFetch<AiCommitResponse>(jobPath(sessionId, jobId, "/commit"), {
+  return aiFetch<unknown>(jobPath(sessionId, jobId, "/commit"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
-  });
+  }).then(parseAiCommitResponse);
 }
 
 export async function cancelGeneration(
@@ -215,8 +231,13 @@ export async function cancelGeneration(
   }
 }
 
-export function getClubAiDefault(clubSlug: string): Promise<ClubAiDefaultResponse> {
-  return readmatesFetch<ClubAiDefaultResponse>(clubsPath(clubSlug));
+export async function getClubAiDefault(clubSlug: string): Promise<ClubAiDefaultResponse> {
+  const response = parseClubAiDefaultResponse(
+    await readmatesFetch<unknown>(clubsPath(clubSlug)),
+  );
+  return response.defaultModel === LEGACY_GEMINI_MODEL_ID
+    ? { defaultModel: CANONICAL_GEMINI_MODEL_ID }
+    : response;
 }
 
 export async function putClubAiDefault(

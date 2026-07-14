@@ -322,43 +322,59 @@ class DefaultGroundedGenerationExecutor(
     private inline fun callGenerate(
         record: JobRecord,
         block: () -> GroundedGenerationOutput,
-    ): GroundedCall =
-        when (reserveCall(record)) {
+    ): GroundedCall {
+        if (!costGuard.renewAdmission(record.hostUserId, record.clubId, record.jobId)) {
+            return GroundedCall.Failure(providerAdmissionExpiredError())
+        }
+        return when (reserveCall(record)) {
             LlmCallReservation.CAP_EXCEEDED -> GroundedCall.Failure(maxCallsError())
             LlmCallReservation.STATE_CHANGED -> GroundedCall.StateChanged
-            LlmCallReservation.RESERVED ->
+            LlmCallReservation.RESERVED -> {
                 try {
                     GroundedCall.Success(block())
                 } catch (failure: LlmGenerationException) {
                     GroundedCall.Failure(failure.error)
                 }
+            }
         }
+    }
 
     private inline fun callRepair(
         record: JobRecord,
         block: () -> GroundedSectionRepairOutput,
-    ): GroundedRepairCall =
-        when (reserveCall(record)) {
+    ): GroundedRepairCall {
+        if (!costGuard.renewAdmission(record.hostUserId, record.clubId, record.jobId)) {
+            return GroundedRepairCall.Failure(providerAdmissionExpiredError())
+        }
+        return when (reserveCall(record)) {
             LlmCallReservation.CAP_EXCEEDED -> GroundedRepairCall.Failure(maxCallsError())
             LlmCallReservation.STATE_CHANGED -> GroundedRepairCall.StateChanged
-            LlmCallReservation.RESERVED ->
+            LlmCallReservation.RESERVED -> {
                 try {
                     GroundedRepairCall.Success(block())
                 } catch (failure: LlmGenerationException) {
                     GroundedRepairCall.Failure(failure.error)
                 }
+            }
         }
+    }
 
     private fun reserveCall(record: JobRecord): LlmCallReservation =
         jobStore.reserveLlmCall(record.jobId, JobStatus.RUNNING, properties.job.maxLlmCallsPerJob)
 
     private fun maxCallsError() = GenerationError(ErrorCode.MAX_CALLS_EXCEEDED, "Per-job LLM call cap exceeded")
 
+    private fun providerAdmissionExpiredError() =
+        GenerationError(
+            ErrorCode.RATE_LIMITED,
+            "Provider admission expired before call",
+        )
+
     private fun recordUsage(
         record: JobRecord,
         cost: BigDecimal,
     ) {
-        runCatching { costGuard.recordUsage(record.hostUserId, record.clubId, cost) }
+        runCatching { costGuard.recordUsage(record.hostUserId, record.clubId, record.jobId, cost) }
             .onFailure { failure ->
                 logger.warn("Grounded usage accounting failed for jobId={}", record.jobId, failure)
             }

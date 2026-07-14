@@ -17,6 +17,21 @@ import java.util.UUID
 
 class AiGenerationWorkerTest {
     @Test
+    fun `expired provider admission fails closed without a provider call`() {
+        val ctx = TestContext()
+        val record = ctx.savedRecord()
+        ctx.costGuard.renewAllowed = false
+
+        ctx.worker.process(record.jobId)
+
+        val updated = ctx.jobStore.load(record.jobId)!!
+        assertThat(updated.status).isEqualTo(JobStatus.FAILED)
+        assertThat(updated.error!!.code).isEqualTo(ErrorCode.RATE_LIMITED)
+        assertThat(ctx.generator.calls).isEmpty()
+        assertThat(updated.llmCallCount).isZero()
+    }
+
+    @Test
     fun `process happy path persists snapshot, audits SUCCESS, and records cost`() {
         val ctx = TestContext()
         val record = ctx.savedRecord()

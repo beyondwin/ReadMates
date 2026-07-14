@@ -145,7 +145,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const contentType = context.request.headers.get("content-type");
   const cookie = context.request.headers.get("cookie");
 
-  if (isAiGenerationTranscriptUpload(context.request.method, upstreamPath, contentType)) {
+  const aiTranscriptUpload = isAiGenerationTranscriptUpload(
+    context.request.method,
+    upstreamPath,
+    contentType,
+  );
+  if (aiTranscriptUpload) {
     const contentLength = Number(context.request.headers.get("content-length"));
     if (Number.isSafeInteger(contentLength) && contentLength > MAX_AI_GENERATION_MULTIPART_BYTES) {
       return bffErrorResponse(413, "REQUEST_TOO_LARGE", "업로드 요청이 너무 큽니다.");
@@ -186,7 +191,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   const body = ["GET", "HEAD"].includes(context.request.method)
     ? undefined
-    : await context.request.arrayBuffer();
+    : aiTranscriptUpload
+      ? context.request.body
+      : await context.request.arrayBuffer();
   const upstream = await fetch(upstreamUrl.toString(), {
     method: context.request.method,
     headers,

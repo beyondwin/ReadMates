@@ -7,6 +7,7 @@ import {
 
 const KEY_PREFIX = "aigen-draft:";
 export const AIGEN_DRAFT_TTL_MS = 6 * 60 * 60 * 1000;
+const expiryTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 export interface AiGenerationDraftEnvelope {
   version: 2;
@@ -50,21 +51,63 @@ function safeSnapshot(snapshot: SessionImportV1Snapshot): SessionImportV1Snapsho
 export function saveAigenDraft(envelope: AiGenerationDraftEnvelope): boolean {
   const store = storage();
   if (!store) return false;
+  const key = draftStorageKey(envelope.jobId);
+  const previous = readStoredEnvelope(store, key);
+  if (previous && isExpired(previous)) {
+    removeStoredDraft(store, key);
+    return false;
+  }
+  const savedAtEpochMs =
+    previous && previous.jobId === envelope.jobId && previous.revision === envelope.revision
+      ? previous.savedAtEpochMs
+      : Date.now();
   const safe: StoredAiGenerationDraftEnvelope = {
     version: 2,
     jobId: envelope.jobId,
     revision: envelope.revision,
-    savedAtEpochMs: Date.now(),
+    // This is the fixed retention anchor for the server revision. Autosave
+    // must never slide private generated/member content beyond six hours.
+    savedAtEpochMs,
     serverSnapshot: safeSnapshot(envelope.serverSnapshot),
     draft: safeSnapshot(envelope.draft),
     sectionReviews: { ...envelope.sectionReviews },
   };
   try {
-    store.setItem(draftStorageKey(envelope.jobId), JSON.stringify(safe));
+    store.setItem(key, JSON.stringify(safe));
+    scheduleExpiry(store, key, savedAtEpochMs + AIGEN_DRAFT_TTL_MS);
     return true;
   } catch {
     return false;
   }
+}
+
+function clearExpiryTimer(key: string): void {
+  const timer = expiryTimers.get(key);
+  if (timer !== undefined) clearTimeout(timer);
+  expiryTimers.delete(key);
+}
+
+function removeStoredDraft(store: Storage, key: string): void {
+  clearExpiryTimer(key);
+  try {
+    store.removeItem(key);
+  } catch {
+    // Cleanup is best effort; no content is copied elsewhere.
+  }
+}
+
+function scheduleExpiry(store: Storage, key: string, expiresAtEpochMs: number): void {
+  clearExpiryTimer(key);
+  const delay = Math.max(0, expiresAtEpochMs - Date.now());
+  const timer = setTimeout(() => {
+    expiryTimers.delete(key);
+    try {
+      store.removeItem(key);
+    } catch {
+      // Cleanup is best effort; no content is copied elsewhere.
+    }
+  }, delay);
+  expiryTimers.set(key, timer);
 }
 
 function isSnapshot(value: unknown): value is SessionImportV1Snapshot {
@@ -154,11 +197,7 @@ export function purgeAigenDrafts(activeJobId?: string): void {
       isExpired(envelope) ||
       (activeJobId !== undefined && envelope.jobId !== activeJobId)
     ) {
-      try {
-        store.removeItem(key);
-      } catch {
-        // Cleanup is best effort; no content is copied elsewhere.
-      }
+      removeStoredDraft(store, key);
     }
   }
 }
@@ -183,9 +222,5 @@ export function loadAigenDraft(jobId: string, revision: number): AiGenerationDra
 export function clearAigenDraft(jobId: string): void {
   const store = storage();
   if (!store) return;
-  try {
-    store.removeItem(draftStorageKey(jobId));
-  } catch {
-    // Cleanup is best effort; no content is copied elsewhere.
-  }
+  removeStoredDraft(store, draftStorageKey(jobId));
 }

@@ -104,11 +104,7 @@ class AiGenerationRegenerationService(
                 )
 
         val modelId = resolveModelId(model, record)
-
-        when (val decision = costGuard.checkBeforeCall(record.hostUserId, record.clubId)) {
-            is GuardDecision.Allow -> Unit
-            is GuardDecision.Deny -> failRegen(record, item, modelId, decision.code, "Cost guard denied call")
-        }
+        val admissionId = UUID.randomUUID()
 
         val sessionMeta = record.toSessionMeta()
         val regenerator =
@@ -120,6 +116,10 @@ class AiGenerationRegenerationService(
                     ErrorCode.AI_DISABLED,
                     "No regenerator wired for provider ${modelId.provider}",
                 )
+        when (val decision = costGuard.checkBeforeCall(record.hostUserId, record.clubId, admissionId)) {
+            is GuardDecision.Allow -> Unit
+            is GuardDecision.Deny -> failRegen(record, item, modelId, decision.code, "Cost guard denied call")
+        }
         val output =
             callWithRetry(
                 regenerator = regenerator,
@@ -129,6 +129,7 @@ class AiGenerationRegenerationService(
                 modelId = modelId,
                 record = record,
                 item = item,
+                admissionId = admissionId,
             )
 
         val cost = CostCalculator.estimate(output.usage, modelCatalog.pricing(modelId))
@@ -142,7 +143,7 @@ class AiGenerationRegenerationService(
             is ValidationResult.Violation ->
                 failRegen(record, item, modelId, validation.code, validation.message)
         }
-        return persistAndAuditRegenSuccess(record, item, modelId, output, patchedSnapshot, cost)
+        return persistAndAuditRegenSuccess(record, item, modelId, output, patchedSnapshot, cost, admissionId)
     }
 
     @Suppress("LongParameterList")
@@ -153,6 +154,7 @@ class AiGenerationRegenerationService(
         output: com.readmates.aigen.application.model.RegenerationOutput,
         patchedSnapshot: SessionImportV1Snapshot,
         cost: BigDecimal,
+        admissionId: UUID,
     ): RegenerationResult {
         val saved = jobStore.saveResultIfStatus(record.jobId, JobStatus.SUCCEEDED, patchedSnapshot, output.usage, cost)
         if (!saved) {
@@ -182,7 +184,7 @@ class AiGenerationRegenerationService(
                 attemptedAction = "regenerate",
             )
         }
-        costGuard.recordUsage(record.hostUserId, record.clubId, cost)
+        costGuard.recordUsage(record.hostUserId, record.clubId, admissionId, cost)
         emitRegenMetrics(modelId, item, output.usage, cost, JobStatus.SUCCEEDED)
         auditPort.insert(
             AuditLogEntry(
@@ -217,6 +219,7 @@ class AiGenerationRegenerationService(
         modelId: ModelId,
         record: JobRecord,
         item: GenerationItem,
+        admissionId: UUID,
     ): com.readmates.aigen.application.model.RegenerationOutput {
         val baseInput =
             RegenerationInput(
@@ -228,7 +231,7 @@ class AiGenerationRegenerationService(
                 instructions = recordedInstructions,
             )
         return try {
-            callRegeneratorRaw(record, regenerator, baseInput)
+            callRegeneratorRaw(record, regenerator, baseInput, admissionId)
         } catch (firstFailure: LlmGenerationException) {
             val retryStrategy = retryStrategyFor(firstFailure.error.code)
             if (retryStrategy == null) {
@@ -251,7 +254,7 @@ class AiGenerationRegenerationService(
                     baseInput
                 }
             try {
-                callRegeneratorRaw(record, regenerator, retryInput)
+                callRegeneratorRaw(record, regenerator, retryInput, admissionId)
             } catch (secondFailure: LlmGenerationException) {
                 failRegen(record, item, modelId, secondFailure.error.code, secondFailure.error.message)
             }
@@ -268,7 +271,16 @@ class AiGenerationRegenerationService(
         record: JobRecord,
         regenerator: SessionContentRegenerator,
         input: RegenerationInput,
+        admissionId: UUID,
     ): com.readmates.aigen.application.model.RegenerationOutput {
+        if (!costGuard.renewAdmission(record.hostUserId, record.clubId, admissionId)) {
+            throw LlmGenerationException(
+                com.readmates.aigen.application.model.GenerationError(
+                    ErrorCode.RATE_LIMITED,
+                    "Provider admission expired before regeneration call",
+                ),
+            )
+        }
         val cap = properties.job.maxLlmCallsPerJob
         val next = jobStore.incrementLlmCallCount(record.jobId)
         if (next > cap) {

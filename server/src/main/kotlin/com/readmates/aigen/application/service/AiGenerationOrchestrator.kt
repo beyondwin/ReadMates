@@ -91,14 +91,14 @@ class AiGenerationOrchestrator(
 
         val groundedBudget = runGroundedBudgetPreflight(command, groundedPreflight, modelId)
         metrics.recordJobStarted()
+        val jobId = UUID.randomUUID()
 
-        when (val decision = costGuard.checkBeforeCall(command.hostUserId, command.clubId)) {
+        when (val decision = costGuard.checkBeforeCall(command.hostUserId, command.clubId, jobId)) {
             is GuardDecision.Allow -> Unit
             is GuardDecision.Deny -> failStart(command, modelId, decision.code, "Cost guard denied call")
         }
 
         val now = clock.instant()
-        val jobId = UUID.randomUUID()
         val expiresAt = now.plus(properties.job.redisTtl)
         val record =
             command.toJobRecord(
@@ -110,7 +110,14 @@ class AiGenerationOrchestrator(
                 now,
                 expiresAt,
             )
-        jobStore.save(record)
+        try {
+            jobStore.save(record)
+        } catch (
+            @Suppress("TooGenericExceptionCaught") failure: Throwable,
+        ) {
+            costGuard.releaseAdmission(command.hostUserId, command.clubId, jobId)
+            throw failure
+        }
         try {
             queue.publish(
                 AiGenerationJobPublishCommand(
@@ -132,6 +139,7 @@ class AiGenerationOrchestrator(
             // orphaned PENDING record.
             @Suppress("TooGenericExceptionCaught") failure: Throwable,
         ) {
+            costGuard.releaseAdmission(record.hostUserId, record.clubId, record.jobId)
             compensateQueuePublishFailure(record, failure)
         }
         return StartGenerationResult(jobId, JobStatus.PENDING, expiresAt)

@@ -1,0 +1,50 @@
+{
+  "item": "summary",
+  "value": {
+    "summary": "공개 합성 재생성 요약"
+  },
+  "tokens": {
+    "input": 100,
+    "cachedInput": 0,
+    "output": 20
+  },
+  "costEstimateUsd": "0.0010",
+  "warnings": [],
+  "revision": 2,
+  "result": {
+    "format": "readmates-session-import:v1",
+    "sessionNumber": 1,
+    "bookTitle": "공개 합성 도서",
+    "meetingDate": "2026-07-14",
+    "summary": "공개 합성 요약",
+    "highlights": [
+      {
+        "authorName": "가람",
+        "text": "공개 합성 하이라이트"
+      }
+    ],
+    "oneLineReviews": [
+      {
+        "authorName": "가람",
+        "text": "공개 합성 한줄평"
+      }
+    ],
+    "feedbackDocumentFileName": "synthetic-feedback.md",
+    "feedbackDocumentMarkdown": "# 공개 합성 피드백"
+  },
+  "evidence": [
+    {
+      "section": "SUMMARY",
+      "targetId": "summary-0",
+      "ordinal": 0,
+      "turnId": "t000001",
+      "startSeconds": 0,
+      "speakerName": "가람",
+      "excerpt": "공개 합성 발언",
+      "truncated": false
+    }
+  ],
+  "sectionReviewStatuses": {
+    "SUMMARY": "PENDING_REVIEW"
+  }
+}

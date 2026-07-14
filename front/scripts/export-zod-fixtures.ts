@@ -172,6 +172,109 @@ const currentSession = {
   },
 };
 
+const aigenJob = {
+  jobId: "00000000-0000-0000-0000-000000000401",
+  status: "SUCCEEDED",
+  stage: "READY",
+  progressPct: 100,
+  model: "gpt-5.4-mini",
+  result: {
+    format: "readmates-session-import:v1",
+    sessionNumber: 1,
+    bookTitle: "공개 합성 도서",
+    meetingDate: "2026-07-14",
+    summary: "공개 합성 요약",
+    highlights: [{ authorName: "가람", text: "공개 합성 하이라이트" }],
+    oneLineReviews: [{ authorName: "가람", text: "공개 합성 한줄평" }],
+    feedbackDocumentFileName: "synthetic-feedback.md",
+    feedbackDocumentMarkdown: "# 공개 합성 피드백",
+  },
+  error: null,
+  tokens: { input: 100, cachedInput: 0, output: 50 },
+  costEstimateUsd: "0.0010",
+  warnings: [],
+  expiresAt: "2026-07-14T12:00:00Z",
+  createdAt: "2026-07-14T06:00:00Z",
+  lastUpdatedAt: "2026-07-14T06:01:00Z",
+  revision: 1,
+  groundingStatus: "VALID",
+  evidence: [
+    {
+      section: "SUMMARY",
+      targetId: "summary-0",
+      ordinal: 0,
+      turnId: "t000001",
+      startSeconds: 0,
+      speakerName: "가람",
+      excerpt: "공개 합성 발언",
+      truncated: false,
+    },
+  ],
+  sectionReviewStatuses: { SUMMARY: "PENDING_REVIEW" },
+};
+
+const aigenModels = {
+  models: [{ id: "gpt-5.4-mini", provider: "OPENAI", isDefault: true }],
+};
+
+const aigenRegeneration = {
+  item: "summary",
+  value: { summary: "공개 합성 재생성 요약" },
+  tokens: { input: 100, cachedInput: 0, output: 20 },
+  costEstimateUsd: "0.0010",
+  warnings: [],
+  revision: 2,
+  result: aigenJob.result,
+  evidence: aigenJob.evidence,
+  sectionReviewStatuses: { SUMMARY: "PENDING_REVIEW" },
+};
+
+const aigenExpandedEvidence = {
+  turnId: "t000001",
+  speakerName: "가람",
+  startSeconds: 0,
+  text: "공개 합성 전체 발언",
+};
+
+const aigenCommitReceipt = {
+  sessionId: "00000000-0000-0000-0000-000000000301",
+  status: "COMMITTED",
+  recovered: false,
+  participantUpdatesCount: 1,
+};
+
+const aigenProblem = {
+  type: "about:blank",
+  title: "Unprocessable Entity",
+  status: 422,
+  detail: "공개 합성 검증 오류",
+  code: "TRANSCRIPT_FORMAT_INVALID",
+  invalidSpeakerLabels: null,
+  currentRevision: null,
+};
+
+const aigenStart = {
+  jobId: "00000000-0000-0000-0000-000000000401",
+  status: "PENDING",
+  expiresAt: "2026-07-14T12:00:00Z",
+};
+
+const aigenRecentJob = {
+  jobId: "00000000-0000-0000-0000-000000000401",
+  status: "RUNNING",
+  stage: "GENERATING_RECORD",
+  progressPct: 50,
+  model: "gpt-5.4-mini",
+  error: null,
+  costEstimateUsd: "0.0000",
+  createdAt: "2026-07-14T06:00:00Z",
+  lastUpdatedAt: "2026-07-14T06:01:00Z",
+  expiresAt: "2026-07-14T12:00:00Z",
+  availableActions: ["POLL", "CANCEL"],
+};
+
+const aigenClubDefault = { defaultModel: "gemini-3-flash-preview" };
+
 function write(filename: string, data: unknown): void {
   const path = join(fixturesDir, filename);
   writeFileSync(path, JSON.stringify(data, null, 2) + "\n", "utf-8");
@@ -182,3 +285,12 @@ write("host-notification-delivery-list.json", hostNotificationDeliveryList);
 write("host-invitation-list.json", hostInvitationList);
 write("admin-analytics-overview.json", adminAnalyticsOverview);
 write("current-session.json", currentSession);
+write("aigen-job.json", aigenJob);
+write("aigen-models.json", aigenModels);
+write("aigen-regeneration.json", aigenRegeneration);
+write("aigen-expanded-evidence.json", aigenExpandedEvidence);
+write("aigen-commit-receipt.json", aigenCommitReceipt);
+write("aigen-problem.json", aigenProblem);
+write("aigen-start.json", aigenStart);
+write("aigen-recent-job.json", aigenRecentJob);
+write("aigen-club-default.json", aigenClubDefault);

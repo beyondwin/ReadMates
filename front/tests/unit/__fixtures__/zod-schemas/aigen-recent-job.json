@@ -1,0 +1,16 @@
+{
+  "jobId": "00000000-0000-0000-0000-000000000401",
+  "status": "RUNNING",
+  "stage": "GENERATING_RECORD",
+  "progressPct": 50,
+  "model": "gpt-5.4-mini",
+  "error": null,
+  "costEstimateUsd": "0.0000",
+  "createdAt": "2026-07-14T06:00:00Z",
+  "lastUpdatedAt": "2026-07-14T06:01:00Z",
+  "expiresAt": "2026-07-14T12:00:00Z",
+  "availableActions": [
+    "POLL",
+    "CANCEL"
+  ]
+}

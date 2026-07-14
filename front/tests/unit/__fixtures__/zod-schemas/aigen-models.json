@@ -1,0 +1,9 @@
+{
+  "models": [
+    {
+      "id": "gpt-5.4-mini",
+      "provider": "OPENAI",
+      "isDefault": true
+    }
+  ]
+}

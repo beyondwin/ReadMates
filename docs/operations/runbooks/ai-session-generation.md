@@ -42,6 +42,7 @@ PENDING/RUNNING           -> FAILED
 - `:transcript`, `:turns`, `:result`, `:evidence` 네 payload는 모두 같은 6시간 TTL을 갖습니다. Commit/cancel은 네 payload를 삭제하고 terminal hash만 남깁니다. 이 중 필수 payload가 먼저 만료하면 부분 결과를 노출하지 않고 `JOB_EXPIRED`로 실패합니다.
 - Kafka job message는 `jobId`, session/club/host ID, provider, model, job kind의 routing metadata만 전달하고 worker가 Redis에서 content payload를 다시 읽습니다. Transcript, turns, member/display name, prompt/instructions, result, evidence/excerpt는 Kafka에 넣지 않습니다.
 - 전체 대본 primary 호출은 1회입니다. 정확히 한 section이 schema/grounding 검증에 실패할 때만 같은 actual provider에 전체 대본을 유지한 section repair 1회를 허용합니다. Availability fallback과 repair, regeneration은 모두 `readmates.aigen.job.max-llm-calls-per-job`(기본 3) 내에서만 실행됩니다.
+- 비용 admission은 Redis Lua에서 host 24h/60s 카운터, club 누적 비용, 5분 owner-token provider-admission lease를 원자적으로 확인합니다. Worker와 regeneration은 retry/repair를 포함한 각 실제 provider network call 직전에 같은 owner token으로 lease를 갱신하고, owner가 사라졌거나 바뀌었으면 `RATE_LIMITED`로 fail closed해 provider를 호출하지 않습니다. OpenAI/Claude/Gemini SDK HTTP timeout은 4분으로 고정되어 갱신된 5분 lease보다 짧고, OpenAI/Claude SDK 자체 retry는 0회라 명시적인 application retry/fallback만 call budget을 사용합니다. Usage/rollback은 owner가 일치할 때만 lease를 해제하고 crash/error에는 TTL이 backstop입니다. Job save/queue publish처럼 provider call 전 실패는 admission counter와 lease를 원자적으로 되돌립니다. Redis가 불명확하면 provider network call을 시작하지 않습니다.
 
 운영자가 job 상태만 확인해야 할 때는 payload를 열지 말고 hash metadata와 key 존재 여부만 봅니다.
 
@@ -119,12 +120,13 @@ Rollback: `application.yml`의 직전 commit으로 되돌리고 재배포.
 
 ## 2. 클럽 cost cap 임시 상향 (Redis 키 수동 reset)
 
-`readmates.aigen.caps.club-monthly-cost-usd` (기본 $20) 초과로 호스트가 503/`COST_CAP_EXCEEDED`를 받을 때 임시로 풀어야 하는 경우의 절차입니다.
+`readmates.aigen.caps.club-monthly-cost-usd` (기본 $20) 초과로 호스트가 429/`CLUB_MONTHLY_CAP_EXCEEDED`를 받을 때 임시로 풀어야 하는 경우의 절차입니다.
 
 1. **승인 게이트**: incident ticket을 먼저 만들고, 운영 책임자 1인의 명시 승인을 받습니다. Cap 정책은 spec §6 비용 보호의 핵심이라 무단 해제는 감사 위반입니다.
 2. 현재 누적 비용 확인:
    ```bash
-   redis-cli -h <host> -a <password> --no-auth-warning GET "aigen:cost:club:<clubId>:2026-05"
+   redis-cli -h <host> -a <password> --no-auth-warning GET "aigen:club:<clubId>:monthly_cost_usd"
+   redis-cli -h <host> -a <password> --no-auth-warning TTL "aigen:club:<clubId>:provider_admission"
    ```
    값은 USD scale=4 BigDecimal의 문자열 표현입니다.
 3. Audit-log로 합계와 교차검증:
@@ -136,7 +138,7 @@ Rollback: `application.yml`의 직전 commit으로 되돌리고 재배포.
    ```
 4. 임시 reset (감사 후 결정):
    ```bash
-   redis-cli -h <host> -a <password> --no-auth-warning SET "aigen:cost:club:<clubId>:2026-05" "0.0000" EX 2678400
+   redis-cli -h <host> -a <password> --no-auth-warning SET "aigen:club:<clubId>:monthly_cost_usd" "0.0000" EX 2678400
    ```
    `EX 2678400` (≈31d)는 monthly counter TTL과 일치합니다. 부분 차감이 필요하면 `SET <newValue>`로 명시값을 적습니다.
 5. 같은 incident ticket에 `operator`, `timestamp`, `clubId`, `previousValue`, `newValue`, `justification`을 남기고 다음 영업일에 cap 재산정 또는 정책 변경 여부를 회의 안건으로 올립니다.
@@ -150,14 +152,15 @@ Backout: 원래 값을 다시 `SET`. Cap 자체를 영구 상향하려면 `appli
 1. **승인 게이트**: incident ticket 발급 + 운영 책임자 승인. 호스트 단위 일일 cap은 PII/abuse 보호 목적이므로 routine 해제 대상이 아닙니다.
 2. 현재 카운트:
    ```bash
-   redis-cli -h <host> -a <password> --no-auth-warning GET "aigen:cost:host:<userId>:2026-05-17"
+   redis-cli -h <host> -a <password> --no-auth-warning GET "aigen:host:<userId>:daily"
+   redis-cli -h <host> -a <password> --no-auth-warning GET "aigen:host:<userId>:minute"
    ```
 3. Delete (counter TTL 24h):
    ```bash
-   redis-cli -h <host> -a <password> --no-auth-warning DEL "aigen:cost:host:<userId>:2026-05-17"
+   redis-cli -h <host> -a <password> --no-auth-warning DEL "aigen:host:<userId>:daily" "aigen:host:<userId>:minute"
    ```
    해제 후 카운트는 0부터 다시 누적됩니다.
-4. Incident ticket에 `operator`, `timestamp`, `userId`, `previousCount`, `justification`, `revertPlan`을 남깁니다. 명시적인 revert plan이 없으면 다음 UTC 자정에 자연 reset됩니다 (TTL 만료).
+4. Incident ticket에 `operator`, `timestamp`, `userId`, `previousCount`, `justification`, `revertPlan`을 남깁니다. 명시적인 revert plan이 없으면 sliding TTL 만료로 자연 reset됩니다.
 
 Backout: TTL 만료를 기다리거나 즉시 counter를 직전 값으로 `SET ... EX 86400`.
 

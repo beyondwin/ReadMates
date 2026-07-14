@@ -345,7 +345,10 @@ describe("Cloudflare BFF function", () => {
       ),
     );
 
-    expect(new Uint8Array(forwardedInit?.body as ArrayBuffer)).toEqual(payload);
+    expect(forwardedInit?.body).toBeInstanceOf(ReadableStream);
+    expect(
+      new Uint8Array(await new Response(forwardedInit?.body as ReadableStream).arrayBuffer()),
+    ).toEqual(payload);
     expect((forwardedInit?.headers as Headers).get("Content-Type")).toBe(
       "multipart/form-data; boundary=ai",
     );
@@ -760,8 +763,10 @@ describe("stripCookieDomain", () => {
     expect((forwardedInit?.headers as Headers).get("X-Readmates-Bff-Secret")).toBe(
       "secret",
     );
-    expect(forwardedInit?.body).toBeInstanceOf(ArrayBuffer);
-    expect(new Uint8Array(forwardedInit?.body as ArrayBuffer)).toEqual(payload);
+    expect(forwardedInit?.body).toBeInstanceOf(ReadableStream);
+    expect(
+      new Uint8Array(await new Response(forwardedInit?.body as ReadableStream).arrayBuffer()),
+    ).toEqual(payload);
     expect(response.status).toBe(202);
   });
 
@@ -791,6 +796,39 @@ describe("stripCookieDomain", () => {
     await expectApiErrorBody(response, { status: 413, code: "REQUEST_TOO_LARGE" });
     expect(arrayBuffer).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("streams an AI transcript multipart request when content length is absent", async () => {
+    let forwardedBody: BodyInit | null | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input, init) => {
+        forwardedBody = init?.body;
+        return new Response("{}", { status: 202 });
+      }),
+    );
+    const request = new Request(
+      "https://readmates.pages.dev/api/bff/api/host/sessions/12345/ai-generate/jobs",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "multipart/form-data; boundary=ai",
+          Origin: "https://readmates.pages.dev",
+        },
+        body: new Uint8Array([1, 2, 3]),
+      },
+    );
+    const arrayBuffer = vi.spyOn(request, "arrayBuffer");
+
+    const response = await onRequest(
+      context(request, {
+        path: ["api", "host", "sessions", "12345", "ai-generate", "jobs"],
+      }),
+    );
+
+    expect(response.status).toBe(202);
+    expect(arrayBuffer).not.toHaveBeenCalled();
+    expect(forwardedBody).toBeInstanceOf(ReadableStream);
   });
 
   it("forwards GET /api/host/sessions/{id}/ai-generate/jobs/{jobId} unchanged", async () => {
