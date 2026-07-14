@@ -384,6 +384,22 @@ class AiGenerationControllerTest {
     }
 
     @Test
+    fun `GET recent COMMIT_RETRY job permits poll and explicit safe retry only`() {
+        recentJobUseCase.view = sampleJobView().copy(status = JobStatus.COMMIT_RETRY)
+
+        mockMvc
+            .get("/api/host/sessions/$sessionId/ai-generate/jobs/recent") {
+                with(authedUser())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.status") { value("COMMIT_RETRY") }
+                jsonPath("$.availableActions[0]") { value("POLL") }
+                jsonPath("$.availableActions[1]") { value("COMMIT_RETRY") }
+                jsonPath("$.availableActions.length()") { value(2) }
+            }
+    }
+
+    @Test
     fun `GET recent job returns 204 when no recoverable job exists`() {
         recentJobUseCase.view = null
 

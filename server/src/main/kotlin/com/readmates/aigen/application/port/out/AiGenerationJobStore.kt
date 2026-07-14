@@ -4,6 +4,8 @@ import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.GenerationItem
+import com.readmates.aigen.application.model.GroundedEvidenceBundle
+import com.readmates.aigen.application.model.GroundingStatus
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelId
@@ -12,6 +14,7 @@ import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.model.ValidatedTranscriptTurn
 import java.math.BigDecimal
+import java.time.Duration
 import java.time.Instant
 import java.util.UUID
 
@@ -26,7 +29,10 @@ interface AiGenerationJobStore {
 
     fun load(jobId: UUID): JobRecord?
 
-    fun findJobById(jobId: UUID): JobRecord? = load(jobId)
+    /** Load safe hash metadata only, without materializing transcript, turns, result, or evidence payloads. */
+    fun loadMetadata(jobId: UUID): JobRecord? = load(jobId)
+
+    fun findJobById(jobId: UUID): JobRecord? = loadMetadata(jobId)
 
     fun loadRecentForSession(
         sessionId: UUID,
@@ -106,15 +112,72 @@ interface AiGenerationJobStore {
         actualModel: ModelId? = null,
     ): Boolean
 
+    fun saveGroundedResult(command: SaveGroundedResultCommand): Boolean
+
+    fun acquireCommitLease(
+        jobId: UUID,
+        expectedRevision: Long,
+        now: Instant,
+        leaseDuration: Duration,
+    ): CommitLeaseResult
+
+    fun recoverExpiredCommitLease(
+        jobId: UUID,
+        now: Instant,
+    ): Boolean
+
+    fun markCommittedForCleanup(
+        jobId: UUID,
+        revision: Long,
+    ): Boolean
+
+    fun markCleanupComplete(
+        jobId: UUID,
+        revision: Long,
+    ): Boolean
+
     /**
      * Delete transient PII/result payload keys while keeping the safe job hash for
      * terminal status reads until the hash TTL expires.
      */
     fun deleteTransientPayload(jobId: UUID): Unit
 
-    /** Delete all 3 job keys (hash, transcript, result) atomically. Used for stale job cleanup. */
+    /** Delete the hash and all four transient payload keys atomically. Used for stale job cleanup. */
     fun delete(jobId: UUID): Unit
 }
+
+data class SaveGroundedResultCommand(
+    val jobId: UUID,
+    val expectedStatus: JobStatus,
+    val expectedRevision: Long,
+    val result: SessionImportV1Snapshot,
+    val evidence: GroundedEvidenceBundle,
+    val usage: TokenUsage,
+    val cost: BigDecimal,
+    val actualModel: ModelId,
+)
+
+sealed interface CommitLeaseResult {
+    data class Acquired(
+        val revision: Long,
+    ) : CommitLeaseResult
+
+    data class AlreadyCommitting(
+        val leaseExpiresAt: Instant,
+    ) : CommitLeaseResult
+
+    data object RevisionConflict : CommitLeaseResult
+
+    data object Expired : CommitLeaseResult
+
+    data object NotReady : CommitLeaseResult
+}
+
+data class GroundedSourceContext(
+    val validatedTurns: List<ValidatedTranscriptTurn>,
+    val sessionMeta: SessionMeta,
+    val instructions: String?,
+)
 
 data class JobRecord(
     val jobId: UUID,
@@ -159,6 +222,11 @@ data class JobRecord(
     val validatedTurns: List<ValidatedTranscriptTurn> = emptyList(),
     /** Ordered availability fallback IDs already proven to fit the exact whole request. */
     val eligibleFallbackModels: List<ModelId> = emptyList(),
+    val revision: Long = 0,
+    val groundingStatus: GroundingStatus? = null,
+    val evidence: GroundedEvidenceBundle? = null,
+    val cleanupPending: Boolean = false,
+    val commitLeaseExpiresAt: Instant? = null,
 ) {
     /**
      * The [SessionMeta] for downstream generator / regenerator prompts and validator

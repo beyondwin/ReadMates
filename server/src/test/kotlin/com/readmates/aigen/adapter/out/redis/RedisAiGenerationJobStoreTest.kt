@@ -5,6 +5,9 @@ import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.GenerationItem
+import com.readmates.aigen.application.model.GroundedEvidenceBundle
+import com.readmates.aigen.application.model.GroundedEvidenceExcerpt
+import com.readmates.aigen.application.model.GroundedEvidenceTarget
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelId
@@ -16,6 +19,7 @@ import com.readmates.aigen.application.model.ValidatedTranscriptTurn
 import com.readmates.aigen.application.port.out.AiGenerationJobQueue
 import com.readmates.aigen.application.port.out.AiGenerationJobStore
 import com.readmates.aigen.application.port.out.JobRecord
+import com.readmates.aigen.application.port.out.SaveGroundedResultCommand
 import com.readmates.aigen.config.AiGenerationProperties
 import com.readmates.support.ReadmatesRedisIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
@@ -226,34 +230,22 @@ class RedisAiGenerationJobStoreTest(
                 validatedTurns = listOf(turn),
             )
         store.save(record)
-        store.saveResult(record.jobId, snapshot(), TokenUsage(1, 0, 1), BigDecimal("0.001"))
-        val payloadKeys =
+        val sourcePayloadKeys =
             listOf(
                 "aigen:job:${record.jobId}:transcript",
                 "aigen:job:${record.jobId}:turns",
-                "aigen:job:${record.jobId}:result",
             )
 
-        shortenPayloadTtls(payloadKeys)
+        shortenPayloadTtls(sourcePayloadKeys)
         store.updateStatus(record.jobId, JobStatus.RUNNING, JobStage.VALIDATING, 80, null)
-        assertPayloadTtlsRefreshed(payloadKeys)
+        assertPayloadTtlsRefreshed(sourcePayloadKeys)
 
-        shortenPayloadTtls(payloadKeys)
-        assertThat(
-            store.transitionStatus(
-                record.jobId,
-                setOf(JobStatus.RUNNING),
-                JobStatus.SUCCEEDED,
-                JobStage.READY,
-                100,
-                null,
-            ),
-        ).isTrue()
-        assertPayloadTtlsRefreshed(payloadKeys)
-
-        shortenPayloadTtls(payloadKeys)
+        shortenPayloadTtls(sourcePayloadKeys)
         store.incrementLlmCallCount(record.jobId)
-        assertPayloadTtlsRefreshed(payloadKeys)
+        assertPayloadTtlsRefreshed(sourcePayloadKeys)
+
+        assertThat(store.saveGroundedResult(groundedResultCommand(record, expectedRevision = 0))).isTrue()
+        assertPayloadTtlsRefreshed(payloadKeys(record.jobId))
     }
 
     @Test
@@ -584,6 +576,54 @@ class RedisAiGenerationJobStoreTest(
             validatedTurns = validatedTurns,
         )
     }
+
+    private fun groundedResultCommand(
+        record: JobRecord,
+        expectedStatus: JobStatus = JobStatus.RUNNING,
+        expectedRevision: Long,
+    ): SaveGroundedResultCommand =
+        SaveGroundedResultCommand(
+            jobId = record.jobId,
+            expectedStatus = expectedStatus,
+            expectedRevision = expectedRevision,
+            result = snapshot(),
+            evidence = evidence(expectedRevision + 1),
+            usage = TokenUsage(10, 0, 20),
+            cost = BigDecimal("0.01"),
+            actualModel = record.model,
+        )
+
+    private fun evidence(revision: Long): GroundedEvidenceBundle =
+        GroundedEvidenceBundle(
+            revision = revision,
+            targets =
+                listOf(
+                    GroundedEvidenceTarget(
+                        targetId = "r$revision:SUMMARY:0",
+                        section = GenerationItem.SUMMARY,
+                        ordinal = 0,
+                        turnIds = listOf("t000001"),
+                    ),
+                ),
+            excerpts =
+                listOf(
+                    GroundedEvidenceExcerpt(
+                        turnId = "t000001",
+                        speakerName = "Alice",
+                        startSeconds = 0,
+                        excerpt = "Public-safe source statement.",
+                        truncated = false,
+                    ),
+                ),
+        )
+
+    private fun payloadKeys(jobId: UUID): List<String> =
+        listOf(
+            "aigen:job:$jobId:transcript",
+            "aigen:job:$jobId:turns",
+            "aigen:job:$jobId:result",
+            "aigen:job:$jobId:evidence",
+        )
 
     private fun shortenPayloadTtls(keys: List<String>) {
         keys.forEach { redisTemplate.expire(it, java.time.Duration.ofSeconds(60)) }

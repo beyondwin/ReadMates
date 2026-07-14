@@ -227,6 +227,7 @@ class JdbcAiGenerationOpsAuditRepository(
                 JobStatus.PENDING,
                 JobStatus.RUNNING,
                 JobStatus.COMMITTING,
+                JobStatus.COMMIT_RETRY,
                 -> where.append(" and 1 = 0")
                 JobStatus.COMMITTED -> {
                     where.append(" and a.status = 'SUCCESS' and a.kind = 'COMMIT'")
@@ -295,6 +296,7 @@ class JdbcAiGenerationOpsAuditRepository(
             JobStatus.PENDING,
             JobStatus.RUNNING,
             JobStatus.COMMITTING,
+            JobStatus.COMMIT_RETRY,
             -> error("Active job status $this is not stored in ai_generation_audit_log")
         }
 

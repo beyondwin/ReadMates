@@ -21,6 +21,7 @@ class AiGenerationJobTransitionPolicyTest {
             JobStatus.FAILED,
             JobStatus.CANCELLED,
             JobStatus.COMMITTING,
+            JobStatus.COMMIT_RETRY,
             JobStatus.COMMITTED,
         ).forEach { status ->
             assertRejected(status, "worker start") {
@@ -39,6 +40,7 @@ class AiGenerationJobTransitionPolicyTest {
             JobStatus.FAILED,
             JobStatus.CANCELLED,
             JobStatus.COMMITTING,
+            JobStatus.COMMIT_RETRY,
             JobStatus.COMMITTED,
         ).forEach { status ->
             assertRejected(status, "worker completion") {
@@ -48,9 +50,10 @@ class AiGenerationJobTransitionPolicyTest {
     }
 
     @Test
-    fun `regenerate and commit may only start from SUCCEEDED`() {
+    fun `regenerate starts from SUCCEEDED while commit also permits COMMIT_RETRY`() {
         assertAllowed { policy.requireRegenerate(JobStatus.SUCCEEDED, jobId) }
         assertAllowed { policy.requireCommit(JobStatus.SUCCEEDED, jobId) }
+        assertAllowed { policy.requireCommit(JobStatus.COMMIT_RETRY, jobId) }
 
         listOf(
             JobStatus.PENDING,
@@ -58,13 +61,16 @@ class AiGenerationJobTransitionPolicyTest {
             JobStatus.FAILED,
             JobStatus.CANCELLED,
             JobStatus.COMMITTING,
+            JobStatus.COMMIT_RETRY,
             JobStatus.COMMITTED,
         ).forEach { status ->
             assertRejected(status, "regenerate") {
                 policy.requireRegenerate(status, jobId)
             }
-            assertRejected(status, "commit") {
-                policy.requireCommit(status, jobId)
+            if (status != JobStatus.COMMIT_RETRY) {
+                assertRejected(status, "commit") {
+                    policy.requireCommit(status, jobId)
+                }
             }
         }
     }
@@ -79,6 +85,7 @@ class AiGenerationJobTransitionPolicyTest {
             JobStatus.FAILED,
             JobStatus.CANCELLED,
             JobStatus.COMMITTING,
+            JobStatus.COMMIT_RETRY,
             JobStatus.COMMITTED,
         ).forEach { status ->
             assertRejected(status, "cancel") {

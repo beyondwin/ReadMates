@@ -24,11 +24,13 @@ import com.readmates.aigen.application.port.out.AiGenerationJobStore
 import com.readmates.aigen.application.port.out.AiGenerationLatencyNotification
 import com.readmates.aigen.application.port.out.AuditLogEntry
 import com.readmates.aigen.application.port.out.ClubDefault
+import com.readmates.aigen.application.port.out.CommitLeaseResult
 import com.readmates.aigen.application.port.out.GenerationCostGuard
 import com.readmates.aigen.application.port.out.GuardDecision
 import com.readmates.aigen.application.port.out.JobKind
 import com.readmates.aigen.application.port.out.JobRecord
 import com.readmates.aigen.application.port.out.ModelCatalog
+import com.readmates.aigen.application.port.out.SaveGroundedResultCommand
 import com.readmates.aigen.application.port.out.SessionContentGenerator
 import com.readmates.aigen.application.port.out.SessionContentRegenerator
 import com.readmates.aigen.config.AiGenerationProperties
@@ -192,6 +194,90 @@ internal class FakeJobStore : AiGenerationJobStore {
         return true
     }
 
+    override fun saveGroundedResult(command: SaveGroundedResultCommand): Boolean {
+        val current =
+            records[command.jobId]?.takeIf {
+                it.status == command.expectedStatus && it.revision == command.expectedRevision
+            } ?: return false
+        records[command.jobId] =
+            current.copy(
+                status = JobStatus.SUCCEEDED,
+                stage = JobStage.READY,
+                progressPct = 100,
+                result = command.result,
+                evidence = command.evidence,
+                revision = current.revision + 1,
+                groundingStatus = com.readmates.aigen.application.model.GroundingStatus.VALID,
+                actualModel = command.actualModel,
+                tokens =
+                    TokenUsage(
+                        current.tokens.inputTokens + command.usage.inputTokens,
+                        current.tokens.cachedInputTokens + command.usage.cachedInputTokens,
+                        current.tokens.outputTokens + command.usage.outputTokens,
+                    ),
+                costAccumulatedUsd = current.costAccumulatedUsd.add(command.cost),
+            )
+        return true
+    }
+
+    override fun acquireCommitLease(
+        jobId: UUID,
+        expectedRevision: Long,
+        now: Instant,
+        leaseDuration: Duration,
+    ): CommitLeaseResult {
+        val current = records[jobId]
+        return when {
+            current == null -> CommitLeaseResult.NotReady
+            current.revision != expectedRevision -> CommitLeaseResult.RevisionConflict
+            current.status == JobStatus.COMMITTING ->
+                CommitLeaseResult.AlreadyCommitting(requireNotNull(current.commitLeaseExpiresAt))
+            current.status !in setOf(JobStatus.SUCCEEDED, JobStatus.COMMIT_RETRY) -> CommitLeaseResult.NotReady
+            else -> {
+                records[jobId] =
+                    current.copy(status = JobStatus.COMMITTING, commitLeaseExpiresAt = now.plus(leaseDuration))
+                CommitLeaseResult.Acquired(current.revision)
+            }
+        }
+    }
+
+    override fun recoverExpiredCommitLease(
+        jobId: UUID,
+        now: Instant,
+    ): Boolean {
+        val current =
+            records[jobId]?.takeIf {
+                it.status == JobStatus.COMMITTING && it.commitLeaseExpiresAt?.isAfter(now) == false
+            } ?: return false
+        records[jobId] = current.copy(status = JobStatus.COMMIT_RETRY, commitLeaseExpiresAt = null)
+        return true
+    }
+
+    override fun markCommittedForCleanup(
+        jobId: UUID,
+        revision: Long,
+    ): Boolean {
+        val current =
+            records[jobId]?.takeIf {
+                it.status == JobStatus.COMMITTING && it.revision == revision
+            } ?: return false
+        records[jobId] =
+            current.copy(status = JobStatus.COMMITTED, cleanupPending = true, commitLeaseExpiresAt = null)
+        return true
+    }
+
+    override fun markCleanupComplete(
+        jobId: UUID,
+        revision: Long,
+    ): Boolean {
+        val current =
+            records[jobId]?.takeIf {
+                it.status == JobStatus.COMMITTED && it.revision == revision && it.cleanupPending
+            } ?: return false
+        records[jobId] = current.copy(cleanupPending = false)
+        return true
+    }
+
     override fun deleteTransientPayload(jobId: UUID) {
         transientPayloadDeleted += jobId
         mutationOrder += "deleteTransient"
@@ -200,6 +286,8 @@ internal class FakeJobStore : AiGenerationJobStore {
             current.copy(
                 transcript = "",
                 result = null,
+                evidence = null,
+                validatedTurns = emptyList(),
             )
     }
 
@@ -217,7 +305,13 @@ internal class FakeJobStore : AiGenerationJobStore {
 
     private companion object {
         val ACTIVE_JOB_STATUSES =
-            setOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCEEDED, JobStatus.COMMITTING)
+            setOf(
+                JobStatus.PENDING,
+                JobStatus.RUNNING,
+                JobStatus.SUCCEEDED,
+                JobStatus.COMMITTING,
+                JobStatus.COMMIT_RETRY,
+            )
     }
 }
 

@@ -125,10 +125,13 @@ enum class JobStatus {
     RUNNING,
     SUCCEEDED,
     COMMITTING,
+    COMMIT_RETRY,
     COMMITTED,
     FAILED,
     CANCELLED,
 }
+
+enum class GroundingStatus { PENDING, VALID, INVALID }
 
 enum class JobStage {
     QUEUED,

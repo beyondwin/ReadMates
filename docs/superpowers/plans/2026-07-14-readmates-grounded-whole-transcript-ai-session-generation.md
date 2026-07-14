@@ -885,7 +885,7 @@ git commit -m "feat(aigen): validate drafts and project source evidence"
 - Adds nonterminal `COMMIT_RETRY` and a bounded commit lease.
 - Cleans every payload on commit/cancel and all five job keys during stale-job deletion.
 
-- [ ] **Step 1: Write Redis key/TTL and conditional-loading tests**
+- [x] **Step 1: Write Redis key/TTL and conditional-loading tests**
 
 Assert:
 
@@ -897,7 +897,7 @@ Assert:
 - stale deletion removes hash and all four payloads;
 - absent/expired payloads map to `JOB_EXPIRED` without partial exposure.
 
-- [ ] **Step 2: Write revision CAS and lease race tests**
+- [x] **Step 2: Write revision CAS and lease race tests**
 
 ```kotlin
 @Test
@@ -913,7 +913,7 @@ fun `only one commit caller acquires the same revision lease`() { /* one winner 
 fun `expired commit lease can move to COMMIT_RETRY without deleting payloads`() { /* recoverable */ }
 ```
 
-- [ ] **Step 3: Run Redis tests and verify RED**
+- [x] **Step 3: Run Redis tests and verify RED**
 
 ```bash
 ./server/gradlew -p server unitTest --tests '*RedisAiGenerationJobStoreTest' --tests '*RedisAiGenerationConditionalLoadingTest' --tests '*AiGenerationJobTransitionPolicyTest'
@@ -921,7 +921,7 @@ fun `expired commit lease can move to COMMIT_RETRY without deleting payloads`() 
 
 Expected: FAIL because revision/evidence/turn keys and lease operations are absent.
 
-- [ ] **Step 4: Extend the job record with metadata-only grounded state**
+- [x] **Step 4: Extend the job record with metadata-only grounded state**
 
 Add fields equivalent to:
 
@@ -939,7 +939,7 @@ data class JobRecord(
 
 `turns`, `result`, and `evidence` remain transient loaded properties or a separate payload aggregate; they must not serialize into the hash. Store a `GroundedSourceContext` envelope containing validated turns, prompt-required session metadata, and optional host instructions under the TTL-bound `:turns` payload, while the normalized raw file remains under `:transcript`. Avoid adding large nullable fields to every ops query if a purpose-specific `GroundedJobPayload` is clearer. Keep legacy hash deserialization compatible for active six-hour jobs, but do not write sensitive legacy `sessionMeta`/`instructions` fields for grounded jobs and remove those fields during terminal cleanup when present.
 
-- [ ] **Step 5: Add explicit atomic store operations**
+- [x] **Step 5: Add explicit atomic store operations**
 
 Prefer request objects for multi-field CAS operations:
 
@@ -965,11 +965,11 @@ sealed interface CommitLeaseResult {
 
 Also expose CAS operations `markCommittedForCleanup(jobId, revision)`, `deleteTransientPayload(jobId)`, and `markCleanupComplete(jobId, revision)`. Implement Lua scripts that check status and revision, write payloads, increment revision, set TTLs, and update hash metadata atomically. Never use load-then-write for revision, lease, terminal status, or cleanup decisions.
 
-- [ ] **Step 6: Update transition policy and browser actions**
+- [x] **Step 6: Update transition policy and browser actions**
 
 `COMMIT_RETRY` is nonterminal and permits poll, explicit safe retry, and scheduler recovery. It is not cancellable after a MySQL receipt may exist. `COMMITTING` permits poll only. Keep `FAILED`, `CANCELLED`, and `COMMITTED` terminal.
 
-- [ ] **Step 7: Rerun Redis and transition suites**
+- [x] **Step 7: Rerun Redis and transition suites**
 
 ```bash
 ./server/gradlew -p server unitTest --tests '*RedisAiGenerationJobStoreTest' --tests '*RedisAiGenerationConditionalLoadingTest' --tests '*AiGenerationJobTransitionPolicyTest'
@@ -977,7 +977,7 @@ Also expose CAS operations `markCommittedForCleanup(jobId, revision)`, `deleteTr
 
 Expected: PASS, including race and TTL assertions against the real Redis test fixture.
 
-- [ ] **Step 8: Commit the Redis state-machine slice**
+- [x] **Step 8: Commit the Redis state-machine slice**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/aigen server/src/test/kotlin/com/readmates/aigen

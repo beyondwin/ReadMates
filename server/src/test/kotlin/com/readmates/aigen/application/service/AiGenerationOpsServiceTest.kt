@@ -100,18 +100,18 @@ class AiGenerationOpsServiceTest {
     }
 
     @Test
-    fun `operator can retry-commit a stuck committing job back to succeeded`() {
-        val job = AiGenerationTestFixtures.jobRecord(status = JobStatus.COMMITTING, stage = JobStage.READY)
+    fun `operator can retry-commit a recovered COMMIT_RETRY job back to succeeded`() {
+        val job = AiGenerationTestFixtures.jobRecord(status = JobStatus.COMMIT_RETRY, stage = JobStage.READY)
         jobStore.save(job)
 
         val result = service.retryCommit(admin(PlatformAdminRole.OPERATOR), job.jobId)
 
-        assertThat(result.previousStatus).isEqualTo(JobStatus.COMMITTING)
+        assertThat(result.previousStatus).isEqualTo(JobStatus.COMMIT_RETRY)
         assertThat(result.nextStatus).isEqualTo(JobStatus.SUCCEEDED)
         assertThat(jobStore.load(job.jobId)?.status).isEqualTo(JobStatus.SUCCEEDED)
         assertThat(jobStore.transientPayloadDeleted).doesNotContain(job.jobId)
         assertThat(actionAudit.entries.single().action).isEqualTo("RETRY_COMMIT")
-        assertThat(actionAudit.entries.single().previousStatus).isEqualTo("COMMITTING")
+        assertThat(actionAudit.entries.single().previousStatus).isEqualTo("COMMIT_RETRY")
         assertThat(actionAudit.entries.single().nextStatus).isEqualTo("SUCCEEDED")
     }
 
@@ -139,14 +139,27 @@ class AiGenerationOpsServiceTest {
     }
 
     @Test
-    fun `committing job lists both force-cancel and retry-commit actions`() {
+    fun `committing job cannot be force-cancelled or reset by an operator`() {
+        val job = AiGenerationTestFixtures.jobRecord(status = JobStatus.COMMITTING, stage = JobStage.READY)
+        jobStore.save(job)
+        val operator = admin(PlatformAdminRole.OPERATOR)
+
+        assertThatThrownBy { service.forceCancel(operator, job.jobId) }
+            .isInstanceOf(AiGenerationException.IllegalGenerationState::class.java)
+        assertThatThrownBy { service.retryCommit(operator, job.jobId) }
+            .isInstanceOf(AiGenerationException.IllegalGenerationState::class.java)
+        assertThat(jobStore.load(job.jobId)?.status).isEqualTo(JobStatus.COMMITTING)
+        assertThat(actionAudit.entries).isEmpty()
+    }
+
+    @Test
+    fun `committing job lists no destructive admin actions`() {
         val job = AiGenerationTestFixtures.jobRecord(status = JobStatus.COMMITTING, stage = JobStage.READY)
         jobStore.save(job)
 
         val item = service.list(admin(PlatformAdminRole.OWNER), AiOpsJobFilters(null, null, null, null)).items.single()
 
-        assertThat(item.availableActions)
-            .containsExactlyInAnyOrder(AiOpsAction.FORCE_CANCEL, AiOpsAction.RETRY_COMMIT)
+        assertThat(item.availableActions).isEmpty()
     }
 
     @Test

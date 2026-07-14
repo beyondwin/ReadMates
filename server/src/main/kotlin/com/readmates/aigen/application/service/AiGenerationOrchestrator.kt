@@ -220,6 +220,7 @@ class AiGenerationOrchestrator(
             JobStatus.RUNNING,
             JobStatus.SUCCEEDED,
             JobStatus.COMMITTING,
+            JobStatus.COMMIT_RETRY,
             -> true
             JobStatus.FAILED -> error?.code in RETRY_SAFE_RECENT_FAILURES
             JobStatus.COMMITTED,

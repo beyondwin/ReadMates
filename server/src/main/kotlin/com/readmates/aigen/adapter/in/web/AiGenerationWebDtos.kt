@@ -181,6 +181,7 @@ private fun JobView.availableActions(): List<String> =
         -> listOf("POLL", "CANCEL")
         JobStatus.SUCCEEDED -> listOf("POLL", "COMMIT_RETRY", "CANCEL")
         JobStatus.COMMITTING -> listOf("POLL")
+        JobStatus.COMMIT_RETRY -> listOf("POLL", "COMMIT_RETRY")
         JobStatus.FAILED -> listOf("START_NEW")
         JobStatus.COMMITTED,
         JobStatus.CANCELLED,

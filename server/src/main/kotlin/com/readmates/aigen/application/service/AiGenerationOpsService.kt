@@ -271,9 +271,10 @@ class AiGenerationOpsService(
     private companion object {
         val ACTION_ROLES = setOf(PlatformAdminRole.OWNER, PlatformAdminRole.OPERATOR)
         val FORCE_CANCEL_STATUSES =
-            setOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCEEDED, JobStatus.COMMITTING)
-        val RETRY_COMMIT_STATUSES = setOf(JobStatus.COMMITTING)
-        val STALE_CANDIDATE_STATUSES = setOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.COMMITTING)
+            setOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCEEDED)
+        val RETRY_COMMIT_STATUSES = setOf(JobStatus.COMMIT_RETRY)
+        val STALE_CANDIDATE_STATUSES =
+            setOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.COMMITTING, JobStatus.COMMIT_RETRY)
         val TERMINAL_STATUSES = setOf(JobStatus.COMMITTED, JobStatus.CANCELLED, JobStatus.FAILED)
         val STALE_CANDIDATE_AGE: Duration = Duration.ofMinutes(15)
     }

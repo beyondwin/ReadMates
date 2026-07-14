@@ -32,7 +32,9 @@ class AiGenerationJobTransitionPolicy {
         status: JobStatus,
         jobId: UUID,
     ) {
-        requireStatus(jobId, status, "commit", JobStatus.SUCCEEDED)
+        if (status !in COMMITTABLE_STATUSES) {
+            throw illegalState(jobId, status, "commit")
+        }
     }
 
     fun requireCancel(
@@ -68,5 +70,6 @@ class AiGenerationJobTransitionPolicy {
 
     private companion object {
         val CANCELLABLE_STATUSES = setOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCEEDED)
+        val COMMITTABLE_STATUSES = setOf(JobStatus.SUCCEEDED, JobStatus.COMMIT_RETRY)
     }
 }

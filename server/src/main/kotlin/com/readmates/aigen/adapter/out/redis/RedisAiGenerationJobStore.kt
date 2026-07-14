@@ -1,35 +1,37 @@
 package com.readmates.aigen.adapter.out.redis
 
 import com.readmates.aigen.application.model.AiGenerationPipelineMode
-import com.readmates.aigen.application.model.AuthorNameMode
-import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.GenerationItem
+import com.readmates.aigen.application.model.GroundedEvidenceBundle
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelId
-import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
-import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
-import com.readmates.aigen.application.model.ValidatedTranscriptTurn
 import com.readmates.aigen.application.port.out.AiGenerationJobStore
+import com.readmates.aigen.application.port.out.CommitLeaseResult
+import com.readmates.aigen.application.port.out.GroundedSourceContext
 import com.readmates.aigen.application.port.out.JobRecord
+import com.readmates.aigen.application.port.out.SaveGroundedResultCommand
 import com.readmates.aigen.config.AiGenerationProperties
 import com.readmates.shared.cache.RedisCacheMetrics
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.data.redis.core.StringRedisTemplate
-import org.springframework.data.redis.core.script.DefaultRedisScript
 import org.springframework.stereotype.Component
+import tools.jackson.core.JacksonException
 import tools.jackson.databind.ObjectMapper
 import tools.jackson.databind.json.JsonMapper
 import java.math.BigDecimal
+import java.time.Duration
 import java.time.Instant
 import java.util.UUID
 
+private class MissingGroundedPayloadException : RuntimeException("Grounded job payload is unavailable")
+
 /**
  * Redis-backed implementation of the AI generation job store.
- * Persists job hash + transcript + result in three keys under `aigen:job:{jobId}*`
+ * Persists a metadata hash plus transcript, source turns, result, and evidence payload keys
  * with TTL from [AiGenerationProperties.Job.redisTtl] (default 6h). Atomic operations
  * (patchItem, delete) use Lua scripts so callers see consistent state.
  *
@@ -45,6 +47,8 @@ class RedisAiGenerationJobStore(
     private val metrics: RedisCacheMetrics,
 ) : AiGenerationJobStore {
     private val objectMapper: ObjectMapper = JsonMapper.builder().findAndAddModules().build()
+    private val recordCodec = AiGenerationRedisRecordCodec(objectMapper, properties.job.redisTtl)
+    private val indexes = AiGenerationRedisIndexes(redisTemplate, properties.job.redisTtl)
 
     override fun save(job: JobRecord) {
         runCatching {
@@ -53,8 +57,9 @@ class RedisAiGenerationJobStore(
             val transcriptKey = transcriptKey(job.jobId)
             val turnsKey = turnsKey(job.jobId)
             val resultKey = resultKey(job.jobId)
+            val evidenceKey = evidenceKey(job.jobId)
 
-            val hash = toHash(job)
+            val hash = recordCodec.toHash(job)
             redisTemplate.opsForHash<String, String>().putAll(hashKey, hash)
             redisTemplate.expire(hashKey, java.time.Duration.ofSeconds(ttlSeconds))
 
@@ -65,7 +70,9 @@ class RedisAiGenerationJobStore(
                     .opsForValue()
                     .set(
                         turnsKey,
-                        objectMapper.writeValueAsString(job.validatedTurns),
+                        objectMapper.writeValueAsString(
+                            GroundedSourceContext(job.validatedTurns, job.sessionMeta, job.instructions),
+                        ),
                         java.time.Duration.ofSeconds(ttlSeconds),
                     )
             }
@@ -79,7 +86,16 @@ class RedisAiGenerationJobStore(
                         java.time.Duration.ofSeconds(ttlSeconds),
                     )
             }
-            indexJob(job)
+            if (job.evidence != null) {
+                redisTemplate
+                    .opsForValue()
+                    .set(
+                        evidenceKey,
+                        objectMapper.writeValueAsString(job.evidence),
+                        java.time.Duration.ofSeconds(ttlSeconds),
+                    )
+            }
+            indexes.index(job)
         }.onFailure { recordFailure("save") }.getOrThrow()
     }
 
@@ -92,28 +108,129 @@ class RedisAiGenerationJobStore(
             val status = hash["status"]?.let { JobStatus.valueOf(it) }
             val pipelineMode =
                 hash["pipelineMode"]?.let(AiGenerationPipelineMode::valueOf) ?: AiGenerationPipelineMode.LEGACY
-            val transcript = redisTemplate.opsForValue().get(transcriptKey(jobId))
-            if (transcript == null && status !in PAYLOAD_OPTIONAL_STATUSES) {
-                return@runCatching deleteStaleJob(jobId)
+            if (pipelineMode == AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT) {
+                loadGrounded(jobId, hash, requireNotNull(status))
+            } else {
+                loadLegacy(jobId, hash, status)
             }
-            val resultJson = redisTemplate.opsForValue().get(resultKey(jobId))
-            val result =
-                resultJson?.let { objectMapper.readValue(it, SessionImportV1Snapshot::class.java) }
-            val turnsJson = redisTemplate.opsForValue().get(turnsKey(jobId))
+        }.onFailure { recordFailure("load") }.getOrThrow()
+
+    override fun loadMetadata(jobId: UUID): JobRecord? =
+        runCatching {
+            val hash = redisTemplate.opsForHash<String, String>().entries(hashKey(jobId))
+            if (hash.isEmpty()) return@runCatching null
+            val status = hash["status"]?.let(JobStatus::valueOf)
+            val pipelineMode =
+                hash["pipelineMode"]?.let(AiGenerationPipelineMode::valueOf) ?: AiGenerationPipelineMode.LEGACY
             if (
                 pipelineMode == AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT &&
-                turnsJson == null &&
-                status !in PAYLOAD_OPTIONAL_STATUSES
+                !requiredGroundedPayloadsExist(jobId, requireNotNull(status))
             ) {
                 return@runCatching deleteStaleJob(jobId)
             }
-            val validatedTurns: List<ValidatedTranscriptTurn> =
-                turnsJson
-                    ?.let { objectMapper.readValue(it, Array<ValidatedTranscriptTurn>::class.java).toList() }
-                    .orEmpty()
+            recordCodec.fromHash(
+                jobId = jobId,
+                hash = hash,
+                transcript = "",
+                result = null,
+                sourceContext = null,
+                evidence = null,
+                includeSensitiveHashFields = false,
+            )
+        }.onFailure { recordFailure("loadMetadata") }.getOrThrow()
 
-            fromHash(jobId, hash, transcript.orEmpty(), result, validatedTurns)
-        }.onFailure { recordFailure("load") }.getOrNull()
+    private fun requiredGroundedPayloadsExist(
+        jobId: UUID,
+        status: JobStatus,
+    ): Boolean {
+        val requiredKeys =
+            when (status) {
+                JobStatus.PENDING,
+                JobStatus.RUNNING,
+                -> listOf(transcriptKey(jobId), turnsKey(jobId))
+                JobStatus.SUCCEEDED ->
+                    listOf(transcriptKey(jobId), turnsKey(jobId), resultKey(jobId), evidenceKey(jobId))
+                JobStatus.COMMITTING,
+                JobStatus.COMMIT_RETRY,
+                -> listOf(turnsKey(jobId), resultKey(jobId), evidenceKey(jobId))
+                JobStatus.COMMITTED,
+                JobStatus.CANCELLED,
+                JobStatus.FAILED,
+                -> emptyList()
+            }
+        return requiredKeys.all(redisTemplate::hasKey)
+    }
+
+    private fun loadGrounded(
+        jobId: UUID,
+        hash: Map<String, String>,
+        status: JobStatus,
+    ): JobRecord? =
+        try {
+            loadGroundedPayloads(jobId, hash, status)
+        } catch (_: MissingGroundedPayloadException) {
+            deleteStaleJob(jobId)
+        } catch (_: JacksonException) {
+            deleteStaleJob(jobId)
+        }
+
+    private fun loadGroundedPayloads(
+        jobId: UUID,
+        hash: Map<String, String>,
+        status: JobStatus,
+    ): JobRecord? {
+        val transcript =
+            if (status in GROUNDED_TRANSCRIPT_STATUSES) {
+                requirePayload(transcriptKey(jobId))
+            } else {
+                ""
+            }
+        val sourceContext =
+            if (status in GROUNDED_SOURCE_CONTEXT_STATUSES) {
+                val sourceJson = requirePayload(turnsKey(jobId))
+                objectMapper.readValue(sourceJson, GroundedSourceContext::class.java)
+            } else {
+                null
+            }
+        val result =
+            if (status in GROUNDED_REVIEW_PAYLOAD_STATUSES) {
+                val resultJson = requirePayload(resultKey(jobId))
+                objectMapper.readValue(resultJson, SessionImportV1Snapshot::class.java)
+            } else {
+                null
+            }
+        val evidence =
+            if (status in GROUNDED_REVIEW_PAYLOAD_STATUSES) {
+                val evidenceJson = requirePayload(evidenceKey(jobId))
+                objectMapper.readValue(evidenceJson, GroundedEvidenceBundle::class.java)
+            } else {
+                null
+            }
+        return recordCodec.fromHash(jobId, hash, transcript, result, sourceContext, evidence)
+    }
+
+    private fun requirePayload(key: String): String =
+        redisTemplate
+            .opsForValue()
+            .get(key)
+            ?: throw MissingGroundedPayloadException()
+
+    private fun loadLegacy(
+        jobId: UUID,
+        hash: Map<String, String>,
+        status: JobStatus?,
+    ): JobRecord? {
+        val transcript = redisTemplate.opsForValue().get(transcriptKey(jobId))
+        if (transcript == null && status !in PAYLOAD_OPTIONAL_STATUSES) {
+            return deleteStaleJob(jobId)
+        }
+        val result =
+            redisTemplate
+                .opsForValue()
+                .get(resultKey(jobId))
+                ?.let { objectMapper.readValue(it, SessionImportV1Snapshot::class.java) }
+        return recordCodec.fromHash(jobId, hash, transcript.orEmpty(), result, null, null)
+    }
 
     override fun loadRecentForSession(
         sessionId: UUID,
@@ -121,22 +238,17 @@ class RedisAiGenerationJobStore(
     ): List<JobRecord> =
         runCatching {
             if (limit <= 0) return@runCatching emptyList()
-            val key = sessionRecentKey(sessionId)
-            val ids =
-                redisTemplate
-                    .opsForZSet()
-                    .reverseRange(key, 0, (limit - 1).coerceAtLeast(0).toLong())
-                    .orEmpty()
+            val ids = indexes.recentIds(sessionId, limit)
             ids.mapNotNull { id ->
                 val jobId = id.toUuidOrNull() ?: return@mapNotNull null
-                val record = load(jobId)
+                val record = loadMetadata(jobId)
                 when {
                     record == null -> {
-                        redisTemplate.opsForZSet().remove(key, id)
+                        indexes.removeRecent(sessionId, id)
                         null
                     }
                     record.sessionId != sessionId -> {
-                        redisTemplate.opsForZSet().remove(key, id)
+                        indexes.removeRecent(sessionId, id)
                         null
                     }
                     else -> record
@@ -147,21 +259,17 @@ class RedisAiGenerationJobStore(
     override fun loadActiveJobs(limit: Int): List<JobRecord> =
         runCatching {
             if (limit <= 0) return@runCatching emptyList()
-            val ids =
-                redisTemplate
-                    .opsForZSet()
-                    .reverseRange(activeJobsKey(), 0, (limit - 1).coerceAtLeast(0).toLong())
-                    .orEmpty()
+            val ids = indexes.activeIds(limit)
             ids.mapNotNull { id ->
                 val jobId = id.toUuidOrNull() ?: return@mapNotNull null
-                val record = load(jobId)
+                val record = loadMetadata(jobId)
                 when {
                     record == null -> {
-                        redisTemplate.opsForZSet().remove(activeJobsKey(), id)
+                        indexes.removeActiveId(id)
                         null
                     }
-                    record.status !in ACTIVE_INDEX_STATUSES -> {
-                        removeFromActiveIndexes(record)
+                    !indexes.isActive(record) -> {
+                        indexes.removeActive(record)
                         null
                     }
                     else -> record
@@ -180,7 +288,7 @@ class RedisAiGenerationJobStore(
             val lastUpdatedAt = Instant.now()
             val resultJson = objectMapper.writeValueAsString(result)
             redisTemplate.execute(
-                PATCH_RESULT_SCRIPT,
+                AiGenerationRedisScripts.patchResult,
                 listOf(hashKey(jobId), resultKey(jobId), transcriptKey(jobId), turnsKey(jobId)),
                 resultJson,
                 usage.inputTokens.toString(),
@@ -211,7 +319,7 @@ class RedisAiGenerationJobStore(
             }
             val newResultJson = objectMapper.writeValueAsString(value)
             redisTemplate.execute(
-                PATCH_RESULT_SCRIPT,
+                AiGenerationRedisScripts.patchResult,
                 listOf(hashKey(jobId), resultKey(jobId), transcriptKey(jobId), turnsKey(jobId)),
                 newResultJson,
                 usage.inputTokens.toString(),
@@ -264,7 +372,7 @@ class RedisAiGenerationJobStore(
             val lastUpdatedAt = Instant.now()
             val result =
                 redisTemplate.execute(
-                    TRANSITION_STATUS_SCRIPT,
+                    AiGenerationRedisScripts.transitionStatus,
                     listOf(hashKey(jobId)),
                     expected.joinToString(",") { it.name },
                     next.name,
@@ -298,7 +406,7 @@ class RedisAiGenerationJobStore(
             val resultJson = objectMapper.writeValueAsString(result)
             val saved =
                 redisTemplate.execute(
-                    SAVE_RESULT_IF_STATUS_SCRIPT,
+                    AiGenerationRedisScripts.saveResultIfStatus,
                     listOf(hashKey(jobId), resultKey(jobId), transcriptKey(jobId), turnsKey(jobId)),
                     expected.name,
                     resultJson,
@@ -318,13 +426,142 @@ class RedisAiGenerationJobStore(
             changed
         }.onFailure { recordFailure("saveResultIfStatus") }.getOrThrow()
 
+    override fun saveGroundedResult(command: SaveGroundedResultCommand): Boolean =
+        runCatching {
+            require(command.evidence.revision == command.expectedRevision + 1) {
+                "Grounded evidence revision must be the next expected revision"
+            }
+            val saved =
+                redisTemplate.execute(
+                    GroundedAiGenerationRedisScripts.saveResult,
+                    listOf(
+                        hashKey(command.jobId),
+                        resultKey(command.jobId),
+                        evidenceKey(command.jobId),
+                        transcriptKey(command.jobId),
+                        turnsKey(command.jobId),
+                    ),
+                    command.expectedStatus.name,
+                    command.expectedRevision.toString(),
+                    objectMapper.writeValueAsString(command.result),
+                    objectMapper.writeValueAsString(command.evidence),
+                    command.usage.inputTokens.toString(),
+                    command.usage.cachedInputTokens.toString(),
+                    command.usage.outputTokens.toString(),
+                    command.cost.toPlainString(),
+                    Instant.now().toString(),
+                    properties.job.redisTtl.seconds
+                        .toString(),
+                    command.actualModel.provider.name,
+                    command.actualModel.name,
+                ) == 1L
+            if (saved) refreshIndexes(command.jobId)
+            saved
+        }.onFailure { recordFailure("saveGroundedResult") }.getOrThrow()
+
+    override fun acquireCommitLease(
+        jobId: UUID,
+        expectedRevision: Long,
+        now: Instant,
+        leaseDuration: Duration,
+    ): CommitLeaseResult =
+        runCatching {
+            require(!leaseDuration.isZero && !leaseDuration.isNegative) { "Commit lease duration must be positive" }
+            val leaseExpiresAt = now.plus(leaseDuration)
+            val response =
+                redisTemplate
+                    .execute(
+                        GroundedAiGenerationRedisScripts.acquireCommitLease,
+                        listOf(
+                            hashKey(jobId),
+                            transcriptKey(jobId),
+                            turnsKey(jobId),
+                            resultKey(jobId),
+                            evidenceKey(jobId),
+                        ),
+                        expectedRevision.toString(),
+                        now.toString(),
+                        leaseExpiresAt.toEpochMilli().toString(),
+                        properties.job.redisTtl.seconds
+                            .toString(),
+                    ).orEmpty()
+            val result = parseCommitLeaseResult(response)
+            if (result is CommitLeaseResult.Acquired) refreshIndexes(jobId)
+            result
+        }.onFailure { recordFailure("acquireCommitLease") }.getOrThrow()
+
+    override fun recoverExpiredCommitLease(
+        jobId: UUID,
+        now: Instant,
+    ): Boolean =
+        runCatching {
+            val recovered =
+                redisTemplate.execute(
+                    GroundedAiGenerationRedisScripts.recoverExpiredCommitLease,
+                    listOf(
+                        hashKey(jobId),
+                        transcriptKey(jobId),
+                        turnsKey(jobId),
+                        resultKey(jobId),
+                        evidenceKey(jobId),
+                    ),
+                    now.toEpochMilli().toString(),
+                    now.toString(),
+                    properties.job.redisTtl.seconds
+                        .toString(),
+                ) == 1L
+            if (recovered) refreshIndexes(jobId)
+            recovered
+        }.onFailure { recordFailure("recoverExpiredCommitLease") }.getOrThrow()
+
+    override fun markCommittedForCleanup(
+        jobId: UUID,
+        revision: Long,
+    ): Boolean =
+        runCatching {
+            val changed =
+                redisTemplate.execute(
+                    GroundedAiGenerationRedisScripts.markCommittedForCleanup,
+                    listOf(hashKey(jobId)),
+                    revision.toString(),
+                    Instant.now().toString(),
+                    properties.job.redisTtl.seconds
+                        .toString(),
+                ) == 1L
+            if (changed) refreshIndexes(jobId)
+            changed
+        }.onFailure { recordFailure("markCommittedForCleanup") }.getOrThrow()
+
+    override fun markCleanupComplete(
+        jobId: UUID,
+        revision: Long,
+    ): Boolean =
+        runCatching {
+            val changed =
+                redisTemplate.execute(
+                    GroundedAiGenerationRedisScripts.markCleanupComplete,
+                    listOf(hashKey(jobId)),
+                    revision.toString(),
+                    Instant.now().toString(),
+                    properties.job.redisTtl.seconds
+                        .toString(),
+                ) == 1L
+            if (changed) refreshIndexes(jobId)
+            changed
+        }.onFailure { recordFailure("markCleanupComplete") }.getOrThrow()
+
     override fun deleteTransientPayload(jobId: UUID) {
         runCatching {
             redisTemplate.execute(
-                DELETE_TRANSIENT_PAYLOAD_SCRIPT,
-                listOf(transcriptKey(jobId), resultKey(jobId), turnsKey(jobId)),
+                AiGenerationRedisScripts.deleteTransientPayload,
+                listOf(
+                    hashKey(jobId),
+                    transcriptKey(jobId),
+                    resultKey(jobId),
+                    turnsKey(jobId),
+                    evidenceKey(jobId),
+                ),
             )
-            refreshIndexes(jobId)
         }.onFailure { recordFailure("deleteTransientPayload") }.getOrThrow()
     }
 
@@ -351,16 +588,23 @@ class RedisAiGenerationJobStore(
         redisTemplate.expire(transcriptKey(jobId), ttl)
         redisTemplate.expire(turnsKey(jobId), ttl)
         redisTemplate.expire(resultKey(jobId), ttl)
+        redisTemplate.expire(evidenceKey(jobId), ttl)
     }
 
     override fun delete(jobId: UUID) {
         runCatching {
             val hash = redisTemplate.opsForHash<String, String>().entries(hashKey(jobId))
             redisTemplate.execute(
-                DELETE_JOB_SCRIPT,
-                listOf(hashKey(jobId), transcriptKey(jobId), resultKey(jobId), turnsKey(jobId)),
+                AiGenerationRedisScripts.deleteJob,
+                listOf(
+                    hashKey(jobId),
+                    transcriptKey(jobId),
+                    resultKey(jobId),
+                    turnsKey(jobId),
+                    evidenceKey(jobId),
+                ),
             )
-            removeFromIndexes(
+            indexes.remove(
                 jobId = jobId,
                 sessionId = hash["sessionId"]?.let(UUID::fromString),
                 clubId = hash["clubId"]?.let(UUID::fromString),
@@ -368,163 +612,20 @@ class RedisAiGenerationJobStore(
         }.onFailure { recordFailure("delete") }.getOrThrow()
     }
 
-    private fun toHash(job: JobRecord): Map<String, String> {
-        val map =
-            mutableMapOf(
-                "jobId" to job.jobId.toString(),
-                "sessionId" to job.sessionId.toString(),
-                "clubId" to job.clubId.toString(),
-                "hostUserId" to job.hostUserId.toString(),
-                "modelProvider" to job.model.provider.name,
-                "modelName" to job.model.name,
-                "authorNameMode" to job.authorNameMode.name,
-                "pipelineMode" to job.pipelineMode.name,
-                "eligibleFallbackModels" to objectMapper.writeValueAsString(job.eligibleFallbackModels),
-                "sessionMeta" to objectMapper.writeValueAsString(job.sessionMeta),
-                "status" to job.status.name,
-                "progressPct" to job.progressPct.toString(),
-                "tokensInput" to job.tokens.inputTokens.toString(),
-                "tokensCached" to job.tokens.cachedInputTokens.toString(),
-                "tokensOutput" to job.tokens.outputTokens.toString(),
-                "costAccumulatedUsd" to job.costAccumulatedUsd.toPlainString(),
-                "llmCallCount" to job.llmCallCount.toString(),
-                "expiresAt" to job.expiresAt.toString(),
-                "createdAt" to job.createdAt.toString(),
-                "lastUpdatedAt" to job.lastUpdatedAt.toString(),
-            )
-        job.actualModel?.let {
-            map["actualModelProvider"] = it.provider.name
-            map["actualModelName"] = it.name
-        }
-        job.stage?.let { map["stage"] = it.name }
-        job.instructions?.let { map["instructions"] = it }
-        job.error?.let {
-            map["errorCode"] = it.code.name
-            map["errorMessage"] = it.message.take(MAX_ERROR_MESSAGE_LEN)
-        }
-        return map
-    }
-
-    private fun fromHash(
-        jobId: UUID,
-        hash: Map<String, String>,
-        transcript: String,
-        result: SessionImportV1Snapshot?,
-        validatedTurns: List<ValidatedTranscriptTurn>,
-    ): JobRecord {
-        val expiresAt =
-            hash["expiresAt"]
-                ?.let { runCatching { Instant.parse(it) }.getOrNull() }
-                ?: Instant.now().plus(properties.job.redisTtl)
-        val createdAt =
-            hash["createdAt"]
-                ?.let { runCatching { Instant.parse(it) }.getOrNull() }
-                ?: expiresAt.minus(properties.job.redisTtl)
-        val lastUpdatedAt =
-            hash["lastUpdatedAt"]
-                ?.let { runCatching { Instant.parse(it) }.getOrNull() }
-                ?: createdAt
-        return JobRecord(
-            jobId = jobId,
-            sessionId = UUID.fromString(hash.getValue("sessionId")),
-            clubId = UUID.fromString(hash.getValue("clubId")),
-            hostUserId = UUID.fromString(hash.getValue("hostUserId")),
-            model =
-                ModelId(
-                    provider = Provider.valueOf(hash.getValue("modelProvider")),
-                    name = hash.getValue("modelName"),
-                ),
-            authorNameMode = AuthorNameMode.valueOf(hash.getValue("authorNameMode")),
-            instructions = hash["instructions"],
-            transcript = transcript,
-            sessionMeta = objectMapper.readValue(hash.getValue("sessionMeta"), SessionMeta::class.java),
-            status = JobStatus.valueOf(hash.getValue("status")),
-            stage = hash["stage"]?.let { JobStage.valueOf(it) },
-            progressPct = hash.getValue("progressPct").toInt(),
-            result = result,
-            error =
-                hash["errorCode"]?.let { code ->
-                    GenerationError(
-                        code = ErrorCode.valueOf(code),
-                        message = hash["errorMessage"].orEmpty(),
-                    )
-                },
-            tokens =
-                TokenUsage(
-                    inputTokens = hash.getValue("tokensInput").toLong(),
-                    cachedInputTokens = hash.getValue("tokensCached").toLong(),
-                    outputTokens = hash.getValue("tokensOutput").toLong(),
-                ),
-            costAccumulatedUsd = BigDecimal(hash.getValue("costAccumulatedUsd")),
-            expiresAt = expiresAt,
-            createdAt = createdAt,
-            lastUpdatedAt = lastUpdatedAt,
-            actualModel = readActualModel(hash),
-            llmCallCount = hash["llmCallCount"]?.toIntOrNull() ?: 0,
-            pipelineMode =
-                hash["pipelineMode"]?.let(AiGenerationPipelineMode::valueOf)
-                    ?: AiGenerationPipelineMode.LEGACY,
-            validatedTurns = validatedTurns,
-            eligibleFallbackModels =
-                hash["eligibleFallbackModels"]
-                    ?.let { objectMapper.readValue(it, Array<ModelId>::class.java).toList() }
-                    .orEmpty(),
-        )
-    }
-
-    private fun readActualModel(hash: Map<String, String>): ModelId? =
-        hash["actualModelName"]?.let { name ->
-            ModelId(
-                provider = Provider.valueOf(hash.getValue("actualModelProvider")),
-                name = name,
-            )
+    private fun parseCommitLeaseResult(response: String): CommitLeaseResult =
+        when {
+            response.startsWith("ACQUIRED|") ->
+                CommitLeaseResult.Acquired(response.substringAfter('|').toLong())
+            response.startsWith("ALREADY_COMMITTING|") ->
+                CommitLeaseResult.AlreadyCommitting(Instant.ofEpochMilli(response.substringAfter('|').toLong()))
+            response == "REVISION_CONFLICT" -> CommitLeaseResult.RevisionConflict
+            response == "EXPIRED" -> CommitLeaseResult.Expired
+            else -> CommitLeaseResult.NotReady
         }
 
     private fun refreshIndexes(jobId: UUID) {
-        val record = load(jobId) ?: return
-        indexJob(record)
-    }
-
-    private fun indexJob(job: JobRecord) {
-        val id = job.jobId.toString()
-        val score = job.lastUpdatedAt.toEpochMilli().toDouble()
-        val ttl = properties.job.redisTtl
-        val zSet = redisTemplate.opsForZSet()
-
-        val sessionKey = sessionRecentKey(job.sessionId)
-        zSet.add(sessionKey, id, score)
-        redisTemplate.expire(sessionKey, ttl)
-
-        if (job.status in ACTIVE_INDEX_STATUSES) {
-            val activeKey = activeJobsKey()
-            val clubKey = activeClubJobsKey(job.clubId)
-            zSet.add(activeKey, id, score)
-            zSet.add(clubKey, id, score)
-            redisTemplate.expire(activeKey, ttl)
-            redisTemplate.expire(clubKey, ttl)
-        } else {
-            removeFromActiveIndexes(job)
-        }
-    }
-
-    private fun removeFromActiveIndexes(job: JobRecord) {
-        removeFromIndexes(job.jobId, sessionId = null, clubId = job.clubId)
-    }
-
-    private fun removeFromIndexes(
-        jobId: UUID,
-        sessionId: UUID?,
-        clubId: UUID?,
-    ) {
-        val id = jobId.toString()
-        val zSet = redisTemplate.opsForZSet()
-        zSet.remove(activeJobsKey(), id)
-        if (sessionId != null) {
-            zSet.remove(sessionRecentKey(sessionId), id)
-        }
-        if (clubId != null) {
-            zSet.remove(activeClubJobsKey(clubId), id)
-        }
+        val record = loadMetadata(jobId) ?: return
+        indexes.index(record)
     }
 
     private fun String.toUuidOrNull(): UUID? =
@@ -551,143 +652,32 @@ class RedisAiGenerationJobStore(
 
     private fun resultKey(jobId: UUID) = "aigen:job:$jobId:result"
 
-    private fun sessionRecentKey(sessionId: UUID) = "aigen:session:$sessionId:jobs"
-
-    private fun activeJobsKey() = "aigen:jobs:active"
-
-    private fun activeClubJobsKey(clubId: UUID) = "aigen:club:$clubId:jobs:active"
+    private fun evidenceKey(jobId: UUID) = "aigen:job:$jobId:evidence"
 
     private companion object {
         const val MAX_ERROR_MESSAGE_LEN = 512
 
         val PAYLOAD_OPTIONAL_STATUSES =
-            setOf(JobStatus.COMMITTING, JobStatus.COMMITTED, JobStatus.CANCELLED, JobStatus.FAILED)
-
-        val ACTIVE_INDEX_STATUSES =
-            setOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCEEDED, JobStatus.COMMITTING)
-
-        /**
-         * KEYS[1]=hashKey
-         * ARGV[1]=comma-separated expected statuses, ARGV[2]=next status,
-         * ARGV[3]=stage or "", ARGV[4]=progressPct,
-         * ARGV[5]=errorCode or "", ARGV[6]=errorMessage or "",
-         * ARGV[7]=lastUpdatedAt, ARGV[8]=ttlSeconds.
-         */
-        val TRANSITION_STATUS_SCRIPT: DefaultRedisScript<Long> =
-            DefaultRedisScript(
-                """
-                if redis.call('EXISTS', KEYS[1]) == 0 then
-                  return 0
-                end
-                local current = redis.call('HGET', KEYS[1], 'status')
-                local expected = ',' .. ARGV[1] .. ','
-                if string.find(expected, ',' .. current .. ',', 1, true) == nil then
-                  return 0
-                end
-                redis.call('HSET', KEYS[1], 'status', ARGV[2])
-                if ARGV[3] == '' then
-                  redis.call('HDEL', KEYS[1], 'stage')
-                else
-                  redis.call('HSET', KEYS[1], 'stage', ARGV[3])
-                end
-                redis.call('HSET', KEYS[1], 'progressPct', ARGV[4])
-                redis.call('HSET', KEYS[1], 'lastUpdatedAt', ARGV[7])
-                if ARGV[5] == '' then
-                  redis.call('HDEL', KEYS[1], 'errorCode', 'errorMessage')
-                else
-                  redis.call('HSET', KEYS[1], 'errorCode', ARGV[5])
-                  redis.call('HSET', KEYS[1], 'errorMessage', ARGV[6])
-                end
-                redis.call('EXPIRE', KEYS[1], ARGV[8])
-                return 1
-                """.trimIndent(),
-                Long::class.java,
+            setOf(
+                JobStatus.COMMITTING,
+                JobStatus.COMMIT_RETRY,
+                JobStatus.COMMITTED,
+                JobStatus.CANCELLED,
+                JobStatus.FAILED,
             )
 
-        /**
-         * KEYS[1]=hashKey, KEYS[2]=resultKey, KEYS[3]=transcriptKey, KEYS[4]=turnsKey
-         * ARGV[1]=expected status, ARGV[2]=resultJson, ARGV[3..5]=token deltas,
-         * ARGV[6]=cost delta, ARGV[7]=lastUpdatedAt, ARGV[8]=ttlSeconds,
-         * ARGV[9]=actualModelProvider or "", ARGV[10]=actualModelName or "".
-         */
-        val SAVE_RESULT_IF_STATUS_SCRIPT: DefaultRedisScript<Long> =
-            DefaultRedisScript(
-                """
-                if redis.call('EXISTS', KEYS[1]) == 0 then
-                  return 0
-                end
-                if redis.call('HGET', KEYS[1], 'status') ~= ARGV[1] then
-                  return 0
-                end
-                redis.call('SET', KEYS[2], ARGV[2])
-                redis.call('EXPIRE', KEYS[2], ARGV[8])
-                redis.call('HINCRBY', KEYS[1], 'tokensInput', ARGV[3])
-                redis.call('HINCRBY', KEYS[1], 'tokensCached', ARGV[4])
-                redis.call('HINCRBY', KEYS[1], 'tokensOutput', ARGV[5])
-                redis.call('HINCRBYFLOAT', KEYS[1], 'costAccumulatedUsd', ARGV[6])
-                redis.call('HSET', KEYS[1], 'lastUpdatedAt', ARGV[7])
-                redis.call('EXPIRE', KEYS[1], ARGV[8])
-                if redis.call('EXISTS', KEYS[3]) == 1 then
-                  redis.call('EXPIRE', KEYS[3], ARGV[8])
-                end
-                if redis.call('EXISTS', KEYS[4]) == 1 then
-                  redis.call('EXPIRE', KEYS[4], ARGV[8])
-                end
-                if ARGV[9] ~= '' then
-                  redis.call('HSET', KEYS[1], 'actualModelProvider', ARGV[9])
-                  redis.call('HSET', KEYS[1], 'actualModelName', ARGV[10])
-                end
-                return 1
-                """.trimIndent(),
-                Long::class.java,
+        val GROUNDED_TRANSCRIPT_STATUSES = setOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCEEDED)
+
+        val GROUNDED_SOURCE_CONTEXT_STATUSES =
+            setOf(
+                JobStatus.PENDING,
+                JobStatus.RUNNING,
+                JobStatus.SUCCEEDED,
+                JobStatus.COMMITTING,
+                JobStatus.COMMIT_RETRY,
             )
 
-        /** KEYS[1]=transcriptKey, KEYS[2]=resultKey, KEYS[3]=turnsKey; deletes transient payload only. */
-        val DELETE_TRANSIENT_PAYLOAD_SCRIPT: DefaultRedisScript<Long> =
-            DefaultRedisScript(
-                """
-                return redis.call('DEL', KEYS[1], KEYS[2], KEYS[3])
-                """.trimIndent(),
-                Long::class.java,
-            )
-
-        /**
-         * KEYS[1]=hashKey, KEYS[2]=resultKey, KEYS[3]=transcriptKey, KEYS[4]=turnsKey
-         * ARGV[1]=resultJson, ARGV[2..4]=tokens (input,cached,output) delta,
-         * ARGV[5]=cost delta (decimal string), ARGV[6]=lastUpdatedAt, ARGV[7]=ttlSeconds
-         *
-         * Atomically: SET resultJson; HINCRBY tokens; HINCRBYFLOAT cost; refresh TTL on
-         * hash + result + (existing) transcript so all three expire together.
-         */
-        val PATCH_RESULT_SCRIPT: DefaultRedisScript<Void> =
-            DefaultRedisScript(
-                """
-                redis.call('SET', KEYS[2], ARGV[1])
-                redis.call('EXPIRE', KEYS[2], ARGV[7])
-                redis.call('HINCRBY', KEYS[1], 'tokensInput', ARGV[2])
-                redis.call('HINCRBY', KEYS[1], 'tokensCached', ARGV[3])
-                redis.call('HINCRBY', KEYS[1], 'tokensOutput', ARGV[4])
-                redis.call('HINCRBYFLOAT', KEYS[1], 'costAccumulatedUsd', ARGV[5])
-                redis.call('HSET', KEYS[1], 'lastUpdatedAt', ARGV[6])
-                redis.call('EXPIRE', KEYS[1], ARGV[7])
-                if redis.call('EXISTS', KEYS[3]) == 1 then
-                  redis.call('EXPIRE', KEYS[3], ARGV[7])
-                end
-                if redis.call('EXISTS', KEYS[4]) == 1 then
-                  redis.call('EXPIRE', KEYS[4], ARGV[7])
-                end
-                return nil
-                """.trimIndent(),
-                Void::class.java,
-            )
-
-        /** KEYS[1]=hash, KEYS[2]=transcript, KEYS[3]=result, KEYS[4]=turns; deletes all atomically. */
-        val DELETE_JOB_SCRIPT: DefaultRedisScript<Long> =
-            DefaultRedisScript(
-                """
-                return redis.call('DEL', KEYS[1], KEYS[2], KEYS[3], KEYS[4])
-                """.trimIndent(),
-                Long::class.java,
-            )
+        val GROUNDED_REVIEW_PAYLOAD_STATUSES =
+            setOf(JobStatus.SUCCEEDED, JobStatus.COMMITTING, JobStatus.COMMIT_RETRY)
     }
 }
