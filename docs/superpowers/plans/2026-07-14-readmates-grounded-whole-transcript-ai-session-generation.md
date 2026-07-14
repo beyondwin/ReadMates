@@ -1837,7 +1837,7 @@ git commit -m "test(aigen): cover grounded transcript workflow"
 - Runbook documents feature-mode rollout, failure recovery, provider capability drift, and private evaluation boundaries.
 - Full server, frontend, E2E, PII, public-release, and release-readiness checks pass before switching the default mode.
 
-- [ ] **Step 1: Write audit and metric regression tests**
+- [x] **Step 1: Write audit and metric regression tests**
 
 Audit entries may add:
 
@@ -1853,7 +1853,7 @@ val userEditedSectionCount: Int?
 
 Use defaults to minimize legacy call-site churn. Assert repository parameters and metrics never include transcript, turns, names, result, evidence, provider response, instructions, or review text. Metric tags remain enum allowlisted and low-cardinality.
 
-- [ ] **Step 2: Extend the PII static guard and its self-test fixtures**
+- [x] **Step 2: Extend the PII static guard and its self-test fixtures**
 
 `scripts/aigen-pii-check.sh` must verify:
 
@@ -1867,7 +1867,7 @@ Use defaults to minimize legacy call-site churn. Assert repository parameters an
 
 Avoid overbroad scans that flag unrelated domain text columns; scope each assertion to AI generation files/tables.
 
-- [ ] **Step 3: Run focused audit and privacy checks**
+- [x] **Step 3: Run focused audit and privacy checks**
 
 ```bash
 ./server/gradlew -p server unitTest --tests '*JdbcAiGenerationAuditRepositoryTest' --tests '*AiGenerationMetricsTest' --tests '*AiGenerationJobMessageSerializationTest'
@@ -1876,7 +1876,7 @@ bash scripts/aigen-pii-check.sh
 
 Expected: PASS with named checks for all four payload types and content-free receipt/audit rules.
 
-- [ ] **Step 4: Align operator smoke defaults without making live calls**
+- [x] **Step 4: Align operator smoke defaults without making live calls**
 
 Update the Gemini default to `gemini-3-flash-preview`, keep OpenAI `gpt-5.4-mini` and Claude `claude-sonnet-4-6`, and make each script upload a public-safe supported TXT shape. Preserve environment-key gating. Validate syntax only in the normal gate; do not execute provider calls.
 
@@ -1886,7 +1886,7 @@ bash -n scripts/aigen-smoke-openai.sh scripts/aigen-smoke-claude.sh scripts/aige
 
 Expected: PASS.
 
-- [ ] **Step 5: Document operator-visible behavior**
+- [x] **Step 5: Document operator-visible behavior**
 
 Update the runbook with:
 
@@ -1903,7 +1903,7 @@ Update the runbook with:
 
 Update architecture with the actual implemented data flow and trust boundaries. Add an Unreleased CHANGELOG entry describing host behavior, migration, model ID correction, and operations impact.
 
-- [ ] **Step 6: Run focused lint/unit/build gates**
+- [x] **Step 6: Run focused lint/unit/build gates**
 
 ```bash
 npx --yes corepack@0.35.0 pnpm --dir front lint
@@ -1915,7 +1915,7 @@ bash scripts/aigen-pii-check.sh
 
 Expected: all commands exit 0. Record exact commands and any environment fallback in the implementation handoff.
 
-- [ ] **Step 7: Run full integration and E2E gates**
+- [x] **Step 7: Run full integration and E2E gates**
 
 ```bash
 ./server/gradlew -p server integrationTest
@@ -1924,7 +1924,7 @@ npx --yes corepack@0.35.0 pnpm --dir front test:e2e
 
 Expected: PASS. If Testcontainers or browser prerequisites are unavailable, report the exact skipped command/reason and do not enable grounded mode by default.
 
-- [ ] **Step 8: Run docs/public safety and release-candidate gates**
+- [x] **Step 8: Run docs/public safety and release-candidate gates**
 
 ```bash
 git diff --check "$IMPLEMENTATION_BASE" -- .env.example CHANGELOG.md docs scripts server front
@@ -1936,7 +1936,7 @@ rg -n '/(Users|home)/|[Dd]ownloads/|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|api[_-
 
 Expected: diff check and release scripts exit 0. Review every regex hit as an allowlisted placeholder/documentation case; there must be no private path, value, fixture, or token-shaped secret.
 
-- [ ] **Step 9: Review the complete branch against its base**
+- [x] **Step 9: Review the complete branch against its base**
 
 Follow `docs/development/release-readiness-review.md`, not only this plan:
 
@@ -1949,20 +1949,20 @@ git log --oneline "$IMPLEMENTATION_BASE"..HEAD
 
 Inspect CHANGELOG/Unreleased, migration reversibility/roll-forward safety, CI/deploy scripts, operator-visible errors, security-code hygiene, architecture-test baselines/exceptions, public-release candidate contents, and every config default. Passing tests alone is not release approval.
 
-- [ ] **Step 10: Keep rollout fail-safe**
+- [x] **Step 10: Keep rollout fail-safe**
 
 Do not change `LEGACY` to the production default in the same code path merely because tests pass. Enable `GROUNDED_WHOLE_TRANSCRIPT` first in a controlled environment with public-safe or separately approved evaluation data, observe aggregate error/latency/cost/recovery metrics, then make the environment rollout decision independently. The code default may change only through a separately reviewed release decision.
 
 Before any evaluation uploads the seven private local files to a provider, pause and obtain a separate explicit approval that names the provider/retention environment. Keep input and any file-to-session mapping ignored and local. The only retained report fields may be per-file pass/fail, provider/model/pipeline version, token/cost/latency, valid evidence-reference ratio, manual unsupported-claim count, speaker-attribution error count, and host-review completion time. Do not retain file names, paths, actual labels, transcript excerpts, prompts, results, screenshots, or CI artifacts. If that approval is absent, record the gate as `SKIPPED_NOT_AUTHORIZED`, keep the rollout default `LEGACY`, and do not claim private quality validation passed.
 
-- [ ] **Step 11: Commit the operational closeout**
+- [x] **Step 11: Commit the operational closeout**
 
 ```bash
 git add .env.example CHANGELOG.md docs/development/architecture.md docs/operations/runbooks/ai-session-generation.md scripts server/src/main/kotlin/com/readmates/aigen server/src/test/kotlin/com/readmates/aigen
 git commit -m "docs(aigen): operationalize grounded generation"
 ```
 
-- [ ] **Step 12: Capture final evidence**
+- [x] **Step 12: Capture final evidence**
 
 Record:
 
