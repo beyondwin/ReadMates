@@ -540,7 +540,9 @@ class AiGenerateApiIntegrationTest(
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value(SESSION_ID) }
-                jsonPath("$.publication.summary") { exists() }
+                jsonPath("$.status") { value("COMMITTED") }
+                jsonPath("$.recovered") { value(false) }
+                jsonPath("$.publication") { doesNotExist() }
             }
     }
 

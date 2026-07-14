@@ -9,6 +9,7 @@ import com.readmates.aigen.application.port.out.GroundedRequestRenderer
 import com.readmates.aigen.application.port.out.ModelCapabilityCatalog
 import com.readmates.aigen.application.port.out.RenderedGroundedRequest
 import com.readmates.aigen.config.AiGenerationProperties
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Service
 
 data class GroundedBudgetDecision(
@@ -20,6 +21,7 @@ data class GroundedBudgetDecision(
 
 /** Makes no network calls and budgets each UTF-8 byte as at most one input token. */
 @Service
+@ConditionalOnProperty(prefix = "readmates", name = ["aigen.enabled"], havingValue = "true")
 class GroundedInputBudgetGuard(
     private val renderer: GroundedRequestRenderer,
     private val capabilityCatalog: ModelCapabilityCatalog,

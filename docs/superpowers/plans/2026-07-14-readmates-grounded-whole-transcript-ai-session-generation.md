@@ -1263,7 +1263,7 @@ git commit -m "feat(aigen): expose revisioned grounded review APIs"
 - Redis lease precedes the MySQL transaction; Redis finalization/cleanup follows the committed transaction.
 - Receipt `(job_id, revision)` makes repeated commit and crash recovery idempotent.
 
-- [ ] **Step 1: Write the Flyway migration**
+- [x] **Step 1: Write the Flyway migration**
 
 Create a content-free receipt table and additive audit columns:
 
@@ -1285,7 +1285,7 @@ Add nullable/defaulted aggregate columns to `ai_generation_audit_log`: `pipeline
 
 Migrate stored `ai_generation_club_defaults.default_model = 'gemini-3-flash'` to `gemini-3-flash-preview` in the same migration.
 
-- [ ] **Step 2: Write persistence adapter tests**
+- [x] **Step 2: Write persistence adapter tests**
 
 Assert:
 
@@ -1295,7 +1295,7 @@ Assert:
 - another-club, inactive, or renamed membership cannot be upserted even if application input is forged;
 - receipt contains identifiers/timestamp only and duplicate `(jobId, revision)` is idempotently detectable.
 
-- [ ] **Step 3: Write commit review/diff tests**
+- [x] **Step 3: Write commit review/diff tests**
 
 Pin server-side enforcement:
 
@@ -1311,7 +1311,7 @@ Pin server-side enforcement:
 - a speaker membership that became inactive or whose current normalized display name no longer matches returns `MEMBERSHIP_CHANGED` before content writes;
 - import or receipt failure rolls back participant changes and session content.
 
-- [ ] **Step 4: Write crash-window recovery tests**
+- [x] **Step 4: Write crash-window recovery tests**
 
 Cover these state transitions:
 
@@ -1323,7 +1323,7 @@ receipt already exists + repeated commit -> content-free COMMITTED response, no 
 cache invalidation or Redis payload deletion failure after receipt -> COMMITTED + cleanupPending=true, cleanup-only recovery converges
 ```
 
-- [ ] **Step 5: Run persistence/commit/recovery tests and verify RED**
+- [x] **Step 5: Run persistence/commit/recovery tests and verify RED**
 
 ```bash
 ./server/gradlew -p server unitTest --tests '*AiGenerationCommitServiceTest' --tests '*AiGenerationCommitRecoveryServiceTest' --tests '*AiGenerationPostCommitCleanupServiceTest' --tests '*AiGenerationOpsServiceTest'
@@ -1332,7 +1332,7 @@ cache invalidation or Redis payload deletion failure after receipt -> COMMITTED 
 
 Expected: FAIL because the port, receipt, transaction coordinator, and recovery service do not exist.
 
-- [ ] **Step 6: Implement the explicit transaction boundary**
+- [x] **Step 6: Implement the explicit transaction boundary**
 
 Branch commit validation by the job's persisted pipeline mode. `LEGACY` keeps `DefaultSessionImportV1Validator`; `GROUNDED_WHOLE_TRANSCRIPT` validates metadata, cardinalities, author names, and edited content against `GroundedSourceContext` before taking a lease. Inject `TransactionTemplate`; do not annotate the full cross-store method with `@Transactional`:
 
@@ -1358,7 +1358,7 @@ return CommitGenerationResult(
 
 Wrap only the MySQL block so a transaction failure atomically moves the still-current Redis lease to `COMMIT_RETRY` while retaining payloads. The existing session-import cache invalidation registration remains unchanged and fail-open. After the transaction, the AI cleanup service explicitly calls the idempotent shared cache eviction again, deletes all four Redis payloads, and clears `cleanupPending` only after both succeed. If either cleanup action fails, keep `COMMITTED`/`cleanupPending` recoverable from the receipt rather than re-running import.
 
-- [ ] **Step 7: Return a content-free AI commit response**
+- [x] **Step 7: Return a content-free AI commit response**
 
 Replace the AI endpoint's alias to the full session import response with:
 
@@ -1373,11 +1373,11 @@ data class CommitGenerationResult(
 
 The response stays content-free while allowing an immediate host-facing completion summary that makes automatic participant registration visible. A receipt-based recovered response returns `participantUpdatesCount=null` and the UI uses a generic “참여자 상태를 포함해 저장됨” summary rather than inventing a count. Never add this count or participant names to the receipt.
 
-- [ ] **Step 8: Add bounded scheduled and operator recovery**
+- [x] **Step 8: Add bounded scheduled and operator recovery**
 
 The scheduler loads a limited set of stale `COMMITTING`/`COMMIT_RETRY` jobs plus `COMMITTED` hashes with `cleanupPending=true`, checks content-free receipts, and converges state. Receipt-backed jobs execute only status finalization and the idempotent cleanup service. It never loads or prints transcript/result/evidence. Adapt `AiGenerationOpsService.retryCommit` to trigger the same recovery service; do not merely change `COMMITTING` back to `SUCCEEDED`. Update ops audit status conversion/exhaustive `when` branches for `COMMIT_RETRY`. Controller/DTO tests must prove platform-admin list/detail/retry responses remain metadata-only and never expose payload keys, names, or content.
 
-- [ ] **Step 9: Run commit and vertical integration gates**
+- [x] **Step 9: Run commit and vertical integration gates**
 
 ```bash
 ./server/gradlew -p server unitTest --tests '*AiGenerationCommitServiceTest' --tests '*AiGenerationCommitRecoveryServiceTest' --tests '*AiGenerationPostCommitCleanupServiceTest' --tests '*AiGenerationOpsServiceTest' --tests '*AiGenerationOpsControllerTest' --tests '*JdbcAiGenerationOpsAuditRepositoryTest' --tests '*AiGenerationJobTransitionPolicyTest'
@@ -1386,7 +1386,7 @@ The scheduler loads a limited set of stale `COMMITTING`/`COMMIT_RETRY` jobs plus
 
 Expected: PASS, including transaction rollback and post-commit recovery scenarios.
 
-- [ ] **Step 10: Commit the crash-recoverable commit slice**
+- [x] **Step 10: Commit the crash-recoverable commit slice**
 
 ```bash
 git add server/src/main/resources/db/mysql/migration/V37__grounded_ai_generation.sql server/src/main/kotlin/com/readmates/aigen server/src/test/kotlin/com/readmates/aigen

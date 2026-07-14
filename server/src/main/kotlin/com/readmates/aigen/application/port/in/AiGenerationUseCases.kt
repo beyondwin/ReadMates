@@ -12,7 +12,6 @@ import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.session.application.SessionRecordVisibility
-import com.readmates.sessionimport.application.model.SessionImportCommitResult
 import java.math.BigDecimal
 import java.time.Instant
 import java.util.UUID
@@ -115,8 +114,15 @@ interface CommitGenerationUseCase {
         overrideResult: SessionImportV1Snapshot?,
         expectedRevision: Long? = null,
         sectionReviews: Map<GenerationItem, SectionReviewStatus>? = null,
-    ): SessionImportCommitResult
+    ): CommitGenerationResult
 }
+
+data class CommitGenerationResult(
+    val sessionId: UUID,
+    val status: JobStatus,
+    val recovered: Boolean,
+    val participantUpdatesCount: Int?,
+)
 
 interface CancelGenerationUseCase {
     fun cancel(

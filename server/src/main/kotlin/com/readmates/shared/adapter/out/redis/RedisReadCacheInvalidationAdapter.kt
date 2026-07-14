@@ -17,26 +17,37 @@ class RedisReadCacheInvalidationAdapter(
     private val circuitBreakers: OutboundCircuitBreakers,
 ) : ReadCacheInvalidationPort {
     override fun evictClubContent(clubId: UUID) {
-        evictPublicContent(clubId)
-        evictNotesContent(clubId)
+        evictClubContentStrict(clubId)
     }
 
-    private fun evictPublicContent(clubId: UUID) {
+    override fun evictClubContentStrict(clubId: UUID): Boolean {
+        val publicEvicted = evictPublicContent(clubId)
+        val notesEvicted = evictNotesContent(clubId)
+        return publicEvicted && notesEvicted
+    }
+
+    private fun evictPublicContent(clubId: UUID): Boolean =
         circuitBreakers.execute(
             name = CIRCUIT_BREAKER_NAME,
-            fallback = { recordRedisFailure("evict-public-content") },
+            fallback = {
+                recordRedisFailure("evict-public-content")
+                false
+            },
         ) {
             val publicKeys = mutableSetOf("public:club:$clubId:home:v1")
             publicKeys.addAll(scanKeys("public:club:$clubId:session:*:v1"))
             delete(publicKeys)
             metrics.increment("readmates.public_cache.evicted", "scope", "club")
+            true
         }
-    }
 
-    private fun evictNotesContent(clubId: UUID) {
+    private fun evictNotesContent(clubId: UUID): Boolean =
         circuitBreakers.execute(
             name = CIRCUIT_BREAKER_NAME,
-            fallback = { recordRedisFailure("evict-notes-content") },
+            fallback = {
+                recordRedisFailure("evict-notes-content")
+                false
+            },
         ) {
             val notesKeys =
                 mutableSetOf(
@@ -46,8 +57,8 @@ class RedisReadCacheInvalidationAdapter(
             notesKeys.addAll(scanKeys("notes:club:$clubId:session:*:feed:v1"))
             delete(notesKeys)
             metrics.increment("readmates.notes_cache.evicted", "scope", "club")
+            true
         }
-    }
 
     private fun delete(keys: Set<String>) {
         if (keys.isNotEmpty()) {
@@ -80,7 +91,7 @@ class RedisReadCacheInvalidationAdapter(
                     collected.add(String(cursor.next(), Charsets.UTF_8))
                 }
             }
-            null
+            Unit
         }
         return collected
     }

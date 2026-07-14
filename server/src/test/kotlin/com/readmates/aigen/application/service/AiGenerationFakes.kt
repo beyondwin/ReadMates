@@ -265,13 +265,33 @@ internal class FakeJobStore : AiGenerationJobStore {
         return true
     }
 
-    override fun markCommittedForCleanup(
+    override fun releaseCommitLeaseForRetry(
         jobId: UUID,
         revision: Long,
     ): Boolean {
         val current =
             records[jobId]?.takeIf {
                 it.status == JobStatus.COMMITTING && it.revision == revision
+            } ?: return false
+        records[jobId] = current.copy(status = JobStatus.COMMIT_RETRY, commitLeaseExpiresAt = null)
+        return true
+    }
+
+    override fun loadCommitRecoveryJobs(limit: Int): List<JobRecord> =
+        records.values
+            .filter {
+                it.status == JobStatus.COMMITTING || it.status == JobStatus.COMMIT_RETRY ||
+                    (it.status == JobStatus.COMMITTED && it.cleanupPending)
+            }.sortedBy { it.lastUpdatedAt }
+            .take(limit)
+
+    override fun markCommittedForCleanup(
+        jobId: UUID,
+        revision: Long,
+    ): Boolean {
+        val current =
+            records[jobId]?.takeIf {
+                it.status in setOf(JobStatus.COMMITTING, JobStatus.COMMIT_RETRY) && it.revision == revision
             } ?: return false
         records[jobId] =
             current.copy(status = JobStatus.COMMITTED, cleanupPending = true, commitLeaseExpiresAt = null)

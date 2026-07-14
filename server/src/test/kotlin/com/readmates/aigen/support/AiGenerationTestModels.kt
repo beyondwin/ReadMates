@@ -12,5 +12,5 @@ package com.readmates.aigen.support
 object AiGenerationTestModels {
     const val CLAUDE_DEFAULT: String = "claude-sonnet-4-6"
     const val OPENAI_DEFAULT: String = "gpt-5.4-mini"
-    const val GEMINI_DEFAULT: String = "gemini-3-flash"
+    const val GEMINI_DEFAULT: String = "gemini-3-flash-preview"
 }

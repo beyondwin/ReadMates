@@ -6,6 +6,7 @@ import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.port.`in`.CancelGenerationUseCase
+import com.readmates.aigen.application.port.`in`.CommitGenerationResult
 import com.readmates.aigen.application.port.`in`.CommitGenerationUseCase
 import com.readmates.aigen.application.port.`in`.ExpandGenerationEvidenceUseCase
 import com.readmates.aigen.application.port.`in`.GetJobUseCase
@@ -16,7 +17,6 @@ import com.readmates.aigen.application.port.`in`.RegenerationResult
 import com.readmates.aigen.application.port.`in`.StartGenerationCommand
 import com.readmates.aigen.application.port.`in`.StartGenerationUseCase
 import com.readmates.aigen.config.AiGenerationProperties
-import com.readmates.sessionimport.application.model.SessionImportCommitResult
 import com.readmates.shared.security.CurrentMember
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.http.HttpStatus
@@ -193,7 +193,7 @@ class AiGenerationController(
         @PathVariable jobId: UUID,
         @RequestBody request: CommitRequest,
         member: CurrentMember,
-    ): SessionImportCommitResult {
+    ): CommitGenerationResult {
         ensureEnabled()
         auth.requireHostAccess(sessionId, member)
         validateReviewContract(request)

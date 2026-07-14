@@ -40,6 +40,7 @@ class AiGenerationOpsService(
     private val adminActionAuditPort: AiGenerationAdminActionAuditPort,
     private val jobStore: AiGenerationJobStore,
     private val clock: Clock,
+    private val commitRecoveryService: AiGenerationCommitRecoveryService? = null,
 ) : GetAiOpsSummaryUseCase,
     ListAiOpsJobsUseCase,
     GetAiOpsJobUseCase,
@@ -194,24 +195,7 @@ class AiGenerationOpsService(
         if (record.status !in RETRY_COMMIT_STATUSES) {
             throw AiGenerationException.IllegalGenerationState(jobId, record.status.name, "admin retry-commit")
         }
-        val reset =
-            jobStore.transitionStatus(
-                jobId = jobId,
-                expected = RETRY_COMMIT_STATUSES,
-                next = JobStatus.SUCCEEDED,
-                stage = JobStage.READY,
-                progressPct = 100,
-                error = null,
-            )
-        if (!reset) {
-            throw AiGenerationException.IllegalGenerationState(
-                jobId = jobId,
-                currentStatus = jobStore.load(jobId)?.status?.name ?: "MISSING",
-                attemptedAction = "admin retry-commit",
-            )
-        }
-        // Intentionally NOT calling deleteTransientPayload: the host needs the
-        // result snapshot to survive so it can re-commit the recovered job.
+        val recovered = requireNotNull(commitRecoveryService) { "AI commit recovery is unavailable" }.recover(jobId)
         adminActionAuditPort.record(
             AiGenerationAdminActionAuditEntry(
                 jobId = jobId,
@@ -221,13 +205,13 @@ class AiGenerationOpsService(
                 adminRole = admin.role,
                 action = AiOpsAction.RETRY_COMMIT.name,
                 previousStatus = record.status.name,
-                nextStatus = JobStatus.SUCCEEDED.name,
+                nextStatus = recovered.status.name,
                 result = "SUCCESS",
                 safeErrorCode = null,
                 createdAt = clock.instant(),
             ),
         )
-        return AiOpsAdminActionResult(jobId, record.status, JobStatus.SUCCEEDED)
+        return AiOpsAdminActionResult(jobId, record.status, recovered.status)
     }
 
     private fun safeMissingLiveJob(jobId: UUID): AiGenerationException {
@@ -255,7 +239,7 @@ class AiGenerationOpsService(
             provider = model.provider,
             model = model.name,
             errorCode = error?.code?.name,
-            safeErrorMessage = error?.message,
+            safeErrorMessage = null,
             costEstimateUsd = costAccumulatedUsd,
             createdAt = createdAt,
             lastUpdatedAt = lastUpdatedAt,
@@ -266,6 +250,13 @@ class AiGenerationOpsService(
                     if (status in FORCE_CANCEL_STATUSES) add(AiOpsAction.FORCE_CANCEL)
                     if (status in RETRY_COMMIT_STATUSES) add(AiOpsAction.RETRY_COMMIT)
                 },
+            revision =
+                revision.takeIf {
+                    pipelineMode ==
+                        com.readmates.aigen.application.model.AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT
+                },
+            cleanupPending = cleanupPending,
+            commitLeaseExpiresAt = commitLeaseExpiresAt,
         )
 
     private companion object {

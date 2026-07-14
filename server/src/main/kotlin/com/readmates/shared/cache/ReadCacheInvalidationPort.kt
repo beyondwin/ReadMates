@@ -7,6 +7,13 @@ import java.util.UUID
 interface ReadCacheInvalidationPort {
     fun evictClubContent(clubId: UUID)
 
+    /** Strict signal used by recoverable workflows; regular after-commit eviction remains fail-open. */
+    fun evictClubContentStrict(clubId: UUID): Boolean =
+        runCatching {
+            evictClubContent(clubId)
+            true
+        }.getOrDefault(false)
+
     fun evictClubContentAfterCommit(clubId: UUID) {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(

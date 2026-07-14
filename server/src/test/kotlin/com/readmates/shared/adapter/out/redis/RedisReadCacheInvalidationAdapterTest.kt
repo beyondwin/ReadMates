@@ -46,7 +46,7 @@ class RedisReadCacheInvalidationAdapterTest(
         val publicEvictionsBefore = counterValue("readmates.public_cache.evicted", "scope", "club")
         val notesEvictionsBefore = counterValue("readmates.notes_cache.evicted", "scope", "club")
 
-        adapter.evictClubContent(TARGET_CLUB_ID)
+        assertThat(adapter.evictClubContentStrict(TARGET_CLUB_ID)).isTrue()
 
         targetKeys.forEach { key ->
             assertThat(redisTemplate.hasKey(key))
@@ -78,7 +78,7 @@ class RedisReadCacheInvalidationAdapterTest(
                 circuitBreakers = circuitBreakers(registry),
             )
 
-        adapter.evictClubContent(TARGET_CLUB_ID)
+        assertThat(adapter.evictClubContentStrict(TARGET_CLUB_ID)).isFalse()
 
         assertEquals(
             2.0,

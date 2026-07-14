@@ -108,6 +108,9 @@ data class AiOpsJobResponse(
     val expiresAt: String?,
     val staleCandidate: Boolean,
     val availableActions: List<String>,
+    val revision: Long?,
+    val cleanupPending: Boolean,
+    val commitLeaseExpiresAt: String?,
 ) {
     companion object {
         fun from(item: AiOpsJobListItem): AiOpsJobResponse =
@@ -137,6 +140,9 @@ data class AiOpsJobResponse(
                 expiresAt = item.expiresAt?.toString(),
                 staleCandidate = item.staleCandidate,
                 availableActions = item.availableActions.map { it.name }.sorted(),
+                revision = item.revision,
+                cleanupPending = item.cleanupPending,
+                commitLeaseExpiresAt = item.commitLeaseExpiresAt?.toString(),
             )
     }
 }

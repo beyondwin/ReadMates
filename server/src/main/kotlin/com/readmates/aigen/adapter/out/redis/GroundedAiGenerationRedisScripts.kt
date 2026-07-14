@@ -44,7 +44,7 @@ internal object GroundedAiGenerationRedisScripts {
             if status ~= 'SUCCEEDED' and status ~= 'COMMIT_RETRY' and status ~= 'COMMITTING' then
               return 'NOT_READY'
             end
-            if redis.call('EXISTS', KEYS[3]) == 0 or redis.call('EXISTS', KEYS[4]) == 0 or
+            if redis.call('EXISTS', KEYS[2]) == 0 or redis.call('EXISTS', KEYS[3]) == 0 or redis.call('EXISTS', KEYS[4]) == 0 or
                 redis.call('EXISTS', KEYS[5]) == 0 then
               redis.call('DEL', KEYS[1], KEYS[2], KEYS[3], KEYS[4], KEYS[5])
               return 'EXPIRED'
@@ -68,7 +68,7 @@ internal object GroundedAiGenerationRedisScripts {
             """
             if redis.call('EXISTS', KEYS[1]) == 0 then return 0 end
             if redis.call('HGET', KEYS[1], 'status') ~= 'COMMITTING' then return 0 end
-            if redis.call('EXISTS', KEYS[3]) == 0 or redis.call('EXISTS', KEYS[4]) == 0 or
+            if redis.call('EXISTS', KEYS[2]) == 0 or redis.call('EXISTS', KEYS[3]) == 0 or redis.call('EXISTS', KEYS[4]) == 0 or
                 redis.call('EXISTS', KEYS[5]) == 0 then
               redis.call('DEL', KEYS[1], KEYS[2], KEYS[3], KEYS[4], KEYS[5])
               return 0
@@ -86,11 +86,29 @@ internal object GroundedAiGenerationRedisScripts {
             Long::class.java,
         )
 
-    val markCommittedForCleanup: DefaultRedisScript<Long> =
+    val releaseCommitLeaseForRetry: DefaultRedisScript<Long> =
         DefaultRedisScript(
             """
             if redis.call('EXISTS', KEYS[1]) == 0 then return 0 end
             if redis.call('HGET', KEYS[1], 'status') ~= 'COMMITTING' then return 0 end
+            if tonumber(redis.call('HGET', KEYS[1], 'revision') or '0') ~= tonumber(ARGV[1]) then return 0 end
+            redis.call('HSET', KEYS[1], 'status', 'COMMIT_RETRY')
+            redis.call('HSET', KEYS[1], 'lastUpdatedAt', ARGV[2])
+            redis.call('HDEL', KEYS[1], 'commitLeaseExpiresAt')
+            for index = 1, 5 do
+              if redis.call('EXISTS', KEYS[index]) == 1 then redis.call('EXPIRE', KEYS[index], ARGV[3]) end
+            end
+            return 1
+            """.trimIndent(),
+            Long::class.java,
+        )
+
+    val markCommittedForCleanup: DefaultRedisScript<Long> =
+        DefaultRedisScript(
+            """
+            if redis.call('EXISTS', KEYS[1]) == 0 then return 0 end
+            local status = redis.call('HGET', KEYS[1], 'status')
+            if status ~= 'COMMITTING' and status ~= 'COMMIT_RETRY' then return 0 end
             if tonumber(redis.call('HGET', KEYS[1], 'revision') or '0') ~= tonumber(ARGV[1]) then return 0 end
             redis.call('HSET', KEYS[1], 'status', 'COMMITTED')
             redis.call('HSET', KEYS[1], 'cleanupPending', 'true')

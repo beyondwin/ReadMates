@@ -13,10 +13,14 @@ import com.readmates.aigen.application.model.AiOpsTrendAvailability
 import com.readmates.aigen.application.model.AiOpsWindowUsage
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
+import com.readmates.aigen.application.model.ValidatedTranscriptTurn
 import com.readmates.aigen.application.port.out.AiGenerationAdminActionAuditEntry
 import com.readmates.aigen.application.port.out.AiGenerationAdminActionAuditPort
 import com.readmates.aigen.application.port.out.AiGenerationAuditQueryPort
+import com.readmates.aigen.application.port.out.AiGenerationCommitPersistencePort
+import com.readmates.aigen.application.port.out.AiGenerationCommitReceipt
 import com.readmates.club.domain.PlatformAdminRole
+import com.readmates.shared.cache.ReadCacheInvalidationPort
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentPlatformAdmin
 import org.assertj.core.api.Assertions.assertThat
@@ -32,12 +36,21 @@ class AiGenerationOpsServiceTest {
     private val jobStore = FakeJobStore()
     private val auditQuery = EmptyAuditQueryPort()
     private val actionAudit = RecordingActionAudit()
+    private val clock = Clock.fixed(Instant.parse("2026-05-18T00:00:00Z"), ZoneOffset.UTC)
+    private val recovery =
+        AiGenerationCommitRecoveryService(
+            jobStore,
+            NoReceiptPersistence(),
+            AiGenerationPostCommitCleanupService(jobStore, ReadCacheInvalidationPort.Noop()),
+            clock,
+        )
     private val service =
         AiGenerationOpsService(
             auditQueryPort = auditQuery,
             adminActionAuditPort = actionAudit,
             jobStore = jobStore,
-            clock = Clock.fixed(Instant.parse("2026-05-18T00:00:00Z"), ZoneOffset.UTC),
+            clock = clock,
+            commitRecoveryService = recovery,
         )
 
     @Test
@@ -100,19 +113,19 @@ class AiGenerationOpsServiceTest {
     }
 
     @Test
-    fun `operator can retry-commit a recovered COMMIT_RETRY job back to succeeded`() {
+    fun `operator retry commit invokes recovery without resetting unreceipted payload`() {
         val job = AiGenerationTestFixtures.jobRecord(status = JobStatus.COMMIT_RETRY, stage = JobStage.READY)
         jobStore.save(job)
 
         val result = service.retryCommit(admin(PlatformAdminRole.OPERATOR), job.jobId)
 
         assertThat(result.previousStatus).isEqualTo(JobStatus.COMMIT_RETRY)
-        assertThat(result.nextStatus).isEqualTo(JobStatus.SUCCEEDED)
-        assertThat(jobStore.load(job.jobId)?.status).isEqualTo(JobStatus.SUCCEEDED)
+        assertThat(result.nextStatus).isEqualTo(JobStatus.COMMIT_RETRY)
+        assertThat(jobStore.load(job.jobId)?.status).isEqualTo(JobStatus.COMMIT_RETRY)
         assertThat(jobStore.transientPayloadDeleted).doesNotContain(job.jobId)
         assertThat(actionAudit.entries.single().action).isEqualTo("RETRY_COMMIT")
         assertThat(actionAudit.entries.single().previousStatus).isEqualTo("COMMIT_RETRY")
-        assertThat(actionAudit.entries.single().nextStatus).isEqualTo("SUCCEEDED")
+        assertThat(actionAudit.entries.single().nextStatus).isEqualTo("COMMIT_RETRY")
     }
 
     @Test
@@ -237,4 +250,19 @@ private class RecordingActionAudit : AiGenerationAdminActionAuditPort {
     override fun record(entry: AiGenerationAdminActionAuditEntry) {
         entries += entry
     }
+}
+
+private class NoReceiptPersistence : AiGenerationCommitPersistencePort {
+    override fun upsertTranscriptSpeakersAsParticipants(
+        clubId: UUID,
+        sessionId: UUID,
+        validatedTurns: List<ValidatedTranscriptTurn>,
+    ): Int = 0
+
+    override fun findReceipt(
+        jobId: UUID,
+        revision: Long,
+    ): AiGenerationCommitReceipt? = null
+
+    override fun insertReceipt(receipt: AiGenerationCommitReceipt): Boolean = true
 }

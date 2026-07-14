@@ -28,6 +28,7 @@ import com.readmates.aigen.application.port.out.RenderedGroundedRequest
 import com.readmates.aigen.application.port.out.SaveGroundedResultCommand
 import com.readmates.aigen.application.port.out.WholeTranscriptGroundedGenerator
 import com.readmates.aigen.config.AiGenerationProperties
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
 import java.time.Clock
@@ -53,6 +54,7 @@ fun interface GroundedRegenerationExecutor {
 }
 
 @Component
+@ConditionalOnProperty(prefix = "readmates", name = ["aigen.enabled"], havingValue = "true")
 @Suppress("LongParameterList", "TooManyFunctions")
 class DefaultGroundedRegenerationExecutor(
     private val jobStore: AiGenerationJobStore,

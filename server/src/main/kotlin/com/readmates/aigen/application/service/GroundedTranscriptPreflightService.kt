@@ -2,6 +2,7 @@ package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.model.ValidatedTranscriptTurn
 import com.readmates.aigen.application.port.out.LoadAiGenerationClubMembersPort
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Service
 import java.util.UUID
 
@@ -11,6 +12,7 @@ data class GroundedTranscriptPreflight(
 )
 
 @Service
+@ConditionalOnProperty(prefix = "readmates", name = ["aigen.enabled"], havingValue = "true")
 class GroundedTranscriptPreflightService(
     private val transcriptParser: TranscriptParser,
     private val memberDirectory: LoadAiGenerationClubMembersPort,

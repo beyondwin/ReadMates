@@ -55,6 +55,9 @@ data class AiOpsJobListItem(
     val expiresAt: Instant?,
     val staleCandidate: Boolean,
     val availableActions: Set<AiOpsAction>,
+    val revision: Long? = null,
+    val cleanupPending: Boolean = false,
+    val commitLeaseExpiresAt: Instant? = null,
 )
 
 enum class AiOpsAction { FORCE_CANCEL, RETRY_COMMIT }

@@ -161,7 +161,7 @@ class RedisAiGenerationJobStore(
                     listOf(transcriptKey(jobId), turnsKey(jobId), resultKey(jobId), evidenceKey(jobId))
                 JobStatus.COMMITTING,
                 JobStatus.COMMIT_RETRY,
-                -> listOf(turnsKey(jobId), resultKey(jobId), evidenceKey(jobId))
+                -> listOf(transcriptKey(jobId), turnsKey(jobId), resultKey(jobId), evidenceKey(jobId))
                 JobStatus.COMMITTED,
                 JobStatus.CANCELLED,
                 JobStatus.FAILED,
@@ -293,6 +293,27 @@ class RedisAiGenerationJobStore(
                 }
             }
         }.onFailure { recordFailure("loadActiveJobs") }.getOrDefault(emptyList())
+
+    @Suppress("ComplexCondition")
+    override fun loadCommitRecoveryJobs(limit: Int): List<JobRecord> =
+        runCatching {
+            if (limit <= 0) return@runCatching emptyList()
+            indexes.commitRecoveryIds(limit).mapNotNull { id ->
+                val jobId = id.toUuidOrNull() ?: return@mapNotNull null
+                val record = loadMetadata(jobId)
+                if (record == null ||
+                    (
+                        record.status != JobStatus.COMMITTING && record.status != JobStatus.COMMIT_RETRY &&
+                            !(record.status == JobStatus.COMMITTED && record.cleanupPending)
+                    )
+                ) {
+                    indexes.removeCommitRecoveryId(id)
+                    null
+                } else {
+                    record
+                }
+            }
+        }.onFailure { recordFailure("loadCommitRecoveryJobs") }.getOrDefault(emptyList())
 
     override fun saveResult(
         jobId: UUID,
@@ -532,6 +553,30 @@ class RedisAiGenerationJobStore(
             if (recovered) refreshIndexes(jobId)
             recovered
         }.onFailure { recordFailure("recoverExpiredCommitLease") }.getOrThrow()
+
+    override fun releaseCommitLeaseForRetry(
+        jobId: UUID,
+        revision: Long,
+    ): Boolean =
+        runCatching {
+            val changed =
+                redisTemplate.execute(
+                    GroundedAiGenerationRedisScripts.releaseCommitLeaseForRetry,
+                    listOf(
+                        hashKey(jobId),
+                        transcriptKey(jobId),
+                        turnsKey(jobId),
+                        resultKey(jobId),
+                        evidenceKey(jobId),
+                    ),
+                    revision.toString(),
+                    Instant.now().toString(),
+                    properties.job.redisTtl.seconds
+                        .toString(),
+                ) == 1L
+            if (changed) refreshIndexes(jobId)
+            changed
+        }.onFailure { recordFailure("releaseCommitLeaseForRetry") }.getOrThrow()
 
     override fun markCommittedForCleanup(
         jobId: UUID,

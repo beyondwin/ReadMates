@@ -3,6 +3,7 @@ package com.readmates.sessionimport.application.port.`in`
 import com.readmates.sessionimport.application.model.SessionImportCommand
 import com.readmates.sessionimport.application.model.SessionImportCommitResult
 import com.readmates.sessionimport.application.model.SessionImportPreviewResult
+import java.util.UUID
 
 interface PreviewSessionImportUseCase {
     fun preview(command: SessionImportCommand): SessionImportPreviewResult
@@ -29,4 +30,6 @@ interface CommitValidatedSessionImportUseCase {
  */
 data class ValidatedSessionImportInput(
     val command: SessionImportCommand,
+    /** Trusted author binding supplied only by grounded AI commit after membership revalidation. */
+    val authorMembershipIdsByName: Map<String, UUID> = emptyMap(),
 )

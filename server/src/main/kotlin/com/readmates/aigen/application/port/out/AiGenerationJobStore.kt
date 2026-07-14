@@ -42,6 +42,10 @@ interface AiGenerationJobStore {
 
     fun loadActiveJobs(limit: Int = 100): List<JobRecord>
 
+    /** Bounded metadata-only queue for commit lease and post-commit cleanup recovery. */
+    fun loadCommitRecoveryJobs(limit: Int = 50): List<JobRecord> =
+        loadActiveJobs(limit).filter { it.status == JobStatus.COMMITTING || it.status == JobStatus.COMMIT_RETRY }
+
     fun saveResult(
         jobId: UUID,
         result: SessionImportV1Snapshot,
@@ -134,6 +138,11 @@ interface AiGenerationJobStore {
         jobId: UUID,
         now: Instant,
     ): Boolean
+
+    fun releaseCommitLeaseForRetry(
+        jobId: UUID,
+        revision: Long,
+    ): Boolean = false
 
     fun markCommittedForCleanup(
         jobId: UUID,

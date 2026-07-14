@@ -160,6 +160,20 @@ class RedisGroundedAiGenerationJobStoreTest(
     }
 
     @Test
+    fun `commit lease retry with missing transcript expires the whole job`() {
+        val record = succeededRecord()
+        val now = Instant.parse("2026-07-14T10:00:00Z")
+        assertThat(store.acquireCommitLease(record.jobId, 1, now, Duration.ofMinutes(2)))
+            .isEqualTo(CommitLeaseResult.Acquired(1))
+        redisTemplate.delete("${hashKey(record.jobId)}:transcript")
+
+        assertThat(store.acquireCommitLease(record.jobId, 1, now.plusSeconds(1), Duration.ofMinutes(2)))
+            .isEqualTo(CommitLeaseResult.Expired)
+        assertThat(redisTemplate.hasKey(hashKey(record.jobId))).isFalse()
+        payloadKeys(record.jobId).forEach { key -> assertThat(redisTemplate.hasKey(key)).isFalse() }
+    }
+
+    @Test
     fun `expired commit lease moves to COMMIT_RETRY without deleting payloads`() {
         val record = succeededRecord()
         val now = Instant.parse("2026-07-14T10:00:00Z")
@@ -173,6 +187,22 @@ class RedisGroundedAiGenerationJobStoreTest(
         assertThat(loaded.commitLeaseExpiresAt).isNull()
         assertThat(loaded.result).isNotNull
         assertThat(loaded.evidence).isNotNull
+    }
+
+    @Test
+    fun `transaction failure releases matching lease and recovery index remains metadata only`() {
+        val record = succeededRecord()
+        val now = Instant.parse("2026-07-14T10:00:00Z")
+        store.acquireCommitLease(record.jobId, 1, now, Duration.ofMinutes(2))
+
+        assertThat(store.releaseCommitLeaseForRetry(record.jobId, 0)).isFalse()
+        assertThat(store.releaseCommitLeaseForRetry(record.jobId, 1)).isTrue()
+        val candidate = store.loadCommitRecoveryJobs().single { it.jobId == record.jobId }
+        assertThat(candidate.status).isEqualTo(JobStatus.COMMIT_RETRY)
+        assertThat(candidate.commitLeaseExpiresAt).isNull()
+        assertThat(candidate.transcript).isEmpty()
+        assertThat(candidate.result).isNull()
+        assertThat(candidate.evidence).isNull()
     }
 
     @Test
@@ -211,6 +241,7 @@ class RedisGroundedAiGenerationJobStoreTest(
         assertThat(store.markCommittedForCleanup(record.jobId, 1)).isTrue()
         assertThat(store.markCommittedForCleanup(record.jobId, 1)).isFalse()
         assertThat(store.load(record.jobId)?.cleanupPending).isTrue()
+        assertThat(store.loadCommitRecoveryJobs().map { it.jobId }).contains(record.jobId)
         assertThat(redisTemplate.opsForHash<String, String>().hasKey(hashKey(record.jobId), "sessionMeta")).isFalse()
         assertThat(redisTemplate.opsForHash<String, String>().hasKey(hashKey(record.jobId), "instructions")).isFalse()
 
@@ -218,6 +249,7 @@ class RedisGroundedAiGenerationJobStoreTest(
         assertThat(store.markCleanupComplete(record.jobId, 1)).isTrue()
         assertThat(store.markCleanupComplete(record.jobId, 1)).isFalse()
         assertThat(store.load(record.jobId)?.cleanupPending).isFalse()
+        assertThat(store.loadCommitRecoveryJobs().map { it.jobId }).doesNotContain(record.jobId)
     }
 
     @Test

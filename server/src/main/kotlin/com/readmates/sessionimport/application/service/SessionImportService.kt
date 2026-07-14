@@ -86,7 +86,7 @@ class SessionImportService(
         // reuse the same SessionImportRecordReplacement payload shape as commit(...). If the
         // caller passed an invalid command, surface InvalidSessionImportException — same as
         // commit(...). This preserves the security invariant.
-        val preview = validate(command, target)
+        val preview = validate(command, target, input.authorMembershipIdsByName)
         if (!preview.valid) {
             throw InvalidSessionImportException(preview.issues)
         }
@@ -143,6 +143,7 @@ class SessionImportService(
     private fun validate(
         command: SessionImportCommand,
         target: SessionImportTarget,
+        trustedAuthorBindings: Map<String, java.util.UUID> = emptyMap(),
     ): SessionImportPreviewResult {
         val issues = mutableListOf<SessionImportIssue>()
         validateSessionMetadata(command, target, issues)
@@ -150,11 +151,11 @@ class SessionImportService(
 
         val highlights =
             command.highlights.map {
-                matchRecord(it.authorName, it.text, target, issues, "HIGHLIGHT_AUTHOR_NOT_FOUND")
+                matchRecord(it.authorName, it.text, target, issues, "HIGHLIGHT_AUTHOR_NOT_FOUND", trustedAuthorBindings)
             }
         val oneLineReviews =
             command.oneLineReviews.map {
-                matchRecord(it.authorName, it.text, target, issues, "ONE_LINE_AUTHOR_NOT_FOUND")
+                matchRecord(it.authorName, it.text, target, issues, "ONE_LINE_AUTHOR_NOT_FOUND", trustedAuthorBindings)
             }
         validateOneLineReviewAuthors(command, issues)
 
@@ -254,10 +255,17 @@ class SessionImportService(
         target: SessionImportTarget,
         issues: MutableList<SessionImportIssue>,
         issueCode: String,
+        trustedAuthorBindings: Map<String, java.util.UUID>,
     ): SessionImportRecordPreview {
         val trimmedAuthorName = authorName.trim()
         val trimmedText = text.trim()
-        val attendee = target.attendees.firstOrNull { it.active && it.displayName == trimmedAuthorName }
+        val trustedMembershipId = trustedAuthorBindings[trimmedAuthorName]
+        val attendee =
+            if (trustedAuthorBindings.isEmpty()) {
+                target.attendees.firstOrNull { it.active && it.displayName == trimmedAuthorName }
+            } else {
+                target.attendees.firstOrNull { it.active && it.membershipId == trustedMembershipId }
+            }
         if (trimmedText.isBlank()) {
             issues += SessionImportIssue("RECORD_TEXT_REQUIRED", "기록 문구가 비어 있습니다.")
         }

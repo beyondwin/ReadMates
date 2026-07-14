@@ -24,6 +24,7 @@ import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.`in`.AvailableGenerationModel
 import com.readmates.aigen.application.port.`in`.CancelGenerationUseCase
+import com.readmates.aigen.application.port.`in`.CommitGenerationResult
 import com.readmates.aigen.application.port.`in`.CommitGenerationUseCase
 import com.readmates.aigen.application.port.`in`.ExpandGenerationEvidenceUseCase
 import com.readmates.aigen.application.port.`in`.ExpandedEvidenceTurn
@@ -39,9 +40,6 @@ import com.readmates.aigen.config.AiGenerationProperties
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.session.application.SessionRecordVisibility
-import com.readmates.sessionimport.application.model.SessionImportCommitResult
-import com.readmates.sessionimport.application.model.SessionImportCommittedFeedbackDocument
-import com.readmates.sessionimport.application.model.SessionImportPublicationPreview
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
 import org.assertj.core.api.Assertions.assertThat
@@ -857,20 +855,8 @@ class AiGenerationControllerTest {
                 ),
         )
 
-    private fun sampleCommitResult(): SessionImportCommitResult =
-        SessionImportCommitResult(
-            sessionId = sessionId.toString(),
-            publication = SessionImportPublicationPreview(summary = "s"),
-            highlights = emptyList(),
-            oneLineReviews = emptyList(),
-            feedbackDocument =
-                SessionImportCommittedFeedbackDocument(
-                    uploaded = true,
-                    fileName = "feedback.md",
-                    title = "Title",
-                    uploadedAt = null,
-                ),
-        )
+    private fun sampleCommitResult(): CommitGenerationResult =
+        CommitGenerationResult(sessionId, JobStatus.COMMITTED, recovered = false, participantUpdatesCount = 1)
 
     private fun authedUser(): RequestPostProcessor =
         RequestPostProcessor { request ->
@@ -948,7 +934,7 @@ class AiGenerationControllerTest {
     }
 
     private class FakeCommitUseCase : CommitGenerationUseCase {
-        lateinit var result: SessionImportCommitResult
+        lateinit var result: CommitGenerationResult
         var lastOverride: SessionImportV1Snapshot? = null
         var lastVisibility: SessionRecordVisibility? = null
         var lastExpectedRevision: Long? = null
@@ -962,7 +948,7 @@ class AiGenerationControllerTest {
             overrideResult: SessionImportV1Snapshot?,
             expectedRevision: Long?,
             sectionReviews: Map<GenerationItem, SectionReviewStatus>?,
-        ): SessionImportCommitResult {
+        ): CommitGenerationResult {
             lastOverride = overrideResult
             lastVisibility = recordVisibility
             lastExpectedRevision = expectedRevision

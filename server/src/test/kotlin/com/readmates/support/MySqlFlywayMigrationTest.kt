@@ -475,12 +475,12 @@ class MySqlFlywayMigrationTest(
                 select count(*)
                 from information_schema.tables
                 where table_schema = database()
-                  and table_name in ('ai_generation_audit_log', 'ai_generation_club_defaults')
+                  and table_name in ('ai_generation_audit_log', 'ai_generation_club_defaults', 'ai_generation_commit_receipts')
                 """.trimIndent(),
                 Int::class.java,
             )
 
-        assertEquals(2, tableCount)
+        assertEquals(3, tableCount)
 
         assertEquals("NO", columnValue("ai_generation_audit_log", "job_id", "is_nullable"))
         assertEquals("NO", columnValue("ai_generation_audit_log", "session_id", "is_nullable"))
@@ -492,6 +492,10 @@ class MySqlFlywayMigrationTest(
         assertEquals("NO", columnValue("ai_generation_audit_log", "model", "is_nullable"))
         assertEquals("NO", columnValue("ai_generation_audit_log", "status", "is_nullable"))
         assertEquals("NO", columnValue("ai_generation_audit_log", "created_at", "is_nullable"))
+        assertEquals("YES", columnValue("ai_generation_audit_log", "pipeline_version", "is_nullable"))
+        assertEquals("YES", columnValue("ai_generation_audit_log", "input_turn_count", "is_nullable"))
+        assertEquals("YES", columnValue("ai_generation_audit_log", "speaker_count", "is_nullable"))
+        assertEquals("YES", columnValue("ai_generation_audit_log", "grounding_status", "is_nullable"))
 
         assertEquals(
             "session_id,created_at",
@@ -513,6 +517,12 @@ class MySqlFlywayMigrationTest(
         assertEquals(
             "clubs:id",
             foreignKeyReference("ai_generation_club_defaults", "fk_aigen_default_club"),
+        )
+        assertEquals("NO", columnValue("ai_generation_commit_receipts", "job_id", "is_nullable"))
+        assertEquals("NO", columnValue("ai_generation_commit_receipts", "revision", "is_nullable"))
+        assertEquals(
+            "job_id,revision",
+            indexColumns("ai_generation_commit_receipts", "uk_aigen_commit_receipt_job_revision"),
         )
     }
 
