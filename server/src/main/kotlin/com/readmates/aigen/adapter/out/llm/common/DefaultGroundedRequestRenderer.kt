@@ -1,12 +1,12 @@
 package com.readmates.aigen.adapter.out.llm.common
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.readmates.aigen.application.port.out.GroundedRenderRequest
 import com.readmates.aigen.application.port.out.GroundedRequestMode
 import com.readmates.aigen.application.port.out.GroundedRequestRenderer
 import com.readmates.aigen.application.port.out.RenderedGroundedRequest
 import com.readmates.aigen.config.AiGenerationProperties
 import org.springframework.stereotype.Component
+import tools.jackson.databind.ObjectMapper
 
 /**
  * Renders transcript and host input as a JSON data envelope. The fixed system boundary never interpolates
@@ -27,28 +27,28 @@ class DefaultGroundedRequestRenderer(
         ) { "Repair and regeneration require the current draft and requested section" }
 
         val envelope =
-            RequestEnvelope(
-                mode = request.mode.name,
-                session =
-                    SessionEnvelope(
-                        sessionNumber = request.sessionMeta.sessionNumber,
-                        bookTitle = request.sessionMeta.bookTitle,
-                        bookAuthor = request.sessionMeta.bookAuthor,
-                        meetingDate = request.sessionMeta.meetingDate.toString(),
+            linkedMapOf<String, Any?>(
+                "mode" to request.mode.name,
+                "session" to
+                    linkedMapOf(
+                        "sessionNumber" to request.sessionMeta.sessionNumber,
+                        "bookTitle" to request.sessionMeta.bookTitle,
+                        "bookAuthor" to request.sessionMeta.bookAuthor,
+                        "meetingDate" to request.sessionMeta.meetingDate.toString(),
                     ),
-                allowedSpeakerNames = request.turns.map { it.speakerName }.distinct(),
-                hostInstructions = request.hostInstructions,
-                turns =
+                "allowedSpeakerNames" to request.turns.map { it.speakerName }.distinct(),
+                "hostInstructions" to request.hostInstructions,
+                "turns" to
                     request.turns.map { turn ->
-                        TurnEnvelope(
-                            turnId = turn.turnId,
-                            startSeconds = turn.startSeconds,
-                            speakerName = turn.speakerName,
-                            text = turn.text,
+                        linkedMapOf(
+                            "turnId" to turn.turnId,
+                            "startSeconds" to turn.startSeconds,
+                            "speakerName" to turn.speakerName,
+                            "text" to turn.text,
                         )
                     },
-                currentDraft = request.currentDraft,
-                requestedSection = request.requestedSection?.name,
+                "currentDraft" to request.currentDraft,
+                "requestedSection" to request.requestedSection?.name,
             )
         return RenderedGroundedRequest(
             systemText = SYSTEM_TEXT,
@@ -57,30 +57,6 @@ class DefaultGroundedRequestRenderer(
             maxOutputTokens = properties.grounded.reservedOutputTokens.toInt(),
         )
     }
-
-    private data class RequestEnvelope(
-        val mode: String,
-        val session: SessionEnvelope,
-        val allowedSpeakerNames: List<String>,
-        val hostInstructions: String?,
-        val turns: List<TurnEnvelope>,
-        val currentDraft: Any?,
-        val requestedSection: String?,
-    )
-
-    private data class SessionEnvelope(
-        val sessionNumber: Int,
-        val bookTitle: String,
-        val bookAuthor: String?,
-        val meetingDate: String,
-    )
-
-    private data class TurnEnvelope(
-        val turnId: String,
-        val startSeconds: Int,
-        val speakerName: String,
-        val text: String,
-    )
 
     private companion object {
         val SYSTEM_TEXT =

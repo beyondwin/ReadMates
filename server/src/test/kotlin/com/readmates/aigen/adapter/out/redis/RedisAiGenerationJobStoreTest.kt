@@ -211,6 +211,52 @@ class RedisAiGenerationJobStoreTest(
     }
 
     @Test
+    fun `grounded status transitions and call count refresh every transient payload ttl`() {
+        val turn =
+            ValidatedTranscriptTurn(
+                "t000001",
+                "가람",
+                UUID.fromString("00000000-0000-0000-0000-000000000777"),
+                0,
+                "공개 테스트 발언입니다.",
+            )
+        val record =
+            newRecord(
+                pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
+                validatedTurns = listOf(turn),
+            )
+        store.save(record)
+        store.saveResult(record.jobId, snapshot(), TokenUsage(1, 0, 1), BigDecimal("0.001"))
+        val payloadKeys =
+            listOf(
+                "aigen:job:${record.jobId}:transcript",
+                "aigen:job:${record.jobId}:turns",
+                "aigen:job:${record.jobId}:result",
+            )
+
+        shortenPayloadTtls(payloadKeys)
+        store.updateStatus(record.jobId, JobStatus.RUNNING, JobStage.VALIDATING, 80, null)
+        assertPayloadTtlsRefreshed(payloadKeys)
+
+        shortenPayloadTtls(payloadKeys)
+        assertThat(
+            store.transitionStatus(
+                record.jobId,
+                setOf(JobStatus.RUNNING),
+                JobStatus.SUCCEEDED,
+                JobStage.READY,
+                100,
+                null,
+            ),
+        ).isTrue()
+        assertPayloadTtlsRefreshed(payloadKeys)
+
+        shortenPayloadTtls(payloadKeys)
+        store.incrementLlmCallCount(record.jobId)
+        assertPayloadTtlsRefreshed(payloadKeys)
+    }
+
+    @Test
     fun `patchItem refreshes transcript ttl with hash and result ttl`() {
         val record = newRecord()
         store.save(record)
@@ -537,6 +583,18 @@ class RedisAiGenerationJobStoreTest(
             pipelineMode = pipelineMode,
             validatedTurns = validatedTurns,
         )
+    }
+
+    private fun shortenPayloadTtls(keys: List<String>) {
+        keys.forEach { redisTemplate.expire(it, java.time.Duration.ofSeconds(60)) }
+    }
+
+    private fun assertPayloadTtlsRefreshed(keys: List<String>) {
+        val ttlSeconds = properties.job.redisTtl.seconds
+        keys.forEach { key ->
+            assertThat(redisTemplate.getExpire(key, TimeUnit.SECONDS))
+                .isBetween(ttlSeconds - 30, ttlSeconds + 30)
+        }
     }
 
     private fun snapshot(): SessionImportV1Snapshot =

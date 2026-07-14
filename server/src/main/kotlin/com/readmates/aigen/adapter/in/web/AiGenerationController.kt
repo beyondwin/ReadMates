@@ -78,9 +78,9 @@ class AiGenerationController(
         member: CurrentMember,
     ): StartGenerationResponse {
         ensureEnabled()
+        val meta = auth.requireHostAccess(sessionId, member)
         transcript.requireTxtFileName()
         val decodedTranscript = transcript.readTranscriptBytes().decodeUtf8()
-        val meta = auth.requireHostAccess(sessionId, member)
         val request = bodyMapper.readValue(body.bytes, StartGenerationRequest::class.java)
         val command =
             StartGenerationCommand(

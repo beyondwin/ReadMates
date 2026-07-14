@@ -49,6 +49,21 @@ class AiGenerationOrchestratorTest {
     }
 
     @Test
+    fun `generic grounded speaker returns membership error with the submitted label`() {
+        val ctx =
+            TestContext(
+                pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
+                activeMembers = listOf(ActiveClubMember(UUID.randomUUID(), "화자 1")),
+            )
+
+        assertThatThrownBy { ctx.orchestrator.start(ctx.commandWithSpeaker("화자 1")) }
+            .isInstanceOfSatisfying(AiGenerationException.InvalidTranscriptSpeakers::class.java) {
+                assertThat(it.code).isEqualTo(ErrorCode.TRANSCRIPT_SPEAKER_NOT_MEMBER)
+                assertThat(it.invalidSpeakerLabels).containsExactly("화자 1")
+            }
+    }
+
+    @Test
     fun `grounded start binds membership identity before saving job`() {
         val membershipId = UUID.randomUUID()
         val ctx =

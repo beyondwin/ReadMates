@@ -247,6 +247,7 @@ class RedisAiGenerationJobStore(
                 ops.delete(hashKey, "errorCode", "errorMessage")
             }
             redisTemplate.expire(hashKey, properties.job.redisTtl)
+            refreshTransientPayloadTtls(jobId)
             refreshIndexes(jobId)
         }.onFailure { recordFailure("updateStatus") }.getOrThrow()
     }
@@ -277,6 +278,7 @@ class RedisAiGenerationJobStore(
                 )
             val changed = result == 1L
             if (changed) {
+                refreshTransientPayloadTtls(jobId)
                 refreshIndexes(jobId)
             }
             changed
@@ -335,12 +337,20 @@ class RedisAiGenerationJobStore(
             // 6h job TTL with the rest of the record). EXPIRE is a no-op if the key is
             // already gone, so we don't need a guard.
             redisTemplate.expire(hashKey, properties.job.redisTtl)
+            refreshTransientPayloadTtls(jobId)
             next.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
         }.onFailure { recordFailure("incrementLlmCallCount") }.getOrThrow()
 
     private fun deleteStaleJob(jobId: UUID): JobRecord? {
         delete(jobId)
         return null
+    }
+
+    private fun refreshTransientPayloadTtls(jobId: UUID) {
+        val ttl = properties.job.redisTtl
+        redisTemplate.expire(transcriptKey(jobId), ttl)
+        redisTemplate.expire(turnsKey(jobId), ttl)
+        redisTemplate.expire(resultKey(jobId), ttl)
     }
 
     override fun delete(jobId: UUID) {

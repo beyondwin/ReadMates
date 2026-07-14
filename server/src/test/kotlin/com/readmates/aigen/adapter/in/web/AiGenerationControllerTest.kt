@@ -209,6 +209,17 @@ class AiGenerationControllerTest {
     }
 
     @Test
+    fun `POST jobs authorizes before validating transcript filename or bytes`() {
+        authPolicy.denyWith = AccessDeniedException("denied")
+
+        postTranscript("not-a-transcript.json", byteArrayOf(0xC3.toByte(), 0x28)).andExpect {
+            status { isForbidden() }
+            jsonPath("$.code") { value("PERMISSION_DENIED") }
+        }
+        assertThat(startUseCase.commands).isEmpty()
+    }
+
+    @Test
     fun `POST jobs with transcript larger than 1MB returns 400`() {
         val tooBig = ByteArray(1024 * 1024 + 1) { 0x41 }
         val transcript =

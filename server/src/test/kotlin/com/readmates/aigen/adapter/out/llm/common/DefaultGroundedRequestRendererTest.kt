@@ -1,7 +1,5 @@
 package com.readmates.aigen.adapter.out.llm.common
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.KotlinModule
 import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.ValidatedTranscriptTurn
@@ -11,11 +9,12 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import tools.jackson.databind.json.JsonMapper
 import java.time.LocalDate
 import java.util.UUID
 
 class DefaultGroundedRequestRendererTest {
-    private val objectMapper = ObjectMapper().registerModule(KotlinModule.Builder().build())
+    private val objectMapper = JsonMapper.builder().findAndAddModules().build()
     private val renderer =
         DefaultGroundedRequestRenderer(
             objectMapper,
@@ -38,8 +37,14 @@ class DefaultGroundedRequestRendererTest {
         assertTrue(rendered.systemText.contains("never invent", ignoreCase = true))
         assertFalse(rendered.systemText.contains(injection))
         assertEquals(injection, envelope.path("hostInstructions").asText())
-        assertEquals(listOf("t000001", "t000002"), envelope.path("turns").map { it.path("turnId").asText() })
-        assertEquals(listOf("Alice", "Bob"), envelope.path("allowedSpeakerNames").map { it.asText() })
+        val turns = envelope.path("turns")
+        assertEquals(2, turns.size())
+        assertEquals("t000001", turns.get(0).path("turnId").asText())
+        assertEquals("t000002", turns.get(1).path("turnId").asText())
+        val speakers = envelope.path("allowedSpeakerNames")
+        assertEquals(2, speakers.size())
+        assertEquals("Alice", speakers.get(0).asText())
+        assertEquals("Bob", speakers.get(1).asText())
         assertEquals(16_384, rendered.maxOutputTokens)
         assertEquals(GroundedGenerationSchemaResource().schemaAsString(), rendered.schemaJson)
     }

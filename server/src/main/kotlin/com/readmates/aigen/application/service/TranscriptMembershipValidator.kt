@@ -55,7 +55,7 @@ class TranscriptMembershipValidator {
     private fun normalize(value: String): String = Normalizer.normalize(value.trim(), Normalizer.Form.NFC)
 
     private companion object {
-        val GENERIC_SPEAKER = Regex("^(화자|speaker|unknown)(\\s*\\d+)?$", RegexOption.IGNORE_CASE)
+        val GENERIC_SPEAKER = Regex("^(화자|참석자|speaker|unknown)(\\s*\\d+)?$", RegexOption.IGNORE_CASE)
     }
 
     private enum class FailureKind { NOT_MEMBER, AMBIGUOUS }

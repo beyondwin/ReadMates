@@ -5,6 +5,7 @@ import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.ParsedTranscript
 import com.readmates.aigen.application.model.ParsedTranscriptTurn
 import org.springframework.stereotype.Component
+import java.text.Normalizer
 
 @Component
 class TranscriptParser {
@@ -86,11 +87,13 @@ class TranscriptParser {
         turns: List<ParsedTranscriptTurn>,
     ) {
         if (participantNames == null) return
-        val participants = participantNames.toSet()
-        if (turns.any { it.speakerName.trim() !in participants }) {
+        val participants = participantNames.map(::normalizeSpeakerName).toSet()
+        if (turns.any { normalizeSpeakerName(it.speakerName) !in participants }) {
             fail(ErrorCode.TRANSCRIPT_FORMAT_INVALID, "PARTICIPANT_LIST_MISMATCH")
         }
     }
+
+    private fun normalizeSpeakerName(name: String): String = Normalizer.normalize(name.trim(), Normalizer.Form.NFC)
 
     private fun parseTurns(
         lines: List<String>,
@@ -133,9 +136,7 @@ class TranscriptParser {
             TURN_HEADER.matchEntire(line)
                 ?: fail(ErrorCode.TRANSCRIPT_FORMAT_INVALID, "EXPECTED_TURN_HEADER", lineNumber)
         val speaker = match.groupValues[SPEAKER_GROUP]
-        if (speaker.isBlank() || GENERIC_SPEAKER.matches(speaker)) {
-            fail(ErrorCode.TRANSCRIPT_FORMAT_INVALID, "UNSUPPORTED_SPEAKER_LABEL", lineNumber)
-        }
+        if (speaker.isBlank()) fail(ErrorCode.TRANSCRIPT_FORMAT_INVALID, "EMPTY_SPEAKER_LABEL", lineNumber)
         val timestamp =
             match.groupValues[MINUTES_GROUP].toInt() * SECONDS_PER_MINUTE +
                 match.groupValues[SECONDS_GROUP].toInt()
@@ -191,7 +192,6 @@ class TranscriptParser {
         const val TURN_ID_WIDTH = 6
         val TURN_HEADER = Regex("^(.+?)\\s+(\\d{1,3}):([0-5]\\d)\\s*$")
         val TURN_HEADER_LIKE = Regex("^.+?\\s+\\d{1,3}:\\d{2}(?::\\d{2})?\\s*$")
-        val GENERIC_SPEAKER = Regex("^화자\\s*\\d+$")
         val EXPORT_DATE_AND_DURATION =
             Regex(
                 "^\\d{4}\\.\\s*\\d{1,2}\\.\\s*\\d{1,2}\\.\\s*(오전|오후)\\s*" +

@@ -58,6 +58,24 @@ class TranscriptParserTest {
     }
 
     @Test
+    fun `parses generic speaker labels so membership preflight owns the typed rejection`() {
+        val parsed = parser.parse("화자 1 00:00\n공개 테스트 발언입니다.")
+
+        assertThat(parsed.turns.single().speakerName).isEqualTo("화자 1")
+    }
+
+    @Test
+    fun `participant preamble comparison uses NFC plus trim`() {
+        val decomposedGaram = "\u1100\u1161람"
+        val parsed =
+            parser.parse(
+                "모임\n2026. 7. 14. 오후 7:30 · 1분 0초\n가람\n\n$decomposedGaram 00:00\n공개 테스트 발언입니다.",
+            )
+
+        assertThat(parsed.turns.single().speakerName).isEqualTo(decomposedGaram)
+    }
+
+    @Test
     fun `rejects an empty transcript with a typed safe code`() {
         assertCoded(ErrorCode.TRANSCRIPT_EMPTY, " \n\t")
     }
@@ -67,7 +85,6 @@ class TranscriptParserTest {
         val cases =
             listOf(
                 "임의 메모\n가람 00:00\n공개 테스트 발언입니다.",
-                "화자 1 00:00\n공개 테스트 발언입니다.",
                 "가람 00:00\n\n나래 00:01\n두 번째 발언입니다.",
                 "가람 03:00:00\n지원하지 않는 시각입니다.",
                 "가람 00:02\n첫 발언입니다.\n\n나래 00:02\n같은 시각입니다.",

@@ -47,7 +47,7 @@ class TranscriptMembershipValidatorTest {
     fun `rejects inactive other club generic and absent speakers`() {
         assertInvalid(
             ErrorCode.TRANSCRIPT_SPEAKER_NOT_MEMBER,
-            listOf("비활성", "다른클럽", "없는이름", "화자 1", "speaker", "unknown"),
+            listOf("비활성", "다른클럽", "없는이름", "화자 1", "참석자 1", "speaker", "unknown"),
         ) {
             validator.validate(
                 turns =
@@ -56,10 +56,21 @@ class TranscriptMembershipValidatorTest {
                         turn("다른클럽", 2),
                         turn("없는이름", 3),
                         turn("화자 1", 4),
-                        turn("speaker", 5),
-                        turn("unknown", 6),
+                        turn("참석자 1", 5),
+                        turn("speaker", 6),
+                        turn("unknown", 7),
                     ),
                 activeMembers = listOf(member(garamId, "가람")),
+            )
+        }
+    }
+
+    @Test
+    fun `generic label remains rejected even when an active display name collides`() {
+        assertInvalid(ErrorCode.TRANSCRIPT_SPEAKER_NOT_MEMBER, listOf("참석자 1")) {
+            validator.validate(
+                turns = listOf(turn("참석자 1")),
+                activeMembers = listOf(member(garamId, "참석자 1")),
             )
         }
     }
