@@ -152,17 +152,17 @@ python3 scripts/generate-slo-report.py \
 
 ## `aigen-pii-check.sh`
 
-In-app AI 세션 생성 경로가 transcript 본문을 durable store, Kafka message, metric tag, Flyway column으로 흘리지 않는지 확인합니다. Redis `aigen:job:<jobId>:transcript`는 worker handoff용 short-lived key로만 허용됩니다.
+In-app AI 세션 생성 경로가 transcript, parsed turns, result, evidence/excerpt, member/display name을 durable store, Kafka message, metric tag, Flyway content column, metadata hash, log/exception으로 흘리지 않는지 확인합니다. 콘텐츠는 job-store adapter가 관리하는 Redis `:transcript`, `:turns`, `:result`, `:evidence` 네 short-lived payload key에서만 허용됩니다.
 
 ```bash
 bash scripts/aigen-pii-check.sh
 ```
 
-CI `scripts` job이 PR마다 실행합니다. 실패하면 출력의 `checkN` 메시지와 [AI session generation runbook](../docs/operations/runbooks/ai-session-generation.md#pii-regression)을 기준으로 어느 invariant가 깨졌는지 확인합니다.
+CI `scripts` job이 PR마다 실행합니다. 현재 self-test fixture와 10개 invariant가 Redis TTL/삭제, grounded metadata hash, Kafka routing metadata, content-free migration/audit/receipt, bounded metric label, request/response logging 금지를 확인합니다. 실패하면 출력의 `checkN` 메시지와 [AI session generation runbook](../docs/operations/runbooks/ai-session-generation.md#pii-regression)을 기준으로 어느 invariant가 깨졌는지 확인합니다.
 
 ## `aigen-smoke-{claude,openai,gemini}.sh`
 
-Provider별 라이브 API key가 있는 운영 또는 staging 노드에서 AI generation multipart start/polling smoke를 수동 확인합니다. 이 스크립트는 live key를 요구하므로 공개 CI에서는 실행하지 않습니다.
+Provider별 라이브 API key가 있는 검토된 환경에서 AI generation multipart start/polling smoke를 수동 확인합니다. 스크립트는 public-safe 합성 회원과 대본만 사용하도록 제한되며, private transcript를 입력으로 받지 않습니다. Live provider 호출은 retention 조건과 별도 승인이 필요하므로 공개 CI에서는 `bash -n` 문법 검사만 수행합니다.
 
 ```bash
 ./scripts/aigen-smoke-claude.sh
@@ -170,7 +170,7 @@ Provider별 라이브 API key가 있는 운영 또는 staging 노드에서 AI ge
 ./scripts/aigen-smoke-gemini.sh
 ```
 
-Provider key, transcript, 응답 전문, 운영 domain은 Git에 남기지 않습니다. 모델 allowlist, cap, key 회전, kill switch 절차는 [AI session generation runbook](../docs/operations/runbooks/ai-session-generation.md)을 기준으로 합니다.
+Provider key, transcript, 응답 전문, 운영 domain은 Git에 남기지 않습니다. 모델 capability/allowlist, grounded rollout, cap, key 회전, kill switch 절차는 [AI session generation runbook](../docs/operations/runbooks/ai-session-generation.md)을 기준으로 합니다.
 
 ## `build-public-release-candidate.sh`
 

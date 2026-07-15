@@ -1,155 +1,192 @@
-# Case Study 04 — PII-safe in-app AI session generation
+# Case Study 04 — PII-safe grounded AI session generation
 
-> 호스트가 녹취록을 업로드하면 LLM이 공개 요약, 하이라이트, 한줄평, 피드백 문서를 생성하지만, transcript 본문은 Kafka/MySQL/metric으로 보내지 않는 운영 경계를 만들었습니다. `readmates.aigen.enabled` kill switch, provider allowlist, Redis TTL job state, Kafka worker, MySQL audit/cost ledger, `readmates-session-import:v1` schema validator를 조합해 "AI 생성"을 제품 기능이 아니라 운영 가능한 비동기 workflow로 다뤘습니다.
+> 호스트가 전체 대본을 업로드하면 서버가 먼저 화자를 같은 클럽의 활성 멤버와 정확히 연결하고, LLM 결과의 모든 항목을 원본 turn 근거와 묶습니다. 호스트는 네 섹션의 근거 또는 직접 편집을 확인한 뒤에만 저장할 수 있습니다. Transcript, parsed turns, result, evidence는 Redis에 6시간만 두고 Kafka와 MySQL에는 콘텐츠를 남기지 않으며, revision CAS와 content-free commit receipt로 crash window를 복구합니다.
 
 ## 문제
 
 **호스트 운영 병목**
 
-독서모임 회차가 끝난 뒤 호스트는 녹취록에서 공개 요약, 하이라이트, 한줄평, 참석자용 피드백 문서를 다시 정리해야 합니다. 기존 JSON 가져오기 흐름은 안전하지만, LLM 호출과 검토가 앱 밖에서 일어나므로 결과를 다시 업로드하고 검증하는 절차가 길었습니다.
+모임이 끝난 뒤 호스트는 대본에서 공개 요약, 하이라이트, 한줄평, 참석자용 피드백 문서를 다시 정리해야 합니다. 외부 JSON 가져오기는 안전한 fallback이지만 LLM 호출, 근거 확인, 결과 업로드가 앱 밖에서 분리되어 반복 작업이 큽니다.
 
-**AI 기능의 운영 위험**
+**“형식이 맞는 결과”만으로는 부족함**
 
-세션 녹취록은 공개 기록보다 민감합니다. AI 생성 기능을 단순 동기 HTTP 호출로 붙이면 다음 문제가 생깁니다.
+초기 in-app AI 흐름은 비동기 job, schema validation, provider adapter, cost cap을 제공했습니다. 하지만 실제 제품 수준에서는 다음 사각지대가 남았습니다.
 
-- Provider 장애나 rate limit이 호스트 편집기 요청 timeout으로 드러납니다.
-- transcript 본문이 Kafka payload, audit log, metric tag, exception message에 섞일 수 있습니다.
-- 모델이 schema를 어기거나 참석자 이름을 만들면 기존 세션 기록 commit 경계가 오염됩니다.
-- 비용 cap, provider disable, 전체 kill switch 없이 운영자가 장애를 좁혀 끌 방법이 없습니다.
+- 대본 화자가 현재 클럽의 활성 멤버인지 provider 호출 전에 확정되지 않으면 잘못된 이름이 결과와 비용 기록에 들어갑니다.
+- JSON schema가 맞아도 각 요약·하이라이트·한줄평·피드백이 어느 원문 발언에서 왔는지 검토할 수 없습니다.
+- 브라우저 수동 편집, 재생성, 늦게 도착한 polling 응답이 섞이면 사용자가 보지 않은 revision을 저장할 수 있습니다.
+- MySQL commit은 성공했지만 Redis 상태 갱신이나 payload 삭제가 실패하는 crash window에서 같은 내용을 두 번 쓸 수 있습니다.
+- Provider SDK의 숨은 retry와 오래된 worker가 비용 cap과 call budget을 우회할 수 있습니다.
 
 **제약**
 
-- 공개 저장소 — 실제 transcript, provider key, 운영 host, private deployment state를 문서와 fixture에 남기지 않습니다.
-- 기존 session import contract — 최종 저장은 `readmates-session-import:v1`과 같은 검증/commit 경로를 재사용해야 합니다.
-- 멀티 provider — Claude, OpenAI, Gemini를 같은 제품 흐름에 붙이되 provider별 실패를 공통 오류 계약으로 변환해야 합니다.
+- 공개 저장소에는 실제 transcript, 멤버 이름, provider key, 운영 host, private deployment state를 남기지 않습니다.
+- 최종 저장은 기존 `readmates-session-import:v1` validation/commit 경계를 재사용합니다.
+- OpenAI, Claude, Gemini가 서로 다른 API를 사용해도 같은 입력 bytes, schema, 근거 계약, call budget을 지켜야 합니다.
+- Private transcript를 live provider로 보내는 품질 평가는 일반 CI나 smoke에 포함하지 않고 별도 승인을 요구합니다.
 
 ## 접근
 
 | 대안 | 기각 이유 |
-|------|----------|
-| Host editor에서 provider API 직접 호출 | API key가 브라우저 번들 또는 client runtime으로 새고, provider별 CORS/retention/cost 정책을 앱이 통제할 수 없습니다. |
-| Spring controller에서 동기 LLM 호출 후 바로 commit | 긴 요청 timeout, 재시도/취소/진행률 부재, provider 장애가 편집기 UX 전체를 막습니다. |
-| Kafka payload에 transcript 포함 | worker 재처리는 쉬워지지만 broker, log, DLQ가 PII 저장소가 됩니다. |
-| LLM 결과를 바로 session table에 저장 | schema/author/feedback template 실패가 partial write로 남을 수 있습니다. |
+| --- | --- |
+| Browser에서 provider API 직접 호출 | API key와 retention/cost 정책을 브라우저 경계에서 통제할 수 없습니다. |
+| Spring controller에서 동기 호출 후 바로 저장 | timeout, 취소, 재시도, 진행률, revision 충돌과 crash recovery를 다룰 수 없습니다. |
+| Kafka message에 전체 대본 포함 | broker, log, DLQ가 private content 저장소가 됩니다. |
+| LLM이 낸 excerpt를 그대로 근거로 노출 | 모델이 원문에 없는 문장을 만들거나 너무 긴 private text를 반환할 수 있습니다. |
+| MySQL에 draft와 evidence 저장 | 검토 전 private content가 durable store와 운영 조회면으로 퍼집니다. |
 
-**선택: Redis handoff + Kafka metadata queue + validated commit**
+**선택: side-effect-free preflight + grounded generation + revisioned review + recoverable commit**
 
-transcript는 Redis TTL key에만 두고, Kafka에는 job routing metadata만 보냅니다. Worker는 Redis에서 transcript를 rehydrate해 provider adapter를 호출하고, 결과는 `SessionImportV1Validator`를 통과한 `SessionImportV1Snapshot`으로만 preview 상태가 됩니다. 호스트가 commit하면 `AiGenerationCommitService`가 다시 검증한 뒤 기존 `SessionImportService.commitValidated(...)`로 넘깁니다.
+서버는 job을 만들기 전에 입력 형식, 시간 범위, 활성 멤버 이름, model capability와 request budget을 검증합니다. 통과한 전체 대본만 Redis TTL payload로 넘기고 Kafka에는 routing metadata만 발행합니다. Provider는 구조화된 draft와 turn ID를 반환하지만, 최종 evidence excerpt는 서버가 원본 turn에서 다시 만듭니다. 호스트가 현재 revision의 네 섹션을 모두 확인해야 commit할 수 있고, MySQL의 content-free receipt가 Redis와 DB 사이의 복구 기준이 됩니다.
 
 ## 구현
 
-### 비동기 job 경계
+### 1. Provider 호출 전 preflight
+
+지원 입력은 UTF-8 또는 UTF-8 BOM `.txt`이며 최대 1 MiB, 3시간입니다. 각 발언은 `화자명 MM:SS` header와 본문을 사용하고 timestamp는 단조 증가해야 합니다.
+
+`GroundedTranscriptPreflightService`는 다음 순서로 실행됩니다.
+
+1. 현재 사용자가 같은 클럽의 활성 호스트인지, 세션이 AI 생성 가능한 상태인지 확인합니다.
+2. 대본을 turn으로 파싱하고 Unicode NFC + trim 후 case-sensitive exact match로 모든 고유 화자를 같은 클럽의 `ACTIVE` membership 하나에 연결합니다.
+3. generic label, 비회원, 비활성/다른 클럽 회원, 정규화 후 중복 표시 이름을 거절합니다.
+4. 실제 `GroundedRequestRenderer`가 만들 request와 16,384 output reserve, safety margin을 model capability와 비교합니다.
+
+이 단계의 422/503 실패는 job ID, Redis, Kafka, provider, cost side effect를 만들지 않습니다. 임의 alias/fuzzy match나 대본 chunking으로 우회하지 않습니다.
+
+### 2. Redis 4-payload와 Kafka metadata queue
 
 ```text
 Browser host editor
   |
-  | POST /api/host/sessions/{id}/ai-generate/jobs
+  | multipart TXT + server-provided model ID
   v
-AiGenerationController
+Transcript preflight
   |
   v
-AiGenerationOrchestrator
-  |-- Redis aigen:job:<jobId>              (state, TTL 6h)
-  |-- Redis aigen:job:<jobId>:transcript   (raw transcript, TTL 6h)
-  |-- Kafka readmates.aigen.jobs.v1        (metadata only)
-  v
-AiGenerationWorker
+Redis aigen:job:<jobId>              content-free metadata, TTL 6h
+Redis aigen:job:<jobId>:transcript   normalized transcript, TTL 6h
+Redis aigen:job:<jobId>:turns        membership-bound turns, TTL 6h
   |
-  | provider adapter + schema validation
-  v
-Redis aigen:job:<jobId>:result             (validated snapshot, TTL 6h)
+  `-> Kafka readmates.aigen.jobs.v1  routing metadata only
+          |
+          v
+      AiGenerationWorker
+          |
+          v
+Redis aigen:job:<jobId>:result       validated snapshot, TTL 6h
+Redis aigen:job:<jobId>:evidence     revision-scoped evidence, TTL 6h
 ```
 
-`AiGenerationController`는 multipart 업로드를 받고 transcript 크기를 1 MB로 제한합니다. `AiGenerationOrchestrator`는 모델 resolve, provider allowlist, host/club cap pre-check를 통과한 뒤 Redis job record를 만들고 Kafka에 `jobId`, `sessionId`, `clubId`, `hostUserId`, provider, model, kind만 발행합니다.
+Kafka message는 `jobId`, `sessionId`, `clubId`, `hostUserId`, provider, model, job kind만 담습니다. Transcript, parsed turns, 이름, prompt/instructions, result, evidence/excerpt는 Kafka, notification payload, metric, log에 넣지 않습니다.
 
-Kafka topic 이름은 `readmates.aigen.jobs.v1`이고 partition key는 club id입니다. transcript 본문은 topic payload에 포함되지 않습니다. 이 invariant는 `scripts/aigen-pii-check.sh`가 production Kotlin, Flyway migration, Kafka producer, Micrometer tag, Redis transcript key 사용 범위를 스캔해 회귀를 막습니다.
+네 payload는 같은 6시간 TTL을 갖습니다. 필수 payload 하나가 먼저 만료하면 부분 결과를 노출하지 않고 `JOB_EXPIRED`로 실패합니다. Commit/cancel은 네 payload를 삭제하고 terminal hash만 TTL까지 남깁니다.
 
-Job status는 `PENDING -> RUNNING -> SUCCEEDED -> COMMITTING -> COMMITTED`를 정상 commit 경로로 사용합니다. `FAILED`와 `CANCELLED`는 terminal 상태이고, Redis `transitionStatus`/`saveResultIfStatus` Lua CAS가 worker completion, regenerate, commit, cancel 경합을 막습니다. Commit/cancel 이후에는 raw transcript와 result payload를 삭제하지만 `aigen:job:<jobId>` hash는 TTL까지 남겨 frontend가 `COMMITTED`/`CANCELLED` 최종 상태를 확인할 수 있습니다. Per-job `llmCallCount`도 같은 hash에서 원자 증가하므로 retry와 regeneration을 합쳐 hard cap을 넘으면 provider 호출 없이 `MAX_CALLS_EXCEEDED`로 중단됩니다.
+### 3. 전체 대본 structured generation과 서버 소유 근거
 
-### provider adapter와 오류 마스킹
+Grounded pipeline은 provider별 `WholeTranscriptGroundedGenerator`를 사용합니다. OpenAI, Claude, Gemini adapter는 같은 renderer의 system instruction, schema, ordered turns, explicit max output을 사용합니다.
 
-Provider 구현은 `SessionContentGenerator`와 `SessionContentRegenerator` outbound port 뒤에 숨겼습니다.
+- Primary generation은 전체 대본 1회 호출입니다.
+- 정확히 한 section이 schema/grounding 검증에 실패할 때만 같은 provider로 전체 대본을 유지한 section repair 1회를 허용합니다.
+- Availability fallback, repair, regeneration은 같은 atomic `llmCallCount`와 cost cap을 사용합니다.
+- Pricing catalog과 capability catalog은 분리합니다. Capability가 확인되지 않은 모델은 grounded model endpoint에 노출하지 않습니다.
 
-- `adapter.out.llm.claude.ClaudeContentGenerator/Regenerator`
-- `adapter.out.llm.openai.OpenAiContentGenerator/Regenerator`
-- `adapter.out.llm.gemini.GeminiContentGenerator/Regenerator`
+LLM은 각 authored item에 `evidenceTurnIds`를 반환하지만 excerpt는 직접 정하지 않습니다. `GroundedEvidenceProjector`가 현재 revision의 원본 turn에서 최대 240 Unicode code point를 만들어 반환합니다. 전체 발언 확장은 현재 evidence가 참조한 단일 turn에 대해서만 허용하며 transcript search/download endpoint는 없습니다.
 
-세 adapter는 `LlmPromptBuilder`와 `SessionImportSchemaResource`를 공유하고, provider 예외는 `LlmErrorMapper`를 거쳐 `PROVIDER_UNAVAILABLE`, `PROVIDER_RATE_LIMITED`, `SCHEMA_INVALID` 같은 내부 enum으로 변환됩니다. 사용자와 HTTP 응답에는 transcript snippet이나 provider raw exception message를 내보내지 않습니다.
+### 4. Revision별 호스트 review workspace
 
-`AiGenerationErrorHandler`는 AI 생성 controller에 한정된 RFC 7807 응답을 만듭니다. catch-all은 `detail="internal error"`로 마스킹하고, downstream session import validation exception도 issue count와 code만 로그에 남깁니다.
+프런트엔드는 `front/features/host/aigen/` 안에서 API, query, pure review model, UI를 분리합니다. 서버의 `/models` 응답이 모델 목록의 source of truth이며 browser에 provider model ID를 별도 hardcode하지 않습니다.
 
-### schema validator가 commit trust boundary
+호스트는 네 섹션을 각각 검토합니다.
 
-LLM 출력은 바로 저장되지 않습니다. Worker는 먼저 `readmates-session-import:v1` snapshot을 만들고 `SessionImportV1Validator`로 검증합니다.
+- 요약
+- 하이라이트
+- 한줄평
+- 피드백 문서
 
-- session number, book title, meeting date가 원본 session metadata와 맞아야 합니다.
-- author name은 해당 회차 참석자 allowlist와 맞아야 합니다.
-- highlights 개수, one-line review 중복, feedback document template을 확인합니다.
+AI 결과를 그대로 쓴 섹션은 `AI_GROUNDED_REVIEWED`, 직접 수정한 섹션은 `USER_EDITED_CONFIRMED`가 되어야 합니다. 항목을 수정하면 해당 근거와 review는 무효화됩니다. 재생성은 revision을 증가시키고 네 섹션 review를 모두 초기화합니다. Commit은 현재 `expectedRevision`, edited result, section review ledger가 함께 맞을 때만 열립니다.
 
-호스트가 preview에서 수동 수정한 override를 commit하더라도 `AiGenerationCommitService`가 Redis에 저장하기 전에 다시 validator를 실행합니다. 검증이 통과한 경우에만 기존 `SessionImportService.commitValidated(...)`가 공개 요약, 하이라이트, 한줄평, 피드백 문서를 한 트랜잭션 경계에서 교체합니다.
+브라우저 draft는 revision을 포함한 복구 envelope로 최대 6시간만 저장합니다. 예약된 삭제와 만료 후 재저장 차단을 적용하며 transcript, parsed turns, evidence/excerpt는 localStorage에 넣지 않습니다.
 
-### 운영 kill switch와 cost cap
+### 5. Recoverable commit
 
-AI 생성은 기본 off입니다.
+정상 상태 전이는 다음과 같습니다.
 
-- `readmates.aigen.enabled=false`이면 `AiGenerationKillSwitchFilter`가 `/api/host/sessions/*/ai-generate/**`와 `/api/host/clubs/*/ai-defaults`를 503 + `AI_DISABLED` problem JSON으로 응답합니다.
-- `readmates.aigen.enabled-providers`에서 provider를 제거하면 catalog 단계에서 해당 provider 모델이 사라집니다.
-- Redis cost key는 club monthly cap과 host daily cap을 관리합니다.
-- MySQL `ai_generation_audit_log`는 provider, model, status, token usage, cost estimate, latency, error code를 보관하지만 transcript 본문 컬럼은 없습니다.
+```text
+PENDING -> RUNNING -> SUCCEEDED -> COMMITTING -> COMMITTED
+                     |              |
+                     |              +-- receipt 없음/lease 만료 -> COMMIT_RETRY
+                     `-- regenerate -> revision 증가 + review 초기화
 
-운영자는 runbook에서 provider key 회전, 모델 allowlist 변경, cap 임시 조정, schema 실패 spike, 전체 kill switch를 같은 절차로 다룹니다.
+COMMIT_RETRY -> COMMITTING -> COMMITTED
+COMMITTED + cleanupPending -> cleanup only retry
+```
 
-### frontend preview와 재생성
+`AiGenerationCommitService`는 Redis revision CAS와 bounded `COMMITTING` lease를 잡고 한 MySQL transaction에서 활성 멤버를 재검증합니다. 그 안에서 participant upsert, `SessionImportService.commitValidated(...)`, unique `job_id + revision` receipt insert를 함께 수행합니다.
 
-프런트엔드는 `front/features/host/aigen/`에 격리했습니다.
+복구 scheduler는 receipt가 있으면 session content를 다시 쓰지 않고 `COMMITTED`로 수렴합니다. Receipt가 없으면 `COMMIT_RETRY`로 돌려 안전한 commit만 재시도합니다. DB commit 후 cache invalidation이나 Redis 삭제만 실패한 경우 `cleanupPending=true`를 남기고 cleanup만 반복합니다.
 
-- `api/` — BFF 호출과 DTO contract
-- `hooks/useAiGenerationJob.ts` — TanStack Query v5 adaptive polling
-- `ui/` — transcript upload, progress, preview, section별 regenerate modal, committed/saving state
-- `storage/aigen-draft-storage.ts` — preview 수동 수정 draft를 `aigen-draft:{jobId}` localStorage key에 보관
+MySQL `ai_generation_commit_receipts`와 audit row에는 transcript, 이름, result, evidence/excerpt를 저장하지 않습니다. Pipeline, provider/model/status/revision과 turn/speaker/review/warning aggregate만 남깁니다.
 
-호스트 세션 편집기는 `세션 기록 완성` 패널에서 `AI로 생성`과 `외부 JSON 가져오기` 모드를 함께 보여주며, `?aigen=1` query로 AI 모드 진입을 보존합니다. 두 모드는 최종 commit 경로를 공유하므로 저장 후 데이터 모델이 갈라지지 않습니다.
+### 6. 비용과 동시성 fail-closed
+
+Redis Lua admission은 host 24시간/60초 counter, club monthly cost, 5분 owner-token provider admission lease를 원자적으로 확인합니다. Worker와 regeneration은 retry/repair를 포함한 각 실제 provider network call 직전에 같은 owner로 lease를 갱신합니다.
+
+Owner가 없거나 바뀌면 provider를 호출하지 않습니다. OpenAI/Claude SDK 내부 retry는 끄고 provider HTTP timeout을 4분으로 제한해 5분 lease보다 짧게 유지합니다. Job save나 queue publish처럼 provider 호출 전 실패는 counter와 lease를 원자적으로 되돌립니다. Redis 응답이 불명확하면 비용을 낙관적으로 허용하지 않습니다.
+
+### 7. 운영 rollout과 privacy 경계
+
+`readmates.aigen.enabled` kill switch와 `enabled-providers` allowlist가 가장 먼저 적용됩니다. Pipeline 기본값은 `LEGACY`이며, 환경별 mock/E2E, provider capability/retention, rollback checklist가 끝난 뒤에만 `GROUNDED_WHOLE_TRANSCRIPT`로 바꿉니다. 장애 시 pipeline을 `LEGACY`로 되돌리며 보안·비용 사건은 kill switch까지 내립니다.
+
+Platform admin은 job ID, status, revision, safe error, `cleanupPending` 같은 metadata만 봅니다. Transcript, 이름, result, evidence를 열거나 수정·commit하지 않습니다. Private transcript를 live provider에 보내는 평가는 별도 명시 승인 없이는 실행하지 않습니다.
 
 ## 검증
 
-**단위/통합 테스트**
+**서버 계약과 persistence**
 
-- `AiGenerateApiIntegrationTest` — HTTP → Kafka/Testcontainers → worker → Redis → commit lifecycle.
-- Provider adapter tests — Claude/OpenAI/Gemini generator와 regenerator의 schema/tool 호출, 오류 마스킹, model 전달.
-- `RedisAiGenerationJobStoreTest`, `RedisGenerationCostCountersTest` — TTL, stale transcript cleanup, atomic status/result transition, terminal payload cleanup, cost counter.
-- `AiGenerationErrorHandlerTest` 계열 — typed RFC 7807 denial과 unknown error scrub.
+- `TranscriptParserTest`, `TranscriptMembershipValidatorTest`, `GroundedInputBudgetGuardTest`가 side-effect-free preflight와 입력 경계를 고정합니다.
+- Provider별 `*WholeTranscriptGroundedGeneratorTest`와 `GroundedGenerationValidatorTest`가 공통 request/schema/evidence 계약을 확인합니다.
+- `RedisGroundedAiGenerationJobStoreTest`, `RedisAiGenerationJobStoreFailureTest`가 4-payload TTL, revision CAS, partial expiry, cleanup을 검증합니다.
+- `AiGenerateGroundedCommitIntegrationTest`, `JdbcAiGenerationCommitPersistenceAdapterTest`, `AiGenerationCommitRecoveryServiceTest`가 receipt 기반 commit/recovery를 검증합니다.
+- `FrontendZodSchemaContractTest`와 exported Zod fixtures가 server/frontend 직렬화 drift를 차단합니다.
 
-**프런트 테스트**
+**프런트엔드와 E2E**
 
-- `front/features/host/aigen/**` unit tests — job polling, draft storage, upload/preview/committed transition.
-- Playwright `aigen-*.spec.ts` — full flow, cancel, regenerate, expired job, cost cap, JSON upload coexistence.
+- `aigen-review-state.test.ts`와 `PreviewView`/`EvidencePanel` tests가 review invalidation, revision reset, commit gate를 확인합니다.
+- Playwright `aigen-evidence-review.spec.ts`, `aigen-mobile-evidence.spec.ts`, `aigen-invalid-speaker.spec.ts`, `aigen-commit-recovery.spec.ts`가 desktop/mobile 근거 검토, preflight denial, recovery를 확인합니다.
+- BFF unit test가 과대 multipart body를 upstream buffering 전에 거절하는지 확인합니다.
 
-**PII invariant**
+**PII와 공개 릴리스**
 
-`bash scripts/aigen-pii-check.sh`는 다음을 확인합니다.
+`bash scripts/aigen-pii-check.sh`는 self-test fixture와 10개 invariant로 다음 경계를 검사합니다.
 
-- durable transcript body column/property name 금지
-- Kafka producer가 transcript 인자를 보내지 않음
-- Micrometer tag key allowlist 유지
-- Flyway migration에 transcript body column 없음
-- raw transcript Redis key 사용이 job-store handoff boundary 안에만 있음
+- 네 Redis payload의 adapter 소유권, TTL, terminal cleanup
+- Grounded metadata hash의 content-free field 계약
+- Kafka routing-metadata-only message
+- Flyway/audit/receipt의 content-free schema
+- low-cardinality metric label
+- request/response/transcript/evidence logging 금지
+
+공개 릴리스 후보는 `*.tsbuildinfo` 같은 로컬 incremental metadata도 제외하고 fixture로 재유입을 차단합니다.
 
 ## Trade-off와 한계
 
-- **Redis가 transient PII store가 됨**: transcript 본문을 durable store와 broker에서 뺐지만, worker 재처리를 위해 Redis TTL key에는 잠깐 보관합니다. 따라서 TTL/delete 테스트와 운영자 runbook이 중요합니다.
-- **비동기 workflow 복잡도**: 동기 호출보다 controller, queue, worker, Redis store, polling UI가 늘어납니다. 대신 timeout, retry, cancel, progress, cap, audit를 분리해 운영할 수 있습니다.
-- **provider retention은 코드만으로 보장 불가**: Gemini paid-tier 같은 provider-side 정책은 운영 provisioning 절차로 검증해야 합니다. 코드는 best-effort signal을 보내지만 계약을 대체하지 않습니다.
-- **모델 catalog 변경 비용**: provider 모델을 바꾸려면 server pricing map, frontend option, smoke script를 함께 맞춰야 합니다. 현재는 runbook으로 절차화했고, 장기적으로 catalog API 단일화를 고려할 수 있습니다.
+- **Redis가 transient private-content store가 됨:** Durable DB와 broker에서는 콘텐츠를 뺐지만 worker/review/recovery를 위해 네 payload를 최대 6시간 보관합니다. TTL, partial expiry, terminal cleanup, 운영자의 metadata-only 조회 규칙이 필요합니다.
+- **비동기 workflow와 review state가 복잡함:** Controller, queue, worker, Redis CAS, revision, receipt, polling UI가 늘어납니다. 대신 timeout, 취소, stale response, 중복 commit, crash cleanup을 각각 검증할 수 있습니다.
+- **정확한 멤버 이름을 요구함:** Alias와 fuzzy match를 지원하지 않아 호스트가 TXT를 고쳐 재업로드해야 할 수 있습니다. 잘못된 사람에게 private feedback이 연결되는 위험을 제품 편의보다 우선했습니다.
+- **Provider retention은 코드만으로 보장할 수 없음:** Provider-side 데이터 사용과 보유 조건은 운영 provisioning과 별도 승인으로 확인해야 합니다.
+- **긴 대본을 chunking하지 않음:** 현재는 전체 문맥과 일관된 근거를 우선해 model budget을 넘는 입력을 422로 거절합니다.
 
-## 다시 한다면
+## 다음 개선 후보
 
-- **catalog endpoint 단일화**: frontend 기본 모델 상수와 server pricing catalog를 하나의 API로 합치면 모델 교체 시 수정 지점이 줄어듭니다.
-- **provider health 자동 fallback**: 지금은 provider 장애를 운영자가 allowlist 변경으로 좁힙니다. provider error burst가 일정 시간 지속되면 catalog에서 자동 제외하는 회로 차단기를 둘 수 있습니다.
-- **preview diff 강화**: AI preview에서 session import commit 전후의 변경 diff를 더 명확히 보여주면 호스트 검토 비용을 줄일 수 있습니다.
+- Public-safe 합성 대본 corpus를 늘려 provider별 schema/grounding drift를 live private data 없이 더 일찍 탐지합니다.
+- Host review에서 revision 간 변경 원인을 더 명확히 보여 주되 evidence 원문을 브라우저 저장소나 운영 로그로 넓히지 않습니다.
+- Model capability와 pricing 변경을 release checklist에서 자동 비교하되 외부 provider 공식 문서 확인은 사람 승인 단계로 유지합니다.
 
-## 관련
+## 관련 문서
 
-- Architecture: [`docs/development/architecture.md`](../development/architecture.md#in-app-ai-세션-생성-컴포넌트)
-- Runbook: [`docs/operations/runbooks/ai-session-generation.md`](../operations/runbooks/ai-session-generation.md)
-- Session import contract: [`docs/development/session-import-generator.md`](../development/session-import-generator.md)
-- Spec: [`docs/superpowers/specs/2026-05-16-readmates-in-app-ai-session-generation-design.md`](../superpowers/specs/2026-05-16-readmates-in-app-ai-session-generation-design.md)
+- Current architecture: [`docs/development/architecture.md`](../development/architecture.md#in-app-ai-세션-생성-컴포넌트)
+- Host workflow and external JSON fallback: [`docs/development/session-import-generator.md`](../development/session-import-generator.md)
+- Operations: [`docs/operations/runbooks/ai-session-generation.md`](../operations/runbooks/ai-session-generation.md)
+- Release notes: [`CHANGELOG.md`](../../CHANGELOG.md#unreleased)
+- Historical design record: [`docs/superpowers/specs/2026-07-14-readmates-grounded-whole-transcript-ai-session-generation-design.md`](../superpowers/specs/2026-07-14-readmates-grounded-whole-transcript-ai-session-generation-design.md)

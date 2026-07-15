@@ -1,6 +1,6 @@
 # 세션 기록 JSON 가져오기
 
-호스트가 모임 녹취록을 로컬에서 정리한 뒤, ReadMates 호스트 세션 편집기에서 한 번에 가져올 수 있는 JSON 형식입니다.
+호스트가 모임 녹취록을 로컬에서 정리한 뒤, ReadMates 호스트 세션 편집기에서 한 번에 가져올 수 있는 JSON 형식입니다. 같은 편집기의 in-app 근거 기반 AI 생성 흐름과 외부 JSON fallback의 경계도 함께 설명합니다.
 
 이 흐름은 production 앱에서 LLM을 호출하지 않습니다. 모델 선택, API key, 원본 녹취록, 중간 산출물은 로컬 작업 공간에만 두고, 앱에는 최종 검토한 JSON만 업로드합니다.
 
@@ -26,9 +26,24 @@
 | 모드 | 입력 | LLM 호출 위치 | 운영 게이트 |
 | --- | --- | --- | --- |
 | 외부 JSON 업로드 | 호스트가 로컬에서 정리한 `readmates-session-import:v1` JSON | 앱 외부 | 항상 사용 가능 |
-| In-app AI 생성 | 호스트가 업로드한 transcript (≤ 1 MB .txt) + 모델 선택 | 서버 측 provider adapter (Claude/OpenAI/Gemini) | `readmates.aigen.enabled` + `readmates.aigen.enabled-providers` + provider API key |
+| In-app AI 생성 | UTF-8/BOM TXT(≤ 1 MiB, ≤ 3시간) + 서버가 제공한 모델 ID | 서버 측 provider adapter (Claude/OpenAI/Gemini) | kill switch + provider allowlist + `pipeline-mode` + provider API key |
 
-두 모드의 commit 경로는 같은 `SessionImportService.commitValidated(...)`를 사용하므로 저장 후의 데이터 형태와 권한 경계는 동일합니다. In-app AI 생성 모드의 흐름, 컴포넌트, 운영 절차는 spec §7 ([docs/superpowers/specs/2026-05-16-readmates-in-app-ai-session-generation-design.md](../superpowers/specs/2026-05-16-readmates-in-app-ai-session-generation-design.md))과 runbook ([docs/operations/runbooks/ai-session-generation.md](../operations/runbooks/ai-session-generation.md))을 참고합니다. 최신 AI job state machine 변경은 CHANGELOG `Unreleased`와 [architecture.md의 In-app AI 세션 생성 컴포넌트](architecture.md#in-app-ai-세션-생성-컴포넌트)에 정리합니다.
+두 모드의 commit 경로는 같은 `SessionImportService.commitValidated(...)`를 사용하므로 저장 후의 데이터 형태와 권한 경계는 동일합니다. 현재 동작은 [architecture.md의 In-app AI 세션 생성 컴포넌트](architecture.md#in-app-ai-세션-생성-컴포넌트), 운영 rollout과 장애 대응은 [AI session generation runbook](../operations/runbooks/ai-session-generation.md)을 기준으로 합니다. `docs/superpowers/**`의 spec과 plan은 설계 이력이며 현재 동작의 source of truth가 아닙니다.
+
+## In-app 근거 기반 AI 생성
+
+`READMATES_AIGEN_PIPELINE_MODE=GROUNDED_WHOLE_TRANSCRIPT`가 승인된 환경에서는 호스트가 다음 순서로 세션 기록을 완성합니다.
+
+1. TXT를 UTF-8 또는 UTF-8 BOM으로 준비합니다. 각 발언은 `화자명 MM:SS` header와 본문을 사용하고 timestamp는 뒤로 가지 않아야 합니다.
+2. 모든 고유 화자명을 현재 클럽의 `ACTIVE` 멤버 표시 이름과 정확히 맞춥니다. 비교는 Unicode NFC + trim 후 case-sensitive exact match이며 alias, fuzzy match, generic label 자동 보정은 없습니다.
+3. 호스트 편집기에서 `AI로 생성`을 열고 서버가 반환한 모델 목록에서 선택해 TXT를 업로드합니다. 최대 크기는 1 MiB, 최대 길이는 3시간입니다.
+4. 생성이 끝나면 요약, 하이라이트, 한줄평, 피드백 문서의 각 항목에서 근거를 확인합니다. 기본 excerpt는 서버가 원본 turn에서 만든 최대 240 Unicode code point이며, 현재 revision이 참조한 turn 하나만 확장할 수 있습니다.
+5. 네 섹션을 모두 `AI 근거 검토 완료`로 표시합니다. 직접 문장을 고친 섹션은 기존 근거/review가 무효화되므로 `직접 수정 내용 확인`으로 다시 확인합니다.
+6. 재생성하면 revision과 네 섹션 review가 초기화됩니다. 최신 revision을 다시 검토한 뒤 `AI 기록 저장`을 누릅니다.
+
+비회원, 비활성/다른 클럽 회원, generic label, 정규화 후 중복 이름은 job을 만들기 전에 422로 거절됩니다. 이 preflight 실패에는 Redis/Kafka/provider/cost side effect가 없습니다. Model capability를 확인할 수 없으면 503, 실제 request budget이 모델 한도를 넘으면 422로 provider 호출 전에 fail closed하며, 임의 chunking은 하지 않습니다.
+
+브라우저 draft는 revision을 포함한 복구용 편집값만 최대 6시간 보관합니다. Transcript, parsed turns, evidence/excerpt는 localStorage에 저장하지 않습니다. 서버의 transcript/turns/result/evidence payload도 Redis에 6시간만 있고 commit/cancel 뒤 삭제됩니다. 만료된 job은 운영 채널로 원문을 전달하지 말고 호스트가 원본 TXT를 다시 업로드합니다.
 
 ## 출력 형식
 
