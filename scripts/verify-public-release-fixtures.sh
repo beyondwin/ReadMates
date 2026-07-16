@@ -22,6 +22,7 @@ repo_abs="$(pwd -P)"
 
 tmp_dir="$repo_abs/.tmp"
 fixture_root="$tmp_dir/public-release-fixtures"
+candidate_dir="$tmp_dir/public-release-candidate"
 
 prepare_tmp_dir() {
   if [[ -L "$tmp_dir" ]]; then
@@ -76,6 +77,10 @@ trap cleanup EXIT
 
 prepare_tmp_dir
 
+if [[ ! -d "$candidate_dir" ]]; then
+  fail "public-release candidate not found at $candidate_dir; run scripts/build-public-release-candidate.sh first"
+fi
+
 if [[ -L "$fixture_root" ]]; then
   fail ".tmp/public-release-fixtures is a symlink; refusing to use it"
 fi
@@ -108,7 +113,25 @@ if ! grep -q "real-looking DB/BFF/OAuth secret assignment" "$fixture_root/secret
   fail "comment-placeholder secret fixture failed for the wrong reason"
 fi
 
-cat > "$fixture_root/placeholders/.env.example" <<'PLACEHOLDERS'
+# The positive placeholder case carries the minimum complete release contract:
+# Tempo assets plus the fail-closed production AI configuration path.
+placeholder_contract_files=(
+  ".env.example"
+  ".github/workflows/sync-config.yml"
+  "deploy/oci/compose.yml"
+  "deploy/oci/compose.infra.yml"
+  "deploy/oci/grafana/provisioning/datasources/tempo.yml"
+  "ops/tempo/tempo.yml"
+  "ops/observability/local/compose.yml"
+  "ops/observability/local/grafana/provisioning/datasources/tempo.yml"
+  "scripts/validate-production-ai-config.sh"
+  "scripts/sync-config/import-from-prod-env.sh"
+)
+for relative_path in "${placeholder_contract_files[@]}"; do
+  mkdir -p "$fixture_root/placeholders/$(dirname "$relative_path")"
+  cp "$candidate_dir/$relative_path" "$fixture_root/placeholders/$relative_path"
+done
+cat >> "$fixture_root/placeholders/.env.example" <<'PLACEHOLDERS'
 SPRING_DATASOURCE_PASSWORD=<db-password>
 SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
 READMATES_BFF_SECRET=<shared-bff-secret>
@@ -152,12 +175,7 @@ if ./scripts/public-release-check.sh "$design_standalone_fixture" > "$design_sta
 fi
 assert_file_contains "$design_standalone_fixture.err" "forbidden candidate path: design/standalone"
 
-candidate_dir="$repo_abs/.tmp/public-release-candidate"
 coverage_fixture="$repo_abs/scripts/fixtures/public-release-candidate-coverage.txt"
-
-if [[ ! -d "$candidate_dir" ]]; then
-  fail "public-release candidate not found at $candidate_dir; run scripts/build-public-release-candidate.sh first"
-fi
 
 if [[ ! -f "$coverage_fixture" ]]; then
   fail "coverage fixture not found at $coverage_fixture"
