@@ -80,7 +80,12 @@ class RedisProviderCallReservationAdapter(
     override fun reconcile(command: ProviderCallReconciliationCommand): ProviderCallReconciliationResult =
         failClosed("reconcile") {
             val actual = command.actualCostUsd?.toPlainString().orEmpty()
-            val basis = if (command.actualCostUsd == null) CostBasis.ESTIMATED_UNKNOWN else CostBasis.ACTUAL
+            val basis =
+                when {
+                    command.releaseCallSlot -> CostBasis.NONE
+                    command.actualCostUsd == null -> CostBasis.ESTIMATED_UNKNOWN
+                    else -> CostBasis.ACTUAL
+                }
             val result =
                 redisTemplate.execute(
                     ProviderCallReservationRedisScripts.reconcile,

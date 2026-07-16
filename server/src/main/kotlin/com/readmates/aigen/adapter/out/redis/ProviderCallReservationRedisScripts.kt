@@ -85,7 +85,10 @@ internal object ProviderCallReservationRedisScripts {
               if currentCalls <= 0 then return -4 end
             end
 
-            if ARGV[5] ~= '' then
+            if releaseSlot then
+              local reserved = tonumber(redis.call('HGET', KEYS[1], prefix .. 'reservedCostUsd') or '0')
+              if reserved ~= 0 then redis.call('INCRBYFLOAT', KEYS[2], tostring(-reserved)) end
+            elseif ARGV[5] ~= '' then
               local reserved = tonumber(redis.call('HGET', KEYS[1], prefix .. 'reservedCostUsd') or '0')
               local actual = tonumber(ARGV[5])
               local delta = actual - reserved

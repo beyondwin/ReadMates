@@ -327,7 +327,12 @@ class GroundedProviderCallCoordinator private constructor(
                 model = command.model.name,
                 transcriptSha256 = null,
                 usage = usage,
-                costEstimateUsd = actualCost ?: attempt.reservedCostUsd,
+                costEstimateUsd =
+                    when (attempt.costBasis) {
+                        CostBasis.ACTUAL -> requireNotNull(actualCost)
+                        CostBasis.ESTIMATED_UNKNOWN -> attempt.reservedCostUsd
+                        CostBasis.NONE -> BigDecimal.ZERO
+                    },
                 status = if (result.error == null) AuditStatus.SUCCESS else AuditStatus.FAILED,
                 errorCode = result.error?.code,
                 errorMessage = result.error?.message,
@@ -415,8 +420,7 @@ class GroundedProviderCallCoordinator private constructor(
         result: PhysicalResult,
     ): BigDecimal? =
         when (result) {
-            is PhysicalResult.Failure ->
-                if (result.failureClass == ProviderFailureClass.PRE_TRANSPORT) BigDecimal.ZERO else null
+            is PhysicalResult.Failure -> null
             else ->
                 result.usage
                     ?.takeIf { result.usageComplete }

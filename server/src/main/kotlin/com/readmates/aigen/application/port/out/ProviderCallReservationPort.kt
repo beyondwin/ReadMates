@@ -57,14 +57,16 @@ data class ProviderCallReconciliationCommand(
             require(actualCostUsd == null) { "unknown reconciliation cannot claim actual cost" }
         }
         if (terminalState == ProviderAttemptState.FAILED) {
-            require(actualCostUsd != null) { "confirmed failure reconciliation must release or charge reserved cost" }
+            require(actualCostUsd != null || releaseCallSlot) {
+                "confirmed failure reconciliation must release or charge reserved cost"
+            }
         }
         if (releaseCallSlot) {
             require(
                 terminalState == ProviderAttemptState.FAILED &&
-                    actualCostUsd?.compareTo(BigDecimal.ZERO) == 0,
+                    actualCostUsd == null,
             ) {
-                "call slot release requires a confirmed zero-cost pre-transport failure"
+                "call slot release requires a confirmed no-cost pre-transport failure"
             }
         }
         actualCostUsd?.let { require(it >= BigDecimal.ZERO) { "actualCostUsd must be non-negative" } }

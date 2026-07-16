@@ -468,7 +468,9 @@ internal class FakeProviderCallReservations(
             existing.copy(
                 state = command.terminalState,
                 costBasis =
-                    if (command.actualCostUsd == null) {
+                    if (command.releaseCallSlot) {
+                        com.readmates.aigen.application.model.CostBasis.NONE
+                    } else if (command.actualCostUsd == null) {
                         com.readmates.aigen.application.model.CostBasis.ESTIMATED_UNKNOWN
                     } else {
                         com.readmates.aigen.application.model.CostBasis.ACTUAL

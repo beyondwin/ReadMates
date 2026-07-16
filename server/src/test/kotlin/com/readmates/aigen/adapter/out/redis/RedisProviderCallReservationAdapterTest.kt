@@ -357,13 +357,18 @@ class RedisProviderCallReservationAdapterTest(
         val release =
             fixture.reconciliation(
                 terminalState = ProviderAttemptState.FAILED,
-                actualCostUsd = BigDecimal.ZERO,
+                actualCostUsd = null,
                 safeErrorCode = ErrorCode.MODEL_CAPABILITY_UNAVAILABLE,
                 releaseCallSlot = true,
             )
 
         val first = reservations.reconcile(release)
         val repeated = reservations.reconcile(release)
+        assertThat((first as ProviderCallReconciliationResult.Reconciled).attempt.costBasis)
+            .isEqualTo(CostBasis.NONE)
+        assertThat((repeated as ProviderCallReconciliationResult.AlreadyTerminal).attempt.costBasis)
+            .isEqualTo(CostBasis.NONE)
+        assertThat(monthlyCost(fixture.clubId)).isEqualByComparingTo(BigDecimal.ZERO)
         val retried =
             reservations.reserve(
                 fixture.command(
@@ -373,8 +378,6 @@ class RedisProviderCallReservationAdapterTest(
                 ),
             )
 
-        assertThat(first).isInstanceOf(ProviderCallReconciliationResult.Reconciled::class.java)
-        assertThat(repeated).isInstanceOf(ProviderCallReconciliationResult.AlreadyTerminal::class.java)
         assertThat(retried).isInstanceOf(ProviderCallReservationResult.Reserved::class.java)
         assertThat((retried as ProviderCallReservationResult.Reserved).attempt.ordinal).isEqualTo(1)
         assertThat(jobCallCount(fixture.jobId)).isEqualTo(1)

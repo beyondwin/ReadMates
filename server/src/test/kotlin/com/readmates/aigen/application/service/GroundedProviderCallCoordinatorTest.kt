@@ -171,10 +171,20 @@ class GroundedProviderCallCoordinatorTest {
         assertThat(result.failureClass).isEqualTo(ProviderFailureClass.PRE_TRANSPORT)
         val reconciliation = context.reservations.reconciliations.single()
         assertThat(reconciliation.terminalState).isEqualTo(ProviderAttemptState.FAILED)
-        assertThat(reconciliation.actualCostUsd).isEqualByComparingTo(BigDecimal.ZERO)
+        assertThat(reconciliation.actualCostUsd).isNull()
         assertThat(reconciliation.releaseCallSlot).isTrue()
         assertThat(context.permit.outcome).isNull()
         assertThat(context.permit.recordCalls).isZero()
+        assertThat(
+            context.audit.entries
+                .single()
+                .costBasis,
+        ).isEqualTo(CostBasis.NONE)
+        assertThat(
+            context.audit.entries
+                .single()
+                .costEstimateUsd,
+        ).isEqualByComparingTo(BigDecimal.ZERO)
     }
 
     @Test
@@ -398,7 +408,12 @@ class GroundedProviderCallCoordinatorTest {
             val terminal =
                 attempt.copy(
                     state = command.terminalState,
-                    costBasis = if (command.actualCostUsd == null) CostBasis.ESTIMATED_UNKNOWN else CostBasis.ACTUAL,
+                    costBasis =
+                        when {
+                            command.releaseCallSlot -> CostBasis.NONE
+                            command.actualCostUsd == null -> CostBasis.ESTIMATED_UNKNOWN
+                            else -> CostBasis.ACTUAL
+                        },
                     safeErrorCode = command.safeErrorCode,
                     completedAt = command.now,
                 )
