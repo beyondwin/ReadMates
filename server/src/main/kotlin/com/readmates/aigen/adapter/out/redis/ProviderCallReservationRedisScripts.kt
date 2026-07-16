@@ -24,10 +24,15 @@ internal object ProviderCallReservationRedisScripts {
             if redis.call('HEXISTS', KEYS[4], prefix .. 'state') == 1 then return -4 end
 
             local requestedMode = ARGV[12]
-            if requestedMode == 'FALLBACK' or requestedMode == 'SCHEMA_CORRECTION' or requestedMode == 'SECTION_REPAIR' then
+            if requestedMode == 'FALLBACK' or requestedMode == 'RETRY' or requestedMode == 'SCHEMA_CORRECTION' or requestedMode == 'SECTION_REPAIR' then
               local attempts = redis.call('HGETALL', KEYS[4])
               for i = 1, #attempts, 2 do
-                if string.sub(attempts[i], -5) == ':mode' and attempts[i + 1] == requestedMode then return -5 end
+                if string.sub(attempts[i], -5) == ':mode' then
+                  local existingMode = attempts[i + 1]
+                  if existingMode == requestedMode then return -5 end
+                  if (requestedMode == 'FALLBACK' or requestedMode == 'RETRY') and
+                    (existingMode == 'FALLBACK' or existingMode == 'RETRY') then return -5 end
+                end
               end
             end
 
@@ -45,6 +50,7 @@ internal object ProviderCallReservationRedisScripts {
               prefix .. 'costBasis', 'NONE',
               prefix .. 'safeErrorCode', '',
               prefix .. 'startedAt', ARGV[13],
+              prefix .. 'startedAtEpochMs', ARGV[16],
               prefix .. 'completedAt', '')
 
             redis.call('EXPIRE', KEYS[1], ARGV[6])
@@ -92,17 +98,23 @@ internal object ProviderCallReservationRedisScripts {
             if redis.call('EXISTS', KEYS[1]) == 0 then return '' end
             local entries = redis.call('HGETALL', KEYS[1])
             local changed = {}
+            local active = false
             for i = 1, #entries, 2 do
               local field = entries[i]
               local value = entries[i + 1]
               if string.sub(field, -6) == ':state' and value == 'IN_FLIGHT' then
                 local attemptId = string.sub(field, 1, -7)
-                table.insert(changed, attemptId)
+                local startedAtEpochMs = tonumber(redis.call('HGET', KEYS[1], attemptId .. ':startedAtEpochMs'))
+                if startedAtEpochMs ~= nil and startedAtEpochMs < tonumber(ARGV[1]) then
+                  table.insert(changed, attemptId)
+                else
+                  active = true
+                end
               end
             end
-            if #changed == 0 then return '' end
+            if #changed == 0 then return active and '!ACTIVE' or '' end
             if redis.call('EXISTS', KEYS[2]) == 0 then return '!BINDING' end
-            if redis.call('HGET', KEYS[2], 'clubId') ~= ARGV[3] then return '!BINDING' end
+            if redis.call('HGET', KEYS[2], 'clubId') ~= ARGV[4] then return '!BINDING' end
             if redis.call('EXISTS', KEYS[3]) == 0 then return '!COUNTER' end
             if redis.call('TTL', KEYS[3]) <= 0 then return '!COUNTER' end
             for _, attemptId in ipairs(changed) do
@@ -110,11 +122,11 @@ internal object ProviderCallReservationRedisScripts {
               redis.call('HSET', KEYS[1],
                 prefix .. 'state', 'UNKNOWN',
                 prefix .. 'costBasis', 'ESTIMATED_UNKNOWN',
-                prefix .. 'completedAt', ARGV[1])
+                prefix .. 'completedAt', ARGV[2])
             end
-            redis.call('EXPIRE', KEYS[1], ARGV[2])
-            redis.call('EXPIRE', KEYS[2], ARGV[2])
-            return table.concat(changed, ',')
+            redis.call('EXPIRE', KEYS[1], ARGV[3])
+            redis.call('EXPIRE', KEYS[2], ARGV[3])
+            return (active and '!ACTIVE|' or '') .. table.concat(changed, ',')
             """.trimIndent(),
             String::class.java,
         )

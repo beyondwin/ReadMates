@@ -31,6 +31,7 @@ import com.readmates.aigen.application.port.out.ProviderCircuitOutcome
 import com.readmates.aigen.application.port.out.ProviderPermitDecision
 import com.readmates.aigen.application.port.out.RenderedGroundedRequest
 import com.readmates.aigen.application.port.out.WholeTranscriptGroundedGenerator
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
@@ -72,6 +73,7 @@ sealed interface GroundedProviderCallResult {
         val error: GenerationError,
         val failureClass: ProviderFailureClass,
         val attempt: ProviderAttempt?,
+        val retryAfter: Duration? = null,
     ) : GroundedProviderCallResult
 
     data object StateChanged : GroundedProviderCallResult
@@ -94,6 +96,8 @@ class GroundedProviderCallCoordinator private constructor(
     private val clock: Clock,
     private val maxCalls: Int,
 ) {
+    private val logger = LoggerFactory.getLogger(GroundedProviderCallCoordinator::class.java)
+
     @Autowired
     constructor(
         gate: ProviderCallGate,
@@ -135,28 +139,44 @@ class GroundedProviderCallCoordinator private constructor(
         val permit = (acquired as ProviderPermitDecision.Acquired).permit
         val startedAt = clock.instant()
         var circuitOutcome = ProviderCircuitOutcome.IGNORED_FAILURE
-        try {
-            val reservation = reserve(command)
-            if (reservation !is ProviderCallReservationResult.Reserved) return rejected(reservation)
-            val attempt = reservation.attempt
-            val transport =
-                try {
-                    callOnce(generator, command)
-                } catch (failure: LlmGenerationException) {
-                    PhysicalResult.Failure(failure.error, classify(failure.error.code))
-                } catch (failure: RuntimeException) {
-                    PhysicalResult.Failure(UNKNOWN_PROVIDER_OUTCOME, ProviderFailureClass.TRANSIENT)
-                }
-            circuitOutcome = transport.circuitOutcome()
-            val reconciled = reconcile(command, attempt, transport)
-            audit(command, reconciled, transport, startedAt)
-            return transport.toResult(reconciled)
-        } finally {
+        val completed =
             try {
-                permit.record(circuitOutcome, Duration.between(startedAt, clock.instant()).nonNegative())
+                val reservation = reserve(command)
+                if (reservation !is ProviderCallReservationResult.Reserved) return rejected(reservation)
+                val attempt = reservation.attempt
+                val transport =
+                    try {
+                        callOnce(generator, command)
+                    } catch (failure: LlmGenerationException) {
+                        PhysicalResult.Failure(failure.error, classify(failure.error.code), failure.retryAfter)
+                    } catch (failure: RuntimeException) {
+                        PhysicalResult.Failure(UNKNOWN_PROVIDER_OUTCOME, ProviderFailureClass.TRANSIENT)
+                    }
+                circuitOutcome = transport.circuitOutcome()
+                val reconciled = reconcile(command, attempt, transport)
+                CompletedCall(reconciled, transport)
             } finally {
-                permit.close()
+                try {
+                    permit.record(circuitOutcome, Duration.between(startedAt, clock.instant()).nonNegative())
+                } finally {
+                    permit.close()
+                }
             }
+        auditSafely(command, completed.attempt, completed.transport, startedAt)
+        return completed.transport.toResult(completed.attempt)
+    }
+
+    @Suppress("SwallowedException", "TooGenericExceptionCaught")
+    private fun auditSafely(
+        command: GroundedProviderCallCommand,
+        attempt: ProviderAttempt,
+        result: PhysicalResult,
+        startedAt: Instant,
+    ) {
+        try {
+            audit(command, attempt, result, startedAt)
+        } catch (failure: RuntimeException) {
+            logger.warn("Provider attempt audit failed after reconciliation; provider request will not be repeated")
         }
     }
 
@@ -186,9 +206,7 @@ class GroundedProviderCallCoordinator private constructor(
         generator: WholeTranscriptGroundedGenerator,
         command: GroundedProviderCallCommand,
     ): PhysicalResult =
-        if (command.mode == ProviderCallMode.SECTION_REPAIR ||
-            command.mode == ProviderCallMode.REGENERATE_SECTION
-        ) {
+        if (command.section != null) {
             PhysicalResult.Repaired(
                 generator.repair(command.model, requireNotNull(command.section), command.request),
             )
@@ -353,6 +371,7 @@ class GroundedProviderCallCoordinator private constructor(
         data class Failure(
             override val error: GenerationError,
             val failureClass: ProviderFailureClass,
+            val retryAfter: Duration? = null,
         ) : PhysicalResult {
             override val usage: TokenUsage? = null
             override val terminalState = ProviderAttemptState.UNKNOWN
@@ -373,9 +392,14 @@ class GroundedProviderCallCoordinator private constructor(
             when (this) {
                 is Generated -> GroundedProviderCallResult.Generated(output, attempt)
                 is Repaired -> GroundedProviderCallResult.Repaired(output, attempt)
-                is Failure -> GroundedProviderCallResult.Failed(error, failureClass, attempt)
+                is Failure -> GroundedProviderCallResult.Failed(error, failureClass, attempt, retryAfter)
             }
     }
+
+    private data class CompletedCall(
+        val attempt: ProviderAttempt,
+        val transport: PhysicalResult,
+    )
 
     private companion object {
         val UNKNOWN_PROVIDER_OUTCOME =

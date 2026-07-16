@@ -1,6 +1,7 @@
 package com.readmates.aigen.config
 
 import com.readmates.aigen.adapter.out.messaging.AiGenerationJobMessage
+import com.readmates.aigen.application.service.ProviderCallStillInFlightException
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerConfig
 import org.apache.kafka.common.serialization.Deserializer
@@ -19,11 +20,14 @@ import org.springframework.kafka.core.DefaultKafkaConsumerFactory
 import org.springframework.kafka.core.DefaultKafkaProducerFactory
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.kafka.core.ProducerFactory
+import org.springframework.kafka.listener.CommonErrorHandler
 import org.springframework.kafka.listener.ContainerProperties
+import org.springframework.kafka.listener.DefaultErrorHandler
 import org.springframework.kafka.support.JacksonMapperUtils
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
 import org.springframework.kafka.support.serializer.JacksonJsonDeserializer
 import org.springframework.kafka.support.serializer.JacksonJsonSerializer
+import org.springframework.util.backoff.FixedBackOff
 import tools.jackson.databind.json.JsonMapper
 
 /**
@@ -43,7 +47,7 @@ private const val PRODUCER_MAX_IN_FLIGHT_REQUESTS = 5
 @ConditionalOnProperty(prefix = "readmates.aigen", name = ["enabled"], havingValue = "true")
 @ConditionalOnProperty(prefix = "readmates.aigen.kafka", name = ["enabled"], havingValue = "true")
 @EnableKafka
-@EnableConfigurationProperties(AiGenerationKafkaProperties::class)
+@EnableConfigurationProperties(AiGenerationKafkaProperties::class, AiGenerationProperties::class)
 class AiGenerationKafkaConfig {
     @Suppress("MaxLineLength")
     @Bean
@@ -70,15 +74,36 @@ class AiGenerationKafkaConfig {
         )
 
     @Bean
+    fun aiGenerationKafkaErrorHandler(properties: AiGenerationProperties): CommonErrorHandler =
+        DefaultErrorHandler().also { handler ->
+            handler.setBackOffFunction { _, failure ->
+                if (failure.hasCause<ProviderCallStillInFlightException>()) {
+                    FixedBackOff(
+                        properties.providerCalls.requestTimeout
+                            .toMillis()
+                            .coerceAtLeast(1L),
+                        FixedBackOff.UNLIMITED_ATTEMPTS,
+                    )
+                } else {
+                    null
+                }
+            }
+        }
+
+    @Bean
     fun aiGenerationKafkaListenerContainerFactory(
         @Qualifier("aiGenerationJobConsumerFactory")
         consumerFactory: ConsumerFactory<String, AiGenerationJobMessage>,
+        @Qualifier("aiGenerationKafkaErrorHandler")
+        errorHandler: CommonErrorHandler,
     ): ConcurrentKafkaListenerContainerFactory<String, AiGenerationJobMessage> =
         ConcurrentKafkaListenerContainerFactory<String, AiGenerationJobMessage>().also {
             it.setConsumerFactory(consumerFactory)
+            it.setCommonErrorHandler(errorHandler)
             // Manual ack: the listener calls Acknowledgment.acknowledge() only after
             // AiGenerationWorker.process(jobId) returns successfully. Throwing skips
-            // the ack so the container redelivers per its default error handler.
+            // the ack so the container redelivers. Live provider attempts use a
+            // timeout-sized unlimited backoff until recovery can safely mark them stale.
             it.containerProperties.ackMode = ContainerProperties.AckMode.MANUAL
         }
 
@@ -128,3 +153,6 @@ class AiGenerationKafkaConfig {
 
     private fun aiGenerationJobJsonMapper(): JsonMapper = JacksonMapperUtils.enhancedJsonMapper()
 }
+
+@Suppress("MaxLineLength")
+private inline fun <reified T : Throwable> Throwable.hasCause(): Boolean = generateSequence(this as Throwable?) { it.cause }.any { it is T }

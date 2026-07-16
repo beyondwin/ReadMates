@@ -49,6 +49,7 @@ class GroundedProviderCallCoordinatorTest {
             "reservation.reconcile",
             "permit.record",
             "permit.close",
+            "audit",
         )
         val audit = context.audit.entries.single()
         assertThat(audit.providerAttempt).isEqualTo(1)
@@ -147,15 +148,42 @@ class GroundedProviderCallCoordinatorTest {
         assertThat(context.permit.closeCalls).isEqualTo(1)
     }
 
+    @Test
+    fun `audit runs after permit close and its failure cannot repeat the physical request`() {
+        val context = Context(auditFailure = IllegalStateException("audit unavailable"))
+
+        val result = context.coordinator.execute(context.command())
+
+        assertThat(result).isInstanceOf(GroundedProviderCallResult.Generated::class.java)
+        assertThat(context.events).containsExactly(
+            "gate.acquire",
+            "reservation.reserve",
+            "generator.generate-or-repair",
+            "reservation.reconcile",
+            "permit.record",
+            "permit.close",
+            "audit",
+        )
+        assertThat(context.generator.physicalCalls).isEqualTo(1)
+        assertThat(context.permit.closeCalls).isEqualTo(1)
+    }
+
     private class Context(
         gateDecision: ProviderPermitDecision? = null,
         reservationResult: ProviderCallReservationResult? = null,
         reconcileFailure: RuntimeException? = null,
+        auditFailure: RuntimeException? = null,
     ) {
         val events = mutableListOf<String>()
         val permit = RecordingPermit(events)
         val generator = RecordingGenerator(events)
-        val audit = FakeAuditPort()
+        val audit =
+            FakeAuditPort().apply {
+                onInsert = {
+                    events += "audit"
+                    auditFailure?.let { throw it }
+                }
+            }
         val record = AiGenerationTestFixtures.jobRecord(status = JobStatus.RUNNING)
         private val model = AiGenerationTestFixtures.CLAUDE_MODEL
         val reservations = RecordingReservations(events, record, model, reservationResult, reconcileFailure)
@@ -241,10 +269,12 @@ class GroundedProviderCallCoordinatorTest {
             return ProviderCallReconciliationResult.Reconciled(terminal)
         }
 
-        override fun markUnresolvedInFlightUnknown(
+        override fun recoverStaleInFlightUnknown(
             jobId: UUID,
+            staleBefore: Instant,
             now: Instant,
-        ) = emptyList<ProviderAttempt>()
+        ) = com.readmates.aigen.application.port.out
+            .ProviderCallRecoveryResult(emptyList(), false)
 
         override fun clubMonthlyCost(clubId: UUID) = BigDecimal.ZERO
     }

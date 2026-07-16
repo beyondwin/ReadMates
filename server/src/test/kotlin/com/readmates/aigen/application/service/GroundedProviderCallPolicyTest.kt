@@ -19,6 +19,7 @@ class GroundedProviderCallPolicyTest {
         )
 
     @Test
+    @Suppress("LongMethod")
     fun `policy table drives every approved transition`() {
         val primaryCall = policy.first(primary)
 
@@ -48,6 +49,24 @@ class GroundedProviderCallPolicyTest {
                 fallback,
             )
         assertThat(fallbackCall.delay).isEqualTo(Duration.ofSeconds(4))
+
+        val correctionCall =
+            assertNext(
+                policy.next(listOf(primaryCall), GroundedProviderCallOutcome.SchemaOrParseFailure, fallback),
+                2,
+                ProviderCallMode.SCHEMA_CORRECTION,
+                primary,
+            )
+        assertNext(
+            policy.next(
+                listOf(primaryCall, correctionCall),
+                GroundedProviderCallOutcome.RepairableGrounding(GenerationItem.SUMMARY),
+                fallback,
+            ),
+            3,
+            ProviderCallMode.SECTION_REPAIR,
+            primary,
+        )
 
         assertNext(
             policy.next(
@@ -109,6 +128,47 @@ class GroundedProviderCallPolicyTest {
     }
 
     @Test
+    fun `transient and rate limit use one capped same-provider retry when no fallback exists`() {
+        val first = policy.first(primary)
+
+        val transient =
+            assertNext(
+                policy.next(listOf(first), GroundedProviderCallOutcome.TransientFailure(), null),
+                2,
+                ProviderCallMode.RETRY,
+                primary,
+            )
+        assertThat(transient.delay).isEqualTo(Duration.ofSeconds(4))
+
+        val rateLimited =
+            assertNext(
+                policy.next(
+                    listOf(first),
+                    GroundedProviderCallOutcome.RateLimited(Duration.ofMinutes(2)),
+                    null,
+                ),
+                2,
+                ProviderCallMode.RETRY,
+                primary,
+            )
+        assertThat(rateLimited.delay).isEqualTo(Duration.ofSeconds(5))
+        assertThat(
+            policy.next(
+                listOf(first, rateLimited),
+                GroundedProviderCallOutcome.TransientFailure(),
+                null,
+            ),
+        ).isEqualTo(GroundedProviderCallDecision.Failed)
+        assertThat(
+            policy.next(
+                listOf(first, rateLimited),
+                GroundedProviderCallOutcome.PreTransportRejection,
+                fallback,
+            ),
+        ).isEqualTo(GroundedProviderCallDecision.Failed)
+    }
+
+    @Test
     fun `pre-transport gate rejection selects one fallback without consuming an ordinal`() {
         val first = policy.first(primary)
 
@@ -142,6 +202,8 @@ class GroundedProviderCallPolicyTest {
             assertThat(history.count { it.mode == ProviderCallMode.SCHEMA_CORRECTION }).isLessThanOrEqualTo(1)
             assertThat(history.count { it.mode == ProviderCallMode.SECTION_REPAIR }).isLessThanOrEqualTo(1)
             assertThat(history.count { it.mode == ProviderCallMode.FALLBACK }).isLessThanOrEqualTo(1)
+            assertThat(history.count { it.mode == ProviderCallMode.FALLBACK || it.mode == ProviderCallMode.RETRY })
+                .isLessThanOrEqualTo(1)
         }
 
         fun generate(

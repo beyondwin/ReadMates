@@ -470,11 +470,11 @@ class DefaultGroundedGenerationExecutor(
     }
 }
 
-private fun GroundedProviderCallResult.Failed.toPolicyOutcome(): GroundedProviderCallOutcome =
+internal fun GroundedProviderCallResult.Failed.toPolicyOutcome(): GroundedProviderCallOutcome =
     when (failureClass) {
         ProviderFailureClass.PRE_TRANSPORT -> GroundedProviderCallOutcome.PreTransportRejection
-        ProviderFailureClass.TRANSIENT -> GroundedProviderCallOutcome.TransientFailure()
-        ProviderFailureClass.RATE_LIMITED -> GroundedProviderCallOutcome.RateLimited()
+        ProviderFailureClass.TRANSIENT -> GroundedProviderCallOutcome.TransientFailure(retryAfter)
+        ProviderFailureClass.RATE_LIMITED -> GroundedProviderCallOutcome.RateLimited(retryAfter)
         ProviderFailureClass.SCHEMA_OR_PARSE -> GroundedProviderCallOutcome.SchemaOrParseFailure
         ProviderFailureClass.TERMINAL -> GroundedProviderCallOutcome.TerminalFailure
     }

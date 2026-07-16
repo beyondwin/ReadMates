@@ -73,15 +73,21 @@ sealed interface ProviderCallReconciliationResult {
     data object AttemptNotFound : ProviderCallReconciliationResult
 }
 
+data class ProviderCallRecoveryResult(
+    val recovered: List<ProviderAttempt>,
+    val activeInFlight: Boolean,
+)
+
 interface ProviderCallReservationPort {
     fun reserve(command: ProviderCallReservationCommand): ProviderCallReservationResult
 
     fun reconcile(command: ProviderCallReconciliationCommand): ProviderCallReconciliationResult
 
-    fun markUnresolvedInFlightUnknown(
+    fun recoverStaleInFlightUnknown(
         jobId: UUID,
+        staleBefore: Instant,
         now: Instant,
-    ): List<ProviderAttempt>
+    ): ProviderCallRecoveryResult
 
     fun clubMonthlyCost(clubId: UUID): BigDecimal
 }

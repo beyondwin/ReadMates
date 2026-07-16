@@ -14,6 +14,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import java.io.IOException
+import java.time.Duration
 
 @Suppress("MaxLineLength")
 class ClaudeWholeTranscriptGroundedGeneratorTest {
@@ -110,6 +111,37 @@ class ClaudeWholeTranscriptGroundedGeneratorTest {
             .isInstanceOfSatisfying(LlmGenerationException::class.java) {
                 assertThat(it.error.code).isEqualTo(ErrorCode.SCHEMA_INVALID)
             }
+    }
+
+    @Test
+    fun `rate limit header is propagated as typed retry after without exposing content`() {
+        val sentinel = GroundedProviderTestFixture.INJECTION_SENTINEL
+        val failure =
+            com.anthropic.errors.RateLimitException
+                .builder()
+                .headers(
+                    com.anthropic.core.http.Headers
+                        .builder()
+                        .put("retry-after", "23")
+                        .build(),
+                ).body(
+                    com.anthropic.core.JsonValue
+                        .from(emptyMap<String, String>()),
+                ).cause(RuntimeException(sentinel))
+                .build()
+        val generator =
+            ClaudeWholeTranscriptGroundedGenerator(
+                FakeClaudeApi(throwException = failure),
+                GroundedDraftJsonCodec(),
+            )
+
+        assertThatThrownBy {
+            generator.generate(GroundedProviderTestFixture.model(Provider.CLAUDE), GroundedProviderTestFixture.request())
+        }.isInstanceOfSatisfying(LlmGenerationException::class.java) {
+            assertThat(it.error.code).isEqualTo(ErrorCode.PROVIDER_RATE_LIMITED)
+            assertThat(it.retryAfter).isEqualTo(Duration.ofSeconds(23))
+            assertThat(it.message).doesNotContain(sentinel)
+        }
     }
 
     private fun usage() =

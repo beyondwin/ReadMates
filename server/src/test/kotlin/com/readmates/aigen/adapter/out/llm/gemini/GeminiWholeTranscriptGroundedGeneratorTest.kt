@@ -16,6 +16,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import java.io.IOException
+import java.time.Duration
 
 @Suppress("MaxLineLength")
 class GeminiWholeTranscriptGroundedGeneratorTest {
@@ -105,6 +106,31 @@ class GeminiWholeTranscriptGroundedGeneratorTest {
             .isInstanceOfSatisfying(LlmGenerationException::class.java) {
                 assertThat(it.error.code).isEqualTo(ErrorCode.SCHEMA_INVALID)
             }
+    }
+
+    @Test
+    fun `typed Gemini rate limit retry hint is propagated without exposing content`() {
+        val sentinel = GroundedProviderTestFixture.INJECTION_SENTINEL
+        val failure =
+            com.google.genai.errors.ClientException(
+                429,
+                "RESOURCE_EXHAUSTED",
+                "Please retry in 12.5s. $sentinel",
+            )
+        val generator =
+            GeminiWholeTranscriptGroundedGenerator(
+                FakeGeminiApi(throwException = failure),
+                GroundedDraftJsonCodec(),
+                compat,
+            )
+
+        assertThatThrownBy {
+            generator.generate(GroundedProviderTestFixture.model(Provider.GEMINI), GroundedProviderTestFixture.request())
+        }.isInstanceOfSatisfying(LlmGenerationException::class.java) {
+            assertThat(it.error.code).isEqualTo(ErrorCode.PROVIDER_RATE_LIMITED)
+            assertThat(it.retryAfter).isEqualTo(Duration.ofMillis(12_500))
+            assertThat(it.message).doesNotContain(sentinel)
+        }
     }
 
     private fun usage() =

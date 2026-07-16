@@ -1,6 +1,7 @@
 package com.readmates.aigen.adapter.out.llm.common
 
 import com.readmates.aigen.application.model.GenerationError
+import java.time.Duration
 
 /**
  * Wraps a provider-side failure that has already been mapped to a
@@ -15,4 +16,5 @@ import com.readmates.aigen.application.model.GenerationError
 class LlmGenerationException(
     val error: GenerationError,
     cause: Throwable? = null,
+    val retryAfter: Duration? = null,
 ) : RuntimeException(error.message, cause)

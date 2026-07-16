@@ -14,6 +14,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import java.io.IOException
+import java.time.Duration
 
 @Suppress("MaxLineLength")
 class OpenAiWholeTranscriptGroundedGeneratorTest {
@@ -90,6 +91,34 @@ class OpenAiWholeTranscriptGroundedGeneratorTest {
                 assertThat(it.error.code).isEqualTo(expectedCode)
                 assertThat(it.message).doesNotContain(sentinel)
             }
+        }
+    }
+
+    @Test
+    fun `rate limit header is propagated as typed retry after without exposing content`() {
+        val sentinel = GroundedProviderTestFixture.INJECTION_SENTINEL
+        val failure =
+            com.openai.errors.RateLimitException
+                .builder()
+                .headers(
+                    com.openai.core.http.Headers
+                        .builder()
+                        .put("Retry-After", "17")
+                        .build(),
+                ).cause(RuntimeException(sentinel))
+                .build()
+        val generator =
+            OpenAiWholeTranscriptGroundedGenerator(
+                FakeOpenAiApi(throwException = failure),
+                GroundedDraftJsonCodec(),
+            )
+
+        assertThatThrownBy {
+            generator.generate(GroundedProviderTestFixture.model(Provider.OPENAI), GroundedProviderTestFixture.request())
+        }.isInstanceOfSatisfying(LlmGenerationException::class.java) {
+            assertThat(it.error.code).isEqualTo(ErrorCode.PROVIDER_RATE_LIMITED)
+            assertThat(it.retryAfter).isEqualTo(Duration.ofSeconds(17))
+            assertThat(it.message).doesNotContain(sentinel)
         }
     }
 

@@ -99,6 +99,26 @@ class GroundedGenerationExecutorTest {
     }
 
     @Test
+    fun `schema correction success with repairable grounding uses the third section repair slot`() {
+        val context = Context()
+        context.claude.generationFailures += GenerationError(ErrorCode.SCHEMA_INVALID, "safe-schema-invalid")
+        context.claude.generations += GroundedGenerationOutput(validDraft().copy(summaryBlocks = emptyList()), USAGE)
+        context.claude.repairs += GroundedSectionRepairOutput.Summary(validDraft().summaryBlocks, REPAIR_USAGE)
+
+        context.executor.process(context.record, AiGenerationTestFixtures.NOW)
+
+        assertThat(context.jobStore.load(context.record.jobId)?.status).isEqualTo(JobStatus.SUCCEEDED)
+        assertThat(context.claude.generateCalls).isEqualTo(2)
+        assertThat(context.claude.repairCalls).isEqualTo(1)
+        assertThat(context.reservations.attempts.map { it.mode })
+            .containsExactly(
+                ProviderCallMode.PRIMARY,
+                ProviderCallMode.SCHEMA_CORRECTION,
+                ProviderCallMode.SECTION_REPAIR,
+            )
+    }
+
+    @Test
     fun `repair failure never exposes the invalid draft`() {
         val context = Context()
         context.claude.generations += GroundedGenerationOutput(validDraft().copy(summaryBlocks = emptyList()), USAGE)
@@ -214,18 +234,33 @@ class GroundedGenerationExecutorTest {
     }
 
     @Test
-    fun `newly available model is never consulted when it was not persisted as eligible`() {
+    fun `timeout retries the same provider once when no fallback was persisted`() {
         val context = Context()
         context.claude.generationFailures += GenerationError(ErrorCode.PROVIDER_UNAVAILABLE, "safe-unavailable")
-        context.openai.generations += GroundedGenerationOutput(validDraft(), USAGE)
+        context.claude.generations += GroundedGenerationOutput(validDraft(), USAGE)
 
         context.executor.process(context.record, AiGenerationTestFixtures.NOW)
 
-        val failed = context.jobStore.load(context.record.jobId)!!
-        assertThat(context.claude.generateCalls).isEqualTo(1)
+        val saved = context.jobStore.load(context.record.jobId)!!
+        assertThat(context.claude.generateCalls).isEqualTo(2)
         assertThat(context.openai.generateCalls).isZero()
-        assertThat(failed.status).isEqualTo(JobStatus.FAILED)
-        assertThat(failed.result).isNull()
+        assertThat(saved.status).isEqualTo(JobStatus.SUCCEEDED)
+        assertThat(context.reservations.attempts.map { it.mode })
+            .containsExactly(ProviderCallMode.PRIMARY, ProviderCallMode.RETRY)
+        assertThat(context.sleeper.sleeps).containsExactly(java.time.Duration.ofSeconds(1))
+    }
+
+    @Test
+    fun `rate limit retry-after is capped for same-provider retry`() {
+        val context = Context()
+        context.claude.generationFailures += GenerationError(ErrorCode.PROVIDER_RATE_LIMITED, "safe-rate-limit")
+        context.claude.generationRetryAfter = java.time.Duration.ofMinutes(2)
+        context.claude.generations += GroundedGenerationOutput(validDraft(), USAGE)
+
+        context.executor.process(context.record, AiGenerationTestFixtures.NOW)
+
+        assertThat(context.claude.generateCalls).isEqualTo(2)
+        assertThat(context.sleeper.sleeps).containsExactly(java.time.Duration.ofSeconds(30))
     }
 
     private class Context(
@@ -242,6 +277,7 @@ class GroundedGenerationExecutorTest {
         val costGuard = FakeCostGuard()
         val gate = FakeProviderCallGate()
         val reservations = FakeProviderCallReservations(jobStore)
+        val sleeper = FakeSleeper()
         private val generators = mapOf(Provider.CLAUDE to claude, Provider.OPENAI to openai)
         private val modelCatalog =
             AiGenerationTestFixtures.defaultModelCatalog(
@@ -285,7 +321,7 @@ class GroundedGenerationExecutorTest {
                 properties,
                 FakeClock(AiGenerationTestFixtures.NOW),
                 fakeMetrics(),
-                FakeSleeper(),
+                sleeper,
                 ProviderFallbackChain(emptyMap(), modelCatalog, properties),
                 GroundedProviderCallPolicy(
                     java.time.Duration.ofSeconds(1),
@@ -317,6 +353,7 @@ class GroundedGenerationExecutorTest {
         val repairs = ArrayDeque<GroundedSectionRepairOutput>()
         val generationFailures = ArrayDeque<GenerationError>()
         val repairFailures = ArrayDeque<GenerationError>()
+        var generationRetryAfter: java.time.Duration? = null
         var generateCalls = 0
         var repairCalls = 0
         var afterGenerate: () -> Unit = {}
@@ -326,7 +363,9 @@ class GroundedGenerationExecutorTest {
             request: RenderedGroundedRequest,
         ): GroundedGenerationOutput {
             generateCalls += 1
-            generationFailures.removeFirstOrNull()?.let { throw LlmGenerationException(it) }
+            generationFailures.removeFirstOrNull()?.let {
+                throw LlmGenerationException(it, retryAfter = generationRetryAfter)
+            }
             return generations.removeFirst().also { afterGenerate() }
         }
 

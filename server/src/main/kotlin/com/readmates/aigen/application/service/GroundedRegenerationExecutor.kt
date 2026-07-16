@@ -21,6 +21,7 @@ import com.readmates.aigen.application.port.out.AuditStatus
 import com.readmates.aigen.application.port.out.GenerationCostGuard
 import com.readmates.aigen.application.port.out.GroundedRenderRequest
 import com.readmates.aigen.application.port.out.GroundedRequestMode
+import com.readmates.aigen.application.port.out.GroundedSectionRepairOutput
 import com.readmates.aigen.application.port.out.GuardDecision
 import com.readmates.aigen.application.port.out.JobKind
 import com.readmates.aigen.application.port.out.JobRecord
@@ -73,6 +74,8 @@ class DefaultGroundedRegenerationExecutor(
     private val clock: Clock,
     private val metrics: AiGenerationMetrics,
     private val callPolicy: GroundedProviderCallPolicy,
+    private val fallbackChain: ProviderFallbackChain,
+    private val sleeper: Sleeper,
 ) : GroundedRegenerationExecutor {
     override fun regenerate(
         record: JobRecord,
@@ -84,29 +87,14 @@ class DefaultGroundedRegenerationExecutor(
         val currentDraft = requireCurrentDraft(record, expectedRevision)
         val selectedModel = resolveModel(model, record)
         requireGenerator(selectedModel)
-        val rendered = renderRegeneration(record, selectedModel, instructions, currentDraft, item)
         val admissionId = UUID.randomUUID()
         requireCostAllowance(record, admissionId)
         recoverUnresolvedAttempt(record, admissionId)
-        val plan = callPolicy.first(selectedModel, ProviderCallMode.REGENERATE_SECTION, item)
-        val repair = callRepair(record, plan, item, rendered, admissionId)
-        val merged = mergeGroundedRepair(currentDraft, item, repair)
+        val attempt = callRepairWithPolicy(record, item, currentDraft, instructions, selectedModel, admissionId)
+        val merged = attempt.merged
         val nextRevision = expectedRevision + 1
-        val valid =
-            when (
-                val validation =
-                    validator.validate(
-                        merged,
-                        record.validatedTurns,
-                        record.toSessionMeta(),
-                        nextRevision,
-                    )
-            ) {
-                is GroundedValidationResult.Valid -> validation
-                is GroundedValidationResult.Repairable -> invalidRegeneration(validation.reasons)
-                is GroundedValidationResult.Invalid -> invalidRegeneration(validation.reasons)
-            }
-        val cost = CostCalculator.actual(repair.usage, modelCatalog.pricing(selectedModel))
+        val valid = attempt.valid
+        val cost = attempt.cost
         val saved =
             jobStore.saveGroundedResult(
                 SaveGroundedResultCommand(
@@ -116,18 +104,18 @@ class DefaultGroundedRegenerationExecutor(
                     valid.snapshot,
                     merged,
                     valid.evidence,
-                    repair.usage,
+                    attempt.usage,
                     cost,
-                    selectedModel,
+                    attempt.model,
                 ),
             )
         if (!saved) staleRevision(jobStore.load(record.jobId)?.revision)
-        auditSuccess(record, item, selectedModel, repair.usage, cost)
-        emitMetrics(item, selectedModel, repair.usage, cost)
+        auditSuccess(record, item, attempt.model, attempt.usage, cost)
+        emitMetrics(item, attempt.model, attempt.usage, cost)
         return RegenerationResult(
             item = item,
             value = sectionValue(valid.snapshot, item),
-            tokens = repair.usage,
+            tokens = attempt.usage,
             costEstimateUsd = cost,
             warnings = warnings(record),
             revision = nextRevision,
@@ -143,7 +131,14 @@ class DefaultGroundedRegenerationExecutor(
     ) {
         try {
             if (record.status == JobStatus.SUCCEEDED) {
-                reservations.markUnresolvedInFlightUnknown(record.jobId, clock.instant())
+                val recoveryNow = clock.instant()
+                val recovery =
+                    reservations.recoverStaleInFlightUnknown(
+                        record.jobId,
+                        recoveryNow.minus(properties.providerCalls.requestTimeout),
+                        recoveryNow,
+                    )
+                if (recovery.activeInFlight) throw ProviderCallStillInFlightException()
             }
         } catch (failure: RuntimeException) {
             costGuard.releaseAdmission(record.hostUserId, record.clubId, admissionId)
@@ -158,6 +153,7 @@ class DefaultGroundedRegenerationExecutor(
         instructions: String?,
         currentDraft: GroundedGenerationDraft,
         item: GenerationItem,
+        callMode: ProviderCallMode,
     ): RenderedGroundedRequest {
         return budgetGuard
             .evaluate(
@@ -166,7 +162,12 @@ class DefaultGroundedRegenerationExecutor(
                     sessionMeta = record.toSessionMeta(),
                     turns = record.validatedTurns,
                     hostInstructions = instructions ?: record.instructions,
-                    mode = GroundedRequestMode.REGENERATE_SECTION,
+                    mode =
+                        if (callMode == ProviderCallMode.SCHEMA_CORRECTION) {
+                            GroundedRequestMode.SCHEMA_CORRECTION
+                        } else {
+                            GroundedRequestMode.REGENERATE_SECTION
+                        },
                     currentDraft = currentDraft,
                     requestedSection = item,
                 ),
@@ -198,32 +199,106 @@ class DefaultGroundedRegenerationExecutor(
         wholeTranscriptGroundedGeneratorsByProvider[model.provider]
             ?: throw AiGenerationException.Coded(ErrorCode.AI_DISABLED)
 
-    private fun callRepair(
+    @Suppress("LongParameterList", "ReturnCount")
+    private fun callRepairWithPolicy(
+        record: JobRecord,
+        item: GenerationItem,
+        currentDraft: GroundedGenerationDraft,
+        instructions: String?,
+        initialModel: ModelId,
+        admissionId: UUID,
+    ): RegenerationAttempt {
+        var plan = callPolicy.first(initialModel, ProviderCallMode.REGENERATE_SECTION, item)
+        var workingDraft = currentDraft
+        var accumulatedUsage = TokenUsage.ZERO
+        var accumulatedCost = BigDecimal.ZERO
+        val history = mutableListOf(plan)
+        while (true) {
+            requireGenerator(plan.model)
+            val request = renderRegeneration(record, plan.model, instructions, workingDraft, item, plan.mode)
+            when (
+                val result = executeRepairCall(record, admissionId, plan, request, item)
+            ) {
+                is GroundedProviderCallResult.Repaired -> {
+                    val usage = accumulatedUsage + result.output.usage
+                    val cost =
+                        accumulatedCost.add(
+                            CostCalculator.actual(result.output.usage, modelCatalog.pricing(plan.model)),
+                        )
+                    when (val validation = validateRepair(record, item, workingDraft, result.output)) {
+                        is RegenerationRepairValidation.Valid ->
+                            return RegenerationAttempt(plan.model, validation.merged, validation.valid, usage, cost)
+                        is RegenerationRepairValidation.Repairable -> {
+                            workingDraft = validation.merged
+                            accumulatedUsage = usage
+                            accumulatedCost = cost
+                            when (
+                                val decision =
+                                    callPolicy.next(
+                                        history,
+                                        GroundedProviderCallOutcome.RepairableGrounding(item),
+                                        null,
+                                    )
+                            ) {
+                                is GroundedProviderCallDecision.Next -> {
+                                    plan = decision.call
+                                    history += plan
+                                }
+                                GroundedProviderCallDecision.Complete ->
+                                    error("repairable regeneration cannot complete")
+                                GroundedProviderCallDecision.Failed -> invalidRegeneration(validation.reasons)
+                            }
+                        }
+                    }
+                }
+                is GroundedProviderCallResult.Failed -> {
+                    plan = nextAfterFailure(record, plan, history, result)
+                    history += plan
+                }
+                GroundedProviderCallResult.StateChanged -> staleRevision(jobStore.load(record.jobId)?.revision)
+                is GroundedProviderCallResult.Generated -> error("regeneration call cannot return a generation output")
+            }
+        }
+    }
+
+    @Suppress("LongParameterList")
+    private fun executeRepairCall(
+        record: JobRecord,
+        admissionId: UUID,
+        plan: GroundedProviderCallPlan,
+        request: RenderedGroundedRequest,
+        item: GenerationItem,
+    ): GroundedProviderCallResult =
+        callCoordinator.execute(
+            GroundedProviderCallCommand(
+                record = record,
+                admissionId = admissionId,
+                expectedStatus = JobStatus.SUCCEEDED,
+                model = plan.model,
+                mode = plan.mode,
+                request = request,
+                section = item,
+            ),
+        )
+
+    private fun nextAfterFailure(
         record: JobRecord,
         plan: GroundedProviderCallPlan,
-        item: GenerationItem,
-        request: com.readmates.aigen.application.port.out.RenderedGroundedRequest,
-        admissionId: UUID,
-    ): com.readmates.aigen.application.port.out.GroundedSectionRepairOutput =
-        when (
-            val result =
-                callCoordinator.execute(
-                    GroundedProviderCallCommand(
-                        record = record,
-                        admissionId = admissionId,
-                        expectedStatus = JobStatus.SUCCEEDED,
-                        model = plan.model,
-                        mode = plan.mode,
-                        request = request,
-                        section = item,
-                    ),
-                )
-        ) {
-            is GroundedProviderCallResult.Repaired -> result.output
-            is GroundedProviderCallResult.Failed -> throw AiGenerationException.Coded(result.error.code)
-            GroundedProviderCallResult.StateChanged -> staleRevision(jobStore.load(record.jobId)?.revision)
-            is GroundedProviderCallResult.Generated -> error("regeneration call cannot return a generation output")
+        history: List<GroundedProviderCallPlan>,
+        result: GroundedProviderCallResult.Failed,
+    ): GroundedProviderCallPlan {
+        val fallback =
+            fallbackChain.nextEligibleGrounded(
+                plan.model,
+                record.eligibleFallbackModels,
+                wholeTranscriptGroundedGeneratorsByProvider,
+            )
+        return when (val decision = callPolicy.next(history, result.toPolicyOutcome(), fallback)) {
+            is GroundedProviderCallDecision.Next -> decision.call.also { sleeper.sleep(it.delay) }
+            GroundedProviderCallDecision.Complete -> error("failure cannot complete regeneration")
+            GroundedProviderCallDecision.Failed -> throw AiGenerationException.Coded(result.error.code)
         }
+    }
 
     private fun resolveModel(
         requested: String?,
@@ -242,6 +317,30 @@ class DefaultGroundedRegenerationExecutor(
         throw AiGenerationException.Coded(ErrorCode.STALE_GENERATION_REVISION, currentRevision = currentRevision)
 
     private fun expiredResult(): Nothing = throw AiGenerationException.Coded(ErrorCode.JOB_EXPIRED)
+
+    @Suppress("LongParameterList")
+    private fun validateRepair(
+        record: JobRecord,
+        item: GenerationItem,
+        currentDraft: GroundedGenerationDraft,
+        output: GroundedSectionRepairOutput,
+    ): RegenerationRepairValidation {
+        val merged = mergeGroundedRepair(currentDraft, item, output)
+        return when (
+            val validation =
+                validator.validate(
+                    merged,
+                    record.validatedTurns,
+                    record.toSessionMeta(),
+                    record.revision + 1,
+                )
+        ) {
+            is GroundedValidationResult.Valid -> RegenerationRepairValidation.Valid(merged, validation)
+            is GroundedValidationResult.Repairable ->
+                RegenerationRepairValidation.Repairable(merged, validation.reasons)
+            is GroundedValidationResult.Invalid -> invalidRegeneration(validation.reasons)
+        }
+    }
 
     private fun sectionValue(
         snapshot: SessionImportV1Snapshot,
@@ -323,5 +422,25 @@ class DefaultGroundedRegenerationExecutor(
             metrics.recordTokens(model.provider, model, TokenDirection.OUTPUT, usage.outputTokens)
         }
         if (cost > BigDecimal.ZERO) metrics.recordCost(model.provider, model, cost)
+    }
+
+    private data class RegenerationAttempt(
+        val model: ModelId,
+        val merged: GroundedGenerationDraft,
+        val valid: GroundedValidationResult.Valid,
+        val usage: TokenUsage,
+        val cost: BigDecimal,
+    )
+
+    private sealed interface RegenerationRepairValidation {
+        data class Valid(
+            val merged: GroundedGenerationDraft,
+            val valid: GroundedValidationResult.Valid,
+        ) : RegenerationRepairValidation
+
+        data class Repairable(
+            val merged: GroundedGenerationDraft,
+            val reasons: Set<GroundingFailureReason>,
+        ) : RegenerationRepairValidation
     }
 }

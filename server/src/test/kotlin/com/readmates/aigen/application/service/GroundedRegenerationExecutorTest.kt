@@ -4,6 +4,7 @@ import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.ErrorCode
+import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.GroundedAuthoredText
 import com.readmates.aigen.application.model.GroundedFeedbackSection
@@ -120,6 +121,103 @@ class GroundedRegenerationExecutorTest {
         assertThat(context.reservations.markCalls).isZero()
     }
 
+    @Test
+    fun `regeneration recovery failure releases the acquired admission`() {
+        val context = Context()
+        context.reservations.recoveryFailure = IllegalStateException("recovery unavailable")
+
+        assertThatThrownBy {
+            context.executor.regenerate(context.record, GenerationItem.SUMMARY, 1, null, null)
+        }.isInstanceOf(IllegalStateException::class.java)
+
+        assertThat(context.costGuard.released).hasSize(1)
+        assertThat(context.generator.calls).isZero()
+    }
+
+    @Test
+    fun `regeneration timeout retries the same provider once without fallback`() {
+        val context = Context()
+        context.generator.failures += GenerationError(ErrorCode.PROVIDER_UNAVAILABLE, "safe-unavailable")
+        context.generator.repairOutput =
+            GroundedSectionRepairOutput.Summary(
+                listOf(GroundedTextBlock("A regenerated grounded summary.", listOf("t000001"))),
+                USAGE,
+            )
+
+        context.executor.regenerate(context.record, GenerationItem.SUMMARY, 1, null, null)
+
+        assertThat(context.generator.calls).isEqualTo(2)
+        assertThat(context.reservations.attempts.map { it.mode })
+            .containsExactly(
+                com.readmates.aigen.application.model.ProviderCallMode.REGENERATE_SECTION,
+                com.readmates.aigen.application.model.ProviderCallMode.RETRY,
+            )
+        assertThat(context.sleeper.sleeps).containsExactly(java.time.Duration.ofSeconds(1))
+    }
+
+    @Test
+    fun `regeneration rate limit retry-after is capped`() {
+        val context = Context()
+        context.generator.failures += GenerationError(ErrorCode.PROVIDER_RATE_LIMITED, "safe-rate-limit")
+        context.generator.retryAfter = java.time.Duration.ofMinutes(2)
+        context.generator.repairOutput =
+            GroundedSectionRepairOutput.Summary(
+                listOf(GroundedTextBlock("A regenerated grounded summary.", listOf("t000001"))),
+                USAGE,
+            )
+
+        context.executor.regenerate(context.record, GenerationItem.SUMMARY, 1, null, null)
+
+        assertThat(context.generator.calls).isEqualTo(2)
+        assertThat(context.sleeper.sleeps).containsExactly(java.time.Duration.ofSeconds(30))
+    }
+
+    @Test
+    fun `regeneration schema correction with repairable grounding consumes slot three repair`() {
+        val context = Context(llmCallCount = 0)
+        context.generator.failures += GenerationError(ErrorCode.SCHEMA_INVALID, "safe-schema-invalid")
+        context.generator.outputs +=
+            GroundedSectionRepairOutput.Summary(
+                listOf(GroundedTextBlock("A parsed but ungrounded summary.", listOf("missing-turn"))),
+                CORRECTION_USAGE,
+            )
+        context.generator.outputs +=
+            GroundedSectionRepairOutput.Summary(
+                listOf(GroundedTextBlock("A repaired grounded summary.", listOf("t000001"))),
+                REPAIR_USAGE,
+            )
+
+        val result = context.executor.regenerate(context.record, GenerationItem.SUMMARY, 1, null, null)
+
+        assertThat(result.result?.summary).isEqualTo("A repaired grounded summary.")
+        assertThat(
+            context.renderer.requests[2]
+                .currentDraft
+                ?.summaryBlocks
+                ?.single()
+                ?.text,
+        ).isEqualTo("A parsed but ungrounded summary.")
+        val expectedUsage = CORRECTION_USAGE + REPAIR_USAGE
+        val expectedCost =
+            CostCalculator.actual(CORRECTION_USAGE, context.modelCatalog.pricing(context.model)).add(
+                CostCalculator.actual(REPAIR_USAGE, context.modelCatalog.pricing(context.model)),
+            )
+        assertThat(result.tokens).isEqualTo(expectedUsage)
+        assertThat(result.costEstimateUsd).isEqualByComparingTo(expectedCost)
+        val saved = context.jobStore.load(context.record.jobId)!!
+        assertThat(saved.tokens).isEqualTo(context.record.tokens + expectedUsage)
+        assertThat(saved.costAccumulatedUsd).isEqualByComparingTo(context.record.costAccumulatedUsd.add(expectedCost))
+        val audit = context.auditPort.entries.single { it.providerAttempt == null }
+        assertThat(audit.usage).isEqualTo(expectedUsage)
+        assertThat(audit.costEstimateUsd).isEqualByComparingTo(expectedCost)
+        assertThat(context.reservations.attempts.map { it.mode })
+            .containsExactly(
+                com.readmates.aigen.application.model.ProviderCallMode.REGENERATE_SECTION,
+                com.readmates.aigen.application.model.ProviderCallMode.SCHEMA_CORRECTION,
+                com.readmates.aigen.application.model.ProviderCallMode.SECTION_REPAIR,
+            )
+    }
+
     private class Context(
         llmCallCount: Int = 1,
     ) {
@@ -130,13 +228,14 @@ class GroundedRegenerationExecutorTest {
         private val validator = GroundedGenerationValidator(GroundedEvidenceProjector())
         private val valid = validator.validate(draft, turns, meta, 1) as GroundedValidationResult.Valid
         val model = AiGenerationTestFixtures.CLAUDE_MODEL
-        private val modelCatalog = AiGenerationTestFixtures.defaultModelCatalog(setOf(model))
+        val modelCatalog = AiGenerationTestFixtures.defaultModelCatalog(setOf(model))
         private val properties = AiGenerationTestFixtures.defaultProperties()
         val renderer = RecordingRenderer()
         val generator = FakeRepairGenerator()
         val costGuard = FakeCostGuard()
         val gate = FakeProviderCallGate()
         val reservations = FakeProviderCallReservations(jobStore)
+        val sleeper = FakeSleeper()
         val auditPort = FakeAuditPort()
         val record =
             AiGenerationTestFixtures
@@ -188,14 +287,18 @@ class GroundedRegenerationExecutorTest {
                     java.time.Duration.ofSeconds(30),
                     JitterSource { 1.0 },
                 ),
+                ProviderFallbackChain(emptyMap(), modelCatalog, properties),
+                sleeper,
             )
     }
 
     private class RecordingRenderer : GroundedRequestRenderer {
         var lastRequest: GroundedRenderRequest? = null
+        val requests = mutableListOf<GroundedRenderRequest>()
 
         override fun render(request: GroundedRenderRequest): RenderedGroundedRequest {
             lastRequest = request
+            requests += request
             return RenderedGroundedRequest("system", "whole-transcript", "{}", 16_384)
         }
     }
@@ -204,6 +307,9 @@ class GroundedRegenerationExecutorTest {
         override val provider = Provider.CLAUDE
         lateinit var repairOutput: GroundedSectionRepairOutput
         var calls = 0
+        val failures = ArrayDeque<GenerationError>()
+        val outputs = ArrayDeque<GroundedSectionRepairOutput>()
+        var retryAfter: java.time.Duration? = null
 
         override fun generate(
             model: ModelId,
@@ -216,7 +322,11 @@ class GroundedRegenerationExecutorTest {
             request: RenderedGroundedRequest,
         ): GroundedSectionRepairOutput {
             calls += 1
-            return repairOutput
+            failures.removeFirstOrNull()?.let {
+                throw com.readmates.aigen.adapter.out.llm.common
+                    .LlmGenerationException(it, retryAfter = retryAfter)
+            }
+            return outputs.removeFirstOrNull() ?: repairOutput
         }
     }
 
@@ -228,6 +338,8 @@ class GroundedRegenerationExecutorTest {
                 cacheReadInputTokens = 0,
                 outputTokens = 75,
             )
+        val CORRECTION_USAGE = TokenUsage(11, 12, 13, 14)
+        val REPAIR_USAGE = TokenUsage(21, 22, 23, 24)
 
         fun validMeta() =
             SessionMeta(

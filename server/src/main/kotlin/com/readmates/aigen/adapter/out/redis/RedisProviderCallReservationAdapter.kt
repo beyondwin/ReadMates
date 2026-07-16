@@ -9,6 +9,7 @@ import com.readmates.aigen.application.model.ProviderAttemptState
 import com.readmates.aigen.application.model.ProviderCallMode
 import com.readmates.aigen.application.port.out.ProviderCallReconciliationCommand
 import com.readmates.aigen.application.port.out.ProviderCallReconciliationResult
+import com.readmates.aigen.application.port.out.ProviderCallRecoveryResult
 import com.readmates.aigen.application.port.out.ProviderCallReservationCommand
 import com.readmates.aigen.application.port.out.ProviderCallReservationPort
 import com.readmates.aigen.application.port.out.ProviderCallReservationResult
@@ -58,6 +59,7 @@ class RedisProviderCallReservationAdapter(
                         command.now.toString(),
                         ADMISSION_TTL.seconds.toString(),
                         command.clubId.toString(),
+                        command.now.toEpochMilli().toString(),
                     )
             ) {
                 null -> error("Redis reservation returned no result")
@@ -104,11 +106,12 @@ class RedisProviderCallReservationAdapter(
             }
         }
 
-    override fun markUnresolvedInFlightUnknown(
+    override fun recoverStaleInFlightUnknown(
         jobId: UUID,
+        staleBefore: Instant,
         now: Instant,
-    ): List<ProviderAttempt> =
-        failClosed("markUnresolvedInFlightUnknown") {
+    ): ProviderCallRecoveryResult =
+        failClosed("recoverStaleInFlightUnknown") {
             val jobKey = jobKey(jobId)
             val clubId =
                 redisTemplate.opsForHash<String, String>().get(jobKey, "clubId")
@@ -118,6 +121,7 @@ class RedisProviderCallReservationAdapter(
                     .execute(
                         ProviderCallReservationRedisScripts.markUnresolvedUnknown,
                         listOf(ledgerKey(jobId), jobKey, monthlyKey(UUID.fromString(clubId))),
+                        staleBefore.toEpochMilli().toString(),
                         now.toString(),
                         properties.job.redisTtl.seconds
                             .toString(),
@@ -127,11 +131,17 @@ class RedisProviderCallReservationAdapter(
                 RECOVERY_BINDING_MISMATCH -> error("Provider attempt job binding changed")
                 RECOVERY_COUNTER_UNAVAILABLE -> error("Monthly reservation counter is unavailable")
             }
-            response
-                .split(',')
-                .filter(String::isNotBlank)
-                .map(UUID::fromString)
-                .map { requireAttempt(jobId, it) }
+            val active = response == RECOVERY_ACTIVE || response.startsWith("$RECOVERY_ACTIVE|")
+            val recoveredIds = response.removePrefix("$RECOVERY_ACTIVE|").takeUnless { it == RECOVERY_ACTIVE }.orEmpty()
+            ProviderCallRecoveryResult(
+                recovered =
+                    recoveredIds
+                        .split(',')
+                        .filter(String::isNotBlank)
+                        .map(UUID::fromString)
+                        .map { requireAttempt(jobId, it) },
+                activeInFlight = active,
+            )
         }
 
     override fun clubMonthlyCost(clubId: UUID): BigDecimal =
@@ -199,6 +209,7 @@ class RedisProviderCallReservationAdapter(
         const val MONTHLY_COUNTER_UNAVAILABLE = -3L
         const val RECOVERY_BINDING_MISMATCH = "!BINDING"
         const val RECOVERY_COUNTER_UNAVAILABLE = "!COUNTER"
+        const val RECOVERY_ACTIVE = "!ACTIVE"
         val MONTHLY_TTL: Duration = Duration.ofDays(31)
         val ADMISSION_TTL: Duration = Duration.ofMinutes(5)
     }

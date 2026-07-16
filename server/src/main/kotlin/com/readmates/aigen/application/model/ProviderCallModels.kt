@@ -7,6 +7,7 @@ import java.util.UUID
 enum class ProviderCallMode {
     PRIMARY,
     FALLBACK,
+    RETRY,
     SCHEMA_CORRECTION,
     SECTION_REPAIR,
     REGENERATE_SECTION,

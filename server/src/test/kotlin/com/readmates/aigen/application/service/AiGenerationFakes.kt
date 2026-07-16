@@ -475,6 +475,8 @@ internal class FakeProviderCallReservations(
     val attempts = mutableListOf<com.readmates.aigen.application.model.ProviderAttempt>()
     var admissionValid = true
     var reconcileFailure: RuntimeException? = null
+    var recoveryFailure: RuntimeException? = null
+    var activeInFlight = false
     var markCalls = 0
 
     @Suppress("ReturnCount")
@@ -495,10 +497,14 @@ internal class FakeProviderCallReservations(
         val oncePerJobModes =
             setOf(
                 com.readmates.aigen.application.model.ProviderCallMode.FALLBACK,
+                com.readmates.aigen.application.model.ProviderCallMode.RETRY,
                 com.readmates.aigen.application.model.ProviderCallMode.SCHEMA_CORRECTION,
                 com.readmates.aigen.application.model.ProviderCallMode.SECTION_REPAIR,
             )
-        if (command.mode in oncePerJobModes && attempts.any { it.mode == command.mode }) {
+        val replayedMode = attempts.any { it.mode == command.mode }
+        val replayedRetryBranch =
+            command.mode in RETRY_BRANCH_MODES && attempts.any { it.mode in RETRY_BRANCH_MODES }
+        if (command.mode in oncePerJobModes && (replayedMode || replayedRetryBranch)) {
             return com.readmates.aigen.application.port.out.ProviderCallReservationResult.ModeAlreadyUsed
         }
         val attempt =
@@ -553,29 +559,50 @@ internal class FakeProviderCallReservations(
             .Reconciled(terminal)
     }
 
-    override fun markUnresolvedInFlightUnknown(
+    override fun recoverStaleInFlightUnknown(
         jobId: UUID,
+        staleBefore: Instant,
         now: Instant,
-    ): List<com.readmates.aigen.application.model.ProviderAttempt> {
+    ): com.readmates.aigen.application.port.out.ProviderCallRecoveryResult {
         markCalls += 1
-        return attempts
-            .mapIndexedNotNull { index, attempt ->
-                if (attempt.jobId != jobId ||
-                    attempt.state != com.readmates.aigen.application.model.ProviderAttemptState.IN_FLIGHT
-                ) {
-                    null
-                } else {
-                    attempt
-                        .copy(
-                            state = com.readmates.aigen.application.model.ProviderAttemptState.UNKNOWN,
-                            costBasis = com.readmates.aigen.application.model.CostBasis.ESTIMATED_UNKNOWN,
-                            completedAt = now,
-                        ).also { attempts[index] = it }
+        recoveryFailure?.let { throw it }
+        val recovered =
+            attempts
+                .mapIndexedNotNull { index, attempt ->
+                    if (attempt.jobId != jobId ||
+                        attempt.state != com.readmates.aigen.application.model.ProviderAttemptState.IN_FLIGHT ||
+                        !attempt.startedAt.isBefore(staleBefore)
+                    ) {
+                        null
+                    } else {
+                        attempt
+                            .copy(
+                                state = com.readmates.aigen.application.model.ProviderAttemptState.UNKNOWN,
+                                costBasis = com.readmates.aigen.application.model.CostBasis.ESTIMATED_UNKNOWN,
+                                completedAt = now,
+                            ).also { attempts[index] = it }
+                    }
                 }
-            }
+        val live =
+            activeInFlight ||
+                attempts.any {
+                    it.jobId == jobId &&
+                        it.state == com.readmates.aigen.application.model.ProviderAttemptState.IN_FLIGHT &&
+                        !it.startedAt.isBefore(staleBefore)
+                }
+        return com.readmates.aigen.application.port.out
+            .ProviderCallRecoveryResult(recovered, live)
     }
 
     override fun clubMonthlyCost(clubId: UUID): BigDecimal = BigDecimal.ZERO
+
+    private companion object {
+        val RETRY_BRANCH_MODES =
+            setOf(
+                com.readmates.aigen.application.model.ProviderCallMode.FALLBACK,
+                com.readmates.aigen.application.model.ProviderCallMode.RETRY,
+            )
+    }
 }
 
 internal class FakeClubDefaultPort(

@@ -34,6 +34,11 @@ import java.time.Duration
 import java.time.Instant
 import java.util.UUID
 
+class ProviderCallStillInFlightException :
+    RuntimeException(
+        "Provider request is still within its active timeout window",
+    )
+
 /**
  * Async worker that consumes a queued AI generation job (spec §7.1 + §9.2).
  *
@@ -88,7 +93,14 @@ class AiGenerationWorker(
         if (record.pipelineMode == AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT &&
             record.status == JobStatus.RUNNING
         ) {
-            providerCallReservations.markUnresolvedInFlightUnknown(record.jobId, clock.instant())
+            val recoveryNow = clock.instant()
+            val recovery =
+                providerCallReservations.recoverStaleInFlightUnknown(
+                    record.jobId,
+                    recoveryNow.minus(properties.providerCalls.requestTimeout),
+                    recoveryNow,
+                )
+            if (recovery.activeInFlight) throw ProviderCallStillInFlightException()
             groundedExecutor.process(record, start)
             return
         }

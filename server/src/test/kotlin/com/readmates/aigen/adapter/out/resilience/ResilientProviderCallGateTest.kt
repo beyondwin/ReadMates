@@ -220,9 +220,8 @@ class ResilientProviderCallGateTest {
             circuitBreakerRegistry = circuitRegistry,
         )
 
-    private fun ResilientProviderCallGate.acquire(provider: Provider): ProviderCallPermit {
-        return (tryAcquire(provider) as ProviderPermitDecision.Acquired).permit
-    }
+    private fun ResilientProviderCallGate.acquire(provider: Provider): ProviderCallPermit =
+        (tryAcquire(provider) as ProviderPermitDecision.Acquired).permit
 
     private fun circuitRegistry(): CircuitBreakerRegistry =
         CircuitBreakerRegistry.of(

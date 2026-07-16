@@ -310,16 +310,80 @@ class RedisProviderCallReservationAdapterTest(
         prepare(fixture, JobStatus.RUNNING)
         reservations.reserve(fixture.command(maximumCostUsd = BigDecimal("0.40")))
 
-        val recovered = reservations.markUnresolvedInFlightUnknown(fixture.jobId, fixture.now.plusSeconds(30))
-        val repeated = reservations.markUnresolvedInFlightUnknown(fixture.jobId, fixture.now.plusSeconds(60))
+        val recovered =
+            reservations.recoverStaleInFlightUnknown(
+                fixture.jobId,
+                fixture.now.plusSeconds(1),
+                fixture.now.plusSeconds(30),
+            )
+        val repeated =
+            reservations.recoverStaleInFlightUnknown(
+                fixture.jobId,
+                fixture.now.plusSeconds(31),
+                fixture.now.plusSeconds(60),
+            )
 
-        assertThat(recovered).hasSize(1)
-        assertThat(recovered.single().state).isEqualTo(ProviderAttemptState.UNKNOWN)
-        assertThat(recovered.single().costBasis).isEqualTo(CostBasis.ESTIMATED_UNKNOWN)
-        assertThat(repeated).isEmpty()
+        assertThat(recovered.recovered).hasSize(1)
+        assertThat(recovered.recovered.single().state).isEqualTo(ProviderAttemptState.UNKNOWN)
+        assertThat(recovered.recovered.single().costBasis).isEqualTo(CostBasis.ESTIMATED_UNKNOWN)
+        assertThat(recovered.activeInFlight).isFalse()
+        assertThat(repeated.recovered).isEmpty()
+        assertThat(repeated.activeInFlight).isFalse()
         assertThat(jobCallCount(fixture.jobId)).isEqualTo(1)
         assertThat(monthlyCost(fixture.clubId)).isEqualByComparingTo("0.4")
         assertThat(attemptCount(fixture.jobId)).isEqualTo(1)
+    }
+
+    @Test
+    fun `live in-flight recovery remains active until request timeout cutoff passes`() {
+        val fixture = fixture()
+        prepare(fixture, JobStatus.RUNNING)
+        reservations.reserve(fixture.command(maximumCostUsd = BigDecimal("0.40")))
+
+        val live =
+            reservations.recoverStaleInFlightUnknown(
+                fixture.jobId,
+                fixture.now.minusSeconds(1),
+                fixture.now.plusSeconds(30),
+            )
+
+        assertThat(live.recovered).isEmpty()
+        assertThat(live.activeInFlight).isTrue()
+        assertThat(attemptState(fixture)).isEqualTo(ProviderAttemptState.IN_FLIGHT.name)
+        assertThat(jobCallCount(fixture.jobId)).isEqualTo(1)
+    }
+
+    @Test
+    fun `concurrent recovery preserves live attempt then terminalizes stale attempt exactly once`() {
+        val fixture = fixture()
+        prepare(fixture, JobStatus.RUNNING)
+        reservations.reserve(fixture.command(maximumCostUsd = BigDecimal("0.40")))
+
+        val liveResults =
+            concurrentlyRecovery(32) {
+                reservations.recoverStaleInFlightUnknown(
+                    fixture.jobId,
+                    fixture.now.minusSeconds(1),
+                    fixture.now.plusSeconds(30),
+                )
+            }
+        assertThat(liveResults).allSatisfy { result ->
+            assertThat(result.activeInFlight).isTrue()
+            assertThat(result.recovered).isEmpty()
+        }
+        assertThat(attemptState(fixture)).isEqualTo(ProviderAttemptState.IN_FLIGHT.name)
+
+        val staleResults =
+            concurrentlyRecovery(32) {
+                reservations.recoverStaleInFlightUnknown(
+                    fixture.jobId,
+                    fixture.now.plusSeconds(1),
+                    fixture.now.plusSeconds(60),
+                )
+            }
+        assertThat(staleResults.sumOf { it.recovered.size }).isEqualTo(1)
+        assertThat(staleResults).allSatisfy { result -> assertThat(result.activeInFlight).isFalse() }
+        assertThat(attemptState(fixture)).isEqualTo(ProviderAttemptState.UNKNOWN.name)
     }
 
     @Test
@@ -330,16 +394,21 @@ class RedisProviderCallReservationAdapterTest(
         assertThat(first).isInstanceOf(ProviderCallReservationResult.Reserved::class.java)
 
         // Simulate a crash after the provider accepted/responded but before reconciliation.
-        val recovered = reservations.markUnresolvedInFlightUnknown(fixture.jobId, fixture.now.plusSeconds(30))
+        val recovered =
+            reservations.recoverStaleInFlightUnknown(
+                fixture.jobId,
+                fixture.now.plusSeconds(1),
+                fixture.now.plusSeconds(30),
+            )
         val secondAttemptId = UUID.randomUUID()
         val thirdAttemptId = UUID.randomUUID()
         val second = reservations.reserve(fixture.command(attemptId = secondAttemptId, maximumCostUsd = CENT))
         val third = reservations.reserve(fixture.command(attemptId = thirdAttemptId, maximumCostUsd = CENT))
         val rejected = reservations.reserve(fixture.command(attemptId = UUID.randomUUID(), maximumCostUsd = CENT))
 
-        assertThat(recovered).hasSize(1)
-        assertThat(recovered.single().state).isEqualTo(ProviderAttemptState.UNKNOWN)
-        assertThat(recovered.single().costBasis).isEqualTo(CostBasis.ESTIMATED_UNKNOWN)
+        assertThat(recovered.recovered).hasSize(1)
+        assertThat(recovered.recovered.single().state).isEqualTo(ProviderAttemptState.UNKNOWN)
+        assertThat(recovered.recovered.single().costBasis).isEqualTo(CostBasis.ESTIMATED_UNKNOWN)
         assertThat(second).isInstanceOf(ProviderCallReservationResult.Reserved::class.java)
         assertThat(third).isInstanceOf(ProviderCallReservationResult.Reserved::class.java)
         assertThat(rejected).isEqualTo(ProviderCallReservationResult.CallCapExceeded)
@@ -352,6 +421,7 @@ class RedisProviderCallReservationAdapterTest(
     fun `redelivery cannot reserve fallback correction or repair mode twice`() {
         listOf(
             ProviderCallMode.FALLBACK,
+            ProviderCallMode.RETRY,
             ProviderCallMode.SCHEMA_CORRECTION,
             ProviderCallMode.SECTION_REPAIR,
         ).forEach { mode ->
@@ -372,6 +442,24 @@ class RedisProviderCallReservationAdapterTest(
     }
 
     @Test
+    fun `fallback and same-provider retry share one durable retry branch`() {
+        listOf(
+            ProviderCallMode.FALLBACK to ProviderCallMode.RETRY,
+            ProviderCallMode.RETRY to ProviderCallMode.FALLBACK,
+        ).forEach { (firstMode, replayMode) ->
+            val fixture = fixture()
+            prepare(fixture, JobStatus.RUNNING)
+
+            val first = reservations.reserve(fixture.command(mode = firstMode))
+            val replay = reservations.reserve(fixture.command(attemptId = UUID.randomUUID(), mode = replayMode))
+
+            assertThat(first).isInstanceOf(ProviderCallReservationResult.Reserved::class.java)
+            assertThat(replay).isEqualTo(ProviderCallReservationResult.ModeAlreadyUsed)
+            assertThat(jobCallCount(fixture.jobId)).isEqualTo(1)
+        }
+    }
+
+    @Test
     fun `stale recovery fails closed when the reserved monthly counter is missing`() {
         val fixture = fixture()
         prepare(fixture, JobStatus.RUNNING)
@@ -379,7 +467,11 @@ class RedisProviderCallReservationAdapterTest(
         redisTemplate.delete(fixture.monthlyKey)
 
         assertThatThrownBy {
-            reservations.markUnresolvedInFlightUnknown(fixture.jobId, fixture.now.plusSeconds(30))
+            reservations.recoverStaleInFlightUnknown(
+                fixture.jobId,
+                fixture.now.plusSeconds(1),
+                fixture.now.plusSeconds(30),
+            )
         }.isInstanceOf(ProviderCallReservationUnavailableException::class.java)
         assertThat(redisTemplate.hasKey(fixture.monthlyKey)).isFalse()
         assertThat(attemptState(fixture)).isEqualTo(ProviderAttemptState.IN_FLIGHT.name)
@@ -393,7 +485,11 @@ class RedisProviderCallReservationAdapterTest(
         redisTemplate.persist(fixture.monthlyKey)
 
         assertThatThrownBy {
-            reservations.markUnresolvedInFlightUnknown(fixture.jobId, fixture.now.plusSeconds(30))
+            reservations.recoverStaleInFlightUnknown(
+                fixture.jobId,
+                fixture.now.plusSeconds(1),
+                fixture.now.plusSeconds(30),
+            )
         }.isInstanceOf(ProviderCallReservationUnavailableException::class.java)
         assertThat(monthlyCost(fixture.clubId)).isEqualByComparingTo("0.40")
         assertThat(redisTemplate.getExpire(fixture.monthlyKey, TimeUnit.SECONDS)).isEqualTo(-1)
@@ -429,6 +525,19 @@ class RedisProviderCallReservationAdapterTest(
         val executor = Executors.newFixedThreadPool(16)
         return try {
             val tasks = List(count) { Callable { reservations.reserve(command()) } }
+            executor.invokeAll(tasks).map { it.get() }
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
+    private fun concurrentlyRecovery(
+        count: Int,
+        recovery: () -> com.readmates.aigen.application.port.out.ProviderCallRecoveryResult,
+    ): List<com.readmates.aigen.application.port.out.ProviderCallRecoveryResult> {
+        val executor = Executors.newFixedThreadPool(16)
+        return try {
+            val tasks = List(count) { Callable(recovery) }
             executor.invokeAll(tasks).map { it.get() }
         } finally {
             executor.shutdownNow()

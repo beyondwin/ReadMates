@@ -10,6 +10,7 @@ import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.out.AuditKind
 import com.readmates.aigen.application.port.out.AuditStatus
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import java.time.Duration
 import java.time.Instant
@@ -530,6 +531,31 @@ class AiGenerationWorkerTest {
         context.worker.process(record.jobId)
 
         assertThat(processed).isEqualTo(1)
+        assertThat(context.reservations.markCalls).isEqualTo(1)
+    }
+
+    @Test
+    fun `grounded redelivery defers while a provider request can still be live`() {
+        var processed = 0
+        val context =
+            TestContext(
+                groundedExecutor = GroundedGenerationExecutor { _, _ -> processed += 1 },
+            )
+        val record =
+            context
+                .savedRecord()
+                .copy(
+                    pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
+                    status = JobStatus.RUNNING,
+                    stage = JobStage.GENERATING_RECORD,
+                )
+        context.jobStore.save(record)
+        context.reservations.activeInFlight = true
+
+        assertThatThrownBy { context.worker.process(record.jobId) }
+            .isInstanceOf(ProviderCallStillInFlightException::class.java)
+
+        assertThat(processed).isZero()
         assertThat(context.reservations.markCalls).isEqualTo(1)
     }
 

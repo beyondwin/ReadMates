@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import com.readmates.aigen.adapter.out.llm.common.GroundedDraftJsonCodec
 import com.readmates.aigen.adapter.out.llm.common.LlmErrorMapper
 import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
+import com.readmates.aigen.adapter.out.llm.common.ProviderRetryAfterExtractor
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
@@ -66,7 +67,11 @@ class GeminiWholeTranscriptGroundedGenerator(
         } catch (
             @Suppress("TooGenericExceptionCaught") error: Throwable,
         ) {
-            throw LlmGenerationException(LlmErrorMapper.mapException(error, provider), error)
+            throw LlmGenerationException(
+                LlmErrorMapper.mapException(error, provider),
+                error,
+                ProviderRetryAfterExtractor.extract(error),
+            )
         }
 
     private fun requireOwnedModel(model: ModelId) {

@@ -106,12 +106,21 @@ class GroundedProviderCallPolicy private constructor(
             return fallback(history, fallbackModel, current.ordinal, Duration.ZERO)
         }
         if (current.ordinal >= MAX_PHYSICAL_CALLS) return GroundedProviderCallDecision.Failed
+        if (outcome is GroundedProviderCallOutcome.RepairableGrounding) {
+            if (current.mode == ProviderCallMode.SECTION_REPAIR) return GroundedProviderCallDecision.Failed
+            return nextUnlessUsed(history, ProviderCallMode.SECTION_REPAIR) {
+                GroundedProviderCallPlan(
+                    current.ordinal + 1,
+                    current.model,
+                    ProviderCallMode.SECTION_REPAIR,
+                    outcome.section,
+                )
+            }
+        }
         if (current.mode == ProviderCallMode.SCHEMA_CORRECTION || current.mode == ProviderCallMode.SECTION_REPAIR) {
             return GroundedProviderCallDecision.Failed
         }
-        if (current.ordinal == 2 && outcome !is GroundedProviderCallOutcome.RepairableGrounding) {
-            return GroundedProviderCallDecision.Failed
-        }
+        if (current.ordinal == 2) return GroundedProviderCallDecision.Failed
 
         val nextOrdinal = current.ordinal + 1
         return when (outcome) {
@@ -119,19 +128,11 @@ class GroundedProviderCallPolicy private constructor(
                 nextUnlessUsed(history, ProviderCallMode.SCHEMA_CORRECTION) {
                     GroundedProviderCallPlan(nextOrdinal, current.model, ProviderCallMode.SCHEMA_CORRECTION)
                 }
-            is GroundedProviderCallOutcome.RepairableGrounding ->
-                nextUnlessUsed(history, ProviderCallMode.SECTION_REPAIR) {
-                    GroundedProviderCallPlan(
-                        nextOrdinal,
-                        current.model,
-                        ProviderCallMode.SECTION_REPAIR,
-                        outcome.section,
-                    )
-                }
+            is GroundedProviderCallOutcome.RepairableGrounding -> error("handled above")
             is GroundedProviderCallOutcome.TransientFailure ->
-                fallback(history, fallbackModel, nextOrdinal, transientDelay(outcome.retryAfter))
+                fallbackOrRetry(history, fallbackModel, nextOrdinal, transientDelay(outcome.retryAfter))
             is GroundedProviderCallOutcome.RateLimited ->
-                fallback(history, fallbackModel, nextOrdinal, capped(outcome.retryAfter ?: transientBackoffBase))
+                fallbackOrRetry(history, fallbackModel, nextOrdinal, capped(outcome.retryAfter ?: transientBackoffBase))
             GroundedProviderCallOutcome.PreTransportRejection,
             GroundedProviderCallOutcome.TerminalFailure,
             GroundedProviderCallOutcome.Valid,
@@ -145,11 +146,40 @@ class GroundedProviderCallPolicy private constructor(
         ordinal: Int,
         delay: Duration,
     ): GroundedProviderCallDecision {
-        if (fallbackModel == null || history.any { it.mode == ProviderCallMode.FALLBACK }) {
+        if (fallbackModel == null ||
+            history.any { it.mode == ProviderCallMode.FALLBACK || it.mode == ProviderCallMode.RETRY }
+        ) {
             return GroundedProviderCallDecision.Failed
         }
         return GroundedProviderCallDecision.Next(
-            GroundedProviderCallPlan(ordinal, fallbackModel, ProviderCallMode.FALLBACK, delay = delay),
+            GroundedProviderCallPlan(
+                ordinal,
+                fallbackModel,
+                ProviderCallMode.FALLBACK,
+                history.last().section,
+                delay,
+            ),
+        )
+    }
+
+    private fun fallbackOrRetry(
+        history: List<GroundedProviderCallPlan>,
+        fallbackModel: ModelId?,
+        ordinal: Int,
+        delay: Duration,
+    ): GroundedProviderCallDecision {
+        if (history.any { it.mode == ProviderCallMode.FALLBACK || it.mode == ProviderCallMode.RETRY }) {
+            return GroundedProviderCallDecision.Failed
+        }
+        val current = history.last()
+        return GroundedProviderCallDecision.Next(
+            GroundedProviderCallPlan(
+                ordinal = ordinal,
+                model = fallbackModel ?: current.model,
+                mode = if (fallbackModel == null) ProviderCallMode.RETRY else ProviderCallMode.FALLBACK,
+                section = current.section,
+                delay = delay,
+            ),
         )
     }
 
@@ -171,7 +201,7 @@ class GroundedProviderCallPolicy private constructor(
         return capped(Duration.ofNanos(jitteredNanos))
     }
 
-    private fun capped(delay: Duration): Duration = delay.coerceAtMost(transientBackoffMax)
+    private fun capped(delay: Duration): Duration = delay.coerceIn(Duration.ZERO, transientBackoffMax)
 
     private companion object {
         const val MAX_PHYSICAL_CALLS = 3
