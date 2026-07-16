@@ -547,6 +547,7 @@ class MySqlFlywayMigrationTest(
         assertEquals("NO", columnValue("ai_generation_audit_log", "cost_basis", "is_nullable"))
         assertEquals("NONE", columnValue("ai_generation_audit_log", "cost_basis", "column_default"))
         assertEquals("int", columnValue("ai_generation_audit_log", "cache_write_input_tokens", "data_type"))
+        assertEquals("int", columnValue("ai_generation_audit_log", "cache_write_input_tokens", "column_type"))
         assertEquals("NO", columnValue("ai_generation_audit_log", "cache_write_input_tokens", "is_nullable"))
         assertEquals("0", columnValue("ai_generation_audit_log", "cache_write_input_tokens", "column_default"))
 
@@ -578,6 +579,23 @@ class MySqlFlywayMigrationTest(
     }
 
     private fun assertAiGenerationAttemptAuditColumnSet() {
+        val migrationSql =
+            checkNotNull(javaClass.classLoader.getResourceAsStream(V38_AI_PROVIDER_ATTEMPT_AUDIT))
+                .bufferedReader()
+                .use { it.readText() }
+        val migrationDeclaredColumns =
+            ADD_COLUMN_NAME_REGEX
+                .findAll(migrationSql)
+                .map { it.groupValues[1] }
+                .toList()
+        assertThat(migrationDeclaredColumns).containsExactly(
+            "trace_id",
+            "provider_attempt",
+            "provider_call_mode",
+            "cost_basis",
+            "cache_write_input_tokens",
+        )
+
         val v38Columns =
             jdbcTemplate.queryForList(
                 """
@@ -1002,6 +1020,12 @@ class MySqlFlywayMigrationTest(
             tableName,
             columnName,
         ) ?: error("Column $tableName.$columnName does not exist")
+
+    companion object {
+        private const val V38_AI_PROVIDER_ATTEMPT_AUDIT =
+            "db/mysql/migration/V38__ai_generation_provider_attempt_audit.sql"
+        private val ADD_COLUMN_NAME_REGEX = Regex("(?i)\\bADD\\s+COLUMN\\s+`?([a-z0-9_]+)`?")
+    }
 
     private fun uniqueIndexCount(
         tableName: String,
