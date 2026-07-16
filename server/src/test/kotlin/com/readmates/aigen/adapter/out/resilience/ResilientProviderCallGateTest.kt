@@ -15,8 +15,6 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertTimeout
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
 import java.time.Duration
 import kotlin.io.path.Path
 import kotlin.io.path.readText
@@ -70,11 +68,26 @@ class ResilientProviderCallGateTest {
         held.close()
     }
 
-    @ParameterizedTest(name = "{0} is a transient circuit failure")
-    @ValueSource(strings = ["timeout", "network", "http_5xx"])
-    fun `transient provider failures are recorded with onError`(
-        @Suppress("UNUSED_PARAMETER") failureClass: String,
-    ) {
+    @Test
+    fun `half open semaphore rejection returns circuit probe permission`() {
+        val circuitRegistry = circuitRegistry()
+        val gate = gate(maxConcurrentPerProvider = 1, circuitRegistry = circuitRegistry)
+        val held = gate.acquire(Provider.OPENAI)
+        val circuit = circuitRegistry.circuitBreaker("aigen-provider-openai")
+        circuit.transitionToOpenState()
+        circuit.transitionToHalfOpenState()
+
+        assertThat(gate.tryAcquire(Provider.OPENAI))
+            .isEqualTo(ProviderPermitDecision.Rejected(ProviderGateRejection.CONCURRENCY_LIMIT))
+        assertThat(gate.tryAcquire(Provider.OPENAI))
+            .isEqualTo(ProviderPermitDecision.Rejected(ProviderGateRejection.CONCURRENCY_LIMIT))
+
+        circuit.transitionToClosedState()
+        held.close()
+    }
+
+    @Test
+    fun `transient failure outcome dispatches to circuit onError`() {
         val circuitRegistry = circuitRegistry()
         val gate = gate(circuitRegistry = circuitRegistry)
 
@@ -89,23 +102,8 @@ class ResilientProviderCallGateTest {
         assertThat(circuit.state).isEqualTo(CircuitBreaker.State.OPEN)
     }
 
-    @ParameterizedTest(name = "{0} is ignored by circuit failure rate")
-    @ValueSource(
-        strings = [
-            "http_429",
-            "auth",
-            "permission",
-            "safety",
-            "invalid_request",
-            "context_limit",
-            "schema",
-            "parse",
-            "grounding",
-        ],
-    )
-    fun `policy and content failures are recorded with onSuccess`(
-        @Suppress("UNUSED_PARAMETER") failureClass: String,
-    ) {
+    @Test
+    fun `ignored failure outcome dispatches to circuit onSuccess`() {
         val circuitRegistry = circuitRegistry()
         val gate = gate(circuitRegistry = circuitRegistry)
 
@@ -119,6 +117,35 @@ class ResilientProviderCallGateTest {
         assertThat(circuit.metrics.numberOfSuccessfulCalls).isEqualTo(2)
         assertThat(circuit.metrics.numberOfFailedCalls).isZero()
         assertThat(circuit.state).isEqualTo(CircuitBreaker.State.CLOSED)
+    }
+
+    @Test
+    fun `success outcome dispatches to circuit onSuccess`() {
+        val circuitRegistry = circuitRegistry()
+        val gate = gate(circuitRegistry = circuitRegistry)
+
+        gate.acquire(Provider.GEMINI).use { permit ->
+            permit.record(ProviderCircuitOutcome.SUCCESS, Duration.ofMillis(10))
+        }
+
+        val circuit = circuitRegistry.circuitBreaker("aigen-provider-gemini")
+        assertThat(circuit.metrics.numberOfSuccessfulCalls).isEqualTo(1)
+        assertThat(circuit.metrics.numberOfFailedCalls).isZero()
+    }
+
+    @Test
+    fun `close winning the lifecycle race prevents later circuit recording`() {
+        val circuitRegistry = circuitRegistry()
+        val gate = gate(maxConcurrentPerProvider = 1, circuitRegistry = circuitRegistry)
+        val permit = gate.acquire(Provider.CLAUDE)
+
+        permit.close()
+        permit.record(ProviderCircuitOutcome.TRANSIENT_FAILURE, Duration.ofMillis(25))
+
+        val circuit = circuitRegistry.circuitBreaker("aigen-provider-claude")
+        assertThat(circuit.metrics.numberOfFailedCalls).isZero()
+        assertThat(circuit.metrics.numberOfSuccessfulCalls).isZero()
+        gate.acquire(Provider.CLAUDE).close()
     }
 
     @Test
@@ -204,6 +231,7 @@ class ResilientProviderCallGateTest {
                 .slidingWindowSize(2)
                 .minimumNumberOfCalls(2)
                 .failureRateThreshold(50f)
+                .permittedNumberOfCallsInHalfOpenState(1)
                 .waitDurationInOpenState(Duration.ofMinutes(1))
                 .build(),
         )

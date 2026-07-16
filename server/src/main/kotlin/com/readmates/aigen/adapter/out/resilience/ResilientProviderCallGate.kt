@@ -16,7 +16,6 @@ import org.springframework.stereotype.Component
 import java.time.Duration
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 
 @Component
 class ResilientProviderCallGate internal constructor(
@@ -74,20 +73,25 @@ class ResilientProviderCallGate internal constructor(
         }
     }
 
+    /**
+     * Coordinator lifecycle: call [record] exactly once for the provider outcome, then call [close]
+     * from `finally`. A close that wins before record cancels the circuit permission and makes every
+     * later record a no-op; all transitions are linearized on this permit instance.
+     */
     private class ResilientProviderCallPermit(
         private val provider: Provider,
         private val circuitBreaker: CircuitBreaker,
         private val semaphore: Semaphore,
         private val metrics: AiGenerationMetrics,
     ) : ProviderCallPermit {
-        private val recorded = AtomicBoolean(false)
-        private val closed = AtomicBoolean(false)
+        private var lifecycleState = PermitLifecycleState.ACTIVE
 
+        @Synchronized
         override fun record(
             outcome: ProviderCircuitOutcome,
             elapsed: Duration,
         ) {
-            if (!recorded.compareAndSet(false, true)) return
+            if (lifecycleState != PermitLifecycleState.ACTIVE) return
             val elapsedNanos = elapsed.toNanos().coerceAtLeast(0)
             when (outcome) {
                 ProviderCircuitOutcome.SUCCESS,
@@ -97,17 +101,27 @@ class ResilientProviderCallGate internal constructor(
                 ProviderCircuitOutcome.TRANSIENT_FAILURE ->
                     circuitBreaker.onError(elapsedNanos, TimeUnit.NANOSECONDS, TransientProviderFailure)
             }
+            lifecycleState = PermitLifecycleState.RECORDED
             metrics.recordProviderCall(provider, outcome, elapsed)
         }
 
+        @Synchronized
         override fun close() {
-            if (!closed.compareAndSet(false, true)) return
+            if (lifecycleState == PermitLifecycleState.CLOSED) return
+            val releaseCircuitPermission = lifecycleState == PermitLifecycleState.ACTIVE
+            lifecycleState = PermitLifecycleState.CLOSED
             try {
-                if (!recorded.get()) circuitBreaker.releasePermission()
+                if (releaseCircuitPermission) circuitBreaker.releasePermission()
             } finally {
                 semaphore.release()
             }
         }
+    }
+
+    private enum class PermitLifecycleState {
+        ACTIVE,
+        RECORDED,
+        CLOSED,
     }
 
     private object TransientProviderFailure : RuntimeException(null, null, false, false)
