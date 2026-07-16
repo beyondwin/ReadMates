@@ -5,6 +5,7 @@ import com.readmates.aigen.adapter.out.llm.common.GroundedDraftJsonCodec
 import com.readmates.aigen.adapter.out.llm.common.GroundedGenerationSchemaResource
 import com.readmates.aigen.adapter.out.llm.common.GroundedProviderTestFixture
 import com.readmates.aigen.adapter.out.llm.gemini.GeminiSchemaCompatAdapter
+import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.ModelCapability
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
@@ -119,7 +120,7 @@ class GoogleGenAiSpringAiContractTest {
     @Test
     fun `429 500 timeout and malformed output each make exactly one request`() {
         listOf(
-            ProviderMockHttpServer.Response(429, errorBody(429)),
+            ProviderMockHttpServer.Response(429, errorBody(429, "provider unavailable; retry in 7200 s")),
             ProviderMockHttpServer.Response(500, errorBody(500)),
             successResponse(text = "not-json"),
             successResponse(delay = Duration.ofMillis(250)),
@@ -127,7 +128,15 @@ class GoogleGenAiSpringAiContractTest {
             ProviderMockHttpServer.start(response, GOOGLE_PATH).use { server ->
                 val timeout = if (index == 3) Duration.ofMillis(30) else Duration.ofSeconds(2)
                 assertThatThrownBy { generator(model(server.origin, timeout)).generate(MODEL, request()) }
-                    .isInstanceOf(ProviderCallException::class.java)
+                    .isInstanceOfSatisfying(ProviderCallException::class.java) { failure ->
+                        assertThat(failure.cause).isNull()
+                        if (index == 0) {
+                            assertThat(failure.error.code).isEqualTo(ErrorCode.PROVIDER_RATE_LIMITED)
+                            assertThat(failure.retryAfter).isEqualTo(Duration.ofHours(1))
+                        }
+                        assertThat(failure.error.message)
+                            .doesNotContain("provider unavailable", "retry in", "not-json")
+                    }
                 assertThat(server.requestCount).isEqualTo(1)
             }
         }
@@ -215,10 +224,13 @@ class GoogleGenAiSpringAiContractTest {
         )
     }
 
-    private fun errorBody(code: Int): String {
+    private fun errorBody(
+        code: Int,
+        message: String = "provider unavailable",
+    ): String {
         val status = "UNAVAILABLE"
         return """
-            {"error":{"code":$code,"message":"provider unavailable","status":"$status"}}
+            {"error":{"code":$code,"message":"$message","status":"$status"}}
             """.trimIndent()
     }
 

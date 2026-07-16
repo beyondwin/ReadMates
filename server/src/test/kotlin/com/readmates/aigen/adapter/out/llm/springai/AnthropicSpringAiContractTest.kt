@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.readmates.aigen.adapter.out.llm.common.GroundedDraftJsonCodec
 import com.readmates.aigen.adapter.out.llm.common.GroundedGenerationSchemaResource
 import com.readmates.aigen.adapter.out.llm.common.GroundedProviderTestFixture
+import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.ModelCapability
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
@@ -154,7 +155,11 @@ class AnthropicSpringAiContractTest {
     fun `each reserved adapter call makes one Anthropic wire request for every failure shape`() {
         val scenarios =
             listOf(
-                ProviderMockHttpServer.Response(429, errorBody("rate_limit_error")),
+                ProviderMockHttpServer.Response(
+                    429,
+                    errorBody("rate_limit_error"),
+                    headers = mapOf("Retry-After" to "7200"),
+                ),
                 ProviderMockHttpServer.Response(500, errorBody("api_error")),
                 ProviderMockHttpServer.Response(200, successResponse(text = "not-json").body),
                 ProviderMockHttpServer.Response(
@@ -170,7 +175,15 @@ class AnthropicSpringAiContractTest {
 
                 assertThatThrownBy {
                     generator(model(server.origin, timeout)).generate(MODEL, request())
-                }.isInstanceOf(ProviderCallException::class.java)
+                }.isInstanceOfSatisfying(ProviderCallException::class.java) { failure ->
+                    assertThat(failure.cause).isNull()
+                    if (index == 0) {
+                        assertThat(failure.error.code).isEqualTo(ErrorCode.PROVIDER_RATE_LIMITED)
+                        assertThat(failure.retryAfter).isEqualTo(Duration.ofHours(1))
+                    }
+                    assertThat(failure.error.message)
+                        .doesNotContain("provider unavailable", "rate_limit_error", "api_error", "not-json")
+                }
                 assertThat(server.requestCount).describedAs("scenario %s", index).isEqualTo(1)
             }
         }

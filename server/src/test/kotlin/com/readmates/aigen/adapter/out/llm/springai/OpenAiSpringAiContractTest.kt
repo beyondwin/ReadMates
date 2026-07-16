@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.readmates.aigen.adapter.out.llm.common.GroundedDraftJsonCodec
 import com.readmates.aigen.adapter.out.llm.common.GroundedGenerationSchemaResource
 import com.readmates.aigen.adapter.out.llm.common.GroundedProviderTestFixture
+import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.ModelCapability
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
@@ -89,7 +90,11 @@ class OpenAiSpringAiContractTest {
     fun `each reserved adapter call makes one wire request for every transport failure shape`() {
         val scenarios =
             listOf(
-                ProviderMockHttpServer.Response(429, errorBody("rate_limit_error")),
+                ProviderMockHttpServer.Response(
+                    429,
+                    errorBody("rate_limit_error"),
+                    headers = mapOf("Retry-After" to "7200"),
+                ),
                 ProviderMockHttpServer.Response(500, errorBody("server_error")),
                 ProviderMockHttpServer.Response(200, "not-json", contentType = "application/json"),
                 ProviderMockHttpServer.Response(
@@ -108,6 +113,10 @@ class OpenAiSpringAiContractTest {
                     generator(model).generate(GroundedProviderTestFixture.model(Provider.OPENAI), request())
                 }.isInstanceOfSatisfying(ProviderCallException::class.java) { failure ->
                     assertThat(failure.cause).isNull()
+                    if (index == 0) {
+                        assertThat(failure.error.code).isEqualTo(ErrorCode.PROVIDER_RATE_LIMITED)
+                        assertThat(failure.retryAfter).isEqualTo(Duration.ofHours(1))
+                    }
                     assertThat(failure.error.message)
                         .isIn(
                             "Provider rate limit exceeded",

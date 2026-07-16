@@ -1,6 +1,10 @@
 package com.readmates.aigen.adapter.out.llm.springai
 
+import com.anthropic.errors.AnthropicServiceException
+import com.google.genai.errors.ApiException
+import com.openai.errors.OpenAIServiceException
 import com.readmates.aigen.adapter.out.llm.common.LlmStructuredOutputException
+import com.readmates.aigen.adapter.out.llm.common.ProviderRetryAfterExtractor
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.Provider
@@ -32,11 +36,12 @@ class SpringAiErrorMapper(
 ) {
     fun map(
         failure: Throwable,
-        @Suppress("UNUSED_PARAMETER") provider: Provider,
+        provider: Provider,
     ): SpringAiMappedFailure {
         val causes = generateSequence(failure) { it.cause }.take(MAX_CAUSE_DEPTH).toList()
         val safe = causes.filterIsInstance<ProviderCallException>().firstOrNull()
         val response = causes.filterIsInstance<RestClientResponseException>().firstOrNull()
+        val providerStatus = providerStatus(causes, provider)
         return when {
             safe != null ->
                 SpringAiMappedFailure(
@@ -46,10 +51,15 @@ class SpringAiErrorMapper(
                 )
             causes.any { it is LlmStructuredOutputException } ->
                 mapped(ErrorCode.SCHEMA_INVALID, SAFE_SCHEMA_MESSAGE, ProviderFailureClass.SCHEMA_OR_PARSE)
+            providerStatus != null ->
+                fromStatus(
+                    providerStatus,
+                    ProviderRetryAfterExtractor.extract(failure)?.capped(),
+                )
             response != null ->
                 fromStatus(
                     response.statusCode.value(),
-                    response.responseHeaders?.getFirst(HttpHeaders.RETRY_AFTER),
+                    parseRetryAfter(response.responseHeaders?.getFirst(HttpHeaders.RETRY_AFTER)),
                 )
             causes.any { it is SocketTimeoutException || it is TimeoutException || it is IOException } ->
                 mapped(ErrorCode.PROVIDER_UNAVAILABLE, SAFE_UNKNOWN_MESSAGE, ProviderFailureClass.TRANSIENT)
@@ -63,7 +73,7 @@ class SpringAiErrorMapper(
 
     private fun fromStatus(
         status: Int,
-        retryAfter: String?,
+        retryAfter: Duration?,
     ): SpringAiMappedFailure =
         when {
             status == HTTP_TOO_MANY_REQUESTS ->
@@ -71,11 +81,21 @@ class SpringAiErrorMapper(
                     ErrorCode.PROVIDER_RATE_LIMITED,
                     SAFE_RATE_LIMIT_MESSAGE,
                     ProviderFailureClass.RATE_LIMITED,
-                    parseRetryAfter(retryAfter),
+                    retryAfter?.capped(),
                 )
             status == HTTP_REQUEST_TIMEOUT || status >= HTTP_SERVER_ERROR_MIN ->
                 mapped(ErrorCode.PROVIDER_UNAVAILABLE, SAFE_UNKNOWN_MESSAGE, ProviderFailureClass.TRANSIENT)
             else -> mapped(ErrorCode.UNKNOWN, SAFE_REJECTED_MESSAGE, ProviderFailureClass.TERMINAL)
+        }
+
+    private fun providerStatus(
+        causes: List<Throwable>,
+        provider: Provider,
+    ): Int? =
+        when (provider) {
+            Provider.OPENAI -> causes.filterIsInstance<OpenAIServiceException>().firstOrNull()?.statusCode()
+            Provider.CLAUDE -> causes.filterIsInstance<AnthropicServiceException>().firstOrNull()?.statusCode()
+            Provider.GEMINI -> causes.filterIsInstance<ApiException>().firstOrNull()?.code()
         }
 
     private fun parseRetryAfter(value: String?): Duration? =

@@ -41,6 +41,7 @@ internal class ProviderMockHttpServer private constructor(
             }
             val bytes = response.body.toByteArray(StandardCharsets.UTF_8)
             exchange.responseHeaders.add("Content-Type", response.contentType)
+            response.headers.forEach { (name, value) -> exchange.responseHeaders.add(name, value) }
             runCatching {
                 exchange.sendResponseHeaders(response.status, bytes.size.toLong())
                 exchange.responseBody.write(bytes)
@@ -58,6 +59,7 @@ internal class ProviderMockHttpServer private constructor(
         val body: String,
         val contentType: String = "application/json",
         val delay: Duration = Duration.ZERO,
+        val headers: Map<String, String> = emptyMap(),
     )
 
     companion object {
