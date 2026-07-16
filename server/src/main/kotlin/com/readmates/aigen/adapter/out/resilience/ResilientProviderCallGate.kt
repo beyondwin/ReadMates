@@ -104,12 +104,13 @@ class ResilientProviderCallGate internal constructor(
             if (lifecycleState != PermitLifecycleState.ACTIVE) return
             val elapsedNanos = elapsed.toNanos().coerceAtLeast(0)
             when (outcome) {
-                ProviderCircuitOutcome.SUCCESS,
-                ProviderCircuitOutcome.IGNORED_FAILURE,
-                -> circuitBreaker.onSuccess(elapsedNanos, TimeUnit.NANOSECONDS)
+                ProviderCircuitOutcome.SUCCESS ->
+                    circuitBreaker.onSuccess(elapsedNanos, TimeUnit.NANOSECONDS)
 
                 ProviderCircuitOutcome.TRANSIENT_FAILURE ->
                     circuitBreaker.onError(elapsedNanos, TimeUnit.NANOSECONDS, TransientProviderFailure)
+
+                ProviderCircuitOutcome.IGNORED_FAILURE -> circuitBreaker.releasePermission()
             }
             lifecycleState = PermitLifecycleState.RECORDED
             metrics.recordProviderCall(provider, outcome, elapsed)

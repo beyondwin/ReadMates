@@ -118,9 +118,9 @@ class GroundedProviderCallCoordinatorTest {
         assertThat(reservationRejected.events).containsExactly(
             "gate.acquire",
             "reservation.reserve",
-            "permit.record",
             "permit.close",
         )
+        assertThat(reservationRejected.permit.recordCalls).isZero()
     }
 
     @Test
@@ -173,7 +173,8 @@ class GroundedProviderCallCoordinatorTest {
         assertThat(reconciliation.terminalState).isEqualTo(ProviderAttemptState.FAILED)
         assertThat(reconciliation.actualCostUsd).isEqualByComparingTo(BigDecimal.ZERO)
         assertThat(reconciliation.releaseCallSlot).isTrue()
-        assertThat(context.permit.outcome).isEqualTo(ProviderCircuitOutcome.IGNORED_FAILURE)
+        assertThat(context.permit.outcome).isNull()
+        assertThat(context.permit.recordCalls).isZero()
     }
 
     @Test

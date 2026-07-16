@@ -162,7 +162,7 @@ class GroundedProviderCallCoordinator private constructor(
         if (acquired is ProviderPermitDecision.Rejected) return preTransportUnavailable()
         val permit = (acquired as ProviderPermitDecision.Acquired).permit
         val startedAt = clock.instant()
-        var circuitOutcome = ProviderCircuitOutcome.IGNORED_FAILURE
+        var circuitOutcome: ProviderCircuitOutcome? = null
         val completed =
             try {
                 val reservation = reserve(command)
@@ -194,7 +194,9 @@ class GroundedProviderCallCoordinator private constructor(
                 CompletedCall(reconciled, transport)
             } finally {
                 try {
-                    permit.record(circuitOutcome, Duration.between(startedAt, clock.instant()).nonNegative())
+                    circuitOutcome?.let { outcome ->
+                        permit.record(outcome, Duration.between(startedAt, clock.instant()).nonNegative())
+                    }
                 } finally {
                     permit.close()
                 }
@@ -460,14 +462,17 @@ class GroundedProviderCallCoordinator private constructor(
                 }
         }
 
-        fun circuitOutcome(): ProviderCircuitOutcome =
+        fun circuitOutcome(): ProviderCircuitOutcome? =
             when (this) {
                 is Generated, is Repaired -> ProviderCircuitOutcome.SUCCESS
                 is Failure ->
-                    if (failureClass == ProviderFailureClass.TRANSIENT) {
-                        ProviderCircuitOutcome.TRANSIENT_FAILURE
-                    } else {
-                        ProviderCircuitOutcome.IGNORED_FAILURE
+                    when (failureClass) {
+                        ProviderFailureClass.PRE_TRANSPORT -> null
+                        ProviderFailureClass.TRANSIENT -> ProviderCircuitOutcome.TRANSIENT_FAILURE
+                        ProviderFailureClass.RATE_LIMITED,
+                        ProviderFailureClass.SCHEMA_OR_PARSE,
+                        ProviderFailureClass.TERMINAL,
+                        -> ProviderCircuitOutcome.IGNORED_FAILURE
                     }
             }
 

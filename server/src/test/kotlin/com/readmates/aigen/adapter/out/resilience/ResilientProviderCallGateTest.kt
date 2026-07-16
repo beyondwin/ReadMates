@@ -117,19 +117,37 @@ class ResilientProviderCallGateTest {
     }
 
     @Test
-    fun `ignored failure outcome dispatches to circuit onSuccess`() {
+    fun `ignored failure releases permission without changing circuit success rate`() {
         val circuitRegistry = circuitRegistry()
         val gate = gate(circuitRegistry = circuitRegistry)
 
-        repeat(2) {
-            gate.acquire(Provider.CLAUDE).use { permit ->
-                permit.record(ProviderCircuitOutcome.IGNORED_FAILURE, Duration.ofMillis(10))
-            }
+        gate.acquire(Provider.CLAUDE).use { permit ->
+            permit.record(ProviderCircuitOutcome.IGNORED_FAILURE, Duration.ofMillis(10))
         }
 
         val circuit = circuitRegistry.circuitBreaker("aigen-provider-claude")
-        assertThat(circuit.metrics.numberOfSuccessfulCalls).isEqualTo(2)
+        assertThat(circuit.metrics.numberOfSuccessfulCalls).isZero()
         assertThat(circuit.metrics.numberOfFailedCalls).isZero()
+        assertThat(circuit.metrics.numberOfBufferedCalls).isZero()
+        assertThat(circuit.state).isEqualTo(CircuitBreaker.State.CLOSED)
+    }
+
+    @Test
+    fun `ignored half open outcome returns probe permission without closing the circuit`() {
+        val circuitRegistry = circuitRegistry()
+        val gate = gate(circuitRegistry = circuitRegistry)
+        val circuit = circuitRegistry.circuitBreaker("aigen-provider-openai")
+        circuit.transitionToOpenState()
+        circuit.transitionToHalfOpenState()
+
+        gate.acquire(Provider.OPENAI).use { permit ->
+            permit.record(ProviderCircuitOutcome.IGNORED_FAILURE, Duration.ofMillis(10))
+        }
+
+        assertThat(circuit.state).isEqualTo(CircuitBreaker.State.HALF_OPEN)
+        gate.acquire(Provider.OPENAI).use { permit ->
+            permit.record(ProviderCircuitOutcome.SUCCESS, Duration.ofMillis(10))
+        }
         assertThat(circuit.state).isEqualTo(CircuitBreaker.State.CLOSED)
     }
 
