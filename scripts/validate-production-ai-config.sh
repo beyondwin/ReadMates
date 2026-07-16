@@ -18,7 +18,7 @@ for file in "$workflow" "$env_example" "$import_script" "$app_compose" "$infra_c
 done
 
 legacy_env='READMATES_AIGEN_''PIPELINE_MODE'
-legacy_property='readmates.aigen.''pipeline-mode'
+legacy_property='readmates.aigen.pipeline''-mode'
 if rg -n "$legacy_env|$legacy_property" \
   "$workflow" "$env_example" "$import_script" "$app_compose"; then
   fail "legacy pipeline selector remains in an active production config path"
