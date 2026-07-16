@@ -137,6 +137,25 @@ class GroundedProviderCallCoordinatorTest {
     }
 
     @Test
+    fun `reservation worst case uses the rendered request output maximum`() {
+        val context = Context()
+        val request = RenderedGroundedRequest("system", "synthetic request", "{}", 4_096)
+
+        context.coordinator.execute(context.command(request = request))
+
+        val reservation = context.reservations.reservationCommands.single()
+        assertThat(reservation.maximumCostUsd)
+            .isEqualByComparingTo(
+                CostCalculator.worstCase(
+                    request.estimatedInputTokens(),
+                    request.maxOutputTokens.toLong(),
+                    context.modelCatalog.pricing(context.model),
+                    cacheWritePossible = true,
+                ),
+            )
+    }
+
+    @Test
     fun `reconciliation failure after transport never issues a second request in one invocation`() {
         val context = Context(reconcileFailure = IllegalStateException("redis unavailable"))
 
@@ -185,8 +204,9 @@ class GroundedProviderCallCoordinatorTest {
                 }
             }
         val record = AiGenerationTestFixtures.jobRecord(status = JobStatus.RUNNING)
-        private val model = AiGenerationTestFixtures.CLAUDE_MODEL
+        val model = AiGenerationTestFixtures.CLAUDE_MODEL
         val reservations = RecordingReservations(events, record, model, reservationResult, reconcileFailure)
+        val modelCatalog = AiGenerationTestFixtures.defaultModelCatalog(setOf(model))
         private val gate =
             ProviderCallGate {
                 events += "gate.acquire"
@@ -197,7 +217,7 @@ class GroundedProviderCallCoordinatorTest {
                 gate = gate,
                 reservations = reservations,
                 generators = mapOf(Provider.CLAUDE to generator),
-                modelCatalog = AiGenerationTestFixtures.defaultModelCatalog(setOf(model)),
+                modelCatalog = modelCatalog,
                 auditPort = audit,
                 traceContext = AiTraceContextPort { TRACE_ID },
                 clock = FakeClock(NOW),
@@ -207,13 +227,14 @@ class GroundedProviderCallCoordinatorTest {
         fun command(
             mode: ProviderCallMode = ProviderCallMode.PRIMARY,
             section: GenerationItem? = null,
+            request: RenderedGroundedRequest = RenderedGroundedRequest("system", "synthetic request", "{}", 100),
         ) = GroundedProviderCallCommand(
             record = record,
             admissionId = record.jobId,
             expectedStatus = JobStatus.RUNNING,
             model = model,
             mode = mode,
-            request = RenderedGroundedRequest("system", "synthetic request", "{}", 100),
+            request = request,
             section = section,
         )
     }
@@ -248,10 +269,12 @@ class GroundedProviderCallCoordinatorTest {
         private val reconcileFailure: RuntimeException?,
     ) : ProviderCallReservationPort {
         val reconciliations = mutableListOf<ProviderCallReconciliationCommand>()
+        val reservationCommands = mutableListOf<ProviderCallReservationCommand>()
         private val attempt = attempt(record.jobId, model)
 
         override fun reserve(command: ProviderCallReservationCommand): ProviderCallReservationResult {
             events += "reservation.reserve"
+            reservationCommands += command
             return reservationResult ?: ProviderCallReservationResult.Reserved(attempt)
         }
 

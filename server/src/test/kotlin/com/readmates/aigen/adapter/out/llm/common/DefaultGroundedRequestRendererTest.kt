@@ -102,6 +102,48 @@ class DefaultGroundedRequestRendererTest {
         assertEquals(2, envelope.path("turns").size())
         assertEquals("HIGHLIGHTS", envelope.path("requestedSection").asText())
         assertEquals("readmates-grounded-generation:v2", envelope.at("/currentDraft/format").asText())
+        assertEquals(4_096, rendered.maxOutputTokens)
+    }
+
+    @Test
+    fun `regeneration schema correction remains section scoped`() {
+        val draft = GroundedDraftJsonCodec().draft(GroundedProviderTestFixture.draftNode())
+        val rendered =
+            renderer.render(
+                request().copy(
+                    mode = GroundedRequestMode.SCHEMA_CORRECTION,
+                    currentDraft = draft,
+                    requestedSection = GenerationItem.SUMMARY,
+                ),
+            )
+        val schema = objectMapper.readTree(rendered.schemaJson)
+
+        assertEquals(1, schema.path("required").size())
+        assertEquals("summaryBlocks", schema.path("required").get(0).asText())
+        assertEquals(
+            listOf("summaryBlocks"),
+            schema
+                .path("properties")
+                .propertyNames()
+                .asSequence()
+                .toList(),
+        )
+        assertTrue(rendered.systemText.contains("Produce only requestedSection"))
+        assertFalse(rendered.systemText.contains("Produce all four"))
+        assertEquals(4_096, rendered.maxOutputTokens)
+    }
+
+    @Test
+    fun `primary schema correction retains the full generation contract`() {
+        val rendered = renderer.render(request().copy(mode = GroundedRequestMode.SCHEMA_CORRECTION))
+        val schema = objectMapper.readTree(rendered.schemaJson)
+
+        assertTrue(rendered.systemText.contains("Produce all four"))
+        assertTrue(schema.path("properties").has("summaryBlocks"))
+        assertTrue(schema.path("properties").has("highlights"))
+        assertTrue(schema.path("properties").has("oneLineReviews"))
+        assertTrue(schema.path("properties").has("feedbackSections"))
+        assertEquals(16_384, rendered.maxOutputTokens)
     }
 
     @Test
