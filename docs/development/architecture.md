@@ -473,7 +473,7 @@ COMMITTED -> cache invalidation + four-payload cleanup
   - `aigen:club:<clubId>:monthly_cost_usd` (String, sliding TTL 31d) — 클럽 누적 비용 BigDecimal USD.
   - `aigen:host:<userId>:daily` (String, sliding TTL 24h) — 호스트 일일 provider admission 횟수.
   - `aigen:host:<userId>:minute` (String, TTL 60s) — AI endpoint 전용 분당 admission 횟수.
-  - `aigen:job:<jobId>:provider_attempts` (Hash, TTL 6h) — attempt ID/ordinal/provider/model/mode/state/reserved cost/cost basis/safe error/timestamp의 content-free ledger.
+  - `aigen:job:<jobId>:provider-attempts` (Hash, TTL 6h) — attempt ID/ordinal/provider/model/mode/state/reserved cost/cost basis/safe error/timestamp의 content-free ledger.
   - `aigen:club:<clubId>:provider_admission` (String, TTL 5m) — provider reservation owner token. 현재 single-node Redis에서 job/admission/monthly-cost/ledger를 한 Lua operation으로 묶습니다. Redis Cluster 호환을 주장하지 않습니다.
 - **Job state machine**: 정상 commit은 `PENDING -> RUNNING -> SUCCEEDED -> COMMITTING -> COMMITTED`입니다. Redis revision CAS가 worker save/regeneration/commit 경합을 막습니다. Receipt 없는 DB 실패 또는 만료 `COMMITTING` lease는 `COMMIT_RETRY`로 복구하고, receipt가 있으면 DB write 없이 `COMMITTED`로 수렴합니다. Commit/cancel은 네 payload를 지우고 terminal hash만 TTL까지 남깁니다. DB commit 후 cleanup 실패는 `COMMITTED + cleanupPending`이며 DB write를 반복하지 않습니다.
 - **LLM call cap/cost**: permit -> atomic reservation -> exactly one HTTP -> `ACTUAL` 또는 `ESTIMATED_UNKNOWN` 순서를 지킵니다. Primary, retry, fallback, schema correction, section repair, regeneration은 같은 최대 3회와 cost cap을 사용합니다. 응답 유실/timeout/crash는 예상 비용을 유지하고, 확실한 pre-transport rejection만 slot/cost를 해제할 수 있습니다. 내부 token은 non-cached input/cache-write/cache-read/output 4채널이며 공개 REST는 기존 input/cachedInput/output 3필드입니다.

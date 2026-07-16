@@ -42,7 +42,7 @@ PENDING/RUNNING           -> FAILED
 - `:transcript`, `:turns`, `:result`, `:evidence` 네 payload는 모두 같은 6시간 TTL을 갖습니다. Commit/cancel은 네 payload를 삭제하고 terminal hash만 남깁니다. 이 중 필수 payload가 먼저 만료하면 부분 결과를 노출하지 않고 `JOB_EXPIRED`로 실패합니다.
 - Kafka job message는 `jobId`, session/club/host ID, provider, model, job kind의 routing metadata만 전달하고 worker가 Redis에서 content payload를 다시 읽습니다. Transcript, turns, member/display name, prompt/instructions, result, evidence/excerpt는 Kafka에 넣지 않습니다.
 - Primary, same-provider retry, fallback, schema correction, section repair, regeneration은 모두 같은 최대 3회 물리 호출 예산을 씁니다. 순서는 항상 `permit -> Redis atomic slot/worst-case cost reservation -> exactly one Spring AI HTTP request -> ACTUAL 또는 ESTIMATED_UNKNOWN`입니다.
-- `aigen:job:<jobId>:provider_attempts` ledger는 `IN_FLIGHT`/`SUCCEEDED`/`FAILED`/`UNKNOWN`, ordinal, call mode, reserved cost, cost basis, safe error, timestamp를 6시간 보존합니다. 응답 유실/timeout/crash처럼 bytes 전송 여부가 불명확하면 비용을 자동 환불하지 않습니다. Kafka redelivery는 살아 있는 `IN_FLIGHT`를 재전송하지 않고 stale attempt를 `UNKNOWN`/`ESTIMATED_UNKNOWN`으로 닫은 뒤 남은 slot에만 새 attempt를 만듭니다.
+- `aigen:job:<jobId>:provider-attempts` ledger는 `IN_FLIGHT`/`SUCCEEDED`/`FAILED`/`UNKNOWN`, ordinal, call mode, reserved cost, cost basis, safe error, timestamp를 6시간 보존합니다. 응답 유실/timeout/crash처럼 bytes 전송 여부가 불명확하면 비용을 자동 환불하지 않습니다. Kafka redelivery는 살아 있는 `IN_FLIGHT`를 재전송하지 않고 stale attempt를 `UNKNOWN`/`ESTIMATED_UNKNOWN`으로 닫은 뒤 남은 slot에만 새 attempt를 만듭니다.
 - Reservation Lua는 job/status/club, 5분 admission owner, 월 비용, 최대 3회와 single-use mode를 한 번에 확인합니다. Redis가 불명확하면 provider 호출을 시작하지 않습니다. 이 원자성은 현재 single-node Redis 전제이며 Redis Cluster 전환 전 재설계가 필요합니다.
 
 운영자가 job 상태만 확인해야 할 때는 payload를 열지 말고 hash metadata와 key 존재 여부만 봅니다.
