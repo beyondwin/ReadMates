@@ -58,11 +58,12 @@ class AiGenerationKafkaConfig {
             { aiGenerationJobValueSerializer() },
         )
 
+    @Suppress("MaxLineLength")
     @Bean
     fun aiGenerationJobKafkaTemplate(
         @Qualifier("aiGenerationJobProducerFactory")
         aiGenerationJobProducerFactory: ProducerFactory<String, AiGenerationJobMessage>,
-    ): KafkaTemplate<String, AiGenerationJobMessage> = KafkaTemplate(aiGenerationJobProducerFactory)
+    ): KafkaTemplate<String, AiGenerationJobMessage> = KafkaTemplate(aiGenerationJobProducerFactory).also { it.setObservationEnabled(true) }
 
     @Suppress("MaxLineLength")
     @Bean
@@ -105,6 +106,7 @@ class AiGenerationKafkaConfig {
             // the ack so the container redelivers. Live provider attempts use a
             // timeout-sized unlimited backoff until recovery can safely mark them stale.
             it.containerProperties.ackMode = ContainerProperties.AckMode.MANUAL
+            it.containerProperties.isObservationEnabled = true
         }
 
     private fun aiGenerationProducerConfigs(properties: AiGenerationKafkaProperties): Map<String, Any> {
@@ -135,6 +137,7 @@ class AiGenerationKafkaConfig {
             ConsumerConfig.AUTO_OFFSET_RESET_CONFIG to "earliest",
             ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG to false,
             ConsumerConfig.ISOLATION_LEVEL_CONFIG to "read_committed",
+            ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG to properties.maxPollInterval.toMillis().toInt(),
         )
     }
 

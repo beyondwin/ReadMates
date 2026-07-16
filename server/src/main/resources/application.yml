@@ -199,3 +199,4 @@ readmates:
       bootstrap-servers: ${READMATES_AIGEN_KAFKA_BOOTSTRAP_SERVERS:}
       topic-jobs: ${READMATES_AIGEN_KAFKA_TOPIC_JOBS:readmates.aigen.jobs.v1}
       consumer-group: ${READMATES_AIGEN_KAFKA_CONSUMER_GROUP:readmates-aigen-worker}
+      max-poll-interval: ${READMATES_AIGEN_KAFKA_MAX_POLL_INTERVAL:16m}

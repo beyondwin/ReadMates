@@ -10,6 +10,7 @@ import org.springframework.boot.env.YamlPropertySourceLoader
 import org.springframework.core.env.MutablePropertySources
 import org.springframework.mock.env.MockEnvironment
 import java.math.BigDecimal
+import java.time.Duration
 
 /**
  * Verifies that application.yml binds correctly into AiGenerationProperties,
@@ -50,12 +51,32 @@ class AiGenerationPropertiesTest {
         return binder.bind("readmates.aigen.pricing", pricingTarget).get()
     }
 
+    private fun loadKafkaProperties(): AiGenerationKafkaProperties {
+        val resource =
+            org.springframework.core.io.FileSystemResource(
+                java.io.File("src/main/resources/application.yml"),
+            )
+        check(resource.exists()) { "application.yml not found" }
+        val sources = YamlPropertySourceLoader().load("application.yml", resource)
+        val environment = MockEnvironment()
+        sources.reversed().forEach { environment.propertySources.addFirst(it) }
+        return Binder
+            .get(environment)
+            .bind("readmates.aigen.kafka", AiGenerationKafkaProperties::class.java)
+            .get()
+    }
+
     @Test
     fun `application yml keeps legacy default and binds grounded reservation`() {
         val properties = loadProperties()
 
         assertEquals(16_384L, properties.grounded.reservedOutputTokens)
         assertEquals(8_192L, properties.grounded.safetyMarginTokens)
+    }
+
+    @Test
+    fun `application yml pins Kafka max poll interval to sixteen minutes`() {
+        assertEquals(Duration.ofMinutes(16), loadKafkaProperties().maxPollInterval)
     }
 
     @Test

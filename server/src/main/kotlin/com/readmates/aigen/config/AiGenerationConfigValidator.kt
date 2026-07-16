@@ -8,6 +8,7 @@ import jakarta.annotation.PostConstruct
 import org.springframework.beans.factory.ListableBeanFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
+import java.time.Duration
 
 /**
  * Guards against the AIGEN_ENABLED=true + KAFKA_ENABLED=false combination that
@@ -26,6 +27,7 @@ class AiGenerationConfigValidator(
     @param:Value("\${readmates.aigen.enabled:false}") private val aigenEnabled: Boolean,
     private val beanFactory: ListableBeanFactory,
     private val properties: AiGenerationProperties = AiGenerationProperties(),
+    private val kafkaProperties: AiGenerationKafkaProperties = AiGenerationKafkaProperties(),
 ) {
     @PostConstruct
     fun validate() {
@@ -39,7 +41,23 @@ class AiGenerationConfigValidator(
                 "Set READMATES_AIGEN_KAFKA_ENABLED=true (with READMATES_AIGEN_KAFKA_BOOTSTRAP_SERVERS) " +
                 "or set READMATES_AIGEN_ENABLED=false."
         }
+        validateKafkaProcessingBudget()
         validateGroundedConfiguration()
+    }
+
+    private fun validateKafkaProcessingBudget() {
+        val maxCalls = properties.job.maxLlmCallsPerJob
+        check(maxCalls > 0) {
+            "readmates.aigen.job.max-llm-calls-per-job must be positive"
+        }
+        val providerTime = properties.providerCalls.requestTimeout.multipliedBy(maxCalls.toLong())
+        val backoffTime =
+            properties.providerCalls.transientBackoffMax.multipliedBy((maxCalls - 1).toLong())
+        val required = providerTime.plus(backoffTime).plus(KAFKA_PROCESSING_SAFETY_MARGIN)
+        check(kafkaProperties.maxPollInterval >= required) {
+            "readmates.aigen.kafka.max-poll-interval must be at least ${required.contractText()} " +
+                "for the configured provider-call processing budget"
+        }
     }
 
     private fun validateGroundedConfiguration() {
@@ -125,5 +143,8 @@ class AiGenerationConfigValidator(
     private companion object {
         const val MAX_RESERVED_OUTPUT_TOKENS = 16_384L
         val OPENAI_O_SERIES_REGEX = Regex("^o\\d.*")
+        val KAFKA_PROCESSING_SAFETY_MARGIN: Duration = Duration.ofMinutes(3)
     }
 }
+
+private fun Duration.contractText(): String = toString().removePrefix("PT").lowercase()

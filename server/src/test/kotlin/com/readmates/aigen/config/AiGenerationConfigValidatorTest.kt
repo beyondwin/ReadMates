@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.support.DefaultListableBeanFactory
 import org.springframework.beans.factory.support.RootBeanDefinition
 import java.math.BigDecimal
+import java.time.Duration
 
 class AiGenerationConfigValidatorTest {
     @Test
@@ -34,6 +35,62 @@ class AiGenerationConfigValidatorTest {
                 properties = validProperties(),
             ).validate()
         }.doesNotThrowAnyException()
+    }
+
+    @Test
+    fun `accepts max poll interval equal to three calls two backoffs and safety margin`() {
+        assertThatCode {
+            AiGenerationConfigValidator(
+                aigenEnabled = true,
+                beanFactory = queueBeanFactory(),
+                properties = validProperties(),
+                kafkaProperties = AiGenerationKafkaProperties(maxPollInterval = Duration.ofMinutes(16)),
+            ).validate()
+        }.doesNotThrowAnyException()
+    }
+
+    @Test
+    fun `fails closed when max poll interval is below worst case processing budget`() {
+        assertThatThrownBy {
+            AiGenerationConfigValidator(
+                aigenEnabled = true,
+                beanFactory = queueBeanFactory(),
+                properties = validProperties(),
+                kafkaProperties =
+                    AiGenerationKafkaProperties(
+                        maxPollInterval = Duration.ofMinutes(16).minusMillis(1),
+                    ),
+            ).validate()
+        }.isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("readmates.aigen.kafka.max-poll-interval")
+            .hasMessageContaining("16m")
+    }
+
+    @Test
+    fun `derives poll budget from configured call timeout count and backoff`() {
+        val base = validProperties()
+        val properties =
+            base.copy(
+                job = base.job.copy(maxLlmCallsPerJob = 2),
+                providerCalls =
+                    base.providerCalls.copy(
+                        requestTimeout = Duration.ofMinutes(2),
+                        transientBackoffMax = Duration.ofSeconds(10),
+                    ),
+            )
+
+        assertThatThrownBy {
+            AiGenerationConfigValidator(
+                aigenEnabled = true,
+                beanFactory = queueBeanFactory(),
+                properties = properties,
+                kafkaProperties =
+                    AiGenerationKafkaProperties(
+                        maxPollInterval = Duration.ofMinutes(7).plusSeconds(9),
+                    ),
+            ).validate()
+        }.isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("7m10s")
     }
 
     @Test
