@@ -3,6 +3,7 @@ package com.readmates.aigen.application.service
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.port.out.JobRecord
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -62,11 +63,34 @@ class AiGenerationWorkerTest {
         val context = TestContext()
         val record = context.savedRecord().copy(status = JobStatus.RUNNING, stage = JobStage.GENERATING_RECORD)
         context.jobStore.save(record)
+        context.reservations.attempts +=
+            com.readmates.aigen.application.model.ProviderAttempt(
+                attemptId = UUID.randomUUID(),
+                ordinal = 1,
+                jobId = record.jobId,
+                provider = AiGenerationTestFixtures.CLAUDE_MODEL.provider,
+                model = AiGenerationTestFixtures.CLAUDE_MODEL,
+                mode = com.readmates.aigen.application.model.ProviderCallMode.PRIMARY,
+                state = com.readmates.aigen.application.model.ProviderAttemptState.IN_FLIGHT,
+                reservedCostUsd = java.math.BigDecimal("1.25"),
+                costBasis = com.readmates.aigen.application.model.CostBasis.NONE,
+                safeErrorCode = null,
+                startedAt = AiGenerationTestFixtures.NOW.minus(context.properties.providerCalls.requestTimeout).minusSeconds(1),
+                completedAt = null,
+            )
 
         context.worker.process(record.jobId)
 
         assertThat(context.reservations.markCalls).isEqualTo(1)
         assertThat(context.processed).containsExactly(record)
+        assertThat(
+            context.registry
+                .find("readmates.aigen.provider.cost.usd")
+                .tag("provider", "CLAUDE")
+                .tag("basis", "ESTIMATED_UNKNOWN")
+                .counter()
+                ?.count(),
+        ).isEqualTo(1.25)
     }
 
     @Test
@@ -89,6 +113,7 @@ class AiGenerationWorkerTest {
         var executorFailure: RuntimeException? = null
         val clock = FakeClock(AiGenerationTestFixtures.NOW)
         val properties = AiGenerationTestFixtures.defaultProperties()
+        val registry = SimpleMeterRegistry()
         val worker =
             AiGenerationWorker(
                 jobStore = jobStore,
@@ -101,6 +126,7 @@ class AiGenerationWorkerTest {
                 costGuard = costGuard,
                 properties = properties,
                 clock = clock,
+                metrics = AiGenerationMetrics(registry),
             )
 
         fun savedRecord(): JobRecord = AiGenerationTestFixtures.jobRecord().also(jobStore::save)

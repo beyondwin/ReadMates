@@ -286,6 +286,7 @@ internal class GroundedRuntime(
             costGuard = FakeCostGuard(),
             properties = properties,
             clock = Clock.systemUTC(),
+            metrics = metrics,
         )
 
     fun newRecord(now: Instant) =

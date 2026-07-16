@@ -147,6 +147,11 @@ class DefaultGroundedRegenerationExecutor(
                         recoveryNow.minus(properties.providerCalls.requestTimeout),
                         recoveryNow,
                     )
+                recovery.recovered.forEach { attempt ->
+                    if (attempt.reservedCostUsd.signum() > 0) {
+                        metrics.recordProviderCost(attempt.provider, attempt.costBasis, attempt.reservedCostUsd)
+                    }
+                }
                 if (recovery.activeInFlight) throw ProviderCallStillInFlightException()
             }
         } catch (failure: RuntimeException) {
@@ -463,7 +468,9 @@ class DefaultGroundedRegenerationExecutor(
         if (usage.outputTokens > 0) {
             metrics.recordTokens(model.provider, model, TokenDirection.OUTPUT, usage.outputTokens)
         }
-        if (cost > BigDecimal.ZERO) metrics.recordCost(model.provider, model, cost)
+        if (cost > BigDecimal.ZERO) {
+            metrics.recordCost(model.provider, model, cost)
+        }
     }
 
     private data class RegenerationAttempt(

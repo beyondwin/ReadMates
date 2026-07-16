@@ -41,12 +41,20 @@ spring:
     locations: ${READMATES_FLYWAY_LOCATIONS:classpath:db/mysql/migration}
 
 management:
+  otlp:
+    metrics:
+      export:
+        enabled: false
   tracing:
     sampling:
       probability: ${READMATES_TRACING_SAMPLING_PROBABILITY:1.0}
   opentelemetry:
     tracing:
       export:
+        max-queue-size: 2048
+        max-batch-size: 512
+        timeout: 5s
+        schedule-delay: 5s
         otlp:
           endpoint: ${READMATES_OTLP_TRACES_ENDPOINT:http://localhost:4318/v1/traces}
   server:

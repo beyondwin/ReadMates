@@ -1,5 +1,6 @@
 package com.readmates.aigen.application.service
 
+import com.readmates.aigen.application.model.CostBasis
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GroundingFailureReason
 import com.readmates.aigen.application.model.JobStatus
@@ -148,6 +149,42 @@ class AiGenerationMetricsTest {
             org.assertj.core.data.Offset
                 .offset(0.001),
         )
+    }
+
+    @Test
+    fun `recordProviderCost separates actual and estimated unknown using a bounded basis tag`() {
+        metrics.recordProviderCost(Provider.CLAUDE, CostBasis.ACTUAL, BigDecimal("0.02"))
+        metrics.recordProviderCost(Provider.CLAUDE, CostBasis.ESTIMATED_UNKNOWN, BigDecimal("0.03"))
+
+        assertThat(
+            registry
+                .find("readmates.aigen.provider.cost.usd")
+                .tag("provider", "CLAUDE")
+                .tag("basis", "ACTUAL")
+                .counter()
+                ?.count(),
+        ).isEqualTo(0.02)
+        assertThat(
+            registry
+                .find("readmates.aigen.provider.cost.usd")
+                .tag("provider", "CLAUDE")
+                .tag("basis", "ESTIMATED_UNKNOWN")
+                .counter()
+                ?.count(),
+        ).isEqualTo(0.03)
+    }
+
+    @Test
+    fun `recordPhysicalCallCapExhausted increments a provider bounded counter`() {
+        metrics.recordPhysicalCallCapExhausted(Provider.GEMINI)
+
+        val counter =
+            registry
+                .find("readmates.aigen.provider.physical.call.cap.exhaustions")
+                .tag("provider", "GEMINI")
+                .counter()
+        assertThat(counter?.count()).isEqualTo(1.0)
+        assertThat(counter?.id?.tags?.map { it.key }).containsExactly("provider")
     }
 
     @Test

@@ -13,7 +13,7 @@ REMOTE_USER="${REMOTE_USER:-ubuntu}"
 SSH_STRICT_HOST_KEY_CHECKING="${SSH_STRICT_HOST_KEY_CHECKING:-accept-new}"
 REMOTE_DIR="${READMATES_REMOTE_DIR:-/opt/readmates}"
 COMPOSE_PROJECT="${READMATES_COMPOSE_PROJECT:-readmates}"
-SERVICES="${READMATES_OBSERVABILITY_SERVICES:-prometheus alertmanager grafana}"
+SERVICES="${READMATES_OBSERVABILITY_SERVICES:-tempo prometheus alertmanager grafana}"
 SKIP_VALIDATE="${READMATES_SKIP_OBSERVABILITY_VALIDATE:-false}"
 GRAFANA_ADMIN_USER="${READMATES_GRAFANA_ADMIN_USER:-readmates}"
 
@@ -24,6 +24,7 @@ ALERTMANAGER_FILE="deploy/oci/alertmanager/alertmanager.yml"
 ALERT_RULES_DIR="ops/prometheus/alerts"
 GRAFANA_PROVISIONING_DIR="deploy/oci/grafana/provisioning"
 GRAFANA_DASHBOARDS_DIR="ops/grafana/dashboards"
+TEMPO_CONFIG="ops/tempo/tempo.yml"
 
 SSH_OPTIONS=(-i "$SSH_KEY" -o "StrictHostKeyChecking=${SSH_STRICT_HOST_KEY_CHECKING}")
 
@@ -156,6 +157,7 @@ require_file "$COMPOSE_INFRA_FILE"
 require_file "$PROMETHEUS_FILE"
 require_file "$ALERTMANAGER_FILE"
 require_dir "$ALERT_RULES_DIR"
+require_file "$TEMPO_CONFIG"
 
 if service_enabled alertmanager; then
   require_alert_env
@@ -170,6 +172,7 @@ if [ "$SKIP_VALIDATE" != "true" ]; then
   echo "==> [2/7] 관측 설정 로컬 검증"
   ./scripts/validate-prometheus-rules.sh
   ./scripts/validate-prometheus-config.sh "$PROMETHEUS_FILE"
+  ./scripts/validate-tempo-config.sh
   if service_enabled alertmanager; then
     ./scripts/validate-alertmanager-config.sh
   fi
@@ -204,6 +207,7 @@ ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
 echo "==> [4/7] 관측성 파일 전송"
 scp "${SSH_OPTIONS[@]}" "$COMPOSE_INFRA_FILE" "${REMOTE_USER}@${VM_PUBLIC_IP}:/tmp/readmates-compose.infra.yml"
 scp "${SSH_OPTIONS[@]}" "$PROMETHEUS_FILE" "${REMOTE_USER}@${VM_PUBLIC_IP}:/tmp/readmates-prometheus.yml"
+scp "${SSH_OPTIONS[@]}" "$TEMPO_CONFIG" "${REMOTE_USER}@${VM_PUBLIC_IP}:/tmp/readmates-tempo.yml"
 scp "${SSH_OPTIONS[@]}" "$ALERTMANAGER_FILE" "${REMOTE_USER}@${VM_PUBLIC_IP}:/tmp/readmates-alertmanager.yml"
 create_clean_archive "$ALERT_RULES_DIR" "$tmpdir/prometheus-alerts.tgz"
 scp "${SSH_OPTIONS[@]}" "$tmpdir/prometheus-alerts.tgz" "${REMOTE_USER}@${VM_PUBLIC_IP}:/tmp/readmates-prometheus-alerts.tgz"
@@ -224,9 +228,10 @@ remote_dir="$1"
 compose_project="$2"
 services="$3"
 
-sudo install -d -m 0755 "$remote_dir/deploy/oci/prometheus" "$remote_dir/deploy/oci/alertmanager" "$remote_dir/deploy/oci/grafana/provisioning" "$remote_dir/ops/prometheus/alerts" "$remote_dir/ops/grafana/dashboards"
+sudo install -d -m 0755 "$remote_dir/deploy/oci/prometheus" "$remote_dir/deploy/oci/alertmanager" "$remote_dir/deploy/oci/grafana/provisioning" "$remote_dir/ops/prometheus/alerts" "$remote_dir/ops/grafana/dashboards" "$remote_dir/ops/tempo"
 sudo mv /tmp/readmates-compose.infra.yml "$remote_dir/deploy/oci/compose.infra.yml"
 sudo mv /tmp/readmates-prometheus.yml "$remote_dir/deploy/oci/prometheus/prometheus.yml"
+sudo mv /tmp/readmates-tempo.yml "$remote_dir/ops/tempo/tempo.yml"
 sudo mv /tmp/readmates-alertmanager.yml "$remote_dir/deploy/oci/alertmanager/alertmanager.yml"
 sudo tar -xzf /tmp/readmates-prometheus-alerts.tgz -C "$remote_dir/ops/prometheus/alerts"
 sudo rm -f /tmp/readmates-prometheus-alerts.tgz
@@ -248,12 +253,12 @@ for cleanup_dir in "$remote_dir/ops/prometheus/alerts" "$remote_dir/deploy/oci/g
   fi
 done
 
-sudo chown -R readmates:readmates "$remote_dir/deploy/oci" "$remote_dir/ops/prometheus/alerts" "$remote_dir/ops/grafana/dashboards"
+sudo chown -R readmates:readmates "$remote_dir/deploy/oci" "$remote_dir/ops/prometheus/alerts" "$remote_dir/ops/grafana/dashboards" "$remote_dir/ops/tempo"
 cd "$remote_dir/deploy/oci"
 sudo docker compose -p "$compose_project" -f compose.infra.yml config >/dev/null
 EOF
 
-echo "==> [6/7] Prometheus/Alertmanager/Grafana 시작"
+echo "==> [6/7] Tempo/Prometheus/Alertmanager/Grafana 시작"
 ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
   "cd $(shell_quote "$REMOTE_DIR/deploy/oci") && sudo docker compose -p $(shell_quote "$COMPOSE_PROJECT") -f compose.infra.yml up -d ${SERVICES}"
 
@@ -270,6 +275,19 @@ remote_dir="$1"
 compose_project="$2"
 services="$3"
 cd "$remote_dir/deploy/oci"
+
+if printf '%s\n' "$services" | grep -Eq '(^|[[:space:]])tempo([[:space:]]|$)'; then
+  for i in $(seq 1 30); do
+    if sudo docker compose -p "$compose_project" -f compose.infra.yml exec -T prometheus wget -qO- http://tempo:3200/ready >/dev/null; then
+      break
+    fi
+    if [ "$i" -eq 30 ]; then
+      sudo docker compose -p "$compose_project" -f compose.infra.yml logs --tail=120 tempo
+      exit 1
+    fi
+    sleep 2
+  done
+fi
 
 for i in $(seq 1 30); do
   if sudo docker compose -p "$compose_project" -f compose.infra.yml exec -T prometheus wget -qO- http://localhost:9090/-/ready >/dev/null; then

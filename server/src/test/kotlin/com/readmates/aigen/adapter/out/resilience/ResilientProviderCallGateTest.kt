@@ -23,6 +23,20 @@ class ResilientProviderCallGateTest {
     private val meterRegistry = SimpleMeterRegistry()
 
     @Test
+    fun `circuit state gauge is bound to the application meter registry`() {
+        gate()
+
+        val closed =
+            meterRegistry
+                .find("resilience4j.circuitbreaker.state")
+                .tags("name", "aigen-provider-openai", "state", "closed")
+                .gauge()
+
+        assertThat(closed).isNotNull
+        assertThat(closed!!.value()).isEqualTo(1.0)
+    }
+
+    @Test
     fun `default gate grants two permits per provider and rejects the third without waiting`() {
         val gate = gate()
         val first = gate.acquire(Provider.OPENAI)
@@ -218,6 +232,7 @@ class ResilientProviderCallGateTest {
                 ),
             metrics = AiGenerationMetrics(meterRegistry),
             circuitBreakerRegistry = circuitRegistry,
+            meterRegistry = meterRegistry,
         )
 
     private fun ResilientProviderCallGate.acquire(provider: Provider): ProviderCallPermit =

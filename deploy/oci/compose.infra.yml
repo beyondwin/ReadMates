@@ -53,6 +53,7 @@ services:
       - "--storage.tsdb.path=/prometheus"
       - "--storage.tsdb.retention.time=30d"
       - "--web.enable-lifecycle"
+      - "--enable-feature=exemplar-storage"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ../../ops/prometheus/alerts:/etc/prometheus/alerts:ro
@@ -63,6 +64,21 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  tempo:
+    image: grafana/tempo:2.10.5
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/tempo/tempo.yml"
+    volumes:
+      - ../../ops/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
+      - readmates_tempo_data:/var/tempo
+    healthcheck:
+      test: ["CMD", "/tempo", "--config.file=/etc/tempo/tempo.yml", "--config.verify=true"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   alertmanager:
     image: prom/alertmanager:v0.27.0
@@ -96,6 +112,8 @@ services:
     depends_on:
       prometheus:
         condition: service_healthy
+      tempo:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health >/dev/null"]
       interval: 30s
@@ -109,3 +127,4 @@ volumes:
   readmates_prom_data:
   readmates_alertmanager_data:
   readmates_grafana_data:
+  readmates_tempo_data:

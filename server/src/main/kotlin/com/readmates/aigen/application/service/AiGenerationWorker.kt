@@ -27,6 +27,7 @@ class AiGenerationWorker(
     private val costGuard: GenerationCostGuard,
     private val properties: AiGenerationProperties,
     private val clock: Clock,
+    private val metrics: AiGenerationMetrics,
 ) {
     fun process(jobId: UUID) {
         val record = jobStore.load(jobId) ?: return
@@ -49,6 +50,11 @@ class AiGenerationWorker(
                 recoveryNow.minus(properties.providerCalls.requestTimeout),
                 recoveryNow,
             )
+        recovery.recovered.forEach { attempt ->
+            if (attempt.reservedCostUsd.signum() > 0) {
+                metrics.recordProviderCost(attempt.provider, attempt.costBasis, attempt.reservedCostUsd)
+            }
+        }
         if (recovery.activeInFlight) throw ProviderCallStillInFlightException()
         processAndReleaseAdmission(record, start)
     }

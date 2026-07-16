@@ -28,6 +28,7 @@ import com.readmates.aigen.application.port.out.ProviderGateRejection
 import com.readmates.aigen.application.port.out.ProviderPermitDecision
 import com.readmates.aigen.application.port.out.RenderedGroundedRequest
 import com.readmates.aigen.application.port.out.WholeTranscriptGroundedGenerator
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -60,6 +61,14 @@ class GroundedProviderCallCoordinatorTest {
         assertThat(audit.providerCallMode).isEqualTo(ProviderCallMode.PRIMARY)
         assertThat(audit.traceId).isEqualTo(TRACE_ID)
         assertThat(audit.costBasis).isEqualTo(CostBasis.ACTUAL)
+        assertThat(
+            context.registry
+                .find("readmates.aigen.provider.cost.usd")
+                .tag("provider", "CLAUDE")
+                .tag("basis", "ACTUAL")
+                .counter()
+                ?.count(),
+        ).isGreaterThan(BigDecimal.ZERO.toDouble())
         assertThat(context.observations.contexts.single())
             .isEqualTo(
                 AiProviderObservationContext(
@@ -98,6 +107,13 @@ class GroundedProviderCallCoordinatorTest {
         assertThat(gateRejected.generator.physicalCalls).isZero()
         assertThat(gateRejected.events).containsExactly("gate.acquire")
         assertThat(reservationResult).isInstanceOf(GroundedProviderCallResult.Failed::class.java)
+        assertThat(
+            reservationRejected.registry
+                .find("readmates.aigen.provider.physical.call.cap.exhaustions")
+                .tag("provider", "CLAUDE")
+                .counter()
+                ?.count(),
+        ).isEqualTo(1.0)
         assertThat(reservationRejected.generator.physicalCalls).isZero()
         assertThat(reservationRejected.events).containsExactly(
             "gate.acquire",
@@ -265,6 +281,8 @@ class GroundedProviderCallCoordinatorTest {
         reconcileFailure: RuntimeException? = null,
         auditFailure: RuntimeException? = null,
     ) {
+        val registry = SimpleMeterRegistry()
+        private val metrics = AiGenerationMetrics(registry)
         val events = mutableListOf<String>()
         val permit = RecordingPermit(events)
         val generator = RecordingGenerator(events)
@@ -296,6 +314,7 @@ class GroundedProviderCallCoordinatorTest {
                 clock = FakeClock(NOW),
                 maxCalls = 3,
                 observations = observations,
+                metrics = metrics,
             )
 
         fun command(

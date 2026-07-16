@@ -1,5 +1,6 @@
 package com.readmates.aigen.application.service
 
+import com.readmates.aigen.application.model.CostBasis
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelId
@@ -18,14 +19,14 @@ import java.time.Duration
  * email) are absolutely forbidden.
  */
 class MetricLabelsTest {
-    private val allowlist = setOf("provider", "model", "kind", "status", "reason", "direction")
+    private val allowlist = setOf("provider", "model", "kind", "status", "reason", "direction", "basis")
     private val forbidden = setOf("transcript", "hostId", "sessionId", "clubId", "email")
 
     @Test
-    fun `MetricLabel enum has exactly the 6 allowlisted entries`() {
+    fun `MetricLabel enum has exactly the bounded allowlisted entries`() {
         val names = MetricLabel.values().map { it.tagKey }.toSet()
         assertThat(names).isEqualTo(allowlist)
-        assertThat(MetricLabel.values().size).isEqualTo(6)
+        assertThat(MetricLabel.values().size).isEqualTo(7)
     }
 
     @Test
@@ -47,6 +48,8 @@ class MetricLabelsTest {
         metrics.recordTokens(Provider.CLAUDE, model, TokenDirection.CACHE_READ_INPUT, 50)
         metrics.recordTokens(Provider.CLAUDE, model, TokenDirection.OUTPUT, 200)
         metrics.recordCost(Provider.CLAUDE, model, BigDecimal("0.05"))
+        metrics.recordProviderCost(Provider.CLAUDE, CostBasis.ESTIMATED_UNKNOWN, BigDecimal("0.05"))
+        metrics.recordPhysicalCallCapExhausted(Provider.CLAUDE)
         metrics.recordValidationFailure(ErrorCode.SCHEMA_INVALID)
         metrics.recordCapDenial(CapDenialReason.HOST_DAILY)
         metrics.registerQueueDepthGauge { 0 }

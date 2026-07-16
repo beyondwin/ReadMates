@@ -475,7 +475,9 @@ class DefaultGroundedGenerationExecutor(
         if (usage.outputTokens > 0) {
             metrics.recordTokens(model.provider, model, TokenDirection.OUTPUT, usage.outputTokens)
         }
-        if (cost > BigDecimal.ZERO) metrics.recordCost(model.provider, model, cost)
+        if (cost > BigDecimal.ZERO) {
+            metrics.recordCost(model.provider, model, cost)
+        }
     }
 
     private fun maybeNotifyLong(

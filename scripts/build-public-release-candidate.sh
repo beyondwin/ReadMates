@@ -421,6 +421,7 @@ copy_manifest() {
   copy_dir "ops/grafana/dashboards"
   copy_dir "ops/observability/local"
   copy_dir "ops/prometheus/alerts"
+  copy_dir "ops/tempo"
   copy_required_file "scripts/build-public-release-candidate.sh"
   copy_required_file "scripts/README.md"
   copy_optional_file "scripts/generate-slo-report.py"
@@ -433,6 +434,7 @@ copy_manifest() {
   copy_optional_file "scripts/validate-alertmanager-config.sh"
   copy_optional_file "scripts/validate-prometheus-config.sh"
   copy_optional_file "scripts/validate-prometheus-rules.sh"
+  copy_optional_file "scripts/validate-tempo-config.sh"
   copy_optional_file "scripts/verify-public-release-fixtures.sh"
 }
 

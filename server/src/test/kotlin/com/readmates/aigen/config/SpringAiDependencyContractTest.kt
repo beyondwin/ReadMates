@@ -49,6 +49,17 @@ class SpringAiDependencyContractTest {
         assertThat(environment.getProperty("spring.ai.tools.observations.include-content")).isEqualTo("false")
     }
 
+    @Test
+    fun `keeps OTLP batch export queue and waits bounded`() {
+        val environment = loadApplicationEnvironment()
+
+        assertThat(environment.getProperty("management.opentelemetry.tracing.export.max-queue-size")).isEqualTo("2048")
+        assertThat(environment.getProperty("management.opentelemetry.tracing.export.max-batch-size")).isEqualTo("512")
+        assertThat(environment.getProperty("management.opentelemetry.tracing.export.timeout")).isEqualTo("5s")
+        assertThat(environment.getProperty("management.opentelemetry.tracing.export.schedule-delay")).isEqualTo("5s")
+        assertThat(environment.getProperty("management.otlp.metrics.export.enabled")).isEqualTo("false")
+    }
+
     private fun loadApplicationEnvironment(): MockEnvironment {
         val resource = FileSystemResource(Path.of("src/main/resources/application.yml"))
         val propertySources = MutablePropertySources()

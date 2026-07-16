@@ -6,6 +6,20 @@ set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
 
+rules="ops/prometheus/alerts/aigen-rules.yml"
+for alert in \
+  AiGenProviderCircuitOpen \
+  AiGenEstimatedUnknownCostGrowth \
+  AiGenPhysicalCallCapExhausted \
+  AiGenOtlpExporterDrops \
+  TempoTargetDown \
+  TempoNotReady; do
+  grep -Fq "alert: $alert" "$rules" || {
+    printf 'Missing required observability alert: %s\n' "$alert" >&2
+    exit 1
+  }
+done
+
 docker run --rm \
   -v "$PWD/ops/prometheus/alerts:/etc/prometheus/alerts:ro" \
   --entrypoint /bin/sh \

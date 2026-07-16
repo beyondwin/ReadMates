@@ -36,6 +36,7 @@ import com.readmates.aigen.application.port.out.RenderedGroundedRequest
 import com.readmates.aigen.application.port.out.WholeTranscriptGroundedGenerator
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
 import java.time.Clock
@@ -88,7 +89,8 @@ class ProviderCallReconciliationException(
 
 /** Owns the complete lifecycle of exactly one physical grounded provider request. */
 @Component
-@Suppress("LongParameterList")
+@ConditionalOnProperty(prefix = "readmates", name = ["aigen.enabled"], havingValue = "true")
+@Suppress("LongParameterList", "TooManyFunctions")
 class GroundedProviderCallCoordinator private constructor(
     private val gate: ProviderCallGate,
     private val reservations: ProviderCallReservationPort,
@@ -97,6 +99,7 @@ class GroundedProviderCallCoordinator private constructor(
     private val auditPort: AiGenerationAuditPort,
     private val traceContext: AiTraceContextPort,
     private val observations: AiProviderObservationPort,
+    private val metrics: AiGenerationMetrics?,
     private val clock: Clock,
     private val maxCalls: Int,
 ) {
@@ -111,6 +114,7 @@ class GroundedProviderCallCoordinator private constructor(
         auditPort: AiGenerationAuditPort,
         traceContext: AiTraceContextPort,
         observations: AiProviderObservationPort,
+        metrics: AiGenerationMetrics,
         clock: Clock,
         properties: com.readmates.aigen.config.AiGenerationProperties,
     ) : this(
@@ -121,6 +125,7 @@ class GroundedProviderCallCoordinator private constructor(
         auditPort,
         traceContext,
         observations,
+        metrics,
         clock,
         properties.job.maxLlmCallsPerJob,
     )
@@ -135,8 +140,20 @@ class GroundedProviderCallCoordinator private constructor(
         clock: Clock,
         maxCalls: Int,
         observations: AiProviderObservationPort = AiProviderObservationPort.PASSTHROUGH,
+        metrics: AiGenerationMetrics? = null,
         @Suppress("UNUSED_PARAMETER") testConstruction: Unit = Unit,
-    ) : this(gate, reservations, generators, modelCatalog, auditPort, traceContext, observations, clock, maxCalls)
+    ) : this(
+        gate,
+        reservations,
+        generators,
+        modelCatalog,
+        auditPort,
+        traceContext,
+        observations,
+        metrics,
+        clock,
+        maxCalls,
+    )
 
     @Suppress("ReturnCount", "SwallowedException", "TooGenericExceptionCaught")
     fun execute(command: GroundedProviderCallCommand): GroundedProviderCallResult {
@@ -149,7 +166,9 @@ class GroundedProviderCallCoordinator private constructor(
         val completed =
             try {
                 val reservation = reserve(command)
-                if (reservation !is ProviderCallReservationResult.Reserved) return rejected(reservation)
+                if (reservation !is ProviderCallReservationResult.Reserved) {
+                    return rejected(command.model.provider, reservation)
+                }
                 val attempt = reservation.attempt
                 val transport =
                     try {
@@ -171,6 +190,7 @@ class GroundedProviderCallCoordinator private constructor(
                     }
                 circuitOutcome = transport.circuitOutcome()
                 val reconciled = reconcile(command, attempt, transport)
+                recordReconciledCost(command.model, reconciled, transport)
                 CompletedCall(reconciled, transport)
             } finally {
                 try {
@@ -264,6 +284,22 @@ class GroundedProviderCallCoordinator private constructor(
         }
     }
 
+    private fun recordReconciledCost(
+        model: ModelId,
+        attempt: ProviderAttempt,
+        result: PhysicalResult,
+    ) {
+        val amount =
+            when (attempt.costBasis) {
+                CostBasis.ACTUAL -> actualCost(model, result) ?: return
+                CostBasis.ESTIMATED_UNKNOWN -> attempt.reservedCostUsd
+                CostBasis.NONE -> return
+            }
+        if (amount > BigDecimal.ZERO) {
+            metrics?.recordProviderCost(model.provider, attempt.costBasis, amount)
+        }
+    }
+
     private fun audit(
         command: GroundedProviderCallCommand,
         attempt: ProviderAttempt,
@@ -315,7 +351,10 @@ class GroundedProviderCallCoordinator private constructor(
         )
     }
 
-    private fun rejected(result: ProviderCallReservationResult): GroundedProviderCallResult =
+    private fun rejected(
+        provider: Provider,
+        result: ProviderCallReservationResult,
+    ): GroundedProviderCallResult =
         when (result) {
             ProviderCallReservationResult.StateChanged -> GroundedProviderCallResult.StateChanged
             ProviderCallReservationResult.AdmissionExpired ->
@@ -324,12 +363,14 @@ class GroundedProviderCallCoordinator private constructor(
                     "Provider admission expired before call",
                     ProviderFailureClass.TERMINAL,
                 )
-            ProviderCallReservationResult.CallCapExceeded ->
+            ProviderCallReservationResult.CallCapExceeded -> {
+                metrics?.recordPhysicalCallCapExhausted(provider)
                 failed(
                     ErrorCode.MAX_CALLS_EXCEEDED,
                     "Per-job LLM call cap exceeded",
                     ProviderFailureClass.TERMINAL,
                 )
+            }
             ProviderCallReservationResult.ModeAlreadyUsed ->
                 failed(
                     ErrorCode.MAX_CALLS_EXCEEDED,

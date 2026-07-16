@@ -11,6 +11,8 @@ import com.readmates.aigen.application.service.ProviderCircuitState
 import com.readmates.aigen.config.AiGenerationProperties
 import io.github.resilience4j.circuitbreaker.CircuitBreaker
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
+import io.github.resilience4j.micrometer.tagged.TaggedCircuitBreakerMetrics
+import io.micrometer.core.instrument.MeterRegistry
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
 import java.time.Duration
@@ -22,12 +24,20 @@ class ResilientProviderCallGate internal constructor(
     properties: AiGenerationProperties,
     private val metrics: AiGenerationMetrics,
     private val circuitBreakerRegistry: CircuitBreakerRegistry,
+    meterRegistry: MeterRegistry,
 ) : ProviderCallGate {
     @Autowired
     constructor(
         properties: AiGenerationProperties,
         metrics: AiGenerationMetrics,
-    ) : this(properties, metrics, CircuitBreakerRegistry.ofDefaults())
+        meterRegistry: MeterRegistry,
+    ) : this(properties, metrics, CircuitBreakerRegistry.ofDefaults(), meterRegistry)
+
+    init {
+        TaggedCircuitBreakerMetrics
+            .ofCircuitBreakerRegistry(circuitBreakerRegistry)
+            .bindTo(meterRegistry)
+    }
 
     private val semaphores =
         Provider.entries.associateWith {

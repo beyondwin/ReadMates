@@ -1,5 +1,6 @@
 package com.readmates.aigen.application.service
 
+import com.readmates.aigen.application.model.CostBasis
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GroundingFailureReason
 import com.readmates.aigen.application.model.JobStatus
@@ -158,6 +159,34 @@ class AiGenerationMetrics(
             .increment(amountUsd.toDouble())
     }
 
+    /** Provider cost split by the bounded reconciliation basis used for operator review. */
+    fun recordProviderCost(
+        provider: Provider,
+        basis: CostBasis,
+        amountUsd: BigDecimal,
+    ) {
+        Counter
+            .builder(NAME_PROVIDER_COST_USD)
+            .description("Accumulated provider cost by reconciliation basis")
+            .baseUnit("usd")
+            .tags(
+                aigenMeter(
+                    MetricLabel.PROVIDER to provider.name,
+                    MetricLabel.BASIS to basis.name,
+                ),
+            ).register(meterRegistry)
+            .increment(amountUsd.toDouble())
+    }
+
+    fun recordPhysicalCallCapExhausted(provider: Provider) {
+        Counter
+            .builder(NAME_PROVIDER_PHYSICAL_CALL_CAP_EXHAUSTIONS)
+            .description("AI jobs that exhausted the bounded physical provider call cap")
+            .tags(aigenMeter(MetricLabel.PROVIDER to provider.name))
+            .register(meterRegistry)
+            .increment()
+    }
+
     /**
      * `readmates_aigen_validation_failures_total{reason}` — counter.
      * Callers should pass only validation-subset [ErrorCode] values
@@ -310,6 +339,9 @@ class AiGenerationMetrics(
         const val NAME_PROVIDER_CALL_LATENCY = "readmates.aigen.provider.call.latency"
         const val NAME_PROVIDER_GATE_REJECTIONS = "readmates.aigen.provider.gate.rejections"
         const val NAME_PROVIDER_CIRCUIT_TRANSITIONS = "readmates.aigen.provider.circuit.state.transitions"
+        const val NAME_PROVIDER_COST_USD = "readmates.aigen.provider.cost.usd"
+        const val NAME_PROVIDER_PHYSICAL_CALL_CAP_EXHAUSTIONS =
+            "readmates.aigen.provider.physical.call.cap.exhaustions"
     }
 }
 
@@ -339,6 +371,7 @@ enum class MetricLabel(
     STATUS("status"),
     REASON("reason"),
     DIRECTION("direction"),
+    BASIS("basis"),
 }
 
 /**

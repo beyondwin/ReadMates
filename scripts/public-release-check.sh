@@ -354,6 +354,7 @@ scan_observability_targets() {
     "$source_abs/deploy/oci/alertmanager"
     "$source_abs/deploy/oci/grafana"
     "$source_abs/ops/prometheus/alerts"
+    "$source_abs/ops/tempo"
   )
   local target rel
 
@@ -370,6 +371,52 @@ scan_observability_targets() {
          | grep -vE '@(example\.com|localhost)' >/dev/null; then
       record_finding "observability target $rel contains a non-placeholder email address — use @example.com"
     fi
+  done
+}
+
+check_internal_tempo_release_contract() {
+  local tempo_config="$source_abs/ops/tempo/tempo.yml"
+  local local_compose="$source_abs/ops/observability/local/compose.yml"
+  local oci_compose="$source_abs/deploy/oci/compose.infra.yml"
+  local local_tempo="$source_abs/ops/observability/local/grafana/provisioning/datasources/tempo.yml"
+  local oci_tempo="$source_abs/deploy/oci/grafana/provisioning/datasources/tempo.yml"
+  local file tempo_service
+
+  for file in "$tempo_config" "$local_compose" "$oci_compose" "$local_tempo" "$oci_tempo"; do
+    [[ -f "$file" ]] || record_finding "missing internal Tempo release asset: ${file#"$source_abs"/}"
+  done
+  [[ -f "$tempo_config" && -f "$local_compose" && -f "$oci_compose" ]] || return 0
+
+  grep -Eq '^[[:space:]]+block_retention:[[:space:]]+168h([[:space:]]|$)' "$tempo_config" ||
+    record_finding "Tempo public release config must retain traces for exactly 168h"
+  grep -Fq 'grafana/tempo:2.10.5' "$local_compose" ||
+    record_finding "local observability compose must pin grafana/tempo:2.10.5"
+  grep -Fq 'grafana/tempo:2.10.5' "$oci_compose" ||
+    record_finding "OCI observability compose must pin grafana/tempo:2.10.5"
+  grep -Fq '127.0.0.1:${READMATES_LOCAL_TEMPO_PORT:-3200}:3200' "$local_compose" ||
+    record_finding "local Tempo query port must be loopback-only"
+  grep -Fq '127.0.0.1:${READMATES_LOCAL_OTLP_HTTP_PORT:-4318}:4318' "$local_compose" ||
+    record_finding "local OTLP HTTP port must be loopback-only"
+  grep -Fq '127.0.0.1:${READMATES_LOCAL_GRAFANA_PORT:-3001}:3000' "$local_compose" ||
+    record_finding "local Grafana must be loopback-only because it proxies Tempo"
+  grep -Fq '127.0.0.1:${READMATES_LOCAL_PROMETHEUS_PORT:-9090}:9090' "$local_compose" ||
+    record_finding "local Prometheus must be loopback-only"
+
+  tempo_service="$(awk '
+    /^  tempo:[[:space:]]*$/ { in_tempo=1; next }
+    in_tempo && /^  [[:alnum:]_-]+:[[:space:]]*$/ { exit }
+    in_tempo { print }
+  ' "$oci_compose")"
+  if printf '%s\n' "$tempo_service" | grep -Eq '^[[:space:]]+ports:[[:space:]]*$'; then
+    record_finding "OCI Tempo service must not publish query or OTLP ports"
+  fi
+
+  for file in "$local_tempo" "$oci_tempo"; do
+    [[ -f "$file" ]] || continue
+    grep -Eq '^[[:space:]]*uid:[[:space:]]*readmates-tempo([[:space:]]|$)' "$file" ||
+      record_finding "Tempo datasource must use stable UID readmates-tempo: ${file#"$source_abs"/}"
+    grep -Eq '^[[:space:]]*url:[[:space:]]*http://tempo:3200([[:space:]]|$)' "$file" ||
+      record_finding "Tempo datasource must use internal Docker DNS: ${file#"$source_abs"/}"
   done
 }
 
@@ -425,6 +472,7 @@ fi
 
 run_targeted_content_checks
 scan_observability_targets
+check_internal_tempo_release_contract
 run_gitleaks_or_fallback_notice
 
 if [[ -s "$findings" ]]; then

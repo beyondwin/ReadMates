@@ -128,3 +128,80 @@ groups:
             sustained for 1m. AI generation depends on Redis for cap
             tracking and idempotency — expect cascading failures.
           runbook_url: "https://github.com/readmates/readmates/blob/main/docs/operations/runbooks/ai-session-generation.md#redis-down"
+
+      - alert: AiGenProviderCircuitOpen
+        expr: resilience4j_circuitbreaker_state{name=~"aigen-provider-(openai|claude|gemini)",state="open"} == 1
+        for: 5m
+        labels:
+          severity: warn
+          component: aigen
+        annotations:
+          summary: "AI provider circuit has remained open"
+          description: >-
+            The bounded provider circuit {{ $labels.name }} has remained open
+            for five minutes. Inspect provider availability before re-enabling traffic.
+          runbook_url: "https://github.com/readmates/readmates/blob/main/docs/operations/runbooks/ai-session-generation.md#provider-circuit-open"
+
+      - alert: AiGenEstimatedUnknownCostGrowth
+        expr: sum(increase(readmates_aigen_provider_cost_usd_total{basis="ESTIMATED_UNKNOWN"}[15m])) > 0
+        for: 5m
+        labels:
+          severity: warn
+          component: aigen
+        annotations:
+          summary: "AI estimated-unknown reserved cost is growing"
+          description: >-
+            Estimated-unknown AI cost grew by {{ printf "$%.4f" $value }} in
+            15 minutes. Review attempt audit rows before any manual adjustment.
+          runbook_url: "https://github.com/readmates/readmates/blob/main/docs/operations/runbooks/ai-session-generation.md#estimated-unknown-cost"
+
+      - alert: AiGenPhysicalCallCapExhausted
+        expr: sum(increase(readmates_aigen_provider_physical_call_cap_exhaustions_total[10m])) > 0
+        for: 5m
+        labels:
+          severity: warn
+          component: aigen
+        annotations:
+          summary: "AI physical-call cap was exhausted"
+          description: >-
+            At least one AI job exhausted the maximum three physical provider
+            requests. Inspect bounded attempt outcomes; do not bypass the cap.
+          runbook_url: "https://github.com/readmates/readmates/blob/main/docs/operations/runbooks/ai-session-generation.md#physical-call-cap"
+
+      - alert: AiGenOtlpExporterDrops
+        expr: |
+          sum(increase(readmates_observability_otlp_export_spans_total{status="failed"}[10m])) > 0
+          or
+          sum(increase(readmates_observability_otlp_queue_dropped_spans_total[10m])) > 0
+        for: 5m
+        labels:
+          severity: warn
+          component: observability
+        annotations:
+          summary: "OTLP exporter is dropping spans"
+          description: >-
+            The bounded OpenTelemetry exporter dropped {{ $value }} spans in
+            ten minutes. Product requests remain isolated from export failure.
+          runbook_url: "https://github.com/readmates/readmates/blob/main/docs/operations/runbooks/ai-session-generation.md#otlp-exporter-drops"
+
+      - alert: TempoTargetDown
+        expr: up{job="tempo"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: observability
+        annotations:
+          summary: "Tempo Prometheus target is down"
+          description: "Prometheus cannot scrape the internal Tempo target for two minutes."
+          runbook_url: "https://github.com/readmates/readmates/blob/main/docs/operations/runbooks/ai-session-generation.md#tempo-down"
+
+      - alert: TempoNotReady
+        expr: absent(tempo_ring_members{name="ingester",state="ACTIVE"}) or max(tempo_ring_members{name="ingester",state="ACTIVE"}) < 1
+        for: 2m
+        labels:
+          severity: critical
+          component: observability
+        annotations:
+          summary: "Tempo ingester is not ready"
+          description: "Tempo is scrapeable but has no active ingester ring member."
+          runbook_url: "https://github.com/readmates/readmates/blob/main/docs/operations/runbooks/ai-session-generation.md#tempo-not-ready"
