@@ -22,6 +22,7 @@ import com.readmates.aigen.application.port.out.GenerationCostGuard
 import com.readmates.aigen.application.port.out.JobKind
 import com.readmates.aigen.application.port.out.JobRecord
 import com.readmates.aigen.application.port.out.ModelCatalog
+import com.readmates.aigen.application.port.out.ProviderCallReservationPort
 import com.readmates.aigen.application.port.out.SessionContentGenerator
 import com.readmates.aigen.config.AiGenerationProperties
 import org.slf4j.LoggerFactory
@@ -76,6 +77,7 @@ class AiGenerationWorker(
     private val sleeper: Sleeper = Sleeper.Default,
     private val fallbackChain: ProviderFallbackChain,
     private val groundedExecutor: GroundedGenerationExecutor = GroundedGenerationExecutor.Disabled,
+    private val providerCallReservations: ProviderCallReservationPort,
 ) {
     private val logger = LoggerFactory.getLogger(AiGenerationWorker::class.java)
 
@@ -83,6 +85,13 @@ class AiGenerationWorker(
     fun process(jobId: UUID) {
         val record = jobStore.load(jobId) ?: return // expired / already cleaned
         val start = clock.instant()
+        if (record.pipelineMode == AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT &&
+            record.status == JobStatus.RUNNING
+        ) {
+            providerCallReservations.markUnresolvedInFlightUnknown(record.jobId, clock.instant())
+            groundedExecutor.process(record, start)
+            return
+        }
         val initialStage =
             if (record.pipelineMode == AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT) {
                 JobStage.PREPARING_TRANSCRIPT

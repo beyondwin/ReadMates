@@ -323,6 +323,55 @@ class RedisProviderCallReservationAdapterTest(
     }
 
     @Test
+    fun `Kafka redelivery after provider response crash marks unknown and keeps total reservations at three`() {
+        val fixture = fixture()
+        prepare(fixture, JobStatus.RUNNING)
+        val first = reservations.reserve(fixture.command(maximumCostUsd = CENT))
+        assertThat(first).isInstanceOf(ProviderCallReservationResult.Reserved::class.java)
+
+        // Simulate a crash after the provider accepted/responded but before reconciliation.
+        val recovered = reservations.markUnresolvedInFlightUnknown(fixture.jobId, fixture.now.plusSeconds(30))
+        val secondAttemptId = UUID.randomUUID()
+        val thirdAttemptId = UUID.randomUUID()
+        val second = reservations.reserve(fixture.command(attemptId = secondAttemptId, maximumCostUsd = CENT))
+        val third = reservations.reserve(fixture.command(attemptId = thirdAttemptId, maximumCostUsd = CENT))
+        val rejected = reservations.reserve(fixture.command(attemptId = UUID.randomUUID(), maximumCostUsd = CENT))
+
+        assertThat(recovered).hasSize(1)
+        assertThat(recovered.single().state).isEqualTo(ProviderAttemptState.UNKNOWN)
+        assertThat(recovered.single().costBasis).isEqualTo(CostBasis.ESTIMATED_UNKNOWN)
+        assertThat(second).isInstanceOf(ProviderCallReservationResult.Reserved::class.java)
+        assertThat(third).isInstanceOf(ProviderCallReservationResult.Reserved::class.java)
+        assertThat(rejected).isEqualTo(ProviderCallReservationResult.CallCapExceeded)
+        assertThat(jobCallCount(fixture.jobId)).isEqualTo(3)
+        assertThat(attemptCount(fixture.jobId)).isEqualTo(3)
+        assertThat(monthlyCost(fixture.clubId)).isEqualByComparingTo("0.03")
+    }
+
+    @Test
+    fun `redelivery cannot reserve fallback correction or repair mode twice`() {
+        listOf(
+            ProviderCallMode.FALLBACK,
+            ProviderCallMode.SCHEMA_CORRECTION,
+            ProviderCallMode.SECTION_REPAIR,
+        ).forEach { mode ->
+            val fixture = fixture()
+            prepare(fixture, JobStatus.RUNNING)
+
+            val first = reservations.reserve(fixture.command(mode = mode))
+            val repeated =
+                reservations.reserve(
+                    fixture.command(attemptId = UUID.randomUUID(), mode = mode),
+                )
+
+            assertThat(first).isInstanceOf(ProviderCallReservationResult.Reserved::class.java)
+            assertThat(repeated).isEqualTo(ProviderCallReservationResult.ModeAlreadyUsed)
+            assertThat(jobCallCount(fixture.jobId)).isEqualTo(1)
+            assertThat(attemptCount(fixture.jobId)).isEqualTo(1)
+        }
+    }
+
+    @Test
     fun `stale recovery fails closed when the reserved monthly counter is missing`() {
         val fixture = fixture()
         prepare(fixture, JobStatus.RUNNING)
@@ -452,6 +501,7 @@ class RedisProviderCallReservationAdapterTest(
             admissionId: UUID = this.admissionId,
             maximumCostUsd: BigDecimal = CENT,
             maxCalls: Int = 3,
+            mode: ProviderCallMode = ProviderCallMode.PRIMARY,
         ) = ProviderCallReservationCommand(
             attemptId = attemptId,
             jobId = jobId,
@@ -459,7 +509,7 @@ class RedisProviderCallReservationAdapterTest(
             admissionId = admissionId,
             expectedStatus = JobStatus.RUNNING,
             model = MODEL,
-            mode = ProviderCallMode.PRIMARY,
+            mode = mode,
             maximumCostUsd = maximumCostUsd,
             maxCalls = maxCalls,
             now = now,

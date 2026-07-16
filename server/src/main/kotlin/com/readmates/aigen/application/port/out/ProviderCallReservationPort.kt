@@ -34,6 +34,9 @@ sealed interface ProviderCallReservationResult {
 
     data object CallCapExceeded : ProviderCallReservationResult
 
+    /** A crash/redelivery replay tried to consume a once-per-job branch again. */
+    data object ModeAlreadyUsed : ProviderCallReservationResult
+
     data object MonthlyCostCapExceeded : ProviderCallReservationResult
 }
 

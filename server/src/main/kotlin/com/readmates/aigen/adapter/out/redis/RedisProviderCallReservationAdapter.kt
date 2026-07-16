@@ -66,6 +66,7 @@ class RedisProviderCallReservationAdapter(
                 CALL_CAP_EXCEEDED -> ProviderCallReservationResult.CallCapExceeded
                 MONTHLY_COST_CAP_EXCEEDED -> ProviderCallReservationResult.MonthlyCostCapExceeded
                 ATTEMPT_ALREADY_RECORDED -> ProviderCallReservationResult.StateChanged
+                MODE_ALREADY_USED -> ProviderCallReservationResult.ModeAlreadyUsed
                 else -> {
                     check(result > 0) { "Unexpected Redis reservation result: $result" }
                     ProviderCallReservationResult.Reserved(requireAttempt(command.jobId, command.attemptId))
@@ -193,6 +194,7 @@ class RedisProviderCallReservationAdapter(
         const val CALL_CAP_EXCEEDED = -2L
         const val MONTHLY_COST_CAP_EXCEEDED = -3L
         const val ATTEMPT_ALREADY_RECORDED = -4L
+        const val MODE_ALREADY_USED = -5L
         const val RECONCILIATION_BINDING_MISMATCH = -2L
         const val MONTHLY_COUNTER_UNAVAILABLE = -3L
         const val RECOVERY_BINDING_MISMATCH = "!BINDING"

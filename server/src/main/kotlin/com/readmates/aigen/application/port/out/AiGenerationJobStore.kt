@@ -85,9 +85,11 @@ interface AiGenerationJobStore {
      * and validator-driven strengthened-instruction retries — so a job that triggers
      * many retries can still hit the cap mid-flight.
      */
+    @Deprecated("LEGACY transition bridge; remove with direct-provider sources in Task 11")
     fun incrementLlmCallCount(jobId: UUID): Int
 
     /** Atomically reserve one provider call only while the job remains in [expectedStatus]. */
+    @Deprecated("LEGACY transition bridge; remove with direct-provider sources in Task 11")
     fun reserveLlmCall(
         jobId: UUID,
         expectedStatus: JobStatus,
@@ -181,6 +183,7 @@ data class GroundedResultPayload(
     val draft: GroundedGenerationDraft,
 )
 
+@Deprecated("LEGACY transition bridge; remove with direct-provider sources in Task 11")
 enum class LlmCallReservation {
     RESERVED,
     STATE_CHANGED,

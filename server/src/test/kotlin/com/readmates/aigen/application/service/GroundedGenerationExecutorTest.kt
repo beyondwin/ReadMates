@@ -16,6 +16,7 @@ import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelCapability
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.model.ProviderCallMode
 import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.model.ValidatedTranscriptTurn
@@ -36,7 +37,7 @@ class GroundedGenerationExecutorTest {
     @Test
     fun `expired provider admission fails closed before grounded provider call`() {
         val context = Context()
-        context.costGuard.renewAllowed = false
+        context.reservations.admissionValid = false
 
         context.executor.process(context.record, AiGenerationTestFixtures.NOW)
 
@@ -64,11 +65,14 @@ class GroundedGenerationExecutorTest {
         assertThat(saved.evidence?.revision).isEqualTo(1)
         assertThat(saved.groundedDraft).isEqualTo(validDraft())
         assertThat(request.turns).containsExactlyElementsOf(context.turns)
-        val audit = context.auditPort.entries.single()
+        val audit = context.auditPort.entries.single { it.providerAttempt == null }
         assertThat(audit.pipelineVersion).isEqualTo("GROUNDED_WHOLE_TRANSCRIPT")
         assertThat(audit.inputTurnCount).isEqualTo(1)
         assertThat(audit.speakerCount).isEqualTo(1)
         assertThat(audit.groundingStatus).isEqualTo("VALID")
+        val providerAudit = context.auditPort.entries.single { it.providerAttempt != null }
+        assertThat(providerAudit.providerAttempt).isEqualTo(1)
+        assertThat(providerAudit.providerCallMode).isEqualTo(ProviderCallMode.PRIMARY)
     }
 
     @Test
@@ -236,6 +240,8 @@ class GroundedGenerationExecutorTest {
         val renderer = RecordingRenderer()
         val auditPort = FakeAuditPort()
         val costGuard = FakeCostGuard()
+        val gate = FakeProviderCallGate()
+        val reservations = FakeProviderCallReservations(jobStore)
         private val generators = mapOf(Provider.CLAUDE to claude, Provider.OPENAI to openai)
         private val modelCatalog =
             AiGenerationTestFixtures.defaultModelCatalog(
@@ -263,13 +269,29 @@ class GroundedGenerationExecutorTest {
                 GroundedGenerationValidator(GroundedEvidenceProjector()),
                 modelCatalog,
                 auditPort,
-                costGuard,
+                GroundedProviderCallCoordinator(
+                    gate,
+                    reservations,
+                    generators,
+                    modelCatalog,
+                    auditPort,
+                    com.readmates.aigen.application.port.out.AiTraceContextPort {
+                        "0123456789abcdef0123456789abcdef"
+                    },
+                    FakeClock(AiGenerationTestFixtures.NOW),
+                    3,
+                ),
                 FakeLatencyNotification(),
                 properties,
                 FakeClock(AiGenerationTestFixtures.NOW),
                 fakeMetrics(),
                 FakeSleeper(),
                 ProviderFallbackChain(emptyMap(), modelCatalog, properties),
+                GroundedProviderCallPolicy(
+                    java.time.Duration.ofSeconds(1),
+                    java.time.Duration.ofSeconds(30),
+                    JitterSource { 1.0 },
+                ),
             )
     }
 

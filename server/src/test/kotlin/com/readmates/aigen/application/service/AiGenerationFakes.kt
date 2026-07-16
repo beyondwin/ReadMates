@@ -437,6 +437,147 @@ internal class FakeCostGuard(
     override fun clubMonthlyCost(clubId: UUID): BigDecimal = clubMonthly
 }
 
+internal class FakeProviderCallGate : com.readmates.aigen.application.port.out.ProviderCallGate {
+    var rejection: com.readmates.aigen.application.port.out.ProviderGateRejection? = null
+    val permits = mutableListOf<FakeProviderCallPermit>()
+
+    override fun tryAcquire(provider: Provider): com.readmates.aigen.application.port.out.ProviderPermitDecision {
+        val reason = rejection
+        if (reason != null) {
+            return com.readmates.aigen.application.port.out.ProviderPermitDecision
+                .Rejected(reason)
+        }
+        return com.readmates.aigen.application.port.out.ProviderPermitDecision.Acquired(
+            FakeProviderCallPermit().also(permits::add),
+        )
+    }
+}
+
+internal class FakeProviderCallPermit : com.readmates.aigen.application.port.out.ProviderCallPermit {
+    var outcome: com.readmates.aigen.application.port.out.ProviderCircuitOutcome? = null
+    var closed = false
+
+    override fun record(
+        outcome: com.readmates.aigen.application.port.out.ProviderCircuitOutcome,
+        elapsed: Duration,
+    ) {
+        this.outcome = outcome
+    }
+
+    override fun close() {
+        closed = true
+    }
+}
+
+internal class FakeProviderCallReservations(
+    private val jobStore: FakeJobStore,
+) : com.readmates.aigen.application.port.out.ProviderCallReservationPort {
+    val attempts = mutableListOf<com.readmates.aigen.application.model.ProviderAttempt>()
+    var admissionValid = true
+    var reconcileFailure: RuntimeException? = null
+    var markCalls = 0
+
+    @Suppress("ReturnCount")
+    override fun reserve(
+        command: com.readmates.aigen.application.port.out.ProviderCallReservationCommand,
+    ): com.readmates.aigen.application.port.out.ProviderCallReservationResult {
+        jobStore.beforeReserveLlmCall?.also { jobStore.beforeReserveLlmCall = null }?.invoke()
+        val current = jobStore.load(command.jobId)
+        if (current == null || current.status != command.expectedStatus) {
+            return com.readmates.aigen.application.port.out.ProviderCallReservationResult.StateChanged
+        }
+        if (!admissionValid) {
+            return com.readmates.aigen.application.port.out.ProviderCallReservationResult.AdmissionExpired
+        }
+        if (current.llmCallCount >= command.maxCalls) {
+            return com.readmates.aigen.application.port.out.ProviderCallReservationResult.CallCapExceeded
+        }
+        val oncePerJobModes =
+            setOf(
+                com.readmates.aigen.application.model.ProviderCallMode.FALLBACK,
+                com.readmates.aigen.application.model.ProviderCallMode.SCHEMA_CORRECTION,
+                com.readmates.aigen.application.model.ProviderCallMode.SECTION_REPAIR,
+            )
+        if (command.mode in oncePerJobModes && attempts.any { it.mode == command.mode }) {
+            return com.readmates.aigen.application.port.out.ProviderCallReservationResult.ModeAlreadyUsed
+        }
+        val attempt =
+            com.readmates.aigen.application.model.ProviderAttempt(
+                attemptId = command.attemptId,
+                ordinal = current.llmCallCount + 1,
+                jobId = command.jobId,
+                provider = command.model.provider,
+                model = command.model,
+                mode = command.mode,
+                state = com.readmates.aigen.application.model.ProviderAttemptState.IN_FLIGHT,
+                reservedCostUsd = command.maximumCostUsd,
+                costBasis = com.readmates.aigen.application.model.CostBasis.NONE,
+                safeErrorCode = null,
+                startedAt = command.now,
+                completedAt = null,
+            )
+        attempts += attempt
+        jobStore.save(current.copy(llmCallCount = attempt.ordinal))
+        return com.readmates.aigen.application.port.out.ProviderCallReservationResult
+            .Reserved(attempt)
+    }
+
+    @Suppress("ReturnCount")
+    override fun reconcile(
+        command: com.readmates.aigen.application.port.out.ProviderCallReconciliationCommand,
+    ): com.readmates.aigen.application.port.out.ProviderCallReconciliationResult {
+        reconcileFailure?.let { throw it }
+        val index = attempts.indexOfFirst { it.attemptId == command.attemptId }
+        if (index < 0) {
+            return com.readmates.aigen.application.port.out.ProviderCallReconciliationResult.AttemptNotFound
+        }
+        val existing = attempts[index]
+        if (existing.state != com.readmates.aigen.application.model.ProviderAttemptState.IN_FLIGHT) {
+            return com.readmates.aigen.application.port.out.ProviderCallReconciliationResult
+                .AlreadyTerminal(existing)
+        }
+        val terminal =
+            existing.copy(
+                state = command.terminalState,
+                costBasis =
+                    if (command.actualCostUsd == null) {
+                        com.readmates.aigen.application.model.CostBasis.ESTIMATED_UNKNOWN
+                    } else {
+                        com.readmates.aigen.application.model.CostBasis.ACTUAL
+                    },
+                safeErrorCode = command.safeErrorCode,
+                completedAt = command.now,
+            )
+        attempts[index] = terminal
+        return com.readmates.aigen.application.port.out.ProviderCallReconciliationResult
+            .Reconciled(terminal)
+    }
+
+    override fun markUnresolvedInFlightUnknown(
+        jobId: UUID,
+        now: Instant,
+    ): List<com.readmates.aigen.application.model.ProviderAttempt> {
+        markCalls += 1
+        return attempts
+            .mapIndexedNotNull { index, attempt ->
+                if (attempt.jobId != jobId ||
+                    attempt.state != com.readmates.aigen.application.model.ProviderAttemptState.IN_FLIGHT
+                ) {
+                    null
+                } else {
+                    attempt
+                        .copy(
+                            state = com.readmates.aigen.application.model.ProviderAttemptState.UNKNOWN,
+                            costBasis = com.readmates.aigen.application.model.CostBasis.ESTIMATED_UNKNOWN,
+                            completedAt = now,
+                        ).also { attempts[index] = it }
+                }
+            }
+    }
+
+    override fun clubMonthlyCost(clubId: UUID): BigDecimal = BigDecimal.ZERO
+}
+
 internal class FakeClubDefaultPort(
     private val defaults: MutableMap<UUID, ClubDefault> = mutableMapOf(),
 ) : AiGenerationClubDefaultPort {

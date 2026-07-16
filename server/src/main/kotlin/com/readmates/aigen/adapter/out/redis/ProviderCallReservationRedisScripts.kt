@@ -23,6 +23,14 @@ internal object ProviderCallReservationRedisScripts {
             local prefix = ARGV[8] .. ':'
             if redis.call('HEXISTS', KEYS[4], prefix .. 'state') == 1 then return -4 end
 
+            local requestedMode = ARGV[12]
+            if requestedMode == 'FALLBACK' or requestedMode == 'SCHEMA_CORRECTION' or requestedMode == 'SECTION_REPAIR' then
+              local attempts = redis.call('HGETALL', KEYS[4])
+              for i = 1, #attempts, 2 do
+                if string.sub(attempts[i], -5) == ':mode' and attempts[i + 1] == requestedMode then return -5 end
+              end
+            end
+
             local ordinal = redis.call('HINCRBY', KEYS[1], 'llmCallCount', 1)
             redis.call('INCRBYFLOAT', KEYS[3], ARGV[4])
             redis.call('HSET', KEYS[4],

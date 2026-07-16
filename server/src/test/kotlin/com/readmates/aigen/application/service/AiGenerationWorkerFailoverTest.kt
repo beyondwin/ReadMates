@@ -156,6 +156,7 @@ internal class FailoverHarness(
     val hostUserId: UUID = UUID.randomUUID()
 
     val jobStore = FakeJobStore()
+    val reservations = FakeProviderCallReservations(jobStore)
     val claude = FakeContentGenerator(provider = Provider.CLAUDE)
     val openai = FakeContentGenerator(provider = Provider.OPENAI)
     val generators = mapOf(Provider.CLAUDE to claude, Provider.OPENAI to openai)
@@ -186,6 +187,7 @@ internal class FailoverHarness(
             metrics = fakeMetrics(),
             sleeper = sleeper,
             fallbackChain = newChain(),
+            providerCallReservations = reservations,
         )
 
     fun rebuildWorker() {

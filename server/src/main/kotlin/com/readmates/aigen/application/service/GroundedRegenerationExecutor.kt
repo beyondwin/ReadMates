@@ -9,6 +9,7 @@ import com.readmates.aigen.application.model.GroundingStatus
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.model.ProviderCallMode
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.`in`.RegenerationResult
@@ -23,8 +24,8 @@ import com.readmates.aigen.application.port.out.GroundedRequestMode
 import com.readmates.aigen.application.port.out.GuardDecision
 import com.readmates.aigen.application.port.out.JobKind
 import com.readmates.aigen.application.port.out.JobRecord
-import com.readmates.aigen.application.port.out.LlmCallReservation
 import com.readmates.aigen.application.port.out.ModelCatalog
+import com.readmates.aigen.application.port.out.ProviderCallReservationPort
 import com.readmates.aigen.application.port.out.RenderedGroundedRequest
 import com.readmates.aigen.application.port.out.SaveGroundedResultCommand
 import com.readmates.aigen.application.port.out.WholeTranscriptGroundedGenerator
@@ -66,9 +67,12 @@ class DefaultGroundedRegenerationExecutor(
     private val modelCatalog: ModelCatalog,
     private val auditPort: AiGenerationAuditPort,
     private val costGuard: GenerationCostGuard,
+    private val reservations: ProviderCallReservationPort,
+    private val callCoordinator: GroundedProviderCallCoordinator,
     private val properties: AiGenerationProperties,
     private val clock: Clock,
     private val metrics: AiGenerationMetrics,
+    private val callPolicy: GroundedProviderCallPolicy,
 ) : GroundedRegenerationExecutor {
     override fun regenerate(
         record: JobRecord,
@@ -79,11 +83,13 @@ class DefaultGroundedRegenerationExecutor(
     ): RegenerationResult {
         val currentDraft = requireCurrentDraft(record, expectedRevision)
         val selectedModel = resolveModel(model, record)
-        val generator = requireGenerator(selectedModel)
+        requireGenerator(selectedModel)
         val rendered = renderRegeneration(record, selectedModel, instructions, currentDraft, item)
         val admissionId = UUID.randomUUID()
         requireCostAllowance(record, admissionId)
-        val repair = callRepair(record, generator, selectedModel, item, rendered, admissionId)
+        recoverUnresolvedAttempt(record, admissionId)
+        val plan = callPolicy.first(selectedModel, ProviderCallMode.REGENERATE_SECTION, item)
+        val repair = callRepair(record, plan, item, rendered, admissionId)
         val merged = mergeGroundedRepair(currentDraft, item, repair)
         val nextRevision = expectedRevision + 1
         val valid =
@@ -101,7 +107,6 @@ class DefaultGroundedRegenerationExecutor(
                 is GroundedValidationResult.Invalid -> invalidRegeneration(validation.reasons)
             }
         val cost = CostCalculator.actual(repair.usage, modelCatalog.pricing(selectedModel))
-        costGuard.recordUsage(record.hostUserId, record.clubId, admissionId, cost)
         val saved =
             jobStore.saveGroundedResult(
                 SaveGroundedResultCommand(
@@ -129,6 +134,21 @@ class DefaultGroundedRegenerationExecutor(
             result = valid.snapshot,
             evidence = valid.evidence,
         )
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun recoverUnresolvedAttempt(
+        record: JobRecord,
+        admissionId: UUID,
+    ) {
+        try {
+            if (record.status == JobStatus.SUCCEEDED) {
+                reservations.markUnresolvedInFlightUnknown(record.jobId, clock.instant())
+            }
+        } catch (failure: RuntimeException) {
+            costGuard.releaseAdmission(record.hostUserId, record.clubId, admissionId)
+            throw failure
+        }
     }
 
     @Suppress("LongParameterList", "ktlint:standard:function-expression-body")
@@ -180,22 +200,30 @@ class DefaultGroundedRegenerationExecutor(
 
     private fun callRepair(
         record: JobRecord,
-        generator: WholeTranscriptGroundedGenerator,
-        model: ModelId,
+        plan: GroundedProviderCallPlan,
         item: GenerationItem,
         request: com.readmates.aigen.application.port.out.RenderedGroundedRequest,
         admissionId: UUID,
-    ): com.readmates.aigen.application.port.out.GroundedSectionRepairOutput {
-        if (!costGuard.renewAdmission(record.hostUserId, record.clubId, admissionId)) {
-            throw AiGenerationException.Coded(ErrorCode.RATE_LIMITED)
+    ): com.readmates.aigen.application.port.out.GroundedSectionRepairOutput =
+        when (
+            val result =
+                callCoordinator.execute(
+                    GroundedProviderCallCommand(
+                        record = record,
+                        admissionId = admissionId,
+                        expectedStatus = JobStatus.SUCCEEDED,
+                        model = plan.model,
+                        mode = plan.mode,
+                        request = request,
+                        section = item,
+                    ),
+                )
+        ) {
+            is GroundedProviderCallResult.Repaired -> result.output
+            is GroundedProviderCallResult.Failed -> throw AiGenerationException.Coded(result.error.code)
+            GroundedProviderCallResult.StateChanged -> staleRevision(jobStore.load(record.jobId)?.revision)
+            is GroundedProviderCallResult.Generated -> error("regeneration call cannot return a generation output")
         }
-        when (jobStore.reserveLlmCall(record.jobId, JobStatus.SUCCEEDED, properties.job.maxLlmCallsPerJob)) {
-            LlmCallReservation.RESERVED -> Unit
-            LlmCallReservation.CAP_EXCEEDED -> throw AiGenerationException.Coded(ErrorCode.MAX_CALLS_EXCEEDED)
-            LlmCallReservation.STATE_CHANGED -> staleRevision(jobStore.load(record.jobId)?.revision)
-        }
-        return generator.repair(model, item, request)
-    }
 
     private fun resolveModel(
         requested: String?,

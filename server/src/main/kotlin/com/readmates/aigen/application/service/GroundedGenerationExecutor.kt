@@ -1,6 +1,5 @@
 package com.readmates.aigen.application.service
 
-import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
 import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
@@ -19,20 +18,17 @@ import com.readmates.aigen.application.port.out.AiGenerationLatencyNotification
 import com.readmates.aigen.application.port.out.AuditKind
 import com.readmates.aigen.application.port.out.AuditLogEntry
 import com.readmates.aigen.application.port.out.AuditStatus
-import com.readmates.aigen.application.port.out.GenerationCostGuard
 import com.readmates.aigen.application.port.out.GroundedGenerationOutput
 import com.readmates.aigen.application.port.out.GroundedRenderRequest
 import com.readmates.aigen.application.port.out.GroundedRequestMode
 import com.readmates.aigen.application.port.out.GroundedSectionRepairOutput
 import com.readmates.aigen.application.port.out.JobKind
 import com.readmates.aigen.application.port.out.JobRecord
-import com.readmates.aigen.application.port.out.LlmCallReservation
 import com.readmates.aigen.application.port.out.ModelCatalog
 import com.readmates.aigen.application.port.out.RenderedGroundedRequest
 import com.readmates.aigen.application.port.out.SaveGroundedResultCommand
 import com.readmates.aigen.application.port.out.WholeTranscriptGroundedGenerator
 import com.readmates.aigen.config.AiGenerationProperties
-import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
@@ -64,16 +60,15 @@ class DefaultGroundedGenerationExecutor(
     private val validator: GroundedGenerationValidator,
     private val modelCatalog: ModelCatalog,
     private val auditPort: AiGenerationAuditPort,
-    private val costGuard: GenerationCostGuard,
+    private val callCoordinator: GroundedProviderCallCoordinator,
     private val latencyNotification: AiGenerationLatencyNotification,
     private val properties: AiGenerationProperties,
     private val clock: Clock,
     private val metrics: AiGenerationMetrics,
     private val sleeper: Sleeper,
     private val fallbackChain: ProviderFallbackChain,
+    private val callPolicy: GroundedProviderCallPolicy,
 ) : GroundedGenerationExecutor {
-    private val logger = LoggerFactory.getLogger(DefaultGroundedGenerationExecutor::class.java)
-
     @Suppress("ReturnCount")
     override fun process(
         record: JobRecord,
@@ -101,41 +96,60 @@ class DefaultGroundedGenerationExecutor(
         record: JobRecord,
         start: Instant,
     ): GroundedAttempt? {
-        val primary = record.model
-        val primaryGenerator =
-            wholeTranscriptGroundedGeneratorsByProvider[primary.provider]
-                ?: return fail(record, ErrorCode.AI_DISABLED, primary, "Grounded provider unavailable", start)
-        val primaryRequest = render(record, primary, GroundedRequestMode.PRIMARY, null, null, start) ?: return null
-        return when (val first = callGenerate(record) { primaryGenerator.generate(primary, primaryRequest) }) {
-            is GroundedCall.Success -> GroundedAttempt(first.output, primary, primaryGenerator)
-            GroundedCall.StateChanged -> null
-            is GroundedCall.Failure -> {
-                if (!isAvailabilityFailure(first.error.code)) {
-                    fail(record, first.error.code, primary, first.error.message, start)
+        var plan = callPolicy.first(record.model)
+        val history = mutableListOf(plan)
+        while (true) {
+            val renderMode =
+                if (plan.mode == com.readmates.aigen.application.model.ProviderCallMode.SCHEMA_CORRECTION) {
+                    GroundedRequestMode.SCHEMA_CORRECTION
                 } else {
-                    auditRetry(record, primary, first.error, start)
-                    sleeper.sleep(backoff(first.error.code))
+                    GroundedRequestMode.PRIMARY
+                }
+            val request = render(record, plan.model, renderMode, null, null, start) ?: return null
+            when (
+                val result =
+                    callCoordinator.execute(
+                        GroundedProviderCallCommand(
+                            record = record,
+                            admissionId = record.jobId,
+                            expectedStatus = JobStatus.RUNNING,
+                            model = plan.model,
+                            mode = plan.mode,
+                            request = request,
+                        ),
+                    )
+            ) {
+                is GroundedProviderCallResult.Generated ->
+                    return GroundedAttempt(result.output, plan.model, history.toList())
+                is GroundedProviderCallResult.Repaired -> error("generation call cannot return a repair output")
+                GroundedProviderCallResult.StateChanged -> return null
+                is GroundedProviderCallResult.Failed -> {
                     val fallback =
                         fallbackChain.nextEligibleGrounded(
-                            primary,
+                            plan.model,
                             record.eligibleFallbackModels,
                             wholeTranscriptGroundedGeneratorsByProvider,
-                        ) ?: return fail(record, first.error.code, primary, "No eligible grounded fallback", start)
-                    val fallbackGenerator = wholeTranscriptGroundedGeneratorsByProvider.getValue(fallback.provider)
-                    val fallbackRequest =
-                        render(record, fallback, GroundedRequestMode.PRIMARY, null, null, start) ?: return null
-                    when (val second = callGenerate(record) { fallbackGenerator.generate(fallback, fallbackRequest) }) {
-                        is GroundedCall.Success -> GroundedAttempt(second.output, fallback, fallbackGenerator)
-                        GroundedCall.StateChanged -> null
-                        is GroundedCall.Failure ->
-                            fail(record, second.error.code, fallback, second.error.message, start)
+                        )
+                    when (val decision = callPolicy.next(history, result.toPolicyOutcome(), fallback)) {
+                        is GroundedProviderCallDecision.Next -> {
+                            sleeper.sleep(decision.call.delay)
+                            plan = decision.call
+                            if (history.last().ordinal == plan.ordinal) {
+                                history[history.lastIndex] = plan
+                            } else {
+                                history += plan
+                            }
+                        }
+                        GroundedProviderCallDecision.Complete -> error("failure cannot complete generation")
+                        GroundedProviderCallDecision.Failed ->
+                            return fail(record, result.error.code, plan.model, result.error.message, start)
                     }
                 }
             }
         }
     }
 
-    @Suppress("ReturnCount")
+    @Suppress("LongMethod", "ReturnCount")
     private fun repairOnce(
         record: JobRecord,
         attempt: GroundedAttempt,
@@ -144,10 +158,28 @@ class DefaultGroundedGenerationExecutor(
     ) {
         metrics.recordGroundingValidationFailure(repairable.reasons)
         if (!moveStage(record.jobId, JobStage.REPAIRING_RECORD, PROGRESS_REPAIRING)) return
+        val repairPlan =
+            when (
+                val decision =
+                    callPolicy.next(
+                        attempt.history,
+                        GroundedProviderCallOutcome.RepairableGrounding(repairable.section),
+                        null,
+                    )
+            ) {
+                is GroundedProviderCallDecision.Next -> decision.call
+                GroundedProviderCallDecision.Complete,
+                GroundedProviderCallDecision.Failed,
+                -> {
+                    fail(record, ErrorCode.MAX_CALLS_EXCEEDED, attempt.model, "Per-job LLM call cap exceeded", start)
+                    return
+                }
+            }
+        sleeper.sleep(repairPlan.delay)
         val request =
             render(
                 record,
-                attempt.model,
+                repairPlan.model,
                 GroundedRequestMode.REPAIR,
                 attempt.output.draft,
                 repairable.section,
@@ -156,15 +188,24 @@ class DefaultGroundedGenerationExecutor(
         val repaired =
             when (
                 val call =
-                    callRepair(record) {
-                        attempt.generator.repair(attempt.model, repairable.section, request)
-                    }
+                    callCoordinator.execute(
+                        GroundedProviderCallCommand(
+                            record = record,
+                            admissionId = record.jobId,
+                            expectedStatus = JobStatus.RUNNING,
+                            model = repairPlan.model,
+                            mode = repairPlan.mode,
+                            request = request,
+                            section = repairable.section,
+                        ),
+                    )
             ) {
-                is GroundedRepairCall.Success -> call.output
-                GroundedRepairCall.StateChanged -> return
-                is GroundedRepairCall.Failure -> {
+                is GroundedProviderCallResult.Repaired -> call.output
+                GroundedProviderCallResult.StateChanged -> return
+                is GroundedProviderCallResult.Generated -> error("repair call cannot return a generation output")
+                is GroundedProviderCallResult.Failed -> {
                     metrics.recordGroundingRepairOutcome(GroundingRepairOutcome.FAILED)
-                    fail(record, call.error.code, attempt.model, call.error.message, start, groundingInvalid = true)
+                    fail(record, call.error.code, repairPlan.model, call.error.message, start, groundingInvalid = true)
                     return
                 }
             }
@@ -207,7 +248,6 @@ class DefaultGroundedGenerationExecutor(
         groundingWarningCount: Int = 0,
     ) {
         val cost = CostCalculator.actual(attempt.output.usage, modelCatalog.pricing(attempt.model))
-        recordUsage(record, cost)
         val saved =
             jobStore.saveGroundedResult(
                 SaveGroundedResultCommand(
@@ -319,85 +359,6 @@ class DefaultGroundedGenerationExecutor(
         }
     }
 
-    private inline fun callGenerate(
-        record: JobRecord,
-        block: () -> GroundedGenerationOutput,
-    ): GroundedCall {
-        if (!costGuard.renewAdmission(record.hostUserId, record.clubId, record.jobId)) {
-            return GroundedCall.Failure(providerAdmissionExpiredError())
-        }
-        return when (reserveCall(record)) {
-            LlmCallReservation.CAP_EXCEEDED -> GroundedCall.Failure(maxCallsError())
-            LlmCallReservation.STATE_CHANGED -> GroundedCall.StateChanged
-            LlmCallReservation.RESERVED -> {
-                try {
-                    GroundedCall.Success(block())
-                } catch (failure: LlmGenerationException) {
-                    GroundedCall.Failure(failure.error)
-                }
-            }
-        }
-    }
-
-    private inline fun callRepair(
-        record: JobRecord,
-        block: () -> GroundedSectionRepairOutput,
-    ): GroundedRepairCall {
-        if (!costGuard.renewAdmission(record.hostUserId, record.clubId, record.jobId)) {
-            return GroundedRepairCall.Failure(providerAdmissionExpiredError())
-        }
-        return when (reserveCall(record)) {
-            LlmCallReservation.CAP_EXCEEDED -> GroundedRepairCall.Failure(maxCallsError())
-            LlmCallReservation.STATE_CHANGED -> GroundedRepairCall.StateChanged
-            LlmCallReservation.RESERVED -> {
-                try {
-                    GroundedRepairCall.Success(block())
-                } catch (failure: LlmGenerationException) {
-                    GroundedRepairCall.Failure(failure.error)
-                }
-            }
-        }
-    }
-
-    private fun reserveCall(record: JobRecord): LlmCallReservation =
-        jobStore.reserveLlmCall(record.jobId, JobStatus.RUNNING, properties.job.maxLlmCallsPerJob)
-
-    private fun maxCallsError() = GenerationError(ErrorCode.MAX_CALLS_EXCEEDED, "Per-job LLM call cap exceeded")
-
-    private fun providerAdmissionExpiredError() =
-        GenerationError(
-            ErrorCode.RATE_LIMITED,
-            "Provider admission expired before call",
-        )
-
-    private fun recordUsage(
-        record: JobRecord,
-        cost: BigDecimal,
-    ) {
-        runCatching { costGuard.recordUsage(record.hostUserId, record.clubId, record.jobId, cost) }
-            .onFailure { failure ->
-                logger.warn("Grounded usage accounting failed for jobId={}", record.jobId, failure)
-            }
-    }
-
-    private fun auditRetry(
-        record: JobRecord,
-        model: ModelId,
-        error: GenerationError,
-        start: Instant,
-    ) {
-        audit(
-            record,
-            model,
-            AuditStatus.FAILED,
-            error.code,
-            error.message,
-            TokenUsage.ZERO,
-            BigDecimal.ZERO,
-            start,
-        )
-    }
-
     @Suppress("LongParameterList")
     private fun audit(
         record: JobRecord,
@@ -495,45 +456,11 @@ class DefaultGroundedGenerationExecutor(
             .coerceAtMost(Int.MAX_VALUE.toLong())
             .toInt()
 
-    private fun isAvailabilityFailure(code: ErrorCode): Boolean =
-        code == ErrorCode.PROVIDER_UNAVAILABLE || code == ErrorCode.PROVIDER_RATE_LIMITED
-
-    private fun backoff(code: ErrorCode): Duration =
-        if (code == ErrorCode.PROVIDER_RATE_LIMITED) {
-            Duration.ofSeconds(PROVIDER_RATE_LIMIT_BACKOFF_SECONDS)
-        } else {
-            Duration.ofSeconds(1)
-        }
-
     private data class GroundedAttempt(
         val output: GroundedGenerationOutput,
         val model: ModelId,
-        val generator: WholeTranscriptGroundedGenerator,
+        val history: List<GroundedProviderCallPlan>,
     )
-
-    private sealed interface GroundedCall {
-        data object StateChanged : GroundedCall
-
-        data class Success(
-            val output: GroundedGenerationOutput,
-        ) : GroundedCall
-
-        data class Failure(
-            val error: GenerationError,
-        ) : GroundedCall
-    }
-
-    private sealed interface GroundedRepairCall {
-        data object StateChanged : GroundedRepairCall
-
-        data class Success(
-            val output: GroundedSectionRepairOutput,
-        ) : GroundedRepairCall
-
-        data class Failure(
-            val error: GenerationError,
-        ) : GroundedRepairCall
-    }
 
     private companion object {
         const val PROGRESS_GENERATING = 10
@@ -542,6 +469,15 @@ class DefaultGroundedGenerationExecutor(
         const val PROGRESS_REVALIDATING = 95
     }
 }
+
+private fun GroundedProviderCallResult.Failed.toPolicyOutcome(): GroundedProviderCallOutcome =
+    when (failureClass) {
+        ProviderFailureClass.PRE_TRANSPORT -> GroundedProviderCallOutcome.PreTransportRejection
+        ProviderFailureClass.TRANSIENT -> GroundedProviderCallOutcome.TransientFailure()
+        ProviderFailureClass.RATE_LIMITED -> GroundedProviderCallOutcome.RateLimited()
+        ProviderFailureClass.SCHEMA_OR_PARSE -> GroundedProviderCallOutcome.SchemaOrParseFailure
+        ProviderFailureClass.TERMINAL -> GroundedProviderCallOutcome.TerminalFailure
+    }
 
 internal fun mergeGroundedRepair(
     draft: GroundedGenerationDraft,

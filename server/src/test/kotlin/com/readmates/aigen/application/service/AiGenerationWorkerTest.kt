@@ -505,6 +505,34 @@ class AiGenerationWorkerTest {
         assertThat(context.generator.calls).isEmpty()
     }
 
+    @Test
+    fun `grounded redelivery marks unresolved attempt unknown before another provider-capable invocation`() {
+        lateinit var context: TestContext
+        var processed = 0
+        context =
+            TestContext(
+                groundedExecutor =
+                    GroundedGenerationExecutor { _, _ ->
+                        assertThat(context.reservations.markCalls).isEqualTo(1)
+                        processed += 1
+                    },
+            )
+        val record =
+            context
+                .savedRecord()
+                .copy(
+                    pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
+                    status = JobStatus.RUNNING,
+                    stage = JobStage.GENERATING_RECORD,
+                )
+        context.jobStore.save(record)
+
+        context.worker.process(record.jobId)
+
+        assertThat(processed).isEqualTo(1)
+        assertThat(context.reservations.markCalls).isEqualTo(1)
+    }
+
     private class TestContext(
         modelEnabled: Set<com.readmates.aigen.application.model.ModelId> =
             setOf(AiGenerationTestFixtures.CLAUDE_MODEL, AiGenerationTestFixtures.CLAUDE_FALLBACK),
@@ -528,6 +556,7 @@ class AiGenerationWorkerTest {
             AiGenerationTestFixtures.defaultProperties(
                 notificationThreshold = notificationThreshold,
             )
+        val reservations = FakeProviderCallReservations(jobStore)
 
         val worker =
             AiGenerationWorker(
@@ -549,6 +578,7 @@ class AiGenerationWorkerTest {
                         properties = properties,
                     ),
                 groundedExecutor = groundedExecutor,
+                providerCallReservations = reservations,
             )
 
         fun savedRecord(): com.readmates.aigen.application.port.out.JobRecord {

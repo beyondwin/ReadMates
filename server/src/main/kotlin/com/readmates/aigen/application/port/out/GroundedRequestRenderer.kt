@@ -8,7 +8,7 @@ import com.readmates.aigen.application.model.ValidatedTranscriptTurn
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 
-enum class GroundedRequestMode { PRIMARY, REPAIR, REGENERATE_SECTION }
+enum class GroundedRequestMode { PRIMARY, SCHEMA_CORRECTION, REPAIR, REGENERATE_SECTION }
 
 data class GroundedRenderRequest(
     val provider: Provider,

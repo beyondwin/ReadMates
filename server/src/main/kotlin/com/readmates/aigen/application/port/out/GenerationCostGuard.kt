@@ -17,7 +17,7 @@ interface GenerationCostGuard {
         admissionId: UUID,
     ): GuardDecision
 
-    @Deprecated("Use ProviderCallReservationPort.reconcile after Task 6 migrates callers")
+    @Deprecated("LEGACY transition bridge; remove with direct-provider sources in Task 11")
     fun recordUsage(
         hostId: UUID,
         clubId: UUID,
@@ -32,8 +32,8 @@ interface GenerationCostGuard {
         admissionId: UUID,
     ): Unit
 
-    /** Temporary compatibility API; reservation renews the owning lease atomically. */
-    @Deprecated("Use ProviderCallReservationPort.reserve after Task 6 migrates callers")
+    /** LEGACY transition bridge; grounded calls reserve and renew atomically through ProviderCallReservationPort. */
+    @Deprecated("LEGACY transition bridge; remove with direct-provider sources in Task 11")
     fun renewAdmission(
         hostId: UUID,
         clubId: UUID,

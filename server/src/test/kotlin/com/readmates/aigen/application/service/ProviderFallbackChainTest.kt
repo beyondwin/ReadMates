@@ -4,6 +4,7 @@ import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.ModelPricing
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.port.out.SessionContentGenerator
+import com.readmates.aigen.application.port.out.WholeTranscriptGroundedGenerator
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
@@ -76,6 +77,33 @@ class ProviderFallbackChainTest {
     @Test
     fun `returns null for an empty chain`() {
         val result = chain(order = emptyList()).nextAfter(claude)
+        assertThat(result).isNull()
+    }
+
+    @Test
+    fun `grounded fallback skips persisted candidates that are no longer enabled`() {
+        val grounded =
+            object : WholeTranscriptGroundedGenerator {
+                override val provider = Provider.OPENAI
+
+                override fun generate(
+                    model: ModelId,
+                    request: com.readmates.aigen.application.port.out.RenderedGroundedRequest,
+                ) = error("not called")
+
+                override fun repair(
+                    model: ModelId,
+                    section: com.readmates.aigen.application.model.GenerationItem,
+                    request: com.readmates.aigen.application.port.out.RenderedGroundedRequest,
+                ) = error("not called")
+            }
+        val result =
+            chain(order = emptyList(), enabled = setOf(claude)).nextEligibleGrounded(
+                claude,
+                listOf(openai),
+                mapOf(Provider.OPENAI to grounded),
+            )
+
         assertThat(result).isNull()
     }
 }

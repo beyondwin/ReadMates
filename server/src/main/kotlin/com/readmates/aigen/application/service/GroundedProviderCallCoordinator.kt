@@ -1,0 +1,386 @@
+package com.readmates.aigen.application.service
+
+import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
+import com.readmates.aigen.application.model.CostBasis
+import com.readmates.aigen.application.model.ErrorCode
+import com.readmates.aigen.application.model.GenerationError
+import com.readmates.aigen.application.model.GenerationItem
+import com.readmates.aigen.application.model.JobStatus
+import com.readmates.aigen.application.model.ModelId
+import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.model.ProviderAttempt
+import com.readmates.aigen.application.model.ProviderAttemptState
+import com.readmates.aigen.application.model.ProviderCallMode
+import com.readmates.aigen.application.model.TokenUsage
+import com.readmates.aigen.application.port.out.AiGenerationAuditPort
+import com.readmates.aigen.application.port.out.AiTraceContextPort
+import com.readmates.aigen.application.port.out.AuditKind
+import com.readmates.aigen.application.port.out.AuditLogEntry
+import com.readmates.aigen.application.port.out.AuditStatus
+import com.readmates.aigen.application.port.out.GroundedGenerationOutput
+import com.readmates.aigen.application.port.out.GroundedSectionRepairOutput
+import com.readmates.aigen.application.port.out.JobRecord
+import com.readmates.aigen.application.port.out.ModelCatalog
+import com.readmates.aigen.application.port.out.ProviderCallGate
+import com.readmates.aigen.application.port.out.ProviderCallReconciliationCommand
+import com.readmates.aigen.application.port.out.ProviderCallReconciliationResult
+import com.readmates.aigen.application.port.out.ProviderCallReservationCommand
+import com.readmates.aigen.application.port.out.ProviderCallReservationPort
+import com.readmates.aigen.application.port.out.ProviderCallReservationResult
+import com.readmates.aigen.application.port.out.ProviderCircuitOutcome
+import com.readmates.aigen.application.port.out.ProviderPermitDecision
+import com.readmates.aigen.application.port.out.RenderedGroundedRequest
+import com.readmates.aigen.application.port.out.WholeTranscriptGroundedGenerator
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.stereotype.Component
+import java.math.BigDecimal
+import java.time.Clock
+import java.time.Duration
+import java.time.Instant
+import java.util.UUID
+
+data class GroundedProviderCallCommand(
+    val record: JobRecord,
+    val admissionId: UUID,
+    val expectedStatus: JobStatus,
+    val model: ModelId,
+    val mode: ProviderCallMode,
+    val request: RenderedGroundedRequest,
+    val section: GenerationItem? = null,
+)
+
+enum class ProviderFailureClass {
+    PRE_TRANSPORT,
+    TRANSIENT,
+    RATE_LIMITED,
+    SCHEMA_OR_PARSE,
+    TERMINAL,
+}
+
+sealed interface GroundedProviderCallResult {
+    data class Generated(
+        val output: GroundedGenerationOutput,
+        val attempt: ProviderAttempt,
+    ) : GroundedProviderCallResult
+
+    data class Repaired(
+        val output: GroundedSectionRepairOutput,
+        val attempt: ProviderAttempt,
+    ) : GroundedProviderCallResult
+
+    data class Failed(
+        val error: GenerationError,
+        val failureClass: ProviderFailureClass,
+        val attempt: ProviderAttempt?,
+    ) : GroundedProviderCallResult
+
+    data object StateChanged : GroundedProviderCallResult
+}
+
+class ProviderCallReconciliationException(
+    cause: Throwable,
+) : RuntimeException("Provider request completed but cost reconciliation failed", cause)
+
+/** Owns the complete lifecycle of exactly one physical grounded provider request. */
+@Component
+@Suppress("LongParameterList")
+class GroundedProviderCallCoordinator private constructor(
+    private val gate: ProviderCallGate,
+    private val reservations: ProviderCallReservationPort,
+    private val generators: Map<Provider, WholeTranscriptGroundedGenerator>,
+    private val modelCatalog: ModelCatalog,
+    private val auditPort: AiGenerationAuditPort,
+    private val traceContext: AiTraceContextPort,
+    private val clock: Clock,
+    private val maxCalls: Int,
+) {
+    @Autowired
+    constructor(
+        gate: ProviderCallGate,
+        reservations: ProviderCallReservationPort,
+        generators: Map<Provider, WholeTranscriptGroundedGenerator>,
+        modelCatalog: ModelCatalog,
+        auditPort: AiGenerationAuditPort,
+        traceContext: AiTraceContextPort,
+        clock: Clock,
+        properties: com.readmates.aigen.config.AiGenerationProperties,
+    ) : this(
+        gate,
+        reservations,
+        generators,
+        modelCatalog,
+        auditPort,
+        traceContext,
+        clock,
+        properties.job.maxLlmCallsPerJob,
+    )
+
+    internal constructor(
+        gate: ProviderCallGate,
+        reservations: ProviderCallReservationPort,
+        generators: Map<Provider, WholeTranscriptGroundedGenerator>,
+        modelCatalog: ModelCatalog,
+        auditPort: AiGenerationAuditPort,
+        traceContext: AiTraceContextPort,
+        clock: Clock,
+        maxCalls: Int,
+        @Suppress("UNUSED_PARAMETER") testConstruction: Unit = Unit,
+    ) : this(gate, reservations, generators, modelCatalog, auditPort, traceContext, clock, maxCalls)
+
+    @Suppress("ReturnCount", "SwallowedException", "TooGenericExceptionCaught")
+    fun execute(command: GroundedProviderCallCommand): GroundedProviderCallResult {
+        val generator = generators[command.model.provider] ?: return preTransportUnavailable()
+        val acquired = gate.tryAcquire(command.model.provider)
+        if (acquired is ProviderPermitDecision.Rejected) return preTransportUnavailable()
+        val permit = (acquired as ProviderPermitDecision.Acquired).permit
+        val startedAt = clock.instant()
+        var circuitOutcome = ProviderCircuitOutcome.IGNORED_FAILURE
+        try {
+            val reservation = reserve(command)
+            if (reservation !is ProviderCallReservationResult.Reserved) return rejected(reservation)
+            val attempt = reservation.attempt
+            val transport =
+                try {
+                    callOnce(generator, command)
+                } catch (failure: LlmGenerationException) {
+                    PhysicalResult.Failure(failure.error, classify(failure.error.code))
+                } catch (failure: RuntimeException) {
+                    PhysicalResult.Failure(UNKNOWN_PROVIDER_OUTCOME, ProviderFailureClass.TRANSIENT)
+                }
+            circuitOutcome = transport.circuitOutcome()
+            val reconciled = reconcile(command, attempt, transport)
+            audit(command, reconciled, transport, startedAt)
+            return transport.toResult(reconciled)
+        } finally {
+            try {
+                permit.record(circuitOutcome, Duration.between(startedAt, clock.instant()).nonNegative())
+            } finally {
+                permit.close()
+            }
+        }
+    }
+
+    private fun reserve(command: GroundedProviderCallCommand): ProviderCallReservationResult =
+        reservations.reserve(
+            ProviderCallReservationCommand(
+                attemptId = UUID.randomUUID(),
+                jobId = command.record.jobId,
+                clubId = command.record.clubId,
+                admissionId = command.admissionId,
+                expectedStatus = command.expectedStatus,
+                model = command.model,
+                mode = command.mode,
+                maximumCostUsd =
+                    CostCalculator.worstCase(
+                        command.request.estimatedInputTokens(),
+                        command.request.maxOutputTokens.toLong(),
+                        modelCatalog.pricing(command.model),
+                        cacheWritePossible = command.model.provider == Provider.CLAUDE,
+                    ),
+                maxCalls = maxCalls,
+                now = clock.instant(),
+            ),
+        )
+
+    private fun callOnce(
+        generator: WholeTranscriptGroundedGenerator,
+        command: GroundedProviderCallCommand,
+    ): PhysicalResult =
+        if (command.mode == ProviderCallMode.SECTION_REPAIR ||
+            command.mode == ProviderCallMode.REGENERATE_SECTION
+        ) {
+            PhysicalResult.Repaired(
+                generator.repair(command.model, requireNotNull(command.section), command.request),
+            )
+        } else {
+            PhysicalResult.Generated(generator.generate(command.model, command.request))
+        }
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun reconcile(
+        command: GroundedProviderCallCommand,
+        attempt: ProviderAttempt,
+        result: PhysicalResult,
+    ): ProviderAttempt {
+        val reconciliation =
+            ProviderCallReconciliationCommand(
+                attemptId = attempt.attemptId,
+                jobId = command.record.jobId,
+                clubId = command.record.clubId,
+                terminalState = result.terminalState,
+                actualCostUsd =
+                    result.usage?.let { usage -> CostCalculator.actual(usage, modelCatalog.pricing(command.model)) },
+                safeErrorCode = result.error?.code,
+                now = clock.instant(),
+            )
+        val reconciled =
+            try {
+                reservations.reconcile(reconciliation)
+            } catch (failure: RuntimeException) {
+                throw ProviderCallReconciliationException(failure)
+            }
+        return when (reconciled) {
+            is ProviderCallReconciliationResult.Reconciled -> reconciled.attempt
+            is ProviderCallReconciliationResult.AlreadyTerminal -> reconciled.attempt
+            ProviderCallReconciliationResult.AttemptNotFound ->
+                throw ProviderCallReconciliationException(IllegalStateException("Reserved provider attempt missing"))
+        }
+    }
+
+    private fun audit(
+        command: GroundedProviderCallCommand,
+        attempt: ProviderAttempt,
+        result: PhysicalResult,
+        startedAt: Instant,
+    ) {
+        val usage = result.usage ?: TokenUsage.ZERO
+        val actualCost = result.usage?.let { CostCalculator.actual(it, modelCatalog.pricing(command.model)) }
+        auditPort.insert(
+            AuditLogEntry(
+                jobId = command.record.jobId,
+                sessionId = command.record.sessionId,
+                clubId = command.record.clubId,
+                hostUserId = command.record.hostUserId,
+                kind =
+                    if (command.mode == ProviderCallMode.REGENERATE_SECTION) {
+                        AuditKind.REGENERATE
+                    } else {
+                        AuditKind.FULL
+                    },
+                item = command.section,
+                provider = command.model.provider,
+                model = command.model.name,
+                transcriptSha256 = null,
+                usage = usage,
+                costEstimateUsd = actualCost ?: attempt.reservedCostUsd,
+                status = if (result.error == null) AuditStatus.SUCCESS else AuditStatus.FAILED,
+                errorCode = result.error?.code,
+                errorMessage = result.error?.message,
+                latencyMs =
+                    Duration
+                        .between(startedAt, clock.instant())
+                        .toMillis()
+                        .coerceIn(0, Int.MAX_VALUE.toLong())
+                        .toInt(),
+                createdAt = clock.instant(),
+                pipelineVersion = command.record.pipelineMode.name,
+                inputTurnCount = command.record.validatedTurns.size,
+                speakerCount =
+                    command.record.validatedTurns
+                        .map { it.speakerMembershipId }
+                        .distinct()
+                        .size,
+                traceId = traceContext.currentTraceId(),
+                providerAttempt = attempt.ordinal,
+                providerCallMode = command.mode,
+                costBasis = attempt.costBasis,
+            ),
+        )
+    }
+
+    private fun rejected(result: ProviderCallReservationResult): GroundedProviderCallResult =
+        when (result) {
+            ProviderCallReservationResult.StateChanged -> GroundedProviderCallResult.StateChanged
+            ProviderCallReservationResult.AdmissionExpired ->
+                failed(
+                    ErrorCode.RATE_LIMITED,
+                    "Provider admission expired before call",
+                    ProviderFailureClass.TERMINAL,
+                )
+            ProviderCallReservationResult.CallCapExceeded ->
+                failed(
+                    ErrorCode.MAX_CALLS_EXCEEDED,
+                    "Per-job LLM call cap exceeded",
+                    ProviderFailureClass.TERMINAL,
+                )
+            ProviderCallReservationResult.ModeAlreadyUsed ->
+                failed(
+                    ErrorCode.MAX_CALLS_EXCEEDED,
+                    "Provider call mode already used for job",
+                    ProviderFailureClass.TERMINAL,
+                )
+            ProviderCallReservationResult.MonthlyCostCapExceeded ->
+                failed(
+                    ErrorCode.CLUB_MONTHLY_CAP_EXCEEDED,
+                    "Club monthly AI cost cap exceeded",
+                    ProviderFailureClass.TERMINAL,
+                )
+            is ProviderCallReservationResult.Reserved -> error("handled above")
+        }
+
+    private fun preTransportUnavailable(): GroundedProviderCallResult.Failed =
+        GroundedProviderCallResult.Failed(
+            GenerationError(ErrorCode.PROVIDER_UNAVAILABLE, "Grounded provider unavailable"),
+            ProviderFailureClass.PRE_TRANSPORT,
+            null,
+        )
+
+    private fun failed(
+        code: ErrorCode,
+        message: String,
+        failureClass: ProviderFailureClass,
+    ) = GroundedProviderCallResult.Failed(GenerationError(code, message), failureClass, null)
+
+    private fun classify(code: ErrorCode): ProviderFailureClass =
+        when (code) {
+            ErrorCode.PROVIDER_UNAVAILABLE -> ProviderFailureClass.TRANSIENT
+            ErrorCode.PROVIDER_RATE_LIMITED -> ProviderFailureClass.RATE_LIMITED
+            ErrorCode.SCHEMA_INVALID -> ProviderFailureClass.SCHEMA_OR_PARSE
+            else -> ProviderFailureClass.TERMINAL
+        }
+
+    private sealed interface PhysicalResult {
+        val usage: TokenUsage?
+        val error: GenerationError?
+        val terminalState: ProviderAttemptState
+
+        data class Generated(
+            val output: GroundedGenerationOutput,
+        ) : PhysicalResult {
+            override val usage = output.usage
+            override val error: GenerationError? = null
+            override val terminalState = ProviderAttemptState.SUCCEEDED
+        }
+
+        data class Repaired(
+            val output: GroundedSectionRepairOutput,
+        ) : PhysicalResult {
+            override val usage = output.usage
+            override val error: GenerationError? = null
+            override val terminalState = ProviderAttemptState.SUCCEEDED
+        }
+
+        data class Failure(
+            override val error: GenerationError,
+            val failureClass: ProviderFailureClass,
+        ) : PhysicalResult {
+            override val usage: TokenUsage? = null
+            override val terminalState = ProviderAttemptState.UNKNOWN
+        }
+
+        fun circuitOutcome(): ProviderCircuitOutcome =
+            when (this) {
+                is Generated, is Repaired -> ProviderCircuitOutcome.SUCCESS
+                is Failure ->
+                    if (failureClass == ProviderFailureClass.TRANSIENT) {
+                        ProviderCircuitOutcome.TRANSIENT_FAILURE
+                    } else {
+                        ProviderCircuitOutcome.IGNORED_FAILURE
+                    }
+            }
+
+        fun toResult(attempt: ProviderAttempt): GroundedProviderCallResult =
+            when (this) {
+                is Generated -> GroundedProviderCallResult.Generated(output, attempt)
+                is Repaired -> GroundedProviderCallResult.Repaired(output, attempt)
+                is Failure -> GroundedProviderCallResult.Failed(error, failureClass, attempt)
+            }
+    }
+
+    private companion object {
+        val UNKNOWN_PROVIDER_OUTCOME =
+            GenerationError(ErrorCode.PROVIDER_UNAVAILABLE, "Provider request outcome unknown")
+    }
+}
+
+private fun Duration.nonNegative(): Duration = if (isNegative) Duration.ZERO else this

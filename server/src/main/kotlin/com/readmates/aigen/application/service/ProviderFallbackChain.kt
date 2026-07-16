@@ -50,6 +50,9 @@ class ProviderFallbackChain(
         groundedGenerators: Map<Provider, WholeTranscriptGroundedGenerator>,
     ): ModelId? =
         persistedCandidates.firstOrNull { candidate ->
-            candidate.provider != failed.provider && groundedGenerators.containsKey(candidate.provider)
+            candidate.provider != failed.provider &&
+                modelCatalog.isEnabled(candidate) &&
+                modelCatalog.allowlisted().contains(candidate) &&
+                groundedGenerators.containsKey(candidate.provider)
         }
 }
