@@ -157,6 +157,11 @@ readmates:
       redis-ttl: ${READMATES_AIGEN_REDIS_TTL:6h}
       notification-latency-threshold: ${READMATES_AIGEN_NOTIFICATION_LATENCY_THRESHOLD:60s}
       max-llm-calls-per-job: ${READMATES_AIGEN_MAX_LLM_CALLS_PER_JOB:3}
+    provider-calls:
+      request-timeout: ${READMATES_AIGEN_PROVIDER_REQUEST_TIMEOUT:4m}
+      max-concurrent-per-provider: ${READMATES_AIGEN_MAX_CONCURRENT_PER_PROVIDER:2}
+      transient-backoff-base: ${READMATES_AIGEN_TRANSIENT_BACKOFF_BASE:1s}
+      transient-backoff-max: ${READMATES_AIGEN_TRANSIENT_BACKOFF_MAX:30s}
     pricing:
       claude-sonnet-4-6:
         input-per-m-token-usd: 3.00

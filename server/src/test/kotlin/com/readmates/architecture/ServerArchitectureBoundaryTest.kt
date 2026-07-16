@@ -201,6 +201,17 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
+    fun `aigen provider gate port does not expose resilience4j types`() {
+        noClasses()
+            .that()
+            .resideInAnyPackage("com.readmates.aigen.application.port.out..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage("io.github.resilience4j..")
+            .check(importedClasses)
+    }
+
+    @Test
     fun `migrated application packages do not depend on jdbc or dao frameworks`() {
         noClasses()
             .that()

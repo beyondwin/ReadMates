@@ -6,6 +6,8 @@ import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.port.out.JobKind
+import com.readmates.aigen.application.port.out.ProviderCircuitOutcome
+import com.readmates.aigen.application.port.out.ProviderGateRejection
 import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry
@@ -192,6 +194,63 @@ class AiGenerationMetrics(
             .increment()
     }
 
+    fun recordProviderCall(
+        provider: Provider,
+        outcome: ProviderCircuitOutcome,
+        duration: Duration,
+    ) {
+        val tags =
+            aigenMeter(
+                MetricLabel.PROVIDER to provider.name,
+                MetricLabel.STATUS to outcome.name,
+            )
+        Counter
+            .builder(NAME_PROVIDER_CALLS)
+            .description("AI provider calls by bounded circuit outcome")
+            .tags(tags)
+            .register(meterRegistry)
+            .increment()
+        Timer
+            .builder(NAME_PROVIDER_CALL_LATENCY)
+            .description("AI provider call latency by bounded circuit outcome")
+            .publishPercentileHistogram()
+            .tags(tags)
+            .register(meterRegistry)
+            .record(duration)
+    }
+
+    fun recordProviderGateRejection(
+        provider: Provider,
+        reason: ProviderGateRejection,
+    ) {
+        Counter
+            .builder(NAME_PROVIDER_GATE_REJECTIONS)
+            .description("AI provider calls rejected before a physical request")
+            .tags(
+                aigenMeter(
+                    MetricLabel.PROVIDER to provider.name,
+                    MetricLabel.REASON to reason.name,
+                ),
+            ).register(meterRegistry)
+            .increment()
+    }
+
+    fun recordProviderCircuitTransition(
+        provider: Provider,
+        state: ProviderCircuitState,
+    ) {
+        Counter
+            .builder(NAME_PROVIDER_CIRCUIT_TRANSITIONS)
+            .description("AI provider circuit state transitions")
+            .tags(
+                aigenMeter(
+                    MetricLabel.PROVIDER to provider.name,
+                    MetricLabel.STATUS to state.name,
+                ),
+            ).register(meterRegistry)
+            .increment()
+    }
+
     /** `readmates_aigen_cap_denials_total{reason}` — counter. */
     fun recordCapDenial(reason: CapDenialReason) {
         Counter
@@ -247,10 +306,23 @@ class AiGenerationMetrics(
         const val NAME_GROUNDING_REPAIRS = "readmates.aigen.grounding.repairs"
         const val NAME_CAP_DENIALS = "readmates.aigen.cap.denials"
         const val NAME_QUEUE_DEPTH = "readmates.aigen.queue.depth"
+        const val NAME_PROVIDER_CALLS = "readmates.aigen.provider.calls"
+        const val NAME_PROVIDER_CALL_LATENCY = "readmates.aigen.provider.call.latency"
+        const val NAME_PROVIDER_GATE_REJECTIONS = "readmates.aigen.provider.gate.rejections"
+        const val NAME_PROVIDER_CIRCUIT_TRANSITIONS = "readmates.aigen.provider.circuit.state.transitions"
     }
 }
 
 enum class GroundingRepairOutcome { SUCCEEDED, FAILED }
+
+enum class ProviderCircuitState {
+    CLOSED,
+    OPEN,
+    HALF_OPEN,
+    DISABLED,
+    FORCED_OPEN,
+    METRICS_ONLY,
+}
 
 /**
  * The 6 enum-valued Prometheus tag keys permitted on any `readmates.aigen.*` meter

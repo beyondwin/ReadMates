@@ -6,6 +6,8 @@ import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.port.out.JobKind
+import com.readmates.aigen.application.port.out.ProviderCircuitOutcome
+import com.readmates.aigen.application.port.out.ProviderGateRejection
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -209,6 +211,61 @@ class AiGenerationMetricsTest {
 
         depth.set(42L)
         assertThat(gauge.value()).isEqualTo(42.0)
+    }
+
+    @Test
+    fun `provider gate metrics use only bounded provider status and reason tags`() {
+        metrics.recordProviderCall(Provider.OPENAI, ProviderCircuitOutcome.SUCCESS, Duration.ofMillis(125))
+        metrics.recordProviderGateRejection(Provider.CLAUDE, ProviderGateRejection.CONCURRENCY_LIMIT)
+        metrics.recordProviderCircuitTransition(Provider.GEMINI, ProviderCircuitState.OPEN)
+
+        assertThat(
+            registry
+                .find("readmates.aigen.provider.calls")
+                .tag("provider", "OPENAI")
+                .tag("status", "SUCCESS")
+                .counter()
+                ?.count(),
+        ).isEqualTo(1.0)
+        assertThat(
+            registry
+                .find("readmates.aigen.provider.call.latency")
+                .tag("provider", "OPENAI")
+                .tag("status", "SUCCESS")
+                .timer()
+                ?.count(),
+        ).isEqualTo(1L)
+        assertThat(
+            registry
+                .find("readmates.aigen.provider.gate.rejections")
+                .tag("provider", "CLAUDE")
+                .tag("reason", "CONCURRENCY_LIMIT")
+                .counter()
+                ?.count(),
+        ).isEqualTo(1.0)
+        assertThat(
+            registry
+                .find("readmates.aigen.provider.circuit.state.transitions")
+                .tag("provider", "GEMINI")
+                .tag("status", "OPEN")
+                .counter()
+                ?.count(),
+        ).isEqualTo(1.0)
+
+        registry.meters
+            .filter { it.id.name.startsWith("readmates.aigen.provider.") }
+            .forEach { meter ->
+                assertThat(meter.id.tags.map { it.key }).allMatch(setOf("provider", "status", "reason")::contains)
+                assertThat(meter.id.tags.map { it.key }).doesNotContain(
+                    "attemptId",
+                    "jobId",
+                    "traceId",
+                    "model",
+                    "exception",
+                    "url",
+                    "statusText",
+                )
+            }
     }
 
     @Test
