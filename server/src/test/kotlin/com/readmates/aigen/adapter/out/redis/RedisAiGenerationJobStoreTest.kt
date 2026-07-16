@@ -275,6 +275,20 @@ class RedisAiGenerationJobStoreTest(
     }
 
     @Test
+    fun `job lifecycle refresh keeps provider attempt ledger aligned with job ttl`() {
+        val record = newRecord()
+        store.save(record)
+        val ledgerKey = "aigen:job:${record.jobId}:provider-attempts"
+        redisTemplate.opsForHash<String, String>().put(ledgerKey, "synthetic-attempt:state", "IN_FLIGHT")
+        redisTemplate.expire(ledgerKey, java.time.Duration.ofSeconds(1))
+
+        store.updateStatus(record.jobId, JobStatus.RUNNING, JobStage.VALIDATING, 80, null)
+
+        val ttlSeconds = properties.job.redisTtl.seconds
+        assertThat(redisTemplate.getExpire(ledgerKey, TimeUnit.SECONDS)).isBetween(ttlSeconds - 30, ttlSeconds + 30)
+    }
+
+    @Test
     fun `load returns null and deletes stale keys when transcript key is missing`() {
         val record = newRecord()
         store.save(record)
@@ -407,12 +421,15 @@ class RedisAiGenerationJobStoreTest(
             ),
             BigDecimal("0.001"),
         )
+        val ledgerKey = "aigen:job:${record.jobId}:provider-attempts"
+        redisTemplate.opsForHash<String, String>().put(ledgerKey, "synthetic-attempt:state", "UNKNOWN")
 
         store.delete(record.jobId)
 
         assertThat(redisTemplate.hasKey("aigen:job:${record.jobId}")).isFalse()
         assertThat(redisTemplate.hasKey("aigen:job:${record.jobId}:transcript")).isFalse()
         assertThat(redisTemplate.hasKey("aigen:job:${record.jobId}:result")).isFalse()
+        assertThat(redisTemplate.hasKey(ledgerKey)).isFalse()
         assertThat(store.load(record.jobId)).isNull()
     }
 

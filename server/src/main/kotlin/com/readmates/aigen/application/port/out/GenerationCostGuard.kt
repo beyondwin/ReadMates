@@ -5,9 +5,9 @@ import java.math.BigDecimal
 import java.util.UUID
 
 /**
- * Outbound port enforcing host-daily call cap and club-monthly cost cap.
- * Admission is atomic so concurrent requests cannot race past daily, per-minute,
- * or club-cost checks before provider usage is recorded.
+ * Outbound port for initial host-daily/per-minute admission.
+ * Physical call count and club-monthly cost are reserved atomically by
+ * [ProviderCallReservationPort] immediately before provider transport.
  * Soft-warning thresholds are computed by the orchestrator via [clubMonthlyCost].
  */
 interface GenerationCostGuard {
@@ -17,6 +17,7 @@ interface GenerationCostGuard {
         admissionId: UUID,
     ): GuardDecision
 
+    @Deprecated("Use ProviderCallReservationPort.reconcile after Task 6 migrates callers")
     fun recordUsage(
         hostId: UUID,
         clubId: UUID,
@@ -31,7 +32,8 @@ interface GenerationCostGuard {
         admissionId: UUID,
     ): Unit
 
-    /** Renew only an admission still owned by this job immediately before a provider call. */
+    /** Temporary compatibility API; reservation renews the owning lease atomically. */
+    @Deprecated("Use ProviderCallReservationPort.reserve after Task 6 migrates callers")
     fun renewAdmission(
         hostId: UUID,
         clubId: UUID,

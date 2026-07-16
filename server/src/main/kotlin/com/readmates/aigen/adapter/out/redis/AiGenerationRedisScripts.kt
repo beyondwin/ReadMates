@@ -102,7 +102,7 @@ internal object AiGenerationRedisScripts {
 
     val deleteJob: DefaultRedisScript<Long> =
         DefaultRedisScript(
-            "return redis.call('DEL', KEYS[1], KEYS[2], KEYS[3], KEYS[4], KEYS[5])",
+            "return redis.call('DEL', KEYS[1], KEYS[2], KEYS[3], KEYS[4], KEYS[5], KEYS[6])",
             Long::class.java,
         )
 }

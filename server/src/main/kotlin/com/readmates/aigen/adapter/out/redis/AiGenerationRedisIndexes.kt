@@ -6,6 +6,8 @@ import org.springframework.data.redis.core.StringRedisTemplate
 import java.time.Duration
 import java.util.UUID
 
+internal fun providerAttemptsKey(jobId: UUID) = "aigen:job:$jobId:provider-attempts"
+
 @Suppress("TooManyFunctions")
 internal class AiGenerationRedisIndexes(
     private val redisTemplate: StringRedisTemplate,
@@ -39,6 +41,7 @@ internal class AiGenerationRedisIndexes(
         val sessionKey = sessionRecentKey(job.sessionId)
         zSet.add(sessionKey, id, score)
         redisTemplate.expire(sessionKey, ttl)
+        redisTemplate.expire(providerAttemptsKey(job.jobId), ttl)
 
         if (isActive(job)) {
             val clubKey = activeClubJobsKey(job.clubId)

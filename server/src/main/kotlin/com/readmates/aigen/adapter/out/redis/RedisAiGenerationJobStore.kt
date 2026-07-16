@@ -695,6 +695,7 @@ class RedisAiGenerationJobStore(
                     resultKey(jobId),
                     turnsKey(jobId),
                     evidenceKey(jobId),
+                    providerAttemptsKey(jobId),
                 ),
             )
             indexes.remove(

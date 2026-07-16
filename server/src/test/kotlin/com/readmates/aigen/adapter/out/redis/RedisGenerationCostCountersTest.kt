@@ -28,6 +28,10 @@ import java.util.concurrent.TimeUnit
         "readmates.bff-secret=test-bff-secret",
         "readmates.redis.enabled=true",
         "readmates.aigen.enabled=true",
+        "spring.ai.model.chat=none",
+        "spring.ai.google.genai.api-key=test-key",
+        "spring.ai.openai.api-key=test-key",
+        "spring.ai.anthropic.api-key=test-key",
     ],
 )
 @Tag("integration")
@@ -73,18 +77,18 @@ class RedisGenerationCostCountersTest(
     }
 
     @Test
-    fun `deny when club monthly cost cap reached`() {
+    fun `initial admission leaves monthly cost decision and accounting to provider reservation`() {
         val hostId = UUID.randomUUID()
         val clubId = UUID.randomUUID()
         deleteCounters(hostId, clubId)
 
-        // Push monthly cost to cap with 1 daily call
+        // Temporary legacy usage writer remains until Task 6 migrates all callers.
         guard.recordUsage(hostId, clubId, UUID.randomUUID(), BigDecimal("20.00"))
 
         val decision = guard.checkBeforeCall(hostId, clubId, UUID.randomUUID())
 
-        assertThat(decision).isInstanceOf(GuardDecision.Deny::class.java)
-        assertThat((decision as GuardDecision.Deny).code).isEqualTo(ErrorCode.CLUB_MONTHLY_CAP_EXCEEDED)
+        assertThat(decision).isEqualTo(GuardDecision.Allow)
+        assertThat(guard.clubMonthlyCost(clubId)).isEqualByComparingTo("20.00")
     }
 
     @Test

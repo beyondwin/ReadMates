@@ -16,12 +16,12 @@ import java.time.Duration
 import java.util.UUID
 
 /**
- * Redis-backed enforcer for AI generation caps (host daily/per-minute call count, club monthly cost).
+ * Redis-backed initial admission guard for host daily/per-minute call count.
  *
  * Sliding windows:
  *  - `aigen:host:{hostId}:daily` — admission count with a 24h sliding TTL
  *  - `aigen:host:{hostId}:minute` — endpoint-specific admission count with a 60s TTL
- *  - `aigen:club:{clubId}:monthly_cost_usd` — INCRBYFLOAT + EXPIRE 31d on first increment
+ *  - `aigen:club:{clubId}:monthly_cost_usd` — legacy usage writer until Task 6 migrates callers
  *  - `aigen:club:{clubId}:provider_admission` — short lease that serializes provider admission
  *
  * Conditional on `readmates.redis.enabled=true` and `readmates.aigen.enabled=true`.
@@ -43,9 +43,8 @@ class RedisGenerationCostCounters(
             when (
                 redisTemplate.execute(
                     ADMIT_SCRIPT,
-                    listOf(dailyKey(hostId), monthlyKey(clubId), minuteKey(hostId), admissionKey(clubId)),
+                    listOf(dailyKey(hostId), minuteKey(hostId), admissionKey(clubId)),
                     properties.caps.hostDailyCalls.toString(),
-                    properties.caps.clubMonthlyCostUsd.toPlainString(),
                     properties.caps.hostPerMinuteCalls.toString(),
                     DAILY_TTL_SECONDS.toString(),
                     MINUTE_TTL_SECONDS.toString(),
@@ -58,10 +57,6 @@ class RedisGenerationCostCounters(
                     aigenMetrics.recordCapDenial(CapDenialReason.HOST_DAILY)
                     GuardDecision.Deny(ErrorCode.HOST_DAILY_CAP_EXCEEDED)
                 }
-                CLUB_MONTHLY_DENIED -> {
-                    aigenMetrics.recordCapDenial(CapDenialReason.CLUB_MONTHLY)
-                    GuardDecision.Deny(ErrorCode.CLUB_MONTHLY_CAP_EXCEEDED)
-                }
                 else -> GuardDecision.Deny(ErrorCode.RATE_LIMITED)
             }
         }.onFailure { recordFailure("checkBeforeCall") }.getOrElse {
@@ -69,6 +64,7 @@ class RedisGenerationCostCounters(
             GuardDecision.Deny(ErrorCode.RATE_LIMITED)
         }
 
+    @Deprecated("Use ProviderCallReservationPort.reconcile after Task 6 migrates callers")
     override fun recordUsage(
         hostId: UUID,
         clubId: UUID,
@@ -100,6 +96,7 @@ class RedisGenerationCostCounters(
         }.onFailure { recordFailure("releaseAdmission") }
     }
 
+    @Deprecated("Use ProviderCallReservationPort.reserve after Task 6 migrates callers")
     override fun renewAdmission(
         hostId: UUID,
         clubId: UUID,
@@ -151,24 +148,20 @@ class RedisGenerationCostCounters(
 
         const val ADMITTED = 1L
         const val HOST_DAILY_DENIED = -1L
-        const val CLUB_MONTHLY_DENIED = -2L
-
         val ADMIT_SCRIPT: DefaultRedisScript<Long> =
             DefaultRedisScript(
                 """
                 local daily = tonumber(redis.call('GET', KEYS[1]) or '0')
                 if daily >= tonumber(ARGV[1]) then return -1 end
-                local monthly = tonumber(redis.call('GET', KEYS[2]) or '0')
-                if monthly >= tonumber(ARGV[2]) then return -2 end
-                local minute = tonumber(redis.call('GET', KEYS[3]) or '0')
-                if minute >= tonumber(ARGV[3]) then return -3 end
-                if redis.call('EXISTS', KEYS[4]) == 1 then return -3 end
+                local minute = tonumber(redis.call('GET', KEYS[2]) or '0')
+                if minute >= tonumber(ARGV[2]) then return -3 end
+                if redis.call('EXISTS', KEYS[3]) == 1 then return -3 end
 
                 daily = redis.call('INCR', KEYS[1])
-                if daily == 1 then redis.call('EXPIRE', KEYS[1], ARGV[4]) end
-                minute = redis.call('INCR', KEYS[3])
-                if minute == 1 then redis.call('EXPIRE', KEYS[3], ARGV[5]) end
-                redis.call('SET', KEYS[4], ARGV[7], 'EX', ARGV[6])
+                if daily == 1 then redis.call('EXPIRE', KEYS[1], ARGV[3]) end
+                minute = redis.call('INCR', KEYS[2])
+                if minute == 1 then redis.call('EXPIRE', KEYS[2], ARGV[4]) end
+                redis.call('SET', KEYS[3], ARGV[6], 'EX', ARGV[5])
                 return 1
                 """.trimIndent(),
                 Long::class.java,
