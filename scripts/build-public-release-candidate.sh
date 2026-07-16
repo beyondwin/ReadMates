@@ -417,6 +417,7 @@ copy_manifest() {
 
   copy_dir "docs/deploy"
   copy_dir "docs/development"
+  copy_dir "docs/case-studies"
   copy_required_file "docs/operations/README.md"
   copy_dir "docs/operations/runbooks"
   copy_dir "ops/grafana/dashboards"
@@ -436,6 +437,7 @@ copy_manifest() {
   copy_optional_file "scripts/validate-prometheus-config.sh"
   copy_optional_file "scripts/validate-prometheus-rules.sh"
   copy_optional_file "scripts/validate-production-ai-config.sh"
+  copy_optional_file "scripts/verify-production-ai-config-fixtures.sh"
   copy_optional_file "scripts/validate-tempo-config.sh"
   copy_optional_file "scripts/verify-public-release-fixtures.sh"
   copy_dir "scripts/sync-config"

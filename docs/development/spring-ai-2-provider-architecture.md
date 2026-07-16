@@ -115,14 +115,14 @@ The application state machine counts primary, same-provider retry, cross-provide
 | Key | Shape / lifetime |
 | --- | --- |
 | `aigen:job:<jobId>` | content-free job hash, `llmCallCount`, club binding; 6h |
-| `aigen:job:<jobId>:provider_attempts` | per-attempt field prefix with ordinal/provider/model/mode/state/reserved cost/basis/safe code/times; 6h |
+| `aigen:job:<jobId>:provider-attempts` | per-attempt field prefix with ordinal/provider/model/mode/state/reserved cost/basis/safe code/times; 6h |
 | `aigen:club:<clubId>:provider_admission` | owner token; 5m and renewed by reservation |
 | `aigen:club:<clubId>:monthly_cost_usd` | reserved/reconciled USD counter; 31d |
 | `aigen:job:<jobId>:{transcript,turns,result,evidence}` | four permitted content payloads; 6h and deleted on commit/cancel |
 
 One Lua reservation checks the job/status/club binding, live admission owner, three-call cap, monthly cap and single-use modes; it then increments `llmCallCount`, reserves worst-case USD and writes `IN_FLIGHT`. This is atomic only for the current single-node Redis topology. Redis Cluster is unsupported because the keys are not guaranteed to share a hash slot.
 
-Worst-case cost prices estimated input at the higher of normal/cache-write input rates when cache write is possible and reserves full configured output. Reconciliation changes the reservation to `ACTUAL` only when complete usage is available. Unknown or incomplete usage keeps the reserved amount with `ESTIMATED_UNKNOWN`. A proven pre-transport outcome may release slot and cost; an uncertain transport outcome may not.
+Worst-case cost prices estimated input at the higher of normal/cache-write input rates when cache write is possible and reserves full configured output. Reconciliation changes the reservation to `ACTUAL` only when complete usage is available. Unknown or incomplete usage keeps the reserved amount with `ESTIMATED_UNKNOWN`. A proven pre-transport outcome atomically releases slot and reserved cost and records `NONE`; an uncertain transport outcome may not.
 
 On Kafka redelivery, a still-live `IN_FLIGHT` attempt is not sent again. After the stale cutoff it becomes `UNKNOWN`/`ESTIMATED_UNKNOWN`, retains its slot/cost, and only a new attempt ID may use a remaining slot. Commit receipt recovery remains the MySQL/Redis cross-store source of truth.
 

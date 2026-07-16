@@ -231,6 +231,7 @@ run_step "Export Zod fixtures" "${pnpm_cmd[@]}" --dir front zod:export-fixtures
 run_step "Check Zod fixtures are committed" git diff --exit-code front/tests/unit/__fixtures__/zod-schemas/
 run_step "Backend CI quality gate" ./scripts/server-ci-check.sh
 run_step "Validate production AI config" bash ./scripts/validate-production-ai-config.sh
+run_step "Verify production AI config fixtures" bash ./scripts/verify-production-ai-config-fixtures.sh
 
 if should_run_public_release_check; then
   run_step "Build public release candidate" ./scripts/build-public-release-candidate.sh

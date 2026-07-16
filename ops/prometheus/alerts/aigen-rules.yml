@@ -9,9 +9,9 @@
 #   * Provider-level error code labels (`PROVIDER_*`) are not exported as
 #     metric labels; the provider adapter records them in the audit log only.
 #     `AiGenProviderErrorBurst` uses `status="FAILED"` as the closest proxy.
-#   * `readmates_aigen_queue_depth` is currently a placeholder gauge (always
-#     0) pending Kafka consumer-lag wiring; `AiGenQueueLagHigh` will not fire
-#     until that integration lands.
+#   * `readmates_aigen_queue_depth` is the Redis-backed active job count
+#     (`PENDING` + `RUNNING`) bound by `AiGenerationQueueDepthGaugeBinder`.
+#     Kafka consumer-group lag is a separate operational signal.
 #   * `redis_up` metric name follows the Spring Boot Actuator / Micrometer
 #     health convention; confirm exported series name with ops before
 #     enabling in production.
@@ -91,9 +91,8 @@ groups:
 
       - alert: AiGenQueueLagHigh
         # Spec: consumer lag > 50 5m.
-        # Backed by readmates_aigen_queue_depth gauge (task 6.1).
-        # NOTE: gauge is a placeholder (0L) until Kafka consumer-lag wiring
-        # lands; alert will not fire until then.
+        # Backed by the live Redis active-job gauge (`PENDING` + `RUNNING`).
+        # This is application backlog, not Kafka consumer-group lag.
         expr: readmates_aigen_queue_depth > 50
         for: 5m
         labels:

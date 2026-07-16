@@ -19,9 +19,29 @@ done
 
 legacy_env='READMATES_AIGEN_''PIPELINE_MODE'
 legacy_property='readmates.aigen.pipeline''-mode'
-if rg -n "$legacy_env|$legacy_property" \
-  "$workflow" "$env_example" "$import_script" "$app_compose"; then
-  fail "legacy pipeline selector remains in an active production config path"
+legacy_enum='AiGenerationPipeline''Mode'
+legacy_field='pipeline''Mode'
+legacy_mode='LEG''ACY'
+grounded_mode='GROUNDED_''WHOLE_TRANSCRIPT'
+legacy_selector_pattern="$legacy_env|$legacy_property|$legacy_enum|$legacy_field|\\b$legacy_mode\\b|\\b$grounded_mode\\b"
+active_paths=(
+  "$workflow"
+  "$env_example"
+  "$import_script"
+  "$app_compose"
+  "$infra_compose"
+)
+for path in \
+  "$repo_root/server/src/main" \
+  "$repo_root/docs/development" \
+  "$repo_root/docs/operations" \
+  "$repo_root/docs/case-studies"; do
+  if [ -e "$path" ]; then
+    active_paths+=("$path")
+  fi
+done
+if rg -n "$legacy_selector_pattern" "${active_paths[@]}"; then
+  fail "legacy pipeline selector remains in an active path"
 fi
 
 grep -Fq 'READMATES_OTLP_TRACES_ENDPOINT: http://tempo:4318/v1/traces' "$app_compose" ||

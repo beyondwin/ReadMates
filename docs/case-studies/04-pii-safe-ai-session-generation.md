@@ -84,7 +84,7 @@ Kafka message는 `jobId`, `sessionId`, `clubId`, `hostUserId`, provider, model, 
 
 ### 3. 전체 대본 structured generation과 서버 소유 근거
 
-Grounded pipeline은 provider별 `WholeTranscriptGroundedGenerator`를 사용합니다. OpenAI, Claude, Gemini adapter는 같은 renderer의 system instruction, schema, ordered turns, explicit max output을 사용합니다.
+Grounded-only 흐름은 하나의 `WholeTranscriptGroundedGenerator` port와 provider별 `SpringAiWholeTranscriptGroundedGenerator` bean을 사용합니다. OpenAI, Claude, Gemini adapter는 같은 renderer의 system instruction, schema, ordered turns, explicit max output을 사용합니다. Spring AI는 한 번의 non-streaming structured-output 호출과 content-safe 응답 변환만 담당하고, application이 retry, fallback, schema correction, grounding repair와 최대 3회 물리 호출 정책을 소유합니다. 직접 provider SDK 호출 경로와 legacy pipeline/runtime selector는 없습니다.
 
 - Primary generation은 전체 대본 1회 호출입니다.
 - 정확히 한 section이 schema/grounding 검증에 실패할 때만 같은 provider로 전체 대본을 유지한 section repair 1회를 허용합니다.
@@ -136,7 +136,7 @@ Owner가 없거나 바뀌면 provider를 호출하지 않습니다. OpenAI/Claud
 
 ### 7. 운영 rollout과 privacy 경계
 
-`readmates.aigen.enabled` kill switch와 `enabled-providers` allowlist가 가장 먼저 적용됩니다. Pipeline 기본값은 `LEGACY`이며, 환경별 mock/E2E, provider capability/retention, rollback checklist가 끝난 뒤에만 `GROUNDED_WHOLE_TRANSCRIPT`로 바꿉니다. 장애 시 pipeline을 `LEGACY`로 되돌리며 보안·비용 사건은 kill switch까지 내립니다.
+`readmates.aigen.enabled` kill switch와 `enabled-providers` allowlist가 가장 먼저 적용됩니다. Provider는 기본 비활성 상태이며 mock/E2E, capability, account retention 확인을 마친 provider만 allowlist로 엽니다. 장애 시 새 AI job 생성을 kill switch로 차단하고 consumer를 중지한 뒤 in-flight 상태를 보존해 복구합니다. Legacy fallback은 존재하지 않으므로 이전 image rollback은 Redis/Kafka 상태와 migration 호환성을 확인한 ordered procedure로만 수행합니다. Provider key가 필요한 live smoke, billable call, production deploy와 secret 변경은 별도 승인이 필요합니다.
 
 Platform admin은 job ID, status, revision, safe error, `cleanupPending` 같은 metadata만 봅니다. Transcript, 이름, result, evidence를 열거나 수정·commit하지 않습니다. Private transcript를 live provider에 보내는 평가는 별도 명시 승인 없이는 실행하지 않습니다.
 
