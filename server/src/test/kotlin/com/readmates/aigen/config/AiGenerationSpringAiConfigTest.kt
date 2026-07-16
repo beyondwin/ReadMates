@@ -5,10 +5,11 @@ import com.readmates.aigen.adapter.out.llm.springai.SpringAiNativeUsage
 import com.readmates.aigen.adapter.out.llm.springai.SpringAiNativeUsageExtractor
 import com.readmates.aigen.adapter.out.llm.springai.SpringAiProviderNativeUsageExtractor
 import com.readmates.aigen.adapter.out.llm.springai.SpringAiUsageMapper
+import com.readmates.aigen.application.model.ModelCapability
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.port.out.ModelCapabilityCatalog
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.springframework.ai.chat.model.ChatModel
 import org.springframework.ai.model.chat.client.autoconfigure.ChatClientBuilderConfigurer
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
 import org.springframework.context.annotation.Bean
@@ -16,7 +17,7 @@ import org.springframework.context.annotation.Configuration
 
 class AiGenerationSpringAiConfigTest {
     @Test
-    fun `enabled non-mock provider without a configured model fails with an actionable content-free error`() {
+    fun `enabled non-mock OpenAI without a key fails with an actionable content-free error`() {
         contextRunner(
             "readmates.aigen.enabled=true",
             "readmates.aigen.mock=false",
@@ -24,8 +25,7 @@ class AiGenerationSpringAiConfigTest {
         ).run { context ->
             assertThat(context).hasFailed()
             assertThat(context.startupFailure)
-                .hasMessageContaining("Spring AI chat model missing for enabled provider: OPENAI")
-                .hasMessageContaining("API key and grounded structured-output capability")
+                .hasMessageContaining("OpenAI API key is required when OPENAI is enabled")
                 .hasMessageNotContaining("READMATES_AIGEN_OPENAI_API_KEY=")
         }
     }
@@ -58,7 +58,8 @@ class AiGenerationSpringAiConfigTest {
             "readmates.aigen.enabled=true",
             "readmates.aigen.mock=false",
             "readmates.aigen.enabled-providers=OPENAI",
-        ).withUserConfiguration(FakeProviderModelConfiguration::class.java)
+            "READMATES_AIGEN_OPENAI_API_KEY=test-api-key",
+        ).withUserConfiguration(FakeProviderNativeUsageConfiguration::class.java)
             .run { context ->
                 assertThat(context).hasNotFailed()
                 @Suppress("UNCHECKED_CAST")
@@ -75,10 +76,41 @@ class AiGenerationSpringAiConfigTest {
                     org.springframework.ai.chat.metadata
                         .DefaultUsage(25, 5, 30, NativeUsageMarker)
                 val mapped = usageMapper.map(Provider.OPENAI, usage, cacheEnabled = true)
-                assertThat(mapped.usage.nonCachedInputTokens).isEqualTo(10)
-                assertThat(mapped.usage.cacheWriteInputTokens).isEqualTo(4)
+                assertThat(mapped.usage.nonCachedInputTokens).isEqualTo(14)
+                assertThat(mapped.usage.cacheWriteInputTokens).isZero()
                 assertThat(mapped.usage.cacheReadInputTokens).isEqualTo(11)
                 assertThat(mapped.usageComplete).isTrue()
+            }
+    }
+
+    @Test
+    fun `enabled provider without one capability catalog fails closed`() {
+        contextRunner(
+            "readmates.aigen.enabled=true",
+            "readmates.aigen.mock=false",
+            "readmates.aigen.enabled-providers=OPENAI",
+            "READMATES_AIGEN_OPENAI_API_KEY=test-api-key",
+        ).run { context ->
+            assertThat(context).hasFailed()
+            assertThat(context.startupFailure)
+                .hasMessageContaining("Exactly one AI model capability catalog is required")
+                .hasMessageNotContaining("test-api-key")
+        }
+    }
+
+    @Test
+    fun `enabled provider with ambiguous capability catalogs fails closed`() {
+        contextRunner(
+            "readmates.aigen.enabled=true",
+            "readmates.aigen.mock=false",
+            "readmates.aigen.enabled-providers=OPENAI",
+            "READMATES_AIGEN_OPENAI_API_KEY=test-api-key",
+        ).withUserConfiguration(AmbiguousCapabilityCatalogConfiguration::class.java)
+            .run { context ->
+                assertThat(context).hasFailed()
+                assertThat(context.startupFailure)
+                    .hasMessageContaining("Exactly one AI model capability catalog is required")
+                    .hasMessageNotContaining("test-api-key")
             }
     }
 
@@ -97,10 +129,16 @@ class AiGenerationSpringAiConfigTest {
     }
 
     @Configuration(proxyBeanMethods = false)
-    class FakeProviderModelConfiguration {
+    class FakeProviderNativeUsageConfiguration {
         @Bean
-        fun openAiProviderChatModel(): SpringAiProviderChatModel =
-            SpringAiProviderChatModel(Provider.OPENAI, ChatModel { error("not called during configuration") })
+        fun modelCapabilityCatalog() =
+            ModelCapabilityCatalog {
+                ModelCapability(
+                    contextWindowTokens = 400_000,
+                    maxOutputTokens = 128_000,
+                    structuredOutputSupported = true,
+                )
+            }
 
         @Bean
         fun openAiNativeUsageExtractor() =
@@ -112,6 +150,15 @@ class AiGenerationSpringAiConfigTest {
                     }
                 },
             )
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    class AmbiguousCapabilityCatalogConfiguration {
+        @Bean
+        fun firstCatalog() = ModelCapabilityCatalog { null }
+
+        @Bean
+        fun secondCatalog() = ModelCapabilityCatalog { null }
     }
 
     private data object NativeUsageMarker

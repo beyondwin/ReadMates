@@ -5,6 +5,7 @@ import com.readmates.aigen.adapter.out.llm.common.GroundedProviderTestFixture
 import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationItem
+import com.readmates.aigen.application.model.ModelCapability
 import com.readmates.aigen.application.model.Provider
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -78,7 +79,14 @@ class SpringAiWholeTranscriptGroundedGeneratorTest {
     private fun generator(
         provider: Provider,
         model: ChatModel,
-        optionsFactory: SpringAiProviderOptionsFactory = SpringAiProviderOptionsFactory(),
+        optionsFactory: SpringAiProviderOptionsFactory =
+            SpringAiProviderOptionsFactory {
+                ModelCapability(
+                    contextWindowTokens = 400_000,
+                    maxOutputTokens = 128_000,
+                    structuredOutputSupported = true,
+                )
+            },
     ) = SpringAiWholeTranscriptGroundedGenerator(
         provider = provider,
         chatClient = ChatClient.create(model),

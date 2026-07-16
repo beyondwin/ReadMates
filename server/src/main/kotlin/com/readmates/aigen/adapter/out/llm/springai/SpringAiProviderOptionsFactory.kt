@@ -5,6 +5,7 @@ import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.port.out.ModelCapabilityCatalog
 import com.readmates.aigen.application.port.out.RenderedGroundedRequest
 import org.springframework.ai.chat.prompt.ChatOptions
+import org.springframework.ai.openai.OpenAiChatOptions
 
 enum class SpringAiGenerationMode { GENERATE, REPAIR }
 
@@ -13,7 +14,7 @@ enum class SpringAiGenerationMode { GENERATE, REPAIR }
  * structured-output settings are added by the provider contract tasks.
  */
 class SpringAiProviderOptionsFactory(
-    private val modelCapabilityCatalog: ModelCapabilityCatalog? = null,
+    private val modelCapabilityCatalog: ModelCapabilityCatalog,
 ) {
     fun options(
         provider: Provider,
@@ -24,18 +25,26 @@ class SpringAiProviderOptionsFactory(
         require(model.provider == provider) { "Model provider does not match Spring AI grounded adapter" }
         require(model.name.isNotBlank()) { "Grounded model must be allowlisted" }
         require(request.maxOutputTokens > 0) { "Grounded maximum output tokens must be positive" }
-        modelCapabilityCatalog?.let { catalog ->
-            val capability = catalog.find(model)
-            require(capability?.structuredOutputSupported == true) {
-                "Grounded model is not allowlisted for structured output"
-            }
-            require(request.maxOutputTokens.toLong() <= capability.maxOutputTokens) {
-                "Grounded maximum output tokens exceed the allowlisted capability"
-            }
+        val capability = modelCapabilityCatalog.find(model)
+        require(capability?.structuredOutputSupported == true) {
+            "Grounded model is not allowlisted for structured output"
         }
-        return ChatOptions
-            .builder()
-            .model(model.name)
-            .maxTokens(request.maxOutputTokens)
+        require(request.maxOutputTokens.toLong() <= capability.maxOutputTokens) {
+            "Grounded maximum output tokens exceed the allowlisted capability"
+        }
+        return when (provider) {
+            Provider.OPENAI ->
+                OpenAiChatOptions
+                    .builder()
+                    .model(model.name)
+                    .maxCompletionTokens(request.maxOutputTokens)
+                    .store(false)
+                    .outputSchema(request.schemaJson)
+            else ->
+                ChatOptions
+                    .builder()
+                    .model(model.name)
+                    .maxTokens(request.maxOutputTokens)
+        }
     }
 }

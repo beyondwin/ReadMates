@@ -38,6 +38,19 @@ class SpringAiUsageMapper(
         val native =
             runCatching { nativeExtractors[provider]?.extract(usage?.nativeUsage) }
                 .getOrNull()
+        return if (provider == Provider.OPENAI) {
+            mapOpenAi(usage, native)
+        } else {
+            mapGeneric(usage, native, cacheEnabled, promptIncludesCache)
+        }
+    }
+
+    private fun mapGeneric(
+        usage: Usage?,
+        native: SpringAiNativeUsage?,
+        cacheEnabled: Boolean,
+        promptIncludesCache: Boolean,
+    ): SpringAiUsageMapping {
         val prompt = usage?.promptTokens?.toLong()
         val output = native?.outputTokens ?: usage?.completionTokens?.toLong()
         val cacheRead = native?.cacheReadInputTokens ?: usage?.cacheReadInputTokens
@@ -61,6 +74,37 @@ class SpringAiUsageMapper(
                 TokenUsage(
                     nonCachedInputTokens = nonCached.safeTokenCount(),
                     cacheWriteInputTokens = cacheWrite.safeTokenCount(),
+                    cacheReadInputTokens = cacheRead.safeTokenCount(),
+                    outputTokens = output.safeTokenCount(),
+                ),
+            usageComplete = complete,
+        )
+    }
+
+    private fun mapOpenAi(
+        usage: Usage?,
+        native: SpringAiNativeUsage?,
+    ): SpringAiUsageMapping {
+        val prompt = usage?.promptTokens?.toLong()
+        val cacheRead = native?.cacheReadInputTokens ?: usage?.cacheReadInputTokens ?: 0L
+        val output = native?.outputTokens ?: usage?.completionTokens?.toLong()
+        val total = usage?.totalTokens?.toLong()
+        val nonCached = prompt?.minus(cacheRead)
+        val complete =
+            prompt != null &&
+                output != null &&
+                total != null &&
+                cacheRead >= 0 &&
+                nonCached != null &&
+                nonCached >= 0 &&
+                total >= 0 &&
+                total == prompt + output
+
+        return SpringAiUsageMapping(
+            usage =
+                TokenUsage(
+                    nonCachedInputTokens = nonCached.safeTokenCount(),
+                    cacheWriteInputTokens = 0,
                     cacheReadInputTokens = cacheRead.safeTokenCount(),
                     outputTokens = output.safeTokenCount(),
                 ),
