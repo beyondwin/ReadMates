@@ -114,14 +114,14 @@ class RedisProviderCallReservationAdapter(
                     ?: error("Provider attempt job binding is unavailable")
             val response =
                 redisTemplate
-                .execute(
-                    ProviderCallReservationRedisScripts.markUnresolvedUnknown,
-                    listOf(ledgerKey(jobId), jobKey, monthlyKey(UUID.fromString(clubId))),
-                    now.toString(),
-                    properties.job.redisTtl.seconds
-                        .toString(),
-                    clubId,
-                ).orEmpty()
+                    .execute(
+                        ProviderCallReservationRedisScripts.markUnresolvedUnknown,
+                        listOf(ledgerKey(jobId), jobKey, monthlyKey(UUID.fromString(clubId))),
+                        now.toString(),
+                        properties.job.redisTtl.seconds
+                            .toString(),
+                        clubId,
+                    ).orEmpty()
             when (response) {
                 RECOVERY_BINDING_MISMATCH -> error("Provider attempt job binding changed")
                 RECOVERY_COUNTER_UNAVAILABLE -> error("Monthly reservation counter is unavailable")

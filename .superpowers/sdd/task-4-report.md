@@ -104,3 +104,13 @@ ktlint report.
 - Aggregate ktlint should be rerun after the parent/root checkout's concurrent package edits settle.
 - Independent read-only re-review after all accounting fixes returned READY with no Critical, Important, or
   Minor findings.
+
+## Formatting follow-up
+
+- Corrected only the Kotlin continuation indentation of the stale-recovery `redisTemplate.execute(...)`
+  chain; runtime behavior and Redis arguments are unchanged.
+- `./server/gradlew -p server ktlintMainSourceSetCheck` no longer reports the reservation adapter. The task
+  remains non-zero only for the two known parent/root checkout package-line findings outside this worktree.
+- `./server/gradlew -p server compileKotlin integrationTest --tests
+  '*RedisProviderCallReservationAdapterTest'` completed successfully; the adapter suite remains 20/20.
+- `git diff --check` passed before the formatting-only commit.
