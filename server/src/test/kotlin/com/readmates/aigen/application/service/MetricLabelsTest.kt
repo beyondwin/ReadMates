@@ -44,7 +44,7 @@ class MetricLabelsTest {
         )
         metrics.recordLatency(Provider.CLAUDE, model, JobKind.FULL, Duration.ofSeconds(2))
         metrics.recordTokens(Provider.CLAUDE, model, TokenDirection.INPUT, 100)
-        metrics.recordTokens(Provider.CLAUDE, model, TokenDirection.CACHED_INPUT, 50)
+        metrics.recordTokens(Provider.CLAUDE, model, TokenDirection.CACHE_READ_INPUT, 50)
         metrics.recordTokens(Provider.CLAUDE, model, TokenDirection.OUTPUT, 200)
         metrics.recordCost(Provider.CLAUDE, model, BigDecimal("0.05"))
         metrics.recordValidationFailure(ErrorCode.SCHEMA_INVALID)

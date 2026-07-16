@@ -107,7 +107,15 @@ internal object StubGenerationPayload {
                 feedbackDocumentFileName = "session-${meta.sessionNumber}-feedback.md",
                 feedbackDocumentMarkdown = feedbackMarkdown,
             )
-        return GenerationOutput(snapshot, TokenUsage(inputTokens = 100, cachedInputTokens = 0, outputTokens = 200))
+        return GenerationOutput(
+            snapshot,
+            TokenUsage(
+                nonCachedInputTokens = 100,
+                cacheWriteInputTokens = 0,
+                cacheReadInputTokens = 0,
+                outputTokens = 200,
+            ),
+        )
     }
 }
 

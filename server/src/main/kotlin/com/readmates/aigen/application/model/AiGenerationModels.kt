@@ -18,6 +18,7 @@ data class ModelId(
 
 data class ModelPricing(
     val inputPerMTokenUsd: BigDecimal,
+    val cacheWriteInputPerMTokenUsd: BigDecimal,
     val cachedInputPerMTokenUsd: BigDecimal,
     val outputPerMTokenUsd: BigDecimal,
 )
@@ -113,10 +114,39 @@ data class GroundedEvidenceBundle(
 )
 
 data class TokenUsage(
-    val inputTokens: Long,
-    val cachedInputTokens: Long,
+    val nonCachedInputTokens: Long,
+    val cacheWriteInputTokens: Long,
+    val cacheReadInputTokens: Long,
     val outputTokens: Long,
-)
+) {
+    init {
+        require(nonCachedInputTokens >= 0) { "nonCachedInputTokens must be non-negative" }
+        require(cacheWriteInputTokens >= 0) { "cacheWriteInputTokens must be non-negative" }
+        require(cacheReadInputTokens >= 0) { "cacheReadInputTokens must be non-negative" }
+        require(outputTokens >= 0) { "outputTokens must be non-negative" }
+    }
+
+    val publicInputTokens: Long get() = nonCachedInputTokens + cacheWriteInputTokens
+    val publicCachedInputTokens: Long get() = cacheReadInputTokens
+
+    operator fun plus(other: TokenUsage): TokenUsage =
+        TokenUsage(
+            nonCachedInputTokens = nonCachedInputTokens + other.nonCachedInputTokens,
+            cacheWriteInputTokens = cacheWriteInputTokens + other.cacheWriteInputTokens,
+            cacheReadInputTokens = cacheReadInputTokens + other.cacheReadInputTokens,
+            outputTokens = outputTokens + other.outputTokens,
+        )
+
+    companion object {
+        val ZERO =
+            TokenUsage(
+                nonCachedInputTokens = 0,
+                cacheWriteInputTokens = 0,
+                cacheReadInputTokens = 0,
+                outputTokens = 0,
+            )
+    }
+}
 
 enum class GenerationItem { SUMMARY, HIGHLIGHTS, ONE_LINE_REVIEWS, FEEDBACK_DOCUMENT }
 

@@ -67,7 +67,7 @@ data class AuditLogEntry(
                 provider = provider,
                 model = model,
                 transcriptSha256 = transcriptSha256,
-                usage = TokenUsage(0, 0, 0),
+                usage = TokenUsage.ZERO,
                 costEstimateUsd = BigDecimal.ZERO,
                 status = AuditStatus.FAILED,
                 errorCode = errorCode,

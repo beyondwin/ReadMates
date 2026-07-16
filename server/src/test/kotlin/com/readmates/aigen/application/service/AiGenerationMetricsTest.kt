@@ -83,10 +83,11 @@ class AiGenerationMetricsTest {
     }
 
     @Test
-    fun `recordTokens increments token counter with lowercase direction tag`() {
+    fun `recordTokens exposes exactly four bounded billing direction values`() {
         metrics.recordTokens(Provider.CLAUDE, model, TokenDirection.INPUT, 1000L)
-        metrics.recordTokens(Provider.CLAUDE, model, TokenDirection.CACHED_INPUT, 200L)
-        metrics.recordTokens(Provider.CLAUDE, model, TokenDirection.OUTPUT, 300L)
+        metrics.recordTokens(Provider.CLAUDE, model, TokenDirection.CACHE_WRITE_INPUT, 200L)
+        metrics.recordTokens(Provider.CLAUDE, model, TokenDirection.CACHE_READ_INPUT, 300L)
+        metrics.recordTokens(Provider.CLAUDE, model, TokenDirection.OUTPUT, 400L)
 
         val input =
             registry
@@ -95,12 +96,19 @@ class AiGenerationMetricsTest {
                 .tag("model", "claude-sonnet-4-6")
                 .tag("direction", "input")
                 .counter()
-        val cached =
+        val cacheWrite =
             registry
                 .find("readmates.aigen.tokens")
                 .tag("provider", "CLAUDE")
                 .tag("model", "claude-sonnet-4-6")
-                .tag("direction", "cached_input")
+                .tag("direction", "cache_write_input")
+                .counter()
+        val cacheRead =
+            registry
+                .find("readmates.aigen.tokens")
+                .tag("provider", "CLAUDE")
+                .tag("model", "claude-sonnet-4-6")
+                .tag("direction", "cache_read_input")
                 .counter()
         val output =
             registry
@@ -110,8 +118,15 @@ class AiGenerationMetricsTest {
                 .tag("direction", "output")
                 .counter()
         assertThat(input?.count()).isEqualTo(1000.0)
-        assertThat(cached?.count()).isEqualTo(200.0)
-        assertThat(output?.count()).isEqualTo(300.0)
+        assertThat(cacheWrite?.count()).isEqualTo(200.0)
+        assertThat(cacheRead?.count()).isEqualTo(300.0)
+        assertThat(output?.count()).isEqualTo(400.0)
+        assertThat(TokenDirection.entries.map { it.tagValue }).containsExactlyInAnyOrder(
+            "input",
+            "cache_write_input",
+            "cache_read_input",
+            "output",
+        )
     }
 
     @Test

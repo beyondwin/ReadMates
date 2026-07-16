@@ -13,7 +13,13 @@ class FakeOpenAiApi(
     private val result: OpenAiToolResult =
         OpenAiToolResult(
             parsed = ObjectMapper().createObjectNode(),
-            usage = TokenUsage(0, 0, 0),
+            usage =
+                TokenUsage(
+                    nonCachedInputTokens = 0,
+                    cacheWriteInputTokens = 0,
+                    cacheReadInputTokens = 0,
+                    outputTokens = 0,
+                ),
         ),
     private val throwException: Throwable? = null,
 ) : OpenAiApiPort {

@@ -206,7 +206,7 @@ class DefaultGroundedGenerationExecutor(
         start: Instant,
         groundingWarningCount: Int = 0,
     ) {
-        val cost = CostCalculator.estimate(attempt.output.usage, modelCatalog.pricing(attempt.model))
+        val cost = CostCalculator.actual(attempt.output.usage, modelCatalog.pricing(attempt.model))
         recordUsage(record, cost)
         val saved =
             jobStore.saveGroundedResult(
@@ -268,14 +268,14 @@ class DefaultGroundedGenerationExecutor(
                 if (groundingInvalid || code == ErrorCode.SCHEMA_INVALID) GroundingStatus.INVALID else null,
             )
         if (transitioned) {
-            emitMetrics(JobStatus.FAILED, model, TokenUsage(0, 0, 0), BigDecimal.ZERO, start)
+            emitMetrics(JobStatus.FAILED, model, TokenUsage.ZERO, BigDecimal.ZERO, start)
             audit(
                 record,
                 model,
                 AuditStatus.FAILED,
                 code,
                 safeMessage,
-                TokenUsage(0, 0, 0),
+                TokenUsage.ZERO,
                 BigDecimal.ZERO,
                 start,
                 groundingStatus =
@@ -392,7 +392,7 @@ class DefaultGroundedGenerationExecutor(
             AuditStatus.FAILED,
             error.code,
             error.message,
-            TokenUsage(0, 0, 0),
+            TokenUsage.ZERO,
             BigDecimal.ZERO,
             start,
         )
@@ -459,9 +459,14 @@ class DefaultGroundedGenerationExecutor(
             JobKind.FULL,
             Duration.between(start, clock.instant()),
         )
-        if (usage.inputTokens > 0) metrics.recordTokens(model.provider, model, TokenDirection.INPUT, usage.inputTokens)
-        if (usage.cachedInputTokens > 0) {
-            metrics.recordTokens(model.provider, model, TokenDirection.CACHED_INPUT, usage.cachedInputTokens)
+        if (usage.nonCachedInputTokens > 0) {
+            metrics.recordTokens(model.provider, model, TokenDirection.INPUT, usage.nonCachedInputTokens)
+        }
+        if (usage.cacheWriteInputTokens > 0) {
+            metrics.recordTokens(model.provider, model, TokenDirection.CACHE_WRITE_INPUT, usage.cacheWriteInputTokens)
+        }
+        if (usage.cacheReadInputTokens > 0) {
+            metrics.recordTokens(model.provider, model, TokenDirection.CACHE_READ_INPUT, usage.cacheReadInputTokens)
         }
         if (usage.outputTokens > 0) {
             metrics.recordTokens(model.provider, model, TokenDirection.OUTPUT, usage.outputTokens)
@@ -537,13 +542,6 @@ class DefaultGroundedGenerationExecutor(
         const val PROGRESS_REVALIDATING = 95
     }
 }
-
-private operator fun TokenUsage.plus(other: TokenUsage): TokenUsage =
-    TokenUsage(
-        inputTokens + other.inputTokens,
-        cachedInputTokens + other.cachedInputTokens,
-        outputTokens + other.outputTokens,
-    )
 
 internal fun mergeGroundedRepair(
     draft: GroundedGenerationDraft,

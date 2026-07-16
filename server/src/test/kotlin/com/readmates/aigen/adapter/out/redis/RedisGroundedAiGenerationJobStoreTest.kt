@@ -363,7 +363,13 @@ class RedisGroundedAiGenerationJobStoreTest(
             progressPct = 0,
             result = null,
             error = null,
-            tokens = TokenUsage(0, 0, 0),
+            tokens =
+                TokenUsage(
+                    nonCachedInputTokens = 0,
+                    cacheWriteInputTokens = 0,
+                    cacheReadInputTokens = 0,
+                    outputTokens = 0,
+                ),
             costAccumulatedUsd = BigDecimal.ZERO,
             expiresAt = now.plus(properties.job.redisTtl),
             createdAt = now,
@@ -394,7 +400,12 @@ class RedisGroundedAiGenerationJobStoreTest(
             snapshot(),
             groundedDraft(),
             evidence(expectedRevision + 1),
-            TokenUsage(10, 0, 20),
+            TokenUsage(
+                nonCachedInputTokens = 10,
+                cacheWriteInputTokens = 0,
+                cacheReadInputTokens = 0,
+                outputTokens = 20,
+            ),
             BigDecimal("0.01"),
             record.model,
         )

@@ -106,20 +106,15 @@ open class ClaudeApiClient : ClaudeApiPort {
         val inputObject = StructuredOutputJson.requireObject(inputNode)
 
         val usage = message.usage()
-        // Per Anthropic billing model: `input_tokens` is the count of non-cached
-        // input tokens for this call; `cache_creation_input_tokens` are new
-        // input tokens that were just written to the prompt cache (billed at
-        // input price + write premium) and are NOT included in `input_tokens`;
-        // `cache_read_input_tokens` are input tokens served from cache and
-        // also NOT included in `input_tokens`. Our domain TokenUsage has 3
-        // fields; we add cache_creation to inputTokens so total billable
-        // input is preserved, and map cache_read to cachedInputTokens.
+        // Anthropic reports non-cached, cache-creation, and cache-read input
+        // separately, so preserve those billing channels without aggregation.
         val cacheCreation = usage.cacheCreationInputTokens().orElse(0L)
         val cacheRead = usage.cacheReadInputTokens().orElse(0L)
         val tokenUsage =
             TokenUsage(
-                inputTokens = usage.inputTokens() + cacheCreation,
-                cachedInputTokens = cacheRead,
+                nonCachedInputTokens = usage.inputTokens(),
+                cacheWriteInputTokens = cacheCreation,
+                cacheReadInputTokens = cacheRead,
                 outputTokens = usage.outputTokens(),
             )
 

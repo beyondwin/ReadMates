@@ -132,7 +132,7 @@ class AiGenerationRegenerationService(
                 admissionId = admissionId,
             )
 
-        val cost = CostCalculator.estimate(output.usage, modelCatalog.pricing(modelId))
+        val cost = CostCalculator.actual(output.usage, modelCatalog.pricing(modelId))
         // Build the patched snapshot and validate it BEFORE persisting so a bad LLM
         // response can't poison the Redis result — see spec §9.3 and the task_1_7
         // commit-override warning that flagged the same trust boundary on the commit
@@ -169,7 +169,7 @@ class AiGenerationRegenerationService(
                     provider = modelId.provider,
                     model = modelId.name,
                     transcriptSha256 = null,
-                    usage = TokenUsage(0, 0, 0),
+                    usage = TokenUsage.ZERO,
                     costEstimateUsd = BigDecimal.ZERO,
                     status = AuditStatus.FAILED,
                     errorCode = ErrorCode.JOB_EXPIRED,
@@ -366,11 +366,19 @@ class AiGenerationRegenerationService(
     ) {
         val kind = regenKindFor(item)
         metrics.recordJobCompleted(status, modelId.provider, modelId, kind)
-        if (usage.inputTokens > 0) {
-            metrics.recordTokens(modelId.provider, modelId, TokenDirection.INPUT, usage.inputTokens)
+        if (usage.nonCachedInputTokens > 0) {
+            metrics.recordTokens(modelId.provider, modelId, TokenDirection.INPUT, usage.nonCachedInputTokens)
         }
-        if (usage.cachedInputTokens > 0) {
-            metrics.recordTokens(modelId.provider, modelId, TokenDirection.CACHED_INPUT, usage.cachedInputTokens)
+        if (usage.cacheWriteInputTokens > 0) {
+            metrics.recordTokens(
+                modelId.provider,
+                modelId,
+                TokenDirection.CACHE_WRITE_INPUT,
+                usage.cacheWriteInputTokens,
+            )
+        }
+        if (usage.cacheReadInputTokens > 0) {
+            metrics.recordTokens(modelId.provider, modelId, TokenDirection.CACHE_READ_INPUT, usage.cacheReadInputTokens)
         }
         if (usage.outputTokens > 0) {
             metrics.recordTokens(modelId.provider, modelId, TokenDirection.OUTPUT, usage.outputTokens)
@@ -410,7 +418,7 @@ class AiGenerationRegenerationService(
                 provider = modelId.provider,
                 model = modelId.name,
                 transcriptSha256 = null,
-                usage = TokenUsage(0, 0, 0),
+                usage = TokenUsage.ZERO,
                 costEstimateUsd = BigDecimal.ZERO,
                 status = AuditStatus.FAILED,
                 errorCode = previousError.code,
@@ -441,7 +449,7 @@ class AiGenerationRegenerationService(
                 provider = modelId.provider,
                 model = modelId.name,
                 transcriptSha256 = null,
-                usage = TokenUsage(0, 0, 0),
+                usage = TokenUsage.ZERO,
                 costEstimateUsd = BigDecimal.ZERO,
                 status = AuditStatus.FAILED,
                 errorCode = code,

@@ -12,7 +12,13 @@ class ProviderFallbackChainTest {
     private val claude = ModelId(Provider.CLAUDE, "claude-sonnet-4-6")
     private val openai = ModelId(Provider.OPENAI, "gpt-5.4-mini")
     private val gemini = ModelId(Provider.GEMINI, "gemini-2.5-flash")
-    private val pricing = ModelPricing(BigDecimal("3"), BigDecimal("0.3"), BigDecimal("15"))
+    private val pricing =
+        ModelPricing(
+            inputPerMTokenUsd = BigDecimal("3"),
+            cacheWriteInputPerMTokenUsd = BigDecimal("3"),
+            cachedInputPerMTokenUsd = BigDecimal("0.3"),
+            outputPerMTokenUsd = BigDecimal("15"),
+        )
 
     private fun gen(p: Provider): SessionContentGenerator = FakeContentGenerator(provider = p)
 

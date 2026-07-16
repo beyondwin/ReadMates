@@ -11,6 +11,7 @@ import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.JobView
 import com.readmates.aigen.application.model.SectionReviewStatus
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
+import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.session.application.SessionRecordVisibility
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -68,6 +69,13 @@ data class TokenUsageJson(
     val cachedInput: Long,
     val output: Long,
 )
+
+fun TokenUsage.toJson(): TokenUsageJson =
+    TokenUsageJson(
+        input = publicInputTokens,
+        cachedInput = publicCachedInputTokens,
+        output = outputTokens,
+    )
 
 data class GenerationErrorJson(
     val code: String,
@@ -205,7 +213,7 @@ fun JobView.toStatusResponse(): JobStatusResponse {
         model = model.name,
         result = visibleResult?.toJson(),
         error = error?.let { GenerationErrorJson(it.code.name, it.code.safeDetail()) },
-        tokens = tokens?.let { TokenUsageJson(it.inputTokens, it.cachedInputTokens, it.outputTokens) },
+        tokens = tokens?.toJson(),
         costEstimateUsd = costEstimateUsd.toPlainString(),
         warnings = warnings,
         expiresAt = expiresAt.toString(),

@@ -196,7 +196,13 @@ class GroundedRegenerationExecutorTest {
     }
 
     private companion object {
-        val USAGE = TokenUsage(50, 0, 75)
+        val USAGE =
+            TokenUsage(
+                nonCachedInputTokens = 50,
+                cacheWriteInputTokens = 0,
+                cacheReadInputTokens = 0,
+                outputTokens = 75,
+            )
 
         fun validMeta() =
             SessionMeta(

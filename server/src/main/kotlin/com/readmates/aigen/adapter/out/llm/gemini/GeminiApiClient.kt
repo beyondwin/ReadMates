@@ -171,17 +171,15 @@ open class GeminiApiClient : GeminiApiPort {
             response.usageMetadata().orElseThrow {
                 IllegalStateException("Gemini response missing usageMetadata; model=$model")
             }
-        // Gemini billing model: `promptTokenCount` is the total input
-        // token count for the call. `cachedContentTokenCount` is the
-        // subset served from explicit `cachedContent` (treated here as
-        // the cached portion already included in promptTokenCount, to
-        // mirror Claude/OpenAI accounting where domain inputTokens is
-        // the gross input billable count). `candidatesTokenCount` is
-        // the output count.
+        // Gemini promptTokenCount is gross input and cachedContentTokenCount is
+        // a subset, so subtract it for the non-cached billing channel.
+        val promptTokens = usage.promptTokenCount().orElse(0).toLong()
+        val cacheReadTokens = usage.cachedContentTokenCount().orElse(0).toLong()
         val tokenUsage =
             TokenUsage(
-                inputTokens = usage.promptTokenCount().orElse(0).toLong(),
-                cachedInputTokens = usage.cachedContentTokenCount().orElse(0).toLong(),
+                nonCachedInputTokens = (promptTokens - cacheReadTokens).coerceAtLeast(0),
+                cacheWriteInputTokens = 0,
+                cacheReadInputTokens = cacheReadTokens,
                 outputTokens = usage.candidatesTokenCount().orElse(0).toLong(),
             )
 

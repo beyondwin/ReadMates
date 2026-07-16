@@ -93,12 +93,7 @@ internal class FakeJobStore : AiGenerationJobStore {
         records[jobId] =
             current.copy(
                 result = result,
-                tokens =
-                    TokenUsage(
-                        current.tokens.inputTokens + usage.inputTokens,
-                        current.tokens.cachedInputTokens + usage.cachedInputTokens,
-                        current.tokens.outputTokens + usage.outputTokens,
-                    ),
+                tokens = current.tokens + usage,
                 costAccumulatedUsd = current.costAccumulatedUsd.add(cost),
             )
     }
@@ -117,12 +112,7 @@ internal class FakeJobStore : AiGenerationJobStore {
         records[jobId] =
             current.copy(
                 result = value,
-                tokens =
-                    TokenUsage(
-                        current.tokens.inputTokens + usage.inputTokens,
-                        current.tokens.cachedInputTokens + usage.cachedInputTokens,
-                        current.tokens.outputTokens + usage.outputTokens,
-                    ),
+                tokens = current.tokens + usage,
                 costAccumulatedUsd = current.costAccumulatedUsd.add(cost),
             )
     }
@@ -187,12 +177,7 @@ internal class FakeJobStore : AiGenerationJobStore {
             current.copy(
                 result = result,
                 actualModel = actualModel ?: current.actualModel,
-                tokens =
-                    TokenUsage(
-                        current.tokens.inputTokens + usage.inputTokens,
-                        current.tokens.cachedInputTokens + usage.cachedInputTokens,
-                        current.tokens.outputTokens + usage.outputTokens,
-                    ),
+                tokens = current.tokens + usage,
                 costAccumulatedUsd = current.costAccumulatedUsd.add(cost),
             )
         return true
@@ -221,12 +206,7 @@ internal class FakeJobStore : AiGenerationJobStore {
                 revision = current.revision + 1,
                 groundingStatus = com.readmates.aigen.application.model.GroundingStatus.VALID,
                 actualModel = command.actualModel,
-                tokens =
-                    TokenUsage(
-                        current.tokens.inputTokens + command.usage.inputTokens,
-                        current.tokens.cachedInputTokens + command.usage.cachedInputTokens,
-                        current.tokens.outputTokens + command.usage.outputTokens,
-                    ),
+                tokens = current.tokens + command.usage,
                 costAccumulatedUsd = current.costAccumulatedUsd.add(command.cost),
             )
         return true
@@ -648,6 +628,7 @@ internal object AiGenerationTestFixtures {
     val CLAUDE_PRICING =
         ModelPricing(
             inputPerMTokenUsd = BigDecimal("3"),
+            cacheWriteInputPerMTokenUsd = BigDecimal("3"),
             cachedInputPerMTokenUsd = BigDecimal("0.30"),
             outputPerMTokenUsd = BigDecimal("15"),
         )
@@ -753,7 +734,13 @@ internal object AiGenerationTestFixtures {
             progressPct = if (status == JobStatus.SUCCEEDED) 100 else 0,
             result = result,
             error = error,
-            tokens = TokenUsage(0, 0, 0),
+            tokens =
+                TokenUsage(
+                    nonCachedInputTokens = 0,
+                    cacheWriteInputTokens = 0,
+                    cacheReadInputTokens = 0,
+                    outputTokens = 0,
+                ),
             costAccumulatedUsd = BigDecimal.ZERO,
             expiresAt = expiresAt,
             createdAt = createdAt,
@@ -764,6 +751,12 @@ internal object AiGenerationTestFixtures {
 
     fun snapshotOutput(
         summary: String = "An interesting discussion.",
-        usage: TokenUsage = TokenUsage(inputTokens = 100, cachedInputTokens = 0, outputTokens = 200),
+        usage: TokenUsage =
+            TokenUsage(
+                nonCachedInputTokens = 100,
+                cacheWriteInputTokens = 0,
+                cacheReadInputTokens = 0,
+                outputTokens = 200,
+            ),
     ): GenerationOutput = GenerationOutput(snapshot(summary), usage)
 }

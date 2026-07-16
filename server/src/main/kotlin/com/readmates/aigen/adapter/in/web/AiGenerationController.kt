@@ -171,12 +171,7 @@ class AiGenerationController(
         return RegenerateResponse(
             item = outcome.item.name,
             value = outcome.value,
-            tokens =
-                TokenUsageJson(
-                    outcome.tokens.inputTokens,
-                    outcome.tokens.cachedInputTokens,
-                    outcome.tokens.outputTokens,
-                ),
+            tokens = outcome.tokens.toJson(),
             costEstimateUsd = outcome.costEstimateUsd.toPlainString(),
             warnings = outcome.warnings,
             revision = outcome.revision,

@@ -71,14 +71,34 @@ class ClaudeContentRegeneratorTest {
     @Test
     fun `SUMMARY uses narrowed schema with only summary property and returns String value`() {
         val toolInput = mapper.readTree("""{"summary": "새 요약 내용"}""") as ObjectNode
-        val fake = FakeClaudeApi(result = ClaudeToolResult(toolInput, TokenUsage(10, 0, 20)))
+        val fake =
+            FakeClaudeApi(
+                result =
+                    ClaudeToolResult(
+                        toolInput,
+                        TokenUsage(
+                            nonCachedInputTokens = 10,
+                            cacheWriteInputTokens = 0,
+                            cacheReadInputTokens = 0,
+                            outputTokens = 20,
+                        ),
+                    ),
+            )
         val regen = ClaudeContentRegenerator(fake, schemaResource)
 
         val output = regen.regenerateItem(inputFor(GenerationItem.SUMMARY))
 
         assertEquals(GenerationItem.SUMMARY, output.patchedItem)
         assertEquals("새 요약 내용", output.patchedValue)
-        assertEquals(TokenUsage(10, 0, 20), output.usage)
+        assertEquals(
+            TokenUsage(
+                nonCachedInputTokens = 10,
+                cacheWriteInputTokens = 0,
+                cacheReadInputTokens = 0,
+                outputTokens = 20,
+            ),
+            output.usage,
+        )
 
         val narrowed = fake.lastToolSchema!!
         val props = narrowed.path("properties")
@@ -96,7 +116,19 @@ class ClaudeContentRegeneratorTest {
             mapper.readTree(
                 """{"highlights":[{"authorName":"김우승","text":"새 하이라이트 1"},{"authorName":"박지민","text":"새 하이라이트 2"}]}""",
             ) as ObjectNode
-        val fake = FakeClaudeApi(result = ClaudeToolResult(toolInput, TokenUsage(0, 0, 0)))
+        val fake =
+            FakeClaudeApi(
+                result =
+                    ClaudeToolResult(
+                        toolInput,
+                        TokenUsage(
+                            nonCachedInputTokens = 0,
+                            cacheWriteInputTokens = 0,
+                            cacheReadInputTokens = 0,
+                            outputTokens = 0,
+                        ),
+                    ),
+            )
         val regen = ClaudeContentRegenerator(fake, schemaResource)
 
         val output = regen.regenerateItem(inputFor(GenerationItem.HIGHLIGHTS))
@@ -120,7 +152,19 @@ class ClaudeContentRegeneratorTest {
             mapper.readTree(
                 """{"oneLineReviews":[{"authorName":"김우승","text":"한줄평1"}]}""",
             ) as ObjectNode
-        val fake = FakeClaudeApi(result = ClaudeToolResult(toolInput, TokenUsage(0, 0, 0)))
+        val fake =
+            FakeClaudeApi(
+                result =
+                    ClaudeToolResult(
+                        toolInput,
+                        TokenUsage(
+                            nonCachedInputTokens = 0,
+                            cacheWriteInputTokens = 0,
+                            cacheReadInputTokens = 0,
+                            outputTokens = 0,
+                        ),
+                    ),
+            )
         val regen = ClaudeContentRegenerator(fake, schemaResource)
 
         val output = regen.regenerateItem(inputFor(GenerationItem.ONE_LINE_REVIEWS))
@@ -144,7 +188,19 @@ class ClaudeContentRegeneratorTest {
                 "\"feedbackDocumentMarkdown\":\"<!-- readmates-feedback:v1 -->\\n# 독서모임 3차 피드백\\n새 내용\"" +
                 "}"
         val toolInput = mapper.readTree(json) as ObjectNode
-        val fake = FakeClaudeApi(result = ClaudeToolResult(toolInput, TokenUsage(0, 0, 0)))
+        val fake =
+            FakeClaudeApi(
+                result =
+                    ClaudeToolResult(
+                        toolInput,
+                        TokenUsage(
+                            nonCachedInputTokens = 0,
+                            cacheWriteInputTokens = 0,
+                            cacheReadInputTokens = 0,
+                            outputTokens = 0,
+                        ),
+                    ),
+            )
         val regen = ClaudeContentRegenerator(fake, schemaResource)
 
         val output = regen.regenerateItem(inputFor(GenerationItem.FEEDBACK_DOCUMENT))
@@ -167,7 +223,19 @@ class ClaudeContentRegeneratorTest {
     @Test
     fun `transcript block carries cache_control via expectCacheControl=true`() {
         val toolInput = mapper.readTree("""{"summary":"x"}""") as ObjectNode
-        val fake = FakeClaudeApi(result = ClaudeToolResult(toolInput, TokenUsage(0, 0, 0)))
+        val fake =
+            FakeClaudeApi(
+                result =
+                    ClaudeToolResult(
+                        toolInput,
+                        TokenUsage(
+                            nonCachedInputTokens = 0,
+                            cacheWriteInputTokens = 0,
+                            cacheReadInputTokens = 0,
+                            outputTokens = 0,
+                        ),
+                    ),
+            )
         val regen = ClaudeContentRegenerator(fake, schemaResource)
 
         regen.regenerateItem(inputFor(GenerationItem.SUMMARY))
@@ -178,7 +246,19 @@ class ClaudeContentRegeneratorTest {
     @Test
     fun `regen user text mentions current snapshot JSON for context`() {
         val toolInput = mapper.readTree("""{"summary":"x"}""") as ObjectNode
-        val fake = FakeClaudeApi(result = ClaudeToolResult(toolInput, TokenUsage(0, 0, 0)))
+        val fake =
+            FakeClaudeApi(
+                result =
+                    ClaudeToolResult(
+                        toolInput,
+                        TokenUsage(
+                            nonCachedInputTokens = 0,
+                            cacheWriteInputTokens = 0,
+                            cacheReadInputTokens = 0,
+                            outputTokens = 0,
+                        ),
+                    ),
+            )
         val regen = ClaudeContentRegenerator(fake, schemaResource)
 
         regen.regenerateItem(inputFor(GenerationItem.SUMMARY))

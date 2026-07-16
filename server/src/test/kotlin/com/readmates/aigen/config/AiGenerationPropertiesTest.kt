@@ -77,6 +77,7 @@ class AiGenerationPropertiesTest {
         val openaiMini = pricing["gpt-5.4-mini"]
         assertNotNull(openaiMini, "gpt-5.4-mini pricing must be present in application.yml")
         assertEquals(0, BigDecimal("0.75").compareTo(openaiMini!!.inputPerMTokenUsd))
+        assertEquals(0, BigDecimal("0.75").compareTo(openaiMini.cacheWriteInputPerMTokenUsd!!))
         assertEquals(0, BigDecimal("0.075").compareTo(openaiMini.cachedInputPerMTokenUsd))
         assertEquals(0, BigDecimal("4.50").compareTo(openaiMini.outputPerMTokenUsd))
     }
@@ -87,6 +88,14 @@ class AiGenerationPropertiesTest {
 
         assertTrue(pricing.containsKey("claude-sonnet-4-6"))
         assertTrue(pricing.containsKey("claude-opus-4-7"))
+        assertEquals(
+            0,
+            BigDecimal("3.75").compareTo(pricing.getValue("claude-sonnet-4-6").cacheWriteInputPerMTokenUsd!!),
+        )
+        assertEquals(
+            0,
+            BigDecimal("18.75").compareTo(pricing.getValue("claude-opus-4-7").cacheWriteInputPerMTokenUsd!!),
+        )
     }
 
     @Test
@@ -96,6 +105,7 @@ class AiGenerationPropertiesTest {
         val geminiFlash = pricing["gemini-3-flash-preview"]
         assertNotNull(geminiFlash, "gemini-3-flash-preview pricing must be present in application.yml")
         assertEquals(0, BigDecimal("0.50").compareTo(geminiFlash!!.inputPerMTokenUsd))
+        assertEquals(0, BigDecimal("0.50").compareTo(geminiFlash.cacheWriteInputPerMTokenUsd!!))
         assertEquals(0, BigDecimal("0.05").compareTo(geminiFlash.cachedInputPerMTokenUsd))
         assertEquals(0, BigDecimal("3.00").compareTo(geminiFlash.outputPerMTokenUsd))
     }

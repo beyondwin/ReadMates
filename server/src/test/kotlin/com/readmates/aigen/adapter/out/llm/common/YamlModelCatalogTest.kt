@@ -150,6 +150,7 @@ class YamlModelCatalogTest {
 
         val p = catalog.pricing(ModelId(Provider.CLAUDE, "claude-sonnet-4-6"))
         assertEquals(BigDecimal("3"), p.inputPerMTokenUsd)
+        assertEquals(BigDecimal("3"), p.cacheWriteInputPerMTokenUsd)
         assertEquals(BigDecimal("0.30"), p.cachedInputPerMTokenUsd)
         assertEquals(BigDecimal("15"), p.outputPerMTokenUsd)
     }

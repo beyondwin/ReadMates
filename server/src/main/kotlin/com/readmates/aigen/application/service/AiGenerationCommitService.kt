@@ -138,7 +138,7 @@ class AiGenerationCommitService(
                     jobId = jobId,
                     expected = JobStatus.COMMITTING,
                     result = overrideResult,
-                    usage = TokenUsage(0, 0, 0),
+                    usage = TokenUsage.ZERO,
                     cost = BigDecimal.ZERO,
                 )
             if (!overrideSaved) {

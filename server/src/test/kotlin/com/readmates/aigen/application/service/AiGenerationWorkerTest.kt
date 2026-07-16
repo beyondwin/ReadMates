@@ -38,7 +38,13 @@ class AiGenerationWorkerTest {
         ctx.generator.enqueueSuccess(
             GenerationOutput(
                 result = AiGenerationTestFixtures.snapshot(),
-                usage = TokenUsage(100, 0, 200),
+                usage =
+                    TokenUsage(
+                        nonCachedInputTokens = 100,
+                        cacheWriteInputTokens = 0,
+                        cacheReadInputTokens = 0,
+                        outputTokens = 200,
+                    ),
             ),
         )
 
@@ -61,7 +67,13 @@ class AiGenerationWorkerTest {
         ctx.generator.enqueueSuccess(
             GenerationOutput(
                 result = AiGenerationTestFixtures.snapshot(),
-                usage = TokenUsage(50, 0, 100),
+                usage =
+                    TokenUsage(
+                        nonCachedInputTokens = 50,
+                        cacheWriteInputTokens = 0,
+                        cacheReadInputTokens = 0,
+                        outputTokens = 100,
+                    ),
             ),
         )
 
@@ -95,13 +107,25 @@ class AiGenerationWorkerTest {
         ctx.generator.enqueueSuccess(
             GenerationOutput(
                 result = AiGenerationTestFixtures.snapshot("first"),
-                usage = TokenUsage(10, 0, 20),
+                usage =
+                    TokenUsage(
+                        nonCachedInputTokens = 10,
+                        cacheWriteInputTokens = 0,
+                        cacheReadInputTokens = 0,
+                        outputTokens = 20,
+                    ),
             ),
         )
         ctx.generator.enqueueSuccess(
             GenerationOutput(
                 result = AiGenerationTestFixtures.snapshot("second"),
-                usage = TokenUsage(10, 0, 20),
+                usage =
+                    TokenUsage(
+                        nonCachedInputTokens = 10,
+                        cacheWriteInputTokens = 0,
+                        cacheReadInputTokens = 0,
+                        outputTokens = 20,
+                    ),
             ),
         )
 
@@ -157,7 +181,13 @@ class AiGenerationWorkerTest {
         ctx.generator.enqueueSuccess(
             GenerationOutput(
                 result = AiGenerationTestFixtures.snapshot(),
-                usage = TokenUsage(5, 0, 5),
+                usage =
+                    TokenUsage(
+                        nonCachedInputTokens = 5,
+                        cacheWriteInputTokens = 0,
+                        cacheReadInputTokens = 0,
+                        outputTokens = 5,
+                    ),
             ),
         )
 
@@ -183,7 +213,13 @@ class AiGenerationWorkerTest {
         ctx.generator.enqueueSuccess(
             GenerationOutput(
                 result = AiGenerationTestFixtures.snapshot(),
-                usage = TokenUsage(5, 0, 5),
+                usage =
+                    TokenUsage(
+                        nonCachedInputTokens = 5,
+                        cacheWriteInputTokens = 0,
+                        cacheReadInputTokens = 0,
+                        outputTokens = 5,
+                    ),
             ),
         )
 
@@ -199,7 +235,13 @@ class AiGenerationWorkerTest {
         ctx.generator.enqueueSuccess(
             GenerationOutput(
                 result = AiGenerationTestFixtures.snapshot(),
-                usage = TokenUsage(5, 0, 5),
+                usage =
+                    TokenUsage(
+                        nonCachedInputTokens = 5,
+                        cacheWriteInputTokens = 0,
+                        cacheReadInputTokens = 0,
+                        outputTokens = 5,
+                    ),
             ),
         )
 
@@ -229,7 +271,13 @@ class AiGenerationWorkerTest {
         ctx.generator.enqueueSuccess(
             GenerationOutput(
                 result = AiGenerationTestFixtures.snapshot("after retry"),
-                usage = TokenUsage(20, 0, 30),
+                usage =
+                    TokenUsage(
+                        nonCachedInputTokens = 20,
+                        cacheWriteInputTokens = 0,
+                        cacheReadInputTokens = 0,
+                        outputTokens = 30,
+                    ),
             ),
         )
 
@@ -254,7 +302,13 @@ class AiGenerationWorkerTest {
         ctx.generator.enqueueSuccess(
             GenerationOutput(
                 result = AiGenerationTestFixtures.snapshot("after retry"),
-                usage = TokenUsage(1, 0, 1),
+                usage =
+                    TokenUsage(
+                        nonCachedInputTokens = 1,
+                        cacheWriteInputTokens = 0,
+                        cacheReadInputTokens = 0,
+                        outputTokens = 1,
+                    ),
             ),
         )
 
@@ -315,7 +369,13 @@ class AiGenerationWorkerTest {
         ctx.generator.enqueueSuccess(
             GenerationOutput(
                 result = AiGenerationTestFixtures.snapshot(),
-                usage = TokenUsage(1, 0, 1),
+                usage =
+                    TokenUsage(
+                        nonCachedInputTokens = 1,
+                        cacheWriteInputTokens = 0,
+                        cacheReadInputTokens = 0,
+                        outputTokens = 1,
+                    ),
             ),
         )
 
@@ -361,7 +421,13 @@ class AiGenerationWorkerTest {
         ctx.generator.enqueueSuccess(
             GenerationOutput(
                 result = AiGenerationTestFixtures.snapshot(),
-                usage = TokenUsage(100, 0, 200),
+                usage =
+                    TokenUsage(
+                        nonCachedInputTokens = 100,
+                        cacheWriteInputTokens = 0,
+                        cacheReadInputTokens = 0,
+                        outputTokens = 200,
+                    ),
             ),
         )
 
@@ -381,7 +447,13 @@ class AiGenerationWorkerTest {
         ctx.generator.enqueueSuccess(
             GenerationOutput(
                 result = AiGenerationTestFixtures.snapshot(),
-                usage = TokenUsage(100, 0, 200),
+                usage =
+                    TokenUsage(
+                        nonCachedInputTokens = 100,
+                        cacheWriteInputTokens = 0,
+                        cacheReadInputTokens = 0,
+                        outputTokens = 200,
+                    ),
             ),
         )
 

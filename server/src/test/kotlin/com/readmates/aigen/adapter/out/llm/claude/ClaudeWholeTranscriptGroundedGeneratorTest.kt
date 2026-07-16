@@ -112,5 +112,11 @@ class ClaudeWholeTranscriptGroundedGeneratorTest {
             }
     }
 
-    private fun usage() = TokenUsage(10, 0, 20)
+    private fun usage() =
+        TokenUsage(
+            nonCachedInputTokens = 10,
+            cacheWriteInputTokens = 0,
+            cacheReadInputTokens = 0,
+            outputTokens = 20,
+        )
 }

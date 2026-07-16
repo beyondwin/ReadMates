@@ -113,14 +113,8 @@ open class OpenAiApiClient : OpenAiApiPort {
                     "OpenAI response missing usage; model=$model schema=$schemaName",
                 )
             }
-        // OpenAI billing model: `prompt_tokens` is the total billable input
-        // count for the call (INCLUDING any tokens served from the prompt
-        // cache); `prompt_tokens_details.cached_tokens` breaks out the
-        // cached portion. `completion_tokens` is the output count. Domain
-        // TokenUsage uses inputTokens = total billable input, and
-        // cachedInputTokens = the cached portion already included in
-        // inputTokens (mirrors Claude's accounting where total input is
-        // exposed verbatim).
+        // OpenAI prompt_tokens is gross input and cached_tokens is its cached
+        // subset, so subtract the latter for the non-cached billing channel.
         val cachedTokens =
             usage
                 .promptTokensDetails()
@@ -128,8 +122,9 @@ open class OpenAiApiClient : OpenAiApiPort {
                 .orElse(0L)
         val tokenUsage =
             TokenUsage(
-                inputTokens = usage.promptTokens(),
-                cachedInputTokens = cachedTokens,
+                nonCachedInputTokens = (usage.promptTokens() - cachedTokens).coerceAtLeast(0L),
+                cacheWriteInputTokens = 0,
+                cacheReadInputTokens = cachedTokens,
                 outputTokens = usage.completionTokens(),
             )
 

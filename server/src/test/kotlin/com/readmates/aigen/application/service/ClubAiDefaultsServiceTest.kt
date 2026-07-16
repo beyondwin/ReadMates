@@ -149,9 +149,10 @@ class ClubAiDefaultsServiceTest {
 
         override fun pricing(id: ModelId): ModelPricing =
             ModelPricing(
-                BigDecimal.ZERO,
-                BigDecimal.ZERO,
-                BigDecimal.ZERO,
+                inputPerMTokenUsd = BigDecimal.ZERO,
+                cacheWriteInputPerMTokenUsd = BigDecimal.ZERO,
+                cachedInputPerMTokenUsd = BigDecimal.ZERO,
+                outputPerMTokenUsd = BigDecimal.ZERO,
             )
 
         override fun resolveAlias(alias: String): ModelId? = allowed.firstOrNull { it.name == alias }

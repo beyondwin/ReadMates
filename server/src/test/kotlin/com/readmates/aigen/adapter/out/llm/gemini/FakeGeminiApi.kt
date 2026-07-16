@@ -13,7 +13,13 @@ class FakeGeminiApi(
     private val result: GeminiToolResult =
         GeminiToolResult(
             parsed = ObjectMapper().createObjectNode(),
-            usage = TokenUsage(0, 0, 0),
+            usage =
+                TokenUsage(
+                    nonCachedInputTokens = 0,
+                    cacheWriteInputTokens = 0,
+                    cacheReadInputTokens = 0,
+                    outputTokens = 0,
+                ),
         ),
     private val throwException: Throwable? = null,
 ) : GeminiApiPort {

@@ -160,10 +160,12 @@ readmates:
     pricing:
       claude-sonnet-4-6:
         input-per-m-token-usd: 3.00
+        cache-write-input-per-m-token-usd: 3.75
         cached-input-per-m-token-usd: 0.30
         output-per-m-token-usd: 15.00
       claude-opus-4-7:
         input-per-m-token-usd: 15.00
+        cache-write-input-per-m-token-usd: 18.75
         cached-input-per-m-token-usd: 1.50
         output-per-m-token-usd: 75.00
       # OpenAI public API pricing (gpt-5.4 family, per-million-token, USD).
@@ -171,6 +173,7 @@ readmates:
       # gpt-4.x mini family is retiring 2026-02-13; we ship gpt-5.4-mini directly.
       "[gpt-5.4-mini]":
         input-per-m-token-usd: 0.75
+        cache-write-input-per-m-token-usd: 0.75
         cached-input-per-m-token-usd: 0.075
         output-per-m-token-usd: 4.50
       # Gemini public API pricing (3 Flash, per-million-token, USD).
@@ -180,6 +183,7 @@ readmates:
       # GA lands. gemini-2.x flash retires 2026-06-01.
       "[gemini-3-flash-preview]":
         input-per-m-token-usd: 0.50
+        cache-write-input-per-m-token-usd: 0.50
         cached-input-per-m-token-usd: 0.05
         output-per-m-token-usd: 3.00
     kafka:

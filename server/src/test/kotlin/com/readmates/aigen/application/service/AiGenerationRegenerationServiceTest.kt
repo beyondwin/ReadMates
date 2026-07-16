@@ -85,7 +85,13 @@ class AiGenerationRegenerationServiceTest {
             RegenerationOutput(
                 patchedItem = GenerationItem.SUMMARY,
                 patchedValue = "fresh summary",
-                usage = TokenUsage(10, 0, 5),
+                usage =
+                    TokenUsage(
+                        nonCachedInputTokens = 10,
+                        cacheWriteInputTokens = 0,
+                        cacheReadInputTokens = 0,
+                        outputTokens = 5,
+                    ),
             ),
         )
 
@@ -100,7 +106,7 @@ class AiGenerationRegenerationServiceTest {
 
         assertThat(result.item).isEqualTo(GenerationItem.SUMMARY)
         assertThat(result.value).isEqualTo("fresh summary")
-        assertThat(result.tokens.inputTokens).isEqualTo(10L)
+        assertThat(result.tokens.nonCachedInputTokens).isEqualTo(10L)
         assertThat(result.costEstimateUsd).isPositive
         val patched = ctx.jobStore.load(record.jobId)!!.result!!
         assertThat(patched.summary).isEqualTo("fresh summary")
@@ -127,7 +133,13 @@ class AiGenerationRegenerationServiceTest {
             RegenerationOutput(
                 patchedItem = GenerationItem.SUMMARY,
                 patchedValue = "summary after retry",
-                usage = TokenUsage(7, 0, 3),
+                usage =
+                    TokenUsage(
+                        nonCachedInputTokens = 7,
+                        cacheWriteInputTokens = 0,
+                        cacheReadInputTokens = 0,
+                        outputTokens = 3,
+                    ),
             ),
         )
 
@@ -235,14 +247,26 @@ class AiGenerationRegenerationServiceTest {
             RegenerationOutput(
                 patchedItem = GenerationItem.SUMMARY,
                 patchedValue = "bad summary",
-                usage = TokenUsage(1, 0, 1),
+                usage =
+                    TokenUsage(
+                        nonCachedInputTokens = 1,
+                        cacheWriteInputTokens = 0,
+                        cacheReadInputTokens = 0,
+                        outputTokens = 1,
+                    ),
             ),
         )
         ctx.regenerator.enqueueSuccess(
             RegenerationOutput(
                 patchedItem = GenerationItem.SUMMARY,
                 patchedValue = "bad summary",
-                usage = TokenUsage(1, 0, 1),
+                usage =
+                    TokenUsage(
+                        nonCachedInputTokens = 1,
+                        cacheWriteInputTokens = 0,
+                        cacheReadInputTokens = 0,
+                        outputTokens = 1,
+                    ),
             ),
         )
 
@@ -320,7 +344,13 @@ class AiGenerationRegenerationServiceTest {
             RegenerationOutput(
                 patchedItem = GenerationItem.SUMMARY,
                 patchedValue = "summary after retry",
-                usage = TokenUsage(7, 0, 3),
+                usage =
+                    TokenUsage(
+                        nonCachedInputTokens = 7,
+                        cacheWriteInputTokens = 0,
+                        cacheReadInputTokens = 0,
+                        outputTokens = 3,
+                    ),
             ),
         )
 
@@ -358,7 +388,13 @@ class AiGenerationRegenerationServiceTest {
             RegenerationOutput(
                 patchedItem = GenerationItem.SUMMARY,
                 patchedValue = "x",
-                usage = TokenUsage(1, 0, 1),
+                usage =
+                    TokenUsage(
+                        nonCachedInputTokens = 1,
+                        cacheWriteInputTokens = 0,
+                        cacheReadInputTokens = 0,
+                        outputTokens = 1,
+                    ),
             ),
         )
 
@@ -411,7 +447,13 @@ class AiGenerationRegenerationServiceTest {
             RegenerationOutput(
                 patchedItem = GenerationItem.SUMMARY,
                 patchedValue = "patched",
-                usage = TokenUsage(1, 0, 1),
+                usage =
+                    TokenUsage(
+                        nonCachedInputTokens = 1,
+                        cacheWriteInputTokens = 0,
+                        cacheReadInputTokens = 0,
+                        outputTokens = 1,
+                    ),
             ),
         )
 

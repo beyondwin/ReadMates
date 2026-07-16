@@ -595,7 +595,13 @@ class AiGenerationControllerTest {
             RegenerationResult(
                 item = GenerationItem.SUMMARY,
                 value = "regenerated summary",
-                tokens = TokenUsage(50, 0, 25),
+                tokens =
+                    TokenUsage(
+                        nonCachedInputTokens = 50,
+                        cacheWriteInputTokens = 0,
+                        cacheReadInputTokens = 0,
+                        outputTokens = 25,
+                    ),
                 costEstimateUsd = BigDecimal("0.05"),
                 warnings = emptyList(),
             )
@@ -621,7 +627,13 @@ class AiGenerationControllerTest {
             RegenerationResult(
                 item = GenerationItem.SUMMARY,
                 value = "Summary",
-                tokens = TokenUsage(50, 0, 25),
+                tokens =
+                    TokenUsage(
+                        nonCachedInputTokens = 50,
+                        cacheWriteInputTokens = 0,
+                        cacheReadInputTokens = 0,
+                        outputTokens = 25,
+                    ),
                 costEstimateUsd = BigDecimal("0.05"),
                 warnings = emptyList(),
                 revision = 2,
@@ -651,7 +663,13 @@ class AiGenerationControllerTest {
             RegenerationResult(
                 item = GenerationItem.SUMMARY,
                 value = "Summary",
-                tokens = TokenUsage(50, 0, 25),
+                tokens =
+                    TokenUsage(
+                        nonCachedInputTokens = 50,
+                        cacheWriteInputTokens = 0,
+                        cacheReadInputTokens = 0,
+                        outputTokens = 25,
+                    ),
                 costEstimateUsd = BigDecimal("0.05"),
                 warnings = emptyList(),
                 revision = 2,
@@ -818,7 +836,13 @@ class AiGenerationControllerTest {
                     feedbackDocumentMarkdown = "# Feedback",
                 ),
             error = null,
-            tokens = TokenUsage(100, 0, 50),
+            tokens =
+                TokenUsage(
+                    nonCachedInputTokens = 100,
+                    cacheWriteInputTokens = 0,
+                    cacheReadInputTokens = 0,
+                    outputTokens = 50,
+                ),
             costEstimateUsd = BigDecimal("0.12"),
             warnings = emptyList(),
             expiresAt = expiresAt,

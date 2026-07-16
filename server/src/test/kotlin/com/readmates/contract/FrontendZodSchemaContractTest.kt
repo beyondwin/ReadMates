@@ -12,8 +12,10 @@ import com.readmates.aigen.adapter.`in`.web.RegenerateResponse
 import com.readmates.aigen.adapter.`in`.web.SessionImportV1Json
 import com.readmates.aigen.adapter.`in`.web.StartGenerationResponse
 import com.readmates.aigen.adapter.`in`.web.TokenUsageJson
+import com.readmates.aigen.adapter.`in`.web.toJson
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.JobStatus
+import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.`in`.CommitGenerationResult
 import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
@@ -321,6 +323,25 @@ class FrontendZodSchemaContractTest
                 objectMapper.writeValueAsString(ClubAiDefaultsResponse("gemini-3-flash-preview")),
                 "aigen-club-default.json",
             )
+        }
+
+        @Test
+        fun `token usage REST JSON keeps three fields and aggregates cache writes into input`() {
+            val usage =
+                TokenUsage(
+                    nonCachedInputTokens = 100,
+                    cacheWriteInputTokens = 20,
+                    cacheReadInputTokens = 30,
+                    outputTokens = 40,
+                )
+
+            val json = objectMapper.readTree(objectMapper.writeValueAsString(usage.toJson()))
+
+            assertThat(json.propertyNames().asSequence().toSet())
+                .containsExactlyInAnyOrder("input", "cachedInput", "output")
+            assertThat(json.get("input").longValue()).isEqualTo(120)
+            assertThat(json.get("cachedInput").longValue()).isEqualTo(30)
+            assertThat(json.get("output").longValue()).isEqualTo(40)
         }
 
         @Test

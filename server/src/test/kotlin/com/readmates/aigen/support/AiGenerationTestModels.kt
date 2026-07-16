@@ -165,6 +165,12 @@ class StubClaudeWholeTranscriptGroundedGenerator : WholeTranscriptGroundedGenera
         """.trimIndent()
 
     private companion object {
-        val USAGE = TokenUsage(inputTokens = 100, cachedInputTokens = 0, outputTokens = 200)
+        val USAGE =
+            TokenUsage(
+                nonCachedInputTokens = 100,
+                cacheWriteInputTokens = 0,
+                cacheReadInputTokens = 0,
+                outputTokens = 200,
+            )
     }
 }

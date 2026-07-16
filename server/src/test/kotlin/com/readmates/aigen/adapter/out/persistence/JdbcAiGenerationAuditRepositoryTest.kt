@@ -32,6 +32,7 @@ class JdbcAiGenerationAuditRepositoryTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
+    @Suppress("LongMethod")
     fun `insert FULL kind succeeds with null item and null transcript hash`() {
         val jobId = UUID.randomUUID()
         val sessionId = UUID.randomUUID()
@@ -50,7 +51,13 @@ class JdbcAiGenerationAuditRepositoryTest(
                 provider = Provider.CLAUDE,
                 model = "claude-sonnet-4-5",
                 transcriptSha256 = null,
-                usage = TokenUsage(inputTokens = 1500, cachedInputTokens = 200, outputTokens = 800),
+                usage =
+                    TokenUsage(
+                        nonCachedInputTokens = 1500,
+                        cacheWriteInputTokens = 0,
+                        cacheReadInputTokens = 200,
+                        outputTokens = 800,
+                    ),
                 costEstimateUsd = BigDecimal("0.1234"),
                 status = AuditStatus.SUCCESS,
                 errorCode = null,
@@ -259,7 +266,13 @@ class JdbcAiGenerationAuditRepositoryTest(
         provider: Provider = Provider.CLAUDE,
         model: String = "claude-sonnet-4-5",
         transcriptSha256: String? = null,
-        usage: TokenUsage = TokenUsage(0, 0, 0),
+        usage: TokenUsage =
+            TokenUsage(
+                nonCachedInputTokens = 0,
+                cacheWriteInputTokens = 0,
+                cacheReadInputTokens = 0,
+                outputTokens = 0,
+            ),
         costEstimateUsd: BigDecimal = BigDecimal.ZERO,
         status: AuditStatus = AuditStatus.SUCCESS,
         errorCode: ErrorCode? = null,

@@ -277,7 +277,16 @@ class AiGenerationOrchestratorTest {
         assertThat(audit.kind).isEqualTo(AuditKind.FULL)
         assertThat(audit.status).isEqualTo(AuditStatus.FAILED)
         assertThat(audit.item).isNull()
-        assertThat(audit.usage).isEqualTo(TokenUsage(0, 0, 0))
+        assertThat(
+            audit.usage,
+        ).isEqualTo(
+            TokenUsage(
+                nonCachedInputTokens = 0,
+                cacheWriteInputTokens = 0,
+                cacheReadInputTokens = 0,
+                outputTokens = 0,
+            ),
+        )
         assertThat(audit.costEstimateUsd).isEqualTo(BigDecimal.ZERO)
         assertThat(audit.latencyMs).isEqualTo(0)
         assertThat(audit.transcriptSha256).isEqualTo(Sha256.hex("the transcript"))

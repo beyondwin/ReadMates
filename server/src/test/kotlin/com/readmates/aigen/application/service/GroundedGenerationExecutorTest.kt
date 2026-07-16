@@ -321,8 +321,20 @@ class GroundedGenerationExecutorTest {
 
     private companion object {
         val OPENAI_MODEL = ModelId(Provider.OPENAI, "gpt-5.4-mini")
-        val USAGE = TokenUsage(100, 0, 200)
-        val REPAIR_USAGE = TokenUsage(50, 0, 75)
+        val USAGE =
+            TokenUsage(
+                nonCachedInputTokens = 100,
+                cacheWriteInputTokens = 0,
+                cacheReadInputTokens = 0,
+                outputTokens = 200,
+            )
+        val REPAIR_USAGE =
+            TokenUsage(
+                nonCachedInputTokens = 50,
+                cacheWriteInputTokens = 0,
+                cacheReadInputTokens = 0,
+                outputTokens = 75,
+            )
 
         fun validMeta(): SessionMeta =
             SessionMeta(
@@ -399,10 +411,3 @@ class GroundedGenerationExecutorTest {
             """.trimIndent()
     }
 }
-
-private operator fun TokenUsage.plus(other: TokenUsage): TokenUsage =
-    TokenUsage(
-        inputTokens + other.inputTokens,
-        cachedInputTokens + other.cachedInputTokens,
-        outputTokens + other.outputTokens,
-    )

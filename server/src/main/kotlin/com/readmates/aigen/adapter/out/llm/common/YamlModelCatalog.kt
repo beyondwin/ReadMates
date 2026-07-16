@@ -58,6 +58,7 @@ class YamlModelCatalog(
                     ModelId(provider, name) to
                         ModelPricing(
                             inputPerMTokenUsd = p.inputPerMTokenUsd,
+                            cacheWriteInputPerMTokenUsd = p.cacheWriteInputPerMTokenUsd ?: p.inputPerMTokenUsd,
                             cachedInputPerMTokenUsd = p.cachedInputPerMTokenUsd,
                             outputPerMTokenUsd = p.outputPerMTokenUsd,
                         )

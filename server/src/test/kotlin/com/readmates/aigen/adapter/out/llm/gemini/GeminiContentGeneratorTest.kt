@@ -77,7 +77,13 @@ class GeminiContentGeneratorTest {
                 result =
                     GeminiToolResult(
                         parsed = validSnapshotJson(),
-                        usage = TokenUsage(inputTokens = 100, cachedInputTokens = 50, outputTokens = 200),
+                        usage =
+                            TokenUsage(
+                                nonCachedInputTokens = 100,
+                                cacheWriteInputTokens = 0,
+                                cacheReadInputTokens = 50,
+                                outputTokens = 200,
+                            ),
                     ),
             )
         val generator = GeminiContentGenerator(fake, schemaResource, schemaAdapter)
@@ -93,8 +99,8 @@ class GeminiContentGeneratorTest {
         assertEquals(2, output.result.oneLineReviews.size)
         assertEquals("feedback.md", output.result.feedbackDocumentFileName)
         assertTrue(output.result.feedbackDocumentMarkdown.contains("<!-- readmates-feedback:v1 -->"))
-        assertEquals(100, output.usage.inputTokens)
-        assertEquals(50, output.usage.cachedInputTokens)
+        assertEquals(100, output.usage.nonCachedInputTokens)
+        assertEquals(50, output.usage.cacheReadInputTokens)
         assertEquals(200, output.usage.outputTokens)
         assertEquals(4096, fake.lastMaxOutputTokens)
     }
@@ -208,7 +214,13 @@ class GeminiContentGeneratorTest {
         assertFalse(ex.message!!.contains(sentinel))
     }
 
-    private fun zeroUsage() = TokenUsage(0, 0, 0)
+    private fun zeroUsage() =
+        TokenUsage(
+            nonCachedInputTokens = 0,
+            cacheWriteInputTokens = 0,
+            cacheReadInputTokens = 0,
+            outputTokens = 0,
+        )
 
     private fun findKeyAnywhere(
         node: JsonNode,

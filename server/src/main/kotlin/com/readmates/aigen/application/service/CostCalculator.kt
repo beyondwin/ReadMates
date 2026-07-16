@@ -5,31 +5,47 @@ import com.readmates.aigen.application.model.TokenUsage
 import java.math.BigDecimal
 import java.math.RoundingMode
 
-/**
- * Pure stateless cost estimator.
- *
- * Computes USD cost from a [TokenUsage] / [ModelPricing] pair. Each pricing column is
- * applied independently:
- *   cost = (input * inputPerM + cachedInput * cachedInputPerM + output * outputPerM) / 1_000_000
- *
- * Result is normalised to scale 4 with HALF_UP rounding so it matches the
- * `cost_estimate_usd DECIMAL(8,4)` audit column.
- */
+/** Pure stateless calculator for actual and reserved worst-case AI cost. */
 object CostCalculator {
-    /** Pricing is quoted per *million* tokens, so usage * price is divided by this denominator. */
     private val TOKENS_PER_PRICING_UNIT: BigDecimal = BigDecimal(TOKENS_PER_PRICING_UNIT_LONG)
-
     private const val TOKENS_PER_PRICING_UNIT_LONG: Long = 1_000_000L
     private const val SCALE: Int = 4
 
-    fun estimate(
+    fun actual(
         usage: TokenUsage,
         pricing: ModelPricing,
     ): BigDecimal {
-        val input = BigDecimal(usage.inputTokens).multiply(pricing.inputPerMTokenUsd)
-        val cached = BigDecimal(usage.cachedInputTokens).multiply(pricing.cachedInputPerMTokenUsd)
-        val output = BigDecimal(usage.outputTokens).multiply(pricing.outputPerMTokenUsd)
-        val total = input.add(cached).add(output)
-        return total.divide(TOKENS_PER_PRICING_UNIT, SCALE, RoundingMode.HALF_UP)
+        val total =
+            priced(usage.nonCachedInputTokens, pricing.inputPerMTokenUsd)
+                .add(priced(usage.cacheWriteInputTokens, pricing.cacheWriteInputPerMTokenUsd))
+                .add(priced(usage.cacheReadInputTokens, pricing.cachedInputPerMTokenUsd))
+                .add(priced(usage.outputTokens, pricing.outputPerMTokenUsd))
+        return persistedPrecision(total)
     }
+
+    fun worstCase(
+        estimatedInputTokens: Long,
+        maxOutputTokens: Long,
+        pricing: ModelPricing,
+        cacheWritePossible: Boolean,
+    ): BigDecimal {
+        val inputPrice =
+            if (cacheWritePossible) {
+                pricing.inputPerMTokenUsd.max(pricing.cacheWriteInputPerMTokenUsd)
+            } else {
+                pricing.inputPerMTokenUsd
+            }
+        val total =
+            priced(estimatedInputTokens, inputPrice)
+                .add(priced(maxOutputTokens, pricing.outputPerMTokenUsd))
+        return persistedPrecision(total)
+    }
+
+    private fun priced(
+        tokens: Long,
+        pricePerMillionTokens: BigDecimal,
+    ): BigDecimal = BigDecimal(tokens).multiply(pricePerMillionTokens)
+
+    private fun persistedPrecision(unscaledTotal: BigDecimal): BigDecimal =
+        unscaledTotal.divide(TOKENS_PER_PRICING_UNIT, SCALE, RoundingMode.HALF_UP)
 }

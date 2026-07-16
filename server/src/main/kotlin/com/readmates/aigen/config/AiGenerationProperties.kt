@@ -51,6 +51,7 @@ data class AiGenerationProperties(
 
     data class Pricing(
         val inputPerMTokenUsd: BigDecimal,
+        val cacheWriteInputPerMTokenUsd: BigDecimal? = null,
         val cachedInputPerMTokenUsd: BigDecimal = BigDecimal.ZERO,
         val outputPerMTokenUsd: BigDecimal,
     )

@@ -100,7 +100,7 @@ class DefaultGroundedRegenerationExecutor(
                 is GroundedValidationResult.Repairable -> invalidRegeneration(validation.reasons)
                 is GroundedValidationResult.Invalid -> invalidRegeneration(validation.reasons)
             }
-        val cost = CostCalculator.estimate(repair.usage, modelCatalog.pricing(selectedModel))
+        val cost = CostCalculator.actual(repair.usage, modelCatalog.pricing(selectedModel))
         costGuard.recordUsage(record.hostUserId, record.clubId, admissionId, cost)
         val saved =
             jobStore.saveGroundedResult(
@@ -282,11 +282,14 @@ class DefaultGroundedRegenerationExecutor(
                 GenerationItem.FEEDBACK_DOCUMENT -> JobKind.REGENERATE_FEEDBACK_DOCUMENT
             }
         metrics.recordJobCompleted(JobStatus.SUCCEEDED, model.provider, model, kind)
-        if (usage.inputTokens > 0) {
-            metrics.recordTokens(model.provider, model, TokenDirection.INPUT, usage.inputTokens)
+        if (usage.nonCachedInputTokens > 0) {
+            metrics.recordTokens(model.provider, model, TokenDirection.INPUT, usage.nonCachedInputTokens)
         }
-        if (usage.cachedInputTokens > 0) {
-            metrics.recordTokens(model.provider, model, TokenDirection.CACHED_INPUT, usage.cachedInputTokens)
+        if (usage.cacheWriteInputTokens > 0) {
+            metrics.recordTokens(model.provider, model, TokenDirection.CACHE_WRITE_INPUT, usage.cacheWriteInputTokens)
+        }
+        if (usage.cacheReadInputTokens > 0) {
+            metrics.recordTokens(model.provider, model, TokenDirection.CACHE_READ_INPUT, usage.cacheReadInputTokens)
         }
         if (usage.outputTokens > 0) {
             metrics.recordTokens(model.provider, model, TokenDirection.OUTPUT, usage.outputTokens)

@@ -386,7 +386,7 @@ class AiGenerationWorker(
                 provider = model.provider,
                 model = model.name,
                 transcriptSha256 = null,
-                usage = TokenUsage(0, 0, 0),
+                usage = TokenUsage.ZERO,
                 costEstimateUsd = BigDecimal.ZERO,
                 status = AuditStatus.FAILED,
                 errorCode = previousError.code,
@@ -404,7 +404,7 @@ class AiGenerationWorker(
         actualModel: ModelId,
         start: Instant,
     ) {
-        val cost = CostCalculator.estimate(usage, modelCatalog.pricing(actualModel))
+        val cost = CostCalculator.actual(usage, modelCatalog.pricing(actualModel))
         // Cost was incurred by the provider call regardless of cancel race.
         // Record BEFORE the CAS so cancel-during-running does not silently
         // drop club/host monthly accounting (spec §"비용 회계 정책").
@@ -489,7 +489,7 @@ class AiGenerationWorker(
         // Validation-failure counter is emitted at the validator (single source of truth).
         // Attribute the failed job to the model that actually produced the final
         // failure (the failover target when one was used), per spec accounting.
-        emitJobMetrics(JobStatus.FAILED, TokenUsage(0, 0, 0), BigDecimal.ZERO, start, failedModel)
+        emitJobMetrics(JobStatus.FAILED, TokenUsage.ZERO, BigDecimal.ZERO, start, failedModel)
         auditPort.insert(
             AuditLogEntry(
                 jobId = record.jobId,
@@ -501,7 +501,7 @@ class AiGenerationWorker(
                 provider = failedModel.provider,
                 model = failedModel.name,
                 transcriptSha256 = null,
-                usage = TokenUsage(0, 0, 0),
+                usage = TokenUsage.ZERO,
                 costEstimateUsd = BigDecimal.ZERO,
                 status = AuditStatus.FAILED,
                 errorCode = code,
@@ -545,15 +545,23 @@ class AiGenerationWorker(
         val elapsed = Duration.between(start, clock.instant())
         metrics.recordJobCompleted(status, model.provider, model, JobKind.FULL)
         metrics.recordLatency(model.provider, model, JobKind.FULL, elapsed)
-        if (usage.inputTokens > 0) {
-            metrics.recordTokens(model.provider, model, TokenDirection.INPUT, usage.inputTokens)
+        if (usage.nonCachedInputTokens > 0) {
+            metrics.recordTokens(model.provider, model, TokenDirection.INPUT, usage.nonCachedInputTokens)
         }
-        if (usage.cachedInputTokens > 0) {
+        if (usage.cacheWriteInputTokens > 0) {
             metrics.recordTokens(
                 model.provider,
                 model,
-                TokenDirection.CACHED_INPUT,
-                usage.cachedInputTokens,
+                TokenDirection.CACHE_WRITE_INPUT,
+                usage.cacheWriteInputTokens,
+            )
+        }
+        if (usage.cacheReadInputTokens > 0) {
+            metrics.recordTokens(
+                model.provider,
+                model,
+                TokenDirection.CACHE_READ_INPUT,
+                usage.cacheReadInputTokens,
             )
         }
         if (usage.outputTokens > 0) {

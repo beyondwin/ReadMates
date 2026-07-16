@@ -59,6 +59,9 @@ class GeminiApiClientLiveContractTest {
             )
 
         assertNotNull(result)
-        assertTrue(result.usage.inputTokens > 0, "expected non-zero inputTokens, got ${result.usage.inputTokens}")
+        assertTrue(
+            result.usage.nonCachedInputTokens > 0,
+            "expected non-zero inputTokens, got ${result.usage.nonCachedInputTokens}",
+        )
     }
 }

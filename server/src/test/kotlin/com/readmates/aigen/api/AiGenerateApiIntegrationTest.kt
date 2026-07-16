@@ -482,7 +482,13 @@ class AiGenerateApiIntegrationTest(
             result = snapshot,
             groundedDraft = draft,
             error = null,
-            tokens = TokenUsage(10, 0, 10),
+            tokens =
+                TokenUsage(
+                    nonCachedInputTokens = 10,
+                    cacheWriteInputTokens = 0,
+                    cacheReadInputTokens = 0,
+                    outputTokens = 10,
+                ),
             costAccumulatedUsd = BigDecimal("0.01"),
             expiresAt = now.plus(Duration.ofHours(6)),
             createdAt = now,

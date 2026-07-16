@@ -2,67 +2,149 @@ package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.model.ModelPricing
 import com.readmates.aigen.application.model.TokenUsage
-import org.junit.jupiter.api.Assertions.assertEquals
+import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 
 class CostCalculatorTest {
+    private val pricing =
+        ModelPricing(
+            inputPerMTokenUsd = BigDecimal("3.00"),
+            cacheWriteInputPerMTokenUsd = BigDecimal("3.75"),
+            cachedInputPerMTokenUsd = BigDecimal("0.30"),
+            outputPerMTokenUsd = BigDecimal("15.00"),
+        )
+
     @Test
-    fun `estimate computes input plus cached plus output divided by million scaled to 4 decimals`() {
-        // 1M input @ $3 => $3.0000
-        // 500K cached @ $0.30 => $0.1500
-        // 500K output @ $15 => $7.5000
-        // total: $10.6500
+    fun `actual prices all four usage channels independently`() {
         val usage =
             TokenUsage(
-                inputTokens = 1_000_000L,
-                cachedInputTokens = 500_000L,
-                outputTokens = 500_000L,
-            )
-        val pricing =
-            ModelPricing(
-                inputPerMTokenUsd = BigDecimal("3"),
-                cachedInputPerMTokenUsd = BigDecimal("0.30"),
-                outputPerMTokenUsd = BigDecimal("15"),
+                nonCachedInputTokens = 1_000_000,
+                cacheWriteInputTokens = 1_000_000,
+                cacheReadInputTokens = 1_000_000,
+                outputTokens = 1_000_000,
             )
 
-        val cost = CostCalculator.estimate(usage, pricing)
-
-        assertEquals(BigDecimal("10.6500"), cost)
+        assertThat(CostCalculator.actual(usage, pricing)).isEqualByComparingTo("22.05")
+        assertThat(usage.publicInputTokens).isEqualTo(2_000_000)
+        assertThat(usage.publicCachedInputTokens).isEqualTo(1_000_000)
     }
 
     @Test
-    fun `estimate with zero pricing returns zero at scale 4`() {
+    fun `actual rounds only after summing all channels`() {
         val usage =
             TokenUsage(
-                inputTokens = 5_000L,
-                cachedInputTokens = 3_000L,
-                outputTokens = 2_000L,
+                nonCachedInputTokens = 25,
+                cacheWriteInputTokens = 25,
+                cacheReadInputTokens = 25,
+                outputTokens = 25,
             )
-        val pricing =
+        val unitPricing =
             ModelPricing(
-                inputPerMTokenUsd = BigDecimal.ZERO,
-                cachedInputPerMTokenUsd = BigDecimal.ZERO,
-                outputPerMTokenUsd = BigDecimal.ZERO,
+                inputPerMTokenUsd = BigDecimal.ONE,
+                cacheWriteInputPerMTokenUsd = BigDecimal.ONE,
+                cachedInputPerMTokenUsd = BigDecimal.ONE,
+                outputPerMTokenUsd = BigDecimal.ONE,
             )
 
-        val cost = CostCalculator.estimate(usage, pricing)
-
-        assertEquals(BigDecimal("0.0000"), cost)
+        assertThat(CostCalculator.actual(usage, unitPricing)).isEqualByComparingTo("0.0001")
     }
 
     @Test
-    fun `estimate with zero usage returns zero at scale 4`() {
-        val usage = TokenUsage(0L, 0L, 0L)
-        val pricing =
-            ModelPricing(
-                inputPerMTokenUsd = BigDecimal("3"),
-                cachedInputPerMTokenUsd = BigDecimal("0.30"),
-                outputPerMTokenUsd = BigDecimal("15"),
+    fun `worst case uses cache write premium when cache writing is possible`() {
+        assertThat(
+            CostCalculator.worstCase(
+                estimatedInputTokens = 1_000_000,
+                maxOutputTokens = 1_000_000,
+                pricing = pricing,
+                cacheWritePossible = true,
+            ),
+        ).isEqualByComparingTo("18.75")
+    }
+
+    @Test
+    fun `worst case uses normal input price when cache writing is impossible`() {
+        assertThat(
+            CostCalculator.worstCase(
+                estimatedInputTokens = 1_000_000,
+                maxOutputTokens = 1_000_000,
+                pricing = pricing,
+                cacheWritePossible = false,
+            ),
+        ).isEqualByComparingTo("18.00")
+    }
+
+    @Test
+    fun `token usage rejects a negative count in every channel`() {
+        val negativeUsages =
+            listOf<() -> TokenUsage>(
+                {
+                    TokenUsage(
+                        nonCachedInputTokens = -1,
+                        cacheWriteInputTokens = 0,
+                        cacheReadInputTokens = 0,
+                        outputTokens = 0,
+                    )
+                },
+                {
+                    TokenUsage(
+                        nonCachedInputTokens = 0,
+                        cacheWriteInputTokens = -1,
+                        cacheReadInputTokens = 0,
+                        outputTokens = 0,
+                    )
+                },
+                {
+                    TokenUsage(
+                        nonCachedInputTokens = 0,
+                        cacheWriteInputTokens = 0,
+                        cacheReadInputTokens = -1,
+                        outputTokens = 0,
+                    )
+                },
+                {
+                    TokenUsage(
+                        nonCachedInputTokens = 0,
+                        cacheWriteInputTokens = 0,
+                        cacheReadInputTokens = 0,
+                        outputTokens = -1,
+                    )
+                },
             )
 
-        val cost = CostCalculator.estimate(usage, pricing)
+        negativeUsages.forEach { construct ->
+            assertThatThrownBy { construct() }
+                .isInstanceOf(IllegalArgumentException::class.java)
+        }
+    }
 
-        assertEquals(BigDecimal("0.0000"), cost)
+    @Test
+    fun `ZERO and plus preserve all four channels`() {
+        val first =
+            TokenUsage(
+                nonCachedInputTokens = 1,
+                cacheWriteInputTokens = 2,
+                cacheReadInputTokens = 3,
+                outputTokens = 4,
+            )
+        val second =
+            TokenUsage(
+                nonCachedInputTokens = 10,
+                cacheWriteInputTokens = 20,
+                cacheReadInputTokens = 30,
+                outputTokens = 40,
+            )
+
+        assertThat(TokenUsage.ZERO + first).isEqualTo(first)
+        assertThat(first + TokenUsage.ZERO).isEqualTo(first)
+        assertThat(first + second).isEqualTo(
+            TokenUsage(
+                nonCachedInputTokens = 11,
+                cacheWriteInputTokens = 22,
+                cacheReadInputTokens = 33,
+                outputTokens = 44,
+            ),
+        )
     }
 }

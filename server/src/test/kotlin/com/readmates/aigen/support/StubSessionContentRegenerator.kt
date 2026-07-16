@@ -93,7 +93,13 @@ internal object StubRegenerationPayload {
         return RegenerationOutput(
             patchedItem = input.item,
             patchedValue = value,
-            usage = TokenUsage(inputTokens = 30, cachedInputTokens = 0, outputTokens = 60),
+            usage =
+                TokenUsage(
+                    nonCachedInputTokens = 30,
+                    cacheWriteInputTokens = 0,
+                    cacheReadInputTokens = 0,
+                    outputTokens = 60,
+                ),
         )
     }
 }

@@ -22,7 +22,13 @@ class ListGenerationModelsServiceTest {
     private val claude = ModelId(Provider.CLAUDE, "claude-sonnet-4-6")
     private val gemini = ModelId(Provider.GEMINI, "gemini-3-flash-preview")
     private val unverified = ModelId(Provider.CLAUDE, "claude-opus-4-7")
-    private val unitPricing = ModelPricing(BigDecimal.ONE, BigDecimal.ZERO, BigDecimal.ONE)
+    private val unitPricing =
+        ModelPricing(
+            inputPerMTokenUsd = BigDecimal.ONE,
+            cacheWriteInputPerMTokenUsd = BigDecimal.ONE,
+            cachedInputPerMTokenUsd = BigDecimal.ZERO,
+            outputPerMTokenUsd = BigDecimal.ONE,
+        )
 
     @Test
     fun `lists enabled priced structured capable models in stable provider order`() {

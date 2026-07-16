@@ -116,7 +116,7 @@ class AiGenerationMetrics(
 
     /**
      * `readmates_aigen_tokens_total{provider,model,direction}` — counter.
-     * `direction` is one of `input`, `cached_input`, `output` (lowercased per spec).
+     * `direction` is one of the four bounded billing-channel values.
      */
     fun recordTokens(
         provider: Provider,
@@ -271,13 +271,14 @@ enum class MetricLabel(
 
 /**
  * Direction tag values for `readmates_aigen_tokens_total`. Emitted lowercase
- * (input / cached_input / output) per spec §11.1.
+ * (input / cache_write_input / cache_read_input / output) per spec §11.1.
  */
 enum class TokenDirection(
     val tagValue: String,
 ) {
     INPUT("input"),
-    CACHED_INPUT("cached_input"),
+    CACHE_WRITE_INPUT("cache_write_input"),
+    CACHE_READ_INPUT("cache_read_input"),
     OUTPUT("output"),
 }
 

@@ -46,6 +46,7 @@ import java.util.concurrent.TimeUnit
 )
 @Tag("integration")
 @Tag("container")
+@Suppress("LargeClass")
 class RedisAiGenerationJobStoreTest(
     @param:Autowired private val store: AiGenerationJobStore,
     @param:Autowired private val redisTemplate: StringRedisTemplate,
@@ -164,7 +165,17 @@ class RedisAiGenerationJobStoreTest(
         store.save(record)
         val snapshot = snapshot()
 
-        store.saveResult(record.jobId, snapshot, TokenUsage(100, 50, 200), BigDecimal("0.01"))
+        store.saveResult(
+            record.jobId,
+            snapshot,
+            TokenUsage(
+                nonCachedInputTokens = 100,
+                cacheWriteInputTokens = 0,
+                cacheReadInputTokens = 50,
+                outputTokens = 200,
+            ),
+            BigDecimal("0.01"),
+        )
 
         val resultKey = "aigen:job:${record.jobId}:result"
         val resultJson = redisTemplate.opsForValue().get(resultKey)
@@ -174,8 +185,8 @@ class RedisAiGenerationJobStoreTest(
         val loaded = store.load(record.jobId)!!
         assertThat(loaded.result).isNotNull
         assertThat(loaded.result!!.bookTitle).isEqualTo(snapshot.bookTitle)
-        assertThat(loaded.tokens.inputTokens).isEqualTo(100L)
-        assertThat(loaded.tokens.cachedInputTokens).isEqualTo(50L)
+        assertThat(loaded.tokens.nonCachedInputTokens).isEqualTo(100L)
+        assertThat(loaded.tokens.cacheReadInputTokens).isEqualTo(50L)
         assertThat(loaded.tokens.outputTokens).isEqualTo(200L)
         assertThat(loaded.costAccumulatedUsd).isEqualByComparingTo(BigDecimal("0.01"))
     }
@@ -184,14 +195,35 @@ class RedisAiGenerationJobStoreTest(
     fun `patchItem atomically updates result and accumulates tokens plus cost`() {
         val record = newRecord()
         store.save(record)
-        store.saveResult(record.jobId, snapshot(), TokenUsage(100, 0, 200), BigDecimal("0.01"))
+        store.saveResult(
+            record.jobId,
+            snapshot(),
+            TokenUsage(
+                nonCachedInputTokens = 100,
+                cacheWriteInputTokens = 0,
+                cacheReadInputTokens = 0,
+                outputTokens = 200,
+            ),
+            BigDecimal("0.01"),
+        )
 
         val patched = snapshot().copy(summary = "patched summary text")
-        store.patchItem(record.jobId, GenerationItem.SUMMARY, patched, TokenUsage(20, 0, 30), BigDecimal("0.005"))
+        store.patchItem(
+            record.jobId,
+            GenerationItem.SUMMARY,
+            patched,
+            TokenUsage(
+                nonCachedInputTokens = 20,
+                cacheWriteInputTokens = 0,
+                cacheReadInputTokens = 0,
+                outputTokens = 30,
+            ),
+            BigDecimal("0.005"),
+        )
 
         val loaded = store.load(record.jobId)!!
         assertThat(loaded.result!!.summary).isEqualTo("patched summary text")
-        assertThat(loaded.tokens.inputTokens).isEqualTo(120L)
+        assertThat(loaded.tokens.nonCachedInputTokens).isEqualTo(120L)
         assertThat(loaded.tokens.outputTokens).isEqualTo(230L)
         assertThat(loaded.costAccumulatedUsd).isEqualByComparingTo(BigDecimal("0.015"))
     }
@@ -214,7 +246,17 @@ class RedisAiGenerationJobStoreTest(
     fun `load returns null and deletes stale keys when transcript key is missing`() {
         val record = newRecord()
         store.save(record)
-        store.saveResult(record.jobId, snapshot(), TokenUsage(1, 0, 1), BigDecimal("0.001"))
+        store.saveResult(
+            record.jobId,
+            snapshot(),
+            TokenUsage(
+                nonCachedInputTokens = 1,
+                cacheWriteInputTokens = 0,
+                cacheReadInputTokens = 0,
+                outputTokens = 1,
+            ),
+            BigDecimal("0.001"),
+        )
         redisTemplate.delete("aigen:job:${record.jobId}:transcript")
 
         val loaded = store.load(record.jobId)
@@ -231,7 +273,17 @@ class RedisAiGenerationJobStoreTest(
         val transcriptKey = "aigen:job:${record.jobId}:transcript"
         redisTemplate.expire(transcriptKey, java.time.Duration.ofSeconds(1))
 
-        store.saveResult(record.jobId, snapshot(), TokenUsage(100, 0, 200), BigDecimal("0.01"))
+        store.saveResult(
+            record.jobId,
+            snapshot(),
+            TokenUsage(
+                nonCachedInputTokens = 100,
+                cacheWriteInputTokens = 0,
+                cacheReadInputTokens = 0,
+                outputTokens = 200,
+            ),
+            BigDecimal("0.01"),
+        )
 
         val ttlSeconds = properties.job.redisTtl.seconds
         val transcriptTtl = redisTemplate.getExpire(transcriptKey, TimeUnit.SECONDS)
@@ -276,7 +328,17 @@ class RedisAiGenerationJobStoreTest(
     fun `patchItem refreshes transcript ttl with hash and result ttl`() {
         val record = newRecord()
         store.save(record)
-        store.saveResult(record.jobId, snapshot(), TokenUsage(1, 0, 1), BigDecimal("0.001"))
+        store.saveResult(
+            record.jobId,
+            snapshot(),
+            TokenUsage(
+                nonCachedInputTokens = 1,
+                cacheWriteInputTokens = 0,
+                cacheReadInputTokens = 0,
+                outputTokens = 1,
+            ),
+            BigDecimal("0.001"),
+        )
         val transcriptKey = "aigen:job:${record.jobId}:transcript"
         redisTemplate.expire(transcriptKey, java.time.Duration.ofSeconds(1))
 
@@ -284,7 +346,12 @@ class RedisAiGenerationJobStoreTest(
             record.jobId,
             GenerationItem.SUMMARY,
             snapshot().copy(summary = "patched summary"),
-            TokenUsage(20, 0, 30),
+            TokenUsage(
+                nonCachedInputTokens = 20,
+                cacheWriteInputTokens = 0,
+                cacheReadInputTokens = 0,
+                outputTokens = 30,
+            ),
             BigDecimal("0.005"),
         )
 
@@ -297,7 +364,17 @@ class RedisAiGenerationJobStoreTest(
     fun `delete removes hash, transcript, and result keys`() {
         val record = newRecord()
         store.save(record)
-        store.saveResult(record.jobId, snapshot(), TokenUsage(1, 0, 1), BigDecimal("0.001"))
+        store.saveResult(
+            record.jobId,
+            snapshot(),
+            TokenUsage(
+                nonCachedInputTokens = 1,
+                cacheWriteInputTokens = 0,
+                cacheReadInputTokens = 0,
+                outputTokens = 1,
+            ),
+            BigDecimal("0.001"),
+        )
 
         store.delete(record.jobId)
 
@@ -357,7 +434,13 @@ class RedisAiGenerationJobStoreTest(
                 jobId = record.jobId,
                 expected = JobStatus.RUNNING,
                 result = snapshot(),
-                usage = TokenUsage(100, 0, 100),
+                usage =
+                    TokenUsage(
+                        nonCachedInputTokens = 100,
+                        cacheWriteInputTokens = 0,
+                        cacheReadInputTokens = 0,
+                        outputTokens = 100,
+                    ),
                 cost = BigDecimal("0.01"),
             )
 
@@ -365,7 +448,7 @@ class RedisAiGenerationJobStoreTest(
         assertThat(saved).isFalse()
         assertThat(loaded.status).isEqualTo(JobStatus.CANCELLED)
         assertThat(loaded.result).isNull()
-        assertThat(loaded.tokens.inputTokens).isEqualTo(0L)
+        assertThat(loaded.tokens.nonCachedInputTokens).isEqualTo(0L)
     }
 
     @Test
@@ -387,7 +470,13 @@ class RedisAiGenerationJobStoreTest(
                 jobId = record.jobId,
                 expected = JobStatus.RUNNING,
                 result = snapshot(),
-                usage = TokenUsage(10, 0, 20),
+                usage =
+                    TokenUsage(
+                        nonCachedInputTokens = 10,
+                        cacheWriteInputTokens = 0,
+                        cacheReadInputTokens = 0,
+                        outputTokens = 20,
+                    ),
                 cost = BigDecimal("0.01"),
                 actualModel = failoverModel,
             )
@@ -414,7 +503,13 @@ class RedisAiGenerationJobStoreTest(
             jobId = record.jobId,
             expected = JobStatus.RUNNING,
             result = snapshot(),
-            usage = TokenUsage(10, 0, 20),
+            usage =
+                TokenUsage(
+                    nonCachedInputTokens = 10,
+                    cacheWriteInputTokens = 0,
+                    cacheReadInputTokens = 0,
+                    outputTokens = 20,
+                ),
             cost = BigDecimal("0.01"),
             actualModel = null,
         )
@@ -426,7 +521,17 @@ class RedisAiGenerationJobStoreTest(
     fun `deleteTransientPayload keeps terminal hash but removes transcript and result`() {
         val record = newRecord()
         store.save(record)
-        store.saveResult(record.jobId, snapshot(), TokenUsage(1, 0, 1), BigDecimal("0.001"))
+        store.saveResult(
+            record.jobId,
+            snapshot(),
+            TokenUsage(
+                nonCachedInputTokens = 1,
+                cacheWriteInputTokens = 0,
+                cacheReadInputTokens = 0,
+                outputTokens = 1,
+            ),
+            BigDecimal("0.001"),
+        )
         store.transitionStatus(
             jobId = record.jobId,
             expected = setOf(JobStatus.PENDING),
@@ -591,7 +696,13 @@ class RedisAiGenerationJobStoreTest(
             progressPct = if (status == JobStatus.SUCCEEDED) 100 else 0,
             result = null,
             error = null,
-            tokens = TokenUsage(0, 0, 0),
+            tokens =
+                TokenUsage(
+                    nonCachedInputTokens = 0,
+                    cacheWriteInputTokens = 0,
+                    cacheReadInputTokens = 0,
+                    outputTokens = 0,
+                ),
             costAccumulatedUsd = BigDecimal.ZERO,
             expiresAt = Instant.now().plusSeconds(ttl.seconds),
             createdAt = createdAt,
@@ -613,7 +724,13 @@ class RedisAiGenerationJobStoreTest(
             result = snapshot(),
             draft = groundedDraft(),
             evidence = evidence(expectedRevision + 1),
-            usage = TokenUsage(10, 0, 20),
+            usage =
+                TokenUsage(
+                    nonCachedInputTokens = 10,
+                    cacheWriteInputTokens = 0,
+                    cacheReadInputTokens = 0,
+                    outputTokens = 20,
+                ),
             cost = BigDecimal("0.01"),
             actualModel = record.model,
         )

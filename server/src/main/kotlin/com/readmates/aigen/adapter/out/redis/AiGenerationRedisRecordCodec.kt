@@ -62,8 +62,8 @@ internal class AiGenerationRedisRecordCodec(
             "eligibleFallbackModels" to objectMapper.writeValueAsString(job.eligibleFallbackModels),
             "status" to job.status.name,
             "progressPct" to job.progressPct.toString(),
-            "tokensInput" to job.tokens.inputTokens.toString(),
-            "tokensCached" to job.tokens.cachedInputTokens.toString(),
+            "tokensInput" to job.tokens.publicInputTokens.toString(),
+            "tokensCached" to job.tokens.publicCachedInputTokens.toString(),
             "tokensOutput" to job.tokens.outputTokens.toString(),
             "costAccumulatedUsd" to job.costAccumulatedUsd.toPlainString(),
             "llmCallCount" to job.llmCallCount.toString(),
@@ -140,9 +140,10 @@ internal class AiGenerationRedisRecordCodec(
 
     private fun readTokens(hash: Map<String, String>): TokenUsage =
         TokenUsage(
-            hash.getValue("tokensInput").toLong(),
-            hash.getValue("tokensCached").toLong(),
-            hash.getValue("tokensOutput").toLong(),
+            nonCachedInputTokens = hash.getValue("tokensInput").toLong(),
+            cacheWriteInputTokens = 0,
+            cacheReadInputTokens = hash.getValue("tokensCached").toLong(),
+            outputTokens = hash.getValue("tokensOutput").toLong(),
         )
 
     private fun readEligibleFallbackModels(hash: Map<String, String>): List<ModelId> =
