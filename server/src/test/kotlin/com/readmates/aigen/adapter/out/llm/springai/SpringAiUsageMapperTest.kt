@@ -117,6 +117,19 @@ class SpringAiUsageMapperTest {
     }
 
     @Test
+    fun `Anthropic generic input is non-cached and cache creation and reads stay separate`() {
+        val usage = DefaultUsage(100, 30, 130, null, 20, 25)
+
+        val mapped = SpringAiUsageMapper().map(Provider.CLAUDE, usage, cacheEnabled = true)
+
+        assertThat(mapped.usage.nonCachedInputTokens).isEqualTo(100)
+        assertThat(mapped.usage.cacheWriteInputTokens).isEqualTo(25)
+        assertThat(mapped.usage.cacheReadInputTokens).isEqualTo(20)
+        assertThat(mapped.usage.outputTokens).isEqualTo(30)
+        assertThat(mapped.usageComplete).isTrue()
+    }
+
+    @Test
     fun `marks cache usage incomplete when read or write breakdown is absent`() {
         val usage = DefaultUsage(120, 30, 150, null)
 

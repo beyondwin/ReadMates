@@ -35,14 +35,47 @@ class SpringAiUsageMapper(
         cacheEnabled: Boolean,
         promptIncludesCache: Boolean = true,
     ): SpringAiUsageMapping {
-        val native =
+        val registeredNative =
             runCatching { nativeExtractors[provider]?.extract(usage?.nativeUsage) }
                 .getOrNull()
+        val native =
+            registeredNative
+                ?: if (provider == Provider.CLAUDE) AnthropicNativeUsage.extract(usage?.nativeUsage) else null
         return if (provider == Provider.OPENAI) {
             mapOpenAi(usage, native)
+        } else if (provider == Provider.CLAUDE) {
+            mapAnthropic(usage, native, cacheEnabled)
         } else {
             mapGeneric(usage, native, cacheEnabled, promptIncludesCache)
         }
+    }
+
+    private fun mapAnthropic(
+        usage: Usage?,
+        native: SpringAiNativeUsage?,
+        cacheEnabled: Boolean,
+    ): SpringAiUsageMapping {
+        val nonCached = preferNative(native?.nonCachedInputTokens, usage?.promptTokens?.toLong())
+        val cacheRead = preferNative(native?.cacheReadInputTokens, usage?.cacheReadInputTokens)
+        val cacheWrite = preferNative(native?.cacheWriteInputTokens, usage?.cacheWriteInputTokens)
+        val output = preferNative(native?.outputTokens, usage?.completionTokens?.toLong())
+        val total = usage?.totalTokens?.toLong()
+        val cacheBreakdownComplete = !cacheEnabled || (cacheRead != null && cacheWrite != null)
+        val values = listOf(nonCached, cacheRead ?: 0L, cacheWrite ?: 0L, output)
+        val totalConsistent =
+            native != null || total == null || (nonCached != null && output != null && total == nonCached + output)
+        val complete = cacheBreakdownComplete && totalConsistent && values.all { it != null && it >= 0 }
+
+        return SpringAiUsageMapping(
+            usage =
+                TokenUsage(
+                    nonCachedInputTokens = nonCached.safeTokenCount(),
+                    cacheWriteInputTokens = cacheWrite.safeTokenCount(),
+                    cacheReadInputTokens = cacheRead.safeTokenCount(),
+                    outputTokens = output.safeTokenCount(),
+                ),
+            usageComplete = complete,
+        )
     }
 
     private fun mapGeneric(
@@ -113,4 +146,34 @@ class SpringAiUsageMapper(
     }
 
     private fun Long?.safeTokenCount(): Long = this?.coerceAtLeast(0) ?: 0
+
+    private fun preferNative(
+        native: Long?,
+        generic: Long?,
+    ): Long? = native ?: generic
+}
+
+private object AnthropicNativeUsage {
+    fun extract(value: Any?): SpringAiNativeUsage? {
+        if (value == null) return null
+        return runCatching {
+            SpringAiNativeUsage(
+                nonCachedInputTokens = value.requiredLong("inputTokens"),
+                cacheWriteInputTokens = value.optionalLong("cacheCreationInputTokens"),
+                cacheReadInputTokens = value.optionalLong("cacheReadInputTokens"),
+                outputTokens = value.requiredLong("outputTokens"),
+            )
+        }.getOrNull()
+    }
+
+    private fun Any.requiredLong(method: String): Long = (javaClass.getMethod(method).invoke(this) as Number).toLong()
+
+    private fun Any.optionalLong(method: String): Long? {
+        val result = javaClass.getMethod(method).invoke(this)
+        return when (result) {
+            is java.util.Optional<*> -> (result.orElse(null) as? Number)?.toLong()
+            is Number -> result.toLong()
+            else -> null
+        }
+    }
 }

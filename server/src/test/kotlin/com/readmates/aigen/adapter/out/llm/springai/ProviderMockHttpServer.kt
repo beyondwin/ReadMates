@@ -13,16 +13,18 @@ internal class ProviderMockHttpServer private constructor(
     private val server: HttpServer,
     private val executor: java.util.concurrent.ExecutorService,
     private val response: Response,
+    path: String,
 ) : AutoCloseable {
     private val count = AtomicInteger()
     private val bodies = CopyOnWriteArrayList<String>()
 
-    val baseUrl: String = "http://127.0.0.1:${server.address.port}/v1"
+    val origin: String = "http://127.0.0.1:${server.address.port}"
+    val baseUrl: String = "$origin/v1"
     val requestCount: Int get() = count.get()
     val requestBodies: List<String> get() = bodies.toList()
 
     init {
-        server.createContext("/v1/chat/completions", ::handle)
+        server.createContext(path, ::handle)
         server.executor = executor
         server.start()
     }
@@ -56,10 +58,13 @@ internal class ProviderMockHttpServer private constructor(
     )
 
     companion object {
-        fun start(response: Response): ProviderMockHttpServer {
+        fun start(
+            response: Response,
+            path: String = "/v1/chat/completions",
+        ): ProviderMockHttpServer {
             val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
             val executor = Executors.newCachedThreadPool()
-            return ProviderMockHttpServer(server, executor, response)
+            return ProviderMockHttpServer(server, executor, response, path)
         }
     }
 }

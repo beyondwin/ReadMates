@@ -6,6 +6,7 @@ import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.ModelCapability
+import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -42,7 +43,7 @@ class SpringAiWholeTranscriptGroundedGeneratorTest {
     @Test
     fun `repair makes one call with the same rendered request and decodes only the requested section`() {
         val request = GroundedProviderTestFixture.request(GroundedProviderTestFixture.HIGHLIGHT_REPAIR_SCHEMA)
-        val model = GroundedProviderTestFixture.model(Provider.CLAUDE)
+        val model = ModelId(Provider.CLAUDE, "claude-sonnet-4-6")
         val chatModel = RecordingChatModel(GroundedProviderTestFixture.highlightRepairNode().toString())
         val generator = generator(Provider.CLAUDE, chatModel)
 

@@ -31,6 +31,23 @@ class AiGenerationSpringAiConfigTest {
     }
 
     @Test
+    fun `enabled non-mock Anthropic without a key fails lazily with a content-free error`() {
+        contextRunner(
+            "readmates.aigen.enabled=true",
+            "readmates.aigen.mock=false",
+            "readmates.aigen.enabled-providers=CLAUDE",
+            "readmates.aigen.grounded.capabilities[claude-sonnet-4-6].context-window-tokens=1000000",
+            "readmates.aigen.grounded.capabilities[claude-sonnet-4-6].max-output-tokens=128000",
+            "readmates.aigen.grounded.capabilities[claude-sonnet-4-6].structured-output-supported=true",
+        ).run { context ->
+            assertThat(context).hasFailed()
+            assertThat(context.startupFailure)
+                .hasMessageContaining("Anthropic API key is required when CLAUDE is enabled")
+                .hasMessageNotContaining("READMATES_AIGEN_ANTHROPIC_API_KEY=")
+        }
+    }
+
+    @Test
     fun `disabled AI does not load Spring AI configuration or require provider keys`() {
         contextRunner("readmates.aigen.enabled=false").run { context ->
             assertThat(context).hasNotFailed()

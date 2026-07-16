@@ -1,5 +1,6 @@
 package com.readmates.aigen.config
 
+import com.readmates.aigen.adapter.out.llm.springai.AnthropicGroundedModelPolicy
 import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.port.out.AiGenerationJobQueue
@@ -69,6 +70,28 @@ class AiGenerationConfigValidator(
             check(grounded.capabilities.keys.any { model -> providerForModel(model) == provider }) {
                 "grounded enabled provider $provider has no verified capability entry"
             }
+        }
+        validateAnthropicGroundedModels()
+    }
+
+    private fun validateAnthropicGroundedModels() {
+        if (properties.enabledProviders.none { it.equals(Provider.CLAUDE.name, ignoreCase = true) }) return
+        val anthropicCapabilities =
+            properties.grounded.capabilities.filterKeys { it.startsWith("claude-") }
+        val valid =
+            anthropicCapabilities.isNotEmpty() &&
+                anthropicCapabilities.all { (model, capability) ->
+                    capability.structuredOutputSupported &&
+                        AnthropicGroundedModelPolicy.isVerified(model) &&
+                        properties.pricing[model]?.let { pricing ->
+                            pricing.inputPerMTokenUsd.signum() > 0 &&
+                                pricing.cacheWriteInputPerMTokenUsd?.signum() == 1 &&
+                                pricing.cachedInputPerMTokenUsd.signum() >= 0 &&
+                                pricing.outputPerMTokenUsd.signum() > 0
+                        } == true
+                }
+        check(valid) {
+            "Enabled Anthropic grounded model lacks verified native structured output or pricing"
         }
     }
 

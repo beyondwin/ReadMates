@@ -1,6 +1,7 @@
 package com.readmates.aigen.config
 
 import com.readmates.aigen.adapter.out.llm.common.GroundedDraftJsonCodec
+import com.readmates.aigen.adapter.out.llm.springai.AnthropicGroundedModelPolicy
 import com.readmates.aigen.adapter.out.llm.springai.SpringAiErrorMapper
 import com.readmates.aigen.adapter.out.llm.springai.SpringAiProviderNativeUsageExtractor
 import com.readmates.aigen.adapter.out.llm.springai.SpringAiProviderOptionsFactory
@@ -10,6 +11,8 @@ import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.port.out.ModelCapabilityCatalog
 import com.readmates.aigen.application.port.out.WholeTranscriptGroundedGenerator
 import io.micrometer.observation.ObservationRegistry
+import org.springframework.ai.anthropic.AnthropicChatModel
+import org.springframework.ai.anthropic.AnthropicChatOptions
 import org.springframework.ai.chat.client.ChatClient
 import org.springframework.ai.chat.client.advisor.ToolCallingAdvisor
 import org.springframework.ai.chat.client.advisor.observation.AdvisorObservationConvention
@@ -61,11 +64,65 @@ internal object OpenAiSpringAiModelFactory {
     }
 }
 
+internal object AnthropicSpringAiModelFactory {
+    const val API_KEY_ENV = "READMATES_AIGEN_ANTHROPIC_API_KEY"
+    private const val DEFAULT_BASE_URL = "https://api.anthropic.com"
+
+    fun create(
+        apiKey: String,
+        baseUrl: String = DEFAULT_BASE_URL,
+        timeout: Duration,
+        observationRegistry: ObservationRegistry = ObservationRegistry.NOOP,
+    ): AnthropicChatModel {
+        require(apiKey.isNotBlank()) { "Anthropic API key must not be blank" }
+        val options =
+            AnthropicChatOptions
+                .builder()
+                .apiKey(apiKey)
+                .baseUrl(baseUrl)
+                .timeout(timeout)
+                .maxRetries(0)
+                .build()
+        return AnthropicChatModel
+            .builder()
+            .options(options)
+            .observationRegistry(observationRegistry)
+            .build()
+    }
+}
+
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(AiGenerationProperties::class)
 @ConditionalOnProperty(prefix = "readmates.aigen", name = ["enabled"], havingValue = "true")
 @ConditionalOnProperty(prefix = "readmates.aigen", name = ["mock"], havingValue = "false", matchIfMissing = true)
 class AiGenerationSpringAiConfig {
+    @Bean
+    fun anthropicSpringAiChatModel(
+        properties: AiGenerationProperties,
+        environment: Environment,
+        observationRegistry: ObjectProvider<ObservationRegistry>,
+    ): SpringAiProviderChatModel? {
+        if (properties.enabledProviders.none { it.equals(Provider.CLAUDE.name, ignoreCase = true) }) {
+            return null
+        }
+        val configuredModels =
+            properties.grounded.capabilities.keys
+                .filter(AnthropicGroundedModelPolicy::isVerified)
+        require(configuredModels.isNotEmpty()) {
+            "Anthropic grounded capability is required when CLAUDE is enabled"
+        }
+        val apiKey = environment.getProperty(AnthropicSpringAiModelFactory.API_KEY_ENV)
+        require(!apiKey.isNullOrBlank()) { "Anthropic API key is required when CLAUDE is enabled" }
+        return SpringAiProviderChatModel(
+            Provider.CLAUDE,
+            AnthropicSpringAiModelFactory.create(
+                apiKey = apiKey,
+                timeout = properties.providerCalls.requestTimeout,
+                observationRegistry = observationRegistry.getIfUnique { ObservationRegistry.NOOP },
+            ),
+        )
+    }
+
     @Bean
     fun openAiSpringAiChatModel(
         properties: AiGenerationProperties,

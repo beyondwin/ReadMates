@@ -153,6 +153,57 @@ class AiGenerationConfigValidatorTest {
             .hasMessageContaining("fallback-default-model")
     }
 
+    @Test
+    fun `rejects enabled Anthropic capability outside native structured output verification`() {
+        val properties =
+            validAnthropicProperties(
+                capabilities =
+                    mapOf(
+                        "claude-unverified-public-test" to
+                            AiGenerationProperties.Capability(1_000_000, 128_000, true),
+                    ),
+                pricing =
+                    mapOf(
+                        "claude-unverified-public-test" to
+                            AiGenerationProperties.Pricing(
+                                inputPerMTokenUsd = BigDecimal("3.00"),
+                                cacheWriteInputPerMTokenUsd = BigDecimal("3.75"),
+                                cachedInputPerMTokenUsd = BigDecimal("0.30"),
+                                outputPerMTokenUsd = BigDecimal("15.00"),
+                            ),
+                    ),
+            )
+
+        assertThatThrownBy {
+            AiGenerationConfigValidator(true, queueBeanFactory(), properties).validate()
+        }.isInstanceOf(IllegalStateException::class.java)
+            .hasMessage("Enabled Anthropic grounded model lacks verified native structured output or pricing")
+            .hasMessageNotContaining("claude-unverified-public-test")
+    }
+
+    @Test
+    fun `rejects enabled Anthropic capability without explicit cache-write pricing`() {
+        val properties =
+            validAnthropicProperties(
+                pricing =
+                    mapOf(
+                        "claude-sonnet-4-6" to
+                            AiGenerationProperties.Pricing(
+                                inputPerMTokenUsd = BigDecimal("3.00"),
+                                cacheWriteInputPerMTokenUsd = null,
+                                cachedInputPerMTokenUsd = BigDecimal("0.30"),
+                                outputPerMTokenUsd = BigDecimal("15.00"),
+                            ),
+                    ),
+            )
+
+        assertThatThrownBy {
+            AiGenerationConfigValidator(true, queueBeanFactory(), properties).validate()
+        }.isInstanceOf(IllegalStateException::class.java)
+            .hasMessage("Enabled Anthropic grounded model lacks verified native structured output or pricing")
+            .hasMessageNotContaining("claude-sonnet-4-6")
+    }
+
     private fun validProperties(reservedOutputTokens: Long = 16_384): AiGenerationProperties =
         AiGenerationProperties(
             fallbackDefaultModel = "gpt-5.4-mini",
@@ -172,6 +223,29 @@ class AiGenerationConfigValidatorTest {
                         AiGenerationProperties.Pricing(BigDecimal("0.75"), outputPerMTokenUsd = BigDecimal("4.50")),
                 ),
         )
+
+    private fun validAnthropicProperties(
+        capabilities: Map<String, AiGenerationProperties.Capability> =
+            mapOf(
+                "claude-sonnet-4-6" to AiGenerationProperties.Capability(1_000_000, 128_000, true),
+            ),
+        pricing: Map<String, AiGenerationProperties.Pricing> =
+            mapOf(
+                "claude-sonnet-4-6" to
+                    AiGenerationProperties.Pricing(
+                        inputPerMTokenUsd = BigDecimal("3.00"),
+                        cacheWriteInputPerMTokenUsd = BigDecimal("3.75"),
+                        cachedInputPerMTokenUsd = BigDecimal("0.30"),
+                        outputPerMTokenUsd = BigDecimal("15.00"),
+                    ),
+            ),
+    ) = AiGenerationProperties(
+        enabledProviders = setOf("CLAUDE"),
+        fallbackDefaultModel = capabilities.keys.first(),
+        pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
+        grounded = AiGenerationProperties.Grounded(capabilities = capabilities),
+        pricing = pricing,
+    )
 
     private fun queueBeanFactory(): DefaultListableBeanFactory =
         DefaultListableBeanFactory().also { factory ->

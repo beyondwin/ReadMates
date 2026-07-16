@@ -79,7 +79,8 @@ class SpringAiWholeTranscriptGroundedGenerator(
         decode: (ObjectNode, SpringAiUsageMapping) -> T,
     ): T =
         try {
-            val converter = GroundedStructuredOutputConverter(request.schemaJson, objectMapper)
+            val providerSchema = optionsFactory.outputSchema(provider, request.schemaJson)
+            val converter = GroundedStructuredOutputConverter(providerSchema, objectMapper)
             val entity =
                 chatClient
                     .prompt()
