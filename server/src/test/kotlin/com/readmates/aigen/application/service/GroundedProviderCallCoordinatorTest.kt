@@ -142,6 +142,7 @@ class GroundedProviderCallCoordinatorTest {
         val reconciliation = context.reservations.reconciliations.single()
         assertThat(reconciliation.terminalState).isEqualTo(ProviderAttemptState.FAILED)
         assertThat(reconciliation.actualCostUsd).isEqualByComparingTo(BigDecimal.ZERO)
+        assertThat(reconciliation.releaseCallSlot).isTrue()
         assertThat(context.permit.outcome).isEqualTo(ProviderCircuitOutcome.IGNORED_FAILURE)
     }
 

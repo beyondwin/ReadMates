@@ -29,8 +29,9 @@ class AiGenerationWorkerTest {
         assertThat(running.status).isEqualTo(JobStatus.RUNNING)
         assertThat(running.stage).isEqualTo(JobStage.PREPARING_TRANSCRIPT)
         assertThat(running.progressPct).isEqualTo(5)
-        assertThat(context.costGuard.released)
+        assertThat(context.costGuard.completed)
             .containsExactly(Triple(record.hostUserId, record.clubId, record.jobId))
+        assertThat(context.costGuard.released).isEmpty()
     }
 
     @Test
@@ -42,6 +43,7 @@ class AiGenerationWorkerTest {
         assertThatThrownBy { context.worker.process(record.jobId) }
             .isSameAs(context.executorFailure)
         assertThat(context.costGuard.released).isEmpty()
+        assertThat(context.costGuard.completed).isEmpty()
     }
 
     @Test

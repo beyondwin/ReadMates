@@ -329,6 +329,7 @@ internal class FakeCostGuard(
 ) : GenerationCostGuard {
     val checked: MutableList<Pair<UUID, UUID>> = mutableListOf()
     val released: MutableList<Triple<UUID, UUID, UUID>> = mutableListOf()
+    val completed: MutableList<Triple<UUID, UUID, UUID>> = mutableListOf()
 
     override fun checkBeforeCall(
         hostId: UUID,
@@ -345,6 +346,14 @@ internal class FakeCostGuard(
         admissionId: UUID,
     ) {
         released += Triple(hostId, clubId, admissionId)
+    }
+
+    override fun completeAdmission(
+        hostId: UUID,
+        clubId: UUID,
+        admissionId: UUID,
+    ) {
+        completed += Triple(hostId, clubId, admissionId)
     }
 
     override fun clubMonthlyCost(clubId: UUID): BigDecimal = clubMonthly

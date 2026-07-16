@@ -77,6 +77,20 @@ class RedisGenerationCostCounters(
         }.onFailure { recordFailure("releaseAdmission") }
     }
 
+    override fun completeAdmission(
+        hostId: UUID,
+        clubId: UUID,
+        admissionId: UUID,
+    ) {
+        runCatching {
+            redisTemplate.execute(
+                COMPLETE_ADMISSION_SCRIPT,
+                listOf(admissionKey(clubId)),
+                admissionId.toString(),
+            )
+        }.onFailure { recordFailure("completeAdmission") }
+    }
+
     override fun clubMonthlyCost(clubId: UUID): BigDecimal =
         runCatching { readMonthlyCost(clubId) }
             .onFailure { recordFailure("clubMonthlyCost") }
@@ -142,6 +156,15 @@ class RedisGenerationCostCounters(
                 local minute = tonumber(redis.call('GET', KEYS[2]) or '0')
                 if minute > 0 then redis.call('DECR', KEYS[2]) end
                 return 1
+                """.trimIndent(),
+                Long::class.java,
+            )
+
+        val COMPLETE_ADMISSION_SCRIPT: DefaultRedisScript<Long> =
+            DefaultRedisScript(
+                """
+                if redis.call('GET', KEYS[1]) ~= ARGV[1] then return 0 end
+                return redis.call('DEL', KEYS[1])
                 """.trimIndent(),
                 Long::class.java,
             )

@@ -24,6 +24,13 @@ interface GenerationCostGuard {
         admissionId: UUID,
     ): Unit
 
+    /** Remove the provider admission lease while retaining the consumed host counters. */
+    fun completeAdmission(
+        hostId: UUID,
+        clubId: UUID,
+        admissionId: UUID,
+    ): Unit
+
     fun clubMonthlyCost(clubId: UUID): BigDecimal
 }
 

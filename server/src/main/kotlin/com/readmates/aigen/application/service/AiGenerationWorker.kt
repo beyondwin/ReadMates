@@ -84,7 +84,7 @@ class AiGenerationWorker(
         start: Instant,
     ) {
         groundedExecutor.process(record, start)
-        costGuard.releaseAdmission(record.hostUserId, record.clubId, record.jobId)
+        costGuard.completeAdmission(record.hostUserId, record.clubId, record.jobId)
     }
 
     private companion object {

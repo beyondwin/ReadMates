@@ -229,6 +229,9 @@ class GroundedProviderCallCoordinator private constructor(
                 terminalState = result.terminalState,
                 actualCostUsd = actualCost(command.model, result),
                 safeErrorCode = result.error?.code,
+                releaseCallSlot =
+                    result is PhysicalResult.Failure &&
+                        result.failureClass == ProviderFailureClass.PRE_TRANSPORT,
                 now = clock.instant(),
             )
         val reconciled =

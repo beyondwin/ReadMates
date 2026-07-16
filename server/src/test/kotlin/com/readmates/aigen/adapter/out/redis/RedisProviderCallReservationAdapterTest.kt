@@ -39,8 +39,18 @@ import java.util.concurrent.TimeUnit
         "readmates.bff-secret=test-bff-secret",
         "readmates.redis.enabled=true",
         "readmates.aigen.enabled=true",
+        "readmates.aigen.enabled-providers=OPENAI",
+        "readmates.aigen.fallback-default-model=gpt-5.4-mini",
+        "readmates.aigen.grounded.capabilities[gpt-5.4-mini].context-window-tokens=400000",
+        "readmates.aigen.grounded.capabilities[gpt-5.4-mini].max-output-tokens=128000",
+        "readmates.aigen.grounded.capabilities[gpt-5.4-mini].structured-output-supported=true",
+        "readmates.aigen.pricing[gpt-5.4-mini].input-per-m-token-usd=0.75",
+        "readmates.aigen.pricing[gpt-5.4-mini].cache-write-input-per-m-token-usd=0.75",
+        "readmates.aigen.pricing[gpt-5.4-mini].cached-input-per-m-token-usd=0.075",
+        "readmates.aigen.pricing[gpt-5.4-mini].output-per-m-token-usd=4.50",
         "readmates.aigen.caps.club-monthly-cost-usd=1.00",
         "spring.ai.model.chat=none",
+        "READMATES_AIGEN_OPENAI_API_KEY=test-key",
         "spring.ai.google.genai.api-key=test-key",
         "spring.ai.openai.api-key=test-key",
         "spring.ai.anthropic.api-key=test-key",
@@ -332,6 +342,43 @@ class RedisProviderCallReservationAdapterTest(
         assertThat(jobCallCount(fixture.jobId)).isEqualTo(1)
         assertThat(monthlyCost(fixture.clubId)).isEqualByComparingTo("0.4")
         assertThat(attemptCount(fixture.jobId)).isEqualTo(1)
+    }
+
+    @Test
+    fun `confirmed pre-transport reconciliation returns call slot exactly once and permits same mode retry`() {
+        val fixture = fixture()
+        prepare(fixture, JobStatus.RUNNING)
+        reservations.reserve(
+            fixture.command(
+                maximumCostUsd = BigDecimal("0.40"),
+                mode = ProviderCallMode.RETRY,
+            ),
+        )
+        val release =
+            fixture.reconciliation(
+                terminalState = ProviderAttemptState.FAILED,
+                actualCostUsd = BigDecimal.ZERO,
+                safeErrorCode = ErrorCode.MODEL_CAPABILITY_UNAVAILABLE,
+                releaseCallSlot = true,
+            )
+
+        val first = reservations.reconcile(release)
+        val repeated = reservations.reconcile(release)
+        val retried =
+            reservations.reserve(
+                fixture.command(
+                    attemptId = UUID.randomUUID(),
+                    maximumCostUsd = BigDecimal("0.20"),
+                    mode = ProviderCallMode.RETRY,
+                ),
+            )
+
+        assertThat(first).isInstanceOf(ProviderCallReconciliationResult.Reconciled::class.java)
+        assertThat(repeated).isInstanceOf(ProviderCallReconciliationResult.AlreadyTerminal::class.java)
+        assertThat(retried).isInstanceOf(ProviderCallReservationResult.Reserved::class.java)
+        assertThat((retried as ProviderCallReservationResult.Reserved).attempt.ordinal).isEqualTo(1)
+        assertThat(jobCallCount(fixture.jobId)).isEqualTo(1)
+        assertThat(monthlyCost(fixture.clubId)).isEqualByComparingTo("0.20")
     }
 
     @Test
@@ -628,6 +675,7 @@ class RedisProviderCallReservationAdapterTest(
             terminalState: ProviderAttemptState,
             actualCostUsd: BigDecimal?,
             safeErrorCode: ErrorCode? = null,
+            releaseCallSlot: Boolean = false,
         ) = ProviderCallReconciliationCommand(
             attemptId = attemptId,
             jobId = jobId,
@@ -635,6 +683,7 @@ class RedisProviderCallReservationAdapterTest(
             terminalState = terminalState,
             actualCostUsd = actualCostUsd,
             safeErrorCode = safeErrorCode,
+            releaseCallSlot = releaseCallSlot,
             now = now.plusSeconds(10),
         )
     }

@@ -93,39 +93,44 @@ class DefaultGroundedRegenerationExecutor(
         val admissionId = UUID.randomUUID()
         requireCostAllowance(record, admissionId)
         recoverUnresolvedAttempt(record, admissionId)
-        val attempt = callRepairWithPolicy(record, item, currentDraft, instructions, selectedModel, admissionId)
-        val merged = attempt.merged
-        val nextRevision = expectedRevision + 1
-        val valid = attempt.valid
-        val cost = attempt.cost
-        val saved =
-            jobStore.saveGroundedResult(
-                SaveGroundedResultCommand(
-                    record.jobId,
-                    JobStatus.SUCCEEDED,
-                    expectedRevision,
-                    valid.snapshot,
-                    merged,
-                    valid.evidence,
-                    attempt.usage,
-                    cost,
-                    attempt.model,
-                ),
+        try {
+            val attempt = callRepairWithPolicy(record, item, currentDraft, instructions, selectedModel, admissionId)
+            val merged = attempt.merged
+            val nextRevision = expectedRevision + 1
+            val valid = attempt.valid
+            val cost = attempt.cost
+            val saved =
+                jobStore.saveGroundedResult(
+                    SaveGroundedResultCommand(
+                        record.jobId,
+                        JobStatus.SUCCEEDED,
+                        expectedRevision,
+                        valid.snapshot,
+                        merged,
+                        valid.evidence,
+                        attempt.usage,
+                        cost,
+                        attempt.model,
+                    ),
+                )
+            if (!saved) staleRevision(jobStore.load(record.jobId)?.revision)
+            auditSuccess(record, item, attempt.model, attempt.usage, cost, attempt.costBasis)
+            emitMetrics(item, attempt.model, attempt.usage, cost)
+            costGuard.completeAdmission(record.hostUserId, record.clubId, admissionId)
+            return RegenerationResult(
+                item = item,
+                value = sectionValue(valid.snapshot, item),
+                tokens = attempt.usage,
+                costEstimateUsd = cost,
+                warnings = warnings(record),
+                revision = nextRevision,
+                result = valid.snapshot,
+                evidence = valid.evidence,
             )
-        if (!saved) staleRevision(jobStore.load(record.jobId)?.revision)
-        auditSuccess(record, item, attempt.model, attempt.usage, cost, attempt.costBasis)
-        emitMetrics(item, attempt.model, attempt.usage, cost)
-        costGuard.releaseAdmission(record.hostUserId, record.clubId, admissionId)
-        return RegenerationResult(
-            item = item,
-            value = sectionValue(valid.snapshot, item),
-            tokens = attempt.usage,
-            costEstimateUsd = cost,
-            warnings = warnings(record),
-            revision = nextRevision,
-            result = valid.snapshot,
-            evidence = valid.evidence,
-        )
+        } catch (failure: AiGenerationException.Coded) {
+            costGuard.completeAdmission(record.hostUserId, record.clubId, admissionId)
+            throw failure
+        }
     }
 
     @Suppress("TooGenericExceptionCaught")

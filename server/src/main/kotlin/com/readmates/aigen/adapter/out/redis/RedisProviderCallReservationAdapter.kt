@@ -95,6 +95,7 @@ class RedisProviderCallReservationAdapter(
                     command.now.toString(),
                     properties.job.redisTtl.seconds
                         .toString(),
+                    if (command.releaseCallSlot) "1" else "0",
                 )
             when (result) {
                 1L -> ProviderCallReconciliationResult.Reconciled(requireAttempt(command.jobId, command.attemptId))

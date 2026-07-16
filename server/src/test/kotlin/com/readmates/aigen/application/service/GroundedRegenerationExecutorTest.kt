@@ -69,9 +69,10 @@ class GroundedRegenerationExecutorTest {
         assertThat(result.evidence?.targets).allSatisfy { target -> assertThat(target.targetId).startsWith("r2:") }
         assertThat(saved.revision).isEqualTo(2)
         assertThat(saved.result?.highlights).isEqualTo(context.record.result?.highlights)
-        assertThat(context.costGuard.released).hasSize(1)
-        val released = context.costGuard.released[0]
-        assertThat(released.third).isNotEqualTo(context.record.jobId)
+        assertThat(context.costGuard.completed).hasSize(1)
+        val completed = context.costGuard.completed[0]
+        assertThat(completed.third).isNotEqualTo(context.record.jobId)
+        assertThat(context.costGuard.released).isEmpty()
         val audit = context.auditPort.entries.single { it.providerAttempt == null }
         assertThat(audit.pipelineVersion).isEqualTo("grounded-session-generation-v2")
         assertThat(audit.inputTurnCount).isEqualTo(1)
@@ -131,6 +132,7 @@ class GroundedRegenerationExecutorTest {
             assertThat(failure.code).isEqualTo(ErrorCode.MAX_CALLS_EXCEEDED)
         }
         assertThat(context.generator.calls).isZero()
+        assertThat(context.costGuard.completed).hasSize(1)
     }
 
     @Test
