@@ -58,7 +58,7 @@ detect_raw_throwable_logging() {
 }
 
 detect_dynamic_observation_key() {
-  rg -q '(?:lowCardinalityKeyValue|highCardinalityKeyValue|addLowCardinalityKeyValue|addHighCardinalityKeyValue)\(\s*[^\"]' -
+  rg -U -q '(?:lowCardinalityKeyValue|highCardinalityKeyValue|addLowCardinalityKeyValue|addHighCardinalityKeyValue)\(\s*[^\"]' -
 }
 
 detect_kafka_header_api() {
@@ -77,7 +77,7 @@ check0_guard_self_test_fixtures() {
   unsafe_column='ALTER TABLE ai_generation_commit_receipts ADD COLUMN evidence_text TEXT;'
   unsafe_flag='log-prompt: true'
   unsafe_log='log.error("provider response={}", response, failure)'
-  unsafe_trace='observation.lowCardinalityKeyValue(JOB_ID_KEY, jobId.toString())'
+  unsafe_trace=$'observation.lowCardinalityKeyValue(\n  JOB_ID_KEY,\n  jobId.toString(),\n)'
   unsafe_header='builder.addHeader("sessionId", command.sessionId)'
   unsafe_throwable='fun failed(err: RuntimeException) { log.error("AI failed", err) }'
   unsafe_baggage='class Telemetry { val field = BaggageField.create("sessionId") }'
@@ -358,11 +358,11 @@ check14_observation_attribute_allowlist() {
       dynamic+="${source_file}"$'\n'
     fi
   done < <(find "$source_root" -type f -name '*.kt' -print)
-  unexpected_sources=$(rg -l \
+  unexpected_sources=$(rg -U -l \
     '(?:lowCardinalityKeyValue|highCardinalityKeyValue|addLowCardinalityKeyValue|addHighCardinalityKeyValue|ObservationConvention|KeyValues?\.of)\s*\(' \
     "$source_root" 2>/dev/null | grep -vF "$adapter" || true)
-  low=$(rg -o 'lowCardinalityKeyValue\("[a-zA-Z]+"' "$source_root" || true)
-  high=$(rg -o 'highCardinalityKeyValue\("[a-zA-Z]+"' "$source_root" || true)
+  low=$(rg -U -o 'lowCardinalityKeyValue\(\s*"[a-zA-Z]+"' "$source_root" || true)
+  high=$(rg -U -o 'highCardinalityKeyValue\(\s*"[a-zA-Z]+"' "$source_root" || true)
   forbidden_low=$(printf '%s\n' "$low" | grep -vE '"(provider|model|callMode|outcome|errorCode)"$' || true)
   forbidden_high=$(printf '%s\n' "$high" | grep -vE '"(jobId|attempt)"$' || true)
   required=""
