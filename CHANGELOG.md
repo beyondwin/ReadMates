@@ -9,22 +9,27 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 ### Highlights
 
 - **근거 기반 전체 대본 AI 세션 기록:** 호스트가 지원 TXT를 업로드하면 provider 호출 전에 모든 화자를 같은 클럽의 활성 회원과 정확히 맞추고, 전체 대본 한 번의 structured generation으로 네 섹션과 근거 turn ID를 만듭니다. 호스트는 desktop/mobile 근거 panel과 네 섹션 review ledger를 모두 확인한 뒤에만 저장할 수 있습니다.
+- **Spring AI 2 + distributed tracing:** OpenAI/Anthropic/Google 직접 adapter와 legacy pipeline을 제거하고 grounded-only Spring AI 2.0 thin adapter로 통합했습니다. API→Kafka→worker→Spring AI→provider trace를 internal Tempo/Grafana에 연결하되 AI content와 user/session/club identity는 observability 표면에서 제외합니다.
 
 ### Changed
 
 - **호스트 TXT 워크플로:** UTF-8/BOM `.txt`, `화자명 MM:SS`, 1 MiB/3시간 한도를 적용합니다. 비회원·비활성·generic·중복 화자는 job/Redis/Kafka/provider/cost side effect 없이 거절하고 real-name 수정 안내만 제공합니다. 수동 편집은 해당 근거/review를 무효화하고 regeneration은 revision과 전체 review를 초기화합니다.
 - **Provider 계약:** grounded model ID를 OpenAI `gpt-5.4-mini`, Claude `claude-sonnet-4-6`, Gemini `gemini-3-flash-preview`로 정렬하고 pricing과 별도인 capability catalog, 16,384-token output reserve, network-call-free request budget guard를 추가했습니다. Capability drift는 503, request budget 초과는 422로 fail closed합니다.
 - **공개 릴리스 안전:** TypeScript incremental build metadata(`*.tsbuildinfo`)를 공개 릴리스 후보에서 제외하고 검사기와 fixture로 로컬 빌드 경로 재유입을 차단합니다.
-- **AI 경계 강화:** 비용 admission을 Redis Lua로 원자화하고 AI 전용 분당 한도와 fail-closed 동작을 적용했습니다. Retry/repair/regeneration을 포함한 각 provider network call 직전에 5분 owner lease를 갱신하고 SDK timeout을 4분으로 제한하며 OpenAI/Claude SDK 내부 retry를 꺼, queue 지연·stale worker·숨은 network attempt가 동시 비용 및 job call cap을 우회하지 못합니다. Problem 응답은 RFC 7807 media type을 사용하며, browser draft는 고정 6시간 TTL/예약 삭제/만료 후 재저장 차단으로 제한되고 BFF는 과대 multipart body를 buffering 전에 거절합니다. Frontend Zod fixture와 server 직렬화 계약 검증이 model default, job/evidence, regeneration, commit receipt, problem shape drift를 막습니다.
+- **AI 호출·비용 경계:** application-owned coordinator가 circuit/concurrency permit, single-node Redis atomic slot + worst-case cost reservation, 정확히 한 번의 provider HTTP, `ACTUAL`/`ESTIMATED_UNKNOWN` reconciliation을 순서대로 수행합니다. Retry/fallback/schema correction/grounding repair/regeneration은 모두 최대 3회 물리 호출 예산을 공유하고 redelivery/crash의 uncertain cost를 자동 환불하지 않습니다.
+- **Token/API compatibility:** 내부 비용은 non-cached input/cache-write/cache-read/output 4채널로 계산하지만 public REST response는 기존 input/cachedInput/output 3필드를 유지합니다.
+- **Trace/privacy/ops:** Spring Kafka observation과 Micrometer/OpenTelemetry OTLP를 활성화하고 7일 Tempo, Grafana datasource/exemplar, provider/cost-basis/circuit/exporter metric/alert를 추가했습니다. Local port는 loopback-only, OCI Tempo/OTLP는 unpublished internal network이며 exporter 장애는 product 요청과 격리됩니다.
 
 ### Database
 
 - **Flyway V37:** content-free `ai_generation_commit_receipts`(`job_id + revision` unique)를 추가하고 `ai_generation_audit_log`에 pipeline/turn/speaker/grounding/review aggregate column을 추가했습니다. Rolling deploy 동안 구 server가 읽지 못하는 값으로 기존 row를 재작성하지 않으며, 새 server가 저장된 `gemini-3-flash` 기본값을 canonical `gemini-3-flash-preview`로 해석합니다. Transcript, member name, result, evidence/excerpt는 MySQL에 저장하지 않습니다.
+- **Flyway V38:** `ai_generation_audit_log`에 nullable trace ID, provider attempt ordinal/call mode, non-null cost basis와 cache-write input token을 additive하게 추가했습니다. 기존 business-audit identity는 유지하지만 prompt/completion/transcript/evidence/raw error는 저장하지 않습니다.
 
 ### Deployment Notes
 
-- Pipeline 기본값은 `LEGACY`로 유지됩니다. `GROUNDED_WHOLE_TRANSCRIPT`는 public-safe mock/E2E, provider capability·retention, 별도 private live-evaluation 승인을 확인한 제한된 환경에서만 활성화하고 이상 시 `LEGACY`로 rollback합니다.
+- Legacy/direct provider 실행과 runtime selector는 없습니다. 활성화 전에 provider allowlist/key, capability, Google paid-tier retention 확인, mock-wire/E2E, single-node Redis 전제를 검증합니다. Kafka max poll interval 기본값은 세 번의 4분 요청과 bounded delay/validation margin을 포함해 16분입니다.
 - Transcript/turns/result/evidence는 6시간 Redis payload로만 유지하고 commit/cancel 후 삭제합니다. MySQL receipt와 Redis revision/lease로 crash window를 복구하며 `COMMITTED + cleanupPending`은 DB write를 반복하지 않고 cleanup만 재시도합니다. Platform admin은 metadata-only 복구만 수행합니다.
+- Rollback은 AI/consumer를 먼저 끄고 6시간 AI TTL을 기다린 뒤 이전 image로 복원합니다. 승인된 job namespace cleanup만 허용하며 Redis 전체 flush나 V38 destructive rollback은 금지합니다.
 - Private transcript를 live provider로 보내는 품질 평가, production mode 변경, deploy는 별도 명시 승인 없이 실행하지 않습니다.
 
 ## v1.17.3 - 2026-07-12

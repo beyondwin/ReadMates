@@ -281,8 +281,14 @@
 | Validation failures by reason | `readmates_aigen_validation_failures_total` | schema/author/template 실패 spike 확인 |
 | Active job backlog | `readmates_aigen_queue_depth` | Redis job store 기준 `PENDING` + `RUNNING` AI job 적체 확인 |
 | Jobs by status/provider | `readmates_aigen_jobs_completed_total` | 성공/실패/취소 비율 확인 |
-| Tokens by direction | `readmates_aigen_tokens_total` | input/cached_input/output token 사용량 확인 |
+| Tokens by direction | `readmates_aigen_tokens_total` | input/cache_write_input/cache_read_input/output 4채널 사용량 확인 |
 | Cap denials by reason | `readmates_aigen_cap_denials_total` | host daily, club monthly, host per-minute cap 거절 확인 |
+| Provider call outcomes / latency | `readmates_aigen_provider_calls_total`, `readmates_aigen_provider_call_latency_seconds_bucket` | bounded physical call outcome와 p95, exemplar trace 확인 |
+| Cost basis | `readmates_aigen_provider_cost_usd_total` | `ACTUAL`과 `ESTIMATED_UNKNOWN` 증가를 분리해 수동 검토 |
+| Gate rejections / circuit state | provider gate meter + `resilience4j_circuitbreaker_state` | pre-transport rejection, provider 장애, concurrency 포화 구분 |
+| Exporter and Tempo health | OTLP export/drop meter + Tempo scrape meter | product 상태와 trace delivery 장애를 분리 |
+
+Latency histogram exemplar는 Grafana의 `readmates-tempo` datasource로 이동합니다. Trace에는 prompt/completion/transcript/evidence/raw error와 user/session/club identity가 없으며, row-level business audit은 MySQL V38을 사용합니다. Tempo는 7일 retention이므로 장기 incident 증거가 필요하면 content-free 집계만 별도 보존합니다.
 
 ## 패널 작성 규약
 

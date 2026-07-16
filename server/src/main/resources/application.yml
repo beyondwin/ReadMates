@@ -130,10 +130,10 @@ readmates:
     enabled: ${READMATES_NOTES_CACHE_ENABLED:false}
     feed-ttl: ${READMATES_NOTES_FEED_CACHE_TTL:3m}
   aigen:
-    # Provider API keys (set by ops; read by SDK clients per provider):
+    # Provider API keys (set by ops; read by the explicit Spring AI ChatModel beans):
     #   READMATES_AIGEN_ANTHROPIC_API_KEY (Claude)
-    #   READMATES_AIGEN_OPENAI_API_KEY    (OpenAI - task 4.2)
-    #   READMATES_AIGEN_GEMINI_API_KEY    (Gemini - task 5.1)
+    #   READMATES_AIGEN_OPENAI_API_KEY    (OpenAI)
+    #   READMATES_AIGEN_GEMINI_API_KEY    (Gemini)
     enabled: ${READMATES_AIGEN_ENABLED:false}
     mock: ${READMATES_AIGEN_MOCK:false}
     # Canonical provider names: CLAUDE, OPENAI, GEMINI. Empty default = kill switch.

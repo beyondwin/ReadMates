@@ -71,7 +71,7 @@ READMATES_SERVER_CI_CHECK_DRY_RUN=true ./scripts/server-ci-check.sh
 ./scripts/pre-push-check.sh --full --release
 ```
 
-`--full`은 `./server/gradlew -p server integrationTest`, Corepack launcher를 통한 `pnpm --dir front test:e2e`, 그리고 관측 설정 검증(`validate-prometheus-rules.sh`, `validate-prometheus-config.sh`, `validate-alertmanager-config.sh`)을 추가로 실행합니다. Docker, MySQL client, Playwright browser 의존성이 준비되지 않은 환경에서는 기본 pre-push hook보다 수동 릴리즈 점검으로 실행합니다.
+`--full`은 `./server/gradlew -p server integrationTest`, Corepack launcher를 통한 `pnpm --dir front test:e2e`, 그리고 관측 설정 검증(Prometheus rules/config, Tempo config, Grafana dashboard lint, Alertmanager config)을 추가로 실행합니다. Docker, MySQL client, Playwright browser 의존성이 준비되지 않은 환경에서는 기본 pre-push hook보다 수동 릴리즈 점검으로 실행합니다.
 
 ### Release-mode CHANGELOG guard
 
@@ -110,13 +110,15 @@ Branch protection bypass 정책 전반은 [release-management.md#branch-protecti
 
 배포 전후 어떤 증거로 해석해야 하는지는 [Deploy observability check runbook](../docs/operations/runbooks/deploy-observability-check.md)을 기준으로 기록합니다.
 
-## `validate-prometheus-rules.sh` / `validate-prometheus-config.sh` / `validate-alertmanager-config.sh`
+## Prometheus / Tempo / Grafana / Alertmanager validators
 
 관측 설정 파일의 구조 유효성을 Docker 기반 `promtool`/`amtool`로 검사합니다. 로컬에 promtool/amtool을 설치하지 않아도 되도록 컨테이너 이미지(`prom/prometheus`, `prom/alertmanager`)로 실행하며, `pre-push-check.sh --full`이 릴리즈 직전에 함께 실행합니다.
 
 ```bash
 ./scripts/validate-prometheus-rules.sh    # ops/prometheus/alerts/*.yml rule 검사
 ./scripts/validate-prometheus-config.sh   # deploy/oci/prometheus/prometheus.yml 검사
+bash ./scripts/validate-tempo-config.sh   # Tempo 7일 retention/internal-port/config 검사
+./scripts/lint-grafana-dashboards.sh      # JSON, AI panels, Tempo datasource/exemplar contract
 ./scripts/validate-alertmanager-config.sh # deploy/oci/alertmanager/alertmanager.yml 구조 검사
 ```
 
@@ -126,17 +128,18 @@ Branch protection bypass 정책 전반은 [release-management.md#branch-protecti
 
 ## `observability-local-smoke.sh`
 
-로컬 Prometheus/Grafana stack을 띄워 alert rule load, `readmates-server` target 등록, Grafana datasource/dashboard provisioning을 확인합니다. 실제 운영 domain, receiver, credential은 사용하지 않습니다.
+격리된 MySQL과 Spring server, Prometheus/Grafana/Tempo stack을 띄워 synthetic OTLP trace query, `readmates-server`/Tempo target, 두 Grafana datasource와 AI dashboard, exported-span metric을 확인합니다. 이어 Tempo를 정지하고 server health가 유지되며 bounded failure metric이 증가하는지 검증합니다. 실제 운영 domain, receiver, credential은 사용하지 않습니다.
 
 ```bash
 ./scripts/lint-grafana-dashboards.sh
 ./scripts/validate-prometheus-rules.sh
-./scripts/observability-local-smoke.sh
+bash ./scripts/validate-tempo-config.sh
+bash ./scripts/observability-local-smoke.sh
 ```
 
 배포 전후 어떤 증거로 해석해야 하는지는 [Deploy observability check runbook](../docs/operations/runbooks/deploy-observability-check.md)을 기준으로 기록합니다.
 
-로컬 Spring Boot 서버가 `8081` management port로 `/actuator/prometheus`를 노출 중이면 target health까지 함께 확인할 수 있습니다. 서버가 떠 있지 않으면 이 smoke는 target presence와 provisioning 확인까지만 로컬 증거로 사용하고, scrape health는 운영 bring-up에서 확인합니다.
+Smoke가 management port 8081을 직접 사용하므로 이미 실행 중인 server가 있으면 중지하거나 스크립트가 안내하는 충돌을 해결합니다. Docker, curl, jq, Python이 필수입니다.
 
 ## `generate-slo-report.py`
 
@@ -158,7 +161,7 @@ In-app AI 세션 생성 경로가 transcript, parsed turns, result, evidence/exc
 bash scripts/aigen-pii-check.sh
 ```
 
-CI `scripts` job이 PR마다 실행합니다. 현재 self-test fixture와 10개 invariant가 Redis TTL/삭제, grounded metadata hash, Kafka routing metadata, content-free migration/audit/receipt, bounded metric label, request/response logging 금지를 확인합니다. 실패하면 출력의 `checkN` 메시지와 [AI session generation runbook](../docs/operations/runbooks/ai-session-generation.md#pii-regression)을 기준으로 어느 invariant가 깨졌는지 확인합니다.
+CI `scripts` job이 PR마다 실행합니다. 현재 self-test fixture와 15개 invariant가 Redis TTL/삭제/attempt ledger, Kafka routing metadata와 header allowlist, content-free migration/audit, Spring AI observation 설정, metric/span/baggage/log allowlist를 확인합니다. 실패하면 출력의 `checkN` 메시지와 [AI session generation runbook](../docs/operations/runbooks/ai-session-generation.md#pii-regression)을 기준으로 어느 invariant가 깨졌는지 확인합니다.
 
 ## `aigen-smoke-{claude,openai,gemini}.sh`
 

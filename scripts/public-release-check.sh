@@ -393,12 +393,20 @@ check_internal_tempo_release_contract() {
     record_finding "local observability compose must pin grafana/tempo:2.10.5"
   grep -Fq 'grafana/tempo:2.10.5' "$oci_compose" ||
     record_finding "OCI observability compose must pin grafana/tempo:2.10.5"
+  # Match the literal Compose interpolation contract.
+  # shellcheck disable=SC2016
   grep -Fq '127.0.0.1:${READMATES_LOCAL_TEMPO_PORT:-3200}:3200' "$local_compose" ||
     record_finding "local Tempo query port must be loopback-only"
+  # Match the literal Compose interpolation contract.
+  # shellcheck disable=SC2016
   grep -Fq '127.0.0.1:${READMATES_LOCAL_OTLP_HTTP_PORT:-4318}:4318' "$local_compose" ||
     record_finding "local OTLP HTTP port must be loopback-only"
+  # Match the literal Compose interpolation contract.
+  # shellcheck disable=SC2016
   grep -Fq '127.0.0.1:${READMATES_LOCAL_GRAFANA_PORT:-3001}:3000' "$local_compose" ||
     record_finding "local Grafana must be loopback-only because it proxies Tempo"
+  # Match the literal Compose interpolation contract.
+  # shellcheck disable=SC2016
   grep -Fq '127.0.0.1:${READMATES_LOCAL_PROMETHEUS_PORT:-9090}:9090' "$local_compose" ||
     record_finding "local Prometheus must be loopback-only"
 

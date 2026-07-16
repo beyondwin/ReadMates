@@ -40,6 +40,18 @@ jobs:
       - name: aigen PII regression check
         run: bash scripts/aigen-pii-check.sh
 
+      - name: Validate Prometheus rules
+        run: ./scripts/validate-prometheus-rules.sh
+
+      - name: Validate Prometheus configs
+        run: ./scripts/validate-prometheus-config.sh
+
+      - name: Validate Tempo config
+        run: bash scripts/validate-tempo-config.sh
+
+      - name: Lint Grafana dashboards
+        run: ./scripts/lint-grafana-dashboards.sh
+
   public-release:
     name: Public release safety
     runs-on: ubuntu-latest

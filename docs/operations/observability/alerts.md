@@ -29,6 +29,12 @@
 <a id="aigenbudgetexhaustion"></a>
 <a id="aigenqueuelaghigh"></a>
 <a id="aigenredisdown"></a>
+<a id="aigenprovidercircuitopen"></a>
+<a id="aigenestimatedunknowncostgrowth"></a>
+<a id="aigenphysicalcallcapexhausted"></a>
+<a id="aigenotlpexporterdrops"></a>
+<a id="tempotargetdown"></a>
+<a id="temponotready"></a>
 
 ## 파일화된 AI 세션 생성 룰
 
@@ -41,10 +47,16 @@
 | `AiGenBudgetExhaustion` | info | aggregate 30d AI generation cost > $1000 | `#budget-exhaustion` |
 | `AiGenQueueLagHigh` | warn | Redis active AI job backlog `readmates_aigen_queue_depth > 50` for 5m | `#queue-lag-high` |
 | `AiGenRedisDown` | critical | `redis_up == 0` and HTTP 5xx rate elevated | `#redis-down` |
+| `AiGenProviderCircuitOpen` | warn | provider circuit open for 5m | `#provider-circuit-open` |
+| `AiGenEstimatedUnknownCostGrowth` | warn | 15m unknown-estimated reserved cost growth | `#estimated-unknown-cost` |
+| `AiGenPhysicalCallCapExhausted` | warn | maximum-three physical-call cap exhausted | `#physical-call-cap` |
+| `AiGenOtlpExporterDrops` | warn | OTLP export failure or bounded queue drop | `#otlp-exporter-drops` |
+| `TempoTargetDown` | critical | internal Tempo scrape target down for 2m | `#tempo-down` |
+| `TempoNotReady` | critical | active Tempo ingester absent for 2m | `#tempo-not-ready` |
 
 Per-club cost cap은 metric label에 `club_id`를 싣지 않는 정책 때문에 Prometheus alert가 아니라 application cap guard와 `ai_generation_audit_log` SQL drill-down으로 운영합니다.
 
-신규 dead-target watch는 `ops/prometheus/alerts/targets-rules.yml`의 `ScrapeTargetDown` (`up == 0` for 5m) 으로 모든 scrape target(`readmates-server`, `prometheus-self`, `alertmanager`)이 사라지면 critical alert를 띄웁니다.
+신규 dead-target watch는 `ops/prometheus/alerts/targets-rules.yml`의 `ScrapeTargetDown` (`up == 0` for 5m) 으로 scrape target이 사라지면 critical alert를 띄웁니다. Tempo는 더 짧은 전용 target/readiness alert로 trace backend 장애를 분리합니다. Exporter failure나 Tempo down은 product failure와 동일시하지 않습니다.
 
 ## 룰 (파일화 완료)
 

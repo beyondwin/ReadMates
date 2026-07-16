@@ -44,7 +44,7 @@ class AiGenerationArchitectureBoundaryTest {
                 "AiGeneration" + "PipelineMode",
                 "pipeline" + "Mode",
                 "pipeline" + "-mode",
-                "READMATES_AIGEN_PIPELINE_MODE",
+                "READMATES_AIGEN_" + "PIPELINE_MODE",
             )
         val sourceViolations =
             aigenProductionFiles()

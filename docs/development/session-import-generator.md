@@ -26,13 +26,13 @@
 | 모드 | 입력 | LLM 호출 위치 | 운영 게이트 |
 | --- | --- | --- | --- |
 | 외부 JSON 업로드 | 호스트가 로컬에서 정리한 `readmates-session-import:v1` JSON | 앱 외부 | 항상 사용 가능 |
-| In-app AI 생성 | UTF-8/BOM TXT(≤ 1 MiB, ≤ 3시간) + 서버가 제공한 모델 ID | 서버 측 provider adapter (Claude/OpenAI/Gemini) | kill switch + provider allowlist + `pipeline-mode` + provider API key |
+| In-app AI 생성 | UTF-8/BOM TXT(≤ 1 MiB, ≤ 3시간) + 서버가 제공한 모델 ID | 서버 측 Spring AI adapter (Claude/OpenAI/Gemini) | kill switch + provider allowlist + provider key + provider retention 확인 |
 
 두 모드의 commit 경로는 같은 `SessionImportService.commitValidated(...)`를 사용하므로 저장 후의 데이터 형태와 권한 경계는 동일합니다. 현재 동작은 [architecture.md의 In-app AI 세션 생성 컴포넌트](architecture.md#in-app-ai-세션-생성-컴포넌트), 운영 rollout과 장애 대응은 [AI session generation runbook](../operations/runbooks/ai-session-generation.md)을 기준으로 합니다. `docs/superpowers/**`의 spec과 plan은 설계 이력이며 현재 동작의 source of truth가 아닙니다.
 
 ## In-app 근거 기반 AI 생성
 
-`READMATES_AIGEN_PIPELINE_MODE=GROUNDED_WHOLE_TRANSCRIPT`가 승인된 환경에서는 호스트가 다음 순서로 세션 기록을 완성합니다.
+In-app AI가 활성화된 환경은 legacy 분기 없이 grounded whole-transcript 경로로 다음 순서에 따라 세션 기록을 완성합니다. 호출·비용·복구·trace 세부 계약은 [Spring AI 2 provider architecture](spring-ai-2-provider-architecture.md)를 기준으로 합니다.
 
 1. TXT를 UTF-8 또는 UTF-8 BOM으로 준비합니다. 각 발언은 `화자명 MM:SS` header와 본문을 사용하고 timestamp는 뒤로 가지 않아야 합니다.
 2. 모든 고유 화자명을 현재 클럽의 `ACTIVE` 멤버 표시 이름과 정확히 맞춥니다. 비교는 Unicode NFC + trim 후 case-sensitive exact match이며 alias, fuzzy match, generic label 자동 보정은 없습니다.

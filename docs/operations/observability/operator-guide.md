@@ -9,6 +9,7 @@
 | 서버가 살아 있나? | management `/actuator/health` |
 | 요청이 늘었나, 느려졌나, 실패하나? | Prometheus/Grafana의 HTTP/JVM/Hikari/Redis/notification metric |
 | 어떤 요청에서 왜 실패했나? | JSON log의 `requestId`와 correlation lookup runbook |
+| API→Kafka→AI provider 호출이 한 흐름인가? | Grafana exemplar 또는 trace ID로 internal Tempo 조회 |
 | 알림/AI/Redis 같은 비동기 또는 선택 계층 상태는? | metrics catalog, alert rules, `/admin/health`, source-of-truth DB row |
 | 중앙 로그 검색 도구가 있나? | 이 phase에서는 도입하지 않음. JSON stdout log는 후속 OCI Logs/Loki/ELK/OpenSearch 연동 후보 |
 
@@ -114,9 +115,20 @@ ls ops/grafana/dashboards
 
 1. HTTP 5xx ratio와 p95 latency로 증상 확인
 2. Hikari/JVM/Redis/notification panel로 영향 surface 좁히기
-3. `requestId` 또는 시간대 기준으로 로그와 DB row 확인
+3. AI/provider 흐름이면 exemplar/trace ID로 Tempo를 확인하고, 일반 장애면 `requestId`/시간대로 로그와 DB row 확인
 
 초보자가 자주 헷갈리는 점: Grafana 그래프는 원인을 자동으로 말해주지 않습니다. 그래프는 증상과 범위를 좁혀주고, 원인은 로그/DB row/최근 배포/외부 의존성 증거와 함께 판단합니다.
+
+### Tempo와 exemplar
+
+Tempo는 content-free span metadata를 7일 보관합니다. 로컬 query/OTLP port는 loopback에만 bind되고 OCI Tempo/OTLP는 Compose internal network에만 있습니다. Prometheus exemplar가 있는 histogram에서 trace로 이동하거나 Grafana Explore의 Tempo datasource에 32자 trace ID를 사용합니다.
+
+```bash
+bash scripts/validate-tempo-config.sh
+bash scripts/observability-local-smoke.sh
+```
+
+AI span의 허용 dimension은 provider, allowlisted model, call mode, outcome, safe error code, job/attempt correlation뿐입니다. Prompt/completion/transcript/evidence/raw error와 user/session/club identity를 검색 편의를 위해 추가하지 않습니다. Tempo가 down이어도 server health와 product 요청이 유지되어야 하며 exporter failure/queue-drop meter로 손실을 별도로 확인합니다.
 
 ## 6. Alerts And SLOs
 

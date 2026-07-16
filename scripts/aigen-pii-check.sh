@@ -231,11 +231,12 @@ check6_grounded_payload_scope_and_lifecycle() {
 }
 
 check7_grounded_hash_boundary() {
-  local codec legacy_cleanup grounded_cleanup
+  local codec legacy_cleanup grounded_cleanup selector_pattern
   codec=server/src/main/kotlin/com/readmates/aigen/adapter/out/redis/AiGenerationRedisRecordCodec.kt
   legacy_cleanup=server/src/main/kotlin/com/readmates/aigen/adapter/out/redis/AiGenerationRedisScripts.kt
   grounded_cleanup=server/src/main/kotlin/com/readmates/aigen/adapter/out/redis/GroundedAiGenerationRedisScripts.kt
-  if grep -qE 'AiGenerationPipelineMode|pipelineMode' "$codec"; then
+  selector_pattern='AiGeneration'"PipelineMode|pipeline"'Mode'
+  if grep -qE "$selector_pattern" "$codec"; then
     echo "FAIL [check7]: removed legacy pipeline selector returned to the Redis codec" >&2
     return 1
   fi

@@ -6,3 +6,22 @@ readmates:
     ip-hash:
       base-secret: test-ip-hash-base-secret
       allow-empty-secret: false
+
+spring:
+  ai:
+    model:
+      audio:
+        speech: none
+        transcription: none
+      chat: none
+      embedding: none
+      embedding.multimodal: none
+      embedding.text: none
+      image: none
+      moderation: none
+
+management:
+  otlp:
+    metrics:
+      export:
+        enabled: false

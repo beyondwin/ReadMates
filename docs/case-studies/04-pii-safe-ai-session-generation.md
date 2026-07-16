@@ -145,8 +145,8 @@ Platform admin은 job ID, status, revision, safe error, `cleanupPending` 같은 
 **서버 계약과 persistence**
 
 - `TranscriptParserTest`, `TranscriptMembershipValidatorTest`, `GroundedInputBudgetGuardTest`가 side-effect-free preflight와 입력 경계를 고정합니다.
-- Provider별 `*WholeTranscriptGroundedGeneratorTest`와 `GroundedGenerationValidatorTest`가 공통 request/schema/evidence 계약을 확인합니다.
-- `RedisGroundedAiGenerationJobStoreTest`, `RedisAiGenerationJobStoreFailureTest`가 4-payload TTL, revision CAS, partial expiry, cleanup을 검증합니다.
+- `OpenAiSpringAiContractTest`, `AnthropicSpringAiContractTest`, `GoogleGenAiSpringAiContractTest`와 `SpringAiWholeTranscriptGroundedGeneratorTest`가 provider wire/schema/usage와 thin adapter 계약을 확인합니다.
+- `RedisGroundedAiGenerationJobStoreTest`, `RedisProviderCallReservationAdapterTest`가 4-payload TTL, revision CAS, atomic call/cost reservation, crash recovery와 cleanup을 검증합니다.
 - `AiGenerateGroundedCommitIntegrationTest`, `JdbcAiGenerationCommitPersistenceAdapterTest`, `AiGenerationCommitRecoveryServiceTest`가 receipt 기반 commit/recovery를 검증합니다.
 - `FrontendZodSchemaContractTest`와 exported Zod fixtures가 server/frontend 직렬화 drift를 차단합니다.
 
@@ -158,14 +158,14 @@ Platform admin은 job ID, status, revision, safe error, `cleanupPending` 같은 
 
 **PII와 공개 릴리스**
 
-`bash scripts/aigen-pii-check.sh`는 self-test fixture와 10개 invariant로 다음 경계를 검사합니다.
+`bash scripts/aigen-pii-check.sh`는 self-test fixture와 15개 invariant로 다음 경계를 검사합니다.
 
 - 네 Redis payload의 adapter 소유권, TTL, terminal cleanup
 - Grounded metadata hash의 content-free field 계약
-- Kafka routing-metadata-only message
+- Kafka routing-metadata-only message와 trace-header allowlist
 - Flyway/audit/receipt의 content-free schema
-- low-cardinality metric label
-- request/response/transcript/evidence logging 금지
+- Spring AI content observation 비활성화와 metric/span/baggage allowlist
+- request/response/transcript/evidence/raw-provider-error logging 금지
 
 공개 릴리스 후보는 `*.tsbuildinfo` 같은 로컬 incremental metadata도 제외하고 fixture로 재유입을 차단합니다.
 

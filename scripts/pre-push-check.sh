@@ -248,6 +248,8 @@ if [[ "$mode" == "full" ]]; then
   run_step "Playwright E2E" "${pnpm_cmd[@]}" --dir front test:e2e
   run_step "Validate Prometheus rules" ./scripts/validate-prometheus-rules.sh
   run_step "Validate Prometheus config" ./scripts/validate-prometheus-config.sh
+  run_step "Validate Tempo config" bash ./scripts/validate-tempo-config.sh
+  run_step "Lint Grafana dashboards" ./scripts/lint-grafana-dashboards.sh
   run_step "Validate Alertmanager config" ./scripts/validate-alertmanager-config.sh
 fi
 

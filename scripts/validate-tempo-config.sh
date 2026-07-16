@@ -56,8 +56,12 @@ if grep -En '(^|[^0-9])(3200|4317|4318):[[:space:]]*(3200|4317|4318)([^0-9]|$)' 
   fail "OCI compose must not publish Tempo or OTLP ports"
 fi
 
+# Match the literal Compose interpolation contract.
+# shellcheck disable=SC2016
 grep -Fq '127.0.0.1:${READMATES_LOCAL_GRAFANA_PORT:-3001}:3000' "$local_compose" ||
   fail "local Grafana must bind to loopback because it proxies the Tempo datasource"
+# Match the literal Compose interpolation contract.
+# shellcheck disable=SC2016
 grep -Fq '127.0.0.1:${READMATES_LOCAL_PROMETHEUS_PORT:-9090}:9090' "$local_compose" ||
   fail "local Prometheus must bind to loopback"
 

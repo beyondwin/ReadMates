@@ -75,7 +75,10 @@ class AiGenerationWorkerTest {
                 reservedCostUsd = java.math.BigDecimal("1.25"),
                 costBasis = com.readmates.aigen.application.model.CostBasis.NONE,
                 safeErrorCode = null,
-                startedAt = AiGenerationTestFixtures.NOW.minus(context.properties.providerCalls.requestTimeout).minusSeconds(1),
+                startedAt =
+                    AiGenerationTestFixtures.NOW
+                        .minus(context.properties.providerCalls.requestTimeout)
+                        .minusSeconds(1),
                 completedAt = null,
             )
 

@@ -15,6 +15,7 @@ ReadMates를 로컬에서 실행하고, 테스트하고, 구조를 이해하기 
 | Cross-surface vertical slice 체크리스트 | [vertical-slice-checklist.md](vertical-slice-checklist.md) |
 | 코드베이스 graph 탐색 | [graphify.md](graphify.md) |
 | 근거 기반 AI 세션 생성과 외부 JSON 가져오기 | [session-import-generator.md](session-import-generator.md) |
+| Spring AI provider, 비용·복구, trace/privacy | [spring-ai-2-provider-architecture.md](spring-ai-2-provider-architecture.md) |
 | 디자인 시스템과 pattern catalog | [../../design/README.md](../../design/README.md) |
 | 주요 기술적 의사결정 | [technical-decisions.md](technical-decisions.md) |
 | Architecture Decision Records | [adr/README.md](adr/README.md) |

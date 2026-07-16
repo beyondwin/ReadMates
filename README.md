@@ -106,12 +106,12 @@ MySQL
 
 ## AI-assisted 운영 콘텐츠
 
-ReadMates 호스트 도구는 세션 기록을 채우는 두 가지 모드를 함께 제공합니다.
+ReadMates 호스트 도구는 세션 기록을 채우는 두 가지 입력 흐름을 제공합니다.
 
-- **외부 정리된 산출물 (legacy)**: 호스트가 앱 밖에서 정리한 `readmates-session-import:v1` JSON을 호스트 세션 편집기로 가져옵니다. 이 흐름은 server/frontend에서 AI API를 호출하지 않고, 앱은 검증과 commit만 담당합니다. 형식 정의는 [docs/development/session-import-generator.md](docs/development/session-import-generator.md).
-- **In-app AI 생성**: 호스트가 UTF-8/BOM TXT 전체 대본을 올리면 서버가 모든 화자를 같은 클럽의 활성 멤버와 exact match한 뒤, 서버 capability catalog가 허용한 Claude/OpenAI/Gemini 모델로 구조화 결과를 만듭니다. Grounded mode에서는 revision별 evidence와 네 섹션 review가 모두 끝나야 저장할 수 있습니다. Transcript/turns/result/evidence는 Redis에 6시간만 두고 commit/cancel 뒤 삭제하며, Kafka와 MySQL에는 콘텐츠를 남기지 않습니다.
+- **외부 정리된 JSON 가져오기**: 호스트가 앱 밖에서 정리한 `readmates-session-import:v1` JSON을 호스트 세션 편집기로 가져옵니다. 이 흐름은 server/frontend에서 AI API를 호출하지 않고, 앱은 검증과 commit만 담당합니다. 형식 정의는 [docs/development/session-import-generator.md](docs/development/session-import-generator.md).
+- **In-app grounded AI 생성**: 호스트가 UTF-8/BOM TXT 전체 대본을 올리면 서버가 모든 화자를 같은 클럽의 활성 멤버와 exact match한 뒤, 서버 capability catalog가 허용한 Claude/OpenAI/Gemini 모델로 구조화 결과를 만듭니다. Revision별 evidence와 네 섹션 review가 모두 끝나야 저장할 수 있습니다. Transcript/turns/result/evidence는 Redis에 6시간만 두고 commit/cancel 뒤 삭제하며, Kafka와 MySQL에는 콘텐츠를 남기지 않습니다.
 
-In-app AI 생성은 `readmates.aigen.enabled`, `readmates.aigen.enabled-providers`, `readmates.aigen.pipeline-mode`, provider API key로 gate됩니다. Kill switch와 provider allowlist는 기본 off이고 pipeline 기본값은 `LEGACY`입니다. `GROUNDED_WHOLE_TRANSCRIPT`는 환경별 mock/E2E, provider retention, rollback 검토를 마친 뒤에만 활성화합니다. 호스트 사용 흐름과 입력 계약은 [세션 기록 완성 가이드](docs/development/session-import-generator.md#in-app-근거-기반-ai-생성), 현재 컴포넌트 경계는 [아키텍처 문서](docs/development/architecture.md#in-app-ai-세션-생성-컴포넌트), 운영 절차는 [AI generation runbook](docs/operations/runbooks/ai-session-generation.md)을 기준으로 합니다.
+In-app AI 생성은 `readmates.aigen.enabled`, `readmates.aigen.enabled-providers`, provider API key와 provider별 retention 확인으로 gate됩니다. Kill switch와 provider allowlist는 기본 off이며 실행 경로는 grounded-only Spring AI 2 thin adapter입니다. Application이 최대 3회 물리 호출, retry/fallback/repair, Redis 원자 비용 예약·정산과 crash recovery를 소유합니다. 호스트 사용 흐름과 입력 계약은 [세션 기록 완성 가이드](docs/development/session-import-generator.md#in-app-근거-기반-ai-생성), 최종 provider/trace 계약은 [Spring AI 2 provider architecture](docs/development/spring-ai-2-provider-architecture.md), 운영 절차는 [AI generation runbook](docs/operations/runbooks/ai-session-generation.md)을 기준으로 합니다.
 
 ## 개발 계획과 스펙 기록
 

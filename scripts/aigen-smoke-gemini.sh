@@ -13,9 +13,9 @@
 # session must belong to a dedicated smoke club with one ACTIVE membership
 # whose display name is exactly `공개 회원 A`; never substitute private data.
 #
-# Retention contract (spec §5.7): the server-side GeminiApiClient MUST send
-# `disablePromptLogging=true` on every request so transcripts are not retained
-# by Google for model training. Verify the server build before exercising live.
+# Retention contract: the Spring AI Google transport sends the configured
+# best-effort no-retention header, but this never replaces paid-tier project
+# confirmation. Verify both the server build and project tier before a live call.
 #
 # Note: requires server-side `readmates.aigen.enabled=true`, `enabled-providers`
 # including GEMINI, and the model name below to be present in the YAML pricing
