@@ -387,6 +387,7 @@ copy_manifest() {
   copy_required_file ".github/workflows/ci.yml"
   copy_required_file ".github/workflows/deploy-front.yml"
   copy_required_file ".github/workflows/deploy-server.yml"
+  copy_required_file ".github/workflows/sync-config.yml"
   copy_optional_file ".github/CODEOWNERS"
   copy_required_file ".gitignore"
   copy_optional_file ".gitleaks.toml"
@@ -434,8 +435,10 @@ copy_manifest() {
   copy_optional_file "scripts/validate-alertmanager-config.sh"
   copy_optional_file "scripts/validate-prometheus-config.sh"
   copy_optional_file "scripts/validate-prometheus-rules.sh"
+  copy_optional_file "scripts/validate-production-ai-config.sh"
   copy_optional_file "scripts/validate-tempo-config.sh"
   copy_optional_file "scripts/verify-public-release-fixtures.sh"
+  copy_dir "scripts/sync-config"
 }
 
 # Approved = not denied. Any path not matched by is_forbidden_candidate_path is

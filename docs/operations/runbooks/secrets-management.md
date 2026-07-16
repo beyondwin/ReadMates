@@ -80,6 +80,7 @@ GitHub Variables 로 관리하는 것 — 환경 의존적인 값:
 | `READMATES_NOTIFICATION_SENDER_NAME` | 발신자 표시 이름 |
 | `READMATES_AIGEN_ENABLED` | `true`/`false` (kill-switch) |
 | `READMATES_AIGEN_ENABLED_PROVIDERS` | 화이트리스트, 예: `OPENAI` |
+| `READMATES_AIGEN_GOOGLE_PAID_TIER_RETENTION_CONFIRMED` | 기본 `false`; Gemini key의 active billing/paid terms를 운영자가 확인한 뒤에만 `true` |
 | `CADDY_SITE` | Caddy 도메인 |
 | `READMATES_SERVER_IMAGE` | GHCR image ref |
 

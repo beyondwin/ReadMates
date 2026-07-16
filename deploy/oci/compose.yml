@@ -25,6 +25,7 @@ services:
     environment:
       READMATES_REDIS_URL: redis://redis:6379
       READMATES_KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+      READMATES_OTLP_TRACES_ENDPOINT: http://tempo:4318/v1/traces
       READMATES_MANAGEMENT_ADDRESS: 0.0.0.0
       READMATES_MANAGEMENT_PORT: 8081
     expose:

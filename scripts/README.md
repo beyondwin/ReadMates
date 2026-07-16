@@ -118,6 +118,7 @@ Branch protection bypass 정책 전반은 [release-management.md#branch-protecti
 ./scripts/validate-prometheus-rules.sh    # ops/prometheus/alerts/*.yml rule 검사
 ./scripts/validate-prometheus-config.sh   # deploy/oci/prometheus/prometheus.yml 검사
 bash ./scripts/validate-tempo-config.sh   # Tempo 7일 retention/internal-port/config 검사
+./scripts/validate-production-ai-config.sh # OCI internal OTLP, legacy 제거, Google retention sync 검사
 ./scripts/lint-grafana-dashboards.sh      # JSON, AI panels, Tempo datasource/exemplar contract
 ./scripts/validate-alertmanager-config.sh # deploy/oci/alertmanager/alertmanager.yml 구조 검사
 ```

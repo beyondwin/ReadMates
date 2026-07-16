@@ -90,13 +90,13 @@ Spring AI modules are versioned only by `org.springframework.ai:spring-ai-bom:2.
 
 ## Provider Contract Matrix
 
-| Provider/model | Request options | Structured output / usage | Retention control | Verified |
+| Provider/model | Request options | Structured output / usage | Official retention source (checked 2026-07-16) | Runtime/account verification status |
 | --- | --- | --- | --- | --- |
-| OpenAI `gpt-5.4-mini` | non-streaming, `maxCompletionTokens`, `store=false`, model allowlist, SDK `maxRetries=0` | shared versioned JSON schema; generic usage mapped to four channels | `store=false`; operator must re-check provider terms before rollout | adapter contract 2026-07-16 |
-| Anthropic `claude-sonnet-4-6` | non-streaming, `maxTokens`, SDK `maxRetries=0`, `SYSTEM_ONLY` prompt cache | `$defs` are inlined for native output schema; native cache creation/read fields map independently | operator must re-check provider terms before rollout | native schema/cache allowlist 2026-07-16 |
-| Google `gemini-3-flash-preview` | non-streaming JSON, `thinkingBudget=0`, `includeThoughts=false`, search/tool invocations off, transport attempts 1, Spring retry 0 | Google-compatible schema and extended usage metadata; incomplete breakdown fails closed | paid-tier confirmation flag is mandatory; `x-goog-data-policy: no-retention` is best effort only | no-thinking capability 2026-07-16 |
+| OpenAI `gpt-5.4-mini` | non-streaming, `maxCompletionTokens`, `store=false`, model allowlist, SDK `maxRetries=0` | shared versioned JSON schema; generic usage mapped to four channels | [OpenAI API data controls](https://developers.openai.com/api/docs/guides/your-data): abuse-monitoring logs default to at most 30 days; ZDR/Modified Abuse Monitoring require separate eligibility/approval; `store=false` is not ZDR | Request option contract verified; ReadMates organization ZDR/MAM status **UNCONFIRMED**. Provider is off by default and rollout remains blocked by operator retention review. |
+| Anthropic `claude-sonnet-4-6` | non-streaming, `maxTokens`, SDK `maxRetries=0`, `SYSTEM_ONLY` prompt cache | `$defs` are inlined for native output schema; native cache creation/read fields map independently | [Anthropic API retention](https://privacy.claude.com/en/articles/7996866-how-long-do-you-store-my-organization-s-data): API inputs/outputs are normally deleted from the backend within 30 days, with ZDR agreement, policy and legal exceptions | Native schema/cache contract verified; ReadMates organization ZDR/exception status **UNCONFIRMED**. Provider is off by default and rollout remains blocked by operator retention review. |
+| Google `gemini-3-flash-preview` | non-streaming JSON, `thinkingBudget=0`, `includeThoughts=false`, search/tool invocations off, transport attempts 1, Spring retry 0 | Google-compatible schema and extended usage metadata; incomplete breakdown fails closed | [Gemini API terms](https://ai.google.dev/gemini-api/terms): paid services do not use prompts/responses for product improvement but may log them for an unspecified limited period for abuse prevention; an active billing account defines paid access | No-thinking/request contract verified; production project paid-tier status **UNCONFIRMED**. `sync-config` defaults confirmation to `false`, and enabling Gemini fails startup until an operator sets it `true`. The request header is best effort only. |
 
-Model names, capabilities, prices and provider terms can drift. The dates above verify adapter contracts, not a billable live provider response. Live contract calls remain opt-in.
+Model names, capabilities, prices and provider terms can drift. The source date records the official policy snapshot only; request/model contracts are verified separately by mock-wire tests, and no source check proves a ReadMates account setting. Live contract calls remain opt-in.
 
 ## Physical Calls, Retry, Fallback And Repair
 
@@ -148,7 +148,9 @@ OCI Compose attaches server, Prometheus, Grafana and Tempo to the same internal 
 
 ## Configuration Changes
 
-Added/current controls include `READMATES_AIGEN_PROVIDER_REQUEST_TIMEOUT` (max 4m), `READMATES_AIGEN_MAX_CONCURRENT_PER_PROVIDER`, transient backoff base/max, `READMATES_AIGEN_GOOGLE_PAID_TIER_RETENTION_CONFIRMED`, four-channel per-model prices, `READMATES_AIGEN_KAFKA_MAX_POLL_INTERVAL` (default 16m), `READMATES_TRACING_SAMPLING_PROBABILITY`, and `READMATES_OTLP_TRACES_ENDPOINT`. Spring AI chat auto-selection and all content/error logging observations are disabled.
+Added/current controls include `READMATES_AIGEN_PROVIDER_REQUEST_TIMEOUT` (max 4m), `READMATES_AIGEN_MAX_CONCURRENT_PER_PROVIDER`, transient backoff base/max, `READMATES_AIGEN_GOOGLE_PAID_TIER_RETENTION_CONFIRMED`, four-channel per-model prices, `READMATES_AIGEN_KAFKA_MAX_POLL_INTERVAL` (default 16m), `READMATES_TRACING_SAMPLING_PROBABILITY`, and `READMATES_OTLP_TRACES_ENDPOINT`. Spring AI chat auto-selection and all content/error logging observations are disabled. The production `sync-config` path renders the Google confirmation from a repository variable with a fail-closed `false` default; `.env.example` and the bulk importer expose the same control without claiming account confirmation.
+
+OCI `readmates-api` overrides the local OTLP default with `http://tempo:4318/v1/traces` on the shared Compose network. Tempo publishes no host port. `scripts/validate-production-ai-config.sh` pins that endpoint, the no-public-port rule, complete legacy-selector removal, and production Google confirmation wiring in CI, pre-push and the public release candidate.
 
 The legacy pipeline mode environment control and every runtime selector were removed. Existing kill switch, provider allowlist and three provider key names remain. Key values are never documented or committed.
 
@@ -179,6 +181,7 @@ Evidence below was run from the Task 15 working tree based on implementation com
 | `npx --yes corepack@0.35.0 pnpm --dir front test:e2e` | PASS — 74/74 Playwright tests in 59.4s after installing the pinned Chromium prerequisite |
 | Prometheus/Tempo/Grafana validators and local smoke | PASS — rules/config/dashboards validated; synthetic trace queried; exporter failure stayed bounded when Tempo stopped |
 | Public release candidate build/check | PASS — candidate built; path/content/Tempo contract checks and gitleaks reported no finding |
+| `scripts/validate-production-ai-config.sh` | PASS — internal OCI OTLP endpoint, unpublished Tempo, no legacy selector, and fail-closed Google confirmation sync contract |
 | Server release image and Trivy | PASS — arm64 release image built; Trivy 0.70.0 returned 0 for HIGH/CRITICAL with unfixed findings ignored |
 | `graphify update .` | PASS — 12,934 nodes, 25,107 edges and 756 communities; 24 data fixtures produced no code nodes and the graph exceeded only the optional HTML visualization limit |
 | OpenAI/Anthropic/Google live provider smoke | SKIPPED — requires provider key and billable external call; mock-wire contracts are CI proof |

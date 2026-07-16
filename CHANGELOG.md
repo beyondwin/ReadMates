@@ -18,7 +18,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - **공개 릴리스 안전:** TypeScript incremental build metadata(`*.tsbuildinfo`)를 공개 릴리스 후보에서 제외하고 검사기와 fixture로 로컬 빌드 경로 재유입을 차단합니다.
 - **AI 호출·비용 경계:** application-owned coordinator가 circuit/concurrency permit, single-node Redis atomic slot + worst-case cost reservation, 정확히 한 번의 provider HTTP, `ACTUAL`/`ESTIMATED_UNKNOWN` reconciliation을 순서대로 수행합니다. Retry/fallback/schema correction/grounding repair/regeneration은 모두 최대 3회 물리 호출 예산을 공유하고 redelivery/crash의 uncertain cost를 자동 환불하지 않습니다.
 - **Token/API compatibility:** 내부 비용은 non-cached input/cache-write/cache-read/output 4채널로 계산하지만 public REST response는 기존 input/cachedInput/output 3필드를 유지합니다.
-- **Trace/privacy/ops:** Spring Kafka observation과 Micrometer/OpenTelemetry OTLP를 활성화하고 7일 Tempo, Grafana datasource/exemplar, provider/cost-basis/circuit/exporter metric/alert를 추가했습니다. Local port는 loopback-only, OCI Tempo/OTLP는 unpublished internal network이며 exporter 장애는 product 요청과 격리됩니다.
+- **Trace/privacy/ops:** Spring Kafka observation과 Micrometer/OpenTelemetry OTLP를 활성화하고 7일 Tempo, Grafana datasource/exemplar, provider/cost-basis/circuit/exporter metric/alert를 추가했습니다. Local port는 loopback-only이고 OCI app은 `tempo:4318` internal DNS로 export하며 Tempo/OTLP host port는 publish하지 않습니다. Production config sync는 Google paid-tier 확인을 기본 `false`로 렌더링해 미확인 Gemini rollout을 fail closed합니다.
 
 ### Database
 

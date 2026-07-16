@@ -481,6 +481,11 @@ fi
 run_targeted_content_checks
 scan_observability_targets
 check_internal_tempo_release_contract
+if [[ -x "$source_abs/scripts/validate-production-ai-config.sh" ]]; then
+  "$source_abs/scripts/validate-production-ai-config.sh" "$source_abs"
+else
+  record_finding "missing executable production AI config validator"
+fi
 run_gitleaks_or_fallback_notice
 
 if [[ -s "$findings" ]]; then

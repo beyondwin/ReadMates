@@ -14,7 +14,7 @@ ReadMates의 최종 OCI backend runtime은 Caddy, Spring Boot API, Redis, Redpan
 
 Compose stack은 deploy/config/start 전에 VM의 `/etc/readmates/readmates.env`가 먼저 있어야 합니다. 이 파일에는 Spring `prod` runtime 값이 들어가며 Git에는 실제 값을 기록하지 않습니다.
 
-운영 표준 경로는 GitHub Actions의 `sync-config` 워크플로(`.github/workflows/sync-config.yml`)입니다. 워크플로는 GitHub Secrets/Variables 값을 렌더링해 `/etc/readmates/readmates.env`와 `/etc/readmates/caddy.env`를 scp로 배포합니다. 변수 inventory, 추가/회전 절차, 비상 복구는 [secrets management runbook](../operations/runbooks/secrets-management.md)을, 워크플로가 사용하는 deploy key/sudoers 부트스트랩은 [VM deploy key bootstrap](../operations/runbooks/vm-deploy-key-bootstrap.md)을 따릅니다. `deploy/oci/02-configure.sh`는 디렉터리와 Caddy만 설정하고 readmates.env를 더 이상 만들지 않습니다.
+운영 표준 경로는 GitHub Actions의 `sync-config` 워크플로(`.github/workflows/sync-config.yml`)입니다. 워크플로는 GitHub Secrets/Variables 값을 렌더링해 `/etc/readmates/readmates.env`와 `/etc/readmates/caddy.env`를 scp로 배포합니다. 변수 inventory, 추가/회전 절차, 비상 복구는 [secrets management runbook](../operations/runbooks/secrets-management.md)을, 워크플로가 사용하는 deploy key/sudoers 부트스트랩은 [VM deploy key bootstrap](../operations/runbooks/vm-deploy-key-bootstrap.md)을 따릅니다. `deploy/oci/02-configure.sh`는 디렉터리와 Caddy만 설정하고 readmates.env를 더 이상 만들지 않습니다. App Compose는 OTLP를 public host가 아닌 같은 network의 `http://tempo:4318/v1/traces`로 고정합니다.
 
 `05-deploy-compose-stack.sh`는 `/opt/readmates/.env`(compose image 변수)를 생성하지만 `/etc/readmates/readmates.env`와 `/etc/readmates/caddy.env`는 생성하지 않습니다.
 

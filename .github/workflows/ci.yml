@@ -49,6 +49,9 @@ jobs:
       - name: Validate Tempo config
         run: bash scripts/validate-tempo-config.sh
 
+      - name: Validate production AI config
+        run: bash scripts/validate-production-ai-config.sh
+
       - name: Lint Grafana dashboards
         run: ./scripts/lint-grafana-dashboards.sh
 
