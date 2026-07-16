@@ -48,6 +48,41 @@ class AiGenerationSpringAiConfigTest {
     }
 
     @Test
+    fun `enabled non-mock Google requires paid tier retention confirmation before a key`() {
+        contextRunner(
+            "readmates.aigen.enabled=true",
+            "readmates.aigen.mock=false",
+            "readmates.aigen.enabled-providers=GEMINI",
+            "readmates.aigen.grounded.capabilities[gemini-3-flash-preview].context-window-tokens=1048576",
+            "readmates.aigen.grounded.capabilities[gemini-3-flash-preview].max-output-tokens=65536",
+            "readmates.aigen.grounded.capabilities[gemini-3-flash-preview].structured-output-supported=true",
+        ).run { context ->
+            assertThat(context).hasFailed()
+            assertThat(context.startupFailure)
+                .hasMessageContaining("readmates.aigen.providers.google.paid-tier-retention-confirmed")
+                .hasMessageNotContaining("READMATES_AIGEN_GEMINI_API_KEY=")
+        }
+    }
+
+    @Test
+    fun `confirmed Google retention still resolves the API key lazily`() {
+        contextRunner(
+            "readmates.aigen.enabled=true",
+            "readmates.aigen.mock=false",
+            "readmates.aigen.enabled-providers=GEMINI",
+            "readmates.aigen.providers.google.paid-tier-retention-confirmed=true",
+            "readmates.aigen.grounded.capabilities[gemini-3-flash-preview].context-window-tokens=1048576",
+            "readmates.aigen.grounded.capabilities[gemini-3-flash-preview].max-output-tokens=65536",
+            "readmates.aigen.grounded.capabilities[gemini-3-flash-preview].structured-output-supported=true",
+        ).run { context ->
+            assertThat(context).hasFailed()
+            assertThat(context.startupFailure)
+                .hasMessageContaining("Google GenAI API key is required when GEMINI is enabled")
+                .hasMessageNotContaining("READMATES_AIGEN_GEMINI_API_KEY=")
+        }
+    }
+
+    @Test
     fun `disabled AI does not load Spring AI configuration or require provider keys`() {
         contextRunner("readmates.aigen.enabled=false").run { context ->
             assertThat(context).hasNotFailed()

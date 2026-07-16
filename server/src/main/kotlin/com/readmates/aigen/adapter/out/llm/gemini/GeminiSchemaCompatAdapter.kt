@@ -1,6 +1,7 @@
 package com.readmates.aigen.adapter.out.llm.gemini
 
 import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.readmates.aigen.adapter.out.llm.common.SessionImportSchemaResource
@@ -29,9 +30,18 @@ import org.springframework.stereotype.Component
 @Component
 class GeminiSchemaCompatAdapter(
     private val source: SessionImportSchemaResource,
+    private val objectMapper: ObjectMapper = ObjectMapper(),
 ) {
     /** Returns a deep-copied Gemini-compatible schema (OpenAPI 3.0 subset). */
     fun geminiResponseSchema(): ObjectNode = convert(source.schema())
+
+    /** Adapts the versioned grounded schema supplied by the common renderer. */
+    fun adapt(schemaJson: String): String {
+        val schema =
+            objectMapper.readTree(schemaJson) as? ObjectNode
+                ?: throw IllegalArgumentException("Grounded Gemini schema must be an object")
+        return objectMapper.writeValueAsString(convert(schema))
+    }
 
     /**
      * Pure conversion entry point. Always returns a deep copy — the input is not mutated.

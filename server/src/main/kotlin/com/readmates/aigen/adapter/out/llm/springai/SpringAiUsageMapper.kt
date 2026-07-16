@@ -3,6 +3,7 @@ package com.readmates.aigen.adapter.out.llm.springai
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.model.TokenUsage
 import org.springframework.ai.chat.metadata.Usage
+import org.springframework.ai.google.genai.metadata.GoogleGenAiUsage
 
 data class SpringAiNativeUsage(
     val nonCachedInputTokens: Long? = null,
@@ -33,7 +34,6 @@ class SpringAiUsageMapper(
         provider: Provider,
         usage: Usage?,
         cacheEnabled: Boolean,
-        promptIncludesCache: Boolean = true,
     ): SpringAiUsageMapping {
         val registeredNative =
             runCatching { nativeExtractors[provider]?.extract(usage?.nativeUsage) }
@@ -41,13 +41,38 @@ class SpringAiUsageMapper(
         val native =
             registeredNative
                 ?: if (provider == Provider.CLAUDE) AnthropicNativeUsage.extract(usage?.nativeUsage) else null
-        return if (provider == Provider.OPENAI) {
-            mapOpenAi(usage, native)
-        } else if (provider == Provider.CLAUDE) {
-            mapAnthropic(usage, native, cacheEnabled)
-        } else {
-            mapGeneric(usage, native, cacheEnabled, promptIncludesCache)
+        return when (provider) {
+            Provider.OPENAI -> mapOpenAi(usage, native)
+            Provider.CLAUDE -> mapAnthropic(usage, native, cacheEnabled)
+            Provider.GEMINI -> mapGoogle(usage, native)
         }
+    }
+
+    /** Google prompt count is gross input; this plan never creates cached content. */
+    private fun mapGoogle(
+        usage: Usage?,
+        native: SpringAiNativeUsage?,
+    ): SpringAiUsageMapping {
+        val prompt = usage?.promptTokens?.toLong()
+        val cacheRead = native?.cacheReadInputTokens ?: usage?.cacheReadInputTokens ?: 0L
+        val output = native?.outputTokens ?: usage?.completionTokens?.toLong()
+        val total = usage?.totalTokens?.toLong()
+        val nonCached = native?.nonCachedInputTokens ?: prompt?.minus(cacheRead)
+        val nativeMetadataPresent = usage !is GoogleGenAiUsage || usage.nativeUsage != null
+        val complete =
+            nativeMetadataPresent && prompt != null && output != null && total != null &&
+                cacheRead >= 0 && nonCached != null && nonCached >= 0 &&
+                total >= 0 && total == prompt + output
+        return SpringAiUsageMapping(
+            usage =
+                TokenUsage(
+                    nonCachedInputTokens = nonCached.safeTokenCount(),
+                    cacheWriteInputTokens = 0,
+                    cacheReadInputTokens = cacheRead.safeTokenCount(),
+                    outputTokens = output.safeTokenCount(),
+                ),
+            usageComplete = complete,
+        )
     }
 
     private fun mapAnthropic(
@@ -65,42 +90,6 @@ class SpringAiUsageMapper(
         val totalConsistent =
             native != null || total == null || (nonCached != null && output != null && total == nonCached + output)
         val complete = cacheBreakdownComplete && totalConsistent && values.all { it != null && it >= 0 }
-
-        return SpringAiUsageMapping(
-            usage =
-                TokenUsage(
-                    nonCachedInputTokens = nonCached.safeTokenCount(),
-                    cacheWriteInputTokens = cacheWrite.safeTokenCount(),
-                    cacheReadInputTokens = cacheRead.safeTokenCount(),
-                    outputTokens = output.safeTokenCount(),
-                ),
-            usageComplete = complete,
-        )
-    }
-
-    private fun mapGeneric(
-        usage: Usage?,
-        native: SpringAiNativeUsage?,
-        cacheEnabled: Boolean,
-        promptIncludesCache: Boolean,
-    ): SpringAiUsageMapping {
-        val prompt = usage?.promptTokens?.toLong()
-        val output = native?.outputTokens ?: usage?.completionTokens?.toLong()
-        val cacheRead = native?.cacheReadInputTokens ?: usage?.cacheReadInputTokens
-        val cacheWrite = native?.cacheWriteInputTokens ?: usage?.cacheWriteInputTokens
-        val nonCached =
-            native?.nonCachedInputTokens
-                ?: prompt?.let { total ->
-                    if (promptIncludesCache) {
-                        total - (cacheRead ?: 0L) - (cacheWrite ?: 0L)
-                    } else {
-                        total
-                    }
-                }
-
-        val cacheBreakdownComplete = !cacheEnabled || (cacheRead != null && cacheWrite != null)
-        val values = listOf(nonCached, cacheRead ?: 0L, cacheWrite ?: 0L, output)
-        val complete = cacheBreakdownComplete && values.all { it != null && it >= 0 }
 
         return SpringAiUsageMapping(
             usage =

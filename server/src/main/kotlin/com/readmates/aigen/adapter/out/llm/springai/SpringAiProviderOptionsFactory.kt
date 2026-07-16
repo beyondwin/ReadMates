@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.ObjectNode
+import com.readmates.aigen.adapter.out.llm.common.SessionImportSchemaResource
+import com.readmates.aigen.adapter.out.llm.gemini.GeminiSchemaCompatAdapter
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.port.out.ModelCapabilityCatalog
@@ -12,6 +14,7 @@ import org.springframework.ai.anthropic.AnthropicCacheOptions
 import org.springframework.ai.anthropic.AnthropicCacheStrategy
 import org.springframework.ai.anthropic.AnthropicChatOptions
 import org.springframework.ai.chat.prompt.ChatOptions
+import org.springframework.ai.google.genai.GoogleGenAiChatOptions
 import org.springframework.ai.openai.OpenAiChatOptions
 import java.time.LocalDate
 
@@ -22,6 +25,13 @@ internal object AnthropicGroundedModelPolicy {
         mapOf("claude-sonnet-4-6" to LocalDate.parse("2026-07-16"))
 
     fun isVerified(model: String): Boolean = verifiedModels.containsKey(model)
+}
+
+internal object GoogleGroundedModelPolicy {
+    val verifiedNoThinkingModels: Map<String, LocalDate> =
+        mapOf("gemini-3-flash-preview" to LocalDate.parse("2026-07-16"))
+
+    fun isVerified(model: String): Boolean = verifiedNoThinkingModels.containsKey(model)
 }
 
 /**
@@ -87,11 +97,22 @@ internal object AnthropicNativeSchema {
  */
 class SpringAiProviderOptionsFactory(
     private val modelCapabilityCatalog: ModelCapabilityCatalog,
+    private val geminiSchemaCompatAdapter: GeminiSchemaCompatAdapter,
 ) {
+    constructor(modelCapabilityCatalog: ModelCapabilityCatalog) : this(
+        modelCapabilityCatalog,
+        GeminiSchemaCompatAdapter(SessionImportSchemaResource()),
+    )
+
     fun outputSchema(
         provider: Provider,
         schemaJson: String,
-    ): String = if (provider == Provider.CLAUDE) AnthropicNativeSchema.forProvider(schemaJson) else schemaJson
+    ): String =
+        when (provider) {
+            Provider.CLAUDE -> AnthropicNativeSchema.forProvider(schemaJson)
+            Provider.GEMINI -> geminiSchemaCompatAdapter.adapt(schemaJson)
+            Provider.OPENAI -> schemaJson
+        }
 
     fun options(
         provider: Provider,
@@ -105,6 +126,11 @@ class SpringAiProviderOptionsFactory(
         if (provider == Provider.CLAUDE) {
             require(AnthropicGroundedModelPolicy.isVerified(model.name)) {
                 "Grounded Anthropic model is not verified for native structured output"
+            }
+        }
+        if (provider == Provider.GEMINI) {
+            require(GoogleGroundedModelPolicy.isVerified(model.name)) {
+                "Grounded Google model is not verified for disabled thinking"
             }
         }
         val capability = modelCapabilityCatalog.find(model)
@@ -135,11 +161,18 @@ class SpringAiProviderOptionsFactory(
                             .build(),
                     )
             }
-            else ->
-                ChatOptions
+            Provider.GEMINI ->
+                GoogleGenAiChatOptions
                     .builder()
                     .model(model.name)
-                    .maxTokens(request.maxOutputTokens)
+                    .maxOutputTokens(request.maxOutputTokens)
+                    .responseMimeType("application/json")
+                    .outputSchema(outputSchema(provider, request.schemaJson))
+                    .thinkingBudget(0)
+                    .includeThoughts(false)
+                    .includeExtendedUsageMetadata(true)
+                    .googleSearchRetrieval(false)
+                    .includeServerSideToolInvocations(false)
         }
     }
 }

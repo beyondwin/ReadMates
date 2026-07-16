@@ -162,6 +162,10 @@ readmates:
       max-concurrent-per-provider: ${READMATES_AIGEN_MAX_CONCURRENT_PER_PROVIDER:2}
       transient-backoff-base: ${READMATES_AIGEN_TRANSIENT_BACKOFF_BASE:1s}
       transient-backoff-max: ${READMATES_AIGEN_TRANSIENT_BACKOFF_MAX:30s}
+    providers:
+      google:
+        # The best-effort no-retention request header does not replace this operational confirmation.
+        paid-tier-retention-confirmed: ${READMATES_AIGEN_GOOGLE_PAID_TIER_RETENTION_CONFIRMED:false}
     pricing:
       claude-sonnet-4-6:
         input-per-m-token-usd: 3.00

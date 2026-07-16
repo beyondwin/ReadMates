@@ -73,16 +73,42 @@ class SpringAiUsageMapperTest {
     }
 
     @Test
-    fun `maps complete generic gross usage to all four channels`() {
+    fun `Google never treats provider cache-write detail as created cached content`() {
         val usage = DefaultUsage(120, 30, 150, null, 20, 10)
 
         val mapped = SpringAiUsageMapper().map(Provider.GEMINI, usage, cacheEnabled = true)
 
-        assertThat(mapped.usage.nonCachedInputTokens).isEqualTo(90)
-        assertThat(mapped.usage.cacheWriteInputTokens).isEqualTo(10)
+        assertThat(mapped.usage.nonCachedInputTokens).isEqualTo(100)
+        assertThat(mapped.usage.cacheWriteInputTokens).isZero()
         assertThat(mapped.usage.cacheReadInputTokens).isEqualTo(20)
         assertThat(mapped.usage.outputTokens).isEqualTo(30)
         assertThat(mapped.usageComplete).isTrue()
+    }
+
+    @Test
+    fun `Google prompt count is gross and only supported cache reads are subtracted`() {
+        val usage = DefaultUsage(120, 30, 150, null, 20, 99)
+
+        val mapped = SpringAiUsageMapper().map(Provider.GEMINI, usage, cacheEnabled = true)
+
+        assertThat(mapped.usage.nonCachedInputTokens).isEqualTo(100)
+        assertThat(mapped.usage.cacheWriteInputTokens).isZero()
+        assertThat(mapped.usage.cacheReadInputTokens).isEqualTo(20)
+        assertThat(mapped.usage.outputTokens).isEqualTo(30)
+        assertThat(mapped.usageComplete).isTrue()
+    }
+
+    @Test
+    fun `Google cache detail greater than gross input is incomplete and conservative`() {
+        val usage = DefaultUsage(10, 3, 13, null, 11, null)
+
+        val mapped = SpringAiUsageMapper().map(Provider.GEMINI, usage, cacheEnabled = true)
+
+        assertThat(mapped.usage.nonCachedInputTokens).isZero()
+        assertThat(mapped.usage.cacheWriteInputTokens).isZero()
+        assertThat(mapped.usage.cacheReadInputTokens).isEqualTo(11)
+        assertThat(mapped.usage.outputTokens).isEqualTo(3)
+        assertThat(mapped.usageComplete).isFalse()
     }
 
     @Test

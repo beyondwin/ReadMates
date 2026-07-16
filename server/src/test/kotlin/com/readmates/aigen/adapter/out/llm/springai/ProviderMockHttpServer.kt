@@ -17,11 +17,13 @@ internal class ProviderMockHttpServer private constructor(
 ) : AutoCloseable {
     private val count = AtomicInteger()
     private val bodies = CopyOnWriteArrayList<String>()
+    private val headers = CopyOnWriteArrayList<Map<String, List<String>>>()
 
     val origin: String = "http://127.0.0.1:${server.address.port}"
     val baseUrl: String = "$origin/v1"
     val requestCount: Int get() = count.get()
     val requestBodies: List<String> get() = bodies.toList()
+    val requestHeaders: List<Map<String, List<String>>> get() = headers.toList()
 
     init {
         server.createContext(path, ::handle)
@@ -33,6 +35,7 @@ internal class ProviderMockHttpServer private constructor(
         exchange.use {
             count.incrementAndGet()
             bodies += exchange.requestBody.readAllBytes().toString(StandardCharsets.UTF_8)
+            headers += exchange.requestHeaders.mapValues { (_, values) -> values.toList() }
             if (!response.delay.isZero) {
                 Thread.sleep(response.delay)
             }

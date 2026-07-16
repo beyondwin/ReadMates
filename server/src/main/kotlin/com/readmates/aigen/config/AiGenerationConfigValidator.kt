@@ -1,6 +1,7 @@
 package com.readmates.aigen.config
 
 import com.readmates.aigen.adapter.out.llm.springai.AnthropicGroundedModelPolicy
+import com.readmates.aigen.adapter.out.llm.springai.GoogleGroundedModelPolicy
 import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.port.out.AiGenerationJobQueue
@@ -51,6 +52,7 @@ class AiGenerationConfigValidator(
             "readmates.aigen.grounded.safety-margin-tokens must be positive"
         }
         validateAnthropicGroundedModels()
+        validateGoogleGroundedModels()
         grounded.capabilities.forEach { (model, capability) ->
             check(capability.contextWindowTokens > 0 && capability.maxOutputTokens > 0) {
                 "grounded capability limits must be positive for model $model"
@@ -71,6 +73,24 @@ class AiGenerationConfigValidator(
             check(grounded.capabilities.keys.any { model -> providerForModel(model) == provider }) {
                 "grounded enabled provider $provider has no verified capability entry"
             }
+        }
+    }
+
+    private fun validateGoogleGroundedModels() {
+        if (properties.enabledProviders.none { it.equals(Provider.GEMINI.name, ignoreCase = true) }) return
+        if (!properties.mock) {
+            check(properties.providers.google.paidTierRetentionConfirmed) {
+                "readmates.aigen.providers.google.paid-tier-retention-confirmed must be true when GEMINI is enabled"
+            }
+        }
+        val googleCapabilities = properties.grounded.capabilities.filterKeys { it.startsWith("gemini-") }
+        val valid =
+            googleCapabilities.isNotEmpty() &&
+                googleCapabilities.all { (model, capability) ->
+                    capability.structuredOutputSupported && GoogleGroundedModelPolicy.isVerified(model)
+                }
+        check(valid) {
+            "Enabled Google grounded model lacks verified no-thinking structured output"
         }
     }
 

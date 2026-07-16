@@ -167,6 +167,33 @@ class GeminiSchemaCompatAdapterTest {
         assertThat(twice).isEqualTo(once)
     }
 
+    @Test
+    fun `adapts the canonical grounded schema string without retaining unsupported keywords`() {
+        val schema =
+            """
+            {
+              "${'$'}schema":"https://json-schema.org/draft/2020-12/schema",
+              "type":"object",
+              "additionalProperties":false,
+              "properties":{"format":{"const":"readmates-grounded:v1"}},
+              "required":["format"]
+            }
+            """.trimIndent()
+
+        val adapted = jsonNode(adapter.adapt(schema))
+
+        assertThat(adapted.has("${'$'}schema")).isFalse()
+        assertThat(adapted.has("additionalProperties")).isFalse()
+        assertThat(
+            adapted
+                .path("properties")
+                .path("format")
+                .path("enum")
+                .first()
+                .asText(),
+        ).isEqualTo("readmates-grounded:v1")
+    }
+
     private fun jsonNode(json: String): ObjectNode {
         val mapper =
             com.fasterxml.jackson.databind

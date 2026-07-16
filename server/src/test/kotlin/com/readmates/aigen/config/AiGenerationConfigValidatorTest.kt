@@ -215,6 +215,28 @@ class AiGenerationConfigValidatorTest {
             .hasMessageNotContaining("claude-sonnet-4-6")
     }
 
+    @Test
+    fun `requires paid tier retention confirmation for non-mock Gemini`() {
+        val properties = validGeminiProperties(paidTierRetentionConfirmed = false)
+
+        assertThatThrownBy {
+            AiGenerationConfigValidator(true, queueBeanFactory(), properties).validate()
+        }.isInstanceOf(IllegalStateException::class.java)
+            .hasMessage(
+                "readmates.aigen.providers.google.paid-tier-retention-confirmed must be true when GEMINI is enabled",
+            ).hasMessageNotContaining("key")
+            .hasMessageNotContaining("project")
+    }
+
+    @Test
+    fun `allows Gemini without paid tier confirmation only in mock mode`() {
+        val properties = validGeminiProperties(paidTierRetentionConfirmed = false).copy(mock = true)
+
+        assertThatCode {
+            AiGenerationConfigValidator(true, queueBeanFactory(), properties).validate()
+        }.doesNotThrowAnyException()
+    }
+
     private fun validProperties(reservedOutputTokens: Long = 16_384): AiGenerationProperties =
         AiGenerationProperties(
             fallbackDefaultModel = "gpt-5.4-mini",
@@ -257,6 +279,38 @@ class AiGenerationConfigValidatorTest {
         grounded = AiGenerationProperties.Grounded(capabilities = capabilities),
         pricing = pricing,
     )
+
+    private fun validGeminiProperties(paidTierRetentionConfirmed: Boolean) =
+        AiGenerationProperties(
+            enabledProviders = setOf("GEMINI"),
+            fallbackDefaultModel = "gemini-3-flash-preview",
+            pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
+            grounded =
+                AiGenerationProperties.Grounded(
+                    capabilities =
+                        mapOf(
+                            "gemini-3-flash-preview" to
+                                AiGenerationProperties.Capability(1_048_576, 65_536, true),
+                        ),
+                ),
+            providers =
+                AiGenerationProperties.Providers(
+                    google =
+                        AiGenerationProperties.GoogleProvider(
+                            paidTierRetentionConfirmed = paidTierRetentionConfirmed,
+                        ),
+                ),
+            pricing =
+                mapOf(
+                    "gemini-3-flash-preview" to
+                        AiGenerationProperties.Pricing(
+                            inputPerMTokenUsd = BigDecimal("0.50"),
+                            cacheWriteInputPerMTokenUsd = BigDecimal("0.50"),
+                            cachedInputPerMTokenUsd = BigDecimal("0.05"),
+                            outputPerMTokenUsd = BigDecimal("3.00"),
+                        ),
+                ),
+        )
 
     private fun queueBeanFactory(): DefaultListableBeanFactory =
         DefaultListableBeanFactory().also { factory ->

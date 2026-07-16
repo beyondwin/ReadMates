@@ -29,8 +29,17 @@ data class AiGenerationProperties(
     val caps: Caps = Caps(),
     val job: Job = Job(),
     val providerCalls: ProviderCalls = ProviderCalls(),
+    val providers: Providers = Providers(),
     val pricing: Map<String, Pricing> = emptyMap(),
 ) {
+    data class Providers(
+        val google: GoogleProvider = GoogleProvider(),
+    )
+
+    data class GoogleProvider(
+        val paidTierRetentionConfirmed: Boolean = false,
+    )
+
     data class Grounded(
         val reservedOutputTokens: Long = 16_384,
         val safetyMarginTokens: Long = 8_192,

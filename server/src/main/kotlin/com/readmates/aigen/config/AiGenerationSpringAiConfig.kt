@@ -1,6 +1,11 @@
 package com.readmates.aigen.config
 
+import com.google.genai.Client
+import com.google.genai.types.HttpOptions
+import com.google.genai.types.HttpRetryOptions
 import com.readmates.aigen.adapter.out.llm.common.GroundedDraftJsonCodec
+import com.readmates.aigen.adapter.out.llm.common.SessionImportSchemaResource
+import com.readmates.aigen.adapter.out.llm.gemini.GeminiSchemaCompatAdapter
 import com.readmates.aigen.adapter.out.llm.springai.AnthropicGroundedModelPolicy
 import com.readmates.aigen.adapter.out.llm.springai.SpringAiErrorMapper
 import com.readmates.aigen.adapter.out.llm.springai.SpringAiProviderNativeUsageExtractor
@@ -18,6 +23,8 @@ import org.springframework.ai.chat.client.advisor.ToolCallingAdvisor
 import org.springframework.ai.chat.client.advisor.observation.AdvisorObservationConvention
 import org.springframework.ai.chat.client.observation.ChatClientObservationConvention
 import org.springframework.ai.chat.model.ChatModel
+import org.springframework.ai.google.genai.GoogleGenAiChatModel
+import org.springframework.ai.google.genai.GoogleGenAiChatOptions
 import org.springframework.ai.model.chat.client.autoconfigure.ChatClientBuilderConfigurer
 import org.springframework.ai.openai.OpenAiChatModel
 import org.springframework.ai.openai.OpenAiChatOptions
@@ -28,6 +35,8 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.env.Environment
+import org.springframework.core.retry.RetryPolicy
+import org.springframework.core.retry.RetryTemplate
 import java.time.Duration
 
 private typealias CapabilityCatalogs = ObjectProvider<ModelCapabilityCatalog>
@@ -91,11 +100,94 @@ internal object AnthropicSpringAiModelFactory {
     }
 }
 
+internal data class GoogleGenAiSpringAiModelResources(
+    val model: GoogleGenAiChatModel,
+    val options: HttpOptions,
+    val retryTemplate: RetryTemplate,
+)
+
+/** The Google SDK client exists only because Spring AI requires it as its transport dependency. */
+internal object GoogleGenAiSpringAiModelFactory {
+    const val API_KEY_ENV = "READMATES_AIGEN_GEMINI_API_KEY"
+    private const val DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com"
+    private const val API_VERSION = "v1beta"
+    private const val NO_RETENTION_HEADER = "x-goog-data-policy"
+    private const val NO_RETENTION_VALUE = "no-retention"
+
+    fun create(
+        apiKey: String,
+        baseUrl: String = DEFAULT_BASE_URL,
+        timeout: Duration,
+        observationRegistry: ObservationRegistry = ObservationRegistry.NOOP,
+    ): GoogleGenAiSpringAiModelResources {
+        require(apiKey.isNotBlank()) { "Google GenAI API key must not be blank" }
+        val timeoutMillis = timeout.toMillis()
+        require(timeoutMillis in 1..Int.MAX_VALUE) { "Google GenAI request timeout is invalid" }
+        val httpOptions =
+            HttpOptions
+                .builder()
+                .baseUrl(baseUrl)
+                .apiVersion(API_VERSION)
+                .timeout(timeoutMillis.toInt())
+                .headers(mapOf(NO_RETENTION_HEADER to NO_RETENTION_VALUE))
+                .retryOptions(HttpRetryOptions.builder().attempts(1))
+                .build()
+        val client =
+            Client
+                .builder()
+                .apiKey(apiKey)
+                .httpOptions(httpOptions)
+                .build()
+        val retryTemplate = RetryTemplate(RetryPolicy.withMaxRetries(0))
+        val defaultOptions = GoogleGenAiChatOptions.builder().includeExtendedUsageMetadata(true).build()
+        val model =
+            GoogleGenAiChatModel
+                .builder()
+                .genAiClient(client)
+                .options(defaultOptions)
+                .retryTemplate(retryTemplate)
+                .observationRegistry(observationRegistry)
+                .build()
+        return GoogleGenAiSpringAiModelResources(model, httpOptions, retryTemplate)
+    }
+}
+
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(AiGenerationProperties::class)
 @ConditionalOnProperty(prefix = "readmates.aigen", name = ["enabled"], havingValue = "true")
 @ConditionalOnProperty(prefix = "readmates.aigen", name = ["mock"], havingValue = "false", matchIfMissing = true)
 class AiGenerationSpringAiConfig {
+    @Bean
+    fun googleGenAiSpringAiChatModel(
+        properties: AiGenerationProperties,
+        environment: Environment,
+        observationRegistry: ObjectProvider<ObservationRegistry>,
+    ): SpringAiProviderChatModel? {
+        if (properties.enabledProviders.none { it.equals(Provider.GEMINI.name, ignoreCase = true) }) {
+            return null
+        }
+        val configuredModels =
+            properties.grounded.capabilities.keys
+                .filter(com.readmates.aigen.adapter.out.llm.springai.GoogleGroundedModelPolicy::isVerified)
+        require(configuredModels.isNotEmpty()) {
+            "Google grounded no-thinking capability is required when GEMINI is enabled"
+        }
+        require(properties.providers.google.paidTierRetentionConfirmed) {
+            "readmates.aigen.providers.google.paid-tier-retention-confirmed must be true when GEMINI is enabled"
+        }
+        val apiKey = environment.getProperty(GoogleGenAiSpringAiModelFactory.API_KEY_ENV)
+        require(!apiKey.isNullOrBlank()) { "Google GenAI API key is required when GEMINI is enabled" }
+        return SpringAiProviderChatModel(
+            Provider.GEMINI,
+            GoogleGenAiSpringAiModelFactory
+                .create(
+                    apiKey = apiKey,
+                    timeout = properties.providerCalls.requestTimeout,
+                    observationRegistry = observationRegistry.getIfUnique { ObservationRegistry.NOOP },
+                ).model,
+        )
+    }
+
     @Bean
     fun anthropicSpringAiChatModel(
         properties: AiGenerationProperties,
@@ -145,12 +237,19 @@ class AiGenerationSpringAiConfig {
     }
 
     @Bean
-    fun optionsFactory(catalogs: CapabilityCatalogs): SpringAiProviderOptionsFactory {
+    fun optionsFactory(
+        catalogs: CapabilityCatalogs,
+        geminiSchemaCompatAdapters: ObjectProvider<GeminiSchemaCompatAdapter>,
+    ): SpringAiProviderOptionsFactory {
         val catalog =
             requireNotNull(catalogs.getIfUnique()) {
                 "Exactly one AI model capability catalog is required"
             }
-        return SpringAiProviderOptionsFactory(catalog)
+        val geminiSchemaCompatAdapter =
+            geminiSchemaCompatAdapters.getIfAvailable {
+                GeminiSchemaCompatAdapter(SessionImportSchemaResource())
+            }
+        return SpringAiProviderOptionsFactory(catalog, geminiSchemaCompatAdapter)
     }
 
     @Bean
