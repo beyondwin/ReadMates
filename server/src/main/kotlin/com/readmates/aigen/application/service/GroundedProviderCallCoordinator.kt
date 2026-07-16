@@ -14,6 +14,8 @@ import com.readmates.aigen.application.model.ProviderCallException
 import com.readmates.aigen.application.model.ProviderCallMode
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.out.AiGenerationAuditPort
+import com.readmates.aigen.application.port.out.AiProviderObservationContext
+import com.readmates.aigen.application.port.out.AiProviderObservationPort
 import com.readmates.aigen.application.port.out.AiTraceContextPort
 import com.readmates.aigen.application.port.out.AuditKind
 import com.readmates.aigen.application.port.out.AuditLogEntry
@@ -94,6 +96,7 @@ class GroundedProviderCallCoordinator private constructor(
     private val modelCatalog: ModelCatalog,
     private val auditPort: AiGenerationAuditPort,
     private val traceContext: AiTraceContextPort,
+    private val observations: AiProviderObservationPort,
     private val clock: Clock,
     private val maxCalls: Int,
 ) {
@@ -107,6 +110,7 @@ class GroundedProviderCallCoordinator private constructor(
         modelCatalog: ModelCatalog,
         auditPort: AiGenerationAuditPort,
         traceContext: AiTraceContextPort,
+        observations: AiProviderObservationPort,
         clock: Clock,
         properties: com.readmates.aigen.config.AiGenerationProperties,
     ) : this(
@@ -116,6 +120,7 @@ class GroundedProviderCallCoordinator private constructor(
         modelCatalog,
         auditPort,
         traceContext,
+        observations,
         clock,
         properties.job.maxLlmCallsPerJob,
     )
@@ -129,8 +134,9 @@ class GroundedProviderCallCoordinator private constructor(
         traceContext: AiTraceContextPort,
         clock: Clock,
         maxCalls: Int,
+        observations: AiProviderObservationPort = AiProviderObservationPort.PASSTHROUGH,
         @Suppress("UNUSED_PARAMETER") testConstruction: Unit = Unit,
-    ) : this(gate, reservations, generators, modelCatalog, auditPort, traceContext, clock, maxCalls)
+    ) : this(gate, reservations, generators, modelCatalog, auditPort, traceContext, observations, clock, maxCalls)
 
     @Suppress("ReturnCount", "SwallowedException", "TooGenericExceptionCaught")
     fun execute(command: GroundedProviderCallCommand): GroundedProviderCallResult {
@@ -147,7 +153,17 @@ class GroundedProviderCallCoordinator private constructor(
                 val attempt = reservation.attempt
                 val transport =
                     try {
-                        callOnce(generator, command)
+                        observations.observe(
+                            AiProviderObservationContext(
+                                provider = command.model.provider,
+                                model = command.model,
+                                mode = command.mode,
+                                attemptOrdinal = attempt.ordinal,
+                                jobId = command.record.jobId,
+                            ),
+                        ) {
+                            callOnce(generator, command)
+                        }
                     } catch (failure: ProviderCallException) {
                         PhysicalResult.Failure(failure.error, classify(failure.error.code), failure.retryAfter)
                     } catch (failure: RuntimeException) {

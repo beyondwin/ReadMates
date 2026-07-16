@@ -26,7 +26,7 @@ import java.io.PrintStream
 @Isolated
 class LogbackJsonEncoderTest {
     @Test
-    fun `console log line is valid JSON containing requestId from MDC`() {
+    fun `console log line is valid JSON containing content-free correlation MDC`() {
         val context = LoggerFactory.getILoggerFactory() as LoggerContext
         val originalOut = System.out
         val captured = ByteArrayOutputStream()
@@ -38,11 +38,22 @@ class LogbackJsonEncoderTest {
         )
         System.setOut(PrintStream(captured))
         try {
-            MDC.put("requestId", "smoke-req-1234")
+            val expected =
+                mapOf(
+                    "requestId" to "smoke-req-1234",
+                    "traceId" to "0123456789abcdef0123456789abcdef",
+                    "spanId" to "0123456789abcdef",
+                    "jobId" to "11111111-2222-4333-8444-555555555555",
+                    "provider" to "openai",
+                    "stage" to "primary",
+                    "attempt" to "2",
+                )
+            expected.forEach(MDC::put)
+            MDC.put("prompt", "synthetic prompt must not be serialized")
             LoggerFactory.getLogger(LogbackJsonEncoderTest::class.java).info("smoke-line")
         } finally {
             System.setOut(originalOut)
-            MDC.remove("requestId")
+            MDC.clear()
             context.reset()
             ContextInitializer(context).autoConfig()
         }
@@ -50,6 +61,13 @@ class LogbackJsonEncoderTest {
         val line = captured.toString().lineSequence().first { it.contains("smoke-line") }
         assertTrue(line.trim().startsWith("{"), "log line should be JSON: $line")
         assertTrue(line.contains("\"requestId\":\"smoke-req-1234\""), "missing requestId in: $line")
+        assertTrue(line.contains("\"traceId\":\"0123456789abcdef0123456789abcdef\""), "missing traceId in: $line")
+        assertTrue(line.contains("\"spanId\":\"0123456789abcdef\""), "missing spanId in: $line")
+        assertTrue(line.contains("\"jobId\":\"11111111-2222-4333-8444-555555555555\""), "missing jobId in: $line")
+        assertTrue(line.contains("\"provider\":\"openai\""), "missing provider in: $line")
+        assertTrue(line.contains("\"stage\":\"primary\""), "missing stage in: $line")
+        assertTrue(line.contains("\"attempt\":\"2\""), "missing attempt in: $line")
+        assertFalse(line.contains("synthetic prompt"), "content-bearing MDC should be excluded: $line")
         assertFalse(line.contains("[ignore]"), "should not contain placeholder")
     }
 }

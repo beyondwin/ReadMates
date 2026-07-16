@@ -2,6 +2,12 @@
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="net.logstash.logback.encoder.LogstashEncoder">
             <includeMdcKeyName>requestId</includeMdcKeyName>
+            <includeMdcKeyName>traceId</includeMdcKeyName>
+            <includeMdcKeyName>spanId</includeMdcKeyName>
+            <includeMdcKeyName>jobId</includeMdcKeyName>
+            <includeMdcKeyName>provider</includeMdcKeyName>
+            <includeMdcKeyName>stage</includeMdcKeyName>
+            <includeMdcKeyName>attempt</includeMdcKeyName>
             <includeMdcKeyName>clubSlug</includeMdcKeyName>
             <includeMdcKeyName>sessionId</includeMdcKeyName>
             <includeMdcKeyName>actorId</includeMdcKeyName>

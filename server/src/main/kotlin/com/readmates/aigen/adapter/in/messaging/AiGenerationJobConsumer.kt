@@ -3,6 +3,7 @@ package com.readmates.aigen.adapter.`in`.messaging
 import com.readmates.aigen.adapter.out.messaging.AiGenerationJobMessage
 import com.readmates.aigen.application.service.AiGenerationWorker
 import org.slf4j.LoggerFactory
+import org.slf4j.MDC
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.kafka.support.Acknowledgment
@@ -39,21 +40,45 @@ class AiGenerationJobConsumer(
         message: AiGenerationJobMessage,
         acknowledgment: Acknowledgment,
     ) {
+        withWorkerMdc(message) {
+            try {
+                worker.process(message.jobId)
+                acknowledgment.acknowledge()
+            } catch (ex: RuntimeException) {
+                // Do NOT ack — let the container redeliver. Never attach the raw
+                // throwable or its message because provider bodies can reach causes.
+                log.error(
+                    "AI generation worker failed errorCode={} failureClass={}",
+                    "UNKNOWN",
+                    "INFRASTRUCTURE",
+                )
+                throw ex
+            }
+        }
+    }
+
+    private fun <T> withWorkerMdc(
+        message: AiGenerationJobMessage,
+        block: () -> T,
+    ): T =
+        withMdcValue("jobId", message.jobId.toString()) {
+            withMdcValue("provider", message.provider.name.lowercase()) {
+                withMdcValue("stage", "worker") { block() }
+            }
+        }
+
+    private fun <T> withMdcValue(
+        key: String,
+        value: String,
+        block: () -> T,
+    ): T {
+        val previous = MDC.get(key)
+        val closeable = MDC.putCloseable(key, value)
         try {
-            worker.process(message.jobId)
-            acknowledgment.acknowledge()
-        } catch (ex: RuntimeException) {
-            // Do NOT ack — let the container redeliver. Worker.process is responsible
-            // for persisting failure state in Redis when retries are exhausted.
-            log.error(
-                "AI generation worker failed for jobId={} sessionId={} clubId={}: {}",
-                message.jobId,
-                message.sessionId,
-                message.clubId,
-                ex.message,
-                ex,
-            )
-            throw ex
+            return block()
+        } finally {
+            closeable.close()
+            previous?.let { MDC.put(key, it) }
         }
     }
 }

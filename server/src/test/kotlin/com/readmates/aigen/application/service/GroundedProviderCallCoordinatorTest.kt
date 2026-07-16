@@ -11,6 +11,8 @@ import com.readmates.aigen.application.model.ProviderAttempt
 import com.readmates.aigen.application.model.ProviderAttemptState
 import com.readmates.aigen.application.model.ProviderCallMode
 import com.readmates.aigen.application.model.TokenUsage
+import com.readmates.aigen.application.port.out.AiProviderObservationContext
+import com.readmates.aigen.application.port.out.AiProviderObservationPort
 import com.readmates.aigen.application.port.out.AiTraceContextPort
 import com.readmates.aigen.application.port.out.GroundedGenerationOutput
 import com.readmates.aigen.application.port.out.GroundedSectionRepairOutput
@@ -45,7 +47,9 @@ class GroundedProviderCallCoordinatorTest {
         assertThat(context.events).containsExactly(
             "gate.acquire",
             "reservation.reserve",
+            "observation.start",
             "generator.generate-or-repair",
+            "observation.stop",
             "reservation.reconcile",
             "permit.record",
             "permit.close",
@@ -56,6 +60,16 @@ class GroundedProviderCallCoordinatorTest {
         assertThat(audit.providerCallMode).isEqualTo(ProviderCallMode.PRIMARY)
         assertThat(audit.traceId).isEqualTo(TRACE_ID)
         assertThat(audit.costBasis).isEqualTo(CostBasis.ACTUAL)
+        assertThat(context.observations.contexts.single())
+            .isEqualTo(
+                AiProviderObservationContext(
+                    provider = context.model.provider,
+                    model = context.model,
+                    mode = ProviderCallMode.PRIMARY,
+                    attemptOrdinal = 1,
+                    jobId = context.record.jobId,
+                ),
+            )
     }
 
     @Test
@@ -233,7 +247,9 @@ class GroundedProviderCallCoordinatorTest {
         assertThat(context.events).containsExactly(
             "gate.acquire",
             "reservation.reserve",
+            "observation.start",
             "generator.generate-or-repair",
+            "observation.stop",
             "reservation.reconcile",
             "permit.record",
             "permit.close",
@@ -252,6 +268,7 @@ class GroundedProviderCallCoordinatorTest {
         val events = mutableListOf<String>()
         val permit = RecordingPermit(events)
         val generator = RecordingGenerator(events)
+        val observations = RecordingObservationPort(events)
         val audit =
             FakeAuditPort().apply {
                 onInsert = {
@@ -278,6 +295,7 @@ class GroundedProviderCallCoordinatorTest {
                 traceContext = AiTraceContextPort { TRACE_ID },
                 clock = FakeClock(NOW),
                 maxCalls = 3,
+                observations = observations,
             )
 
         fun command(
@@ -293,6 +311,25 @@ class GroundedProviderCallCoordinatorTest {
             request = request,
             section = section,
         )
+    }
+
+    private class RecordingObservationPort(
+        private val events: MutableList<String>,
+    ) : AiProviderObservationPort {
+        val contexts = mutableListOf<AiProviderObservationContext>()
+
+        override fun <T> observe(
+            context: AiProviderObservationContext,
+            block: () -> T,
+        ): T {
+            contexts += context
+            events += "observation.start"
+            try {
+                return block()
+            } finally {
+                events += "observation.stop"
+            }
+        }
     }
 
     private class RecordingPermit(

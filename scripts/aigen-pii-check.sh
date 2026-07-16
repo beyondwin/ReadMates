@@ -18,10 +18,15 @@
 #   5. The raw transcript Redis key is allowed only inside the job-store handoff
 #      boundary and must remain TTL/delete covered by integration tests.
 #   6. All four short-lived Redis payload keys stay inside the Redis adapter boundary.
-#   7. Grounded hashes remain metadata-only and terminal cleanup removes legacy fields.
+#   7. Grounded hashes remain metadata-only and terminal cleanup removes sensitive fields.
 #   8. Kafka job messages remain content-free routing metadata.
 #   9. AI audit/receipt schemas remain aggregate/metadata-only.
 #  10. Production logs do not interpolate request or generation content objects.
+#  11. Spring AI prompt/completion/error/tool content observations remain disabled.
+#  12. AI logs/advisors never receive content-bearing objects or raw throwables.
+#  13. AI tracing code never uses baggage or member/session/club identity.
+#  14. Provider observation keys stay within the metric/span allowlists.
+#  15. Kafka payload/header changes cannot add content or identity metadata.
 #
 # Exit 0 = all PII invariants hold; non-zero = at least one regression found.
 set -euo pipefail
@@ -33,10 +38,14 @@ cd "$REPO_ROOT"
 # main aggregates so the operator sees every failing invariant in one run.
 
 check0_guard_self_test_fixtures() {
-  local unsafe_message safe_message unsafe_column
+  local unsafe_message safe_message unsafe_column unsafe_flag unsafe_log unsafe_trace unsafe_header
   unsafe_message=$'data class AiGenerationJobMessage(\n  val jobId: UUID,\n  val transcript: String,\n)'
   safe_message=$'data class AiGenerationJobMessage(\n  val jobId: UUID,\n  val model: String,\n)'
   unsafe_column='ALTER TABLE ai_generation_commit_receipts ADD COLUMN evidence_text TEXT;'
+  unsafe_flag='log-prompt: true'
+  unsafe_log='log.error("provider response={}", response, failure)'
+  unsafe_trace='observation.lowCardinalityKeyValue("jobId", jobId.toString())'
+  unsafe_header='builder.setHeader("sessionId", command.sessionId)'
   if ! printf '%s\n' "$unsafe_message" | grep -Eiq '\b(transcript|turns?|speaker|result|evidence|excerpt|prompt|instructions|name)\b'; then
     echo "FAIL [check0]: Kafka unsafe-field self-test fixture was not detected" >&2
     return 1
@@ -47,6 +56,22 @@ check0_guard_self_test_fixtures() {
   fi
   if ! printf '%s\n' "$unsafe_column" | grep -Eiq '\b(transcript|turns?|result|evidence|excerpt|prompt|instructions|member_name|speaker_name|body|text)\b'; then
     echo "FAIL [check0]: migration unsafe-column self-test fixture was not detected" >&2
+    return 1
+  fi
+  if ! printf '%s\n' "$unsafe_flag" | grep -Eq '(log-prompt|log-completion|include-error-logging|include-content):[[:space:]]*true'; then
+    echo "FAIL [check0]: unsafe Spring AI observation flag self-test fixture was not detected" >&2
+    return 1
+  fi
+  if ! printf '%s\n' "$unsafe_log" | grep -Eiq '(log|logger)\.(trace|debug|info|warn|error).*\b(prompt|request|response|content|transcript|evidence|instructions)\b'; then
+    echo "FAIL [check0]: unsafe content-log self-test fixture was not detected" >&2
+    return 1
+  fi
+  if ! printf '%s\n' "$unsafe_trace" | grep -Eq '(lowCardinalityKeyValue|tag)\("(jobId|traceId|spanId|sessionId|clubId|hostUserId|userId|email)"'; then
+    echo "FAIL [check0]: unsafe metric-key self-test fixture was not detected" >&2
+    return 1
+  fi
+  if ! printf '%s\n' "$unsafe_header" | grep -Eiq '(header|setHeader).*\b(session|club|host|user|email|prompt|content|transcript|evidence)'; then
+    echo "FAIL [check0]: unsafe Kafka header self-test fixture was not detected" >&2
     return 1
   fi
   return 0
@@ -142,17 +167,18 @@ check6_grounded_payload_scope_and_lifecycle() {
     return 1
   fi
   adapter=server/src/main/kotlin/com/readmates/aigen/adapter/out/redis/RedisAiGenerationJobStore.kt
-  tests=server/src/test/kotlin/com/readmates/aigen/adapter/out/redis/RedisAiGenerationJobStoreTest.kt
+  tests=server/src/test/kotlin/com/readmates/aigen/adapter/out/redis/RedisGroundedAiGenerationJobStoreTest.kt
   for suffix in transcript turns result evidence; do
     if ! grep -q "private fun ${suffix}Key" "$adapter"; then
       echo "FAIL [check6]: missing $suffix payload key boundary" >&2
       return 1
     fi
-    if ! grep -q "aigen:job:.*:$suffix" "$tests"; then
-      echo "FAIL [check6]: missing $suffix TTL/delete regression coverage" >&2
-      return 1
-    fi
   done
+  if ! grep -q 'payloadSuffixes = listOf("transcript", "turns", "result", "evidence")' "$tests" || \
+     ! grep -q 'all four grounded payloads share six hour ttl and cleanup removes each' "$tests"; then
+    echo "FAIL [check6]: missing four-payload TTL/delete regression coverage" >&2
+    return 1
+  fi
   if ! grep -q "DEL', KEYS\[2\], KEYS\[3\], KEYS\[4\], KEYS\[5\]" \
     server/src/main/kotlin/com/readmates/aigen/adapter/out/redis/AiGenerationRedisScripts.kt; then
     echo "FAIL [check6]: terminal cleanup no longer deletes all four payload keys" >&2
@@ -166,8 +192,8 @@ check7_grounded_hash_boundary() {
   codec=server/src/main/kotlin/com/readmates/aigen/adapter/out/redis/AiGenerationRedisRecordCodec.kt
   legacy_cleanup=server/src/main/kotlin/com/readmates/aigen/adapter/out/redis/AiGenerationRedisScripts.kt
   grounded_cleanup=server/src/main/kotlin/com/readmates/aigen/adapter/out/redis/GroundedAiGenerationRedisScripts.kt
-  if ! grep -q 'pipelineMode == AiGenerationPipelineMode.LEGACY' "$codec"; then
-    echo "FAIL [check7]: sensitive compatibility hash fields are not LEGACY-gated" >&2
+  if grep -qE 'AiGenerationPipelineMode|pipelineMode' "$codec"; then
+    echo "FAIL [check7]: removed legacy pipeline selector returned to the Redis codec" >&2
     return 1
   fi
   if ! grep -q "HDEL'.*'sessionMeta'.*'instructions'" "$legacy_cleanup" || \
@@ -206,12 +232,107 @@ check9_content_free_mysql_surfaces() {
 
 check10_no_content_object_logging() {
   local hits
-  hits=$(grep -RIn --include='*.kt' -Ei \
-    'logger\.(trace|debug|info|warn|error).*\b(request|response|transcript|turns?|evidence|draft|instructions)\b' \
+  hits=$(rg -n -U -i \
+    '(?:log|logger)\.(?:trace|debug|info|warn|error)\([^\"]*\"[^\"]*\"\s*,[\s\S]{0,500}?\b(?:prompt|request|response|content|transcript|turns?|evidence|draft|instructions|schema|completion)\b' \
     server/src/main/kotlin/com/readmates/aigen/ 2>/dev/null || true)
   if [[ -n "$hits" ]]; then
     echo "FAIL [check10]: AI production log may interpolate content-bearing objects:" >&2
     echo "$hits" >&2
+    return 1
+  fi
+  return 0
+}
+
+check11_spring_ai_content_observation_disabled() {
+  local config unsafe
+  config=server/src/main/resources/application.yml
+  unsafe=$(grep -nE '(log-prompt|log-completion|include-error-logging|include-content):[[:space:]]*true' "$config" || true)
+  if [[ -n "$unsafe" ]]; then
+    echo "FAIL [check11]: Spring AI content/error observation was enabled:" >&2
+    echo "$unsafe" >&2
+    return 1
+  fi
+  if [[ "$(grep -c 'log-prompt:[[:space:]]*false' "$config" || true)" -lt 2 ]] || \
+     [[ "$(grep -c 'log-completion:[[:space:]]*false' "$config" || true)" -lt 2 ]] || \
+     ! grep -q 'include-error-logging:[[:space:]]*false' "$config" || \
+     ! grep -q 'include-content:[[:space:]]*false' "$config"; then
+    echo "FAIL [check11]: required Spring AI content/privacy flags are not explicitly false" >&2
+    return 1
+  fi
+  return 0
+}
+
+check12_no_content_advisor_or_raw_throwable_logging() {
+  local content_hits throwable_hits advisor_hits
+  content_hits=$(rg -n -U -i \
+    '(?:log|logger)\.(?:trace|debug|info|warn|error)\([^\"]*\"[^\"]*\"\s*,[\s\S]{0,500}?\b(?:prompt|request|response|content|transcript|turns?|evidence|draft|instructions|schema|completion)\b' \
+    server/src/main/kotlin/com/readmates/aigen/ 2>/dev/null || true)
+  throwable_hits=$(rg -n -U \
+    '(?:log|logger)\.(?:trace|debug|info|warn|error)\([\s\S]{0,500}?(?:\b(?:ex|failure|throwable)\.message\b|\b(?:ex|failure|throwable)\s*[,\)])' \
+    server/src/main/kotlin/com/readmates/aigen/ 2>/dev/null || true)
+  advisor_hits=$(rg -n -i \
+    '(SimpleLoggerAdvisor|LoggingAdvisor|PromptChatMemoryAdvisor|\.advisors?\([^)]*(prompt|request|response|content))' \
+    server/src/main/kotlin/com/readmates/aigen/ 2>/dev/null || true)
+  if [[ -n "$content_hits$throwable_hits$advisor_hits" ]]; then
+    echo "FAIL [check12]: AI logging/advisor path can receive content or a raw throwable:" >&2
+    printf '%s\n%s\n%s\n' "$content_hits" "$throwable_hits" "$advisor_hits" >&2
+    return 1
+  fi
+  return 0
+}
+
+check13_trace_identity_and_baggage_absent() {
+  local trace_files hits
+  trace_files=$(find server/src/main/kotlin/com/readmates/aigen -type f \( -iname '*Observation*.kt' -o -iname '*Trace*.kt' \) -print)
+  [[ -z "$trace_files" ]] && return 0
+  hits=$(printf '%s\n' "$trace_files" | xargs grep -nEi \
+    '\b(baggage|BaggageField|sessionId|clubId|hostUserId|userId|actorId|email)\b' 2>/dev/null || true)
+  if [[ -n "$hits" ]]; then
+    echo "FAIL [check13]: AI trace/observation code contains baggage or business identity:" >&2
+    echo "$hits" >&2
+    return 1
+  fi
+  return 0
+}
+
+check14_observation_attribute_allowlist() {
+  local adapter low high forbidden_low forbidden_high
+  adapter=server/src/main/kotlin/com/readmates/aigen/adapter/out/observability/MicrometerAiProviderObservationAdapter.kt
+  if [[ ! -f "$adapter" ]]; then
+    echo "FAIL [check14]: content-free provider observation adapter is missing" >&2
+    return 1
+  fi
+  low=$(grep -oE 'lowCardinalityKeyValue\("[a-zA-Z]+"' "$adapter" || true)
+  high=$(grep -oE 'highCardinalityKeyValue\("[a-zA-Z]+"' "$adapter" || true)
+  forbidden_low=$(printf '%s\n' "$low" | grep -vE '"(provider|model|callMode|outcome|errorCode)"$' || true)
+  forbidden_high=$(printf '%s\n' "$high" | grep -vE '"(jobId|attempt)"$' || true)
+  if [[ -n "$forbidden_low$forbidden_high" ]]; then
+    echo "FAIL [check14]: provider observation attribute escaped its bounded allowlist:" >&2
+    printf '%s\n%s\n' "$forbidden_low" "$forbidden_high" >&2
+    return 1
+  fi
+  return 0
+}
+
+check15_kafka_payload_and_header_allowlist() {
+  local message fields unexpected_fields header_calls unexpected_headers producer
+  message=server/src/main/kotlin/com/readmates/aigen/adapter/out/messaging/AiGenerationJobMessage.kt
+  fields=$(sed -n '/data class AiGenerationJobMessage(/,/^)/p' "$message" | sed -nE 's/.*val ([a-zA-Z0-9_]+):.*/\1/p')
+  unexpected_fields=$(printf '%s\n' "$fields" | grep -vE '^(jobId|sessionId|clubId|hostUserId|provider|model|kind)$' || true)
+  header_calls=$(rg -n '\.setHeader\(' server/src/main/kotlin/com/readmates/aigen/ 2>/dev/null || true)
+  unexpected_headers=$(printf '%s\n' "$header_calls" | \
+    grep -vE 'KafkaHeaders\.(TOPIC|KEY)|"readmates-aigen-(job-id|kind)"' || true)
+  producer=server/src/main/kotlin/com/readmates/aigen/adapter/out/messaging/AiGenerationJobProducer.kt
+  if [[ "$(printf '%s\n' "$header_calls" | grep -c . || true)" -ne 4 ]] || \
+     ! rg -U -q '\.setHeader\(KafkaHeaders\.TOPIC,\s*properties\.topicJobs\)' "$producer" || \
+     ! rg -U -q '\.setHeader\(KafkaHeaders\.KEY,\s*command\.clubId\.toString\(\)\)' "$producer" || \
+     ! grep -q '\.setHeader("readmates-aigen-job-id", jobId.toString())' "$producer" || \
+     ! grep -q '\.setHeader("readmates-aigen-kind", command.kind.name)' "$producer"; then
+    unexpected_headers="${unexpected_headers}"$'\nKafka header baseline changed; only existing topic, partition key, random job ID, and kind headers are allowed'
+  fi
+  if [[ -n "$unexpected_fields$unexpected_headers" ]]; then
+    echo "FAIL [check15]: Kafka payload/header gained content or identity metadata:" >&2
+    printf '%s\n%s\n' "$unexpected_fields" "$unexpected_headers" >&2
     return 1
   fi
   return 0
@@ -230,8 +351,13 @@ main() {
   check8_kafka_message_content_free || rc=1
   check9_content_free_mysql_surfaces || rc=1
   check10_no_content_object_logging || rc=1
+  check11_spring_ai_content_observation_disabled || rc=1
+  check12_no_content_advisor_or_raw_throwable_logging || rc=1
+  check13_trace_identity_and_baggage_absent || rc=1
+  check14_observation_attribute_allowlist || rc=1
+  check15_kafka_payload_and_header_allowlist || rc=1
   if [[ "$rc" -eq 0 ]]; then
-    echo "aigen-pii-check: PASS (10 invariants + self-test fixtures; transcript/turns/result/evidence lifecycle covered)"
+    echo "aigen-pii-check: PASS (15 invariants + self-test fixtures; content-free logs, traces, metrics, and Kafka covered)"
   else
     echo "aigen-pii-check: FAIL — see lines above (spec §11)" >&2
   fi
