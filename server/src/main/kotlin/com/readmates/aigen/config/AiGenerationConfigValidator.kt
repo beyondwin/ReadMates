@@ -50,6 +50,7 @@ class AiGenerationConfigValidator(
         check(grounded.safetyMarginTokens > 0) {
             "readmates.aigen.grounded.safety-margin-tokens must be positive"
         }
+        validateAnthropicGroundedModels()
         grounded.capabilities.forEach { (model, capability) ->
             check(capability.contextWindowTokens > 0 && capability.maxOutputTokens > 0) {
                 "grounded capability limits must be positive for model $model"
@@ -71,7 +72,6 @@ class AiGenerationConfigValidator(
                 "grounded enabled provider $provider has no verified capability entry"
             }
         }
-        validateAnthropicGroundedModels()
     }
 
     private fun validateAnthropicGroundedModels() {

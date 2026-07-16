@@ -204,6 +204,17 @@ class AiGenerationConfigValidatorTest {
             .hasMessageNotContaining("claude-sonnet-4-6")
     }
 
+    @Test
+    fun `rejects enabled Anthropic capability without pricing using a content-free message`() {
+        val properties = validAnthropicProperties(pricing = emptyMap())
+
+        assertThatThrownBy {
+            AiGenerationConfigValidator(true, queueBeanFactory(), properties).validate()
+        }.isInstanceOf(IllegalStateException::class.java)
+            .hasMessage("Enabled Anthropic grounded model lacks verified native structured output or pricing")
+            .hasMessageNotContaining("claude-sonnet-4-6")
+    }
+
     private fun validProperties(reservedOutputTokens: Long = 16_384): AiGenerationProperties =
         AiGenerationProperties(
             fallbackDefaultModel = "gpt-5.4-mini",
