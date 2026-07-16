@@ -11,9 +11,9 @@ import com.readmates.aigen.application.port.out.AuditLogEntry
 import com.readmates.aigen.application.port.out.AuditStatus
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate

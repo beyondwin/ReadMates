@@ -532,14 +532,21 @@ class MySqlFlywayMigrationTest(
     }
 
     private fun assertAiGenerationAttemptAuditColumns() {
+        assertAiGenerationAttemptAuditColumnSet()
+
         assertEquals("char", columnValue("ai_generation_audit_log", "trace_id", "data_type"))
+        assertEquals("32", columnValue("ai_generation_audit_log", "trace_id", "character_maximum_length"))
         assertEquals("YES", columnValue("ai_generation_audit_log", "trace_id", "is_nullable"))
         assertEquals("tinyint unsigned", columnValue("ai_generation_audit_log", "provider_attempt", "column_type"))
         assertEquals("YES", columnValue("ai_generation_audit_log", "provider_attempt", "is_nullable"))
         assertEquals("varchar", columnValue("ai_generation_audit_log", "provider_call_mode", "data_type"))
+        assertEquals("32", columnValue("ai_generation_audit_log", "provider_call_mode", "character_maximum_length"))
         assertEquals("YES", columnValue("ai_generation_audit_log", "provider_call_mode", "is_nullable"))
+        assertEquals("varchar", columnValue("ai_generation_audit_log", "cost_basis", "data_type"))
+        assertEquals("32", columnValue("ai_generation_audit_log", "cost_basis", "character_maximum_length"))
         assertEquals("NO", columnValue("ai_generation_audit_log", "cost_basis", "is_nullable"))
         assertEquals("NONE", columnValue("ai_generation_audit_log", "cost_basis", "column_default"))
+        assertEquals("int", columnValue("ai_generation_audit_log", "cache_write_input_tokens", "data_type"))
         assertEquals("NO", columnValue("ai_generation_audit_log", "cache_write_input_tokens", "is_nullable"))
         assertEquals("0", columnValue("ai_generation_audit_log", "cache_write_input_tokens", "column_default"))
 
@@ -568,6 +575,34 @@ class MySqlFlywayMigrationTest(
             )
         assertEquals(0, traceIndexes)
         assertEquals(0, traceForeignKeys)
+    }
+
+    private fun assertAiGenerationAttemptAuditColumnSet() {
+        val v38Columns =
+            jdbcTemplate.queryForList(
+                """
+                select column_name
+                from information_schema.columns
+                where table_schema = database()
+                  and table_name = 'ai_generation_audit_log'
+                  and column_name in (
+                    'trace_id',
+                    'provider_attempt',
+                    'provider_call_mode',
+                    'cost_basis',
+                    'cache_write_input_tokens'
+                  )
+                """.trimIndent(),
+                String::class.java,
+            )
+        assertEquals(5, v38Columns.size)
+        assertThat(v38Columns).containsExactlyInAnyOrder(
+            "trace_id",
+            "provider_attempt",
+            "provider_call_mode",
+            "cost_basis",
+            "cache_write_input_tokens",
+        )
     }
 
     @Test
