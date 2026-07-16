@@ -42,6 +42,10 @@ import java.util.concurrent.TimeUnit
         "readmates.bff-secret=test-bff-secret",
         "readmates.redis.enabled=true",
         "readmates.aigen.enabled=true",
+        "spring.ai.model.chat=none",
+        "spring.ai.google.genai.api-key=test-key",
+        "spring.ai.openai.api-key=test-key",
+        "spring.ai.anthropic.api-key=test-key",
     ],
 )
 @Tag("integration")
@@ -141,7 +145,9 @@ class RedisAiGenerationJobStoreTest(
             "revision",
             "eligibleFallbackModels",
             "cleanupPending",
+            "tokensCacheWrite",
         )
+        redisTemplate.opsForHash<String, String>().put(hashKey, "tokensInput", "77")
 
         val loaded = store.load(record.jobId)!!
 
@@ -150,6 +156,28 @@ class RedisAiGenerationJobStoreTest(
         assertThat(loaded.eligibleFallbackModels).isEmpty()
         assertThat(loaded.cleanupPending).isFalse()
         assertThat(loaded.transcript).isEqualTo(record.transcript)
+        assertThat(loaded.tokens.nonCachedInputTokens).isEqualTo(77L)
+        assertThat(loaded.tokens.cacheWriteInputTokens).isZero()
+        assertThat(loaded.tokens.publicInputTokens).isEqualTo(77L)
+    }
+
+    @Test
+    fun `save and load preserve all four token usage channels`() {
+        val usage =
+            TokenUsage(
+                nonCachedInputTokens = 100,
+                cacheWriteInputTokens = 25,
+                cacheReadInputTokens = 50,
+                outputTokens = 200,
+            )
+        val record = newRecord().copy(tokens = usage)
+
+        store.save(record)
+
+        val loaded = store.load(record.jobId)!!
+        assertThat(loaded.tokens).isEqualTo(usage)
+        assertThat(loaded.tokens.publicInputTokens).isEqualTo(125L)
+        assertThat(loaded.tokens.publicCachedInputTokens).isEqualTo(50L)
     }
 
     @Test
@@ -170,7 +198,7 @@ class RedisAiGenerationJobStoreTest(
             snapshot,
             TokenUsage(
                 nonCachedInputTokens = 100,
-                cacheWriteInputTokens = 0,
+                cacheWriteInputTokens = 25,
                 cacheReadInputTokens = 50,
                 outputTokens = 200,
             ),
@@ -186,8 +214,10 @@ class RedisAiGenerationJobStoreTest(
         assertThat(loaded.result).isNotNull
         assertThat(loaded.result!!.bookTitle).isEqualTo(snapshot.bookTitle)
         assertThat(loaded.tokens.nonCachedInputTokens).isEqualTo(100L)
+        assertThat(loaded.tokens.cacheWriteInputTokens).isEqualTo(25L)
         assertThat(loaded.tokens.cacheReadInputTokens).isEqualTo(50L)
         assertThat(loaded.tokens.outputTokens).isEqualTo(200L)
+        assertThat(loaded.tokens.publicInputTokens).isEqualTo(125L)
         assertThat(loaded.costAccumulatedUsd).isEqualByComparingTo(BigDecimal("0.01"))
     }
 
@@ -200,7 +230,7 @@ class RedisAiGenerationJobStoreTest(
             snapshot(),
             TokenUsage(
                 nonCachedInputTokens = 100,
-                cacheWriteInputTokens = 0,
+                cacheWriteInputTokens = 25,
                 cacheReadInputTokens = 0,
                 outputTokens = 200,
             ),
@@ -214,7 +244,7 @@ class RedisAiGenerationJobStoreTest(
             patched,
             TokenUsage(
                 nonCachedInputTokens = 20,
-                cacheWriteInputTokens = 0,
+                cacheWriteInputTokens = 5,
                 cacheReadInputTokens = 0,
                 outputTokens = 30,
             ),
@@ -224,7 +254,9 @@ class RedisAiGenerationJobStoreTest(
         val loaded = store.load(record.jobId)!!
         assertThat(loaded.result!!.summary).isEqualTo("patched summary text")
         assertThat(loaded.tokens.nonCachedInputTokens).isEqualTo(120L)
+        assertThat(loaded.tokens.cacheWriteInputTokens).isEqualTo(30L)
         assertThat(loaded.tokens.outputTokens).isEqualTo(230L)
+        assertThat(loaded.tokens.publicInputTokens).isEqualTo(150L)
         assertThat(loaded.costAccumulatedUsd).isEqualByComparingTo(BigDecimal("0.015"))
     }
 
@@ -473,7 +505,7 @@ class RedisAiGenerationJobStoreTest(
                 usage =
                     TokenUsage(
                         nonCachedInputTokens = 10,
-                        cacheWriteInputTokens = 0,
+                        cacheWriteInputTokens = 4,
                         cacheReadInputTokens = 0,
                         outputTokens = 20,
                     ),
@@ -484,6 +516,7 @@ class RedisAiGenerationJobStoreTest(
         val loaded = store.load(record.jobId)!!
         assertThat(saved).isTrue()
         assertThat(loaded.actualModel).isEqualTo(failoverModel)
+        assertThat(loaded.tokens.cacheWriteInputTokens).isEqualTo(4L)
     }
 
     @Test

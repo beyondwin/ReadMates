@@ -44,6 +44,10 @@ import java.util.concurrent.TimeUnit
         "readmates.bff-secret=test-bff-secret",
         "readmates.redis.enabled=true",
         "readmates.aigen.enabled=true",
+        "spring.ai.model.chat=none",
+        "spring.ai.google.genai.api-key=test-key",
+        "spring.ai.openai.api-key=test-key",
+        "spring.ai.anthropic.api-key=test-key",
     ],
 )
 @Tag("integration")
@@ -95,6 +99,7 @@ class RedisGroundedAiGenerationJobStoreTest(
         assertThat(loaded.revision).isEqualTo(1)
         assertThat(loaded.result).isEqualTo(snapshot())
         assertThat(loaded.evidence).isEqualTo(evidence(1))
+        assertThat(loaded.tokens.cacheWriteInputTokens).isEqualTo(3L)
     }
 
     @Test
@@ -402,7 +407,7 @@ class RedisGroundedAiGenerationJobStoreTest(
             evidence(expectedRevision + 1),
             TokenUsage(
                 nonCachedInputTokens = 10,
-                cacheWriteInputTokens = 0,
+                cacheWriteInputTokens = 3,
                 cacheReadInputTokens = 0,
                 outputTokens = 20,
             ),

@@ -22,13 +22,14 @@ internal object GroundedAiGenerationRedisScripts {
             redis.call('HSET', KEYS[1], 'cleanupPending', 'false')
             redis.call('HDEL', KEYS[1], 'commitLeaseExpiresAt', 'errorCode', 'errorMessage')
             redis.call('HINCRBY', KEYS[1], 'tokensInput', ARGV[5])
-            redis.call('HINCRBY', KEYS[1], 'tokensCached', ARGV[6])
-            redis.call('HINCRBY', KEYS[1], 'tokensOutput', ARGV[7])
-            redis.call('HINCRBYFLOAT', KEYS[1], 'costAccumulatedUsd', ARGV[8])
-            redis.call('HSET', KEYS[1], 'lastUpdatedAt', ARGV[9])
-            redis.call('HSET', KEYS[1], 'actualModelProvider', ARGV[11])
-            redis.call('HSET', KEYS[1], 'actualModelName', ARGV[12])
-            for index = 1, 5 do redis.call('EXPIRE', KEYS[index], ARGV[10]) end
+            redis.call('HINCRBY', KEYS[1], 'tokensCacheWrite', ARGV[6])
+            redis.call('HINCRBY', KEYS[1], 'tokensCached', ARGV[7])
+            redis.call('HINCRBY', KEYS[1], 'tokensOutput', ARGV[8])
+            redis.call('HINCRBYFLOAT', KEYS[1], 'costAccumulatedUsd', ARGV[9])
+            redis.call('HSET', KEYS[1], 'lastUpdatedAt', ARGV[10])
+            redis.call('HSET', KEYS[1], 'actualModelProvider', ARGV[12])
+            redis.call('HSET', KEYS[1], 'actualModelName', ARGV[13])
+            for index = 1, 5 do redis.call('EXPIRE', KEYS[index], ARGV[11]) end
             return 1
             """.trimIndent(),
             Long::class.java,

@@ -51,18 +51,19 @@ internal object AiGenerationRedisScripts {
             if redis.call('EXISTS', KEYS[1]) == 0 then return 0 end
             if redis.call('HGET', KEYS[1], 'status') ~= ARGV[1] then return 0 end
             redis.call('SET', KEYS[2], ARGV[2])
-            redis.call('EXPIRE', KEYS[2], ARGV[8])
+            redis.call('EXPIRE', KEYS[2], ARGV[9])
             redis.call('HINCRBY', KEYS[1], 'tokensInput', ARGV[3])
-            redis.call('HINCRBY', KEYS[1], 'tokensCached', ARGV[4])
-            redis.call('HINCRBY', KEYS[1], 'tokensOutput', ARGV[5])
-            redis.call('HINCRBYFLOAT', KEYS[1], 'costAccumulatedUsd', ARGV[6])
-            redis.call('HSET', KEYS[1], 'lastUpdatedAt', ARGV[7])
-            redis.call('EXPIRE', KEYS[1], ARGV[8])
-            if redis.call('EXISTS', KEYS[3]) == 1 then redis.call('EXPIRE', KEYS[3], ARGV[8]) end
-            if redis.call('EXISTS', KEYS[4]) == 1 then redis.call('EXPIRE', KEYS[4], ARGV[8]) end
-            if ARGV[9] ~= '' then
-              redis.call('HSET', KEYS[1], 'actualModelProvider', ARGV[9])
-              redis.call('HSET', KEYS[1], 'actualModelName', ARGV[10])
+            redis.call('HINCRBY', KEYS[1], 'tokensCacheWrite', ARGV[4])
+            redis.call('HINCRBY', KEYS[1], 'tokensCached', ARGV[5])
+            redis.call('HINCRBY', KEYS[1], 'tokensOutput', ARGV[6])
+            redis.call('HINCRBYFLOAT', KEYS[1], 'costAccumulatedUsd', ARGV[7])
+            redis.call('HSET', KEYS[1], 'lastUpdatedAt', ARGV[8])
+            redis.call('EXPIRE', KEYS[1], ARGV[9])
+            if redis.call('EXISTS', KEYS[3]) == 1 then redis.call('EXPIRE', KEYS[3], ARGV[9]) end
+            if redis.call('EXISTS', KEYS[4]) == 1 then redis.call('EXPIRE', KEYS[4], ARGV[9]) end
+            if ARGV[10] ~= '' then
+              redis.call('HSET', KEYS[1], 'actualModelProvider', ARGV[10])
+              redis.call('HSET', KEYS[1], 'actualModelName', ARGV[11])
             end
             return 1
             """.trimIndent(),
@@ -84,15 +85,16 @@ internal object AiGenerationRedisScripts {
         DefaultRedisScript(
             """
             redis.call('SET', KEYS[2], ARGV[1])
-            redis.call('EXPIRE', KEYS[2], ARGV[7])
+            redis.call('EXPIRE', KEYS[2], ARGV[8])
             redis.call('HINCRBY', KEYS[1], 'tokensInput', ARGV[2])
-            redis.call('HINCRBY', KEYS[1], 'tokensCached', ARGV[3])
-            redis.call('HINCRBY', KEYS[1], 'tokensOutput', ARGV[4])
-            redis.call('HINCRBYFLOAT', KEYS[1], 'costAccumulatedUsd', ARGV[5])
-            redis.call('HSET', KEYS[1], 'lastUpdatedAt', ARGV[6])
-            redis.call('EXPIRE', KEYS[1], ARGV[7])
-            if redis.call('EXISTS', KEYS[3]) == 1 then redis.call('EXPIRE', KEYS[3], ARGV[7]) end
-            if redis.call('EXISTS', KEYS[4]) == 1 then redis.call('EXPIRE', KEYS[4], ARGV[7]) end
+            redis.call('HINCRBY', KEYS[1], 'tokensCacheWrite', ARGV[3])
+            redis.call('HINCRBY', KEYS[1], 'tokensCached', ARGV[4])
+            redis.call('HINCRBY', KEYS[1], 'tokensOutput', ARGV[5])
+            redis.call('HINCRBYFLOAT', KEYS[1], 'costAccumulatedUsd', ARGV[6])
+            redis.call('HSET', KEYS[1], 'lastUpdatedAt', ARGV[7])
+            redis.call('EXPIRE', KEYS[1], ARGV[8])
+            if redis.call('EXISTS', KEYS[3]) == 1 then redis.call('EXPIRE', KEYS[3], ARGV[8]) end
+            if redis.call('EXISTS', KEYS[4]) == 1 then redis.call('EXPIRE', KEYS[4], ARGV[8]) end
             return nil
             """.trimIndent(),
             Void::class.java,

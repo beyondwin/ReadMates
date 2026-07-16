@@ -76,6 +76,24 @@ class CostCalculatorTest {
     }
 
     @Test
+    fun `worst case keeps normal input price when it exceeds cache write price`() {
+        val normalInputPremium =
+            pricing.copy(
+                inputPerMTokenUsd = BigDecimal("4.00"),
+                cacheWriteInputPerMTokenUsd = BigDecimal("3.75"),
+            )
+
+        assertThat(
+            CostCalculator.worstCase(
+                estimatedInputTokens = 1_000_000,
+                maxOutputTokens = 0,
+                pricing = normalInputPremium,
+                cacheWritePossible = true,
+            ),
+        ).isEqualByComparingTo("4.00")
+    }
+
+    @Test
     fun `token usage rejects a negative count in every channel`() {
         val negativeUsages =
             listOf<() -> TokenUsage>(
