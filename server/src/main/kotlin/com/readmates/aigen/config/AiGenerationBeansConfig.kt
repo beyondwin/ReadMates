@@ -8,6 +8,8 @@ import com.readmates.aigen.application.port.out.SessionContentRegenerator
 import com.readmates.aigen.application.port.out.WholeTranscriptGroundedGenerator
 import com.readmates.aigen.application.service.ProviderFallbackChain
 import com.readmates.aigen.application.service.Sleeper
+import org.springframework.beans.factory.ObjectProvider
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -54,6 +56,17 @@ class AiGenerationBeansConfig {
         )
 
     @Bean
+    fun wholeTranscriptGroundedGeneratorsByProvider(
+        generators: List<WholeTranscriptGroundedGenerator>,
+        properties: AiGenerationProperties,
+        @Qualifier("springAiGroundedGeneratorsByProvider")
+        springAiGenerators: ObjectProvider<Map<Provider, WholeTranscriptGroundedGenerator>>,
+    ): Map<Provider, WholeTranscriptGroundedGenerator> =
+        wholeTranscriptGroundedGeneratorsByProvider(
+            generators + springAiGenerators.getIfAvailable(::emptyMap).values,
+            properties,
+        )
+
     fun wholeTranscriptGroundedGeneratorsByProvider(
         generators: List<WholeTranscriptGroundedGenerator>,
         properties: AiGenerationProperties,

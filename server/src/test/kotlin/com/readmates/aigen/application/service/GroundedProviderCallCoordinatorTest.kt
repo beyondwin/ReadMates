@@ -126,6 +126,44 @@ class GroundedProviderCallCoordinatorTest {
     }
 
     @Test
+    fun `confirmed pre-transport option failure releases the reservation without retryable uncertainty`() {
+        val context = Context()
+        context.generator.failure =
+            com.readmates.aigen.adapter.out.llm.common.LlmGenerationException(
+                com.readmates.aigen.application.model.GenerationError(
+                    ErrorCode.MODEL_CAPABILITY_UNAVAILABLE,
+                    "Grounded model capability unavailable",
+                ),
+            )
+
+        val result = context.coordinator.execute(context.command()) as GroundedProviderCallResult.Failed
+
+        assertThat(result.failureClass).isEqualTo(ProviderFailureClass.PRE_TRANSPORT)
+        val reconciliation = context.reservations.reconciliations.single()
+        assertThat(reconciliation.terminalState).isEqualTo(ProviderAttemptState.FAILED)
+        assertThat(reconciliation.actualCostUsd).isEqualByComparingTo(BigDecimal.ZERO)
+        assertThat(context.permit.outcome).isEqualTo(ProviderCircuitOutcome.IGNORED_FAILURE)
+    }
+
+    @Test
+    fun `confirmed failure reconciliation requires an explicit released or charged cost`() {
+        val context = Context()
+
+        assertThatThrownBy {
+            ProviderCallReconciliationCommand(
+                attemptId = UUID.randomUUID(),
+                jobId = context.record.jobId,
+                clubId = context.record.clubId,
+                terminalState = ProviderAttemptState.FAILED,
+                actualCostUsd = null,
+                safeErrorCode = ErrorCode.MODEL_CAPABILITY_UNAVAILABLE,
+                now = Instant.parse("2026-07-17T00:00:00Z"),
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("confirmed failure reconciliation")
+    }
+
+    @Test
     fun `complete usage reconciles actual cost`() {
         val context = Context()
 
@@ -134,6 +172,23 @@ class GroundedProviderCallCoordinatorTest {
         val reconciliation = context.reservations.reconciliations.single()
         assertThat(reconciliation.terminalState).isEqualTo(ProviderAttemptState.SUCCEEDED)
         assertThat(reconciliation.actualCostUsd).isEqualByComparingTo("0.0018")
+    }
+
+    @Test
+    fun `incomplete usage keeps the maximum reservation as estimated unknown`() {
+        val context = Context()
+        context.generator.usageComplete = false
+
+        context.coordinator.execute(context.command())
+
+        val reconciliation = context.reservations.reconciliations.single()
+        assertThat(reconciliation.terminalState).isEqualTo(ProviderAttemptState.SUCCEEDED)
+        assertThat(reconciliation.actualCostUsd).isNull()
+        assertThat(
+            context.audit.entries
+                .single()
+                .costBasis,
+        ).isEqualTo(CostBasis.ESTIMATED_UNKNOWN)
     }
 
     @Test
@@ -309,6 +364,7 @@ class GroundedProviderCallCoordinatorTest {
         var generateCalls = 0
         var repairCalls = 0
         var failure: RuntimeException? = null
+        var usageComplete = true
         val physicalCalls get() = generateCalls + repairCalls
 
         override fun generate(
@@ -318,7 +374,7 @@ class GroundedProviderCallCoordinatorTest {
             events += "generator.generate-or-repair"
             generateCalls += 1
             failure?.let { throw it }
-            return GroundedGenerationOutput(GroundedGenerationDraftFixture.value, USAGE)
+            return GroundedGenerationOutput(GroundedGenerationDraftFixture.value, USAGE, usageComplete)
         }
 
         override fun repair(
@@ -329,7 +385,7 @@ class GroundedProviderCallCoordinatorTest {
             events += "generator.generate-or-repair"
             repairCalls += 1
             failure?.let { throw it }
-            return GroundedSectionRepairOutput.Summary(emptyList(), USAGE)
+            return GroundedSectionRepairOutput.Summary(emptyList(), USAGE, usageComplete)
         }
     }
 

@@ -1,6 +1,7 @@
 package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.AiGenerationException
+import com.readmates.aigen.application.model.CostBasis
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.GenerationItem
@@ -11,6 +12,7 @@ import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.model.ProviderAttempt
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.out.AiGenerationAuditPort
 import com.readmates.aigen.application.port.out.AiGenerationJobStore
@@ -120,7 +122,13 @@ class DefaultGroundedGenerationExecutor(
                     )
             ) {
                 is GroundedProviderCallResult.Generated ->
-                    return GroundedAttempt(result.output, plan.model, history.toList())
+                    return GroundedAttempt(
+                        output = result.output,
+                        model = plan.model,
+                        history = history.toList(),
+                        cost = accountedCost(result.output.usage, plan.model, result.attempt),
+                        costBasis = result.attempt.costBasis,
+                    )
                 is GroundedProviderCallResult.Repaired -> error("generation call cannot return a repair output")
                 GroundedProviderCallResult.StateChanged -> return null
                 is GroundedProviderCallResult.Failed -> {
@@ -185,7 +193,7 @@ class DefaultGroundedGenerationExecutor(
                 repairable.section,
                 start,
             ) ?: return
-        val repaired =
+        val repairCall =
             when (
                 val call =
                     callCoordinator.execute(
@@ -200,7 +208,7 @@ class DefaultGroundedGenerationExecutor(
                         ),
                     )
             ) {
-                is GroundedProviderCallResult.Repaired -> call.output
+                is GroundedProviderCallResult.Repaired -> call
                 GroundedProviderCallResult.StateChanged -> return
                 is GroundedProviderCallResult.Generated -> error("repair call cannot return a generation output")
                 is GroundedProviderCallResult.Failed -> {
@@ -209,6 +217,7 @@ class DefaultGroundedGenerationExecutor(
                     return
                 }
             }
+        val repaired = repairCall.output
         val merged = mergeGroundedRepair(attempt.output.draft, repairable.section, repaired)
         if (!moveStage(record.jobId, JobStage.VALIDATING_GROUNDING, PROGRESS_REVALIDATING)) return
         val validation =
@@ -223,7 +232,16 @@ class DefaultGroundedGenerationExecutor(
                 metrics.recordGroundingRepairOutcome(GroundingRepairOutcome.SUCCEEDED)
                 persistValid(
                     record,
-                    attempt.copy(output = GroundedGenerationOutput(merged, attempt.output.usage + repaired.usage)),
+                    attempt.copy(
+                        output =
+                            GroundedGenerationOutput(
+                                merged,
+                                attempt.output.usage + repaired.usage,
+                                attempt.output.usageComplete && repaired.usageComplete,
+                            ),
+                        cost = attempt.cost.add(accountedCost(repaired.usage, repairPlan.model, repairCall.attempt)),
+                        costBasis = combinedCostBasis(attempt.costBasis, repairCall.attempt.costBasis),
+                    ),
                     validation,
                     start,
                     groundingWarningCount = 1,
@@ -247,7 +265,7 @@ class DefaultGroundedGenerationExecutor(
         start: Instant,
         groundingWarningCount: Int = 0,
     ) {
-        val cost = CostCalculator.actual(attempt.output.usage, modelCatalog.pricing(attempt.model))
+        val cost = attempt.cost
         val saved =
             jobStore.saveGroundedResult(
                 SaveGroundedResultCommand(
@@ -274,6 +292,7 @@ class DefaultGroundedGenerationExecutor(
             cost,
             start,
             groundingWarningCount,
+            costBasis = attempt.costBasis,
         )
         maybeNotifyLong(record, start)
     }
@@ -371,6 +390,7 @@ class DefaultGroundedGenerationExecutor(
         start: Instant,
         groundingWarningCount: Int = 0,
         groundingStatus: GroundingStatus? = null,
+        costBasis: CostBasis = CostBasis.NONE,
     ) {
         val auditedGroundingStatus =
             groundingStatus?.name
@@ -402,9 +422,31 @@ class DefaultGroundedGenerationExecutor(
                         .size,
                 groundingStatus = auditedGroundingStatus,
                 groundingWarningCount = groundingWarningCount,
+                costBasis = costBasis,
             ),
         )
     }
+
+    private fun accountedCost(
+        usage: TokenUsage,
+        model: ModelId,
+        attempt: ProviderAttempt,
+    ): BigDecimal =
+        when (attempt.costBasis) {
+            CostBasis.ACTUAL -> CostCalculator.actual(usage, modelCatalog.pricing(model))
+            CostBasis.ESTIMATED_UNKNOWN -> attempt.reservedCostUsd
+            CostBasis.NONE -> error("Reconciled provider attempt must have a cost basis")
+        }
+
+    private fun combinedCostBasis(
+        first: CostBasis,
+        second: CostBasis,
+    ): CostBasis =
+        if (first == CostBasis.ACTUAL && second == CostBasis.ACTUAL) {
+            CostBasis.ACTUAL
+        } else {
+            CostBasis.ESTIMATED_UNKNOWN
+        }
 
     private fun emitMetrics(
         status: JobStatus,
@@ -460,6 +502,8 @@ class DefaultGroundedGenerationExecutor(
         val output: GroundedGenerationOutput,
         val model: ModelId,
         val history: List<GroundedProviderCallPlan>,
+        val cost: BigDecimal,
+        val costBasis: CostBasis,
     )
 
     private companion object {

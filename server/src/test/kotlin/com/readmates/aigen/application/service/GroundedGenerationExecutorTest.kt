@@ -3,6 +3,7 @@ package com.readmates.aigen.application.service
 import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
 import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.AuthorNameMode
+import com.readmates.aigen.application.model.CostBasis
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.GenerationItem
@@ -76,6 +77,25 @@ class GroundedGenerationExecutorTest {
     }
 
     @Test
+    fun `incomplete successful usage keeps reserved cost through job persistence audit and metrics`() {
+        val context = Context()
+        context.claude.generations += GroundedGenerationOutput(validDraft(), USAGE, usageComplete = false)
+
+        context.executor.process(context.record, AiGenerationTestFixtures.NOW)
+
+        val reservedCost =
+            context.reservations.attempts
+                .single()
+                .reservedCostUsd
+        val saved = context.jobStore.load(context.record.jobId)!!
+        assertThat(saved.costAccumulatedUsd)
+            .isEqualByComparingTo(context.record.costAccumulatedUsd.add(reservedCost))
+        val successAudit = context.auditPort.entries.single { it.providerAttempt == null }
+        assertThat(successAudit.costEstimateUsd).isEqualByComparingTo(reservedCost)
+        assertThat(successAudit.costBasis).isEqualTo(CostBasis.ESTIMATED_UNKNOWN)
+    }
+
+    @Test
     fun `one repairable section gets one full-context repair and then succeeds`() {
         val context = Context()
         context.claude.generations += GroundedGenerationOutput(validDraft().copy(summaryBlocks = emptyList()), USAGE)
@@ -96,6 +116,35 @@ class GroundedGenerationExecutorTest {
                 .last()
                 .groundingWarningCount,
         ).isEqualTo(1)
+    }
+
+    @Test
+    fun `incomplete repair usage remains estimated when merged with complete generation usage`() {
+        val context = Context()
+        context.claude.generations += GroundedGenerationOutput(validDraft().copy(summaryBlocks = emptyList()), USAGE)
+        context.claude.repairs +=
+            GroundedSectionRepairOutput.Summary(
+                validDraft().summaryBlocks,
+                REPAIR_USAGE,
+                usageComplete = false,
+            )
+
+        context.executor.process(context.record, AiGenerationTestFixtures.NOW)
+
+        val expectedCost =
+            CostCalculator
+                .actual(USAGE, context.modelCatalog.pricing(AiGenerationTestFixtures.CLAUDE_MODEL))
+                .add(
+                    context.reservations.attempts
+                        .last()
+                        .reservedCostUsd,
+                )
+        val saved = context.jobStore.load(context.record.jobId)!!
+        assertThat(saved.costAccumulatedUsd)
+            .isEqualByComparingTo(context.record.costAccumulatedUsd.add(expectedCost))
+        val successAudit = context.auditPort.entries.single { it.providerAttempt == null }
+        assertThat(successAudit.costEstimateUsd).isEqualByComparingTo(expectedCost)
+        assertThat(successAudit.costBasis).isEqualTo(CostBasis.ESTIMATED_UNKNOWN)
     }
 
     @Test
@@ -279,7 +328,7 @@ class GroundedGenerationExecutorTest {
         val reservations = FakeProviderCallReservations(jobStore)
         val sleeper = FakeSleeper()
         private val generators = mapOf(Provider.CLAUDE to claude, Provider.OPENAI to openai)
-        private val modelCatalog =
+        val modelCatalog =
             AiGenerationTestFixtures.defaultModelCatalog(
                 setOf(AiGenerationTestFixtures.CLAUDE_MODEL, OPENAI_MODEL),
             )

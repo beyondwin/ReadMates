@@ -29,15 +29,18 @@ fun RenderedGroundedRequest.forModel(model: ModelId): StructuredGenerationReques
 data class GroundedGenerationOutput(
     val draft: GroundedGenerationDraft,
     val usage: TokenUsage,
+    val usageComplete: Boolean = true,
 )
 
 sealed interface GroundedSectionRepairOutput {
     val section: GenerationItem
     val usage: TokenUsage
+    val usageComplete: Boolean
 
     data class Summary(
         val blocks: List<GroundedTextBlock>,
         override val usage: TokenUsage,
+        override val usageComplete: Boolean = true,
     ) : GroundedSectionRepairOutput {
         override val section = GenerationItem.SUMMARY
     }
@@ -45,6 +48,7 @@ sealed interface GroundedSectionRepairOutput {
     data class Highlights(
         val items: List<GroundedAuthoredText>,
         override val usage: TokenUsage,
+        override val usageComplete: Boolean = true,
     ) : GroundedSectionRepairOutput {
         override val section = GenerationItem.HIGHLIGHTS
     }
@@ -52,6 +56,7 @@ sealed interface GroundedSectionRepairOutput {
     data class OneLineReviews(
         val items: List<GroundedAuthoredText>,
         override val usage: TokenUsage,
+        override val usageComplete: Boolean = true,
     ) : GroundedSectionRepairOutput {
         override val section = GenerationItem.ONE_LINE_REVIEWS
     }
@@ -60,6 +65,7 @@ sealed interface GroundedSectionRepairOutput {
         val fileName: String,
         val sections: List<GroundedFeedbackSection>,
         override val usage: TokenUsage,
+        override val usageComplete: Boolean = true,
     ) : GroundedSectionRepairOutput {
         override val section = GenerationItem.FEEDBACK_DOCUMENT
     }

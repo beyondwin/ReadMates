@@ -3,6 +3,7 @@ package com.readmates.aigen.application.service
 import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.AuthorNameMode
+import com.readmates.aigen.application.model.CostBasis
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.GenerationItem
@@ -78,6 +79,31 @@ class GroundedRegenerationExecutorTest {
         assertThat(providerAudit.providerAttempt).isEqualTo(2)
         assertThat(providerAudit.providerCallMode)
             .isEqualTo(com.readmates.aigen.application.model.ProviderCallMode.REGENERATE_SECTION)
+    }
+
+    @Test
+    fun `incomplete regeneration usage returns and persists reserved estimated cost`() {
+        val context = Context()
+        context.generator.repairOutput =
+            GroundedSectionRepairOutput.Summary(
+                listOf(GroundedTextBlock("A regenerated grounded summary.", listOf("t000001"))),
+                USAGE,
+                usageComplete = false,
+            )
+
+        val result = context.executor.regenerate(context.record, GenerationItem.SUMMARY, 1, null, null)
+
+        val reservedCost =
+            context.reservations.attempts
+                .last()
+                .reservedCostUsd
+        assertThat(result.costEstimateUsd).isEqualByComparingTo(reservedCost)
+        val saved = context.jobStore.load(context.record.jobId)!!
+        assertThat(saved.costAccumulatedUsd)
+            .isEqualByComparingTo(context.record.costAccumulatedUsd.add(reservedCost))
+        val successAudit = context.auditPort.entries.single { it.providerAttempt == null }
+        assertThat(successAudit.costEstimateUsd).isEqualByComparingTo(reservedCost)
+        assertThat(successAudit.costBasis).isEqualTo(CostBasis.ESTIMATED_UNKNOWN)
     }
 
     @Test

@@ -226,8 +226,7 @@ class GroundedProviderCallCoordinator private constructor(
                 jobId = command.record.jobId,
                 clubId = command.record.clubId,
                 terminalState = result.terminalState,
-                actualCostUsd =
-                    result.usage?.let { usage -> CostCalculator.actual(usage, modelCatalog.pricing(command.model)) },
+                actualCostUsd = actualCost(command.model, result),
                 safeErrorCode = result.error?.code,
                 now = clock.instant(),
             )
@@ -252,7 +251,7 @@ class GroundedProviderCallCoordinator private constructor(
         startedAt: Instant,
     ) {
         val usage = result.usage ?: TokenUsage.ZERO
-        val actualCost = result.usage?.let { CostCalculator.actual(it, modelCatalog.pricing(command.model)) }
+        val actualCost = actualCost(command.model, result)
         auditPort.insert(
             AuditLogEntry(
                 jobId = command.record.jobId,
@@ -341,14 +340,29 @@ class GroundedProviderCallCoordinator private constructor(
 
     private fun classify(code: ErrorCode): ProviderFailureClass =
         when (code) {
+            ErrorCode.MODEL_CAPABILITY_UNAVAILABLE -> ProviderFailureClass.PRE_TRANSPORT
             ErrorCode.PROVIDER_UNAVAILABLE -> ProviderFailureClass.TRANSIENT
             ErrorCode.PROVIDER_RATE_LIMITED -> ProviderFailureClass.RATE_LIMITED
             ErrorCode.SCHEMA_INVALID -> ProviderFailureClass.SCHEMA_OR_PARSE
             else -> ProviderFailureClass.TERMINAL
         }
 
+    private fun actualCost(
+        model: ModelId,
+        result: PhysicalResult,
+    ): BigDecimal? =
+        when (result) {
+            is PhysicalResult.Failure ->
+                if (result.failureClass == ProviderFailureClass.PRE_TRANSPORT) BigDecimal.ZERO else null
+            else ->
+                result.usage
+                    ?.takeIf { result.usageComplete }
+                    ?.let { CostCalculator.actual(it, modelCatalog.pricing(model)) }
+        }
+
     private sealed interface PhysicalResult {
         val usage: TokenUsage?
+        val usageComplete: Boolean
         val error: GenerationError?
         val terminalState: ProviderAttemptState
 
@@ -356,6 +370,7 @@ class GroundedProviderCallCoordinator private constructor(
             val output: GroundedGenerationOutput,
         ) : PhysicalResult {
             override val usage = output.usage
+            override val usageComplete = output.usageComplete
             override val error: GenerationError? = null
             override val terminalState = ProviderAttemptState.SUCCEEDED
         }
@@ -364,6 +379,7 @@ class GroundedProviderCallCoordinator private constructor(
             val output: GroundedSectionRepairOutput,
         ) : PhysicalResult {
             override val usage = output.usage
+            override val usageComplete = output.usageComplete
             override val error: GenerationError? = null
             override val terminalState = ProviderAttemptState.SUCCEEDED
         }
@@ -374,7 +390,13 @@ class GroundedProviderCallCoordinator private constructor(
             val retryAfter: Duration? = null,
         ) : PhysicalResult {
             override val usage: TokenUsage? = null
-            override val terminalState = ProviderAttemptState.UNKNOWN
+            override val usageComplete = false
+            override val terminalState =
+                if (failureClass == ProviderFailureClass.PRE_TRANSPORT) {
+                    ProviderAttemptState.FAILED
+                } else {
+                    ProviderAttemptState.UNKNOWN
+                }
         }
 
         fun circuitOutcome(): ProviderCircuitOutcome =

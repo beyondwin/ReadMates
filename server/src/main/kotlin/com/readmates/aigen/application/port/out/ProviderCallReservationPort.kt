@@ -54,10 +54,11 @@ data class ProviderCallReconciliationCommand(
         require(terminalState != ProviderAttemptState.IN_FLIGHT) { "reconciliation state must be terminal" }
         if (terminalState == ProviderAttemptState.UNKNOWN) {
             require(actualCostUsd == null) { "unknown reconciliation cannot claim actual cost" }
-        } else {
-            requireNotNull(actualCostUsd) { "success or failure reconciliation requires actual cost" }
-            require(actualCostUsd >= BigDecimal.ZERO) { "actualCostUsd must be non-negative" }
         }
+        if (terminalState == ProviderAttemptState.FAILED) {
+            require(actualCostUsd != null) { "confirmed failure reconciliation must release or charge reserved cost" }
+        }
+        actualCostUsd?.let { require(it >= BigDecimal.ZERO) { "actualCostUsd must be non-negative" } }
     }
 }
 

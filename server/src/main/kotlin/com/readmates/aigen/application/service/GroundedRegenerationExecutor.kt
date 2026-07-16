@@ -1,6 +1,7 @@
 package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.AiGenerationException
+import com.readmates.aigen.application.model.CostBasis
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.GroundedGenerationDraft
@@ -9,6 +10,7 @@ import com.readmates.aigen.application.model.GroundingStatus
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.model.ProviderAttempt
 import com.readmates.aigen.application.model.ProviderCallMode
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.model.TokenUsage
@@ -110,7 +112,7 @@ class DefaultGroundedRegenerationExecutor(
                 ),
             )
         if (!saved) staleRevision(jobStore.load(record.jobId)?.revision)
-        auditSuccess(record, item, attempt.model, attempt.usage, cost)
+        auditSuccess(record, item, attempt.model, attempt.usage, cost, attempt.costBasis)
         emitMetrics(item, attempt.model, attempt.usage, cost)
         return RegenerationResult(
             item = item,
@@ -199,7 +201,7 @@ class DefaultGroundedRegenerationExecutor(
         wholeTranscriptGroundedGeneratorsByProvider[model.provider]
             ?: throw AiGenerationException.Coded(ErrorCode.AI_DISABLED)
 
-    @Suppress("LongParameterList", "ReturnCount")
+    @Suppress("LongMethod", "LongParameterList", "ReturnCount")
     private fun callRepairWithPolicy(
         record: JobRecord,
         item: GenerationItem,
@@ -212,6 +214,7 @@ class DefaultGroundedRegenerationExecutor(
         var workingDraft = currentDraft
         var accumulatedUsage = TokenUsage.ZERO
         var accumulatedCost = BigDecimal.ZERO
+        var accumulatedCostBasis = CostBasis.ACTUAL
         val history = mutableListOf(plan)
         while (true) {
             requireGenerator(plan.model)
@@ -223,15 +226,24 @@ class DefaultGroundedRegenerationExecutor(
                     val usage = accumulatedUsage + result.output.usage
                     val cost =
                         accumulatedCost.add(
-                            CostCalculator.actual(result.output.usage, modelCatalog.pricing(plan.model)),
+                            accountedCost(result.output.usage, plan.model, result.attempt),
                         )
+                    val costBasis = combinedCostBasis(accumulatedCostBasis, result.attempt.costBasis)
                     when (val validation = validateRepair(record, item, workingDraft, result.output)) {
                         is RegenerationRepairValidation.Valid ->
-                            return RegenerationAttempt(plan.model, validation.merged, validation.valid, usage, cost)
+                            return RegenerationAttempt(
+                                plan.model,
+                                validation.merged,
+                                validation.valid,
+                                usage,
+                                cost,
+                                costBasis,
+                            )
                         is RegenerationRepairValidation.Repairable -> {
                             workingDraft = validation.merged
                             accumulatedUsage = usage
                             accumulatedCost = cost
+                            accumulatedCostBasis = costBasis
                             when (
                                 val decision =
                                     callPolicy.next(
@@ -364,6 +376,7 @@ class DefaultGroundedRegenerationExecutor(
         model: ModelId,
         usage: TokenUsage,
         cost: BigDecimal,
+        costBasis: CostBasis,
     ) {
         auditPort.insert(
             AuditLogEntry(
@@ -391,9 +404,31 @@ class DefaultGroundedRegenerationExecutor(
                         .distinct()
                         .size,
                 groundingStatus = GroundingStatus.VALID.name,
+                costBasis = costBasis,
             ),
         )
     }
+
+    private fun accountedCost(
+        usage: TokenUsage,
+        model: ModelId,
+        attempt: ProviderAttempt,
+    ): BigDecimal =
+        when (attempt.costBasis) {
+            CostBasis.ACTUAL -> CostCalculator.actual(usage, modelCatalog.pricing(model))
+            CostBasis.ESTIMATED_UNKNOWN -> attempt.reservedCostUsd
+            CostBasis.NONE -> error("Reconciled provider attempt must have a cost basis")
+        }
+
+    private fun combinedCostBasis(
+        first: CostBasis,
+        second: CostBasis,
+    ): CostBasis =
+        if (first == CostBasis.ACTUAL && second == CostBasis.ACTUAL) {
+            CostBasis.ACTUAL
+        } else {
+            CostBasis.ESTIMATED_UNKNOWN
+        }
 
     private fun emitMetrics(
         item: GenerationItem,
@@ -430,6 +465,7 @@ class DefaultGroundedRegenerationExecutor(
         val valid: GroundedValidationResult.Valid,
         val usage: TokenUsage,
         val cost: BigDecimal,
+        val costBasis: CostBasis,
     )
 
     private sealed interface RegenerationRepairValidation {
