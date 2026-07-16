@@ -2,7 +2,7 @@
 
 ReadMates의 테스트는 frontend lint/unit/build, Playwright E2E, backend Gradle test, 공개 릴리즈 후보 점검, 배포 연동 smoke로 나뉩니다.
 
-GitHub Actions CI는 frontend job에서 Node.js 24와 `pnpm@10.33.0`을 사용해 lint, coverage 포함 unit test, build, Zod fixture freshness check를 실행하고, design-system job에서 `pnpm design:check`를 실행합니다. Backend job은 JDK 25로 `./scripts/server-ci-check.sh`를 실행하며, wrapper의 `check` 안에서 unit test, architectureTest, ktlint, detekt, JaCoCo가 함께 실행됩니다. Testcontainers 기반 integration suite는 별도 `backend-integration` job의 `./gradlew integrationTest`로 병렬 실행합니다. E2E job은 MySQL service를 띄운 뒤 Playwright suite를 3개 shard로 나눠 실행합니다.
+GitHub Actions CI는 frontend job에서 Node.js 24와 `pnpm@11.13.1`을 사용해 lint, coverage 포함 unit test, build, Zod fixture freshness check를 실행하고, design-system job에서 `pnpm design:check`를 실행합니다. Backend job은 JDK 25로 `./scripts/server-ci-check.sh`를 실행하며, wrapper의 `check` 안에서 unit test, architectureTest, ktlint, detekt, JaCoCo가 함께 실행됩니다. Testcontainers 기반 integration suite는 별도 `backend-integration` job의 `./gradlew integrationTest`로 병렬 실행합니다. E2E job은 MySQL service를 띄운 뒤 Playwright suite를 3개 shard로 나눠 실행합니다.
 
 검증은 변경 surface와 위험도에 맞춰 고릅니다. 완료 보고에는 실행한 명령, 실패 또는 스킵한 명령과 이유, 남은 리스크를 함께 남깁니다. 실패한 검증을 무시하고 완료로 표시하지 않습니다.
 

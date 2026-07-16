@@ -359,7 +359,7 @@ class GuidanceCheckerTests(unittest.TestCase):
             lambda root: write(
                 root,
                 "docs/development/performance-budget.md",
-                "```bash\nnpx --yes pnpm@10.33.0 --dir front build\n```\n",
+                "```bash\nnpx --yes pnpm@11.13.1 --dir front build\n```\n",
             )
         )
         self.assertTrue(any("direct pnpm" in error for error in errors), errors)
