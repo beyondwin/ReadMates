@@ -134,7 +134,7 @@ function handleLedgerTabKeyDown(
 
   const currentIndex = notificationLedgerTabs.findIndex((tab) => tab.key === activeTab);
   const lastIndex = notificationLedgerTabs.length - 1;
-  let nextIndex = currentIndex;
+  let nextIndex: number;
 
   if (event.key === "Home") {
     nextIndex = 0;

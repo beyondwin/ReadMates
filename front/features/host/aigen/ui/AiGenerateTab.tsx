@@ -90,7 +90,7 @@ function sectionEditDetails(
 ) {
   const sectionTargetIds = sectionEvidence(evidence, section);
   let changedTargetIds: string[] = [];
-  let mappingAmbiguous = false;
+  let mappingAmbiguous: boolean;
   if (section === "SUMMARY") {
     const before = summaryBlocks(server.summary);
     const after = summaryBlocks(draft.summary);
