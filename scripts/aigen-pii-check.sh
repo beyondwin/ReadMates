@@ -37,15 +37,50 @@ cd "$REPO_ROOT"
 # Each check returns 0 on pass, 1 on fail. They never abort the whole script;
 # main aggregates so the operator sees every failing invariant in one run.
 
+detect_raw_throwable_logging() {
+  perl -0777 -ne '
+    my $source = $_;
+    my %throwables;
+    while ($source =~ /\b([A-Za-z_][A-Za-z0-9_]*)\s*:\s*[A-Za-z0-9_.]*(?:Exception|Throwable|Error)\b/g) {
+      $throwables{$1} = 1;
+    }
+    while ($source =~ /\b(?:log|logger)\.(?:trace|debug|info|warn|error)\s*\((.*?)\)\s*/sg) {
+      my $arguments = $1;
+      for my $name (keys %throwables) {
+        if ($arguments =~ /\b\Q$name\E\.(?:message|localizedMessage|cause|stackTrace|toString)\b/ ||
+            $arguments =~ /\$\{?\Q$name\E\b/ ||
+            $arguments =~ /(?:^|,)\s*\Q$name\E\s*(?:,|$)/s) {
+          print "$name\n";
+        }
+      }
+    }
+  ' | grep -q .
+}
+
+detect_dynamic_observation_key() {
+  rg -q '(?:lowCardinalityKeyValue|highCardinalityKeyValue|addLowCardinalityKeyValue|addHighCardinalityKeyValue)\(\s*[^\"]' -
+}
+
+detect_kafka_header_api() {
+  rg -q '(?:setHeader[A-Za-z]+|addHeader|copyHeaders|copyHeadersIfAbsent|RecordHeader|headers?(?:\(\))?\.add)\s*\(' -
+}
+
+detect_trace_privacy_violation() {
+  rg -q -i \
+    '\b(?:baggage|BaggageField)\b|(?:lowCardinalityKeyValue|highCardinalityKeyValue|addLowCardinalityKeyValue|addHighCardinalityKeyValue|span\.tag|setAttribute)\(\s*\"(?:session(?:[-_]?id)?|club(?:[-_]?(?:id|slug))?|host(?:[-_]?user)?[-_]?id|user[-_]?id|actor[-_]?id|email(?:[-_]?address)?)\"|(?:span\.tag|setAttribute)\(\s*[^\"]' -
+}
+
 check0_guard_self_test_fixtures() {
-  local unsafe_message safe_message unsafe_column unsafe_flag unsafe_log unsafe_trace unsafe_header
+  local unsafe_message safe_message unsafe_column unsafe_flag unsafe_log unsafe_trace unsafe_header unsafe_throwable unsafe_baggage
   unsafe_message=$'data class AiGenerationJobMessage(\n  val jobId: UUID,\n  val transcript: String,\n)'
   safe_message=$'data class AiGenerationJobMessage(\n  val jobId: UUID,\n  val model: String,\n)'
   unsafe_column='ALTER TABLE ai_generation_commit_receipts ADD COLUMN evidence_text TEXT;'
   unsafe_flag='log-prompt: true'
   unsafe_log='log.error("provider response={}", response, failure)'
-  unsafe_trace='observation.lowCardinalityKeyValue("jobId", jobId.toString())'
-  unsafe_header='builder.setHeader("sessionId", command.sessionId)'
+  unsafe_trace='observation.lowCardinalityKeyValue(JOB_ID_KEY, jobId.toString())'
+  unsafe_header='builder.addHeader("sessionId", command.sessionId)'
+  unsafe_throwable='fun failed(err: RuntimeException) { log.error("AI failed", err) }'
+  unsafe_baggage='class Telemetry { val field = BaggageField.create("sessionId") }'
   if ! printf '%s\n' "$unsafe_message" | grep -Eiq '\b(transcript|turns?|speaker|result|evidence|excerpt|prompt|instructions|name)\b'; then
     echo "FAIL [check0]: Kafka unsafe-field self-test fixture was not detected" >&2
     return 1
@@ -66,12 +101,20 @@ check0_guard_self_test_fixtures() {
     echo "FAIL [check0]: unsafe content-log self-test fixture was not detected" >&2
     return 1
   fi
-  if ! printf '%s\n' "$unsafe_trace" | grep -Eq '(lowCardinalityKeyValue|tag)\("(jobId|traceId|spanId|sessionId|clubId|hostUserId|userId|email)"'; then
-    echo "FAIL [check0]: unsafe metric-key self-test fixture was not detected" >&2
+  if ! printf '%s\n' "$unsafe_throwable" | detect_raw_throwable_logging; then
+    echo "FAIL [check0]: raw throwable logging self-test fixture was not detected" >&2
     return 1
   fi
-  if ! printf '%s\n' "$unsafe_header" | grep -Eiq '(header|setHeader).*\b(session|club|host|user|email|prompt|content|transcript|evidence)'; then
-    echo "FAIL [check0]: unsafe Kafka header self-test fixture was not detected" >&2
+  if ! printf '%s\n' "$unsafe_trace" | detect_dynamic_observation_key; then
+    echo "FAIL [check0]: dynamic observation-key self-test fixture was not detected" >&2
+    return 1
+  fi
+  if ! printf '%s\n' "$unsafe_header" | detect_kafka_header_api; then
+    echo "FAIL [check0]: alternate Kafka header API self-test fixture was not detected" >&2
+    return 1
+  fi
+  if ! printf '%s\n' "$unsafe_baggage" | detect_trace_privacy_violation; then
+    echo "FAIL [check0]: baggage/trace identity self-test fixture was not detected" >&2
     return 1
   fi
   return 0
@@ -246,7 +289,8 @@ check10_no_content_object_logging() {
 check11_spring_ai_content_observation_disabled() {
   local config unsafe
   config=server/src/main/resources/application.yml
-  unsafe=$(grep -nE '(log-prompt|log-completion|include-error-logging|include-content):[[:space:]]*true' "$config" || true)
+  unsafe=$(grep -nHE '(log-prompt|log-completion|include-error-logging|include-content):[[:space:]]*true' \
+    server/src/main/resources/application*.yml 2>/dev/null || true)
   if [[ -n "$unsafe" ]]; then
     echo "FAIL [check11]: Spring AI content/error observation was enabled:" >&2
     echo "$unsafe" >&2
@@ -267,9 +311,12 @@ check12_no_content_advisor_or_raw_throwable_logging() {
   content_hits=$(rg -n -U -i \
     '(?:log|logger)\.(?:trace|debug|info|warn|error)\([^\"]*\"[^\"]*\"\s*,[\s\S]{0,500}?\b(?:prompt|request|response|content|transcript|turns?|evidence|draft|instructions|schema|completion)\b' \
     server/src/main/kotlin/com/readmates/aigen/ 2>/dev/null || true)
-  throwable_hits=$(rg -n -U \
-    '(?:log|logger)\.(?:trace|debug|info|warn|error)\([\s\S]{0,500}?(?:\b(?:ex|failure|throwable)\.message\b|\b(?:ex|failure|throwable)\s*[,\)])' \
-    server/src/main/kotlin/com/readmates/aigen/ 2>/dev/null || true)
+  throwable_hits=""
+  while IFS= read -r source_file; do
+    if detect_raw_throwable_logging < "$source_file"; then
+      throwable_hits+="${source_file}"$'\n'
+    fi
+  done < <(find server/src/main/kotlin/com/readmates/aigen -type f -name '*.kt' -print)
   advisor_hits=$(rg -n -i \
     '(SimpleLoggerAdvisor|LoggingAdvisor|PromptChatMemoryAdvisor|\.advisors?\([^)]*(prompt|request|response|content))' \
     server/src/main/kotlin/com/readmates/aigen/ 2>/dev/null || true)
@@ -282,11 +329,13 @@ check12_no_content_advisor_or_raw_throwable_logging() {
 }
 
 check13_trace_identity_and_baggage_absent() {
-  local trace_files hits
-  trace_files=$(find server/src/main/kotlin/com/readmates/aigen -type f \( -iname '*Observation*.kt' -o -iname '*Trace*.kt' \) -print)
-  [[ -z "$trace_files" ]] && return 0
-  hits=$(printf '%s\n' "$trace_files" | xargs grep -nEi \
-    '\b(baggage|BaggageField|sessionId|clubId|hostUserId|userId|actorId|email)\b' 2>/dev/null || true)
+  local hits source_file
+  hits=""
+  while IFS= read -r source_file; do
+    if detect_trace_privacy_violation < "$source_file"; then
+      hits+="${source_file}"$'\n'
+    fi
+  done < <(find server/src/main/kotlin/com/readmates/aigen -type f -name '*.kt' -print)
   if [[ -n "$hits" ]]; then
     echo "FAIL [check13]: AI trace/observation code contains baggage or business identity:" >&2
     echo "$hits" >&2
@@ -296,32 +345,59 @@ check13_trace_identity_and_baggage_absent() {
 }
 
 check14_observation_attribute_allowlist() {
-  local adapter low high forbidden_low forbidden_high
+  local adapter source_root low high forbidden_low forbidden_high dynamic required unexpected_sources
   adapter=server/src/main/kotlin/com/readmates/aigen/adapter/out/observability/MicrometerAiProviderObservationAdapter.kt
+  source_root=server/src/main/kotlin/com/readmates/aigen
   if [[ ! -f "$adapter" ]]; then
     echo "FAIL [check14]: content-free provider observation adapter is missing" >&2
     return 1
   fi
-  low=$(grep -oE 'lowCardinalityKeyValue\("[a-zA-Z]+"' "$adapter" || true)
-  high=$(grep -oE 'highCardinalityKeyValue\("[a-zA-Z]+"' "$adapter" || true)
+  dynamic=""
+  while IFS= read -r source_file; do
+    if detect_dynamic_observation_key < "$source_file"; then
+      dynamic+="${source_file}"$'\n'
+    fi
+  done < <(find "$source_root" -type f -name '*.kt' -print)
+  unexpected_sources=$(rg -l \
+    '(?:lowCardinalityKeyValue|highCardinalityKeyValue|addLowCardinalityKeyValue|addHighCardinalityKeyValue|ObservationConvention|KeyValues?\.of)\s*\(' \
+    "$source_root" 2>/dev/null | grep -vF "$adapter" || true)
+  low=$(rg -o 'lowCardinalityKeyValue\("[a-zA-Z]+"' "$source_root" || true)
+  high=$(rg -o 'highCardinalityKeyValue\("[a-zA-Z]+"' "$source_root" || true)
   forbidden_low=$(printf '%s\n' "$low" | grep -vE '"(provider|model|callMode|outcome|errorCode)"$' || true)
   forbidden_high=$(printf '%s\n' "$high" | grep -vE '"(jobId|attempt)"$' || true)
-  if [[ -n "$forbidden_low$forbidden_high" ]]; then
+  required=""
+  for key in provider model callMode outcome errorCode; do
+    grep -q "\"${key}\"$" <<< "$low" || required+="missing low-cardinality ${key}"$'\n'
+  done
+  for key in jobId attempt; do
+    grep -q "\"${key}\"$" <<< "$high" || required+="missing high-cardinality ${key}"$'\n'
+  done
+  if [[ -n "$forbidden_low$forbidden_high$dynamic$required$unexpected_sources" ]]; then
     echo "FAIL [check14]: provider observation attribute escaped its bounded allowlist:" >&2
-    printf '%s\n%s\n' "$forbidden_low" "$forbidden_high" >&2
+    printf '%s\n%s\n%s\n%s\n%s\n' \
+      "$forbidden_low" "$forbidden_high" "$dynamic" "$required" "$unexpected_sources" >&2
     return 1
   fi
   return 0
 }
 
 check15_kafka_payload_and_header_allowlist() {
-  local message fields unexpected_fields header_calls unexpected_headers producer
+  local message fields unexpected_fields header_calls unexpected_headers producer kafka_constants
   message=server/src/main/kotlin/com/readmates/aigen/adapter/out/messaging/AiGenerationJobMessage.kt
   fields=$(sed -n '/data class AiGenerationJobMessage(/,/^)/p' "$message" | sed -nE 's/.*val ([a-zA-Z0-9_]+):.*/\1/p')
   unexpected_fields=$(printf '%s\n' "$fields" | grep -vE '^(jobId|sessionId|clubId|hostUserId|provider|model|kind)$' || true)
-  header_calls=$(rg -n '\.setHeader\(' server/src/main/kotlin/com/readmates/aigen/ 2>/dev/null || true)
+  header_calls=$(rg -n '(?:setHeader[A-Za-z]*|addHeader|copyHeaders|copyHeadersIfAbsent|RecordHeader|headers?(?:\(\))?\.add)\s*\(' \
+    server/src/main/kotlin/com/readmates/aigen/ 2>/dev/null || true)
   unexpected_headers=$(printf '%s\n' "$header_calls" | \
     grep -vE 'KafkaHeaders\.(TOPIC|KEY)|"readmates-aigen-(job-id|kind)"' || true)
+  while IFS= read -r source_file; do
+    if detect_kafka_header_api < "$source_file"; then
+      unexpected_headers+="${source_file}: alternate Kafka header API"$'\n'
+    fi
+  done < <(find server/src/main/kotlin/com/readmates/aigen -type f -name '*.kt' -print)
+  kafka_constants=$(rg -n 'KafkaHeaders\.[A-Z_]+' server/src/main/kotlin/com/readmates/aigen/ 2>/dev/null | \
+    grep -vE 'KafkaHeaders\.(TOPIC|KEY)\b' || true)
+  [[ -n "$kafka_constants" ]] && unexpected_headers+="${kafka_constants}"$'\n'
   producer=server/src/main/kotlin/com/readmates/aigen/adapter/out/messaging/AiGenerationJobProducer.kt
   if [[ "$(printf '%s\n' "$header_calls" | grep -c . || true)" -ne 4 ]] || \
      ! rg -U -q '\.setHeader\(KafkaHeaders\.TOPIC,\s*properties\.topicJobs\)' "$producer" || \
