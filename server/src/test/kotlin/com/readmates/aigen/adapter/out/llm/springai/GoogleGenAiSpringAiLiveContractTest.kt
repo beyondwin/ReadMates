@@ -1,6 +1,8 @@
 package com.readmates.aigen.adapter.out.llm.springai
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.readmates.aigen.adapter.out.llm.common.SessionImportSchemaResource
+import com.readmates.aigen.adapter.out.llm.gemini.GeminiSchemaCompatAdapter
 import com.readmates.aigen.config.GoogleGenAiSpringAiModelFactory
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -29,13 +31,15 @@ class GoogleGenAiSpringAiLiveContractTest {
               "additionalProperties":false
             }
             """.trimIndent()
+        val providerSchema = GeminiSchemaCompatAdapter(SessionImportSchemaResource()).adapt(schema)
+        assertThat(providerSchema).doesNotContain("additionalProperties")
         val options =
             GoogleGenAiChatOptions
                 .builder()
                 .model("gemini-3-flash-preview")
                 .maxOutputTokens(256)
                 .responseMimeType("application/json")
-                .outputSchema(schema)
+                .outputSchema(providerSchema)
                 .thinkingBudget(0)
                 .includeThoughts(false)
                 .googleSearchRetrieval(false)
@@ -52,7 +56,7 @@ class GoogleGenAiSpringAiLiveContractTest {
                 .user("Return a JSON object whose value field is the word ok.")
                 .options(options)
                 .call()
-                .responseEntity(GroundedStructuredOutputConverter(schema, ObjectMapper())) {
+                .responseEntity(GroundedStructuredOutputConverter(providerSchema, ObjectMapper())) {
                     it.useProviderStructuredOutput()
                 }
 
