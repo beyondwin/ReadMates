@@ -21,8 +21,11 @@ Active 또는 active 가능 secret이 발견되면 문서 수정으로 끝내지
 - `.gitignore`
 - `.gitleaks.toml`, 파일이 있을 때만 포함
 - `.env.example`
+- `.node-version`
 - `README.md`, `PRODUCT.md`
 - `compose.yml`
+- `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`
+- `design/`: frontend workspace dependency와 CI 검증 대상인 design-system source 및 static catalog
 - `front/`
 - `server/`
 - `deploy/oci/`
@@ -40,7 +43,8 @@ Active 또는 active 가능 secret이 발견되면 문서 수정으로 끝내지
 - `docs/superpowers/`의 historical design/spec/implementation records
 - sanitization을 거치지 않은 private planning docs
 - 실제 멤버 데이터, 로컬 절대 경로, private domain, provider state, 실제 secret, token-shaped example, 개인 Gmail 주소가 남아 있는 historical planning docs
-- `design/`
+- `design/*/node_modules/`
+- `design/*/dist/`
 - `output/`
 - `front/output/`
 - `front/dist/`
@@ -104,7 +108,9 @@ Active 또는 active 가능 secret이 발견되면 문서 수정으로 끝내지
 루트 `.gitignore`는 아래 범주를 막아야 합니다.
 
 ```text
-design/
+/design/standalone/
+/design/docs/dist/
+/design/system/dist/
 recode
 .env
 .env.*
@@ -130,7 +136,7 @@ deploy/oci/*.state
 docs/private/
 ```
 
-`design/`은 로컬 설계 산출물 폴더로 취급하고 공개 저장소에는 올리지 않습니다.
+`design/system`과 `design/docs`는 frontend workspace와 CI가 사용하는 제품 source이므로 공개 후보에 포함합니다. 로컬 독립 실행 산출물인 `design/standalone`과 각 package의 `dist`만 ignore하고 공개 후보에서 제외합니다.
 `.claude/`와 `.orchestrator/`는 local agent 설정과 실행 state이며 product source of truth가 아니므로 Git에 추적하지 않습니다. 이미 추적된 파일이 발견되면 `git rm --cached`로 index에서 제거하고 local copy는 ignore된 상태로 남깁니다.
 
 ## 공개 전 scan

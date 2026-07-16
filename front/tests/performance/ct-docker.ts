@@ -1,4 +1,4 @@
-export const CT_DOCKER_IMAGE = "mcr.microsoft.com/playwright:v1.60.0-jammy";
+export const CT_DOCKER_IMAGE = "mcr.microsoft.com/playwright:v1.61.1-jammy";
 export const CT_ROOT_NODE_MODULES_VOLUME = "readmates-ct-root-node-modules";
 export const CT_FRONT_NODE_MODULES_VOLUME = "readmates-ct-front-node-modules";
 export const CT_PNPM_STORE_VOLUME = "readmates-ct-pnpm-store";

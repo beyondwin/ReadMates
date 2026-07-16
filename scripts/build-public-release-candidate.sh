@@ -174,6 +174,7 @@ promote_candidate() {
 preflight_envrc_loaders() {
   local roots=(
     "."
+    "design"
     "front"
     "server"
     "deploy/oci"
@@ -193,6 +194,15 @@ preflight_envrc_loaders() {
     new_temp_file
     results="$new_temp_file_path"
     case "$root" in
+      design)
+        capture_find "$results" "$root" \
+          "(" -path "$root/docs/node_modules" -o \
+          -path "$root/docs/dist" -o \
+          -path "$root/standalone" -o \
+          -path "$root/system/node_modules" -o \
+          -path "$root/system/dist" ")" \
+          -prune -o -name '.envrc*'
+        ;;
       .|docs/operations)
         capture_find "$results" "$root" -maxdepth 1 -name '.envrc*'
         ;;
@@ -216,6 +226,7 @@ preflight_envrc_loaders() {
 preflight_source_symlinks() {
   local roots=(
     ".github/workflows"
+    "design"
     "front"
     "server"
     "deploy/oci"
@@ -237,6 +248,18 @@ preflight_source_symlinks() {
     find_args=("$root")
 
     case "$root" in
+      design)
+        find_args+=(
+          "("
+          -path "$root/docs/node_modules" -o
+          -path "$root/docs/dist" -o
+          -path "$root/standalone" -o
+          -path "$root/system/node_modules" -o
+          -path "$root/system/dist"
+          ")"
+          -prune -o -type l
+        )
+        ;;
       front)
         find_args+=(
           "("
@@ -392,9 +415,18 @@ copy_manifest() {
   copy_required_file ".gitignore"
   copy_optional_file ".gitleaks.toml"
   copy_required_file ".env.example"
+  copy_required_file ".node-version"
   copy_required_file "README.md"
   copy_required_file "PRODUCT.md"
   copy_required_file "compose.yml"
+  copy_required_file "package.json"
+  copy_required_file "pnpm-lock.yaml"
+  copy_required_file "pnpm-workspace.yaml"
+
+  copy_dir "design" \
+    --exclude='node_modules/' \
+    --exclude='dist/' \
+    --exclude='/standalone/'
 
   copy_dir "front" \
     --exclude='/output/' \
@@ -441,6 +473,7 @@ copy_manifest() {
   copy_optional_file "scripts/validate-tempo-config.sh"
   copy_optional_file "scripts/verify-public-release-fixtures.sh"
   copy_dir "scripts/sync-config"
+  copy_required_file "scripts/fixtures/public-release-candidate-coverage.txt"
 }
 
 # Approved = not denied. Any path not matched by is_forbidden_candidate_path is
@@ -474,9 +507,10 @@ is_forbidden_candidate_path() {
     # Build / generated output
     output|output/*) return 0 ;;
     front/output|front/output/*) return 0 ;;
-    node_modules|node_modules/*) return 0 ;;
-    front/node_modules|front/node_modules/*) return 0 ;;
+    node_modules|node_modules/*|*/node_modules|*/node_modules/*) return 0 ;;
     front/dist|front/dist/*) return 0 ;;
+    design/*/dist|design/*/dist/*) return 0 ;;
+    design/standalone|design/standalone/*) return 0 ;;
     front/test-results|front/test-results/*) return 0 ;;
     front/playwright-report|front/playwright-report/*) return 0 ;;
     front/coverage|front/coverage/*) return 0 ;;
@@ -485,7 +519,6 @@ is_forbidden_candidate_path() {
     server/.gradle|server/.gradle/*) return 0 ;;
     server/.kotlin|server/.kotlin/*) return 0 ;;
     # Internal / private directories not in copy manifest
-    design|design/*) return 0 ;;
     recode|recode/*) return 0 ;;
     .gstack|.gstack/*) return 0 ;;
     .superpowers|.superpowers/*) return 0 ;;
@@ -568,7 +601,7 @@ Public release candidate built:
 Next verification commands:
   find .tmp/public-release-candidate -type l -print
   find .tmp/public-release-candidate -name '.env*' -print
-  find .tmp/public-release-candidate \\( -path '*/design/*' -o -path '*/.gstack/*' -o -path '*/.superpowers/*' -o -path '*/.idea/*' -o -path '*/.playwright-cli/*' -o -path '*/.tmp/*' -o -path '*/recode/*' -o -path '*/front/output/*' -o -path '*/front/node_modules/*' -o -path '*/front/dist/*' -o -path '*/front/test-results*' -o -path '*/front/playwright-report*' -o -path '*/front/coverage*' -o -path '*/front/.nyc_output*' -o -path '*/server/build/*' -o -path '*/server/.gradle/*' -o -path '*/server/.kotlin/*' -o -path '*/.wrangler' -o -path '*/.wrangler/*' -o -path '*/.cloudflare' -o -path '*/.cloudflare/*' -o -path '*/.vercel' -o -path '*/.vercel/*' -o -iname '*.env' -o -iname '*.pem' -o -iname '*.key' -o -iname '*.p8' -o -iname '*.p12' -o -iname '*.pfx' -o -iname '*.jks' -o -iname 'id_rsa*' -o -iname 'id_ed25519*' -o -iname 'id_ecdsa*' -o -iname 'id_dsa*' -o -iname '*.sql.gz' -o -iname '*.dump' -o -iname '*.tfstate' -o -iname '*.db' -o -iname '*.sqlite' \\) -print
+  find .tmp/public-release-candidate \\( -path '*/node_modules/*' -o -path '*/design/*/dist/*' -o -path '*/design/standalone' -o -path '*/design/standalone/*' -o -path '*/.gstack/*' -o -path '*/.superpowers/*' -o -path '*/.idea/*' -o -path '*/.playwright-cli/*' -o -path '*/.tmp/*' -o -path '*/recode/*' -o -path '*/front/output/*' -o -path '*/front/dist/*' -o -path '*/front/test-results*' -o -path '*/front/playwright-report*' -o -path '*/front/coverage*' -o -path '*/front/.nyc_output*' -o -path '*/server/build/*' -o -path '*/server/.gradle/*' -o -path '*/server/.kotlin/*' -o -path '*/.wrangler' -o -path '*/.wrangler/*' -o -path '*/.cloudflare' -o -path '*/.cloudflare/*' -o -path '*/.vercel' -o -path '*/.vercel/*' -o -iname '*.env' -o -iname '*.pem' -o -iname '*.key' -o -iname '*.p8' -o -iname '*.p12' -o -iname '*.pfx' -o -iname '*.jks' -o -iname 'id_rsa*' -o -iname 'id_ed25519*' -o -iname 'id_ecdsa*' -o -iname 'id_dsa*' -o -iname '*.sql.gz' -o -iname '*.dump' -o -iname '*.tfstate' -o -iname '*.db' -o -iname '*.sqlite' \\) -print
   git diff --check
 EOF
 }

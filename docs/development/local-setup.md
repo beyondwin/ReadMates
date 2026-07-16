@@ -9,11 +9,11 @@
 ## 필수 도구
 
 - `JDK 25 LTS`
-- `Node.js 24` 권장
-- `pnpm`
+- `Node.js 24` (`.node-version`과 CI 기준)
+- `pnpm@11.13.1` (Corepack으로 활성화)
 - `Docker Compose` 또는 `MySQL 8` compatible database
 
-프론트엔드와 디자인 시스템은 루트 `package.json` / `pnpm-workspace.yaml` 기준의 `pnpm@10.33.0` workspace를 사용합니다. CI는 Node.js 24로 frontend lint/test/build와 design-system check를 실행합니다. 백엔드는 Gradle wrapper와 Java toolchain으로 `JDK 25 LTS`를 사용합니다.
+프론트엔드와 디자인 시스템은 루트 `package.json` / `pnpm-workspace.yaml` 기준의 `pnpm@11.13.1` workspace를 사용합니다. CI와 로컬 검증은 `.node-version`과 같은 Node.js 24로 frontend lint/test/build와 design-system check를 실행합니다. 백엔드는 Gradle wrapper와 Java toolchain으로 `JDK 25 LTS`를 사용합니다.
 
 ## 의존성 설치
 

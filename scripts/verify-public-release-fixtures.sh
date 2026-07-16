@@ -143,6 +143,15 @@ if ./scripts/public-release-check.sh "$tsbuildinfo_fixture" > "$tsbuildinfo_fixt
 fi
 assert_file_contains "$tsbuildinfo_fixture.err" "forbidden candidate path: front/tsconfig.tsbuildinfo"
 
+design_standalone_fixture="$fixture_root/design-standalone-path"
+mkdir -p "$design_standalone_fixture/design/standalone"
+printf '<html>local design export</html>\n' > "$design_standalone_fixture/design/standalone/index.html"
+
+if ./scripts/public-release-check.sh "$design_standalone_fixture" > "$design_standalone_fixture.out" 2> "$design_standalone_fixture.err"; then
+  fail "public release check should reject design/standalone"
+fi
+assert_file_contains "$design_standalone_fixture.err" "forbidden candidate path: design/standalone"
+
 candidate_dir="$repo_abs/.tmp/public-release-candidate"
 coverage_fixture="$repo_abs/scripts/fixtures/public-release-candidate-coverage.txt"
 
@@ -162,5 +171,20 @@ if [ "$candidate_top" != "$expected_top" ]; then
   diff <(printf '%s\n' "$expected_top") <(printf '%s\n' "$candidate_top") >&2 || true
   fail "public release candidate top-level does not match scripts/fixtures/public-release-candidate-coverage.txt"
 fi
+
+for required_workspace_file in \
+  ".node-version" \
+  "package.json" \
+  "pnpm-lock.yaml" \
+  "pnpm-workspace.yaml" \
+  "front/package.json" \
+  "design/system/package.json" \
+  "design/docs/package.json" \
+  "scripts/fixtures/public-release-candidate-coverage.txt"
+do
+  if [[ ! -f "$candidate_dir/$required_workspace_file" ]]; then
+    fail "public release candidate is missing required workspace file: $required_workspace_file"
+  fi
+done
 
 printf 'Public-release fixture checks passed.\n'

@@ -167,9 +167,10 @@ is_forbidden_path() {
     .git|.git/*) return 0 ;;
     output|output/*) return 0 ;;
     front/output|front/output/*) return 0 ;;
-    node_modules|node_modules/*) return 0 ;;
-    front/node_modules|front/node_modules/*) return 0 ;;
+    node_modules|node_modules/*|*/node_modules|*/node_modules/*) return 0 ;;
     front/dist|front/dist/*) return 0 ;;
+    design/*/dist|design/*/dist/*) return 0 ;;
+    design/standalone|design/standalone/*) return 0 ;;
     front/test-results|front/test-results/*) return 0 ;;
     front/playwright-report|front/playwright-report/*) return 0 ;;
     front/coverage|front/coverage/*) return 0 ;;
@@ -177,7 +178,6 @@ is_forbidden_path() {
     server/build|server/build/*) return 0 ;;
     server/.gradle|server/.gradle/*) return 0 ;;
     server/.kotlin|server/.kotlin/*) return 0 ;;
-    design|design/*) return 0 ;;
     .gstack|.gstack/*) return 0 ;;
     .superpowers|.superpowers/*) return 0 ;;
     .idea|.idea/*) return 0 ;;

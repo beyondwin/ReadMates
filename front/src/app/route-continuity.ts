@@ -92,7 +92,7 @@ export function readStoredReadmatesMobileWorkspace(): ReadmatesMobileWorkspace |
     return null;
   }
 
-  let workspace: string | null = null;
+  let workspace: string | null;
 
   try {
     workspace = window.sessionStorage.getItem(MOBILE_WORKSPACE_KEY);

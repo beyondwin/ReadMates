@@ -2,7 +2,7 @@
 
 ReadMates의 테스트는 frontend lint/unit/build, Playwright E2E, backend Gradle test, 공개 릴리즈 후보 점검, 배포 연동 smoke로 나뉩니다.
 
-GitHub Actions CI는 frontend job에서 Node.js 24와 `pnpm@10.33.0`을 사용해 lint, coverage 포함 unit test, build, Zod fixture freshness check를 실행하고, design-system job에서 `pnpm design:check`를 실행합니다. Backend job은 JDK 25로 `./scripts/server-ci-check.sh`를 실행하며, wrapper의 `check` 안에서 unit test, architectureTest, ktlint, detekt, JaCoCo가 함께 실행됩니다. Testcontainers 기반 integration suite는 별도 `backend-integration` job의 `./gradlew integrationTest`로 병렬 실행합니다. E2E job은 MySQL service를 띄운 뒤 Playwright suite를 3개 shard로 나눠 실행합니다.
+GitHub Actions CI는 frontend job에서 Node.js 24와 `pnpm@11.13.1`을 사용해 lint, coverage 포함 unit test, build, Zod fixture freshness check를 실행하고, design-system job에서 `pnpm design:check`를 실행합니다. Backend job은 JDK 25로 `./scripts/server-ci-check.sh`를 실행하며, wrapper의 `check` 안에서 unit test, architectureTest, ktlint, detekt, JaCoCo가 함께 실행됩니다. Testcontainers 기반 integration suite는 별도 `backend-integration` job의 `./gradlew integrationTest`로 병렬 실행합니다. E2E job은 MySQL service를 띄운 뒤 Playwright suite를 3개 shard로 나눠 실행합니다.
 
 검증은 변경 surface와 위험도에 맞춰 고릅니다. 완료 보고에는 실행한 명령, 실패 또는 스킵한 명령과 이유, 남은 리스크를 함께 남깁니다. 실패한 검증을 무시하고 완료로 표시하지 않습니다.
 
@@ -216,7 +216,7 @@ pnpm --dir front test:ct:update:docker
 - `test:ct`는 Linux CI와 로컬 Linux에서 committed baseline과 현재 렌더 결과를 비교하는 검증 명령입니다. snapshot update flag를 사용하지 않습니다.
 - `test:ct:docker`는 macOS/renderer drift 회피용 검증 명령입니다. `front/scripts/run-ct-docker.ts`가 루트 `package.json`의 `packageManager`를 읽고 Docker 컨테이너 안에서 Corepack으로 같은 pnpm을 활성화한 뒤 Playwright CT를 실행합니다. 이 명령은 snapshot을 갱신하지 않습니다.
 - `test:ct:update`는 로컬 baseline 갱신용이지만, macOS나 CI 기준과 다른 렌더러에서 생성한 결과는 커밋하지 않습니다.
-- `test:ct:update:docker`가 baseline 생성의 **유일한 정규 경로**입니다. 같은 helper에 `--update`를 넘겨 `mcr.microsoft.com/playwright:v1.60.0-jammy` 이미지 안에서 실행합니다.
+- `test:ct:update:docker`가 baseline 생성의 **유일한 정규 경로**입니다. 같은 helper에 `--update`를 넘겨 `mcr.microsoft.com/playwright:v1.61.1-jammy` 이미지 안에서 실행합니다.
 
 Docker CT는 repository를 `/work`에 mount하되 root `node_modules`, `front/node_modules`, pnpm store를 Docker named volume으로 분리합니다. 그래서 Linux optional dependency install이 host `node_modules`를 덮어쓰는 일을 피합니다. Docker volume이 오래되어 의존성 상태가 의심되면 다음처럼 CT 전용 volume만 지웁니다.
 

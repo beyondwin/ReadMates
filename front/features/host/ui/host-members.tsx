@@ -300,7 +300,7 @@ export default function HostMembers({ initialMembers, actions, LinkComponent = D
       );
       setMessage({ kind: "status", text: "이름을 저장했습니다." });
     } catch (error) {
-      throw new Error(profileFailureMessage(error));
+      throw new Error(profileFailureMessage(error), { cause: error });
     } finally {
       setActionPending(key, false);
     }
