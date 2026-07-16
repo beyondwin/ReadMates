@@ -58,9 +58,10 @@ class SpringAiUsageMapper(
         val output = native?.outputTokens ?: usage?.completionTokens?.toLong()
         val total = usage?.totalTokens?.toLong()
         val nonCached = native?.nonCachedInputTokens ?: prompt?.minus(cacheRead)
-        val nativeMetadataPresent = usage !is GoogleGenAiUsage || usage.nativeUsage != null
+        val nativeMetadataComplete =
+            usage !is GoogleGenAiUsage || GoogleNativeUsageCompleteness.hasRequiredFields(usage.nativeUsage)
         val complete =
-            nativeMetadataPresent && prompt != null && output != null && total != null &&
+            nativeMetadataComplete && prompt != null && output != null && total != null &&
                 cacheRead >= 0 && nonCached != null && nonCached >= 0 &&
                 nonCached + cacheRead == prompt &&
                 total >= 0 && total == prompt + output
@@ -141,6 +142,21 @@ class SpringAiUsageMapper(
         native: Long?,
         generic: Long?,
     ): Long? = native ?: generic
+}
+
+private object GoogleNativeUsageCompleteness {
+    fun hasRequiredFields(value: Any?): Boolean {
+        if (value == null) return false
+        return REQUIRED_FIELDS.all { field ->
+            runCatching {
+                val publicUsageType = value.javaClass.superclass
+                val result = publicUsageType.getMethod(field).invoke(value)
+                result is java.util.Optional<*> && result.isPresent
+            }.getOrDefault(false)
+        }
+    }
+
+    private val REQUIRED_FIELDS = listOf("promptTokenCount", "candidatesTokenCount", "totalTokenCount")
 }
 
 private object AnthropicNativeUsage {

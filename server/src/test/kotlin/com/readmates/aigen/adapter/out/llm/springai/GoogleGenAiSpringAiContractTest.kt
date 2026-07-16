@@ -93,11 +93,27 @@ class GoogleGenAiSpringAiContractTest {
 
     @Test
     fun `missing Google usage metadata keeps worst-case reservation`() {
-        ProviderMockHttpServer.start(successResponse(includeUsage = false), GOOGLE_PATH).use { server ->
+        ProviderMockHttpServer.start(successResponse(usageMetadata = null), GOOGLE_PATH).use { server ->
             val output = generator(model(server.origin, Duration.ofSeconds(2))).generate(MODEL, request())
 
             assertThat(output.usageComplete).isFalse()
             assertThat(server.requestCount).isEqualTo(1)
+        }
+    }
+
+    @Test
+    fun `empty or partial Google usage metadata keeps worst-case reservation`() {
+        listOf(
+            "{}",
+            """{"promptTokenCount":120}""",
+            """{"promptTokenCount":120,"candidatesTokenCount":30}""",
+        ).forEach { metadata ->
+            ProviderMockHttpServer.start(successResponse(usageMetadata = metadata), GOOGLE_PATH).use { server ->
+                val output = generator(model(server.origin, Duration.ofSeconds(2))).generate(MODEL, request())
+
+                assertThat(output.usageComplete).isFalse()
+                assertThat(server.requestCount).isEqualTo(1)
+            }
         }
     }
 
@@ -178,22 +194,11 @@ class GoogleGenAiSpringAiContractTest {
     private fun successResponse(
         text: String = GroundedProviderTestFixture.draftNode().toString(),
         delay: Duration = Duration.ZERO,
-        includeUsage: Boolean = true,
+        usageMetadata: String? = DEFAULT_USAGE_METADATA,
     ): ProviderMockHttpServer.Response {
         val content = ObjectMapper().writeValueAsString(text)
         val usage =
-            if (includeUsage) {
-                """
-                ,"usageMetadata":{
-                  "promptTokenCount":120,
-                  "cachedContentTokenCount":20,
-                  "candidatesTokenCount":30,
-                  "totalTokenCount":150
-                }
-                """.trimIndent()
-            } else {
-                ""
-            }
+            usageMetadata?.let { ",\"usageMetadata\":$it" }.orEmpty()
         return ProviderMockHttpServer.Response(
             200,
             """
@@ -221,5 +226,7 @@ class GoogleGenAiSpringAiContractTest {
     private companion object {
         val MODEL = ModelId(Provider.GEMINI, "gemini-3-flash-preview")
         const val GOOGLE_PATH = "/v1beta/models/gemini-3-flash-preview:generateContent"
+        const val DEFAULT_USAGE_METADATA =
+            """{"promptTokenCount":120,"cachedContentTokenCount":20,"candidatesTokenCount":30,"totalTokenCount":150}"""
     }
 }
