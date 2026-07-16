@@ -49,6 +49,12 @@ configurations.configureEach {
     }
 }
 
+dependencyManagement {
+    imports {
+        mavenBom("org.springframework.ai:spring-ai-bom:2.0.0")
+    }
+}
+
 dependencies {
     constraints {
         implementation("org.lz4:lz4-java:1.8.1") {
@@ -92,12 +98,13 @@ dependencies {
     // SLO catalog yaml parsing (com.fasterxml.jackson.dataformat.yaml.YAMLFactory).
     // Pinned to match jackson-module-kotlin 2.21.2 already resolved transitively.
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.21.2")
-    // Official Anthropic Java SDK for the Claude provider adapter (aigen task 1.6).
-    implementation("com.anthropic:anthropic-java:2.27.0")
-    // Official OpenAI Java SDK for the OpenAI provider adapter (aigen task 4.2).
-    implementation("com.openai:openai-java:4.32.0")
-    // Official Google Gen AI Java SDK for the Gemini provider adapter (aigen task 5.1).
-    implementation("com.google.genai:google-genai:1.53.0")
+    implementation("org.springframework.ai:spring-ai-starter-model-openai")
+    implementation("org.springframework.ai:spring-ai-starter-model-anthropic")
+    implementation("org.springframework.ai:spring-ai-starter-model-google-genai")
+    implementation("org.springframework.boot:spring-boot-starter-opentelemetry")
+    // TODO(Task 11): remove this compile-only bridge with the legacy direct-SDK clients.
+    compileOnly("com.anthropic:anthropic-java-client-okhttp:2.40.1")
+    compileOnly("com.openai:openai-java-client-okhttp:4.39.1")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     runtimeOnly("org.flywaydb:flyway-mysql")
     runtimeOnly("com.mysql:mysql-connector-j")

@@ -1,6 +1,31 @@
 spring:
   application:
     name: readmates-server
+  ai:
+    model:
+      audio:
+        speech: none
+        transcription: none
+      chat: none
+      embedding: none
+      embedding.multimodal: none
+      embedding.text: none
+      image: none
+      moderation: none
+    retry:
+      max-attempts: 1
+    chat:
+      client:
+        observations:
+          log-prompt: false
+          log-completion: false
+      observations:
+        log-prompt: false
+        log-completion: false
+        include-error-logging: false
+    tools:
+      observations:
+        include-content: false
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/readmates?serverTimezone=UTC}
     username: ${SPRING_DATASOURCE_USERNAME:readmates}
@@ -16,6 +41,14 @@ spring:
     locations: ${READMATES_FLYWAY_LOCATIONS:classpath:db/mysql/migration}
 
 management:
+  tracing:
+    sampling:
+      probability: ${READMATES_TRACING_SAMPLING_PROBABILITY:1.0}
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${READMATES_OTLP_TRACES_ENDPOINT:http://localhost:4318/v1/traces}
   server:
     address: ${READMATES_MANAGEMENT_ADDRESS:127.0.0.1}
     port: ${READMATES_MANAGEMENT_PORT:8081}
