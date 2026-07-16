@@ -1,14 +1,17 @@
 package com.readmates.aigen.adapter.out.persistence
 
+import com.readmates.aigen.application.model.CostBasis
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.model.ProviderCallMode
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.out.AuditKind
 import com.readmates.aigen.application.port.out.AuditLogEntry
 import com.readmates.aigen.application.port.out.AuditStatus
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -24,6 +27,10 @@ import java.util.UUID
 @TestPropertySource(
     properties = [
         "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
+        "spring.ai.model.chat=none",
+        "spring.ai.google.genai.api-key=test-key",
+        "spring.ai.openai.api-key=test-key",
+        "spring.ai.anthropic.api-key=test-key",
     ],
 )
 @Tag("integration")
@@ -178,6 +185,58 @@ class JdbcAiGenerationAuditRepositoryTest(
     }
 
     @Test
+    fun `insert persists provider attempt correlation and an already safe error message`() {
+        val jobId = UUID.randomUUID()
+        val safeErrorMessage = "The provider is temporarily unavailable."
+
+        adapter.insert(
+            sampleEntry(
+                jobId = jobId,
+                usage =
+                    TokenUsage(
+                        nonCachedInputTokens = 100,
+                        cacheWriteInputTokens = 25,
+                        cacheReadInputTokens = 50,
+                        outputTokens = 75,
+                    ),
+                status = AuditStatus.FAILED,
+                errorCode = ErrorCode.PROVIDER_UNAVAILABLE,
+                errorMessage = safeErrorMessage,
+                traceId = "A1b2C3d4E5f60718293a4B5c6D7e8F90",
+                providerAttempt = 2,
+                providerCallMode = ProviderCallMode.FALLBACK,
+                costBasis = CostBasis.ESTIMATED_UNKNOWN,
+            ),
+        )
+
+        val row =
+            jdbcTemplate.queryForMap(
+                """
+                select input_tokens, trace_id, provider_attempt, provider_call_mode, cost_basis,
+                       cache_write_input_tokens, error_message
+                from ai_generation_audit_log
+                where job_id = ?
+                """.trimIndent(),
+                jobId.toString(),
+            )
+
+        assertThat((row["input_tokens"] as Number).toInt()).isEqualTo(100)
+        assertThat(row["trace_id"]).isEqualTo("A1b2C3d4E5f60718293a4B5c6D7e8F90")
+        assertThat((row["provider_attempt"] as Number).toInt()).isEqualTo(2)
+        assertThat(row["provider_call_mode"]).isEqualTo("FALLBACK")
+        assertThat(row["cost_basis"]).isEqualTo("ESTIMATED_UNKNOWN")
+        assertThat((row["cache_write_input_tokens"] as Number).toInt()).isEqualTo(25)
+        assertThat(row["error_message"]).isEqualTo(safeErrorMessage)
+    }
+
+    @Test
+    fun `insert rejects a value that is not a W3C trace id`() {
+        assertThrows<IllegalArgumentException> {
+            adapter.insert(sampleEntry(traceId = "00-not-a-traceparent-or-trace-id"))
+        }
+    }
+
+    @Test
     fun `audit log table has no transcript body column and rejects transcript sentinel substring`() {
         val transcriptColumns =
             jdbcTemplate.queryForList(
@@ -286,6 +345,10 @@ class JdbcAiGenerationAuditRepositoryTest(
         groundingWarningCount: Int = 0,
         reviewedSectionCount: Int = 0,
         userEditedSectionCount: Int = 0,
+        traceId: String? = null,
+        providerAttempt: Int? = null,
+        providerCallMode: ProviderCallMode? = null,
+        costBasis: CostBasis = CostBasis.NONE,
     ): AuditLogEntry =
         AuditLogEntry(
             jobId = jobId,
@@ -311,5 +374,9 @@ class JdbcAiGenerationAuditRepositoryTest(
             groundingWarningCount = groundingWarningCount,
             reviewedSectionCount = reviewedSectionCount,
             userEditedSectionCount = userEditedSectionCount,
+            traceId = traceId,
+            providerAttempt = providerAttempt,
+            providerCallMode = providerCallMode,
+            costBasis = costBasis,
         )
 }

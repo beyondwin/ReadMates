@@ -18,6 +18,10 @@ import java.util.UUID
 @TestPropertySource(
     properties = [
         "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
+        "spring.ai.model.chat=none",
+        "spring.ai.google.genai.api-key=test-key",
+        "spring.ai.openai.api-key=test-key",
+        "spring.ai.anthropic.api-key=test-key",
     ],
 )
 @Tag("integration")
@@ -496,6 +500,7 @@ class MySqlFlywayMigrationTest(
         assertEquals("YES", columnValue("ai_generation_audit_log", "input_turn_count", "is_nullable"))
         assertEquals("YES", columnValue("ai_generation_audit_log", "speaker_count", "is_nullable"))
         assertEquals("YES", columnValue("ai_generation_audit_log", "grounding_status", "is_nullable"))
+        assertAiGenerationAttemptAuditColumns()
 
         assertEquals(
             "session_id,created_at",
@@ -524,6 +529,45 @@ class MySqlFlywayMigrationTest(
             "job_id,revision",
             indexColumns("ai_generation_commit_receipts", "uk_aigen_commit_receipt_job_revision"),
         )
+    }
+
+    private fun assertAiGenerationAttemptAuditColumns() {
+        assertEquals("char", columnValue("ai_generation_audit_log", "trace_id", "data_type"))
+        assertEquals("YES", columnValue("ai_generation_audit_log", "trace_id", "is_nullable"))
+        assertEquals("tinyint unsigned", columnValue("ai_generation_audit_log", "provider_attempt", "column_type"))
+        assertEquals("YES", columnValue("ai_generation_audit_log", "provider_attempt", "is_nullable"))
+        assertEquals("varchar", columnValue("ai_generation_audit_log", "provider_call_mode", "data_type"))
+        assertEquals("YES", columnValue("ai_generation_audit_log", "provider_call_mode", "is_nullable"))
+        assertEquals("NO", columnValue("ai_generation_audit_log", "cost_basis", "is_nullable"))
+        assertEquals("NONE", columnValue("ai_generation_audit_log", "cost_basis", "column_default"))
+        assertEquals("NO", columnValue("ai_generation_audit_log", "cache_write_input_tokens", "is_nullable"))
+        assertEquals("0", columnValue("ai_generation_audit_log", "cache_write_input_tokens", "column_default"))
+
+        val traceIndexes =
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from information_schema.statistics
+                where table_schema = database()
+                  and table_name = 'ai_generation_audit_log'
+                  and column_name = 'trace_id'
+                """.trimIndent(),
+                Int::class.java,
+            )
+        val traceForeignKeys =
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from information_schema.key_column_usage
+                where table_schema = database()
+                  and table_name = 'ai_generation_audit_log'
+                  and column_name = 'trace_id'
+                  and referenced_table_name is not null
+                """.trimIndent(),
+                Int::class.java,
+            )
+        assertEquals(0, traceIndexes)
+        assertEquals(0, traceForeignKeys)
     }
 
     @Test

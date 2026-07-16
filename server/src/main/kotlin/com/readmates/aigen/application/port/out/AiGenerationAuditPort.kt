@@ -1,8 +1,10 @@
 package com.readmates.aigen.application.port.out
 
+import com.readmates.aigen.application.model.CostBasis
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.model.ProviderCallMode
 import com.readmates.aigen.application.model.TokenUsage
 import java.math.BigDecimal
 import java.time.Instant
@@ -36,6 +38,10 @@ data class AuditLogEntry(
     val groundingWarningCount: Int = 0,
     val reviewedSectionCount: Int = 0,
     val userEditedSectionCount: Int = 0,
+    val traceId: String? = null,
+    val providerAttempt: Int? = null,
+    val providerCallMode: ProviderCallMode? = null,
+    val costBasis: CostBasis = CostBasis.NONE,
 ) {
     companion object {
         // Mirrors the cohesive identity/context fields of a failed audit row; collapsing
