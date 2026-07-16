@@ -216,7 +216,7 @@ pnpm --dir front test:ct:update:docker
 - `test:ct`는 Linux CI와 로컬 Linux에서 committed baseline과 현재 렌더 결과를 비교하는 검증 명령입니다. snapshot update flag를 사용하지 않습니다.
 - `test:ct:docker`는 macOS/renderer drift 회피용 검증 명령입니다. `front/scripts/run-ct-docker.ts`가 루트 `package.json`의 `packageManager`를 읽고 Docker 컨테이너 안에서 Corepack으로 같은 pnpm을 활성화한 뒤 Playwright CT를 실행합니다. 이 명령은 snapshot을 갱신하지 않습니다.
 - `test:ct:update`는 로컬 baseline 갱신용이지만, macOS나 CI 기준과 다른 렌더러에서 생성한 결과는 커밋하지 않습니다.
-- `test:ct:update:docker`가 baseline 생성의 **유일한 정규 경로**입니다. 같은 helper에 `--update`를 넘겨 `mcr.microsoft.com/playwright:v1.60.0-jammy` 이미지 안에서 실행합니다.
+- `test:ct:update:docker`가 baseline 생성의 **유일한 정규 경로**입니다. 같은 helper에 `--update`를 넘겨 `mcr.microsoft.com/playwright:v1.61.1-jammy` 이미지 안에서 실행합니다.
 
 Docker CT는 repository를 `/work`에 mount하되 root `node_modules`, `front/node_modules`, pnpm store를 Docker named volume으로 분리합니다. 그래서 Linux optional dependency install이 host `node_modules`를 덮어쓰는 일을 피합니다. Docker volume이 오래되어 의존성 상태가 의심되면 다음처럼 CT 전용 volume만 지웁니다.
 

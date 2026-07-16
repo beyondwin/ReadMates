@@ -56,6 +56,7 @@ describe("CT Docker command helpers", () => {
     });
 
     expect(command.command).toBe("docker");
+    expect(CT_DOCKER_IMAGE).toBe("mcr.microsoft.com/playwright:v1.61.1-jammy");
     expect(command.args).toContain(CT_DOCKER_IMAGE);
     expect(command.args).toContain("READMATES_CT_PACKAGE_MANAGER=pnpm@11.13.1");
     expect(command.args).toContain(`${CT_ROOT_NODE_MODULES_VOLUME}:/work/node_modules`);
