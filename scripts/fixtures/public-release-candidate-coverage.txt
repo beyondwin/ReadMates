@@ -2,10 +2,15 @@
 .github
 .gitignore
 .gitleaks.toml
+.node-version
 compose.yml
 deploy
+design
 docs
 front
+package.json
+pnpm-lock.yaml
+pnpm-workspace.yaml
 README.md
 PRODUCT.md
 ops
