@@ -62,6 +62,7 @@ class SpringAiUsageMapper(
         val complete =
             nativeMetadataPresent && prompt != null && output != null && total != null &&
                 cacheRead >= 0 && nonCached != null && nonCached >= 0 &&
+                nonCached + cacheRead == prompt &&
                 total >= 0 && total == prompt + output
         return SpringAiUsageMapping(
             usage =

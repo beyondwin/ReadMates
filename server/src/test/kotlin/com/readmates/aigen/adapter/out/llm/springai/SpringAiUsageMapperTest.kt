@@ -112,6 +112,31 @@ class SpringAiUsageMapperTest {
     }
 
     @Test
+    fun `Google native input breakdown inconsistent with gross prompt is incomplete`() {
+        val usage = DefaultUsage(120, 30, 150, NativeFixture("google"), 20, null)
+        val mapper =
+            SpringAiUsageMapper(
+                nativeExtractors =
+                    mapOf(
+                        Provider.GEMINI to
+                            SpringAiNativeUsageExtractor {
+                                SpringAiNativeUsage(
+                                    nonCachedInputTokens = 99,
+                                    cacheReadInputTokens = 20,
+                                    outputTokens = 30,
+                                )
+                            },
+                    ),
+            )
+
+        val mapped = mapper.map(Provider.GEMINI, usage, cacheEnabled = true)
+
+        assertThat(mapped.usage.nonCachedInputTokens).isEqualTo(99)
+        assertThat(mapped.usage.cacheReadInputTokens).isEqualTo(20)
+        assertThat(mapped.usageComplete).isFalse()
+    }
+
+    @Test
     fun `uses only the registered provider native extractor to complete cache channels`() {
         val native = NativeFixture("opaque-native-response")
         val usage = DefaultUsage(77, 13, 90, native)
