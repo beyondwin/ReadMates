@@ -102,9 +102,6 @@ dependencies {
     implementation("org.springframework.ai:spring-ai-starter-model-anthropic")
     implementation("org.springframework.ai:spring-ai-starter-model-google-genai")
     implementation("org.springframework.boot:spring-boot-starter-opentelemetry")
-    // TODO(Task 11): remove this compile-only bridge with the legacy direct-SDK clients.
-    compileOnly("com.anthropic:anthropic-java-client-okhttp:2.40.1")
-    compileOnly("com.openai:openai-java-client-okhttp:4.39.1")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     runtimeOnly("org.flywaydb:flyway-mysql")
     runtimeOnly("com.mysql:mysql-connector-j")

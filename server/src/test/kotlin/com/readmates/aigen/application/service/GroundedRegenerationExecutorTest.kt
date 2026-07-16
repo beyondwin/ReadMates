@@ -1,7 +1,6 @@
 package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.AiGenerationException
-import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.CostBasis
 import com.readmates.aigen.application.model.ErrorCode
@@ -70,8 +69,11 @@ class GroundedRegenerationExecutorTest {
         assertThat(result.evidence?.targets).allSatisfy { target -> assertThat(target.targetId).startsWith("r2:") }
         assertThat(saved.revision).isEqualTo(2)
         assertThat(saved.result?.highlights).isEqualTo(context.record.result?.highlights)
+        assertThat(context.costGuard.released).hasSize(1)
+        val released = context.costGuard.released[0]
+        assertThat(released.third).isNotEqualTo(context.record.jobId)
         val audit = context.auditPort.entries.single { it.providerAttempt == null }
-        assertThat(audit.pipelineVersion).isEqualTo("GROUNDED_WHOLE_TRANSCRIPT")
+        assertThat(audit.pipelineVersion).isEqualTo("grounded-session-generation-v2")
         assertThat(audit.inputTurnCount).isEqualTo(1)
         assertThat(audit.speakerCount).isEqualTo(1)
         assertThat(audit.groundingStatus).isEqualTo("VALID")
@@ -117,7 +119,6 @@ class GroundedRegenerationExecutorTest {
         }
         assertThat(context.generator.calls).isZero()
         assertThat(context.jobStore.load(context.record.jobId)?.llmCallCount).isEqualTo(1)
-        assertThat(context.costGuard.recorded).isEmpty()
     }
 
     @Test
@@ -271,7 +272,6 @@ class GroundedRegenerationExecutorTest {
                     result = valid.snapshot,
                     sessionMeta = meta,
                 ).copy(
-                    pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
                     validatedTurns = turns,
                     revision = 1,
                     groundingStatus = GroundingStatus.VALID,
@@ -313,7 +313,7 @@ class GroundedRegenerationExecutorTest {
                     java.time.Duration.ofSeconds(30),
                     JitterSource { 1.0 },
                 ),
-                ProviderFallbackChain(emptyMap(), modelCatalog, properties),
+                ProviderFallbackChain(modelCatalog, properties),
                 sleeper,
             )
     }
@@ -349,8 +349,8 @@ class GroundedRegenerationExecutorTest {
         ): GroundedSectionRepairOutput {
             calls += 1
             failures.removeFirstOrNull()?.let {
-                throw com.readmates.aigen.adapter.out.llm.common
-                    .LlmGenerationException(it, retryAfter = retryAfter)
+                throw com.readmates.aigen.application.model
+                    .ProviderCallException(it, retryAfter = retryAfter)
             }
             return outputs.removeFirstOrNull() ?: repairOutput
         }

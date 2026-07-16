@@ -1,7 +1,6 @@
 package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.AiGenerationException
-import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GroundingStatus
 import com.readmates.aigen.application.model.JobStatus
@@ -34,9 +33,7 @@ class AiGenerationEvidenceService(
             throw AiGenerationException.Coded(ErrorCode.STALE_GENERATION_REVISION, currentRevision = record.revision)
         }
         if (
-            record.status != JobStatus.SUCCEEDED ||
-            record.pipelineMode != AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT ||
-            record.groundingStatus != GroundingStatus.VALID
+            record.status != JobStatus.SUCCEEDED || record.groundingStatus != GroundingStatus.VALID
         ) {
             throw AiGenerationException.Coded(ErrorCode.JOB_EXPIRED)
         }

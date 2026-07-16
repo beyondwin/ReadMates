@@ -1,9 +1,9 @@
 package com.readmates.aigen.adapter.`in`.web
 
-import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
 import com.readmates.aigen.adapter.out.messaging.AiGenerationJobPublishException
 import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.ErrorCode
+import com.readmates.aigen.application.model.ProviderCallException
 import com.readmates.shared.security.AccessDeniedException
 import org.springframework.core.annotation.Order
 import org.springframework.http.HttpStatus
@@ -95,8 +95,8 @@ class AiGenerationErrorHandler {
     ): ResponseEntity<ProblemDetail> =
         problem(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.QUEUE_UNAVAILABLE.name, "Generation queue unavailable")
 
-    @ExceptionHandler(LlmGenerationException::class)
-    fun handleLlmGeneration(error: LlmGenerationException): ResponseEntity<ProblemDetail> {
+    @ExceptionHandler(ProviderCallException::class)
+    fun handleLlmGeneration(error: ProviderCallException): ResponseEntity<ProblemDetail> {
         val status = error.error.code.toHttpStatus()
         return problem(status, error.error.code.name, error.error.code.safeDetail())
     }

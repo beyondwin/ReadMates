@@ -4,14 +4,13 @@ package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.AiGenerationActor
-import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.ErrorCode
+import com.readmates.aigen.application.model.GROUNDED_PIPELINE_VERSION
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.SectionReviewStatus
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
-import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.`in`.CommitGenerationResult
 import com.readmates.aigen.application.port.`in`.CommitGenerationUseCase
 import com.readmates.aigen.application.port.`in`.JobNotFoundException
@@ -38,7 +37,6 @@ import com.readmates.sessionimport.application.service.InvalidSessionImportExcep
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
-import java.math.BigDecimal
 import java.time.Clock
 import java.time.Duration
 import java.util.UUID
@@ -85,168 +83,14 @@ class AiGenerationCommitService(
         if (record.sessionId != sessionId) {
             throw JobSessionMismatchException(jobId, sessionId, record.sessionId)
         }
-        if (record.pipelineMode == AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT) {
-            return commitGrounded(
-                host,
-                record,
-                recordVisibility,
-                overrideResult,
-                expectedRevision,
-                sectionReviews,
-            )
-        }
-        transitionPolicy.requireCommit(record.status, record.jobId)
-        val snapshot =
-            overrideResult
-                ?: record.result
-                ?: throw AiGenerationException.IllegalGenerationState(
-                    jobId = jobId,
-                    currentStatus = record.status.name,
-                    attemptedAction = "commit",
-                )
-
-        // Validate BEFORE persisting any override. Otherwise a bad client-supplied
-        // override would pollute the Redis result before validation could reject it.
-        // See spec §9.3: validation is the trust boundary between aigen and
-        // sessionimport.commitValidated.
-        val sessionMeta = record.toSessionMeta()
-        when (val outcome = validator.validate(snapshot, sessionMeta)) {
-            is ValidationResult.Ok -> Unit
-            is ValidationResult.Violation -> failCommit(record, outcome)
-        }
-
-        val beganCommit =
-            jobStore.transitionStatus(
-                jobId = record.jobId,
-                expected = setOf(JobStatus.SUCCEEDED),
-                next = JobStatus.COMMITTING,
-                stage = JobStage.READY,
-                progressPct = 100,
-                error = null,
-            )
-        if (!beganCommit) {
-            throw AiGenerationException.IllegalGenerationState(
-                jobId = record.jobId,
-                currentStatus = jobStore.load(record.jobId)?.status?.name ?: "MISSING",
-                attemptedAction = "commit",
-            )
-        }
-
-        if (overrideResult != null) {
-            val overrideSaved =
-                jobStore.saveResultIfStatus(
-                    jobId = jobId,
-                    expected = JobStatus.COMMITTING,
-                    result = overrideResult,
-                    usage = TokenUsage.ZERO,
-                    cost = BigDecimal.ZERO,
-                )
-            if (!overrideSaved) {
-                jobStore.transitionStatus(
-                    jobId = record.jobId,
-                    expected = setOf(JobStatus.COMMITTING),
-                    next = JobStatus.SUCCEEDED,
-                    stage = JobStage.READY,
-                    progressPct = 100,
-                    error = null,
-                )
-                throw AiGenerationException.IllegalGenerationState(
-                    jobId = record.jobId,
-                    currentStatus = jobStore.load(record.jobId)?.status?.name ?: "MISSING",
-                    attemptedAction = "commit",
-                )
-            }
-        }
-
-        val command = toSessionImportCommand(host, snapshot, sessionId, recordVisibility)
-        val result =
-            try {
-                commitDelegate.commitValidated(ValidatedSessionImportInput(command))
-            } catch (ignored: InvalidSessionImportException) {
-                // Detail is intentionally dropped: the client already failed the trust
-                // boundary, so we restore the job to SUCCEEDED and surface a uniform
-                // SCHEMA_INVALID violation rather than leaking validator internals.
-                jobStore.transitionStatus(
-                    jobId = record.jobId,
-                    expected = setOf(JobStatus.COMMITTING),
-                    next = JobStatus.SUCCEEDED,
-                    stage = JobStage.READY,
-                    progressPct = 100,
-                    error = null,
-                )
-                failCommit(
-                    record,
-                    ValidationResult.Violation(
-                        ErrorCode.SCHEMA_INVALID,
-                        "Generated session import failed validation",
-                    ),
-                )
-            } catch (
-                // Catch all RuntimeExceptions so a commit-delegate failure can never strand
-                // the job in COMMITTING: restore SUCCEEDED and audit before rethrowing.
-                @Suppress("TooGenericExceptionCaught") error: RuntimeException,
-            ) {
-                jobStore.transitionStatus(
-                    jobId = record.jobId,
-                    expected = setOf(JobStatus.COMMITTING),
-                    next = JobStatus.SUCCEEDED,
-                    stage = JobStage.READY,
-                    progressPct = 100,
-                    error = null,
-                )
-                auditPort.insert(
-                    AuditLogEntry(
-                        jobId = record.jobId,
-                        sessionId = record.sessionId,
-                        clubId = record.clubId,
-                        hostUserId = record.hostUserId,
-                        kind = AuditKind.COMMIT,
-                        item = null,
-                        provider = record.model.provider,
-                        model = record.model.name,
-                        transcriptSha256 = null,
-                        usage = record.tokens,
-                        costEstimateUsd = record.costAccumulatedUsd,
-                        status = AuditStatus.FAILED,
-                        errorCode = ErrorCode.UNKNOWN,
-                        errorMessage = "Commit delegate failed; status restored to SUCCEEDED",
-                        latencyMs = 0,
-                        createdAt = clock.instant(),
-                    ),
-                )
-                throw error
-            }
-
-        jobStore.transitionStatus(
-            jobId = record.jobId,
-            expected = setOf(JobStatus.COMMITTING),
-            next = JobStatus.COMMITTED,
-            stage = null,
-            progressPct = 100,
-            error = null,
+        return commitGrounded(
+            host,
+            record,
+            recordVisibility,
+            overrideResult,
+            expectedRevision,
+            sectionReviews,
         )
-        jobStore.deleteTransientPayload(jobId)
-        auditPort.insert(
-            AuditLogEntry(
-                jobId = record.jobId,
-                sessionId = record.sessionId,
-                clubId = record.clubId,
-                hostUserId = record.hostUserId,
-                kind = AuditKind.COMMIT,
-                item = null,
-                provider = record.model.provider,
-                model = record.model.name,
-                transcriptSha256 = null,
-                usage = record.tokens,
-                costEstimateUsd = record.costAccumulatedUsd,
-                status = AuditStatus.SUCCESS,
-                errorCode = null,
-                errorMessage = null,
-                latencyMs = 0,
-                createdAt = clock.instant(),
-            ),
-        )
-        return CommitGenerationResult(sessionId, JobStatus.COMMITTED, recovered = false, participantUpdatesCount = null)
     }
 
     @Suppress(
@@ -443,7 +287,7 @@ class AiGenerationCommitService(
                 errorMessage = null,
                 latencyMs = 0,
                 createdAt = clock.instant(),
-                pipelineVersion = record.pipelineMode.name,
+                pipelineVersion = GROUNDED_PIPELINE_VERSION,
                 inputTurnCount = record.validatedTurns.size,
                 speakerCount =
                     record.validatedTurns

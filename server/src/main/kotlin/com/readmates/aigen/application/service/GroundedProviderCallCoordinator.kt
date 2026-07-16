@@ -1,8 +1,8 @@
 package com.readmates.aigen.application.service
 
-import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
 import com.readmates.aigen.application.model.CostBasis
 import com.readmates.aigen.application.model.ErrorCode
+import com.readmates.aigen.application.model.GROUNDED_PIPELINE_VERSION
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.JobStatus
@@ -10,6 +10,7 @@ import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.model.ProviderAttempt
 import com.readmates.aigen.application.model.ProviderAttemptState
+import com.readmates.aigen.application.model.ProviderCallException
 import com.readmates.aigen.application.model.ProviderCallMode
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.out.AiGenerationAuditPort
@@ -147,7 +148,7 @@ class GroundedProviderCallCoordinator private constructor(
                 val transport =
                     try {
                         callOnce(generator, command)
-                    } catch (failure: LlmGenerationException) {
+                    } catch (failure: ProviderCallException) {
                         PhysicalResult.Failure(failure.error, classify(failure.error.code), failure.retryAfter)
                     } catch (failure: RuntimeException) {
                         PhysicalResult.Failure(UNKNOWN_PROVIDER_OUTCOME, ProviderFailureClass.TRANSIENT)
@@ -280,7 +281,7 @@ class GroundedProviderCallCoordinator private constructor(
                         .coerceIn(0, Int.MAX_VALUE.toLong())
                         .toInt(),
                 createdAt = clock.instant(),
-                pipelineVersion = command.record.pipelineMode.name,
+                pipelineVersion = GROUNDED_PIPELINE_VERSION,
                 inputTurnCount = command.record.validatedTurns.size,
                 speakerCount =
                     command.record.validatedTurns

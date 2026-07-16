@@ -97,7 +97,7 @@ class GroundedProviderCallCoordinatorTest {
     fun `uncertain provider failure reconciles estimated unknown and records transient circuit failure`() {
         val context = Context()
         context.generator.failure =
-            com.readmates.aigen.adapter.out.llm.common.LlmGenerationException(
+            com.readmates.aigen.application.model.ProviderCallException(
                 com.readmates.aigen.application.model.GenerationError(
                     ErrorCode.PROVIDER_UNAVAILABLE,
                     "safe unavailable",
@@ -129,7 +129,7 @@ class GroundedProviderCallCoordinatorTest {
     fun `confirmed pre-transport option failure releases the reservation without retryable uncertainty`() {
         val context = Context()
         context.generator.failure =
-            com.readmates.aigen.adapter.out.llm.common.LlmGenerationException(
+            com.readmates.aigen.application.model.ProviderCallException(
                 com.readmates.aigen.application.model.GenerationError(
                     ErrorCode.MODEL_CAPABILITY_UNAVAILABLE,
                     "Grounded model capability unavailable",

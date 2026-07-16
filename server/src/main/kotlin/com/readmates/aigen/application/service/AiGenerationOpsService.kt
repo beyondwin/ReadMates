@@ -250,11 +250,7 @@ class AiGenerationOpsService(
                     if (status in FORCE_CANCEL_STATUSES) add(AiOpsAction.FORCE_CANCEL)
                     if (status in RETRY_COMMIT_STATUSES) add(AiOpsAction.RETRY_COMMIT)
                 },
-            revision =
-                revision.takeIf {
-                    pipelineMode ==
-                        com.readmates.aigen.application.model.AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT
-                },
+            revision = revision,
             cleanupPending = cleanupPending,
             commitLeaseExpiresAt = commitLeaseExpiresAt,
         )

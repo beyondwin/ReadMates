@@ -1,6 +1,5 @@
 package com.readmates.aigen.config
 
-import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import org.springframework.boot.context.properties.ConfigurationProperties
 import java.math.BigDecimal
 import java.time.Duration
@@ -24,7 +23,6 @@ data class AiGenerationProperties(
     // Ordered model aliases tried for cross-provider failover on availability
     // failures. Empty = feature off (same-provider retry only).
     val fallbackChain: List<String> = emptyList(),
-    val pipelineMode: AiGenerationPipelineMode = AiGenerationPipelineMode.LEGACY,
     val grounded: Grounded = Grounded(),
     val caps: Caps = Caps(),
     val job: Job = Job(),
@@ -43,7 +41,7 @@ data class AiGenerationProperties(
     data class Grounded(
         val reservedOutputTokens: Long = 16_384,
         val safetyMarginTokens: Long = 8_192,
-        // Explicit mode-specific allowlist: legacy pricing entries do not become grounded-capable implicitly.
+        // Explicit allowlist: pricing entries do not become grounded-capable implicitly.
         val capabilities: Map<String, Capability> = emptyMap(),
     )
 

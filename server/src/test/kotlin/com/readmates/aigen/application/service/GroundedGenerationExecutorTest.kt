@@ -1,7 +1,5 @@
 package com.readmates.aigen.application.service
 
-import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
-import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.CostBasis
 import com.readmates.aigen.application.model.ErrorCode
@@ -17,6 +15,7 @@ import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelCapability
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.model.ProviderCallException
 import com.readmates.aigen.application.model.ProviderCallMode
 import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
@@ -67,7 +66,7 @@ class GroundedGenerationExecutorTest {
         assertThat(saved.groundedDraft).isEqualTo(validDraft())
         assertThat(request.turns).containsExactlyElementsOf(context.turns)
         val audit = context.auditPort.entries.single { it.providerAttempt == null }
-        assertThat(audit.pipelineVersion).isEqualTo("GROUNDED_WHOLE_TRANSCRIPT")
+        assertThat(audit.pipelineVersion).isEqualTo("grounded-session-generation-v2")
         assertThat(audit.inputTurnCount).isEqualTo(1)
         assertThat(audit.speakerCount).isEqualTo(1)
         assertThat(audit.groundingStatus).isEqualTo("VALID")
@@ -220,7 +219,7 @@ class GroundedGenerationExecutorTest {
     fun `cancellation between stage transition and call reservation prevents provider call`() {
         val context = Context()
         context.claude.generations += GroundedGenerationOutput(validDraft(), USAGE)
-        context.jobStore.beforeReserveLlmCall = {
+        context.jobStore.beforeProviderReservation = {
             val current = context.jobStore.load(context.record.jobId)!!
             context.jobStore.save(current.copy(status = JobStatus.CANCELLED))
         }
@@ -337,7 +336,6 @@ class GroundedGenerationExecutorTest {
             AiGenerationTestFixtures
                 .jobRecord(status = JobStatus.RUNNING, stage = JobStage.PREPARING_TRANSCRIPT, sessionMeta = meta)
                 .copy(
-                    pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
                     validatedTurns = turns,
                     eligibleFallbackModels = eligibleFallbacks,
                     groundingStatus = GroundingStatus.PENDING,
@@ -371,7 +369,7 @@ class GroundedGenerationExecutorTest {
                 FakeClock(AiGenerationTestFixtures.NOW),
                 fakeMetrics(),
                 sleeper,
-                ProviderFallbackChain(emptyMap(), modelCatalog, properties),
+                ProviderFallbackChain(modelCatalog, properties),
                 GroundedProviderCallPolicy(
                     java.time.Duration.ofSeconds(1),
                     java.time.Duration.ofSeconds(30),
@@ -413,7 +411,7 @@ class GroundedGenerationExecutorTest {
         ): GroundedGenerationOutput {
             generateCalls += 1
             generationFailures.removeFirstOrNull()?.let {
-                throw LlmGenerationException(it, retryAfter = generationRetryAfter)
+                throw ProviderCallException(it, retryAfter = generationRetryAfter)
             }
             return generations.removeFirst().also { afterGenerate() }
         }
@@ -424,7 +422,7 @@ class GroundedGenerationExecutorTest {
             request: RenderedGroundedRequest,
         ): GroundedSectionRepairOutput {
             repairCalls += 1
-            repairFailures.removeFirstOrNull()?.let { throw LlmGenerationException(it) }
+            repairFailures.removeFirstOrNull()?.let { throw ProviderCallException(it) }
             return repairs.removeFirst()
         }
     }

@@ -3,16 +3,12 @@ package com.readmates.aigen.application.service
 import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
-import com.readmates.aigen.application.model.GenerationInput
 import com.readmates.aigen.application.model.GenerationItem
-import com.readmates.aigen.application.model.GenerationOutput
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.ModelPricing
 import com.readmates.aigen.application.model.Provider
-import com.readmates.aigen.application.model.RegenerationInput
-import com.readmates.aigen.application.model.RegenerationOutput
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
@@ -29,11 +25,8 @@ import com.readmates.aigen.application.port.out.GenerationCostGuard
 import com.readmates.aigen.application.port.out.GuardDecision
 import com.readmates.aigen.application.port.out.JobKind
 import com.readmates.aigen.application.port.out.JobRecord
-import com.readmates.aigen.application.port.out.LlmCallReservation
 import com.readmates.aigen.application.port.out.ModelCatalog
 import com.readmates.aigen.application.port.out.SaveGroundedResultCommand
-import com.readmates.aigen.application.port.out.SessionContentGenerator
-import com.readmates.aigen.application.port.out.SessionContentRegenerator
 import com.readmates.aigen.config.AiGenerationProperties
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import java.math.BigDecimal
@@ -58,7 +51,7 @@ internal class FakeJobStore : AiGenerationJobStore {
      */
     val mutationOrder: MutableList<String> = mutableListOf()
     var failNextConditionalSave: Boolean = false
-    var beforeReserveLlmCall: (() -> Unit)? = null
+    var beforeProviderReservation: (() -> Unit)? = null
 
     override fun save(job: JobRecord) {
         records[job.jobId] = job
@@ -82,40 +75,6 @@ internal class FakeJobStore : AiGenerationJobStore {
             .filter { it.status in ACTIVE_JOB_STATUSES }
             .sortedByDescending { it.lastUpdatedAt }
             .take(limit)
-
-    override fun saveResult(
-        jobId: UUID,
-        result: SessionImportV1Snapshot,
-        usage: TokenUsage,
-        cost: BigDecimal,
-    ) {
-        val current = records.getValue(jobId)
-        records[jobId] =
-            current.copy(
-                result = result,
-                tokens = current.tokens + usage,
-                costAccumulatedUsd = current.costAccumulatedUsd.add(cost),
-            )
-    }
-
-    override fun patchItem(
-        jobId: UUID,
-        item: GenerationItem,
-        value: Any,
-        usage: TokenUsage,
-        cost: BigDecimal,
-    ) {
-        require(value is SessionImportV1Snapshot) {
-            "FakeJobStore.patchItem requires value: SessionImportV1Snapshot (mirrors Redis contract)"
-        }
-        val current = records.getValue(jobId)
-        records[jobId] =
-            current.copy(
-                result = value,
-                tokens = current.tokens + usage,
-                costAccumulatedUsd = current.costAccumulatedUsd.add(cost),
-            )
-    }
 
     override fun updateStatus(
         jobId: UUID,
@@ -303,30 +262,6 @@ internal class FakeJobStore : AiGenerationJobStore {
             )
     }
 
-    override fun incrementLlmCallCount(jobId: UUID): Int {
-        val current = records.getValue(jobId)
-        val next = current.llmCallCount + 1
-        records[jobId] = current.copy(llmCallCount = next)
-        return next
-    }
-
-    override fun reserveLlmCall(
-        jobId: UUID,
-        expectedStatus: JobStatus,
-        maxCalls: Int,
-    ): LlmCallReservation {
-        beforeReserveLlmCall?.also { beforeReserveLlmCall = null }?.invoke()
-        val current = records[jobId]
-        return when {
-            current == null || current.status != expectedStatus -> LlmCallReservation.STATE_CHANGED
-            current.llmCallCount >= maxCalls -> LlmCallReservation.CAP_EXCEEDED
-            else -> {
-                records[jobId] = current.copy(llmCallCount = current.llmCallCount + 1)
-                LlmCallReservation.RESERVED
-            }
-        }
-    }
-
     override fun delete(jobId: UUID) {
         records.remove(jobId)
         deleted += jobId
@@ -392,12 +327,8 @@ internal class FakeCostGuard(
     var decision: GuardDecision = GuardDecision.Allow,
     var clubMonthly: BigDecimal = BigDecimal.ZERO,
 ) : GenerationCostGuard {
-    val recorded: MutableList<Triple<UUID, UUID, BigDecimal>> = mutableListOf()
     val checked: MutableList<Pair<UUID, UUID>> = mutableListOf()
     val released: MutableList<Triple<UUID, UUID, UUID>> = mutableListOf()
-    val renewed: MutableList<Triple<UUID, UUID, UUID>> = mutableListOf()
-    val renewDecisions: ArrayDeque<Boolean> = ArrayDeque()
-    var renewAllowed: Boolean = true
 
     override fun checkBeforeCall(
         hostId: UUID,
@@ -408,30 +339,12 @@ internal class FakeCostGuard(
         return decision
     }
 
-    override fun recordUsage(
-        hostId: UUID,
-        clubId: UUID,
-        admissionId: UUID,
-        cost: BigDecimal,
-    ) {
-        recorded += Triple(hostId, clubId, cost)
-    }
-
     override fun releaseAdmission(
         hostId: UUID,
         clubId: UUID,
         admissionId: UUID,
     ) {
         released += Triple(hostId, clubId, admissionId)
-    }
-
-    override fun renewAdmission(
-        hostId: UUID,
-        clubId: UUID,
-        admissionId: UUID,
-    ): Boolean {
-        renewed += Triple(hostId, clubId, admissionId)
-        return renewDecisions.removeFirstOrNull() ?: renewAllowed
     }
 
     override fun clubMonthlyCost(clubId: UUID): BigDecimal = clubMonthly
@@ -483,7 +396,7 @@ internal class FakeProviderCallReservations(
     override fun reserve(
         command: com.readmates.aigen.application.port.out.ProviderCallReservationCommand,
     ): com.readmates.aigen.application.port.out.ProviderCallReservationResult {
-        jobStore.beforeReserveLlmCall?.also { jobStore.beforeReserveLlmCall = null }?.invoke()
+        jobStore.beforeProviderReservation?.also { jobStore.beforeProviderReservation = null }?.invoke()
         val current = jobStore.load(command.jobId)
         if (current == null || current.status != command.expectedStatus) {
             return com.readmates.aigen.application.port.out.ProviderCallReservationResult.StateChanged
@@ -649,82 +562,6 @@ internal class FakeModelCatalog(
     override fun resolveAlias(alias: String): ModelId? = enabled.firstOrNull { it.name == alias }
 
     override fun isEnabled(id: ModelId): Boolean = id in enabled
-}
-
-internal class FakeContentGenerator(
-    override val provider: Provider,
-    private val responses: ArrayDeque<Response> = ArrayDeque(),
-) : SessionContentGenerator {
-    sealed class Response {
-        data class Success(
-            val output: GenerationOutput,
-        ) : Response()
-
-        data class Failure(
-            val error: GenerationError,
-        ) : Response()
-    }
-
-    val calls: MutableList<GenerationInput> = mutableListOf()
-
-    fun enqueueSuccess(output: GenerationOutput) {
-        responses.addLast(Response.Success(output))
-    }
-
-    fun enqueueFailure(error: GenerationError) {
-        responses.addLast(Response.Failure(error))
-    }
-
-    override fun generateFull(input: GenerationInput): GenerationOutput {
-        calls += input
-        val response =
-            responses.removeFirstOrNull()
-                ?: error("FakeContentGenerator: no more queued responses (call #${calls.size})")
-        return when (response) {
-            is Response.Success -> response.output
-            is Response.Failure ->
-                throw com.readmates.aigen.adapter.out.llm.common
-                    .LlmGenerationException(response.error)
-        }
-    }
-}
-
-internal class FakeContentRegenerator(
-    override val provider: Provider,
-    private val responses: ArrayDeque<Response> = ArrayDeque(),
-) : SessionContentRegenerator {
-    sealed class Response {
-        data class Success(
-            val output: RegenerationOutput,
-        ) : Response()
-
-        data class Failure(
-            val error: GenerationError,
-        ) : Response()
-    }
-
-    val calls: MutableList<RegenerationInput> = mutableListOf()
-
-    fun enqueueSuccess(output: RegenerationOutput) {
-        responses.addLast(Response.Success(output))
-    }
-
-    fun enqueueFailure(error: GenerationError) {
-        responses.addLast(Response.Failure(error))
-    }
-
-    override fun regenerateItem(input: RegenerationInput): RegenerationOutput {
-        calls += input
-        val response =
-            responses.removeFirstOrNull()
-                ?: error("FakeContentRegenerator: no more queued responses")
-        return when (response) {
-            is Response.Success -> response.output
-            is Response.Failure ->
-                throw com.readmates.aigen.adapter.out.llm.common
-                    .LlmGenerationException(response.error)
-        }
-    }
 }
 
 internal class FakeValidator(
@@ -914,17 +751,4 @@ internal object AiGenerationTestFixtures {
             createdAt = createdAt,
             lastUpdatedAt = lastUpdatedAt,
         )
-
-    fun providerError(code: ErrorCode): GenerationError = GenerationError(code, code.name)
-
-    fun snapshotOutput(
-        summary: String = "An interesting discussion.",
-        usage: TokenUsage =
-            TokenUsage(
-                nonCachedInputTokens = 100,
-                cacheWriteInputTokens = 0,
-                cacheReadInputTokens = 0,
-                outputTokens = 200,
-            ),
-    ): GenerationOutput = GenerationOutput(snapshot(summary), usage)
 }

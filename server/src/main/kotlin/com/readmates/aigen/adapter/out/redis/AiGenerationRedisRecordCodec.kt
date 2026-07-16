@@ -1,6 +1,5 @@
 package com.readmates.aigen.adapter.out.redis
 
-import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
@@ -29,13 +28,7 @@ internal class AiGenerationRedisRecordCodec(
 ) {
     fun toHash(job: JobRecord): Map<String, String> {
         val map = baseHash(job)
-        if (job.pipelineMode == AiGenerationPipelineMode.LEGACY) {
-            map["sessionMeta"] = objectMapper.writeValueAsString(job.sessionMeta)
-            job.instructions?.let { map["instructions"] = it }
-            job.groundingStatus?.let { map["groundingStatus"] = it.name }
-        } else {
-            map["groundingStatus"] = (job.groundingStatus ?: GroundingStatus.PENDING).name
-        }
+        map["groundingStatus"] = (job.groundingStatus ?: GroundingStatus.PENDING).name
         job.actualModel?.let {
             map["actualModelProvider"] = it.provider.name
             map["actualModelName"] = it.name
@@ -58,7 +51,6 @@ internal class AiGenerationRedisRecordCodec(
             "modelProvider" to job.model.provider.name,
             "modelName" to job.model.name,
             "authorNameMode" to job.authorNameMode.name,
-            "pipelineMode" to job.pipelineMode.name,
             "eligibleFallbackModels" to objectMapper.writeValueAsString(job.eligibleFallbackModels),
             "status" to job.status.name,
             "progressPct" to job.progressPct.toString(),
@@ -83,7 +75,6 @@ internal class AiGenerationRedisRecordCodec(
         groundedDraft: GroundedGenerationDraft?,
         sourceContext: GroundedSourceContext?,
         evidence: GroundedEvidenceBundle?,
-        includeSensitiveHashFields: Boolean = true,
     ): JobRecord {
         val timestamps = readTimestamps(hash)
         return JobRecord(
@@ -93,9 +84,9 @@ internal class AiGenerationRedisRecordCodec(
             hostUserId = UUID.fromString(hash.getValue("hostUserId")),
             model = readModel(hash, "modelProvider", "modelName"),
             authorNameMode = AuthorNameMode.valueOf(hash.getValue("authorNameMode")),
-            instructions = sourceContext?.instructions ?: hash["instructions"]?.takeIf { includeSensitiveHashFields },
+            instructions = sourceContext?.instructions,
             transcript = transcript,
-            sessionMeta = sourceContext?.sessionMeta ?: readSessionMeta(hash, includeSensitiveHashFields),
+            sessionMeta = sourceContext?.sessionMeta ?: placeholderSessionMeta(hash),
             status = JobStatus.valueOf(hash.getValue("status")),
             stage = hash["stage"]?.let(JobStage::valueOf),
             progressPct = hash.getValue("progressPct").toInt(),
@@ -109,9 +100,6 @@ internal class AiGenerationRedisRecordCodec(
             lastUpdatedAt = timestamps.lastUpdatedAt,
             actualModel = readActualModel(hash),
             llmCallCount = hash["llmCallCount"]?.toIntOrNull() ?: 0,
-            pipelineMode =
-                hash["pipelineMode"]?.let(AiGenerationPipelineMode::valueOf)
-                    ?: AiGenerationPipelineMode.LEGACY,
             validatedTurns = sourceContext?.validatedTurns.orEmpty(),
             eligibleFallbackModels = readEligibleFallbackModels(hash),
             revision = hash["revision"]?.toLongOrNull() ?: 0,
@@ -152,23 +140,17 @@ internal class AiGenerationRedisRecordCodec(
             ?.let { objectMapper.readValue(it, Array<ModelId>::class.java).toList() }
             .orEmpty()
 
-    private fun readSessionMeta(
-        hash: Map<String, String>,
-        includeSensitiveHashFields: Boolean,
-    ): SessionMeta =
-        hash["sessionMeta"]
-            ?.takeIf { includeSensitiveHashFields }
-            ?.let { objectMapper.readValue(it, SessionMeta::class.java) }
-            ?: SessionMeta(
-                UUID.fromString(hash.getValue("sessionId")),
-                UUID.fromString(hash.getValue("clubId")),
-                0,
-                "",
-                null,
-                LocalDate.MIN,
-                emptyList(),
-                AuthorNameMode.valueOf(hash.getValue("authorNameMode")),
-            )
+    private fun placeholderSessionMeta(hash: Map<String, String>): SessionMeta =
+        SessionMeta(
+            UUID.fromString(hash.getValue("sessionId")),
+            UUID.fromString(hash.getValue("clubId")),
+            0,
+            "",
+            null,
+            LocalDate.MIN,
+            emptyList(),
+            AuthorNameMode.valueOf(hash.getValue("authorNameMode")),
+        )
 
     private fun readActualModel(hash: Map<String, String>): ModelId? =
         hash["actualModelName"]?.let { readModel(hash, "actualModelProvider", "actualModelName") }

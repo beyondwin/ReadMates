@@ -9,6 +9,7 @@ import com.readmates.aigen.application.model.GroundedAuthoredText
 import com.readmates.aigen.application.model.GroundedFeedbackSection
 import com.readmates.aigen.application.model.GroundedGenerationDraft
 import com.readmates.aigen.application.model.GroundedTextBlock
+import com.readmates.aigen.application.model.ProviderCallException
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.out.GroundedSectionRepairOutput
 import org.springframework.stereotype.Component
@@ -80,7 +81,7 @@ class GroundedDraftJsonCodec {
         } catch (
             @Suppress("TooGenericExceptionCaught") error: Throwable,
         ) {
-            throw LlmGenerationException(
+            throw ProviderCallException(
                 GenerationError(ErrorCode.SCHEMA_INVALID, INVALID_OUTPUT_MESSAGE),
                 error,
             )

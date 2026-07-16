@@ -4,10 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.readmates.aigen.adapter.out.llm.common.GroundedDraftJsonCodec
 import com.readmates.aigen.adapter.out.llm.common.GroundedGenerationSchemaResource
 import com.readmates.aigen.adapter.out.llm.common.GroundedProviderTestFixture
-import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
 import com.readmates.aigen.application.model.ModelCapability
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.model.ProviderCallException
 import com.readmates.aigen.application.port.out.ModelCapabilityCatalog
 import com.readmates.aigen.config.AnthropicSpringAiModelFactory
 import org.assertj.core.api.Assertions.assertThat
@@ -170,7 +170,7 @@ class AnthropicSpringAiContractTest {
 
                 assertThatThrownBy {
                     generator(model(server.origin, timeout)).generate(MODEL, request())
-                }.isInstanceOf(LlmGenerationException::class.java)
+                }.isInstanceOf(ProviderCallException::class.java)
                 assertThat(server.requestCount).describedAs("scenario %s", index).isEqualTo(1)
             }
         }

@@ -1,8 +1,8 @@
 package com.readmates.aigen.adapter.out.llm.springai
 
-import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.model.ProviderCallException
 import com.readmates.aigen.application.service.ProviderFailureClass
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -35,7 +35,7 @@ class SpringAiErrorMapperTest {
         assertThat(mapped.failureClass).isEqualTo(ProviderFailureClass.RATE_LIMITED)
         assertThat(mapped.error.code).isEqualTo(ErrorCode.PROVIDER_RATE_LIMITED)
         assertThat(mapped.retryAfter).isEqualTo(Duration.ofHours(1))
-        assertThat(thrown).isInstanceOf(LlmGenerationException::class.java)
+        assertThat(thrown).isInstanceOf(ProviderCallException::class.java)
         assertThat(thrown.cause).isNull()
         assertThat(thrown.message).doesNotContain(sensitive, "prompt", "completion", "schema", "evidence")
     }

@@ -1,10 +1,10 @@
 package com.readmates.aigen.adapter.out.llm.springai
 
-import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
 import com.readmates.aigen.adapter.out.llm.common.LlmStructuredOutputException
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.model.ProviderCallException
 import com.readmates.aigen.application.service.ProviderFailureClass
 import org.springframework.ai.retry.NonTransientAiException
 import org.springframework.ai.retry.TransientAiException
@@ -24,7 +24,7 @@ data class SpringAiMappedFailure(
     val retryAfter: Duration? = null,
 ) {
     /** Deliberately omits the provider exception/cause and its response body. */
-    fun toException(): LlmGenerationException = LlmGenerationException(error, retryAfter = retryAfter)
+    fun toException(): ProviderCallException = ProviderCallException(error, retryAfter = retryAfter)
 }
 
 class SpringAiErrorMapper(
@@ -35,7 +35,7 @@ class SpringAiErrorMapper(
         @Suppress("UNUSED_PARAMETER") provider: Provider,
     ): SpringAiMappedFailure {
         val causes = generateSequence(failure) { it.cause }.take(MAX_CAUSE_DEPTH).toList()
-        val safe = causes.filterIsInstance<LlmGenerationException>().firstOrNull()
+        val safe = causes.filterIsInstance<ProviderCallException>().firstOrNull()
         val response = causes.filterIsInstance<RestClientResponseException>().firstOrNull()
         return when {
             safe != null ->

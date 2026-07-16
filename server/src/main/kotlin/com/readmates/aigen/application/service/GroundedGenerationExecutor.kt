@@ -3,6 +3,7 @@ package com.readmates.aigen.application.service
 import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.CostBasis
 import com.readmates.aigen.application.model.ErrorCode
+import com.readmates.aigen.application.model.GROUNDED_PIPELINE_VERSION
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.GroundedGenerationDraft
@@ -413,7 +414,7 @@ class DefaultGroundedGenerationExecutor(
                 errorMessage,
                 elapsedMillis(start),
                 clock.instant(),
-                pipelineVersion = record.pipelineMode.name,
+                pipelineVersion = GROUNDED_PIPELINE_VERSION,
                 inputTurnCount = record.validatedTurns.size,
                 speakerCount =
                     record.validatedTurns

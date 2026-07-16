@@ -1,7 +1,7 @@
 package com.readmates.aigen.adapter.out.llm.springai
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.readmates.aigen.adapter.out.llm.common.SessionImportSchemaResource
+import com.readmates.aigen.adapter.out.llm.common.GroundedGenerationSchemaResource
 import com.readmates.aigen.adapter.out.llm.gemini.GeminiSchemaCompatAdapter
 import com.readmates.aigen.config.GoogleGenAiSpringAiModelFactory
 import org.assertj.core.api.Assertions.assertThat
@@ -31,7 +31,7 @@ class GoogleGenAiSpringAiLiveContractTest {
               "additionalProperties":false
             }
             """.trimIndent()
-        val providerSchema = GeminiSchemaCompatAdapter(SessionImportSchemaResource()).adapt(schema)
+        val providerSchema = GeminiSchemaCompatAdapter().adapt(schema)
         assertThat(providerSchema).doesNotContain("additionalProperties")
         val options =
             GoogleGenAiChatOptions

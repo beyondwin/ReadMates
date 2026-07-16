@@ -3,7 +3,6 @@ package com.readmates.aigen.application.service
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.port.out.ModelCatalog
-import com.readmates.aigen.application.port.out.SessionContentGenerator
 import com.readmates.aigen.application.port.out.WholeTranscriptGroundedGenerator
 import com.readmates.aigen.config.AiGenerationProperties
 import org.slf4j.LoggerFactory
@@ -14,7 +13,6 @@ import org.slf4j.LoggerFactory
  * Empty chain = feature off (caller keeps same-provider retry).
  */
 class ProviderFallbackChain(
-    private val generators: Map<Provider, SessionContentGenerator>,
     private val modelCatalog: ModelCatalog,
     private val properties: AiGenerationProperties,
 ) {
@@ -33,16 +31,6 @@ class ProviderFallbackChain(
                 )
             }
     }
-
-    fun nextAfter(failed: ModelId): ModelId? =
-        properties.fallbackChain
-            .asSequence()
-            .mapNotNull { alias -> modelCatalog.resolveAlias(alias) }
-            .firstOrNull { candidate ->
-                candidate.provider != failed.provider &&
-                    modelCatalog.isEnabled(candidate) &&
-                    generators.containsKey(candidate.provider)
-            }
 
     fun nextEligibleGrounded(
         failed: ModelId,

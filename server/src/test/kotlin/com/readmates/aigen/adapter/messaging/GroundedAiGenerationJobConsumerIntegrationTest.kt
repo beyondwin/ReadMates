@@ -1,10 +1,8 @@
 package com.readmates.aigen.adapter.messaging
 
 import com.readmates.aigen.adapter.`in`.messaging.AiGenerationJobConsumer
-import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
 import com.readmates.aigen.adapter.out.messaging.AiGenerationJobProducer
 import com.readmates.aigen.adapter.out.redis.RedisProviderCallReservationAdapter
-import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.GenerationItem
@@ -18,6 +16,7 @@ import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelCapability
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.model.ProviderCallException
 import com.readmates.aigen.application.model.ProviderCallMode
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.model.ValidatedTranscriptTurn
@@ -276,25 +275,17 @@ internal class GroundedRuntime(
             clock = Clock.systemUTC(),
             metrics = metrics,
             sleeper = Sleeper { },
-            fallbackChain = ProviderFallbackChain(emptyMap(), modelCatalog, properties),
+            fallbackChain = ProviderFallbackChain(modelCatalog, properties),
             callPolicy = GroundedProviderCallPolicy(properties),
         )
     val worker =
         AiGenerationWorker(
             jobStore = jobStore,
-            generators = emptyMap(),
-            modelCatalog = modelCatalog,
-            validator = FakeValidator(),
-            auditPort = audit,
-            costGuard = FakeCostGuard(),
-            latencyNotification = FakeLatencyNotification(),
-            properties = properties,
-            clock = Clock.systemUTC(),
-            metrics = metrics,
-            sleeper = Sleeper { },
-            fallbackChain = ProviderFallbackChain(emptyMap(), modelCatalog, properties),
             groundedExecutor = groundedExecutor,
             providerCallReservations = crashingReservations,
+            costGuard = FakeCostGuard(),
+            properties = properties,
+            clock = Clock.systemUTC(),
         )
 
     fun newRecord(now: Instant) =
@@ -311,7 +302,6 @@ internal class GroundedRuntime(
                 lastUpdatedAt = now,
                 expiresAt = now.plus(Duration.ofHours(1)),
             ).copy(
-                pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
                 validatedTurns =
                     listOf(
                         ValidatedTranscriptTurn(
@@ -357,7 +347,7 @@ internal class SequencedGroundedGenerator(
     ): GroundedGenerationOutput {
         calls += 1
         if (failFirst && calls == 1) {
-            throw LlmGenerationException(GenerationError(ErrorCode.PROVIDER_UNAVAILABLE, "safe unavailable"))
+            throw ProviderCallException(GenerationError(ErrorCode.PROVIDER_UNAVAILABLE, "safe unavailable"))
         }
         return GroundedGenerationOutput(validDraft(), USAGE)
     }

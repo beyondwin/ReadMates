@@ -1,6 +1,5 @@
 package com.readmates.aigen.config
 
-import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.port.out.AiGenerationJobPublishCommand
 import com.readmates.aigen.application.port.out.AiGenerationJobQueue
 import org.assertj.core.api.Assertions.assertThatCode
@@ -29,7 +28,11 @@ class AiGenerationConfigValidatorTest {
             RootBeanDefinition(NoopQueue::class.java),
         )
         assertThatCode {
-            AiGenerationConfigValidator(aigenEnabled = true, beanFactory = factory).validate()
+            AiGenerationConfigValidator(
+                aigenEnabled = true,
+                beanFactory = factory,
+                properties = validProperties(),
+            ).validate()
         }.doesNotThrowAnyException()
     }
 
@@ -143,7 +146,6 @@ class AiGenerationConfigValidatorTest {
     fun `rejects grounded default without verified capability`() {
         val properties =
             validProperties().copy(
-                pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
                 fallbackDefaultModel = "future-model",
             )
 
@@ -240,7 +242,6 @@ class AiGenerationConfigValidatorTest {
     private fun validProperties(reservedOutputTokens: Long = 16_384): AiGenerationProperties =
         AiGenerationProperties(
             fallbackDefaultModel = "gpt-5.4-mini",
-            pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
             grounded =
                 AiGenerationProperties.Grounded(
                     reservedOutputTokens = reservedOutputTokens,
@@ -275,7 +276,6 @@ class AiGenerationConfigValidatorTest {
     ) = AiGenerationProperties(
         enabledProviders = setOf("CLAUDE"),
         fallbackDefaultModel = capabilities.keys.first(),
-        pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
         grounded = AiGenerationProperties.Grounded(capabilities = capabilities),
         pricing = pricing,
     )
@@ -284,7 +284,6 @@ class AiGenerationConfigValidatorTest {
         AiGenerationProperties(
             enabledProviders = setOf("GEMINI"),
             fallbackDefaultModel = "gemini-3-flash-preview",
-            pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
             grounded =
                 AiGenerationProperties.Grounded(
                     capabilities =

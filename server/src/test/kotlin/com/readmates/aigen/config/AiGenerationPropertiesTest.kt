@@ -1,6 +1,5 @@
 package com.readmates.aigen.config
 
-import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -55,7 +54,6 @@ class AiGenerationPropertiesTest {
     fun `application yml keeps legacy default and binds grounded reservation`() {
         val properties = loadProperties()
 
-        assertEquals(AiGenerationPipelineMode.LEGACY, properties.pipelineMode)
         assertEquals(16_384L, properties.grounded.reservedOutputTokens)
         assertEquals(8_192L, properties.grounded.safetyMarginTokens)
     }

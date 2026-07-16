@@ -2,17 +2,17 @@ package com.readmates.aigen.adapter.out.llm.gemini
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ObjectNode
-import com.readmates.aigen.adapter.out.llm.common.SessionImportSchemaResource
+import com.readmates.aigen.adapter.out.llm.common.GroundedGenerationSchemaResource
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
 class GeminiSchemaCompatAdapterTest {
-    private val schemaResource = SessionImportSchemaResource()
-    private val adapter = GeminiSchemaCompatAdapter(schemaResource)
+    private val schemaResource = GroundedGenerationSchemaResource()
+    private val adapter = GeminiSchemaCompatAdapter()
 
     @Test
     fun `removes top-level json-schema metadata that Gemini rejects`() {
-        val converted = adapter.geminiResponseSchema()
+        val converted = adapter.convert(schemaResource.schema())
 
         assertThat(converted.has("\$schema")).isFalse()
         assertThat(converted.has("\$id")).isFalse()
@@ -20,7 +20,7 @@ class GeminiSchemaCompatAdapterTest {
 
     @Test
     fun `recursively strips additionalProperties everywhere`() {
-        val converted = adapter.geminiResponseSchema()
+        val converted = adapter.convert(schemaResource.schema())
 
         assertThat(findKeyAnywhere(converted, "additionalProperties"))
             .`as`("Gemini OpenAPI 3.0 subset does not support additionalProperties anywhere in the schema")
@@ -29,7 +29,7 @@ class GeminiSchemaCompatAdapterTest {
 
     @Test
     fun `recursively strips const (Draft 2020-12) which Gemini does not support`() {
-        val converted = adapter.geminiResponseSchema()
+        val converted = adapter.convert(schemaResource.schema())
 
         assertThat(findKeyAnywhere(converted, "const"))
             .`as`("const must be replaced by single-element enum for Gemini")
@@ -38,7 +38,7 @@ class GeminiSchemaCompatAdapterTest {
 
     @Test
     fun `replaces format const string with single-element enum`() {
-        val converted = adapter.geminiResponseSchema()
+        val converted = adapter.convert(schemaResource.schema())
 
         val formatProp =
             converted.get("properties").get("format") as ObjectNode
@@ -47,13 +47,13 @@ class GeminiSchemaCompatAdapterTest {
         assertThat(enumNode).isNotNull
         assertThat(enumNode.isArray).isTrue()
         assertThat(enumNode.size()).isEqualTo(1)
-        assertThat(enumNode.get(0).asText()).isEqualTo("readmates-session-import:v1")
+        assertThat(enumNode.get(0).asText()).isEqualTo("readmates-grounded-generation:v2")
         assertThat(formatProp.has("const")).isFalse()
     }
 
     @Test
-    fun `retains supported keywords (type, properties, required, enum, pattern, format date, min-max constraints)`() {
-        val converted = adapter.geminiResponseSchema()
+    fun `retains supported keywords and min-max constraints`() {
+        val converted = adapter.convert(schemaResource.schema())
 
         assertThat(converted.get("type").asText()).isEqualTo("object")
         assertThat(converted.has("properties")).isTrue()
@@ -70,10 +70,6 @@ class GeminiSchemaCompatAdapterTest {
         // bookTitle keeps minLength.
         val bookTitle = converted.get("properties").get("bookTitle") as ObjectNode
         assertThat(bookTitle.get("minLength").asInt()).isEqualTo(1)
-
-        // feedbackDocumentFileName keeps pattern.
-        val fileName = converted.get("properties").get("feedbackDocumentFileName") as ObjectNode
-        assertThat(fileName.get("pattern").asText()).isEqualTo("^[^/\\\\]+\\.(md|txt)$")
 
         // highlights keeps minItems / maxItems.
         val highlights = converted.get("properties").get("highlights") as ObjectNode
@@ -140,8 +136,8 @@ class GeminiSchemaCompatAdapterTest {
     @Test
     fun `does not mutate the source schema (deep copy invariant)`() {
         val originalSource = schemaResource.schema()
-        val first = adapter.geminiResponseSchema()
-        val second = adapter.geminiResponseSchema()
+        val first = adapter.convert(schemaResource.schema())
+        val second = adapter.convert(schemaResource.schema())
 
         // Mutating the returned node must not affect subsequent calls.
         first.put("__mutated__", true)
@@ -152,8 +148,8 @@ class GeminiSchemaCompatAdapterTest {
 
     @Test
     fun `returns equal-but-not-same instances on repeated calls`() {
-        val first = adapter.geminiResponseSchema()
-        val second = adapter.geminiResponseSchema()
+        val first = adapter.convert(schemaResource.schema())
+        val second = adapter.convert(schemaResource.schema())
 
         assertThat(first).isEqualTo(second)
         assertThat(first).isNotSameAs(second)
@@ -161,7 +157,7 @@ class GeminiSchemaCompatAdapterTest {
 
     @Test
     fun `conversion is idempotent (convert(convert(x)) == convert(x))`() {
-        val once = adapter.geminiResponseSchema()
+        val once = adapter.convert(schemaResource.schema())
         val twice = adapter.convert(once)
 
         assertThat(twice).isEqualTo(once)

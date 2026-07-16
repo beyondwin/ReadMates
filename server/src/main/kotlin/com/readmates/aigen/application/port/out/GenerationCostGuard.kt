@@ -17,28 +17,12 @@ interface GenerationCostGuard {
         admissionId: UUID,
     ): GuardDecision
 
-    @Deprecated("LEGACY transition bridge; remove with direct-provider sources in Task 11")
-    fun recordUsage(
-        hostId: UUID,
-        clubId: UUID,
-        admissionId: UUID,
-        cost: BigDecimal,
-    ): Unit
-
     /** Roll back an admission only when no provider call could have occurred. */
     fun releaseAdmission(
         hostId: UUID,
         clubId: UUID,
         admissionId: UUID,
     ): Unit
-
-    /** LEGACY transition bridge; grounded calls reserve and renew atomically through ProviderCallReservationPort. */
-    @Deprecated("LEGACY transition bridge; remove with direct-provider sources in Task 11")
-    fun renewAdmission(
-        hostId: UUID,
-        clubId: UUID,
-        admissionId: UUID,
-    ): Boolean
 
     fun clubMonthlyCost(clubId: UUID): BigDecimal
 }

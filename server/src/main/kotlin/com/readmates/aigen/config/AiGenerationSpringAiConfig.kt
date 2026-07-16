@@ -4,7 +4,6 @@ import com.google.genai.Client
 import com.google.genai.types.HttpOptions
 import com.google.genai.types.HttpRetryOptions
 import com.readmates.aigen.adapter.out.llm.common.GroundedDraftJsonCodec
-import com.readmates.aigen.adapter.out.llm.common.SessionImportSchemaResource
 import com.readmates.aigen.adapter.out.llm.gemini.GeminiSchemaCompatAdapter
 import com.readmates.aigen.adapter.out.llm.springai.AnthropicGroundedModelPolicy
 import com.readmates.aigen.adapter.out.llm.springai.SpringAiErrorMapper
@@ -247,7 +246,7 @@ class AiGenerationSpringAiConfig {
             }
         val geminiSchemaCompatAdapter =
             geminiSchemaCompatAdapters.getIfAvailable {
-                GeminiSchemaCompatAdapter(SessionImportSchemaResource())
+                GeminiSchemaCompatAdapter()
             }
         return SpringAiProviderOptionsFactory(catalog, geminiSchemaCompatAdapter)
     }

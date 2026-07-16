@@ -1,7 +1,6 @@
 package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.AiGenerationException
-import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.GroundedEvidenceBundle
@@ -54,7 +53,6 @@ class AiGenerationEvidenceServiceTest {
             AiGenerationTestFixtures
                 .jobRecord(status = JobStatus.SUCCEEDED)
                 .copy(
-                    pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
                     revision = 1,
                     groundingStatus = GroundingStatus.VALID,
                     validatedTurns =

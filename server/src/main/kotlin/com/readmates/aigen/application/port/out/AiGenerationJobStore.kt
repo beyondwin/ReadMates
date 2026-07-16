@@ -1,6 +1,5 @@
 package com.readmates.aigen.application.port.out
 
-import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.GenerationItem
@@ -46,27 +45,6 @@ interface AiGenerationJobStore {
     fun loadCommitRecoveryJobs(limit: Int = 50): List<JobRecord> =
         loadActiveJobs(limit).filter { it.status == JobStatus.COMMITTING || it.status == JobStatus.COMMIT_RETRY }
 
-    fun saveResult(
-        jobId: UUID,
-        result: SessionImportV1Snapshot,
-        usage: TokenUsage,
-        cost: BigDecimal,
-    ): Unit
-
-    /**
-     * Atomically replace the full result (caller provides the already-patched snapshot)
-     * and accumulate token usage + cost. The [value] parameter records the new value
-     * applied for [item] but the source of truth is the full snapshot serialized via
-     * [saveResult]-style write under the `:result` key.
-     */
-    fun patchItem(
-        jobId: UUID,
-        item: GenerationItem,
-        value: Any,
-        usage: TokenUsage,
-        cost: BigDecimal,
-    ): Unit
-
     fun updateStatus(
         jobId: UUID,
         status: JobStatus,
@@ -74,27 +52,6 @@ interface AiGenerationJobStore {
         progressPct: Int,
         error: GenerationError?,
     ): Unit
-
-    /**
-     * Atomically increment the per-job LLM call counter and return the new value.
-     * Used by [com.readmates.aigen.application.service.AiGenerationWorker] and
-     * [com.readmates.aigen.application.service.AiGenerationRegenerationService] to
-     * enforce the spec §9.2 hard cap (`maxLlmCallsPerJob`).
-     *
-     * The counter increments per LLM call ATTEMPT — including provider-side retries
-     * and validator-driven strengthened-instruction retries — so a job that triggers
-     * many retries can still hit the cap mid-flight.
-     */
-    @Deprecated("LEGACY transition bridge; remove with direct-provider sources in Task 11")
-    fun incrementLlmCallCount(jobId: UUID): Int
-
-    /** Atomically reserve one provider call only while the job remains in [expectedStatus]. */
-    @Deprecated("LEGACY transition bridge; remove with direct-provider sources in Task 11")
-    fun reserveLlmCall(
-        jobId: UUID,
-        expectedStatus: JobStatus,
-        maxCalls: Int,
-    ): LlmCallReservation
 
     /**
      * Atomically change status only when the current status belongs to [expected].
@@ -183,13 +140,6 @@ data class GroundedResultPayload(
     val draft: GroundedGenerationDraft,
 )
 
-@Deprecated("LEGACY transition bridge; remove with direct-provider sources in Task 11")
-enum class LlmCallReservation {
-    RESERVED,
-    STATE_CHANGED,
-    CAP_EXCEEDED,
-}
-
 sealed interface CommitLeaseResult {
     data class Acquired(
         val revision: Long,
@@ -253,7 +203,6 @@ data class JobRecord(
      * to enforce the spec §9.2 hard cap.
      */
     val llmCallCount: Int = 0,
-    val pipelineMode: AiGenerationPipelineMode = AiGenerationPipelineMode.LEGACY,
     val validatedTurns: List<ValidatedTranscriptTurn> = emptyList(),
     /** Ordered availability fallback IDs already proven to fit the exact whole request. */
     val eligibleFallbackModels: List<ModelId> = emptyList(),

@@ -1,14 +1,13 @@
 package com.readmates.aigen.application.service
 
-import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
 import com.readmates.aigen.application.AiGenerationException
-import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelCapability
+import com.readmates.aigen.application.model.ProviderCallException
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.`in`.JobNotFoundException
 import com.readmates.aigen.application.port.`in`.JobSessionMismatchException
@@ -34,7 +33,6 @@ class AiGenerationOrchestratorTest {
     fun `invalid grounded speaker rejects before Redis Kafka cost or audit work`() {
         val ctx =
             TestContext(
-                pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
                 activeMembers = emptyList(),
             )
 
@@ -52,7 +50,6 @@ class AiGenerationOrchestratorTest {
     fun `generic grounded speaker returns membership error with the submitted label`() {
         val ctx =
             TestContext(
-                pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
                 activeMembers = listOf(ActiveClubMember(UUID.randomUUID(), "화자 1")),
             )
 
@@ -68,7 +65,6 @@ class AiGenerationOrchestratorTest {
         val membershipId = UUID.randomUUID()
         val ctx =
             TestContext(
-                pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
                 activeMembers = listOf(ActiveClubMember(membershipId, "가람")),
             )
 
@@ -85,7 +81,6 @@ class AiGenerationOrchestratorTest {
     fun `grounded start stores only whole-request-compatible fallback models`() {
         val ctx =
             TestContext(
-                pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
                 activeMembers = listOf(ActiveClubMember(UUID.randomUUID(), "가람")),
                 fallbackChain = listOf(AiGenerationTestFixtures.CLAUDE_FALLBACK.name),
             )
@@ -102,7 +97,6 @@ class AiGenerationOrchestratorTest {
     fun `unknown grounded capability rejects before Redis Kafka cost or audit work`() {
         val ctx =
             TestContext(
-                pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
                 activeMembers = listOf(ActiveClubMember(UUID.randomUUID(), "가람")),
                 capabilities = emptyMap(),
             )
@@ -122,7 +116,6 @@ class AiGenerationOrchestratorTest {
     fun `oversized grounded request rejects before Redis Kafka cost or audit work`() {
         val ctx =
             TestContext(
-                pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
                 activeMembers = listOf(ActiveClubMember(UUID.randomUUID(), "가람")),
                 capabilities = mapOf(AiGenerationTestFixtures.CLAUDE_MODEL to ModelCapability(24_576, 16_384, true)),
             )
@@ -170,7 +163,7 @@ class AiGenerationOrchestratorTest {
         // task_1_7 #5: a Kafka producer outage must NOT leave a PENDING JobRecord
         // hanging in Redis for the TTL. The orchestrator should transition the
         // record to FAILED, audit QUEUE_UNAVAILABLE, and rethrow as
-        // LlmGenerationException so the controller surfaces 503.
+        // ProviderCallException so the controller surfaces 503.
         val ctx = TestContext()
         ctx.queue.throwOnPublish = RuntimeException("kafka down")
 
@@ -178,7 +171,7 @@ class AiGenerationOrchestratorTest {
             assertThatThrownBy {
                 ctx.orchestrator.start(ctx.command(model = AiGenerationTestFixtures.CLAUDE_MODEL.name))
             }
-        thrown.isInstanceOf(LlmGenerationException::class.java)
+        thrown.isInstanceOf(ProviderCallException::class.java)
 
         val saved =
             ctx.jobStore.records.values
@@ -195,17 +188,16 @@ class AiGenerationOrchestratorTest {
     fun `grounded queue failure audit stores only aggregate metadata`() {
         val ctx =
             TestContext(
-                pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
                 activeMembers = listOf(ActiveClubMember(UUID.randomUUID(), "가람")),
             )
         ctx.queue.throwOnPublish = RuntimeException("kafka down")
 
         assertThatThrownBy { ctx.orchestrator.start(ctx.commandWithSpeaker("가람")) }
-            .isInstanceOf(LlmGenerationException::class.java)
+            .isInstanceOf(ProviderCallException::class.java)
 
         val audit = ctx.auditPort.entries.single()
         assertThat(audit.transcriptSha256).isNull()
-        assertThat(audit.pipelineVersion).isEqualTo("GROUNDED_WHOLE_TRANSCRIPT")
+        assertThat(audit.pipelineVersion).isEqualTo("grounded-session-generation-v2")
         assertThat(audit.inputTurnCount).isEqualTo(1)
         assertThat(audit.speakerCount).isEqualTo(1)
     }
@@ -289,7 +281,7 @@ class AiGenerationOrchestratorTest {
         )
         assertThat(audit.costEstimateUsd).isEqualTo(BigDecimal.ZERO)
         assertThat(audit.latencyMs).isEqualTo(0)
-        assertThat(audit.transcriptSha256).isEqualTo(Sha256.hex("the transcript"))
+        assertThat(audit.transcriptSha256).isNull()
         assertThat(audit.sessionId).isEqualTo(ctx.sessionId)
         assertThat(audit.clubId).isEqualTo(ctx.clubId)
         assertThat(audit.hostUserId).isEqualTo(ctx.hostUserId)
@@ -521,8 +513,7 @@ class AiGenerationOrchestratorTest {
     private class TestContext(
         modelEnabled: Set<com.readmates.aigen.application.model.ModelId> =
             setOf(AiGenerationTestFixtures.CLAUDE_MODEL, AiGenerationTestFixtures.CLAUDE_FALLBACK),
-        pipelineMode: AiGenerationPipelineMode = AiGenerationPipelineMode.LEGACY,
-        activeMembers: List<ActiveClubMember> = emptyList(),
+        activeMembers: List<ActiveClubMember> = listOf(ActiveClubMember(UUID.randomUUID(), "Alice")),
         capabilities: Map<com.readmates.aigen.application.model.ModelId, ModelCapability>? = null,
         fallbackChain: List<String> = emptyList(),
     ) {
@@ -538,7 +529,6 @@ class AiGenerationOrchestratorTest {
         val modelCatalog = AiGenerationTestFixtures.defaultModelCatalog(enabled = modelEnabled)
         val properties =
             AiGenerationTestFixtures.defaultProperties().copy(
-                pipelineMode = pipelineMode,
                 fallbackChain = fallbackChain,
             )
         val clock = FakeClock(AiGenerationTestFixtures.NOW)
@@ -585,7 +575,7 @@ class AiGenerationOrchestratorTest {
                 sessionId = sessionId,
                 clubId = clubId,
                 hostUserId = hostUserId,
-                transcript = "the transcript",
+                transcript = "Alice 00:00\nPublic-safe test statement.",
                 model = model,
                 authorNameMode = AuthorNameMode.REAL,
                 instructions = null,

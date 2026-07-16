@@ -4,10 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.readmates.aigen.adapter.out.llm.common.GroundedDraftJsonCodec
 import com.readmates.aigen.adapter.out.llm.common.GroundedGenerationSchemaResource
 import com.readmates.aigen.adapter.out.llm.common.GroundedProviderTestFixture
-import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
 import com.readmates.aigen.application.model.ModelCapability
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.model.ProviderCallException
 import com.readmates.aigen.application.port.out.ModelCapabilityCatalog
 import com.readmates.aigen.config.OpenAiSpringAiModelFactory
 import org.assertj.core.api.Assertions.assertThat
@@ -106,7 +106,7 @@ class OpenAiSpringAiContractTest {
 
                 assertThatThrownBy {
                     generator(model).generate(GroundedProviderTestFixture.model(Provider.OPENAI), request())
-                }.isInstanceOfSatisfying(LlmGenerationException::class.java) { failure ->
+                }.isInstanceOfSatisfying(ProviderCallException::class.java) { failure ->
                     assertThat(failure.cause).isNull()
                     assertThat(failure.error.message)
                         .isIn(

@@ -1,6 +1,7 @@
 package com.readmates.aigen.application.model
 
 import java.math.BigDecimal
+import java.time.Duration
 import java.time.Instant
 import java.util.UUID
 
@@ -25,6 +26,13 @@ enum class ProviderAttemptState {
     FAILED,
     UNKNOWN,
 }
+
+/** Content-safe provider failure exposed across the outbound-port boundary. */
+class ProviderCallException(
+    val error: GenerationError,
+    cause: Throwable? = null,
+    val retryAfter: Duration? = null,
+) : RuntimeException(error.message, cause)
 
 /**
  * Content-free metadata for one physical provider request.

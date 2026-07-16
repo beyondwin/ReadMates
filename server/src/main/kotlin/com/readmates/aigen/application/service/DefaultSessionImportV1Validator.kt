@@ -21,7 +21,7 @@ import org.springframework.stereotype.Component
  *
  * Rules are evaluated in order; the first violation is returned.
  *
- * The JSON Schema in `SessionImportSchemaResource` is the source-of-truth shape for
+ * The public session-import JSON schema is the source-of-truth shape for
  * provider adapters (Claude tool input_schema, OpenAI response_format, Gemini
  * responseSchema). At validation time the snapshot is already a typed Kotlin data
  * class, so the type-level guarantees from deserialisation are sufficient — we only

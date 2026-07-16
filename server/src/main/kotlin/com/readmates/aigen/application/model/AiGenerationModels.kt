@@ -7,7 +7,7 @@ import java.util.UUID
 
 enum class Provider { CLAUDE, OPENAI, GEMINI }
 
-enum class AiGenerationPipelineMode { LEGACY, GROUNDED_WHOLE_TRANSCRIPT }
+const val GROUNDED_PIPELINE_VERSION = "grounded-session-generation-v2"
 
 data class ModelId(
     val provider: Provider,
@@ -193,33 +193,6 @@ data class SessionMeta(
     val authorNameMode: AuthorNameMode,
 )
 
-data class GenerationInput(
-    val transcript: String,
-    val sessionMeta: SessionMeta,
-    val model: ModelId,
-    val instructions: String?,
-)
-
-data class RegenerationInput(
-    val transcript: String,
-    val currentResult: SessionImportV1Snapshot,
-    val item: GenerationItem,
-    val sessionMeta: SessionMeta,
-    val model: ModelId,
-    val instructions: String?,
-)
-
-data class GenerationOutput(
-    val result: SessionImportV1Snapshot,
-    val usage: TokenUsage,
-)
-
-data class RegenerationOutput(
-    val patchedItem: GenerationItem,
-    val patchedValue: Any,
-    val usage: TokenUsage,
-)
-
 /**
  * In-memory snapshot mirroring the readmates-session-import:v1 JSON.
  * Reuses the same shape as sessionimport.application.model.SessionImportCommand fields,
@@ -300,7 +273,6 @@ data class JobView(
     val expiresAt: Instant,
     val createdAt: Instant,
     val lastUpdatedAt: Instant,
-    val pipelineMode: AiGenerationPipelineMode = AiGenerationPipelineMode.LEGACY,
     val revision: Long = 0,
     val groundingStatus: GroundingStatus? = null,
     val evidence: GroundedEvidenceBundle? = null,

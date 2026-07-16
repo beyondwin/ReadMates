@@ -1,15 +1,15 @@
 package com.readmates.aigen.application.service
 
-import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
 import com.readmates.aigen.application.AiGenerationException
-import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.ErrorCode
+import com.readmates.aigen.application.model.GROUNDED_PIPELINE_VERSION
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.JobView
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.model.ProviderCallException
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.`in`.CancelGenerationUseCase
 import com.readmates.aigen.application.port.`in`.GetJobUseCase
@@ -34,7 +34,6 @@ import com.readmates.aigen.application.port.out.JobKind
 import com.readmates.aigen.application.port.out.JobRecord
 import com.readmates.aigen.application.port.out.ModelCatalog
 import com.readmates.aigen.config.AiGenerationProperties
-import com.readmates.shared.security.Sha256
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
@@ -75,12 +74,7 @@ class AiGenerationOrchestrator(
     GetRecentSessionGenerationJobUseCase,
     CancelGenerationUseCase {
     override fun start(command: StartGenerationCommand): StartGenerationResult {
-        val groundedPreflight =
-            if (properties.pipelineMode == AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT) {
-                groundedPreflightService.preflight(command.clubId, command.transcript)
-            } else {
-                null
-            }
+        val groundedPreflight = groundedPreflightService.preflight(command.clubId, command.transcript)
         val modelId =
             resolveModelId(command.model, command.clubId)
                 ?: failStart(command, ErrorCode.AI_DISABLED, "Requested model is not enabled")
@@ -106,7 +100,6 @@ class AiGenerationOrchestrator(
                 modelId,
                 groundedPreflight,
                 groundedBudget,
-                properties.pipelineMode,
                 now,
                 expiresAt,
             )
@@ -134,7 +127,7 @@ class AiGenerationOrchestrator(
             // Compensate: a PENDING JobRecord lives in Redis for TTL hours otherwise
             // (task_1_7 finding #5). Audit QUEUE_UNAVAILABLE, transition the record to
             // FAILED so /get returns the correct state, then rethrow a wrapped
-            // LlmGenerationException so the caller sees the failure code. We catch
+            // ProviderCallException so the caller sees the failure code. We catch
             // Throwable on purpose so a producer-thread Error doesn't leak an
             // orphaned PENDING record.
             @Suppress("TooGenericExceptionCaught") failure: Throwable,
@@ -168,22 +161,21 @@ class AiGenerationOrchestrator(
                 hostUserId = record.hostUserId,
                 provider = record.model.provider,
                 model = record.model.name,
-                transcriptSha256 = record.auditTranscriptSha256(),
+                transcriptSha256 = null,
                 errorCode = ErrorCode.QUEUE_UNAVAILABLE,
                 errorMessage = message,
                 createdAt = clock.instant(),
-                pipelineVersion = record.pipelineMode.name,
-                inputTurnCount = record.validatedTurns.size.takeIf { record.isGrounded() },
+                pipelineVersion = GROUNDED_PIPELINE_VERSION,
+                inputTurnCount = record.validatedTurns.size,
                 speakerCount =
                     record.validatedTurns
                         .map { it.speakerMembershipId }
                         .distinct()
-                        .size
-                        .takeIf { record.isGrounded() },
+                        .size,
                 groundingStatus = record.groundingStatus?.name,
             ),
         )
-        throw LlmGenerationException(error, failure)
+        throw ProviderCallException(error, failure)
     }
 
     override fun get(
@@ -228,7 +220,6 @@ class AiGenerationOrchestrator(
             expiresAt = record.expiresAt,
             createdAt = record.createdAt,
             lastUpdatedAt = record.lastUpdatedAt,
-            pipelineMode = record.pipelineMode,
             revision = record.revision,
             groundingStatus = record.groundingStatus,
             evidence = record.evidence,
@@ -335,22 +326,20 @@ class AiGenerationOrchestrator(
 
     private fun runGroundedBudgetPreflight(
         command: StartGenerationCommand,
-        preflight: GroundedTranscriptPreflight?,
+        preflight: GroundedTranscriptPreflight,
         modelId: ModelId,
-    ): GroundedBudgetDecision? =
-        preflight?.let {
-            groundedInputBudgetGuard.evaluate(
-                request =
-                    GroundedRenderRequest(
-                        provider = modelId.provider,
-                        sessionMeta = command.sessionMeta.copy(authorNameMode = command.authorNameMode),
-                        turns = it.validatedTurns,
-                        hostInstructions = command.instructions,
-                    ),
-                selectedModel = modelId,
-                fallbackModels = resolveEnabledFallbackModels(),
-            )
-        }
+    ): GroundedBudgetDecision =
+        groundedInputBudgetGuard.evaluate(
+            request =
+                GroundedRenderRequest(
+                    provider = modelId.provider,
+                    sessionMeta = command.sessionMeta.copy(authorNameMode = command.authorNameMode),
+                    turns = preflight.validatedTurns,
+                    hostInstructions = command.instructions,
+                ),
+            selectedModel = modelId,
+            fallbackModels = resolveEnabledFallbackModels(),
+        )
 
     private fun failStart(
         command: StartGenerationCommand,
@@ -366,11 +355,11 @@ class AiGenerationOrchestrator(
                 hostUserId = command.hostUserId,
                 provider = modelId.provider,
                 model = modelId.name,
-                transcriptSha256 = command.auditTranscriptSha256(),
+                transcriptSha256 = null,
                 errorCode = code,
                 errorMessage = message,
                 createdAt = clock.instant(),
-                pipelineVersion = properties.pipelineMode.name,
+                pipelineVersion = GROUNDED_PIPELINE_VERSION,
             ),
         )
         throw AiGenerationException.Coded(code, message)
@@ -402,11 +391,11 @@ class AiGenerationOrchestrator(
                 hostUserId = command.hostUserId,
                 provider = provider,
                 model = candidateModel,
-                transcriptSha256 = command.auditTranscriptSha256(),
+                transcriptSha256 = null,
                 errorCode = code,
                 errorMessage = message,
                 createdAt = clock.instant(),
-                pipelineVersion = properties.pipelineMode.name,
+                pipelineVersion = GROUNDED_PIPELINE_VERSION,
             ),
         )
         throw AiGenerationException.Coded(code, message)
@@ -423,26 +412,14 @@ class AiGenerationOrchestrator(
                 ErrorCode.RATE_LIMITED,
             )
     }
-
-    private fun JobRecord.isGrounded(): Boolean = pipelineMode == AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT
-
-    private fun JobRecord.auditTranscriptSha256(): String? = if (isGrounded()) null else Sha256.hex(transcript)
-
-    private fun StartGenerationCommand.auditTranscriptSha256(): String? =
-        if (properties.pipelineMode == AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT) {
-            null
-        } else {
-            Sha256.hex(transcript)
-        }
 }
 
 @Suppress("LongParameterList")
 private fun StartGenerationCommand.toJobRecord(
     jobId: UUID,
     modelId: ModelId,
-    groundedPreflight: GroundedTranscriptPreflight?,
-    groundedBudget: GroundedBudgetDecision?,
-    pipelineMode: AiGenerationPipelineMode,
+    groundedPreflight: GroundedTranscriptPreflight,
+    groundedBudget: GroundedBudgetDecision,
     now: Instant,
     expiresAt: Instant,
 ): JobRecord =
@@ -454,7 +431,7 @@ private fun StartGenerationCommand.toJobRecord(
         model = modelId,
         authorNameMode = authorNameMode,
         instructions = instructions,
-        transcript = groundedPreflight?.normalizedTranscript ?: transcript,
+        transcript = groundedPreflight.normalizedTranscript,
         sessionMeta = sessionMeta.copy(authorNameMode = authorNameMode),
         status = JobStatus.PENDING,
         stage = JobStage.QUEUED,
@@ -466,7 +443,6 @@ private fun StartGenerationCommand.toJobRecord(
         expiresAt = expiresAt,
         createdAt = now,
         lastUpdatedAt = now,
-        pipelineMode = pipelineMode,
-        validatedTurns = groundedPreflight?.validatedTurns.orEmpty(),
-        eligibleFallbackModels = groundedBudget?.eligibleFallbackModels.orEmpty(),
+        validatedTurns = groundedPreflight.validatedTurns,
+        eligibleFallbackModels = groundedBudget.eligibleFallbackModels,
     )

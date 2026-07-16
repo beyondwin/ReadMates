@@ -1,10 +1,10 @@
 package com.readmates.aigen.adapter.`in`.web
 
-import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
 import com.readmates.aigen.adapter.out.messaging.AiGenerationJobPublishException
 import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
+import com.readmates.aigen.application.model.ProviderCallException
 import com.readmates.sessionimport.application.model.SessionImportIssue
 import com.readmates.sessionimport.application.service.InvalidSessionImportException
 import com.readmates.shared.security.AccessDeniedException
@@ -109,10 +109,10 @@ class AiGenerationErrorHandlerTest {
     }
 
     @Test
-    fun `maps LlmGenerationException with PROVIDER_UNAVAILABLE to 502`() {
+    fun `maps ProviderCallException with PROVIDER_UNAVAILABLE to 502`() {
         val response =
             handler.handleLlmGeneration(
-                LlmGenerationException(GenerationError(ErrorCode.PROVIDER_UNAVAILABLE, "provider down")),
+                ProviderCallException(GenerationError(ErrorCode.PROVIDER_UNAVAILABLE, "provider down")),
             )
         assertThat(response.statusCode).isEqualTo(HttpStatus.BAD_GATEWAY)
         assertThat(response.body!!.code).isEqualTo(ErrorCode.PROVIDER_UNAVAILABLE.name)
@@ -120,10 +120,10 @@ class AiGenerationErrorHandlerTest {
     }
 
     @Test
-    fun `maps LlmGenerationException with SCHEMA_INVALID to 422`() {
+    fun `maps ProviderCallException with SCHEMA_INVALID to 422`() {
         val response =
             handler.handleLlmGeneration(
-                LlmGenerationException(GenerationError(ErrorCode.SCHEMA_INVALID, "bad schema")),
+                ProviderCallException(GenerationError(ErrorCode.SCHEMA_INVALID, "bad schema")),
             )
         assertThat(response.statusCode).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY)
         assertThat(response.body!!.code).isEqualTo(ErrorCode.SCHEMA_INVALID.name)

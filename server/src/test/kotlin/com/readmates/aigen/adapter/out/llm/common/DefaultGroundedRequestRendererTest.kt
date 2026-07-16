@@ -28,10 +28,8 @@ class DefaultGroundedRequestRendererTest {
                         reservedOutputTokens = 16_384,
                     ),
             ),
-            com.readmates.aigen.adapter.out.llm.gemini.GeminiSchemaCompatAdapter(
-                com.readmates.aigen.adapter.out.llm.common
-                    .SessionImportSchemaResource(),
-            ),
+            com.readmates.aigen.adapter.out.llm.gemini
+                .GeminiSchemaCompatAdapter(),
         )
 
     @Test

@@ -1,6 +1,5 @@
 package com.readmates.aigen.api
 
-import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.GroundedAuthoredText
@@ -47,6 +46,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.multipart
 import org.springframework.test.web.servlet.post
+import tools.jackson.databind.ObjectMapper
 import java.math.BigDecimal
 import java.time.Duration
 import java.time.Instant
@@ -112,13 +112,30 @@ private const val SEED_SQL = """
         "readmates.redis.enabled=true",
         "readmates.aigen.enabled=true",
         "readmates.aigen.mock=true",
+        "spring.ai.model.audio.speech=none",
+        "spring.ai.model.audio.transcription=none",
+        "spring.ai.model.chat=none",
+        "spring.ai.model.embedding=none",
+        "spring.ai.model.embedding.multimodal=none",
+        "spring.ai.model.embedding.text=none",
+        "spring.ai.model.image=none",
+        "spring.ai.model.moderation=none",
         "readmates.aigen.caps.host-per-minute-calls=100",
         "readmates.aigen.caps.host-daily-calls=100",
         "readmates.aigen.enabled-providers=CLAUDE,OPENAI",
+        "readmates.aigen.fallback-default-model=gpt-5.4-mini",
+        "readmates.aigen.grounded.capabilities[claude-sonnet-4-6].context-window-tokens=1000000",
+        "readmates.aigen.grounded.capabilities[claude-sonnet-4-6].max-output-tokens=128000",
+        "readmates.aigen.grounded.capabilities[claude-sonnet-4-6].structured-output-supported=true",
+        "readmates.aigen.grounded.capabilities[gpt-5.4-mini].context-window-tokens=400000",
+        "readmates.aigen.grounded.capabilities[gpt-5.4-mini].max-output-tokens=128000",
+        "readmates.aigen.grounded.capabilities[gpt-5.4-mini].structured-output-supported=true",
         "readmates.aigen.pricing.claude-sonnet-4-6.input-per-m-token-usd=3.00",
+        "readmates.aigen.pricing.claude-sonnet-4-6.cache-write-input-per-m-token-usd=3.75",
         "readmates.aigen.pricing.claude-sonnet-4-6.cached-input-per-m-token-usd=0.30",
         "readmates.aigen.pricing.claude-sonnet-4-6.output-per-m-token-usd=15.00",
         "readmates.aigen.pricing[gpt-5.4-mini].input-per-m-token-usd=0.75",
+        "readmates.aigen.pricing[gpt-5.4-mini].cache-write-input-per-m-token-usd=0.75",
         "readmates.aigen.pricing[gpt-5.4-mini].cached-input-per-m-token-usd=0.075",
         "readmates.aigen.pricing[gpt-5.4-mini].output-per-m-token-usd=4.50",
         "readmates.aigen.kafka.enabled=true",
@@ -135,6 +152,7 @@ class AiGenerateApiIntegrationTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val redis: StringRedisTemplate,
     @param:Autowired private val jobStore: AiGenerationJobStore,
+    @param:Autowired private val objectMapper: ObjectMapper,
 ) : ReadmatesRedisIntegrationTestSupport() {
     @Test
     fun `full generation lifecycle - start, poll until SUCCEEDED, commit, then Redis payload cleaned`() {
@@ -191,7 +209,7 @@ class AiGenerateApiIntegrationTest(
             .post("/api/host/sessions/$SESSION_ID/ai-generate/jobs/$jobId/regenerate") {
                 with(user(HOST_EMAIL))
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"item":"SUMMARY","model":null,"instructions":null}"""
+                content = """{"item":"SUMMARY","expectedRevision":1,"model":null,"instructions":null}"""
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.item") { value("SUMMARY") }
@@ -260,7 +278,7 @@ class AiGenerateApiIntegrationTest(
             .post("/api/host/sessions/$SESSION_ID/ai-generate/jobs/$jobId/regenerate") {
                 with(user(HOST_EMAIL))
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"item":"SUMMARY","model":null,"instructions":null}"""
+                content = """{"item":"SUMMARY","expectedRevision":1,"model":null,"instructions":null}"""
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.item") { value("SUMMARY") }
@@ -495,7 +513,6 @@ class AiGenerateApiIntegrationTest(
             lastUpdatedAt = now,
             actualModel = ModelId(Provider.CLAUDE, "claude-sonnet-4-6"),
             llmCallCount = 1,
-            pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
             validatedTurns = turns,
             revision = 1,
             groundingStatus = GroundingStatus.VALID,
@@ -549,11 +566,24 @@ class AiGenerateApiIntegrationTest(
     }
 
     private fun commitJob(jobId: UUID) {
+        val currentResult = objectMapper.readTree(jobStatusJson(jobId)).path("result").deepCopy()
+        val request =
+            objectMapper.createObjectNode().apply {
+                put("recordVisibility", "MEMBER")
+                put("expectedRevision", 1)
+                set("result", currentResult)
+                putObject("sectionReviews").apply {
+                    put("SUMMARY", "AI_GROUNDED_REVIEWED")
+                    put("HIGHLIGHTS", "AI_GROUNDED_REVIEWED")
+                    put("ONE_LINE_REVIEWS", "AI_GROUNDED_REVIEWED")
+                    put("FEEDBACK_DOCUMENT", "AI_GROUNDED_REVIEWED")
+                }
+            }
         mockMvc
             .post("/api/host/sessions/$SESSION_ID/ai-generate/jobs/$jobId/commit") {
                 with(user(HOST_EMAIL))
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"recordVisibility":"MEMBER","result":null}"""
+                content = objectMapper.writeValueAsString(request)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value(SESSION_ID) }
@@ -598,6 +628,13 @@ class AiGenerateApiIntegrationTest(
         """
         {
           "recordVisibility": "MEMBER",
+          "expectedRevision": 1,
+          "sectionReviews": {
+            "SUMMARY": "USER_EDITED_CONFIRMED",
+            "HIGHLIGHTS": "USER_EDITED_CONFIRMED",
+            "ONE_LINE_REVIEWS": "USER_EDITED_CONFIRMED",
+            "FEEDBACK_DOCUMENT": "USER_EDITED_CONFIRMED"
+          },
           "result": {
             "format": "readmates-session-import:v1",
             "sessionNumber": 8861,

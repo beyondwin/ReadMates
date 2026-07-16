@@ -14,6 +14,7 @@ import com.readmates.aigen.application.port.out.RenderedGroundedRequest
 import com.readmates.aigen.application.port.out.WholeTranscriptGroundedGenerator
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
+import tools.jackson.databind.ObjectMapper
 import java.time.LocalDate
 
 data class SyntheticTranscriptTurn(
@@ -53,20 +54,22 @@ object AiGenerationTestModels {
 /** Public-safe deterministic provider used only by the grounded integration profile. */
 @Component
 @ConditionalOnProperty(prefix = "readmates.aigen", name = ["enabled", "mock"], havingValue = "true")
-class StubClaudeWholeTranscriptGroundedGenerator : WholeTranscriptGroundedGenerator {
+class StubClaudeWholeTranscriptGroundedGenerator(
+    private val objectMapper: ObjectMapper,
+) : WholeTranscriptGroundedGenerator {
     override val provider: Provider = Provider.CLAUDE
 
     override fun generate(
         model: ModelId,
         request: RenderedGroundedRequest,
-    ): GroundedGenerationOutput = GroundedGenerationOutput(draft(), USAGE)
+    ): GroundedGenerationOutput = GroundedGenerationOutput(draft(request), USAGE)
 
     override fun repair(
         model: ModelId,
         section: GenerationItem,
         request: RenderedGroundedRequest,
     ): GroundedSectionRepairOutput {
-        val draft = draft()
+        val draft = draft(request)
         return when (section) {
             GenerationItem.SUMMARY -> GroundedSectionRepairOutput.Summary(draft.summaryBlocks, USAGE)
             GenerationItem.HIGHLIGHTS -> GroundedSectionRepairOutput.Highlights(draft.highlights, USAGE)
@@ -80,50 +83,99 @@ class StubClaudeWholeTranscriptGroundedGenerator : WholeTranscriptGroundedGenera
         }
     }
 
-    private fun draft(): GroundedGenerationDraft =
-        GroundedGenerationDraft(
+    private fun draft(request: RenderedGroundedRequest): GroundedGenerationDraft {
+        val envelope = objectMapper.readValue(request.userText, StubEnvelope::class.java)
+        val sessionNumber = envelope.session.sessionNumber
+        val bookTitle = envelope.session.bookTitle
+        val meetingDate = LocalDate.parse(envelope.session.meetingDate)
+        val speakers = envelope.allowedSpeakerNames
+        val turns = envelope.turns
+        val firstTurnId = turns.first().turnId
+        val turnIds = turns.map(StubTurn::turnId)
+        val requestedSection = envelope.requestedSection
+        val summary =
+            if (requestedSection == GenerationItem.SUMMARY.name) {
+                "Regenerated summary for $bookTitle."
+            } else if (sessionNumber == 8961) {
+                "A public-safe grounded summary."
+            } else {
+                "Stub summary for $bookTitle (session $sessionNumber)."
+            }
+        val firstSpeaker = speakers.first()
+        val highlights =
+            (1..2).map { ordinal ->
+                GroundedAuthoredText(
+                    firstSpeaker,
+                    "Stub highlight #$ordinal for $bookTitle",
+                    listOf(firstTurnId),
+                )
+            }
+        val reviews =
+            speakers.map { speaker ->
+                val speakerTurnId =
+                    turns
+                        .firstOrNull { it.speakerName == speaker }
+                        ?.turnId
+                        ?: firstTurnId
+                GroundedAuthoredText(speaker, "Stub one-line review by $speaker", listOf(speakerTurnId))
+            }
+        return GroundedGenerationDraft(
             format = "readmates-grounded-generation:v2",
-            sessionNumber = 8961,
-            bookTitle = "Public Test Book",
-            meetingDate = LocalDate.of(2026, 7, 14),
-            summaryBlocks =
-                listOf(
-                    GroundedTextBlock(
-                        "A public-safe grounded summary.",
-                        listOf("t000001", "t000002"),
-                    ),
-                ),
-            highlights =
-                listOf(
-                    GroundedAuthoredText("PublicMemberA", "A public-safe first highlight.", listOf("t000001")),
-                    GroundedAuthoredText("PublicMemberB", "A public-safe second highlight.", listOf("t000002")),
-                ),
-            oneLineReviews =
-                listOf(
-                    GroundedAuthoredText("PublicMemberA", "A public-safe first review.", listOf("t000001")),
-                    GroundedAuthoredText("PublicMemberB", "A public-safe second review.", listOf("t000002")),
-                ),
-            feedbackDocumentFileName = "session-8961-feedback.md",
+            sessionNumber = sessionNumber,
+            bookTitle = bookTitle,
+            meetingDate = meetingDate,
+            summaryBlocks = listOf(GroundedTextBlock(summary, turnIds)),
+            highlights = highlights,
+            oneLineReviews = reviews,
+            feedbackDocumentFileName = "session-$sessionNumber-feedback.md",
             feedbackSections =
                 listOf(
                     GroundedFeedbackSection(
                         "관찰자 노트",
-                        "두 참여자는 공개 합성 문장으로 근거를 확인했다.",
-                        listOf("t000001", "t000002"),
+                        "Stub observer notes.",
+                        turnIds,
                     ),
                     GroundedFeedbackSection(
                         "참여자별 피드백",
-                        participantFeedback(),
-                        listOf("t000001", "t000002"),
+                        participantFeedback(speakers, turns.map(StubTurn::text)),
+                        turnIds,
                     ),
                 ),
         )
+    }
 
-    private fun participantFeedback(): String =
-        listOf(
-            participantSection(1, "PublicMemberA", "첫 공개 합성 발언"),
-            participantSection(2, "PublicMemberB", "둘째 공개 합성 발언"),
-        ).joinToString("\n\n")
+    private fun participantFeedback(
+        speakers: List<String>,
+        quotes: List<String>,
+    ): String =
+        speakers
+            .mapIndexed { index, speaker ->
+                participantSection(index + 1, speaker, quotes.getOrElse(index) { quotes.first() })
+            }.joinToString("\n\n")
+
+    private data class StubEnvelope(
+        val mode: String,
+        val session: StubSession,
+        val allowedSpeakerNames: List<String>,
+        val hostInstructions: String? = null,
+        val turns: List<StubTurn>,
+        val currentDraft: Any? = null,
+        val requestedSection: String? = null,
+    )
+
+    private data class StubSession(
+        val sessionNumber: Int,
+        val bookTitle: String,
+        val bookAuthor: String,
+        val meetingDate: String,
+    )
+
+    private data class StubTurn(
+        val turnId: String,
+        val startSeconds: Int,
+        val speakerName: String,
+        val text: String,
+    )
 
     private fun participantSection(
         ordinal: Int,
@@ -173,4 +225,24 @@ class StubClaudeWholeTranscriptGroundedGenerator : WholeTranscriptGroundedGenera
                 outputTokens = 200,
             )
     }
+}
+
+/** Public-safe OpenAI variant that keeps the API provider matrix on the grounded-only path. */
+@Component
+@ConditionalOnProperty(prefix = "readmates.aigen", name = ["enabled", "mock"], havingValue = "true")
+class StubOpenAiWholeTranscriptGroundedGenerator(
+    private val delegate: StubClaudeWholeTranscriptGroundedGenerator,
+) : WholeTranscriptGroundedGenerator {
+    override val provider: Provider = Provider.OPENAI
+
+    override fun generate(
+        model: ModelId,
+        request: RenderedGroundedRequest,
+    ): GroundedGenerationOutput = delegate.generate(model, request)
+
+    override fun repair(
+        model: ModelId,
+        section: GenerationItem,
+        request: RenderedGroundedRequest,
+    ): GroundedSectionRepairOutput = delegate.repair(model, section, request)
 }

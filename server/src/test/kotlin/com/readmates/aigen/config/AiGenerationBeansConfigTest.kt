@@ -1,35 +1,32 @@
 package com.readmates.aigen.config
 
-import com.readmates.aigen.application.model.AiGenerationPipelineMode
+import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.port.out.WholeTranscriptGroundedGenerator
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 
 class AiGenerationBeansConfigTest {
-    private val config = AiGenerationBeansConfig()
-
     @Test
-    fun `grounded mode fails startup when an enabled provider has no grounded adapter`() {
-        val properties =
-            AiGenerationProperties(
-                pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
-                enabledProviders = setOf("CLAUDE"),
-            )
-
+    fun `grounded map requires every enabled provider`() {
         assertThatThrownBy {
-            config.wholeTranscriptGroundedGeneratorsByProvider(emptyList(), properties)
+            AiGenerationBeansConfig().validateGroundedGenerators(
+                emptyMap(),
+                AiGenerationProperties(enabledProviders = setOf("OPENAI")),
+            )
         }.isInstanceOf(IllegalArgumentException::class.java)
-            .hasMessage("Grounded generator missing for an enabled provider")
     }
 
     @Test
-    fun `legacy mode does not require grounded adapters`() {
-        val result =
-            config.wholeTranscriptGroundedGeneratorsByProvider(
-                emptyList(),
-                AiGenerationProperties(pipelineMode = AiGenerationPipelineMode.LEGACY),
-            )
+    fun `grounded map accepts the single Spring AI implementation for enabled providers`() {
+        val generator = org.mockito.Mockito.mock(WholeTranscriptGroundedGenerator::class.java)
+        val map = mapOf(Provider.OPENAI to generator)
 
-        assertThat(result).isEmpty()
+        assertThat(
+            AiGenerationBeansConfig().validateGroundedGenerators(
+                map,
+                AiGenerationProperties(enabledProviders = setOf("OPENAI")),
+            ),
+        ).isSameAs(map)
     }
 }

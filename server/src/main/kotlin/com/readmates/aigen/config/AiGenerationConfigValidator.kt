@@ -2,7 +2,6 @@ package com.readmates.aigen.config
 
 import com.readmates.aigen.adapter.out.llm.springai.AnthropicGroundedModelPolicy
 import com.readmates.aigen.adapter.out.llm.springai.GoogleGroundedModelPolicy
-import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.port.out.AiGenerationJobQueue
 import jakarta.annotation.PostConstruct
@@ -64,8 +63,6 @@ class AiGenerationConfigValidator(
                 "grounded capability for model $model requires a separate pricing entry"
             }
         }
-        if (properties.pipelineMode != AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT) return
-
         check(grounded.capabilities.containsKey(properties.fallbackDefaultModel)) {
             "grounded fallback-default-model requires a verified capability entry"
         }

@@ -131,7 +131,6 @@ readmates:
     # Canonical provider names: CLAUDE, OPENAI, GEMINI. Empty default = kill switch.
     enabled-providers: ${READMATES_AIGEN_ENABLED_PROVIDERS:}
     fallback-default-model: ${READMATES_AIGEN_FALLBACK_DEFAULT_MODEL:gpt-5.4-mini}
-    pipeline-mode: ${READMATES_AIGEN_PIPELINE_MODE:LEGACY}
     grounded:
       reserved-output-tokens: ${READMATES_AIGEN_GROUNDED_RESERVED_OUTPUT_TOKENS:16384}
       safety-margin-tokens: ${READMATES_AIGEN_GROUNDED_SAFETY_MARGIN_TOKENS:8192}

@@ -4,11 +4,10 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.ObjectNode
-import com.readmates.aigen.adapter.out.llm.common.SessionImportSchemaResource
 import org.springframework.stereotype.Component
 
 /**
- * Converts the canonical [SessionImportSchemaResource] (a JSON Schema Draft 2020-12 document)
+ * Converts the versioned grounded schema (a JSON Schema Draft 2020-12 document)
  * into the subset of OpenAPI 3.0 Schema that the Gemini `responseSchema` field accepts.
  *
  * Gemini's structured-output mode REJECTS arbitrary JSON Schema features. Concretely we must:
@@ -29,12 +28,8 @@ import org.springframework.stereotype.Component
  */
 @Component
 class GeminiSchemaCompatAdapter(
-    private val source: SessionImportSchemaResource,
     private val objectMapper: ObjectMapper = ObjectMapper(),
 ) {
-    /** Returns a deep-copied Gemini-compatible schema (OpenAPI 3.0 subset). */
-    fun geminiResponseSchema(): ObjectNode = convert(source.schema())
-
     /** Adapts the versioned grounded schema supplied by the common renderer. */
     fun adapt(schemaJson: String): String {
         val schema =

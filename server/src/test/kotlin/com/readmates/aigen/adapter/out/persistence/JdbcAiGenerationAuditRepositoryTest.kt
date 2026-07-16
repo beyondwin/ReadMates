@@ -140,7 +140,7 @@ class JdbcAiGenerationAuditRepositoryTest(
         adapter.insert(
             sampleEntry(
                 jobId = jobId,
-                pipelineVersion = "GROUNDED_WHOLE_TRANSCRIPT",
+                pipelineVersion = "grounded-session-generation-v2",
                 inputTurnCount = 14,
                 speakerCount = 2,
                 groundingStatus = "VALID",
@@ -151,7 +151,7 @@ class JdbcAiGenerationAuditRepositoryTest(
         )
 
         val row = jdbcTemplate.queryForMap("select * from ai_generation_audit_log where job_id=?", jobId.toString())
-        assertThat(row["pipeline_version"]).isEqualTo("GROUNDED_WHOLE_TRANSCRIPT")
+        assertThat(row["pipeline_version"]).isEqualTo("grounded-session-generation-v2")
         assertThat((row["input_turn_count"] as Number).toInt()).isEqualTo(14)
         assertThat((row["speaker_count"] as Number).toInt()).isEqualTo(2)
         assertThat(row["grounding_status"]).isEqualTo("VALID")

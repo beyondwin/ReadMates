@@ -2,7 +2,6 @@ package com.readmates.aigen.adapter.`in`.web
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.readmates.aigen.application.AiGenerationException
-import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.GroundedEvidenceBundle
@@ -190,14 +189,13 @@ fun SessionImportV1Snapshot.toJson(): SessionImportV1Json =
     )
 
 fun JobView.toStatusResponse(): JobStatusResponse {
-    val grounded = pipelineMode == AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT
-    val groundedSucceeded = grounded && status == JobStatus.SUCCEEDED
+    val groundedSucceeded = status == JobStatus.SUCCEEDED
     val completeGroundedPayload =
         result != null && evidence?.revision == revision && groundingStatus == GroundingStatus.VALID
     if (groundedSucceeded && !completeGroundedPayload) {
         throw AiGenerationException.Coded(ErrorCode.JOB_EXPIRED)
     }
-    val visibleResult = if (grounded && !groundedSucceeded) null else result
+    val visibleResult = if (groundedSucceeded) result else null
     val visibleEvidence = if (groundedSucceeded) evidence?.toResponse() else null
     val reviewStatuses =
         if (groundedSucceeded) {
@@ -219,8 +217,8 @@ fun JobView.toStatusResponse(): JobStatusResponse {
         expiresAt = expiresAt.toString(),
         createdAt = createdAt.toString(),
         lastUpdatedAt = lastUpdatedAt.toString(),
-        revision = revision.takeIf { grounded },
-        groundingStatus = groundingStatus?.name.takeIf { grounded },
+        revision = revision,
+        groundingStatus = groundingStatus?.name,
         evidence = visibleEvidence,
         sectionReviewStatuses = reviewStatuses,
     )

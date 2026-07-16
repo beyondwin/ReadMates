@@ -1,6 +1,5 @@
 package com.readmates.aigen.adapter.out.redis
 
-import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.GroundedEvidenceBundle
@@ -14,7 +13,6 @@ import com.readmates.aigen.application.port.out.CommitLeaseResult
 import com.readmates.aigen.application.port.out.GroundedResultPayload
 import com.readmates.aigen.application.port.out.GroundedSourceContext
 import com.readmates.aigen.application.port.out.JobRecord
-import com.readmates.aigen.application.port.out.LlmCallReservation
 import com.readmates.aigen.application.port.out.SaveGroundedResultCommand
 import com.readmates.aigen.config.AiGenerationProperties
 import com.readmates.shared.cache.RedisCacheMetrics
@@ -66,26 +64,19 @@ class RedisAiGenerationJobStore(
             redisTemplate.expire(hashKey, java.time.Duration.ofSeconds(ttlSeconds))
 
             redisTemplate.opsForValue().set(transcriptKey, job.transcript, java.time.Duration.ofSeconds(ttlSeconds))
-            if (job.pipelineMode == AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT) {
-                require(job.validatedTurns.isNotEmpty()) { "Grounded job requires validated transcript turns" }
-                redisTemplate
-                    .opsForValue()
-                    .set(
-                        turnsKey,
-                        objectMapper.writeValueAsString(
-                            GroundedSourceContext(job.validatedTurns, job.sessionMeta, job.instructions),
-                        ),
-                        java.time.Duration.ofSeconds(ttlSeconds),
-                    )
-            }
+            require(job.validatedTurns.isNotEmpty()) { "Grounded job requires validated transcript turns" }
+            redisTemplate
+                .opsForValue()
+                .set(
+                    turnsKey,
+                    objectMapper.writeValueAsString(
+                        GroundedSourceContext(job.validatedTurns, job.sessionMeta, job.instructions),
+                    ),
+                    java.time.Duration.ofSeconds(ttlSeconds),
+                )
 
             if (job.result != null) {
-                val payload =
-                    if (job.pipelineMode == AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT) {
-                        GroundedResultPayload(job.result, requireNotNull(job.groundedDraft))
-                    } else {
-                        job.result
-                    }
+                val payload = GroundedResultPayload(job.result, requireNotNull(job.groundedDraft))
                 redisTemplate
                     .opsForValue()
                     .set(
@@ -114,13 +105,7 @@ class RedisAiGenerationJobStore(
             if (hash.isEmpty()) return@runCatching null
 
             val status = hash["status"]?.let { JobStatus.valueOf(it) }
-            val pipelineMode =
-                hash["pipelineMode"]?.let(AiGenerationPipelineMode::valueOf) ?: AiGenerationPipelineMode.LEGACY
-            if (pipelineMode == AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT) {
-                loadGrounded(jobId, hash, requireNotNull(status))
-            } else {
-                loadLegacy(jobId, hash, status)
-            }
+            loadGrounded(jobId, hash, requireNotNull(status))
         }.onFailure { recordFailure("load") }.getOrThrow()
 
     override fun loadMetadata(jobId: UUID): JobRecord? =
@@ -128,12 +113,7 @@ class RedisAiGenerationJobStore(
             val hash = redisTemplate.opsForHash<String, String>().entries(hashKey(jobId))
             if (hash.isEmpty()) return@runCatching null
             val status = hash["status"]?.let(JobStatus::valueOf)
-            val pipelineMode =
-                hash["pipelineMode"]?.let(AiGenerationPipelineMode::valueOf) ?: AiGenerationPipelineMode.LEGACY
-            if (
-                pipelineMode == AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT &&
-                !requiredGroundedPayloadsExist(jobId, requireNotNull(status))
-            ) {
+            if (!requiredGroundedPayloadsExist(jobId, requireNotNull(status))) {
                 return@runCatching deleteStaleJob(jobId)
             }
             recordCodec.fromHash(
@@ -144,7 +124,6 @@ class RedisAiGenerationJobStore(
                 groundedDraft = null,
                 sourceContext = null,
                 evidence = null,
-                includeSensitiveHashFields = false,
             )
         }.onFailure { recordFailure("loadMetadata") }.getOrThrow()
 
@@ -232,23 +211,6 @@ class RedisAiGenerationJobStore(
             .get(key)
             ?: throw MissingGroundedPayloadException()
 
-    private fun loadLegacy(
-        jobId: UUID,
-        hash: Map<String, String>,
-        status: JobStatus?,
-    ): JobRecord? {
-        val transcript = redisTemplate.opsForValue().get(transcriptKey(jobId))
-        if (transcript == null && status !in PAYLOAD_OPTIONAL_STATUSES) {
-            return deleteStaleJob(jobId)
-        }
-        val result =
-            redisTemplate
-                .opsForValue()
-                .get(resultKey(jobId))
-                ?.let { objectMapper.readValue(it, SessionImportV1Snapshot::class.java) }
-        return recordCodec.fromHash(jobId, hash, transcript.orEmpty(), result, null, null, null)
-    }
-
     override fun loadRecentForSession(
         sessionId: UUID,
         limit: Int,
@@ -314,64 +276,6 @@ class RedisAiGenerationJobStore(
                 }
             }
         }.onFailure { recordFailure("loadCommitRecoveryJobs") }.getOrDefault(emptyList())
-
-    override fun saveResult(
-        jobId: UUID,
-        result: SessionImportV1Snapshot,
-        usage: TokenUsage,
-        cost: BigDecimal,
-    ) {
-        runCatching {
-            val ttlSeconds = properties.job.redisTtl.seconds
-            val lastUpdatedAt = Instant.now()
-            val resultJson = objectMapper.writeValueAsString(result)
-            redisTemplate.execute(
-                AiGenerationRedisScripts.patchResult,
-                listOf(hashKey(jobId), resultKey(jobId), transcriptKey(jobId), turnsKey(jobId)),
-                resultJson,
-                usage.nonCachedInputTokens.toString(),
-                usage.cacheWriteInputTokens.toString(),
-                usage.cacheReadInputTokens.toString(),
-                usage.outputTokens.toString(),
-                cost.toPlainString(),
-                lastUpdatedAt.toString(),
-                ttlSeconds.toString(),
-            )
-            refreshIndexes(jobId)
-        }.onFailure { recordFailure("saveResult") }.getOrThrow()
-    }
-
-    override fun patchItem(
-        jobId: UUID,
-        item: GenerationItem,
-        value: Any,
-        usage: TokenUsage,
-        cost: BigDecimal,
-    ) {
-        runCatching {
-            val ttlSeconds = properties.job.redisTtl.seconds
-            val lastUpdatedAt = Instant.now()
-            // value contract: orchestrator passes the FULL patched SessionImportV1Snapshot.
-            // We always re-serialize the snapshot — primitive/per-item values are not supported.
-            require(value is SessionImportV1Snapshot) {
-                "patchItem requires value: SessionImportV1Snapshot (full patched snapshot)"
-            }
-            val newResultJson = objectMapper.writeValueAsString(value)
-            redisTemplate.execute(
-                AiGenerationRedisScripts.patchResult,
-                listOf(hashKey(jobId), resultKey(jobId), transcriptKey(jobId), turnsKey(jobId)),
-                newResultJson,
-                usage.nonCachedInputTokens.toString(),
-                usage.cacheWriteInputTokens.toString(),
-                usage.cacheReadInputTokens.toString(),
-                usage.outputTokens.toString(),
-                cost.toPlainString(),
-                lastUpdatedAt.toString(),
-                ttlSeconds.toString(),
-            )
-            refreshIndexes(jobId)
-        }.onFailure { recordFailure("patchItem") }.getOrThrow()
-    }
 
     override fun updateStatus(
         jobId: UUID,
@@ -633,44 +537,6 @@ class RedisAiGenerationJobStore(
         }.onFailure { recordFailure("deleteTransientPayload") }.getOrThrow()
     }
 
-    override fun incrementLlmCallCount(jobId: UUID): Int =
-        runCatching {
-            val hashKey = hashKey(jobId)
-            val ops = redisTemplate.opsForHash<String, String>()
-            val next = ops.increment(hashKey, "llmCallCount", 1L) ?: 1L
-            // Refresh TTL so the counter doesn't outlast the hash (the field shares the
-            // 6h job TTL with the rest of the record). EXPIRE is a no-op if the key is
-            // already gone, so we don't need a guard.
-            redisTemplate.expire(hashKey, properties.job.redisTtl)
-            refreshTransientPayloadTtls(jobId)
-            next.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
-        }.onFailure { recordFailure("incrementLlmCallCount") }.getOrThrow()
-
-    override fun reserveLlmCall(
-        jobId: UUID,
-        expectedStatus: JobStatus,
-        maxCalls: Int,
-    ): LlmCallReservation =
-        runCatching {
-            val result =
-                redisTemplate.execute(
-                    AiGenerationRedisScripts.reserveLlmCall,
-                    listOf(hashKey(jobId)),
-                    expectedStatus.name,
-                    maxCalls.toString(),
-                    properties.job.redisTtl.seconds
-                        .toString(),
-                )
-            when (result) {
-                1L -> {
-                    refreshTransientPayloadTtls(jobId)
-                    LlmCallReservation.RESERVED
-                }
-                -1L -> LlmCallReservation.CAP_EXCEEDED
-                else -> LlmCallReservation.STATE_CHANGED
-            }
-        }.onFailure { recordFailure("reserveLlmCall") }.getOrThrow()
-
     private fun deleteStaleJob(jobId: UUID): JobRecord? {
         delete(jobId)
         return null
@@ -750,15 +616,6 @@ class RedisAiGenerationJobStore(
 
     private companion object {
         const val MAX_ERROR_MESSAGE_LEN = 512
-
-        val PAYLOAD_OPTIONAL_STATUSES =
-            setOf(
-                JobStatus.COMMITTING,
-                JobStatus.COMMIT_RETRY,
-                JobStatus.COMMITTED,
-                JobStatus.CANCELLED,
-                JobStatus.FAILED,
-            )
 
         val GROUNDED_TRANSCRIPT_STATUSES = setOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCEEDED)
 

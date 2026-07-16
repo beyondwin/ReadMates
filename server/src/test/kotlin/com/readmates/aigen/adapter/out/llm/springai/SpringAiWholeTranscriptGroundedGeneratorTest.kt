@@ -2,12 +2,12 @@ package com.readmates.aigen.adapter.out.llm.springai
 
 import com.readmates.aigen.adapter.out.llm.common.GroundedDraftJsonCodec
 import com.readmates.aigen.adapter.out.llm.common.GroundedProviderTestFixture
-import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.ModelCapability
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.model.ProviderCallException
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -70,7 +70,7 @@ class SpringAiWholeTranscriptGroundedGeneratorTest {
             )
 
         assertThatThrownBy { generator.generate(model, request) }
-            .isInstanceOfSatisfying(LlmGenerationException::class.java) { failure ->
+            .isInstanceOfSatisfying(ProviderCallException::class.java) { failure ->
                 assertThat(failure.error.code).isEqualTo(ErrorCode.MODEL_CAPABILITY_UNAVAILABLE)
                 assertThat(failure.cause).isNull()
             }

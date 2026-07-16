@@ -3,13 +3,13 @@ package com.readmates.aigen.adapter.out.llm.springai
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.readmates.aigen.adapter.out.llm.common.GroundedDraftJsonCodec
-import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
 import com.readmates.aigen.adapter.out.llm.common.LlmStructuredOutputException
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.model.ProviderCallException
 import com.readmates.aigen.application.port.out.GroundedGenerationOutput
 import com.readmates.aigen.application.port.out.GroundedSectionRepairOutput
 import com.readmates.aigen.application.port.out.RenderedGroundedRequest
@@ -67,7 +67,7 @@ class SpringAiWholeTranscriptGroundedGenerator(
     ) = try {
         optionsFactory.options(provider, model, request, mode)
     } catch (failure: RuntimeException) {
-        throw LlmGenerationException(
+        throw ProviderCallException(
             GenerationError(ErrorCode.MODEL_CAPABILITY_UNAVAILABLE, "Grounded model capability unavailable"),
         )
     }

@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.AiGenerationActor
-import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
@@ -380,24 +379,6 @@ class AiGenerationControllerTest {
             jsonPath("$.membershipId") { doesNotExist() }
             jsonPath("$.candidateMembers") { doesNotExist() }
         }
-    }
-
-    @Test
-    fun `GET jobs jobId returns JobStatusResponse JSON`() {
-        getJobUseCase.view = sampleJobView()
-
-        mockMvc
-            .get("/api/host/sessions/$sessionId/ai-generate/jobs/$jobId") {
-                with(authedUser())
-            }.andExpect {
-                status { isOk() }
-                jsonPath("$.jobId") { value(jobId.toString()) }
-                jsonPath("$.status") { value("SUCCEEDED") }
-                jsonPath("$.model") { value("claude-sonnet-4-6") }
-                jsonPath("$.result.bookTitle") { value("Title") }
-                jsonPath("$.costEstimateUsd") { value("0.12") }
-                jsonPath("$.tokens.input") { value(100) }
-            }
     }
 
     @Test
@@ -852,7 +833,6 @@ class AiGenerationControllerTest {
 
     private fun groundedJobView(): JobView =
         sampleJobView().copy(
-            pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
             revision = 1,
             groundingStatus = GroundingStatus.VALID,
             evidence =

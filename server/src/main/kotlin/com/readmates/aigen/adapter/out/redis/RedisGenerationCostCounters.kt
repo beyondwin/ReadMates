@@ -21,7 +21,6 @@ import java.util.UUID
  * Sliding windows:
  *  - `aigen:host:{hostId}:daily` — admission count with a 24h sliding TTL
  *  - `aigen:host:{hostId}:minute` — endpoint-specific admission count with a 60s TTL
- *  - `aigen:club:{clubId}:monthly_cost_usd` — legacy usage writer until Task 6 migrates callers
  *  - `aigen:club:{clubId}:provider_admission` — short lease that serializes provider admission
  *
  * Conditional on `readmates.redis.enabled=true` and `readmates.aigen.enabled=true`.
@@ -64,24 +63,6 @@ class RedisGenerationCostCounters(
             GuardDecision.Deny(ErrorCode.RATE_LIMITED)
         }
 
-    @Deprecated("Use ProviderCallReservationPort.reconcile after Task 6 migrates callers")
-    override fun recordUsage(
-        hostId: UUID,
-        clubId: UUID,
-        admissionId: UUID,
-        cost: BigDecimal,
-    ) {
-        runCatching {
-            redisTemplate.execute(
-                INCREMENT_FLOAT_WITH_TTL_SCRIPT,
-                listOf(monthlyKey(clubId), admissionKey(clubId)),
-                cost.toPlainString(),
-                MONTHLY_TTL_SECONDS.toString(),
-                admissionId.toString(),
-            )
-        }.onFailure { recordFailure("recordUsage") }
-    }
-
     override fun releaseAdmission(
         hostId: UUID,
         clubId: UUID,
@@ -95,21 +76,6 @@ class RedisGenerationCostCounters(
             )
         }.onFailure { recordFailure("releaseAdmission") }
     }
-
-    @Deprecated("Use ProviderCallReservationPort.reserve after Task 6 migrates callers")
-    override fun renewAdmission(
-        hostId: UUID,
-        clubId: UUID,
-        admissionId: UUID,
-    ): Boolean =
-        runCatching {
-            redisTemplate.execute(
-                RENEW_ADMISSION_SCRIPT,
-                listOf(admissionKey(clubId)),
-                admissionId.toString(),
-                ADMISSION_TTL_SECONDS.toString(),
-            ) == 1L
-        }.onFailure { recordFailure("renewAdmission") }.getOrDefault(false)
 
     override fun clubMonthlyCost(clubId: UUID): BigDecimal =
         runCatching { readMonthlyCost(clubId) }
@@ -143,7 +109,6 @@ class RedisGenerationCostCounters(
     private companion object {
         val DAILY_TTL_SECONDS: Long = Duration.ofHours(24).seconds
         val MINUTE_TTL_SECONDS: Long = Duration.ofMinutes(1).seconds
-        val MONTHLY_TTL_SECONDS: Long = Duration.ofDays(31).seconds
         val ADMISSION_TTL_SECONDS: Long = Duration.ofMinutes(5).seconds
 
         const val ADMITTED = 1L
@@ -167,22 +132,6 @@ class RedisGenerationCostCounters(
                 Long::class.java,
             )
 
-        val INCREMENT_FLOAT_WITH_TTL_SCRIPT: DefaultRedisScript<String> =
-            DefaultRedisScript(
-                """
-                local newVal = redis.call('INCRBYFLOAT', KEYS[1], ARGV[1])
-                local ttl = redis.call('TTL', KEYS[1])
-                if ttl < 0 then
-                  redis.call('EXPIRE', KEYS[1], ARGV[2])
-                end
-                if redis.call('GET', KEYS[2]) == ARGV[3] then
-                  redis.call('DEL', KEYS[2])
-                end
-                return newVal
-                """.trimIndent(),
-                String::class.java,
-            )
-
         val RELEASE_ADMISSION_SCRIPT: DefaultRedisScript<Long> =
             DefaultRedisScript(
                 """
@@ -192,16 +141,6 @@ class RedisGenerationCostCounters(
                 if daily > 0 then redis.call('DECR', KEYS[1]) end
                 local minute = tonumber(redis.call('GET', KEYS[2]) or '0')
                 if minute > 0 then redis.call('DECR', KEYS[2]) end
-                return 1
-                """.trimIndent(),
-                Long::class.java,
-            )
-
-        val RENEW_ADMISSION_SCRIPT: DefaultRedisScript<Long> =
-            DefaultRedisScript(
-                """
-                if redis.call('GET', KEYS[1]) ~= ARGV[1] then return 0 end
-                redis.call('EXPIRE', KEYS[1], ARGV[2])
                 return 1
                 """.trimIndent(),
                 Long::class.java,

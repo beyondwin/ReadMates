@@ -1,6 +1,5 @@
 package com.readmates.aigen.adapter.out.redis
 
-import com.readmates.aigen.application.model.AiGenerationPipelineMode
 import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.GroundedEvidenceBundle
@@ -20,7 +19,6 @@ import com.readmates.aigen.application.port.out.AiGenerationJobQueue
 import com.readmates.aigen.application.port.out.AiGenerationJobStore
 import com.readmates.aigen.application.port.out.CommitLeaseResult
 import com.readmates.aigen.application.port.out.JobRecord
-import com.readmates.aigen.application.port.out.LlmCallReservation
 import com.readmates.aigen.application.port.out.SaveGroundedResultCommand
 import com.readmates.aigen.config.AiGenerationProperties
 import com.readmates.support.ReadmatesRedisIntegrationTestSupport
@@ -44,6 +42,14 @@ import java.util.concurrent.TimeUnit
         "readmates.bff-secret=test-bff-secret",
         "readmates.redis.enabled=true",
         "readmates.aigen.enabled=true",
+        "readmates.aigen.fallback-default-model=gpt-5.4-mini",
+        "readmates.aigen.grounded.capabilities[gpt-5.4-mini].context-window-tokens=400000",
+        "readmates.aigen.grounded.capabilities[gpt-5.4-mini].max-output-tokens=128000",
+        "readmates.aigen.grounded.capabilities[gpt-5.4-mini].structured-output-supported=true",
+        "readmates.aigen.pricing[gpt-5.4-mini].input-per-m-token-usd=0.75",
+        "readmates.aigen.pricing[gpt-5.4-mini].cache-write-input-per-m-token-usd=0.75",
+        "readmates.aigen.pricing[gpt-5.4-mini].cached-input-per-m-token-usd=0.075",
+        "readmates.aigen.pricing[gpt-5.4-mini].output-per-m-token-usd=4.50",
         "spring.ai.model.chat=none",
         "spring.ai.google.genai.api-key=test-key",
         "spring.ai.openai.api-key=test-key",
@@ -72,6 +78,7 @@ class RedisGroundedAiGenerationJobStoreTest(
         val hash = redisTemplate.opsForHash<String, String>().entries(hashKey(record.jobId))
         val hashJson = hash.toString()
         assertThat(hash.keys).doesNotContain("sessionMeta", "instructions")
+        assertThat(hash.keys).doesNotContain("pipeline" + "Mode")
         assertThat(hashJson)
             .doesNotContain(record.transcript)
             .doesNotContain(record.validatedTurns.single().speakerName)
@@ -103,19 +110,18 @@ class RedisGroundedAiGenerationJobStoreTest(
     }
 
     @Test
-    fun `call reservation is atomic with running status and hard cap`() {
-        val record = groundedRecord(JobStatus.RUNNING, JobStage.GENERATING_RECORD)
+    fun `rolling read ignores obsolete route selector and stays grounded`() {
+        val record = groundedRecord()
         store.save(record)
+        redisTemplate
+            .opsForHash<String, String>()
+            .put(hashKey(record.jobId), "pipeline" + "Mode", "LEG" + "ACY")
 
-        assertThat(store.reserveLlmCall(record.jobId, JobStatus.RUNNING, 1))
-            .isEqualTo(LlmCallReservation.RESERVED)
-        assertThat(store.reserveLlmCall(record.jobId, JobStatus.RUNNING, 1))
-            .isEqualTo(LlmCallReservation.CAP_EXCEEDED)
-        assertThat(store.transitionStatus(record.jobId, setOf(JobStatus.RUNNING), JobStatus.CANCELLED, null, 0, null))
-            .isTrue()
-        assertThat(store.reserveLlmCall(record.jobId, JobStatus.RUNNING, 3))
-            .isEqualTo(LlmCallReservation.STATE_CHANGED)
-        assertThat(store.load(record.jobId)?.llmCallCount).isEqualTo(1)
+        val loaded = store.load(record.jobId)
+
+        assertThat(loaded?.validatedTurns).isEqualTo(record.validatedTurns)
+        assertThat(loaded?.toSessionMeta()).isEqualTo(record.toSessionMeta())
+        assertThat(loaded?.groundingStatus).isEqualTo(GroundingStatus.PENDING)
     }
 
     @Test
@@ -379,7 +385,6 @@ class RedisGroundedAiGenerationJobStoreTest(
             expiresAt = now.plus(properties.job.redisTtl),
             createdAt = now,
             lastUpdatedAt = now,
-            pipelineMode = AiGenerationPipelineMode.GROUNDED_WHOLE_TRANSCRIPT,
             validatedTurns =
                 listOf(
                     ValidatedTranscriptTurn(
