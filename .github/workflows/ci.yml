@@ -25,8 +25,8 @@ jobs:
         if: ${{ hashFiles('AGENTS.md') != '' || hashFiles('scripts/check-agent-guidance.py') != '' }}
         run: python3 scripts/check-agent-guidance.py
 
-      - name: Install shellcheck
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends shellcheck
+      - name: Install script tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ripgrep shellcheck
 
       - name: Bash syntax
         run: |
