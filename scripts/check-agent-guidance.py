@@ -84,6 +84,18 @@ GUIDANCE_PATHS = tuple(
         }
     )
 )
+PUBLIC_SCAN_SUPPORT_PATHS = (
+    ".env.example",
+    ".github/workflows/sync-config.yml",
+    "deploy/oci/compose.yml",
+    "deploy/oci/compose.infra.yml",
+    "deploy/oci/grafana/provisioning/datasources/tempo.yml",
+    "ops/tempo/tempo.yml",
+    "ops/observability/local/compose.yml",
+    "ops/observability/local/grafana/provisioning/datasources/tempo.yml",
+    "scripts/validate-production-ai-config.sh",
+    "scripts/sync-config/import-from-prod-env.sh",
+)
 LINK_CHECK_PATHS = tuple(
     relative
     for relative in GUIDANCE_PATHS
@@ -234,7 +246,7 @@ def run_guidance_public_scan(root: Path) -> list[str]:
         return ["public release scanner is missing"]
     with tempfile.TemporaryDirectory(prefix="readmates-guidance-scan-") as raw:
         staged = Path(raw)
-        for relative in GUIDANCE_PATHS:
+        for relative in GUIDANCE_PATHS + PUBLIC_SCAN_SUPPORT_PATHS:
             source = root / relative
             if not source.is_file():
                 continue
@@ -279,6 +291,40 @@ class GuidanceCheckerTests(unittest.TestCase):
 
     def test_valid_fixture(self) -> None:
         self.assertEqual([], self.check_fixture())
+
+    def test_guidance_public_scan_stages_release_contract_support_files(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="readmates-guidance-public-scan-test-") as raw:
+            root = Path(raw)
+            make_valid_fixture(root)
+            required_support = (
+                ".env.example",
+                ".github/workflows/sync-config.yml",
+                "ops/tempo/tempo.yml",
+                "ops/observability/local/compose.yml",
+                "deploy/oci/compose.yml",
+                "deploy/oci/compose.infra.yml",
+                "ops/observability/local/grafana/provisioning/datasources/tempo.yml",
+                "deploy/oci/grafana/provisioning/datasources/tempo.yml",
+                "scripts/validate-production-ai-config.sh",
+                "scripts/sync-config/import-from-prod-env.sh",
+            )
+            for relative in required_support:
+                write(root, relative, "fixture\n")
+
+            scanner = root / "scripts/public-release-check.sh"
+            scanner.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                "staged=$1\n"
+                + "".join(
+                    f'test -f \"$staged/{relative}\"\n'
+                    for relative in required_support
+                ),
+                encoding="utf-8",
+            )
+            scanner.chmod(0o755)
+
+            self.assertEqual([], run_guidance_public_scan(root))
 
     def test_broken_link_fails(self) -> None:
         errors = self.check_fixture(
