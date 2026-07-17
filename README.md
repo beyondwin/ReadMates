@@ -236,7 +236,6 @@ pnpm --dir front dev
 | 개발자 문서 허브 | [docs/development/README.md](docs/development/README.md) |
 | 로컬 실행 | [docs/development/local-setup.md](docs/development/local-setup.md) |
 | 아키텍처 상세 | [docs/development/architecture.md](docs/development/architecture.md) |
-| 코드베이스 graph 탐색 | [docs/development/graphify.md](docs/development/graphify.md) |
 | Cross-surface 작업 체크리스트 | [docs/development/vertical-slice-checklist.md](docs/development/vertical-slice-checklist.md) |
 | AI 세션 기록 생성과 외부 JSON 가져오기 | [docs/development/session-import-generator.md](docs/development/session-import-generator.md) |
 | 디자인 시스템 | [design/README.md](design/README.md) |

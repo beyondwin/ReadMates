@@ -13,6 +13,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Changed
 
+- **에이전트 탐색 경로 단순화:** 프로젝트 전용 Graphify 설정·가이드·freshness 계약을 제거했습니다. 에이전트는 `project-map`, surface guide, architecture, 현재 코드·테스트·migration·script와 branch diff를 직접 확인하며, 과거 Graphify 실행 기록과 전역 도구 설치는 이 변경의 대상이 아닙니다.
 - **개발 도구 정렬:** 저장소 Node 계약을 CI와 같은 24로 명시하고 pnpm 11.13.1, React 19.2.7/Vite 8.1.5/Vitest 4.1.10/Playwright 1.61.1 등 최신 호환 frontend·design 의존성, ESLint 10.7.0, TypeScript 6.0.3, Gradle wrapper 9.6.1로 갱신했습니다. TypeScript 7은 stable typescript-eslint의 `<6.1.0` peer contract 때문에 보류하고, jsdom 28/29는 CSS variable inline-style 검증 회귀를 재현해 26.1.0을 유지합니다.
 - **호스트 TXT 워크플로:** UTF-8/BOM `.txt`, `화자명 MM:SS`, 1 MiB/3시간 한도를 적용합니다. 비회원·비활성·generic·중복 화자는 job/Redis/Kafka/provider/cost side effect 없이 거절하고 real-name 수정 안내만 제공합니다. 수동 편집은 해당 근거/review를 무효화하고 regeneration은 revision과 전체 review를 초기화합니다.
 - **Provider 계약:** grounded model ID를 OpenAI `gpt-5.4-mini`, Claude `claude-sonnet-4-6`, Gemini `gemini-3-flash-preview`로 정렬하고 pricing과 별도인 capability catalog, 16,384-token output reserve, network-call-free request budget guard를 추가했습니다. Capability drift는 503, request budget 초과는 422로 fail closed합니다.

@@ -10,7 +10,7 @@
 
 ## `check-agent-guidance.py`
 
-Agent router, active guide links, instruction-chain size, canonical server/Corepack commands, release-checklist size, Graphify local-state exclusion, and tracked-guidance public safety are checked with `python3 scripts/check-agent-guidance.py`. Run `python3 scripts/check-agent-guidance.py --self-test` for the temporary positive/negative fixtures.
+Agent router, active guide links, instruction-chain size, canonical server/Corepack commands, release-checklist size, and tracked-guidance public safety are checked with `python3 scripts/check-agent-guidance.py`. Run `python3 scripts/check-agent-guidance.py --self-test` for the temporary positive/negative fixtures.
 
 The checker stages only tracked guidance into a temporary directory and delegates content safety to `public-release-check.sh`; it does not maintain a second secret-pattern engine or inspect user-local Codex configuration.
 

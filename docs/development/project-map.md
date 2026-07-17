@@ -109,7 +109,6 @@ Lockfile, install, build, or CI-parity work uses the root `packageManager` throu
 - 실행하지 못한 검증은 통과처럼 쓰지 않습니다.
 - docs-only 변경은 `git diff --check -- <changed-docs>`와 targeted safety scan을 기본으로 봅니다.
 - public release나 scanner 동작을 바꾸면 public release candidate checks까지 봅니다.
-- Graphify를 썼다면 결과가 아니라 실제로 확인한 코드, 테스트, migration, active docs를 근거로 씁니다.
 
 ## 역사 문서 경계
 
@@ -118,18 +117,3 @@ Lockfile, install, build, or CI-parity work uses the root `packageManager` throu
 `docs/reports/**`는 작성 시점의 분석, 진단, 사후 보고입니다. 날짜가 붙은 snapshot으로 읽고, 현재 상태를 말할 때는 코드, 테스트, scripts, active docs를 다시 확인합니다.
 
 과거 문서에서 유용한 아이디어를 가져올 수는 있지만, 그대로 현재 사실로 쓰면 안 됩니다.
-
-## Graphify 사용법
-
-Graphify는 코드베이스 discovery aid입니다. architecture question, impact analysis, cross-surface work에서 관련 후보 파일을 좁히는 데 사용합니다.
-
-사용 원칙:
-
-- Graphify 결과는 source of truth가 아닙니다.
-- 결과로 나온 파일을 실제로 열어 확인합니다.
-- `docs/superpowers/**` archive 전체를 기본 탐색 범위처럼 다루지 않습니다.
-- 생성된 `graphify-out/**` 산출물은 local-only로 유지하고, 공개 문서로 옮길 때는 public-safety review를 거칩니다.
-
-자세한 사용법은 `docs/development/graphify.md`를 따릅니다.
-
-Graphify 사용 여부와 별개로 최종 판단은 항상 현재 파일 확인으로 닫습니다.

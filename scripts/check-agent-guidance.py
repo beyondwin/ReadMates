@@ -34,7 +34,6 @@ REQUIRED_PATHS = (
     "docs/development/vertical-slice-checklist.md",
     "docs/development/release-readiness-review.md",
     "docs/reports/2026-07-11-release-readiness-history.md",
-    ".graphifyignore",
     "scripts/README.md",
     "scripts/public-release-check.sh",
 )
@@ -116,7 +115,6 @@ def make_valid_fixture(root: Path) -> None:
         write(root, relative, f"# Guidance\n\n```bash\n{CANONICAL_SERVER_COMMAND}\n```\n")
     write(root, "CLAUDE.md", "@AGENTS.md\n")
     write(root, "front/CLAUDE.md", "@AGENTS.md\n")
-    write(root, ".graphifyignore", ".waygent/\n")
     write(
         root,
         "docs/development/release-readiness-review.md",
@@ -219,14 +217,6 @@ def check_pointer_contract(root: Path) -> list[str]:
     return errors
 
 
-def check_graphify_ignore(root: Path) -> list[str]:
-    path = root / ".graphifyignore"
-    if not path.is_file():
-        return []
-    lines = {line.strip() for line in path.read_text(encoding="utf-8").splitlines()}
-    return [] if ".waygent/" in lines else [".graphifyignore must contain .waygent/"]
-
-
 def check_release_docs(root: Path) -> list[str]:
     active = root / "docs/development/release-readiness-review.md"
     history = root / "docs/reports/2026-07-11-release-readiness-history.md"
@@ -273,7 +263,6 @@ def run_checks(root: Path, *, run_public_scan: bool) -> list[str]:
     errors.extend(check_instruction_chains(root))
     errors.extend(check_normative_commands(root))
     errors.extend(check_pointer_contract(root))
-    errors.extend(check_graphify_ignore(root))
     errors.extend(check_release_docs(root))
     if run_public_scan and not errors:
         errors.extend(run_guidance_public_scan(root))
@@ -415,10 +404,6 @@ class GuidanceCheckerTests(unittest.TestCase):
             lambda root: write(root, "AGENTS.md", "x" * (INSTRUCTION_LIMIT + 1))
         )
         self.assertTrue(any("instruction chain" in error for error in errors), errors)
-
-    def test_missing_waygent_exclusion_fails(self) -> None:
-        errors = self.check_fixture(lambda root: write(root, ".graphifyignore", "graphify-out/\n"))
-        self.assertTrue(any(".waygent/" in error for error in errors), errors)
 
     def test_oversized_release_checklist_fails(self) -> None:
         errors = self.check_fixture(

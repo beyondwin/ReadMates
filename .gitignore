@@ -99,9 +99,6 @@ front/playwright/.cache/
 output/
 recode
 
-# Graphify local extraction artifacts
-graphify-out/
-
 # =============================================================================
 # Design system — tracked source lives under /design; ignore local exports
 # =============================================================================
