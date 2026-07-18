@@ -398,7 +398,7 @@ copy_dir() {
     --exclude='/.cursor/' \
     --exclude='/.windsurf/' \
     --exclude='/CLAUDE.md' \
-    --exclude='/AGENTS.md' \
+    --exclude='AGENTS.md' \
     --exclude='/GEMINI.md' \
     --exclude='/.impeccable.md' \
     --exclude='/CHANGELOG.md' \
@@ -447,6 +447,7 @@ copy_manifest() {
     --exclude='/.deploy-state' \
     --exclude='/*.state'
 
+  copy_required_file "docs/agents/execution.md"
   copy_dir "docs/deploy"
   copy_dir "docs/development"
   copy_dir "docs/case-studies"
