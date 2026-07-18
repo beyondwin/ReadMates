@@ -543,9 +543,15 @@ class GuidanceCheckerTests(unittest.TestCase):
 
     def test_oversized_front_functions_chain_fails(self) -> None:
         errors = self.check_fixture(
-            lambda root: write(root, "front/functions/AGENTS.md", "x" * INSTRUCTION_LIMIT)
+            lambda root: write(
+                root,
+                "front/functions/AGENTS.md",
+                "\n".join(LOCAL_ROUTER_CONTRACTS["front/functions/AGENTS.md"])
+                + "\n"
+                + "x" * INSTRUCTION_LIMIT,
+            )
         )
-        self.assertTrue(any("front/functions" in error for error in errors), errors)
+        self.assertTrue(any("instruction chain front/functions" in error for error in errors), errors)
 
     def test_package_manager_version_drift_fails(self) -> None:
         errors = self.check_fixture(
