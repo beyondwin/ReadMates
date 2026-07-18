@@ -120,6 +120,10 @@ def matches(path: str, prefix: str) -> bool:
     return path.startswith(prefix) if prefix.endswith("/") else path == prefix
 
 
+def rule_matches(path: str, rule: PathRule) -> bool:
+    return not rule.prefixes or any(matches(path, prefix) for prefix in rule.prefixes)
+
+
 def stable_unique(values: list[str]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(values))
 
@@ -136,7 +140,7 @@ def classify_paths(paths: tuple[str, ...], intent: str) -> Classification:
             else PATH_RULES
         )
         for rule in candidate_rules:
-            if any(matches(path, prefix) for prefix in rule.prefixes):
+            if rule_matches(path, rule):
                 surfaces.extend(rule.surfaces)
                 guides.extend(rule.guides)
                 risks.extend(rule.risks)
@@ -217,6 +221,41 @@ class AgentPreflightTests(unittest.TestCase):
         result = classify_paths(("docs/README.md",), "release")
         self.assertIn("release-readiness", result.surfaces)
         self.assertIn("whole-branch-diff", result.risk_triggers)
+
+    def test_root_agent_guide_uses_documentation_policy(self) -> None:
+        result = classify_paths(("AGENTS.md",), "change")
+        self.assertEqual(("documentation",), result.surfaces)
+        self.assertIn("docs/agents/docs.md", result.required_guides)
+        self.assertIn("public-safety", result.risk_triggers)
+        self.assertIn("git diff --check", result.recommended_checks)
+
+    def test_local_router_documentation_precedes_server_policy(self) -> None:
+        result = classify_paths(("server/AGENTS.md",), "change")
+        self.assertEqual(("documentation",), result.surfaces)
+        self.assertNotIn("server", result.surfaces)
+        self.assertNotIn("./scripts/server-ci-check.sh", result.recommended_checks)
+
+    def test_bff_local_router_documentation_precedes_bff_policy(self) -> None:
+        result = classify_paths(("front/functions/AGENTS.md",), "change")
+        self.assertEqual(("documentation",), result.surfaces)
+        self.assertNotIn("bff-auth", result.surfaces)
+        self.assertNotIn("pnpm --dir front test:e2e", result.recommended_checks)
+
+    def test_nested_documentation_path_uses_documentation_policy(self) -> None:
+        result = classify_paths(("docs/development/example.md",), "change")
+        self.assertEqual(("documentation",), result.surfaces)
+        self.assertIn("docs/agents/execution.md", result.required_guides)
+
+    def test_text_and_json_share_complete_result_model(self) -> None:
+        state = RepositoryState("main", "origin/main", True, ("docs/README.md",), (), ())
+        result = build_result(state, ("docs/README.md",), "change", None)
+        encoded = json.loads(json.dumps(asdict(result), sort_keys=True))
+        rendered = render_text(result)
+        self.assertEqual("documentation", encoded["surfaces"][0])
+        self.assertEqual("main", encoded["repository_state"]["branch"])
+        self.assertIn("repository_state:", rendered)
+        self.assertIn("documentation", rendered)
+        self.assertIn("recommended_checks:", rendered)
 
 
 def git_lines(root: Path, *args: str) -> tuple[int, tuple[str, ...]]:
