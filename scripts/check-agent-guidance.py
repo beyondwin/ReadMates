@@ -20,7 +20,40 @@ MARKDOWN_LINK_RE = re.compile(r"!?\[[^]]+\]\(([^)]+)\)")
 SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 PNPM_VERSION_RE = re.compile(r"\bpnpm@(\d+\.\d+\.\d+)\b")
 
+PRIVATE_GUIDANCE_SOURCE_PATHS = (
+    "AGENTS.md",
+    "scripts/check-agent-guidance.py",
+    "scripts/agent-preflight.py",
+)
+PUBLIC_AGENT_GUIDE_PATHS = (
+    "docs/agents/execution.md",
+    "docs/agents/front.md",
+    "docs/agents/server.md",
+    "docs/agents/design.md",
+    "docs/agents/docs.md",
+)
+AUTHORITY_CONTRACT_SNIPPETS = (
+    '"--authority-scope"',
+    '"--authority-note"',
+    '"private-data"',
+    '"secrets"',
+    '"live-mutation"',
+    "authority-sensitive scopes require a non-blank authority note",
+    "authority-note-confirmed",
+)
+PRIVATE_GUIDANCE_GUARD_SNIPPETS = (
+    "private_guidance_paths=(",
+    'if [[ "$present_count" -eq "${#private_guidance_paths[@]}" ]]; then',
+    'elif [[ "$present_count" -eq 0 ]]; then',
+    'READMATES_PRIVATE_AGENT_GUIDANCE=true',
+    'READMATES_PRIVATE_AGENT_GUIDANCE=false',
+    "Private guidance source contract is incomplete",
+    "exit 1",
+    "if: env.READMATES_PRIVATE_AGENT_GUIDANCE == 'true'",
+)
+
 REQUIRED_PATHS = (
+    ".github/workflows/ci.yml",
     "AGENTS.md",
     "front/AGENTS.md",
     "front/functions/AGENTS.md",
@@ -44,6 +77,7 @@ REQUIRED_PATHS = (
     "docs/reports/2026-07-11-release-readiness-history.md",
     "scripts/README.md",
     "scripts/agent-preflight.py",
+    "scripts/build-public-release-candidate.sh",
     "scripts/public-release-check.sh",
     "package.json",
 )
@@ -158,9 +192,43 @@ def make_valid_fixture(root: Path) -> None:
                 "./scripts/server-ci-check.sh",
                 "pnpm --dir front test:e2e",
                 "./scripts/public-release-check.sh .tmp/public-release-candidate",
+                '"--authority-scope"',
+                '"--authority-note"',
+                '"private-data"',
+                '"secrets"',
+                '"live-mutation"',
+                "authority-sensitive scopes require a non-blank authority note",
+                "authority-note-confirmed",
             )
         )
         + "\n",
+    )
+    write(
+        root,
+        ".github/workflows/ci.yml",
+        "private_guidance_paths=(\n"
+        "  AGENTS.md\n"
+        "  scripts/check-agent-guidance.py\n"
+        "  scripts/agent-preflight.py\n"
+        ")\n"
+        'if [[ "$present_count" -eq "${#private_guidance_paths[@]}" ]]; then\n'
+        '  echo "READMATES_PRIVATE_AGENT_GUIDANCE=true"\n'
+        'elif [[ "$present_count" -eq 0 ]]; then\n'
+        '  echo "READMATES_PRIVATE_AGENT_GUIDANCE=false"\n'
+        "else\n"
+        '  echo "Private guidance source contract is incomplete"\n'
+        "  exit 1\n"
+        "fi\n"
+        "if: env.READMATES_PRIVATE_AGENT_GUIDANCE == 'true'\n"
+        "python3 -B scripts/check-agent-guidance.py --self-test\n"
+        "python3 -B scripts/agent-preflight.py --self-test\n"
+        "if: env.READMATES_PRIVATE_AGENT_GUIDANCE == 'true'\n"
+        "python3 -B scripts/check-agent-guidance.py\n",
+    )
+    write(
+        root,
+        "scripts/build-public-release-candidate.sh",
+        "".join(f'copy_required_file "{relative}"\n' for relative in PUBLIC_AGENT_GUIDE_PATHS),
     )
     write(root, "CLAUDE.md", "@AGENTS.md\n")
     write(root, "front/CLAUDE.md", "@AGENTS.md\n")
@@ -343,6 +411,60 @@ def check_preflight_policy_references(root: Path) -> list[str]:
     ]
 
 
+def check_preflight_authority_contract(root: Path) -> list[str]:
+    path = root / "scripts/agent-preflight.py"
+    if not path.is_file():
+        return []
+    text = path.read_text(encoding="utf-8")
+    return [
+        f"preflight authority contract missing: {snippet}"
+        for snippet in AUTHORITY_CONTRACT_SNIPPETS
+        if snippet not in text
+    ]
+
+
+def check_ci_private_guidance_guard(root: Path) -> list[str]:
+    path = root / ".github/workflows/ci.yml"
+    if not path.is_file():
+        return []
+    text = path.read_text(encoding="utf-8")
+    errors = [
+        f"private guidance source guard missing: {snippet}"
+        for snippet in (*PRIVATE_GUIDANCE_SOURCE_PATHS, *PRIVATE_GUIDANCE_GUARD_SNIPPETS)
+        if snippet not in text
+    ]
+    if text.count("if: env.READMATES_PRIVATE_AGENT_GUIDANCE == 'true'") < 2:
+        errors.append("private guidance source guard must protect both guidance CI steps")
+    ordered_commands = (
+        "python3 -B scripts/check-agent-guidance.py --self-test",
+        "python3 -B scripts/agent-preflight.py --self-test",
+        "python3 -B scripts/check-agent-guidance.py",
+    )
+    positions = [
+        text.find(ordered_commands[0]),
+        text.find(ordered_commands[1]),
+        text.rfind(ordered_commands[2]),
+    ]
+    if any(position < 0 for position in positions) or positions != sorted(positions):
+        errors.append("private guidance source guard must preserve self-test/current-tree order")
+    return errors
+
+
+def check_public_guidance_manifest(root: Path) -> list[str]:
+    path = root / "scripts/build-public-release-candidate.sh"
+    if not path.is_file():
+        return []
+    text = path.read_text(encoding="utf-8")
+    errors = [
+        f"public guidance manifest missing explicit required file: {relative}"
+        for relative in PUBLIC_AGENT_GUIDE_PATHS
+        if f'copy_required_file "{relative}"' not in text
+    ]
+    if 'copy_dir "docs/agents"' in text:
+        errors.append("public guidance manifest must not copy the docs/agents directory")
+    return errors
+
+
 def check_release_docs(root: Path) -> list[str]:
     active = root / "docs/development/release-readiness-review.md"
     history = root / "docs/reports/2026-07-11-release-readiness-history.md"
@@ -392,6 +514,9 @@ def run_checks(root: Path, *, run_public_scan: bool) -> list[str]:
     errors.extend(check_pointer_contract(root))
     errors.extend(check_package_manager_contract(root))
     errors.extend(check_preflight_policy_references(root))
+    errors.extend(check_preflight_authority_contract(root))
+    errors.extend(check_ci_private_guidance_guard(root))
+    errors.extend(check_public_guidance_manifest(root))
     errors.extend(check_release_docs(root))
     if run_public_scan and not errors:
         errors.extend(run_guidance_public_scan(root))
@@ -568,6 +693,63 @@ class GuidanceCheckerTests(unittest.TestCase):
             lambda root: write(root, "scripts/agent-preflight.py", "docs/agents/execution.md\n")
         )
         self.assertTrue(any("preflight policy reference missing" in error for error in errors), errors)
+
+    def test_missing_authority_preflight_contract_fails(self) -> None:
+        errors = self.check_fixture(
+            lambda root: write(
+                root,
+                "scripts/agent-preflight.py",
+                "docs/agents/execution.md\n"
+                "docs/development/acceptance-matrix.md\n"
+                "./scripts/server-ci-check.sh\n"
+                "pnpm --dir front test:e2e\n"
+                "./scripts/public-release-check.sh .tmp/public-release-candidate\n",
+            )
+        )
+        self.assertTrue(any("preflight authority contract" in error for error in errors), errors)
+
+    def test_unconditional_private_guidance_workflow_fails(self) -> None:
+        errors = self.check_fixture(
+            lambda root: write(
+                root,
+                ".github/workflows/ci.yml",
+                "run: python3 -B scripts/check-agent-guidance.py --self-test\n",
+            )
+        )
+        self.assertTrue(any("private guidance source guard" in error for error in errors), errors)
+
+    def test_partial_private_guidance_guard_fails_closed(self) -> None:
+        errors = self.check_fixture(
+            lambda root: write(
+                root,
+                ".github/workflows/ci.yml",
+                "AGENTS.md scripts/check-agent-guidance.py scripts/agent-preflight.py\n"
+                "python3 -B scripts/check-agent-guidance.py --self-test\n"
+                "python3 -B scripts/agent-preflight.py --self-test\n"
+                "python3 -B scripts/check-agent-guidance.py\n",
+            )
+        )
+        self.assertTrue(any("private guidance source guard" in error for error in errors), errors)
+
+    def test_public_guidance_manifest_requires_explicit_files(self) -> None:
+        errors = self.check_fixture(
+            lambda root: write(
+                root,
+                "scripts/build-public-release-candidate.sh",
+                'copy_required_file "docs/agents/execution.md"\n',
+            )
+        )
+        self.assertTrue(any("public guidance manifest" in error for error in errors), errors)
+
+    def test_public_guidance_manifest_rejects_directory_copy(self) -> None:
+        errors = self.check_fixture(
+            lambda root: (root / "scripts/build-public-release-candidate.sh").write_text(
+                (root / "scripts/build-public-release-candidate.sh").read_text(encoding="utf-8")
+                + 'copy_dir "docs/agents"\n',
+                encoding="utf-8",
+            )
+        )
+        self.assertTrue(any("public guidance manifest" in error for error in errors), errors)
 
     def test_oversized_instruction_chain_fails(self) -> None:
         errors = self.check_fixture(

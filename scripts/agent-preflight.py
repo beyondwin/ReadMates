@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 import json
 import subprocess
 import sys
@@ -63,6 +65,33 @@ DOCUMENTATION_RULE = PathRule(
     ("documentation",),
     ("docs/agents/docs.md", "docs/agents/execution.md"),
     ("public-safety", "source-of-truth-drift"),
+    (
+        "git diff --check",
+        "./scripts/build-public-release-candidate.sh",
+        "./scripts/public-release-check.sh .tmp/public-release-candidate",
+    ),
+)
+
+RELEASE_DOCUMENTATION_PATHS = {
+    "CHANGELOG.md",
+    "docs/development/release-readiness-review.md",
+}
+
+RELEASE_DOCUMENTATION_RULE = PathRule(
+    (),
+    ("documentation", "release-documentation"),
+    (
+        "docs/agents/docs.md",
+        "docs/agents/execution.md",
+        "docs/deploy/README.md",
+        "docs/development/release-readiness-review.md",
+    ),
+    (
+        "public-safety",
+        "source-of-truth-drift",
+        "release-contract",
+        "operator-surprise",
+    ),
     (
         "git diff --check",
         "./scripts/build-public-release-candidate.sh",
@@ -135,9 +164,13 @@ def classify_paths(paths: tuple[str, ...], intent: str) -> Classification:
     checks: list[str] = []
     for path in paths:
         candidate_rules = (
-            (DOCUMENTATION_RULE,)
-            if path.startswith("docs/") or path in DOCUMENTATION_PATHS
-            else PATH_RULES
+            (RELEASE_DOCUMENTATION_RULE,)
+            if path.startswith("docs/deploy/") or path in RELEASE_DOCUMENTATION_PATHS
+            else (
+                (DOCUMENTATION_RULE,)
+                if path.startswith("docs/") or path in DOCUMENTATION_PATHS
+                else PATH_RULES
+            )
         )
         for rule in candidate_rules:
             if rule_matches(path, rule):
@@ -175,6 +208,16 @@ def paths_overlap(expected: tuple[str, ...], dirty: tuple[str, ...]) -> bool:
 
 
 class AgentPreflightTests(unittest.TestCase):
+    def run_main(self, *args: str) -> tuple[int, str, str]:
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            try:
+                code = main(list(args))
+            except SystemExit as error:
+                code = int(error.code)
+        return code, stdout.getvalue(), stderr.getvalue()
+
     def test_bff_selects_front_server_and_e2e(self) -> None:
         result = classify_paths(("front/functions/api/bff/[...path].ts",), "change")
         self.assertIn("bff-auth", result.surfaces)
@@ -246,6 +289,93 @@ class AgentPreflightTests(unittest.TestCase):
         self.assertEqual(("documentation",), result.surfaces)
         self.assertIn("docs/agents/execution.md", result.required_guides)
 
+    def test_deploy_documentation_uses_release_sensitive_policy(self) -> None:
+        result = classify_paths(("docs/deploy/README.md",), "release")
+        self.assertIn("release-documentation", result.surfaces)
+        self.assertIn("docs/agents/docs.md", result.required_guides)
+        self.assertIn("docs/development/release-readiness-review.md", result.required_guides)
+        self.assertIn("operator-surprise", result.risk_triggers)
+        self.assertIn("./scripts/public-release-check.sh .tmp/public-release-candidate", result.recommended_checks)
+        self.assertNotIn("frontend", result.surfaces)
+        self.assertNotIn("server", result.surfaces)
+
+    def test_release_readiness_checklist_uses_release_sensitive_policy(self) -> None:
+        result = classify_paths(
+            ("docs/development/release-readiness-review.md",),
+            "change",
+        )
+        self.assertIn("release-documentation", result.surfaces)
+        self.assertIn("release-contract", result.risk_triggers)
+        self.assertIn("docs/agents/docs.md", result.required_guides)
+        self.assertNotIn("./scripts/server-ci-check.sh", result.recommended_checks)
+
+    def test_changelog_uses_release_sensitive_policy(self) -> None:
+        result = classify_paths(("CHANGELOG.md",), "change")
+        self.assertIn("release-documentation", result.surfaces)
+        self.assertIn("docs/development/release-readiness-review.md", result.required_guides)
+
+    def test_ordinary_documentation_keeps_generic_precedence(self) -> None:
+        result = classify_paths(("docs/README.md",), "change")
+        self.assertEqual(("documentation",), result.surfaces)
+        self.assertNotIn("release-documentation", result.surfaces)
+        self.assertNotIn("operator-surprise", result.risk_triggers)
+
+    def test_missing_sensitive_authority_stops_with_stable_text(self) -> None:
+        code, stdout, _ = self.run_main(
+            "--base", "HEAD",
+            "--intent", "release",
+            "--paths", "deploy/oci/compose.yml",
+            "--authority-scope", "live-mutation",
+        )
+        self.assertEqual(2, code)
+        self.assertIn(
+            "authority-sensitive scopes require a non-blank authority note: live-mutation",
+            stdout,
+        )
+        self.assertIn("authority-live-mutation", stdout)
+
+    def test_sensitive_authority_note_allows_classification_and_json(self) -> None:
+        code, stdout, _ = self.run_main(
+            "--base", "HEAD",
+            "--intent", "release",
+            "--paths", "deploy/oci/compose.yml",
+            "--authority-scope", "private-data",
+            "--authority-scope", "secrets",
+            "--authority-note", "repository-only review; no sensitive value access",
+            "--json",
+        )
+        self.assertEqual(0, code)
+        payload = json.loads(stdout)
+        self.assertEqual([], payload["stop_reasons"])
+        self.assertIn("authority-private-data", payload["risk_triggers"])
+        self.assertIn("authority-secrets", payload["risk_triggers"])
+
+    def test_blank_authority_note_is_missing(self) -> None:
+        code, stdout, _ = self.run_main(
+            "--base", "HEAD",
+            "--paths", "docs/README.md",
+            "--authority-scope", "private-data",
+            "--authority-note", "   ",
+        )
+        self.assertEqual(2, code)
+        self.assertIn("authority-sensitive scopes require a non-blank authority note", stdout)
+
+    def test_authority_classification_does_not_mutate_repository(self) -> None:
+        root = Path(__file__).resolve().parent.parent
+        before_status = git_lines(root, "status", "--porcelain=v1", "--untracked-files=all")
+        before_head = git_lines(root, "rev-parse", "HEAD")
+        code, _, _ = self.run_main(
+            "--base", "HEAD",
+            "--paths", "deploy/oci/compose.yml",
+            "--authority-scope", "live-mutation",
+            "--authority-note", "repository-only review; no live mutation",
+        )
+        after_status = git_lines(root, "status", "--porcelain=v1", "--untracked-files=all")
+        after_head = git_lines(root, "rev-parse", "HEAD")
+        self.assertEqual(0, code)
+        self.assertEqual(before_status, after_status)
+        self.assertEqual(before_head, after_head)
+
     def test_text_and_json_share_complete_result_model(self) -> None:
         state = RepositoryState("main", "origin/main", True, ("docs/README.md",), (), ())
         result = build_result(state, ("docs/README.md",), "change", None)
@@ -297,11 +427,25 @@ def build_result(
     expected_paths: tuple[str, ...],
     intent: str,
     isolation_note: str | None,
+    authority_scopes: tuple[str, ...] = (),
+    authority_note: str | None = None,
 ) -> PreflightResult:
     selected_paths = expected_paths or stable_unique(
         [*state.dirty_paths, *state.base_paths]
     )
     classification = classify_paths(selected_paths, intent)
+    selected_authority_scopes = stable_unique(list(authority_scopes))
+    risk_triggers = stable_unique(
+        [
+            *classification.risk_triggers,
+            *(f"authority-{scope}" for scope in selected_authority_scopes),
+            *(
+                ("authority-note-confirmed",)
+                if selected_authority_scopes and authority_note and authority_note.strip()
+                else ()
+            ),
+        ]
+    )
     stop_reasons: list[str] = []
     if not state.branch:
         stop_reasons.append("detached HEAD: branch-scoped mutation and integration require an explicit safe path")
@@ -311,12 +455,17 @@ def build_result(
         stop_reasons.append("expected edit paths overlap existing dirty paths")
     if intent == "local-runtime" and not isolation_note:
         stop_reasons.append("local-runtime intent requires an isolation note that preserves existing services")
+    if selected_authority_scopes and not (authority_note and authority_note.strip()):
+        stop_reasons.append(
+            "authority-sensitive scopes require a non-blank authority note: "
+            + ", ".join(selected_authority_scopes)
+        )
     evidence_level = "local-runtime-required" if intent == "local-runtime" else "repository"
     return PreflightResult(
         repository_state=state,
         surfaces=classification.surfaces,
         required_guides=classification.required_guides,
-        risk_triggers=classification.risk_triggers,
+        risk_triggers=risk_triggers,
         recommended_checks=classification.recommended_checks,
         stop_reasons=tuple(stop_reasons),
         evidence_level=evidence_level,
@@ -362,6 +511,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--base", default="origin/main")
     parser.add_argument("--paths", action="append", default=[])
     parser.add_argument("--isolation-note")
+    parser.add_argument(
+        "--authority-scope",
+        action="append",
+        choices=("private-data", "secrets", "live-mutation"),
+        default=[],
+        help="declare an authority-sensitive scope requested by the task",
+    )
+    parser.add_argument(
+        "--authority-note",
+        help="non-blank confirmation describing the authority boundary",
+    )
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args(argv)
@@ -376,6 +536,8 @@ def main(argv: list[str] | None = None) -> int:
         tuple(args.paths),
         args.intent,
         args.isolation_note,
+        tuple(args.authority_scope),
+        args.authority_note,
     )
     if args.json:
         print(json.dumps(asdict(result), indent=2, sort_keys=True))

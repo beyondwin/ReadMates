@@ -448,6 +448,10 @@ copy_manifest() {
     --exclude='/*.state'
 
   copy_required_file "docs/agents/execution.md"
+  copy_required_file "docs/agents/front.md"
+  copy_required_file "docs/agents/server.md"
+  copy_required_file "docs/agents/design.md"
+  copy_required_file "docs/agents/docs.md"
   copy_dir "docs/deploy"
   copy_dir "docs/development"
   copy_dir "docs/case-studies"

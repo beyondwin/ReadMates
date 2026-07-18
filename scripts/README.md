@@ -26,10 +26,13 @@ When `--paths` is omitted, it classifies dirty, staged, and untracked paths plus
 python3 -B scripts/agent-preflight.py --intent change --paths front/functions/api/example.ts
 python3 -B scripts/agent-preflight.py --intent change --paths server/src/main/resources/db/mysql/migration/V999__example.sql --json
 python3 -B scripts/agent-preflight.py --intent local-runtime --paths front/ --isolation-note "preserve existing services and use an alternate port"
+python3 -B scripts/agent-preflight.py --intent release --paths deploy/oci/compose.yml --authority-scope live-mutation --authority-note "repository-only review; no live mutation"
 python3 -B scripts/agent-preflight.py --self-test
 ```
 
-Exit code 2 means a stop reason requires resolution, such as detached HEAD, unresolved base, dirty overlap, or missing local-runtime isolation. Recommended checks remain canonical commands owned by existing scripts and guides; preflight does not replace `pre-push-check.sh`.
+Authority-sensitive work declares one or more repeated `--authority-scope` values: `private-data`, `secrets`, or `live-mutation`. Each such request also requires a non-blank `--authority-note`; without it preflight retains the risk trigger, prints a deterministic stop reason, and exits 2. The note records the approved boundary only and should remain public-safe, as in the repository-only example above.
+
+Exit code 2 means a stop reason requires resolution, such as detached HEAD, unresolved base, dirty overlap, missing local-runtime isolation, or missing authority confirmation. Recommended checks remain canonical commands owned by existing scripts and guides; preflight does not replace `pre-push-check.sh`.
 
 ## `server-ci-check.sh`
 

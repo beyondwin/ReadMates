@@ -14,6 +14,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Changed
 
+- **Agent preflight 및 공개 후보 CI 계약:** private source에서는 guidance/preflight self-test와 current-tree 검사를 순서대로 유지하고, clean public candidate에서는 누락된 private guidance 도구를 명시적 source-contract guard로만 건너뜁니다. Preflight는 private data·secret·live mutation 요청의 authority note를 확인하며, 공개 후보에는 acceptance matrix가 연결하는 public-safe agent guide만 명시적으로 포함합니다.
 - **에이전트 탐색 경로 단순화:** 프로젝트 전용 Graphify 설정·가이드·freshness 계약을 제거했습니다. 에이전트는 `project-map`, surface guide, architecture, 현재 코드·테스트·migration·script와 branch diff를 직접 확인하며, 과거 Graphify 실행 기록과 전역 도구 설치는 이 변경의 대상이 아닙니다.
 - **개발 도구 정렬:** 저장소 Node 계약을 CI와 같은 24로 명시하고 pnpm 11.13.1, React 19.2.7/Vite 8.1.5/Vitest 4.1.10/Playwright 1.61.1 등 최신 호환 frontend·design 의존성, ESLint 10.7.0, TypeScript 6.0.3, Gradle wrapper 9.6.1로 갱신했습니다. TypeScript 7은 stable typescript-eslint의 `<6.1.0` peer contract 때문에 보류하고, jsdom 28/29는 CSS variable inline-style 검증 회귀를 재현해 26.1.0을 유지합니다.
 - **호스트 TXT 워크플로:** UTF-8/BOM `.txt`, `화자명 MM:SS`, 1 MiB/3시간 한도를 적용합니다. 비회원·비활성·generic·중복 화자는 job/Redis/Kafka/provider/cost side effect 없이 거절하고 real-name 수정 안내만 제공합니다. 수동 편집은 해당 근거/review를 무효화하고 regeneration은 revision과 전체 review를 초기화합니다.

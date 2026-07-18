@@ -21,12 +21,38 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
+      - name: Detect private guidance source contract
+        shell: bash
+        run: |
+          private_guidance_paths=(
+            AGENTS.md
+            scripts/check-agent-guidance.py
+            scripts/agent-preflight.py
+          )
+          present_count=0
+          for path in "${private_guidance_paths[@]}"; do
+            if [[ -f "$path" ]]; then
+              present_count=$((present_count + 1))
+            fi
+          done
+          if [[ "$present_count" -eq "${#private_guidance_paths[@]}" ]]; then
+            echo "READMATES_PRIVATE_AGENT_GUIDANCE=true" >> "$GITHUB_ENV"
+          elif [[ "$present_count" -eq 0 ]]; then
+            echo "READMATES_PRIVATE_AGENT_GUIDANCE=false" >> "$GITHUB_ENV"
+            echo "Private guidance tooling is intentionally absent; skipping its CI-only checks."
+          else
+            echo "Private guidance source contract is incomplete; refusing to weaken CI checks." >&2
+            exit 1
+          fi
+
       - name: Agent tooling self-tests
+        if: env.READMATES_PRIVATE_AGENT_GUIDANCE == 'true'
         run: |
           python3 -B scripts/check-agent-guidance.py --self-test
           python3 -B scripts/agent-preflight.py --self-test
 
       - name: Agent guidance contract
+        if: env.READMATES_PRIVATE_AGENT_GUIDANCE == 'true'
         run: python3 -B scripts/check-agent-guidance.py
 
       - name: Install script tools
