@@ -20,6 +20,8 @@ The private/source tree always contains `AGENTS.md`, so CI and pre-push run this
 
 `agent-preflight.py` reads Git state plus current or expected paths and prints the required guides, ReadMates risk triggers, canonical recommended checks, stop reasons, and evidence level. It is read-only: it never executes the recommended commands or changes repository/runtime state.
 
+When `--paths` is omitted, it classifies dirty, staged, and untracked paths plus changes in `<base>...HEAD`; `--base` selects that comparison ref and defaults to `origin/main`.
+
 ```bash
 python3 -B scripts/agent-preflight.py --intent change --paths front/functions/api/example.ts
 python3 -B scripts/agent-preflight.py --intent change --paths server/src/main/resources/db/mysql/migration/V999__example.sql --json
