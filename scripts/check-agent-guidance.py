@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import shutil
 import subprocess
@@ -17,10 +18,15 @@ CANONICAL_SERVER_COMMAND = "./scripts/server-ci-check.sh"
 DIRECT_PNPM_RE = re.compile(r"\bnpx --yes pnpm@\d")
 MARKDOWN_LINK_RE = re.compile(r"!?\[[^]]+\]\(([^)]+)\)")
 SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
+PNPM_VERSION_RE = re.compile(r"\bpnpm@(\d+\.\d+\.\d+)\b")
 
 REQUIRED_PATHS = (
     "AGENTS.md",
     "front/AGENTS.md",
+    "front/functions/AGENTS.md",
+    "server/AGENTS.md",
+    "scripts/AGENTS.md",
+    "deploy/AGENTS.md",
     "CLAUDE.md",
     "front/CLAUDE.md",
     ".claude/settings.json",
@@ -30,13 +36,33 @@ REQUIRED_PATHS = (
     "docs/agents/server.md",
     "docs/agents/design.md",
     "docs/agents/docs.md",
+    "docs/agents/execution.md",
+    "docs/development/acceptance-matrix.md",
     "docs/development/project-map.md",
     "docs/development/vertical-slice-checklist.md",
     "docs/development/release-readiness-review.md",
     "docs/reports/2026-07-11-release-readiness-history.md",
     "scripts/README.md",
+    "scripts/agent-preflight.py",
     "scripts/public-release-check.sh",
+    "package.json",
 )
+
+LOCAL_ROUTER_CONTRACTS = {
+    "server/AGENTS.md": ("../AGENTS.md", "../docs/agents/execution.md", "../docs/agents/server.md"),
+    "front/functions/AGENTS.md": ("../../AGENTS.md", "../AGENTS.md", "../../docs/agents/execution.md", "../../docs/agents/front.md", "../../docs/agents/server.md"),
+    "scripts/AGENTS.md": ("../AGENTS.md", "../docs/agents/execution.md", "../docs/agents/docs.md", "README.md"),
+    "deploy/AGENTS.md": ("../AGENTS.md", "../docs/agents/execution.md", "../docs/agents/docs.md", "../docs/deploy/README.md"),
+}
+
+INSTRUCTION_CHAINS = {
+    "root": ("AGENTS.md",),
+    "front": ("AGENTS.md", "front/AGENTS.md"),
+    "front/functions": ("AGENTS.md", "front/AGENTS.md", "front/functions/AGENTS.md"),
+    "server": ("AGENTS.md", "server/AGENTS.md"),
+    "scripts": ("AGENTS.md", "scripts/AGENTS.md"),
+    "deploy": ("AGENTS.md", "deploy/AGENTS.md"),
+}
 
 NORMATIVE_COMMAND_PATHS = (
     "AGENTS.md",
@@ -58,6 +84,11 @@ DIRECT_PNPM_FORBIDDEN_PATHS = (
     "docs/development/local-setup.md",
     "docs/development/performance-budget.md",
     "docs/development/project-map.md",
+)
+PACKAGE_MANAGER_GUIDANCE_PATHS = (
+    "AGENTS.md",
+    "docs/development/local-setup.md",
+    "docs/development/test-guide.md",
 )
 SERVER_GATE_REQUIRED_PATHS = (
     "AGENTS.md",
@@ -113,6 +144,24 @@ def make_valid_fixture(root: Path) -> None:
         write(root, relative, "# Guidance\n")
     for relative in SERVER_GATE_REQUIRED_PATHS:
         write(root, relative, f"# Guidance\n\n```bash\n{CANONICAL_SERVER_COMMAND}\n```\n")
+    write(root, "AGENTS.md", f"# Guidance\n\n{CANONICAL_SERVER_COMMAND}\npnpm@11.13.1\n")
+    for relative, references in LOCAL_ROUTER_CONTRACTS.items():
+        write(root, relative, "\n".join(references) + "\n")
+    write(root, "package.json", '{"packageManager":"pnpm@11.13.1"}\n')
+    write(
+        root,
+        "scripts/agent-preflight.py",
+        "\n".join(
+            (
+                "docs/agents/execution.md",
+                "docs/development/acceptance-matrix.md",
+                "./scripts/server-ci-check.sh",
+                "pnpm --dir front test:e2e",
+                "./scripts/public-release-check.sh .tmp/public-release-candidate",
+            )
+        )
+        + "\n",
+    )
     write(root, "CLAUDE.md", "@AGENTS.md\n")
     write(root, "front/CLAUDE.md", "@AGENTS.md\n")
     write(
@@ -171,11 +220,7 @@ def check_markdown_links(root: Path) -> list[str]:
 
 def check_instruction_chains(root: Path) -> list[str]:
     errors: list[str] = []
-    chains = {
-        "root": ("AGENTS.md",),
-        "front": ("AGENTS.md", "front/AGENTS.md"),
-    }
-    for name, paths in chains.items():
+    for name, paths in INSTRUCTION_CHAINS.items():
         total = sum(
             (root / relative).stat().st_size
             for relative in paths
@@ -185,6 +230,49 @@ def check_instruction_chains(root: Path) -> list[str]:
             errors.append(
                 f"instruction chain {name} is {total} bytes; must be below {INSTRUCTION_LIMIT}"
             )
+    return errors
+
+
+def discover_agent_paths(root: Path) -> tuple[str, ...]:
+    result = subprocess.run(
+        ["git", "ls-files", "-z"],
+        cwd=root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if result.returncode == 0 and result.stdout:
+        tracked = (
+            item.decode()
+            for item in result.stdout.split(b"\0")
+            if item
+        )
+        return tuple(
+            sorted(
+                relative
+                for relative in tracked
+                if relative == "AGENTS.md" or relative.endswith("/AGENTS.md")
+            )
+        )
+    return tuple(
+        sorted(path.relative_to(root).as_posix() for path in root.rglob("AGENTS.md"))
+    )
+
+
+def check_agent_router_contracts(root: Path) -> list[str]:
+    errors: list[str] = []
+    supported = {"AGENTS.md", "front/AGENTS.md", *LOCAL_ROUTER_CONTRACTS}
+    for relative in discover_agent_paths(root):
+        if relative not in supported:
+            errors.append(f"unsupported AGENTS.md without chain contract: {relative}")
+    for relative, required in LOCAL_ROUTER_CONTRACTS.items():
+        path = root / relative
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        for reference in required:
+            if reference not in text:
+                errors.append(f"local router reference missing: {relative} -> {reference}")
     return errors
 
 
@@ -215,6 +303,44 @@ def check_pointer_contract(root: Path) -> list[str]:
         if path.is_file() and path.read_text(encoding="utf-8") != "@AGENTS.md\n":
             errors.append(f"pointer contract violation: {relative}")
     return errors
+
+
+def check_package_manager_contract(root: Path) -> list[str]:
+    package_path = root / "package.json"
+    if not package_path.is_file():
+        return []
+    package_manager = json.loads(package_path.read_text(encoding="utf-8")).get("packageManager", "")
+    expected = package_manager.removeprefix("pnpm@")
+    errors: list[str] = []
+    for relative in PACKAGE_MANAGER_GUIDANCE_PATHS:
+        path = root / relative
+        if not path.is_file():
+            continue
+        for found in PNPM_VERSION_RE.findall(path.read_text(encoding="utf-8")):
+            if found != expected:
+                errors.append(
+                    f"package manager drift: {relative} has pnpm@{found}; expected pnpm@{expected}"
+                )
+    return errors
+
+
+def check_preflight_policy_references(root: Path) -> list[str]:
+    path = root / "scripts/agent-preflight.py"
+    if not path.is_file():
+        return []
+    text = path.read_text(encoding="utf-8")
+    required = (
+        "docs/agents/execution.md",
+        "docs/development/acceptance-matrix.md",
+        "./scripts/server-ci-check.sh",
+        "pnpm --dir front test:e2e",
+        "./scripts/public-release-check.sh .tmp/public-release-candidate",
+    )
+    return [
+        f"preflight policy reference missing: {reference}"
+        for reference in required
+        if reference not in text
+    ]
 
 
 def check_release_docs(root: Path) -> list[str]:
@@ -260,9 +386,12 @@ def run_checks(root: Path, *, run_public_scan: bool) -> list[str]:
     errors: list[str] = []
     errors.extend(check_required_paths(root))
     errors.extend(check_markdown_links(root))
+    errors.extend(check_agent_router_contracts(root))
     errors.extend(check_instruction_chains(root))
     errors.extend(check_normative_commands(root))
     errors.extend(check_pointer_contract(root))
+    errors.extend(check_package_manager_contract(root))
+    errors.extend(check_preflight_policy_references(root))
     errors.extend(check_release_docs(root))
     if run_public_scan and not errors:
         errors.extend(run_guidance_public_scan(root))
@@ -297,6 +426,15 @@ class GuidanceCheckerTests(unittest.TestCase):
                 "scripts/validate-production-ai-config.sh",
                 "scripts/sync-config/import-from-prod-env.sh",
             )
+            required_guidance = (
+                "server/AGENTS.md",
+                "front/functions/AGENTS.md",
+                "scripts/AGENTS.md",
+                "deploy/AGENTS.md",
+                "docs/agents/execution.md",
+                "docs/development/acceptance-matrix.md",
+                "scripts/agent-preflight.py",
+            )
             for relative in required_support:
                 write(root, relative, "fixture\n")
 
@@ -307,7 +445,7 @@ class GuidanceCheckerTests(unittest.TestCase):
                 "staged=$1\n"
                 + "".join(
                     f'test -f \"$staged/{relative}\"\n'
-                    for relative in required_support
+                    for relative in required_support + required_guidance
                 ),
                 encoding="utf-8",
             )
@@ -398,6 +536,32 @@ class GuidanceCheckerTests(unittest.TestCase):
             )
         )
         self.assertTrue(any("direct pnpm" in error for error in errors), errors)
+
+    def test_missing_local_router_reference_fails(self) -> None:
+        errors = self.check_fixture(lambda root: write(root, "server/AGENTS.md", "../AGENTS.md\n"))
+        self.assertTrue(any("local router reference missing" in error for error in errors), errors)
+
+    def test_oversized_front_functions_chain_fails(self) -> None:
+        errors = self.check_fixture(
+            lambda root: write(root, "front/functions/AGENTS.md", "x" * INSTRUCTION_LIMIT)
+        )
+        self.assertTrue(any("front/functions" in error for error in errors), errors)
+
+    def test_package_manager_version_drift_fails(self) -> None:
+        errors = self.check_fixture(
+            lambda root: write(root, "AGENTS.md", f"{CANONICAL_SERVER_COMMAND}\npnpm@10.0.0\n")
+        )
+        self.assertTrue(any("package manager drift" in error for error in errors), errors)
+
+    def test_unmapped_agent_router_fails(self) -> None:
+        errors = self.check_fixture(lambda root: write(root, "ops/AGENTS.md", "# Unexpected\n"))
+        self.assertTrue(any("unsupported AGENTS.md" in error for error in errors), errors)
+
+    def test_missing_preflight_policy_reference_fails(self) -> None:
+        errors = self.check_fixture(
+            lambda root: write(root, "scripts/agent-preflight.py", "docs/agents/execution.md\n")
+        )
+        self.assertTrue(any("preflight policy reference missing" in error for error in errors), errors)
 
     def test_oversized_instruction_chain_fails(self) -> None:
         errors = self.check_fixture(
