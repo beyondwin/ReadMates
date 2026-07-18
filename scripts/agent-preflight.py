@@ -208,12 +208,24 @@ def paths_overlap(expected: tuple[str, ...], dirty: tuple[str, ...]) -> bool:
 
 
 class AgentPreflightTests(unittest.TestCase):
-    def run_main(self, *args: str) -> tuple[int, str, str]:
+    def run_main(
+        self,
+        *args: str,
+        state: RepositoryState | None = None,
+    ) -> tuple[int, str, str]:
+        test_state = state or RepositoryState(
+            "self-test",
+            "HEAD",
+            True,
+            (),
+            (),
+            (),
+        )
         stdout = io.StringIO()
         stderr = io.StringIO()
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
             try:
-                code = main(list(args))
+                code = main(list(args), repository_state=test_state)
             except SystemExit as error:
                 code = int(error.code)
         return code, stdout.getvalue(), stderr.getvalue()
@@ -254,6 +266,21 @@ class AgentPreflightTests(unittest.TestCase):
         state = RepositoryState("main", "origin/main", True, (), (), ())
         result = build_result(state, ("front/",), "local-runtime", None)
         self.assertTrue(any("isolation note" in reason for reason in result.stop_reasons))
+
+    def test_local_runtime_rejects_whitespace_isolation_note(self) -> None:
+        state = RepositoryState("main", "origin/main", True, (), (), ())
+        result = build_result(state, ("front/",), "local-runtime", "   ")
+        self.assertTrue(any("isolation note" in reason for reason in result.stop_reasons))
+
+    def test_local_runtime_accepts_meaningful_isolation_note(self) -> None:
+        state = RepositoryState("main", "origin/main", True, (), (), ())
+        result = build_result(
+            state,
+            ("front/",),
+            "local-runtime",
+            "preserve existing services and use an alternate port",
+        )
+        self.assertFalse(any("isolation note" in reason for reason in result.stop_reasons))
 
     def test_dirty_overlap_becomes_stop_reason(self) -> None:
         state = RepositoryState("main", "origin/main", True, ("server/AGENTS.md",), (), ())
@@ -360,21 +387,28 @@ class AgentPreflightTests(unittest.TestCase):
         self.assertEqual(2, code)
         self.assertIn("authority-sensitive scopes require a non-blank authority note", stdout)
 
-    def test_authority_classification_does_not_mutate_repository(self) -> None:
-        root = Path(__file__).resolve().parent.parent
-        before_status = git_lines(root, "status", "--porcelain=v1", "--untracked-files=all")
-        before_head = git_lines(root, "rev-parse", "HEAD")
+    def test_authority_classification_does_not_mutate_injected_state(self) -> None:
+        state = RepositoryState("self-test", "HEAD", True, (), (), ())
+        before = asdict(state)
         code, _, _ = self.run_main(
             "--base", "HEAD",
             "--paths", "deploy/oci/compose.yml",
             "--authority-scope", "live-mutation",
             "--authority-note", "repository-only review; no live mutation",
+            state=state,
         )
-        after_status = git_lines(root, "status", "--porcelain=v1", "--untracked-files=all")
-        after_head = git_lines(root, "rev-parse", "HEAD")
         self.assertEqual(0, code)
-        self.assertEqual(before_status, after_status)
-        self.assertEqual(before_head, after_head)
+        self.assertEqual(before, asdict(state))
+
+    def test_detached_head_injected_state_stops_cli(self) -> None:
+        state = RepositoryState("", "HEAD", True, (), (), ())
+        code, stdout, _ = self.run_main(
+            "--base", "HEAD",
+            "--paths", "docs/README.md",
+            state=state,
+        )
+        self.assertEqual(2, code)
+        self.assertIn("detached HEAD", stdout)
 
     def test_text_and_json_share_complete_result_model(self) -> None:
         state = RepositoryState("main", "origin/main", True, ("docs/README.md",), (), ())
@@ -453,7 +487,7 @@ def build_result(
         stop_reasons.append(f"base ref cannot be resolved: {state.base}")
     if expected_paths and paths_overlap(expected_paths, state.dirty_paths):
         stop_reasons.append("expected edit paths overlap existing dirty paths")
-    if intent == "local-runtime" and not isolation_note:
+    if intent == "local-runtime" and not (isolation_note and isolation_note.strip()):
         stop_reasons.append("local-runtime intent requires an isolation note that preserves existing services")
     if selected_authority_scopes and not (authority_note and authority_note.strip()):
         stop_reasons.append(
@@ -501,7 +535,11 @@ def run_self_tests() -> int:
     return 0 if result.wasSuccessful() else 1
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(
+    argv: list[str] | None = None,
+    *,
+    repository_state: RepositoryState | None = None,
+) -> int:
     parser = argparse.ArgumentParser(description="Inspect ReadMates agent task readiness")
     parser.add_argument(
         "--intent",
@@ -529,10 +567,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.self_test:
         return run_self_tests()
 
-    root = Path(__file__).resolve().parent.parent
-    state = collect_repository_state(root, args.base)
+    if repository_state is None:
+        root = Path(__file__).resolve().parent.parent
+        repository_state = collect_repository_state(root, args.base)
     result = build_result(
-        state,
+        repository_state,
         tuple(args.paths),
         args.intent,
         args.isolation_note,
