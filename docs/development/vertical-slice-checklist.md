@@ -5,10 +5,12 @@ Use this checklist when a change crosses frontend, BFF, server API, auth, persis
 ## 0. Handoff
 
 - Requirement마다 구현 task와 acceptance evidence가 연결되어 있습니다.
+- `acceptance-matrix.md`에서 선택한 row와 이유, 인접한 high-risk row를 제외한 이유가 기록되어 있습니다.
 - Task dependency와 예상 수정 파일이 명시되어 있습니다.
 - Parallel task는 같은 파일, database, container, fixture directory, build output을 공유하지 않습니다.
 - Executor-specific state, 개인 경로, model/auth/MCP 설정이 제품 계약에 포함되지 않습니다.
 - Non-goal, skipped validation, deploy 이후 operator follow-up이 구분되어 있습니다.
+- local runtime 작업은 기존 service, worktree, container, port, cache를 보존하고 시작 전에 isolation 방식을 선택합니다.
 
 ## 1. Surface
 

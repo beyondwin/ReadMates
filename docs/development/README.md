@@ -7,6 +7,8 @@ ReadMates를 로컬에서 실행하고, 테스트하고, 구조를 이해하기 
 | 목적 | 문서 |
 | --- | --- |
 | 프로젝트 지형과 변경 유형별 읽는 순서 | [project-map.md](project-map.md) |
+| 공통 작업 계약과 권한·local-runtime 경계 | [../agents/execution.md](../agents/execution.md) |
+| 변경 slice의 risk evidence 선택 | [acceptance-matrix.md](acceptance-matrix.md) |
 | 로컬 실행 | [local-setup.md](local-setup.md) |
 | 테스트, 공개 릴리즈, 배포 smoke 점검 | [test-guide.md](test-guide.md) |
 | Lighthouse 진단과 route-critical 시각 회귀 baseline | [test-guide.md#lighthouse-diagnostic](test-guide.md#lighthouse-diagnostic), [test-guide.md#시각-회귀-컴포넌트-하니스](test-guide.md#시각-회귀-컴포넌트-하니스) |
@@ -30,7 +32,8 @@ ReadMates를 로컬에서 실행하고, 테스트하고, 구조를 이해하기 
 
 ## 주요 구조 문서
 
-- 처음 작업 표면을 고르는 에이전트나 개발자는 [project-map.md](project-map.md)에서 source of truth 우선순위, 코드/문서 지형, 변경 유형별 읽는 순서, 검증 선택표를 먼저 확인합니다.
+- 처음 작업 표면을 고르는 에이전트나 개발자는 [project-map.md](project-map.md)에서 source of truth 우선순위, 코드/문서 지형, 실행 가이드와 preflight를 포함한 변경 유형별 읽는 순서, 검증 선택표를 먼저 확인합니다.
+- 변경 slice의 상태와 실패 경로는 [acceptance-matrix.md](acceptance-matrix.md)로 선택하고, selected row와 adjacent high-risk exclusion을 handoff에 남깁니다.
 - 새로 합류했거나 처음 프로젝트를 맡는 개발자는 [new-developer-onboarding-guide.md](new-developer-onboarding-guide.md)에서 제품 표면, 저장소 구조, 프론트엔드/BFF/백엔드/DB/Redis/Kafka 흐름, 기술 선택 이유, 작업 순서를 먼저 확인합니다.
 - 프런트엔드 route-first 경계, feature `api/model/route/ui` 책임, legacy 예외 제거 기준은 [architecture.md](architecture.md)의 "프런트엔드 route-first 경계" 섹션을 기준으로 합니다.
 - Lighthouse diagnostic은 public/member/host/admin dev-seed route의 비차단 품질 baseline입니다. Route-critical component visual regression은 host closing board, platform admin support/audit 판단 패널, public records/session 카드처럼 props만으로 검증 가능한 UI 조각을 Docker renderer baseline으로 관리합니다. 명령과 macOS 제약은 [test-guide.md](test-guide.md)의 해당 섹션을 기준으로 합니다.
@@ -39,7 +42,7 @@ ReadMates를 로컬에서 실행하고, 테스트하고, 구조를 이해하기 
 - 핵심 기술 선택의 배경, trade-off, 관련 검증 명령은 [technical-decisions.md](technical-decisions.md)를 기준으로 합니다. 현재 accepted ADR 목록은 [adr/README.md](adr/README.md)에서 개별 결정 문서로 확인할 수 있습니다.
 - 제품 릴리즈 버전 source of truth, server/frontend 공통 tag 기준, OCI server image tag 기준은 [versioning.md](versioning.md)를 기준으로 합니다.
 - v1.3.0 이후 OCI Docker Compose cutover와 BFF secret handling incident는 [2026-04-30 배포 보고서](../reports/2026-04-30-oci-compose-cutover.md)를 참고하되, 현재 운영 절차는 [compose-stack.md](../deploy/compose-stack.md)와 [oci-backend.md](../deploy/oci-backend.md)를 우선합니다.
-- 작업자는 루트 [../../AGENTS.md](../../AGENTS.md)에서 task별 agent guide를 먼저 고르고, 프런트엔드 패키지 안에서는 [../../front/AGENTS.md](../../front/AGENTS.md)의 패키지 지침도 함께 확인합니다.
+- 작업자는 루트 [../../AGENTS.md](../../AGENTS.md)와 [../agents/execution.md](../agents/execution.md)에서 task별 공통 계약을 먼저 확인하고, 해당 경로의 package-local `AGENTS.md` 지침도 함께 확인합니다.
 - `docs/superpowers` 아래 문서는 과거 설계와 구현 계획의 기록입니다. 현재 동작의 source of truth는 이 디렉터리와 실제 코드, 테스트, 배포 스크립트입니다.
 
 ## 문서 경계

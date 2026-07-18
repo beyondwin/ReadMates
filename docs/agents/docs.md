@@ -14,7 +14,7 @@ Current source-of-truth order:
 - `docs/development/release-readiness-review.md`: release-readiness and residual-risk review checklist for post-merge or pre-ship checks.
 - `docs/deploy/`: public-safe deployment runbooks and release-safety policy.
 - `scripts/README.md`: public release helper behavior and scanner expectations.
-- `AGENTS.md`, `front/AGENTS.md`, `docs/agents/*.md`: agent routing and task-specific editing rules.
+- `AGENTS.md`, package-local `AGENTS.md` files, and `docs/agents/*.md`: agent routing and task-specific editing rules. The shared execution contract is `docs/agents/execution.md`; use `docs/development/acceptance-matrix.md` to select risk evidence.
 - `docs/superpowers/`: historical design and implementation records. Do not treat these as current behavior unless the user explicitly asks to update historical planning notes.
 
 Documentation rules:
@@ -26,7 +26,7 @@ Documentation rules:
 - Preserve the Korean-first documentation style in current docs.
 - Prefer small factual patches over broad rewrites unless the user asks for a rewrite.
 - Architecture flexibility changes should keep `docs/development/architecture.md`, ADR-0002, ADR-0003, `docs/agents/front.md`, and `docs/agents/server.md` aligned with the boundary tests that enforce the rule.
-- Agent instruction changes should keep `AGENTS.md`, package-local `AGENTS.md` files, `docs/agents/*.md`, and lightweight tool entrypoints such as `CLAUDE.md` aligned. Do not duplicate large rule blocks into `CLAUDE.md`; keep it as a pointer unless the tool cannot resolve `AGENTS.md`.
+- Agent instruction changes should keep `AGENTS.md`, `front/AGENTS.md`, `front/functions/AGENTS.md`, `server/AGENTS.md`, `scripts/AGENTS.md`, `deploy/AGENTS.md`, `docs/agents/*.md`, and lightweight tool entrypoints such as `CLAUDE.md` aligned. Do not duplicate large rule blocks into `CLAUDE.md`; keep it as a pointer unless the tool cannot resolve `AGENTS.md`.
 - If documentation entrypoints, documentation IA, or agent-routing guidance changes, keep `docs/development/project-map.md`, `README.md`, `docs/README.md`, and `docs/development/README.md` aligned without duplicating large rule blocks.
 - For CHANGELOG, release-readiness, or residual-risk review work, use `docs/development/release-readiness-review.md` and do not treat passing tests as sufficient evidence that release or operational risk is closed.
 - If docs describe frontend, server, or UI rules in detail, read the matching surface guide before changing those claims.

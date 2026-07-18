@@ -12,6 +12,8 @@ Before editing, check `git status --short --branch`, identify the touched surfac
 - UI, layout, copy, or visual polish: `docs/agents/design.md`
 - README, project docs, deploy docs, scripts docs, or agent instructions: `docs/agents/docs.md`
 
+Read `docs/agents/execution.md` for the shared analyze/diagnose/change/release/local-runtime contract. Use `python3 scripts/agent-preflight.py` to classify current or expected paths, and use `docs/development/acceptance-matrix.md` to select ReadMates-specific risk evidence. These are navigation and evidence-selection aids; current code, tests, migrations, scripts, and architecture remain source of truth.
+
 Mixed-surface examples:
 
 - UI implementation under `front/`: read `docs/agents/front.md` and `docs/agents/design.md`.
@@ -19,7 +21,7 @@ Mixed-surface examples:
 - Documentation that describes frontend, server, or UI behavior: read `docs/agents/docs.md` plus the relevant surface guide.
 - Deploy, CI, public-release, or scanner behavior: read `docs/agents/docs.md`, then verify the referenced scripts/workflows directly.
 
-Package-local instructions add to this router. When working inside `front/`, read `front/AGENTS.md` as well; it does not replace the root guide.
+Package-local instructions add to this router. Read the matching local guide when working in `front/` (`front/AGENTS.md`), `front/functions/` (`front/functions/AGENTS.md`), `server/` (`server/AGENTS.md`), `scripts/` (`scripts/AGENTS.md`), or `deploy/` (`deploy/AGENTS.md`); none replaces the root guide.
 
 Keep changes scoped to the touched feature and follow `docs/development/architecture.md` when boundaries are unclear.
 
