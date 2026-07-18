@@ -10,11 +10,24 @@
 
 ## `check-agent-guidance.py`
 
-Agent router, active guide links, instruction-chain size, canonical server/Corepack commands, release-checklist size, and tracked-guidance public safety are checked with `python3 scripts/check-agent-guidance.py`. Run `python3 scripts/check-agent-guidance.py --self-test` for the temporary positive/negative fixtures.
+Agent router, active guide links, instruction-chain size, canonical server/Corepack commands, release-checklist size, and tracked-guidance public safety are checked with `python3 scripts/check-agent-guidance.py`. Run `python3 scripts/check-agent-guidance.py --self-test` for the temporary positive/negative fixtures. CI runs `--self-test` and the current-tree check separately.
 
 The checker stages only tracked guidance into a temporary directory and delegates content safety to `public-release-check.sh`; it does not maintain a second secret-pattern engine or inspect user-local Codex configuration.
 
 The private/source tree always contains `AGENTS.md`, so CI and pre-push run this checker there. The clean public candidate intentionally excludes private agent guidance and skips this private guidance-only gate; its public files remain covered by `public-release-check.sh`.
+
+## `agent-preflight.py`
+
+`agent-preflight.py` reads Git state plus current or expected paths and prints the required guides, ReadMates risk triggers, canonical recommended checks, stop reasons, and evidence level. It is read-only: it never executes the recommended commands or changes repository/runtime state.
+
+```bash
+python3 -B scripts/agent-preflight.py --intent change --paths front/functions/api/example.ts
+python3 -B scripts/agent-preflight.py --intent change --paths server/src/main/resources/db/mysql/migration/V999__example.sql --json
+python3 -B scripts/agent-preflight.py --intent local-runtime --paths front/ --isolation-note "preserve existing services and use an alternate port"
+python3 -B scripts/agent-preflight.py --self-test
+```
+
+Exit code 2 means a stop reason requires resolution, such as detached HEAD, unresolved base, dirty overlap, or missing local-runtime isolation. Recommended checks remain canonical commands owned by existing scripts and guides; preflight does not replace `pre-push-check.sh`.
 
 ## `server-ci-check.sh`
 
@@ -43,6 +56,8 @@ READMATES_SERVER_CI_CHECK_DRY_RUN=true ./scripts/server-ci-check.sh
 ```bash
 ./scripts/pre-push-check.sh
 ```
+
+`agent-preflight.py` can be used as read-only planning support before this command; it does not replace `pre-push-check.sh`.
 
 기본 실행 범위는 다음과 같습니다.
 
