@@ -149,6 +149,43 @@ describe("MemberHome", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/sessions/upcoming", expect.objectContaining({}));
   });
 
+  it("keeps long reviews out of the member home activity feed", async () => {
+    const longReviewItem = {
+      sessionId: "session-9",
+      sessionNumber: 9,
+      bookTitle: "테스트 책",
+      date: "2026-07-22",
+      authorName: "테스트 멤버",
+      authorShortName: "테",
+      kind: "LONG_REVIEW",
+      text: "홈에는 노출하지 않을 장문 서평입니다.",
+    };
+    const oneLineReviewItem = {
+      sessionId: "session-9",
+      sessionNumber: 9,
+      bookTitle: "테스트 책",
+      date: "2026-07-22",
+      authorName: "테스트 멤버",
+      authorShortName: "테",
+      kind: "ONE_LINE_REVIEW",
+      text: "홈에 유지할 공개 한줄평입니다.",
+    };
+    const fetchMock = vi.fn((url: string) => {
+      if (url === "/api/bff/api/auth/me") return Promise.resolve(jsonResponse(auth));
+      if (url === "/api/bff/api/sessions/current") return Promise.resolve(jsonResponse(current));
+      if (url === "/api/bff/api/notes/feed?limit=60") {
+        return Promise.resolve(jsonResponse(pageOf([longReviewItem, oneLineReviewItem])));
+      }
+      if (url === "/api/bff/api/sessions/upcoming") return Promise.resolve(jsonResponse([]));
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const data = await memberHomeLoader();
+
+    expect(data.noteFeedItems).toEqual([oneLineReviewItem]);
+  });
+
   it("shows member-visible upcoming sessions on desktop and mobile home", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 3, 25, 0, 0, 0));

@@ -36,6 +36,9 @@ export async function memberHomeLoader(args?: LoaderFunctionArgs): Promise<Membe
     fetchMemberHomeNoteFeed(context, { limit: MEMBER_HOME_NOTE_FEED_LIMIT }),
     fetchMemberHomeUpcomingSessions(context),
   ]);
+  const noteFeedItems = noteFeed.items.filter(
+    (item): item is MemberHomeNoteFeedItemView => item.kind !== "LONG_REVIEW",
+  );
 
-  return { current, noteFeedItems: noteFeed.items, upcomingSessions };
+  return { current, noteFeedItems, upcomingSessions };
 }
