@@ -1,10 +1,27 @@
+import type { AnchorHTMLAttributes, ComponentType, ReactNode } from "react";
 import type { SessionClosingBoardView, SessionClosingTone } from "@/features/host/model/session-closing-model";
+
+export type SessionClosingLinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> & {
+  to: string;
+  children: ReactNode;
+};
+
+export type SessionClosingLinkComponent = ComponentType<SessionClosingLinkProps>;
 
 type SessionClosingBoardProps = {
   view: SessionClosingBoardView;
+  LinkComponent?: SessionClosingLinkComponent;
 };
 
-export function SessionClosingBoard({ view }: SessionClosingBoardProps) {
+function PlainSessionClosingLink({ to, children, ...props }: SessionClosingLinkProps) {
+  return (
+    <a {...props} href={to}>
+      {children}
+    </a>
+  );
+}
+
+export function SessionClosingBoard({ view, LinkComponent = PlainSessionClosingLink }: SessionClosingBoardProps) {
   return (
     <main className="rm-host-closing-board">
       <section className="page-header-compact">
@@ -29,9 +46,9 @@ export function SessionClosingBoard({ view }: SessionClosingBoardProps) {
           </div>
           <span className={badgeClass(view.primaryAction.tone)}>{view.primaryAction.label}</span>
           {view.primaryAction.href ? (
-            <a className="btn btn-primary" href={view.primaryAction.href}>
+            <LinkComponent className="btn btn-primary" to={view.primaryAction.href}>
               {view.primaryAction.label}
-            </a>
+            </LinkComponent>
           ) : null}
         </section>
 
@@ -46,9 +63,9 @@ export function SessionClosingBoard({ view }: SessionClosingBoardProps) {
                 </div>
                 <p className="small muted">{item.detail}</p>
                 {item.href ? (
-                  <a className="tiny mono" href={item.href}>
+                  <LinkComponent className="tiny mono" to={item.href}>
                     {item.actionLabel}
-                  </a>
+                  </LinkComponent>
                 ) : (
                   <span className="tiny muted">{item.actionLabel}</span>
                 )}
@@ -68,9 +85,9 @@ export function SessionClosingBoard({ view }: SessionClosingBoardProps) {
                 </div>
                 <p className="body muted">{surface.detail}</p>
                 {surface.href ? (
-                  <a className="btn btn-quiet btn-sm" href={surface.href}>
+                  <LinkComponent className="btn btn-quiet btn-sm" to={surface.href}>
                     {surface.actionLabel}
-                  </a>
+                  </LinkComponent>
                 ) : null}
               </article>
             ))}

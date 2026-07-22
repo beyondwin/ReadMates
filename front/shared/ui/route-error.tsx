@@ -1,7 +1,8 @@
 import { useEffect } from "react";
-import { isRouteErrorResponse, Link, useRouteError } from "react-router-dom";
+import { isRouteErrorResponse, Link, useLocation, useRouteError } from "react-router-dom";
 import { isReadmatesApiError } from "@/shared/api/errors";
 import { recordFrontendRuntimeError } from "@/shared/observability/frontend-observability";
+import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 import { PageMetadataHead, type PageMetadata } from "@/shared/ui/page-metadata-head";
 
 export type RouteErrorVariant = "public" | "member" | "host" | "auth";
@@ -117,8 +118,10 @@ function metadataForRouteError(variant: RouteErrorVariant, status: number): Page
 }
 
 export function RouteErrorPage({ variant, status }: { variant: RouteErrorVariant; status: number }) {
+  const location = useLocation();
   const view = classifyStatus(status, variant);
   const metadata = metadataForRouteError(variant, status);
+  const actionHref = scopedAppLinkTarget(location.pathname, view.actionHref);
 
   return (
     <>
@@ -133,7 +136,7 @@ export function RouteErrorPage({ variant, status }: { variant: RouteErrorVariant
             {view.body}
           </p>
           <div className="auth-card__actions auth-card__actions--primary">
-            <Link className="btn btn-primary" to={view.actionHref}>
+            <Link className="btn btn-primary" to={actionHref}>
               {view.actionLabel}
             </Link>
           </div>

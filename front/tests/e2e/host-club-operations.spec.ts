@@ -109,6 +109,24 @@ test("host dashboard renders read-only operating-signal card without leaking adm
   await expectHostOperatingSignalCardPublicSafe(page);
 });
 
+test("host dashboard keeps operating-signal actions inside the scoped club workspace", async ({ page }) => {
+  await loginWithGoogleFixture(page, "host@example.com");
+  await routeHostDashboardPublicSafe(page);
+  await routeHostClubOperations(page);
+
+  await page.goto("/clubs/reading-sai/app/host");
+
+  const card = page.getByRole("region", { name: "운영 신호" });
+  await expect(card.getByRole("link", { name: "세션 문서 열기" })).toHaveAttribute(
+    "href",
+    "/clubs/reading-sai/app/host/sessions/new",
+  );
+  await expect(card.getByRole("link", { name: "알림 장부 보기" })).toHaveAttribute(
+    "href",
+    "/clubs/reading-sai/app/host/notifications",
+  );
+});
+
 test("host dashboard captures public-safe operating-signal visual evidence", async ({ page }, testInfo) => {
   await loginWithGoogleFixture(page, "host@example.com");
   await routeHostDashboardPublicSafe(page);

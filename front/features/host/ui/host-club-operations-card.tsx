@@ -1,4 +1,5 @@
 import { clubAiFailureDelta, type HostClubOperationsSnapshot } from "@/shared/model/club-operations";
+import type { HostDashboardLinkComponent, HostDashboardLinkProps } from "./dashboard/types";
 
 type ReadinessTone = "ok" | "warn" | "neutral";
 
@@ -72,7 +73,21 @@ function operatingMetrics(snapshot: HostClubOperationsSnapshot): OperatingMetric
   ];
 }
 
-export function HostClubOperationsCard({ snapshot }: { snapshot: HostClubOperationsSnapshot }) {
+function PlainHostClubOperationsLink({ to, children, ...props }: HostDashboardLinkProps) {
+  return (
+    <a {...props} href={to}>
+      {children}
+    </a>
+  );
+}
+
+export function HostClubOperationsCard({
+  snapshot,
+  LinkComponent = PlainHostClubOperationsLink,
+}: {
+  snapshot: HostClubOperationsSnapshot;
+  LinkComponent?: HostDashboardLinkComponent;
+}) {
   const tone = readinessTone(snapshot.readiness.state, snapshot.readiness.blockingReasons);
   const metrics = operatingMetrics(snapshot);
 
@@ -104,12 +119,12 @@ export function HostClubOperationsCard({ snapshot }: { snapshot: HostClubOperati
       ) : null}
 
       <div className="host-club-ops__actions" aria-label="운영 신호 조치">
-        <a className="btn btn-quiet btn-sm" href="/app/host/sessions/new">
+        <LinkComponent className="btn btn-quiet btn-sm" to="/app/host/sessions/new">
           세션 문서 열기
-        </a>
-        <a className="btn btn-ghost btn-sm" href="/app/host/notifications">
+        </LinkComponent>
+        <LinkComponent className="btn btn-ghost btn-sm" to="/app/host/notifications">
           알림 장부 보기
-        </a>
+        </LinkComponent>
       </div>
     </section>
   );

@@ -646,7 +646,7 @@ export default function HostDashboard({
                 </section>
 
                 <PublicationFeedbackSection data={data} />
-                {clubOperations ? <HostClubOperationsCard snapshot={clubOperations} /> : null}
+                {clubOperations ? <HostClubOperationsCard snapshot={clubOperations} LinkComponent={LinkComponent} /> : null}
                 <HostNotificationLedger notifications={notifications} LinkComponent={LinkComponent} />
                 <InvitePipelineSection LinkComponent={LinkComponent} />
 
