@@ -86,7 +86,7 @@ describe("PublicClub", () => {
 
     const overview = screen.getByLabelText("클럽 운영 정보");
     expect(within(overview).getByText("시작")).toBeInTheDocument();
-    expect(within(overview).getByText("2024.11")).toBeInTheDocument();
+    expect(within(overview).getByText("2025.11")).toBeInTheDocument();
     expect(within(overview).getByText("운영 리듬")).toBeInTheDocument();
     expect(within(overview).getByText("호스트가 공지하는 날 · 20:00 – 22:00")).toBeInTheDocument();
     expect(within(overview).getByText("현재 멤버")).toBeInTheDocument();
