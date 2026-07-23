@@ -18,6 +18,7 @@ import com.readmates.session.application.model.HostSessionCommand
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.UpsertPublicationCommand
 import com.readmates.session.application.port.out.HostSessionTransitionResult
+import com.readmates.session.application.port.out.HostSessionVisibilityUpdateResult
 import com.readmates.session.application.requireHost
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.toUtcLocalDateTime
@@ -323,8 +324,21 @@ internal class HostSessionWriteOperations(
     fun updateVisibility(
         jdbcTemplate: JdbcTemplate,
         command: com.readmates.session.application.model.UpdateHostSessionVisibilityCommand,
-    ): HostSessionDetailResponse {
+    ): HostSessionVisibilityUpdateResult {
         queries.requireHostSession(jdbcTemplate, command.host, command.sessionId)
+        val previousVisibility =
+            jdbcTemplate
+                .queryForObject(
+                    """
+                    select visibility
+                    from sessions
+                    where id = ? and club_id = ?
+                    for update
+                    """.trimIndent(),
+                    String::class.java,
+                    command.sessionId.dbString(),
+                    command.host.clubId.dbString(),
+                )?.let(SessionRecordVisibility::valueOf) ?: throw HostSessionNotFoundException()
         jdbcTemplate.update(
             """
             update sessions
@@ -353,7 +367,10 @@ internal class HostSessionWriteOperations(
             command.sessionId.dbString(),
             command.host.clubId.dbString(),
         )
-        return queries.findHostSessionAfterHostCheck(jdbcTemplate, command.host, command.sessionId)
+        return HostSessionVisibilityUpdateResult(
+            previousVisibility = previousVisibility,
+            detail = queries.findHostSessionAfterHostCheck(jdbcTemplate, command.host, command.sessionId),
+        )
     }
 
     fun open(

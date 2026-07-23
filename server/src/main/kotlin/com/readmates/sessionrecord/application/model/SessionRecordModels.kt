@@ -141,6 +141,11 @@ data class SessionRecordApplyResult(
     val eventId: UUID?,
 )
 
+data class HostSessionRecordCapabilities(
+    val sessionRecordDrafts: Boolean = true,
+    val hostActionNotificationConfirmationRequired: Boolean,
+)
+
 data class CompletedSessionRecordApply(
     val previewId: UUID,
     val expectedDraftRevision: Long,

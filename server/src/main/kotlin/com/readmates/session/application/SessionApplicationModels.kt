@@ -2,6 +2,8 @@ package com.readmates.session.application
 
 import com.readmates.session.domain.SessionParticipationStatus
 import com.readmates.sessionrecord.application.model.SessionRecordStatus
+import java.time.OffsetDateTime
+import java.util.UUID
 
 data class CurrentSessionPayload(
     val currentSession: CurrentSessionDetail?,
@@ -171,6 +173,15 @@ data class HostSessionListQuery(
     val state: String? = null,
     val recordStatus: SessionRecordStatus? = null,
     val needsAttention: Boolean? = null,
+)
+
+data class HostSessionVisibilityPreview(
+    val previewId: UUID,
+    val targetCount: Int,
+    val expectedInAppCount: Int,
+    val expectedEmailCount: Int,
+    val excludedCount: Int,
+    val expiresAt: OffsetDateTime,
 )
 
 data class HostSessionBasicAuditSnapshot(

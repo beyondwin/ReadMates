@@ -79,6 +79,8 @@ management:
 
 readmates:
   app-base-url: ${READMATES_APP_BASE_URL:http://localhost:3000}
+  host-action-confirmation:
+    required: false
   auth:
     auth-base-url: ${READMATES_AUTH_BASE_URL:${READMATES_APP_BASE_URL:http://localhost:3000}}
     return-state-secret: ${READMATES_AUTH_RETURN_STATE_SECRET:}

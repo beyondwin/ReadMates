@@ -1,9 +1,11 @@
 package com.readmates.session.adapter.`in`.web
 
+import com.readmates.notification.application.model.NotificationDecision
 import com.readmates.session.application.HostSessionListQuery
 import com.readmates.session.application.InvalidHostSessionCursorException
 import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.application.model.HostSessionIdCommand
+import com.readmates.session.application.model.PreviewHostSessionVisibilityCommand
 import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
 import com.readmates.session.application.port.`in`.HostSessionDraftUseCase
@@ -30,11 +32,29 @@ import java.util.UUID
 
 data class HostSessionVisibilityRequest(
     val visibility: SessionRecordVisibility,
+    val previewId: String? = null,
+    val notificationDecision: NotificationDecision? = null,
 ) {
     fun toCommand(
         host: CurrentMember,
         sessionId: UUID,
-    ): UpdateHostSessionVisibilityCommand = UpdateHostSessionVisibilityCommand(host, sessionId, visibility)
+    ): UpdateHostSessionVisibilityCommand =
+        UpdateHostSessionVisibilityCommand(
+            host = host,
+            sessionId = sessionId,
+            visibility = visibility,
+            previewId = previewId?.let(::parseNotificationPreviewId),
+            notificationDecision = notificationDecision,
+        )
+}
+
+data class HostSessionVisibilityPreviewRequest(
+    val visibility: SessionRecordVisibility,
+) {
+    fun toCommand(
+        host: CurrentMember,
+        sessionId: UUID,
+    ) = PreviewHostSessionVisibilityCommand(host, sessionId, visibility)
 }
 
 @RestController
@@ -92,6 +112,13 @@ class HostSessionController(
         member: CurrentMember,
     ) = hostSessionLifecycleUseCase.updateVisibility(request.toCommand(member, parseHostSessionId(sessionId)))
 
+    @PostMapping("/{sessionId}/visibility-preview")
+    fun visibilityPreview(
+        @PathVariable sessionId: String,
+        @Valid @RequestBody request: HostSessionVisibilityPreviewRequest,
+        member: CurrentMember,
+    ) = hostSessionLifecycleUseCase.previewVisibility(request.toCommand(member, parseHostSessionId(sessionId)))
+
     @PostMapping("/{sessionId}/open")
     fun open(
         member: CurrentMember,
@@ -133,3 +160,7 @@ private fun requireValidCursor(cursor: String?): String? {
 internal fun parseHostSessionId(sessionId: String): UUID =
     runCatching { UUID.fromString(sessionId) }
         .getOrElse { throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid session id") }
+
+private fun parseNotificationPreviewId(previewId: String): UUID =
+    runCatching { UUID.fromString(previewId) }
+        .getOrElse { throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid preview id") }

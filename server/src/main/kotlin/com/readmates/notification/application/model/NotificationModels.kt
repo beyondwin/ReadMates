@@ -102,9 +102,11 @@ data class RecordHostConfirmedNotificationEventCommand(
 )
 
 enum class HostActionNotificationError {
+    CONFIRMATION_REQUIRED,
     PREVIEW_NOT_FOUND,
     PREVIEW_EXPIRED,
     PREVIEW_MISMATCH,
+    PREVIEW_ALREADY_CONSUMED,
     TARGETS_CHANGED,
     AUDIENCE_EMPTY,
     INVALID_DECISION,

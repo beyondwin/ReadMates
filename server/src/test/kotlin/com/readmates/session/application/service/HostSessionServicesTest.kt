@@ -6,10 +6,27 @@ import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
+import com.readmates.notification.application.model.CompleteHostActionDecisionCommand
+import com.readmates.notification.application.model.HostActionDecisionCommand
+import com.readmates.notification.application.model.HostActionNotificationError
+import com.readmates.notification.application.model.HostActionNotificationException
+import com.readmates.notification.application.model.HostActionPreview
+import com.readmates.notification.application.model.HostActionPreviewCommand
+import com.readmates.notification.application.model.HostActionTargetCounts
+import com.readmates.notification.application.model.HostConfirmedAction
+import com.readmates.notification.application.model.NotificationDecision
+import com.readmates.notification.application.model.PreparedHostActionDecision
+import com.readmates.notification.application.model.RecordHostConfirmedNotificationEventCommand
+import com.readmates.notification.application.port.`in`.ConfirmHostActionNotificationUseCase
+import com.readmates.notification.application.port.`in`.RecordHostConfirmedNotificationEventUseCase
+import com.readmates.notification.application.port.`in`.RecordNotificationEventUseCase
+import com.readmates.notification.application.port.out.StoredHostActionDecision
+import com.readmates.notification.domain.NotificationEventType
 import com.readmates.session.application.CreatedSessionResponse
-import com.readmates.session.application.HostAttendanceResponse
 import com.readmates.session.application.HostAttendanceAuditTransition
+import com.readmates.session.application.HostAttendanceResponse
 import com.readmates.session.application.HostPublicationResponse
+import com.readmates.session.application.HostSessionBasicAuditSnapshot
 import com.readmates.session.application.HostSessionDeletionCounts
 import com.readmates.session.application.HostSessionDeletionPreviewResponse
 import com.readmates.session.application.HostSessionDeletionResponse
@@ -17,7 +34,6 @@ import com.readmates.session.application.HostSessionDetailResponse
 import com.readmates.session.application.HostSessionFeedbackDocument
 import com.readmates.session.application.HostSessionListItem
 import com.readmates.session.application.HostSessionListQuery
-import com.readmates.session.application.HostSessionBasicAuditSnapshot
 import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.model.AttendanceEntryCommand
@@ -25,6 +41,7 @@ import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.model.HostDashboardResult
 import com.readmates.session.application.model.HostSessionCommand
 import com.readmates.session.application.model.HostSessionIdCommand
+import com.readmates.session.application.model.PreviewHostSessionVisibilityCommand
 import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
 import com.readmates.session.application.model.UpsertPublicationCommand
@@ -36,6 +53,8 @@ import com.readmates.session.application.port.out.HostSessionLifecyclePort
 import com.readmates.session.application.port.out.HostSessionPublicationPort
 import com.readmates.session.application.port.out.HostSessionQueryPort
 import com.readmates.session.application.port.out.HostSessionTransitionResult
+import com.readmates.session.application.port.out.HostSessionVisibilityUpdateResult
+import com.readmates.sessionrecord.config.HostActionConfirmationProperties
 import com.readmates.shared.cache.ReadCacheInvalidationPort
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
@@ -47,6 +66,8 @@ import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
 import org.springframework.transaction.support.TransactionSynchronizationManager
+import java.time.LocalDate
+import java.time.OffsetDateTime
 import java.util.UUID
 
 class HostSessionServicesTest {
@@ -95,6 +116,135 @@ class HostSessionServicesTest {
         service.updateVisibility(command)
 
         assertEquals(command, port.visibilityCommand)
+    }
+
+    @Test
+    fun `required next book publication rejects missing decision before visibility mutation`() {
+        val port =
+            RecordingHostSessionPorts().apply {
+                visibilityState = "DRAFT"
+                currentVisibility = SessionRecordVisibility.HOST_ONLY
+            }
+        val service =
+            HostSessionLifecycleService(
+                port,
+                port,
+                port,
+                confirmationProperties = HostActionConfirmationProperties(required = true),
+            )
+
+        val error =
+            assertThrows(HostActionNotificationException::class.java) {
+                service.updateVisibility(
+                    UpdateHostSessionVisibilityCommand(host, sessionId, SessionRecordVisibility.MEMBER),
+                )
+            }
+
+        assertThat(error.error).isEqualTo(HostActionNotificationError.CONFIRMATION_REQUIRED)
+        assertThat(port.visibilityCommand).isNull()
+    }
+
+    @Test
+    fun `safe default preserves legacy next book publication behavior`() {
+        val port =
+            RecordingHostSessionPorts().apply {
+                visibilityState = "DRAFT"
+                currentVisibility = SessionRecordVisibility.HOST_ONLY
+            }
+        val legacyRecorder = RecordingLegacyNotificationRecorder()
+        val service =
+            HostSessionLifecycleService(
+                port,
+                port,
+                port,
+                recordNotificationEventUseCase = legacyRecorder,
+            )
+
+        service.updateVisibility(
+            UpdateHostSessionVisibilityCommand(host, sessionId, SessionRecordVisibility.MEMBER),
+        )
+
+        assertThat(legacyRecorder.nextBookSessions).containsExactly(sessionId)
+    }
+
+    @Test
+    fun `required next book publication previews and completes explicit send`() {
+        val port =
+            RecordingHostSessionPorts().apply {
+                visibilityState = "DRAFT"
+                currentVisibility = SessionRecordVisibility.HOST_ONLY
+            }
+        val gate = RecordingHostActionGate(host)
+        val recorder = RecordingConfirmedEventRecorder()
+        val service =
+            HostSessionLifecycleService(
+                port,
+                port,
+                port,
+                notificationGate = gate,
+                confirmedEventRecorder = recorder,
+                confirmationProperties = HostActionConfirmationProperties(required = true),
+            )
+
+        val preview =
+            service.previewVisibility(
+                PreviewHostSessionVisibilityCommand(host, sessionId, SessionRecordVisibility.MEMBER),
+            )
+        val result =
+            service.updateVisibility(
+                UpdateHostSessionVisibilityCommand(
+                    host,
+                    sessionId,
+                    SessionRecordVisibility.MEMBER,
+                    preview.previewId,
+                    NotificationDecision.SEND,
+                ),
+            )
+
+        assertThat(result.visibility).isEqualTo(SessionRecordVisibility.MEMBER)
+        assertThat(gate.prepared).hasSize(1)
+        assertThat(gate.completed).hasSize(1)
+        assertThat(recorder.commands).hasSize(1)
+        assertThat(recorder.commands.single().eventType).isEqualTo(NotificationEventType.NEXT_BOOK_PUBLISHED)
+    }
+
+    @Test
+    fun `required next book publication skip records decision without event and replays idempotently`() {
+        val port =
+            RecordingHostSessionPorts().apply {
+                visibilityState = "DRAFT"
+                currentVisibility = SessionRecordVisibility.HOST_ONLY
+            }
+        val gate = RecordingHostActionGate(host)
+        val recorder = RecordingConfirmedEventRecorder()
+        val service =
+            HostSessionLifecycleService(
+                port,
+                port,
+                port,
+                notificationGate = gate,
+                confirmedEventRecorder = recorder,
+                confirmationProperties = HostActionConfirmationProperties(required = true),
+            )
+        val preview =
+            service.previewVisibility(
+                PreviewHostSessionVisibilityCommand(host, sessionId, SessionRecordVisibility.PUBLIC),
+            )
+        val command =
+            UpdateHostSessionVisibilityCommand(
+                host,
+                sessionId,
+                SessionRecordVisibility.PUBLIC,
+                preview.previewId,
+                NotificationDecision.SKIP,
+            )
+
+        service.updateVisibility(command)
+        gate.completedDecision = gate.lastDecision
+        service.updateVisibility(command)
+
+        assertThat(gate.completed).hasSize(1)
+        assertThat(recorder.commands).isEmpty()
     }
 
     @Test
@@ -421,6 +571,8 @@ class HostSessionServicesTest {
         var closeChanged = true
         var publishChanged = true
         var throwOnUpsertPublication = false
+        var visibilityState = "OPEN"
+        var currentVisibility = SessionRecordVisibility.HOST_ONLY
         val basicSnapshots = ArrayDeque<HostSessionBasicAuditSnapshot>()
         var basicAuditFields: Set<String> = emptySet()
         var attendanceStates: Map<UUID, String> = emptyMap()
@@ -455,8 +607,10 @@ class HostSessionServicesTest {
                 visibility = SessionRecordVisibility.HOST_ONLY,
             ).also { calls += "create:${command.title}" }
 
-        override fun loadBasicSnapshot(host: CurrentMember, sessionId: UUID): HostSessionBasicAuditSnapshot? =
-            basicSnapshots.removeFirstOrNull()
+        override fun loadBasicSnapshot(
+            host: CurrentMember,
+            sessionId: UUID,
+        ): HostSessionBasicAuditSnapshot? = basicSnapshots.removeFirstOrNull()
 
         override fun loadAttendanceStates(
             host: CurrentMember,
@@ -464,7 +618,11 @@ class HostSessionServicesTest {
             membershipIds: Set<UUID>,
         ): Map<UUID, String> = attendanceStates.filterKeys { it in membershipIds }
 
-        override fun recordBasicUpdate(host: CurrentMember, sessionId: UUID, changedFields: Set<String>) {
+        override fun recordBasicUpdate(
+            host: CurrentMember,
+            sessionId: UUID,
+            changedFields: Set<String>,
+        ) {
             basicAuditFields = changedFields
         }
 
@@ -482,9 +640,21 @@ class HostSessionServicesTest {
         override fun update(command: UpdateHostSessionCommand) =
             hostSessionDetail(command.sessionId).also { calls += "update:${command.sessionId}:${command.session.title}" }
 
-        override fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionDetailResponse {
+        override fun detailForVisibility(command: HostSessionIdCommand): HostSessionDetailResponse =
+            hostSessionDetail(command.sessionId).copy(state = visibilityState, visibility = currentVisibility)
+
+        override fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionVisibilityUpdateResult {
             visibilityCommand = command
-            return hostSessionDetail(command.sessionId).copy(visibility = command.visibility)
+            val previous = currentVisibility
+            currentVisibility = command.visibility
+            return HostSessionVisibilityUpdateResult(
+                previousVisibility = previous,
+                detail =
+                    hostSessionDetail(command.sessionId).copy(
+                        state = visibilityState,
+                        visibility = command.visibility,
+                    ),
+            )
         }
 
         override fun open(command: HostSessionIdCommand): HostSessionTransitionResult {
@@ -608,6 +778,117 @@ class HostSessionServicesTest {
         override fun evictClubContent(clubId: UUID) {
             clubs += clubId
         }
+    }
+
+    private class RecordingHostActionGate(
+        private val host: CurrentMember,
+    ) : ConfirmHostActionNotificationUseCase {
+        private val now = OffsetDateTime.parse("2026-07-23T10:00:00Z")
+        private val previewId = UUID.fromString("00000000-0000-0000-0000-000000008001")
+        val prepared = mutableListOf<HostActionDecisionCommand>()
+        val completed = mutableListOf<CompleteHostActionDecisionCommand>()
+        var completedDecision: StoredHostActionDecision? = null
+        var lastDecision: StoredHostActionDecision? = null
+
+        override fun preview(
+            host: CurrentMember,
+            command: HostActionPreviewCommand,
+        ): HostActionPreview =
+            HostActionPreview(
+                previewId,
+                2,
+                2,
+                1,
+                0,
+                now.plusMinutes(5),
+            )
+
+        override fun prepare(
+            host: CurrentMember,
+            command: HostActionDecisionCommand,
+        ): PreparedHostActionDecision {
+            prepared += command
+            return PreparedHostActionDecision(
+                command.previewId,
+                host.clubId,
+                command.sessionId,
+                host.membershipId,
+                HostConfirmedAction.NEXT_BOOK_PUBLISH,
+                NotificationEventType.NEXT_BOOK_PUBLISHED,
+                command.decision,
+                HostActionTargetCounts(2, 2, 1, 0),
+            )
+        }
+
+        override fun complete(command: CompleteHostActionDecisionCommand): StoredHostActionDecision {
+            completed += command
+            return StoredHostActionDecision(
+                id = UUID.fromString("00000000-0000-0000-0000-000000008002"),
+                previewId = command.prepared.previewId,
+                clubId = command.prepared.clubId,
+                sessionId = command.prepared.sessionId,
+                hostMembershipId = command.prepared.hostMembershipId,
+                action = command.prepared.action,
+                eventType = command.prepared.eventType,
+                liveRevision = command.liveRevision,
+                decision = command.prepared.decision,
+                counts = command.prepared.counts,
+                eventId = command.eventId,
+                createdAt = now,
+            ).also { lastDecision = it }
+        }
+
+        override fun findCompleted(
+            host: CurrentMember,
+            command: HostActionDecisionCommand,
+        ): StoredHostActionDecision? = completedDecision
+    }
+
+    private class RecordingConfirmedEventRecorder : RecordHostConfirmedNotificationEventUseCase {
+        val commands = mutableListOf<RecordHostConfirmedNotificationEventCommand>()
+
+        override fun record(command: RecordHostConfirmedNotificationEventCommand): UUID {
+            commands += command
+            return UUID.fromString("00000000-0000-0000-0000-000000008003")
+        }
+    }
+
+    private class RecordingLegacyNotificationRecorder : RecordNotificationEventUseCase {
+        val nextBookSessions = mutableListOf<UUID>()
+
+        override fun recordNextBookPublished(
+            clubId: UUID,
+            sessionId: UUID,
+            sessionNumber: Int,
+            bookTitle: String,
+        ) {
+            nextBookSessions += sessionId
+        }
+
+        override fun recordFeedbackDocumentPublished(
+            clubId: UUID,
+            sessionId: UUID,
+            sessionNumber: Int,
+            bookTitle: String,
+            documentVersion: Int,
+        ) = Unit
+
+        override fun recordReviewPublished(
+            clubId: UUID,
+            sessionId: UUID,
+            sessionNumber: Int,
+            bookTitle: String,
+            authorMembershipId: UUID,
+        ) = Unit
+
+        override fun recordSessionReminderDue(targetDate: LocalDate) = Unit
+
+        override fun recordAiGenerationReady(
+            jobId: UUID,
+            sessionId: UUID,
+            clubId: UUID,
+            hostUserId: UUID,
+        ) = Unit
     }
 
     private class ThrowingReadCacheInvalidationPort : ReadCacheInvalidationPort {

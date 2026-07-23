@@ -96,6 +96,11 @@ interface ConfirmHostActionNotificationUseCase {
     ): PreparedHostActionDecision
 
     fun complete(command: CompleteHostActionDecisionCommand): StoredHostActionDecision
+
+    fun findCompleted(
+        host: CurrentMember,
+        command: HostActionDecisionCommand,
+    ): StoredHostActionDecision? = null
 }
 
 interface RecordHostConfirmedNotificationEventUseCase {

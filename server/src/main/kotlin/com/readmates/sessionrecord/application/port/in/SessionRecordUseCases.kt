@@ -2,6 +2,7 @@ package com.readmates.sessionrecord.application.port.`in`
 
 import com.readmates.sessionrecord.application.model.ApplySessionRecordCommand
 import com.readmates.sessionrecord.application.model.HostSessionHistoryItem
+import com.readmates.sessionrecord.application.model.HostSessionRecordCapabilities
 import com.readmates.sessionrecord.application.model.PreviewSessionRecordApplyCommand
 import com.readmates.sessionrecord.application.model.RestoreSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.SaveSessionRecordDraftCommand
@@ -42,4 +43,8 @@ interface GetHostSessionHistoryUseCase {
         sessionId: UUID,
         pageRequest: PageRequest,
     ): CursorPage<HostSessionHistoryItem>
+}
+
+interface GetHostSessionRecordCapabilitiesUseCase {
+    fun capabilities(host: CurrentMember): HostSessionRecordCapabilities
 }

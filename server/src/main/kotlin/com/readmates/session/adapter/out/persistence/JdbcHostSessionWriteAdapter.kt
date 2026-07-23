@@ -79,8 +79,11 @@ class JdbcHostSessionWriteAdapter(
 
     override fun dashboard(host: CurrentMember) = queries.hostDashboard(jdbcTemplate, host)
 
-    override fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionDetailResponse =
-        writeOperations.updateVisibility(jdbcTemplate, command)
+    override fun detailForVisibility(command: HostSessionIdCommand): HostSessionDetailResponse =
+        queries.findHostSession(jdbcTemplate, command.host, command.sessionId)
+
+    @Suppress("MaxLineLength")
+    override fun updateVisibility(command: UpdateHostSessionVisibilityCommand) = writeOperations.updateVisibility(jdbcTemplate, command)
 
     override fun open(command: HostSessionIdCommand): HostSessionTransitionResult =
         writeOperations.open(

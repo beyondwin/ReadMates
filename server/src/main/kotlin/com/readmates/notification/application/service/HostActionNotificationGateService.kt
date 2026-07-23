@@ -116,6 +116,36 @@ class HostActionNotificationGateService(
         )
     }
 
+    override fun findCompleted(
+        host: CurrentMember,
+        command: HostActionDecisionCommand,
+    ): StoredHostActionDecision? {
+        val decision = port.findDecision(command.previewId) ?: return null
+        val preview =
+            port.lockPreview(command.previewId, host.clubId, host.membershipId)
+                ?: fail(HostActionNotificationError.PREVIEW_NOT_FOUND)
+        val selection =
+            HostActionPreviewCommand(
+                command.sessionId,
+                command.action,
+                command.eventType,
+                command.expectedDraftRevision,
+                command.expectedLiveRevision,
+                command.requestHash,
+            )
+        val matchesDecision =
+            decision.clubId == host.clubId &&
+                decision.hostMembershipId == host.membershipId &&
+                decision.sessionId == command.sessionId &&
+                decision.action == command.action &&
+                decision.eventType == command.eventType &&
+                decision.decision == command.decision
+        if (!preview.matches(command, selectionHash(host, selection)) || !matchesDecision) {
+            fail(HostActionNotificationError.PREVIEW_ALREADY_CONSUMED)
+        }
+        return decision
+    }
+
     private fun selectionHash(
         host: CurrentMember,
         command: HostActionPreviewCommand,
