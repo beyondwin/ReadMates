@@ -68,6 +68,17 @@ class HostActionNotificationGateServiceTest {
     }
 
     @Test
+    fun `prepare rejects preview exactly at expiry`() {
+        val preview = storedPreview(expiresAt = now)
+        port.previews[preview.id] = preview
+
+        assertThatThrownBy { service.prepare(HOST, decisionCommand(preview.id)) }
+            .isInstanceOf(HostActionNotificationException::class.java)
+            .extracting("error")
+            .isEqualTo(HostActionNotificationError.PREVIEW_EXPIRED)
+    }
+
+    @Test
     fun `prepare rejects another host or changed revisions`() {
         val preview = storedPreview()
         port.previews[preview.id] = preview

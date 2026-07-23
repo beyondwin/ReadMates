@@ -19,6 +19,8 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.OffsetDateTime
 import java.util.UUID
 
+private const val HOST_ACTION_PREVIEW_TTL_MINUTES = 5L
+
 @Service
 class HostActionNotificationGateService(
     private val port: HostActionNotificationPort,
@@ -28,7 +30,7 @@ class HostActionNotificationGateService(
         host: CurrentMember,
         command: HostActionPreviewCommand,
     ): HostActionPreview {
-        val expiresAt = clock().plusMinutes(5)
+        val expiresAt = clock().plusMinutes(HOST_ACTION_PREVIEW_TTL_MINUTES)
         val counts = port.countTargets(host.clubId, command.sessionId, command.eventType)
         val record =
             HostActionNotificationPreviewRecord(
@@ -63,7 +65,7 @@ class HostActionNotificationGateService(
         val preview =
             port.lockPreview(command.previewId, host.clubId, host.membershipId)
                 ?: fail(HostActionNotificationError.PREVIEW_NOT_FOUND)
-        if (preview.expiresAt.isBefore(clock())) fail(HostActionNotificationError.PREVIEW_EXPIRED)
+        if (!preview.expiresAt.isAfter(clock())) fail(HostActionNotificationError.PREVIEW_EXPIRED)
         val selection =
             HostActionPreviewCommand(
                 command.sessionId,
@@ -73,13 +75,7 @@ class HostActionNotificationGateService(
                 command.expectedLiveRevision,
                 command.requestHash,
             )
-        if (preview.sessionId != command.sessionId ||
-            preview.action != command.action ||
-            preview.eventType != command.eventType ||
-            preview.expectedDraftRevision != command.expectedDraftRevision ||
-            preview.expectedLiveRevision != command.expectedLiveRevision ||
-            preview.requestHash != selectionHash(host, selection)
-        ) {
+        if (!preview.matches(command, selectionHash(host, selection))) {
             fail(HostActionNotificationError.PREVIEW_MISMATCH)
         }
         val currentCounts = port.countTargets(host.clubId, command.sessionId, command.eventType)
@@ -138,4 +134,15 @@ class HostActionNotificationGateService(
         )
 
     private fun fail(error: HostActionNotificationError): Nothing = throw HostActionNotificationException(error)
+
+    private fun HostActionNotificationPreviewRecord.matches(
+        command: HostActionDecisionCommand,
+        expectedSelectionHash: String,
+    ): Boolean =
+        sessionId == command.sessionId &&
+            action == command.action &&
+            eventType == command.eventType &&
+            expectedDraftRevision == command.expectedDraftRevision &&
+            expectedLiveRevision == command.expectedLiveRevision &&
+            requestHash == expectedSelectionHash
 }

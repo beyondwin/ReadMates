@@ -1,5 +1,7 @@
 package com.readmates.notification.application.service
 
+import com.readmates.notification.application.model.HostActionNotificationError
+import com.readmates.notification.application.model.HostActionNotificationException
 import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.application.model.RecordHostConfirmedNotificationEventCommand
 import com.readmates.notification.application.port.`in`.RecordHostConfirmedNotificationEventUseCase
@@ -34,7 +36,6 @@ class NotificationEventService(
                     command.sessionId,
                     command.sessionNumber,
                     command.bookTitle,
-                    command.revision,
                 )
             NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED ->
                 recordConfirmedFeedbackDocumentPublished(
@@ -68,7 +69,6 @@ class NotificationEventService(
         sessionId: UUID,
         sessionNumber: Int,
         bookTitle: String,
-        revision: Long,
     ): UUID =
         recordConfirmedEvent(
             clubId,
@@ -76,7 +76,7 @@ class NotificationEventService(
             sessionNumber,
             bookTitle,
             NotificationEventType.NEXT_BOOK_PUBLISHED,
-            "next-book:$sessionId:$revision",
+            "next-book:$sessionId",
         )
 
     fun recordConfirmedFeedbackDocumentPublished(
@@ -104,7 +104,7 @@ class NotificationEventService(
         dedupeKey: String,
     ): UUID {
         val eventId = UUID.randomUUID()
-        check(
+        val inserted =
             eventOutboxPort.enqueueEvent(
                 eventId = eventId,
                 clubId = clubId,
@@ -118,8 +118,10 @@ class NotificationEventService(
                         bookTitle = bookTitle,
                     ),
                 dedupeKey = dedupeKey,
-            ),
-        ) { "Host-confirmed notification event conflicts with an existing dedupe key" }
+            )
+        if (!inserted) {
+            throw HostActionNotificationException(HostActionNotificationError.DUPLICATE_EVENT)
+        }
         return eventId
     }
 

@@ -24,6 +24,8 @@ private const val CLEANUP_HOST_ACTION_GATE_SQL = """
     where preview_id = '00000000-0000-0000-0000-000000009101';
     delete from host_action_notification_previews
     where id = '00000000-0000-0000-0000-000000009101';
+    delete from sessions
+    where id = '00000000-0000-0000-0000-000000009102';
 """
 
 @SpringBootTest(properties = ["spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev"])
@@ -34,6 +36,34 @@ class JdbcHostActionNotificationAdapterTest(
     @param:Autowired private val adapter: JdbcHostActionNotificationAdapter,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
 ) : ReadmatesMySqlIntegrationTestSupport() {
+    @Test
+    fun `target counts use the same session state eligibility as delivery planning`() {
+        insertTargetCountSession("OPEN")
+
+        assertThat(
+            adapter.countTargets(CLUB_ID, TARGET_COUNT_SESSION_ID, NotificationEventType.SESSION_RECORD_UPDATED),
+        )
+            .isEqualTo(HostActionTargetCounts(0, 0, 0, 0))
+        assertThat(
+            adapter.countTargets(CLUB_ID, TARGET_COUNT_SESSION_ID, NotificationEventType.NEXT_BOOK_PUBLISHED),
+        )
+            .isEqualTo(HostActionTargetCounts(0, 0, 0, 0))
+
+        jdbcTemplate.update("update sessions set state = 'CLOSED' where id = ?", TARGET_COUNT_SESSION_ID.toString())
+        assertThat(
+            adapter
+                .countTargets(CLUB_ID, TARGET_COUNT_SESSION_ID, NotificationEventType.SESSION_RECORD_UPDATED)
+                .targetCount,
+        ).isGreaterThan(0)
+
+        jdbcTemplate.update("update sessions set state = 'DRAFT' where id = ?", TARGET_COUNT_SESSION_ID.toString())
+        assertThat(
+            adapter
+                .countTargets(CLUB_ID, TARGET_COUNT_SESSION_ID, NotificationEventType.NEXT_BOOK_PUBLISHED)
+                .targetCount,
+        ).isGreaterThan(0)
+    }
+
     @Test
     fun `complete stores skip decision and consumes preview atomically`() {
         val preview =
@@ -72,9 +102,26 @@ class JdbcHostActionNotificationAdapterTest(
         assertThat(consumed["consumed_at"]).isNotNull()
         assertThat(consumed["consumed_decision_id"]).isEqualTo(stored.id.toString())
     }
+
+    private fun insertTargetCountSession(state: String) {
+        jdbcTemplate.update(
+            """
+            insert into sessions (
+              id, club_id, number, title, book_title, book_author,
+              session_date, start_time, end_time, location_label, question_deadline_at, state, visibility
+            )
+            values (?, ?, 9102, '대상 계산 테스트', '테스트 책', '테스트 저자',
+                    '2026-07-23', '19:00:00', '21:00:00', '온라인', '2026-07-22 19:00:00', ?, 'HOST_ONLY')
+            """.trimIndent(),
+            TARGET_COUNT_SESSION_ID.toString(),
+            CLUB_ID.toString(),
+            state,
+        )
+    }
 }
 
 private val PREVIEW_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000009101")
 private val CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000001")
 private val SESSION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000301")
 private val HOST_MEMBERSHIP_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000201")
+private val TARGET_COUNT_SESSION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000009102")

@@ -1,5 +1,7 @@
 package com.readmates.notification.application.service
 
+import com.readmates.notification.application.model.HostActionNotificationError
+import com.readmates.notification.application.model.HostActionNotificationException
 import com.readmates.notification.application.model.HostNotificationEvent
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventOutboxItem
@@ -10,6 +12,7 @@ import com.readmates.notification.domain.NotificationEventType
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import java.time.LocalDate
 import java.time.OffsetDateTime
@@ -46,14 +49,31 @@ class NotificationEventServiceTest {
         val sessionId = UUID.randomUUID()
 
         val nextBookEventId =
-            service.recordConfirmedNextBookPublished(clubId, sessionId, 9, "다음 책", 1)
+            service.recordConfirmedNextBookPublished(clubId, sessionId, 9, "다음 책")
         val feedbackEventId =
             service.recordConfirmedFeedbackDocumentPublished(clubId, sessionId, 9, "다음 책", 2)
 
         assertThat(outbox.recorded.map { it.eventId })
             .containsExactly(nextBookEventId, feedbackEventId)
         assertThat(outbox.recorded.map { it.dedupeKey })
-            .containsExactly("next-book:$sessionId:1", "feedback-document:$sessionId:2")
+            .containsExactly("next-book:$sessionId", "feedback-document:$sessionId:2")
+    }
+
+    @Test
+    fun `host confirmed duplicate dedupe key is a typed conflict`() {
+        val service = NotificationEventService(RecordingEventOutbox(enqueueResult = false))
+
+        assertThatThrownBy {
+            service.recordSessionRecordUpdated(
+                clubId = UUID.randomUUID(),
+                sessionId = UUID.randomUUID(),
+                sessionNumber = 8,
+                bookTitle = "기록 테스트",
+                revision = 4,
+            )
+        }.isInstanceOf(HostActionNotificationException::class.java)
+            .extracting("error")
+            .isEqualTo(HostActionNotificationError.DUPLICATE_EVENT)
     }
 
     @Test
@@ -205,7 +225,9 @@ private data class RecordedEvent(
     val dedupeKey: String,
 )
 
-private class RecordingEventOutbox : NotificationEventOutboxPort {
+private class RecordingEventOutbox(
+    private val enqueueResult: Boolean = true,
+) : NotificationEventOutboxPort {
     val recorded = mutableListOf<RecordedEvent>()
     val reminderDates = mutableListOf<LocalDate>()
 
@@ -227,6 +249,7 @@ private class RecordingEventOutbox : NotificationEventOutboxPort {
         payload: NotificationEventPayload,
         dedupeKey: String,
     ): Boolean {
+        if (!enqueueResult) return false
         recorded += RecordedEvent(eventId, clubId, eventType, aggregateType, aggregateId, payload, dedupeKey)
         return true
     }

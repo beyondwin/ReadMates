@@ -228,7 +228,7 @@ object NotificationEmailTemplates {
             append(footer)
         }
 
-    @Suppress("ktlint:standard:string-template-indent")
+    @Suppress("LongMethod", "ktlint:standard:string-template-indent")
     private fun htmlEmail(
         label: String,
         brandName: String,

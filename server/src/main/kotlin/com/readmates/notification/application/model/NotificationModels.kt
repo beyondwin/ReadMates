@@ -108,6 +108,7 @@ enum class HostActionNotificationError {
     TARGETS_CHANGED,
     AUDIENCE_EMPTY,
     INVALID_DECISION,
+    DUPLICATE_EVENT,
 }
 
 class HostActionNotificationException(

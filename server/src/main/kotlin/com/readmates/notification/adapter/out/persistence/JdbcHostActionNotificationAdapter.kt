@@ -28,25 +28,15 @@ class JdbcHostActionNotificationAdapter(
         sessionId: UUID,
         eventType: NotificationEventType,
     ): HostActionTargetCounts {
-        val feedbackAudience =
-            eventType == NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED ||
-                eventType == NotificationEventType.SESSION_RECORD_UPDATED
-        val preferenceColumn =
-            when (eventType) {
-                NotificationEventType.NEXT_BOOK_PUBLISHED -> "next_book_published_enabled"
-                NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED,
-                NotificationEventType.SESSION_RECORD_UPDATED,
-                -> "feedback_document_published_enabled"
-                else -> error("Unsupported host-confirmed event type: $eventType")
-            }
+        val policy = targetPolicy(eventType)
         val audiencePredicate =
-            if (feedbackAudience) {
+            if (policy.feedbackAudience) {
                 "(session_participants.membership_id is not null or memberships.role = 'HOST')"
             } else {
                 "true"
             }
         val emailAudiencePredicate =
-            if (feedbackAudience) "session_participants.membership_id is not null" else "true"
+            if (policy.feedbackAudience) "session_participants.membership_id is not null" else "true"
         val row =
             jdbcTemplate.queryForMap(
                 """
@@ -56,7 +46,7 @@ class JdbcHostActionNotificationAdapter(
                   sum(
                     case when $emailAudiencePredicate
                       and coalesce(notification_preferences.email_enabled, true)
-                      and coalesce(notification_preferences.$preferenceColumn, true)
+                      and coalesce(notification_preferences.${policy.preferenceColumn}, true)
                       and users.email is not null
                       and trim(users.email) <> ''
                     then 1 else 0 end
@@ -74,6 +64,7 @@ class JdbcHostActionNotificationAdapter(
                   and notification_preferences.club_id = memberships.club_id
                 where sessions.club_id = ?
                   and sessions.id = ?
+                  and ${policy.statePredicate}
                   and $audiencePredicate
                 """.trimIndent(),
                 clubId.dbString(),
@@ -145,8 +136,15 @@ class JdbcHostActionNotificationAdapter(
         liveRevision: Long,
         eventId: UUID?,
         now: OffsetDateTime,
+    ): StoredHostActionDecision = findDecision(preview.id) ?: insertDecision(preview, decision, liveRevision, eventId, now)
+
+    private fun insertDecision(
+        preview: HostActionNotificationPreviewRecord,
+        decision: NotificationDecision,
+        liveRevision: Long,
+        eventId: UUID?,
+        now: OffsetDateTime,
     ): StoredHostActionDecision {
-        findDecision(preview.id)?.let { return it }
         val id = UUID.randomUUID()
         try {
             jdbcTemplate.update(
@@ -237,6 +235,31 @@ class JdbcHostActionNotificationAdapter(
         return if (wasNull()) null else value
     }
 }
+
+private data class HostActionTargetPolicy(
+    val preferenceColumn: String,
+    val statePredicate: String,
+    val feedbackAudience: Boolean,
+)
+
+private fun targetPolicy(eventType: NotificationEventType): HostActionTargetPolicy =
+    when (eventType) {
+        NotificationEventType.NEXT_BOOK_PUBLISHED ->
+            HostActionTargetPolicy(
+                preferenceColumn = "next_book_published_enabled",
+                statePredicate = "sessions.state = 'DRAFT'",
+                feedbackAudience = false,
+            )
+        NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED,
+        NotificationEventType.SESSION_RECORD_UPDATED,
+        ->
+            HostActionTargetPolicy(
+                preferenceColumn = "feedback_document_published_enabled",
+                statePredicate = "sessions.state in ('CLOSED', 'PUBLISHED')",
+                feedbackAudience = true,
+            )
+        else -> error("Unsupported host-confirmed event type: $eventType")
+    }
 
 private fun HostConfirmedAction.dbValue(): String =
     when (this) {
