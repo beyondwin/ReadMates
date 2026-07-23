@@ -14,7 +14,6 @@ import {
   fetchManualNotificationDispatches,
   openHostSession,
   publishHostSession,
-  previewHostSessionVisibility,
   saveHostSessionAttendance,
   saveHostSessionPublication,
   saveHostSessionVisibility,
@@ -30,7 +29,6 @@ import type {
   HostSessionPublicationRequest,
   HostSessionRequest,
   HostSessionVisibilityRequest,
-  HostSessionVisibilityPreviewRequest,
   HostSessionVisibilityUpdateResult,
   ManualNotificationDispatchListResponse,
   HostNotificationEventType,
@@ -297,15 +295,6 @@ export function useSaveHostSessionVisibilityMutation(context?: ReadmatesApiConte
         invalidateHostSessionDashboard(client, context),
       ]);
     },
-  });
-}
-
-export function usePreviewHostSessionVisibilityMutation(context?: ReadmatesApiContext) {
-  return useMutation({
-    mutationFn: ({ sessionId, request }: {
-      sessionId: string;
-      request: HostSessionVisibilityPreviewRequest;
-    }) => previewHostSessionVisibility(sessionId, request, context),
   });
 }
 

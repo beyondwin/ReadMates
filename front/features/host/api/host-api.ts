@@ -28,8 +28,6 @@ import type {
   HostSessionRequest,
   HostSessionVisibilityRequest,
   HostSessionVisibilityUpdateResult,
-  HostSessionVisibilityPreviewRequest,
-  HostSessionVisibilityPreviewResponse,
   ManualNotificationConfirmRequest,
   ManualNotificationConfirmResponse,
   ManualNotificationDispatchListResponse,
@@ -301,21 +299,6 @@ export async function saveHostSessionVisibility(
   }
   return HostSessionVisibilityUpdateResponseSchema.parse(
     await response.json(),
-  ) as HostSessionVisibilityUpdateResult;
-}
-
-export function previewHostSessionVisibility(
-  sessionId: string,
-  request: HostSessionVisibilityPreviewRequest,
-  context?: ReadmatesApiContext,
-) {
-  return readmatesFetch<HostSessionVisibilityPreviewResponse>(
-    `/api/host/sessions/${encodeURIComponent(sessionId)}/visibility-preview`,
-    {
-      method: "POST",
-      body: JSON.stringify(request),
-    },
-    context,
   );
 }
 

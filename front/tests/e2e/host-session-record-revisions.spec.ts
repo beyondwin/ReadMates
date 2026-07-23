@@ -19,7 +19,6 @@ const UPDATED_SUMMARY = "알림과 함께 적용하는 수정 요약";
 
 let recordSessionId = "";
 let recordSessionNumber = 0;
-let nextBookSessionId = "";
 
 function resetRevisionWorkflowState() {
   resetE2eState({
@@ -357,47 +356,7 @@ test("6. restoring an immutable revision creates a new draft and a new applied r
   await expect(page.getByText("과거 revision 복원").first()).toBeVisible();
 });
 
-test("7. next-book publication supports cancel, SKIP, and SEND without a default decision", async ({ page }) => {
-  await loginHost(page);
-  await page.goto(`${HOST_PATH}/sessions/new`);
-  await page.getByLabel("세션 제목").fill("Next Book Confirmation Session");
-  await page.getByLabel("책 제목").fill("Next Book Confirmation Book");
-  await page.getByLabel("저자").fill("Public Fixture Author");
-  await page.getByLabel("모임 날짜").fill("2026-08-20");
-  await page.getByRole("button", { name: "세션 문서 저장" }).click();
-  await expect(page).toHaveURL(/\/app\/host\/sessions\/[^/]+\/edit/);
-  await expect(page.getByRole("heading", { name: /세션 문서 편집/ })).toBeVisible();
-  nextBookSessionId = new URL(page.url()).pathname.split("/").at(-2) ?? "";
-  expect(nextBookSessionId).not.toBe("");
-
-  await page.goto(HOST_PATH);
-  const visibilityButton = page.getByRole("button", {
-    name: /Next Book Confirmation Book 공개 범위를 멤버 공개로 변경/,
-  });
-  await visibilityButton.click();
-  await expect(page.getByRole("radio", { name: "알림 보내고 반영" })).not.toBeChecked();
-  await expect(page.getByRole("radio", { name: "알림 없이 반영" })).not.toBeChecked();
-  await page.getByRole("button", { name: "취소" }).click();
-  expect(await readHostActionDecision(nextBookSessionId)).toBeNull();
-
-  await visibilityButton.click();
-  await page.getByRole("radio", { name: "알림 없이 반영" }).click();
-  await page.getByRole("button", { name: "선택대로 반영" }).click();
-  await expect.poll(() => readHostActionDecision(nextBookSessionId)).toBe("SKIP");
-  expect(await readNotificationEventCount(nextBookSessionId, "NEXT_BOOK_PUBLISHED")).toBe(0);
-
-  const privateButton = page.getByRole("button", {
-    name: /Next Book Confirmation Book 공개 범위를 비공개로 변경/,
-  });
-  await privateButton.click();
-  await visibilityButton.click();
-  await page.getByRole("radio", { name: "알림 보내고 반영" }).click();
-  await page.getByRole("button", { name: "선택대로 반영" }).click();
-  await expect.poll(() => readHostActionDecision(nextBookSessionId)).toBe("SEND");
-  await expect.poll(() => readNotificationEventCount(nextBookSessionId, "NEXT_BOOK_PUBLISHED")).toBe(1);
-});
-
-test("8. 320px host record navigation and confirmation sheet remain accessible", async ({ page }) => {
+test("7. 320px host record navigation and confirmation sheet remain accessible", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 720 });
   await loginHost(page);
   await page.goto(`${HOST_PATH}/sessions`);

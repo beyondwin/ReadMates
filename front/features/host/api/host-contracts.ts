@@ -4,7 +4,6 @@ import type { AttendanceStatus, RsvpStatus, SessionState } from "@/shared/model/
 import type { PagedResponse } from "@/shared/model/paging";
 import type {
   HostNotificationComposerContext,
-  NotificationDecision,
   SessionRecordStatus,
 } from "./host-session-record-contracts";
 export type { AttendanceStatus, RsvpStatus, SessionState } from "@/shared/model/readmates-types";
@@ -516,21 +515,6 @@ export type HostSessionRecordLedgerPage = HostSessionListPage & {
 
 export type HostSessionVisibilityRequest = {
   visibility: SessionRecordVisibility;
-  previewId?: string | null;
-  notificationDecision?: NotificationDecision | null;
-};
-
-export type HostSessionVisibilityPreviewRequest = {
-  visibility: SessionRecordVisibility;
-};
-
-export type HostSessionVisibilityPreviewResponse = {
-  previewId: string;
-  targetCount: number;
-  expectedInAppCount: number;
-  expectedEmailCount: number;
-  excludedCount: number;
-  expiresAt: string;
 };
 
 export type HostSessionVisibilityUpdateResult = {

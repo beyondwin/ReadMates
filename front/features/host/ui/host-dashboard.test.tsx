@@ -38,26 +38,10 @@ const draftHostSessions = {
 
 const actions = {
   updateCurrentSessionParticipation: async () => undefined,
-  previewSessionVisibility: async () => ({
-    previewId: "preview-1",
-    targetCount: 1,
-    expectedInAppCount: 1,
-    expectedEmailCount: 1,
-    excludedCount: 0,
-    expiresAt: "2026-07-23T20:00:00+09:00",
-  }),
   updateSessionVisibility: async () => undefined,
   openSession: async () => undefined,
   loadHostSessions: async () => ({ items: [], nextCursor: null }),
 } satisfies HostDashboardProps["actions"];
-
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((next) => {
-    resolve = next;
-  });
-  return { promise, resolve };
-}
 
 describe("HostDashboard", () => {
   it("renders headings without unnamed interactive elements", () => {
@@ -87,11 +71,10 @@ describe("HostDashboard", () => {
     expect(screen.getAllByLabelText(/준비 페이스:/).length).toBeGreaterThan(0);
   });
 
-  it("requires a no-default SEND or SKIP confirmation when capability is enabled", async () => {
+  it("saves visibility directly and reflects the successful result", async () => {
     const user = userEvent.setup();
-    const gatedActions = {
+    const directActions = {
       ...actions,
-      previewSessionVisibility: vi.fn(actions.previewSessionVisibility),
       updateSessionVisibility: vi.fn(actions.updateSessionVisibility),
     };
     render(
@@ -99,146 +82,40 @@ describe("HostDashboard", () => {
         data={dashboard}
         current={{ currentSession: null }}
         hostSessions={draftHostSessions}
-        actions={gatedActions}
-        hostActionNotificationConfirmationRequired
+        actions={directActions}
       />,
     );
 
     await user.click(screen.getAllByRole("button", { name: /멤버 공개/ })[0]);
-    expect(gatedActions.previewSessionVisibility).toHaveBeenCalledWith("session-next", "MEMBER");
-    expect(gatedActions.updateSessionVisibility).not.toHaveBeenCalled();
-    expect(await screen.findByRole("button", { name: "선택대로 반영" })).toBeDisabled();
-
-    await user.click(screen.getByRole("radio", { name: "알림 없이 반영" }));
-    await user.click(screen.getByRole("button", { name: "선택대로 반영" }));
-    await waitFor(() => expect(gatedActions.updateSessionVisibility).toHaveBeenCalledWith("session-next", {
+    await waitFor(() => expect(directActions.updateSessionVisibility).toHaveBeenCalledWith("session-next", {
       visibility: "MEMBER",
-      previewId: "preview-1",
-      notificationDecision: "SKIP",
     }));
+    expect(screen.queryByRole("dialog", {
+      name: "반영 방법을 선택해 주세요",
+    })).not.toBeInTheDocument();
+    expect(screen.getAllByText("멤버 공개").length).toBeGreaterThan(0);
   });
 
-  it("keeps rollout-off visibility legacy and fails closed on confirmation-required", async () => {
+  it("does not reflect visibility when the save fails", async () => {
     const user = userEvent.setup();
-    const confirmationRequired = {
+    const failingActions = {
       ...actions,
-      previewSessionVisibility: vi.fn(actions.previewSessionVisibility),
-      updateSessionVisibility: vi.fn(async () => {
-        throw { code: "NOTIFICATION_CONFIRMATION_REQUIRED" };
-      }),
+      updateSessionVisibility: vi.fn().mockRejectedValue(new Error("save failed")),
     };
     render(
       <HostDashboard
         data={dashboard}
         current={{ currentSession: null }}
         hostSessions={draftHostSessions}
-        actions={confirmationRequired}
+        actions={failingActions}
       />,
     );
 
     await user.click(screen.getAllByRole("button", { name: /멤버 공개/ })[0]);
-    expect(confirmationRequired.previewSessionVisibility).not.toHaveBeenCalled();
-    expect(confirmationRequired.updateSessionVisibility).toHaveBeenCalledTimes(1);
-    expect(confirmationRequired.updateSessionVisibility).toHaveBeenCalledWith("session-next", {
+    await waitFor(() => expect(failingActions.updateSessionVisibility).toHaveBeenCalledWith("session-next", {
       visibility: "MEMBER",
-    });
-    expect((await screen.findAllByRole("alert"))[0]).toHaveTextContent("화면을 새로고침");
-  });
-
-  it("reopens changed target counts and requires a new decision", async () => {
-    const user = userEvent.setup();
-    const previewSessionVisibility = vi.fn()
-      .mockResolvedValueOnce(await actions.previewSessionVisibility())
-      .mockResolvedValueOnce({
-        ...(await actions.previewSessionVisibility()),
-        previewId: "preview-2",
-        targetCount: 2,
-        expectedInAppCount: 2,
-      });
-    const changedTargets = {
-      ...actions,
-      previewSessionVisibility,
-      updateSessionVisibility: vi.fn(async () => {
-        throw { code: "NOTIFICATION_TARGETS_CHANGED" };
-      }),
-    };
-    render(
-      <HostDashboard
-        data={dashboard}
-        current={{ currentSession: null }}
-        hostSessions={draftHostSessions}
-        actions={changedTargets}
-        hostActionNotificationConfirmationRequired
-      />,
-    );
-
-    await user.click(screen.getAllByRole("button", { name: /멤버 공개/ })[0]);
-    await user.click(await screen.findByRole("radio", { name: "알림 없이 반영" }));
-    await user.click(screen.getByRole("button", { name: "선택대로 반영" }));
-
-    await waitFor(() => expect(previewSessionVisibility).toHaveBeenCalledTimes(2));
-    expect(screen.getByRole("dialog")).toHaveTextContent("미리보기 대상 2명");
-    expect(screen.getByRole("radio", { name: "알림 없이 반영" })).not.toBeChecked();
-    expect(screen.getByRole("button", { name: "선택대로 반영" })).toBeDisabled();
-  });
-
-  it("keeps an ambiguous next-book apply retryable with the same preview receipt", async () => {
-    const user = userEvent.setup();
-    const updateSessionVisibility = vi.fn()
-      .mockRejectedValueOnce(new TypeError("network response lost"))
-      .mockResolvedValueOnce(undefined);
-    render(
-      <HostDashboard
-        data={dashboard}
-        current={{ currentSession: null }}
-        hostSessions={draftHostSessions}
-        actions={{ ...actions, updateSessionVisibility }}
-        hostActionNotificationConfirmationRequired
-      />,
-    );
-
-    await user.click(screen.getAllByRole("button", { name: /멤버 공개/ })[0]);
-    await user.click(await screen.findByRole("radio", { name: "알림 없이 반영" }));
-    await user.click(screen.getByRole("button", { name: "선택대로 반영" }));
-
-    expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    expect(screen.getAllByRole("alert")[0]).toHaveTextContent("처리 결과를 확인하지 못했습니다");
-    expect(screen.getAllByRole("alert")[0]).not.toHaveTextContent("변경되지 않았습니다");
-    await user.click(screen.getByRole("button", { name: "선택대로 반영" }));
-
-    await waitFor(() => expect(updateSessionVisibility).toHaveBeenCalledTimes(2));
-    expect(updateSessionVisibility.mock.calls[0]).toEqual(updateSessionVisibility.mock.calls[1]);
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  });
-
-  it("disables the stale confirmation while target re-preview is pending", async () => {
-    const user = userEvent.setup();
-    const refreshed = deferred<Awaited<ReturnType<typeof actions.previewSessionVisibility>>>();
-    const previewSessionVisibility = vi.fn()
-      .mockResolvedValueOnce(await actions.previewSessionVisibility())
-      .mockImplementationOnce(() => refreshed.promise);
-    render(
-      <HostDashboard
-        data={dashboard}
-        current={{ currentSession: null }}
-        hostSessions={draftHostSessions}
-        actions={{
-          ...actions,
-          previewSessionVisibility,
-          updateSessionVisibility: vi.fn().mockRejectedValue({ code: "NOTIFICATION_TARGETS_CHANGED" }),
-        }}
-        hostActionNotificationConfirmationRequired
-      />,
-    );
-
-    await user.click(screen.getAllByRole("button", { name: /멤버 공개/ })[0]);
-    await user.click(await screen.findByRole("radio", { name: "알림 없이 반영" }));
-    await user.click(screen.getByRole("button", { name: "선택대로 반영" }));
-    await waitFor(() => expect(previewSessionVisibility).toHaveBeenCalledTimes(2));
-
-    expect(screen.getByRole("button", { name: "반영 중" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "취소" })).toBeDisabled();
-    refreshed.resolve({ ...(await actions.previewSessionVisibility()), previewId: "preview-2" });
-    await waitFor(() => expect(screen.getByRole("button", { name: "취소" })).toBeEnabled());
+    }));
+    expect((await screen.findAllByRole("alert"))[0]).toHaveTextContent("저장하지 못했습니다");
+    expect(screen.getAllByText("비공개").length).toBeGreaterThan(0);
   });
 });
