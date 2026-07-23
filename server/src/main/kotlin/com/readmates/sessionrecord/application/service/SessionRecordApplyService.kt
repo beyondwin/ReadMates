@@ -17,8 +17,8 @@ import com.readmates.sessionrecord.application.model.HostNotificationComposerCon
 import com.readmates.sessionrecord.application.model.LiveSessionRecord
 import com.readmates.sessionrecord.application.model.PreviewSessionRecordApplyCommand
 import com.readmates.sessionrecord.application.model.SessionRecordApplyPreview
-import com.readmates.sessionrecord.application.model.SessionRecordApplyResult
 import com.readmates.sessionrecord.application.model.SessionRecordApplyReceipt
+import com.readmates.sessionrecord.application.model.SessionRecordApplyResult
 import com.readmates.sessionrecord.application.model.SessionRecordDraft
 import com.readmates.sessionrecord.application.model.SessionRecordEditor
 import com.readmates.sessionrecord.application.model.SessionRecordError
@@ -51,7 +51,7 @@ class SessionRecordApplyService(
                 ?: throw draftStale()
         requireRevisions(live, draft, command.expectedLiveRevision, command.expectedDraftRevision)
         return SessionRecordApplyPreview(
-            eventType = eventType(live, draft),
+            eventType = composerEventType(live, draft),
             expectedDraftHash = codec.encode(draft.snapshot).sha256,
         )
     }
@@ -82,10 +82,18 @@ class SessionRecordApplyService(
         }
         val draft = editor.draft ?: throw draftStale()
         requireRevisions(editor.live, draft, command.expectedLiveRevision, command.expectedDraftRevision)
-        val eventType = eventType(editor.live, draft)
+        val eventType = composerEventType(editor.live, draft)
         val requestHash = codec.encode(draft.snapshot).sha256
-        if (!java.security.MessageDigest.isEqual(requestHash.toByteArray(), command.expectedDraftHash.toByteArray())) {
-            throw SessionRecordException(SessionRecordError.INVALID_APPLY_CONTRACT, "Session record draft hash is invalid")
+        val requestHashMatches =
+            java.security.MessageDigest.isEqual(
+                requestHash.toByteArray(),
+                command.expectedDraftHash.toByteArray(),
+            )
+        if (!requestHashMatches) {
+            throw SessionRecordException(
+                SessionRecordError.INVALID_APPLY_CONTRACT,
+                "Session record draft hash is invalid",
+            )
         }
         val importCommand = draft.toImportCommand(host, editor.live)
         val validated =
@@ -142,7 +150,10 @@ class SessionRecordApplyService(
             HostNotificationComposerContext(
                 sessionId = revision.sessionId,
                 eventType = eventType,
-                contentRevision = ManualNotificationContentRevision.sessionRecord(codec.encode(revision.snapshot).sha256),
+                contentRevision =
+                    ManualNotificationContentRevision.sessionRecord(
+                        codec.encode(revision.snapshot).sha256,
+                    ),
             ),
     )
 
@@ -160,20 +171,6 @@ class SessionRecordApplyService(
             throw SessionRecordException(SessionRecordError.LIVE_STALE, "Session record live revision is stale")
         }
     }
-
-    private fun eventType(
-        live: LiveSessionRecord,
-        draft: SessionRecordDraft,
-    ): NotificationEventType =
-        if (live.snapshot.feedbackDocument.markdown
-                .isBlank() &&
-            draft.snapshot.feedbackDocument.markdown
-                .isNotBlank()
-        ) {
-            NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED
-        } else {
-            NotificationEventType.SESSION_RECORD_UPDATED
-        }
 
     private fun SessionRecordDraft.trustedAuthorBindings(): Map<String, UUID> =
         (snapshot.highlights + snapshot.oneLineReviews)
@@ -236,3 +233,17 @@ private fun SessionRecordDraft.historicalAuthorBindings(
             }
     }
 }
+
+private fun composerEventType(
+    live: LiveSessionRecord,
+    draft: SessionRecordDraft,
+): NotificationEventType =
+    if (live.snapshot.feedbackDocument.markdown
+            .isBlank() &&
+        draft.snapshot.feedbackDocument.markdown
+            .isNotBlank()
+    ) {
+        NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED
+    } else {
+        NotificationEventType.SESSION_RECORD_UPDATED
+    }

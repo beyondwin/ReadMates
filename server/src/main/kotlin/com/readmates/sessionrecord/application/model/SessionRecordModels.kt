@@ -158,8 +158,10 @@ data class SessionRecordApplyResult(
 ) {
     @get:com.fasterxml.jackson.annotation.JsonIgnore
     val decisionId: UUID get() = UUID(0, 0)
+
     @get:com.fasterxml.jackson.annotation.JsonIgnore
     val notificationDecision: NotificationDecision get() = NotificationDecision.SKIP
+
     @get:com.fasterxml.jackson.annotation.JsonIgnore
     val eventId: UUID? get() = null
 }

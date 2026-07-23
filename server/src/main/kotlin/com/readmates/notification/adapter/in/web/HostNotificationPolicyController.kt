@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:package-name")
+
 package com.readmates.notification.adapter.`in`.web
 
 import com.readmates.notification.application.model.HostNotificationPolicy

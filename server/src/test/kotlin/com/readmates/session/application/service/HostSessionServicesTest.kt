@@ -6,21 +6,9 @@ import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
-import com.readmates.notification.application.model.CompleteHostActionDecisionCommand
-import com.readmates.notification.application.model.HostActionDecisionCommand
-import com.readmates.notification.application.model.HostActionNotificationError
-import com.readmates.notification.application.model.HostActionNotificationException
-import com.readmates.notification.application.model.HostActionPreview
-import com.readmates.notification.application.model.HostActionPreviewCommand
-import com.readmates.notification.application.model.HostActionTargetCounts
-import com.readmates.notification.application.model.HostConfirmedAction
-import com.readmates.notification.application.model.NotificationDecision
-import com.readmates.notification.application.model.PreparedHostActionDecision
-import com.readmates.notification.application.model.RecordHostConfirmedNotificationEventCommand
 import com.readmates.notification.application.port.`in`.ConfirmHostActionNotificationUseCase
 import com.readmates.notification.application.port.`in`.RecordHostConfirmedNotificationEventUseCase
 import com.readmates.notification.application.port.`in`.RecordNotificationEventUseCase
-import com.readmates.notification.application.port.out.StoredHostActionDecision
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.session.application.CreatedSessionResponse
 import com.readmates.session.application.HostAttendanceAuditTransition
@@ -67,7 +55,6 @@ import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
 import org.springframework.transaction.support.TransactionSynchronizationManager
-import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -187,15 +174,11 @@ class HostSessionServicesTest {
                 visibilityState = "DRAFT"
                 currentVisibility = SessionRecordVisibility.HOST_ONLY
             }
-        val legacyRecorder = RecordingLegacyNotificationRecorder()
-        val gate = RecordingHostActionGate(host)
         val service =
             HostSessionLifecycleService(
                 port,
                 port,
                 port,
-                recordNotificationEventUseCase = legacyRecorder,
-                notificationGate = gate,
             )
 
         val result =
@@ -205,8 +188,7 @@ class HostSessionServicesTest {
 
         assertThat(result.session.visibility).isEqualTo(SessionRecordVisibility.MEMBER)
         assertThat(result.composer?.eventType).isEqualTo(NotificationEventType.NEXT_BOOK_PUBLISHED)
-        assertThat(legacyRecorder.nextBookSessions).isEmpty()
-        assertThat(gate.prepared).isEmpty()
+        assertLifecycleHasNoNotificationDispatchCollaborator()
     }
 
     @Test
@@ -216,15 +198,11 @@ class HostSessionServicesTest {
                 visibilityState = "DRAFT"
                 currentVisibility = SessionRecordVisibility.HOST_ONLY
             }
-        val legacyRecorder = RecordingLegacyNotificationRecorder()
-        val gate = RecordingHostActionGate(host)
         val service =
             HostSessionLifecycleService(
                 port,
                 port,
                 port,
-                recordNotificationEventUseCase = legacyRecorder,
-                notificationGate = gate,
                 confirmationProperties = HostActionConfirmationProperties(required = true),
             )
 
@@ -235,8 +213,7 @@ class HostSessionServicesTest {
 
         assertThat(result.session.visibility).isEqualTo(SessionRecordVisibility.MEMBER)
         assertThat(result.composer?.eventType).isEqualTo(NotificationEventType.NEXT_BOOK_PUBLISHED)
-        assertThat(legacyRecorder.nextBookSessions).isEmpty()
-        assertThat(gate.prepared).isEmpty()
+        assertLifecycleHasNoNotificationDispatchCollaborator()
     }
 
     @Test
@@ -793,126 +770,6 @@ class HostSessionServicesTest {
         }
     }
 
-    private class RecordingHostActionGate(
-        private val host: CurrentMember,
-    ) : ConfirmHostActionNotificationUseCase {
-        private val now = OffsetDateTime.parse("2026-07-23T10:00:00Z")
-        private val previewId = UUID.fromString("00000000-0000-0000-0000-000000008001")
-        var previewCommand: HostActionPreviewCommand? = null
-        val prepared = mutableListOf<HostActionDecisionCommand>()
-        val completed = mutableListOf<CompleteHostActionDecisionCommand>()
-        var completedDecision: StoredHostActionDecision? = null
-        var lastDecision: StoredHostActionDecision? = null
-
-        override fun preview(
-            host: CurrentMember,
-            command: HostActionPreviewCommand,
-        ): HostActionPreview {
-            previewCommand = command
-            return HostActionPreview(
-                previewId,
-                2,
-                2,
-                1,
-                0,
-                now.plusMinutes(5),
-            )
-        }
-
-        override fun prepare(
-            host: CurrentMember,
-            command: HostActionDecisionCommand,
-        ): PreparedHostActionDecision {
-            prepared += command
-            val preview = requireNotNull(previewCommand)
-            if (preview.expectedLiveRevision != command.expectedLiveRevision ||
-                preview.requestHash != command.requestHash
-            ) {
-                throw HostActionNotificationException(HostActionNotificationError.PREVIEW_MISMATCH)
-            }
-            return PreparedHostActionDecision(
-                command.previewId,
-                host.clubId,
-                command.sessionId,
-                host.membershipId,
-                HostConfirmedAction.NEXT_BOOK_PUBLISH,
-                NotificationEventType.NEXT_BOOK_PUBLISHED,
-                command.decision,
-                HostActionTargetCounts(2, 2, 1, 0),
-            )
-        }
-
-        override fun complete(command: CompleteHostActionDecisionCommand): StoredHostActionDecision {
-            completed += command
-            return StoredHostActionDecision(
-                id = UUID.fromString("00000000-0000-0000-0000-000000008002"),
-                previewId = command.prepared.previewId,
-                clubId = command.prepared.clubId,
-                sessionId = command.prepared.sessionId,
-                hostMembershipId = command.prepared.hostMembershipId,
-                action = command.prepared.action,
-                eventType = command.prepared.eventType,
-                liveRevision = command.liveRevision,
-                decision = command.prepared.decision,
-                counts = command.prepared.counts,
-                eventId = command.eventId,
-                createdAt = now,
-            ).also { lastDecision = it }
-        }
-
-        override fun findCompleted(
-            host: CurrentMember,
-            command: HostActionDecisionCommand,
-        ): StoredHostActionDecision? = completedDecision
-    }
-
-    private class RecordingConfirmedEventRecorder : RecordHostConfirmedNotificationEventUseCase {
-        val commands = mutableListOf<RecordHostConfirmedNotificationEventCommand>()
-
-        override fun record(command: RecordHostConfirmedNotificationEventCommand): UUID {
-            commands += command
-            return UUID.fromString("00000000-0000-0000-0000-000000008003")
-        }
-    }
-
-    private class RecordingLegacyNotificationRecorder : RecordNotificationEventUseCase {
-        val nextBookSessions = mutableListOf<UUID>()
-
-        override fun recordNextBookPublished(
-            clubId: UUID,
-            sessionId: UUID,
-            sessionNumber: Int,
-            bookTitle: String,
-        ) {
-            nextBookSessions += sessionId
-        }
-
-        override fun recordFeedbackDocumentPublished(
-            clubId: UUID,
-            sessionId: UUID,
-            sessionNumber: Int,
-            bookTitle: String,
-            documentVersion: Int,
-        ) = Unit
-
-        override fun recordReviewPublished(
-            clubId: UUID,
-            sessionId: UUID,
-            sessionNumber: Int,
-            bookTitle: String,
-            authorMembershipId: UUID,
-        ) = Unit
-
-        override fun recordSessionReminderDue(targetDate: LocalDate) = Unit
-
-        override fun recordAiGenerationReady(
-            jobId: UUID,
-            sessionId: UUID,
-            clubId: UUID,
-            hostUserId: UUID,
-        ) = Unit
-    }
-
     private class ThrowingReadCacheInvalidationPort : ReadCacheInvalidationPort {
         var attempts = 0
 
@@ -941,4 +798,17 @@ private fun captureHostSessionLogs(): HostSessionLogCapture {
     val appender = ListAppender<ILoggingEvent>().apply { start() }
     logger.addAppender(appender)
     return HostSessionLogCapture(logger, appender)
+}
+
+private fun assertLifecycleHasNoNotificationDispatchCollaborator() {
+    val constructorParameterTypes =
+        HostSessionLifecycleService::class.java.declaredConstructors
+            .flatMap { it.parameterTypes.asIterable() }
+
+    assertThat(constructorParameterTypes)
+        .doesNotContain(
+            RecordNotificationEventUseCase::class.java,
+            ConfirmHostActionNotificationUseCase::class.java,
+            RecordHostConfirmedNotificationEventUseCase::class.java,
+        )
 }

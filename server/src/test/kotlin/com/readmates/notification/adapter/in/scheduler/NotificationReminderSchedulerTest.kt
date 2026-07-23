@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:package-name")
+
 package com.readmates.notification.adapter.`in`.scheduler
 
 import com.readmates.notification.application.port.`in`.RecordNotificationEventUseCase

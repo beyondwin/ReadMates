@@ -79,6 +79,10 @@ class MySqlFlywayMigrationTest(
         assertTrue(decisionCounts.contains("target_count") && decisionCounts.contains(">= 0"))
         val decisions = checkConstraintClause("host_action_notification_decisions_decision_check")
         assertTrue(decisions.contains("SEND") && decisions.contains("SKIP"))
+        assertHostNotificationComposerSchema()
+    }
+
+    private fun assertHostNotificationComposerSchema() {
         assertThat(columns("session_record_apply_receipts"))
             .contains(
                 "apply_request_id",
@@ -104,7 +108,8 @@ class MySqlFlywayMigrationTest(
                 """.trimIndent(),
                 String::class.java,
                 table,
-            ).filterNotNull().toSet()
+            ).filterNotNull()
+            .toSet()
 
     @Test
     fun `mysql baseline creates auth session and feedback document tables`() {

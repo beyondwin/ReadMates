@@ -1,16 +1,16 @@
 package com.readmates.sessionrecord.application.port.out
 
-import com.readmates.sessionrecord.application.model.CompletedSessionRecordApply
+import com.readmates.notification.domain.NotificationEventType
 import com.readmates.sessionrecord.application.model.ApplySessionRecordCommand
+import com.readmates.sessionrecord.application.model.CompletedSessionRecordApply
 import com.readmates.sessionrecord.application.model.EncodedSessionRecordSnapshot
 import com.readmates.sessionrecord.application.model.LiveSessionRecord
 import com.readmates.sessionrecord.application.model.RestoreSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.SaveSessionRecordDraftCommand
+import com.readmates.sessionrecord.application.model.SessionRecordApplyReceipt
 import com.readmates.sessionrecord.application.model.SessionRecordDraft
 import com.readmates.sessionrecord.application.model.SessionRecordEditor
 import com.readmates.sessionrecord.application.model.SessionRecordRevision
-import com.readmates.sessionrecord.application.model.SessionRecordApplyReceipt
-import com.readmates.notification.domain.NotificationEventType
 import com.readmates.shared.security.AuthenticatedClubActor
 import java.util.UUID
 
@@ -37,7 +37,7 @@ interface SessionRecordStorePort {
         draftSha256: String,
         composerEventType: NotificationEventType,
         revision: SessionRecordRevision,
-    ): SessionRecordApplyReceipt = error("Apply receipts are not supported by this store")
+    ): SessionRecordApplyReceipt
 
     fun insertBaselineIfAbsent(
         host: AuthenticatedClubActor,

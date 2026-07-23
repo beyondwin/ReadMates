@@ -1,8 +1,8 @@
 package com.readmates.session.application
 
 import com.readmates.session.domain.SessionParticipationStatus
-import com.readmates.sessionrecord.application.model.SessionRecordStatus
 import com.readmates.sessionrecord.application.model.HostNotificationComposerContext
+import com.readmates.sessionrecord.application.model.SessionRecordStatus
 import java.time.OffsetDateTime
 import java.util.UUID
 

@@ -1,13 +1,13 @@
 package com.readmates.sessionrecord.adapter.out.persistence
 
 import com.readmates.auth.domain.MembershipRole
+import com.readmates.notification.domain.NotificationEventType
 import com.readmates.session.application.SessionRecordVisibility
-import com.readmates.sessionrecord.application.model.SaveSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.ApplySessionRecordCommand
+import com.readmates.sessionrecord.application.model.SaveSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.SessionRecordEntry
 import com.readmates.sessionrecord.application.model.SessionRecordFeedbackDocument
 import com.readmates.sessionrecord.application.model.SessionRecordSnapshot
-import com.readmates.notification.domain.NotificationEventType
 import com.readmates.sessionrecord.application.service.SessionRecordSnapshotCodec
 import com.readmates.shared.security.CurrentMember
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport

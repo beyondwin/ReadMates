@@ -1,18 +1,8 @@
 package com.readmates.session.application.service
 
-import com.readmates.notification.application.model.CompleteHostActionDecisionCommand
-import com.readmates.notification.application.model.HostActionDecisionCommand
 import com.readmates.notification.application.model.HostActionNotificationError
 import com.readmates.notification.application.model.HostActionNotificationException
-import com.readmates.notification.application.model.HostActionPreview
-import com.readmates.notification.application.model.HostActionPreviewCommand
 import com.readmates.notification.application.model.ManualNotificationContentRevision
-import com.readmates.notification.application.model.PreparedHostActionDecision
-import com.readmates.notification.application.model.RecordHostConfirmedNotificationEventCommand
-import com.readmates.notification.application.port.`in`.ConfirmHostActionNotificationUseCase
-import com.readmates.notification.application.port.`in`.RecordHostConfirmedNotificationEventUseCase
-import com.readmates.notification.application.port.`in`.RecordNotificationEventUseCase
-import com.readmates.notification.application.port.out.StoredHostActionDecision
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.session.application.HostSessionDetailResponse
 import com.readmates.session.application.HostSessionRecordStagingRequiredException
@@ -25,14 +15,12 @@ import com.readmates.session.application.port.out.HostSessionDeletionPort
 import com.readmates.session.application.port.out.HostSessionDraftPort
 import com.readmates.session.application.port.out.HostSessionLifecyclePort
 import com.readmates.session.application.port.out.HostSessionVisibilitySnapshot
-import com.readmates.sessionrecord.config.HostActionConfirmationProperties
 import com.readmates.sessionrecord.application.model.HostNotificationComposerContext
+import com.readmates.sessionrecord.config.HostActionConfirmationProperties
 import com.readmates.shared.cache.ReadCacheInvalidationPort
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.time.LocalDate
-import java.util.UUID
 
 @Service
 class HostSessionLifecycleService(
@@ -40,9 +28,6 @@ class HostSessionLifecycleService(
     private val deletionPort: HostSessionDeletionPort,
     private val draftPort: HostSessionDraftPort,
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
-    @Suppress("UNUSED_PARAMETER") recordNotificationEventUseCase: RecordNotificationEventUseCase = NoopRecordNotificationEventUseCase,
-    @Suppress("UNUSED_PARAMETER") notificationGate: ConfirmHostActionNotificationUseCase = NoopHostActionNotificationGate,
-    @Suppress("UNUSED_PARAMETER") confirmedEventRecorder: RecordHostConfirmedNotificationEventUseCase = NoopConfirmedEventRecorder,
     private val confirmationProperties: HostActionConfirmationProperties = HostActionConfirmationProperties(),
 ) : HostSessionLifecycleUseCase {
     @Transactional
@@ -89,7 +74,6 @@ class HostSessionLifecycleService(
             throw HostSessionRecordStagingRequiredException()
         }
     }
-
 
     @Transactional
     override fun open(command: HostSessionIdCommand) =
@@ -161,57 +145,3 @@ private fun isFirstMemberPublication(
     state == "DRAFT" &&
         previousVisibility == SessionRecordVisibility.HOST_ONLY &&
         requestedVisibility != SessionRecordVisibility.HOST_ONLY
-
-private object NoopRecordNotificationEventUseCase : RecordNotificationEventUseCase {
-    override fun recordFeedbackDocumentPublished(
-        clubId: UUID,
-        sessionId: UUID,
-        sessionNumber: Int,
-        bookTitle: String,
-        documentVersion: Int,
-    ) = Unit
-
-    override fun recordNextBookPublished(
-        clubId: UUID,
-        sessionId: UUID,
-        sessionNumber: Int,
-        bookTitle: String,
-    ) = Unit
-
-    override fun recordReviewPublished(
-        clubId: UUID,
-        sessionId: UUID,
-        sessionNumber: Int,
-        bookTitle: String,
-        authorMembershipId: UUID,
-    ) = Unit
-
-    override fun recordSessionReminderDue(targetDate: LocalDate) = Unit
-
-    override fun recordAiGenerationReady(
-        jobId: UUID,
-        sessionId: UUID,
-        clubId: UUID,
-        hostUserId: UUID,
-    ) = Unit
-}
-
-private object NoopHostActionNotificationGate : ConfirmHostActionNotificationUseCase {
-    override fun preview(
-        host: com.readmates.shared.security.CurrentMember,
-        command: HostActionPreviewCommand,
-    ): HostActionPreview = error("Host action confirmation gate is not configured")
-
-    override fun prepare(
-        host: com.readmates.shared.security.CurrentMember,
-        command: HostActionDecisionCommand,
-    ): PreparedHostActionDecision = error("Host action confirmation gate is not configured")
-
-    override fun complete(command: CompleteHostActionDecisionCommand): StoredHostActionDecision =
-        error("Host action confirmation gate is not configured")
-}
-
-private object NoopConfirmedEventRecorder : RecordHostConfirmedNotificationEventUseCase {
-    override fun record(command: RecordHostConfirmedNotificationEventCommand): UUID =
-        error("Host-confirmed event recorder is not configured")
-}
