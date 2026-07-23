@@ -47,10 +47,10 @@ class SessionRecordErrorHandler {
                 conflict("NOTIFICATION_PREVIEW_EXPIRED", "알림 확인 시간이 만료되었습니다.")
             HostActionNotificationError.TARGETS_CHANGED ->
                 conflict("NOTIFICATION_TARGETS_CHANGED", "알림 대상이 변경되었습니다.")
-            HostActionNotificationError.PREVIEW_ALREADY_CONSUMED,
-            HostActionNotificationError.DUPLICATE_EVENT,
-            ->
+            HostActionNotificationError.PREVIEW_ALREADY_CONSUMED ->
                 conflict("NOTIFICATION_PREVIEW_ALREADY_CONSUMED", "이미 사용된 알림 확인입니다.")
+            HostActionNotificationError.DUPLICATE_EVENT ->
+                conflict("NOTIFICATION_DUPLICATE_EVENT", "동일한 알림 이벤트가 이미 생성되었습니다.")
             HostActionNotificationError.CONFIRMATION_REQUIRED,
             HostActionNotificationError.PREVIEW_NOT_FOUND,
             HostActionNotificationError.PREVIEW_MISMATCH,

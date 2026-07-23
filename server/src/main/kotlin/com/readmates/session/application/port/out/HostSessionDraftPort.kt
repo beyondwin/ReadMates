@@ -7,16 +7,22 @@ import com.readmates.session.application.model.HostSessionCommand
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
+import java.time.OffsetDateTime
 
 interface HostSessionDraftPort {
     fun create(command: HostSessionCommand): CreatedSessionResponse
 
     fun update(command: UpdateHostSessionCommand): HostSessionDetailResponse
 
-    fun detailForVisibility(command: HostSessionIdCommand): HostSessionDetailResponse
+    fun lockVisibilitySnapshot(command: HostSessionIdCommand): HostSessionVisibilitySnapshot
 
     fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionVisibilityUpdateResult
 }
+
+data class HostSessionVisibilitySnapshot(
+    val detail: HostSessionDetailResponse,
+    val contentUpdatedAt: OffsetDateTime,
+)
 
 data class HostSessionVisibilityUpdateResult(
     val previousVisibility: SessionRecordVisibility,

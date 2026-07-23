@@ -152,6 +152,35 @@ class HostActionNotificationGateServiceTest {
         assertThat(port.insertCount).isEqualTo(1)
     }
 
+    @Test
+    fun `completed lookup resolves immutable scope while caller verifies current result`() {
+        val preview = storedPreview()
+        port.previews[preview.id] = preview
+        port.currentCounts = preview.counts
+        val original = decisionCommand(preview.id, NotificationDecision.SKIP)
+        val stored =
+            service.complete(
+                CompleteHostActionDecisionCommand(
+                    prepared = service.prepare(HOST, original),
+                    liveRevision = 31,
+                    eventId = null,
+                ),
+            )
+
+        val replay =
+            service.findCompleted(
+                HOST,
+                original.copy(expectedLiveRevision = 99, requestHash = "b".repeat(64)),
+            )
+
+        assertThat(replay).isEqualTo(stored)
+        assertThatThrownBy {
+            service.findCompleted(HOST, original.copy(decision = NotificationDecision.SEND))
+        }.isInstanceOf(HostActionNotificationException::class.java)
+            .extracting("error")
+            .isEqualTo(HostActionNotificationError.PREVIEW_ALREADY_CONSUMED)
+    }
+
     private fun previewCommand() =
         HostActionPreviewCommand(
             sessionId = SESSION_ID,

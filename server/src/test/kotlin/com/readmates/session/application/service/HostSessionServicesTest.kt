@@ -53,6 +53,7 @@ import com.readmates.session.application.port.out.HostSessionLifecyclePort
 import com.readmates.session.application.port.out.HostSessionPublicationPort
 import com.readmates.session.application.port.out.HostSessionQueryPort
 import com.readmates.session.application.port.out.HostSessionTransitionResult
+import com.readmates.session.application.port.out.HostSessionVisibilitySnapshot
 import com.readmates.session.application.port.out.HostSessionVisibilityUpdateResult
 import com.readmates.sessionrecord.config.HostActionConfirmationProperties
 import com.readmates.shared.cache.ReadCacheInvalidationPort
@@ -241,10 +242,101 @@ class HostSessionServicesTest {
 
         service.updateVisibility(command)
         gate.completedDecision = gate.lastDecision
-        service.updateVisibility(command)
+        val replayed = service.updateVisibility(command)
 
         assertThat(gate.completed).hasSize(1)
         assertThat(recorder.commands).isEmpty()
+        assertThat(port.visibilityUpdateCount).isEqualTo(1)
+        assertThat(replayed.visibility).isEqualTo(SessionRecordVisibility.PUBLIC)
+        val mismatchedReplay =
+            assertThrows(HostActionNotificationException::class.java) {
+                service.updateVisibility(command.copy(visibility = SessionRecordVisibility.MEMBER))
+            }
+        assertThat(mismatchedReplay.error).isEqualTo(HostActionNotificationError.PREVIEW_ALREADY_CONSUMED)
+        assertThat(port.visibilityUpdateCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `consumed visibility replay rejects intervening content without another write`() {
+        val port =
+            RecordingHostSessionPorts().apply {
+                visibilityState = "DRAFT"
+                currentVisibility = SessionRecordVisibility.HOST_ONLY
+            }
+        val gate = RecordingHostActionGate(host)
+        val service =
+            HostSessionLifecycleService(
+                port,
+                port,
+                port,
+                notificationGate = gate,
+                confirmedEventRecorder = RecordingConfirmedEventRecorder(),
+                confirmationProperties = HostActionConfirmationProperties(required = true),
+            )
+        val preview =
+            service.previewVisibility(
+                PreviewHostSessionVisibilityCommand(host, sessionId, SessionRecordVisibility.MEMBER),
+            )
+        val command =
+            UpdateHostSessionVisibilityCommand(
+                host,
+                sessionId,
+                SessionRecordVisibility.MEMBER,
+                preview.previewId,
+                NotificationDecision.SKIP,
+            )
+        service.updateVisibility(command)
+        gate.completedDecision = gate.lastDecision
+        port.visibilityUpdatedAt = port.visibilityUpdatedAt.plusSeconds(1)
+
+        val error =
+            assertThrows(HostActionNotificationException::class.java) {
+                service.updateVisibility(command)
+            }
+
+        assertThat(error.error).isEqualTo(HostActionNotificationError.PREVIEW_ALREADY_CONSUMED)
+        assertThat(port.visibilityUpdateCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `visibility apply revalidates locked preview payload before mutation`() {
+        val port =
+            RecordingHostSessionPorts().apply {
+                visibilityState = "DRAFT"
+                currentVisibility = SessionRecordVisibility.HOST_ONLY
+            }
+        val gate = RecordingHostActionGate(host)
+        val service =
+            HostSessionLifecycleService(
+                port,
+                port,
+                port,
+                notificationGate = gate,
+                confirmedEventRecorder = RecordingConfirmedEventRecorder(),
+                confirmationProperties = HostActionConfirmationProperties(required = true),
+            )
+        val preview =
+            service.previewVisibility(
+                PreviewHostSessionVisibilityCommand(host, sessionId, SessionRecordVisibility.MEMBER),
+            )
+        port.visibilityBookTitle = "Changed notification payload"
+
+        val error =
+            assertThrows(HostActionNotificationException::class.java) {
+                service.updateVisibility(
+                    UpdateHostSessionVisibilityCommand(
+                        host,
+                        sessionId,
+                        SessionRecordVisibility.MEMBER,
+                        preview.previewId,
+                        NotificationDecision.SEND,
+                    ),
+                )
+            }
+
+        assertThat(error.error).isEqualTo(HostActionNotificationError.PREVIEW_MISMATCH)
+        assertThat(port.visibilityUpdateCount).isZero()
+        assertThat(port.visibilityLockCount).isEqualTo(2)
     }
 
     @Test
@@ -573,6 +665,10 @@ class HostSessionServicesTest {
         var throwOnUpsertPublication = false
         var visibilityState = "OPEN"
         var currentVisibility = SessionRecordVisibility.HOST_ONLY
+        var visibilityBookTitle = "테스트 책"
+        var visibilityUpdatedAt = OffsetDateTime.parse("2026-07-23T10:00:00Z")
+        var visibilityUpdateCount = 0
+        var visibilityLockCount = 0
         val basicSnapshots = ArrayDeque<HostSessionBasicAuditSnapshot>()
         var basicAuditFields: Set<String> = emptySet()
         var attendanceStates: Map<UUID, String> = emptyMap()
@@ -640,19 +736,32 @@ class HostSessionServicesTest {
         override fun update(command: UpdateHostSessionCommand) =
             hostSessionDetail(command.sessionId).also { calls += "update:${command.sessionId}:${command.session.title}" }
 
-        override fun detailForVisibility(command: HostSessionIdCommand): HostSessionDetailResponse =
-            hostSessionDetail(command.sessionId).copy(state = visibilityState, visibility = currentVisibility)
+        override fun lockVisibilitySnapshot(command: HostSessionIdCommand): HostSessionVisibilitySnapshot {
+            visibilityLockCount += 1
+            return HostSessionVisibilitySnapshot(
+                detail =
+                    hostSessionDetail(command.sessionId).copy(
+                        state = visibilityState,
+                        visibility = currentVisibility,
+                        bookTitle = visibilityBookTitle,
+                    ),
+                contentUpdatedAt = visibilityUpdatedAt,
+            )
+        }
 
         override fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionVisibilityUpdateResult {
             visibilityCommand = command
+            visibilityUpdateCount += 1
             val previous = currentVisibility
             currentVisibility = command.visibility
+            visibilityUpdatedAt = visibilityUpdatedAt.plusNanos(1_000)
             return HostSessionVisibilityUpdateResult(
                 previousVisibility = previous,
                 detail =
                     hostSessionDetail(command.sessionId).copy(
                         state = visibilityState,
                         visibility = command.visibility,
+                        bookTitle = visibilityBookTitle,
                     ),
             )
         }
@@ -785,6 +894,7 @@ class HostSessionServicesTest {
     ) : ConfirmHostActionNotificationUseCase {
         private val now = OffsetDateTime.parse("2026-07-23T10:00:00Z")
         private val previewId = UUID.fromString("00000000-0000-0000-0000-000000008001")
+        var previewCommand: HostActionPreviewCommand? = null
         val prepared = mutableListOf<HostActionDecisionCommand>()
         val completed = mutableListOf<CompleteHostActionDecisionCommand>()
         var completedDecision: StoredHostActionDecision? = null
@@ -793,8 +903,9 @@ class HostSessionServicesTest {
         override fun preview(
             host: CurrentMember,
             command: HostActionPreviewCommand,
-        ): HostActionPreview =
-            HostActionPreview(
+        ): HostActionPreview {
+            previewCommand = command
+            return HostActionPreview(
                 previewId,
                 2,
                 2,
@@ -802,12 +913,19 @@ class HostSessionServicesTest {
                 0,
                 now.plusMinutes(5),
             )
+        }
 
         override fun prepare(
             host: CurrentMember,
             command: HostActionDecisionCommand,
         ): PreparedHostActionDecision {
             prepared += command
+            val preview = requireNotNull(previewCommand)
+            if (preview.expectedLiveRevision != command.expectedLiveRevision ||
+                preview.requestHash != command.requestHash
+            ) {
+                throw HostActionNotificationException(HostActionNotificationError.PREVIEW_MISMATCH)
+            }
             return PreparedHostActionDecision(
                 command.previewId,
                 host.clubId,

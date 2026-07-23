@@ -38,6 +38,7 @@ class SessionRecordErrorHandlerTest {
             HostActionNotificationError.PREVIEW_ALREADY_CONSUMED,
             "NOTIFICATION_PREVIEW_ALREADY_CONSUMED",
         )
+        assertNotificationError(HostActionNotificationError.DUPLICATE_EVENT, "NOTIFICATION_DUPLICATE_EVENT")
     }
 
     private fun assertRecordError(

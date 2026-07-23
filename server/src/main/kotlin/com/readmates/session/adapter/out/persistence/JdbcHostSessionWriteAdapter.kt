@@ -1,8 +1,8 @@
 package com.readmates.session.adapter.out.persistence
 
-import com.readmates.session.application.HostSessionDetailResponse
 import com.readmates.session.application.HostSessionListItem
 import com.readmates.session.application.HostSessionListQuery
+import com.readmates.session.application.HostSessionNotFoundException
 import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.model.HostSessionCommand
@@ -17,6 +17,9 @@ import com.readmates.session.application.port.out.HostSessionLifecyclePort
 import com.readmates.session.application.port.out.HostSessionPublicationPort
 import com.readmates.session.application.port.out.HostSessionQueryPort
 import com.readmates.session.application.port.out.HostSessionTransitionResult
+import com.readmates.session.application.port.out.HostSessionVisibilitySnapshot
+import com.readmates.shared.db.dbString
+import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
@@ -79,8 +82,26 @@ class JdbcHostSessionWriteAdapter(
 
     override fun dashboard(host: CurrentMember) = queries.hostDashboard(jdbcTemplate, host)
 
-    override fun detailForVisibility(command: HostSessionIdCommand): HostSessionDetailResponse =
-        queries.findHostSession(jdbcTemplate, command.host, command.sessionId)
+    override fun lockVisibilitySnapshot(command: HostSessionIdCommand): HostSessionVisibilitySnapshot {
+        queries.requireHostSession(jdbcTemplate, command.host, command.sessionId)
+        val updatedAt =
+            jdbcTemplate
+                .query(
+                    """
+                    select updated_at
+                    from sessions
+                    where id = ? and club_id = ?
+                    for update
+                    """.trimIndent(),
+                    { resultSet, _ -> resultSet.utcOffsetDateTime("updated_at") },
+                    command.sessionId.dbString(),
+                    command.host.clubId.dbString(),
+                ).firstOrNull() ?: throw HostSessionNotFoundException()
+        return HostSessionVisibilitySnapshot(
+            detail = queries.findHostSessionAfterHostCheck(jdbcTemplate, command.host, command.sessionId),
+            contentUpdatedAt = updatedAt,
+        )
+    }
 
     @Suppress("MaxLineLength")
     override fun updateVisibility(command: UpdateHostSessionVisibilityCommand) = writeOperations.updateVisibility(jdbcTemplate, command)

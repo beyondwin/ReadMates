@@ -25,6 +25,7 @@ import com.readmates.session.application.port.`in`.HostSessionLifecycleUseCase
 import com.readmates.session.application.port.out.HostSessionDeletionPort
 import com.readmates.session.application.port.out.HostSessionDraftPort
 import com.readmates.session.application.port.out.HostSessionLifecyclePort
+import com.readmates.session.application.port.out.HostSessionVisibilitySnapshot
 import com.readmates.sessionrecord.config.HostActionConfirmationProperties
 import com.readmates.shared.cache.ReadCacheInvalidationPort
 import com.readmates.shared.security.Sha256
@@ -47,34 +48,46 @@ class HostSessionLifecycleService(
 ) : HostSessionLifecycleUseCase {
     @Transactional
     override fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionDetailResponse {
-        val decisionCommand = command.toDecisionCommand()
+        val current = draftPort.lockVisibilitySnapshot(HostSessionIdCommand(command.host, command.sessionId))
+        val binding = current.visibilityBinding(command.visibility)
+        val decisionCommand = command.toDecisionCommand(binding)
         if (confirmationProperties.required && decisionCommand != null) {
-            notificationGate.findCompleted(command.host, decisionCommand)?.let {
-                return finishVisibilityUpdate(command)
+            notificationGate.findCompleted(command.host, decisionCommand)?.let { completed ->
+                return replayVisibilityUpdate(command, current, completed)
             }
         }
-        if (confirmationProperties.required && decisionCommand == null) {
-            val current = draftPort.detailForVisibility(HostSessionIdCommand(command.host, command.sessionId))
-            if (isFirstMemberPublication(current.state, current.visibility, command.visibility)) confirmationRequired()
+        val firstPublication =
+            isFirstMemberPublication(current.detail.state, current.detail.visibility, command.visibility)
+        if (confirmationProperties.required && !firstPublication && decisionCommand != null) {
+            throw HostActionNotificationException(HostActionNotificationError.PREVIEW_MISMATCH)
         }
-
-        val result = draftPort.updateVisibility(command)
-        if (isFirstMemberPublication(result.detail.state, result.previousVisibility, command.visibility)) {
-            if (confirmationProperties.required) {
-                confirmVisibilityUpdate(command, decisionCommand ?: confirmationRequired())
+        val prepared =
+            if (confirmationProperties.required && firstPublication) {
+                notificationGate.prepare(command.host, decisionCommand ?: confirmationRequired())
             } else {
-                recordLegacyNextBookNotification(command, result.detail)
+                null
             }
+        draftPort.updateVisibility(command)
+        val applied = draftPort.lockVisibilitySnapshot(HostSessionIdCommand(command.host, command.sessionId))
+        if (applied.detail.visibility != command.visibility) {
+            throw HostActionNotificationException(HostActionNotificationError.PREVIEW_MISMATCH)
+        }
+        if (prepared != null) {
+            confirmVisibilityUpdate(prepared, applied)
+        } else if (firstPublication) {
+            recordLegacyNextBookNotification(command, applied.detail)
         }
         cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
-        return result.detail
+        return applied.detail
     }
 
+    @Transactional
     override fun previewVisibility(command: PreviewHostSessionVisibilityCommand): HostSessionVisibilityPreview {
-        val current = draftPort.detailForVisibility(HostSessionIdCommand(command.host, command.sessionId))
-        if (!isFirstMemberPublication(current.state, current.visibility, command.visibility)) {
+        val current = draftPort.lockVisibilitySnapshot(HostSessionIdCommand(command.host, command.sessionId))
+        if (!isFirstMemberPublication(current.detail.state, current.detail.visibility, command.visibility)) {
             throw HostActionNotificationException(HostActionNotificationError.CONFIRMATION_REQUIRED)
         }
+        val binding = current.visibilityBinding(command.visibility)
         val preview =
             notificationGate.preview(
                 command.host,
@@ -83,35 +96,27 @@ class HostSessionLifecycleService(
                     action = HostConfirmedAction.NEXT_BOOK_PUBLISH,
                     eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
                     expectedDraftRevision = null,
-                    expectedLiveRevision = VISIBILITY_REVISION,
-                    requestHash = visibilityRequestHash(command.visibility),
+                    expectedLiveRevision = binding.contentRevision,
+                    requestHash = binding.requestHash,
                 ),
             )
         return preview.toVisibilityPreview()
     }
 
-    private fun finishVisibilityUpdate(command: UpdateHostSessionVisibilityCommand): HostSessionDetailResponse {
-        val result = draftPort.updateVisibility(command)
-        cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
-        return result.detail
-    }
-
     private fun confirmVisibilityUpdate(
-        command: UpdateHostSessionVisibilityCommand,
-        decisionCommand: HostActionDecisionCommand,
+        prepared: PreparedHostActionDecision,
+        applied: HostSessionVisibilitySnapshot,
     ) {
-        val prepared = notificationGate.prepare(command.host, decisionCommand)
-        val detail = draftPort.detailForVisibility(HostSessionIdCommand(command.host, command.sessionId))
         val eventId =
             if (prepared.decision == NotificationDecision.SEND) {
                 confirmedEventRecorder.record(
                     RecordHostConfirmedNotificationEventCommand(
-                        clubId = command.host.clubId,
-                        sessionId = command.sessionId,
-                        sessionNumber = detail.sessionNumber,
-                        bookTitle = detail.bookTitle,
+                        clubId = prepared.clubId,
+                        sessionId = prepared.sessionId,
+                        sessionNumber = applied.detail.sessionNumber,
+                        bookTitle = applied.detail.bookTitle,
                         eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
-                        revision = VISIBILITY_REVISION,
+                        revision = applied.contentRevision(),
                     ),
                 )
             } else {
@@ -120,10 +125,23 @@ class HostSessionLifecycleService(
         notificationGate.complete(
             CompleteHostActionDecisionCommand(
                 prepared = prepared,
-                liveRevision = VISIBILITY_REVISION,
+                liveRevision = applied.contentRevision(),
                 eventId = eventId,
             ),
         )
+    }
+
+    private fun replayVisibilityUpdate(
+        command: UpdateHostSessionVisibilityCommand,
+        current: HostSessionVisibilitySnapshot,
+        completed: StoredHostActionDecision,
+    ): HostSessionDetailResponse {
+        if (current.detail.visibility != command.visibility ||
+            current.contentRevision() != completed.liveRevision
+        ) {
+            throw HostActionNotificationException(HostActionNotificationError.PREVIEW_ALREADY_CONSUMED)
+        }
+        return current.detail
     }
 
     private fun recordLegacyNextBookNotification(
@@ -196,7 +214,6 @@ class HostSessionLifecycleService(
         deletionPort.delete(command).also { cacheInvalidation.evictClubContentAfterCommit(command.host.clubId) }
 
     private companion object {
-        private const val VISIBILITY_REVISION = 0L
         private val logger = LoggerFactory.getLogger(HostSessionLifecycleService::class.java)
     }
 }
@@ -210,10 +227,59 @@ private fun isFirstMemberPublication(
         previousVisibility == SessionRecordVisibility.HOST_ONLY &&
         requestedVisibility != SessionRecordVisibility.HOST_ONLY
 
-@Suppress("MaxLineLength")
-private fun visibilityRequestHash(visibility: SessionRecordVisibility): String = Sha256.hex("next-book-visibility|${visibility.name}")
+private data class HostSessionVisibilityBinding(
+    val contentRevision: Long,
+    val requestHash: String,
+)
 
-private fun UpdateHostSessionVisibilityCommand.toDecisionCommand(): HostActionDecisionCommand? {
+private fun HostSessionVisibilitySnapshot.visibilityBinding(
+    targetVisibility: SessionRecordVisibility,
+): HostSessionVisibilityBinding {
+    val revision = contentRevision()
+    return HostSessionVisibilityBinding(
+        contentRevision = revision,
+        requestHash =
+            Sha256.hex(
+                visibilityFrame(
+                    "schema" to "next-book-visibility:v2",
+                    "sessionId" to detail.sessionId,
+                    "state" to detail.state,
+                    "sourceVisibility" to detail.visibility.name,
+                    "targetVisibility" to targetVisibility.name,
+                    "contentRevision" to revision.toString(),
+                    "sessionNumber" to detail.sessionNumber.toString(),
+                    "bookTitle" to detail.bookTitle,
+                    "eventType" to NotificationEventType.NEXT_BOOK_PUBLISHED.name,
+                ),
+            ),
+    )
+}
+
+private fun HostSessionVisibilitySnapshot.contentRevision(): Long =
+    Sha256
+        .hex(
+            visibilityFrame(
+                "contentUpdatedAt" to contentUpdatedAt.toInstant().toString(),
+                "sessionId" to detail.sessionId,
+                "state" to detail.state,
+                "visibility" to detail.visibility.name,
+                "sessionNumber" to detail.sessionNumber.toString(),
+                "bookTitle" to detail.bookTitle,
+            ),
+        ).take(CONTENT_REVISION_HEX_LENGTH)
+        .toLong(HASH_RADIX)
+
+private fun visibilityFrame(vararg fields: Pair<String, String>): String =
+    buildString {
+        fields.forEach { (name, value) ->
+            append(name).append('=')
+            append(value.toByteArray(Charsets.UTF_8).size).append(':').append(value).append(';')
+        }
+    }
+
+private fun UpdateHostSessionVisibilityCommand.toDecisionCommand(
+    binding: HostSessionVisibilityBinding,
+): HostActionDecisionCommand? {
     if (previewId == null || notificationDecision == null) return null
     return HostActionDecisionCommand(
         previewId = previewId,
@@ -221,8 +287,8 @@ private fun UpdateHostSessionVisibilityCommand.toDecisionCommand(): HostActionDe
         action = HostConfirmedAction.NEXT_BOOK_PUBLISH,
         eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
         expectedDraftRevision = null,
-        expectedLiveRevision = 0,
-        requestHash = visibilityRequestHash(visibility),
+        expectedLiveRevision = binding.contentRevision,
+        requestHash = binding.requestHash,
         decision = notificationDecision,
     )
 }
@@ -239,6 +305,9 @@ private fun HostActionPreview.toVisibilityPreview() =
 
 @Suppress("MaxLineLength")
 private fun confirmationRequired(): Nothing = throw HostActionNotificationException(HostActionNotificationError.CONFIRMATION_REQUIRED)
+
+private const val CONTENT_REVISION_HEX_LENGTH = 15
+private const val HASH_RADIX = 16
 
 private object NoopRecordNotificationEventUseCase : RecordNotificationEventUseCase {
     override fun recordFeedbackDocumentPublished(
