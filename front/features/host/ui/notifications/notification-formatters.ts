@@ -25,7 +25,7 @@ export type HostNotificationEventItem = {
   manualDispatch?: {
     manualDispatchId: string;
     requestedChannels: "IN_APP" | "EMAIL" | "BOTH";
-    audience: "ALL_ACTIVE_MEMBERS" | "SESSION_PARTICIPANTS" | "CONFIRMED_ATTENDEES";
+    audience: "ALL_ACTIVE_MEMBERS" | "SESSION_PARTICIPANTS" | "CONFIRMED_ATTENDEES" | "SELECTED_MEMBERS";
     resend: boolean;
     requestedBy: string;
     targetCount: number;

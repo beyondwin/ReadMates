@@ -7,6 +7,7 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const FORBIDDEN = [
   /from\s+["']@\/features\/host\/api\/host-api["']/,
   /from\s+["']@\/features\/host\/queries\/host-notification-queries["']/,
+  /from\s+["']@\/features\/host\/route(?:\/[^"']+)?["']/,
   /from\s+["']@\/shared\/api(?:\/[^"']+)?["']/,
 ];
 
@@ -31,6 +32,17 @@ function toPosixRelative(absolutePath: string): string {
 }
 
 describe("host notifications UI boundary", () => {
+  it("keeps the reusable composer and recipient picker in the UI surface", () => {
+    const uiRoot = resolve(repoRoot, "features/host/ui/notifications");
+    const files = collectUiFiles(uiRoot).map(toPosixRelative);
+
+    expect(files).toEqual(expect.arrayContaining([
+      "features/host/ui/notifications/host-notification-composer.tsx",
+      "features/host/ui/notifications/host-notification-composer-dialog.tsx",
+      "features/host/ui/notifications/notification-recipient-picker.tsx",
+    ]));
+  });
+
   it("does not import server-state modules from features/host/ui", () => {
     const uiRoot = resolve(repoRoot, "features/host/ui");
     const files = collectUiFiles(uiRoot);
@@ -45,5 +57,14 @@ describe("host notifications UI boundary", () => {
       }
     }
     expect(violations).toEqual([]);
+  });
+
+  it("reuses the shared composer from the operations workbench", () => {
+    const workbench = readFileSync(
+      resolve(repoRoot, "features/host/ui/notifications/manual-notification-workbench.tsx"),
+      "utf8",
+    );
+    expect(workbench).toContain('from "./host-notification-composer"');
+    expect(workbench).not.toContain("manual-notification-member-picker");
   });
 });

@@ -6,6 +6,7 @@ import type { LoaderFunctionArgs } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { hostNotificationsLoaderFactory } from "@/features/host/route/host-notifications-data";
 import { HostNotificationsRoute } from "@/features/host/route/host-notifications-route";
+import { combineManualOptions } from "@/features/host/route/host-notifications-route-model";
 import {
   hostNotificationAuditQuery,
   hostNotificationDeliveriesQuery,
@@ -460,6 +461,39 @@ describe("hostNotificationsLoader", () => {
 });
 
 describe("HostNotificationsRoute", () => {
+  it("deduplicates overlapping manual member cursor pages by membership id", () => {
+    const member = {
+      membershipId: "member-overlap",
+      displayName: "겹치는 멤버",
+      maskedEmail: "o***@example.com",
+      role: "MEMBER" as const,
+      membershipStatus: "ACTIVE" as const,
+      sessionParticipationStatus: "ACTIVE" as const,
+      attendanceStatus: null,
+      emailEligibility: "ELIGIBLE" as const,
+      inAppEligibility: "ELIGIBLE" as const,
+    };
+
+    const combined = combineManualOptions([
+      {
+        ...manualOptionsFixture,
+        members: { items: [member], nextCursor: "cursor-2" },
+      },
+      {
+        ...manualOptionsFixture,
+        members: {
+          items: [member, { ...member, membershipId: "member-next", displayName: "다음 멤버" }],
+          nextCursor: null,
+        },
+      },
+    ]);
+
+    expect(combined.members.items.map((item) => item.membershipId)).toEqual([
+      "member-overlap",
+      "member-next",
+    ]);
+  });
+
   it("renders host notifications route from query seeded data", async () => {
     renderNotificationsRoute();
 
@@ -719,6 +753,7 @@ describe("HostNotificationsPage", () => {
       onLoadMoreManualMembers,
     });
 
+    await user.click(screen.getByRole("radio", { name: "직접 선택" }));
     await user.type(screen.getByRole("searchbox", { name: "멤버 검색" }), "김");
     await user.click(screen.getByRole("button", { name: "검색" }));
     expect(onLoadManualOptions).toHaveBeenCalledWith("session-1", "김");

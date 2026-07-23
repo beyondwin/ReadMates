@@ -5,7 +5,6 @@ import { HostNotificationsPage } from "@/features/host/ui/host-notifications-pag
 import type {
   HostNotificationDeliveryListResponse,
   HostNotificationEventListResponse,
-  ManualNotificationOptionsResponse,
   NotificationTestMailAuditPage,
 } from "@/features/host/api/host-contracts";
 import {
@@ -32,6 +31,7 @@ import {
   pageRequests,
 } from "@/shared/query/cursor-pagination";
 import type { HostNotificationsRouteData } from "./host-notifications-data";
+import { combineManualOptions } from "./host-notifications-route-model";
 
 const HOST_NOTIFICATION_LEDGER_PAGE_LIMIT = 50;
 const MANUAL_DISPATCH_PAGE_LIMIT = 20;
@@ -39,29 +39,6 @@ const MANUAL_MEMBER_PAGE_LIMIT = 50;
 
 function contextFromClubSlug(clubSlug?: string): ReadmatesApiContext | undefined {
   return clubSlug ? { clubSlug } : undefined;
-}
-
-function combineManualOptions(
-  pages: Array<ManualNotificationOptionsResponse | undefined>,
-): ManualNotificationOptionsResponse {
-  const first = pages.find(Boolean);
-  const last = [...pages].reverse().find(Boolean);
-  if (!first) {
-    return {
-      session: null,
-      templates: [],
-      members: { items: [], nextCursor: null },
-      recentDispatches: [],
-    };
-  }
-
-  return {
-    ...first,
-    members: {
-      items: pages.flatMap((page) => page?.members.items ?? []),
-      nextCursor: last?.members.nextCursor ?? null,
-    },
-  };
 }
 
 export function HostNotificationsRoute() {

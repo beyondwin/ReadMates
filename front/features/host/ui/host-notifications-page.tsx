@@ -312,6 +312,10 @@ export function HostNotificationsPage({
           onSessionChange={handleManualSessionChange}
           onLoadManualOptions={handleLoadManualOptions}
           onLoadMoreManualMembers={handleLoadMoreManualMembers}
+          onDraftInvalidated={() => {
+            setManualPreview(null);
+            setManualError(null);
+          }}
         />
 
         <ManualNotificationDispatchLedger
