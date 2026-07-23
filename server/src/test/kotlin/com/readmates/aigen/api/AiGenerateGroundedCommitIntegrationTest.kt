@@ -540,6 +540,9 @@ class AiGenerateGroundedCommitIntegrationTest(
             "revision",
             "session_id",
             "club_id",
+            "request_sha256",
+            "base_live_revision",
+            "draft_revision",
             "committed_at",
         )
     }

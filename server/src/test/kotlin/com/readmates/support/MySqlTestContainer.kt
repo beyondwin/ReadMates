@@ -16,7 +16,7 @@ object MySqlTestContainer {
                 "--innodb-buffer-pool-size=32M",
                 "--performance-schema=OFF",
                 "--key-buffer-size=8M",
-                "--max-connections=20",
+                "--max-connections=100",
             )
             // Local-only opt-in: developer enables via ~/.testcontainers.properties
             // (testcontainers.reuse.enable=true). CI is unaffected because each
