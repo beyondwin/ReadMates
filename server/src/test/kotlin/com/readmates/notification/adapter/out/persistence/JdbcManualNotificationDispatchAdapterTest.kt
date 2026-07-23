@@ -20,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.jdbc.Sql
+import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.UUID
@@ -224,70 +225,42 @@ class JdbcManualNotificationDispatchAdapterTest(
     }
 
     @Test
-    fun `confirmManualDispatch consumes preview once and returns existing dispatch on retry`() {
+    fun `confirm replays persisted summary after revision member channel and ttl changes`() {
         val now = OffsetDateTime.of(2026, 7, 23, 0, 0, 0, 0, ZoneOffset.UTC)
-        val previewId =
-            adapter.insertPreview(
-                clubId,
-                hostMembershipId,
-                "a".repeat(64),
-                now.plusMinutes(10),
-            )
-        val snapshot = adapter.previewTargets(clubId, selection())
-        val payload =
-            NotificationEventPayload(
-                sessionId = sessionId,
-                sessionNumber = 7,
-                bookTitle = "Example Book",
-                manualDispatch =
-                    NotificationManualDispatchPayload(
-                        id = UUID.nameUUIDFromBytes("manual-dispatch-idempotent".toByteArray()),
-                        source = NotificationDispatchSource.MANUAL,
-                        requestedByMembershipId = hostMembershipId,
-                        requestedChannels = ManualNotificationRequestedChannels.BOTH,
-                        audience = ManualNotificationAudience.ALL_ACTIVE_MEMBERS,
-                        contentRevision = reminderRevision(),
-                        targetMembershipIds = snapshot.targetMembershipIds,
-                        inAppMembershipIds = snapshot.inAppMembershipIds,
-                        emailMembershipIds = snapshot.emailMembershipIds,
-                        resend = false,
-                        sendMode = ManualNotificationSendMode.NOW,
-                    ),
-            )
+        val currentSelection = selection()
+        val previewId = adapter.insertPreview(clubId, hostMembershipId, "a".repeat(64), now.plusMinutes(10))
+        val snapshot = adapter.previewTargets(clubId, currentSelection)
+        val payload = payload("manual-dispatch-idempotent", currentSelection, snapshot)
+        val first = confirm(previewId, now, currentSelection, payload, snapshot)
+        val mutableMembershipId = snapshot.emailMembershipIds.first { it != hostMembershipId }
+        val originalState = mutableReplayState(mutableMembershipId)
 
-        val first =
-            adapter.confirmManualDispatch(
-                previewId = previewId,
-                clubId = clubId,
-                hostMembershipId = hostMembershipId,
-                selectionHash = "a".repeat(64),
-                now = now,
-                selection = selection(),
-                payload = payload,
-                targetSnapshot = snapshot,
-                resend = false,
-            )
-        val second =
-            adapter.confirmManualDispatch(
-                previewId = previewId,
-                clubId = clubId,
-                hostMembershipId = hostMembershipId,
-                selectionHash = "a".repeat(64),
-                now = now.plusMinutes(11),
-                selection = selection(),
-                payload =
-                    payload.copy(
-                        manualDispatch = payload.manualDispatch!!.copy(id = UUID.randomUUID()),
-                    ),
-                targetSnapshot = snapshot,
-                resend = false,
-            )
+        try {
+            makeReplayStateIneligible(mutableMembershipId, originalState.date.plusDays(1))
+            val second =
+                confirm(
+                    previewId,
+                    now.plusMinutes(11),
+                    currentSelection,
+                    payload =
+                        payload.copy(
+                            manualDispatch = payload.manualDispatch!!.copy(id = UUID.randomUUID()),
+                        ),
+                    snapshot = ManualNotificationTargetSnapshot(0, 0, 0, 0, 0, 0, 0, 0),
+                )
 
-        assertThat(first!!.status).isEqualTo(ManualNotificationConfirmInsertStatus.CREATED)
-        assertThat(second!!.status).isEqualTo(ManualNotificationConfirmInsertStatus.ALREADY_CONSUMED)
-        assertThat(first.eventId).isEqualTo(second.eventId)
-        assertThat(eventCount(first.eventId)).isEqualTo(1)
-        assertThat(previewManualDispatchCount(previewId)).isEqualTo(1)
+            assertThat(first!!.status).isEqualTo(ManualNotificationConfirmInsertStatus.CREATED)
+            assertThat(second!!.status).isEqualTo(ManualNotificationConfirmInsertStatus.ALREADY_CONSUMED)
+            assertThat(first.eventId).isEqualTo(second.eventId)
+            assertThat(second.summary).isEqualTo(first.summary)
+            assertThat(second.summary.targetCount).isEqualTo(snapshot.finalTargetCount)
+            assertThat(second.summary.expectedInAppCount).isEqualTo(snapshot.inAppEligibleCount)
+            assertThat(second.summary.expectedEmailCount).isEqualTo(snapshot.emailEligibleCount)
+            assertThat(eventCount(first.eventId)).isEqualTo(1)
+            assertThat(previewManualDispatchCount(previewId)).isEqualTo(1)
+        } finally {
+            restoreMutableReplayState(mutableMembershipId, originalState)
+        }
     }
 
     @Test
@@ -456,6 +429,124 @@ class JdbcManualNotificationDispatchAdapterTest(
             ),
     )
 
+    private fun confirm(
+        previewId: UUID,
+        now: OffsetDateTime,
+        selection: ManualNotificationSelection,
+        payload: NotificationEventPayload,
+        snapshot: ManualNotificationTargetSnapshot,
+    ) = adapter.confirmManualDispatch(
+        previewId = previewId,
+        clubId = clubId,
+        hostMembershipId = hostMembershipId,
+        selectionHash = "a".repeat(64),
+        now = now,
+        selection = selection,
+        payload = payload,
+        targetSnapshot = snapshot,
+        resend = false,
+    )
+
+    private fun mutableReplayState(membershipId: UUID): MutableReplayState {
+        val date =
+            jdbcTemplate.queryForObject(
+                "select session_date from sessions where club_id = ? and id = ?",
+                LocalDate::class.java,
+                clubId.toString(),
+                sessionId.toString(),
+            )
+        val membershipStatus =
+            jdbcTemplate.queryForObject(
+                "select status from memberships where club_id = ? and id = ?",
+                String::class.java,
+                clubId.toString(),
+                membershipId.toString(),
+            )
+        val preference =
+            jdbcTemplate
+                .query(
+                    """
+                    select email_enabled, session_reminder_due_enabled
+                    from notification_preferences
+                    where club_id = ? and membership_id = ?
+                    """.trimIndent(),
+                    { rs, _ -> rs.getBoolean("email_enabled") to rs.getBoolean("session_reminder_due_enabled") },
+                    clubId.toString(),
+                    membershipId.toString(),
+                ).singleOrNull()
+        return MutableReplayState(requireNotNull(date), requireNotNull(membershipStatus), preference)
+    }
+
+    private fun makeReplayStateIneligible(
+        membershipId: UUID,
+        changedDate: LocalDate,
+    ) {
+        jdbcTemplate.update(
+            "update sessions set session_date = ? where club_id = ? and id = ?",
+            changedDate,
+            clubId.toString(),
+            sessionId.toString(),
+        )
+        jdbcTemplate.update(
+            "update memberships set status = 'INACTIVE' where club_id = ? and id = ?",
+            clubId.toString(),
+            membershipId.toString(),
+        )
+        jdbcTemplate.update(
+            """
+            insert into notification_preferences (membership_id, club_id, email_enabled, session_reminder_due_enabled)
+            values (?, ?, false, false)
+            on duplicate key update email_enabled = false, session_reminder_due_enabled = false
+            """.trimIndent(),
+            membershipId.toString(),
+            clubId.toString(),
+        )
+    }
+
+    private fun restoreMutableReplayState(
+        membershipId: UUID,
+        state: MutableReplayState,
+    ) {
+        jdbcTemplate.update(
+            "update sessions set session_date = ? where club_id = ? and id = ?",
+            state.date,
+            clubId.toString(),
+            sessionId.toString(),
+        )
+        jdbcTemplate.update(
+            "update memberships set status = ? where club_id = ? and id = ?",
+            state.membershipStatus,
+            clubId.toString(),
+            membershipId.toString(),
+        )
+        restorePreference(membershipId, state.preference)
+    }
+
+    private fun restorePreference(
+        membershipId: UUID,
+        preference: Pair<Boolean, Boolean>?,
+    ) {
+        if (preference == null) {
+            jdbcTemplate.update(
+                "delete from notification_preferences where club_id = ? and membership_id = ?",
+                clubId.toString(),
+                membershipId.toString(),
+            )
+            return
+        }
+        jdbcTemplate.update(
+            """
+            update notification_preferences
+            set email_enabled = ?, session_reminder_due_enabled = ?
+            where club_id = ? and membership_id = ?
+            """.trimIndent(),
+            preference.first,
+            preference.second,
+            clubId.toString(),
+            membershipId.toString(),
+        )
+    }
+
     private fun disablePreference(email: String) {
         val membershipId = membershipId(email)
         jdbcTemplate.update(
@@ -522,4 +613,10 @@ class JdbcManualNotificationDispatchAdapterTest(
             NotificationEventType.SESSION_REMINDER_DUE.name,
             contentRevision,
         ) ?: 0
+
+    private data class MutableReplayState(
+        val date: LocalDate,
+        val membershipStatus: String,
+        val preference: Pair<Boolean, Boolean>?,
+    )
 }

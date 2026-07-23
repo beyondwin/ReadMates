@@ -1,8 +1,6 @@
 package com.readmates.sessionimport.api
 
 import com.readmates.auth.domain.MembershipRole
-import com.readmates.notification.application.model.HostActionNotificationException
-import com.readmates.notification.application.model.NotificationDecision
 import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.application.port.out.NotificationEventOutboxPort
 import com.readmates.notification.domain.NotificationEventType
@@ -12,7 +10,6 @@ import com.readmates.sessionrecord.application.service.SessionRecordApplyService
 import com.readmates.shared.security.CurrentMember
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -39,6 +36,7 @@ set consumed_at = null, consumed_decision_id = null
 where session_id = '$SESSION_ID';
 delete from host_action_notification_decisions where session_id = '$SESSION_ID';
 delete from host_action_notification_previews where session_id = '$SESSION_ID';
+delete from session_record_apply_receipts where session_id = '$SESSION_ID';
 delete from session_record_revisions where session_id = '$SESSION_ID';
 delete from notification_event_outbox where aggregate_id = '$SESSION_ID';
 delete from session_record_drafts where session_id = '$SESSION_ID';
@@ -218,14 +216,15 @@ class HostSessionImportControllerDbTest(
                 host,
                 ApplySessionRecordCommand(
                     sessionId = UUID.fromString(SESSION_ID),
-                    previewId = preview.previewId,
+                    applyRequestId = UUID.nameUUIDFromBytes("canonical-import-apply".toByteArray()),
                     expectedDraftRevision = 1,
                     expectedLiveRevision = 0,
-                    notificationDecision = NotificationDecision.SKIP,
+                    expectedDraftHash = preview.expectedDraftHash,
                 ),
             )
 
         assertEquals(2, applied.liveRevision)
+        assertEquals(NotificationEventType.SESSION_RECORD_UPDATED, applied.composer.eventType)
         assertEquals(
             "Import summary.",
             scalar("select public_summary from public_session_publications where session_id = '$SESSION_ID'"),
@@ -239,7 +238,7 @@ class HostSessionImportControllerDbTest(
 
     @Test
     @Suppress("LongMethod")
-    fun `actual outbox dedupe failure rolls back live revision decision and draft deletion`() {
+    fun `preexisting notification dedupe does not affect content only apply`() {
         mockMvc
             .post("/api/host/sessions/$SESSION_ID/session-import/commit") {
                 with(user("session-import-host@example.test"))
@@ -277,32 +276,27 @@ class HostSessionImportControllerDbTest(
             ),
         )
 
-        assertThrows(HostActionNotificationException::class.java) {
+        val applied =
             applyService.apply(
                 host,
                 ApplySessionRecordCommand(
                     sessionId = UUID.fromString(SESSION_ID),
-                    previewId = preview.previewId,
+                    applyRequestId = UUID.nameUUIDFromBytes("dedupe-independent-apply".toByteArray()),
                     expectedDraftRevision = 1,
                     expectedLiveRevision = 0,
-                    notificationDecision = NotificationDecision.SEND,
+                    expectedDraftHash = preview.expectedDraftHash,
                 ),
             )
-        }
 
-        assertDraftSavedAndLiveUnchanged()
-        assertEquals(0, countRows("session_record_revisions"))
-        assertEquals(0, countRows("host_action_notification_decisions"))
+        assertEquals(2, applied.liveRevision)
+        assertEquals(NotificationEventType.SESSION_RECORD_UPDATED, applied.composer.eventType)
         assertEquals(
-            null,
-            scalar(
-                """
-                select cast(consumed_at as char)
-                from host_action_notification_previews
-                where id = '${preview.previewId}'
-                """.trimIndent(),
-            ),
+            "Import summary.",
+            scalar("select public_summary from public_session_publications where session_id = '$SESSION_ID'"),
         )
+        assertEquals(2, countRows("session_record_revisions"))
+        assertEquals(0, countRows("session_record_drafts"))
+        assertEquals(0, countRows("host_action_notification_decisions"))
         assertEquals(
             1,
             jdbcTemplate.queryForObject(

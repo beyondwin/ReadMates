@@ -1,12 +1,9 @@
 package com.readmates.sessionrecord.api
 
-import com.readmates.notification.application.model.NotificationDecision
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.EnumSource
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -165,7 +162,7 @@ class HostSessionRecordControllerDbTest(
     }
 
     @Test
-    fun `first next book publication requires a preview and explicit decision`() {
+    fun `first next book publication returns composer without notification mutation`() {
         mockMvc
             .patch("/api/host/sessions/$VISIBILITY_SESSION_ID/visibility") {
                 with(user("host@example.com"))
@@ -173,8 +170,10 @@ class HostSessionRecordControllerDbTest(
                 contentType = MediaType.APPLICATION_JSON
                 content = """{"visibility":"MEMBER"}"""
             }.andExpect {
-                status { isConflict() }
-                jsonPath("$.code") { value("NOTIFICATION_CONFIRMATION_REQUIRED") }
+                status { isOk() }
+                jsonPath("$.session.visibility") { value("MEMBER") }
+                jsonPath("$.composer.eventType") { value("NEXT_BOOK_PUBLISHED") }
+                jsonPath("$.composer.contentRevision") { isString() }
             }
 
         val visibility =
@@ -183,7 +182,9 @@ class HostSessionRecordControllerDbTest(
                 String::class.java,
                 VISIBILITY_SESSION_ID,
             )
-        assertThat(visibility).isEqualTo("HOST_ONLY")
+        assertThat(visibility).isEqualTo("MEMBER")
+        assertThat(notificationEventCount()).isZero()
+        assertThat(notificationDecisionCount()).isZero()
     }
 
     @Test
@@ -219,70 +220,41 @@ class HostSessionRecordControllerDbTest(
             }
     }
 
-    @ParameterizedTest
-    @EnumSource(NotificationDecision::class)
-    fun `confirmed next book publication records send or skip exactly once`(decision: NotificationDecision) {
-        val previewResponse =
-            mockMvc
-                .post("/api/host/sessions/$VISIBILITY_SESSION_ID/visibility-preview") {
-                    with(user("host@example.com"))
-                    with(csrf())
-                    contentType = MediaType.APPLICATION_JSON
-                    content = """{"visibility":"MEMBER"}"""
-                }.andExpect {
-                    status { isOk() }
-                    jsonPath("$.previewId") { isString() }
-                }.andReturn()
-                .response
-                .contentAsString
-        val previewId =
-            """"previewId"\s*:\s*"([^"]+)""""
-                .toRegex()
-                .find(previewResponse)
-                ?.groupValues
-                ?.get(1)
-                ?: error("visibility preview response did not include previewId")
-        val request =
-            """
-            {
-              "visibility": "MEMBER",
-              "previewId": "$previewId",
-              "notificationDecision": "$decision"
-            }
-            """.trimIndent()
-
+    @Test
+    fun `repeated next book publication update never creates notification or legacy decision`() {
         repeat(2) {
             mockMvc
                 .patch("/api/host/sessions/$VISIBILITY_SESSION_ID/visibility") {
                     with(user("host@example.com"))
                     with(csrf())
                     contentType = MediaType.APPLICATION_JSON
-                    content = request
+                    content = """{"visibility":"MEMBER"}"""
                 }.andExpect {
                     status { isOk() }
-                    jsonPath("$.visibility") { value("MEMBER") }
+                    jsonPath("$.session.visibility") { value("MEMBER") }
                 }
         }
 
-        val decisionCount =
-            jdbcTemplate.queryForObject(
-                "select count(*) from host_action_notification_decisions where preview_id = ?",
-                Int::class.java,
-                previewId,
-            )
-        val eventCount =
-            jdbcTemplate.queryForObject(
-                """
-                select count(*) from notification_event_outbox
-                where aggregate_id = ? and event_type = 'NEXT_BOOK_PUBLISHED'
-                """.trimIndent(),
-                Int::class.java,
-                VISIBILITY_SESSION_ID,
-            )
-        assertThat(decisionCount).isEqualTo(1)
-        assertThat(eventCount)
-            .isEqualTo(if (decision == NotificationDecision.SEND) 1 else 0)
+        assertThat(notificationDecisionCount()).isZero()
+        assertThat(notificationEventCount()).isZero()
     }
+
+    private fun notificationDecisionCount(): Int =
+        jdbcTemplate.queryForObject(
+            "select count(*) from host_action_notification_decisions where session_id = ?",
+            Int::class.java,
+            VISIBILITY_SESSION_ID,
+        ) ?: 0
+
+    private fun notificationEventCount(): Int =
+        jdbcTemplate.queryForObject(
+            """
+            select count(*) from notification_event_outbox
+            where aggregate_id = ? and event_type = 'NEXT_BOOK_PUBLISHED'
+            """.trimIndent(),
+            Int::class.java,
+            VISIBILITY_SESSION_ID,
+        ) ?: 0
 
     private fun draftJson(expectedDraftRevision: Long?): String {
         val revision = expectedDraftRevision?.toString() ?: "null"

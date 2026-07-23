@@ -7,7 +7,6 @@ import com.readmates.notification.application.model.ManualNotificationAudiencePr
 import com.readmates.notification.application.model.ManualNotificationChannelPreview
 import com.readmates.notification.application.model.ManualNotificationConfirmCommand
 import com.readmates.notification.application.model.ManualNotificationConfirmResult
-import com.readmates.notification.application.model.ManualNotificationConfirmSummary
 import com.readmates.notification.application.model.ManualNotificationDispatchList
 import com.readmates.notification.application.model.ManualNotificationDuplicatePreview
 import com.readmates.notification.application.model.ManualNotificationOptions
@@ -160,9 +159,6 @@ class HostManualNotificationService(
         command: ManualNotificationConfirmCommand,
     ): ManualNotificationConfirmResult {
         val currentHost = requireHost(host)
-        validateSelection(currentHost, command.selection)
-        val targetSnapshot = manualDispatchPort.previewTargets(currentHost.clubId, command.selection)
-        requireEligibleTarget(targetSnapshot, command.selection.requestedChannels)
         manualDispatchPort
             .findConsumedManualDispatch(
                 previewId = command.previewId,
@@ -171,8 +167,11 @@ class HostManualNotificationService(
                 selectionHash = selectionHash(command.selection),
                 now = clock(),
             )?.let { stored ->
-                return confirmResult(stored, targetSnapshot, command.selection.requestedChannels)
+                return confirmResult(stored)
             }
+        validateSelection(currentHost, command.selection)
+        val targetSnapshot = manualDispatchPort.previewTargets(currentHost.clubId, command.selection)
+        requireEligibleTarget(targetSnapshot, command.selection.requestedChannels)
         val recent =
             manualDispatchPort.recentDispatches(
                 currentHost.clubId,
@@ -229,26 +228,16 @@ class HostManualNotificationService(
                 "Manual notification dispatch already exists for session/template",
             )
         }
-        return confirmResult(stored, targetSnapshot, command.selection.requestedChannels)
+        return confirmResult(stored)
     }
 
-    private fun confirmResult(
-        stored: ManualNotificationConfirmedDispatch,
-        targetSnapshot: ManualNotificationTargetSnapshot,
-        requestedChannels: ManualNotificationRequestedChannels,
-    ): ManualNotificationConfirmResult =
+    private fun confirmResult(stored: ManualNotificationConfirmedDispatch): ManualNotificationConfirmResult =
         ManualNotificationConfirmResult(
             manualDispatchId = stored.manualDispatchId,
             eventId = stored.eventId,
             status = NotificationEventOutboxStatus.PENDING,
             createdAt = stored.createdAt,
-            summary =
-                ManualNotificationConfirmSummary(
-                    targetCount = targetSnapshot.finalTargetCount,
-                    requestedChannels = requestedChannels,
-                    expectedInAppCount = targetSnapshot.inAppEligibleCount,
-                    expectedEmailCount = targetSnapshot.emailEligibleCount,
-                ),
+            summary = stored.summary,
         )
 
     private fun validateSelection(

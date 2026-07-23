@@ -115,6 +115,13 @@ class NotificationManualDispatchModelsTest {
                 eventId = UUID.nameUUIDFromBytes("event".toByteArray()),
                 createdAt = OffsetDateTime.parse("2026-05-13T10:10:00Z"),
                 status = ManualNotificationConfirmInsertStatus.ALREADY_CONSUMED,
+                summary =
+                    ManualNotificationConfirmSummary(
+                        targetCount = 1,
+                        requestedChannels = ManualNotificationRequestedChannels.BOTH,
+                        expectedInAppCount = 1,
+                        expectedEmailCount = 1,
+                    ),
             )
 
         assertThat(confirmed.status).isEqualTo(ManualNotificationConfirmInsertStatus.ALREADY_CONSUMED)

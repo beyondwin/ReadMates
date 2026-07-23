@@ -1,6 +1,7 @@
 package com.readmates.notification.adapter.out.persistence
 
 import com.readmates.notification.application.model.ManualNotificationAudience
+import com.readmates.notification.application.model.ManualNotificationConfirmSummary
 import com.readmates.notification.application.model.ManualNotificationDispatchList
 import com.readmates.notification.application.model.ManualNotificationDispatchListItem
 import com.readmates.notification.application.model.ManualNotificationEligibility
@@ -438,7 +439,14 @@ class JdbcManualNotificationDispatchAdapter(
         jdbcTemplate
             .query(
                 """
-                select notification_manual_dispatches.id, notification_manual_dispatches.event_id, notification_manual_dispatches.created_at
+                select
+                  notification_manual_dispatches.id,
+                  notification_manual_dispatches.event_id,
+                  notification_manual_dispatches.created_at,
+                  notification_manual_dispatches.requested_channels,
+                  notification_manual_dispatches.target_count,
+                  notification_manual_dispatches.expected_in_app_count,
+                  notification_manual_dispatches.expected_email_count
                 from notification_manual_dispatch_previews
                 join notification_manual_dispatches on notification_manual_dispatches.event_id = notification_manual_dispatch_previews.consumed_event_id
                   and notification_manual_dispatches.club_id = notification_manual_dispatch_previews.club_id
@@ -452,14 +460,7 @@ class JdbcManualNotificationDispatchAdapter(
                   )
                   and notification_manual_dispatch_previews.consumed_event_id is not null
                 """.trimIndent(),
-                { rs, _ ->
-                    ManualNotificationConfirmedDispatch(
-                        manualDispatchId = rs.uuid("id"),
-                        eventId = rs.uuid("event_id"),
-                        createdAt = rs.utcOffsetDateTime("created_at"),
-                        status = ManualNotificationConfirmInsertStatus.ALREADY_CONSUMED,
-                    )
-                },
+                { rs, _ -> rs.toConfirmedDispatch(ManualNotificationConfirmInsertStatus.ALREADY_CONSUMED) },
                 previewId.dbString(),
                 clubId.dbString(),
                 hostMembershipId.dbString(),
@@ -589,12 +590,13 @@ class JdbcManualNotificationDispatchAdapter(
                 "select created_at from notification_manual_dispatches where id = ?",
                 { rs, _ -> rs.utcOffsetDateTime("created_at") },
                 dispatchId.dbString(),
-            )!!
+            )
         return ManualNotificationConfirmedDispatch(
             manualDispatchId = dispatchId,
             eventId = eventId,
             createdAt = createdAt,
             status = ManualNotificationConfirmInsertStatus.CREATED,
+            summary = targetSnapshot.toConfirmSummary(selection.requestedChannels),
         )
     }
 
@@ -656,7 +658,7 @@ class JdbcManualNotificationDispatchAdapter(
                 "select created_at from notification_manual_dispatches where id = ?",
                 { rs, _ -> rs.utcOffsetDateTime("created_at") },
                 dispatchId.dbString(),
-            )!!
+            )
         return ManualNotificationStoredDispatch(dispatchId, eventId, createdAt)
     }
 
@@ -667,19 +669,19 @@ class JdbcManualNotificationDispatchAdapter(
         jdbcTemplate
             .query(
                 """
-                select id, event_id, created_at
+                select
+                  id,
+                  event_id,
+                  created_at,
+                  requested_channels,
+                  target_count,
+                  expected_in_app_count,
+                  expected_email_count
                 from notification_manual_dispatches
                 where club_id = ?
                   and event_id = ?
                 """.trimIndent(),
-                { rs, _ ->
-                    ManualNotificationConfirmedDispatch(
-                        manualDispatchId = rs.uuid("id"),
-                        eventId = rs.uuid("event_id"),
-                        createdAt = rs.utcOffsetDateTime("created_at"),
-                        status = ManualNotificationConfirmInsertStatus.ALREADY_CONSUMED,
-                    )
-                },
+                { rs, _ -> rs.toConfirmedDispatch(ManualNotificationConfirmInsertStatus.ALREADY_CONSUMED) },
                 clubId.dbString(),
                 eventId.dbString(),
             ).firstOrNull()
@@ -691,7 +693,14 @@ class JdbcManualNotificationDispatchAdapter(
         jdbcTemplate
             .query(
                 """
-                select id, event_id, created_at
+                select
+                  id,
+                  event_id,
+                  created_at,
+                  requested_channels,
+                  target_count,
+                  expected_in_app_count,
+                  expected_email_count
                 from notification_manual_dispatches
                 where club_id = ?
                   and session_id = ?
@@ -700,14 +709,7 @@ class JdbcManualNotificationDispatchAdapter(
                 order by created_at desc, id desc
                 limit 1
                 """.trimIndent(),
-                { rs, _ ->
-                    ManualNotificationConfirmedDispatch(
-                        manualDispatchId = rs.uuid("id"),
-                        eventId = rs.uuid("event_id"),
-                        createdAt = rs.utcOffsetDateTime("created_at"),
-                        status = ManualNotificationConfirmInsertStatus.DUPLICATE,
-                    )
-                },
+                { rs, _ -> rs.toConfirmedDispatch(ManualNotificationConfirmInsertStatus.DUPLICATE) },
                 clubId.dbString(),
                 selection.sessionId.dbString(),
                 selection.eventType.name,
@@ -848,6 +850,31 @@ class JdbcManualNotificationDispatchAdapter(
             feedbackDocumentUploaded = getBoolean("feedback_document_uploaded"),
             feedbackDocumentVersion = getInt("feedback_document_version").takeUnless { wasNull() },
             sessionRecordContentRevision = getString("session_record_content_revision"),
+        )
+
+    private fun ResultSet.toConfirmedDispatch(status: ManualNotificationConfirmInsertStatus) =
+        ManualNotificationConfirmedDispatch(
+            manualDispatchId = uuid("id"),
+            eventId = uuid("event_id"),
+            createdAt = utcOffsetDateTime("created_at"),
+            status = status,
+            summary =
+                ManualNotificationConfirmSummary(
+                    targetCount = getInt("target_count"),
+                    requestedChannels = ManualNotificationRequestedChannels.valueOf(getString("requested_channels")),
+                    expectedInAppCount = getInt("expected_in_app_count"),
+                    expectedEmailCount = getInt("expected_email_count"),
+                ),
+        )
+
+    private fun ManualNotificationTargetSnapshot.toConfirmSummary(
+        requestedChannels: ManualNotificationRequestedChannels,
+    ): ManualNotificationConfirmSummary =
+        ManualNotificationConfirmSummary(
+            targetCount = finalTargetCount,
+            requestedChannels = requestedChannels,
+            expectedInAppCount = inAppEligibleCount,
+            expectedEmailCount = emailEligibleCount,
         )
 
     private fun ResultSet.toMemberOption(): ManualNotificationMemberOption {

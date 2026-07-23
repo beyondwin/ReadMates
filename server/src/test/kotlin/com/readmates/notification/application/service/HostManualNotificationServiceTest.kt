@@ -6,6 +6,7 @@ import com.readmates.notification.application.NotificationApplicationError
 import com.readmates.notification.application.NotificationApplicationException
 import com.readmates.notification.application.model.ManualNotificationAudience
 import com.readmates.notification.application.model.ManualNotificationConfirmCommand
+import com.readmates.notification.application.model.ManualNotificationConfirmSummary
 import com.readmates.notification.application.model.ManualNotificationContentRevision
 import com.readmates.notification.application.model.ManualNotificationDispatchList
 import com.readmates.notification.application.model.ManualNotificationMemberOption
@@ -332,6 +333,93 @@ class HostManualNotificationServiceTest {
     }
 
     @Test
+    fun `consumed confirm retry returns original dispatch after content revision changes`() {
+        val port = FakeManualPort()
+        val service = service(port)
+        val currentSelection = selection()
+        val previewId = service.preview(host(), ManualNotificationPreviewCommand(currentSelection)).previewId
+        val first =
+            service.confirm(
+                host(),
+                ManualNotificationConfirmCommand(previewId, currentSelection, resendConfirmed = false),
+            )
+        port.sessionContext = port.sessionContext.copy(date = port.sessionContext.date!!.plusDays(1))
+
+        val replay =
+            service.confirm(
+                host(),
+                ManualNotificationConfirmCommand(previewId, currentSelection, resendConfirmed = false),
+            )
+
+        assertThat(replay).isEqualTo(first)
+        assertThat(port.insertedDispatches).hasSize(1)
+    }
+
+    @Test
+    fun `consumed confirm retry returns original summary after member and channel eligibility changes`() {
+        val selected = UUID.nameUUIDFromBytes("selected-replay".toByteArray())
+        val currentSelection =
+            selection(
+                selectedMembershipIds = listOf(selected),
+                audience = ManualNotificationAudience.SELECTED_MEMBERS,
+            )
+        val port =
+            FakeManualPort(
+                targetSnapshot =
+                    targetSnapshot(
+                        finalTargetCount = 1,
+                        inAppEligibleCount = 1,
+                        emailEligibleCount = 1,
+                    ),
+            )
+        val service = service(port)
+        val previewId = service.preview(host(), ManualNotificationPreviewCommand(currentSelection)).previewId
+        val first =
+            service.confirm(
+                host(),
+                ManualNotificationConfirmCommand(previewId, currentSelection, resendConfirmed = false),
+            )
+        port.membershipEditsAllowed = false
+        port.targetSnapshot = targetSnapshot(finalTargetCount = 0, inAppEligibleCount = 0, emailEligibleCount = 0)
+
+        val replay =
+            service.confirm(
+                host(),
+                ManualNotificationConfirmCommand(previewId, currentSelection, resendConfirmed = false),
+            )
+
+        assertThat(replay).isEqualTo(first)
+        assertThat(replay.summary.targetCount).isEqualTo(1)
+        assertThat(replay.summary.expectedEmailCount).isEqualTo(1)
+        assertThat(port.insertedDispatches).hasSize(1)
+    }
+
+    @Test
+    fun `consumed confirm retry survives preview ttl without recomputing target summary`() {
+        var currentTime = now
+        val port = FakeManualPort()
+        val service = HostManualNotificationService(port, clock = { currentTime })
+        val currentSelection = selection()
+        val previewId = service.preview(host(), ManualNotificationPreviewCommand(currentSelection)).previewId
+        val first =
+            service.confirm(
+                host(),
+                ManualNotificationConfirmCommand(previewId, currentSelection, resendConfirmed = false),
+            )
+        currentTime = currentTime.plusMinutes(11)
+        port.targetSnapshot = targetSnapshot(finalTargetCount = 0, inAppEligibleCount = 0, emailEligibleCount = 0)
+
+        val replay =
+            service.confirm(
+                host(),
+                ManualNotificationConfirmCommand(previewId, currentSelection, resendConfirmed = false),
+            )
+
+        assertThat(replay).isEqualTo(first)
+        assertThat(port.insertedDispatches).hasSize(1)
+    }
+
+    @Test
     fun `preview rejects membership edits outside current club`() {
         val invalidId = UUID.nameUUIDFromBytes("invalid".toByteArray())
         val port = FakeManualPort(membershipEditsAllowed = false)
@@ -426,7 +514,7 @@ class HostManualNotificationServiceTest {
     )
 
     private class FakeManualPort(
-        private val sessionContext: ManualNotificationSessionContext =
+        var sessionContext: ManualNotificationSessionContext =
             ManualNotificationSessionContext(
                 sessionId = SESSION_ID,
                 clubId = CLUB_ID,
@@ -440,8 +528,8 @@ class HostManualNotificationServiceTest {
                 sessionRecordContentRevision = "c".repeat(64),
             ),
         private val recentDispatchCount: Int = 0,
-        private val membershipEditsAllowed: Boolean = true,
-        private val targetSnapshot: ManualNotificationTargetSnapshot =
+        var membershipEditsAllowed: Boolean = true,
+        var targetSnapshot: ManualNotificationTargetSnapshot =
             ManualNotificationTargetSnapshot(
                 baseCount = 4,
                 excludedCount = 1,
@@ -546,9 +634,12 @@ class HostManualNotificationServiceTest {
             now: OffsetDateTime,
         ): ManualNotificationConfirmedDispatch? {
             val preview = previews[previewId] ?: return null
-            if (preview.expiresAt.isBefore(now) || preview.selectionHash != selectionHash) return null
-            return confirmedByPreview[previewId]
-                ?.copy(status = ManualNotificationConfirmInsertStatus.ALREADY_CONSUMED)
+            if (preview.selectionHash != selectionHash) return null
+            confirmedByPreview[previewId]?.let {
+                return it.copy(status = ManualNotificationConfirmInsertStatus.ALREADY_CONSUMED)
+            }
+            if (preview.expiresAt.isBefore(now)) return null
+            return null
         }
 
         override fun confirmManualDispatch(
@@ -570,6 +661,13 @@ class HostManualNotificationServiceTest {
                     eventId = UUID.nameUUIDFromBytes("event".toByteArray()),
                     createdAt = OffsetDateTime.of(2026, 5, 13, 9, 1, 0, 0, ZoneOffset.UTC),
                     status = ManualNotificationConfirmInsertStatus.CREATED,
+                    summary =
+                        ManualNotificationConfirmSummary(
+                            targetCount = targetSnapshot.finalTargetCount,
+                            requestedChannels = selection.requestedChannels,
+                            expectedInAppCount = targetSnapshot.inAppEligibleCount,
+                            expectedEmailCount = targetSnapshot.emailEligibleCount,
+                        ),
                 )
             }
         }

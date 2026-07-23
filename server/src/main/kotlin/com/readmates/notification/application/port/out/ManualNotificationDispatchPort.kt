@@ -1,5 +1,6 @@
 package com.readmates.notification.application.port.out
 
+import com.readmates.notification.application.model.ManualNotificationConfirmSummary
 import com.readmates.notification.application.model.ManualNotificationContentRevision
 import com.readmates.notification.application.model.ManualNotificationDispatchList
 import com.readmates.notification.application.model.ManualNotificationMemberOption
@@ -81,6 +82,7 @@ data class ManualNotificationConfirmedDispatch(
     val eventId: UUID,
     val createdAt: OffsetDateTime,
     val status: ManualNotificationConfirmInsertStatus,
+    val summary: ManualNotificationConfirmSummary,
 )
 
 interface ManualNotificationDispatchPort {
