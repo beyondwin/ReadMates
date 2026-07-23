@@ -31,6 +31,23 @@ export async function fetchFeedbackDocument(sessionId: string, context?: Readmat
     context,
   );
 
+  return feedbackLoadResult(response);
+}
+
+export async function fetchHostFeedbackDocumentPreview(
+  sessionId: string,
+  context?: ReadmatesApiContext,
+): Promise<FeedbackLoadResult> {
+  const response = await readmatesFetchResponse(
+    `/api/host/sessions/${encodeURIComponent(sessionId)}/feedback-document/preview`,
+    undefined,
+    context,
+  );
+
+  return feedbackLoadResult(response);
+}
+
+async function feedbackLoadResult(response: Response): Promise<FeedbackLoadResult> {
   if (response.status === 403) {
     return { status: "unavailable", reason: "forbidden" };
   }

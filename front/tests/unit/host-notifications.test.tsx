@@ -13,6 +13,7 @@ import {
   hostNotificationEventsQuery,
   hostNotificationManualDispatchesQuery,
   hostNotificationManualOptionsQuery,
+  hostNotificationPolicyQuery,
   hostNotificationSessionsQuery,
   hostNotificationSummaryQuery,
 } from "@/features/host/queries/host-notification-queries";
@@ -21,6 +22,7 @@ import { ManualNotificationWorkbench } from "@/features/host/ui/notifications/ma
 import type {
   HostNotificationDeliveryItem,
   HostNotificationEventItem,
+  HostNotificationPolicyResponse,
   HostNotificationSummary,
   HostSessionListItem,
   ManualNotificationConfirmRequest,
@@ -189,6 +191,8 @@ function renderPage({
   onConfirmManual = vi.fn().mockResolvedValue(undefined),
   onLoadManualOptions = vi.fn().mockResolvedValue(manualOptions),
   onLoadMoreManualMembers = vi.fn().mockResolvedValue(manualOptions),
+  policy = { sessionReminderEnabled: false, updatedAt: null },
+  onPolicyChange = vi.fn().mockResolvedValue(undefined),
 }: {
   summaryData?: HostNotificationSummary;
   events?: HostNotificationEventItem[];
@@ -208,6 +212,8 @@ function renderPage({
   onConfirmManual?: (request: ManualNotificationConfirmRequest) => Promise<unknown>;
   onLoadManualOptions?: (sessionId?: string, search?: string) => Promise<ManualNotificationOptionsResponse>;
   onLoadMoreManualMembers?: () => Promise<ManualNotificationOptionsResponse>;
+  policy?: HostNotificationPolicyResponse;
+  onPolicyChange?: (enabled: boolean) => Promise<unknown>;
 } = {}) {
   render(
     <HostNotificationsPage
@@ -218,6 +224,8 @@ function renderPage({
       hostSessions={hostSessions}
       manualOptions={manualOptions}
       initialManualSelection={initialManualSelection}
+      policy={policy}
+      onPolicyChange={onPolicyChange}
       onProcess={onProcess}
       onRetry={onRetry}
       onRestore={onRestore}
@@ -263,6 +271,10 @@ function seedNotificationsRoute(client: QueryClient) {
   client.setQueryData(hostNotificationSessionsQuery(context).queryKey, {
     items: [hostSessionCurrent, hostSessionDraft],
     nextCursor: null,
+  });
+  client.setQueryData(hostNotificationPolicyQuery(context).queryKey, {
+    sessionReminderEnabled: false,
+    updatedAt: null,
   });
   client.setQueryData(hostNotificationManualOptionsQuery(
     { sessionId: "session-1", page: { limit: 50 } },
@@ -502,6 +514,39 @@ describe("HostNotificationsRoute", () => {
     expect(screen.getByRole("heading", { name: "새 알림 발송" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "최근 수동 발송" })).toBeInTheDocument();
     expect(screen.getAllByText("앱+이메일").length).toBeGreaterThan(0);
+    expect(screen.getByRole("checkbox", { name: "모임 전날 자동 리마인더" })).not.toBeChecked();
+  });
+
+  it("keeps the route policy truth when the club-scoped save fails", async () => {
+    const client = testQueryClient();
+    seedNotificationsRoute(client);
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+
+      if (
+        url === "/api/bff/api/host/notifications/policy?clubSlug=reading-sai"
+        && init?.method === "PUT"
+      ) {
+        return Promise.resolve(jsonResponse({ message: "save failed" }, 500));
+      }
+
+      return Promise.reject(new Error(`Unexpected request: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderNotificationsRoute(client);
+
+    const reminder = await screen.findByRole("checkbox", { name: "모임 전날 자동 리마인더" });
+    await userEvent.click(reminder);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("리마인더 정책을 저장하지 못했습니다");
+    expect(reminder).not.toBeChecked();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/host/notifications/policy?clubSlug=reading-sai",
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({ sessionReminderEnabled: true }),
+      }),
+    );
   });
 
   it("disables manual preview button while manual options refetch is in flight after a session change", async () => {

@@ -1,6 +1,9 @@
 import { useLoaderData, useLocation, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { feedbackDocumentQuery } from "@/features/feedback/queries/feedback-queries";
+import {
+  feedbackDocumentQuery,
+  hostFeedbackDocumentPreviewQuery,
+} from "@/features/feedback/queries/feedback-queries";
 import type { FeedbackDocumentRouteData } from "@/features/feedback/route/feedback-document-data";
 import { readFeedbackReturnTarget } from "@/features/feedback/route/feedback-route-continuity";
 import FeedbackDocumentPage, {
@@ -8,11 +11,19 @@ import FeedbackDocumentPage, {
 } from "@/features/feedback/ui/feedback-document-page";
 import { feedbackDocumentPdfDownloadsEnabled } from "@/shared/config/readmates-feature-flags";
 
-export function FeedbackDocumentRoute({ printMode = false }: { printMode?: boolean }) {
+export function FeedbackDocumentRoute({
+  printMode = false,
+  hostPreview = false,
+}: {
+  printMode?: boolean;
+  hostPreview?: boolean;
+}) {
   const { sessionId, unavailableReason } = useLoaderData() as FeedbackDocumentRouteData;
   const { clubSlug } = useParams();
   const documentQuery = useQuery({
-    ...feedbackDocumentQuery(sessionId ?? "", { clubSlug }),
+    ...(hostPreview
+      ? hostFeedbackDocumentPreviewQuery(sessionId ?? "", { clubSlug })
+      : feedbackDocumentQuery(sessionId ?? "", { clubSlug })),
     enabled: Boolean(sessionId && !unavailableReason),
   });
   const result = unavailableReason
@@ -35,4 +46,8 @@ export function FeedbackDocumentRoute({ printMode = false }: { printMode?: boole
 
 export function FeedbackDocumentPrintRoute() {
   return <FeedbackDocumentRoute printMode />;
+}
+
+export function HostFeedbackDocumentPreviewRoute() {
+  return <FeedbackDocumentRoute hostPreview />;
 }

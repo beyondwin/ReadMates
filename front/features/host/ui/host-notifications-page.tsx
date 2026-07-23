@@ -11,6 +11,7 @@ import { NotificationLedgerTabs } from "./notifications/notification-ledger-tabs
 import type {
   HostSessionListItem,
   HostNotificationEventType,
+  HostNotificationPolicyResponse,
   ManualNotificationConfirmRequest,
   ManualNotificationDispatchListItem,
   ManualNotificationOptionsResponse,
@@ -28,6 +29,7 @@ import {
 } from "./notifications/notification-formatters";
 import { RestoreNotificationDialog } from "./notifications/restore-notification-dialog";
 import { ManualNotificationDispatchLedger } from "./notifications/manual-notification-dispatch-ledger";
+import { HostNotificationPolicyCard } from "./notifications/host-notification-policy-card";
 
 type HostNotificationsPageProps = {
   summary: HostNotificationSummary;
@@ -63,6 +65,10 @@ type HostNotificationsPageProps = {
   onLoadMoreManualMembers?: (sessionId?: string, search?: string, cursor?: string) => Promise<ManualNotificationOptionsResponse>;
   isRefreshing?: boolean;
   manualPending?: boolean;
+  policy?: HostNotificationPolicyResponse;
+  policyPending?: boolean;
+  policyError?: string | null;
+  onPolicyChange?: (enabled: boolean) => Promise<unknown>;
 };
 
 type HostNotificationMessage = {
@@ -107,6 +113,10 @@ export function HostNotificationsPage({
   onLoadMoreManualMembers,
   isRefreshing = false,
   manualPending = false,
+  policy,
+  policyPending = false,
+  policyError = null,
+  onPolicyChange = async () => undefined,
 }: HostNotificationsPageProps) {
   const [activeLedgerTab, setActiveLedgerTab] = useState<NotificationLedgerTab>("events");
   const [restoreTarget, setRestoreTarget] = useState<HostNotificationDeliveryItem | null>(null);
@@ -298,6 +308,13 @@ export function HostNotificationsPage({
             {message.text}
           </p>
         ) : null}
+
+        <HostNotificationPolicyCard
+          policy={policy}
+          pending={policyPending}
+          error={policyError}
+          onChange={onPolicyChange}
+        />
 
         <ManualNotificationWorkbench
           options={visibleManualOptions}

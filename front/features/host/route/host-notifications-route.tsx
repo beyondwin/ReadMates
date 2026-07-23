@@ -14,6 +14,7 @@ import {
   hostNotificationKeys,
   hostNotificationManualDispatchesQuery,
   hostNotificationManualOptionsQuery,
+  hostNotificationPolicyQuery,
   hostNotificationSessionsQuery,
   hostNotificationSummaryQuery,
   useConfirmManualNotificationMutation,
@@ -22,6 +23,7 @@ import {
   useRestoreHostNotificationMutation,
   useRetryHostNotificationMutation,
   useSendHostNotificationTestMailMutation,
+  useUpdateHostNotificationPolicyMutation,
   type ManualOptionsQueryRequest,
 } from "@/features/host/queries/host-notification-queries";
 import type { ReadmatesApiContext } from "@/shared/api/client";
@@ -51,6 +53,7 @@ export function HostNotificationsRoute() {
   const [auditCursors, setAuditCursors] = useState<string[]>([]);
   const [manualDispatchCursors, setManualDispatchCursors] = useState<string[]>([]);
   const [manualMemberCursors, setManualMemberCursors] = useState<string[]>([]);
+  const [policyError, setPolicyError] = useState<string | null>(null);
   const [manualOptionsRequest, setManualOptionsRequest] = useState<ManualOptionsQueryRequest>(() => ({
     sessionId: data.initialManualSelection.sessionId,
     page: { limit: MANUAL_MEMBER_PAGE_LIMIT },
@@ -58,6 +61,7 @@ export function HostNotificationsRoute() {
 
   const summaryQuery = useQuery(hostNotificationSummaryQuery(context));
   const sessionsQuery = useQuery(hostNotificationSessionsQuery(context));
+  const policyQuery = useQuery(hostNotificationPolicyQuery(context));
 
   const eventPageRequests = pageRequests(HOST_NOTIFICATION_LEDGER_PAGE_LIMIT, eventCursors);
   const deliveryPageRequests = pageRequests(HOST_NOTIFICATION_LEDGER_PAGE_LIMIT, deliveryCursors);
@@ -102,6 +106,7 @@ export function HostNotificationsRoute() {
   const testMailMutation = useSendHostNotificationTestMailMutation(context);
   const previewManualMutation = usePreviewManualNotificationMutation();
   const confirmManualMutation = useConfirmManualNotificationMutation(context);
+  const updatePolicyMutation = useUpdateHostNotificationPolicyMutation(context);
   const isAnyQueryFetching =
     summaryQuery.isFetching ||
     sessionsQuery.isFetching ||
@@ -162,6 +167,9 @@ export function HostNotificationsRoute() {
       manualOptions={manualOptions}
       manualDispatches={manualDispatches.items}
       initialManualSelection={data.initialManualSelection}
+      policy={policyQuery.data}
+      policyPending={updatePolicyMutation.isPending}
+      policyError={policyError}
       hasMoreEvents={Boolean(events.nextCursor)}
       hasMoreDeliveries={Boolean(deliveries.nextCursor)}
       hasMoreAudit={Boolean(audit.nextCursor)}
@@ -199,6 +207,14 @@ export function HostNotificationsRoute() {
       }}
       onLoadManualOptions={loadManualOptions}
       onLoadMoreManualMembers={loadMoreManualMembers}
+      onPolicyChange={async (enabled) => {
+        setPolicyError(null);
+        try {
+          await updatePolicyMutation.mutateAsync({ sessionReminderEnabled: enabled });
+        } catch {
+          setPolicyError("리마인더 정책을 저장하지 못했습니다. 다시 시도해 주세요.");
+        }
+      }}
     />
   );
 }

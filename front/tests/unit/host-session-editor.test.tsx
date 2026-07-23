@@ -468,17 +468,23 @@ describe("HostSessionEditor", () => {
     expect(screen.queryByText("feedback-14-sample-member.html")).not.toBeInTheDocument();
   });
 
-  it("shows feedback document status without standalone upload controls", () => {
-    render(<HostSessionEditorForTest session={session} clubSlug="club-a" />);
+  it.each(["OPEN", "CLOSED", "PUBLISHED"] as const)(
+    "uses the club-scoped host preview for a %s session feedback document",
+    (state) => {
+      render(<HostSessionEditorForTest session={{ ...session, state }} clubSlug="club-a" />);
 
-    expect(screen.getByText("세션 기록 완성")).toBeInTheDocument();
-    expect(screen.getByText("업로드 완료")).toBeInTheDocument();
-    expect(screen.getByText("251126 1차.md")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "미리보기" })).toHaveAttribute("href", "/app/feedback/session-1");
-    expect(screen.queryByLabelText("피드백 문서 파일")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "교체" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "등록" })).not.toBeInTheDocument();
-  });
+      expect(screen.getByText("세션 기록 완성")).toBeInTheDocument();
+      expect(screen.getByText("업로드 완료")).toBeInTheDocument();
+      expect(screen.getByText("251126 1차.md")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "피드백 문서 미리보기" })).toHaveAttribute(
+        "href",
+        "/clubs/club-a/app/host/sessions/session-1/feedback-document",
+      );
+      expect(screen.queryByLabelText("피드백 문서 파일")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "교체" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "등록" })).not.toBeInTheDocument();
+    },
+  );
 
   it("renders manual notification sent badges from route data", () => {
     render(

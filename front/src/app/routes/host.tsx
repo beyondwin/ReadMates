@@ -104,6 +104,24 @@ function hostAppRoutes(queryClient: QueryClient): RouteObject[] {
       },
     },
     {
+      path: "sessions/:sessionId/feedback-document",
+      errorElement: <HostRouteError />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="피드백 문서 미리보기를 불러오는 중" variant="host" />,
+      lazy: async () => {
+        const [
+          { HostFeedbackDocumentPreviewRouteElement },
+          { hostFeedbackDocumentPreviewLoaderFactory },
+        ] = await Promise.all([
+          import("@/src/app/host-routes/feedback-document-preview-route-element"),
+          import("@/src/app/host-routes/feedback-document-preview-data"),
+        ]);
+        return {
+          Component: HostFeedbackDocumentPreviewRouteElement,
+          loader: hostFeedbackDocumentPreviewLoaderFactory(queryClient),
+        };
+      },
+    },
+    {
       path: "sessions/:sessionId/edit",
       errorElement: <HostRouteError />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="세션 문서 정보를 불러오는 중" variant="host" />,
