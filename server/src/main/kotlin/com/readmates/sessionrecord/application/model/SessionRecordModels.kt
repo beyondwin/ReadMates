@@ -1,6 +1,9 @@
 package com.readmates.sessionrecord.application.model
 
+import com.readmates.notification.application.model.NotificationDecision
+import com.readmates.notification.domain.NotificationEventType
 import com.readmates.session.application.SessionRecordVisibility
+import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -23,11 +26,6 @@ enum class SessionRecordStatus {
     NOT_STARTED,
     INCOMPLETE,
     COMPLETE,
-}
-
-enum class NotificationDecision {
-    SEND,
-    SKIP,
 }
 
 data class SessionRecordEntry(
@@ -86,6 +84,9 @@ data class LiveSessionRecord(
     val clubId: UUID,
     val revision: Long,
     val snapshot: SessionRecordSnapshot,
+    val sessionNumber: Int = 0,
+    val bookTitle: String = "",
+    val meetingDate: LocalDate = LocalDate.MIN,
 )
 
 data class SessionRecordEditor(
@@ -108,10 +109,55 @@ data class RestoreSessionRecordDraftCommand(
     val expectedDraftRevision: Long?,
 )
 
+data class PreviewSessionRecordApplyCommand(
+    val sessionId: UUID,
+    val expectedDraftRevision: Long,
+    val expectedLiveRevision: Long,
+)
+
+data class ApplySessionRecordCommand(
+    val sessionId: UUID,
+    val previewId: UUID,
+    val expectedDraftRevision: Long,
+    val expectedLiveRevision: Long,
+    val notificationDecision: NotificationDecision,
+)
+
+data class SessionRecordApplyPreview(
+    val previewId: UUID,
+    val eventType: NotificationEventType,
+    val targetCount: Int,
+    val expectedInAppCount: Int,
+    val expectedEmailCount: Int,
+    val excludedCount: Int,
+    val expiresAt: OffsetDateTime,
+)
+
+data class SessionRecordApplyResult(
+    val revisionId: UUID,
+    val liveRevision: Long,
+    val decisionId: UUID,
+    val notificationDecision: NotificationDecision,
+    val eventId: UUID?,
+)
+
+data class CompletedSessionRecordApply(
+    val previewId: UUID,
+    val expectedDraftRevision: Long,
+    val expectedLiveRevision: Long,
+    val notificationDecision: NotificationDecision,
+    val decisionId: UUID,
+    val eventId: UUID?,
+    val revision: SessionRecordRevision,
+)
+
 enum class SessionRecordError {
     SESSION_NOT_FOUND,
     REVISION_NOT_FOUND,
     DRAFT_STALE,
+    LIVE_STALE,
+    INVALID_RECORD,
+    PREVIEW_ALREADY_CONSUMED,
 }
 
 class SessionRecordException(

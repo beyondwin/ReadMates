@@ -35,7 +35,11 @@ class SessionRecordDraftServiceTest {
         val store = FakeStore(live = live())
         val service = SessionRecordDraftService(store, codec)
 
-        val saved = service.save(host, SaveSessionRecordDraftCommand(sessionId, snapshot(), expectedDraftRevision = null))
+        val saved =
+            service.save(
+                host,
+                SaveSessionRecordDraftCommand(sessionId, snapshot(), expectedDraftRevision = null),
+            )
 
         assertThat(saved.draftRevision).isEqualTo(1)
         assertThat(saved.baseLiveRevision).isEqualTo(4)
@@ -79,7 +83,15 @@ class SessionRecordDraftServiceTest {
         val service = SessionRecordDraftService(store, codec)
         val liveBefore = store.live
 
-        val restored = service.restore(host, RestoreSessionRecordDraftCommand(sessionId, revision.id, expectedDraftRevision = null))
+        val restored =
+            service.restore(
+                host,
+                RestoreSessionRecordDraftCommand(
+                    sessionId,
+                    revision.id,
+                    expectedDraftRevision = null,
+                ),
+            )
 
         assertThat(restored.source).isEqualTo(SessionRecordDraftSource.RESTORED)
         assertThat(restored.restoredFromRevisionId).isEqualTo(revision.id)
@@ -155,6 +167,32 @@ class SessionRecordDraftServiceTest {
     ) : SessionRecordStorePort {
         val revisions = revision?.let(::listOf).orEmpty()
 
+        override fun lockEditor(host: CurrentMember, sessionId: UUID): SessionRecordEditor? =
+            live?.let { SessionRecordEditor(it, draft, draft?.baseLiveRevision != it.revision) }
+
+        override fun findCompletedApply(
+            host: CurrentMember,
+            previewId: UUID,
+        ): com.readmates.sessionrecord.application.model.CompletedSessionRecordApply? = null
+
+        override fun insertBaselineIfAbsent(
+            host: CurrentMember,
+            live: LiveSessionRecord,
+            encoded: EncodedSessionRecordSnapshot,
+        ) = Unit
+
+        override fun insertAppliedRevision(
+            host: CurrentMember,
+            editor: SessionRecordEditor,
+            encoded: EncodedSessionRecordSnapshot,
+        ): SessionRecordRevision = error("Not used by draft service tests")
+
+        override fun deleteAppliedDraft(
+            host: CurrentMember,
+            sessionId: UUID,
+            expectedDraftRevision: Long,
+        ): Boolean = false
+
         override fun loadLive(host: CurrentMember, sessionId: UUID, forUpdate: Boolean) = live
 
         override fun loadDraft(host: CurrentMember, sessionId: UUID, forUpdate: Boolean) = draft
@@ -171,6 +209,7 @@ class SessionRecordDraftServiceTest {
                 restoredFromRevisionId = null,
             ).also { draft = it }
 
+        @Suppress("ReturnCount")
         override fun compareAndSetDraft(
             host: CurrentMember,
             command: SaveSessionRecordDraftCommand,
@@ -187,6 +226,7 @@ class SessionRecordDraftServiceTest {
             ).also { draft = it }
         }
 
+        @Suppress("ReturnCount")
         override fun deleteDraft(host: CurrentMember, sessionId: UUID, expectedDraftRevision: Long): Boolean {
             val current = draft ?: return false
             if (current.draftRevision != expectedDraftRevision) return false

@@ -1,7 +1,6 @@
 package com.readmates.sessionimport.application.service
 
 import com.readmates.auth.domain.MembershipRole
-import com.readmates.notification.application.port.`in`.RecordNotificationEventUseCase
 import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.sessionimport.application.model.SessionImportAttendee
 import com.readmates.sessionimport.application.model.SessionImportCommand
@@ -104,11 +103,9 @@ class SessionImportServiceCommitValidatedTest {
             )
         val writePort = RecordingWritePort(target)
         val cache = RecordingCacheInvalidation()
-        val notificationEvents = RecordingNotificationEvents()
         val service =
             SessionImportService(
                 writePort = writePort,
-                recordNotificationEventUseCase = notificationEvents,
                 cacheInvalidation = cache,
             )
 
@@ -160,13 +157,6 @@ class SessionImportServiceCommitValidatedTest {
         assertEquals(1, cache.evictCount, "cache eviction must be invoked exactly once")
         assertEquals(clubId, cache.lastClubId)
 
-        assertEquals(1, notificationEvents.feedbackEvents.size)
-        val event = notificationEvents.feedbackEvents.single()
-        assertEquals(clubId, event.clubId)
-        assertEquals(sessionId, event.sessionId)
-        assertEquals(7951, event.sessionNumber)
-        assertEquals("Import Test Book", event.bookTitle)
-        assertEquals(2, event.documentVersion)
     }
 
     private fun currentMember(
@@ -206,52 +196,6 @@ private class RecordingWritePort(
             version = 2,
         )
     }
-}
-
-private data class RecordedFeedbackEvent(
-    val clubId: UUID,
-    val sessionId: UUID,
-    val sessionNumber: Int,
-    val bookTitle: String,
-    val documentVersion: Int,
-)
-
-private class RecordingNotificationEvents : RecordNotificationEventUseCase {
-    val feedbackEvents = mutableListOf<RecordedFeedbackEvent>()
-
-    override fun recordFeedbackDocumentPublished(
-        clubId: UUID,
-        sessionId: UUID,
-        sessionNumber: Int,
-        bookTitle: String,
-        documentVersion: Int,
-    ) {
-        feedbackEvents += RecordedFeedbackEvent(clubId, sessionId, sessionNumber, bookTitle, documentVersion)
-    }
-
-    override fun recordNextBookPublished(
-        clubId: UUID,
-        sessionId: UUID,
-        sessionNumber: Int,
-        bookTitle: String,
-    ) = Unit
-
-    override fun recordReviewPublished(
-        clubId: UUID,
-        sessionId: UUID,
-        sessionNumber: Int,
-        bookTitle: String,
-        authorMembershipId: UUID,
-    ) = Unit
-
-    override fun recordSessionReminderDue(targetDate: LocalDate) = Unit
-
-    override fun recordAiGenerationReady(
-        jobId: UUID,
-        sessionId: UUID,
-        clubId: UUID,
-        hostUserId: UUID,
-    ) = Unit
 }
 
 private class RecordingCacheInvalidation : ReadCacheInvalidationPort {

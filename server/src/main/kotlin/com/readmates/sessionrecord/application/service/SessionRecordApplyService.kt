@@ -1,0 +1,231 @@
+package com.readmates.sessionrecord.application.service
+
+import com.readmates.notification.application.model.CompleteHostActionDecisionCommand
+import com.readmates.notification.application.model.HostActionDecisionCommand
+import com.readmates.notification.application.model.HostActionPreviewCommand
+import com.readmates.notification.application.model.HostConfirmedAction
+import com.readmates.notification.application.model.NotificationDecision
+import com.readmates.notification.application.model.RecordHostConfirmedNotificationEventCommand
+import com.readmates.notification.application.port.`in`.ConfirmHostActionNotificationUseCase
+import com.readmates.notification.application.port.`in`.RecordHostConfirmedNotificationEventUseCase
+import com.readmates.notification.domain.NotificationEventType
+import com.readmates.sessionimport.application.model.SessionImportCommand
+import com.readmates.sessionimport.application.model.SessionImportFeedbackDocumentCommand
+import com.readmates.sessionimport.application.model.SessionImportPublicationCommand
+import com.readmates.sessionimport.application.model.SessionImportRecordCommand
+import com.readmates.sessionimport.application.model.SessionImportSessionCommand
+import com.readmates.sessionimport.application.port.`in`.ReplaceValidatedSessionImportUseCase
+import com.readmates.sessionimport.application.port.`in`.ValidateSessionImportUseCase
+import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportReplacement
+import com.readmates.sessionrecord.application.model.ApplySessionRecordCommand
+import com.readmates.sessionrecord.application.model.CompletedSessionRecordApply
+import com.readmates.sessionrecord.application.model.LiveSessionRecord
+import com.readmates.sessionrecord.application.model.PreviewSessionRecordApplyCommand
+import com.readmates.sessionrecord.application.model.SessionRecordApplyPreview
+import com.readmates.sessionrecord.application.model.SessionRecordApplyResult
+import com.readmates.sessionrecord.application.model.SessionRecordDraft
+import com.readmates.sessionrecord.application.model.SessionRecordEditor
+import com.readmates.sessionrecord.application.model.SessionRecordError
+import com.readmates.sessionrecord.application.model.SessionRecordException
+import com.readmates.sessionrecord.application.port.`in`.ApplySessionRecordUseCase
+import com.readmates.sessionrecord.application.port.out.SessionRecordStorePort
+import com.readmates.shared.security.AccessDeniedException
+import com.readmates.shared.security.CurrentMember
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+
+@Service
+class SessionRecordApplyService(
+    private val store: SessionRecordStorePort,
+    private val codec: SessionRecordSnapshotCodec,
+    private val validator: ValidateSessionImportUseCase,
+    private val replacer: ReplaceValidatedSessionImportUseCase,
+    private val notificationGate: ConfirmHostActionNotificationUseCase,
+    private val confirmedEventRecorder: RecordHostConfirmedNotificationEventUseCase,
+) : ApplySessionRecordUseCase {
+    override fun preview(
+        host: CurrentMember,
+        command: PreviewSessionRecordApplyCommand,
+    ): SessionRecordApplyPreview {
+        requireHost(host)
+        val live =
+            store.loadLive(host, command.sessionId)
+                ?: throw notFound()
+        val draft =
+            store.loadDraft(host, command.sessionId)
+                ?: throw draftStale()
+        requireRevisions(live, draft, command.expectedLiveRevision, command.expectedDraftRevision)
+        val eventType = eventType(live, draft)
+        val preview =
+            notificationGate.preview(
+                host,
+                HostActionPreviewCommand(
+                    sessionId = command.sessionId,
+                    action = HostConfirmedAction.SESSION_RECORD_APPLY,
+                    eventType = eventType,
+                    expectedDraftRevision = command.expectedDraftRevision,
+                    expectedLiveRevision = command.expectedLiveRevision,
+                    requestHash = codec.encode(draft.snapshot).sha256,
+                ),
+            )
+        return SessionRecordApplyPreview(
+            previewId = preview.id,
+            eventType = eventType,
+            targetCount = preview.targetCount,
+            expectedInAppCount = preview.expectedInAppCount,
+            expectedEmailCount = preview.expectedEmailCount,
+            excludedCount = preview.excludedCount,
+            expiresAt = preview.expiresAt,
+        )
+    }
+
+    @Transactional
+    @Suppress("LongMethod", "ThrowsCount")
+    override fun apply(
+        host: CurrentMember,
+        command: ApplySessionRecordCommand,
+    ): SessionRecordApplyResult {
+        requireHost(host)
+        store.findCompletedApply(host, command.previewId)?.let { completed ->
+            return replay(command, completed)
+        }
+        val editor =
+            store.lockEditor(host, command.sessionId)
+                ?: throw notFound()
+        val draft = editor.draft ?: throw draftStale()
+        requireRevisions(editor.live, draft, command.expectedLiveRevision, command.expectedDraftRevision)
+        val eventType = eventType(editor.live, draft)
+        val requestHash = codec.encode(draft.snapshot).sha256
+        val prepared =
+            notificationGate.prepare(
+                host,
+                HostActionDecisionCommand(
+                    previewId = command.previewId,
+                    sessionId = command.sessionId,
+                    action = HostConfirmedAction.SESSION_RECORD_APPLY,
+                    eventType = eventType,
+                    expectedDraftRevision = command.expectedDraftRevision,
+                    expectedLiveRevision = command.expectedLiveRevision,
+                    requestHash = requestHash,
+                    decision = command.notificationDecision,
+                ),
+            )
+        val importCommand = draft.toImportCommand(host, editor.live)
+        val validated = validator.validate(importCommand)
+        if (!validated.valid) {
+            throw SessionRecordException(
+                SessionRecordError.INVALID_RECORD,
+                "Session record draft is invalid",
+            )
+        }
+        val encodedLive = codec.encode(editor.live.snapshot)
+        val encodedDraft = codec.encode(draft.snapshot)
+        store.insertBaselineIfAbsent(host, editor.live, encodedLive)
+        replacer.replace(ValidatedSessionImportReplacement(importCommand, validated, draft.snapshot))
+        val revision = store.insertAppliedRevision(host, editor, encodedDraft)
+        val eventId =
+            if (prepared.decision == NotificationDecision.SEND) {
+                confirmedEventRecorder.record(
+                    RecordHostConfirmedNotificationEventCommand(
+                        clubId = host.clubId,
+                        sessionId = command.sessionId,
+                        sessionNumber = editor.live.sessionNumber,
+                        bookTitle = editor.live.bookTitle,
+                        eventType = eventType,
+                        revision = revision.version,
+                    ),
+                )
+            } else {
+                null
+            }
+        val decision =
+            notificationGate.complete(
+                CompleteHostActionDecisionCommand(
+                    prepared = prepared,
+                    liveRevision = revision.version,
+                    eventId = eventId,
+                ),
+            )
+        if (!store.deleteAppliedDraft(host, command.sessionId, command.expectedDraftRevision)) {
+            throw draftStale()
+        }
+        return SessionRecordApplyResult(
+            revisionId = revision.id,
+            liveRevision = revision.version,
+            decisionId = decision.id,
+            notificationDecision = decision.decision,
+            eventId = decision.eventId,
+        )
+    }
+
+    private fun replay(
+        command: ApplySessionRecordCommand,
+        completed: CompletedSessionRecordApply,
+    ): SessionRecordApplyResult {
+        if (completed.expectedDraftRevision != command.expectedDraftRevision ||
+            completed.expectedLiveRevision != command.expectedLiveRevision ||
+            completed.notificationDecision != command.notificationDecision ||
+            completed.revision.sessionId != command.sessionId
+        ) {
+            throw SessionRecordException(
+                SessionRecordError.PREVIEW_ALREADY_CONSUMED,
+                "Notification preview was already consumed",
+            )
+        }
+        return SessionRecordApplyResult(
+            revisionId = completed.revision.id,
+            liveRevision = completed.revision.version,
+            decisionId = completed.decisionId,
+            notificationDecision = completed.notificationDecision,
+            eventId = completed.eventId,
+        )
+    }
+
+    private fun requireRevisions(
+        live: LiveSessionRecord,
+        draft: SessionRecordDraft,
+        expectedLiveRevision: Long,
+        expectedDraftRevision: Long,
+    ) {
+        if (draft.draftRevision != expectedDraftRevision) throw draftStale()
+        if (live.revision != expectedLiveRevision || draft.baseLiveRevision != live.revision) {
+            throw SessionRecordException(SessionRecordError.LIVE_STALE, "Session record live revision is stale")
+        }
+    }
+
+    private fun eventType(live: LiveSessionRecord, draft: SessionRecordDraft): NotificationEventType =
+        if (live.snapshot.feedbackDocument.markdown.isBlank() &&
+            draft.snapshot.feedbackDocument.markdown.isNotBlank()
+        ) {
+            NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED
+        } else {
+            NotificationEventType.SESSION_RECORD_UPDATED
+        }
+
+    private fun SessionRecordDraft.toImportCommand(
+        host: CurrentMember,
+        live: LiveSessionRecord,
+    ) = SessionImportCommand(
+        host = host,
+        sessionId = sessionId,
+        recordVisibility = snapshot.visibility,
+        format = snapshot.schema,
+        session = SessionImportSessionCommand(live.sessionNumber, live.bookTitle, live.meetingDate),
+        publication = SessionImportPublicationCommand(snapshot.publicationSummary),
+        highlights = snapshot.highlights.map { SessionImportRecordCommand(it.authorDisplayName, it.text) },
+        oneLineReviews = snapshot.oneLineReviews.map { SessionImportRecordCommand(it.authorDisplayName, it.text) },
+        feedbackDocument =
+            SessionImportFeedbackDocumentCommand(
+                snapshot.feedbackDocument.fileName,
+                snapshot.feedbackDocument.markdown,
+            ),
+    )
+
+    private fun requireHost(host: CurrentMember) {
+        if (!host.isHost) throw AccessDeniedException("Host role required")
+    }
+
+    private fun draftStale() = SessionRecordException(SessionRecordError.DRAFT_STALE, "Session record draft is stale")
+
+    private fun notFound() = SessionRecordException(SessionRecordError.SESSION_NOT_FOUND, "Session record not found")
+}

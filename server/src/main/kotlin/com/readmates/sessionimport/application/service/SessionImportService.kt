@@ -1,7 +1,6 @@
 package com.readmates.sessionimport.application.service
 
 import com.readmates.feedback.application.FeedbackDocumentParser
-import com.readmates.notification.application.port.`in`.RecordNotificationEventUseCase
 import com.readmates.session.application.HostSessionNotFoundException
 import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.sessionimport.application.model.SessionImportCommand
@@ -17,6 +16,9 @@ import com.readmates.sessionimport.application.model.SessionImportTarget
 import com.readmates.sessionimport.application.port.`in`.CommitSessionImportUseCase
 import com.readmates.sessionimport.application.port.`in`.CommitValidatedSessionImportUseCase
 import com.readmates.sessionimport.application.port.`in`.PreviewSessionImportUseCase
+import com.readmates.sessionimport.application.port.`in`.ReplaceValidatedSessionImportUseCase
+import com.readmates.sessionimport.application.port.`in`.ValidateSessionImportUseCase
+import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportReplacement
 import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportInput
 import com.readmates.sessionimport.application.port.out.SessionImportRecordReplacement
 import com.readmates.sessionimport.application.port.out.SessionImportWritePort
@@ -45,30 +47,32 @@ private fun requireHost(host: AuthenticatedClubActor) {
 }
 
 @Service
+@Suppress("TooManyFunctions")
 class SessionImportService(
     private val writePort: SessionImportWritePort,
-    private val recordNotificationEventUseCase: RecordNotificationEventUseCase,
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
 ) : PreviewSessionImportUseCase,
     CommitSessionImportUseCase,
-    CommitValidatedSessionImportUseCase {
+    CommitValidatedSessionImportUseCase,
+    ValidateSessionImportUseCase,
+    ReplaceValidatedSessionImportUseCase {
     private val parser = FeedbackDocumentParser()
 
     override fun preview(command: SessionImportCommand): SessionImportPreviewResult {
         requireHost(command.host)
         val target = writePort.loadTarget(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
-        return validate(command, target)
+        return validateAgainstTarget(command, target)
     }
 
     @Transactional
     override fun commit(command: SessionImportCommand): SessionImportCommitResult {
         requireHost(command.host)
         val target = writePort.loadTarget(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
-        val preview = validate(command, target)
+        val preview = validateAgainstTarget(command, target)
         if (!preview.valid) {
             throw InvalidSessionImportException(preview.issues)
         }
-        return commitVerifiedTarget(command, preview)
+        return replace(command.toReplacement(preview))
     }
 
     /**
@@ -86,17 +90,27 @@ class SessionImportService(
         // reuse the same SessionImportRecordReplacement payload shape as commit(...). If the
         // caller passed an invalid command, surface InvalidSessionImportException — same as
         // commit(...). This preserves the security invariant.
-        val preview = validate(command, target, input.authorMembershipIdsByName)
+        val preview = validateAgainstTarget(command, target, input.authorMembershipIdsByName)
         if (!preview.valid) {
             throw InvalidSessionImportException(preview.issues)
         }
-        return commitVerifiedTarget(command, preview)
+        return replace(command.toReplacement(preview))
     }
 
-    private fun commitVerifiedTarget(
+    override fun validate(
         command: SessionImportCommand,
-        preview: SessionImportPreviewResult,
-    ): SessionImportCommitResult {
+        trustedAuthorBindings: Map<String, java.util.UUID>,
+    ): SessionImportPreviewResult {
+        requireHost(command.host)
+        val target = writePort.loadTarget(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
+        return validateAgainstTarget(command, target, trustedAuthorBindings)
+    }
+
+    override fun replace(input: ValidatedSessionImportReplacement): SessionImportCommitResult {
+        val command = input.command
+        val preview = input.preview
+        requireHost(command.host)
+        if (!preview.valid) throw InvalidSessionImportException(preview.issues)
         val feedbackTitle =
             preview.feedbackDocument.title
                 ?: throw InvalidSessionImportException(
@@ -116,13 +130,6 @@ class SessionImportService(
                     feedbackTitle = feedbackTitle,
                 ),
             )
-        recordNotificationEventUseCase.recordFeedbackDocumentPublished(
-            clubId = command.host.clubId,
-            sessionId = command.sessionId,
-            sessionNumber = command.session.number,
-            bookTitle = command.session.bookTitle,
-            documentVersion = storedFeedback.version,
-        )
         cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
 
         return SessionImportCommitResult(
@@ -140,7 +147,7 @@ class SessionImportService(
         )
     }
 
-    private fun validate(
+    private fun validateAgainstTarget(
         command: SessionImportCommand,
         target: SessionImportTarget,
         trustedAuthorBindings: Map<String, java.util.UUID> = emptyMap(),
@@ -182,6 +189,39 @@ class SessionImportService(
             issues = issues,
         )
     }
+
+    private fun SessionImportCommand.toReplacement(preview: SessionImportPreviewResult) =
+        ValidatedSessionImportReplacement(
+            command = this,
+            preview = preview,
+            snapshot =
+                com.readmates.sessionrecord.application.model.SessionRecordSnapshot(
+                    visibility = recordVisibility,
+                    publicationSummary = preview.publication.summary,
+                    highlights =
+                        preview.highlights.map {
+                            com.readmates.sessionrecord.application.model.SessionRecordEntry(
+                                membershipId = java.util.UUID.fromString(requireNotNull(it.membershipId)),
+                                authorDisplayName = it.authorName,
+                                text = it.text,
+                            )
+                        },
+                    oneLineReviews =
+                        preview.oneLineReviews.map {
+                            com.readmates.sessionrecord.application.model.SessionRecordEntry(
+                                membershipId = java.util.UUID.fromString(requireNotNull(it.membershipId)),
+                                authorDisplayName = it.authorName,
+                                text = it.text,
+                            )
+                        },
+                    feedbackDocument =
+                        com.readmates.sessionrecord.application.model.SessionRecordFeedbackDocument(
+                            fileName = feedbackDocument.fileName.trim(),
+                            title = requireNotNull(preview.feedbackDocument.title),
+                            markdown = feedbackDocument.markdown,
+                        ),
+                ),
+        )
 
     private fun validateSessionMetadata(
         command: SessionImportCommand,

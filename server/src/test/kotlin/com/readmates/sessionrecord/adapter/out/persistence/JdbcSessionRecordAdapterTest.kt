@@ -46,6 +46,7 @@ class JdbcSessionRecordAdapterTest(
     }
 
     @Test
+    @Suppress("LongMethod")
     fun `compare and set updates exactly once while revisions remain ordered and immutable`() {
         val fixture = fixture("cas")
         val live = requireNotNull(adapter.loadLive(fixture.host, fixture.sessionId))
@@ -55,13 +56,21 @@ class JdbcSessionRecordAdapterTest(
         val updated =
             adapter.compareAndSetDraft(
                 fixture.host,
-                SaveSessionRecordDraftCommand(fixture.sessionId, changed, expectedDraftRevision = firstDraft.draftRevision),
+                SaveSessionRecordDraftCommand(
+                    fixture.sessionId,
+                    changed,
+                    expectedDraftRevision = firstDraft.draftRevision,
+                ),
                 codec.encode(changed),
             )
         val stale =
             adapter.compareAndSetDraft(
                 fixture.host,
-                SaveSessionRecordDraftCommand(fixture.sessionId, fixture.snapshot, expectedDraftRevision = firstDraft.draftRevision),
+                SaveSessionRecordDraftCommand(
+                    fixture.sessionId,
+                    fixture.snapshot,
+                    expectedDraftRevision = firstDraft.draftRevision,
+                ),
                 codec.encode(fixture.snapshot),
             )
 
@@ -69,11 +78,28 @@ class JdbcSessionRecordAdapterTest(
         assertThat(stale).isNull()
         assertThat(adapter.loadDraft(fixture.host, fixture.sessionId)?.snapshot).isEqualTo(changed)
 
-        val older = insertRevision(fixture, version = 1, snapshot = fixture.snapshot, appliedAt = LocalDateTime.of(2026, 7, 20, 0, 0))
-        val newer = insertRevision(fixture, version = 2, snapshot = changed, appliedAt = LocalDateTime.of(2026, 7, 21, 0, 0))
+        val older =
+            insertRevision(
+                fixture,
+                version = 1,
+                snapshot = fixture.snapshot,
+                appliedAt = LocalDateTime.of(2026, 7, 20, 0, 0),
+            )
+        val newer =
+            insertRevision(
+                fixture,
+                version = 2,
+                snapshot = changed,
+                appliedAt = LocalDateTime.of(2026, 7, 21, 0, 0),
+            )
         val versions =
             jdbcTemplate.queryForList(
-                "select version from session_record_revisions where club_id = ? and session_id = ? order by applied_at desc, id desc",
+                """
+                select version
+                from session_record_revisions
+                where club_id = ? and session_id = ?
+                order by applied_at desc, id desc
+                """.trimIndent(),
                 Long::class.java,
                 fixture.host.clubId.toString(),
                 fixture.sessionId.toString(),
@@ -82,9 +108,44 @@ class JdbcSessionRecordAdapterTest(
         assertThat(versions).containsExactly(2, 1)
         assertThat(adapter.loadRevision(fixture.host, fixture.sessionId, older)?.snapshot).isEqualTo(fixture.snapshot)
         assertThat(adapter.loadRevision(fixture.host, fixture.sessionId, newer)?.snapshot).isEqualTo(changed)
-        assertThat(adapter.loadRevision(fixture.host.copy(clubId = UUID.randomUUID()), fixture.sessionId, newer)).isNull()
+        assertThat(
+            adapter.loadRevision(
+                fixture.host.copy(clubId = UUID.randomUUID()),
+                fixture.sessionId,
+                newer,
+            ),
+        ).isNull()
     }
 
+    @Test
+    fun `apply persistence writes baseline and immutable revision before deleting the draft`() {
+        val fixture = fixture("apply")
+        val live = requireNotNull(adapter.loadLive(fixture.host, fixture.sessionId))
+        val draft = adapter.insertDraft(fixture.host, live, codec.encode(fixture.snapshot))
+        val editor = requireNotNull(adapter.lockEditor(fixture.host, fixture.sessionId))
+
+        adapter.insertBaselineIfAbsent(fixture.host, live, codec.encode(live.snapshot))
+        val applied = adapter.insertAppliedRevision(fixture.host, editor, codec.encode(draft.snapshot))
+
+        assertThat(applied.version).isEqualTo(2)
+        assertThat(adapter.deleteAppliedDraft(fixture.host, fixture.sessionId, draft.draftRevision)).isTrue()
+        assertThat(adapter.loadDraft(fixture.host, fixture.sessionId)).isNull()
+        assertThat(
+            jdbcTemplate.queryForList(
+                """
+                select source
+                from session_record_revisions
+                where club_id = ? and session_id = ?
+                order by version
+                """.trimIndent(),
+                String::class.java,
+                fixture.host.clubId.toString(),
+                fixture.sessionId.toString(),
+            ),
+        ).containsExactly("BASELINE", "MANUAL")
+    }
+
+    @Suppress("LongMethod")
     private fun fixture(label: String): Fixture {
         val clubId = UUID.randomUUID()
         val sessionId = UUID.randomUUID()
@@ -101,7 +162,10 @@ class JdbcSessionRecordAdapterTest(
             "host-$label-${userId.toString().take(8)}@example.com",
         )
         jdbcTemplate.update(
-            "insert into memberships (id, club_id, user_id, role, status, short_name, joined_at) values (?, ?, ?, 'HOST', 'ACTIVE', '호스트', utc_timestamp(6))",
+            """
+            insert into memberships (id, club_id, user_id, role, status, short_name, joined_at)
+            values (?, ?, ?, 'HOST', 'ACTIVE', '호스트', utc_timestamp(6))
+            """.trimIndent(),
             membershipId.toString(),
             clubId.toString(),
             userId.toString(),
@@ -126,14 +190,20 @@ class JdbcSessionRecordAdapterTest(
             sessionId.toString(),
         )
         jdbcTemplate.update(
-            "insert into highlights (id, club_id, session_id, membership_id, text, sort_order) values (?, ?, ?, ?, '하이라이트', 0)",
+            """
+            insert into highlights (id, club_id, session_id, membership_id, text, sort_order)
+            values (?, ?, ?, ?, '하이라이트', 0)
+            """.trimIndent(),
             UUID.randomUUID().toString(),
             clubId.toString(),
             sessionId.toString(),
             membershipId.toString(),
         )
         jdbcTemplate.update(
-            "insert into one_line_reviews (id, club_id, session_id, membership_id, text, visibility) values (?, ?, ?, ?, '한줄평', 'SESSION')",
+            """
+            insert into one_line_reviews (id, club_id, session_id, membership_id, text, visibility)
+            values (?, ?, ?, ?, '한줄평', 'SESSION')
+            """.trimIndent(),
             UUID.randomUUID().toString(),
             clubId.toString(),
             sessionId.toString(),

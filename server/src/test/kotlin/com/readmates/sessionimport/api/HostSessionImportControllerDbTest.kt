@@ -147,7 +147,7 @@ class HostSessionImportControllerDbTest(
     }
 
     @Test
-    fun `host commits session import and replaces existing records`() {
+    fun `host commits validated session import without creating a notification event`() {
         mockMvc
             .post("/api/host/sessions/$SESSION_ID/session-import/commit") {
                 with(user("session-import-host@example.test"))
@@ -164,41 +164,13 @@ class HostSessionImportControllerDbTest(
             }
 
         assertCommittedImportRecords()
-        assertFeedbackDocumentNotificationEvent()
-    }
-
-    private fun assertFeedbackDocumentNotificationEvent() {
-        val documentVersion =
+        assertEquals(
+            0,
             jdbcTemplate.queryForObject(
-                """
-                select max(version)
-                from session_feedback_documents
-                where club_id = '$CLUB_ID'
-                  and session_id = '$SESSION_ID'
-                """.trimIndent(),
+                "select count(*) from notification_event_outbox where aggregate_id = '$SESSION_ID'",
                 Int::class.java,
-            )
-
-        val event =
-            jdbcTemplate.queryForMap(
-                """
-                select
-                  dedupe_key,
-                  json_unquote(json_extract(payload_json, '$.sessionId')) as session_id,
-                  cast(json_unquote(json_extract(payload_json, '$.sessionNumber')) as signed) as session_number,
-                  json_unquote(json_extract(payload_json, '$.bookTitle')) as book_title,
-                  cast(json_unquote(json_extract(payload_json, '$.documentVersion')) as signed) as document_version
-                from notification_event_outbox
-                where event_type = 'FEEDBACK_DOCUMENT_PUBLISHED'
-                  and aggregate_id = '$SESSION_ID'
-                """.trimIndent(),
-            )
-
-        assertEquals("feedback-document:$SESSION_ID:$documentVersion", event["dedupe_key"])
-        assertEquals(SESSION_ID, event["session_id"])
-        assertEquals(7951, (event["session_number"] as Number).toInt())
-        assertEquals("Import Test Book", event["book_title"])
-        assertEquals(documentVersion, (event["document_version"] as Number).toInt())
+            ),
+        )
     }
 
     private fun assertCommittedImportRecords() {

@@ -1,9 +1,13 @@
 package com.readmates.sessionrecord.application.port.`in`
 
+import com.readmates.sessionrecord.application.model.ApplySessionRecordCommand
+import com.readmates.sessionrecord.application.model.PreviewSessionRecordApplyCommand
 import com.readmates.sessionrecord.application.model.RestoreSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.SaveSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.SessionRecordDraft
 import com.readmates.sessionrecord.application.model.SessionRecordEditor
+import com.readmates.sessionrecord.application.model.SessionRecordApplyPreview
+import com.readmates.sessionrecord.application.model.SessionRecordApplyResult
 import com.readmates.shared.security.CurrentMember
 import java.util.UUID
 
@@ -15,4 +19,10 @@ interface ManageSessionRecordDraftUseCase {
     fun discard(host: CurrentMember, sessionId: UUID, expectedDraftRevision: Long)
 
     fun restore(host: CurrentMember, command: RestoreSessionRecordDraftCommand): SessionRecordDraft
+}
+
+interface ApplySessionRecordUseCase {
+    fun preview(host: CurrentMember, command: PreviewSessionRecordApplyCommand): SessionRecordApplyPreview
+
+    fun apply(host: CurrentMember, command: ApplySessionRecordCommand): SessionRecordApplyResult
 }

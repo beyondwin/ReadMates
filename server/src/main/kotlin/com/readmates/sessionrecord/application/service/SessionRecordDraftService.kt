@@ -31,6 +31,7 @@ class SessionRecordDraftService(
     }
 
     @Transactional
+    @Suppress("ThrowsCount")
     override fun save(host: CurrentMember, command: SaveSessionRecordDraftCommand): SessionRecordDraft {
         requireHost(host)
         val live = requireLive(host, command.sessionId, forUpdate = true)
@@ -58,7 +59,10 @@ class SessionRecordDraftService(
         val live = requireLive(host, command.sessionId, forUpdate = true)
         val revision =
             store.loadRevision(host, command.sessionId, command.revisionId)
-                ?: throw SessionRecordException(SessionRecordError.REVISION_NOT_FOUND, "Session record revision not found")
+                ?: throw SessionRecordException(
+                    SessionRecordError.REVISION_NOT_FOUND,
+                    "Session record revision not found",
+                )
         return store.insertRestoredDraft(
             host = host,
             live = live,

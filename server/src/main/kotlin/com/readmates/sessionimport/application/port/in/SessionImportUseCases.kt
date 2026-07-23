@@ -3,6 +3,7 @@ package com.readmates.sessionimport.application.port.`in`
 import com.readmates.sessionimport.application.model.SessionImportCommand
 import com.readmates.sessionimport.application.model.SessionImportCommitResult
 import com.readmates.sessionimport.application.model.SessionImportPreviewResult
+import com.readmates.sessionrecord.application.model.SessionRecordSnapshot
 import java.util.UUID
 
 interface PreviewSessionImportUseCase {
@@ -24,6 +25,23 @@ interface CommitSessionImportUseCase {
 interface CommitValidatedSessionImportUseCase {
     fun commitValidated(input: ValidatedSessionImportInput): SessionImportCommitResult
 }
+
+interface ValidateSessionImportUseCase {
+    fun validate(
+        command: SessionImportCommand,
+        trustedAuthorBindings: Map<String, UUID> = emptyMap(),
+    ): SessionImportPreviewResult
+}
+
+interface ReplaceValidatedSessionImportUseCase {
+    fun replace(input: ValidatedSessionImportReplacement): SessionImportCommitResult
+}
+
+data class ValidatedSessionImportReplacement(
+    val command: SessionImportCommand,
+    val preview: SessionImportPreviewResult,
+    val snapshot: SessionRecordSnapshot,
+)
 
 /**
  * A [SessionImportCommand] whose caller has already validated it against the target session.
