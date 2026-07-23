@@ -15,137 +15,137 @@ import kotlin.io.path.name
 import kotlin.io.path.readLines
 import kotlin.io.path.relativeTo
 
-@Tag("architecture")
-class ServerArchitectureBoundaryTest {
-    private val importedClasses =
-        ClassFileImporter()
-            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-            .importPackages("com.readmates")
+private val importedClasses =
+    ClassFileImporter()
+        .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+        .importPackages("com.readmates")
 
-    private enum class ServerSliceType {
-        WRITE,
-        READ,
-        OPS_READ,
-        WORKFLOW,
-        SHARED,
-    }
+private enum class ServerSliceType {
+    WRITE,
+    READ,
+    OPS_READ,
+    WORKFLOW,
+    SHARED,
+}
 
-    private data class ServerSlice(
-        val name: String,
-        val type: ServerSliceType,
-        val webAdapterPackages: List<String> = emptyList(),
-        val applicationPackages: List<String> = emptyList(),
+private data class ServerSlice(
+    val name: String,
+    val type: ServerSliceType,
+    val webAdapterPackages: List<String> = emptyList(),
+    val applicationPackages: List<String> = emptyList(),
+)
+
+private val serverSlices =
+    listOf(
+        ServerSlice(
+            name = "session",
+            type = ServerSliceType.WRITE,
+            webAdapterPackages = listOf("com.readmates.session.adapter.in.web.."),
+            applicationPackages = listOf("com.readmates.session.application.."),
+        ),
+        ServerSlice(
+            name = "note",
+            type = ServerSliceType.READ,
+            webAdapterPackages = listOf("com.readmates.note.adapter.in.web.."),
+            applicationPackages = listOf("com.readmates.note.application.."),
+        ),
+        ServerSlice(
+            name = "publication",
+            type = ServerSliceType.READ,
+            webAdapterPackages = listOf("com.readmates.publication.adapter.in.web.."),
+            applicationPackages = listOf("com.readmates.publication.application.."),
+        ),
+        ServerSlice(
+            name = "archive",
+            type = ServerSliceType.READ,
+            webAdapterPackages = listOf("com.readmates.archive.adapter.in.web.."),
+            applicationPackages = listOf("com.readmates.archive.application.."),
+        ),
+        ServerSlice(
+            name = "sessionclosing",
+            type = ServerSliceType.READ,
+            webAdapterPackages = listOf("com.readmates.sessionclosing.adapter.in.web.."),
+            applicationPackages = listOf("com.readmates.sessionclosing.application.."),
+        ),
+        ServerSlice(
+            name = "feedback",
+            type = ServerSliceType.WORKFLOW,
+            webAdapterPackages = listOf("com.readmates.feedback.adapter.in.web.."),
+            applicationPackages = listOf("com.readmates.feedback.application.."),
+        ),
+        ServerSlice(
+            name = "auth",
+            type = ServerSliceType.WRITE,
+            webAdapterPackages = listOf("com.readmates.auth.adapter.in.web.."),
+            applicationPackages = listOf("com.readmates.auth.application.."),
+        ),
+        ServerSlice(
+            name = "notification",
+            type = ServerSliceType.WRITE,
+            webAdapterPackages = listOf("com.readmates.notification.adapter.in.web.."),
+            applicationPackages = listOf("com.readmates.notification.application.."),
+        ),
+        ServerSlice(
+            name = "club",
+            type = ServerSliceType.WRITE,
+            webAdapterPackages = listOf("com.readmates.club.adapter.in.web.."),
+            applicationPackages = listOf("com.readmates.club.application.."),
+        ),
+        ServerSlice(
+            name = "admin.audit",
+            type = ServerSliceType.READ,
+            webAdapterPackages = listOf("com.readmates.admin.audit.adapter.in.web.."),
+            applicationPackages = listOf("com.readmates.admin.audit.application.."),
+        ),
+        ServerSlice(
+            name = "admin.health",
+            type = ServerSliceType.OPS_READ,
+            webAdapterPackages = listOf("com.readmates.admin.health.adapter.in.web.."),
+            applicationPackages = listOf("com.readmates.admin.health.application.."),
+        ),
+        ServerSlice(
+            name = "observability",
+            type = ServerSliceType.OPS_READ,
+            webAdapterPackages = listOf("com.readmates.observability.adapter.in.web.."),
+            applicationPackages = listOf("com.readmates.observability.application.."),
+        ),
+        ServerSlice(
+            name = "admin.analytics",
+            type = ServerSliceType.READ,
+            webAdapterPackages = listOf("com.readmates.admin.analytics.adapter.in.web.."),
+            applicationPackages = listOf("com.readmates.admin.analytics.application.."),
+        ),
+        ServerSlice(
+            name = "aigen",
+            type = ServerSliceType.WORKFLOW,
+            webAdapterPackages = listOf("com.readmates.aigen.adapter.in.web.."),
+            applicationPackages = listOf("com.readmates.aigen.application.."),
+        ),
+        ServerSlice(
+            name = "sessionrecord",
+            type = ServerSliceType.WORKFLOW,
+            webAdapterPackages = listOf("com.readmates.sessionrecord.adapter.in.web.."),
+            applicationPackages = listOf("com.readmates.sessionrecord.application.."),
+        ),
+        ServerSlice(
+            name = "shared",
+            type = ServerSliceType.SHARED,
+            webAdapterPackages = listOf("com.readmates.shared.adapter.in.web.."),
+        ),
     )
 
-    private val serverSlices =
-        listOf(
-            ServerSlice(
-                name = "session",
-                type = ServerSliceType.WRITE,
-                webAdapterPackages = listOf("com.readmates.session.adapter.in.web.."),
-                applicationPackages = listOf("com.readmates.session.application.."),
-            ),
-            ServerSlice(
-                name = "note",
-                type = ServerSliceType.READ,
-                webAdapterPackages = listOf("com.readmates.note.adapter.in.web.."),
-                applicationPackages = listOf("com.readmates.note.application.."),
-            ),
-            ServerSlice(
-                name = "publication",
-                type = ServerSliceType.READ,
-                webAdapterPackages = listOf("com.readmates.publication.adapter.in.web.."),
-                applicationPackages = listOf("com.readmates.publication.application.."),
-            ),
-            ServerSlice(
-                name = "archive",
-                type = ServerSliceType.READ,
-                webAdapterPackages = listOf("com.readmates.archive.adapter.in.web.."),
-                applicationPackages = listOf("com.readmates.archive.application.."),
-            ),
-            ServerSlice(
-                name = "sessionclosing",
-                type = ServerSliceType.READ,
-                webAdapterPackages = listOf("com.readmates.sessionclosing.adapter.in.web.."),
-                applicationPackages = listOf("com.readmates.sessionclosing.application.."),
-            ),
-            ServerSlice(
-                name = "feedback",
-                type = ServerSliceType.WORKFLOW,
-                webAdapterPackages = listOf("com.readmates.feedback.adapter.in.web.."),
-                applicationPackages = listOf("com.readmates.feedback.application.."),
-            ),
-            ServerSlice(
-                name = "auth",
-                type = ServerSliceType.WRITE,
-                webAdapterPackages = listOf("com.readmates.auth.adapter.in.web.."),
-                applicationPackages = listOf("com.readmates.auth.application.."),
-            ),
-            ServerSlice(
-                name = "notification",
-                type = ServerSliceType.WRITE,
-                webAdapterPackages = listOf("com.readmates.notification.adapter.in.web.."),
-                applicationPackages = listOf("com.readmates.notification.application.."),
-            ),
-            ServerSlice(
-                name = "club",
-                type = ServerSliceType.WRITE,
-                webAdapterPackages = listOf("com.readmates.club.adapter.in.web.."),
-                applicationPackages = listOf("com.readmates.club.application.."),
-            ),
-            ServerSlice(
-                name = "admin.audit",
-                type = ServerSliceType.READ,
-                webAdapterPackages = listOf("com.readmates.admin.audit.adapter.in.web.."),
-                applicationPackages = listOf("com.readmates.admin.audit.application.."),
-            ),
-            ServerSlice(
-                name = "admin.health",
-                type = ServerSliceType.OPS_READ,
-                webAdapterPackages = listOf("com.readmates.admin.health.adapter.in.web.."),
-                applicationPackages = listOf("com.readmates.admin.health.application.."),
-            ),
-            ServerSlice(
-                name = "observability",
-                type = ServerSliceType.OPS_READ,
-                webAdapterPackages = listOf("com.readmates.observability.adapter.in.web.."),
-                applicationPackages = listOf("com.readmates.observability.application.."),
-            ),
-            ServerSlice(
-                name = "admin.analytics",
-                type = ServerSliceType.READ,
-                webAdapterPackages = listOf("com.readmates.admin.analytics.adapter.in.web.."),
-                applicationPackages = listOf("com.readmates.admin.analytics.application.."),
-            ),
-            ServerSlice(
-                name = "aigen",
-                type = ServerSliceType.WORKFLOW,
-                webAdapterPackages = listOf("com.readmates.aigen.adapter.in.web.."),
-                applicationPackages = listOf("com.readmates.aigen.application.."),
-            ),
-            ServerSlice(
-                name = "sessionrecord",
-                type = ServerSliceType.WORKFLOW,
-                webAdapterPackages = listOf("com.readmates.sessionrecord.adapter.in.web.."),
-                applicationPackages = listOf("com.readmates.sessionrecord.application.."),
-            ),
-            ServerSlice(
-                name = "shared",
-                type = ServerSliceType.SHARED,
-                webAdapterPackages = listOf("com.readmates.shared.adapter.in.web.."),
-            ),
-        )
+private val migratedApplicationPackages =
+    serverSlices
+        .flatMap(ServerSlice::applicationPackages)
+        .toTypedArray()
 
-    private val migratedApplicationPackages =
-        serverSlices
-            .flatMap(ServerSlice::applicationPackages)
-            .toTypedArray()
+private val migratedWebAdapterPackages =
+    serverSlices
+        .flatMap(ServerSlice::webAdapterPackages)
+        .toTypedArray()
 
-    private val migratedWebAdapterPackages =
-        serverSlices
-            .flatMap(ServerSlice::webAdapterPackages)
-            .toTypedArray()
-
+@Tag("architecture")
+class ServerArchitectureBoundaryTest {
     @Test
     fun `server architecture registry includes recent workflow and migrated slices`() {
         val registered = serverSlices.map(ServerSlice::name).toSet()
@@ -291,7 +291,10 @@ class ServerArchitectureBoundaryTest {
             .haveSimpleName("NotificationOutboxPort")
             .check(importedClasses)
     }
+}
 
+@Tag("architecture")
+class ServerArchitectureSourceBoundaryTest {
     @Test
     fun `session application does not depend on removed host session write port`() {
         val forbiddenTypeName = "HostSessionWritePort"
@@ -301,7 +304,12 @@ class ServerArchitectureBoundaryTest {
                     javaClass.packageName == "com.readmates.session.application" ||
                         javaClass.packageName.startsWith("com.readmates.session.application.")
                 }.flatMap { javaClass ->
-                    val classViolation = if (javaClass.simpleName == forbiddenTypeName) listOf(javaClass.name) else emptyList()
+                    val classViolation =
+                        if (javaClass.simpleName == forbiddenTypeName) {
+                            listOf(javaClass.name)
+                        } else {
+                            emptyList()
+                        }
                     val dependencyViolations =
                         javaClass.directDependenciesFromSelf
                             .filter { dependency -> dependency.targetClass.simpleName == forbiddenTypeName }
@@ -337,9 +345,15 @@ class ServerArchitectureBoundaryTest {
         val bytecodeViolations =
             importedClasses
                 .filter { javaClass ->
-                    javaClass.packageName == "com.readmates.auth" || javaClass.packageName.startsWith("com.readmates.auth.")
+                    javaClass.packageName == "com.readmates.auth" ||
+                        javaClass.packageName.startsWith("com.readmates.auth.")
                 }.flatMap { javaClass ->
-                    val classViolation = if (javaClass.simpleName == forbiddenTypeName) listOf(javaClass.name) else emptyList()
+                    val classViolation =
+                        if (javaClass.simpleName == forbiddenTypeName) {
+                            listOf(javaClass.name)
+                        } else {
+                            emptyList()
+                        }
                     val dependencyViolations =
                         javaClass.directDependenciesFromSelf
                             .filter { dependency -> dependency.targetClass.simpleName == forbiddenTypeName }
@@ -408,7 +422,8 @@ class ServerArchitectureBoundaryTest {
 
         assertTrue(
             violations.isEmpty(),
-            "Outbound ports must not hide unsupported behavior behind default runtime failures:\n${violations.joinToString("\n")}",
+            "Outbound ports must not hide unsupported behavior behind default runtime failures:\n" +
+                violations.joinToString("\n"),
         )
     }
 
@@ -554,7 +569,9 @@ class ServerArchitectureBoundaryTest {
         )
     }
 
-    private fun com.tngtech.archunit.core.domain.JavaClass.residesInAnyPackagePattern(patterns: Array<String>): Boolean =
+    private fun com.tngtech.archunit.core.domain.JavaClass.residesInAnyPackagePattern(
+        patterns: Array<String>,
+    ): Boolean =
         patterns.any { pattern ->
             val packagePrefix = pattern.removeSuffix("..")
             packageName == packagePrefix || packageName.startsWith("$packagePrefix.")
