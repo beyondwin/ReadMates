@@ -715,14 +715,12 @@ export type HostAttendanceUpdate = {
 export type HostClubOperationsResponse = HostClubOperationsSnapshot;
 
 // ---------------------------------------------------------------------------
-// Zod runtime validators — DEV-only, tree-shaken from production bundle.
-// Each schema constant is wrapped in `import.meta.env.DEV ? ... : null as never`
-// so Rollup dead-code-eliminates all z.* references in production, allowing
-// the `import { z } from "zod"` import to be tree-shaken from the bundle.
+// Zod runtime validators. Most read-only schemas remain DEV-only and are
+// tree-shaken from production. Visibility mutation responses are validated in
+// every environment before their composer context reaches route state.
 // ---------------------------------------------------------------------------
 
-export const HostSessionDetailResponseSchema = import.meta.env.DEV
-  ? z.object({
+export const HostSessionDetailResponseSchema = z.object({
       sessionId: z.string(),
       sessionNumber: z.number(),
       title: z.string(),
@@ -760,11 +758,9 @@ export const HostSessionDetailResponseSchema = import.meta.env.DEV
         fileName: z.string().nullable(),
         uploadedAt: z.string().nullable(),
       }),
-    })
-  : (null as never);
+    });
 
-export const HostSessionVisibilityUpdateResponseSchema = import.meta.env.DEV
-  ? z.object({
+export const HostSessionVisibilityUpdateResponseSchema = z.object({
       session: HostSessionDetailResponseSchema,
       composer: z.object({
         sessionId: z.string(),
@@ -775,8 +771,7 @@ export const HostSessionVisibilityUpdateResponseSchema = import.meta.env.DEV
         ]),
         contentRevision: z.string(),
       }).strict().nullable(),
-    }).strict()
-  : (null as never);
+    }).strict();
 
 export const HostNotificationDeliveryListResponseSchema = import.meta.env.DEV
   ? z.object({

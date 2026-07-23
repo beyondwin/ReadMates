@@ -1,4 +1,5 @@
 import { readmatesFetch, readmatesFetchResponse, type ReadmatesApiContext } from "@/shared/api/client";
+import { apiErrorFromResponse } from "@/shared/api/errors";
 import type { CurrentSessionResponse } from "@/shared/model/current-session-contracts";
 import type {
   CreatedSessionResponse,
@@ -26,6 +27,7 @@ import type {
   HostSessionPublicationRequest,
   HostSessionRequest,
   HostSessionVisibilityRequest,
+  HostSessionVisibilityUpdateResult,
   HostSessionVisibilityPreviewRequest,
   HostSessionVisibilityPreviewResponse,
   ManualNotificationConfirmRequest,
@@ -47,6 +49,7 @@ import type {
   ViewerMember,
 } from "./host-contracts";
 import {
+  HostSessionVisibilityUpdateResponseSchema,
   parseHostSessionDetailResponse,
   parseHostNotificationDeliveryListResponse,
   parseHostInvitationListPage,
@@ -283,16 +286,22 @@ export function saveHostSessionPublication(sessionId: string, request: HostSessi
   });
 }
 
-export function saveHostSessionVisibility(
+export async function saveHostSessionVisibility(
   sessionId: string,
   request: HostSessionVisibilityRequest,
   context?: ReadmatesApiContext,
-) {
-  return readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/visibility`, {
+): Promise<HostSessionVisibilityUpdateResult> {
+  const response = await readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/visibility`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
-  }, context) as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
+  }, context);
+  if (!response.ok) {
+    throw await apiErrorFromResponse(response);
+  }
+  return HostSessionVisibilityUpdateResponseSchema.parse(
+    await response.json(),
+  ) as HostSessionVisibilityUpdateResult;
 }
 
 export function previewHostSessionVisibility(

@@ -31,6 +31,7 @@ import type {
   HostSessionRequest,
   HostSessionVisibilityRequest,
   HostSessionVisibilityPreviewRequest,
+  HostSessionVisibilityUpdateResult,
   ManualNotificationDispatchListResponse,
   HostNotificationEventType,
   SessionImportRequest,
@@ -279,17 +280,23 @@ export function usePublishHostSessionMutation(context?: ReadmatesApiContext) {
 
 export function useSaveHostSessionVisibilityMutation(context?: ReadmatesApiContext) {
   const client = useQueryClient();
-  return useMutation({
+  return useMutation<
+    HostSessionVisibilityUpdateResult,
+    Error,
+    { sessionId: string; request: HostSessionVisibilityRequest }
+  >({
     mutationFn: ({ sessionId, request }: { sessionId: string; request: HostSessionVisibilityRequest }) =>
       saveHostSessionVisibility(sessionId, request, context),
-    onSuccess: (response, variables) =>
-      invalidateOk(response, () =>
-        Promise.all([
-          invalidateHostSessionDetail(client, variables.sessionId, context),
-          invalidateHostSessionLists(client, context),
-          invalidateHostSessionDashboard(client, context),
-        ]),
-      ),
+    onSuccess: (result, variables) => {
+      client.setQueryData(
+        hostSessionKeys.detail(variables.sessionId, context),
+        result.session,
+      );
+      return Promise.all([
+        invalidateHostSessionLists(client, context),
+        invalidateHostSessionDashboard(client, context),
+      ]);
+    },
   });
 }
 

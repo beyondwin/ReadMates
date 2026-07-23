@@ -30,7 +30,6 @@ import {
   hostSessionRecordLedgerQuery,
 } from "@/features/host/queries/host-session-record-queries";
 import type { ReadmatesApiContext } from "@/shared/api/client";
-import { apiErrorFromResponse } from "@/shared/api/errors";
 import { hostDashboardActions, type HostDashboardRouteData } from "./host-dashboard-data";
 
 function contextFromClubSlug(clubSlug?: string): ReadmatesApiContext {
@@ -72,10 +71,7 @@ export function HostDashboardRoute({
     previewSessionVisibility: (sessionId, visibility) =>
       visibilityPreviewMutation.mutateAsync({ sessionId, request: { visibility } }),
     updateSessionVisibility: async (sessionId, request) => {
-      const response = await visibilityMutation.mutateAsync({ sessionId, request });
-      if (!response.ok) {
-        throw await apiErrorFromResponse(response);
-      }
+      await visibilityMutation.mutateAsync({ sessionId, request });
     },
     openSession: async (sessionId) => {
       const response = await openMutation.mutateAsync(sessionId);

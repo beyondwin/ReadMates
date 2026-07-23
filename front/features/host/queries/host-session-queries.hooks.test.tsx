@@ -83,6 +83,41 @@ const importRequest: SessionImportRequest = {
   recordVisibility: "MEMBER",
 };
 
+function visibilityResult() {
+  return {
+    session: {
+      sessionId: "session-7",
+      sessionNumber: 7,
+      title: "함께 읽기",
+      bookTitle: "모비 딕",
+      bookAuthor: "허먼 멜빌",
+      bookLink: null,
+      bookImageUrl: null,
+      date: "2026-07-23",
+      startTime: "19:00",
+      endTime: "21:00",
+      questionDeadlineAt: "2026-07-22T23:59:00+09:00",
+      locationLabel: "온라인",
+      meetingUrl: null,
+      meetingPasscode: null,
+      publication: null,
+      state: "OPEN" as const,
+      attendees: [],
+      feedbackDocument: {
+        uploaded: false,
+        fileName: null,
+        uploadedAt: null,
+      },
+      visibility: "MEMBER" as const,
+    },
+    composer: {
+      sessionId: "session-7",
+      eventType: "NEXT_BOOK_PUBLISHED" as const,
+      contentRevision: "b".repeat(64),
+    },
+  };
+}
+
 beforeEach(() => {
   vi.mocked(createHostSession).mockReset();
   vi.mocked(updateHostSession).mockReset();
@@ -218,22 +253,29 @@ describe("host session mutation hooks", () => {
     }
   });
 
-  it("invalidates detail, lists, and dashboard after visibility save", async () => {
-    vi.mocked(saveHostSessionVisibility).mockResolvedValue(new Response("{}", { status: 200 }) as never);
+  it("returns the visibility composer result and caches the updated session", async () => {
+    vi.mocked(saveHostSessionVisibility).mockResolvedValue(visibilityResult());
     const { client, Wrapper } = createWrapper();
     const invalidateSpy = vi.spyOn(client, "invalidateQueries");
     const { result } = renderHook(() => useSaveHostSessionVisibilityMutation({ clubSlug: "reading-sai" }), { wrapper: Wrapper });
 
+    let mutationResult: ReturnType<typeof visibilityResult> | undefined;
     await act(async () => {
-      await result.current.mutateAsync({ sessionId: "session-7", request: { visibility: "MEMBER" } });
+      mutationResult = await result.current.mutateAsync({
+        sessionId: "session-7",
+        request: { visibility: "MEMBER" },
+      });
     });
 
+    expect(mutationResult).toEqual(visibilityResult());
     expect(saveHostSessionVisibility).toHaveBeenCalledWith(
       "session-7",
       { visibility: "MEMBER" },
       { clubSlug: "reading-sai" },
     );
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.detail("session-7", { clubSlug: "reading-sai" }) });
+    expect(client.getQueryData(
+      hostSessionKeys.detail("session-7", { clubSlug: "reading-sai" }),
+    )).toEqual(visibilityResult().session);
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.lists({ clubSlug: "reading-sai" }) });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.dashboard({ clubSlug: "reading-sai" }) });
   });
