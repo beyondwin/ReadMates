@@ -2,8 +2,8 @@ package com.readmates.sessionimport.application.service
 
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.session.application.SessionRecordVisibility
-import com.readmates.sessionimport.application.model.SessionImportCommand
 import com.readmates.sessionimport.application.model.SessionImportAttendee
+import com.readmates.sessionimport.application.model.SessionImportCommand
 import com.readmates.sessionimport.application.model.SessionImportFeedbackDocumentCommand
 import com.readmates.sessionimport.application.model.SessionImportFeedbackDocumentPreview
 import com.readmates.sessionimport.application.model.SessionImportPreviewResult
@@ -15,9 +15,9 @@ import com.readmates.sessionimport.application.model.SessionImportSessionCommand
 import com.readmates.sessionimport.application.model.SessionImportSessionPreview
 import com.readmates.sessionimport.application.model.SessionImportTarget
 import com.readmates.sessionimport.application.port.`in`.SaveValidatedSessionRecordDraftUseCase
+import com.readmates.sessionimport.application.port.`in`.ValidateSessionImportUseCase
 import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportDraftInput
 import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportReplacement
-import com.readmates.sessionimport.application.port.`in`.ValidateSessionImportUseCase
 import com.readmates.sessionimport.application.port.out.SessionImportRecordReplacement
 import com.readmates.sessionimport.application.port.out.SessionImportStoredFeedbackDocument
 import com.readmates.sessionimport.application.port.out.SessionImportWritePort
@@ -48,8 +48,13 @@ class SessionImportDraftServiceTest {
         assertThat(result.baseLiveRevision).isEqualTo(0)
         assertThat(result.liveApplied).isFalse()
         assertThat(fixture.drafts.savedCommand?.source).isEqualTo(SessionRecordDraftSource.JSON_IMPORT)
-        assertThat(fixture.drafts.savedCommand?.snapshot?.highlights?.single()?.membershipId)
-            .isEqualTo(fixture.authorMembershipId)
+        assertThat(
+            fixture.drafts.savedCommand
+                ?.snapshot
+                ?.highlights
+                ?.single()
+                ?.membershipId,
+        ).isEqualTo(fixture.authorMembershipId)
     }
 
     @Test
@@ -252,7 +257,10 @@ class SessionImportDraftServiceTest {
             )
         }
 
-        override fun getEditor(host: AuthenticatedClubActor, sessionId: UUID): SessionRecordEditor =
+        override fun getEditor(
+            host: AuthenticatedClubActor,
+            sessionId: UUID,
+        ): SessionRecordEditor =
             SessionRecordEditor(
                 live =
                     com.readmates.sessionrecord.application.model.LiveSessionRecord(
@@ -291,13 +299,21 @@ class SessionImportDraftServiceTest {
                 draftLiveBaseStale = false,
             )
 
-        override fun save(host: CurrentMember, command: SaveSessionRecordDraftCommand): SessionRecordDraft =
-            error("Not used")
+        override fun save(
+            host: CurrentMember,
+            command: SaveSessionRecordDraftCommand,
+        ): SessionRecordDraft = error("Not used")
 
-        override fun discard(host: CurrentMember, sessionId: UUID, expectedDraftRevision: Long) = error("Not used")
+        override fun discard(
+            host: CurrentMember,
+            sessionId: UUID,
+            expectedDraftRevision: Long,
+        ) = error("Not used")
 
-        override fun restore(host: CurrentMember, command: RestoreSessionRecordDraftCommand): SessionRecordDraft =
-            error("Not used")
+        override fun restore(
+            host: CurrentMember,
+            command: RestoreSessionRecordDraftCommand,
+        ): SessionRecordDraft = error("Not used")
     }
 
     private class TargetOnlyWritePort(

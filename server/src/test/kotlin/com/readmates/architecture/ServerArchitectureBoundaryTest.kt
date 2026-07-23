@@ -569,9 +569,8 @@ class ServerArchitectureSourceBoundaryTest {
         )
     }
 
-    private fun com.tngtech.archunit.core.domain.JavaClass.residesInAnyPackagePattern(
-        patterns: Array<String>,
-    ): Boolean =
+    @Suppress("MaxLineLength")
+    private fun com.tngtech.archunit.core.domain.JavaClass.residesInAnyPackagePattern(patterns: Array<String>): Boolean =
         patterns.any { pattern ->
             val packagePrefix = pattern.removeSuffix("..")
             packageName == packagePrefix || packageName.startsWith("$packagePrefix.")

@@ -31,21 +31,22 @@ class MySqlFlywayMigrationTest(
     @Test
     fun `mysql creates host session record revision and notification confirmation tables`() {
         val tables =
-            jdbcTemplate.queryForList(
-                """
-                select table_name
-                from information_schema.tables
-                where table_schema = database()
-                  and table_name in (
-                    'session_record_drafts',
-                    'session_record_revisions',
-                    'host_session_change_audit',
-                    'host_action_notification_previews',
-                    'host_action_notification_decisions'
-                  )
-                """.trimIndent(),
-                String::class.java,
-            ).toSet()
+            jdbcTemplate
+                .queryForList(
+                    """
+                    select table_name
+                    from information_schema.tables
+                    where table_schema = database()
+                      and table_name in (
+                        'session_record_drafts',
+                        'session_record_revisions',
+                        'host_session_change_audit',
+                        'host_action_notification_previews',
+                        'host_action_notification_decisions'
+                      )
+                    """.trimIndent(),
+                    String::class.java,
+                ).toSet()
 
         assertEquals(
             setOf(

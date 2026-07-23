@@ -212,9 +212,14 @@ class SessionRecordApplyService(
         }
     }
 
-    private fun eventType(live: LiveSessionRecord, draft: SessionRecordDraft): NotificationEventType =
-        if (live.snapshot.feedbackDocument.markdown.isBlank() &&
-            draft.snapshot.feedbackDocument.markdown.isNotBlank()
+    private fun eventType(
+        live: LiveSessionRecord,
+        draft: SessionRecordDraft,
+    ): NotificationEventType =
+        if (live.snapshot.feedbackDocument.markdown
+                .isBlank() &&
+            draft.snapshot.feedbackDocument.markdown
+                .isNotBlank()
         ) {
             NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED
         } else {

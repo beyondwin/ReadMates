@@ -232,9 +232,8 @@ private data class HostSessionVisibilityBinding(
     val requestHash: String,
 )
 
-private fun HostSessionVisibilitySnapshot.visibilityBinding(
-    targetVisibility: SessionRecordVisibility,
-): HostSessionVisibilityBinding {
+@Suppress("MaxLineLength")
+private fun HostSessionVisibilitySnapshot.visibilityBinding(targetVisibility: SessionRecordVisibility): HostSessionVisibilityBinding {
     val revision = contentRevision()
     return HostSessionVisibilityBinding(
         contentRevision = revision,
@@ -277,9 +276,8 @@ private fun visibilityFrame(vararg fields: Pair<String, String>): String =
         }
     }
 
-private fun UpdateHostSessionVisibilityCommand.toDecisionCommand(
-    binding: HostSessionVisibilityBinding,
-): HostActionDecisionCommand? {
+@Suppress("MaxLineLength")
+private fun UpdateHostSessionVisibilityCommand.toDecisionCommand(binding: HostSessionVisibilityBinding): HostActionDecisionCommand? {
     if (previewId == null || notificationDecision == null) return null
     return HostActionDecisionCommand(
         previewId = previewId,

@@ -459,7 +459,11 @@ private class CanonicalFrame {
         fieldValue: String,
     ) = apply {
         value.append(name).append('=')
-        value.append(fieldValue.toByteArray(Charsets.UTF_8).size).append(':').append(fieldValue).append(';')
+        value
+            .append(fieldValue.toByteArray(Charsets.UTF_8).size)
+            .append(':')
+            .append(fieldValue)
+            .append(';')
     }
 
     fun nullableField(

@@ -33,7 +33,10 @@ class JdbcSessionRecordAdapter(
     private val jdbcTemplate: JdbcTemplate,
     private val codec: SessionRecordSnapshotCodec,
 ) : SessionRecordStorePort {
-    override fun lockEditor(host: AuthenticatedClubActor, sessionId: UUID): SessionRecordEditor? {
+    override fun lockEditor(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+    ): SessionRecordEditor? {
         val live = loadLive(host, sessionId, forUpdate = true) ?: return null
         val draft = loadDraft(host, sessionId, forUpdate = true)
         return SessionRecordEditor(
@@ -47,41 +50,42 @@ class JdbcSessionRecordAdapter(
         host: AuthenticatedClubActor,
         previewId: UUID,
     ): CompletedSessionRecordApply? =
-        jdbcTemplate.query(
-            """
-            select p.id as preview_id,
-                   p.expected_draft_revision,
-                   p.expected_live_revision,
-                   d.id as decision_id,
-                   d.decision,
-                   d.event_id,
-                   r.id, r.session_id, r.club_id, r.version, r.source, r.restored_from_revision_id,
-                   r.snapshot_json, r.applied_by_membership_id, r.applied_at
-            from host_action_notification_previews p
-            join host_action_notification_decisions d
-              on d.preview_id = p.id and d.club_id = p.club_id and d.session_id = p.session_id
-            join session_record_revisions r
-              on r.club_id = d.club_id and r.session_id = d.session_id and r.version = d.live_revision
-            where p.id = ?
-              and p.club_id = ?
-              and p.host_membership_id = ?
-              and p.action_type = 'RECORD_APPLY'
-            """.trimIndent(),
-            { rs, _ ->
-                CompletedSessionRecordApply(
-                    previewId = rs.uuid("preview_id"),
-                    expectedDraftRevision = rs.getLong("expected_draft_revision"),
-                    expectedLiveRevision = rs.getLong("expected_live_revision"),
-                    notificationDecision = NotificationDecision.valueOf(rs.getString("decision")),
-                    decisionId = rs.uuid("decision_id"),
-                    eventId = rs.uuidOrNull("event_id"),
-                    revision = revision(rs),
-                )
-            },
-            previewId.dbString(),
-            host.clubId.dbString(),
-            host.membershipId.dbString(),
-        ).firstOrNull()
+        jdbcTemplate
+            .query(
+                """
+                select p.id as preview_id,
+                       p.expected_draft_revision,
+                       p.expected_live_revision,
+                       d.id as decision_id,
+                       d.decision,
+                       d.event_id,
+                       r.id, r.session_id, r.club_id, r.version, r.source, r.restored_from_revision_id,
+                       r.snapshot_json, r.applied_by_membership_id, r.applied_at
+                from host_action_notification_previews p
+                join host_action_notification_decisions d
+                  on d.preview_id = p.id and d.club_id = p.club_id and d.session_id = p.session_id
+                join session_record_revisions r
+                  on r.club_id = d.club_id and r.session_id = d.session_id and r.version = d.live_revision
+                where p.id = ?
+                  and p.club_id = ?
+                  and p.host_membership_id = ?
+                  and p.action_type = 'RECORD_APPLY'
+                """.trimIndent(),
+                { rs, _ ->
+                    CompletedSessionRecordApply(
+                        previewId = rs.uuid("preview_id"),
+                        expectedDraftRevision = rs.getLong("expected_draft_revision"),
+                        expectedLiveRevision = rs.getLong("expected_live_revision"),
+                        notificationDecision = NotificationDecision.valueOf(rs.getString("decision")),
+                        decisionId = rs.uuid("decision_id"),
+                        eventId = rs.uuidOrNull("event_id"),
+                        revision = revision(rs),
+                    )
+                },
+                previewId.dbString(),
+                host.clubId.dbString(),
+                host.membershipId.dbString(),
+            ).firstOrNull()
 
     override fun insertBaselineIfAbsent(
         host: AuthenticatedClubActor,
@@ -145,49 +149,52 @@ class JdbcSessionRecordAdapter(
         expectedDraftRevision: Long,
     ): Boolean = deleteDraft(host, sessionId, expectedDraftRevision)
 
+    @Suppress("LongMethod")
     override fun loadLive(
         host: AuthenticatedClubActor,
         sessionId: UUID,
         forUpdate: Boolean,
     ): LiveSessionRecord? {
         val session =
-            jdbcTemplate.query(
-                """
-                select s.visibility, s.number, s.book_title, s.session_date,
-                       coalesce((
-                         select max(r.version)
-                         from session_record_revisions r
-                         where r.club_id = s.club_id and r.session_id = s.id
-                       ), 0) as live_revision
-                from sessions s
-                where s.id = ? and s.club_id = ?
-                ${if (forUpdate) "for update" else ""}
-                """.trimIndent(),
-                { rs, _ ->
-                    LiveRow(
-                        visibility = rs.getString("visibility"),
-                        revision = rs.getLong("live_revision"),
-                        sessionNumber = rs.getInt("number"),
-                        bookTitle = rs.getString("book_title"),
-                        meetingDate = rs.getObject("session_date", LocalDate::class.java),
-                    )
-                },
-                sessionId.dbString(),
-                host.clubId.dbString(),
-            ).singleOrNull()
+            jdbcTemplate
+                .query(
+                    """
+                    select s.visibility, s.number, s.book_title, s.session_date,
+                           coalesce((
+                             select max(r.version)
+                             from session_record_revisions r
+                             where r.club_id = s.club_id and r.session_id = s.id
+                           ), 0) as live_revision
+                    from sessions s
+                    where s.id = ? and s.club_id = ?
+                    ${if (forUpdate) "for update" else ""}
+                    """.trimIndent(),
+                    { rs, _ ->
+                        LiveRow(
+                            visibility = rs.getString("visibility"),
+                            revision = rs.getLong("live_revision"),
+                            sessionNumber = rs.getInt("number"),
+                            bookTitle = rs.getString("book_title"),
+                            meetingDate = rs.getObject("session_date", LocalDate::class.java),
+                        )
+                    },
+                    sessionId.dbString(),
+                    host.clubId.dbString(),
+                ).singleOrNull()
                 ?: return null
 
         val publicationSummary =
-            jdbcTemplate.query(
-                """
-                select public_summary
-                from public_session_publications
-                where club_id = ? and session_id = ?
-                """.trimIndent(),
-                { rs, _ -> rs.getString("public_summary") },
-                host.clubId.dbString(),
-                sessionId.dbString(),
-            ).singleOrNull()
+            jdbcTemplate
+                .query(
+                    """
+                    select public_summary
+                    from public_session_publications
+                    where club_id = ? and session_id = ?
+                    """.trimIndent(),
+                    { rs, _ -> rs.getString("public_summary") },
+                    host.clubId.dbString(),
+                    sessionId.dbString(),
+                ).singleOrNull()
                 ?: ""
         val highlights = loadEntries("highlights", host, sessionId)
         val oneLineReviews = loadEntries("one_line_reviews", host, sessionId)
@@ -215,18 +222,19 @@ class JdbcSessionRecordAdapter(
         sessionId: UUID,
         forUpdate: Boolean,
     ): SessionRecordDraft? =
-        jdbcTemplate.query(
-            """
-            select session_id, club_id, base_live_revision, draft_revision, source, restored_from_revision_id,
-                   snapshot_json, updated_by_membership_id, created_at, updated_at
-            from session_record_drafts
-            where club_id = ? and session_id = ?
-            ${if (forUpdate) "for update" else ""}
-            """.trimIndent(),
-            { rs, _ -> draft(rs) },
-            host.clubId.dbString(),
-            sessionId.dbString(),
-        ).singleOrNull()
+        jdbcTemplate
+            .query(
+                """
+                select session_id, club_id, base_live_revision, draft_revision, source, restored_from_revision_id,
+                       snapshot_json, updated_by_membership_id, created_at, updated_at
+                from session_record_drafts
+                where club_id = ? and session_id = ?
+                ${if (forUpdate) "for update" else ""}
+                """.trimIndent(),
+                { rs, _ -> draft(rs) },
+                host.clubId.dbString(),
+                sessionId.dbString(),
+            ).singleOrNull()
 
     override fun insertDraft(
         host: AuthenticatedClubActor,
@@ -304,18 +312,19 @@ class JdbcSessionRecordAdapter(
         sessionId: UUID,
         revisionId: UUID,
     ): SessionRecordRevision? =
-        jdbcTemplate.query(
-            """
-            select id, session_id, club_id, version, source, restored_from_revision_id, snapshot_json,
-                   applied_by_membership_id, applied_at
-            from session_record_revisions
-            where id = ? and club_id = ? and session_id = ?
-            """.trimIndent(),
-            { rs, _ -> revision(rs) },
-            revisionId.dbString(),
-            host.clubId.dbString(),
-            sessionId.dbString(),
-        ).singleOrNull()
+        jdbcTemplate
+            .query(
+                """
+                select id, session_id, club_id, version, source, restored_from_revision_id, snapshot_json,
+                       applied_by_membership_id, applied_at
+                from session_record_revisions
+                where id = ? and club_id = ? and session_id = ?
+                """.trimIndent(),
+                { rs, _ -> revision(rs) },
+                revisionId.dbString(),
+                host.clubId.dbString(),
+                sessionId.dbString(),
+            ).singleOrNull()
 
     override fun insertRestoredDraft(
         host: AuthenticatedClubActor,
@@ -401,25 +410,29 @@ class JdbcSessionRecordAdapter(
         )
     }
 
-    private fun loadFeedback(host: AuthenticatedClubActor, sessionId: UUID): SessionRecordFeedbackDocument =
-        jdbcTemplate.query(
-            """
-            select file_name, coalesce(nullif(document_title, ''), file_name) as document_title, source_text
-            from session_feedback_documents
-            where club_id = ? and session_id = ?
-            order by version desc, id desc
-            limit 1
-            """.trimIndent(),
-            { rs, _ ->
-                SessionRecordFeedbackDocument(
-                    fileName = rs.getString("file_name"),
-                    title = rs.getString("document_title"),
-                    markdown = rs.getString("source_text"),
-                )
-            },
-            host.clubId.dbString(),
-            sessionId.dbString(),
-        ).singleOrNull()
+    private fun loadFeedback(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+    ): SessionRecordFeedbackDocument =
+        jdbcTemplate
+            .query(
+                """
+                select file_name, coalesce(nullif(document_title, ''), file_name) as document_title, source_text
+                from session_feedback_documents
+                where club_id = ? and session_id = ?
+                order by version desc, id desc
+                limit 1
+                """.trimIndent(),
+                { rs, _ ->
+                    SessionRecordFeedbackDocument(
+                        fileName = rs.getString("file_name"),
+                        title = rs.getString("document_title"),
+                        markdown = rs.getString("source_text"),
+                    )
+                },
+                host.clubId.dbString(),
+                sessionId.dbString(),
+            ).singleOrNull()
             ?: SessionRecordFeedbackDocument("feedback.md", "", "")
 
     private fun draft(rs: ResultSet) =

@@ -83,7 +83,12 @@ class SessionRecordApplyServiceTest {
         fixture.apply()
 
         assertEquals("Summary", fixture.replacer.lastSnapshot?.publicationSummary)
-        assertEquals("Summary", fixture.store.revisions.last().snapshot.publicationSummary)
+        assertEquals(
+            "Summary",
+            fixture.store.revisions
+                .last()
+                .snapshot.publicationSummary,
+        )
     }
 
     @Test
@@ -127,8 +132,18 @@ class SessionRecordApplyServiceTest {
         val result = fixture.apply(NotificationDecision.SEND)
 
         assertEquals(1, fixture.recorder.commands.size)
-        assertEquals(result.liveRevision, fixture.recorder.commands.single().revision)
-        assertEquals(NotificationEventType.SESSION_RECORD_UPDATED, fixture.recorder.commands.single().eventType)
+        assertEquals(
+            result.liveRevision,
+            fixture.recorder.commands
+                .single()
+                .revision,
+        )
+        assertEquals(
+            NotificationEventType.SESSION_RECORD_UPDATED,
+            fixture.recorder.commands
+                .single()
+                .eventType,
+        )
         assertNotNull(result.eventId)
     }
 
@@ -374,7 +389,10 @@ private class FakeApplyStore(
     private val stagedRevisions = mutableListOf<SessionRecordRevision>()
     var onCommit: () -> Unit = {}
 
-    override fun lockEditor(host: AuthenticatedClubActor, sessionId: UUID): SessionRecordEditor? {
+    override fun lockEditor(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+    ): SessionRecordEditor? {
         completed = completedAfterLock ?: completed
         return SessionRecordEditor(live, draft, draftLiveBaseStale = false)
     }
@@ -418,17 +436,24 @@ private class FakeApplyStore(
         return true
     }
 
-    override fun loadLive(host: AuthenticatedClubActor, sessionId: UUID, forUpdate: Boolean) = live
+    override fun loadLive(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+        forUpdate: Boolean,
+    ) = live
 
-    override fun loadDraft(host: AuthenticatedClubActor, sessionId: UUID, forUpdate: Boolean) = draft
+    override fun loadDraft(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+        forUpdate: Boolean,
+    ) = draft
 
     override fun insertDraft(
         host: AuthenticatedClubActor,
         live: LiveSessionRecord,
         command: SaveSessionRecordDraftCommand,
         encoded: EncodedSessionRecordSnapshot,
-    ) =
-        requireNotNull(draft)
+    ) = requireNotNull(draft)
 
     override fun compareAndSetDraft(
         host: AuthenticatedClubActor,
@@ -436,9 +461,17 @@ private class FakeApplyStore(
         encoded: EncodedSessionRecordSnapshot,
     ) = draft
 
-    override fun deleteDraft(host: AuthenticatedClubActor, sessionId: UUID, expectedDraftRevision: Long) = false
+    override fun deleteDraft(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+        expectedDraftRevision: Long,
+    ) = false
 
-    override fun loadRevision(host: AuthenticatedClubActor, sessionId: UUID, revisionId: UUID) = null
+    override fun loadRevision(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+        revisionId: UUID,
+    ) = null
 
     override fun insertRestoredDraft(
         host: AuthenticatedClubActor,
@@ -507,12 +540,18 @@ private class FakeGate(
     val prepared = mutableListOf<HostActionDecisionCommand>()
     val completed = mutableListOf<CompleteHostActionDecisionCommand>()
 
-    override fun preview(host: CurrentMember, command: HostActionPreviewCommand): HostActionPreview {
+    override fun preview(
+        host: CurrentMember,
+        command: HostActionPreviewCommand,
+    ): HostActionPreview {
         lastPreview = command
         return HostActionPreview(previewId, 2, 2, 1, 1, now.plusMinutes(5))
     }
 
-    override fun prepare(host: CurrentMember, command: HostActionDecisionCommand): PreparedHostActionDecision {
+    override fun prepare(
+        host: CurrentMember,
+        command: HostActionDecisionCommand,
+    ): PreparedHostActionDecision {
         prepared += command
         return PreparedHostActionDecision(
             command.previewId,
@@ -556,9 +595,8 @@ private class FakeRecorder : RecordHostConfirmedNotificationEventUseCase {
     }
 }
 
-private fun com.readmates.sessionimport.application.model.SessionImportCommand.validPreview(
-    trustedAuthorBindings: Map<String, UUID>,
-) =
+@Suppress("MaxLineLength")
+private fun com.readmates.sessionimport.application.model.SessionImportCommand.validPreview(trustedAuthorBindings: Map<String, UUID>) =
     SessionImportPreviewResult(
         valid = true,
         session =

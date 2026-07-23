@@ -31,7 +31,10 @@ class CursorCodecTest {
 
     @Test
     fun `strict decode rejects blank malformed duplicate and non canonical cursors`() {
-        val encoder = java.util.Base64.getUrlEncoder().withoutPadding()
+        val encoder =
+            java.util.Base64
+                .getUrlEncoder()
+                .withoutPadding()
         val duplicateKeys = encoder.encodeToString("id=one&id=two".toByteArray())
         val unsortedKeys = encoder.encodeToString("number=7&id=one".toByteArray())
 

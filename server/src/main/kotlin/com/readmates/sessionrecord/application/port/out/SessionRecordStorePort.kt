@@ -13,9 +13,15 @@ import java.util.UUID
 
 @Suppress("TooManyFunctions")
 interface SessionRecordStorePort {
-    fun lockEditor(host: AuthenticatedClubActor, sessionId: UUID): SessionRecordEditor?
+    fun lockEditor(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+    ): SessionRecordEditor?
 
-    fun findCompletedApply(host: AuthenticatedClubActor, previewId: UUID): CompletedSessionRecordApply?
+    fun findCompletedApply(
+        host: AuthenticatedClubActor,
+        previewId: UUID,
+    ): CompletedSessionRecordApply?
 
     fun insertBaselineIfAbsent(
         host: AuthenticatedClubActor,
@@ -29,11 +35,23 @@ interface SessionRecordStorePort {
         encoded: EncodedSessionRecordSnapshot,
     ): SessionRecordRevision
 
-    fun deleteAppliedDraft(host: AuthenticatedClubActor, sessionId: UUID, expectedDraftRevision: Long): Boolean
+    fun deleteAppliedDraft(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+        expectedDraftRevision: Long,
+    ): Boolean
 
-    fun loadLive(host: AuthenticatedClubActor, sessionId: UUID, forUpdate: Boolean = false): LiveSessionRecord?
+    fun loadLive(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+        forUpdate: Boolean = false,
+    ): LiveSessionRecord?
 
-    fun loadDraft(host: AuthenticatedClubActor, sessionId: UUID, forUpdate: Boolean = false): SessionRecordDraft?
+    fun loadDraft(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+        forUpdate: Boolean = false,
+    ): SessionRecordDraft?
 
     fun insertDraft(
         host: AuthenticatedClubActor,
@@ -48,9 +66,17 @@ interface SessionRecordStorePort {
         encoded: EncodedSessionRecordSnapshot,
     ): SessionRecordDraft?
 
-    fun deleteDraft(host: AuthenticatedClubActor, sessionId: UUID, expectedDraftRevision: Long): Boolean
+    fun deleteDraft(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+        expectedDraftRevision: Long,
+    ): Boolean
 
-    fun loadRevision(host: AuthenticatedClubActor, sessionId: UUID, revisionId: UUID): SessionRecordRevision?
+    fun loadRevision(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+        revisionId: UUID,
+    ): SessionRecordRevision?
 
     fun insertRestoredDraft(
         host: AuthenticatedClubActor,

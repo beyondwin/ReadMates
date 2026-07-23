@@ -42,12 +42,10 @@ class JdbcHostActionNotificationAdapterTest(
 
         assertThat(
             adapter.countTargets(CLUB_ID, TARGET_COUNT_SESSION_ID, NotificationEventType.SESSION_RECORD_UPDATED),
-        )
-            .isEqualTo(HostActionTargetCounts(0, 0, 0, 0))
+        ).isEqualTo(HostActionTargetCounts(0, 0, 0, 0))
         assertThat(
             adapter.countTargets(CLUB_ID, TARGET_COUNT_SESSION_ID, NotificationEventType.NEXT_BOOK_PUBLISHED),
-        )
-            .isEqualTo(HostActionTargetCounts(0, 0, 0, 0))
+        ).isEqualTo(HostActionTargetCounts(0, 0, 0, 0))
 
         jdbcTemplate.update("update sessions set state = 'CLOSED' where id = ?", TARGET_COUNT_SESSION_ID.toString())
         assertThat(

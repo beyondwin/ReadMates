@@ -193,16 +193,15 @@ class AiGenerationController(
         validateReviewContract(request)
         return commitUc
             .commit(
-            host = auth.actor(member),
-            sessionId = sessionId,
-            jobId = jobId,
-            recordVisibility = request.recordVisibility,
-            overrideResult = request.result?.toSnapshot(),
-            expectedRevision = request.expectedRevision,
-            sectionReviews = request.sectionReviews,
-            expectedDraftRevision = request.expectedDraftRevision,
-        )
-            .toResponse()
+                host = auth.actor(member),
+                sessionId = sessionId,
+                jobId = jobId,
+                recordVisibility = request.recordVisibility,
+                overrideResult = request.result?.toSnapshot(),
+                expectedRevision = request.expectedRevision,
+                sectionReviews = request.sectionReviews,
+                expectedDraftRevision = request.expectedDraftRevision,
+            ).toResponse()
     }
 
     @DeleteMapping("/jobs/{jobId}")

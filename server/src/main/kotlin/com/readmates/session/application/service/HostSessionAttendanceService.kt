@@ -4,8 +4,8 @@ import com.readmates.session.application.HostAttendanceAuditTransition
 import com.readmates.session.application.HostAttendanceResponse
 import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.port.`in`.ConfirmAttendanceUseCase
-import com.readmates.session.application.port.out.HostSessionAuditPort
 import com.readmates.session.application.port.out.HostSessionAttendancePort
+import com.readmates.session.application.port.out.HostSessionAuditPort
 import com.readmates.shared.cache.ReadCacheInvalidationPort
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional

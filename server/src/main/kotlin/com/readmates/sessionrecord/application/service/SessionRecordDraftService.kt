@@ -20,7 +20,10 @@ class SessionRecordDraftService(
     private val store: SessionRecordStorePort,
     private val codec: SessionRecordSnapshotCodec,
 ) : ManageSessionRecordDraftUseCase {
-    override fun getEditor(host: AuthenticatedClubActor, sessionId: UUID): SessionRecordEditor {
+    override fun getEditor(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+    ): SessionRecordEditor {
         requireHost(host)
         val live = requireLive(host, sessionId)
         val draft = store.loadDraft(host, sessionId)
@@ -33,9 +36,10 @@ class SessionRecordDraftService(
 
     @Transactional
     @Suppress("ThrowsCount")
-    override fun save(host: CurrentMember, command: SaveSessionRecordDraftCommand): SessionRecordDraft {
-        return saveSnapshot(host, command, requireExpectedRevision = true)
-    }
+    override fun save(
+        host: CurrentMember,
+        command: SaveSessionRecordDraftCommand,
+    ): SessionRecordDraft = saveSnapshot(host, command, requireExpectedRevision = true)
 
     @Transactional
     override fun saveValidatedSnapshot(
@@ -64,14 +68,21 @@ class SessionRecordDraftService(
     }
 
     @Transactional
-    override fun discard(host: CurrentMember, sessionId: UUID, expectedDraftRevision: Long) {
+    override fun discard(
+        host: CurrentMember,
+        sessionId: UUID,
+        expectedDraftRevision: Long,
+    ) {
         requireHost(host)
         requireLive(host, sessionId, forUpdate = true)
         if (!store.deleteDraft(host, sessionId, expectedDraftRevision)) throw draftStale()
     }
 
     @Transactional
-    override fun restore(host: CurrentMember, command: RestoreSessionRecordDraftCommand): SessionRecordDraft {
+    override fun restore(
+        host: CurrentMember,
+        command: RestoreSessionRecordDraftCommand,
+    ): SessionRecordDraft {
         requireHost(host)
         val live = requireLive(host, command.sessionId, forUpdate = true)
         val revision =
@@ -89,9 +100,12 @@ class SessionRecordDraftService(
         ) ?: throw draftStale()
     }
 
-    private fun requireLive(host: AuthenticatedClubActor, sessionId: UUID, forUpdate: Boolean = false) =
-        store.loadLive(host, sessionId, forUpdate)
-            ?: throw SessionRecordException(SessionRecordError.SESSION_NOT_FOUND, "Session record not found")
+    private fun requireLive(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+        forUpdate: Boolean = false,
+    ) = store.loadLive(host, sessionId, forUpdate)
+        ?: throw SessionRecordException(SessionRecordError.SESSION_NOT_FOUND, "Session record not found")
 
     private fun requireHost(host: AuthenticatedClubActor) {
         if (!host.isHost) throw AccessDeniedException("Host role required")

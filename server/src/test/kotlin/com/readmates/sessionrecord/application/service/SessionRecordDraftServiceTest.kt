@@ -21,10 +21,10 @@ import com.readmates.shared.security.CurrentMember
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import tools.jackson.databind.json.JsonMapper
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.UUID
-import tools.jackson.databind.json.JsonMapper
 
 class SessionRecordDraftServiceTest {
     private val host = host()
@@ -146,38 +146,41 @@ class SessionRecordDraftServiceTest {
         updatedAt = NOW,
     )
 
-    private fun revision() = SessionRecordRevision(
-        id = UUID.randomUUID(),
-        sessionId = sessionId,
-        clubId = host.clubId,
-        version = 3,
-        source = SessionRecordSource.MANUAL,
-        restoredFromRevisionId = null,
-        snapshot = changedSnapshot(),
-        appliedByMembershipId = host.membershipId,
-        appliedAt = NOW,
-    )
+    private fun revision() =
+        SessionRecordRevision(
+            id = UUID.randomUUID(),
+            sessionId = sessionId,
+            clubId = host.clubId,
+            version = 3,
+            source = SessionRecordSource.MANUAL,
+            restoredFromRevisionId = null,
+            snapshot = changedSnapshot(),
+            appliedByMembershipId = host.membershipId,
+            appliedAt = NOW,
+        )
 
-    private fun snapshot(summary: String = "요약") = SessionRecordSnapshot(
-        visibility = SessionRecordVisibility.MEMBER,
-        publicationSummary = summary,
-        highlights = emptyList(),
-        oneLineReviews = emptyList(),
-        feedbackDocument = SessionRecordFeedbackDocument("feedback.md", "피드백", "# 피드백"),
-    )
+    private fun snapshot(summary: String = "요약") =
+        SessionRecordSnapshot(
+            visibility = SessionRecordVisibility.MEMBER,
+            publicationSummary = summary,
+            highlights = emptyList(),
+            oneLineReviews = emptyList(),
+            feedbackDocument = SessionRecordFeedbackDocument("feedback.md", "피드백", "# 피드백"),
+        )
 
     private fun changedSnapshot() = snapshot("수정 요약")
 
-    private fun host() = CurrentMember(
-        userId = UUID.randomUUID(),
-        membershipId = UUID.randomUUID(),
-        clubId = UUID.randomUUID(),
-        clubSlug = "test-club",
-        email = "host@example.com",
-        displayName = "호스트",
-        accountName = "host",
-        role = MembershipRole.HOST,
-    )
+    private fun host() =
+        CurrentMember(
+            userId = UUID.randomUUID(),
+            membershipId = UUID.randomUUID(),
+            clubId = UUID.randomUUID(),
+            clubSlug = "test-club",
+            email = "host@example.com",
+            displayName = "호스트",
+            accountName = "host",
+            role = MembershipRole.HOST,
+        )
 
     private inner class FakeStore(
         var live: LiveSessionRecord?,
@@ -186,8 +189,10 @@ class SessionRecordDraftServiceTest {
     ) : SessionRecordStorePort {
         val revisions = revision?.let(::listOf).orEmpty()
 
-        override fun lockEditor(host: AuthenticatedClubActor, sessionId: UUID): SessionRecordEditor? =
-            live?.let { SessionRecordEditor(it, draft, draft?.baseLiveRevision != it.revision) }
+        override fun lockEditor(
+            host: AuthenticatedClubActor,
+            sessionId: UUID,
+        ): SessionRecordEditor? = live?.let { SessionRecordEditor(it, draft, draft?.baseLiveRevision != it.revision) }
 
         override fun findCompletedApply(
             host: AuthenticatedClubActor,
@@ -212,9 +217,17 @@ class SessionRecordDraftServiceTest {
             expectedDraftRevision: Long,
         ): Boolean = false
 
-        override fun loadLive(host: AuthenticatedClubActor, sessionId: UUID, forUpdate: Boolean) = live
+        override fun loadLive(
+            host: AuthenticatedClubActor,
+            sessionId: UUID,
+            forUpdate: Boolean,
+        ) = live
 
-        override fun loadDraft(host: AuthenticatedClubActor, sessionId: UUID, forUpdate: Boolean) = draft
+        override fun loadDraft(
+            host: AuthenticatedClubActor,
+            sessionId: UUID,
+            forUpdate: Boolean,
+        ) = draft
 
         override fun insertDraft(
             host: AuthenticatedClubActor,
@@ -237,13 +250,14 @@ class SessionRecordDraftServiceTest {
         ): SessionRecordDraft? {
             val current = draft ?: return null
             if (current.draftRevision != command.expectedDraftRevision) return null
-            return current.copy(
-                draftRevision = current.draftRevision + 1,
-                source = command.source,
-                restoredFromRevisionId = command.restoredFromRevisionId,
-                snapshot = codec.decode(encoded.json),
-                updatedAt = NOW,
-            ).also { draft = it }
+            return current
+                .copy(
+                    draftRevision = current.draftRevision + 1,
+                    source = command.source,
+                    restoredFromRevisionId = command.restoredFromRevisionId,
+                    snapshot = codec.decode(encoded.json),
+                    updatedAt = NOW,
+                ).also { draft = it }
         }
 
         @Suppress("ReturnCount")
@@ -258,8 +272,11 @@ class SessionRecordDraftServiceTest {
             return true
         }
 
-        override fun loadRevision(host: AuthenticatedClubActor, sessionId: UUID, revisionId: UUID) =
-            revisions.singleOrNull { it.id == revisionId }
+        override fun loadRevision(
+            host: AuthenticatedClubActor,
+            sessionId: UUID,
+            revisionId: UUID,
+        ) = revisions.singleOrNull { it.id == revisionId }
 
         override fun insertRestoredDraft(
             host: AuthenticatedClubActor,
