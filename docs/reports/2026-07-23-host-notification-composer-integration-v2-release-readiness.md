@@ -10,7 +10,7 @@ Reviewed scope: the complete `origin/main..HEAD` branch plus the Task 12 working
 
 The accumulated concrete CHANGELOG body is prepared locally under `v2.0.0 - 2026-07-23`, while `Unreleased` is restored to the documented single-placeholder convention. A major version is required because the old and new frontend/server API pairings are not compatible long-lived deployment states.
 
-This preparation does not publish `v2.0.0`. The branch remains blocked by a local `CHECK_FAILURE` until the exact `./scripts/pre-push-check.sh --full --release` command is rerun successfully at the prepared HEAD. Production migration/deploy smoke also requires operator access after merge and a separately authorized tag.
+This preparation does not publish `v2.0.0`. At prepared commit `dc8f0f7f`, the exact `./scripts/pre-push-check.sh --full --release` command exited 0 without `--no-changelog-check`, closing the prior local `CHECK_FAILURE`. The branch is locally ready for review and merge, but production migration/deploy smoke still requires operator access after merge and a separately authorized tag.
 
 The reviewed branch contains two intentional release surfaces:
 
@@ -21,11 +21,11 @@ No push, merge, pull request, tag, deploy, production policy mutation, or live n
 
 ## Blocker
 
-### Prior canonical release gate is `CHECK_FAILURE`
+No unresolved local Blocker remains.
 
 The earlier exact `./scripts/pre-push-check.sh --full --release` run stopped nonzero at `check_changelog_unreleased_guard` before executable gates. Per the release-management policy this is `CHECK_FAILURE`, not an expected success state, and the passing `--full --no-release` run is complementary evidence rather than a substitute.
 
-The concrete entries are now under the local `v2.0.0 - 2026-07-23` release-preparation section and the emergency `--no-changelog-check` override remains unused. The blocker stays open until the exact release command exits 0 at the prepared HEAD.
+The concrete entries are now under the local `v2.0.0 - 2026-07-23` release-preparation section and the emergency `--no-changelog-check` override remains unused. The exact command was rerun at `dc8f0f7f` and exited 0, so the `CHECK_FAILURE` is closed with canonical evidence rather than a no-release substitute.
 
 ## High
 
@@ -83,7 +83,7 @@ Tag-triggered `Deploy Front`, tag-triggered `Deploy Server Image`, GHCR image sc
 - Session history reads do not create legacy decision rows.
 - No architecture-test baseline or exception file changed.
 - No deploy workflow trigger or permission widening was found. The CI change fail-closes partial private-guidance source contracts.
-- The complete `origin/main..HEAD` tracked diff is the required private-data/token/local-path scan scope; its prepared-HEAD rerun is recorded as pending until the release gate and independent safety commands complete.
+- The private-data/token/local-path scan covered all 165 added, copied, modified, or renamed tracked files in `origin/main..HEAD`. The broad phrase scan returned one intentional negative assertion, `doesNotContain("BEGIN PRIVATE KEY")`, which contains no delimiter or payload. The precise token-shaped scan using a delimited PEM header returned no findings.
 - `readmates.host-action-confirmation.required` controls staged session-record capability exposure only; it does not control dispatch.
 
 ## Migration and API Contract
@@ -121,19 +121,17 @@ Focused evidence:
 
 Canonical local evidence:
 
+- `./scripts/pre-push-check.sh --full --release` — exited 0 at prepared commit `dc8f0f7f` without any CHANGELOG override. It passed the release guard, agent guidance, frontend lint, 188 files and 1,470 coverage tests (82.5% statements, 78.06% branches, 83.12% functions, 83.2% lines), frontend build, Zod fixture freshness, server quality/integration, production AI config, public candidate/gitleaks, 90 Playwright E2E tests, and Prometheus/Tempo/Grafana/Alertmanager checks.
 - `./scripts/server-ci-check.sh` — passed.
 - `./server/gradlew -p server integrationTest --rerun-tasks` — passed from a forced rerun.
 - `corepack pnpm --dir front lint` — passed.
 - `corepack pnpm --dir front test` — passed, 188 files and 1,470 tests.
 - `corepack pnpm --dir front build` — passed.
 - `corepack pnpm --dir front test:e2e` — passed, 90 Playwright tests.
-- `./scripts/pre-push-check.sh --full --no-release` — passed, including frontend coverage at 82.5% statements, 78.06% branches, 83.12% functions, and 83.2% lines; server quality/integration; 90 E2E tests; AI config; and observability config checks.
-- `git diff --check` — passed.
-- `./scripts/build-public-release-candidate.sh` — passed. The repository candidate contract intentionally excludes historical/report artifacts.
-- `./scripts/public-release-check.sh .tmp/public-release-candidate` — passed; gitleaks found no leaks.
+- The earlier `./scripts/pre-push-check.sh --full --no-release` pass remains historical complementary evidence only; it is not used to close the prior `CHECK_FAILURE`.
+- Independent `./scripts/build-public-release-candidate.sh` and `./scripts/public-release-check.sh .tmp/public-release-candidate` reruns passed after the exact gate; gitleaks found no leaks.
+- `git diff --check origin/main..HEAD` — passed.
+- The full `origin/main..HEAD` targeted scan inspected 165 tracked changed files. One broad-pattern match was the negative security assertion described above; the precise private/token/local-path pattern returned no findings.
+- `git tag --list v2.0.0` returned no tag, and the tag-ref digest remained `a8071d68c3691234ecaec50982780ab762582d853aad5d44d16f75c300c45190` before and after release preparation.
 
-The earlier exact tag-mode command remains a recorded `CHECK_FAILURE`, not a pass:
-
-- `./scripts/pre-push-check.sh --full --release` — stopped nonzero at the CHANGELOG tag guard. The prepared-HEAD exact rerun is pending; `--full --no-release` and separate public-candidate commands do not close this blocker.
-
-Residual release-operation risk remains until the exact local release gate passes, remote CI passes on the pushed commit, both tag workflows succeed, V42 is observed in production Flyway history before traffic promotion, and sanitized BFF/OAuth/notification smoke succeeds. Passing local tests is evidence for review readiness, not proof that those production steps have completed.
+Residual release-operation risk remains until remote CI passes on the pushed commit, both tag workflows succeed, V42 is observed in production Flyway history before traffic promotion, and sanitized BFF/OAuth/notification smoke succeeds. Passing local tests is evidence for review readiness, not proof that those production steps have completed.
