@@ -3,6 +3,7 @@ import type { HostClubOperationsSnapshot } from "@/shared/model/club-operations"
 import type { AttendanceStatus, RsvpStatus, SessionState } from "@/shared/model/readmates-types";
 import type { PagedResponse } from "@/shared/model/paging";
 import type {
+  HostNotificationComposerContext,
   NotificationDecision,
   SessionRecordStatus,
 } from "./host-session-record-contracts";
@@ -170,7 +171,11 @@ export type HostNotificationEventType =
   | "FEEDBACK_DOCUMENT_PUBLISHED"
   | "REVIEW_PUBLISHED"
   | "SESSION_RECORD_UPDATED";
-export type ManualNotificationAudience = "ALL_ACTIVE_MEMBERS" | "SESSION_PARTICIPANTS" | "CONFIRMED_ATTENDEES";
+export type ManualNotificationAudience =
+  | "ALL_ACTIVE_MEMBERS"
+  | "SESSION_PARTICIPANTS"
+  | "CONFIRMED_ATTENDEES"
+  | "SELECTED_MEMBERS";
 export type ManualNotificationRequestedChannels = "IN_APP" | "EMAIL" | "BOTH";
 export type ManualNotificationSendMode = "NOW";
 export type ManualNotificationEligibility = "ELIGIBLE" | "INELIGIBLE" | "EMAIL_DISABLED" | "EMAIL_MISSING";
@@ -304,6 +309,7 @@ export type HostSessionClosingStatusResponse = {
 
 export type ManualNotificationTemplateOption = {
   eventType: HostNotificationEventType;
+  contentRevision: string;
   label: string;
   enabled: boolean;
   disabledReason: string | null;
@@ -365,11 +371,22 @@ export type ManualNotificationDispatchListResponse = PagedResponse<ManualNotific
 export type ManualNotificationSelectionRequest = {
   sessionId: string;
   eventType: HostNotificationEventType;
+  contentRevision: string;
   audience: ManualNotificationAudience;
   requestedChannels: ManualNotificationRequestedChannels;
+  selectedMembershipIds: string[];
   excludedMembershipIds: string[];
   includedMembershipIds: string[];
   sendMode: ManualNotificationSendMode;
+};
+
+export type HostNotificationPolicyResponse = {
+  sessionReminderEnabled: boolean;
+  updatedAt: string | null;
+};
+
+export type UpdateHostNotificationPolicyRequest = {
+  sessionReminderEnabled: boolean;
 };
 
 export type ManualNotificationPreviewRequest = ManualNotificationSelectionRequest;
@@ -514,6 +531,11 @@ export type HostSessionVisibilityPreviewResponse = {
   expectedEmailCount: number;
   excludedCount: number;
   expiresAt: string;
+};
+
+export type HostSessionVisibilityUpdateResult = {
+  session: HostSessionDetailResponse;
+  composer: HostNotificationComposerContext | null;
 };
 
 export type HostSessionPublication = {
@@ -741,6 +763,21 @@ export const HostSessionDetailResponseSchema = import.meta.env.DEV
     })
   : (null as never);
 
+export const HostSessionVisibilityUpdateResponseSchema = import.meta.env.DEV
+  ? z.object({
+      session: HostSessionDetailResponseSchema,
+      composer: z.object({
+        sessionId: z.string(),
+        eventType: z.enum([
+          "NEXT_BOOK_PUBLISHED",
+          "FEEDBACK_DOCUMENT_PUBLISHED",
+          "SESSION_RECORD_UPDATED",
+        ]),
+        contentRevision: z.string(),
+      }).strict().nullable(),
+    }).strict()
+  : (null as never);
+
 export const HostNotificationDeliveryListResponseSchema = import.meta.env.DEV
   ? z.object({
       items: z.array(
@@ -824,6 +861,7 @@ export const HostInvitationListPageSchema = import.meta.env.DEV
 
 // Type aliases — erased at build time, z.infer<> resolves from the truthy branch
 export type HostSessionDetailResponseParsed = z.infer<typeof HostSessionDetailResponseSchema>;
+export type HostSessionVisibilityUpdateResponseParsed = z.infer<typeof HostSessionVisibilityUpdateResponseSchema>;
 export type HostNotificationDeliveryListResponseParsed = z.infer<typeof HostNotificationDeliveryListResponseSchema>;
 export type HostInvitationListPageParsed = z.infer<typeof HostInvitationListPageSchema>;
 export type SessionImportPreviewResponseParsed = z.infer<typeof SessionImportPreviewResponseSchema>;

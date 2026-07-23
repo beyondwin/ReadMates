@@ -3,6 +3,7 @@ import {
   hostNotificationKeys,
   hostNotificationEventsQuery,
   hostNotificationManualOptionsQuery,
+  hostNotificationPolicyQuery,
   hostNotificationSessionsQuery,
   invalidateHostNotificationOverview,
   invalidateManualNotificationState,
@@ -18,6 +19,15 @@ describe("host notification query keys", () => {
       "reading-sai",
       "overview",
       "summary",
+    ]);
+  });
+
+  it("keeps policy state in its own club-scoped key", () => {
+    expect(hostNotificationPolicyQuery({ clubSlug: "reading-sai" }).queryKey).toEqual([
+      "host",
+      "notifications",
+      "reading-sai",
+      "policy",
     ]);
   });
 

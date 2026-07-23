@@ -72,9 +72,11 @@ describe("host session record API", () => {
       return Promise.resolve(jsonResponse({
         revisionId: "revision-3",
         liveRevision: 3,
-        decisionId: "decision-1",
-        notificationDecision: "SKIP",
-        eventId: null,
+        composer: {
+          sessionId: "session-28",
+          eventType: "SESSION_RECORD_UPDATED",
+          contentRevision: "b".repeat(64),
+        },
       }));
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -86,10 +88,10 @@ describe("host session record API", () => {
       snapshot: snapshot(),
     }, context);
     await applyHostSessionRecord("session-28", {
-      previewId: "preview-1",
+      applyRequestId: "apply-request-1",
       expectedDraftRevision: 3,
       expectedLiveRevision: 2,
-      notificationDecision: "SKIP",
+      expectedDraftHash: "a".repeat(64),
     }, context);
 
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -114,10 +116,10 @@ describe("host session record API", () => {
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({
-          previewId: "preview-1",
+          applyRequestId: "apply-request-1",
           expectedDraftRevision: 3,
           expectedLiveRevision: 2,
-          notificationDecision: "SKIP",
+          expectedDraftHash: "a".repeat(64),
         }),
       }),
     );
@@ -160,13 +162,8 @@ describe("host session record API", () => {
       }
       if (url.includes("/record-apply-preview")) {
         return Promise.resolve(jsonResponse({
-          previewId: "preview-1",
           eventType: "SESSION_RECORD_UPDATED",
-          targetCount: 2,
-          expectedInAppCount: 2,
-          expectedEmailCount: 2,
-          excludedCount: 0,
-          expiresAt: "2026-07-23T10:05:00+09:00",
+          expectedDraftHash: "a".repeat(64),
         }));
       }
       if (url.includes("/restore-to-draft")) {
@@ -283,7 +280,7 @@ describe("host session record response schemas", () => {
     }).success).toBe(false);
   });
 
-  it("rejects negative revisions and unknown notification decisions", () => {
+  it("rejects negative revisions and legacy apply result fields", () => {
     expect(HostSessionRecordEditorResponseSchema.safeParse({
       sessionId: "session-28",
       liveRevision: -1,
@@ -296,7 +293,7 @@ describe("host session record response schemas", () => {
       revisionId: "revision-3",
       liveRevision: 3,
       decisionId: "decision-1",
-      notificationDecision: "LATER",
+      notificationDecision: "SKIP",
       eventId: null,
     }).success).toBe(false);
   });

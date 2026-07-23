@@ -13,6 +13,10 @@ vi.mock("@/features/host/api/host-session-record-api", () => ({
 }));
 
 import {
+  HostSessionRecordApplyPreviewResponseSchema,
+  HostSessionRecordApplyResultResponseSchema,
+} from "@/features/host/api/host-session-record-contracts";
+import {
   applyHostSessionRecord,
   fetchHostSessionHistory,
   fetchHostSessionRecordEditor,
@@ -66,6 +70,28 @@ beforeEach(() => {
 });
 
 describe("host session record queries", () => {
+  it("accepts the content-only preview and composer apply contracts", () => {
+    expect(HostSessionRecordApplyPreviewResponseSchema.parse({
+      eventType: "SESSION_RECORD_UPDATED",
+      expectedDraftHash: "a".repeat(64),
+    })).toEqual({
+      eventType: "SESSION_RECORD_UPDATED",
+      expectedDraftHash: "a".repeat(64),
+    });
+    expect(HostSessionRecordApplyResultResponseSchema.parse({
+      revisionId: "revision-3",
+      liveRevision: 3,
+      composer: {
+        sessionId: "session-28",
+        eventType: "SESSION_RECORD_UPDATED",
+        contentRevision: "b".repeat(64),
+      },
+    })).toMatchObject({
+      revisionId: "revision-3",
+      composer: { eventType: "SESSION_RECORD_UPDATED" },
+    });
+  });
+
   it("uses normalized club-scoped keys", () => {
     const context = { clubSlug: "reading-sai" };
 
@@ -147,9 +173,11 @@ describe("host session record queries", () => {
     vi.mocked(applyHostSessionRecord).mockResolvedValue({
       revisionId: "revision-3",
       liveRevision: 3,
-      decisionId: "decision-1",
-      notificationDecision: "SKIP",
-      eventId: null,
+      composer: {
+        sessionId: "session-28",
+        eventType: "SESSION_RECORD_UPDATED",
+        contentRevision: "b".repeat(64),
+      },
     });
     const context = { clubSlug: "reading-sai" };
     const { client, Wrapper } = createWrapper();
@@ -164,10 +192,10 @@ describe("host session record queries", () => {
       await result.current.mutateAsync({
         sessionId: "session-28",
         request: {
-          previewId: "preview-1",
+          applyRequestId: "apply-request-1",
           expectedDraftRevision: 3,
           expectedLiveRevision: 2,
-          notificationDecision: "SKIP",
+          expectedDraftHash: "a".repeat(64),
         },
       });
     });
@@ -194,9 +222,11 @@ describe("host session record queries", () => {
     vi.mocked(applyHostSessionRecord).mockResolvedValue({
       revisionId: "revision-3",
       liveRevision: 3,
-      decisionId: "decision-1",
-      notificationDecision: "SKIP",
-      eventId: null,
+      composer: {
+        sessionId: "session-28",
+        eventType: "SESSION_RECORD_UPDATED",
+        contentRevision: "b".repeat(64),
+      },
     });
     const { Wrapper } = createWrapper();
     const invalidateMemberAndPublicSurfaces = vi.fn().mockResolvedValue(undefined);
@@ -209,10 +239,10 @@ describe("host session record queries", () => {
       await result.current.mutateAsync({
         sessionId: "session-28",
         request: {
-          previewId: "preview-1",
+          applyRequestId: "apply-request-1",
           expectedDraftRevision: 3,
           expectedLiveRevision: 2,
-          notificationDecision: "SKIP",
+          expectedDraftHash: "a".repeat(64),
         },
       });
     });

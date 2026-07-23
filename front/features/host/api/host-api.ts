@@ -15,6 +15,7 @@ import type {
   HostNotificationDetailResponse,
   HostNotificationEventType,
   HostNotificationItemListResponse,
+  HostNotificationPolicyResponse,
   HostNotificationSummary,
   HostNotificationStatus,
   HostSessionDeletionPreviewResponse,
@@ -42,6 +43,7 @@ import type {
   SessionImportPreviewResponse,
   SessionImportRequest,
   UpdateHostMemberProfileRequest,
+  UpdateHostNotificationPolicyRequest,
   ViewerMember,
 } from "./host-contracts";
 import {
@@ -66,6 +68,29 @@ export function fetchHostClubOperations(context: { clubSlug: string | undefined 
 
 export function fetchHostNotificationSummary(context?: ReadmatesApiContext) {
   return readmatesFetch<HostNotificationSummary>("/api/host/notifications/summary", undefined, context);
+}
+
+export function fetchHostNotificationPolicy(context?: ReadmatesApiContext) {
+  return readmatesFetch<HostNotificationPolicyResponse>(
+    "/api/host/notifications/policy",
+    undefined,
+    context,
+  );
+}
+
+export function updateHostNotificationPolicy(
+  request: UpdateHostNotificationPolicyRequest,
+  context?: ReadmatesApiContext,
+) {
+  return readmatesFetch<HostNotificationPolicyResponse>(
+    "/api/host/notifications/policy",
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    },
+    context,
+  );
 }
 
 export function processHostNotifications() {

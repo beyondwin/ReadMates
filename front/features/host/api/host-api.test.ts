@@ -13,6 +13,7 @@ import {
   fetchHostNotificationDetail,
   fetchHostNotificationEvents,
   fetchHostNotificationItems,
+  fetchHostNotificationPolicy,
   fetchHostNotificationSummary,
   fetchHostNotificationTestMailAudit,
   fetchHostSessions,
@@ -36,7 +37,9 @@ import {
   submitHostMemberProfile,
   submitHostViewerAction,
   updateHostSession,
+  updateHostNotificationPolicy,
 } from "./host-api";
+import { HostSessionVisibilityUpdateResponseSchema } from "./host-contracts";
 
 function jsonResponse(body: unknown = {}) {
   return new Response(JSON.stringify(body), {
@@ -83,6 +86,7 @@ describe("host api wrappers", () => {
     await fetchHostDashboard(context);
     await fetchHostClubOperations(context);
     await fetchHostNotificationSummary(context);
+    await fetchHostNotificationPolicy(context);
     await fetchHostNotificationItems("FAILED", context, { limit: 20, cursor: "next page" });
     await fetchHostNotificationEvents(context, { limit: 10 });
     await fetchManualNotificationOptions(context, {
@@ -105,6 +109,7 @@ describe("host api wrappers", () => {
       "/api/bff/api/host/dashboard?clubSlug=reading-sai",
       "/api/bff/api/host/club-operations?clubSlug=reading-sai",
       "/api/bff/api/host/notifications/summary?clubSlug=reading-sai",
+      "/api/bff/api/host/notifications/policy?clubSlug=reading-sai",
       "/api/bff/api/host/notifications/items?status=FAILED&limit=20&cursor=next+page&clubSlug=reading-sai",
       "/api/bff/api/host/notifications/events?limit=10&clubSlug=reading-sai",
       "/api/bff/api/host/notifications/manual/options?sessionId=session+7&search=alice&limit=5&cursor=c1&clubSlug=reading-sai",
@@ -121,6 +126,10 @@ describe("host api wrappers", () => {
     const membershipId = "member/7";
 
     await processHostNotifications();
+    await updateHostNotificationPolicy(
+      { sessionReminderEnabled: true },
+      { clubSlug: "reading-sai" },
+    );
     await previewManualNotification({ templateKey: "SESSION_REMINDER", sessionId });
     await confirmManualNotification({ previewId: "preview-1" });
     await fetchHostNotificationDetail("item/1");
@@ -151,6 +160,7 @@ describe("host api wrappers", () => {
     }));
     expect(calls.map((call) => [call.method, call.url])).toEqual([
       ["POST", "/api/bff/api/host/notifications/process"],
+      ["PUT", "/api/bff/api/host/notifications/policy?clubSlug=reading-sai"],
       ["POST", "/api/bff/api/host/notifications/manual/preview"],
       ["POST", "/api/bff/api/host/notifications/manual"],
       ["GET", "/api/bff/api/host/notifications/items/item%2F1"],
@@ -174,9 +184,50 @@ describe("host api wrappers", () => {
       ["POST", "/api/bff/api/host/invitations"],
       ["POST", "/api/bff/api/host/invitations/invite%2F1/revoke"],
     ]);
-    expect(calls[1].body).toBe(JSON.stringify({ templateKey: "SESSION_REMINDER", sessionId }));
-    expect(calls[17].body).toBe(JSON.stringify({ currentSessionPolicy: "NEXT_SESSION" }));
-    expect(calls[19].body).toBe(JSON.stringify({ displayName: "Alice" }));
+    expect(calls[1].body).toBe(JSON.stringify({ sessionReminderEnabled: true }));
+    expect(calls[2].body).toBe(JSON.stringify({ templateKey: "SESSION_REMINDER", sessionId }));
+    expect(calls[18].body).toBe(JSON.stringify({ currentSessionPolicy: "NEXT_SESSION" }));
+    expect(calls[20].body).toBe(JSON.stringify({ displayName: "Alice" }));
+  });
+
+  it("accepts visibility responses with a composer context", () => {
+    const session = {
+      sessionId: "session-7",
+      sessionNumber: 7,
+      title: "함께 읽기",
+      bookTitle: "모비 딕",
+      bookAuthor: "허먼 멜빌",
+      bookLink: null,
+      bookImageUrl: null,
+      date: "2026-07-23",
+      startTime: "19:00",
+      endTime: "21:00",
+      questionDeadlineAt: "2026-07-22T23:59:00+09:00",
+      locationLabel: "온라인",
+      meetingUrl: null,
+      meetingPasscode: null,
+      publication: null,
+      state: "OPEN",
+      attendees: [],
+      feedbackDocument: {
+        uploaded: false,
+        fileName: null,
+        uploadedAt: null,
+      },
+      visibility: "MEMBER",
+    };
+
+    expect(HostSessionVisibilityUpdateResponseSchema.parse({
+      session,
+      composer: {
+        sessionId: "session-7",
+        eventType: "NEXT_BOOK_PUBLISHED",
+        contentRevision: "b".repeat(64),
+      },
+    })).toMatchObject({
+      session: { sessionId: "session-7" },
+      composer: { eventType: "NEXT_BOOK_PUBLISHED" },
+    });
   });
 
   it("parses host invitation responses from raw Response objects", async () => {

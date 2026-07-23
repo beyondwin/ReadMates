@@ -4,6 +4,7 @@ import {
   confirmManualNotification,
   fetchHostNotificationDeliveries,
   fetchHostNotificationEvents,
+  fetchHostNotificationPolicy,
   fetchHostNotificationSummary,
   fetchHostNotificationTestMailAudit,
   fetchManualNotificationDispatches,
@@ -13,6 +14,7 @@ import {
   restoreHostNotification,
   retryHostNotification,
   sendHostNotificationTestMail,
+  updateHostNotificationPolicy,
 } from "@/features/host/api/host-api";
 import {
   DEFAULT_HOST_SESSION_LIST_LIMIT,
@@ -22,6 +24,7 @@ import type {
   HostNotificationDeliveryListResponse,
   HostNotificationEventListResponse,
   HostNotificationEventType,
+  HostNotificationPolicyResponse,
   HostNotificationSummary,
   HostSessionListPage,
   ManualNotificationConfirmRequest,
@@ -32,6 +35,7 @@ import type {
   ManualNotificationPreviewResponse,
   NotificationTestMailAuditPage,
   SendNotificationTestMailRequest,
+  UpdateHostNotificationPolicyRequest,
 } from "@/features/host/api/host-contracts";
 import type { ReadmatesApiContext } from "@/shared/api/client";
 import type { PageRequest } from "@/shared/model/paging";
@@ -83,6 +87,8 @@ function normalizeManualDispatchesRequest(request?: ManualDispatchesQueryRequest
 
 export const hostNotificationKeys = {
   all: ["host", "notifications"] as const,
+  policy: (context?: ReadmatesApiContext) =>
+    [...hostNotificationKeys.all, scopeKey(context), "policy"] as const,
   scope: (context?: ReadmatesApiContext) =>
     [...hostNotificationKeys.all, "scope", scopeKey(context)] as const,
   overview: (context?: ReadmatesApiContext) =>
@@ -117,6 +123,13 @@ export function hostNotificationSummaryQuery(context?: ReadmatesApiContext) {
   return queryOptions({
     queryKey: hostNotificationKeys.summary(context),
     queryFn: () => fetchHostNotificationSummary(context),
+  });
+}
+
+export function hostNotificationPolicyQuery(context?: ReadmatesApiContext) {
+  return queryOptions({
+    queryKey: hostNotificationKeys.policy(context),
+    queryFn: () => fetchHostNotificationPolicy(context),
   });
 }
 
@@ -183,6 +196,10 @@ export function invalidateManualNotificationState(client: QueryClient, context?:
   return client.invalidateQueries({ queryKey: hostNotificationKeys.manual(context) });
 }
 
+export function invalidateHostNotificationPolicy(client: QueryClient, context?: ReadmatesApiContext) {
+  return client.invalidateQueries({ queryKey: hostNotificationKeys.policy(context) });
+}
+
 export function invalidateHostNotifications(client: QueryClient, context?: ReadmatesApiContext) {
   return client.invalidateQueries({ queryKey: hostNotificationKeys.scope(context) });
 }
@@ -226,6 +243,18 @@ export function useSendHostNotificationTestMailMutation(context?: ReadmatesApiCo
   });
 }
 
+export function useUpdateHostNotificationPolicyMutation(context?: ReadmatesApiContext) {
+  const client = useQueryClient();
+  return useMutation<
+    HostNotificationPolicyResponse,
+    Error,
+    UpdateHostNotificationPolicyRequest
+  >({
+    mutationFn: (request) => updateHostNotificationPolicy(request, context),
+    onSuccess: () => invalidateHostNotificationPolicy(client, context),
+  });
+}
+
 export function usePreviewManualNotificationMutation() {
   return useMutation<ManualNotificationPreviewResponse, Error, ManualNotificationPreviewRequest>({
     mutationFn: (request) => previewManualNotification(request),
@@ -238,8 +267,18 @@ export function useConfirmManualNotificationMutation(context?: ReadmatesApiConte
     mutationFn: (request) => confirmManualNotification(request),
     onSuccess: async () => {
       await Promise.all([
-        invalidateHostNotificationOverview(client, context),
-        invalidateManualNotificationState(client, context),
+        client.invalidateQueries({
+          queryKey: hostNotificationKeys.manualDispatchesRoot(context),
+        }),
+        client.invalidateQueries({
+          queryKey: hostNotificationKeys.eventsRoot(context),
+        }),
+        client.invalidateQueries({
+          queryKey: hostNotificationKeys.deliveriesRoot(context),
+        }),
+        client.invalidateQueries({
+          queryKey: hostNotificationKeys.summary(context),
+        }),
       ]);
     },
   });
@@ -253,4 +292,5 @@ export type HostNotificationQueryData = {
   hostSessions: HostSessionListPage;
   manualOptions: ManualNotificationOptionsResponse;
   manualDispatches: ManualNotificationDispatchListResponse;
+  policy: HostNotificationPolicyResponse;
 };

@@ -69,28 +69,27 @@ export type PreviewHostSessionRecordApplyRequest = {
 };
 
 export type HostSessionRecordApplyRequest = {
-  previewId: string;
+  applyRequestId: string;
   expectedDraftRevision: number;
   expectedLiveRevision: number;
-  notificationDecision: NotificationDecision;
+  expectedDraftHash: string;
+};
+
+export type HostNotificationComposerContext = {
+  sessionId: string;
+  eventType: "NEXT_BOOK_PUBLISHED" | "FEEDBACK_DOCUMENT_PUBLISHED" | "SESSION_RECORD_UPDATED";
+  contentRevision: string;
 };
 
 export type HostSessionRecordApplyPreview = {
-  previewId: string;
   eventType: "FEEDBACK_DOCUMENT_PUBLISHED" | "SESSION_RECORD_UPDATED";
-  targetCount: number;
-  expectedInAppCount: number;
-  expectedEmailCount: number;
-  excludedCount: number;
-  expiresAt: string;
+  expectedDraftHash: string;
 };
 
 export type HostSessionRecordApplyResult = {
   revisionId: string;
   liveRevision: number;
-  decisionId: string;
-  notificationDecision: NotificationDecision;
-  eventId: string | null;
+  composer: HostNotificationComposerContext;
 };
 
 export type RestoreHostSessionRecordDraftRequest = {
@@ -153,7 +152,11 @@ const nullableString = z.string().nullable();
 const SessionRecordVisibilitySchema = z.enum(["HOST_ONLY", "MEMBER", "PUBLIC"]);
 const SessionRecordSourceSchema = z.enum(["BASELINE", "MANUAL", "JSON_IMPORT", "AI_GENERATED", "RESTORED"]);
 const SessionRecordDraftSourceSchema = z.enum(["MANUAL", "JSON_IMPORT", "AI_GENERATED", "RESTORED"]);
-const NotificationDecisionSchema = z.enum(["SEND", "SKIP"]);
+const HostNotificationComposerContextSchema = z.object({
+  sessionId: z.string(),
+  eventType: z.enum(["NEXT_BOOK_PUBLISHED", "FEEDBACK_DOCUMENT_PUBLISHED", "SESSION_RECORD_UPDATED"]),
+  contentRevision: z.string(),
+}).strict();
 
 const SessionRecordEntryResponseSchema = z.object({
   membershipId: z.string(),
@@ -197,22 +200,15 @@ export const HostSessionRecordEditorResponseSchema = z.object({
 });
 
 export const HostSessionRecordApplyPreviewResponseSchema = z.object({
-  previewId: z.string(),
   eventType: z.enum(["FEEDBACK_DOCUMENT_PUBLISHED", "SESSION_RECORD_UPDATED"]),
-  targetCount: nonNegativeInteger,
-  expectedInAppCount: nonNegativeInteger,
-  expectedEmailCount: nonNegativeInteger,
-  excludedCount: nonNegativeInteger,
-  expiresAt: z.string(),
-});
+  expectedDraftHash: z.string(),
+}).strict();
 
 export const HostSessionRecordApplyResultResponseSchema = z.object({
   revisionId: z.string(),
   liveRevision: positiveInteger,
-  decisionId: z.string(),
-  notificationDecision: NotificationDecisionSchema,
-  eventId: nullableString,
-});
+  composer: HostNotificationComposerContextSchema,
+}).strict();
 
 export const HostSessionHistoryPageResponseSchema = z.object({
   items: z.array(z.object({
