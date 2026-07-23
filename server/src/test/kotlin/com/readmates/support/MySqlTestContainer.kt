@@ -10,7 +10,14 @@ object MySqlTestContainer {
             withDatabaseName("readmates")
             withUsername("readmates")
             withPassword("readmates")
-            withCommand("--log-bin-trust-function-creators=1")
+            // Keep MySQL 8.4 startup deterministic in constrained local/CI Docker VMs.
+            withCommand(
+                "--log-bin-trust-function-creators=1",
+                "--innodb-buffer-pool-size=32M",
+                "--performance-schema=OFF",
+                "--key-buffer-size=8M",
+                "--max-connections=20",
+            )
             // Local-only opt-in: developer enables via ~/.testcontainers.properties
             // (testcontainers.reuse.enable=true). CI is unaffected because each
             // runner is fresh, but containers keep the same Docker image identity
