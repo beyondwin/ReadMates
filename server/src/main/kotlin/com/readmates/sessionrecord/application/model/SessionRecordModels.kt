@@ -80,3 +80,41 @@ data class SessionRecordRevision(
     val appliedByMembershipId: UUID,
     val appliedAt: OffsetDateTime,
 )
+
+data class LiveSessionRecord(
+    val sessionId: UUID,
+    val clubId: UUID,
+    val revision: Long,
+    val snapshot: SessionRecordSnapshot,
+)
+
+data class SessionRecordEditor(
+    val live: LiveSessionRecord,
+    val draft: SessionRecordDraft?,
+    val draftLiveBaseStale: Boolean,
+)
+
+data class SaveSessionRecordDraftCommand(
+    val sessionId: UUID,
+    val snapshot: SessionRecordSnapshot,
+    val expectedDraftRevision: Long?,
+    val source: SessionRecordDraftSource = SessionRecordDraftSource.MANUAL,
+    val restoredFromRevisionId: UUID? = null,
+)
+
+data class RestoreSessionRecordDraftCommand(
+    val sessionId: UUID,
+    val revisionId: UUID,
+    val expectedDraftRevision: Long?,
+)
+
+enum class SessionRecordError {
+    SESSION_NOT_FOUND,
+    REVISION_NOT_FOUND,
+    DRAFT_STALE,
+}
+
+class SessionRecordException(
+    val error: SessionRecordError,
+    message: String,
+) : RuntimeException(message)
