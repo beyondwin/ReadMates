@@ -92,6 +92,7 @@ class SecurityConfig(
                     methodAndPath("POST", Regex("^/api/host/notifications/test-mail$")),
                     methodAndPath("POST", Regex("^/api/host/notifications/manual/preview$")),
                     methodAndPath("POST", Regex("^/api/host/notifications/manual$")),
+                    methodAndPath("PUT", Regex("^/api/host/notifications/policy$")),
                     methodAndPath("POST", Regex("^/api/host/notifications/items/[^/]+/(retry|restore)$")),
                     methodAndPath("PUT", Regex("^/api/archive/sessions/[^/]+/my-long-review$")),
                     methodAndPath("POST", Regex("^/api/me/membership/leave$")),

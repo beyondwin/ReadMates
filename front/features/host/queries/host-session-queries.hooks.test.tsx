@@ -256,6 +256,8 @@ describe("host session mutation hooks", () => {
   it("returns the visibility composer result and caches the updated session", async () => {
     vi.mocked(saveHostSessionVisibility).mockResolvedValue(visibilityResult());
     const { client, Wrapper } = createWrapper();
+    const detailKey = hostSessionKeys.detail("session-7", { clubSlug: "reading-sai" });
+    client.setQueryDefaults(detailKey, { gcTime: Number.POSITIVE_INFINITY });
     const invalidateSpy = vi.spyOn(client, "invalidateQueries");
     const { result } = renderHook(() => useSaveHostSessionVisibilityMutation({ clubSlug: "reading-sai" }), { wrapper: Wrapper });
 
@@ -273,9 +275,7 @@ describe("host session mutation hooks", () => {
       { visibility: "MEMBER" },
       { clubSlug: "reading-sai" },
     );
-    expect(client.getQueryData(
-      hostSessionKeys.detail("session-7", { clubSlug: "reading-sai" }),
-    )).toEqual(visibilityResult().session);
+    expect(client.getQueryData(detailKey)).toEqual(visibilityResult().session);
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.lists({ clubSlug: "reading-sai" }) });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.dashboard({ clubSlug: "reading-sai" }) });
   });

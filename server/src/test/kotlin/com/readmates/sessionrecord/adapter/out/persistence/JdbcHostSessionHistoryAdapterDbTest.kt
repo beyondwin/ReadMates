@@ -72,6 +72,7 @@ class JdbcHostSessionHistoryAdapterDbTest(
     @Test
     fun `notification send and skip at equal time map and paginate by database tuple`() {
         insertNotificationHistory()
+        val decisionRowsBeforeRead = legacyDecisionRows()
 
         val firstPage = historyService.history(host(), SESSION_ID, PageRequest(limit = 1, cursor = emptyMap()))
         val secondPage =
@@ -87,7 +88,15 @@ class JdbcHostSessionHistoryAdapterDbTest(
         assertThat(secondPage.items.single().notificationEventId).isEqualTo(NOTIFICATION_EVENT_ID)
         assertThat(secondPage.items.single().id).isEqualTo(SEND_DECISION_ID)
         assertThat(secondPage.nextCursor).isNull()
+        assertThat(legacyDecisionRows()).isEqualTo(decisionRowsBeforeRead)
     }
+
+    private fun legacyDecisionRows(): Int =
+        jdbcTemplate.queryForObject(
+            "select count(*) from host_action_notification_decisions where session_id = ?",
+            Int::class.java,
+            SESSION_ID.toString(),
+        ) ?: 0
 
     private fun insertFirstClubHistory() {
         jdbcTemplate.update(

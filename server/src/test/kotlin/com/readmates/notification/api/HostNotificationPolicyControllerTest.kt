@@ -70,6 +70,19 @@ class HostNotificationPolicyControllerTest(
     }
 
     @Test
+    fun `host updates policy without spring csrf token`() {
+        mockMvc
+            .put("/api/host/notifications/policy") {
+                with(user("host@example.com"))
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"sessionReminderEnabled":true}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionReminderEnabled") { value(true) }
+            }
+    }
+
+    @Test
     fun `member cannot read or update host policy`() {
         mockMvc
             .get("/api/host/notifications/policy") {

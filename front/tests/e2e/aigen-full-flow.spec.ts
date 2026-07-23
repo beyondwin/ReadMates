@@ -20,6 +20,7 @@ import {
   hostSessionDetailResponse,
   isHostSessionDetailRequest,
   routeHostEditorShell,
+  trackNotificationMutationRequests,
 } from "./aigen-test-fixtures";
 
 const SESSION_ID = "11111111-1111-1111-1111-111111111111";
@@ -91,6 +92,7 @@ async function fulfillJson(route: Route, status: number, body: unknown): Promise
 }
 
 test("AI generation full flow: upload → poll → preview → commit", async ({ page }) => {
+  const notificationMutations = trackNotificationMutationRequests(page);
   // ── Stub auth / session shell so the editor page renders without a live API ──
   await routeHostEditorShell(page, CLUB_SLUG);
 
@@ -186,4 +188,6 @@ test("AI generation full flow: upload → poll → preview → commit", async ({
   // Commit should refresh the editor through Query invalidation, not a full page reload.
   await expect(page.getByText(/AI 기록을 공유 초안으로 저장했습니다|AI로 세션 기록 생성/)).toBeVisible({ timeout: 15000 });
   await expect.poll(() => mainFrameNavigationsAfterCommit).toBe(0);
+  await expect(page.getByRole("dialog", { name: "알림 보내기" })).toHaveCount(0);
+  expect(notificationMutations()).toEqual([]);
 });

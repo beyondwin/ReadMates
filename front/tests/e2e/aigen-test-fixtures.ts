@@ -3,6 +3,24 @@ import type { AiGenerationJobResponse, SessionImportV1 } from "@/features/host/a
 import type { HostSessionDetailResponse } from "@/features/host/api/host-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 
+export function trackNotificationMutationRequests(page: Page) {
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    const path = new URL(request.url()).pathname;
+    if (
+      request.method() !== "GET"
+      && (
+        path.endsWith("/api/host/notifications/manual")
+        || path.endsWith("/api/host/notifications/manual/preview")
+        || path.includes("/host-action-notification")
+      )
+    ) {
+      requests.push(`${request.method()} ${path}`);
+    }
+  });
+  return () => [...requests];
+}
+
 export function hostAuthResponse(clubSlug: string): AuthMeResponse {
   return {
     authenticated: true,

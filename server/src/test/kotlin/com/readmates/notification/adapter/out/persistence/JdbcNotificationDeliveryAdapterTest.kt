@@ -291,6 +291,34 @@ class JdbcNotificationDeliveryAdapterTest(
     }
 
     @Test
+    fun `selected member delivery snapshot stays membership exact and idempotent`() {
+        val manualEventId = UUID.nameUUIDFromBytes("manual-event-selected-idempotent".toByteArray())
+        val selected = membershipIdForEmail("member1@example.com")
+        insertManualEventOutboxRow(
+            eventId = manualEventId,
+            requestedChannels = "IN_APP",
+            audience = "SELECTED_MEMBERS",
+            selectedMembershipIds = listOf(selected),
+            targetMembershipIds = listOf(selected, selected),
+            inAppMembershipIds = listOf(selected, selected),
+        )
+
+        val first =
+            deliveryAdapter.persistPlannedDeliveries(
+                message(eventId = manualEventId, eventType = NotificationEventType.SESSION_REMINDER_DUE),
+            )
+        val retry =
+            deliveryAdapter.persistPlannedDeliveries(
+                message(eventId = manualEventId, eventType = NotificationEventType.SESSION_REMINDER_DUE),
+            )
+
+        assertThat(first.map { it.recipientMembershipId }).containsExactly(selected)
+        assertThat(retry.map { it.recipientMembershipId }).containsExactly(selected)
+        assertThat(deliveryRows(manualEventId)).isEqualTo(1)
+        assertThat(memberNotificationRows(manualEventId)).isEqualTo(1)
+    }
+
+    @Test
     fun `claimEmailDelivery leases only due email rows and mark sent requires active lease`() {
         insertEventOutboxRow()
         deliveryAdapter.persistPlannedDeliveries(message())
@@ -439,6 +467,7 @@ class JdbcNotificationDeliveryAdapterTest(
         eventId: UUID,
         requestedChannels: String,
         audience: String,
+        selectedMembershipIds: List<UUID> = emptyList(),
         excludedMembershipIds: List<UUID> = emptyList(),
         includedMembershipIds: List<UUID> = emptyList(),
         targetMembershipIds: List<UUID> = emptyList(),
@@ -446,6 +475,7 @@ class JdbcNotificationDeliveryAdapterTest(
         emailMembershipIds: List<UUID> = emptyList(),
     ) {
         val manualDispatchId = UUID.nameUUIDFromBytes("manual-dispatch-$eventId".toByteArray())
+        val selectedJson = uuidListJson(selectedMembershipIds)
         val excludedJson = uuidListJson(excludedMembershipIds)
         val includedJson = uuidListJson(includedMembershipIds)
         val targetJson = uuidListJson(targetMembershipIds)
@@ -465,6 +495,7 @@ class JdbcNotificationDeliveryAdapterTest(
                 'requestedByMembershipId', '00000000-0000-0000-0000-000000000201',
                 'requestedChannels', ?,
                 'audience', ?,
+                'selectedMembershipIds', cast(? as json),
                 'excludedMembershipIds', cast(? as json),
                 'includedMembershipIds', cast(? as json),
                 'targetMembershipIds', cast(? as json),
@@ -482,6 +513,7 @@ class JdbcNotificationDeliveryAdapterTest(
             manualDispatchId.toString(),
             requestedChannels,
             audience,
+            selectedJson,
             excludedJson,
             includedJson,
             targetJson,

@@ -3,6 +3,7 @@ import {
   hostSessionDetailResponse,
   isHostSessionDetailRequest,
   routeHostEditorShell,
+  trackNotificationMutationRequests,
 } from "./aigen-test-fixtures";
 
 const SESSION_ID = "11111111-1111-1111-1111-111111111111";
@@ -14,6 +15,7 @@ async function json(route: Route, status: number, body: unknown): Promise<void> 
 }
 
 test("receipt-backed COMMIT_RETRY converges to COMMITTED without exposing content", async ({ page }) => {
+  const notificationMutations = trackNotificationMutationRequests(page);
   await routeHostEditorShell(page, CLUB_SLUG);
   await page.route(`**/api/bff/api/host/sessions/${SESSION_ID}**`, async (route) => {
     if (!isHostSessionDetailRequest(route, SESSION_ID)) return route.fallback();
@@ -46,4 +48,6 @@ test("receipt-backed COMMIT_RETRY converges to COMMITTED without exposing conten
   await expect(page.getByText(/AI 기록을 공유 초안으로 저장했습니다/)).toBeVisible({ timeout: 10_000 });
   expect(polls).toBeGreaterThanOrEqual(2);
   await expect(page.getByText(/공개 합성|대본|근거 발언/)).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "알림 보내기" })).toHaveCount(0);
+  expect(notificationMutations()).toEqual([]);
 });
