@@ -23,19 +23,30 @@ class SessionImportDraftService(
             command = command,
             preview = validator.validate(command),
             source = SessionRecordDraftSource.JSON_IMPORT,
+            expectedDraftRevision = command.expectedDraftRevision,
         )
 
-    override fun saveValidated(input: ValidatedSessionImportDraftInput): SessionImportDraftResult =
-        save(
+    override fun saveValidated(input: ValidatedSessionImportDraftInput): SessionImportDraftResult {
+        val editor = drafts.getEditor(input.command.host, input.command.sessionId)
+        val historicalBindings = input.historicalBindings(editor.draft?.snapshot ?: editor.live.snapshot)
+        return save(
             command = input.command,
-            preview = validator.validate(input.command, input.authorMembershipIdsByName),
+            preview =
+                validator.validate(
+                    input.command,
+                    input.authorMembershipIdsByName,
+                    historicalBindings,
+                ),
             source = input.source,
+            expectedDraftRevision = input.expectedDraftRevision,
         )
+    }
 
     private fun save(
         command: SessionImportCommand,
         preview: SessionImportPreviewResult,
         source: SessionRecordDraftSource,
+        expectedDraftRevision: Long?,
     ): SessionImportDraftResult {
         if (!preview.valid) throw InvalidSessionImportException(preview.issues)
         val draft =
@@ -44,7 +55,7 @@ class SessionImportDraftService(
                 SaveSessionRecordDraftCommand(
                     sessionId = command.sessionId,
                     snapshot = command.toCanonicalSnapshot(preview),
-                    expectedDraftRevision = null,
+                    expectedDraftRevision = expectedDraftRevision,
                     source = source,
                 ),
             )
@@ -54,5 +65,23 @@ class SessionImportDraftService(
             baseLiveRevision = draft.baseLiveRevision,
         )
     }
+}
 
+private fun ValidatedSessionImportDraftInput.historicalBindings(
+    baseline: com.readmates.sessionrecord.application.model.SessionRecordSnapshot,
+): Map<String, java.util.UUID> {
+    if (source == SessionRecordDraftSource.RESTORED) return authorMembershipIdsByName
+    val baselineRecords = baseline.highlights + baseline.oneLineReviews
+    val submittedRecords = command.highlights + command.oneLineReviews
+    return authorMembershipIdsByName.filter { (authorName, membershipId) ->
+        submittedRecords
+            .filter { it.authorName.trim() == authorName }
+            .all { submitted ->
+                baselineRecords.any {
+                    it.membershipId == membershipId &&
+                        it.authorDisplayName == authorName &&
+                        it.text == submitted.text.trim()
+                }
+            }
+    }
 }

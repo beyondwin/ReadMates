@@ -61,10 +61,11 @@ class SessionImportService(
     override fun validate(
         command: SessionImportCommand,
         trustedAuthorBindings: Map<String, java.util.UUID>,
+        historicalAuthorBindings: Map<String, java.util.UUID>,
     ): SessionImportPreviewResult {
         requireHost(command.host)
         val target = writePort.loadTarget(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
-        return validateAgainstTarget(command, target, trustedAuthorBindings)
+        return validateAgainstTarget(command, target, trustedAuthorBindings, historicalAuthorBindings)
     }
 
     override fun replace(input: ValidatedSessionImportReplacement): SessionImportCommitResult {
@@ -112,6 +113,7 @@ class SessionImportService(
         command: SessionImportCommand,
         target: SessionImportTarget,
         trustedAuthorBindings: Map<String, java.util.UUID> = emptyMap(),
+        historicalAuthorBindings: Map<String, java.util.UUID> = emptyMap(),
     ): SessionImportPreviewResult {
         val issues = mutableListOf<SessionImportIssue>()
         validateSessionMetadata(command, target, issues)
@@ -119,11 +121,27 @@ class SessionImportService(
 
         val highlights =
             command.highlights.map {
-                matchRecord(it.authorName, it.text, target, issues, "HIGHLIGHT_AUTHOR_NOT_FOUND", trustedAuthorBindings)
+                matchRecord(
+                    it.authorName,
+                    it.text,
+                    target,
+                    issues,
+                    "HIGHLIGHT_AUTHOR_NOT_FOUND",
+                    trustedAuthorBindings,
+                    historicalAuthorBindings,
+                )
             }
         val oneLineReviews =
             command.oneLineReviews.map {
-                matchRecord(it.authorName, it.text, target, issues, "ONE_LINE_AUTHOR_NOT_FOUND", trustedAuthorBindings)
+                matchRecord(
+                    it.authorName,
+                    it.text,
+                    target,
+                    issues,
+                    "ONE_LINE_AUTHOR_NOT_FOUND",
+                    trustedAuthorBindings,
+                    historicalAuthorBindings,
+                )
             }
         validateOneLineReviewAuthors(command, issues)
 
@@ -224,6 +242,7 @@ class SessionImportService(
         issues: MutableList<SessionImportIssue>,
         issueCode: String,
         trustedAuthorBindings: Map<String, java.util.UUID>,
+        historicalAuthorBindings: Map<String, java.util.UUID>,
     ): SessionImportRecordPreview {
         val trimmedAuthorName = authorName.trim()
         val trimmedText = text.trim()
@@ -232,7 +251,10 @@ class SessionImportService(
             if (trustedAuthorBindings.isEmpty()) {
                 target.attendees.firstOrNull { it.active && it.displayName == trimmedAuthorName }
             } else {
-                target.attendees.firstOrNull { it.membershipId == trustedMembershipId }
+                target.attendees.firstOrNull {
+                    it.membershipId == trustedMembershipId &&
+                        (it.active || historicalAuthorBindings[trimmedAuthorName] == trustedMembershipId)
+                }
             }
         if (trimmedText.isBlank()) {
             issues += SessionImportIssue("RECORD_TEXT_REQUIRED", "기록 문구가 비어 있습니다.")

@@ -85,7 +85,8 @@ class JdbcAiGenerationCommitPersistenceAdapter(
         jdbc
             .query(
                 """
-                select job_id, revision, session_id, club_id, committed_at
+                select job_id, revision, session_id, club_id,
+                       draft_revision, base_live_revision, request_sha256, committed_at
                 from ai_generation_commit_receipts
                 where job_id = ? and revision = ?
                 """.trimIndent(),
@@ -95,6 +96,9 @@ class JdbcAiGenerationCommitPersistenceAdapter(
                         revision = rs.getLong("revision"),
                         sessionId = UUID.fromString(rs.getString("session_id")),
                         clubId = UUID.fromString(rs.getString("club_id")),
+                        draftRevision = rs.getLong("draft_revision").takeUnless { rs.wasNull() },
+                        baseLiveRevision = rs.getLong("base_live_revision").takeUnless { rs.wasNull() },
+                        requestSha256 = rs.getString("request_sha256"),
                         committedAt = rs.getObject("committed_at", LocalDateTime::class.java).toInstant(ZoneOffset.UTC),
                     )
                 },
@@ -106,13 +110,19 @@ class JdbcAiGenerationCommitPersistenceAdapter(
         try {
             jdbc.update(
                 """
-                insert into ai_generation_commit_receipts (job_id, revision, session_id, club_id, committed_at)
-                values (?, ?, ?, ?, ?)
+                insert into ai_generation_commit_receipts (
+                  job_id, revision, session_id, club_id,
+                  draft_revision, base_live_revision, request_sha256, committed_at
+                )
+                values (?, ?, ?, ?, ?, ?, ?, ?)
                 """.trimIndent(),
                 receipt.jobId.dbString(),
                 receipt.revision,
                 receipt.sessionId.dbString(),
                 receipt.clubId.dbString(),
+                receipt.draftRevision,
+                receipt.baseLiveRevision,
+                receipt.requestSha256,
                 LocalDateTime.ofInstant(receipt.committedAt, ZoneOffset.UTC),
             ) == 1
         } catch (_: DuplicateKeyException) {

@@ -108,6 +108,9 @@ class AiGenerationCommitServiceTest {
 
         assertThat(ctx.auditPort.entries).hasSize(1)
         assertThat(ctx.persistence.receipt).isNotNull()
+        assertThat(ctx.persistence.receipt?.draftRevision).isEqualTo(1)
+        assertThat(ctx.persistence.receipt?.baseLiveRevision).isZero()
+        assertThat(ctx.persistence.receipt?.requestSha256).hasSize(64)
     }
 
     @Test
@@ -210,12 +213,44 @@ class AiGenerationCommitServiceTest {
                 ctx.sessionId,
                 record.jobId,
                 SessionRecordVisibility.MEMBER,
-                null,
+                record.result,
                 2,
                 groundedReviews(),
             )
 
         assertThat(recovered.recovered).isTrue()
+        assertThat(recovered.draftRevision).isEqualTo(1)
+        assertThat(recovered.baseLiveRevision).isZero()
+        assertThat(ctx.delegate.invocations).hasSize(1)
+    }
+
+    @Test
+    fun `grounded committed replay rejects a different public safe request hash`() {
+        val ctx = GroundedContext()
+        val record = ctx.record()
+        ctx.jobStore.save(record)
+        ctx.service.commit(
+            ctx.host,
+            ctx.sessionId,
+            record.jobId,
+            SessionRecordVisibility.MEMBER,
+            record.result,
+            2,
+            groundedReviews(),
+        )
+
+        assertThatThrownBy {
+            ctx.service.commit(
+                ctx.host,
+                ctx.sessionId,
+                record.jobId,
+                SessionRecordVisibility.PUBLIC,
+                record.result,
+                2,
+                groundedReviews(),
+            )
+        }.isInstanceOf(AiGenerationException.IllegalGenerationState::class.java)
+
         assertThat(ctx.delegate.invocations).hasSize(1)
     }
 

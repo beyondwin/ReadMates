@@ -114,6 +114,7 @@ interface CommitGenerationUseCase {
         overrideResult: SessionImportV1Snapshot?,
         expectedRevision: Long? = null,
         sectionReviews: Map<GenerationItem, SectionReviewStatus>? = null,
+        expectedDraftRevision: Long? = null,
     ): CommitGenerationResult
 }
 

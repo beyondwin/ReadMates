@@ -24,6 +24,7 @@ interface ValidateSessionImportUseCase {
     fun validate(
         command: SessionImportCommand,
         trustedAuthorBindings: Map<String, UUID> = emptyMap(),
+        historicalAuthorBindings: Map<String, UUID> = emptyMap(),
     ): SessionImportPreviewResult
 }
 
@@ -45,4 +46,5 @@ data class ValidatedSessionImportDraftInput(
     /** Trusted author binding supplied only by grounded AI commit after membership revalidation. */
     val authorMembershipIdsByName: Map<String, UUID> = emptyMap(),
     val source: SessionRecordDraftSource,
+    val expectedDraftRevision: Long? = null,
 )

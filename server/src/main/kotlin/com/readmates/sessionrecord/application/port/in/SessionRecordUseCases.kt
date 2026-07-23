@@ -16,7 +16,7 @@ import com.readmates.shared.security.CurrentMember
 import java.util.UUID
 
 interface ManageSessionRecordDraftUseCase {
-    fun getEditor(host: CurrentMember, sessionId: UUID): SessionRecordEditor
+    fun getEditor(host: AuthenticatedClubActor, sessionId: UUID): SessionRecordEditor
 
     fun save(host: CurrentMember, command: SaveSessionRecordDraftCommand): SessionRecordDraft
 

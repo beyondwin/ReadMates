@@ -53,6 +53,15 @@ class SessionImportDraftServiceTest {
     }
 
     @Test
+    fun `json commit forwards expected draft revision for optimistic replacement`() {
+        val fixture = Fixture()
+
+        fixture.service.commit(fixture.command.copy(expectedDraftRevision = 3))
+
+        assertThat(fixture.drafts.savedCommand?.expectedDraftRevision).isEqualTo(3)
+    }
+
+    @Test
     fun `ai validated input keeps trusted membership attribution and saves AI draft`() {
         val fixture = Fixture()
         val useCase: SaveValidatedSessionRecordDraftUseCase = fixture.service
@@ -97,11 +106,46 @@ class SessionImportDraftServiceTest {
             service.validate(
                 fixture.command,
                 mapOf("Member" to fixture.authorMembershipId),
+                mapOf("Member" to fixture.authorMembershipId),
             )
 
         assertThat(preview.highlights.single().authorMatched).isTrue()
         assertThat(preview.highlights.single().membershipId)
             .isEqualTo(fixture.authorMembershipId.toString())
+    }
+
+    @Test
+    fun `inactive historical participant cannot author changed generated content`() {
+        val fixture = Fixture()
+        val target =
+            SessionImportTarget(
+                sessionId = fixture.command.sessionId,
+                clubId = fixture.host.clubId,
+                sessionNumber = 1,
+                bookTitle = "Book",
+                meetingDate = LocalDate.of(2026, 7, 23),
+                attendees =
+                    listOf(
+                        SessionImportAttendee(
+                            membershipId = fixture.authorMembershipId,
+                            displayName = "Renamed Member",
+                            active = false,
+                        ),
+                    ),
+            )
+        val service = SessionImportService(TargetOnlyWritePort(target))
+
+        val preview =
+            service.validate(
+                fixture.command.copy(
+                    highlights = listOf(SessionImportRecordCommand("Member", "Changed highlight")),
+                ),
+                mapOf("Member" to fixture.authorMembershipId),
+                emptyMap(),
+            )
+
+        assertThat(preview.valid).isFalse()
+        assertThat(preview.highlights.single().authorMatched).isFalse()
     }
 
     @Test
@@ -156,7 +200,7 @@ class SessionImportDraftServiceTest {
                     ),
             )
         val validator = FakeValidator(authorMembershipId)
-        val drafts = FakeDrafts()
+        val drafts = FakeDrafts(authorMembershipId)
         val service = SessionImportDraftService(validator, drafts)
     }
 
@@ -168,6 +212,7 @@ class SessionImportDraftServiceTest {
         override fun validate(
             command: SessionImportCommand,
             trustedAuthorBindings: Map<String, UUID>,
+            historicalAuthorBindings: Map<String, UUID>,
         ): SessionImportPreviewResult {
             lastTrustedBindings = trustedAuthorBindings
             val record = SessionImportRecordPreview("Member", "Text", true, authorMembershipId.toString())
@@ -183,7 +228,9 @@ class SessionImportDraftServiceTest {
         }
     }
 
-    private class FakeDrafts : ManageSessionRecordDraftUseCase {
+    private class FakeDrafts(
+        private val authorMembershipId: UUID,
+    ) : ManageSessionRecordDraftUseCase {
         var savedCommand: SaveSessionRecordDraftCommand? = null
 
         override fun saveValidatedSnapshot(
@@ -205,7 +252,44 @@ class SessionImportDraftServiceTest {
             )
         }
 
-        override fun getEditor(host: CurrentMember, sessionId: UUID): SessionRecordEditor = error("Not used")
+        override fun getEditor(host: AuthenticatedClubActor, sessionId: UUID): SessionRecordEditor =
+            SessionRecordEditor(
+                live =
+                    com.readmates.sessionrecord.application.model.LiveSessionRecord(
+                        sessionId = sessionId,
+                        clubId = host.clubId,
+                        revision = 0,
+                        snapshot =
+                            com.readmates.sessionrecord.application.model.SessionRecordSnapshot(
+                                visibility = SessionRecordVisibility.MEMBER,
+                                publicationSummary = "Summary",
+                                highlights =
+                                    listOf(
+                                        com.readmates.sessionrecord.application.model.SessionRecordEntry(
+                                            authorMembershipId,
+                                            "Member",
+                                            "Highlight",
+                                        ),
+                                    ),
+                                oneLineReviews =
+                                    listOf(
+                                        com.readmates.sessionrecord.application.model.SessionRecordEntry(
+                                            authorMembershipId,
+                                            "Member",
+                                            "Review",
+                                        ),
+                                    ),
+                                feedbackDocument =
+                                    com.readmates.sessionrecord.application.model.SessionRecordFeedbackDocument(
+                                        "feedback.md",
+                                        "Feedback",
+                                        "markdown",
+                                    ),
+                            ),
+                    ),
+                draft = null,
+                draftLiveBaseStale = false,
+            )
 
         override fun save(host: CurrentMember, command: SaveSessionRecordDraftCommand): SessionRecordDraft =
             error("Not used")

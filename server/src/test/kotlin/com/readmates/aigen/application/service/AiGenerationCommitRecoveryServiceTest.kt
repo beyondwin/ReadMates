@@ -33,7 +33,17 @@ class AiGenerationCommitRecoveryServiceTest {
         store.save(record)
         store.acquireCommitLease(record.jobId, 2, AiGenerationTestFixtures.NOW, java.time.Duration.ofMinutes(1))
         val persistence = FakeCommitPersistence()
-        persistence.receipt = AiGenerationCommitReceipt(record.jobId, 2, record.sessionId, record.clubId, AiGenerationTestFixtures.NOW)
+        persistence.receipt =
+            AiGenerationCommitReceipt(
+                record.jobId,
+                2,
+                record.sessionId,
+                record.clubId,
+                AiGenerationTestFixtures.NOW,
+                draftRevision = 1,
+                baseLiveRevision = 0,
+                requestSha256 = "a".repeat(64),
+            )
         val service =
             AiGenerationCommitRecoveryService(
                 store,

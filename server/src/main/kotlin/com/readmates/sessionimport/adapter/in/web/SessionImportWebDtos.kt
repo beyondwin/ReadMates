@@ -19,6 +19,7 @@ data class SessionImportRequest(
     val highlights: List<SessionImportRecordRequest> = emptyList(),
     val oneLineReviews: List<SessionImportRecordRequest> = emptyList(),
     val feedbackDocument: SessionImportFeedbackDocumentRequest,
+    val expectedDraftRevision: Long? = null,
 ) {
     fun toCommand(
         host: CurrentMember,
@@ -33,6 +34,7 @@ data class SessionImportRequest(
         highlights = highlights.map { SessionImportRecordCommand(it.authorName, it.text) },
         oneLineReviews = oneLineReviews.map { SessionImportRecordCommand(it.authorName, it.text) },
         feedbackDocument = SessionImportFeedbackDocumentCommand(feedbackDocument.fileName, feedbackDocument.markdown),
+        expectedDraftRevision = expectedDraftRevision,
     )
 }
 

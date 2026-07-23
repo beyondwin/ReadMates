@@ -953,6 +953,7 @@ class AiGenerationControllerTest {
             overrideResult: SessionImportV1Snapshot?,
             expectedRevision: Long?,
             sectionReviews: Map<GenerationItem, SectionReviewStatus>?,
+            expectedDraftRevision: Long?,
         ): CommitGenerationResult {
             lastOverride = overrideResult
             lastVisibility = recordVisibility

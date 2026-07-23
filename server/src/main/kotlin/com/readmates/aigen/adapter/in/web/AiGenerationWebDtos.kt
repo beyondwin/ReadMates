@@ -158,6 +158,7 @@ data class CommitRequest(
     val result: SessionImportV1Json?,
     val expectedRevision: Long? = null,
     val sectionReviews: Map<GenerationItem, SectionReviewStatus>? = null,
+    val expectedDraftRevision: Long? = null,
 )
 
 data class CommitGenerationResponse(

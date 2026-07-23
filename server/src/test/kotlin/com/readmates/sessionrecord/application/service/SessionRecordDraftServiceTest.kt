@@ -64,6 +64,24 @@ class SessionRecordDraftServiceTest {
     }
 
     @Test
+    fun `validated generated save requires current expected draft revision`() {
+        val store = FakeStore(live = live(), draft = draft(draftRevision = 2))
+        val service = SessionRecordDraftService(store, codec)
+        val before = store.state()
+
+        assertThatThrownBy {
+            service.saveValidatedSnapshot(
+                host,
+                SaveSessionRecordDraftCommand(sessionId, changedSnapshot(), expectedDraftRevision = null),
+            )
+        }.isInstanceOf(SessionRecordException::class.java)
+            .extracting { (it as SessionRecordException).error }
+            .isEqualTo(SessionRecordError.DRAFT_STALE)
+
+        assertThat(store.state()).isEqualTo(before)
+    }
+
+    @Test
     fun `discard requires the current draft revision`() {
         val store = FakeStore(live = live(), draft = draft(draftRevision = 2))
         val service = SessionRecordDraftService(store, codec)

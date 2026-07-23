@@ -30,7 +30,7 @@ class AiGenerationCommitRecoveryService(
             jobStore.loadMetadata(jobId)
                 ?: return AiGenerationCommitRecoveryResult(jobId, JobStatus.COMMIT_RETRY, false)
         val receipt = persistence.findReceipt(jobId, record.revision)
-        if (receipt != null && receipt.sessionId == record.sessionId && receipt.clubId == record.clubId) {
+        if (receipt?.isCompleteFor(record) == true) {
             if (record.status == JobStatus.COMMITTING || record.status == JobStatus.COMMIT_RETRY) {
                 jobStore.markCommittedForCleanup(jobId, record.revision)
             }
@@ -51,6 +51,17 @@ class AiGenerationCommitRecoveryService(
         return AiGenerationCommitRecoveryResult(jobId, jobStore.loadMetadata(jobId)?.status ?: record.status, false)
     }
 
+    private fun com.readmates.aigen.application.port.out.AiGenerationCommitReceipt.isCompleteFor(
+        record: com.readmates.aigen.application.port.out.JobRecord,
+    ): Boolean =
+        listOf(
+            sessionId == record.sessionId,
+            clubId == record.clubId,
+            draftRevision != null,
+            baseLiveRevision != null,
+            requestSha256?.length == SHA256_LENGTH,
+        ).all { it }
+
     fun recoverBatch(limit: Int = 50): List<AiGenerationCommitRecoveryResult> =
         jobStore.loadCommitRecoveryJobs(limit).mapNotNull { record ->
             try {
@@ -70,6 +81,7 @@ class AiGenerationCommitRecoveryService(
         }
 
     private companion object {
+        const val SHA256_LENGTH = 64
         val log = LoggerFactory.getLogger(AiGenerationCommitRecoveryService::class.java)
     }
 }

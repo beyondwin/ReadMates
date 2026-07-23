@@ -124,7 +124,12 @@ class SessionRecordApplyService(
                 ),
             )
         val importCommand = draft.toImportCommand(host, editor.live)
-        val validated = validator.validate(importCommand, draft.trustedAuthorBindings())
+        val validated =
+            validator.validate(
+                importCommand,
+                draft.trustedAuthorBindings(),
+                draft.historicalAuthorBindings(editor.live, draft.trustedAuthorBindings()),
+            )
         if (!validated.valid) {
             throw SessionRecordException(
                 SessionRecordError.INVALID_RECORD,
@@ -256,4 +261,24 @@ class SessionRecordApplyService(
     private fun draftStale() = SessionRecordException(SessionRecordError.DRAFT_STALE, "Session record draft is stale")
 
     private fun notFound() = SessionRecordException(SessionRecordError.SESSION_NOT_FOUND, "Session record not found")
+}
+
+private fun SessionRecordDraft.historicalAuthorBindings(
+    live: LiveSessionRecord,
+    trusted: Map<String, UUID>,
+): Map<String, UUID> {
+    if (source == com.readmates.sessionrecord.application.model.SessionRecordDraftSource.RESTORED) return trusted
+    val liveRecords = live.snapshot.highlights + live.snapshot.oneLineReviews
+    val draftRecords = snapshot.highlights + snapshot.oneLineReviews
+    return trusted.filter { (name, membershipId) ->
+        draftRecords
+            .filter { it.authorDisplayName == name }
+            .all { draftRecord ->
+                liveRecords.any {
+                    it.membershipId == membershipId &&
+                        it.authorDisplayName == name &&
+                        it.text == draftRecord.text
+                }
+            }
+    }
 }

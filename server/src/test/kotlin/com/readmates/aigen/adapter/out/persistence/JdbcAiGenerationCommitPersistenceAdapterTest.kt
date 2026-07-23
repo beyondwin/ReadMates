@@ -114,6 +114,9 @@ class JdbcAiGenerationCommitPersistenceAdapterTest(
                 fixture.sessionId,
                 fixture.clubId,
                 Instant.parse("2026-07-14T00:00:00Z"),
+                draftRevision = 3,
+                baseLiveRevision = 2,
+                requestSha256 = "a".repeat(64),
             )
 
         assertThat(adapter.insertReceipt(receipt)).isTrue()
@@ -124,7 +127,17 @@ class JdbcAiGenerationCommitPersistenceAdapterTest(
                 "select column_name from information_schema.columns where table_schema=database() and table_name='ai_generation_commit_receipts'",
                 String::class.java,
             )
-        assertThat(columns).containsExactlyInAnyOrder("id", "job_id", "revision", "session_id", "club_id", "committed_at")
+        assertThat(columns).containsExactlyInAnyOrder(
+            "id",
+            "job_id",
+            "revision",
+            "session_id",
+            "club_id",
+            "draft_revision",
+            "base_live_revision",
+            "request_sha256",
+            "committed_at",
+        )
     }
 
     @Test

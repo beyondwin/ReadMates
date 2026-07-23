@@ -69,6 +69,10 @@ class SessionRecordApplyServiceTest {
             mapOf("Host" to fixture.host.membershipId),
             fixture.validator.lastTrustedBindings,
         )
+        assertEquals(
+            mapOf("Host" to fixture.host.membershipId),
+            fixture.validator.lastHistoricalBindings,
+        )
         assertTrue(fixture.replacer.committed)
     }
 
@@ -466,13 +470,16 @@ private class FakeApplyStore(
 private class FakeValidator : ValidateSessionImportUseCase {
     var calls = 0
     var lastTrustedBindings: Map<String, UUID> = emptyMap()
+    var lastHistoricalBindings: Map<String, UUID> = emptyMap()
 
     override fun validate(
         command: com.readmates.sessionimport.application.model.SessionImportCommand,
         trustedAuthorBindings: Map<String, UUID>,
+        historicalAuthorBindings: Map<String, UUID>,
     ): SessionImportPreviewResult {
         calls += 1
         lastTrustedBindings = trustedAuthorBindings
+        lastHistoricalBindings = historicalAuthorBindings
         return command.validPreview(trustedAuthorBindings)
     }
 }

@@ -200,6 +200,7 @@ class AiGenerationController(
             overrideResult = request.result?.toSnapshot(),
             expectedRevision = request.expectedRevision,
             sectionReviews = request.sectionReviews,
+            expectedDraftRevision = request.expectedDraftRevision,
         )
             .toResponse()
     }

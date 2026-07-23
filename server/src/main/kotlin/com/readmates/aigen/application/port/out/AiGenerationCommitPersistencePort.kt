@@ -26,6 +26,9 @@ data class AiGenerationCommitReceipt(
     val sessionId: UUID,
     val clubId: UUID,
     val committedAt: Instant,
+    val draftRevision: Long? = null,
+    val baseLiveRevision: Long? = null,
+    val requestSha256: String? = null,
 )
 
 class AiGenerationMembershipChangedException : RuntimeException("Grounded transcript membership changed")

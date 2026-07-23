@@ -20,7 +20,7 @@ class SessionRecordDraftService(
     private val store: SessionRecordStorePort,
     private val codec: SessionRecordSnapshotCodec,
 ) : ManageSessionRecordDraftUseCase {
-    override fun getEditor(host: CurrentMember, sessionId: UUID): SessionRecordEditor {
+    override fun getEditor(host: AuthenticatedClubActor, sessionId: UUID): SessionRecordEditor {
         requireHost(host)
         val live = requireLive(host, sessionId)
         val draft = store.loadDraft(host, sessionId)
@@ -41,7 +41,7 @@ class SessionRecordDraftService(
     override fun saveValidatedSnapshot(
         host: AuthenticatedClubActor,
         command: SaveSessionRecordDraftCommand,
-    ): SessionRecordDraft = saveSnapshot(host, command, requireExpectedRevision = false)
+    ): SessionRecordDraft = saveSnapshot(host, command, requireExpectedRevision = true)
 
     @Suppress("ThrowsCount")
     private fun saveSnapshot(

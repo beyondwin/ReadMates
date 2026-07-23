@@ -15,6 +15,7 @@ data class SessionImportCommand(
     val highlights: List<SessionImportRecordCommand>,
     val oneLineReviews: List<SessionImportRecordCommand>,
     val feedbackDocument: SessionImportFeedbackDocumentCommand,
+    val expectedDraftRevision: Long? = null,
 )
 
 data class SessionImportSessionCommand(
