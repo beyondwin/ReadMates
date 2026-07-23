@@ -29,6 +29,57 @@ class MySqlFlywayMigrationTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
+    fun `mysql creates host session record revision and notification confirmation tables`() {
+        val tables =
+            jdbcTemplate.queryForList(
+                """
+                select table_name
+                from information_schema.tables
+                where table_schema = database()
+                  and table_name in (
+                    'session_record_drafts',
+                    'session_record_revisions',
+                    'host_session_change_audit',
+                    'host_action_notification_previews',
+                    'host_action_notification_decisions'
+                  )
+                """.trimIndent(),
+                String::class.java,
+            ).toSet()
+
+        assertEquals(
+            setOf(
+                "session_record_drafts",
+                "session_record_revisions",
+                "host_session_change_audit",
+                "host_action_notification_previews",
+                "host_action_notification_decisions",
+            ),
+            tables,
+        )
+        assertEquals(
+            "club_id,session_id,version",
+            indexColumns("session_record_revisions", "session_record_revisions_version_uk"),
+        )
+        assertEquals(
+            "session_id,club_id",
+            foreignKeyColumns("session_record_drafts", "session_record_drafts_session_fk"),
+        )
+        assertEquals(
+            "session_id,club_id",
+            indexColumns("session_record_drafts", "PRIMARY"),
+        )
+        assertTrue(checkConstraintClause("session_record_drafts_sha_check").contains("64"))
+        assertTrue(checkConstraintClause("session_record_revisions_sha_check").contains("64"))
+        val previewCounts = checkConstraintClause("host_action_notification_previews_counts_check")
+        assertTrue(previewCounts.contains("target_count") && previewCounts.contains(">= 0"))
+        val decisionCounts = checkConstraintClause("host_action_notification_decisions_counts_check")
+        assertTrue(decisionCounts.contains("target_count") && decisionCounts.contains(">= 0"))
+        val decisions = checkConstraintClause("host_action_notification_decisions_decision_check")
+        assertTrue(decisions.contains("SEND") && decisions.contains("SKIP"))
+    }
+
+    @Test
     fun `mysql baseline creates auth session and feedback document tables`() {
         val tableCount =
             jdbcTemplate.queryForObject(
