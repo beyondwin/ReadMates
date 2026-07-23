@@ -17,6 +17,7 @@ import com.readmates.sessionrecord.application.model.SessionRecordSource
 import com.readmates.sessionrecord.application.port.out.SessionRecordStorePort
 import com.readmates.sessionrecord.application.service.SessionRecordSnapshotCodec
 import com.readmates.shared.db.dbString
+import com.readmates.shared.db.toUtcLocalDateTime
 import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.db.uuid
 import com.readmates.shared.db.uuidOrNull
@@ -25,6 +26,7 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import java.sql.ResultSet
 import java.time.LocalDate
+import java.time.OffsetDateTime
 import java.util.UUID
 
 @Repository
@@ -42,7 +44,12 @@ class JdbcSessionRecordAdapter(
         return SessionRecordEditor(
             live = live,
             draft = draft,
-            draftLiveBaseStale = draft != null && draft.baseLiveRevision != live.revision,
+            draftLiveBaseStale =
+                draft != null &&
+                    (
+                        draft.baseLiveRevision != live.revision ||
+                            draft.baseSessionUpdatedAt != live.sessionUpdatedAt
+                    ),
         )
     }
 
@@ -159,7 +166,7 @@ class JdbcSessionRecordAdapter(
             jdbcTemplate
                 .query(
                     """
-                    select s.visibility, s.number, s.book_title, s.session_date,
+                    select s.visibility, s.number, s.book_title, s.session_date, s.updated_at,
                            coalesce((
                              select max(r.version)
                              from session_record_revisions r
@@ -176,6 +183,7 @@ class JdbcSessionRecordAdapter(
                             sessionNumber = rs.getInt("number"),
                             bookTitle = rs.getString("book_title"),
                             meetingDate = rs.getObject("session_date", LocalDate::class.java),
+                            sessionUpdatedAt = rs.utcOffsetDateTime("updated_at"),
                         )
                     },
                     sessionId.dbString(),
@@ -225,7 +233,8 @@ class JdbcSessionRecordAdapter(
         jdbcTemplate
             .query(
                 """
-                select session_id, club_id, base_live_revision, draft_revision, source, restored_from_revision_id,
+                select session_id, club_id, base_live_revision, base_session_updated_at,
+                       draft_revision, source, restored_from_revision_id,
                        snapshot_json, updated_by_membership_id, created_at, updated_at
                 from session_record_drafts
                 where club_id = ? and session_id = ?
@@ -245,13 +254,15 @@ class JdbcSessionRecordAdapter(
         jdbcTemplate.update(
             """
             insert into session_record_drafts (
-              session_id, club_id, base_live_revision, draft_revision, source, restored_from_revision_id,
+              session_id, club_id, base_live_revision, base_session_updated_at,
+              draft_revision, source, restored_from_revision_id,
               snapshot_json, snapshot_sha256, updated_by_membership_id
-            ) values (?, ?, ?, 1, ?, ?, ?, ?, ?)
+            ) values (?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
             """.trimIndent(),
             live.sessionId.dbString(),
             host.clubId.dbString(),
             live.revision,
+            live.sessionUpdatedAt.toUtcLocalDateTime(),
             command.source.name,
             command.restoredFromRevisionId?.dbString(),
             encoded.json,
@@ -338,10 +349,11 @@ class JdbcSessionRecordAdapter(
                 jdbcTemplate.update(
                     """
                     insert into session_record_drafts (
-                      session_id, club_id, base_live_revision, draft_revision, source, restored_from_revision_id,
+                      session_id, club_id, base_live_revision, base_session_updated_at,
+                      draft_revision, source, restored_from_revision_id,
                       snapshot_json, snapshot_sha256, updated_by_membership_id
                     )
-                    select ?, ?, ?, 1, 'RESTORED', ?, ?, ?, ?
+                    select ?, ?, ?, ?, 1, 'RESTORED', ?, ?, ?, ?
                     where not exists (
                       select 1 from session_record_drafts where club_id = ? and session_id = ?
                     )
@@ -349,6 +361,7 @@ class JdbcSessionRecordAdapter(
                     live.sessionId.dbString(),
                     host.clubId.dbString(),
                     live.revision,
+                    live.sessionUpdatedAt.toUtcLocalDateTime(),
                     revision.id.dbString(),
                     encoded.json,
                     encoded.sha256,
@@ -361,6 +374,7 @@ class JdbcSessionRecordAdapter(
                     """
                     update session_record_drafts
                     set base_live_revision = ?,
+                        base_session_updated_at = ?,
                         draft_revision = draft_revision + 1,
                         source = 'RESTORED',
                         restored_from_revision_id = ?,
@@ -371,6 +385,7 @@ class JdbcSessionRecordAdapter(
                     where club_id = ? and session_id = ? and draft_revision = ?
                     """.trimIndent(),
                     live.revision,
+                    live.sessionUpdatedAt.toUtcLocalDateTime(),
                     revision.id.dbString(),
                     encoded.json,
                     encoded.sha256,
@@ -440,6 +455,7 @@ class JdbcSessionRecordAdapter(
             sessionId = rs.uuid("session_id"),
             clubId = rs.uuid("club_id"),
             baseLiveRevision = rs.getLong("base_live_revision"),
+            baseSessionUpdatedAt = rs.utcOffsetDateTime("base_session_updated_at"),
             draftRevision = rs.getLong("draft_revision"),
             source = SessionRecordDraftSource.valueOf(rs.getString("source")),
             restoredFromRevisionId = rs.uuidOrNull("restored_from_revision_id"),
@@ -468,5 +484,6 @@ class JdbcSessionRecordAdapter(
         val sessionNumber: Int,
         val bookTitle: String,
         val meetingDate: LocalDate,
+        val sessionUpdatedAt: OffsetDateTime,
     )
 }

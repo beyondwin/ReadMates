@@ -47,6 +47,31 @@ class JdbcSessionRecordAdapterTest(
     }
 
     @Test
+    fun `session metadata changes make the persisted draft base stale`() {
+        val fixture = fixture("metadata-stale")
+        val live = requireNotNull(adapter.loadLive(fixture.host, fixture.sessionId))
+        adapter.insertDraft(
+            fixture.host,
+            live,
+            SaveSessionRecordDraftCommand(fixture.sessionId, fixture.snapshot, null),
+            codec.encode(fixture.snapshot),
+        )
+
+        jdbcTemplate.update(
+            """
+            update sessions
+            set book_title = '변경된 책',
+                updated_at = timestampadd(microsecond, 1, updated_at)
+            where id = ? and club_id = ?
+            """.trimIndent(),
+            fixture.sessionId.toString(),
+            fixture.host.clubId.toString(),
+        )
+
+        assertThat(requireNotNull(adapter.lockEditor(fixture.host, fixture.sessionId)).draftLiveBaseStale).isTrue()
+    }
+
+    @Test
     @Suppress("LongMethod")
     fun `compare and set updates exactly once while revisions remain ordered and immutable`() {
         val fixture = fixture("cas")

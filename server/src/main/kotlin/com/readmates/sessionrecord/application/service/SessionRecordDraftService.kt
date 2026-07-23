@@ -1,5 +1,6 @@
 package com.readmates.sessionrecord.application.service
 
+import com.readmates.sessionrecord.application.model.LiveSessionRecord
 import com.readmates.sessionrecord.application.model.RestoreSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.SaveSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.SessionRecordDraft
@@ -30,7 +31,7 @@ class SessionRecordDraftService(
         return SessionRecordEditor(
             live = live,
             draft = draft,
-            draftLiveBaseStale = draft != null && draft.baseLiveRevision != live.revision,
+            draftLiveBaseStale = draft?.isStaleAgainst(live) == true,
         )
     }
 
@@ -124,3 +125,6 @@ class SessionRecordDraftService(
 
     private fun draftStale() = SessionRecordException(SessionRecordError.DRAFT_STALE, "Session record draft is stale")
 }
+
+private fun SessionRecordDraft.isStaleAgainst(live: LiveSessionRecord): Boolean =
+    baseLiveRevision != live.revision || baseSessionUpdatedAt != live.sessionUpdatedAt

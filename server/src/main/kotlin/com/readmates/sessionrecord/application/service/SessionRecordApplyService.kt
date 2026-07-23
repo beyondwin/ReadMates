@@ -209,7 +209,10 @@ class SessionRecordApplyService(
         expectedDraftRevision: Long,
     ) {
         if (draft.draftRevision != expectedDraftRevision) throw draftStale()
-        if (live.revision != expectedLiveRevision || draft.baseLiveRevision != live.revision) {
+        if (live.revision != expectedLiveRevision ||
+            draft.baseLiveRevision != live.revision ||
+            draft.baseSessionUpdatedAt != live.sessionUpdatedAt
+        ) {
             throw SessionRecordException(SessionRecordError.LIVE_STALE, "Session record live revision is stale")
         }
     }

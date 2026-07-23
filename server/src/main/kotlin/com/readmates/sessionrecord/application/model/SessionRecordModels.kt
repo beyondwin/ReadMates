@@ -7,6 +7,9 @@ import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.util.UUID
 
+private val LEGACY_SESSION_RECORD_TIMESTAMP: OffsetDateTime =
+    OffsetDateTime.parse("1970-01-01T00:00:00Z")
+
 enum class SessionRecordSource {
     BASELINE,
     MANUAL,
@@ -65,6 +68,7 @@ data class SessionRecordDraft(
     val updatedByMembershipId: UUID,
     val createdAt: OffsetDateTime,
     val updatedAt: OffsetDateTime,
+    val baseSessionUpdatedAt: OffsetDateTime = LEGACY_SESSION_RECORD_TIMESTAMP,
 )
 
 data class SessionRecordRevision(
@@ -87,6 +91,7 @@ data class LiveSessionRecord(
     val sessionNumber: Int = 0,
     val bookTitle: String = "",
     val meetingDate: LocalDate = LocalDate.MIN,
+    val sessionUpdatedAt: OffsetDateTime = LEGACY_SESSION_RECORD_TIMESTAMP,
 )
 
 data class SessionRecordEditor(

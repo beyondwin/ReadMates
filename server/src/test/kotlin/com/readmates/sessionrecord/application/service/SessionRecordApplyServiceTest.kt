@@ -192,6 +192,26 @@ class SessionRecordApplyServiceTest {
     }
 
     @Test
+    fun `session metadata drift rejects preview and apply before notification preparation`() {
+        val fixture =
+            Fixture(
+                liveSessionUpdatedAt = TEST_NOW.plusSeconds(1),
+                draftBaseSessionUpdatedAt = TEST_NOW,
+            )
+
+        assertThrows(SessionRecordException::class.java) {
+            fixture.preview()
+        }.also { assertEquals(SessionRecordError.LIVE_STALE, it.error) }
+        assertThrows(SessionRecordException::class.java) {
+            fixture.apply()
+        }.also { assertEquals(SessionRecordError.LIVE_STALE, it.error) }
+
+        assertTrue(fixture.gate.prepared.isEmpty())
+        assertFalse(fixture.replacer.committed)
+        assertNotNull(fixture.store.draft)
+    }
+
+    @Test
     fun `restore apply records restored from revision`() {
         val restoredFrom = UUID.randomUUID()
         val fixture = Fixture(draftSource = SessionRecordDraftSource.RESTORED, restoredFromRevisionId = restoredFrom)
@@ -270,12 +290,16 @@ class SessionRecordApplyServiceTest {
     }
 }
 
+private val TEST_NOW = OffsetDateTime.of(2026, 7, 23, 0, 0, 0, 0, ZoneOffset.UTC)
+
 private class Fixture(
     liveRevision: Long = 0,
     liveFeedback: String = "",
     draftSource: SessionRecordDraftSource = SessionRecordDraftSource.MANUAL,
     restoredFromRevisionId: UUID? = null,
     draftPublicationSummary: String = "Summary",
+    liveSessionUpdatedAt: OffsetDateTime = TEST_NOW,
+    draftBaseSessionUpdatedAt: OffsetDateTime = liveSessionUpdatedAt,
 ) {
     val clubId: UUID = UUID.randomUUID()
     val sessionId: UUID = UUID.randomUUID()
@@ -292,7 +316,7 @@ private class Fixture(
             accountName = "host",
             role = MembershipRole.HOST,
         )
-    private val now = OffsetDateTime.of(2026, 7, 23, 0, 0, 0, 0, ZoneOffset.UTC)
+    private val now = TEST_NOW
     private val live =
         LiveSessionRecord(
             sessionId = sessionId,
@@ -302,6 +326,7 @@ private class Fixture(
             sessionNumber = 28,
             bookTitle = "Apply Test Book",
             meetingDate = LocalDate.of(2026, 7, 23),
+            sessionUpdatedAt = liveSessionUpdatedAt,
         )
     val draft =
         SessionRecordDraft(
@@ -317,6 +342,7 @@ private class Fixture(
             updatedByMembershipId = host.membershipId,
             createdAt = now,
             updatedAt = now,
+            baseSessionUpdatedAt = draftBaseSessionUpdatedAt,
         )
     private val codec = SessionRecordSnapshotCodec(JsonMapper.builder().findAndAddModules().build())
     val store = FakeApplyStore(live, draft, now, codec)

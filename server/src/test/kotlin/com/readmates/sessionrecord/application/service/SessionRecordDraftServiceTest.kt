@@ -145,7 +145,11 @@ class SessionRecordDraftServiceTest {
 
     @Test
     fun `basic metadata drift marks draft live base stale`() {
-        val store = FakeStore(live = live(revision = 5), draft = draft(baseLiveRevision = 4))
+        val store =
+            FakeStore(
+                live = live(sessionUpdatedAt = NOW.plusSeconds(1)),
+                draft = draft(baseSessionUpdatedAt = NOW),
+            )
         val service = SessionRecordDraftService(store, codec)
 
         val editor: SessionRecordEditor = service.getEditor(host, sessionId)
@@ -153,11 +157,21 @@ class SessionRecordDraftServiceTest {
         assertThat(editor.draftLiveBaseStale).isTrue()
     }
 
-    private fun live(revision: Long = 4) = LiveSessionRecord(sessionId, host.clubId, revision, snapshot())
+    private fun live(
+        revision: Long = 4,
+        sessionUpdatedAt: OffsetDateTime = NOW,
+    ) = LiveSessionRecord(
+        sessionId,
+        host.clubId,
+        revision,
+        snapshot(),
+        sessionUpdatedAt = sessionUpdatedAt,
+    )
 
     private fun draft(
         baseLiveRevision: Long = 4,
         draftRevision: Long = 1,
+        baseSessionUpdatedAt: OffsetDateTime = NOW,
     ) = SessionRecordDraft(
         sessionId = sessionId,
         clubId = host.clubId,
@@ -169,6 +183,7 @@ class SessionRecordDraftServiceTest {
         updatedByMembershipId = host.membershipId,
         createdAt = NOW,
         updatedAt = NOW,
+        baseSessionUpdatedAt = baseSessionUpdatedAt,
     )
 
     private fun revision() =
@@ -217,7 +232,17 @@ class SessionRecordDraftServiceTest {
         override fun lockEditor(
             host: AuthenticatedClubActor,
             sessionId: UUID,
-        ): SessionRecordEditor? = live?.let { SessionRecordEditor(it, draft, draft?.baseLiveRevision != it.revision) }
+        ): SessionRecordEditor? =
+            live?.let {
+                SessionRecordEditor(
+                    it,
+                    draft,
+                    draft?.let { current ->
+                        current.baseLiveRevision != it.revision ||
+                            current.baseSessionUpdatedAt != it.sessionUpdatedAt
+                    } ?: false,
+                )
+            }
 
         override fun findCompletedApply(
             host: AuthenticatedClubActor,
@@ -337,6 +362,7 @@ class SessionRecordDraftServiceTest {
             updatedByMembershipId = host.membershipId,
             createdAt = draft?.createdAt ?: NOW,
             updatedAt = NOW,
+            baseSessionUpdatedAt = live.sessionUpdatedAt,
         )
     }
 

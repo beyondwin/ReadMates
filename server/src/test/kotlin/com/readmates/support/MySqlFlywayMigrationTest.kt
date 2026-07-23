@@ -70,6 +70,7 @@ class MySqlFlywayMigrationTest(
             "session_id,club_id",
             indexColumns("session_record_drafts", "PRIMARY"),
         )
+        assertEquals("NO", columnValue("session_record_drafts", "base_session_updated_at", "is_nullable"))
         assertTrue(checkConstraintClause("session_record_drafts_sha_check").contains("64"))
         assertTrue(checkConstraintClause("session_record_revisions_sha_check").contains("64"))
         val previewCounts = checkConstraintClause("host_action_notification_previews_counts_check")
