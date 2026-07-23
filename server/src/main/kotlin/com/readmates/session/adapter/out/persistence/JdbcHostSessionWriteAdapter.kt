@@ -1,6 +1,6 @@
 package com.readmates.session.adapter.out.persistence
 
-import com.readmates.session.application.HostSessionListItem
+import com.readmates.session.application.HostSessionListPage
 import com.readmates.session.application.HostSessionListQuery
 import com.readmates.session.application.HostSessionNotFoundException
 import com.readmates.session.application.UpcomingSessionItem
@@ -20,7 +20,6 @@ import com.readmates.session.application.port.out.HostSessionTransitionResult
 import com.readmates.session.application.port.out.HostSessionVisibilitySnapshot
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.utcOffsetDateTime
-import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.springframework.jdbc.core.JdbcTemplate
@@ -50,7 +49,7 @@ class JdbcHostSessionWriteAdapter(
         host: CurrentMember,
         pageRequest: PageRequest,
         query: HostSessionListQuery,
-    ): CursorPage<HostSessionListItem> = queries.list(jdbcTemplate, host, pageRequest, query)
+    ): HostSessionListPage = queries.list(jdbcTemplate, host, pageRequest, query)
 
     override fun upcoming(member: CurrentMember): List<UpcomingSessionItem> = queries.upcoming(jdbcTemplate, member)
 

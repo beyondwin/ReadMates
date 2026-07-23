@@ -6,7 +6,7 @@ import com.readmates.session.application.HostPublicationResponse
 import com.readmates.session.application.HostSessionDeletionPreviewResponse
 import com.readmates.session.application.HostSessionDeletionResponse
 import com.readmates.session.application.HostSessionDetailResponse
-import com.readmates.session.application.HostSessionListItem
+import com.readmates.session.application.HostSessionListPage
 import com.readmates.session.application.HostSessionListQuery
 import com.readmates.session.application.HostSessionVisibilityPreview
 import com.readmates.session.application.UpcomingSessionItem
@@ -18,7 +18,6 @@ import com.readmates.session.application.model.PreviewHostSessionVisibilityComma
 import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
 import com.readmates.session.application.model.UpsertPublicationCommand
-import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 
@@ -43,7 +42,7 @@ interface HostSessionQueryUseCase {
         host: CurrentMember,
         pageRequest: PageRequest,
         query: HostSessionListQuery = HostSessionListQuery(),
-    ): CursorPage<HostSessionListItem>
+    ): HostSessionListPage
 
     fun detail(command: HostSessionIdCommand): HostSessionDetailResponse
 }

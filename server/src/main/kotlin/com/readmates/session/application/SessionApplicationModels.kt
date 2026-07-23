@@ -168,6 +168,18 @@ data class HostSessionListItem(
     val lastModifiedAt: String? = null,
 )
 
+data class HostSessionListSummary(
+    val needsAttentionCount: Int,
+    val incompletePublishedCount: Int,
+    val draftCount: Int,
+)
+
+data class HostSessionListPage(
+    val items: List<HostSessionListItem>,
+    val nextCursor: String?,
+    val summary: HostSessionListSummary,
+)
+
 data class HostSessionListQuery(
     val search: String? = null,
     val state: String? = null,

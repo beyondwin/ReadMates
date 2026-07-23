@@ -2,7 +2,9 @@ package com.readmates.session.adapter.out.persistence
 
 import com.readmates.session.application.HostSessionFeedbackDocument
 import com.readmates.session.application.HostSessionListItem
+import com.readmates.session.application.HostSessionListPage
 import com.readmates.session.application.HostSessionListQuery
+import com.readmates.session.application.HostSessionListSummary
 import com.readmates.session.application.HostSessionNotFoundException
 import com.readmates.session.application.HostSessionPublication
 import com.readmates.session.application.InvalidHostSessionCursorException
@@ -10,10 +12,11 @@ import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.model.HostDashboardResult
 import com.readmates.session.application.requireHost
+import com.readmates.sessionclosing.application.model.SessionRecordReadinessPolicy
+import com.readmates.sessionrecord.application.model.SessionRecordStatus
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.uuid
 import com.readmates.shared.paging.CursorCodec
-import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.springframework.jdbc.core.JdbcTemplate
@@ -28,7 +31,7 @@ internal class HostSessionQueries {
         host: CurrentMember,
         pageRequest: PageRequest,
         query: HostSessionListQuery,
-    ): CursorPage<HostSessionListItem> {
+    ): HostSessionListPage {
         requireHost(host)
         val normalizedQuery = query.normalized()
         val queryKey = normalizedQuery.fingerprint()
@@ -74,13 +77,13 @@ internal class HostSessionQueries {
                              sessions.book_title, sessions.book_author, sessions.book_image_url,
                              sessions.session_date, sessions.start_time, sessions.end_time,
                              sessions.location_label, sessions.state, sessions.visibility,
-                             (coalesce(publication.public_summary, '') <> ''
-                               or (select count(*) from highlights
-                                   where highlights.club_id = sessions.club_id
-                                     and highlights.session_id = sessions.id) > 0
-                               or (select count(*) from one_line_reviews
-                                   where one_line_reviews.club_id = sessions.club_id
-                                     and one_line_reviews.session_id = sessions.id) > 0) as record_saved,
+                             publication.public_summary,
+                             (select count(*) from highlights
+                              where highlights.club_id = sessions.club_id
+                                and highlights.session_id = sessions.id) as highlight_count,
+                             (select count(*) from one_line_reviews
+                              where one_line_reviews.club_id = sessions.club_id
+                                and one_line_reviews.session_id = sessions.id) as one_liner_count,
                              exists (
                                select 1 from session_feedback_documents
                                where session_feedback_documents.club_id = sessions.club_id
@@ -125,14 +128,60 @@ internal class HostSessionQueries {
                     *parameters.toTypedArray(),
                 )
             }
-        return CursorPage(
+        return HostSessionListPage(
             items = scan.items,
             nextCursor =
                 scan.continuation?.let {
                     hostSessionCursor(it.number, it.id, queryKey, host.clubId)
                 },
+            summary = loadLedgerSummary(jdbcTemplate, host),
         )
     }
+
+    private fun loadLedgerSummary(
+        jdbcTemplate: JdbcTemplate,
+        host: CurrentMember,
+    ): HostSessionListSummary =
+        summarizeHostSessionLedger(
+            jdbcTemplate.query(
+                """
+                select sessions.state,
+                       publication.public_summary,
+                       (select count(*) from highlights
+                        where highlights.club_id = sessions.club_id
+                          and highlights.session_id = sessions.id) as highlight_count,
+                       (select count(*) from one_line_reviews
+                        where one_line_reviews.club_id = sessions.club_id
+                          and one_line_reviews.session_id = sessions.id) as one_liner_count,
+                       exists (
+                         select 1 from session_feedback_documents
+                         where session_feedback_documents.club_id = sessions.club_id
+                           and session_feedback_documents.session_id = sessions.id
+                       ) as feedback_ready,
+                       exists (
+                         select 1 from session_record_drafts
+                         where session_record_drafts.club_id = sessions.club_id
+                           and session_record_drafts.session_id = sessions.id
+                       ) as has_draft
+                from sessions
+                left join public_session_publications publication
+                  on publication.club_id = sessions.club_id
+                 and publication.session_id = sessions.id
+                where sessions.club_id = ?
+                """.trimIndent(),
+                { resultSet, _ ->
+                    HostSessionLedgerReadiness(
+                        state = resultSet.getString("state"),
+                        summaryPublished = !resultSet.getString("public_summary").isNullOrBlank(),
+                        highlightCount = resultSet.getInt("highlight_count"),
+                        oneLinerCount = resultSet.getInt("one_liner_count"),
+                        feedbackReady = resultSet.getBoolean("feedback_ready"),
+                        hasDraft = resultSet.getBoolean("has_draft"),
+                    )
+                },
+                host.clubId.dbString(),
+            ),
+        )
 
     fun upcoming(
         jdbcTemplate: JdbcTemplate,
@@ -504,6 +553,43 @@ internal data class HostSessionLedgerScanResult(
     val items: List<HostSessionListItem>,
     val continuation: HostSessionCursor?,
 )
+
+internal data class HostSessionLedgerReadiness(
+    val state: String,
+    val summaryPublished: Boolean,
+    val highlightCount: Int,
+    val oneLinerCount: Int,
+    val feedbackReady: Boolean,
+    val hasDraft: Boolean,
+)
+
+internal fun summarizeHostSessionLedger(rows: List<HostSessionLedgerReadiness>): HostSessionListSummary {
+    var needsAttentionCount = 0
+    var incompletePublishedCount = 0
+    var draftCount = 0
+    rows.forEach { row ->
+        val recordStatus =
+            SessionRecordReadinessPolicy.recordStatus(
+                summaryPublished = row.summaryPublished,
+                highlightCount = row.highlightCount,
+                oneLinerCount = row.oneLinerCount,
+                feedbackReady = row.feedbackReady,
+                hasDraft = row.hasDraft,
+            )
+        if (SessionRecordReadinessPolicy.needsAttention(row.state, recordStatus, row.hasDraft)) {
+            needsAttentionCount += 1
+        }
+        if (row.state == "PUBLISHED" && recordStatus != SessionRecordStatus.COMPLETE) {
+            incompletePublishedCount += 1
+        }
+        if (row.hasDraft) draftCount += 1
+    }
+    return HostSessionListSummary(
+        needsAttentionCount = needsAttentionCount,
+        incompletePublishedCount = incompletePublishedCount,
+        draftCount = draftCount,
+    )
+}
 
 @Suppress("ReturnCount")
 internal fun scanHostSessionLedger(

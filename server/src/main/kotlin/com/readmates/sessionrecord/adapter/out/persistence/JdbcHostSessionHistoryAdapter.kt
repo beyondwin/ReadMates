@@ -1,7 +1,5 @@
 package com.readmates.sessionrecord.adapter.out.persistence
 
-import com.fasterxml.jackson.core.type.TypeReference
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.readmates.sessionrecord.application.model.HostSessionHistoryAttendanceTransition
 import com.readmates.sessionrecord.application.model.HostSessionHistoryCursor
 import com.readmates.sessionrecord.application.model.HostSessionHistoryItem
@@ -14,6 +12,8 @@ import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.security.CurrentMember
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
+import tools.jackson.core.type.TypeReference
+import tools.jackson.databind.ObjectMapper
 import java.sql.ResultSet
 import java.util.UUID
 

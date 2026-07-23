@@ -1,6 +1,5 @@
 package com.readmates.session.adapter.out.persistence
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.readmates.session.application.HostAttendanceAuditTransition
 import com.readmates.session.application.HostSessionBasicAuditSnapshot
 import com.readmates.session.application.port.out.HostSessionAuditPort
@@ -10,6 +9,7 @@ import com.readmates.shared.security.CurrentMember
 import org.slf4j.MDC
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
+import tools.jackson.databind.ObjectMapper
 import java.time.LocalDate
 import java.time.LocalTime
 import java.util.UUID

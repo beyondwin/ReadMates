@@ -32,8 +32,9 @@ import com.readmates.session.application.HostSessionDeletionPreviewResponse
 import com.readmates.session.application.HostSessionDeletionResponse
 import com.readmates.session.application.HostSessionDetailResponse
 import com.readmates.session.application.HostSessionFeedbackDocument
-import com.readmates.session.application.HostSessionListItem
+import com.readmates.session.application.HostSessionListPage
 import com.readmates.session.application.HostSessionListQuery
+import com.readmates.session.application.HostSessionListSummary
 import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.model.AttendanceEntryCommand
@@ -57,7 +58,6 @@ import com.readmates.session.application.port.out.HostSessionVisibilitySnapshot
 import com.readmates.session.application.port.out.HostSessionVisibilityUpdateResult
 import com.readmates.sessionrecord.config.HostActionConfirmationProperties
 import com.readmates.shared.cache.ReadCacheInvalidationPort
-import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.assertj.core.api.Assertions.assertThat
@@ -678,9 +678,13 @@ class HostSessionServicesTest {
             host: CurrentMember,
             pageRequest: PageRequest,
             query: HostSessionListQuery,
-        ): CursorPage<HostSessionListItem> {
+        ): HostSessionListPage {
             listHost = host
-            return CursorPage(emptyList(), null)
+            return HostSessionListPage(
+                items = emptyList(),
+                nextCursor = null,
+                summary = HostSessionListSummary(0, 0, 0),
+            )
         }
 
         override fun create(command: HostSessionCommand) =

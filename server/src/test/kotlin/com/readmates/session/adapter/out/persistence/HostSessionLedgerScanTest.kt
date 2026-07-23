@@ -8,6 +8,30 @@ import org.junit.jupiter.api.Test
 
 class HostSessionLedgerScanTest {
     @Test
+    fun `ledger summary uses shared readiness semantics for global counts`() {
+        val summary =
+            summarizeHostSessionLedger(
+                listOf(
+                    HostSessionLedgerReadiness(
+                        "PUBLISHED",
+                        summaryPublished = false,
+                        highlightCount = 0,
+                        oneLinerCount = 0,
+                        feedbackReady = false,
+                        hasDraft = false,
+                    ),
+                    HostSessionLedgerReadiness("CLOSED", true, 0, 0, feedbackReady = true, hasDraft = true),
+                    HostSessionLedgerReadiness("OPEN", false, 0, 0, feedbackReady = false, hasDraft = true),
+                    HostSessionLedgerReadiness("PUBLISHED", false, 1, 0, feedbackReady = true, hasDraft = false),
+                ),
+            )
+
+        assertThat(summary.needsAttentionCount).isEqualTo(2)
+        assertThat(summary.incompletePublishedCount).isEqualTo(1)
+        assertThat(summary.draftCount).isEqualTo(2)
+    }
+
+    @Test
     fun `large sparse ledger scan is capped by SQL chunk query budget`() {
         val fixture = (5_000 downTo 1).map(::ledgerItem)
         var queryCount = 0

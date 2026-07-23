@@ -104,7 +104,9 @@ internal fun ResultSet.toHostSessionListItem() =
     getBoolean("has_draft").let { hasDraft ->
         val recordStatus =
             SessionRecordReadinessPolicy.recordStatus(
-                recordSaved = getBoolean("record_saved"),
+                summaryPublished = !getString("public_summary").isNullOrBlank(),
+                highlightCount = getInt("highlight_count"),
+                oneLinerCount = getInt("one_liner_count"),
                 feedbackReady = getBoolean("feedback_ready"),
                 hasDraft = hasDraft,
             )

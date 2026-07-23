@@ -49,6 +49,8 @@ private const val CLEANUP_GENERATED_SESSIONS_SQL = """
         select id from sessions
         where club_id = '00000000-0000-0000-0000-000000000001' and number >= 7
       );
+    delete from session_record_drafts
+    where session_id = '00000000-0000-0000-0000-000000019777';
     delete from session_record_revisions
     where club_id = '00000000-0000-0000-0000-000000000001'
       and session_id in (
@@ -257,6 +259,69 @@ class HostSessionControllerDbTest(
                 status { isOk() }
                 jsonPath("$.items.length()") { value(2) }
                 jsonPath("$.nextCursor") { exists() }
+            }
+    }
+
+    @Test
+    fun `host list summary is club scoped and independent of filters and pagination`() {
+        val publishedIncomplete = createDraftSessionSeven()
+        publishSession(publishedIncomplete)
+        val closedDraft = createDraftSessionEight()
+        updateSessionState(closedDraft, "CLOSED")
+        insertRecordDraft(closedDraft)
+        createOutsideClubSession(state = "PUBLISHED", visibility = "PUBLIC")
+        insertRecordDraft(
+            sessionId = "00000000-0000-0000-0000-000000019777",
+            clubId = "00000000-0000-0000-0000-000000019001",
+            membershipId = "00000000-0000-0000-0000-000000019201",
+        )
+
+        mockMvc
+            .get("/api/host/sessions") {
+                with(user("host@example.com"))
+                param("search", "does-not-match")
+                param("state", "OPEN")
+                param("limit", "1")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items.length()") { value(0) }
+                jsonPath("$.summary.needsAttentionCount") { value(2) }
+                jsonPath("$.summary.incompletePublishedCount") { value(1) }
+                jsonPath("$.summary.draftCount") { value(1) }
+            }
+
+        val firstPage =
+            mockMvc
+                .get("/api/host/sessions") {
+                    with(user("host@example.com"))
+                    param("limit", "1")
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.items.length()") { value(1) }
+                    jsonPath("$.summary.needsAttentionCount") { value(2) }
+                    jsonPath("$.summary.incompletePublishedCount") { value(1) }
+                    jsonPath("$.summary.draftCount") { value(1) }
+                }.andReturn()
+                .response
+                .contentAsString
+        val cursor =
+            """"nextCursor"\s*:\s*"([^"]+)""""
+                .toRegex()
+                .find(firstPage)
+                ?.groupValues
+                ?.get(1)
+                ?: error("first host session page did not include a next cursor")
+
+        mockMvc
+            .get("/api/host/sessions") {
+                with(user("host@example.com"))
+                param("limit", "1")
+                param("cursor", cursor)
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.summary.needsAttentionCount") { value(2) }
+                jsonPath("$.summary.incompletePublishedCount") { value(1) }
+                jsonPath("$.summary.draftCount") { value(1) }
             }
     }
 
@@ -1391,7 +1456,11 @@ class HostSessionControllerDbTest(
             ?: error("created session response did not include a sessionId")
     }
 
-    private fun insertRecordDraft(sessionId: String) {
+    private fun insertRecordDraft(
+        sessionId: String,
+        clubId: String = "00000000-0000-0000-0000-000000000001",
+        membershipId: String = "00000000-0000-0000-0000-000000000201",
+    ) {
         jdbcTemplate.update(
             """
             insert into session_record_drafts (
@@ -1400,9 +1469,9 @@ class HostSessionControllerDbTest(
             ) values (?, ?, 0, 1, 'MANUAL', '{}', ?, ?)
             """.trimIndent(),
             sessionId,
-            "00000000-0000-0000-0000-000000000001",
+            clubId,
             "a".repeat(64),
-            "00000000-0000-0000-0000-000000000201",
+            membershipId,
         )
     }
 
@@ -1823,6 +1892,18 @@ class HostSessionControllerDbTest(
               and club_id = '00000000-0000-0000-0000-000000000001'
             """.trimIndent(),
             state,
+            sessionId,
+        )
+    }
+
+    private fun publishSession(sessionId: String) {
+        jdbcTemplate.update(
+            """
+            update sessions
+            set state = 'PUBLISHED', visibility = 'PUBLIC'
+            where id = ?
+              and club_id = '00000000-0000-0000-0000-000000000001'
+            """.trimIndent(),
             sessionId,
         )
     }
