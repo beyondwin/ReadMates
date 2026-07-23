@@ -19,6 +19,11 @@ interface FeedbackDocumentStorePort {
         sessionId: UUID,
     ): FeedbackDocumentSessionResult?
 
+    fun findSession(
+        clubId: UUID,
+        sessionId: UUID,
+    ): FeedbackDocumentSessionResult?
+
     fun findLatestDocument(
         clubId: UUID,
         sessionId: UUID,

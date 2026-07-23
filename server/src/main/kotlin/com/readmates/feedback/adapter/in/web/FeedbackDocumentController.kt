@@ -1,5 +1,6 @@
 package com.readmates.feedback.adapter.`in`.web
 
+import com.readmates.feedback.application.port.`in`.GetHostFeedbackDocumentPreviewUseCase
 import com.readmates.feedback.application.port.`in`.GetHostFeedbackDocumentStatusUseCase
 import com.readmates.feedback.application.port.`in`.GetReadableFeedbackDocumentUseCase
 import com.readmates.feedback.application.port.`in`.ListMyReadableFeedbackDocumentsUseCase
@@ -17,6 +18,7 @@ import java.util.UUID
 class FeedbackDocumentController(
     private val listMyReadableFeedbackDocumentsUseCase: ListMyReadableFeedbackDocumentsUseCase,
     private val getReadableFeedbackDocumentUseCase: GetReadableFeedbackDocumentUseCase,
+    private val getHostFeedbackDocumentPreviewUseCase: GetHostFeedbackDocumentPreviewUseCase,
     private val getHostFeedbackDocumentStatusUseCase: GetHostFeedbackDocumentStatusUseCase,
 ) {
     @GetMapping("/api/feedback-documents/me")
@@ -38,6 +40,16 @@ class FeedbackDocumentController(
     ): FeedbackDocumentResponse =
         getReadableFeedbackDocumentUseCase
             .getReadableFeedbackDocument(currentMember, parseSessionId(sessionId))
+            ?.toWebDto()
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+
+    @GetMapping("/api/host/sessions/{sessionId}/feedback-document/preview")
+    fun hostFeedbackDocumentPreview(
+        currentMember: CurrentMember,
+        @PathVariable sessionId: String,
+    ): FeedbackDocumentResponse =
+        getHostFeedbackDocumentPreviewUseCase
+            .getHostFeedbackDocumentPreview(currentMember, parseSessionId(sessionId))
             ?.toWebDto()
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
 

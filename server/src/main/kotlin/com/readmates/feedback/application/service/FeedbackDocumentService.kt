@@ -14,6 +14,7 @@ import com.readmates.feedback.application.model.FeedbackProblemResult
 import com.readmates.feedback.application.model.FeedbackRevealingQuoteResult
 import com.readmates.feedback.application.model.StoredFeedbackDocumentListResult
 import com.readmates.feedback.application.model.StoredFeedbackDocumentResult
+import com.readmates.feedback.application.port.`in`.GetHostFeedbackDocumentPreviewUseCase
 import com.readmates.feedback.application.port.`in`.GetHostFeedbackDocumentStatusUseCase
 import com.readmates.feedback.application.port.`in`.GetReadableFeedbackDocumentUseCase
 import com.readmates.feedback.application.port.`in`.ListMyReadableFeedbackDocumentsUseCase
@@ -30,6 +31,7 @@ class FeedbackDocumentService(
     private val feedbackDocumentStorePort: FeedbackDocumentStorePort,
 ) : ListMyReadableFeedbackDocumentsUseCase,
     GetReadableFeedbackDocumentUseCase,
+    GetHostFeedbackDocumentPreviewUseCase,
     GetHostFeedbackDocumentStatusUseCase {
     private val parser = FeedbackDocumentParser()
 
@@ -72,11 +74,24 @@ class FeedbackDocumentService(
         return document.toResponse(session, parsedDocument)
     }
 
+    override fun getHostFeedbackDocumentPreview(
+        currentMember: CurrentMember,
+        sessionId: UUID,
+    ): FeedbackDocumentResult? {
+        requireHostFeedbackDocumentAccess(currentMember)
+        return feedbackDocumentStorePort.findSession(currentMember.clubId, sessionId)?.let { session ->
+            feedbackDocumentStorePort.findLatestDocument(currentMember.clubId, sessionId)?.let { document ->
+                val parsedDocument = parseStoredDetailDocument(currentMember, document.sourceText)
+                document.toResponse(session, parsedDocument)
+            }
+        }
+    }
+
     override fun getHostFeedbackDocumentStatus(
         currentMember: CurrentMember,
         sessionId: UUID,
     ): FeedbackDocumentStatusResult {
-        requireHostFeedbackDocumentStatusAccess(currentMember)
+        requireHostFeedbackDocumentAccess(currentMember)
         feedbackDocumentStorePort.findReadableSession(currentMember.clubId, sessionId)
             ?: throw FeedbackDocumentException(FeedbackDocumentError.NOT_FOUND, "Feedback session not found")
 
@@ -88,7 +103,7 @@ class FeedbackDocumentService(
         )
     }
 
-    private fun requireHostFeedbackDocumentStatusAccess(currentMember: CurrentMember) {
+    private fun requireHostFeedbackDocumentAccess(currentMember: CurrentMember) {
         if (!currentMember.isHost) {
             throw AccessDeniedException("Host role required")
         }

@@ -22,6 +22,13 @@ interface GetReadableFeedbackDocumentUseCase {
     ): FeedbackDocumentResult?
 }
 
+interface GetHostFeedbackDocumentPreviewUseCase {
+    fun getHostFeedbackDocumentPreview(
+        currentMember: CurrentMember,
+        sessionId: UUID,
+    ): FeedbackDocumentResult?
+}
+
 interface GetHostFeedbackDocumentStatusUseCase {
     fun getHostFeedbackDocumentStatus(
         currentMember: CurrentMember,
