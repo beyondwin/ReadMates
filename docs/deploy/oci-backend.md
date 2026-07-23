@@ -309,13 +309,13 @@ Kafka relay/consumer와 실제 SMTP 발송은 아래 조건이 모두 맞을 때
 알림 생성 시점:
 
 - 다음 책 공개 범위 변경, 피드백 문서·세션 기록 적용, 외부 JSON commit, AI commit은 알림을 자동 생성하지 않습니다. 이 경로는 콘텐츠·revision·apply receipt만 저장하고 현재 콘텐츠 revision을 가진 composer context를 반환합니다.
-- 호스트가 `/app/host/notifications` 또는 콘텐츠 변경 직후 열린 composer에서 수동 발송을 확정하면 선택한 세션과 대상 그룹 기준으로 `NEXT_BOOK_PUBLISHED`, `SESSION_REMINDER_DUE`, `FEEDBACK_DOCUMENT_PUBLISHED` 이벤트를 만듭니다. 이 경우에도 최종 발송은 `notification_event_outbox` → Kafka relay/consumer → `notification_deliveries`/`member_notifications` 파이프라인을 사용합니다.
+- 호스트가 `/app/host/notifications` 또는 콘텐츠 변경 직후 열린 composer에서 수동 발송을 확정하면 선택한 세션과 대상 그룹 기준으로 `NEXT_BOOK_PUBLISHED`, `SESSION_REMINDER_DUE`, `FEEDBACK_DOCUMENT_PUBLISHED`, `SESSION_RECORD_UPDATED` 이벤트를 만듭니다. 이 경우에도 최종 발송은 `notification_event_outbox` → Kafka relay/consumer → `notification_deliveries`/`member_notifications` 파이프라인을 사용합니다.
 - 클럽별 `sessionReminderEnabled` 정책을 호스트가 명시적으로 켠 경우에만 daily scheduler가 해당 날짜의 `SESSION_REMINDER_DUE` outbox row를 만듭니다. 정책 row가 없거나 꺼져 있으면 만들지 않으며 같은 날짜의 재실행은 dedupe됩니다.
 - 멤버가 발행된 공개 회차에 공개 서평을 저장하면 `REVIEW_PUBLISHED` 알림을 생성합니다. 이 알림은 멤버가 직접 켜야 하는 opt-in 알림입니다.
 
 멤버 알림 설정 기본값:
 
-- 기존 운영 알림(`NEXT_BOOK_PUBLISHED`, `SESSION_REMINDER_DUE`, `FEEDBACK_DOCUMENT_PUBLISHED`)은 기본 켜짐입니다.
+- 운영 알림 `NEXT_BOOK_PUBLISHED`, `SESSION_REMINDER_DUE`, `FEEDBACK_DOCUMENT_PUBLISHED`, `SESSION_RECORD_UPDATED`는 선호도 row가 없을 때 기본 켜짐입니다. `FEEDBACK_DOCUMENT_PUBLISHED`와 `SESSION_RECORD_UPDATED`는 같은 `feedback_document_published_enabled` 멤버 선호도를 공유합니다.
 - 서평 공개 알림(`REVIEW_PUBLISHED`)은 기본 꺼짐입니다.
 
 Relay/consumer 처리 기준:
@@ -335,7 +335,7 @@ Email delivery dispatch/worker retry 간격은 `READMATES_NOTIFICATION_RETRY_DEL
 - Host dashboard의 알림 섹션에서 pending/failed/dead/sentLast24h를 확인합니다.
 - 호스트 알림 운영 페이지는 `/app/host/notifications`입니다.
 - 호스트 알림 운영 페이지에서 현재 host club의 event outbox와 channel delivery ledger를 확인하고, pending/failed email delivery를 처리하며, `DEAD` email delivery를 retry 가능한 상태로 복구할 수 있습니다.
-- 같은 페이지와 콘텐츠 변경 직후 열린 composer에서 세션, 템플릿, 대상 그룹, 채널을 선택한 뒤 preview와 confirm을 거쳐 알림 이벤트를 만들 수 있습니다. 이벤트별 기본 대상은 다음 책·리마인더의 `ALL_ACTIVE_MEMBERS`, 피드백 문서·세션 기록의 `CONFIRMED_ATTENDEES`이고 기본 채널은 모두 `BOTH`입니다. `SELECTED_MEMBERS`는 호스트가 명시적으로 선택해야 하며 현재 클럽의 중복 없는 활성 membership을 한 명 이상 요구합니다. Preview는 현재 `contentRevision`과 함께 10분 TTL로 저장되며, stale revision이나 같은 세션/템플릿/revision의 최근 수동 발송은 재-preview 또는 명시적 재발송 확인을 요구합니다.
+- 같은 페이지와 콘텐츠 변경 직후 열린 composer에서 세션, 템플릿, 대상 그룹, 채널을 선택한 뒤 preview와 confirm을 거쳐 알림 이벤트를 만들 수 있습니다. 이벤트별 기본 대상은 `NEXT_BOOK_PUBLISHED`·`SESSION_REMINDER_DUE`의 `ALL_ACTIVE_MEMBERS`, `FEEDBACK_DOCUMENT_PUBLISHED`·`SESSION_RECORD_UPDATED`의 `CONFIRMED_ATTENDEES`이고 기본 채널은 모두 `BOTH`입니다. 피드백 문서와 세션 기록은 전달 계획에서도 같은 `feedback_document_published_enabled` 멤버 선호도를 사용합니다. `SELECTED_MEMBERS`는 호스트가 명시적으로 선택해야 하며 현재 클럽의 중복 없는 활성 membership을 한 명 이상 요구합니다. Preview는 현재 `contentRevision`과 함께 10분 TTL로 저장되며, stale revision이나 같은 세션/템플릿/revision의 최근 수동 발송은 재-preview 또는 명시적 재발송 확인을 요구합니다.
 - 같은 페이지의 리마인더 정책은 기본 꺼짐입니다. Host `GET/PUT /api/host/notifications/policy`가 `sessionReminderEnabled=true`를 저장한 클럽만 scheduler 자동 outbox 생성 대상입니다.
 - 호스트 알림 운영 페이지에서 redesigned template helper를 쓰는 테스트 메일을 보낼 수 있습니다. 테스트 메일 copy는 별도 문구를 사용하고 CTA/deep link는 포함하지 않습니다. 테스트 메일 audit은 masked recipient email과 hash만 저장하고 raw recipient email은 저장하지 않습니다.
 - Host dashboard의 수동 처리 action은 현재 host club의 pending/failed 알림만 처리합니다.

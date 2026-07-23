@@ -83,7 +83,7 @@ Tag-triggered `Deploy Front`, tag-triggered `Deploy Server Image`, GHCR image sc
 - Session history reads do not create legacy decision rows.
 - No architecture-test baseline or exception file changed.
 - No deploy workflow trigger or permission widening was found. The CI change fail-closes partial private-guidance source contracts.
-- The private-data/token/local-path scan covered all 165 added, copied, modified, or renamed tracked files in `origin/main..HEAD`. The broad phrase scan returned one intentional negative assertion, `doesNotContain("BEGIN PRIVATE KEY")`, which contains no delimiter or payload. The precise token-shaped scan using a delimited PEM header returned no findings.
+- The complete `origin/main..HEAD` diff contains 168 paths: 165 added, copied, modified, or renamed paths plus 3 deletions. The private-data/token/local-path scan covered the 165 paths present at HEAD; deleted paths cannot introduce current-tree values. The broad phrase scan returned one intentional negative assertion, `doesNotContain("BEGIN PRIVATE KEY")`, which contains no delimiter or payload. The precise token-shaped scan using a delimited PEM header returned no findings.
 - `readmates.host-action-confirmation.required` controls staged session-record capability exposure only; it does not control dispatch.
 
 ## Migration and API Contract
@@ -112,10 +112,10 @@ Review path:
 
 Focused evidence:
 
-- Manual notification Playwright: 10 passed, including zero-row preview, explicit defaults, selected-recipient rejection, stale/expired preview, retry idempotency, and explicit resend.
+- Manual notification Playwright: 10 passed, including zero-row preview, the reminder template's explicit `ALL_ACTIVE_MEMBERS`/`BOTH` defaults, selected-recipient rejection, stale/expired preview, retry idempotency, and explicit resend.
 - AI commit Playwright: 3 passed, with no notification dialog or mutation request after commit.
 - Composer/controller/editor Vitest: 3 files and 18 tests passed.
-- Focused session-record/manual-policy server unit tests: passed.
+- `NotificationManualDispatchModelsTest.manual template defaults match host workflow decisions` binds all four event-specific server defaults; `HostManualNotificationServiceTest.options expose event defaults allowed selected audience and current revisions` binds feedback/session-record options and `BOTH`; the frontend `host-notification-composer-model.test.ts` case `uses the event-specific recommended audience` binds next-book, feedback, and session-record composer choices.
 - Focused controller, dispatch, outbox, feedback, delivery-planning, and history integration tests: passed.
 - Policy CSRF regression: 4 tests passed.
 
@@ -131,7 +131,7 @@ Canonical local evidence:
 - The earlier `./scripts/pre-push-check.sh --full --no-release` pass remains historical complementary evidence only; it is not used to close the prior `CHECK_FAILURE`.
 - Independent `./scripts/build-public-release-candidate.sh` and `./scripts/public-release-check.sh .tmp/public-release-candidate` reruns passed after the exact gate; gitleaks found no leaks.
 - `git diff --check origin/main..HEAD` — passed.
-- The full `origin/main..HEAD` targeted scan inspected 165 tracked changed files. One broad-pattern match was the negative security assertion described above; the precise private/token/local-path pattern returned no findings.
+- The full `origin/main..HEAD` diff contains 168 paths: the targeted scan inspected all 165 added, copied, modified, or renamed paths present at HEAD, while 3 deleted paths were counted separately. One broad-pattern match was the negative security assertion described above; the precise private/token/local-path pattern returned no findings.
 - `git tag --list v2.0.0` returned no tag, and the tag-ref digest remained `a8071d68c3691234ecaec50982780ab762582d853aad5d44d16f75c300c45190` before and after release preparation.
 
 Residual release-operation risk remains until remote CI passes on the pushed commit, both tag workflows succeed, V42 is observed in production Flyway history before traffic promotion, and sanitized BFF/OAuth/notification smoke succeeds. Passing local tests is evidence for review readiness, not proof that those production steps have completed.
