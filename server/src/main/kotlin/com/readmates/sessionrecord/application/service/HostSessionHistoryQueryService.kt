@@ -25,7 +25,7 @@ class HostSessionHistoryQueryService(
         pageRequest: PageRequest,
     ): CursorPage<HostSessionHistoryItem> {
         if (!host.isHost) throw AccessDeniedException("Host role required")
-        val cursor = pageRequest.cursor.toHistoryCursor()
+        val cursor = pageRequest.cursor.toHistoryCursor(host.clubId, sessionId)
         val sourceLimit = pageRequest.limit + 1
         val rows =
             (
@@ -38,7 +38,7 @@ class HostSessionHistoryQueryService(
             items = visible,
             nextCursor =
                 if (rows.size > pageRequest.limit) {
-                    visible.lastOrNull()?.toHistoryCursor()
+                    visible.lastOrNull()?.toHistoryCursor(host.clubId, sessionId)
                 } else {
                     null
                 },
@@ -62,22 +62,49 @@ internal val HostSessionHistoryType.typeSort: Int
             HostSessionHistoryType.NOTIFICATION_SKIPPED -> NOTIFICATION_SKIPPED_SORT
         }
 
-private fun Map<String, String>.toHistoryCursor(): HostSessionHistoryCursor? {
+private fun Map<String, String>.toHistoryCursor(
+    expectedClubId: UUID,
+    expectedSessionId: UUID,
+): HostSessionHistoryCursor? {
     if (isEmpty()) return null
-    if (keys != setOf("createdAt", "typeSort", "id")) throw InvalidHostSessionCursorException()
-    val createdAt = get("createdAt")?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
-    val typeSort = get("typeSort")?.toIntOrNull()
-    val id = get("id")?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-    if (createdAt == null || typeSort == null || id == null) throw InvalidHostSessionCursorException()
+    if (keys != setOf("createdAt", "typeSort", "id", "clubId", "sessionId")) {
+        invalidCursor()
+    }
+    val createdAt =
+        get("createdAt")
+            ?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
+            ?: invalidCursor()
+    val typeSort = get("typeSort")?.toIntOrNull() ?: invalidCursor()
+    val id =
+        get("id")
+            ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+            ?: invalidCursor()
+    val clubId =
+        get("clubId")
+            ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+            ?: invalidCursor()
+    if (clubId != expectedClubId) invalidCursor()
+    val sessionId =
+        get("sessionId")
+            ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+            ?: invalidCursor()
+    if (sessionId != expectedSessionId) invalidCursor()
     return HostSessionHistoryCursor(createdAt, typeSort, id)
 }
 
-private fun HostSessionHistoryItem.toHistoryCursor(): String? =
+private fun invalidCursor(): Nothing = throw InvalidHostSessionCursorException()
+
+private fun HostSessionHistoryItem.toHistoryCursor(
+    clubId: UUID,
+    sessionId: UUID,
+): String? =
     CursorCodec.encode(
         mapOf(
             "createdAt" to createdAt.toString(),
             "typeSort" to type.typeSort.toString(),
             "id" to id.toString(),
+            "clubId" to clubId.toString(),
+            "sessionId" to sessionId.toString(),
         ),
     )
 

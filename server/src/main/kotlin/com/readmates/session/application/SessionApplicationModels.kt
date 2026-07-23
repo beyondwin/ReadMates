@@ -170,6 +170,7 @@ data class HostSessionListQuery(
     val search: String? = null,
     val state: String? = null,
     val recordStatus: SessionRecordStatus? = null,
+    val needsAttention: Boolean? = null,
 )
 
 data class HostSessionBasicAuditSnapshot(

@@ -1,5 +1,6 @@
 package com.readmates.session.api
 
+import com.readmates.shared.paging.CursorCodec
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -295,6 +296,114 @@ class HostSessionControllerDbTest(
                 jsonPath("$.items[0].hasDraft") { value(true) }
                 jsonPath("$.items[0].draftRevision") { value(1) }
             }
+    }
+
+    @Test
+    fun `host list explicitly filters attention for not started draft and open sessions`() {
+        val sessionId = createDraftSessionSeven()
+        updateSessionState(sessionId, "OPEN")
+        updateSessionState(sessionId, "CLOSED")
+
+        mockMvc
+            .get("/api/host/sessions") {
+                with(user("host@example.com"))
+                param("search", "7")
+                param("needsAttention", "true")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items.length()") { value(1) }
+                jsonPath("$.items[0].sessionId") { value(sessionId) }
+                jsonPath("$.items[0].recordStatus") { value("NOT_STARTED") }
+                jsonPath("$.items[0].needsAttention") { value(true) }
+            }
+
+        insertRecordDraft(sessionId)
+        mockMvc
+            .get("/api/host/sessions") {
+                with(user("host@example.com"))
+                param("search", "7")
+                param("needsAttention", "true")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items[0].recordStatus") { value("INCOMPLETE") }
+                jsonPath("$.items[0].hasDraft") { value(true) }
+            }
+
+        updateSessionState(sessionId, "OPEN")
+        mockMvc
+            .get("/api/host/sessions") {
+                with(user("host@example.com"))
+                param("search", "7")
+                param("needsAttention", "false")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items.length()") { value(1) }
+                jsonPath("$.items[0].sessionId") { value(sessionId) }
+                jsonPath("$.items[0].needsAttention") { value(false) }
+            }
+    }
+
+    @Test
+    fun `host list rejects malformed query bound and cross club cursors`() {
+        createDraftSessionSeven()
+        createDraftSessionEight()
+
+        mockMvc
+            .get("/api/host/sessions") {
+                with(user("host@example.com"))
+                param("cursor", "not-a-cursor")
+            }.andExpect {
+                status { isBadRequest() }
+                jsonPath("$.code") { value("INVALID_CURSOR") }
+            }
+
+        val response =
+            mockMvc
+                .get("/api/host/sessions") {
+                    with(user("host@example.com"))
+                    param("limit", "1")
+                }.andExpect {
+                    status { isOk() }
+                }.andReturn()
+                .response
+                .contentAsString
+        val cursor =
+            """"nextCursor"\s*:\s*"([^"]+)""""
+                .toRegex()
+                .find(response)
+                ?.groupValues
+                ?.get(1)
+                ?: error("paged host session response did not include a next cursor")
+
+        mockMvc
+            .get("/api/host/sessions") {
+                with(user("host@example.com"))
+                param("limit", "1")
+                param("cursor", cursor)
+                param("needsAttention", "true")
+            }.andExpect {
+                status { isBadRequest() }
+                jsonPath("$.code") { value("INVALID_CURSOR") }
+            }
+
+        val decoded = CursorCodec.decode(cursor) ?: error("host session cursor did not decode")
+        val crossClubCursor =
+            CursorCodec.encode(decoded + ("clubId" to "00000000-0000-0000-0000-000000000002"))
+                ?: error("cross-club cursor did not encode")
+        val malformedIdCursor =
+            CursorCodec.encode(decoded + ("id" to "not-a-uuid"))
+                ?: error("malformed-id cursor did not encode")
+        listOf(crossClubCursor, malformedIdCursor).forEach { invalidCursor ->
+            mockMvc
+                .get("/api/host/sessions") {
+                    with(user("host@example.com"))
+                    param("limit", "1")
+                    param("cursor", invalidCursor)
+                }.andExpect {
+                    status { isBadRequest() }
+                    jsonPath("$.code") { value("INVALID_CURSOR") }
+                }
+        }
     }
 
     @Test

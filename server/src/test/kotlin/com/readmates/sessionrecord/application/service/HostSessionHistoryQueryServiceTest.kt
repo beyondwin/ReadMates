@@ -43,8 +43,10 @@ class HostSessionHistoryQueryServiceTest {
             HostSessionHistoryType.RECORD_REVISION_APPLIED,
         )
         val cursor = CursorCodec.decode(page.nextCursor)
-        assertThat(cursor).containsOnlyKeys("createdAt", "typeSort", "id")
+        assertThat(cursor).containsOnlyKeys("createdAt", "typeSort", "id", "clubId", "sessionId")
         assertThat(cursor?.get("typeSort")).isEqualTo("30")
+        assertThat(cursor?.get("clubId")).isEqualTo(CLUB_ID.toString())
+        assertThat(cursor?.get("sessionId")).isEqualTo(SESSION_ID.toString())
     }
 
     @Test
@@ -54,6 +56,8 @@ class HostSessionHistoryQueryServiceTest {
                 "createdAt" to "2026-07-23T10:00Z",
                 "typeSort" to "40",
                 "id" to "00000000-0000-0000-0000-000000000014",
+                "clubId" to CLUB_ID.toString(),
+                "sessionId" to SESSION_ID.toString(),
             )
 
         service.history(host(), SESSION_ID, PageRequest(limit = 10, cursor = cursor))
@@ -81,6 +85,41 @@ class HostSessionHistoryQueryServiceTest {
         assertThat(historyPort.cursors).isEmpty()
     }
 
+    @Test
+    fun `rejects a cursor bound to another club or session without querying sources`() {
+        val baseCursor =
+            mapOf(
+                "createdAt" to "2026-07-23T10:00Z",
+                "typeSort" to "40",
+                "id" to "00000000-0000-0000-0000-000000000014",
+                "clubId" to CLUB_ID.toString(),
+                "sessionId" to SESSION_ID.toString(),
+            )
+
+        assertThatThrownBy {
+            service.history(
+                host(),
+                SESSION_ID,
+                PageRequest(
+                    limit = 10,
+                    cursor = baseCursor + ("clubId" to "00000000-0000-0000-0000-000000000002"),
+                ),
+            )
+        }.isInstanceOf(InvalidHostSessionCursorException::class.java)
+        assertThatThrownBy {
+            service.history(
+                host(),
+                SESSION_ID,
+                PageRequest(
+                    limit = 10,
+                    cursor = baseCursor + ("sessionId" to "00000000-0000-0000-0000-000000000302"),
+                ),
+            )
+        }.isInstanceOf(InvalidHostSessionCursorException::class.java)
+
+        assertThat(historyPort.cursors).isEmpty()
+    }
+
     private fun item(
         id: String,
         type: HostSessionHistoryType,
@@ -96,7 +135,7 @@ class HostSessionHistoryQueryServiceTest {
         CurrentMember(
             userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
             membershipId = HOST_MEMBERSHIP_ID,
-            clubId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
+            clubId = CLUB_ID,
             clubSlug = "history-test",
             email = "history-host@example.test",
             displayName = "History Host",
@@ -134,6 +173,7 @@ class HostSessionHistoryQueryServiceTest {
     }
 
     private companion object {
+        val CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000001")
         val SESSION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000301")
         val HOST_MEMBERSHIP_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000201")
     }

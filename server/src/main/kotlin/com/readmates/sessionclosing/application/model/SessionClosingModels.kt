@@ -123,14 +123,23 @@ object SessionRecordReadinessPolicy {
         oneLinerCount: Int,
         feedbackReady: Boolean,
         hasDraft: Boolean,
-    ): SessionRecordStatus {
-        val recordSaved = recordSaved(summaryPublished, highlightCount, oneLinerCount)
-        return when {
+    ): SessionRecordStatus =
+        recordStatus(
+            recordSaved = recordSaved(summaryPublished, highlightCount, oneLinerCount),
+            feedbackReady = feedbackReady,
+            hasDraft = hasDraft,
+        )
+
+    fun recordStatus(
+        recordSaved: Boolean,
+        feedbackReady: Boolean,
+        hasDraft: Boolean,
+    ): SessionRecordStatus =
+        when {
             recordSaved && feedbackReady && !hasDraft -> SessionRecordStatus.COMPLETE
             recordSaved || feedbackReady || hasDraft -> SessionRecordStatus.INCOMPLETE
             else -> SessionRecordStatus.NOT_STARTED
         }
-    }
 
     fun recordSaved(
         summaryPublished: Boolean,

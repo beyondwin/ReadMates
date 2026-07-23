@@ -102,7 +102,12 @@ internal fun ResultSet.toHostSessionPublication() =
 
 internal fun ResultSet.toHostSessionListItem() =
     getBoolean("has_draft").let { hasDraft ->
-        val recordStatus = SessionRecordStatus.valueOf(getString("record_status"))
+        val recordStatus =
+            SessionRecordReadinessPolicy.recordStatus(
+                recordSaved = getBoolean("record_saved"),
+                feedbackReady = getBoolean("feedback_ready"),
+                hasDraft = hasDraft,
+            )
         HostSessionListItem(
             sessionId = uuid("id").toString(),
             sessionNumber = getInt("number"),

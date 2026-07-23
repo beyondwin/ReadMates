@@ -1,6 +1,7 @@
 package com.readmates.session.adapter.`in`.web
 
 import com.readmates.session.application.HostSessionListQuery
+import com.readmates.session.application.InvalidHostSessionCursorException
 import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.UpdateHostSessionCommand
@@ -8,9 +9,10 @@ import com.readmates.session.application.model.UpdateHostSessionVisibilityComman
 import com.readmates.session.application.port.`in`.HostSessionDraftUseCase
 import com.readmates.session.application.port.`in`.HostSessionLifecycleUseCase
 import com.readmates.session.application.port.`in`.HostSessionQueryUseCase
+import com.readmates.sessionrecord.application.model.SessionRecordStatus
+import com.readmates.shared.paging.CursorCodec
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
-import com.readmates.sessionrecord.application.model.SessionRecordStatus
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -57,10 +59,11 @@ class HostSessionController(
         @RequestParam(required = false) search: String?,
         @RequestParam(required = false) state: String?,
         @RequestParam(required = false) recordStatus: SessionRecordStatus?,
+        @RequestParam(required = false) needsAttention: Boolean?,
     ) = hostSessionQueryUseCase.list(
         member,
-        PageRequest.cursor(limit, cursor, defaultLimit = 50, maxLimit = 100),
-        HostSessionListQuery(search, state, recordStatus),
+        PageRequest.cursor(limit, requireValidCursor(cursor), defaultLimit = 50, maxLimit = 100),
+        HostSessionListQuery(search, state, recordStatus, needsAttention),
     )
 
     @GetMapping("/{sessionId}")
@@ -118,6 +121,13 @@ class HostSessionController(
         member: CurrentMember,
         @PathVariable sessionId: String,
     ) = hostSessionLifecycleUseCase.delete(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
+}
+
+private fun requireValidCursor(cursor: String?): String? {
+    if (!cursor.isNullOrBlank() && CursorCodec.decode(cursor) == null) {
+        throw InvalidHostSessionCursorException()
+    }
+    return cursor
 }
 
 internal fun parseHostSessionId(sessionId: String): UUID =
