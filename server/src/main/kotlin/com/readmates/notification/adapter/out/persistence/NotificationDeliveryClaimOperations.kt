@@ -65,7 +65,7 @@ internal class NotificationDeliveryClaimOperations(
             jdbcTemplate.query(
                 """
                 select id
-                from notification_deliveries
+                from notification_deliveries force index (notification_deliveries_retry_idx)
                 where channel = 'EMAIL'
                   and status in ('PENDING', 'FAILED')
                   and next_attempt_at <= utc_timestamp(6)

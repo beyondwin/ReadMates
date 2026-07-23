@@ -8,9 +8,6 @@ object RedisTestContainer {
     private val container =
         GenericContainer(DockerImageName.parse("redis:7.4-alpine")).apply {
             withExposedPorts(6379)
-            // Local-only opt-in via ~/.testcontainers.properties.
-            // Refs: docs/superpowers/specs/2026-05-16-readmates-build-test-speed-spec.md §4.5
-            withReuse(true)
             start()
         }
 
