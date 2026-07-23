@@ -3,9 +3,11 @@ package com.readmates.sessionrecord.adapter.out.persistence
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.sessionrecord.application.model.SaveSessionRecordDraftCommand
+import com.readmates.sessionrecord.application.model.ApplySessionRecordCommand
 import com.readmates.sessionrecord.application.model.SessionRecordEntry
 import com.readmates.sessionrecord.application.model.SessionRecordFeedbackDocument
 import com.readmates.sessionrecord.application.model.SessionRecordSnapshot
+import com.readmates.notification.domain.NotificationEventType
 import com.readmates.sessionrecord.application.service.SessionRecordSnapshotCodec
 import com.readmates.shared.security.CurrentMember
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
@@ -189,6 +191,54 @@ class JdbcSessionRecordAdapterTest(
                 fixture.sessionId.toString(),
             ),
         ).containsExactly("BASELINE", "MANUAL")
+    }
+
+    @Test
+    fun `apply receipt replays the same revision and is scoped to its host`() {
+        val fixture = fixture("receipt")
+        val live = requireNotNull(adapter.loadLive(fixture.host, fixture.sessionId))
+        val draft =
+            adapter.insertDraft(
+                fixture.host,
+                live,
+                SaveSessionRecordDraftCommand(fixture.sessionId, fixture.snapshot, null),
+                codec.encode(fixture.snapshot),
+            )
+        val editor = requireNotNull(adapter.lockEditor(fixture.host, fixture.sessionId))
+        adapter.insertBaselineIfAbsent(fixture.host, live, codec.encode(live.snapshot))
+        val revision = adapter.insertAppliedRevision(fixture.host, editor, codec.encode(draft.snapshot))
+        val requestId = UUID.randomUUID()
+        val command =
+            ApplySessionRecordCommand(
+                sessionId = fixture.sessionId,
+                applyRequestId = requestId,
+                expectedDraftRevision = draft.draftRevision,
+                expectedLiveRevision = live.revision,
+                expectedDraftHash = codec.encode(draft.snapshot).sha256,
+            )
+
+        val inserted =
+            adapter.insertApplyReceipt(
+                fixture.host,
+                command,
+                command.expectedDraftHash,
+                NotificationEventType.SESSION_RECORD_UPDATED,
+                revision,
+            )
+
+        assertThat(adapter.findApplyReceipt(fixture.host, requestId)).isEqualTo(inserted)
+        assertThat(
+            adapter.findApplyReceipt(
+                fixture.host.copy(membershipId = UUID.randomUUID()),
+                requestId,
+            ),
+        ).isNull()
+        assertThat(
+            adapter.findApplyReceipt(
+                fixture.host.copy(clubId = UUID.randomUUID()),
+                requestId,
+            ),
+        ).isNull()
     }
 
     @Suppress("LongMethod")

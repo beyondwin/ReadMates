@@ -122,10 +122,18 @@ data class PreviewSessionRecordApplyCommand(
 
 data class ApplySessionRecordCommand(
     val sessionId: UUID,
-    val previewId: UUID,
+    val previewId: UUID = UUID(0, 0),
     val expectedDraftRevision: Long,
     val expectedLiveRevision: Long,
-    val notificationDecision: NotificationDecision,
+    val notificationDecision: NotificationDecision = NotificationDecision.SKIP,
+    val applyRequestId: UUID? = null,
+    val expectedDraftHash: String = "",
+)
+
+data class HostNotificationComposerContext(
+    val sessionId: UUID,
+    val eventType: NotificationEventType,
+    val contentRevision: String,
 )
 
 data class SessionRecordApplyPreview(
@@ -158,6 +166,15 @@ data class CompletedSessionRecordApply(
     val notificationDecision: NotificationDecision,
     val decisionId: UUID,
     val eventId: UUID?,
+    val revision: SessionRecordRevision,
+)
+
+data class SessionRecordApplyReceipt(
+    val applyRequestId: UUID,
+    val expectedDraftRevision: Long,
+    val expectedLiveRevision: Long,
+    val draftSha256: String,
+    val composerEventType: NotificationEventType,
     val revision: SessionRecordRevision,
 )
 
