@@ -16,6 +16,7 @@ import com.readmates.notification.application.port.`in`.RecordNotificationEventU
 import com.readmates.notification.application.port.out.StoredHostActionDecision
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.session.application.HostSessionDetailResponse
+import com.readmates.session.application.HostSessionRecordStagingRequiredException
 import com.readmates.session.application.HostSessionVisibilityPreview
 import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.application.model.HostSessionIdCommand
@@ -49,6 +50,7 @@ class HostSessionLifecycleService(
     @Transactional
     override fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionDetailResponse {
         val current = draftPort.lockVisibilitySnapshot(HostSessionIdCommand(command.host, command.sessionId))
+        requireLegacyVisibilityWriteAllowed(current, command.visibility)
         val binding = current.visibilityBinding(command.visibility)
         val decisionCommand = command.toDecisionCommand(binding)
         if (confirmationProperties.required && decisionCommand != null) {
@@ -79,6 +81,17 @@ class HostSessionLifecycleService(
         }
         cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
         return applied.detail
+    }
+
+    private fun requireLegacyVisibilityWriteAllowed(
+        current: HostSessionVisibilitySnapshot,
+        requested: SessionRecordVisibility,
+    ) {
+        if (current.detail.state in setOf("CLOSED", "PUBLISHED") &&
+            current.detail.visibility != requested
+        ) {
+            throw HostSessionRecordStagingRequiredException()
+        }
     }
 
     @Transactional

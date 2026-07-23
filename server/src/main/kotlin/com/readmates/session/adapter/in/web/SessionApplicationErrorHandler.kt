@@ -2,11 +2,13 @@ package com.readmates.session.adapter.`in`.web
 
 import com.readmates.session.application.CurrentSessionNotOpenException
 import com.readmates.session.application.HostSessionCloseNotAllowedException
+import com.readmates.session.application.HostSessionDeletionHistoryExistsException
 import com.readmates.session.application.HostSessionDeletionNotAllowedException
 import com.readmates.session.application.HostSessionNotFoundException
 import com.readmates.session.application.HostSessionOpenNotAllowedException
 import com.readmates.session.application.HostSessionParticipantNotFoundException
 import com.readmates.session.application.HostSessionPublishNotAllowedException
+import com.readmates.session.application.HostSessionRecordStagingRequiredException
 import com.readmates.session.application.InvalidHostSessionCursorException
 import com.readmates.session.application.InvalidMembershipIdException
 import com.readmates.session.application.InvalidQuestionSetException
@@ -21,6 +23,22 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 
 @RestControllerAdvice
 class SessionApplicationErrorHandler {
+    @ExceptionHandler(HostSessionDeletionHistoryExistsException::class)
+    fun handleDeletionHistoryExists(): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            status = HttpStatus.CONFLICT,
+            code = "SESSION_DELETE_HISTORY_EXISTS",
+            message = "적용 기록 또는 알림 확인 이력이 있는 세션은 삭제할 수 없습니다.",
+        )
+
+    @ExceptionHandler(HostSessionRecordStagingRequiredException::class)
+    fun handleStagingRequired(): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            status = HttpStatus.CONFLICT,
+            code = "SESSION_RECORD_STAGING_REQUIRED",
+            message = "종료된 세션 기록은 초안에서 수정한 뒤 적용해 주세요.",
+        )
+
     @ExceptionHandler(
         CurrentSessionNotOpenException::class,
         OpenSessionAlreadyExistsException::class,

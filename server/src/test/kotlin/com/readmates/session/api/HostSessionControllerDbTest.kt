@@ -31,6 +31,13 @@ import java.util.concurrent.TimeUnit
 import javax.sql.DataSource
 
 private const val CLEANUP_GENERATED_SESSIONS_SQL = """
+    update host_action_notification_previews
+    set consumed_at = null, consumed_decision_id = null
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and session_id in (
+        select id from sessions
+        where club_id = '00000000-0000-0000-0000-000000000001' and number >= 7
+      );
     delete from host_action_notification_decisions
     where club_id = '00000000-0000-0000-0000-000000000001'
       and session_id in (
@@ -44,6 +51,12 @@ private const val CLEANUP_GENERATED_SESSIONS_SQL = """
         where club_id = '00000000-0000-0000-0000-000000000001' and number >= 7
       );
     delete from session_record_drafts
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and session_id in (
+        select id from sessions
+        where club_id = '00000000-0000-0000-0000-000000000001' and number >= 7
+      );
+    delete from ai_generation_commit_receipts
     where club_id = '00000000-0000-0000-0000-000000000001'
       and session_id in (
         select id from sessions
@@ -615,7 +628,7 @@ class HostSessionControllerDbTest(
     }
 
     @Test
-    fun `host visibility update syncs existing publication compatibility columns`() {
+    fun `closed session visibility changes require staged record apply`() {
         val sessionId = createDraftSessionSeven()
         // Transition to CLOSED state first so that PUBLIC visibility is valid (DRAFT+PUBLIC violates the invariant)
         updateSessionState(sessionId, "OPEN")
@@ -629,30 +642,14 @@ class HostSessionControllerDbTest(
                 contentType = MediaType.APPLICATION_JSON
                 content = """{"visibility":"PUBLIC"}"""
             }.andExpect {
-                status { isOk() }
-                jsonPath("$.visibility") { value("PUBLIC") }
+                status { isConflict() }
+                jsonPath("$.code") { value("SESSION_RECORD_STAGING_REQUIRED") }
             }
 
         val publicPublication = findPublicationRow(sessionId)
-        assertEquals("PUBLIC", publicPublication["visibility"])
-        assertEquals(true, publicPublication["is_public"])
-        assertNotNull(publicPublication["published_at"])
-
-        mockMvc
-            .patch("/api/host/sessions/$sessionId/visibility") {
-                with(user("host@example.com"))
-                with(csrf())
-                contentType = MediaType.APPLICATION_JSON
-                content = """{"visibility":"HOST_ONLY"}"""
-            }.andExpect {
-                status { isOk() }
-                jsonPath("$.visibility") { value("HOST_ONLY") }
-            }
-
-        val hostOnlyPublication = findPublicationRow(sessionId)
-        assertEquals("HOST_ONLY", hostOnlyPublication["visibility"])
-        assertEquals(false, hostOnlyPublication["is_public"])
-        assertNull(hostOnlyPublication["published_at"])
+        assertEquals("MEMBER", publicPublication["visibility"])
+        assertEquals(false, publicPublication["is_public"])
+        assertNull(publicPublication["published_at"])
     }
 
     @Test
@@ -792,7 +789,6 @@ class HostSessionControllerDbTest(
     @Test
     fun `host publishes closed session with member or public publication`() {
         createSessionSeven()
-        updateSessionState("00000000-0000-0000-0000-000000009777", "CLOSED")
 
         mockMvc
             .put("/api/host/sessions/00000000-0000-0000-0000-000000009777/publication") {
@@ -809,6 +805,7 @@ class HostSessionControllerDbTest(
             }.andExpect {
                 status { isOk() }
             }
+        updateSessionState("00000000-0000-0000-0000-000000009777", "CLOSED")
 
         mockMvc
             .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/publish") {
@@ -865,7 +862,8 @@ class HostSessionControllerDbTest(
                     }
                     """.trimIndent()
             }.andExpect {
-                status { isOk() }
+                status { isConflict() }
+                jsonPath("$.code") { value("SESSION_RECORD_STAGING_REQUIRED") }
             }
 
         mockMvc
@@ -1098,6 +1096,157 @@ class HostSessionControllerDbTest(
                 "email in ('host@example.com', 'member1@example.com', 'member2@example.com', 'member3@example.com', 'member4@example.com', 'member5@example.com')",
             ),
         )
+    }
+
+    @Test
+    @Suppress("LongMethod")
+    fun `immutable record history prevents open session deletion`() {
+        val sessionId = "00000000-0000-0000-0000-000000009777"
+        createSessionSeven()
+        jdbcTemplate.update(
+            """
+            insert into session_record_revisions (
+              id, session_id, club_id, version, source, snapshot_json, snapshot_sha256,
+              applied_by_membership_id
+            ) values (?, ?, ?, 1, 'BASELINE', '{}', ?, ?)
+            """.trimIndent(),
+            "00000000-0000-0000-0000-000000009901",
+            sessionId,
+            "00000000-0000-0000-0000-000000000001",
+            "a".repeat(64),
+            "00000000-0000-0000-0000-000000000201",
+        )
+        jdbcTemplate.update(
+            """
+            insert into host_action_notification_previews (
+              id, club_id, session_id, host_membership_id, action_type, event_type, request_hash,
+              expected_live_revision, target_count, expected_in_app_count, expected_email_count,
+              excluded_count, expires_at
+            ) values (?, ?, ?, ?, 'RECORD_APPLY', 'SESSION_RECORD_UPDATED', ?, 1, 0, 0, 0, 0,
+                      timestampadd(hour, 1, utc_timestamp(6)))
+            """.trimIndent(),
+            "00000000-0000-0000-0000-000000009905",
+            "00000000-0000-0000-0000-000000000001",
+            sessionId,
+            "00000000-0000-0000-0000-000000000201",
+            "d".repeat(64),
+        )
+        jdbcTemplate.update(
+            """
+            insert into host_action_notification_decisions (
+              id, preview_id, club_id, session_id, host_membership_id, action_type, event_type,
+              live_revision, decision, target_count, expected_in_app_count, expected_email_count,
+              excluded_count
+            ) values (?, ?, ?, ?, ?, 'RECORD_APPLY', 'SESSION_RECORD_UPDATED', 1, 'SKIP', 0, 0, 0, 0)
+            """.trimIndent(),
+            "00000000-0000-0000-0000-000000009906",
+            "00000000-0000-0000-0000-000000009905",
+            "00000000-0000-0000-0000-000000000001",
+            sessionId,
+            "00000000-0000-0000-0000-000000000201",
+        )
+        jdbcTemplate.update(
+            """
+            update host_action_notification_previews
+            set consumed_at = utc_timestamp(6),
+                consumed_decision_id = ?
+            where id = ?
+            """.trimIndent(),
+            "00000000-0000-0000-0000-000000009906",
+            "00000000-0000-0000-0000-000000009905",
+        )
+
+        mockMvc
+            .get("/api/host/sessions/$sessionId/deletion-preview") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.canDelete") { value(false) }
+            }
+        mockMvc
+            .delete("/api/host/sessions/$sessionId") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("SESSION_DELETE_HISTORY_EXISTS") }
+            }
+        assertEquals(1, countRows("sessions", "id = '$sessionId'"))
+        assertEquals(1, countRows("host_action_notification_decisions", "session_id = '$sessionId'"))
+    }
+
+    @Test
+    @Suppress("LongMethod")
+    fun `open deletion removes ephemeral draft audit preview and AI receipt rows transactionally`() {
+        val sessionId = "00000000-0000-0000-0000-000000009777"
+        val clubId = "00000000-0000-0000-0000-000000000001"
+        val hostMembershipId = "00000000-0000-0000-0000-000000000201"
+        createSessionSeven()
+        jdbcTemplate.update(
+            """
+            insert into session_record_drafts (
+              session_id, club_id, base_live_revision, draft_revision, source, snapshot_json,
+              snapshot_sha256, updated_by_membership_id
+            ) values (?, ?, 0, 1, 'MANUAL', '{}', ?, ?)
+            """.trimIndent(),
+            sessionId,
+            clubId,
+            "b".repeat(64),
+            hostMembershipId,
+        )
+        jdbcTemplate.update(
+            """
+            insert into host_session_change_audit (
+              id, club_id, session_id, actor_membership_id, action_type, changed_fields_json
+            ) values (?, ?, ?, ?, 'BASIC_INFO_UPDATED', '{}')
+            """.trimIndent(),
+            "00000000-0000-0000-0000-000000009902",
+            clubId,
+            sessionId,
+            hostMembershipId,
+        )
+        jdbcTemplate.update(
+            """
+            insert into host_action_notification_previews (
+              id, club_id, session_id, host_membership_id, action_type, event_type, request_hash,
+              expected_live_revision, target_count, expected_in_app_count, expected_email_count,
+              excluded_count, expires_at
+            ) values (?, ?, ?, ?, 'RECORD_APPLY', 'SESSION_RECORD_UPDATED', ?, 0, 0, 0, 0, 0,
+                      timestampadd(hour, 1, utc_timestamp(6)))
+            """.trimIndent(),
+            "00000000-0000-0000-0000-000000009903",
+            clubId,
+            sessionId,
+            hostMembershipId,
+            "c".repeat(64),
+        )
+        jdbcTemplate.update(
+            """
+            insert into ai_generation_commit_receipts (
+              job_id, revision, session_id, club_id, committed_at
+            ) values (?, 1, ?, ?, utc_timestamp(6))
+            """.trimIndent(),
+            "00000000-0000-0000-0000-000000009904",
+            sessionId,
+            clubId,
+        )
+
+        mockMvc
+            .delete("/api/host/sessions/$sessionId") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+            }
+
+        listOf(
+            "session_record_drafts",
+            "host_session_change_audit",
+            "host_action_notification_previews",
+            "ai_generation_commit_receipts",
+        ).forEach { table ->
+            assertEquals(0, countRows(table, "session_id = '$sessionId'"), table)
+        }
     }
 
     @Test

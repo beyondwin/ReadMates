@@ -9,6 +9,7 @@ import com.readmates.session.application.HostSessionNotFoundException
 import com.readmates.session.application.HostSessionOpenNotAllowedException
 import com.readmates.session.application.HostSessionParticipantNotFoundException
 import com.readmates.session.application.HostSessionPublishNotAllowedException
+import com.readmates.session.application.HostSessionRecordStagingRequiredException
 import com.readmates.session.application.InvalidMembershipIdException
 import com.readmates.session.application.InvalidSessionScheduleException
 import com.readmates.session.application.OpenSessionAlreadyExistsException
@@ -265,6 +266,7 @@ internal class HostSessionWriteOperations(
         command: UpsertPublicationCommand,
     ): HostPublicationResponse {
         queries.requireHostSession(jdbcTemplate, command.host, command.sessionId)
+        requireLegacyPublicationWriteAllowed(jdbcTemplate, command)
         val isPublic = command.visibility == SessionRecordVisibility.PUBLIC
         jdbcTemplate.update(
             """
@@ -319,6 +321,27 @@ internal class HostSessionWriteOperations(
             publicSummary = command.publicSummary,
             visibility = command.visibility,
         )
+    }
+
+    private fun requireLegacyPublicationWriteAllowed(
+        jdbcTemplate: JdbcTemplate,
+        command: UpsertPublicationCommand,
+    ) {
+        val state =
+            jdbcTemplate.queryForObject(
+                """
+                select state
+                from sessions
+                where id = ? and club_id = ?
+                for update
+                """.trimIndent(),
+                String::class.java,
+                command.sessionId.dbString(),
+                command.host.clubId.dbString(),
+            ) ?: throw HostSessionNotFoundException()
+        if (state == "CLOSED" || state == "PUBLISHED") {
+            throw HostSessionRecordStagingRequiredException()
+        }
     }
 
     fun updateVisibility(

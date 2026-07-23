@@ -35,6 +35,7 @@ import com.readmates.session.application.HostSessionFeedbackDocument
 import com.readmates.session.application.HostSessionListPage
 import com.readmates.session.application.HostSessionListQuery
 import com.readmates.session.application.HostSessionListSummary
+import com.readmates.session.application.HostSessionRecordStagingRequiredException
 import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.model.AttendanceEntryCommand
@@ -117,6 +118,23 @@ class HostSessionServicesTest {
         service.updateVisibility(command)
 
         assertEquals(command, port.visibilityCommand)
+    }
+
+    @Test
+    fun `closed session visibility changes require the staged record workflow`() {
+        val port =
+            RecordingHostSessionPorts().apply {
+                visibilityState = "CLOSED"
+                currentVisibility = SessionRecordVisibility.MEMBER
+            }
+        val service = HostSessionLifecycleService(port, port, port)
+
+        assertThrows(HostSessionRecordStagingRequiredException::class.java) {
+            service.updateVisibility(
+                UpdateHostSessionVisibilityCommand(host, sessionId, SessionRecordVisibility.PUBLIC),
+            )
+        }
+        assertThat(port.visibilityCommand).isNull()
     }
 
     @Test

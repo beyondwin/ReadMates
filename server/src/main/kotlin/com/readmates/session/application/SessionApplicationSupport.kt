@@ -30,6 +30,12 @@ class HostSessionParticipantNotFoundException : RuntimeException("Host session p
 
 class HostSessionDeletionNotAllowedException : RuntimeException("Only open sessions can be deleted")
 
+class HostSessionDeletionHistoryExistsException :
+    RuntimeException("Sessions with immutable record or notification decision history cannot be deleted")
+
+class HostSessionRecordStagingRequiredException :
+    RuntimeException("Closed and published session records must be changed through a staged draft")
+
 class HostSessionOpenNotAllowedException : RuntimeException("Only draft sessions can be opened")
 
 class HostSessionCloseNotAllowedException : RuntimeException("Only open sessions can be closed")

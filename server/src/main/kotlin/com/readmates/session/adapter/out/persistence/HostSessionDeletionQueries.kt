@@ -1,6 +1,7 @@
 package com.readmates.session.adapter.out.persistence
 
 import com.readmates.session.application.HostSessionDeletionCounts
+import com.readmates.session.application.HostSessionDeletionHistoryExistsException
 import com.readmates.session.application.HostSessionDeletionNotAllowedException
 import com.readmates.session.application.HostSessionDeletionPreviewResponse
 import com.readmates.session.application.HostSessionDeletionResponse
@@ -32,13 +33,14 @@ class HostSessionDeletionQueries(
         requireHost(member)
         val target = findDeletionTarget(jdbcTemplate, member, sessionId, lock = false)
         requireOpenDeletionTarget(target)
+        val hasDurableHistory = hasDurableHistory(jdbcTemplate, member.clubId, sessionId)
 
         return HostSessionDeletionPreviewResponse(
             sessionId = target.sessionId.toString(),
             sessionNumber = target.sessionNumber,
             title = target.title,
             state = target.state,
-            canDelete = true,
+            canDelete = !hasDurableHistory,
             counts = countSessionDeletionRows(jdbcTemplate, member.clubId, sessionId),
         )
     }
@@ -51,6 +53,9 @@ class HostSessionDeletionQueries(
         requireHost(member)
         val target = findDeletionTarget(jdbcTemplate, member, sessionId, lock = true)
         requireOpenDeletionTarget(target)
+        if (hasDurableHistory(jdbcTemplate, member.clubId, sessionId)) {
+            throw HostSessionDeletionHistoryExistsException()
+        }
         val counts = countSessionDeletionRows(jdbcTemplate, member.clubId, sessionId)
 
         deleteSessionOwnedRows(jdbcTemplate, member.clubId, sessionId)
@@ -210,11 +215,55 @@ class HostSessionDeletionQueries(
             sessionId.dbString(),
         ) ?: 0
 
+    private fun hasDurableHistory(
+        jdbcTemplate: JdbcTemplate,
+        clubId: UUID,
+        sessionId: UUID,
+    ): Boolean =
+        jdbcTemplate.queryForObject(
+            """
+            select exists(
+              select 1
+              from session_record_revisions
+              where club_id = ? and session_id = ?
+              union all
+              select 1
+              from host_action_notification_decisions
+              where club_id = ? and session_id = ?
+            )
+            """.trimIndent(),
+            Boolean::class.java,
+            clubId.dbString(),
+            sessionId.dbString(),
+            clubId.dbString(),
+            sessionId.dbString(),
+        ) == true
+
     private fun deleteSessionOwnedRows(
         jdbcTemplate: JdbcTemplate,
         clubId: UUID,
         sessionId: UUID,
     ) {
+        jdbcTemplate.update(
+            "delete from ai_generation_commit_receipts where club_id = ? and session_id = ?",
+            clubId.dbString(),
+            sessionId.dbString(),
+        )
+        jdbcTemplate.update(
+            "delete from host_action_notification_previews where club_id = ? and session_id = ?",
+            clubId.dbString(),
+            sessionId.dbString(),
+        )
+        jdbcTemplate.update(
+            "delete from session_record_drafts where club_id = ? and session_id = ?",
+            clubId.dbString(),
+            sessionId.dbString(),
+        )
+        jdbcTemplate.update(
+            "delete from host_session_change_audit where club_id = ? and session_id = ?",
+            clubId.dbString(),
+            sessionId.dbString(),
+        )
         jdbcTemplate.update("delete from feedback_reports where club_id = ? and session_id = ?", clubId.dbString(), sessionId.dbString())
         jdbcTemplate.update(
             "delete from session_feedback_documents where club_id = ? and session_id = ?",
