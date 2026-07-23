@@ -146,40 +146,48 @@ data class SendNotificationTestMailRequest(
 data class ManualNotificationSelectionRequest(
     val sessionId: UUID,
     val eventType: NotificationEventType,
+    val contentRevision: String,
     val audience: ManualNotificationAudience,
     val requestedChannels: ManualNotificationRequestedChannels,
-    val excludedMembershipIds: List<UUID> = emptyList(),
-    val includedMembershipIds: List<UUID> = emptyList(),
-    val sendMode: ManualNotificationSendMode = ManualNotificationSendMode.NOW,
+    val selectedMembershipIds: List<UUID>? = null,
+    val excludedMembershipIds: List<UUID>? = null,
+    val includedMembershipIds: List<UUID>? = null,
+    val sendMode: ManualNotificationSendMode? = null,
 ) {
     fun toSelection(): ManualNotificationSelection =
         ManualNotificationSelection(
             sessionId = sessionId,
             eventType = eventType,
+            contentRevision = contentRevision,
             audience = audience,
             requestedChannels = requestedChannels,
-            excludedMembershipIds = excludedMembershipIds,
-            includedMembershipIds = includedMembershipIds,
-            sendMode = sendMode,
+            selectedMembershipIds = selectedMembershipIds.orEmpty(),
+            excludedMembershipIds = excludedMembershipIds.orEmpty(),
+            includedMembershipIds = includedMembershipIds.orEmpty(),
+            sendMode = sendMode ?: ManualNotificationSendMode.NOW,
         )
 }
 
 data class ManualNotificationPreviewRequest(
     val sessionId: UUID,
     val eventType: NotificationEventType,
+    val contentRevision: String,
     val audience: ManualNotificationAudience,
     val requestedChannels: ManualNotificationRequestedChannels,
-    val excludedMembershipIds: List<UUID> = emptyList(),
-    val includedMembershipIds: List<UUID> = emptyList(),
-    val sendMode: ManualNotificationSendMode = ManualNotificationSendMode.NOW,
+    val selectedMembershipIds: List<UUID>? = null,
+    val excludedMembershipIds: List<UUID>? = null,
+    val includedMembershipIds: List<UUID>? = null,
+    val sendMode: ManualNotificationSendMode? = null,
 ) {
     fun toCommand(): ManualNotificationPreviewCommand =
         ManualNotificationPreviewCommand(
             ManualNotificationSelectionRequest(
                 sessionId = sessionId,
                 eventType = eventType,
+                contentRevision = contentRevision,
                 audience = audience,
                 requestedChannels = requestedChannels,
+                selectedMembershipIds = selectedMembershipIds,
                 excludedMembershipIds = excludedMembershipIds,
                 includedMembershipIds = includedMembershipIds,
                 sendMode = sendMode,
@@ -191,12 +199,14 @@ data class ManualNotificationConfirmRequest(
     val previewId: UUID,
     val sessionId: UUID,
     val eventType: NotificationEventType,
+    val contentRevision: String,
     val audience: ManualNotificationAudience,
     val requestedChannels: ManualNotificationRequestedChannels,
-    val excludedMembershipIds: List<UUID> = emptyList(),
-    val includedMembershipIds: List<UUID> = emptyList(),
-    val sendMode: ManualNotificationSendMode = ManualNotificationSendMode.NOW,
-    val resendConfirmed: Boolean = false,
+    val selectedMembershipIds: List<UUID>? = null,
+    val excludedMembershipIds: List<UUID>? = null,
+    val includedMembershipIds: List<UUID>? = null,
+    val sendMode: ManualNotificationSendMode? = null,
+    val resendConfirmed: Boolean? = null,
 ) {
     fun toCommand(): ManualNotificationConfirmCommand =
         ManualNotificationConfirmCommand(
@@ -205,13 +215,15 @@ data class ManualNotificationConfirmRequest(
                 ManualNotificationSelectionRequest(
                     sessionId = sessionId,
                     eventType = eventType,
+                    contentRevision = contentRevision,
                     audience = audience,
                     requestedChannels = requestedChannels,
+                    selectedMembershipIds = selectedMembershipIds,
                     excludedMembershipIds = excludedMembershipIds,
                     includedMembershipIds = includedMembershipIds,
                     sendMode = sendMode,
                 ).toSelection(),
-            resendConfirmed = resendConfirmed,
+            resendConfirmed = resendConfirmed ?: false,
         )
 }
 
@@ -278,6 +290,7 @@ data class ManualNotificationSessionSummaryResponse(
 data class ManualNotificationTemplateOptionResponse(
     val eventType: NotificationEventType,
     val label: String,
+    val contentRevision: String,
     val enabled: Boolean,
     val disabledReason: String?,
     val defaultAudience: ManualNotificationAudience,
@@ -431,6 +444,7 @@ fun ManualNotificationOptions.toResponse(): ManualNotificationOptionsResponse =
                 ManualNotificationTemplateOptionResponse(
                     eventType = it.eventType,
                     label = it.label,
+                    contentRevision = it.contentRevision,
                     enabled = it.enabled,
                     disabledReason = it.disabledReason,
                     defaultAudience = it.defaultAudience,

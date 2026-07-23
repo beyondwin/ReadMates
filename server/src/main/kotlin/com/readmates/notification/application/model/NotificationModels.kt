@@ -121,6 +121,7 @@ enum class ManualNotificationAudience {
     ALL_ACTIVE_MEMBERS,
     SESSION_PARTICIPANTS,
     CONFIRMED_ATTENDEES,
+    SELECTED_MEMBERS,
 }
 
 enum class ManualNotificationRequestedChannels {
@@ -146,6 +147,8 @@ data class NotificationManualDispatchPayload(
     val requestedByMembershipId: UUID,
     val requestedChannels: ManualNotificationRequestedChannels,
     val audience: ManualNotificationAudience,
+    val contentRevision: String? = null,
+    val selectedMembershipIds: List<UUID>? = null,
     val excludedMembershipIds: List<UUID> = emptyList(),
     val includedMembershipIds: List<UUID> = emptyList(),
     val targetMembershipIds: List<UUID> = emptyList(),
@@ -173,11 +176,27 @@ fun allowedManualAudiences(eventType: NotificationEventType): Set<ManualNotifica
     when (eventType) {
         NotificationEventType.NEXT_BOOK_PUBLISHED,
         NotificationEventType.SESSION_REMINDER_DUE,
-        -> setOf(ManualNotificationAudience.ALL_ACTIVE_MEMBERS, ManualNotificationAudience.SESSION_PARTICIPANTS)
+        ->
+            setOf(
+                ManualNotificationAudience.ALL_ACTIVE_MEMBERS,
+                ManualNotificationAudience.SESSION_PARTICIPANTS,
+                ManualNotificationAudience.SELECTED_MEMBERS,
+            )
         NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED ->
-            setOf(ManualNotificationAudience.CONFIRMED_ATTENDEES, ManualNotificationAudience.SESSION_PARTICIPANTS)
+            setOf(
+                ManualNotificationAudience.CONFIRMED_ATTENDEES,
+                ManualNotificationAudience.SESSION_PARTICIPANTS,
+                ManualNotificationAudience.ALL_ACTIVE_MEMBERS,
+                ManualNotificationAudience.SELECTED_MEMBERS,
+            )
         NotificationEventType.REVIEW_PUBLISHED -> emptySet()
-        NotificationEventType.SESSION_RECORD_UPDATED -> emptySet()
+        NotificationEventType.SESSION_RECORD_UPDATED ->
+            setOf(
+                ManualNotificationAudience.CONFIRMED_ATTENDEES,
+                ManualNotificationAudience.SESSION_PARTICIPANTS,
+                ManualNotificationAudience.ALL_ACTIVE_MEMBERS,
+                ManualNotificationAudience.SELECTED_MEMBERS,
+            )
         // AI_GENERATION_READY is never offered via manual dispatch UI — host-only auto trigger.
         NotificationEventType.AI_GENERATION_READY -> emptySet()
     }
@@ -391,6 +410,7 @@ data class HostNotificationManualDispatchMetadata(
 data class ManualNotificationTemplateOption(
     val eventType: NotificationEventType,
     val label: String,
+    val contentRevision: String,
     val enabled: Boolean,
     val disabledReason: String?,
     val defaultAudience: ManualNotificationAudience,
@@ -413,11 +433,13 @@ data class ManualNotificationMemberOption(
 data class ManualNotificationSelection(
     val sessionId: UUID,
     val eventType: NotificationEventType,
+    val contentRevision: String,
     val audience: ManualNotificationAudience,
     val requestedChannels: ManualNotificationRequestedChannels,
-    val excludedMembershipIds: List<UUID>,
-    val includedMembershipIds: List<UUID>,
-    val sendMode: ManualNotificationSendMode,
+    val selectedMembershipIds: List<UUID> = emptyList(),
+    val excludedMembershipIds: List<UUID> = emptyList(),
+    val includedMembershipIds: List<UUID> = emptyList(),
+    val sendMode: ManualNotificationSendMode = ManualNotificationSendMode.NOW,
 )
 
 data class ManualNotificationPreviewCommand(

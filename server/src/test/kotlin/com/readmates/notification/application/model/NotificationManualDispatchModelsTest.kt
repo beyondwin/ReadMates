@@ -21,12 +21,24 @@ class NotificationManualDispatchModelsTest {
             .isEqualTo(ManualNotificationAudience.CONFIRMED_ATTENDEES)
         assertThat(defaultManualAudience(NotificationEventType.SESSION_RECORD_UPDATED))
             .isEqualTo(ManualNotificationAudience.CONFIRMED_ATTENDEES)
-        assertThat(allowedManualAudiences(NotificationEventType.SESSION_RECORD_UPDATED)).isEmpty()
+        assertThat(allowedManualAudiences(NotificationEventType.NEXT_BOOK_PUBLISHED))
+            .contains(ManualNotificationAudience.SELECTED_MEMBERS)
+        assertThat(allowedManualAudiences(NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED))
+            .contains(
+                ManualNotificationAudience.ALL_ACTIVE_MEMBERS,
+                ManualNotificationAudience.SELECTED_MEMBERS,
+            )
+        assertThat(allowedManualAudiences(NotificationEventType.SESSION_RECORD_UPDATED))
+            .contains(
+                ManualNotificationAudience.CONFIRMED_ATTENDEES,
+                ManualNotificationAudience.SELECTED_MEMBERS,
+            )
     }
 
     @Test
     fun `manual dispatch payload exposes requested channels and target edits`() {
         val excluded = UUID.nameUUIDFromBytes("excluded".toByteArray())
+        val selected = UUID.nameUUIDFromBytes("selected".toByteArray())
         val payload =
             NotificationManualDispatchPayload(
                 id = UUID.nameUUIDFromBytes("dispatch".toByteArray()),
@@ -34,12 +46,16 @@ class NotificationManualDispatchModelsTest {
                 requestedByMembershipId = UUID.nameUUIDFromBytes("host".toByteArray()),
                 requestedChannels = ManualNotificationRequestedChannels.BOTH,
                 audience = ManualNotificationAudience.ALL_ACTIVE_MEMBERS,
+                contentRevision = "a".repeat(64),
+                selectedMembershipIds = listOf(selected),
                 excludedMembershipIds = listOf(excluded),
                 includedMembershipIds = emptyList(),
                 resend = true,
                 sendMode = ManualNotificationSendMode.NOW,
             )
 
+        assertThat(payload.contentRevision).isEqualTo("a".repeat(64))
+        assertThat(payload.selectedMembershipIds).containsExactly(selected)
         assertThat(payload.excludedMembershipIds).containsExactly(excluded)
         assertThat(payload.includedMembershipIds).isEmpty()
         assertThat(payload.resend).isTrue()

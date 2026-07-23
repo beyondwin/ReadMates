@@ -2,6 +2,7 @@ package com.readmates.notification.application.service
 
 import com.readmates.notification.application.NotificationApplicationError
 import com.readmates.notification.application.NotificationApplicationException
+import com.readmates.notification.application.model.ManualNotificationAudience
 import com.readmates.notification.application.model.ManualNotificationAudiencePreview
 import com.readmates.notification.application.model.ManualNotificationChannelPreview
 import com.readmates.notification.application.model.ManualNotificationConfirmCommand
@@ -24,10 +25,12 @@ import com.readmates.notification.application.model.NotificationManualDispatchPa
 import com.readmates.notification.application.model.allowedManualAudiences
 import com.readmates.notification.application.model.defaultManualAudience
 import com.readmates.notification.application.port.`in`.ManageManualHostNotificationsUseCase
+import com.readmates.notification.application.port.out.ManualNotificationConfirmInsertStatus
 import com.readmates.notification.application.port.out.ManualNotificationConfirmedDispatch
 import com.readmates.notification.application.port.out.ManualNotificationDispatchPort
 import com.readmates.notification.application.port.out.ManualNotificationSessionContext
 import com.readmates.notification.application.port.out.ManualNotificationTargetSnapshot
+import com.readmates.notification.application.port.out.contentRevision
 import com.readmates.notification.domain.NotificationEventOutboxStatus
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.shared.paging.PageRequest
@@ -35,6 +38,7 @@ import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
 import com.readmates.shared.security.Sha256
 import org.springframework.stereotype.Service
+import java.security.MessageDigest
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.UUID
@@ -61,6 +65,11 @@ class HostManualNotificationService(
                 ManualNotificationTemplateOption(
                     eventType = eventType,
                     label = manualTemplateLabel(eventType),
+                    contentRevision =
+                        session
+                            ?.takeIf { disabledReason == null }
+                            ?.contentRevision(eventType)
+                            .orEmpty(),
                     enabled = disabledReason == null,
                     disabledReason = disabledReason,
                     defaultAudience = defaultManualAudience(eventType),
@@ -101,12 +110,13 @@ class HostManualNotificationService(
         val currentHost = requireHost(host)
         validateSelection(currentHost, command.selection)
         val targetSnapshot = manualDispatchPort.previewTargets(currentHost.clubId, command.selection)
-        requireNonEmptyAudience(targetSnapshot)
+        requireEligibleTarget(targetSnapshot, command.selection.requestedChannels)
         val recent =
             manualDispatchPort.recentDispatches(
                 currentHost.clubId,
                 command.selection.sessionId,
                 command.selection.eventType,
+                command.selection.contentRevision,
             )
         val expiresAt = clock().plusMinutes(PREVIEW_TTL_MINUTES)
         val previewId =
@@ -152,7 +162,7 @@ class HostManualNotificationService(
         val currentHost = requireHost(host)
         validateSelection(currentHost, command.selection)
         val targetSnapshot = manualDispatchPort.previewTargets(currentHost.clubId, command.selection)
-        requireNonEmptyAudience(targetSnapshot)
+        requireEligibleTarget(targetSnapshot, command.selection.requestedChannels)
         manualDispatchPort
             .findConsumedManualDispatch(
                 previewId = command.previewId,
@@ -168,6 +178,7 @@ class HostManualNotificationService(
                 currentHost.clubId,
                 command.selection.sessionId,
                 command.selection.eventType,
+                command.selection.contentRevision,
             )
         if (recent.isNotEmpty() && !command.resendConfirmed) {
             throw NotificationApplicationException(
@@ -189,12 +200,14 @@ class HostManualNotificationService(
                         requestedByMembershipId = currentHost.membershipId,
                         requestedChannels = command.selection.requestedChannels,
                         audience = command.selection.audience,
+                        contentRevision = command.selection.contentRevision,
+                        selectedMembershipIds = command.selection.selectedMembershipIds,
                         excludedMembershipIds = command.selection.excludedMembershipIds,
                         includedMembershipIds = command.selection.includedMembershipIds,
                         targetMembershipIds = targetSnapshot.targetMembershipIds,
                         inAppMembershipIds = targetSnapshot.inAppMembershipIds,
                         emailMembershipIds = targetSnapshot.emailMembershipIds,
-                        resend = recent.isNotEmpty(),
+                        resend = command.resendConfirmed,
                         sendMode = command.selection.sendMode,
                     ),
             )
@@ -208,8 +221,14 @@ class HostManualNotificationService(
                 selection = command.selection,
                 payload = payload,
                 targetSnapshot = targetSnapshot,
-                resend = recent.isNotEmpty(),
+                resend = command.resendConfirmed,
             ) ?: throw previewExpired()
+        if (stored.status == ManualNotificationConfirmInsertStatus.DUPLICATE) {
+            throw NotificationApplicationException(
+                NotificationApplicationError.DUPLICATE_NOTIFICATION_DISPATCH,
+                "Manual notification dispatch already exists for session/template",
+            )
+        }
         return confirmResult(stored, targetSnapshot, command.selection.requestedChannels)
     }
 
@@ -246,12 +265,30 @@ class HostManualNotificationService(
         disabledReason(selection.eventType, session)?.let {
             throw NotificationApplicationException(NotificationApplicationError.MANUAL_NOTIFICATION_TEMPLATE_UNAVAILABLE, it)
         }
-        val editedIds = (selection.includedMembershipIds + selection.excludedMembershipIds).toSet()
-        if (!manualDispatchPort.validateMembershipEdits(host.clubId, editedIds)) {
-            throw NotificationApplicationException(
-                NotificationApplicationError.MEMBERSHIP_NOT_ALLOWED,
-                "Manual notification membership selection is not allowed",
+        val currentRevision = session.contentRevision(selection.eventType)
+        if (currentRevision == null ||
+            !MessageDigest.isEqual(
+                selection.contentRevision.toByteArray(),
+                currentRevision.toByteArray(),
             )
+        ) {
+            throw NotificationApplicationException(
+                NotificationApplicationError.MANUAL_NOTIFICATION_TEMPLATE_UNAVAILABLE,
+                "Manual notification content revision is stale",
+            )
+        }
+        val selected = selection.selectedMembershipIds
+        val legacyEdits = selection.includedMembershipIds + selection.excludedMembershipIds
+        if (selection.audience == ManualNotificationAudience.SELECTED_MEMBERS) {
+            if (selected.isEmpty() || selected.size != selected.toSet().size || legacyEdits.isNotEmpty()) {
+                throw membershipNotAllowed()
+            }
+        } else if (selected.isNotEmpty()) {
+            throw membershipNotAllowed()
+        }
+        val editedIds = (selected + legacyEdits).toSet()
+        if (!manualDispatchPort.validateMembershipEdits(host.clubId, editedIds)) {
+            throw membershipNotAllowed()
         }
     }
 
@@ -290,7 +327,12 @@ class HostManualNotificationService(
                     null
                 }
             NotificationEventType.REVIEW_PUBLISHED -> "서평 공개 알림은 수동 발송하지 않습니다."
-            NotificationEventType.SESSION_RECORD_UPDATED -> "세션 기록 수정 알림은 반영 확인에서만 발송합니다."
+            NotificationEventType.SESSION_RECORD_UPDATED ->
+                if (session.sessionRecordContentRevision == null) {
+                    "반영된 세션 기록이 있어야 수정 알림을 보낼 수 있습니다."
+                } else {
+                    null
+                }
             NotificationEventType.AI_GENERATION_READY -> "AI 회차 초안 완료 알림은 수동 발송하지 않습니다."
         }
 
@@ -345,8 +387,10 @@ class HostManualNotificationService(
             listOf(
                 selection.sessionId,
                 selection.eventType,
+                selection.contentRevision,
                 selection.audience,
                 selection.requestedChannels,
+                selection.selectedMembershipIds.sorted(),
                 selection.excludedMembershipIds.sorted(),
                 selection.includedMembershipIds.sorted(),
                 selection.sendMode,
@@ -361,14 +405,30 @@ class HostManualNotificationService(
         return host
     }
 
-    private fun requireNonEmptyAudience(snapshot: ManualNotificationTargetSnapshot) {
-        if (snapshot.finalTargetCount <= 0) {
+    private fun requireEligibleTarget(
+        snapshot: ManualNotificationTargetSnapshot,
+        requestedChannels: ManualNotificationRequestedChannels,
+    ) {
+        val hasEligibleChannelTarget =
+            when (requestedChannels) {
+                ManualNotificationRequestedChannels.IN_APP -> snapshot.inAppEligibleCount > 0
+                ManualNotificationRequestedChannels.EMAIL -> snapshot.emailEligibleCount > 0
+                ManualNotificationRequestedChannels.BOTH ->
+                    snapshot.inAppEligibleCount > 0 || snapshot.emailEligibleCount > 0
+            }
+        if (snapshot.finalTargetCount <= 0 || !hasEligibleChannelTarget) {
             throw NotificationApplicationException(
                 NotificationApplicationError.MANUAL_NOTIFICATION_AUDIENCE_EMPTY,
-                "Manual notification target audience is empty",
+                "Manual notification requested channels have no eligible target",
             )
         }
     }
+
+    private fun membershipNotAllowed(): NotificationApplicationException =
+        NotificationApplicationException(
+            NotificationApplicationError.MEMBERSHIP_NOT_ALLOWED,
+            "Manual notification membership selection is not allowed",
+        )
 
     private fun notFound(): NotificationApplicationException =
         NotificationApplicationException(
@@ -389,6 +449,7 @@ class HostManualNotificationService(
                 NotificationEventType.NEXT_BOOK_PUBLISHED,
                 NotificationEventType.SESSION_REMINDER_DUE,
                 NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED,
+                NotificationEventType.SESSION_RECORD_UPDATED,
             )
     }
 }

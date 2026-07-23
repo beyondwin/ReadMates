@@ -56,6 +56,7 @@ private const val CLEANUP_HOST_NOTIFICATIONS_SQL = """
     where id = '00000000-0000-0000-0000-000000000902';
 """
 private const val FAILING_TEST_MAIL_RECIPIENT = "failure@example.com"
+private const val REMINDER_REVISION = "3420157b15165a9a7df6827d409a6e6f9e6b5eeaf34833378270c3ac7d5b4823"
 private const val SENSITIVE_TEST_MAIL_ERROR =
     "smtp rejected external@example.com password=marker Bearer marker api_key=marker authorization=Basic marker " +
         "-----BEGIN " + "PRIVATE KEY----- marker"
@@ -544,6 +545,32 @@ class HostNotificationControllerTest(
     }
 
     @Test
+    fun `host manual options expose current revision defaults and selected audience`() {
+        withTemporarySessionState("OPEN", "MEMBER") {
+            val response =
+                mockMvc
+                    .get("/api/host/notifications/manual/options") {
+                        with(user("host@example.com"))
+                        param("sessionId", "00000000-0000-0000-0000-000000000301")
+                    }.andExpect {
+                        status { isOk() }
+                    }.andReturn()
+                    .response.contentAsString
+            val reminder =
+                tools.jackson.databind
+                    .ObjectMapper()
+                    .readTree(response)
+                    .get("templates")
+                    .first { it.get("eventType").asText() == "SESSION_REMINDER_DUE" }
+
+            assertThat(reminder.get("contentRevision").asText()).isEqualTo(REMINDER_REVISION)
+            assertThat(reminder.get("defaultAudience").asText()).isEqualTo("ALL_ACTIVE_MEMBERS")
+            assertThat(reminder.get("defaultChannels").asText()).isEqualTo("BOTH")
+            assertThat(reminder.get("allowedAudiences").toString()).contains("SELECTED_MEMBERS")
+        }
+    }
+
+    @Test
     fun `host previews manual reminder without exposing raw email`() {
         withTemporarySessionState("OPEN", "MEMBER") {
             val response =
@@ -556,6 +583,7 @@ class HostNotificationControllerTest(
                             {
                               "sessionId": "00000000-0000-0000-0000-000000000301",
                               "eventType": "SESSION_REMINDER_DUE",
+                              "contentRevision": "$REMINDER_REVISION",
                               "audience": "ALL_ACTIVE_MEMBERS",
                               "requestedChannels": "BOTH",
                               "excludedMembershipIds": [],
@@ -589,6 +617,7 @@ class HostNotificationControllerTest(
                             {
                               "sessionId": "00000000-0000-0000-0000-000000000301",
                               "eventType": "SESSION_REMINDER_DUE",
+                              "contentRevision": "$REMINDER_REVISION",
                               "audience": "ALL_ACTIVE_MEMBERS",
                               "requestedChannels": "IN_APP",
                               "excludedMembershipIds": [],
@@ -616,6 +645,7 @@ class HostNotificationControllerTest(
                           "previewId": "$previewId",
                           "sessionId": "00000000-0000-0000-0000-000000000301",
                           "eventType": "SESSION_REMINDER_DUE",
+                          "contentRevision": "$REMINDER_REVISION",
                           "audience": "ALL_ACTIVE_MEMBERS",
                           "requestedChannels": "IN_APP",
                           "excludedMembershipIds": [],
@@ -629,6 +659,44 @@ class HostNotificationControllerTest(
                     jsonPath("$.status") { value("PENDING") }
                     jsonPath("$.summary.requestedChannels") { value("IN_APP") }
                 }
+        }
+    }
+
+    @Test
+    fun `host previews and confirms exactly selected active same club member`() {
+        withTemporarySessionState("OPEN", "MEMBER") {
+            val selectedMembershipId = lookupMembershipId("host@example.com")
+            val previewId = createSelectedManualPreview(selectedMembershipId)
+            val eventId = confirmSelectedManualDispatch(previewId, selectedMembershipId)
+
+            assertThat(selectedPayloadMembershipId(eventId)).isEqualTo(selectedMembershipId.toString())
+        }
+    }
+
+    @Test
+    fun `host preview rejects stale content revision without outbox`() {
+        withTemporarySessionState("OPEN", "MEMBER") {
+            val before = manualEventCount()
+
+            mockMvc
+                .post("/api/host/notifications/manual/preview") {
+                    with(user("host@example.com"))
+                    contentType = MediaType.APPLICATION_JSON
+                    content =
+                        """
+                        {
+                          "sessionId": "00000000-0000-0000-0000-000000000301",
+                          "eventType": "SESSION_REMINDER_DUE",
+                          "contentRevision": "${"0".repeat(64)}",
+                          "audience": "ALL_ACTIVE_MEMBERS",
+                          "requestedChannels": "IN_APP"
+                        }
+                        """.trimIndent()
+                }.andExpect {
+                    status { isConflict() }
+                }
+
+            assertThat(manualEventCount()).isEqualTo(before)
         }
     }
 
@@ -736,6 +804,7 @@ class HostNotificationControllerTest(
                     {
                       "sessionId": "00000000-0000-0000-0000-000000000301",
                       "eventType": "SESSION_REMINDER_DUE",
+                      "contentRevision": "$REMINDER_REVISION",
                       "audience": "ALL_ACTIVE_MEMBERS",
                       "requestedChannels": "BOTH",
                       "excludedMembershipIds": [],
@@ -753,6 +822,82 @@ class HostNotificationControllerTest(
                     .asText()
             }
 
+    private fun createSelectedManualPreview(selectedMembershipId: UUID): String =
+        mockMvc
+            .post("/api/host/notifications/manual/preview") {
+                with(user("host@example.com"))
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "sessionId": "00000000-0000-0000-0000-000000000301",
+                      "eventType": "SESSION_REMINDER_DUE",
+                      "contentRevision": "$REMINDER_REVISION",
+                      "audience": "SELECTED_MEMBERS",
+                      "requestedChannels": "IN_APP",
+                      "selectedMembershipIds": ["$selectedMembershipId"]
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.audience.finalTargetCount") { value(1) }
+            }.andReturn()
+            .response.contentAsString
+            .let {
+                tools.jackson.databind
+                    .ObjectMapper()
+                    .readTree(it)
+                    .get("previewId")
+                    .asText()
+            }
+
+    private fun confirmSelectedManualDispatch(
+        previewId: String,
+        selectedMembershipId: UUID,
+    ): String =
+        mockMvc
+            .post("/api/host/notifications/manual") {
+                with(user("host@example.com"))
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "previewId": "$previewId",
+                      "sessionId": "00000000-0000-0000-0000-000000000301",
+                      "eventType": "SESSION_REMINDER_DUE",
+                      "contentRevision": "$REMINDER_REVISION",
+                      "audience": "SELECTED_MEMBERS",
+                      "requestedChannels": "IN_APP",
+                      "selectedMembershipIds": ["$selectedMembershipId"]
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.summary.targetCount") { value(1) }
+            }.andReturn()
+            .response.contentAsString
+            .let {
+                tools.jackson.databind
+                    .ObjectMapper()
+                    .readTree(it)
+                    .get("eventId")
+                    .asText()
+            }
+
+    private fun selectedPayloadMembershipId(eventId: String): String {
+        val payload =
+            jdbcTemplate.queryForObject(
+                "select payload_json from notification_event_outbox where id = ?",
+                String::class.java,
+                eventId,
+            )
+        return tools.jackson.databind
+            .ObjectMapper()
+            .readTree(payload)
+            .at("/manualDispatch/selectedMembershipIds/0")
+            .asText()
+    }
+
     private fun confirmManualDispatch(
         previewId: String,
         resendConfirmed: Boolean,
@@ -767,6 +912,7 @@ class HostNotificationControllerTest(
                       "previewId": "$previewId",
                       "sessionId": "00000000-0000-0000-0000-000000000301",
                       "eventType": "SESSION_REMINDER_DUE",
+                      "contentRevision": "$REMINDER_REVISION",
                       "audience": "ALL_ACTIVE_MEMBERS",
                       "requestedChannels": "BOTH",
                       "excludedMembershipIds": [],
@@ -786,6 +932,33 @@ class HostNotificationControllerTest(
                     .get("eventId")
                     .asText()
             }
+
+    private fun lookupMembershipId(email: String): UUID =
+        UUID.fromString(
+            jdbcTemplate.queryForObject(
+                """
+                select memberships.id
+                from memberships
+                join users on users.id = memberships.user_id
+                where memberships.club_id = ?
+                  and users.email = ?
+                """.trimIndent(),
+                String::class.java,
+                "00000000-0000-0000-0000-000000000001",
+                email,
+            )!!,
+        )
+
+    private fun manualEventCount(): Int =
+        jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from notification_event_outbox
+            where club_id = '00000000-0000-0000-0000-000000000001'
+              and dedupe_key like 'manual:%'
+            """.trimIndent(),
+            Int::class.java,
+        ) ?: 0
 
     private fun insertOtherClub() {
         jdbcTemplate.update(

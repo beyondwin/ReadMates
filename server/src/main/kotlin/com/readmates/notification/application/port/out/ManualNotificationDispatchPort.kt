@@ -1,5 +1,6 @@
 package com.readmates.notification.application.port.out
 
+import com.readmates.notification.application.model.ManualNotificationContentRevision
 import com.readmates.notification.application.model.ManualNotificationDispatchList
 import com.readmates.notification.application.model.ManualNotificationMemberOption
 import com.readmates.notification.application.model.ManualNotificationRecentDispatch
@@ -21,7 +22,25 @@ data class ManualNotificationSessionContext(
     val state: String,
     val visibility: String,
     val feedbackDocumentUploaded: Boolean,
+    val feedbackDocumentVersion: Int? = null,
+    val sessionRecordContentRevision: String? = null,
 )
+
+fun ManualNotificationSessionContext.contentRevision(eventType: NotificationEventType): String? =
+    when (eventType) {
+        NotificationEventType.NEXT_BOOK_PUBLISHED ->
+            ManualNotificationContentRevision.nextBook(sessionId, sessionNumber, bookTitle, visibility)
+        NotificationEventType.SESSION_REMINDER_DUE ->
+            ManualNotificationContentRevision.reminder(sessionId, date)
+        NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED ->
+            sessionRecordContentRevision?.let(ManualNotificationContentRevision::sessionRecord)
+                ?: feedbackDocumentVersion?.let { ManualNotificationContentRevision.feedbackDocument(sessionId, it) }
+        NotificationEventType.SESSION_RECORD_UPDATED ->
+            sessionRecordContentRevision?.let(ManualNotificationContentRevision::sessionRecord)
+        NotificationEventType.REVIEW_PUBLISHED,
+        NotificationEventType.AI_GENERATION_READY,
+        -> null
+    }
 
 data class ManualNotificationTargetSnapshot(
     val baseCount: Int,
@@ -54,6 +73,7 @@ data class ManualNotificationStoredDispatch(
 enum class ManualNotificationConfirmInsertStatus {
     CREATED,
     ALREADY_CONSUMED,
+    DUPLICATE,
 }
 
 data class ManualNotificationConfirmedDispatch(
@@ -97,6 +117,7 @@ interface ManualNotificationDispatchPort {
         clubId: UUID,
         sessionId: UUID,
         eventType: NotificationEventType,
+        contentRevision: String,
     ): List<ManualNotificationRecentDispatch>
 
     fun insertPreview(

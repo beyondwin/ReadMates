@@ -6,6 +6,7 @@ import com.readmates.notification.application.NotificationApplicationError
 import com.readmates.notification.application.NotificationApplicationException
 import com.readmates.notification.application.model.ManualNotificationAudience
 import com.readmates.notification.application.model.ManualNotificationConfirmCommand
+import com.readmates.notification.application.model.ManualNotificationContentRevision
 import com.readmates.notification.application.model.ManualNotificationDispatchList
 import com.readmates.notification.application.model.ManualNotificationMemberOption
 import com.readmates.notification.application.model.ManualNotificationPreviewCommand
@@ -38,8 +39,19 @@ class HostManualNotificationServiceTest {
     private val now = OffsetDateTime.of(2026, 5, 13, 9, 0, 0, 0, ZoneOffset.UTC)
 
     @Test
-    fun `session record updated is unavailable for manual dispatch`() {
-        val service = service(FakeManualPort())
+    fun `options expose event defaults allowed selected audience and current revisions`() {
+        val feedbackRevision = "b".repeat(64)
+        val service =
+            service(
+                FakeManualPort(
+                    sessionContext =
+                        sessionContext(
+                            state = "CLOSED",
+                            feedbackDocumentVersion = 3,
+                            sessionRecordContentRevision = feedbackRevision,
+                        ),
+                ),
+            )
 
         val options =
             service.options(
@@ -49,21 +61,111 @@ class HostManualNotificationServiceTest {
                 PageRequest.cursor(null, null, defaultLimit = 50, maxLimit = 100),
             )
 
-        assertThat(options.templates.map { it.eventType })
-            .doesNotContain(NotificationEventType.SESSION_RECORD_UPDATED)
+        val feedback = options.templates.single { it.eventType == NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED }
+        val sessionRecord = options.templates.single { it.eventType == NotificationEventType.SESSION_RECORD_UPDATED }
+        assertThat(feedback.contentRevision).isEqualTo(feedbackRevision)
+        assertThat(feedback.defaultAudience).isEqualTo(ManualNotificationAudience.CONFIRMED_ATTENDEES)
+        assertThat(feedback.defaultChannels).isEqualTo(ManualNotificationRequestedChannels.BOTH)
+        assertThat(sessionRecord.contentRevision).isEqualTo(feedbackRevision)
+        assertThat(sessionRecord.defaultAudience).isEqualTo(ManualNotificationAudience.CONFIRMED_ATTENDEES)
+        assertThat(sessionRecord.allowedAudiences).contains(ManualNotificationAudience.SELECTED_MEMBERS)
+    }
+
+    @Test
+    fun `legacy feedback options derive revision from document version`() {
+        val service =
+            service(
+                FakeManualPort(
+                    sessionContext =
+                        sessionContext(
+                            state = "CLOSED",
+                            feedbackDocumentVersion = 3,
+                            sessionRecordContentRevision = null,
+                        ),
+                ),
+            )
+
+        val feedback =
+            service
+                .options(
+                    host(),
+                    SESSION_ID,
+                    null,
+                    PageRequest.cursor(null, null, defaultLimit = 50, maxLimit = 100),
+                ).templates
+                .single { it.eventType == NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED }
+
+        assertThat(feedback.contentRevision)
+            .isEqualTo(ManualNotificationContentRevision.feedbackDocument(SESSION_ID, 3))
+    }
+
+    @Test
+    fun `selected members require unique active same club memberships without legacy edits`() {
+        val selected = UUID.nameUUIDFromBytes("selected".toByteArray())
+        val service = service(FakeManualPort())
+        val invalidSelections =
+            listOf(
+                selection(
+                    audience = ManualNotificationAudience.SELECTED_MEMBERS,
+                    selectedMembershipIds = emptyList(),
+                ),
+                selection(
+                    audience = ManualNotificationAudience.SELECTED_MEMBERS,
+                    selectedMembershipIds = listOf(selected, selected),
+                ),
+                selection(
+                    audience = ManualNotificationAudience.SELECTED_MEMBERS,
+                    selectedMembershipIds = listOf(selected),
+                    includedMembershipIds = listOf(selected),
+                ),
+                selection(selectedMembershipIds = listOf(selected)),
+            )
+
+        invalidSelections.forEach { invalid ->
+            assertThatThrownBy {
+                service.preview(host(), ManualNotificationPreviewCommand(invalid))
+            }.isInstanceOf(NotificationApplicationException::class.java)
+                .extracting("error")
+                .isEqualTo(NotificationApplicationError.MEMBERSHIP_NOT_ALLOWED)
+        }
+
+        val foreignOrInactive =
+            service(FakeManualPort(membershipEditsAllowed = false))
         assertThatThrownBy {
-            service.preview(
+            foreignOrInactive.preview(
                 host(),
                 ManualNotificationPreviewCommand(
                     selection(
-                        eventType = NotificationEventType.SESSION_RECORD_UPDATED,
-                        audience = ManualNotificationAudience.CONFIRMED_ATTENDEES,
+                        audience = ManualNotificationAudience.SELECTED_MEMBERS,
+                        selectedMembershipIds = listOf(selected),
                     ),
                 ),
             )
         }.isInstanceOf(NotificationApplicationException::class.java)
             .extracting("error")
+            .isEqualTo(NotificationApplicationError.MEMBERSHIP_NOT_ALLOWED)
+    }
+
+    @Test
+    fun `stale content revision fails preview and confirm without outbox`() {
+        val port = FakeManualPort()
+        val service = service(port)
+        val staleSelection = selection(contentRevision = "f".repeat(64))
+
+        assertThatThrownBy {
+            service.preview(host(), ManualNotificationPreviewCommand(staleSelection))
+        }.isInstanceOf(NotificationApplicationException::class.java)
+            .extracting("error")
             .isEqualTo(NotificationApplicationError.MANUAL_NOTIFICATION_TEMPLATE_UNAVAILABLE)
+        assertThatThrownBy {
+            service.confirm(
+                host(),
+                ManualNotificationConfirmCommand(UUID.randomUUID(), staleSelection, resendConfirmed = false),
+            )
+        }.isInstanceOf(NotificationApplicationException::class.java)
+            .extracting("error")
+            .isEqualTo(NotificationApplicationError.MANUAL_NOTIFICATION_TEMPLATE_UNAVAILABLE)
+        assertThat(port.insertedDispatches).isEmpty()
     }
 
     @Test
@@ -117,6 +219,57 @@ class HostManualNotificationServiceTest {
         assertThat(preview.duplicates.requiresResendConfirmation).isTrue()
         assertThat(preview.warnings.map { it.code }).contains("EMAIL_PREFERENCE_SKIPS")
         assertThat(port.insertedPreviewHashes).hasSize(1)
+    }
+
+    @Test
+    fun `email only preview and confirm reject audience without eligible email recipient`() {
+        val port =
+            FakeManualPort(
+                targetSnapshot =
+                    targetSnapshot(
+                        finalTargetCount = 1,
+                        inAppEligibleCount = 0,
+                        emailEligibleCount = 0,
+                    ),
+            )
+        val service = service(port)
+        val emailSelection = selection().copy(requestedChannels = ManualNotificationRequestedChannels.EMAIL)
+
+        assertThatThrownBy {
+            service.preview(host(), ManualNotificationPreviewCommand(emailSelection))
+        }.isInstanceOf(NotificationApplicationException::class.java)
+            .extracting("error")
+            .isEqualTo(NotificationApplicationError.MANUAL_NOTIFICATION_AUDIENCE_EMPTY)
+        assertThatThrownBy {
+            service.confirm(
+                host(),
+                ManualNotificationConfirmCommand(UUID.randomUUID(), emailSelection, resendConfirmed = false),
+            )
+        }.isInstanceOf(NotificationApplicationException::class.java)
+            .extracting("error")
+            .isEqualTo(NotificationApplicationError.MANUAL_NOTIFICATION_AUDIENCE_EMPTY)
+        assertThat(port.insertedDispatches).isEmpty()
+    }
+
+    @Test
+    fun `both channels allow audience with only in app eligible recipient`() {
+        val service =
+            service(
+                FakeManualPort(
+                    targetSnapshot =
+                        targetSnapshot(
+                            finalTargetCount = 1,
+                            inAppEligibleCount = 1,
+                            emailEligibleCount = 0,
+                        ),
+                ),
+            )
+
+        val preview = service.preview(host(), ManualNotificationPreviewCommand(selection()))
+
+        assertThat(preview.audience.finalTargetCount).isEqualTo(1)
+        assertThat(preview.channels.inAppEligibleCount).isEqualTo(1)
+        assertThat(preview.channels.emailEligibleCount).isZero()
     }
 
     @Test
@@ -210,6 +363,12 @@ class HostManualNotificationServiceTest {
         )
 
     private fun selection(
+        contentRevision: String =
+            ManualNotificationContentRevision.reminder(
+                SESSION_ID,
+                LocalDate.parse("2026-05-20"),
+            ),
+        selectedMembershipIds: List<UUID> = emptyList(),
         includedMembershipIds: List<UUID> = emptyList(),
         excludedMembershipIds: List<UUID> = emptyList(),
         eventType: NotificationEventType = NotificationEventType.SESSION_REMINDER_DUE,
@@ -217,8 +376,10 @@ class HostManualNotificationServiceTest {
     ) = ManualNotificationSelection(
         sessionId = SESSION_ID,
         eventType = eventType,
+        contentRevision = contentRevision,
         audience = audience,
         requestedChannels = ManualNotificationRequestedChannels.BOTH,
+        selectedMembershipIds = selectedMembershipIds,
         excludedMembershipIds = excludedMembershipIds,
         includedMembershipIds = includedMembershipIds,
         sendMode = ManualNotificationSendMode.NOW,
@@ -228,6 +389,8 @@ class HostManualNotificationServiceTest {
         state: String = "OPEN",
         visibility: String = "MEMBER",
         feedbackDocumentUploaded: Boolean = true,
+        feedbackDocumentVersion: Int? = if (feedbackDocumentUploaded) 1 else null,
+        sessionRecordContentRevision: String? = "c".repeat(64),
     ) = ManualNotificationSessionContext(
         sessionId = SESSION_ID,
         clubId = CLUB_ID,
@@ -237,6 +400,29 @@ class HostManualNotificationServiceTest {
         state = state,
         visibility = visibility,
         feedbackDocumentUploaded = feedbackDocumentUploaded,
+        feedbackDocumentVersion = feedbackDocumentVersion,
+        sessionRecordContentRevision = sessionRecordContentRevision,
+    )
+
+    private fun targetSnapshot(
+        finalTargetCount: Int = 3,
+        inAppEligibleCount: Int = 3,
+        emailEligibleCount: Int = 2,
+    ) = ManualNotificationTargetSnapshot(
+        baseCount = finalTargetCount,
+        excludedCount = 0,
+        includedCount = 0,
+        finalTargetCount = finalTargetCount,
+        inAppEligibleCount = inAppEligibleCount,
+        emailEligibleCount = emailEligibleCount,
+        emailSkippedByPreferenceCount = if (emailEligibleCount == 0) finalTargetCount else 0,
+        emailMissingCount = 0,
+        targetMembershipIds =
+            (1..finalTargetCount).map { UUID.nameUUIDFromBytes("target-$it".toByteArray()) },
+        inAppMembershipIds =
+            (1..inAppEligibleCount).map { UUID.nameUUIDFromBytes("target-$it".toByteArray()) },
+        emailMembershipIds =
+            (1..emailEligibleCount).map { UUID.nameUUIDFromBytes("target-$it".toByteArray()) },
     )
 
     private class FakeManualPort(
@@ -250,9 +436,39 @@ class HostManualNotificationServiceTest {
                 state = "OPEN",
                 visibility = "MEMBER",
                 feedbackDocumentUploaded = true,
+                feedbackDocumentVersion = 1,
+                sessionRecordContentRevision = "c".repeat(64),
             ),
         private val recentDispatchCount: Int = 0,
         private val membershipEditsAllowed: Boolean = true,
+        private val targetSnapshot: ManualNotificationTargetSnapshot =
+            ManualNotificationTargetSnapshot(
+                baseCount = 4,
+                excludedCount = 1,
+                includedCount = 0,
+                finalTargetCount = 3,
+                inAppEligibleCount = 3,
+                emailEligibleCount = 2,
+                emailSkippedByPreferenceCount = 1,
+                emailMissingCount = 0,
+                targetMembershipIds =
+                    listOf(
+                        UUID.nameUUIDFromBytes("target-1".toByteArray()),
+                        UUID.nameUUIDFromBytes("target-2".toByteArray()),
+                        UUID.nameUUIDFromBytes("target-3".toByteArray()),
+                    ),
+                inAppMembershipIds =
+                    listOf(
+                        UUID.nameUUIDFromBytes("target-1".toByteArray()),
+                        UUID.nameUUIDFromBytes("target-2".toByteArray()),
+                        UUID.nameUUIDFromBytes("target-3".toByteArray()),
+                    ),
+                emailMembershipIds =
+                    listOf(
+                        UUID.nameUUIDFromBytes("target-1".toByteArray()),
+                        UUID.nameUUIDFromBytes("target-2".toByteArray()),
+                    ),
+            ),
     ) : ManualNotificationDispatchPort {
         val insertedPreviewHashes = mutableListOf<String>()
         val insertedDispatches = mutableListOf<NotificationEventPayload>()
@@ -286,38 +502,13 @@ class HostManualNotificationServiceTest {
         override fun previewTargets(
             clubId: UUID,
             selection: ManualNotificationSelection,
-        ) = ManualNotificationTargetSnapshot(
-            baseCount = 4,
-            excludedCount = 1,
-            includedCount = 0,
-            finalTargetCount = 3,
-            inAppEligibleCount = 3,
-            emailEligibleCount = 2,
-            emailSkippedByPreferenceCount = 1,
-            emailMissingCount = 0,
-            targetMembershipIds =
-                listOf(
-                    UUID.nameUUIDFromBytes("target-1".toByteArray()),
-                    UUID.nameUUIDFromBytes("target-2".toByteArray()),
-                    UUID.nameUUIDFromBytes("target-3".toByteArray()),
-                ),
-            inAppMembershipIds =
-                listOf(
-                    UUID.nameUUIDFromBytes("target-1".toByteArray()),
-                    UUID.nameUUIDFromBytes("target-2".toByteArray()),
-                    UUID.nameUUIDFromBytes("target-3".toByteArray()),
-                ),
-            emailMembershipIds =
-                listOf(
-                    UUID.nameUUIDFromBytes("target-1".toByteArray()),
-                    UUID.nameUUIDFromBytes("target-2".toByteArray()),
-                ),
-        )
+        ) = targetSnapshot
 
         override fun recentDispatches(
             clubId: UUID,
             sessionId: UUID,
             eventType: NotificationEventType,
+            contentRevision: String,
         ) = (1..(recentDispatchCount + insertedDispatches.size)).map {
             ManualNotificationRecentDispatch(
                 manualDispatchId = UUID.nameUUIDFromBytes("recent-$it".toByteArray()),

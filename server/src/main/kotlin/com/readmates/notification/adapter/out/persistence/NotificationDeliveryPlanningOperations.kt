@@ -453,6 +453,8 @@ internal class NotificationDeliveryPlanningOperations(
                 where memberships.club_id = ?
                   and memberships.status = 'ACTIVE'
             """
+                ManualNotificationAudience.SELECTED_MEMBERS ->
+                    return activeMembershipIds(jdbcTemplate, message.clubId, manual.selectedMembershipIds.orEmpty())
             }.trimIndent()
         val args =
             if (manual.audience == ManualNotificationAudience.ALL_ACTIVE_MEMBERS) {
