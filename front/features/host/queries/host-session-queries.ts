@@ -205,7 +205,7 @@ export function invalidateHostSessionRecordSurfaces(
   sessionId: string,
   context?: ReadmatesApiContext,
 ) {
-  return invalidateSessionMutationSurfaces(client, sessionId, context, { manualDispatches: true });
+  return invalidateSessionMutationSurfaces(client, sessionId, context);
 }
 
 export function useCreateHostSessionMutation(context?: ReadmatesApiContext) {
@@ -341,7 +341,6 @@ export function useCommitHostSessionImportMutation(context?: ReadmatesApiContext
         invalidateHostSessionLists(client, context),
         invalidateHostSessionDashboard(client, context),
         invalidateHostCurrentSession(client, context),
-        invalidateHostSessionManualDispatches(client, context),
       ]),
   });
 }

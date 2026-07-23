@@ -637,6 +637,12 @@ class AiGenerateApiIntegrationTest(
         assertThat(draft["source"]).isEqualTo("AI_GENERATED")
         assertThat(draft["snapshot_json"].toString()).contains("AI Gen Book")
         assertThat(kindStatus).contains("FULL" to "SUCCESS", "COMMIT" to "SUCCESS")
+        assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from notification_event_outbox where aggregate_id = '$SESSION_ID'",
+                Int::class.java,
+            ),
+        ).isZero()
     }
 
     private fun unknownAuthorOverrideJson(): String =

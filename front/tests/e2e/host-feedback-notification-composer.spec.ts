@@ -20,6 +20,7 @@ const HOST_PATH = `/clubs/${CLUB_SLUG}/app/host`;
 const RECORD_BOOK = "Feedback Composer Contract Book";
 const IMPORT_SUMMARY = "JSON 가져오기로 저장한 공개 안전 초안";
 const UPDATED_SUMMARY = "최종 반영 뒤 알림 작성기를 여는 수정 요약";
+const FINAL_SUMMARY = "stale 확인 뒤 새 알림을 작성하는 최종 요약";
 const AI_JOB_ID = "22222222-2222-4222-8222-222222222222";
 
 function resetFeedbackComposerState() {
@@ -228,6 +229,81 @@ async function reviewAndApply(page: Page, sessionId: string) {
   return dialog;
 }
 
+async function applyConcurrentRecordRevision(page: Page, sessionId: string) {
+  return page.evaluate(async ({ id, clubSlug }) => {
+    const basePath = `/api/bff/api/host/sessions/${encodeURIComponent(id)}`;
+    const scopedPath = (suffix: string) =>
+      `${basePath}/${suffix}?clubSlug=${encodeURIComponent(clubSlug)}`;
+    const requestJson = async <T>(path: string, init?: RequestInit): Promise<T> => {
+      const response = await fetch(path, {
+        ...init,
+        headers: {
+          "Content-Type": "application/json",
+          ...init?.headers,
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`${path} failed: ${response.status} ${await response.text()}`);
+      }
+      return response.json() as Promise<T>;
+    };
+    const editor = await requestJson<{
+      liveRevision: number;
+      liveSnapshot: {
+        schema: "readmates-session-record:v1";
+        visibility: "HOST_ONLY" | "MEMBER" | "PUBLIC";
+        publicationSummary: string;
+        highlights: unknown[];
+        oneLineReviews: unknown[];
+        feedbackDocument: {
+          fileName: string;
+          title: string;
+          markdown: string;
+        };
+      };
+      draft: { draftRevision: number } | null;
+    }>(scopedPath("record-editor"));
+    const draft = await requestJson<{ draftRevision: number }>(
+      scopedPath("record-draft"),
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          expectedDraftRevision: editor.draft?.draftRevision ?? null,
+          snapshot: {
+            ...editor.liveSnapshot,
+            publicationSummary: `${editor.liveSnapshot.publicationSummary} · 동시 수정`,
+          },
+        }),
+      },
+    );
+    const preview = await requestJson<{ expectedDraftHash: string }>(
+      scopedPath("record-apply-preview"),
+      {
+        method: "POST",
+        body: JSON.stringify({
+          expectedDraftRevision: draft.draftRevision,
+          expectedLiveRevision: editor.liveRevision,
+        }),
+      },
+    );
+    return requestJson<{
+      liveRevision: number;
+      composer: { contentRevision: string };
+    }>(
+      scopedPath("record-apply"),
+      {
+        method: "POST",
+        body: JSON.stringify({
+          applyRequestId: crypto.randomUUID(),
+          expectedDraftRevision: draft.draftRevision,
+          expectedLiveRevision: editor.liveRevision,
+          expectedDraftHash: preview.expectedDraftHash,
+        }),
+      },
+    );
+  }, { id: sessionId, clubSlug: CLUB_SLUG });
+}
+
 test.beforeEach(resetFeedbackComposerState);
 test.afterEach(resetFeedbackComposerState);
 
@@ -420,6 +496,32 @@ where id = (
   await expect(page.getByText(/발송을 요청하지 못했습니다/)).toBeVisible();
   expect(await readNotificationEventCount(sessionId, "SESSION_RECORD_UPDATED")).toBe(0);
   expect(countManualNotificationEventsForSession(sessionId, "SESSION_RECORD_UPDATED")).toBe(0);
+
+  const revisionPreviewResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST"
+      && new URL(response.url()).pathname.endsWith("/host/notifications/manual/preview"),
+  );
+  await page.getByRole("button", { name: "알림 미리보기" }).click();
+  const revisionPreview = await revisionPreviewResponse;
+  expect(revisionPreview.status(), await revisionPreview.text()).toBe(200);
+  await expect(page.getByRole("region", { name: "발송 전 확인" })).toBeVisible();
+
+  const concurrentApply = await applyConcurrentRecordRevision(page, sessionId);
+  expect(concurrentApply.liveRevision).toBeGreaterThan(0);
+  expect(concurrentApply.composer.contentRevision).toMatch(/^[0-9a-f]{64}$/);
+  await page.getByRole("button", { name: "발송 확인" }).click();
+  await expect(page.getByText(/발송을 요청하지 못했습니다/)).toBeVisible();
+  expect(await readNotificationEventCount(sessionId, "SESSION_RECORD_UPDATED")).toBe(0);
+  expect(countManualNotificationEventsForSession(sessionId, "SESSION_RECORD_UPDATED")).toBe(0);
+
+  await page.getByRole("button", { name: "이번에는 보내지 않기" }).click();
+  await page.reload();
+  await page.getByLabel("공개 요약").fill(FINAL_SUMMARY);
+  await waitForDraftSaved(page);
+  const finalApplyDialog = await reviewAndApply(page, sessionId);
+  await finalApplyDialog.getByRole("button", { name: "기록 반영" }).click();
+  await expect(page.getByRole("dialog", { name: "알림 보내기" })).toBeVisible();
 
   const freshPreviewResponse = page.waitForResponse(
     (response) =>

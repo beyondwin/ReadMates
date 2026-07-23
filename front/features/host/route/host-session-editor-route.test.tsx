@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, vi, describe, expect, it } from "vitest";
 
 const routeMocks = vi.hoisted(() => ({
@@ -70,6 +70,7 @@ vi.mock("@/features/host/route/host-notification-composer-controller", () => ({
   HostNotificationComposerController: ({
     request,
     onClose,
+    onConfirmed,
   }: {
     request: {
       sessionId: string;
@@ -77,9 +78,41 @@ vi.mock("@/features/host/route/host-notification-composer-controller", () => ({
       origin: string;
     } | null;
     onClose: () => void;
+    onConfirmed?: (result: {
+      manualDispatchId: string;
+      eventId: string;
+      status: "PUBLISHED";
+      createdAt: string;
+      summary: {
+        targetCount: number;
+        requestedChannels: "IN_APP";
+        expectedInAppCount: number;
+        expectedEmailCount: number;
+      };
+    }) => void;
   }) => request ? (
     <div role="dialog" aria-label="멤버에게 알림을 보낼까요?">
       <span>{`${request.sessionId}:${request.eventType}:${request.origin}`}</span>
+      <button
+        type="button"
+        onClick={() => {
+          onConfirmed?.({
+            manualDispatchId: "dispatch-1",
+            eventId: "event-1",
+            status: "PUBLISHED",
+            createdAt: "2026-07-24T00:00:00Z",
+            summary: {
+              targetCount: 1,
+              requestedChannels: "IN_APP",
+              expectedInAppCount: 1,
+              expectedEmailCount: 0,
+            },
+          });
+          onClose();
+        }}
+      >
+        발송 확인
+      </button>
       <button type="button" onClick={onClose}>이번에는 보내지 않기</button>
     </div>
   ) : null,
@@ -90,6 +123,7 @@ import {
   NewHostSessionRoute,
 } from "./host-session-editor-route";
 import { hostNotificationKeys } from "@/features/host/queries/host-notification-queries";
+import { hostSessionKeys } from "@/features/host/queries/host-session-queries";
 
 const snapshot = {
   schema: "readmates-session-record:v1" as const,
@@ -262,6 +296,19 @@ describe("EditHostSessionRecordWorkflow", () => {
     })).toHaveTextContent(
       "session-1:FEEDBACK_DOCUMENT_PUBLISHED:CONTENT_UPDATE",
     );
+
+    const editorDispatchesKey = hostSessionKeys.manualDispatches(
+      { sessionId: "session-1", page: { limit: 10 } },
+      { clubSlug: "club-a" },
+    );
+    client.setQueryData(editorDispatchesKey, { items: [], nextCursor: null });
+    expect(client.getQueryState(editorDispatchesKey)?.isInvalidated).toBe(false);
+
+    screen.getByRole("button", { name: "발송 확인" }).click();
+
+    await waitFor(() => {
+      expect(client.getQueryState(editorDispatchesKey)?.isInvalidated).toBe(true);
+    });
   });
 
   it("does not open the composer when final apply fails", async () => {

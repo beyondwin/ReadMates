@@ -319,7 +319,7 @@ describe("host session mutation hooks", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.current({ clubSlug: "reading-sai" }) });
   });
 
-  it("invalidates the full host session surface after import commit", async () => {
+  it("invalidates record-only session surfaces after import commit", async () => {
     vi.mocked(commitHostSessionImport).mockResolvedValue({
       sessionId: "session-7",
       draftRevision: 2,
@@ -339,6 +339,8 @@ describe("host session mutation hooks", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.lists({ clubSlug: "reading-sai" }) });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.dashboard({ clubSlug: "reading-sai" }) });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.current({ clubSlug: "reading-sai" }) });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.manualDispatchesRoot({ clubSlug: "reading-sai" }) });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({
+      queryKey: hostSessionKeys.manualDispatchesRoot({ clubSlug: "reading-sai" }),
+    });
   });
 });

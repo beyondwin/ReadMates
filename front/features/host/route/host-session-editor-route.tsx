@@ -35,6 +35,7 @@ import { useSessionRecordDraftController } from "@/features/host/hooks/use-sessi
 import {
   hostSessionDeletionPreviewQuery,
   hostSessionDetailQuery,
+  invalidateHostSessionManualDispatches,
   invalidateHostSessionRecordSurfaces,
   hostSessionManualDispatchesQuery,
   useCloseHostSessionMutation,
@@ -539,6 +540,9 @@ export function EditHostSessionRecordWorkflow({
         request={composerRequest}
         context={context}
         onClose={() => setComposerRequest(null)}
+        onConfirmed={() => {
+          void invalidateHostSessionManualDispatches(queryClient, context);
+        }}
       />
     </>
   );
