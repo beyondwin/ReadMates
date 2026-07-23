@@ -241,6 +241,9 @@ const aigenCommitReceipt = {
   status: "COMMITTED",
   recovered: false,
   participantUpdatesCount: 1,
+  draftRevision: 6,
+  baseLiveRevision: 2,
+  liveApplied: false,
 };
 
 const aigenProblem = {
