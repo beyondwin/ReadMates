@@ -2,8 +2,10 @@ package com.readmates.session.adapter.out.persistence
 
 import com.readmates.session.application.HostSessionFeedbackDocument
 import com.readmates.session.application.HostSessionListItem
+import com.readmates.session.application.HostSessionListQuery
 import com.readmates.session.application.HostSessionNotFoundException
 import com.readmates.session.application.HostSessionPublication
+import com.readmates.session.application.InvalidHostSessionCursorException
 import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.model.HostDashboardResult
@@ -15,55 +17,113 @@ import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.springframework.jdbc.core.JdbcTemplate
-import java.time.LocalDate
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 import java.util.UUID
 
 internal class HostSessionQueries {
+    @Suppress("LongMethod")
     fun list(
         jdbcTemplate: JdbcTemplate,
         host: CurrentMember,
         pageRequest: PageRequest,
+        query: HostSessionListQuery,
     ): CursorPage<HostSessionListItem> {
         requireHost(host)
-        val cursor = HostSessionCursor.from(pageRequest.cursor)
+        val normalizedQuery = query.normalized()
+        val queryKey = normalizedQuery.fingerprint()
+        val cursor = HostSessionCursor.from(pageRequest.cursor, queryKey)
+        val conditions = mutableListOf("club_id = ?")
+        val parameters = mutableListOf<Any>(host.clubId.dbString())
+        normalizedQuery.search?.let { search ->
+            conditions += "(cast(number as char) = ? or lower(title) like ? or lower(book_title) like ?)"
+            parameters += search
+            parameters += "%$search%"
+            parameters += "%$search%"
+        }
+        normalizedQuery.state?.let {
+            conditions += "state = ?"
+            parameters += it
+        }
+        normalizedQuery.recordStatus?.let {
+            conditions += "record_status = ?"
+            parameters += it.name
+        }
+        cursor?.let {
+            conditions += "(number < ? or (number = ? and id < ?))"
+            parameters += it.number
+            parameters += it.number
+            parameters += it.id
+        }
+        parameters += pageRequest.limit + 1
         val rows =
             jdbcTemplate.query(
                 """
-                select id, number, title, book_title, book_author, book_image_url,
-                       session_date, start_time, end_time, location_label, state, visibility
+                select *
                 from (
-                  select id, number, title, book_title, book_author, book_image_url,
-                         session_date, start_time, end_time, location_label, state, visibility,
-                         case state when 'OPEN' then 0 when 'DRAFT' then 1 when 'CLOSED' then 2 else 3 end as state_rank
-                  from sessions
-                  where club_id = ?
-                ) ordered_sessions
-                where (
-                  ? is null
-                  or state_rank > ?
-                  or (state_rank = ? and session_date > ?)
-                  or (state_rank = ? and session_date = ? and number > ?)
-                  or (state_rank = ? and session_date = ? and number = ? and id > ?)
-                )
-                order by state_rank, session_date, number, id
+                  select ledger_facts.*,
+                         case
+                           when record_saved and feedback_ready and not has_draft then 'COMPLETE'
+                           when record_saved or feedback_ready or has_draft then 'INCOMPLETE'
+                           else 'NOT_STARTED'
+                         end as record_status
+                  from (
+                    select sessions.id, sessions.club_id, sessions.number, sessions.title,
+                           sessions.book_title, sessions.book_author, sessions.book_image_url,
+                           sessions.session_date, sessions.start_time, sessions.end_time,
+                           sessions.location_label, sessions.state, sessions.visibility,
+                           (coalesce(publication.public_summary, '') <> ''
+                             or (select count(*) from highlights
+                                 where highlights.club_id = sessions.club_id
+                                   and highlights.session_id = sessions.id) > 0
+                             or (select count(*) from one_line_reviews
+                                 where one_line_reviews.club_id = sessions.club_id
+                                   and one_line_reviews.session_id = sessions.id) > 0) as record_saved,
+                           exists (
+                             select 1 from session_feedback_documents
+                             where session_feedback_documents.club_id = sessions.club_id
+                               and session_feedback_documents.session_id = sessions.id
+                           ) as feedback_ready,
+                           (draft.session_id is not null) as has_draft,
+                           draft.draft_revision,
+                           coalesce(revision.live_revision, 0) as live_revision,
+                           greatest(
+                             sessions.updated_at,
+                             coalesce(draft.updated_at, sessions.updated_at),
+                             coalesce(revision.applied_at, sessions.updated_at),
+                             coalesce(audit.created_at, sessions.updated_at)
+                           ) as last_modified_at
+                    from sessions
+                    left join public_session_publications publication
+                      on publication.club_id = sessions.club_id
+                     and publication.session_id = sessions.id
+                    left join session_record_drafts draft
+                      on draft.club_id = sessions.club_id
+                     and draft.session_id = sessions.id
+                    left join (
+                      select club_id, session_id, max(version) as live_revision, max(applied_at) as applied_at
+                      from session_record_revisions
+                      group by club_id, session_id
+                    ) revision
+                      on revision.club_id = sessions.club_id
+                     and revision.session_id = sessions.id
+                    left join (
+                      select club_id, session_id, max(created_at) as created_at
+                      from host_session_change_audit
+                      group by club_id, session_id
+                    ) audit
+                      on audit.club_id = sessions.club_id
+                     and audit.session_id = sessions.id
+                  ) ledger_facts
+                ) host_session_ledger
+                where ${conditions.joinToString(" and ")}
+                order by number desc, id desc
                 limit ?
                 """.trimIndent(),
                 { resultSet, _ -> resultSet.toHostSessionListItem() },
-                host.clubId.dbString(),
-                cursor?.stateRank,
-                cursor?.stateRank,
-                cursor?.stateRank,
-                cursor?.date,
-                cursor?.stateRank,
-                cursor?.date,
-                cursor?.number,
-                cursor?.stateRank,
-                cursor?.date,
-                cursor?.number,
-                cursor?.id,
-                pageRequest.limit + 1,
+                *parameters.toTypedArray(),
             )
-        return pageFromRows(rows, pageRequest.limit, ::hostSessionCursor)
+        return pageFromRows(rows, pageRequest.limit) { hostSessionCursor(it, queryKey) }
     }
 
     fun upcoming(
@@ -388,23 +448,17 @@ internal class HostSessionQueries {
             ).firstOrNull()
 }
 
-private fun hostSessionCursor(item: HostSessionListItem): String? =
+private fun hostSessionCursor(
+    item: HostSessionListItem,
+    queryKey: String,
+): String? =
     CursorCodec.encode(
         mapOf(
-            "stateRank" to hostSessionStateRank(item.state).toString(),
-            "date" to item.date,
             "number" to item.sessionNumber.toString(),
             "id" to item.sessionId,
+            "query" to queryKey,
         ),
     )
-
-private fun hostSessionStateRank(state: String): Int =
-    when (state) {
-        "OPEN" -> 0
-        "DRAFT" -> 1
-        "CLOSED" -> 2
-        else -> 3
-    }
 
 private fun <T> pageFromRows(
     rows: List<T>,
@@ -419,18 +473,37 @@ private fun <T> pageFromRows(
 }
 
 private data class HostSessionCursor(
-    val stateRank: Int,
-    val date: LocalDate,
     val number: Int,
     val id: String,
 ) {
     companion object {
-        fun from(cursor: Map<String, String>): HostSessionCursor? {
-            val stateRank = cursor["stateRank"]?.toIntOrNull() ?: return null
-            val date = cursor["date"]?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return null
-            val number = cursor["number"]?.toIntOrNull() ?: return null
-            val id = cursor["id"]?.takeIf { it.isNotBlank() } ?: return null
-            return HostSessionCursor(stateRank, date, number, id)
+        fun from(
+            cursor: Map<String, String>,
+            expectedQuery: String,
+        ): HostSessionCursor? {
+            if (cursor.isEmpty()) return null
+            val number = cursor["number"]?.toIntOrNull()
+            val id = cursor["id"]?.takeIf { it.isNotBlank() }
+            val query = cursor["query"]
+            val hasExpectedKeys = cursor.keys == setOf("number", "id", "query")
+            if (number == null || id == null || query != expectedQuery || !hasExpectedKeys) {
+                throw InvalidHostSessionCursorException()
+            }
+            return HostSessionCursor(number, id)
         }
     }
+}
+
+private fun HostSessionListQuery.normalized() =
+    copy(
+        search = search?.trim()?.lowercase()?.takeIf(String::isNotBlank),
+        state = state?.trim()?.uppercase()?.takeIf(String::isNotBlank),
+    )
+
+private fun HostSessionListQuery.fingerprint(): String {
+    val value = listOf(search.orEmpty(), state.orEmpty(), recordStatus?.name.orEmpty()).joinToString("\u0000")
+    return MessageDigest
+        .getInstance("SHA-256")
+        .digest(value.toByteArray(StandardCharsets.UTF_8))
+        .joinToString("") { "%02x".format(it) }
 }

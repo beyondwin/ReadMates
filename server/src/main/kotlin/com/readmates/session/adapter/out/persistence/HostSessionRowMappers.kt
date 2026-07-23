@@ -9,6 +9,8 @@ import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.model.HostDashboardMissingMemberResult
 import com.readmates.session.domain.SessionParticipationStatus
+import com.readmates.sessionclosing.application.model.SessionRecordReadinessPolicy
+import com.readmates.sessionrecord.application.model.SessionRecordStatus
 import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.db.uuid
 import java.sql.ResultSet
@@ -99,20 +101,29 @@ internal fun ResultSet.toHostSessionPublication() =
     )
 
 internal fun ResultSet.toHostSessionListItem() =
-    HostSessionListItem(
-        sessionId = uuid("id").toString(),
-        sessionNumber = getInt("number"),
-        title = getString("title"),
-        bookTitle = getString("book_title"),
-        bookAuthor = getString("book_author"),
-        bookImageUrl = getString("book_image_url"),
-        date = getObject("session_date", LocalDate::class.java).toString(),
-        startTime = getObject("start_time", LocalTime::class.java).toString(),
-        endTime = getObject("end_time", LocalTime::class.java).toString(),
-        locationLabel = getString("location_label"),
-        state = getString("state"),
-        visibility = SessionRecordVisibility.valueOf(getString("visibility")),
-    )
+    getBoolean("has_draft").let { hasDraft ->
+        val recordStatus = SessionRecordStatus.valueOf(getString("record_status"))
+        HostSessionListItem(
+            sessionId = uuid("id").toString(),
+            sessionNumber = getInt("number"),
+            title = getString("title"),
+            bookTitle = getString("book_title"),
+            bookAuthor = getString("book_author"),
+            bookImageUrl = getString("book_image_url"),
+            date = getObject("session_date", LocalDate::class.java).toString(),
+            startTime = getObject("start_time", LocalTime::class.java).toString(),
+            endTime = getObject("end_time", LocalTime::class.java).toString(),
+            locationLabel = getString("location_label"),
+            state = getString("state"),
+            visibility = SessionRecordVisibility.valueOf(getString("visibility")),
+            recordStatus = recordStatus,
+            needsAttention = SessionRecordReadinessPolicy.needsAttention(getString("state"), recordStatus, hasDraft),
+            hasDraft = hasDraft,
+            liveRevision = getLong("live_revision"),
+            draftRevision = getLong("draft_revision").takeUnless { wasNull() },
+            lastModifiedAt = utcOffsetDateTime("last_modified_at").toString(),
+        )
+    }
 
 internal fun ResultSet.toUpcomingSessionItem() =
     UpcomingSessionItem(

@@ -44,3 +44,5 @@ class InvalidMembershipIdException : RuntimeException("Invalid membership id")
 class InvalidSessionScheduleException : RuntimeException("Session end time must be after start time")
 
 class InvalidQuestionSetException : RuntimeException("Questions must include up to 5 non-empty items")
+
+class InvalidHostSessionCursorException : RuntimeException("Invalid host session cursor")

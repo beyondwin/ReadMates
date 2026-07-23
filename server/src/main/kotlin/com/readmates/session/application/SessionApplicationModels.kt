@@ -1,6 +1,7 @@
 package com.readmates.session.application
 
 import com.readmates.session.domain.SessionParticipationStatus
+import com.readmates.sessionrecord.application.model.SessionRecordStatus
 
 data class CurrentSessionPayload(
     val currentSession: CurrentSessionDetail?,
@@ -157,6 +158,39 @@ data class HostSessionListItem(
     val locationLabel: String,
     val state: String,
     val visibility: SessionRecordVisibility,
+    val recordStatus: SessionRecordStatus = SessionRecordStatus.NOT_STARTED,
+    val needsAttention: Boolean = false,
+    val hasDraft: Boolean = false,
+    val liveRevision: Long = 0,
+    val draftRevision: Long? = null,
+    val lastModifiedAt: String? = null,
+)
+
+data class HostSessionListQuery(
+    val search: String? = null,
+    val state: String? = null,
+    val recordStatus: SessionRecordStatus? = null,
+)
+
+data class HostSessionBasicAuditSnapshot(
+    val title: String,
+    val bookTitle: String,
+    val bookAuthor: String,
+    val bookLink: String?,
+    val bookImageUrl: String?,
+    val date: String,
+    val startTime: String,
+    val endTime: String,
+    val questionDeadlineAt: String,
+    val locationLabel: String,
+    val meetingUrl: String?,
+    val meetingPasscode: String?,
+)
+
+data class HostAttendanceAuditTransition(
+    val membershipId: String,
+    val from: String,
+    val to: String,
 )
 
 data class UpcomingSessionItem(

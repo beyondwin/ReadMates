@@ -30,6 +30,36 @@ import java.util.concurrent.TimeUnit
 import javax.sql.DataSource
 
 private const val CLEANUP_GENERATED_SESSIONS_SQL = """
+    delete from host_action_notification_decisions
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and session_id in (
+        select id from sessions
+        where club_id = '00000000-0000-0000-0000-000000000001' and number >= 7
+      );
+    delete from host_action_notification_previews
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and session_id in (
+        select id from sessions
+        where club_id = '00000000-0000-0000-0000-000000000001' and number >= 7
+      );
+    delete from session_record_drafts
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and session_id in (
+        select id from sessions
+        where club_id = '00000000-0000-0000-0000-000000000001' and number >= 7
+      );
+    delete from session_record_revisions
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and session_id in (
+        select id from sessions
+        where club_id = '00000000-0000-0000-0000-000000000001' and number >= 7
+      );
+    delete from host_session_change_audit
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and session_id in (
+        select id from sessions
+        where club_id = '00000000-0000-0000-0000-000000000001' and number >= 7
+      );
     delete from admin_closing_risk_ledger
     where club_id = '00000000-0000-0000-0000-000000000001'
       and session_id in (
@@ -227,6 +257,112 @@ class HostSessionControllerDbTest(
                 jsonPath("$.items.length()") { value(2) }
                 jsonPath("$.nextCursor") { exists() }
             }
+    }
+
+    @Test
+    fun `host list searches session number title and book within club`() {
+        val seventh = createDraftSession("고유 제목", "검색 대상 책", "2026-05-20")
+        createDraftSession("다른 제목", "다른 책", "2026-06-17")
+        createOutsideClubSession(state = "DRAFT")
+
+        mockMvc
+            .get("/api/host/sessions") {
+                with(user("host@example.com"))
+                param("search", "검색 대상")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items.length()") { value(1) }
+                jsonPath("$.items[0].sessionId") { value(seventh) }
+            }
+    }
+
+    @Test
+    fun `host list filters needs attention using closing readiness and draft existence`() {
+        val sessionId = createDraftSessionSeven()
+        updateSessionState(sessionId, "OPEN")
+        updateSessionState(sessionId, "CLOSED")
+        insertRecordDraft(sessionId)
+
+        mockMvc
+            .get("/api/host/sessions") {
+                with(user("host@example.com"))
+                param("recordStatus", "INCOMPLETE")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items[0].sessionId") { value(sessionId) }
+                jsonPath("$.items[0].recordStatus") { value("INCOMPLETE") }
+                jsonPath("$.items[0].needsAttention") { value(true) }
+                jsonPath("$.items[0].hasDraft") { value(true) }
+                jsonPath("$.items[0].draftRevision") { value(1) }
+            }
+    }
+
+    @Test
+    fun `host list orders by session number and id descending`() {
+        val seventh = createDraftSessionSeven()
+        val eighth = createDraftSessionEight()
+
+        mockMvc
+            .get("/api/host/sessions") {
+                with(user("host@example.com"))
+                param("limit", "2")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items[0].sessionId") { value(eighth) }
+                jsonPath("$.items[1].sessionId") { value(seventh) }
+            }
+    }
+
+    @Test
+    fun `basic update audit records field names but not meeting credentials`() {
+        val sessionId = createDraftSessionSeven()
+
+        mockMvc
+            .patch("/api/host/sessions/$sessionId") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = hostSessionRequestJson()
+            }.andExpect {
+                status { isOk() }
+            }
+
+        val audit =
+            jdbcTemplate.queryForMap(
+                "select action_type, changed_fields_json from host_session_change_audit where session_id = ?",
+                sessionId,
+            )
+        assertThat(audit["action_type"]).isEqualTo("BASIC_INFO_UPDATED")
+        assertThat(audit["changed_fields_json"].toString())
+            .contains("meetingUrl", "meetingPasscode")
+            .doesNotContain("meet.google.com")
+            .doesNotContain("readmates")
+    }
+
+    @Test
+    fun `attendance audit records membership id and state transition`() {
+        createSessionSeven()
+        val membershipId = "00000000-0000-0000-0000-000000000201"
+
+        mockMvc
+            .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/attendance") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """[{"membershipId":"$membershipId","attendanceStatus":"ABSENT"}]"""
+            }.andExpect {
+                status { isOk() }
+            }
+
+        val details =
+            jdbcTemplate.queryForObject(
+                "select changed_fields_json from host_session_change_audit where session_id = ?",
+                String::class.java,
+                "00000000-0000-0000-0000-000000009777",
+            )
+        assertThat(details)
+            .contains(membershipId, """"from":"UNKNOWN"""", """"to":"ABSENT"""")
+            .doesNotContain("host@example.com", "김호스트")
     }
 
     @Test
@@ -1129,6 +1265,21 @@ class HostSessionControllerDbTest(
             ?.groupValues
             ?.get(1)
             ?: error("created session response did not include a sessionId")
+    }
+
+    private fun insertRecordDraft(sessionId: String) {
+        jdbcTemplate.update(
+            """
+            insert into session_record_drafts (
+              session_id, club_id, base_live_revision, draft_revision, source,
+              snapshot_json, snapshot_sha256, updated_by_membership_id
+            ) values (?, ?, 0, 1, 'MANUAL', '{}', ?, ?)
+            """.trimIndent(),
+            sessionId,
+            "00000000-0000-0000-0000-000000000001",
+            "a".repeat(64),
+            "00000000-0000-0000-0000-000000000201",
+        )
     }
 
     private fun participantCountForSessionNumber(number: Int): Int =

@@ -7,6 +7,7 @@ import com.readmates.session.application.HostSessionDeletionPreviewResponse
 import com.readmates.session.application.HostSessionDeletionResponse
 import com.readmates.session.application.HostSessionDetailResponse
 import com.readmates.session.application.HostSessionListItem
+import com.readmates.session.application.HostSessionListQuery
 import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.model.HostDashboardResult
@@ -37,6 +38,7 @@ interface HostSessionQueryUseCase {
     fun list(
         host: CurrentMember,
         pageRequest: PageRequest,
+        query: HostSessionListQuery = HostSessionListQuery(),
     ): CursorPage<HostSessionListItem>
 
     fun detail(command: HostSessionIdCommand): HostSessionDetailResponse

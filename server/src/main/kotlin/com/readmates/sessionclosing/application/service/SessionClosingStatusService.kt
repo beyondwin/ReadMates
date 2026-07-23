@@ -14,6 +14,7 @@ import com.readmates.sessionclosing.application.model.FeedbackDocumentClosingSta
 import com.readmates.sessionclosing.application.model.HostSessionClosingStatus
 import com.readmates.sessionclosing.application.model.NotificationClosingStatus
 import com.readmates.sessionclosing.application.model.SessionClosingSnapshot
+import com.readmates.sessionclosing.application.model.SessionRecordReadinessPolicy
 import com.readmates.sessionclosing.application.port.`in`.GetHostSessionClosingStatusUseCase
 import com.readmates.sessionclosing.application.port.out.LoadSessionClosingStatusPort
 import com.readmates.shared.security.AccessDeniedException
@@ -64,7 +65,7 @@ private data class ClosingSignals(
 private fun SessionClosingSnapshot.closingSignals() =
     ClosingSignals(
         sessionClosed = state in setOf("CLOSED", "PUBLISHED"),
-        recordSaved = summaryPublished || highlightCount > 0 || oneLinerCount > 0,
+        recordSaved = SessionRecordReadinessPolicy.recordSaved(summaryPublished, highlightCount, oneLinerCount),
         feedbackReady = feedbackDocumentState == FeedbackDocumentClosingState.AVAILABLE,
         feedbackBlocked = feedbackDocumentState == FeedbackDocumentClosingState.INVALID,
         notificationSent = latestNotificationEvent?.status == NotificationClosingStatus.PUBLISHED,

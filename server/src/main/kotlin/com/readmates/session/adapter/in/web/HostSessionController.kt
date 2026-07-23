@@ -1,5 +1,6 @@
 package com.readmates.session.adapter.`in`.web
 
+import com.readmates.session.application.HostSessionListQuery
 import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.UpdateHostSessionCommand
@@ -9,6 +10,7 @@ import com.readmates.session.application.port.`in`.HostSessionLifecycleUseCase
 import com.readmates.session.application.port.`in`.HostSessionQueryUseCase
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
+import com.readmates.sessionrecord.application.model.SessionRecordStatus
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -52,7 +54,14 @@ class HostSessionController(
         member: CurrentMember,
         @RequestParam(required = false) limit: Int?,
         @RequestParam(required = false) cursor: String?,
-    ) = hostSessionQueryUseCase.list(member, PageRequest.cursor(limit, cursor, defaultLimit = 50, maxLimit = 100))
+        @RequestParam(required = false) search: String?,
+        @RequestParam(required = false) state: String?,
+        @RequestParam(required = false) recordStatus: SessionRecordStatus?,
+    ) = hostSessionQueryUseCase.list(
+        member,
+        PageRequest.cursor(limit, cursor, defaultLimit = 50, maxLimit = 100),
+        HostSessionListQuery(search, state, recordStatus),
+    )
 
     @GetMapping("/{sessionId}")
     fun detail(

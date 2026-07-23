@@ -1,6 +1,7 @@
 package com.readmates.sessionclosing.application.model
 
 import com.readmates.session.application.SessionRecordVisibility
+import com.readmates.sessionrecord.application.model.SessionRecordStatus
 import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.util.UUID
@@ -114,3 +115,32 @@ data class ClosingEvidence(
     val publicRecordHref: String?,
     val memberReflectionHref: String?,
 )
+
+object SessionRecordReadinessPolicy {
+    fun recordStatus(
+        summaryPublished: Boolean,
+        highlightCount: Int,
+        oneLinerCount: Int,
+        feedbackReady: Boolean,
+        hasDraft: Boolean,
+    ): SessionRecordStatus {
+        val recordSaved = recordSaved(summaryPublished, highlightCount, oneLinerCount)
+        return when {
+            recordSaved && feedbackReady && !hasDraft -> SessionRecordStatus.COMPLETE
+            recordSaved || feedbackReady || hasDraft -> SessionRecordStatus.INCOMPLETE
+            else -> SessionRecordStatus.NOT_STARTED
+        }
+    }
+
+    fun recordSaved(
+        summaryPublished: Boolean,
+        highlightCount: Int,
+        oneLinerCount: Int,
+    ): Boolean = summaryPublished || highlightCount > 0 || oneLinerCount > 0
+
+    fun needsAttention(
+        state: String,
+        recordStatus: SessionRecordStatus,
+        hasDraft: Boolean,
+    ): Boolean = state in setOf("CLOSED", "PUBLISHED") && (recordStatus != SessionRecordStatus.COMPLETE || hasDraft)
+}

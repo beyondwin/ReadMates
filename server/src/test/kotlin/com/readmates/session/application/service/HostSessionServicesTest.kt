@@ -8,6 +8,7 @@ import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.session.application.CreatedSessionResponse
 import com.readmates.session.application.HostAttendanceResponse
+import com.readmates.session.application.HostAttendanceAuditTransition
 import com.readmates.session.application.HostPublicationResponse
 import com.readmates.session.application.HostSessionDeletionCounts
 import com.readmates.session.application.HostSessionDeletionPreviewResponse
@@ -15,6 +16,8 @@ import com.readmates.session.application.HostSessionDeletionResponse
 import com.readmates.session.application.HostSessionDetailResponse
 import com.readmates.session.application.HostSessionFeedbackDocument
 import com.readmates.session.application.HostSessionListItem
+import com.readmates.session.application.HostSessionListQuery
+import com.readmates.session.application.HostSessionBasicAuditSnapshot
 import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.model.AttendanceEntryCommand
@@ -26,6 +29,7 @@ import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
 import com.readmates.session.application.model.UpsertPublicationCommand
 import com.readmates.session.application.port.out.HostSessionAttendancePort
+import com.readmates.session.application.port.out.HostSessionAuditPort
 import com.readmates.session.application.port.out.HostSessionDeletionPort
 import com.readmates.session.application.port.out.HostSessionDraftPort
 import com.readmates.session.application.port.out.HostSessionLifecyclePort
@@ -151,6 +155,46 @@ class HostSessionServicesTest {
 
         assertEquals(1, result.count)
         assertEquals("confirmAttendance:$sessionId:1", port.calls.single())
+    }
+
+    @Test
+    fun `basic update audit records allowlisted field names without credential values`() {
+        val port = RecordingHostSessionPorts()
+        val before = basicAuditSnapshot()
+        port.basicSnapshots += before
+        port.basicSnapshots +=
+            before.copy(
+                title = "수정된 회차",
+                meetingUrl = "https://changed.invalid/private",
+                meetingPasscode = "changed-private-value",
+            )
+        val service = HostSessionDraftCommandService(port, port)
+
+        service.update(UpdateHostSessionCommand(host, sessionId, hostSessionCommand()))
+
+        assertThat(port.basicAuditFields).containsExactlyInAnyOrder("meetingPasscode", "meetingUrl", "title")
+        assertThat(port.basicAuditFields.joinToString())
+            .doesNotContain("changed.invalid")
+            .doesNotContain("changed-private-value")
+    }
+
+    @Test
+    fun `attendance audit records membership id and changed state only`() {
+        val port = RecordingHostSessionPorts()
+        val membershipId = UUID.fromString("00000000-0000-0000-0000-000000000401")
+        port.attendanceStates = mapOf(membershipId to "ABSENT")
+        val service = HostSessionAttendanceService(port, port)
+        val command =
+            ConfirmAttendanceCommand(
+                host = host,
+                sessionId = sessionId,
+                entries = listOf(AttendanceEntryCommand(membershipId.toString(), "ATTENDED")),
+            )
+
+        service.confirmAttendance(command)
+
+        assertThat(port.attendanceAuditTransitions)
+            .containsExactly(HostAttendanceAuditTransition(membershipId.toString(), "ABSENT", "ATTENDED"))
     }
 
     @Test
@@ -342,12 +386,29 @@ class HostSessionServicesTest {
             meetingPasscode = "readmates",
         )
 
+    private fun basicAuditSnapshot() =
+        HostSessionBasicAuditSnapshot(
+            title = "7회차",
+            bookTitle = "책",
+            bookAuthor = "저자",
+            bookLink = null,
+            bookImageUrl = null,
+            date = "2026-05-20",
+            startTime = "19:30",
+            endTime = "21:30",
+            questionDeadlineAt = "2026-05-19T14:59Z",
+            locationLabel = "온라인",
+            meetingUrl = "https://original.invalid/private",
+            meetingPasscode = "original-private-value",
+        )
+
     private class RecordingHostSessionPorts :
         HostSessionQueryPort,
         HostSessionDraftPort,
         HostSessionLifecyclePort,
         HostSessionDeletionPort,
         HostSessionAttendancePort,
+        HostSessionAuditPort,
         HostSessionPublicationPort {
         val calls = mutableListOf<String>()
         var listHost: CurrentMember? = null
@@ -360,10 +421,15 @@ class HostSessionServicesTest {
         var closeChanged = true
         var publishChanged = true
         var throwOnUpsertPublication = false
+        val basicSnapshots = ArrayDeque<HostSessionBasicAuditSnapshot>()
+        var basicAuditFields: Set<String> = emptySet()
+        var attendanceStates: Map<UUID, String> = emptyMap()
+        var attendanceAuditTransitions: List<HostAttendanceAuditTransition> = emptyList()
 
         override fun list(
             host: CurrentMember,
             pageRequest: PageRequest,
+            query: HostSessionListQuery,
         ): CursorPage<HostSessionListItem> {
             listHost = host
             return CursorPage(emptyList(), null)
@@ -388,6 +454,27 @@ class HostSessionServicesTest {
                 state = "OPEN",
                 visibility = SessionRecordVisibility.HOST_ONLY,
             ).also { calls += "create:${command.title}" }
+
+        override fun loadBasicSnapshot(host: CurrentMember, sessionId: UUID): HostSessionBasicAuditSnapshot? =
+            basicSnapshots.removeFirstOrNull()
+
+        override fun loadAttendanceStates(
+            host: CurrentMember,
+            sessionId: UUID,
+            membershipIds: Set<UUID>,
+        ): Map<UUID, String> = attendanceStates.filterKeys { it in membershipIds }
+
+        override fun recordBasicUpdate(host: CurrentMember, sessionId: UUID, changedFields: Set<String>) {
+            basicAuditFields = changedFields
+        }
+
+        override fun recordAttendanceUpdate(
+            host: CurrentMember,
+            sessionId: UUID,
+            transitions: List<HostAttendanceAuditTransition>,
+        ) {
+            attendanceAuditTransitions = transitions
+        }
 
         override fun detail(command: HostSessionIdCommand) =
             hostSessionDetail(command.sessionId).also { calls += "detail:${command.sessionId}" }

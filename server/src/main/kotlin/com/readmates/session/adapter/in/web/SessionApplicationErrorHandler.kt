@@ -7,6 +7,7 @@ import com.readmates.session.application.HostSessionNotFoundException
 import com.readmates.session.application.HostSessionOpenNotAllowedException
 import com.readmates.session.application.HostSessionParticipantNotFoundException
 import com.readmates.session.application.HostSessionPublishNotAllowedException
+import com.readmates.session.application.InvalidHostSessionCursorException
 import com.readmates.session.application.InvalidMembershipIdException
 import com.readmates.session.application.InvalidQuestionSetException
 import com.readmates.session.application.InvalidSessionScheduleException
@@ -56,5 +57,13 @@ class SessionApplicationErrorHandler {
             status = HttpStatus.BAD_REQUEST,
             code = "INVALID_REQUEST",
             message = "세션 요청 값을 확인해 주세요.",
+        )
+
+    @ExceptionHandler(InvalidHostSessionCursorException::class)
+    fun handleInvalidCursor(): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            status = HttpStatus.BAD_REQUEST,
+            code = "INVALID_CURSOR",
+            message = "커서가 현재 검색 조건과 일치하지 않습니다.",
         )
 }

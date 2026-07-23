@@ -164,3 +164,38 @@ class SessionRecordException(
     val error: SessionRecordError,
     message: String,
 ) : RuntimeException(message)
+
+enum class HostSessionHistoryType {
+    BASIC_INFO_UPDATED,
+    ATTENDANCE_UPDATED,
+    RECORD_REVISION_APPLIED,
+    RECORD_REVISION_RESTORED,
+    NOTIFICATION_SENT,
+    NOTIFICATION_SKIPPED,
+}
+
+data class HostSessionHistoryAttendanceTransition(
+    val membershipId: UUID,
+    val from: String,
+    val to: String,
+)
+
+data class HostSessionHistoryItem(
+    val id: UUID,
+    val type: HostSessionHistoryType,
+    val createdAt: OffsetDateTime,
+    val actorMembershipId: UUID,
+    val changedFields: List<String> = emptyList(),
+    val attendanceTransitions: List<HostSessionHistoryAttendanceTransition> = emptyList(),
+    val revisionId: UUID? = null,
+    val revisionVersion: Long? = null,
+    val revisionSource: SessionRecordSource? = null,
+    val restoredFromRevisionId: UUID? = null,
+    val notificationEventId: UUID? = null,
+)
+
+data class HostSessionHistoryCursor(
+    val createdAt: OffsetDateTime,
+    val typeSort: Int,
+    val id: UUID,
+)

@@ -2,6 +2,7 @@ package com.readmates.session.adapter.out.persistence
 
 import com.readmates.session.application.HostSessionDetailResponse
 import com.readmates.session.application.HostSessionListItem
+import com.readmates.session.application.HostSessionListQuery
 import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.model.HostSessionCommand
@@ -45,7 +46,8 @@ class JdbcHostSessionWriteAdapter(
     override fun list(
         host: CurrentMember,
         pageRequest: PageRequest,
-    ): CursorPage<HostSessionListItem> = queries.list(jdbcTemplate, host, pageRequest)
+        query: HostSessionListQuery,
+    ): CursorPage<HostSessionListItem> = queries.list(jdbcTemplate, host, pageRequest, query)
 
     override fun upcoming(member: CurrentMember): List<UpcomingSessionItem> = queries.upcoming(jdbcTemplate, member)
 
