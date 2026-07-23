@@ -2,6 +2,10 @@ import { z } from "zod";
 import type { HostClubOperationsSnapshot } from "@/shared/model/club-operations";
 import type { AttendanceStatus, RsvpStatus, SessionState } from "@/shared/model/readmates-types";
 import type { PagedResponse } from "@/shared/model/paging";
+import type {
+  NotificationDecision,
+  SessionRecordStatus,
+} from "./host-session-record-contracts";
 export type { AttendanceStatus, RsvpStatus, SessionState } from "@/shared/model/readmates-types";
 export type { CurrentSessionResponse } from "@/shared/model/current-session-contracts";
 
@@ -472,12 +476,33 @@ export type HostSessionListItem = {
   locationLabel: string;
   state: SessionState;
   visibility: SessionRecordVisibility;
+  recordStatus: SessionRecordStatus;
+  needsAttention: boolean;
+  hasDraft: boolean;
+  liveRevision: number;
+  draftRevision: number | null;
+  lastModifiedAt: string | null;
 };
 
 export type HostSessionListPage = PagedResponse<HostSessionListItem>;
 
 export type HostSessionVisibilityRequest = {
   visibility: SessionRecordVisibility;
+  previewId?: string | null;
+  notificationDecision?: NotificationDecision | null;
+};
+
+export type HostSessionVisibilityPreviewRequest = {
+  visibility: SessionRecordVisibility;
+};
+
+export type HostSessionVisibilityPreviewResponse = {
+  previewId: string;
+  targetCount: number;
+  expectedInAppCount: number;
+  expectedEmailCount: number;
+  excludedCount: number;
+  expiresAt: string;
 };
 
 export type HostSessionPublication = {
