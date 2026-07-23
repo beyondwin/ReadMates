@@ -1,6 +1,6 @@
 # Host Notification Composer Integration v2 Release Readiness
 
-Date: 2026-07-24
+Date: 2026-07-23
 
 Review base: `origin/main` at `f5336b78fb21199710e852fc0f0804289a370831`
 
@@ -8,7 +8,9 @@ Reviewed scope: the complete `origin/main..HEAD` branch plus the Task 12 working
 
 ## Decision
 
-The branch is locally ready for review and merge after the Task 12 commit. It is not yet ready for a release tag: the tag-mode CHANGELOG guard correctly rejects concrete entries under `Unreleased`, and production migration/deploy smoke requires operator access after merge and versioning.
+The accumulated concrete CHANGELOG body is prepared locally under `v2.0.0 - 2026-07-23`, while `Unreleased` is restored to the documented single-placeholder convention. A major version is required because the old and new frontend/server API pairings are not compatible long-lived deployment states.
+
+This preparation does not publish `v2.0.0`. The branch remains blocked by a local `CHECK_FAILURE` until the exact `./scripts/pre-push-check.sh --full --release` command is rerun successfully at the prepared HEAD. Production migration/deploy smoke also requires operator access after merge and a separately authorized tag.
 
 The reviewed branch contains two intentional release surfaces:
 
@@ -19,11 +21,11 @@ No push, merge, pull request, tag, deploy, production policy mutation, or live n
 
 ## Blocker
 
-### Release tag is blocked until `Unreleased` is versioned
+### Prior canonical release gate is `CHECK_FAILURE`
 
-`./scripts/pre-push-check.sh --full --release` stopped at `check_changelog_unreleased_guard` before running executable gates. The guard found required concrete feature categories under `## Unreleased`. This is expected for a merge candidate but must be resolved before tagging by moving the entries into the selected `vMAJOR.MINOR.PATCH` section. The emergency `--no-changelog-check` override was not used.
+The earlier exact `./scripts/pre-push-check.sh --full --release` run stopped nonzero at `check_changelog_unreleased_guard` before executable gates. Per the release-management policy this is `CHECK_FAILURE`, not an expected success state, and the passing `--full --no-release` run is complementary evidence rather than a substitute.
 
-This does not block the Task 12 branch commit or merge. It does block claiming tag readiness.
+The concrete entries are now under the local `v2.0.0 - 2026-07-23` release-preparation section and the emergency `--no-changelog-check` override remains unused. The blocker stays open until the exact release command exits 0 at the prepared HEAD.
 
 ## High
 
@@ -40,7 +42,7 @@ The host notification and session-record contracts intentionally remove the lega
 - `PATCH /api/host/sessions/{sessionId}/visibility` returns a session plus composer context and rejects legacy `previewId`/`notificationDecision`.
 - `POST /api/host/sessions/{sessionId}/record-apply-preview` returns the event type and expected draft hash.
 - `POST /api/host/sessions/{sessionId}/record-apply` requires `applyRequestId`, expected draft/live revisions, and `expectedDraftHash`; it returns revision metadata plus composer context.
-- Manual options/preview/confirm carry `contentRevision`; `SELECTED_MEMBERS` requires one or more unique active membership IDs from the current club.
+- Manual options/preview/confirm carry `contentRevision`; next-book/reminder default to `ALL_ACTIVE_MEMBERS`, feedback/session-record default to `CONFIRMED_ATTENDEES`, all templates default to `BOTH`, and `SELECTED_MEMBERS` requires an explicit choice of one or more unique active membership IDs from the current club.
 - `GET/PUT /api/host/notifications/policy` exposes the opt-in session-reminder policy.
 - `GET /api/host/sessions/{sessionId}/feedback-document/preview` exposes the staged feedback document to the current host only.
 
@@ -81,7 +83,7 @@ Tag-triggered `Deploy Front`, tag-triggered `Deploy Server Image`, GHCR image sc
 - Session history reads do not create legacy decision rows.
 - No architecture-test baseline or exception file changed.
 - No deploy workflow trigger or permission widening was found. The CI change fail-closes partial private-guidance source contracts.
-- The Task 12 diff contains no committed secret, private member data, local absolute path, private domain, OCID, VM IP, or token-shaped example.
+- The complete `origin/main..HEAD` tracked diff is the required private-data/token/local-path scan scope; its prepared-HEAD rerun is recorded as pending until the release gate and independent safety commands complete.
 - `readmates.host-action-confirmation.required` controls staged session-record capability exposure only; it does not control dispatch.
 
 ## Migration and API Contract
@@ -96,11 +98,17 @@ policy ON scheduler -> automatic reminder outbox
 
 V42 is the only migration added by the notification-composer integration. V39–V41 remain byte-for-byte unchanged by Task 12. Migration coverage verifies application from clean schema and the expected V42 tables/columns/check constraints.
 
-Manual preview is bound to the exact content revision, selection hash, host/club/session/template, and ten-minute TTL. Confirm fails closed on stale revision, expired or altered preview, an empty/duplicate/inactive/foreign selected membership set, or an unacknowledged duplicate send. Delivery still uses the existing outbox → Kafka → delivery/inbox pipeline.
+Manual preview is bound to the exact content revision, selection hash, host/club/session/template, and ten-minute TTL. Next-book/reminder default to `ALL_ACTIVE_MEMBERS`; feedback/session-record default to `CONFIRMED_ATTENDEES`; all default to `BOTH`; and `SELECTED_MEMBERS` is explicit. Confirm fails closed on stale revision, expired or altered preview, an empty/duplicate/inactive/foreign selected membership set, or an unacknowledged duplicate send. Delivery still uses the existing outbox → Kafka → delivery/inbox pipeline.
 
 Apply receipt identity is scoped by club, session, and `applyRequestId`. Reusing the same request converges on the existing applied revision; reusing it for a different apply contract is rejected.
 
 ## Evidence and Residual Risk
+
+Review path:
+
+- The complete branch review uses `origin/main..HEAD`, not only the Task 12 implementation plan or last commit.
+- The Task 12 change set also received an independent per-task review. That review found the date, semantic-version, audience-default, scan-scope, and gate-classification gaps repaired by this release-preparation follow-up.
+- This independent task review is repository evidence, not non-author human approval. Because the branch changes DB/API/auth surfaces, the DB/API release PR path, remote CI, and operator-owned deployment proof remain required before publication.
 
 Focused evidence:
 
@@ -124,8 +132,8 @@ Canonical local evidence:
 - `./scripts/build-public-release-candidate.sh` — passed. The repository candidate contract intentionally excludes historical/report artifacts.
 - `./scripts/public-release-check.sh .tmp/public-release-candidate` — passed; gitleaks found no leaks.
 
-The exact tag-mode command remains a recorded failure, not a pass:
+The earlier exact tag-mode command remains a recorded `CHECK_FAILURE`, not a pass:
 
-- `./scripts/pre-push-check.sh --full --release` — stopped at the required CHANGELOG tag guard; executable checks were subsequently covered by the passing `--full --no-release` run and the separate public-candidate commands.
+- `./scripts/pre-push-check.sh --full --release` — stopped nonzero at the CHANGELOG tag guard. The prepared-HEAD exact rerun is pending; `--full --no-release` and separate public-candidate commands do not close this blocker.
 
-Residual release-operation risk remains until a version section is cut, remote CI passes on the pushed commit, both tag workflows succeed, V42 is observed in production Flyway history before traffic promotion, and sanitized BFF/OAuth/notification smoke succeeds. Passing local tests is evidence for merge readiness, not proof that those production steps have completed.
+Residual release-operation risk remains until the exact local release gate passes, remote CI passes on the pushed commit, both tag workflows succeed, V42 is observed in production Flyway history before traffic promotion, and sanitized BFF/OAuth/notification smoke succeeds. Passing local tests is evidence for review readiness, not proof that those production steps have completed.

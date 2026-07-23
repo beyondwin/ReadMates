@@ -8,6 +8,12 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Highlights
 
+- 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
+
+## v2.0.0 - 2026-07-23
+
+### Highlights
+
 - **근거 기반 전체 대본 AI 세션 기록:** 호스트가 지원 TXT를 업로드하면 provider 호출 전에 모든 화자를 같은 클럽의 활성 회원과 정확히 맞추고, 전체 대본 한 번의 structured generation으로 네 섹션과 근거 turn ID를 만듭니다. 호스트는 desktop/mobile 근거 panel과 네 섹션 review ledger를 모두 확인한 뒤에만 저장할 수 있습니다.
 - **Spring AI 2 + distributed tracing:** OpenAI/Anthropic/Google 직접 adapter와 legacy pipeline을 제거하고 grounded-only Spring AI 2.0 thin adapter로 통합했습니다. API→Kafka→worker→Spring AI→provider trace를 internal Tempo/Grafana에 연결하되 AI content와 user/session/club identity는 observability 표면에서 제외합니다.
 - **호스트 세션 기록 revision workflow:** `/app/host/sessions` 장부에서 과거 회차를 찾고 기본 정보·출석을 즉시 저장하며, 공개 기록은 공통 초안에서 검토한 뒤 immutable revision으로 적용하거나 과거 revision을 새 초안으로 복원할 수 있습니다.
@@ -28,7 +34,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - **호스트 알림 발송 분리:** 다음 책 공개, 피드백 문서 적용, 세션 기록 수정, 외부 JSON commit, AI commit은 콘텐츠·revision·apply receipt만 갱신하며 legacy 호스트 결정 ledger나 outbox row를 만들지 않습니다. 이후 composer가 현재 `contentRevision`을 고정해 options → preview → confirm 순서로 수동 dispatch와 outbox를 만들고, stale/만료/중복/클럽 밖 수신자는 fail closed합니다.
 - **공통 기록 초안과 적용 receipt:** 수동 편집, 외부 JSON, AI 결과는 모두 live record를 직접 바꾸지 않고 같은 staged draft에 저장됩니다. 적용 작업은 호스트가 제공한 `applyRequestId`와 draft hash를 검증해 콘텐츠·immutable revision·idempotent apply receipt를 원자적으로 갱신하고 발송 가능한 composer context를 반환합니다.
 - **호스트 피드백 preview:** 적용 전 staged draft의 피드백 문서를 host-only preview route에서 검토할 수 있으며, member/public 피드백 문서는 live 적용 뒤 기존 열람 권한을 따릅니다.
-- **알림 대상과 리마인더 정책:** 수동 발송 기본값은 전체 활성 멤버와 `BOTH` 채널입니다. `SELECTED_MEMBERS`는 현재 클럽의 중복 없는 활성 membership ID를 한 명 이상 요구하고, 예약 리마인더는 클럽별 정책이 명시적으로 켜진 경우에만 scheduler가 outbox row를 만듭니다. 정책 row가 없으면 꺼짐입니다.
+- **알림 대상과 리마인더 정책:** 다음 책과 리마인더의 기본 대상은 `ALL_ACTIVE_MEMBERS`, 피드백 문서와 세션 기록의 기본 대상은 `CONFIRMED_ATTENDEES`이며 기본 채널은 모두 `BOTH`입니다. `SELECTED_MEMBERS`는 호스트가 명시적으로 선택해야 하고 현재 클럽의 중복 없는 활성 membership ID를 한 명 이상 요구합니다. 예약 리마인더는 클럽별 정책이 명시적으로 켜진 경우에만 scheduler가 outbox row를 만들며, 정책 row가 없으면 꺼짐입니다.
 - **의존성 보안:** 전이 의존성 `brace-expansion`을 DoS 취약점이 수정된 `5.0.7` 이상으로 강제합니다.
 
 ### Database
@@ -40,6 +46,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Deployment Notes
 
+- `v2.0.0` major release 준비입니다. 기존 SEND/SKIP mutation 계약을 제거한 새 frontend/server API 조합은 이전 frontend 또는 server와 장기간 혼용할 수 없으므로 호환 쌍을 같은 release commit에서 배포해야 합니다. 이 섹션은 2026-07-23 로컬 문서 준비이며 tag, GitHub Release, push, production deploy가 수행됐다는 뜻이 아닙니다.
 - Legacy/direct provider 실행과 runtime selector는 없습니다. 활성화 전에 provider allowlist/key, capability, Google paid-tier retention 확인, mock-wire/E2E, single-node Redis 전제를 검증합니다. Kafka max poll interval 기본값은 세 번의 4분 요청과 bounded delay/validation margin을 포함해 16분입니다.
 - Transcript/turns/result/evidence는 6시간 Redis payload로만 유지하고 commit/cancel 후 삭제합니다. MySQL receipt와 Redis revision/lease로 crash window를 복구하며 `COMMITTED + cleanupPending`은 DB write를 반복하지 않고 cleanup만 재시도합니다. Platform admin은 metadata-only 복구만 수행합니다.
 - Rollback은 AI/consumer를 먼저 끄고 6시간 AI TTL을 기다린 뒤 이전 image로 복원합니다. 승인된 job namespace cleanup만 허용하며 Redis 전체 flush나 V38 destructive rollback은 금지합니다.

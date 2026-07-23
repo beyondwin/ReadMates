@@ -335,7 +335,7 @@ Email delivery dispatch/worker retry 간격은 `READMATES_NOTIFICATION_RETRY_DEL
 - Host dashboard의 알림 섹션에서 pending/failed/dead/sentLast24h를 확인합니다.
 - 호스트 알림 운영 페이지는 `/app/host/notifications`입니다.
 - 호스트 알림 운영 페이지에서 현재 host club의 event outbox와 channel delivery ledger를 확인하고, pending/failed email delivery를 처리하며, `DEAD` email delivery를 retry 가능한 상태로 복구할 수 있습니다.
-- 같은 페이지와 콘텐츠 변경 직후 열린 composer에서 세션, 템플릿, 대상 그룹, 채널을 선택한 뒤 preview와 confirm을 거쳐 알림 이벤트를 만들 수 있습니다. 기본값은 전체 활성 멤버와 `BOTH`이고, `SELECTED_MEMBERS`는 현재 클럽의 중복 없는 활성 membership을 한 명 이상 요구합니다. Preview는 현재 `contentRevision`과 함께 10분 TTL로 저장되며, stale revision이나 같은 세션/템플릿/revision의 최근 수동 발송은 재-preview 또는 명시적 재발송 확인을 요구합니다.
+- 같은 페이지와 콘텐츠 변경 직후 열린 composer에서 세션, 템플릿, 대상 그룹, 채널을 선택한 뒤 preview와 confirm을 거쳐 알림 이벤트를 만들 수 있습니다. 이벤트별 기본 대상은 다음 책·리마인더의 `ALL_ACTIVE_MEMBERS`, 피드백 문서·세션 기록의 `CONFIRMED_ATTENDEES`이고 기본 채널은 모두 `BOTH`입니다. `SELECTED_MEMBERS`는 호스트가 명시적으로 선택해야 하며 현재 클럽의 중복 없는 활성 membership을 한 명 이상 요구합니다. Preview는 현재 `contentRevision`과 함께 10분 TTL로 저장되며, stale revision이나 같은 세션/템플릿/revision의 최근 수동 발송은 재-preview 또는 명시적 재발송 확인을 요구합니다.
 - 같은 페이지의 리마인더 정책은 기본 꺼짐입니다. Host `GET/PUT /api/host/notifications/policy`가 `sessionReminderEnabled=true`를 저장한 클럽만 scheduler 자동 outbox 생성 대상입니다.
 - 호스트 알림 운영 페이지에서 redesigned template helper를 쓰는 테스트 메일을 보낼 수 있습니다. 테스트 메일 copy는 별도 문구를 사용하고 CTA/deep link는 포함하지 않습니다. 테스트 메일 audit은 masked recipient email과 hash만 저장하고 raw recipient email은 저장하지 않습니다.
 - Host dashboard의 수동 처리 action은 현재 host club의 pending/failed 알림만 처리합니다.
