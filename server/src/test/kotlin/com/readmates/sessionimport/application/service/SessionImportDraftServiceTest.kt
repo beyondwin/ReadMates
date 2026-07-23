@@ -154,6 +154,39 @@ class SessionImportDraftServiceTest {
     }
 
     @Test
+    fun `manual trusted binding rejects a membership id owned by another display name`() {
+        val fixture = Fixture()
+        val target =
+            SessionImportTarget(
+                sessionId = fixture.command.sessionId,
+                clubId = fixture.host.clubId,
+                sessionNumber = 1,
+                bookTitle = "Book",
+                meetingDate = LocalDate.of(2026, 7, 23),
+                attendees =
+                    listOf(
+                        SessionImportAttendee(
+                            membershipId = fixture.authorMembershipId,
+                            displayName = "Authoritative Member",
+                            active = true,
+                        ),
+                    ),
+            )
+        val service = SessionImportService(TargetOnlyWritePort(target))
+
+        val preview =
+            service.validate(
+                fixture.command,
+                mapOf("Member" to fixture.authorMembershipId),
+                emptyMap(),
+            )
+
+        assertThat(preview.valid).isFalse()
+        assertThat(preview.highlights.single().authorMatched).isFalse()
+        assertThat(preview.oneLineReviews.single().authorMatched).isFalse()
+    }
+
+    @Test
     fun `validated replacement keeps normalized live write and cache invalidation contract`() {
         val fixture = Fixture()
         val preview = fixture.validator.validate(fixture.command)
@@ -218,6 +251,7 @@ class SessionImportDraftServiceTest {
             command: SessionImportCommand,
             trustedAuthorBindings: Map<String, UUID>,
             historicalAuthorBindings: Map<String, UUID>,
+            trustAuthorDisplayNames: Boolean,
         ): SessionImportPreviewResult {
             lastTrustedBindings = trustedAuthorBindings
             val record = SessionImportRecordPreview("Member", "Text", true, authorMembershipId.toString())

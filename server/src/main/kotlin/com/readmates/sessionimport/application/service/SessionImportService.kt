@@ -62,10 +62,17 @@ class SessionImportService(
         command: SessionImportCommand,
         trustedAuthorBindings: Map<String, java.util.UUID>,
         historicalAuthorBindings: Map<String, java.util.UUID>,
+        trustAuthorDisplayNames: Boolean,
     ): SessionImportPreviewResult {
         requireHost(command.host)
         val target = writePort.loadTarget(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
-        return validateAgainstTarget(command, target, trustedAuthorBindings, historicalAuthorBindings)
+        return validateAgainstTarget(
+            command,
+            target,
+            trustedAuthorBindings,
+            historicalAuthorBindings,
+            trustAuthorDisplayNames,
+        )
     }
 
     override fun replace(input: ValidatedSessionImportReplacement): SessionImportCommitResult {
@@ -114,6 +121,7 @@ class SessionImportService(
         target: SessionImportTarget,
         trustedAuthorBindings: Map<String, java.util.UUID> = emptyMap(),
         historicalAuthorBindings: Map<String, java.util.UUID> = emptyMap(),
+        trustAuthorDisplayNames: Boolean = false,
     ): SessionImportPreviewResult {
         val issues = mutableListOf<SessionImportIssue>()
         validateSessionMetadata(command, target, issues)
@@ -129,6 +137,7 @@ class SessionImportService(
                     "HIGHLIGHT_AUTHOR_NOT_FOUND",
                     trustedAuthorBindings,
                     historicalAuthorBindings,
+                    trustAuthorDisplayNames,
                 )
             }
         val oneLineReviews =
@@ -141,6 +150,7 @@ class SessionImportService(
                     "ONE_LINE_AUTHOR_NOT_FOUND",
                     trustedAuthorBindings,
                     historicalAuthorBindings,
+                    trustAuthorDisplayNames,
                 )
             }
         validateOneLineReviewAuthors(command, issues)
@@ -243,6 +253,7 @@ class SessionImportService(
         issueCode: String,
         trustedAuthorBindings: Map<String, java.util.UUID>,
         historicalAuthorBindings: Map<String, java.util.UUID>,
+        trustAuthorDisplayNames: Boolean,
     ): SessionImportRecordPreview {
         val trimmedAuthorName = authorName.trim()
         val trimmedText = text.trim()
@@ -253,7 +264,13 @@ class SessionImportService(
             } else {
                 target.attendees.firstOrNull {
                     it.membershipId == trustedMembershipId &&
-                        (it.active || historicalAuthorBindings[trimmedAuthorName] == trustedMembershipId)
+                        (
+                            historicalAuthorBindings[trimmedAuthorName] == trustedMembershipId ||
+                                (
+                                    it.active &&
+                                        (trustAuthorDisplayNames || it.displayName == trimmedAuthorName)
+                                )
+                        )
                 }
             }
         if (trimmedText.isBlank()) {

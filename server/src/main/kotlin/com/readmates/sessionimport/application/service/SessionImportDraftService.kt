@@ -36,6 +36,7 @@ class SessionImportDraftService(
                     input.command,
                     input.authorMembershipIdsByName,
                     historicalBindings,
+                    trustAuthorDisplayNames = input.source == SessionRecordDraftSource.AI_GENERATED,
                 ),
             source = input.source,
             expectedDraftRevision = input.expectedDraftRevision,

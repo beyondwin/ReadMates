@@ -25,6 +25,7 @@ interface ValidateSessionImportUseCase {
         command: SessionImportCommand,
         trustedAuthorBindings: Map<String, UUID> = emptyMap(),
         historicalAuthorBindings: Map<String, UUID> = emptyMap(),
+        trustAuthorDisplayNames: Boolean = false,
     ): SessionImportPreviewResult
 }
 

@@ -129,6 +129,8 @@ class SessionRecordApplyService(
                 importCommand,
                 draft.trustedAuthorBindings(),
                 draft.historicalAuthorBindings(editor.live, draft.trustedAuthorBindings()),
+                trustAuthorDisplayNames =
+                    draft.source == com.readmates.sessionrecord.application.model.SessionRecordDraftSource.AI_GENERATED,
             )
         if (!validated.valid) {
             throw SessionRecordException(

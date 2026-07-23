@@ -509,6 +509,7 @@ private class FakeValidator : ValidateSessionImportUseCase {
         command: com.readmates.sessionimport.application.model.SessionImportCommand,
         trustedAuthorBindings: Map<String, UUID>,
         historicalAuthorBindings: Map<String, UUID>,
+        trustAuthorDisplayNames: Boolean,
     ): SessionImportPreviewResult {
         calls += 1
         lastTrustedBindings = trustedAuthorBindings
