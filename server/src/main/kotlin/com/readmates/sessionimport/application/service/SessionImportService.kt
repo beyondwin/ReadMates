@@ -3,6 +3,7 @@ package com.readmates.sessionimport.application.service
 import com.readmates.feedback.application.FeedbackDocumentParser
 import com.readmates.session.application.HostSessionNotFoundException
 import com.readmates.session.application.SessionRecordVisibility
+import com.readmates.sessionimport.application.model.SESSION_IMPORT_FORMAT
 import com.readmates.sessionimport.application.model.SessionImportCommand
 import com.readmates.sessionimport.application.model.SessionImportCommitResult
 import com.readmates.sessionimport.application.model.SessionImportCommittedFeedbackDocument
@@ -184,7 +185,7 @@ class SessionImportService(
         target: SessionImportTarget,
         issues: MutableList<SessionImportIssue>,
     ) {
-        if (command.format != FORMAT) {
+        if (command.format != SESSION_IMPORT_FORMAT) {
             issues += SessionImportIssue("INVALID_FORMAT", "이 파일은 readmates-session-import:v1 형식이 아닙니다.")
         }
         if (command.recordVisibility == SessionRecordVisibility.HOST_ONLY) {
@@ -288,7 +289,6 @@ class SessionImportService(
     }
 
     private companion object {
-        private const val FORMAT = "readmates-session-import:v1"
         private const val MAX_HIGHLIGHT_COUNT = 6
     }
 }

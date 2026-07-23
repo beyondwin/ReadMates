@@ -9,6 +9,7 @@ import com.readmates.notification.application.model.RecordHostConfirmedNotificat
 import com.readmates.notification.application.port.`in`.ConfirmHostActionNotificationUseCase
 import com.readmates.notification.application.port.`in`.RecordHostConfirmedNotificationEventUseCase
 import com.readmates.notification.domain.NotificationEventType
+import com.readmates.sessionimport.application.model.SESSION_IMPORT_FORMAT
 import com.readmates.sessionimport.application.model.SessionImportCommand
 import com.readmates.sessionimport.application.model.SessionImportFeedbackDocumentCommand
 import com.readmates.sessionimport.application.model.SessionImportPublicationCommand
@@ -252,7 +253,7 @@ class SessionRecordApplyService(
         host = host,
         sessionId = sessionId,
         recordVisibility = snapshot.visibility,
-        format = snapshot.schema,
+        format = SESSION_IMPORT_FORMAT,
         session = SessionImportSessionCommand(live.sessionNumber, live.bookTitle, live.meetingDate),
         publication = SessionImportPublicationCommand(snapshot.publicationSummary),
         highlights = snapshot.highlights.map { SessionImportRecordCommand(it.authorDisplayName, it.text) },

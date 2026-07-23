@@ -5,6 +5,8 @@ import com.readmates.shared.security.AuthenticatedClubActor
 import java.time.LocalDate
 import java.util.UUID
 
+const val SESSION_IMPORT_FORMAT = "readmates-session-import:v1"
+
 data class SessionImportCommand(
     val host: AuthenticatedClubActor,
     val sessionId: UUID,

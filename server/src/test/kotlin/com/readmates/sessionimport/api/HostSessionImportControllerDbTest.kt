@@ -34,6 +34,9 @@ private const val HOST_MEMBERSHIP_ID = "00000000-0000-0000-0000-000000079521"
 private const val MEMBER_MEMBERSHIP_ID = "00000000-0000-0000-0000-000000079522"
 
 private const val CLEANUP_SQL = """
+update host_action_notification_previews
+set consumed_at = null, consumed_decision_id = null
+where session_id = '$SESSION_ID';
 delete from host_action_notification_decisions where session_id = '$SESSION_ID';
 delete from host_action_notification_previews where session_id = '$SESSION_ID';
 delete from session_record_revisions where session_id = '$SESSION_ID';
@@ -187,6 +190,51 @@ class HostSessionImportControllerDbTest(
                 Int::class.java,
             ),
         )
+    }
+
+    @Test
+    fun `committed json shared draft applies through canonical import validation`() {
+        mockMvc
+            .post("/api/host/sessions/$SESSION_ID/session-import/commit") {
+                with(user("session-import-host@example.test"))
+                contentType = MediaType.APPLICATION_JSON
+                content = validImportJson(recordVisibility = "PUBLIC")
+            }.andExpect {
+                status { isOk() }
+            }
+        val host = directHost()
+        val preview =
+            applyService.preview(
+                host,
+                PreviewSessionRecordApplyCommand(
+                    sessionId = UUID.fromString(SESSION_ID),
+                    expectedDraftRevision = 1,
+                    expectedLiveRevision = 0,
+                ),
+            )
+
+        val applied =
+            applyService.apply(
+                host,
+                ApplySessionRecordCommand(
+                    sessionId = UUID.fromString(SESSION_ID),
+                    previewId = preview.previewId,
+                    expectedDraftRevision = 1,
+                    expectedLiveRevision = 0,
+                    notificationDecision = NotificationDecision.SKIP,
+                ),
+            )
+
+        assertEquals(2, applied.liveRevision)
+        assertEquals(
+            "Import summary.",
+            scalar("select public_summary from public_session_publications where session_id = '$SESSION_ID'"),
+        )
+        assertEquals(
+            "JSON_IMPORT",
+            scalar("select source from session_record_revisions where session_id = '$SESSION_ID' and version = 2"),
+        )
+        assertEquals(0, countRows("session_record_drafts"))
     }
 
     @Test
