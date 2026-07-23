@@ -203,6 +203,10 @@ function publicTitle(pathname: string, publicBasePath = "") {
 }
 
 function appTitle(variant: Exclude<MobileHeaderVariant, "guest">, pathname: string) {
+  if (variant === "host" && pathname === "/app/host/sessions") {
+    return "기록";
+  }
+
   if (
     variant === "host" &&
     (pathname.startsWith("/app/archive") || pathname.startsWith("/app/sessions/") || pathname.startsWith("/app/feedback/"))
@@ -287,6 +291,10 @@ function appBackTarget(
 
   if (pathname === "/app/notes") {
     return { href: "/app", label: "홈", icon: "brand" };
+  }
+
+  if (pathname === "/app/host/sessions") {
+    return null;
   }
 
   if (pathname.startsWith("/app/host/sessions/")) {

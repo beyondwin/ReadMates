@@ -18,6 +18,7 @@ import {
   getMissingCurrentSessionMembersSummary,
   hostSessionEditHref,
 } from "@/features/host/model/host-dashboard-model";
+import type { HostSessionLedgerItem } from "@/features/host/model/host-session-ledger-model";
 import { deriveHostPrepPace, hostPrepPaceInputFrom } from "@/features/host/model/host-prep-pace";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { BookCover } from "@/shared/ui/book-cover";
@@ -35,6 +36,7 @@ import { badgeClass, checklistBadgeClass, checklistTextColor, hostAlertMetrics, 
 import { HostNotificationLedger } from "./dashboard/host-notification-ledger";
 import { InvitePipelineSection } from "./dashboard/invite-pipeline-section";
 import { MobileHostDashboard } from "./dashboard/mobile-host-dashboard";
+import { HostSessionAttentionSummary } from "./host-session-ledger";
 import { QuickAction } from "./dashboard/quick-action";
 import {
   ChecklistMarker,
@@ -98,6 +100,7 @@ export default function HostDashboard({
   hostSessions,
   notifications = EMPTY_NOTIFICATION_SUMMARY,
   clubOperations = null,
+  recordAttention = [],
   actions,
   LinkComponent = DefaultLinkComponent,
   hostDashboardReturnTarget = defaultHostDashboardReturnTarget,
@@ -109,6 +112,7 @@ export default function HostDashboard({
   hostSessions: HostSessionListPage;
   notifications?: HostNotificationSummary;
   clubOperations?: HostClubOperationsSnapshot | null;
+  recordAttention?: HostSessionLedgerItem[] | null;
   actions: HostDashboardActions;
   LinkComponent?: HostDashboardLinkComponent;
   hostDashboardReturnTarget?: ReadmatesReturnTarget;
@@ -305,6 +309,10 @@ export default function HostDashboard({
                   </div>
                 </div>
               ))}
+            </div>
+            <div style={{ marginTop: 14 }}>
+              <div className="eyebrow" style={{ marginBottom: 8 }}>기록 확인 필요</div>
+              <HostSessionAttentionSummary items={recordAttention} LinkComponent={LinkComponent} />
             </div>
           </div>
         </section>
@@ -568,6 +576,7 @@ export default function HostDashboard({
         currentMembershipId={auth?.membershipId}
         hasCurrentSession={hasCurrentSession}
         upcomingSessions={upcomingSessions}
+        recordAttention={recordAttention}
         upcomingActions={upcomingActions}
         upcomingMessage={upcomingMessage}
         hasMoreUpcomingSessions={Boolean(nextHostSessionsCursor)}

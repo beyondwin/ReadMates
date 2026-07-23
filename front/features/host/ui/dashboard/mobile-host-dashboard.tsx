@@ -8,10 +8,12 @@ import {
 } from "@/features/host/model/host-dashboard-model";
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
 import type { HostPrepPace } from "@/features/host/model/host-prep-pace";
+import type { HostSessionLedgerItem } from "@/features/host/model/host-session-ledger-model";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { formatDateOnlyLabel, formatMobileTodayLabel, hostAlertStateLabel } from "@/shared/ui/readmates-display";
 import { SessionTimingIdentity } from "@/shared/ui/session-identity";
 import { HostNotificationLedger } from "./host-notification-ledger";
+import { HostSessionAttentionSummary } from "../host-session-ledger";
 import { InvitePipelineSection } from "./invite-pipeline-section";
 import { QuickAction } from "./quick-action";
 import { HOST_DASHBOARD_LABELS, newSessionHref, quickActions, SESSION_REQUIRED_REASON } from "./constants";
@@ -44,6 +46,7 @@ export function MobileHostDashboard({
   currentMembershipId,
   hasCurrentSession,
   upcomingSessions,
+  recordAttention,
   upcomingActions,
   upcomingMessage,
   hasMoreUpcomingSessions,
@@ -70,6 +73,7 @@ export function MobileHostDashboard({
   currentMembershipId: string | null | undefined;
   hasCurrentSession: boolean;
   upcomingSessions: HostSessionListItem[];
+  recordAttention: HostSessionLedgerItem[] | null;
   upcomingActions: UpcomingActionHandlers;
   upcomingMessage: null | { kind: "alert" | "status"; text: string };
   hasMoreUpcomingSessions: boolean;
@@ -138,6 +142,9 @@ export function MobileHostDashboard({
               </div>
             </div>
           ))}
+        </div>
+        <div style={{ marginTop: 10 }}>
+          <HostSessionAttentionSummary items={recordAttention} LinkComponent={LinkComponent} />
         </div>
       </section>
 

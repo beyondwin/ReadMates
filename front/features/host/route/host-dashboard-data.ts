@@ -9,6 +9,7 @@ import {
   hostDashboardQuery,
   hostSessionListQuery,
 } from "@/features/host/queries/host-session-queries";
+import { hostSessionRecordLedgerQuery } from "@/features/host/queries/host-session-record-queries";
 import { isReadmatesApiError } from "@/shared/api/errors";
 import type {
   CurrentSessionResponse,
@@ -35,6 +36,7 @@ export type HostDashboardRouteData = {
   hostSessions: HostSessionListPage;
   notifications: HostNotificationSummary;
   clubOperations: HostClubOperationsResponse | null;
+  recordAttention?: HostSessionListPage;
 };
 
 export function hostDashboardLoaderFactory(client: QueryClient) {
@@ -42,12 +44,16 @@ export function hostDashboardLoaderFactory(client: QueryClient) {
     await requireHostLoaderAuth(args);
     const context = { clubSlug: clubSlugFromLoaderArgs(args) };
 
-    const [current, data, hostSessions, notifications, clubOperations] = await Promise.all([
+    const [current, data, hostSessions, notifications, clubOperations, recordAttention] = await Promise.all([
       client.fetchQuery(hostCurrentSessionQuery(context)),
       client.fetchQuery(hostDashboardQuery(context)),
       client.fetchQuery(hostSessionListQuery({ limit: DEFAULT_HOST_SESSION_LIST_LIMIT }, context)),
       fetchHostNotificationSummary(context).catch(notificationSummaryFallback),
       fetchHostClubOperations(context).catch(() => null),
+      client.fetchQuery(hostSessionRecordLedgerQuery({
+        needsAttention: true,
+        page: { limit: 3 },
+      }, context)).catch(() => null),
     ]);
 
     client.setQueryData(hostNotificationSummaryQuery(context).queryKey, notifications);
@@ -62,6 +68,7 @@ export function hostDashboardLoaderFactory(client: QueryClient) {
       hostSessions,
       notifications,
       clubOperations,
+      ...(recordAttention ? { recordAttention } : {}),
     };
   };
 }

@@ -56,9 +56,11 @@ describe("router route order", () => {
 
   it("matches host session detail routes before host and member wildcards", () => {
     const hostPaths = [
+      { pathname: "/app/host/sessions", routeId: "app-host" },
       { pathname: "/app/host/sessions/new", routeId: "app-host" },
       { pathname: "/app/host/sessions/session-7/edit", routeId: "app-host" },
       { pathname: "/app/host/sessions/session-7/closing", routeId: "app-host" },
+      { pathname: "/clubs/reading-sai/app/host/sessions", routeId: "club-app-host" },
       { pathname: "/clubs/reading-sai/app/host/sessions/new", routeId: "club-app-host" },
       { pathname: "/clubs/reading-sai/app/host/sessions/session-7/edit", routeId: "club-app-host" },
       { pathname: "/clubs/reading-sai/app/host/sessions/session-7/closing", routeId: "club-app-host" },

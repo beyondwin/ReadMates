@@ -83,10 +83,10 @@ const hostLinks: NavLink[] = [
     current: (pathname) => pathname === "/app/host",
   },
   {
-    key: "host-session-edit",
-    href: "/app/host/sessions/new",
-    label: READMATES_NAV_LABELS.host.sessionEditor,
-    current: (pathname) => pathname === "/app/host/sessions/new" || /^\/app\/host\/sessions\/[^/]+\/edit$/.test(pathname),
+    key: "host-session-records",
+    href: "/app/host/sessions",
+    label: READMATES_NAV_LABELS.host.sessionRecords,
+    current: (pathname) => pathname === "/app/host/sessions" || pathname.startsWith("/app/host/sessions/"),
   },
   {
     key: "host-notifications",

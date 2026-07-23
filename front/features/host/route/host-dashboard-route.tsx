@@ -24,6 +24,7 @@ import {
   useOpenHostSessionMutation,
   useSaveHostSessionVisibilityMutation,
 } from "@/features/host/queries/host-session-queries";
+import { hostSessionRecordLedgerQuery } from "@/features/host/queries/host-session-record-queries";
 import type { ReadmatesApiContext } from "@/shared/api/client";
 import { hostDashboardActions, type HostDashboardRouteData } from "./host-dashboard-data";
 
@@ -53,6 +54,10 @@ export function HostDashboardRoute({
   const clubOperationsQuery = useQuery(hostClubOperationsQuery(context));
   const visibilityMutation = useSaveHostSessionVisibilityMutation(context);
   const openMutation = useOpenHostSessionMutation(context);
+  const recordAttentionQuery = useQuery(hostSessionRecordLedgerQuery({
+    needsAttention: true,
+    page: { limit: 3 },
+  }, context));
 
   const actions = useMemo<HostDashboardActions>(() => ({
     updateCurrentSessionParticipation: hostDashboardActions.updateCurrentSessionParticipation,
@@ -80,6 +85,11 @@ export function HostDashboardRoute({
         hostSessions={sessionsQuery.data ?? loaderData.hostSessions}
         notifications={notificationsQuery.data ?? loaderData.notifications}
         clubOperations={clubOperationsQuery.data ?? loaderData.clubOperations}
+        recordAttention={
+          recordAttentionQuery.data?.items
+          ?? loaderData.recordAttention?.items
+          ?? (recordAttentionQuery.isError ? null : [])
+        }
         actions={actions}
         LinkComponent={LinkComponent}
         hostDashboardReturnTarget={hostDashboardReturnTarget}

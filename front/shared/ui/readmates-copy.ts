@@ -17,6 +17,7 @@ export const READMATES_NAV_LABELS = {
   host: {
     operations: "운영",
     sessionEditor: "세션 문서",
+    sessionRecords: "세션 기록",
     notifications: "알림 발송",
     invitations: "멤버 초대",
     memberApproval: "멤버 승인",
@@ -35,5 +36,5 @@ export const READMATES_MOBILE_TAB_LABELS = {
   hostSessionPending: "확인 중",
   hostNotifications: "알림",
   hostMembers: "멤버",
-  hostRecords: "아카이브",
+  hostRecords: "기록",
 } as const;

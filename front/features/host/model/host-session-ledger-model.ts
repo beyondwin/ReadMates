@@ -14,6 +14,27 @@ export type HostSessionLedgerBadge = {
   tone: "default" | "accent" | "warn" | "ok";
 };
 
+export type HostSessionLedgerItem = {
+  sessionId: string;
+  sessionNumber: number;
+  title: string;
+  bookTitle: string;
+  bookAuthor: string;
+  bookImageUrl: string | null;
+  date: string;
+  startTime: string;
+  endTime: string;
+  locationLabel: string;
+  state: SessionState;
+  visibility: "HOST_ONLY" | "MEMBER" | "PUBLIC";
+  recordStatus: HostSessionLedgerRecordStatus;
+  needsAttention: boolean;
+  hasDraft: boolean;
+  liveRevision: number;
+  draftRevision: number | null;
+  lastModifiedAt: string | null;
+};
+
 const SESSION_STATES = new Set<SessionState>(["DRAFT", "OPEN", "PUBLISHED", "CLOSED"]);
 const RECORD_STATUSES = new Set<HostSessionLedgerRecordStatus>(["NOT_STARTED", "INCOMPLETE", "COMPLETE"]);
 

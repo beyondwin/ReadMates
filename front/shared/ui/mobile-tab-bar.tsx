@@ -150,12 +150,10 @@ function hostTabs(currentSessionId?: string | null): TabLink[] {
     },
     {
       key: "host-records",
-      href: "/app/archive",
+      href: "/app/host/sessions",
       label: READMATES_MOBILE_TAB_LABELS.hostRecords,
       icon: "archive",
-      state: { readmatesWorkspace: "host" },
-      current: (pathname) =>
-        pathname.startsWith("/app/archive") || pathname.startsWith("/app/sessions/") || pathname.startsWith("/app/feedback/"),
+      current: (pathname) => pathname === "/app/host/sessions",
     },
   ];
 }
