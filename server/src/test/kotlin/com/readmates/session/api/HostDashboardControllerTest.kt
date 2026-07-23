@@ -21,6 +21,43 @@ import org.springframework.test.web.servlet.put
 import java.util.UUID
 
 private const val CLEANUP_GENERATED_HOST_SESSIONS_SQL = """
+    update host_action_notification_previews
+    set consumed_at = null, consumed_decision_id = null
+    where session_id in (
+      select id from sessions
+      where club_id = '00000000-0000-0000-0000-000000000001'
+        and number >= 7
+    );
+    delete from host_action_notification_decisions
+    where session_id in (
+      select id from sessions
+      where club_id = '00000000-0000-0000-0000-000000000001'
+        and number >= 7
+    );
+    delete from host_action_notification_previews
+    where session_id in (
+      select id from sessions
+      where club_id = '00000000-0000-0000-0000-000000000001'
+        and number >= 7
+    );
+    delete from session_record_drafts
+    where session_id in (
+      select id from sessions
+      where club_id = '00000000-0000-0000-0000-000000000001'
+        and number >= 7
+    );
+    delete from session_record_revisions
+    where session_id in (
+      select id from sessions
+      where club_id = '00000000-0000-0000-0000-000000000001'
+        and number >= 7
+    );
+    delete from host_session_change_audit
+    where session_id in (
+      select id from sessions
+      where club_id = '00000000-0000-0000-0000-000000000001'
+        and number >= 7
+    );
     delete from admin_closing_risk_ledger
     where club_id = '00000000-0000-0000-0000-000000000001'
       and session_id in (

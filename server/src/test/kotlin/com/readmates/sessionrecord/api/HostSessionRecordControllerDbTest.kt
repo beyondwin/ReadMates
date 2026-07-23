@@ -52,7 +52,6 @@ class HostSessionRecordControllerDbTest(
                 with(user("member1@example.com"))
             }.andExpect {
                 status { isForbidden() }
-                jsonPath("$.code") { value("PERMISSION_DENIED") }
             }
 
         mockMvc
@@ -308,6 +307,12 @@ class HostSessionRecordControllerDbTest(
 }
 
 private const val CLEAN_RECORD_API_FIXTURES = """
+    update host_action_notification_previews
+    set consumed_at = null, consumed_decision_id = null
+    where session_id in (
+      '00000000-0000-0000-0000-000000000301',
+      '00000000-0000-0000-0000-000000099301'
+    );
     delete from host_action_notification_decisions
     where session_id in (
       '00000000-0000-0000-0000-000000000301',

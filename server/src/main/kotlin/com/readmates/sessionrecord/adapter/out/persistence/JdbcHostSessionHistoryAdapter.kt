@@ -8,6 +8,7 @@ import com.readmates.sessionrecord.application.model.SessionRecordSource
 import com.readmates.sessionrecord.application.port.out.HostSessionHistoryPort
 import com.readmates.sessionrecord.application.service.typeSort
 import com.readmates.shared.db.dbString
+import com.readmates.shared.db.toUtcLocalDateTime
 import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.security.CurrentMember
 import org.springframework.jdbc.core.JdbcTemplate
@@ -93,10 +94,10 @@ class JdbcHostSessionHistoryAdapter(
             if (cursor == null) {
                 ""
             } else {
-                parameters += cursor.createdAt
-                parameters += cursor.createdAt
+                parameters += cursor.createdAt.toUtcLocalDateTime()
+                parameters += cursor.createdAt.toUtcLocalDateTime()
                 parameters += cursor.typeSort
-                parameters += cursor.createdAt
+                parameters += cursor.createdAt.toUtcLocalDateTime()
                 parameters += cursor.typeSort
                 parameters += cursor.id.dbString()
                 """

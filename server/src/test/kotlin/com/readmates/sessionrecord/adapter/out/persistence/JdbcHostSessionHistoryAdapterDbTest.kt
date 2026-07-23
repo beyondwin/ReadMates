@@ -280,6 +280,12 @@ class JdbcHostSessionHistoryAdapterDbTest(
 }
 
 private const val CLEANUP_HISTORY_TEST_FIXTURES = """
+    update host_action_notification_previews
+    set consumed_at = null, consumed_decision_id = null
+    where id in (
+      '00000000-0000-0000-0000-000000098501',
+      '00000000-0000-0000-0000-000000098502'
+    );
     delete from host_action_notification_decisions where id in (
       '00000000-0000-0000-0000-000000098601',
       '00000000-0000-0000-0000-000000098602'
