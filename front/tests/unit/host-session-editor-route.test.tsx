@@ -73,7 +73,7 @@ describe("EditHostSessionRoute query actions", () => {
     });
   });
 
-  it("keeps editor rendering from query seeded data and invalidates notifications after import commit", async () => {
+  it("keeps editor rendering from query seeded data and leaves notifications untouched after import commit", async () => {
     const user = userEvent.setup();
     const onSessionRecordsChanged = vi.fn().mockResolvedValue(undefined);
     const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
@@ -129,7 +129,7 @@ describe("EditHostSessionRoute query actions", () => {
     expect(commitHostSessionImport).toHaveBeenCalledWith("session-7", expect.objectContaining({
       format: "readmates-session-import:v1",
     }));
-    expect(invalidateSpy).toHaveBeenCalledWith({
+    expect(invalidateSpy).not.toHaveBeenCalledWith({
       queryKey: hostNotificationKeys.scope({ clubSlug: "reading-sai" }),
     });
     expect(onSessionRecordsChanged).toHaveBeenCalledWith({

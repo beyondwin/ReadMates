@@ -47,6 +47,7 @@ describe("session import model", () => {
   it("describes the replacement scope in one warning", () => {
     expect(sessionImportReplacementWarning()).toContain("요약");
     expect(sessionImportReplacementWarning()).toContain("피드백 문서");
+    expect(sessionImportReplacementWarning()).toContain("알림은 생성되지 않습니다");
   });
 
   it("summarizes author matching across highlights and one-line reviews", () => {
@@ -174,7 +175,7 @@ describe("session import model", () => {
         "한줄평 2개 초안 저장",
         "피드백 문서 초안 저장: 독서모임 7차 피드백",
       ],
-      nextAction: "검토 후 변경사항을 반영하기 전까지 멤버와 공개 화면은 바뀌지 않습니다.",
+      nextAction: "알림은 생성되지 않습니다. 검토 후 변경사항을 반영하기 전까지 멤버와 공개 화면은 바뀌지 않습니다.",
     });
   });
 

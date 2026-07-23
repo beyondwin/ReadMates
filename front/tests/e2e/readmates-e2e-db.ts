@@ -588,6 +588,26 @@ where session_id in (
     and number >= 7
 );
 
+delete from notification_manual_dispatches
+where club_id = ${sqlString(clubId)}
+  and session_id in (
+    select id from sessions
+    where club_id = ${sqlString(clubId)}
+      and number >= 7
+  );
+
+delete from notification_manual_dispatch_previews
+where club_id = ${sqlString(clubId)}
+  and consumed_event_id in (
+    select id from notification_event_outbox
+    where club_id = ${sqlString(clubId)}
+      and aggregate_id in (
+        select id from sessions
+        where club_id = ${sqlString(clubId)}
+          and number >= 7
+      )
+  );
+
 delete from member_notifications
 where event_id in (
   select id from notification_event_outbox
@@ -619,6 +639,13 @@ where club_id = ${sqlString(clubId)}
   );
 
 delete from session_record_drafts
+where session_id in (
+  select id from sessions
+  where club_id = ${sqlString(clubId)}
+    and number >= 7
+);
+
+delete from session_record_apply_receipts
 where session_id in (
   select id from sessions
   where club_id = ${sqlString(clubId)}

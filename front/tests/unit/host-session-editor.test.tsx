@@ -11,10 +11,21 @@ vi.mock("@/features/host/aigen/ui/AiGenerateTab", () => ({
   }: {
     sessionId: string;
     clubSlug: string;
-    onCommitted: () => void;
+    onCommitted: (result: {
+      draftRevision: number;
+      baseLiveRevision: number;
+      liveApplied: boolean;
+    }) => void;
   }) => (
     <div data-testid="aigen-tab" data-session-id={sessionId} data-club-slug={clubSlug}>
-      <button type="button" onClick={onCommitted}>
+      <button
+        type="button"
+        onClick={() => onCommitted({
+          draftRevision: 5,
+          baseLiveRevision: 0,
+          liveApplied: false,
+        })}
+      >
         simulate AI commit
       </button>
     </div>
@@ -223,11 +234,9 @@ function recordWorkflow(
     confirmation: {
       open: false,
       preview: null,
-      decision: null,
       submitting: false,
       message: null,
       onReview: vi.fn(),
-      onDecisionChange: vi.fn(),
       onCancel: vi.fn(),
       onConfirm: vi.fn(),
     },
@@ -584,6 +593,77 @@ describe("HostSessionEditor", () => {
       expectedDraftRevision: 4,
     });
     expect(screen.getByRole("button", { name: "초안으로 가져오기" })).toBeEnabled();
+  });
+
+  it("shows a content-only apply review with revision and recovery context", async () => {
+    const user = userEvent.setup();
+    const onConfirm = vi.fn();
+    const workflow = recordWorkflow("MEMBER");
+    workflow.confirmation = {
+      open: true,
+      preview: {
+        eventType: "FEEDBACK_DOCUMENT_PUBLISHED",
+        changedSections: ["공개 요약", "피드백 문서"],
+        liveRevision: 0,
+        nextLiveRevision: 1,
+        draftRevision: 4,
+      },
+      submitting: false,
+      message: null,
+      onReview: vi.fn(),
+      onCancel: vi.fn(),
+      onConfirm,
+    } as never;
+
+    render(
+      <HostSessionEditorForTest
+        session={session}
+        recordWorkflow={workflow}
+      />,
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "기록 반영 확인" });
+    expect(within(dialog).getByText("공개 요약")).toBeVisible();
+    expect(within(dialog).getByText("피드백 문서")).toBeVisible();
+    expect(within(dialog).getByText(/live revision 0 → 1/)).toBeVisible();
+    expect(within(dialog).getByText(/revision 0은 변경 이력에서 복원/)).toBeVisible();
+    expect(within(dialog).queryByRole("radio", { name: /알림/ })).not.toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "기록 반영" }));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancels content-only apply with Escape without applying", async () => {
+    const user = userEvent.setup();
+    const onCancel = vi.fn();
+    const onConfirm = vi.fn();
+    const workflow = recordWorkflow("MEMBER");
+    workflow.confirmation = {
+      open: true,
+      preview: {
+        eventType: "SESSION_RECORD_UPDATED",
+        changedSections: ["공개 요약"],
+        liveRevision: 2,
+        nextLiveRevision: 3,
+        draftRevision: 6,
+      },
+      submitting: false,
+      message: null,
+      onReview: vi.fn(),
+      onCancel,
+      onConfirm,
+    } as never;
+
+    render(
+      <HostSessionEditorForTest
+        session={session}
+        recordWorkflow={workflow}
+      />,
+    );
+    await user.keyboard("{Escape}");
+
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onConfirm).not.toHaveBeenCalled();
   });
 
   it("commits a valid session import preview and refreshes editor state", async () => {
@@ -1605,6 +1685,9 @@ describe("HostSessionEditor", () => {
       const user = userEvent.setup();
       const reload = vi.fn();
       const onSessionRecordsChanged = vi.fn().mockResolvedValue(undefined);
+      const workflow = recordWorkflow("MEMBER");
+      const onDraftCommitted = vi.fn().mockResolvedValue(undefined);
+      workflow.onDraftCommitted = onDraftCommitted;
       Object.defineProperty(window, "location", {
         configurable: true,
         writable: true,
@@ -1619,6 +1702,7 @@ describe("HostSessionEditor", () => {
           session={session}
           clubSlug="club-a"
           onSessionRecordsChanged={onSessionRecordsChanged}
+          recordWorkflow={workflow}
         />,
       );
 
@@ -1626,6 +1710,14 @@ describe("HostSessionEditor", () => {
 
       expect(reload).not.toHaveBeenCalled();
       expect(onSessionRecordsChanged).toHaveBeenCalledWith(session.sessionId);
+      expect(onDraftCommitted).toHaveBeenCalledWith({
+        draftRevision: 5,
+        baseLiveRevision: 0,
+        liveApplied: false,
+      });
+      expect(screen.queryByRole("dialog", {
+        name: "멤버에게 알림을 보낼까요?",
+      })).not.toBeInTheDocument();
     });
 
     it("does not render the toggle for a not-yet-created session", () => {

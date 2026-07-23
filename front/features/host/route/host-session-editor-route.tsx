@@ -1,23 +1,28 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useBlocker, useLoaderData, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import HostSessionEditor, { type HostSessionEditorLinkComponent } from "@/features/host/ui/host-session-editor";
+import HostSessionEditor, {
+  type HostSessionEditorLinkComponent,
+  type HostSessionRecordApplyReview,
+} from "@/features/host/ui/host-session-editor";
 import { appendUniqueSessionHistory } from "@/features/host/ui/session-editor/session-history-model";
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
 import type { ReadmatesApiContext } from "@/shared/api/client";
 import type { HostSessionEditorActions } from "@/features/host/route/host-session-editor-actions";
-import { invalidateHostNotifications } from "@/features/host/queries/host-notification-queries";
 import type {
   HostSessionHistoryItem,
   HostSessionHistoryPage,
-  HostSessionRecordApplyPreview,
+  HostSessionRecordApplyRequest,
   HostSessionRecordEditor,
-  NotificationDecision,
+  SessionRecordSnapshot,
 } from "@/features/host/api/host-session-record-contracts";
 import type {
   HostSessionDetailResponse,
   ManualNotificationDispatchListItem,
 } from "@/features/host/api/host-contracts";
+import {
+  hostNotificationKeys,
+} from "@/features/host/queries/host-notification-queries";
 import {
   hostSessionRecordEditorQuery,
   hostSessionRecordHistoryQuery,
@@ -45,6 +50,10 @@ import {
   hostSessionEditorPreviewActions,
   type HostSessionEditorRouteData,
 } from "./host-session-editor-data";
+import {
+  HostNotificationComposerController,
+  type HostNotificationComposerRequest,
+} from "./host-notification-composer-controller";
 
 const EDITOR_MANUAL_DISPATCH_PAGE_LIMIT = 20;
 const EDITOR_HISTORY_PAGE_LIMIT = 30;
@@ -70,6 +79,38 @@ function apiErrorCode(error: unknown) {
   return error && typeof error === "object" && "code" in error
     ? String((error as { code?: unknown }).code ?? "")
     : "";
+}
+
+function recordApplyChangedSections(
+  live: SessionRecordSnapshot,
+  draft: SessionRecordSnapshot,
+) {
+  const changed: string[] = [];
+  if (live.visibility !== draft.visibility) {
+    changed.push("공개 범위");
+  }
+  if (live.publicationSummary !== draft.publicationSummary) {
+    changed.push("공개 요약");
+  }
+  if (JSON.stringify(live.highlights) !== JSON.stringify(draft.highlights)) {
+    changed.push("하이라이트");
+  }
+  if (JSON.stringify(live.oneLineReviews) !== JSON.stringify(draft.oneLineReviews)) {
+    changed.push("한줄평");
+  }
+  if (JSON.stringify(live.feedbackDocument) !== JSON.stringify(draft.feedbackDocument)) {
+    changed.push("피드백 문서");
+  }
+  return changed;
+}
+
+function isFreshApplyRequired(code: string) {
+  return [
+    "SESSION_RECORD_DRAFT_STALE",
+    "SESSION_RECORD_LIVE_STALE",
+    "SESSION_RECORD_APPLY_REQUEST_ALREADY_USED",
+    "SESSION_RECORD_INVALID_APPLY_CONTRACT",
+  ].includes(code);
 }
 
 function useDraftRouteNavigationGuard(shouldBlock: boolean) {
@@ -117,7 +158,6 @@ function useHostSessionEditorActions(
     previewSessionImport: hostSessionEditorPreviewActions.previewSessionImport,
     commitSessionImport: async (sessionId, request) => {
       const result = await commitImport({ sessionId, request });
-      await invalidateHostNotifications(queryClient, context);
       await onSessionRecordsChanged?.(sessionId);
       return result;
     },
@@ -262,14 +302,20 @@ export function EditHostSessionRecordWorkflow({
   readmatesReturnState?: (target: ReadmatesReturnTarget) => ReadmatesReturnState;
   onSessionRecordsChanged: (sessionId: string) => void | Promise<void>;
 }) {
+  const queryClient = useQueryClient();
   const saveMutation = useSaveHostSessionRecordDraftMutation(context);
   const restoreMutation = useRestoreHostSessionRevisionToDraftMutation(context);
   const previewMutation = usePreviewHostSessionRecordApplyMutation(context);
   const applyMutation = useApplyHostSessionRecordMutation(context, async (event) => {
     await onSessionRecordsChanged(event.sessionId);
   });
-  const [applyPreview, setApplyPreview] = useState<HostSessionRecordApplyPreview | null>(null);
-  const [notificationDecision, setNotificationDecision] = useState<NotificationDecision | null>(null);
+  const [applyPreview, setApplyPreview] = useState<HostSessionRecordApplyReview | null>(null);
+  const [pendingApply, setPendingApply] = useState<{
+    sessionId: string;
+    request: HostSessionRecordApplyRequest;
+  } | null>(null);
+  const [composerRequest, setComposerRequest] =
+    useState<HostNotificationComposerRequest | null>(null);
   const [confirmationOpen, setConfirmationOpen] = useState(false);
   const [applyPreviewRefreshing, setApplyPreviewRefreshing] = useState(false);
   const [confirmationMessage, setConfirmationMessage] = useState<null | {
@@ -314,8 +360,26 @@ export function EditHostSessionRecordWorkflow({
           expectedLiveRevision: recordEditor.liveRevision,
         },
       });
-      setApplyPreview(preview);
-      setNotificationDecision(null);
+      const request = {
+        applyRequestId: crypto.randomUUID(),
+        expectedDraftRevision: controller.expectedDraftRevision,
+        expectedLiveRevision: recordEditor.liveRevision,
+        expectedDraftHash: preview.expectedDraftHash,
+      };
+      setPendingApply({
+        sessionId: recordEditor.sessionId,
+        request,
+      });
+      setApplyPreview({
+        eventType: preview.eventType,
+        changedSections: recordApplyChangedSections(
+          recordEditor.liveSnapshot,
+          controller.snapshot,
+        ),
+        liveRevision: recordEditor.liveRevision,
+        nextLiveRevision: recordEditor.liveRevision + 1,
+        draftRevision: controller.expectedDraftRevision,
+      });
       setConfirmationOpen(true);
       return preview;
     } finally {
@@ -323,8 +387,10 @@ export function EditHostSessionRecordWorkflow({
     }
   }, [
     controller.expectedDraftRevision,
+    controller.snapshot,
     previewMutation,
     recordEditor.liveRevision,
+    recordEditor.liveSnapshot,
     recordEditor.sessionId,
   ]);
 
@@ -341,148 +407,139 @@ export function EditHostSessionRecordWorkflow({
   }, [requestApplyPreview]);
 
   const confirmApply = useCallback(async () => {
-    if (
-      !applyPreview ||
-      notificationDecision === null ||
-      controller.expectedDraftRevision === null
-    ) {
+    if (!applyPreview || !pendingApply) {
       return;
     }
     try {
-      const result = await applyMutation.mutateAsync({
-        sessionId: recordEditor.sessionId,
-        request: {
-          previewId: applyPreview.previewId,
-          expectedDraftRevision: controller.expectedDraftRevision,
-          expectedLiveRevision: recordEditor.liveRevision,
-          notificationDecision,
-        },
-      });
+      const result = await applyMutation.mutateAsync(pendingApply);
       setConfirmationOpen(false);
       setApplyPreview(null);
-      setNotificationDecision(null);
+      setPendingApply(null);
       await controller.reloadDraft();
+      if (result.composer) {
+        queryClient.removeQueries({
+          queryKey: hostNotificationKeys.manualOptionsRoot(context),
+        });
+        setComposerRequest({
+          sessionId: result.composer.sessionId,
+          eventType: result.composer.eventType,
+          origin: "CONTENT_UPDATE",
+        });
+      }
       setConfirmationMessage({
         kind: "status",
-        text: result.notificationDecision === "SEND"
-          ? "변경사항을 반영했습니다. 알림 발송 장부에서 확인해 주세요."
-          : "알림 없이 변경사항을 반영했습니다.",
+        text: "변경사항을 반영했습니다. 알림은 작성기에서 별도로 선택해 주세요.",
       });
     } catch (error) {
       const code = apiErrorCode(error);
-      if (code === "NOTIFICATION_PREVIEW_EXPIRED" || code === "NOTIFICATION_TARGETS_CHANGED") {
-        try {
-          await requestApplyPreview();
-          setConfirmationMessage({
-            kind: "alert",
-            text: "알림 대상이 변경되어 미리보기를 갱신했습니다. SEND 또는 SKIP을 다시 선택해 주세요.",
-          });
-        } catch {
-          setConfirmationOpen(false);
-          setApplyPreview(null);
-          setNotificationDecision(null);
-          setConfirmationMessage({
-            kind: "alert",
-            text: "미리보기를 갱신하지 못했습니다. 변경사항은 반영되지 않았습니다.",
-          });
-        }
+      if (isFreshApplyRequired(code)) {
+        setConfirmationOpen(false);
+        setApplyPreview(null);
+        setPendingApply(null);
+        await controller.reloadDraft();
+        setConfirmationMessage({
+          kind: "alert",
+          text: "기록 상태가 변경되었습니다. 최신 초안을 확인한 뒤 새 반영 요청을 만들어 주세요.",
+        });
         return;
       }
       if (!code) {
         setConfirmationMessage({
           kind: "alert",
-          text: "처리 결과를 확인하지 못했습니다. 같은 SEND 또는 SKIP 선택으로 다시 확인해 주세요.",
+          text: "처리 결과를 확인하지 못했습니다. 같은 반영 요청으로 다시 확인해 주세요.",
         });
         return;
       }
       setConfirmationOpen(false);
       setApplyPreview(null);
-      setNotificationDecision(null);
+      setPendingApply(null);
       setConfirmationMessage({
         kind: "alert",
-        text: code === "NOTIFICATION_PREVIEW_ALREADY_CONSUMED"
-          ? "이미 처리된 미리보기입니다. 최신 기록을 다시 불러와 결과를 확인해 주세요."
-          : "변경사항을 반영하지 못했습니다. live 기록은 변경되지 않았습니다.",
+        text: "변경사항을 반영하지 못했습니다. live 기록은 변경되지 않았습니다.",
       });
     }
   }, [
     applyMutation,
     applyPreview,
+    context,
     controller,
-    notificationDecision,
-    recordEditor.liveRevision,
-    recordEditor.sessionId,
-    requestApplyPreview,
+    pendingApply,
+    queryClient,
   ]);
 
   return (
-    <HostSessionEditor
-      session={session}
-      notificationDispatches={notificationDispatches}
-      returnTarget={returnTarget}
-      actions={actions}
-      clubSlug={clubSlug}
-      LinkComponent={LinkComponent}
-      hostDashboardReturnTarget={hostDashboardReturnTarget}
-      readmatesReturnState={readmatesReturnState}
-      onSessionRecordsChanged={onSessionRecordsChanged}
-      recordWorkflow={{
-        editor: recordEditor,
-        history: effectiveHistory.items,
-        historyNextCursor: effectiveHistory.nextCursor,
-        historyLoadingMore,
-        snapshot: controller.snapshot,
-        saveState: controller.saveState,
-        expectedDraftRevision: controller.expectedDraftRevision,
-        restoring: restoreMutation.isPending,
-        onSnapshotChange: controller.updateSnapshot,
-        onReloadDraft: controller.reloadDraft,
-        onDraftCommitted: async ({ draftRevision }) => {
-          controller.adoptDraftRevision(draftRevision);
-          await controller.reloadDraft();
-        },
-        onLoadMoreHistory: async (cursor) => {
-          setHistoryLoadingMore(true);
-          try {
-            const nextPage = await loadHistoryPage(cursor);
-            setHistoryState({
-              firstPage: historyPage,
-              items: appendUniqueSessionHistory(effectiveHistory.items, nextPage.items),
-              nextCursor: nextPage.nextCursor,
-            });
-          } finally {
-            setHistoryLoadingMore(false);
-          }
-        },
-        onCopyInput: controller.copyInput,
-        confirmation: {
-          open: confirmationOpen,
-          preview: applyPreview,
-          decision: notificationDecision,
-          submitting: applyPreviewRefreshing || previewMutation.isPending || applyMutation.isPending,
-          message: confirmationMessage,
-          onReview: reviewDraft,
-          onDecisionChange: setNotificationDecision,
-          onCancel: () => {
-            setConfirmationOpen(false);
-            setApplyPreview(null);
-            setNotificationDecision(null);
+    <>
+      <HostSessionEditor
+        session={session}
+        notificationDispatches={notificationDispatches}
+        returnTarget={returnTarget}
+        actions={actions}
+        clubSlug={clubSlug}
+        LinkComponent={LinkComponent}
+        hostDashboardReturnTarget={hostDashboardReturnTarget}
+        readmatesReturnState={readmatesReturnState}
+        onSessionRecordsChanged={onSessionRecordsChanged}
+        recordWorkflow={{
+          editor: recordEditor,
+          history: effectiveHistory.items,
+          historyNextCursor: effectiveHistory.nextCursor,
+          historyLoadingMore,
+          snapshot: controller.snapshot,
+          saveState: controller.saveState,
+          expectedDraftRevision: controller.expectedDraftRevision,
+          restoring: restoreMutation.isPending,
+          onSnapshotChange: controller.updateSnapshot,
+          onReloadDraft: controller.reloadDraft,
+          onDraftCommitted: async ({ draftRevision }) => {
+            controller.adoptDraftRevision(draftRevision);
+            await controller.reloadDraft();
           },
-          onConfirm: confirmApply,
-        },
-        onRestore: async ({ revisionId, expectedDraftRevision }) => {
-          const draft = await restoreMutation.mutateAsync({
-            sessionId: recordEditor.sessionId,
-            revisionId,
-            request: { expectedDraftRevision },
-          });
-          controller.adoptEditor({
-            ...recordEditor,
-            draft,
-            draftLiveBaseStale: draft.baseLiveRevision !== recordEditor.liveRevision,
-          });
-        },
-      }}
-    />
+          onLoadMoreHistory: async (cursor) => {
+            setHistoryLoadingMore(true);
+            try {
+              const nextPage = await loadHistoryPage(cursor);
+              setHistoryState({
+                firstPage: historyPage,
+                items: appendUniqueSessionHistory(effectiveHistory.items, nextPage.items),
+                nextCursor: nextPage.nextCursor,
+              });
+            } finally {
+              setHistoryLoadingMore(false);
+            }
+          },
+          onCopyInput: controller.copyInput,
+          confirmation: {
+            open: confirmationOpen,
+            preview: applyPreview,
+            submitting: applyPreviewRefreshing || previewMutation.isPending || applyMutation.isPending,
+            message: confirmationMessage,
+            onReview: reviewDraft,
+            onCancel: () => {
+              setConfirmationOpen(false);
+              setApplyPreview(null);
+              setPendingApply(null);
+            },
+            onConfirm: confirmApply,
+          },
+          onRestore: async ({ revisionId, expectedDraftRevision }) => {
+            const draft = await restoreMutation.mutateAsync({
+              sessionId: recordEditor.sessionId,
+              revisionId,
+              request: { expectedDraftRevision },
+            });
+            controller.adoptEditor({
+              ...recordEditor,
+              draft,
+              draftLiveBaseStale: draft.baseLiveRevision !== recordEditor.liveRevision,
+            });
+          },
+        }}
+      />
+      <HostNotificationComposerController
+        request={composerRequest}
+        context={context}
+        onClose={() => setComposerRequest(null)}
+      />
+    </>
   );
 }

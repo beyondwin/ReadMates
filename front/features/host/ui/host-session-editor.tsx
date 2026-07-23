@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import type {
   AttendanceStatus,
   HostSessionDeletionPreviewResponse,
@@ -77,13 +78,16 @@ import {
   SessionHistoryPanel,
   type SessionHistoryPanelItem,
 } from "./session-editor/session-history-panel";
-import {
-  HostActionConfirmationDialog,
-  type HostActionPreview,
-  type NotificationDecision,
-} from "./session-editor/host-action-confirmation-dialog";
 
 export type { HostSessionEditorLinkComponent } from "./session-editor/session-editor-links";
+
+export type HostSessionRecordApplyReview = {
+  eventType: "FEEDBACK_DOCUMENT_PUBLISHED" | "SESSION_RECORD_UPDATED";
+  changedSections: string[];
+  liveRevision: number;
+  nextLiveRevision: number;
+  draftRevision: number;
+};
 
 type HostSessionRecordWorkflow = {
   editor: {
@@ -109,12 +113,10 @@ type HostSessionRecordWorkflow = {
   onCopyInput: () => void | Promise<void>;
   confirmation: {
     open: boolean;
-    preview: HostActionPreview | null;
-    decision: NotificationDecision | null;
+    preview: HostSessionRecordApplyReview | null;
     submitting: boolean;
     message: { kind: "alert" | "status"; text: string } | null;
     onReview: () => void | Promise<void>;
-    onDecisionChange: (decision: NotificationDecision) => void;
     onCancel: () => void;
     onConfirm: () => void | Promise<void>;
   };
@@ -123,6 +125,140 @@ type HostSessionRecordWorkflow = {
     expectedDraftRevision: number | null;
   }) => void | Promise<void>;
 };
+
+function dialogFocusableElements(container: HTMLElement) {
+  return Array.from(container.querySelectorAll<HTMLElement>(
+    'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+  ));
+}
+
+function SessionRecordApplyDialog({
+  open,
+  preview,
+  submitting,
+  onCancel,
+  onConfirm,
+}: {
+  open: boolean;
+  preview: HostSessionRecordApplyReview | null;
+  submitting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open || !preview || !dialogRef.current) {
+      return;
+    }
+    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialogFocusableElements(dialogRef.current)[0]?.focus();
+    return () => {
+      trigger?.focus();
+    };
+  }, [open, preview]);
+
+  if (!open || !preview) {
+    return null;
+  }
+
+  return createPortal(
+    <div
+      className="rm-host-action-dialog-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !submitting) {
+          onCancel();
+        }
+      }}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="session-record-apply-title"
+        aria-describedby="session-record-apply-description"
+        className="rm-host-action-dialog-sheet stack"
+        data-testid="host-action-dialog-sheet"
+        onKeyDown={(event) => {
+          if (event.key === "Escape" && !submitting) {
+            event.preventDefault();
+            onCancel();
+            return;
+          }
+          if (event.key !== "Tab") {
+            return;
+          }
+          const elements = dialogFocusableElements(event.currentTarget);
+          if (elements.length === 0) {
+            return;
+          }
+          const first = elements[0];
+          const last = elements[elements.length - 1];
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+          }
+        }}
+        style={{
+          "--stack": "16px",
+          width: "min(480px, calc(100vw - 24px))",
+          maxWidth: "100%",
+          maxHeight: "calc(100dvh - 24px)",
+          overflowY: "auto",
+        } as CSSProperties}
+      >
+        <div>
+          <div className="eyebrow">최종 반영</div>
+          <h2 id="session-record-apply-title" className="h3" style={{ margin: "6px 0 0" }}>
+            기록 반영 확인
+          </h2>
+        </div>
+        <p id="session-record-apply-description" className="small" style={{ margin: 0 }}>
+          공유 초안을 live 기록에 반영합니다. 이 단계에서는 알림을 만들거나 보내지 않습니다.
+        </p>
+        <section className="surface-quiet stack" style={{ "--stack": "10px", padding: 14 } as CSSProperties}>
+          <div className="field-label">변경 항목</div>
+          {preview.changedSections.length > 0 ? (
+            <ul className="small" style={{ margin: 0, paddingLeft: 18 }}>
+              {preview.changedSections.map((section) => <li key={section}>{section}</li>)}
+            </ul>
+          ) : (
+            <p className="small" style={{ margin: 0 }}>정규화된 초안 내용을 반영합니다.</p>
+          )}
+          <div className="tiny">
+            live revision {preview.liveRevision} → {preview.nextLiveRevision}
+            {" · "}draft revision {preview.draftRevision}
+          </div>
+          <div className="tiny">
+            revision {preview.liveRevision}은 변경 이력에서 복원할 수 있습니다.
+          </div>
+        </section>
+        <div className="row" style={{ gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <button
+            className="btn btn-quiet"
+            type="button"
+            disabled={submitting}
+            onClick={onCancel}
+          >
+            취소
+          </button>
+          <button
+            className="btn btn-primary"
+            type="button"
+            disabled={submitting}
+            onClick={onConfirm}
+          >
+            {submitting ? "반영 중" : "기록 반영"}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
 
 const emptyManagementMessage = "세션을 만든 뒤 참석과 피드백 문서를 관리할 수 있습니다.";
 
@@ -1106,12 +1242,10 @@ export default function HostSessionEditor({
       ) : null}
 
       {recordWorkflow ? (
-        <HostActionConfirmationDialog
+        <SessionRecordApplyDialog
           open={recordWorkflow.confirmation.open}
           preview={recordWorkflow.confirmation.preview}
-          decision={recordWorkflow.confirmation.decision}
           submitting={recordWorkflow.confirmation.submitting}
-          onDecisionChange={recordWorkflow.confirmation.onDecisionChange}
           onCancel={recordWorkflow.confirmation.onCancel}
           onConfirm={() => void recordWorkflow.confirmation.onConfirm()}
         />
