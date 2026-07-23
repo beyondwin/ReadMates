@@ -3,6 +3,7 @@ import {
   composerCanPreview,
   recommendedAudience,
   type HostNotificationComposerDraft,
+  type HostNotificationRecipientMode,
 } from "@/features/host/model/host-notification-composer-model";
 import type {
   HostNotificationEventType,
@@ -11,6 +12,7 @@ import type {
   ManualNotificationRequestedChannels,
 } from "@/features/host/model/host-view-types";
 import { ManualNotificationPreviewPanel } from "./manual-notification-preview";
+import { manualAudienceLabels } from "./manual-notification-labels";
 import { NotificationRecipientPicker } from "./notification-recipient-picker";
 
 export type HostNotificationComposerProps = {
@@ -29,12 +31,19 @@ export type HostNotificationComposerProps = {
   showSkip?: boolean;
   previewButtonLabel?: string;
   recommendedRecipientLabel?: string;
+  recipientModes?: readonly HostNotificationRecipientMode[];
 };
 
 const channelOptions: Array<[ManualNotificationRequestedChannels, string]> = [
   ["BOTH", "앱+이메일"],
   ["IN_APP", "앱 알림"],
   ["EMAIL", "이메일"],
+];
+
+const publicationRecipientModes: readonly HostNotificationRecipientMode[] = [
+  "RECOMMENDED",
+  "ALL_ACTIVE_MEMBERS",
+  "SELECTED_MEMBERS",
 ];
 
 function recommendedLabel(eventType: HostNotificationEventType) {
@@ -59,8 +68,10 @@ export function HostNotificationComposer({
   showSkip = true,
   previewButtonLabel = "알림 미리보기",
   recommendedRecipientLabel = recommendedLabel(eventType),
+  recipientModes = publicationRecipientModes,
 }: HostNotificationComposerProps) {
   const template = options.templates.find((item) => item.eventType === eventType);
+  const visibleRecipientModes = [...new Set(recipientModes)];
   const updateDraft = (patch: Partial<HostNotificationComposerDraft>) => {
     onDraftChange({ ...draft, ...patch });
   };
@@ -102,36 +113,29 @@ export function HostNotificationComposer({
           className="stack"
           style={{ "--stack": "10px", marginTop: 10 } as CSSProperties}
         >
-          <label>
-            <input
-              type="radio"
-              name="notification-recipient-mode"
-              aria-label={`추천 대상 · ${recommendedRecipientLabel}`}
-              checked={draft.recipientMode === "RECOMMENDED"}
-              onChange={() => updateDraft({ recipientMode: "RECOMMENDED" })}
-            />{" "}
-            추천 대상 <span className="tiny muted">{recommendedRecipientLabel}</span>
-          </label>
-          <label>
-            <input
-              type="radio"
-              name="notification-recipient-mode"
-              aria-label="전체 활성 멤버"
-              checked={draft.recipientMode === "ALL_ACTIVE_MEMBERS"}
-              onChange={() => updateDraft({ recipientMode: "ALL_ACTIVE_MEMBERS" })}
-            />{" "}
-            전체 활성 멤버
-          </label>
-          <label>
-            <input
-              type="radio"
-              name="notification-recipient-mode"
-              aria-label="직접 선택"
-              checked={draft.recipientMode === "SELECTED_MEMBERS"}
-              onChange={() => updateDraft({ recipientMode: "SELECTED_MEMBERS" })}
-            />{" "}
-            직접 선택
-          </label>
+          {visibleRecipientModes.map((mode) => {
+            const label = mode === "RECOMMENDED"
+              ? "추천 대상"
+              : manualAudienceLabels[mode];
+            const ariaLabel = mode === "RECOMMENDED"
+              ? `${label} · ${recommendedRecipientLabel}`
+              : label;
+            return (
+              <label key={mode}>
+                <input
+                  type="radio"
+                  name="notification-recipient-mode"
+                  aria-label={ariaLabel}
+                  checked={draft.recipientMode === mode}
+                  onChange={() => updateDraft({ recipientMode: mode })}
+                />{" "}
+                {label}
+                {mode === "RECOMMENDED" ? (
+                  <> <span className="tiny muted">{recommendedRecipientLabel}</span></>
+                ) : null}
+              </label>
+            );
+          })}
         </div>
       </fieldset>
 

@@ -1,13 +1,13 @@
 import type {
   HostNotificationEventType,
+  ManualNotificationAudience,
   ManualNotificationRequestedChannels,
   ManualNotificationSelectionRequest,
 } from "./host-view-types";
 
 export type HostNotificationRecipientMode =
   | "RECOMMENDED"
-  | "ALL_ACTIVE_MEMBERS"
-  | "SELECTED_MEMBERS";
+  | ManualNotificationAudience;
 
 export type HostNotificationComposerDraft = {
   sessionId: string;

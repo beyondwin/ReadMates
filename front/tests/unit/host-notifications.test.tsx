@@ -17,6 +17,7 @@ import {
   hostNotificationSummaryQuery,
 } from "@/features/host/queries/host-notification-queries";
 import { HostNotificationsPage } from "@/features/host/ui/host-notifications-page";
+import { ManualNotificationWorkbench } from "@/features/host/ui/notifications/manual-notification-workbench";
 import type {
   HostNotificationDeliveryItem,
   HostNotificationEventItem,
@@ -615,6 +616,130 @@ describe("HostNotificationsRoute", () => {
 });
 
 describe("HostNotificationsPage", () => {
+  it("preserves the selected enabled template when session options change", async () => {
+    const user = userEvent.setup();
+    const sessionOneOptions = {
+      ...manualOptionsFixture,
+      templates: manualOptionsFixture.templates.map((template, index) => ({
+        ...template,
+        contentRevision: `${index + 1}`.repeat(64),
+        enabled: true,
+        disabledReason: null,
+      })),
+    } satisfies ManualNotificationOptionsResponse;
+    const sessionTwoOptions = {
+      ...sessionOneOptions,
+      session: {
+        ...sessionOneOptions.session!,
+        sessionId: "session-draft",
+      },
+      templates: sessionOneOptions.templates.map((template, index) => ({
+        ...template,
+        contentRevision: `${index + 3}`.repeat(64),
+      })),
+    } satisfies ManualNotificationOptionsResponse;
+    const workbenchProps = {
+      hostSessions: [hostSessionCurrent, hostSessionDraft],
+      initialSessionId: "session-1",
+      initialEventType: null,
+      preview: null,
+      busy: false,
+      error: null,
+      onPreview: vi.fn().mockResolvedValue(undefined),
+      onConfirm: vi.fn().mockResolvedValue(undefined),
+      onSessionChange: vi.fn().mockResolvedValue(sessionTwoOptions),
+      onLoadManualOptions: vi.fn().mockResolvedValue(sessionTwoOptions),
+      onLoadMoreManualMembers: vi.fn().mockResolvedValue(sessionTwoOptions),
+    };
+    const view = render(
+      <ManualNotificationWorkbench {...workbenchProps} options={sessionOneOptions} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "피드백 문서 등록" }));
+    expect(screen.getByRole("button", { name: "피드백 문서 등록" })).toHaveClass(
+      "btn-primary",
+    );
+
+    await user.selectOptions(screen.getByLabelText("세션 선택"), "session-draft");
+    view.rerender(
+      <ManualNotificationWorkbench {...workbenchProps} options={sessionTwoOptions} />,
+    );
+
+    expect(screen.getByRole("button", { name: "피드백 문서 등록" })).toHaveClass(
+      "btn-primary",
+    );
+  });
+
+  it("falls back to the first enabled template when the selected template becomes invalid", async () => {
+    const user = userEvent.setup();
+    const sessionOneOptions = {
+      ...manualOptionsFixture,
+      templates: manualOptionsFixture.templates.map((template, index) => ({
+        ...template,
+        contentRevision: `${index + 1}`.repeat(64),
+        enabled: true,
+        disabledReason: null,
+      })),
+    } satisfies ManualNotificationOptionsResponse;
+    const sessionTwoOptions = {
+      ...sessionOneOptions,
+      session: {
+        ...sessionOneOptions.session!,
+        sessionId: "session-draft",
+      },
+      templates: sessionOneOptions.templates.map((template, index) => ({
+        ...template,
+        contentRevision: `${index + 3}`.repeat(64),
+        enabled: template.eventType !== "FEEDBACK_DOCUMENT_PUBLISHED",
+        disabledReason: template.eventType === "FEEDBACK_DOCUMENT_PUBLISHED"
+          ? "이 세션에서는 사용할 수 없습니다."
+          : null,
+      })),
+    } satisfies ManualNotificationOptionsResponse;
+    const workbenchProps = {
+      hostSessions: [hostSessionCurrent, hostSessionDraft],
+      initialSessionId: "session-1",
+      initialEventType: null,
+      preview: null,
+      busy: false,
+      error: null,
+      onPreview: vi.fn().mockResolvedValue(undefined),
+      onConfirm: vi.fn().mockResolvedValue(undefined),
+      onSessionChange: vi.fn().mockResolvedValue(sessionTwoOptions),
+      onLoadManualOptions: vi.fn().mockResolvedValue(sessionTwoOptions),
+      onLoadMoreManualMembers: vi.fn().mockResolvedValue(sessionTwoOptions),
+    };
+    const view = render(
+      <ManualNotificationWorkbench {...workbenchProps} options={sessionOneOptions} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "피드백 문서 등록" }));
+    await user.selectOptions(screen.getByLabelText("세션 선택"), "session-draft");
+    view.rerender(
+      <ManualNotificationWorkbench {...workbenchProps} options={sessionTwoOptions} />,
+    );
+
+    expect(screen.getByRole("button", { name: "모임 전날 리마인더" })).toHaveClass(
+      "btn-primary",
+    );
+  });
+
+  it("offers each allowed reminder audience once and previews session participants", async () => {
+    const user = userEvent.setup();
+    const onPreviewManual = vi.fn().mockResolvedValue(undefined);
+
+    renderPage({ onPreviewManual });
+
+    expect(screen.getAllByRole("radio", { name: /전체 활성 멤버/ })).toHaveLength(1);
+    expect(screen.queryByRole("radio", { name: /추천 대상/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: "세션 참가자" }));
+    await user.click(screen.getByRole("button", { name: "미리보기" }));
+
+    expect(onPreviewManual).toHaveBeenCalledWith(expect.objectContaining({
+      audience: "SESSION_PARTICIPANTS",
+    }));
+  });
+
   it("renders manual notification workbench before ledgers", () => {
     renderPage({
       manualOptions: {
@@ -715,15 +840,28 @@ describe("HostNotificationsPage", () => {
 
   it("searches manual notification members and loads more", async () => {
     const user = userEvent.setup();
-    const searchedOptions = {
+    const selectableOptions = {
       ...manualOptionsFixture,
+      templates: manualOptionsFixture.templates.map((template) =>
+        template.eventType === "SESSION_REMINDER_DUE"
+          ? {
+              ...template,
+              allowedAudiences: [
+                ...template.allowedAudiences,
+                "SELECTED_MEMBERS" as const,
+              ],
+            }
+          : template),
+    } satisfies ManualNotificationOptionsResponse;
+    const searchedOptions = {
+      ...selectableOptions,
       members: {
         items: [],
         nextCursor: "cursor-2",
       },
     } as ManualNotificationOptionsResponse;
     const nextOptions = {
-      ...manualOptionsFixture,
+      ...selectableOptions,
       members: {
         items: [
           {
@@ -746,7 +884,7 @@ describe("HostNotificationsPage", () => {
 
     renderPage({
       manualOptions: {
-        ...manualOptionsFixture,
+        ...selectableOptions,
         members: { items: [], nextCursor: "cursor-1" },
       },
       onLoadManualOptions,

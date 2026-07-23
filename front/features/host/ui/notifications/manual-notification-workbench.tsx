@@ -2,7 +2,6 @@ import { type CSSProperties, useState } from "react";
 import {
   buildComposerSelection,
   type HostNotificationComposerDraft,
-  type HostNotificationRecipientMode,
 } from "@/features/host/model/host-notification-composer-model";
 import type {
   HostNotificationEventType,
@@ -13,7 +12,6 @@ import type {
   ManualNotificationPreviewResponse,
 } from "@/features/host/model/host-view-types";
 import { HostNotificationComposer } from "./host-notification-composer";
-import { manualAudienceLabels } from "./manual-notification-labels";
 
 type ManualNotificationWorkbenchProps = {
   options: ManualNotificationOptionsResponse;
@@ -38,19 +36,12 @@ type ManualNotificationWorkbenchProps = {
   onDraftInvalidated?: () => void;
 };
 
-function recipientModeFromAudience(audience: string): HostNotificationRecipientMode {
-  if (audience === "ALL_ACTIVE_MEMBERS") {
-    return "ALL_ACTIVE_MEMBERS";
-  }
-  if (audience === "SELECTED_MEMBERS") {
-    return "SELECTED_MEMBERS";
-  }
-  return "RECOMMENDED";
-}
-
 export function ManualNotificationWorkbench(props: ManualNotificationWorkbenchProps) {
+  const [preferredEventType, setPreferredEventType] = useState(
+    props.initialEventType,
+  );
   const initialTemplate = props.options.templates.find(
-    (item) => item.eventType === props.initialEventType && item.enabled,
+    (item) => item.eventType === preferredEventType && item.enabled,
   ) ?? props.options.templates.find((item) => item.enabled);
   const optionsSessionId = props.options.session?.sessionId;
   const resolvedSessionId = optionsSessionId
@@ -70,6 +61,7 @@ export function ManualNotificationWorkbench(props: ManualNotificationWorkbenchPr
       {...props}
       initialSessionId={resolvedSessionId}
       initialTemplate={initialTemplate}
+      onEventTypeSelected={setPreferredEventType}
     />
   );
 }
@@ -88,16 +80,16 @@ function ManualNotificationWorkbenchState({
   onLoadMoreManualMembers,
   onDraftInvalidated,
   initialTemplate,
+  onEventTypeSelected,
 }: ManualNotificationWorkbenchProps & {
   initialTemplate: ManualNotificationOptionsResponse["templates"][number] | undefined;
+  onEventTypeSelected: (eventType: HostNotificationEventType) => void;
 }) {
   const [draft, setDraft] = useState<HostNotificationComposerDraft>({
     sessionId: initialSessionId ?? "",
     eventType: initialTemplate?.eventType ?? "SESSION_REMINDER_DUE",
     contentRevision: initialTemplate?.contentRevision ?? "",
-    recipientMode: recipientModeFromAudience(
-      initialTemplate?.defaultAudience ?? "ALL_ACTIVE_MEMBERS",
-    ),
+    recipientMode: initialTemplate?.defaultAudience ?? "ALL_ACTIVE_MEMBERS",
     requestedChannels: initialTemplate?.defaultChannels ?? "BOTH",
     selectedMembershipIds: [],
   });
@@ -114,11 +106,12 @@ function ManualNotificationWorkbenchState({
     if (!template) {
       return;
     }
+    onEventTypeSelected(eventType);
     changeDraft({
       ...draft,
       eventType,
       contentRevision: template.contentRevision,
-      recipientMode: recipientModeFromAudience(template.defaultAudience),
+      recipientMode: template.defaultAudience,
       requestedChannels: template.defaultChannels,
       selectedMembershipIds: [],
     });
@@ -139,12 +132,7 @@ function ManualNotificationWorkbenchState({
   const currentTemplate = options.templates.find(
     (template) => template.eventType === draft.eventType,
   );
-  const buildOperationsSelection = () => {
-    const selection = buildComposerSelection(draft);
-    return draft.recipientMode === "RECOMMENDED" && currentTemplate
-      ? { ...selection, audience: currentTemplate.defaultAudience }
-      : selection;
-  };
+  const buildOperationsSelection = () => buildComposerSelection(draft);
 
   return (
     <section
@@ -262,11 +250,7 @@ function ManualNotificationWorkbenchState({
           onSkip={() => undefined}
           showSkip={false}
           previewButtonLabel="미리보기"
-          recommendedRecipientLabel={
-            currentTemplate
-              ? manualAudienceLabels[currentTemplate.defaultAudience]
-              : "추천 대상"
-          }
+          recipientModes={currentTemplate?.allowedAudiences}
         />
       </div>
     </section>
