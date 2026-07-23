@@ -89,7 +89,17 @@ class ReadmatesMySqlSeedTest(
         assertEquals(1, jdbcTemplate.queryForObject("select count(*) from clubs where slug = 'reading-sai'", Int::class.java))
         assertEquals(
             1,
-            jdbcTemplate.queryForObject("select count(*) from memberships where role = 'HOST' and status = 'ACTIVE'", Int::class.java),
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from memberships
+                join clubs on clubs.id = memberships.club_id
+                where clubs.slug = 'reading-sai'
+                  and memberships.role = 'HOST'
+                  and memberships.status = 'ACTIVE'
+                """.trimIndent(),
+                Int::class.java,
+            ),
         )
         assertEquals(
             7,

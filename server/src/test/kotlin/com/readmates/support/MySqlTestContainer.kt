@@ -18,12 +18,6 @@ object MySqlTestContainer {
                 "--key-buffer-size=8M",
                 "--max-connections=100",
             )
-            // Local-only opt-in: developer enables via ~/.testcontainers.properties
-            // (testcontainers.reuse.enable=true). CI is unaffected because each
-            // runner is fresh, but containers keep the same Docker image identity
-            // and label so subsequent local runs short-circuit container startup.
-            // Refs: docs/superpowers/specs/2026-05-16-readmates-build-test-speed-spec.md §4.5
-            withReuse(true)
             start()
         }
 
