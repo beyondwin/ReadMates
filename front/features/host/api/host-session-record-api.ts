@@ -1,7 +1,7 @@
 import { readmatesFetch, readmatesFetchResponse, type ReadmatesApiContext } from "@/shared/api/client";
 import { apiErrorFromResponse } from "@/shared/api/errors";
 import type { PageRequest } from "@/shared/model/paging";
-import type { HostSessionListPage } from "./host-contracts";
+import type { HostSessionRecordLedgerPage } from "./host-contracts";
 import {
   HostSessionRecordLedgerPageResponseSchema,
   normalizeHostSessionLedgerRequest,
@@ -74,8 +74,11 @@ export function fetchHostSessionRecordLedger(
   request?: HostSessionLedgerRequest,
   context?: ReadmatesApiContext,
 ) {
-  return readmatesFetch<HostSessionListPage>(`/api/host/sessions${ledgerSearch(request)}`, undefined, context)
-    .then((value) => HostSessionRecordLedgerPageResponseSchema.parse(value) as HostSessionListPage);
+  return readmatesFetch<HostSessionRecordLedgerPage>(
+    `/api/host/sessions${ledgerSearch(request)}`,
+    undefined,
+    context,
+  ).then((value) => HostSessionRecordLedgerPageResponseSchema.parse(value) as HostSessionRecordLedgerPage);
 }
 
 export function fetchHostSessionRecordEditor(sessionId: string, context?: ReadmatesApiContext) {

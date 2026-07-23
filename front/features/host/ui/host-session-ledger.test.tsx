@@ -79,8 +79,41 @@ describe("HostSessionLedger", () => {
     const mobileCard = container.querySelector("article[data-session-id='session-28']");
     expect(mobileCard).toHaveTextContent("모비 딕");
     expect(mobileCard).toHaveTextContent("확인 필요");
+    expect(mobileCard).toHaveTextContent("마지막 수정 2026.07.23 10:00");
     expect(mobileCard).toHaveStyle({ minWidth: "0", overflowWrap: "anywhere" });
-    expect(screen.getAllByRole("link", { name: "28회차 기록 열기" })).toHaveLength(2);
+    expect(screen.getAllByRole("link", { name: "28회차 초안 열기" })).toHaveLength(2);
+    expect(screen.getAllByText("마지막 수정 2026.07.23 10:00")).toHaveLength(2);
+    expect(screen.getByRole("link", { name: "새 세션 만들기" })).toHaveAttribute(
+      "href",
+      "/app/host/sessions/new",
+    );
+  });
+
+  it("uses incomplete and complete record actions when no draft exists", () => {
+    render(
+      <HostSessionLedger
+        items={[
+          { ...items[0], sessionId: "incomplete", hasDraft: false, draftRevision: null },
+          {
+            ...items[0],
+            sessionId: "complete",
+            sessionNumber: 29,
+            hasDraft: false,
+            draftRevision: null,
+            recordStatus: "COMPLETE",
+            needsAttention: false,
+          },
+        ]}
+        filters={filters}
+        nextCursor={null}
+        loadingMore={false}
+        onFiltersChange={vi.fn()}
+        onLoadMore={vi.fn()}
+      />,
+    );
+
+    expect(screen.getAllByRole("link", { name: "28회차 이어서 수정" })).toHaveLength(2);
+    expect(screen.getAllByRole("link", { name: "29회차 보기·수정" })).toHaveLength(2);
   });
 
   it("loads the next cursor page without replacing the current rows", async () => {
@@ -109,12 +142,32 @@ describe("HostSessionLedger", () => {
       sessionNumber: number,
       bookTitle: `책 ${number}`,
     }));
-    const { rerender } = render(<HostSessionAttentionSummary items={attentionItems} />);
+    const { container, rerender } = render(<HostSessionAttentionSummary page={{
+      items: attentionItems,
+      nextCursor: "more",
+      summary: {
+        needsAttentionCount: 7,
+        incompletePublishedCount: 4,
+        draftCount: 2,
+      },
+    }} />);
 
     expect(screen.getAllByRole("link", { name: /기록 열기/ })).toHaveLength(3);
     expect(screen.queryByText("책 4")).not.toBeInTheDocument();
+    expect(screen.getByText("수정 필요 회차").parentElement).toHaveTextContent("7");
+    expect(screen.getByText("공개 기록 미완성").parentElement).toHaveTextContent("4");
+    expect(screen.getByText("저장된 초안").parentElement).toHaveTextContent("2");
+    expect(screen.getByRole("link", { name: "세션 기록 전체 보기" })).toHaveAttribute(
+      "href",
+      "/app/host/sessions",
+    );
+    expect(container.querySelector("dl")).toHaveStyle({
+      gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 110px), 1fr))",
+      minWidth: "0",
+    });
 
-    rerender(<HostSessionAttentionSummary items={null} />);
+    rerender(<HostSessionAttentionSummary page={null} />);
     expect(screen.getByRole("status")).toHaveTextContent("기록 확인 항목을 불러오지 못했습니다");
+    expect(screen.getByRole("link", { name: "세션 기록 전체 보기" })).toBeInTheDocument();
   });
 });

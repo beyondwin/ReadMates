@@ -487,6 +487,16 @@ export type HostSessionListItem = {
 
 export type HostSessionListPage = PagedResponse<HostSessionListItem>;
 
+export type HostSessionLedgerSummary = {
+  needsAttentionCount: number;
+  incompletePublishedCount: number;
+  draftCount: number;
+};
+
+export type HostSessionRecordLedgerPage = HostSessionListPage & {
+  summary: HostSessionLedgerSummary;
+};
+
 export type HostSessionVisibilityRequest = {
   visibility: SessionRecordVisibility;
   previewId?: string | null;

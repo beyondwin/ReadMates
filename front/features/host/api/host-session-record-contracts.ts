@@ -269,7 +269,12 @@ export const HostSessionRecordLedgerPageResponseSchema = z.object({
     lastModifiedAt: nullableString,
   })),
   nextCursor: nullableString,
-});
+  summary: z.object({
+    needsAttentionCount: nonNegativeInteger,
+    incompletePublishedCount: nonNegativeInteger,
+    draftCount: nonNegativeInteger,
+  }).strict(),
+}).strict();
 
 export function parseHostSessionRecordEditor(value: unknown): HostSessionRecordEditor {
   return HostSessionRecordEditorResponseSchema.parse(value) as HostSessionRecordEditor;

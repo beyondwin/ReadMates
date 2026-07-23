@@ -58,6 +58,7 @@ export function HostDashboardRoute({
     needsAttention: true,
     page: { limit: 3 },
   }, context));
+  const recordAttentionPage = recordAttentionQuery.data ?? loaderData.recordAttention;
 
   const actions = useMemo<HostDashboardActions>(() => ({
     updateCurrentSessionParticipation: hostDashboardActions.updateCurrentSessionParticipation,
@@ -86,9 +87,21 @@ export function HostDashboardRoute({
         notifications={notificationsQuery.data ?? loaderData.notifications}
         clubOperations={clubOperationsQuery.data ?? loaderData.clubOperations}
         recordAttention={
-          recordAttentionQuery.data?.items
-          ?? loaderData.recordAttention?.items
-          ?? (recordAttentionQuery.isError ? null : [])
+          recordAttentionPage
+            ? {
+                items: recordAttentionPage.items,
+                summary: recordAttentionPage.summary,
+              }
+            : recordAttentionQuery.isError
+              ? null
+              : {
+                  items: [],
+                  summary: {
+                    needsAttentionCount: 0,
+                    incompletePublishedCount: 0,
+                    draftCount: 0,
+                  },
+                }
         }
         actions={actions}
         LinkComponent={LinkComponent}

@@ -17,6 +17,7 @@ import type {
   HostDashboardResponse,
   HostNotificationSummary,
   HostSessionListPage,
+  HostSessionRecordLedgerPage,
 } from "@/features/host/api/host-contracts";
 import type { LoaderFunctionArgs } from "react-router-dom";
 import { requireHostLoaderAuth } from "./host-loader-auth";
@@ -36,7 +37,7 @@ export type HostDashboardRouteData = {
   hostSessions: HostSessionListPage;
   notifications: HostNotificationSummary;
   clubOperations: HostClubOperationsResponse | null;
-  recordAttention?: HostSessionListPage;
+  recordAttention?: HostSessionRecordLedgerPage;
 };
 
 export function hostDashboardLoaderFactory(client: QueryClient) {

@@ -18,7 +18,7 @@ import {
   getMissingCurrentSessionMembersSummary,
   hostSessionEditHref,
 } from "@/features/host/model/host-dashboard-model";
-import type { HostSessionLedgerItem } from "@/features/host/model/host-session-ledger-model";
+import type { HostSessionAttentionData } from "@/features/host/model/host-session-ledger-model";
 import { deriveHostPrepPace, hostPrepPaceInputFrom } from "@/features/host/model/host-prep-pace";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { BookCover } from "@/shared/ui/book-cover";
@@ -63,6 +63,14 @@ const EMPTY_NOTIFICATION_SUMMARY: HostNotificationSummary = {
   sentLast24h: 0,
   latestFailures: [],
 };
+const EMPTY_RECORD_ATTENTION: HostSessionAttentionData = {
+  items: [],
+  summary: {
+    needsAttentionCount: 0,
+    incompletePublishedCount: 0,
+    draftCount: 0,
+  },
+};
 
 function RouterScopedDefaultLink({ to, state: _state, children, ...props }: HostDashboardLinkProps) {
   void _state;
@@ -100,7 +108,7 @@ export default function HostDashboard({
   hostSessions,
   notifications = EMPTY_NOTIFICATION_SUMMARY,
   clubOperations = null,
-  recordAttention = [],
+  recordAttention = EMPTY_RECORD_ATTENTION,
   actions,
   LinkComponent = DefaultLinkComponent,
   hostDashboardReturnTarget = defaultHostDashboardReturnTarget,
@@ -112,7 +120,7 @@ export default function HostDashboard({
   hostSessions: HostSessionListPage;
   notifications?: HostNotificationSummary;
   clubOperations?: HostClubOperationsSnapshot | null;
-  recordAttention?: HostSessionLedgerItem[] | null;
+  recordAttention?: HostSessionAttentionData | null;
   actions: HostDashboardActions;
   LinkComponent?: HostDashboardLinkComponent;
   hostDashboardReturnTarget?: ReadmatesReturnTarget;
@@ -312,7 +320,7 @@ export default function HostDashboard({
             </div>
             <div style={{ marginTop: 14 }}>
               <div className="eyebrow" style={{ marginBottom: 8 }}>기록 확인 필요</div>
-              <HostSessionAttentionSummary items={recordAttention} LinkComponent={LinkComponent} />
+              <HostSessionAttentionSummary page={recordAttention} LinkComponent={LinkComponent} />
             </div>
           </div>
         </section>

@@ -8,7 +8,7 @@ import {
 } from "@/features/host/model/host-dashboard-model";
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
 import type { HostPrepPace } from "@/features/host/model/host-prep-pace";
-import type { HostSessionLedgerItem } from "@/features/host/model/host-session-ledger-model";
+import type { HostSessionAttentionData } from "@/features/host/model/host-session-ledger-model";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { formatDateOnlyLabel, formatMobileTodayLabel, hostAlertStateLabel } from "@/shared/ui/readmates-display";
 import { SessionTimingIdentity } from "@/shared/ui/session-identity";
@@ -73,7 +73,7 @@ export function MobileHostDashboard({
   currentMembershipId: string | null | undefined;
   hasCurrentSession: boolean;
   upcomingSessions: HostSessionListItem[];
-  recordAttention: HostSessionLedgerItem[] | null;
+  recordAttention: HostSessionAttentionData | null;
   upcomingActions: UpcomingActionHandlers;
   upcomingMessage: null | { kind: "alert" | "status"; text: string };
   hasMoreUpcomingSessions: boolean;
@@ -144,7 +144,7 @@ export function MobileHostDashboard({
           ))}
         </div>
         <div style={{ marginTop: 10 }}>
-          <HostSessionAttentionSummary items={recordAttention} LinkComponent={LinkComponent} />
+          <HostSessionAttentionSummary page={recordAttention} LinkComponent={LinkComponent} />
         </div>
       </section>
 

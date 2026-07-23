@@ -83,7 +83,15 @@ describe("host session record queries", () => {
   });
 
   it("calls the scoped API wrappers from query options", async () => {
-    vi.mocked(fetchHostSessionRecordLedger).mockResolvedValue({ items: [], nextCursor: null });
+    vi.mocked(fetchHostSessionRecordLedger).mockResolvedValue({
+      items: [],
+      nextCursor: null,
+      summary: {
+        needsAttentionCount: 0,
+        incompletePublishedCount: 0,
+        draftCount: 0,
+      },
+    });
     vi.mocked(fetchHostSessionRecordEditor).mockResolvedValue({} as never);
     vi.mocked(fetchHostSessionHistory).mockResolvedValue({ items: [], nextCursor: null });
     const context = { clubSlug: "reading-sai" };

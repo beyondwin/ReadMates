@@ -1,6 +1,9 @@
 import { useState, type ComponentType, type FormEvent, type ReactNode } from "react";
 import {
+  hostSessionLedgerActionLabel,
   hostSessionLedgerBadges,
+  hostSessionLedgerModifiedAtLabel,
+  type HostSessionAttentionData,
   type HostSessionLedgerFilters,
   type HostSessionLedgerItem,
 } from "@/features/host/model/host-session-ledger-model";
@@ -27,6 +30,7 @@ export type HostSessionLedgerProps = {
   errorMessage?: string | null;
   loadMoreError?: string | null;
   onRetry?: () => void;
+  newSessionHref?: string;
 };
 
 function DefaultLink({ to, children, ...props }: LedgerLinkProps) {
@@ -177,7 +181,7 @@ function DesktopLedger({
       >
         <thead>
           <tr>
-            {["회차", "책과 세션", "일정", "상태", "기록", "공개 범위", ""].map((label) => (
+            {["회차", "책과 세션", "일정", "상태", "기록", "공개 범위", "마지막 수정", ""].map((label) => (
               <th key={label} scope="col" className="tiny" style={{ padding: "13px 16px", borderBottom: "1px solid var(--line)" }}>
                 {label}
               </th>
@@ -199,13 +203,16 @@ function DesktopLedger({
               <td className="small" style={{ padding: 16, verticalAlign: "top" }}>{stateLabel(item.state)}</td>
               <td style={{ padding: 16, verticalAlign: "top" }}><LedgerBadges item={item} /></td>
               <td className="small" style={{ padding: 16, verticalAlign: "top" }}>{visibilityLabel(item.visibility)}</td>
+              <td className="tiny" style={{ padding: 16, verticalAlign: "top", whiteSpace: "nowrap" }}>
+                {hostSessionLedgerModifiedAtLabel(item.lastModifiedAt)}
+              </td>
               <td style={{ padding: 16, verticalAlign: "top" }}>
                 <LinkComponent
                   to={sessionRecordHref(item.sessionId)}
                   className="btn btn-ghost btn-sm"
-                  aria-label={`${item.sessionNumber}회차 기록 열기`}
+                  aria-label={`${item.sessionNumber}회차 ${hostSessionLedgerActionLabel(item)}`}
                 >
-                  열기
+                  {hostSessionLedgerActionLabel(item)}
                 </LinkComponent>
               </td>
             </tr>
@@ -243,13 +250,16 @@ function MobileLedger({
           <div className="tiny" style={{ marginTop: 10 }}>
             {formatDateOnlyLabel(item.date)} · {item.startTime}–{item.endTime} · {item.locationLabel}
           </div>
+          <div className="tiny" style={{ marginTop: 4 }}>
+            {hostSessionLedgerModifiedAtLabel(item.lastModifiedAt)}
+          </div>
           <div style={{ marginTop: 12 }}><LedgerBadges item={item} /></div>
           <LinkComponent
             to={sessionRecordHref(item.sessionId)}
             className="btn btn-primary"
-            aria-label={`${item.sessionNumber}회차 기록 열기`}
+            aria-label={`${item.sessionNumber}회차 ${hostSessionLedgerActionLabel(item)}`}
           >
-            기록 열기
+            {hostSessionLedgerActionLabel(item)}
           </LinkComponent>
         </article>
       ))}
@@ -269,9 +279,18 @@ export function HostSessionLedger({
   errorMessage = null,
   loadMoreError = null,
   onRetry,
+  newSessionHref = "/app/host/sessions/new",
 }: HostSessionLedgerProps) {
   return (
     <div className="stack" style={{ "--stack": "16px", minWidth: 0 } as React.CSSProperties}>
+      <div className="row-between" style={{ gap: 10, flexWrap: "wrap", minWidth: 0 }}>
+        <span className="small" style={{ color: "var(--text-2)" }}>
+          회차별 기록과 저장된 초안을 확인합니다.
+        </span>
+        <LinkComponent to={newSessionHref} className="btn btn-primary btn-sm">
+          새 세션 만들기
+        </LinkComponent>
+      </div>
       <LedgerFilters key={filters.search} filters={filters} onFiltersChange={onFiltersChange} />
       {errorMessage ? (
         <div className="surface-quiet" role="alert" style={{ padding: 18 }}>
@@ -299,27 +318,53 @@ export function HostSessionLedger({
 }
 
 export function HostSessionAttentionSummary({
-  items,
+  page,
   LinkComponent = DefaultLink,
 }: {
-  items: HostSessionLedgerItem[] | null;
+  page: HostSessionAttentionData | null;
   LinkComponent?: HostSessionLedgerLinkComponent;
 }) {
-  if (items === null) {
+  if (page === null) {
     return (
-      <div className="surface-quiet small" role="status" style={{ padding: 14 }}>
-        기록 확인 항목을 불러오지 못했습니다. 다른 운영 영역은 계속 사용할 수 있습니다.
+      <div className="stack" style={{ "--stack": "8px" } as React.CSSProperties}>
+        <div className="surface-quiet small" role="status" style={{ padding: 14 }}>
+          기록 확인 항목을 불러오지 못했습니다. 다른 운영 영역은 계속 사용할 수 있습니다.
+        </div>
+        <LinkComponent to="/app/host/sessions" className="btn btn-ghost btn-sm">
+          세션 기록 전체 보기
+        </LinkComponent>
       </div>
     );
   }
 
-  const visibleItems = items.slice(0, 3);
-  if (visibleItems.length === 0) {
-    return <div className="surface-quiet small" style={{ padding: 14 }}>확인 필요한 세션 기록이 없습니다.</div>;
-  }
+  const visibleItems = page.items.slice(0, 3);
+  const metrics = [
+    ["수정 필요 회차", page.summary.needsAttentionCount],
+    ["공개 기록 미완성", page.summary.incompletePublishedCount],
+    ["저장된 초안", page.summary.draftCount],
+  ] as const;
 
   return (
     <div className="stack" style={{ "--stack": "8px", minWidth: 0 } as React.CSSProperties}>
+      <dl
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 110px), 1fr))",
+          gap: 8,
+          margin: 0,
+          minWidth: 0,
+        }}
+      >
+        {metrics.map(([label, value]) => (
+          <div key={label} className="surface-quiet" style={{ padding: 12, minWidth: 0 }}>
+            <dt className="tiny" style={{ overflowWrap: "anywhere" }}>{label}</dt>
+            <dd className="editorial" style={{ margin: "4px 0 0", fontSize: 22 }}>{value}</dd>
+          </div>
+        ))}
+      </dl>
+      {visibleItems.length === 0 ? (
+        <div className="surface-quiet small" style={{ padding: 14 }}>확인 필요한 세션 기록이 없습니다.</div>
+      ) : null}
       {visibleItems.map((item) => (
         <LinkComponent
           key={item.sessionId}
@@ -335,6 +380,9 @@ export function HostSessionAttentionSummary({
           </span>
         </LinkComponent>
       ))}
+      <LinkComponent to="/app/host/sessions" className="btn btn-ghost btn-sm">
+        세션 기록 전체 보기
+      </LinkComponent>
     </div>
   );
 }

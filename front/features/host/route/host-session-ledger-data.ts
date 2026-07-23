@@ -1,6 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { LoaderFunctionArgs } from "react-router-dom";
-import type { HostSessionListPage } from "@/features/host/api/host-contracts";
+import type { HostSessionRecordLedgerPage } from "@/features/host/api/host-contracts";
 import type { HostSessionLedgerFilters } from "@/features/host/model/host-session-ledger-model";
 import { normalizeHostSessionLedgerFilters } from "@/features/host/model/host-session-ledger-model";
 import {
@@ -13,7 +13,7 @@ export const HOST_SESSION_LEDGER_PAGE_LIMIT = 50;
 
 export type HostSessionLedgerRouteData = {
   filters: HostSessionLedgerFilters;
-  page: HostSessionListPage | null;
+  page: HostSessionRecordLedgerPage | null;
 };
 
 export function hostSessionLedgerFiltersFromRequest(request?: Request) {

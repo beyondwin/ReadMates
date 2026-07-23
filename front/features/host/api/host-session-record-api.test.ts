@@ -148,7 +148,15 @@ describe("host session record API", () => {
         }));
       }
       if (url.includes("/api/host/sessions?")) {
-        return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
+        return Promise.resolve(jsonResponse({
+          items: [],
+          nextCursor: null,
+          summary: {
+            needsAttentionCount: 7,
+            incompletePublishedCount: 4,
+            draftCount: 2,
+          },
+        }));
       }
       if (url.includes("/record-apply-preview")) {
         return Promise.resolve(jsonResponse({
@@ -181,7 +189,7 @@ describe("host session record API", () => {
     const context = { clubSlug: "reading-sai" };
 
     await fetchHostSessionRecordCapabilities(context);
-    await fetchHostSessionRecordLedger({
+    const ledgerPage = await fetchHostSessionRecordLedger({
       search: "  Moby   Dick  ",
       state: "CLOSED",
       recordStatus: "INCOMPLETE",
@@ -200,6 +208,11 @@ describe("host session record API", () => {
       context,
     );
 
+    expect(ledgerPage.summary).toEqual({
+      needsAttentionCount: 7,
+      incompletePublishedCount: 4,
+      draftCount: 2,
+    });
     expect(fetchMock.mock.calls.map(([url, init]) => [
       (init as RequestInit | undefined)?.method ?? "GET",
       url,

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLoaderData, useParams, useSearchParams } from "react-router-dom";
-import type { HostSessionListPage } from "@/features/host/api/host-contracts";
+import type { HostSessionRecordLedgerPage } from "@/features/host/api/host-contracts";
 import {
   normalizeHostSessionLedgerFilters,
   toHostSessionLedgerSearch,
@@ -46,8 +46,8 @@ export function HostSessionLedgerRoute({
   const loaderPage = sameFilters(filters, loaderData.filters) ? loaderData.page : null;
   const basePage = query.data ?? loaderPage;
   const [appended, setAppended] = useState<{
-    base: HostSessionListPage;
-    items: HostSessionListPage["items"];
+    base: HostSessionRecordLedgerPage;
+    items: HostSessionRecordLedgerPage["items"];
     nextCursor: string | null;
   } | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
