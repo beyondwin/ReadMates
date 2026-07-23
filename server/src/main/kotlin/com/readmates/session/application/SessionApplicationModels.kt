@@ -2,6 +2,7 @@ package com.readmates.session.application
 
 import com.readmates.session.domain.SessionParticipationStatus
 import com.readmates.sessionrecord.application.model.SessionRecordStatus
+import com.readmates.sessionrecord.application.model.HostNotificationComposerContext
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -187,13 +188,9 @@ data class HostSessionListQuery(
     val needsAttention: Boolean? = null,
 )
 
-data class HostSessionVisibilityPreview(
-    val previewId: UUID,
-    val targetCount: Int,
-    val expectedInAppCount: Int,
-    val expectedEmailCount: Int,
-    val excludedCount: Int,
-    val expiresAt: OffsetDateTime,
+data class HostSessionVisibilityUpdateResult(
+    val session: HostSessionDetailResponse,
+    val composer: HostNotificationComposerContext?,
 )
 
 data class HostSessionBasicAuditSnapshot(

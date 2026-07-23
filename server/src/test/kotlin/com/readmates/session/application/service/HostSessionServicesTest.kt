@@ -43,7 +43,6 @@ import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.model.HostDashboardResult
 import com.readmates.session.application.model.HostSessionCommand
 import com.readmates.session.application.model.HostSessionIdCommand
-import com.readmates.session.application.model.PreviewHostSessionVisibilityCommand
 import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
 import com.readmates.session.application.model.UpsertPublicationCommand
@@ -182,223 +181,62 @@ class HostSessionServicesTest {
     }
 
     @Test
-    fun `required next book publication rejects missing decision before visibility mutation`() {
-        val port =
-            RecordingHostSessionPorts().apply {
-                visibilityState = "DRAFT"
-                currentVisibility = SessionRecordVisibility.HOST_ONLY
-            }
-        val service =
-            HostSessionLifecycleService(
-                port,
-                port,
-                port,
-                confirmationProperties = HostActionConfirmationProperties(required = true),
-            )
-
-        val error =
-            assertThrows(HostActionNotificationException::class.java) {
-                service.updateVisibility(
-                    UpdateHostSessionVisibilityCommand(host, sessionId, SessionRecordVisibility.MEMBER),
-                )
-            }
-
-        assertThat(error.error).isEqualTo(HostActionNotificationError.CONFIRMATION_REQUIRED)
-        assertThat(port.visibilityCommand).isNull()
-    }
-
-    @Test
-    fun `safe default preserves legacy next book publication behavior`() {
+    fun `safe default first publication returns composer without notification dispatch`() {
         val port =
             RecordingHostSessionPorts().apply {
                 visibilityState = "DRAFT"
                 currentVisibility = SessionRecordVisibility.HOST_ONLY
             }
         val legacyRecorder = RecordingLegacyNotificationRecorder()
+        val gate = RecordingHostActionGate(host)
         val service =
             HostSessionLifecycleService(
                 port,
                 port,
                 port,
                 recordNotificationEventUseCase = legacyRecorder,
-            )
-
-        service.updateVisibility(
-            UpdateHostSessionVisibilityCommand(host, sessionId, SessionRecordVisibility.MEMBER),
-        )
-
-        assertThat(legacyRecorder.nextBookSessions).containsExactly(sessionId)
-    }
-
-    @Test
-    fun `required next book publication previews and completes explicit send`() {
-        val port =
-            RecordingHostSessionPorts().apply {
-                visibilityState = "DRAFT"
-                currentVisibility = SessionRecordVisibility.HOST_ONLY
-            }
-        val gate = RecordingHostActionGate(host)
-        val recorder = RecordingConfirmedEventRecorder()
-        val service =
-            HostSessionLifecycleService(
-                port,
-                port,
-                port,
                 notificationGate = gate,
-                confirmedEventRecorder = recorder,
-                confirmationProperties = HostActionConfirmationProperties(required = true),
             )
 
-        val preview =
-            service.previewVisibility(
-                PreviewHostSessionVisibilityCommand(host, sessionId, SessionRecordVisibility.MEMBER),
-            )
         val result =
             service.updateVisibility(
-                UpdateHostSessionVisibilityCommand(
-                    host,
-                    sessionId,
-                    SessionRecordVisibility.MEMBER,
-                    preview.previewId,
-                    NotificationDecision.SEND,
-                ),
+                UpdateHostSessionVisibilityCommand(host, sessionId, SessionRecordVisibility.MEMBER),
             )
 
-        assertThat(result.visibility).isEqualTo(SessionRecordVisibility.MEMBER)
-        assertThat(gate.prepared).hasSize(1)
-        assertThat(gate.completed).hasSize(1)
-        assertThat(recorder.commands).hasSize(1)
-        assertThat(recorder.commands.single().eventType).isEqualTo(NotificationEventType.NEXT_BOOK_PUBLISHED)
+        assertThat(result.session.visibility).isEqualTo(SessionRecordVisibility.MEMBER)
+        assertThat(result.composer?.eventType).isEqualTo(NotificationEventType.NEXT_BOOK_PUBLISHED)
+        assertThat(legacyRecorder.nextBookSessions).isEmpty()
+        assertThat(gate.prepared).isEmpty()
     }
 
     @Test
-    fun `required next book publication skip records decision without event and replays idempotently`() {
+    fun `required first publication returns composer without notification dispatch`() {
         val port =
             RecordingHostSessionPorts().apply {
                 visibilityState = "DRAFT"
                 currentVisibility = SessionRecordVisibility.HOST_ONLY
             }
-        val gate = RecordingHostActionGate(host)
-        val recorder = RecordingConfirmedEventRecorder()
-        val service =
-            HostSessionLifecycleService(
-                port,
-                port,
-                port,
-                notificationGate = gate,
-                confirmedEventRecorder = recorder,
-                confirmationProperties = HostActionConfirmationProperties(required = true),
-            )
-        val preview =
-            service.previewVisibility(
-                PreviewHostSessionVisibilityCommand(host, sessionId, SessionRecordVisibility.PUBLIC),
-            )
-        val command =
-            UpdateHostSessionVisibilityCommand(
-                host,
-                sessionId,
-                SessionRecordVisibility.PUBLIC,
-                preview.previewId,
-                NotificationDecision.SKIP,
-            )
-
-        service.updateVisibility(command)
-        gate.completedDecision = gate.lastDecision
-        val replayed = service.updateVisibility(command)
-
-        assertThat(gate.completed).hasSize(1)
-        assertThat(recorder.commands).isEmpty()
-        assertThat(port.visibilityUpdateCount).isEqualTo(1)
-        assertThat(replayed.visibility).isEqualTo(SessionRecordVisibility.PUBLIC)
-        val mismatchedReplay =
-            assertThrows(HostActionNotificationException::class.java) {
-                service.updateVisibility(command.copy(visibility = SessionRecordVisibility.MEMBER))
-            }
-        assertThat(mismatchedReplay.error).isEqualTo(HostActionNotificationError.PREVIEW_ALREADY_CONSUMED)
-        assertThat(port.visibilityUpdateCount).isEqualTo(1)
-    }
-
-    @Test
-    fun `consumed visibility replay rejects intervening content without another write`() {
-        val port =
-            RecordingHostSessionPorts().apply {
-                visibilityState = "DRAFT"
-                currentVisibility = SessionRecordVisibility.HOST_ONLY
-            }
+        val legacyRecorder = RecordingLegacyNotificationRecorder()
         val gate = RecordingHostActionGate(host)
         val service =
             HostSessionLifecycleService(
                 port,
                 port,
                 port,
+                recordNotificationEventUseCase = legacyRecorder,
                 notificationGate = gate,
-                confirmedEventRecorder = RecordingConfirmedEventRecorder(),
                 confirmationProperties = HostActionConfirmationProperties(required = true),
             )
-        val preview =
-            service.previewVisibility(
-                PreviewHostSessionVisibilityCommand(host, sessionId, SessionRecordVisibility.MEMBER),
+
+        val result =
+            service.updateVisibility(
+                UpdateHostSessionVisibilityCommand(host, sessionId, SessionRecordVisibility.MEMBER),
             )
-        val command =
-            UpdateHostSessionVisibilityCommand(
-                host,
-                sessionId,
-                SessionRecordVisibility.MEMBER,
-                preview.previewId,
-                NotificationDecision.SKIP,
-            )
-        service.updateVisibility(command)
-        gate.completedDecision = gate.lastDecision
-        port.visibilityUpdatedAt = port.visibilityUpdatedAt.plusSeconds(1)
 
-        val error =
-            assertThrows(HostActionNotificationException::class.java) {
-                service.updateVisibility(command)
-            }
-
-        assertThat(error.error).isEqualTo(HostActionNotificationError.PREVIEW_ALREADY_CONSUMED)
-        assertThat(port.visibilityUpdateCount).isEqualTo(1)
-    }
-
-    @Test
-    fun `visibility apply revalidates locked preview payload before mutation`() {
-        val port =
-            RecordingHostSessionPorts().apply {
-                visibilityState = "DRAFT"
-                currentVisibility = SessionRecordVisibility.HOST_ONLY
-            }
-        val gate = RecordingHostActionGate(host)
-        val service =
-            HostSessionLifecycleService(
-                port,
-                port,
-                port,
-                notificationGate = gate,
-                confirmedEventRecorder = RecordingConfirmedEventRecorder(),
-                confirmationProperties = HostActionConfirmationProperties(required = true),
-            )
-        val preview =
-            service.previewVisibility(
-                PreviewHostSessionVisibilityCommand(host, sessionId, SessionRecordVisibility.MEMBER),
-            )
-        port.visibilityBookTitle = "Changed notification payload"
-
-        val error =
-            assertThrows(HostActionNotificationException::class.java) {
-                service.updateVisibility(
-                    UpdateHostSessionVisibilityCommand(
-                        host,
-                        sessionId,
-                        SessionRecordVisibility.MEMBER,
-                        preview.previewId,
-                        NotificationDecision.SEND,
-                    ),
-                )
-            }
-
-        assertThat(error.error).isEqualTo(HostActionNotificationError.PREVIEW_MISMATCH)
-        assertThat(port.visibilityUpdateCount).isZero()
-        assertThat(port.visibilityLockCount).isEqualTo(2)
+        assertThat(result.session.visibility).isEqualTo(SessionRecordVisibility.MEMBER)
+        assertThat(result.composer?.eventType).isEqualTo(NotificationEventType.NEXT_BOOK_PUBLISHED)
+        assertThat(legacyRecorder.nextBookSessions).isEmpty()
+        assertThat(gate.prepared).isEmpty()
     }
 
     @Test
