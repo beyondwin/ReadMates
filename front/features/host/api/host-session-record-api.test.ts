@@ -3,6 +3,7 @@ import {
   HostSessionHistoryPageResponseSchema,
   HostSessionRecordApplyResultResponseSchema,
   HostSessionRecordEditorResponseSchema,
+  SessionRecordSnapshotResponseSchema,
 } from "./host-session-record-contracts";
 import {
   applyHostSessionRecord,
@@ -181,7 +182,7 @@ describe("host session record API", () => {
 
     await fetchHostSessionRecordCapabilities(context);
     await fetchHostSessionRecordLedger({
-      search: "  Moby Dick  ",
+      search: "  Moby   Dick  ",
       state: "CLOSED",
       recordStatus: "INCOMPLETE",
       needsAttention: true,
@@ -225,6 +226,27 @@ describe("host session record API", () => {
       body: JSON.stringify({ expectedDraftRevision: 3 }),
     }));
   });
+
+  it("preserves structured API errors when draft deletion fails", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      code: "SESSION_RECORD_DRAFT_STALE",
+      message: "다른 호스트가 먼저 초안을 수정했습니다.",
+      status: 409,
+    }), {
+      status: 409,
+      headers: { "Content-Type": "application/json" },
+    })));
+
+    await expect(deleteHostSessionRecordDraft("session-28", 3, {
+      clubSlug: "reading-sai",
+    })).rejects.toMatchObject({
+      name: "ReadmatesApiError",
+      status: 409,
+      code: "SESSION_RECORD_DRAFT_STALE",
+      message: "다른 호스트가 먼저 초안을 수정했습니다.",
+      fallback: false,
+    });
+  });
 });
 
 describe("host session record response schemas", () => {
@@ -263,6 +285,26 @@ describe("host session record response schemas", () => {
       decisionId: "decision-1",
       notificationDecision: "LATER",
       eventId: null,
+    }).success).toBe(false);
+  });
+
+  it("accepts only the v1 snapshot schema and rejects unknown snapshot fields", () => {
+    expect(SessionRecordSnapshotResponseSchema.safeParse({
+      ...snapshot(),
+      schema: "readmates-session-record:v2",
+    }).success).toBe(false);
+    expect(SessionRecordSnapshotResponseSchema.safeParse({
+      ...snapshot(),
+      privateEvidence: "must not be silently ignored",
+    }).success).toBe(false);
+    expect(SessionRecordSnapshotResponseSchema.safeParse({
+      ...snapshot(),
+      highlights: [{
+        membershipId: "membership-1",
+        authorDisplayName: "Alice",
+        text: "기억할 문장",
+        privateEmail: "must not be silently ignored",
+      }],
     }).success).toBe(false);
   });
 });

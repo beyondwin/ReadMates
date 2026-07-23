@@ -87,7 +87,10 @@ describe("host session record queries", () => {
     vi.mocked(fetchHostSessionRecordEditor).mockResolvedValue({} as never);
     vi.mocked(fetchHostSessionHistory).mockResolvedValue({ items: [], nextCursor: null });
     const context = { clubSlug: "reading-sai" };
-    const ledger = hostSessionRecordLedgerQuery({ page: { limit: 50 } }, context);
+    const ledger = hostSessionRecordLedgerQuery({
+      search: "  모비   딕  ",
+      page: { limit: 50 },
+    }, context);
     const editor = hostSessionRecordEditorQuery("session-28", context);
     const history = hostSessionRecordHistoryQuery("session-28", { limit: 20 }, context);
 
@@ -95,7 +98,13 @@ describe("host session record queries", () => {
     await editor.queryFn?.({} as never);
     await history.queryFn?.({} as never);
 
-    expect(fetchHostSessionRecordLedger).toHaveBeenCalledWith({ page: { limit: 50 } }, context);
+    expect(fetchHostSessionRecordLedger).toHaveBeenCalledWith({
+      search: "모비 딕",
+      state: null,
+      recordStatus: null,
+      needsAttention: null,
+      page: { limit: 50, cursor: null },
+    }, context);
     expect(fetchHostSessionRecordEditor).toHaveBeenCalledWith("session-28", context);
     expect(fetchHostSessionHistory).toHaveBeenCalledWith("session-28", { limit: 20 }, context);
   });
@@ -167,6 +176,42 @@ describe("host session record queries", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: hostSessionKeys.dashboard(context),
     });
-    expect(invalidateMemberAndPublicSurfaces).toHaveBeenCalledWith({ clubSlug: "reading-sai" });
+    expect(invalidateMemberAndPublicSurfaces).toHaveBeenCalledWith({
+      sessionId: "session-28",
+      clubSlug: "reading-sai",
+    });
+  });
+
+  it("requires and invokes cross-feature invalidation for unscoped apply", async () => {
+    vi.mocked(applyHostSessionRecord).mockResolvedValue({
+      revisionId: "revision-3",
+      liveRevision: 3,
+      decisionId: "decision-1",
+      notificationDecision: "SKIP",
+      eventId: null,
+    });
+    const { Wrapper } = createWrapper();
+    const invalidateMemberAndPublicSurfaces = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(
+      () => useApplyHostSessionRecordMutation(undefined, invalidateMemberAndPublicSurfaces),
+      { wrapper: Wrapper },
+    );
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        sessionId: "session-28",
+        request: {
+          previewId: "preview-1",
+          expectedDraftRevision: 3,
+          expectedLiveRevision: 2,
+          notificationDecision: "SKIP",
+        },
+      });
+    });
+
+    expect(invalidateMemberAndPublicSurfaces).toHaveBeenCalledWith({
+      sessionId: "session-28",
+      clubSlug: undefined,
+    });
   });
 });

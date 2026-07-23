@@ -126,8 +126,9 @@ export type HostNotificationEventType =
   | "NEXT_BOOK_PUBLISHED"
   | "SESSION_REMINDER_DUE"
   | "FEEDBACK_DOCUMENT_PUBLISHED"
-  | "REVIEW_PUBLISHED";
-export type NotificationDispatchSource = "AUTOMATIC" | "MANUAL";
+  | "REVIEW_PUBLISHED"
+  | "SESSION_RECORD_UPDATED";
+export type NotificationDispatchSource = "AUTOMATIC" | "MANUAL" | "HOST_CONFIRMED";
 
 export type HostNotificationSummary = {
   pending: number;

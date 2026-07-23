@@ -57,6 +57,24 @@ afterEach(() => {
 });
 
 describe("host api wrappers", () => {
+  it("passes explicit club context through visibility PATCH", async () => {
+    const fetchMock = stubFetch();
+
+    await saveHostSessionVisibility(
+      "session 7",
+      { visibility: "MEMBER" },
+      { clubSlug: "reading-sai" },
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/host/sessions/session%207/visibility?clubSlug=reading-sai",
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ visibility: "MEMBER" }),
+      }),
+    );
+  });
+
   it("builds scoped host read URLs with query parameters", async () => {
     const fetchMock = stubFetch();
     const context = { clubSlug: "reading-sai" };

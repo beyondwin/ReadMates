@@ -28,7 +28,7 @@ export type SessionRecordFeedbackDocument = {
 };
 
 export type SessionRecordSnapshot = {
-  schema: string;
+  schema: "readmates-session-record:v1";
   visibility: SessionRecordVisibility;
   publicationSummary: string;
   highlights: SessionRecordEntry[];
@@ -132,6 +132,21 @@ export type HostSessionLedgerRequest = {
   page?: PageRequest;
 };
 
+export function normalizeHostSessionLedgerRequest(
+  request?: HostSessionLedgerRequest,
+): HostSessionLedgerRequest {
+  return {
+    search: request?.search?.trim().replace(/\s+/g, " ") || null,
+    state: request?.state ?? null,
+    recordStatus: request?.recordStatus ?? null,
+    needsAttention: request?.needsAttention ?? null,
+    page: {
+      ...(request?.page?.limit !== undefined ? { limit: request.page.limit } : {}),
+      cursor: request?.page?.cursor ?? null,
+    },
+  };
+}
+
 const nonNegativeInteger = z.number().int().nonnegative();
 const positiveInteger = z.number().int().positive();
 const nullableString = z.string().nullable();
@@ -140,26 +155,24 @@ const SessionRecordSourceSchema = z.enum(["BASELINE", "MANUAL", "JSON_IMPORT", "
 const SessionRecordDraftSourceSchema = z.enum(["MANUAL", "JSON_IMPORT", "AI_GENERATED", "RESTORED"]);
 const NotificationDecisionSchema = z.enum(["SEND", "SKIP"]);
 
+const SessionRecordEntryResponseSchema = z.object({
+  membershipId: z.string(),
+  authorDisplayName: z.string(),
+  text: z.string(),
+}).strict();
+
 export const SessionRecordSnapshotResponseSchema = z.object({
-  schema: z.string(),
+  schema: z.literal("readmates-session-record:v1"),
   visibility: SessionRecordVisibilitySchema,
   publicationSummary: z.string(),
-  highlights: z.array(z.object({
-    membershipId: z.string(),
-    authorDisplayName: z.string(),
-    text: z.string(),
-  })),
-  oneLineReviews: z.array(z.object({
-    membershipId: z.string(),
-    authorDisplayName: z.string(),
-    text: z.string(),
-  })),
+  highlights: z.array(SessionRecordEntryResponseSchema),
+  oneLineReviews: z.array(SessionRecordEntryResponseSchema),
   feedbackDocument: z.object({
     fileName: z.string(),
     title: z.string(),
     markdown: z.string(),
-  }),
-});
+  }).strict(),
+}).strict();
 
 export const HostSessionRecordDraftResponseSchema = z.object({
   sessionId: z.string(),

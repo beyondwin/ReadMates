@@ -1,8 +1,10 @@
 import { readmatesFetch, readmatesFetchResponse, type ReadmatesApiContext } from "@/shared/api/client";
+import { apiErrorFromResponse } from "@/shared/api/errors";
 import type { PageRequest } from "@/shared/model/paging";
 import type { HostSessionListPage } from "./host-contracts";
 import {
   HostSessionRecordLedgerPageResponseSchema,
+  normalizeHostSessionLedgerRequest,
   parseHostSessionHistoryPage,
   parseHostSessionRecordApplyPreview,
   parseHostSessionRecordApplyResult,
@@ -36,21 +38,22 @@ function appendPage(params: URLSearchParams, page?: PageRequest) {
 }
 
 function ledgerSearch(request?: HostSessionLedgerRequest) {
+  const normalized = normalizeHostSessionLedgerRequest(request);
   const params = new URLSearchParams();
-  const search = request?.search?.trim();
+  const search = normalized.search;
   if (search) {
     params.set("search", search);
   }
-  if (request?.state) {
-    params.set("state", request.state);
+  if (normalized.state) {
+    params.set("state", normalized.state);
   }
-  if (request?.recordStatus) {
-    params.set("recordStatus", request.recordStatus);
+  if (normalized.recordStatus) {
+    params.set("recordStatus", normalized.recordStatus);
   }
-  if (request?.needsAttention !== null && request?.needsAttention !== undefined) {
-    params.set("needsAttention", String(request.needsAttention));
+  if (normalized.needsAttention !== null && normalized.needsAttention !== undefined) {
+    params.set("needsAttention", String(normalized.needsAttention));
   }
-  appendPage(params, request?.page);
+  appendPage(params, normalized.page);
   const query = params.toString();
   return query ? `?${query}` : "";
 }
@@ -108,9 +111,9 @@ export function deleteHostSessionRecordDraft(
     `${sessionRecordPath(sessionId, "record-draft")}?${params.toString()}`,
     { method: "DELETE" },
     context,
-  ).then((response) => {
+  ).then(async (response) => {
     if (!response.ok) {
-      throw new Error(`Failed to delete session record draft (${response.status})`);
+      throw await apiErrorFromResponse(response);
     }
     return response;
   });

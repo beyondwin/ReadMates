@@ -1,12 +1,13 @@
 export type NotificationEventOutboxStatus = "PENDING" | "PUBLISHING" | "PUBLISHED" | "FAILED" | "DEAD";
 export type NotificationDeliveryStatus = "PENDING" | "SENDING" | "SENT" | "FAILED" | "DEAD" | "SKIPPED";
 export type NotificationChannel = "EMAIL" | "IN_APP";
-export type NotificationDispatchSource = "AUTOMATIC" | "MANUAL";
+export type NotificationDispatchSource = "AUTOMATIC" | "MANUAL" | "HOST_CONFIRMED";
 export type HostNotificationEventType =
   | "NEXT_BOOK_PUBLISHED"
   | "SESSION_REMINDER_DUE"
   | "FEEDBACK_DOCUMENT_PUBLISHED"
-  | "REVIEW_PUBLISHED";
+  | "REVIEW_PUBLISHED"
+  | "SESSION_RECORD_UPDATED";
 
 export type HostNotificationSummary = {
   pending: number;
@@ -69,6 +70,13 @@ export const eventLabels: Record<HostNotificationEventType, string> = {
   SESSION_REMINDER_DUE: "세션 리마인더",
   FEEDBACK_DOCUMENT_PUBLISHED: "피드백 문서 공개",
   REVIEW_PUBLISHED: "리뷰 공개",
+  SESSION_RECORD_UPDATED: "세션 기록 수정",
+};
+
+export const notificationSourceLabels: Record<NotificationDispatchSource, string> = {
+  AUTOMATIC: "자동",
+  MANUAL: "수동",
+  HOST_CONFIRMED: "호스트 확인",
 };
 
 export const eventOutboxStatusLabels: Record<NotificationEventOutboxStatus, string> = {

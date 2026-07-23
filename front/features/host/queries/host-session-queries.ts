@@ -281,7 +281,7 @@ export function useSaveHostSessionVisibilityMutation(context?: ReadmatesApiConte
   const client = useQueryClient();
   return useMutation({
     mutationFn: ({ sessionId, request }: { sessionId: string; request: HostSessionVisibilityRequest }) =>
-      saveHostSessionVisibility(sessionId, request),
+      saveHostSessionVisibility(sessionId, request, context),
     onSuccess: (response, variables) =>
       invalidateOk(response, () =>
         Promise.all([

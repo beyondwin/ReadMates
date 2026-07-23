@@ -163,12 +163,13 @@ export type HostNotificationStatus = "PENDING" | "SENDING" | "SENT" | "FAILED" |
 export type NotificationEventOutboxStatus = "PENDING" | "PUBLISHING" | "PUBLISHED" | "FAILED" | "DEAD";
 export type NotificationDeliveryStatus = "PENDING" | "SENDING" | "SENT" | "FAILED" | "DEAD" | "SKIPPED";
 export type NotificationChannel = "EMAIL" | "IN_APP";
-export type NotificationDispatchSource = "AUTOMATIC" | "MANUAL";
+export type NotificationDispatchSource = "AUTOMATIC" | "MANUAL" | "HOST_CONFIRMED";
 export type HostNotificationEventType =
   | "NEXT_BOOK_PUBLISHED"
   | "SESSION_REMINDER_DUE"
   | "FEEDBACK_DOCUMENT_PUBLISHED"
-  | "REVIEW_PUBLISHED";
+  | "REVIEW_PUBLISHED"
+  | "SESSION_RECORD_UPDATED";
 export type ManualNotificationAudience = "ALL_ACTIVE_MEMBERS" | "SESSION_PARTICIPANTS" | "CONFIRMED_ATTENDEES";
 export type ManualNotificationRequestedChannels = "IN_APP" | "EMAIL" | "BOTH";
 export type ManualNotificationSendMode = "NOW";

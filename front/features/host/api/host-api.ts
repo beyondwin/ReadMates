@@ -258,12 +258,16 @@ export function saveHostSessionPublication(sessionId: string, request: HostSessi
   });
 }
 
-export function saveHostSessionVisibility(sessionId: string, request: HostSessionVisibilityRequest) {
+export function saveHostSessionVisibility(
+  sessionId: string,
+  request: HostSessionVisibilityRequest,
+  context?: ReadmatesApiContext,
+) {
   return readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/visibility`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
-  }) as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
+  }, context) as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
 }
 
 export function previewHostSessionVisibility(

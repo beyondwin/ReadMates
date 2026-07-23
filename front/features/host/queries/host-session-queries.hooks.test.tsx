@@ -227,7 +227,11 @@ describe("host session mutation hooks", () => {
       await result.current.mutateAsync({ sessionId: "session-7", request: { visibility: "MEMBER" } });
     });
 
-    expect(saveHostSessionVisibility).toHaveBeenCalledWith("session-7", { visibility: "MEMBER" });
+    expect(saveHostSessionVisibility).toHaveBeenCalledWith(
+      "session-7",
+      { visibility: "MEMBER" },
+      { clubSlug: "reading-sai" },
+    );
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.detail("session-7", { clubSlug: "reading-sai" }) });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.lists({ clubSlug: "reading-sai" }) });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.dashboard({ clubSlug: "reading-sai" }) });

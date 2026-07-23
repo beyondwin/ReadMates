@@ -4,6 +4,7 @@ import {
   eventLabels,
   eventOutboxStatusBadgeClass,
   eventOutboxStatusLabels,
+  notificationSourceLabels,
   type HostNotificationEventItem,
 } from "./notification-formatters";
 import { manualAudienceLabels, manualChannelLabels } from "./manual-notification-labels";
@@ -42,8 +43,8 @@ function NotificationEventRow({ event, isFirst }: { event: HostNotificationEvent
           <strong className="body" style={{ minWidth: 0 }}>
             {eventLabels[event.eventType]}
           </strong>
-          <span className={event.source === "MANUAL" ? "badge badge-accent badge-dot" : "badge"}>
-            {event.source === "MANUAL" ? "수동" : "자동"}
+          <span className={event.source && event.source !== "AUTOMATIC" ? "badge badge-accent badge-dot" : "badge"}>
+            {notificationSourceLabels[event.source ?? "AUTOMATIC"]}
           </span>
           <span className={eventOutboxStatusBadgeClass(event.status)}>{event.status}</span>
         </div>

@@ -20,6 +20,7 @@ import type {
   RestoreHostSessionRecordDraftRequest,
   SaveHostSessionRecordDraftRequest,
 } from "@/features/host/api/host-session-record-contracts";
+import { normalizeHostSessionLedgerRequest } from "@/features/host/api/host-session-record-contracts";
 import type { ReadmatesApiContext } from "@/shared/api/client";
 import type { PageRequest } from "@/shared/model/paging";
 import { normalizePageRequest } from "@/shared/query/cursor-pagination";
@@ -27,16 +28,6 @@ import { invalidateHostSessionDashboard } from "./host-session-queries";
 
 function scopeKey(context?: ReadmatesApiContext) {
   return context?.clubSlug ?? null;
-}
-
-function normalizeLedgerRequest(request?: HostSessionLedgerRequest) {
-  return {
-    search: request?.search?.trim().replace(/\s+/g, " ") || null,
-    state: request?.state ?? null,
-    recordStatus: request?.recordStatus ?? null,
-    needsAttention: request?.needsAttention ?? null,
-    page: normalizePageRequest(request?.page),
-  };
 }
 
 export const hostSessionRecordKeys = {
@@ -48,7 +39,7 @@ export const hostSessionRecordKeys = {
   ledgers: (context?: ReadmatesApiContext) =>
     [...hostSessionRecordKeys.scope(context), "ledger"] as const,
   ledger: (request?: HostSessionLedgerRequest, context?: ReadmatesApiContext) =>
-    [...hostSessionRecordKeys.ledgers(context), normalizeLedgerRequest(request)] as const,
+    [...hostSessionRecordKeys.ledgers(context), normalizeHostSessionLedgerRequest(request)] as const,
   editor: (sessionId: string, context?: ReadmatesApiContext) =>
     [...hostSessionRecordKeys.scope(context), "editor", sessionId] as const,
   historyRoot: (sessionId: string, context?: ReadmatesApiContext) =>
@@ -68,9 +59,10 @@ export function hostSessionRecordLedgerQuery(
   request?: HostSessionLedgerRequest,
   context?: ReadmatesApiContext,
 ) {
+  const normalizedRequest = normalizeHostSessionLedgerRequest(request);
   return queryOptions({
-    queryKey: hostSessionRecordKeys.ledger(request, context),
-    queryFn: () => fetchHostSessionRecordLedger(request, context),
+    queryKey: hostSessionRecordKeys.ledger(normalizedRequest, context),
+    queryFn: () => fetchHostSessionRecordLedger(normalizedRequest, context),
   });
 }
 
@@ -145,22 +137,31 @@ async function invalidateAppliedRecordSurfaces(
   client: QueryClient,
   sessionId: string,
   context?: ReadmatesApiContext,
-  invalidateMemberAndPublicSurfaces?: (event: { clubSlug: string }) => Promise<unknown>,
+  invalidateMemberAndPublicSurfaces?: (event: {
+    sessionId: string;
+    clubSlug?: string;
+  }) => Promise<unknown>,
 ) {
   await Promise.all([
     client.invalidateQueries({ queryKey: hostSessionRecordKeys.editor(sessionId, context) }),
     client.invalidateQueries({ queryKey: hostSessionRecordKeys.ledgers(context) }),
     client.invalidateQueries({ queryKey: hostSessionRecordKeys.historyRoot(sessionId, context) }),
     invalidateHostSessionDashboard(client, context),
-    ...(context?.clubSlug && invalidateMemberAndPublicSurfaces
-      ? [invalidateMemberAndPublicSurfaces({ clubSlug: context.clubSlug })]
+    ...(invalidateMemberAndPublicSurfaces
+      ? [invalidateMemberAndPublicSurfaces({
+          sessionId,
+          clubSlug: context?.clubSlug,
+        })]
       : []),
   ]);
 }
 
 export function useApplyHostSessionRecordMutation(
-  context?: ReadmatesApiContext,
-  invalidateMemberAndPublicSurfaces?: (event: { clubSlug: string }) => Promise<unknown>,
+  context: ReadmatesApiContext | undefined,
+  invalidateMemberAndPublicSurfaces: (event: {
+    sessionId: string;
+    clubSlug?: string;
+  }) => Promise<unknown>,
 ) {
   const client = useQueryClient();
   return useMutation({
