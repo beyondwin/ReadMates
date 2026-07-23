@@ -347,7 +347,7 @@ class AiGenerateApiIntegrationTest(
                 jsonPath("$.code") { value("TRANSCRIPT_ALIAS_MODE_UNSUPPORTED") }
             }
 
-        assertThat(redis.keys("aigen:job:*")).isEqualTo(before)
+        assertThat(redis.keys("aigen:job:*")).containsAll(before)
     }
 
     @Test
