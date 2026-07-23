@@ -136,7 +136,9 @@ class JdbcHostActionNotificationAdapter(
         liveRevision: Long,
         eventId: UUID?,
         now: OffsetDateTime,
-    ): StoredHostActionDecision = findDecision(preview.id) ?: insertDecision(preview, decision, liveRevision, eventId, now)
+    ): StoredHostActionDecision =
+        findDecision(preview.id)
+            ?: insertDecision(preview, decision, liveRevision, eventId, now)
 
     private fun insertDecision(
         preview: HostActionNotificationPreviewRecord,
