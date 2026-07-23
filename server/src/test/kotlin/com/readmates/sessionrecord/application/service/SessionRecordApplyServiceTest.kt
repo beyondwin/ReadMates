@@ -58,6 +58,18 @@ import java.util.UUID
 @Tag("unit")
 class SessionRecordApplyServiceTest {
     @Test
+    fun `apply creates revision and receipt without notification decision or outbox`() {
+        val fixture = Fixture(liveRevision = 3)
+
+        val result = fixture.applyContentOnly()
+
+        assertEquals(4L, result.liveRevision)
+        assertEquals(fixture.sessionId, result.composer.sessionId)
+        assertEquals(1, fixture.store.receipts.size)
+        assertTrue(fixture.recorder.commands.isEmpty())
+    }
+
+    @Test
     fun `apply validates and replaces the full record package`() {
         val fixture = Fixture()
 
@@ -113,7 +125,6 @@ class SessionRecordApplyServiceTest {
         val preview = fixture.preview()
 
         assertEquals(NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED, preview.eventType)
-        assertEquals(NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED, fixture.gate.lastPreview?.eventType)
     }
 
     @Test
@@ -123,52 +134,6 @@ class SessionRecordApplyServiceTest {
         val preview = fixture.preview()
 
         assertEquals(NotificationEventType.SESSION_RECORD_UPDATED, preview.eventType)
-    }
-
-    @Test
-    fun `send creates exactly one revision keyed event`() {
-        val fixture = Fixture(liveRevision = 3, liveFeedback = "Previously visible")
-
-        val result = fixture.apply(NotificationDecision.SEND)
-
-        assertEquals(1, fixture.recorder.commands.size)
-        assertEquals(
-            result.liveRevision,
-            fixture.recorder.commands
-                .single()
-                .revision,
-        )
-        assertEquals(
-            NotificationEventType.SESSION_RECORD_UPDATED,
-            fixture.recorder.commands
-                .single()
-                .eventType,
-        )
-        assertNotNull(result.eventId)
-    }
-
-    @Test
-    fun `skip creates no outbox event`() {
-        val fixture = Fixture(liveRevision = 3)
-
-        val result = fixture.apply(NotificationDecision.SKIP)
-
-        assertTrue(fixture.recorder.commands.isEmpty())
-        assertNull(result.eventId)
-        assertEquals(NotificationDecision.SKIP, result.notificationDecision)
-    }
-
-    @Test
-    fun `outbox failure rolls back live replacement revision and draft deletion`() {
-        val fixture = Fixture(liveRevision = 3)
-        fixture.recorder.failure = IllegalStateException("outbox unavailable")
-
-        assertThrows(IllegalStateException::class.java) { fixture.apply(NotificationDecision.SEND) }
-
-        assertFalse(fixture.replacer.committed)
-        assertTrue(fixture.store.revisions.isEmpty())
-        assertNotNull(fixture.store.draft)
-        assertTrue(fixture.gate.completed.isEmpty())
     }
 
     @Test
@@ -223,71 +188,6 @@ class SessionRecordApplyServiceTest {
         assertEquals(restoredFrom, applied.restoredFromRevisionId)
     }
 
-    @Test
-    fun `completed preview returns original result without another mutation`() {
-        val fixture = Fixture(liveRevision = 3)
-        val revision = fixture.appliedRevision(version = 4)
-        fixture.store.completed =
-            CompletedSessionRecordApply(
-                previewId = fixture.previewId,
-                expectedDraftRevision = fixture.draft.draftRevision,
-                expectedLiveRevision = 3,
-                notificationDecision = NotificationDecision.SKIP,
-                decisionId = fixture.decisionId,
-                eventId = null,
-                revision = revision,
-            )
-
-        val result = fixture.apply(NotificationDecision.SKIP)
-
-        assertEquals(4L, result.liveRevision)
-        assertEquals(fixture.decisionId, result.decisionId)
-        assertEquals(0, fixture.validator.calls)
-        assertFalse(fixture.replacer.committed)
-    }
-
-    @Test
-    fun `completed preview discovered after lock returns original concurrent result`() {
-        val fixture = Fixture(liveRevision = 3)
-        fixture.store.completedAfterLock =
-            CompletedSessionRecordApply(
-                previewId = fixture.previewId,
-                expectedDraftRevision = fixture.draft.draftRevision,
-                expectedLiveRevision = 3,
-                notificationDecision = NotificationDecision.SKIP,
-                decisionId = fixture.decisionId,
-                eventId = null,
-                revision = fixture.appliedRevision(version = 4),
-            )
-
-        val result = fixture.apply(NotificationDecision.SKIP)
-
-        assertEquals(4L, result.liveRevision)
-        assertEquals(0, fixture.validator.calls)
-        assertFalse(fixture.replacer.committed)
-    }
-
-    @Test
-    fun `completed preview rejects a mismatched replay`() {
-        val fixture = Fixture(liveRevision = 3)
-        fixture.store.completed =
-            CompletedSessionRecordApply(
-                previewId = fixture.previewId,
-                expectedDraftRevision = fixture.draft.draftRevision,
-                expectedLiveRevision = 3,
-                notificationDecision = NotificationDecision.SKIP,
-                decisionId = fixture.decisionId,
-                eventId = null,
-                revision = fixture.appliedRevision(version = 4),
-            )
-
-        val error =
-            assertThrows(SessionRecordException::class.java) {
-                fixture.apply(NotificationDecision.SEND)
-            }
-
-        assertEquals(SessionRecordError.PREVIEW_ALREADY_CONSUMED, error.error)
-    }
 }
 
 private val TEST_NOW = OffsetDateTime.of(2026, 7, 23, 0, 0, 0, 0, ZoneOffset.UTC)
@@ -356,8 +256,6 @@ private class Fixture(
             codec = codec,
             validator = validator,
             replacer = replacer,
-            notificationGate = gate,
-            confirmedEventRecorder = recorder,
         )
 
     init {
@@ -376,8 +274,26 @@ private class Fixture(
         expectedLiveRevision: Long = live.revision,
     ) = service.apply(
         host,
-        ApplySessionRecordCommand(sessionId, previewId, expectedDraftRevision, expectedLiveRevision, decision),
+        ApplySessionRecordCommand(
+            sessionId,
+            previewId,
+            expectedDraftRevision,
+            expectedLiveRevision,
+            codec.encode(draft.snapshot).sha256,
+        ),
     )
+
+    fun applyContentOnly() =
+        service.apply(
+            host,
+            ApplySessionRecordCommand(
+                sessionId = sessionId,
+                applyRequestId = UUID.randomUUID(),
+                expectedDraftRevision = draft.draftRevision,
+                expectedLiveRevision = live.revision,
+                expectedDraftHash = codec.encode(draft.snapshot).sha256,
+            ),
+        )
 
     fun appliedRevision(version: Long) =
         SessionRecordRevision(
@@ -412,6 +328,7 @@ private class FakeApplyStore(
     var completed: CompletedSessionRecordApply? = null
     var completedAfterLock: CompletedSessionRecordApply? = null
     val revisions = mutableListOf<SessionRecordRevision>()
+    val receipts = mutableListOf<com.readmates.sessionrecord.application.model.SessionRecordApplyReceipt>()
     private val stagedRevisions = mutableListOf<SessionRecordRevision>()
     var onCommit: () -> Unit = {}
 
@@ -427,6 +344,26 @@ private class FakeApplyStore(
         host: AuthenticatedClubActor,
         previewId: UUID,
     ): CompletedSessionRecordApply? = completed
+
+    override fun findApplyReceipt(
+        host: AuthenticatedClubActor,
+        applyRequestId: UUID,
+    ) = receipts.firstOrNull { it.applyRequestId == applyRequestId }
+
+    override fun insertApplyReceipt(
+        host: AuthenticatedClubActor,
+        command: ApplySessionRecordCommand,
+        draftSha256: String,
+        composerEventType: NotificationEventType,
+        revision: SessionRecordRevision,
+    ) = com.readmates.sessionrecord.application.model.SessionRecordApplyReceipt(
+        command.applyRequestId,
+        command.expectedDraftRevision,
+        command.expectedLiveRevision,
+        draftSha256,
+        composerEventType,
+        revision,
+    ).also(receipts::add)
 
     override fun insertBaselineIfAbsent(
         host: AuthenticatedClubActor,

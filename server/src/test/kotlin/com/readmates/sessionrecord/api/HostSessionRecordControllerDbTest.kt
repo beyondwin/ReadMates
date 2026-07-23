@@ -96,13 +96,17 @@ class HostSessionRecordControllerDbTest(
                 content =
                     """
                     {
+                      "applyRequestId": "00000000-0000-0000-0000-000000000123",
                       "expectedDraftRevision": 1,
-                      "expectedLiveRevision": 0
+                      "expectedLiveRevision": 0,
+                      "expectedDraftHash": "${"f".repeat(64)}",
+                      "previewId": "00000000-0000-0000-0000-000000000456",
+                      "notificationDecision": "SEND"
                     }
                     """.trimIndent()
             }.andExpect {
-                status { isConflict() }
-                jsonPath("$.code") { value("NOTIFICATION_CONFIRMATION_REQUIRED") }
+                status { isBadRequest() }
+                jsonPath("$.code") { value("SESSION_RECORD_INVALID_APPLY_CONTRACT") }
             }
 
         mockMvc

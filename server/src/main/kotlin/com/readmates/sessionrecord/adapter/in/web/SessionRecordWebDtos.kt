@@ -8,6 +8,7 @@ import com.readmates.notification.application.model.NotificationDecision
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.sessionrecord.application.model.ApplySessionRecordCommand
+import com.readmates.sessionrecord.application.model.HostNotificationComposerContext
 import com.readmates.sessionrecord.application.model.HostSessionHistoryAttendanceTransition
 import com.readmates.sessionrecord.application.model.HostSessionHistoryItem
 import com.readmates.sessionrecord.application.model.PreviewSessionRecordApplyCommand
@@ -89,15 +90,27 @@ data class PreviewSessionRecordApplyRequest(
 }
 
 data class ApplySessionRecordRequest(
-    val previewId: String?,
+    val applyRequestId: String,
     @field:Positive val expectedDraftRevision: Long,
     @field:PositiveOrZero val expectedLiveRevision: Long,
-    val notificationDecision: NotificationDecision?,
+    val expectedDraftHash: String,
+    val previewId: String? = null,
+    val notificationDecision: NotificationDecision? = null,
 ) {
     fun toCommand(sessionId: UUID): ApplySessionRecordCommand {
-        val decision = notificationDecision ?: confirmationRequired()
-        val id = previewId?.let(::parseRecordUuid) ?: confirmationRequired()
-        return ApplySessionRecordCommand(sessionId, id, expectedDraftRevision, expectedLiveRevision, decision)
+        if (previewId != null || notificationDecision != null) {
+            throw SessionRecordException(
+                SessionRecordError.INVALID_APPLY_CONTRACT,
+                "Legacy notification decision contract is not accepted",
+            )
+        }
+        return ApplySessionRecordCommand(
+            sessionId,
+            parseRecordUuid(applyRequestId),
+            expectedDraftRevision,
+            expectedLiveRevision,
+            expectedDraftHash,
+        )
     }
 }
 
@@ -156,21 +169,14 @@ data class SessionRecordEditorResponse(
 )
 
 data class SessionRecordApplyPreviewResponse(
-    val previewId: String,
     val eventType: NotificationEventType,
-    val targetCount: Int,
-    val expectedInAppCount: Int,
-    val expectedEmailCount: Int,
-    val excludedCount: Int,
-    val expiresAt: OffsetDateTime,
+    val expectedDraftHash: String,
 )
 
 data class SessionRecordApplyResultResponse(
     val revisionId: String,
     val liveRevision: Long,
-    val decisionId: String,
-    val notificationDecision: NotificationDecision,
-    val eventId: String?,
+    val composer: HostNotificationComposerContext,
 )
 
 data class HostSessionHistoryPageResponse(
@@ -225,22 +231,15 @@ fun SessionRecordDraft.toResponse() =
 
 fun SessionRecordApplyPreview.toResponse() =
     SessionRecordApplyPreviewResponse(
-        previewId.toString(),
         eventType,
-        targetCount,
-        expectedInAppCount,
-        expectedEmailCount,
-        excludedCount,
-        expiresAt,
+        expectedDraftHash,
     )
 
 fun SessionRecordApplyResult.toResponse() =
     SessionRecordApplyResultResponse(
         revisionId.toString(),
         liveRevision,
-        decisionId.toString(),
-        notificationDecision,
-        eventId?.toString(),
+        composer,
     )
 
 fun CursorPage<HostSessionHistoryItem>.toHistoryResponse() =

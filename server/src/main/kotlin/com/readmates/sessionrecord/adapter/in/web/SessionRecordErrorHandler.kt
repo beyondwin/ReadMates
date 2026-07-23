@@ -24,6 +24,14 @@ class SessionRecordErrorHandler {
                 conflict("SESSION_RECORD_LIVE_STALE", "현재 세션 기록이 변경되었습니다.")
             SessionRecordError.PREVIEW_ALREADY_CONSUMED ->
                 conflict("NOTIFICATION_PREVIEW_ALREADY_CONSUMED", "이미 사용된 알림 확인입니다.")
+            SessionRecordError.APPLY_REQUEST_ALREADY_USED ->
+                conflict("SESSION_RECORD_APPLY_REQUEST_ALREADY_USED", "이미 사용된 세션 기록 적용 요청입니다.")
+            SessionRecordError.INVALID_APPLY_CONTRACT ->
+                apiErrorResponse(
+                    HttpStatus.BAD_REQUEST,
+                    "SESSION_RECORD_INVALID_APPLY_CONTRACT",
+                    "세션 기록 적용 요청을 확인해 주세요.",
+                )
             SessionRecordError.INVALID_RECORD ->
                 apiErrorResponse(
                     HttpStatus.UNPROCESSABLE_CONTENT,

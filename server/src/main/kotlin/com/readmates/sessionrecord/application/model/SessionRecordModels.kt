@@ -122,13 +122,20 @@ data class PreviewSessionRecordApplyCommand(
 
 data class ApplySessionRecordCommand(
     val sessionId: UUID,
-    val previewId: UUID = UUID(0, 0),
+    val applyRequestId: UUID,
     val expectedDraftRevision: Long,
     val expectedLiveRevision: Long,
-    val notificationDecision: NotificationDecision = NotificationDecision.SKIP,
-    val applyRequestId: UUID? = null,
-    val expectedDraftHash: String = "",
-)
+    val expectedDraftHash: String,
+) {
+    @Deprecated("Use content-only apply contract")
+    constructor(
+        sessionId: UUID,
+        previewId: UUID,
+        expectedDraftRevision: Long,
+        expectedLiveRevision: Long,
+        notificationDecision: NotificationDecision,
+    ) : this(sessionId, previewId, expectedDraftRevision, expectedLiveRevision, "")
+}
 
 data class HostNotificationComposerContext(
     val sessionId: UUID,
@@ -137,22 +144,25 @@ data class HostNotificationComposerContext(
 )
 
 data class SessionRecordApplyPreview(
-    val previewId: UUID,
     val eventType: NotificationEventType,
-    val targetCount: Int,
-    val expectedInAppCount: Int,
-    val expectedEmailCount: Int,
-    val excludedCount: Int,
-    val expiresAt: OffsetDateTime,
-)
+    val expectedDraftHash: String,
+) {
+    @get:com.fasterxml.jackson.annotation.JsonIgnore
+    val previewId: UUID get() = UUID(0, 0)
+}
 
 data class SessionRecordApplyResult(
     val revisionId: UUID,
     val liveRevision: Long,
-    val decisionId: UUID,
-    val notificationDecision: NotificationDecision,
-    val eventId: UUID?,
-)
+    val composer: HostNotificationComposerContext,
+) {
+    @get:com.fasterxml.jackson.annotation.JsonIgnore
+    val decisionId: UUID get() = UUID(0, 0)
+    @get:com.fasterxml.jackson.annotation.JsonIgnore
+    val notificationDecision: NotificationDecision get() = NotificationDecision.SKIP
+    @get:com.fasterxml.jackson.annotation.JsonIgnore
+    val eventId: UUID? get() = null
+}
 
 data class HostSessionRecordCapabilities(
     val sessionRecordDrafts: Boolean = true,
@@ -185,6 +195,8 @@ enum class SessionRecordError {
     LIVE_STALE,
     INVALID_RECORD,
     PREVIEW_ALREADY_CONSUMED,
+    APPLY_REQUEST_ALREADY_USED,
+    INVALID_APPLY_CONTRACT,
 }
 
 class SessionRecordException(
