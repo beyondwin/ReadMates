@@ -121,7 +121,7 @@ class HostSessionServicesTest {
     }
 
     @Test
-    fun `closed session visibility changes require the staged record workflow`() {
+    fun `safe default keeps closed session legacy visibility compatibility`() {
         val port =
             RecordingHostSessionPorts().apply {
                 visibilityState = "CLOSED"
@@ -129,12 +129,56 @@ class HostSessionServicesTest {
             }
         val service = HostSessionLifecycleService(port, port, port)
 
+        service.updateVisibility(
+            UpdateHostSessionVisibilityCommand(host, sessionId, SessionRecordVisibility.PUBLIC),
+        )
+
+        assertThat(port.visibilityCommand?.visibility).isEqualTo(SessionRecordVisibility.PUBLIC)
+    }
+
+    @Test
+    fun `required rollout stages closed session legacy visibility changes`() {
+        val port =
+            RecordingHostSessionPorts().apply {
+                visibilityState = "CLOSED"
+                currentVisibility = SessionRecordVisibility.MEMBER
+            }
+        val service =
+            HostSessionLifecycleService(
+                port,
+                port,
+                port,
+                confirmationProperties = HostActionConfirmationProperties(required = true),
+            )
+
         assertThrows(HostSessionRecordStagingRequiredException::class.java) {
             service.updateVisibility(
                 UpdateHostSessionVisibilityCommand(host, sessionId, SessionRecordVisibility.PUBLIC),
             )
         }
         assertThat(port.visibilityCommand).isNull()
+    }
+
+    @Test
+    fun `required rollout keeps non historical visibility updates compatible`() {
+        val port =
+            RecordingHostSessionPorts().apply {
+                visibilityState = "OPEN"
+                currentVisibility = SessionRecordVisibility.HOST_ONLY
+            }
+        val service =
+            HostSessionLifecycleService(
+                port,
+                port,
+                port,
+                confirmationProperties = HostActionConfirmationProperties(required = true),
+            )
+
+        service.updateVisibility(
+            UpdateHostSessionVisibilityCommand(host, sessionId, SessionRecordVisibility.HOST_ONLY),
+        )
+
+        assertThat(port.visibilityCommand?.visibility).isEqualTo(SessionRecordVisibility.HOST_ONLY)
     }
 
     @Test

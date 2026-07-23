@@ -33,8 +33,16 @@ class JdbcSessionRecordAdapterTest(
         val first = fixture("first")
         val second = fixture("second")
         val live = requireNotNull(adapter.loadLive(first.host, first.sessionId))
+        val persistedSessionUpdatedAt =
+            jdbcTemplate.queryForObject(
+                "select updated_at from sessions where id = ? and club_id = ?",
+                LocalDateTime::class.java,
+                first.sessionId.toString(),
+                first.host.clubId.toString(),
+            )
 
         assertThat(live.snapshot).isEqualTo(first.snapshot)
+        assertThat(live.sessionUpdatedAt.toLocalDateTime()).isEqualTo(persistedSessionUpdatedAt)
         assertThat(adapter.loadLive(second.host, first.sessionId)).isNull()
 
         val command = SaveSessionRecordDraftCommand(first.sessionId, first.snapshot, null)

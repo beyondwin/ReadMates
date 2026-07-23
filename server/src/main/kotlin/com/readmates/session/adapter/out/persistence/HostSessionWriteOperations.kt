@@ -264,9 +264,12 @@ internal class HostSessionWriteOperations(
     fun upsertHostPublication(
         jdbcTemplate: JdbcTemplate,
         command: UpsertPublicationCommand,
+        stagingRequired: Boolean,
     ): HostPublicationResponse {
         queries.requireHostSession(jdbcTemplate, command.host, command.sessionId)
-        requireLegacyPublicationWriteAllowed(jdbcTemplate, command)
+        if (stagingRequired) {
+            requireLegacyPublicationWriteAllowed(jdbcTemplate, command)
+        }
         val isPublic = command.visibility == SessionRecordVisibility.PUBLIC
         jdbcTemplate.update(
             """

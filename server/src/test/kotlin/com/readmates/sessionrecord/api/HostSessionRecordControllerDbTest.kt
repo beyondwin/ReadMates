@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
+import org.springframework.test.web.servlet.put
 
 @SpringBootTest(
     properties = [
@@ -180,6 +181,39 @@ class HostSessionRecordControllerDbTest(
                 VISIBILITY_SESSION_ID,
             )
         assertThat(visibility).isEqualTo("HOST_ONLY")
+    }
+
+    @Test
+    fun `required rollout rejects historical legacy publication and visibility writes`() {
+        jdbcTemplate.update(
+            "update sessions set state = 'OPEN' where id = ?",
+            VISIBILITY_SESSION_ID,
+        )
+        jdbcTemplate.update(
+            "update sessions set state = 'CLOSED', visibility = 'MEMBER' where id = ?",
+            VISIBILITY_SESSION_ID,
+        )
+
+        mockMvc
+            .put("/api/host/sessions/$VISIBILITY_SESSION_ID/publication") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"publicSummary":"legacy","visibility":"PUBLIC"}"""
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("SESSION_RECORD_STAGING_REQUIRED") }
+            }
+        mockMvc
+            .patch("/api/host/sessions/$VISIBILITY_SESSION_ID/visibility") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"visibility":"PUBLIC"}"""
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("SESSION_RECORD_STAGING_REQUIRED") }
+            }
     }
 
     @ParameterizedTest

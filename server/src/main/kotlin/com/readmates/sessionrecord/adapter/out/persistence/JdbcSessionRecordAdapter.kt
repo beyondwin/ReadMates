@@ -222,6 +222,7 @@ class JdbcSessionRecordAdapter(
             sessionNumber = session.sessionNumber,
             bookTitle = session.bookTitle,
             meetingDate = session.meetingDate,
+            sessionUpdatedAt = session.sessionUpdatedAt,
         )
     }
 

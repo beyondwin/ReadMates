@@ -18,6 +18,7 @@ import com.readmates.session.application.port.out.HostSessionPublicationPort
 import com.readmates.session.application.port.out.HostSessionQueryPort
 import com.readmates.session.application.port.out.HostSessionTransitionResult
 import com.readmates.session.application.port.out.HostSessionVisibilitySnapshot
+import com.readmates.sessionrecord.config.HostActionConfirmationProperties
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.paging.PageRequest
@@ -29,6 +30,7 @@ import org.springframework.stereotype.Repository
 class JdbcHostSessionWriteAdapter(
     private val jdbcTemplate: JdbcTemplate,
     private val deletionQueries: HostSessionDeletionQueries,
+    private val confirmationProperties: HostActionConfirmationProperties,
 ) : HostSessionQueryPort,
     HostSessionDraftPort,
     HostSessionLifecyclePort,
@@ -77,6 +79,7 @@ class JdbcHostSessionWriteAdapter(
         writeOperations.upsertHostPublication(
             jdbcTemplate,
             command,
+            stagingRequired = confirmationProperties.required,
         )
 
     override fun dashboard(host: CurrentMember) = queries.hostDashboard(jdbcTemplate, host)

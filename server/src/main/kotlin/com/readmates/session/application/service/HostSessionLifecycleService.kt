@@ -87,7 +87,8 @@ class HostSessionLifecycleService(
         current: HostSessionVisibilitySnapshot,
         requested: SessionRecordVisibility,
     ) {
-        if (current.detail.state in setOf("CLOSED", "PUBLISHED") &&
+        if (confirmationProperties.required &&
+            current.detail.state in setOf("CLOSED", "PUBLISHED") &&
             current.detail.visibility != requested
         ) {
             throw HostSessionRecordStagingRequiredException()

@@ -628,7 +628,7 @@ class HostSessionControllerDbTest(
     }
 
     @Test
-    fun `closed session visibility changes require staged record apply`() {
+    fun `safe default keeps closed session visibility compatibility`() {
         val sessionId = createDraftSessionSeven()
         // Transition to CLOSED state first so that PUBLIC visibility is valid (DRAFT+PUBLIC violates the invariant)
         updateSessionState(sessionId, "OPEN")
@@ -642,14 +642,30 @@ class HostSessionControllerDbTest(
                 contentType = MediaType.APPLICATION_JSON
                 content = """{"visibility":"PUBLIC"}"""
             }.andExpect {
-                status { isConflict() }
-                jsonPath("$.code") { value("SESSION_RECORD_STAGING_REQUIRED") }
+                status { isOk() }
+                jsonPath("$.visibility") { value("PUBLIC") }
             }
 
         val publicPublication = findPublicationRow(sessionId)
-        assertEquals("MEMBER", publicPublication["visibility"])
-        assertEquals(false, publicPublication["is_public"])
-        assertNull(publicPublication["published_at"])
+        assertEquals("PUBLIC", publicPublication["visibility"])
+        assertEquals(true, publicPublication["is_public"])
+        assertNotNull(publicPublication["published_at"])
+
+        mockMvc
+            .patch("/api/host/sessions/$sessionId/visibility") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"visibility":"HOST_ONLY"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.visibility") { value("HOST_ONLY") }
+            }
+
+        val hostOnlyPublication = findPublicationRow(sessionId)
+        assertEquals("HOST_ONLY", hostOnlyPublication["visibility"])
+        assertEquals(false, hostOnlyPublication["is_public"])
+        assertNull(hostOnlyPublication["published_at"])
     }
 
     @Test
@@ -862,8 +878,7 @@ class HostSessionControllerDbTest(
                     }
                     """.trimIndent()
             }.andExpect {
-                status { isConflict() }
-                jsonPath("$.code") { value("SESSION_RECORD_STAGING_REQUIRED") }
+                status { isOk() }
             }
 
         mockMvc
