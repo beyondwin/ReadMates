@@ -22,10 +22,15 @@ import {
   hostDashboardQuery,
   hostSessionListQuery,
   useOpenHostSessionMutation,
+  usePreviewHostSessionVisibilityMutation,
   useSaveHostSessionVisibilityMutation,
 } from "@/features/host/queries/host-session-queries";
-import { hostSessionRecordLedgerQuery } from "@/features/host/queries/host-session-record-queries";
+import {
+  hostSessionRecordCapabilitiesQuery,
+  hostSessionRecordLedgerQuery,
+} from "@/features/host/queries/host-session-record-queries";
 import type { ReadmatesApiContext } from "@/shared/api/client";
+import { apiErrorFromResponse } from "@/shared/api/errors";
 import { hostDashboardActions, type HostDashboardRouteData } from "./host-dashboard-data";
 
 function contextFromClubSlug(clubSlug?: string): ReadmatesApiContext {
@@ -53,7 +58,9 @@ export function HostDashboardRoute({
   const notificationsQuery = useQuery(hostNotificationSummaryQuery(context));
   const clubOperationsQuery = useQuery(hostClubOperationsQuery(context));
   const visibilityMutation = useSaveHostSessionVisibilityMutation(context);
+  const visibilityPreviewMutation = usePreviewHostSessionVisibilityMutation(context);
   const openMutation = useOpenHostSessionMutation(context);
+  const capabilitiesQuery = useQuery(hostSessionRecordCapabilitiesQuery(context));
   const recordAttentionQuery = useQuery(hostSessionRecordLedgerQuery({
     needsAttention: true,
     page: { limit: 3 },
@@ -62,10 +69,12 @@ export function HostDashboardRoute({
 
   const actions = useMemo<HostDashboardActions>(() => ({
     updateCurrentSessionParticipation: hostDashboardActions.updateCurrentSessionParticipation,
-    updateSessionVisibility: async (sessionId, visibility) => {
-      const response = await visibilityMutation.mutateAsync({ sessionId, request: { visibility } });
+    previewSessionVisibility: (sessionId, visibility) =>
+      visibilityPreviewMutation.mutateAsync({ sessionId, request: { visibility } }),
+    updateSessionVisibility: async (sessionId, request) => {
+      const response = await visibilityMutation.mutateAsync({ sessionId, request });
       if (!response.ok) {
-        throw new Error("Host session visibility update failed");
+        throw await apiErrorFromResponse(response);
       }
     },
     openSession: async (sessionId) => {
@@ -75,7 +84,7 @@ export function HostDashboardRoute({
       }
     },
     loadHostSessions: (page) => queryClient.fetchQuery(hostSessionListQuery(page, context)),
-  }), [context, openMutation, queryClient, visibilityMutation]);
+  }), [context, openMutation, queryClient, visibilityMutation, visibilityPreviewMutation]);
 
   return (
     <>
@@ -104,6 +113,9 @@ export function HostDashboardRoute({
                 }
         }
         actions={actions}
+        hostActionNotificationConfirmationRequired={
+          capabilitiesQuery.data?.hostActionNotificationConfirmationRequired ?? false
+        }
         LinkComponent={LinkComponent}
         hostDashboardReturnTarget={hostDashboardReturnTarget}
         readmatesReturnState={readmatesReturnState}

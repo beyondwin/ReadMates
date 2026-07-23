@@ -12,6 +12,21 @@ export type CurrentSessionPolicy = "APPLY_NOW" | "NEXT_SESSION";
 export type CurrentSessionPolicyResult = "APPLIED" | "NOT_APPLICABLE" | "DEFERRED";
 export type SessionRecordVisibility = "HOST_ONLY" | "MEMBER" | "PUBLIC";
 
+export type HostSessionVisibilityRequest = {
+  visibility: SessionRecordVisibility;
+  previewId?: string | null;
+  notificationDecision?: "SEND" | "SKIP" | null;
+};
+
+export type HostSessionVisibilityPreviewResponse = {
+  previewId: string;
+  targetCount: number;
+  expectedInAppCount: number;
+  expectedEmailCount: number;
+  excludedCount: number;
+  expiresAt: string;
+};
+
 export type FeedbackDocumentStatus = {
   uploaded: boolean;
   fileName: string | null;

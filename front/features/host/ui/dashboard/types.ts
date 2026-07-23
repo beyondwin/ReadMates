@@ -2,6 +2,8 @@ import type { ComponentType, CSSProperties, ReactNode } from "react";
 import type { ReadmatesReturnState } from "@/shared/routing/readmates-route-state";
 import type {
   HostDashboardResponse,
+  HostSessionVisibilityPreviewResponse,
+  HostSessionVisibilityRequest,
   HostSessionListPage,
   SessionRecordVisibility,
 } from "@/features/host/model/host-view-types";
@@ -39,7 +41,11 @@ export type HostDashboardActions = {
     membershipId: string,
     action: HostDashboardMissingMemberAction,
   ) => Promise<void>;
-  updateSessionVisibility: (sessionId: string, visibility: SessionRecordVisibility) => Promise<void>;
+  previewSessionVisibility: (
+    sessionId: string,
+    visibility: SessionRecordVisibility,
+  ) => Promise<HostSessionVisibilityPreviewResponse>;
+  updateSessionVisibility: (sessionId: string, request: HostSessionVisibilityRequest) => Promise<void>;
   openSession: (sessionId: string) => Promise<void>;
   loadHostSessions: (page?: PageRequest) => Promise<HostSessionListPage>;
 };

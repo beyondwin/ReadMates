@@ -76,6 +76,11 @@ import {
   SessionHistoryPanel,
   type SessionHistoryPanelItem,
 } from "./session-editor/session-history-panel";
+import {
+  HostActionConfirmationDialog,
+  type HostActionPreview,
+  type NotificationDecision,
+} from "./session-editor/host-action-confirmation-dialog";
 
 export type { HostSessionEditorLinkComponent } from "./session-editor/session-editor-links";
 
@@ -93,6 +98,17 @@ type HostSessionRecordWorkflow = {
   onSnapshotChange: (snapshot: SessionRecordDraftSnapshot) => void;
   onReloadDraft: () => void | Promise<void>;
   onCopyInput: () => void | Promise<void>;
+  confirmation: {
+    open: boolean;
+    preview: HostActionPreview | null;
+    decision: NotificationDecision | null;
+    submitting: boolean;
+    message: { kind: "alert" | "status"; text: string } | null;
+    onReview: () => void | Promise<void>;
+    onDecisionChange: (decision: NotificationDecision) => void;
+    onCancel: () => void;
+    onConfirm: () => void | Promise<void>;
+  };
   onRestore: (request: {
     revisionId: string;
     expectedDraftRevision: number | null;
@@ -941,6 +957,7 @@ export default function HostSessionEditor({
                   onSnapshotChange={recordWorkflow.onSnapshotChange}
                   onReloadDraft={recordWorkflow.onReloadDraft}
                   onCopyInput={recordWorkflow.onCopyInput}
+                  onReviewDraft={() => void recordWorkflow.confirmation.onReview()}
                 />
               ) : null}
 
@@ -971,6 +988,16 @@ export default function HostSessionEditor({
                 restoring={recordWorkflow?.restoring ?? false}
                 onRestore={recordWorkflow?.onRestore ?? (() => undefined)}
               />
+
+              {recordWorkflow?.confirmation.message ? (
+                <div
+                  className="surface-quiet small"
+                  role={recordWorkflow.confirmation.message.kind}
+                  style={{ padding: 14 }}
+                >
+                  {recordWorkflow.confirmation.message.text}
+                </div>
+              ) : null}
             </form>
 
             <aside className="stack rm-host-session-editor__aside" style={{ "--stack": "20px" } as CSSProperties}>
@@ -1049,6 +1076,18 @@ export default function HostSessionEditor({
           restoreFocusRef={deleteRestoreFocusRef}
           onClose={closeDeleteModal}
           onConfirm={confirmDeleteSession}
+        />
+      ) : null}
+
+      {recordWorkflow ? (
+        <HostActionConfirmationDialog
+          open={recordWorkflow.confirmation.open}
+          preview={recordWorkflow.confirmation.preview}
+          decision={recordWorkflow.confirmation.decision}
+          submitting={recordWorkflow.confirmation.submitting}
+          onDecisionChange={recordWorkflow.confirmation.onDecisionChange}
+          onCancel={recordWorkflow.confirmation.onCancel}
+          onConfirm={() => void recordWorkflow.confirmation.onConfirm()}
         />
       ) : null}
 

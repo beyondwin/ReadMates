@@ -8,7 +8,9 @@ import type { HostSessionEditorActions } from "@/features/host/route/host-sessio
 import { invalidateHostNotifications } from "@/features/host/queries/host-notification-queries";
 import type {
   HostSessionHistoryItem,
+  HostSessionRecordApplyPreview,
   HostSessionRecordEditor,
+  NotificationDecision,
 } from "@/features/host/api/host-session-record-contracts";
 import type {
   HostSessionDetailResponse,
@@ -17,6 +19,8 @@ import type {
 import {
   hostSessionRecordEditorQuery,
   hostSessionRecordHistoryQuery,
+  useApplyHostSessionRecordMutation,
+  usePreviewHostSessionRecordApplyMutation,
   useRestoreHostSessionRevisionToDraftMutation,
   useSaveHostSessionRecordDraftMutation,
 } from "@/features/host/queries/host-session-record-queries";
@@ -58,6 +62,12 @@ export type HostSessionRecordsChangedEvent = {
 
 function contextFromClubSlug(clubSlug?: string): ReadmatesApiContext {
   return { clubSlug };
+}
+
+function apiErrorCode(error: unknown) {
+  return error && typeof error === "object" && "code" in error
+    ? String((error as { code?: unknown }).code ?? "")
+    : "";
 }
 
 function useDraftRouteNavigationGuard(shouldBlock: boolean) {
@@ -245,12 +255,126 @@ function EditHostSessionRecordWorkflow({
 }) {
   const saveMutation = useSaveHostSessionRecordDraftMutation(context);
   const restoreMutation = useRestoreHostSessionRevisionToDraftMutation(context);
+  const previewMutation = usePreviewHostSessionRecordApplyMutation(context);
+  const applyMutation = useApplyHostSessionRecordMutation(context, async (event) => {
+    await onSessionRecordsChanged(event.sessionId);
+  });
+  const [applyPreview, setApplyPreview] = useState<HostSessionRecordApplyPreview | null>(null);
+  const [notificationDecision, setNotificationDecision] = useState<NotificationDecision | null>(null);
+  const [confirmationOpen, setConfirmationOpen] = useState(false);
+  const [confirmationMessage, setConfirmationMessage] = useState<null | {
+    kind: "alert" | "status";
+    text: string;
+  }>(null);
   const controller = useSessionRecordDraftController({
     editor: recordEditor,
     onSave: saveMutation.mutateAsync,
     onReload: reloadRecordEditor,
   });
   useDraftRouteNavigationGuard(controller.shouldBlockNavigation);
+
+  const requestApplyPreview = useCallback(async () => {
+    if (controller.expectedDraftRevision === null) {
+      setConfirmationMessage({ kind: "alert", text: "먼저 공개 기록 초안을 저장해 주세요." });
+      return null;
+    }
+    const preview = await previewMutation.mutateAsync({
+      sessionId: recordEditor.sessionId,
+      request: {
+        expectedDraftRevision: controller.expectedDraftRevision,
+        expectedLiveRevision: recordEditor.liveRevision,
+      },
+    });
+    setApplyPreview(preview);
+    setNotificationDecision(null);
+    setConfirmationOpen(true);
+    return preview;
+  }, [
+    controller.expectedDraftRevision,
+    previewMutation,
+    recordEditor.liveRevision,
+    recordEditor.sessionId,
+  ]);
+
+  const reviewDraft = useCallback(async () => {
+    setConfirmationMessage(null);
+    try {
+      await requestApplyPreview();
+    } catch {
+      setConfirmationMessage({
+        kind: "alert",
+        text: "반영 미리보기를 만들지 못했습니다. 초안 상태를 확인한 뒤 다시 시도해 주세요.",
+      });
+    }
+  }, [requestApplyPreview]);
+
+  const confirmApply = useCallback(async () => {
+    if (
+      !applyPreview ||
+      notificationDecision === null ||
+      controller.expectedDraftRevision === null
+    ) {
+      return;
+    }
+    try {
+      const result = await applyMutation.mutateAsync({
+        sessionId: recordEditor.sessionId,
+        request: {
+          previewId: applyPreview.previewId,
+          expectedDraftRevision: controller.expectedDraftRevision,
+          expectedLiveRevision: recordEditor.liveRevision,
+          notificationDecision,
+        },
+      });
+      setConfirmationOpen(false);
+      setApplyPreview(null);
+      setNotificationDecision(null);
+      await controller.reloadDraft();
+      setConfirmationMessage({
+        kind: "status",
+        text: result.notificationDecision === "SEND"
+          ? "변경사항을 반영했습니다. 알림 발송 장부에서 확인해 주세요."
+          : "알림 없이 변경사항을 반영했습니다.",
+      });
+    } catch (error) {
+      const code = apiErrorCode(error);
+      if (code === "NOTIFICATION_PREVIEW_EXPIRED" || code === "NOTIFICATION_TARGETS_CHANGED") {
+        try {
+          await requestApplyPreview();
+          setConfirmationMessage({
+            kind: "alert",
+            text: "알림 대상이 변경되어 미리보기를 갱신했습니다. SEND 또는 SKIP을 다시 선택해 주세요.",
+          });
+        } catch {
+          setConfirmationOpen(false);
+          setApplyPreview(null);
+          setNotificationDecision(null);
+          setConfirmationMessage({
+            kind: "alert",
+            text: "미리보기를 갱신하지 못했습니다. 변경사항은 반영되지 않았습니다.",
+          });
+        }
+        return;
+      }
+      setConfirmationOpen(false);
+      setApplyPreview(null);
+      setNotificationDecision(null);
+      setConfirmationMessage({
+        kind: "alert",
+        text: code === "NOTIFICATION_PREVIEW_ALREADY_CONSUMED"
+          ? "이미 처리된 미리보기입니다. 최신 기록을 다시 불러와 결과를 확인해 주세요."
+          : "변경사항을 반영하지 못했습니다. live 기록은 변경되지 않았습니다.",
+      });
+    }
+  }, [
+    applyMutation,
+    applyPreview,
+    controller,
+    notificationDecision,
+    recordEditor.liveRevision,
+    recordEditor.sessionId,
+    requestApplyPreview,
+  ]);
 
   return (
     <HostSessionEditor
@@ -273,6 +397,21 @@ function EditHostSessionRecordWorkflow({
         onSnapshotChange: controller.updateSnapshot,
         onReloadDraft: controller.reloadDraft,
         onCopyInput: controller.copyInput,
+        confirmation: {
+          open: confirmationOpen,
+          preview: applyPreview,
+          decision: notificationDecision,
+          submitting: previewMutation.isPending || applyMutation.isPending,
+          message: confirmationMessage,
+          onReview: reviewDraft,
+          onDecisionChange: setNotificationDecision,
+          onCancel: () => {
+            setConfirmationOpen(false);
+            setApplyPreview(null);
+            setNotificationDecision(null);
+          },
+          onConfirm: confirmApply,
+        },
         onRestore: async ({ revisionId, expectedDraftRevision }) => {
           const draft = await restoreMutation.mutateAsync({
             sessionId: recordEditor.sessionId,

@@ -3883,3 +3883,36 @@
     overflow-x: auto;
   }
 }
+
+.rm-host-action-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: rgb(20 18 15 / 55%);
+}
+
+.rm-host-action-dialog-sheet {
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  background: var(--bg);
+  box-shadow: 0 24px 80px rgb(20 18 15 / 24%);
+  padding: 22px;
+}
+
+@media (max-width: 600px) {
+  .rm-host-action-dialog-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .rm-host-action-dialog-sheet {
+    width: 100% !important;
+    max-height: calc(100dvh - 16px) !important;
+    border-radius: var(--r-3) var(--r-3) 0 0;
+    padding: 18px 12px max(18px, env(safe-area-inset-bottom));
+  }
+}

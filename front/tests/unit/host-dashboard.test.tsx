@@ -240,6 +240,14 @@ const twoDraftHostSessions = [
 
 const noopHostDashboardActions = {
   updateCurrentSessionParticipation: vi.fn(async () => undefined),
+  previewSessionVisibility: vi.fn(async () => ({
+    previewId: "preview-1",
+    targetCount: 1,
+    expectedInAppCount: 1,
+    expectedEmailCount: 1,
+    excludedCount: 0,
+    expiresAt: "2026-07-23T20:00:00+09:00",
+  })),
   updateSessionVisibility: vi.fn(async () => undefined),
   openSession: vi.fn(async () => undefined),
   loadHostSessions: vi.fn(async () => ({ items: [], nextCursor: null })),
@@ -618,6 +626,30 @@ describe("HostDashboard", () => {
       ) {
         return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
       }
+      if (url === "/api/bff/api/host/sessions/session-7/record-editor?clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse({
+          sessionId: "session-7",
+          liveRevision: 0,
+          liveSnapshot: {
+            schema: "readmates-session-record:v1",
+            visibility: "HOST_ONLY",
+            publicationSummary: "",
+            highlights: [],
+            oneLineReviews: [],
+            feedbackDocument: { fileName: "", title: "", markdown: "" },
+          },
+          draft: null,
+          draftLiveBaseStale: false,
+          validationSummary: { valid: true, issues: [] },
+        }));
+      }
+      if (
+        url.includes("/api/bff/api/host/sessions/session-7/history") &&
+        url.includes("limit=30") &&
+        url.includes("clubSlug=reading-sai")
+      ) {
+        return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
+      }
       return Promise.reject(new Error(`Unexpected URL: ${url}`));
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -833,7 +865,7 @@ describe("HostDashboard", () => {
     );
 
     await user.click(screen.getAllByRole("button", { name: /멤버 공개/ })[0]);
-    expect(actions.updateSessionVisibility).toHaveBeenCalledWith("session-8", "MEMBER");
+    expect(actions.updateSessionVisibility).toHaveBeenCalledWith("session-8", { visibility: "MEMBER" });
 
     await user.click(screen.getAllByRole("button", { name: /현재로 시작/ })[0]);
     expect(actions.openSession).toHaveBeenCalledWith("session-8");
@@ -854,7 +886,7 @@ describe("HostDashboard", () => {
     await user.click(desktop.getByRole("button", { name: /멤버 공개/ }));
 
     expect(desktop.getByRole("button", { name: /처리 중/ })).toBeDisabled();
-    expect(actions.updateSessionVisibility).toHaveBeenCalledWith("session-8", "MEMBER");
+    expect(actions.updateSessionVisibility).toHaveBeenCalledWith("session-8", { visibility: "MEMBER" });
 
     visibilityUpdate.resolve();
 
