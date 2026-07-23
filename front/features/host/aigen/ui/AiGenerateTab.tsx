@@ -49,7 +49,8 @@ type Stage =
 export type AiGenerateTabProps = {
   sessionId: string;
   clubSlug: string;
-  onCommitted: () => void;
+  expectedDraftRevision?: number | null;
+  onCommitted: (result: AiCommitResponse | null) => void;
 };
 
 function sectionEvidence(evidence: AiEvidenceExcerpt[], section: ReviewSection) {
@@ -162,7 +163,11 @@ function restoredReviewState(
   return state;
 }
 
-export function AiGenerateTab({ sessionId, onCommitted }: AiGenerateTabProps) {
+export function AiGenerateTab({
+  sessionId,
+  expectedDraftRevision = null,
+  onCommitted,
+}: AiGenerateTabProps) {
   const [stage, setStage] = useState<Stage>({ tag: "idle", startError: null });
   const [recordVisibility, setRecordVisibility] = useState<AiRecordVisibility>("MEMBER");
   const [submittingStart, setSubmittingStart] = useState(false);
@@ -295,7 +300,7 @@ export function AiGenerateTab({ sessionId, onCommitted }: AiGenerateTabProps) {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- committed server event clears local draft state
     clearWorkspace();
     setStage({ tag: "committed", result: null });
-    onCommitted();
+    onCommitted(null);
   }, [stage, jobStatus, onCommitted, clearWorkspace, discardPendingDraft]);
 
   const handleStart = useCallback(async (payload: StartGenerationRequest) => {
@@ -373,6 +378,7 @@ export function AiGenerateTab({ sessionId, onCommitted }: AiGenerateTabProps) {
     try {
       const request: CommitGenerationRequest = {
         recordVisibility,
+        expectedDraftRevision,
         result: editedSnapshot,
         ...(grounded ? { expectedRevision: reviewState.revision, sectionReviews: sectionReviews! } : {}),
       };
@@ -382,7 +388,7 @@ export function AiGenerateTab({ sessionId, onCommitted }: AiGenerateTabProps) {
       adoptedRevisionRef.current = null;
       clearWorkspace();
       setStage({ tag: "committed", result });
-      onCommitted();
+      onCommitted(result);
     } catch (caught) {
       if (caught instanceof AiGenerationApiError && caught.status === 409) {
         setRevisionConflict(caught.problem);
@@ -393,7 +399,7 @@ export function AiGenerateTab({ sessionId, onCommitted }: AiGenerateTabProps) {
     } finally {
       setCommitting(false);
     }
-  }, [stage, editedSnapshot, reviewState, serverSnapshot, recordVisibility, commitMutation, onCommitted, clearWorkspace, jobQuery, discardPendingDraft]);
+  }, [stage, editedSnapshot, reviewState, serverSnapshot, recordVisibility, expectedDraftRevision, commitMutation, onCommitted, clearWorkspace, jobQuery, discardPendingDraft]);
 
   const handleReloadRevision = useCallback(async () => {
     if (stage.tag !== "active") return;

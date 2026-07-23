@@ -551,6 +551,7 @@ export type SessionImportFileRequest = {
 
 export type SessionImportRequest = SessionImportFileRequest & {
   recordVisibility: SessionRecordVisibility;
+  expectedDraftRevision: number | null;
 };
 
 export type SessionImportIssue = {

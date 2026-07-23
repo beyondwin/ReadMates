@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import type { MobileEditorSection } from "./mobile-editor-tabs";
 import { Panel } from "./session-editor-panel";
 
@@ -36,18 +36,59 @@ export function SessionHistoryPanel({
   items,
   expectedDraftRevision,
   restoring,
+  nextCursor = null,
+  loadingMore = false,
+  onLoadMore,
   onRestore,
 }: {
   activeMobileSection: MobileEditorSection;
   items: SessionHistoryPanelItem[];
   expectedDraftRevision: number | null;
   restoring: boolean;
+  nextCursor?: string | null;
+  loadingMore?: boolean;
+  onLoadMore?: (cursor: string) => void | Promise<void>;
   onRestore: (request: {
     revisionId: string;
     expectedDraftRevision: number | null;
   }) => void | Promise<void>;
 }) {
   const [pending, setPending] = useState<SessionHistoryPanelItem | null>(null);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+  const restoreTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const cancelRef = useRef<HTMLButtonElement | null>(null);
+  const confirmRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (pending) {
+      cancelRef.current?.focus();
+    }
+  }, [pending]);
+
+  const closeRestoreDialog = () => {
+    setPending(null);
+    setRestoreError(null);
+    queueMicrotask(() => restoreTriggerRef.current?.focus());
+  };
+
+  const handleDialogKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape" && !restoring) {
+      event.preventDefault();
+      closeRestoreDialog();
+      return;
+    }
+    if (event.key !== "Tab") {
+      return;
+    }
+    if (event.shiftKey && document.activeElement === cancelRef.current) {
+      event.preventDefault();
+      confirmRef.current?.focus();
+    } else if (!event.shiftKey && document.activeElement === confirmRef.current) {
+      event.preventDefault();
+      cancelRef.current?.focus();
+    }
+  };
 
   return (
     <>
@@ -76,7 +117,11 @@ export function SessionHistoryPanel({
                     className="btn btn-quiet btn-sm"
                     type="button"
                     disabled={restoring}
-                    onClick={() => setPending(item)}
+                    onClick={(event) => {
+                      restoreTriggerRef.current = event.currentTarget;
+                      setRestoreError(null);
+                      setPending(item);
+                    }}
                   >
                     revision {item.revisionVersion} 복원
                   </button>
@@ -84,6 +129,24 @@ export function SessionHistoryPanel({
               </div>
             </article>
           ))}
+          {nextCursor && onLoadMore ? (
+            <button
+              className="btn btn-quiet"
+              type="button"
+              disabled={loadingMore}
+              onClick={async () => {
+                setLoadMoreError(null);
+                try {
+                  await onLoadMore(nextCursor);
+                } catch {
+                  setLoadMoreError("변경 이력을 더 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
+                }
+              }}
+            >
+              {loadingMore ? "변경 이력 불러오는 중" : "변경 이력 더 보기"}
+            </button>
+          ) : null}
+          {loadMoreError ? <p role="alert" className="small" style={{ color: "var(--danger)", margin: 0 }}>{loadMoreError}</p> : null}
         </div>
       </Panel>
 
@@ -92,29 +155,42 @@ export function SessionHistoryPanel({
           role="dialog"
           aria-modal="true"
           aria-label={`revision ${pending.revisionVersion}를 새 초안으로 복원`}
-          className="modal-backdrop"
+          className="rm-host-action-dialog-backdrop"
+          onKeyDown={handleDialogKeyDown}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !restoring) {
+              closeRestoreDialog();
+            }
+          }}
         >
-          <div className="modal-card stack" style={{ "--stack": "14px" } as CSSProperties}>
+          <div className="rm-host-action-dialog-sheet stack" style={{ "--stack": "14px" } as CSSProperties}>
             <h2 className="h3" style={{ margin: 0 }}>
               revision {pending.revisionVersion}를 새 초안으로 복원
             </h2>
             <p className="small" style={{ margin: 0 }}>
               과거 revision의 내용을 공유 초안으로 가져옵니다. live 기록은 변경되지 않습니다.
             </p>
+            {restoreError ? <p role="alert" className="small" style={{ color: "var(--danger)", margin: 0 }}>{restoreError}</p> : null}
             <div className="row" style={{ gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
-              <button className="btn btn-quiet" type="button" disabled={restoring} onClick={() => setPending(null)}>
+              <button ref={cancelRef} className="btn btn-quiet" type="button" disabled={restoring} onClick={closeRestoreDialog}>
                 복원 취소
               </button>
               <button
+                ref={confirmRef}
                 className="btn btn-primary"
                 type="button"
                 disabled={restoring}
                 onClick={async () => {
-                  await onRestore({
-                    revisionId: pending.revisionId as string,
-                    expectedDraftRevision,
-                  });
-                  setPending(null);
+                  setRestoreError(null);
+                  try {
+                    await onRestore({
+                      revisionId: pending.revisionId as string,
+                      expectedDraftRevision,
+                    });
+                    closeRestoreDialog();
+                  } catch {
+                    setRestoreError("복원하지 못했습니다. 최신 초안 상태를 확인한 뒤 다시 시도해 주세요.");
+                  }
                 }}
               >
                 {restoring ? "복원 중" : "새 초안으로 복원"}

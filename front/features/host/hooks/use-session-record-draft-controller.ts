@@ -38,6 +38,14 @@ export function useSessionRecordDraftController({
   );
   const expectedDraftRevisionRef = useRef(expectedDraftRevision);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveInFlightRef = useRef(false);
+  const queuedSaveRef = useRef<{
+    snapshot: SessionRecordSnapshot;
+    version: number;
+  } | null>(null);
+  const editVersionRef = useRef(0);
+  const controllerEpochRef = useRef(0);
+  const mountedRef = useRef(true);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current !== null) {
@@ -51,34 +59,78 @@ export function useSessionRecordDraftController({
     setExpectedDraftRevision(revision);
   }, []);
 
-  const persistSnapshot = useCallback(async (nextSnapshot: SessionRecordSnapshot) => {
+  const persistSnapshot = useCallback(async (
+    nextSnapshot: SessionRecordSnapshot,
+    version: number,
+  ) => {
+    if (saveInFlightRef.current) {
+      queuedSaveRef.current = { snapshot: nextSnapshot, version };
+      return;
+    }
+    saveInFlightRef.current = true;
+    const epoch = controllerEpochRef.current;
     setSaveState("saving");
     try {
-      const draft = await onSave({
-        sessionId: editor.sessionId,
-        request: {
-          expectedDraftRevision: expectedDraftRevisionRef.current,
-          snapshot: nextSnapshot,
-        },
-      });
-      setDraftRevision(draft.draftRevision);
-      setSaveState("saved");
+      let pending = { snapshot: nextSnapshot, version };
+      while (mountedRef.current && epoch === controllerEpochRef.current) {
+        const draft = await onSave({
+          sessionId: editor.sessionId,
+          request: {
+            expectedDraftRevision: expectedDraftRevisionRef.current,
+            snapshot: pending.snapshot,
+          },
+        });
+        if (!mountedRef.current || epoch !== controllerEpochRef.current) {
+          return;
+        }
+        setDraftRevision(draft.draftRevision);
+        const queued = queuedSaveRef.current;
+        queuedSaveRef.current = null;
+        if (queued) {
+          pending = queued;
+          setSaveState("saving");
+          continue;
+        }
+        setSaveState(pending.version === editVersionRef.current ? "saved" : "dirty");
+        break;
+      }
     } catch (error) {
-      setSaveState(isDraftStaleError(error) ? "stale" : "error");
+      queuedSaveRef.current = null;
+      if (mountedRef.current && epoch === controllerEpochRef.current) {
+        setSaveState(isDraftStaleError(error) ? "stale" : "error");
+      }
+    } finally {
+      saveInFlightRef.current = false;
+      const queuedAfterAdoption = queuedSaveRef.current;
+      if (
+        queuedAfterAdoption &&
+        mountedRef.current &&
+        epoch !== controllerEpochRef.current
+      ) {
+        queuedSaveRef.current = null;
+        queueMicrotask(() => {
+          void persistSnapshot(queuedAfterAdoption.snapshot, queuedAfterAdoption.version);
+        });
+      }
     }
   }, [editor.sessionId, onSave, setDraftRevision]);
 
   const updateSnapshot = useCallback((nextSnapshot: SessionRecordSnapshot) => {
+    const version = editVersionRef.current + 1;
+    editVersionRef.current = version;
     setSnapshot(nextSnapshot);
     setSaveState("dirty");
     clearTimer();
     timerRef.current = setTimeout(() => {
       timerRef.current = null;
-      void persistSnapshot(nextSnapshot);
+      void persistSnapshot(nextSnapshot, version);
     }, 600);
   }, [clearTimer, persistSnapshot]);
 
   const adoptEditor = useCallback((nextEditor: HostSessionRecordEditor) => {
+    controllerEpochRef.current += 1;
+    queuedSaveRef.current = null;
+    editVersionRef.current = 0;
     const nextSnapshot = nextEditor.draft?.snapshot ?? nextEditor.liveSnapshot;
     setDraftRevision(nextEditor.draft?.draftRevision ?? null);
     setSnapshot(nextSnapshot);
@@ -93,11 +145,23 @@ export function useSessionRecordDraftController({
     }
   }, [adoptEditor, clearTimer, onReload]);
 
+  const adoptDraftRevision = useCallback((revision: number) => {
+    clearTimer();
+    controllerEpochRef.current += 1;
+    queuedSaveRef.current = null;
+    editVersionRef.current = 0;
+    setDraftRevision(revision);
+    setSaveState("saved");
+  }, [clearTimer, setDraftRevision]);
+
   const copyInput = useCallback(async () => {
     await navigator.clipboard?.writeText(JSON.stringify(snapshot, null, 2));
   }, [snapshot]);
 
-  useEffect(() => clearTimer, [clearTimer]);
+  useEffect(() => () => {
+    mountedRef.current = false;
+    clearTimer();
+  }, [clearTimer]);
 
   const shouldBlockNavigation =
     saveState === "dirty" || saveState === "saving" || saveState === "error" || saveState === "stale";
@@ -124,5 +188,6 @@ export function useSessionRecordDraftController({
     reloadDraft,
     copyInput,
     adoptEditor,
+    adoptDraftRevision,
   };
 }

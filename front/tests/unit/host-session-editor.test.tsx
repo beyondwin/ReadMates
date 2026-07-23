@@ -505,6 +505,9 @@ describe("HostSessionEditor", () => {
     await user.upload(screen.getByLabelText("AI 결과 JSON 가져오기"), file);
 
     await waitFor(() => expect(previewSessionImport).toHaveBeenCalledTimes(1));
+    expect(previewSessionImport.mock.calls[0]?.[1]).toMatchObject({
+      expectedDraftRevision: null,
+    });
     expect(screen.getByText("Import summary.")).toBeVisible();
     expect(screen.getByRole("button", { name: "초안으로 가져오기" })).toBeEnabled();
   });

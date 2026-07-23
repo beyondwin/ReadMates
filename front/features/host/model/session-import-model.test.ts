@@ -23,9 +23,11 @@ describe("session import model", () => {
         feedbackDocument: { fileName: "session-7.md", markdown: "<!-- readmates-feedback:v1 -->" },
       }),
       "MEMBER",
+      4,
     );
 
     expect(request.recordVisibility).toBe("MEMBER");
+    expect(request.expectedDraftRevision).toBe(4);
     expect(request.format).toBe("readmates-session-import:v1");
     expect(request.highlights).toHaveLength(1);
   });

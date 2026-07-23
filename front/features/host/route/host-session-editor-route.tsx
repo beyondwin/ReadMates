@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo } from "react";
 import { useBlocker, useLoaderData, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import HostSessionEditor, { type HostSessionEditorLinkComponent } from "@/features/host/ui/host-session-editor";
+import { appendUniqueSessionHistory } from "@/features/host/ui/session-editor/session-history-model";
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
 import type { ReadmatesApiContext } from "@/shared/api/client";
 import type { HostSessionEditorActions } from "@/features/host/route/host-session-editor-actions";
 import { invalidateHostNotifications } from "@/features/host/queries/host-notification-queries";
 import type {
   HostSessionHistoryItem,
+  HostSessionHistoryPage,
   HostSessionRecordApplyPreview,
   HostSessionRecordEditor,
   NotificationDecision,
@@ -209,7 +211,12 @@ export function EditHostSessionRoute({
     <EditHostSessionRecordWorkflow
       session={sessionQuery.data}
       recordEditor={recordEditorQuery.data}
-      history={historyQuery.data?.items ?? []}
+      historyPage={historyQuery.data ?? { items: [], nextCursor: null }}
+      loadHistoryPage={(cursor) => queryClient.fetchQuery(hostSessionRecordHistoryQuery(
+        sessionId,
+        { limit: EDITOR_HISTORY_PAGE_LIMIT, cursor },
+        context,
+      ))}
       notificationDispatches={dispatchesQuery.data?.items ?? []}
       context={context}
       actions={actions}
@@ -227,7 +234,8 @@ export function EditHostSessionRoute({
 function EditHostSessionRecordWorkflow({
   session,
   recordEditor,
-  history,
+  historyPage,
+  loadHistoryPage,
   notificationDispatches,
   context,
   actions,
@@ -241,7 +249,8 @@ function EditHostSessionRecordWorkflow({
 }: {
   session: HostSessionDetailResponse;
   recordEditor: HostSessionRecordEditor;
-  history: HostSessionHistoryItem[];
+  historyPage: HostSessionHistoryPage;
+  loadHistoryPage: (cursor: string) => Promise<HostSessionHistoryPage>;
   notificationDispatches: ManualNotificationDispatchListItem[];
   context: ReadmatesApiContext;
   actions: HostSessionEditorActions;
@@ -266,6 +275,23 @@ function EditHostSessionRecordWorkflow({
     kind: "alert" | "status";
     text: string;
   }>(null);
+  const [historyState, setHistoryState] = useState<{
+    firstPage: HostSessionHistoryPage;
+    items: HostSessionHistoryItem[];
+    nextCursor: string | null;
+  }>({
+    firstPage: historyPage,
+    items: historyPage.items,
+    nextCursor: historyPage.nextCursor,
+  });
+  const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
+  const effectiveHistory = historyState.firstPage === historyPage
+    ? historyState
+    : {
+        firstPage: historyPage,
+        items: historyPage.items,
+        nextCursor: historyPage.nextCursor,
+      };
   const controller = useSessionRecordDraftController({
     editor: recordEditor,
     onSave: saveMutation.mutateAsync,
@@ -389,13 +415,32 @@ function EditHostSessionRecordWorkflow({
       onSessionRecordsChanged={onSessionRecordsChanged}
       recordWorkflow={{
         editor: recordEditor,
-        history,
+        history: effectiveHistory.items,
+        historyNextCursor: effectiveHistory.nextCursor,
+        historyLoadingMore,
         snapshot: controller.snapshot,
         saveState: controller.saveState,
         expectedDraftRevision: controller.expectedDraftRevision,
         restoring: restoreMutation.isPending,
         onSnapshotChange: controller.updateSnapshot,
         onReloadDraft: controller.reloadDraft,
+        onDraftCommitted: async ({ draftRevision }) => {
+          controller.adoptDraftRevision(draftRevision);
+          await controller.reloadDraft();
+        },
+        onLoadMoreHistory: async (cursor) => {
+          setHistoryLoadingMore(true);
+          try {
+            const nextPage = await loadHistoryPage(cursor);
+            setHistoryState({
+              firstPage: historyPage,
+              items: appendUniqueSessionHistory(effectiveHistory.items, nextPage.items),
+              nextCursor: nextPage.nextCursor,
+            });
+          } finally {
+            setHistoryLoadingMore(false);
+          }
+        },
         onCopyInput: controller.copyInput,
         confirmation: {
           open: confirmationOpen,

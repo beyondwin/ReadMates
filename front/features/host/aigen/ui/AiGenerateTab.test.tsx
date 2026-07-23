@@ -558,9 +558,22 @@ describe("AiGenerateTab", () => {
       status: "COMMITTED",
       recovered: false,
       participantUpdatesCount: 2,
+      draftRevision: 8,
+      baseLiveRevision: 3,
+      liveApplied: false,
     });
+    const onCommitted = vi.fn();
     const { Wrapper } = createWrapper();
-    render(<Wrapper><AiGenerateTab sessionId="s1" clubSlug="club-a" onCommitted={() => {}} /></Wrapper>);
+    render(
+      <Wrapper>
+        <AiGenerateTab
+          sessionId="s1"
+          clubSlug="club-a"
+          expectedDraftRevision={7}
+          onCommitted={onCommitted}
+        />
+      </Wrapper>,
+    );
 
     fireEvent.change(await screen.findByLabelText(/대본 파일/), {
       target: { files: [new File(["공개 회원 00:00\n합성 대화"], "transcript.txt")] },
@@ -579,6 +592,7 @@ describe("AiGenerateTab", () => {
 
     await waitFor(() => expect(mockedCommit).toHaveBeenCalledTimes(1));
     expect(mockedCommit.mock.calls[0]?.[2]).toMatchObject({
+      expectedDraftRevision: 7,
       expectedRevision: 3,
       sectionReviews: {
         SUMMARY: "AI_GROUNDED_REVIEWED",
@@ -587,6 +601,7 @@ describe("AiGenerateTab", () => {
         FEEDBACK_DOCUMENT: "AI_GROUNDED_REVIEWED",
       },
     });
+    expect(onCommitted).toHaveBeenCalledWith(expect.objectContaining({ draftRevision: 8 }));
     expect(await screen.findByRole("status")).toHaveTextContent("참여 상태 2건을 확인했습니다");
   });
 

@@ -415,6 +415,9 @@ describe("commitGeneration", () => {
         status: "COMMITTED",
         recovered: false,
         participantUpdatesCount: 1,
+        draftRevision: 6,
+        baseLiveRevision: 2,
+        liveApplied: false,
       }),
     );
 
@@ -444,11 +447,15 @@ describe("commitGeneration", () => {
         status: "COMMITTED",
         recovered: false,
         participantUpdatesCount: 1,
+        draftRevision: 6,
+        baseLiveRevision: 2,
+        liveApplied: false,
       }),
     );
 
     await commitGeneration("sid-1", "job-1", {
       recordVisibility: "PUBLIC",
+      expectedDraftRevision: 5,
       result: {
         format: "readmates-session-import:v1",
         sessionNumber: 3,
@@ -467,6 +474,7 @@ describe("commitGeneration", () => {
       result: { sessionNumber: number };
     };
     expect(parsed.result.sessionNumber).toBe(3);
+    expect(parsed.expectedDraftRevision).toBe(5);
   });
 });
 

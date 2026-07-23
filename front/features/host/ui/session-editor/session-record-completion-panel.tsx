@@ -5,6 +5,7 @@ import type {
   SessionRecordVisibility,
 } from "@/features/host/model/host-view-types";
 import type { SessionImportCommitResult } from "@/features/host/model/session-import-model";
+import type { AiCommitResponse } from "@/features/host/aigen/api/aigen-contracts";
 import type { ReadmatesReturnState } from "@/shared/routing/readmates-route-state";
 import { Panel } from "./session-editor-panel";
 import { SessionImportPanelBody } from "./session-import-panel";
@@ -38,8 +39,9 @@ type SessionRecordCompletionPanelProps = {
   commitResult: SessionImportCommitResult | null;
   status: "idle" | "previewing" | "ready" | "committing" | "error";
   error: string | null;
+  expectedDraftRevision: number | null;
   onModeChange: (mode: SessionRecordCompletionMode) => void;
-  onAigenCommitted: () => void;
+  onAigenCommitted: (result: AiCommitResponse | null) => void;
   onFileSelected: (event: ChangeEvent<HTMLInputElement>) => void;
   onCommit: () => void;
 };
@@ -58,6 +60,7 @@ export function SessionRecordCompletionPanel({
   commitResult,
   status,
   error,
+  expectedDraftRevision,
   onModeChange,
   onAigenCommitted,
   onFileSelected,
@@ -88,7 +91,12 @@ export function SessionRecordCompletionPanel({
           </p>
         )}
         {effectiveMode === "aigen" && sessionId && clubSlug ? (
-          <AiGenerateTab sessionId={sessionId} clubSlug={clubSlug} onCommitted={onAigenCommitted} />
+          <AiGenerateTab
+            sessionId={sessionId}
+            clubSlug={clubSlug}
+            expectedDraftRevision={expectedDraftRevision}
+            onCommitted={onAigenCommitted}
+          />
         ) : (
           <SessionImportPanelBody
             sessionId={sessionId}

@@ -17,6 +17,7 @@ import type {
   SessionImportPreviewResponse,
   SessionImportRequest,
 } from "@/features/host/model/host-view-types";
+import type { AiCommitResponse } from "@/features/host/aigen/api/aigen-contracts";
 import {
   buildHostSessionRequest,
   buildPublicationRequest,
@@ -91,12 +92,20 @@ type HostSessionRecordWorkflow = {
     validationSummary: { valid: boolean; issues: string[] };
   };
   history: SessionHistoryPanelItem[];
+  historyNextCursor: string | null;
+  historyLoadingMore: boolean;
   snapshot: SessionRecordDraftSnapshot;
   saveState: DraftSaveState;
   expectedDraftRevision: number | null;
   restoring: boolean;
   onSnapshotChange: (snapshot: SessionRecordDraftSnapshot) => void;
   onReloadDraft: () => void | Promise<void>;
+  onDraftCommitted: (result: {
+    draftRevision: number;
+    baseLiveRevision: number | null;
+    liveApplied: boolean;
+  }) => void | Promise<void>;
+  onLoadMoreHistory: (cursor: string) => void | Promise<void>;
   onCopyInput: () => void | Promise<void>;
   confirmation: {
     open: boolean;
@@ -260,9 +269,17 @@ export default function HostSessionEditor({
     }
   }, [canShowImportModeToggle]);
 
-  const handleAigenCommitted = useCallback(() => {
+  const handleAigenCommitted = useCallback((result: AiCommitResponse | null) => {
     if (sessionIdForAigen) {
-      void recordWorkflow?.onReloadDraft();
+      if (recordWorkflow && result?.draftRevision !== null && result?.draftRevision !== undefined) {
+        void recordWorkflow.onDraftCommitted({
+          draftRevision: result.draftRevision,
+          baseLiveRevision: result.baseLiveRevision,
+          liveApplied: result.liveApplied,
+        });
+      } else {
+        void recordWorkflow?.onReloadDraft();
+      }
       void onSessionRecordsChanged?.(sessionIdForAigen);
     }
   }, [onSessionRecordsChanged, recordWorkflow, sessionIdForAigen]);
@@ -724,7 +741,11 @@ export default function HostSessionEditor({
 
       try {
         const sourceJson = await readTextFile(file);
-        const request = buildSessionImportRequest(sourceJson, recordVisibility);
+        const request = buildSessionImportRequest(
+          sourceJson,
+          recordVisibility,
+          recordWorkflow?.expectedDraftRevision ?? null,
+        );
         const preview = await actions.previewSessionImport(session.sessionId, request);
         setSessionImportRequest(request);
         setSessionImportPreview(preview);
@@ -739,7 +760,7 @@ export default function HostSessionEditor({
         input.value = "";
       }
     },
-    [session, recordVisibility, actions],
+    [session, recordVisibility, actions, recordWorkflow],
   );
 
   const commitSessionImport = useCallback(async () => {
@@ -759,7 +780,7 @@ export default function HostSessionEditor({
         sessionImportRequest.recordVisibility,
       );
       if (recordWorkflow) {
-        await recordWorkflow.onReloadDraft();
+        await recordWorkflow.onDraftCommitted(committed);
       }
       setSessionImportStatus("idle");
       setSessionImportPreview(null);
@@ -975,6 +996,7 @@ export default function HostSessionEditor({
                 commitResult={sessionImportCommitResult}
                 status={sessionImportStatus}
                 error={sessionImportError}
+                expectedDraftRevision={recordWorkflow?.expectedDraftRevision ?? null}
                 onModeChange={handleImportModeChange}
                 onAigenCommitted={handleAigenCommitted}
                 onFileSelected={previewSessionImport}
@@ -984,6 +1006,9 @@ export default function HostSessionEditor({
               <SessionHistoryPanel
                 activeMobileSection={activeMobileSection}
                 items={recordWorkflow?.history ?? []}
+                nextCursor={recordWorkflow?.historyNextCursor ?? null}
+                loadingMore={recordWorkflow?.historyLoadingMore ?? false}
+                onLoadMore={recordWorkflow?.onLoadMoreHistory}
                 expectedDraftRevision={recordWorkflow?.expectedDraftRevision ?? null}
                 restoring={recordWorkflow?.restoring ?? false}
                 onRestore={recordWorkflow?.onRestore ?? (() => undefined)}

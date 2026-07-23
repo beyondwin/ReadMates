@@ -237,6 +237,7 @@ export type RegenerateResponse = {
 
 export type CommitGenerationRequest = {
   recordVisibility: AiRecordVisibility;
+  expectedDraftRevision?: number | null;
   /** Optional override sent when the host edited the PREVIEW manually. */
   result?: SessionImportV1;
   expectedRevision?: number;
@@ -249,6 +250,9 @@ export type AiCommitResponse = {
   status: "COMMITTED";
   recovered: boolean;
   participantUpdatesCount: number | null;
+  draftRevision: number | null;
+  baseLiveRevision: number | null;
+  liveApplied: boolean;
 };
 
 export type ClubAiDefaultResponse = {
@@ -357,6 +361,9 @@ export const AiCommitResponseSchema = import.meta.env.DEV
       status: z.literal("COMMITTED"),
       recovered: z.boolean(),
       participantUpdatesCount: z.number().int().nonnegative().nullable(),
+      draftRevision: z.number().int().nonnegative().nullable(),
+      baseLiveRevision: z.number().int().nonnegative().nullable(),
+      liveApplied: z.boolean(),
     })
   : (null as never);
 

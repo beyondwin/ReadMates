@@ -318,6 +318,7 @@ export type SessionImportRecordRequest = {
 
 export type SessionImportRequest = {
   recordVisibility: SessionRecordVisibility;
+  expectedDraftRevision: number | null;
   format: "readmates-session-import:v1";
   session: {
     number: number;

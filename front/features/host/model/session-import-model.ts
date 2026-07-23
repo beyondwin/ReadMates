@@ -6,7 +6,7 @@ import type {
   SessionRecordVisibility,
 } from "./host-view-types";
 
-type SessionImportFileRequest = Omit<SessionImportRequest, "recordVisibility">;
+type SessionImportFileRequest = Omit<SessionImportRequest, "recordVisibility" | "expectedDraftRevision">;
 
 export type SessionImportAuthorSummary = {
   totalCount: number;
@@ -30,7 +30,7 @@ export type SessionImportReview = {
 
 export type SessionImportCommitResult = {
   tone: "success";
-  title: "저장 완료";
+  title: "초안 저장 완료";
   message: string;
   visibilityLabel: string;
   items: string[];
@@ -44,7 +44,11 @@ export type SessionImportFailureStage =
   | "commit-network"
   | "refresh";
 
-export function buildSessionImportRequest(sourceJson: string, recordVisibility: SessionRecordVisibility): SessionImportRequest {
+export function buildSessionImportRequest(
+  sourceJson: string,
+  recordVisibility: SessionRecordVisibility,
+  expectedDraftRevision: number | null = null,
+): SessionImportRequest {
   let parsed: unknown;
   try {
     parsed = JSON.parse(sourceJson);
@@ -56,6 +60,7 @@ export function buildSessionImportRequest(sourceJson: string, recordVisibility: 
   return {
     ...fileRequest,
     recordVisibility,
+    expectedDraftRevision,
   };
 }
 

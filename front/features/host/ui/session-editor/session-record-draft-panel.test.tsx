@@ -126,6 +126,64 @@ describe("SessionRecordDraftPanel", () => {
     expect(result.current.saveState).toBe("saved");
   });
 
+  it("serializes autosaves, queues only the latest snapshot, and marks saved only for its acknowledgement", async () => {
+    vi.useFakeTimers();
+    let resolveFirst!: (value: NonNullable<ReturnType<typeof editor>["draft"]>) => void;
+    let resolveSecond!: (value: NonNullable<ReturnType<typeof editor>["draft"]>) => void;
+    const first = new Promise<NonNullable<ReturnType<typeof editor>["draft"]>>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const second = new Promise<NonNullable<ReturnType<typeof editor>["draft"]>>((resolve) => {
+      resolveSecond = resolve;
+    });
+    const onSave = vi.fn()
+      .mockImplementationOnce(() => first)
+      .mockImplementationOnce(() => second);
+    const { result } = renderHook(() => useSessionRecordDraftController({
+      editor: editor(),
+      onSave,
+      onReload: vi.fn(),
+    }));
+
+    act(() => result.current.updateSnapshot({
+      ...draftSnapshot,
+      publicationSummary: "첫 입력",
+    }));
+    await act(async () => vi.advanceTimersByTimeAsync(600));
+    expect(onSave).toHaveBeenCalledTimes(1);
+
+    act(() => result.current.updateSnapshot({
+      ...draftSnapshot,
+      publicationSummary: "가장 최신 입력",
+    }));
+    await act(async () => vi.advanceTimersByTimeAsync(600));
+    expect(onSave).toHaveBeenCalledTimes(1);
+
+    await act(async () => resolveFirst(editor({
+      ...draftSnapshot,
+      publicationSummary: "첫 입력",
+    }, 5).draft!));
+    expect(result.current.saveState).not.toBe("saved");
+    expect(onSave).toHaveBeenCalledTimes(2);
+    expect(onSave).toHaveBeenLastCalledWith({
+      sessionId: "session-1",
+      request: {
+        expectedDraftRevision: 5,
+        snapshot: {
+          ...draftSnapshot,
+          publicationSummary: "가장 최신 입력",
+        },
+      },
+    });
+
+    await act(async () => resolveSecond(editor({
+      ...draftSnapshot,
+      publicationSummary: "가장 최신 입력",
+    }, 6).draft!));
+    expect(result.current.saveState).toBe("saved");
+    expect(result.current.expectedDraftRevision).toBe(6);
+  });
+
   it("shows unsaved state and blocks navigation after autosave failure", async () => {
     vi.useFakeTimers();
     const { result } = renderHook(() => useSessionRecordDraftController({
@@ -179,6 +237,23 @@ describe("SessionRecordDraftPanel", () => {
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining("내가 입력한 초안"));
     await act(async () => result.current.reloadDraft());
     expect(result.current.snapshot.publicationSummary).toBe("서버의 최신 초안");
+  });
+
+  it("adopts a JSON or AI commit revision before reloading the shared draft", async () => {
+    const onReload = vi.fn().mockResolvedValue(editor(draftSnapshot, 8));
+    const { result } = renderHook(() => useSessionRecordDraftController({
+      editor: editor(),
+      onSave: vi.fn(),
+      onReload,
+    }));
+
+    act(() => result.current.adoptDraftRevision(8));
+    expect(result.current.expectedDraftRevision).toBe(8);
+    expect(result.current.saveState).toBe("saved");
+
+    await act(async () => result.current.reloadDraft());
+    expect(onReload).toHaveBeenCalledTimes(1);
+    expect(result.current.expectedDraftRevision).toBe(8);
   });
 
   it("maps validation issues to summary highlights reviews and feedback", () => {

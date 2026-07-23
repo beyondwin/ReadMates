@@ -64,6 +64,7 @@ const sessionRequest: HostSessionRequest = {
 };
 
 const importRequest: SessionImportRequest = {
+  expectedDraftRevision: null,
   format: "readmates-session-import:v1",
   session: {
     number: 7,
