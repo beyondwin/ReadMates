@@ -47,6 +47,11 @@ export async function fulfillHostAuth(route: Route, clubSlug: string): Promise<v
   });
 }
 
+export function isHostSessionDetailRequest(route: Route, sessionId: string): boolean {
+  return new URL(route.request().url()).pathname ===
+    `/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}`;
+}
+
 export async function routeHostEditorShell(page: Page, clubSlug: string): Promise<void> {
   await page.route("**/api/bff/api/auth/me**", async (route) => {
     await fulfillHostAuth(route, clubSlug);
@@ -79,6 +84,50 @@ export async function routeHostEditorShell(page: Page, clubSlug: string): Promis
       body: JSON.stringify({
         models: [{ id: "claude-sonnet-4-6", provider: "CLAUDE", isDefault: true }],
       }),
+    });
+  });
+
+  await page.route("**/api/bff/api/host/capabilities**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        sessionRecordDrafts: true,
+        hostActionNotificationConfirmationRequired: true,
+      }),
+    });
+  });
+
+  await page.route("**/api/bff/api/host/sessions/*/record-editor**", async (route) => {
+    const pathSegments = new URL(route.request().url()).pathname.split("/");
+    const recordEditorIndex = pathSegments.lastIndexOf("record-editor");
+    const sessionId = pathSegments[recordEditorIndex - 1] ?? "session-e2e";
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        sessionId,
+        liveRevision: 0,
+        liveSnapshot: {
+          schema: "readmates-session-record:v1",
+          visibility: "HOST_ONLY",
+          publicationSummary: "",
+          highlights: [],
+          oneLineReviews: [],
+          feedbackDocument: { fileName: "", title: "", markdown: "" },
+        },
+        draft: null,
+        draftLiveBaseStale: false,
+        validationSummary: { valid: true, issues: [] },
+      }),
+    });
+  });
+
+  await page.route("**/api/bff/api/host/sessions/*/history**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ items: [], nextCursor: null }),
     });
   });
 }

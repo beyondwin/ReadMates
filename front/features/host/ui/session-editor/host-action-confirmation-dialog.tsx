@@ -1,4 +1,5 @@
 import { useEffect, useRef, type CSSProperties, type KeyboardEvent } from "react";
+import { createPortal } from "react-dom";
 
 export type NotificationDecision = "SEND" | "SKIP";
 
@@ -85,7 +86,7 @@ export function HostActionConfirmationDialog({
     }
   };
 
-  return (
+  return createPortal(
     <div
       className="rm-host-action-dialog-backdrop"
       onMouseDown={(event) => {
@@ -191,6 +192,7 @@ export function HostActionConfirmationDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

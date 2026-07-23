@@ -1,5 +1,9 @@
 import { expect, test, type Route } from "@playwright/test";
-import { hostSessionDetailResponse, routeHostEditorShell } from "./aigen-test-fixtures";
+import {
+  hostSessionDetailResponse,
+  isHostSessionDetailRequest,
+  routeHostEditorShell,
+} from "./aigen-test-fixtures";
 
 const SESSION_ID = "11111111-1111-1111-1111-111111111111";
 const JOB_ID = "22222222-2222-2222-2222-222222222222";
@@ -12,7 +16,7 @@ async function json(route: Route, status: number, body: unknown): Promise<void> 
 test("receipt-backed COMMIT_RETRY converges to COMMITTED without exposing content", async ({ page }) => {
   await routeHostEditorShell(page, CLUB_SLUG);
   await page.route(`**/api/bff/api/host/sessions/${SESSION_ID}**`, async (route) => {
-    if (route.request().url().includes("/ai-generate")) return route.fallback();
+    if (!isHostSessionDetailRequest(route, SESSION_ID)) return route.fallback();
     await json(route, 200, hostSessionDetailResponse(SESSION_ID));
   });
   await page.route(`**/api/bff/api/host/sessions/${SESSION_ID}/ai-generate/jobs/recent**`, async (route) => {
@@ -39,7 +43,7 @@ test("receipt-backed COMMIT_RETRY converges to COMMITTED without exposing conten
   await expect(page.getByText("COMMIT_RETRY")).toBeVisible();
   await page.getByRole("button", { name: "Commit 재시도" }).click();
   await expect(page.getByText("커밋 확인 중")).toBeVisible();
-  await expect(page.getByText(/AI 기록 저장을 완료했습니다/)).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText(/AI 기록을 공유 초안으로 저장했습니다/)).toBeVisible({ timeout: 10_000 });
   expect(polls).toBeGreaterThanOrEqual(2);
   await expect(page.getByText(/공개 합성|대본|근거 발언/)).toHaveCount(0);
 });

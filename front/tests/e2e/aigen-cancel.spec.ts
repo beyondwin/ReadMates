@@ -12,7 +12,12 @@ import type {
   ClubAiDefaultResponse,
   StartGenerationResponse,
 } from "@/features/host/aigen/api/aigen-contracts";
-import { groundedTranscript, hostSessionDetailResponse, routeHostEditorShell } from "./aigen-test-fixtures";
+import {
+  groundedTranscript,
+  hostSessionDetailResponse,
+  isHostSessionDetailRequest,
+  routeHostEditorShell,
+} from "./aigen-test-fixtures";
 
 const SESSION_ID = "11111111-1111-1111-1111-111111111111";
 const JOB_ID = "22222222-2222-2222-2222-222222222222";
@@ -64,7 +69,7 @@ test("cancel during GENERATING returns the editor to IDLE and clears the draft",
   await routeHostEditorShell(page, CLUB_SLUG);
 
   await page.route(`**/api/bff/api/host/sessions/${SESSION_ID}**`, async (route) => {
-    if (route.request().url().includes("/ai-generate")) {
+    if (!isHostSessionDetailRequest(route, SESSION_ID)) {
       await route.fallback();
       return;
     }

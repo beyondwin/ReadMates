@@ -50,7 +50,7 @@ async function expectPublicRecordMetadataLayout(page: Page, width: number, stack
 }
 
 const memberMobileTabs = ["홈", "이번 세션", "클럽 노트", "아카이브", "알림", "내 공간"];
-const hostMobileTabs = ["홈", "세션", "알림", "멤버", "아카이브"];
+const hostMobileTabs = ["홈", "세션", "알림", "멤버", "기록"];
 const baselineClubAppPath = "/clubs/reading-sai/app";
 const baselineClubHostPath = `${baselineClubAppPath}/host`;
 
@@ -101,7 +101,7 @@ test("desktop public and host pages show the expected top navigation", async ({ 
   await hostEntry.click();
   await expect(page).toHaveURL(new RegExp(`${baselineClubHostPath}$`));
   await expect(appNav.getByRole("link", { name: "운영" })).toHaveAttribute("aria-current", "page");
-  await expect(appNav.getByRole("link", { name: "세션 문서" })).toBeVisible();
+  await expect(appNav.getByRole("link", { name: "세션 기록" })).toBeVisible();
   await expect(appNav.getByRole("link", { name: "멤버 초대" })).toBeVisible();
   await expect(appNav.getByRole("link", { name: "멤버 승인" })).toBeVisible();
 
@@ -192,21 +192,33 @@ test("mobile public pages hide app tabs and host app pages show mobile chrome", 
   await expect(tabs.getByRole("link", { name: "세션" })).toHaveAttribute("href", /\/app\/host\/sessions\/(.+\/edit|new)$/);
   await expect(tabs.getByRole("link", { name: "알림" })).toHaveAttribute("href", `${baselineClubHostPath}/notifications`);
   await expect(tabs.getByRole("link", { name: "멤버" })).toHaveAttribute("href", `${baselineClubHostPath}/members`);
-  await expect(tabs.getByRole("link", { name: "아카이브" })).toHaveAttribute("href", `${baselineClubAppPath}/archive`);
+  await expect(tabs.getByRole("link", { name: "기록" })).toHaveAttribute("href", `${baselineClubHostPath}/sessions`);
   await expect(tabs.getByRole("link", { name: "세션" })).toHaveAttribute("aria-current", "page");
   await expect(tabs.getByRole("link", { name: "호스트" })).toHaveCount(0);
   await expect(tabs.getByRole("link", { name: "이번 세션" })).toHaveCount(0);
   await expectPracticalTapTarget(tabs.getByRole("link", { name: "세션" }));
 
-  await tabs.getByRole("link", { name: "아카이브" }).click();
-  await expect(page).toHaveURL(new RegExp(`${baselineClubAppPath}/archive$`));
+  await page.setViewportSize({ width: 320, height: 720 });
+  await page.goto(`${baselineClubHostPath}/sessions`);
+  await expect(page.getByRole("heading", { name: "세션 기록 장부" })).toBeVisible();
+  await expect(page.getByRole("searchbox", { name: "세션 기록 검색" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const firstLedgerAction = page.locator("article[data-session-id]").first().getByRole("link");
+  await expect(firstLedgerAction).toBeVisible();
+  await expectPracticalTapTarget(firstLedgerAction);
+  await firstLedgerAction.click();
+  await expect(page).toHaveURL(/\/app\/host\/sessions\/.+\/edit/);
+  await expect(page.getByRole("tab", { name: "공개 기록" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  await tabs.getByRole("link", { name: "기록" }).click();
+  await expect(page).toHaveURL(new RegExp(`${baselineClubHostPath}/sessions$`));
   await expect(mobileHeader).toContainText("기록");
   await expect(mobileHeader.getByRole("link", { name: "멤버 화면으로" })).toHaveAttribute("href", baselineClubAppPath);
   await expect(mobileHeader.getByRole("link", { name: "멤버 화면으로" })).toHaveText("");
   await expect(mobileHeader.getByRole("link", { name: "멤버 화면으로" })).toHaveClass(/m-hdr-link--icon/);
   await expect(tabs.getByRole("link")).toHaveText(hostMobileTabs);
-  await expect(tabs.getByRole("link", { name: "아카이브" })).toHaveAttribute("aria-current", "page");
-  await expect(tabs.getByRole("link", { name: "기록" })).toHaveCount(0);
+  await expect(tabs.getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
 
   const editHref = await tabs.getByRole("link", { name: "세션" }).getAttribute("href");
   expect(editHref).toBeTruthy();

@@ -4,6 +4,7 @@ import {
   groundedSucceededJob,
   groundedTranscript,
   hostSessionDetailResponse,
+  isHostSessionDetailRequest,
   routeHostEditorShell,
 } from "./aigen-test-fixtures";
 
@@ -18,7 +19,7 @@ async function json(route: Route, status: number, body: unknown): Promise<void> 
 test("host reviews grounded blocks, confirms one edit, and commits the exact revision", async ({ page }) => {
   await routeHostEditorShell(page, CLUB_SLUG);
   await page.route(`**/api/bff/api/host/sessions/${SESSION_ID}**`, async (route) => {
-    if (route.request().url().includes("/ai-generate")) return route.fallback();
+    if (!isHostSessionDetailRequest(route, SESSION_ID)) return route.fallback();
     await json(route, 200, hostSessionDetailResponse(SESSION_ID));
   });
   await page.route(`**/api/bff/api/host/sessions/${SESSION_ID}/ai-generate/jobs**`, async (route) => {
@@ -38,7 +39,15 @@ test("host reviews grounded blocks, confirms one edit, and commits the exact rev
     }
     if (request.url().includes("/commit") && request.method() === "POST") {
       committed = JSON.parse(request.postData() ?? "{}") as CommitGenerationRequest;
-      await json(route, 200, { sessionId: SESSION_ID, status: "COMMITTED", recovered: false, participantUpdatesCount: 2 });
+      await json(route, 200, {
+        sessionId: SESSION_ID,
+        status: "COMMITTED",
+        recovered: false,
+        participantUpdatesCount: 2,
+        draftRevision: 1,
+        baseLiveRevision: 0,
+        liveApplied: false,
+      });
       return;
     }
     if (request.method() === "GET") {
@@ -71,7 +80,7 @@ test("host reviews grounded blocks, confirms one edit, and commits the exact rev
   for (const button of await page.getByRole("button", { name: "AI 근거 검토 완료" }).all()) await button.click();
   await expect(page.getByText("4/4 검토 완료")).toBeVisible();
 
-  await page.getByRole("button", { name: "AI 기록 저장" }).click();
+  await page.getByRole("button", { name: "초안으로 저장" }).click();
   await expect(page.getByText(/참여 상태 2건/)).toBeVisible();
   expect(committed).toMatchObject({
     expectedRevision: 1,

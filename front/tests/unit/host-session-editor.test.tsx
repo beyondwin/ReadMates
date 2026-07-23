@@ -186,6 +186,55 @@ function sessionImportJson() {
   });
 }
 
+function recordWorkflow(
+  visibility: "HOST_ONLY" | "MEMBER" | "PUBLIC",
+): NonNullable<HostSessionEditorProps["recordWorkflow"]> {
+  const snapshot = {
+    schema: "readmates-session-record:v1" as const,
+    visibility,
+    publicationSummary: "공유 초안 요약",
+    highlights: [],
+    oneLineReviews: [],
+    feedbackDocument: {
+      fileName: "feedback.md",
+      title: "",
+      markdown: "",
+    },
+  };
+
+  return {
+    editor: {
+      liveSnapshot: { ...snapshot, visibility: "HOST_ONLY", publicationSummary: "" },
+      draftLiveBaseStale: false,
+      validationSummary: { valid: true, issues: [] },
+    },
+    history: [],
+    historyNextCursor: null,
+    historyLoadingMore: false,
+    snapshot,
+    saveState: "saved",
+    expectedDraftRevision: 4,
+    restoring: false,
+    onSnapshotChange: vi.fn(),
+    onReloadDraft: vi.fn(),
+    onDraftCommitted: vi.fn(),
+    onLoadMoreHistory: vi.fn(),
+    onCopyInput: vi.fn(),
+    confirmation: {
+      open: false,
+      preview: null,
+      decision: null,
+      submitting: false,
+      message: null,
+      onReview: vi.fn(),
+      onDecisionChange: vi.fn(),
+      onCancel: vi.fn(),
+      onConfirm: vi.fn(),
+    },
+    onRestore: vi.fn(),
+  };
+}
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -509,6 +558,31 @@ describe("HostSessionEditor", () => {
       expectedDraftRevision: null,
     });
     expect(screen.getByText("Import summary.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "초안으로 가져오기" })).toBeEnabled();
+  });
+
+  it("previews JSON with the shared draft visibility and revision", async () => {
+    const user = userEvent.setup();
+    const previewSessionImport = vi.fn(hostSessionEditorTestActions.previewSessionImport);
+
+    render(
+      <HostSessionEditorForTest
+        session={{ ...session, publication: null }}
+        recordWorkflow={recordWorkflow("MEMBER")}
+        actions={{ ...hostSessionEditorTestActions, previewSessionImport }}
+      />,
+    );
+
+    await user.upload(
+      screen.getByLabelText("AI 결과 JSON 가져오기"),
+      new File([sessionImportJson()], "session-import.json", { type: "application/json" }),
+    );
+
+    await waitFor(() => expect(previewSessionImport).toHaveBeenCalledTimes(1));
+    expect(previewSessionImport.mock.calls[0]?.[1]).toMatchObject({
+      recordVisibility: "MEMBER",
+      expectedDraftRevision: 4,
+    });
     expect(screen.getByRole("button", { name: "초안으로 가져오기" })).toBeEnabled();
   });
 

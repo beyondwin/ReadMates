@@ -12,7 +12,12 @@ import type {
   AiProblemDetail,
   ClubAiDefaultResponse,
 } from "@/features/host/aigen/api/aigen-contracts";
-import { groundedTranscript, hostSessionDetailResponse, routeHostEditorShell } from "./aigen-test-fixtures";
+import {
+  groundedTranscript,
+  hostSessionDetailResponse,
+  isHostSessionDetailRequest,
+  routeHostEditorShell,
+} from "./aigen-test-fixtures";
 
 const SESSION_ID = "11111111-1111-1111-1111-111111111111";
 const CLUB_SLUG = "club-a";
@@ -39,7 +44,7 @@ test("cost cap exceeded on start surfaces an explanatory message and stays on ID
   await routeHostEditorShell(page, CLUB_SLUG);
 
   await page.route(`**/api/bff/api/host/sessions/${SESSION_ID}**`, async (route) => {
-    if (route.request().url().includes("/ai-generate")) {
+    if (!isHostSessionDetailRequest(route, SESSION_ID)) {
       await route.fallback();
       return;
     }

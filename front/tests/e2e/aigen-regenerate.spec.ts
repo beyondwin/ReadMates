@@ -19,6 +19,7 @@ import {
   groundedSucceededJob,
   groundedTranscript,
   hostSessionDetailResponse,
+  isHostSessionDetailRequest,
   routeHostEditorShell,
 } from "./aigen-test-fixtures";
 
@@ -47,7 +48,7 @@ test("regenerate summary: modal payload uses UPPER_SNAKE item and updates PREVIE
   await routeHostEditorShell(page, CLUB_SLUG);
 
   await page.route(`**/api/bff/api/host/sessions/${SESSION_ID}**`, async (route) => {
-    if (route.request().url().includes("/ai-generate")) {
+    if (!isHostSessionDetailRequest(route, SESSION_ID)) {
       await route.fallback();
       return;
     }
@@ -155,15 +156,15 @@ test("regenerate summary: modal payload uses UPPER_SNAKE item and updates PREVIE
   // Assert the new summary replaced the old one.
   await expect(summaryField).toHaveValue("재생성된 요약 내용", { timeout: 10000 });
   await expect(page.getByText("0/4 검토 완료")).toBeVisible();
-  await expect(page.getByRole("button", { name: "AI 기록 저장" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "초안으로 저장" })).toBeDisabled();
 
   await summaryField.fill("revision 2 호스트 공개 합성 초안");
   await page.getByRole("button", { name: "직접 수정 내용 확인" }).click();
   for (const button of await page.getByRole("button", { name: "AI 근거 검토 완료" }).all()) await button.click();
-  await page.getByRole("button", { name: "AI 기록 저장" }).click();
+  await page.getByRole("button", { name: "초안으로 저장" }).click();
   await expect(page.getByRole("alert")).toContainText("현재 편집은 자동으로 덮어쓰지 않았습니다");
   await expect(summaryField).toHaveValue("revision 2 호스트 공개 합성 초안");
-  await expect(page.getByRole("button", { name: "AI 기록 저장" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "초안으로 저장" })).toBeDisabled();
 
   // The regenerate request must have used UPPER_SNAKE_CASE per the
   // documented server defect workaround.

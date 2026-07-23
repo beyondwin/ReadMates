@@ -56,6 +56,7 @@ export default defineConfig({
         `${envAssignment("READMATES_MANAGEMENT_PORT", "0")} ` +
         `${envAssignment("READMATES_FLYWAY_LOCATIONS", "classpath:db/mysql/migration,classpath:db/mysql/dev")} ` +
         `${envAssignment("READMATES_AUTH_SESSION_COOKIE_SECURE", "false")} ` +
+        `${envAssignment("READMATES_HOST_ACTION_CONFIRMATION_REQUIRED", "true")} ` +
         "../server/gradlew -p ../server bootRun",
       url: `${apiBaseURL}/internal/health`,
       reuseExistingServer: false,

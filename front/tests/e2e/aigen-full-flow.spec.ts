@@ -15,7 +15,12 @@ import type {
   SessionImportV1,
   StartGenerationResponse,
 } from "@/features/host/aigen/api/aigen-contracts";
-import { groundedTranscript, hostSessionDetailResponse, routeHostEditorShell } from "./aigen-test-fixtures";
+import {
+  groundedTranscript,
+  hostSessionDetailResponse,
+  isHostSessionDetailRequest,
+  routeHostEditorShell,
+} from "./aigen-test-fixtures";
 
 const SESSION_ID = "11111111-1111-1111-1111-111111111111";
 const JOB_ID = "22222222-2222-2222-2222-222222222222";
@@ -90,7 +95,7 @@ test("AI generation full flow: upload → poll → preview → commit", async ({
   await routeHostEditorShell(page, CLUB_SLUG);
 
   await page.route(`**/api/bff/api/host/sessions/${SESSION_ID}**`, async (route) => {
-    if (route.request().url().includes("/ai-generate")) {
+    if (!isHostSessionDetailRequest(route, SESSION_ID)) {
       await route.fallback();
       return;
     }
@@ -129,6 +134,9 @@ test("AI generation full flow: upload → poll → preview → commit", async ({
             status: "COMMITTED",
             recovered: false,
             participantUpdatesCount: 2,
+            draftRevision: 1,
+            baseLiveRevision: 0,
+            liveApplied: false,
           });
           return;
         }
@@ -173,9 +181,9 @@ test("AI generation full flow: upload → poll → preview → commit", async ({
 
   // Commit
   trackingCommitNavigation = true;
-  await page.getByRole("button", { name: /AI 기록 저장/ }).click();
+  await page.getByRole("button", { name: "초안으로 저장" }).click();
 
   // Commit should refresh the editor through Query invalidation, not a full page reload.
-  await expect(page.getByText(/AI 기록 저장을 완료했습니다|AI로 세션 기록 생성/)).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText(/AI 기록을 공유 초안으로 저장했습니다|AI로 세션 기록 생성/)).toBeVisible({ timeout: 15000 });
   await expect.poll(() => mainFrameNavigationsAfterCommit).toBe(0);
 });

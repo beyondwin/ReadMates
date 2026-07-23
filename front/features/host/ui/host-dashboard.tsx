@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from "react";
 import { useInRouterContext, useLocation } from "react-router-dom";
 import type {
+  CurrentSessionResponse,
   HostDashboardResponse,
   HostNotificationSummary,
   HostSessionListPage,
@@ -9,7 +10,6 @@ import type {
   HostSessionVisibilityRequest,
   SessionRecordVisibility,
 } from "@/features/host/model/host-view-types";
-import type { CurrentSessionResponse } from "@/features/current-session/api/current-session-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import type { HostClubOperationsSnapshot } from "@/shared/model/club-operations";
 import { HostClubOperationsCard } from "@/features/host/ui/host-club-operations-card";

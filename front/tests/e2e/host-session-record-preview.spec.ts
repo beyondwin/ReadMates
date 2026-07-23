@@ -1,6 +1,11 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import type { HostSessionDetailResponse, SessionImportPreviewResponse } from "@/features/host/model/host-view-types";
-import { fulfillHostAuth, hostSessionDetailResponse, routeHostEditorShell } from "./aigen-test-fixtures";
+import {
+  fulfillHostAuth,
+  hostSessionDetailResponse,
+  isHostSessionDetailRequest,
+  routeHostEditorShell,
+} from "./aigen-test-fixtures";
 
 const SESSION_ID = "11111111-1111-1111-1111-111111111111";
 const CLUB_SLUG = "club-a";
@@ -84,6 +89,7 @@ function previewResponse(): SessionImportPreviewResponse {
 }
 
 async function routeHostSessionEditor(page: Page): Promise<void> {
+  let draftSaved = false;
   await routeHostEditorShell(page, CLUB_SLUG);
 
   await page.route("**/api/bff/api/auth/me**", async (route) => {
@@ -91,8 +97,7 @@ async function routeHostSessionEditor(page: Page): Promise<void> {
   });
 
   await page.route(`**/api/bff/api/host/sessions/${SESSION_ID}**`, async (route) => {
-    const url = route.request().url();
-    if (url.includes("/session-import/") || url.includes("/ai-generate")) {
+    if (!isHostSessionDetailRequest(route, SESSION_ID)) {
       await route.fallback();
       return;
     }
@@ -104,17 +109,59 @@ async function routeHostSessionEditor(page: Page): Promise<void> {
   });
 
   await page.route(`**/api/bff/api/host/sessions/${SESSION_ID}/session-import/commit**`, async (route) => {
+    const request = route.request().postDataJSON();
+    expect(request.expectedDraftRevision).toBeNull();
+    draftSaved = true;
     await json(route, 200, {
       sessionId: SESSION_ID,
-      publication: { summary: "공개 가능한 세션 요약입니다." },
-      highlights: previewResponse().highlights,
-      oneLineReviews: previewResponse().oneLineReviews,
-      feedbackDocument: {
-        uploaded: true,
-        fileName: "session-7-feedback.md",
-        title: "독서모임 7차 피드백",
-        uploadedAt: "2026-05-16T12:00:00Z",
+      draftRevision: 1,
+      baseLiveRevision: 0,
+      liveApplied: false,
+    });
+  });
+
+  await page.route(`**/api/bff/api/host/sessions/${SESSION_ID}/record-editor**`, async (route) => {
+    await json(route, 200, {
+      sessionId: SESSION_ID,
+      liveRevision: 0,
+      liveSnapshot: {
+        schema: "readmates-session-record:v1",
+        visibility: "MEMBER",
+        publicationSummary: "기존 공개 요약입니다.",
+        highlights: [],
+        oneLineReviews: [
+          { membershipId: "member-b", authorDisplayName: "독자B", text: "기존 live 한줄평입니다." },
+        ],
+        feedbackDocument: { fileName: "", title: "", markdown: "" },
       },
+      draft: draftSaved
+        ? {
+            sessionId: SESSION_ID,
+            baseLiveRevision: 0,
+            draftRevision: 1,
+            source: "JSON_IMPORT",
+            restoredFromRevisionId: null,
+            snapshot: {
+              schema: "readmates-session-record:v1",
+              visibility: "MEMBER",
+              publicationSummary: "공개 가능한 세션 요약입니다.",
+              highlights: [
+                { membershipId: "member-a", authorDisplayName: "독자A", text: "하이라이트입니다." },
+              ],
+              oneLineReviews: [
+                { membershipId: "member-b", authorDisplayName: "독자B", text: "한줄평입니다." },
+              ],
+              feedbackDocument: {
+                fileName: "session-7-feedback.md",
+                title: "독서모임 7차 피드백",
+                markdown: importJson().feedbackDocument.markdown,
+              },
+            },
+            updatedAt: "2026-05-16T12:00:00Z",
+          }
+        : null,
+      draftLiveBaseStale: false,
+      validationSummary: { valid: true, issues: [] },
     });
   });
 }
@@ -161,7 +208,7 @@ async function routeMemberHome(page: Page): Promise<void> {
           authorName: "독자B",
           authorShortName: "B",
           kind: "ONE_LINE_REVIEW",
-          text: "한줄평입니다.",
+          text: "기존 live 한줄평입니다.",
         },
       ],
       nextCursor: null,
@@ -191,7 +238,7 @@ async function expectSessionRecordPreviewPublicSafe(page: Page): Promise<void> {
   await expect(review.getByText("한줄평 1개")).toBeVisible();
   await expect(review.getByText("작성자 매칭 완료")).toBeVisible();
   await expect(review.getByText("피드백 문서 구조 확인 완료")).toBeVisible();
-  await expect(page.getByRole("button", { name: "가져온 기록 저장" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "초안으로 가져오기" })).toBeEnabled();
   await expect(page.getByText("member1@example.com")).toHaveCount(0);
   await expect(page.getByText("private.example.com")).toHaveCount(0);
   await expect(page.getByText("ADMIN_ROUTE")).toHaveCount(0);
@@ -199,10 +246,11 @@ async function expectSessionRecordPreviewPublicSafe(page: Page): Promise<void> {
 }
 
 async function expectSessionImportCommitResultPublicSafe(page: Page): Promise<void> {
-  const commitResult = page.getByRole("region", { name: "세션 기록 저장 결과" });
+  const commitResult = page.getByRole("region", { name: "세션 기록 초안 저장 결과" });
   await expect(commitResult).toBeVisible();
-  await expect(commitResult.getByText("저장 완료")).toBeVisible();
-  await expect(commitResult.getByText("피드백 문서 저장: 독서모임 7차 피드백")).toBeVisible();
+  await expect(commitResult.getByText("초안 저장 완료")).toBeVisible();
+  await expect(commitResult.getByText("피드백 문서 초안 저장: 독서모임 7차 피드백")).toBeVisible();
+  await expect(commitResult.getByText("검토 후 변경사항을 반영하기 전까지 멤버와 공개 화면은 바뀌지 않습니다.")).toBeVisible();
   await expect(page.getByText("member1@example.com")).toHaveCount(0);
   await expect(page.getByText("private.example.com")).toHaveCount(0);
   await expect(page.getByText("{\"")).toHaveCount(0);
@@ -227,7 +275,7 @@ test("host captures public-safe session record preview evidence on desktop and m
       response.request().method() === "POST" &&
       response.url().includes(`/api/bff/api/host/sessions/${SESSION_ID}/session-import/commit`),
   );
-  await page.getByRole("button", { name: "가져온 기록 저장" }).click();
+  await page.getByRole("button", { name: "초안으로 가져오기" }).click();
   expect((await commitPost).ok()).toBe(true);
   await expectSessionImportCommitResultPublicSafe(page);
   const desktopScreenshot = await page.screenshot({
@@ -237,7 +285,7 @@ test("host captures public-safe session record preview evidence on desktop and m
   expect(desktopScreenshot.byteLength).toBeGreaterThan(10_000);
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole("tab", { name: "문서" }).click();
+  await page.getByRole("tab", { name: "공개 기록" }).click();
   await expectSessionImportCommitResultPublicSafe(page);
   const mobileScreenshot = await page.screenshot({
     path: testInfo.outputPath("host-session-record-preview-mobile.png"),
@@ -253,6 +301,9 @@ test("host captures public-safe session record preview evidence on desktop and m
   await expect(recentRecord.getByText("No.07 · E2E 책")).toBeVisible();
   await expect(recentRecord.getByText("E2E 책의 기록과 피드백을 이어 읽을 수 있어요.")).toBeVisible();
   await expect(recentRecord.getByText("한줄평")).toBeVisible();
+  await expect(page.getByText("기존 live 한줄평입니다.", { exact: true }).last()).toBeVisible();
+  await expect(page.getByText("공개 가능한 세션 요약입니다.")).toHaveCount(0);
+  await expect(page.getByText("한줄평입니다.", { exact: true })).toHaveCount(0);
   await expect(recentRecord.getByText("피드백 문서는 열람 화면에서 확인합니다.")).toBeVisible();
   await expect(recentRecord.getByRole("link", { name: "기록 보기" })).toHaveAttribute(
     "href",

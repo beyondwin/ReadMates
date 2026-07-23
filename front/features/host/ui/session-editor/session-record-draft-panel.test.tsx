@@ -1,6 +1,6 @@
 import { act, render, renderHook, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useState } from "react";
+import { StrictMode, useState, type PropsWithChildren } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   useSessionRecordDraftController,
@@ -59,6 +59,17 @@ afterEach(() => {
 });
 
 describe("SessionRecordDraftPanel", () => {
+  it("treats a persisted draft as saved when the editor is reopened", () => {
+    const { result } = renderHook(() => useSessionRecordDraftController({
+      editor: editor(),
+      onSave: vi.fn(),
+      onReload: vi.fn(),
+    }));
+
+    expect(result.current.saveState).toBe("saved");
+    expect(result.current.expectedDraftRevision).toBe(4);
+  });
+
   it("keeps live preview unchanged while editing a draft", async () => {
     const user = userEvent.setup();
     function Harness() {
@@ -123,6 +134,31 @@ describe("SessionRecordDraftPanel", () => {
         },
       },
     });
+    expect(result.current.saveState).toBe("saved");
+  });
+
+  it("autosaves after the StrictMode effect remount used by the app entrypoint", async () => {
+    vi.useFakeTimers();
+    const onSave = vi.fn().mockResolvedValue(editor({
+      ...draftSnapshot,
+      visibility: "PUBLIC",
+    }, 5).draft);
+    const wrapper = ({ children }: PropsWithChildren) => <StrictMode>{children}</StrictMode>;
+    const { result } = renderHook(() => useSessionRecordDraftController({
+      editor: editor(),
+      onSave,
+      onReload: vi.fn(),
+    }), { wrapper });
+
+    act(() => result.current.updateSnapshot({
+      ...draftSnapshot,
+      visibility: "PUBLIC",
+    }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600);
+    });
+
+    expect(onSave).toHaveBeenCalledTimes(1);
     expect(result.current.saveState).toBe("saved");
   });
 

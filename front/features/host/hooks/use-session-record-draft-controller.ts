@@ -32,7 +32,9 @@ export function useSessionRecordDraftController({
   const [snapshot, setSnapshot] = useState<SessionRecordSnapshot>(
     () => editor.draft?.snapshot ?? editor.liveSnapshot,
   );
-  const [saveState, setSaveState] = useState<DraftSaveState>("idle");
+  const [saveState, setSaveState] = useState<DraftSaveState>(
+    () => editor.draft ? "saved" : "idle",
+  );
   const [expectedDraftRevision, setExpectedDraftRevision] = useState<number | null>(
     editor.draft?.draftRevision ?? null,
   );
@@ -158,9 +160,12 @@ export function useSessionRecordDraftController({
     await navigator.clipboard?.writeText(JSON.stringify(snapshot, null, 2));
   }, [snapshot]);
 
-  useEffect(() => () => {
-    mountedRef.current = false;
-    clearTimer();
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      clearTimer();
+    };
   }, [clearTimer]);
 
   const shouldBlockNavigation =

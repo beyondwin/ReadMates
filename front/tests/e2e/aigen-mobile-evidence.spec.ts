@@ -3,6 +3,7 @@ import {
   groundedSucceededJob,
   groundedTranscript,
   hostSessionDetailResponse,
+  isHostSessionDetailRequest,
   routeHostEditorShell,
 } from "./aigen-test-fixtures";
 
@@ -18,7 +19,7 @@ test("mobile review keeps the ledger and editor usable and shows evidence in a f
   await page.setViewportSize({ width: 390, height: 844 });
   await routeHostEditorShell(page, CLUB_SLUG);
   await page.route(`**/api/bff/api/host/sessions/${SESSION_ID}**`, async (route) => {
-    if (route.request().url().includes("/ai-generate")) return route.fallback();
+    if (!isHostSessionDetailRequest(route, SESSION_ID)) return route.fallback();
     await json(route, 200, hostSessionDetailResponse(SESSION_ID));
   });
   await page.route(`**/api/bff/api/host/sessions/${SESSION_ID}/ai-generate/jobs**`, async (route) => {
@@ -37,7 +38,7 @@ test("mobile review keeps the ledger and editor usable and shows evidence in a f
   });
 
   await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}/edit?aigen=1`);
-  await page.getByRole("tab", { name: "문서" }).click();
+  await page.getByRole("tab", { name: "공개 기록" }).click();
   await page.getByLabel(/대본 파일/).setInputFiles({
     name: "transcript.txt", mimeType: "text/plain",
     buffer: Buffer.from(groundedTranscript([{ speaker: "공개 회원 A", at: "00:00", text: "공개 합성 발언입니다." }])),
@@ -57,8 +58,8 @@ test("mobile review keeps the ledger and editor usable and shows evidence in a f
   await expect(evidenceButton).toBeFocused();
 
   await page.getByRole("textbox", { name: "요약", exact: true }).fill("모바일에서 직접 확인한 공개 요약");
-  await expect(page.getByRole("button", { name: "AI 기록 저장" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "초안으로 저장" })).toBeDisabled();
   await page.getByRole("button", { name: "직접 수정 내용 확인" }).click();
   for (const button of await page.getByRole("button", { name: "AI 근거 검토 완료" }).all()) await button.click();
-  await expect(page.getByRole("button", { name: "AI 기록 저장" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "초안으로 저장" })).toBeEnabled();
 });

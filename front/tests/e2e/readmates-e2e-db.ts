@@ -40,6 +40,7 @@ export function runMysql(sql: string) {
       process.env.READMATES_E2E_DB_PORT ?? "3306",
       "-u",
       process.env.READMATES_E2E_DB_USER ?? "readmates",
+      "--default-character-set=utf8mb4",
       resolveE2eDatabaseName(),
       "--batch",
       "--raw",
@@ -564,6 +565,88 @@ export function cleanupGeneratedSessions(invitedEmails: string[] = []) {
 
 function cleanupGeneratedSessionsSql() {
   return `
+update host_action_notification_previews
+set consumed_at = null,
+    consumed_decision_id = null
+where session_id in (
+  select id from sessions
+  where club_id = ${sqlString(clubId)}
+    and number >= 7
+);
+
+delete from host_action_notification_decisions
+where session_id in (
+  select id from sessions
+  where club_id = ${sqlString(clubId)}
+    and number >= 7
+);
+
+delete from host_action_notification_previews
+where session_id in (
+  select id from sessions
+  where club_id = ${sqlString(clubId)}
+    and number >= 7
+);
+
+delete from member_notifications
+where event_id in (
+  select id from notification_event_outbox
+  where club_id = ${sqlString(clubId)}
+    and aggregate_id in (
+      select id from sessions
+      where club_id = ${sqlString(clubId)}
+        and number >= 7
+    )
+);
+
+delete from notification_deliveries
+where event_id in (
+  select id from notification_event_outbox
+  where club_id = ${sqlString(clubId)}
+    and aggregate_id in (
+      select id from sessions
+      where club_id = ${sqlString(clubId)}
+        and number >= 7
+    )
+);
+
+delete from notification_event_outbox
+where club_id = ${sqlString(clubId)}
+  and aggregate_id in (
+    select id from sessions
+    where club_id = ${sqlString(clubId)}
+      and number >= 7
+  );
+
+delete from session_record_drafts
+where session_id in (
+  select id from sessions
+  where club_id = ${sqlString(clubId)}
+    and number >= 7
+);
+
+update session_record_revisions
+set restored_from_revision_id = null
+where session_id in (
+  select id from sessions
+  where club_id = ${sqlString(clubId)}
+    and number >= 7
+);
+
+delete from session_record_revisions
+where session_id in (
+  select id from sessions
+  where club_id = ${sqlString(clubId)}
+    and number >= 7
+);
+
+delete from host_session_change_audit
+where session_id in (
+  select id from sessions
+  where club_id = ${sqlString(clubId)}
+    and number >= 7
+);
+
 delete from feedback_reports
 where session_id in (
   select id from sessions
@@ -715,6 +798,42 @@ export function countManualNotificationEventsForSession(sessionId: string, event
 select count(*) as count
 from notification_manual_dispatches
 where session_id = ${sqlString(sessionId)}
+  and event_type = ${sqlString(eventType)};
+`);
+  const [, count] = output.trim().split(/\s+/);
+  return Number(count ?? 0);
+}
+
+export async function readSessionRecordRevisionCount(sessionId: string): Promise<number> {
+  const output = runMysql(`
+select count(*) as count
+from session_record_revisions
+where club_id = ${sqlString(clubId)}
+  and session_id = ${sqlString(sessionId)};
+`);
+  const [, count] = output.trim().split(/\s+/);
+  return Number(count ?? 0);
+}
+
+export async function readHostActionDecision(sessionId: string): Promise<"SEND" | "SKIP" | null> {
+  const output = runMysql(`
+select decision
+from host_action_notification_decisions
+where club_id = ${sqlString(clubId)}
+  and session_id = ${sqlString(sessionId)}
+order by created_at desc, id desc
+limit 1;
+`);
+  const [, decision] = output.trim().split(/\s+/);
+  return decision === "SEND" || decision === "SKIP" ? decision : null;
+}
+
+export async function readNotificationEventCount(sessionId: string, eventType: string): Promise<number> {
+  const output = runMysql(`
+select count(*) as count
+from notification_event_outbox
+where club_id = ${sqlString(clubId)}
+  and aggregate_id = ${sqlString(sessionId)}
   and event_type = ${sqlString(eventType)};
 `);
   const [, count] = output.trim().split(/\s+/);

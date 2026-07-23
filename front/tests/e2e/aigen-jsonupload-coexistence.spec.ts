@@ -12,7 +12,11 @@
 
 import { expect, test, type Route } from "@playwright/test";
 import type { ClubAiDefaultResponse } from "@/features/host/aigen/api/aigen-contracts";
-import { hostSessionDetailResponse, routeHostEditorShell } from "./aigen-test-fixtures";
+import {
+  hostSessionDetailResponse,
+  isHostSessionDetailRequest,
+  routeHostEditorShell,
+} from "./aigen-test-fixtures";
 
 const SESSION_ID = "11111111-1111-1111-1111-111111111111";
 const CLUB_SLUG = "club-a";
@@ -29,7 +33,7 @@ test("JSON-upload and AI-generate modes coexist and toggle via URL query params"
   await routeHostEditorShell(page, CLUB_SLUG);
 
   await page.route(`**/api/bff/api/host/sessions/${SESSION_ID}**`, async (route) => {
-    if (route.request().url().includes("/ai-generate")) {
+    if (!isHostSessionDetailRequest(route, SESSION_ID)) {
       await route.fallback();
       return;
     }

@@ -57,10 +57,21 @@ test("host creates member-visible upcoming session then starts it", async ({ pag
 
   await expect(page).toHaveURL(/\/app\/host\/sessions\/.+\/edit/);
   await page.goto("/app/host");
+  const visibilityPreviewResponse = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/bff/api/host/sessions/") &&
+      response.url().includes("/visibility-preview") &&
+      response.status() === 200,
+  );
+  await page.getByRole("button", { name: /E2E 예정 책 공개 범위를 멤버 공개로 변경/ }).click();
+  await visibilityPreviewResponse;
+  await expect(page.getByRole("radio", { name: "알림 보내고 반영" })).not.toBeChecked();
+  await expect(page.getByRole("radio", { name: "알림 없이 반영" })).not.toBeChecked();
+  await page.getByRole("radio", { name: "알림 없이 반영" }).click();
   const visibilityResponse = page.waitForResponse(
     (response) => response.url().includes("/api/bff/api/host/sessions/") && response.url().includes("/visibility") && response.status() === 200,
   );
-  await page.getByRole("button", { name: /E2E 예정 책 공개 범위를 멤버 공개로 변경/ }).click();
+  await page.getByRole("button", { name: "선택대로 반영" }).click();
   await visibilityResponse;
 
   await loginAsDevAccount(page, /멤버1/);

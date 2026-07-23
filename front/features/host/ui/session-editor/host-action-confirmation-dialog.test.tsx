@@ -51,7 +51,9 @@ describe("HostActionConfirmationDialog", () => {
     render(<DialogHarness />);
     await user.click(screen.getByRole("button", { name: "변경사항 검토" }));
 
-    expect(screen.getByRole("dialog")).toHaveAttribute("aria-modal", "true");
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(dialog.parentElement?.parentElement).toBe(document.body);
     expect(screen.getByRole("radio", { name: "알림 보내고 반영" })).not.toBeChecked();
     expect(screen.getByRole("radio", { name: "알림 없이 반영" })).not.toBeChecked();
     expect(screen.getByRole("group", { name: "필수 선택" })).toHaveAttribute("aria-required", "true");

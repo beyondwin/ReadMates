@@ -6,6 +6,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EditHostSessionRoute } from "@/features/host/route/host-session-editor-route";
 import { hostNotificationKeys } from "@/features/host/queries/host-notification-queries";
 import {
+  hostSessionRecordEditorQuery,
+  hostSessionRecordHistoryQuery,
+} from "@/features/host/queries/host-session-record-queries";
+import {
   hostSessionDetailQuery,
   hostSessionManualDispatchesQuery,
 } from "@/features/host/queries/host-session-queries";
@@ -23,6 +27,7 @@ vi.mock("react-router-dom", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react-router-dom")>();
   return {
     ...actual,
+    useBlocker: () => ({ state: "unblocked" }),
     useLoaderData: () => ({ sessionId: "session-7" }),
     useParams: () => ({ clubSlug: "reading-sai", sessionId: "session-7" }),
   };
@@ -79,6 +84,32 @@ describe("EditHostSessionRoute query actions", () => {
     client.setQueryData(
       hostSessionManualDispatchesQuery(
         { sessionId: "session-7", page: { limit: 20 } },
+        { clubSlug: "reading-sai" },
+      ).queryKey,
+      { items: [], nextCursor: null },
+    );
+    client.setQueryData(
+      hostSessionRecordEditorQuery("session-7", { clubSlug: "reading-sai" }).queryKey,
+      {
+        sessionId: "session-7",
+        liveRevision: 0,
+        liveSnapshot: {
+          schema: "readmates-session-record:v1",
+          visibility: "HOST_ONLY",
+          publicationSummary: "",
+          highlights: [],
+          oneLineReviews: [],
+          feedbackDocument: { fileName: "feedback.md", title: "", markdown: "" },
+        },
+        draft: null,
+        draftLiveBaseStale: false,
+        validationSummary: { valid: true, issues: [] },
+      },
+    );
+    client.setQueryData(
+      hostSessionRecordHistoryQuery(
+        "session-7",
+        { limit: 30 },
         { clubSlug: "reading-sai" },
       ).queryKey,
       { items: [], nextCursor: null },

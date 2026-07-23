@@ -10,6 +10,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - **근거 기반 전체 대본 AI 세션 기록:** 호스트가 지원 TXT를 업로드하면 provider 호출 전에 모든 화자를 같은 클럽의 활성 회원과 정확히 맞추고, 전체 대본 한 번의 structured generation으로 네 섹션과 근거 turn ID를 만듭니다. 호스트는 desktop/mobile 근거 panel과 네 섹션 review ledger를 모두 확인한 뒤에만 저장할 수 있습니다.
 - **Spring AI 2 + distributed tracing:** OpenAI/Anthropic/Google 직접 adapter와 legacy pipeline을 제거하고 grounded-only Spring AI 2.0 thin adapter로 통합했습니다. API→Kafka→worker→Spring AI→provider trace를 internal Tempo/Grafana에 연결하되 AI content와 user/session/club identity는 observability 표면에서 제외합니다.
+- **호스트 세션 기록 revision workflow:** `/app/host/sessions` 장부에서 과거 회차를 찾고 기본 정보·출석을 즉시 저장하며, 공개 기록은 공통 초안에서 검토한 뒤 immutable revision으로 적용하거나 과거 revision을 새 초안으로 복원할 수 있습니다.
 
 ### Changed
 
@@ -22,11 +23,14 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - **AI 호출·비용 경계:** application-owned coordinator가 circuit/concurrency permit, single-node Redis atomic slot + worst-case cost reservation, 정확히 한 번의 provider HTTP, `ACTUAL`/`ESTIMATED_UNKNOWN` reconciliation을 순서대로 수행합니다. Retry/fallback/schema correction/grounding repair/regeneration은 모두 최대 3회 물리 호출 예산을 공유하고 redelivery/crash의 uncertain cost를 자동 환불하지 않습니다.
 - **Token/API compatibility:** 내부 비용은 non-cached input/cache-write/cache-read/output 4채널로 계산하지만 public REST response는 기존 input/cachedInput/output 3필드를 유지합니다.
 - **Trace/privacy/ops:** Spring Kafka observation과 Micrometer/OpenTelemetry OTLP를 활성화하고 7일 Tempo, Grafana datasource/exemplar, provider/cost-basis/circuit/exporter metric/alert를 추가했습니다. Local port는 loopback-only이고 OCI app은 `tempo:4318` internal DNS로 export하며 Tempo/OTLP host port는 publish하지 않습니다. Production config sync는 Google paid-tier 확인을 기본 `false`로 렌더링해 미확인 Gemini rollout을 fail closed합니다.
+- **호스트 작업 알림 확인:** 다음 책 공개, 첫 피드백 공개, 이후 기록 수정은 capability가 켜진 환경에서 기본 선택 없는 `SEND`/`SKIP` 확인을 요구합니다. preview 만료·대상 변경·stale revision·중복 요청은 fail closed하고, SEND 이벤트는 notification ledger에서 `HOST_CONFIRMED`로 구분합니다. 예약 리마인더, 멤버 서평, AI ready 자동 흐름은 기존 gate를 유지합니다.
+- **공통 기록 초안:** 수동 편집, 외부 JSON, AI 결과는 모두 live record를 직접 바꾸지 않고 같은 staged draft에 저장됩니다. 적용 작업만 콘텐츠, immutable revision, 결정 ledger, 선택적인 outbox event를 원자적으로 갱신합니다.
 
 ### Database
 
 - **Flyway V37:** content-free `ai_generation_commit_receipts`(`job_id + revision` unique)를 추가하고 `ai_generation_audit_log`에 pipeline/turn/speaker/grounding/review aggregate column을 추가했습니다. Rolling deploy 동안 구 server가 읽지 못하는 값으로 기존 row를 재작성하지 않으며, 새 server가 저장된 `gemini-3-flash` 기본값을 canonical `gemini-3-flash-preview`로 해석합니다. Transcript, member name, result, evidence/excerpt는 MySQL에 저장하지 않습니다.
 - **Flyway V38:** `ai_generation_audit_log`에 nullable trace ID, provider attempt ordinal/call mode, non-null cost basis와 cache-write input token을 additive하게 추가했습니다. 기존 business-audit identity는 유지하지만 prompt/completion/transcript/evidence/raw error는 저장하지 않습니다.
+- **Flyway V39–V41:** 세션 기록 draft/revision, metadata-only 변경 audit, 호스트 작업 preview/decision ledger를 추가하고 AI commit receipt와 draft를 session metadata 및 revision에 안전하게 결속합니다. 저장되는 audit/ledger는 변경 필드·식별자·집계값 중심이며 transcript, AI evidence, 이메일 원문, credential은 저장하지 않습니다.
 
 ### Deployment Notes
 
@@ -34,6 +38,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - Transcript/turns/result/evidence는 6시간 Redis payload로만 유지하고 commit/cancel 후 삭제합니다. MySQL receipt와 Redis revision/lease로 crash window를 복구하며 `COMMITTED + cleanupPending`은 DB write를 반복하지 않고 cleanup만 재시도합니다. Platform admin은 metadata-only 복구만 수행합니다.
 - Rollback은 AI/consumer를 먼저 끄고 6시간 AI TTL을 기다린 뒤 이전 image로 복원합니다. 승인된 job namespace cleanup만 허용하며 Redis 전체 flush나 V38 destructive rollback은 금지합니다.
 - Private transcript를 live provider로 보내는 품질 평가, production mode 변경, deploy는 별도 명시 승인 없이 실행하지 않습니다.
+- 세션 기록 draft와 호스트 작업 알림 확인 capability의 운영 기본값은 꺼져 있습니다. Flyway migration과 호환 server/frontend 배포를 마친 뒤 별도 운영 승인으로만 활성화하며, 이 변경 자체는 production capability를 켜거나 실제 알림을 발송하지 않습니다.
 
 ## v1.17.3 - 2026-07-12
 

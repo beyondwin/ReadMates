@@ -17,6 +17,7 @@ Engineering proof portfolio 분기에서는 아래 순서로 server state migrat
 9. `platform-admin/club-operations` — 클럽 상세 운영 snapshot을 loader-seeded Query read model로 분리합니다.
 10. `platform-admin/support` — support search, grant ledger, grant create/revoke mutation cache ownership을 support route module로 분리합니다.
 11. `platform-admin/audit` — 통합 감사 ledger를 loader-seeded Query read model로 분리합니다. Filter URL state는 S8 analytics가 재사용할 date range, club scope, source slice, action category, actor role, outcome vocabulary를 따릅니다.
+12. `host/session-records` — 전체 회차 장부, record editor, cursor history, draft save/apply/restore와 호스트 작업 알림 preview/decision을 club-scoped Query cache와 route-owned mutation으로 분리합니다.
 
 각 migration은 UI 컴포넌트가 API를 직접 호출하지 않는다는 route-first 경계를 유지해야 합니다.
 
@@ -35,6 +36,7 @@ Engineering proof portfolio 분기에서는 아래 순서로 server state migrat
 - `platform-admin/club-operations` — selected club operations snapshot is loader-seeded and Query-owned
 - `platform-admin/support` — support search, active grant ledger, grant create, and revoke invalidation are Query-owned
 - `platform-admin/audit` — platform/club/notification replay/AI audit source를 Query-owned cursor ledger로 조회하고, route loader seeding과 safe metadata detail rendering을 적용합니다.
+- `host/session-records` — `/app/host/sessions` 장부, editor live/draft projection, cursor history, draft save/apply/restore, host-action preview/confirm이 Query-owned이며 성공 mutation은 장부·editor·history·member/public record surface를 범위에 맞게 invalidate합니다. JSON/AI commit receipt의 draft revision도 editor cache와 동기화합니다.
 
 ## 패턴
 - query: `features/<feature>/queries/<area>-queries.ts` 에 `queryOptions` + `useXxxMutation` export

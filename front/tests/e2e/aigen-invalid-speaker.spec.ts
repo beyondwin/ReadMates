@@ -2,6 +2,7 @@ import { expect, test, type Route } from "@playwright/test";
 import {
   groundedTranscript,
   hostSessionDetailResponse,
+  isHostSessionDetailRequest,
   routeHostEditorShell,
 } from "./aigen-test-fixtures";
 
@@ -16,7 +17,7 @@ async function json(route: Route, status: number, body: unknown): Promise<void> 
 test("unknown speaker is corrected before a job exists and explicit resubmit starts polling", async ({ page }) => {
   await routeHostEditorShell(page, CLUB_SLUG);
   await page.route(`**/api/bff/api/host/sessions/${SESSION_ID}**`, async (route) => {
-    if (route.request().url().includes("/ai-generate")) return route.fallback();
+    if (!isHostSessionDetailRequest(route, SESSION_ID)) return route.fallback();
     await json(route, 200, hostSessionDetailResponse(SESSION_ID));
   });
 

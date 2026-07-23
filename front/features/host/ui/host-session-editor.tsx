@@ -300,6 +300,7 @@ export default function HostSessionEditor({
   // Derived values
   // ---------------------------------------------------------------------------
   const deadline = questionDeadlineLabelForForm(session, date);
+  const sessionImportVisibility = recordWorkflow?.snapshot.visibility ?? recordVisibility;
   const isNewSession = session === null || session === undefined;
   const editorTitle = isNewSession ? "세션 문서 만들기" : "세션 문서 편집";
   const primarySaveLabel = isNewSession ? "세션 문서 저장" : "변경 사항 저장";
@@ -743,7 +744,7 @@ export default function HostSessionEditor({
         const sourceJson = await readTextFile(file);
         const request = buildSessionImportRequest(
           sourceJson,
-          recordVisibility,
+          sessionImportVisibility,
           recordWorkflow?.expectedDraftRevision ?? null,
         );
         const preview = await actions.previewSessionImport(session.sessionId, request);
@@ -760,7 +761,7 @@ export default function HostSessionEditor({
         input.value = "";
       }
     },
-    [session, recordVisibility, actions, recordWorkflow],
+    [session, sessionImportVisibility, actions, recordWorkflow],
   );
 
   const commitSessionImport = useCallback(async () => {
@@ -991,7 +992,7 @@ export default function HostSessionEditor({
                 feedbackDocument={feedbackDocumentForPanel}
                 previewState={feedbackPreviewState}
                 LinkComponent={LinkComponent}
-                recordVisibility={recordVisibility}
+                recordVisibility={sessionImportVisibility}
                 preview={sessionImportPreview}
                 commitResult={sessionImportCommitResult}
                 status={sessionImportStatus}
