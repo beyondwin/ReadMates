@@ -20,7 +20,7 @@ describe("SessionImportPanelBody", () => {
     expect(within(review).getByText("피드백 문서 구조 확인 완료")).toBeInTheDocument();
     expect(screen.getByText("현재 선택한 공개 범위: MEMBER")).toBeInTheDocument();
 
-    const button = screen.getByRole("button", { name: "가져온 기록 저장" });
+    const button = screen.getByRole("button", { name: "초안으로 가져오기" });
     expect(button).toBeEnabled();
     fireEvent.click(button);
     expect(onCommit).toHaveBeenCalledTimes(1);
@@ -40,7 +40,7 @@ describe("SessionImportPanelBody", () => {
     expect(within(review).getByText("작성자 1개 확인 필요")).toBeInTheDocument();
     expect(within(review).getByText("긴 이름을 가진 외부 작성자")).toBeInTheDocument();
     expect(within(review).getByText("기록 공개 범위를 MEMBER 또는 PUBLIC으로 바꾼 뒤 저장할 수 있습니다.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "가져온 기록 저장" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "초안으로 가져오기" })).toBeDisabled();
   });
 
   it("renders server issue messages but not issue codes or raw json", () => {
@@ -58,7 +58,7 @@ describe("SessionImportPanelBody", () => {
     expect(within(review).getByText("피드백 문서 heading을 확인해 주세요.")).toBeInTheDocument();
     expect(screen.queryByText("ADMIN_ROUTE")).toBeNull();
     expect(screen.queryByText("{\"")).toBeNull();
-    expect(screen.getByRole("button", { name: "가져온 기록 저장" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "초안으로 가져오기" })).toBeDisabled();
   });
 
   it("renders the commit result ledger after a successful import", () => {
@@ -67,15 +67,15 @@ describe("SessionImportPanelBody", () => {
       commitResult: commitResult(),
     });
 
-    const result = screen.getByRole("region", { name: "세션 기록 저장 결과" });
-    expect(within(result).getByText("저장 완료")).toBeInTheDocument();
-    expect(within(result).getByText("가져온 세션 기록을 저장했습니다.")).toBeInTheDocument();
+    const result = screen.getByRole("region", { name: "세션 기록 초안 저장 결과" });
+    expect(within(result).getByText("초안 저장 완료")).toBeInTheDocument();
+    expect(within(result).getByText("가져온 세션 기록을 공유 초안으로 저장했습니다.")).toBeInTheDocument();
     expect(within(result).getByText(/멤버 공개/)).toBeInTheDocument();
-    expect(within(result).getByText("공개 요약 교체")).toBeInTheDocument();
-    expect(within(result).getByText("하이라이트 1개 저장")).toBeInTheDocument();
-    expect(within(result).getByText("한줄평 2개 저장")).toBeInTheDocument();
-    expect(within(result).getByText("피드백 문서 저장: 독서모임 7차 피드백")).toBeInTheDocument();
-    expect(within(result).getByText("멤버는 아카이브와 피드백 문서에서 이 기록을 이어 읽을 수 있습니다.")).toBeInTheDocument();
+    expect(within(result).getByText("공개 요약 초안 교체")).toBeInTheDocument();
+    expect(within(result).getByText("하이라이트 1개 초안 저장")).toBeInTheDocument();
+    expect(within(result).getByText("한줄평 2개 초안 저장")).toBeInTheDocument();
+    expect(within(result).getByText("피드백 문서 초안 저장: 독서모임 7차 피드백")).toBeInTheDocument();
+    expect(within(result).getByText("검토 후 변경사항을 반영하기 전까지 멤버와 공개 화면은 바뀌지 않습니다.")).toBeInTheDocument();
   });
 
   it("keeps commit result rendering public safe", () => {
@@ -83,11 +83,11 @@ describe("SessionImportPanelBody", () => {
       preview: preview({ valid: true }),
       commitResult: {
         ...commitResult(),
-        items: ["공개 요약 교체", "피드백 문서 저장: 독서모임 7차 피드백"],
+        items: ["공개 요약 초안 교체", "피드백 문서 초안 저장: 독서모임 7차 피드백"],
       },
     });
 
-    expect(screen.getByRole("region", { name: "세션 기록 저장 결과" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "세션 기록 초안 저장 결과" })).toBeInTheDocument();
     expect(screen.queryByText("PRIVATE_MEMBER_EMAIL")).not.toBeInTheDocument();
     expect(screen.queryByText("{\"raw\"")).not.toBeInTheDocument();
   });
@@ -121,16 +121,16 @@ function renderPanel({
 function commitResult(): SessionImportCommitResult {
   return {
     tone: "success",
-    title: "저장 완료",
-    message: "가져온 세션 기록을 저장했습니다.",
+    title: "초안 저장 완료",
+    message: "가져온 세션 기록을 공유 초안으로 저장했습니다.",
     visibilityLabel: "멤버 공개",
     items: [
-      "공개 요약 교체",
-      "하이라이트 1개 저장",
-      "한줄평 2개 저장",
-      "피드백 문서 저장: 독서모임 7차 피드백",
+      "공개 요약 초안 교체",
+      "하이라이트 1개 초안 저장",
+      "한줄평 2개 초안 저장",
+      "피드백 문서 초안 저장: 독서모임 7차 피드백",
     ],
-    nextAction: "멤버는 아카이브와 피드백 문서에서 이 기록을 이어 읽을 수 있습니다.",
+    nextAction: "검토 후 변경사항을 반영하기 전까지 멤버와 공개 화면은 바뀌지 않습니다.",
   };
 }
 

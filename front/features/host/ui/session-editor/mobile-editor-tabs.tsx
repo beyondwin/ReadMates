@@ -1,6 +1,6 @@
 import type { KeyboardEvent } from "react";
 
-export type MobileEditorSection = "basic" | "publish" | "attendance" | "report";
+export type MobileEditorSection = "basic" | "attendance" | "records" | "history";
 
 export const mobileEditorSections: { key: MobileEditorSection; label: string; tabId: string; panelIds: string[] }[] = [
   {
@@ -10,22 +10,26 @@ export const mobileEditorSections: { key: MobileEditorSection; label: string; ta
     panelIds: ["host-editor-panel-basic-info", "host-editor-panel-basic-schedule"],
   },
   {
-    key: "publish",
-    label: "공개",
-    tabId: "host-editor-tab-publish",
-    panelIds: ["host-editor-panel-publish"],
-  },
-  {
     key: "attendance",
     label: "출석",
     tabId: "host-editor-tab-attendance",
     panelIds: ["host-editor-panel-attendance"],
   },
   {
-    key: "report",
-    label: "문서",
-    tabId: "host-editor-tab-report",
-    panelIds: ["host-editor-panel-session-record-completion"],
+    key: "records",
+    label: "공개 기록",
+    tabId: "host-editor-tab-records",
+    panelIds: [
+      "host-editor-panel-publish",
+      "host-editor-panel-records",
+      "host-editor-panel-session-record-completion",
+    ],
+  },
+  {
+    key: "history",
+    label: "변경 이력",
+    tabId: "host-editor-tab-history",
+    panelIds: ["host-editor-panel-history"],
   },
 ];
 

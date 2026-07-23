@@ -279,15 +279,9 @@ describe("host session mutation hooks", () => {
   it("invalidates the full host session surface after import commit", async () => {
     vi.mocked(commitHostSessionImport).mockResolvedValue({
       sessionId: "session-7",
-      publication: { summary: "세션 요약" },
-      highlights: [],
-      oneLineReviews: [],
-      feedbackDocument: {
-        uploaded: true,
-        fileName: "session-7.md",
-        title: "세션 기록",
-        uploadedAt: "2026-05-18T00:00:00Z",
-      },
+      draftRevision: 2,
+      baseLiveRevision: 1,
+      liveApplied: false,
     });
     const { client, Wrapper } = createWrapper();
     const invalidateSpy = vi.spyOn(client, "invalidateQueries");

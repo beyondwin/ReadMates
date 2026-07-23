@@ -69,7 +69,7 @@ export function SessionRecordCompletionPanel({
     <Panel
       eyebrow="세션 기록"
       title="세션 기록 완성"
-      mobileSection="report"
+      mobileSection="records"
       panelId="host-editor-panel-session-record-completion"
       activeMobileSection={activeMobileSection}
     >

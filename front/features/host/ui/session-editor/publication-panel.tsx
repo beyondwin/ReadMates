@@ -51,7 +51,7 @@ export const PublicationPanel = memo(function PublicationPanel({
       eyebrow="기록 · 공개 범위"
       title="기록 공개 범위"
       tone="warn"
-      mobileSection="publish"
+      mobileSection="records"
       panelId="host-editor-panel-publish"
       activeMobileSection={activeMobileSection}
     >

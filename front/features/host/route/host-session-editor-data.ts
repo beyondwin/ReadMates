@@ -6,10 +6,15 @@ import {
   hostSessionDetailQuery,
   hostSessionManualDispatchesQuery,
 } from "@/features/host/queries/host-session-queries";
+import {
+  hostSessionRecordEditorQuery,
+  hostSessionRecordHistoryQuery,
+} from "@/features/host/queries/host-session-record-queries";
 import { requireHostLoaderAuth } from "./host-loader-auth";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 
 const EDITOR_MANUAL_DISPATCH_PAGE_LIMIT = 20;
+const EDITOR_HISTORY_PAGE_LIMIT = 30;
 
 export type HostSessionEditorRouteData = {
   sessionId: string;
@@ -29,6 +34,12 @@ export function hostSessionEditorLoaderFactory(client: QueryClient) {
       client.fetchQuery(hostSessionDetailQuery(params.sessionId, context)),
       client.fetchQuery(hostSessionManualDispatchesQuery(
         { sessionId: params.sessionId, page: { limit: EDITOR_MANUAL_DISPATCH_PAGE_LIMIT } },
+        context,
+      )),
+      client.fetchQuery(hostSessionRecordEditorQuery(params.sessionId, context)),
+      client.fetchQuery(hostSessionRecordHistoryQuery(
+        params.sessionId,
+        { limit: EDITOR_HISTORY_PAGE_LIMIT },
         context,
       )),
     ]);

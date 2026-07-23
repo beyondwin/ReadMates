@@ -410,13 +410,13 @@ export function AiGenerateTab({ sessionId, onCommitted }: AiGenerateTabProps) {
     const count = stage.result?.participantUpdatesCount;
     return (
       <div className="small" role="status">
-        AI 기록 저장을 완료했습니다. {typeof count === "number" ? `참여 상태 ${count}건을 동기화했습니다.` : "참여 상태 동기화도 확인했습니다."}
+        AI 기록을 공유 초안으로 저장했습니다. {typeof count === "number" ? `참여 상태 ${count}건을 확인했습니다.` : "검토 후 반영할 수 있습니다."}
       </div>
     );
   }
 
   if (stage.tag === "active") {
-    if (jobStatus === "COMMITTING") return <div className="small" role="status">AI 기록을 저장하는 중입니다.</div>;
+    if (jobStatus === "COMMITTING") return <div className="small" role="status">AI 기록을 초안으로 저장하는 중입니다.</div>;
     if (jobStatus === "COMMIT_RETRY") {
       return <div className="stack" style={{ "--stack": "8px" } as CSSProperties} role="status"><h2 style={{ margin: 0 }}>커밋 확인 중</h2><p className="small" style={{ color: "var(--text-2)", margin: 0 }}>기록 저장 영수증과 참여 상태 동기화를 확인하고 있습니다. 페이지를 유지하면 안전하게 다시 확인합니다.</p></div>;
     }

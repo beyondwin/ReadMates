@@ -324,7 +324,7 @@ export function PreviewView(props: PreviewViewProps) {
       ) : null}
       {commitError ? <div className="small" role="alert" style={{ color: "var(--danger)" }}>{commitError}</div> : null}
       <button type="button" className="btn btn-primary" onClick={onCommit} disabled={committing || Boolean(revisionConflict) || (grounded && !commitEnabled)}>
-        {committing ? "저장 중…" : "AI 기록 저장"}
+        {committing ? "초안 저장 중…" : "초안으로 저장"}
       </button>
 
       {regenItem ? (

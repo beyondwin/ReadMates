@@ -587,17 +587,9 @@ export type SessionImportPreviewResponse = {
 
 export type SessionImportCommitResponse = {
   sessionId: string;
-  publication: {
-    summary: string;
-  };
-  highlights: SessionImportRecordPreview[];
-  oneLineReviews: SessionImportRecordPreview[];
-  feedbackDocument: {
-    uploaded: boolean;
-    fileName: string;
-    title: string;
-    uploadedAt: string | null;
-  };
+  draftRevision: number;
+  baseLiveRevision: number;
+  liveApplied: boolean;
 };
 
 export type HostSessionDetailResponse = {

@@ -67,8 +67,37 @@ import {
   SessionRecordCompletionPanel,
   type SessionRecordCompletionMode,
 } from "./session-editor/session-record-completion-panel";
+import {
+  SessionRecordDraftPanel,
+  type DraftSaveState,
+  type SessionRecordDraftSnapshot,
+} from "./session-editor/session-record-draft-panel";
+import {
+  SessionHistoryPanel,
+  type SessionHistoryPanelItem,
+} from "./session-editor/session-history-panel";
 
 export type { HostSessionEditorLinkComponent } from "./session-editor/session-editor-links";
+
+type HostSessionRecordWorkflow = {
+  editor: {
+    liveSnapshot: SessionRecordDraftSnapshot;
+    draftLiveBaseStale: boolean;
+    validationSummary: { valid: boolean; issues: string[] };
+  };
+  history: SessionHistoryPanelItem[];
+  snapshot: SessionRecordDraftSnapshot;
+  saveState: DraftSaveState;
+  expectedDraftRevision: number | null;
+  restoring: boolean;
+  onSnapshotChange: (snapshot: SessionRecordDraftSnapshot) => void;
+  onReloadDraft: () => void | Promise<void>;
+  onCopyInput: () => void | Promise<void>;
+  onRestore: (request: {
+    revisionId: string;
+    expectedDraftRevision: number | null;
+  }) => void | Promise<void>;
+};
 
 const emptyManagementMessage = "세션을 만든 뒤 참석과 피드백 문서를 관리할 수 있습니다.";
 
@@ -133,6 +162,7 @@ export default function HostSessionEditor({
   hostDashboardReturnTarget = defaultHostDashboardReturnTarget,
   readmatesReturnState = defaultReadmatesReturnState,
   onSessionRecordsChanged,
+  recordWorkflow,
 }: {
   session?: HostSessionDetailResponse | null;
   notificationDispatches?: ManualNotificationDispatchListItem[];
@@ -143,6 +173,7 @@ export default function HostSessionEditor({
   hostDashboardReturnTarget?: ReadmatesReturnTarget;
   readmatesReturnState?: (target: ReadmatesReturnTarget) => ReadmatesReturnState;
   onSessionRecordsChanged?: (sessionId: string) => void | Promise<void>;
+  recordWorkflow?: HostSessionRecordWorkflow;
 }) {
   // ---------------------------------------------------------------------------
   // Form state (reducer)
@@ -215,9 +246,10 @@ export default function HostSessionEditor({
 
   const handleAigenCommitted = useCallback(() => {
     if (sessionIdForAigen) {
+      void recordWorkflow?.onReloadDraft();
       void onSessionRecordsChanged?.(sessionIdForAigen);
     }
-  }, [onSessionRecordsChanged, sessionIdForAigen]);
+  }, [onSessionRecordsChanged, recordWorkflow, sessionIdForAigen]);
 
   // ---------------------------------------------------------------------------
   // Refs
@@ -705,30 +737,24 @@ export default function HostSessionEditor({
 
     try {
       const committed = await actions.commitSessionImport(session.sessionId, sessionImportRequest);
-      const commitResult = buildSessionImportCommitResult(committed, sessionImportRequest.recordVisibility);
-      dispatch({
-        type: "PUBLICATION_SAVED",
-        publicSummary: committed.publication.summary,
-        visibility: sessionImportRequest.recordVisibility,
-      });
-      dispatch({
-        type: "FEEDBACK_DOCUMENT_UPDATED",
-        feedbackDocument: {
-          uploaded: committed.feedbackDocument.uploaded,
-          fileName: committed.feedbackDocument.fileName,
-          uploadedAt: committed.feedbackDocument.uploadedAt,
-        },
-      });
+      const commitResult = buildSessionImportCommitResult(
+        committed,
+        sessionImportPreview,
+        sessionImportRequest.recordVisibility,
+      );
+      if (recordWorkflow) {
+        await recordWorkflow.onReloadDraft();
+      }
       setSessionImportStatus("idle");
       setSessionImportPreview(null);
       setSessionImportRequest(null);
       setSessionImportCommitResult(commitResult);
-      flash("가져온 세션 기록을 저장했습니다");
+      flash("가져온 세션 기록을 초안으로 저장했습니다");
     } catch {
       setSessionImportStatus("error");
       setSessionImportError(sessionImportFailureMessage("commit-network"));
     }
-  }, [session, sessionImportRequest, sessionImportPreview, sessionImportStatus, actions, flash]);
+  }, [session, sessionImportRequest, sessionImportPreview, sessionImportStatus, actions, flash, recordWorkflow]);
 
   const feedbackDocumentForPanel = feedbackDocumentUploadStatus(feedbackDocument);
 
@@ -876,23 +902,25 @@ export default function HostSessionEditor({
                 onMeetingPasscodeChange={onMeetingPasscodeChange}
               />
 
-              <PublicationPanel
-                activeMobileSection={activeMobileSection}
-                session={session}
-                sessionState={sessionState}
-                recordVisibility={recordVisibility}
-                recordSaveInFlight={recordSaveInFlight}
-                lifecycleSaveState={lifecycleSaveState}
-                summary={summary}
-                publicationFeedback={publicationFeedback}
-                publicationLifecycleHelp={publicationLifecycleHelp}
-                onRecordVisibilityChange={onRecordVisibilityChange}
-                onSummaryChange={onSummaryChange}
-                onPublicationFeedbackChange={setPublicationFeedback}
-                onSavePublication={savePublication}
-                onCloseSession={closeSession}
-                onPublishRecord={publishRecord}
-              />
+              {!recordWorkflow ? (
+                <PublicationPanel
+                  activeMobileSection={activeMobileSection}
+                  session={session}
+                  sessionState={sessionState}
+                  recordVisibility={recordVisibility}
+                  recordSaveInFlight={recordSaveInFlight}
+                  lifecycleSaveState={lifecycleSaveState}
+                  summary={summary}
+                  publicationFeedback={publicationFeedback}
+                  publicationLifecycleHelp={publicationLifecycleHelp}
+                  onRecordVisibilityChange={onRecordVisibilityChange}
+                  onSummaryChange={onSummaryChange}
+                  onPublicationFeedbackChange={setPublicationFeedback}
+                  onSavePublication={savePublication}
+                  onCloseSession={closeSession}
+                  onPublishRecord={publishRecord}
+                />
+              ) : null}
 
               <AttendancePanel
                 activeMobileSection={activeMobileSection}
@@ -901,6 +929,20 @@ export default function HostSessionEditor({
                 emptyMessage={emptyManagementMessage}
                 onUpdateAttendance={updateAttendance}
               />
+
+              {recordWorkflow ? (
+                <SessionRecordDraftPanel
+                  activeMobileSection={activeMobileSection}
+                  liveSnapshot={recordWorkflow.editor.liveSnapshot}
+                  snapshot={recordWorkflow.snapshot}
+                  saveState={recordWorkflow.saveState}
+                  validationIssues={recordWorkflow.editor.validationSummary.issues}
+                  draftLiveBaseStale={recordWorkflow.editor.draftLiveBaseStale}
+                  onSnapshotChange={recordWorkflow.onSnapshotChange}
+                  onReloadDraft={recordWorkflow.onReloadDraft}
+                  onCopyInput={recordWorkflow.onCopyInput}
+                />
+              ) : null}
 
               <SessionRecordCompletionPanel
                 activeMobileSection={activeMobileSection}
@@ -920,6 +962,14 @@ export default function HostSessionEditor({
                 onAigenCommitted={handleAigenCommitted}
                 onFileSelected={previewSessionImport}
                 onCommit={commitSessionImport}
+              />
+
+              <SessionHistoryPanel
+                activeMobileSection={activeMobileSection}
+                items={recordWorkflow?.history ?? []}
+                expectedDraftRevision={recordWorkflow?.expectedDraftRevision ?? null}
+                restoring={recordWorkflow?.restoring ?? false}
+                onRestore={recordWorkflow?.onRestore ?? (() => undefined)}
               />
             </form>
 

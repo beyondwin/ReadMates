@@ -92,22 +92,24 @@ const hostSessionEditorTestActions = {
     valid: true,
     session: { sessionNumber: request.session.number, bookTitle: request.session.bookTitle, meetingDate: request.session.meetingDate },
     publication: { summary: request.publication.summary },
-    highlights: [],
-    oneLineReviews: [],
+    highlights: request.highlights.map((record, index) => ({
+      ...record,
+      authorMatched: true,
+      membershipId: `membership-highlight-${index + 1}`,
+    })),
+    oneLineReviews: request.oneLineReviews.map((record, index) => ({
+      ...record,
+      authorMatched: true,
+      membershipId: `membership-review-${index + 1}`,
+    })),
     feedbackDocument: { fileName: request.feedbackDocument.fileName, title: "독서모임 7차 피드백", valid: true },
     issues: [],
   }),
-  commitSessionImport: async (sessionId, request: SessionImportRequest) => ({
+  commitSessionImport: async (sessionId) => ({
     sessionId,
-    publication: { summary: request.publication.summary },
-    highlights: [],
-    oneLineReviews: [],
-    feedbackDocument: {
-      uploaded: true,
-      fileName: request.feedbackDocument.fileName,
-      title: "독서모임 7차 피드백",
-      uploadedAt: "2026-05-15T00:00:00Z",
-    },
+    draftRevision: 1,
+    baseLiveRevision: 0,
+    liveApplied: false,
   }),
 } satisfies HostSessionEditorActions;
 
@@ -273,24 +275,25 @@ describe("HostSessionEditor", () => {
     expect(screen.getByText("세션 기본 정보는 변경 사항 저장 버튼으로 저장하고, 기록 공개 범위와 피드백 문서는 각 섹션에서 따로 저장합니다.")).toBeVisible();
   });
 
-  it("switches the mobile editor between basic, publish, attendance, and feedback document contexts", async () => {
+  it("switches the mobile editor between basic, attendance, records, and history contexts", async () => {
     const user = userEvent.setup();
     const { container } = render(<HostSessionEditorForTest session={session} />);
 
     const segments = screen.getByTestId("host-editor-mobile-segments");
     const basic = screen.getByRole("tab", { name: "기본" });
-    const publish = screen.getByRole("tab", { name: "공개" });
     const attendance = screen.getByRole("tab", { name: "출석" });
-    const report = screen.getByRole("tab", { name: "문서" });
+    const records = screen.getByRole("tab", { name: "공개 기록" });
+    const history = screen.getByRole("tab", { name: "변경 이력" });
     const basicPanels = Array.from(container.querySelectorAll('[data-mobile-editor-section="basic"]'));
-    const publishPanel = container.querySelector('[data-mobile-editor-section="publish"]');
+    const recordsPanels = Array.from(container.querySelectorAll('[data-mobile-editor-section="records"]'));
+    const historyPanel = container.querySelector('[data-mobile-editor-section="history"]');
 
     expect(segments).toHaveAttribute("role", "tablist");
     expect(Array.from(segments.querySelectorAll('[role="tab"]')).map((button) => button.textContent)).toEqual([
       "기본",
-      "공개",
       "출석",
-      "문서",
+      "공개 기록",
+      "변경 이력",
     ]);
     expect(basic).toHaveAttribute("aria-selected", "true");
     expect(basic).toHaveAttribute("aria-controls", "host-editor-panel-basic-info host-editor-panel-basic-schedule");
@@ -303,7 +306,7 @@ describe("HostSessionEditor", () => {
       background: "var(--text)",
       color: "var(--bg)",
     });
-    expect(publish).toHaveStyle({
+    expect(records).toHaveStyle({
       minHeight: "32px",
       height: "32px",
       padding: "0 14px",
@@ -319,20 +322,20 @@ describe("HostSessionEditor", () => {
       expect(panel).toHaveClass("is-mobile-active");
     });
     expect(basicPanels.map((panel) => panel.id)).toEqual(["host-editor-panel-basic-info", "host-editor-panel-basic-schedule"]);
-    expect(publishPanel).not.toHaveClass("is-mobile-active");
+    recordsPanels.forEach((panel) => expect(panel).not.toHaveClass("is-mobile-active"));
 
-    await user.click(publish);
-    expect(publish).toHaveAttribute("aria-selected", "true");
+    await user.click(records);
+    expect(records).toHaveAttribute("aria-selected", "true");
     basicPanels.forEach((panel) => expect(panel).not.toHaveClass("is-mobile-active"));
-    expect(publishPanel).toHaveClass("is-mobile-active");
+    recordsPanels.forEach((panel) => expect(panel).toHaveClass("is-mobile-active"));
 
     await user.click(attendance);
     expect(attendance).toHaveAttribute("aria-selected", "true");
     expect(container.querySelector('[data-mobile-editor-section="attendance"]')).toHaveClass("is-mobile-active");
 
-    await user.click(report);
-    expect(report).toHaveAttribute("aria-selected", "true");
-    expect(container.querySelector('[data-mobile-editor-section="report"]')).toHaveClass("is-mobile-active");
+    await user.click(history);
+    expect(history).toHaveAttribute("aria-selected", "true");
+    expect(historyPanel).toHaveClass("is-mobile-active");
   });
 
   it("supports keyboard selection in the mobile editor tablist", async () => {
@@ -340,25 +343,25 @@ describe("HostSessionEditor", () => {
     render(<HostSessionEditorForTest session={session} />);
 
     const basic = screen.getByRole("tab", { name: "기본" });
-    const publish = screen.getByRole("tab", { name: "공개" });
-    const report = screen.getByRole("tab", { name: "문서" });
+    const attendance = screen.getByRole("tab", { name: "출석" });
+    const history = screen.getByRole("tab", { name: "변경 이력" });
 
     basic.focus();
     await user.keyboard("{ArrowRight}");
-    await waitFor(() => expect(publish).toHaveFocus());
-    expect(publish).toHaveAttribute("aria-selected", "true");
+    await waitFor(() => expect(attendance).toHaveFocus());
+    expect(attendance).toHaveAttribute("aria-selected", "true");
 
     await user.keyboard("{End}");
-    await waitFor(() => expect(report).toHaveFocus());
-    expect(report).toHaveAttribute("aria-selected", "true");
+    await waitFor(() => expect(history).toHaveFocus());
+    expect(history).toHaveAttribute("aria-selected", "true");
 
     await user.keyboard("{Home}");
     await waitFor(() => expect(basic).toHaveFocus());
     expect(basic).toHaveAttribute("aria-selected", "true");
 
     await user.keyboard("{ArrowLeft}");
-    await waitFor(() => expect(report).toHaveFocus());
-    expect(report).toHaveAttribute("aria-selected", "true");
+    await waitFor(() => expect(history).toHaveFocus());
+    expect(history).toHaveAttribute("aria-selected", "true");
   });
 
   it("shows a new-session empty message instead of static attendance and feedback document controls", () => {
@@ -503,7 +506,7 @@ describe("HostSessionEditor", () => {
 
     await waitFor(() => expect(previewSessionImport).toHaveBeenCalledTimes(1));
     expect(screen.getByText("Import summary.")).toBeVisible();
-    expect(screen.getByRole("button", { name: "가져온 기록 저장" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "초안으로 가져오기" })).toBeEnabled();
   });
 
   it("commits a valid session import preview and refreshes editor state", async () => {
@@ -521,28 +524,19 @@ describe("HostSessionEditor", () => {
       screen.getByLabelText("AI 결과 JSON 가져오기"),
       new File([sessionImportJson()], "session-import.json", { type: "application/json" }),
     );
-    await user.click(await screen.findByRole("button", { name: "가져온 기록 저장" }));
+    await user.click(await screen.findByRole("button", { name: "초안으로 가져오기" }));
 
     await waitFor(() => expect(commitSessionImport).toHaveBeenCalledTimes(1));
-    expect(screen.getAllByText(/가져온 세션 기록을 저장했습니다/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/가져온 세션 기록을 (공유 )?초안으로 저장했습니다/).length).toBeGreaterThan(0);
   });
 
   it("shows the session import commit result inside the import panel", async () => {
     const user = userEvent.setup();
-    const commitSessionImport = vi.fn(async (sessionId: string, request: SessionImportRequest) => ({
+    const commitSessionImport = vi.fn(async (sessionId: string) => ({
       sessionId,
-      publication: { summary: request.publication.summary },
-      highlights: [{ authorName: "호스트", text: "Import highlight.", authorMatched: true, membershipId: "membership-host" }],
-      oneLineReviews: [
-        { authorName: "호스트", text: "Import one line.", authorMatched: true, membershipId: "membership-host" },
-        { authorName: "멤버", text: "Import second line.", authorMatched: true, membershipId: "membership-member" },
-      ],
-      feedbackDocument: {
-        uploaded: true,
-        fileName: "PRIVATE_MEMBER_EMAIL-session-import.md",
-        title: "독서모임 7차 피드백",
-        uploadedAt: "2026-05-15T00:00:00Z",
-      },
+      draftRevision: 2,
+      baseLiveRevision: 0,
+      liveApplied: false,
     }));
 
     render(
@@ -556,14 +550,14 @@ describe("HostSessionEditor", () => {
       screen.getByLabelText("AI 결과 JSON 가져오기"),
       new File([sessionImportJson()], "session-import.json", { type: "application/json" }),
     );
-    await user.click(await screen.findByRole("button", { name: "가져온 기록 저장" }));
+    await user.click(await screen.findByRole("button", { name: "초안으로 가져오기" }));
 
-    const result = await screen.findByRole("region", { name: "세션 기록 저장 결과" });
-    expect(within(result).getByText("저장 완료")).toBeVisible();
+    const result = await screen.findByRole("region", { name: "세션 기록 초안 저장 결과" });
+    expect(within(result).getByText("초안 저장 완료")).toBeVisible();
     expect(within(result).getByText(/외부 공개/)).toBeVisible();
-    expect(within(result).getByText("하이라이트 1개 저장")).toBeVisible();
-    expect(within(result).getByText("한줄평 2개 저장")).toBeVisible();
-    expect(within(result).getByText("피드백 문서 저장: 독서모임 7차 피드백")).toBeVisible();
+    expect(within(result).getByText("하이라이트 1개 초안 저장")).toBeVisible();
+    expect(within(result).getByText("한줄평 1개 초안 저장")).toBeVisible();
+    expect(within(result).getByText("피드백 문서 초안 저장: 독서모임 7차 피드백")).toBeVisible();
     expect(screen.queryByText("PRIVATE_MEMBER_EMAIL")).not.toBeInTheDocument();
   });
 
@@ -843,7 +837,7 @@ describe("HostSessionEditor", () => {
 
     render(<HostSessionEditorForTest session={{ ...session, publication: null }} />);
 
-    const publicationStatusRow = screen.getByText("공개 기록").closest(".row-between");
+    const publicationStatusRow = screen.getByText("기록 없음").closest(".row-between");
     expect(publicationStatusRow).not.toBeNull();
     expect(within(publicationStatusRow as HTMLElement).getByText("기록 없음")).toBeVisible();
 

@@ -64,7 +64,7 @@ export function SessionImportPanelBody({
       {review && preview ? <SessionImportReviewCard review={review} summary={preview.publication.summary} /> : null}
       {commitResult ? <SessionImportCommitResultCard result={commitResult} /> : null}
       <button className="btn btn-primary" type="button" disabled={!canCommit} onClick={onCommit}>
-        {status === "committing" ? "가져온 기록 저장 중" : "가져온 기록 저장"}
+        {status === "committing" ? "초안으로 가져오는 중" : "초안으로 가져오기"}
       </button>
       <div className="tiny">현재 선택한 공개 범위: {recordVisibility}</div>
     </div>
@@ -137,7 +137,7 @@ function SessionImportCommitResultCard({ result }: { result: SessionImportCommit
     <section
       className="surface-quiet"
       role="region"
-      aria-label="세션 기록 저장 결과"
+      aria-label="세션 기록 초안 저장 결과"
       style={{ padding: 16, overflowWrap: "anywhere" }}
     >
       <div className="row-between" style={{ gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
@@ -180,7 +180,7 @@ export function SessionImportPanel({
     <Panel
       eyebrow="AI 결과 JSON"
       title="세션 기록 가져오기"
-      mobileSection="report"
+      mobileSection="records"
       panelId="host-editor-panel-session-import"
       activeMobileSection={activeMobileSection}
     >

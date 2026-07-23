@@ -146,34 +146,33 @@ describe("session import model", () => {
     const result = buildSessionImportCommitResult(
       {
         sessionId: "session-7",
-        publication: { summary: "새 공개 요약입니다." },
+        draftRevision: 5,
+        baseLiveRevision: 3,
+        liveApplied: false,
+      },
+      {
+        ...preview({ valid: true, issueCount: 0 }),
         highlights: [record({ authorName: "독자A", authorMatched: true })],
         oneLineReviews: [
           record({ authorName: "독자B", authorMatched: true }),
           record({ authorName: "독자C", authorMatched: true }),
         ],
-        feedbackDocument: {
-          uploaded: true,
-          fileName: "session-7-feedback.md",
-          title: "독서모임 7차 피드백",
-          uploadedAt: "2026-05-16T12:00:00Z",
-        },
       },
       "MEMBER",
     );
 
     expect(result).toEqual({
       tone: "success",
-      title: "저장 완료",
-      message: "가져온 세션 기록을 저장했습니다.",
+      title: "초안 저장 완료",
+      message: "가져온 세션 기록을 공유 초안으로 저장했습니다.",
       visibilityLabel: "멤버 공개",
       items: [
-        "공개 요약 교체",
-        "하이라이트 1개 저장",
-        "한줄평 2개 저장",
-        "피드백 문서 저장: 독서모임 7차 피드백",
+        "공개 요약 초안 교체",
+        "하이라이트 1개 초안 저장",
+        "한줄평 2개 초안 저장",
+        "피드백 문서 초안 저장: 독서모임 7차 피드백",
       ],
-      nextAction: "멤버는 아카이브와 피드백 문서에서 이 기록을 이어 읽을 수 있습니다.",
+      nextAction: "검토 후 변경사항을 반영하기 전까지 멤버와 공개 화면은 바뀌지 않습니다.",
     });
   });
 
@@ -181,14 +180,19 @@ describe("session import model", () => {
     const result = buildSessionImportCommitResult(
       {
         sessionId: "session-7",
+        draftRevision: 5,
+        baseLiveRevision: 3,
+        liveApplied: false,
+      },
+      {
+        ...preview({ valid: true, issueCount: 0 }),
         publication: { summary: "{\"raw\":\"PRIVATE_MEMBER_EMAIL\"}" },
         highlights: [],
         oneLineReviews: [],
         feedbackDocument: {
-          uploaded: true,
           fileName: "PRIVATE_MEMBER_EMAIL-session.md",
           title: "독서모임 7차 피드백",
-          uploadedAt: null,
+          valid: true,
         },
       },
       "PUBLIC",

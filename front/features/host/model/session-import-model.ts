@@ -67,7 +67,7 @@ export function sessionImportCanCommit(
 }
 
 export function sessionImportReplacementWarning(): string {
-  return "저장하면 이 회차의 요약, 하이라이트, 한줄평, 피드백 문서를 가져온 JSON 내용으로 교체합니다.";
+  return "가져오면 공유 초안의 요약, 하이라이트, 한줄평, 피드백 문서를 JSON 내용으로 교체합니다. live 기록은 바뀌지 않습니다.";
 }
 
 export function summarizeAuthorMatches(records: SessionImportRecordPreview[]): SessionImportAuthorSummary {
@@ -101,25 +101,25 @@ export function sessionImportReplacementSummary(preview: SessionImportPreviewRes
 
 export function buildSessionImportCommitResult(
   committed: SessionImportCommitResponse,
+  preview: SessionImportPreviewResponse,
   recordVisibility: SessionRecordVisibility,
 ): SessionImportCommitResult {
-  const feedbackDocumentLabel = committed.feedbackDocument.title.trim() || "피드백 문서";
+  const feedbackDocumentLabel = preview.feedbackDocument.title?.trim() || "피드백 문서";
 
   return {
     tone: "success",
-    title: "저장 완료",
-    message: "가져온 세션 기록을 저장했습니다.",
+    title: "초안 저장 완료",
+    message: committed.liveApplied
+      ? "가져온 세션 기록의 적용 상태를 다시 확인해 주세요."
+      : "가져온 세션 기록을 공유 초안으로 저장했습니다.",
     visibilityLabel: recordVisibilityLabel(recordVisibility),
     items: [
-      "공개 요약 교체",
-      `하이라이트 ${committed.highlights.length}개 저장`,
-      `한줄평 ${committed.oneLineReviews.length}개 저장`,
-      `피드백 문서 저장: ${feedbackDocumentLabel}`,
+      "공개 요약 초안 교체",
+      `하이라이트 ${preview.highlights.length}개 초안 저장`,
+      `한줄평 ${preview.oneLineReviews.length}개 초안 저장`,
+      `피드백 문서 초안 저장: ${feedbackDocumentLabel}`,
     ],
-    nextAction:
-      recordVisibility === "PUBLIC"
-        ? "멤버와 공개 기록 화면에서 이 기록을 이어 읽을 수 있습니다."
-        : "멤버는 아카이브와 피드백 문서에서 이 기록을 이어 읽을 수 있습니다.",
+    nextAction: "검토 후 변경사항을 반영하기 전까지 멤버와 공개 화면은 바뀌지 않습니다.",
   };
 }
 

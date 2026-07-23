@@ -539,7 +539,7 @@ describe("AiGenerateTab", () => {
       fireEvent.click(submit);
     });
 
-    const commitBtn = await screen.findByRole("button", { name: /기록 저장/ });
+    const commitBtn = await screen.findByRole("button", { name: "초안으로 저장" });
     await act(async () => {
       fireEvent.click(commitBtn);
     });
@@ -569,7 +569,7 @@ describe("AiGenerateTab", () => {
     await waitFor(() => expect(start).toBeEnabled());
     fireEvent.click(start);
 
-    const commit = await screen.findByRole("button", { name: "AI 기록 저장" });
+    const commit = await screen.findByRole("button", { name: "초안으로 저장" });
     expect(commit).toBeDisabled();
     for (const button of screen.getAllByRole("button", { name: "AI 근거 검토 완료" })) {
       fireEvent.click(button);
@@ -587,7 +587,7 @@ describe("AiGenerateTab", () => {
         FEEDBACK_DOCUMENT: "AI_GROUNDED_REVIEWED",
       },
     });
-    expect(await screen.findByRole("status")).toHaveTextContent("참여 상태 2건을 동기화했습니다");
+    expect(await screen.findByRole("status")).toHaveTextContent("참여 상태 2건을 확인했습니다");
   });
 
   it("preserves local edits on a stale revision and offers an explicit review reset", async () => {
@@ -614,16 +614,16 @@ describe("AiGenerateTab", () => {
       fireEvent.click(button);
     }
     fireEvent.click(screen.getByRole("button", { name: "직접 수정 내용 확인" }));
-    const commit = screen.getByRole("button", { name: "AI 기록 저장" });
+    const commit = screen.getByRole("button", { name: "초안으로 저장" });
     await waitFor(() => expect(commit).toBeEnabled());
     fireEvent.click(commit);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/현재 편집은 자동으로 덮어쓰지 않았습니다/);
     expect(screen.getByDisplayValue("호스트가 직접 수정한 요약")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "최신 revision 다시 불러오기" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "AI 기록 저장" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "초안으로 저장" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "요약 재생성" })).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "AI 기록 저장" }));
+    fireEvent.click(screen.getByRole("button", { name: "초안으로 저장" }));
     expect(mockedCommit).toHaveBeenCalledTimes(1);
   });
 
@@ -698,7 +698,7 @@ describe("AiGenerateTab", () => {
     for (const button of await screen.findAllByRole("button", { name: "AI 근거 검토 완료" })) {
       fireEvent.click(button);
     }
-    expect(screen.getByRole("button", { name: "AI 기록 저장" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "초안으로 저장" })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "요약 재생성" }));
     fireEvent.click(screen.getByRole("button", { name: "확인" }));
 
@@ -709,7 +709,7 @@ describe("AiGenerateTab", () => {
     });
     expect(await screen.findByDisplayValue("revision 4 합성 요약")).toBeInTheDocument();
     expect(screen.getByText("0/4 검토 완료")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "AI 기록 저장" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "초안으로 저장" })).toBeDisabled();
   });
 
   it("shows saving state when poll returns COMMITTING", async () => {
@@ -738,8 +738,8 @@ describe("AiGenerateTab", () => {
       fireEvent.click(submit);
     });
 
-    expect(await screen.findByRole("status")).toHaveTextContent("AI 기록을 저장하는 중입니다.");
-    expect(screen.queryByRole("button", { name: /기록 저장/ })).not.toBeInTheDocument();
+    expect(await screen.findByRole("status")).toHaveTextContent("AI 기록을 초안으로 저장하는 중입니다.");
+    expect(screen.queryByRole("button", { name: "초안으로 저장" })).not.toBeInTheDocument();
   });
 
   it("treats server COMMITTED status as completed and calls onCommitted once", async () => {
@@ -769,7 +769,7 @@ describe("AiGenerateTab", () => {
       fireEvent.click(submit);
     });
 
-    expect(await screen.findByRole("status")).toHaveTextContent("AI 기록 저장을 완료했습니다.");
+    expect(await screen.findByRole("status")).toHaveTextContent("AI 기록을 공유 초안으로 저장했습니다.");
     expect(onCommitted).toHaveBeenCalledTimes(1);
   });
 
