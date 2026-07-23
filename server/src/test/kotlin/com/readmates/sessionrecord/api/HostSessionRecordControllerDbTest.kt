@@ -121,6 +121,19 @@ class HostSessionRecordControllerDbTest(
                 status { isBadRequest() }
                 jsonPath("$.code") { value("INVALID_CURSOR") }
             }
+        val duplicateKeyCursor =
+            java.util.Base64
+                .getUrlEncoder()
+                .withoutPadding()
+                .encodeToString("id=one&id=two".toByteArray())
+        mockMvc
+            .get("/api/host/sessions/$SESSION_ID/history") {
+                with(user("host@example.com"))
+                param("cursor", duplicateKeyCursor)
+            }.andExpect {
+                status { isBadRequest() }
+                jsonPath("$.code") { value("INVALID_CURSOR") }
+            }
 
         mockMvc
             .post(

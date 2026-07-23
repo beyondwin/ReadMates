@@ -50,6 +50,23 @@ class HostSessionHistoryQueryServiceTest {
     }
 
     @Test
+    fun `orders equal time and type UUIDs by canonical database string order`() {
+        val sameTime = OffsetDateTime.parse("2026-07-23T10:00:00Z")
+        historyPort.audit =
+            listOf(
+                item("7fffffff-0000-0000-0000-000000000001", HostSessionHistoryType.BASIC_INFO_UPDATED, sameTime),
+                item("80000000-0000-0000-0000-000000000001", HostSessionHistoryType.BASIC_INFO_UPDATED, sameTime),
+            )
+
+        val page = service.history(host(), SESSION_ID, PageRequest(limit = 10, cursor = emptyMap()))
+
+        assertThat(page.items.map { it.id.toString() }).containsExactly(
+            "80000000-0000-0000-0000-000000000001",
+            "7fffffff-0000-0000-0000-000000000001",
+        )
+    }
+
+    @Test
     fun `decodes stable typed cursor before loading every history source`() {
         val cursor =
             mapOf(
@@ -80,6 +97,24 @@ class HostSessionHistoryQueryServiceTest {
                 SESSION_ID,
                 PageRequest(limit = 10, cursor = mapOf("createdAt" to "not-a-time", "id" to "bad")),
             )
+        }.isInstanceOf(InvalidHostSessionCursorException::class.java)
+
+        assertThat(historyPort.cursors).isEmpty()
+    }
+
+    @Test
+    fun `rejects unknown type sort before querying sources`() {
+        val cursor =
+            mapOf(
+                "createdAt" to "2026-07-23T10:00Z",
+                "typeSort" to "99",
+                "id" to "00000000-0000-0000-0000-000000000014",
+                "clubId" to CLUB_ID.toString(),
+                "sessionId" to SESSION_ID.toString(),
+            )
+
+        assertThatThrownBy {
+            service.history(host(), SESSION_ID, PageRequest(limit = 10, cursor = cursor))
         }.isInstanceOf(InvalidHostSessionCursorException::class.java)
 
         assertThat(historyPort.cursors).isEmpty()

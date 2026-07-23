@@ -46,7 +46,42 @@ object CursorCodec {
         }.getOrNull()
     }
 
+    @Suppress("ThrowsCount")
+    fun decodeStrict(rawCursor: String?): Map<String, String>? {
+        if (rawCursor == null) return null
+        if (rawCursor.isBlank()) throw InvalidCursorEncodingException()
+        val payload =
+            try {
+                val bytes = decoder.decode(rawCursor)
+                if (encoder.encodeToString(bytes) != rawCursor) throw InvalidCursorEncodingException()
+                String(bytes, StandardCharsets.UTF_8)
+            } catch (error: IllegalArgumentException) {
+                throw InvalidCursorEncodingException(error)
+            }
+        if (payload.isBlank()) throw InvalidCursorEncodingException()
+
+        val cursor = linkedMapOf<String, String>()
+        payload.split("&").forEach { pair ->
+            val separatorIndex = pair.indexOf("=")
+            if (separatorIndex <= 0) throw InvalidCursorEncodingException()
+            val key =
+                runCatching { unescape(pair.substring(0, separatorIndex)) }
+                    .getOrElse { throw InvalidCursorEncodingException(it) }
+            val value =
+                runCatching { unescape(pair.substring(separatorIndex + 1)) }
+                    .getOrElse { throw InvalidCursorEncodingException(it) }
+            if (key.isBlank() || cursor.putIfAbsent(key, value) != null) throw InvalidCursorEncodingException()
+        }
+        val canonical = cursor.toSortedMap()
+        if (encode(canonical) != rawCursor) throw InvalidCursorEncodingException()
+        return canonical
+    }
+
     private fun escape(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8)
 
     private fun unescape(value: String): String = URLDecoder.decode(value, StandardCharsets.UTF_8)
 }
+
+class InvalidCursorEncodingException(
+    cause: Throwable? = null,
+) : IllegalArgumentException("Invalid cursor encoding", cause)

@@ -101,7 +101,9 @@ class HostSessionRecordController(
 }
 
 private fun requireValidHistoryCursor(cursor: String?): String? {
-    if (!cursor.isNullOrBlank() && CursorCodec.decode(cursor) == null) {
+    try {
+        CursorCodec.decodeStrict(cursor)
+    } catch (_: IllegalArgumentException) {
         throw InvalidHostSessionCursorException()
     }
     return cursor

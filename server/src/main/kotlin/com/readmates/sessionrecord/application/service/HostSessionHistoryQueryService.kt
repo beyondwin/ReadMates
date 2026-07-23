@@ -49,7 +49,7 @@ class HostSessionHistoryQueryService(
 private val historyComparator =
     compareByDescending<HostSessionHistoryItem> { it.createdAt }
         .thenByDescending { it.type.typeSort }
-        .thenByDescending { it.id }
+        .thenByDescending { it.id.toString() }
 
 internal val HostSessionHistoryType.typeSort: Int
     get() =
@@ -75,6 +75,7 @@ private fun Map<String, String>.toHistoryCursor(
             ?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
             ?: invalidCursor()
     val typeSort = get("typeSort")?.toIntOrNull() ?: invalidCursor()
+    if (typeSort !in HISTORY_TYPE_SORTS) invalidCursor()
     val id =
         get("id")
             ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
@@ -114,3 +115,12 @@ private const val REVISION_APPLIED_SORT = 30
 private const val REVISION_RESTORED_SORT = 40
 private const val NOTIFICATION_SENT_SORT = 50
 private const val NOTIFICATION_SKIPPED_SORT = 60
+private val HISTORY_TYPE_SORTS =
+    setOf(
+        BASIC_INFO_SORT,
+        ATTENDANCE_SORT,
+        REVISION_APPLIED_SORT,
+        REVISION_RESTORED_SORT,
+        NOTIFICATION_SENT_SORT,
+        NOTIFICATION_SKIPPED_SORT,
+    )

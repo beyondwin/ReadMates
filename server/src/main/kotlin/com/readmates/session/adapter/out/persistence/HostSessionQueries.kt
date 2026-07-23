@@ -33,93 +33,105 @@ internal class HostSessionQueries {
         val normalizedQuery = query.normalized()
         val queryKey = normalizedQuery.fingerprint()
         val cursor = HostSessionCursor.from(pageRequest.cursor, queryKey, host.clubId)
-        val conditions = mutableListOf("club_id = ?")
-        val parameters = mutableListOf<Any>(host.clubId.dbString())
+        val baseConditions = mutableListOf("club_id = ?")
+        val baseParameters = mutableListOf<Any>(host.clubId.dbString())
         normalizedQuery.search?.let { search ->
-            conditions += "(cast(number as char) = ? or lower(title) like ? or lower(book_title) like ?)"
-            parameters += search
-            parameters += "%$search%"
-            parameters += "%$search%"
+            baseConditions += "(cast(number as char) = ? or lower(title) like ? or lower(book_title) like ?)"
+            baseParameters += search
+            baseParameters += "%$search%"
+            baseParameters += "%$search%"
         }
         normalizedQuery.state?.let {
-            conditions += "state = ?"
-            parameters += it
+            baseConditions += "state = ?"
+            baseParameters += it
         }
-        cursor?.let {
-            conditions += "(number < ? or (number = ? and id < ?))"
-            parameters += it.number
-            parameters += it.number
-            parameters += it.id.dbString()
-        }
-        val rows =
-            jdbcTemplate.query(
-                """
-                select *
-                from (
-                  select sessions.id, sessions.club_id, sessions.number, sessions.title,
-                         sessions.book_title, sessions.book_author, sessions.book_image_url,
-                         sessions.session_date, sessions.start_time, sessions.end_time,
-                         sessions.location_label, sessions.state, sessions.visibility,
-                         (coalesce(publication.public_summary, '') <> ''
-                           or (select count(*) from highlights
-                               where highlights.club_id = sessions.club_id
-                                 and highlights.session_id = sessions.id) > 0
-                           or (select count(*) from one_line_reviews
-                               where one_line_reviews.club_id = sessions.club_id
-                                 and one_line_reviews.session_id = sessions.id) > 0) as record_saved,
-                         exists (
-                           select 1 from session_feedback_documents
-                           where session_feedback_documents.club_id = sessions.club_id
-                             and session_feedback_documents.session_id = sessions.id
-                         ) as feedback_ready,
-                         (draft.session_id is not null) as has_draft,
-                         draft.draft_revision,
-                         coalesce(revision.live_revision, 0) as live_revision,
-                         greatest(
-                           sessions.updated_at,
-                           coalesce(draft.updated_at, sessions.updated_at),
-                           coalesce(revision.applied_at, sessions.updated_at),
-                           coalesce(audit.created_at, sessions.updated_at)
-                         ) as last_modified_at
-                  from sessions
-                  left join public_session_publications publication
-                    on publication.club_id = sessions.club_id
-                   and publication.session_id = sessions.id
-                  left join session_record_drafts draft
-                    on draft.club_id = sessions.club_id
-                   and draft.session_id = sessions.id
-                  left join (
-                    select club_id, session_id, max(version) as live_revision, max(applied_at) as applied_at
-                    from session_record_revisions
-                    group by club_id, session_id
-                  ) revision
-                    on revision.club_id = sessions.club_id
-                   and revision.session_id = sessions.id
-                  left join (
-                    select club_id, session_id, max(created_at) as created_at
-                    from host_session_change_audit
-                    group by club_id, session_id
-                  ) audit
-                    on audit.club_id = sessions.club_id
-                   and audit.session_id = sessions.id
-                ) ledger_facts
-                where ${conditions.joinToString(" and ")}
-                order by number desc, id desc
-                """.trimIndent(),
-                { resultSet, _ -> resultSet.toHostSessionListItem() },
-                *parameters.toTypedArray(),
-            )
-        val filteredRows =
-            rows
-                .asSequence()
-                .filter { normalizedQuery.recordStatus == null || it.recordStatus == normalizedQuery.recordStatus }
-                .filter {
-                    normalizedQuery.needsAttention == null ||
-                        it.needsAttention == normalizedQuery.needsAttention
+        val scan =
+            scanHostSessionLedger(
+                limit = pageRequest.limit,
+                initialCursor = cursor,
+                matches = { item ->
+                    (normalizedQuery.recordStatus == null || item.recordStatus == normalizedQuery.recordStatus) &&
+                        (
+                            normalizedQuery.needsAttention == null ||
+                                item.needsAttention == normalizedQuery.needsAttention
+                        )
+                },
+            ) { scanCursor, chunkSize ->
+                val conditions = baseConditions.toMutableList()
+                val parameters = baseParameters.toMutableList()
+                scanCursor?.let {
+                    conditions += "(number < ? or (number = ? and id < ?))"
+                    parameters += it.number
+                    parameters += it.number
+                    parameters += it.id.dbString()
                 }
-                .take(pageRequest.limit + 1)
-                .toList()
-        return pageFromRows(filteredRows, pageRequest.limit) { hostSessionCursor(it, queryKey, host.clubId) }
+                parameters += chunkSize
+                jdbcTemplate.query(
+                    """
+                    select *
+                    from (
+                      select sessions.id, sessions.club_id, sessions.number, sessions.title,
+                             sessions.book_title, sessions.book_author, sessions.book_image_url,
+                             sessions.session_date, sessions.start_time, sessions.end_time,
+                             sessions.location_label, sessions.state, sessions.visibility,
+                             (coalesce(publication.public_summary, '') <> ''
+                               or (select count(*) from highlights
+                                   where highlights.club_id = sessions.club_id
+                                     and highlights.session_id = sessions.id) > 0
+                               or (select count(*) from one_line_reviews
+                                   where one_line_reviews.club_id = sessions.club_id
+                                     and one_line_reviews.session_id = sessions.id) > 0) as record_saved,
+                             exists (
+                               select 1 from session_feedback_documents
+                               where session_feedback_documents.club_id = sessions.club_id
+                                 and session_feedback_documents.session_id = sessions.id
+                             ) as feedback_ready,
+                             (draft.session_id is not null) as has_draft,
+                             draft.draft_revision,
+                             coalesce(revision.live_revision, 0) as live_revision,
+                             greatest(
+                               sessions.updated_at,
+                               coalesce(draft.updated_at, sessions.updated_at),
+                               coalesce(revision.applied_at, sessions.updated_at),
+                               coalesce(audit.created_at, sessions.updated_at)
+                             ) as last_modified_at
+                      from sessions
+                      left join public_session_publications publication
+                        on publication.club_id = sessions.club_id
+                       and publication.session_id = sessions.id
+                      left join session_record_drafts draft
+                        on draft.club_id = sessions.club_id
+                       and draft.session_id = sessions.id
+                      left join (
+                        select club_id, session_id, max(version) as live_revision, max(applied_at) as applied_at
+                        from session_record_revisions
+                        group by club_id, session_id
+                      ) revision
+                        on revision.club_id = sessions.club_id
+                       and revision.session_id = sessions.id
+                      left join (
+                        select club_id, session_id, max(created_at) as created_at
+                        from host_session_change_audit
+                        group by club_id, session_id
+                      ) audit
+                        on audit.club_id = sessions.club_id
+                       and audit.session_id = sessions.id
+                    ) ledger_facts
+                    where ${conditions.joinToString(" and ")}
+                    order by number desc, id desc
+                    limit ?
+                    """.trimIndent(),
+                    { resultSet, _ -> resultSet.toHostSessionListItem() },
+                    *parameters.toTypedArray(),
+                )
+            }
+        return CursorPage(
+            items = scan.items,
+            nextCursor =
+                scan.continuation?.let {
+                    hostSessionCursor(it.number, it.id, queryKey, host.clubId)
+                },
+        )
     }
 
     fun upcoming(
@@ -445,32 +457,21 @@ internal class HostSessionQueries {
 }
 
 private fun hostSessionCursor(
-    item: HostSessionListItem,
+    number: Int,
+    id: UUID,
     queryKey: String,
     clubId: UUID,
 ): String? =
     CursorCodec.encode(
         mapOf(
-            "number" to item.sessionNumber.toString(),
-            "id" to item.sessionId,
+            "number" to number.toString(),
+            "id" to id.toString(),
             "query" to queryKey,
             "clubId" to clubId.toString(),
         ),
     )
 
-private fun <T> pageFromRows(
-    rows: List<T>,
-    limit: Int,
-    cursorFor: (T) -> String?,
-): CursorPage<T> {
-    val visibleRows = rows.take(limit)
-    return CursorPage(
-        items = visibleRows,
-        nextCursor = if (rows.size > limit) visibleRows.lastOrNull()?.let(cursorFor) else null,
-    )
-}
-
-private data class HostSessionCursor(
+internal data class HostSessionCursor(
     val number: Int,
     val id: UUID,
 ) {
@@ -498,6 +499,42 @@ private data class HostSessionCursor(
         }
     }
 }
+
+internal data class HostSessionLedgerScanResult(
+    val items: List<HostSessionListItem>,
+    val continuation: HostSessionCursor?,
+)
+
+@Suppress("ReturnCount")
+internal fun scanHostSessionLedger(
+    limit: Int,
+    initialCursor: HostSessionCursor?,
+    matches: (HostSessionListItem) -> Boolean,
+    loadChunk: (HostSessionCursor?, Int) -> List<HostSessionListItem>,
+): HostSessionLedgerScanResult {
+    val matched = mutableListOf<HostSessionListItem>()
+    var scanCursor = initialCursor
+    repeat(HOST_SESSION_LEDGER_MAX_SCAN_CHUNKS) {
+        val rows = loadChunk(scanCursor, HOST_SESSION_LEDGER_SCAN_CHUNK_SIZE)
+        if (rows.isEmpty()) return HostSessionLedgerScanResult(matched, null)
+        val lastScanned = rows.last().toScanCursor()
+        rows.filterTo(matched, matches)
+        if (matched.size > limit) {
+            val visible = matched.take(limit)
+            return HostSessionLedgerScanResult(visible, visible.lastOrNull()?.toScanCursor())
+        }
+        if (rows.size < HOST_SESSION_LEDGER_SCAN_CHUNK_SIZE) {
+            return HostSessionLedgerScanResult(matched, null)
+        }
+        scanCursor = lastScanned
+    }
+    return HostSessionLedgerScanResult(matched, scanCursor)
+}
+
+private fun HostSessionListItem.toScanCursor() = HostSessionCursor(sessionNumber, UUID.fromString(sessionId))
+
+internal const val HOST_SESSION_LEDGER_SCAN_CHUNK_SIZE = 200
+internal const val HOST_SESSION_LEDGER_MAX_SCAN_CHUNKS = 10
 
 private fun invalidCursor(): Nothing = throw InvalidHostSessionCursorException()
 

@@ -69,6 +69,26 @@ class JdbcHostSessionHistoryAdapterDbTest(
         assertThat(page.items).isEmpty()
     }
 
+    @Test
+    fun `notification send and skip at equal time map and paginate by database tuple`() {
+        insertNotificationHistory()
+
+        val firstPage = historyService.history(host(), SESSION_ID, PageRequest(limit = 1, cursor = emptyMap()))
+        val secondPage =
+            historyService.history(
+                host(),
+                SESSION_ID,
+                PageRequest(limit = 1, cursor = CursorCodec.decode(firstPage.nextCursor).orEmpty()),
+            )
+
+        assertThat(firstPage.items.single().type).isEqualTo(HostSessionHistoryType.NOTIFICATION_SKIPPED)
+        assertThat(firstPage.items.single().notificationEventId).isNull()
+        assertThat(secondPage.items.single().type).isEqualTo(HostSessionHistoryType.NOTIFICATION_SENT)
+        assertThat(secondPage.items.single().notificationEventId).isEqualTo(NOTIFICATION_EVENT_ID)
+        assertThat(secondPage.items.single().id).isEqualTo(SEND_DECISION_ID)
+        assertThat(secondPage.nextCursor).isNull()
+    }
+
     private fun insertFirstClubHistory() {
         jdbcTemplate.update(
             """
@@ -154,6 +174,74 @@ class JdbcHostSessionHistoryAdapterDbTest(
         )
     }
 
+    @Suppress("LongMethod")
+    private fun insertNotificationHistory() {
+        jdbcTemplate.update(
+            """
+            insert into notification_event_outbox (
+              id, club_id, event_type, aggregate_type, aggregate_id, payload_json,
+              kafka_key, dedupe_key, created_at, updated_at
+            ) values (?, ?, 'SESSION_RECORD_UPDATED', 'SESSION', ?, '{}', ?, ?, ?, ?)
+            """.trimIndent(),
+            NOTIFICATION_EVENT_ID.toString(),
+            CLUB_ID.toString(),
+            SESSION_ID.toString(),
+            "history-event",
+            "history-event-dedupe",
+            HISTORY_TIMESTAMP,
+            HISTORY_TIMESTAMP,
+        )
+        jdbcTemplate.update(
+            """
+            insert into host_action_notification_previews (
+              id, club_id, session_id, host_membership_id, action_type, event_type,
+              request_hash, expected_live_revision, target_count, expected_in_app_count,
+              expected_email_count, excluded_count, expires_at, created_at
+            ) values
+              (?, ?, ?, ?, 'RECORD_APPLY', 'SESSION_RECORD_UPDATED', ?, 9101, 1, 1, 0, 0, ?, ?),
+              (?, ?, ?, ?, 'RECORD_APPLY', 'SESSION_RECORD_UPDATED', ?, 9102, 1, 1, 0, 0, ?, ?)
+            """.trimIndent(),
+            SEND_PREVIEW_ID.toString(),
+            CLUB_ID.toString(),
+            SESSION_ID.toString(),
+            HOST_MEMBERSHIP_ID.toString(),
+            "c".repeat(64),
+            PREVIEW_EXPIRY,
+            HISTORY_TIMESTAMP,
+            SKIP_PREVIEW_ID.toString(),
+            CLUB_ID.toString(),
+            SESSION_ID.toString(),
+            HOST_MEMBERSHIP_ID.toString(),
+            "d".repeat(64),
+            PREVIEW_EXPIRY,
+            HISTORY_TIMESTAMP,
+        )
+        jdbcTemplate.update(
+            """
+            insert into host_action_notification_decisions (
+              id, preview_id, club_id, session_id, host_membership_id, action_type,
+              event_type, live_revision, decision, target_count, expected_in_app_count,
+              expected_email_count, excluded_count, event_id, created_at
+            ) values
+              (?, ?, ?, ?, ?, 'RECORD_APPLY', 'SESSION_RECORD_UPDATED', 9101, 'SEND', 1, 1, 0, 0, ?, ?),
+              (?, ?, ?, ?, ?, 'RECORD_APPLY', 'SESSION_RECORD_UPDATED', 9102, 'SKIP', 1, 1, 0, 0, null, ?)
+            """.trimIndent(),
+            SEND_DECISION_ID.toString(),
+            SEND_PREVIEW_ID.toString(),
+            CLUB_ID.toString(),
+            SESSION_ID.toString(),
+            HOST_MEMBERSHIP_ID.toString(),
+            NOTIFICATION_EVENT_ID.toString(),
+            HISTORY_TIMESTAMP,
+            SKIP_DECISION_ID.toString(),
+            SKIP_PREVIEW_ID.toString(),
+            CLUB_ID.toString(),
+            SESSION_ID.toString(),
+            HOST_MEMBERSHIP_ID.toString(),
+            HISTORY_TIMESTAMP,
+        )
+    }
+
     private fun host() =
         CurrentMember(
             userId = HOST_USER_ID,
@@ -181,10 +269,26 @@ class JdbcHostSessionHistoryAdapterDbTest(
         val OUTSIDE_MEMBERSHIP_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098201")
         val OUTSIDE_SESSION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098301")
         val OUTSIDE_AUDIT_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098401")
+        val SEND_PREVIEW_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098501")
+        val SKIP_PREVIEW_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098502")
+        val SEND_DECISION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098601")
+        val SKIP_DECISION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098602")
+        val NOTIFICATION_EVENT_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098701")
+        const val HISTORY_TIMESTAMP = "2026-07-23 10:00:00.000000"
+        const val PREVIEW_EXPIRY = "2026-07-23 10:05:00.000000"
     }
 }
 
 private const val CLEANUP_HISTORY_TEST_FIXTURES = """
+    delete from host_action_notification_decisions where id in (
+      '00000000-0000-0000-0000-000000098601',
+      '00000000-0000-0000-0000-000000098602'
+    );
+    delete from host_action_notification_previews where id in (
+      '00000000-0000-0000-0000-000000098501',
+      '00000000-0000-0000-0000-000000098502'
+    );
+    delete from notification_event_outbox where id = '00000000-0000-0000-0000-000000098701';
     delete from host_session_change_audit where id in (
       '00000000-0000-0000-0000-000000098003',
       '00000000-0000-0000-0000-000000098004',

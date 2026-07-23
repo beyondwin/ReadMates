@@ -344,6 +344,7 @@ class HostSessionControllerDbTest(
     }
 
     @Test
+    @Suppress("LongMethod")
     fun `host list rejects malformed query bound and cross club cursors`() {
         createDraftSessionSeven()
         createDraftSessionEight()
@@ -352,6 +353,20 @@ class HostSessionControllerDbTest(
             .get("/api/host/sessions") {
                 with(user("host@example.com"))
                 param("cursor", "not-a-cursor")
+            }.andExpect {
+                status { isBadRequest() }
+                jsonPath("$.code") { value("INVALID_CURSOR") }
+            }
+
+        val duplicateKeyCursor =
+            java.util.Base64
+                .getUrlEncoder()
+                .withoutPadding()
+                .encodeToString("id=one&id=two".toByteArray())
+        mockMvc
+            .get("/api/host/sessions") {
+                with(user("host@example.com"))
+                param("cursor", duplicateKeyCursor)
             }.andExpect {
                 status { isBadRequest() }
                 jsonPath("$.code") { value("INVALID_CURSOR") }

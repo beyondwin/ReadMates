@@ -123,7 +123,7 @@ class AiGenerationCommitService(
             throw AiGenerationException.Coded(ErrorCode.STALE_GENERATION_REVISION, currentRevision = record.revision)
         }
         val requestSha256 =
-            commitRequestSha256(
+            AiGenerationCommitRequestHasher.hash(
                 recordVisibility,
                 submittedResult,
                 revision,
@@ -325,26 +325,6 @@ class AiGenerationCommitService(
         }
     }
 
-    private fun commitRequestSha256(
-        visibility: SessionRecordVisibility,
-        submittedResult: SessionImportV1Snapshot?,
-        revision: Long,
-        sectionReviews: Map<GenerationItem, SectionReviewStatus>?,
-        expectedDraftRevision: Long?,
-    ): String =
-        Sha256.hex(
-            buildString {
-                append("aigen-commit:v1\n")
-                append(visibility.name).append('\n')
-                append(revision).append('\n')
-                append(expectedDraftRevision?.toString() ?: "none").append('\n')
-                append(submittedResult?.toString() ?: "server-result").append('\n')
-                GenerationItem.entries.forEach { item ->
-                    append(item.name).append('=').append(sectionReviews?.get(item)?.name ?: "missing").append('\n')
-                }
-            },
-        )
-
     private fun writeCommitAudit(
         record: JobRecord,
         sectionReviews: Map<GenerationItem, SectionReviewStatus>,
@@ -446,4 +426,71 @@ class AiGenerationCommitService(
         val draftRevision: Long,
         val baseLiveRevision: Long,
     )
+}
+
+internal object AiGenerationCommitRequestHasher {
+    fun hash(
+        visibility: SessionRecordVisibility,
+        submittedResult: SessionImportV1Snapshot?,
+        revision: Long,
+        sectionReviews: Map<GenerationItem, SectionReviewStatus>?,
+        expectedDraftRevision: Long?,
+    ): String =
+        Sha256.hex(
+            CanonicalFrame()
+                .field("schema", "aigen-commit:v2")
+                .field("visibility", visibility.name)
+                .field("revision", revision.toString())
+                .nullableField("expectedDraftRevision", expectedDraftRevision?.toString())
+                .snapshot(submittedResult)
+                .apply {
+                    GenerationItem.entries.forEach { item ->
+                        nullableField("review.${item.name}", sectionReviews?.get(item)?.name)
+                    }
+                }.toString(),
+        )
+}
+
+private class CanonicalFrame {
+    private val value = StringBuilder()
+
+    fun field(
+        name: String,
+        fieldValue: String,
+    ) = apply {
+        value.append(name).append('=')
+        value.append(fieldValue.toByteArray(Charsets.UTF_8).size).append(':').append(fieldValue).append(';')
+    }
+
+    fun nullableField(
+        name: String,
+        fieldValue: String?,
+    ) = if (fieldValue == null) field("$name.present", "false") else field("$name.present", "true").field(name, fieldValue)
+
+    fun snapshot(snapshot: SessionImportV1Snapshot?) =
+        apply {
+            nullableField("snapshot.format", snapshot?.format)
+            if (snapshot == null) return@apply
+            field("snapshot.sessionNumber", snapshot.sessionNumber.toString())
+            field("snapshot.bookTitle", snapshot.bookTitle)
+            field("snapshot.meetingDate", snapshot.meetingDate.toString())
+            field("snapshot.summary", snapshot.summary)
+            authoredTexts("snapshot.highlights", snapshot.highlights)
+            authoredTexts("snapshot.oneLineReviews", snapshot.oneLineReviews)
+            field("snapshot.feedbackDocumentFileName", snapshot.feedbackDocumentFileName)
+            field("snapshot.feedbackDocumentMarkdown", snapshot.feedbackDocumentMarkdown)
+        }
+
+    private fun authoredTexts(
+        name: String,
+        entries: List<SessionImportV1Snapshot.AuthoredText>,
+    ) {
+        field("$name.count", entries.size.toString())
+        entries.forEachIndexed { index, entry ->
+            field("$name.$index.authorName", entry.authorName)
+            field("$name.$index.text", entry.text)
+        }
+    }
+
+    override fun toString(): String = value.toString()
 }

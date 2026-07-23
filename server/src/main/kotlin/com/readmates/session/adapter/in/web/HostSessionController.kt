@@ -151,7 +151,9 @@ class HostSessionController(
 }
 
 private fun requireValidCursor(cursor: String?): String? {
-    if (!cursor.isNullOrBlank() && CursorCodec.decode(cursor) == null) {
+    try {
+        CursorCodec.decodeStrict(cursor)
+    } catch (_: IllegalArgumentException) {
         throw InvalidHostSessionCursorException()
     }
     return cursor
