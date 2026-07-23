@@ -15,5 +15,6 @@ overrides:
   "@playwright/experimental-ct-react@1.61.1>@vitejs/plugin-react": 6.0.3
   "lighthouse>@sentry/node": 10.65.0
   "esbuild@>=0.27.3 <0.28.1": 0.28.1
+  "brace-expansion@>=3.0.0 <5.0.7": 5.0.7
   "js-yaml@<=4.1.1": 4.2.0
   "ws@>=8.0.0 <8.21.0": 8.21.0

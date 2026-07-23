@@ -25,6 +25,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - **Trace/privacy/ops:** Spring Kafka observation과 Micrometer/OpenTelemetry OTLP를 활성화하고 7일 Tempo, Grafana datasource/exemplar, provider/cost-basis/circuit/exporter metric/alert를 추가했습니다. Local port는 loopback-only이고 OCI app은 `tempo:4318` internal DNS로 export하며 Tempo/OTLP host port는 publish하지 않습니다. Production config sync는 Google paid-tier 확인을 기본 `false`로 렌더링해 미확인 Gemini rollout을 fail closed합니다.
 - **호스트 작업 알림 확인:** 다음 책 공개, 첫 피드백 공개, 이후 기록 수정은 capability가 켜진 환경에서 기본 선택 없는 `SEND`/`SKIP` 확인을 요구합니다. preview 만료·대상 변경·stale revision·중복 요청은 fail closed하고, SEND 이벤트는 notification ledger에서 `HOST_CONFIRMED`로 구분합니다. 예약 리마인더, 멤버 서평, AI ready 자동 흐름은 기존 gate를 유지합니다.
 - **공통 기록 초안:** 수동 편집, 외부 JSON, AI 결과는 모두 live record를 직접 바꾸지 않고 같은 staged draft에 저장됩니다. 적용 작업만 콘텐츠, immutable revision, 결정 ledger, 선택적인 outbox event를 원자적으로 갱신합니다.
+- **의존성 보안:** 전이 의존성 `brace-expansion`을 DoS 취약점이 수정된 `5.0.7` 이상으로 강제합니다.
 
 ### Database
 
