@@ -12,6 +12,13 @@ enum class SessionRecordSource {
     RESTORED,
 }
 
+enum class SessionRecordDraftSource {
+    MANUAL,
+    JSON_IMPORT,
+    AI_GENERATED,
+    RESTORED,
+}
+
 enum class SessionRecordStatus {
     NOT_STARTED,
     INCOMPLETE,
@@ -54,7 +61,7 @@ data class SessionRecordDraft(
     val clubId: UUID,
     val baseLiveRevision: Long,
     val draftRevision: Long,
-    val source: SessionRecordSource,
+    val source: SessionRecordDraftSource,
     val restoredFromRevisionId: UUID?,
     val snapshot: SessionRecordSnapshot,
     val updatedByMembershipId: UUID,

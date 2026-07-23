@@ -18,6 +18,15 @@ class SessionRecordSnapshotCodec(
         )
     }
 
-    fun decode(json: String): SessionRecordSnapshot =
-        objectMapper.readValue(json, SessionRecordSnapshot::class.java)
+    fun decode(json: String): SessionRecordSnapshot {
+        val schema = objectMapper.readTree(json).path("schema").asString()
+        require(schema == SESSION_RECORD_SCHEMA) {
+            "Unsupported session record snapshot schema"
+        }
+        return objectMapper.readValue(json, SessionRecordSnapshot::class.java)
+    }
+
+    private companion object {
+        const val SESSION_RECORD_SCHEMA = "readmates-session-record:v1"
+    }
 }
