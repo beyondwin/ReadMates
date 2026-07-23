@@ -245,13 +245,24 @@ export function useSendHostNotificationTestMailMutation(context?: ReadmatesApiCo
 
 export function useUpdateHostNotificationPolicyMutation(context?: ReadmatesApiContext) {
   const client = useQueryClient();
+  const policyKey = hostNotificationKeys.policy(context);
   return useMutation<
     HostNotificationPolicyResponse,
     Error,
     UpdateHostNotificationPolicyRequest
   >({
     mutationFn: (request) => updateHostNotificationPolicy(request, context),
-    onSuccess: () => invalidateHostNotificationPolicy(client, context),
+    onSuccess: async (policy) => {
+      client.setQueryData(policyKey, policy);
+      await invalidateHostNotificationPolicy(client, context).catch(() => undefined);
+    },
+    onError: async () => {
+      await client.refetchQueries({
+        queryKey: policyKey,
+        exact: true,
+        type: "active",
+      }).catch(() => undefined);
+    },
   });
 }
 

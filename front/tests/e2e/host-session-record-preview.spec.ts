@@ -338,6 +338,11 @@ test("host captures public-safe session record preview evidence on desktop and m
     new RegExp(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}/feedback-document$`),
   );
   await expect(page.getByRole("heading", { name: "독서모임 7차 피드백" })).toBeVisible();
+  await expect(page.getByText("피드백 문서 · 호스트 미리보기")).toBeVisible();
+  await expect(
+    page.getByText("운영 확인본 · 이 미리보기 경로는 멤버에게 공개되지 않습니다."),
+  ).toBeVisible();
+  await expect(page.getByText("보존 문서 · 참석자 열람본")).toHaveCount(0);
   await expect(page.getByText("공개 안전한 호스트 미리보기입니다.")).toBeVisible();
   expect(previewMutations).toEqual([]);
   page.off("request", trackPreviewMutation);

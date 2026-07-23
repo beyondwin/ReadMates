@@ -5,7 +5,10 @@ type HostNotificationPolicyCardProps = {
   policy?: HostNotificationPolicyResponse;
   pending?: boolean;
   error?: string | null;
+  loadError?: string | null;
+  loading?: boolean;
   onChange: (enabled: boolean) => Promise<unknown>;
+  onRetryLoad?: () => Promise<unknown>;
 };
 
 const policyDescriptionId = "host-notification-policy-description";
@@ -15,13 +18,16 @@ export function HostNotificationPolicyCard({
   policy,
   pending = false,
   error = null,
+  loadError = null,
+  loading = false,
   onChange,
+  onRetryLoad,
 }: HostNotificationPolicyCardProps) {
   const [submitting, setSubmitting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
-  const busy = pending || submitting;
+  const busy = pending || submitting || loading;
   const enabled = policy?.sessionReminderEnabled ?? false;
-  const visibleError = error ?? localError;
+  const visibleError = error ?? loadError ?? localError;
 
   const handleChange = async (nextEnabled: boolean) => {
     if (!policy || busy) {
@@ -91,7 +97,15 @@ export function HostNotificationPolicyCard({
               모임 전날 자동 리마인더
             </span>
             <span className="tiny" style={{ color: "var(--text-3)" }}>
-              {!policy ? "정책 불러오는 중" : busy ? "저장 중" : enabled ? "켜짐" : "꺼짐"}
+              {!policy
+                ? loadError && !loading
+                  ? "정책 확인 필요"
+                  : "정책 불러오는 중"
+                : pending || submitting
+                  ? "저장 중"
+                  : enabled
+                    ? "켜짐"
+                    : "꺼짐"}
             </span>
           </span>
           <input
@@ -115,14 +129,27 @@ export function HostNotificationPolicyCard({
       </div>
 
       {visibleError ? (
-        <p
-          id={policyErrorId}
-          role="alert"
-          className="small"
-          style={{ color: "var(--danger)", margin: "12px 0 0" }}
-        >
-          {visibleError}
-        </p>
+        <div style={{ marginTop: 12 }}>
+          <p
+            id={policyErrorId}
+            role="alert"
+            className="small"
+            style={{ color: "var(--danger)", margin: 0 }}
+          >
+            {visibleError}
+          </p>
+          {loadError && !policy && onRetryLoad ? (
+            <button
+              className="btn btn-quiet btn-sm"
+              type="button"
+              disabled={loading}
+              onClick={() => void onRetryLoad()}
+              style={{ marginTop: 10 }}
+            >
+              {loading ? "정책 불러오는 중" : "정책 다시 불러오기"}
+            </button>
+          ) : null}
+        </div>
       ) : null}
     </section>
   );

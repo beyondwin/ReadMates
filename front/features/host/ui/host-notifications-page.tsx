@@ -68,7 +68,10 @@ type HostNotificationsPageProps = {
   policy?: HostNotificationPolicyResponse;
   policyPending?: boolean;
   policyError?: string | null;
+  policyLoadError?: string | null;
+  policyLoading?: boolean;
   onPolicyChange?: (enabled: boolean) => Promise<unknown>;
+  onPolicyRetry?: () => Promise<unknown>;
 };
 
 type HostNotificationMessage = {
@@ -116,7 +119,10 @@ export function HostNotificationsPage({
   policy,
   policyPending = false,
   policyError = null,
+  policyLoadError = null,
+  policyLoading = false,
   onPolicyChange = async () => undefined,
+  onPolicyRetry = async () => undefined,
 }: HostNotificationsPageProps) {
   const [activeLedgerTab, setActiveLedgerTab] = useState<NotificationLedgerTab>("events");
   const [restoreTarget, setRestoreTarget] = useState<HostNotificationDeliveryItem | null>(null);
@@ -313,7 +319,10 @@ export function HostNotificationsPage({
           policy={policy}
           pending={policyPending}
           error={policyError}
+          loadError={policyLoadError}
+          loading={policyLoading}
           onChange={onPolicyChange}
+          onRetryLoad={onPolicyRetry}
         />
 
         <ManualNotificationWorkbench

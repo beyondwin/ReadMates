@@ -20,18 +20,21 @@ type FeedbackDocumentPageProps = {
   document: FeedbackDocumentView;
   printMode?: boolean;
   returnTarget?: ReadmatesReturnTarget;
+  presentation?: "member" | "hostPreview";
 };
 
 type FeedbackDocumentUnavailablePageProps = {
   reason: FeedbackUnavailableReason;
   printMode?: boolean;
   returnTarget?: ReadmatesReturnTarget;
+  presentation?: "member" | "hostPreview";
 };
 
 export default function FeedbackDocumentPage({
   document,
   printMode = false,
   returnTarget = archiveReportReturnTarget,
+  presentation = "member",
 }: FeedbackDocumentPageProps) {
   const feedbackHref = appFeedbackHref(document.sessionId);
   const returnState = readmatesReturnState(returnTarget);
@@ -50,7 +53,11 @@ export default function FeedbackDocumentPage({
                 {shouldShowFeedbackReturnLink(returnTarget) ? (
                   <span className="rm-feedback-document-kicker__divider">·</span>
                 ) : null}
-                <span>피드백 문서</span>
+                <span>
+                  {presentation === "hostPreview"
+                    ? "피드백 문서 · 호스트 미리보기"
+                    : "피드백 문서"}
+                </span>
               </p>
               <h1 className="h1 editorial" style={{ margin: "6px 0 6px" }}>
                 {document.title}
@@ -61,7 +68,9 @@ export default function FeedbackDocumentPage({
                     {document.subtitle}
                   </p>
                   <p className="tiny mono" style={{ color: "var(--text-3)", margin: "8px 0 0" }}>
-                    보존 문서 · 참석자 열람본
+                    {presentation === "hostPreview"
+                      ? "운영 확인본 · 이 미리보기 경로는 멤버에게 공개되지 않습니다."
+                      : "보존 문서 · 참석자 열람본"}
                   </p>
                 </div>
                 {!printMode && feedbackDocumentPdfDownloadsEnabled ? (
@@ -258,8 +267,23 @@ export function FeedbackDocumentUnavailablePage({
   reason,
   printMode = false,
   returnTarget = archiveReportReturnTarget,
+  presentation = "member",
 }: FeedbackDocumentUnavailablePageProps) {
-  const copy = feedbackUnavailableCopy(reason);
+  const hostPreviewCopy = reason === "forbidden"
+    ? {
+        eyebrow: "호스트 미리보기",
+        title: "이 피드백 문서를 미리볼 권한이 없습니다.",
+        body: "현재 클럽의 호스트 권한과 문서 범위를 확인해 주세요.",
+        rule: "호스트 전용 미리보기는 현재 클럽의 호스트만 열 수 있습니다.",
+      }
+    : {
+        eyebrow: "호스트 미리보기",
+        title: "아직 미리볼 피드백 문서가 없습니다.",
+        body: "피드백 문서를 저장하면 이 호스트 전용 경로에서 먼저 확인할 수 있습니다.",
+        rule: "미발행 문서는 멤버 화면에 노출되지 않으며, 호스트가 먼저 검토할 수 있습니다.",
+      };
+  const memberCopy = feedbackUnavailableCopy(reason);
+  const copy = presentation === "hostPreview" ? hostPreviewCopy : memberCopy;
 
   return (
     <main className={`rm-feedback-document-page${printMode ? " rm-feedback-document-page--print" : ""}`}>
@@ -279,9 +303,11 @@ export function FeedbackDocumentUnavailablePage({
             <div className={reason === "forbidden" ? "rm-locked-state" : "rm-empty-state"} role="note" style={{ padding: "18px 20px" }}>
               <div className="eyebrow">열람 규칙</div>
               <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
-                {reason === "forbidden"
-                  ? "active 정식 멤버로 확인된 계정만 문서 본문을 열람할 수 있습니다."
-                  : "문서가 등록되지 않은 회차는 본문을 표시하지 않습니다."}
+                {presentation === "hostPreview"
+                  ? copy.rule
+                  : reason === "forbidden"
+                    ? "active 정식 멤버로 확인된 계정만 문서 본문을 열람할 수 있습니다."
+                    : "문서가 등록되지 않은 회차는 본문을 표시하지 않습니다."}
               </p>
             </div>
             <div className="row rm-feedback-document-actions" style={{ gap: 8, flexWrap: "wrap" }}>

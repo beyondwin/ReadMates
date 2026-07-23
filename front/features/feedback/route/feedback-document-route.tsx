@@ -38,9 +38,19 @@ export function FeedbackDocumentRoute({
   }
 
   return result.status === "ready" ? (
-    <FeedbackDocumentPage document={result.document} printMode={effectivePrintMode} returnTarget={returnTarget} />
+    <FeedbackDocumentPage
+      document={result.document}
+      printMode={effectivePrintMode}
+      returnTarget={returnTarget}
+      presentation={hostPreview ? "hostPreview" : "member"}
+    />
   ) : (
-    <FeedbackDocumentUnavailablePage reason={result.reason} printMode={effectivePrintMode} returnTarget={returnTarget} />
+    <FeedbackDocumentUnavailablePage
+      reason={result.reason}
+      printMode={effectivePrintMode}
+      returnTarget={returnTarget}
+      presentation={hostPreview ? "hostPreview" : "member"}
+    />
   );
 }
 

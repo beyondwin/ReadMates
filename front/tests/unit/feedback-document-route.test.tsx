@@ -438,6 +438,11 @@ describe("Host feedback document preview route", () => {
     );
 
     expect(await screen.findByRole("heading", { name: "열린 모임 피드백 미리보기" })).toBeInTheDocument();
+    expect(screen.getByText("피드백 문서 · 호스트 미리보기")).toBeInTheDocument();
+    expect(
+      screen.getByText("운영 확인본 · 이 미리보기 경로는 멤버에게 공개되지 않습니다."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("보존 문서 · 참석자 열람본")).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/bff/api/host/sessions/open-session/feedback-document/preview?clubSlug=reading-sai",
       expect.anything(),
@@ -466,7 +471,38 @@ describe("Host feedback document preview route", () => {
       "/clubs/reading-sai/app/host/sessions/missing-session/feedback-document",
     );
 
-    expect(await screen.findByRole("heading", { name: "아직 열람 가능한 피드백 문서가 없습니다." })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "아직 미리볼 피드백 문서가 없습니다." })).toBeInTheDocument();
+    expect(screen.getByText("호스트 미리보기")).toBeInTheDocument();
+    expect(
+      screen.getByText("미발행 문서는 멤버 화면에 노출되지 않으며, 호스트가 먼저 검토할 수 있습니다."),
+    ).toBeInTheDocument();
+  });
+
+  it("uses host access copy when the host preview API denies document access", async () => {
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me?clubSlug=reading-sai") {
+        return Promise.resolve(new Response(JSON.stringify(hostAuth), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }));
+      }
+
+      return Promise.resolve(new Response("", { status: 403 }));
+    }));
+
+    renderHostFeedbackPreviewRoute(
+      "/clubs/reading-sai/app/host/sessions/denied-session/feedback-document",
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "이 피드백 문서를 미리볼 권한이 없습니다." }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("호스트 전용 미리보기는 현재 클럽의 호스트만 열 수 있습니다."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/active 정식 멤버/)).not.toBeInTheDocument();
   });
 
   it("requires host authorization before requesting preview data", async () => {

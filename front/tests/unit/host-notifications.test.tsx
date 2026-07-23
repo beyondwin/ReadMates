@@ -253,7 +253,10 @@ function installRouterRequestShim() {
   );
 }
 
-function seedNotificationsRoute(client: QueryClient) {
+function seedNotificationsRoute(
+  client: QueryClient,
+  { includePolicy = true }: { includePolicy?: boolean } = {},
+) {
   const context = { clubSlug: "reading-sai" };
   client.setQueryData(hostNotificationSummaryQuery(context).queryKey, summary);
   client.setQueryData(hostNotificationEventsQuery({ limit: 50 }, context).queryKey, {
@@ -272,10 +275,12 @@ function seedNotificationsRoute(client: QueryClient) {
     items: [hostSessionCurrent, hostSessionDraft],
     nextCursor: null,
   });
-  client.setQueryData(hostNotificationPolicyQuery(context).queryKey, {
-    sessionReminderEnabled: false,
-    updatedAt: null,
-  });
+  if (includePolicy) {
+    client.setQueryData(hostNotificationPolicyQuery(context).queryKey, {
+      sessionReminderEnabled: false,
+      updatedAt: null,
+    });
+  }
   client.setQueryData(hostNotificationManualOptionsQuery(
     { sessionId: "session-1", page: { limit: 50 } },
     context,
@@ -289,9 +294,12 @@ function seedNotificationsRoute(client: QueryClient) {
   });
 }
 
-function renderNotificationsRoute(client = testQueryClient()) {
+function renderNotificationsRoute(
+  client = testQueryClient(),
+  options?: { includePolicy?: boolean },
+) {
   installRouterRequestShim();
-  seedNotificationsRoute(client);
+  seedNotificationsRoute(client, options);
   const router = createMemoryRouter([
     {
       path: "/clubs/:clubSlug/app/host/notifications",
@@ -520,6 +528,7 @@ describe("HostNotificationsRoute", () => {
   it("keeps the route policy truth when the club-scoped save fails", async () => {
     const client = testQueryClient();
     seedNotificationsRoute(client);
+    let policyGetCount = 0;
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = input.toString();
 
@@ -528,6 +537,17 @@ describe("HostNotificationsRoute", () => {
         && init?.method === "PUT"
       ) {
         return Promise.resolve(jsonResponse({ message: "save failed" }, 500));
+      }
+
+      if (
+        url === "/api/bff/api/host/notifications/policy?clubSlug=reading-sai"
+        && !init?.method
+      ) {
+        policyGetCount += 1;
+        return Promise.resolve(jsonResponse({
+          sessionReminderEnabled: false,
+          updatedAt: null,
+        }));
       }
 
       return Promise.reject(new Error(`Unexpected request: ${url}`));
@@ -540,6 +560,7 @@ describe("HostNotificationsRoute", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("리마인더 정책을 저장하지 못했습니다");
     expect(reminder).not.toBeChecked();
+    expect(policyGetCount).toBe(1);
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/bff/api/host/notifications/policy?clubSlug=reading-sai",
       expect.objectContaining({
@@ -547,6 +568,140 @@ describe("HostNotificationsRoute", () => {
         body: JSON.stringify({ sessionReminderEnabled: true }),
       }),
     );
+  });
+
+  it("keeps the successful PUT response when the follow-up policy GET fails", async () => {
+    const client = testQueryClient();
+    const otherClubPolicy = {
+      sessionReminderEnabled: false,
+      updatedAt: "2026-07-24T09:55:00+09:00",
+    };
+    client.setQueryData(
+      hostNotificationPolicyQuery({ clubSlug: "other-club" }).queryKey,
+      otherClubPolicy,
+    );
+    const updatedPolicy = {
+      sessionReminderEnabled: true,
+      updatedAt: "2026-07-24T10:00:00+09:00",
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+
+      if (
+        url === "/api/bff/api/host/notifications/policy?clubSlug=reading-sai"
+        && init?.method === "PUT"
+      ) {
+        return Promise.resolve(jsonResponse(updatedPolicy));
+      }
+
+      if (
+        url === "/api/bff/api/host/notifications/policy?clubSlug=reading-sai"
+        && !init?.method
+      ) {
+        return Promise.resolve(jsonResponse({ message: "refetch failed" }, 500));
+      }
+
+      return Promise.reject(new Error(`Unexpected request: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderNotificationsRoute(client);
+
+    await userEvent.click(
+      await screen.findByRole("checkbox", { name: "모임 전날 자동 리마인더" }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("checkbox", { name: "모임 전날 자동 리마인더" })).toBeChecked();
+    });
+    expect(client.getQueryData(
+      hostNotificationPolicyQuery({ clubSlug: "reading-sai" }).queryKey,
+    )).toEqual(updatedPolicy);
+    expect(client.getQueryData(
+      hostNotificationPolicyQuery({ clubSlug: "other-club" }).queryKey,
+    )).toEqual(otherClubPolicy);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("shows an initial policy load error and retries into the club-scoped server truth", async () => {
+    const client = testQueryClient();
+    let policyGetCount = 0;
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+
+      if (
+        url === "/api/bff/api/host/notifications/policy?clubSlug=reading-sai"
+        && !init?.method
+      ) {
+        policyGetCount += 1;
+        return Promise.resolve(
+          policyGetCount === 1
+            ? jsonResponse({ message: "load failed" }, 500)
+            : jsonResponse({
+                sessionReminderEnabled: true,
+                updatedAt: "2026-07-24T10:05:00+09:00",
+              }),
+        );
+      }
+
+      return Promise.reject(new Error(`Unexpected request: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderNotificationsRoute(client, { includePolicy: false });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "자동 리마인더 정책을 불러오지 못했습니다",
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "정책 다시 불러오기" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("checkbox", { name: "모임 전날 자동 리마인더" })).toBeChecked();
+    });
+    expect(policyGetCount).toBe(2);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("reconciles an ambiguous failed PUT to the club-scoped server truth", async () => {
+    const client = testQueryClient();
+    const serverTruth = {
+      sessionReminderEnabled: true,
+      updatedAt: "2026-07-24T10:10:00+09:00",
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+
+      if (
+        url === "/api/bff/api/host/notifications/policy?clubSlug=reading-sai"
+        && init?.method === "PUT"
+      ) {
+        return Promise.resolve(jsonResponse({ message: "ambiguous failure" }, 500));
+      }
+
+      if (
+        url === "/api/bff/api/host/notifications/policy?clubSlug=reading-sai"
+        && !init?.method
+      ) {
+        return Promise.resolve(jsonResponse(serverTruth));
+      }
+
+      return Promise.reject(new Error(`Unexpected request: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderNotificationsRoute(client);
+
+    await userEvent.click(
+      await screen.findByRole("checkbox", { name: "모임 전날 자동 리마인더" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "리마인더 정책을 저장하지 못했습니다",
+    );
+    await waitFor(() => {
+      expect(screen.getByRole("checkbox", { name: "모임 전날 자동 리마인더" })).toBeChecked();
+    });
+    expect(client.getQueryData(
+      hostNotificationPolicyQuery({ clubSlug: "reading-sai" }).queryKey,
+    )).toEqual(serverTruth);
   });
 
   it("disables manual preview button while manual options refetch is in flight after a session change", async () => {

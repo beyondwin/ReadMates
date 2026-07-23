@@ -62,4 +62,24 @@ describe("HostNotificationPolicyCard", () => {
     expect(screen.getByRole("checkbox", { name: "모임 전날 자동 리마인더" })).toBeDisabled();
     expect(screen.getByText("저장 중")).toBeInTheDocument();
   });
+
+  it("exposes a failed initial load and lets the host retry", async () => {
+    const user = userEvent.setup();
+    const onRetryLoad = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <HostNotificationPolicyCard
+        loadError="자동 리마인더 정책을 불러오지 못했습니다."
+        onChange={vi.fn()}
+        onRetryLoad={onRetryLoad}
+      />,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent("정책을 불러오지 못했습니다");
+    expect(screen.getByRole("checkbox", { name: "모임 전날 자동 리마인더" })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "정책 다시 불러오기" }));
+
+    expect(onRetryLoad).toHaveBeenCalledTimes(1);
+  });
 });

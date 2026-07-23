@@ -170,6 +170,12 @@ export function HostNotificationsRoute() {
       policy={policyQuery.data}
       policyPending={updatePolicyMutation.isPending}
       policyError={policyError}
+      policyLoadError={
+        policyQuery.isError && !policyQuery.data
+          ? "자동 리마인더 정책을 불러오지 못했습니다."
+          : null
+      }
+      policyLoading={policyQuery.isFetching && !policyQuery.data}
       hasMoreEvents={Boolean(events.nextCursor)}
       hasMoreDeliveries={Boolean(deliveries.nextCursor)}
       hasMoreAudit={Boolean(audit.nextCursor)}
@@ -214,6 +220,10 @@ export function HostNotificationsRoute() {
         } catch {
           setPolicyError("리마인더 정책을 저장하지 못했습니다. 다시 시도해 주세요.");
         }
+      }}
+      onPolicyRetry={async () => {
+        setPolicyError(null);
+        await policyQuery.refetch();
       }}
     />
   );
