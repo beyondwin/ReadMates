@@ -119,6 +119,31 @@ class SessionRecordDraftServiceTest {
     }
 
     @Test
+    fun `editing a restored draft preserves its restore provenance`() {
+        val revision = revision()
+        val store = FakeStore(live = live(), revision = revision)
+        val service = SessionRecordDraftService(store, codec)
+        val restored =
+            service.restore(
+                host,
+                RestoreSessionRecordDraftCommand(sessionId, revision.id, expectedDraftRevision = null),
+            )
+
+        val edited =
+            service.save(
+                host,
+                SaveSessionRecordDraftCommand(
+                    sessionId,
+                    snapshot("복원 후 검토한 요약"),
+                    expectedDraftRevision = restored.draftRevision,
+                ),
+            )
+
+        assertThat(edited.source).isEqualTo(SessionRecordDraftSource.RESTORED)
+        assertThat(edited.restoredFromRevisionId).isEqualTo(revision.id)
+    }
+
+    @Test
     fun `basic metadata drift marks draft live base stale`() {
         val store = FakeStore(live = live(revision = 5), draft = draft(baseLiveRevision = 4))
         val service = SessionRecordDraftService(store, codec)

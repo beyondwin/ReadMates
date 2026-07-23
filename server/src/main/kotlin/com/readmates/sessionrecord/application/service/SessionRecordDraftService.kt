@@ -63,7 +63,18 @@ class SessionRecordDraftService(
             return store.insertDraft(host, live, command, encoded)
         }
         if (requireExpectedRevision && current.draftRevision != command.expectedDraftRevision) throw draftStale()
-        val updateCommand = command.copy(expectedDraftRevision = current.draftRevision)
+        val updateCommand =
+            if (current.source == com.readmates.sessionrecord.application.model.SessionRecordDraftSource.RESTORED &&
+                command.source == com.readmates.sessionrecord.application.model.SessionRecordDraftSource.MANUAL
+            ) {
+                command.copy(
+                    expectedDraftRevision = current.draftRevision,
+                    source = current.source,
+                    restoredFromRevisionId = current.restoredFromRevisionId,
+                )
+            } else {
+                command.copy(expectedDraftRevision = current.draftRevision)
+            }
         return store.compareAndSetDraft(host, updateCommand, encoded) ?: throw draftStale()
     }
 
