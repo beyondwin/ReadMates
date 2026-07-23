@@ -4,9 +4,12 @@ import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.MethodSource
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
@@ -15,6 +18,9 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import java.util.stream.Stream
 
 private const val CLEANUP_BFF_DELETE_SESSION_SQL = """
     delete from public_session_publications
@@ -50,6 +56,42 @@ class HostSessionBffSecurityTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
 ) : ReadmatesMySqlIntegrationTestSupport() {
+    @ParameterizedTest
+    @MethodSource("recordMutationCases")
+    fun `trusted host bff reaches every record mutation controller without csrf`(case: RecordMutationCase) {
+        val request =
+            request(case.method, case.path)
+                .with(user("host@example.com"))
+                .header("X-Readmates-Bff-Secret", "test-bff-secret")
+                .header("Origin", "http://localhost:3000")
+        case.body?.let {
+            request
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(it)
+        }
+
+        mockMvc.perform(request).andExpect(status().isNotFound)
+    }
+
+    @Test
+    fun `record mutations still reject missing invalid bff secret and non host identity`() {
+        fun requestWith(
+            username: String,
+            secret: String?,
+        ) = request(
+            HttpMethod.PATCH,
+            "/api/host/sessions/00000000-0000-0000-0000-000000009998/record-draft",
+        ).with(user(username))
+            .header("Origin", "http://localhost:3000")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(RECORD_DRAFT_BODY)
+            .also { builder -> secret?.let { builder.header("X-Readmates-Bff-Secret", it) } }
+
+        mockMvc.perform(requestWith("host@example.com", null)).andExpect(status().isUnauthorized)
+        mockMvc.perform(requestWith("host@example.com", "invalid-secret")).andExpect(status().isUnauthorized)
+        mockMvc.perform(requestWith("member5@example.com", "test-bff-secret")).andExpect(status().isForbidden)
+    }
+
     @Test
     fun `host delete bff request reaches controller without spring csrf token`() {
         createOpenSession()
@@ -233,4 +275,70 @@ class HostSessionBffSecurityTest(
             "select count(*) from $tableName where $whereClause",
             Int::class.java,
         ) ?: 0
+
+    private companion object {
+        private const val RECORD_DRAFT_BODY =
+            """
+            {
+              "expectedDraftRevision": null,
+              "snapshot": {
+                "visibility": "HOST_ONLY",
+                "publicationSummary": "",
+                "highlights": [],
+                "oneLineReviews": [],
+                "feedbackDocument": {"fileName":"feedback.md","title":"Feedback","markdown":""}
+              }
+            }
+            """
+
+        @JvmStatic
+        fun recordMutationCases(): Stream<RecordMutationCase> =
+            Stream.of(
+                RecordMutationCase(
+                    HttpMethod.POST,
+                    "/api/host/sessions/00000000-0000-0000-0000-000000009998/visibility-preview",
+                    """{"visibility":"MEMBER"}""",
+                ),
+                RecordMutationCase(
+                    HttpMethod.PATCH,
+                    "/api/host/sessions/00000000-0000-0000-0000-000000009998/record-draft",
+                    RECORD_DRAFT_BODY,
+                ),
+                RecordMutationCase(
+                    HttpMethod.DELETE,
+                    "/api/host/sessions/00000000-0000-0000-0000-000000009998/record-draft" +
+                        "?expectedDraftRevision=1",
+                    null,
+                ),
+                RecordMutationCase(
+                    HttpMethod.POST,
+                    "/api/host/sessions/00000000-0000-0000-0000-000000009998/record-apply-preview",
+                    """{"expectedDraftRevision":1,"expectedLiveRevision":0}""",
+                ),
+                RecordMutationCase(
+                    HttpMethod.POST,
+                    "/api/host/sessions/00000000-0000-0000-0000-000000009998/record-apply",
+                    """
+                    {
+                      "previewId":"00000000-0000-0000-0000-000000008998",
+                      "expectedDraftRevision":1,
+                      "expectedLiveRevision":0,
+                      "notificationDecision":"SKIP"
+                    }
+                    """,
+                ),
+                RecordMutationCase(
+                    HttpMethod.POST,
+                    "/api/host/sessions/00000000-0000-0000-0000-000000009998/revisions/" +
+                        "00000000-0000-0000-0000-000000007998/restore-to-draft",
+                    """{"expectedDraftRevision":null}""",
+                ),
+            )
+    }
 }
+
+data class RecordMutationCase(
+    val method: HttpMethod,
+    val path: String,
+    val body: String?,
+)
