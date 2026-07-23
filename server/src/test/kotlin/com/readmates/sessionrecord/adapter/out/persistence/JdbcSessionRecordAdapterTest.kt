@@ -37,11 +37,12 @@ class JdbcSessionRecordAdapterTest(
         assertThat(live.snapshot).isEqualTo(first.snapshot)
         assertThat(adapter.loadLive(second.host, first.sessionId)).isNull()
 
-        val draft = adapter.insertDraft(first.host, live, codec.encode(first.snapshot))
+        val command = SaveSessionRecordDraftCommand(first.sessionId, first.snapshot, null)
+        val draft = adapter.insertDraft(first.host, live, command, codec.encode(first.snapshot))
 
         assertThat(adapter.loadDraft(first.host, first.sessionId)).isEqualTo(draft)
         assertThat(adapter.loadDraft(second.host, first.sessionId)).isNull()
-        assertThatThrownBy { adapter.insertDraft(first.host, live, codec.encode(first.snapshot)) }
+        assertThatThrownBy { adapter.insertDraft(first.host, live, command, codec.encode(first.snapshot)) }
             .isInstanceOf(DuplicateKeyException::class.java)
     }
 
@@ -50,7 +51,13 @@ class JdbcSessionRecordAdapterTest(
     fun `compare and set updates exactly once while revisions remain ordered and immutable`() {
         val fixture = fixture("cas")
         val live = requireNotNull(adapter.loadLive(fixture.host, fixture.sessionId))
-        val firstDraft = adapter.insertDraft(fixture.host, live, codec.encode(fixture.snapshot))
+        val firstDraft =
+            adapter.insertDraft(
+                fixture.host,
+                live,
+                SaveSessionRecordDraftCommand(fixture.sessionId, fixture.snapshot, null),
+                codec.encode(fixture.snapshot),
+            )
         val changed = fixture.snapshot.copy(publicationSummary = "수정 요약")
 
         val updated =
@@ -121,7 +128,13 @@ class JdbcSessionRecordAdapterTest(
     fun `apply persistence writes baseline and immutable revision before deleting the draft`() {
         val fixture = fixture("apply")
         val live = requireNotNull(adapter.loadLive(fixture.host, fixture.sessionId))
-        val draft = adapter.insertDraft(fixture.host, live, codec.encode(fixture.snapshot))
+        val draft =
+            adapter.insertDraft(
+                fixture.host,
+                live,
+                SaveSessionRecordDraftCommand(fixture.sessionId, fixture.snapshot, null),
+                codec.encode(fixture.snapshot),
+            )
         val editor = requireNotNull(adapter.lockEditor(fixture.host, fixture.sessionId))
 
         adapter.insertBaselineIfAbsent(fixture.host, live, codec.encode(live.snapshot))

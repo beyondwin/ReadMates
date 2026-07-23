@@ -9,6 +9,7 @@ import com.readmates.sessionrecord.application.model.SessionRecordException
 import com.readmates.sessionrecord.application.port.`in`.ManageSessionRecordDraftUseCase
 import com.readmates.sessionrecord.application.port.out.SessionRecordStorePort
 import com.readmates.shared.security.AccessDeniedException
+import com.readmates.shared.security.AuthenticatedClubActor
 import com.readmates.shared.security.CurrentMember
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -33,6 +34,21 @@ class SessionRecordDraftService(
     @Transactional
     @Suppress("ThrowsCount")
     override fun save(host: CurrentMember, command: SaveSessionRecordDraftCommand): SessionRecordDraft {
+        return saveSnapshot(host, command, requireExpectedRevision = true)
+    }
+
+    @Transactional
+    override fun saveValidatedSnapshot(
+        host: AuthenticatedClubActor,
+        command: SaveSessionRecordDraftCommand,
+    ): SessionRecordDraft = saveSnapshot(host, command, requireExpectedRevision = false)
+
+    @Suppress("ThrowsCount")
+    private fun saveSnapshot(
+        host: AuthenticatedClubActor,
+        command: SaveSessionRecordDraftCommand,
+        requireExpectedRevision: Boolean,
+    ): SessionRecordDraft {
         requireHost(host)
         val live = requireLive(host, command.sessionId, forUpdate = true)
         val current = store.loadDraft(host, command.sessionId, forUpdate = true)
@@ -40,10 +56,11 @@ class SessionRecordDraftService(
 
         if (current == null) {
             if (command.expectedDraftRevision != null) throw draftStale()
-            return store.insertDraft(host, live, encoded)
+            return store.insertDraft(host, live, command, encoded)
         }
-        if (current.draftRevision != command.expectedDraftRevision) throw draftStale()
-        return store.compareAndSetDraft(host, command, encoded) ?: throw draftStale()
+        if (requireExpectedRevision && current.draftRevision != command.expectedDraftRevision) throw draftStale()
+        val updateCommand = command.copy(expectedDraftRevision = current.draftRevision)
+        return store.compareAndSetDraft(host, updateCommand, encoded) ?: throw draftStale()
     }
 
     @Transactional
@@ -72,11 +89,11 @@ class SessionRecordDraftService(
         ) ?: throw draftStale()
     }
 
-    private fun requireLive(host: CurrentMember, sessionId: UUID, forUpdate: Boolean = false) =
+    private fun requireLive(host: AuthenticatedClubActor, sessionId: UUID, forUpdate: Boolean = false) =
         store.loadLive(host, sessionId, forUpdate)
             ?: throw SessionRecordException(SessionRecordError.SESSION_NOT_FOUND, "Session record not found")
 
-    private fun requireHost(host: CurrentMember) {
+    private fun requireHost(host: AuthenticatedClubActor) {
         if (!host.isHost) throw AccessDeniedException("Host role required")
     }
 

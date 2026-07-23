@@ -18,13 +18,10 @@ import com.readmates.aigen.application.port.out.AuditKind
 import com.readmates.aigen.application.port.out.AuditStatus
 import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.sessionimport.application.model.SessionImportCommand
-import com.readmates.sessionimport.application.model.SessionImportCommitResult
-import com.readmates.sessionimport.application.model.SessionImportCommittedFeedbackDocument
-import com.readmates.sessionimport.application.model.SessionImportFeedbackDocumentPreview
+import com.readmates.sessionimport.application.model.SessionImportDraftResult
 import com.readmates.sessionimport.application.model.SessionImportIssue
-import com.readmates.sessionimport.application.model.SessionImportPublicationPreview
-import com.readmates.sessionimport.application.port.`in`.CommitValidatedSessionImportUseCase
-import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportInput
+import com.readmates.sessionimport.application.port.`in`.SaveValidatedSessionRecordDraftUseCase
+import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportDraftInput
 import com.readmates.sessionimport.application.service.InvalidSessionImportException
 import com.readmates.shared.cache.ReadCacheInvalidationPort
 import org.assertj.core.api.Assertions.assertThat
@@ -56,6 +53,9 @@ class AiGenerationCommitServiceTest {
 
         assertThat(result.status).isEqualTo(JobStatus.COMMITTED)
         assertThat(result.participantUpdatesCount).isEqualTo(2)
+        assertThat(result.draftRevision).isEqualTo(1)
+        assertThat(result.baseLiveRevision).isZero()
+        assertThat(result.liveApplied).isFalse()
         assertThat(ctx.persistence.upsertCalls).isEqualTo(1)
         assertThat(ctx.delegate.invocations).hasSize(1)
         assertThat(
@@ -92,6 +92,8 @@ class AiGenerationCommitServiceTest {
         val ctx = GroundedContext()
         val record = ctx.record()
         ctx.jobStore.save(record)
+        ctx.persistence.onUpsert = { assertThat(ctx.transactionManager.active).isTrue() }
+        ctx.delegate.onSave = { assertThat(ctx.transactionManager.active).isTrue() }
         ctx.auditPort.onInsert = { assertThat(ctx.transactionManager.active).isTrue() }
 
         ctx.service.commit(
@@ -239,6 +241,7 @@ class AiGenerationCommitServiceTest {
         val host: AiGenerationActor =
             AiGenerationActor(
                 userId = UUID.randomUUID(),
+                membershipId = UUID.randomUUID(),
                 clubId = UUID.randomUUID(),
                 clubSlug = "test-club",
                 isHost = true,
@@ -261,33 +264,34 @@ class AiGenerationCommitServiceTest {
             )
     }
 
-    private class FakeCommitValidatedUseCase : CommitValidatedSessionImportUseCase {
-        val invocations: MutableList<ValidatedSessionImportInput> = mutableListOf()
+    private class FakeCommitValidatedUseCase : SaveValidatedSessionRecordDraftUseCase {
+        val invocations: MutableList<ValidatedSessionImportDraftInput> = mutableListOf()
         var exception: RuntimeException? = null
+        var onSave: () -> Unit = {}
 
-        override fun commitValidated(input: ValidatedSessionImportInput): SessionImportCommitResult {
+        override fun saveValidated(input: ValidatedSessionImportDraftInput): SessionImportDraftResult {
             exception?.let { throw it }
+            onSave()
             invocations += input
             val command: SessionImportCommand = input.command
-            return SessionImportCommitResult(
+            return SessionImportDraftResult(
                 sessionId = command.sessionId.toString(),
-                publication = SessionImportPublicationPreview(command.publication.summary),
-                highlights = emptyList(),
-                oneLineReviews = emptyList(),
-                feedbackDocument =
-                    SessionImportCommittedFeedbackDocument(
-                        uploaded = true,
-                        fileName = command.feedbackDocument.fileName,
-                        title = "title",
-                        uploadedAt = "2026-05-16T10:00:00Z",
-                    ),
+                draftRevision = 1,
+                baseLiveRevision = 0,
             )
         }
     }
 
     private class GroundedContext {
         val sessionId = UUID.randomUUID()
-        val host = AiGenerationActor(UUID.randomUUID(), UUID.randomUUID(), "test-club", true)
+        val host =
+            AiGenerationActor(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                "test-club",
+                true,
+            )
         val jobStore = FakeJobStore()
         val auditPort = FakeAuditPort()
         val validator = FakeValidator()
@@ -331,6 +335,7 @@ class AiGenerationCommitServiceTest {
         var upsertCalls = 0
         var receipt: AiGenerationCommitReceipt? = null
         var failure: RuntimeException? = null
+        var onUpsert: () -> Unit = {}
 
         override fun upsertTranscriptSpeakersAsParticipants(
             clubId: UUID,
@@ -338,6 +343,7 @@ class AiGenerationCommitServiceTest {
             validatedTurns: List<ValidatedTranscriptTurn>,
         ): Int {
             upsertCalls += 1
+            onUpsert()
             failure?.let { throw it }
             return validatedTurns.map { it.speakerMembershipId }.distinct().size
         }

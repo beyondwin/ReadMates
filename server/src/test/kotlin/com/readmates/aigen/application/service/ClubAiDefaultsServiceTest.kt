@@ -28,6 +28,7 @@ class ClubAiDefaultsServiceTest {
     private val hostActor =
         AiGenerationActor(
             userId = hostUserId,
+            membershipId = UUID.randomUUID(),
             clubId = clubId,
             clubSlug = clubSlug,
             isHost = true,

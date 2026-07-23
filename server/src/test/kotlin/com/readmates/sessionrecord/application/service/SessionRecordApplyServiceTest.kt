@@ -39,6 +39,7 @@ import com.readmates.sessionrecord.application.model.SessionRecordRevision
 import com.readmates.sessionrecord.application.model.SessionRecordSnapshot
 import com.readmates.sessionrecord.application.model.SessionRecordSource
 import com.readmates.sessionrecord.application.port.out.SessionRecordStorePort
+import com.readmates.shared.security.AuthenticatedClubActor
 import com.readmates.shared.security.CurrentMember
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -64,7 +65,21 @@ class SessionRecordApplyServiceTest {
 
         assertEquals(1, fixture.validator.calls)
         assertEquals(fixture.draft.snapshot, fixture.replacer.lastSnapshot)
+        assertEquals(
+            mapOf("Host" to fixture.host.membershipId),
+            fixture.validator.lastTrustedBindings,
+        )
         assertTrue(fixture.replacer.committed)
+    }
+
+    @Test
+    fun `apply uses one validation canonical snapshot for replacement and immutable revision`() {
+        val fixture = Fixture(draftPublicationSummary = "  Summary  ")
+
+        fixture.apply()
+
+        assertEquals("Summary", fixture.replacer.lastSnapshot?.publicationSummary)
+        assertEquals("Summary", fixture.store.revisions.last().snapshot.publicationSummary)
     }
 
     @Test
@@ -193,6 +208,27 @@ class SessionRecordApplyServiceTest {
     }
 
     @Test
+    fun `completed preview discovered after lock returns original concurrent result`() {
+        val fixture = Fixture(liveRevision = 3)
+        fixture.store.completedAfterLock =
+            CompletedSessionRecordApply(
+                previewId = fixture.previewId,
+                expectedDraftRevision = fixture.draft.draftRevision,
+                expectedLiveRevision = 3,
+                notificationDecision = NotificationDecision.SKIP,
+                decisionId = fixture.decisionId,
+                eventId = null,
+                revision = fixture.appliedRevision(version = 4),
+            )
+
+        val result = fixture.apply(NotificationDecision.SKIP)
+
+        assertEquals(4L, result.liveRevision)
+        assertEquals(0, fixture.validator.calls)
+        assertFalse(fixture.replacer.committed)
+    }
+
+    @Test
     fun `completed preview rejects a mismatched replay`() {
         val fixture = Fixture(liveRevision = 3)
         fixture.store.completed =
@@ -220,6 +256,7 @@ private class Fixture(
     liveFeedback: String = "",
     draftSource: SessionRecordDraftSource = SessionRecordDraftSource.MANUAL,
     restoredFromRevisionId: UUID? = null,
+    draftPublicationSummary: String = "Summary",
 ) {
     val clubId: UUID = UUID.randomUUID()
     val sessionId: UUID = UUID.randomUUID()
@@ -255,12 +292,15 @@ private class Fixture(
             draftRevision = 2,
             source = draftSource,
             restoredFromRevisionId = restoredFromRevisionId,
-            snapshot = snapshot(feedback = "Draft feedback"),
+            snapshot =
+                snapshot(feedback = "Draft feedback")
+                    .copy(publicationSummary = draftPublicationSummary),
             updatedByMembershipId = host.membershipId,
             createdAt = now,
             updatedAt = now,
         )
-    val store = FakeApplyStore(live, draft, now)
+    private val codec = SessionRecordSnapshotCodec(JsonMapper.builder().findAndAddModules().build())
+    val store = FakeApplyStore(live, draft, now, codec)
     val validator = FakeValidator()
     val replacer = FakeReplacer()
     val gate = FakeGate(previewId, decisionId, now)
@@ -268,7 +308,7 @@ private class Fixture(
     private val service =
         SessionRecordApplyService(
             store = store,
-            codec = SessionRecordSnapshotCodec(JsonMapper.builder().findAndAddModules().build()),
+            codec = codec,
             validator = validator,
             replacer = replacer,
             notificationGate = gate,
@@ -321,20 +361,27 @@ private class FakeApplyStore(
     private val live: LiveSessionRecord,
     initialDraft: SessionRecordDraft,
     private val now: OffsetDateTime,
+    private val codec: SessionRecordSnapshotCodec,
 ) : SessionRecordStorePort {
     var draft: SessionRecordDraft? = initialDraft
     var completed: CompletedSessionRecordApply? = null
+    var completedAfterLock: CompletedSessionRecordApply? = null
     val revisions = mutableListOf<SessionRecordRevision>()
     private val stagedRevisions = mutableListOf<SessionRecordRevision>()
     var onCommit: () -> Unit = {}
 
-    override fun lockEditor(host: CurrentMember, sessionId: UUID): SessionRecordEditor? =
-        SessionRecordEditor(live, draft, draftLiveBaseStale = false)
+    override fun lockEditor(host: AuthenticatedClubActor, sessionId: UUID): SessionRecordEditor? {
+        completed = completedAfterLock ?: completed
+        return SessionRecordEditor(live, draft, draftLiveBaseStale = false)
+    }
 
-    override fun findCompletedApply(host: CurrentMember, previewId: UUID): CompletedSessionRecordApply? = completed
+    override fun findCompletedApply(
+        host: AuthenticatedClubActor,
+        previewId: UUID,
+    ): CompletedSessionRecordApply? = completed
 
     override fun insertBaselineIfAbsent(
-        host: CurrentMember,
+        host: AuthenticatedClubActor,
         live: LiveSessionRecord,
         encoded: EncodedSessionRecordSnapshot,
     ) {
@@ -344,17 +391,21 @@ private class FakeApplyStore(
     }
 
     override fun insertAppliedRevision(
-        host: CurrentMember,
+        host: AuthenticatedClubActor,
         editor: SessionRecordEditor,
         encoded: EncodedSessionRecordSnapshot,
     ): SessionRecordRevision {
         val version = if (editor.live.revision == 0L) 2 else editor.live.revision + 1
         val source = SessionRecordSource.valueOf(requireNotNull(editor.draft).source.name)
-        return revision(host, editor.draft.snapshot, version, source, editor.draft.restoredFromRevisionId)
+        return revision(host, codec.decode(encoded.json), version, source, editor.draft.restoredFromRevisionId)
             .also(stagedRevisions::add)
     }
 
-    override fun deleteAppliedDraft(host: CurrentMember, sessionId: UUID, expectedDraftRevision: Long): Boolean {
+    override fun deleteAppliedDraft(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+        expectedDraftRevision: Long,
+    ): Boolean {
         if (draft?.draftRevision != expectedDraftRevision) return false
         revisions += stagedRevisions
         stagedRevisions.clear()
@@ -363,25 +414,30 @@ private class FakeApplyStore(
         return true
     }
 
-    override fun loadLive(host: CurrentMember, sessionId: UUID, forUpdate: Boolean) = live
+    override fun loadLive(host: AuthenticatedClubActor, sessionId: UUID, forUpdate: Boolean) = live
 
-    override fun loadDraft(host: CurrentMember, sessionId: UUID, forUpdate: Boolean) = draft
+    override fun loadDraft(host: AuthenticatedClubActor, sessionId: UUID, forUpdate: Boolean) = draft
 
-    override fun insertDraft(host: CurrentMember, live: LiveSessionRecord, encoded: EncodedSessionRecordSnapshot) =
+    override fun insertDraft(
+        host: AuthenticatedClubActor,
+        live: LiveSessionRecord,
+        command: SaveSessionRecordDraftCommand,
+        encoded: EncodedSessionRecordSnapshot,
+    ) =
         requireNotNull(draft)
 
     override fun compareAndSetDraft(
-        host: CurrentMember,
+        host: AuthenticatedClubActor,
         command: SaveSessionRecordDraftCommand,
         encoded: EncodedSessionRecordSnapshot,
     ) = draft
 
-    override fun deleteDraft(host: CurrentMember, sessionId: UUID, expectedDraftRevision: Long) = false
+    override fun deleteDraft(host: AuthenticatedClubActor, sessionId: UUID, expectedDraftRevision: Long) = false
 
-    override fun loadRevision(host: CurrentMember, sessionId: UUID, revisionId: UUID) = null
+    override fun loadRevision(host: AuthenticatedClubActor, sessionId: UUID, revisionId: UUID) = null
 
     override fun insertRestoredDraft(
-        host: CurrentMember,
+        host: AuthenticatedClubActor,
         live: LiveSessionRecord,
         revision: SessionRecordRevision,
         expectedDraftRevision: Long?,
@@ -389,7 +445,7 @@ private class FakeApplyStore(
     ) = draft
 
     private fun revision(
-        host: CurrentMember,
+        host: AuthenticatedClubActor,
         snapshot: SessionRecordSnapshot,
         version: Long,
         source: SessionRecordSource,
@@ -409,12 +465,15 @@ private class FakeApplyStore(
 
 private class FakeValidator : ValidateSessionImportUseCase {
     var calls = 0
+    var lastTrustedBindings: Map<String, UUID> = emptyMap()
+
     override fun validate(
         command: com.readmates.sessionimport.application.model.SessionImportCommand,
         trustedAuthorBindings: Map<String, UUID>,
     ): SessionImportPreviewResult {
         calls += 1
-        return command.validPreview()
+        lastTrustedBindings = trustedAuthorBindings
+        return command.validPreview(trustedAuthorBindings)
     }
 }
 
@@ -490,7 +549,9 @@ private class FakeRecorder : RecordHostConfirmedNotificationEventUseCase {
     }
 }
 
-private fun com.readmates.sessionimport.application.model.SessionImportCommand.validPreview() =
+private fun com.readmates.sessionimport.application.model.SessionImportCommand.validPreview(
+    trustedAuthorBindings: Map<String, UUID>,
+) =
     SessionImportPreviewResult(
         valid = true,
         session =
@@ -501,24 +562,24 @@ private fun com.readmates.sessionimport.application.model.SessionImportCommand.v
             ),
         publication =
             com.readmates.sessionimport.application.model.SessionImportPublicationPreview(
-                publication.summary,
+                publication.summary.trim(),
             ),
         highlights =
             highlights.map {
                 com.readmates.sessionimport.application.model.SessionImportRecordPreview(
                     it.authorName,
-                    it.text,
+                    it.text.trim(),
                     true,
-                    UUID.randomUUID().toString(),
+                    trustedAuthorBindings.getValue(it.authorName).toString(),
                 )
             },
         oneLineReviews =
             oneLineReviews.map {
                 com.readmates.sessionimport.application.model.SessionImportRecordPreview(
                     it.authorName,
-                    it.text,
+                    it.text.trim(),
                     true,
-                    UUID.randomUUID().toString(),
+                    trustedAuthorBindings.getValue(it.authorName).toString(),
                 )
             },
         feedbackDocument =

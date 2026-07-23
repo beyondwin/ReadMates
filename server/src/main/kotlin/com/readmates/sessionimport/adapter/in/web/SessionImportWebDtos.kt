@@ -2,6 +2,7 @@ package com.readmates.sessionimport.adapter.`in`.web
 
 import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.sessionimport.application.model.SessionImportCommand
+import com.readmates.sessionimport.application.model.SessionImportDraftResult
 import com.readmates.sessionimport.application.model.SessionImportFeedbackDocumentCommand
 import com.readmates.sessionimport.application.model.SessionImportPublicationCommand
 import com.readmates.sessionimport.application.model.SessionImportRecordCommand
@@ -54,3 +55,18 @@ data class SessionImportFeedbackDocumentRequest(
     val fileName: String,
     val markdown: String,
 )
+
+data class SessionImportDraftResponse(
+    val sessionId: String,
+    val draftRevision: Long,
+    val baseLiveRevision: Long,
+    val liveApplied: Boolean,
+)
+
+fun SessionImportDraftResult.toResponse() =
+    SessionImportDraftResponse(
+        sessionId = sessionId,
+        draftRevision = draftRevision,
+        baseLiveRevision = baseLiveRevision,
+        liveApplied = liveApplied,
+    )

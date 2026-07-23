@@ -17,6 +17,7 @@ import com.readmates.sessionimport.application.model.SessionImportSessionCommand
 import com.readmates.sessionimport.application.port.`in`.ReplaceValidatedSessionImportUseCase
 import com.readmates.sessionimport.application.port.`in`.ValidateSessionImportUseCase
 import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportReplacement
+import com.readmates.sessionimport.application.service.toCanonicalSnapshot
 import com.readmates.sessionrecord.application.model.ApplySessionRecordCommand
 import com.readmates.sessionrecord.application.model.CompletedSessionRecordApply
 import com.readmates.sessionrecord.application.model.LiveSessionRecord
@@ -33,6 +34,7 @@ import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.util.UUID
 
 @Service
 class SessionRecordApplyService(
@@ -80,7 +82,6 @@ class SessionRecordApplyService(
     }
 
     @Transactional
-    @Suppress("LongMethod", "ThrowsCount")
     override fun apply(
         host: CurrentMember,
         command: ApplySessionRecordCommand,
@@ -92,6 +93,18 @@ class SessionRecordApplyService(
         val editor =
             store.lockEditor(host, command.sessionId)
                 ?: throw notFound()
+        return applyLocked(host, command, editor)
+    }
+
+    @Suppress("LongMethod", "ThrowsCount")
+    private fun applyLocked(
+        host: CurrentMember,
+        command: ApplySessionRecordCommand,
+        editor: SessionRecordEditor,
+    ): SessionRecordApplyResult {
+        store.findCompletedApply(host, command.previewId)?.let { completed ->
+            return replay(command, completed)
+        }
         val draft = editor.draft ?: throw draftStale()
         requireRevisions(editor.live, draft, command.expectedLiveRevision, command.expectedDraftRevision)
         val eventType = eventType(editor.live, draft)
@@ -111,7 +124,7 @@ class SessionRecordApplyService(
                 ),
             )
         val importCommand = draft.toImportCommand(host, editor.live)
-        val validated = validator.validate(importCommand)
+        val validated = validator.validate(importCommand, draft.trustedAuthorBindings())
         if (!validated.valid) {
             throw SessionRecordException(
                 SessionRecordError.INVALID_RECORD,
@@ -119,9 +132,10 @@ class SessionRecordApplyService(
             )
         }
         val encodedLive = codec.encode(editor.live.snapshot)
-        val encodedDraft = codec.encode(draft.snapshot)
+        val canonicalSnapshot = importCommand.toCanonicalSnapshot(validated)
+        val encodedDraft = codec.encode(canonicalSnapshot)
         store.insertBaselineIfAbsent(host, editor.live, encodedLive)
-        replacer.replace(ValidatedSessionImportReplacement(importCommand, validated, draft.snapshot))
+        replacer.replace(ValidatedSessionImportReplacement(importCommand, validated, canonicalSnapshot))
         val revision = store.insertAppliedRevision(host, editor, encodedDraft)
         val eventId =
             if (prepared.decision == NotificationDecision.SEND) {
@@ -201,6 +215,20 @@ class SessionRecordApplyService(
         } else {
             NotificationEventType.SESSION_RECORD_UPDATED
         }
+
+    private fun SessionRecordDraft.trustedAuthorBindings(): Map<String, UUID> =
+        (snapshot.highlights + snapshot.oneLineReviews)
+            .groupBy { it.authorDisplayName }
+            .mapValues { (name, entries) ->
+                entries
+                    .map { it.membershipId }
+                    .distinct()
+                    .singleOrNull()
+                    ?: throw SessionRecordException(
+                        SessionRecordError.INVALID_RECORD,
+                        "Session record author attribution is ambiguous for $name",
+                    )
+            }
 
     private fun SessionRecordDraft.toImportCommand(
         host: CurrentMember,

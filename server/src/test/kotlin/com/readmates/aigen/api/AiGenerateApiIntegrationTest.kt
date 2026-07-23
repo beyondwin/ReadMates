@@ -65,6 +65,8 @@ private const val HOST_EMAIL = "aigen-host@example.test"
 
 private const val CLEANUP_SQL = """
     delete from notification_event_outbox where club_id = '$CLUB_ID';
+    delete from ai_generation_commit_receipts where club_id = '$CLUB_ID';
+    delete from session_record_drafts where club_id = '$CLUB_ID';
     delete from session_feedback_documents where session_id = '$SESSION_ID';
     delete from public_session_publications where session_id = '$SESSION_ID';
     delete from highlights where session_id = '$SESSION_ID';
@@ -589,6 +591,9 @@ class AiGenerateApiIntegrationTest(
                 jsonPath("$.sessionId") { value(SESSION_ID) }
                 jsonPath("$.status") { value("COMMITTED") }
                 jsonPath("$.recovered") { value(false) }
+                jsonPath("$.draftRevision") { value(1) }
+                jsonPath("$.baseLiveRevision") { value(0) }
+                jsonPath("$.liveApplied") { value(false) }
                 jsonPath("$.publication") { doesNotExist() }
             }
     }
@@ -619,8 +624,21 @@ class AiGenerateApiIntegrationTest(
                 """.trimIndent(),
             )
         val kindStatus = auditRows.map { it["kind"] as String to it["status"] as String }
-        assertThat(summary).isNotNull.contains("AI Gen Book")
-        assertThat(feedbackCount).isGreaterThanOrEqualTo(1)
+        assertThat(summary).isEqualTo("placeholder")
+        assertThat(feedbackCount).isZero()
+        val draft =
+            jdbcTemplate.queryForMap(
+                """
+                select draft_revision, base_live_revision, source, snapshot_json
+                from session_record_drafts where club_id=? and session_id=?
+                """.trimIndent(),
+                CLUB_ID,
+                SESSION_ID,
+            )
+        assertThat(draft["draft_revision"]).isEqualTo(1L)
+        assertThat(draft["base_live_revision"]).isEqualTo(0L)
+        assertThat(draft["source"]).isEqualTo("AI_GENERATED")
+        assertThat(draft["snapshot_json"].toString()).contains("AI Gen Book")
         assertThat(kindStatus).contains("FULL" to "SUCCESS", "COMMIT" to "SUCCESS")
     }
 

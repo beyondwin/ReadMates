@@ -5,6 +5,7 @@ import java.util.UUID
 
 data class AiGenerationActor(
     override val userId: UUID,
+    override val membershipId: UUID,
     override val clubId: UUID,
     override val clubSlug: String,
     override val isHost: Boolean,

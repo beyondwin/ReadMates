@@ -20,7 +20,7 @@ import com.readmates.shared.db.dbString
 import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.db.uuid
 import com.readmates.shared.db.uuidOrNull
-import com.readmates.shared.security.CurrentMember
+import com.readmates.shared.security.AuthenticatedClubActor
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import java.sql.ResultSet
@@ -33,7 +33,7 @@ class JdbcSessionRecordAdapter(
     private val jdbcTemplate: JdbcTemplate,
     private val codec: SessionRecordSnapshotCodec,
 ) : SessionRecordStorePort {
-    override fun lockEditor(host: CurrentMember, sessionId: UUID): SessionRecordEditor? {
+    override fun lockEditor(host: AuthenticatedClubActor, sessionId: UUID): SessionRecordEditor? {
         val live = loadLive(host, sessionId, forUpdate = true) ?: return null
         val draft = loadDraft(host, sessionId, forUpdate = true)
         return SessionRecordEditor(
@@ -44,7 +44,7 @@ class JdbcSessionRecordAdapter(
     }
 
     override fun findCompletedApply(
-        host: CurrentMember,
+        host: AuthenticatedClubActor,
         previewId: UUID,
     ): CompletedSessionRecordApply? =
         jdbcTemplate.query(
@@ -84,7 +84,7 @@ class JdbcSessionRecordAdapter(
         ).firstOrNull()
 
     override fun insertBaselineIfAbsent(
-        host: CurrentMember,
+        host: AuthenticatedClubActor,
         live: LiveSessionRecord,
         encoded: EncodedSessionRecordSnapshot,
     ) {
@@ -112,7 +112,7 @@ class JdbcSessionRecordAdapter(
     }
 
     override fun insertAppliedRevision(
-        host: CurrentMember,
+        host: AuthenticatedClubActor,
         editor: SessionRecordEditor,
         encoded: EncodedSessionRecordSnapshot,
     ): SessionRecordRevision {
@@ -140,13 +140,13 @@ class JdbcSessionRecordAdapter(
     }
 
     override fun deleteAppliedDraft(
-        host: CurrentMember,
+        host: AuthenticatedClubActor,
         sessionId: UUID,
         expectedDraftRevision: Long,
     ): Boolean = deleteDraft(host, sessionId, expectedDraftRevision)
 
     override fun loadLive(
-        host: CurrentMember,
+        host: AuthenticatedClubActor,
         sessionId: UUID,
         forUpdate: Boolean,
     ): LiveSessionRecord? {
@@ -211,7 +211,7 @@ class JdbcSessionRecordAdapter(
     }
 
     override fun loadDraft(
-        host: CurrentMember,
+        host: AuthenticatedClubActor,
         sessionId: UUID,
         forUpdate: Boolean,
     ): SessionRecordDraft? =
@@ -229,8 +229,9 @@ class JdbcSessionRecordAdapter(
         ).singleOrNull()
 
     override fun insertDraft(
-        host: CurrentMember,
+        host: AuthenticatedClubActor,
         live: LiveSessionRecord,
+        command: SaveSessionRecordDraftCommand,
         encoded: EncodedSessionRecordSnapshot,
     ): SessionRecordDraft {
         jdbcTemplate.update(
@@ -238,11 +239,13 @@ class JdbcSessionRecordAdapter(
             insert into session_record_drafts (
               session_id, club_id, base_live_revision, draft_revision, source, restored_from_revision_id,
               snapshot_json, snapshot_sha256, updated_by_membership_id
-            ) values (?, ?, ?, 1, 'MANUAL', null, ?, ?, ?)
+            ) values (?, ?, ?, 1, ?, ?, ?, ?, ?)
             """.trimIndent(),
             live.sessionId.dbString(),
             host.clubId.dbString(),
             live.revision,
+            command.source.name,
+            command.restoredFromRevisionId?.dbString(),
             encoded.json,
             encoded.sha256,
             host.membershipId.dbString(),
@@ -251,7 +254,7 @@ class JdbcSessionRecordAdapter(
     }
 
     override fun compareAndSetDraft(
-        host: CurrentMember,
+        host: AuthenticatedClubActor,
         command: SaveSessionRecordDraftCommand,
         encoded: EncodedSessionRecordSnapshot,
     ): SessionRecordDraft? {
@@ -281,7 +284,11 @@ class JdbcSessionRecordAdapter(
         return if (updated == 1) loadDraft(host, command.sessionId) else null
     }
 
-    override fun deleteDraft(host: CurrentMember, sessionId: UUID, expectedDraftRevision: Long): Boolean =
+    override fun deleteDraft(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+        expectedDraftRevision: Long,
+    ): Boolean =
         jdbcTemplate.update(
             """
             delete from session_record_drafts
@@ -292,7 +299,11 @@ class JdbcSessionRecordAdapter(
             expectedDraftRevision,
         ) == 1
 
-    override fun loadRevision(host: CurrentMember, sessionId: UUID, revisionId: UUID): SessionRecordRevision? =
+    override fun loadRevision(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+        revisionId: UUID,
+    ): SessionRecordRevision? =
         jdbcTemplate.query(
             """
             select id, session_id, club_id, version, source, restored_from_revision_id, snapshot_json,
@@ -307,7 +318,7 @@ class JdbcSessionRecordAdapter(
         ).singleOrNull()
 
     override fun insertRestoredDraft(
-        host: CurrentMember,
+        host: AuthenticatedClubActor,
         live: LiveSessionRecord,
         revision: SessionRecordRevision,
         expectedDraftRevision: Long?,
@@ -363,7 +374,11 @@ class JdbcSessionRecordAdapter(
         return if (updated == 1) loadDraft(host, live.sessionId) else null
     }
 
-    private fun loadEntries(table: String, host: CurrentMember, sessionId: UUID): List<SessionRecordEntry> {
+    private fun loadEntries(
+        table: String,
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+    ): List<SessionRecordEntry> {
         require(table == "highlights" || table == "one_line_reviews")
         return jdbcTemplate.query(
             """
@@ -386,7 +401,7 @@ class JdbcSessionRecordAdapter(
         )
     }
 
-    private fun loadFeedback(host: CurrentMember, sessionId: UUID): SessionRecordFeedbackDocument =
+    private fun loadFeedback(host: AuthenticatedClubActor, sessionId: UUID): SessionRecordFeedbackDocument =
         jdbcTemplate.query(
             """
             select file_name, coalesce(nullif(document_title, ''), file_name) as document_title, source_text

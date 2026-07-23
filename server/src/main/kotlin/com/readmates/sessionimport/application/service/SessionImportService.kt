@@ -13,20 +13,16 @@ import com.readmates.sessionimport.application.model.SessionImportPublicationPre
 import com.readmates.sessionimport.application.model.SessionImportRecordPreview
 import com.readmates.sessionimport.application.model.SessionImportSessionPreview
 import com.readmates.sessionimport.application.model.SessionImportTarget
-import com.readmates.sessionimport.application.port.`in`.CommitSessionImportUseCase
-import com.readmates.sessionimport.application.port.`in`.CommitValidatedSessionImportUseCase
 import com.readmates.sessionimport.application.port.`in`.PreviewSessionImportUseCase
 import com.readmates.sessionimport.application.port.`in`.ReplaceValidatedSessionImportUseCase
 import com.readmates.sessionimport.application.port.`in`.ValidateSessionImportUseCase
 import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportReplacement
-import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportInput
 import com.readmates.sessionimport.application.port.out.SessionImportRecordReplacement
 import com.readmates.sessionimport.application.port.out.SessionImportWritePort
 import com.readmates.shared.cache.ReadCacheInvalidationPort
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.AuthenticatedClubActor
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 
 class InvalidSessionImportException(
     val issues: List<SessionImportIssue>,
@@ -52,8 +48,6 @@ class SessionImportService(
     private val writePort: SessionImportWritePort,
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
 ) : PreviewSessionImportUseCase,
-    CommitSessionImportUseCase,
-    CommitValidatedSessionImportUseCase,
     ValidateSessionImportUseCase,
     ReplaceValidatedSessionImportUseCase {
     private val parser = FeedbackDocumentParser()
@@ -62,39 +56,6 @@ class SessionImportService(
         requireHost(command.host)
         val target = writePort.loadTarget(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
         return validateAgainstTarget(command, target)
-    }
-
-    @Transactional
-    override fun commit(command: SessionImportCommand): SessionImportCommitResult {
-        requireHost(command.host)
-        val target = writePort.loadTarget(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
-        val preview = validateAgainstTarget(command, target)
-        if (!preview.valid) {
-            throw InvalidSessionImportException(preview.issues)
-        }
-        return replace(command.toReplacement(preview))
-    }
-
-    /**
-     * Commits a session import command whose caller has already validated it. Skips the
-     * standard [validate] step but still loads the target, replaces records, and triggers
-     * post-commit cache invalidation. Trust boundary: callers (e.g. the AI generation flow,
-     * which re-runs SessionImportV1Validator) MUST validate the command first.
-     */
-    @Transactional
-    override fun commitValidated(input: ValidatedSessionImportInput): SessionImportCommitResult {
-        val command = input.command
-        requireHost(command.host)
-        val target = writePort.loadTarget(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
-        // The caller has already validated, but we still build the preview projection so we
-        // reuse the same SessionImportRecordReplacement payload shape as commit(...). If the
-        // caller passed an invalid command, surface InvalidSessionImportException — same as
-        // commit(...). This preserves the security invariant.
-        val preview = validateAgainstTarget(command, target, input.authorMembershipIdsByName)
-        if (!preview.valid) {
-            throw InvalidSessionImportException(preview.issues)
-        }
-        return replace(command.toReplacement(preview))
     }
 
     override fun validate(
@@ -190,39 +151,6 @@ class SessionImportService(
         )
     }
 
-    private fun SessionImportCommand.toReplacement(preview: SessionImportPreviewResult) =
-        ValidatedSessionImportReplacement(
-            command = this,
-            preview = preview,
-            snapshot =
-                com.readmates.sessionrecord.application.model.SessionRecordSnapshot(
-                    visibility = recordVisibility,
-                    publicationSummary = preview.publication.summary,
-                    highlights =
-                        preview.highlights.map {
-                            com.readmates.sessionrecord.application.model.SessionRecordEntry(
-                                membershipId = java.util.UUID.fromString(requireNotNull(it.membershipId)),
-                                authorDisplayName = it.authorName,
-                                text = it.text,
-                            )
-                        },
-                    oneLineReviews =
-                        preview.oneLineReviews.map {
-                            com.readmates.sessionrecord.application.model.SessionRecordEntry(
-                                membershipId = java.util.UUID.fromString(requireNotNull(it.membershipId)),
-                                authorDisplayName = it.authorName,
-                                text = it.text,
-                            )
-                        },
-                    feedbackDocument =
-                        com.readmates.sessionrecord.application.model.SessionRecordFeedbackDocument(
-                            fileName = feedbackDocument.fileName.trim(),
-                            title = requireNotNull(preview.feedbackDocument.title),
-                            markdown = feedbackDocument.markdown,
-                        ),
-                ),
-        )
-
     private fun validateSessionMetadata(
         command: SessionImportCommand,
         target: SessionImportTarget,
@@ -304,7 +232,7 @@ class SessionImportService(
             if (trustedAuthorBindings.isEmpty()) {
                 target.attendees.firstOrNull { it.active && it.displayName == trimmedAuthorName }
             } else {
-                target.attendees.firstOrNull { it.active && it.membershipId == trustedMembershipId }
+                target.attendees.firstOrNull { it.membershipId == trustedMembershipId }
             }
         if (trimmedText.isBlank()) {
             issues += SessionImportIssue("RECORD_TEXT_REQUIRED", "기록 문구가 비어 있습니다.")

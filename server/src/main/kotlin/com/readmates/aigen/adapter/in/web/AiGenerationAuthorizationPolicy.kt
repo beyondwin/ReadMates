@@ -17,6 +17,7 @@ interface AiGenerationAuthorizationPolicy {
     fun actor(member: CurrentMember): AiGenerationActor =
         AiGenerationActor(
             userId = member.userId,
+            membershipId = member.membershipId,
             clubId = member.clubId,
             clubSlug = member.clubSlug,
             isHost = member.isHost,

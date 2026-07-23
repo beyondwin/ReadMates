@@ -122,6 +122,9 @@ data class CommitGenerationResult(
     val status: JobStatus,
     val recovered: Boolean,
     val participantUpdatesCount: Int?,
+    val draftRevision: Long? = null,
+    val baseLiveRevision: Long? = null,
+    val liveApplied: Boolean = false,
 )
 
 interface CancelGenerationUseCase {

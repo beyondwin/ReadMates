@@ -16,6 +16,7 @@ import com.readmates.sessionrecord.application.model.SessionRecordRevision
 import com.readmates.sessionrecord.application.model.SessionRecordSnapshot
 import com.readmates.sessionrecord.application.model.SessionRecordSource
 import com.readmates.sessionrecord.application.port.out.SessionRecordStorePort
+import com.readmates.shared.security.AuthenticatedClubActor
 import com.readmates.shared.security.CurrentMember
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -167,39 +168,40 @@ class SessionRecordDraftServiceTest {
     ) : SessionRecordStorePort {
         val revisions = revision?.let(::listOf).orEmpty()
 
-        override fun lockEditor(host: CurrentMember, sessionId: UUID): SessionRecordEditor? =
+        override fun lockEditor(host: AuthenticatedClubActor, sessionId: UUID): SessionRecordEditor? =
             live?.let { SessionRecordEditor(it, draft, draft?.baseLiveRevision != it.revision) }
 
         override fun findCompletedApply(
-            host: CurrentMember,
+            host: AuthenticatedClubActor,
             previewId: UUID,
         ): com.readmates.sessionrecord.application.model.CompletedSessionRecordApply? = null
 
         override fun insertBaselineIfAbsent(
-            host: CurrentMember,
+            host: AuthenticatedClubActor,
             live: LiveSessionRecord,
             encoded: EncodedSessionRecordSnapshot,
         ) = Unit
 
         override fun insertAppliedRevision(
-            host: CurrentMember,
+            host: AuthenticatedClubActor,
             editor: SessionRecordEditor,
             encoded: EncodedSessionRecordSnapshot,
         ): SessionRecordRevision = error("Not used by draft service tests")
 
         override fun deleteAppliedDraft(
-            host: CurrentMember,
+            host: AuthenticatedClubActor,
             sessionId: UUID,
             expectedDraftRevision: Long,
         ): Boolean = false
 
-        override fun loadLive(host: CurrentMember, sessionId: UUID, forUpdate: Boolean) = live
+        override fun loadLive(host: AuthenticatedClubActor, sessionId: UUID, forUpdate: Boolean) = live
 
-        override fun loadDraft(host: CurrentMember, sessionId: UUID, forUpdate: Boolean) = draft
+        override fun loadDraft(host: AuthenticatedClubActor, sessionId: UUID, forUpdate: Boolean) = draft
 
         override fun insertDraft(
-            host: CurrentMember,
+            host: AuthenticatedClubActor,
             live: LiveSessionRecord,
+            command: SaveSessionRecordDraftCommand,
             encoded: EncodedSessionRecordSnapshot,
         ): SessionRecordDraft =
             draft(
@@ -211,7 +213,7 @@ class SessionRecordDraftServiceTest {
 
         @Suppress("ReturnCount")
         override fun compareAndSetDraft(
-            host: CurrentMember,
+            host: AuthenticatedClubActor,
             command: SaveSessionRecordDraftCommand,
             encoded: EncodedSessionRecordSnapshot,
         ): SessionRecordDraft? {
@@ -227,18 +229,22 @@ class SessionRecordDraftServiceTest {
         }
 
         @Suppress("ReturnCount")
-        override fun deleteDraft(host: CurrentMember, sessionId: UUID, expectedDraftRevision: Long): Boolean {
+        override fun deleteDraft(
+            host: AuthenticatedClubActor,
+            sessionId: UUID,
+            expectedDraftRevision: Long,
+        ): Boolean {
             val current = draft ?: return false
             if (current.draftRevision != expectedDraftRevision) return false
             draft = null
             return true
         }
 
-        override fun loadRevision(host: CurrentMember, sessionId: UUID, revisionId: UUID) =
+        override fun loadRevision(host: AuthenticatedClubActor, sessionId: UUID, revisionId: UUID) =
             revisions.singleOrNull { it.id == revisionId }
 
         override fun insertRestoredDraft(
-            host: CurrentMember,
+            host: AuthenticatedClubActor,
             live: LiveSessionRecord,
             revision: SessionRecordRevision,
             expectedDraftRevision: Long?,

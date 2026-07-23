@@ -31,9 +31,10 @@ import com.readmates.sessionimport.application.model.SessionImportFeedbackDocume
 import com.readmates.sessionimport.application.model.SessionImportPublicationCommand
 import com.readmates.sessionimport.application.model.SessionImportRecordCommand
 import com.readmates.sessionimport.application.model.SessionImportSessionCommand
-import com.readmates.sessionimport.application.port.`in`.CommitValidatedSessionImportUseCase
-import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportInput
+import com.readmates.sessionimport.application.port.`in`.SaveValidatedSessionRecordDraftUseCase
+import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportDraftInput
 import com.readmates.sessionimport.application.service.InvalidSessionImportException
+import com.readmates.sessionrecord.application.model.SessionRecordDraftSource
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
@@ -49,12 +50,11 @@ import java.util.UUID
  *  2. If [overrideResult] supplied, persist it via [AiGenerationJobStore.saveResult]
  *     (so the snapshot to validate is identical to the one persisted in Redis).
  *  3. Validate via [SessionImportV1Validator] — Violation → FAILED audit + throw.
- *  4. Convert to a [SessionImportCommand] and delegate to
- *     [CommitValidatedSessionImportUseCase.commitValidated].
+ *  4. Convert to a [SessionImportCommand] and save a shared validated draft.
  *  5. Delete transient Redis payload, write a COMMIT SUCCESS audit row, return the result.
  *
- * Trust boundary: the validator runs here, so the downstream `commitValidated`
- * skips schema validation but still loads the target and replaces records.
+ * Trust boundary: transcript/evidence remain transient. Only the final canonical
+ * record snapshot reaches MySQL through the shared draft contract.
  */
 @Service
 @ConditionalOnProperty(prefix = "readmates", name = ["aigen.enabled"], havingValue = "true")
@@ -62,7 +62,7 @@ class AiGenerationCommitService(
     private val jobStore: AiGenerationJobStore,
     private val auditPort: AiGenerationAuditPort,
     private val validator: SessionImportV1Validator,
-    private val commitDelegate: CommitValidatedSessionImportUseCase,
+    private val commitDelegate: SaveValidatedSessionRecordDraftUseCase,
     private val clock: Clock,
     private val transitionPolicy: AiGenerationJobTransitionPolicy,
     private val commitPersistence: AiGenerationCommitPersistencePort? = null,
@@ -166,20 +166,26 @@ class AiGenerationCommitService(
                 transactions.execute {
                     val participantUpdates =
                         persistence.upsertTranscriptSpeakersAsParticipants(record.clubId, record.sessionId, record.validatedTurns)
-                    commitDelegate.commitValidated(
-                        ValidatedSessionImportInput(
-                            command = toSessionImportCommand(host, submitted, record.sessionId, recordVisibility),
-                            authorMembershipIdsByName =
-                                record.validatedTurns.associate { it.speakerName to it.speakerMembershipId },
-                        ),
-                    )
+                    val draft =
+                        commitDelegate.saveValidated(
+                            ValidatedSessionImportDraftInput(
+                                command = toSessionImportCommand(host, submitted, record.sessionId, recordVisibility),
+                                authorMembershipIdsByName =
+                                    record.validatedTurns.associate { it.speakerName to it.speakerMembershipId },
+                                source = SessionRecordDraftSource.AI_GENERATED,
+                            ),
+                        )
                     check(
                         persistence.insertReceipt(
                             AiGenerationCommitReceipt(record.jobId, revision, record.sessionId, record.clubId, clock.instant()),
                         ),
                     ) { "Grounded commit receipt already exists" }
                     writeCommitAudit(record, sectionReviews.orEmpty(), AuditStatus.SUCCESS, null)
-                    participantUpdates
+                    CommitTransactionResult(
+                        participantUpdates = participantUpdates,
+                        draftRevision = draft.draftRevision,
+                        baseLiveRevision = draft.baseLiveRevision,
+                    )
                 }
             } catch (error: RuntimeException) {
                 val committedReceipt = persistence.findReceipt(record.jobId, revision)
@@ -199,7 +205,14 @@ class AiGenerationCommitService(
             }
 
         finalizeGroundedCommit(record, revision, cleanup)
-        return CommitGenerationResult(record.sessionId, JobStatus.COMMITTED, recovered = false, participantUpdatesCount = transactionResult)
+        return CommitGenerationResult(
+            sessionId = record.sessionId,
+            status = JobStatus.COMMITTED,
+            recovered = false,
+            participantUpdatesCount = transactionResult?.participantUpdates,
+            draftRevision = transactionResult?.draftRevision,
+            baseLiveRevision = transactionResult?.baseLiveRevision,
+        )
     }
 
     @Suppress("ComplexCondition")
@@ -358,4 +371,10 @@ class AiGenerationCommitService(
     private companion object {
         val COMMIT_LEASE_DURATION: Duration = Duration.ofMinutes(2)
     }
+
+    private data class CommitTransactionResult(
+        val participantUpdates: Int,
+        val draftRevision: Long,
+        val baseLiveRevision: Long,
+    )
 }

@@ -11,6 +11,7 @@ import java.util.UUID
 
 interface AuthenticatedClubActor {
     val userId: UUID
+    val membershipId: UUID
     val clubId: UUID
     val clubSlug: String
     val isHost: Boolean
@@ -18,7 +19,7 @@ interface AuthenticatedClubActor {
 
 data class CurrentMember(
     override val userId: UUID,
-    val membershipId: UUID,
+    override val membershipId: UUID,
     override val clubId: UUID,
     override val clubSlug: String,
     val email: String,

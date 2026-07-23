@@ -6,7 +6,6 @@ import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.port.`in`.CancelGenerationUseCase
-import com.readmates.aigen.application.port.`in`.CommitGenerationResult
 import com.readmates.aigen.application.port.`in`.CommitGenerationUseCase
 import com.readmates.aigen.application.port.`in`.ExpandGenerationEvidenceUseCase
 import com.readmates.aigen.application.port.`in`.GetJobUseCase
@@ -188,11 +187,12 @@ class AiGenerationController(
         @PathVariable jobId: UUID,
         @RequestBody request: CommitRequest,
         member: CurrentMember,
-    ): CommitGenerationResult {
+    ): CommitGenerationResponse {
         ensureEnabled()
         auth.requireHostAccess(sessionId, member)
         validateReviewContract(request)
-        return commitUc.commit(
+        return commitUc
+            .commit(
             host = auth.actor(member),
             sessionId = sessionId,
             jobId = jobId,
@@ -201,6 +201,7 @@ class AiGenerationController(
             expectedRevision = request.expectedRevision,
             sectionReviews = request.sectionReviews,
         )
+            .toResponse()
     }
 
     @DeleteMapping("/jobs/{jobId}")

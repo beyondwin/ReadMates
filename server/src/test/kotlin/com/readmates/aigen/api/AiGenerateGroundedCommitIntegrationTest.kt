@@ -15,8 +15,9 @@ import com.readmates.sessionimport.application.model.SessionImportFeedbackDocume
 import com.readmates.sessionimport.application.model.SessionImportPublicationCommand
 import com.readmates.sessionimport.application.model.SessionImportRecordCommand
 import com.readmates.sessionimport.application.model.SessionImportSessionCommand
-import com.readmates.sessionimport.application.port.`in`.CommitValidatedSessionImportUseCase
-import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportInput
+import com.readmates.sessionimport.application.port.`in`.SaveValidatedSessionRecordDraftUseCase
+import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportDraftInput
+import com.readmates.sessionrecord.application.model.SessionRecordDraftSource
 import com.readmates.support.KafkaTestContainer
 import com.readmates.support.ReadmatesRedisIntegrationTestSupport
 import org.apache.kafka.clients.admin.AdminClient
@@ -63,6 +64,7 @@ private const val GROUNDED_CLEANUP_SQL = """
     delete from ai_generation_commit_receipts where club_id = '$GROUNDED_CLUB_ID';
     delete from ai_generation_audit_log where club_id = '$GROUNDED_CLUB_ID';
     delete from notification_event_outbox where club_id = '$GROUNDED_CLUB_ID';
+    delete from session_record_drafts where club_id = '$GROUNDED_CLUB_ID';
     delete from session_feedback_documents where session_id = '$GROUNDED_SESSION_ID';
     delete from public_session_publications where session_id = '$GROUNDED_SESSION_ID';
     delete from highlights where session_id = '$GROUNDED_SESSION_ID';
@@ -144,7 +146,7 @@ class AiGenerateGroundedCommitIntegrationTest(
     @param:Autowired private val redis: StringRedisTemplate,
     @param:Autowired private val jobStore: AiGenerationJobStore,
     @param:Autowired private val commitPersistence: AiGenerationCommitPersistencePort,
-    @param:Autowired private val commitDelegate: CommitValidatedSessionImportUseCase,
+    @param:Autowired private val commitDelegate: SaveValidatedSessionRecordDraftUseCase,
     @param:Autowired private val transactions: TransactionTemplate,
 ) : ReadmatesRedisIntegrationTestSupport() {
     private val objectMapper = JsonMapper.builder().findAndAddModules().build()
@@ -164,7 +166,7 @@ class AiGenerateGroundedCommitIntegrationTest(
         commit(jobId, committedResult, recovered = false, participantUpdates = 2)
 
         assertParticipantsSynchronized()
-        assertImportedContents()
+        assertDraftStoredAndLiveUnchanged()
         assertContentFreeReceipt(jobId)
         assertTransientPayloadsRemoved(jobId)
 
@@ -174,6 +176,7 @@ class AiGenerateGroundedCommitIntegrationTest(
     }
 
     @Test
+    @Suppress("LongMethod")
     fun `forced failure after import and receipt rolls back participant content and receipt together`() {
         val jobId = startGroundedJob()
         awaitSucceeded(jobId)
@@ -187,7 +190,7 @@ class AiGenerateGroundedCommitIntegrationTest(
                     record.sessionId,
                     record.validatedTurns,
                 )
-                commitDelegate.commitValidated(
+                commitDelegate.saveValidated(
                     validatedImport(
                         snapshot,
                         record.validatedTurns.associate { it.speakerName to it.speakerMembershipId },
@@ -230,6 +233,13 @@ class AiGenerateGroundedCommitIntegrationTest(
                 GROUNDED_SESSION_ID,
             ),
         ).isZero()
+        assertThat(
+            jdbc.queryForObject(
+                "select count(*) from session_record_drafts where session_id=?",
+                Int::class.java,
+                GROUNDED_SESSION_ID,
+            ),
+        ).isZero()
         assertThat(receiptCount(jobId)).isZero()
     }
 
@@ -257,20 +267,21 @@ class AiGenerateGroundedCommitIntegrationTest(
         jdbc.update("update memberships set status='ACTIVE' where id=?", GROUNDED_MEMBER_B_MEMBERSHIP_ID)
         commit(jobId, committedResult, recovered = false, participantUpdates = 2)
         assertParticipantsSynchronized()
-        assertImportedContents()
+        assertDraftStoredAndLiveUnchanged()
         assertContentFreeReceipt(jobId)
     }
 
     private fun validatedImport(
         snapshot: SessionImportV1Snapshot,
         authorMemberships: Map<String, UUID>,
-    ): ValidatedSessionImportInput =
-        ValidatedSessionImportInput(
+    ): ValidatedSessionImportDraftInput =
+        ValidatedSessionImportDraftInput(
             command =
                 SessionImportCommand(
                     host =
                         AiGenerationActor(
                             UUID.fromString(GROUNDED_HOST_USER_ID),
+                            UUID.fromString(GROUNDED_HOST_MEMBERSHIP_ID),
                             UUID.fromString(GROUNDED_CLUB_ID),
                             "grounded-int-club",
                             true,
@@ -294,6 +305,7 @@ class AiGenerateGroundedCommitIntegrationTest(
                         ),
                 ),
             authorMembershipIdsByName = authorMemberships,
+            source = SessionRecordDraftSource.AI_GENERATED,
         )
 
     private fun startGroundedJob(): UUID {
@@ -361,6 +373,11 @@ class AiGenerateGroundedCommitIntegrationTest(
                 jsonPath("$.sessionId") { value(GROUNDED_SESSION_ID) }
                 jsonPath("$.status") { value("COMMITTED") }
                 jsonPath("$.recovered") { value(recovered) }
+                jsonPath("$.liveApplied") { value(false) }
+                if (!recovered) {
+                    jsonPath("$.draftRevision") { value(1) }
+                    jsonPath("$.baseLiveRevision") { value(0) }
+                }
                 if (participantUpdates == null) {
                     jsonPath("$.participantUpdatesCount") { value(null) }
                 } else {
@@ -416,35 +433,48 @@ class AiGenerateGroundedCommitIntegrationTest(
         }
     }
 
-    private fun assertImportedContents() {
+    private fun assertDraftStoredAndLiveUnchanged() {
         assertThat(
             jdbc.queryForObject(
                 "select public_summary from public_session_publications where session_id=?",
                 String::class.java,
                 GROUNDED_SESSION_ID,
             ),
-        ).isEqualTo("A public-safe grounded summary.")
+        ).isEqualTo("unchanged placeholder")
         assertThat(
             jdbc.queryForObject(
                 "select count(*) from highlights where session_id=?",
                 Int::class.java,
                 GROUNDED_SESSION_ID,
             ),
-        ).isEqualTo(2)
+        ).isZero()
         assertThat(
             jdbc.queryForObject(
                 "select count(*) from one_line_reviews where session_id=?",
                 Int::class.java,
                 GROUNDED_SESSION_ID,
             ),
-        ).isEqualTo(2)
+        ).isZero()
         assertThat(
             jdbc.queryForObject(
                 "select count(*) from session_feedback_documents where session_id=?",
                 Int::class.java,
                 GROUNDED_SESSION_ID,
             ),
-        ).isEqualTo(1)
+        ).isZero()
+        val draft =
+            jdbc.queryForMap(
+                """
+                select base_live_revision, draft_revision, source, snapshot_json
+                from session_record_drafts where club_id=? and session_id=?
+                """.trimIndent(),
+                GROUNDED_CLUB_ID,
+                GROUNDED_SESSION_ID,
+            )
+        assertThat(draft["base_live_revision"]).isEqualTo(0L)
+        assertThat(draft["draft_revision"]).isEqualTo(1L)
+        assertThat(draft["source"]).isEqualTo("AI_GENERATED")
+        assertThat(draft["snapshot_json"].toString()).contains("A public-safe grounded summary.")
     }
 
     private fun assertNoCommittedWrites(jobId: UUID) {
@@ -480,6 +510,13 @@ class AiGenerateGroundedCommitIntegrationTest(
         assertThat(
             jdbc.queryForObject(
                 "select count(*) from session_feedback_documents where session_id=?",
+                Int::class.java,
+                GROUNDED_SESSION_ID,
+            ),
+        ).isZero()
+        assertThat(
+            jdbc.queryForObject(
+                "select count(*) from session_record_drafts where session_id=?",
                 Int::class.java,
                 GROUNDED_SESSION_ID,
             ),

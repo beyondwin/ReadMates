@@ -1,7 +1,18 @@
 package com.readmates.sessionimport.api
 
+import com.readmates.auth.domain.MembershipRole
+import com.readmates.notification.application.model.HostActionNotificationException
+import com.readmates.notification.application.model.NotificationDecision
+import com.readmates.notification.application.model.NotificationEventPayload
+import com.readmates.notification.application.port.out.NotificationEventOutboxPort
+import com.readmates.notification.domain.NotificationEventType
+import com.readmates.sessionrecord.application.model.ApplySessionRecordCommand
+import com.readmates.sessionrecord.application.model.PreviewSessionRecordApplyCommand
+import com.readmates.sessionrecord.application.service.SessionRecordApplyService
+import com.readmates.shared.security.CurrentMember
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -13,6 +24,7 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.post
+import java.util.UUID
 
 private const val CLUB_ID = "00000000-0000-0000-0000-000000079500"
 private const val SESSION_ID = "00000000-0000-0000-0000-000000079501"
@@ -22,7 +34,11 @@ private const val HOST_MEMBERSHIP_ID = "00000000-0000-0000-0000-000000079521"
 private const val MEMBER_MEMBERSHIP_ID = "00000000-0000-0000-0000-000000079522"
 
 private const val CLEANUP_SQL = """
+delete from host_action_notification_decisions where session_id = '$SESSION_ID';
+delete from host_action_notification_previews where session_id = '$SESSION_ID';
+delete from session_record_revisions where session_id = '$SESSION_ID';
 delete from notification_event_outbox where aggregate_id = '$SESSION_ID';
+delete from session_record_drafts where session_id = '$SESSION_ID';
 delete from session_feedback_documents where session_id = '$SESSION_ID';
 delete from public_session_publications where session_id = '$SESSION_ID';
 delete from highlights where session_id = '$SESSION_ID';
@@ -93,6 +109,8 @@ values (
 class HostSessionImportControllerDbTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
+    @param:Autowired private val applyService: SessionRecordApplyService,
+    @param:Autowired private val eventOutbox: NotificationEventOutboxPort,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `host previews valid session import json`() {
@@ -147,7 +165,7 @@ class HostSessionImportControllerDbTest(
     }
 
     @Test
-    fun `host commits validated session import without creating a notification event`() {
+    fun `host saves validated session import as shared draft without changing live`() {
         mockMvc
             .post("/api/host/sessions/$SESSION_ID/session-import/commit") {
                 with(user("session-import-host@example.test"))
@@ -156,14 +174,12 @@ class HostSessionImportControllerDbTest(
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value(SESSION_ID) }
-                jsonPath("$.publication.summary") { value("Import summary.") }
-                jsonPath("$.highlights.length()") { value(2) }
-                jsonPath("$.oneLineReviews.length()") { value(2) }
-                jsonPath("$.feedbackDocument.uploaded") { value(true) }
-                jsonPath("$.feedbackDocument.title") { value("독서모임 7951차 피드백") }
+                jsonPath("$.draftRevision") { value(1) }
+                jsonPath("$.baseLiveRevision") { value(0) }
+                jsonPath("$.liveApplied") { value(false) }
             }
 
-        assertCommittedImportRecords()
+        assertDraftSavedAndLiveUnchanged()
         assertEquals(
             0,
             jdbcTemplate.queryForObject(
@@ -173,19 +189,95 @@ class HostSessionImportControllerDbTest(
         )
     }
 
-    private fun assertCommittedImportRecords() {
+    @Test
+    @Suppress("LongMethod")
+    fun `actual outbox dedupe failure rolls back live revision decision and draft deletion`() {
+        mockMvc
+            .post("/api/host/sessions/$SESSION_ID/session-import/commit") {
+                with(user("session-import-host@example.test"))
+                contentType = MediaType.APPLICATION_JSON
+                content = validImportJson(recordVisibility = "PUBLIC")
+            }.andExpect {
+                status { isOk() }
+            }
+        val host = directHost()
+        val preview =
+            applyService.preview(
+                host,
+                PreviewSessionRecordApplyCommand(
+                    sessionId = UUID.fromString(SESSION_ID),
+                    expectedDraftRevision = 1,
+                    expectedLiveRevision = 0,
+                ),
+            )
+        val duplicateDedupeKey = "session-record-updated:$SESSION_ID:2"
         assertEquals(
-            "Import summary.",
+            true,
+            eventOutbox.enqueueEvent(
+                eventId = UUID.randomUUID(),
+                clubId = UUID.fromString(CLUB_ID),
+                eventType = NotificationEventType.SESSION_RECORD_UPDATED,
+                aggregateType = "SESSION",
+                aggregateId = UUID.fromString(SESSION_ID),
+                payload =
+                    NotificationEventPayload(
+                        sessionId = UUID.fromString(SESSION_ID),
+                        sessionNumber = 7951,
+                        bookTitle = "Import Test Book",
+                    ),
+                dedupeKey = duplicateDedupeKey,
+            ),
+        )
+
+        assertThrows(HostActionNotificationException::class.java) {
+            applyService.apply(
+                host,
+                ApplySessionRecordCommand(
+                    sessionId = UUID.fromString(SESSION_ID),
+                    previewId = preview.previewId,
+                    expectedDraftRevision = 1,
+                    expectedLiveRevision = 0,
+                    notificationDecision = NotificationDecision.SEND,
+                ),
+            )
+        }
+
+        assertDraftSavedAndLiveUnchanged()
+        assertEquals(0, countRows("session_record_revisions"))
+        assertEquals(0, countRows("host_action_notification_decisions"))
+        assertEquals(
+            null,
+            scalar(
+                """
+                select cast(consumed_at as char)
+                from host_action_notification_previews
+                where id = '${preview.previewId}'
+                """.trimIndent(),
+            ),
+        )
+        assertEquals(
+            1,
+            jdbcTemplate.queryForObject(
+                "select count(*) from notification_event_outbox where dedupe_key = '$duplicateDedupeKey'",
+                Int::class.java,
+            ),
+        )
+    }
+
+    @Suppress("LongMethod")
+    private fun assertDraftSavedAndLiveUnchanged() {
+        assertEquals(
+            "Existing summary.",
             scalar("select public_summary from public_session_publications where session_id = '$SESSION_ID'"),
         )
         assertEquals(
-            "PUBLIC",
+            "MEMBER",
             scalar("select visibility from public_session_publications where session_id = '$SESSION_ID'"),
         )
         assertEquals(2, countRows("highlights"))
         assertEquals(2, countRows("one_line_reviews"))
         assertEquals(
-            "PUBLIC",
+            "SESSION",
             scalar(
                 """
                 select visibility
@@ -196,7 +288,7 @@ class HostSessionImportControllerDbTest(
             ),
         )
         assertEquals(
-            "Import highlight from host.",
+            "Existing highlight 1.",
             scalar(
                 """
                 select text
@@ -208,7 +300,7 @@ class HostSessionImportControllerDbTest(
             ),
         )
         assertEquals(
-            "독서모임 7951차 피드백",
+            "Existing Feedback",
             scalar(
                 """
                 select document_title
@@ -217,6 +309,22 @@ class HostSessionImportControllerDbTest(
                 order by version desc
                 limit 1
                 """.trimIndent(),
+            ),
+        )
+        assertEquals(
+            "JSON_IMPORT",
+            scalar("select source from session_record_drafts where session_id = '$SESSION_ID'"),
+        )
+        assertEquals(
+            1,
+            jdbcTemplate.queryForObject(
+                """
+                select count(*) from session_record_drafts
+                where session_id = '$SESSION_ID'
+                  and snapshot_json like '%Import summary.%'
+                  and snapshot_json not like '%Existing summary.%'
+                """.trimIndent(),
+                Int::class.java,
             ),
         )
     }
@@ -247,6 +355,18 @@ class HostSessionImportControllerDbTest(
         ) ?: 0
 
     private fun scalar(sql: String): String? = jdbcTemplate.queryForObject(sql, String::class.java)
+
+    private fun directHost() =
+        CurrentMember(
+            userId = UUID.fromString(HOST_USER_ID),
+            membershipId = UUID.fromString(HOST_MEMBERSHIP_ID),
+            clubId = UUID.fromString(CLUB_ID),
+            clubSlug = "session-import-test-club",
+            email = "session-import-host@example.test",
+            displayName = "Import Host",
+            accountName = "host",
+            role = MembershipRole.HOST,
+        )
 }
 
 private fun validImportJson(

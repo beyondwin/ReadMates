@@ -98,6 +98,13 @@ data class SessionImportCommitResult(
     val feedbackDocument: SessionImportCommittedFeedbackDocument,
 )
 
+data class SessionImportDraftResult(
+    val sessionId: String,
+    val draftRevision: Long,
+    val baseLiveRevision: Long,
+    val liveApplied: Boolean = false,
+)
+
 data class SessionImportCommittedFeedbackDocument(
     val uploaded: Boolean,
     val fileName: String,

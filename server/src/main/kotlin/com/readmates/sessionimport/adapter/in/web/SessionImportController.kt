@@ -30,7 +30,9 @@ class SessionImportController(
         @PathVariable sessionId: String,
         @RequestBody request: SessionImportRequest,
         member: CurrentMember,
-    ) = commitSessionImportUseCase.commit(request.toCommand(member, parseSessionId(sessionId)))
+    ) = commitSessionImportUseCase
+        .commit(request.toCommand(member, parseSessionId(sessionId)))
+        .toResponse()
 
     private fun parseSessionId(value: String): UUID =
         runCatching { UUID.fromString(value) }

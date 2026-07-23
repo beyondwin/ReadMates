@@ -11,6 +11,7 @@ import com.readmates.aigen.application.model.JobView
 import com.readmates.aigen.application.model.SectionReviewStatus
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.model.TokenUsage
+import com.readmates.aigen.application.port.`in`.CommitGenerationResult
 import com.readmates.session.application.SessionRecordVisibility
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -158,6 +159,27 @@ data class CommitRequest(
     val expectedRevision: Long? = null,
     val sectionReviews: Map<GenerationItem, SectionReviewStatus>? = null,
 )
+
+data class CommitGenerationResponse(
+    val sessionId: UUID,
+    val status: JobStatus,
+    val recovered: Boolean,
+    val participantUpdatesCount: Int?,
+    val draftRevision: Long?,
+    val baseLiveRevision: Long?,
+    val liveApplied: Boolean,
+)
+
+fun CommitGenerationResult.toResponse() =
+    CommitGenerationResponse(
+        sessionId = sessionId,
+        status = status,
+        recovered = recovered,
+        participantUpdatesCount = participantUpdatesCount,
+        draftRevision = draftRevision,
+        baseLiveRevision = baseLiveRevision,
+        liveApplied = liveApplied,
+    )
 
 /**
  * RFC 7807 problem-detail JSON. Always serialized with the same field
