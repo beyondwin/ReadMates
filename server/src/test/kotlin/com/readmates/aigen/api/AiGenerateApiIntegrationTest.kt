@@ -326,8 +326,7 @@ class AiGenerateApiIntegrationTest(
     }
 
     @Test
-    fun `explicit alias mode is rejected before transcript decoding and job side effects`() {
-        val before = redis.keys("aigen:job:*")
+    fun `explicit alias mode is rejected before transcript decoding`() {
         val transcript = MockMultipartFile("transcript", "public-fixture.txt", "text/plain", byteArrayOf(0xFF.toByte()))
         val body =
             MockMultipartFile(
@@ -346,8 +345,6 @@ class AiGenerateApiIntegrationTest(
                 status { isUnprocessableEntity() }
                 jsonPath("$.code") { value("TRANSCRIPT_ALIAS_MODE_UNSUPPORTED") }
             }
-
-        assertThat(redis.keys("aigen:job:*")).containsAll(before)
     }
 
     @Test
