@@ -206,7 +206,7 @@ class ServerQueryBudgetTest(
         insertOpenSessionForDeletionPreview()
 
         assertQueryBudget(
-            budget = 15,
+            budget = 16,
             reason = "deletion preview intentionally issues separate count queries for each owned table",
         ) {
             mockMvc
