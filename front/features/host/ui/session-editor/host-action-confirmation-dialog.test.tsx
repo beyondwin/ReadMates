@@ -54,6 +54,9 @@ describe("HostActionConfirmationDialog", () => {
     expect(screen.getByRole("dialog")).toHaveAttribute("aria-modal", "true");
     expect(screen.getByRole("radio", { name: "알림 보내고 반영" })).not.toBeChecked();
     expect(screen.getByRole("radio", { name: "알림 없이 반영" })).not.toBeChecked();
+    expect(screen.getByRole("group", { name: "필수 선택" })).toHaveAttribute("aria-required", "true");
+    expect(screen.getByRole("radio", { name: "알림 보내고 반영" })).toBeRequired();
+    expect(screen.getByRole("radio", { name: "알림 없이 반영" })).toBeRequired();
     expect(screen.getByRole("button", { name: "선택대로 반영" })).toBeDisabled();
 
     await user.click(screen.getByRole("radio", { name: "알림 없이 반영" }));
@@ -110,5 +113,23 @@ describe("HostActionConfirmationDialog", () => {
     expect(screen.getByRole("button", { name: "선택대로 반영" })).toHaveStyle({
       whiteSpace: "nowrap",
     });
+  });
+
+  it("waits for an open preview before focusing the required decision group", () => {
+    const props = {
+      open: true,
+      preview: null,
+      decision: null,
+      submitting: false,
+      onDecisionChange: vi.fn(),
+      onCancel: vi.fn(),
+      onConfirm: vi.fn(),
+    };
+    const { rerender } = render(<HostActionConfirmationDialog {...props} />);
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    rerender(<HostActionConfirmationDialog {...props} preview={preview} />);
+
+    expect(screen.getByRole("radio", { name: "알림 보내고 반영" })).toHaveFocus();
   });
 });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useBlocker, useLoaderData, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import HostSessionEditor, { type HostSessionEditorLinkComponent } from "@/features/host/ui/host-session-editor";
@@ -231,7 +231,7 @@ export function EditHostSessionRoute({
   );
 }
 
-function EditHostSessionRecordWorkflow({
+export function EditHostSessionRecordWorkflow({
   session,
   recordEditor,
   historyPage,
@@ -271,6 +271,7 @@ function EditHostSessionRecordWorkflow({
   const [applyPreview, setApplyPreview] = useState<HostSessionRecordApplyPreview | null>(null);
   const [notificationDecision, setNotificationDecision] = useState<NotificationDecision | null>(null);
   const [confirmationOpen, setConfirmationOpen] = useState(false);
+  const [applyPreviewRefreshing, setApplyPreviewRefreshing] = useState(false);
   const [confirmationMessage, setConfirmationMessage] = useState<null | {
     kind: "alert" | "status";
     text: string;
@@ -304,17 +305,22 @@ function EditHostSessionRecordWorkflow({
       setConfirmationMessage({ kind: "alert", text: "먼저 공개 기록 초안을 저장해 주세요." });
       return null;
     }
-    const preview = await previewMutation.mutateAsync({
-      sessionId: recordEditor.sessionId,
-      request: {
-        expectedDraftRevision: controller.expectedDraftRevision,
-        expectedLiveRevision: recordEditor.liveRevision,
-      },
-    });
-    setApplyPreview(preview);
-    setNotificationDecision(null);
-    setConfirmationOpen(true);
-    return preview;
+    setApplyPreviewRefreshing(true);
+    try {
+      const preview = await previewMutation.mutateAsync({
+        sessionId: recordEditor.sessionId,
+        request: {
+          expectedDraftRevision: controller.expectedDraftRevision,
+          expectedLiveRevision: recordEditor.liveRevision,
+        },
+      });
+      setApplyPreview(preview);
+      setNotificationDecision(null);
+      setConfirmationOpen(true);
+      return preview;
+    } finally {
+      setApplyPreviewRefreshing(false);
+    }
   }, [
     controller.expectedDraftRevision,
     previewMutation,
@@ -382,6 +388,13 @@ function EditHostSessionRecordWorkflow({
         }
         return;
       }
+      if (!code) {
+        setConfirmationMessage({
+          kind: "alert",
+          text: "처리 결과를 확인하지 못했습니다. 같은 SEND 또는 SKIP 선택으로 다시 확인해 주세요.",
+        });
+        return;
+      }
       setConfirmationOpen(false);
       setApplyPreview(null);
       setNotificationDecision(null);
@@ -446,7 +459,7 @@ function EditHostSessionRecordWorkflow({
           open: confirmationOpen,
           preview: applyPreview,
           decision: notificationDecision,
-          submitting: previewMutation.isPending || applyMutation.isPending,
+          submitting: applyPreviewRefreshing || previewMutation.isPending || applyMutation.isPending,
           message: confirmationMessage,
           onReview: reviewDraft,
           onDecisionChange: setNotificationDecision,

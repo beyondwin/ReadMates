@@ -45,15 +45,15 @@ export function HostActionConfirmationDialog({
   const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!open) {
+    if (!open || !preview || !dialogRef.current) {
       return;
     }
     const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    focusableElements(dialogRef.current as HTMLElement)[0]?.focus();
+    focusableElements(dialogRef.current)[0]?.focus();
     return () => {
       trigger?.focus();
     };
-  }, [open]);
+  }, [open, preview]);
 
   if (!open || !preview) {
     return null;
@@ -125,13 +125,18 @@ export function HostActionConfirmationDialog({
           <p className="tiny" style={{ margin: 0 }}>제외 대상 {preview.excludedCount}명</p>
         ) : null}
 
-        <fieldset className="stack" style={{ "--stack": "10px", border: 0, padding: 0, margin: 0 } as CSSProperties}>
+        <fieldset
+          aria-required="true"
+          className="stack"
+          style={{ "--stack": "10px", border: 0, padding: 0, margin: 0 } as CSSProperties}
+        >
           <legend className="field-label">필수 선택</legend>
           <label className="surface-quiet row" style={{ gap: 10, padding: 14 }}>
             <input
               type="radio"
               aria-label="알림 보내고 반영"
               name="host-action-notification-decision"
+              required
               checked={decision === "SEND"}
               disabled={sendDisabled}
               onChange={() => onDecisionChange("SEND")}
@@ -151,6 +156,7 @@ export function HostActionConfirmationDialog({
               type="radio"
               aria-label="알림 없이 반영"
               name="host-action-notification-decision"
+              required
               checked={decision === "SKIP"}
               disabled={submitting}
               onChange={() => onDecisionChange("SKIP")}
