@@ -116,6 +116,26 @@ class JdbcNotificationEventOutboxAdapterTest(
     }
 
     @Test
+    fun `enqueue event preserves a caller supplied event id`() {
+        insertClub()
+        val eventId = UUID.fromString("00000000-0000-0000-0000-000000000111")
+
+        val inserted =
+            adapter.enqueueEvent(
+                eventId = eventId,
+                clubId = clubId,
+                eventType = NotificationEventType.SESSION_RECORD_UPDATED,
+                aggregateType = "SESSION",
+                aggregateId = sessionId,
+                payload = NotificationEventPayload(sessionId = sessionId, sessionNumber = 7, bookTitle = "기록"),
+                dedupeKey = "event-outbox-caller-id",
+            )
+
+        assertThat(inserted).isTrue()
+        assertThat(eventIdForDedupeKey("event-outbox-caller-id")).isEqualTo(eventId.toString())
+    }
+
+    @Test
     fun `claim publishable moves pending row to publishing`() {
         insertClub()
         adapter.enqueueEvent(

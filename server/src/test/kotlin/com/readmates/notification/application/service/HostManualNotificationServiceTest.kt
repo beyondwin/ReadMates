@@ -38,6 +38,35 @@ class HostManualNotificationServiceTest {
     private val now = OffsetDateTime.of(2026, 5, 13, 9, 0, 0, 0, ZoneOffset.UTC)
 
     @Test
+    fun `session record updated is unavailable for manual dispatch`() {
+        val service = service(FakeManualPort())
+
+        val options =
+            service.options(
+                host(),
+                SESSION_ID,
+                null,
+                PageRequest.cursor(null, null, defaultLimit = 50, maxLimit = 100),
+            )
+
+        assertThat(options.templates.map { it.eventType })
+            .doesNotContain(NotificationEventType.SESSION_RECORD_UPDATED)
+        assertThatThrownBy {
+            service.preview(
+                host(),
+                ManualNotificationPreviewCommand(
+                    selection(
+                        eventType = NotificationEventType.SESSION_RECORD_UPDATED,
+                        audience = ManualNotificationAudience.CONFIRMED_ATTENDEES,
+                    ),
+                ),
+            )
+        }.isInstanceOf(NotificationApplicationException::class.java)
+            .extracting("error")
+            .isEqualTo(NotificationApplicationError.MANUAL_NOTIFICATION_TEMPLATE_UNAVAILABLE)
+    }
+
+    @Test
     fun `options disables feedback template until document exists`() {
         val port =
             FakeManualPort(
@@ -183,10 +212,12 @@ class HostManualNotificationServiceTest {
     private fun selection(
         includedMembershipIds: List<UUID> = emptyList(),
         excludedMembershipIds: List<UUID> = emptyList(),
+        eventType: NotificationEventType = NotificationEventType.SESSION_REMINDER_DUE,
+        audience: ManualNotificationAudience = ManualNotificationAudience.ALL_ACTIVE_MEMBERS,
     ) = ManualNotificationSelection(
         sessionId = SESSION_ID,
-        eventType = NotificationEventType.SESSION_REMINDER_DUE,
-        audience = ManualNotificationAudience.ALL_ACTIVE_MEMBERS,
+        eventType = eventType,
+        audience = audience,
         requestedChannels = ManualNotificationRequestedChannels.BOTH,
         excludedMembershipIds = excludedMembershipIds,
         includedMembershipIds = includedMembershipIds,

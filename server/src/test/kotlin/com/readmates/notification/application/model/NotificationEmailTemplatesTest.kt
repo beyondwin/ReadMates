@@ -82,6 +82,16 @@ class NotificationEmailTemplatesTest {
                         cta = "피드백 문서 확인하기",
                         path = "/clubs/reading-sai/app/feedback/$sessionId",
                     ),
+                NotificationEventType.SESSION_RECORD_UPDATED to
+                    ExpectedEmail(
+                        subject = "8회차 기록이 수정되었습니다",
+                        label = "session record",
+                        summary = "참석한 회차의 공개 기록이 수정되었습니다. 변경된 모임 기록을 확인해 주세요.",
+                        contextLabel = "확인",
+                        context = "수정된 모임 기록",
+                        cta = "회차 기록 확인하기",
+                        path = "/clubs/reading-sai/app/sessions/$sessionId",
+                    ),
                 NotificationEventType.REVIEW_PUBLISHED to
                     ExpectedEmail(
                         subject = "8회차에 새 서평이 공개되었습니다",

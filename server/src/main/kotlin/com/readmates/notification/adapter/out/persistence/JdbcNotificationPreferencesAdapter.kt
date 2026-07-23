@@ -76,6 +76,7 @@ class JdbcNotificationPreferencesAdapter(
                     NotificationEventType.NEXT_BOOK_PUBLISHED to getBoolean("next_book_published_enabled"),
                     NotificationEventType.SESSION_REMINDER_DUE to getBoolean("session_reminder_due_enabled"),
                     NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED to getBoolean("feedback_document_published_enabled"),
+                    NotificationEventType.SESSION_RECORD_UPDATED to getBoolean("feedback_document_published_enabled"),
                     NotificationEventType.REVIEW_PUBLISHED to getBoolean("review_published_enabled"),
                 ),
         )

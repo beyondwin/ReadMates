@@ -51,6 +51,25 @@ class JdbcNotificationEventOutboxAdapter(
         payload: NotificationEventPayload,
         dedupeKey: String,
     ): Boolean =
+        enqueueEvent(
+            eventId = UUID.randomUUID(),
+            clubId = clubId,
+            eventType = eventType,
+            aggregateType = aggregateType,
+            aggregateId = aggregateId,
+            payload = payload,
+            dedupeKey = dedupeKey,
+        )
+
+    override fun enqueueEvent(
+        eventId: UUID,
+        clubId: UUID,
+        eventType: NotificationEventType,
+        aggregateType: String,
+        aggregateId: UUID,
+        payload: NotificationEventPayload,
+        dedupeKey: String,
+    ): Boolean =
         try {
             jdbcTemplate.update(
                 """
@@ -69,7 +88,7 @@ class JdbcNotificationEventOutboxAdapter(
                 )
                 values (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)
                 """.trimIndent(),
-                UUID.randomUUID().dbString(),
+                eventId.dbString(),
                 clubId.dbString(),
                 eventType.name,
                 currentRequestId(),
@@ -315,7 +334,11 @@ class JdbcNotificationEventOutboxAdapter(
                   notification_event_outbox.event_type,
                   notification_event_outbox.status,
                   notification_event_outbox.attempt_count,
-                  case when notification_manual_dispatches.id is null then 'AUTOMATIC' else 'MANUAL' end as source,
+                  case
+                    when notification_manual_dispatches.id is not null then 'MANUAL'
+                    when host_action_notification_decisions.id is not null then 'HOST_CONFIRMED'
+                    else 'AUTOMATIC'
+                  end as source,
                   notification_manual_dispatches.id as manual_dispatch_id,
                   notification_manual_dispatches.requested_channels,
                   notification_manual_dispatches.audience,
@@ -329,6 +352,8 @@ class JdbcNotificationEventOutboxAdapter(
                 from notification_event_outbox
                 left join notification_manual_dispatches on notification_manual_dispatches.event_id = notification_event_outbox.id
                   and notification_manual_dispatches.club_id = notification_event_outbox.club_id
+                left join host_action_notification_decisions on host_action_notification_decisions.event_id = notification_event_outbox.id
+                  and host_action_notification_decisions.club_id = notification_event_outbox.club_id
                 left join memberships on memberships.id = notification_manual_dispatches.requested_by_membership_id
                   and memberships.club_id = notification_manual_dispatches.club_id
                 left join users on users.id = memberships.user_id

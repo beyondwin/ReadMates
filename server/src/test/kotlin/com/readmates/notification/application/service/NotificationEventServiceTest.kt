@@ -17,6 +17,46 @@ import java.util.UUID
 
 class NotificationEventServiceTest {
     @Test
+    fun `host confirmed session record update uses caller event id and revision dedupe key`() {
+        val outbox = RecordingEventOutbox()
+        val service = NotificationEventService(outbox)
+        val clubId = UUID.randomUUID()
+        val sessionId = UUID.randomUUID()
+
+        val eventId =
+            service.recordSessionRecordUpdated(
+                clubId = clubId,
+                sessionId = sessionId,
+                sessionNumber = 8,
+                bookTitle = "기록 테스트",
+                revision = 4,
+            )
+
+        val event = outbox.recorded.single()
+        assertThat(event.eventId).isEqualTo(eventId)
+        assertThat(event.eventType).isEqualTo(NotificationEventType.SESSION_RECORD_UPDATED)
+        assertThat(event.dedupeKey).isEqualTo("session-record-updated:$sessionId:4")
+    }
+
+    @Test
+    fun `host confirmed next book and feedback events preserve caller ids`() {
+        val outbox = RecordingEventOutbox()
+        val service = NotificationEventService(outbox)
+        val clubId = UUID.randomUUID()
+        val sessionId = UUID.randomUUID()
+
+        val nextBookEventId =
+            service.recordConfirmedNextBookPublished(clubId, sessionId, 9, "다음 책", 1)
+        val feedbackEventId =
+            service.recordConfirmedFeedbackDocumentPublished(clubId, sessionId, 9, "다음 책", 2)
+
+        assertThat(outbox.recorded.map { it.eventId })
+            .containsExactly(nextBookEventId, feedbackEventId)
+        assertThat(outbox.recorded.map { it.dedupeKey })
+            .containsExactly("next-book:$sessionId:1", "feedback-document:$sessionId:2")
+    }
+
+    @Test
     fun `feedback document event uses session and version dedupe key`() {
         val outbox = RecordingEventOutbox()
         val service = NotificationEventService(outbox)
@@ -156,6 +196,7 @@ class NotificationEventServiceTest {
 }
 
 private data class RecordedEvent(
+    val eventId: UUID,
     val clubId: UUID,
     val eventType: NotificationEventType,
     val aggregateType: String,
@@ -175,8 +216,18 @@ private class RecordingEventOutbox : NotificationEventOutboxPort {
         aggregateId: UUID,
         payload: NotificationEventPayload,
         dedupeKey: String,
+    ): Boolean = enqueueEvent(UUID.randomUUID(), clubId, eventType, aggregateType, aggregateId, payload, dedupeKey)
+
+    override fun enqueueEvent(
+        eventId: UUID,
+        clubId: UUID,
+        eventType: NotificationEventType,
+        aggregateType: String,
+        aggregateId: UUID,
+        payload: NotificationEventPayload,
+        dedupeKey: String,
     ): Boolean {
-        recorded += RecordedEvent(clubId, eventType, aggregateType, aggregateId, payload, dedupeKey)
+        recorded += RecordedEvent(eventId, clubId, eventType, aggregateType, aggregateId, payload, dedupeKey)
         return true
     }
 

@@ -14,6 +14,24 @@ import java.util.UUID
 
 interface NotificationEventOutboxPort {
     fun enqueueEvent(
+        eventId: UUID,
+        clubId: UUID,
+        eventType: NotificationEventType,
+        aggregateType: String,
+        aggregateId: UUID,
+        payload: NotificationEventPayload,
+        dedupeKey: String,
+    ): Boolean =
+        enqueueEvent(
+            clubId = clubId,
+            eventType = eventType,
+            aggregateType = aggregateType,
+            aggregateId = aggregateId,
+            payload = payload,
+            dedupeKey = dedupeKey,
+        )
+
+    fun enqueueEvent(
         clubId: UUID,
         eventType: NotificationEventType,
         aggregateType: String,

@@ -12,6 +12,7 @@ class NotificationPreferencesTest {
         assertThat(preferences.enabled(NotificationEventType.NEXT_BOOK_PUBLISHED)).isTrue()
         assertThat(preferences.enabled(NotificationEventType.SESSION_REMINDER_DUE)).isTrue()
         assertThat(preferences.enabled(NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED)).isTrue()
+        assertThat(preferences.enabled(NotificationEventType.SESSION_RECORD_UPDATED)).isTrue()
         assertThat(preferences.enabled(NotificationEventType.REVIEW_PUBLISHED)).isFalse()
     }
 

@@ -159,6 +159,19 @@ object NotificationEmailTemplates {
                     inAppBody = "${sessionNumber}회차 $bookTitle 피드백 문서가 올라왔습니다.",
                 )
 
+            NotificationEventType.SESSION_RECORD_UPDATED ->
+                EventEmailDetail(
+                    label = "session record",
+                    subject = "${sessionNumber}회차 기록이 수정되었습니다",
+                    title = "${sessionNumber}회차 기록이 수정되었습니다",
+                    summary = "참석한 회차의 공개 기록이 수정되었습니다. 변경된 모임 기록을 확인해 주세요.",
+                    contextLabel = "확인",
+                    context = "수정된 모임 기록",
+                    ctaLabel = "회차 기록 확인하기",
+                    deepLinkPath = clubScopedAppPath(clubSlug, "/sessions/$sessionId"),
+                    inAppBody = "${sessionNumber}회차 $bookTitle 기록이 수정되었습니다.",
+                )
+
             NotificationEventType.REVIEW_PUBLISHED ->
                 EventEmailDetail(
                     label = "new review",
@@ -215,6 +228,7 @@ object NotificationEmailTemplates {
             append(footer)
         }
 
+    @Suppress("ktlint:standard:string-template-indent")
     private fun htmlEmail(
         label: String,
         brandName: String,

@@ -1,6 +1,8 @@
 package com.readmates.notification.application.service
 
 import com.readmates.notification.application.model.NotificationEventPayload
+import com.readmates.notification.application.model.RecordHostConfirmedNotificationEventCommand
+import com.readmates.notification.application.port.`in`.RecordHostConfirmedNotificationEventUseCase
 import com.readmates.notification.application.port.`in`.RecordNotificationEventUseCase
 import com.readmates.notification.application.port.out.NotificationEventOutboxPort
 import com.readmates.notification.domain.NotificationEventType
@@ -14,7 +16,113 @@ private const val AI_GENERATION_JOB_AGGREGATE_TYPE = "AI_GENERATION_JOB"
 @Service
 class NotificationEventService(
     private val eventOutboxPort: NotificationEventOutboxPort,
-) : RecordNotificationEventUseCase {
+) : RecordNotificationEventUseCase,
+    RecordHostConfirmedNotificationEventUseCase {
+    override fun record(command: RecordHostConfirmedNotificationEventCommand): UUID =
+        when (command.eventType) {
+            NotificationEventType.SESSION_RECORD_UPDATED ->
+                recordSessionRecordUpdated(
+                    command.clubId,
+                    command.sessionId,
+                    command.sessionNumber,
+                    command.bookTitle,
+                    command.revision,
+                )
+            NotificationEventType.NEXT_BOOK_PUBLISHED ->
+                recordConfirmedNextBookPublished(
+                    command.clubId,
+                    command.sessionId,
+                    command.sessionNumber,
+                    command.bookTitle,
+                    command.revision,
+                )
+            NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED ->
+                recordConfirmedFeedbackDocumentPublished(
+                    command.clubId,
+                    command.sessionId,
+                    command.sessionNumber,
+                    command.bookTitle,
+                    command.revision,
+                )
+            else -> error("Unsupported host-confirmed notification event type: ${command.eventType}")
+        }
+
+    fun recordSessionRecordUpdated(
+        clubId: UUID,
+        sessionId: UUID,
+        sessionNumber: Int,
+        bookTitle: String,
+        revision: Long,
+    ): UUID =
+        recordConfirmedEvent(
+            clubId,
+            sessionId,
+            sessionNumber,
+            bookTitle,
+            NotificationEventType.SESSION_RECORD_UPDATED,
+            "session-record-updated:$sessionId:$revision",
+        )
+
+    fun recordConfirmedNextBookPublished(
+        clubId: UUID,
+        sessionId: UUID,
+        sessionNumber: Int,
+        bookTitle: String,
+        revision: Long,
+    ): UUID =
+        recordConfirmedEvent(
+            clubId,
+            sessionId,
+            sessionNumber,
+            bookTitle,
+            NotificationEventType.NEXT_BOOK_PUBLISHED,
+            "next-book:$sessionId:$revision",
+        )
+
+    fun recordConfirmedFeedbackDocumentPublished(
+        clubId: UUID,
+        sessionId: UUID,
+        sessionNumber: Int,
+        bookTitle: String,
+        revision: Long,
+    ): UUID =
+        recordConfirmedEvent(
+            clubId,
+            sessionId,
+            sessionNumber,
+            bookTitle,
+            NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED,
+            "feedback-document:$sessionId:$revision",
+        )
+
+    private fun recordConfirmedEvent(
+        clubId: UUID,
+        sessionId: UUID,
+        sessionNumber: Int,
+        bookTitle: String,
+        eventType: NotificationEventType,
+        dedupeKey: String,
+    ): UUID {
+        val eventId = UUID.randomUUID()
+        check(
+            eventOutboxPort.enqueueEvent(
+                eventId = eventId,
+                clubId = clubId,
+                eventType = eventType,
+                aggregateType = SESSION_AGGREGATE_TYPE,
+                aggregateId = sessionId,
+                payload =
+                    NotificationEventPayload(
+                        sessionId = sessionId,
+                        sessionNumber = sessionNumber,
+                        bookTitle = bookTitle,
+                    ),
+                dedupeKey = dedupeKey,
+            ),
+        ) { "Host-confirmed notification event conflicts with an existing dedupe key" }
+        return eventId
+    }
+
     /**
      * Dedupe policy: feedback-document keys include the document version so each revision
      * triggers exactly one notification. See ADR-0015.

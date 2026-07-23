@@ -83,6 +83,8 @@ internal class NotificationDeliveryPlanningOperations(
                 sessionViewerRecipients(jdbcTemplate, message, "session_reminder_due_enabled", "sessions.state in ('DRAFT', 'OPEN')")
             NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED ->
                 feedbackRecipients(jdbcTemplate, message)
+            NotificationEventType.SESSION_RECORD_UPDATED ->
+                feedbackRecipients(jdbcTemplate, message)
             NotificationEventType.REVIEW_PUBLISHED ->
                 reviewRecipients(jdbcTemplate, message)
             NotificationEventType.AI_GENERATION_READY ->
@@ -339,6 +341,7 @@ internal class NotificationDeliveryPlanningOperations(
                 NotificationEventType.SESSION_REMINDER_DUE -> "session_reminder_due_enabled"
                 NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED -> "feedback_document_published_enabled"
                 NotificationEventType.REVIEW_PUBLISHED -> "review_published_enabled"
+                NotificationEventType.SESSION_RECORD_UPDATED -> "feedback_document_published_enabled"
                 // AI_GENERATION_READY is never dispatched manually (allowedManualAudiences=emptySet
                 // — see NotificationModels.kt). The branch is required only for exhaustiveness;
                 // any column literal would do because this code path is unreachable for this event.

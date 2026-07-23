@@ -1,6 +1,7 @@
 package com.readmates.notification.adapter.out.persistence
 
 import com.readmates.notification.application.model.AdminNotificationFilter
+import com.readmates.notification.application.model.NotificationDispatchSource
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.shared.paging.PageRequest
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
@@ -14,23 +15,33 @@ import org.springframework.test.context.jdbc.Sql
 import java.util.UUID
 
 private const val CLEANUP_ADMIN_NOTIFICATION_OPERATIONS_SQL = """
+    update host_action_notification_previews
+    set consumed_at = null, consumed_decision_id = null
+    where id = '00000000-0000-0000-0000-000000007801';
+    delete from host_action_notification_decisions
+    where id = '00000000-0000-0000-0000-000000007901';
+    delete from host_action_notification_previews
+    where id = '00000000-0000-0000-0000-000000007801';
     delete from notification_manual_dispatches
     where event_id in (
       '00000000-0000-0000-0000-000000007501',
       '00000000-0000-0000-0000-000000007502',
-      '00000000-0000-0000-0000-000000007503'
+      '00000000-0000-0000-0000-000000007503',
+      '00000000-0000-0000-0000-000000007504'
     );
     delete from notification_deliveries
     where event_id in (
       '00000000-0000-0000-0000-000000007501',
       '00000000-0000-0000-0000-000000007502',
-      '00000000-0000-0000-0000-000000007503'
+      '00000000-0000-0000-0000-000000007503',
+      '00000000-0000-0000-0000-000000007504'
     );
     delete from notification_event_outbox
     where id in (
       '00000000-0000-0000-0000-000000007501',
       '00000000-0000-0000-0000-000000007502',
-      '00000000-0000-0000-0000-000000007503'
+      '00000000-0000-0000-0000-000000007503',
+      '00000000-0000-0000-0000-000000007504'
     );
     delete from memberships where id = '00000000-0000-0000-0000-000000008002';
     delete from users where id = '00000000-0000-0000-0000-000000008001';
@@ -42,6 +53,7 @@ private const val CLEANUP_ADMIN_NOTIFICATION_OPERATIONS_SQL = """
 @Tag("integration")
 class JdbcAdminNotificationOperationsAdapterTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
+    @param:Autowired private val hostLedgerAdapter: JdbcNotificationEventOutboxAdapter,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     private val adapter by lazy { JdbcAdminNotificationOperationsAdapter(jdbcTemplate) }
 
@@ -74,6 +86,34 @@ class JdbcAdminNotificationOperationsAdapterTest(
             assertThat(safeCode.lowercase()).doesNotContain("sql")
             assertThat(safeCode.lowercase()).doesNotContain("smtp")
         }
+    }
+
+    @Test
+    fun `host and admin ledgers distinguish automatic manual and host confirmed sources`() {
+        seedOperationsRows()
+        seedHostConfirmedDecision()
+
+        val adminEvents =
+            adapter.listEvents(
+                AdminNotificationFilter(clubId = BASELINE_CLUB_ID),
+                PageRequest.cursor(20, null, defaultLimit = 50, maxLimit = 100),
+            )
+        val hostEvents =
+            hostLedgerAdapter.listHostEvents(
+                BASELINE_CLUB_ID,
+                null,
+                PageRequest.cursor(20, null, defaultLimit = 50, maxLimit = 100),
+            )
+
+        assertThat(adminEvents.items.associate { it.eventId to it.source })
+            .containsEntry(FAILED_EVENT_ID, NotificationDispatchSource.AUTOMATIC)
+            .containsEntry(MANUAL_EVENT_ID, NotificationDispatchSource.MANUAL)
+            .containsEntry(HOST_CONFIRMED_EVENT_ID, NotificationDispatchSource.HOST_CONFIRMED)
+        assertThat(hostEvents.items.associate { it.id to it.source })
+            .containsEntry(FAILED_EVENT_ID, NotificationDispatchSource.AUTOMATIC)
+            .containsEntry(MANUAL_EVENT_ID, NotificationDispatchSource.MANUAL)
+            .containsEntry(HOST_CONFIRMED_EVENT_ID, NotificationDispatchSource.HOST_CONFIRMED)
+        assertThat(hostEvents.items.single { it.id == MANUAL_EVENT_ID }.manualDispatch).isNotNull()
     }
 
     private fun seedOperationsRows() {
@@ -112,6 +152,7 @@ class JdbcAdminNotificationOperationsAdapterTest(
             "SMTP 550 token=abc member1@example.com SQLSTATE 42S02",
         )
         insertEvent(MANUAL_EVENT_ID, BASELINE_CLUB_ID, "PUBLISHED", null)
+        insertEvent(HOST_CONFIRMED_EVENT_ID, BASELINE_CLUB_ID, "PUBLISHED", null)
         insertEvent(SECOND_CLUB_EVENT_ID, SECOND_CLUB_ID, "FAILED", "mailbox unavailable")
     }
 
@@ -152,6 +193,49 @@ class JdbcAdminNotificationOperationsAdapterTest(
             MANUAL_EVENT_ID.toString(),
             BASELINE_SESSION_ID.toString(),
             BASELINE_HOST_MEMBERSHIP_ID.toString(),
+        )
+    }
+
+    private fun seedHostConfirmedDecision() {
+        jdbcTemplate.update(
+            """
+            insert into host_action_notification_previews (
+              id, club_id, session_id, host_membership_id, action_type, event_type, request_hash,
+              expected_draft_revision, expected_live_revision, target_count, expected_in_app_count,
+              expected_email_count, excluded_count, expires_at
+            )
+            values (?, ?, ?, ?, 'RECORD_APPLY', 'SESSION_RECORD_UPDATED', ?, 2, 1, 2, 2, 1, 1, timestampadd(MINUTE, 5, utc_timestamp(6)))
+            """.trimIndent(),
+            HOST_PREVIEW_ID.toString(),
+            BASELINE_CLUB_ID.toString(),
+            BASELINE_SESSION_ID.toString(),
+            BASELINE_HOST_MEMBERSHIP_ID.toString(),
+            "a".repeat(64),
+        )
+        jdbcTemplate.update(
+            """
+            insert into host_action_notification_decisions (
+              id, preview_id, club_id, session_id, host_membership_id, action_type, event_type,
+              live_revision, decision, target_count, expected_in_app_count, expected_email_count,
+              excluded_count, event_id
+            )
+            values (?, ?, ?, ?, ?, 'RECORD_APPLY', 'SESSION_RECORD_UPDATED', 11, 'SEND', 2, 2, 1, 1, ?)
+            """.trimIndent(),
+            HOST_DECISION_ID.toString(),
+            HOST_PREVIEW_ID.toString(),
+            BASELINE_CLUB_ID.toString(),
+            BASELINE_SESSION_ID.toString(),
+            BASELINE_HOST_MEMBERSHIP_ID.toString(),
+            HOST_CONFIRMED_EVENT_ID.toString(),
+        )
+        jdbcTemplate.update(
+            """
+            update host_action_notification_previews
+            set consumed_at = utc_timestamp(6), consumed_decision_id = ?
+            where id = ?
+            """.trimIndent(),
+            HOST_DECISION_ID.toString(),
+            HOST_PREVIEW_ID.toString(),
         )
     }
 
@@ -219,6 +303,9 @@ private val SECOND_MEMBERSHIP_ID: UUID = UUID.fromString("00000000-0000-0000-000
 private val FAILED_EVENT_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000007501")
 private val MANUAL_EVENT_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000007502")
 private val SECOND_CLUB_EVENT_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000007503")
+private val HOST_CONFIRMED_EVENT_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000007504")
 private val DEAD_DELIVERY_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000007601")
 private val SECOND_DELIVERY_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000007602")
 private val MANUAL_DISPATCH_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000007701")
+private val HOST_PREVIEW_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000007801")
+private val HOST_DECISION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000007901")

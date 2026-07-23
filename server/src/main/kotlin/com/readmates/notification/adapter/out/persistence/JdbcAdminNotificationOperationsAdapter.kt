@@ -84,12 +84,15 @@ class JdbcAdminNotificationOperationsAdapter(
                   clubs.slug as club_slug,
                   clubs.name as club_name,
                   notification_manual_dispatches.id as manual_dispatch_id,
+                  host_action_notification_decisions.id as host_decision_id,
                   notification_manual_dispatches.target_count as manual_target_count,
                   users.email as requested_by_email
                 from notification_event_outbox
                 join clubs on clubs.id = notification_event_outbox.club_id
                 left join notification_manual_dispatches on notification_manual_dispatches.event_id = notification_event_outbox.id
                   and notification_manual_dispatches.club_id = notification_event_outbox.club_id
+                left join host_action_notification_decisions on host_action_notification_decisions.event_id = notification_event_outbox.id
+                  and host_action_notification_decisions.club_id = notification_event_outbox.club_id
                 left join memberships on memberships.id = notification_manual_dispatches.requested_by_membership_id
                   and memberships.club_id = notification_manual_dispatches.club_id
                 left join users on users.id = memberships.user_id
@@ -545,10 +548,10 @@ private fun ResultSet.toAdminNotificationOutboxEvent(): AdminNotificationOutboxE
         club = adminClubRef(),
         eventType = NotificationEventType.valueOf(getString("event_type")),
         source =
-            if (getString("manual_dispatch_id") == null) {
-                NotificationDispatchSource.AUTOMATIC
-            } else {
-                NotificationDispatchSource.MANUAL
+            when {
+                getString("manual_dispatch_id") != null -> NotificationDispatchSource.MANUAL
+                getString("host_decision_id") != null -> NotificationDispatchSource.HOST_CONFIRMED
+                else -> NotificationDispatchSource.AUTOMATIC
             },
         status = NotificationEventOutboxStatus.valueOf(getString("status")),
         attemptCount = getInt("attempt_count"),

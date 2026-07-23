@@ -8,6 +8,10 @@ import com.readmates.notification.application.model.AdminNotificationReplayConfi
 import com.readmates.notification.application.model.AdminNotificationReplayConfirmResult
 import com.readmates.notification.application.model.AdminNotificationReplayPreview
 import com.readmates.notification.application.model.AdminNotificationReplayPreviewRequest
+import com.readmates.notification.application.model.CompleteHostActionDecisionCommand
+import com.readmates.notification.application.model.HostActionDecisionCommand
+import com.readmates.notification.application.model.HostActionPreview
+import com.readmates.notification.application.model.HostActionPreviewCommand
 import com.readmates.notification.application.model.HostNotificationDeliveryList
 import com.readmates.notification.application.model.HostNotificationDetail
 import com.readmates.notification.application.model.HostNotificationEventList
@@ -24,7 +28,10 @@ import com.readmates.notification.application.model.MemberNotificationList
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationPreferences
 import com.readmates.notification.application.model.NotificationTestMailAuditItem
+import com.readmates.notification.application.model.PreparedHostActionDecision
+import com.readmates.notification.application.model.RecordHostConfirmedNotificationEventCommand
 import com.readmates.notification.application.model.SendNotificationTestMailCommand
+import com.readmates.notification.application.port.out.StoredHostActionDecision
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventOutboxStatus
@@ -75,6 +82,24 @@ interface RecordNotificationEventUseCase {
         clubId: UUID,
         hostUserId: UUID,
     )
+}
+
+interface ConfirmHostActionNotificationUseCase {
+    fun preview(
+        host: CurrentMember,
+        command: HostActionPreviewCommand,
+    ): HostActionPreview
+
+    fun prepare(
+        host: CurrentMember,
+        command: HostActionDecisionCommand,
+    ): PreparedHostActionDecision
+
+    fun complete(command: CompleteHostActionDecisionCommand): StoredHostActionDecision
+}
+
+interface RecordHostConfirmedNotificationEventUseCase {
+    fun record(command: RecordHostConfirmedNotificationEventCommand): UUID
 }
 
 interface ProcessNotificationDeliveriesUseCase {

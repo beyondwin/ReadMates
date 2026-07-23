@@ -19,6 +19,9 @@ class NotificationManualDispatchModelsTest {
             .isEqualTo(ManualNotificationAudience.ALL_ACTIVE_MEMBERS)
         assertThat(defaultManualAudience(NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED))
             .isEqualTo(ManualNotificationAudience.CONFIRMED_ATTENDEES)
+        assertThat(defaultManualAudience(NotificationEventType.SESSION_RECORD_UPDATED))
+            .isEqualTo(ManualNotificationAudience.CONFIRMED_ATTENDEES)
+        assertThat(allowedManualAudiences(NotificationEventType.SESSION_RECORD_UPDATED)).isEmpty()
     }
 
     @Test

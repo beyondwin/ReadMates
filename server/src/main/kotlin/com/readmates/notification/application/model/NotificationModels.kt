@@ -26,7 +26,93 @@ data class NotificationEventPayload(
 enum class NotificationDispatchSource {
     AUTOMATIC,
     MANUAL,
+    HOST_CONFIRMED,
 }
+
+enum class HostConfirmedAction {
+    NEXT_BOOK_PUBLISH,
+    SESSION_RECORD_APPLY,
+}
+
+enum class NotificationDecision {
+    SEND,
+    SKIP,
+}
+
+data class HostActionTargetCounts(
+    val targetCount: Int,
+    val expectedInAppCount: Int,
+    val expectedEmailCount: Int,
+    val excludedCount: Int,
+)
+
+data class HostActionPreviewCommand(
+    val sessionId: UUID,
+    val action: HostConfirmedAction,
+    val eventType: NotificationEventType,
+    val expectedDraftRevision: Long?,
+    val expectedLiveRevision: Long,
+    val requestHash: String,
+)
+
+data class HostActionPreview(
+    val id: UUID,
+    val targetCount: Int,
+    val expectedInAppCount: Int,
+    val expectedEmailCount: Int,
+    val excludedCount: Int,
+    val expiresAt: OffsetDateTime,
+)
+
+data class HostActionDecisionCommand(
+    val previewId: UUID,
+    val sessionId: UUID,
+    val action: HostConfirmedAction,
+    val eventType: NotificationEventType,
+    val expectedDraftRevision: Long?,
+    val expectedLiveRevision: Long,
+    val requestHash: String,
+    val decision: NotificationDecision,
+)
+
+data class PreparedHostActionDecision(
+    val previewId: UUID,
+    val clubId: UUID,
+    val sessionId: UUID,
+    val hostMembershipId: UUID,
+    val action: HostConfirmedAction,
+    val eventType: NotificationEventType,
+    val decision: NotificationDecision,
+    val counts: HostActionTargetCounts,
+)
+
+data class CompleteHostActionDecisionCommand(
+    val prepared: PreparedHostActionDecision,
+    val liveRevision: Long,
+    val eventId: UUID?,
+)
+
+data class RecordHostConfirmedNotificationEventCommand(
+    val clubId: UUID,
+    val sessionId: UUID,
+    val sessionNumber: Int,
+    val bookTitle: String,
+    val eventType: NotificationEventType,
+    val revision: Long,
+)
+
+enum class HostActionNotificationError {
+    PREVIEW_NOT_FOUND,
+    PREVIEW_EXPIRED,
+    PREVIEW_MISMATCH,
+    TARGETS_CHANGED,
+    AUDIENCE_EMPTY,
+    INVALID_DECISION,
+}
+
+class HostActionNotificationException(
+    val error: HostActionNotificationError,
+) : RuntimeException(error.name)
 
 enum class ManualNotificationAudience {
     ALL_ACTIVE_MEMBERS,
@@ -72,6 +158,7 @@ fun defaultManualAudience(eventType: NotificationEventType): ManualNotificationA
         NotificationEventType.SESSION_REMINDER_DUE,
         -> ManualNotificationAudience.ALL_ACTIVE_MEMBERS
         NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED -> ManualNotificationAudience.CONFIRMED_ATTENDEES
+        NotificationEventType.SESSION_RECORD_UPDATED -> ManualNotificationAudience.CONFIRMED_ATTENDEES
         NotificationEventType.REVIEW_PUBLISHED -> ManualNotificationAudience.SESSION_PARTICIPANTS
         // AI_GENERATION_READY is system-triggered only; manual dispatch is disallowed
         // (see allowedManualAudiences -> emptySet). Mirror REVIEW_PUBLISHED's default for
@@ -87,6 +174,7 @@ fun allowedManualAudiences(eventType: NotificationEventType): Set<ManualNotifica
         NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED ->
             setOf(ManualNotificationAudience.CONFIRMED_ATTENDEES, ManualNotificationAudience.SESSION_PARTICIPANTS)
         NotificationEventType.REVIEW_PUBLISHED -> emptySet()
+        NotificationEventType.SESSION_RECORD_UPDATED -> emptySet()
         // AI_GENERATION_READY is never offered via manual dispatch UI — host-only auto trigger.
         NotificationEventType.AI_GENERATION_READY -> emptySet()
     }
@@ -464,6 +552,7 @@ data class NotificationPreferences(
                 NotificationEventType.NEXT_BOOK_PUBLISHED -> true
                 NotificationEventType.SESSION_REMINDER_DUE -> true
                 NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED -> true
+                NotificationEventType.SESSION_RECORD_UPDATED -> true
                 NotificationEventType.REVIEW_PUBLISHED -> false
                 // AI_GENERATION_READY is in-app only and gated on the host completing a
                 // generation — no per-user preference toggle in v1. Default true so it
