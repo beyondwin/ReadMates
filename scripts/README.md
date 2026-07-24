@@ -46,7 +46,7 @@ Repository-local planning support, when available in a full source checkout, doe
 
 기본 실행 범위는 다음과 같습니다.
 
-- `python3 scripts/check-agent-guidance.py`
+- Full source checkout에 contributor-guidance checker가 있으면 해당 계약 검사
 - `git diff --check`
 - `corepack pnpm --dir front lint`
 - `npx --yes corepack@0.35.0 pnpm --dir front lint` (`corepack`이 PATH에 없을 때)

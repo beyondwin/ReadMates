@@ -185,6 +185,17 @@ if ./scripts/public-release-check.sh "$instruction_reference_fixture" > "$instru
 fi
 assert_file_contains "$instruction_reference_fixture.err" "artifact instruction references omitted contributor path: docs/development/project-map.md:1: Run AGENTS.md before editing."
 
+guidance_checker_reference_fixture="$fixture_root/omitted-guidance-checker-reference"
+mkdir -p "$guidance_checker_reference_fixture"
+cp -R "$candidate_dir/." "$guidance_checker_reference_fixture"
+printf 'Run python3 scripts/check-agent-guidance.py before editing.\n' \
+  > "$guidance_checker_reference_fixture/scripts/README.md"
+
+if ./scripts/public-release-check.sh "$guidance_checker_reference_fixture" > "$guidance_checker_reference_fixture.out" 2> "$guidance_checker_reference_fixture.err"; then
+  fail "public release check should reject an instruction that requires the omitted guidance checker"
+fi
+assert_file_contains "$guidance_checker_reference_fixture.err" "artifact instruction references omitted contributor path: scripts/README.md:1: Run python3 scripts/check-agent-guidance.py before editing."
+
 coverage_fixture="$repo_abs/scripts/fixtures/public-release-candidate-coverage.txt"
 
 if [[ ! -f "$coverage_fixture" ]]; then

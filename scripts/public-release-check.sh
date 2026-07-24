@@ -445,7 +445,12 @@ check_omitted_contributor_instruction_references() {
 
     while IFS=: read -r line_number line; do
       record_finding "artifact instruction references omitted contributor path: $relative_path:$line_number: $line"
-    done < <(grep -nE 'AGENTS[.]md|docs/agents/|scripts/agent-preflight[.]py' "$file" || true)
+    done < <(
+      grep -nE \
+        'AGENTS[.]md|docs/agents/|scripts/agent-preflight[.]py|scripts/check-agent-guidance[.]py' \
+        "$file" ||
+        true
+    )
   done
 }
 
