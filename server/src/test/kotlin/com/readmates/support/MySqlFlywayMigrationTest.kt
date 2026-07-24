@@ -1,6 +1,7 @@
 package com.readmates.support
 
 import org.assertj.core.api.Assertions.assertThat
+import org.flywaydb.core.Flyway
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -8,10 +9,15 @@ import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.core.io.ClassPathResource
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.jdbc.UncategorizedSQLException
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.jdbc.datasource.DriverManagerDataSource
+import org.springframework.jdbc.datasource.init.ScriptUtils
 import org.springframework.test.context.TestPropertySource
+import org.testcontainers.mysql.MySQLContainer
+import org.testcontainers.utility.DockerImageName
 import java.util.UUID
 
 @SpringBootTest
@@ -28,6 +34,125 @@ import java.util.UUID
 class MySqlFlywayMigrationTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
 ) : ReadmatesMySqlIntegrationTestSupport() {
+    @Test
+    @Suppress("LongMethod")
+    fun `mysql upgrades populated v41 schema to latest and preserves rows`() {
+        FlywayUpgradeMySqlContainer().use { database ->
+            database.start()
+            val dataSource = DriverManagerDataSource(database.jdbcUrl, database.username, database.password)
+            val preLatestFlyway =
+                Flyway
+                    .configure()
+                    .dataSource(dataSource)
+                    .locations("classpath:db/mysql/migration")
+                    .target("41")
+                    .load()
+
+            assertThat(preLatestFlyway.migrate().targetSchemaVersion.toString()).isEqualTo("41")
+            dataSource.connection.use { connection ->
+                ScriptUtils.executeSqlScript(
+                    connection,
+                    ClassPathResource("db/phase2/flyway-upgrade-before-latest.sql"),
+                )
+            }
+            val upgradeJdbc = JdbcTemplate(dataSource)
+            assertThat(
+                upgradeJdbc.queryForObject(
+                    """
+                    select count(*)
+                    from information_schema.tables
+                    where table_schema = database()
+                      and table_name = 'session_record_apply_receipts'
+                    """.trimIndent(),
+                    Int::class.java,
+                ),
+            ).isZero()
+
+            val upgradeResult =
+                Flyway
+                    .configure()
+                    .dataSource(dataSource)
+                    .locations("classpath:db/mysql/migration")
+                    .load()
+                    .migrate()
+
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(1)
+            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("42")
+            assertThat(
+                upgradeJdbc.queryForObject(
+                    """
+                    select version
+                    from flyway_schema_history
+                    where success = true
+                    order by installed_rank desc
+                    limit 1
+                    """.trimIndent(),
+                    String::class.java,
+                ),
+            ).isEqualTo("42")
+            assertThat(
+                upgradeJdbc.queryForObject(
+                    """
+                    select concat(short_name, ':', status, ':', role)
+                    from memberships
+                    where id = '10000000-0000-0000-0000-000000000002'
+                    """.trimIndent(),
+                    String::class.java,
+                ),
+            ).isEqualTo("Upgrade Host:ACTIVE:HOST")
+            assertThat(
+                upgradeJdbc.queryForObject(
+                    """
+                    select concat(book_title, ':', state, ':', visibility)
+                    from sessions
+                    where id = '10000000-0000-0000-0000-000000000003'
+                    """.trimIndent(),
+                    String::class.java,
+                ),
+            ).isEqualTo("Upgrade Fixture Book:CLOSED:MEMBER")
+            assertThat(
+                upgradeJdbc.queryForObject(
+                    """
+                    select concat(version, ':', source, ':', snapshot_sha256)
+                    from session_record_revisions
+                    where id = '10000000-0000-0000-0000-000000000004'
+                    """.trimIndent(),
+                    String::class.java,
+                ),
+            ).isEqualTo("1:BASELINE:${"a".repeat(64)}")
+            assertThat(
+                upgradeJdbc.queryForObject(
+                    """
+                    select concat(draft_revision, ':', source, ':', snapshot_sha256, ':',
+                                  date_format(base_session_updated_at, '%Y-%m-%d %H:%i:%s.%f'))
+                    from session_record_drafts
+                    where session_id = '10000000-0000-0000-0000-000000000003'
+                    """.trimIndent(),
+                    String::class.java,
+                ),
+            ).isEqualTo("2:MANUAL:${"b".repeat(64)}:2026-07-24 10:00:00.000000")
+            assertEquals(
+                "club_id,session_id,event_type,content_revision,created_at",
+                indexColumns(
+                    upgradeJdbc,
+                    "notification_manual_dispatches",
+                    "notification_manual_dispatches_revision_idx",
+                ),
+            )
+            assertEquals(
+                "revision_id,club_id,session_id",
+                foreignKeyColumns(
+                    upgradeJdbc,
+                    "session_record_apply_receipts",
+                    "session_record_apply_receipts_revision_scope_fk",
+                ),
+            )
+            assertThat(
+                checkConstraintClause(upgradeJdbc, "notification_manual_dispatches_audience_check"),
+            ).contains("SELECTED_MEMBERS")
+        }
+    }
+
     @Test
     fun `mysql creates host session record revision and notification confirmation tables`() {
         val tables =
@@ -1206,6 +1331,57 @@ class MySqlFlywayMigrationTest(
             constraintName,
         ) ?: error("Check constraint $constraintName does not exist")
 
+    private fun indexColumns(
+        jdbcTemplate: JdbcTemplate,
+        tableName: String,
+        indexName: String,
+    ): String =
+        jdbcTemplate.queryForObject(
+            """
+            select group_concat(column_name order by seq_in_index separator ',')
+            from information_schema.statistics
+            where table_schema = database()
+              and table_name = ?
+              and index_name = ?
+            """.trimIndent(),
+            String::class.java,
+            tableName,
+            indexName,
+        ) ?: error("Index $tableName.$indexName does not exist")
+
+    private fun foreignKeyColumns(
+        jdbcTemplate: JdbcTemplate,
+        tableName: String,
+        constraintName: String,
+    ): String =
+        jdbcTemplate.queryForObject(
+            """
+            select group_concat(column_name order by ordinal_position separator ',')
+            from information_schema.key_column_usage
+            where constraint_schema = database()
+              and table_name = ?
+              and constraint_name = ?
+            """.trimIndent(),
+            String::class.java,
+            tableName,
+            constraintName,
+        ) ?: error("Foreign key $tableName.$constraintName does not exist")
+
+    private fun checkConstraintClause(
+        jdbcTemplate: JdbcTemplate,
+        constraintName: String,
+    ): String =
+        jdbcTemplate.queryForObject(
+            """
+            select check_clause
+            from information_schema.check_constraints
+            where constraint_schema = database()
+              and constraint_name = ?
+            """.trimIndent(),
+            String::class.java,
+            constraintName,
+        ) ?: error("Check constraint $constraintName does not exist")
+
     private fun deleteWhereIn(
         tableName: String,
         columnName: String,
@@ -1219,6 +1395,24 @@ class MySqlFlywayMigrationTest(
         jdbcTemplate.update(
             "delete from $tableName where $columnName in ($placeholders)",
             *values.toTypedArray(),
+        )
+    }
+}
+
+private class FlywayUpgradeMySqlContainer :
+    MySQLContainer(
+        DockerImageName.parse("mysql:8.4"),
+    ) {
+    init {
+        withDatabaseName("readmates_upgrade")
+        withUsername("readmates_upgrade")
+        withPassword("readmates_upgrade")
+        withCommand(
+            "--log-bin-trust-function-creators=1",
+            "--innodb-buffer-pool-size=32M",
+            "--performance-schema=OFF",
+            "--key-buffer-size=8M",
+            "--max-connections=50",
         )
     }
 }
