@@ -28,15 +28,28 @@ class PlatformAdminNotificationControllerTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     private val createdSessionTokenHashes = linkedSetOf<String>()
+    private val createdReplayPreviewIds = linkedSetOf<String>()
 
     @AfterEach
     fun cleanup() {
-        jdbcTemplate.update("delete from platform_audit_events where actor_user_id = ?", OWNER_USER_ID)
-        jdbcTemplate.update(
-            "delete from admin_notification_replay_previews where actor_user_id in (?, ?)",
-            OWNER_USER_ID,
-            SUPPORT_USER_ID,
-        )
+        if (createdReplayPreviewIds.isNotEmpty()) {
+            val placeholders = createdReplayPreviewIds.joinToString(",") { "?" }
+            jdbcTemplate.update(
+                """
+                delete from platform_audit_events
+                where actor_user_id = ?
+                  and event_type = 'ADMIN_NOTIFICATION_REPLAY_CONFIRMED'
+                  and json_unquote(json_extract(metadata_json, '$.previewId')) in ($placeholders)
+                """.trimIndent(),
+                OWNER_USER_ID,
+                *createdReplayPreviewIds.toTypedArray(),
+            )
+            jdbcTemplate.update(
+                "delete from admin_notification_replay_previews where id in ($placeholders)",
+                *createdReplayPreviewIds.toTypedArray(),
+            )
+        }
+        createdReplayPreviewIds.clear()
         jdbcTemplate.update("delete from notification_deliveries where event_id = ?", EVENT_ID)
         jdbcTemplate.update("delete from notification_event_outbox where id = ?", EVENT_ID)
         if (createdSessionTokenHashes.isNotEmpty()) {
@@ -57,7 +70,7 @@ class PlatformAdminNotificationControllerTest(
         assertDeliverySafe()
         val replay = previewReplay()
         confirmReplay(replay)
-        assertReplayWasAudited()
+        assertReplayWasAudited(replay.previewId)
     }
 
     private fun assertSnapshotVisible() {
@@ -104,6 +117,7 @@ class PlatformAdminNotificationControllerTest(
                     jsonPath("$.matchedCount") { value(1) }
                 }.andReturn()
         val previewId = previewResult.response.jsonPathValue<String>("$.previewId")
+        createdReplayPreviewIds += previewId
         val selectionHash = previewResult.response.jsonPathValue<String>("$.selectionHash")
         return ReplayPreviewIds(previewId, selectionHash)
     }
@@ -128,7 +142,7 @@ class PlatformAdminNotificationControllerTest(
             }
     }
 
-    private fun assertReplayWasAudited() {
+    private fun assertReplayWasAudited(previewId: String) {
         assertThat(deliveryStatus()).isEqualTo("PENDING")
         assertThat(
             jdbcTemplate.queryForObject(
@@ -137,9 +151,11 @@ class PlatformAdminNotificationControllerTest(
                 from platform_audit_events
                 where actor_user_id = ?
                   and event_type = 'ADMIN_NOTIFICATION_REPLAY_CONFIRMED'
+                  and json_unquote(json_extract(metadata_json, '$.previewId')) = ?
                 """.trimIndent(),
                 Long::class.java,
                 OWNER_USER_ID,
+                previewId,
             ),
         ).isEqualTo(1)
     }

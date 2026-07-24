@@ -127,7 +127,7 @@ class PlatformAdminAuditControllerTest(
             insert into platform_audit_events (id, actor_user_id, actor_platform_role, target_user_id, event_type, metadata_json, created_at)
             values (?, ?, 'OWNER', ?, 'ADMIN_NOTIFICATION_REPLAY_CONFIRMED',
                     json_object('previewId', ?, 'selectionHash', ?, 'reason', 'provider recovered', 'replayedCount', 2, 'skippedCount', 0),
-                    utc_timestamp(6))
+                    timestampadd(MINUTE, -1, utc_timestamp(6)))
             """.trimIndent(),
             PLATFORM_EVENT_ID,
             OWNER_USER_ID,
@@ -143,7 +143,7 @@ class PlatformAdminAuditControllerTest(
             insert into platform_audit_events (id, actor_user_id, actor_platform_role, target_user_id, event_type, metadata_json, created_at)
             values (?, ?, 'OWNER', ?, 'SUPPORT_ACCESS_GRANT_CREATED',
                     json_object('grantId', 'grant-1', 'clubId', ?, 'granteeUserId', ?, 'scope', 'METADATA_READ', 'expiresAt', '2026-05-28T00:00:00Z'),
-                    utc_timestamp(6))
+                    timestampadd(MINUTE, -1, utc_timestamp(6)))
             """.trimIndent(),
             SUPPORT_EVENT_ID,
             OWNER_USER_ID,
@@ -157,7 +157,8 @@ class PlatformAdminAuditControllerTest(
         jdbcTemplate.update(
             """
             insert into club_audit_events (id, actor_user_id, actor_platform_role, club_id, event_type, metadata_json, created_at)
-            values (?, ?, 'OPERATOR', ?, 'CLUB_STATUS_CHANGED', json_object('reason', 'manual review'), utc_timestamp(6))
+            values (?, ?, 'OPERATOR', ?, 'CLUB_STATUS_CHANGED', json_object('reason', 'manual review'),
+                    timestampadd(MINUTE, -1, utc_timestamp(6)))
             """.trimIndent(),
             CLUB_EVENT_ID,
             OWNER_USER_ID,
@@ -173,7 +174,7 @@ class PlatformAdminAuditControllerTest(
               input_tokens, cached_input_tokens, output_tokens, cost_estimate_usd, latency_ms, created_at
             )
             values (?, ?, ?, ?, 'GENERATE', 'openai', 'gpt-safe', 'FAILED', 'PROVIDER_UNAVAILABLE',
-                    10, 0, 3, 0.0100, 1200, utc_timestamp(6))
+                    10, 0, 3, 0.0100, 1200, timestampadd(MINUTE, -1, utc_timestamp(6)))
             """.trimIndent(),
             AI_JOB_ID,
             SESSION_ID,
@@ -186,7 +187,8 @@ class PlatformAdminAuditControllerTest(
         jdbcTemplate.update(
             """
             insert into admin_notification_replay_previews (id, actor_user_id, filter_json, selection_hash, matched_count, expires_at, consumed_at, created_at)
-            values (?, ?, json_object('deliveryStatus', 'DEAD'), ?, 2, timestampadd(MINUTE, 10, utc_timestamp(6)), null, utc_timestamp(6))
+            values (?, ?, json_object('deliveryStatus', 'DEAD'), ?, 2, timestampadd(MINUTE, 10, utc_timestamp(6)), null,
+                    timestampadd(MINUTE, -1, utc_timestamp(6)))
             """.trimIndent(),
             PREVIEW_ID,
             OWNER_USER_ID,
