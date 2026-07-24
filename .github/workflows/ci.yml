@@ -56,35 +56,65 @@ jobs:
         run: python3 -B scripts/check-agent-guidance.py
 
       - name: Install script tools
+        if: ${{ always() }}
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ripgrep shellcheck
 
-      - name: Bash syntax
+      - name: Collect tracked shell scripts
+        if: ${{ always() }}
+        shell: bash
         run: |
-          for f in scripts/*.sh deploy/oci/*.sh; do
-            bash -n "$f"
-          done
+          shell_script_list="$RUNNER_TEMP/readmates-tracked-shell-scripts.zlist"
+          git ls-files -z -- \
+            ':(glob)scripts/**/*.sh' \
+            ':(glob)deploy/oci/**/*.sh' \
+            > "$shell_script_list"
+          if [[ ! -s "$shell_script_list" ]]; then
+            echo "No tracked shell scripts found under scripts or deploy/oci." >&2
+            exit 1
+          fi
+          printf 'READMATES_TRACKED_SHELL_SCRIPTS=%s\n' "$shell_script_list" >> "$GITHUB_ENV"
+
+      - name: Bash syntax
+        if: ${{ always() }}
+        run: |
+          shell_script_list="${READMATES_TRACKED_SHELL_SCRIPTS:?tracked shell-script list is unavailable}"
+          while IFS= read -r -d '' shell_script; do
+            bash -n "$shell_script"
+          done < "$shell_script_list"
 
       - name: ShellCheck
-        run: shellcheck scripts/*.sh deploy/oci/*.sh
+        if: ${{ always() }}
+        run: |
+          shell_script_list="${READMATES_TRACKED_SHELL_SCRIPTS:?tracked shell-script list is unavailable}"
+          mapfile -d '' -t shell_scripts < "$shell_script_list"
+          shellcheck "${shell_scripts[@]}"
 
       - name: aigen PII regression check
+        if: ${{ always() }}
         run: bash scripts/aigen-pii-check.sh
 
       - name: Validate Prometheus rules
+        if: ${{ always() }}
         run: ./scripts/validate-prometheus-rules.sh
 
       - name: Validate Prometheus configs
+        if: ${{ always() }}
         run: ./scripts/validate-prometheus-config.sh
 
       - name: Validate Tempo config
+        if: ${{ always() }}
         run: bash scripts/validate-tempo-config.sh
 
       - name: Validate production AI config
-        run: |
-          bash scripts/validate-production-ai-config.sh
-          bash scripts/verify-production-ai-config-fixtures.sh
+        if: ${{ always() }}
+        run: bash scripts/validate-production-ai-config.sh
+
+      - name: Verify production AI config fixtures
+        if: ${{ always() }}
+        run: bash scripts/verify-production-ai-config-fixtures.sh
 
       - name: Lint Grafana dashboards
+        if: ${{ always() }}
         run: ./scripts/lint-grafana-dashboards.sh
 
   public-release:
@@ -293,9 +323,6 @@ jobs:
 
       - name: Server quality gates (ktlint + detekt + tests + JaCoCo + architecture)
         run: ./scripts/server-ci-check.sh
-
-      - name: Lint Grafana dashboards
-        run: ./scripts/lint-grafana-dashboards.sh
 
       - name: Upload server reports
         if: always()

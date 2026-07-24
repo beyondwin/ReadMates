@@ -42,9 +42,11 @@ prep_warm() {
 
 measure() {
   local id="$1" cmd="$2"
-  echo "### $id" >> "$OUT"
-  echo '```' >> "$OUT"
-  echo "command: $cmd" >> "$OUT"
+  {
+    echo "### $id"
+    echo '```'
+    echo "command: $cmd"
+  } >> "$OUT"
   local runs=()
   for i in 1 2 3; do
     if [[ "$MODE" == "cold" ]]; then
@@ -61,16 +63,20 @@ measure() {
   min=$(echo "$sorted" | sed -n '1p')
   median=$(echo "$sorted" | sed -n '2p')
   max=$(echo "$sorted" | sed -n '3p')
-  echo "median: ${median} sec  min: ${min}  max: ${max}" >> "$OUT"
-  echo '```' >> "$OUT"
-  echo "" >> "$OUT"
+  {
+    echo "median: ${median} sec  min: ${min}  max: ${max}"
+    echo '```'
+    echo ""
+  } >> "$OUT"
 }
 
-echo "# ${LABEL} (${MODE})" > "$OUT"
-echo "" >> "$OUT"
-echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$OUT"
-echo "Host: $(uname -a)" >> "$OUT"
-echo "" >> "$OUT"
+{
+  echo "# ${LABEL} (${MODE})"
+  echo ""
+  echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "Host: $(uname -a)"
+  echo ""
+} > "$OUT"
 
 measure "L1" "cd '$REPO_ROOT/server' && ./gradlew check"
 measure "L2" "cd '$REPO_ROOT/server' && ./gradlew unitTest"
