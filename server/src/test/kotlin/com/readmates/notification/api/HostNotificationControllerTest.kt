@@ -776,6 +776,14 @@ class HostNotificationControllerTest(
                 }
 
             assertThat(manualEventCount()).isEqualTo(before + 1)
+
+            mockMvc
+                .get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
+                    with(user("member5@example.com"))
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.sessionNumber") { value(1) }
+                }
         }
     }
 

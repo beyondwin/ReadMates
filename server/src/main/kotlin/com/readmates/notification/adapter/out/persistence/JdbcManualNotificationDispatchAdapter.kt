@@ -448,6 +448,7 @@ class JdbcManualNotificationDispatchAdapter(
         val clubId = input.clubId
         val hostMembershipId = input.hostMembershipId
         val selection = input.selection
+        lockClubForAudienceMutation(clubId)
         val preview =
             jdbcTemplate
                 .query(
@@ -784,6 +785,14 @@ class JdbcManualNotificationDispatchAdapter(
                 clubId.dbString(),
                 hostMembershipId.dbString(),
             ).firstOrNull() == true
+
+    private fun lockClubForAudienceMutation(clubId: UUID) {
+        jdbcTemplate.queryForObject(
+            "select id from clubs where id = ? for update",
+            String::class.java,
+            clubId.dbString(),
+        )
+    }
 
     private fun hasValidSelectionShape(selection: ManualNotificationSelection): Boolean {
         val selected = selection.selectedMembershipIds

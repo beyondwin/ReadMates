@@ -43,10 +43,16 @@ class MemberLifecycleServiceTest {
 
         assertEquals(MembershipStatus.SUSPENDED, response.member.status)
         assertEquals(listOf(clubId), invalidation.clubs)
+        assertEquals(listOf("lock-club", "find-membership", "suspend"), store.mutationCalls)
     }
 
     private inner class RecordingMemberLifecycleStorePort : MemberLifecycleStorePort {
         private var targetStatus = MembershipStatus.ACTIVE
+        val mutationCalls = mutableListOf<String>()
+
+        override fun lockClubForUpdate(clubId: UUID) {
+            mutationCalls += "lock-club"
+        }
 
         override fun listMembers(
             clubId: UUID,
@@ -57,6 +63,7 @@ class MemberLifecycleServiceTest {
             clubId: UUID,
             membershipId: UUID,
         ): Boolean {
+            mutationCalls += "suspend"
             targetStatus = MembershipStatus.SUSPENDED
             return true
         }
@@ -102,8 +109,9 @@ class MemberLifecycleServiceTest {
         override fun findMembershipInClubForUpdate(
             clubId: UUID,
             membershipId: UUID,
-        ): LifecycleMembershipRow? =
-            if (clubId == this@MemberLifecycleServiceTest.clubId && membershipId == targetMembershipId) {
+        ): LifecycleMembershipRow? {
+            mutationCalls += "find-membership"
+            return if (clubId == this@MemberLifecycleServiceTest.clubId && membershipId == targetMembershipId) {
                 LifecycleMembershipRow(
                     membershipId = targetMembershipId,
                     userId = UUID.fromString("00000000-0000-0000-0000-000000000102"),
@@ -118,6 +126,7 @@ class MemberLifecycleServiceTest {
             } else {
                 null
             }
+        }
 
         override fun lockActiveHostRows(clubId: UUID) = Unit
 

@@ -333,6 +333,22 @@ describe("HostNotificationComposerController", () => {
     expect(screen.getByRole("button", { name: "알림 미리보기" })).toBeEnabled();
   });
 
+  it("requires a fresh preview when the server no longer has the preview", async () => {
+    vi.mocked(confirmManualNotification).mockRejectedValue({
+      code: "MANUAL_NOTIFICATION_PREVIEW_NOT_FOUND",
+    });
+    renderController();
+
+    await userEvent.click(await screen.findByRole("button", { name: "알림 미리보기" }));
+    await userEvent.click(await screen.findByRole("button", { name: "발송 확인" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "새 미리보기를 만든 뒤 다시 발송해 주세요",
+    );
+    expect(screen.queryByRole("region", { name: "발송 전 확인" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "알림 미리보기" })).toBeEnabled();
+  });
+
   it("offers retry and a safe later action when options loading fails", async () => {
     vi.mocked(fetchManualNotificationOptions)
       .mockRejectedValueOnce(new Error("network failed"))

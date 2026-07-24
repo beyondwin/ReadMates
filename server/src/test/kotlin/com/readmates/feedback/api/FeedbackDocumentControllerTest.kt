@@ -218,7 +218,7 @@ class FeedbackDocumentControllerTest(
         ],
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
-    fun `open session feedback document is not listed or directly readable`() {
+    fun `open session feedback document is omitted from archive but directly readable`() {
         mockMvc
             .get("/api/feedback-documents/me") {
                 with(user("member5@example.com"))
@@ -239,14 +239,16 @@ class FeedbackDocumentControllerTest(
             .get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
                 with(user("member5@example.com"))
             }.andExpect {
-                status { isNotFound() }
+                status { isOk() }
+                jsonPath("$.sessionNumber") { value(1) }
             }
 
         mockMvc
             .get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
                 with(user("host@example.com"))
             }.andExpect {
-                status { isNotFound() }
+                status { isOk() }
+                jsonPath("$.sessionNumber") { value(1) }
             }
     }
 

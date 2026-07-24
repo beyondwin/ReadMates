@@ -1,5 +1,6 @@
 package com.readmates.notification.adapter.out.persistence
 
+import com.readmates.auth.adapter.out.persistence.JdbcMemberLifecycleStoreAdapter
 import com.readmates.notification.application.model.ManualNotificationAudience
 import com.readmates.notification.application.model.ManualNotificationRequestedChannels
 import com.readmates.notification.application.model.ManualNotificationSelection
@@ -18,12 +19,15 @@ import com.readmates.notification.domain.NotificationEventType
 import com.readmates.shared.paging.PageRequest
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.jdbc.Sql
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
 import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -31,6 +35,8 @@ import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 private const val PREPARE_MANUAL_DISPATCH_SQL = """
     delete from notification_manual_dispatches where club_id = '00000000-0000-0000-0000-000000000001';
@@ -67,7 +73,9 @@ private const val RESTORE_MANUAL_DISPATCH_SQL = """
 @Suppress("LargeClass")
 class JdbcManualNotificationDispatchAdapterTest(
     @param:Autowired private val adapter: JdbcManualNotificationDispatchAdapter,
+    @param:Autowired private val memberLifecycleAdapter: JdbcMemberLifecycleStoreAdapter,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
+    @param:Autowired private val transactionManager: PlatformTransactionManager,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     private val clubId = UUID.fromString("00000000-0000-0000-0000-000000000001")
     private val hostMembershipId = UUID.fromString("00000000-0000-0000-0000-000000000201")
@@ -414,6 +422,146 @@ class JdbcManualNotificationDispatchAdapterTest(
     }
 
     @Test
+    @Suppress("LongMethod")
+    fun `different hosts confirm different sessions concurrently with the shared club lock`() {
+        val now = OffsetDateTime.of(2026, 7, 23, 0, 0, 0, 0, ZoneOffset.UTC)
+        val secondSessionId = UUID.fromString("00000000-0000-0000-0000-000000000302")
+        val secondHostMembershipId = membershipId("member1@example.com")
+        val firstSelection = selection()
+        val start = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(2)
+
+        try {
+            jdbcTemplate.update(
+                "update memberships set role = 'HOST' where club_id = ? and id = ?",
+                clubId.toString(),
+                secondHostMembershipId.toString(),
+            )
+            jdbcTemplate.update(
+                "update sessions set state = 'DRAFT', visibility = 'HOST_ONLY' where club_id = ? and id = ?",
+                clubId.toString(),
+                secondSessionId.toString(),
+            )
+            val secondSelection = selection(sessionId = secondSessionId)
+            val attempts =
+                listOf(
+                    hostMembershipId to firstSelection,
+                    secondHostMembershipId to secondSelection,
+                ).map { (membershipId, currentSelection) ->
+                    val snapshot = adapter.previewTargets(clubId, currentSelection)
+                    val previewId =
+                        adapter.insertPreview(
+                            clubId,
+                            membershipId,
+                            "a".repeat(64),
+                            snapshot.snapshotHash(),
+                            now.plusMinutes(10),
+                        )
+                    CompletableFuture.supplyAsync(
+                        {
+                            start.await()
+                            adapter.confirmManualDispatch(
+                                ManualNotificationConfirmTransactionInput(
+                                    previewId = previewId,
+                                    clubId = clubId,
+                                    hostMembershipId = membershipId,
+                                    selectionHash = "a".repeat(64),
+                                    now = now,
+                                    selection = currentSelection,
+                                    resendConfirmed = false,
+                                ),
+                            )
+                        },
+                        executor,
+                    )
+                }
+
+            start.countDown()
+            val confirmed = attempts.map { it.get(10, TimeUnit.SECONDS) }
+
+            assertThat(confirmed)
+                .allMatch {
+                    it is ManualNotificationConfirmAttempt.Confirmed &&
+                        it.dispatch.status == ManualNotificationConfirmInsertStatus.CREATED
+                }
+            assertThat(revisionManualDispatchCount(firstSelection.contentRevision)).isEqualTo(1)
+            assertThat(
+                revisionManualDispatchCount(
+                    secondSelection.contentRevision,
+                    secondSelection.sessionId,
+                ),
+            ).isEqualTo(1)
+        } finally {
+            executor.shutdownNow()
+            jdbcTemplate.update(
+                "update memberships set role = 'MEMBER' where club_id = ? and id = ?",
+                clubId.toString(),
+                secondHostMembershipId.toString(),
+            )
+            jdbcTemplate.update(
+                "update sessions set state = 'PUBLISHED', visibility = 'PUBLIC' where club_id = ? and id = ?",
+                clubId.toString(),
+                secondSessionId.toString(),
+            )
+        }
+    }
+
+    @Test
+    fun `confirm waits behind the same club lock used by member lifecycle mutations`() {
+        val now = OffsetDateTime.of(2026, 7, 23, 0, 0, 0, 0, ZoneOffset.UTC)
+        val currentSelection = selection()
+        val snapshot = adapter.previewTargets(clubId, currentSelection)
+        val previewId =
+            adapter.insertPreview(
+                clubId,
+                hostMembershipId,
+                "a".repeat(64),
+                snapshot.snapshotHash(),
+                now.plusMinutes(10),
+            )
+        val lifecycleLockAcquired = CountDownLatch(1)
+        val releaseLifecycle = CountDownLatch(1)
+        val confirmStarted = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(2)
+        val transactionTemplate = TransactionTemplate(transactionManager)
+
+        try {
+            val lifecycle =
+                CompletableFuture.runAsync(
+                    {
+                        transactionTemplate.executeWithoutResult {
+                            memberLifecycleAdapter.lockClubForUpdate(clubId)
+                            lifecycleLockAcquired.countDown()
+                            check(releaseLifecycle.await(10, TimeUnit.SECONDS))
+                        }
+                    },
+                    executor,
+                )
+            check(lifecycleLockAcquired.await(10, TimeUnit.SECONDS))
+            val confirmation =
+                CompletableFuture.supplyAsync(
+                    {
+                        confirmStarted.countDown()
+                        confirm(previewId, now, currentSelection)
+                    },
+                    executor,
+                )
+            check(confirmStarted.await(10, TimeUnit.SECONDS))
+
+            assertThatThrownBy { confirmation.get(250, TimeUnit.MILLISECONDS) }
+                .isInstanceOf(TimeoutException::class.java)
+
+            releaseLifecycle.countDown()
+            lifecycle.get(10, TimeUnit.SECONDS)
+            assertThat(confirmation.get(10, TimeUnit.SECONDS))
+                .isInstanceOf(ManualNotificationConfirmAttempt.Confirmed::class.java)
+        } finally {
+            releaseLifecycle.countDown()
+            executor.shutdownNow()
+        }
+    }
+
+    @Test
     fun `confirm rechecks current content revision after session lock without outbox`() {
         val now = OffsetDateTime.of(2026, 7, 23, 0, 0, 0, 0, ZoneOffset.UTC)
         val currentSelection = selection()
@@ -672,13 +820,14 @@ class JdbcManualNotificationDispatchAdapterTest(
         )
 
     private fun selection(
+        sessionId: UUID = this.sessionId,
         requestedChannels: ManualNotificationRequestedChannels = ManualNotificationRequestedChannels.BOTH,
         excludedMembershipIds: List<UUID> = emptyList(),
         includedMembershipIds: List<UUID> = emptyList(),
     ) = ManualNotificationSelection(
         sessionId = sessionId,
         eventType = NotificationEventType.SESSION_REMINDER_DUE,
-        contentRevision = reminderRevision(),
+        contentRevision = reminderRevision(sessionId),
         audience = ManualNotificationAudience.ALL_ACTIVE_MEMBERS,
         requestedChannels = requestedChannels,
         excludedMembershipIds = excludedMembershipIds,
@@ -686,7 +835,7 @@ class JdbcManualNotificationDispatchAdapterTest(
         sendMode = ManualNotificationSendMode.NOW,
     )
 
-    private fun reminderRevision(): String =
+    private fun reminderRevision(sessionId: UUID = this.sessionId): String =
         requireNotNull(
             adapter
                 .findSessionContext(clubId, sessionId)
@@ -870,7 +1019,10 @@ class JdbcManualNotificationDispatchAdapterTest(
             previewId.toString(),
         ) ?: 0
 
-    private fun revisionManualDispatchCount(contentRevision: String): Int =
+    private fun revisionManualDispatchCount(
+        contentRevision: String,
+        sessionId: UUID = this.sessionId,
+    ): Int =
         jdbcTemplate.queryForObject(
             """
             select count(*)

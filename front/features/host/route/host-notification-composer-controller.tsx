@@ -235,7 +235,10 @@ function ReadyComposerController({
         ? "미리보기 이후 수신 대상이 변경되었습니다. 최신 저장 결과에서 작성기를 다시 열어 주세요."
         : "알림 내용 또는 세션 상태가 변경되었습니다. 최신 저장 결과에서 작성기를 다시 열어 주세요.";
     }
-    if (code === "MANUAL_NOTIFICATION_PREVIEW_EXPIRED") {
+    if (
+      code === "MANUAL_NOTIFICATION_PREVIEW_EXPIRED"
+      || code === "MANUAL_NOTIFICATION_PREVIEW_NOT_FOUND"
+    ) {
       setPreview(null);
       return "미리보기가 만료되었습니다. 새 미리보기를 만든 뒤 다시 발송해 주세요.";
     }

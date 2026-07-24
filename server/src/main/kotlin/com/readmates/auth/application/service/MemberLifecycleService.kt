@@ -47,6 +47,7 @@ class MemberLifecycleService(
         request: MemberLifecycleRequest,
     ): MemberLifecycleResponse {
         requireHost(host)
+        memberLifecycleStore.lockClubForUpdate(host.clubId)
         val membership = ensureMutableMembership(host, membershipId)
         if (!membership.status.canTransitionTo(MembershipStatus.SUSPENDED)) {
             throw lifecycleConflict("${membership.status} → SUSPENDED is not allowed")
@@ -69,6 +70,7 @@ class MemberLifecycleService(
         membershipId: UUID,
     ): MemberLifecycleResponse {
         requireHost(host)
+        memberLifecycleStore.lockClubForUpdate(host.clubId)
         val membership = ensureMutableMembership(host, membershipId)
         if (!membership.status.canTransitionTo(MembershipStatus.ACTIVE)) {
             throw lifecycleConflict("${membership.status} → ACTIVE is not allowed")
@@ -91,6 +93,7 @@ class MemberLifecycleService(
         request: MemberLifecycleRequest,
     ): MemberLifecycleResponse {
         requireHost(host)
+        memberLifecycleStore.lockClubForUpdate(host.clubId)
         val membership = ensureMutableMembership(host, membershipId)
         if (!membership.status.canTransitionTo(MembershipStatus.LEFT)) {
             throw lifecycleConflict("${membership.status} → LEFT is not allowed")
@@ -113,6 +116,7 @@ class MemberLifecycleService(
         membershipId: UUID,
     ): MemberLifecycleResponse {
         requireHost(host)
+        memberLifecycleStore.lockClubForUpdate(host.clubId)
         val membership = ensureMutableMembership(host, membershipId)
         if (membership.status != MembershipStatus.ACTIVE) {
             throw lifecycleConflict("Only active members can be added to current session")
@@ -138,6 +142,7 @@ class MemberLifecycleService(
         membershipId: UUID,
     ): MemberLifecycleResponse {
         requireHost(host)
+        memberLifecycleStore.lockClubForUpdate(host.clubId)
         ensureMutableMembership(host, membershipId)
         val openSessionId =
             memberLifecycleStore.findCurrentOpenSessionId(host.clubId)
@@ -158,6 +163,7 @@ class MemberLifecycleService(
         member: CurrentMember,
         request: MemberLifecycleRequest,
     ): MemberLifecycleResponse {
+        memberLifecycleStore.lockClubForUpdate(member.clubId)
         if (member.role == MembershipRole.HOST) {
             memberLifecycleStore.lockActiveHostRows(member.clubId)
         }
