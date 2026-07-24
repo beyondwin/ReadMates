@@ -183,7 +183,9 @@ test.describe("/admin shell", () => {
     await expect(page).toHaveURL(/onboarding=1/);
     await expect(page.getByRole("dialog")).toBeVisible();
 
-    await page.getByRole("button", { name: "닫기" }).click();
+    const closeButton = page.getByRole("button", { name: "닫기" });
+    await expect(closeButton).toBeFocused();
+    await closeButton.click();
     await expect(page.getByRole("dialog")).not.toBeVisible();
     await expect(page).not.toHaveURL(/onboarding=1/);
   });

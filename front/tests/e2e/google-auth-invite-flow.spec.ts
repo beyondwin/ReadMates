@@ -64,6 +64,12 @@ test("host creates invite and member is directed to Google acceptance", async ({
   await page.goto("/app");
   await expect(page).toHaveURL(/\/login/);
 
+  await page.goto("/login?returnTo=https%3A%2F%2Fexternal.example%2Fescape");
+  await expect(page.getByRole("link", { name: "시작하기" })).toHaveAttribute(
+    "href",
+    "/oauth2/authorization/google",
+  );
+
   await page.goto(inviteUrl);
   await expect(page.getByText("테스트멤버").first()).toBeVisible();
   await expect(page.getByText(invitedEmail, { exact: true })).toBeVisible();
