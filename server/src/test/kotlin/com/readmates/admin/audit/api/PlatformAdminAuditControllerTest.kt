@@ -4,6 +4,8 @@ import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
 import org.assertj.core.api.Assertions.assertThat
+import org.hamcrest.Matchers.hasItem
+import org.hamcrest.Matchers.hasItems
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -54,10 +56,20 @@ class PlatformAdminAuditControllerTest(
                     status { isOk() }
                     content { contentTypeCompatibleWith(MediaType.APPLICATION_JSON) }
                     jsonPath("$.generatedAt") { exists() }
-                    jsonPath("$.items[0].sourceTable") { exists() }
-                    jsonPath("$.items[?(@.actionType == 'ADMIN_NOTIFICATION_REPLAY_CONFIRMED')]") { exists() }
-                    jsonPath("$.items[?(@.actionType == 'SUPPORT_ACCESS_GRANT_CREATED')]") { exists() }
-                    jsonPath("$.items[?(@.actionType == 'AI_GENERATION_AUDIT')]") { exists() }
+                    jsonPath(
+                        "$.items[?(@.id == 'platform_audit_events:$PLATFORM_EVENT_ID')].sourceTable",
+                    ) {
+                        value(hasItem("platform_audit_events"))
+                    }
+                    jsonPath("$.items[*].actionType") {
+                        value(
+                            hasItems(
+                                "ADMIN_NOTIFICATION_REPLAY_CONFIRMED",
+                                "SUPPORT_ACCESS_GRANT_CREATED",
+                                "AI_GENERATION_AUDIT",
+                            ),
+                        )
+                    }
                 }.andReturn()
                 .response
                 .contentAsString
@@ -79,7 +91,11 @@ class PlatformAdminAuditControllerTest(
                     cookie(sessionCookieForUser(SUPPORT_USER_ID))
                 }.andExpect {
                     status { isOk() }
-                    jsonPath("$.items[0].target.label") { value("사용자 숨김") }
+                    jsonPath(
+                        "$.items[?(@.id == 'platform_audit_events:$SUPPORT_EVENT_ID')].target.label",
+                    ) {
+                        value(hasItem("사용자 숨김"))
+                    }
                 }.andReturn()
                 .response
                 .contentAsString
