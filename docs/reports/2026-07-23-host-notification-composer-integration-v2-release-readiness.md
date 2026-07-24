@@ -2,9 +2,9 @@
 
 Date: 2026-07-23
 
-Review base: `origin/main` at `f5336b78fb21199710e852fc0f0804289a370831`
+Implementation review base: `f5336b78fb21199710e852fc0f0804289a370831` (the fetched `origin/main` merge-base used when the CPE worktree started)
 
-Reviewed scope: the complete `origin/main..HEAD` branch plus the Task 12 working-tree closeout, not only the implementation plan
+Reviewed scope: the complete implementation-base-to-HEAD branch, the current `origin/main..HEAD` comparison, and the Task 12 closeout, not only the implementation plan
 
 ## Decision
 
@@ -21,7 +21,7 @@ No push, merge, pull request, tag, deploy, production policy mutation, or live n
 
 ## Final-review follow-up (2026-07-24)
 
-An independent broad review of the complete branch, rather than only the implementation plan, found the following final-review issues. This follow-up records the corrected implementation, public-artifact, and active-document contracts. The exact canonical and release gates still need one final-HEAD rerun after this report is committed.
+An independent broad review of the complete branch, rather than only the implementation plan, found the following final-review issues. This follow-up records the corrected implementation, public-artifact, and active-document contracts. The exact final-HEAD canonical and release results are preserved in the CPE saved-worktree verification receipt so recording those results does not move the reviewed commit.
 
 ### Corrected documentation and public-artifact contract
 
@@ -38,6 +38,8 @@ An independent broad review of the complete branch, rather than only the impleme
 - Apply receipts use the database identity `(club, session, applyRequestId)`, retain and validate the actor and apply contract, permit the same key in another session, and return a public 409 for a conflicting actor or contract.
 - Notification failures return allowlisted `{code,message,status}` bodies. Stale, expired, reused, changed-recipient, invalid-recipient, empty-audience, and duplicate paths have distinct safe recovery guidance.
 - V42 ties `(revision_id, club_id, session_id)` to the same scoped session-record revision with a composite foreign key.
+- Manual confirm, member lifecycle changes, viewer activation/deactivation, and attendance confirmation acquire the same club row before membership, session, participant, preference, preview, or outbox rows. This removes the cross-workflow lock inversion while preserving transaction-scoped revalidation.
+- Real-service MySQL concurrency coverage uses independent `NOWAIT` probes to prove the audience mutation owns the club row while confirm has not reached the preview row. Attendance exercises the actual transition/audit path, and viewer/participant fixture timestamps and states are restored after each test.
 
 ### Evidence boundary for AI commits
 
@@ -107,7 +109,7 @@ Tag-triggered `Deploy Front`, tag-triggered `Deploy Server Image`, GHCR image sc
 - Session history reads do not create legacy decision rows.
 - No architecture-test baseline or exception file changed.
 - No deploy workflow trigger or permission widening was found. The CI change fail-closes partial private-guidance source contracts.
-- The complete `origin/main..HEAD` diff contains 168 paths: 165 added, copied, modified, or renamed paths plus 3 deletions. The private-data/token/local-path scan covered the 165 paths present at HEAD; deleted paths cannot introduce current-tree values. The broad phrase scan returned one intentional negative assertion for a private-key header, with no delimiter or payload. The precise token-shaped scan returned no findings.
+- The implementation diff from `f5336b78` contains 179 paths: 176 added or modified paths plus 3 deletions. The private-data/token/local-path scan covers the 176 paths present at HEAD; deleted paths cannot introduce current-tree values. The broad phrase scan returns one intentional negative assertion for a private-key header, with no delimiter or payload. The precise token-shaped scan returns no findings.
 - `readmates.host-action-confirmation.required` controls staged session-record capability exposure only; it does not control dispatch.
 
 ## Migration and API Contract
@@ -162,8 +164,11 @@ Canonical local evidence:
 - Final-review frontend gates: `corepack pnpm --dir front lint`, `corepack pnpm --dir front test` (188 files, 1,474 tests), and `corepack pnpm --dir front build` passed.
 - Final-review affected browser gate: `corepack pnpm --dir front exec playwright test tests/e2e/host-feedback-notification-composer.spec.ts tests/e2e/manual-notifications.spec.ts` passed 11 tests.
 - Final-review server PR gate: `./scripts/server-ci-check.sh` passed.
+- Final-review lock-order suite: `./server/gradlew -p server integrationTest --tests '*JdbcManualNotificationDispatchAdapterTest' --rerun-tasks` passed 22 tests. Independent review approved the club-first production order, `NOWAIT` evidence, real attendance audit transition, and complete fixture restoration with no open finding.
 - `git diff --check origin/main..HEAD` — passed.
-- The full `origin/main..HEAD` diff contains 168 paths: the targeted scan inspected all 165 added, copied, modified, or renamed paths present at HEAD, while 3 deleted paths were counted separately. One broad-pattern match was the negative security assertion described above; the precise private/token/local-path pattern returned no findings.
+- The implementation-base diff contains 179 paths: the targeted scan inspects all 176 added or modified paths present at HEAD, while 3 deleted paths are counted separately. One broad-pattern match is the negative security assertion described above; the precise private/token/local-path pattern returns no findings.
 - `git tag --list v2.0.0` returned no tag, and the tag-ref digest remained `a8071d68c3691234ecaec50982780ab762582d853aad5d44d16f75c300c45190` before and after release preparation.
 
-Residual release-operation risk remains until the exact canonical and release gates are rerun at the final report commit, remote CI passes on the pushed commit, both tag workflows succeed, V42 is observed in production Flyway history before traffic promotion, and sanitized BFF/OAuth/notification smoke succeeds. Passing local tests is evidence for review readiness, not proof that those production steps have completed.
+While this local program was running, `origin/main` advanced from the implementation merge-base to `e92409ef530df7b5b80125f8a65b8295cb7cd7d4`. A read-only `git merge-tree --write-tree --messages HEAD origin/main` completed without conflicts, but no merge or other integration action was performed; the CPE handoff therefore correctly remains `integration=not_observed`. That newer main includes separate test-suite, frontend, CI, guidance, and public-candidate work and must receive normal integration review when this branch is later considered for merge.
+
+Residual release-operation risk remains until remote CI passes on an authorized integrated commit, both tag workflows succeed, V42 is observed in production Flyway history before traffic promotion, and sanitized BFF/OAuth/notification smoke succeeds. Passing local tests is evidence for review readiness, not proof that those production steps have completed.
