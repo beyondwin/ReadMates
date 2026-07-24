@@ -226,6 +226,37 @@ describe("Cloudflare OAuth proxy functions", () => {
     );
   });
 
+  it("preserves the backend fallback redirect for malformed OAuth state", async () => {
+    const fetchMock = vi.fn(async () => (
+      new Response(null, {
+        status: 302,
+        headers: {
+          Location: "https://readmates.pages.dev/app",
+        },
+      })
+    ));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await callbackGet(
+      context(
+        new Request(
+          "https://readmates.pages.dev/login/oauth2/code/google?code=test&state=not-a-state",
+        ),
+        "google",
+      ),
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/login/oauth2/code/google?code=test&state=not-a-state",
+      expect.objectContaining({
+        method: "GET",
+        redirect: "manual",
+      }),
+    );
+    expect(response.status).toBe(302);
+    expect(response.headers.get("Location")).toBe("https://readmates.pages.dev/app");
+  });
+
   it.each([
     {
       name: "authorization start",
