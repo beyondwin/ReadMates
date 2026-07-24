@@ -10,7 +10,7 @@
 
 ## 1. 배경
 
-ReadMates 테스트 스위트는 frontend, Cloudflare Pages Functions BFF, Kotlin/Spring Boot server, MySQL/Flyway, design system, public-release automation을 함께 검증한다. 2026-07-24 파일 스캔 기준으로 테스트 파일은 504개이고, 해당 테스트 파일 자체의 총 길이는 약 10.9만 줄이다.
+ReadMates 테스트 스위트는 frontend, Cloudflare Pages Functions BFF, Kotlin/Spring Boot server, MySQL/Flyway, design system, public-release automation을 함께 검증한다. 2026-07-24 파일 스캔 기준으로 자동화 테스트 파일은 510개이고, 해당 테스트 파일 자체의 총 길이는 약 10.9만 줄이다. 이 수치는 일반 `*.test.*`/`*.spec.*` 및 Kotlin `*Test.kt` 파일 504개와 Playwright CT `*.ct.tsx` 파일 6개를 합친 값이다.
 
 현재 구성에는 다음 검증 lane이 있다.
 
@@ -46,7 +46,7 @@ ReadMates 테스트 스위트는 frontend, Cloudflare Pages Functions BFF, Kotli
 
 ### 2.3 작업 분해
 
-504개 테스트 전체의 inventory, 코드 변경, 결함 주입, 전체 검증을 하나의 implementation plan에 담으면 작업 단위와 검토 범위가 지나치게 커진다. 전체 목표와 판정 규칙은 이 설계가 통제하되 실행은 다음의 bounded plan으로 나눈다.
+510개 자동화 테스트 파일 전체의 inventory, 코드 변경, 결함 주입, 전체 검증을 하나의 implementation plan에 담으면 작업 단위와 검토 범위가 지나치게 커진다. 전체 목표와 판정 규칙은 이 설계가 통제하되 실행은 다음의 bounded plan으로 나눈다.
 
 1. 기준선, 전체 파일 inventory, 실행 연결성, 고위험 gap matrix;
 2. server unit/integration/architecture 최적화;
