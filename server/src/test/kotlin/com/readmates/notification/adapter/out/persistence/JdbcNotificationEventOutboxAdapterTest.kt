@@ -3,6 +3,7 @@ package com.readmates.notification.adapter.out.persistence
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventOutboxItem
 import com.readmates.notification.application.model.NotificationEventPayload
+import com.readmates.notification.application.port.out.NotificationEventOutboxPort
 import com.readmates.notification.application.port.out.NotificationEventPublisherPort
 import com.readmates.notification.application.service.NotificationRelayService
 import com.readmates.notification.application.service.ReadmatesOperationalMetrics
@@ -88,6 +89,7 @@ private const val TEST_NOTIFICATION_EVENTS_TOPIC = "readmates.notification.event
     executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
 )
 @Tag("integration")
+@Suppress("LargeClass")
 class JdbcNotificationEventOutboxAdapterTest(
     @param:Autowired private val adapter: JdbcNotificationEventOutboxAdapter,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
@@ -226,6 +228,69 @@ class JdbcNotificationEventOutboxAdapterTest(
     }
 
     @Test
+    fun `published event remains reclaimable when the local published mark is lost`() {
+        insertClub()
+        val requestId = "request-r09-partial-delivery"
+        val dedupeKey = "event-outbox-adapter-test-published-mark-lost"
+        MDC.put("requestId", requestId)
+        val eventId =
+            try {
+                enqueueTestEvent(
+                    dedupeKey = dedupeKey,
+                    payload =
+                        NotificationEventPayload(
+                            sessionId = sessionId,
+                            sessionNumber = 7,
+                            bookTitle = "Partial Delivery Recovery",
+                            targetDate = LocalDate.of(2026, 5, 1),
+                        ),
+                )
+            } finally {
+                MDC.remove("requestId")
+            }
+        val publisher = RecordingNotificationEventPublisher()
+        val metrics = ReadmatesOperationalMetrics(SimpleMeterRegistry())
+        val firstRelay = relay(RejectPublishedMarkOutboxPort(adapter), publisher, metrics)
+
+        assertThat(firstRelay.publishPending(limit = 1)).isEqualTo(1)
+
+        val publishingRow = eventRow(eventId)
+        assertThat(publishingRow["status"]).isEqualTo("PUBLISHING")
+        assertThat(publishingRow["attempt_count"]).isEqualTo(0)
+        assertThat(publishingRow["locked_at"]).isNotNull()
+        assertThat(publishingRow["published_at"]).isNull()
+        assertThat(publishingRow["request_id"]).isEqualTo(requestId)
+        assertThat(eventRows()).isEqualTo(1)
+
+        jdbcTemplate.update(
+            """
+            update notification_event_outbox
+            set locked_at = timestampadd(MINUTE, -16, utc_timestamp(6))
+            where id = ?
+            """.trimIndent(),
+            eventId,
+        )
+        val secondRelay = relay(adapter, publisher, metrics)
+
+        assertThat(secondRelay.publishPending(limit = 1)).isEqualTo(1)
+
+        val recoveredRow = eventRow(eventId)
+        assertThat(publisher.records).hasSize(2)
+        assertThat(publisher.records.map { it.eventId }).containsOnly(UUID.fromString(eventId))
+        assertThat(publisher.records.map { it.topic }).containsOnly(TEST_NOTIFICATION_EVENTS_TOPIC)
+        assertThat(publisher.records.map { it.key }).containsOnly(clubId.toString())
+        assertThat(publisher.records.map { it.requestId }).containsOnly(requestId)
+        assertThat(recoveredRow["status"]).isEqualTo("PUBLISHED")
+        assertThat(recoveredRow["attempt_count"]).isEqualTo(0)
+        assertThat(recoveredRow["locked_at"]).isNull()
+        assertThat(recoveredRow["published_at"]).isNotNull()
+        assertThat(recoveredRow["last_error"]).isNull()
+        assertThat(recoveredRow["request_id"]).isEqualTo(requestId)
+        assertThat(eventRows()).isEqualTo(1)
+        assertThat(eventIdForDedupeKey(dedupeKey)).isEqualTo(eventId)
+    }
+
+    @Test
     fun `claim publishable reclaims stale publishing rows but not fresh publishing rows`() {
         insertClub()
         adapter.enqueueEvent(
@@ -266,11 +331,18 @@ class JdbcNotificationEventOutboxAdapterTest(
             """.trimIndent(),
             freshPublishingId,
         )
+        val staleLeaseBefore = eventRow(stalePublishingId)["locked_at"]
+        val freshLeaseBefore = eventRow(freshPublishingId)["locked_at"]
 
         val claimed = adapter.claimPublishable(10)
+        val reclaimed = claimed.single { it.id.toString() == stalePublishingId }
 
         assertThat(claimed.map { it.id.toString() }).contains(stalePublishingId)
         assertThat(claimed.map { it.id.toString() }).doesNotContain(freshPublishingId)
+        assertThat(reclaimed.status).isEqualTo(NotificationEventOutboxStatus.PUBLISHING)
+        assertThat(reclaimed.attemptCount).isZero()
+        assertThat(reclaimed.lockedAt).isNotNull()
+        assertThat(eventRow(stalePublishingId)["locked_at"]).isNotEqualTo(staleLeaseBefore)
         assertThat(
             jdbcTemplate.queryForObject(
                 """
@@ -293,6 +365,11 @@ class JdbcNotificationEventOutboxAdapterTest(
                 stalePublishingId,
             ),
         ).isTrue()
+        val freshRow = eventRow(freshPublishingId)
+        assertThat(freshRow["status"]).isEqualTo("PUBLISHING")
+        assertThat(freshRow["attempt_count"]).isEqualTo(0)
+        assertThat(freshRow["locked_at"]).isEqualTo(freshLeaseBefore)
+        assertThat(freshRow["published_at"]).isNull()
     }
 
     @Test
@@ -572,6 +649,18 @@ class JdbcNotificationEventOutboxAdapterTest(
         return adapter.claimPublishable(10).single { it.id.toString() == eventId }
     }
 
+    private fun relay(
+        outboxPort: NotificationEventOutboxPort,
+        publisherPort: NotificationEventPublisherPort,
+        metrics: ReadmatesOperationalMetrics,
+    ): NotificationRelayService =
+        NotificationRelayService(
+            notificationEventOutboxPort = outboxPort,
+            notificationEventPublisherPort = publisherPort,
+            operationalMetrics = metrics,
+            maxAttempts = 5,
+        )
+
     private fun enqueueTestEvent(
         dedupeKey: String,
         eventType: NotificationEventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
@@ -626,7 +715,7 @@ class JdbcNotificationEventOutboxAdapterTest(
     private fun eventRow(eventId: String): Map<String, Any?> =
         jdbcTemplate.queryForMap(
             """
-            select status, attempt_count, locked_at, published_at, last_error
+            select status, attempt_count, locked_at, published_at, last_error, request_id
             from notification_event_outbox
             where id = ?
             """.trimIndent(),
@@ -681,7 +770,7 @@ class JdbcNotificationEventOutboxAdapterTest(
     }
 
     private class RecordingNotificationEventPublisher : NotificationEventPublisherPort {
-        private val eventIds = Collections.synchronizedList(mutableListOf<UUID>())
+        val records = Collections.synchronizedList(mutableListOf<PublishedEventRecord>())
 
         override fun publish(
             message: NotificationEventMessage,
@@ -689,11 +778,27 @@ class JdbcNotificationEventOutboxAdapterTest(
             key: String,
             requestId: String?,
         ) {
-            eventIds += message.eventId
+            records += PublishedEventRecord(message.eventId, topic, key, requestId)
         }
 
-        fun eventIds(): List<UUID> = eventIds.toList()
+        fun eventIds(): List<UUID> = records.map { it.eventId }
     }
+}
+
+private data class PublishedEventRecord(
+    val eventId: UUID,
+    val topic: String,
+    val key: String,
+    val requestId: String?,
+)
+
+private class RejectPublishedMarkOutboxPort(
+    delegate: NotificationEventOutboxPort,
+) : NotificationEventOutboxPort by delegate {
+    override fun markPublished(
+        id: UUID,
+        lockedAt: OffsetDateTime,
+    ): Boolean = false
 }
 
 private fun JdbcTemplate.seedReminderCandidate(

@@ -102,6 +102,37 @@ class NotificationDeliveryProcessingServiceTest {
     }
 
     @Test
+    fun `processClaimed records bounded sanitized retry and dead transitions`() {
+        val deliveryPort = ProcessingRecordingDeliveryPort()
+        val unsafeError = "Authorization: synthetic-secret synthetic@example.test " + "x".repeat(600)
+        val service =
+            notificationDeliveryProcessingService(
+                deliveryStatusPort = deliveryPort,
+                mailPort = FailingMailPort(unsafeError),
+            )
+        val retryable = processingClaimedDelivery(attemptCount = 1)
+        val exhausted = processingClaimedDelivery(attemptCount = 4)
+
+        service.processClaimed(retryable)
+        service.processClaimed(exhausted)
+
+        val retryMark = deliveryPort.failed.single()
+        assertThat(retryMark.id).isEqualTo(retryable.id)
+        assertThat(retryMark.lockedAt).isEqualTo(retryable.lockedAt)
+        assertThat(retryMark.delayMinutes).isEqualTo(15L)
+        assertThat(retryMark.error).hasSize(500)
+        assertThat(retryMark.error).contains("[redacted-secret]", "[redacted-email]")
+        assertThat(retryMark.error).doesNotContain("synthetic-secret", "synthetic@example.test")
+
+        val deadMark = deliveryPort.dead.single()
+        assertThat(deadMark.id).isEqualTo(exhausted.id)
+        assertThat(deadMark.lockedAt).isEqualTo(exhausted.lockedAt)
+        assertThat(deadMark.error).hasSize(500)
+        assertThat(deadMark.error).contains("[redacted-secret]", "[redacted-email]")
+        assertThat(deadMark.error).doesNotContain("synthetic-secret", "synthetic@example.test")
+    }
+
+    @Test
     fun `processClaimed increments dead metric after exhausted failure mark succeeds`() {
         val deliveryPort = ProcessingRecordingDeliveryPort()
         val registry = SimpleMeterRegistry()
@@ -204,8 +235,15 @@ private data class ProcessingFailedMark(
     val delayMinutes: Long,
 )
 
+private data class ProcessingDeadMark(
+    val id: UUID,
+    val lockedAt: OffsetDateTime,
+    val error: String,
+)
+
 private class ProcessingRecordingDeliveryPort : NotificationDeliveryStatusPort {
     val failed = mutableListOf<ProcessingFailedMark>()
+    val dead = mutableListOf<ProcessingDeadMark>()
 
     override fun findDeliveryStatus(id: UUID): NotificationDeliveryStatus? = error("unused")
 
@@ -228,7 +266,10 @@ private class ProcessingRecordingDeliveryPort : NotificationDeliveryStatusPort {
         id: UUID,
         lockedAt: OffsetDateTime,
         error: String,
-    ): Boolean = true
+    ): Boolean {
+        dead += ProcessingDeadMark(id, lockedAt, error)
+        return true
+    }
 
     override fun restoreDeadEmailDeliveryForClub(
         clubId: UUID,
