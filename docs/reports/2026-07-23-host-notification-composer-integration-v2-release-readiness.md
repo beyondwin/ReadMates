@@ -1,6 +1,6 @@
 # Host Notification Composer Integration v2 Release Readiness
 
-Date: 2026-07-23
+Date: 2026-07-24
 
 Implementation review base: `f5336b78fb21199710e852fc0f0804289a370831` (the fetched `origin/main` merge-base used when the CPE worktree started)
 
@@ -10,14 +10,14 @@ Reviewed scope: the complete implementation-base-to-HEAD branch, the current `or
 
 The accumulated concrete CHANGELOG body is prepared locally under `v2.0.0 - 2026-07-23`, while `Unreleased` is restored to the documented single-placeholder convention. A major version is required because the old and new frontend/server API pairings are not compatible long-lived deployment states.
 
-This preparation does not publish `v2.0.0`. At prepared commit `dc8f0f7f`, the exact `./scripts/pre-push-check.sh --full --release` command exited 0 without `--no-changelog-check`, closing the prior local `CHECK_FAILURE`. The branch is locally ready for review and merge, but production migration/deploy smoke still requires operator access after merge and a separately authorized tag.
+This preparation does not publish `v2.0.0`. At prepared commit `dc8f0f7f`, the exact `./scripts/pre-push-check.sh --full --release` command exited 0 without `--no-changelog-check`, closing the prior local `CHECK_FAILURE`. The implementation was subsequently merged into an integration branch based on current local `main` and passed the same full release gate at merge commit `e0f677cf1f78a20ae6318d92b40c16b40161a9d4`. Production migration/deploy smoke still requires operator access after local integration and a separately authorized tag.
 
 The reviewed branch contains two intentional release surfaces:
 
 - Repository-agent guidance and CI/public-candidate contract changes.
 - Host notification composer integration across frontend routes/state, Spring APIs and authorization, Flyway V42, notification persistence/scheduling, and operator documentation.
 
-No push, merge, pull request, tag, deploy, production policy mutation, or live notification send was performed by this review.
+No push, pull request, tag, deploy, production policy mutation, or live notification send was performed by this review. Local Git integration is recorded below.
 
 ## Final-review follow-up (2026-07-24)
 
@@ -148,6 +148,8 @@ Focused evidence:
 
 Canonical local evidence:
 
+- Integration merge `e0f677cf1f78a20ae6318d92b40c16b40161a9d4` combines current local `main` (`6b7792f424a1b3eebf4cf5b1338dca9719c5cf0f`) with the reviewed feature HEAD (`726e692526fa0879e9fa0cd4e8a4aa420069ed76`) without conflicts.
+- `./scripts/pre-push-check.sh --full --release` — exited 0 on that integration merge. It passed frontend lint and 188 files/1,475 coverage tests, frontend build, server CI, Testcontainers integration, production AI configuration, public candidate/gitleaks, 90 Playwright E2E tests, and Prometheus/Tempo/Grafana/Alertmanager checks.
 - `./scripts/pre-push-check.sh --full --release` — exited 0 at prepared commit `dc8f0f7f` without any CHANGELOG override. It passed the release guard, agent guidance, frontend lint, 188 files and 1,470 coverage tests (82.5% statements, 78.06% branches, 83.12% functions, 83.2% lines), frontend build, Zod fixture freshness, server quality/integration, production AI config, public candidate/gitleaks, 90 Playwright E2E tests, and Prometheus/Tempo/Grafana/Alertmanager checks.
 - `./scripts/server-ci-check.sh` — passed.
 - `./server/gradlew -p server integrationTest --rerun-tasks` — passed from a forced rerun.
@@ -169,6 +171,6 @@ Canonical local evidence:
 - The implementation-base diff contains 179 paths: the targeted scan inspects all 176 added or modified paths present at HEAD, while 3 deleted paths are counted separately. One broad-pattern match is the negative security assertion described above; the precise private/token/local-path pattern returns no findings.
 - `git tag --list v2.0.0` returned no tag, and the tag-ref digest remained `a8071d68c3691234ecaec50982780ab762582d853aad5d44d16f75c300c45190` before and after release preparation.
 
-While this local program was running, `origin/main` advanced from the implementation merge-base to `e92409ef530df7b5b80125f8a65b8295cb7cd7d4`. A read-only `git merge-tree --write-tree --messages HEAD origin/main` completed without conflicts, but no merge or other integration action was performed; the CPE handoff therefore correctly remains `integration=not_observed`. That newer main includes separate test-suite, frontend, CI, guidance, and public-candidate work and must receive normal integration review when this branch is later considered for merge.
+While this local program was running, `origin/main` advanced from the implementation merge-base to `e92409ef530df7b5b80125f8a65b8295cb7cd7d4`, and local `main` incorporated that remote commit plus separate test-suite planning work at `6b7792f424a1b3eebf4cf5b1338dca9719c5cf0f`. The reviewed feature was merged into a separate integration branch from that exact local-main commit. The merge was conflict-free and the complete `./scripts/pre-push-check.sh --full --release` gate passed on the resulting commit. This is observed local integration evidence; it is not remote CI, a push, or deployment evidence.
 
 Residual release-operation risk remains until remote CI passes on an authorized integrated commit, both tag workflows succeed, V42 is observed in production Flyway history before traffic promotion, and sanitized BFF/OAuth/notification smoke succeeds. Passing local tests is evidence for review readiness, not proof that those production steps have completed.
