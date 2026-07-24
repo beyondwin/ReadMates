@@ -19,6 +19,30 @@ The reviewed branch contains two intentional release surfaces:
 
 No push, merge, pull request, tag, deploy, production policy mutation, or live notification send was performed by this review.
 
+## Final-review follow-up (2026-07-24)
+
+An independent broad review of the complete branch, rather than only the implementation plan, found the following final-review issues. This follow-up records the corrected implementation, public-artifact, and active-document contracts. The exact canonical and release gates still need one final-HEAD rerun after this report is committed.
+
+### Corrected documentation and public-artifact contract
+
+- Clean public candidates intentionally omit contributor-only routing, preflight, and agent-guide files. `scripts/README.md`, the project map, README entrypoints, and development hub now keep full-source-checkout guidance conditional and make shipped candidate guidance tool-neutral.
+- `public-release-check.sh` now rejects a candidate instruction that references an omitted contributor path. The tracked fixture first proved the missing check (RED), then passed after the candidate check and fixture were added (GREEN). The final public candidate build and scanner also passed in this follow-up; the exact commands are listed in the evidence section below.
+- Host feedback-document preview reads the latest live `session_feedback_documents` row, not a staged draft. `FEEDBACK_DOCUMENT_PUBLISHED` CTA/options/preview availability follows that current live document. An `OPEN` session with a current live document can use manual options → preview → confirm.
+- JSON import and AI commit persist only the common draft and do not return or open a composer. Only final live apply returns composer context. Content mutation remains silent until an explicit manual confirm creates dispatch/outbox state.
+
+### Final-review implementation fixes
+
+- Manual confirm now locks and revalidates the preview, current host role, session state and revision, recipient membership/attendance/preferences, target fingerprint, and duplicate state in one transaction. Payload and outbox rows are built only from the locked current snapshot.
+- Frontend composer requests retain the mutation-returned opaque `contentRevision`. Cached or newly loaded options must match it, first-publication apply removes cached options, and revision drift fails closed without retargeting the request.
+- `OPEN` sessions with a current live feedback document can use `FEEDBACK_DOCUMENT_PUBLISHED` options → preview → confirm.
+- Apply receipts use the database identity `(club, session, applyRequestId)`, retain and validate the actor and apply contract, permit the same key in another session, and return a public 409 for a conflicting actor or contract.
+- Notification failures return allowlisted `{code,message,status}` bodies. Stale, expired, reused, changed-recipient, invalid-recipient, empty-audience, and duplicate paths have distinct safe recovery guidance.
+- V42 ties `(revision_id, club_id, session_id)` to the same scoped session-record revision with a composite foreign key.
+
+### Evidence boundary for AI commits
+
+Browser Playwright scenarios that mock AI responses establish browser behavior only: no dialog and no browser notification mutation after commit. They are not evidence that a server AI commit persisted a draft with zero outbox rows. The separately named server integration test uses a mock provider through the real API/Kafka/Redis/persistence path, proves an `AI_GENERATED` draft was persisted, and asserts zero `notification_event_outbox` rows.
+
 ## Blocker
 
 No unresolved local Blocker remains.
@@ -44,7 +68,7 @@ The host notification and session-record contracts intentionally remove the lega
 - `POST /api/host/sessions/{sessionId}/record-apply` requires `applyRequestId`, expected draft/live revisions, and `expectedDraftHash`; it returns revision metadata plus composer context.
 - Manual options/preview/confirm carry `contentRevision`; next-book/reminder default to `ALL_ACTIVE_MEMBERS`, feedback/session-record default to `CONFIRMED_ATTENDEES`, all templates default to `BOTH`, and `SELECTED_MEMBERS` requires an explicit choice of one or more unique active membership IDs from the current club.
 - `GET/PUT /api/host/notifications/policy` exposes the opt-in session-reminder policy.
-- `GET /api/host/sessions/{sessionId}/feedback-document/preview` exposes the staged feedback document to the current host only.
+- `GET /api/host/sessions/{sessionId}/feedback-document/preview` exposes the latest live feedback document to the current host only.
 
 An old frontend paired with the new server, or a new frontend paired with the old server, is not a supported long-lived state. Deploy the compatible server and frontend from the same release commit and complete BFF smoke before enabling notification delivery.
 
@@ -75,7 +99,7 @@ Tag-triggered `Deploy Front`, tag-triggered `Deploy Server Image`, GHCR image sc
 
 ## Not an issue
 
-- Content mutations are silent by contract: next-book visibility changes, feedback/session-record apply, external JSON commit, and AI commit do not create manual dispatch, outbox, or legacy host-action decision rows.
+- Content mutations are silent by contract: next-book visibility changes and final apply do not create manual dispatch, outbox, or legacy host-action decision rows; external JSON/AI commit only saves a draft and neither returns nor opens a composer.
 - Preview alone does not send. Escape, close, and skip paths create no dispatch or outbox row.
 - Confirm retries return the same event without duplication. Explicit resend creates one separate event.
 - Selected recipients are frozen in the event metadata and delivery planning deduplicates membership IDs.
@@ -83,7 +107,7 @@ Tag-triggered `Deploy Front`, tag-triggered `Deploy Server Image`, GHCR image sc
 - Session history reads do not create legacy decision rows.
 - No architecture-test baseline or exception file changed.
 - No deploy workflow trigger or permission widening was found. The CI change fail-closes partial private-guidance source contracts.
-- The complete `origin/main..HEAD` diff contains 168 paths: 165 added, copied, modified, or renamed paths plus 3 deletions. The private-data/token/local-path scan covered the 165 paths present at HEAD; deleted paths cannot introduce current-tree values. The broad phrase scan returned one intentional negative assertion, `doesNotContain("BEGIN PRIVATE KEY")`, which contains no delimiter or payload. The precise token-shaped scan using a delimited PEM header returned no findings.
+- The complete `origin/main..HEAD` diff contains 168 paths: 165 added, copied, modified, or renamed paths plus 3 deletions. The private-data/token/local-path scan covered the 165 paths present at HEAD; deleted paths cannot introduce current-tree values. The broad phrase scan returned one intentional negative assertion for a private-key header, with no delimiter or payload. The precise token-shaped scan returned no findings.
 - `readmates.host-action-confirmation.required` controls staged session-record capability exposure only; it does not control dispatch.
 
 ## Migration and API Contract
@@ -114,6 +138,7 @@ Focused evidence:
 
 - Manual notification Playwright: 10 passed, including zero-row preview, the reminder template's explicit `ALL_ACTIVE_MEMBERS`/`BOTH` defaults, selected-recipient rejection, stale/expired preview, retry idempotency, and explicit resend.
 - AI commit Playwright: 3 passed, with no notification dialog or mutation request after commit.
+- This browser mock evidence is intentionally separate from real-AI persistence evidence. It must not be cited as proof that a real server AI commit wrote a draft and zero outbox rows; that assertion belongs to a named server integration result.
 - Composer/controller/editor Vitest: 3 files and 18 tests passed.
 - `NotificationManualDispatchModelsTest.manual template defaults match host workflow decisions` binds all four event-specific server defaults; `HostManualNotificationServiceTest.options expose event defaults allowed selected audience and current revisions` binds feedback/session-record options and `BOTH`; the frontend `host-notification-composer-model.test.ts` case `uses the event-specific recommended audience` binds next-book, feedback, and session-record composer choices.
 - Focused controller, dispatch, outbox, feedback, delivery-planning, and history integration tests: passed.
@@ -130,8 +155,15 @@ Canonical local evidence:
 - `corepack pnpm --dir front test:e2e` — passed, 90 Playwright tests.
 - The earlier `./scripts/pre-push-check.sh --full --no-release` pass remains historical complementary evidence only; it is not used to close the prior `CHECK_FAILURE`.
 - Independent `./scripts/build-public-release-candidate.sh` and `./scripts/public-release-check.sh .tmp/public-release-candidate` reruns passed after the exact gate; gitleaks found no leaks.
+- Final-review public-artifact RED: `./scripts/build-public-release-candidate.sh && ./scripts/verify-public-release-fixtures.sh` exited 1 because the new omitted-contributor-path fixture was not yet enforced (`public release check should reject an instruction that requires an omitted contributor path`).
+- Final-review public-artifact GREEN: `./scripts/build-public-release-candidate.sh && ./scripts/verify-public-release-fixtures.sh && ./scripts/public-release-check.sh .tmp/public-release-candidate` exited 0. This is repository-only evidence for the public-artifact contract, not a server/frontend release gate.
+- Final-review confirm revalidation RED: four MySQL cases changed host authority, selected-member activity, attendance, or email preference after preview; the old path still created an outbox row. GREEN: all four now return the exact rejection reason and create no dispatch or outbox row.
+- Final-review server focused suite: manual service/adapter/API, apply service/adapter/API, receipt identity, V42 Flyway scope, `OPEN` feedback confirm, and the named AI draft/zero-outbox integration test passed.
+- Final-review frontend gates: `corepack pnpm --dir front lint`, `corepack pnpm --dir front test` (188 files, 1,474 tests), and `corepack pnpm --dir front build` passed.
+- Final-review affected browser gate: `corepack pnpm --dir front exec playwright test tests/e2e/host-feedback-notification-composer.spec.ts tests/e2e/manual-notifications.spec.ts` passed 11 tests.
+- Final-review server PR gate: `./scripts/server-ci-check.sh` passed.
 - `git diff --check origin/main..HEAD` — passed.
 - The full `origin/main..HEAD` diff contains 168 paths: the targeted scan inspected all 165 added, copied, modified, or renamed paths present at HEAD, while 3 deleted paths were counted separately. One broad-pattern match was the negative security assertion described above; the precise private/token/local-path pattern returned no findings.
 - `git tag --list v2.0.0` returned no tag, and the tag-ref digest remained `a8071d68c3691234ecaec50982780ab762582d853aad5d44d16f75c300c45190` before and after release preparation.
 
-Residual release-operation risk remains until remote CI passes on the pushed commit, both tag workflows succeed, V42 is observed in production Flyway history before traffic promotion, and sanitized BFF/OAuth/notification smoke succeeds. Passing local tests is evidence for review readiness, not proof that those production steps have completed.
+Residual release-operation risk remains until the exact canonical and release gates are rerun at the final report commit, remote CI passes on the pushed commit, both tag workflows succeed, V42 is observed in production Flyway history before traffic promotion, and sanitized BFF/OAuth/notification smoke succeeds. Passing local tests is evidence for review readiness, not proof that those production steps have completed.
