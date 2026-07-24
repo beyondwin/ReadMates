@@ -21,6 +21,7 @@ import {
 
 const SESSION_ID = "11111111-1111-1111-1111-111111111111";
 const CLUB_SLUG = "club-a";
+const SYNTHETIC_TRANSCRIPT_MARKER = "합성 테스트 발언입니다.";
 
 function clubDefault(): ClubAiDefaultResponse {
   return { defaultModel: "claude-sonnet-4-6" };
@@ -76,7 +77,11 @@ test("cost cap exceeded on start surfaces an explanatory message and stays on ID
   await page.getByLabel(/대본 파일/).setInputFiles({
     name: "transcript.txt",
     mimeType: "text/plain",
-    buffer: Buffer.from(groundedTranscript([{ speaker: "공개 회원 A", at: "00:00", text: "합성 테스트 발언입니다." }])),
+    buffer: Buffer.from(
+      groundedTranscript([
+        { speaker: "공개 회원 A", at: "00:00", text: SYNTHETIC_TRANSCRIPT_MARKER },
+      ]),
+    ),
   });
   await page.getByRole("button", { name: /생성 시작/ }).click();
 
@@ -87,6 +92,7 @@ test("cost cap exceeded on start surfaces an explanatory message and stays on ID
   // (the BFF/error wrapper concatenates code + detail; this assertion is
   // forgiving so both "비용 한도" and the code surface satisfy it).
   await expect(alert).toContainText(/비용|COST_CAP_EXCEEDED|한도/);
+  await expect(page.getByText(SYNTHETIC_TRANSCRIPT_MARKER, { exact: false })).toHaveCount(0);
 
   // Still on the upload form — IDLE state.
   await expect(page.getByLabel(/대본 파일/)).toBeVisible();

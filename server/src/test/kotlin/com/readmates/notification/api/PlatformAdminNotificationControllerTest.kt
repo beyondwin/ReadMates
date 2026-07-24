@@ -17,6 +17,8 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.result.MockMvcResultHandlers.print
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.util.UUID
 
 @SpringBootTest(properties = ["spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev"])
@@ -110,14 +112,21 @@ class PlatformAdminNotificationControllerTest(
                     cookie(sessionCookieForUser(OWNER_USER_ID))
                 }.andDo {
                     print()
-                }.andExpect {
-                    status { isOk() }
-                    jsonPath("$.previewId") { exists() }
-                    jsonPath("$.selectionHash") { exists() }
-                    jsonPath("$.matchedCount") { value(1) }
                 }.andReturn()
         val previewId = previewResult.response.jsonPathValue<String>("$.previewId")
         createdReplayPreviewIds += previewId
+        status()
+            .isOk
+            .match(previewResult)
+        jsonPath("$.previewId")
+            .exists()
+            .match(previewResult)
+        jsonPath("$.selectionHash")
+            .exists()
+            .match(previewResult)
+        jsonPath("$.matchedCount")
+            .value(1)
+            .match(previewResult)
         val selectionHash = previewResult.response.jsonPathValue<String>("$.selectionHash")
         return ReplayPreviewIds(previewId, selectionHash)
     }
