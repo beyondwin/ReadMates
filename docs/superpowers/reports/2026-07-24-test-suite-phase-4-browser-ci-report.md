@@ -79,7 +79,7 @@ Phase 1의 환경 미검증 항목은 Phase 4 Task 1에서 모두 해소했다.
 
 | 후보 | Layer | 결정 | 보존 또는 강화한 실패 모드 |
 | --- | --- | --- | --- |
-| `front/features/current-session/ui/session-closing-board.ct.tsx` | CT | `retain` | blocked/published lifecycle와 긴 상태 중심 layout의 차이 |
+| `front/features/host/ui/session-closing-board.ct.tsx` | CT | `retain` | blocked/published lifecycle와 긴 상태 중심 layout의 차이 |
 | `front/features/platform-admin/ui/admin-support-workbench.ct.tsx` | CT | `retain` | masked identity, READY checklist, expiry/create/revoke의 480px 구성 |
 | `front/features/public/ui/public-records-page.ct.tsx` | CT | `retain` | public archive hierarchy, 긴 한국어 wrapping, fallback cover와 metadata |
 | `front/shared/ui/avatar-chip.ct.tsx` | CT | `retain` | 48px 원형, deterministic tone, 한국어 initial 정렬 |
@@ -191,7 +191,7 @@ owned fixture row가 exclusive upper-bound에 포함되지 않은 문제였다.
 focused audit는 3 cases 중 owner case가 재현됐고, audit와 notification
 class를 process-local concurrent parallelism 2로 묶은 세 표본은
 fail/fail/pass였다. 원인은 host JVM의 `Instant.now()`와 MySQL container
-clock 사이의 작은 차이가 `created_at <= to` 경계와 경쟁한 것이었다.
+clock 사이의 작은 차이가 `created_at < to` 경계와 경쟁한 것이었다.
 동시에 notification fixture가 actor 전체를 cleanup하던 latent
 격리 위험도 확인했다.
 
