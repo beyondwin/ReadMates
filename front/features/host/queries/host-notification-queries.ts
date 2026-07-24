@@ -43,6 +43,7 @@ import {
   normalizePageRequest,
   pageFromNormalizedPageRequest,
 } from "@/shared/query/cursor-pagination";
+import { hostNotificationManualOptionsRootKey } from "./host-notification-query-key-helpers";
 
 export type ManualOptionsQueryRequest = {
   sessionId?: string | null;
@@ -110,7 +111,7 @@ export const hostNotificationKeys = {
   audit: (page?: PageRequest, context?: ReadmatesApiContext) =>
     [...hostNotificationKeys.auditRoot(context), normalizePageRequest(page)] as const,
   manualOptionsRoot: (context?: ReadmatesApiContext) =>
-    [...hostNotificationKeys.manual(context), "options"] as const,
+    hostNotificationManualOptionsRootKey(context),
   manualOptions: (request?: ManualOptionsQueryRequest, context?: ReadmatesApiContext) =>
     [...hostNotificationKeys.manualOptionsRoot(context), normalizeManualOptionsRequest(request)] as const,
   manualDispatchesRoot: (context?: ReadmatesApiContext) =>

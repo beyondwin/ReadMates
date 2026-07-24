@@ -75,6 +75,7 @@ vi.mock("@/features/host/route/host-notification-composer-controller", () => ({
     request: {
       sessionId: string;
       eventType: string;
+      contentRevision: string;
       origin: string;
     } | null;
     onClose: () => void;
@@ -92,7 +93,7 @@ vi.mock("@/features/host/route/host-notification-composer-controller", () => ({
     }) => void;
   }) => request ? (
     <div role="dialog" aria-label="멤버에게 알림을 보낼까요?">
-      <span>{`${request.sessionId}:${request.eventType}:${request.origin}`}</span>
+      <span>{`${request.sessionId}:${request.eventType}:${request.contentRevision}:${request.origin}`}</span>
       <button
         type="button"
         onClick={() => {
@@ -294,7 +295,7 @@ describe("EditHostSessionRecordWorkflow", () => {
     expect(await screen.findByRole("dialog", {
       name: "멤버에게 알림을 보낼까요?",
     })).toHaveTextContent(
-      "session-1:FEEDBACK_DOCUMENT_PUBLISHED:CONTENT_UPDATE",
+      `session-1:FEEDBACK_DOCUMENT_PUBLISHED:${"b".repeat(64)}:CONTENT_UPDATE`,
     );
 
     const editorDispatchesKey = hostSessionKeys.manualDispatches(

@@ -76,6 +76,7 @@ export function HostDashboardRoute({
         setComposerRequest({
           sessionId: result.composer.sessionId,
           eventType: result.composer.eventType,
+          contentRevision: result.composer.contentRevision,
           origin: "FIRST_PUBLICATION",
         });
       }

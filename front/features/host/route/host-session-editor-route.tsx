@@ -424,6 +424,7 @@ export function EditHostSessionRecordWorkflow({
         setComposerRequest({
           sessionId: result.composer.sessionId,
           eventType: result.composer.eventType,
+          contentRevision: result.composer.contentRevision,
           origin: "CONTENT_UPDATE",
         });
       }

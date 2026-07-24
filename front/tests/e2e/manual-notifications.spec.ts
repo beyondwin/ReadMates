@@ -249,10 +249,22 @@ test("selected members must be unique, active, same-club, and non-empty", async 
     selectedMembershipIds: [foreignMembershipId],
   });
 
-  expect(empty.status).toBe(403);
-  expect(duplicate.status).toBe(403);
-  expect(inactive.status).toBe(403);
-  expect(foreign.status).toBe(403);
+  expect(empty).toMatchObject({
+    status: 422,
+    body: { code: "MANUAL_NOTIFICATION_SELECTION_INVALID", status: 422 },
+  });
+  expect(duplicate).toMatchObject({
+    status: 422,
+    body: { code: "MANUAL_NOTIFICATION_SELECTION_INVALID", status: 422 },
+  });
+  expect(inactive).toMatchObject({
+    status: 422,
+    body: { code: "MANUAL_NOTIFICATION_RECIPIENT_INVALID", status: 422 },
+  });
+  expect(foreign).toMatchObject({
+    status: 422,
+    body: { code: "MANUAL_NOTIFICATION_RECIPIENT_INVALID", status: 422 },
+  });
   expect(manualDispatchCount(sessionId, "SESSION_REMINDER_DUE")).toBe(0);
   expect(notificationEventCount(sessionId, "SESSION_REMINDER_DUE")).toBe(0);
 });

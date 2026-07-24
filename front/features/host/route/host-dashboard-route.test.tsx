@@ -130,12 +130,13 @@ vi.mock("@/features/host/route/host-notification-composer-controller", () => ({
     request: null | {
       sessionId: string;
       eventType: string;
+      contentRevision: string;
       origin: string;
     };
     onClose: () => void;
   }) => request ? (
     <div role="dialog" aria-label="멤버에게 알림을 보낼까요?">
-      <span>{`${request.sessionId}:${request.eventType}:${request.origin}`}</span>
+      <span>{`${request.sessionId}:${request.eventType}:${request.contentRevision}:${request.origin}`}</span>
       <button type="button" onClick={onClose}>이번에는 보내지 않기</button>
     </div>
   ) : null,
@@ -183,7 +184,7 @@ describe("HostDashboardRoute next-book composer", () => {
     expect(await screen.findByRole("dialog", {
       name: "멤버에게 알림을 보낼까요?",
     })).toHaveTextContent(
-      "session-next:NEXT_BOOK_PUBLISHED:FIRST_PUBLICATION",
+      `session-next:NEXT_BOOK_PUBLISHED:${"a".repeat(64)}:FIRST_PUBLICATION`,
     );
 
     await userEvent.click(screen.getByRole("button", {

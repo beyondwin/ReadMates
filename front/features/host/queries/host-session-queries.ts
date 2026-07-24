@@ -40,6 +40,7 @@ import {
   normalizePageRequest,
   pageFromNormalizedPageRequest,
 } from "@/shared/query/cursor-pagination";
+import { hostNotificationManualOptionsRootKey } from "./host-notification-query-key-helpers";
 
 export const DEFAULT_HOST_SESSION_LIST_LIMIT = 50;
 
@@ -290,6 +291,11 @@ export function useSaveHostSessionVisibilityMutation(context?: ReadmatesApiConte
         hostSessionKeys.detail(variables.sessionId, context),
         result.session,
       );
+      if (result.composer) {
+        client.removeQueries({
+          queryKey: hostNotificationManualOptionsRootKey(context),
+        });
+      }
       return Promise.all([
         invalidateHostSessionLists(client, context),
         invalidateHostSessionDashboard(client, context),

@@ -25,11 +25,13 @@ import {
   HostNotificationComposerController,
   type HostNotificationComposerRequest,
 } from "./host-notification-composer-controller";
+import { hostNotificationKeys } from "@/features/host/queries/host-notification-queries";
 
 const contentRevision = "b".repeat(64);
 const request: HostNotificationComposerRequest = {
   sessionId: "session-1",
   eventType: "FEEDBACK_DOCUMENT_PUBLISHED",
+  contentRevision,
   origin: "FIRST_PUBLICATION",
 };
 
@@ -61,6 +63,7 @@ const members = [
 function optionsPage(
   items: ManualNotificationOptionsResponse["members"]["items"] = [members[0]],
   nextCursor: string | null = null,
+  revision: string = contentRevision,
 ): ManualNotificationOptionsResponse {
   return {
     session: {
@@ -74,7 +77,7 @@ function optionsPage(
     },
     templates: [{
       eventType: "FEEDBACK_DOCUMENT_PUBLISHED",
-      contentRevision,
+      contentRevision: revision,
       label: "피드백 문서 공개",
       enabled: true,
       disabledReason: null,
@@ -158,7 +161,7 @@ function renderController({
   onClose?: () => void;
   onConfirmed?: (result: ManualNotificationConfirmResponse) => void;
 } = {}) {
-  const { Wrapper } = createWrapper();
+  const { client, Wrapper } = createWrapper();
   render(
     <HostNotificationComposerController
       request={request}
@@ -167,7 +170,7 @@ function renderController({
     />,
     { wrapper: Wrapper },
   );
-  return { onClose, onConfirmed };
+  return { client, onClose, onConfirmed };
 }
 
 beforeEach(() => {
@@ -194,6 +197,20 @@ describe("HostNotificationComposerController", () => {
       sessionId: "session-1",
       contentRevision,
     }));
+  });
+
+  it("never retargets a mutation request to a newer options revision", async () => {
+    const newerRevision = "c".repeat(64);
+    vi.mocked(fetchManualNotificationOptions).mockResolvedValue(
+      optionsPage([members[0]], null, newerRevision),
+    );
+    renderController();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "알림 내용이 변경되었습니다",
+    );
+    expect(screen.queryByRole("button", { name: "알림 미리보기" })).not.toBeInTheDocument();
+    expect(previewManualNotification).not.toHaveBeenCalled();
   });
 
   it("accumulates searched recipient pages by cursor", async () => {
@@ -223,6 +240,27 @@ describe("HostNotificationComposerController", () => {
         page: { limit: 50, cursor: "cursor-2" },
       }),
     );
+  });
+
+  it("fails closed when options revision changes while loading members", async () => {
+    const newerRevision = "d".repeat(64);
+    vi.mocked(fetchManualNotificationOptions).mockImplementation((_context, input) =>
+      Promise.resolve(
+        input?.search
+          ? optionsPage([members[0]], null, newerRevision)
+          : optionsPage(),
+      ));
+    renderController();
+
+    await userEvent.click(await screen.findByRole("radio", { name: "직접 선택" }));
+    await userEvent.type(screen.getByRole("searchbox", { name: "멤버 검색" }), "멤버");
+    await userEvent.click(screen.getByRole("button", { name: "검색" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "멤버를 불러오는 동안 알림 내용이 변경되었습니다",
+    );
+    expect(screen.getByRole("button", { name: "알림 미리보기" })).toBeDisabled();
+    expect(previewManualNotification).not.toHaveBeenCalled();
   });
 
   it("invalidates a preview whenever the draft changes", async () => {
@@ -257,6 +295,42 @@ describe("HostNotificationComposerController", () => {
       "발송을 요청하지 못했습니다",
     );
     expect(onConfirmed).not.toHaveBeenCalled();
+  });
+
+  it("clears preview and evicts options on authoritative stale content errors", async () => {
+    vi.mocked(confirmManualNotification).mockRejectedValue({
+      code: "MANUAL_NOTIFICATION_CONTENT_STALE",
+    });
+    const { client } = renderController();
+    const removeSpy = vi.spyOn(client, "removeQueries");
+
+    await userEvent.click(await screen.findByRole("button", { name: "알림 미리보기" }));
+    await userEvent.click(await screen.findByRole("button", { name: "발송 확인" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "최신 저장 결과에서 작성기를 다시 열어 주세요",
+    );
+    expect(screen.queryByRole("region", { name: "발송 전 확인" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "알림 미리보기" })).toBeDisabled();
+    expect(removeSpy).toHaveBeenCalledWith({
+      queryKey: hostNotificationKeys.manualOptionsRoot({ clubSlug: "reading-sai" }),
+    });
+  });
+
+  it("requires a fresh preview after an expired confirmation", async () => {
+    vi.mocked(confirmManualNotification).mockRejectedValue({
+      code: "MANUAL_NOTIFICATION_PREVIEW_EXPIRED",
+    });
+    renderController();
+
+    await userEvent.click(await screen.findByRole("button", { name: "알림 미리보기" }));
+    await userEvent.click(await screen.findByRole("button", { name: "발송 확인" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "새 미리보기를 만든 뒤 다시 발송해 주세요",
+    );
+    expect(screen.queryByRole("region", { name: "발송 전 확인" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "알림 미리보기" })).toBeEnabled();
   });
 
   it("offers retry and a safe later action when options loading fails", async () => {

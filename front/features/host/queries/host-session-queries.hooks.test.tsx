@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { HostSessionRequest, SessionImportRequest } from "@/features/host/api/host-contracts";
+import { hostNotificationKeys } from "./host-notification-queries";
 
 vi.mock("@/features/host/api/host-api", () => ({
   closeHostSession: vi.fn(),
@@ -257,8 +258,14 @@ describe("host session mutation hooks", () => {
     vi.mocked(saveHostSessionVisibility).mockResolvedValue(visibilityResult());
     const { client, Wrapper } = createWrapper();
     const detailKey = hostSessionKeys.detail("session-7", { clubSlug: "reading-sai" });
+    const manualOptionsKey = hostNotificationKeys.manualOptions(
+      { sessionId: "session-7", page: { limit: 50 } },
+      { clubSlug: "reading-sai" },
+    );
     client.setQueryDefaults(detailKey, { gcTime: Number.POSITIVE_INFINITY });
+    client.setQueryData(manualOptionsKey, { contentRevision: "stale-before-publication" });
     const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    const removeSpy = vi.spyOn(client, "removeQueries");
     const { result } = renderHook(() => useSaveHostSessionVisibilityMutation({ clubSlug: "reading-sai" }), { wrapper: Wrapper });
 
     let mutationResult: ReturnType<typeof visibilityResult> | undefined;
@@ -276,6 +283,10 @@ describe("host session mutation hooks", () => {
       { clubSlug: "reading-sai" },
     );
     expect(client.getQueryData(detailKey)).toEqual(visibilityResult().session);
+    expect(client.getQueryData(manualOptionsKey)).toBeUndefined();
+    expect(removeSpy).toHaveBeenCalledWith({
+      queryKey: hostNotificationKeys.manualOptionsRoot({ clubSlug: "reading-sai" }),
+    });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.lists({ clubSlug: "reading-sai" }) });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.dashboard({ clubSlug: "reading-sai" }) });
   });

@@ -493,7 +493,9 @@ where id = (
 );
 `);
   await page.getByRole("button", { name: "발송 확인" }).click();
-  await expect(page.getByText(/발송을 요청하지 못했습니다/)).toBeVisible();
+  await expect(
+    page.getByText("미리보기가 만료되었습니다. 새 미리보기를 만든 뒤 다시 발송해 주세요."),
+  ).toBeVisible();
   expect(await readNotificationEventCount(sessionId, "SESSION_RECORD_UPDATED")).toBe(0);
   expect(countManualNotificationEventsForSession(sessionId, "SESSION_RECORD_UPDATED")).toBe(0);
 
@@ -511,7 +513,9 @@ where id = (
   expect(concurrentApply.liveRevision).toBeGreaterThan(0);
   expect(concurrentApply.composer.contentRevision).toMatch(/^[0-9a-f]{64}$/);
   await page.getByRole("button", { name: "발송 확인" }).click();
-  await expect(page.getByText(/발송을 요청하지 못했습니다/)).toBeVisible();
+  await expect(
+    page.getByText("알림 내용 또는 세션 상태가 변경되었습니다. 최신 저장 결과에서 작성기를 다시 열어 주세요."),
+  ).toBeVisible();
   expect(await readNotificationEventCount(sessionId, "SESSION_RECORD_UPDATED")).toBe(0);
   expect(countManualNotificationEventsForSession(sessionId, "SESSION_RECORD_UPDATED")).toBe(0);
 
