@@ -376,7 +376,7 @@ class HostSessionServicesTest {
     }
 
     @Test
-    fun `invalidation failure does not fail host mutation`() {
+    fun `post commit invalidation failure does not fail the completed host mutation`() {
         val port = RecordingHostSessionPorts()
         val invalidation = ThrowingReadCacheInvalidationPort()
         val service = HostSessionPublicationService(port, invalidation)
@@ -389,14 +389,28 @@ class HostSessionServicesTest {
             )
 
         var result: HostPublicationResponse? = null
-        assertDoesNotThrow {
-            service
-                .upsertPublication(command)
-                .also { result = it }
-        }
+        TransactionSynchronizationManager.initSynchronization()
+        try {
+            assertDoesNotThrow {
+                service
+                    .upsertPublication(command)
+                    .also { result = it }
+            }
 
-        assertEquals(SessionRecordVisibility.PUBLIC, result?.visibility)
-        assertEquals(1, invalidation.attempts)
+            assertEquals(SessionRecordVisibility.PUBLIC, result?.visibility)
+            assertEquals(0, invalidation.attempts)
+
+            assertDoesNotThrow {
+                TransactionSynchronizationManager.getSynchronizations().forEach { synchronization ->
+                    synchronization.afterCommit()
+                }
+            }
+
+            assertEquals(SessionRecordVisibility.PUBLIC, result?.visibility)
+            assertEquals(1, invalidation.attempts)
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization()
+        }
     }
 
     @Test

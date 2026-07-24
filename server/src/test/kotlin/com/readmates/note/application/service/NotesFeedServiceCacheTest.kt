@@ -30,48 +30,57 @@ class NotesFeedServiceCacheTest {
         )
 
     @Test
-    fun `paged club feed bypasses legacy unpaged cache`() {
-        val cache = RecordingNotesCache(feed = listOf(feedItem(text = "cached feed item")))
-        val loader = RecordingNotesLoader()
+    fun `paged club feed returns refetched source content instead of stale legacy cache`() {
+        val cache = RecordingNotesCache(feed = listOf(feedItem(text = "Stale cached feed item")))
+        val loader =
+            RecordingNotesLoader(
+                feed = listOf(feedItem(text = "Refetched source feed item")),
+            )
         val service = NotesFeedService(loader, cache)
 
         val result = service.getNotesFeed(member, null, firstPage)
 
         assertEquals(1, result.items.size)
-        assertEquals("Question", result.items.single().text)
+        assertEquals("Refetched source feed item", result.items.single().text)
         assertEquals(0, cache.getCalls)
         assertEquals(0, cache.putCalls)
         assertEquals(1, loader.feedLoads)
     }
 
     @Test
-    fun `paged session feed bypasses legacy unpaged cache`() {
-        val cache = RecordingNotesCache(sessionFeed = listOf(feedItem(text = "cached session item")))
-        val loader = RecordingNotesLoader()
+    fun `paged session feed returns refetched source content instead of stale legacy cache`() {
+        val cache = RecordingNotesCache(sessionFeed = listOf(feedItem(text = "Stale cached session item")))
+        val loader =
+            RecordingNotesLoader(
+                sessionFeed = listOf(feedItem(text = "Refetched source session item")),
+            )
         val service = NotesFeedService(loader, cache)
         val sessionId = SESSION_ID.toString()
 
         val firstResult = service.getNotesFeed(member, sessionId, firstPage)
         val secondResult = service.getNotesFeed(member, sessionId, firstPage)
 
-        assertEquals("Question", firstResult.items.single().text)
-        assertEquals("Question", secondResult.items.single().text)
+        assertEquals("Refetched source session item", firstResult.items.single().text)
+        assertEquals("Refetched source session item", secondResult.items.single().text)
         assertEquals(0, cache.getCalls)
         assertEquals(0, cache.putCalls)
         assertEquals(2, loader.sessionFeedLoads)
     }
 
     @Test
-    fun `paged sessions list bypasses legacy unpaged cache`() {
-        val cache = RecordingNotesCache(sessions = listOf(noteSession(bookTitle = "Cached Book")))
-        val loader = RecordingNotesLoader()
+    fun `paged sessions list returns refetched source content instead of stale legacy cache`() {
+        val cache = RecordingNotesCache(sessions = listOf(noteSession(bookTitle = "Stale cached book")))
+        val loader =
+            RecordingNotesLoader(
+                sessions = listOf(noteSession(bookTitle = "Refetched source book")),
+            )
         val service = NotesFeedService(loader, cache)
 
         val firstResult = service.listNoteSessions(member, sessionPage)
         val secondResult = service.listNoteSessions(member, sessionPage)
 
-        assertEquals("Book", firstResult.items.single().bookTitle)
-        assertEquals("Book", secondResult.items.single().bookTitle)
+        assertEquals("Refetched source book", firstResult.items.single().bookTitle)
+        assertEquals("Refetched source book", secondResult.items.single().bookTitle)
         assertEquals(0, cache.getCalls)
         assertEquals(0, cache.putCalls)
         assertEquals(2, loader.sessionsLoads)
@@ -93,7 +102,11 @@ class NotesFeedServiceCacheTest {
         assertEquals(0, loader.sessionsLoads)
     }
 
-    private class RecordingNotesLoader : LoadNotesFeedPort {
+    private class RecordingNotesLoader(
+        private val feed: List<NoteFeedResult> = listOf(feedItem()),
+        private val sessionFeed: List<NoteFeedResult> = listOf(feedItem()),
+        private val sessions: List<NoteSessionResult> = listOf(noteSession()),
+    ) : LoadNotesFeedPort {
         var feedLoads = 0
         var sessionFeedLoads = 0
         var sessionsLoads = 0
@@ -101,18 +114,18 @@ class NotesFeedServiceCacheTest {
         override fun loadNoteSessions(
             clubId: UUID,
             pageRequest: PageRequest,
-        ): CursorPage<NoteSessionResult> = CursorPage(listOf(noteSession()), null).also { sessionsLoads += 1 }
+        ): CursorPage<NoteSessionResult> = CursorPage(sessions, null).also { sessionsLoads += 1 }
 
         override fun loadNotesFeed(
             clubId: UUID,
             pageRequest: PageRequest,
-        ): CursorPage<NoteFeedResult> = CursorPage(listOf(feedItem()), null).also { feedLoads += 1 }
+        ): CursorPage<NoteFeedResult> = CursorPage(feed, null).also { feedLoads += 1 }
 
         override fun loadNotesFeedForSession(
             clubId: UUID,
             sessionId: UUID,
             pageRequest: PageRequest,
-        ): CursorPage<NoteFeedResult> = CursorPage(listOf(feedItem()), null).also { sessionFeedLoads += 1 }
+        ): CursorPage<NoteFeedResult> = CursorPage(sessionFeed, null).also { sessionFeedLoads += 1 }
     }
 
     private class RecordingNotesCache(
