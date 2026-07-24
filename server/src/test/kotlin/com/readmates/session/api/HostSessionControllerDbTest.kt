@@ -2142,26 +2142,68 @@ class HostSessionControllerDbTest(
                     """.trimIndent(),
                     sessionId,
                 ),
-            outboxCount =
-                jdbcTemplate.queryForObject(
-                    "select count(*) from notification_event_outbox where aggregate_id = ?",
-                    Int::class.java,
-                    sessionId,
-                ) ?: 0,
-            auditCount =
-                jdbcTemplate.queryForObject(
-                    "select count(*) from host_session_change_audit where session_id = ?",
-                    Int::class.java,
-                    sessionId,
-                ) ?: 0,
+            outboxEvents = lifecycleOutboxEvents(sessionId),
+            auditEntries = lifecycleAuditEntries(sessionId),
+        )
+
+    private fun lifecycleOutboxEvents(sessionId: String): List<Map<String, Any?>> =
+        jdbcTemplate.queryForList(
+            """
+            select
+              id,
+              club_id,
+              event_type,
+              request_id,
+              aggregate_type,
+              aggregate_id,
+              payload_json,
+              status,
+              kafka_topic,
+              kafka_key,
+              attempt_count,
+              next_attempt_at,
+              locked_at,
+              published_at,
+              last_error,
+              dedupe_key,
+              created_at,
+              updated_at
+            from notification_event_outbox
+            where club_id = (select club_id from sessions where id = ?)
+              and aggregate_id = ?
+            order by id
+            """.trimIndent(),
+            sessionId,
+            sessionId,
+        )
+
+    private fun lifecycleAuditEntries(sessionId: String): List<Map<String, Any?>> =
+        jdbcTemplate.queryForList(
+            """
+            select
+              id,
+              club_id,
+              session_id,
+              actor_membership_id,
+              action_type,
+              changed_fields_json,
+              request_id,
+              created_at
+            from host_session_change_audit
+            where club_id = (select club_id from sessions where id = ?)
+              and session_id = ?
+            order by id
+            """.trimIndent(),
+            sessionId,
+            sessionId,
         )
 
     private data class LifecycleDbEvidence(
         val session: Map<String, Any?>,
         val participants: List<Map<String, Any?>>,
         val publications: List<Map<String, Any?>>,
-        val outboxCount: Int,
-        val auditCount: Int,
+        val outboxEvents: List<Map<String, Any?>>,
+        val auditEntries: List<Map<String, Any?>>,
     )
 
     private fun insertPublicationRow(
