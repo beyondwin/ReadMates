@@ -167,12 +167,12 @@ integration 소스 삭제(-3 integration)의 결과다. 새 실패 경로를
 | Decision | 이전 경로 | 최종 경로 또는 survivor | 보존한 실패 모드 |
 | --- | --- | --- | --- |
 | move-layer | `server/src/test/kotlin/com/readmates/auth/api/DevInvitationControllerTest.kt` | `server/src/test/kotlin/com/readmates/auth/adapter/in/web/DevInvitationControllerTest.kt` | 제거된 dev invitation endpoint의 HTTP 410, `GONE` projection |
-| move-layer | `server/src/test/kotlin/com/readmates/note/api/ReviewControllerTest.kt` | `server/src/test/kotlin/com/readmates/note/adapter/in/web/ReviewWebDtosTest.kt` | blank `OneLineReviewRequest.text`의 `NotBlank` violation |
+| move-layer | `server/src/test/kotlin/com/readmates/note/api/ReviewControllerTest.kt` | `server/src/test/kotlin/com/readmates/note/adapter/in/web/ReviewControllerTest.kt`, `ReviewWebDtosTest.kt` | blank 요청의 HTTP 400·use case 미호출과 `OneLineReviewRequest.text`의 `NotBlank` violation |
 | consolidate | `server/src/test/kotlin/com/readmates/session/api/CurrentSessionControllerTest.kt` | 기존 `server/src/test/kotlin/com/readmates/archive/api/ArchiveControllerTest.kt` | `CurrentMemberArgumentResolver`를 통한 unresolved-member HTTP 401 |
 
 `CurrentSessionControllerDbTest`의 실제 current-session projection은
 integration lane에 그대로 남았다. 두 move destination과 consolidation
-survivor는 최종 unit lane에서 각각 1, 1, 2개 케이스로 통과했다. 별도
+survivor는 최종 unit lane에서 각각 1, 2, 2개 케이스로 통과했다. 별도
 `delete` 또는 `split` disposition은 적용하지 않았다.
 
 ## 집중 반복 실행
