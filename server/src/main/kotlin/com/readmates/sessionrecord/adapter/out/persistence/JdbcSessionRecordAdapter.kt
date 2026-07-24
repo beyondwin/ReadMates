@@ -99,12 +99,15 @@ class JdbcSessionRecordAdapter(
 
     override fun findApplyReceipt(
         host: AuthenticatedClubActor,
+        sessionId: UUID,
         applyRequestId: UUID,
+        forUpdate: Boolean,
     ): SessionRecordApplyReceipt? =
         jdbcTemplate
             .query(
                 """
                 select a.apply_request_id,
+                       a.host_membership_id,
                        a.expected_draft_revision,
                        a.expected_live_revision,
                        a.draft_sha256,
@@ -112,14 +115,19 @@ class JdbcSessionRecordAdapter(
                        r.id, r.session_id, r.club_id, r.version, r.source, r.restored_from_revision_id,
                        r.snapshot_json, r.applied_by_membership_id, r.applied_at
                 from session_record_apply_receipts a
-                join session_record_revisions r on r.id = a.revision_id
+                join session_record_revisions r
+                  on r.id = a.revision_id
+                 and r.club_id = a.club_id
+                 and r.session_id = a.session_id
                 where a.club_id = ?
-                  and a.host_membership_id = ?
+                  and a.session_id = ?
                   and a.apply_request_id = ?
+                ${if (forUpdate) "for update" else ""}
                 """.trimIndent(),
                 { rs, _ ->
                     SessionRecordApplyReceipt(
                         applyRequestId = rs.uuid("apply_request_id"),
+                        hostMembershipId = rs.uuid("host_membership_id"),
                         expectedDraftRevision = rs.getLong("expected_draft_revision"),
                         expectedLiveRevision = rs.getLong("expected_live_revision"),
                         draftSha256 = rs.getString("draft_sha256"),
@@ -128,7 +136,7 @@ class JdbcSessionRecordAdapter(
                     )
                 },
                 host.clubId.dbString(),
-                host.membershipId.dbString(),
+                sessionId.dbString(),
                 applyRequestId.dbString(),
             ).singleOrNull()
 
@@ -159,7 +167,7 @@ class JdbcSessionRecordAdapter(
             composerEventType.name,
             revision.id.dbString(),
         )
-        return requireNotNull(findApplyReceipt(host, applyRequestId))
+        return requireNotNull(findApplyReceipt(host, command.sessionId, applyRequestId))
     }
 
     override fun insertBaselineIfAbsent(

@@ -183,6 +183,7 @@ data class CompletedSessionRecordApply(
 
 data class SessionRecordApplyReceipt(
     val applyRequestId: UUID,
+    val hostMembershipId: UUID,
     val expectedDraftRevision: Long,
     val expectedLiveRevision: Long,
     val draftSha256: String,

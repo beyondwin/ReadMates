@@ -157,7 +157,7 @@ class AiGenerateApiIntegrationTest(
     @param:Autowired private val objectMapper: ObjectMapper,
 ) : ReadmatesRedisIntegrationTestSupport() {
     @Test
-    fun `full generation lifecycle - start, poll until SUCCEEDED, commit, then Redis payload cleaned`() {
+    fun `server AI generation commit persists an AI draft with zero notification outbox`() {
         val jobId = startJob("claude-sonnet-4-6", "AiGenHost 00:00\nPublic-safe integration statement.")
 
         // Wait for the Kafka consumer to dispatch to the worker and the stub to drive

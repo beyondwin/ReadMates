@@ -694,9 +694,210 @@ class HostNotificationControllerTest(
                         """.trimIndent()
                 }.andExpect {
                     status { isConflict() }
+                    jsonPath("$.code") { value("MANUAL_NOTIFICATION_CONTENT_STALE") }
+                    jsonPath("$.message") { value(containsString("최신 내용")) }
+                    jsonPath("$.status") { value(409) }
                 }
 
             assertThat(manualEventCount()).isEqualTo(before)
+        }
+    }
+
+    @Test
+    @Suppress("LongMethod")
+    fun `host previews and confirms feedback document notification while session is open`() {
+        withTemporarySessionState("OPEN", "MEMBER") {
+            val options =
+                mockMvc
+                    .get("/api/host/notifications/manual/options") {
+                        with(user("host@example.com"))
+                        param("sessionId", "00000000-0000-0000-0000-000000000301")
+                    }.andExpect {
+                        status { isOk() }
+                        jsonPath("$.templates[?(@.eventType == 'FEEDBACK_DOCUMENT_PUBLISHED')].enabled") { value(true) }
+                    }.andReturn()
+                    .response.contentAsString
+            val contentRevision =
+                tools.jackson.databind
+                    .ObjectMapper()
+                    .readTree(options)
+                    .get("templates")
+                    .first { it.get("eventType").asText() == "FEEDBACK_DOCUMENT_PUBLISHED" }
+                    .get("contentRevision")
+                    .asText()
+            val before = manualEventCount()
+            val previewId =
+                mockMvc
+                    .post("/api/host/notifications/manual/preview") {
+                        with(user("host@example.com"))
+                        contentType = MediaType.APPLICATION_JSON
+                        content =
+                            """
+                            {
+                              "sessionId": "00000000-0000-0000-0000-000000000301",
+                              "eventType": "FEEDBACK_DOCUMENT_PUBLISHED",
+                              "contentRevision": "$contentRevision",
+                              "audience": "CONFIRMED_ATTENDEES",
+                              "requestedChannels": "IN_APP"
+                            }
+                            """.trimIndent()
+                    }.andExpect {
+                        status { isOk() }
+                        jsonPath("$.template.eventType") { value("FEEDBACK_DOCUMENT_PUBLISHED") }
+                    }.andReturn()
+                    .response.contentAsString
+                    .let {
+                        tools.jackson.databind
+                            .ObjectMapper()
+                            .readTree(it)
+                            .get("previewId")
+                            .asText()
+                    }
+
+            mockMvc
+                .post("/api/host/notifications/manual") {
+                    with(user("host@example.com"))
+                    contentType = MediaType.APPLICATION_JSON
+                    content =
+                        """
+                        {
+                          "previewId": "$previewId",
+                          "sessionId": "00000000-0000-0000-0000-000000000301",
+                          "eventType": "FEEDBACK_DOCUMENT_PUBLISHED",
+                          "contentRevision": "$contentRevision",
+                          "audience": "CONFIRMED_ATTENDEES",
+                          "requestedChannels": "IN_APP",
+                          "resendConfirmed": false
+                        }
+                        """.trimIndent()
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.summary.requestedChannels") { value("IN_APP") }
+                }
+
+            assertThat(manualEventCount()).isEqualTo(before + 1)
+        }
+    }
+
+    @Test
+    fun `host confirm returns public stale code when content changes after preview without outbox`() {
+        withTemporarySessionState("OPEN", "MEMBER") {
+            val previewId = createManualPreview()
+            val before = manualEventCount()
+            val originalDate =
+                jdbcTemplate.queryForObject(
+                    """
+                    select session_date
+                    from sessions
+                    where club_id = '00000000-0000-0000-0000-000000000001'
+                      and id = '00000000-0000-0000-0000-000000000301'
+                    """.trimIndent(),
+                    java.time.LocalDate::class.java,
+                )!!
+            try {
+                jdbcTemplate.update(
+                    """
+                    update sessions
+                    set session_date = ?
+                    where club_id = '00000000-0000-0000-0000-000000000001'
+                      and id = '00000000-0000-0000-0000-000000000301'
+                    """.trimIndent(),
+                    originalDate.plusDays(1),
+                )
+
+                mockMvc
+                    .post("/api/host/notifications/manual") {
+                        with(user("host@example.com"))
+                        contentType = MediaType.APPLICATION_JSON
+                        content =
+                            """
+                            {
+                              "previewId": "$previewId",
+                              "sessionId": "00000000-0000-0000-0000-000000000301",
+                              "eventType": "SESSION_REMINDER_DUE",
+                              "contentRevision": "$REMINDER_REVISION",
+                              "audience": "ALL_ACTIVE_MEMBERS",
+                              "requestedChannels": "BOTH",
+                              "resendConfirmed": false
+                            }
+                            """.trimIndent()
+                    }.andExpect {
+                        status { isConflict() }
+                        jsonPath("$.code") { value("MANUAL_NOTIFICATION_CONTENT_STALE") }
+                        jsonPath("$.status") { value(409) }
+                    }
+                assertThat(manualEventCount()).isEqualTo(before)
+            } finally {
+                jdbcTemplate.update(
+                    """
+                    update sessions
+                    set session_date = ?
+                    where club_id = '00000000-0000-0000-0000-000000000001'
+                      and id = '00000000-0000-0000-0000-000000000301'
+                    """.trimIndent(),
+                    originalDate,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `host confirm distinguishes expired and reused previews with public codes`() {
+        withTemporarySessionState("OPEN", "MEMBER") {
+            val expiredPreviewId = createManualPreview()
+            jdbcTemplate.update(
+                """
+                update notification_manual_dispatch_previews
+                set expires_at = date_sub(utc_timestamp(6), interval 1 second)
+                where id = ?
+                """.trimIndent(),
+                expiredPreviewId,
+            )
+            mockMvc
+                .post("/api/host/notifications/manual") {
+                    with(user("host@example.com"))
+                    contentType = MediaType.APPLICATION_JSON
+                    content =
+                        """
+                        {
+                          "previewId": "$expiredPreviewId",
+                          "sessionId": "00000000-0000-0000-0000-000000000301",
+                          "eventType": "SESSION_REMINDER_DUE",
+                          "contentRevision": "$REMINDER_REVISION",
+                          "audience": "ALL_ACTIVE_MEMBERS",
+                          "requestedChannels": "BOTH",
+                          "resendConfirmed": false
+                        }
+                        """.trimIndent()
+                }.andExpect {
+                    status { isConflict() }
+                    jsonPath("$.code") { value("MANUAL_NOTIFICATION_PREVIEW_EXPIRED") }
+                    jsonPath("$.status") { value(409) }
+                }
+
+            val consumedPreviewId = createManualPreview()
+            confirmManualDispatch(consumedPreviewId, resendConfirmed = false)
+            mockMvc
+                .post("/api/host/notifications/manual") {
+                    with(user("host@example.com"))
+                    contentType = MediaType.APPLICATION_JSON
+                    content =
+                        """
+                        {
+                          "previewId": "$consumedPreviewId",
+                          "sessionId": "00000000-0000-0000-0000-000000000301",
+                          "eventType": "SESSION_REMINDER_DUE",
+                          "contentRevision": "$REMINDER_REVISION",
+                          "audience": "ALL_ACTIVE_MEMBERS",
+                          "requestedChannels": "IN_APP",
+                          "resendConfirmed": false
+                        }
+                        """.trimIndent()
+                }.andExpect {
+                    status { isConflict() }
+                    jsonPath("$.code") { value("MANUAL_NOTIFICATION_PREVIEW_REUSED") }
+                    jsonPath("$.status") { value(409) }
+                }
         }
     }
 

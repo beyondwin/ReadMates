@@ -96,6 +96,20 @@ class MySqlFlywayMigrationTest(
             .contains("club_id", "session_reminder_enabled", "updated_by_membership_id")
         assertThat(columns("notification_manual_dispatches"))
             .contains("content_revision")
+        assertThat(columns("notification_manual_dispatch_previews"))
+            .contains("target_snapshot_hash")
+        assertEquals(
+            "id,club_id,session_id",
+            indexColumns("session_record_revisions", "session_record_revisions_scope_uk"),
+        )
+        assertEquals(
+            "revision_id,club_id,session_id",
+            foreignKeyColumns("session_record_apply_receipts", "session_record_apply_receipts_revision_scope_fk"),
+        )
+        assertEquals(
+            "session_record_revisions:id,club_id,session_id",
+            foreignKeyReference("session_record_apply_receipts", "session_record_apply_receipts_revision_scope_fk"),
+        )
     }
 
     private fun columns(table: String): Set<String> =

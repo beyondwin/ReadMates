@@ -7,9 +7,13 @@ import com.readmates.notification.application.model.ManualNotificationSendMode
 import com.readmates.notification.application.model.NotificationDispatchSource
 import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.application.model.NotificationManualDispatchPayload
+import com.readmates.notification.application.port.out.ManualNotificationConfirmAttempt
 import com.readmates.notification.application.port.out.ManualNotificationConfirmInsertStatus
+import com.readmates.notification.application.port.out.ManualNotificationConfirmRejection
+import com.readmates.notification.application.port.out.ManualNotificationConfirmTransactionInput
 import com.readmates.notification.application.port.out.ManualNotificationTargetSnapshot
 import com.readmates.notification.application.port.out.contentRevision
+import com.readmates.notification.application.port.out.snapshotHash
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.shared.paging.PageRequest
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
@@ -28,7 +32,7 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 
-private const val CLEANUP_MANUAL_DISPATCH_SQL = """
+private const val PREPARE_MANUAL_DISPATCH_SQL = """
     delete from notification_manual_dispatches where club_id = '00000000-0000-0000-0000-000000000001';
     delete from notification_manual_dispatch_previews where club_id = '00000000-0000-0000-0000-000000000001';
     delete from notification_deliveries where club_id = '00000000-0000-0000-0000-000000000001';
@@ -36,12 +40,31 @@ private const val CLEANUP_MANUAL_DISPATCH_SQL = """
     delete from notification_event_outbox
     where club_id = '00000000-0000-0000-0000-000000000001'
       and (dedupe_key like 'manual:%' or dedupe_key like 'manual-dispatch-test-%');
+    update sessions
+    set state = 'OPEN'
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and id = '00000000-0000-0000-0000-000000000301';
+"""
+
+private const val RESTORE_MANUAL_DISPATCH_SQL = """
+    delete from notification_manual_dispatches where club_id = '00000000-0000-0000-0000-000000000001';
+    delete from notification_manual_dispatch_previews where club_id = '00000000-0000-0000-0000-000000000001';
+    delete from notification_deliveries where club_id = '00000000-0000-0000-0000-000000000001';
+    delete from member_notifications where club_id = '00000000-0000-0000-0000-000000000001';
+    delete from notification_event_outbox
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and (dedupe_key like 'manual:%' or dedupe_key like 'manual-dispatch-test-%');
+    update sessions
+    set state = 'PUBLISHED'
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and id = '00000000-0000-0000-0000-000000000301';
 """
 
 @SpringBootTest(properties = ["spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev"])
-@Sql(statements = [CLEANUP_MANUAL_DISPATCH_SQL], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
-@Sql(statements = [CLEANUP_MANUAL_DISPATCH_SQL], executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
+@Sql(statements = [PREPARE_MANUAL_DISPATCH_SQL], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
+@Sql(statements = [RESTORE_MANUAL_DISPATCH_SQL], executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
 @Tag("integration")
+@Suppress("LargeClass")
 class JdbcManualNotificationDispatchAdapterTest(
     @param:Autowired private val adapter: JdbcManualNotificationDispatchAdapter,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
@@ -181,10 +204,12 @@ class JdbcManualNotificationDispatchAdapterTest(
     fun `insertPreview and findPreview round trip host scoped preview`() {
         val expiresAt = OffsetDateTime.of(2026, 5, 13, 9, 10, 0, 0, ZoneOffset.UTC)
 
-        val id = adapter.insertPreview(clubId, hostMembershipId, "a".repeat(64), expiresAt)
+        val targetSnapshotHash = "b".repeat(64)
+        val id = adapter.insertPreview(clubId, hostMembershipId, "a".repeat(64), targetSnapshotHash, expiresAt)
         val record = adapter.findPreview(id, clubId, hostMembershipId)
 
         assertThat(record!!.selectionHash).isEqualTo("a".repeat(64))
+        assertThat(record.targetSnapshotHash).isEqualTo(targetSnapshotHash)
         assertThat(record.expiresAt).isEqualTo(expiresAt)
     }
 
@@ -228,29 +253,25 @@ class JdbcManualNotificationDispatchAdapterTest(
     fun `confirm replays persisted summary after revision member channel and ttl changes`() {
         val now = OffsetDateTime.of(2026, 7, 23, 0, 0, 0, 0, ZoneOffset.UTC)
         val currentSelection = selection()
-        val previewId = adapter.insertPreview(clubId, hostMembershipId, "a".repeat(64), now.plusMinutes(10))
         val snapshot = adapter.previewTargets(clubId, currentSelection)
-        val payload = payload("manual-dispatch-idempotent", currentSelection, snapshot)
-        val first = confirm(previewId, now, currentSelection, payload, snapshot)
+        val previewId =
+            adapter.insertPreview(
+                clubId,
+                hostMembershipId,
+                "a".repeat(64),
+                snapshot.snapshotHash(),
+                now.plusMinutes(10),
+            )
+        val first = confirmed(confirm(previewId, now, currentSelection))
         val mutableMembershipId = snapshot.emailMembershipIds.first { it != hostMembershipId }
         val originalState = mutableReplayState(mutableMembershipId)
 
         try {
             makeReplayStateIneligible(mutableMembershipId, originalState.date.plusDays(1))
-            val second =
-                confirm(
-                    previewId,
-                    now.plusMinutes(11),
-                    currentSelection,
-                    payload =
-                        payload.copy(
-                            manualDispatch = payload.manualDispatch!!.copy(id = UUID.randomUUID()),
-                        ),
-                    snapshot = ManualNotificationTargetSnapshot(0, 0, 0, 0, 0, 0, 0, 0),
-                )
+            val second = confirmed(confirm(previewId, now.plusMinutes(11), currentSelection))
 
-            assertThat(first!!.status).isEqualTo(ManualNotificationConfirmInsertStatus.CREATED)
-            assertThat(second!!.status).isEqualTo(ManualNotificationConfirmInsertStatus.ALREADY_CONSUMED)
+            assertThat(first.status).isEqualTo(ManualNotificationConfirmInsertStatus.CREATED)
+            assertThat(second.status).isEqualTo(ManualNotificationConfirmInsertStatus.ALREADY_CONSUMED)
             assertThat(first.eventId).isEqualTo(second.eventId)
             assertThat(second.summary).isEqualTo(first.summary)
             assertThat(second.summary.targetCount).isEqualTo(snapshot.finalTargetCount)
@@ -266,13 +287,25 @@ class JdbcManualNotificationDispatchAdapterTest(
     @Test
     fun `distinct previews confirmed concurrently create one dispatch without resend approval`() {
         val now = OffsetDateTime.of(2026, 7, 23, 0, 0, 0, 0, ZoneOffset.UTC)
-        val previewIds =
-            listOf(
-                adapter.insertPreview(clubId, hostMembershipId, "a".repeat(64), now.plusMinutes(10)),
-                adapter.insertPreview(clubId, hostMembershipId, "a".repeat(64), now.plusMinutes(10)),
-            )
         val currentSelection = selection()
         val snapshot = adapter.previewTargets(clubId, currentSelection)
+        val previewIds =
+            listOf(
+                adapter.insertPreview(
+                    clubId,
+                    hostMembershipId,
+                    "a".repeat(64),
+                    snapshot.snapshotHash(),
+                    now.plusMinutes(10),
+                ),
+                adapter.insertPreview(
+                    clubId,
+                    hostMembershipId,
+                    "a".repeat(64),
+                    snapshot.snapshotHash(),
+                    now.plusMinutes(10),
+                ),
+            )
         val start = CountDownLatch(1)
         val executor = Executors.newFixedThreadPool(2)
 
@@ -283,15 +316,15 @@ class JdbcManualNotificationDispatchAdapterTest(
                         {
                             start.await()
                             adapter.confirmManualDispatch(
-                                previewId = previewId,
-                                clubId = clubId,
-                                hostMembershipId = hostMembershipId,
-                                selectionHash = "a".repeat(64),
-                                now = now,
-                                selection = currentSelection,
-                                payload = payload("concurrent-$index", currentSelection, snapshot),
-                                targetSnapshot = snapshot,
-                                resend = false,
+                                ManualNotificationConfirmTransactionInput(
+                                    previewId = previewId,
+                                    clubId = clubId,
+                                    hostMembershipId = hostMembershipId,
+                                    selectionHash = "a".repeat(64),
+                                    now = now,
+                                    selection = currentSelection,
+                                    resendConfirmed = false,
+                                ),
                             )
                         },
                         executor,
@@ -300,11 +333,83 @@ class JdbcManualNotificationDispatchAdapterTest(
             start.countDown()
             val stored = results.map { it.get() }
 
-            assertThat(stored.count { it?.status == ManualNotificationConfirmInsertStatus.CREATED }).isEqualTo(1)
-            assertThat(stored.count { it?.status == ManualNotificationConfirmInsertStatus.DUPLICATE }).isEqualTo(1)
+            assertThat(stored)
+                .describedAs("confirmation attempts")
+                .allMatch { it is ManualNotificationConfirmAttempt.Confirmed }
+            val dispatches = stored.map { (it as ManualNotificationConfirmAttempt.Confirmed).dispatch }
+            assertThat(dispatches.count { it.status == ManualNotificationConfirmInsertStatus.CREATED }).isEqualTo(1)
+            assertThat(dispatches.count { it.status == ManualNotificationConfirmInsertStatus.DUPLICATE }).isEqualTo(1)
             assertThat(revisionManualDispatchCount(currentSelection.contentRevision)).isEqualTo(1)
         } finally {
             executor.shutdownNow()
+        }
+    }
+
+    @Test
+    @Suppress("LongMethod")
+    fun `different hosts confirm the same revision concurrently without deadlock or duplicate outbox`() {
+        val now = OffsetDateTime.of(2026, 7, 23, 0, 0, 0, 0, ZoneOffset.UTC)
+        val secondHostMembershipId = membershipId("member1@example.com")
+        val currentSelection = selection()
+        val snapshot = adapter.previewTargets(clubId, currentSelection)
+        val start = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(2)
+
+        try {
+            jdbcTemplate.update(
+                "update memberships set role = 'HOST' where club_id = ? and id = ?",
+                clubId.toString(),
+                secondHostMembershipId.toString(),
+            )
+            val hosts = listOf(hostMembershipId, secondHostMembershipId)
+            val previewIds =
+                hosts.map { membershipId ->
+                    adapter.insertPreview(
+                        clubId,
+                        membershipId,
+                        "a".repeat(64),
+                        snapshot.snapshotHash(),
+                        now.plusMinutes(10),
+                    )
+                }
+            val results =
+                previewIds.zip(hosts).map { (previewId, membershipId) ->
+                    CompletableFuture.supplyAsync(
+                        {
+                            start.await()
+                            adapter.confirmManualDispatch(
+                                ManualNotificationConfirmTransactionInput(
+                                    previewId = previewId,
+                                    clubId = clubId,
+                                    hostMembershipId = membershipId,
+                                    selectionHash = "a".repeat(64),
+                                    now = now,
+                                    selection = currentSelection,
+                                    resendConfirmed = false,
+                                ),
+                            )
+                        },
+                        executor,
+                    )
+                }
+
+            start.countDown()
+            val attempts = results.map { it.get() }
+
+            assertThat(attempts)
+                .describedAs("confirmation attempts")
+                .allMatch { it is ManualNotificationConfirmAttempt.Confirmed }
+            val dispatches = attempts.map { (it as ManualNotificationConfirmAttempt.Confirmed).dispatch }
+            assertThat(dispatches.count { it.status == ManualNotificationConfirmInsertStatus.CREATED }).isEqualTo(1)
+            assertThat(dispatches.count { it.status == ManualNotificationConfirmInsertStatus.DUPLICATE }).isEqualTo(1)
+            assertThat(revisionManualDispatchCount(currentSelection.contentRevision)).isEqualTo(1)
+        } finally {
+            executor.shutdownNow()
+            jdbcTemplate.update(
+                "update memberships set role = 'MEMBER' where club_id = ? and id = ?",
+                clubId.toString(),
+                secondHostMembershipId.toString(),
+            )
         }
     }
 
@@ -313,7 +418,14 @@ class JdbcManualNotificationDispatchAdapterTest(
         val now = OffsetDateTime.of(2026, 7, 23, 0, 0, 0, 0, ZoneOffset.UTC)
         val currentSelection = selection()
         val snapshot = adapter.previewTargets(clubId, currentSelection)
-        val previewId = adapter.insertPreview(clubId, hostMembershipId, "b".repeat(64), now.plusMinutes(10))
+        val previewId =
+            adapter.insertPreview(
+                clubId,
+                hostMembershipId,
+                "b".repeat(64),
+                snapshot.snapshotHash(),
+                now.plusMinutes(10),
+            )
         val originalDate =
             jdbcTemplate.queryForObject(
                 "select session_date from sessions where club_id = ? and id = ?",
@@ -331,20 +443,20 @@ class JdbcManualNotificationDispatchAdapterTest(
                 sessionId.toString(),
             )
 
-            val stored =
-                adapter.confirmManualDispatch(
-                    previewId = previewId,
-                    clubId = clubId,
-                    hostMembershipId = hostMembershipId,
+            val attempt =
+                confirm(
+                    previewId,
+                    now,
+                    currentSelection,
                     selectionHash = "b".repeat(64),
-                    now = now,
-                    selection = currentSelection,
-                    payload = payload("stale-confirm", currentSelection, snapshot),
-                    targetSnapshot = snapshot,
-                    resend = false,
                 )
 
-            assertThat(stored).isNull()
+            assertThat(attempt)
+                .isEqualTo(
+                    ManualNotificationConfirmAttempt.Rejected(
+                        ManualNotificationConfirmRejection.CONTENT_REVISION_STALE,
+                    ),
+                )
             assertThat(revisionManualDispatchCount(currentSelection.contentRevision)).isZero()
         } finally {
             jdbcTemplate.update(
@@ -353,6 +465,183 @@ class JdbcManualNotificationDispatchAdapterTest(
                 clubId.toString(),
                 sessionId.toString(),
             )
+        }
+    }
+
+    @Test
+    fun `confirm rejects when host role is revoked after preview without outbox`() {
+        val now = OffsetDateTime.of(2026, 7, 23, 0, 0, 0, 0, ZoneOffset.UTC)
+        val currentSelection = selection()
+        val snapshot = adapter.previewTargets(clubId, currentSelection)
+        val previewId =
+            adapter.insertPreview(
+                clubId,
+                hostMembershipId,
+                "a".repeat(64),
+                snapshot.snapshotHash(),
+                now.plusMinutes(10),
+            )
+
+        try {
+            jdbcTemplate.update(
+                "update memberships set role = 'MEMBER' where club_id = ? and id = ?",
+                clubId.toString(),
+                hostMembershipId.toString(),
+            )
+
+            val attempt = confirm(previewId, now, currentSelection)
+
+            assertThat(attempt)
+                .isEqualTo(
+                    ManualNotificationConfirmAttempt.Rejected(
+                        ManualNotificationConfirmRejection.HOST_NOT_AUTHORIZED,
+                    ),
+                )
+            assertThat(previewManualDispatchCount(previewId)).isZero()
+        } finally {
+            jdbcTemplate.update(
+                "update memberships set role = 'HOST' where club_id = ? and id = ?",
+                clubId.toString(),
+                hostMembershipId.toString(),
+            )
+        }
+    }
+
+    @Test
+    fun `confirm rejects when selected membership becomes inactive after preview without outbox`() {
+        val now = OffsetDateTime.of(2026, 7, 23, 0, 0, 0, 0, ZoneOffset.UTC)
+        val selectedMembershipId = membershipId("member1@example.com")
+        val currentSelection =
+            selection().copy(
+                audience = ManualNotificationAudience.SELECTED_MEMBERS,
+                selectedMembershipIds = listOf(selectedMembershipId),
+            )
+        val snapshot = adapter.previewTargets(clubId, currentSelection)
+        val previewId =
+            adapter.insertPreview(
+                clubId,
+                hostMembershipId,
+                "a".repeat(64),
+                snapshot.snapshotHash(),
+                now.plusMinutes(10),
+            )
+
+        try {
+            jdbcTemplate.update(
+                "update memberships set status = 'INACTIVE' where club_id = ? and id = ?",
+                clubId.toString(),
+                selectedMembershipId.toString(),
+            )
+
+            val attempt = confirm(previewId, now, currentSelection)
+
+            assertThat(attempt)
+                .isEqualTo(
+                    ManualNotificationConfirmAttempt.Rejected(
+                        ManualNotificationConfirmRejection.RECIPIENT_INVALID,
+                    ),
+                )
+            assertThat(previewManualDispatchCount(previewId)).isZero()
+        } finally {
+            jdbcTemplate.update(
+                "update memberships set status = 'ACTIVE' where club_id = ? and id = ?",
+                clubId.toString(),
+                selectedMembershipId.toString(),
+            )
+        }
+    }
+
+    @Test
+    fun `confirm rejects when attendance eligibility changes after preview without outbox`() {
+        val now = OffsetDateTime.of(2026, 7, 23, 0, 0, 0, 0, ZoneOffset.UTC)
+        val feedbackRevision =
+            requireNotNull(
+                adapter
+                    .findSessionContext(clubId, sessionId)
+                    ?.contentRevision(NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED),
+            )
+        val currentSelection =
+            selection().copy(
+                eventType = NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED,
+                contentRevision = feedbackRevision,
+                audience = ManualNotificationAudience.CONFIRMED_ATTENDEES,
+            )
+        val snapshot = adapter.previewTargets(clubId, currentSelection)
+        val changedMembershipId = membershipId("member1@example.com")
+        val previewId =
+            adapter.insertPreview(
+                clubId,
+                hostMembershipId,
+                "a".repeat(64),
+                snapshot.snapshotHash(),
+                now.plusMinutes(10),
+            )
+
+        try {
+            jdbcTemplate.update(
+                """
+                update session_participants
+                set attendance_status = 'ABSENT'
+                where club_id = ? and session_id = ? and membership_id = ?
+                """.trimIndent(),
+                clubId.toString(),
+                sessionId.toString(),
+                changedMembershipId.toString(),
+            )
+
+            val attempt = confirm(previewId, now, currentSelection)
+
+            assertThat(attempt)
+                .isEqualTo(
+                    ManualNotificationConfirmAttempt.Rejected(
+                        ManualNotificationConfirmRejection.RECIPIENTS_CHANGED,
+                    ),
+                )
+            assertThat(previewManualDispatchCount(previewId)).isZero()
+        } finally {
+            jdbcTemplate.update(
+                """
+                update session_participants
+                set attendance_status = 'ATTENDED'
+                where club_id = ? and session_id = ? and membership_id = ?
+                """.trimIndent(),
+                clubId.toString(),
+                sessionId.toString(),
+                changedMembershipId.toString(),
+            )
+        }
+    }
+
+    @Test
+    fun `confirm rejects when recipient preference changes after preview without outbox`() {
+        val now = OffsetDateTime.of(2026, 7, 23, 0, 0, 0, 0, ZoneOffset.UTC)
+        val changedMembershipId = membershipId("member1@example.com")
+        val originalPreference = mutableReplayState(changedMembershipId).preference
+        val currentSelection = selection(requestedChannels = ManualNotificationRequestedChannels.EMAIL)
+        val snapshot = adapter.previewTargets(clubId, currentSelection)
+        val previewId =
+            adapter.insertPreview(
+                clubId,
+                hostMembershipId,
+                "a".repeat(64),
+                snapshot.snapshotHash(),
+                now.plusMinutes(10),
+            )
+
+        try {
+            disablePreference("member1@example.com")
+
+            val attempt = confirm(previewId, now, currentSelection)
+
+            assertThat(attempt)
+                .isEqualTo(
+                    ManualNotificationConfirmAttempt.Rejected(
+                        ManualNotificationConfirmRejection.RECIPIENTS_CHANGED,
+                    ),
+                )
+            assertThat(previewManualDispatchCount(previewId)).isZero()
+        } finally {
+            restorePreference(changedMembershipId, originalPreference)
         }
     }
 
@@ -404,48 +693,32 @@ class JdbcManualNotificationDispatchAdapterTest(
                 ?.contentRevision(NotificationEventType.SESSION_REMINDER_DUE),
         )
 
-    private fun payload(
-        idSeed: String,
-        selection: ManualNotificationSelection,
-        snapshot: ManualNotificationTargetSnapshot,
-    ) = NotificationEventPayload(
-        sessionId = sessionId,
-        sessionNumber = 7,
-        bookTitle = "Example Book",
-        manualDispatch =
-            NotificationManualDispatchPayload(
-                id = UUID.nameUUIDFromBytes(idSeed.toByteArray()),
-                source = NotificationDispatchSource.MANUAL,
-                requestedByMembershipId = hostMembershipId,
-                requestedChannels = selection.requestedChannels,
-                audience = selection.audience,
-                contentRevision = selection.contentRevision,
-                selectedMembershipIds = selection.selectedMembershipIds,
-                targetMembershipIds = snapshot.targetMembershipIds,
-                inAppMembershipIds = snapshot.inAppMembershipIds,
-                emailMembershipIds = snapshot.emailMembershipIds,
-                resend = false,
-                sendMode = selection.sendMode,
-            ),
-    )
-
     private fun confirm(
         previewId: UUID,
         now: OffsetDateTime,
         selection: ManualNotificationSelection,
-        payload: NotificationEventPayload,
-        snapshot: ManualNotificationTargetSnapshot,
-    ) = adapter.confirmManualDispatch(
-        previewId = previewId,
-        clubId = clubId,
-        hostMembershipId = hostMembershipId,
-        selectionHash = "a".repeat(64),
-        now = now,
-        selection = selection,
-        payload = payload,
-        targetSnapshot = snapshot,
-        resend = false,
-    )
+        selectionHash: String = "a".repeat(64),
+    ): ManualNotificationConfirmAttempt =
+        adapter.confirmManualDispatch(
+            ManualNotificationConfirmTransactionInput(
+                previewId = previewId,
+                clubId = clubId,
+                hostMembershipId = hostMembershipId,
+                selectionHash = selectionHash,
+                now = now,
+                selection = selection,
+                resendConfirmed = false,
+            ),
+        )
+
+    private fun confirmed(
+        attempt: ManualNotificationConfirmAttempt,
+    ): com.readmates.notification.application.port.out.ManualNotificationConfirmedDispatch {
+        assertThat(attempt)
+            .describedAs("confirmation attempt")
+            .isInstanceOf(ManualNotificationConfirmAttempt.Confirmed::class.java)
+        return (attempt as ManualNotificationConfirmAttempt.Confirmed).dispatch
+    }
 
     private fun mutableReplayState(membershipId: UUID): MutableReplayState {
         val date =

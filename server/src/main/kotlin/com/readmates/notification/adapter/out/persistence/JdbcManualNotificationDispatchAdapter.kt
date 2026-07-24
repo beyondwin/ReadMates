@@ -10,7 +10,12 @@ import com.readmates.notification.application.model.ManualNotificationRequestedC
 import com.readmates.notification.application.model.ManualNotificationSelection
 import com.readmates.notification.application.model.NotificationDispatchSource
 import com.readmates.notification.application.model.NotificationEventPayload
+import com.readmates.notification.application.model.NotificationManualDispatchPayload
+import com.readmates.notification.application.model.allowedManualAudiences
+import com.readmates.notification.application.port.out.ManualNotificationConfirmAttempt
 import com.readmates.notification.application.port.out.ManualNotificationConfirmInsertStatus
+import com.readmates.notification.application.port.out.ManualNotificationConfirmRejection
+import com.readmates.notification.application.port.out.ManualNotificationConfirmTransactionInput
 import com.readmates.notification.application.port.out.ManualNotificationConfirmedDispatch
 import com.readmates.notification.application.port.out.ManualNotificationDispatchPort
 import com.readmates.notification.application.port.out.ManualNotificationPreviewRecord
@@ -18,6 +23,8 @@ import com.readmates.notification.application.port.out.ManualNotificationSession
 import com.readmates.notification.application.port.out.ManualNotificationStoredDispatch
 import com.readmates.notification.application.port.out.ManualNotificationTargetSnapshot
 import com.readmates.notification.application.port.out.contentRevision
+import com.readmates.notification.application.port.out.manualDispatchDisabledReason
+import com.readmates.notification.application.port.out.snapshotHash
 import com.readmates.notification.domain.NotificationEventOutboxStatus
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.shared.db.dbString
@@ -384,18 +391,22 @@ class JdbcManualNotificationDispatchAdapter(
         clubId: UUID,
         hostMembershipId: UUID,
         selectionHash: String,
+        targetSnapshotHash: String,
         expiresAt: OffsetDateTime,
     ): UUID {
         val id = UUID.randomUUID()
         jdbcTemplate.update(
             """
-            insert into notification_manual_dispatch_previews (id, club_id, host_membership_id, selection_hash, expires_at)
-            values (?, ?, ?, ?, ?)
+            insert into notification_manual_dispatch_previews (
+              id, club_id, host_membership_id, selection_hash, target_snapshot_hash, expires_at
+            )
+            values (?, ?, ?, ?, ?, ?)
             """.trimIndent(),
             id.dbString(),
             clubId.dbString(),
             hostMembershipId.dbString(),
             selectionHash,
+            targetSnapshotHash,
             expiresAt.toUtcLocalDateTime(),
         )
         return id
@@ -409,7 +420,7 @@ class JdbcManualNotificationDispatchAdapter(
         jdbcTemplate
             .query(
                 """
-                select id, club_id, host_membership_id, selection_hash, expires_at
+                select id, club_id, host_membership_id, selection_hash, target_snapshot_hash, expires_at
                 from notification_manual_dispatch_previews
                 where id = ?
                   and club_id = ?
@@ -421,6 +432,7 @@ class JdbcManualNotificationDispatchAdapter(
                         clubId = rs.uuid("club_id"),
                         hostMembershipId = rs.uuid("host_membership_id"),
                         selectionHash = rs.getString("selection_hash"),
+                        targetSnapshotHash = rs.getString("target_snapshot_hash"),
                         expiresAt = rs.utcOffsetDateTime("expires_at"),
                     )
                 },
@@ -429,62 +441,25 @@ class JdbcManualNotificationDispatchAdapter(
                 hostMembershipId.dbString(),
             ).firstOrNull()
 
-    override fun findConsumedManualDispatch(
-        previewId: UUID,
-        clubId: UUID,
-        hostMembershipId: UUID,
-        selectionHash: String,
-        now: OffsetDateTime,
-    ): ManualNotificationConfirmedDispatch? =
-        jdbcTemplate
-            .query(
-                """
-                select
-                  notification_manual_dispatches.id,
-                  notification_manual_dispatches.event_id,
-                  notification_manual_dispatches.created_at,
-                  notification_manual_dispatches.requested_channels,
-                  notification_manual_dispatches.target_count,
-                  notification_manual_dispatches.expected_in_app_count,
-                  notification_manual_dispatches.expected_email_count
-                from notification_manual_dispatch_previews
-                join notification_manual_dispatches on notification_manual_dispatches.event_id = notification_manual_dispatch_previews.consumed_event_id
-                  and notification_manual_dispatches.club_id = notification_manual_dispatch_previews.club_id
-                where notification_manual_dispatch_previews.id = ?
-                  and notification_manual_dispatch_previews.club_id = ?
-                  and notification_manual_dispatch_previews.host_membership_id = ?
-                  and notification_manual_dispatch_previews.selection_hash = ?
-                  and (
-                    notification_manual_dispatch_previews.expires_at >= ?
-                    or notification_manual_dispatch_previews.consumed_event_id is not null
-                  )
-                  and notification_manual_dispatch_previews.consumed_event_id is not null
-                """.trimIndent(),
-                { rs, _ -> rs.toConfirmedDispatch(ManualNotificationConfirmInsertStatus.ALREADY_CONSUMED) },
-                previewId.dbString(),
-                clubId.dbString(),
-                hostMembershipId.dbString(),
-                selectionHash,
-                now.toUtcLocalDateTime(),
-            ).firstOrNull()
-
     @Transactional
-    override fun confirmManualDispatch(
-        previewId: UUID,
-        clubId: UUID,
-        hostMembershipId: UUID,
-        selectionHash: String,
-        now: OffsetDateTime,
-        selection: ManualNotificationSelection,
-        payload: NotificationEventPayload,
-        targetSnapshot: ManualNotificationTargetSnapshot,
-        resend: Boolean,
-    ): ManualNotificationConfirmedDispatch? {
+    @Suppress("CyclomaticComplexMethod", "LongMethod", "MaxLineLength", "ReturnCount")
+    override fun confirmManualDispatch(input: ManualNotificationConfirmTransactionInput): ManualNotificationConfirmAttempt {
+        val previewId = input.previewId
+        val clubId = input.clubId
+        val hostMembershipId = input.hostMembershipId
+        val selection = input.selection
         val preview =
             jdbcTemplate
                 .query(
                     """
-                    select id, club_id, host_membership_id, selection_hash, expires_at, consumed_event_id
+                    select
+                      id,
+                      club_id,
+                      host_membership_id,
+                      selection_hash,
+                      target_snapshot_hash,
+                      expires_at,
+                      consumed_event_id
                     from notification_manual_dispatch_previews
                     where id = ?
                       and club_id = ?
@@ -495,6 +470,7 @@ class JdbcManualNotificationDispatchAdapter(
                         LockedPreview(
                             id = rs.uuid("id"),
                             selectionHash = rs.getString("selection_hash"),
+                            targetSnapshotHash = rs.getString("target_snapshot_hash"),
                             expiresAt = rs.utcOffsetDateTime("expires_at"),
                             consumedEventId = rs.getString("consumed_event_id")?.let(UUID::fromString),
                         )
@@ -502,31 +478,104 @@ class JdbcManualNotificationDispatchAdapter(
                     previewId.dbString(),
                     clubId.dbString(),
                     hostMembershipId.dbString(),
-                ).firstOrNull() ?: return null
-        if (preview.selectionHash != selectionHash) return null
+                ).firstOrNull()
+                ?: return rejected(ManualNotificationConfirmRejection.PREVIEW_NOT_FOUND)
+
+        if (preview.selectionHash != input.selectionHash) {
+            return rejected(
+                if (preview.consumedEventId == null) {
+                    ManualNotificationConfirmRejection.PREVIEW_SELECTION_MISMATCH
+                } else {
+                    ManualNotificationConfirmRejection.PREVIEW_ALREADY_CONSUMED
+                },
+            )
+        }
+        if (preview.consumedEventId == null && preview.expiresAt.isBefore(input.now)) {
+            return rejected(ManualNotificationConfirmRejection.PREVIEW_EXPIRED)
+        }
+        if (preview.consumedEventId == null && !hasValidSelectionShape(selection)) {
+            return rejected(ManualNotificationConfirmRejection.RECIPIENT_INVALID)
+        }
+
+        // All confirm paths lock the shared session before an actor membership.
+        // This gives concurrent hosts a stable lock order before audience rows are
+        // frozen and prevents host A / host B from waiting on each other's row.
+        val session =
+            findSessionContext(clubId, selection.sessionId, forUpdate = true)
+                ?: return rejected(ManualNotificationConfirmRejection.SESSION_STATE_INVALID)
+        if (!isCurrentHost(clubId, hostMembershipId)) {
+            return rejected(ManualNotificationConfirmRejection.HOST_NOT_AUTHORIZED)
+        }
         preview.consumedEventId?.let { eventId ->
             return findStoredDispatchByEventId(clubId, eventId)
                 ?.copy(status = ManualNotificationConfirmInsertStatus.ALREADY_CONSUMED)
+                ?.let(ManualNotificationConfirmAttempt::Confirmed)
+                ?: rejected(ManualNotificationConfirmRejection.PREVIEW_NOT_FOUND)
         }
-        if (preview.expiresAt.isBefore(now)) return null
-
-        val session = findSessionContext(clubId, selection.sessionId, forUpdate = true) ?: return null
-        val currentRevision = session.contentRevision(selection.eventType) ?: return null
+        if (session.manualDispatchDisabledReason(selection.eventType) != null) {
+            return rejected(ManualNotificationConfirmRejection.SESSION_STATE_INVALID)
+        }
+        val currentRevision =
+            session.contentRevision(selection.eventType)
+                ?: return rejected(ManualNotificationConfirmRejection.CONTENT_REVISION_STALE)
         if (!MessageDigest.isEqual(
                 selection.contentRevision.toByteArray(),
                 currentRevision.toByteArray(),
             )
         ) {
-            return null
+            return rejected(ManualNotificationConfirmRejection.CONTENT_REVISION_STALE)
+        }
+
+        lockAudienceInputs(clubId, selection.sessionId)
+        val editedIds =
+            (
+                selection.selectedMembershipIds +
+                    selection.includedMembershipIds +
+                    selection.excludedMembershipIds
+            ).toSet()
+        if (activeMembershipIds(clubId, editedIds.toList()).size != editedIds.size) {
+            return rejected(ManualNotificationConfirmRejection.RECIPIENT_INVALID)
+        }
+        val targetSnapshot = previewTargets(clubId, selection)
+        if (preview.targetSnapshotHash == null || preview.targetSnapshotHash != targetSnapshot.snapshotHash()) {
+            return rejected(ManualNotificationConfirmRejection.RECIPIENTS_CHANGED)
+        }
+        if (!targetSnapshot.hasEligibleTarget(selection.requestedChannels)) {
+            return rejected(ManualNotificationConfirmRejection.AUDIENCE_EMPTY)
         }
         findStoredDispatchByRevision(clubId, selection)?.let { duplicate ->
-            if (!resend) {
-                return duplicate.copy(status = ManualNotificationConfirmInsertStatus.DUPLICATE)
+            if (!input.resendConfirmed) {
+                return ManualNotificationConfirmAttempt.Confirmed(
+                    duplicate.copy(status = ManualNotificationConfirmInsertStatus.DUPLICATE),
+                )
             }
         }
 
         val eventId = UUID.randomUUID()
-        val dispatchId = requireNotNull(payload.manualDispatch?.id) { "Manual dispatch payload id is required" }
+        val dispatchId = UUID.randomUUID()
+        val payload =
+            NotificationEventPayload(
+                sessionId = selection.sessionId,
+                sessionNumber = session.sessionNumber,
+                bookTitle = session.bookTitle,
+                manualDispatch =
+                    NotificationManualDispatchPayload(
+                        id = dispatchId,
+                        source = NotificationDispatchSource.MANUAL,
+                        requestedByMembershipId = hostMembershipId,
+                        requestedChannels = selection.requestedChannels,
+                        audience = selection.audience,
+                        contentRevision = selection.contentRevision,
+                        selectedMembershipIds = selection.selectedMembershipIds,
+                        excludedMembershipIds = selection.excludedMembershipIds,
+                        includedMembershipIds = selection.includedMembershipIds,
+                        targetMembershipIds = targetSnapshot.targetMembershipIds,
+                        inAppMembershipIds = targetSnapshot.inAppMembershipIds,
+                        emailMembershipIds = targetSnapshot.emailMembershipIds,
+                        resend = input.resendConfirmed,
+                        sendMode = selection.sendMode,
+                    ),
+            )
         jdbcTemplate.update(
             """
             insert into notification_event_outbox (
@@ -567,7 +616,7 @@ class JdbcManualNotificationDispatchAdapter(
             targetSnapshot.finalTargetCount,
             targetSnapshot.inAppEligibleCount,
             targetSnapshot.emailEligibleCount,
-            resend,
+            input.resendConfirmed,
             selection.sendMode.name,
         )
         jdbcTemplate.update(
@@ -591,12 +640,14 @@ class JdbcManualNotificationDispatchAdapter(
                 { rs, _ -> rs.utcOffsetDateTime("created_at") },
                 dispatchId.dbString(),
             )
-        return ManualNotificationConfirmedDispatch(
-            manualDispatchId = dispatchId,
-            eventId = eventId,
-            createdAt = createdAt,
-            status = ManualNotificationConfirmInsertStatus.CREATED,
-            summary = targetSnapshot.toConfirmSummary(selection.requestedChannels),
+        return ManualNotificationConfirmAttempt.Confirmed(
+            ManualNotificationConfirmedDispatch(
+                manualDispatchId = dispatchId,
+                eventId = eventId,
+                createdAt = createdAt,
+                status = ManualNotificationConfirmInsertStatus.CREATED,
+                summary = targetSnapshot.toConfirmSummary(selection.requestedChannels),
+            ),
         )
     }
 
@@ -715,6 +766,97 @@ class JdbcManualNotificationDispatchAdapter(
                 selection.eventType.name,
                 selection.contentRevision,
             ).firstOrNull()
+
+    private fun isCurrentHost(
+        clubId: UUID,
+        hostMembershipId: UUID,
+    ): Boolean =
+        jdbcTemplate
+            .query(
+                """
+                select role, status
+                from memberships
+                where club_id = ?
+                  and id = ?
+                for update
+                """.trimIndent(),
+                { rs, _ -> rs.getString("role") == "HOST" && rs.getString("status") == "ACTIVE" },
+                clubId.dbString(),
+                hostMembershipId.dbString(),
+            ).firstOrNull() == true
+
+    private fun hasValidSelectionShape(selection: ManualNotificationSelection): Boolean {
+        val selected = selection.selectedMembershipIds
+        val included = selection.includedMembershipIds
+        val excluded = selection.excludedMembershipIds
+        val legacyEdits = included + excluded
+        val legacyEditsAreInvalid =
+            included.size != included.toSet().size ||
+                excluded.size != excluded.toSet().size ||
+                included.toSet().intersect(excluded.toSet()).isNotEmpty()
+        val audienceShapeIsValid =
+            if (selection.audience == ManualNotificationAudience.SELECTED_MEMBERS) {
+                selected.isNotEmpty() &&
+                    selected.size == selected.toSet().size &&
+                    legacyEdits.isEmpty()
+            } else {
+                selected.isEmpty()
+            }
+        return selection.audience in allowedManualAudiences(selection.eventType) &&
+            !legacyEditsAreInvalid &&
+            audienceShapeIsValid
+    }
+
+    private fun lockAudienceInputs(
+        clubId: UUID,
+        sessionId: UUID,
+    ) {
+        jdbcTemplate.queryForList(
+            "select id from memberships where club_id = ? for update",
+            String::class.java,
+            clubId.dbString(),
+        )
+        jdbcTemplate.queryForList(
+            """
+            select users.id
+            from users
+            join memberships on memberships.user_id = users.id
+            where memberships.club_id = ?
+            for update
+            """.trimIndent(),
+            String::class.java,
+            clubId.dbString(),
+        )
+        jdbcTemplate.queryForList(
+            """
+            select membership_id
+            from session_participants
+            where club_id = ?
+              and session_id = ?
+            for update
+            """.trimIndent(),
+            String::class.java,
+            clubId.dbString(),
+            sessionId.dbString(),
+        )
+        jdbcTemplate.queryForList(
+            "select membership_id from notification_preferences where club_id = ? for update",
+            String::class.java,
+            clubId.dbString(),
+        )
+    }
+
+    @Suppress("MaxLineLength")
+    private fun ManualNotificationTargetSnapshot.hasEligibleTarget(requestedChannels: ManualNotificationRequestedChannels): Boolean =
+        finalTargetCount > 0 &&
+            when (requestedChannels) {
+                ManualNotificationRequestedChannels.IN_APP -> inAppEligibleCount > 0
+                ManualNotificationRequestedChannels.EMAIL -> emailEligibleCount > 0
+                ManualNotificationRequestedChannels.BOTH -> inAppEligibleCount > 0 || emailEligibleCount > 0
+            }
+
+    private fun rejected(reason: ManualNotificationConfirmRejection): ManualNotificationConfirmAttempt =
+        ManualNotificationConfirmAttempt.Rejected(reason)
 
     private fun baseMembershipIds(
         clubId: UUID,
@@ -953,6 +1095,7 @@ class JdbcManualNotificationDispatchAdapter(
     private data class LockedPreview(
         val id: UUID,
         val selectionHash: String,
+        val targetSnapshotHash: String?,
         val expiresAt: OffsetDateTime,
         val consumedEventId: UUID?,
     )

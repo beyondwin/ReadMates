@@ -62,8 +62,8 @@ class SessionRecordApplyService(
         command: ApplySessionRecordCommand,
     ): SessionRecordApplyResult {
         requireHost(host)
-        store.findApplyReceipt(host, command.applyRequestId)?.let { completed ->
-            return replay(command, completed)
+        store.findApplyReceipt(host, command.sessionId, command.applyRequestId)?.let { completed ->
+            return replay(host, command, completed)
         }
         val editor =
             store.lockEditor(host, command.sessionId)
@@ -77,8 +77,8 @@ class SessionRecordApplyService(
         command: ApplySessionRecordCommand,
         editor: SessionRecordEditor,
     ): SessionRecordApplyResult {
-        store.findApplyReceipt(host, command.applyRequestId)?.let { completed ->
-            return replay(command, completed)
+        store.findApplyReceipt(host, command.sessionId, command.applyRequestId, forUpdate = true)?.let { completed ->
+            return replay(host, command, completed)
         }
         val draft = editor.draft ?: throw draftStale()
         requireRevisions(editor.live, draft, command.expectedLiveRevision, command.expectedDraftRevision)
@@ -124,14 +124,19 @@ class SessionRecordApplyService(
     }
 
     private fun replay(
+        host: CurrentMember,
         command: ApplySessionRecordCommand,
         completed: SessionRecordApplyReceipt,
     ): SessionRecordApplyResult {
-        if (completed.expectedDraftRevision != command.expectedDraftRevision ||
-            completed.expectedLiveRevision != command.expectedLiveRevision ||
-            completed.draftSha256 != command.expectedDraftHash ||
-            completed.revision.sessionId != command.sessionId
-        ) {
+        val sameActor = completed.hostMembershipId == host.membershipId
+        val sameExpectedRevisions =
+            completed.expectedDraftRevision == command.expectedDraftRevision &&
+                completed.expectedLiveRevision == command.expectedLiveRevision
+        val sameApplyContract =
+            sameExpectedRevisions &&
+                completed.draftSha256 == command.expectedDraftHash &&
+                completed.revision.sessionId == command.sessionId
+        if (!sameActor || !sameApplyContract) {
             throw SessionRecordException(
                 SessionRecordError.APPLY_REQUEST_ALREADY_USED,
                 "Session record apply request was already used",

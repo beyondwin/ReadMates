@@ -177,6 +177,50 @@ class SessionRecordApplyServiceTest {
         assertEquals(SessionRecordSource.RESTORED, applied.source)
         assertEquals(restoredFrom, applied.restoredFromRevisionId)
     }
+
+    @Test
+    fun `exact apply request replay returns the original revision`() {
+        val fixture = Fixture(liveRevision = 3)
+        val command = fixture.command()
+
+        val first = fixture.apply(command)
+        val replay = fixture.apply(command)
+
+        assertEquals(first, replay)
+        assertEquals(1, fixture.store.receipts.size)
+        assertEquals(1, fixture.validator.calls)
+    }
+
+    @Test
+    fun `same session apply request with a different contract returns conflict`() {
+        val fixture = Fixture(liveRevision = 3)
+        val command = fixture.command()
+        fixture.apply(command)
+
+        val error =
+            assertThrows(SessionRecordException::class.java) {
+                fixture.apply(command.copy(expectedDraftHash = "f".repeat(64)))
+            }
+
+        assertEquals(SessionRecordError.APPLY_REQUEST_ALREADY_USED, error.error)
+        assertEquals(1, fixture.store.receipts.size)
+    }
+
+    @Test
+    fun `same session apply request replay by another host returns conflict`() {
+        val fixture = Fixture(liveRevision = 3)
+        val command = fixture.command()
+        fixture.apply(command)
+        val anotherHost = fixture.host.copy(membershipId = UUID.randomUUID())
+
+        val error =
+            assertThrows(SessionRecordException::class.java) {
+                fixture.apply(command, anotherHost)
+            }
+
+        assertEquals(SessionRecordError.APPLY_REQUEST_ALREADY_USED, error.error)
+        assertEquals(1, fixture.store.receipts.size)
+    }
 }
 
 private val TEST_NOW = OffsetDateTime.of(2026, 7, 23, 0, 0, 0, 0, ZoneOffset.UTC)
@@ -279,6 +323,20 @@ private class Fixture(
         ),
     )
 
+    fun command(applyRequestId: UUID = previewId) =
+        ApplySessionRecordCommand(
+            sessionId = sessionId,
+            applyRequestId = applyRequestId,
+            expectedDraftRevision = draft.draftRevision,
+            expectedLiveRevision = live.revision,
+            expectedDraftHash = codec.encode(draft.snapshot).sha256,
+        )
+
+    fun apply(
+        command: ApplySessionRecordCommand,
+        actor: CurrentMember = host,
+    ) = service.apply(actor, command)
+
     fun applyContentOnly() =
         service.apply(
             host,
@@ -343,8 +401,14 @@ private class FakeApplyStore(
 
     override fun findApplyReceipt(
         host: AuthenticatedClubActor,
+        sessionId: UUID,
         applyRequestId: UUID,
-    ) = receipts.firstOrNull { it.applyRequestId == applyRequestId }
+        forUpdate: Boolean,
+    ) = receipts.firstOrNull {
+        it.revision.sessionId == sessionId &&
+            it.revision.clubId == host.clubId &&
+            it.applyRequestId == applyRequestId
+    }
 
     override fun insertApplyReceipt(
         host: AuthenticatedClubActor,
@@ -355,6 +419,7 @@ private class FakeApplyStore(
     ) = com.readmates.sessionrecord.application.model
         .SessionRecordApplyReceipt(
             command.applyRequestId,
+            host.membershipId,
             command.expectedDraftRevision,
             command.expectedLiveRevision,
             draftSha256,

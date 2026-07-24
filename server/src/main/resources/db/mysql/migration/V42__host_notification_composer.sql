@@ -57,3 +57,17 @@ alter table notification_manual_dispatches
     )),
   add constraint notification_manual_dispatches_content_revision_check
     check (content_revision is null or regexp_like(content_revision, '^[0-9a-f]{64}$', 'c'));
+
+alter table notification_manual_dispatch_previews
+  add column target_snapshot_hash char(64) null after selection_hash,
+  add constraint notification_manual_dispatch_previews_target_hash_check
+    check (target_snapshot_hash is null or regexp_like(target_snapshot_hash, '^[0-9a-f]{64}$', 'c'));
+
+alter table session_record_revisions
+  add unique key session_record_revisions_scope_uk (id, club_id, session_id);
+
+alter table session_record_apply_receipts
+  drop foreign key session_record_apply_receipts_revision_fk,
+  add constraint session_record_apply_receipts_revision_scope_fk
+    foreign key (revision_id, club_id, session_id)
+    references session_record_revisions(id, club_id, session_id);

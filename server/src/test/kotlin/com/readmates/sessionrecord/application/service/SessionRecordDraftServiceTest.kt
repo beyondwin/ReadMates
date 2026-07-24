@@ -260,6 +260,7 @@ class SessionRecordDraftServiceTest {
             revision: SessionRecordRevision,
         ) = SessionRecordApplyReceipt(
             applyRequestId = command.applyRequestId,
+            hostMembershipId = host.membershipId,
             expectedDraftRevision = command.expectedDraftRevision,
             expectedLiveRevision = command.expectedLiveRevision,
             draftSha256 = draftSha256,
