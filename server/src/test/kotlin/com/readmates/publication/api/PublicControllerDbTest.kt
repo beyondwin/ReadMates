@@ -4,6 +4,7 @@ import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.hasItems
 import org.hamcrest.Matchers.not
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -275,12 +276,16 @@ class PublicControllerDbTest(
             "PUBLIC but unpublished" to "00000000-0000-0000-0000-000000000993",
             "MEMBER draft" to "00000000-0000-0000-0000-000000000994",
             "PUBLIC open" to "00000000-0000-0000-0000-000000000995",
-        ).forEach { (_, sessionId) ->
-            mockMvc
-                .get("/api/public/clubs/reading-sai/sessions/$sessionId")
-                .andExpect {
-                    status { isNotFound() }
-                }
+        ).forEach { (matrixDescription, sessionId) ->
+            val result =
+                mockMvc
+                    .get("/api/public/clubs/reading-sai/sessions/$sessionId")
+                    .andReturn()
+            assertEquals(
+                404,
+                result.response.status,
+                "$matrixDescription visibility/state row must not be exposed by the public detail endpoint",
+            )
         }
 
         mockMvc

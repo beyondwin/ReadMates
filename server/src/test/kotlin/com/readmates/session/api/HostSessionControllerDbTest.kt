@@ -759,33 +759,49 @@ class HostSessionControllerDbTest(
 
     @Test
     fun `host cannot open closed session`() {
+        val sessionId = "00000000-0000-0000-0000-000000009777"
         createSessionSeven()
-        updateSessionState("00000000-0000-0000-0000-000000009777", "CLOSED")
+        updateSessionState(sessionId, "CLOSED")
+        val beforeOpenAttempt = lifecycleDbEvidence(sessionId)
 
         mockMvc
-            .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/open") {
+            .post("/api/host/sessions/$sessionId/open") {
                 with(user("host@example.com"))
                 with(csrf())
             }.andExpect {
                 status { isConflict() }
+                jsonPath("$.code") { value("CONFLICT") }
+                jsonPath("$.message") { value("요청한 작업이 현재 세션 상태와 충돌합니다.") }
+                jsonPath("$.status") { value(409) }
+                jsonPath("$.traceId") { isNotEmpty() }
+                jsonPath("$.length()") { value(4) }
             }
+        assertEquals(beforeOpenAttempt, lifecycleDbEvidence(sessionId))
     }
 
     @Test
     fun `host cannot open published session`() {
+        val sessionId = "00000000-0000-0000-0000-000000009777"
         createSessionSeven()
         // OPEN→CLOSED to maintain valid state, then set visibility before PUBLISHED (PUBLISHED+HOST_ONLY violates invariant)
-        updateSessionState("00000000-0000-0000-0000-000000009777", "CLOSED")
-        updateSessionVisibility("00000000-0000-0000-0000-000000009777", "MEMBER")
-        updateSessionState("00000000-0000-0000-0000-000000009777", "PUBLISHED")
+        updateSessionState(sessionId, "CLOSED")
+        updateSessionVisibility(sessionId, "MEMBER")
+        updateSessionState(sessionId, "PUBLISHED")
+        val beforeOpenAttempt = lifecycleDbEvidence(sessionId)
 
         mockMvc
-            .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/open") {
+            .post("/api/host/sessions/$sessionId/open") {
                 with(user("host@example.com"))
                 with(csrf())
             }.andExpect {
                 status { isConflict() }
+                jsonPath("$.code") { value("CONFLICT") }
+                jsonPath("$.message") { value("요청한 작업이 현재 세션 상태와 충돌합니다.") }
+                jsonPath("$.status") { value(409) }
+                jsonPath("$.traceId") { isNotEmpty() }
+                jsonPath("$.length()") { value(4) }
             }
+        assertEquals(beforeOpenAttempt, lifecycleDbEvidence(sessionId))
     }
 
     @Test
@@ -2097,12 +2113,25 @@ class HostSessionControllerDbTest(
                     """.trimIndent(),
                     sessionId,
                 ),
-            participantCount =
-                jdbcTemplate.queryForObject(
-                    "select count(*) from session_participants where session_id = ?",
-                    Int::class.java,
+            participants =
+                jdbcTemplate.queryForList(
+                    """
+                    select
+                      id,
+                      club_id,
+                      session_id,
+                      membership_id,
+                      rsvp_status,
+                      attendance_status,
+                      participation_status,
+                      created_at,
+                      updated_at
+                    from session_participants
+                    where session_id = ?
+                    order by id
+                    """.trimIndent(),
                     sessionId,
-                ) ?: 0,
+                ),
             publications =
                 jdbcTemplate.queryForList(
                     """
@@ -2129,7 +2158,7 @@ class HostSessionControllerDbTest(
 
     private data class LifecycleDbEvidence(
         val session: Map<String, Any?>,
-        val participantCount: Int,
+        val participants: List<Map<String, Any?>>,
         val publications: List<Map<String, Any?>>,
         val outboxCount: Int,
         val auditCount: Int,

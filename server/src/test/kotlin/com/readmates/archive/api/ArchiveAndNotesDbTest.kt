@@ -12,6 +12,7 @@ import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.hasItems
 import org.hamcrest.Matchers.not
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -135,6 +136,15 @@ class ArchiveAndNotesDbTest(
         val publicSessionId = "00000000-0000-0000-0000-0000000092b1"
         val memberSessionId = "00000000-0000-0000-0000-0000000092b2"
         val hostOnlySessionId = "00000000-0000-0000-0000-0000000092b3"
+        val matrixSessionIds = listOf(publicSessionId, memberSessionId, hostOnlySessionId)
+        val actorCases =
+            listOf(
+                VisibilityActorCase("member4@example.com", "active non-attendee member", isAttendee = false),
+                VisibilityActorCase("member5@example.com", "active attendee", isAttendee = true),
+                VisibilityActorCase("host@example.com", "active host", isAttendee = false),
+            )
+
+        assertVisibilityActorFixtures(actorCases, matrixSessionIds)
 
         mockMvc
             .get("/api/public/clubs/reading-sai/sessions/$publicSessionId")
@@ -150,29 +160,8 @@ class ArchiveAndNotesDbTest(
                 }
         }
 
-        listOf(
-            "member4@example.com" to "active non-attendee member",
-            "member5@example.com" to "active attendee",
-            "host@example.com" to "active host",
-        ).forEach { (email, _) ->
-            listOf(publicSessionId, memberSessionId).forEach { visibleSessionId ->
-                mockMvc
-                    .get("/api/archive/sessions/$visibleSessionId") {
-                        header("X-Readmates-Club-Slug", "reading-sai")
-                        with(user(email))
-                    }.andExpect {
-                        status { isOk() }
-                        jsonPath("$.sessionId") { value(visibleSessionId) }
-                    }
-            }
-
-            mockMvc
-                .get("/api/archive/sessions/$hostOnlySessionId") {
-                    header("X-Readmates-Club-Slug", "reading-sai")
-                    with(user(email))
-                }.andExpect {
-                    status { isNotFound() }
-                }
+        actorCases.forEach { actor ->
+            assertArchiveVisibilityContract(actor, publicSessionId, memberSessionId, hostOnlySessionId)
         }
 
         mockMvc
@@ -195,6 +184,110 @@ class ArchiveAndNotesDbTest(
                 }
         }
     }
+
+    private fun assertVisibilityActorFixtures(
+        actors: List<VisibilityActorCase>,
+        sessionIds: List<String>,
+    ) {
+        actors.forEach { actor ->
+            val participantRows = visibilityMatrixParticipantRows(actor.email, sessionIds)
+            if (actor.isAttendee) {
+                assertEquals(
+                    sessionIds,
+                    participantRows.map { it["session_id"] },
+                    "${actor.description} fixture must attend every visibility-matrix session",
+                )
+                participantRows.forEach { participant ->
+                    assertEquals("GOING", participant["rsvp_status"], "${actor.description} RSVP fixture")
+                    assertEquals(
+                        "ATTENDED",
+                        participant["attendance_status"],
+                        "${actor.description} attendance fixture",
+                    )
+                    assertEquals(
+                        "ACTIVE",
+                        participant["participation_status"],
+                        "${actor.description} participation fixture",
+                    )
+                }
+            } else {
+                assertEquals(
+                    emptyList<Map<String, Any?>>(),
+                    participantRows,
+                    "${actor.description} fixture must not have visibility-matrix participation",
+                )
+            }
+        }
+    }
+
+    private fun assertArchiveVisibilityContract(
+        actor: VisibilityActorCase,
+        publicSessionId: String,
+        memberSessionId: String,
+        hostOnlySessionId: String,
+    ) {
+        listOf(
+            publicSessionId to "PUBLIC",
+            memberSessionId to "MEMBER",
+        ).forEach { (visibleSessionId, visibility) ->
+            val resultActions =
+                mockMvc
+                    .get("/api/archive/sessions/$visibleSessionId") {
+                        header("X-Readmates-Club-Slug", "reading-sai")
+                        with(user(actor.email))
+                    }
+            assertEquals(
+                200,
+                resultActions.andReturn().response.status,
+                "${actor.description} must receive the current $visibility visibility contract",
+            )
+            resultActions.andExpect {
+                jsonPath("$.sessionId") { value(visibleSessionId) }
+            }
+        }
+
+        val hostOnlyResult =
+            mockMvc
+                .get("/api/archive/sessions/$hostOnlySessionId") {
+                    header("X-Readmates-Club-Slug", "reading-sai")
+                    with(user(actor.email))
+                }
+        assertEquals(
+            404,
+            hostOnlyResult.andReturn().response.status,
+            "${actor.description} must not receive host-only archive visibility",
+        )
+    }
+
+    private fun visibilityMatrixParticipantRows(
+        email: String,
+        sessionIds: List<String>,
+    ): List<Map<String, Any?>> =
+        jdbcTemplate.queryForList(
+            """
+            select
+              session_participants.session_id,
+              session_participants.rsvp_status,
+              session_participants.attendance_status,
+              session_participants.participation_status
+            from session_participants
+            join memberships on memberships.id = session_participants.membership_id
+            join users on users.id = memberships.user_id
+            where users.email = ?
+              and session_participants.session_id in (?, ?, ?)
+            order by session_participants.session_id
+            """.trimIndent(),
+            email,
+            sessionIds[0],
+            sessionIds[1],
+            sessionIds[2],
+        )
+
+    private data class VisibilityActorCase(
+        val email: String,
+        val description: String,
+        val isAttendee: Boolean,
+    )
 
     @Test
     @Sql(
