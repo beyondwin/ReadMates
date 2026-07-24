@@ -14,17 +14,17 @@ export type SessionRecordVisibility = "HOST_ONLY" | "MEMBER" | "PUBLIC";
 
 export type HostSessionVisibilityRequest = {
   visibility: SessionRecordVisibility;
-  previewId?: string | null;
-  notificationDecision?: "SEND" | "SKIP" | null;
 };
 
-export type HostSessionVisibilityPreviewResponse = {
-  previewId: string;
-  targetCount: number;
-  expectedInAppCount: number;
-  expectedEmailCount: number;
-  excludedCount: number;
-  expiresAt: string;
+export type HostNotificationComposerContext = {
+  sessionId: string;
+  eventType: "NEXT_BOOK_PUBLISHED" | "FEEDBACK_DOCUMENT_PUBLISHED" | "SESSION_RECORD_UPDATED";
+  contentRevision: string;
+};
+
+export type HostSessionVisibilityUpdateResult = {
+  session: HostSessionDetailResponse;
+  composer: HostNotificationComposerContext | null;
 };
 
 export type FeedbackDocumentStatus = {
@@ -159,13 +159,18 @@ export type HostNotificationSummary = {
   }>;
 };
 
-export type ManualNotificationAudience = "ALL_ACTIVE_MEMBERS" | "SESSION_PARTICIPANTS" | "CONFIRMED_ATTENDEES";
+export type ManualNotificationAudience =
+  | "ALL_ACTIVE_MEMBERS"
+  | "SESSION_PARTICIPANTS"
+  | "CONFIRMED_ATTENDEES"
+  | "SELECTED_MEMBERS";
 export type ManualNotificationRequestedChannels = "IN_APP" | "EMAIL" | "BOTH";
 export type ManualNotificationSendMode = "NOW";
 export type ManualNotificationEligibility = "ELIGIBLE" | "INELIGIBLE" | "EMAIL_DISABLED" | "EMAIL_MISSING";
 
 export type ManualNotificationTemplateOption = {
   eventType: HostNotificationEventType;
+  contentRevision: string;
   label: string;
   enabled: boolean;
   disabledReason: string | null;
@@ -225,11 +230,22 @@ export type ManualNotificationDispatchListItem = {
 export type ManualNotificationSelectionRequest = {
   sessionId: string;
   eventType: HostNotificationEventType;
+  contentRevision: string;
   audience: ManualNotificationAudience;
   requestedChannels: ManualNotificationRequestedChannels;
+  selectedMembershipIds: string[];
   excludedMembershipIds: string[];
   includedMembershipIds: string[];
   sendMode: ManualNotificationSendMode;
+};
+
+export type HostNotificationPolicyResponse = {
+  sessionReminderEnabled: boolean;
+  updatedAt: string | null;
+};
+
+export type UpdateHostNotificationPolicyRequest = {
+  sessionReminderEnabled: boolean;
 };
 
 export type ManualNotificationPreviewRequest = ManualNotificationSelectionRequest;

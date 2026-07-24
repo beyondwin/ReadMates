@@ -548,6 +548,12 @@ describe("AiGenerateTab", () => {
       expect(mockedCommit).toHaveBeenCalledTimes(1);
       expect(onCommitted).toHaveBeenCalledTimes(1);
     });
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "알림은 생성되지 않습니다",
+    );
+    expect(screen.queryByRole("dialog", {
+      name: "멤버에게 알림을 보낼까요?",
+    })).not.toBeInTheDocument();
   });
 
   it("blocks grounded commit until all four sections are reviewed and sends exact revision reviews", async () => {

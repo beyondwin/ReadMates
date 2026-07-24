@@ -3,7 +3,7 @@ import type { HostClubOperationsSnapshot } from "@/shared/model/club-operations"
 import type { AttendanceStatus, RsvpStatus, SessionState } from "@/shared/model/readmates-types";
 import type { PagedResponse } from "@/shared/model/paging";
 import type {
-  NotificationDecision,
+  HostNotificationComposerContext,
   SessionRecordStatus,
 } from "./host-session-record-contracts";
 export type { AttendanceStatus, RsvpStatus, SessionState } from "@/shared/model/readmates-types";
@@ -170,7 +170,11 @@ export type HostNotificationEventType =
   | "FEEDBACK_DOCUMENT_PUBLISHED"
   | "REVIEW_PUBLISHED"
   | "SESSION_RECORD_UPDATED";
-export type ManualNotificationAudience = "ALL_ACTIVE_MEMBERS" | "SESSION_PARTICIPANTS" | "CONFIRMED_ATTENDEES";
+export type ManualNotificationAudience =
+  | "ALL_ACTIVE_MEMBERS"
+  | "SESSION_PARTICIPANTS"
+  | "CONFIRMED_ATTENDEES"
+  | "SELECTED_MEMBERS";
 export type ManualNotificationRequestedChannels = "IN_APP" | "EMAIL" | "BOTH";
 export type ManualNotificationSendMode = "NOW";
 export type ManualNotificationEligibility = "ELIGIBLE" | "INELIGIBLE" | "EMAIL_DISABLED" | "EMAIL_MISSING";
@@ -304,6 +308,7 @@ export type HostSessionClosingStatusResponse = {
 
 export type ManualNotificationTemplateOption = {
   eventType: HostNotificationEventType;
+  contentRevision: string;
   label: string;
   enabled: boolean;
   disabledReason: string | null;
@@ -365,11 +370,22 @@ export type ManualNotificationDispatchListResponse = PagedResponse<ManualNotific
 export type ManualNotificationSelectionRequest = {
   sessionId: string;
   eventType: HostNotificationEventType;
+  contentRevision: string;
   audience: ManualNotificationAudience;
   requestedChannels: ManualNotificationRequestedChannels;
+  selectedMembershipIds: string[];
   excludedMembershipIds: string[];
   includedMembershipIds: string[];
   sendMode: ManualNotificationSendMode;
+};
+
+export type HostNotificationPolicyResponse = {
+  sessionReminderEnabled: boolean;
+  updatedAt: string | null;
+};
+
+export type UpdateHostNotificationPolicyRequest = {
+  sessionReminderEnabled: boolean;
 };
 
 export type ManualNotificationPreviewRequest = ManualNotificationSelectionRequest;
@@ -499,21 +515,11 @@ export type HostSessionRecordLedgerPage = HostSessionListPage & {
 
 export type HostSessionVisibilityRequest = {
   visibility: SessionRecordVisibility;
-  previewId?: string | null;
-  notificationDecision?: NotificationDecision | null;
 };
 
-export type HostSessionVisibilityPreviewRequest = {
-  visibility: SessionRecordVisibility;
-};
-
-export type HostSessionVisibilityPreviewResponse = {
-  previewId: string;
-  targetCount: number;
-  expectedInAppCount: number;
-  expectedEmailCount: number;
-  excludedCount: number;
-  expiresAt: string;
+export type HostSessionVisibilityUpdateResult = {
+  session: HostSessionDetailResponse;
+  composer: HostNotificationComposerContext | null;
 };
 
 export type HostSessionPublication = {
@@ -693,14 +699,12 @@ export type HostAttendanceUpdate = {
 export type HostClubOperationsResponse = HostClubOperationsSnapshot;
 
 // ---------------------------------------------------------------------------
-// Zod runtime validators — DEV-only, tree-shaken from production bundle.
-// Each schema constant is wrapped in `import.meta.env.DEV ? ... : null as never`
-// so Rollup dead-code-eliminates all z.* references in production, allowing
-// the `import { z } from "zod"` import to be tree-shaken from the bundle.
+// Zod runtime validators. Most read-only schemas remain DEV-only and are
+// tree-shaken from production. Visibility mutation responses are validated in
+// every environment before their composer context reaches route state.
 // ---------------------------------------------------------------------------
 
-export const HostSessionDetailResponseSchema = import.meta.env.DEV
-  ? z.object({
+export const HostSessionDetailResponseSchema = z.object({
       sessionId: z.string(),
       sessionNumber: z.number(),
       title: z.string(),
@@ -738,8 +742,20 @@ export const HostSessionDetailResponseSchema = import.meta.env.DEV
         fileName: z.string().nullable(),
         uploadedAt: z.string().nullable(),
       }),
-    })
-  : (null as never);
+    });
+
+export const HostSessionVisibilityUpdateResponseSchema = z.object({
+      session: HostSessionDetailResponseSchema,
+      composer: z.object({
+        sessionId: z.string(),
+        eventType: z.enum([
+          "NEXT_BOOK_PUBLISHED",
+          "FEEDBACK_DOCUMENT_PUBLISHED",
+          "SESSION_RECORD_UPDATED",
+        ]),
+        contentRevision: z.string(),
+      }).strict().nullable(),
+    }).strict();
 
 export const HostNotificationDeliveryListResponseSchema = import.meta.env.DEV
   ? z.object({
@@ -824,6 +840,7 @@ export const HostInvitationListPageSchema = import.meta.env.DEV
 
 // Type aliases — erased at build time, z.infer<> resolves from the truthy branch
 export type HostSessionDetailResponseParsed = z.infer<typeof HostSessionDetailResponseSchema>;
+export type HostSessionVisibilityUpdateResponseParsed = z.infer<typeof HostSessionVisibilityUpdateResponseSchema>;
 export type HostNotificationDeliveryListResponseParsed = z.infer<typeof HostNotificationDeliveryListResponseSchema>;
 export type HostInvitationListPageParsed = z.infer<typeof HostInvitationListPageSchema>;
 export type SessionImportPreviewResponseParsed = z.infer<typeof SessionImportPreviewResponseSchema>;

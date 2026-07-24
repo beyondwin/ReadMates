@@ -1,10 +1,13 @@
 package com.readmates.sessionrecord.application.port.out
 
+import com.readmates.notification.domain.NotificationEventType
+import com.readmates.sessionrecord.application.model.ApplySessionRecordCommand
 import com.readmates.sessionrecord.application.model.CompletedSessionRecordApply
 import com.readmates.sessionrecord.application.model.EncodedSessionRecordSnapshot
 import com.readmates.sessionrecord.application.model.LiveSessionRecord
 import com.readmates.sessionrecord.application.model.RestoreSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.SaveSessionRecordDraftCommand
+import com.readmates.sessionrecord.application.model.SessionRecordApplyReceipt
 import com.readmates.sessionrecord.application.model.SessionRecordDraft
 import com.readmates.sessionrecord.application.model.SessionRecordEditor
 import com.readmates.sessionrecord.application.model.SessionRecordRevision
@@ -22,6 +25,21 @@ interface SessionRecordStorePort {
         host: AuthenticatedClubActor,
         previewId: UUID,
     ): CompletedSessionRecordApply?
+
+    fun findApplyReceipt(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+        applyRequestId: UUID,
+        forUpdate: Boolean = false,
+    ): SessionRecordApplyReceipt? = null
+
+    fun insertApplyReceipt(
+        host: AuthenticatedClubActor,
+        command: ApplySessionRecordCommand,
+        draftSha256: String,
+        composerEventType: NotificationEventType,
+        revision: SessionRecordRevision,
+    ): SessionRecordApplyReceipt
 
     fun insertBaselineIfAbsent(
         host: AuthenticatedClubActor,

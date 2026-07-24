@@ -588,6 +588,26 @@ where session_id in (
     and number >= 7
 );
 
+delete from notification_manual_dispatches
+where club_id = ${sqlString(clubId)}
+  and session_id in (
+    select id from sessions
+    where club_id = ${sqlString(clubId)}
+      and number >= 7
+  );
+
+delete from notification_manual_dispatch_previews
+where club_id = ${sqlString(clubId)}
+  and consumed_event_id in (
+    select id from notification_event_outbox
+    where club_id = ${sqlString(clubId)}
+      and aggregate_id in (
+        select id from sessions
+        where club_id = ${sqlString(clubId)}
+          and number >= 7
+      )
+  );
+
 delete from member_notifications
 where event_id in (
   select id from notification_event_outbox
@@ -619,6 +639,13 @@ where club_id = ${sqlString(clubId)}
   );
 
 delete from session_record_drafts
+where session_id in (
+  select id from sessions
+  where club_id = ${sqlString(clubId)}
+    and number >= 7
+);
+
+delete from session_record_apply_receipts
 where session_id in (
   select id from sessions
   where club_id = ${sqlString(clubId)}
@@ -767,6 +794,7 @@ type E2eResetOptions = {
   invitedEmails?: string[];
   cleanupGeneratedSessions?: boolean;
   cleanupManualNotifications?: boolean;
+  cleanupNotificationPolicy?: boolean;
 };
 
 export function resetE2eState(options: E2eResetOptions) {
@@ -778,6 +806,13 @@ export function resetE2eState(options: E2eResetOptions) {
 
   if (options.cleanupGeneratedSessions) {
     statements.push(cleanupGeneratedSessionsSql());
+  }
+
+  if (options.cleanupNotificationPolicy) {
+    statements.push(`
+delete from club_notification_policies
+where club_id = ${sqlString(clubId)};
+`);
   }
 
   if (options.invitedEmails?.length) {
@@ -794,14 +829,104 @@ export function resetE2eState(options: E2eResetOptions) {
 }
 
 export function countManualNotificationEventsForSession(sessionId: string, eventType: string) {
+  return manualDispatchCount(sessionId, eventType);
+}
+
+export function notificationEventCount(sessionId: string, eventType: string): number {
   const output = runMysql(`
 select count(*) as count
-from notification_manual_dispatches
-where session_id = ${sqlString(sessionId)}
+from notification_event_outbox
+where club_id = ${sqlString(clubId)}
+  and aggregate_id = ${sqlString(sessionId)}
   and event_type = ${sqlString(eventType)};
 `);
   const [, count] = output.trim().split(/\s+/);
   return Number(count ?? 0);
+}
+
+export function manualDispatchCount(
+  sessionId: string,
+  eventType: string,
+  contentRevision?: string,
+): number {
+  const revisionFilter = contentRevision
+    ? `\n  and content_revision = ${sqlString(contentRevision)}`
+    : "";
+  const output = runMysql(`
+select count(*) as count
+from notification_manual_dispatches
+where club_id = ${sqlString(clubId)}
+  and session_id = ${sqlString(sessionId)}
+  and event_type = ${sqlString(eventType)}${revisionFilter};
+`);
+  const [, count] = output.trim().split(/\s+/);
+  return Number(count ?? 0);
+}
+
+export function hostActionDecisionCount(sessionId: string): number {
+  const output = runMysql(`
+select count(*) as count
+from host_action_notification_decisions
+where club_id = ${sqlString(clubId)}
+  and session_id = ${sqlString(sessionId)};
+`);
+  const [, count] = output.trim().split(/\s+/);
+  return Number(count ?? 0);
+}
+
+export function sessionRecordApplyReceiptCount(
+  sessionId: string,
+  applyRequestId?: string,
+): number {
+  const requestFilter = applyRequestId
+    ? `\n  and apply_request_id = ${sqlString(applyRequestId)}`
+    : "";
+  const output = runMysql(`
+select count(*) as count
+from session_record_apply_receipts
+where club_id = ${sqlString(clubId)}
+  and session_id = ${sqlString(sessionId)}${requestFilter};
+`);
+  const [, count] = output.trim().split(/\s+/);
+  return Number(count ?? 0);
+}
+
+export function clubReminderPolicy(targetClubId: string): boolean | null {
+  const output = runMysql(`
+select session_reminder_enabled
+from club_notification_policies
+where club_id = ${sqlString(targetClubId)};
+`);
+  const [, value] = output.trim().split(/\s+/);
+  if (value === undefined) {
+    return null;
+  }
+  return value === "1";
+}
+
+export function readMembershipId(email: string, clubSlug = "reading-sai"): string {
+  const output = runMysql(`
+select memberships.id
+from memberships
+join users on users.id = memberships.user_id
+join clubs on clubs.id = memberships.club_id
+where lower(users.email) = ${sqlString(normalizeEmail(email))}
+  and clubs.slug = ${sqlString(clubSlug)}
+limit 1;
+`);
+  const [, membershipId] = output.trim().split(/\s+/);
+  if (!membershipId) {
+    throw new Error(`Missing E2E membership for ${normalizeEmail(email)} in ${clubSlug}`);
+  }
+  return membershipId;
+}
+
+export function expireManualNotificationPreview(previewId: string) {
+  runMysql(`
+update notification_manual_dispatch_previews
+set expires_at = date_sub(utc_timestamp(6), interval 1 second)
+where id = ${sqlString(previewId)};
+`);
 }
 
 export async function readSessionRecordRevisionCount(sessionId: string): Promise<number> {
@@ -829,15 +954,7 @@ limit 1;
 }
 
 export async function readNotificationEventCount(sessionId: string, eventType: string): Promise<number> {
-  const output = runMysql(`
-select count(*) as count
-from notification_event_outbox
-where club_id = ${sqlString(clubId)}
-  and aggregate_id = ${sqlString(sessionId)}
-  and event_type = ${sqlString(eventType)};
-`);
-  const [, count] = output.trim().split(/\s+/);
-  return Number(count ?? 0);
+  return notificationEventCount(sessionId, eventType);
 }
 
 export function materializeManualReminderInAppNotifications() {

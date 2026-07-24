@@ -428,6 +428,32 @@ check_internal_tempo_release_contract() {
   done
 }
 
+check_omitted_contributor_instruction_references() {
+  [[ "$mode" == "candidate" ]] || return 0
+
+  local instruction_files=(
+    "README.md"
+    "docs/development/README.md"
+    "docs/development/project-map.md"
+    "scripts/README.md"
+  )
+  local relative_path file line_number line
+
+  for relative_path in "${instruction_files[@]}"; do
+    file="$source_abs/$relative_path"
+    [[ -f "$file" ]] || continue
+
+    while IFS=: read -r line_number line; do
+      record_finding "artifact instruction references omitted contributor path: $relative_path:$line_number: $line"
+    done < <(
+      grep -nE \
+        'AGENTS[.]md|docs/agents/|scripts/agent-preflight[.]py|scripts/check-agent-guidance[.]py' \
+        "$file" ||
+        true
+    )
+  done
+}
+
 run_targeted_content_checks() {
   run_content_check "private key block" '-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----'
   run_content_check "OCI OCID" 'ocid1[.][a-z0-9][a-z0-9._-]{16,}'
@@ -481,6 +507,7 @@ fi
 run_targeted_content_checks
 scan_observability_targets
 check_internal_tempo_release_contract
+check_omitted_contributor_instruction_references
 if [[ -x "$source_abs/scripts/validate-production-ai-config.sh" ]]; then
   "$source_abs/scripts/validate-production-ai-config.sh" "$source_abs"
 else

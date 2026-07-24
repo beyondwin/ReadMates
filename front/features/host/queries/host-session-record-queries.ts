@@ -13,7 +13,9 @@ import {
 } from "@/features/host/api/host-session-record-api";
 import type {
   HostSessionLedgerRequest,
+  HostSessionRecordApplyPreview,
   HostSessionRecordApplyRequest,
+  HostSessionRecordApplyResult,
   HostSessionRecordDraft,
   HostSessionRecordEditor,
   PreviewHostSessionRecordApplyRequest,
@@ -125,7 +127,14 @@ export function useDeleteHostSessionRecordDraftMutation(context?: ReadmatesApiCo
 }
 
 export function usePreviewHostSessionRecordApplyMutation(context?: ReadmatesApiContext) {
-  return useMutation({
+  return useMutation<
+    HostSessionRecordApplyPreview,
+    Error,
+    {
+      sessionId: string;
+      request: PreviewHostSessionRecordApplyRequest;
+    }
+  >({
     mutationFn: ({ sessionId, request }: {
       sessionId: string;
       request: PreviewHostSessionRecordApplyRequest;
@@ -164,7 +173,14 @@ export function useApplyHostSessionRecordMutation(
   }) => Promise<unknown>,
 ) {
   const client = useQueryClient();
-  return useMutation({
+  return useMutation<
+    HostSessionRecordApplyResult,
+    Error,
+    {
+      sessionId: string;
+      request: HostSessionRecordApplyRequest;
+    }
+  >({
     mutationFn: ({ sessionId, request }: {
       sessionId: string;
       request: HostSessionRecordApplyRequest;

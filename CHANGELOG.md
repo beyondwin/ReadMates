@@ -8,9 +8,16 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Highlights
 
+- 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
+
+## v2.0.0 - 2026-07-23
+
+### Highlights
+
 - **근거 기반 전체 대본 AI 세션 기록:** 호스트가 지원 TXT를 업로드하면 provider 호출 전에 모든 화자를 같은 클럽의 활성 회원과 정확히 맞추고, 전체 대본 한 번의 structured generation으로 네 섹션과 근거 turn ID를 만듭니다. 호스트는 desktop/mobile 근거 panel과 네 섹션 review ledger를 모두 확인한 뒤에만 저장할 수 있습니다.
 - **Spring AI 2 + distributed tracing:** OpenAI/Anthropic/Google 직접 adapter와 legacy pipeline을 제거하고 grounded-only Spring AI 2.0 thin adapter로 통합했습니다. API→Kafka→worker→Spring AI→provider trace를 internal Tempo/Grafana에 연결하되 AI content와 user/session/club identity는 observability 표면에서 제외합니다.
 - **호스트 세션 기록 revision workflow:** `/app/host/sessions` 장부에서 과거 회차를 찾고 기본 정보·출석을 즉시 저장하며, 공개 기록은 공통 초안에서 검토한 뒤 immutable revision으로 적용하거나 과거 revision을 새 초안으로 복원할 수 있습니다.
+- **명시적 호스트 알림 composer:** 다음 책·피드백 문서·세션 기록 콘텐츠 변경은 알림을 자동 발송하지 않습니다. 호스트는 변경 완료 뒤 열린 composer에서 대상과 채널을 확인하고 preview/confirm을 거쳐 별도로 발송하며, 선택 회원 발송과 opt-in 예약 리마인더 정책을 사용할 수 있습니다.
 
 ### Changed
 
@@ -24,8 +31,10 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - **AI 호출·비용 경계:** application-owned coordinator가 circuit/concurrency permit, single-node Redis atomic slot + worst-case cost reservation, 정확히 한 번의 provider HTTP, `ACTUAL`/`ESTIMATED_UNKNOWN` reconciliation을 순서대로 수행합니다. Retry/fallback/schema correction/grounding repair/regeneration은 모두 최대 3회 물리 호출 예산을 공유하고 redelivery/crash의 uncertain cost를 자동 환불하지 않습니다.
 - **Token/API compatibility:** 내부 비용은 non-cached input/cache-write/cache-read/output 4채널로 계산하지만 public REST response는 기존 input/cachedInput/output 3필드를 유지합니다.
 - **Trace/privacy/ops:** Spring Kafka observation과 Micrometer/OpenTelemetry OTLP를 활성화하고 7일 Tempo, Grafana datasource/exemplar, provider/cost-basis/circuit/exporter metric/alert를 추가했습니다. Local port는 loopback-only이고 OCI app은 `tempo:4318` internal DNS로 export하며 Tempo/OTLP host port는 publish하지 않습니다. Production config sync는 Google paid-tier 확인을 기본 `false`로 렌더링해 미확인 Gemini rollout을 fail closed합니다.
-- **호스트 작업 알림 확인:** 다음 책 공개, 첫 피드백 공개, 이후 기록 수정은 capability가 켜진 환경에서 기본 선택 없는 `SEND`/`SKIP` 확인을 요구합니다. preview 만료·대상 변경·stale revision·중복 요청은 fail closed하고, SEND 이벤트는 notification ledger에서 `HOST_CONFIRMED`로 구분합니다. 예약 리마인더, 멤버 서평, AI ready 자동 흐름은 기존 gate를 유지합니다.
-- **공통 기록 초안:** 수동 편집, 외부 JSON, AI 결과는 모두 live record를 직접 바꾸지 않고 같은 staged draft에 저장됩니다. 적용 작업만 콘텐츠, immutable revision, 결정 ledger, 선택적인 outbox event를 원자적으로 갱신합니다.
+- **호스트 알림 발송 분리:** 다음 책 공개, 피드백 문서·세션 기록 final live apply는 legacy 호스트 결정 ledger나 outbox row를 만들지 않습니다. 외부 JSON import와 AI commit은 draft만 저장하고 composer를 반환하거나 열지 않습니다. 이후 composer가 현재 `contentRevision`을 고정해 options → preview → confirm 순서로 수동 dispatch와 outbox를 만들고, stale/만료/중복/클럽 밖 수신자는 fail closed합니다.
+- **공통 기록 초안과 적용 receipt:** 수동 편집, 외부 JSON, AI 결과는 모두 live record를 직접 바꾸지 않고 같은 staged draft에 저장됩니다. final apply는 호스트가 제공한 `applyRequestId`와 draft hash를 검증해 콘텐츠·immutable revision·idempotent apply receipt를 원자적으로 갱신하고, 그 때만 발송 가능한 composer context를 반환합니다.
+- **호스트 피드백 preview:** host-only preview는 staged draft가 아니라 `session_feedback_documents`의 최신 live 문서를 읽습니다. `OPEN` 세션도 현재 live 문서가 있으면 `FEEDBACK_DOCUMENT_PUBLISHED` manual options → preview → confirm을 사용할 수 있으며, member/public 피드백 문서는 기존 열람 권한을 따릅니다.
+- **알림 대상과 리마인더 정책:** 다음 책과 리마인더의 기본 대상은 `ALL_ACTIVE_MEMBERS`, 피드백 문서와 세션 기록의 기본 대상은 `CONFIRMED_ATTENDEES`이며 기본 채널은 모두 `BOTH`입니다. `SELECTED_MEMBERS`는 호스트가 명시적으로 선택해야 하고 현재 클럽의 중복 없는 활성 membership ID를 한 명 이상 요구합니다. 예약 리마인더는 클럽별 정책이 명시적으로 켜진 경우에만 scheduler가 outbox row를 만들며, 정책 row가 없으면 꺼짐입니다.
 - **의존성 보안:** 전이 의존성 `brace-expansion`을 DoS 취약점이 수정된 `5.0.7` 이상으로 강제합니다.
 
 ### Database
@@ -33,14 +42,17 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - **Flyway V37:** content-free `ai_generation_commit_receipts`(`job_id + revision` unique)를 추가하고 `ai_generation_audit_log`에 pipeline/turn/speaker/grounding/review aggregate column을 추가했습니다. Rolling deploy 동안 구 server가 읽지 못하는 값으로 기존 row를 재작성하지 않으며, 새 server가 저장된 `gemini-3-flash` 기본값을 canonical `gemini-3-flash-preview`로 해석합니다. Transcript, member name, result, evidence/excerpt는 MySQL에 저장하지 않습니다.
 - **Flyway V38:** `ai_generation_audit_log`에 nullable trace ID, provider attempt ordinal/call mode, non-null cost basis와 cache-write input token을 additive하게 추가했습니다. 기존 business-audit identity는 유지하지만 prompt/completion/transcript/evidence/raw error는 저장하지 않습니다.
 - **Flyway V39–V41:** 세션 기록 draft/revision, metadata-only 변경 audit, 호스트 작업 preview/decision ledger를 추가하고 AI commit receipt와 draft를 session metadata 및 revision에 안전하게 결속합니다. 저장되는 audit/ledger는 변경 필드·식별자·집계값 중심이며 transcript, AI evidence, 이메일 원문, credential은 저장하지 않습니다.
+- **Flyway V42:** idempotent `session_record_apply_receipts`와 opt-in `club_notification_policies`를 추가하고, 수동 dispatch에 nullable `content_revision`과 `SELECTED_MEMBERS` audience를 forward-only로 확장합니다. V39–V41은 변경하지 않으며 기존 수동 dispatch row는 nullable revision으로 호환됩니다.
 
 ### Deployment Notes
 
+- `v2.0.0` major release 준비입니다. 기존 SEND/SKIP mutation 계약을 제거한 새 frontend/server API 조합은 이전 frontend 또는 server와 장기간 혼용할 수 없으므로 호환 쌍을 같은 release commit에서 배포해야 합니다. 이 섹션은 2026-07-23 로컬 문서 준비이며 tag, GitHub Release, push, production deploy가 수행됐다는 뜻이 아닙니다.
 - Legacy/direct provider 실행과 runtime selector는 없습니다. 활성화 전에 provider allowlist/key, capability, Google paid-tier retention 확인, mock-wire/E2E, single-node Redis 전제를 검증합니다. Kafka max poll interval 기본값은 세 번의 4분 요청과 bounded delay/validation margin을 포함해 16분입니다.
 - Transcript/turns/result/evidence는 6시간 Redis payload로만 유지하고 commit/cancel 후 삭제합니다. MySQL receipt와 Redis revision/lease로 crash window를 복구하며 `COMMITTED + cleanupPending`은 DB write를 반복하지 않고 cleanup만 재시도합니다. Platform admin은 metadata-only 복구만 수행합니다.
 - Rollback은 AI/consumer를 먼저 끄고 6시간 AI TTL을 기다린 뒤 이전 image로 복원합니다. 승인된 job namespace cleanup만 허용하며 Redis 전체 flush나 V38 destructive rollback은 금지합니다.
 - Private transcript를 live provider로 보내는 품질 평가, production mode 변경, deploy는 별도 명시 승인 없이 실행하지 않습니다.
-- 세션 기록 draft와 호스트 작업 알림 확인 capability의 운영 기본값은 꺼져 있습니다. Flyway migration과 호환 server/frontend 배포를 마친 뒤 별도 운영 승인으로만 활성화하며, 이 변경 자체는 production capability를 켜거나 실제 알림을 발송하지 않습니다.
+- `readmates.host-action-confirmation.required`는 staged session-record capability 노출만 제어하며 알림 dispatch를 다시 결합하지 않습니다. 알림은 호스트의 manual composer confirm 또는 명시적으로 켠 클럽 리마인더 정책에서만 outbox에 기록됩니다.
+- V42는 forward-only migration입니다. DB backup과 migration diff를 확인하고 V42 적용을 완료한 뒤 호환 server/frontend를 배포하며, rollback은 V42 schema를 남긴 채 이전 호환 image로 전환합니다. 이 변경 자체는 production 정책을 켜거나 실제 알림을 발송하지 않습니다.
 
 ## v1.17.3 - 2026-07-12
 

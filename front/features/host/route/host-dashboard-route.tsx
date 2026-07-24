@@ -6,7 +6,7 @@
 // - appendedHostSessions: KEPT (transient pagination buffer).
 // - locallyOpenedSessionId: KEPT (transient UX state).
 // - pendingUpcomingAction / upcomingMessage: KEPT (pure UI affordances).
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useLoaderData, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import HostDashboard, { type HostDashboardLinkComponent } from "@/features/host/ui/host-dashboard";
@@ -22,16 +22,17 @@ import {
   hostDashboardQuery,
   hostSessionListQuery,
   useOpenHostSessionMutation,
-  usePreviewHostSessionVisibilityMutation,
   useSaveHostSessionVisibilityMutation,
 } from "@/features/host/queries/host-session-queries";
 import {
-  hostSessionRecordCapabilitiesQuery,
   hostSessionRecordLedgerQuery,
 } from "@/features/host/queries/host-session-record-queries";
 import type { ReadmatesApiContext } from "@/shared/api/client";
-import { apiErrorFromResponse } from "@/shared/api/errors";
 import { hostDashboardActions, type HostDashboardRouteData } from "./host-dashboard-data";
+import {
+  HostNotificationComposerController,
+  type HostNotificationComposerRequest,
+} from "./host-notification-composer-controller";
 
 function contextFromClubSlug(clubSlug?: string): ReadmatesApiContext {
   return { clubSlug };
@@ -58,9 +59,9 @@ export function HostDashboardRoute({
   const notificationsQuery = useQuery(hostNotificationSummaryQuery(context));
   const clubOperationsQuery = useQuery(hostClubOperationsQuery(context));
   const visibilityMutation = useSaveHostSessionVisibilityMutation(context);
-  const visibilityPreviewMutation = usePreviewHostSessionVisibilityMutation(context);
   const openMutation = useOpenHostSessionMutation(context);
-  const capabilitiesQuery = useQuery(hostSessionRecordCapabilitiesQuery(context));
+  const [composerRequest, setComposerRequest] =
+    useState<HostNotificationComposerRequest | null>(null);
   const recordAttentionQuery = useQuery(hostSessionRecordLedgerQuery({
     needsAttention: true,
     page: { limit: 3 },
@@ -69,12 +70,15 @@ export function HostDashboardRoute({
 
   const actions = useMemo<HostDashboardActions>(() => ({
     updateCurrentSessionParticipation: hostDashboardActions.updateCurrentSessionParticipation,
-    previewSessionVisibility: (sessionId, visibility) =>
-      visibilityPreviewMutation.mutateAsync({ sessionId, request: { visibility } }),
     updateSessionVisibility: async (sessionId, request) => {
-      const response = await visibilityMutation.mutateAsync({ sessionId, request });
-      if (!response.ok) {
-        throw await apiErrorFromResponse(response);
+      const result = await visibilityMutation.mutateAsync({ sessionId, request });
+      if (result.composer) {
+        setComposerRequest({
+          sessionId: result.composer.sessionId,
+          eventType: result.composer.eventType,
+          contentRevision: result.composer.contentRevision,
+          origin: "FIRST_PUBLICATION",
+        });
       }
     },
     openSession: async (sessionId) => {
@@ -84,7 +88,7 @@ export function HostDashboardRoute({
       }
     },
     loadHostSessions: (page) => queryClient.fetchQuery(hostSessionListQuery(page, context)),
-  }), [context, openMutation, queryClient, visibilityMutation, visibilityPreviewMutation]);
+  }), [context, openMutation, queryClient, visibilityMutation]);
 
   return (
     <>
@@ -113,12 +117,14 @@ export function HostDashboardRoute({
                 }
         }
         actions={actions}
-        hostActionNotificationConfirmationRequired={
-          capabilitiesQuery.data?.hostActionNotificationConfirmationRequired ?? false
-        }
         LinkComponent={LinkComponent}
         hostDashboardReturnTarget={hostDashboardReturnTarget}
         readmatesReturnState={readmatesReturnState}
+      />
+      <HostNotificationComposerController
+        request={composerRequest}
+        context={context}
+        onClose={() => setComposerRequest(null)}
       />
       {clubSlug ? (
         <section className="container" style={{ padding: "0 0 48px" }}>

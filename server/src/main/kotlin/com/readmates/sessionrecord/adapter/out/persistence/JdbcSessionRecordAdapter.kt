@@ -1,11 +1,14 @@
 package com.readmates.sessionrecord.adapter.out.persistence
 
 import com.readmates.notification.application.model.NotificationDecision
+import com.readmates.notification.domain.NotificationEventType
 import com.readmates.session.application.SessionRecordVisibility
+import com.readmates.sessionrecord.application.model.ApplySessionRecordCommand
 import com.readmates.sessionrecord.application.model.CompletedSessionRecordApply
 import com.readmates.sessionrecord.application.model.EncodedSessionRecordSnapshot
 import com.readmates.sessionrecord.application.model.LiveSessionRecord
 import com.readmates.sessionrecord.application.model.SaveSessionRecordDraftCommand
+import com.readmates.sessionrecord.application.model.SessionRecordApplyReceipt
 import com.readmates.sessionrecord.application.model.SessionRecordDraft
 import com.readmates.sessionrecord.application.model.SessionRecordDraftSource
 import com.readmates.sessionrecord.application.model.SessionRecordEditor
@@ -93,6 +96,79 @@ class JdbcSessionRecordAdapter(
                 host.clubId.dbString(),
                 host.membershipId.dbString(),
             ).firstOrNull()
+
+    override fun findApplyReceipt(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+        applyRequestId: UUID,
+        forUpdate: Boolean,
+    ): SessionRecordApplyReceipt? =
+        jdbcTemplate
+            .query(
+                """
+                select a.apply_request_id,
+                       a.host_membership_id,
+                       a.expected_draft_revision,
+                       a.expected_live_revision,
+                       a.draft_sha256,
+                       a.composer_event_type,
+                       r.id, r.session_id, r.club_id, r.version, r.source, r.restored_from_revision_id,
+                       r.snapshot_json, r.applied_by_membership_id, r.applied_at
+                from session_record_apply_receipts a
+                join session_record_revisions r
+                  on r.id = a.revision_id
+                 and r.club_id = a.club_id
+                 and r.session_id = a.session_id
+                where a.club_id = ?
+                  and a.session_id = ?
+                  and a.apply_request_id = ?
+                ${if (forUpdate) "for update" else ""}
+                """.trimIndent(),
+                { rs, _ ->
+                    SessionRecordApplyReceipt(
+                        applyRequestId = rs.uuid("apply_request_id"),
+                        hostMembershipId = rs.uuid("host_membership_id"),
+                        expectedDraftRevision = rs.getLong("expected_draft_revision"),
+                        expectedLiveRevision = rs.getLong("expected_live_revision"),
+                        draftSha256 = rs.getString("draft_sha256"),
+                        composerEventType = NotificationEventType.valueOf(rs.getString("composer_event_type")),
+                        revision = revision(rs),
+                    )
+                },
+                host.clubId.dbString(),
+                sessionId.dbString(),
+                applyRequestId.dbString(),
+            ).singleOrNull()
+
+    override fun insertApplyReceipt(
+        host: AuthenticatedClubActor,
+        command: ApplySessionRecordCommand,
+        draftSha256: String,
+        composerEventType: NotificationEventType,
+        revision: SessionRecordRevision,
+    ): SessionRecordApplyReceipt {
+        val applyRequestId = requireNotNull(command.applyRequestId)
+        jdbcTemplate.update(
+            """
+            insert into session_record_apply_receipts (
+              id, apply_request_id, club_id, session_id, host_membership_id,
+              expected_draft_revision, expected_live_revision, draft_sha256,
+              composer_event_type, revision_id
+            ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """.trimIndent(),
+            UUID.randomUUID().dbString(),
+            applyRequestId.dbString(),
+            host.clubId.dbString(),
+            command.sessionId.dbString(),
+            host.membershipId.dbString(),
+            command.expectedDraftRevision,
+            command.expectedLiveRevision,
+            draftSha256,
+            composerEventType.name,
+            revision.id.dbString(),
+        )
+        return requireNotNull(findApplyReceipt(host, command.sessionId, applyRequestId))
+    }
 
     override fun insertBaselineIfAbsent(
         host: AuthenticatedClubActor,

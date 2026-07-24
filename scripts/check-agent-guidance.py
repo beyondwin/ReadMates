@@ -25,7 +25,7 @@ PRIVATE_GUIDANCE_SOURCE_PATHS = (
     "scripts/check-agent-guidance.py",
     "scripts/agent-preflight.py",
 )
-PUBLIC_AGENT_GUIDE_PATHS = (
+CONTRIBUTOR_ONLY_GUIDANCE_PATHS = (
     "docs/agents/execution.md",
     "docs/agents/front.md",
     "docs/agents/server.md",
@@ -228,7 +228,7 @@ def make_valid_fixture(root: Path) -> None:
     write(
         root,
         "scripts/build-public-release-candidate.sh",
-        "".join(f'copy_required_file "{relative}"\n' for relative in PUBLIC_AGENT_GUIDE_PATHS),
+        "# Contributor-only agent guidance is intentionally omitted.\n",
     )
     write(root, "CLAUDE.md", "@AGENTS.md\n")
     write(root, "front/CLAUDE.md", "@AGENTS.md\n")
@@ -455,11 +455,15 @@ def check_public_guidance_manifest(root: Path) -> list[str]:
     if not path.is_file():
         return []
     text = path.read_text(encoding="utf-8")
-    errors = [
-        f"public guidance manifest missing explicit required file: {relative}"
-        for relative in PUBLIC_AGENT_GUIDE_PATHS
-        if f'copy_required_file "{relative}"' not in text
-    ]
+    errors = []
+    for relative in CONTRIBUTOR_ONLY_GUIDANCE_PATHS:
+        if (
+            f'copy_required_file "{relative}"' in text
+            or f'copy_optional_file "{relative}"' in text
+        ):
+            errors.append(
+                f"public guidance manifest must omit contributor-only file: {relative}"
+            )
     if 'copy_dir "docs/agents"' in text:
         errors.append("public guidance manifest must not copy the docs/agents directory")
     return errors
@@ -731,7 +735,7 @@ class GuidanceCheckerTests(unittest.TestCase):
         )
         self.assertTrue(any("private guidance source guard" in error for error in errors), errors)
 
-    def test_public_guidance_manifest_requires_explicit_files(self) -> None:
+    def test_public_guidance_manifest_rejects_contributor_files(self) -> None:
         errors = self.check_fixture(
             lambda root: write(
                 root,
@@ -739,7 +743,10 @@ class GuidanceCheckerTests(unittest.TestCase):
                 'copy_required_file "docs/agents/execution.md"\n',
             )
         )
-        self.assertTrue(any("public guidance manifest" in error for error in errors), errors)
+        self.assertTrue(
+            any("must omit contributor-only file" in error for error in errors),
+            errors,
+        )
 
     def test_public_guidance_manifest_rejects_directory_copy(self) -> None:
         errors = self.check_fixture(

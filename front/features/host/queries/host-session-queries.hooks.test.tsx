@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { HostSessionRequest, SessionImportRequest } from "@/features/host/api/host-contracts";
+import { hostNotificationKeys } from "./host-notification-queries";
 
 vi.mock("@/features/host/api/host-api", () => ({
   closeHostSession: vi.fn(),
@@ -82,6 +83,41 @@ const importRequest: SessionImportRequest = {
   },
   recordVisibility: "MEMBER",
 };
+
+function visibilityResult() {
+  return {
+    session: {
+      sessionId: "session-7",
+      sessionNumber: 7,
+      title: "함께 읽기",
+      bookTitle: "모비 딕",
+      bookAuthor: "허먼 멜빌",
+      bookLink: null,
+      bookImageUrl: null,
+      date: "2026-07-23",
+      startTime: "19:00",
+      endTime: "21:00",
+      questionDeadlineAt: "2026-07-22T23:59:00+09:00",
+      locationLabel: "온라인",
+      meetingUrl: null,
+      meetingPasscode: null,
+      publication: null,
+      state: "OPEN" as const,
+      attendees: [],
+      feedbackDocument: {
+        uploaded: false,
+        fileName: null,
+        uploadedAt: null,
+      },
+      visibility: "MEMBER" as const,
+    },
+    composer: {
+      sessionId: "session-7",
+      eventType: "NEXT_BOOK_PUBLISHED" as const,
+      contentRevision: "b".repeat(64),
+    },
+  };
+}
 
 beforeEach(() => {
   vi.mocked(createHostSession).mockReset();
@@ -218,22 +254,39 @@ describe("host session mutation hooks", () => {
     }
   });
 
-  it("invalidates detail, lists, and dashboard after visibility save", async () => {
-    vi.mocked(saveHostSessionVisibility).mockResolvedValue(new Response("{}", { status: 200 }) as never);
+  it("returns the visibility composer result and caches the updated session", async () => {
+    vi.mocked(saveHostSessionVisibility).mockResolvedValue(visibilityResult());
     const { client, Wrapper } = createWrapper();
+    const detailKey = hostSessionKeys.detail("session-7", { clubSlug: "reading-sai" });
+    const manualOptionsKey = hostNotificationKeys.manualOptions(
+      { sessionId: "session-7", page: { limit: 50 } },
+      { clubSlug: "reading-sai" },
+    );
+    client.setQueryDefaults(detailKey, { gcTime: Number.POSITIVE_INFINITY });
+    client.setQueryData(manualOptionsKey, { contentRevision: "stale-before-publication" });
     const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    const removeSpy = vi.spyOn(client, "removeQueries");
     const { result } = renderHook(() => useSaveHostSessionVisibilityMutation({ clubSlug: "reading-sai" }), { wrapper: Wrapper });
 
+    let mutationResult: ReturnType<typeof visibilityResult> | undefined;
     await act(async () => {
-      await result.current.mutateAsync({ sessionId: "session-7", request: { visibility: "MEMBER" } });
+      mutationResult = await result.current.mutateAsync({
+        sessionId: "session-7",
+        request: { visibility: "MEMBER" },
+      });
     });
 
+    expect(mutationResult).toEqual(visibilityResult());
     expect(saveHostSessionVisibility).toHaveBeenCalledWith(
       "session-7",
       { visibility: "MEMBER" },
       { clubSlug: "reading-sai" },
     );
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.detail("session-7", { clubSlug: "reading-sai" }) });
+    expect(client.getQueryData(detailKey)).toEqual(visibilityResult().session);
+    expect(client.getQueryData(manualOptionsKey)).toBeUndefined();
+    expect(removeSpy).toHaveBeenCalledWith({
+      queryKey: hostNotificationKeys.manualOptionsRoot({ clubSlug: "reading-sai" }),
+    });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.lists({ clubSlug: "reading-sai" }) });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.dashboard({ clubSlug: "reading-sai" }) });
   });
@@ -277,7 +330,7 @@ describe("host session mutation hooks", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.current({ clubSlug: "reading-sai" }) });
   });
 
-  it("invalidates the full host session surface after import commit", async () => {
+  it("invalidates record-only session surfaces after import commit", async () => {
     vi.mocked(commitHostSessionImport).mockResolvedValue({
       sessionId: "session-7",
       draftRevision: 2,
@@ -297,6 +350,8 @@ describe("host session mutation hooks", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.lists({ clubSlug: "reading-sai" }) });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.dashboard({ clubSlug: "reading-sai" }) });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.current({ clubSlug: "reading-sai" }) });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.manualDispatchesRoot({ clubSlug: "reading-sai" }) });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({
+      queryKey: hostSessionKeys.manualDispatchesRoot({ clubSlug: "reading-sai" }),
+    });
   });
 });

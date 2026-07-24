@@ -1,6 +1,5 @@
 package com.readmates.session.application.model
 
-import com.readmates.notification.application.model.NotificationDecision
 import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.shared.security.CurrentMember
 import java.util.UUID
@@ -33,14 +32,6 @@ data class UpdateHostSessionCommand(
 )
 
 data class UpdateHostSessionVisibilityCommand(
-    val host: CurrentMember,
-    val sessionId: UUID,
-    val visibility: SessionRecordVisibility,
-    val previewId: UUID? = null,
-    val notificationDecision: NotificationDecision? = null,
-)
-
-data class PreviewHostSessionVisibilityCommand(
     val host: CurrentMember,
     val sessionId: UUID,
     val visibility: SessionRecordVisibility,

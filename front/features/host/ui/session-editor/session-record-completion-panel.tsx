@@ -79,6 +79,7 @@ export function SessionRecordCompletionPanel({
       <div className="stack" style={{ "--stack": "14px" } as CSSProperties}>
         <FeedbackDocumentStatusView
           sessionId={sessionId}
+          clubSlug={clubSlug}
           feedbackDocument={feedbackDocument}
           previewState={previewState}
           LinkComponent={LinkComponent}
@@ -116,11 +117,13 @@ export function SessionRecordCompletionPanel({
 
 function FeedbackDocumentStatusView({
   sessionId,
+  clubSlug,
   feedbackDocument,
   previewState,
   LinkComponent,
 }: {
   sessionId: string | undefined;
+  clubSlug: string | undefined;
   feedbackDocument: FeedbackDocumentStatus;
   previewState?: ReadmatesReturnState;
   LinkComponent: ComponentType<FeedbackPreviewLinkProps>;
@@ -140,15 +143,22 @@ function FeedbackDocumentStatusView({
         {feedbackDocument.uploaded ? (
           <LinkComponent
             className="btn btn-quiet btn-sm"
-            to={`/app/feedback/${encodeURIComponent(sessionId)}`}
+            to={hostFeedbackDocumentPreviewPath(clubSlug, sessionId)}
             state={previewState}
           >
-            미리보기
+            피드백 문서 미리보기
           </LinkComponent>
         ) : null}
       </div>
     </div>
   );
+}
+
+function hostFeedbackDocumentPreviewPath(clubSlug: string | undefined, sessionId: string) {
+  const appPath = clubSlug
+    ? `/clubs/${encodeURIComponent(clubSlug)}/app`
+    : "/app";
+  return `${appPath}/host/sessions/${encodeURIComponent(sessionId)}/feedback-document`;
 }
 
 function ModeTabs({

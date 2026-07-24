@@ -6,19 +6,23 @@ import type { LoaderFunctionArgs } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { hostNotificationsLoaderFactory } from "@/features/host/route/host-notifications-data";
 import { HostNotificationsRoute } from "@/features/host/route/host-notifications-route";
+import { combineManualOptions } from "@/features/host/route/host-notifications-route-model";
 import {
   hostNotificationAuditQuery,
   hostNotificationDeliveriesQuery,
   hostNotificationEventsQuery,
   hostNotificationManualDispatchesQuery,
   hostNotificationManualOptionsQuery,
+  hostNotificationPolicyQuery,
   hostNotificationSessionsQuery,
   hostNotificationSummaryQuery,
 } from "@/features/host/queries/host-notification-queries";
 import { HostNotificationsPage } from "@/features/host/ui/host-notifications-page";
+import { ManualNotificationWorkbench } from "@/features/host/ui/notifications/manual-notification-workbench";
 import type {
   HostNotificationDeliveryItem,
   HostNotificationEventItem,
+  HostNotificationPolicyResponse,
   HostNotificationSummary,
   HostSessionListItem,
   ManualNotificationConfirmRequest,
@@ -187,6 +191,8 @@ function renderPage({
   onConfirmManual = vi.fn().mockResolvedValue(undefined),
   onLoadManualOptions = vi.fn().mockResolvedValue(manualOptions),
   onLoadMoreManualMembers = vi.fn().mockResolvedValue(manualOptions),
+  policy = { sessionReminderEnabled: false, updatedAt: null },
+  onPolicyChange = vi.fn().mockResolvedValue(undefined),
 }: {
   summaryData?: HostNotificationSummary;
   events?: HostNotificationEventItem[];
@@ -206,6 +212,8 @@ function renderPage({
   onConfirmManual?: (request: ManualNotificationConfirmRequest) => Promise<unknown>;
   onLoadManualOptions?: (sessionId?: string, search?: string) => Promise<ManualNotificationOptionsResponse>;
   onLoadMoreManualMembers?: () => Promise<ManualNotificationOptionsResponse>;
+  policy?: HostNotificationPolicyResponse;
+  onPolicyChange?: (enabled: boolean) => Promise<unknown>;
 } = {}) {
   render(
     <HostNotificationsPage
@@ -216,6 +224,8 @@ function renderPage({
       hostSessions={hostSessions}
       manualOptions={manualOptions}
       initialManualSelection={initialManualSelection}
+      policy={policy}
+      onPolicyChange={onPolicyChange}
       onProcess={onProcess}
       onRetry={onRetry}
       onRestore={onRestore}
@@ -243,7 +253,10 @@ function installRouterRequestShim() {
   );
 }
 
-function seedNotificationsRoute(client: QueryClient) {
+function seedNotificationsRoute(
+  client: QueryClient,
+  { includePolicy = true }: { includePolicy?: boolean } = {},
+) {
   const context = { clubSlug: "reading-sai" };
   client.setQueryData(hostNotificationSummaryQuery(context).queryKey, summary);
   client.setQueryData(hostNotificationEventsQuery({ limit: 50 }, context).queryKey, {
@@ -262,6 +275,12 @@ function seedNotificationsRoute(client: QueryClient) {
     items: [hostSessionCurrent, hostSessionDraft],
     nextCursor: null,
   });
+  if (includePolicy) {
+    client.setQueryData(hostNotificationPolicyQuery(context).queryKey, {
+      sessionReminderEnabled: false,
+      updatedAt: null,
+    });
+  }
   client.setQueryData(hostNotificationManualOptionsQuery(
     { sessionId: "session-1", page: { limit: 50 } },
     context,
@@ -275,9 +294,12 @@ function seedNotificationsRoute(client: QueryClient) {
   });
 }
 
-function renderNotificationsRoute(client = testQueryClient()) {
+function renderNotificationsRoute(
+  client = testQueryClient(),
+  options?: { includePolicy?: boolean },
+) {
   installRouterRequestShim();
-  seedNotificationsRoute(client);
+  seedNotificationsRoute(client, options);
   const router = createMemoryRouter([
     {
       path: "/clubs/:clubSlug/app/host/notifications",
@@ -460,6 +482,39 @@ describe("hostNotificationsLoader", () => {
 });
 
 describe("HostNotificationsRoute", () => {
+  it("deduplicates overlapping manual member cursor pages by membership id", () => {
+    const member = {
+      membershipId: "member-overlap",
+      displayName: "겹치는 멤버",
+      maskedEmail: "o***@example.com",
+      role: "MEMBER" as const,
+      membershipStatus: "ACTIVE" as const,
+      sessionParticipationStatus: "ACTIVE" as const,
+      attendanceStatus: null,
+      emailEligibility: "ELIGIBLE" as const,
+      inAppEligibility: "ELIGIBLE" as const,
+    };
+
+    const combined = combineManualOptions([
+      {
+        ...manualOptionsFixture,
+        members: { items: [member], nextCursor: "cursor-2" },
+      },
+      {
+        ...manualOptionsFixture,
+        members: {
+          items: [member, { ...member, membershipId: "member-next", displayName: "다음 멤버" }],
+          nextCursor: null,
+        },
+      },
+    ]);
+
+    expect(combined.members.items.map((item) => item.membershipId)).toEqual([
+      "member-overlap",
+      "member-next",
+    ]);
+  });
+
   it("renders host notifications route from query seeded data", async () => {
     renderNotificationsRoute();
 
@@ -467,6 +522,186 @@ describe("HostNotificationsRoute", () => {
     expect(screen.getByRole("heading", { name: "새 알림 발송" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "최근 수동 발송" })).toBeInTheDocument();
     expect(screen.getAllByText("앱+이메일").length).toBeGreaterThan(0);
+    expect(screen.getByRole("checkbox", { name: "모임 전날 자동 리마인더" })).not.toBeChecked();
+  });
+
+  it("keeps the route policy truth when the club-scoped save fails", async () => {
+    const client = testQueryClient();
+    seedNotificationsRoute(client);
+    let policyGetCount = 0;
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+
+      if (
+        url === "/api/bff/api/host/notifications/policy?clubSlug=reading-sai"
+        && init?.method === "PUT"
+      ) {
+        return Promise.resolve(jsonResponse({ message: "save failed" }, 500));
+      }
+
+      if (
+        url === "/api/bff/api/host/notifications/policy?clubSlug=reading-sai"
+        && !init?.method
+      ) {
+        policyGetCount += 1;
+        return Promise.resolve(jsonResponse({
+          sessionReminderEnabled: false,
+          updatedAt: null,
+        }));
+      }
+
+      return Promise.reject(new Error(`Unexpected request: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderNotificationsRoute(client);
+
+    const reminder = await screen.findByRole("checkbox", { name: "모임 전날 자동 리마인더" });
+    await userEvent.click(reminder);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("리마인더 정책을 저장하지 못했습니다");
+    expect(reminder).not.toBeChecked();
+    expect(policyGetCount).toBe(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/host/notifications/policy?clubSlug=reading-sai",
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({ sessionReminderEnabled: true }),
+      }),
+    );
+  });
+
+  it("keeps the successful PUT response when the follow-up policy GET fails", async () => {
+    const client = testQueryClient();
+    const otherClubPolicy = {
+      sessionReminderEnabled: false,
+      updatedAt: "2026-07-24T09:55:00+09:00",
+    };
+    client.setQueryData(
+      hostNotificationPolicyQuery({ clubSlug: "other-club" }).queryKey,
+      otherClubPolicy,
+    );
+    const updatedPolicy = {
+      sessionReminderEnabled: true,
+      updatedAt: "2026-07-24T10:00:00+09:00",
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+
+      if (
+        url === "/api/bff/api/host/notifications/policy?clubSlug=reading-sai"
+        && init?.method === "PUT"
+      ) {
+        return Promise.resolve(jsonResponse(updatedPolicy));
+      }
+
+      if (
+        url === "/api/bff/api/host/notifications/policy?clubSlug=reading-sai"
+        && !init?.method
+      ) {
+        return Promise.resolve(jsonResponse({ message: "refetch failed" }, 500));
+      }
+
+      return Promise.reject(new Error(`Unexpected request: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderNotificationsRoute(client);
+
+    await userEvent.click(
+      await screen.findByRole("checkbox", { name: "모임 전날 자동 리마인더" }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("checkbox", { name: "모임 전날 자동 리마인더" })).toBeChecked();
+    });
+    expect(client.getQueryData(
+      hostNotificationPolicyQuery({ clubSlug: "reading-sai" }).queryKey,
+    )).toEqual(updatedPolicy);
+    expect(client.getQueryData(
+      hostNotificationPolicyQuery({ clubSlug: "other-club" }).queryKey,
+    )).toEqual(otherClubPolicy);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("shows an initial policy load error and retries into the club-scoped server truth", async () => {
+    const client = testQueryClient();
+    let policyGetCount = 0;
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+
+      if (
+        url === "/api/bff/api/host/notifications/policy?clubSlug=reading-sai"
+        && !init?.method
+      ) {
+        policyGetCount += 1;
+        return Promise.resolve(
+          policyGetCount === 1
+            ? jsonResponse({ message: "load failed" }, 500)
+            : jsonResponse({
+                sessionReminderEnabled: true,
+                updatedAt: "2026-07-24T10:05:00+09:00",
+              }),
+        );
+      }
+
+      return Promise.reject(new Error(`Unexpected request: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderNotificationsRoute(client, { includePolicy: false });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "자동 리마인더 정책을 불러오지 못했습니다",
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "정책 다시 불러오기" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("checkbox", { name: "모임 전날 자동 리마인더" })).toBeChecked();
+    });
+    expect(policyGetCount).toBe(2);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("reconciles an ambiguous failed PUT to the club-scoped server truth", async () => {
+    const client = testQueryClient();
+    const serverTruth = {
+      sessionReminderEnabled: true,
+      updatedAt: "2026-07-24T10:10:00+09:00",
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+
+      if (
+        url === "/api/bff/api/host/notifications/policy?clubSlug=reading-sai"
+        && init?.method === "PUT"
+      ) {
+        return Promise.resolve(jsonResponse({ message: "ambiguous failure" }, 500));
+      }
+
+      if (
+        url === "/api/bff/api/host/notifications/policy?clubSlug=reading-sai"
+        && !init?.method
+      ) {
+        return Promise.resolve(jsonResponse(serverTruth));
+      }
+
+      return Promise.reject(new Error(`Unexpected request: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderNotificationsRoute(client);
+
+    await userEvent.click(
+      await screen.findByRole("checkbox", { name: "모임 전날 자동 리마인더" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "리마인더 정책을 저장하지 못했습니다",
+    );
+    await waitFor(() => {
+      expect(screen.getByRole("checkbox", { name: "모임 전날 자동 리마인더" })).toBeChecked();
+    });
+    expect(client.getQueryData(
+      hostNotificationPolicyQuery({ clubSlug: "reading-sai" }).queryKey,
+    )).toEqual(serverTruth);
   });
 
   it("disables manual preview button while manual options refetch is in flight after a session change", async () => {
@@ -581,6 +816,130 @@ describe("HostNotificationsRoute", () => {
 });
 
 describe("HostNotificationsPage", () => {
+  it("preserves the selected enabled template when session options change", async () => {
+    const user = userEvent.setup();
+    const sessionOneOptions = {
+      ...manualOptionsFixture,
+      templates: manualOptionsFixture.templates.map((template, index) => ({
+        ...template,
+        contentRevision: `${index + 1}`.repeat(64),
+        enabled: true,
+        disabledReason: null,
+      })),
+    } satisfies ManualNotificationOptionsResponse;
+    const sessionTwoOptions = {
+      ...sessionOneOptions,
+      session: {
+        ...sessionOneOptions.session!,
+        sessionId: "session-draft",
+      },
+      templates: sessionOneOptions.templates.map((template, index) => ({
+        ...template,
+        contentRevision: `${index + 3}`.repeat(64),
+      })),
+    } satisfies ManualNotificationOptionsResponse;
+    const workbenchProps = {
+      hostSessions: [hostSessionCurrent, hostSessionDraft],
+      initialSessionId: "session-1",
+      initialEventType: null,
+      preview: null,
+      busy: false,
+      error: null,
+      onPreview: vi.fn().mockResolvedValue(undefined),
+      onConfirm: vi.fn().mockResolvedValue(undefined),
+      onSessionChange: vi.fn().mockResolvedValue(sessionTwoOptions),
+      onLoadManualOptions: vi.fn().mockResolvedValue(sessionTwoOptions),
+      onLoadMoreManualMembers: vi.fn().mockResolvedValue(sessionTwoOptions),
+    };
+    const view = render(
+      <ManualNotificationWorkbench {...workbenchProps} options={sessionOneOptions} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "피드백 문서 등록" }));
+    expect(screen.getByRole("button", { name: "피드백 문서 등록" })).toHaveClass(
+      "btn-primary",
+    );
+
+    await user.selectOptions(screen.getByLabelText("세션 선택"), "session-draft");
+    view.rerender(
+      <ManualNotificationWorkbench {...workbenchProps} options={sessionTwoOptions} />,
+    );
+
+    expect(screen.getByRole("button", { name: "피드백 문서 등록" })).toHaveClass(
+      "btn-primary",
+    );
+  });
+
+  it("falls back to the first enabled template when the selected template becomes invalid", async () => {
+    const user = userEvent.setup();
+    const sessionOneOptions = {
+      ...manualOptionsFixture,
+      templates: manualOptionsFixture.templates.map((template, index) => ({
+        ...template,
+        contentRevision: `${index + 1}`.repeat(64),
+        enabled: true,
+        disabledReason: null,
+      })),
+    } satisfies ManualNotificationOptionsResponse;
+    const sessionTwoOptions = {
+      ...sessionOneOptions,
+      session: {
+        ...sessionOneOptions.session!,
+        sessionId: "session-draft",
+      },
+      templates: sessionOneOptions.templates.map((template, index) => ({
+        ...template,
+        contentRevision: `${index + 3}`.repeat(64),
+        enabled: template.eventType !== "FEEDBACK_DOCUMENT_PUBLISHED",
+        disabledReason: template.eventType === "FEEDBACK_DOCUMENT_PUBLISHED"
+          ? "이 세션에서는 사용할 수 없습니다."
+          : null,
+      })),
+    } satisfies ManualNotificationOptionsResponse;
+    const workbenchProps = {
+      hostSessions: [hostSessionCurrent, hostSessionDraft],
+      initialSessionId: "session-1",
+      initialEventType: null,
+      preview: null,
+      busy: false,
+      error: null,
+      onPreview: vi.fn().mockResolvedValue(undefined),
+      onConfirm: vi.fn().mockResolvedValue(undefined),
+      onSessionChange: vi.fn().mockResolvedValue(sessionTwoOptions),
+      onLoadManualOptions: vi.fn().mockResolvedValue(sessionTwoOptions),
+      onLoadMoreManualMembers: vi.fn().mockResolvedValue(sessionTwoOptions),
+    };
+    const view = render(
+      <ManualNotificationWorkbench {...workbenchProps} options={sessionOneOptions} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "피드백 문서 등록" }));
+    await user.selectOptions(screen.getByLabelText("세션 선택"), "session-draft");
+    view.rerender(
+      <ManualNotificationWorkbench {...workbenchProps} options={sessionTwoOptions} />,
+    );
+
+    expect(screen.getByRole("button", { name: "모임 전날 리마인더" })).toHaveClass(
+      "btn-primary",
+    );
+  });
+
+  it("offers each allowed reminder audience once and previews session participants", async () => {
+    const user = userEvent.setup();
+    const onPreviewManual = vi.fn().mockResolvedValue(undefined);
+
+    renderPage({ onPreviewManual });
+
+    expect(screen.getAllByRole("radio", { name: /전체 활성 멤버/ })).toHaveLength(1);
+    expect(screen.queryByRole("radio", { name: /추천 대상/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: "세션 참가자" }));
+    await user.click(screen.getByRole("button", { name: "미리보기" }));
+
+    expect(onPreviewManual).toHaveBeenCalledWith(expect.objectContaining({
+      audience: "SESSION_PARTICIPANTS",
+    }));
+  });
+
   it("renders manual notification workbench before ledgers", () => {
     renderPage({
       manualOptions: {
@@ -681,15 +1040,28 @@ describe("HostNotificationsPage", () => {
 
   it("searches manual notification members and loads more", async () => {
     const user = userEvent.setup();
-    const searchedOptions = {
+    const selectableOptions = {
       ...manualOptionsFixture,
+      templates: manualOptionsFixture.templates.map((template) =>
+        template.eventType === "SESSION_REMINDER_DUE"
+          ? {
+              ...template,
+              allowedAudiences: [
+                ...template.allowedAudiences,
+                "SELECTED_MEMBERS" as const,
+              ],
+            }
+          : template),
+    } satisfies ManualNotificationOptionsResponse;
+    const searchedOptions = {
+      ...selectableOptions,
       members: {
         items: [],
         nextCursor: "cursor-2",
       },
     } as ManualNotificationOptionsResponse;
     const nextOptions = {
-      ...manualOptionsFixture,
+      ...selectableOptions,
       members: {
         items: [
           {
@@ -712,13 +1084,14 @@ describe("HostNotificationsPage", () => {
 
     renderPage({
       manualOptions: {
-        ...manualOptionsFixture,
+        ...selectableOptions,
         members: { items: [], nextCursor: "cursor-1" },
       },
       onLoadManualOptions,
       onLoadMoreManualMembers,
     });
 
+    await user.click(screen.getByRole("radio", { name: "직접 선택" }));
     await user.type(screen.getByRole("searchbox", { name: "멤버 검색" }), "김");
     await user.click(screen.getByRole("button", { name: "검색" }));
     expect(onLoadManualOptions).toHaveBeenCalledWith("session-1", "김");

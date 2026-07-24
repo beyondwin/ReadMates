@@ -1,8 +1,6 @@
 import type {
-  HostSessionVisibilityPreviewResponse,
   HostSessionVisibilityRequest,
   HostSessionListPage,
-  SessionRecordVisibility,
 } from "@/features/host/api/host-contracts";
 import type { PageRequest } from "@/shared/model/paging";
 
@@ -13,10 +11,6 @@ export type HostDashboardActions = {
     membershipId: string,
     action: HostDashboardMissingMemberAction,
   ) => Promise<void>;
-  previewSessionVisibility: (
-    sessionId: string,
-    visibility: SessionRecordVisibility,
-  ) => Promise<HostSessionVisibilityPreviewResponse>;
   updateSessionVisibility: (sessionId: string, request: HostSessionVisibilityRequest) => Promise<void>;
   openSession: (sessionId: string) => Promise<void>;
   loadHostSessions: (page?: PageRequest) => Promise<HostSessionListPage>;

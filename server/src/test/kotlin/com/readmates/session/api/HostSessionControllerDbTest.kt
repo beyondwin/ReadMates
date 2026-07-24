@@ -579,7 +579,7 @@ class HostSessionControllerDbTest(
                 content = """{"visibility":"MEMBER"}"""
             }.andExpect {
                 status { isOk() }
-                jsonPath("$.visibility") { value("MEMBER") }
+                jsonPath("$.session.visibility") { value("MEMBER") }
             }
 
         mockMvc
@@ -593,7 +593,7 @@ class HostSessionControllerDbTest(
     }
 
     @Test
-    fun `member visible draft session enqueues next book notification`() {
+    fun `member visible draft session returns composer without notification or decision rows`() {
         val sessionId = createDraftSessionSeven()
 
         mockMvc
@@ -604,27 +604,33 @@ class HostSessionControllerDbTest(
                 content = """{"visibility":"MEMBER"}"""
             }.andExpect {
                 status { isOk() }
+                jsonPath("$.session.visibility") { value("MEMBER") }
+                jsonPath("$.composer.eventType") { value("NEXT_BOOK_PUBLISHED") }
             }
 
-        val event =
-            jdbcTemplate.queryForMap(
-                """
-                select
-                  dedupe_key,
-                  json_unquote(json_extract(payload_json, '$.sessionId')) as session_id,
-                  cast(json_unquote(json_extract(payload_json, '$.sessionNumber')) as signed) as session_number,
-                  json_unquote(json_extract(payload_json, '$.bookTitle')) as book_title
-                from notification_event_outbox
-                where event_type = 'NEXT_BOOK_PUBLISHED'
-                  and aggregate_id = ?
-                """.trimIndent(),
-                sessionId,
-            )
+        assertEquals(0, countRows("notification_event_outbox", "aggregate_id = '$sessionId'"))
+        assertEquals(0, countRows("host_action_notification_decisions", "session_id = '$sessionId'"))
+    }
 
-        assertThat(event["dedupe_key"]).isEqualTo("next-book:$sessionId")
-        assertThat(event["session_id"]).isEqualTo(sessionId)
-        assertThat((event["session_number"] as Number).toInt()).isEqualTo(7)
-        assertThat(event["book_title"]).isEqualTo("테스트 책")
+    @Test
+    fun `legacy visibility notification fields are rejected before mutation`() {
+        val sessionId = createDraftSessionSeven()
+
+        listOf(
+            """{"visibility":"MEMBER","previewId":"00000000-0000-0000-0000-000000008001"}""",
+            """{"visibility":"MEMBER","notificationDecision":"SEND"}""",
+        ).forEach { request ->
+            mockMvc
+                .patch("/api/host/sessions/$sessionId/visibility") {
+                    with(user("host@example.com"))
+                    with(csrf())
+                    contentType = MediaType.APPLICATION_JSON
+                    content = request
+                }.andExpect {
+                    status { isBadRequest() }
+                }
+            assertEquals("HOST_ONLY", findSessionVisibility(sessionId))
+        }
     }
 
     @Test
@@ -643,7 +649,7 @@ class HostSessionControllerDbTest(
                 content = """{"visibility":"PUBLIC"}"""
             }.andExpect {
                 status { isOk() }
-                jsonPath("$.visibility") { value("PUBLIC") }
+                jsonPath("$.session.visibility") { value("PUBLIC") }
             }
 
         val publicPublication = findPublicationRow(sessionId)
@@ -659,7 +665,7 @@ class HostSessionControllerDbTest(
                 content = """{"visibility":"HOST_ONLY"}"""
             }.andExpect {
                 status { isOk() }
-                jsonPath("$.visibility") { value("HOST_ONLY") }
+                jsonPath("$.session.visibility") { value("HOST_ONLY") }
             }
 
         val hostOnlyPublication = findPublicationRow(sessionId)

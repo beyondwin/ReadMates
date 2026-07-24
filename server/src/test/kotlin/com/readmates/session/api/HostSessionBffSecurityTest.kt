@@ -126,9 +126,19 @@ class HostSessionBffSecurityTest(
                 content = """{"visibility":"MEMBER"}"""
             }.andExpect {
                 status { isOk() }
-                jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
-                jsonPath("$.visibility") { value("MEMBER") }
+                jsonPath("$.session.sessionId") { value("00000000-0000-0000-0000-000000009888") }
+                jsonPath("$.session.visibility") { value("MEMBER") }
+                jsonPath("$.composer.eventType") { value("NEXT_BOOK_PUBLISHED") }
             }
+
+        assertEquals(
+            0,
+            countRows("notification_event_outbox", "aggregate_id = '00000000-0000-0000-0000-000000009888'"),
+        )
+        assertEquals(
+            0,
+            countRows("host_action_notification_decisions", "session_id = '00000000-0000-0000-0000-000000009888'"),
+        )
     }
 
     @Test
@@ -320,10 +330,10 @@ class HostSessionBffSecurityTest(
                     "/api/host/sessions/00000000-0000-0000-0000-000000009998/record-apply",
                     """
                     {
-                      "previewId":"00000000-0000-0000-0000-000000008998",
+                      "applyRequestId":"00000000-0000-0000-0000-000000008998",
                       "expectedDraftRevision":1,
                       "expectedLiveRevision":0,
-                      "notificationDecision":"SKIP"
+                      "expectedDraftHash":"${"a".repeat(64)}"
                     }
                     """,
                 ),

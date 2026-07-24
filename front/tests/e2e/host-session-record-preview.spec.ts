@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Page, type Request, type Route } from "@playwright/test";
 import type { HostSessionDetailResponse, SessionImportPreviewResponse } from "@/features/host/model/host-view-types";
 import {
   fulfillHostAuth,
@@ -40,6 +40,27 @@ function sessionResponse(): HostSessionDetailResponse {
         participationStatus: "ACTIVE",
       },
     ],
+    feedbackDocument: {
+      uploaded: true,
+      fileName: "session-7-feedback.md",
+      uploadedAt: "2026-05-16T12:00:00Z",
+    },
+  };
+}
+
+function hostFeedbackDocumentPreviewResponse() {
+  return {
+    sessionId: SESSION_ID,
+    sessionNumber: 7,
+    title: "독서모임 7차 피드백",
+    subtitle: "E2E 책 · 2026.05.16",
+    bookTitle: "E2E 책",
+    date: "2026-05-16",
+    fileName: "session-7-feedback.md",
+    uploadedAt: "2026-05-16T12:00:00Z",
+    metadata: [{ label: "열람 범위", value: "호스트 미리보기" }],
+    observerNotes: ["공개 안전한 호스트 미리보기입니다."],
+    participants: [],
   };
 }
 
@@ -118,6 +139,11 @@ async function routeHostSessionEditor(page: Page): Promise<void> {
       baseLiveRevision: 0,
       liveApplied: false,
     });
+  });
+
+  await page.route(`**/api/bff/api/host/sessions/${SESSION_ID}/feedback-document/preview**`, async (route) => {
+    expect(route.request().method()).toBe("GET");
+    await json(route, 200, hostFeedbackDocumentPreviewResponse());
   });
 
   await page.route(`**/api/bff/api/host/sessions/${SESSION_ID}/record-editor**`, async (route) => {
@@ -292,6 +318,34 @@ test("host captures public-safe session record preview evidence on desktop and m
     fullPage: true,
   });
   expect(mobileScreenshot.byteLength).toBeGreaterThan(10_000);
+
+  const previewMutations: string[] = [];
+  const trackPreviewMutation = (request: Request) => {
+    const url = request.url();
+    if (
+      request.method() !== "GET"
+      && (
+        url.includes(`/host/sessions/${SESSION_ID}/feedback-document`)
+        || url.includes("/host/notifications/manual")
+      )
+    ) {
+      previewMutations.push(`${request.method()} ${url}`);
+    }
+  };
+  page.on("request", trackPreviewMutation);
+  await page.getByRole("link", { name: "피드백 문서 미리보기" }).click();
+  await expect(page).toHaveURL(
+    new RegExp(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}/feedback-document$`),
+  );
+  await expect(page.getByRole("heading", { name: "독서모임 7차 피드백" })).toBeVisible();
+  await expect(page.getByText("피드백 문서 · 호스트 미리보기")).toBeVisible();
+  await expect(
+    page.getByText("운영 확인본 · 이 미리보기 경로는 멤버에게 공개되지 않습니다."),
+  ).toBeVisible();
+  await expect(page.getByText("보존 문서 · 참석자 열람본")).toHaveCount(0);
+  await expect(page.getByText("공개 안전한 호스트 미리보기입니다.")).toBeVisible();
+  expect(previewMutations).toEqual([]);
+  page.off("request", trackPreviewMutation);
 
   await page.unrouteAll({ behavior: "ignoreErrors" });
   await routeMemberHome(page);

@@ -6,6 +6,7 @@ import {
   hostSessionDetailResponse,
   isHostSessionDetailRequest,
   routeHostEditorShell,
+  trackNotificationMutationRequests,
 } from "./aigen-test-fixtures";
 
 const SESSION_ID = "11111111-1111-1111-1111-111111111111";
@@ -17,6 +18,7 @@ async function json(route: Route, status: number, body: unknown): Promise<void> 
 }
 
 test("host reviews grounded blocks, confirms one edit, and commits the exact revision", async ({ page }) => {
+  const notificationMutations = trackNotificationMutationRequests(page);
   await routeHostEditorShell(page, CLUB_SLUG);
   await page.route(`**/api/bff/api/host/sessions/${SESSION_ID}**`, async (route) => {
     if (!isHostSessionDetailRequest(route, SESSION_ID)) return route.fallback();
@@ -91,4 +93,6 @@ test("host reviews grounded blocks, confirms one edit, and commits the exact rev
       FEEDBACK_DOCUMENT: "AI_GROUNDED_REVIEWED",
     },
   });
+  await expect(page.getByRole("dialog", { name: "알림 보내기" })).toHaveCount(0);
+  expect(notificationMutations()).toEqual([]);
 });

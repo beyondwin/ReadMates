@@ -1,4 +1,5 @@
 import { readmatesFetch, readmatesFetchResponse, type ReadmatesApiContext } from "@/shared/api/client";
+import { apiErrorFromResponse } from "@/shared/api/errors";
 import type { CurrentSessionResponse } from "@/shared/model/current-session-contracts";
 import type {
   CreatedSessionResponse,
@@ -15,6 +16,7 @@ import type {
   HostNotificationDetailResponse,
   HostNotificationEventType,
   HostNotificationItemListResponse,
+  HostNotificationPolicyResponse,
   HostNotificationSummary,
   HostNotificationStatus,
   HostSessionDeletionPreviewResponse,
@@ -25,8 +27,7 @@ import type {
   HostSessionPublicationRequest,
   HostSessionRequest,
   HostSessionVisibilityRequest,
-  HostSessionVisibilityPreviewRequest,
-  HostSessionVisibilityPreviewResponse,
+  HostSessionVisibilityUpdateResult,
   ManualNotificationConfirmRequest,
   ManualNotificationConfirmResponse,
   ManualNotificationDispatchListResponse,
@@ -42,9 +43,11 @@ import type {
   SessionImportPreviewResponse,
   SessionImportRequest,
   UpdateHostMemberProfileRequest,
+  UpdateHostNotificationPolicyRequest,
   ViewerMember,
 } from "./host-contracts";
 import {
+  HostSessionVisibilityUpdateResponseSchema,
   parseHostSessionDetailResponse,
   parseHostNotificationDeliveryListResponse,
   parseHostInvitationListPage,
@@ -66,6 +69,29 @@ export function fetchHostClubOperations(context: { clubSlug: string | undefined 
 
 export function fetchHostNotificationSummary(context?: ReadmatesApiContext) {
   return readmatesFetch<HostNotificationSummary>("/api/host/notifications/summary", undefined, context);
+}
+
+export function fetchHostNotificationPolicy(context?: ReadmatesApiContext) {
+  return readmatesFetch<HostNotificationPolicyResponse>(
+    "/api/host/notifications/policy",
+    undefined,
+    context,
+  );
+}
+
+export function updateHostNotificationPolicy(
+  request: UpdateHostNotificationPolicyRequest,
+  context?: ReadmatesApiContext,
+) {
+  return readmatesFetch<HostNotificationPolicyResponse>(
+    "/api/host/notifications/policy",
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    },
+    context,
+  );
 }
 
 export function processHostNotifications() {
@@ -258,30 +284,21 @@ export function saveHostSessionPublication(sessionId: string, request: HostSessi
   });
 }
 
-export function saveHostSessionVisibility(
+export async function saveHostSessionVisibility(
   sessionId: string,
   request: HostSessionVisibilityRequest,
   context?: ReadmatesApiContext,
-) {
-  return readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/visibility`, {
+): Promise<HostSessionVisibilityUpdateResult> {
+  const response = await readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/visibility`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
-  }, context) as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
-}
-
-export function previewHostSessionVisibility(
-  sessionId: string,
-  request: HostSessionVisibilityPreviewRequest,
-  context?: ReadmatesApiContext,
-) {
-  return readmatesFetch<HostSessionVisibilityPreviewResponse>(
-    `/api/host/sessions/${encodeURIComponent(sessionId)}/visibility-preview`,
-    {
-      method: "POST",
-      body: JSON.stringify(request),
-    },
-    context,
+  }, context);
+  if (!response.ok) {
+    throw await apiErrorFromResponse(response);
+  }
+  return HostSessionVisibilityUpdateResponseSchema.parse(
+    await response.json(),
   );
 }
 

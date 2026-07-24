@@ -8,4 +8,5 @@ export const manualAudienceLabels = {
   ALL_ACTIVE_MEMBERS: "전체 활성 멤버",
   SESSION_PARTICIPANTS: "세션 참가자",
   CONFIRMED_ATTENDEES: "참석 확정자",
+  SELECTED_MEMBERS: "직접 선택",
 } as const;

@@ -1,18 +1,8 @@
 package com.readmates.sessionrecord.application.service
 
 import com.readmates.auth.domain.MembershipRole
-import com.readmates.notification.application.model.CompleteHostActionDecisionCommand
-import com.readmates.notification.application.model.HostActionDecisionCommand
-import com.readmates.notification.application.model.HostActionPreview
-import com.readmates.notification.application.model.HostActionPreviewCommand
-import com.readmates.notification.application.model.HostActionTargetCounts
-import com.readmates.notification.application.model.HostConfirmedAction
-import com.readmates.notification.application.model.NotificationDecision
-import com.readmates.notification.application.model.PreparedHostActionDecision
-import com.readmates.notification.application.model.RecordHostConfirmedNotificationEventCommand
 import com.readmates.notification.application.port.`in`.ConfirmHostActionNotificationUseCase
 import com.readmates.notification.application.port.`in`.RecordHostConfirmedNotificationEventUseCase
-import com.readmates.notification.application.port.out.StoredHostActionDecision
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.sessionimport.application.model.SessionImportCommitResult
@@ -57,6 +47,18 @@ import java.util.UUID
 
 @Tag("unit")
 class SessionRecordApplyServiceTest {
+    @Test
+    fun `apply creates revision and receipt without notification decision or outbox`() {
+        val fixture = Fixture(liveRevision = 3)
+
+        val result = fixture.applyContentOnly()
+
+        assertEquals(4L, result.liveRevision)
+        assertEquals(fixture.sessionId, result.composer.sessionId)
+        assertEquals(1, fixture.store.receipts.size)
+        assertApplyHasNoNotificationDispatchCollaborator()
+    }
+
     @Test
     fun `apply validates and replaces the full record package`() {
         val fixture = Fixture()
@@ -113,7 +115,6 @@ class SessionRecordApplyServiceTest {
         val preview = fixture.preview()
 
         assertEquals(NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED, preview.eventType)
-        assertEquals(NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED, fixture.gate.lastPreview?.eventType)
     }
 
     @Test
@@ -123,52 +124,6 @@ class SessionRecordApplyServiceTest {
         val preview = fixture.preview()
 
         assertEquals(NotificationEventType.SESSION_RECORD_UPDATED, preview.eventType)
-    }
-
-    @Test
-    fun `send creates exactly one revision keyed event`() {
-        val fixture = Fixture(liveRevision = 3, liveFeedback = "Previously visible")
-
-        val result = fixture.apply(NotificationDecision.SEND)
-
-        assertEquals(1, fixture.recorder.commands.size)
-        assertEquals(
-            result.liveRevision,
-            fixture.recorder.commands
-                .single()
-                .revision,
-        )
-        assertEquals(
-            NotificationEventType.SESSION_RECORD_UPDATED,
-            fixture.recorder.commands
-                .single()
-                .eventType,
-        )
-        assertNotNull(result.eventId)
-    }
-
-    @Test
-    fun `skip creates no outbox event`() {
-        val fixture = Fixture(liveRevision = 3)
-
-        val result = fixture.apply(NotificationDecision.SKIP)
-
-        assertTrue(fixture.recorder.commands.isEmpty())
-        assertNull(result.eventId)
-        assertEquals(NotificationDecision.SKIP, result.notificationDecision)
-    }
-
-    @Test
-    fun `outbox failure rolls back live replacement revision and draft deletion`() {
-        val fixture = Fixture(liveRevision = 3)
-        fixture.recorder.failure = IllegalStateException("outbox unavailable")
-
-        assertThrows(IllegalStateException::class.java) { fixture.apply(NotificationDecision.SEND) }
-
-        assertFalse(fixture.replacer.committed)
-        assertTrue(fixture.store.revisions.isEmpty())
-        assertNotNull(fixture.store.draft)
-        assertTrue(fixture.gate.completed.isEmpty())
     }
 
     @Test
@@ -186,8 +141,8 @@ class SessionRecordApplyServiceTest {
         listOf(draftStale, liveStale).forEach {
             assertFalse(it.replacer.committed)
             assertTrue(it.store.revisions.isEmpty())
+            assertTrue(it.store.receipts.isEmpty())
             assertNotNull(it.store.draft)
-            assertTrue(it.gate.prepared.isEmpty())
         }
     }
 
@@ -206,7 +161,7 @@ class SessionRecordApplyServiceTest {
             fixture.apply()
         }.also { assertEquals(SessionRecordError.LIVE_STALE, it.error) }
 
-        assertTrue(fixture.gate.prepared.isEmpty())
+        assertTrue(fixture.store.receipts.isEmpty())
         assertFalse(fixture.replacer.committed)
         assertNotNull(fixture.store.draft)
     }
@@ -224,73 +179,62 @@ class SessionRecordApplyServiceTest {
     }
 
     @Test
-    fun `completed preview returns original result without another mutation`() {
+    fun `exact apply request replay returns the original revision`() {
         val fixture = Fixture(liveRevision = 3)
-        val revision = fixture.appliedRevision(version = 4)
-        fixture.store.completed =
-            CompletedSessionRecordApply(
-                previewId = fixture.previewId,
-                expectedDraftRevision = fixture.draft.draftRevision,
-                expectedLiveRevision = 3,
-                notificationDecision = NotificationDecision.SKIP,
-                decisionId = fixture.decisionId,
-                eventId = null,
-                revision = revision,
-            )
+        val command = fixture.command()
 
-        val result = fixture.apply(NotificationDecision.SKIP)
+        val first = fixture.apply(command)
+        val replay = fixture.apply(command)
 
-        assertEquals(4L, result.liveRevision)
-        assertEquals(fixture.decisionId, result.decisionId)
-        assertEquals(0, fixture.validator.calls)
-        assertFalse(fixture.replacer.committed)
+        assertEquals(first, replay)
+        assertEquals(1, fixture.store.receipts.size)
+        assertEquals(1, fixture.validator.calls)
     }
 
     @Test
-    fun `completed preview discovered after lock returns original concurrent result`() {
+    fun `same session apply request with a different contract returns conflict`() {
         val fixture = Fixture(liveRevision = 3)
-        fixture.store.completedAfterLock =
-            CompletedSessionRecordApply(
-                previewId = fixture.previewId,
-                expectedDraftRevision = fixture.draft.draftRevision,
-                expectedLiveRevision = 3,
-                notificationDecision = NotificationDecision.SKIP,
-                decisionId = fixture.decisionId,
-                eventId = null,
-                revision = fixture.appliedRevision(version = 4),
-            )
-
-        val result = fixture.apply(NotificationDecision.SKIP)
-
-        assertEquals(4L, result.liveRevision)
-        assertEquals(0, fixture.validator.calls)
-        assertFalse(fixture.replacer.committed)
-    }
-
-    @Test
-    fun `completed preview rejects a mismatched replay`() {
-        val fixture = Fixture(liveRevision = 3)
-        fixture.store.completed =
-            CompletedSessionRecordApply(
-                previewId = fixture.previewId,
-                expectedDraftRevision = fixture.draft.draftRevision,
-                expectedLiveRevision = 3,
-                notificationDecision = NotificationDecision.SKIP,
-                decisionId = fixture.decisionId,
-                eventId = null,
-                revision = fixture.appliedRevision(version = 4),
-            )
+        val command = fixture.command()
+        fixture.apply(command)
 
         val error =
             assertThrows(SessionRecordException::class.java) {
-                fixture.apply(NotificationDecision.SEND)
+                fixture.apply(command.copy(expectedDraftHash = "f".repeat(64)))
             }
 
-        assertEquals(SessionRecordError.PREVIEW_ALREADY_CONSUMED, error.error)
+        assertEquals(SessionRecordError.APPLY_REQUEST_ALREADY_USED, error.error)
+        assertEquals(1, fixture.store.receipts.size)
+    }
+
+    @Test
+    fun `same session apply request replay by another host returns conflict`() {
+        val fixture = Fixture(liveRevision = 3)
+        val command = fixture.command()
+        fixture.apply(command)
+        val anotherHost = fixture.host.copy(membershipId = UUID.randomUUID())
+
+        val error =
+            assertThrows(SessionRecordException::class.java) {
+                fixture.apply(command, anotherHost)
+            }
+
+        assertEquals(SessionRecordError.APPLY_REQUEST_ALREADY_USED, error.error)
+        assertEquals(1, fixture.store.receipts.size)
     }
 }
 
 private val TEST_NOW = OffsetDateTime.of(2026, 7, 23, 0, 0, 0, 0, ZoneOffset.UTC)
+
+private fun assertApplyHasNoNotificationDispatchCollaborator() {
+    val constructorParameterTypes =
+        SessionRecordApplyService::class.java.declaredConstructors
+            .flatMap { it.parameterTypes.asIterable() }
+
+    assertFalse(
+        constructorParameterTypes.contains(ConfirmHostActionNotificationUseCase::class.java) ||
+            constructorParameterTypes.contains(RecordHostConfirmedNotificationEventUseCase::class.java),
+    )
+}
 
 private class Fixture(
     liveRevision: Long = 0,
@@ -304,7 +248,6 @@ private class Fixture(
     val clubId: UUID = UUID.randomUUID()
     val sessionId: UUID = UUID.randomUUID()
     val previewId: UUID = UUID.randomUUID()
-    val decisionId: UUID = UUID.randomUUID()
     val host: CurrentMember =
         CurrentMember(
             userId = UUID.randomUUID(),
@@ -348,16 +291,12 @@ private class Fixture(
     val store = FakeApplyStore(live, draft, now, codec)
     val validator = FakeValidator()
     val replacer = FakeReplacer()
-    val gate = FakeGate(previewId, decisionId, now)
-    val recorder = FakeRecorder()
     private val service =
         SessionRecordApplyService(
             store = store,
             codec = codec,
             validator = validator,
             replacer = replacer,
-            notificationGate = gate,
-            confirmedEventRecorder = recorder,
         )
 
     init {
@@ -371,13 +310,44 @@ private class Fixture(
         )
 
     fun apply(
-        decision: NotificationDecision = NotificationDecision.SKIP,
         expectedDraftRevision: Long = draft.draftRevision,
         expectedLiveRevision: Long = live.revision,
     ) = service.apply(
         host,
-        ApplySessionRecordCommand(sessionId, previewId, expectedDraftRevision, expectedLiveRevision, decision),
+        ApplySessionRecordCommand(
+            sessionId,
+            previewId,
+            expectedDraftRevision,
+            expectedLiveRevision,
+            codec.encode(draft.snapshot).sha256,
+        ),
     )
+
+    fun command(applyRequestId: UUID = previewId) =
+        ApplySessionRecordCommand(
+            sessionId = sessionId,
+            applyRequestId = applyRequestId,
+            expectedDraftRevision = draft.draftRevision,
+            expectedLiveRevision = live.revision,
+            expectedDraftHash = codec.encode(draft.snapshot).sha256,
+        )
+
+    fun apply(
+        command: ApplySessionRecordCommand,
+        actor: CurrentMember = host,
+    ) = service.apply(actor, command)
+
+    fun applyContentOnly() =
+        service.apply(
+            host,
+            ApplySessionRecordCommand(
+                sessionId = sessionId,
+                applyRequestId = UUID.randomUUID(),
+                expectedDraftRevision = draft.draftRevision,
+                expectedLiveRevision = live.revision,
+                expectedDraftHash = codec.encode(draft.snapshot).sha256,
+            ),
+        )
 
     fun appliedRevision(version: Long) =
         SessionRecordRevision(
@@ -412,6 +382,7 @@ private class FakeApplyStore(
     var completed: CompletedSessionRecordApply? = null
     var completedAfterLock: CompletedSessionRecordApply? = null
     val revisions = mutableListOf<SessionRecordRevision>()
+    val receipts = mutableListOf<com.readmates.sessionrecord.application.model.SessionRecordApplyReceipt>()
     private val stagedRevisions = mutableListOf<SessionRecordRevision>()
     var onCommit: () -> Unit = {}
 
@@ -427,6 +398,34 @@ private class FakeApplyStore(
         host: AuthenticatedClubActor,
         previewId: UUID,
     ): CompletedSessionRecordApply? = completed
+
+    override fun findApplyReceipt(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+        applyRequestId: UUID,
+        forUpdate: Boolean,
+    ) = receipts.firstOrNull {
+        it.revision.sessionId == sessionId &&
+            it.revision.clubId == host.clubId &&
+            it.applyRequestId == applyRequestId
+    }
+
+    override fun insertApplyReceipt(
+        host: AuthenticatedClubActor,
+        command: ApplySessionRecordCommand,
+        draftSha256: String,
+        composerEventType: NotificationEventType,
+        revision: SessionRecordRevision,
+    ) = com.readmates.sessionrecord.application.model
+        .SessionRecordApplyReceipt(
+            command.applyRequestId,
+            host.membershipId,
+            command.expectedDraftRevision,
+            command.expectedLiveRevision,
+            draftSha256,
+            composerEventType,
+            revision,
+        ).also(receipts::add)
 
     override fun insertBaselineIfAbsent(
         host: AuthenticatedClubActor,
@@ -555,70 +554,6 @@ private class FakeReplacer : ReplaceValidatedSessionImportUseCase {
 
     fun commit() {
         committed = true
-    }
-}
-
-private class FakeGate(
-    private val previewId: UUID,
-    private val decisionId: UUID,
-    private val now: OffsetDateTime,
-) : ConfirmHostActionNotificationUseCase {
-    var lastPreview: HostActionPreviewCommand? = null
-    val prepared = mutableListOf<HostActionDecisionCommand>()
-    val completed = mutableListOf<CompleteHostActionDecisionCommand>()
-
-    override fun preview(
-        host: CurrentMember,
-        command: HostActionPreviewCommand,
-    ): HostActionPreview {
-        lastPreview = command
-        return HostActionPreview(previewId, 2, 2, 1, 1, now.plusMinutes(5))
-    }
-
-    override fun prepare(
-        host: CurrentMember,
-        command: HostActionDecisionCommand,
-    ): PreparedHostActionDecision {
-        prepared += command
-        return PreparedHostActionDecision(
-            command.previewId,
-            host.clubId,
-            command.sessionId,
-            host.membershipId,
-            HostConfirmedAction.SESSION_RECORD_APPLY,
-            command.eventType,
-            command.decision,
-            HostActionTargetCounts(2, 2, 1, 1),
-        )
-    }
-
-    override fun complete(command: CompleteHostActionDecisionCommand): StoredHostActionDecision {
-        completed += command
-        return StoredHostActionDecision(
-            decisionId,
-            command.prepared.previewId,
-            command.prepared.clubId,
-            command.prepared.sessionId,
-            command.prepared.hostMembershipId,
-            command.prepared.action,
-            command.prepared.eventType,
-            command.liveRevision,
-            command.prepared.decision,
-            command.prepared.counts,
-            command.eventId,
-            now,
-        )
-    }
-}
-
-private class FakeRecorder : RecordHostConfirmedNotificationEventUseCase {
-    val commands = mutableListOf<RecordHostConfirmedNotificationEventCommand>()
-    var failure: RuntimeException? = null
-
-    override fun record(command: RecordHostConfirmedNotificationEventCommand): UUID {
-        failure?.let { throw it }
-        commands += command
-        return UUID.randomUUID()
     }
 }
 

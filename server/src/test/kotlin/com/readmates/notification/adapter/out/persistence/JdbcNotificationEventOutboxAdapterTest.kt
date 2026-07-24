@@ -32,9 +32,42 @@ private const val CLEANUP_NOTIFICATION_EVENT_OUTBOX_SQL = """
     delete from notification_event_outbox
     where club_id = '00000000-0000-0000-0000-000000000101';
     delete from notification_event_outbox
-    where aggregate_id = '00000000-0000-0000-0000-000000009501';
+    where aggregate_id in (
+      '00000000-0000-0000-0000-000000009501',
+      '00000000-0000-0000-0000-000000009510',
+      '00000000-0000-0000-0000-000000009511',
+      '00000000-0000-0000-0000-000000009512'
+    );
+    delete from club_notification_policies
+    where club_id in (
+      '00000000-0000-0000-0000-000000000910',
+      '00000000-0000-0000-0000-000000000911'
+    );
     delete from sessions
-    where id = '00000000-0000-0000-0000-000000009501';
+    where id in (
+      '00000000-0000-0000-0000-000000009501',
+      '00000000-0000-0000-0000-000000009510',
+      '00000000-0000-0000-0000-000000009511',
+      '00000000-0000-0000-0000-000000009512'
+    );
+    delete from memberships
+    where id in (
+      '00000000-0000-0000-0000-000000000810',
+      '00000000-0000-0000-0000-000000000811',
+      '00000000-0000-0000-0000-000000000812'
+    );
+    delete from users
+    where id in (
+      '00000000-0000-0000-0000-000000000710',
+      '00000000-0000-0000-0000-000000000711',
+      '00000000-0000-0000-0000-000000000712'
+    );
+    delete from clubs
+    where id in (
+      '00000000-0000-0000-0000-000000000910',
+      '00000000-0000-0000-0000-000000000911',
+      '00000000-0000-0000-0000-000000000912'
+    );
     delete from clubs
     where id = '00000000-0000-0000-0000-000000000101';
 """
@@ -476,47 +509,38 @@ class JdbcNotificationEventOutboxAdapterTest(
     }
 
     @Test
-    fun `enqueueSessionReminderDue creates idempotent session reminder events with public-safe payload`() {
-        val reminderSessionId = "00000000-0000-0000-0000-000000009501"
-        insertReminderSession(reminderSessionId)
+    fun `enqueueSessionReminderDue includes only opted in clubs and remains idempotent`() {
+        jdbcTemplate.seedReminderCandidate(
+            clubId = "00000000-0000-0000-0000-000000000910",
+            userId = "00000000-0000-0000-0000-000000000710",
+            membershipId = "00000000-0000-0000-0000-000000000810",
+            sessionId = "00000000-0000-0000-0000-000000009510",
+            policy = true,
+        )
+        jdbcTemplate.seedReminderCandidate(
+            clubId = "00000000-0000-0000-0000-000000000911",
+            userId = "00000000-0000-0000-0000-000000000711",
+            membershipId = "00000000-0000-0000-0000-000000000811",
+            sessionId = "00000000-0000-0000-0000-000000009511",
+            policy = false,
+        )
+        jdbcTemplate.seedReminderCandidate(
+            clubId = "00000000-0000-0000-0000-000000000912",
+            userId = "00000000-0000-0000-0000-000000000712",
+            membershipId = "00000000-0000-0000-0000-000000000812",
+            sessionId = "00000000-0000-0000-0000-000000009512",
+            policy = null,
+        )
 
         val firstInserted = adapter.enqueueSessionReminderDue(LocalDate.of(2026, 5, 1))
         val duplicateInserted = adapter.enqueueSessionReminderDue(LocalDate.of(2026, 5, 1))
 
-        val row =
-            jdbcTemplate.queryForMap(
-                """
-                select
-                  event_type,
-                  aggregate_type,
-                  aggregate_id,
-                  status,
-                  kafka_topic,
-                  kafka_key,
-                  dedupe_key,
-                  json_unquote(json_extract(payload_json, '$.sessionId')) as session_id,
-                  cast(json_unquote(json_extract(payload_json, '$.sessionNumber')) as signed) as session_number,
-                  json_unquote(json_extract(payload_json, '$.bookTitle')) as book_title,
-                  json_unquote(json_extract(payload_json, '$.targetDate')) as target_date
-                from notification_event_outbox
-                where aggregate_id = ?
-                """.trimIndent(),
-                reminderSessionId,
-            )
-
         assertThat(firstInserted).isEqualTo(1)
         assertThat(duplicateInserted).isZero()
-        assertThat(row["event_type"]).isEqualTo("SESSION_REMINDER_DUE")
-        assertThat(row["aggregate_type"]).isEqualTo("SESSION")
-        assertThat(row["aggregate_id"]).isEqualTo(reminderSessionId)
-        assertThat(row["status"]).isEqualTo("PENDING")
-        assertThat(row["kafka_topic"]).isEqualTo(TEST_NOTIFICATION_EVENTS_TOPIC)
-        assertThat(row["kafka_key"]).isEqualTo("00000000-0000-0000-0000-000000000001")
-        assertThat(row["dedupe_key"]).isEqualTo("session-reminder:2026-05-01:$reminderSessionId")
-        assertThat(row["session_id"]).isEqualTo(reminderSessionId)
-        assertThat((row["session_number"] as Number).toInt()).isEqualTo(9501)
-        assertThat(row["book_title"]).isEqualTo("리마인더 이벤트 테스트 책")
-        assertThat(row["target_date"]).isEqualTo("2026-05-01")
+        assertThat(jdbcTemplate.reminderEventCount("00000000-0000-0000-0000-000000000910")).isEqualTo(1)
+        assertThat(jdbcTemplate.reminderEventCount("00000000-0000-0000-0000-000000000911")).isZero()
+        assertThat(jdbcTemplate.reminderEventCount("00000000-0000-0000-0000-000000000912")).isZero()
+        assertOptedInReminderRow(jdbcTemplate)
     }
 
     private fun eventRows(): Int =
@@ -632,33 +656,6 @@ class JdbcNotificationEventOutboxAdapterTest(
         )
     }
 
-    private fun insertReminderSession(sessionId: String) {
-        jdbcTemplate.update(
-            """
-            insert into sessions (
-              id, club_id, number, title, book_title, book_author,
-              session_date, start_time, end_time, location_label,
-              question_deadline_at, state, visibility
-            ) values (
-              ?,
-              '00000000-0000-0000-0000-000000000001',
-              9501,
-              '리마인더 이벤트 테스트 회차',
-              '리마인더 이벤트 테스트 책',
-              '테스트 저자',
-              '2026-05-01',
-              '19:30:00',
-              '21:30:00',
-              '온라인',
-              '2026-04-30 14:59:00.000000',
-              'OPEN',
-              'MEMBER'
-            )
-            """.trimIndent(),
-            sessionId,
-        )
-    }
-
     private fun <T> runConcurrently(
         workerCount: Int,
         action: () -> T,
@@ -697,4 +694,138 @@ class JdbcNotificationEventOutboxAdapterTest(
 
         fun eventIds(): List<UUID> = eventIds.toList()
     }
+}
+
+private fun JdbcTemplate.seedReminderCandidate(
+    clubId: String,
+    userId: String,
+    membershipId: String,
+    sessionId: String,
+    policy: Boolean?,
+) {
+    insertReminderClub(clubId)
+    insertReminderHost(clubId, userId, membershipId)
+    insertReminderSession(clubId, sessionId)
+    policy?.let { insertReminderPolicy(clubId, membershipId, it) }
+}
+
+private fun JdbcTemplate.insertReminderClub(clubId: String) {
+    update(
+        """
+        insert into clubs (id, slug, name, tagline, about)
+        values (?, ?, 'Reminder Test Club', 'Read together', 'Reminder policy adapter test club.')
+        """.trimIndent(),
+        clubId,
+        "reminder-${clubId.takeLast(3)}",
+    )
+}
+
+private fun JdbcTemplate.insertReminderHost(
+    clubId: String,
+    userId: String,
+    membershipId: String,
+) {
+    update(
+        """
+        insert into users (id, google_subject_id, email, name, short_name, auth_provider)
+        values (?, ?, ?, 'Reminder Host', 'Host', 'GOOGLE')
+        """.trimIndent(),
+        userId,
+        "google-$userId",
+        "host-${clubId.takeLast(3)}@example.com",
+    )
+    update(
+        """
+        insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+        values (?, ?, ?, 'HOST', 'ACTIVE', utc_timestamp(6), 'Host')
+        """.trimIndent(),
+        membershipId,
+        clubId,
+        userId,
+    )
+}
+
+private fun JdbcTemplate.insertReminderSession(
+    clubId: String,
+    sessionId: String,
+) {
+    update(
+        """
+        insert into sessions (
+          id, club_id, number, title, book_title, book_author,
+          session_date, start_time, end_time, location_label,
+          question_deadline_at, state, visibility
+        ) values (
+          ?, ?, 9501, '리마인더 이벤트 테스트 회차', '리마인더 이벤트 테스트 책', '테스트 저자',
+          '2026-05-01', '19:30:00', '21:30:00', '온라인',
+          '2026-04-30 14:59:00.000000', 'OPEN', 'MEMBER'
+        )
+        """.trimIndent(),
+        sessionId,
+        clubId,
+    )
+}
+
+private fun JdbcTemplate.insertReminderPolicy(
+    clubId: String,
+    membershipId: String,
+    enabled: Boolean,
+) {
+    update(
+        """
+        insert into club_notification_policies (
+          club_id, session_reminder_enabled, updated_by_membership_id
+        ) values (?, ?, ?)
+        """.trimIndent(),
+        clubId,
+        enabled,
+        membershipId,
+    )
+}
+
+private fun JdbcTemplate.reminderEventCount(clubId: String): Int =
+    queryForObject(
+        """
+        select count(*)
+        from notification_event_outbox
+        where club_id = ?
+          and event_type = 'SESSION_REMINDER_DUE'
+        """.trimIndent(),
+        Int::class.java,
+        clubId,
+    ) ?: 0
+
+private fun assertOptedInReminderRow(jdbcTemplate: JdbcTemplate) {
+    val row =
+        jdbcTemplate.queryForMap(
+            """
+            select
+              event_type,
+              aggregate_type,
+              aggregate_id,
+              status,
+              kafka_topic,
+              kafka_key,
+              dedupe_key,
+              json_unquote(json_extract(payload_json, '$.sessionId')) as session_id,
+              cast(json_unquote(json_extract(payload_json, '$.sessionNumber')) as signed) as session_number,
+              json_unquote(json_extract(payload_json, '$.bookTitle')) as book_title,
+              json_unquote(json_extract(payload_json, '$.targetDate')) as target_date
+            from notification_event_outbox
+            where club_id = '00000000-0000-0000-0000-000000000910'
+            """.trimIndent(),
+        )
+
+    assertThat(row["event_type"]).isEqualTo("SESSION_REMINDER_DUE")
+    assertThat(row["aggregate_type"]).isEqualTo("SESSION")
+    assertThat(row["aggregate_id"]).isEqualTo("00000000-0000-0000-0000-000000009510")
+    assertThat(row["status"]).isEqualTo("PENDING")
+    assertThat(row["kafka_topic"]).isEqualTo(TEST_NOTIFICATION_EVENTS_TOPIC)
+    assertThat(row["kafka_key"]).isEqualTo("00000000-0000-0000-0000-000000000910")
+    assertThat(row["dedupe_key"])
+        .isEqualTo("session-reminder:2026-05-01:00000000-0000-0000-0000-000000009510")
+    assertThat(row["session_id"]).isEqualTo("00000000-0000-0000-0000-000000009510")
+    assertThat((row["session_number"] as Number).toInt()).isEqualTo(9501)
+    assertThat(row["book_title"]).isEqualTo("리마인더 이벤트 테스트 책")
+    assertThat(row["target_date"]).isEqualTo("2026-05-01")
 }

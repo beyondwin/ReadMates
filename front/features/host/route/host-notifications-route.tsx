@@ -5,7 +5,6 @@ import { HostNotificationsPage } from "@/features/host/ui/host-notifications-pag
 import type {
   HostNotificationDeliveryListResponse,
   HostNotificationEventListResponse,
-  ManualNotificationOptionsResponse,
   NotificationTestMailAuditPage,
 } from "@/features/host/api/host-contracts";
 import {
@@ -15,6 +14,7 @@ import {
   hostNotificationKeys,
   hostNotificationManualDispatchesQuery,
   hostNotificationManualOptionsQuery,
+  hostNotificationPolicyQuery,
   hostNotificationSessionsQuery,
   hostNotificationSummaryQuery,
   useConfirmManualNotificationMutation,
@@ -23,6 +23,7 @@ import {
   useRestoreHostNotificationMutation,
   useRetryHostNotificationMutation,
   useSendHostNotificationTestMailMutation,
+  useUpdateHostNotificationPolicyMutation,
   type ManualOptionsQueryRequest,
 } from "@/features/host/queries/host-notification-queries";
 import type { ReadmatesApiContext } from "@/shared/api/client";
@@ -32,6 +33,7 @@ import {
   pageRequests,
 } from "@/shared/query/cursor-pagination";
 import type { HostNotificationsRouteData } from "./host-notifications-data";
+import { combineManualOptions } from "./host-notifications-route-model";
 
 const HOST_NOTIFICATION_LEDGER_PAGE_LIMIT = 50;
 const MANUAL_DISPATCH_PAGE_LIMIT = 20;
@@ -39,29 +41,6 @@ const MANUAL_MEMBER_PAGE_LIMIT = 50;
 
 function contextFromClubSlug(clubSlug?: string): ReadmatesApiContext | undefined {
   return clubSlug ? { clubSlug } : undefined;
-}
-
-function combineManualOptions(
-  pages: Array<ManualNotificationOptionsResponse | undefined>,
-): ManualNotificationOptionsResponse {
-  const first = pages.find(Boolean);
-  const last = [...pages].reverse().find(Boolean);
-  if (!first) {
-    return {
-      session: null,
-      templates: [],
-      members: { items: [], nextCursor: null },
-      recentDispatches: [],
-    };
-  }
-
-  return {
-    ...first,
-    members: {
-      items: pages.flatMap((page) => page?.members.items ?? []),
-      nextCursor: last?.members.nextCursor ?? null,
-    },
-  };
 }
 
 export function HostNotificationsRoute() {
@@ -74,6 +53,7 @@ export function HostNotificationsRoute() {
   const [auditCursors, setAuditCursors] = useState<string[]>([]);
   const [manualDispatchCursors, setManualDispatchCursors] = useState<string[]>([]);
   const [manualMemberCursors, setManualMemberCursors] = useState<string[]>([]);
+  const [policyError, setPolicyError] = useState<string | null>(null);
   const [manualOptionsRequest, setManualOptionsRequest] = useState<ManualOptionsQueryRequest>(() => ({
     sessionId: data.initialManualSelection.sessionId,
     page: { limit: MANUAL_MEMBER_PAGE_LIMIT },
@@ -81,6 +61,7 @@ export function HostNotificationsRoute() {
 
   const summaryQuery = useQuery(hostNotificationSummaryQuery(context));
   const sessionsQuery = useQuery(hostNotificationSessionsQuery(context));
+  const policyQuery = useQuery(hostNotificationPolicyQuery(context));
 
   const eventPageRequests = pageRequests(HOST_NOTIFICATION_LEDGER_PAGE_LIMIT, eventCursors);
   const deliveryPageRequests = pageRequests(HOST_NOTIFICATION_LEDGER_PAGE_LIMIT, deliveryCursors);
@@ -125,6 +106,7 @@ export function HostNotificationsRoute() {
   const testMailMutation = useSendHostNotificationTestMailMutation(context);
   const previewManualMutation = usePreviewManualNotificationMutation();
   const confirmManualMutation = useConfirmManualNotificationMutation(context);
+  const updatePolicyMutation = useUpdateHostNotificationPolicyMutation(context);
   const isAnyQueryFetching =
     summaryQuery.isFetching ||
     sessionsQuery.isFetching ||
@@ -185,6 +167,15 @@ export function HostNotificationsRoute() {
       manualOptions={manualOptions}
       manualDispatches={manualDispatches.items}
       initialManualSelection={data.initialManualSelection}
+      policy={policyQuery.data}
+      policyPending={updatePolicyMutation.isPending}
+      policyError={policyError}
+      policyLoadError={
+        policyQuery.isError && !policyQuery.data
+          ? "자동 리마인더 정책을 불러오지 못했습니다."
+          : null
+      }
+      policyLoading={policyQuery.isFetching && !policyQuery.data}
       hasMoreEvents={Boolean(events.nextCursor)}
       hasMoreDeliveries={Boolean(deliveries.nextCursor)}
       hasMoreAudit={Boolean(audit.nextCursor)}
@@ -222,6 +213,18 @@ export function HostNotificationsRoute() {
       }}
       onLoadManualOptions={loadManualOptions}
       onLoadMoreManualMembers={loadMoreManualMembers}
+      onPolicyChange={async (enabled) => {
+        setPolicyError(null);
+        try {
+          await updatePolicyMutation.mutateAsync({ sessionReminderEnabled: enabled });
+        } catch {
+          setPolicyError("리마인더 정책을 저장하지 못했습니다. 다시 시도해 주세요.");
+        }
+      }}
+      onPolicyRetry={async () => {
+        setPolicyError(null);
+        await policyQuery.refetch();
+      }}
     />
   );
 }

@@ -138,6 +138,9 @@ class JdbcNotificationEventOutboxAdapter(
               'PENDING',
               concat('session-reminder:', ?, ':', sessions.id)
             from sessions
+            join club_notification_policies
+              on club_notification_policies.club_id = sessions.club_id
+             and club_notification_policies.session_reminder_enabled = true
             where sessions.session_date = ?
               and sessions.state in ('DRAFT', 'OPEN')
               and sessions.visibility in ('MEMBER', 'PUBLIC')

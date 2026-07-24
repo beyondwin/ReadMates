@@ -1,7 +1,9 @@
 package com.readmates.sessionrecord.adapter.out.persistence
 
 import com.readmates.auth.domain.MembershipRole
+import com.readmates.notification.domain.NotificationEventType
 import com.readmates.session.application.SessionRecordVisibility
+import com.readmates.sessionrecord.application.model.ApplySessionRecordCommand
 import com.readmates.sessionrecord.application.model.SaveSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.SessionRecordEntry
 import com.readmates.sessionrecord.application.model.SessionRecordFeedbackDocument
@@ -15,6 +17,7 @@ import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.jdbc.core.JdbcTemplate
 import java.time.LocalDateTime
@@ -191,6 +194,138 @@ class JdbcSessionRecordAdapterTest(
         ).containsExactly("BASELINE", "MANUAL")
     }
 
+    @Test
+    fun `apply receipt lookup is scoped by club session and request while retaining the actor`() {
+        val fixture = fixture("receipt")
+        val live = requireNotNull(adapter.loadLive(fixture.host, fixture.sessionId))
+        val draft =
+            adapter.insertDraft(
+                fixture.host,
+                live,
+                SaveSessionRecordDraftCommand(fixture.sessionId, fixture.snapshot, null),
+                codec.encode(fixture.snapshot),
+            )
+        val editor = requireNotNull(adapter.lockEditor(fixture.host, fixture.sessionId))
+        adapter.insertBaselineIfAbsent(fixture.host, live, codec.encode(live.snapshot))
+        val revision = adapter.insertAppliedRevision(fixture.host, editor, codec.encode(draft.snapshot))
+        val requestId = UUID.randomUUID()
+        val command =
+            ApplySessionRecordCommand(
+                sessionId = fixture.sessionId,
+                applyRequestId = requestId,
+                expectedDraftRevision = draft.draftRevision,
+                expectedLiveRevision = live.revision,
+                expectedDraftHash = codec.encode(draft.snapshot).sha256,
+            )
+
+        val inserted =
+            adapter.insertApplyReceipt(
+                fixture.host,
+                command,
+                command.expectedDraftHash,
+                NotificationEventType.SESSION_RECORD_UPDATED,
+                revision,
+            )
+
+        assertThat(adapter.findApplyReceipt(fixture.host, fixture.sessionId, requestId)).isEqualTo(inserted)
+        assertThat(inserted.hostMembershipId).isEqualTo(fixture.host.membershipId)
+        assertThat(
+            adapter.findApplyReceipt(
+                fixture.host.copy(membershipId = UUID.randomUUID()),
+                fixture.sessionId,
+                requestId,
+            ),
+        ).isEqualTo(inserted)
+        assertThat(
+            adapter.findApplyReceipt(
+                fixture.host.copy(clubId = UUID.randomUUID()),
+                fixture.sessionId,
+                requestId,
+            ),
+        ).isNull()
+        assertThat(
+            adapter.findApplyReceipt(
+                fixture.host,
+                UUID.randomUUID(),
+                requestId,
+            ),
+        ).isNull()
+    }
+
+    @Test
+    fun `same apply request id is independent across sessions in one club`() {
+        val first = fixture("receipt-session-one")
+        val second = additionalSession(first.host, "receipt-session-two")
+        val requestId = UUID.randomUUID()
+
+        val firstReceipt = insertReceipt(first, requestId)
+        val secondReceipt = insertReceipt(second, requestId)
+
+        assertThat(firstReceipt.revision.sessionId).isEqualTo(first.sessionId)
+        assertThat(secondReceipt.revision.sessionId).isEqualTo(second.sessionId)
+        assertThat(secondReceipt.revision.id).isNotEqualTo(firstReceipt.revision.id)
+        assertThat(adapter.findApplyReceipt(first.host, first.sessionId, requestId)).isEqualTo(firstReceipt)
+        assertThat(adapter.findApplyReceipt(first.host, second.sessionId, requestId)).isEqualTo(secondReceipt)
+    }
+
+    @Test
+    fun `apply receipt revision foreign key rejects a revision from another session`() {
+        val first = fixture("receipt-fk-one")
+        val second = additionalSession(first.host, "receipt-fk-two")
+        val firstReceipt = insertReceipt(first, UUID.randomUUID())
+
+        assertThatThrownBy {
+            jdbcTemplate.update(
+                """
+                insert into session_record_apply_receipts (
+                  id, apply_request_id, club_id, session_id, host_membership_id,
+                  expected_draft_revision, expected_live_revision, draft_sha256,
+                  composer_event_type, revision_id
+                ) values (?, ?, ?, ?, ?, 1, 0, ?, 'SESSION_RECORD_UPDATED', ?)
+                """.trimIndent(),
+                UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(),
+                first.host.clubId.toString(),
+                second.sessionId.toString(),
+                first.host.membershipId.toString(),
+                "a".repeat(64),
+                firstReceipt.revision.id.toString(),
+            )
+        }.isInstanceOf(DataIntegrityViolationException::class.java)
+    }
+
+    private fun insertReceipt(
+        fixture: Fixture,
+        requestId: UUID,
+    ): com.readmates.sessionrecord.application.model.SessionRecordApplyReceipt {
+        val live = requireNotNull(adapter.loadLive(fixture.host, fixture.sessionId))
+        val draft =
+            adapter.insertDraft(
+                fixture.host,
+                live,
+                SaveSessionRecordDraftCommand(fixture.sessionId, fixture.snapshot, null),
+                codec.encode(fixture.snapshot),
+            )
+        val editor = requireNotNull(adapter.lockEditor(fixture.host, fixture.sessionId))
+        adapter.insertBaselineIfAbsent(fixture.host, live, codec.encode(live.snapshot))
+        val revision = adapter.insertAppliedRevision(fixture.host, editor, codec.encode(draft.snapshot))
+        val command =
+            ApplySessionRecordCommand(
+                sessionId = fixture.sessionId,
+                applyRequestId = requestId,
+                expectedDraftRevision = draft.draftRevision,
+                expectedLiveRevision = live.revision,
+                expectedDraftHash = codec.encode(draft.snapshot).sha256,
+            )
+        return adapter.insertApplyReceipt(
+            fixture.host,
+            command,
+            command.expectedDraftHash,
+            NotificationEventType.SESSION_RECORD_UPDATED,
+            revision,
+        )
+    }
+
     @Suppress("LongMethod")
     private fun fixture(label: String): Fixture {
         val clubId = UUID.randomUUID()
@@ -286,6 +421,76 @@ class JdbcSessionRecordAdapterTest(
                     highlights = listOf(SessionRecordEntry(membershipId, "호스트", "하이라이트")),
                     oneLineReviews = listOf(SessionRecordEntry(membershipId, "호스트", "한줄평")),
                     feedbackDocument = SessionRecordFeedbackDocument("feedback.md", "피드백", "# 피드백"),
+                ),
+        )
+    }
+
+    @Suppress("LongMethod")
+    private fun additionalSession(
+        host: CurrentMember,
+        label: String,
+    ): Fixture {
+        val sessionId = UUID.randomUUID()
+        jdbcTemplate.update(
+            """
+            insert into sessions (id, club_id, number, title, book_title, book_author, session_date, start_time, end_time,
+                                  location_label, question_deadline_at, state, visibility)
+            values (?, ?, 2, ?, '테스트 책 2', '테스트 저자', '2026-07-21', '19:00:00', '21:00:00',
+                    '테스트 장소', '2026-07-20 00:00:00', 'CLOSED', 'MEMBER')
+            """.trimIndent(),
+            sessionId.toString(),
+            host.clubId.toString(),
+            "테스트 회차 $label",
+        )
+        jdbcTemplate.update(
+            """
+            insert into public_session_publications (id, club_id, session_id, public_summary, is_public, visibility)
+            values (?, ?, ?, '요약 2', false, 'MEMBER')
+            """.trimIndent(),
+            UUID.randomUUID().toString(),
+            host.clubId.toString(),
+            sessionId.toString(),
+        )
+        jdbcTemplate.update(
+            """
+            insert into highlights (id, club_id, session_id, membership_id, text, sort_order)
+            values (?, ?, ?, ?, '하이라이트 2', 0)
+            """.trimIndent(),
+            UUID.randomUUID().toString(),
+            host.clubId.toString(),
+            sessionId.toString(),
+            host.membershipId.toString(),
+        )
+        jdbcTemplate.update(
+            """
+            insert into one_line_reviews (id, club_id, session_id, membership_id, text, visibility)
+            values (?, ?, ?, ?, '한줄평 2', 'SESSION')
+            """.trimIndent(),
+            UUID.randomUUID().toString(),
+            host.clubId.toString(),
+            sessionId.toString(),
+            host.membershipId.toString(),
+        )
+        jdbcTemplate.update(
+            """
+            insert into session_feedback_documents (
+              id, club_id, session_id, version, source_text, document_title, file_name, content_type, file_size
+            ) values (?, ?, ?, 1, '# 피드백 2', '피드백 2', 'feedback-2.md', 'text/markdown', 14)
+            """.trimIndent(),
+            UUID.randomUUID().toString(),
+            host.clubId.toString(),
+            sessionId.toString(),
+        )
+        return Fixture(
+            host = host,
+            sessionId = sessionId,
+            snapshot =
+                SessionRecordSnapshot(
+                    visibility = SessionRecordVisibility.MEMBER,
+                    publicationSummary = "요약 2",
+                    highlights = listOf(SessionRecordEntry(host.membershipId, "호스트", "하이라이트 2")),
+                    oneLineReviews = listOf(SessionRecordEntry(host.membershipId, "호스트", "한줄평 2")),
+                    feedbackDocument = SessionRecordFeedbackDocument("feedback-2.md", "피드백 2", "# 피드백 2"),
                 ),
         )
     }

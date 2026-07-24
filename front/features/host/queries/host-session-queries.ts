@@ -14,7 +14,6 @@ import {
   fetchManualNotificationDispatches,
   openHostSession,
   publishHostSession,
-  previewHostSessionVisibility,
   saveHostSessionAttendance,
   saveHostSessionPublication,
   saveHostSessionVisibility,
@@ -30,7 +29,7 @@ import type {
   HostSessionPublicationRequest,
   HostSessionRequest,
   HostSessionVisibilityRequest,
-  HostSessionVisibilityPreviewRequest,
+  HostSessionVisibilityUpdateResult,
   ManualNotificationDispatchListResponse,
   HostNotificationEventType,
   SessionImportRequest,
@@ -41,6 +40,7 @@ import {
   normalizePageRequest,
   pageFromNormalizedPageRequest,
 } from "@/shared/query/cursor-pagination";
+import { hostNotificationManualOptionsRootKey } from "./host-notification-query-key-helpers";
 
 export const DEFAULT_HOST_SESSION_LIST_LIMIT = 50;
 
@@ -206,7 +206,7 @@ export function invalidateHostSessionRecordSurfaces(
   sessionId: string,
   context?: ReadmatesApiContext,
 ) {
-  return invalidateSessionMutationSurfaces(client, sessionId, context, { manualDispatches: true });
+  return invalidateSessionMutationSurfaces(client, sessionId, context);
 }
 
 export function useCreateHostSessionMutation(context?: ReadmatesApiContext) {
@@ -279,26 +279,28 @@ export function usePublishHostSessionMutation(context?: ReadmatesApiContext) {
 
 export function useSaveHostSessionVisibilityMutation(context?: ReadmatesApiContext) {
   const client = useQueryClient();
-  return useMutation({
+  return useMutation<
+    HostSessionVisibilityUpdateResult,
+    Error,
+    { sessionId: string; request: HostSessionVisibilityRequest }
+  >({
     mutationFn: ({ sessionId, request }: { sessionId: string; request: HostSessionVisibilityRequest }) =>
       saveHostSessionVisibility(sessionId, request, context),
-    onSuccess: (response, variables) =>
-      invalidateOk(response, () =>
-        Promise.all([
-          invalidateHostSessionDetail(client, variables.sessionId, context),
-          invalidateHostSessionLists(client, context),
-          invalidateHostSessionDashboard(client, context),
-        ]),
-      ),
-  });
-}
-
-export function usePreviewHostSessionVisibilityMutation(context?: ReadmatesApiContext) {
-  return useMutation({
-    mutationFn: ({ sessionId, request }: {
-      sessionId: string;
-      request: HostSessionVisibilityPreviewRequest;
-    }) => previewHostSessionVisibility(sessionId, request, context),
+    onSuccess: (result, variables) => {
+      client.setQueryData(
+        hostSessionKeys.detail(variables.sessionId, context),
+        result.session,
+      );
+      if (result.composer) {
+        client.removeQueries({
+          queryKey: hostNotificationManualOptionsRootKey(context),
+        });
+      }
+      return Promise.all([
+        invalidateHostSessionLists(client, context),
+        invalidateHostSessionDashboard(client, context),
+      ]);
+    },
   });
 }
 
@@ -345,7 +347,6 @@ export function useCommitHostSessionImportMutation(context?: ReadmatesApiContext
         invalidateHostSessionLists(client, context),
         invalidateHostSessionDashboard(client, context),
         invalidateHostCurrentSession(client, context),
-        invalidateHostSessionManualDispatches(client, context),
       ]),
   });
 }

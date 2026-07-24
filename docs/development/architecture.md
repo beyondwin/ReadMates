@@ -127,9 +127,15 @@ adapter.in.web
 
 Notification slice는 MySQL `notification_event_outbox`를 이벤트 source of truth로 유지합니다. Relay scheduler가 publish 가능한 row를 Kafka topic `readmates.notification.events.v1`로 발행하고, 같은 Spring Boot 모듈의 Kafka consumer가 이벤트별 수신자를 계산해 멤버 선호도를 적용한 뒤 `notification_deliveries`와 `member_notifications`를 만듭니다. 이메일 발송은 `notification_deliveries`의 `EMAIL` row를 기준으로 재시도 가능한 side effect로 처리하고, in-app 알림은 `member_notifications`가 멤버 inbox source of truth입니다. 이벤트 발행 상태는 `notification_event_outbox`, 채널별 발송/skip 상태는 `notification_deliveries`, 멤버 inbox 상태는 `member_notifications`에 저장합니다.
 
-호스트가 다음 책을 처음 공개하거나 첫 피드백 문서를 적용하거나 이후 세션 기록을 수정하는 작업은 capability가 켜진 환경에서 preview 뒤 `SEND` 또는 `SKIP`을 명시해야 합니다. 기본 선택은 없으며 preview 만료, 대상 변경, stale live/draft revision, 재사용 요청은 fail closed합니다. 콘텐츠 변경, immutable revision, 결정 ledger, 선택적인 outbox event는 한 트랜잭션에서 처리되고, SEND로 생성된 outbox row는 `HOST_CONFIRMED` source와 `NEXT_BOOK_PUBLISHED`, `FEEDBACK_DOCUMENT_PUBLISHED`, `SESSION_RECORD_UPDATED` event type을 기록합니다. 예약 리마인더, 멤버 서평, AI ready 같은 비호스트 자동 흐름의 기존 event gate는 이 확인 절차를 사용하지 않습니다.
+호스트가 다음 책을 공개하거나 피드백 문서·세션 기록을 적용하는 콘텐츠 mutation은 알림 발송과 분리됩니다. 다음 책 변경은 콘텐츠 revision만 갱신하고, 세션 기록 적용은 콘텐츠·immutable revision·`session_record_apply_receipts`만 한 트랜잭션에서 갱신합니다. 이 경로는 legacy host-action decision이나 outbox row를 만들지 않고 현재 `contentRevision`을 가진 composer context만 반환합니다. `readmates.host-action-confirmation.required`는 staged session-record capability 노출만 제어하며 dispatch를 다시 결합하지 않습니다.
 
-호스트 수동 알림도 같은 outbox 파이프라인에 들어갑니다. 호스트는 `/api/host/notifications/manual/options`에서 세션별 템플릿, 대상 멤버, 최근 수동 발송 이력을 읽고, `/api/host/notifications/manual/preview`로 대상 수와 이메일 선호도 skip/missing 경고를 확인한 뒤, `/api/host/notifications/manual`로 확정합니다. Preview는 selection hash와 10분 TTL을 가진 `notification_manual_dispatch_previews` row로 저장되고, 확정 시 `notification_manual_dispatches`와 `notification_event_outbox` row가 같은 트랜잭션에서 만들어집니다. 이미 같은 세션/템플릿으로 최근 수동 발송이 있으면 confirm은 명시적인 `resendConfirmed` 없이는 실패합니다. `NEXT_BOOK_PUBLISHED`, `SESSION_REMINDER_DUE`, `FEEDBACK_DOCUMENT_PUBLISHED`만 수동 템플릿으로 열리며, `REVIEW_PUBLISHED`는 사용자가 작성한 서평 이벤트에 묶인 자동 알림으로 유지합니다.
+호스트 수동 알림은 별도 composer를 통해 같은 outbox 파이프라인에 들어갑니다. 호스트는 `/api/host/notifications/manual/options`에서 세션별 템플릿, 현재 `contentRevision`, 대상 멤버, 최근 수동 발송 이력을 읽고, `/api/host/notifications/manual/preview`로 대상 수와 이메일 선호도 skip/missing 경고를 확인한 뒤, `/api/host/notifications/manual`로 확정합니다. Preview는 selection hash와 10분 TTL을 가진 `notification_manual_dispatch_previews` row로 저장되고, 확정 시 `notification_manual_dispatches`와 `notification_event_outbox` row가 같은 트랜잭션에서 만들어집니다. Stale content revision, 만료된 preview, 선택 대상 변경, 클럽 밖·비활성 회원, 같은 session/template/revision의 중복 발송은 fail closed하며, 재발송은 명시적인 `resendConfirmed`가 필요합니다. `NEXT_BOOK_PUBLISHED`, `SESSION_REMINDER_DUE`, `FEEDBACK_DOCUMENT_PUBLISHED`, `SESSION_RECORD_UPDATED`만 수동 템플릿으로 열리며, `REVIEW_PUBLISHED`는 사용자가 작성한 서평 이벤트에 묶인 자동 알림으로 유지합니다.
+
+```text
+content mutation -> content/revision/apply receipt only
+manual options -> preview -> confirm -> manual dispatch + outbox
+policy ON scheduler -> automatic reminder outbox
+```
 
 `NotificationDeliveryEngine`은 claimed email delivery의 SMTP 전송, retry/dead 전환, redacted error 저장, metrics/logging을 한 곳에서 처리하고, automatic event dispatch path, manual event dispatch path, pending-delivery worker path가 같은 engine을 사용합니다. 이메일 copy는 `notification.application.model`의 순수 template helper가 in-app 제목/본문/deep link, 이메일 subject, plain text, HTML을 함께 렌더링하고, SMTP adapter는 HTML이 있으면 plain text fallback을 포함한 multipart MIME으로 발송합니다. 호스트 알림 상세 API는 subject, masked recipient, deep link, allowlist metadata만 노출하고 plain/HTML body는 노출하지 않습니다. 테스트 메일 audit은 별도 `notification_test_mail_audit` table에 masked email과 hash만 저장합니다. 발행 조건, 생성 시점, relay/consumer 주기, 재시도 정책은 [OCI backend runbook](../deploy/oci-backend.md#email-notification-operations)을 기준으로 운영합니다. 패키지 경계는 아래처럼 web/scheduler/Kafka inbound adapter, application service, outbound port, persistence/mail/Kafka adapter로 나눕니다.
 
@@ -308,11 +314,13 @@ ReadMates는 클럽별로 하나의 현재 `OPEN` 세션과 여러 개의 예정
 
 ## 이메일 알림, 멤버 알림함, 호스트 운영
 
-멤버 알림 설정은 `/api/me/notifications/preferences`에서 읽고 저장합니다. 선호도 row가 없으면 기존 운영 알림(`NEXT_BOOK_PUBLISHED`, `SESSION_REMINDER_DUE`, `FEEDBACK_DOCUMENT_PUBLISHED`)은 켜짐, 서평 공개 알림(`REVIEW_PUBLISHED`)은 꺼짐으로 해석합니다. `/app/me`는 정식 멤버와 호스트에게 이 설정을 보여주며, 둘러보기 멤버는 저장 가능한 알림 설정을 보지 않습니다.
+멤버 알림 설정은 `/api/me/notifications/preferences`에서 읽고 저장합니다. 선호도 row가 없으면 운영 알림(`NEXT_BOOK_PUBLISHED`, `SESSION_REMINDER_DUE`, `FEEDBACK_DOCUMENT_PUBLISHED`, `SESSION_RECORD_UPDATED`)은 켜짐, 서평 공개 알림(`REVIEW_PUBLISHED`)은 꺼짐으로 해석합니다. `FEEDBACK_DOCUMENT_PUBLISHED`와 `SESSION_RECORD_UPDATED`는 같은 `feedback_document_published_enabled` 선호도를 공유합니다. `/app/me`는 정식 멤버와 호스트에게 이 설정을 보여주며, 둘러보기 멤버는 저장 가능한 알림 설정을 보지 않습니다.
 
 멤버 알림함은 `/api/me/notifications`, `/api/me/notifications/unread-count`, `/api/me/notifications/{id}/read`, `/api/me/notifications/read-all`을 사용합니다. `/app/notifications`는 `member_notifications`를 source of truth로 읽고, unread count, 개별 읽음 처리, 전체 읽음 처리를 제공합니다. 각 알림의 deep link를 열면 해당 알림을 읽음 처리한 뒤 대상 화면으로 이동합니다.
 
-호스트 알림 운영 페이지는 `/app/host/notifications`입니다. 이 페이지는 현재 host club의 event outbox row와 channel delivery row 목록, 이메일 pending/failed 처리, 개별 retry, `DEAD` delivery 복구, redesigned template helper를 사용하는 테스트 메일, 최근 테스트 메일 audit을 다룹니다. 같은 화면에서 호스트는 세션을 선택하고 수동 템플릿, 대상 그룹(`ALL_ACTIVE_MEMBERS`, `SESSION_PARTICIPANTS`, `CONFIRMED_ATTENDEES`), 채널(`IN_APP`, `EMAIL`, `BOTH`), 멤버별 포함/제외를 조합해 새 알림을 발송할 수 있습니다. Preview는 최종 대상 수, in-app/email 예상 건수, 이메일 설정으로 인한 skip, 이메일 누락, 중복 발송 여부를 보여주며, confirm 후 생성된 수동 dispatch는 event ledger에서 `source=MANUAL`과 manual metadata로 구분됩니다. 호스트 API 응답은 recipient email을 masked 값으로만 반환하고, detail metadata는 `sessionNumber`, `bookTitle`처럼 allowlist된 제품 metadata만 노출합니다.
+호스트 알림 운영 페이지는 `/app/host/notifications`입니다. 이 페이지는 현재 host club의 event outbox row와 channel delivery row 목록, 이메일 pending/failed 처리, 개별 retry, `DEAD` delivery 복구, redesigned template helper를 사용하는 테스트 메일, 최근 테스트 메일 audit을 다룹니다. 같은 화면과 콘텐츠 변경 직후 열린 composer에서 호스트는 세션을 선택하고 수동 템플릿, 대상 그룹(`ALL_ACTIVE_MEMBERS`, `SESSION_PARTICIPANTS`, `CONFIRMED_ATTENDEES`, `SELECTED_MEMBERS`), 채널(`IN_APP`, `EMAIL`, `BOTH`)을 조합해 새 알림을 발송할 수 있습니다. 이벤트별 기본 대상은 `NEXT_BOOK_PUBLISHED`·`SESSION_REMINDER_DUE`의 `ALL_ACTIVE_MEMBERS`, `FEEDBACK_DOCUMENT_PUBLISHED`·`SESSION_RECORD_UPDATED`의 `CONFIRMED_ATTENDEES`이고 기본 채널은 모두 `BOTH`입니다. 피드백 문서와 세션 기록은 전달 계획에서도 같은 `feedback_document_published_enabled` 멤버 선호도를 사용합니다. `FEEDBACK_DOCUMENT_PUBLISHED`의 CTA/options/preview는 `session_feedback_documents`의 최신 live 문서가 있을 때 제공되며, `OPEN` 세션도 그 current live 문서가 있으면 manual options → preview → confirm을 사용할 수 있습니다. `SELECTED_MEMBERS`는 호스트가 명시적으로 선택해야 하며 같은 클럽의 중복 없는 활성 membership ID를 한 명 이상 요구합니다. Preview는 최종 대상 수, in-app/email 예상 건수, 이메일 설정으로 인한 skip, 이메일 누락, 중복 발송 여부를 보여주며, confirm 후 생성된 수동 dispatch는 event ledger에서 `source=MANUAL`과 manual metadata로 구분됩니다. 호스트 API 응답은 recipient email을 masked 값으로만 반환하고, detail metadata는 `sessionNumber`, `bookTitle`처럼 allowlist된 제품 metadata만 노출합니다.
+
+클럽별 예약 리마인더 정책은 `GET/PUT /api/host/notifications/policy`로 읽고 저장합니다. Policy row가 없으면 `sessionReminderEnabled=false`이며, 호스트가 명시적으로 켠 클럽만 `NotificationReminderScheduler`가 `SESSION_REMINDER_DUE` outbox row를 만듭니다. 같은 대상 날짜의 scheduler 재실행은 기존 dedupe key로 중복 event를 만들지 않습니다.
 
 테스트 메일은 SMTP 호출 전 audit row를 먼저 예약해 host membership 단위 60초 cooldown을 직렬화합니다. 실패한 테스트 메일은 같은 audit row를 `FAILED`로 갱신하고, 저장/응답되는 error는 email, secret, token, credential 형태를 redaction한 뒤 길이를 제한합니다.
 
@@ -355,22 +363,21 @@ Public route/API에는 명시적으로 공개된 데이터만 나갑니다.
 피드백 문서는 모임 후 운영 산출물을 저장하고 읽기 좋게 제공하기 위한 기능입니다.
 
 ```text
-Session record package commit
+Session record final live apply
   |
-  | AI generation result or readmates-session-import:v1 JSON
+  | applies the current staged package (including AI or JSON import results)
   v
-SessionImportService validation and replacement
+`session_feedback_documents` 최신 live 문서
   |
-  | UTF-8, structured feedback template, session metadata, attendee authors
+  | host preview: GET /api/host/sessions/{sessionId}/feedback-document/preview
   v
-MySQL session_feedback_documents
+GET /api/sessions/{sessionId}/feedback-document
   |
-  | GET /api/sessions/{sessionId}/feedback-document
   v
 Readable response for active full member or host
 ```
 
-호스트는 더 이상 피드백 문서만 별도로 업로드하지 않습니다. 새 피드백 문서는 AI 생성 또는 `readmates-session-import:v1` JSON import commit이 세션 기록 패키지를 저장할 때 함께 교체됩니다.
+호스트는 더 이상 피드백 문서만 별도로 업로드하지 않습니다. AI 생성 또는 `readmates-session-import:v1` JSON import commit은 피드백 문서를 공통 staged draft에 저장하고 composer를 열지 않습니다. Member/public이 읽는 live 피드백 문서는 세션 기록 final apply가 성공할 때 함께 교체됩니다. Host preview route는 staged draft가 아니라 `session_feedback_documents`의 최신 live 문서를 읽으므로, `OPEN` 세션에서도 현재 live 문서가 있으면 피드백 알림 CTA와 manual composer가 사용할 수 있습니다.
 
 프런트엔드에는 `/app/feedback/:sessionId/print` route와 browser print 기반 helper가 남아 있지만, 현재 `front/shared/config/readmates-feature-flags.ts`의 `feedbackDocumentPdfDownloadsEnabled`가 `false`라서 사용자는 `PDF로 저장` 또는 자동 print action을 보지 않습니다. 이 기능을 다시 켤 때는 archive, my page, feedback document route, E2E print smoke를 함께 검증합니다.
 
@@ -402,10 +409,10 @@ Host commit
   |
   | POST /api/host/sessions/{sessionId}/session-import/commit
   v
-Replace publication summary, highlights, one-line reviews, feedback document
+Replace staged draft; live record remains unchanged until session-record apply
 ```
 
-Commit은 활성 호스트만 사용할 수 있고, `HOST_ONLY` 공개 범위에서는 저장을 거절합니다. JSON의 회차 번호, 책 제목, 모임 날짜는 현재 편집 중인 세션과 일치해야 하며, 하이라이트와 한줄평의 `authorName`은 해당 회차의 활성 참석자 이름과 매칭되어야 합니다. 저장은 기존 공개 요약, 하이라이트, 한줄평, 피드백 문서를 새 JSON 내용으로 교체하고, public/notes cache invalidation을 commit 이후 best-effort로 실행합니다. 파일 형식과 운영 검토 체크는 [session-import-generator.md](session-import-generator.md)를 기준으로 합니다.
+Commit은 활성 호스트만 사용할 수 있고, `HOST_ONLY` 공개 범위에서는 저장을 거절합니다. JSON의 회차 번호, 책 제목, 모임 날짜는 현재 편집 중인 세션과 일치해야 하며, 하이라이트와 한줄평의 `authorName`은 해당 회차의 활성 참석자 이름과 매칭되어야 합니다. Commit은 기존 live 공개 요약, 하이라이트, 한줄평, 피드백 문서를 직접 바꾸지 않고 공통 staged draft를 교체합니다. 이후 session-record apply가 expected draft/live revision과 draft hash를 검증해 live content와 immutable revision을 갱신하고, public/notes cache invalidation을 best-effort로 실행합니다. 파일 형식과 운영 검토 체크는 [session-import-generator.md](session-import-generator.md)를 기준으로 합니다.
 
 ## AI-assisted 콘텐츠 운영
 

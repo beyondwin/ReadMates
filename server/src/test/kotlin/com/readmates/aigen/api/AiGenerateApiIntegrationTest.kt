@@ -157,7 +157,7 @@ class AiGenerateApiIntegrationTest(
     @param:Autowired private val objectMapper: ObjectMapper,
 ) : ReadmatesRedisIntegrationTestSupport() {
     @Test
-    fun `full generation lifecycle - start, poll until SUCCEEDED, commit, then Redis payload cleaned`() {
+    fun `server AI generation commit persists an AI draft with zero notification outbox`() {
         val jobId = startJob("claude-sonnet-4-6", "AiGenHost 00:00\nPublic-safe integration statement.")
 
         // Wait for the Kafka consumer to dispatch to the worker and the stub to drive
@@ -637,6 +637,12 @@ class AiGenerateApiIntegrationTest(
         assertThat(draft["source"]).isEqualTo("AI_GENERATED")
         assertThat(draft["snapshot_json"].toString()).contains("AI Gen Book")
         assertThat(kindStatus).contains("FULL" to "SUCCESS", "COMMIT" to "SUCCESS")
+        assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from notification_event_outbox where aggregate_id = '$SESSION_ID'",
+                Int::class.java,
+            ),
+        ).isZero()
     }
 
     private fun unknownAuthorOverrideJson(): String =

@@ -3,21 +3,28 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
+  HostNotificationPolicyResponse,
   ManualNotificationConfirmRequest,
   ManualNotificationConfirmResponse,
 } from "@/features/host/api/host-contracts";
 
 vi.mock("@/features/host/api/host-api", () => ({
   confirmManualNotification: vi.fn(),
+  updateHostNotificationPolicy: vi.fn(),
 }));
 
-import { confirmManualNotification } from "@/features/host/api/host-api";
+import {
+  confirmManualNotification,
+  updateHostNotificationPolicy,
+} from "@/features/host/api/host-api";
 import {
   hostNotificationKeys,
   useConfirmManualNotificationMutation,
+  useUpdateHostNotificationPolicyMutation,
 } from "./host-notification-queries";
 
 const mockedConfirm = vi.mocked(confirmManualNotification);
+const mockedUpdatePolicy = vi.mocked(updateHostNotificationPolicy);
 
 function createWrapper() {
   const client = new QueryClient({
@@ -35,9 +42,15 @@ function createWrapper() {
 const confirmRequest: ManualNotificationConfirmRequest = {
   sessionId: "session-1",
   eventType: "SESSION_REMINDER_DUE",
+  contentRevision: "a".repeat(64),
   audience: "ALL_ACTIVE_MEMBERS",
-  channels: "BOTH",
-  previewToken: "token-abc",
+  requestedChannels: "BOTH",
+  selectedMembershipIds: [],
+  excludedMembershipIds: [],
+  includedMembershipIds: [],
+  sendMode: "NOW",
+  previewId: "preview-1",
+  resendConfirmed: false,
 };
 
 const confirmResponse: ManualNotificationConfirmResponse = {
@@ -45,25 +58,25 @@ const confirmResponse: ManualNotificationConfirmResponse = {
   eventId: "event-manual-1",
   status: "PUBLISHED",
   createdAt: "2026-05-18T00:00:00Z",
-  selection: {
-    sessionId: "session-1",
-    eventType: "SESSION_REMINDER_DUE",
-    audience: "ALL_ACTIVE_MEMBERS",
-    requestedChannels: "BOTH",
+  summary: {
     targetCount: 3,
+    requestedChannels: "BOTH",
+    expectedInAppCount: 3,
+    expectedEmailCount: 2,
   },
 };
 
 describe("useConfirmManualNotificationMutation", () => {
   beforeEach(() => {
     mockedConfirm.mockReset();
+    mockedUpdatePolicy.mockReset();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("invalidates overview and manual roots after a successful confirm", async () => {
+  it("invalidates dispatch, event, delivery, and summary keys after a successful confirm", async () => {
     mockedConfirm.mockResolvedValue(confirmResponse);
     const { client, Wrapper } = createWrapper();
     const invalidateSpy = vi.spyOn(client, "invalidateQueries");
@@ -83,10 +96,16 @@ describe("useConfirmManualNotificationMutation", () => {
 
     expect(mockedConfirm).toHaveBeenCalledWith(confirmRequest);
     expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: hostNotificationKeys.overview({ clubSlug: "reading-sai" }),
+      queryKey: hostNotificationKeys.manualDispatchesRoot({ clubSlug: "reading-sai" }),
     });
     expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: hostNotificationKeys.manual({ clubSlug: "reading-sai" }),
+      queryKey: hostNotificationKeys.eventsRoot({ clubSlug: "reading-sai" }),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: hostNotificationKeys.deliveriesRoot({ clubSlug: "reading-sai" }),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: hostNotificationKeys.summary({ clubSlug: "reading-sai" }),
     });
   });
 
@@ -132,14 +151,45 @@ describe("useConfirmManualNotificationMutation", () => {
     const invalidatedKeys = invalidateSpy.mock.calls.map((call) => call[0]?.queryKey);
     expect(invalidatedKeys).toEqual(
       expect.arrayContaining([
-        hostNotificationKeys.overview({ clubSlug: "other-club" }),
-        hostNotificationKeys.manual({ clubSlug: "other-club" }),
+        hostNotificationKeys.manualDispatchesRoot({ clubSlug: "other-club" }),
+        hostNotificationKeys.eventsRoot({ clubSlug: "other-club" }),
+        hostNotificationKeys.deliveriesRoot({ clubSlug: "other-club" }),
+        hostNotificationKeys.summary({ clubSlug: "other-club" }),
       ]),
     );
     expect(invalidatedKeys).not.toEqual(
       expect.arrayContaining([
-        hostNotificationKeys.overview({ clubSlug: "reading-sai" }),
+        hostNotificationKeys.summary({ clubSlug: "reading-sai" }),
       ]),
     );
+  });
+});
+
+describe("useUpdateHostNotificationPolicyMutation", () => {
+  it("invalidates only the club-scoped policy key after success", async () => {
+    const response: HostNotificationPolicyResponse = {
+      sessionReminderEnabled: true,
+      updatedAt: "2026-07-24T10:00:00+09:00",
+    };
+    mockedUpdatePolicy.mockResolvedValue(response);
+    const { client, Wrapper } = createWrapper();
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    const { result } = renderHook(
+      () => useUpdateHostNotificationPolicyMutation({ clubSlug: "reading-sai" }),
+      { wrapper: Wrapper },
+    );
+
+    await act(async () => {
+      await result.current.mutateAsync({ sessionReminderEnabled: true });
+    });
+
+    expect(mockedUpdatePolicy).toHaveBeenCalledWith(
+      { sessionReminderEnabled: true },
+      { clubSlug: "reading-sai" },
+    );
+    expect(invalidateSpy).toHaveBeenCalledTimes(1);
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: hostNotificationKeys.policy({ clubSlug: "reading-sai" }),
+    });
   });
 });

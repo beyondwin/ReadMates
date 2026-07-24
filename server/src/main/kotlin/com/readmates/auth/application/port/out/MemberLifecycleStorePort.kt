@@ -36,6 +36,8 @@ data class HostMemberListRow(
 )
 
 interface MemberLifecycleStorePort {
+    fun lockClubForUpdate(clubId: UUID)
+
     fun listMembers(
         clubId: UUID,
         pageRequest: PageRequest,

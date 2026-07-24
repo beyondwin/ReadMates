@@ -1,12 +1,9 @@
 package com.readmates.sessionrecord.api
 
-import com.readmates.notification.application.model.NotificationDecision
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.EnumSource
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -96,13 +93,17 @@ class HostSessionRecordControllerDbTest(
                 content =
                     """
                     {
+                      "applyRequestId": "00000000-0000-0000-0000-000000000123",
                       "expectedDraftRevision": 1,
-                      "expectedLiveRevision": 0
+                      "expectedLiveRevision": 0,
+                      "expectedDraftHash": "${"f".repeat(64)}",
+                      "previewId": "00000000-0000-0000-0000-000000000456",
+                      "notificationDecision": "SEND"
                     }
                     """.trimIndent()
             }.andExpect {
-                status { isConflict() }
-                jsonPath("$.code") { value("NOTIFICATION_CONFIRMATION_REQUIRED") }
+                status { isBadRequest() }
+                jsonPath("$.code") { value("SESSION_RECORD_INVALID_APPLY_CONTRACT") }
             }
 
         mockMvc
@@ -161,7 +162,136 @@ class HostSessionRecordControllerDbTest(
     }
 
     @Test
-    fun `first next book publication requires a preview and explicit decision`() {
+    @Suppress("LongMethod")
+    fun `apply receipt replays exactly and returns 409 for changed contract or actor`() {
+        val liveSnapshot =
+            mockMvc
+                .get("/api/host/sessions/$SESSION_ID/record-editor") {
+                    with(user("host@example.com"))
+                }.andExpect {
+                    status { isOk() }
+                }.andReturn()
+                .response.contentAsString
+                .let {
+                    tools.jackson.databind
+                        .ObjectMapper()
+                        .readTree(it)
+                        .get("liveSnapshot")
+                        .toString()
+                }
+        mockMvc
+            .patch("/api/host/sessions/$SESSION_ID/record-draft") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"expectedDraftRevision":null,"snapshot":$liveSnapshot}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.draftRevision") { value(1) }
+            }
+        val draftHash =
+            mockMvc
+                .post("/api/host/sessions/$SESSION_ID/record-apply-preview") {
+                    with(user("host@example.com"))
+                    with(csrf())
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"expectedDraftRevision":1,"expectedLiveRevision":0}"""
+                }.andExpect {
+                    status { isOk() }
+                }.andReturn()
+                .response.contentAsString
+                .let {
+                    tools.jackson.databind
+                        .ObjectMapper()
+                        .readTree(it)
+                        .get("expectedDraftHash")
+                        .asText()
+                }
+        val applyRequestId = "00000000-0000-0000-0000-000000000124"
+        val applyBody =
+            """
+            {
+              "applyRequestId": "$applyRequestId",
+              "expectedDraftRevision": 1,
+              "expectedLiveRevision": 0,
+              "expectedDraftHash": "$draftHash"
+            }
+            """.trimIndent()
+        val firstRevisionId =
+            mockMvc
+                .post("/api/host/sessions/$SESSION_ID/record-apply") {
+                    with(user("host@example.com"))
+                    with(csrf())
+                    contentType = MediaType.APPLICATION_JSON
+                    content = applyBody
+                }.andExpect {
+                    status { isOk() }
+                }.andReturn()
+                .response.contentAsString
+                .let {
+                    tools.jackson.databind
+                        .ObjectMapper()
+                        .readTree(it)
+                        .get("revisionId")
+                        .asText()
+                }
+
+        mockMvc
+            .post("/api/host/sessions/$SESSION_ID/record-apply") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = applyBody
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.revisionId") { value(firstRevisionId) }
+            }
+        mockMvc
+            .post("/api/host/sessions/$SESSION_ID/record-apply") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = applyBody.replace(draftHash, "f".repeat(64))
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("SESSION_RECORD_APPLY_REQUEST_ALREADY_USED") }
+                jsonPath("$.status") { value(409) }
+            }
+
+        jdbcTemplate.update(
+            """
+            update memberships
+            set role = 'HOST'
+            where club_id = '00000000-0000-0000-0000-000000000001'
+              and id = '00000000-0000-0000-0000-000000000202'
+            """.trimIndent(),
+        )
+        try {
+            mockMvc
+                .post("/api/host/sessions/$SESSION_ID/record-apply") {
+                    with(user("member1@example.com"))
+                    with(csrf())
+                    contentType = MediaType.APPLICATION_JSON
+                    content = applyBody
+                }.andExpect {
+                    status { isConflict() }
+                    jsonPath("$.code") { value("SESSION_RECORD_APPLY_REQUEST_ALREADY_USED") }
+                    jsonPath("$.status") { value(409) }
+                }
+        } finally {
+            jdbcTemplate.update(
+                """
+                update memberships
+                set role = 'MEMBER'
+                where club_id = '00000000-0000-0000-0000-000000000001'
+                  and id = '00000000-0000-0000-0000-000000000202'
+                """.trimIndent(),
+            )
+        }
+    }
+
+    @Test
+    fun `first next book publication returns composer without notification mutation`() {
         mockMvc
             .patch("/api/host/sessions/$VISIBILITY_SESSION_ID/visibility") {
                 with(user("host@example.com"))
@@ -169,8 +299,10 @@ class HostSessionRecordControllerDbTest(
                 contentType = MediaType.APPLICATION_JSON
                 content = """{"visibility":"MEMBER"}"""
             }.andExpect {
-                status { isConflict() }
-                jsonPath("$.code") { value("NOTIFICATION_CONFIRMATION_REQUIRED") }
+                status { isOk() }
+                jsonPath("$.session.visibility") { value("MEMBER") }
+                jsonPath("$.composer.eventType") { value("NEXT_BOOK_PUBLISHED") }
+                jsonPath("$.composer.contentRevision") { isString() }
             }
 
         val visibility =
@@ -179,7 +311,9 @@ class HostSessionRecordControllerDbTest(
                 String::class.java,
                 VISIBILITY_SESSION_ID,
             )
-        assertThat(visibility).isEqualTo("HOST_ONLY")
+        assertThat(visibility).isEqualTo("MEMBER")
+        assertThat(notificationEventCount()).isZero()
+        assertThat(notificationDecisionCount()).isZero()
     }
 
     @Test
@@ -215,70 +349,41 @@ class HostSessionRecordControllerDbTest(
             }
     }
 
-    @ParameterizedTest
-    @EnumSource(NotificationDecision::class)
-    fun `confirmed next book publication records send or skip exactly once`(decision: NotificationDecision) {
-        val previewResponse =
-            mockMvc
-                .post("/api/host/sessions/$VISIBILITY_SESSION_ID/visibility-preview") {
-                    with(user("host@example.com"))
-                    with(csrf())
-                    contentType = MediaType.APPLICATION_JSON
-                    content = """{"visibility":"MEMBER"}"""
-                }.andExpect {
-                    status { isOk() }
-                    jsonPath("$.previewId") { isString() }
-                }.andReturn()
-                .response
-                .contentAsString
-        val previewId =
-            """"previewId"\s*:\s*"([^"]+)""""
-                .toRegex()
-                .find(previewResponse)
-                ?.groupValues
-                ?.get(1)
-                ?: error("visibility preview response did not include previewId")
-        val request =
-            """
-            {
-              "visibility": "MEMBER",
-              "previewId": "$previewId",
-              "notificationDecision": "$decision"
-            }
-            """.trimIndent()
-
+    @Test
+    fun `repeated next book publication update never creates notification or legacy decision`() {
         repeat(2) {
             mockMvc
                 .patch("/api/host/sessions/$VISIBILITY_SESSION_ID/visibility") {
                     with(user("host@example.com"))
                     with(csrf())
                     contentType = MediaType.APPLICATION_JSON
-                    content = request
+                    content = """{"visibility":"MEMBER"}"""
                 }.andExpect {
                     status { isOk() }
-                    jsonPath("$.visibility") { value("MEMBER") }
+                    jsonPath("$.session.visibility") { value("MEMBER") }
                 }
         }
 
-        val decisionCount =
-            jdbcTemplate.queryForObject(
-                "select count(*) from host_action_notification_decisions where preview_id = ?",
-                Int::class.java,
-                previewId,
-            )
-        val eventCount =
-            jdbcTemplate.queryForObject(
-                """
-                select count(*) from notification_event_outbox
-                where aggregate_id = ? and event_type = 'NEXT_BOOK_PUBLISHED'
-                """.trimIndent(),
-                Int::class.java,
-                VISIBILITY_SESSION_ID,
-            )
-        assertThat(decisionCount).isEqualTo(1)
-        assertThat(eventCount)
-            .isEqualTo(if (decision == NotificationDecision.SEND) 1 else 0)
+        assertThat(notificationDecisionCount()).isZero()
+        assertThat(notificationEventCount()).isZero()
     }
+
+    private fun notificationDecisionCount(): Int =
+        jdbcTemplate.queryForObject(
+            "select count(*) from host_action_notification_decisions where session_id = ?",
+            Int::class.java,
+            VISIBILITY_SESSION_ID,
+        ) ?: 0
+
+    private fun notificationEventCount(): Int =
+        jdbcTemplate.queryForObject(
+            """
+            select count(*) from notification_event_outbox
+            where aggregate_id = ? and event_type = 'NEXT_BOOK_PUBLISHED'
+            """.trimIndent(),
+            Int::class.java,
+            VISIBILITY_SESSION_ID,
+        ) ?: 0
 
     private fun draftJson(expectedDraftRevision: Long?): String {
         val revision = expectedDraftRevision?.toString() ?: "null"
@@ -325,6 +430,8 @@ private const val CLEAN_RECORD_API_FIXTURES = """
     );
     delete from notification_event_outbox
     where aggregate_id = '00000000-0000-0000-0000-000000099301';
+    delete from session_record_apply_receipts
+    where session_id = '00000000-0000-0000-0000-000000000301';
     delete from session_record_drafts
     where session_id = '00000000-0000-0000-0000-000000000301';
     delete from session_record_revisions

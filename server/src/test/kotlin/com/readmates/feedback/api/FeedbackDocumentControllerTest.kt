@@ -93,6 +93,71 @@ private const val RESET_SESSION_ONE_PUBLISHED_SQL = """
       and id = '00000000-0000-0000-0000-000000000301';
 """
 
+private const val CREATE_OPEN_SESSION_WITHOUT_DOCUMENT_SQL = """
+    insert into sessions (
+      id,
+      club_id,
+      number,
+      title,
+      book_title,
+      book_author,
+      session_date,
+      start_time,
+      end_time,
+      location_label,
+      question_deadline_at,
+      state
+    )
+    values (
+      '00000000-0000-0000-0000-000000000995',
+      '00000000-0000-0000-0000-000000000001',
+      99,
+      '99회차 · 문서 없음',
+      '문서 없음',
+      '테스트 저자',
+      '2026-12-31',
+      '19:30:00',
+      '21:30:00',
+      '온라인',
+      '2026-12-30 14:59:00',
+      'OPEN'
+    );
+"""
+
+private const val CLEANUP_OPEN_SESSION_WITHOUT_DOCUMENT_SQL = """
+    delete from sessions
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and id = '00000000-0000-0000-0000-000000000995';
+"""
+
+private const val CREATE_FOREIGN_CLUB_HOST_SQL = """
+    insert into users (id, email, name, short_name, auth_provider)
+    values (
+      '00000000-0000-0000-0000-000000000991',
+      'feedback.foreign.host@example.com',
+      '외부 호스트',
+      '외부',
+      'PASSWORD'
+    );
+    insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+    values (
+      '00000000-0000-0000-0000-000000000992',
+      '00000000-0000-0000-0000-000000000002',
+      '00000000-0000-0000-0000-000000000991',
+      'HOST',
+      'ACTIVE',
+      utc_timestamp(6),
+      '외부'
+    );
+"""
+
+private const val CLEANUP_FOREIGN_CLUB_HOST_SQL = """
+    delete from memberships
+    where id = '00000000-0000-0000-0000-000000000992';
+    delete from users
+    where id = '00000000-0000-0000-0000-000000000991';
+"""
+
 @SpringBootTest(
     properties = [
         "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
@@ -153,7 +218,7 @@ class FeedbackDocumentControllerTest(
         ],
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
-    fun `open session feedback document is not listed or directly readable`() {
+    fun `open session feedback document is omitted from archive but directly readable`() {
         mockMvc
             .get("/api/feedback-documents/me") {
                 with(user("member5@example.com"))
@@ -174,14 +239,16 @@ class FeedbackDocumentControllerTest(
             .get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
                 with(user("member5@example.com"))
             }.andExpect {
-                status { isNotFound() }
+                status { isOk() }
+                jsonPath("$.sessionNumber") { value(1) }
             }
 
         mockMvc
             .get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
                 with(user("host@example.com"))
             }.andExpect {
-                status { isNotFound() }
+                status { isOk() }
+                jsonPath("$.sessionNumber") { value(1) }
             }
     }
 
@@ -344,6 +411,99 @@ class FeedbackDocumentControllerTest(
                 status { isOk() }
                 jsonPath("$.uploaded") { value(true) }
                 jsonPath("$.fileName") { value("251126 1차.md") }
+            }
+    }
+
+    @Test
+    @Sql(
+        statements = [
+            MARK_SESSION_ONE_OPEN_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            RESET_SESSION_ONE_PUBLISHED_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `host previews an open session feedback document`() {
+        mockMvc
+            .get("/api/host/sessions/00000000-0000-0000-0000-000000000301/feedback-document/preview") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000000301") }
+                jsonPath("$.sessionNumber") { value(1) }
+                jsonPath("$.fileName") { value("251126 1차.md") }
+            }
+    }
+
+    @Test
+    @Sql(
+        statements = [
+            MARK_SESSION_ONE_OPEN_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            RESET_SESSION_ONE_PUBLISHED_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `member cannot preview a host feedback document`() {
+        mockMvc
+            .get("/api/host/sessions/00000000-0000-0000-0000-000000000301/feedback-document/preview") {
+                with(user("member5@example.com"))
+            }.andExpect {
+                status { isForbidden() }
+            }
+    }
+
+    @Test
+    @Sql(
+        statements = [
+            MARK_SESSION_ONE_OPEN_SQL,
+            CREATE_FOREIGN_CLUB_HOST_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            CLEANUP_FOREIGN_CLUB_HOST_SQL,
+            RESET_SESSION_ONE_PUBLISHED_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `host cannot preview another club feedback document`() {
+        mockMvc
+            .get("/api/host/sessions/00000000-0000-0000-0000-000000000301/feedback-document/preview") {
+                with(user("feedback.foreign.host@example.com"))
+            }.andExpect {
+                status { isNotFound() }
+            }
+    }
+
+    @Test
+    @Sql(
+        statements = [
+            CREATE_OPEN_SESSION_WITHOUT_DOCUMENT_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            CLEANUP_OPEN_SESSION_WITHOUT_DOCUMENT_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `host preview returns not found when open session has no document`() {
+        mockMvc
+            .get("/api/host/sessions/00000000-0000-0000-0000-000000000995/feedback-document/preview") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isNotFound() }
             }
     }
 

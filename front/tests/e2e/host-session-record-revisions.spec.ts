@@ -19,7 +19,6 @@ const UPDATED_SUMMARY = "알림과 함께 적용하는 수정 요약";
 
 let recordSessionId = "";
 let recordSessionNumber = 0;
-let nextBookSessionId = "";
 
 function resetRevisionWorkflowState() {
   resetE2eState({
@@ -51,7 +50,7 @@ async function waitForDraftSaved(page: Page) {
   await expect(page.getByText("초안 저장됨 · 검토 후 반영").first()).toBeVisible({ timeout: 15_000 });
 }
 
-async function reviewAndApply(page: Page, decision: "SEND" | "SKIP") {
+async function reviewAndApply(page: Page) {
   const previewResponse = page.waitForResponse(
     (response) =>
       response.request().method() === "POST" &&
@@ -60,21 +59,19 @@ async function reviewAndApply(page: Page, decision: "SEND" | "SKIP") {
   );
   await page.getByRole("button", { name: "변경사항 검토" }).click();
   expect((await previewResponse).ok()).toBe(true);
-  await expect(page.getByRole("radio", { name: "알림 보내고 반영" })).not.toBeChecked();
-  await expect(page.getByRole("radio", { name: "알림 없이 반영" })).not.toBeChecked();
-  await expect(page.getByRole("button", { name: "선택대로 반영" })).toBeDisabled();
-  await page.getByRole("radio", {
-    name: decision === "SEND" ? "알림 보내고 반영" : "알림 없이 반영",
-  }).click();
+  const dialog = page.getByRole("dialog", { name: "기록 반영 확인" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("radio")).toHaveCount(0);
   const applyResponse = page.waitForResponse(
     (response) =>
       response.request().method() === "POST" &&
       response.url().includes(`/host/sessions/${recordSessionId}/record-apply`) &&
-      !response.url().endsWith("/record-apply-preview"),
+      !new URL(response.url()).pathname.endsWith("/record-apply-preview"),
   );
-  await page.getByRole("button", { name: "선택대로 반영" }).click();
+  await dialog.getByRole("button", { name: "기록 반영" }).click();
   const applied = await applyResponse;
   expect(applied.status(), await applied.text()).toBe(200);
+  await expect(page.getByRole("dialog", { name: "알림 보내기" })).toBeVisible();
 }
 
 function feedbackMarkdown(sessionNumber: number, authorName: string) {
@@ -308,28 +305,33 @@ test("3. JSON import saves the shared draft while member and public live content
   await expect(page.getByText(RECORD_SUMMARY)).toHaveCount(0);
 });
 
-test("4. SKIP applies an immutable revision without creating a notification event", async ({ page }) => {
+test("4. apply then composer skip creates a revision without a notification event", async ({ page }) => {
   await loginHost(page);
   await openRecordEditor(page);
   const before = await readSessionRecordRevisionCount(recordSessionId);
   await waitForDraftSaved(page);
-  await reviewAndApply(page, "SKIP");
-  await expect.poll(() => readHostActionDecision(recordSessionId)).toBe("SKIP");
+  await reviewAndApply(page);
+  await page.getByRole("button", { name: "이번에는 보내지 않기" }).click();
+  await expect(page.getByRole("dialog", { name: "알림 보내기" })).toBeHidden();
+  expect(await readHostActionDecision(recordSessionId)).toBeNull();
   await expect.poll(() => readSessionRecordRevisionCount(recordSessionId)).toBeGreaterThan(before);
   expect(await readNotificationEventCount(recordSessionId, "FEEDBACK_DOCUMENT_PUBLISHED")).toBe(0);
   expect(await readNotificationEventCount(recordSessionId, "SESSION_RECORD_UPDATED")).toBe(0);
   await expect(page.getByRole("region", { name: "현재 적용된 공개 기록" })).toContainText(RECORD_SUMMARY);
 });
 
-test("5. SEND applies a later revision and creates exactly one session-record event", async ({ page }) => {
+test("5. apply then composer confirm creates exactly one session-record event", async ({ page }) => {
   await loginHost(page);
   await openRecordEditor(page);
   const before = await readSessionRecordRevisionCount(recordSessionId);
   await page.getByLabel("공개 요약").fill(UPDATED_SUMMARY);
   await waitForDraftSaved(page);
-  await reviewAndApply(page, "SEND");
-  await expect.poll(() => readHostActionDecision(recordSessionId)).toBe("SEND");
+  await reviewAndApply(page);
   await expect.poll(() => readSessionRecordRevisionCount(recordSessionId)).toBe(before + 1);
+  await page.getByRole("button", { name: "알림 미리보기" }).click();
+  await expect(page.getByRole("region", { name: "발송 전 확인" })).toBeVisible();
+  await page.getByRole("button", { name: "발송 확인" }).click();
+  expect(await readHostActionDecision(recordSessionId)).toBeNull();
   await expect.poll(() => readNotificationEventCount(recordSessionId, "SESSION_RECORD_UPDATED")).toBe(1);
   await expect(page.getByRole("region", { name: "현재 적용된 공개 기록" })).toContainText(UPDATED_SUMMARY);
 });
@@ -352,52 +354,13 @@ test("6. restoring an immutable revision creates a new draft and a new applied r
   await page.getByRole("button", { name: "새 초안으로 복원" }).click();
   expect((await restoreResponse).ok()).toBe(true);
   await waitForDraftSaved(page);
-  await reviewAndApply(page, "SKIP");
+  await reviewAndApply(page);
+  await page.getByRole("button", { name: "이번에는 보내지 않기" }).click();
   await expect.poll(() => readSessionRecordRevisionCount(recordSessionId)).toBe(before + 1);
   await expect(page.getByText("과거 revision 복원").first()).toBeVisible();
 });
 
-test("7. next-book publication supports cancel, SKIP, and SEND without a default decision", async ({ page }) => {
-  await loginHost(page);
-  await page.goto(`${HOST_PATH}/sessions/new`);
-  await page.getByLabel("세션 제목").fill("Next Book Confirmation Session");
-  await page.getByLabel("책 제목").fill("Next Book Confirmation Book");
-  await page.getByLabel("저자").fill("Public Fixture Author");
-  await page.getByLabel("모임 날짜").fill("2026-08-20");
-  await page.getByRole("button", { name: "세션 문서 저장" }).click();
-  await expect(page).toHaveURL(/\/app\/host\/sessions\/[^/]+\/edit/);
-  await expect(page.getByRole("heading", { name: /세션 문서 편집/ })).toBeVisible();
-  nextBookSessionId = new URL(page.url()).pathname.split("/").at(-2) ?? "";
-  expect(nextBookSessionId).not.toBe("");
-
-  await page.goto(HOST_PATH);
-  const visibilityButton = page.getByRole("button", {
-    name: /Next Book Confirmation Book 공개 범위를 멤버 공개로 변경/,
-  });
-  await visibilityButton.click();
-  await expect(page.getByRole("radio", { name: "알림 보내고 반영" })).not.toBeChecked();
-  await expect(page.getByRole("radio", { name: "알림 없이 반영" })).not.toBeChecked();
-  await page.getByRole("button", { name: "취소" }).click();
-  expect(await readHostActionDecision(nextBookSessionId)).toBeNull();
-
-  await visibilityButton.click();
-  await page.getByRole("radio", { name: "알림 없이 반영" }).click();
-  await page.getByRole("button", { name: "선택대로 반영" }).click();
-  await expect.poll(() => readHostActionDecision(nextBookSessionId)).toBe("SKIP");
-  expect(await readNotificationEventCount(nextBookSessionId, "NEXT_BOOK_PUBLISHED")).toBe(0);
-
-  const privateButton = page.getByRole("button", {
-    name: /Next Book Confirmation Book 공개 범위를 비공개로 변경/,
-  });
-  await privateButton.click();
-  await visibilityButton.click();
-  await page.getByRole("radio", { name: "알림 보내고 반영" }).click();
-  await page.getByRole("button", { name: "선택대로 반영" }).click();
-  await expect.poll(() => readHostActionDecision(nextBookSessionId)).toBe("SEND");
-  await expect.poll(() => readNotificationEventCount(nextBookSessionId, "NEXT_BOOK_PUBLISHED")).toBe(1);
-});
-
-test("8. 320px host record navigation and confirmation sheet remain accessible", async ({ page }) => {
+test("7. 320px host record navigation and confirmation sheet remain accessible", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 720 });
   await loginHost(page);
   await page.goto(`${HOST_PATH}/sessions`);
@@ -410,12 +373,12 @@ test("8. 320px host record navigation and confirmation sheet remain accessible",
   await waitForDraftSaved(page);
   await page.getByRole("button", { name: "변경사항 검토" }).click();
 
-  const dialog = page.getByRole("dialog", { name: "반영 방법을 선택해 주세요" });
+  const dialog = page.getByRole("dialog", { name: "기록 반영 확인" });
   const sheet = page.getByTestId("host-action-dialog-sheet");
   await expect(dialog).toBeVisible();
-  await expect(page.getByRole("radio", { name: "알림 보내고 반영" })).toBeFocused();
-  await expect(page.getByRole("radio", { name: "알림 보내고 반영" })).not.toBeChecked();
-  await expect(page.getByRole("radio", { name: "알림 없이 반영" })).not.toBeChecked();
+  await expect(dialog.getByRole("button", { name: "취소" })).toBeFocused();
+  await expect(dialog.getByRole("radio")).toHaveCount(0);
+  await expect(dialog).toContainText("이 단계에서는 알림을 만들거나 보내지 않습니다");
   const box = await sheet.boundingBox();
   expect(box).not.toBeNull();
   expect(box!.x).toBeGreaterThanOrEqual(0);

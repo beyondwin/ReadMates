@@ -1483,3 +1483,36 @@ body[data-home="stack"] .home-carousel { display: none; }
     transition: none !important;
   }
 }
+
+.host-notification-composer-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: oklch(0 0 0 / 0.35);
+}
+
+.host-notification-composer-dialog {
+  width: min(100%, 640px);
+  max-height: 88dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: 20px 20px 0 0;
+  padding: 24px;
+  padding-bottom: calc(24px + var(--m-safe-bottom));
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 769px) {
+  .host-notification-composer-scrim {
+    align-items: center;
+    padding: 24px;
+  }
+
+  .host-notification-composer-dialog {
+    border-radius: 20px;
+    padding-bottom: 24px;
+  }
+}

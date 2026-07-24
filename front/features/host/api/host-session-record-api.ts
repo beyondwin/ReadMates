@@ -126,7 +126,7 @@ export function previewHostSessionRecordApply(
   sessionId: string,
   request: PreviewHostSessionRecordApplyRequest,
   context?: ReadmatesApiContext,
-) {
+): Promise<HostSessionRecordApplyPreview> {
   return readmatesFetch<HostSessionRecordApplyPreview>(
     sessionRecordPath(sessionId, "record-apply-preview"),
     {
@@ -141,7 +141,7 @@ export function applyHostSessionRecord(
   sessionId: string,
   request: HostSessionRecordApplyRequest,
   context?: ReadmatesApiContext,
-) {
+): Promise<HostSessionRecordApplyResult> {
   return readmatesFetch<HostSessionRecordApplyResult>(
     sessionRecordPath(sessionId, "record-apply"),
     {

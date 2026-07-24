@@ -1,5 +1,6 @@
 package com.readmates.session.adapter.out.persistence
 
+import com.readmates.session.application.HostAttendanceResponse
 import com.readmates.session.application.HostSessionListPage
 import com.readmates.session.application.HostSessionListQuery
 import com.readmates.session.application.HostSessionNotFoundException
@@ -69,11 +70,17 @@ class JdbcHostSessionWriteAdapter(
             command.sessionId,
         )
 
-    override fun confirmAttendance(command: ConfirmAttendanceCommand) =
-        writeOperations.confirmHostAttendance(
+    override fun confirmAttendance(command: ConfirmAttendanceCommand): HostAttendanceResponse {
+        jdbcTemplate.queryForObject(
+            "select id from clubs where id = ? for update",
+            String::class.java,
+            command.host.clubId.dbString(),
+        )
+        return writeOperations.confirmHostAttendance(
             jdbcTemplate,
             command,
         )
+    }
 
     override fun upsertPublication(command: UpsertPublicationCommand) =
         writeOperations.upsertHostPublication(

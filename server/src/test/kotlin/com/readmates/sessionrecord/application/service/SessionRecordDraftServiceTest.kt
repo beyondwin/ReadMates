@@ -1,11 +1,14 @@
 package com.readmates.sessionrecord.application.service
 
 import com.readmates.auth.domain.MembershipRole
+import com.readmates.notification.domain.NotificationEventType
 import com.readmates.session.application.SessionRecordVisibility
+import com.readmates.sessionrecord.application.model.ApplySessionRecordCommand
 import com.readmates.sessionrecord.application.model.EncodedSessionRecordSnapshot
 import com.readmates.sessionrecord.application.model.LiveSessionRecord
 import com.readmates.sessionrecord.application.model.RestoreSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.SaveSessionRecordDraftCommand
+import com.readmates.sessionrecord.application.model.SessionRecordApplyReceipt
 import com.readmates.sessionrecord.application.model.SessionRecordDraft
 import com.readmates.sessionrecord.application.model.SessionRecordDraftSource
 import com.readmates.sessionrecord.application.model.SessionRecordEditor
@@ -248,6 +251,22 @@ class SessionRecordDraftServiceTest {
             host: AuthenticatedClubActor,
             previewId: UUID,
         ): com.readmates.sessionrecord.application.model.CompletedSessionRecordApply? = null
+
+        override fun insertApplyReceipt(
+            host: AuthenticatedClubActor,
+            command: ApplySessionRecordCommand,
+            draftSha256: String,
+            composerEventType: NotificationEventType,
+            revision: SessionRecordRevision,
+        ) = SessionRecordApplyReceipt(
+            applyRequestId = command.applyRequestId,
+            hostMembershipId = host.membershipId,
+            expectedDraftRevision = command.expectedDraftRevision,
+            expectedLiveRevision = command.expectedLiveRevision,
+            draftSha256 = draftSha256,
+            composerEventType = composerEventType,
+            revision = revision,
+        )
 
         override fun insertBaselineIfAbsent(
             host: AuthenticatedClubActor,

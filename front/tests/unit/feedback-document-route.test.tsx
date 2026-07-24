@@ -7,6 +7,8 @@ import FeedbackDocumentRoutePage from "@/src/pages/feedback-document";
 import FeedbackDocumentPrintRoutePage from "@/src/pages/feedback-print";
 import { feedbackDocumentLoaderFactory } from "@/features/feedback/route/feedback-document-data";
 import { FeedbackRouteError } from "@/features/feedback/route/feedback-route-state";
+import { hostFeedbackDocumentPreviewLoaderFactory } from "@/src/app/host-routes/feedback-document-preview-data";
+import { HostFeedbackDocumentPreviewRouteElement } from "@/src/app/host-routes/feedback-document-preview-route-element";
 
 function installRouterRequestShim() {
   const NativeRequest = globalThis.Request;
@@ -37,6 +39,16 @@ const activeAuth = {
   role: "MEMBER",
   membershipStatus: "ACTIVE",
   approvalState: "ACTIVE",
+};
+
+const hostAuth = {
+  ...activeAuth,
+  userId: "host-user",
+  membershipId: "host-membership",
+  email: "host@example.com",
+  displayName: "호스트",
+  accountName: "호스트",
+  role: "HOST",
 };
 
 function setupBffStatus(status: number) {
@@ -127,6 +139,31 @@ function renderFeedbackRoute(
         errorElement: <FeedbackRouteError />,
         hydrateFallbackElement: <div>피드백 문서를 불러오는 중</div>,
       },
+      { path: "/login", element: <main><h1>읽는사이 들어가기</h1></main> },
+    ],
+    { initialEntries: [path] },
+  );
+
+  render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
+}
+
+function renderHostFeedbackPreviewRoute(path: string) {
+  installRouterRequestShim();
+  const queryClient = createTestQueryClient();
+  const router = createMemoryRouter(
+    [
+      {
+        path: "/clubs/:clubSlug/app/host/sessions/:sessionId/feedback-document",
+        element: <HostFeedbackDocumentPreviewRouteElement />,
+        loader: hostFeedbackDocumentPreviewLoaderFactory(queryClient),
+        errorElement: <FeedbackRouteError />,
+        hydrateFallbackElement: <div>호스트 피드백 문서를 불러오는 중</div>,
+      },
+      { path: "/clubs/:clubSlug/app", element: <main><h1>멤버 앱</h1></main> },
       { path: "/login", element: <main><h1>읽는사이 들어가기</h1></main> },
     ],
     { initialEntries: [path] },
@@ -358,5 +395,139 @@ describe("Feedback document routes", () => {
 
     expect(screen.getByTestId("return-to")).toHaveTextContent("/app/archive?view=reviews");
     expect(screen.getByTestId("return-label")).toHaveTextContent("아카이브로");
+  });
+});
+
+describe("Host feedback document preview route", () => {
+  it("renders an OPEN session document from the club-scoped host preview API", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me?clubSlug=reading-sai") {
+        return Promise.resolve(new Response(JSON.stringify(hostAuth), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }));
+      }
+
+      if (url === "/api/bff/api/host/sessions/open-session/feedback-document/preview?clubSlug=reading-sai") {
+        return Promise.resolve(new Response(JSON.stringify({
+          sessionId: "open-session",
+          sessionNumber: 8,
+          title: "열린 모임 피드백 미리보기",
+          subtitle: "테스트 책 · 2026.07.24",
+          bookTitle: "테스트 책",
+          date: "2026-07-24",
+          fileName: "session-8-feedback.md",
+          uploadedAt: "2026-07-24T09:00:00Z",
+          metadata: [],
+          observerNotes: [],
+          participants: [],
+        }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }));
+      }
+
+      return Promise.reject(new Error(`Unexpected request: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderHostFeedbackPreviewRoute(
+      "/clubs/reading-sai/app/host/sessions/open-session/feedback-document",
+    );
+
+    expect(await screen.findByRole("heading", { name: "열린 모임 피드백 미리보기" })).toBeInTheDocument();
+    expect(screen.getByText("피드백 문서 · 호스트 미리보기")).toBeInTheDocument();
+    expect(
+      screen.getByText("운영 확인본 · 이 미리보기 경로는 멤버에게 공개되지 않습니다."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("보존 문서 · 참석자 열람본")).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/host/sessions/open-session/feedback-document/preview?clubSlug=reading-sai",
+      expect.anything(),
+    );
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.stringContaining("/api/sessions/open-session/feedback-document"),
+      expect.anything(),
+    );
+  });
+
+  it("renders the missing-document state from the host preview API", async () => {
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me?clubSlug=reading-sai") {
+        return Promise.resolve(new Response(JSON.stringify(hostAuth), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }));
+      }
+
+      return Promise.resolve(new Response("", { status: 404 }));
+    }));
+
+    renderHostFeedbackPreviewRoute(
+      "/clubs/reading-sai/app/host/sessions/missing-session/feedback-document",
+    );
+
+    expect(await screen.findByRole("heading", { name: "아직 미리볼 피드백 문서가 없습니다." })).toBeInTheDocument();
+    expect(screen.getByText("호스트 미리보기")).toBeInTheDocument();
+    expect(
+      screen.getByText("미발행 문서는 멤버 화면에 노출되지 않으며, 호스트가 먼저 검토할 수 있습니다."),
+    ).toBeInTheDocument();
+  });
+
+  it("uses host access copy when the host preview API denies document access", async () => {
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me?clubSlug=reading-sai") {
+        return Promise.resolve(new Response(JSON.stringify(hostAuth), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }));
+      }
+
+      return Promise.resolve(new Response("", { status: 403 }));
+    }));
+
+    renderHostFeedbackPreviewRoute(
+      "/clubs/reading-sai/app/host/sessions/denied-session/feedback-document",
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "이 피드백 문서를 미리볼 권한이 없습니다." }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("호스트 전용 미리보기는 현재 클럽의 호스트만 열 수 있습니다."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/active 정식 멤버/)).not.toBeInTheDocument();
+  });
+
+  it("requires host authorization before requesting preview data", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me?clubSlug=reading-sai") {
+        return Promise.resolve(new Response(JSON.stringify(activeAuth), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }));
+      }
+
+      return Promise.reject(new Error(`Unexpected request: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderHostFeedbackPreviewRoute(
+      "/clubs/reading-sai/app/host/sessions/open-session/feedback-document",
+    );
+
+    expect(await screen.findByRole("heading", { name: "멤버 앱" })).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.stringContaining("/feedback-document/preview"),
+      expect.anything(),
+    );
   });
 });

@@ -8,31 +8,11 @@
 
 `gitleaks` 미설치 fallback이나 current-tree historical finding처럼 검증 강도가 낮거나 해석이 필요한 경우에는 그 한계를 결과에 남깁니다. 이 스크립트 통과만으로 secret rotation, GitHub 공개 전환, branch protection 설정, production 배포가 끝났다고 판단하지 않습니다.
 
-## `check-agent-guidance.py`
+## Source-checkout contributor guidance
 
-Agent router, active guide links, instruction-chain size, canonical server/Corepack commands, release-checklist size, and tracked-guidance public safety are checked with `python3 scripts/check-agent-guidance.py`. Run `python3 scripts/check-agent-guidance.py --self-test` for the temporary positive/negative fixtures. CI runs `--self-test` and the current-tree check separately.
+A full source checkout can provide repository-local contributor routing, preflight, and guidance checks. Use those tools when they are present in that checkout; they are read-only planning support and do not replace the canonical checks below.
 
-The checker stages only tracked guidance into a temporary directory and delegates content safety to `public-release-check.sh`; it does not maintain a second secret-pattern engine or inspect user-local Codex configuration.
-
-The private/source tree always contains `AGENTS.md`, so CI and pre-push run this checker there. The clean public candidate intentionally excludes private agent guidance and skips this private guidance-only gate; its public files remain covered by `public-release-check.sh`.
-
-## `agent-preflight.py`
-
-`agent-preflight.py` reads Git state plus current or expected paths and prints the required guides, ReadMates risk triggers, canonical recommended checks, stop reasons, and evidence level. It is read-only: it never executes the recommended commands or changes repository/runtime state.
-
-When `--paths` is omitted, it classifies dirty, staged, and untracked paths plus changes in `<base>...HEAD`; `--base` selects that comparison ref and defaults to `origin/main`.
-
-```bash
-python3 -B scripts/agent-preflight.py --intent change --paths front/functions/api/example.ts
-python3 -B scripts/agent-preflight.py --intent change --paths server/src/main/resources/db/mysql/migration/V999__example.sql --json
-python3 -B scripts/agent-preflight.py --intent local-runtime --paths front/ --isolation-note "preserve existing services and use an alternate port"
-python3 -B scripts/agent-preflight.py --intent release --paths deploy/oci/compose.yml --authority-scope live-mutation --authority-note "repository-only review; no live mutation"
-python3 -B scripts/agent-preflight.py --self-test
-```
-
-Authority-sensitive work declares one or more repeated `--authority-scope` values: `private-data`, `secrets`, or `live-mutation`. Each such request also requires a non-blank `--authority-note`; without it preflight retains the risk trigger, prints a deterministic stop reason, and exits 2. The note records the approved boundary only and should remain public-safe, as in the repository-only example above.
-
-Exit code 2 means a stop reason requires resolution, such as detached HEAD, unresolved base, dirty overlap, missing local-runtime isolation, or missing authority confirmation. Recommended checks remain canonical commands owned by existing scripts and guides; preflight does not replace `pre-push-check.sh`.
+The clean public release candidate intentionally omits contributor-only guidance. Its shipped release helpers are self-contained and do not require a particular local agent tool.
 
 ## `server-ci-check.sh`
 
@@ -62,11 +42,11 @@ READMATES_SERVER_CI_CHECK_DRY_RUN=true ./scripts/server-ci-check.sh
 ./scripts/pre-push-check.sh
 ```
 
-`agent-preflight.py` can be used as read-only planning support before this command; it does not replace `pre-push-check.sh`.
+Repository-local planning support, when available in a full source checkout, does not replace `pre-push-check.sh`.
 
 기본 실행 범위는 다음과 같습니다.
 
-- `python3 scripts/check-agent-guidance.py`
+- Full source checkout에 contributor-guidance checker가 있으면 해당 계약 검사
 - `git diff --check`
 - `corepack pnpm --dir front lint`
 - `npx --yes corepack@0.35.0 pnpm --dir front lint` (`corepack`이 PATH에 없을 때)
@@ -307,6 +287,7 @@ scanner pattern을 바꾼 뒤 fixture 검증을 실행합니다.
 - 문서화된 placeholder와 environment variable indirection은 통과하는지 확인합니다.
 - `.tmp` parent가 symlink이면 실행을 거부합니다. 이 기준은 공개 릴리즈 후보 builder의 cleanup guard와 맞춥니다.
 - 후보의 top-level manifest와 루트 pnpm 계약, `front`, `design/system`, `design/docs` package manifest가 모두 포함되는지 확인합니다.
+- 후보 안의 shipped instruction이 제외된 contributor-only 경로를 요구하지 않는지 확인합니다.
 
 fixture 검증도 GitHub 게시, 저장소 공개 설정 변경, secret rotation, commit 생성을 수행하지 않습니다.
 

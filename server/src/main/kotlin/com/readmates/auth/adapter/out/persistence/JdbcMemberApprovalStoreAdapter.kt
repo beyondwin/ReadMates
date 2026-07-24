@@ -66,8 +66,9 @@ class JdbcMemberApprovalStoreAdapter(
     override fun activateViewer(
         clubId: UUID,
         membershipId: UUID,
-    ): Boolean =
-        jdbcTemplate.update(
+    ): Boolean {
+        lockClubForAudienceMutation(clubId)
+        return jdbcTemplate.update(
             """
             update memberships
             set status = 'ACTIVE',
@@ -81,12 +82,14 @@ class JdbcMemberApprovalStoreAdapter(
             membershipId.dbString(),
             clubId.dbString(),
         ) == 1
+    }
 
     override fun deactivateViewer(
         clubId: UUID,
         membershipId: UUID,
-    ): Boolean =
-        jdbcTemplate.update(
+    ): Boolean {
+        lockClubForAudienceMutation(clubId)
+        return jdbcTemplate.update(
             """
             update memberships
             set status = 'INACTIVE',
@@ -99,6 +102,7 @@ class JdbcMemberApprovalStoreAdapter(
             membershipId.dbString(),
             clubId.dbString(),
         ) == 1
+    }
 
     override fun addToCurrentOpenSession(
         clubId: UUID,
@@ -159,6 +163,14 @@ class JdbcMemberApprovalStoreAdapter(
                 membershipId.dbString(),
                 clubId.dbString(),
             ).firstOrNull()
+
+    private fun lockClubForAudienceMutation(clubId: UUID) {
+        jdbcTemplate.queryForObject(
+            "select id from clubs where id = ? for update",
+            String::class.java,
+            clubId.dbString(),
+        )
+    }
 
     private fun mapViewerMember(
         resultSet: ResultSet,

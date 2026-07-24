@@ -79,7 +79,51 @@ class MySqlFlywayMigrationTest(
         assertTrue(decisionCounts.contains("target_count") && decisionCounts.contains(">= 0"))
         val decisions = checkConstraintClause("host_action_notification_decisions_decision_check")
         assertTrue(decisions.contains("SEND") && decisions.contains("SKIP"))
+        assertHostNotificationComposerSchema()
     }
+
+    private fun assertHostNotificationComposerSchema() {
+        assertThat(columns("session_record_apply_receipts"))
+            .contains(
+                "apply_request_id",
+                "expected_draft_revision",
+                "expected_live_revision",
+                "draft_sha256",
+                "composer_event_type",
+                "revision_id",
+            )
+        assertThat(columns("club_notification_policies"))
+            .contains("club_id", "session_reminder_enabled", "updated_by_membership_id")
+        assertThat(columns("notification_manual_dispatches"))
+            .contains("content_revision")
+        assertThat(columns("notification_manual_dispatch_previews"))
+            .contains("target_snapshot_hash")
+        assertEquals(
+            "id,club_id,session_id",
+            indexColumns("session_record_revisions", "session_record_revisions_scope_uk"),
+        )
+        assertEquals(
+            "revision_id,club_id,session_id",
+            foreignKeyColumns("session_record_apply_receipts", "session_record_apply_receipts_revision_scope_fk"),
+        )
+        assertEquals(
+            "session_record_revisions:id,club_id,session_id",
+            foreignKeyReference("session_record_apply_receipts", "session_record_apply_receipts_revision_scope_fk"),
+        )
+    }
+
+    private fun columns(table: String): Set<String> =
+        jdbcTemplate
+            .queryForList(
+                """
+                select column_name
+                from information_schema.columns
+                where table_schema = database() and table_name = ?
+                """.trimIndent(),
+                String::class.java,
+                table,
+            ).filterNotNull()
+            .toSet()
 
     @Test
     fun `mysql baseline creates auth session and feedback document tables`() {

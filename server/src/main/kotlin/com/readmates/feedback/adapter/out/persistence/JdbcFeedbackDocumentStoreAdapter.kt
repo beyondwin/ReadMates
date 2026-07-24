@@ -96,7 +96,24 @@ class JdbcFeedbackDocumentStoreAdapter(
                 from sessions
                 where id = ?
                   and club_id = ?
-                  and state in ('CLOSED', 'PUBLISHED')
+                  and state in ('OPEN', 'CLOSED', 'PUBLISHED')
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.toSessionMetadata() },
+                sessionId.dbString(),
+                clubId.dbString(),
+            ).firstOrNull()
+
+    override fun findSession(
+        clubId: UUID,
+        sessionId: UUID,
+    ): FeedbackDocumentSessionResult? =
+        jdbcTemplate
+            .query(
+                """
+                select id, number, book_title, session_date
+                from sessions
+                where id = ?
+                  and club_id = ?
                 """.trimIndent(),
                 { resultSet, _ -> resultSet.toSessionMetadata() },
                 sessionId.dbString(),

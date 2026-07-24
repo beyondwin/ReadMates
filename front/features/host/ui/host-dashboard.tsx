@@ -6,7 +6,6 @@ import type {
   HostNotificationSummary,
   HostSessionListPage,
   HostSessionListItem,
-  HostSessionVisibilityPreviewResponse,
   HostSessionVisibilityRequest,
   SessionRecordVisibility,
 } from "@/features/host/model/host-view-types";
@@ -60,7 +59,6 @@ import type {
   UpcomingActionHandlers,
   UpcomingActionKind,
 } from "./dashboard/types";
-import { HostActionConfirmationDialog } from "./session-editor/host-action-confirmation-dialog";
 export type { HostDashboardLinkComponent } from "./dashboard/types";
 const defaultHostDashboardReturnTarget: ReadmatesReturnTarget = {
   href: "/app/host",
@@ -120,7 +118,6 @@ export default function HostDashboard({
   clubOperations = null,
   recordAttention = EMPTY_RECORD_ATTENTION,
   actions,
-  hostActionNotificationConfirmationRequired = false,
   LinkComponent = DefaultLinkComponent,
   hostDashboardReturnTarget = defaultHostDashboardReturnTarget,
   readmatesReturnState = defaultReadmatesReturnState,
@@ -133,7 +130,6 @@ export default function HostDashboard({
   clubOperations?: HostClubOperationsSnapshot | null;
   recordAttention?: HostSessionAttentionData | null;
   actions: HostDashboardActions;
-  hostActionNotificationConfirmationRequired?: boolean;
   LinkComponent?: HostDashboardLinkComponent;
   hostDashboardReturnTarget?: ReadmatesReturnTarget;
   readmatesReturnState?: (target: ReadmatesReturnTarget) => ReadmatesReturnState;
@@ -159,13 +155,6 @@ export default function HostDashboard({
   const [pendingUpcomingAction, setPendingUpcomingAction] = useState<string | null>(null);
   const [isLoadingMoreHostSessions, setIsLoadingMoreHostSessions] = useState(false);
   const [upcomingMessage, setUpcomingMessage] = useState<null | { kind: "alert" | "status"; text: string }>(null);
-  const [visibilityConfirmation, setVisibilityConfirmation] = useState<null | {
-    sessionId: string;
-    visibility: SessionRecordVisibility;
-    preview: HostSessionVisibilityPreviewResponse;
-  }>(null);
-  const [visibilityDecision, setVisibilityDecision] = useState<"SEND" | "SKIP" | null>(null);
-  const [visibilityRepreviewing, setVisibilityRepreviewing] = useState(false);
   const hostSessionPage =
     appendedHostSessions?.base === hostSessions
       ? {
@@ -228,96 +217,18 @@ export default function HostDashboard({
         [sessionId]: request.visibility,
       }));
       setUpcomingMessage(null);
-      return true;
-    } catch (error) {
-      const code = error && typeof error === "object" && "code" in error
-        ? String((error as { code?: unknown }).code ?? "")
-        : "";
+    } catch {
       setUpcomingMessage({
         kind: "alert",
-        text: code === "NOTIFICATION_CONFIRMATION_REQUIRED"
-          ? "알림 확인 기능 상태가 변경되었습니다. 화면을 새로고침한 뒤 다시 시도해 주세요."
-          : request.previewId
-            ? "처리 결과를 확인하지 못했습니다. 같은 선택으로 다시 확인해 주세요."
-            : "저장하지 못했습니다",
+        text: "저장하지 못했습니다",
       });
-      return code || "UNKNOWN";
     } finally {
       setPendingUpcomingAction(null);
     }
   };
 
   const handleUpdateUpcomingVisibility = async (sessionId: string, visibility: SessionRecordVisibility) => {
-    const currentVisibility = localHostSessions.find((item) => item.sessionId === sessionId)?.visibility;
-    const requiresConfirmation =
-      hostActionNotificationConfirmationRequired &&
-      currentVisibility === "HOST_ONLY" &&
-      visibility !== "HOST_ONLY";
-
-    if (!requiresConfirmation) {
-      await saveUpcomingVisibility(sessionId, { visibility });
-      return;
-    }
-    if (pendingUpcomingAction !== null) {
-      return;
-    }
-    const key = upcomingActionKey(sessionId, "visibility");
-    setPendingUpcomingAction(key);
-    setUpcomingMessage({ kind: "status", text: "알림 대상을 확인하고 있습니다" });
-    try {
-      const preview = await actions.previewSessionVisibility(sessionId, visibility);
-      setVisibilityDecision(null);
-      setVisibilityConfirmation({ sessionId, visibility, preview });
-      setUpcomingMessage(null);
-    } catch {
-      setUpcomingMessage({ kind: "alert", text: "알림 미리보기를 만들지 못했습니다" });
-    } finally {
-      setPendingUpcomingAction(null);
-    }
-  };
-
-  const confirmUpcomingVisibility = async () => {
-    if (!visibilityConfirmation || visibilityDecision === null) {
-      return;
-    }
-    const current = visibilityConfirmation;
-    const saved = await saveUpcomingVisibility(current.sessionId, {
-      visibility: current.visibility,
-      previewId: current.preview.previewId,
-      notificationDecision: visibilityDecision,
-    });
-    if (saved === true) {
-      setVisibilityConfirmation(null);
-      setVisibilityDecision(null);
-      return;
-    }
-    if (saved === "NOTIFICATION_PREVIEW_EXPIRED" || saved === "NOTIFICATION_TARGETS_CHANGED") {
-      setVisibilityRepreviewing(true);
-      try {
-        const preview = await actions.previewSessionVisibility(current.sessionId, current.visibility);
-        setVisibilityConfirmation({ ...current, preview });
-        setVisibilityDecision(null);
-        setUpcomingMessage({
-          kind: "alert",
-          text: "알림 대상이 변경되어 미리보기를 갱신했습니다. SEND 또는 SKIP을 다시 선택해 주세요.",
-        });
-      } catch {
-        setVisibilityConfirmation(null);
-        setVisibilityDecision(null);
-        setUpcomingMessage({
-          kind: "alert",
-          text: "미리보기를 갱신하지 못했습니다. 공개 범위는 변경되지 않았습니다.",
-        });
-      } finally {
-        setVisibilityRepreviewing(false);
-      }
-      return;
-    }
-    if (saved === "UNKNOWN") {
-      return;
-    }
-    setVisibilityConfirmation(null);
-    setVisibilityDecision(null);
+    await saveUpcomingVisibility(sessionId, { visibility });
   };
 
   const handleOpenUpcomingSession = async (sessionId: string) => {
@@ -703,21 +614,6 @@ export default function HostDashboard({
         LinkComponent={LinkComponent}
         hostDashboardReturnTarget={hostDashboardReturnTarget}
         readmatesReturnState={readmatesReturnState}
-      />
-      <HostActionConfirmationDialog
-        open={visibilityConfirmation !== null}
-        preview={visibilityConfirmation?.preview ?? null}
-        decision={visibilityDecision}
-        submitting={
-          visibilityConfirmation !== null &&
-          (isUpcomingActionPending(visibilityConfirmation.sessionId, "visibility") || visibilityRepreviewing)
-        }
-        onDecisionChange={setVisibilityDecision}
-        onCancel={() => {
-          setVisibilityConfirmation(null);
-          setVisibilityDecision(null);
-        }}
-        onConfirm={() => void confirmUpcomingVisibility()}
       />
     </>
   );

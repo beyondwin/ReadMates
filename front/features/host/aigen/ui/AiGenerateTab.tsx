@@ -416,7 +416,7 @@ export function AiGenerateTab({
     const count = stage.result?.participantUpdatesCount;
     return (
       <div className="small" role="status">
-        AI 기록을 공유 초안으로 저장했습니다. {typeof count === "number" ? `참여 상태 ${count}건을 확인했습니다.` : "검토 후 반영할 수 있습니다."}
+        AI 기록을 공유 초안으로 저장했습니다. 알림은 생성되지 않습니다. {typeof count === "number" ? `참여 상태 ${count}건을 확인했습니다.` : "검토 후 반영할 수 있습니다."}
       </div>
     );
   }

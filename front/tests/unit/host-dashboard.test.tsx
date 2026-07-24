@@ -240,14 +240,6 @@ const twoDraftHostSessions = [
 
 const noopHostDashboardActions = {
   updateCurrentSessionParticipation: vi.fn(async () => undefined),
-  previewSessionVisibility: vi.fn(async () => ({
-    previewId: "preview-1",
-    targetCount: 1,
-    expectedInAppCount: 1,
-    expectedEmailCount: 1,
-    excludedCount: 0,
-    expiresAt: "2026-07-23T20:00:00+09:00",
-  })),
   updateSessionVisibility: vi.fn(async () => undefined),
   openSession: vi.fn(async () => undefined),
   loadHostSessions: vi.fn(async () => ({ items: [], nextCursor: null })),

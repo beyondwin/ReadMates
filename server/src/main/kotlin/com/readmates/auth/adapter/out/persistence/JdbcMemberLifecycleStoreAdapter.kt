@@ -24,6 +24,14 @@ import java.util.UUID
 class JdbcMemberLifecycleStoreAdapter(
     private val jdbcTemplate: JdbcTemplate,
 ) : MemberLifecycleStorePort {
+    override fun lockClubForUpdate(clubId: UUID) {
+        jdbcTemplate.queryForObject(
+            "select id from clubs where id = ? for update",
+            String::class.java,
+            clubId.dbString(),
+        )
+    }
+
     override fun listMembers(
         clubId: UUID,
         pageRequest: PageRequest,
