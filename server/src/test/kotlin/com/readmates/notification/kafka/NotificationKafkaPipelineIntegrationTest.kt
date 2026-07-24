@@ -5,6 +5,7 @@ import com.readmates.notification.adapter.out.kafka.KafkaNotificationEventPublis
 import com.readmates.notification.adapter.out.kafka.NotificationKafkaConfiguration
 import com.readmates.notification.adapter.out.kafka.NotificationKafkaProperties
 import com.readmates.notification.adapter.out.persistence.JdbcNotificationDeliveryAdapter
+import com.readmates.notification.adapter.out.persistence.JdbcNotificationEventOutboxAdapter
 import com.readmates.notification.application.model.ManualNotificationAudience
 import com.readmates.notification.application.model.ManualNotificationRequestedChannels
 import com.readmates.notification.application.model.ManualNotificationSendMode
@@ -15,10 +16,12 @@ import com.readmates.notification.application.model.NotificationManualDispatchPa
 import com.readmates.notification.application.port.`in`.DispatchNotificationEventUseCase
 import com.readmates.notification.application.port.out.MailDeliveryCommand
 import com.readmates.notification.application.port.out.MailDeliveryPort
+import com.readmates.notification.application.port.out.NotificationEventOutboxPort
 import com.readmates.notification.application.port.out.NotificationEventPublisherPort
 import com.readmates.notification.application.service.NotificationDeliveryEngine
 import com.readmates.notification.application.service.NotificationDeliveryTransactionalOperations
 import com.readmates.notification.application.service.NotificationDispatchService
+import com.readmates.notification.application.service.NotificationRelayService
 import com.readmates.notification.application.service.ReadmatesOperationalMetrics
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.support.KafkaTestContainer
@@ -27,6 +30,9 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.apache.kafka.clients.admin.AdminClient
 import org.apache.kafka.clients.admin.AdminClientConfig
 import org.apache.kafka.clients.admin.NewTopic
+import org.apache.kafka.clients.consumer.Consumer
+import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.apache.kafka.common.TopicPartition
 import org.assertj.core.api.Assertions.assertThat
 import org.awaitility.Awaitility.await
 import org.junit.jupiter.api.BeforeEach
@@ -35,6 +41,7 @@ import org.junit.jupiter.api.Test
 import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.SpringBootConfiguration
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration
 import org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration
@@ -50,12 +57,15 @@ import org.springframework.context.annotation.Primary
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.kafka.annotation.EnableKafka
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry
+import org.springframework.kafka.core.ConsumerFactory
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.kafka.test.utils.ContainerTestUtils
+import org.springframework.kafka.test.utils.KafkaTestUtils
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 import tools.jackson.databind.ObjectMapper
+import java.nio.charset.StandardCharsets.UTF_8
 import java.time.Duration
 import java.time.LocalDate
 import java.time.OffsetDateTime
@@ -113,6 +123,10 @@ class NotificationKafkaPipelineIntegrationTest(
     @param:Autowired private val kafkaListenerEndpointRegistry: KafkaListenerEndpointRegistry,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val objectMapper: ObjectMapper,
+    @param:Autowired private val notificationEventOutboxAdapter: JdbcNotificationEventOutboxAdapter,
+    @param:Autowired
+    @param:Qualifier("notificationEventConsumerFactory")
+    private val observerConsumerFactory: ConsumerFactory<String, NotificationEventMessage>,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @BeforeEach
     fun resetDispatchRecorder() {
@@ -154,41 +168,44 @@ class NotificationKafkaPipelineIntegrationTest(
     }
 
     @Test
-    fun `redelivery of the same event id creates one logical dispatch and preserves request metadata`() {
-        val message = notificationEventMessage()
-        val requestId = "request-r09-kafka-redelivery"
-        insertEventFixture(message, requestId)
+    fun `publish mark loss reclaims through Kafka with exactly once logical side effects`() {
+        val sourceMessage = notificationEventMessage()
+        val requestId = "request-r09-partial-delivery"
+        insertDomainFixture()
+        val persistedMessage = enqueuePendingEvent(sourceMessage, requestId)
         waitForListenerAssignment()
 
-        notificationEventPublisherPort.publish(message, eventsTopic, message.clubId.toString(), requestId)
-        notificationEventPublisherPort.publish(message, eventsTopic, message.clubId.toString(), requestId)
+        observeBrokerFromCurrentEnd().use { observer ->
+            val firstRelay = relay(RejectPublishedMarkOutboxPort(notificationEventOutboxAdapter))
 
-        await()
-            .atMost(Duration.ofSeconds(20))
-            .untilAsserted {
-                assertThat(recordingDispatchUseCase.receivedMessages()).containsExactly(message, message)
-                assertThat(recordingDispatchUseCase.requestIds()).containsExactly(requestId, requestId)
-                assertThat(recordingMailDeliveryPort.commands()).hasSize(1)
-                assertThat(deliveryRows(message.eventId)).isEqualTo(2)
-                assertThat(memberNotificationRows(message.eventId)).isEqualTo(1)
-                val emailRow = emailDeliveryRow(message.eventId)
-                assertThat(emailRow["event_id"]).isEqualTo(message.eventId.toString())
-                assertThat(emailRow["club_id"]).isEqualTo(message.clubId.toString())
-                assertThat(emailRow["recipient_membership_id"]).isEqualTo(PIPELINE_MEMBERSHIP_ID)
-                assertThat(emailRow["dedupe_key"])
-                    .isEqualTo("${message.eventId}:$PIPELINE_MEMBERSHIP_ID:EMAIL")
-                assertThat(emailRow["status"]).isEqualTo("SENT")
-                assertThat(emailRow["attempt_count"]).isEqualTo(0)
-                assertThat(emailRow["locked_at"]).isNull()
-                assertThat(emailRow["sent_at"]).isNotNull()
-                assertThat(emailRow["last_error"]).isNull()
-            }
+            assertThat(firstRelay.publishPending(1)).isEqualTo(1)
+            val firstBrokerRecord = observeNextBrokerRecord(observer)
+            awaitDispatches(persistedMessage, requestId, expectedCount = 1)
+            assertPublishingAfterLostMark(persistedMessage.eventId, requestId)
+
+            makePublishingLeaseStale(persistedMessage.eventId)
+
+            assertThat(relay(notificationEventOutboxAdapter).publishPending(1)).isEqualTo(1)
+            val secondBrokerRecord = observeNextBrokerRecord(observer)
+            awaitExactlyOnceRecovery(persistedMessage, requestId)
+
+            assertBrokerRecord(firstBrokerRecord, persistedMessage, requestId)
+            assertBrokerRecord(secondBrokerRecord, persistedMessage, requestId)
+            assertThat(secondBrokerRecord.partition()).isEqualTo(firstBrokerRecord.partition())
+            assertThat(secondBrokerRecord.offset()).isEqualTo(firstBrokerRecord.offset() + 1)
+            assertPublishedAfterRecovery(persistedMessage.eventId, requestId)
+        }
     }
 
     private fun insertEventFixture(
         message: NotificationEventMessage,
         requestId: String? = null,
     ) {
+        insertDomainFixture()
+        insertPublishedEvent(message, requestId)
+    }
+
+    private fun insertDomainFixture() {
         jdbcTemplate.update(
             """
             insert into clubs (id, slug, name, tagline, about)
@@ -227,6 +244,12 @@ class NotificationKafkaPipelineIntegrationTest(
             PIPELINE_SESSION_ID,
             PIPELINE_CLUB_ID,
         )
+    }
+
+    private fun insertPublishedEvent(
+        message: NotificationEventMessage,
+        requestId: String?,
+    ) {
         jdbcTemplate.update(
             """
             insert into notification_event_outbox (
@@ -248,12 +271,209 @@ class NotificationKafkaPipelineIntegrationTest(
         )
     }
 
+    private fun enqueuePendingEvent(
+        message: NotificationEventMessage,
+        requestId: String,
+    ): NotificationEventMessage {
+        MDC.put("requestId", requestId)
+        try {
+            assertThat(
+                notificationEventOutboxAdapter.enqueueEvent(
+                    eventId = message.eventId,
+                    clubId = message.clubId,
+                    eventType = message.eventType,
+                    aggregateType = message.aggregateType,
+                    aggregateId = message.aggregateId,
+                    payload = message.payload,
+                    dedupeKey = "notification-pipeline-partial:${message.eventId}",
+                ),
+            ).isTrue()
+        } finally {
+            MDC.remove("requestId")
+        }
+
+        return requireNotNull(notificationEventOutboxAdapter.loadMessage(message.eventId))
+    }
+
+    private fun relay(outboxPort: NotificationEventOutboxPort): NotificationRelayService =
+        NotificationRelayService(
+            notificationEventOutboxPort = outboxPort,
+            notificationEventPublisherPort = notificationEventPublisherPort,
+            operationalMetrics = ReadmatesOperationalMetrics(SimpleMeterRegistry()),
+            maxAttempts = 5,
+        )
+
+    private fun observeBrokerFromCurrentEnd(): Consumer<String, NotificationEventMessage> {
+        val observer = observerConsumerFactory.createConsumer("notification-r09-observer-$topicSuffix")
+        val partition = TopicPartition(eventsTopic, 0)
+        observer.assign(listOf(partition))
+        observer.seek(partition, observer.endOffsets(listOf(partition)).getValue(partition))
+        return observer
+    }
+
+    private fun observeNextBrokerRecord(
+        observer: Consumer<String, NotificationEventMessage>,
+    ): ConsumerRecord<String, NotificationEventMessage> {
+        val timeout = Duration.ofSeconds(20)
+        return KafkaTestUtils.getSingleRecord(observer, eventsTopic, timeout)
+    }
+
+    private fun awaitDispatches(
+        message: NotificationEventMessage,
+        requestId: String,
+        expectedCount: Int,
+    ) {
+        await()
+            .atMost(Duration.ofSeconds(20))
+            .untilAsserted {
+                assertThat(recordingDispatchUseCase.receivedMessages())
+                    .containsExactlyElementsOf(List(expectedCount) { message })
+                assertThat(recordingDispatchUseCase.requestIds())
+                    .containsExactlyElementsOf(List(expectedCount) { requestId })
+            }
+    }
+
+    private fun assertPublishingAfterLostMark(
+        eventId: UUID,
+        requestId: String,
+    ) {
+        val row = outboxRow(eventId)
+        assertThat(row["status"]).isEqualTo("PUBLISHING")
+        assertOutboxMetadata(row, eventId, requestId)
+        assertThat(row["attempt_count"]).isEqualTo(0)
+        assertThat(row["locked_at"]).isNotNull()
+        assertThat(row["published_at"]).isNull()
+        assertThat(row["last_error"]).isNull()
+        assertThat(outboxRows(eventId)).isEqualTo(1)
+    }
+
+    private fun makePublishingLeaseStale(eventId: UUID) {
+        assertThat(
+            jdbcTemplate.update(
+                """
+                update notification_event_outbox
+                set locked_at = timestampadd(MINUTE, -16, utc_timestamp(6))
+                where id = ?
+                  and status = 'PUBLISHING'
+                """.trimIndent(),
+                eventId.toString(),
+            ),
+        ).isEqualTo(1)
+    }
+
+    private fun awaitExactlyOnceRecovery(
+        message: NotificationEventMessage,
+        requestId: String,
+    ) {
+        await()
+            .atMost(Duration.ofSeconds(20))
+            .untilAsserted {
+                assertThat(recordingDispatchUseCase.receivedMessages()).containsExactly(message, message)
+                assertThat(recordingDispatchUseCase.requestIds()).containsExactly(requestId, requestId)
+                assertThat(recordingMailDeliveryPort.commands()).hasSize(1)
+                assertThat(deliveryRows(message.eventId)).isEqualTo(2)
+                assertThat(memberNotificationRows(message.eventId)).isEqualTo(1)
+                assertThat(deliveryChannelDedupeRows(message.eventId))
+                    .containsExactly(
+                        "EMAIL|SENT|${message.eventId}:$PIPELINE_MEMBERSHIP_ID:EMAIL",
+                        "IN_APP|SENT|${message.eventId}:$PIPELINE_MEMBERSHIP_ID:IN_APP",
+                    )
+                assertSentEmailDelivery(message)
+            }
+    }
+
+    private fun assertSentEmailDelivery(message: NotificationEventMessage) {
+        val emailRow = emailDeliveryRow(message.eventId)
+        assertThat(emailRow["event_id"]).isEqualTo(message.eventId.toString())
+        assertThat(emailRow["club_id"]).isEqualTo(message.clubId.toString())
+        assertThat(emailRow["recipient_membership_id"]).isEqualTo(PIPELINE_MEMBERSHIP_ID)
+        assertThat(emailRow["dedupe_key"]).isEqualTo("${message.eventId}:$PIPELINE_MEMBERSHIP_ID:EMAIL")
+        assertThat(emailRow["status"]).isEqualTo("SENT")
+        assertThat(emailRow["attempt_count"]).isEqualTo(0)
+        assertThat(emailRow["locked_at"]).isNull()
+        assertThat(emailRow["sent_at"]).isNotNull()
+        assertThat(emailRow["last_error"]).isNull()
+    }
+
+    private fun assertBrokerRecord(
+        record: ConsumerRecord<String, NotificationEventMessage>,
+        message: NotificationEventMessage,
+        requestId: String,
+    ) {
+        assertThat(record.topic()).isEqualTo(eventsTopic)
+        assertThat(record.key()).isEqualTo(PIPELINE_CLUB_ID)
+        assertThat(record.value()).isEqualTo(message)
+        assertThat(record.headerValue("readmates-schema-version")).isEqualTo(message.schemaVersion.toString())
+        assertThat(record.headerValue("readmates-event-id")).isEqualTo(message.eventId.toString())
+        assertThat(record.headerValue("readmates-event-type")).isEqualTo(message.eventType.name)
+        assertThat(record.headerValue("readmates-request-id")).isEqualTo(requestId)
+    }
+
+    private fun assertPublishedAfterRecovery(
+        eventId: UUID,
+        requestId: String,
+    ) {
+        val row = outboxRow(eventId)
+        assertThat(row["status"]).isEqualTo("PUBLISHED")
+        assertOutboxMetadata(row, eventId, requestId)
+        assertThat(row["attempt_count"]).isEqualTo(0)
+        assertThat(row["locked_at"]).isNull()
+        assertThat(row["published_at"]).isNotNull()
+        assertThat(row["last_error"]).isNull()
+        assertThat(outboxRows(eventId)).isEqualTo(1)
+    }
+
+    private fun assertOutboxMetadata(
+        row: Map<String, Any?>,
+        eventId: UUID,
+        requestId: String,
+    ) {
+        assertThat(row["id"]).isEqualTo(eventId.toString())
+        assertThat(row["request_id"]).isEqualTo(requestId)
+        assertThat(row["kafka_topic"]).isEqualTo(eventsTopic)
+        assertThat(row["kafka_key"]).isEqualTo(PIPELINE_CLUB_ID)
+        assertThat(row["dedupe_key"]).isEqualTo("notification-pipeline-partial:$eventId")
+    }
+
+    private fun outboxRow(eventId: UUID): Map<String, Any?> =
+        jdbcTemplate.queryForMap(
+            """
+            select id, status, request_id, kafka_topic, kafka_key, dedupe_key, attempt_count,
+                   locked_at, published_at, last_error
+            from notification_event_outbox
+            where id = ?
+            """.trimIndent(),
+            eventId.toString(),
+        )
+
+    private fun outboxRows(eventId: UUID): Int =
+        jdbcTemplate.queryForObject(
+            "select count(*) from notification_event_outbox where id = ?",
+            Int::class.java,
+            eventId.toString(),
+        ) ?: 0
+
     private fun deliveryRows(eventId: UUID): Int =
         jdbcTemplate.queryForObject(
             "select count(*) from notification_deliveries where event_id = ?",
             Int::class.java,
             eventId.toString(),
         ) ?: 0
+
+    private fun deliveryChannelDedupeRows(eventId: UUID): List<String> {
+        val rows =
+            jdbcTemplate.queryForList(
+                """
+                select concat(channel, '|', status, '|', dedupe_key)
+                from notification_deliveries
+                where event_id = ?
+                order by channel
+                """.trimIndent(),
+                String::class.java,
+                eventId.toString(),
+            )
+        return rows.filterNotNull()
+    }
 
     private fun memberNotificationRows(eventId: UUID): Int =
         jdbcTemplate.queryForObject(
@@ -280,6 +500,9 @@ class NotificationKafkaPipelineIntegrationTest(
         ContainerTestUtils.waitForAssignment(listenerContainers.single(), 1)
     }
 
+    private fun ConsumerRecord<String, NotificationEventMessage>.headerValue(name: String): String =
+        String(requireNotNull(headers().lastHeader(name)).value(), UTF_8)
+
     @SpringBootConfiguration
     @EnableKafka
     @ImportAutoConfiguration(
@@ -301,6 +524,16 @@ class NotificationKafkaPipelineIntegrationTest(
         ): JdbcNotificationDeliveryAdapter {
             val appBaseUrl = PIPELINE_APP_BASE_URL
             return JdbcNotificationDeliveryAdapter(jdbcTemplate, objectMapper, appBaseUrl)
+        }
+
+        @Bean
+        fun jdbcNotificationEventOutboxAdapter(
+            jdbcTemplate: JdbcTemplate,
+            objectMapper: ObjectMapper,
+            @Value("\${readmates.notifications.kafka.events-topic}") eventsTopic: String,
+        ): JdbcNotificationEventOutboxAdapter {
+            val topic = eventsTopic
+            return JdbcNotificationEventOutboxAdapter(jdbcTemplate, objectMapper, topic)
         }
 
         @Bean
@@ -471,4 +704,13 @@ class RecordingMailDeliveryPort : MailDeliveryPort {
     fun clear() {
         sent.clear()
     }
+}
+
+private class RejectPublishedMarkOutboxPort(
+    delegate: NotificationEventOutboxPort,
+) : NotificationEventOutboxPort by delegate {
+    override fun markPublished(
+        id: UUID,
+        lockedAt: OffsetDateTime,
+    ): Boolean = false
 }
