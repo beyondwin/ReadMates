@@ -172,6 +172,7 @@ is_forbidden_path() {
     design/*/dist|design/*/dist/*) return 0 ;;
     design/standalone|design/standalone/*) return 0 ;;
     front/test-results|front/test-results/*) return 0 ;;
+    front/playwright/.cache|front/playwright/.cache/*) return 0 ;;
     front/playwright-report|front/playwright-report/*) return 0 ;;
     front/coverage|front/coverage/*) return 0 ;;
     front/.nyc_output|front/.nyc_output/*) return 0 ;;

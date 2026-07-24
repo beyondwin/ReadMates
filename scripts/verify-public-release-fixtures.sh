@@ -157,6 +157,20 @@ if ./scripts/public-release-check.sh "$artifact_fixture" > "$artifact_fixture.ou
 fi
 assert_file_contains "$artifact_fixture.err" "forbidden candidate path: front/test-results/.last-run.json"
 
+playwright_cache_fixture="$fixture_root/playwright-cache-path"
+mkdir -p "$playwright_cache_fixture/front/playwright/.cache/assets"
+printf 'generated component-test bundle\n' \
+  > "$playwright_cache_fixture/front/playwright/.cache/assets/index.js"
+
+if ./scripts/public-release-check.sh "$playwright_cache_fixture" \
+  > "$playwright_cache_fixture.out" 2> "$playwright_cache_fixture.err"
+then
+  fail "public release check should reject front/playwright/.cache"
+fi
+assert_file_contains \
+  "$playwright_cache_fixture.err" \
+  "forbidden candidate path: front/playwright/.cache"
+
 tsbuildinfo_fixture="$fixture_root/tsbuildinfo-path"
 mkdir -p "$tsbuildinfo_fixture/front"
 printf '{"diagnostics":"generated compiler state"}\n' > "$tsbuildinfo_fixture/front/tsconfig.tsbuildinfo"

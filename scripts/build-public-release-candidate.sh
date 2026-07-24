@@ -203,6 +203,11 @@ preflight_envrc_loaders() {
           -path "$root/system/dist" ")" \
           -prune -o -name '.envrc*'
         ;;
+      front)
+        capture_find "$results" "$root" \
+          "(" -path "$root/playwright/.cache" ")" \
+          -prune -o -name '.envrc*'
+        ;;
       .|docs/operations)
         capture_find "$results" "$root" -maxdepth 1 -name '.envrc*'
         ;;
@@ -267,6 +272,7 @@ preflight_source_symlinks() {
           -path "$root/node_modules" -o
           -path "$root/dist" -o
           -path "$root/test-results" -o
+          -path "$root/playwright/.cache" -o
           -path "$root/playwright-report" -o
           -path "$root/coverage" -o
           -path "$root/.nyc_output" -o
@@ -433,6 +439,7 @@ copy_manifest() {
     --exclude='/node_modules/' \
     --exclude='/dist/' \
     --exclude='/test-results/' \
+    --exclude='/playwright/.cache/' \
     --exclude='/playwright-report/' \
     --exclude='/__screenshots__/' \
     --exclude='/coverage/' \
@@ -512,6 +519,7 @@ is_forbidden_candidate_path() {
     design/*/dist|design/*/dist/*) return 0 ;;
     design/standalone|design/standalone/*) return 0 ;;
     front/test-results|front/test-results/*) return 0 ;;
+    front/playwright/.cache|front/playwright/.cache/*) return 0 ;;
     front/playwright-report|front/playwright-report/*) return 0 ;;
     front/coverage|front/coverage/*) return 0 ;;
     front/.nyc_output|front/.nyc_output/*) return 0 ;;
@@ -601,7 +609,7 @@ Public release candidate built:
 Next verification commands:
   find .tmp/public-release-candidate -type l -print
   find .tmp/public-release-candidate -name '.env*' -print
-  find .tmp/public-release-candidate \\( -path '*/node_modules/*' -o -path '*/design/*/dist/*' -o -path '*/design/standalone' -o -path '*/design/standalone/*' -o -path '*/.gstack/*' -o -path '*/.superpowers/*' -o -path '*/.idea/*' -o -path '*/.playwright-cli/*' -o -path '*/.tmp/*' -o -path '*/recode/*' -o -path '*/front/output/*' -o -path '*/front/dist/*' -o -path '*/front/test-results*' -o -path '*/front/playwright-report*' -o -path '*/front/coverage*' -o -path '*/front/.nyc_output*' -o -path '*/server/build/*' -o -path '*/server/.gradle/*' -o -path '*/server/.kotlin/*' -o -path '*/.wrangler' -o -path '*/.wrangler/*' -o -path '*/.cloudflare' -o -path '*/.cloudflare/*' -o -path '*/.vercel' -o -path '*/.vercel/*' -o -iname '*.env' -o -iname '*.pem' -o -iname '*.key' -o -iname '*.p8' -o -iname '*.p12' -o -iname '*.pfx' -o -iname '*.jks' -o -iname 'id_rsa*' -o -iname 'id_ed25519*' -o -iname 'id_ecdsa*' -o -iname 'id_dsa*' -o -iname '*.sql.gz' -o -iname '*.dump' -o -iname '*.tfstate' -o -iname '*.db' -o -iname '*.sqlite' \\) -print
+  find .tmp/public-release-candidate \\( -path '*/node_modules/*' -o -path '*/design/*/dist/*' -o -path '*/design/standalone' -o -path '*/design/standalone/*' -o -path '*/.gstack/*' -o -path '*/.superpowers/*' -o -path '*/.idea/*' -o -path '*/.playwright-cli/*' -o -path '*/.tmp/*' -o -path '*/recode/*' -o -path '*/front/output/*' -o -path '*/front/dist/*' -o -path '*/front/test-results*' -o -path '*/front/playwright/.cache*' -o -path '*/front/playwright-report*' -o -path '*/front/coverage*' -o -path '*/front/.nyc_output*' -o -path '*/server/build/*' -o -path '*/server/.gradle/*' -o -path '*/server/.kotlin/*' -o -path '*/.wrangler' -o -path '*/.wrangler/*' -o -path '*/.cloudflare' -o -path '*/.cloudflare/*' -o -path '*/.vercel' -o -path '*/.vercel/*' -o -iname '*.env' -o -iname '*.pem' -o -iname '*.key' -o -iname '*.p8' -o -iname '*.p12' -o -iname '*.pfx' -o -iname '*.jks' -o -iname 'id_rsa*' -o -iname 'id_ed25519*' -o -iname 'id_ecdsa*' -o -iname 'id_dsa*' -o -iname '*.sql.gz' -o -iname '*.dump' -o -iname '*.tfstate' -o -iname '*.db' -o -iname '*.sqlite' \\) -print
   git diff --check
 EOF
 }
