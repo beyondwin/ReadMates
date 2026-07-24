@@ -1,5 +1,7 @@
 package com.readmates.aigen.api
 
+import com.readmates.aigen.adapter.out.persistence.JdbcAiGenerationAuditRepository
+import com.readmates.aigen.adapter.out.redis.RedisProviderCallReservationAdapter
 import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.GroundedAuthoredText
@@ -14,14 +16,24 @@ import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.model.ProviderAttemptState
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.model.ValidatedTranscriptTurn
+import com.readmates.aigen.application.port.out.AiGenerationAuditPort
 import com.readmates.aigen.application.port.out.AiGenerationJobStore
+import com.readmates.aigen.application.port.out.AuditLogEntry
 import com.readmates.aigen.application.port.out.JobRecord
+import com.readmates.aigen.application.port.out.ProviderCallReconciliationCommand
+import com.readmates.aigen.application.port.out.ProviderCallReconciliationResult
+import com.readmates.aigen.application.port.out.ProviderCallRecoveryResult
+import com.readmates.aigen.application.port.out.ProviderCallReservationCommand
+import com.readmates.aigen.application.port.out.ProviderCallReservationPort
+import com.readmates.aigen.application.port.out.ProviderCallReservationResult
 import com.readmates.support.KafkaTestContainer
 import com.readmates.support.ReadmatesRedisIntegrationTestSupport
+import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.admin.AdminClient
 import org.apache.kafka.clients.admin.AdminClientConfig
 import org.apache.kafka.clients.admin.NewTopic
@@ -33,7 +45,11 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Import
+import org.springframework.context.annotation.Primary
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
@@ -52,7 +68,9 @@ import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 private const val CLUB_ID = "00000000-0000-0000-0000-000000088600"
 private const val SESSION_ID = "00000000-0000-0000-0000-000000088601"
@@ -141,20 +159,26 @@ private const val SEED_SQL = """
         "readmates.aigen.pricing[gpt-5.4-mini].cached-input-per-m-token-usd=0.075",
         "readmates.aigen.pricing[gpt-5.4-mini].output-per-m-token-usd=4.50",
         "readmates.aigen.kafka.enabled=true",
+        "readmates.aigen.provider-calls.request-timeout=1ms",
         "spring.kafka.consumer.auto-offset-reset=earliest",
     ],
 )
 @AutoConfigureMockMvc
+@Import(AiGenerateApiIntegrationTest.ReconciliationInterruptionConfiguration::class)
 @Sql(statements = [CLEANUP_SQL, SEED_SQL], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 @Sql(statements = [CLEANUP_SQL], executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
 @Tag("integration")
 @Tag("container")
+@Suppress("LargeClass")
 class AiGenerateApiIntegrationTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val redis: StringRedisTemplate,
     @param:Autowired private val jobStore: AiGenerationJobStore,
     @param:Autowired private val objectMapper: ObjectMapper,
+    @param:Autowired private val meterRegistry: MeterRegistry,
+    @param:Autowired private val interruptingReservations: InterruptingProviderCallReservations,
+    @param:Autowired private val recordingAudit: RecordingAiGenerationAuditPort,
 ) : ReadmatesRedisIntegrationTestSupport() {
     @Test
     fun `server AI generation commit persists an AI draft with zero notification outbox`() {
@@ -173,6 +197,128 @@ class AiGenerateApiIntegrationTest(
         commitJob(jobId)
         assertTerminalHashRetainedAndPayloadDeleted(jobId)
         assertSessionImportCommitted()
+    }
+
+    @Test
+    @Suppress("LongMethod")
+    fun `provider response reconciliation crash redelivers once and converges with retained unknown cost`() {
+        val clubId = UUID.fromString(CLUB_ID)
+        val monthlyKey = "aigen:club:$clubId:monthly_cost_usd"
+        val admissionKey = "aigen:club:$clubId:provider_admission"
+        redis.delete(listOf(monthlyKey, admissionKey))
+        val physicalCallsBefore = physicalProviderCalls()
+        interruptingReservations.interruptNextReconciliation()
+        recordingAudit.clear()
+        var jobId: UUID? = null
+
+        try {
+            jobId =
+                startJob(
+                    "claude-sonnet-4-6",
+                    "AiGenHost 00:00\nPublic-safe redelivery statement.",
+                )
+            awaitSucceeded(jobId)
+
+            val record = jobStore.loadMetadata(jobId)
+            assertThat(record?.status).isEqualTo(JobStatus.SUCCEEDED)
+            assertThat(record?.llmCallCount).isEqualTo(2)
+            assertThat(physicalProviderCalls() - physicalCallsBefore).isEqualTo(2.0)
+
+            val ledgerKey = "aigen:job:$jobId:provider-attempts"
+            val ledger = redis.opsForHash<String, String>().entries(ledgerKey)
+            val attemptPrefixes = ledger.keys.filter { it.endsWith(":state") }.map { it.removeSuffix(":state") }
+            assertThat(attemptPrefixes).hasSize(2)
+            val attempts =
+                attemptPrefixes.associateWith { prefix ->
+                    AttemptEvidence(
+                        state = ProviderAttemptState.valueOf(ledger.getValue("$prefix:state")),
+                        costBasis = ledger.getValue("$prefix:costBasis"),
+                        reservedCost = ledger.getValue("$prefix:reservedCostUsd").toBigDecimal(),
+                        slotReleased = ledger.getValue("$prefix:slotReleased"),
+                    )
+                }
+            val unknown = attempts.values.single { it.state == ProviderAttemptState.UNKNOWN }
+            val succeeded = attempts.values.single { it.state == ProviderAttemptState.SUCCEEDED }
+            assertThat(unknown.costBasis).isEqualTo("ESTIMATED_UNKNOWN")
+            assertThat(unknown.slotReleased).isEqualTo("0")
+            assertThat(succeeded.costBasis).isEqualTo("ACTUAL")
+            assertThat(succeeded.slotReleased).isEqualTo("0")
+            assertThat(redis.opsForValue().get(monthlyKey)?.toBigDecimal())
+                .isEqualByComparingTo(unknown.reservedCost.add(CLAUDE_STUB_ACTUAL_COST_USD))
+            assertThat(redis.hasKey(admissionKey)).isFalse()
+
+            val metadata =
+                listOf(
+                    redis.opsForHash<String, String>().entries("aigen:job:$jobId"),
+                    ledger,
+                ).joinToString("|")
+                    .lowercase()
+            assertThat(metadata)
+                .doesNotContain("public-safe redelivery statement")
+                .doesNotContain("prompt")
+                .doesNotContain("completion")
+                .doesNotContain("providerresponse")
+
+            val auditEntries = recordingAudit.entriesFor(jobId)
+            assertThat(auditEntries).hasSize(2)
+            val providerAudit = auditEntries.single { it.providerAttempt != null }
+            val terminalAudit = auditEntries.single { it.providerAttempt == null }
+            assertThat(providerAudit.kind.name).isEqualTo("FULL")
+            assertThat(providerAudit.status.name).isEqualTo("SUCCESS")
+            assertThat(providerAudit.providerAttempt).isEqualTo(2)
+            assertThat(providerAudit.providerCallMode?.name).isEqualTo("PRIMARY")
+            assertThat(providerAudit.costBasis.name).isEqualTo("ACTUAL")
+            assertThat(providerAudit.costEstimateUsd).isEqualByComparingTo(CLAUDE_STUB_ACTUAL_COST_USD)
+            assertThat(terminalAudit.groundingStatus).isEqualTo("VALID")
+            assertThat(auditEntries).allSatisfy { audit ->
+                assertThat(audit.transcriptSha256).isNull()
+                assertThat(audit.errorMessage).isNull()
+            }
+            assertThat(auditEntries.joinToString("|").lowercase())
+                .doesNotContain("public-safe redelivery statement")
+                .doesNotContain("prompt")
+                .doesNotContain("completion")
+        } finally {
+            interruptingReservations.disableInterruption()
+            recordingAudit.clear()
+            jobId?.let(jobStore::delete)
+            redis.delete(listOf(monthlyKey, admissionKey))
+        }
+    }
+
+    @Test
+    fun `anonymous start is denied before a provider call or audit write`() {
+        val beforeCalls = physicalProviderCalls()
+        val transcript =
+            MockMultipartFile(
+                "transcript",
+                "public-fixture.txt",
+                "text/plain",
+                "AiGenHost 00:00\nPublic-safe denied statement.".toByteArray(),
+            )
+        val body =
+            MockMultipartFile(
+                "body",
+                "body.json",
+                "application/json",
+                """{"model":"claude-sonnet-4-6","authorNameMode":"real","instructions":null}""".toByteArray(),
+            )
+
+        mockMvc
+            .multipart("/api/host/sessions/$SESSION_ID/ai-generate/jobs") {
+                file(transcript)
+                file(body)
+            }.andExpect {
+                status { isUnauthorized() }
+            }
+
+        assertThat(physicalProviderCalls()).isEqualTo(beforeCalls)
+        assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from ai_generation_audit_log where session_id = '$SESSION_ID'",
+                Int::class.java,
+            ),
+        ).isZero()
     }
 
     @Test
@@ -298,6 +444,7 @@ class AiGenerateApiIntegrationTest(
 
     @Test
     fun `start with unknown model returns typed AI disabled problem`() {
+        val beforeCalls = physicalProviderCalls()
         val transcript =
             MockMultipartFile(
                 "transcript",
@@ -323,6 +470,7 @@ class AiGenerateApiIntegrationTest(
                 jsonPath("$.code") { value("AI_DISABLED") }
                 jsonPath("$.detail") { value("AI generation request could not be completed") }
             }
+        assertThat(physicalProviderCalls()).isEqualTo(beforeCalls)
     }
 
     @Test
@@ -424,6 +572,12 @@ class AiGenerateApiIntegrationTest(
                 with(user(HOST_EMAIL))
             }.andReturn()
             .response.contentAsString
+
+    private fun physicalProviderCalls(): Double =
+        meterRegistry
+            .find("readmates.aigen.provider.calls")
+            .counters()
+            .sumOf { it.count() }
 
     @Suppress("LongMethod")
     private fun groundedSucceededRecord(): JobRecord {
@@ -683,12 +837,20 @@ class AiGenerateApiIntegrationTest(
         return UUID.fromString(match.groupValues[1])
     }
 
+    private data class AttemptEvidence(
+        val state: ProviderAttemptState,
+        val costBasis: String,
+        val reservedCost: BigDecimal,
+        val slotReleased: String,
+    )
+
     companion object {
         // A run-id keeps the Kafka topic+consumer-group unique per test JVM so reused
         // KafkaContainer instances don't bleed offsets between integration test classes.
         val RUN_ID: String = UUID.randomUUID().toString().take(8)
 
         private val TOPIC = "readmates.aigen.jobs.int.$RUN_ID"
+        private val CLAUDE_STUB_ACTUAL_COST_USD = BigDecimal("0.0033")
 
         @JvmStatic
         @DynamicPropertySource
@@ -719,5 +881,68 @@ class AiGenerateApiIntegrationTest(
                         .get(10, TimeUnit.SECONDS)
                 }
         }
+    }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    class ReconciliationInterruptionConfiguration {
+        @Bean
+        @Primary
+        @Suppress("MaxLineLength")
+        fun interruptingProviderCallReservations(delegate: RedisProviderCallReservationAdapter): InterruptingProviderCallReservations =
+            InterruptingProviderCallReservations(delegate)
+
+        @Bean
+        @Primary
+        fun recordingAiGenerationAuditPort(delegate: JdbcAiGenerationAuditRepository): RecordingAiGenerationAuditPort =
+            RecordingAiGenerationAuditPort(delegate)
+    }
+}
+
+class InterruptingProviderCallReservations(
+    private val delegate: ProviderCallReservationPort,
+) : ProviderCallReservationPort {
+    private val interruptReconciliation = AtomicBoolean(false)
+
+    fun interruptNextReconciliation() {
+        check(interruptReconciliation.compareAndSet(false, true))
+    }
+
+    fun disableInterruption() {
+        interruptReconciliation.set(false)
+    }
+
+    @Suppress("MaxLineLength")
+    override fun reserve(command: ProviderCallReservationCommand): ProviderCallReservationResult = delegate.reserve(command)
+
+    override fun reconcile(command: ProviderCallReconciliationCommand): ProviderCallReconciliationResult {
+        if (interruptReconciliation.compareAndSet(true, false)) {
+            throw IllegalStateException("synthetic content-free reconciliation interruption")
+        }
+        return delegate.reconcile(command)
+    }
+
+    override fun recoverStaleInFlightUnknown(
+        jobId: UUID,
+        staleBefore: Instant,
+        now: Instant,
+    ): ProviderCallRecoveryResult = delegate.recoverStaleInFlightUnknown(jobId, staleBefore, now)
+
+    override fun clubMonthlyCost(clubId: UUID): BigDecimal = delegate.clubMonthlyCost(clubId)
+}
+
+class RecordingAiGenerationAuditPort(
+    private val delegate: AiGenerationAuditPort,
+) : AiGenerationAuditPort {
+    private val entries = ConcurrentLinkedQueue<AuditLogEntry>()
+
+    override fun insert(entry: AuditLogEntry) {
+        delegate.insert(entry)
+        entries += entry
+    }
+
+    fun entriesFor(jobId: UUID): List<AuditLogEntry> = entries.filter { it.jobId == jobId }
+
+    fun clear() {
+        entries.clear()
     }
 }
