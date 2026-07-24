@@ -90,3 +90,60 @@ Frontend V8 coverage는 lines 82.57%, statements 81.77%, functions 82.06%, branc
 - `script-shellcheck`: ShellCheck 실행 파일이 없어 `UNVERIFIED_ENV`다. CI `scripts` job은 이를 설치한다.
 - `script-observability-config`: 실행은 됐지만 Docker daemon 연결 실패로 non-zero다. config 자체의 성공 여부는 미검증이다.
 - Playwright E2E/CT의 runtime, retry, screenshot drift는 수집하지 못했다. 정적 list 결과만 file/case census 근거로 사용했다.
+
+## 9. 고위험 gap matrix
+
+표의 테스트 경로는 inventory와 대조했다. `server-unit`은 Task 3에서 실행됐고 `server-integration` 및 `front-playwright-e2e`는 환경 원인으로 실행되지 않았다.
+
+| risk_id | boundary | production evidence | test evidence와 관찰점 | observed gap | disposition | follow-up plan |
+| --- | --- | --- | --- | --- | --- | --- |
+| R01 | BFF secret, internal header stripping, cookie/redirect trust | `front/functions/_shared/proxy.ts`가 BFF secret과 신뢰된 host/IP를 덮어쓰고 upstream cookie domain 및 내부 응답 header를 제거하며, `front/functions/api/bff/[[path]].ts`가 route-selected slug만 전달한다. `server/src/main/kotlin/com/readmates/auth/infrastructure/security/BffSecretFilter.kt`는 보호 API의 secret을 거부한다. | `front/tests/unit/cloudflare-bff.test.ts`와 `front/tests/unit/proxy-bff-secret.test.ts`는 browser header overwrite, invalid slug rejection, secret precedence를 assertion하며 `server/src/test/kotlin/com/readmates/auth/infrastructure/security/BffSecretFilterTest.kt`는 missing/wrong secret 403과 valid secret 통과를 assertion한다. node lane은 검증됐다. | cookie attribute와 redirect response sanitization을 한 contract로 묶은 부정 테스트가 약하다. | strengthen | frontend-bff |
+| R02 | OAuth return state와 open redirect 방지 | `server/src/main/kotlin/com/readmates/auth/infrastructure/security/OAuthReturnState.kt`는 return path를 정규화하고 expiry와 HMAC을 검증하며 timing-safe 비교한다. | `server/src/test/kotlin/com/readmates/auth/infrastructure/security/OAuthReturnStateTest.kt`는 blank secret fail-fast만 직접 assertion한다. `front/tests/unit/cloudflare-oauth-proxy.test.ts`는 query/cookie forwarding, Location/Set-Cookie 보존, 내부 header 제거를 assertion하고 `front/tests/e2e/google-auth-invite-flow.spec.ts`는 invite login return 흐름을 관찰한다. unit은 검증됐고 E2E는 미검증이다. | tampered/expired state와 scheme-relative 또는 external return target의 직접 거부 matrix가 부족하다. | add | frontend-bff |
+| R03 | membership, role, club-context tenant isolation | `server/src/main/kotlin/com/readmates/club/adapter/in/web/ClubContextResolver.kt`는 active slug/host만 resolve하고 `server/src/main/kotlin/com/readmates/auth/infrastructure/security/SecurityConfig.kt`는 host/member 경계를 강제한다. | `server/src/test/kotlin/com/readmates/club/api/ClubContextResolverTest.kt`는 disabled host/invalid slug가 null임을, `server/src/test/kotlin/com/readmates/auth/api/AuthenticatedMemberSecurityTest.kt`는 inactive membership과 member-to-host 거부를 assertion한다. `front/tests/e2e/multi-club-flow.spec.ts`는 slug별 public data, role, invite target 분리를 assertion한다. server unit만 검증됐다. | 임의 resource ID를 다른 club context에서 재사용하는 endpoint별 거부 matrix가 완전하지 않다. | strengthen | server |
+| R04 | public/member/attendee visibility | `server/src/main/kotlin/com/readmates/publication/application/service/PublicQueryService.kt`와 `server/src/main/kotlin/com/readmates/club/domain/ClubPublicVisibility.kt`가 publication 및 visibility 조건을 적용한다. | `server/src/test/kotlin/com/readmates/publication/api/PublicControllerDbTest.kt`는 unpublished/removed-author 자료 제외와 left-member 익명화를, `server/src/test/kotlin/com/readmates/archive/api/ArchiveAndNotesDbTest.kt`는 club scope와 viewer feedback-document 거부를 assertion한다. `front/tests/e2e/public-auth-member-host.spec.ts`는 public→member→host UI 차이를 assertion한다. 모두 integration/E2E라 실행은 미검증이다. | visibility 전이의 runtime 증거가 없고 attendee-only denial 조합을 더 확인해야 한다. | runtime-unverified | server |
+| R05 | session/member/invitation/publication lifecycle denial | `server/src/main/kotlin/com/readmates/session/application/service/HostSessionLifecycleService.kt`가 lifecycle command를 조율하고 domain/DB invariant가 불가능한 상태를 거부한다. | `server/src/test/kotlin/com/readmates/session/application/service/HostSessionServicesTest.kt`는 rollout staging 거부와 visibility command 부재를, `server/src/test/kotlin/com/readmates/session/domain/SessionInvariantConstraintTest.kt`는 invalid status/visibility SQL 실패를, `server/src/test/kotlin/com/readmates/auth/application/MemberLifecycleServiceTest.kt`는 suspend와 invalidation을 assertion한다. `front/tests/e2e/member-lifecycle.spec.ts`는 suspended member의 save disabled를 관찰한다. unit은 검증됐고 integration/E2E는 미검증이다. | invitation/publication의 forbidden transition과 duplicate command 조합이 분산돼 있다. | strengthen | server |
+| R06 | transaction rollback과 Flyway upgrade | `server/src/main/resources/db/mysql/migration`이 schema/data 전이를 정의하고 apply service/controller가 package replacement와 revision commit을 transaction 경계에서 수행한다. | `server/src/test/kotlin/com/readmates/support/MySqlFlywayMigrationTest.kt`는 baseline table, constraint, non-null schema를, `server/src/test/kotlin/com/readmates/sessionrecord/application/service/SessionRecordApplyServiceTest.kt`는 validation-before-commit과 immutable revision을, `server/src/test/kotlin/com/readmates/sessionrecord/api/HostSessionRecordControllerDbTest.kt`는 CAS/restore fail-closed를 assertion한다. unit만 검증됐다. | 중간 persistence 실패 후 전체 rollback 및 기존 schema/data에서 최신 migration까지의 upgrade fixture가 명시적이지 않다. | add | server |
+| R07 | Redis failure, stale read, post-commit invalidation | `server/src/main/kotlin/com/readmates/shared/adapter/out/redis/RedisReadCacheInvalidationAdapter.kt`, `server/src/main/kotlin/com/readmates/publication/adapter/out/redis/RedisPublicReadCacheAdapter.kt`, `server/src/main/kotlin/com/readmates/note/adapter/out/redis/RedisNotesReadCacheAdapter.kt`가 key scope와 fallback을 구현한다. | `server/src/test/kotlin/com/readmates/shared/adapter/out/redis/RedisReadCacheInvalidationAdapterTest.kt`는 target keys 제거, unrelated keys 보존, failure metrics를 assertion한다. `server/src/test/kotlin/com/readmates/publication/application/service/PublicQueryServiceCacheTest.kt`와 `server/src/test/kotlin/com/readmates/note/application/service/NotesFeedServiceCacheTest.kt`는 hit/miss 및 paged-read cache bypass를 assertion한다. service unit은 검증됐지만 Redis integration은 미검증이다. | commit 직후 invalidation 실패와 stale read의 실제 Redis 동작을 재검증하지 못했다. | runtime-unverified | server |
+| R08 | AI authorization, cost cap, reservation, cancel/expiry/recovery race | `server/src/main/kotlin/com/readmates/aigen/application/service/AiGenerationCommitRecoveryService.kt`가 receipt/lease recovery를, `server/src/main/kotlin/com/readmates/aigen/adapter/out/redis/RedisProviderCallReservationAdapter.kt`가 원자적 call/cost reservation을 구현한다. | `server/src/test/kotlin/com/readmates/aigen/application/service/AiGenerationCommitRecoveryServiceTest.kt`는 receipt convergence, expired lease retry, content-free warning을 assertion한다. `server/src/test/kotlin/com/readmates/aigen/adapter/out/redis/RedisGenerationCostCountersTest.kt`와 `RedisProviderCallReservationAdapterTest.kt`는 fail-closed cap, release, TTL, 64-way concurrency cap을 assertion한다. `front/tests/e2e/aigen-cost-cap.spec.ts`와 `aigen-commit-recovery.spec.ts`는 사용자 오류와 content 비노출을 관찰한다. unit만 검증됐다. | Redis concurrency 및 브라우저 recovery lane은 runtime 미검증이다. | runtime-unverified | server |
+| R09 | notification outbox idempotency와 partial delivery | `server/src/main/kotlin/com/readmates/notification/adapter/out/persistence/JdbcNotificationEventOutboxAdapter.kt`가 dedupe/claim을, `server/src/main/kotlin/com/readmates/notification/application/service/NotificationDeliveryProcessingService.kt`가 sent/retry/dead 처리를 구현한다. | `server/src/test/kotlin/com/readmates/notification/adapter/out/persistence/JdbcNotificationEventOutboxAdapterTest.kt`는 duplicate enqueue 1-row와 claim transition을, `server/src/test/kotlin/com/readmates/notification/application/service/NotificationDeliveryProcessingServiceTest.kt`는 sent/failed/dead metrics, retry delay, PII-safe warning을 assertion한다. `server/src/test/kotlin/com/readmates/notification/kafka/NotificationKafkaPipelineIntegrationTest.kt`는 Kafka metadata 보존을 assertion한다. service unit만 검증됐다. | DB/Kafka partial-delivery와 reclaim 동작의 runtime 증거가 없다. | runtime-unverified | server |
+| R10 | PII-safe frontend/server observability와 profile parity | `front/shared/observability/frontend-observability-client.ts`는 enqueue와 flush 전에 batch를 sanitize하고 `server/src/main/kotlin/com/readmates/observability/application/service/FrontendObservabilityService.kt`는 bounded metric을 기록한다. | `front/tests/e2e/frontend-observability-local-proxy.spec.ts`는 proxy 202와 accepted/dropped 값을, `server/src/test/kotlin/com/readmates/observability/application/service/FrontendObservabilityServiceTest.kt`는 supported/dropped metrics를, `server/src/test/kotlin/com/readmates/observability/adapter/in/web/FrontendObservabilityBffSecurityTest.kt`는 BFF secret/origin 거부를 assertion한다. server unit은 검증됐지만 E2E와 config validation은 미검증이다. | Docker 기반 config validator가 non-zero였고 local/test profile과 production label/cardinality parity를 끝까지 확인하지 못했다. | runtime-unverified | final-verification |
+
+## 10. 후속 계획 경계
+
+후속 계획은 이 보고서와 candidate ledger를 입력으로 사용한다. ledger의 101개 고유 path는 모두 `candidate-only`이며 아래 ownership rule이 정확한 후보 파일 목록을 만든다. 중복 flag는 한 파일로 합친다.
+
+### server
+
+- Candidate files: candidate ledger를 inventory와 path로 join했을 때 lane이 `server-unit`, `server-integration`, `server-architecture`인 61개 고유 파일.
+- 소유 risk: R03–R09. R01의 Spring filter는 frontend-bff와 공동 검토하되 server 변경은 이 계획이 소유한다.
+- 기준선: `./scripts/server-ci-check.sh` 9.11초/성공; `./server/gradlew -p server integrationTest`는 Docker daemon 부재로 미검증.
+- 선행 조건: JDK 25; integration에는 reachable Docker daemon.
+- 비목표: 제품 계약, migration, coverage minimum을 바꾸거나 환경 실패를 테스트 삭제로 해결하지 않는다.
+- acceptance: focused unit/integration tests, `./scripts/server-ci-check.sh`, `./server/gradlew -p server integrationTest`.
+
+### frontend-bff
+
+- Candidate files: candidate ledger를 inventory와 join했을 때 lane이 `front-vitest-node` 또는 `front-vitest-jsdom`인 33개 고유 파일.
+- 소유 risk: R01–R02 및 R03/R10의 browser-facing contract.
+- 기준선: `pnpm --dir front test:coverage` 43.48초/1,425 tests 성공, lint 19.01초 성공, build 2.28초 성공.
+- 선행 조건: Node 24.18.0, pnpm 11.13.1(Corepack launcher).
+- 비목표: server persistence, browser visual baseline, coverage threshold 변경.
+- acceptance: focused Vitest, `pnpm --dir front lint`, `pnpm --dir front test`, `pnpm --dir front build`; auth/BFF 흐름 변경 시 E2E.
+
+### e2e-ct-ci
+
+- Candidate files: candidate ledger를 inventory와 join했을 때 `front-playwright-e2e`, `front-playwright-ct`, `design-system-vitest`, `design-docs-vitest` lane인 7개 고유 파일. scripts/CI는 정적 ledger 대상 밖이므로 현재 workflow와 validation scripts를 별도 reachability 대상으로 포함한다.
+- 소유 risk: R02–R05/R08/R10의 browser evidence와 visual/CI reachability.
+- 기준선: design-check 8.28초/15 tests 성공; E2E는 MySQL CLI 부재, CT는 Docker daemon 부재, ShellCheck는 실행 파일 부재로 미검증; public-release 24.90초 성공.
+- 선행 조건: Node/pnpm, MySQL service와 CLI, reachable Docker daemon, Playwright browser, ShellCheck.
+- 비목표: retry/timeout 증가, snapshot 무검토 갱신, server domain 계약 변경.
+- acceptance: `pnpm --dir front test:e2e`, `pnpm --dir front test:ct:docker`, `pnpm design:check`, script/ShellCheck lanes, public-release candidate checks.
+
+### final-verification
+
+- Candidate files: 앞의 101개 candidate 결론과 변경된 테스트 전체. 새 정적 삭제 후보를 독자적으로 만들지 않는다.
+- 소유 risk: R01–R10 통합 재검토, 특히 R10 config/profile parity.
+- 기준선: 이 보고서의 모든 명령과 real time; non-zero/UNVERIFIED_ENV 상태도 전후 비교에서 유지한다.
+- 선행 조건: Node/pnpm/JDK, Docker daemon, MySQL CLI/service, browser, ShellCheck.
+- 비목표: 배포, merge, production credential/provider 호출, broad mutation testing.
+- acceptance: 선택된 결함 주입의 expected failure와 복원 후 pass, 전체 공식 gates, coverage/wallclock 전후표, public-safety scan과 최종 residual-risk 기록.
