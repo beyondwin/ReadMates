@@ -86,6 +86,7 @@ describe("frontend observability client", () => {
       navigationType: "LOAD",
       result: "success",
     });
+    expect(client.pendingCount()).toBe(0);
     client.record({
       type: "RUNTIME_ERROR",
       routePattern: "/admin",
@@ -93,6 +94,7 @@ describe("frontend observability client", () => {
       errorCode: "REACT_ROUTE_ERROR",
       severity: "error",
     });
+    expect(client.pendingCount()).toBe(1);
 
     await expect(client.flush()).resolves.toBeUndefined();
     expect(fetchImpl).toHaveBeenCalledTimes(1);
