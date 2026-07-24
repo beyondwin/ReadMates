@@ -31,6 +31,7 @@ import com.readmates.aigen.application.port.out.ProviderCallRecoveryResult
 import com.readmates.aigen.application.port.out.ProviderCallReservationCommand
 import com.readmates.aigen.application.port.out.ProviderCallReservationPort
 import com.readmates.aigen.application.port.out.ProviderCallReservationResult
+import com.readmates.aigen.config.AiGenerationProperties
 import com.readmates.support.KafkaTestContainer
 import com.readmates.support.ReadmatesRedisIntegrationTestSupport
 import io.micrometer.core.instrument.MeterRegistry
@@ -159,7 +160,6 @@ private const val SEED_SQL = """
         "readmates.aigen.pricing[gpt-5.4-mini].cached-input-per-m-token-usd=0.075",
         "readmates.aigen.pricing[gpt-5.4-mini].output-per-m-token-usd=4.50",
         "readmates.aigen.kafka.enabled=true",
-        "readmates.aigen.provider-calls.request-timeout=1ms",
         "spring.kafka.consumer.auto-offset-reset=earliest",
     ],
 )
@@ -207,7 +207,7 @@ class AiGenerateApiIntegrationTest(
         val admissionKey = "aigen:club:$clubId:provider_admission"
         redis.delete(listOf(monthlyKey, admissionKey))
         val physicalCallsBefore = physicalProviderCalls()
-        interruptingReservations.interruptNextReconciliation()
+        interruptingReservations.interruptNextReconciliationAfterAgingAttempt()
         recordingAudit.clear()
         var jobId: UUID? = null
 
@@ -888,8 +888,11 @@ class AiGenerateApiIntegrationTest(
         @Bean
         @Primary
         @Suppress("MaxLineLength")
-        fun interruptingProviderCallReservations(delegate: RedisProviderCallReservationAdapter): InterruptingProviderCallReservations =
-            InterruptingProviderCallReservations(delegate)
+        fun interruptingProviderCallReservations(
+            delegate: RedisProviderCallReservationAdapter,
+            redis: StringRedisTemplate,
+            properties: AiGenerationProperties,
+        ): InterruptingProviderCallReservations = InterruptingProviderCallReservations(delegate, redis, properties)
 
         @Bean
         @Primary
@@ -900,10 +903,12 @@ class AiGenerateApiIntegrationTest(
 
 class InterruptingProviderCallReservations(
     private val delegate: ProviderCallReservationPort,
+    private val redis: StringRedisTemplate,
+    private val properties: AiGenerationProperties,
 ) : ProviderCallReservationPort {
     private val interruptReconciliation = AtomicBoolean(false)
 
-    fun interruptNextReconciliation() {
+    fun interruptNextReconciliationAfterAgingAttempt() {
         check(interruptReconciliation.compareAndSet(false, true))
     }
 
@@ -916,6 +921,15 @@ class InterruptingProviderCallReservations(
 
     override fun reconcile(command: ProviderCallReconciliationCommand): ProviderCallReconciliationResult {
         if (interruptReconciliation.compareAndSet(true, false)) {
+            val staleStartedAt =
+                command.now
+                    .minus(properties.providerCalls.requestTimeout)
+                    .minusMillis(1)
+            redis.opsForHash<String, String>().put(
+                "aigen:job:${command.jobId}:provider-attempts",
+                "${command.attemptId}:startedAtEpochMs",
+                staleStartedAt.toEpochMilli().toString(),
+            )
             throw IllegalStateException("synthetic content-free reconciliation interruption")
         }
         return delegate.reconcile(command)

@@ -30,6 +30,7 @@ import java.time.Duration
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.Callable
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.CyclicBarrier
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -129,37 +130,52 @@ class RedisProviderCallReservationAdapterTest(
     }
 
     @Test
-    fun `cancel racing reservation leaves either no attempt or one retained in-flight call`() {
-        repeat(24) {
-            val fixture = fixture()
-            prepare(fixture, JobStatus.RUNNING)
-            try {
-                val (reservation, cancelled) =
-                    race(
-                        left = { reservations.reserve(fixture.command()) },
-                        right = {
-                            cancelJob(fixture)
-                        },
-                    )
+    fun `cancel completed before reservation phase denies the call without consuming cost`() {
+        val fixture = fixture()
+        prepare(fixture, JobStatus.RUNNING)
+        try {
+            val (cancelled, reservation) =
+                phasedInterleaving(
+                    first = { cancelJob(fixture) },
+                    second = { reservations.reserve(fixture.command()) },
+                )
 
-                assertThat(cancelled).isTrue()
-                assertThat(jobStatus(fixture.jobId)).isEqualTo(JobStatus.CANCELLED.name)
-                assertThat(redisTemplate.opsForValue().get(fixture.admissionKey))
-                    .isEqualTo(fixture.admissionId.toString())
-                when (reservation) {
-                    is ProviderCallReservationResult.Reserved -> {
-                        assertThat(jobCallCount(fixture.jobId)).isEqualTo(1)
-                        assertThat(monthlyCost(fixture.clubId)).isEqualByComparingTo(CENT)
-                        assertThat(attemptState(fixture)).isEqualTo(ProviderAttemptState.IN_FLIGHT.name)
-                        assertThat(attemptField(fixture, "slotReleased")).isEqualTo("0")
-                        assertContentFreeLedger(fixture)
-                    }
-                    ProviderCallReservationResult.StateChanged -> assertNoReservationWrites(fixture)
-                    else -> error("Unexpected cancel-versus-reserve result: $reservation")
-                }
-            } finally {
-                cleanup(fixture)
-            }
+            assertThat(cancelled).isTrue()
+            assertThat(reservation).isEqualTo(ProviderCallReservationResult.StateChanged)
+            assertThat(jobStatus(fixture.jobId)).isEqualTo(JobStatus.CANCELLED.name)
+            assertThat(redisTemplate.opsForValue().get(fixture.admissionKey))
+                .isEqualTo(fixture.admissionId.toString())
+            assertNoReservationWrites(fixture)
+            assertThat(attemptState(fixture)).isNull()
+            assertThat(attemptField(fixture, "slotReleased")).isNull()
+        } finally {
+            cleanup(fixture)
+        }
+    }
+
+    @Test
+    fun `reservation completed before cancel phase retains the accepted in-flight call and cost`() {
+        val fixture = fixture()
+        prepare(fixture, JobStatus.RUNNING)
+        try {
+            val (reservation, cancelled) =
+                phasedInterleaving(
+                    first = { reservations.reserve(fixture.command()) },
+                    second = { cancelJob(fixture) },
+                )
+
+            assertThat(reservation).isInstanceOf(ProviderCallReservationResult.Reserved::class.java)
+            assertThat(cancelled).isTrue()
+            assertThat(jobStatus(fixture.jobId)).isEqualTo(JobStatus.CANCELLED.name)
+            assertThat(jobCallCount(fixture.jobId)).isEqualTo(1)
+            assertThat(monthlyCost(fixture.clubId)).isEqualByComparingTo(CENT)
+            assertThat(attemptState(fixture)).isEqualTo(ProviderAttemptState.IN_FLIGHT.name)
+            assertThat(attemptField(fixture, "slotReleased")).isEqualTo("0")
+            assertThat(redisTemplate.opsForValue().get(fixture.admissionKey))
+                .isEqualTo(fixture.admissionId.toString())
+            assertContentFreeLedger(fixture)
+        } finally {
+            cleanup(fixture)
         }
     }
 
@@ -689,6 +705,44 @@ class RedisProviderCallReservationAdapterTest(
                 )
             barrier.await()
             leftFuture.get() to rightFuture.get()
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
+    private fun <F, S> phasedInterleaving(
+        first: () -> F,
+        second: () -> S,
+    ): Pair<F, S> {
+        val executor = Executors.newFixedThreadPool(2)
+        val ready = CountDownLatch(2)
+        val start = CountDownLatch(1)
+        val firstComplete = CountDownLatch(1)
+        return try {
+            val firstFuture =
+                executor.submit(
+                    Callable {
+                        ready.countDown()
+                        start.await()
+                        try {
+                            first()
+                        } finally {
+                            firstComplete.countDown()
+                        }
+                    },
+                )
+            val secondFuture =
+                executor.submit(
+                    Callable {
+                        ready.countDown()
+                        start.await()
+                        firstComplete.await()
+                        second()
+                    },
+                )
+            ready.await()
+            start.countDown()
+            firstFuture.get() to secondFuture.get()
         } finally {
             executor.shutdownNow()
         }
