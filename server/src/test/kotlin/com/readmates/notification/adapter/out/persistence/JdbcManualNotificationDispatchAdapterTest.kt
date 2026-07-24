@@ -30,13 +30,19 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
+import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.core.env.Environment
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
+import java.sql.Connection
+import java.sql.DriverManager
+import java.sql.SQLException
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.UUID
@@ -86,6 +92,7 @@ class JdbcManualNotificationDispatchAdapterTest(
     @param:Autowired private val attendanceService: HostSessionAttendanceService,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val transactionManager: PlatformTransactionManager,
+    @param:Autowired private val environment: Environment,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     private val clubId = UUID.fromString("00000000-0000-0000-0000-000000000001")
     private val hostMembershipId = UUID.fromString("00000000-0000-0000-0000-000000000201")
@@ -582,6 +589,7 @@ class JdbcManualNotificationDispatchAdapterTest(
     fun `confirm waits behind a real viewer activation using the same club lock`() {
         val now = OffsetDateTime.of(2026, 7, 23, 0, 0, 0, 0, ZoneOffset.UTC)
         val changedMembershipId = membershipId("member1@example.com")
+        val originalState = viewerActivationState(changedMembershipId)
         val activationApplied = CountDownLatch(1)
         val releaseActivation = CountDownLatch(1)
         val executor = Executors.newFixedThreadPool(2)
@@ -624,11 +632,7 @@ class JdbcManualNotificationDispatchAdapterTest(
         } finally {
             releaseActivation.countDown()
             executor.shutdownNow()
-            jdbcTemplate.update(
-                "update memberships set status = 'ACTIVE' where club_id = ? and id = ?",
-                clubId.toString(),
-                changedMembershipId.toString(),
-            )
+            restoreViewerActivationState(changedMembershipId, originalState)
         }
     }
 
@@ -636,7 +640,9 @@ class JdbcManualNotificationDispatchAdapterTest(
     fun `confirm waits behind a real attendance mutation using the same club lock`() {
         val now = OffsetDateTime.of(2026, 7, 23, 0, 0, 0, 0, ZoneOffset.UTC)
         val changedMembershipId = membershipId("member1@example.com")
-        val originalAttendance = participantStatus("attendance_status", changedMembershipId)
+        val originalState = attendanceState(changedMembershipId)
+        val changedAttendance = if (originalState.status == "ATTENDED") "ABSENT" else "ATTENDED"
+        val auditRequestId = "manual-confirm-lock-${UUID.randomUUID()}"
         val currentSelection = selection()
         val previewId = insertLockTestPreview(now, currentSelection)
         val attendanceApplied = CountDownLatch(1)
@@ -649,21 +655,26 @@ class JdbcManualNotificationDispatchAdapterTest(
                 CompletableFuture.runAsync(
                     {
                         transactionTemplate.executeWithoutResult {
-                            attendanceService.confirmAttendance(
-                                ConfirmAttendanceCommand(
-                                    host = host,
-                                    sessionId = sessionId,
-                                    entries =
-                                        listOf(
-                                            AttendanceEntryCommand(
-                                                membershipId = changedMembershipId.toString(),
-                                                attendanceStatus = originalAttendance,
+                            MDC.put("requestId", auditRequestId)
+                            try {
+                                attendanceService.confirmAttendance(
+                                    ConfirmAttendanceCommand(
+                                        host = host,
+                                        sessionId = sessionId,
+                                        entries =
+                                            listOf(
+                                                AttendanceEntryCommand(
+                                                    membershipId = changedMembershipId.toString(),
+                                                    attendanceStatus = changedAttendance,
+                                                ),
                                             ),
-                                        ),
-                                ),
-                            )
-                            attendanceApplied.countDown()
-                            check(releaseAttendance.await(10, TimeUnit.SECONDS))
+                                    ),
+                                )
+                                attendanceApplied.countDown()
+                                check(releaseAttendance.await(10, TimeUnit.SECONDS))
+                            } finally {
+                                MDC.remove("requestId")
+                            }
                         }
                     },
                     executor,
@@ -682,6 +693,7 @@ class JdbcManualNotificationDispatchAdapterTest(
         } finally {
             releaseAttendance.countDown()
             executor.shutdownNow()
+            restoreAttendanceLockTestState(changedMembershipId, originalState, auditRequestId)
         }
     }
 
@@ -1197,6 +1209,7 @@ class JdbcManualNotificationDispatchAdapterTest(
         check(confirmStarted.await(10, TimeUnit.SECONDS))
         assertThatThrownBy { confirmation.get(250, TimeUnit.MILLISECONDS) }
             .isInstanceOf(TimeoutException::class.java)
+        assertMutationOwnsClubBeforeConfirmReachesPreview(previewId)
 
         releaseMutation.countDown()
         mutation.get(10, TimeUnit.SECONDS)
@@ -1219,6 +1232,148 @@ class JdbcManualNotificationDispatchAdapterTest(
             sessionId.toString(),
             membershipId.toString(),
         )!!
+    }
+
+    private fun assertMutationOwnsClubBeforeConfirmReachesPreview(previewId: UUID) {
+        openProbeConnection().use { connection ->
+            connection.autoCommit = false
+            assertThatThrownBy {
+                connection.prepareStatement("select id from clubs where id = ? for update nowait").use { statement ->
+                    statement.setString(1, clubId.toString())
+                    statement.executeQuery().use { it.next() }
+                }
+            }.isInstanceOf(SQLException::class.java)
+            connection.rollback()
+        }
+        openProbeConnection().use { connection ->
+            connection.autoCommit = false
+            connection
+                .prepareStatement(
+                    "select id from notification_manual_dispatch_previews where id = ? for update nowait",
+                ).use { statement ->
+                    statement.setString(1, previewId.toString())
+                    statement.executeQuery().use { resultSet ->
+                        assertThat(resultSet.next()).isTrue()
+                        assertThat(resultSet.getString("id")).isEqualTo(previewId.toString())
+                    }
+                }
+            connection.rollback()
+        }
+    }
+
+    private fun openProbeConnection(): Connection =
+        DriverManager.getConnection(
+            environment.getRequiredProperty("spring.datasource.url"),
+            environment.getRequiredProperty("spring.datasource.username"),
+            environment.getRequiredProperty("spring.datasource.password"),
+        )
+
+    private fun viewerActivationState(membershipId: UUID): ViewerActivationState =
+        jdbcTemplate.queryForObject(
+            """
+            select
+              memberships.status,
+              memberships.joined_at,
+              memberships.updated_at,
+              session_participants.participation_status,
+              session_participants.updated_at as participant_updated_at
+            from memberships
+            join session_participants
+              on session_participants.club_id = memberships.club_id
+             and session_participants.membership_id = memberships.id
+             and session_participants.session_id = ?
+            where memberships.club_id = ? and memberships.id = ?
+            """.trimIndent(),
+            { rs, _ ->
+                ViewerActivationState(
+                    status = rs.getString("status"),
+                    joinedAt = rs.getObject("joined_at", LocalDateTime::class.java),
+                    updatedAt = rs.getObject("updated_at", LocalDateTime::class.java),
+                    participationStatus = rs.getString("participation_status"),
+                    participantUpdatedAt = rs.getObject("participant_updated_at", LocalDateTime::class.java),
+                )
+            },
+            sessionId.toString(),
+            clubId.toString(),
+            membershipId.toString(),
+        )
+
+    private fun restoreViewerActivationState(
+        membershipId: UUID,
+        state: ViewerActivationState,
+    ) {
+        jdbcTemplate.update(
+            """
+            update memberships
+            set status = ?, joined_at = ?, updated_at = ?
+            where club_id = ? and id = ?
+            """.trimIndent(),
+            state.status,
+            state.joinedAt,
+            state.updatedAt,
+            clubId.toString(),
+            membershipId.toString(),
+        )
+        jdbcTemplate.update(
+            """
+            update session_participants
+            set participation_status = ?, updated_at = ?
+            where club_id = ? and session_id = ? and membership_id = ?
+            """.trimIndent(),
+            state.participationStatus,
+            state.participantUpdatedAt,
+            clubId.toString(),
+            sessionId.toString(),
+            membershipId.toString(),
+        )
+    }
+
+    private fun attendanceState(membershipId: UUID): AttendanceState =
+        jdbcTemplate.queryForObject(
+            """
+            select attendance_status, updated_at
+            from session_participants
+            where club_id = ? and session_id = ? and membership_id = ?
+            """.trimIndent(),
+            { rs, _ ->
+                AttendanceState(
+                    status = rs.getString("attendance_status"),
+                    updatedAt = rs.getObject("updated_at", LocalDateTime::class.java),
+                )
+            },
+            clubId.toString(),
+            sessionId.toString(),
+            membershipId.toString(),
+        )
+
+    private fun restoreAttendanceState(
+        membershipId: UUID,
+        state: AttendanceState,
+    ) {
+        jdbcTemplate.update(
+            """
+            update session_participants
+            set attendance_status = ?, updated_at = ?
+            where club_id = ? and session_id = ? and membership_id = ?
+            """.trimIndent(),
+            state.status,
+            state.updatedAt,
+            clubId.toString(),
+            sessionId.toString(),
+            membershipId.toString(),
+        )
+    }
+
+    private fun restoreAttendanceLockTestState(
+        membershipId: UUID,
+        state: AttendanceState,
+        auditRequestId: String,
+    ) {
+        restoreAttendanceState(membershipId, state)
+        jdbcTemplate.update(
+            "delete from host_session_change_audit where request_id = ?",
+            auditRequestId,
+        )
     }
 
     private fun restoreLifecycleLockTestState(
@@ -1247,5 +1402,18 @@ class JdbcManualNotificationDispatchAdapterTest(
         val date: LocalDate,
         val membershipStatus: String,
         val preference: Pair<Boolean, Boolean>?,
+    )
+
+    private data class ViewerActivationState(
+        val status: String,
+        val joinedAt: LocalDateTime?,
+        val updatedAt: LocalDateTime?,
+        val participationStatus: String,
+        val participantUpdatedAt: LocalDateTime?,
+    )
+
+    private data class AttendanceState(
+        val status: String,
+        val updatedAt: LocalDateTime?,
     )
 }
