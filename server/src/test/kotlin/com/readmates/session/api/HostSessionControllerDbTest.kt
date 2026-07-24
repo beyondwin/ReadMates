@@ -729,18 +729,31 @@ class HostSessionControllerDbTest(
 
     @Test
     fun `host open transition is idempotent for already open session`() {
-        createSessionSeven()
+        val sessionId = createDraftSessionSeven()
 
         mockMvc
-            .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/open") {
+            .post("/api/host/sessions/$sessionId/open") {
                 with(user("host@example.com"))
                 with(csrf())
             }.andExpect {
                 status { isOk() }
-                jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009777") }
+                jsonPath("$.sessionId") { value(sessionId) }
                 jsonPath("$.state") { value("OPEN") }
             }
 
+        val afterFirstOpen = lifecycleDbEvidence(sessionId)
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/open") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value(sessionId) }
+                jsonPath("$.state") { value("OPEN") }
+            }
+
+        assertEquals(afterFirstOpen, lifecycleDbEvidence(sessionId))
         assertEquals(6, participantCountForSessionNumber(7))
     }
 
@@ -795,7 +808,6 @@ class HostSessionControllerDbTest(
     @Test
     fun `host close transition is idempotent for already closed session`() {
         createSessionSeven()
-        updateSessionState("00000000-0000-0000-0000-000000009777", "CLOSED")
 
         mockMvc
             .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/close") {
@@ -806,6 +818,20 @@ class HostSessionControllerDbTest(
                 jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009777") }
                 jsonPath("$.state") { value("CLOSED") }
             }
+
+        val afterFirstClose = lifecycleDbEvidence("00000000-0000-0000-0000-000000009777")
+
+        mockMvc
+            .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/close") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009777") }
+                jsonPath("$.state") { value("CLOSED") }
+            }
+
+        assertEquals(afterFirstClose, lifecycleDbEvidence("00000000-0000-0000-0000-000000009777"))
     }
 
     @Test
@@ -844,35 +870,83 @@ class HostSessionControllerDbTest(
     }
 
     @Test
-    fun `host cannot publish open draft host only or unpublished sessions`() {
+    fun `host publish replay returns published result without second write outbox or audit transition`() {
+        val sessionId = "00000000-0000-0000-0000-000000009777"
         createSessionSeven()
+        updateSessionVisibility(sessionId, "MEMBER")
+        insertPublicationRow(sessionId, visibility = "MEMBER", isPublic = false, published = false)
 
         mockMvc
-            .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/publish") {
+            .post("/api/host/sessions/$sessionId/close") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.state") { value("CLOSED") }
+            }
+        mockMvc
+            .post("/api/host/sessions/$sessionId/publish") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.state") { value("PUBLISHED") }
+            }
+
+        val afterFirstPublish = lifecycleDbEvidence(sessionId)
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/publish") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value(sessionId) }
+                jsonPath("$.state") { value("PUBLISHED") }
+            }
+
+        assertEquals(afterFirstPublish, lifecycleDbEvidence(sessionId))
+    }
+
+    @Test
+    fun `host cannot publish open draft host only or unpublished sessions`() {
+        val sessionId = "00000000-0000-0000-0000-000000009777"
+        createSessionSeven()
+        val openBefore = lifecycleDbEvidence(sessionId)
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/publish") {
                 with(user("host@example.com"))
                 with(csrf())
             }.andExpect {
                 status { isConflict() }
+                jsonPath("$.code") { value("CONFLICT") }
+                jsonPath("$.status") { value(409) }
             }
+        assertEquals(openBefore, lifecycleDbEvidence(sessionId))
 
         mockMvc
-            .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/close") {
+            .post("/api/host/sessions/$sessionId/close") {
                 with(user("host@example.com"))
                 with(csrf())
             }.andExpect {
                 status { isOk() }
             }
+        val unpublishedBefore = lifecycleDbEvidence(sessionId)
 
         mockMvc
-            .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/publish") {
+            .post("/api/host/sessions/$sessionId/publish") {
                 with(user("host@example.com"))
                 with(csrf())
             }.andExpect {
                 status { isConflict() }
+                jsonPath("$.code") { value("CONFLICT") }
+                jsonPath("$.status") { value(409) }
             }
+        assertEquals(unpublishedBefore, lifecycleDbEvidence(sessionId))
 
         mockMvc
-            .put("/api/host/sessions/00000000-0000-0000-0000-000000009777/publication") {
+            .put("/api/host/sessions/$sessionId/publication") {
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
@@ -886,14 +960,18 @@ class HostSessionControllerDbTest(
             }.andExpect {
                 status { isOk() }
             }
+        val hostOnlyBefore = lifecycleDbEvidence(sessionId)
 
         mockMvc
-            .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/publish") {
+            .post("/api/host/sessions/$sessionId/publish") {
                 with(user("host@example.com"))
                 with(csrf())
             }.andExpect {
                 status { isConflict() }
+                jsonPath("$.code") { value("CONFLICT") }
+                jsonPath("$.status") { value(409) }
             }
+        assertEquals(hostOnlyBefore, lifecycleDbEvidence(sessionId))
     }
 
     @Test
@@ -920,6 +998,7 @@ class HostSessionControllerDbTest(
     @Test
     fun `host cannot close draft or published session`() {
         val sessionId = createDraftSessionSeven()
+        val draftBefore = lifecycleDbEvidence(sessionId)
 
         mockMvc
             .post("/api/host/sessions/$sessionId/close") {
@@ -927,11 +1006,15 @@ class HostSessionControllerDbTest(
                 with(csrf())
             }.andExpect {
                 status { isConflict() }
+                jsonPath("$.code") { value("CONFLICT") }
+                jsonPath("$.status") { value(409) }
             }
+        assertEquals(draftBefore, lifecycleDbEvidence(sessionId))
 
         // PUBLISHED+HOST_ONLY violates the invariant; set visibility to MEMBER first
         updateSessionVisibility(sessionId, "MEMBER")
         updateSessionState(sessionId, "PUBLISHED")
+        val publishedBefore = lifecycleDbEvidence(sessionId)
 
         mockMvc
             .post("/api/host/sessions/$sessionId/close") {
@@ -939,7 +1022,10 @@ class HostSessionControllerDbTest(
                 with(csrf())
             }.andExpect {
                 status { isConflict() }
+                jsonPath("$.code") { value("CONFLICT") }
+                jsonPath("$.status") { value(409) }
             }
+        assertEquals(publishedBefore, lifecycleDbEvidence(sessionId))
     }
 
     @Test
@@ -1999,6 +2085,55 @@ class HostSessionControllerDbTest(
             "select count(*) from $tableName where $whereClause",
             Int::class.java,
         ) ?: 0
+
+    private fun lifecycleDbEvidence(sessionId: String): LifecycleDbEvidence =
+        LifecycleDbEvidence(
+            session =
+                jdbcTemplate.queryForMap(
+                    """
+                    select state, visibility, updated_at
+                    from sessions
+                    where id = ?
+                    """.trimIndent(),
+                    sessionId,
+                ),
+            participantCount =
+                jdbcTemplate.queryForObject(
+                    "select count(*) from session_participants where session_id = ?",
+                    Int::class.java,
+                    sessionId,
+                ) ?: 0,
+            publications =
+                jdbcTemplate.queryForList(
+                    """
+                    select visibility, is_public, published_at, updated_at
+                    from public_session_publications
+                    where session_id = ?
+                    order by id
+                    """.trimIndent(),
+                    sessionId,
+                ),
+            outboxCount =
+                jdbcTemplate.queryForObject(
+                    "select count(*) from notification_event_outbox where aggregate_id = ?",
+                    Int::class.java,
+                    sessionId,
+                ) ?: 0,
+            auditCount =
+                jdbcTemplate.queryForObject(
+                    "select count(*) from host_session_change_audit where session_id = ?",
+                    Int::class.java,
+                    sessionId,
+                ) ?: 0,
+        )
+
+    private data class LifecycleDbEvidence(
+        val session: Map<String, Any?>,
+        val participantCount: Int,
+        val publications: List<Map<String, Any?>>,
+        val outboxCount: Int,
+        val auditCount: Int,
+    )
 
     private fun insertPublicationRow(
         sessionId: String,

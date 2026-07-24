@@ -260,7 +260,7 @@ class PublicControllerDbTest(
         ],
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
-    fun `club scoped public records expose only published public sessions`() {
+    fun `anonymous visibility matrix exposes only published public sessions`() {
         mockMvc
             .get("/api/public/clubs/reading-sai/sessions/00000000-0000-0000-0000-000000000991")
             .andExpect {
@@ -269,12 +269,13 @@ class PublicControllerDbTest(
                 jsonPath("$.summary") { value("발행 공개 세션만 공개 상세에 노출됩니다.") }
             }
 
-        listOf(
-            "00000000-0000-0000-0000-000000000992",
-            "00000000-0000-0000-0000-000000000993",
-            "00000000-0000-0000-0000-000000000994",
-            "00000000-0000-0000-0000-000000000995",
-        ).forEach { sessionId ->
+        mapOf(
+            "MEMBER" to "00000000-0000-0000-0000-000000000992",
+            "HOST_ONLY" to "00000000-0000-0000-0000-000000000990",
+            "PUBLIC but unpublished" to "00000000-0000-0000-0000-000000000993",
+            "MEMBER draft" to "00000000-0000-0000-0000-000000000994",
+            "PUBLIC open" to "00000000-0000-0000-0000-000000000995",
+        ).forEach { (_, sessionId) ->
             mockMvc
                 .get("/api/public/clubs/reading-sai/sessions/$sessionId")
                 .andExpect {
@@ -289,6 +290,7 @@ class PublicControllerDbTest(
                 jsonPath("$.stats.sessions") { value(7) }
                 jsonPath("$.recentSessions[*].bookTitle") { value(hasItem("공개 범위 테스트 책 - 발행 공개")) }
                 jsonPath("$.recentSessions[*].bookTitle") { value(not(hasItem("공개 범위 테스트 책 - 발행 멤버"))) }
+                jsonPath("$.recentSessions[*].bookTitle") { value(not(hasItem("공개 범위 테스트 책 - 호스트 전용"))) }
                 jsonPath("$.recentSessions[*].bookTitle") { value(not(hasItem("공개 범위 테스트 책 - 종료 공개"))) }
                 jsonPath("$.recentSessions[*].bookTitle") { value(not(hasItem("공개 범위 테스트 책 - 예정 공개"))) }
                 jsonPath("$.recentSessions[*].bookTitle") { value(not(hasItem("공개 범위 테스트 책 - 진행 공개"))) }
@@ -550,6 +552,7 @@ class PublicControllerDbTest(
         private const val CLEANUP_PUBLIC_PUBLICATION_MATRIX_SQL = """
             delete from public_session_publications
             where session_id in (
+              '00000000-0000-0000-0000-000000000990',
               '00000000-0000-0000-0000-000000000991',
               '00000000-0000-0000-0000-000000000992',
               '00000000-0000-0000-0000-000000000993',
@@ -558,6 +561,7 @@ class PublicControllerDbTest(
             );
             delete from sessions
             where id in (
+              '00000000-0000-0000-0000-000000000990',
               '00000000-0000-0000-0000-000000000991',
               '00000000-0000-0000-0000-000000000992',
               '00000000-0000-0000-0000-000000000993',
@@ -572,6 +576,13 @@ class PublicControllerDbTest(
               session_date, start_time, end_time, location_label, question_deadline_at, state, visibility
             )
             values
+            (
+              '00000000-0000-0000-0000-000000000990',
+              '00000000-0000-0000-0000-000000000001',
+              990, '990회차 · 공개 범위 테스트 책 - 호스트 전용', '공개 범위 테스트 책 - 호스트 전용',
+              '공개 범위 테스트 저자', null, null, null, '2026-10-31', '20:00', '22:00', '온라인',
+              '2026-10-30 14:59:00.000000', 'CLOSED', 'HOST_ONLY'
+            ),
             (
               '00000000-0000-0000-0000-000000000991',
               '00000000-0000-0000-0000-000000000001',
@@ -614,6 +625,15 @@ class PublicControllerDbTest(
               id, club_id, session_id, public_summary, is_public, visibility, published_at
             )
             values
+            (
+              '00000000-0000-0000-0000-000000001990',
+              '00000000-0000-0000-0000-000000000001',
+              '00000000-0000-0000-0000-000000000990',
+              '호스트 전용 세션은 공개 상세에 노출되지 않습니다.',
+              false,
+              'HOST_ONLY',
+              null
+            ),
             (
               '00000000-0000-0000-0000-000000001991',
               '00000000-0000-0000-0000-000000000001',

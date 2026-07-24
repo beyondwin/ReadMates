@@ -120,6 +120,85 @@ class ArchiveAndNotesDbTest(
     @Test
     @Sql(
         statements = [
+            CLEANUP_VISIBILITY_ACTOR_MATRIX_SQL,
+            INSERT_VISIBILITY_ACTOR_MATRIX_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            CLEANUP_VISIBILITY_ACTOR_MATRIX_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `member archive visibility matrix distinguishes non attendee attendee host and cross club actors`() {
+        val publicSessionId = "00000000-0000-0000-0000-0000000092b1"
+        val memberSessionId = "00000000-0000-0000-0000-0000000092b2"
+        val hostOnlySessionId = "00000000-0000-0000-0000-0000000092b3"
+
+        mockMvc
+            .get("/api/public/clubs/reading-sai/sessions/$publicSessionId")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value(publicSessionId) }
+            }
+        listOf(memberSessionId, hostOnlySessionId).forEach { deniedSessionId ->
+            mockMvc
+                .get("/api/public/clubs/reading-sai/sessions/$deniedSessionId")
+                .andExpect {
+                    status { isNotFound() }
+                }
+        }
+
+        listOf(
+            "member4@example.com" to "active non-attendee member",
+            "member5@example.com" to "active attendee",
+            "host@example.com" to "active host",
+        ).forEach { (email, _) ->
+            listOf(publicSessionId, memberSessionId).forEach { visibleSessionId ->
+                mockMvc
+                    .get("/api/archive/sessions/$visibleSessionId") {
+                        header("X-Readmates-Club-Slug", "reading-sai")
+                        with(user(email))
+                    }.andExpect {
+                        status { isOk() }
+                        jsonPath("$.sessionId") { value(visibleSessionId) }
+                    }
+            }
+
+            mockMvc
+                .get("/api/archive/sessions/$hostOnlySessionId") {
+                    header("X-Readmates-Club-Slug", "reading-sai")
+                    with(user(email))
+                }.andExpect {
+                    status { isNotFound() }
+                }
+        }
+
+        mockMvc
+            .get("/api/host/sessions/$hostOnlySessionId") {
+                header("X-Readmates-Club-Slug", "reading-sai")
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value(hostOnlySessionId) }
+                jsonPath("$.visibility") { value("HOST_ONLY") }
+            }
+
+        listOf(publicSessionId, memberSessionId, hostOnlySessionId).forEach { otherClubSessionId ->
+            mockMvc
+                .get("/api/archive/sessions/$otherClubSessionId") {
+                    header("X-Readmates-Club-Slug", "sample-book-club")
+                    with(user("member5@example.com"))
+                }.andExpect {
+                    status { isNotFound() }
+                }
+        }
+    }
+
+    @Test
+    @Sql(
+        statements = [
             CLEANUP_VIEWER_ARCHIVE_VISIBILITY_SESSIONS_SQL,
             INSERT_VIEWER_DRAFT_SESSION_SQL,
             INSERT_VIEWER_OPEN_SESSION_SQL,
@@ -931,6 +1010,118 @@ class ArchiveAndNotesDbTest(
 
     companion object {
         private fun removedJsonPath(vararg parts: String) = parts.joinToString(separator = "")
+
+        private const val CLEANUP_VISIBILITY_ACTOR_MATRIX_SQL = """
+            delete from public_session_publications
+            where session_id in (
+              '00000000-0000-0000-0000-0000000092b1',
+              '00000000-0000-0000-0000-0000000092b2',
+              '00000000-0000-0000-0000-0000000092b3'
+            );
+            delete from session_participants
+            where session_id in (
+              '00000000-0000-0000-0000-0000000092b1',
+              '00000000-0000-0000-0000-0000000092b2',
+              '00000000-0000-0000-0000-0000000092b3'
+            );
+            delete from sessions
+            where id in (
+              '00000000-0000-0000-0000-0000000092b1',
+              '00000000-0000-0000-0000-0000000092b2',
+              '00000000-0000-0000-0000-0000000092b3'
+            );
+            delete from memberships
+            where id = '00000000-0000-0000-0000-0000000092b9';
+        """
+
+        private const val INSERT_VISIBILITY_ACTOR_MATRIX_SQL = """
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+            select
+              '00000000-0000-0000-0000-0000000092b9',
+              '00000000-0000-0000-0000-000000000002',
+              users.id,
+              'MEMBER',
+              'ACTIVE',
+              '2026-01-01 00:00:00.000000',
+              '다른클럽멤버5'
+            from users
+            where users.email = 'member5@example.com';
+            insert into sessions (
+              id, club_id, number, title, book_title, book_author,
+              session_date, start_time, end_time, location_label,
+              question_deadline_at, state, visibility
+            )
+            values
+              (
+                '00000000-0000-0000-0000-0000000092b1',
+                '00000000-0000-0000-0000-000000000001',
+                921, '921회차 · 공개 actor matrix', '공개 actor matrix 책', '검증 저자',
+                '2026-12-21', '20:00:00', '22:00:00', '온라인',
+                '2026-12-20 14:59:00.000000', 'PUBLISHED', 'PUBLIC'
+              ),
+              (
+                '00000000-0000-0000-0000-0000000092b2',
+                '00000000-0000-0000-0000-000000000001',
+                922, '922회차 · 멤버 actor matrix', '멤버 actor matrix 책', '검증 저자',
+                '2026-12-22', '20:00:00', '22:00:00', '온라인',
+                '2026-12-21 14:59:00.000000', 'PUBLISHED', 'MEMBER'
+              ),
+              (
+                '00000000-0000-0000-0000-0000000092b3',
+                '00000000-0000-0000-0000-000000000001',
+                923, '923회차 · 호스트 actor matrix', '호스트 actor matrix 책', '검증 저자',
+                '2026-12-23', '20:00:00', '22:00:00', '온라인',
+                '2026-12-22 14:59:00.000000', 'CLOSED', 'HOST_ONLY'
+              );
+            insert into public_session_publications (
+              id, club_id, session_id, public_summary, is_public, visibility, published_at
+            )
+            values
+              (
+                '00000000-0000-0000-0000-0000000092b4',
+                '00000000-0000-0000-0000-000000000001',
+                '00000000-0000-0000-0000-0000000092b1',
+                '공개 actor matrix 요약입니다.', true, 'PUBLIC', '2026-12-24 00:00:00.000000'
+              ),
+              (
+                '00000000-0000-0000-0000-0000000092b5',
+                '00000000-0000-0000-0000-000000000001',
+                '00000000-0000-0000-0000-0000000092b2',
+                '멤버 actor matrix 요약입니다.', false, 'MEMBER', null
+              ),
+              (
+                '00000000-0000-0000-0000-0000000092b6',
+                '00000000-0000-0000-0000-000000000001',
+                '00000000-0000-0000-0000-0000000092b3',
+                '호스트 actor matrix 요약입니다.', false, 'HOST_ONLY', null
+              );
+            insert into session_participants (
+              id, club_id, session_id, membership_id,
+              rsvp_status, attendance_status, participation_status
+            )
+            values
+              (
+                '00000000-0000-0000-0000-0000000092b7',
+                '00000000-0000-0000-0000-000000000001',
+                '00000000-0000-0000-0000-0000000092b1',
+                '00000000-0000-0000-0000-000000000206',
+                'GOING', 'ATTENDED', 'ACTIVE'
+              ),
+              (
+                '00000000-0000-0000-0000-0000000092b8',
+                '00000000-0000-0000-0000-000000000001',
+                '00000000-0000-0000-0000-0000000092b2',
+                '00000000-0000-0000-0000-000000000206',
+                'GOING', 'ATTENDED', 'ACTIVE'
+              ),
+              (
+                '00000000-0000-0000-0000-0000000092ba',
+                '00000000-0000-0000-0000-000000000001',
+                '00000000-0000-0000-0000-0000000092b3',
+                '00000000-0000-0000-0000-000000000206',
+                'GOING', 'ATTENDED', 'ACTIVE'
+              );
+        """
 
         private const val CLEANUP_MY_PAGE_READING_COMPLETION_SQL = """
             delete from reading_checkins
