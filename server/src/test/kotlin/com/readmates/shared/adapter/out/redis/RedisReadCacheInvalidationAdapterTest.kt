@@ -99,11 +99,7 @@ class RedisReadCacheInvalidationAdapterTest(
     @Test
     fun `host publication keeps stale entries until commit then target refetches while unrelated clubs stay cached`() {
         seedRealReadCaches()
-        val publicationService =
-            HostSessionPublicationService(
-                publicationPort = SuccessfulPublicationPort(),
-                cacheInvalidation = adapter,
-            )
+        val publicationService = publicationService(adapter)
 
         TransactionSynchronizationManager.initSynchronization()
         try {
@@ -123,34 +119,9 @@ class RedisReadCacheInvalidationAdapterTest(
             TransactionSynchronizationManager.clearSynchronization()
         }
 
-        targetKeys.forEach { key ->
-            assertThat(redisTemplate.hasKey(key))
-                .describedAs("$key should miss after commit")
-                .isFalse()
-        }
-        unrelatedClubKeys.forEach { key ->
-            assertThat(redisTemplate.hasKey(key))
-                .describedAs("$key should remain a hit after target commit")
-                .isTrue()
-        }
-
-        val publicResult =
-            PublicQueryService(
-                loadPublishedPublicDataPort =
-                    SourcePublicLoader(
-                        session = publicSession(SESSION_ID, "Refetched source summary"),
-                    ),
-                cache = publicCache,
-                resolveClubContextUseCase = StaticClubContextResolver(TARGET_CLUB_ID),
-            ).getSession(TARGET_CLUB_SLUG, SESSION_ID)
-        val notesResult =
-            NotesFeedService(
-                loadNotesFeedPort =
-                    SourceNotesLoader(
-                        feed = listOf(noteFeedItem("Refetched source note")),
-                    ),
-                cache = notesCache,
-            ).getNotesFeed(targetHost, null, NOTES_FIRST_PAGE)
+        assertTargetKeysMissAndUnrelatedKeysHit()
+        val publicResult = refetchPublicSession("Refetched source summary")
+        val notesResult = refetchNotesFeed("Refetched source note")
 
         assertEquals("Refetched source summary", publicResult?.summary)
         assertEquals("Refetched source note", notesResult.items.single().text)
@@ -177,17 +148,7 @@ class RedisReadCacheInvalidationAdapterTest(
             publicSession(SESSION_ID, "Stale cached summary"),
         )
         val registry = SimpleMeterRegistry()
-        val failingInvalidation =
-            RedisReadCacheInvalidationAdapter(
-                redisTemplate = failingRedisTemplate(),
-                metrics = metrics(registry),
-                circuitBreakers = circuitBreakers(registry),
-            )
-        val publicationService =
-            HostSessionPublicationService(
-                publicationPort = SuccessfulPublicationPort(),
-                cacheInvalidation = failingInvalidation,
-            )
+        val publicationService = publicationService(failingInvalidationAdapter(registry))
         val mutationResult: HostPublicationResponse
 
         TransactionSynchronizationManager.initSynchronization()
@@ -204,18 +165,15 @@ class RedisReadCacheInvalidationAdapterTest(
             TransactionSynchronizationManager.clearSynchronization()
         }
 
-        val observedAfterFailure =
-            PublicQueryService(
-                loadPublishedPublicDataPort =
-                    SourcePublicLoader(
-                        session = publicSession(SESSION_ID, "Refetched source summary"),
-                    ),
-                cache = publicCache,
-                resolveClubContextUseCase = StaticClubContextResolver(TARGET_CLUB_ID),
-            ).getSession(TARGET_CLUB_SLUG, SESSION_ID)
+        val observedAfterFailure = refetchPublicSession("Refetched source summary")
 
         assertEquals("Refetched source summary", mutationResult.publicSummary)
         assertEquals("Stale cached summary", observedAfterFailure?.summary)
+        assertInvalidationFailureMetrics(registry)
+        assertMeterLabelsAreContentFree(registry)
+    }
+
+    private fun assertInvalidationFailureMetrics(registry: MeterRegistry) {
         assertEquals(
             2.0,
             counterValue(registry, "readmates.redis.fallbacks", "feature", "read-cache-invalidation"),
@@ -242,6 +200,9 @@ class RedisReadCacheInvalidationAdapterTest(
                 "evict-notes-content",
             ),
         )
+    }
+
+    private fun assertMeterLabelsAreContentFree(registry: MeterRegistry) {
         assertThat(
             registry.meters.flatMap { meter ->
                 listOf(meter.id.name) + meter.id.tags.flatMap { tag -> listOf(tag.key, tag.value) }
@@ -402,6 +363,51 @@ class RedisReadCacheInvalidationAdapterTest(
             listOf(noteFeedItem("Unrelated cached session note")),
         )
     }
+
+    private fun publicationService(cacheInvalidation: RedisReadCacheInvalidationAdapter) =
+        HostSessionPublicationService(
+            publicationPort = SuccessfulPublicationPort(),
+            cacheInvalidation = cacheInvalidation,
+        )
+
+    private fun failingInvalidationAdapter(registry: MeterRegistry) =
+        RedisReadCacheInvalidationAdapter(
+            redisTemplate = failingRedisTemplate(),
+            metrics = metrics(registry),
+            circuitBreakers = circuitBreakers(registry),
+        )
+
+    private fun assertTargetKeysMissAndUnrelatedKeysHit() {
+        targetKeys.forEach { key ->
+            assertThat(redisTemplate.hasKey(key))
+                .describedAs("$key should miss after commit")
+                .isFalse()
+        }
+        unrelatedClubKeys.forEach { key ->
+            assertThat(redisTemplate.hasKey(key))
+                .describedAs("$key should remain a hit after target commit")
+                .isTrue()
+        }
+    }
+
+    private fun refetchPublicSession(summary: String) =
+        PublicQueryService(
+            loadPublishedPublicDataPort =
+                SourcePublicLoader(
+                    session = publicSession(SESSION_ID, summary),
+                ),
+            cache = publicCache,
+            resolveClubContextUseCase = StaticClubContextResolver(TARGET_CLUB_ID),
+        ).getSession(TARGET_CLUB_SLUG, SESSION_ID)
+
+    private fun refetchNotesFeed(text: String) =
+        NotesFeedService(
+            loadNotesFeedPort =
+                SourceNotesLoader(
+                    feed = listOf(noteFeedItem(text)),
+                ),
+            cache = notesCache,
+        ).getNotesFeed(targetHost, null, NOTES_FIRST_PAGE)
 
     private fun publicationCommand(publicSummary: String) =
         UpsertPublicationCommand(
