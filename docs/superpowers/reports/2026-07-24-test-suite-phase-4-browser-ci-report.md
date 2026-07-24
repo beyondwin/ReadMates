@@ -2,7 +2,7 @@
 
 ## 결론
 
-Phase 4는 시작 커밋 `cca15776`에서 최종 runtime 후보 `33cbe73e`까지
+Phase 4는 시작 커밋 `cca15776`에서 최종 runtime 후보 `5c89986b`까지
 browser/visual/CI 테스트의 실효성과 도달 가능성을 강화했다. 제품 계약은
 현재 구현을 기준으로 유지했으며 production 코드, API, route, auth,
 visibility, domain model, migration은 변경하지 않았다.
@@ -15,9 +15,9 @@ visibility, domain model, migration은 변경하지 않았다.
   통과했고 PNG baseline 변경은 없다.
 - tracked shell 34개가 Bash syntax와 ShellCheck에 모두 도달하며,
   독립 validator가 앞선 실패에 가려지지 않도록 CI 조건을 보정했다.
-- 최종 runtime 후보에서 Testcontainers integration 744 cases를
-  연속 두 번 fresh 실행해 모두 통과했고 server PR gate와 public-release
-  gate도 통과했다.
+- `33cbe73e`에서 Testcontainers integration 744 cases를 연속 두 번,
+  최종 runtime 후보 `5c89986b`에서 한 번 더 fresh 실행해 모두
+  통과했고 final server PR gate와 public-release gate도 통과했다.
 - worker, shard, retry, timeout, cache, Gradle fork, coverage 및 screenshot
   threshold는 변경하지 않았다.
 - 환경 미검증 항목은 0개다. 외부 provider 및 live deployment는
@@ -30,8 +30,10 @@ visibility, domain model, migration은 변경하지 않았다.
 - browser/visual/CI 결정 원장: `aed8e3be`, `d357f925`
 - browser 강화: `67849ef3`
 - CI reachability 보정: `f7108732`
-- 최종 server integration fixture 격리: `33cbe73e`
-- 최종 runtime 후보: `33cbe73e`
+- server integration fixture 격리: `33cbe73e`
+- 최초 보고서와 사실 보정: `6e11158b`, `f379e1c6` (report-only)
+- 최종 review test evidence 보강: `5c89986b`
+- 최종 runtime 후보: `5c89986b`
 
 Task 7의 최초 browser, CT, design, script/config validator 실행은
 `f7108732`에서 수행했다. 그 뒤 fresh full integration에서 드러난
@@ -43,7 +45,14 @@ production 및 deploy/public-release 입력 변경이 없다. 따라서 해당
 명시해 승계하고, 영향받은 server integration, server PR gate,
 public-release candidate와 scanner는 `33cbe73e`에서 다시 실행했다.
 
-이 문서를 추가하는 커밋은 runtime을 바꾸지 않는 report-only
+최종 whole-plan review 뒤 `5c89986b`는 cost-cap E2E의 raw transcript
+부재 assertion과 notification preview fixture의 failure-safe ID 등록
+순서만 보강했다. 영향받은 두 focused test, 병렬 fixture 묶음, full
+integration, server PR gate와 public-release를 이 후보에서 다시
+검증했다. Mandatory before/after E2E 시간 증거는 정확한 `d357f925`와
+`67849ef3` detached checkout에서 동일 조건으로 수집했다.
+
+이 최종 보고서 보정 커밋은 runtime을 바꾸지 않는 report-only
 descendant다. 별도 브랜치의 CPE 복구 커밋 `86c002b5`는 이 계보의
 조상이 아니고 Phase 4에 필요하지 않아 포함하지 않았다.
 
@@ -119,15 +128,31 @@ retry는 없었다. 최종 full E2E도 같은 risk spec을 포함해 90/90으로
 
 | Risk | Browser 결과 | 검증한 현재 제품 계약 |
 | --- | --- | --- |
-| R02 | Google invite flow 1/1, 강화 전 8.40s, 후 9.14s | relative invite return은 보존하고 external `returnTo`는 거부해 `/oauth2/authorization/google` fallback으로 수렴 |
+| R02 | Google invite flow 강화 전/후 각각 1/1씩 3회, 모두 첫 시도 통과 | relative invite return은 보존하고 external `returnTo`는 거부해 `/oauth2/authorization/google` fallback으로 수렴 |
 | R03 | multi-club flow 4/4, 15.05s | public slug isolation, shared-session club 선택, role 보존 전환, target-club-only invite activation |
 | R04 | public/member/host 2/2, 8.46s | visibility는 `PUBLIC`, `MEMBER`, `HOST_ONLY`; `ATTENDEE`는 `MEMBER` 안의 actor 차원이지 네 번째 visibility가 아님 |
 | R05 | member lifecycle 1/1, 8.18s | 현재 lifecycle 허용/금지 경계와 browser state 전환 |
-| R08 | AI cost cap 1/1, 6.78s; commit recovery 1/1, 9.15s | cost-cap 거부와 commit retry/recovery 상태 |
+| R08 | AI cost cap 최종 후보 1/1, 7.97s; commit recovery 1/1, 9.15s | cost-cap 거부 뒤 synthetic uploaded transcript marker가 렌더링되지 않고 upload form이 유지됨; commit retry/recovery 상태 |
 | R10 | frontend observability local proxy 1/1, 6.65s | local BFF proxy의 202 forwarding 경계 |
 
-focused 전후 wallclock은 환경이 통제된 반복 benchmark가 아니라 한 번의
-개발 증거다. 회귀 또는 개선률을 추론하지 않는다.
+두 Task 3 변경 spec의 mandatory focused E2E 측정은 Node `v24.18.0`,
+Corepack `0.35.0`, pnpm `11.13.1`, Playwright `1.61.1`, Java `25.0.2`,
+Chromium, worker 1, `CI` unset과 retry 0으로 고정했다. 두 exact commit은
+분리된 detached worktree, 고유 MySQL database, 동일 warm
+pnpm/Gradle cache와 frontend/API port를 사용했다. 각 invocation은
+Spring/Vite startup과 fresh migration을 포함한다.
+
+| Commit | Spec | Cases/run | wallclock 3회 | min / median / max |
+| --- | --- | ---: | --- | --- |
+| `d357f925` (before) | `google-auth-invite-flow` | 1 | 15.40s / 10.04s / 10.15s | 10.04s / 10.15s / 15.40s |
+| `67849ef3` (after) | `google-auth-invite-flow` | 1 | 14.81s / 13.08s / 13.16s | 13.08s / 13.16s / 14.81s |
+| `d357f925` (before) | `admin-shell` | 4 | 15.68s / 14.71s / 15.64s | 14.71s / 15.64s / 15.68s |
+| `67849ef3` (after) | `admin-shell` | 4 | 16.75s / 21.29s / 14.70s | 14.70s / 16.75s / 21.29s |
+
+12회 모두 첫 시도에 통과했고 retry marker, port collision, server leak은
+없었다. after admin의 21.29s startup/runtime outlier를 포함한 warm
+single-host 3회 표본이므로 통계적 성능 회귀나 개선을 주장하지 않는다.
+측정용 database, port, cache와 detached worktree는 모두 제거했다.
 
 ## CT 및 design 증거
 
@@ -220,6 +245,33 @@ server gate는 daemon과 build cache를 비활성화한 상태에서 16 tasks를
 실행했다. JaCoCo line coverage는 11,347 / 25,234 = 44.97%로 변경하지
 않은 minimum `0.23`을 만족했다.
 
+최종 whole-plan review는 두 test evidence 공백을 닫았다.
+
+- `aigen-cost-cap.spec.ts`는 fixture에 이미 있던 synthetic transcript
+  marker를 상수화하고 cost-cap error 뒤 DOM에 없음을 직접 확인한다.
+  generic error와 raw transcript를 함께 렌더링하는 회귀는 이제
+  실패한다.
+- notification preview request는 response를 받은 즉시 `previewId`를
+  parse해 cleanup set에 등록한 뒤 status/body matcher를 실행한다.
+  이후 assertion이 실패해도 생성된 preview와 같은 `previewId`의 audit
+  row를 `@AfterEach`가 제거한다.
+
+`5c89986b`의 최종 추가 evidence는 다음과 같다.
+
+| Gate | 결과 | wallclock |
+| --- | --- | ---: |
+| cost-cap direct Playwright | 1/1 PASS, worker 1, retry 0 | 7.97s |
+| notification focused | 2/2 PASS | 18.99s |
+| concurrent audit+notification run 1/2/3 | 각 5/5 PASS | 16.12s / 16.17s / 16.15s |
+| full integration fresh | 744/744, failure/error/skip 0 | 116.72s |
+| `./scripts/server-ci-check.sh` | PASS, unit 962(1 skip), architecture 25, failure/error 0 | 16.76s |
+
+최종 concurrent pair의 min/median/max는
+16.12s / 16.15s / 16.17s다. full integration은 실제
+`cleanIntegrationTest integrationTest --no-build-cache --no-daemon`으로
+실행했다. 최종 server gate도 daemon과 build cache를 비활성화했고
+JaCoCo threshold 및 coverage 대상은 바뀌지 않았다.
+
 ## public-release와 public-repo safety
 
 최종 runtime 후보 내용으로 public candidate를 다시 만들고 exact
@@ -227,17 +279,17 @@ candidate를 검사했다.
 
 | Gate | 결과 | wallclock |
 | --- | --- | ---: |
-| `./scripts/build-public-release-candidate.sh` | PASS | 8.57s |
-| `./scripts/public-release-check.sh .tmp/public-release-candidate` | PASS | 8.87s |
+| `./scripts/build-public-release-candidate.sh` | PASS | 7.68s |
+| `./scripts/public-release-check.sh .tmp/public-release-candidate` | PASS | 7.89s |
 
-production AI config가 통과했고 gitleaks는 약 10.50MB를 검사해 leak을
+production AI config가 통과했고 gitleaks는 약 10.51MB를 검사해 leak을
 찾지 않았다. 실제 member data, secret, deployment state, private
 domain, local absolute path, token-shaped fixture는 tracked 변경과 이
 보고서에 추가하지 않았다.
 
 ## 변경하지 않은 계약
 
-`cca15776..33cbe73e`는 테스트, test evidence, CI reachability만
+`cca15776..5c89986b`는 테스트, test evidence, CI reachability만
 변경한다.
 
 - production product behavior, route, API schema, auth, authorization,
