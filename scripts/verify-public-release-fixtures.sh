@@ -175,6 +175,16 @@ if ./scripts/public-release-check.sh "$design_standalone_fixture" > "$design_sta
 fi
 assert_file_contains "$design_standalone_fixture.err" "forbidden candidate path: design/standalone"
 
+instruction_reference_fixture="$fixture_root/omitted-instruction-reference"
+mkdir -p "$instruction_reference_fixture"
+cp -R "$candidate_dir/." "$instruction_reference_fixture"
+printf 'Run AGENTS.md before editing.\n' > "$instruction_reference_fixture/docs/development/project-map.md"
+
+if ./scripts/public-release-check.sh "$instruction_reference_fixture" > "$instruction_reference_fixture.out" 2> "$instruction_reference_fixture.err"; then
+  fail "public release check should reject an instruction that requires an omitted contributor path"
+fi
+assert_file_contains "$instruction_reference_fixture.err" "artifact instruction references omitted contributor path: docs/development/project-map.md:1: Run AGENTS.md before editing."
+
 coverage_fixture="$repo_abs/scripts/fixtures/public-release-candidate-coverage.txt"
 
 if [[ ! -f "$coverage_fixture" ]]; then

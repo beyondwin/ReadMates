@@ -7,8 +7,8 @@
 | 순서 | 확인할 것 | 이유 |
 | --- | --- | --- |
 | 1 | `git status --short --branch --untracked-files=all` | 현재 브랜치, 모든 미커밋 변경, ahead/behind 상태를 먼저 확인합니다. |
-| 2 | 루트 `AGENTS.md`, `docs/agents/execution.md` | 작업 표면별 필수 guide와 공유 request/authority/local-runtime 계약을 고릅니다. |
-| 3 | `python3 scripts/agent-preflight.py`와 관련 `docs/agents/*.md` | 현재 또는 예상 경로를 분류하고 실제 수정 표면의 frontend, server, design, docs 규칙을 읽습니다. |
+| 2 | Full source checkout의 repository-local contributor guidance(있는 경우)와 이 문서 | 작업 표면과 공유 request/authority/local-runtime 계약을 고릅니다. |
+| 3 | 실제 수정 경로와 관련 active docs | 현재 또는 예상 경로를 분류하고 frontend, server, design, docs 규칙을 읽습니다. |
 | 4 | 이 문서의 "변경 유형별 읽는 순서"와 `acceptance-matrix.md` | 어떤 active docs와 risk evidence를 먼저 볼지 좁힙니다. |
 | 5 | `docs/development/architecture.md` | 제품 route, BFF/auth, frontend/server 경계가 불명확하면 확인합니다. |
 | 6 | 최소 검증 명령 | 변경한 표면만 검증하고, 못 돌린 검증은 통과처럼 쓰지 않습니다. |
@@ -19,7 +19,7 @@
 | --- | --- | --- |
 | 1 | 현재 코드, 테스트, migrations, scripts | 실제 동작과 검증 명령의 기준입니다. |
 | 2 | `docs/development/architecture.md` | 제품/기술 경계와 active architecture 기준입니다. |
-| 3 | `AGENTS.md`, `docs/agents/*.md`, package-local `AGENTS.md` | 작업 전 읽는 agent routing과 표면별 editing rules입니다. |
+| 3 | Full source checkout의 repository-local contributor guidance(있는 경우) | 작업 전 표면별 editing rules를 확인합니다. Clean public artifact는 이 도구를 요구하지 않습니다. |
 | 4 | `docs/development/*`, `docs/deploy/*`, `docs/operations/*` | 개발, 배포, 운영 절차의 active docs입니다. |
 | 5 | `docs/reports/*` | 작성 시점의 분석/진단 snapshot입니다. 현재 근거로 쓰기 전에 재검증합니다. |
 | 6 | `docs/superpowers/*` | 과거 design spec과 implementation plan archive입니다. 현재 동작 기준이 아닙니다. |
@@ -39,12 +39,12 @@
 
 | 경로 | 책임 | 처음 확인할 파일 |
 | --- | --- | --- |
-| `front/` | React/Vite SPA, route-first frontend, Pages Functions BFF | `front/AGENTS.md`, `front/package.json`, `front/src/app/router.tsx` |
-| `front/functions/` | Cloudflare Pages Functions BFF와 OAuth proxy | `front/functions/AGENTS.md`, `docs/agents/front.md`, `docs/agents/server.md`, `front/functions/_shared/proxy.ts` |
-| `server/` | Kotlin/Spring Boot API, auth, persistence, migrations, async adapters | `server/AGENTS.md`, `docs/agents/server.md`, `server/build.gradle.kts`, `server/src/main/kotlin/com/readmates` |
-| `design/` | 디자인 시스템 workspace와 static catalog | `docs/agents/design.md`, `design/README.md` |
-| `scripts/` | public release, smoke, deploy helper, safety automation | `scripts/AGENTS.md`, `scripts/README.md`, `docs/deploy/security-public-repo.md` |
-| `deploy/` | deploy manifest와 release configuration | `deploy/AGENTS.md`, `docs/deploy/README.md` |
+| `front/` | React/Vite SPA, route-first frontend, Pages Functions BFF | `front/package.json`, `front/src/app/router.tsx`, `docs/development/architecture.md` |
+| `front/functions/` | Cloudflare Pages Functions BFF와 OAuth proxy | `front/functions/_shared/proxy.ts`, `docs/development/architecture.md` |
+| `server/` | Kotlin/Spring Boot API, auth, persistence, migrations, async adapters | `server/build.gradle.kts`, `server/src/main/kotlin/com/readmates`, `docs/development/architecture.md` |
+| `design/` | 디자인 시스템 workspace와 static catalog | `design/README.md`, `docs/development/architecture.md` |
+| `scripts/` | public release, smoke, deploy helper, safety automation | `scripts/README.md`, `docs/deploy/security-public-repo.md` |
+| `deploy/` | deploy manifest와 release configuration | `docs/deploy/README.md`, `docs/development/release-readiness-review.md` |
 | `docs/development/` | active 개발자 문서와 architecture source of truth | `docs/development/README.md`, `docs/development/architecture.md` |
 | `docs/deploy/` | public-safe 배포 runbook | `docs/deploy/README.md` |
 | `docs/operations/` | 운영 runbook, observability, postmortems | `docs/operations/README.md` |
@@ -54,12 +54,12 @@
 
 | 변경 유형 | 읽는 순서 | 검증 선택 기준 |
 | --- | --- | --- |
-| UI/frontend | `AGENTS.md` -> `docs/agents/execution.md` -> `front/AGENTS.md` -> `docs/agents/front.md` -> 필요 시 `docs/agents/design.md` | `docs/development/acceptance-matrix.md`와 함께 `pnpm --dir front lint`, `pnpm --dir front test`, `pnpm --dir front build` 중 영향 표면에 맞게 선택합니다. |
-| BFF/auth/API | `AGENTS.md` -> `docs/agents/execution.md` -> `front/functions/AGENTS.md` -> `docs/agents/front.md` -> `docs/agents/server.md` -> `docs/development/architecture.md` | acceptance matrix의 auth, club-context, header, cookie, redirect 상태와 BFF/server tests, 필요 시 `pnpm --dir front test:e2e`를 선택합니다. |
-| Server/persistence/migration | `AGENTS.md` -> `docs/agents/execution.md` -> `server/AGENTS.md` -> `docs/agents/server.md` -> `docs/development/architecture.md` -> migration/test docs | acceptance matrix와 `./scripts/server-ci-check.sh`를 선택하고, MySQL/Flyway evidence가 필요할 때 별도 `integrationTest` 범위를 판단합니다. |
-| Deploy/public-release/security | `AGENTS.md` -> `docs/agents/execution.md` -> `deploy/AGENTS.md` 또는 `scripts/AGENTS.md` -> `docs/agents/docs.md` -> deploy docs -> scripts/workflows 직접 확인 | public release candidate checks와 targeted safety scans를 우선합니다. |
-| Docs-only | `AGENTS.md` -> `docs/agents/execution.md` -> `docs/agents/docs.md` -> 관련 active docs | `git diff --check -- <changed-docs>`와 targeted public-safety scan을 실행합니다. |
-| Release readiness/residual risk | `AGENTS.md` -> `docs/development/release-readiness-review.md` -> branch diff | 테스트 통과만으로 닫지 않고 CHANGELOG, CI/deploy, operator-facing change, public safety를 함께 봅니다. |
+| UI/frontend | repository-local contributor guidance(있는 경우) -> `docs/development/architecture.md` -> route/state/tests -> 필요 시 design docs | `docs/development/acceptance-matrix.md`와 함께 `pnpm --dir front lint`, `pnpm --dir front test`, `pnpm --dir front build` 중 영향 표면에 맞게 선택합니다. |
+| BFF/auth/API | repository-local contributor guidance(있는 경우) -> `docs/development/architecture.md` -> BFF/server contract/tests | acceptance matrix의 auth, club-context, header, cookie, redirect 상태와 BFF/server tests, 필요 시 `pnpm --dir front test:e2e`를 선택합니다. |
+| Server/persistence/migration | repository-local contributor guidance(있는 경우) -> `docs/development/architecture.md` -> migration/test docs | acceptance matrix와 `./scripts/server-ci-check.sh`를 선택하고, MySQL/Flyway evidence가 필요할 때 별도 `integrationTest` 범위를 판단합니다. |
+| Deploy/public-release/security | repository-local contributor guidance(있는 경우) -> deploy docs -> scripts/workflows 직접 확인 | public release candidate checks와 targeted safety scans를 우선합니다. |
+| Docs-only | repository-local contributor guidance(있는 경우) -> 관련 active docs | `git diff --check -- <changed-docs>`와 targeted public-safety scan을 실행합니다. |
+| Release readiness/residual risk | `docs/development/release-readiness-review.md` -> branch diff | 테스트 통과만으로 닫지 않고 CHANGELOG, CI/deploy, operator-facing change, public safety를 함께 봅니다. |
 
 ## 계획에서 실행으로 넘길 때
 
@@ -77,7 +77,7 @@ Executor 이름, 개인 skill 경로, model, auth, MCP 상태는 plan source of 
 
 ## 검증 선택표
 
-루트 `AGENTS.md`가 최종 검증 기준입니다. 아래 표는 처음 범위를 좁히기 위한 빠른 선택표입니다.
+현재 코드·테스트·scripts와 active docs가 최종 검증 기준입니다. 아래 표는 처음 범위를 좁히기 위한 빠른 선택표입니다.
 
 | 표면 | 대표 명령 |
 | --- | --- |

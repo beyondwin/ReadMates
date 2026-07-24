@@ -318,7 +318,7 @@ ReadMates는 클럽별로 하나의 현재 `OPEN` 세션과 여러 개의 예정
 
 멤버 알림함은 `/api/me/notifications`, `/api/me/notifications/unread-count`, `/api/me/notifications/{id}/read`, `/api/me/notifications/read-all`을 사용합니다. `/app/notifications`는 `member_notifications`를 source of truth로 읽고, unread count, 개별 읽음 처리, 전체 읽음 처리를 제공합니다. 각 알림의 deep link를 열면 해당 알림을 읽음 처리한 뒤 대상 화면으로 이동합니다.
 
-호스트 알림 운영 페이지는 `/app/host/notifications`입니다. 이 페이지는 현재 host club의 event outbox row와 channel delivery row 목록, 이메일 pending/failed 처리, 개별 retry, `DEAD` delivery 복구, redesigned template helper를 사용하는 테스트 메일, 최근 테스트 메일 audit을 다룹니다. 같은 화면과 콘텐츠 변경 직후 열린 composer에서 호스트는 세션을 선택하고 수동 템플릿, 대상 그룹(`ALL_ACTIVE_MEMBERS`, `SESSION_PARTICIPANTS`, `CONFIRMED_ATTENDEES`, `SELECTED_MEMBERS`), 채널(`IN_APP`, `EMAIL`, `BOTH`)을 조합해 새 알림을 발송할 수 있습니다. 이벤트별 기본 대상은 `NEXT_BOOK_PUBLISHED`·`SESSION_REMINDER_DUE`의 `ALL_ACTIVE_MEMBERS`, `FEEDBACK_DOCUMENT_PUBLISHED`·`SESSION_RECORD_UPDATED`의 `CONFIRMED_ATTENDEES`이고 기본 채널은 모두 `BOTH`입니다. 피드백 문서와 세션 기록은 전달 계획에서도 같은 `feedback_document_published_enabled` 멤버 선호도를 사용합니다. `SELECTED_MEMBERS`는 호스트가 명시적으로 선택해야 하며 같은 클럽의 중복 없는 활성 membership ID를 한 명 이상 요구합니다. Preview는 최종 대상 수, in-app/email 예상 건수, 이메일 설정으로 인한 skip, 이메일 누락, 중복 발송 여부를 보여주며, confirm 후 생성된 수동 dispatch는 event ledger에서 `source=MANUAL`과 manual metadata로 구분됩니다. 호스트 API 응답은 recipient email을 masked 값으로만 반환하고, detail metadata는 `sessionNumber`, `bookTitle`처럼 allowlist된 제품 metadata만 노출합니다.
+호스트 알림 운영 페이지는 `/app/host/notifications`입니다. 이 페이지는 현재 host club의 event outbox row와 channel delivery row 목록, 이메일 pending/failed 처리, 개별 retry, `DEAD` delivery 복구, redesigned template helper를 사용하는 테스트 메일, 최근 테스트 메일 audit을 다룹니다. 같은 화면과 콘텐츠 변경 직후 열린 composer에서 호스트는 세션을 선택하고 수동 템플릿, 대상 그룹(`ALL_ACTIVE_MEMBERS`, `SESSION_PARTICIPANTS`, `CONFIRMED_ATTENDEES`, `SELECTED_MEMBERS`), 채널(`IN_APP`, `EMAIL`, `BOTH`)을 조합해 새 알림을 발송할 수 있습니다. 이벤트별 기본 대상은 `NEXT_BOOK_PUBLISHED`·`SESSION_REMINDER_DUE`의 `ALL_ACTIVE_MEMBERS`, `FEEDBACK_DOCUMENT_PUBLISHED`·`SESSION_RECORD_UPDATED`의 `CONFIRMED_ATTENDEES`이고 기본 채널은 모두 `BOTH`입니다. 피드백 문서와 세션 기록은 전달 계획에서도 같은 `feedback_document_published_enabled` 멤버 선호도를 사용합니다. `FEEDBACK_DOCUMENT_PUBLISHED`의 CTA/options/preview는 `session_feedback_documents`의 최신 live 문서가 있을 때 제공되며, `OPEN` 세션도 그 current live 문서가 있으면 manual options → preview → confirm을 사용할 수 있습니다. `SELECTED_MEMBERS`는 호스트가 명시적으로 선택해야 하며 같은 클럽의 중복 없는 활성 membership ID를 한 명 이상 요구합니다. Preview는 최종 대상 수, in-app/email 예상 건수, 이메일 설정으로 인한 skip, 이메일 누락, 중복 발송 여부를 보여주며, confirm 후 생성된 수동 dispatch는 event ledger에서 `source=MANUAL`과 manual metadata로 구분됩니다. 호스트 API 응답은 recipient email을 masked 값으로만 반환하고, detail metadata는 `sessionNumber`, `bookTitle`처럼 allowlist된 제품 metadata만 노출합니다.
 
 클럽별 예약 리마인더 정책은 `GET/PUT /api/host/notifications/policy`로 읽고 저장합니다. Policy row가 없으면 `sessionReminderEnabled=false`이며, 호스트가 명시적으로 켠 클럽만 `NotificationReminderScheduler`가 `SESSION_REMINDER_DUE` outbox row를 만듭니다. 같은 대상 날짜의 scheduler 재실행은 기존 dedupe key로 중복 event를 만들지 않습니다.
 
@@ -363,26 +363,21 @@ Public route/API에는 명시적으로 공개된 데이터만 나갑니다.
 피드백 문서는 모임 후 운영 산출물을 저장하고 읽기 좋게 제공하기 위한 기능입니다.
 
 ```text
-Session record draft commit
+Session record final live apply
   |
-  | AI generation result or readmates-session-import:v1 JSON
+  | applies the current staged package (including AI or JSON import results)
   v
-SessionImportService validation and staged draft replacement
+`session_feedback_documents` 최신 live 문서
   |
   | host preview: GET /api/host/sessions/{sessionId}/feedback-document/preview
   v
-Session record apply
+GET /api/sessions/{sessionId}/feedback-document
   |
-  | UTF-8, structured feedback template, session metadata, attendee authors
-  v
-MySQL session_feedback_documents
-  |
-  | GET /api/sessions/{sessionId}/feedback-document
   v
 Readable response for active full member or host
 ```
 
-호스트는 더 이상 피드백 문서만 별도로 업로드하지 않습니다. AI 생성 또는 `readmates-session-import:v1` JSON import commit은 피드백 문서를 공통 staged draft에 저장하며, 호스트는 host-only preview route에서 이를 검토합니다. Member/public이 읽는 live 피드백 문서는 세션 기록 apply가 성공할 때 함께 교체됩니다.
+호스트는 더 이상 피드백 문서만 별도로 업로드하지 않습니다. AI 생성 또는 `readmates-session-import:v1` JSON import commit은 피드백 문서를 공통 staged draft에 저장하고 composer를 열지 않습니다. Member/public이 읽는 live 피드백 문서는 세션 기록 final apply가 성공할 때 함께 교체됩니다. Host preview route는 staged draft가 아니라 `session_feedback_documents`의 최신 live 문서를 읽으므로, `OPEN` 세션에서도 현재 live 문서가 있으면 피드백 알림 CTA와 manual composer가 사용할 수 있습니다.
 
 프런트엔드에는 `/app/feedback/:sessionId/print` route와 browser print 기반 helper가 남아 있지만, 현재 `front/shared/config/readmates-feature-flags.ts`의 `feedbackDocumentPdfDownloadsEnabled`가 `false`라서 사용자는 `PDF로 저장` 또는 자동 print action을 보지 않습니다. 이 기능을 다시 켤 때는 archive, my page, feedback document route, E2E print smoke를 함께 검증합니다.
 

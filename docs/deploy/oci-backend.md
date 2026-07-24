@@ -308,7 +308,7 @@ Kafka relay/consumer와 실제 SMTP 발송은 아래 조건이 모두 맞을 때
 
 알림 생성 시점:
 
-- 다음 책 공개 범위 변경, 피드백 문서·세션 기록 적용, 외부 JSON commit, AI commit은 알림을 자동 생성하지 않습니다. 이 경로는 콘텐츠·revision·apply receipt만 저장하고 현재 콘텐츠 revision을 가진 composer context를 반환합니다.
+- 다음 책 공개 범위 변경과 피드백 문서·세션 기록의 final live apply는 알림을 자동 생성하지 않습니다. final live apply만 현재 콘텐츠 revision을 가진 composer context를 반환합니다. 외부 JSON import와 AI commit은 draft만 저장하며 composer를 반환하거나 열지 않습니다.
 - 호스트가 `/app/host/notifications` 또는 콘텐츠 변경 직후 열린 composer에서 수동 발송을 확정하면 선택한 세션과 대상 그룹 기준으로 `NEXT_BOOK_PUBLISHED`, `SESSION_REMINDER_DUE`, `FEEDBACK_DOCUMENT_PUBLISHED`, `SESSION_RECORD_UPDATED` 이벤트를 만듭니다. 이 경우에도 최종 발송은 `notification_event_outbox` → Kafka relay/consumer → `notification_deliveries`/`member_notifications` 파이프라인을 사용합니다.
 - 클럽별 `sessionReminderEnabled` 정책을 호스트가 명시적으로 켠 경우에만 daily scheduler가 해당 날짜의 `SESSION_REMINDER_DUE` outbox row를 만듭니다. 정책 row가 없거나 꺼져 있으면 만들지 않으며 같은 날짜의 재실행은 dedupe됩니다.
 - 멤버가 발행된 공개 회차에 공개 서평을 저장하면 `REVIEW_PUBLISHED` 알림을 생성합니다. 이 알림은 멤버가 직접 켜야 하는 opt-in 알림입니다.
