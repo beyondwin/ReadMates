@@ -6,6 +6,10 @@ Phase 2는 시작 커밋 `0cd590a9`의 Task 1 기준선에서 후보 커밋
 `dfc0cb5b`까지 서버 테스트만 강화하고, 승인된 테스트 이동과 통합만
 적용했다.
 
+Runtime 검증 대상은 `dfc0cb5b`다. 최초 보고서 커밋 `bf77bdc0`과 이
+후속 문서 보정은 해당 후보의 report-only descendant이며, 새 제품 또는
+테스트 runtime 후보를 만들지 않는다.
+
 - 61개 후보의 최종 결정은 `retain` 48, `strengthen` 10,
   `move-layer` 2, `consolidate` 1이다.
 - 실제 테스트 소스 파일은 277개에서 276개로 1개 줄었지만, 실행
@@ -94,8 +98,10 @@ integration 소스 삭제(-3 integration)의 결과다. 새 실패 경로를
   이 application result/error와 side-effect 부재를 함께 관찰한다.
 - `HostSessionControllerDbTest`의 open/close replay와
   `host publish replay returns published result without second write outbox or audit transition`
-  이 실제 API/MySQL에서 두 번째 write, outbox, cache, audit 전이를
-  막는다.
+  이 실제 API/MySQL snapshot으로 두 번째 DB write, outbox, audit
+  mutation이 없음을 확인한다. Cache eviction 부재는 DB 테스트가
+  아니라 위 `HostSessionServicesTest`의 application-port 관찰이
+  별도로 증명한다.
 
 ### R06 - transaction rollback과 Flyway upgrade
 
@@ -190,17 +196,24 @@ integration 7개 클래스 99개 케이스다.
   --tests com.readmates.notification.kafka.NotificationKafkaPipelineIntegrationTest
 ```
 
-Gradle은 동일 argv의 두 번째와 세 번째 호출에서 task output을
-재사용했다. 정확한 계획 argv의 결과는 다음과 같으며 cache-only
-결과는 flake 또는 실행 시간 표본으로 세지 않았다.
+정확한 계획 argv 계열과 실제 3회 실행 계열은 별도로 기록했다.
+정확한 argv를 각 lane에서 세 번 호출한 결과는 다음과 같으며,
+cache-only 결과는 flake 또는 실행 시간 표본으로 세지 않았다.
 
-| Lane | 정확한 argv 1 | 정확한 argv 2 | 정확한 argv 3 |
+| Lane | 정확한 argv 호출 1 | 정확한 argv 호출 2 | 정확한 argv 호출 3 |
 | --- | --- | --- | --- |
 | unit | 실제 실행, 3.82s | `UP-TO-DATE`, 0.45s | `FROM-CACHE`, 0.52s |
 | integration | 실제 실행, 35.79s | `FROM-CACHE`, 0.41s | `UP-TO-DATE`, 0.35s |
 
-세 번의 실제 실행을 확보하기 위해 두 번째와 세 번째 표본에서는
-해당 task output만 `cleanUnitTest`/`cleanIntegrationTest`로 비우고
+이 표는 하나의 연속된 six-command loop chronology가 아니다. Unit의
+cache-only 관찰은 supplemental unit 실행 전에 나왔지만, supplemental
+integration 2/3회차는 약 03:02-03:03에 먼저 실행됐고 표의 exact
+integration cache-only 호출 2/3은 full gate 뒤 약 03:07에 상태 확인용으로
+실행됐다. 따라서 뒤의 cache probe가 앞선 supplemental 실행을
+동기부여했다는 순서를 주장하지 않는다.
+
+실제 3회 표본 계열에서는 2/3회차에 해당 task output만
+`cleanUnitTest`/`cleanIntegrationTest`로 비우고
 `--no-build-cache`를 추가했다. class filter, JVM heap, fork, retry,
 timeout, worker, Testcontainers 정책은 바꾸지 않았다.
 
@@ -239,8 +252,10 @@ gate를 실행했다.
 PR gate 기준선은 일부 task cache를 사용했고 최종 표본은 clean
 no-cache 16-task 실행이므로 13.55s와 24.84s는 직접적인 성능 회귀
 비교가 아니다. Integration lane은 케이스가 734에서 744로 늘고
-추가 disposable MySQL Flyway upgrade fixture를 실행하면서 11.37s
-증가했다.
+추가 disposable MySQL Flyway upgrade fixture를 실행한 한 번씩의
+표본에서 11.37s 차이가 관찰됐다. 이는 +10 cases와 fixture 비용을
+포함한 descriptive one-sample evidence일 뿐이며, 통계적으로 의미
+있는 regression measurement가 아니다.
 
 ## JaCoCo
 
@@ -266,17 +281,31 @@ test, public-safe test fixture, decision ledger뿐이다.
 - retry/backoff 정책 변경 없음
 - production/test suite timeout 설정 또는 값 변경 없음
 - worker, max heap, `maxParallelForks`, `forkEvery` 변경 없음
+- Gradle build/configuration cache 설정 파일과 repository 설정 변경 없음
 - external provider/mail delivery 없음
 
 새 Kafka 검증은 기존 20초 bounded wait를 재사용하며 deadline을
 늘리지 않았다. Test-only retry/dead assertions는 기존 정책 값을
-관찰할 뿐 정책을 수정하지 않는다.
+관찰할 뿐 정책을 수정하지 않는다. `--no-build-cache`는 실제 실행을
+확보하기 위한 process-local command option이었고 repository에 cache
+설정을 저장하지 않았다. Clean task도 해당 build output만 비웠다.
 
 ## 경고와 잔여 위험
 
-후보 HEAD의 R03-R09 및 cleanup 범위에는 아래 경고 외에 남은 알려진
-server behavior risk 또는 blocker가 없다. 남은 local
-toolchain/dependency 경고는 다음과 같다.
+후보 HEAD의 R03-R09 및 cleanup 범위에 열린 구현 또는 test-suite
+blocker는 없다. 다만 다음 server behavior/evidence residual risk는
+의도적으로 남는다.
+
+- R07 invalidation은 best-effort 계약이다. Commit 후 Redis
+  invalidation이 실패하면 stale cache가 TTL 만료 또는 다음 성공한
+  invalidation까지 남을 수 있다. 새 테스트는 이 위험을 제거하지
+  않고 stale 값을 fresh refetch로 오인하지 않도록 관찰한다.
+- AI provider와 mail은 deterministic provider stub과 recording mail
+  boundary까지만 검증했다. 실제 외부 provider/mail network 또는 live
+  deployment 검증은 수행하지 않았으므로 그 통합 상태는 이 보고서의
+  증거 범위 밖이다.
+
+별도로 남은 local toolchain/dependency 경고는 다음과 같다.
 
 - Java native-access, deprecated `sun.misc.Unsafe`, dynamic agent loading
   경고
