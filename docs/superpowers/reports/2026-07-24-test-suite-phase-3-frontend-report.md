@@ -150,7 +150,7 @@ disabled, terminal, `COMMITTING`, `COMMIT_RETRY`, initial/later cadence,
 | R01 | BFF 3 files / 62 cases가 hostile trusted headers, cookie Domain stripping, redirect/status, internal response-header stripping, secret/token 부재를 확인 | `google-auth-invite-flow` 1 case와 full local E2E의 auth/BFF 흐름 통과 | browser-facing contract verified |
 | R02 | `OAuthReturnStateTest` 7 cases와 OAuth proxy malformed-state case가 unsafe return target과 fallback을 확인 | Google invite acceptance 흐름 통과 | verified |
 | R03 | ordinary/OAuth BFF가 browser club host/slug를 덮어쓰고 route/server context만 전달함을 확인 | `multi-club-flow` 4 cases가 public slug isolation, shared-session club choice, role-preserving switch, target-club-only invite activation을 확인 | verified |
-| R10 | frontend observability 4 files / 13 cases가 low-cardinality sanitization, short hashes, invalid/high-cardinality drop, bounded batch, raw-stack 제거, BFF internal-header stripping을 확인. server PR gate에서 observability controller/service/metrics 7 unit cases도 통과 | 계획의 exact E2E 실행에 포함된 `frontend-observability-local-proxy`가 202 forwarding 경계를 통과 | Phase 3 browser-facing 범위 verified; production-profile config/cardinality parity는 Phase 5 범위 |
+| R10 | frontend observability 4 files / 13 cases가 low-cardinality sanitization, short hashes, invalid/high-cardinality drop, bounded batch, raw-stack 제거, BFF internal-header stripping을 확인. server PR gate에서 observability controller/service/metrics 7 unit cases도 통과 | 계획의 exact E2E 실행에 포함된 `frontend-observability-local-proxy`가 202 forwarding 경계를 통과 | Phase 3 관찰 증거 기록 완료. observability proxy 독립 실행, config/profile validator, label/cardinality policy와 독립 script/config 결과는 Phase 4 소유 |
 
 R10 unit 묶음은 다음 네 파일이다.
 
@@ -266,15 +266,18 @@ async/cache, UI/runtime-state 행을 선택했다. 이 Phase의 test-only
 바꾸지 않았으므로 해당 행은 제외했다.
 
 `UNVERIFIED_ENV`는 없다. Phase 4가 넘겨받는 것은 환경 실패가 아니라
-계획대로의 전체 browser/visual evidence 확장이다.
+계획대로의 전체 browser/visual evidence 확장과 R10 observability
+proxy, config/profile validator, label/cardinality policy, 독립
+script/config 결과 검증이다.
 
 남은 evidence boundary는 다음과 같다.
 
 - 실제 외부 Google OAuth provider와 production deployment는 호출하지
   않았다.
-- R10의 production-profile config/label/cardinality parity는 이 Phase의
-  browser-facing 범위가 아니며 Phase 5 final verification에서 닫아야
-  한다.
+- R10 observability proxy, production config/profile validator,
+  label/cardinality policy와 독립 script/config 결과는 Phase 4가
+  검증하고 닫는다. Phase 5는 그 결과를 fresh final gate와 defect
+  injection으로 재검증하고 남은 residual을 조정·대조한다.
 - Phase 2에서 기록한 Redis best-effort stale-cache risk와 외부
   provider/mail network 미검증은 Phase 3 test-only 변경으로 제거되지
   않았다.
