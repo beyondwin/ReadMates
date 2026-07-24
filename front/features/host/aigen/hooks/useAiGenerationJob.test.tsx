@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AiGenerationJobResponse, AiGenerationStatus } from "@/features/host/aigen/api/aigen-contracts";
@@ -41,6 +41,12 @@ function createWrapper() {
   return { client, Wrapper };
 }
 
+async function advancePollingClock(milliseconds: number) {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(milliseconds);
+  });
+}
+
 describe("aiGenerationJobKeys", () => {
   it("namespaces by session and job id", () => {
     expect(aiGenerationJobKeys.all).toEqual(["host", "aigen", "jobs"]);
@@ -59,9 +65,11 @@ describe("aiGenerationJobKeys", () => {
 describe("useAiGenerationJob", () => {
   beforeEach(() => {
     mockedGetJob.mockReset();
+    vi.useFakeTimers();
   });
 
   afterEach(() => {
+    vi.clearAllTimers();
     vi.useRealTimers();
   });
 
@@ -71,8 +79,7 @@ describe("useAiGenerationJob", () => {
       wrapper: Wrapper,
     });
 
-    // Give react-query a tick.
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await advancePollingClock(0);
     expect(mockedGetJob).not.toHaveBeenCalled();
     expect(result.current.fetchStatus).toBe("idle");
   });
@@ -83,7 +90,7 @@ describe("useAiGenerationJob", () => {
       wrapper: Wrapper,
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await advancePollingClock(0);
     expect(mockedGetJob).not.toHaveBeenCalled();
     expect(result.current.fetchStatus).toBe("idle");
   });
@@ -94,111 +101,47 @@ describe("useAiGenerationJob", () => {
       wrapper: Wrapper,
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await advancePollingClock(0);
     expect(mockedGetJob).not.toHaveBeenCalled();
   });
 
-  it("stops polling when status is SUCCEEDED", async () => {
-    vi.useFakeTimers();
-    mockedGetJob.mockResolvedValue(jobResponse("SUCCEEDED"));
-    const { Wrapper } = createWrapper();
-    const { result } = renderHook(() => useAiGenerationJob("s1", "j1"), {
-      wrapper: Wrapper,
-    });
+  it.each(["SUCCEEDED", "FAILED", "CANCELLED", "COMMITTED"] as const)(
+    "stops polling when status is %s",
+    async (status) => {
+      mockedGetJob.mockResolvedValue(jobResponse(status));
+      const { Wrapper } = createWrapper();
+      const { result } = renderHook(() => useAiGenerationJob("s1", "j1"), {
+        wrapper: Wrapper,
+      });
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    await vi.waitFor(() => expect(result.current.data?.status).toBe("SUCCEEDED"));
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(5000);
-    });
-    expect(mockedGetJob).toHaveBeenCalledTimes(1);
-  });
+      await advancePollingClock(0);
+      expect(result.current.data?.status).toBe(status);
+      expect(mockedGetJob).toHaveBeenCalledTimes(1);
 
-  it("stops polling when status is FAILED", async () => {
-    mockedGetJob.mockResolvedValue(jobResponse("FAILED"));
-    const { Wrapper } = createWrapper();
-    const { result } = renderHook(() => useAiGenerationJob("s1", "j1"), {
-      wrapper: Wrapper,
-    });
+      await advancePollingClock(10_000);
+      expect(mockedGetJob).toHaveBeenCalledTimes(1);
+    },
+  );
 
-    await waitFor(() => {
-      expect(result.current.data?.status).toBe("FAILED");
-    });
+  it.each(["COMMITTING", "COMMIT_RETRY"] as const)(
+    "continues polling when status is %s",
+    async (status) => {
+      mockedGetJob.mockResolvedValue(jobResponse(status));
+      const { Wrapper } = createWrapper();
+      renderHook(() => useAiGenerationJob("s1", "j1"), { wrapper: Wrapper });
 
-    const callsAfterSettle = mockedGetJob.mock.calls.length;
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(mockedGetJob.mock.calls.length).toBe(callsAfterSettle);
-  });
+      await advancePollingClock(0);
+      expect(mockedGetJob).toHaveBeenCalledTimes(1);
 
-  it("stops polling when status is CANCELLED", async () => {
-    mockedGetJob.mockResolvedValue(jobResponse("CANCELLED"));
-    const { Wrapper } = createWrapper();
-    const { result } = renderHook(() => useAiGenerationJob("s1", "j1"), {
-      wrapper: Wrapper,
-    });
+      await advancePollingClock(1_999);
+      expect(mockedGetJob).toHaveBeenCalledTimes(1);
 
-    await waitFor(() => {
-      expect(result.current.data?.status).toBe("CANCELLED");
-    });
+      await advancePollingClock(1);
+      expect(mockedGetJob).toHaveBeenCalledTimes(2);
+    },
+  );
 
-    const callsAfterSettle = mockedGetJob.mock.calls.length;
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(mockedGetJob.mock.calls.length).toBe(callsAfterSettle);
-  });
-
-  it("continues polling when status is COMMITTING", async () => {
-    vi.useFakeTimers();
-    mockedGetJob.mockResolvedValue(jobResponse("COMMITTING"));
-    const { Wrapper } = createWrapper();
-    renderHook(() => useAiGenerationJob("s1", "j1"), { wrapper: Wrapper });
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    await vi.waitFor(() => expect(mockedGetJob).toHaveBeenCalledTimes(1));
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(2500);
-    });
-    await vi.waitFor(() => expect(mockedGetJob).toHaveBeenCalledTimes(2));
-  });
-
-  it("continues polling while a COMMIT_RETRY receipt is being recovered", async () => {
-    vi.useFakeTimers();
-    mockedGetJob.mockResolvedValue(jobResponse("COMMIT_RETRY"));
-    const { Wrapper } = createWrapper();
-    renderHook(() => useAiGenerationJob("s1", "j1"), { wrapper: Wrapper });
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    await vi.waitFor(() => expect(mockedGetJob).toHaveBeenCalledTimes(1));
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(2500);
-    });
-    await vi.waitFor(() => expect(mockedGetJob).toHaveBeenCalledTimes(2));
-  });
-
-  it("stops polling when status is COMMITTED", async () => {
-    mockedGetJob.mockResolvedValue(jobResponse("COMMITTED"));
-    const { Wrapper } = createWrapper();
-    const { result } = renderHook(() => useAiGenerationJob("s1", "j1"), {
-      wrapper: Wrapper,
-    });
-
-    await waitFor(() => {
-      expect(result.current.data?.status).toBe("COMMITTED");
-    });
-
-    const callsAfterSettle = mockedGetJob.mock.calls.length;
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(mockedGetJob.mock.calls.length).toBe(callsAfterSettle);
-  });
-
-  it("polls at the spec-mandated cadence while RUNNING (first ~2s, then ~3-5s)", async () => {
-    vi.useFakeTimers();
+  it("polls after two seconds initially and every four seconds thereafter", async () => {
     const timestamps: number[] = [];
     const startedAt = Date.now();
     mockedGetJob.mockImplementation(() => {
@@ -209,49 +152,32 @@ describe("useAiGenerationJob", () => {
     const { Wrapper } = createWrapper();
     renderHook(() => useAiGenerationJob("s1", "j1"), { wrapper: Wrapper });
 
-    // Flush the initial fetch.
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    await vi.waitFor(() => expect(mockedGetJob).toHaveBeenCalledTimes(1));
+    await advancePollingClock(0);
+    expect(mockedGetJob).toHaveBeenCalledTimes(1);
 
-    // Advance well past the second poll (which should fire near 2s).
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(2500);
-    });
-    await vi.waitFor(() => expect(mockedGetJob).toHaveBeenCalledTimes(2));
+    await advancePollingClock(1_999);
+    expect(mockedGetJob).toHaveBeenCalledTimes(1);
+    await advancePollingClock(1);
+    expect(mockedGetJob).toHaveBeenCalledTimes(2);
 
-    // Advance past the third poll (which should fire ~4s after the 2nd).
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(4500);
-    });
-    await vi.waitFor(() => expect(mockedGetJob).toHaveBeenCalledTimes(3));
+    await advancePollingClock(3_999);
+    expect(mockedGetJob).toHaveBeenCalledTimes(2);
+    await advancePollingClock(1);
+    expect(mockedGetJob).toHaveBeenCalledTimes(3);
 
-    // Validate the cadence: gap[1] ≈ 2s; gap[2] ≈ 3-5s (spec window).
-    const gap1 = timestamps[1] - timestamps[0];
-    const gap2 = timestamps[2] - timestamps[1];
-    expect(gap1).toBeGreaterThanOrEqual(1500);
-    expect(gap1).toBeLessThanOrEqual(2500);
-    expect(gap2).toBeGreaterThanOrEqual(3000);
-    expect(gap2).toBeLessThanOrEqual(5000);
+    expect(timestamps).toEqual([0, 2_000, 6_000]);
   });
 
   it("does NOT poll again before the first scheduled interval elapses", async () => {
-    vi.useFakeTimers();
     mockedGetJob.mockResolvedValue(jobResponse("RUNNING"));
 
     const { Wrapper } = createWrapper();
     renderHook(() => useAiGenerationJob("s1", "j1"), { wrapper: Wrapper });
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    await vi.waitFor(() => expect(mockedGetJob).toHaveBeenCalledTimes(1));
+    await advancePollingClock(0);
+    expect(mockedGetJob).toHaveBeenCalledTimes(1);
 
-    // Comfortably under the 2s first-poll window — should still be only 1 call.
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1000);
-    });
+    await advancePollingClock(1_999);
     expect(mockedGetJob).toHaveBeenCalledTimes(1);
   });
 
@@ -270,19 +196,15 @@ describe("useAiGenerationJob", () => {
       wrapper: Wrapper,
     });
 
-    // First call rejects -> retry: false in test client means error is delivered.
-    await waitFor(() => {
-      expect(result.current.isError || result.current.data !== undefined).toBe(true);
-    });
+    await advancePollingClock(0);
+    expect(result.current.isError).toBe(true);
+    expect(mockedGetJob).toHaveBeenCalledTimes(1);
 
-    // The hook should still schedule the next poll. Wait until at least 1 more
-    // call lands and produces data.
-    await waitFor(
-      () => {
-        expect(result.current.data?.status).toBe("RUNNING");
-      },
-      { timeout: 5000 },
-    );
-    expect(mockedGetJob.mock.calls.length).toBeGreaterThanOrEqual(2);
+    await advancePollingClock(1_999);
+    expect(mockedGetJob).toHaveBeenCalledTimes(1);
+
+    await advancePollingClock(1);
+    expect(mockedGetJob).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => expect(result.current.data?.status).toBe("RUNNING"));
   });
 });
