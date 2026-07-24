@@ -68,7 +68,7 @@ function cacheState(client: QueryClient) {
 
 function seedCommitSurfaces(client: QueryClient) {
   const context = { clubSlug: "reading-sai" };
-  const entries = [
+  const invalidatedEntries = [
     [aiJobKeys.recent("session-1"), recentJob("SUCCEEDED")],
     [aiJobKeys.detail("session-1", "job-1"), { jobId: "job-1", status: "SUCCEEDED" }],
     [aiJobKeys.models("session-1"), { models: [{ id: "model-1", provider: "test", isDefault: true }] }],
@@ -77,12 +77,19 @@ function seedCommitSurfaces(client: QueryClient) {
     [hostSessionKeys.list({ limit: 50 }, context), { items: [{ sessionId: "session-1" }] }],
     [hostSessionKeys.dashboard(context), { sessions: ["session-1"] }],
     [hostSessionKeys.current(context), { sessionId: "session-1" }],
-    [hostSessionKeys.manualDispatches({ sessionId: "session-1" }, context), { items: ["dispatch-1"] }],
   ] as const;
-  for (const [key, value] of entries) {
+  const controlEntries = [
+    [hostSessionKeys.manualDispatches({ sessionId: "session-1" }, context), { items: ["dispatch-1"] }],
+    [aiJobKeys.recent("session-2"), recentJob("RUNNING")],
+    [
+      hostSessionKeys.detail("session-1", { clubSlug: "other-club" }),
+      { sessionId: "other-club-session-1" },
+    ],
+  ] as const;
+  for (const [key, value] of [...invalidatedEntries, ...controlEntries]) {
     client.setQueryData(key, value);
   }
-  return entries.map(([key]) => key);
+  return { controlEntries, invalidatedEntries };
 }
 
 describe("AI job query helpers", () => {
@@ -165,7 +172,7 @@ describe("AI job query helpers", () => {
       liveApplied: false,
     });
     const { client, Wrapper } = createWrapper();
-    const seededKeys = seedCommitSurfaces(client);
+    const { controlEntries, invalidatedEntries } = seedCommitSurfaces(client);
     const { result } = renderHook(
       () => useCommitAiJobMutation(
         "session-1",
@@ -184,13 +191,14 @@ describe("AI job query helpers", () => {
       "job-1",
       { recordVisibility: "MEMBER" },
     );
-    for (const key of seededKeys.slice(0, -1)) {
+    for (const [key, value] of invalidatedEntries) {
       expect(client.getQueryState(key)?.isInvalidated, JSON.stringify(key)).toBe(true);
-      expect(client.getQueryData(key), JSON.stringify(key)).toBeDefined();
+      expect(client.getQueryData(key), JSON.stringify(key)).toEqual(value);
     }
-    const manualDispatchKey = seededKeys.at(-1)!;
-    expect(client.getQueryState(manualDispatchKey)?.isInvalidated).toBe(false);
-    expect(client.getQueryData(manualDispatchKey)).toEqual({ items: ["dispatch-1"] });
+    for (const [key, value] of controlEntries) {
+      expect(client.getQueryState(key)?.isInvalidated, JSON.stringify(key)).toBe(false);
+      expect(client.getQueryData(key), JSON.stringify(key)).toEqual(value);
+    }
   });
 
   it("leaves AI and host-session caches unchanged when draft commit fails", async () => {

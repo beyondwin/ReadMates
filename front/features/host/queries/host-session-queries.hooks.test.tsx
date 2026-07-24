@@ -58,6 +58,7 @@ function createWrapper() {
 }
 
 const context = { clubSlug: "reading-sai" };
+type CacheEntry = readonly [readonly unknown[], unknown];
 
 function surfaceKeys() {
   return {
@@ -67,18 +68,25 @@ function surfaceKeys() {
     dashboard: hostSessionKeys.dashboard(context),
     current: hostSessionKeys.current(context),
     manualDispatches: hostSessionKeys.manualDispatches({ sessionId: "session-7" }, context),
+    otherClubDetail: hostSessionKeys.detail("session-7", { clubSlug: "other-club" }),
   };
 }
 
 function seedSurfaces(client: QueryClient) {
   const keys = surfaceKeys();
-  client.setQueryData(keys.detail, { surface: "detail", sessionId: "session-7" });
-  client.setQueryData(keys.closingStatus, { surface: "closing-status", state: "OPEN" });
-  client.setQueryData(keys.list, { surface: "list", items: ["session-7"] });
-  client.setQueryData(keys.dashboard, { surface: "dashboard", sessions: ["session-7"] });
-  client.setQueryData(keys.current, { surface: "current", sessionId: "session-7" });
-  client.setQueryData(keys.manualDispatches, { surface: "manual-dispatches", items: ["dispatch-1"] });
-  return keys;
+  const entries = {
+    detail: [keys.detail, { surface: "detail", sessionId: "session-7" }],
+    closingStatus: [keys.closingStatus, { surface: "closing-status", state: "OPEN" }],
+    list: [keys.list, { surface: "list", items: ["session-7"] }],
+    dashboard: [keys.dashboard, { surface: "dashboard", sessions: ["session-7"] }],
+    current: [keys.current, { surface: "current", sessionId: "session-7" }],
+    manualDispatches: [keys.manualDispatches, { surface: "manual-dispatches", items: ["dispatch-1"] }],
+    otherClubDetail: [keys.otherClubDetail, { surface: "detail", sessionId: "other-club-session-7" }],
+  } as const satisfies Record<string, CacheEntry>;
+  for (const [key, value] of Object.values(entries)) {
+    client.setQueryData(key, value);
+  }
+  return { entries, keys };
 }
 
 function cacheState(client: QueryClient) {
@@ -89,17 +97,17 @@ function cacheState(client: QueryClient) {
   }));
 }
 
-function expectInvalidated(client: QueryClient, keys: readonly (readonly unknown[])[]) {
-  for (const key of keys) {
+function expectInvalidated(client: QueryClient, entries: readonly CacheEntry[]) {
+  for (const [key, value] of entries) {
     expect(client.getQueryState(key)?.isInvalidated, JSON.stringify(key)).toBe(true);
-    expect(client.getQueryData(key), JSON.stringify(key)).toBeDefined();
+    expect(client.getQueryData(key), JSON.stringify(key)).toEqual(value);
   }
 }
 
-function expectFresh(client: QueryClient, keys: readonly (readonly unknown[])[]) {
-  for (const key of keys) {
+function expectFresh(client: QueryClient, entries: readonly CacheEntry[]) {
+  for (const [key, value] of entries) {
     expect(client.getQueryState(key)?.isInvalidated, JSON.stringify(key)).toBe(false);
-    expect(client.getQueryData(key), JSON.stringify(key)).toBeDefined();
+    expect(client.getQueryData(key), JSON.stringify(key)).toEqual(value);
   }
 }
 
@@ -186,7 +194,7 @@ describe("host session mutation hooks", () => {
   it("invalidates lists and dashboard after a successful create response", async () => {
     vi.mocked(createHostSession).mockResolvedValue(new Response(JSON.stringify({ sessionId: "session-8" }), { status: 201 }) as never);
     const { client, Wrapper } = createWrapper();
-    const keys = seedSurfaces(client);
+    const { entries } = seedSurfaces(client);
     const { result } = renderHook(() => useCreateHostSessionMutation(context), { wrapper: Wrapper });
 
     await act(async () => {
@@ -195,8 +203,14 @@ describe("host session mutation hooks", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(createHostSession).toHaveBeenCalledWith(sessionRequest);
-    expectInvalidated(client, [keys.list, keys.dashboard]);
-    expectFresh(client, [keys.detail, keys.closingStatus, keys.current, keys.manualDispatches]);
+    expectInvalidated(client, [entries.list, entries.dashboard]);
+    expectFresh(client, [
+      entries.detail,
+      entries.closingStatus,
+      entries.current,
+      entries.manualDispatches,
+      entries.otherClubDetail,
+    ]);
   });
 
   it("leaves every seeded cache unchanged when create returns a non-ok response", async () => {
@@ -217,7 +231,7 @@ describe("host session mutation hooks", () => {
   it("invalidates detail, lists, dashboard, and current session after update", async () => {
     vi.mocked(updateHostSession).mockResolvedValue(new Response("{}", { status: 200 }) as never);
     const { client, Wrapper } = createWrapper();
-    const keys = seedSurfaces(client);
+    const { entries } = seedSurfaces(client);
     const { result } = renderHook(() => useUpdateHostSessionMutation(context), { wrapper: Wrapper });
 
     await act(async () => {
@@ -225,8 +239,14 @@ describe("host session mutation hooks", () => {
     });
 
     expect(updateHostSession).toHaveBeenCalledWith("session-7", sessionRequest);
-    expectInvalidated(client, [keys.detail, keys.closingStatus, keys.list, keys.dashboard, keys.current]);
-    expectFresh(client, [keys.manualDispatches]);
+    expectInvalidated(client, [
+      entries.detail,
+      entries.closingStatus,
+      entries.list,
+      entries.dashboard,
+      entries.current,
+    ]);
+    expectFresh(client, [entries.manualDispatches, entries.otherClubDetail]);
   });
 
   it("does not remove detail or invalidate when delete returns a non-ok response", async () => {
@@ -246,7 +266,7 @@ describe("host session mutation hooks", () => {
   it("removes deleted detail cache and invalidates dependent surfaces after delete", async () => {
     vi.mocked(deleteHostSession).mockResolvedValue(new Response("{}", { status: 200 }) as never);
     const { client, Wrapper } = createWrapper();
-    const keys = seedSurfaces(client);
+    const { entries, keys } = seedSurfaces(client);
     const { result } = renderHook(() => useDeleteHostSessionMutation(context), { wrapper: Wrapper });
 
     await act(async () => {
@@ -256,8 +276,13 @@ describe("host session mutation hooks", () => {
     expect(deleteHostSession).toHaveBeenCalledWith("session-7");
     expect(client.getQueryData(keys.detail)).toBeUndefined();
     expect(client.getQueryState(keys.detail)).toBeUndefined();
-    expectInvalidated(client, [keys.list, keys.dashboard, keys.current, keys.manualDispatches]);
-    expectFresh(client, [keys.closingStatus]);
+    expectInvalidated(client, [
+      entries.list,
+      entries.dashboard,
+      entries.current,
+      entries.manualDispatches,
+    ]);
+    expectFresh(client, [entries.closingStatus, entries.otherClubDetail]);
   });
 
   it.each([
@@ -267,7 +292,7 @@ describe("host session mutation hooks", () => {
   ] as const)("invalidates session surfaces after %s", async (_name, hook, apiFn, expectsManualDispatches) => {
     vi.mocked(apiFn).mockResolvedValue(new Response("{}", { status: 200 }) as never);
     const { client, Wrapper } = createWrapper();
-    const keys = seedSurfaces(client);
+    const { entries } = seedSurfaces(client);
     const { result } = renderHook(() => hook(context), { wrapper: Wrapper });
 
     await act(async () => {
@@ -275,18 +300,25 @@ describe("host session mutation hooks", () => {
     });
 
     expect(apiFn).toHaveBeenCalledWith("session-7");
-    expectInvalidated(client, [keys.detail, keys.closingStatus, keys.list, keys.dashboard, keys.current]);
+    expectInvalidated(client, [
+      entries.detail,
+      entries.closingStatus,
+      entries.list,
+      entries.dashboard,
+      entries.current,
+    ]);
     if (expectsManualDispatches) {
-      expectInvalidated(client, [keys.manualDispatches]);
+      expectInvalidated(client, [entries.manualDispatches]);
     } else {
-      expectFresh(client, [keys.manualDispatches]);
+      expectFresh(client, [entries.manualDispatches]);
     }
+    expectFresh(client, [entries.otherClubDetail]);
   });
 
   it("returns the visibility composer result and caches the updated session", async () => {
     vi.mocked(saveHostSessionVisibility).mockResolvedValue(visibilityResult());
     const { client, Wrapper } = createWrapper();
-    const keys = seedSurfaces(client);
+    const { entries, keys } = seedSurfaces(client);
     const detailKey = keys.detail;
     const manualOptionsKey = hostNotificationKeys.manualOptions(
       { sessionId: "session-7", page: { limit: 50 } },
@@ -311,14 +343,20 @@ describe("host session mutation hooks", () => {
     );
     expect(client.getQueryData(detailKey)).toEqual(visibilityResult().session);
     expect(client.getQueryData(manualOptionsKey)).toBeUndefined();
-    expectInvalidated(client, [keys.list, keys.dashboard]);
-    expectFresh(client, [keys.detail, keys.closingStatus, keys.current, keys.manualDispatches]);
+    expectInvalidated(client, [entries.list, entries.dashboard]);
+    expectFresh(client, [
+      [keys.detail, visibilityResult().session],
+      entries.closingStatus,
+      entries.current,
+      entries.manualDispatches,
+      entries.otherClubDetail,
+    ]);
   });
 
   it("invalidates manual dispatches after publication save", async () => {
     vi.mocked(saveHostSessionPublication).mockResolvedValue(new Response("{}", { status: 200 }) as never);
     const { client, Wrapper } = createWrapper();
-    const keys = seedSurfaces(client);
+    const { entries } = seedSurfaces(client);
     const { result } = renderHook(() => useSaveHostSessionPublicationMutation(context), { wrapper: Wrapper });
 
     await act(async () => {
@@ -328,14 +366,14 @@ describe("host session mutation hooks", () => {
       });
     });
 
-    expectInvalidated(client, [keys.detail, keys.list, keys.dashboard, keys.manualDispatches]);
-    expectFresh(client, [keys.closingStatus, keys.current]);
+    expectInvalidated(client, [entries.detail, entries.list, entries.dashboard, entries.manualDispatches]);
+    expectFresh(client, [entries.closingStatus, entries.current, entries.otherClubDetail]);
   });
 
   it("invalidates detail and current session after attendance update", async () => {
     vi.mocked(saveHostSessionAttendance).mockResolvedValue(new Response("{}", { status: 200 }) as never);
     const { client, Wrapper } = createWrapper();
-    const keys = seedSurfaces(client);
+    const { entries } = seedSurfaces(client);
     const { result } = renderHook(() => useUpdateHostSessionAttendanceMutation(context), { wrapper: Wrapper });
 
     await act(async () => {
@@ -348,8 +386,14 @@ describe("host session mutation hooks", () => {
     expect(saveHostSessionAttendance).toHaveBeenCalledWith("session-7", [
       { membershipId: "member-1", attendanceStatus: "ATTENDED" },
     ]);
-    expectInvalidated(client, [keys.detail, keys.current]);
-    expectFresh(client, [keys.closingStatus, keys.list, keys.dashboard, keys.manualDispatches]);
+    expectInvalidated(client, [entries.detail, entries.current]);
+    expectFresh(client, [
+      entries.closingStatus,
+      entries.list,
+      entries.dashboard,
+      entries.manualDispatches,
+      entries.otherClubDetail,
+    ]);
   });
 
   it("invalidates record-only session surfaces after import commit", async () => {
@@ -360,7 +404,7 @@ describe("host session mutation hooks", () => {
       liveApplied: false,
     });
     const { client, Wrapper } = createWrapper();
-    const keys = seedSurfaces(client);
+    const { entries } = seedSurfaces(client);
     const { result } = renderHook(() => useCommitHostSessionImportMutation(context), { wrapper: Wrapper });
 
     await act(async () => {
@@ -368,8 +412,8 @@ describe("host session mutation hooks", () => {
     });
 
     expect(commitHostSessionImport).toHaveBeenCalledWith("session-7", importRequest);
-    expectInvalidated(client, [keys.detail, keys.list, keys.dashboard, keys.current]);
-    expectFresh(client, [keys.closingStatus, keys.manualDispatches]);
+    expectInvalidated(client, [entries.detail, entries.list, entries.dashboard, entries.current]);
+    expectFresh(client, [entries.closingStatus, entries.manualDispatches, entries.otherClubDetail]);
   });
 
   it("leaves every seeded cache unchanged when visibility save rejects", async () => {
