@@ -1,6 +1,10 @@
 package com.readmates.notification.adapter.out.persistence
 
-import com.readmates.auth.adapter.out.persistence.JdbcMemberLifecycleStoreAdapter
+import com.readmates.auth.application.MemberLifecycleRequest
+import com.readmates.auth.application.service.MemberApprovalService
+import com.readmates.auth.application.service.MemberLifecycleService
+import com.readmates.auth.domain.MembershipRole
+import com.readmates.auth.domain.MembershipStatus
 import com.readmates.notification.application.model.ManualNotificationAudience
 import com.readmates.notification.application.model.ManualNotificationRequestedChannels
 import com.readmates.notification.application.model.ManualNotificationSelection
@@ -16,7 +20,11 @@ import com.readmates.notification.application.port.out.ManualNotificationTargetS
 import com.readmates.notification.application.port.out.contentRevision
 import com.readmates.notification.application.port.out.snapshotHash
 import com.readmates.notification.domain.NotificationEventType
+import com.readmates.session.application.model.AttendanceEntryCommand
+import com.readmates.session.application.model.ConfirmAttendanceCommand
+import com.readmates.session.application.service.HostSessionAttendanceService
 import com.readmates.shared.paging.PageRequest
+import com.readmates.shared.security.CurrentMember
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -73,13 +81,27 @@ private const val RESTORE_MANUAL_DISPATCH_SQL = """
 @Suppress("LargeClass")
 class JdbcManualNotificationDispatchAdapterTest(
     @param:Autowired private val adapter: JdbcManualNotificationDispatchAdapter,
-    @param:Autowired private val memberLifecycleAdapter: JdbcMemberLifecycleStoreAdapter,
+    @param:Autowired private val memberLifecycleService: MemberLifecycleService,
+    @param:Autowired private val memberApprovalService: MemberApprovalService,
+    @param:Autowired private val attendanceService: HostSessionAttendanceService,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val transactionManager: PlatformTransactionManager,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     private val clubId = UUID.fromString("00000000-0000-0000-0000-000000000001")
     private val hostMembershipId = UUID.fromString("00000000-0000-0000-0000-000000000201")
     private val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301")
+    private val host =
+        CurrentMember(
+            userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
+            membershipId = hostMembershipId,
+            clubId = clubId,
+            clubSlug = "reading-sai",
+            email = "host@example.com",
+            displayName = "호스트",
+            accountName = "호스트",
+            role = MembershipRole.HOST,
+            membershipStatus = MembershipStatus.ACTIVE,
+        )
 
     @Test
     fun `findSessionContext returns session metadata and feedback document state`() {
@@ -507,21 +529,14 @@ class JdbcManualNotificationDispatchAdapterTest(
     }
 
     @Test
-    fun `confirm waits behind the same club lock used by member lifecycle mutations`() {
+    fun `confirm waits behind a real member lifecycle mutation using the same club lock`() {
         val now = OffsetDateTime.of(2026, 7, 23, 0, 0, 0, 0, ZoneOffset.UTC)
+        val changedMembershipId = membershipId("member1@example.com")
+        val originalParticipation = participantStatus("participation_status", changedMembershipId)
         val currentSelection = selection()
-        val snapshot = adapter.previewTargets(clubId, currentSelection)
-        val previewId =
-            adapter.insertPreview(
-                clubId,
-                hostMembershipId,
-                "a".repeat(64),
-                snapshot.snapshotHash(),
-                now.plusMinutes(10),
-            )
-        val lifecycleLockAcquired = CountDownLatch(1)
+        val previewId = insertLockTestPreview(now, currentSelection)
+        val lifecycleMutationApplied = CountDownLatch(1)
         val releaseLifecycle = CountDownLatch(1)
-        val confirmStarted = CountDownLatch(1)
         val executor = Executors.newFixedThreadPool(2)
         val transactionTemplate = TransactionTemplate(transactionManager)
 
@@ -530,33 +545,142 @@ class JdbcManualNotificationDispatchAdapterTest(
                 CompletableFuture.runAsync(
                     {
                         transactionTemplate.executeWithoutResult {
-                            memberLifecycleAdapter.lockClubForUpdate(clubId)
-                            lifecycleLockAcquired.countDown()
+                            memberLifecycleService.suspend(
+                                host,
+                                changedMembershipId,
+                                MemberLifecycleRequest(),
+                            )
+                            lifecycleMutationApplied.countDown()
                             check(releaseLifecycle.await(10, TimeUnit.SECONDS))
                         }
                     },
                     executor,
                 )
-            check(lifecycleLockAcquired.await(10, TimeUnit.SECONDS))
-            val confirmation =
-                CompletableFuture.supplyAsync(
+            check(lifecycleMutationApplied.await(10, TimeUnit.SECONDS))
+            assertThat(
+                awaitConfirmAfterMutation(
+                    executor,
+                    previewId,
+                    now,
+                    currentSelection,
+                    releaseLifecycle,
+                    lifecycle,
+                ),
+            ).isEqualTo(
+                ManualNotificationConfirmAttempt.Rejected(
+                    ManualNotificationConfirmRejection.RECIPIENTS_CHANGED,
+                ),
+            )
+        } finally {
+            releaseLifecycle.countDown()
+            executor.shutdownNow()
+            restoreLifecycleLockTestState(changedMembershipId, originalParticipation)
+        }
+    }
+
+    @Test
+    fun `confirm waits behind a real viewer activation using the same club lock`() {
+        val now = OffsetDateTime.of(2026, 7, 23, 0, 0, 0, 0, ZoneOffset.UTC)
+        val changedMembershipId = membershipId("member1@example.com")
+        val activationApplied = CountDownLatch(1)
+        val releaseActivation = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(2)
+        val transactionTemplate = TransactionTemplate(transactionManager)
+
+        try {
+            jdbcTemplate.update(
+                "update memberships set status = 'VIEWER' where club_id = ? and id = ?",
+                clubId.toString(),
+                changedMembershipId.toString(),
+            )
+            val currentSelection = selection()
+            val previewId = insertLockTestPreview(now, currentSelection)
+            val activation =
+                CompletableFuture.runAsync(
                     {
-                        confirmStarted.countDown()
-                        confirm(previewId, now, currentSelection)
+                        transactionTemplate.executeWithoutResult {
+                            memberApprovalService.activateViewer(host, changedMembershipId)
+                            activationApplied.countDown()
+                            check(releaseActivation.await(10, TimeUnit.SECONDS))
+                        }
                     },
                     executor,
                 )
-            check(confirmStarted.await(10, TimeUnit.SECONDS))
-
-            assertThatThrownBy { confirmation.get(250, TimeUnit.MILLISECONDS) }
-                .isInstanceOf(TimeoutException::class.java)
-
-            releaseLifecycle.countDown()
-            lifecycle.get(10, TimeUnit.SECONDS)
-            assertThat(confirmation.get(10, TimeUnit.SECONDS))
-                .isInstanceOf(ManualNotificationConfirmAttempt.Confirmed::class.java)
+            check(activationApplied.await(10, TimeUnit.SECONDS))
+            assertThat(
+                awaitConfirmAfterMutation(
+                    executor,
+                    previewId,
+                    now,
+                    currentSelection,
+                    releaseActivation,
+                    activation,
+                ),
+            ).isEqualTo(
+                ManualNotificationConfirmAttempt.Rejected(
+                    ManualNotificationConfirmRejection.RECIPIENTS_CHANGED,
+                ),
+            )
         } finally {
-            releaseLifecycle.countDown()
+            releaseActivation.countDown()
+            executor.shutdownNow()
+            jdbcTemplate.update(
+                "update memberships set status = 'ACTIVE' where club_id = ? and id = ?",
+                clubId.toString(),
+                changedMembershipId.toString(),
+            )
+        }
+    }
+
+    @Test
+    fun `confirm waits behind a real attendance mutation using the same club lock`() {
+        val now = OffsetDateTime.of(2026, 7, 23, 0, 0, 0, 0, ZoneOffset.UTC)
+        val changedMembershipId = membershipId("member1@example.com")
+        val originalAttendance = participantStatus("attendance_status", changedMembershipId)
+        val currentSelection = selection()
+        val previewId = insertLockTestPreview(now, currentSelection)
+        val attendanceApplied = CountDownLatch(1)
+        val releaseAttendance = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(2)
+        val transactionTemplate = TransactionTemplate(transactionManager)
+
+        try {
+            val attendance =
+                CompletableFuture.runAsync(
+                    {
+                        transactionTemplate.executeWithoutResult {
+                            attendanceService.confirmAttendance(
+                                ConfirmAttendanceCommand(
+                                    host = host,
+                                    sessionId = sessionId,
+                                    entries =
+                                        listOf(
+                                            AttendanceEntryCommand(
+                                                membershipId = changedMembershipId.toString(),
+                                                attendanceStatus = originalAttendance,
+                                            ),
+                                        ),
+                                ),
+                            )
+                            attendanceApplied.countDown()
+                            check(releaseAttendance.await(10, TimeUnit.SECONDS))
+                        }
+                    },
+                    executor,
+                )
+            check(attendanceApplied.await(10, TimeUnit.SECONDS))
+            assertThat(
+                awaitConfirmAfterMutation(
+                    executor,
+                    previewId,
+                    now,
+                    currentSelection,
+                    releaseAttendance,
+                    attendance,
+                ),
+            ).isInstanceOf(ManualNotificationConfirmAttempt.Confirmed::class.java)
+        } finally {
+            releaseAttendance.countDown()
             executor.shutdownNow()
         }
     }
@@ -1038,6 +1162,86 @@ class JdbcManualNotificationDispatchAdapterTest(
             NotificationEventType.SESSION_REMINDER_DUE.name,
             contentRevision,
         ) ?: 0
+
+    private fun insertLockTestPreview(
+        now: OffsetDateTime,
+        currentSelection: ManualNotificationSelection,
+    ): UUID {
+        val snapshot = adapter.previewTargets(clubId, currentSelection)
+        return adapter.insertPreview(
+            clubId,
+            hostMembershipId,
+            "a".repeat(64),
+            snapshot.snapshotHash(),
+            now.plusMinutes(10),
+        )
+    }
+
+    private fun awaitConfirmAfterMutation(
+        executor: java.util.concurrent.Executor,
+        previewId: UUID,
+        now: OffsetDateTime,
+        currentSelection: ManualNotificationSelection,
+        releaseMutation: CountDownLatch,
+        mutation: CompletableFuture<Void>,
+    ): ManualNotificationConfirmAttempt {
+        val confirmStarted = CountDownLatch(1)
+        val confirmation =
+            CompletableFuture.supplyAsync(
+                {
+                    confirmStarted.countDown()
+                    confirm(previewId, now, currentSelection)
+                },
+                executor,
+            )
+        check(confirmStarted.await(10, TimeUnit.SECONDS))
+        assertThatThrownBy { confirmation.get(250, TimeUnit.MILLISECONDS) }
+            .isInstanceOf(TimeoutException::class.java)
+
+        releaseMutation.countDown()
+        mutation.get(10, TimeUnit.SECONDS)
+        return confirmation.get(10, TimeUnit.SECONDS)
+    }
+
+    private fun participantStatus(
+        column: String,
+        membershipId: UUID,
+    ): String {
+        check(column == "participation_status" || column == "attendance_status")
+        return jdbcTemplate.queryForObject(
+            """
+            select $column
+            from session_participants
+            where club_id = ? and session_id = ? and membership_id = ?
+            """.trimIndent(),
+            String::class.java,
+            clubId.toString(),
+            sessionId.toString(),
+            membershipId.toString(),
+        )!!
+    }
+
+    private fun restoreLifecycleLockTestState(
+        membershipId: UUID,
+        originalParticipation: String,
+    ) {
+        jdbcTemplate.update(
+            "update memberships set status = 'ACTIVE' where club_id = ? and id = ?",
+            clubId.toString(),
+            membershipId.toString(),
+        )
+        jdbcTemplate.update(
+            """
+            update session_participants
+            set participation_status = ?
+            where club_id = ? and session_id = ? and membership_id = ?
+            """.trimIndent(),
+            originalParticipation,
+            clubId.toString(),
+            sessionId.toString(),
+            membershipId.toString(),
+        )
+    }
 
     private data class MutableReplayState(
         val date: LocalDate,
