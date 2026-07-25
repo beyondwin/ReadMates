@@ -10,6 +10,24 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 
+## v2.0.1 - 2026-07-25
+
+### Fixed
+
+- **서버 이미지 release scan blocker:** `v2.0.0` scan candidate에서 Trivy가 발견한 수정 가능한 HIGH 6건을 제거했습니다. Runtime classpath의 `com.fasterxml.jackson.core:jackson-core`를 `2.21.4`, Netty 전체를 `4.2.16.Final`로 정렬해 Jackson async parser와 Netty compression/HTTP/HTTP3 취약 버전이 release image에 포함되지 않게 했습니다.
+
+### Deployment Notes
+
+- `v2.0.0` source tag의 `Deploy Server Image`는 scan candidate를 만들었지만 Trivy에서 차단되어 GHCR `v2.0.0` release image tag로 승격되지 않았습니다. 따라서 `sync-config`, OCI backend promotion, Cloudflare Pages frontend 배포와 GitHub Release 생성은 시작하지 않았습니다.
+- `v2.0.1`은 같은 v2 기능과 V37–V42 migration을 포함한 forward-fix release입니다. `v2.0.1` 서버 이미지 scan/promote → production config sync → OCI backend/Flyway/health → `Deploy Front(release_tag=v2.0.1)` → production smoke 순서를 사용합니다.
+
+### Verification
+
+- Runtime dependency resolution: `com.fasterxml.jackson.core:jackson-core 2.21.4`, `tools.jackson.core:jackson-core 3.1.4`, Netty compression/HTTP/HTTP3 `4.2.16.Final`.
+- `./scripts/server-ci-check.sh` passed.
+- Local `linux/arm64` release image build passed, and Trivy `0.70.0` HIGH/CRITICAL scan reported zero findings for both Ubuntu packages and application JARs.
+- `./scripts/pre-push-check.sh --full --release` passed, including 1,536 frontend tests, server quality and Testcontainers integration gates, public candidate/gitleaks, 92 Playwright E2E tests, and observability configuration validation.
+
 ## v2.0.0 - 2026-07-25
 
 ### Highlights

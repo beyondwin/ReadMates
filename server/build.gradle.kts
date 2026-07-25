@@ -12,7 +12,7 @@ plugins {
 group = "com.readmates"
 version = "0.0.1-SNAPSHOT"
 
-extra["netty.version"] = "4.2.15.Final"
+extra["netty.version"] = "4.2.16.Final"
 extra["spring-kafka.version"] = "4.0.6"
 extra["tomcat.version"] = "11.0.22"
 
@@ -34,6 +34,10 @@ repositories {
 
 configurations.configureEach {
     resolutionStrategy.eachDependency {
+        if (requested.group == "com.fasterxml.jackson.core" && requested.name == "jackson-core") {
+            useVersion("2.21.4")
+            because("Trivy flags GHSA-r7wm-3cxj-wff9 in jackson-core 2.21.2.")
+        }
         if (requested.group == "com.fasterxml.jackson.core" && requested.name == "jackson-databind") {
             useVersion("2.21.4")
             because("Trivy flags CVE-2026-54512 and CVE-2026-54513 in jackson-databind 2.21.2.")
@@ -66,8 +70,11 @@ dependencies {
         implementation("org.springframework.security:spring-security-web:7.0.5") {
             because("Trivy flags servlet path matching vulnerabilities before Spring Security web 7.0.4.")
         }
-        implementation("tools.jackson.core:jackson-core:3.1.2") {
+        implementation("tools.jackson.core:jackson-core:3.1.4") {
             because("Trivy flags jackson-core 3.0.2 for high severity parser issues.")
+        }
+        implementation("com.fasterxml.jackson.core:jackson-core:2.21.4") {
+            because("Trivy flags GHSA-r7wm-3cxj-wff9 in jackson-core 2.21.2.")
         }
         implementation("com.fasterxml.jackson.core:jackson-databind:2.21.4") {
             because("Trivy flags CVE-2026-54512 and CVE-2026-54513 in jackson-databind 2.21.2.")
@@ -75,8 +82,8 @@ dependencies {
         implementation("tools.jackson.core:jackson-databind:3.1.4") {
             because("Trivy flags CVE-2026-54512 and CVE-2026-54513 in tools.jackson databind 3.1.2.")
         }
-        implementation("io.netty:netty-codec-dns:4.2.15.Final") {
-            because("Trivy flags Netty DNS/handler CVEs before 4.2.15.Final.")
+        implementation("io.netty:netty-codec-dns:4.2.16.Final") {
+            because("Trivy flags fixed HIGH Netty codec CVEs before 4.2.16.Final.")
         }
         implementation("org.springframework.kafka:spring-kafka:4.0.6") {
             because("Trivy flags CVE-2026-41731 in spring-kafka 4.0.5.")
