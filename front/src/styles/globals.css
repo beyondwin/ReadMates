@@ -4825,19 +4825,19 @@
 }
 
 .rm-host-notifications-rail {
-  display: grid;
-  grid-template-columns: minmax(260px, 2fr) repeat(4, minmax(110px, 1fr));
   border-block: 1px solid var(--line);
 }
 
-.rm-host-notifications-rail > * {
-  grid-column: 1 / -1;
+.rm-host-notifications-rail__grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 2fr) repeat(4, minmax(110px, 1fr));
 }
 
 .rm-host-notifications-rail__cell {
   min-width: 0;
   padding: 16px;
   border-inline-end: 1px solid var(--line);
+  border-block-end: 1px solid var(--line);
 }
 
 .rm-notification-dispatch-row {
@@ -4867,7 +4867,7 @@
 }
 
 @media (max-width: 900px) {
-  .rm-host-notifications-rail {
+  .rm-host-notifications-rail__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

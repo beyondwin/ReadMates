@@ -67,20 +67,8 @@ export function HostNotificationOperationsRail({
       aria-label="알림 운영 상태"
       style={{ padding: 0, overflow: "hidden" }}
     >
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))",
-        }}
-      >
-        <div
-          style={{
-            gridColumn: "span 2",
-            minWidth: 0,
-            padding: "18px 20px",
-            borderBottom: "1px solid var(--line)",
-          }}
-        >
+      <div className="rm-host-notifications-rail__grid">
+        <div className="rm-host-notifications-rail__cell rm-host-notifications-rail__policy">
           <div className="eyebrow">자동 리마인더</div>
           <div className="small" style={{ color: "var(--text-3)", marginTop: 4 }}>
             {enabled ? "모임 전날 · 켜짐" : "모임 전날 · 기본 꺼짐"}
@@ -134,7 +122,7 @@ export function HostNotificationOperationsRail({
         {metrics.map((metric) => (
           <div
             key={metric.label}
-            style={{ minWidth: 0, padding: "18px 20px", borderBottom: "1px solid var(--line)" }}
+            className="rm-host-notifications-rail__cell"
           >
             <div className="tiny" style={{ color: "var(--text-3)" }}>{metric.label}</div>
             <div className="row" style={{ gap: 8, alignItems: "baseline", marginTop: 6 }}>

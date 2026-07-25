@@ -520,7 +520,7 @@ describe("HostNotificationsRoute", () => {
 
     expect(await screen.findByRole("heading", { name: "알림 발송 작업대" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "새 알림 발송" })).toBeInTheDocument();
-    expect(screen.getAllByRole("heading", { name: "최근 수동 발송" }).length).toBeGreaterThan(0);
+    expect(screen.getByRole("heading", { name: "최근 수동 발송" })).toBeInTheDocument();
     expect(screen.getAllByText("앱+이메일").length).toBeGreaterThan(0);
     expect(screen.getByRole("checkbox", { name: "모임 전날 자동 리마인더" })).not.toBeChecked();
   });
@@ -947,7 +947,8 @@ describe("HostNotificationsPage", () => {
 
     const rail = screen.getByRole("region", { name: "알림 운영 상태" });
     const workbench = screen.getByRole("region", { name: "새 알림 발송" });
-    const recent = screen.getAllByRole("region", { name: "최근 수동 발송" })[0];
+    const recent = screen.getByRole("region", { name: "최근 수동 발송" });
+    const full = screen.getByRole("region", { name: "전체 수동 발송" });
     const detailToggle = screen.getByRole("button", { name: /운영 상세/ });
 
     expect(
@@ -959,6 +960,9 @@ describe("HostNotificationsPage", () => {
     expect(
       recent.compareDocumentPosition(detailToggle) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+    expect(recent.getAttribute("aria-labelledby")).not.toBe(
+      full.getAttribute("aria-labelledby"),
+    );
     expect(
       screen.queryByRole("heading", { name: "자동 리마인더 정책" }),
     ).not.toBeInTheDocument();
@@ -993,7 +997,7 @@ describe("HostNotificationsPage", () => {
       ],
     });
 
-    expect(screen.getAllByRole("heading", { name: "최근 수동 발송" }).length).toBeGreaterThan(0);
+    expect(screen.getByRole("heading", { name: "최근 수동 발송" })).toBeInTheDocument();
     expect(screen.getAllByText("앱+이메일").length).toBeGreaterThan(0);
     expect(screen.getAllByText("수동").length).toBeGreaterThan(0);
   });

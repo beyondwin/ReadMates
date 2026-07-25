@@ -26,6 +26,24 @@ const dispatches: ManualNotificationDispatchListItem[] = Array.from(
 );
 
 describe("ManualNotificationDispatchLedger", () => {
+  it("gives recent and full ledgers unique accessible names and heading ids", () => {
+    render(
+      <>
+        <ManualNotificationDispatchLedger variant="recent" dispatches={[]} />
+        <ManualNotificationDispatchLedger variant="full" dispatches={[]} />
+      </>,
+    );
+
+    const recent = screen.getByRole("region", { name: "최근 수동 발송" });
+    const full = screen.getByRole("region", { name: "전체 수동 발송" });
+    const recentTitleId = recent.getAttribute("aria-labelledby");
+    const fullTitleId = full.getAttribute("aria-labelledby");
+
+    expect(recentTitleId).toBe("manual-dispatch-ledger-recent-title");
+    expect(fullTitleId).toBe("manual-dispatch-ledger-full-title");
+    expect(recentTitleId).not.toBe(fullTitleId);
+  });
+
   it("shows only the newest three rows in recent mode", () => {
     render(
       <ManualNotificationDispatchLedger

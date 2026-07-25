@@ -25,12 +25,14 @@ export function ManualNotificationDispatchLedger({
     ? dispatches.slice(0, Math.max(0, limit ?? 3))
     : dispatches;
   const showPagination = variant === "full" && hasMore && onLoadMore;
+  const titleId = `manual-dispatch-ledger-${variant}-title`;
+  const title = variant === "recent" ? "최근 수동 발송" : "전체 수동 발송";
 
   return (
-    <section className="surface" aria-labelledby="manual-dispatch-ledger-title" style={{ padding: 22, marginBottom: 20 }}>
+    <section className="surface" aria-labelledby={titleId} style={{ padding: 22, marginBottom: 20 }}>
       <div className="row-between" style={{ gap: 12, alignItems: "baseline", flexWrap: "wrap" }}>
-        <h2 id="manual-dispatch-ledger-title" className="h3 editorial" style={{ margin: 0 }}>
-          최근 수동 발송
+        <h2 id={titleId} className="h3 editorial" style={{ margin: 0 }}>
+          {title}
         </h2>
       </div>
       {visibleDispatches.length === 0 ? (

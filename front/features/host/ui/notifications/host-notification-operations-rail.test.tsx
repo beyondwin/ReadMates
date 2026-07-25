@@ -37,6 +37,12 @@ describe("HostNotificationOperationsRail", () => {
     renderRail();
 
     const rail = screen.getByRole("region", { name: "알림 운영 상태" });
+    const grid = rail.querySelector(".rm-host-notifications-rail__grid");
+    expect(grid).not.toBeNull();
+    expect(grid?.querySelectorAll(".rm-host-notifications-rail__cell")).toHaveLength(5);
+    expect(
+      grid?.querySelector(".rm-host-notifications-rail__policy"),
+    ).toHaveClass("rm-host-notifications-rail__cell");
     expect(within(rail).getByText("자동 리마인더")).toBeInTheDocument();
     expect(within(rail).getByText("모임 전날 · 기본 꺼짐")).toBeInTheDocument();
     expect(within(rail).getByText("대기")).toBeInTheDocument();
