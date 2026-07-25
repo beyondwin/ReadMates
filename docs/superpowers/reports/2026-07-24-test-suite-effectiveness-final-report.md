@@ -34,7 +34,7 @@ PR, tag, publish, deploy는 수행하지 않았으므로
 | --- | --- | --- |
 | Phase 1 수집 기준 | `7cb38818124742d340dc26e8bfa8c1d43ebca848` | 510개 파일·case·환경 기준선 |
 | Phase 2–5 구현 시작 | `0cd590a9cd480b0c8e26c6c287993e3a08768bf9` | `origin/main`과 같은 isolated branch 시작점 |
-| Phase 5 시작 | `a70a8dd4c7114cb39c08379143594a0f67ed9b4a` | Phase 2–4 최종 보고서가 존재하는 report-only descendant |
+| Phase 5 시작 | `a70a8dd47596d65fb46e0c940f8c730491a06618` | Phase 2–4 최종 보고서가 존재하는 report-only descendant |
 | 최종 runtime 후보 | `753e6ce02e89938bdf07e1ad3dfceb6cf0c2c212` | mutation 복원 뒤 Task 3 반복과 Task 4 전체 gate를 실행한 exact HEAD |
 | release-review 문서 HEAD | `c5b77d6b70280f974d530033e06ebaa165f471a3` | runtime 후보 뒤 `CHANGELOG.md`와 release review만 추가한 docs-only descendant |
 | 최종 보고서 HEAD | 이 문서를 포함하는 `docs: close test suite effectiveness optimization` commit | runtime과 test를 바꾸지 않는 report-only descendant이며 exact SHA는 commit metadata와 handoff에 기록 |
