@@ -29,7 +29,10 @@ for n in 1 2 3 4; do
   } >> "$OUT"
   runs=()
   for i in 1 2 3; do
-    (cd "$REPO_ROOT/server" && ./gradlew --stop >/dev/null 2>&1 || true)
+    (
+      cd "$REPO_ROOT/server"
+      ./gradlew --stop >/dev/null 2>&1 || true
+    )
     rm -rf "$REPO_ROOT/server/.gradle" "$REPO_ROOT/server/build"
     real=$(/usr/bin/time -p bash -c "cd '$REPO_ROOT/server' && ./gradlew unitTest -PmaxForks=$n" 2>&1 >/dev/null | awk '/^real/ {print $2}')
     runs+=("$real")

@@ -29,7 +29,10 @@ run_once() {
 }
 
 prep_cold() {
-  (cd "$REPO_ROOT/server" && ./gradlew --stop >/dev/null 2>&1 || true)
+  (
+    cd "$REPO_ROOT/server"
+    ./gradlew --stop >/dev/null 2>&1 || true
+  )
   rm -rf "$HOME/.gradle/caches/build-cache-"* 2>/dev/null || true
   rm -rf "$REPO_ROOT/server/.gradle" "$REPO_ROOT/server/build"
 }
