@@ -155,11 +155,13 @@ test("preview dismissal never dispatches a manual reminder", async ({ page }) =>
   expect(hostActionDecisionCount(sessionId)).toBe(0);
 
   await page.getByRole("button", { name: "미리보기 열기" }).click();
+  await expect(page.getByRole("dialog", { name: "발송 전 확인" })).toBeVisible();
   await page.goBack();
 
   await expect(page).toHaveURL(new RegExp(`/clubs/${CLUB_SLUG}/app/host$`));
   expect(manualDispatchCount(sessionId, "SESSION_REMINDER_DUE")).toBe(0);
   expect(notificationEventCount(sessionId, "SESSION_REMINDER_DUE")).toBe(0);
+  expect(hostActionDecisionCount(sessionId)).toBe(0);
 });
 
 test("host can change the selected session before previewing a manual reminder", async ({ page }) => {
