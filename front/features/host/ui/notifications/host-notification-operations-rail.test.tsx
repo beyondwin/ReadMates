@@ -15,6 +15,7 @@ const defaultProps: HostNotificationOperationsRailProps = {
   hasProcessableNotifications: true,
   processPending: false,
   isRefreshing: false,
+  pageBusy: false,
   policyPending: false,
   policyError: null,
   policyLoadError: null,
@@ -84,6 +85,37 @@ describe("HostNotificationOperationsRail", () => {
     renderRail({ policyPending: true });
 
     expect(screen.getByRole("checkbox", { name: "모임 전날 자동 리마인더" })).toBeDisabled();
+  });
+
+  it("does not present an unknown policy as off while loading", () => {
+    renderRail({
+      policy: undefined,
+      policyLoading: true,
+    });
+
+    expect(screen.getByText("불러오는 중")).toBeInTheDocument();
+    expect(screen.queryByText("모임 전날 · 기본 꺼짐")).not.toBeInTheDocument();
+  });
+
+  it("does not present a failed initial policy load as off", () => {
+    renderRail({
+      policy: undefined,
+      policyLoadError: "정책을 불러오지 못했습니다.",
+    });
+
+    expect(screen.getByText("정책 확인 필요")).toBeInTheDocument();
+    expect(screen.queryByText("모임 전날 · 기본 꺼짐")).not.toBeInTheDocument();
+  });
+
+  it("shows saving copy while waiting for server confirmation", async () => {
+    const user = userEvent.setup();
+    const onPolicyChange = vi.fn(() => new Promise<unknown>(() => undefined));
+    renderRail({ onPolicyChange });
+
+    await user.click(screen.getByRole("checkbox", { name: "모임 전날 자동 리마인더" }));
+
+    expect(screen.getByText("저장 중")).toBeInTheDocument();
+    expect(screen.queryByText("모임 전날 · 기본 꺼짐")).not.toBeInTheDocument();
   });
 
   it("keeps the server-confirmed policy value when saving fails", async () => {

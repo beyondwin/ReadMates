@@ -9,6 +9,7 @@ export type HostNotificationOperationsRailProps = {
   hasProcessableNotifications: boolean;
   processPending: boolean;
   isRefreshing: boolean;
+  pageBusy: boolean;
   policyPending: boolean;
   policyError: string | null;
   policyLoadError: string | null;
@@ -27,6 +28,7 @@ export function HostNotificationOperationsRail({
   hasProcessableNotifications,
   processPending,
   isRefreshing,
+  pageBusy,
   policyPending,
   policyError,
   policyLoadError,
@@ -46,6 +48,15 @@ export function HostNotificationOperationsRail({
   const enabled = policy?.sessionReminderEnabled ?? false;
   const busy = policyPending || policyLoading || submitting;
   const visibleError = policyError ?? policyLoadError ?? localError;
+  const policyStatus = policyLoading
+    ? "불러오는 중"
+    : !policy
+      ? "정책 확인 필요"
+      : policyPending || submitting
+        ? "저장 중"
+        : enabled
+          ? "모임 전날 · 켜짐"
+          : "모임 전날 · 기본 꺼짐";
 
   const handlePolicyChange = async (nextEnabled: boolean) => {
     if (!policy || policyPending || policyLoading || submitting) return;
@@ -71,7 +82,7 @@ export function HostNotificationOperationsRail({
         <div className="rm-host-notifications-rail__cell rm-host-notifications-rail__policy">
           <div className="eyebrow">자동 리마인더</div>
           <div className="small" style={{ color: "var(--text-3)", marginTop: 4 }}>
-            {enabled ? "모임 전날 · 켜짐" : "모임 전날 · 기본 꺼짐"}
+            {policyStatus}
           </div>
           <label
             htmlFor="host-session-reminder-policy"
@@ -138,7 +149,7 @@ export function HostNotificationOperationsRail({
           <button
             type="button"
             className="btn btn-primary btn-sm rm-host-notifications-rail__process"
-            disabled={processPending || isRefreshing}
+            disabled={pageBusy || processPending || isRefreshing}
             onClick={onProcess}
           >
             {processPending

@@ -1240,31 +1240,48 @@ describe("HostNotificationsPage", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("keeps processing available when a pending item is visible even if the summary is stale", async () => {
+  it("keeps stale-summary processing available for a pending email delivery", async () => {
     const user = userEvent.setup();
     const onProcess = vi.fn().mockResolvedValue(undefined);
-    const pendingItem: HostNotificationDeliveryItem = { ...deadDelivery, id: "notification-2", status: "PENDING" };
+    const pendingEmail: HostNotificationDeliveryItem = {
+      ...deadDelivery,
+      id: "notification-email",
+      channel: "EMAIL",
+      status: "PENDING",
+    };
 
-    render(
-      <HostNotificationsPage
-        summary={{ ...summary, pending: 0, failed: 0 }}
-        events={[]}
-        deliveries={[pendingItem]}
-        audit={[]}
-        manualOptions={manualOptionsFixture}
-        initialManualSelection={{ sessionId: "session-1", eventType: null }}
-        onProcess={onProcess}
-        onRetry={vi.fn()}
-        onRestore={vi.fn()}
-        onSendTestMail={vi.fn()}
-        onPreviewManual={vi.fn().mockResolvedValue(undefined)}
-        onConfirmManual={vi.fn().mockResolvedValue(undefined)}
-      />,
-    );
+    renderPage({
+      summaryData: { ...summary, pending: 0, failed: 0 },
+      events: [],
+      deliveries: [pendingEmail],
+      onProcess,
+    });
 
     await user.click(screen.getByRole("button", { name: "대기·실패 처리" }));
 
     expect(onProcess).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not offer stale-summary processing for a pending in-app delivery", () => {
+    const onProcess = vi.fn().mockResolvedValue(undefined);
+    const pendingInApp: HostNotificationDeliveryItem = {
+      ...deadDelivery,
+      id: "notification-in-app",
+      channel: "IN_APP",
+      status: "PENDING",
+    };
+
+    renderPage({
+      summaryData: { ...summary, pending: 0, failed: 0 },
+      events: [],
+      deliveries: [pendingInApp],
+      onProcess,
+    });
+
+    expect(
+      screen.queryByRole("button", { name: "대기·실패 처리" }),
+    ).not.toBeInTheDocument();
+    expect(onProcess).not.toHaveBeenCalled();
   });
 
   it("keeps processing available for a visible pending row when summary counts are stale", async () => {
@@ -1314,6 +1331,30 @@ describe("HostNotificationsPage", () => {
     await user.click(retryButton);
 
     expect(onRetry).not.toHaveBeenCalled();
+  });
+
+  it("disables processing while another page operation is pending", async () => {
+    const user = userEvent.setup();
+    const onProcess = vi.fn().mockResolvedValue(undefined);
+    const onRetry = vi.fn(() => new Promise<unknown>(() => undefined));
+    const failedEmail: HostNotificationDeliveryItem = {
+      ...deadDelivery,
+      id: "notification-failed",
+      status: "FAILED",
+    };
+
+    renderPage({
+      deliveries: [failedEmail],
+      onProcess,
+      onRetry,
+    });
+    await user.click(screen.getByRole("tab", { name: "배송" }));
+    await user.click(screen.getByRole("button", { name: "재시도" }));
+
+    const processButton = screen.getByRole("button", { name: "3건 처리" });
+    expect(processButton).toBeDisabled();
+    await user.click(processButton);
+    expect(onProcess).not.toHaveBeenCalled();
   });
 
   it("shows restore failures inside the active confirmation dialog", async () => {

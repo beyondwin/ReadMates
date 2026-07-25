@@ -88,7 +88,7 @@ export function HostNotificationComposer({
         <div className="rm-notification-workbench__decision-heading">
           <span className="rm-notification-workbench__step">03</span>
           <div>
-            <h3>03 · 대상과 채널</h3>
+            <h3>대상과 채널</h3>
             <p>누구에게 어떤 방식으로 보낼지 선택합니다.</p>
           </div>
         </div>

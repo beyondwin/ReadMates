@@ -273,12 +273,28 @@ function ManualNotificationWorkbenchState({
         onClose={onPreviewDismiss}
       >
         {preview ? (
-          <ManualNotificationPreviewConfirmation
-            key={preview.previewId}
-            preview={preview}
-            busy={busy}
-            onConfirm={handleConfirm}
-          />
+          <>
+            <div
+              className="row"
+              style={{ justifyContent: "flex-end", marginBottom: 12 }}
+            >
+              <button
+                type="button"
+                className="btn btn-quiet btn-sm"
+                disabled={busy}
+                onClick={onPreviewDismiss}
+              >
+                닫기
+              </button>
+            </div>
+            <ManualNotificationPreviewConfirmation
+              key={preview.previewId}
+              preview={preview}
+              busy={busy}
+              presentation="side-sheet"
+              onConfirm={handleConfirm}
+            />
+          </>
         ) : null}
       </HostNotificationComposerDialog>
     </section>

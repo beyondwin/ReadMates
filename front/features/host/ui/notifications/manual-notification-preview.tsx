@@ -4,6 +4,7 @@ import type { ManualNotificationPreviewResponse } from "@/features/host/model/ho
 export type ManualNotificationPreviewConfirmationProps = {
   preview: ManualNotificationPreviewResponse;
   busy: boolean;
+  presentation?: "centered" | "side-sheet";
   onConfirm: (resendConfirmed: boolean) => Promise<unknown> | void;
 };
 
@@ -13,6 +14,7 @@ export function ManualNotificationPreviewPanel({
   disabled,
   busy,
   confirmLabel,
+  showTitle,
   onResendConfirmedChange,
   onConfirm,
 }: {
@@ -21,11 +23,25 @@ export function ManualNotificationPreviewPanel({
   disabled: boolean;
   busy: boolean;
   confirmLabel: string;
+  showTitle: boolean;
   onResendConfirmedChange: (value: boolean) => void;
   onConfirm: () => void;
 }) {
   return (
-    <section aria-label="발송 전 확인" style={{ borderTop: "1px solid var(--line-soft)", paddingTop: 16 }}>
+    <section
+      aria-label={showTitle ? undefined : "발송 전 확인"}
+      aria-labelledby={showTitle ? "manual-notification-preview-title" : undefined}
+      style={{ borderTop: "1px solid var(--line-soft)", paddingTop: 16 }}
+    >
+      {showTitle ? (
+        <h3
+          id="manual-notification-preview-title"
+          className="h4 editorial"
+          style={{ margin: 0 }}
+        >
+          발송 전 확인
+        </h3>
+      ) : null}
       <div className="row wrap" style={{ gap: 8, marginTop: 12 }}>
         <span className="badge badge-accent badge-dot">앱 알림 {preview.channels.inAppEligibleCount}명</span>
         <span className="badge badge-accent badge-dot">이메일 {preview.channels.emailEligibleCount}명</span>
@@ -69,10 +85,12 @@ export function ManualNotificationPreviewPanel({
 export function ManualNotificationPreviewConfirmation({
   preview,
   busy,
+  presentation = "centered",
   onConfirm,
 }: ManualNotificationPreviewConfirmationProps): ReactElement {
   const [resendConfirmed, setResendConfirmed] = useState(false);
   const requiresResend = preview.duplicates.requiresResendConfirmation;
+  const isSideSheet = presentation === "side-sheet";
 
   return (
     <ManualNotificationPreviewPanel
@@ -80,7 +98,10 @@ export function ManualNotificationPreviewConfirmation({
       resendConfirmed={resendConfirmed}
       disabled={busy || (requiresResend && !resendConfirmed)}
       busy={busy}
-      confirmLabel={`${preview.audience.finalTargetCount}명에게 알림 발송`}
+      confirmLabel={isSideSheet
+        ? `${preview.audience.finalTargetCount}명에게 알림 발송`
+        : "발송 확인"}
+      showTitle={!isSideSheet}
       onResendConfirmedChange={setResendConfirmed}
       onConfirm={() => void onConfirm(resendConfirmed)}
     />

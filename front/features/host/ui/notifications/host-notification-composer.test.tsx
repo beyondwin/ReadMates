@@ -196,7 +196,7 @@ describe("HostNotificationComposer", () => {
     renderComposer({ preview: duplicatePreview, onConfirm });
 
     const previewRegion = screen.getByRole("region", { name: "발송 전 확인" });
-    const confirmButton = within(previewRegion).getByRole("button", { name: "3명에게 알림 발송" });
+    const confirmButton = within(previewRegion).getByRole("button", { name: "발송 확인" });
     expect(confirmButton).toBeDisabled();
 
     await user.click(within(previewRegion).getByRole("checkbox", { name: "재발송을 확인했습니다" }));
@@ -204,6 +204,21 @@ describe("HostNotificationComposer", () => {
     await user.click(confirmButton);
 
     expect(onConfirm).toHaveBeenCalledWith(true);
+  });
+
+  it("keeps the shared centered preview heading and confirmation copy", () => {
+    renderComposer({ preview: duplicatePreview });
+
+    const previewRegion = screen.getByRole("region", { name: "발송 전 확인" });
+    expect(
+      within(previewRegion).getByRole("heading", { name: "발송 전 확인" }),
+    ).toBeVisible();
+    expect(
+      within(previewRegion).getByRole("button", { name: "발송 확인" }),
+    ).toBeInTheDocument();
+    expect(
+      within(previewRegion).queryByRole("button", { name: "3명에게 알림 발송" }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows the selected member count in workbench presentation", () => {

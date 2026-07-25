@@ -116,15 +116,18 @@ describe("ManualNotificationWorkbench", () => {
     renderWorkbench();
 
     const workbench = screen.getByRole("region", { name: "새 알림 발송" });
-    const labels = within(workbench)
-      .getAllByText(/0[123] ·/)
-      .map((node) => node.textContent);
+    const decisionHeadings = within(workbench)
+      .getAllByRole("heading", { level: 3 })
+      .map((heading) => heading.textContent);
 
-    expect(labels).toEqual([
+    expect(decisionHeadings).toEqual([
       "01 · 대상 회차",
       "02 · 알림 종류",
-      "03 · 대상과 채널",
+      "대상과 채널",
     ]);
+    expect(
+      within(workbench).getAllByText(/^03(?: · 대상과 채널)?$/),
+    ).toHaveLength(1);
     expect(within(workbench).getByRole("button", { name: "미리보기 열기" })).toBeEnabled();
     expect(within(workbench).queryByRole("heading", { name: "멤버에게 알림을 보낼까요?" })).not.toBeInTheDocument();
   });
@@ -173,5 +176,32 @@ describe("ManualNotificationWorkbench", () => {
 
     expect(onPreviewDismiss).toHaveBeenCalledTimes(1);
     expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it("provides a visible close action that dismisses without confirming", async () => {
+    const user = userEvent.setup();
+    const onConfirm = vi.fn();
+    const onPreviewDismiss = vi.fn();
+    renderWorkbench({
+      preview: previewFixture,
+      onConfirm,
+      onPreviewDismiss,
+    });
+
+    const dialog = screen.getByRole("dialog", { name: "발송 전 확인" });
+    await user.click(within(dialog).getByRole("button", { name: "닫기" }));
+
+    expect(onPreviewDismiss).toHaveBeenCalledTimes(1);
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it("disables the visible close action while the side sheet is busy", () => {
+    renderWorkbench({
+      preview: previewFixture,
+      busy: true,
+    });
+
+    const dialog = screen.getByRole("dialog", { name: "발송 전 확인" });
+    expect(within(dialog).getByRole("button", { name: "닫기" })).toBeDisabled();
   });
 });
