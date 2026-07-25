@@ -10,6 +10,10 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 
+### Changed
+
+- **CI 테스트 안전망 도달성:** PR CI가 `scripts/`와 `deploy/oci/`의 tracked shell을 재귀적으로 수집해 Bash와 ShellCheck에 전달하고, 관측·AI 설정 validator를 앞선 실패와 독립적으로 실행합니다. 중복 Grafana lint는 단일 job 소유권으로 통합했으며 제품 동작, 배포 계약, worker·retry·timeout·coverage 기준은 바꾸지 않았습니다.
+
 ## v2.0.0 - 2026-07-23
 
 ### Highlights
