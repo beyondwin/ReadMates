@@ -66,6 +66,14 @@ describe("HostNotificationOperationsRail", () => {
     expect(screen.queryByRole("button", { name: /처리/ })).not.toBeInTheDocument();
   });
 
+  it("renders the server-confirmed enabled policy value", () => {
+    renderRail({
+      policy: { sessionReminderEnabled: true, updatedAt: "2026-07-25T09:00:00Z" },
+    });
+
+    expect(screen.getByRole("checkbox", { name: "모임 전날 자동 리마인더" })).toBeChecked();
+  });
+
   it("disables the policy control while saving is pending", () => {
     renderRail({ policyPending: true });
 
@@ -81,5 +89,19 @@ describe("HostNotificationOperationsRail", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("저장하지 못했습니다");
     expect(reminder).not.toBeChecked();
+  });
+
+  it("retries a failed initial policy load", async () => {
+    const user = userEvent.setup();
+    const onPolicyRetry = vi.fn().mockResolvedValue(undefined);
+    renderRail({
+      policy: undefined,
+      policyLoadError: "정책을 불러오지 못했습니다.",
+      onPolicyRetry,
+    });
+
+    await user.click(screen.getByRole("button", { name: "정책 다시 불러오기" }));
+
+    expect(onPolicyRetry).toHaveBeenCalledTimes(1);
   });
 });
