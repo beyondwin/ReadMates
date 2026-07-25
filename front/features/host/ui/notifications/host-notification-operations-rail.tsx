@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { HostNotificationPolicyResponse } from "@/features/host/model/host-view-types";
-import type { HostNotificationSummary } from "./notification-formatters";
+import { summaryBadgeClass, type HostNotificationSummary } from "./notification-formatters";
 
 export type HostNotificationOperationsRailProps = {
   summary: HostNotificationSummary;
@@ -38,10 +38,10 @@ export function HostNotificationOperationsRail({
   const [submitting, setSubmitting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const metrics = [
-    { label: "대기", value: Math.max(0, summary.pending), tone: summary.pending > 0 ? "attention" : "quiet" },
-    { label: "실패", value: Math.max(0, summary.failed), tone: summary.failed > 0 ? "warning" : "quiet" },
-    { label: "중단", value: Math.max(0, summary.dead), tone: summary.dead > 0 ? "warning" : "quiet" },
-    { label: "최근 24시간", value: Math.max(0, summary.sentLast24h), tone: "positive" },
+    { label: "대기", value: Math.max(0, summary.pending), tone: summary.pending > 0 ? "accent" : "default" },
+    { label: "실패", value: Math.max(0, summary.failed), tone: summary.failed > 0 ? "warn" : "default" },
+    { label: "중단", value: Math.max(0, summary.dead), tone: summary.dead > 0 ? "warn" : "default" },
+    { label: "최근 24시간", value: Math.max(0, summary.sentLast24h), tone: "ok" },
   ] as const;
   const enabled = policy?.sessionReminderEnabled ?? false;
   const busy = policyPending || policyLoading || submitting;
@@ -134,11 +134,13 @@ export function HostNotificationOperationsRail({
         {metrics.map((metric) => (
           <div
             key={metric.label}
-            data-tone={metric.tone}
             style={{ minWidth: 0, padding: "18px 20px", borderBottom: "1px solid var(--line)" }}
           >
             <div className="tiny" style={{ color: "var(--text-3)" }}>{metric.label}</div>
-            <div className="h3" style={{ marginTop: 6 }}>{metric.value}</div>
+            <div className="row" style={{ gap: 8, alignItems: "baseline", marginTop: 6 }}>
+              <strong className="h3 mono" style={{ margin: 0 }}>{metric.value}</strong>
+              <span className={summaryBadgeClass(metric.tone)}>건</span>
+            </div>
           </div>
         ))}
       </div>

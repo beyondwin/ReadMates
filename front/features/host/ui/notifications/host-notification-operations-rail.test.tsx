@@ -46,6 +46,16 @@ describe("HostNotificationOperationsRail", () => {
     expect(within(rail).queryByText(/opt-in|Asia\/Seoul/i)).not.toBeInTheDocument();
   });
 
+  it("renders each metric with the established severity badge", () => {
+    renderRail();
+
+    const rail = screen.getByRole("region", { name: "알림 운영 상태" });
+    expect(within(rail).getByText("대기").parentElement?.querySelector("span")).toHaveClass("badge-accent");
+    expect(within(rail).getByText("실패").parentElement?.querySelector("span")).toHaveClass("badge-warn");
+    expect(within(rail).getByText("중단").parentElement?.querySelector("span")).toHaveClass("badge");
+    expect(within(rail).getByText("최근 24시간").parentElement?.querySelector("span")).toHaveClass("badge-ok");
+  });
+
   it("hides the process action when no notification can be processed", () => {
     renderRail({
       summary: { pending: 0, failed: 0, dead: 0, sentLast24h: 0 },
