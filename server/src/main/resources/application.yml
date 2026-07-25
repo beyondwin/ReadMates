@@ -91,6 +91,8 @@ readmates:
   security:
     bff:
       secrets: ${READMATES_BFF_SECRETS:}
+    host-write-client-contract:
+      required: ${READMATES_HOST_WRITE_CLIENT_CONTRACT_REQUIRED:false}
     ip-hash:
       base-secret: ${READMATES_IP_HASH_BASE_SECRET:}
       allow-empty-secret: false

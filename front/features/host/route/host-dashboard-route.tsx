@@ -127,10 +127,11 @@ export function HostDashboardRoute({
         onClose={() => setComposerRequest(null)}
       />
       {clubSlug ? (
-        <section className="container" style={{ padding: "0 0 48px" }}>
-          <div className="rm-document-panel" style={{ padding: "22px" }}>
-            <ClubAiDefaultsSection clubSlug={clubSlug} />
-          </div>
+        <section
+          className="container rm-host-dashboard-ai-tool"
+          aria-label="AI 운영 도구"
+        >
+          <ClubAiDefaultsSection clubSlug={clubSlug} variant="compact" />
         </section>
       ) : null}
     </>

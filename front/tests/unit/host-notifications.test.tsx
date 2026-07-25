@@ -518,7 +518,7 @@ describe("HostNotificationsRoute", () => {
   it("renders host notifications route from query seeded data", async () => {
     renderNotificationsRoute();
 
-    expect(await screen.findByRole("heading", { name: "알림 발송 장부" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "알림 발송 작업대" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "새 알림 발송" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "최근 수동 발송" })).toBeInTheDocument();
     expect(screen.getAllByText("앱+이메일").length).toBeGreaterThan(0);
@@ -736,7 +736,7 @@ describe("HostNotificationsRoute", () => {
     renderNotificationsRoute(client);
     await screen.findByRole("heading", { name: "새 알림 발송" });
 
-    const previewButton = screen.getByRole("button", { name: "미리보기" });
+    const previewButton = screen.getByRole("button", { name: "미리보기 열기" });
     expect(previewButton).not.toBeDisabled();
 
     const sessionSelect = screen.getByLabelText("세션 선택");
@@ -752,7 +752,7 @@ describe("HostNotificationsRoute", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "미리보기" })).not.toBeDisabled();
+      expect(screen.getByRole("button", { name: "미리보기 열기" })).not.toBeDisabled();
     });
   });
 
@@ -847,6 +847,7 @@ describe("HostNotificationsPage", () => {
       error: null,
       onPreview: vi.fn().mockResolvedValue(undefined),
       onConfirm: vi.fn().mockResolvedValue(undefined),
+      onPreviewDismiss: vi.fn(),
       onSessionChange: vi.fn().mockResolvedValue(sessionTwoOptions),
       onLoadManualOptions: vi.fn().mockResolvedValue(sessionTwoOptions),
       onLoadMoreManualMembers: vi.fn().mockResolvedValue(sessionTwoOptions),
@@ -905,6 +906,7 @@ describe("HostNotificationsPage", () => {
       error: null,
       onPreview: vi.fn().mockResolvedValue(undefined),
       onConfirm: vi.fn().mockResolvedValue(undefined),
+      onPreviewDismiss: vi.fn(),
       onSessionChange: vi.fn().mockResolvedValue(sessionTwoOptions),
       onLoadManualOptions: vi.fn().mockResolvedValue(sessionTwoOptions),
       onLoadMoreManualMembers: vi.fn().mockResolvedValue(sessionTwoOptions),
@@ -933,36 +935,40 @@ describe("HostNotificationsPage", () => {
     expect(screen.getAllByRole("radio", { name: /전체 활성 멤버/ })).toHaveLength(1);
     expect(screen.queryByRole("radio", { name: /추천 대상/ })).not.toBeInTheDocument();
     await user.click(screen.getByRole("radio", { name: "세션 참가자" }));
-    await user.click(screen.getByRole("button", { name: "미리보기" }));
+    await user.click(screen.getByRole("button", { name: "미리보기 열기" }));
 
     expect(onPreviewManual).toHaveBeenCalledWith(expect.objectContaining({
       audience: "SESSION_PARTICIPANTS",
     }));
   });
 
-  it("renders manual notification workbench before ledgers", () => {
-    renderPage({
-      manualOptions: {
-        templates: [
-          {
-            eventType: "SESSION_REMINDER_DUE",
-            label: "모임 전날 리마인더",
-            enabled: true,
-            disabledReason: null,
-            defaultAudience: "ALL_ACTIVE_MEMBERS",
-            allowedAudiences: ["ALL_ACTIVE_MEMBERS", "SESSION_PARTICIPANTS"],
-            defaultChannels: "BOTH",
-          },
-        ],
-        members: { items: [], nextCursor: null },
-        session: null,
-        recentDispatches: [],
-      },
-    });
+  it("renders the sending workbench between the unified rail and recent history", () => {
+    renderPage();
 
-    expect(screen.getByRole("heading", { name: "새 알림 발송" })).toBeInTheDocument();
-    expect(screen.getByText("모임 전날 리마인더")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "운영 장부" })).toBeInTheDocument();
+    const rail = screen.getByRole("region", { name: "알림 운영 상태" });
+    const workbench = screen.getByRole("region", { name: "새 알림 발송" });
+    const recent = screen.getByRole("region", { name: "최근 수동 발송" });
+    const full = screen.getByRole("region", { name: "전체 수동 발송" });
+    const detailToggle = screen.getByRole("button", { name: /운영 상세/ });
+
+    expect(
+      rail.compareDocumentPosition(workbench) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      workbench.compareDocumentPosition(recent) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      recent.compareDocumentPosition(detailToggle) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(recent.getAttribute("aria-labelledby")).not.toBe(
+      full.getAttribute("aria-labelledby"),
+    );
+    expect(
+      screen.queryByRole("heading", { name: "자동 리마인더 정책" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "알림 발송 요약" }),
+    ).not.toBeInTheDocument();
   });
 
   it("renders recent manual dispatches and source metadata", () => {
@@ -1013,7 +1019,7 @@ describe("HostNotificationsPage", () => {
     });
 
     expect(screen.getByText("선택 가능한 세션이 없습니다.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "미리보기" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "미리보기 열기" })).toBeDisabled();
   });
 
   it("asks the route to reload manual options when the host changes the selected session", async () => {
@@ -1145,7 +1151,7 @@ describe("HostNotificationsPage", () => {
     renderPage({ onPreviewManual, onConfirmManual, manualOptions: manualOptionsFixture });
 
     await user.click(screen.getByRole("button", { name: "모임 전날 리마인더" }));
-    await user.click(screen.getByRole("button", { name: "미리보기" }));
+    await user.click(screen.getByRole("button", { name: "미리보기 열기" }));
 
     expect(await screen.findByText("앱 알림 3명")).toBeInTheDocument();
     expect(screen.getByText("이메일 2명")).toBeInTheDocument();
@@ -1155,7 +1161,7 @@ describe("HostNotificationsPage", () => {
     expect(within(previewPanel as HTMLElement).getByText("모임 전 준비를 확인해 주세요.")).toBeInTheDocument();
     expect(screen.getByText("이미 발송된 알림입니다.")).toBeInTheDocument();
 
-    const confirm = screen.getByRole("button", { name: "발송 확인" });
+    const confirm = screen.getByRole("button", { name: "3명에게 알림 발송" });
     expect(confirm).toBeDisabled();
     await user.click(screen.getByRole("checkbox", { name: "재발송을 확인했습니다" }));
     await user.click(confirm);
@@ -1168,7 +1174,7 @@ describe("HostNotificationsPage", () => {
 
     renderPage();
 
-    expect(screen.getByRole("tab", { name: "이벤트" })).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "이벤트" }));
     expect(screen.getByText("Kafka 발행 대기")).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "배송" }));
@@ -1182,7 +1188,7 @@ describe("HostNotificationsPage", () => {
 
     renderPage({ onRestore });
 
-    expect(screen.getByText("알림 발송 장부")).toBeInTheDocument();
+    expect(screen.getByText("알림 발송 작업대")).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "배송" }));
     expect(screen.getByText("m***@example.com")).toBeInTheDocument();
 
@@ -1215,68 +1221,70 @@ describe("HostNotificationsPage", () => {
 
     renderPage({ onProcess });
 
-    await user.click(screen.getByRole("button", { name: "대기/실패 처리" }));
+    await user.click(screen.getByRole("button", { name: "3건 처리" }));
 
     expect(onProcess).toHaveBeenCalledTimes(1);
   });
 
-  it("does not process notifications when there are no pending or failed items", async () => {
+  it("does not render a disabled process action in a healthy state", () => {
+    renderPage({
+      summaryData: { pending: 0, failed: 0, dead: 0, sentLast24h: 0 },
+      events: [],
+      deliveries: [],
+    });
+
+    expect(
+      screen.queryByRole("button", {
+        name: /처리할 알림 없음|건 처리|대기·실패 처리/,
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps stale-summary processing available for a pending email delivery", async () => {
     const user = userEvent.setup();
     const onProcess = vi.fn().mockResolvedValue(undefined);
+    const pendingEmail: HostNotificationDeliveryItem = {
+      ...deadDelivery,
+      id: "notification-email",
+      channel: "EMAIL",
+      status: "PENDING",
+    };
 
-    render(
-      <HostNotificationsPage
-        summary={{ ...summary, pending: 0, failed: 0 }}
-        events={[]}
-        deliveries={[]}
-        audit={[]}
-        manualOptions={manualOptionsFixture}
-        initialManualSelection={{ sessionId: "session-1", eventType: null }}
-        onProcess={onProcess}
-        onRetry={vi.fn()}
-        onRestore={vi.fn()}
-        onSendTestMail={vi.fn()}
-        onPreviewManual={vi.fn().mockResolvedValue(undefined)}
-        onConfirmManual={vi.fn().mockResolvedValue(undefined)}
-      />,
-    );
+    renderPage({
+      summaryData: { ...summary, pending: 0, failed: 0 },
+      events: [],
+      deliveries: [pendingEmail],
+      onProcess,
+    });
 
-    const processButton = screen.getByRole("button", { name: "처리할 알림 없음" });
-    expect(processButton).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "대기·실패 처리" }));
 
-    await user.click(processButton);
+    expect(onProcess).toHaveBeenCalledTimes(1);
+  });
 
+  it("does not offer stale-summary processing for a pending in-app delivery", () => {
+    const onProcess = vi.fn().mockResolvedValue(undefined);
+    const pendingInApp: HostNotificationDeliveryItem = {
+      ...deadDelivery,
+      id: "notification-in-app",
+      channel: "IN_APP",
+      status: "PENDING",
+    };
+
+    renderPage({
+      summaryData: { ...summary, pending: 0, failed: 0 },
+      events: [],
+      deliveries: [pendingInApp],
+      onProcess,
+    });
+
+    expect(
+      screen.queryByRole("button", { name: "대기·실패 처리" }),
+    ).not.toBeInTheDocument();
     expect(onProcess).not.toHaveBeenCalled();
   });
 
-  it("keeps processing available when a pending item is visible even if the summary is stale", async () => {
-    const user = userEvent.setup();
-    const onProcess = vi.fn().mockResolvedValue(undefined);
-    const pendingItem: HostNotificationDeliveryItem = { ...deadDelivery, id: "notification-2", status: "PENDING" };
-
-    render(
-      <HostNotificationsPage
-        summary={{ ...summary, pending: 0, failed: 0 }}
-        events={[]}
-        deliveries={[pendingItem]}
-        audit={[]}
-        manualOptions={manualOptionsFixture}
-        initialManualSelection={{ sessionId: "session-1", eventType: null }}
-        onProcess={onProcess}
-        onRetry={vi.fn()}
-        onRestore={vi.fn()}
-        onSendTestMail={vi.fn()}
-        onPreviewManual={vi.fn().mockResolvedValue(undefined)}
-        onConfirmManual={vi.fn().mockResolvedValue(undefined)}
-      />,
-    );
-
-    await user.click(screen.getByRole("button", { name: "대기/실패 처리" }));
-
-    expect(onProcess).toHaveBeenCalledTimes(1);
-  });
-
-  it("keeps processing available when a pending event is visible even if the summary is stale", async () => {
+  it("keeps processing available for a visible pending row when summary counts are stale", async () => {
     const user = userEvent.setup();
     const onProcess = vi.fn().mockResolvedValue(undefined);
 
@@ -1287,7 +1295,7 @@ describe("HostNotificationsPage", () => {
       onProcess,
     });
 
-    await user.click(screen.getByRole("button", { name: "대기/실패 처리" }));
+    await user.click(screen.getByRole("button", { name: "대기·실패 처리" }));
 
     expect(onProcess).toHaveBeenCalledTimes(1);
   });
@@ -1323,6 +1331,30 @@ describe("HostNotificationsPage", () => {
     await user.click(retryButton);
 
     expect(onRetry).not.toHaveBeenCalled();
+  });
+
+  it("disables processing while another page operation is pending", async () => {
+    const user = userEvent.setup();
+    const onProcess = vi.fn().mockResolvedValue(undefined);
+    const onRetry = vi.fn(() => new Promise<unknown>(() => undefined));
+    const failedEmail: HostNotificationDeliveryItem = {
+      ...deadDelivery,
+      id: "notification-failed",
+      status: "FAILED",
+    };
+
+    renderPage({
+      deliveries: [failedEmail],
+      onProcess,
+      onRetry,
+    });
+    await user.click(screen.getByRole("tab", { name: "배송" }));
+    await user.click(screen.getByRole("button", { name: "재시도" }));
+
+    const processButton = screen.getByRole("button", { name: "3건 처리" });
+    expect(processButton).toBeDisabled();
+    await user.click(processButton);
+    expect(onProcess).not.toHaveBeenCalled();
   });
 
   it("shows restore failures inside the active confirmation dialog", async () => {
@@ -1408,7 +1440,7 @@ describe("HostNotificationsPage", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "미리보기" }));
+    await user.click(screen.getByRole("button", { name: "미리보기 열기" }));
     expect(await screen.findByRole("heading", { name: "발송 전 확인" })).toBeInTheDocument();
 
     rerender(
@@ -1472,10 +1504,10 @@ describe("HostNotificationsPage", () => {
 
     renderPage({ onPreviewManual, onConfirmManual });
 
-    await user.click(screen.getByRole("button", { name: "미리보기" }));
+    await user.click(screen.getByRole("button", { name: "미리보기 열기" }));
     await screen.findByRole("heading", { name: "발송 전 확인" });
 
-    const confirmButton = screen.getByRole("button", { name: "발송 확인" });
+    const confirmButton = screen.getByRole("button", { name: "3명에게 알림 발송" });
     expect(confirmButton).toBeDisabled();
     await user.click(confirmButton);
     expect(onConfirmManual).not.toHaveBeenCalled();

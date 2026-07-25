@@ -114,7 +114,10 @@ test("confirm creates exactly one dispatch and retry remains one", async ({ page
       `/api/bff/api/host/notifications/manual?clubSlug=${encodeURIComponent(clubSlug)}`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Readmates-Client-Contract": "v2",
+        },
         body: JSON.stringify(body),
       },
     );

@@ -39,7 +39,7 @@ PENDING/RUNNING           -> FAILED
 
 - Worker start/completion, regenerate, commit, cancel은 Redis CAS로 현재 상태가 기대값일 때만 진행합니다. Cancel/commit/worker completion이 경합하면 늦게 도착한 결과는 저장하지 않습니다.
 - `aigen:job:<jobId>` hash는 status, stage, revision, token/cost 누적값, `llmCallCount`, model, lease, `cleanupPending` 같은 content-free metadata만 담고 6시간 TTL까지 유지됩니다.
-- `:transcript`, `:turns`, `:result`, `:evidence` 네 payload는 모두 같은 6시간 TTL을 갖습니다. Commit/cancel은 네 payload를 삭제하고 terminal hash만 남깁니다. 이 중 필수 payload가 먼저 만료하면 부분 결과를 노출하지 않고 `JOB_EXPIRED`로 실패합니다.
+- `:transcript`, `:turns`, `:result`, `:evidence` 네 payload는 모두 같은 6시간 TTL을 갖습니다. Commit/cancel은 네 payload 정리를 즉시 시도하고 terminal hash만 남깁니다. Commit cleanup 실패는 `cleanupPending`으로 재시도하며 payload TTL이 최종 backstop입니다. 이 중 필수 payload 하나가 먼저 만료하면 부분 결과를 노출하지 않고 `JOB_EXPIRED`로 실패합니다.
 - Kafka job message는 `jobId`, session/club/host ID, provider, model, job kind의 routing metadata만 전달하고 worker가 Redis에서 content payload를 다시 읽습니다. Transcript, turns, member/display name, prompt/instructions, result, evidence/excerpt는 Kafka에 넣지 않습니다.
 - Primary, same-provider retry, fallback, schema correction, section repair, regeneration은 모두 같은 최대 3회 물리 호출 예산을 씁니다. 순서는 항상 `permit -> Redis atomic slot/worst-case cost reservation -> exactly one Spring AI HTTP request -> ACTUAL 또는 ESTIMATED_UNKNOWN`입니다.
 - `aigen:job:<jobId>:provider-attempts` ledger는 `IN_FLIGHT`/`SUCCEEDED`/`FAILED`/`UNKNOWN`, ordinal, call mode, reserved cost, cost basis, safe error, timestamp를 6시간 보존합니다. 응답 유실/timeout/crash처럼 bytes 전송 여부가 불명확하면 비용을 자동 환불하지 않습니다. Kafka redelivery는 살아 있는 `IN_FLIGHT`를 재전송하지 않고 stale attempt를 `UNKNOWN`/`ESTIMATED_UNKNOWN`으로 닫은 뒤 남은 slot에만 새 attempt를 만듭니다.
@@ -70,7 +70,7 @@ redis-cli -h <host> -a <password> --no-auth-warning TTL "aigen:job:<jobId>:trans
 - 지원 입력은 UTF-8 또는 UTF-8 BOM `.txt`, `화자명 MM:SS` header와 이어지는 발언 본문입니다. 최대 1 MiB와 3시간을 동시에 적용하고, 시간은 단조 증가해야 합니다.
 - 모든 고유 화자는 현재 같은 클럽의 `ACTIVE` membership 표시 이름 하나와 일치해야 합니다. 비교는 Unicode NFC + trim 후 case-sensitive exact match이며 fuzzy/alias/자동 후보 선택은 없습니다. 대본 화자는 활성 회원 집합의 부분집합이어도 됩니다.
 - 비회원, 비활성/다른 클럽 회원, generic label, 중복 정규화 이름은 422로 거절되며 job ID, Redis, Kafka, provider, cost side effect가 없습니다. 호스트는 TXT의 화자명을 현재 표시 이름과 정확히 맞추거나 회원을 활성화한 뒤 새로 업로드합니다.
-- Platform admin은 job ID, status, revision, safe error, `cleanupPending` 같은 metadata만 보고 cancel/retry-cleanup 같은 허용된 복구만 수행합니다. 회원 대신 콘텐츠를 열거나 고치고, 화자 검증을 bypass하거나, draft를 commit하지 않습니다.
+- Platform admin은 job ID, status, revision, safe error, `cleanupPending` 같은 metadata만 보고 상태상 허용된 force-cancel 또는 retry-commit만 수행합니다. Cleanup retry는 scheduler/service가 처리합니다. 운영자는 회원 대신 콘텐츠를 열거나 고치고, 화자 검증을 bypass하거나, draft를 commit하지 않습니다.
 
 ### Model capability와 call budget
 
@@ -81,7 +81,7 @@ redis-cli -h <host> -a <password> --no-auth-warning TTL "aigen:job:<jobId>:trans
 
 ### Privacy와 근거 열람 경계
 
-- Transcript, parsed turns, draft result, evidence excerpt는 6시간 Redis payload와 현재 호스트 review response에만 있습니다. Kafka, MySQL receipt/audit, log, metric, notification, admin API, incident ticket/chat에는 transcript, 이름, prompt/instructions, provider response, result, excerpt, invalid speaker label을 넣지 않습니다. Audit/metric은 provider/model/status/revision과 turn/speaker/review/warning 같은 aggregate count만 기록합니다.
+- Transcript, parsed turns, evidence excerpt와 검토 전 draft result는 6시간 Redis payload와 현재 호스트 review response에만 있습니다. AI commit 뒤 검토 완료 snapshot은 `session_record_drafts`에 저장되지만 Kafka, MySQL receipt/audit, log, metric, notification, admin API, incident ticket/chat에는 transcript, 이름, prompt/instructions, provider response, generated snapshot, excerpt, invalid speaker label을 넣지 않습니다. Audit/metric은 provider/model/status/revision과 turn/speaker/review/warning 같은 aggregate count만 기록합니다.
 - 기본 evidence excerpt는 서버가 원본 turn에서 만든 최대 240 Unicode code point입니다. 전체 발언 확장은 현재 revision evidence가 실제 참조한 단일 turn에 대해 현재 호스트 route에서만 허용됩니다. 임의 turn 조회, transcript search/download endpoint는 없습니다.
 - Private transcript를 live provider로 보내는 품질 평가는 CI/smoke/rollout의 암묵적 부분이 아닙니다. 보유·파기·provider data-use 조건을 확인한 후 별도의 명시적 승인을 받은 경우에만 실행하고, 이 Goal의 private/live 평가는 `SKIPPED_NOT_AUTHORIZED`입니다.
 

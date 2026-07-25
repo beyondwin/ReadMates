@@ -83,6 +83,50 @@ class JdbcSessionRecordAdapterTest(
     }
 
     @Test
+    fun `draft rebase atomically updates only base metadata and its optimistic revision`() {
+        val fixture = fixture("metadata-rebase")
+        val originalLive = requireNotNull(adapter.loadLive(fixture.host, fixture.sessionId))
+        val originalDraft =
+            adapter.insertDraft(
+                fixture.host,
+                originalLive,
+                SaveSessionRecordDraftCommand(fixture.sessionId, fixture.snapshot, null),
+                codec.encode(fixture.snapshot),
+            )
+        jdbcTemplate.update(
+            """
+            update sessions
+            set book_title = '변경된 책',
+                updated_at = timestampadd(microsecond, 1, updated_at)
+            where id = ? and club_id = ?
+            """.trimIndent(),
+            fixture.sessionId.toString(),
+            fixture.host.clubId.toString(),
+        )
+        val currentLive = requireNotNull(adapter.loadLive(fixture.host, fixture.sessionId))
+
+        val rebased =
+            adapter.rebaseDraft(
+                fixture.host,
+                currentLive,
+                expectedDraftRevision = originalDraft.draftRevision,
+            )
+
+        assertThat(rebased?.draftRevision).isEqualTo(originalDraft.draftRevision + 1)
+        assertThat(rebased?.baseLiveRevision).isEqualTo(currentLive.revision)
+        assertThat(rebased?.baseSessionUpdatedAt).isEqualTo(currentLive.sessionUpdatedAt)
+        assertThat(rebased?.snapshot).isEqualTo(originalDraft.snapshot)
+        assertThat(
+            adapter.rebaseDraft(
+                fixture.host,
+                currentLive,
+                expectedDraftRevision = originalDraft.draftRevision,
+            ),
+        ).isNull()
+        assertThat(requireNotNull(adapter.lockEditor(fixture.host, fixture.sessionId)).draftLiveBaseStale).isFalse()
+    }
+
+    @Test
     @Suppress("LongMethod")
     fun `compare and set updates exactly once while revisions remain ordered and immutable`() {
         val fixture = fixture("cas")

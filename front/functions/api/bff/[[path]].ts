@@ -30,6 +30,8 @@ type PagesFunction<Env> = (context: {
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const MAX_AI_GENERATION_MULTIPART_BYTES = 2 * 1024 * 1024;
+const READMATES_CLIENT_CONTRACT_HEADER = "X-Readmates-Client-Contract";
+const READMATES_CLIENT_CONTRACT = "v2";
 
 function isAiGenerationTranscriptUpload(method: string, path: string, contentType: string | null) {
   return (
@@ -101,6 +103,18 @@ function isSameOriginMutation(request: Request) {
   }
 }
 
+function isHostMutation(request: Request, upstreamPath: string) {
+  return MUTATING_METHODS.has(request.method) && upstreamPath.startsWith("/api/host/");
+}
+
+function hasCurrentHostWriteClientContract(request: Request, upstreamPath: string) {
+  if (!isHostMutation(request, upstreamPath)) {
+    return true;
+  }
+
+  return request.headers.get(READMATES_CLIENT_CONTRACT_HEADER) === READMATES_CLIENT_CONTRACT;
+}
+
 function normalizedClubSlugFromRequest(request: Request) {
   const params = new URL(request.url).searchParams;
   if (!params.has("clubSlug")) {
@@ -123,6 +137,14 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   if (!isSameOriginMutation(context.request)) {
     return bffErrorResponse(403, "PERMISSION_DENIED");
+  }
+
+  if (!hasCurrentHostWriteClientContract(context.request, upstreamPath)) {
+    return bffErrorResponse(
+      409,
+      "HOST_CLIENT_UPGRADE_REQUIRED",
+      "호스트 운영 화면을 최신 버전으로 새로고침해 주세요.",
+    );
   }
 
   const requestUrl = new URL(context.request.url);
@@ -173,6 +195,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   const requestId = requestIdForUpstream(context.request);
   headers.set(READMATES_REQUEST_ID_HEADER, requestId);
+  if (
+    isHostMutation(context.request, upstreamPath)
+    && context.request.headers.get(READMATES_CLIENT_CONTRACT_HEADER) === READMATES_CLIENT_CONTRACT
+  ) {
+    headers.set(READMATES_CLIENT_CONTRACT_HEADER, READMATES_CLIENT_CONTRACT);
+  }
 
   headers.set("X-Readmates-Club-Host", normalizedHostFromRequest(context.request));
   if (clubSlug) {

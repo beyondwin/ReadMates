@@ -20,6 +20,7 @@ import {
   type HostSessionRecordDraft,
   type HostSessionRecordEditor,
   type PreviewHostSessionRecordApplyRequest,
+  type RebaseHostSessionRecordDraftRequest,
   type RestoreHostSessionRecordDraftRequest,
   type SaveHostSessionRecordDraftRequest,
 } from "./host-session-record-contracts";
@@ -98,6 +99,21 @@ export function saveHostSessionRecordDraft(
     sessionRecordPath(sessionId, "record-draft"),
     {
       method: "PATCH",
+      body: JSON.stringify(request),
+    },
+    context,
+  ).then(parseHostSessionRecordDraft);
+}
+
+export function rebaseHostSessionRecordDraft(
+  sessionId: string,
+  request: RebaseHostSessionRecordDraftRequest,
+  context?: ReadmatesApiContext,
+) {
+  return readmatesFetch<HostSessionRecordDraft>(
+    sessionRecordPath(sessionId, "record-draft/rebase"),
+    {
+      method: "POST",
       body: JSON.stringify(request),
     },
     context,

@@ -221,6 +221,24 @@ class SessionRecordApplyServiceTest {
         assertEquals(SessionRecordError.APPLY_REQUEST_ALREADY_USED, error.error)
         assertEquals(1, fixture.store.receipts.size)
     }
+
+    @Test
+    fun `applied revision failure happens after live replacement and before receipt or draft deletion`() {
+        val fixture = Fixture()
+        fixture.store.failOnAppliedRevisionInsert = true
+
+        assertThrows(IllegalStateException::class.java) {
+            fixture.apply()
+        }
+
+        assertEquals(
+            listOf("baseline", "live replacement", "applied revision"),
+            fixture.store.operations,
+        )
+        assertNotNull(fixture.replacer.lastSnapshot)
+        assertTrue(fixture.store.receipts.isEmpty())
+        assertNotNull(fixture.store.draft)
+    }
 }
 
 private val TEST_NOW = OffsetDateTime.of(2026, 7, 23, 0, 0, 0, 0, ZoneOffset.UTC)
@@ -290,7 +308,7 @@ private class Fixture(
     private val codec = SessionRecordSnapshotCodec(JsonMapper.builder().findAndAddModules().build())
     val store = FakeApplyStore(live, draft, now, codec)
     val validator = FakeValidator()
-    val replacer = FakeReplacer()
+    val replacer = FakeReplacer { store.operations += "live replacement" }
     private val service =
         SessionRecordApplyService(
             store = store,
@@ -383,6 +401,8 @@ private class FakeApplyStore(
     var completedAfterLock: CompletedSessionRecordApply? = null
     val revisions = mutableListOf<SessionRecordRevision>()
     val receipts = mutableListOf<com.readmates.sessionrecord.application.model.SessionRecordApplyReceipt>()
+    val operations = mutableListOf<String>()
+    var failOnAppliedRevisionInsert = false
     private val stagedRevisions = mutableListOf<SessionRecordRevision>()
     var onCommit: () -> Unit = {}
 
@@ -425,7 +445,10 @@ private class FakeApplyStore(
             draftSha256,
             composerEventType,
             revision,
-        ).also(receipts::add)
+        ).also {
+            operations += "receipt"
+            receipts += it
+        }
 
     override fun insertBaselineIfAbsent(
         host: AuthenticatedClubActor,
@@ -433,6 +456,7 @@ private class FakeApplyStore(
         encoded: EncodedSessionRecordSnapshot,
     ) {
         if (live.revision == 0L) {
+            operations += "baseline"
             stagedRevisions += revision(host, live.snapshot, 1, SessionRecordSource.BASELINE, null)
         }
     }
@@ -442,6 +466,10 @@ private class FakeApplyStore(
         editor: SessionRecordEditor,
         encoded: EncodedSessionRecordSnapshot,
     ): SessionRecordRevision {
+        operations += "applied revision"
+        if (failOnAppliedRevisionInsert) {
+            throw IllegalStateException("test-only applied revision failure")
+        }
         val version = if (editor.live.revision == 0L) 2 else editor.live.revision + 1
         val source = SessionRecordSource.valueOf(requireNotNull(editor.draft).source.name)
         return revision(host, codec.decode(encoded.json), version, source, editor.draft.restoredFromRevisionId)
@@ -454,6 +482,7 @@ private class FakeApplyStore(
         expectedDraftRevision: Long,
     ): Boolean {
         if (draft?.draftRevision != expectedDraftRevision) return false
+        operations += "draft deletion"
         revisions += stagedRevisions
         stagedRevisions.clear()
         draft = null
@@ -484,6 +513,12 @@ private class FakeApplyStore(
         host: AuthenticatedClubActor,
         command: SaveSessionRecordDraftCommand,
         encoded: EncodedSessionRecordSnapshot,
+    ) = draft
+
+    override fun rebaseDraft(
+        host: AuthenticatedClubActor,
+        live: LiveSessionRecord,
+        expectedDraftRevision: Long,
     ) = draft
 
     override fun deleteDraft(
@@ -543,11 +578,14 @@ private class FakeValidator : ValidateSessionImportUseCase {
     }
 }
 
-private class FakeReplacer : ReplaceValidatedSessionImportUseCase {
+private class FakeReplacer(
+    private val onReplace: () -> Unit = {},
+) : ReplaceValidatedSessionImportUseCase {
     var lastSnapshot: SessionRecordSnapshot? = null
     var committed = false
 
     override fun replace(input: ValidatedSessionImportReplacement): SessionImportCommitResult {
+        onReplace()
         lastSnapshot = input.snapshot
         return input.preview.commitResult()
     }

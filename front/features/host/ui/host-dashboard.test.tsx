@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
@@ -44,6 +44,50 @@ const actions = {
 } satisfies HostDashboardProps["actions"];
 
 describe("HostDashboard", () => {
+  it("uses the approved priority-ledger hierarchy without the global two-column grid", () => {
+    const { container } = render(
+      <HostDashboard
+        data={{
+          ...dashboard,
+          rsvpPending: 2,
+          publishPending: 1,
+        }}
+        current={{ currentSession: null }}
+        hostSessions={draftHostSessions}
+        actions={actions}
+      />,
+    );
+
+    const desktop = container.querySelector(".rm-host-dashboard-desktop");
+    expect(desktop).not.toBeNull();
+    const desktopView = desktop as HTMLElement;
+
+    expect(within(desktopView).getByRole("region", { name: "오늘의 운영" })).toBeInTheDocument();
+    expect(within(desktopView).getByRole("region", { name: "처리 대기 원장" })).toBeInTheDocument();
+    expect(within(desktopView).getByRole("region", { name: "다음 세션과 운영 흐름" })).toBeInTheDocument();
+    expect(within(desktopView).getByRole("region", { name: "운영 도구" })).toBeInTheDocument();
+    expect(desktopView.querySelector(".home-grid")).toBeNull();
+  });
+
+  it("places mobile priority work before the current-session summary", () => {
+    const { container } = render(
+      <HostDashboard
+        data={{
+          ...dashboard,
+          rsvpPending: 2,
+        }}
+        current={{ currentSession: null }}
+        hostSessions={hostSessions}
+        actions={actions}
+      />,
+    );
+
+    const mobileText = container.querySelector(".rm-host-dashboard-mobile")?.textContent ?? "";
+    expect(mobileText.indexOf("지금 처리할 일")).toBeGreaterThanOrEqual(0);
+    expect(mobileText.indexOf("현재 세션")).toBeGreaterThanOrEqual(0);
+    expect(mobileText.indexOf("지금 처리할 일")).toBeLessThan(mobileText.indexOf("현재 세션"));
+  });
+
   it("renders headings without unnamed interactive elements", () => {
     const { container } = render(
       <HostDashboard

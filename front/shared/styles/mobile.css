@@ -1516,3 +1516,37 @@ body[data-home="stack"] .home-carousel { display: none; }
     padding-bottom: 24px;
   }
 }
+
+.host-notification-composer-scrim--side-sheet {
+  align-items: stretch;
+  justify-content: flex-end;
+  padding: 16px;
+}
+
+.host-notification-composer-dialog--side-sheet {
+  width: min(520px, 100%);
+  height: calc(100dvh - 32px);
+  max-height: none;
+  overflow-y: auto;
+  border-radius: var(--r-3);
+}
+
+@media (max-width: 640px) {
+  .host-notification-composer-scrim--side-sheet {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .host-notification-composer-dialog--side-sheet {
+    width: 100%;
+    height: auto;
+    max-height: calc(100dvh - 16px);
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+    border-radius: var(--r-3) var(--r-3) 0 0;
+  }
+
+  .host-notification-composer-dialog--side-sheet .btn-primary {
+    min-height: 44px;
+    width: 100%;
+  }
+}

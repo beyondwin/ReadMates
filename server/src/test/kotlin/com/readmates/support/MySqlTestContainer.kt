@@ -10,6 +10,7 @@ object MySqlTestContainer {
             withDatabaseName("readmates")
             withUsername("readmates")
             withPassword("readmates")
+            withUrlParam("serverTimezone", "UTC")
             // Keep MySQL 8.4 startup deterministic in constrained local/CI Docker VMs.
             withCommand(
                 "--log-bin-trust-function-creators=1",

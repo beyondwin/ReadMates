@@ -22,7 +22,7 @@ import java.util.UUID
 @ResourceLock("AiGenerationCommitRecoveryServiceLogger")
 class AiGenerationCommitRecoveryServiceTest {
     @Test
-    fun `receipt backed committing job converges to committed cleanup without import`() {
+    fun `commit receipt wins over the lease and repeated recovery converges without importing twice`() {
         val store = FakeJobStore()
         val record =
             AiGenerationTestFixtures
@@ -44,6 +44,9 @@ class AiGenerationCommitRecoveryServiceTest {
                 baseLiveRevision = 0,
                 requestSha256 = "a".repeat(64),
             )
+        assertThat(store.loadMetadata(record.jobId)?.status).isEqualTo(JobStatus.COMMITTING)
+        assertThat(store.loadMetadata(record.jobId)?.commitLeaseExpiresAt)
+            .isEqualTo(AiGenerationTestFixtures.NOW.plusSeconds(60))
         val service =
             AiGenerationCommitRecoveryService(
                 store,
@@ -53,10 +56,24 @@ class AiGenerationCommitRecoveryServiceTest {
                 fakeMetrics(),
             )
 
-        val result = service.recover(record.jobId)
+        val first = service.recover(record.jobId)
+        val repeated = service.recover(record.jobId)
 
-        assertThat(result.status).isEqualTo(JobStatus.COMMITTED)
-        assertThat(store.loadMetadata(record.jobId)?.cleanupPending).isFalse()
+        assertThat(first.status).isEqualTo(JobStatus.COMMITTED)
+        assertThat(first.recovered).isTrue()
+        assertThat(repeated.status).isEqualTo(JobStatus.COMMITTED)
+        assertThat(repeated.recovered).isTrue()
+        val terminal = store.loadMetadata(record.jobId)
+        assertThat(terminal?.status).isEqualTo(JobStatus.COMMITTED)
+        assertThat(terminal?.commitLeaseExpiresAt).isNull()
+        assertThat(terminal?.cleanupPending).isFalse()
+        assertThat(terminal?.result).isNull()
+        assertThat(terminal?.transcript).isEmpty()
+        assertThat(store.transientPayloadDeleted).containsExactly(record.jobId)
+        assertThat(persistence.findReceiptCalls).isEqualTo(2)
+        assertThat(persistence.importCalls).isZero()
+        assertThat(persistence.insertReceiptCalls).isZero()
+        assertThat(persistence.receipt?.requestSha256).isEqualTo("a".repeat(64))
     }
 
     @Test
@@ -135,25 +152,36 @@ class AiGenerationCommitRecoveryServiceTest {
 
 private class FakeCommitPersistence : AiGenerationCommitPersistencePort {
     var receipt: AiGenerationCommitReceipt? = null
+    var findReceiptCalls = 0
+    var importCalls = 0
+    var insertReceiptCalls = 0
 
     override fun upsertTranscriptSpeakersAsParticipants(
         clubId: UUID,
         sessionId: UUID,
         validatedTurns: List<ValidatedTranscriptTurn>,
-    ) = 0
+    ): Int {
+        importCalls += 1
+        return 0
+    }
 
     override fun findReceipt(
         jobId: UUID,
         revision: Long,
-    ) = receipt?.takeIf { it.jobId == jobId && it.revision == revision }
+    ): AiGenerationCommitReceipt? {
+        findReceiptCalls += 1
+        return receipt?.takeIf { it.jobId == jobId && it.revision == revision }
+    }
 
-    override fun insertReceipt(receipt: AiGenerationCommitReceipt) =
-        if (this.receipt == null) {
+    override fun insertReceipt(receipt: AiGenerationCommitReceipt): Boolean {
+        insertReceiptCalls += 1
+        return if (this.receipt == null) {
             this.receipt = receipt
             true
         } else {
             false
         }
+    }
 }
 
 private class SelectiveFailingCommitPersistence(

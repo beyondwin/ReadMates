@@ -126,7 +126,7 @@ class GoogleGenAiSpringAiContractTest {
             successResponse(delay = Duration.ofMillis(250)),
         ).forEachIndexed { index, response ->
             ProviderMockHttpServer.start(response, GOOGLE_PATH).use { server ->
-                val timeout = if (index == 3) Duration.ofMillis(30) else Duration.ofSeconds(2)
+                val timeout = if (index == 3) Duration.ofMillis(30) else Duration.ofSeconds(10)
                 assertThatThrownBy { generator(model(server.origin, timeout)).generate(MODEL, request()) }
                     .isInstanceOfSatisfying(ProviderCallException::class.java) { failure ->
                         assertThat(failure.cause).isNull()

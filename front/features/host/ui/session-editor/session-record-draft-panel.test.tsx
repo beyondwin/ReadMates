@@ -317,4 +317,31 @@ describe("SessionRecordDraftPanel", () => {
     expect(screen.getByRole("link", { name: "한줄평 오류" })).toHaveAttribute("href", "#session-record-reviews");
     expect(screen.getByRole("link", { name: "피드백 문서 오류" })).toHaveAttribute("href", "#session-record-feedback");
   });
+
+  it("offers an explicit retryable rebase action while review remains blocked", async () => {
+    const user = userEvent.setup();
+    const onRebaseDraft = vi.fn().mockResolvedValue(undefined);
+    render(
+      <SessionRecordDraftPanel
+        activeMobileSection="records"
+        liveSnapshot={liveSnapshot}
+        snapshot={draftSnapshot}
+        saveState="saved"
+        validationIssues={["LIVE_REVISION_STALE"]}
+        draftLiveBaseStale
+        onSnapshotChange={vi.fn()}
+        onReloadDraft={vi.fn()}
+        onCopyInput={vi.fn()}
+        onRebaseDraft={onRebaseDraft}
+        rebasePending={false}
+        rebaseError={null}
+        onReviewDraft={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "최신 정보 확인 완료" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "변경사항 검토" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "최신 정보 확인 완료" }));
+    expect(onRebaseDraft).toHaveBeenCalledTimes(1);
+  });
 });

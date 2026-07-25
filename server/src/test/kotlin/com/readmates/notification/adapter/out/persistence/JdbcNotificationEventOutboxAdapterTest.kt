@@ -260,17 +260,26 @@ class JdbcNotificationEventOutboxAdapterTest(
             """
             update notification_event_outbox
             set status = 'PUBLISHING',
-                locked_at = utc_timestamp(6),
-                next_attempt_at = timestampadd(MINUTE, -16, utc_timestamp(6))
+                locked_at = timestampadd(MINUTE, -14, utc_timestamp(6)),
+                next_attempt_at = timestampadd(MINUTE, -14, utc_timestamp(6))
             where id = ?
             """.trimIndent(),
             freshPublishingId,
         )
+        val staleLeaseBefore = eventRow(stalePublishingId)["locked_at"]
+        val freshLeaseBefore = eventRow(freshPublishingId)["locked_at"]
+        assertThat(leaseIsOlderThanProductionCutoff(stalePublishingId)).isTrue()
+        assertThat(leaseIsOlderThanProductionCutoff(freshPublishingId)).isFalse()
 
         val claimed = adapter.claimPublishable(10)
+        val reclaimed = claimed.single { it.id.toString() == stalePublishingId }
 
         assertThat(claimed.map { it.id.toString() }).contains(stalePublishingId)
         assertThat(claimed.map { it.id.toString() }).doesNotContain(freshPublishingId)
+        assertThat(reclaimed.status).isEqualTo(NotificationEventOutboxStatus.PUBLISHING)
+        assertThat(reclaimed.attemptCount).isZero()
+        assertThat(reclaimed.lockedAt).isNotNull()
+        assertThat(eventRow(stalePublishingId)["locked_at"]).isNotEqualTo(staleLeaseBefore)
         assertThat(
             jdbcTemplate.queryForObject(
                 """
@@ -293,6 +302,11 @@ class JdbcNotificationEventOutboxAdapterTest(
                 stalePublishingId,
             ),
         ).isTrue()
+        val freshRow = eventRow(freshPublishingId)
+        assertThat(freshRow["status"]).isEqualTo("PUBLISHING")
+        assertThat(freshRow["attempt_count"]).isEqualTo(0)
+        assertThat(freshRow["locked_at"]).isEqualTo(freshLeaseBefore)
+        assertThat(freshRow["published_at"]).isNull()
     }
 
     @Test
@@ -626,7 +640,7 @@ class JdbcNotificationEventOutboxAdapterTest(
     private fun eventRow(eventId: String): Map<String, Any?> =
         jdbcTemplate.queryForMap(
             """
-            select status, attempt_count, locked_at, published_at, last_error
+            select status, attempt_count, locked_at, published_at, last_error, request_id
             from notification_event_outbox
             where id = ?
             """.trimIndent(),
@@ -643,6 +657,17 @@ class JdbcNotificationEventOutboxAdapterTest(
             String::class.java,
             dedupeKey,
         ) ?: error("Missing notification event outbox row for dedupe key $dedupeKey")
+
+    private fun leaseIsOlderThanProductionCutoff(eventId: String): Boolean =
+        jdbcTemplate.queryForObject(
+            """
+            select locked_at < timestampadd(MINUTE, -15, utc_timestamp(6))
+            from notification_event_outbox
+            where id = ?
+            """.trimIndent(),
+            Boolean::class.java,
+            eventId,
+        ) ?: false
 
     private fun unsafeLongError(): String = "Authorization: Bearer example reader@example.com " + "x".repeat(600)
 

@@ -4,12 +4,15 @@ import { beforeEach, vi, describe, expect, it } from "vitest";
 
 const routeMocks = vi.hoisted(() => ({
   apply: vi.fn(),
+  rebase: vi.fn(),
   commitImport: vi.fn(),
   invalidateHostNotifications: vi.fn(),
   invalidateRecordSurfaces: vi.fn(),
   preview: vi.fn(),
   randomUUID: vi.fn(),
   reload: vi.fn(),
+  adoptDraftRevision: vi.fn(),
+  adoptEditor: vi.fn(),
   capturedProps: null as Record<string, unknown> | null,
 }));
 
@@ -34,15 +37,19 @@ vi.mock("@/features/host/hooks/use-session-record-draft-controller", () => ({
     shouldBlockNavigation: false,
     updateSnapshot: vi.fn(),
     reloadDraft: routeMocks.reload,
-    adoptDraftRevision: vi.fn(),
+    adoptDraftRevision: routeMocks.adoptDraftRevision,
     copyInput: vi.fn(),
-    adoptEditor: vi.fn(),
+    adoptEditor: routeMocks.adoptEditor,
   }),
 }));
 
 vi.mock("@/features/host/queries/host-session-record-queries", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/features/host/queries/host-session-record-queries")>()),
   useSaveHostSessionRecordDraftMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useRebaseHostSessionRecordDraftMutation: () => ({
+    mutateAsync: routeMocks.rebase,
+    isPending: false,
+  }),
   useRestoreHostSessionRevisionToDraftMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   usePreviewHostSessionRecordApplyMutation: () => ({ mutateAsync: routeMocks.preview, isPending: false }),
   useApplyHostSessionRecordMutation: () => ({ mutateAsync: routeMocks.apply, isPending: false }),
@@ -138,13 +145,17 @@ const snapshot = {
 const recordEditor = {
   sessionId: "session-1",
   liveRevision: 0,
+  liveSessionUpdatedAt: "2026-07-25T00:00:00Z",
   liveSnapshot: snapshot,
   draft: null,
   draftLiveBaseStale: false,
   validationSummary: { valid: true, issues: [] },
 };
 
-function renderWorkflow() {
+function renderWorkflow(
+  editor = recordEditor,
+  reloadRecordEditor: () => Promise<typeof recordEditor | undefined> = vi.fn(),
+) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -152,13 +163,13 @@ function renderWorkflow() {
     <QueryClientProvider client={client}>
       <EditHostSessionRecordWorkflow
         session={{ sessionId: "session-1" } as never}
-        recordEditor={recordEditor}
+        recordEditor={editor}
         historyPage={{ items: [], nextCursor: null }}
         loadHistoryPage={vi.fn()}
         notificationDispatches={[]}
         context={{ clubSlug: "club-a" }}
         actions={{} as never}
-        reloadRecordEditor={vi.fn()}
+        reloadRecordEditor={reloadRecordEditor}
         onSessionRecordsChanged={vi.fn()}
       />
     </QueryClientProvider>,
@@ -173,6 +184,8 @@ function workflow() {
       baseLiveRevision: number | null;
       liveApplied: boolean;
     }) => Promise<void>;
+    onRebaseDraft: () => Promise<void>;
+    rebaseError: string | null;
     confirmation: {
       open: boolean;
       message: { text: string } | null;
@@ -186,12 +199,15 @@ function workflow() {
 describe("EditHostSessionRecordWorkflow", () => {
   beforeEach(() => {
     routeMocks.apply.mockReset();
+    routeMocks.rebase.mockReset();
     routeMocks.commitImport.mockReset();
     routeMocks.invalidateHostNotifications.mockReset();
     routeMocks.invalidateRecordSurfaces.mockReset();
     routeMocks.preview.mockReset();
     routeMocks.randomUUID.mockReset();
     routeMocks.reload.mockReset();
+    routeMocks.adoptDraftRevision.mockReset();
+    routeMocks.adoptEditor.mockReset();
     routeMocks.capturedProps = null;
     routeMocks.commitImport.mockResolvedValue({
       sessionId: "session-1",
@@ -212,6 +228,58 @@ describe("EditHostSessionRecordWorkflow", () => {
     renderWorkflow();
 
     expect(screen.getByText("record workflow route ready")).toBeInTheDocument();
+  });
+
+  it("rebases the draft against the exact live metadata version rendered to the host", async () => {
+    const staleEditor = {
+      ...recordEditor,
+      draft: {
+        sessionId: "session-1",
+        baseLiveRevision: 0,
+        draftRevision: 4,
+        source: "MANUAL" as const,
+        restoredFromRevisionId: null,
+        snapshot,
+        updatedAt: "2026-07-25T00:01:00Z",
+      },
+      draftLiveBaseStale: true,
+      validationSummary: { valid: false, issues: ["LIVE_REVISION_STALE"] },
+    };
+    routeMocks.rebase.mockResolvedValue({
+      ...staleEditor.draft,
+      draftRevision: 5,
+    });
+    renderWorkflow(staleEditor);
+
+    await act(async () => workflow().onRebaseDraft());
+
+    expect(routeMocks.rebase).toHaveBeenCalledWith({
+      sessionId: "session-1",
+      request: {
+        expectedDraftRevision: 4,
+        expectedLiveRevision: 0,
+        expectedSessionUpdatedAt: "2026-07-25T00:00:00Z",
+      },
+    });
+    expect(routeMocks.adoptDraftRevision).toHaveBeenCalledWith(5);
+  });
+
+  it("reloads authoritative state and keeps rebase retryable when live metadata changes again", async () => {
+    const latestEditor = {
+      ...recordEditor,
+      liveSessionUpdatedAt: "2026-07-25T00:02:00Z",
+      draftLiveBaseStale: true,
+      validationSummary: { valid: false, issues: ["LIVE_REVISION_STALE"] },
+    };
+    routeMocks.rebase.mockRejectedValue({ code: "SESSION_RECORD_LIVE_STALE" });
+    const reloadRecordEditor = vi.fn().mockResolvedValue(latestEditor);
+    renderWorkflow(recordEditor, reloadRecordEditor);
+
+    await act(async () => workflow().onRebaseDraft());
+
+    expect(reloadRecordEditor).toHaveBeenCalledTimes(1);
+    expect(routeMocks.adoptEditor).toHaveBeenCalledWith(latestEditor);
+    expect(workflow().rebaseError).toContain("다시 변경");
   });
 
   it("keeps JSON import invalidation on record surfaces without opening or invalidating notifications", async () => {

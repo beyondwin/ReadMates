@@ -1,13 +1,8 @@
 
-import {
-  type CSSProperties,
-  type FormEvent,
-  useState,
-} from "react";
-import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
-import { HostNotificationsSummary } from "./notifications/host-notifications-summary";
+import { type FormEvent, useState } from "react";
+import { HostNotificationOperationsRail } from "./notifications/host-notification-operations-rail";
 import { ManualNotificationWorkbench } from "./notifications/manual-notification-workbench";
-import { NotificationLedgerTabs } from "./notifications/notification-ledger-tabs";
+import { NotificationOperationsDisclosure } from "./notifications/notification-operations-disclosure";
 import type {
   HostSessionListItem,
   HostNotificationEventType,
@@ -22,14 +17,11 @@ import {
   type HostNotificationDeliveryItem,
   type HostNotificationEventItem,
   type HostNotificationSummary,
-  maskRecipient,
-  type NotificationLedgerTab,
   type NotificationTestMailAuditItem,
   type SendNotificationTestMailRequest,
 } from "./notifications/notification-formatters";
 import { RestoreNotificationDialog } from "./notifications/restore-notification-dialog";
 import { ManualNotificationDispatchLedger } from "./notifications/manual-notification-dispatch-ledger";
-import { HostNotificationPolicyCard } from "./notifications/host-notification-policy-card";
 
 type HostNotificationsPageProps = {
   summary: HostNotificationSummary;
@@ -124,7 +116,6 @@ export function HostNotificationsPage({
   onPolicyChange = async () => undefined,
   onPolicyRetry = async () => undefined,
 }: HostNotificationsPageProps) {
-  const [activeLedgerTab, setActiveLedgerTab] = useState<NotificationLedgerTab>("events");
   const [restoreTarget, setRestoreTarget] = useState<HostNotificationDeliveryItem | null>(null);
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const [testEmail, setTestEmail] = useState("");
@@ -133,12 +124,19 @@ export function HostNotificationsPage({
   const [manualError, setManualError] = useState<string | null>(null);
   const manualBusy = manualPending;
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
-  const processableNotificationCount = Math.max(0, summary.pending) + Math.max(0, summary.failed);
+  const processableCount = Math.max(0, summary.pending) + Math.max(0, summary.failed);
   const hasVisibleProcessableDelivery = deliveries.some(
-    (delivery) => delivery.channel === "EMAIL" && (delivery.status === "PENDING" || delivery.status === "FAILED"),
+    (item) =>
+      item.channel === "EMAIL"
+      && (item.status === "PENDING" || item.status === "FAILED"),
   );
-  const hasVisibleProcessableEvent = events.some((event) => event.status === "PENDING" || event.status === "FAILED");
-  const hasProcessableNotifications = processableNotificationCount > 0 || hasVisibleProcessableDelivery || hasVisibleProcessableEvent;
+  const hasVisibleProcessableEvent = events.some(
+    (item) => item.status === "PENDING" || item.status === "FAILED",
+  );
+  const hasProcessableNotifications =
+    processableCount > 0
+    || hasVisibleProcessableDelivery
+    || hasVisibleProcessableEvent;
   const isBusy = pendingAction !== null || manualBusy || isRefreshing;
   const visibleManualOptions = manualOptions;
   const visibleManualDispatches = manualDispatches ?? manualOptions.recentDispatches;
@@ -271,58 +269,36 @@ export function HostNotificationsPage({
 
   return (
     <main className="rm-host-notifications-page">
-      <section className="page-header-compact">
+      <header className="rm-host-notifications-page__header">
         <div className="container">
-          <div className="row-between" style={{ alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
-            <div>
-              <div className="eyebrow">운영 · 알림 발송</div>
-              <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
-                알림 발송 장부
-              </h1>
-              <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-                Kafka 이벤트와 배송 상태를 나누어 확인하고 필요한 작업만 실행합니다.
-              </p>
-            </div>
-            <button
-              className="btn btn-primary btn-sm"
-              type="button"
-              disabled={isBusy || !hasProcessableNotifications}
-              onClick={handleProcess}
-            >
-              {isPending("process")
-                ? "처리 중"
-                : isRefreshing
-                  ? "새로고침 중"
-                  : hasProcessableNotifications
-                    ? "대기/실패 처리"
-                    : "처리할 알림 없음"}
-            </button>
-          </div>
+          <div className="eyebrow">운영 · 알림 발송</div>
+          <h1>알림 발송 작업대</h1>
+          <p>필요한 알림을 고르고, 확인한 뒤 발송합니다.</p>
         </div>
-      </section>
+      </header>
 
-      <section className="container rm-host-notifications-page__body" style={{ paddingTop: 8, paddingBottom: 72 }}>
+      <div className="container rm-host-notifications-page__body">
         {message ? (
-          <p
-            role={message.kind === "alert" ? "alert" : "status"}
-            className="small"
-            style={{
-              color: message.kind === "alert" ? "var(--danger)" : "var(--text-2)",
-              margin: "0 0 14px",
-            }}
-          >
+          <p role={message.kind === "alert" ? "alert" : "status"}>
             {message.text}
           </p>
         ) : null}
 
-        <HostNotificationPolicyCard
+        <HostNotificationOperationsRail
+          summary={summary}
           policy={policy}
-          pending={policyPending}
-          error={policyError}
-          loadError={policyLoadError}
-          loading={policyLoading}
-          onChange={onPolicyChange}
-          onRetryLoad={onPolicyRetry}
+          processableCount={processableCount}
+          hasProcessableNotifications={hasProcessableNotifications}
+          processPending={isPending("process")}
+          isRefreshing={isRefreshing}
+          pageBusy={isBusy}
+          onProcess={handleProcess}
+          onPolicyChange={onPolicyChange}
+          onPolicyRetry={onPolicyRetry}
+          policyPending={policyPending}
+          policyError={policyError}
+          policyLoadError={policyLoadError}
+          policyLoading={policyLoading}
         />
 
         <ManualNotificationWorkbench
@@ -335,6 +311,10 @@ export function HostNotificationsPage({
           error={manualError}
           onPreview={handleManualPreview}
           onConfirm={handleManualConfirm}
+          onPreviewDismiss={() => {
+            setManualPreview(null);
+            setManualError(null);
+          }}
           onSessionChange={handleManualSessionChange}
           onLoadManualOptions={handleLoadManualOptions}
           onLoadMoreManualMembers={handleLoadMoreManualMembers}
@@ -345,111 +325,43 @@ export function HostNotificationsPage({
         />
 
         <ManualNotificationDispatchLedger
+          variant="recent"
+          limit={3}
           dispatches={visibleManualDispatches}
-          hasMore={hasMoreManualDispatches}
-          loading={isLoadingMoreManualDispatches}
-          onLoadMore={onLoadMoreManualDispatches}
         />
 
-        <HostNotificationsSummary summary={summary} />
-
-        <div
-          className="rm-host-notifications-page__layout"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
-            gap: 24,
-            alignItems: "start",
+        <NotificationOperationsDisclosure
+          summary={summary}
+          events={events}
+          deliveries={deliveries}
+          manualDispatches={visibleManualDispatches}
+          audit={audit}
+          retryPendingId={pendingAction?.kind === "retry" ? pendingAction.id : null}
+          restorePendingId={pendingAction?.kind === "restore" ? pendingAction.id : null}
+          disabled={isBusy}
+          hasMoreEvents={hasMoreEvents}
+          hasMoreDeliveries={hasMoreDeliveries}
+          hasMoreManualDispatches={hasMoreManualDispatches}
+          hasMoreAudit={hasMoreAudit}
+          isLoadingMoreEvents={isLoadingMoreEvents}
+          isLoadingMoreDeliveries={isLoadingMoreDeliveries}
+          isLoadingMoreManualDispatches={isLoadingMoreManualDispatches}
+          isLoadingMoreAudit={isLoadingMoreAudit}
+          testMailValue={testEmail}
+          testMailPending={isPending("test-mail")}
+          onTestMailValueChange={setTestEmail}
+          onSubmitTestMail={submitTestMail}
+          onRetry={handleRetry}
+          onRestore={(item) => {
+            setRestoreError(null);
+            setRestoreTarget(item);
           }}
-        >
-          <NotificationLedgerTabs
-            events={events}
-            deliveries={deliveries}
-            activeLedgerTab={activeLedgerTab}
-            retryPendingId={pendingAction?.kind === "retry" ? pendingAction.id : null}
-            restorePendingId={pendingAction?.kind === "restore" ? pendingAction.id : null}
-            disabled={isBusy}
-            hasMoreEvents={hasMoreEvents}
-            hasMoreDeliveries={hasMoreDeliveries}
-            isLoadingMoreEvents={isLoadingMoreEvents}
-            isLoadingMoreDeliveries={isLoadingMoreDeliveries}
-            onActiveLedgerTabChange={setActiveLedgerTab}
-            onRetry={handleRetry}
-            onRestore={(item) => {
-              setRestoreError(null);
-              setRestoreTarget(item);
-            }}
-            onLoadMoreEvents={onLoadMoreEvents}
-            onLoadMoreDeliveries={onLoadMoreDeliveries}
-          />
-
-          <section className="surface" aria-labelledby="test-mail-title" style={{ padding: 22 }}>
-            <h2 id="test-mail-title" className="h3 editorial" style={{ margin: 0 }}>
-              테스트 메일
-            </h2>
-            <form onSubmit={submitTestMail} className="stack" style={{ "--stack": "12px", marginTop: 14 } as CSSProperties}>
-              <div>
-                <label className="label" htmlFor="notification-test-mail">
-                  테스트 메일 주소
-                </label>
-                <input
-                  id="notification-test-mail"
-                  className="input"
-                  type="email"
-                  value={testEmail}
-                  onChange={(event) => setTestEmail(event.currentTarget.value)}
-                  aria-label="테스트 메일 주소"
-                  autoComplete="email"
-                  required
-                />
-              </div>
-              <button className="btn btn-primary btn-sm" type="submit" disabled={isBusy}>
-                {isPending("test-mail") ? "발송 중" : "테스트 발송"}
-              </button>
-            </form>
-
-            <div style={{ marginTop: 20 }}>
-              <div className="eyebrow" style={{ marginBottom: 8 }}>
-                테스트 발송 기록
-              </div>
-              {audit.length > 0 ? (
-                <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-                  {audit.map((row, index) => (
-                    <li
-                      key={row.id}
-                      className="row-between"
-                      style={{
-                        gap: 10,
-                        padding: "10px 0",
-                        borderTop: index === 0 ? undefined : "1px solid var(--line-soft)",
-                      }}
-                    >
-                      <span style={{ minWidth: 0 }}>
-                        <strong className="tiny mono" style={{ display: "block", color: "var(--text)" }}>
-                          {maskRecipient(row.recipientEmail)}
-                        </strong>
-                        <span className="tiny" style={{ color: "var(--text-3)" }}>
-                          {formatDateOnlyLabel(row.createdAt)}
-                        </span>
-                      </span>
-                      <span className={row.status === "SENT" ? "badge badge-ok badge-dot" : "badge badge-warn badge-dot"}>
-                        {row.status}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-                  테스트 발송 기록이 없습니다.
-                </p>
-              )}
-              {hasMoreAudit && onLoadMoreAudit ? (
-                <LoadMoreButton loading={isLoadingMoreAudit} onLoadMore={onLoadMoreAudit} />
-              ) : null}
-            </div>
-          </section>
-        </div>
-      </section>
+          onLoadMoreEvents={onLoadMoreEvents}
+          onLoadMoreDeliveries={onLoadMoreDeliveries}
+          onLoadMoreManualDispatches={onLoadMoreManualDispatches}
+          onLoadMoreAudit={onLoadMoreAudit}
+        />
+      </div>
 
       {restoreTarget ? (
         <RestoreNotificationDialog
@@ -461,19 +373,5 @@ export function HostNotificationsPage({
         />
       ) : null}
     </main>
-  );
-}
-
-function LoadMoreButton({ loading, onLoadMore }: { loading: boolean; onLoadMore: () => Promise<unknown> }) {
-  return (
-    <button
-      type="button"
-      className="btn btn-quiet btn-sm"
-      disabled={loading}
-      style={{ marginTop: 12 }}
-      onClick={() => void onLoadMore()}
-    >
-      {loading ? "불러오는 중" : "더 보기"}
-    </button>
   );
 }

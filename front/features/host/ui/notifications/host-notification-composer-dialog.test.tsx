@@ -7,9 +7,15 @@ import { HostNotificationComposerDialog } from "./host-notification-composer-dia
 function DialogHarness({
   busy = false,
   onClose = vi.fn(),
+  variant,
+  title,
+  description,
 }: {
   busy?: boolean;
   onClose?: () => void;
+  variant?: "centered" | "side-sheet";
+  title?: string;
+  description?: string;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -18,6 +24,9 @@ function DialogHarness({
       <HostNotificationComposerDialog
         open={open}
         busy={busy}
+        variant={variant}
+        title={title}
+        description={description}
         onClose={() => {
           onClose();
           setOpen(false);
@@ -71,5 +80,21 @@ describe("HostNotificationComposerDialog", () => {
 
     expect(screen.getByRole("dialog", { name: "알림 보내기" })).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("renders a named side sheet without changing the dialog contract", async () => {
+    const user = userEvent.setup();
+    render(
+      <DialogHarness
+        variant="side-sheet"
+        title="발송 전 확인"
+        description="최종 대상과 채널을 확인한 뒤 발송합니다."
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "작성기 열기" }));
+
+    expect(screen.getByRole("dialog", { name: "발송 전 확인" }))
+      .toHaveClass("host-notification-composer-dialog--side-sheet");
   });
 });

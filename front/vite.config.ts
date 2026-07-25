@@ -54,6 +54,14 @@ export default defineConfig({
         },
         configure: (proxy) => {
           proxy.on("proxyReq", (proxyReq) => {
+            const clientContract = proxyReq.getHeader("X-Readmates-Client-Contract");
+            const isHostMutation =
+              ["POST", "PUT", "PATCH", "DELETE"].includes(proxyReq.method ?? "") &&
+              /^\/(?:api\/bff\/)?api\/host(?:\/|[?])/.test(proxyReq.path);
+            proxyReq.removeHeader("X-Readmates-Client-Contract");
+            if (clientContract === "v2" && isHostMutation) {
+              proxyReq.setHeader("X-Readmates-Client-Contract", "v2");
+            }
             proxyReq.removeHeader("X-Readmates-Club-Slug");
             proxyReq.removeHeader("X-Readmates-Club-Host");
             const clubSlug = normalizedClubSlugFromProxyPath(proxyReq.path);

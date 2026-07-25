@@ -33,6 +33,8 @@ Cloudflare 프로젝트 root가 `front`이므로 Pages Functions는 `front/funct
 
 Pages Functions는 browser가 보낸 `X-Readmates-Club-Slug`, `X-Readmates-Club-Host`를 그대로 신뢰하지 않습니다. `/clubs/<club-slug>` path fallback은 검증된 slug를 `clubSlug` query로 BFF에 전달하고, registered host alias는 request host를 Spring에 전달합니다.
 
+Mutating `/api/host/**` 요청은 browser bundle이 `X-Readmates-Client-Contract: v2`를 선언해야 합니다. Pages Functions는 정확한 값만 trusted upstream header로 재생성하고 누락/불일치는 upstream 호출 전에 `409 HOST_CLIENT_UPGRADE_REQUIRED`로 거절합니다. 값을 무조건 주입하면 열린 구버전 탭이 새 backend contract를 잘못 호출할 수 있으므로 금지합니다.
+
 `front/public/_redirects`는 함수 pass-through 규칙을 SPA fallback보다 위에 둬야 합니다. Club path와 registered host alias deep link는 모두 SPA fallback으로 진입해야 합니다.
 
 ```text
@@ -71,12 +73,16 @@ Preview 배포에는 운영 BFF secret을 넣지 않습니다. Preview에서 API
 프론트엔드 정상 배포 경로:
 
 1. GitHub `main`에 변경을 병합하고 필요한 검증을 끝냅니다.
-2. `vMAJOR.MINOR.PATCH` 형식의 release tag를 만들고 push합니다. 예: `git push origin v1.2.0`
-3. `.github/workflows/deploy-front.yml`이 tag 대상 commit에서 `front`를 빌드합니다.
-4. Wrangler가 `front/dist`와 `front/functions`를 Cloudflare Pages production으로 함께 배포합니다.
-5. [README.md](README.md)의 smoke check를 실행합니다.
+2. `vMAJOR.MINOR.PATCH` 형식의 release tag를 만들고 push해 server image를 build/scan/promote합니다.
+3. Server/API 변경이 있으면 OCI backend를 같은 image tag로 올리고 Flyway/health/BFF smoke를 확인합니다.
+4. `.github/workflows/deploy-front.yml`을 `release_tag=vMAJOR.MINOR.PATCH` 입력으로 수동 실행합니다.
+5. Workflow가 입력 tag와 checkout commit이 일치하는지 검증한 뒤 `front`를 빌드합니다.
+6. Wrangler가 `front/dist`와 `front/functions`를 Cloudflare Pages production으로 함께 배포합니다.
+7. [README.md](../../README.md)의 smoke check를 실행합니다.
 
-`main` push만으로는 production 배포가 실행되지 않습니다. 수동 workflow 실행과 로컬 deploy hook은 장애 대응용입니다. 직접 업로드를 사용했다면 배포한 commit을 기록하고 GitHub `main`과 release tag가 가리키는 commit을 다시 맞춥니다.
+`main` 또는 tag push만으로는 frontend production 배포가 실행되지 않습니다. `Deploy Front`의 수동 `release_tag` 입력이 정상 production 경로이며, server image workflow와 OCI promotion 뒤 실행합니다. 직접 업로드를 사용했다면 배포한 commit을 기록하고 GitHub `main`과 release tag가 가리키는 commit을 다시 맞춥니다.
+
+Major host-write contract release에서는 backend promotion 직후부터 frontend 배포 완료까지 구 Pages BFF의 host mutation이 409로 동결되는 것이 정상입니다. 같은 tag의 SPA와 Functions가 함께 배포되면 새 browser + 새 BFF handshake에서 쓰기가 재개됩니다. Frontend만 이전 tag로 rollback하면 읽기와 멤버 기능은 유지되지만 host write는 계속 동결되며, 복구하려면 호환 frontend 재배포 또는 backend image rollback/forward-fix가 필요합니다.
 
 이 절차는 Cloudflare Pages의 프론트엔드 배포 흐름입니다. Spring Boot release image는 별도 `Deploy Server Image` workflow가 GHCR에 scan/promote하지만, OCI compose stack promotion은 운영자가 `deploy/oci/05-deploy-compose-stack.sh`로 수행하는 별도 절차입니다.
 
@@ -109,6 +115,7 @@ READMATES_BFF_SECRET=<shared-bff-secret>
 # 무중단 rotation 중에만 설정. READMATES_BFF_SECRETS가 있으면 READMATES_BFF_SECRET보다 우선합니다.
 READMATES_BFF_SECRETS=<new-secret>,<old-secret>
 READMATES_BFF_SECRET_REQUIRED=true
+READMATES_HOST_WRITE_CLIENT_CONTRACT_REQUIRED=true
 READMATES_IP_HASH_BASE_SECRET=<openssl rand -base64 32으로 생성>
 READMATES_AUTH_SESSION_COOKIE_SECURE=true
 ```

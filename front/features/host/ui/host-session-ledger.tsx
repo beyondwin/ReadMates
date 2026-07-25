@@ -321,68 +321,50 @@ export function HostSessionAttentionSummary({
   page,
   LinkComponent = DefaultLink,
 }: {
-  page: HostSessionAttentionData | null;
+  page: HostSessionAttentionData;
   LinkComponent?: HostSessionLedgerLinkComponent;
 }) {
-  if (page === null) {
-    return (
-      <div className="stack" style={{ "--stack": "8px" } as React.CSSProperties}>
-        <div className="surface-quiet small" role="status" style={{ padding: 14 }}>
-          기록 확인 항목을 불러오지 못했습니다. 다른 운영 영역은 계속 사용할 수 있습니다.
-        </div>
-        <LinkComponent to="/app/host/sessions" className="btn btn-ghost btn-sm">
-          세션 기록 전체 보기
-        </LinkComponent>
-      </div>
-    );
+  const visibleItems = page.items.slice(0, 3);
+
+  if (visibleItems.length === 0) {
+    return <p className="rm-host-attention__empty">확인 필요한 세션 기록이 없습니다.</p>;
   }
 
-  const visibleItems = page.items.slice(0, 3);
-  const metrics = [
-    ["수정 필요 회차", page.summary.needsAttentionCount],
-    ["공개 기록 미완성", page.summary.incompletePublishedCount],
-    ["저장된 초안", page.summary.draftCount],
-  ] as const;
-
   return (
-    <div className="stack" style={{ "--stack": "8px", minWidth: 0 } as React.CSSProperties}>
-      <dl
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 110px), 1fr))",
-          gap: 8,
-          margin: 0,
-          minWidth: 0,
-        }}
-      >
-        {metrics.map(([label, value]) => (
-          <div key={label} className="surface-quiet" style={{ padding: 12, minWidth: 0 }}>
-            <dt className="tiny" style={{ overflowWrap: "anywhere" }}>{label}</dt>
-            <dd className="editorial" style={{ margin: "4px 0 0", fontSize: 22 }}>{value}</dd>
-          </div>
-        ))}
-      </dl>
-      {visibleItems.length === 0 ? (
-        <div className="surface-quiet small" style={{ padding: 14 }}>확인 필요한 세션 기록이 없습니다.</div>
-      ) : null}
-      {visibleItems.map((item) => (
-        <LinkComponent
-          key={item.sessionId}
-          to={sessionRecordHref(item.sessionId)}
-          className="rm-ledger-row"
-          aria-label={`${item.sessionNumber}회차 기록 열기`}
-        >
-          <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>
-            <strong className="body">{item.bookTitle}</strong>
-            <span className="tiny" style={{ display: "block", marginTop: 2 }}>
-              No.{item.sessionNumber} · {hostSessionLedgerBadges(item)[0]?.label ?? "기록 확인"}
-            </span>
-          </span>
-        </LinkComponent>
-      ))}
-      <LinkComponent to="/app/host/sessions" className="btn btn-ghost btn-sm">
-        세션 기록 전체 보기
-      </LinkComponent>
-    </div>
+    <ol className="rm-host-attention" aria-label="확인 필요한 세션 기록">
+      {visibleItems.map((item) => {
+        const status = hostSessionLedgerBadges(item)[0] ?? {
+          label: "기록 확인",
+          tone: "default",
+        };
+
+        return (
+          <li key={item.sessionId} className="rm-host-attention__item">
+            <LinkComponent
+              to={sessionRecordHref(item.sessionId)}
+              className="rm-host-attention__row"
+              aria-label={`${item.sessionNumber}회차 기록 열기`}
+            >
+              <span className="rm-host-attention__number">No.{item.sessionNumber}</span>
+              <span className="rm-host-attention__copy">
+                <strong>{item.bookTitle}</strong>
+                <span>{item.bookAuthor}</span>
+              </span>
+              <span
+                className={`rm-host-attention__status badge${
+                  status.tone === "default" ? "" : ` badge-${status.tone}`
+                } badge-dot`}
+              >
+                {status.label}
+              </span>
+              <span className="rm-host-attention__action">
+                기록 열기
+                <span aria-hidden="true">→</span>
+              </span>
+            </LinkComponent>
+          </li>
+        );
+      })}
+    </ol>
   );
 }

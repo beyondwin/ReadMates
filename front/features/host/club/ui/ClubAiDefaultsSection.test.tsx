@@ -63,6 +63,21 @@ describe("ClubAiDefaultsSection", () => {
       .then((el) => el as HTMLSelectElement);
   }
 
+  it("renders the compact operations-tool variant without the standalone-card explanation", async () => {
+    mockedGet.mockResolvedValue({ defaultModel: CLUB_AI_OPENAI_DEFAULT_MODEL_ID });
+    const { Wrapper } = createWrapper();
+
+    render(
+      <Wrapper>
+        <ClubAiDefaultsSection clubSlug="club-a" variant="compact" />
+      </Wrapper>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "AI 기본 모델" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "기본 모델" })).toBeInTheDocument();
+    expect(screen.queryByText(/호스트가 업로드 시/)).not.toBeInTheDocument();
+  });
+
   it("renders the current default model from the GET response", async () => {
     mockedGet.mockResolvedValue({ defaultModel: CLUB_AI_OPENAI_DEFAULT_MODEL_ID });
     const { Wrapper } = createWrapper();

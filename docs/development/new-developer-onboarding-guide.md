@@ -159,9 +159,9 @@ Redis는 기본 off인 optional 보조 계층입니다. `READMATES_REDIS_ENABLED
 | Auth session cache | session metadata cache | MySQL session row 검증과 fallback 유지 |
 | Public/notes cache | 공개 API, notes read model cache | decode 실패나 Redis 장애 시 MySQL fallback |
 | Cache invalidation | mutation commit 뒤 best-effort key 삭제 | invalidation 실패가 domain mutation rollback 이유가 되면 안 됨 |
-| AI generation job state | job hash, transcript TTL, result TTL, cost counters | AI job은 실패/만료될 수 있지만 기존 세션/멤버 데이터는 MySQL에 남음 |
+| AI generation job state | job hash, transcript/turn/result/evidence TTL, cost counters | Commit 전 AI job은 실패/만료될 수 있고, commit한 검토 완료 snapshot은 MySQL staged draft에 남음 |
 
-Redis key와 metric label에는 raw session token, 초대 token, BFF secret, OAuth code, private feedback document body, 이메일, 표시 이름을 넣지 않습니다. AI transcript 본문은 짧은 TTL의 job handoff 값에만 둘 수 있고 Kafka, MySQL audit, metric tag, operator log로 복사하지 않습니다.
+Redis key와 metric label에는 raw session token, 초대 token, BFF secret, OAuth code, private feedback document body, 이메일, 표시 이름을 넣지 않습니다. AI transcript 본문과 evidence는 짧은 TTL의 job handoff 값에만 둘 수 있고 Kafka, MySQL audit, metric tag, operator log로 복사하지 않습니다. 검토 완료 generated snapshot만 공통 MySQL staged draft에 저장됩니다.
 
 ## Kafka와 Redpanda
 

@@ -1,10 +1,20 @@
+import { type ReactElement, useState } from "react";
 import type { ManualNotificationPreviewResponse } from "@/features/host/model/host-view-types";
+
+export type ManualNotificationPreviewConfirmationProps = {
+  preview: ManualNotificationPreviewResponse;
+  busy: boolean;
+  presentation?: "centered" | "side-sheet";
+  onConfirm: (resendConfirmed: boolean) => Promise<unknown> | void;
+};
 
 export function ManualNotificationPreviewPanel({
   preview,
   resendConfirmed,
   disabled,
   busy,
+  confirmLabel,
+  showTitle,
   onResendConfirmedChange,
   onConfirm,
 }: {
@@ -12,14 +22,26 @@ export function ManualNotificationPreviewPanel({
   resendConfirmed: boolean;
   disabled: boolean;
   busy: boolean;
+  confirmLabel: string;
+  showTitle: boolean;
   onResendConfirmedChange: (value: boolean) => void;
   onConfirm: () => void;
 }) {
   return (
-    <section aria-labelledby="manual-notification-preview-title" style={{ borderTop: "1px solid var(--line-soft)", paddingTop: 16 }}>
-      <h3 id="manual-notification-preview-title" className="h4 editorial" style={{ margin: 0 }}>
-        발송 전 확인
-      </h3>
+    <section
+      aria-label={showTitle ? undefined : "발송 전 확인"}
+      aria-labelledby={showTitle ? "manual-notification-preview-title" : undefined}
+      style={{ borderTop: "1px solid var(--line-soft)", paddingTop: 16 }}
+    >
+      {showTitle ? (
+        <h3
+          id="manual-notification-preview-title"
+          className="h4 editorial"
+          style={{ margin: 0 }}
+        >
+          발송 전 확인
+        </h3>
+      ) : null}
       <div className="row wrap" style={{ gap: 8, marginTop: 12 }}>
         <span className="badge badge-accent badge-dot">앱 알림 {preview.channels.inAppEligibleCount}명</span>
         <span className="badge badge-accent badge-dot">이메일 {preview.channels.emailEligibleCount}명</span>
@@ -54,8 +76,34 @@ export function ManualNotificationPreviewPanel({
         </div>
       ) : null}
       <button type="button" className="btn btn-primary btn-sm" disabled={disabled || busy} style={{ marginTop: 14 }} onClick={onConfirm}>
-        {busy ? "발송 요청 중" : "발송 확인"}
+        {busy ? "발송 요청 중" : confirmLabel}
       </button>
     </section>
+  );
+}
+
+export function ManualNotificationPreviewConfirmation({
+  preview,
+  busy,
+  presentation = "centered",
+  onConfirm,
+}: ManualNotificationPreviewConfirmationProps): ReactElement {
+  const [resendConfirmed, setResendConfirmed] = useState(false);
+  const requiresResend = preview.duplicates.requiresResendConfirmation;
+  const isSideSheet = presentation === "side-sheet";
+
+  return (
+    <ManualNotificationPreviewPanel
+      preview={preview}
+      resendConfirmed={resendConfirmed}
+      disabled={busy || (requiresResend && !resendConfirmed)}
+      busy={busy}
+      confirmLabel={isSideSheet
+        ? `${preview.audience.finalTargetCount}명에게 알림 발송`
+        : "발송 확인"}
+      showTitle={!isSideSheet}
+      onResendConfirmedChange={setResendConfirmed}
+      onConfirm={() => void onConfirm(resendConfirmed)}
+    />
   );
 }

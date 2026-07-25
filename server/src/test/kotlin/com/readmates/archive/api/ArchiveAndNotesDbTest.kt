@@ -12,6 +12,7 @@ import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.hasItems
 import org.hamcrest.Matchers.not
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -116,6 +117,177 @@ class ArchiveAndNotesDbTest(
                 jsonPath("$.items[*].bookTitle") { value(not(hasItem("가난한 찰리의 연감"))) }
             }
     }
+
+    @Test
+    @Sql(
+        statements = [
+            CLEANUP_VISIBILITY_ACTOR_MATRIX_SQL,
+            INSERT_VISIBILITY_ACTOR_MATRIX_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            CLEANUP_VISIBILITY_ACTOR_MATRIX_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `member archive visibility matrix distinguishes non attendee attendee host and cross club actors`() {
+        val publicSessionId = "00000000-0000-0000-0000-0000000092b1"
+        val memberSessionId = "00000000-0000-0000-0000-0000000092b2"
+        val hostOnlySessionId = "00000000-0000-0000-0000-0000000092b3"
+        val matrixSessionIds = listOf(publicSessionId, memberSessionId, hostOnlySessionId)
+        val actorCases =
+            listOf(
+                VisibilityActorCase("member4@example.com", "active non-attendee member", isAttendee = false),
+                VisibilityActorCase("member5@example.com", "active attendee", isAttendee = true),
+                VisibilityActorCase("host@example.com", "active host", isAttendee = false),
+            )
+
+        assertVisibilityActorFixtures(actorCases, matrixSessionIds)
+
+        mockMvc
+            .get("/api/public/clubs/reading-sai/sessions/$publicSessionId")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value(publicSessionId) }
+            }
+        listOf(memberSessionId, hostOnlySessionId).forEach { deniedSessionId ->
+            mockMvc
+                .get("/api/public/clubs/reading-sai/sessions/$deniedSessionId")
+                .andExpect {
+                    status { isNotFound() }
+                }
+        }
+
+        actorCases.forEach { actor ->
+            assertArchiveVisibilityContract(actor, publicSessionId, memberSessionId, hostOnlySessionId)
+        }
+
+        mockMvc
+            .get("/api/host/sessions/$hostOnlySessionId") {
+                header("X-Readmates-Club-Slug", "reading-sai")
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value(hostOnlySessionId) }
+                jsonPath("$.visibility") { value("HOST_ONLY") }
+            }
+
+        listOf(publicSessionId, memberSessionId, hostOnlySessionId).forEach { otherClubSessionId ->
+            mockMvc
+                .get("/api/archive/sessions/$otherClubSessionId") {
+                    header("X-Readmates-Club-Slug", "sample-book-club")
+                    with(user("member5@example.com"))
+                }.andExpect {
+                    status { isNotFound() }
+                }
+        }
+    }
+
+    private fun assertVisibilityActorFixtures(
+        actors: List<VisibilityActorCase>,
+        sessionIds: List<String>,
+    ) {
+        actors.forEach { actor ->
+            val participantRows = visibilityMatrixParticipantRows(actor.email, sessionIds)
+            if (actor.isAttendee) {
+                assertEquals(
+                    sessionIds,
+                    participantRows.map { it["session_id"] },
+                    "${actor.description} fixture must attend every visibility-matrix session",
+                )
+                participantRows.forEach { participant ->
+                    assertEquals("GOING", participant["rsvp_status"], "${actor.description} RSVP fixture")
+                    assertEquals(
+                        "ATTENDED",
+                        participant["attendance_status"],
+                        "${actor.description} attendance fixture",
+                    )
+                    assertEquals(
+                        "ACTIVE",
+                        participant["participation_status"],
+                        "${actor.description} participation fixture",
+                    )
+                }
+            } else {
+                assertEquals(
+                    emptyList<Map<String, Any?>>(),
+                    participantRows,
+                    "${actor.description} fixture must not have visibility-matrix participation",
+                )
+            }
+        }
+    }
+
+    private fun assertArchiveVisibilityContract(
+        actor: VisibilityActorCase,
+        publicSessionId: String,
+        memberSessionId: String,
+        hostOnlySessionId: String,
+    ) {
+        listOf(
+            publicSessionId to "PUBLIC",
+            memberSessionId to "MEMBER",
+        ).forEach { (visibleSessionId, visibility) ->
+            val resultActions =
+                mockMvc
+                    .get("/api/archive/sessions/$visibleSessionId") {
+                        header("X-Readmates-Club-Slug", "reading-sai")
+                        with(user(actor.email))
+                    }
+            assertEquals(
+                200,
+                resultActions.andReturn().response.status,
+                "${actor.description} must receive the current $visibility visibility contract",
+            )
+            resultActions.andExpect {
+                jsonPath("$.sessionId") { value(visibleSessionId) }
+            }
+        }
+
+        val hostOnlyResult =
+            mockMvc
+                .get("/api/archive/sessions/$hostOnlySessionId") {
+                    header("X-Readmates-Club-Slug", "reading-sai")
+                    with(user(actor.email))
+                }
+        assertEquals(
+            404,
+            hostOnlyResult.andReturn().response.status,
+            "${actor.description} must not receive host-only archive visibility",
+        )
+    }
+
+    private fun visibilityMatrixParticipantRows(
+        email: String,
+        sessionIds: List<String>,
+    ): List<Map<String, Any?>> =
+        jdbcTemplate.queryForList(
+            """
+            select
+              session_participants.session_id,
+              session_participants.rsvp_status,
+              session_participants.attendance_status,
+              session_participants.participation_status
+            from session_participants
+            join memberships on memberships.id = session_participants.membership_id
+            join users on users.id = memberships.user_id
+            where users.email = ?
+              and session_participants.session_id in (?, ?, ?)
+            order by session_participants.session_id
+            """.trimIndent(),
+            email,
+            sessionIds[0],
+            sessionIds[1],
+            sessionIds[2],
+        )
+
+    private data class VisibilityActorCase(
+        val email: String,
+        val description: String,
+        val isAttendee: Boolean,
+    )
 
     @Test
     @Sql(
@@ -931,6 +1103,118 @@ class ArchiveAndNotesDbTest(
 
     companion object {
         private fun removedJsonPath(vararg parts: String) = parts.joinToString(separator = "")
+
+        private const val CLEANUP_VISIBILITY_ACTOR_MATRIX_SQL = """
+            delete from public_session_publications
+            where session_id in (
+              '00000000-0000-0000-0000-0000000092b1',
+              '00000000-0000-0000-0000-0000000092b2',
+              '00000000-0000-0000-0000-0000000092b3'
+            );
+            delete from session_participants
+            where session_id in (
+              '00000000-0000-0000-0000-0000000092b1',
+              '00000000-0000-0000-0000-0000000092b2',
+              '00000000-0000-0000-0000-0000000092b3'
+            );
+            delete from sessions
+            where id in (
+              '00000000-0000-0000-0000-0000000092b1',
+              '00000000-0000-0000-0000-0000000092b2',
+              '00000000-0000-0000-0000-0000000092b3'
+            );
+            delete from memberships
+            where id = '00000000-0000-0000-0000-0000000092b9';
+        """
+
+        private const val INSERT_VISIBILITY_ACTOR_MATRIX_SQL = """
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+            select
+              '00000000-0000-0000-0000-0000000092b9',
+              '00000000-0000-0000-0000-000000000002',
+              users.id,
+              'MEMBER',
+              'ACTIVE',
+              '2026-01-01 00:00:00.000000',
+              '다른클럽멤버5'
+            from users
+            where users.email = 'member5@example.com';
+            insert into sessions (
+              id, club_id, number, title, book_title, book_author,
+              session_date, start_time, end_time, location_label,
+              question_deadline_at, state, visibility
+            )
+            values
+              (
+                '00000000-0000-0000-0000-0000000092b1',
+                '00000000-0000-0000-0000-000000000001',
+                921, '921회차 · 공개 actor matrix', '공개 actor matrix 책', '검증 저자',
+                '2026-12-21', '20:00:00', '22:00:00', '온라인',
+                '2026-12-20 14:59:00.000000', 'PUBLISHED', 'PUBLIC'
+              ),
+              (
+                '00000000-0000-0000-0000-0000000092b2',
+                '00000000-0000-0000-0000-000000000001',
+                922, '922회차 · 멤버 actor matrix', '멤버 actor matrix 책', '검증 저자',
+                '2026-12-22', '20:00:00', '22:00:00', '온라인',
+                '2026-12-21 14:59:00.000000', 'PUBLISHED', 'MEMBER'
+              ),
+              (
+                '00000000-0000-0000-0000-0000000092b3',
+                '00000000-0000-0000-0000-000000000001',
+                923, '923회차 · 호스트 actor matrix', '호스트 actor matrix 책', '검증 저자',
+                '2026-12-23', '20:00:00', '22:00:00', '온라인',
+                '2026-12-22 14:59:00.000000', 'CLOSED', 'HOST_ONLY'
+              );
+            insert into public_session_publications (
+              id, club_id, session_id, public_summary, is_public, visibility, published_at
+            )
+            values
+              (
+                '00000000-0000-0000-0000-0000000092b4',
+                '00000000-0000-0000-0000-000000000001',
+                '00000000-0000-0000-0000-0000000092b1',
+                '공개 actor matrix 요약입니다.', true, 'PUBLIC', '2026-12-24 00:00:00.000000'
+              ),
+              (
+                '00000000-0000-0000-0000-0000000092b5',
+                '00000000-0000-0000-0000-000000000001',
+                '00000000-0000-0000-0000-0000000092b2',
+                '멤버 actor matrix 요약입니다.', false, 'MEMBER', null
+              ),
+              (
+                '00000000-0000-0000-0000-0000000092b6',
+                '00000000-0000-0000-0000-000000000001',
+                '00000000-0000-0000-0000-0000000092b3',
+                '호스트 actor matrix 요약입니다.', false, 'HOST_ONLY', null
+              );
+            insert into session_participants (
+              id, club_id, session_id, membership_id,
+              rsvp_status, attendance_status, participation_status
+            )
+            values
+              (
+                '00000000-0000-0000-0000-0000000092b7',
+                '00000000-0000-0000-0000-000000000001',
+                '00000000-0000-0000-0000-0000000092b1',
+                '00000000-0000-0000-0000-000000000206',
+                'GOING', 'ATTENDED', 'ACTIVE'
+              ),
+              (
+                '00000000-0000-0000-0000-0000000092b8',
+                '00000000-0000-0000-0000-000000000001',
+                '00000000-0000-0000-0000-0000000092b2',
+                '00000000-0000-0000-0000-000000000206',
+                'GOING', 'ATTENDED', 'ACTIVE'
+              ),
+              (
+                '00000000-0000-0000-0000-0000000092ba',
+                '00000000-0000-0000-0000-000000000001',
+                '00000000-0000-0000-0000-0000000092b3',
+                '00000000-0000-0000-0000-000000000206',
+                'GOING', 'ATTENDED', 'ACTIVE'
+              );
+        """
 
         private const val CLEANUP_MY_PAGE_READING_COMPLETION_SQL = """
             delete from reading_checkins

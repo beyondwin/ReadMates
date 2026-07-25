@@ -22,12 +22,14 @@ import type {
 export function MissingCurrentSessionMembersAlert({
   alert,
   mobile = false,
+  compact = false,
   actions,
   onResolved,
   LinkComponent,
 }: {
   alert: MissingCurrentSessionMembers;
   mobile?: boolean;
+  compact?: boolean;
   actions: HostDashboardActions;
   onResolved: (membershipId: string) => void;
   LinkComponent: HostDashboardLinkComponent;
@@ -36,8 +38,10 @@ export function MissingCurrentSessionMembersAlert({
   const [message, setMessage] = useState<null | { kind: "alert" | "status"; text: string }>(null);
   const memberNames = alert.members.length > 0 ? alert.members.map((member) => member.displayName).join(", ") : null;
   const countLabel = `새 멤버 ${alert.count}명이 현재 세션에 아직 없습니다.`;
-  const className = mobile ? "m-card" : "rm-ledger-row";
-  const style = mobile
+  const className = compact ? "rm-host-missing-compact" : mobile ? "m-card" : "rm-ledger-row";
+  const style = compact
+    ? undefined
+    : mobile
     ? ({ marginBottom: 12 } as CSSProperties)
     : ({
         padding: "20px 22px",
@@ -78,9 +82,13 @@ export function MissingCurrentSessionMembersAlert({
       <div className="stack" style={{ "--stack": "14px" } as CSSProperties}>
         <div>
           <span className="badge badge-warn badge-dot">확인 필요</span>
-          <h2 className={mobile ? "h4 editorial" : "h3 editorial"} style={{ margin: "8px 0 0" }}>
-            {countLabel}
-          </h2>
+          {compact ? (
+            <h3 style={{ margin: "8px 0 0" }}>{countLabel}</h3>
+          ) : (
+            <h2 className={mobile ? "h4 editorial" : "h3 editorial"} style={{ margin: "8px 0 0" }}>
+              {countLabel}
+            </h2>
+          )}
           {memberNames ? (
             <p className="small" style={{ color: "var(--text-2)", margin: "4px 0 0" }}>
               {memberNames}

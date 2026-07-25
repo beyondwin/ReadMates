@@ -28,7 +28,7 @@
 | 외부 JSON 업로드 | 호스트가 로컬에서 정리한 `readmates-session-import:v1` JSON | 앱 외부 | 항상 사용 가능 |
 | In-app AI 생성 | UTF-8/BOM TXT(≤ 1 MiB, ≤ 3시간) + 서버가 제공한 모델 ID | 서버 측 Spring AI adapter (Claude/OpenAI/Gemini) | kill switch + provider allowlist + provider key + provider retention 확인 |
 
-두 모드의 commit 경로는 같은 `SessionImportService.commitValidated(...)`를 사용하므로 저장 후의 데이터 형태와 권한 경계는 동일합니다. 현재 동작은 [architecture.md의 In-app AI 세션 생성 컴포넌트](architecture.md#in-app-ai-세션-생성-컴포넌트), 운영 rollout과 장애 대응은 [AI session generation runbook](../operations/runbooks/ai-session-generation.md)을 기준으로 합니다. `docs/superpowers/**`의 spec과 plan은 설계 이력이며 현재 동작의 source of truth가 아닙니다.
+두 모드의 commit은 같은 validation과 `SaveValidatedSessionRecordDraftUseCase.saveValidated(...)` 경계를 사용해 검토 완료 snapshot을 공통 `session_record_drafts`에 저장합니다. 이 단계는 live 기록을 바꾸지 않으며, 별도 session-record apply가 draft revision/hash와 live revision을 검증한 뒤 immutable revision과 live 콘텐츠를 갱신합니다. 현재 동작은 [architecture.md의 In-app AI 세션 생성 컴포넌트](architecture.md#in-app-ai-세션-생성-컴포넌트), 운영 rollout과 장애 대응은 [AI session generation runbook](../operations/runbooks/ai-session-generation.md)을 기준으로 합니다. `docs/superpowers/**`의 spec과 plan은 설계 이력이며 현재 동작의 source of truth가 아닙니다.
 
 ## In-app 근거 기반 AI 생성
 
@@ -43,7 +43,7 @@ In-app AI가 활성화된 환경은 legacy 분기 없이 grounded whole-transcri
 
 비회원, 비활성/다른 클럽 회원, generic label, 정규화 후 중복 이름은 job을 만들기 전에 422로 거절됩니다. 이 preflight 실패에는 Redis/Kafka/provider/cost side effect가 없습니다. Model capability를 확인할 수 없으면 503, 실제 request budget이 모델 한도를 넘으면 422로 provider 호출 전에 fail closed하며, 임의 chunking은 하지 않습니다.
 
-브라우저 draft는 revision을 포함한 복구용 편집값만 최대 6시간 보관합니다. Transcript, parsed turns, evidence/excerpt는 localStorage에 저장하지 않습니다. 서버의 transcript/turns/result/evidence payload도 Redis에 6시간만 있고 commit/cancel 뒤 삭제됩니다. 만료된 job은 운영 채널로 원문을 전달하지 말고 호스트가 원본 TXT를 다시 업로드합니다.
+브라우저 draft는 revision을 포함한 복구용 편집값만 최대 6시간 보관합니다. Transcript, parsed turns, evidence/excerpt는 localStorage에 저장하지 않습니다. 서버의 transcript/turns/result/evidence payload도 Redis에 최대 6시간만 있고 AI commit/cancel에서 즉시 정리를 시도합니다. Commit cleanup 실패는 `cleanupPending`으로 재시도하며 TTL이 최종 backstop입니다. Commit한 검토 완료 snapshot은 공통 MySQL staged draft에 저장되지만 transcript, parsed turns, evidence/excerpt, provider response는 함께 저장되지 않습니다. 만료된 job은 운영 채널로 원문을 전달하지 말고 호스트가 원본 TXT를 다시 업로드합니다.
 
 ## 출력 형식
 

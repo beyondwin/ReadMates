@@ -34,7 +34,7 @@ import {
 function createWrapper() {
   const client = new QueryClient({
     defaultOptions: {
-      queries: { retry: false, gcTime: 0, staleTime: 0 },
+      queries: { retry: false, gcTime: Number.POSITIVE_INFINITY, staleTime: 0 },
       mutations: { retry: false },
     },
   });
@@ -44,11 +44,12 @@ function createWrapper() {
   return { client, Wrapper };
 }
 
-async function runQuery(query: { queryFn?: (context: never) => unknown }) {
-  if (!query.queryFn) {
-    throw new Error("Missing queryFn");
-  }
-  return query.queryFn({} as never);
+function cacheState(client: QueryClient) {
+  return client.getQueryCache().getAll().map((query) => ({
+    queryKey: query.queryKey,
+    data: query.state.data,
+    isInvalidated: query.state.isInvalidated,
+  }));
 }
 
 beforeEach(() => {
@@ -76,22 +77,33 @@ describe("current session query keys", () => {
     expect(currentSessionKeys.scope()).toEqual(["current-session", "scope", null]);
   });
 
-  it("query function calls getCurrentSession with the route context", async () => {
-    vi.mocked(getCurrentSession).mockResolvedValue({ currentSession: null });
+  it("writes the scoped query result to the normalized cache key", async () => {
+    const response = { currentSession: null };
+    const context = { clubSlug: "reading-sai" };
+    vi.mocked(getCurrentSession).mockResolvedValue(response);
+    const { client } = createWrapper();
+    const options = currentSessionQuery(context);
 
-    await runQuery(currentSessionQuery({ clubSlug: "reading-sai" }));
+    await client.fetchQuery(options);
 
-    expect(getCurrentSession).toHaveBeenCalledWith({ clubSlug: "reading-sai" });
+    expect(options.queryKey).toEqual(currentSessionKeys.current(context));
+    expect(getCurrentSession).toHaveBeenCalledWith(context);
+    expect(client.getQueryData(currentSessionKeys.current(context))).toEqual(response);
   });
 
-  it("invalidates the current session scope", async () => {
-    const client = { invalidateQueries: vi.fn().mockResolvedValue(undefined) };
+  it("invalidates only the selected current-session scope while preserving values", async () => {
+    const { client } = createWrapper();
+    const selectedKey = currentSessionKeys.current({ clubSlug: "reading-sai" });
+    const otherKey = currentSessionKeys.current({ clubSlug: "other-club" });
+    client.setQueryData(selectedKey, { currentSession: { sessionId: "session-7" } });
+    client.setQueryData(otherKey, { currentSession: { sessionId: "session-9" } });
 
-    await invalidateCurrentSession(client as never, { clubSlug: "reading-sai" });
+    await invalidateCurrentSession(client, { clubSlug: "reading-sai" });
 
-    expect(client.invalidateQueries).toHaveBeenCalledWith({
-      queryKey: currentSessionKeys.scope({ clubSlug: "reading-sai" }),
-    });
+    expect(client.getQueryState(selectedKey)?.isInvalidated).toBe(true);
+    expect(client.getQueryState(otherKey)?.isInvalidated).toBe(false);
+    expect(client.getQueryData(selectedKey)).toEqual({ currentSession: { sessionId: "session-7" } });
+    expect(client.getQueryData(otherKey)).toEqual({ currentSession: { sessionId: "session-9" } });
   });
 });
 
@@ -127,10 +139,13 @@ describe("current session mutation hooks", () => {
       saveCurrentSessionOneLineReview,
       "한줄평",
     ],
-  ] as const)("invalidates current-session after successful %s save", async (_name, hook, apiFn, payload) => {
+  ] as const)("invalidates the scoped cache and preserves its value after successful %s save", async (_name, hook, apiFn, payload) => {
     vi.mocked(apiFn).mockResolvedValue(new Response("{}", { status: 200 }) as never);
     const { client, Wrapper } = createWrapper();
-    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    const selectedKey = currentSessionKeys.current({ clubSlug: "reading-sai" });
+    const otherKey = currentSessionKeys.current({ clubSlug: "other-club" });
+    client.setQueryData(selectedKey, { currentSession: { sessionId: "session-7" } });
+    client.setQueryData(otherKey, { currentSession: { sessionId: "session-9" } });
     const { result } = renderHook(hook, { wrapper: Wrapper });
 
     await act(async () => {
@@ -138,21 +153,57 @@ describe("current session mutation hooks", () => {
     });
 
     expect(apiFn).toHaveBeenCalledWith(payload, { clubSlug: "reading-sai" });
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: currentSessionKeys.scope({ clubSlug: "reading-sai" }),
-    });
+    expect(client.getQueryState(selectedKey)?.isInvalidated).toBe(true);
+    expect(client.getQueryState(otherKey)?.isInvalidated).toBe(false);
+    expect(client.getQueryData(selectedKey)).toEqual({ currentSession: { sessionId: "session-7" } });
   });
 
-  it("throws and leaves cache untouched when a save response is not ok", async () => {
-    vi.mocked(saveCurrentSessionCheckin).mockResolvedValue(new Response("bad request", { status: 400 }) as never);
-    const { client, Wrapper } = createWrapper();
-    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
-    const { result } = renderHook(
+  it.each([
+    [
+      "rsvp",
+      () => useUpdateCurrentSessionRsvpMutation({ clubSlug: "reading-sai" }),
+      updateCurrentSessionRsvp,
+      "GOING" as const,
+    ],
+    [
+      "checkin",
       () => useSaveCurrentSessionCheckinMutation({ clubSlug: "reading-sai" }),
-      { wrapper: Wrapper },
+      saveCurrentSessionCheckin,
+      72,
+    ],
+    [
+      "questions",
+      () => useSaveCurrentSessionQuestionsMutation({ clubSlug: "reading-sai" }),
+      saveCurrentSessionQuestions,
+      [{ priority: 1, text: "토론 질문" }],
+    ],
+    [
+      "long review",
+      () => useSaveCurrentSessionLongReviewMutation({ clubSlug: "reading-sai" }),
+      saveCurrentSessionLongReview,
+      "긴 서평",
+    ],
+    [
+      "one-line review",
+      () => useSaveCurrentSessionOneLineReviewMutation({ clubSlug: "reading-sai" }),
+      saveCurrentSessionOneLineReview,
+      "한줄평",
+    ],
+  ] as const)("leaves every cached scope unchanged when %s save fails", async (_name, hook, apiFn, payload) => {
+    vi.mocked(apiFn).mockResolvedValue(new Response("bad request", { status: 400 }) as never);
+    const { client, Wrapper } = createWrapper();
+    client.setQueryData(
+      currentSessionKeys.current({ clubSlug: "reading-sai" }),
+      { currentSession: { sessionId: "session-7" } },
     );
+    client.setQueryData(
+      currentSessionKeys.current({ clubSlug: "other-club" }),
+      { currentSession: { sessionId: "session-9" } },
+    );
+    const before = cacheState(client);
+    const { result } = renderHook(hook, { wrapper: Wrapper });
 
-    await expect(result.current.mutateAsync(72)).rejects.toThrow("Current session save failed");
-    expect(invalidateSpy).not.toHaveBeenCalled();
+    await expect(result.current.mutateAsync(payload as never)).rejects.toThrow("Current session save failed");
+    expect(cacheState(client)).toEqual(before);
   });
 });

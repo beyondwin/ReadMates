@@ -126,6 +126,7 @@ export async function routeHostEditorShell(page: Page, clubSlug: string): Promis
       body: JSON.stringify({
         sessionId,
         liveRevision: 0,
+        liveSessionUpdatedAt: "2026-06-01T00:00:00Z",
         liveSnapshot: {
           schema: "readmates-session-record:v1",
           visibility: "HOST_ONLY",

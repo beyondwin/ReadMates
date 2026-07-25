@@ -273,6 +273,24 @@ describe("HostNotificationComposerController", () => {
     expect(screen.queryByRole("region", { name: "발송 전 확인" })).not.toBeInTheDocument();
   });
 
+  it("keeps the centered composer preview structure and confirmation copy", async () => {
+    renderController();
+
+    await userEvent.click(await screen.findByRole("button", { name: "알림 미리보기" }));
+
+    const previewRegion = await screen.findByRole("region", { name: "발송 전 확인" });
+    expect(
+      screen.getByRole("heading", { name: "발송 전 확인" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "발송 확인" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "2명에게 알림 발송" }),
+    ).not.toBeInTheDocument();
+    expect(previewRegion).toBeInTheDocument();
+  });
+
   it("calls onConfirmed only after confirm succeeds", async () => {
     const onConfirmed = vi.fn();
     renderController({ onConfirmed });

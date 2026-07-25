@@ -8,6 +8,24 @@ import {
   notificationLedgerTabs,
 } from "./notification-formatters";
 
+export type NotificationLedgerTabsProps = {
+  events: HostNotificationEventItem[];
+  deliveries: HostNotificationDeliveryItem[];
+  activeLedgerTab: NotificationLedgerTab;
+  retryPendingId: string | null;
+  restorePendingId: string | null;
+  disabled: boolean;
+  hasMoreEvents: boolean;
+  hasMoreDeliveries: boolean;
+  isLoadingMoreEvents: boolean;
+  isLoadingMoreDeliveries: boolean;
+  onActiveLedgerTabChange: (tab: NotificationLedgerTab) => void;
+  onRetry: (item: HostNotificationDeliveryItem) => void;
+  onRestore: (item: HostNotificationDeliveryItem) => void;
+  onLoadMoreEvents?: () => Promise<unknown>;
+  onLoadMoreDeliveries?: () => Promise<unknown>;
+};
+
 export function NotificationLedgerTabs({
   events,
   deliveries,
@@ -24,23 +42,7 @@ export function NotificationLedgerTabs({
   onRestore,
   onLoadMoreEvents,
   onLoadMoreDeliveries,
-}: {
-  events: HostNotificationEventItem[];
-  deliveries: HostNotificationDeliveryItem[];
-  activeLedgerTab: NotificationLedgerTab;
-  retryPendingId: string | null;
-  restorePendingId: string | null;
-  disabled: boolean;
-  hasMoreEvents: boolean;
-  hasMoreDeliveries: boolean;
-  isLoadingMoreEvents: boolean;
-  isLoadingMoreDeliveries: boolean;
-  onActiveLedgerTabChange: (tab: NotificationLedgerTab) => void;
-  onRetry: (item: HostNotificationDeliveryItem) => void;
-  onRestore: (item: HostNotificationDeliveryItem) => void;
-  onLoadMoreEvents?: () => Promise<unknown>;
-  onLoadMoreDeliveries?: () => Promise<unknown>;
-}) {
+}: NotificationLedgerTabsProps) {
   return (
     <section className="surface" aria-labelledby="notification-items-title" style={{ padding: 22 }}>
       <div className="row-between" style={{ gap: 14, alignItems: "baseline", marginBottom: 12 }}>

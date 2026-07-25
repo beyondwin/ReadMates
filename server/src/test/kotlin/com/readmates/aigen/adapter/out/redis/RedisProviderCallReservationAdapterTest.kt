@@ -30,6 +30,8 @@ import java.time.Duration
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.Callable
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.CyclicBarrier
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -58,6 +60,7 @@ import java.util.concurrent.TimeUnit
 )
 @Tag("integration")
 @Tag("container")
+@Suppress("LargeClass")
 class RedisProviderCallReservationAdapterTest(
     @param:Autowired private val reservations: ProviderCallReservationPort,
     @param:Autowired private val redisTemplate: StringRedisTemplate,
@@ -124,6 +127,91 @@ class RedisProviderCallReservationAdapterTest(
         assertThat(jobCallCount(fixture.jobId)).isEqualTo(2)
         assertThat(monthlyCost(fixture.clubId)).isEqualByComparingTo("0.8")
         assertThat(attemptCount(fixture.jobId)).isEqualTo(2)
+    }
+
+    @Test
+    fun `cancel completed before reservation phase denies the call without consuming cost`() {
+        val fixture = fixture()
+        prepare(fixture, JobStatus.RUNNING)
+        try {
+            val (cancelled, reservation) =
+                phasedInterleaving(
+                    first = { cancelJob(fixture) },
+                    second = { reservations.reserve(fixture.command()) },
+                )
+
+            assertThat(cancelled).isTrue()
+            assertThat(reservation).isEqualTo(ProviderCallReservationResult.StateChanged)
+            assertThat(jobStatus(fixture.jobId)).isEqualTo(JobStatus.CANCELLED.name)
+            assertThat(redisTemplate.opsForValue().get(fixture.admissionKey))
+                .isEqualTo(fixture.admissionId.toString())
+            assertNoReservationWrites(fixture)
+            assertThat(attemptState(fixture)).isNull()
+            assertThat(attemptField(fixture, "slotReleased")).isNull()
+        } finally {
+            cleanup(fixture)
+        }
+    }
+
+    @Test
+    fun `reservation completed before cancel phase retains the accepted in-flight call and cost`() {
+        val fixture = fixture()
+        prepare(fixture, JobStatus.RUNNING)
+        try {
+            val (reservation, cancelled) =
+                phasedInterleaving(
+                    first = { reservations.reserve(fixture.command()) },
+                    second = { cancelJob(fixture) },
+                )
+
+            assertThat(reservation).isInstanceOf(ProviderCallReservationResult.Reserved::class.java)
+            assertThat(cancelled).isTrue()
+            assertThat(jobStatus(fixture.jobId)).isEqualTo(JobStatus.CANCELLED.name)
+            assertThat(jobCallCount(fixture.jobId)).isEqualTo(1)
+            assertThat(monthlyCost(fixture.clubId)).isEqualByComparingTo(CENT)
+            assertThat(attemptState(fixture)).isEqualTo(ProviderAttemptState.IN_FLIGHT.name)
+            assertThat(attemptField(fixture, "slotReleased")).isEqualTo("0")
+            assertThat(redisTemplate.opsForValue().get(fixture.admissionKey))
+                .isEqualTo(fixture.admissionId.toString())
+            assertContentFreeLedger(fixture)
+        } finally {
+            cleanup(fixture)
+        }
+    }
+
+    @Test
+    fun `admission expiry racing reconciliation still terminalizes the accepted provider call once`() {
+        val fixture = fixture()
+        prepare(fixture, JobStatus.RUNNING)
+        try {
+            reservations.reserve(fixture.command(maximumCostUsd = BigDecimal("0.40")))
+
+            val (reconciliation, admissionExpired) =
+                race(
+                    left = {
+                        reservations.reconcile(
+                            fixture.reconciliation(
+                                terminalState = ProviderAttemptState.SUCCEEDED,
+                                actualCostUsd = BigDecimal("0.10"),
+                            ),
+                        )
+                    },
+                    right = { redisTemplate.expire(fixture.admissionKey, Duration.ZERO) },
+                )
+
+            assertThat(admissionExpired).isTrue()
+            assertThat(reconciliation).isInstanceOf(ProviderCallReconciliationResult.Reconciled::class.java)
+            val attempt = (reconciliation as ProviderCallReconciliationResult.Reconciled).attempt
+            assertThat(attempt.state).isEqualTo(ProviderAttemptState.SUCCEEDED)
+            assertThat(attempt.costBasis).isEqualTo(CostBasis.ACTUAL)
+            assertThat(jobCallCount(fixture.jobId)).isEqualTo(1)
+            assertThat(monthlyCost(fixture.clubId)).isEqualByComparingTo("0.10")
+            assertThat(redisTemplate.hasKey(fixture.admissionKey)).isFalse()
+            assertThat(attemptField(fixture, "slotReleased")).isEqualTo("0")
+            assertContentFreeLedger(fixture)
+        } finally {
+            cleanup(fixture)
+        }
     }
 
     @Test
@@ -594,6 +682,72 @@ class RedisProviderCallReservationAdapterTest(
         }
     }
 
+    private fun <L, R> race(
+        left: () -> L,
+        right: () -> R,
+    ): Pair<L, R> {
+        val executor = Executors.newFixedThreadPool(2)
+        val barrier = CyclicBarrier(3)
+        return try {
+            val leftFuture =
+                executor.submit(
+                    Callable {
+                        barrier.await()
+                        left()
+                    },
+                )
+            val rightFuture =
+                executor.submit(
+                    Callable {
+                        barrier.await()
+                        right()
+                    },
+                )
+            barrier.await()
+            leftFuture.get() to rightFuture.get()
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
+    private fun <F, S> phasedInterleaving(
+        first: () -> F,
+        second: () -> S,
+    ): Pair<F, S> {
+        val executor = Executors.newFixedThreadPool(2)
+        val ready = CountDownLatch(2)
+        val start = CountDownLatch(1)
+        val firstComplete = CountDownLatch(1)
+        return try {
+            val firstFuture =
+                executor.submit(
+                    Callable {
+                        ready.countDown()
+                        start.await()
+                        try {
+                            first()
+                        } finally {
+                            firstComplete.countDown()
+                        }
+                    },
+                )
+            val secondFuture =
+                executor.submit(
+                    Callable {
+                        ready.countDown()
+                        start.await()
+                        firstComplete.await()
+                        second()
+                    },
+                )
+            ready.await()
+            start.countDown()
+            firstFuture.get() to secondFuture.get()
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
     private fun prepare(
         fixture: Fixture,
         status: JobStatus,
@@ -619,10 +773,42 @@ class RedisProviderCallReservationAdapterTest(
         }
     }
 
+    private fun cancelJob(fixture: Fixture): Boolean =
+        redisTemplate.execute(
+            AiGenerationRedisScripts.transitionStatus,
+            listOf(fixture.jobKey),
+            JobStatus.RUNNING.name,
+            JobStatus.CANCELLED.name,
+            "",
+            "0",
+            "",
+            "",
+            fixture.now.plusSeconds(1).toString(),
+            properties.job.redisTtl.seconds
+                .toString(),
+            "",
+        ) == 1L
+
     private fun assertNoReservationWrites(fixture: Fixture) {
         assertThat(jobCallCount(fixture.jobId)).isZero()
         assertThat(redisTemplate.hasKey(fixture.monthlyKey)).isFalse()
         assertThat(redisTemplate.hasKey(fixture.ledgerKey)).isFalse()
+    }
+
+    private fun assertContentFreeLedger(fixture: Fixture) {
+        val serialized =
+            redisTemplate
+                .opsForHash<String, String>()
+                .entries(fixture.ledgerKey)
+                .entries
+                .joinToString("|") { "${it.key}=${it.value}" }
+                .lowercase()
+        assertThat(serialized).doesNotContain(fixture.clubId.toString(), fixture.admissionId.toString())
+        FORBIDDEN_LEDGER_TERMS.forEach { assertThat(serialized).doesNotContain(it) }
+    }
+
+    private fun cleanup(fixture: Fixture) {
+        redisTemplate.delete(listOf(fixture.jobKey, fixture.admissionKey, fixture.monthlyKey, fixture.ledgerKey))
     }
 
     private fun jobCallCount(jobId: UUID): Int =
@@ -637,8 +823,15 @@ class RedisProviderCallReservationAdapterTest(
             .keys("aigen:job:$jobId:provider-attempts")
             .count { it.endsWith(":state") }
 
-    private fun attemptState(fixture: Fixture): String? =
-        redisTemplate.opsForHash<String, String>().get(fixture.ledgerKey, "${fixture.attemptId}:state")
+    @Suppress("MaxLineLength")
+    private fun jobStatus(jobId: UUID): String? = redisTemplate.opsForHash<String, String>().get("aigen:job:$jobId", "status")
+
+    private fun attemptState(fixture: Fixture): String? = attemptField(fixture, "state")
+
+    private fun attemptField(
+        fixture: Fixture,
+        field: String,
+    ): String? = redisTemplate.opsForHash<String, String>().get(fixture.ledgerKey, "${fixture.attemptId}:$field")
 
     private fun fixture() = Fixture()
 

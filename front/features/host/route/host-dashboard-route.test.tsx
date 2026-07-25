@@ -143,7 +143,9 @@ vi.mock("@/features/host/route/host-notification-composer-controller", () => ({
 }));
 
 vi.mock("@/features/host/club/ui/ClubAiDefaultsSection", () => ({
-  ClubAiDefaultsSection: () => null,
+  ClubAiDefaultsSection: ({ variant }: { variant?: "default" | "compact" }) => (
+    <div aria-label={variant === "compact" ? "compact AI 운영 도구" : "standalone AI 설정"} />
+  ),
 }));
 
 import { HostDashboardRoute } from "./host-dashboard-route";
@@ -163,6 +165,15 @@ beforeEach(() => {
 });
 
 describe("HostDashboardRoute next-book composer", () => {
+  it("continues the dashboard with the compact AI operations tool", () => {
+    renderRoute();
+
+    expect(screen.getByLabelText("AI 운영 도구")).toContainElement(
+      screen.getByLabelText("compact AI 운영 도구"),
+    );
+    expect(screen.queryByLabelText("standalone AI 설정")).not.toBeInTheDocument();
+  });
+
   it("opens only after the first successful publication and ignores a later null composer", async () => {
     routeMocks.visibilityMutation.mutateAsync
       .mockResolvedValueOnce({

@@ -1,6 +1,6 @@
 # 새 버전 발행과 운영 배포 Runbook
 
-검토일: 2026-07-12
+검토일: 2026-07-25
 
 이 문서는 ReadMates 새 제품 버전을 발행하고, 같은 tag로 Cloudflare Pages 프론트엔드와 OCI Compose 백엔드를 운영에 반영하는 절차입니다. 세부 설정 기준은 [Cloudflare Pages](cloudflare-pages.md), [OCI Compose Stack](compose-stack.md), [버저닝](../development/versioning.md)을 우선합니다.
 
@@ -13,8 +13,10 @@
 - `CHANGELOG.md`에 `vMAJOR.MINOR.PATCH - YYYY-MM-DD` 섹션, deployment notes, 실행한 verification이 있습니다.
 - `main`이 release commit을 포함하고, `vMAJOR.MINOR.PATCH` annotated tag가 같은 commit을 가리킵니다.
 - GitHub Release가 존재하고 body가 `CHANGELOG.md`의 같은 버전 섹션과 일치합니다.
-- `Deploy Front` workflow가 같은 tag에서 성공해 Cloudflare Pages production을 배포했습니다.
+- `Deploy Front` workflow가 backend promotion 뒤 같은 `release_tag` 입력으로 성공해 Cloudflare Pages production을 배포했습니다.
 - `Deploy Server Image` workflow가 같은 tag에서 성공해 GHCR `readmates-server:vMAJOR.MINOR.PATCH` 이미지를 scan/promote했습니다.
+- Release에서 production runtime rendering이 바뀌면 `sync-config` workflow가 `restart_api=false`, `dry_run=false`로 성공해 다음 container start가 새 설정을 읽도록 준비했습니다.
+- Major host-write contract release이면 sync된 env에 `READMATES_HOST_WRITE_CLIENT_CONTRACT_REQUIRED=true`가 있고, backend-first 창의 구 client write 동결과 same-tag frontend 배포 후 재개를 확인했습니다.
 - 서버 변경이나 DB migration이 있으면 OCI Compose stack이 같은 GHCR tag로 재시작됐고 `/internal/health`, BFF auth smoke, OAuth redirect smoke가 통과했습니다.
 - 공개 릴리즈 후보 검사가 통과했거나, blocker와 남은 리스크가 release note에 명확히 남아 있습니다.
 
@@ -70,26 +72,30 @@ git tag -a vX.Y.Z -m "ReadMates vX.Y.Z"
 git push origin vX.Y.Z
 ```
 
-`main` push는 production 배포를 시작하지 않습니다. `v*` tag push가 production Cloudflare Pages 배포와 GHCR server image publish workflow를 시작합니다.
+`main` push는 production 배포를 시작하지 않습니다. `v*` tag push는 GHCR server image publish workflow만 시작합니다. Cloudflare Pages production은 server image scan/promote와 OCI backend health 확인 뒤 같은 tag를 `release_tag`로 입력해 수동 배포합니다.
 
 Branch protection bypass 정책은 [release-management.md#branch-protection-bypass-policy](../development/release-management.md#branch-protection-bypass-policy)를 참조합니다. `main` direct push (admin bypass) 허용 조건, release PR 강제 조건, emergency bypass ledger 기록 기준이 그 절에 정리되어 있습니다. Release tag push 직전에는 `./scripts/pre-push-check.sh --release`를 실행해 `CHANGELOG Unreleased` 가드를 통과시키고, 통과가 어려운 emergency 상황에서만 `--no-changelog-check`로 우회합니다.
 
 ## GitHub Actions 확인
 
-Tag push 뒤 같은 tag의 배포 workflow를 확인합니다.
+Tag push 뒤 먼저 같은 tag의 server image workflow를 확인합니다.
 
 ```bash
-gh run list --workflow "Deploy Front" --branch vX.Y.Z --limit 5
 gh run list --workflow "Deploy Server Image" --branch vX.Y.Z --limit 5
-gh run watch <deploy-front-run-id> --exit-status
 gh run watch <deploy-server-run-id> --exit-status
 ```
 
-`Deploy Front`는 `front/dist`와 `front/functions`를 Cloudflare Pages production에 배포합니다. `Deploy Server Image`는 scan candidate digest를 Trivy로 검사한 뒤 같은 digest를 `ghcr.io/<owner>/<repo>/readmates-server:vX.Y.Z`로 promote합니다.
+`Deploy Server Image`는 scan candidate digest를 Trivy로 검사한 뒤 같은 digest를 `ghcr.io/<owner>/<repo>/readmates-server:vX.Y.Z`로 promote합니다. 성공 후 [Backend OCI Promotion](#backend-oci-promotion)을 먼저 완료합니다.
 
-서버/API/frontend contract가 함께 바뀐 릴리스에서는 `Deploy Front` 성공만으로 final smoke를 끝내지 않습니다. `Deploy Server Image`가 같은 tag의 GHCR image를 promote하고, OCI Compose backend promotion이 끝난 뒤 frontend-facing smoke를 최종 판정으로 삼습니다. 새 frontend가 구 backend를 잠시 만날 수 있는 tag-push window는 frontend 하위호환 처리로 완화하되, release 완료 판정은 backend promotion 이후에만 내립니다.
+Backend health와 BFF contract를 확인한 뒤 frontend workflow를 같은 release tag로 수동 실행합니다.
 
-둘 중 하나가 실패하면 운영 배포를 진행하지 않습니다. 실패 원인은 GitHub Actions log와 artifact를 보고 수정한 뒤 새 patch tag로 다시 발행합니다. 이미 push된 tag를 force update하지 않습니다.
+```bash
+gh workflow run "Deploy Front" --ref main -f release_tag=vX.Y.Z
+gh run list --workflow "Deploy Front" --event workflow_dispatch --limit 5
+gh run watch <deploy-front-run-id> --exit-status
+```
+
+`Deploy Front`는 입력 tag 형식을 검사하고 checkout commit이 그 tag를 가리키는지 확인한 뒤 `front/dist`와 `front/functions`를 Cloudflare Pages production에 배포합니다. Server image, OCI promotion, frontend 중 하나가 실패하면 다음 단계로 진행하지 않습니다. 실패 원인은 GitHub Actions log와 artifact를 보고 수정한 뒤 새 patch tag로 다시 발행합니다. 이미 push된 tag를 force update하지 않습니다.
 
 ## GitHub Release 생성
 
@@ -115,7 +121,7 @@ gh release view vX.Y.Z --json tagName,name,url,publishedAt
 
 서버 코드, API contract, DB migration, BFF/auth, 또는 frontend가 소비하는 server response shape가 바뀐 릴리스는 `Backend OCI Promotion`을 먼저 완료한 뒤 이 섹션의 frontend smoke를 final smoke로 실행합니다. frontend-only 릴리스는 Cloudflare Pages 성공 뒤 바로 이 섹션을 실행할 수 있습니다.
 
-Cloudflare Pages 배포 workflow가 성공한 뒤 browser-facing origin을 확인합니다.
+Backend OCI promotion 뒤 같은 tag의 Cloudflare Pages 배포 workflow가 성공하면 browser-facing origin을 확인합니다.
 
 ```bash
 curl -sS -o /dev/null -w '%{http_code}\n' https://readmates.pages.dev/app
@@ -132,6 +138,19 @@ Registered club host를 같이 확인할 때는 실제 host를 Git 밖에서 `RE
 
 서버 코드, DB migration, runtime 설정, 배포 script 변경이 포함된 릴리즈는 GHCR image workflow 성공 뒤 OCI Compose stack을 같은 제품 tag로 올립니다.
 
+Production runtime rendering이 바뀐 릴리즈는 container를 먼저 재시작하지 않고 현재 `main`의 `sync-config`를 성공시킨 뒤 image promotion을 실행합니다.
+
+```bash
+gh workflow run sync-config.yml \
+  --ref main \
+  -f restart_api=false \
+  -f dry_run=false
+gh run list --workflow sync-config.yml --event workflow_dispatch --limit 5
+gh run watch <sync-config-run-id> --exit-status
+```
+
+`restart_api=false`는 구 image를 새 설정으로 먼저 재시작하지 않기 위한 값입니다. `dry_run=false`는 검증만 하는 것이 아니라 운영 env 파일을 실제 동기화합니다. Major host-write contract release에서는 이 단계가 `READMATES_HOST_WRITE_CLIENT_CONTRACT_REQUIRED=true`를 기록하고, v2 image가 시작될 때부터 구 client write를 fail closed하도록 준비합니다. Workflow가 실패하면 OCI promotion을 시작하지 않습니다.
+
 ```bash
 READMATES_SERVER_IMAGE='ghcr.io/<owner>/<repo>/readmates-server:vX.Y.Z' \
 VM_PUBLIC_IP='<vm-public-ip>' \
@@ -145,8 +164,27 @@ CADDY_SITE=api.example.com \
 - DB backup이 Git 밖의 운영 backup 위치에 있으며 최근 48시간 이내입니다.
 - GHCR package가 private이면 VM의 registry login이 Git 밖의 credential로 준비되어 있습니다.
 - `Deploy Server Image` workflow가 같은 tag에서 성공했습니다.
+- Runtime rendering이 바뀌었다면 `sync-config` workflow가 `restart_api=false`, `dry_run=false`로 성공했습니다.
 
 스크립트는 legacy host `readmates-server`와 host `caddy`를 중지하고, compose stack의 `readmates-api` 이미지 ID가 기대 이미지와 같은지 확인한 뒤 `/internal/health`, BFF auth smoke, post-deploy watch를 실행합니다.
+
+Major host-write contract release에서는 실데이터 mutation 없이 배포 창을 확인합니다. 아래 probe는 인증 cookie를 보내지 않으므로 controller mutation에 도달하지 않습니다.
+
+```bash
+# Backend promotion 후/Frontend 배포 전: 구 BFF가 contract를 전달하지 않아 409.
+curl -sS -o /dev/null -w '%{http_code}\n' \
+  -X POST \
+  -H 'Origin: https://readmates.pages.dev' \
+  https://readmates.pages.dev/api/bff/api/host/notifications/process
+
+# Frontend + Pages Functions 배포 후에도 contract 누락은 409.
+# 정확한 v2 선언은 contract gate를 통과한 뒤 인증 계층에서 401이어야 합니다.
+curl -sS -o /dev/null -w '%{http_code}\n' \
+  -X POST \
+  -H 'Origin: https://readmates.pages.dev' \
+  -H 'X-Readmates-Client-Contract: v2' \
+  https://readmates.pages.dev/api/bff/api/host/notifications/process
+```
 
 ## 배포 후 확인
 
@@ -168,6 +206,8 @@ DB migration이 있는 릴리즈는 Spring startup log 또는 Flyway schema hist
 ## Rollback 기준
 
 Frontend만 실패하면 이전 정상 tag의 Cloudflare Pages 배포를 재배포하거나 새 patch tag를 발행합니다.
+
+v2 host-write gate가 켜진 backend에서 frontend만 이전 tag로 rollback하면 host mutation이 409로 동결되는 것이 정상입니다. 쓰기를 복구하려면 호환 frontend를 다시 배포하거나 backend도 schema를 보존한 호환 image로 rollback/forward-fix합니다.
 
 서버 image만 되돌릴 때는 [compose-stack.md](compose-stack.md#rollback)의 rollback 절차를 따릅니다.
 

@@ -4,34 +4,47 @@ import type { ManualNotificationDispatchListItem } from "@/features/host/model/h
 import { eventLabels, eventOutboxStatusBadgeClass } from "./notification-formatters";
 import { manualAudienceLabels, manualChannelLabels } from "./manual-notification-labels";
 
-export function ManualNotificationDispatchLedger({
-  dispatches,
-  hasMore = false,
-  loading = false,
-  onLoadMore,
-}: {
+export type ManualNotificationDispatchLedgerProps = {
   dispatches: ManualNotificationDispatchListItem[];
+  variant?: "recent" | "full";
+  limit?: number;
   hasMore?: boolean;
   loading?: boolean;
   onLoadMore?: () => Promise<unknown>;
-}) {
+};
+
+export function ManualNotificationDispatchLedger({
+  dispatches,
+  variant = "full",
+  limit,
+  hasMore = false,
+  loading = false,
+  onLoadMore,
+}: ManualNotificationDispatchLedgerProps) {
+  const visibleDispatches = variant === "recent"
+    ? dispatches.slice(0, Math.max(0, limit ?? 3))
+    : dispatches;
+  const showPagination = variant === "full" && hasMore && onLoadMore;
+  const titleId = `manual-dispatch-ledger-${variant}-title`;
+  const title = variant === "recent" ? "최근 수동 발송" : "전체 수동 발송";
+
   return (
-    <section className="surface" aria-labelledby="manual-dispatch-ledger-title" style={{ padding: 22, marginBottom: 20 }}>
+    <section className="surface" aria-labelledby={titleId} style={{ padding: 22, marginBottom: 20 }}>
       <div className="row-between" style={{ gap: 12, alignItems: "baseline", flexWrap: "wrap" }}>
-        <h2 id="manual-dispatch-ledger-title" className="h3 editorial" style={{ margin: 0 }}>
-          최근 수동 발송
+        <h2 id={titleId} className="h3 editorial" style={{ margin: 0 }}>
+          {title}
         </h2>
       </div>
-      {dispatches.length === 0 ? (
+      {visibleDispatches.length === 0 ? (
         <p className="small" style={{ color: "var(--text-2)", margin: "12px 0 0" }}>
           아직 수동 발송 기록이 없습니다.
         </p>
       ) : (
         <div className="stack" style={{ "--stack": "0px", marginTop: 10 } as CSSProperties}>
-          {dispatches.map((dispatch, index) => (
+          {visibleDispatches.map((dispatch, index) => (
             <article
               key={dispatch.manualDispatchId}
-              className="row-between"
+              className="rm-notification-dispatch-row row-between"
               style={{
                 gap: 14,
                 alignItems: "flex-start",
@@ -63,7 +76,7 @@ export function ManualNotificationDispatchLedger({
           ))}
         </div>
       )}
-      {hasMore && onLoadMore ? (
+      {showPagination ? (
         <button
           type="button"
           className="btn btn-quiet btn-sm"

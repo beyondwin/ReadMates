@@ -239,6 +239,7 @@ async function applyConcurrentRecordRevision(page: Page, sessionId: string) {
         ...init,
         headers: {
           "Content-Type": "application/json",
+          "X-Readmates-Client-Contract": "v2",
           ...init?.headers,
         },
       });

@@ -13,19 +13,26 @@ REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="${REPO_ROOT}/docs/superpowers/reports/2026-05-16-sweep-forks.md"
 mkdir -p "$(dirname "$OUT")"
 
-echo "# maxParallelForks sweep" > "$OUT"
-echo "" >> "$OUT"
-echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$OUT"
-echo "Host: $(uname -a)" >> "$OUT"
-echo "Processors: $(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu)" >> "$OUT"
-echo "" >> "$OUT"
+{
+  echo "# maxParallelForks sweep"
+  echo ""
+  echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "Host: $(uname -a)"
+  echo "Processors: $(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu)"
+  echo ""
+} > "$OUT"
 
 for n in 1 2 3 4; do
-  echo "## forks=$n" >> "$OUT"
-  echo '```' >> "$OUT"
+  {
+    echo "## forks=$n"
+    echo '```'
+  } >> "$OUT"
   runs=()
   for i in 1 2 3; do
-    (cd "$REPO_ROOT/server" && ./gradlew --stop >/dev/null 2>&1 || true)
+    (
+      cd "$REPO_ROOT/server"
+      ./gradlew --stop >/dev/null 2>&1 || true
+    )
     rm -rf "$REPO_ROOT/server/.gradle" "$REPO_ROOT/server/build"
     real=$(/usr/bin/time -p bash -c "cd '$REPO_ROOT/server' && ./gradlew unitTest -PmaxForks=$n" 2>&1 >/dev/null | awk '/^real/ {print $2}')
     runs+=("$real")
@@ -33,9 +40,11 @@ for n in 1 2 3 4; do
   done
   sorted=$(printf '%s\n' "${runs[@]}" | sort -n)
   median=$(echo "$sorted" | sed -n '2p')
-  echo "median=$median" >> "$OUT"
-  echo '```' >> "$OUT"
-  echo "" >> "$OUT"
+  {
+    echo "median=$median"
+    echo '```'
+    echo ""
+  } >> "$OUT"
 done
 
 echo "Wrote $OUT"

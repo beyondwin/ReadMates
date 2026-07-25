@@ -23,6 +23,7 @@ import com.readmates.session.application.HostSessionFeedbackDocument
 import com.readmates.session.application.HostSessionListPage
 import com.readmates.session.application.HostSessionListQuery
 import com.readmates.session.application.HostSessionListSummary
+import com.readmates.session.application.HostSessionOpenNotAllowedException
 import com.readmates.session.application.HostSessionRecordStagingRequiredException
 import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.application.UpcomingSessionItem
@@ -375,7 +376,7 @@ class HostSessionServicesTest {
     }
 
     @Test
-    fun `invalidation failure does not fail host mutation`() {
+    fun `post commit invalidation failure does not fail the completed host mutation`() {
         val port = RecordingHostSessionPorts()
         val invalidation = ThrowingReadCacheInvalidationPort()
         val service = HostSessionPublicationService(port, invalidation)
@@ -388,14 +389,28 @@ class HostSessionServicesTest {
             )
 
         var result: HostPublicationResponse? = null
-        assertDoesNotThrow {
-            service
-                .upsertPublication(command)
-                .also { result = it }
-        }
+        TransactionSynchronizationManager.initSynchronization()
+        try {
+            assertDoesNotThrow {
+                service
+                    .upsertPublication(command)
+                    .also { result = it }
+            }
 
-        assertEquals(SessionRecordVisibility.PUBLIC, result?.visibility)
-        assertEquals(1, invalidation.attempts)
+            assertEquals(SessionRecordVisibility.PUBLIC, result?.visibility)
+            assertEquals(0, invalidation.attempts)
+
+            assertDoesNotThrow {
+                TransactionSynchronizationManager.getSynchronizations().forEach { synchronization ->
+                    synchronization.afterCommit()
+                }
+            }
+
+            assertEquals(SessionRecordVisibility.PUBLIC, result?.visibility)
+            assertEquals(1, invalidation.attempts)
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization()
+        }
     }
 
     @Test
@@ -438,6 +453,57 @@ class HostSessionServicesTest {
         service.publish(command)
 
         assertEquals(emptyList<UUID>(), invalidation.clubs)
+    }
+
+    @Test
+    fun `duplicate lifecycle replays return stable results without second write cache eviction or audit transition`() {
+        val port =
+            RecordingHostSessionPorts().apply {
+                openChanged = false
+                closeChanged = false
+                publishChanged = false
+            }
+        val invalidation = RecordingReadCacheInvalidationPort()
+        val service = HostSessionLifecycleService(port, port, port, invalidation)
+        val command = HostSessionIdCommand(host, sessionId)
+
+        captureHostSessionLogs().use { logs ->
+            val opened = service.open(command)
+            val closed = service.close(command)
+            val published = service.publish(command)
+
+            assertThat(opened.state).isEqualTo("OPEN")
+            assertThat(closed.state).isEqualTo("CLOSED")
+            assertThat(published.state).isEqualTo("PUBLISHED")
+            assertThat(port.lifecycleStateWriteCount).isZero()
+            assertThat(invalidation.clubs).isEmpty()
+            assertThat(logs.events).isEmpty()
+            assertLifecycleHasNoNotificationDispatchCollaborator()
+        }
+    }
+
+    @Test
+    fun `forbidden lifecycle transition propagates error without write cache eviction or audit transition`() {
+        val failure = HostSessionOpenNotAllowedException()
+        val port =
+            RecordingHostSessionPorts().apply {
+                openFailure = failure
+            }
+        val invalidation = RecordingReadCacheInvalidationPort()
+        val service = HostSessionLifecycleService(port, port, port, invalidation)
+
+        captureHostSessionLogs().use { logs ->
+            val thrown =
+                assertThrows(HostSessionOpenNotAllowedException::class.java) {
+                    service.open(HostSessionIdCommand(host, sessionId))
+                }
+
+            assertThat(thrown).isSameAs(failure)
+            assertThat(port.lifecycleStateWriteCount).isZero()
+            assertThat(invalidation.clubs).isEmpty()
+            assertThat(logs.events).isEmpty()
+            assertLifecycleHasNoNotificationDispatchCollaborator()
+        }
     }
 
     @Test
@@ -539,6 +605,8 @@ class HostSessionServicesTest {
         var openChanged = true
         var closeChanged = true
         var publishChanged = true
+        var openFailure: RuntimeException? = null
+        var lifecycleStateWriteCount = 0
         var throwOnUpsertPublication = false
         var visibilityState = "OPEN"
         var currentVisibility = SessionRecordVisibility.HOST_ONLY
@@ -649,6 +717,10 @@ class HostSessionServicesTest {
 
         override fun open(command: HostSessionIdCommand): HostSessionTransitionResult {
             openCommand = command
+            openFailure?.let { throw it }
+            if (openChanged) {
+                lifecycleStateWriteCount += 1
+            }
             return HostSessionTransitionResult(
                 detail = hostSessionDetail(command.sessionId).copy(state = "OPEN"),
                 changed = openChanged,
@@ -657,6 +729,9 @@ class HostSessionServicesTest {
 
         override fun close(command: HostSessionIdCommand): HostSessionTransitionResult {
             closeCommand = command
+            if (closeChanged) {
+                lifecycleStateWriteCount += 1
+            }
             return HostSessionTransitionResult(
                 detail = hostSessionDetail(command.sessionId).copy(state = "CLOSED"),
                 changed = closeChanged,
@@ -665,6 +740,9 @@ class HostSessionServicesTest {
 
         override fun publish(command: HostSessionIdCommand): HostSessionTransitionResult {
             publishCommand = command
+            if (publishChanged) {
+                lifecycleStateWriteCount += 1
+            }
             return HostSessionTransitionResult(
                 detail = hostSessionDetail(command.sessionId).copy(state = "PUBLISHED"),
                 changed = publishChanged,

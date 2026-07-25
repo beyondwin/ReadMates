@@ -12,6 +12,7 @@ import com.readmates.sessionrecord.application.model.HostNotificationComposerCon
 import com.readmates.sessionrecord.application.model.HostSessionHistoryAttendanceTransition
 import com.readmates.sessionrecord.application.model.HostSessionHistoryItem
 import com.readmates.sessionrecord.application.model.PreviewSessionRecordApplyCommand
+import com.readmates.sessionrecord.application.model.RebaseSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.RestoreSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.SaveSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.SessionRecordApplyPreview
@@ -78,6 +79,20 @@ data class SaveSessionRecordDraftRequest(
             sessionId = sessionId,
             snapshot = snapshot.toDomain(),
             expectedDraftRevision = expectedDraftRevision,
+        )
+}
+
+data class RebaseSessionRecordDraftRequest(
+    @field:Positive val expectedDraftRevision: Long,
+    @field:PositiveOrZero val expectedLiveRevision: Long,
+    val expectedSessionUpdatedAt: OffsetDateTime,
+) {
+    fun toCommand(sessionId: UUID) =
+        RebaseSessionRecordDraftCommand(
+            sessionId = sessionId,
+            expectedDraftRevision = expectedDraftRevision,
+            expectedLiveRevision = expectedLiveRevision,
+            expectedSessionUpdatedAt = expectedSessionUpdatedAt,
         )
 }
 
@@ -162,6 +177,7 @@ data class SessionRecordValidationSummaryResponse(
 data class SessionRecordEditorResponse(
     val sessionId: String,
     val liveRevision: Long,
+    val liveSessionUpdatedAt: OffsetDateTime,
     val liveSnapshot: SessionRecordSnapshotResponse,
     val draft: SessionRecordDraftResponse?,
     val draftLiveBaseStale: Boolean,
@@ -208,6 +224,7 @@ fun SessionRecordEditor.toResponse() =
     SessionRecordEditorResponse(
         sessionId = live.sessionId.toString(),
         liveRevision = live.revision,
+        liveSessionUpdatedAt = live.sessionUpdatedAt,
         liveSnapshot = live.snapshot.toResponse(),
         draft = draft?.toResponse(),
         draftLiveBaseStale = draftLiveBaseStale,

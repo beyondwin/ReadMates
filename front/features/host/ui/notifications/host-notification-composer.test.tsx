@@ -90,11 +90,13 @@ function renderComposer({
   preview = null,
   onDraftChange = vi.fn(),
   onConfirm = vi.fn(),
+  presentation,
 }: {
   currentDraft?: HostNotificationComposerDraft;
   preview?: ManualNotificationPreviewResponse | null;
   onDraftChange?: (next: HostNotificationComposerDraft) => void;
   onConfirm?: (resendConfirmed: boolean) => void;
+  presentation?: "dialog" | "workbench";
 } = {}) {
   render(
     <HostNotificationComposer
@@ -111,6 +113,7 @@ function renderComposer({
       onConfirm={onConfirm}
       onSkip={vi.fn()}
       showSkip
+      presentation={presentation}
     />,
   );
   return { onDraftChange, onConfirm };
@@ -201,5 +204,33 @@ describe("HostNotificationComposer", () => {
     await user.click(confirmButton);
 
     expect(onConfirm).toHaveBeenCalledWith(true);
+  });
+
+  it("keeps the shared centered preview heading and confirmation copy", () => {
+    renderComposer({ preview: duplicatePreview });
+
+    const previewRegion = screen.getByRole("region", { name: "발송 전 확인" });
+    expect(
+      within(previewRegion).getByRole("heading", { name: "발송 전 확인" }),
+    ).toBeVisible();
+    expect(
+      within(previewRegion).getByRole("button", { name: "발송 확인" }),
+    ).toBeInTheDocument();
+    expect(
+      within(previewRegion).queryByRole("button", { name: "3명에게 알림 발송" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the selected member count in workbench presentation", () => {
+    renderComposer({
+      currentDraft: {
+        ...draft,
+        recipientMode: "SELECTED_MEMBERS",
+        selectedMembershipIds: ["membership-1"],
+      },
+      presentation: "workbench",
+    });
+
+    expect(screen.getByText("직접 선택 · 1명")).toBeInTheDocument();
   });
 });

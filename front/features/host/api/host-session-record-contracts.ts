@@ -49,6 +49,7 @@ export type HostSessionRecordDraft = {
 export type HostSessionRecordEditor = {
   sessionId: string;
   liveRevision: number;
+  liveSessionUpdatedAt: string;
   liveSnapshot: SessionRecordSnapshot;
   draft: HostSessionRecordDraft | null;
   draftLiveBaseStale: boolean;
@@ -61,6 +62,12 @@ export type HostSessionRecordEditor = {
 export type SaveHostSessionRecordDraftRequest = {
   expectedDraftRevision: number | null;
   snapshot: SessionRecordSnapshot;
+};
+
+export type RebaseHostSessionRecordDraftRequest = {
+  expectedDraftRevision: number;
+  expectedLiveRevision: number;
+  expectedSessionUpdatedAt: string;
 };
 
 export type PreviewHostSessionRecordApplyRequest = {
@@ -190,6 +197,7 @@ export const HostSessionRecordDraftResponseSchema = z.object({
 export const HostSessionRecordEditorResponseSchema = z.object({
   sessionId: z.string(),
   liveRevision: nonNegativeInteger,
+  liveSessionUpdatedAt: z.string(),
   liveSnapshot: SessionRecordSnapshotResponseSchema,
   draft: HostSessionRecordDraftResponseSchema.nullable(),
   draftLiveBaseStale: z.boolean(),

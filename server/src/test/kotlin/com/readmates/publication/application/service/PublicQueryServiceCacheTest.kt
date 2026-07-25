@@ -16,27 +16,38 @@ class PublicQueryServiceCacheTest {
     private val clubId = UUID.fromString("00000000-0000-0000-0000-000000000099")
 
     @Test
-    fun `returns cached public club without loading port`() {
-        val cache = PublicReadCachePort.InMemoryForTest(club = publicClub())
-        val loader = RecordingPublicLoader()
+    fun `returns stale cached public content while the cache entry still exists`() {
+        val cache =
+            PublicReadCachePort.InMemoryForTest(
+                club = publicClub(clubName = "Cached club before mutation"),
+            )
+        val loader =
+            RecordingPublicLoader(
+                club = publicClub(clubName = "Refetched club from source"),
+            )
         val service = PublicQueryService(loader, cache)
 
         val result = service.getClub()
 
-        assertEquals("ReadMates", result?.clubName)
+        assertEquals("Cached club before mutation", result?.clubName)
         assertEquals(0, loader.clubLoads)
     }
 
     @Test
-    fun `loads and stores public session on cache miss`() {
+    fun `cache miss returns refetched source content and stores that content`() {
         val cache = PublicReadCachePort.InMemoryForTest()
-        val loader = RecordingPublicLoader()
-        val service = PublicQueryService(loader, cache)
         val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301")
+        val loader =
+            RecordingPublicLoader(
+                session = publicSession(sessionId, summary = "Refetched source summary"),
+            )
+        val service = PublicQueryService(loader, cache)
 
-        service.getSession(sessionId)
-        service.getSession(sessionId)
+        val firstResult = service.getSession(sessionId)
+        val secondResult = service.getSession(sessionId)
 
+        assertEquals("Refetched source summary", firstResult?.summary)
+        assertEquals("Refetched source summary", secondResult?.summary)
         assertEquals(1, loader.sessionLoads)
     }
 
@@ -139,26 +150,28 @@ class PublicQueryServiceCacheTest {
     }
 
     companion object {
-        fun publicClub() =
+        fun publicClub(clubName: String = "ReadMates") =
             PublicClubResult(
-                clubName = "ReadMates",
+                clubName = clubName,
                 tagline = "Read together",
                 about = "About",
                 stats = PublicClubStatsResult(sessions = 1, books = 1, members = 3),
                 recentSessions = emptyList(),
             )
 
-        fun publicSession(sessionId: UUID) =
-            PublicSessionDetailResult(
-                sessionId = sessionId.toString(),
-                sessionNumber = 1,
-                bookTitle = "Book",
-                bookAuthor = "Author",
-                bookImageUrl = null,
-                date = "2026-04-28",
-                summary = "Summary",
-                highlights = emptyList(),
-                oneLiners = emptyList(),
-            )
+        fun publicSession(
+            sessionId: UUID,
+            summary: String = "Summary",
+        ) = PublicSessionDetailResult(
+            sessionId = sessionId.toString(),
+            sessionNumber = 1,
+            bookTitle = "Book",
+            bookAuthor = "Author",
+            bookImageUrl = null,
+            date = "2026-04-28",
+            summary = summary,
+            highlights = emptyList(),
+            oneLiners = emptyList(),
+        )
     }
 }

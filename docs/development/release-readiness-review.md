@@ -32,7 +32,7 @@ DB migration 또는 public API contract 변경이 포함된 release는 일반 �
 
 - **Migration scope:** 변경된 `server/src/main/resources/db/mysql/migration/V*.sql` 파일, Flyway 적용 방향, additive 여부, rollback 대신 forward-fix가 필요한 이유.
 - **API contract scope:** 변경된 route, method, request schema, response schema, error code, auth requirement, frontend Zod fixture/export 영향.
-- **Deployment order:** `main` merge, annotated release tag, `Deploy Front`, `Deploy Server Image`, OCI compose promotion, post-deploy smoke 순서.
+- **Deployment order:** `main` merge, annotated release tag, `Deploy Server Image`, 필요한 `sync-config(restart_api=false)`, OCI compose promotion/Flyway/health, same-tag `Deploy Front` manual dispatch, post-deploy smoke 순서.
 - **Review path:** non-author reviewer 존재 여부, solo-admin release PR 사용 여부, branch protection blocker가 있다면 `POLICY_MISMATCH`, `CHECK_FAILURE`, `MISSING_EVIDENCE` 중 하나로 분류.
 - **Smoke evidence:** anonymous BFF/auth status, logged-in host/member route, OAuth redirect marker, DB-backed route, admin route 중 변경 표면에 맞는 smoke 결과.
 - **Public safety:** public release candidate check 결과와 private value, token-shaped value, local path, member data 노출 여부.
@@ -98,3 +98,45 @@ findings를 우선순위별로 보고합니다.
 - CHANGELOG/release note, 운영 문서, CI/deploy, security-code hygiene, architecture baseline, public-release safety가 모두 고려되었습니다.
 - 실행한 검증과 skipped validation이 구분되어 있습니다.
 - “테스트 통과”만을 근거로 운영/릴리즈 리스크가 없다고 결론내리지 않았습니다.
+
+## v2.0.0 release evidence — 2026-07-25
+
+### 범위와 결정
+
+- 비교 범위는 이전 제품 tag `v1.17.3..codex/release-v2.0.0`과 publication 직전 `origin/main..HEAD`입니다. 이 범위는 frontend, Pages Functions BFF, Spring API, V37–V42 migration, AI/notification/session-record 운영 계약, CI/deploy workflow와 active docs를 포함합니다.
+- Release class는 **major**입니다. 기존 SEND/SKIP host-action 계약을 제거하고 staged session-record와 explicit notification composer API를 함께 도입해 이전 frontend/server 조합을 장기간 혼용할 수 없습니다.
+- Local decision은 **GO after release PR CI**입니다. Release PR의 merge SHA에서 CI가 성공해야 tag를 만들며, tag 뒤 production-only 단계가 하나라도 실패하면 frontend dispatch와 release 완료 판정을 중단합니다.
+
+### Migration과 API contract
+
+- V37/V38은 grounded AI content-free receipt/audit·provider-attempt metadata를 additive하게 추가합니다.
+- V39–V41은 `session_record_drafts`, immutable `session_record_revisions`, metadata-only host audit와 AI receipt/draft binding을 추가합니다. JSON import와 AI commit은 reviewed snapshot을 staged draft에 저장하고 live record는 별도 apply 전까지 바꾸지 않습니다.
+- V42는 idempotent `session_record_apply_receipts`, opt-in `club_notification_policies`, manual dispatch content revision과 `SELECTED_MEMBERS` audience를 forward-only로 추가합니다. Destructive rollback 대신 schema를 남긴 image rollback/forward-fix를 사용합니다.
+- 새 host record contract는 `/api/host/sessions/{sessionId}/record-editor`, `record-draft`, `record-apply[-preview]`, `history`, revision restore route family입니다.
+- 새 notification contract는 `/api/host/notifications/manual/{options,dispatches,preview}`, manual confirm, `/api/host/notifications/policy`입니다. Close, Escape, navigation, content save는 dispatch를 만들지 않고 preview/confirm만 outbox를 만들 수 있습니다.
+- Frontend Zod fixture export와 server serialization contract가 AI job/evidence, draft/apply, notification preview/confirm problem shapes를 고정합니다.
+
+### CI/CD와 review path
+
+- Tag push는 `Deploy Server Image`만 시작합니다. Trivy가 통과한 GHCR tag를 만든 뒤 `sync-config(restart_api=false, dry_run=false)` → OCI Compose promotion/Flyway/health/BFF → `Deploy Front(release_tag=v2.0.0)` → final smoke 순서를 사용합니다. Front workflow는 입력 tag 형식과 checkout commit을 검증하므로 새 frontend가 구 backend API를 먼저 호출하는 window를 만들지 않습니다.
+- `sync-config`는 `READMATES_HOST_WRITE_CLIENT_CONTRACT_REQUIRED=true`를 고정합니다. 새 browser는 host mutation에 v2를 선언하고 새 Pages BFF만 그 값을 trusted upstream header로 재생성하며 Spring도 exact match를 요구합니다. 따라서 backend-first 창과 열린 구 탭은 host write 409로 동결되고 새 browser + 새 BFF만 재개합니다. E2E backend도 같은 gate를 켜 전체 browser→Vite→Spring 경로를 검증합니다.
+- Live `main` protection 조회 결과 required status checks와 required PR reviews가 설정되지 않았고 admin enforcement도 꺼져 있습니다. 분류는 `POLICY_MISMATCH`이며 보호가 적용된 것처럼 간주하지 않습니다.
+- 이 release는 DB migration, public API, deploy workflow를 바꾸므로 direct-push solo path를 사용하지 않습니다. Release PR을 만들고 CI의 merge SHA 성공을 수동 확인한 뒤 admin merge하며, `main` CI 성공을 다시 확인한 뒤 tag를 발행합니다.
+
+### Local verification
+
+| Evidence | Result |
+| --- | --- |
+| `./scripts/pre-push-check.sh --full --release` | PASS — agent guidance, frontend lint/coverage/build, Zod fixtures, server PR quality, AI/privacy/config validators, public candidate/gitleaks, Testcontainers integration, Playwright E2E와 observability config gates |
+| `corepack pnpm --dir front test:e2e` | PASS — 92/92 |
+| `corepack pnpm --dir front test:ct:docker` | PASS — 7/7 route-critical component tests |
+| `actionlint .github/workflows/deploy-front.yml .github/workflows/deploy-server.yml .github/workflows/sync-config.yml` | PASS — no findings |
+| Public release candidate | PASS — candidate built, required files/workflows present, gitleaks no findings |
+
+### Production-only pending and residual risk
+
+- Publication 전 pending 단계는 release PR/main CI, annotated tag, GHCR image scan/promote, config sync, OCI backup/Flyway/promotion, same-tag frontend dispatch, GitHub Release, production smoke입니다. 실행 결과는 GitHub workflow/release와 최종 sanitized deployment report에 남깁니다.
+- Private transcript를 live provider에 보내는 품질 평가는 실행하지 않습니다. Provider account retention/paid-tier 상태는 CI가 증명하지 않으며 현재 production allowlist와 fail-closed 설정을 이 release에서 임의로 넓히지 않습니다.
+- V37–V42는 forward-only입니다. OCI promotion 전에 최근 48시간 backup을 확인하고, 실패 시 새 frontend를 배포하지 않은 채 AI/consumer를 먼저 끄고 schema를 유지하는 이전 호환 image 또는 patch release로 roll forward합니다.
+- Frontend만 이전 tag로 rollback하면 v2 backend가 host write를 409로 계속 동결합니다. 읽기/멤버 표면을 보존한 안전 상태이며, 쓰기 복구는 호환 frontend 재배포 또는 schema를 보존한 backend rollback/forward-fix로 수행합니다.
+- 실제 알림 발송은 release smoke에 포함하지 않습니다. 인증된 host 확인은 preview close/no-send와 기존 sanitized ledger를 사용하며 실제 member address/body를 증거에 남기지 않습니다.

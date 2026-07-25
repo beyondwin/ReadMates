@@ -10,6 +10,9 @@ import { createPortal } from "react-dom";
 export type HostNotificationComposerDialogProps = {
   open: boolean;
   busy: boolean;
+  variant?: "centered" | "side-sheet";
+  title?: string;
+  description?: string;
   children: ReactNode;
   onClose: () => void;
 };
@@ -26,6 +29,9 @@ const focusableSelector = [
 export function HostNotificationComposerDialog({
   open,
   busy,
+  variant = "centered",
+  title = "알림 보내기",
+  description = "대상과 채널을 확인한 뒤에만 알림이 발송됩니다.",
   children,
   onClose,
 }: HostNotificationComposerDialogProps) {
@@ -95,7 +101,10 @@ export function HostNotificationComposerDialog({
     <div
       role="presentation"
       data-testid="host-notification-composer-backdrop"
-      className="host-notification-composer-scrim"
+      className={[
+        "host-notification-composer-scrim",
+        variant === "side-sheet" ? "host-notification-composer-scrim--side-sheet" : "",
+      ].filter(Boolean).join(" ")}
       onMouseDown={handleBackdrop}
     >
       <section
@@ -105,14 +114,16 @@ export function HostNotificationComposerDialog({
         aria-labelledby="host-notification-composer-dialog-title"
         aria-describedby="host-notification-composer-dialog-description"
         tabIndex={-1}
-        className="surface host-notification-composer-dialog"
+        className={[
+          "surface",
+          "host-notification-composer-dialog",
+          variant === "side-sheet" ? "host-notification-composer-dialog--side-sheet" : "",
+        ].filter(Boolean).join(" ")}
         onKeyDown={handleKeyDown}
       >
         <div className="sr-only">
-          <h2 id="host-notification-composer-dialog-title">알림 보내기</h2>
-          <p id="host-notification-composer-dialog-description">
-            대상과 채널을 확인한 뒤에만 알림이 발송됩니다.
-          </p>
+          <h2 id="host-notification-composer-dialog-title">{title}</h2>
+          <p id="host-notification-composer-dialog-description">{description}</p>
         </div>
         {children}
       </section>

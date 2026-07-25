@@ -70,6 +70,23 @@ describe("readmatesFetchResponse", () => {
     const headers = fetchMock.mock.calls[0]?.[1]?.headers;
     expect(headers).toBeInstanceOf(Headers);
     expect((headers as Headers).has("Content-Type")).toBe(false);
+    expect((headers as Headers).get("X-Readmates-Client-Contract")).toBe("v2");
+  });
+
+  it("declares the v2 client contract only for host mutations", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await readmatesFetchResponse("/api/host/sessions/session-1", { method: "PATCH" });
+    await readmatesFetchResponse("/api/host/sessions/session-1");
+    await readmatesFetchResponse("/api/sessions/current/rsvp", { method: "POST" });
+
+    const hostMutationHeaders = fetchMock.mock.calls[0]?.[1]?.headers as Headers;
+    const hostReadHeaders = fetchMock.mock.calls[1]?.[1]?.headers as Headers;
+    const memberMutationHeaders = fetchMock.mock.calls[2]?.[1]?.headers as Headers;
+    expect(hostMutationHeaders.get("X-Readmates-Client-Contract")).toBe("v2");
+    expect(hostReadHeaders.get("X-Readmates-Client-Contract")).toBeNull();
+    expect(memberMutationHeaders.get("X-Readmates-Client-Contract")).toBeNull();
   });
 
   it("adds the current scoped app club slug to BFF API requests", async () => {
