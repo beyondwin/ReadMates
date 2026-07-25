@@ -3,9 +3,9 @@
 ReadMates는 여러 정기 독서모임의 세션 준비, 참여 관리, 기록 공개, 피드백 문서 열람을 클럽별 공개 사이트와 공유 로그인 세션으로 묶은 멤버십 풀스택 웹 서비스입니다.
 
 - Site: [https://readmates.pages.dev](https://readmates.pages.dev)
-- Stack: `React 19`, `TypeScript`, `Vite`, `Cloudflare Pages Functions`, `Kotlin`, `Spring Boot`, `Spring Security`, `MySQL`, `Flyway`, optional `Redis`, `Redpanda/Kafka`, `Micrometer/Prometheus`
+- Stack: `React 19`, `TypeScript`, `Vite`, `Cloudflare Pages Functions`, `Kotlin`, `Spring Boot`, `Spring AI 2`, `Spring Security`, `MySQL`, `Flyway`, optional `Redis`, `Redpanda/Kafka`, `Micrometer/OpenTelemetry`
 - Scope: 멀티 클럽 플랫폼에서 클럽별 공개 사이트, 현재·예정 회차 준비, 참여 관리, 기록 공개, 피드백 문서 열람까지 아우르는 운영형 서비스
-- Highlight: Google OAuth, 안전한 로그인 복귀 경로, 서버 측 공유 session cookie, Cloudflare BFF 보안 경계, club-scoped URL과 역할 권한, Cloudflare Pages marker 기반 domain alias 상태 확인, optional Redis rate limit/cache와 근거 기반 AI job state/cost cap, 현재/예정 세션 공개 범위, 세션 기록 JSON 가져오기와 전체 대본 AI 세션 생성·근거 검토, 멤버 알림 설정과 알림함, 호스트 수동 알림 발송 워크벤치, 피드백 문서 접근 제어, 디자인 시스템 workspace, Playwright E2E, route-critical component visual regression, Lighthouse diagnostic, 공개 릴리즈 후보 scan
+- Highlight: Google OAuth, 안전한 로그인 복귀 경로, 서버 측 공유 session cookie, Cloudflare BFF 보안 경계, club-scoped URL과 역할 권한, Cloudflare Pages marker 기반 domain alias 상태 확인, 전체 대본 근거 검토·멀티 프로바이더 Spring AI·비용/호출 fail-closed·receipt 기반 복구, 현재/예정 세션 공개 범위, 세션 기록 JSON 가져오기, 멤버 알림 설정과 알림함, 호스트 우선순위 운영 원장과 3단계 수동 알림 발송 워크벤치, 피드백 문서 접근 제어, 디자인 시스템 workspace, Playwright E2E, route-critical component visual regression, Lighthouse diagnostic, 공개 릴리즈 후보 scan
 - 운영 파이프라인: MySQL transactional event outbox, Redpanda/Kafka relay/consumer 기반 이메일 및 in-app 알림, 수동 발송 preview/confirm 감사 원장, 클럽명 기반 HTML/plain text 이메일 템플릿, Micrometer/Prometheus 운영 지표, OCI Object Storage 백업 업로드를 지원합니다.
 
 이 저장소는 외부 공개를 전제로 정리되어 있습니다. 운영 secret, 실제 멤버 데이터, private deployment state, DB dump, 로컬 경로, OCI OCID는 문서와 예시에 포함하지 않습니다.
@@ -28,7 +28,8 @@ Showcase 문서는 현재 동작의 source of truth가 아니라 읽는 순서�
 - **BFF 보안 경계와 무중단 secret rotation** — Cloudflare Pages Functions에서 cookie domain strip, 내부 헤더 차단, multi-secret 회전을 한 곳에 응집. 분 단위 secret 회전과 audit log를 보유합니다. → [Case study](docs/case-studies/01-bff-security-and-secret-rotation.md)
 - **Mutation과 알림 발송의 결합 분리** — MySQL transactional outbox + Kafka relay로 mutation 트랜잭션과 SMTP/in-app 발송을 분리. PENDING/PUBLISHING/PUBLISHED/FAILED/DEAD state machine과 masked audit ledger를 운영합니다. → [Case study](docs/case-studies/02-notification-pipeline-with-outbox.md)
 - **Multi-club domain platform** — 하나의 인스턴스에서 path-routed shared fallback과 custom domain alias를 같은 codepath로. host/slug 우선순위 설계와 dev/prod parity가 깨진 실제 incident를 post-mortem으로 보유합니다. → [Case study](docs/case-studies/03-multi-club-domain-platform.md)
-- **PII-safe grounded AI session generation** — 전체 대본과 활성 멤버를 먼저 검증하고, revision별 근거와 네 섹션 review를 통과한 결과만 저장합니다. Redis 4-payload TTL, Kafka metadata-only queue, content-free MySQL receipt, 비용 admission lease와 복구 절차를 함께 둡니다. → [Case study](docs/case-studies/04-pii-safe-ai-session-generation.md)
+- **PII-safe grounded AI review** — 전체 대본의 모든 화자를 같은 클럽의 활성 멤버와 먼저 exact match하고, 서버가 원문 turn에서 만든 revision별 근거와 네 섹션 review를 모두 통과한 결과만 공통 staged draft에 저장합니다. 원본 transcript·turn·evidence와 검토 전 result는 6시간 Redis payload에만 두며 Kafka, audit, receipt에는 콘텐츠를 남기지 않습니다. → [Case study](docs/case-studies/04-pii-safe-ai-session-generation.md)
+- **Fail-closed multi-provider AI execution** — OpenAI·Anthropic·Google을 grounded-only Spring AI 2 thin adapter로 통합하되 application이 retry/fallback/repair와 최대 3회 물리 호출, provider별 circuit/concurrency permit, 원자 비용 예약·정산을 소유합니다. Revision CAS와 content-free commit receipt로 DB commit crash window를 복구하고, content-free OpenTelemetry trace와 AI Ops 지표로 운영합니다. → [Provider architecture](docs/development/spring-ai-2-provider-architecture.md)
 
 ## 문서 사용 기준
 
@@ -59,8 +60,8 @@ ReadMates는 이 문제를 단순 게시판이나 CRUD 목록으로 풀지 않�
 | 게스트 | 로그인 없이 클럽별 공개 소개, 공개 기록, 공개 세션 상세를 볼 수 있습니다. |
 | 둘러보기 멤버 | 초대 없이 Google로 로그인한 계정입니다. 비공개 세션 기록, 현재 세션 현황, 멤버 공개 예정 세션을 읽을 수 있지만 RSVP, 체크인, 질문/서평 작성, 피드백 문서 열람, 호스트 도구는 제한됩니다. |
 | 정식 멤버 | 초대 링크를 수락했거나 호스트가 전환한 계정입니다. 현재 세션 참여, 예정 세션 확인, RSVP, 읽은 분량 제출, 질문, 한줄평, 장문 서평 작성, 본인 표시 이름과 이메일 알림 설정 변경, `/app/notifications` 알림함 확인이 가능하며 참석한 회차의 피드백 문서를 읽을 수 있습니다. |
-| 호스트 | 정식 멤버 권한에 운영 권한이 추가됩니다. 초대 생성, 둘러보기 멤버 전환, 멤버 상태와 표시 이름 관리, 예정 세션 생성/수정, 공개 범위 설정, 현재 세션 시작, 참석 확정, 진행 세션 닫기, 닫힌 기록 발행, AI 생성 또는 JSON 가져오기를 통한 세션 기록 패키지 저장, 세션별 수동 알림 발송과 발송 원장 운영을 수행합니다. |
-| 플랫폼 관리자 | `/admin/today` 트리아지 · `/admin/health` 운영 헬스 · `/admin/notifications` 알림 운영 · `/admin/clubs[/{clubId}]` 클럽 운영 · `/admin/ai-ops` AI Ops · `/admin/support` 지원 · `/admin/audit` 감사 ledger · `/admin/analytics` 운영 분석 라우트 패밀리에서 좌측 nav, 상단 status strip, OWNER/OPERATOR/SUPPORT 권한 매트릭스로 플랫폼 운영을 합니다. 클럽별 호스트/멤버 권한과 별도 권한입니다. |
+| 호스트 | 정식 멤버 권한에 운영 권한이 추가됩니다. 우선순위 운영 원장에서 현재 세션과 확인 필요 회차를 관리하고, 초대 생성, 둘러보기 멤버 전환, 멤버 상태와 표시 이름 관리, 예정 세션 생성/수정, 공개 범위 설정, 현재 세션 시작, 참석 확정, 진행 세션 닫기, 닫힌 기록 발행, AI 생성·취소·섹션 재생성 또는 JSON 가져오기를 통한 세션 기록 초안 저장, 3단계 수동 알림 발송과 발송 원장 운영을 수행합니다. |
+| 플랫폼 관리자 | `/admin/today` 트리아지 · `/admin/health` 운영 헬스 · `/admin/notifications` 알림 운영 · `/admin/clubs[/{clubId}]` 클럽 운영 · `/admin/ai-ops` AI Ops · `/admin/support` 지원 · `/admin/audit` 감사 ledger · `/admin/analytics` 운영 분석 라우트 패밀리에서 좌측 nav, 상단 status strip, OWNER/OPERATOR/SUPPORT 권한 매트릭스로 플랫폼 운영을 합니다. AI Ops에서 SUPPORT는 metadata를 읽기만 하고 OWNER/OPERATOR만 허용된 force-cancel·commit recovery를 실행할 수 있습니다. 클럽별 호스트/멤버 권한과 별도 권한입니다. |
 
 로그인은 Google OAuth를 사용하며, 로컬 개발에서는 fixture 기반 dev-login을 사용할 수 있습니다.
 
@@ -83,13 +84,15 @@ Cloudflare Pages
 Spring Boot API
   |-- Google OAuth success handling
   |-- HttpOnly readmates_session cookie
-  |-- optional Redis-backed rate limit/read-through cache, AI job state/evidence
+  |-- optional Redis-backed rate limit/read-through cache
+  |-- grounded AI job state/evidence/cost admission
+  |-- transactional outbox and metadata-only AI job publication
   |-- membership, role, and session authorization
   |-- feedback document parsing and access control
   |-- Flyway migrations
-  |---> Redis (optional, disabled by default)
-  v
-MySQL
+  |---> Redis (optional transient state, disabled by default)
+  |---> Redpanda/Kafka (routing and outbox events)
+  `----> MySQL (source of truth)
 ```
 
 프로덕션에서 브라우저는 Spring API origin을 직접 신뢰 경계로 사용하지 않습니다. 브라우저는 같은 origin의 Cloudflare Pages Functions에 요청하고, BFF가 Spring `/api/**`로 전달하면서 `X-Readmates-Bff-Secret`을 붙입니다. 직접 API origin 예시는 문서에서 `https://api.example.com` 같은 placeholder만 사용합니다.
@@ -100,9 +103,9 @@ MySQL
 
 - Browser-facing origin은 Cloudflare Pages이며, API와 OAuth는 Pages Functions BFF를 통해 Spring으로 전달합니다.
 - 인증은 Google OAuth와 서버 측 `readmates_session` cookie를 사용하고, raw token은 저장하지 않습니다. 로그인 세션은 platform 전체에서 공유하고 role/status는 club membership별로 판정합니다. 프런트엔드는 같은 origin의 안전한 relative `returnTo`만 로그인과 OAuth 시작 흐름에 전달합니다.
-- MySQL/Flyway가 source of truth이며 Redis는 rate limit, cache, invalidation과 AI generation의 짧은 TTL transcript/turn/result/evidence handoff 및 cost admission을 위한 optional 보조 계층입니다. AI generation은 Redis가 불명확하면 provider 호출 전에 fail closed합니다.
+- MySQL/Flyway가 live 콘텐츠와 호스트가 저장한 staged draft의 source of truth이며 Redis는 rate limit, cache, invalidation과 AI generation의 짧은 TTL transcript/turn/result/evidence handoff 및 cost admission을 위한 optional 보조 계층입니다. AI generation은 Redis나 provider capability가 불명확하면 provider 호출 전에 fail closed하고, Kafka에는 content가 아닌 routing metadata만 전달합니다.
 - 세션 lifecycle, 공개 범위, 역할 기반 권한, 피드백 문서 접근 제어는 서버에서 검증합니다.
-- 알림은 MySQL transactional outbox와 Kafka relay/consumer로 처리하며, 서버의 순수 템플릿 helper가 club-scoped in-app/deep link/email subject/plain/HTML copy를 함께 생성합니다. 호스트는 세션과 대상 그룹을 고른 뒤 preview를 10분 TTL로 확정해 수동 알림을 만들 수 있고, duplicate dispatch는 명시적 재발송 확인을 요구합니다. SMTP는 HTML이 있으면 plain text fallback을 포함한 MIME 메시지로 발송하고, 공개 릴리즈 후보는 별도 scanner로 점검합니다.
+- 알림은 MySQL transactional outbox와 Kafka relay/consumer로 처리하며, 서버의 순수 템플릿 helper가 club-scoped in-app/deep link/email subject/plain/HTML copy를 함께 생성합니다. 콘텐츠 저장 자체는 알림을 발송하지 않고, 호스트가 `회차 → 알림 종류 → 대상과 채널`을 정한 뒤 10분 TTL preview에서 수신 인원을 확인하고 확정해야 수동 dispatch가 만들어집니다. 닫기·Escape·화면 이동은 발송하지 않으며 duplicate dispatch는 명시적 재발송 확인을 요구합니다. SMTP는 HTML이 있으면 plain text fallback을 포함한 MIME 메시지로 발송하고, 공개 릴리즈 후보는 별도 scanner로 점검합니다.
 
 상세한 배경과 trade-off는 [주요 기술적 의사결정](docs/development/technical-decisions.md)을 참고합니다.
 
@@ -111,9 +114,11 @@ MySQL
 ReadMates 호스트 도구는 세션 기록을 채우는 두 가지 입력 흐름을 제공합니다.
 
 - **외부 정리된 JSON 가져오기**: 호스트가 앱 밖에서 정리한 `readmates-session-import:v1` JSON을 호스트 세션 편집기로 가져옵니다. 이 흐름은 server/frontend에서 AI API를 호출하지 않고, 앱은 검증과 commit만 담당합니다. 형식 정의는 [docs/development/session-import-generator.md](docs/development/session-import-generator.md).
-- **In-app grounded AI 생성**: 호스트가 UTF-8/BOM TXT 전체 대본을 올리면 서버가 모든 화자를 같은 클럽의 활성 멤버와 exact match한 뒤, 서버 capability catalog가 허용한 Claude/OpenAI/Gemini 모델로 구조화 결과를 만듭니다. Revision별 evidence와 네 섹션 review가 모두 끝나야 저장할 수 있습니다. Transcript/turns/result/evidence는 Redis에 6시간만 두고 commit/cancel 뒤 삭제하며, Kafka와 MySQL에는 콘텐츠를 남기지 않습니다.
+- **In-app grounded AI 생성**: 호스트가 UTF-8/BOM TXT 전체 대본을 올리면 서버가 모든 화자를 같은 클럽의 활성 멤버와 exact match한 뒤, 서버 capability catalog가 허용한 Claude/OpenAI/Gemini 모델로 구조화 결과를 만듭니다. Revision별 evidence와 네 섹션 review가 모두 끝나야 공통 staged draft로 저장할 수 있고, 별도 record apply 전까지 live 콘텐츠는 바뀌지 않습니다. Transcript/turns/evidence와 검토 전 result는 Redis에 최대 6시간만 두고 commit/cancel에서 즉시 정리를 시도합니다. Commit cleanup 실패는 `cleanupPending`으로 재시도하고 TTL이 최종 backstop이 되며, Kafka와 MySQL audit/receipt에는 콘텐츠를 복사하지 않습니다. 검토 완료 snapshot은 `session_record_drafts`에 내구 저장됩니다.
 
-In-app AI 생성은 `readmates.aigen.enabled`, `readmates.aigen.enabled-providers`, provider API key와 provider별 retention 확인으로 gate됩니다. Kill switch와 provider allowlist는 기본 off이며 실행 경로는 grounded-only Spring AI 2 thin adapter입니다. Application이 최대 3회 물리 호출, retry/fallback/repair, Redis 원자 비용 예약·정산과 crash recovery를 소유합니다. 호스트 사용 흐름과 입력 계약은 [세션 기록 완성 가이드](docs/development/session-import-generator.md#in-app-근거-기반-ai-생성), 최종 provider/trace 계약은 [Spring AI 2 provider architecture](docs/development/spring-ai-2-provider-architecture.md), 운영 절차는 [AI generation runbook](docs/operations/runbooks/ai-session-generation.md)을 기준으로 합니다.
+In-app AI 생성은 `readmates.aigen.enabled`, `readmates.aigen.enabled-providers`, provider API key와 provider별 retention 확인으로 gate됩니다. Kill switch와 provider allowlist는 기본 off이며 실행 경로는 grounded-only Spring AI 2 thin adapter입니다. Application이 최대 3회 물리 호출, retry/fallback/schema correction/section repair, provider별 circuit·동시성 permit, Redis 원자 비용 예약·정산을 소유합니다. 응답 유실이나 timeout으로 비용이 불명확하면 자동 환불하지 않으며, revision CAS와 content-free MySQL receipt가 commit crash window를 안전하게 복구합니다. OpenTelemetry trace와 AI Ops는 provider/model/status/cost-basis 같은 허용된 metadata만 사용합니다. 호스트 사용 흐름과 입력 계약은 [세션 기록 완성 가이드](docs/development/session-import-generator.md#in-app-근거-기반-ai-생성), 최종 provider/trace 계약은 [Spring AI 2 provider architecture](docs/development/spring-ai-2-provider-architecture.md), 운영 절차는 [AI generation runbook](docs/operations/runbooks/ai-session-generation.md)을 기준으로 합니다.
+
+호스트는 진행 중 job을 취소하고 현재 revision의 섹션을 재생성할 수 있으며, 재생성은 전체 review를 초기화합니다. Platform AI Ops는 private content를 열지 않고 metadata만 다루며 SUPPORT는 read-only, OWNER/OPERATOR만 상태상 허용된 force-cancel과 commit recovery를 실행합니다. Live provider 품질 호출과 계정 retention 확인은 일반 CI에 포함하지 않고 별도 운영 승인으로 유지합니다.
 
 ## 개발 계획과 스펙 기록
 
@@ -133,9 +138,10 @@ ReadMates는 기능을 설계하고 구현하는 과정에서 작성한 계획�
 | Frontend tests | `Vitest`, `Testing Library`, `Playwright E2E`, `Playwright CT`, `Lighthouse` diagnostic |
 | Edge/BFF | `Cloudflare Pages Functions` |
 | Backend | `Kotlin`, `Spring Boot`, `Spring Security`, `OAuth2 Client`, `JDBC`, `Flyway` |
+| AI generation | `Spring AI 2`, provider-specific `ChatModel`, Redis revision/cost state, Kafka metadata queue |
 | Database | `MySQL 8` compatible database, `Testcontainers MySQL` |
 | Cache/Rate limit | Optional `Redis`, `Testcontainers Redis` |
-| Async/Operations | `Redpanda/Kafka`, `Micrometer`, `Prometheus`, OCI Email Delivery, OCI Object Storage backup |
+| Async/Operations | `Redpanda/Kafka`, `Micrometer`, `OpenTelemetry`, `Prometheus`, `Tempo`, `Grafana`, OCI Email Delivery, OCI Object Storage backup |
 | Deployment | `Cloudflare Pages`, `OCI Compute`, `Docker Compose`, `OCI MySQL HeatWave`, `systemd`, `Caddy` |
 
 ## 검증 방식
@@ -242,6 +248,8 @@ pnpm --dir front dev
 | 변경 acceptance matrix | [docs/development/acceptance-matrix.md](docs/development/acceptance-matrix.md) |
 | Cross-surface 작업 체크리스트 | [docs/development/vertical-slice-checklist.md](docs/development/vertical-slice-checklist.md) |
 | AI 세션 기록 생성과 외부 JSON 가져오기 | [docs/development/session-import-generator.md](docs/development/session-import-generator.md) |
+| Spring AI provider, 비용, trace 계약 | [docs/development/spring-ai-2-provider-architecture.md](docs/development/spring-ai-2-provider-architecture.md) |
+| AI 생성 운영 절차 | [docs/operations/runbooks/ai-session-generation.md](docs/operations/runbooks/ai-session-generation.md) |
 | 디자인 시스템 | [design/README.md](design/README.md) |
 | 주요 기술적 의사결정 | [docs/development/technical-decisions.md](docs/development/technical-decisions.md) |
 | 테스트 가이드 | [docs/development/test-guide.md](docs/development/test-guide.md) |

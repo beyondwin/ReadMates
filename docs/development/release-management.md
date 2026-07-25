@@ -127,9 +127,9 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식의 semantic version을 사용합니다.
    git push origin v1.2.0
    ```
 
-   `main` push는 CI만 실행하고 production 배포를 시작하지 않습니다. `v*` release tag push가 Cloudflare Pages 프론트 배포 workflow와 GHCR server image scan/promote workflow를 시작합니다.
+   `main` push는 CI만 실행하고 production 배포를 시작하지 않습니다. `v*` release tag push는 GHCR server image scan/promote workflow만 시작합니다. 새 frontend가 구 backend API를 먼저 호출하지 않도록 Cloudflare Pages production 배포는 backend OCI promotion과 health 확인 뒤 같은 release tag를 입력해 수동 실행합니다.
 
-   새 버전 발행과 운영 배포를 한 번에 진행할 때는 [새 버전 발행과 운영 배포 Runbook](../deploy/release-publish-runbook.md)을 함께 사용합니다. 이 runbook은 tag push 뒤 `Deploy Front`, `Deploy Server Image`, GitHub Release, OCI Compose promotion, smoke 확인이 같은 제품 tag를 바라보는지 점검하는 순서를 정리합니다.
+   새 버전 발행과 운영 배포를 한 번에 진행할 때는 [새 버전 발행과 운영 배포 Runbook](../deploy/release-publish-runbook.md)을 함께 사용합니다. 이 runbook은 tag push 뒤 `Deploy Server Image`, OCI Compose promotion, `Deploy Front(release_tag)`, GitHub Release, smoke 확인이 같은 제품 tag를 바라보는지 점검하는 순서를 정리합니다.
 
    서버 변경이 포함된 release tag는 `Deploy Server Image` workflow가 scan-candidate digest를 Trivy로 검사한 뒤 같은 digest를 release tag로 promote했는지 확인합니다. 수동 실행할 때는 release tag/ref에서 실행하고 workflow input `image_tag`에도 같은 release tag를 넣습니다. OCI backend는 그 release artifact를 같은 제품 버전 image tag로 배포합니다.
 
@@ -138,6 +138,12 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식의 semantic version을 사용합니다.
    VM_PUBLIC_IP='<vm-public-ip>' \
    CADDY_SITE=api.example.com \
    ./deploy/oci/05-deploy-compose-stack.sh
+   ```
+
+   Backend health와 BFF contract를 확인한 다음 frontend를 같은 tag에서 배포합니다.
+
+   ```bash
+   gh workflow run "Deploy Front" --ref main -f release_tag=v1.2.0
    ```
 
 8. GitHub Release를 만듭니다.
@@ -174,11 +180,11 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식의 semantic version을 사용합니다.
 
 ## Branch protection bypass policy
 
-ReadMates `main` branch는 GitHub branch protection 대상입니다. 이 저장소는 단독 운영(solo admin)을 기본 운영 형태로 두므로, branch protection이 실제 reviewer가 없는 self-review를 요구하면 release PR이 구조적으로 막힐 수 있습니다. 정책의 목표는 review 요구를 형식적으로 유지하는 것이 아니라, CI와 release-readiness 증거를 통해 DB/API/auth/deploy 리스크를 추적 가능하게 닫는 것입니다.
+ReadMates `main` branch는 GitHub branch protection 적용을 목표 정책으로 둡니다. 릴리즈마다 GitHub API에서 현재 required check/review/enforce-admin 상태를 다시 확인하며, 설정이 비어 있으면 보호가 적용된 것처럼 가정하지 않고 `POLICY_MISMATCH`와 수동 CI 증거를 release-readiness에 기록합니다. 이 저장소는 단독 운영(solo admin)을 기본 운영 형태로 두므로, branch protection이 실제 reviewer가 없는 self-review를 요구하면 release PR이 구조적으로 막힐 수 있습니다. 정책의 목표는 review 요구를 형식적으로 유지하는 것이 아니라, CI와 release-readiness 증거를 통해 DB/API/auth/deploy 리스크를 추적 가능하게 닫는 것입니다.
 
 ### 기본 원칙
 
-- `main`의 필수 CI status check는 유지합니다.
+- `main`의 필수 CI status check를 설정·유지하는 것이 목표이며, 실제 설정이 없으면 release PR의 merge/tag SHA에서 CI 성공을 수동으로 확인합니다.
 - solo-admin release PR은 명시적인 release-readiness 증거를 남기면 유효한 review artifact로 봅니다.
 - branch protection은 실제 non-author reviewer가 없을 때 불가능한 code-owner self-review를 정상 경로로 요구하지 않습니다.
 - `.github/workflows/**`, deploy scripts, auth/permission, secret/session/token handling, branch protection 정책 변경은 external-review preferred 표면으로 분류합니다.

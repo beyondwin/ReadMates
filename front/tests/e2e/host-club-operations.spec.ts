@@ -87,12 +87,13 @@ async function expectHostOperatingSignalCardPublicSafe(page: Page): Promise<void
   await expectNoHostPrivateSentinels(page);
 }
 
-async function expectHostMobileOperatingSummaryPublicSafe(page: Page): Promise<void> {
+async function expectHostMobilePriorityLedgerPublicSafe(page: Page): Promise<void> {
   const mobileDashboard = page.locator("main.rm-host-dashboard-mobile");
   await expect(mobileDashboard.getByRole("heading", { name: "모임 운영" })).toBeVisible();
-  await expect(mobileDashboard.getByText("오늘의 운영 판단")).toBeVisible();
-  await expect(mobileDashboard.getByText("RSVP 미응답")).toBeVisible();
-  await expect(mobileDashboard.getByText("공개 대기", { exact: true })).toBeVisible();
+  await expect(mobileDashboard.getByRole("heading", { name: "지금 처리할 일" })).toBeVisible();
+  await expect(mobileDashboard.getByRole("heading", { name: "현재 세션", exact: true })).toBeVisible();
+  await expect(mobileDashboard.getByText("처리 대기 원장")).toBeVisible();
+  await expect(mobileDashboard.getByText("운영 도구", { exact: true })).toBeVisible();
   await expectNoHostPrivateSentinels(page);
 }
 
@@ -127,7 +128,7 @@ test("host dashboard keeps operating-signal actions inside the scoped club works
   );
 });
 
-test("host dashboard captures public-safe operating-signal visual evidence", async ({ page }, testInfo) => {
+test("host dashboard captures public-safe operating-signal and priority-ledger visual evidence", async ({ page }, testInfo) => {
   await loginWithGoogleFixture(page, "host@example.com");
   await routeHostDashboardPublicSafe(page);
   await routeHostClubOperations(page);
@@ -143,7 +144,7 @@ test("host dashboard captures public-safe operating-signal visual evidence", asy
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/app/host");
-  await expectHostMobileOperatingSummaryPublicSafe(page);
+  await expectHostMobilePriorityLedgerPublicSafe(page);
   const mobileScreenshot = await page.screenshot({
     path: testInfo.outputPath("host-dashboard-operating-signal-mobile.png"),
     fullPage: true,

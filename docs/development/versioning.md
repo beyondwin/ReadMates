@@ -6,7 +6,7 @@ ReadMates의 제품 릴리즈 버전은 Git tag와 `CHANGELOG.md`, GitHub Releas
 
 | 항목 | 역할 |
 | --- | --- |
-| Git tag `vMAJOR.MINOR.PATCH` | 배포 가능한 제품 버전과 Cloudflare Pages frontend deployment trigger |
+| Git tag `vMAJOR.MINOR.PATCH` | 배포 가능한 제품 버전, GHCR server image trigger, 수동 frontend 배포의 immutable 입력 |
 | `CHANGELOG.md` | 저장소에 남는 버전별 릴리즈 노트 |
 | GitHub Release | 공개 사용자와 운영자가 보는 tag별 릴리즈 노트 |
 | OCI compose image tag | 서버 배포 시 운영 VM에서 pull하는 container image 식별자. 제품 tag와 맞춰 `ghcr.io/<owner>/<repo>/readmates-server:vMAJOR.MINOR.PATCH`를 사용 |
@@ -33,12 +33,13 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식을 사용합니다.
 4. 릴리즈 문서 변경을 `main`에 커밋하고 push합니다.
 5. 서버 변경이 있으면 같은 release tag로 GHCR image와 OCI compose 배포를 진행할 계획을 deployment notes에 확정합니다.
 6. `git tag -a vX.Y.Z -m "ReadMates vX.Y.Z"`를 만들고 push합니다.
-7. Tag push가 `.github/workflows/deploy-front.yml`을 통해 Cloudflare Pages frontend와 Pages Functions를 배포하고, `.github/workflows/deploy-server.yml`을 통해 GHCR scan-candidate image를 만든 뒤 Trivy가 통과한 같은 digest를 release tag로 promote합니다.
-8. 서버 변경이 있으면 `Deploy Server Image` workflow 성공 뒤 OCI backend를 promote된 GHCR release image tag로 배포합니다.
-9. GitHub Release를 생성하거나 갱신하고, body는 `CHANGELOG.md`의 해당 버전 섹션과 맞춥니다.
-10. `gh release view vX.Y.Z --json tagName,name,url,publishedAt`로 GitHub Release 객체가 실제로 존재하는지 확인합니다. tag만 있고 release가 없으면 GitHub의 릴리즈 노트 화면에는 아무것도 보이지 않습니다.
+7. Tag push가 `.github/workflows/deploy-server.yml`을 통해 GHCR scan-candidate image를 만들고, Trivy가 통과한 같은 digest를 release tag로 promote합니다.
+8. 서버 runtime rendering이 바뀌면 `sync-config(restart_api=false, dry_run=false)`를 성공시킨 뒤 OCI backend를 promote된 GHCR release image tag로 배포하고 Flyway/health/BFF smoke를 확인합니다.
+9. Backend가 새 API contract를 제공하는 것을 확인한 뒤 `Deploy Front` workflow를 `release_tag=vX.Y.Z`로 수동 dispatch해 같은 tag의 Cloudflare Pages frontend와 Pages Functions를 배포합니다.
+10. GitHub Release를 생성하거나 갱신하고, body는 `CHANGELOG.md`의 해당 버전 섹션과 맞춥니다.
+11. `gh release view vX.Y.Z --json tagName,name,url,publishedAt`로 GitHub Release 객체가 실제로 존재하는지 확인합니다. tag만 있고 release가 없으면 GitHub의 릴리즈 노트 화면에는 아무것도 보이지 않습니다.
 
-`main` push만으로는 frontend production 배포가 시작되지 않습니다. Production frontend 배포 기준은 `v*` tag push입니다.
+`main` 또는 tag push만으로는 frontend production 배포가 시작되지 않습니다. Production frontend는 backend promotion 뒤 `Deploy Front` workflow에 검증할 release tag를 명시해 수동 dispatch합니다. 이 순서는 새 frontend가 구 backend의 미지원 API를 먼저 호출하는 배포 window를 막습니다.
 
 ## Server Image Tags
 
@@ -60,5 +61,5 @@ Rollback은 `/opt/readmates/.env`의 `READMATES_SERVER_IMAGE`를 이전 검증 t
 - `CHANGELOG.md`에 새 버전 섹션, deployment notes, verification 결과가 있습니다.
 - Git tag, GitHub Release title, 서버 image tag가 같은 `vX.Y.Z`를 사용하고 `gh release view vX.Y.Z`가 성공합니다.
 - 서버 변경이 있으면 backend 배포와 `/internal/health` smoke가 통과했거나, 배포 blocker가 명확히 기록되어 있습니다.
-- Frontend tag deployment workflow가 성공했거나, GitHub Actions blocker가 명확히 기록되어 있습니다.
+- 같은 release tag를 입력한 frontend deployment workflow가 backend promotion 뒤 성공했거나, GitHub Actions blocker가 명확히 기록되어 있습니다.
 - 공개 릴리즈 후보 scan이 통과했거나, 실행하지 못한 사유가 남아 있습니다.

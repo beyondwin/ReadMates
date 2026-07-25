@@ -118,7 +118,7 @@ The application state machine counts primary, same-provider retry, cross-provide
 | `aigen:job:<jobId>:provider-attempts` | per-attempt field prefix with ordinal/provider/model/mode/state/reserved cost/basis/safe code/times; 6h |
 | `aigen:club:<clubId>:provider_admission` | owner token; 5m and renewed by reservation |
 | `aigen:club:<clubId>:monthly_cost_usd` | reserved/reconciled USD counter; 31d |
-| `aigen:job:<jobId>:{transcript,turns,result,evidence}` | four permitted content payloads; 6h and deleted on commit/cancel |
+| `aigen:job:<jobId>:{transcript,turns,result,evidence}` | four permitted pre-commit content payloads; 6h, immediate cleanup attempt on commit/cancel, TTL backstop |
 
 One Lua reservation checks the job/status/club binding, live admission owner, three-call cap, monthly cap and single-use modes; it then increments `llmCallCount`, reserves worst-case USD and writes `IN_FLIGHT`. This is atomic only for the current single-node Redis topology. Redis Cluster is unsupported because the keys are not guaranteed to share a hash slot.
 

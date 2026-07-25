@@ -246,9 +246,9 @@ Redis 사용 범위는 재생성 가능한 보조 데이터 또는 짧은 TTL의
 | Public cache | 공개 API read model | decode 실패 또는 Redis 장애 시 key 삭제/best-effort 후 MySQL fallback |
 | Notes cache | 멤버 공개 `PUBLISHED` notes feed/session 목록 read model | decode 실패 또는 Redis 장애 시 key 삭제/best-effort 후 MySQL fallback |
 | Read-cache invalidation | public/notes cache key 삭제 | mutation commit 이후 best-effort, 실패해도 domain mutation은 유지 |
-| AI generation job handoff | content-free job hash, transcript/turns/result/evidence TTL payload, revision/CAS, LLM call counter, cost admission counter/lease | Redis가 불명확하면 provider 호출 전에 fail closed. 기존 session/publication 데이터는 MySQL에 유지하고, commit/cancel 뒤 네 payload를 삭제하며 terminal hash만 TTL까지 유지 |
+| AI generation job handoff | content-free job hash, transcript/turns/result/evidence TTL payload, revision/CAS, LLM call counter, cost admission counter/lease | Redis가 불명확하면 provider 호출 전에 fail closed. Commit한 검토 완료 snapshot은 MySQL staged draft에 유지하고, commit/cancel에서 네 Redis payload 정리를 시도합니다. Commit cleanup 실패는 재시도하고 TTL을 backstop으로 사용합니다. |
 
-Redis key와 metric label에는 raw session token, 초대 token 원문, BFF secret, OAuth code, private feedback document body, 이메일, 표시 이름을 넣지 않습니다. AI generation 콘텐츠는 job-store adapter가 관리하는 `:transcript`, `:turns`, `:result`, `:evidence` 네 값에만 짧은 TTL로 저장하고, Kafka/MySQL/metrics/metadata hash/operator log로 복사하지 않습니다. Cache invalidation은 command transaction commit 이후 실행해 pre-commit DB 상태가 cache로 다시 채워지는 race를 줄입니다.
+Redis key와 metric label에는 raw session token, 초대 token 원문, BFF secret, OAuth code, private feedback document body, 이메일, 표시 이름을 넣지 않습니다. AI generation의 transcript, parsed turns, evidence와 검토 전 result는 job-store adapter가 관리하는 `:transcript`, `:turns`, `:result`, `:evidence` 네 값에만 짧은 TTL로 저장하고 Kafka, MySQL audit/receipt, metrics, metadata hash, operator log로 복사하지 않습니다. Commit한 검토 완료 snapshot만 공통 `session_record_drafts`에 내구 저장됩니다. Cache invalidation은 command transaction commit 이후 실행해 pre-commit DB 상태가 cache로 다시 채워지는 race를 줄입니다.
 
 ## 공개 API 2계층 캐시
 
@@ -318,7 +318,7 @@ ReadMates는 클럽별로 하나의 현재 `OPEN` 세션과 여러 개의 예정
 
 멤버 알림함은 `/api/me/notifications`, `/api/me/notifications/unread-count`, `/api/me/notifications/{id}/read`, `/api/me/notifications/read-all`을 사용합니다. `/app/notifications`는 `member_notifications`를 source of truth로 읽고, unread count, 개별 읽음 처리, 전체 읽음 처리를 제공합니다. 각 알림의 deep link를 열면 해당 알림을 읽음 처리한 뒤 대상 화면으로 이동합니다.
 
-호스트 알림 운영 페이지는 `/app/host/notifications`입니다. 이 페이지는 현재 host club의 event outbox row와 channel delivery row 목록, 이메일 pending/failed 처리, 개별 retry, `DEAD` delivery 복구, redesigned template helper를 사용하는 테스트 메일, 최근 테스트 메일 audit을 다룹니다. 같은 화면과 콘텐츠 변경 직후 열린 composer에서 호스트는 세션을 선택하고 수동 템플릿, 대상 그룹(`ALL_ACTIVE_MEMBERS`, `SESSION_PARTICIPANTS`, `CONFIRMED_ATTENDEES`, `SELECTED_MEMBERS`), 채널(`IN_APP`, `EMAIL`, `BOTH`)을 조합해 새 알림을 발송할 수 있습니다. 이벤트별 기본 대상은 `NEXT_BOOK_PUBLISHED`·`SESSION_REMINDER_DUE`의 `ALL_ACTIVE_MEMBERS`, `FEEDBACK_DOCUMENT_PUBLISHED`·`SESSION_RECORD_UPDATED`의 `CONFIRMED_ATTENDEES`이고 기본 채널은 모두 `BOTH`입니다. 피드백 문서와 세션 기록은 전달 계획에서도 같은 `feedback_document_published_enabled` 멤버 선호도를 사용합니다. `FEEDBACK_DOCUMENT_PUBLISHED`의 CTA/options/preview는 `session_feedback_documents`의 최신 live 문서가 있을 때 제공되며, `OPEN` 세션도 그 current live 문서가 있으면 manual options → preview → confirm을 사용할 수 있습니다. `SELECTED_MEMBERS`는 호스트가 명시적으로 선택해야 하며 같은 클럽의 중복 없는 활성 membership ID를 한 명 이상 요구합니다. Preview는 최종 대상 수, in-app/email 예상 건수, 이메일 설정으로 인한 skip, 이메일 누락, 중복 발송 여부를 보여주며, confirm 후 생성된 수동 dispatch는 event ledger에서 `source=MANUAL`과 manual metadata로 구분됩니다. 호스트 API 응답은 recipient email을 masked 값으로만 반환하고, detail metadata는 `sessionNumber`, `bookTitle`처럼 allowlist된 제품 metadata만 노출합니다.
+호스트 알림 운영 페이지는 `/app/host/notifications`입니다. 기본 화면은 서버에서 확인된 리마인더 정책과 pending/failed/dead/최근 24시간 발송 지표를 한 줄에 묶은 상태 레일, `회차 → 알림 종류 → 대상과 채널` 3단계 작업대, 최근 수동 발송 원장으로 구성됩니다. Preview는 desktop 오른쪽 side sheet와 mobile bottom sheet로 열리며 수신 인원 기반 확정 CTA를 사용합니다. 닫기, Escape, backdrop, route navigation은 dispatch를 만들지 않습니다. Event outbox/channel delivery 전체 원장, 이메일 pending/failed 처리, 개별 retry, `DEAD` delivery 복구, 테스트 메일과 audit은 이상 상태 또는 명시적 운영 점검 때 펼치는 운영 상세에 둡니다. 같은 화면과 콘텐츠 변경 직후 열린 composer에서 호스트는 세션을 선택하고 수동 템플릿, 대상 그룹(`ALL_ACTIVE_MEMBERS`, `SESSION_PARTICIPANTS`, `CONFIRMED_ATTENDEES`, `SELECTED_MEMBERS`), 채널(`IN_APP`, `EMAIL`, `BOTH`)을 조합해 새 알림을 발송할 수 있습니다. 이벤트별 기본 대상은 `NEXT_BOOK_PUBLISHED`·`SESSION_REMINDER_DUE`의 `ALL_ACTIVE_MEMBERS`, `FEEDBACK_DOCUMENT_PUBLISHED`·`SESSION_RECORD_UPDATED`의 `CONFIRMED_ATTENDEES`이고 기본 채널은 모두 `BOTH`입니다. 피드백 문서와 세션 기록은 전달 계획에서도 같은 `feedback_document_published_enabled` 멤버 선호도를 사용합니다. `FEEDBACK_DOCUMENT_PUBLISHED`의 CTA/options/preview는 `session_feedback_documents`의 최신 live 문서가 있을 때 제공되며, `OPEN` 세션도 그 current live 문서가 있으면 manual options → preview → confirm을 사용할 수 있습니다. `SELECTED_MEMBERS`는 호스트가 명시적으로 선택해야 하며 같은 클럽의 중복 없는 활성 membership ID를 한 명 이상 요구합니다. Preview는 최종 대상 수, in-app/email 예상 건수, 이메일 설정으로 인한 skip, 이메일 누락, 중복 발송 여부를 보여주며, confirm 후 생성된 수동 dispatch는 event ledger에서 `source=MANUAL`과 manual metadata로 구분됩니다. 호스트 API 응답은 recipient email을 masked 값으로만 반환하고, detail metadata는 `sessionNumber`, `bookTitle`처럼 allowlist된 제품 metadata만 노출합니다.
 
 클럽별 예약 리마인더 정책은 `GET/PUT /api/host/notifications/policy`로 읽고 저장합니다. Policy row가 없으면 `sessionReminderEnabled=false`이며, 호스트가 명시적으로 켠 클럽만 `NotificationReminderScheduler`가 `SESSION_REMINDER_DUE` outbox row를 만듭니다. 같은 대상 날짜의 scheduler 재실행은 기존 dedupe key로 중복 event를 만들지 않습니다.
 
@@ -416,7 +416,7 @@ Commit은 활성 호스트만 사용할 수 있고, `HOST_ONLY` 공개 범위에
 
 ## AI-assisted 콘텐츠 운영
 
-ReadMates 호스트 세션 편집기는 세션 기록을 채우는 두 가지 입력을 같은 validation/commit 경계(`SessionImportService.commitValidated`)로 흘려 보냅니다.
+ReadMates 호스트 세션 편집기는 세션 기록을 채우는 두 가지 입력을 같은 validation과 staged-draft 저장 경계(`SaveValidatedSessionRecordDraftUseCase.saveValidated`)로 흘려 보냅니다. 외부 JSON 또는 AI commit은 live 기록을 직접 바꾸지 않고 공통 `session_record_drafts`를 교체하며, 별도 session-record apply가 live 콘텐츠와 immutable revision을 갱신합니다.
 
 | 모드 | 입력 | LLM 호출 위치 | 운영 게이트 |
 | --- | --- | --- | --- |
@@ -464,10 +464,10 @@ AiGenerationCommitService
   |-- Redis revision CAS + bounded COMMITTING lease
   `-- one MySQL transaction
        |-- ACTIVE membership revalidation + participant upsert
-       |-- SessionImportService.commitValidated(...)
-       `-- content-free job_id + revision receipt
+       |-- validated snapshot -> session_record_drafts (AI_GENERATED)
+       `-- content-free job/revision + draft/base revision receipt
   v
-COMMITTED -> cache invalidation + four-payload cleanup
+COMMITTED -> four-payload cleanup; live record changes only on later apply
 ```
 
 - **Feature module 위치**: `server/src/main/kotlin/com/readmates/aigen/`. 도메인 model, port, service, controller, Redis/JDBC adapter, Kafka adapter, LLM adapter가 한 패키지 트리 안에 있습니다.
@@ -485,13 +485,15 @@ COMMITTED -> cache invalidation + four-payload cleanup
   - `aigen:host:<userId>:minute` (String, TTL 60s) — AI endpoint 전용 분당 admission 횟수.
   - `aigen:job:<jobId>:provider-attempts` (Hash, TTL 6h) — attempt ID/ordinal/provider/model/mode/state/reserved cost/cost basis/safe error/timestamp의 content-free ledger.
   - `aigen:club:<clubId>:provider_admission` (String, TTL 5m) — provider reservation owner token. 현재 single-node Redis에서 job/admission/monthly-cost/ledger를 한 Lua operation으로 묶습니다. Redis Cluster 호환을 주장하지 않습니다.
-- **Job state machine**: 정상 commit은 `PENDING -> RUNNING -> SUCCEEDED -> COMMITTING -> COMMITTED`입니다. Redis revision CAS가 worker save/regeneration/commit 경합을 막습니다. Receipt 없는 DB 실패 또는 만료 `COMMITTING` lease는 `COMMIT_RETRY`로 복구하고, receipt가 있으면 DB write 없이 `COMMITTED`로 수렴합니다. Commit/cancel은 네 payload를 지우고 terminal hash만 TTL까지 남깁니다. DB commit 후 cleanup 실패는 `COMMITTED + cleanupPending`이며 DB write를 반복하지 않습니다.
+- **Job state machine**: 정상 commit은 `PENDING -> RUNNING -> SUCCEEDED -> COMMITTING -> COMMITTED`입니다. Redis revision CAS가 worker save/regeneration/commit 경합을 막습니다. Receipt 없는 DB 실패 또는 만료 `COMMITTING` lease는 `COMMIT_RETRY`로 복구하고, receipt가 있으면 staged-draft write 없이 `COMMITTED`로 수렴합니다. Commit/cancel은 네 payload 정리를 즉시 시도하고 terminal hash만 TTL까지 남깁니다. DB commit 후 cleanup 실패는 `COMMITTED + cleanupPending`이며 draft write를 반복하지 않고 payload TTL을 최종 backstop으로 사용합니다.
 - **LLM call cap/cost**: permit -> atomic reservation -> exactly one HTTP -> `ACTUAL` 또는 `ESTIMATED_UNKNOWN` 순서를 지킵니다. Primary, retry, fallback, schema correction, section repair, regeneration은 같은 최대 3회와 cost cap을 사용합니다. 응답 유실/timeout/crash는 예상 비용을 유지하고, 확실한 pre-transport rejection만 slot/cost를 해제할 수 있습니다. 내부 token은 non-cached input/cache-write/cache-read/output 4채널이며 공개 REST는 기존 input/cachedInput/output 3필드입니다.
-- **MySQL 테이블** (Flyway V30/V31/V34/V37/V38):
+- **MySQL 테이블** (Flyway V30/V31/V34/V37–V42):
   - `ai_generation_audit_log` — 기존 business-audit identity와 provider/model/status/token/cost/latency를 보존하며 V38이 trace ID, attempt ordinal, call mode, cost basis, cache-write input token을 additive하게 추가합니다. Transcript, name, prompt, result, evidence, excerpt, raw provider error 컬럼은 없습니다.
-  - `ai_generation_commit_receipts` — unique `job_id + revision`, `session_id`, `club_id`, `committed_at`만 저장하는 cross-store recovery source of truth입니다. Participant upsert, session import, receipt insert는 하나의 MySQL transaction입니다.
+  - `ai_generation_commit_receipts` — unique `job_id + revision`, session/club, draft/base live revision, request hash, committed time을 저장하는 content-free cross-store recovery source of truth입니다. Participant upsert, staged-draft save, receipt insert는 하나의 MySQL transaction입니다.
   - `ai_generation_club_defaults` — 클럽별 default provider/model. `clubs(id)` FK.
   - `ai_generation_admin_action_audit` — platform admin AI Ops action ledger. `job_id`, `club_id`, `session_id`, `admin_user_id`, `admin_role`, action/result, 이전/다음 상태, safe error code만 저장합니다.
+  - `session_record_drafts` — JSON import, AI commit, manual edit, revision restore가 공유하는 검토 완료 snapshot과 draft/base live revision을 저장합니다. AI raw transcript, parsed turns, evidence, provider response는 포함하지 않습니다.
+  - `session_record_revisions` / `session_record_apply_receipts` — apply된 immutable snapshot history와 idempotent apply request를 결속합니다. Apply가 완료되어야 live 공개 요약·하이라이트·한줄평·피드백 문서가 바뀝니다.
 - **Frontend 모듈**: `front/features/host/aigen/` 안의 API/query/model/route/UI 경계를 유지합니다. Grounded draft는 revision을 포함한 local recovery envelope로만 저장하고 evidence/transcript를 localStorage에 넣지 않습니다. Review ledger의 네 section이 모두 `AI_GROUNDED_REVIEWED` 또는 편집 후 `USER_EDITED_CONFIRMED`일 때만 expected revision/result와 함께 commit합니다. Evidence 확장은 현재 revision이 참조한 단일 turn만 허용하며 transcript search/download API는 없습니다.
 - **Trace/privacy**: Spring MVC -> Kafka producer -> consumer/worker -> application provider observation -> Spring AI/provider span을 W3C context로 연결하고 OTLP로 internal Tempo에 비동기 export합니다. AI span/log/metric/baggage에는 prompt, completion, transcript, evidence, raw error, user/session/club identity를 넣지 않습니다. `requestId`는 별도 lookup ID입니다.
 - **운영 표면**: 기존 AI meter에 physical call/cost basis/gate rejection/circuit/exporter delivery 지표가 추가됩니다. Prometheus exemplar storage, Grafana Tempo datasource, seven-day Tempo retention을 사용합니다. 로컬 포트는 loopback, OCI Tempo/OTLP는 internal network only입니다.

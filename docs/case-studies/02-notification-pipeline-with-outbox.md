@@ -1,12 +1,12 @@
 # Case Study 02 — Mutation과 알림 발송의 결합 분리 (transactional outbox)
 
-> 세션 발행/멤버 초대 등 mutation의 side effect로 이메일과 in-app 알림이 발송됩니다. 동기 발송은 mutation latency를 SMTP에 묶고, 발송 실패가 mutation rollback을 일으킵니다. MySQL transactional outbox + Kafka relay + state machine consumer로 mutation과 발송을 분리했고, masked audit ledger와 backlog gauge로 운영 가시성을 확보했습니다.
+> 초대·서평 같은 도메인 이벤트와 호스트가 preview/confirm한 수동 발송을 이메일 및 in-app delivery로 전달합니다. 콘텐츠 저장 자체는 알림을 만들지 않습니다. MySQL transactional outbox + Kafka relay + state machine consumer로 알림 의사결정과 외부 발송을 분리했고, masked audit ledger와 backlog gauge로 운영 가시성을 확보했습니다.
 
 ## 문제
 
 **동기 발송의 두 가지 결합**
 
-세션 발행, 멤버 초대 등 mutation은 완료 직후 알림을 보내야 합니다. 가장 단순한 구현은 mutation 트랜잭션 안에서(또는 직후에) SMTP 호출을 넣는 것인데, 이 방식은 두 가지 결합을 만듭니다.
+멤버 초대·서평 공개처럼 알림이 도메인 이벤트의 일부인 흐름과, 다음 책·피드백 문서·세션 기록처럼 호스트가 대상과 채널을 별도로 결정해야 하는 흐름이 있습니다. 어느 경우든 가장 단순한 구현은 콘텐츠 mutation이나 발송 확정 트랜잭션 안에서 SMTP를 직접 호출하는 것인데, 이 방식은 두 가지 결합을 만듭니다.
 
 1. **latency 결합**: mutation 응답 시간 = 비즈니스 로직 시간 + SMTP 왕복 시간. SMTP 서버가 느리면 모든 mutation이 느려집니다.
 2. **가용성 결합**: SMTP 장애 → 발송 실패 → mutation rollback(또는 발송 누락). 어떤 선택을 해도 일관성이 깨집니다.
@@ -37,15 +37,15 @@
 
 선택: **MySQL transactional outbox + Kafka relay + state machine consumer**.
 
-mutation과 같은 DB 트랜잭션에 `notification_event_outbox` row를 INSERT합니다. relay가 outbox를 polling해서 Kafka로 publish하고, consumer가 Kafka 메시지를 받아 `notification_deliveries`에 채널별 delivery row를 INSERT한 뒤 실제 발송을 실행합니다. 각 단계는 idempotency key(`dedupe_key`)로 중복 실행이 안전하며, 각자 독립적으로 재시도합니다.
+알림 의사결정이 확정되는 DB 트랜잭션에 `notification_event_outbox` row를 INSERT합니다. 자동 도메인 이벤트는 해당 mutation과, 호스트 수동 발송은 consumed preview 및 `notification_manual_dispatches`와 같은 트랜잭션을 사용합니다. relay가 outbox를 polling해서 Kafka로 publish하고, consumer가 Kafka 메시지를 받아 `notification_deliveries`에 채널별 delivery row를 INSERT한 뒤 실제 발송을 실행합니다. 각 단계는 idempotency key(`dedupe_key`)로 중복 실행이 안전하며, 각자 독립적으로 재시도합니다.
 
 ## 구현
 
 **흐름 다이어그램**
 
 ```text
-[Mutation TX]
-  ├─ INSERT business row (sessions, memberships, ...)
+[Notification decision TX]
+  ├─ INSERT business row or manual dispatch
   └─ INSERT notification_event_outbox row   (같은 트랜잭션 commit)
                 |
                 v
@@ -78,6 +78,8 @@ mutation과 같은 DB 트랜잭션에 `notification_event_outbox` row를 INSERT�
 - `V18__notification_preferences_and_test_mail_audit.sql` — 알림 설정 + 테스트 메일 audit 테이블.
 - `V19__notification_outbox_metadata.sql` — outbox 메타데이터 컬럼 추가.
 - `V20__kafka_notification_pipeline.sql` — `notification_event_outbox` (이벤트 payload JSON) + `notification_deliveries` (채널별 delivery 상태). Kafka 도입으로 outbox와 delivery를 분리.
+- `V27__manual_notification_dispatch.sql`, `V28__manual_notification_dispatch_hardening.sql` — 10분 TTL preview와 수동 dispatch 감사 원장, preview 소비 및 dispatch 1:1 제약.
+- `V42__host_notification_composer.sql` — current content revision, `SELECTED_MEMBERS`, opt-in 클럽 리마인더 정책을 추가하고 명시적 composer 발송을 강화.
 
 **outbox 삽입 — `JdbcNotificationEventOutboxAdapter.enqueueEvent`**
 
@@ -107,7 +109,7 @@ override fun enqueueEvent(
     }
 ```
 
-mutation 서비스는 비즈니스 row INSERT와 같은 `@Transactional` 경계 안에서 `enqueueEvent`를 호출합니다. DB commit이 실패하면 outbox row도 사라지므로, 알림이 발송될 조건과 비즈니스 사실이 항상 일치합니다.
+자동 이벤트 서비스 또는 수동 발송 확정 서비스는 알림 의사결정 row와 같은 `@Transactional` 경계 안에서 `enqueueEvent`를 호출합니다. DB commit이 실패하면 outbox row도 사라지므로, 알림 발송 의사결정과 outbox 사실이 항상 일치합니다. 다음 책·피드백 문서·세션 기록의 콘텐츠 저장은 composer context만 반환하며 이 호출을 하지 않습니다.
 
 **relay — `NotificationRelayService.publishPending`**
 
@@ -174,6 +176,10 @@ plain text와 HTML body를 `NotificationEmailTemplates.eventCopy()` 단일 호�
 
 테스트 메일 발송은 `notification_test_mail_audit` 테이블에 기록됩니다. `recipient_masked_email` 컬럼에는 `maskEmail()` 함수 결과(`k***@example.com` 형식, local part 첫 글자 + `***` + `@domain`)만 저장하고 평문 이메일은 저장하지 않습니다. 추가로 `recipientEmailHash`를 저장해 중복 발송 방지 cooldown 검사에 활용합니다. 운영 delivery 감사는 `notification_deliveries` 테이블을 직접 조회하며, 호스트 대시보드 API는 응답 직렬화 시점에 `maskEmail()`을 적용해 recipient email이 API 응답에 평문으로 노출되지 않습니다.
 
+**호스트 수동 발송 작업대**
+
+`/app/host/notifications`는 서버 확인 정책과 backlog 지표를 상태 레일로 먼저 보여주고, `회차 → 알림 종류 → 대상과 채널` 세 결정을 한 작업대에서 받습니다. Preview는 current `contentRevision`, selection hash, 10분 TTL을 고정하고 최종 수신 인원과 채널별 예상 건수를 side sheet에서 보여줍니다. 확정 CTA만 `notification_manual_dispatches`와 outbox row를 만들며 닫기, Escape, backdrop, route navigation은 아무 발송도 만들지 않습니다. 최근 수동 발송 3건은 기본 원장에, 전체 event/delivery와 retry/recovery 도구는 조건부 운영 상세에 둡니다.
+
 ## 검증
 
 **통합 테스트**
@@ -210,7 +216,7 @@ notification.dispatch.unknown_status
 
 **e2e**
 
-호스트 대시보드 알림 화면에서 최근 N건의 delivery를 조회해 `sent_at`, 채널, 이벤트 유형, masked recipient를 확인합니다.
+호스트 알림 작업대 E2E는 options → preview → confirm, 선택 회원, duplicate resend, side sheet close/Escape/navigation no-send, 최근 dispatch 원장과 mobile bottom sheet를 검증합니다. 운영 상세에서는 최근 delivery의 `sent_at`, 채널, 이벤트 유형, masked recipient를 확인합니다.
 
 ## Trade-off와 한계
 

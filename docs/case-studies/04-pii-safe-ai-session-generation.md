@@ -1,6 +1,6 @@
 # Case Study 04 — PII-safe grounded AI session generation
 
-> 호스트가 전체 대본을 업로드하면 서버가 먼저 화자를 같은 클럽의 활성 멤버와 정확히 연결하고, LLM 결과의 모든 항목을 원본 turn 근거와 묶습니다. 호스트는 네 섹션의 근거 또는 직접 편집을 확인한 뒤에만 저장할 수 있습니다. Transcript, parsed turns, result, evidence는 Redis에 6시간만 두고 Kafka와 MySQL에는 콘텐츠를 남기지 않으며, revision CAS와 content-free commit receipt로 crash window를 복구합니다.
+> 호스트가 전체 대본을 업로드하면 서버가 먼저 화자를 같은 클럽의 활성 멤버와 정확히 연결하고, LLM 결과의 모든 항목을 원본 turn 근거와 묶습니다. 호스트는 네 섹션의 근거 또는 직접 편집을 확인한 뒤에만 공통 staged draft로 저장할 수 있습니다. Transcript, parsed turns, evidence와 검토 전 result는 Redis에 6시간만 두고 Kafka, audit, receipt에는 콘텐츠를 남기지 않습니다. 검토 완료 snapshot만 MySQL draft에 저장하며 revision CAS와 content-free commit receipt로 crash window를 복구합니다.
 
 ## 문제
 
@@ -21,7 +21,7 @@
 **제약**
 
 - 공개 저장소에는 실제 transcript, 멤버 이름, provider key, 운영 host, private deployment state를 남기지 않습니다.
-- 최종 저장은 기존 `readmates-session-import:v1` validation/commit 경계를 재사용합니다.
+- 검토 완료 저장은 기존 `readmates-session-import:v1` validation과 공통 staged-draft 저장 경계를 재사용하며 live 반영은 별도 apply로 분리합니다.
 - OpenAI, Claude, Gemini가 서로 다른 API를 사용해도 같은 입력 bytes, schema, 근거 계약, call budget을 지켜야 합니다.
 - Private transcript를 live provider로 보내는 품질 평가는 일반 CI나 smoke에 포함하지 않고 별도 승인을 요구합니다.
 
@@ -33,11 +33,11 @@
 | Spring controller에서 동기 호출 후 바로 저장 | timeout, 취소, 재시도, 진행률, revision 충돌과 crash recovery를 다룰 수 없습니다. |
 | Kafka message에 전체 대본 포함 | broker, log, DLQ가 private content 저장소가 됩니다. |
 | LLM이 낸 excerpt를 그대로 근거로 노출 | 모델이 원문에 없는 문장을 만들거나 너무 긴 private text를 반환할 수 있습니다. |
-| MySQL에 draft와 evidence 저장 | 검토 전 private content가 durable store와 운영 조회면으로 퍼집니다. |
+| 검토 전 provider result와 evidence를 MySQL에 저장 | 호스트가 확인하지 않은 private content가 durable store와 운영 조회면으로 퍼집니다. 검토 완료 snapshot만 staged draft로 저장합니다. |
 
-**선택: side-effect-free preflight + grounded generation + revisioned review + recoverable commit**
+**선택: side-effect-free preflight + grounded generation + revisioned review + recoverable draft commit**
 
-서버는 job을 만들기 전에 입력 형식, 시간 범위, 활성 멤버 이름, model capability와 request budget을 검증합니다. 통과한 전체 대본만 Redis TTL payload로 넘기고 Kafka에는 routing metadata만 발행합니다. Provider는 구조화된 draft와 turn ID를 반환하지만, 최종 evidence excerpt는 서버가 원본 turn에서 다시 만듭니다. 호스트가 현재 revision의 네 섹션을 모두 확인해야 commit할 수 있고, MySQL의 content-free receipt가 Redis와 DB 사이의 복구 기준이 됩니다.
+서버는 job을 만들기 전에 입력 형식, 시간 범위, 활성 멤버 이름, model capability와 request budget을 검증합니다. 통과한 전체 대본만 Redis TTL payload로 넘기고 Kafka에는 routing metadata만 발행합니다. Provider는 구조화된 draft와 turn ID를 반환하지만, 최종 evidence excerpt는 서버가 원본 turn에서 다시 만듭니다. 호스트가 현재 revision의 네 섹션을 모두 확인해야 공통 MySQL staged draft로 commit할 수 있고, content-free receipt가 Redis와 draft 저장 사이의 복구 기준이 됩니다. Live 기록은 후속 session-record apply 전까지 바뀌지 않습니다.
 
 ## 구현
 
@@ -80,7 +80,7 @@ Redis aigen:job:<jobId>:evidence     revision-scoped evidence, TTL 6h
 
 Kafka message는 `jobId`, `sessionId`, `clubId`, `hostUserId`, provider, model, job kind만 담습니다. Transcript, parsed turns, 이름, prompt/instructions, result, evidence/excerpt는 Kafka, notification payload, metric, log에 넣지 않습니다.
 
-네 payload는 같은 6시간 TTL을 갖습니다. 필수 payload 하나가 먼저 만료하면 부분 결과를 노출하지 않고 `JOB_EXPIRED`로 실패합니다. Commit/cancel은 네 payload를 삭제하고 terminal hash만 TTL까지 남깁니다.
+네 payload는 같은 6시간 TTL을 갖습니다. 필수 payload 하나가 먼저 만료하면 부분 결과를 노출하지 않고 `JOB_EXPIRED`로 실패합니다. Commit/cancel은 네 payload를 즉시 정리하려고 시도하고 terminal hash만 TTL까지 남깁니다. Commit cleanup 실패는 `cleanupPending`으로 재시도하며 payload TTL이 최종 backstop입니다.
 
 ### 3. 전체 대본 structured generation과 서버 소유 근거
 
@@ -122,11 +122,11 @@ COMMIT_RETRY -> COMMITTING -> COMMITTED
 COMMITTED + cleanupPending -> cleanup only retry
 ```
 
-`AiGenerationCommitService`는 Redis revision CAS와 bounded `COMMITTING` lease를 잡고 한 MySQL transaction에서 활성 멤버를 재검증합니다. 그 안에서 participant upsert, `SessionImportService.commitValidated(...)`, unique `job_id + revision` receipt insert를 함께 수행합니다.
+`AiGenerationCommitService`는 Redis revision CAS와 bounded `COMMITTING` lease를 잡고 한 MySQL transaction에서 활성 멤버를 재검증합니다. 그 안에서 participant upsert, `SaveValidatedSessionRecordDraftUseCase.saveValidated(...)`, unique `job_id + revision` receipt insert를 함께 수행합니다. Receipt는 draft revision, base live revision, request hash를 결속합니다.
 
 복구 scheduler는 receipt가 있으면 session content를 다시 쓰지 않고 `COMMITTED`로 수렴합니다. Receipt가 없으면 `COMMIT_RETRY`로 돌려 안전한 commit만 재시도합니다. DB commit 후 cache invalidation이나 Redis 삭제만 실패한 경우 `cleanupPending=true`를 남기고 cleanup만 반복합니다.
 
-MySQL `ai_generation_commit_receipts`와 audit row에는 transcript, 이름, result, evidence/excerpt를 저장하지 않습니다. Pipeline, provider/model/status/revision과 turn/speaker/review/warning aggregate만 남깁니다.
+MySQL `ai_generation_commit_receipts`와 audit row에는 transcript, 이름, generated snapshot, evidence/excerpt를 저장하지 않습니다. Pipeline, provider/model/status/revision과 turn/speaker/review/warning aggregate만 남깁니다. 검토 완료 generated snapshot은 `session_record_drafts.snapshot_json`에 `AI_GENERATED` source로 저장되며, 원본 transcript, parsed turns, evidence/excerpt, provider response는 포함하지 않습니다.
 
 ### 6. 비용과 동시성 fail-closed
 
@@ -171,7 +171,7 @@ Platform admin은 job ID, status, revision, safe error, `cleanupPending` 같은 
 
 ## Trade-off와 한계
 
-- **Redis가 transient private-content store가 됨:** Durable DB와 broker에서는 콘텐츠를 뺐지만 worker/review/recovery를 위해 네 payload를 최대 6시간 보관합니다. TTL, partial expiry, terminal cleanup, 운영자의 metadata-only 조회 규칙이 필요합니다.
+- **Redis가 검토 전 private-content store가 됨:** Worker/review/recovery를 위해 transcript, turns, result, evidence 네 payload를 최대 6시간 보관합니다. Commit 뒤 검토 완료 snapshot은 staged draft로 내구 저장되지만 raw transcript/turn/evidence는 저장하지 않습니다. TTL, partial expiry, terminal cleanup, 운영자의 metadata-only 조회 규칙이 필요합니다.
 - **비동기 workflow와 review state가 복잡함:** Controller, queue, worker, Redis CAS, revision, receipt, polling UI가 늘어납니다. 대신 timeout, 취소, stale response, 중복 commit, crash cleanup을 각각 검증할 수 있습니다.
 - **정확한 멤버 이름을 요구함:** Alias와 fuzzy match를 지원하지 않아 호스트가 TXT를 고쳐 재업로드해야 할 수 있습니다. 잘못된 사람에게 private feedback이 연결되는 위험을 제품 편의보다 우선했습니다.
 - **Provider retention은 코드만으로 보장할 수 없음:** Provider-side 데이터 사용과 보유 조건은 운영 provisioning과 별도 승인으로 확인해야 합니다.
@@ -188,5 +188,5 @@ Platform admin은 job ID, status, revision, safe error, `cleanupPending` 같은 
 - Current architecture: [`docs/development/architecture.md`](../development/architecture.md#in-app-ai-세션-생성-컴포넌트)
 - Host workflow and external JSON fallback: [`docs/development/session-import-generator.md`](../development/session-import-generator.md)
 - Operations: [`docs/operations/runbooks/ai-session-generation.md`](../operations/runbooks/ai-session-generation.md)
-- Release notes: [`CHANGELOG.md`](../../CHANGELOG.md#unreleased)
+- Release notes: [`CHANGELOG.md`](../../CHANGELOG.md#v200---2026-07-25)
 - Historical design record: [`docs/superpowers/specs/2026-07-14-readmates-grounded-whole-transcript-ai-session-generation-design.md`](../superpowers/specs/2026-07-14-readmates-grounded-whole-transcript-ai-session-generation-design.md)

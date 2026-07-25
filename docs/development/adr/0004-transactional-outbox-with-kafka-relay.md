@@ -7,6 +7,8 @@
   `server/src/main/kotlin/com/readmates/notification/`,
   `server/src/main/resources/db/mysql/migration/V16__notification_outbox.sql`,
   `server/src/main/resources/db/mysql/migration/V20__kafka_notification_pipeline.sql`,
+  `server/src/main/resources/db/mysql/migration/V27__manual_notification_dispatch.sql`,
+  `server/src/main/resources/db/mysql/migration/V42__host_notification_composer.sql`,
   `server/src/main/kotlin/com/readmates/notification/application/service/NotificationDeliveryEngine.kt`,
   `server/src/main/kotlin/com/readmates/notification/application/service/CachedNotificationBacklogProvider.kt`,
   `server/src/main/kotlin/com/readmates/notification/adapter/out/persistence/JdbcNotificationEventOutboxAdapter.kt`,
@@ -22,6 +24,12 @@ ReadMates에서 알림은 다음 domain mutation이 발생할 때 생성된다:
 - 초대 수락
 
 각 mutation에서 이메일과 in-app 알림이 발송되어야 한다. "mutation 처리 + 알림 발송"을 어떻게 결합할 것인가를 결정해야 했다.
+
+### 2026-07-25 현재 적용 범위
+
+이 ADR의 outbox 전달 결정은 유지하지만 모든 콘텐츠 mutation이 자동 알림을 만든다는 초기 전제는 더 이상 현재 계약이 아니다. 멤버 초대와 `REVIEW_PUBLISHED`처럼 도메인 이벤트 자체가 알림 의사결정인 흐름은 mutation과 outbox를 같은 트랜잭션에 둔다. 다음 책, 피드백 문서, 세션 기록은 콘텐츠 저장과 발송을 분리하고, 호스트가 current content revision을 고정한 options → preview → confirm을 완료할 때 `notification_manual_dispatches`와 outbox를 같은 트랜잭션에 기록한다. 클럽 리마인더도 명시적으로 켠 정책만 scheduler가 outbox를 만든다.
+
+따라서 현재 보장식은 “모든 mutation commit ⇔ outbox”가 아니라 “확정된 알림 의사결정 commit ⇔ outbox”다. 콘텐츠 저장, preview 닫기, Escape, backdrop, 화면 이동은 알림 의사결정이 아니며 outbox를 만들지 않는다.
 
 ### 초기 접근의 문제
 

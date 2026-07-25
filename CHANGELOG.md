@@ -10,13 +10,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 
-### Changed
-
-- 호스트 알림 발송 화면을 상태 레일, 3단계 발송 작업대, 수신 인원 기반 미리보기 확인, 조건부 운영 상세로 재구성해 평상시 스크롤을 줄이고 이상 상태 복구 경로를 분명히 했습니다.
-- **호스트 운영 원장:** 호스트 대시보드를 현재 세션과 우선 행동 중심의 운영 원장으로 재구성하고, 확인 필요 세션을 중복 지표 없는 compact ledger row로 정렬해 비대칭 빈 공간과 모바일의 과도한 스크롤을 줄였습니다.
-- **CI 테스트 안전망 도달성:** PR CI가 `scripts/`와 `deploy/oci/`의 tracked shell을 재귀적으로 수집해 Bash와 ShellCheck에 전달하고, 관측·AI 설정 validator를 앞선 실패와 독립적으로 실행합니다. 중복 Grafana lint는 단일 job 소유권으로 통합했으며 제품 동작, 배포 계약, worker·retry·timeout·coverage 기준은 바꾸지 않았습니다.
-
-## v2.0.0 - 2026-07-23
+## v2.0.0 - 2026-07-25
 
 ### Highlights
 
@@ -38,27 +32,39 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - **Token/API compatibility:** 내부 비용은 non-cached input/cache-write/cache-read/output 4채널로 계산하지만 public REST response는 기존 input/cachedInput/output 3필드를 유지합니다.
 - **Trace/privacy/ops:** Spring Kafka observation과 Micrometer/OpenTelemetry OTLP를 활성화하고 7일 Tempo, Grafana datasource/exemplar, provider/cost-basis/circuit/exporter metric/alert를 추가했습니다. Local port는 loopback-only이고 OCI app은 `tempo:4318` internal DNS로 export하며 Tempo/OTLP host port는 publish하지 않습니다. Production config sync는 Google paid-tier 확인을 기본 `false`로 렌더링해 미확인 Gemini rollout을 fail closed합니다.
 - **호스트 알림 발송 분리:** 다음 책 공개, 피드백 문서·세션 기록 final live apply는 legacy 호스트 결정 ledger나 outbox row를 만들지 않습니다. 외부 JSON import와 AI commit은 draft만 저장하고 composer를 반환하거나 열지 않습니다. 이후 composer가 현재 `contentRevision`을 고정해 options → preview → confirm 순서로 수동 dispatch와 outbox를 만들고, stale/만료/중복/클럽 밖 수신자는 fail closed합니다.
+- **호스트 알림 발송 작업대:** `/app/host/notifications`를 서버에서 확인된 리마인더 정책과 네 운영 지표를 한 줄에 보여주는 상태 레일, `회차 → 알림 종류 → 대상과 채널` 3단계 작업대, 수신 인원 기반 preview side sheet, 최근 수동 발송 원장, 이상 상태에서만 펼치는 운영 상세로 재구성했습니다. Desktop은 오른쪽 side sheet, mobile은 닫기 가능한 bottom sheet를 사용하며 닫기·Escape·backdrop·화면 이동은 발송을 만들지 않습니다.
+- **호스트 운영 원장:** 호스트 대시보드를 현재 세션과 우선 행동 중심의 운영 원장으로 재구성하고, 확인 필요 세션을 중복 지표 없는 compact ledger row로 정렬해 비대칭 빈 공간과 모바일의 과도한 스크롤을 줄였습니다.
 - **공통 기록 초안과 적용 receipt:** 수동 편집, 외부 JSON, AI 결과는 모두 live record를 직접 바꾸지 않고 같은 staged draft에 저장됩니다. final apply는 호스트가 제공한 `applyRequestId`와 draft hash를 검증해 콘텐츠·immutable revision·idempotent apply receipt를 원자적으로 갱신하고, 그 때만 발송 가능한 composer context를 반환합니다.
 - **호스트 피드백 preview:** host-only preview는 staged draft가 아니라 `session_feedback_documents`의 최신 live 문서를 읽습니다. `OPEN` 세션도 현재 live 문서가 있으면 `FEEDBACK_DOCUMENT_PUBLISHED` manual options → preview → confirm을 사용할 수 있으며, member/public 피드백 문서는 기존 열람 권한을 따릅니다.
 - **알림 대상과 리마인더 정책:** 다음 책과 리마인더의 기본 대상은 `ALL_ACTIVE_MEMBERS`, 피드백 문서와 세션 기록의 기본 대상은 `CONFIRMED_ATTENDEES`이며 기본 채널은 모두 `BOTH`입니다. `SELECTED_MEMBERS`는 호스트가 명시적으로 선택해야 하고 현재 클럽의 중복 없는 활성 membership ID를 한 명 이상 요구합니다. 예약 리마인더는 클럽별 정책이 명시적으로 켜진 경우에만 scheduler가 outbox row를 만들며, 정책 row가 없으면 꺼짐입니다.
+- **CI 테스트 안전망 도달성:** PR CI가 `scripts/`와 `deploy/oci/`의 tracked shell을 재귀적으로 수집해 Bash와 ShellCheck에 전달하고, 관측·AI 설정 validator를 앞선 실패와 독립적으로 실행합니다. 중복 Grafana lint는 단일 job 소유권으로 통합했으며 제품 동작, 배포 계약, worker·retry·timeout·coverage 기준은 바꾸지 않았습니다.
+- **Google GenAI contract test 안정화:** full suite 부하에서 mock 429/500 응답보다 먼저 테스트용 2초 timeout이 발생하던 경합을 제거했습니다. 실제 timeout 시나리오의 30ms 경계와 production 4분 timeout, SDK/Spring AI 단일 요청·무재시도 계약은 그대로 유지합니다.
 - **의존성 보안:** 전이 의존성 `brace-expansion`을 DoS 취약점이 수정된 `5.0.7` 이상으로 강제합니다.
 
 ### Database
 
-- **Flyway V37:** content-free `ai_generation_commit_receipts`(`job_id + revision` unique)를 추가하고 `ai_generation_audit_log`에 pipeline/turn/speaker/grounding/review aggregate column을 추가했습니다. Rolling deploy 동안 구 server가 읽지 못하는 값으로 기존 row를 재작성하지 않으며, 새 server가 저장된 `gemini-3-flash` 기본값을 canonical `gemini-3-flash-preview`로 해석합니다. Transcript, member name, result, evidence/excerpt는 MySQL에 저장하지 않습니다.
+- **Flyway V37:** content-free `ai_generation_commit_receipts`(`job_id + revision` unique)를 추가하고 `ai_generation_audit_log`에 pipeline/turn/speaker/grounding/review aggregate column을 추가했습니다. Rolling deploy 동안 구 server가 읽지 못하는 값으로 기존 row를 재작성하지 않으며, 새 server가 저장된 `gemini-3-flash` 기본값을 canonical `gemini-3-flash-preview`로 해석합니다. Transcript, member name, 검토 전 provider result, evidence/excerpt는 AI audit/receipt에 저장하지 않습니다. V39 이후 호스트가 commit한 검토 완료 snapshot만 공통 staged draft에 저장됩니다.
 - **Flyway V38:** `ai_generation_audit_log`에 nullable trace ID, provider attempt ordinal/call mode, non-null cost basis와 cache-write input token을 additive하게 추가했습니다. 기존 business-audit identity는 유지하지만 prompt/completion/transcript/evidence/raw error는 저장하지 않습니다.
 - **Flyway V39–V41:** 세션 기록 draft/revision, metadata-only 변경 audit, 호스트 작업 preview/decision ledger를 추가하고 AI commit receipt와 draft를 session metadata 및 revision에 안전하게 결속합니다. 저장되는 audit/ledger는 변경 필드·식별자·집계값 중심이며 transcript, AI evidence, 이메일 원문, credential은 저장하지 않습니다.
 - **Flyway V42:** idempotent `session_record_apply_receipts`와 opt-in `club_notification_policies`를 추가하고, 수동 dispatch에 nullable `content_revision`과 `SELECTED_MEMBERS` audience를 forward-only로 확장합니다. V39–V41은 변경하지 않으며 기존 수동 dispatch row는 nullable revision으로 호환됩니다.
 
 ### Deployment Notes
 
-- `v2.0.0` major release 준비입니다. 기존 SEND/SKIP mutation 계약을 제거한 새 frontend/server API 조합은 이전 frontend 또는 server와 장기간 혼용할 수 없으므로 호환 쌍을 같은 release commit에서 배포해야 합니다. 이 섹션은 2026-07-23 로컬 문서 준비이며 tag, GitHub Release, push, production deploy가 수행됐다는 뜻이 아닙니다.
+- 기존 SEND/SKIP mutation 계약을 제거한 새 frontend/server API 조합은 이전 frontend 또는 server와 혼용할 수 없으므로 `v2.0.0` tag push는 `Deploy Server Image`만 시작합니다. Scan/promote 뒤 `sync-config(restart_api=false, dry_run=false)`로 새 fail-closed AI runtime rendering을 준비하고, GHCR image를 OCI Compose에 반영해 V37–V42 Flyway 성공과 backend health/BFF contract를 확인합니다. 마지막으로 `Deploy Front`를 `release_tag=v2.0.0`으로 수동 실행해 같은 tag의 Cloudflare Pages frontend를 배포합니다.
 - Legacy/direct provider 실행과 runtime selector는 없습니다. 활성화 전에 provider allowlist/key, capability, Google paid-tier retention 확인, mock-wire/E2E, single-node Redis 전제를 검증합니다. Kafka max poll interval 기본값은 세 번의 4분 요청과 bounded delay/validation margin을 포함해 16분입니다.
-- Transcript/turns/result/evidence는 6시간 Redis payload로만 유지하고 commit/cancel 후 삭제합니다. MySQL receipt와 Redis revision/lease로 crash window를 복구하며 `COMMITTED + cleanupPending`은 DB write를 반복하지 않고 cleanup만 재시도합니다. Platform admin은 metadata-only 복구만 수행합니다.
+- Transcript/turns/evidence와 검토 전 result는 최대 6시간 Redis payload로 유지하고 commit/cancel에서 즉시 정리를 시도합니다. MySQL receipt와 Redis revision/lease로 crash window를 복구하며 `COMMITTED + cleanupPending`은 staged-draft write를 반복하지 않고 cleanup만 재시도하고 TTL을 최종 backstop으로 사용합니다. Platform admin은 metadata-only 복구만 수행합니다.
 - Rollback은 AI/consumer를 먼저 끄고 6시간 AI TTL을 기다린 뒤 이전 image로 복원합니다. 승인된 job namespace cleanup만 허용하며 Redis 전체 flush나 V38 destructive rollback은 금지합니다.
-- Private transcript를 live provider로 보내는 품질 평가, production mode 변경, deploy는 별도 명시 승인 없이 실행하지 않습니다.
+- Private transcript를 live provider로 보내는 품질 평가는 별도 명시 승인 없이는 실행하지 않습니다. Production AI provider는 현재 운영 allowlist, key, retention 확인 상태를 그대로 유지하며 이 릴리스 과정에서 임의로 활성화하거나 범위를 넓히지 않습니다.
 - `readmates.host-action-confirmation.required`는 staged session-record capability 노출만 제어하며 알림 dispatch를 다시 결합하지 않습니다. 알림은 호스트의 manual composer confirm 또는 명시적으로 켠 클럽 리마인더 정책에서만 outbox에 기록됩니다.
 - V42는 forward-only migration입니다. DB backup과 migration diff를 확인하고 V42 적용을 완료한 뒤 호환 server/frontend를 배포하며, rollback은 V42 schema를 남긴 채 이전 호환 image로 전환합니다. 이 변경 자체는 production 정책을 켜거나 실제 알림을 발송하지 않습니다.
+- 배포 후 `/internal/health`, anonymous BFF auth, OAuth start redirect, 공개 앱 응답을 확인하고, 인증된 호스트 화면에서는 운영 원장과 알림 작업대가 로드되는지, preview를 닫았을 때 dispatch/event/outbox가 생기지 않는지, confirmed send만 최근 발송 원장에 나타나는지 확인합니다. 실제 멤버 정보나 알림 본문은 릴리스 증거에 기록하지 않습니다.
+
+### Verification
+
+- Full local release gate (2026-07-25): `./scripts/pre-push-check.sh --full --release` passed. It covered agent guidance, frontend lint and coverage (192 files, 1,533 tests), production build, Zod fixture freshness, server PR quality, AI privacy/production config validators, public release candidate/gitleaks, Testcontainers integration, 92 Playwright E2E tests, and observability config validation.
+- Route-critical visual regression (2026-07-25): `corepack pnpm --dir front test:ct:docker` passed 7/7 component tests.
+- Workflow contract (2026-07-25): `actionlint .github/workflows/deploy-front.yml .github/workflows/deploy-server.yml .github/workflows/sync-config.yml` reported no findings. `Deploy Front` is manual and validates an exact `vMAJOR.MINOR.PATCH` input/tag checkout after backend promotion.
+- Live provider quality calls were skipped because they require billable credentials and separate retention approval. Production deploy, secret/config sync, tag-triggered server image publication, manual frontend dispatch and production smoke are release-operation evidence performed after `main` publication.
 
 ## v1.17.3 - 2026-07-12
 
