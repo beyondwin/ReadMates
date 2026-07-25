@@ -847,6 +847,7 @@ describe("HostNotificationsPage", () => {
       error: null,
       onPreview: vi.fn().mockResolvedValue(undefined),
       onConfirm: vi.fn().mockResolvedValue(undefined),
+      onPreviewDismiss: vi.fn(),
       onSessionChange: vi.fn().mockResolvedValue(sessionTwoOptions),
       onLoadManualOptions: vi.fn().mockResolvedValue(sessionTwoOptions),
       onLoadMoreManualMembers: vi.fn().mockResolvedValue(sessionTwoOptions),
@@ -905,6 +906,7 @@ describe("HostNotificationsPage", () => {
       error: null,
       onPreview: vi.fn().mockResolvedValue(undefined),
       onConfirm: vi.fn().mockResolvedValue(undefined),
+      onPreviewDismiss: vi.fn(),
       onSessionChange: vi.fn().mockResolvedValue(sessionTwoOptions),
       onLoadManualOptions: vi.fn().mockResolvedValue(sessionTwoOptions),
       onLoadMoreManualMembers: vi.fn().mockResolvedValue(sessionTwoOptions),
@@ -1155,7 +1157,7 @@ describe("HostNotificationsPage", () => {
     expect(within(previewPanel as HTMLElement).getByText("모임 전 준비를 확인해 주세요.")).toBeInTheDocument();
     expect(screen.getByText("이미 발송된 알림입니다.")).toBeInTheDocument();
 
-    const confirm = screen.getByRole("button", { name: "발송 확인" });
+    const confirm = screen.getByRole("button", { name: "3명에게 알림 발송" });
     expect(confirm).toBeDisabled();
     await user.click(screen.getByRole("checkbox", { name: "재발송을 확인했습니다" }));
     await user.click(confirm);
@@ -1475,7 +1477,7 @@ describe("HostNotificationsPage", () => {
     await user.click(screen.getByRole("button", { name: "미리보기 열기" }));
     await screen.findByRole("heading", { name: "발송 전 확인" });
 
-    const confirmButton = screen.getByRole("button", { name: "발송 확인" });
+    const confirmButton = screen.getByRole("button", { name: "3명에게 알림 발송" });
     expect(confirmButton).toBeDisabled();
     await user.click(confirmButton);
     expect(onConfirmManual).not.toHaveBeenCalled();

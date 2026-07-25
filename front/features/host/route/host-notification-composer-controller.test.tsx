@@ -278,7 +278,7 @@ describe("HostNotificationComposerController", () => {
     renderController({ onConfirmed });
 
     await userEvent.click(await screen.findByRole("button", { name: "알림 미리보기" }));
-    await userEvent.click(await screen.findByRole("button", { name: "발송 확인" }));
+    await userEvent.click(await screen.findByRole("button", { name: "2명에게 알림 발송" }));
 
     await waitFor(() => expect(onConfirmed).toHaveBeenCalledWith(confirmResponse));
   });
@@ -289,7 +289,7 @@ describe("HostNotificationComposerController", () => {
     renderController({ onConfirmed });
 
     await userEvent.click(await screen.findByRole("button", { name: "알림 미리보기" }));
-    await userEvent.click(await screen.findByRole("button", { name: "발송 확인" }));
+    await userEvent.click(await screen.findByRole("button", { name: "2명에게 알림 발송" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "발송을 요청하지 못했습니다",
@@ -305,7 +305,7 @@ describe("HostNotificationComposerController", () => {
     const removeSpy = vi.spyOn(client, "removeQueries");
 
     await userEvent.click(await screen.findByRole("button", { name: "알림 미리보기" }));
-    await userEvent.click(await screen.findByRole("button", { name: "발송 확인" }));
+    await userEvent.click(await screen.findByRole("button", { name: "2명에게 알림 발송" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "최신 저장 결과에서 작성기를 다시 열어 주세요",
@@ -324,7 +324,7 @@ describe("HostNotificationComposerController", () => {
     renderController();
 
     await userEvent.click(await screen.findByRole("button", { name: "알림 미리보기" }));
-    await userEvent.click(await screen.findByRole("button", { name: "발송 확인" }));
+    await userEvent.click(await screen.findByRole("button", { name: "2명에게 알림 발송" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "새 미리보기를 만든 뒤 다시 발송해 주세요",
@@ -340,7 +340,7 @@ describe("HostNotificationComposerController", () => {
     renderController();
 
     await userEvent.click(await screen.findByRole("button", { name: "알림 미리보기" }));
-    await userEvent.click(await screen.findByRole("button", { name: "발송 확인" }));
+    await userEvent.click(await screen.findByRole("button", { name: "2명에게 알림 발송" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "새 미리보기를 만든 뒤 다시 발송해 주세요",

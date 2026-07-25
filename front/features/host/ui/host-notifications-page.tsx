@@ -335,6 +335,10 @@ export function HostNotificationsPage({
           error={manualError}
           onPreview={handleManualPreview}
           onConfirm={handleManualConfirm}
+          onPreviewDismiss={() => {
+            setManualPreview(null);
+            setManualError(null);
+          }}
           onSessionChange={handleManualSessionChange}
           onLoadManualOptions={handleLoadManualOptions}
           onLoadMoreManualMembers={handleLoadMoreManualMembers}

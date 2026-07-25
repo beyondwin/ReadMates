@@ -12,6 +12,8 @@ import type {
   ManualNotificationPreviewResponse,
 } from "@/features/host/model/host-view-types";
 import { HostNotificationComposer } from "./host-notification-composer";
+import { HostNotificationComposerDialog } from "./host-notification-composer-dialog";
+import { ManualNotificationPreviewConfirmation } from "./manual-notification-preview";
 
 type ManualNotificationWorkbenchProps = {
   options: ManualNotificationOptionsResponse;
@@ -23,6 +25,7 @@ type ManualNotificationWorkbenchProps = {
   error: string | null;
   onPreview: (request: ManualNotificationPreviewRequest) => Promise<void>;
   onConfirm: (request: ManualNotificationConfirmRequest) => Promise<void>;
+  onPreviewDismiss: () => void;
   onSessionChange?: (sessionId: string) => Promise<ManualNotificationOptionsResponse>;
   onLoadManualOptions?: (
     sessionId?: string,
@@ -75,6 +78,7 @@ function ManualNotificationWorkbenchState({
   error,
   onPreview,
   onConfirm,
+  onPreviewDismiss,
   onSessionChange,
   onLoadManualOptions,
   onLoadMoreManualMembers,
@@ -259,6 +263,24 @@ function ManualNotificationWorkbenchState({
         showSkip={false}
         recipientModes={currentTemplate?.allowedAudiences}
       />
+
+      <HostNotificationComposerDialog
+        open={preview !== null}
+        busy={busy}
+        variant="side-sheet"
+        title="발송 전 확인"
+        description="최종 대상과 채널을 확인한 뒤 발송합니다."
+        onClose={onPreviewDismiss}
+      >
+        {preview ? (
+          <ManualNotificationPreviewConfirmation
+            key={preview.previewId}
+            preview={preview}
+            busy={busy}
+            onConfirm={handleConfirm}
+          />
+        ) : null}
+      </HostNotificationComposerDialog>
     </section>
   );
 }

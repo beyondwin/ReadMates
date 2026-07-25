@@ -1,4 +1,4 @@
-import { type CSSProperties, useState } from "react";
+import { type CSSProperties } from "react";
 import {
   composerCanPreview,
   recommendedAudience,
@@ -11,7 +11,7 @@ import type {
   ManualNotificationPreviewResponse,
   ManualNotificationRequestedChannels,
 } from "@/features/host/model/host-view-types";
-import { ManualNotificationPreviewPanel } from "./manual-notification-preview";
+import { ManualNotificationPreviewConfirmation } from "./manual-notification-preview";
 import { manualAudienceLabels } from "./manual-notification-labels";
 import { NotificationRecipientPicker } from "./notification-recipient-picker";
 
@@ -214,8 +214,8 @@ export function HostNotificationComposer({
         ) : null}
       </div>
 
-      {preview ? (
-        <ComposerPreview
+      {preview && presentation === "dialog" ? (
+        <ManualNotificationPreviewConfirmation
           key={preview.previewId}
           preview={preview}
           busy={busy}
@@ -223,29 +223,5 @@ export function HostNotificationComposer({
         />
       ) : null}
     </div>
-  );
-}
-
-function ComposerPreview({
-  preview,
-  busy,
-  onConfirm,
-}: {
-  preview: ManualNotificationPreviewResponse;
-  busy: boolean;
-  onConfirm: (resendConfirmed: boolean) => Promise<unknown> | void;
-}) {
-  const [resendConfirmed, setResendConfirmed] = useState(false);
-  const requiresResend = preview.duplicates.requiresResendConfirmation;
-
-  return (
-    <ManualNotificationPreviewPanel
-      preview={preview}
-      resendConfirmed={resendConfirmed}
-      disabled={busy || (requiresResend && !resendConfirmed)}
-      busy={busy}
-      onResendConfirmedChange={setResendConfirmed}
-      onConfirm={() => void onConfirm(resendConfirmed)}
-    />
   );
 }

@@ -196,7 +196,7 @@ describe("HostNotificationComposer", () => {
     renderComposer({ preview: duplicatePreview, onConfirm });
 
     const previewRegion = screen.getByRole("region", { name: "발송 전 확인" });
-    const confirmButton = within(previewRegion).getByRole("button", { name: "발송 확인" });
+    const confirmButton = within(previewRegion).getByRole("button", { name: "3명에게 알림 발송" });
     expect(confirmButton).toBeDisabled();
 
     await user.click(within(previewRegion).getByRole("checkbox", { name: "재발송을 확인했습니다" }));

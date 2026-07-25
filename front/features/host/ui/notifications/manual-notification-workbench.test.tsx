@@ -1,9 +1,11 @@
 import { render, screen, within } from "@testing-library/react";
 import type { ComponentProps } from "react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type {
   HostSessionListItem,
   ManualNotificationOptionsResponse,
+  ManualNotificationPreviewResponse,
 } from "@/features/host/model/host-view-types";
 import { ManualNotificationWorkbench } from "./manual-notification-workbench";
 
@@ -60,6 +62,36 @@ const sessions: HostSessionListItem[] = [{
   visibility: "MEMBER",
 }];
 
+const previewFixture: ManualNotificationPreviewResponse = {
+  previewId: "preview-1",
+  expiresAt: "2026-07-25T12:10:00+09:00",
+  template: {
+    eventType: "SESSION_REMINDER_DUE",
+    label: "모임 전날 리마인더",
+    subject: "모임 전날 리마인더",
+    bodyPreview: "내일 모임 준비를 확인해 주세요.",
+  },
+  audience: {
+    baseGroup: "ALL_ACTIVE_MEMBERS",
+    baseCount: 3,
+    excludedCount: 0,
+    includedCount: 0,
+    finalTargetCount: 3,
+  },
+  channels: {
+    requested: "BOTH",
+    inAppEligibleCount: 3,
+    emailEligibleCount: 2,
+    emailSkippedByPreferenceCount: 1,
+    emailMissingCount: 0,
+  },
+  duplicates: {
+    requiresResendConfirmation: false,
+    recentDispatches: [],
+  },
+  warnings: [],
+};
+
 type WorkbenchProps = ComponentProps<typeof ManualNotificationWorkbench>;
 
 function renderWorkbench(overrides: Partial<WorkbenchProps> = {}) {
@@ -73,6 +105,7 @@ function renderWorkbench(overrides: Partial<WorkbenchProps> = {}) {
     error: null,
     onPreview: vi.fn().mockResolvedValue(undefined),
     onConfirm: vi.fn().mockResolvedValue(undefined),
+    onPreviewDismiss: vi.fn(),
     ...overrides,
   };
   return render(<ManualNotificationWorkbench {...props} />);
@@ -103,5 +136,42 @@ describe("ManualNotificationWorkbench", () => {
     const reason = screen.getByText("피드백 문서가 등록된 뒤 발송할 수 있습니다.");
     expect(unavailable).toBeDisabled();
     expect(unavailable).toHaveAttribute("aria-describedby", reason.id);
+  });
+
+  it("opens preview externally and Escape dismisses without confirming", async () => {
+    const user = userEvent.setup();
+    const onConfirm = vi.fn();
+    const onPreviewDismiss = vi.fn();
+    renderWorkbench({
+      preview: previewFixture,
+      onConfirm,
+      onPreviewDismiss,
+    });
+
+    const dialog = screen.getByRole("dialog", { name: "발송 전 확인" });
+    expect(within(dialog).getByRole("button", { name: "3명에게 알림 발송" }))
+      .toBeInTheDocument();
+    expect(screen.getAllByText("발송 전 확인")).toHaveLength(1);
+
+    await user.keyboard("{Escape}");
+
+    expect(onPreviewDismiss).toHaveBeenCalledTimes(1);
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it("backdrop dismissal never confirms a preview", async () => {
+    const user = userEvent.setup();
+    const onConfirm = vi.fn();
+    const onPreviewDismiss = vi.fn();
+    renderWorkbench({
+      preview: previewFixture,
+      onConfirm,
+      onPreviewDismiss,
+    });
+
+    await user.click(screen.getByTestId("host-notification-composer-backdrop"));
+
+    expect(onPreviewDismiss).toHaveBeenCalledTimes(1);
+    expect(onConfirm).not.toHaveBeenCalled();
   });
 });
