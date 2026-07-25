@@ -95,7 +95,7 @@ Spring Boot API
   `----> MySQL (source of truth)
 ```
 
-프로덕션에서 브라우저는 Spring API origin을 직접 신뢰 경계로 사용하지 않습니다. 브라우저는 같은 origin의 Cloudflare Pages Functions에 요청하고, BFF가 Spring `/api/**`로 전달하면서 `X-Readmates-Bff-Secret`을 붙입니다. 직접 API origin 예시는 문서에서 `https://api.example.com` 같은 placeholder만 사용합니다.
+프로덕션에서 브라우저는 Spring API origin을 직접 신뢰 경계로 사용하지 않습니다. 브라우저는 같은 origin의 Cloudflare Pages Functions에 요청하고, BFF가 Spring `/api/**`로 전달하면서 `X-Readmates-Bff-Secret`을 붙입니다. Major contract 배포의 host mutation은 browser bundle과 Pages BFF가 같은 client contract를 선언·검증한 경우에만 Spring이 허용해, backend-first 배포 창과 열린 구 탭을 fail closed합니다. 직접 API origin 예시는 문서에서 `https://api.example.com` 같은 placeholder만 사용합니다.
 
 클럽 공개 URL은 `https://readmates.pages.dev/clubs/<club-slug>` fallback을 기본 보장 경로로 사용합니다. 운영자가 primary domain과 registered subdomain alias를 연결하면 canonical public URL, OAuth return URL, domain status check 정책은 [multi-club domain runbook](docs/deploy/multi-club-domains.md)을 따릅니다.
 

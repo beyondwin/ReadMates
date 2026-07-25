@@ -41,6 +41,8 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식을 사용합니다.
 
 `main` 또는 tag push만으로는 frontend production 배포가 시작되지 않습니다. Production frontend는 backend promotion 뒤 `Deploy Front` workflow에 검증할 release tag를 명시해 수동 dispatch합니다. 이 순서는 새 frontend가 구 backend의 미지원 API를 먼저 호출하는 배포 window를 막습니다.
 
+Major host-write contract release는 `READMATES_HOST_WRITE_CLIENT_CONTRACT_REQUIRED=true`를 backend promotion 전에 동기화합니다. 새 backend는 구 browser/BFF의 mutating `/api/host/**`를 409로 잠시 동결하고, 같은 tag의 새 browser bundle과 Pages BFF가 함께 배포된 뒤에만 write를 재개합니다. Frontend-only rollback은 host write 동결을 유지하므로 호환 frontend 재배포 또는 backend rollback/forward-fix까지 운영 계획에 포함합니다.
+
 ## Server Image Tags
 
 OCI compose 배포 script는 `READMATES_SERVER_IMAGE`가 없으면 `readmates-server:local`을 사용해 로컬 빌드 이미지를 VM으로 전송합니다. 릴리즈 배포에서는 먼저 `Deploy Server Image` workflow가 scan-candidate digest를 Trivy로 검사한 뒤 같은 digest를 release tag로 promote했는지 확인하고, 아래처럼 제품 tag와 같은 image tag를 명시합니다.

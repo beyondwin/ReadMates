@@ -142,6 +142,8 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식의 semantic version을 사용합니다.
 
    Backend health와 BFF contract를 확인한 다음 frontend를 같은 tag에서 배포합니다.
 
+   Major host-write contract release는 backend promotion 전에 `sync-config`가 `READMATES_HOST_WRITE_CLIENT_CONTRACT_REQUIRED=true`를 렌더링했는지 확인합니다. Backend-first 구간에는 구 browser/BFF의 host mutation이 409로 동결되고, 같은 tag의 browser bundle과 Pages Functions가 함께 올라온 뒤에만 쓰기가 재개됩니다. Frontend rollback만으로는 쓰기가 복구되지 않습니다.
+
    ```bash
    gh workflow run "Deploy Front" --ref main -f release_tag=v1.2.0
    ```

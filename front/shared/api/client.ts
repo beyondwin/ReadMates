@@ -12,6 +12,9 @@ export class ReadMatesSessionExpiredError extends Error {
 
 let lastLoginRedirectAt = 0;
 const REDIRECT_COOL_OFF_MS = 1500;
+const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const HOST_WRITE_CLIENT_CONTRACT_HEADER = "X-Readmates-Client-Contract";
+const HOST_WRITE_CLIENT_CONTRACT = "v2";
 
 export function __resetRedirectGuardForTest() {
   lastLoginRedirectAt = 0;
@@ -50,9 +53,16 @@ export function readmatesApiPath(path: string, context?: ReadmatesApiContext) {
 export async function readmatesFetchResponse(path: string, init?: RequestInit, context?: ReadmatesApiContext): Promise<Response> {
   const headers = new Headers(init?.headers);
   const bodyIsFormData = typeof FormData !== "undefined" && init?.body instanceof FormData;
+  const method = init?.method?.toUpperCase() ?? "GET";
 
   if (!headers.has("Content-Type") && !bodyIsFormData) {
     headers.set("Content-Type", "application/json");
+  }
+
+  if (MUTATING_METHODS.has(method) && path.startsWith("/api/host/")) {
+    headers.set(HOST_WRITE_CLIENT_CONTRACT_HEADER, HOST_WRITE_CLIENT_CONTRACT);
+  } else {
+    headers.delete(HOST_WRITE_CLIENT_CONTRACT_HEADER);
   }
 
   const response = await fetch(`/api/bff${readmatesApiPath(path, context)}`, {

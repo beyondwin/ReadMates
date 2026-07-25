@@ -84,7 +84,10 @@ async function postJson(
   return page.evaluate(async ({ requestPath, requestBody }) => {
     const response = await fetch(requestPath, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Readmates-Client-Contract": "v2",
+      },
       body: JSON.stringify(requestBody),
     });
     const text = await response.text();
@@ -389,7 +392,10 @@ test("selected-member confirm retry returns the same event without duplicate dis
   const preview = await page.evaluate(async (request) => {
     const response = await fetch("/api/bff/api/host/notifications/manual/preview?clubSlug=reading-sai", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Readmates-Client-Contract": "v2",
+      },
       body: JSON.stringify(request),
     });
     return {
@@ -402,7 +408,10 @@ test("selected-member confirm retry returns the same event without duplicate dis
   const firstStatus = await page.evaluate(async (request) => {
     const response = await fetch("/api/bff/api/host/notifications/manual?clubSlug=reading-sai", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Readmates-Client-Contract": "v2",
+      },
       body: JSON.stringify(request),
     });
     return response.status;
@@ -410,7 +419,10 @@ test("selected-member confirm retry returns the same event without duplicate dis
   const retryStatus = await page.evaluate(async (request) => {
     const response = await fetch("/api/bff/api/host/notifications/manual?clubSlug=reading-sai", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Readmates-Client-Contract": "v2",
+      },
       body: JSON.stringify(request),
     });
     return response.status;

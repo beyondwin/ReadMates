@@ -16,6 +16,7 @@
 - `Deploy Front` workflow가 backend promotion 뒤 같은 `release_tag` 입력으로 성공해 Cloudflare Pages production을 배포했습니다.
 - `Deploy Server Image` workflow가 같은 tag에서 성공해 GHCR `readmates-server:vMAJOR.MINOR.PATCH` 이미지를 scan/promote했습니다.
 - Release에서 production runtime rendering이 바뀌면 `sync-config` workflow가 `restart_api=false`, `dry_run=false`로 성공해 다음 container start가 새 설정을 읽도록 준비했습니다.
+- Major host-write contract release이면 sync된 env에 `READMATES_HOST_WRITE_CLIENT_CONTRACT_REQUIRED=true`가 있고, backend-first 창의 구 client write 동결과 same-tag frontend 배포 후 재개를 확인했습니다.
 - 서버 변경이나 DB migration이 있으면 OCI Compose stack이 같은 GHCR tag로 재시작됐고 `/internal/health`, BFF auth smoke, OAuth redirect smoke가 통과했습니다.
 - 공개 릴리즈 후보 검사가 통과했거나, blocker와 남은 리스크가 release note에 명확히 남아 있습니다.
 
@@ -148,7 +149,7 @@ gh run list --workflow sync-config.yml --event workflow_dispatch --limit 5
 gh run watch <sync-config-run-id> --exit-status
 ```
 
-`restart_api=false`는 구 image를 새 설정으로 먼저 재시작하지 않기 위한 값입니다. `dry_run=false`는 검증만 하는 것이 아니라 운영 env 파일을 실제 동기화합니다. Workflow가 실패하면 OCI promotion을 시작하지 않습니다.
+`restart_api=false`는 구 image를 새 설정으로 먼저 재시작하지 않기 위한 값입니다. `dry_run=false`는 검증만 하는 것이 아니라 운영 env 파일을 실제 동기화합니다. Major host-write contract release에서는 이 단계가 `READMATES_HOST_WRITE_CLIENT_CONTRACT_REQUIRED=true`를 기록하고, v2 image가 시작될 때부터 구 client write를 fail closed하도록 준비합니다. Workflow가 실패하면 OCI promotion을 시작하지 않습니다.
 
 ```bash
 READMATES_SERVER_IMAGE='ghcr.io/<owner>/<repo>/readmates-server:vX.Y.Z' \
@@ -166,6 +167,24 @@ CADDY_SITE=api.example.com \
 - Runtime rendering이 바뀌었다면 `sync-config` workflow가 `restart_api=false`, `dry_run=false`로 성공했습니다.
 
 스크립트는 legacy host `readmates-server`와 host `caddy`를 중지하고, compose stack의 `readmates-api` 이미지 ID가 기대 이미지와 같은지 확인한 뒤 `/internal/health`, BFF auth smoke, post-deploy watch를 실행합니다.
+
+Major host-write contract release에서는 실데이터 mutation 없이 배포 창을 확인합니다. 아래 probe는 인증 cookie를 보내지 않으므로 controller mutation에 도달하지 않습니다.
+
+```bash
+# Backend promotion 후/Frontend 배포 전: 구 BFF가 contract를 전달하지 않아 409.
+curl -sS -o /dev/null -w '%{http_code}\n' \
+  -X POST \
+  -H 'Origin: https://readmates.pages.dev' \
+  https://readmates.pages.dev/api/bff/api/host/notifications/process
+
+# Frontend + Pages Functions 배포 후에도 contract 누락은 409.
+# 정확한 v2 선언은 contract gate를 통과한 뒤 인증 계층에서 401이어야 합니다.
+curl -sS -o /dev/null -w '%{http_code}\n' \
+  -X POST \
+  -H 'Origin: https://readmates.pages.dev' \
+  -H 'X-Readmates-Client-Contract: v2' \
+  https://readmates.pages.dev/api/bff/api/host/notifications/process
+```
 
 ## 배포 후 확인
 
@@ -187,6 +206,8 @@ DB migration이 있는 릴리즈는 Spring startup log 또는 Flyway schema hist
 ## Rollback 기준
 
 Frontend만 실패하면 이전 정상 tag의 Cloudflare Pages 배포를 재배포하거나 새 patch tag를 발행합니다.
+
+v2 host-write gate가 켜진 backend에서 frontend만 이전 tag로 rollback하면 host mutation이 409로 동결되는 것이 정상입니다. 쓰기를 복구하려면 호환 frontend를 다시 배포하거나 backend도 schema를 보존한 호환 image로 rollback/forward-fix합니다.
 
 서버 image만 되돌릴 때는 [compose-stack.md](compose-stack.md#rollback)의 rollback 절차를 따릅니다.
 

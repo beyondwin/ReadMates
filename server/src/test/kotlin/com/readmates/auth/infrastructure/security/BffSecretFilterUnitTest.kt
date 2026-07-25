@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
+import org.springframework.http.MediaType
 import org.springframework.mock.web.MockFilterChain
 import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.mock.web.MockHttpServletResponse
@@ -180,6 +181,149 @@ class BffSecretFilterUnitTest {
                 .doesNotContain("test-bff-secret")
                 .doesNotContain("evil.example.com")
         }
+    }
+
+    @Test
+    fun `required v2 client contract rejects legacy host mutation with problem response`() {
+        val filter =
+            BffSecretFilter(
+                configuredSecretsRaw = "",
+                legacyExpectedSecret = "test-bff-secret",
+                bffSecretRequired = true,
+                allowedOriginPort =
+                    staticAllowedOriginPort(
+                        allowedOrigins = "https://app.example.com",
+                        appBaseUrl = "http://localhost:3000",
+                    ),
+                hostWriteClientContractRequired = true,
+            )
+        val request =
+            MockHttpServletRequest("POST", "/api/host/sessions/session-1/session-import/commit").apply {
+                servletPath = "/api/host/sessions/session-1/session-import/commit"
+                addHeader("X-Readmates-Bff-Secret", "test-bff-secret")
+                addHeader("Origin", "https://app.example.com")
+            }
+        val response = MockHttpServletResponse()
+
+        filter.doFilter(request, response, MockFilterChain())
+
+        assertEquals(409, response.status)
+        assertThat(response.contentType).startsWith(MediaType.APPLICATION_PROBLEM_JSON_VALUE)
+        assertThat(response.contentAsString)
+            .contains("\"code\":\"HOST_CLIENT_UPGRADE_REQUIRED\"")
+            .doesNotContain("session-1")
+    }
+
+    @Test
+    fun `required v2 client contract accepts trusted host mutation`() {
+        val filter =
+            BffSecretFilter(
+                configuredSecretsRaw = "",
+                legacyExpectedSecret = "test-bff-secret",
+                bffSecretRequired = true,
+                allowedOriginPort =
+                    staticAllowedOriginPort(
+                        allowedOrigins = "https://app.example.com",
+                        appBaseUrl = "http://localhost:3000",
+                    ),
+                hostWriteClientContractRequired = true,
+            )
+        val request =
+            MockHttpServletRequest("POST", "/api/host/sessions/session-1/session-import/commit").apply {
+                servletPath = "/api/host/sessions/session-1/session-import/commit"
+                addHeader("X-Readmates-Bff-Secret", "test-bff-secret")
+                addHeader("X-Readmates-Client-Contract", "v2")
+                addHeader("Origin", "https://app.example.com")
+            }
+        val response = MockHttpServletResponse()
+
+        filter.doFilter(request, response, MockFilterChain())
+
+        assertEquals(200, response.status)
+    }
+
+    @Test
+    fun `invalid bff secret is rejected before host client contract`() {
+        val filter =
+            BffSecretFilter(
+                configuredSecretsRaw = "",
+                legacyExpectedSecret = "test-bff-secret",
+                bffSecretRequired = true,
+                allowedOriginPort = noopAllowedOriginPort(),
+                hostWriteClientContractRequired = true,
+            )
+        val request =
+            MockHttpServletRequest("POST", "/api/host/sessions").apply {
+                servletPath = "/api/host/sessions"
+                addHeader("X-Readmates-Bff-Secret", "wrong-secret")
+            }
+        val response = MockHttpServletResponse()
+
+        filter.doFilter(request, response, MockFilterChain())
+
+        assertEquals(401, response.status)
+    }
+
+    @Test
+    fun `required v2 client contract does not block host reads or member mutations`() {
+        val filter =
+            BffSecretFilter(
+                configuredSecretsRaw = "",
+                legacyExpectedSecret = "test-bff-secret",
+                bffSecretRequired = true,
+                allowedOriginPort =
+                    staticAllowedOriginPort(
+                        allowedOrigins = "https://app.example.com",
+                        appBaseUrl = "http://localhost:3000",
+                    ),
+                hostWriteClientContractRequired = true,
+            )
+        val hostRead =
+            MockHttpServletRequest("GET", "/api/host/sessions").apply {
+                servletPath = "/api/host/sessions"
+                addHeader("X-Readmates-Bff-Secret", "test-bff-secret")
+            }
+        val memberMutation =
+            MockHttpServletRequest("POST", "/api/sessions/current/rsvp").apply {
+                servletPath = "/api/sessions/current/rsvp"
+                addHeader("X-Readmates-Bff-Secret", "test-bff-secret")
+                addHeader("Origin", "https://app.example.com")
+            }
+
+        val hostReadResponse = MockHttpServletResponse()
+        val memberMutationResponse = MockHttpServletResponse()
+        filter.doFilter(hostRead, hostReadResponse, MockFilterChain())
+        filter.doFilter(memberMutation, memberMutationResponse, MockFilterChain())
+
+        assertEquals(200, hostReadResponse.status)
+        assertEquals(200, memberMutationResponse.status)
+    }
+
+    @Test
+    fun `optional client contract keeps legacy host mutation compatible outside production`() {
+        val filter =
+            BffSecretFilter(
+                configuredSecretsRaw = "",
+                legacyExpectedSecret = "test-bff-secret",
+                bffSecretRequired = true,
+                allowedOriginPort =
+                    staticAllowedOriginPort(
+                        allowedOrigins = "https://app.example.com",
+                        appBaseUrl = "http://localhost:3000",
+                    ),
+                hostWriteClientContractRequired = false,
+            )
+        val request =
+            MockHttpServletRequest("POST", "/api/host/sessions/session-1/session-import/commit").apply {
+                servletPath = "/api/host/sessions/session-1/session-import/commit"
+                addHeader("X-Readmates-Bff-Secret", "test-bff-secret")
+                addHeader("Origin", "https://app.example.com")
+            }
+        val response = MockHttpServletResponse()
+
+        filter.doFilter(request, response, MockFilterChain())
+
+        assertEquals(200, response.status)
     }
 
     // --- New scenarios for REQ-R-003a-9 ---

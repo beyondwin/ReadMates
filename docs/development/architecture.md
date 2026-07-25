@@ -85,7 +85,7 @@ Frontend runtime observability is a same-origin telemetry side path. The SPA sen
 
 Spring API의 application service는 Spring Web/HTTP type에 의존하지 않는다. 이번 전환 범위의 feature application/domain error는 `adapter.in.web`의 handler가 HTTP status와 `ApiErrorResponse`로 매핑한다. 이후 새로 추가하거나 전환하는 web handler도 이 contract를 따른다. 공통 framework error와 shared access-denied error는 shared web advice가 안전한 기본 code/message로 매핑한다.
 
-Cloudflare Pages Functions BFF가 upstream Spring API에 도달하기 전에 거절하는 요청도 같은 shape를 사용한다. 예를 들어 invalid `/api/bff/**` path는 `404 RESOURCE_NOT_FOUND`, cross-origin mutation은 `403 PERMISSION_DENIED`, invalid `clubSlug`는 `400 INVALID_REQUEST`를 반환한다. Upstream Spring API 응답은 status와 안전한 body를 유지하되, 내부 `x-readmates-*` response header와 secret은 계속 제거한다.
+Cloudflare Pages Functions BFF가 upstream Spring API에 도달하기 전에 거절하는 요청도 같은 shape를 사용한다. 예를 들어 invalid `/api/bff/**` path는 `404 RESOURCE_NOT_FOUND`, cross-origin mutation은 `403 PERMISSION_DENIED`, invalid `clubSlug`는 `400 INVALID_REQUEST`, 구 host-write client contract는 `409 HOST_CLIENT_UPGRADE_REQUIRED`를 반환한다. Upstream Spring API 응답은 status와 안전한 body를 유지하되, 내부 `x-readmates-*` response header와 secret은 계속 제거한다.
 
 프런트엔드 `shared/api`는 non-OK 응답을 `ReadmatesApiError`로 변환하고 status, code, message, fallback 여부, response metadata를 보존한다. JSON body가 비어 있거나 잘못된 형태여도 HTTP status를 기준으로 안전한 fallback code/message를 만든다. React Router route boundary는 HTTP status와 public/member/host/auth context를 기준으로 404, 403, 409, 410, 5xx 화면을 보여주며, code와 message는 `ReadmatesApiError`에 보존한다. 정상적인 401 session 만료는 기존 login return flow를 유지한다.
 
@@ -226,6 +226,8 @@ Password login과 password reset endpoint는 현재 운영 경로가 아니며 `
 Spring은 `/api/**` 요청에서 `X-Readmates-Bff-Secret`을 검사할 수 있습니다. 운영 기본값은 `READMATES_BFF_SECRET_REQUIRED=true`이며, `READMATES_BFF_SECRETS`가 있으면 쉼표로 구분된 후보 목록 전체를 허용하고 없을 때만 `READMATES_BFF_SECRET`을 fallback으로 사용합니다. Cloudflare Pages Functions는 같은 목록의 첫 번째 non-empty 값을 primary secret으로 Spring에 전달합니다.
 
 Mutating method인 `POST`, `PUT`, `PATCH`, `DELETE`는 `Origin` 또는 `Referer`가 `READMATES_ALLOWED_ORIGINS` 또는 `READMATES_APP_BASE_URL`에서 파생된 허용 origin에 포함되어야 합니다.
+
+Production은 `READMATES_HOST_WRITE_CLIENT_CONTRACT_REQUIRED=true`로 mutating `/api/host/**`에 현재 client contract를 추가로 요구합니다. 새 browser bundle은 `X-Readmates-Client-Contract: v2`를 선언하고 Pages Functions는 정확한 선언만 새 upstream header로 재생성합니다. BFF가 값을 무조건 부여하지 않으므로 구 browser + 새 BFF, 새 browser + 구 BFF, 구 browser + 구 BFF는 모두 새 backend에서 409로 fail closed하고 새 browser + 새 BFF만 통과합니다. 이 header는 인증이나 권한을 대신하지 않으며 BFF secret, same-origin 검증, session, club-scoped HOST 권한을 모두 통과해야 합니다.
 
 클럽 context header도 BFF 신뢰 경계 안에 있습니다. Spring은 `X-Readmates-Club-Slug`와 `X-Readmates-Club-Host`를 browser input으로 취급하지 않고, BFF secret을 통과한 요청에서만 context resolve 입력으로 사용합니다. 허용 origin은 primary auth/app origin, `https://readmates.pages.dev`, 등록된 active club host를 명시적으로 포함해야 하며 wildcard suffix로 넓게 열지 않습니다.
 

@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.core.task.TaskExecutor
 import org.springframework.core.task.TaskRejectedException
+import org.springframework.http.MediaType
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
 import java.net.URI
@@ -27,6 +28,8 @@ class BffSecretFilter(
     @param:Value("\${readmates.bff-secret-required:true}")
     private val bffSecretRequired: Boolean,
     private val allowedOriginPort: AllowedOriginPort,
+    @param:Value("\${readmates.security.host-write-client-contract.required:false}")
+    private val hostWriteClientContractRequired: Boolean = false,
     private val ipHashingProperties: ClientIpHashingProperties = ClientIpHashingProperties(),
     @param:Autowired(required = false)
     private val auditPort: BffSecretRotationAuditPort? = null,
@@ -95,7 +98,15 @@ class BffSecretFilter(
             }
         }
 
-        filterChain.doFilter(request, response)
+        if (requiresCurrentHostWriteClientContract(request) && !hasCurrentHostWriteClientContract(request)) {
+            operationalLogger.warn(
+                "Host write client contract rejected method={}",
+                request.method,
+            )
+            writeHostClientUpgradeRequired(response)
+        } else {
+            filterChain.doFilter(request, response)
+        }
     }
 
     private fun auditAsync(
@@ -154,16 +165,41 @@ class BffSecretFilter(
 
     private fun isMutatingRequest(request: HttpServletRequest): Boolean = request.method in MUTATING_METHODS
 
+    private fun requiresCurrentHostWriteClientContract(request: HttpServletRequest): Boolean =
+        hostWriteClientContractRequired &&
+            isMutatingRequest(request) &&
+            request.requestPath().let { it == HOST_API_ROOT || it.startsWith(HOST_API_PREFIX) }
+
+    private fun hasCurrentHostWriteClientContract(request: HttpServletRequest): Boolean =
+        request.getHeader(CLIENT_CONTRACT_HEADER) == CURRENT_CLIENT_CONTRACT
+
+    private fun writeHostClientUpgradeRequired(response: HttpServletResponse) {
+        response.status = HttpServletResponse.SC_CONFLICT
+        response.characterEncoding = Charsets.UTF_8.name()
+        response.contentType = MediaType.APPLICATION_PROBLEM_JSON_VALUE
+        response.writer.write(HOST_CLIENT_UPGRADE_REQUIRED_BODY)
+    }
+
     private fun isApiRequest(request: HttpServletRequest): Boolean {
-        val servletPath = request.servletPath.orEmpty()
-        val pathInfo = request.pathInfo.orEmpty()
-        val path = "$servletPath$pathInfo"
+        val path = request.requestPath()
         return path == "/api" || path.startsWith("/api/")
+    }
+
+    private fun HttpServletRequest.requestPath(): String {
+        val servletPathValue = servletPath.orEmpty()
+        val pathInfoValue = pathInfo.orEmpty()
+        return "$servletPathValue$pathInfoValue"
     }
 
     internal companion object {
         private val operationalLogger = LoggerFactory.getLogger(BffSecretFilter::class.java)
         const val BFF_SECRET_HEADER = "X-Readmates-Bff-Secret"
+        const val CLIENT_CONTRACT_HEADER = "X-Readmates-Client-Contract"
+        const val CURRENT_CLIENT_CONTRACT = "v2"
+        private const val HOST_API_ROOT = "/api/host"
+        private const val HOST_API_PREFIX = "/api/host/"
+        private const val HOST_CLIENT_UPGRADE_REQUIRED_BODY =
+            """{"type":"about:blank","title":"Conflict","status":409,"detail":"호스트 운영 화면을 최신 버전으로 새로고침해 주세요.","code":"HOST_CLIENT_UPGRADE_REQUIRED"}"""
         val MUTATING_METHODS = setOf("POST", "PUT", "PATCH", "DELETE")
 
         fun parseAllowedOrigins(

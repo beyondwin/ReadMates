@@ -78,8 +78,76 @@ describe("Cloudflare BFF function", () => {
     );
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect((init.headers as Headers).get("X-Readmates-Bff-Secret")).toBe("test-bff-secret");
+    expect((init.headers as Headers).get("X-Readmates-Client-Contract")).toBeNull();
     expect((init.headers as Headers).get("X-Readmates-Client-IP")).toBe("203.0.113.10");
     expect((init.headers as Headers).get("X-Readmates-Club-Host")).toBe("readmates.pages.dev");
+  });
+
+  it("forwards the trusted v2 client contract only from an exact browser declaration", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await onRequest(
+      context(
+        new Request("https://readmates.pages.dev/api/bff/api/host/sessions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Origin: "https://readmates.pages.dev",
+            "X-Readmates-Client-Contract": "v2",
+          },
+          body: "{}",
+        }),
+        { path: ["api", "host", "sessions"] },
+      ),
+    );
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect((init.headers as Headers).get("X-Readmates-Client-Contract")).toBe("v2");
+  });
+
+  it("rejects a missing or mismatched browser client contract before upstream", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const mismatched = await onRequest(
+      context(
+        new Request("https://readmates.pages.dev/api/bff/api/host/sessions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Origin: "https://readmates.pages.dev",
+            "X-Readmates-Client-Contract": "attacker-version",
+          },
+          body: "{}",
+        }),
+        { path: ["api", "host", "sessions"] },
+      ),
+    );
+
+    const missing = await onRequest(
+      context(
+        new Request("https://readmates.pages.dev/api/bff/api/host/sessions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Origin: "https://readmates.pages.dev",
+          },
+          body: "{}",
+        }),
+        { path: ["api", "host", "sessions"] },
+      ),
+    );
+
+    await expectApiErrorBody(mismatched, {
+      status: 409,
+      code: "HOST_CLIENT_UPGRADE_REQUIRED",
+    });
+    await expectApiErrorBody(missing, {
+      status: 409,
+      code: "HOST_CLIENT_UPGRADE_REQUIRED",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("uses the dedicated bff secret and strips API base URL query parameters", async () => {
@@ -279,6 +347,7 @@ describe("Cloudflare BFF function", () => {
             "Content-Type": "multipart/form-data; boundary=readmates",
             Cookie: "readmates.sid=current",
             Origin: "https://readmates.pages.dev",
+            "X-Readmates-Client-Contract": "v2",
           },
           body: payload,
         }),
@@ -295,6 +364,7 @@ describe("Cloudflare BFF function", () => {
       "multipart/form-data; boundary=readmates",
     );
     expect((forwardedInit?.headers as Headers).get("Cookie")).toBe("readmates.sid=current");
+    expect((forwardedInit?.headers as Headers).get("X-Readmates-Client-Contract")).toBeNull();
     expect(forwardedInit?.body).toBeInstanceOf(ArrayBuffer);
     expect(new Uint8Array(forwardedInit?.body as ArrayBuffer)).toEqual(payload);
     expect(response.status).toBe(201);
@@ -435,6 +505,7 @@ describe("Cloudflare BFF function", () => {
               Origin: "https://readmates.pages.dev",
               Cookie: "readmates.sid=current",
               "X-Readmates-Request-Id": "request-safe-1",
+              "X-Readmates-Client-Contract": "v2",
             },
             body: payload,
           },
@@ -834,6 +905,7 @@ describe("stripCookieDomain", () => {
                 "multipart/form-data; boundary=----ReadMatesAiGenBoundary-XYZ",
               Cookie: "readmates.sid=current",
               Origin: "https://readmates.pages.dev",
+              "X-Readmates-Client-Contract": "v2",
             },
             body: payload,
           },
@@ -879,6 +951,7 @@ describe("stripCookieDomain", () => {
           "Content-Type": "multipart/form-data; boundary=ai",
           "Content-Length": String(2 * 1024 * 1024 + 1),
           Origin: "https://readmates.pages.dev",
+          "X-Readmates-Client-Contract": "v2",
         },
         body: new Uint8Array([1]),
       },
@@ -912,6 +985,7 @@ describe("stripCookieDomain", () => {
         headers: {
           "Content-Type": "multipart/form-data; boundary=ai",
           Origin: "https://readmates.pages.dev",
+          "X-Readmates-Client-Contract": "v2",
         },
         body: new Uint8Array([1, 2, 3]),
       },
@@ -1005,6 +1079,7 @@ describe("stripCookieDomain", () => {
             headers: {
               "Content-Type": "application/json",
               Origin: "https://readmates.pages.dev",
+              "X-Readmates-Client-Contract": "v2",
             },
             body,
           },

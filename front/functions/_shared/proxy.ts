@@ -12,6 +12,7 @@ export function copyUpstreamHeaders(headers: Headers) {
   const copiedHeaders = new Headers(headers);
   copiedHeaders.delete("set-cookie");
   copiedHeaders.delete("x-readmates-bff-secret");
+  copiedHeaders.delete("x-readmates-client-contract");
   copiedHeaders.delete("x-readmates-client-ip");
   copiedHeaders.delete("x-readmates-club-host");
   copiedHeaders.delete("x-readmates-club-slug");
