@@ -99,6 +99,27 @@ findings를 우선순위별로 보고합니다.
 - 실행한 검증과 skipped validation이 구분되어 있습니다.
 - “테스트 통과”만을 근거로 운영/릴리즈 리스크가 없다고 결론내리지 않았습니다.
 
+## v2.0.1 release evidence — 2026-07-25
+
+### Patch scope and decision
+
+- `v2.0.0` tag의 server workflow run `30148358730`은 GHCR scan candidate build 뒤 Trivy HIGH gate에서 멈췄습니다. Release image tag promotion 전에 중단되었고 config sync, OCI backend, Cloudflare frontend, GitHub Release는 실행하지 않았습니다.
+- `v2.0.1`은 같은 v2 source에 release blocker만 닫는 patch입니다. `com.fasterxml.jackson.core:jackson-core 2.21.2`를 `2.21.4`로, Netty `4.2.15.Final`을 `4.2.16.Final`로 정렬합니다. API, migration, host-write handshake, notification/AI product behavior는 바꾸지 않습니다.
+- Decision은 **GO after patch PR/main CI and GHCR scan**입니다. 기존 `v2.0.0` tag를 이동하거나 덮어쓰지 않고 새 annotated `v2.0.1` tag를 사용합니다.
+
+### Verification and remaining production gates
+
+| Evidence | Result |
+| --- | --- |
+| Gradle runtime dependency insight | PASS — Jackson core `2.21.4`/`3.1.4`, Netty compression/HTTP/HTTP3 `4.2.16.Final` |
+| `./scripts/server-ci-check.sh` | PASS |
+| Local `linux/arm64` release image build | PASS |
+| Trivy `0.70.0` HIGH/CRITICAL scan | PASS — Ubuntu packages 0, application JARs 0 |
+| `./scripts/pre-push-check.sh --full --release` | PASS — frontend 1,536 tests/build, server quality and Testcontainers integration, public candidate/gitleaks, Playwright 92/92, observability config |
+
+- Patch PR과 merge SHA의 CI, GHCR `v2.0.1` scan/promote, production config sync, OCI promotion/Flyway/health, same-tag frontend dispatch, GitHub Release와 production smoke는 순서대로 닫아야 합니다.
+- Live provider quality calls과 실제 알림 발송은 이 patch smoke에 포함하지 않습니다. 기존 production provider allowlist와 fail-closed 정책을 유지하고, member address/body/private transcript를 release evidence에 기록하지 않습니다.
+
 ## v2.0.0 release evidence — 2026-07-25
 
 ### 범위와 결정
@@ -135,7 +156,8 @@ findings를 우선순위별로 보고합니다.
 
 ### Production-only pending and residual risk
 
-- Publication 전 pending 단계는 release PR/main CI, annotated tag, GHCR image scan/promote, config sync, OCI backup/Flyway/promotion, same-tag frontend dispatch, GitHub Release, production smoke입니다. 실행 결과는 GitHub workflow/release와 최종 sanitized deployment report에 남깁니다.
+- Release PR #14와 `main` CI는 통과했고 annotated `v2.0.0` tag를 발행했습니다. Server workflow run `30148358730`은 scan candidate를 만든 뒤 Jackson core/Netty의 수정 가능한 HIGH 6건으로 Trivy gate에서 차단됐으며 release image tag로 promote되지 않았습니다.
+- Fail-closed 순서에 따라 production config sync, OCI backend/Flyway, frontend dispatch와 GitHub Release는 실행하지 않았습니다. 기존 production은 변경되지 않았고, source tag를 이동하지 않은 채 `v2.0.1` patch release로 이어갑니다.
 - Private transcript를 live provider에 보내는 품질 평가는 실행하지 않습니다. Provider account retention/paid-tier 상태는 CI가 증명하지 않으며 현재 production allowlist와 fail-closed 설정을 이 release에서 임의로 넓히지 않습니다.
 - V37–V42는 forward-only입니다. OCI promotion 전에 최근 48시간 backup을 확인하고, 실패 시 새 frontend를 배포하지 않은 채 AI/consumer를 먼저 끄고 schema를 유지하는 이전 호환 image 또는 patch release로 roll forward합니다.
 - Frontend만 이전 tag로 rollback하면 v2 backend가 host write를 409로 계속 동결합니다. 읽기/멤버 표면을 보존한 안전 상태이며, 쓰기 복구는 호환 frontend 재배포 또는 schema를 보존한 backend rollback/forward-fix로 수행합니다.
