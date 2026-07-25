@@ -1390,6 +1390,9 @@ describe("HostDashboard", () => {
     expect(ledger).not.toHaveAttribute("open");
     expect(tools).not.toHaveAttribute("open");
     expect(within(ledger as HTMLElement).getByText("RSVP 미응답")).toBeInTheDocument();
+    expect(
+      within(ledger as HTMLElement).getByRole("link", { name: "세션 기록 전체 보기" }),
+    ).toHaveAttribute("href", "/app/host/sessions");
     expect(within(tools as HTMLElement).getByText("알림 · 멤버 · 초대 · AI 설정")).toBeInTheDocument();
   });
 

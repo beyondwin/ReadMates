@@ -244,7 +244,13 @@ export function MobileHostDashboard({
             <LinkComponent to="/app/host/sessions">세션 기록 열기</LinkComponent>
           </p>
         ) : (
-          <HostSessionAttentionSummary page={recordAttention} LinkComponent={LinkComponent} />
+          <>
+            <HostSessionAttentionSummary page={recordAttention} LinkComponent={LinkComponent} />
+            <LinkComponent to="/app/host/sessions" className="rm-host-attention__all">
+              <span>세션 기록 전체 보기</span>
+              <Icon name="arrow-right" size={14} />
+            </LinkComponent>
+          </>
         )}
       </details>
 

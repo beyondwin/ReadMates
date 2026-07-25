@@ -135,7 +135,7 @@ describe("HostSessionLedger", () => {
     expect(onLoadMore).toHaveBeenCalledTimes(1);
   });
 
-  it("caps dashboard attention rows at three and isolates unavailable state", () => {
+  it("renders dashboard attention records as one compact ledger without duplicate metrics or actions", () => {
     const attentionItems = [1, 2, 3, 4].map((number) => ({
       ...items[0],
       sessionId: `session-${number}`,
@@ -152,22 +152,34 @@ describe("HostSessionLedger", () => {
       },
     }} />);
 
-    expect(screen.getAllByRole("link", { name: /기록 열기/ })).toHaveLength(3);
-    expect(screen.queryByText("책 4")).not.toBeInTheDocument();
-    expect(screen.getByText("수정 필요 회차").parentElement).toHaveTextContent("7");
-    expect(screen.getByText("공개 기록 미완성").parentElement).toHaveTextContent("4");
-    expect(screen.getByText("저장된 초안").parentElement).toHaveTextContent("2");
-    expect(screen.getByRole("link", { name: "세션 기록 전체 보기" })).toHaveAttribute(
-      "href",
-      "/app/host/sessions",
+    const ledger = screen.getByRole("list", { name: "확인 필요한 세션 기록" });
+    const rows = within(ledger).getAllByRole("listitem");
+    expect(rows).toHaveLength(3);
+    expect(within(rows[0]).getByRole("link", { name: "1회차 기록 열기" })).toHaveClass(
+      "rm-host-attention__row",
     );
-    expect(container.querySelector("dl")).toHaveStyle({
-      gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 110px), 1fr))",
-      minWidth: "0",
-    });
+    expect(rows[0]).toHaveTextContent("No.1");
+    expect(rows[0]).toHaveTextContent("책 1");
+    expect(rows[0]).toHaveTextContent("확인 필요");
+    expect(rows[0]).toHaveTextContent("기록 열기");
+    expect(screen.queryByText("책 4")).not.toBeInTheDocument();
+    expect(container.querySelector("dl")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "세션 기록 전체 보기" })).not.toBeInTheDocument();
 
-    rerender(<HostSessionAttentionSummary page={null} />);
-    expect(screen.getByRole("status")).toHaveTextContent("기록 확인 항목을 불러오지 못했습니다");
-    expect(screen.getByRole("link", { name: "세션 기록 전체 보기" })).toBeInTheDocument();
+    rerender(
+      <HostSessionAttentionSummary
+        page={{
+          items: [],
+          summary: {
+            needsAttentionCount: 0,
+            incompletePublishedCount: 0,
+            draftCount: 0,
+          },
+        }}
+      />,
+    );
+    expect(screen.getByText("확인 필요한 세션 기록이 없습니다.")).toHaveClass(
+      "rm-host-attention__empty",
+    );
   });
 });
