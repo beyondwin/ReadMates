@@ -106,7 +106,11 @@ test("host can open manual notification workbench", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "새 알림 발송" })).toBeVisible();
   await expect(page.getByRole("button", { name: "모임 전날 리마인더" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "운영 장부" })).toBeVisible();
+  const operationsDetail = page.getByRole("button", { name: /운영 상세/ });
+  await expect(operationsDetail).toHaveAttribute("aria-expanded", "false");
+  await operationsDetail.click();
+  await expect(page.getByRole("tab", { name: "이벤트" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "배송" })).toBeVisible();
 });
 
 test("host can preview a manual reminder from the notifications tab without typing a session id", async ({ page }) => {
@@ -120,13 +124,42 @@ test("host can preview a manual reminder from the notifications tab without typi
   await expect(page.getByText("E2E 현재 세션 책 · OPEN · HOST_ONLY", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "모임 전날 리마인더" }).click();
-  await page.getByRole("button", { name: "미리보기" }).click();
+  await page.getByRole("button", { name: "미리보기 열기" }).click();
 
-  await expect(page.getByRole("heading", { name: "발송 전 확인" })).toBeVisible();
-  await expect(page.getByText(/최종 대상/)).toBeVisible();
+  const previewDialog = page.getByRole("dialog", { name: "발송 전 확인" });
+  await expect(previewDialog).toBeVisible();
+  await expect(previewDialog.getByText(/^최종 대상 \d+명$/)).toBeVisible();
   expect(manualDispatchCount(sessionId, "SESSION_REMINDER_DUE")).toBe(0);
   expect(notificationEventCount(sessionId, "SESSION_REMINDER_DUE")).toBe(0);
   expect(hostActionDecisionCount(sessionId)).toBe(0);
+});
+
+test("preview dismissal never dispatches a manual reminder", async ({ page }) => {
+  const sessionId = createOpenSessionFixture();
+  await loginWithGoogleFixture(page, "host@example.com");
+  await page.goto(`/clubs/${CLUB_SLUG}/app/host`);
+  await page.goto(
+    `/clubs/${CLUB_SLUG}/app/host/notifications?sessionId=${sessionId}&eventType=SESSION_REMINDER_DUE`,
+  );
+
+  await page.getByRole("button", { name: "미리보기 열기" }).click();
+  await expect(page.getByRole("dialog", { name: "발송 전 확인" })).toBeVisible();
+  expect(manualDispatchCount(sessionId, "SESSION_REMINDER_DUE")).toBe(0);
+  expect(notificationEventCount(sessionId, "SESSION_REMINDER_DUE")).toBe(0);
+
+  await page.keyboard.press("Escape");
+
+  await expect(page.getByRole("dialog", { name: "발송 전 확인" })).toBeHidden();
+  expect(manualDispatchCount(sessionId, "SESSION_REMINDER_DUE")).toBe(0);
+  expect(notificationEventCount(sessionId, "SESSION_REMINDER_DUE")).toBe(0);
+  expect(hostActionDecisionCount(sessionId)).toBe(0);
+
+  await page.getByRole("button", { name: "미리보기 열기" }).click();
+  await page.goBack();
+
+  await expect(page).toHaveURL(new RegExp(`/clubs/${CLUB_SLUG}/app/host$`));
+  expect(manualDispatchCount(sessionId, "SESSION_REMINDER_DUE")).toBe(0);
+  expect(notificationEventCount(sessionId, "SESSION_REMINDER_DUE")).toBe(0);
 });
 
 test("host can change the selected session before previewing a manual reminder", async ({ page }) => {
@@ -140,9 +173,9 @@ test("host can change the selected session before previewing a manual reminder",
   await expect(page.getByText("E2E 두 번째 세션 책 · OPEN · HOST_ONLY", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "모임 전날 리마인더" }).click();
-  await page.getByRole("button", { name: "미리보기" }).click();
+  await page.getByRole("button", { name: "미리보기 열기" }).click();
 
-  await expect(page.getByRole("heading", { name: "발송 전 확인" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "발송 전 확인" })).toBeVisible();
 });
 
 test("host previews and confirms a manual reminder, then duplicate requires resend confirmation", async ({ page }) => {
@@ -150,18 +183,21 @@ test("host previews and confirms a manual reminder, then duplicate requires rese
 
   await loginWithGoogleFixture(page, "host@example.com");
   await page.goto(`/clubs/reading-sai/app/host/notifications?sessionId=${sessionId}&eventType=SESSION_REMINDER_DUE`);
-  await page.getByRole("button", { name: "미리보기" }).click();
-  await expect(page.getByRole("heading", { name: "발송 전 확인" })).toBeVisible();
-  await expect(page.getByText(/최종 대상/)).toBeVisible();
+  await page.getByRole("button", { name: "미리보기 열기" }).click();
+  const previewDialog = page.getByRole("dialog", { name: "발송 전 확인" });
+  await expect(previewDialog).toBeVisible();
+  await expect(previewDialog.getByText(/^최종 대상 \d+명$/)).toBeVisible();
 
-  await page.getByRole("button", { name: "발송 확인" }).click();
+  const confirm = page.getByRole("button", { name: /\d+명에게 알림 발송/ });
+  await expect(confirm).toBeVisible();
+  await confirm.click();
   await expect(page.getByText("수동 알림 발송을 요청했습니다.")).toBeVisible();
   expect(manualDispatchCount(sessionId, "SESSION_REMINDER_DUE")).toBe(1);
   expect(notificationEventCount(sessionId, "SESSION_REMINDER_DUE")).toBe(1);
   expect(hostActionDecisionCount(sessionId)).toBe(0);
   await expect(page.getByRole("heading", { name: "최근 수동 발송" })).toBeVisible();
   await expect(page.getByText("모임 전날 리마인더").first()).toBeVisible();
-  await page.getByRole("button", { name: "대기/실패 처리" }).click();
+  await page.getByRole("button", { name: "대기·실패 처리" }).click();
   await expect(page.getByText("대기/실패 알림 처리를 요청했습니다.")).toBeVisible();
   materializeManualReminderInAppNotifications();
 
@@ -171,7 +207,7 @@ test("host previews and confirms a manual reminder, then duplicate requires rese
 
   await loginWithGoogleFixture(page, "host@example.com");
   await page.goto(`/clubs/reading-sai/app/host/notifications?sessionId=${sessionId}&eventType=SESSION_REMINDER_DUE`);
-  await page.getByRole("button", { name: "미리보기" }).click();
+  await page.getByRole("button", { name: "미리보기 열기" }).click();
   await expect(page.getByText("이미 발송된 알림입니다.")).toBeVisible();
 });
 

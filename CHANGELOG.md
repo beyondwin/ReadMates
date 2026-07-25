@@ -12,6 +12,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Changed
 
+- 호스트 알림 발송 화면을 상태 레일, 3단계 발송 작업대, 수신 인원 기반 미리보기 확인, 조건부 운영 상세로 재구성해 평상시 스크롤을 줄이고 이상 상태 복구 경로를 분명히 했습니다.
 - **호스트 운영 원장:** 호스트 대시보드를 현재 세션과 우선 행동 중심의 운영 원장으로 재구성하고, 확인 필요 세션을 중복 지표 없는 compact ledger row로 정렬해 비대칭 빈 공간과 모바일의 과도한 스크롤을 줄였습니다.
 - **CI 테스트 안전망 도달성:** PR CI가 `scripts/`와 `deploy/oci/`의 tracked shell을 재귀적으로 수집해 Bash와 ShellCheck에 전달하고, 관측·AI 설정 validator를 앞선 실패와 독립적으로 실행합니다. 중복 Grafana lint는 단일 job 소유권으로 통합했으며 제품 동작, 배포 계약, worker·retry·timeout·coverage 기준은 바꾸지 않았습니다.
 
