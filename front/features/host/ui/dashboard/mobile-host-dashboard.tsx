@@ -1,5 +1,12 @@
-import type { HostDashboardResponse, HostNotificationSummary, HostSessionListItem } from "@/features/host/model/host-view-types";
+import type {
+  HostDashboardResponse,
+  HostNotificationSummary,
+  HostSessionListItem,
+} from "@/features/host/model/host-view-types";
 import {
+  getHostDashboardChecklistView,
+  getHostDashboardLedgerMetrics,
+  getHostDashboardPriorityItems,
   getHostDashboardSessionMetrics,
   type HostChecklistItem,
   type HostDashboardNextOperationAction as NextOperationAction,
@@ -9,24 +16,40 @@ import {
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
 import type { HostPrepPace } from "@/features/host/model/host-prep-pace";
 import type { HostSessionAttentionData } from "@/features/host/model/host-session-ledger-model";
-import { AvatarChip } from "@/shared/ui/avatar-chip";
-import { formatDateOnlyLabel, formatMobileTodayLabel, hostAlertStateLabel } from "@/shared/ui/readmates-display";
+import { formatDateOnlyLabel, formatMobileTodayLabel } from "@/shared/ui/readmates-display";
 import { SessionTimingIdentity } from "@/shared/ui/session-identity";
-import { HostNotificationLedger } from "./host-notification-ledger";
 import { HostSessionAttentionSummary } from "../host-session-ledger";
-import { InvitePipelineSection } from "./invite-pipeline-section";
+import { HostNotificationLedger } from "./host-notification-ledger";
+import { HostPrepPaceNote } from "./host-prep-pace-note";
 import { QuickAction } from "./quick-action";
-import { HOST_DASHBOARD_LABELS, newSessionHref, quickActions, SESSION_REQUIRED_REASON } from "./constants";
-import { badgeClass, checklistBadgeClass, checklistTextColor, hostAlertMetrics, memberSessionState, type CurrentSession } from "./dashboard-helpers";
+import { newSessionHref, quickActions, SESSION_REQUIRED_REASON } from "./constants";
+import { badgeClass, type CurrentSession } from "./dashboard-helpers";
+import { Icon, MissingCurrentSessionMembersAlert } from "./shared-sections";
 import {
-  ChecklistMarker,
-  Icon,
-  MissingCurrentSessionMembersAlert,
-  NextActionCard,
-  PublicationFeedbackSection,
-} from "./shared-sections";
-import { UpcomingActionMessage, UpcomingSessionMobileCard, UpcomingStartBlockedNotice } from "./upcoming-session-row";
-import type { HostDashboardActions, HostDashboardLinkComponent, UpcomingActionHandlers } from "./types";
+  UpcomingActionMessage,
+  UpcomingSessionMobileCard,
+  UpcomingStartBlockedNotice,
+} from "./upcoming-session-row";
+import type {
+  HostDashboardActions,
+  HostDashboardLinkComponent,
+  UpcomingActionHandlers,
+} from "./types";
+
+function MobileChecklistRow({ item }: { item: HostChecklistItem }) {
+  return (
+    <li className="rm-host-mobile-flow__step">
+      <span className="tiny mono">{item.when}</span>
+      <span>
+        <strong>{item.title}</strong>
+        <small>{item.helper}</small>
+      </span>
+      <span className={`badge badge-${item.state === "complete" ? "ok" : item.state === "pending" ? "warn" : "default"} badge-dot`}>
+        {item.statusLabel}
+      </span>
+    </li>
+  );
+}
 
 export function MobileHostDashboard({
   hostName,
@@ -41,10 +64,10 @@ export function MobileHostDashboard({
   actions,
   onMissingMemberResolved,
   phase,
-  nextAction,
+  nextAction: _nextAction,
   prepPace,
-  currentMembershipId,
-  hasCurrentSession,
+  currentMembershipId: _currentMembershipId,
+  hasCurrentSession: _hasCurrentSession,
   upcomingSessions,
   recordAttention,
   upcomingActions,
@@ -83,139 +106,151 @@ export function MobileHostDashboard({
   hostDashboardReturnTarget: ReadmatesReturnTarget;
   readmatesReturnState: (target: ReadmatesReturnTarget) => ReadmatesReturnState;
 }) {
-  const mobileAlerts = hostAlertMetrics(data);
+  void _currentMembershipId;
+  void _hasCurrentSession;
+
+  const priorityItems = getHostDashboardPriorityItems({
+    session,
+    data,
+    missingMembers,
+    notifications,
+    recordAttention,
+  });
+  const ledgerMetrics = getHostDashboardLedgerMetrics(data, recordAttention);
+  const checklistView = getHostDashboardChecklistView(checklist);
+  const goingCount = session?.attendees.filter((member) => member.rsvpStatus === "GOING").length ?? 0;
+  const noResponseCount = session?.attendees.filter((member) => member.rsvpStatus === "NO_RESPONSE").length ?? 0;
 
   return (
     <main className="mobile-only rm-host-dashboard-mobile m-body">
-      <section className="rm-host-dashboard-mobile__hero">
-        <div>
-          <div className="tiny mono" style={{ color: "var(--text-3)", letterSpacing: "0.1em" }}>
-            {formatMobileTodayLabel()}
-          </div>
-          <h1 className="h2 editorial rm-host-dashboard-mobile__title">모임 운영</h1>
-        </div>
-        <div className="small" style={{ color: "var(--text-2)" }}>
-          {hostName}님, 세션 준비, 멤버 참여, 공개 기록, 초대 흐름을 작업 순서대로 확인합니다.
-        </div>
-      </section>
+      <header className="rm-host-dashboard-mobile__hero">
+        <div className="tiny mono">{formatMobileTodayLabel()}</div>
+        <h1 className="h2 editorial rm-host-dashboard-mobile__title">모임 운영</h1>
+        <p className="small">{hostName}님, 우선 행동부터 확인하세요.</p>
+      </header>
 
-      <section className="m-sec">
-        <div className="eyebrow" style={{ marginBottom: 10 }}>
-          {HOST_DASHBOARD_LABELS.attention}
+      <section className="m-sec rm-host-mobile-priority" aria-labelledby="host-mobile-priority-title">
+        <div className="m-eyebrow-row">
+          <h2 id="host-mobile-priority-title">지금 처리할 일</h2>
+          <span className="tiny">최대 3건</span>
         </div>
-        {missingMembers ? (
-          <MissingCurrentSessionMembersAlert
-            alert={missingMembers}
-            mobile
-            actions={actions}
-            onResolved={onMissingMemberResolved}
-            LinkComponent={LinkComponent}
-          />
-        ) : null}
-        <div className="m-list">
-          {mobileAlerts.map((alert) => (
-            <div
-              key={alert.mobileLabel}
-              className="m-list-row rm-host-dashboard-mobile__two-column-row rm-host-dashboard-mobile__metric"
-            >
-              <div style={{ minWidth: 0 }}>
-                <div className="body" style={{ fontSize: "13.5px", fontWeight: 600 }}>
-                  {alert.mobileLabel}
-                </div>
-                <div className="tiny" style={{ marginTop: 2 }}>
-                  {alert.mobileHint}
-                </div>
-              </div>
-              <div className="m-row-between">
-                <div
-                  className="editorial"
-                  style={{
-                    fontSize: 30,
-                    letterSpacing: 0,
-                    lineHeight: 1,
-                    color: alert.value > 0 ? "var(--text)" : "var(--text-4)",
-                  }}
-                >
-                  {alert.value}
-                </div>
-                <span className={badgeClass(alert.value, alert.tone)}>{hostAlertStateLabel(alert.value, hasCurrentSession)}</span>
-              </div>
-            </div>
+        <div className="rm-host-mobile-priority__state">
+          <span className="badge badge-accent badge-dot">{_nextAction.loopLabel}</span>
+          <span className="tiny">{_nextAction.loopBridge}</span>
+        </div>
+        <HostPrepPaceNote pace={prepPace} />
+        <ol className="rm-host-mobile-priority__list">
+          {priorityItems.map((item) => (
+            <li key={item.id} className={`rm-host-mobile-priority__item rm-host-mobile-priority__item--${item.tone}`}>
+              {item.id === "missing-members" && missingMembers ? (
+                <MissingCurrentSessionMembersAlert
+                  alert={missingMembers}
+                  compact
+                  mobile
+                  actions={actions}
+                  onResolved={onMissingMemberResolved}
+                  LinkComponent={LinkComponent}
+                />
+              ) : (
+                <>
+                  <div>
+                    <span className={`badge ${item.tone === "ok" ? "badge-ok" : item.tone === "accent" ? "badge-accent" : "badge-warn"} badge-dot`}>
+                      {item.count > 0 ? `${item.count}건` : "안정"}
+                    </span>
+                    <h3>{item.title}</h3>
+                    <p>{item.helper}</p>
+                  </div>
+                  {item.href && item.actionLabel ? (
+                    <LinkComponent
+                      to={item.href}
+                      state={item.href.includes("/sessions/") ? sessionEditState : undefined}
+                      className="btn btn-quiet btn-sm"
+                    >
+                      {item.actionLabel}
+                    </LinkComponent>
+                  ) : null}
+                </>
+              )}
+            </li>
           ))}
-        </div>
-        <div style={{ marginTop: 10 }}>
-          <HostSessionAttentionSummary page={recordAttention} LinkComponent={LinkComponent} />
-        </div>
+        </ol>
       </section>
 
-      <section className="m-sec">
-        <div className="eyebrow" style={{ marginBottom: 10 }}>
-          {HOST_DASHBOARD_LABELS.nextActionSection}
-        </div>
-        <NextActionCard
-          action={nextAction}
-          pace={prepPace}
-          mobile
-          LinkComponent={LinkComponent}
-          hostDashboardReturnTarget={hostDashboardReturnTarget}
-          readmatesReturnState={readmatesReturnState}
-        />
-      </section>
-
-      <section className="m-sec">
-        <div className="eyebrow" style={{ marginBottom: 10 }}>
-          {HOST_DASHBOARD_LABELS.upcoming}
+      <section className="m-sec rm-host-mobile-current" aria-labelledby="host-mobile-current-title">
+        <div className="m-eyebrow-row">
+          <h2 id="host-mobile-current-title">현재 세션</h2>
+          <span className={badgeClass(phase.tone === "warn" ? 1 : 0, phase.tone)}>{phase.status}</span>
         </div>
         <article className="m-card rm-host-dashboard-mobile__session-card">
-          <div className="rm-host-dashboard-mobile__session-head">
-            {session ? (
-              <>
-                <div className="m-row-between" style={{ alignItems: "flex-start" }}>
-                  <div>
-                    <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} phaseLabel="이번 세션" />
-                    <h2 className="h4 editorial" style={{ margin: "6px 0 2px" }}>
-                      {session.bookTitle}
-                    </h2>
-                    <div className="tiny">
-                      {formatDateOnlyLabel(session.date)} · {session.startTime}
-                    </div>
-                    <div className="tiny" style={{ marginTop: 6, color: "var(--text-3)" }}>
-                      {phase.helper}
-                    </div>
+          {session ? (
+            <>
+              <SessionTimingIdentity
+                sessionNumber={session.sessionNumber}
+                date={session.date}
+                phaseLabel="이번 세션"
+              />
+              <h3 className="h4 editorial">{session.bookTitle}</h3>
+              <p className="tiny">
+                {formatDateOnlyLabel(session.date)} · {session.startTime} · {session.locationLabel}
+              </p>
+              <dl className="rm-host-dashboard-mobile__session-metrics">
+                {getHostDashboardSessionMetrics(session).map(([label, value]) => (
+                  <div key={label}>
+                    <dt className="eyebrow">{label}</dt>
+                    <dd>{value}</dd>
                   </div>
-                  <span className={badgeClass(phase.tone === "warn" ? 1 : 0, phase.tone)}>{phase.status}</span>
-                </div>
-                <div className="rm-host-dashboard-mobile__session-metrics">
-                  {getHostDashboardSessionMetrics(session).map(([label, value]) => (
-                    <div key={label}>
-                      <div className="eyebrow">{label}</div>
-                      <div className="editorial" style={{ fontSize: 18, marginTop: 3, letterSpacing: 0 }}>
-                        {value}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div>
-                <div className="eyebrow">{HOST_DASHBOARD_LABELS.upcoming}</div>
-                <h2 className="h4 editorial" style={{ margin: "6px 0 2px" }}>
-                  열린 세션 없음
-                </h2>
-                <div className="tiny">새 세션을 등록하면 RSVP와 질문 작성이 열립니다.</div>
-              </div>
-            )}
-          </div>
-          <LinkComponent to={sessionEditHref} state={sessionEditState} className="btn btn-primary rm-host-dashboard-mobile__session-cta">
+                ))}
+              </dl>
+              <p className="tiny">참석 {goingCount}명 · 미응답 {noResponseCount}명</p>
+            </>
+          ) : (
+            <>
+              <h3 className="h4 editorial">열린 세션 없음</h3>
+              <p className="tiny">새 세션을 등록하면 RSVP와 질문 작성이 열립니다.</p>
+            </>
+          )}
+          <LinkComponent
+            to={sessionEditHref}
+            state={sessionEditState}
+            className="btn btn-primary rm-host-dashboard-mobile__session-cta"
+          >
             <span>{session ? "세션 문서 편집" : "세션 문서 만들기"}</span>
             <Icon name="arrow-right" size={14} />
           </LinkComponent>
         </article>
       </section>
 
-      <section className="m-sec">
+      <details className="m-sec rm-host-mobile-disclosure">
+        <summary>
+          <span>
+            <strong>처리 대기 원장</strong>
+            <small>상태 {ledgerMetrics.reduce((sum, metric) => sum + metric.value, 0)}건</small>
+          </span>
+        </summary>
+        <dl className="rm-host-mobile-ledger">
+          {ledgerMetrics.map((metric) => (
+            <div key={metric.id}>
+              <dt>{metric.label}</dt>
+              <dd>
+                <strong>{metric.value}</strong>
+                <span>{metric.stateLabel}</span>
+              </dd>
+            </div>
+          ))}
+        </dl>
+        {recordAttention === null ? (
+          <p role="alert">
+            기록 상태를 불러오지 못했습니다.{" "}
+            <LinkComponent to="/app/host/sessions">세션 기록 열기</LinkComponent>
+          </p>
+        ) : (
+          <HostSessionAttentionSummary page={recordAttention} LinkComponent={LinkComponent} />
+        )}
+      </details>
+
+      <section className="m-sec rm-host-mobile-flow" aria-labelledby="host-mobile-flow-title">
         <div className="m-eyebrow-row">
-          <span className="eyebrow">예정 세션</span>
+          <h2 id="host-mobile-flow-title">다음 세션과 운영 흐름</h2>
           <LinkComponent to={newSessionHref} className="tiny">
             문서 만들기
           </LinkComponent>
@@ -223,10 +258,7 @@ export function MobileHostDashboard({
         {upcomingSessions.length > 0 ? (
           <>
             {!upcomingActions.canOpenSession ? <UpcomingStartBlockedNotice mobile /> : null}
-            <div
-              className="rm-host-dashboard-mobile__session-rail"
-              style={{ display: "grid", gridAutoFlow: "column", gridAutoColumns: "minmax(220px, 82%)", gap: 10, overflowX: "auto" }}
-            >
+            <div className="rm-host-dashboard-mobile__session-rail">
               {upcomingSessions.map((item) => (
                 <UpcomingSessionMobileCard
                   key={item.sessionId}
@@ -244,7 +276,6 @@ export function MobileHostDashboard({
           <button
             type="button"
             className="btn btn-ghost btn-sm"
-            style={{ marginTop: 10 }}
             disabled={isLoadingMoreHostSessions}
             onClick={() => onLoadMoreHostSessions()}
           >
@@ -252,103 +283,50 @@ export function MobileHostDashboard({
           </button>
         ) : null}
         {upcomingMessage ? <UpcomingActionMessage message={upcomingMessage} mobile /> : null}
-      </section>
-
-      <section className="m-sec">
-        <div className="eyebrow" style={{ marginBottom: 10 }}>
-          {HOST_DASHBOARD_LABELS.operationTimeline}
-        </div>
-        <div className="m-list">
-          {checklist.map((item) => (
-            <div key={item.id} className="m-list-row rm-host-dashboard-mobile__checklist-row">
-              <ChecklistMarker state={item.state} label={item.statusLabel} mobile />
-              <div>
-                <div className="tiny mono" style={{ color: "var(--text-3)" }}>
-                  {item.when}
-                </div>
-                <div className="body" style={{ fontSize: "13.5px", color: checklistTextColor(item.state), marginTop: 2 }}>
-                  {item.title}
-                </div>
-                <div className="tiny" style={{ color: "var(--text-3)", marginTop: 2 }}>
-                  {item.helper}
-                </div>
-              </div>
-              {item.action ? (
-                <button
-                  className="btn btn-ghost btn-sm"
-                  type="button"
-                  disabled
-                  aria-label={`${item.action.label} 준비 중: ${item.action.unavailableReason}`}
-                >
-                  {item.action.label} 준비 중
-                </button>
-              ) : (
-                <span className={checklistBadgeClass(item.state)}>{item.statusLabel}</span>
-              )}
-            </div>
+        <ol className="rm-host-mobile-flow__steps" aria-label="현재 운영 단계">
+          {checklistView.highlighted.map((item) => (
+            <MobileChecklistRow key={item.id} item={item} />
           ))}
-        </div>
+        </ol>
+        <details className="rm-host-mobile-flow__details">
+          <summary>전체 운영 일정 {checklistView.all.length}단계</summary>
+          <ol aria-label="전체 운영 일정">
+            {checklistView.all.map((item) => (
+              <MobileChecklistRow key={item.id} item={item} />
+            ))}
+          </ol>
+        </details>
       </section>
 
-      <section className="m-sec">
-        <div className="eyebrow" style={{ marginBottom: 10 }}>
-          {HOST_DASHBOARD_LABELS.memberStatus}
-        </div>
-        {!session ? (
-          <div className="m-card-quiet">
-            <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-              세션을 만들면 참석 현황이 표시됩니다.
-            </p>
+      <details className="m-sec rm-host-mobile-disclosure rm-host-mobile-tools">
+        <summary>
+          <span>
+            <strong>운영 도구</strong>
+            <small>알림 · 멤버 · 초대 · AI 설정</small>
+          </span>
+        </summary>
+        <div className="rm-host-mobile-tools__rows">
+          <HostNotificationLedger notifications={notifications} mobile LinkComponent={LinkComponent} />
+          <div>
+            <span>
+              <strong>멤버 관리</strong>
+              <small>
+                {session
+                  ? session.attendees.length === 0
+                    ? "참석 현황 준비 중"
+                    : `참석 ${goingCount}명 · 미응답 ${noResponseCount}명`
+                  : "현재 세션 없음"}
+              </small>
+            </span>
+            <LinkComponent to="/app/host/members">멤버 보기</LinkComponent>
           </div>
-        ) : session.attendees.length === 0 ? (
-          <div className="m-card-quiet">
-            <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-              참석 현황 준비 중
-            </p>
+          <div>
+            <span>
+              <strong>멤버 초대</strong>
+              <small>초대 상태와 링크 관리</small>
+            </span>
+            <LinkComponent to="/app/host/invitations">초대 관리</LinkComponent>
           </div>
-        ) : (
-          <div className="m-list">
-            {session.attendees.map((member) => {
-              const state = memberSessionState(session, member, currentMembershipId);
-              const warn = member.rsvpStatus === "NO_RESPONSE";
-
-              return (
-                <div key={member.membershipId} className="m-list-row rm-host-dashboard-mobile__member-row">
-                  <AvatarChip name={member.displayName} fallbackInitial={member.displayName} label={member.displayName} size={24} />
-                  <span className="body" style={{ fontSize: "13.5px" }}>
-                    {member.displayName}
-                  </span>
-                  <span className="tiny mono" style={{ color: warn ? "var(--warn)" : "var(--text-3)" }}>
-                    {state}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      <section className="m-sec">
-        <div className="eyebrow" style={{ marginBottom: 10 }}>
-          {HOST_DASHBOARD_LABELS.publishFeedback}
-        </div>
-        <PublicationFeedbackSection data={data} mobile />
-      </section>
-
-      <section className="m-sec">
-        <HostNotificationLedger notifications={notifications} mobile LinkComponent={LinkComponent} />
-      </section>
-
-      <section className="m-sec">
-        <div className="eyebrow" style={{ marginBottom: 10 }}>
-          {HOST_DASHBOARD_LABELS.invitePipeline}
-        </div>
-        <InvitePipelineSection mobile LinkComponent={LinkComponent} />
-      </section>
-
-      <section className="m-sec">
-        <div className="eyebrow" style={{ marginBottom: 10 }}>
-          {HOST_DASHBOARD_LABELS.quickActions}
         </div>
         <div className="m-list rm-host-dashboard-mobile__quick-actions">
           {quickActions.map((action, index) => (
@@ -366,7 +344,7 @@ export function MobileHostDashboard({
             />
           ))}
         </div>
-      </section>
+      </details>
     </main>
   );
 }
