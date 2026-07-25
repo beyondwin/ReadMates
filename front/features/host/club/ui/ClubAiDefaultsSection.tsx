@@ -23,13 +23,17 @@ import {
 
 export type ClubAiDefaultsSectionProps = {
   clubSlug: string;
+  variant?: "default" | "compact";
 };
 
 function clubAiDefaultQueryKey(clubSlug: string): readonly unknown[] {
   return ["host", "aigen", "club-ai-default", clubSlug] as const;
 }
 
-export function ClubAiDefaultsSection({ clubSlug }: ClubAiDefaultsSectionProps) {
+export function ClubAiDefaultsSection({
+  clubSlug,
+  variant = "default",
+}: ClubAiDefaultsSectionProps) {
   const queryClient = useQueryClient();
   const defaultsQuery = useQuery({
     queryKey: clubAiDefaultQueryKey(clubSlug),
@@ -89,16 +93,17 @@ export function ClubAiDefaultsSection({ clubSlug }: ClubAiDefaultsSectionProps) 
   return (
     <section
       aria-labelledby="club-ai-defaults-heading"
-      className="stack"
-      style={{ "--stack": "12px" } as CSSProperties}
+      className={variant === "compact" ? "rm-host-ai-tool" : "stack"}
+      style={variant === "compact" ? undefined : ({ "--stack": "12px" } as CSSProperties)}
     >
       <header>
         <h2 id="club-ai-defaults-heading" style={{ margin: 0 }}>
-          AI 기본 모델 설정
+          {variant === "compact" ? "AI 기본 모델" : "AI 기본 모델 설정"}
         </h2>
         <p className="small" style={{ color: "var(--text-2)", margin: "4px 0 0" }}>
-          새 세션 AI 생성에 사용할 기본 모델입니다. 호스트가 업로드 시 다른
-          모델로 바꿀 수도 있습니다.
+          {variant === "compact"
+            ? "새 세션 AI 생성에 적용할 기본값입니다."
+            : "새 세션 AI 생성에 사용할 기본 모델입니다. 호스트가 업로드 시 다른 모델로 바꿀 수도 있습니다."}
         </p>
       </header>
 
@@ -108,7 +113,7 @@ export function ClubAiDefaultsSection({ clubSlug }: ClubAiDefaultsSectionProps) 
         </div>
       ) : null}
 
-      <div>
+      <div className={variant === "compact" ? "rm-host-ai-tool__field" : undefined}>
         <label className="field-label" htmlFor="club-ai-default-model">
           기본 모델
         </label>
@@ -128,7 +133,7 @@ export function ClubAiDefaultsSection({ clubSlug }: ClubAiDefaultsSectionProps) 
         </select>
       </div>
 
-      <div className="row" style={{ gap: 12, alignItems: "center" }}>
+      <div className="row rm-host-ai-tool__actions" style={{ gap: 12, alignItems: "center" }}>
         <button
           type="button"
           className="btn btn-primary btn-sm"

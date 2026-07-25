@@ -4,6 +4,8 @@ import {
   readingLoopDescription,
   type ReadingLoopState,
 } from "@/shared/model/reading-loop";
+import type { HostNotificationSummary } from "@/features/host/model/host-view-types";
+import type { HostSessionAttentionData } from "@/features/host/model/host-session-ledger-model";
 
 export type HostDashboardRsvpStatus = "NO_RESPONSE" | "GOING" | "DECLINED" | "MAYBE";
 export type HostDashboardAlertTone = "warn" | "default" | "accent" | "ok";
@@ -90,6 +92,35 @@ export type HostChecklistItem = {
   };
 };
 
+export type HostDashboardPriorityItem = {
+  id:
+    | "missing-members"
+    | "notification-failure"
+    | "current-session"
+    | "record-attention"
+    | "publication"
+    | "stable";
+  title: string;
+  helper: string;
+  count: number;
+  tone: HostDashboardAlertTone;
+  href: string | null;
+  actionLabel: string | null;
+};
+
+export type HostDashboardLedgerMetric = {
+  id: "rsvp" | "checkin" | "record" | "publication" | "draft";
+  label: string;
+  value: number;
+  stateLabel: string;
+  tone: HostDashboardAlertTone;
+};
+
+export type HostDashboardChecklistView = {
+  highlighted: HostChecklistItem[];
+  all: HostChecklistItem[];
+};
+
 export const HOST_DASHBOARD_REMINDER_UNAVAILABLE_REASON =
   "리마인더 발송 기능이 아직 연결되지 않아 사용할 수 없습니다.";
 
@@ -101,6 +132,188 @@ export function hostSessionEditHref(sessionId: string) {
 
 export function nonNegativeDashboardCount(value: number) {
   return Math.max(0, value);
+}
+
+function dashboardMetric(
+  id: HostDashboardLedgerMetric["id"],
+  label: string,
+  value: number,
+  tone: HostDashboardAlertTone = "warn",
+): HostDashboardLedgerMetric {
+  const normalizedValue = nonNegativeDashboardCount(value);
+
+  return {
+    id,
+    label,
+    value: normalizedValue,
+    stateLabel: normalizedValue > 0 ? "확인 필요" : "안정",
+    tone: normalizedValue > 0 ? tone : "ok",
+  };
+}
+
+export function getHostDashboardLedgerMetrics(
+  data: HostDashboardData,
+  recordAttention: HostSessionAttentionData | null,
+): HostDashboardLedgerMetric[] {
+  const recordMetric = recordAttention
+    ? dashboardMetric("record", "수정 필요 회차", recordAttention.summary.needsAttentionCount)
+    : {
+        id: "record" as const,
+        label: "수정 필요 회차",
+        value: 0,
+        stateLabel: "불러오기 실패",
+        tone: "warn" as const,
+      };
+
+  return [
+    dashboardMetric("rsvp", "RSVP 미응답", data.rsvpPending),
+    dashboardMetric("checkin", "진행률 미작성", data.checkinMissing),
+    recordMetric,
+    dashboardMetric(
+      "publication",
+      "공개·피드백 대기",
+      nonNegativeDashboardCount(data.publishPending) + nonNegativeDashboardCount(data.feedbackPending),
+      "accent",
+    ),
+    dashboardMetric("draft", "저장 초안", recordAttention?.summary.draftCount ?? 0, "accent"),
+  ];
+}
+
+export function getHostDashboardPriorityItems({
+  session,
+  data,
+  missingMembers,
+  notifications,
+  recordAttention,
+}: {
+  session: HostDashboardCurrentSession | null;
+  data: HostDashboardData;
+  missingMembers: MissingCurrentSessionMembersSummary | null;
+  notifications: HostNotificationSummary;
+  recordAttention: HostSessionAttentionData | null;
+}): HostDashboardPriorityItem[] {
+  const items: HostDashboardPriorityItem[] = [];
+
+  if (missingMembers) {
+    items.push({
+      id: "missing-members",
+      title: "새 멤버의 이번 세션 참여 여부 결정",
+      helper: `${missingMembers.count}명이 현재 세션 참석 명단에 없습니다.`,
+      count: missingMembers.count,
+      tone: "warn",
+      href: null,
+      actionLabel: null,
+    });
+  }
+
+  const notificationFailureCount =
+    nonNegativeDashboardCount(notifications.failed) + nonNegativeDashboardCount(notifications.dead);
+  if (notificationFailureCount > 0) {
+    items.push({
+      id: "notification-failure",
+      title: "실패한 알림 확인",
+      helper: `실패 또는 중단된 알림 ${notificationFailureCount}건의 발송 상태를 확인해 주세요.`,
+      count: notificationFailureCount,
+      tone: "warn",
+      href: "/app/host/notifications",
+      actionLabel: "알림 장부 열기",
+    });
+  }
+
+  const rsvpPending = nonNegativeDashboardCount(data.rsvpPending);
+  const checkinMissing = nonNegativeDashboardCount(data.checkinMissing);
+  if (!session) {
+    items.push({
+      id: "current-session",
+      title: "새 세션 문서 만들기",
+      helper: "책, 일정, 장소를 등록하면 멤버의 RSVP와 질문 작성 흐름이 열립니다.",
+      count: 1,
+      tone: "accent",
+      href: "/app/host/sessions/new",
+      actionLabel: "세션 문서 만들기",
+    });
+  } else if (rsvpPending + checkinMissing > 0) {
+    items.push({
+      id: "current-session",
+      title: rsvpPending > 0 ? "RSVP 미응답 확인" : "읽기 진행률 확인",
+      helper: [
+        rsvpPending > 0 ? `미응답 ${rsvpPending}명` : null,
+        checkinMissing > 0 ? `진행률 미작성 ${checkinMissing}명` : null,
+      ].filter(Boolean).join(" · "),
+      count: rsvpPending + checkinMissing,
+      tone: "warn",
+      href: hostSessionEditHref(session.sessionId),
+      actionLabel: "세션 문서 열기",
+    });
+  }
+
+  const recordAttentionCount = nonNegativeDashboardCount(
+    recordAttention?.summary.needsAttentionCount ?? 0,
+  );
+  if (recordAttentionCount > 0) {
+    items.push({
+      id: "record-attention",
+      title: "수정이 필요한 세션 기록",
+      helper: `${recordAttentionCount}개 회차의 공개 기록 또는 저장 내용을 확인해 주세요.`,
+      count: recordAttentionCount,
+      tone: "warn",
+      href: "/app/host/sessions?needsAttention=true",
+      actionLabel: "세션 기록 열기",
+    });
+  }
+
+  const publicationCount =
+    nonNegativeDashboardCount(data.publishPending) + nonNegativeDashboardCount(data.feedbackPending);
+  if (publicationCount > 0) {
+    items.push({
+      id: "publication",
+      title: "공개 기록과 피드백 마감",
+      helper: `공개 또는 피드백 문서 대기 ${publicationCount}건의 정확한 회차를 선택해 주세요.`,
+      count: publicationCount,
+      tone: "accent",
+      href: "/app/host/sessions?needsAttention=true",
+      actionLabel: "세션 기록에서 선택",
+    });
+  }
+
+  if (items.length === 0) {
+    return [{
+      id: "stable",
+      title: "지금 처리할 긴급 항목이 없습니다",
+      helper: "현재 세션과 운영 기록이 안정적인 상태입니다.",
+      count: 0,
+      tone: "ok",
+      href: session ? hostSessionEditHref(session.sessionId) : null,
+      actionLabel: session ? "세션 문서 확인" : null,
+    }];
+  }
+
+  return items.slice(0, 3);
+}
+
+export function getHostDashboardChecklistView(
+  checklist: HostChecklistItem[],
+): HostDashboardChecklistView {
+  if (checklist.length <= 3) {
+    return {
+      highlighted: checklist,
+      all: checklist,
+    };
+  }
+
+  const pendingIndex = checklist.findIndex((item) => item.state === "pending");
+  if (pendingIndex < 0) {
+    return {
+      highlighted: checklist.slice(0, 3),
+      all: checklist,
+    };
+  }
+
+  const start = Math.min(Math.max(pendingIndex - 1, 0), checklist.length - 3);
+  return {
+    highlighted: checklist.slice(start, start + 3),
+    all: checklist,
+  };
 }
 
 export function formatHostSessionDday(sessionDate: string, now: Date) {

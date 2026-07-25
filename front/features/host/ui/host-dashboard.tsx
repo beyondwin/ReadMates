@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useState } from "react";
 import { useInRouterContext, useLocation } from "react-router-dom";
 import type {
   CurrentSessionResponse,
@@ -14,7 +14,10 @@ import type { HostClubOperationsSnapshot } from "@/shared/model/club-operations"
 import { HostClubOperationsCard } from "@/features/host/ui/host-club-operations-card";
 import {
   getHostDashboardChecklist,
+  getHostDashboardChecklistView,
+  getHostDashboardLedgerMetrics,
   getHostDashboardNextOperationAction,
+  getHostDashboardPriorityItems,
   getHostDashboardSessionMetrics,
   getHostDashboardSessionPhase,
   getMissingCurrentSessionMembersSummary,
@@ -22,31 +25,26 @@ import {
 } from "@/features/host/model/host-dashboard-model";
 import type { HostSessionAttentionData } from "@/features/host/model/host-session-ledger-model";
 import { deriveHostPrepPace, hostPrepPaceInputFrom } from "@/features/host/model/host-prep-pace";
-import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { BookCover } from "@/shared/ui/book-cover";
-import { READMATES_NAV_LABELS } from "@/shared/ui/readmates-copy";
 import { readmatesReturnState as defaultReadmatesReturnState } from "@/shared/routing/readmates-route-state";
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
-import {
-  formatDateOnlyLabel,
-  hostAlertStateLabel,
-} from "@/shared/ui/readmates-display";
+import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 import { SessionTimingIdentity } from "@/shared/ui/session-identity";
-import { HOST_DASHBOARD_LABELS, newSessionHref, quickActions, SESSION_REQUIRED_REASON } from "./dashboard/constants";
-import { badgeClass, checklistBadgeClass, checklistTextColor, hostAlertMetrics, memberSessionState } from "./dashboard/dashboard-helpers";
+import { newSessionHref, quickActions, SESSION_REQUIRED_REASON } from "./dashboard/constants";
+import { badgeClass } from "./dashboard/dashboard-helpers";
 import { HostNotificationLedger } from "./dashboard/host-notification-ledger";
-import { InvitePipelineSection } from "./dashboard/invite-pipeline-section";
+import { HostPrepPaceNote } from "./dashboard/host-prep-pace-note";
 import { MobileHostDashboard } from "./dashboard/mobile-host-dashboard";
+import {
+  HostOperationFlow,
+  HostOperationsTools,
+  HostPriorityLedger,
+  HostTodayBoard,
+} from "./dashboard/priority-ledger-sections";
 import { HostSessionAttentionSummary } from "./host-session-ledger";
 import { QuickAction } from "./dashboard/quick-action";
-import {
-  ChecklistMarker,
-  MissingCurrentSessionMembersAlert,
-  NextActionCard,
-  PublicationFeedbackSection,
-  SectionHeader,
-} from "./dashboard/shared-sections";
+import { MissingCurrentSessionMembersAlert } from "./dashboard/shared-sections";
 import {
   UpcomingActionMessage,
   UpcomingSessionRow,
@@ -79,7 +77,6 @@ const EMPTY_RECORD_ATTENTION: HostSessionAttentionData = {
     draftCount: 0,
   },
 };
-
 function RouterScopedDefaultLink({ to, state: _state, children, ...props }: HostDashboardLinkProps) {
   void _state;
   const location = useLocation();
@@ -185,6 +182,17 @@ export default function HostDashboard({
   const phase = getHostDashboardSessionPhase(session);
   const nextAction = getHostDashboardNextOperationAction(session, data, missingMembers);
   const prepPace = deriveHostPrepPace(hostPrepPaceInputFrom(session, data));
+  const priorityItems = getHostDashboardPriorityItems({
+    session,
+    data,
+    missingMembers,
+    notifications,
+    recordAttention,
+  });
+  const ledgerMetrics = getHostDashboardLedgerMetrics(data, recordAttention);
+  const checklistView = getHostDashboardChecklistView(checklist);
+  const goingCount = session?.attendees.filter((member) => member.rsvpStatus === "GOING").length ?? 0;
+  const noResponseCount = session?.attendees.filter((member) => member.rsvpStatus === "NO_RESPONSE").length ?? 0;
 
   const resolveMissingMember = (membershipId: string) => {
     setResolvedMissingMemberIdsByKey((current) => {
@@ -284,309 +292,252 @@ export default function HostDashboard({
   return (
     <>
       <main className="desktop-only rm-host-dashboard-desktop">
-        <section className="page-header-compact">
-          <div className="container">
-            <div className="row-between" style={{ alignItems: "flex-end", flexWrap: "wrap" }}>
-              <div>
-                <div className="eyebrow">운영</div>
-                <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
-                  모임 운영
-                </h1>
-                <div className="small" style={{ color: "var(--text-2)" }}>
-                  세션 준비, 멤버 참여, 공개 기록, 초대 흐름을 작업 순서대로 확인합니다.
-                </div>
-              </div>
-            </div>
+        <header className="page-header-compact">
+          <div className="container rm-host-dashboard-header">
+            <div className="eyebrow">호스트 원장</div>
+            <h1 className="h1 editorial">모임 운영</h1>
+            <p className="small">
+              {hostName}님, 지금 처리할 일부터 확인하고 세션과 기록을 이어서 관리하세요.
+            </p>
           </div>
-        </section>
+        </header>
 
-        <section className="rm-host-dashboard-desktop__summary">
-          <div className="container">
-            <SectionHeader eyebrow={HOST_DASHBOARD_LABELS.attention} title="운영 상태 요약" />
-            {missingMembers ? (
-                    <MissingCurrentSessionMembersAlert
-                      alert={missingMembers}
-                      actions={actions}
-                      onResolved={resolveMissingMember}
-                      LinkComponent={LinkComponent}
+        <div className="container rm-host-dashboard-ledger">
+          <HostTodayBoard
+            mobile={false}
+            currentSession={(
+              <article className="rm-host-current" aria-labelledby="host-current-session-title">
+                <header className="rm-host-current__header">
+                  <div>
+                    <div className="eyebrow">현재 세션</div>
+                    <h2 id="host-current-session-title">현재 세션</h2>
+                  </div>
+                  <span className={badgeClass(phase.tone === "warn" ? 1 : 0, phase.tone)}>
+                    {phase.status}
+                  </span>
+                </header>
+                {session ? (
+                  <div className="rm-host-current__body">
+                    <BookCover
+                      title={session.bookTitle}
+                      author={session.bookAuthor}
+                      imageUrl={session.bookImageUrl}
+                      width={76}
                     />
-            ) : null}
-            <div className="rm-document-panel" style={{ padding: "8px 22px" }}>
-              {hostAlertMetrics(data).map((alert) => (
-                <div
-                  key={alert.desktopLabel}
-                  className="row-between"
-                  style={{
-                    gap: 18,
-                    padding: "14px 0",
-                    borderTop: alert.desktopLabel === "RSVP 미응답" ? 0 : "1px solid var(--line-soft)",
-                  }}
-                >
-                  <div style={{ minWidth: 0 }}>
-                    <div className="body" style={{ fontSize: "14px", fontWeight: 600 }}>
-                      {alert.desktopLabel}
-                    </div>
-                    <div className="tiny" style={{ marginTop: 2 }}>
-                      {alert.desktopHint}
-                    </div>
-                  </div>
-                  <div className="row" style={{ gap: 10, alignItems: "center" }}>
-                    <strong className="editorial" style={{ fontSize: "20px", color: alert.value > 0 ? "var(--text)" : "var(--text-4)" }}>
-                      {alert.value}
-                    </strong>
-                    <span className={badgeClass(alert.value, alert.tone)}>{hostAlertStateLabel(alert.value, hasCurrentSession)}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div style={{ marginTop: 14 }}>
-              <div className="eyebrow" style={{ marginBottom: 8 }}>기록 확인 필요</div>
-              <HostSessionAttentionSummary page={recordAttention} LinkComponent={LinkComponent} />
-            </div>
-          </div>
-        </section>
-
-        <section style={{ padding: "28px 0 64px" }}>
-          <div className="container">
-            <div className="home-grid">
-              <div>
-                <SectionHeader
-                  eyebrow={HOST_DASHBOARD_LABELS.upcoming}
-                  title={phase.title}
-                  action={
-                    <LinkComponent to={sessionEditHref} state={sessionEditState} className="btn btn-ghost btn-sm">
-                      {session ? "세션 문서 편집" : "세션 문서 만들기"}
-                    </LinkComponent>
-                  }
-                />
-                <article className="rm-document-panel" style={{ padding: "28px" }}>
-                  {session ? (
-                    <div className="row" style={{ alignItems: "flex-start", gap: "24px" }}>
-                      <BookCover
-                        title={session.bookTitle}
-                        author={session.bookAuthor}
-                        imageUrl={session.bookImageUrl}
-                        width={96}
+                    <div className="rm-host-current__copy">
+                      <SessionTimingIdentity
+                        sessionNumber={session.sessionNumber}
+                        date={session.date}
+                        phaseLabel="이번 세션"
                       />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} phaseLabel="이번 세션" />
-                        <h2 className="h3 editorial" style={{ margin: "6px 0 0" }}>
-                          {session.bookTitle}
-                        </h2>
-                        <div className="small" style={{ marginTop: "4px" }}>
-                          {formatDateOnlyLabel(session.date)} {session.startTime} · {session.locationLabel}
-                        </div>
-                        <div className="surface-quiet" style={{ marginTop: 14, padding: "12px 14px" }}>
-                          <div className="row-between" style={{ gap: 12 }}>
-                            <span className="small" style={{ color: "var(--text-2)" }}>
-                              {phase.helper}
-                            </span>
-                            <span className={badgeClass(phase.tone === "warn" ? 1 : 0, phase.tone)}>{phase.status}</span>
-                          </div>
-                        </div>
-                        <hr className="divider-soft" style={{ margin: "16px 0" }} />
-                        <div
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "repeat(auto-fit, minmax(92px, 1fr))",
-                            gap: "16px",
-                          }}
-                        >
-                          {getHostDashboardSessionMetrics(session).map(([label, value]) => (
-                            <div key={label}>
-                              <div className="eyebrow">{label}</div>
-                              <div className="editorial" style={{ fontSize: "20px", marginTop: "4px" }}>
-                                {value}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <h2 className="h3 editorial" style={{ margin: 0 }}>
-                        새 세션을 등록해 주세요
-                      </h2>
-                      <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
-                        {phase.helper}
+                      <h3 className="editorial">{session.bookTitle}</h3>
+                      <p>
+                        {formatDateOnlyLabel(session.date)} {session.startTime} · {session.locationLabel}
                       </p>
-                    </div>
-                  )}
-                </article>
-
-                <section style={{ marginTop: "28px" }}>
-                  <SectionHeader
-                    eyebrow="예정 세션"
-                    title="앞으로 읽을 세션"
-                    action={
-                      <LinkComponent to={newSessionHref} className="btn btn-ghost btn-sm">
-                        세션 문서 만들기
-                      </LinkComponent>
-                    }
-                  />
-                  {upcomingSessions.length > 0 ? (
-                    <>
-                      {!upcomingActions.canOpenSession ? <UpcomingStartBlockedNotice /> : null}
-                      <div className="surface" style={{ padding: 4 }}>
-                        {upcomingSessions.map((item, index) => (
-                          <UpcomingSessionRow
-                            key={item.sessionId}
-                            session={item}
-                            actions={upcomingActions}
-                            showSeparator={index > 0}
-                            LinkComponent={LinkComponent}
-                          />
+                      <dl className="rm-host-current__metrics">
+                        {getHostDashboardSessionMetrics(session).map(([label, value]) => (
+                          <div key={label}>
+                            <dt>{label}</dt>
+                            <dd>{value}</dd>
+                          </div>
                         ))}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="surface-quiet" style={{ padding: 20 }}>
-                      <div className="body" style={{ fontSize: 14 }}>
-                        아직 등록된 예정 세션이 없습니다.
-                      </div>
+                      </dl>
                     </div>
-                  )}
-                  {nextHostSessionsCursor ? (
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm"
-                      style={{ marginTop: 12 }}
-                      disabled={isLoadingMoreHostSessions}
-                      onClick={() => void handleLoadMoreHostSessions()}
-                    >
-                      {isLoadingMoreHostSessions ? "불러오는 중" : "더 보기"}
-                    </button>
-                  ) : null}
-                  {upcomingMessage ? <UpcomingActionMessage message={upcomingMessage} /> : null}
-                </section>
-
-                <section style={{ marginTop: "36px" }}>
-                  <SectionHeader eyebrow={HOST_DASHBOARD_LABELS.operationTimeline} title="운영 체크리스트 · 모임 전후" />
-                  <ol style={{ margin: 0, padding: 0, listStyle: "none" }}>
-                    {checklist.map((item, index) => (
-                      <li
-                        key={item.id}
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "80px 28px 1fr auto",
-                          gap: "20px",
-                          padding: "18px 0",
-                          borderTop: index === 0 ? "1px solid var(--line)" : "1px solid var(--line-soft)",
-                          alignItems: "center",
-                        }}
-                      >
-                        <span className="mono tiny" style={{ color: "var(--text-3)" }}>
-                          {item.when}
-                        </span>
-                        <ChecklistMarker state={item.state} label={item.statusLabel} />
-                        <span className="body" style={{ fontSize: "15px", color: checklistTextColor(item.state) }}>
-                          {item.title}
-                          <span className="tiny" style={{ display: "block", marginTop: "3px", color: "var(--text-3)" }}>
-                            {item.helper}
-                          </span>
-                        </span>
-                        {item.action ? (
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            type="button"
-                            disabled
-                            aria-label={`${item.action.label} 준비 중: ${item.action.unavailableReason}`}
-                          >
-                            {item.action.label} 준비 중
-                          </button>
-                        ) : (
-                          <span className={checklistBadgeClass(item.state)}>{item.statusLabel}</span>
-                        )}
-                      </li>
-                    ))}
-                  </ol>
-                </section>
-              </div>
-
-              <aside className="stack" style={{ "--stack": "24px" } as CSSProperties}>
-                <NextActionCard
-                  action={nextAction}
-                  pace={prepPace}
-                  LinkComponent={LinkComponent}
-                  hostDashboardReturnTarget={hostDashboardReturnTarget}
-                  readmatesReturnState={readmatesReturnState}
-                />
-
-                <section>
-                  <div className="eyebrow" style={{ marginBottom: "10px" }}>
-                    {HOST_DASHBOARD_LABELS.memberStatus} · {READMATES_NAV_LABELS.member.currentSession}
                   </div>
-                  <div className="rm-reading-desk" style={{ padding: "20px" }}>
-                    <div className="stack" style={{ "--stack": "10px" } as CSSProperties}>
-                      {!session ? (
-                        <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-                          세션을 만들면 참석 현황이 표시됩니다.
-                        </p>
-                      ) : session.attendees.length === 0 ? (
-                        <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-                          참석 현황 준비 중
-                        </p>
+                ) : (
+                  <div className="rm-host-current__empty">
+                    <h3>열린 세션이 없습니다</h3>
+                    <p>{phase.helper}</p>
+                  </div>
+                )}
+                <div className="rm-host-current__footer">
+                  <span>
+                    {session
+                      ? `참석 ${goingCount}명 · 미응답 ${noResponseCount}명`
+                      : "새 세션을 만들면 RSVP와 질문 작성이 열립니다."}
+                  </span>
+                  <LinkComponent
+                    to={sessionEditHref}
+                    state={sessionEditState}
+                    className="btn btn-primary btn-sm"
+                  >
+                    {session ? "세션 문서 편집" : "세션 문서 만들기"}
+                  </LinkComponent>
+                </div>
+              </article>
+            )}
+            priorityBoard={(
+              <section className="rm-host-priority" aria-labelledby="host-priority-title">
+                <header className="rm-host-priority__header">
+                  <div>
+                    <div className="eyebrow">우선순위</div>
+                    <h2 id="host-priority-title">지금 처리할 일</h2>
+                  </div>
+                  <div className="rm-host-priority__meta">
+                    <span className="tiny">최대 3건</span>
+                    <span className="badge badge-accent badge-dot">{nextAction.loopLabel}</span>
+                    <HostPrepPaceNote pace={prepPace} />
+                  </div>
+                </header>
+                <p className="rm-host-priority__bridge">{nextAction.loopBridge}</p>
+                <ol className="rm-host-priority__list">
+                  {priorityItems.map((item) => (
+                    <li key={item.id} className={`rm-host-priority__item rm-host-priority__item--${item.tone}`}>
+                      {item.id === "missing-members" && missingMembers ? (
+                        <MissingCurrentSessionMembersAlert
+                          alert={missingMembers}
+                          compact
+                          actions={actions}
+                          onResolved={resolveMissingMember}
+                          LinkComponent={LinkComponent}
+                        />
                       ) : (
-                        session.attendees.map((member) => {
-                          const state = memberSessionState(session, member, auth?.membershipId);
-                          const warn = member.rsvpStatus === "NO_RESPONSE";
-
-                          return (
-                            <div key={member.membershipId} className="row-between">
-                              <span className="row" style={{ gap: "10px" }}>
-                                <AvatarChip
-                                  name={member.displayName}
-                                  fallbackInitial={member.displayName}
-                                  label={member.displayName}
-                                  size={22}
-                                />
-                                <span className="body" style={{ fontSize: "13.5px" }}>
-                                  {member.displayName}
-                                </span>
-                              </span>
-                              <span className="tiny mono" style={{ color: warn ? "var(--warn)" : "var(--text-3)" }}>
-                                {state}
-                              </span>
-                            </div>
-                          );
-                        })
+                        <>
+                          <div className="rm-host-priority__copy">
+                            <span className={`badge ${item.tone === "ok" ? "badge-ok" : item.tone === "accent" ? "badge-accent" : "badge-warn"} badge-dot`}>
+                              {item.count > 0 ? `${item.count}건` : "안정"}
+                            </span>
+                            <h3>{item.title}</h3>
+                            <p>{item.helper}</p>
+                          </div>
+                          {item.href && item.actionLabel ? (
+                            <LinkComponent
+                              to={item.href}
+                              state={item.href.includes("/sessions/") ? sessionEditState : undefined}
+                              className="btn btn-quiet btn-sm"
+                            >
+                              {item.actionLabel}
+                            </LinkComponent>
+                          ) : null}
+                        </>
                       )}
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            )}
+          />
+
+          <HostPriorityLedger
+            metrics={ledgerMetrics}
+            recordRows={
+              recordAttention ? (
+                <HostSessionAttentionSummary page={recordAttention} LinkComponent={LinkComponent} />
+              ) : null
+            }
+            recordError={recordAttention === null}
+            LinkComponent={LinkComponent}
+          />
+
+          <HostOperationFlow
+            upcomingSessions={(
+              <section className="rm-host-upcoming" aria-label="예정 세션">
+                <div className="rm-host-upcoming__header">
+                  <h3>앞으로 읽을 세션</h3>
+                  <LinkComponent to={newSessionHref} className="btn btn-quiet btn-sm">
+                    세션 문서 만들기
+                  </LinkComponent>
+                </div>
+                {upcomingSessions.length > 0 ? (
+                  <>
+                    {!upcomingActions.canOpenSession ? <UpcomingStartBlockedNotice /> : null}
+                    <div className="rm-host-upcoming__list">
+                      {upcomingSessions.map((item, index) => (
+                        <UpcomingSessionRow
+                          key={item.sessionId}
+                          session={item}
+                          actions={upcomingActions}
+                          showSeparator={index > 0}
+                          LinkComponent={LinkComponent}
+                        />
+                      ))}
                     </div>
-                  </div>
-                </section>
+                  </>
+                ) : (
+                  <p className="small">아직 등록된 예정 세션이 없습니다.</p>
+                )}
+                {nextHostSessionsCursor ? (
+                  <button
+                    type="button"
+                    className="btn btn-quiet btn-sm"
+                    disabled={isLoadingMoreHostSessions}
+                    onClick={() => void handleLoadMoreHostSessions()}
+                  >
+                    {isLoadingMoreHostSessions ? "불러오는 중" : "더 보기"}
+                  </button>
+                ) : null}
+                {upcomingMessage ? <UpcomingActionMessage message={upcomingMessage} /> : null}
+              </section>
+            )}
+            checklist={checklistView}
+          />
 
-                <PublicationFeedbackSection data={data} />
-                {clubOperations ? <HostClubOperationsCard snapshot={clubOperations} LinkComponent={LinkComponent} /> : null}
-                <HostNotificationLedger notifications={notifications} LinkComponent={LinkComponent} />
-                <InvitePipelineSection LinkComponent={LinkComponent} />
+          <HostOperationsTools
+            notifications={(
+              <HostNotificationLedger notifications={notifications} LinkComponent={LinkComponent} />
+            )}
+            members={(
+              <div className="rm-host-tool">
+                <div>
+                  <h3>멤버 관리</h3>
+                  <p>
+                    {session
+                      ? session.attendees.length === 0
+                        ? "참석 현황 준비 중"
+                        : `현재 세션 참석 ${goingCount}명 · 미응답 ${noResponseCount}명`
+                      : "현재 세션을 만들면 참여 현황이 연결됩니다."}
+                  </p>
+                </div>
+                <LinkComponent to="/app/host/members" className="btn btn-quiet btn-sm">
+                  멤버 보기
+                </LinkComponent>
+              </div>
+            )}
+            invitations={(
+              <div className="rm-host-tool">
+                <div>
+                  <h3>멤버 초대</h3>
+                  <p>초대 링크와 대기·수락·만료 상태를 관리합니다.</p>
+                </div>
+                <LinkComponent to="/app/host/invitations" className="btn btn-quiet btn-sm">
+                  초대 관리
+                </LinkComponent>
+              </div>
+            )}
+            quickActions={(
+              <div className="rm-host-tool rm-host-tool--actions">
+                <div>
+                  <h3>빠른 실행</h3>
+                  <p>회차가 필요한 작업은 세션 기록에서 정확한 대상을 선택합니다.</p>
+                </div>
+                <div className="rm-host-tool__actions">
+                  {quickActions.map((action, index) => (
+                    <QuickAction
+                      key={action.label}
+                      icon={action.icon}
+                      label={action.label}
+                      href={action.target === "session-edit" ? sessionSpecificEditHref : null}
+                      unavailableReason={action.target === "session-edit" ? SESSION_REQUIRED_REASON : action.unavailableReason}
+                      disabledStatusLabel={action.target === "session-edit" ? "세션 필요" : action.statusLabel}
+                      index={index}
+                      LinkComponent={LinkComponent}
+                      hostDashboardReturnTarget={hostDashboardReturnTarget}
+                      readmatesReturnState={readmatesReturnState}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          />
 
-                <section>
-                  <div className="eyebrow" style={{ marginBottom: "10px" }}>
-                    {HOST_DASHBOARD_LABELS.quickActions}
-                  </div>
-                  <div className="rm-action-cluster rm-action-cluster--stacked" style={{ padding: "6px" }}>
-                    {quickActions.map((action, index) => (
-                      <QuickAction
-                        key={action.label}
-                        icon={action.icon}
-                        label={action.label}
-                        href={action.target === "session-edit" ? sessionSpecificEditHref : null}
-                        unavailableReason={action.target === "session-edit" ? SESSION_REQUIRED_REASON : action.unavailableReason}
-                        disabledStatusLabel={action.target === "session-edit" ? "세션 필요" : action.statusLabel}
-                        index={index}
-                        LinkComponent={LinkComponent}
-                        hostDashboardReturnTarget={hostDashboardReturnTarget}
-                        readmatesReturnState={readmatesReturnState}
-                      />
-                    ))}
-                  </div>
-                </section>
-              </aside>
+          {clubOperations ? (
+            <div className="rm-host-dashboard-ledger__operations-signal">
+              <HostClubOperationsCard snapshot={clubOperations} LinkComponent={LinkComponent} />
             </div>
-          </div>
-        </section>
+          ) : null}
+        </div>
       </main>
+
       <MobileHostDashboard
         hostName={hostName}
         session={session}
