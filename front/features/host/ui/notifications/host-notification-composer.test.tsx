@@ -90,11 +90,13 @@ function renderComposer({
   preview = null,
   onDraftChange = vi.fn(),
   onConfirm = vi.fn(),
+  presentation,
 }: {
   currentDraft?: HostNotificationComposerDraft;
   preview?: ManualNotificationPreviewResponse | null;
   onDraftChange?: (next: HostNotificationComposerDraft) => void;
   onConfirm?: (resendConfirmed: boolean) => void;
+  presentation?: "dialog" | "workbench";
 } = {}) {
   render(
     <HostNotificationComposer
@@ -111,6 +113,7 @@ function renderComposer({
       onConfirm={onConfirm}
       onSkip={vi.fn()}
       showSkip
+      presentation={presentation}
     />,
   );
   return { onDraftChange, onConfirm };
@@ -201,5 +204,18 @@ describe("HostNotificationComposer", () => {
     await user.click(confirmButton);
 
     expect(onConfirm).toHaveBeenCalledWith(true);
+  });
+
+  it("shows the selected member count in workbench presentation", () => {
+    renderComposer({
+      currentDraft: {
+        ...draft,
+        recipientMode: "SELECTED_MEMBERS",
+        selectedMembershipIds: ["membership-1"],
+      },
+      presentation: "workbench",
+    });
+
+    expect(screen.getByText("직접 선택 · 1명")).toBeInTheDocument();
   });
 });

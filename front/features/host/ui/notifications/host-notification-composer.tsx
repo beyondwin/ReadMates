@@ -28,6 +28,7 @@ export type HostNotificationComposerProps = {
   onPreview: () => Promise<unknown>;
   onConfirm: (resendConfirmed: boolean) => Promise<unknown> | void;
   onSkip: () => void;
+  presentation?: "dialog" | "workbench";
   showSkip?: boolean;
   previewButtonLabel?: string;
   recommendedRecipientLabel?: string;
@@ -65,11 +66,13 @@ export function HostNotificationComposer({
   onPreview,
   onConfirm,
   onSkip,
+  presentation = "dialog",
   showSkip = true,
   previewButtonLabel = "알림 미리보기",
   recommendedRecipientLabel = recommendedLabel(eventType),
   recipientModes = publicationRecipientModes,
 }: HostNotificationComposerProps) {
+  const isWorkbench = presentation === "workbench";
   const template = options.templates.find((item) => item.eventType === eventType);
   const visibleRecipientModes = [...new Set(recipientModes)];
   const updateDraft = (patch: Partial<HostNotificationComposerDraft>) => {
@@ -81,25 +84,35 @@ export function HostNotificationComposer({
       className="stack host-notification-composer"
       style={{ "--stack": "18px" } as CSSProperties}
     >
-      <header>
-        <div className="eyebrow">발송 전 확인</div>
-        <h2
-          id="host-notification-composer-title"
-          className="h2 editorial"
-          style={{ margin: "6px 0 0", overflowWrap: "anywhere" }}
-        >
-          멤버에게 알림을 보낼까요?
-        </h2>
-        {options.session ? (
-          <p
-            className="small muted"
+      {isWorkbench ? (
+        <div className="rm-notification-workbench__decision-heading">
+          <span className="rm-notification-workbench__step">03</span>
+          <div>
+            <h3>03 · 대상과 채널</h3>
+            <p>누구에게 어떤 방식으로 보낼지 선택합니다.</p>
+          </div>
+        </div>
+      ) : (
+        <header>
+          <div className="eyebrow">발송 전 확인</div>
+          <h2
+            id="host-notification-composer-title"
+            className="h2 editorial"
             style={{ margin: "6px 0 0", overflowWrap: "anywhere" }}
           >
-            {options.session.sessionNumber}회차 · {options.session.bookTitle}
-            {template ? ` · ${template.label}` : ""}
-          </p>
-        ) : null}
-      </header>
+            멤버에게 알림을 보낼까요?
+          </h2>
+          {options.session ? (
+            <p
+              className="small muted"
+              style={{ margin: "6px 0 0", overflowWrap: "anywhere" }}
+            >
+              {options.session.sessionNumber}회차 · {options.session.bookTitle}
+              {template ? ` · ${template.label}` : ""}
+            </p>
+          ) : null}
+        </header>
+      )}
 
       {error ? (
         <p role="alert" className="small" style={{ color: "var(--danger)", margin: 0 }}>
@@ -108,7 +121,12 @@ export function HostNotificationComposer({
       ) : null}
 
       <fieldset disabled={busy} style={{ border: 0, padding: 0, margin: 0 }}>
-        <legend className="label">알림 대상</legend>
+        <legend className="label">
+          알림 대상
+          {isWorkbench && draft.recipientMode === "SELECTED_MEMBERS" ? (
+            <span className="tiny muted">직접 선택 · {draft.selectedMembershipIds.length}명</span>
+          ) : null}
+        </legend>
         <div
           className="stack"
           style={{ "--stack": "10px", marginTop: 10 } as CSSProperties}

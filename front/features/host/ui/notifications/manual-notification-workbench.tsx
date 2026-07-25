@@ -1,4 +1,4 @@
-import { type CSSProperties, useState } from "react";
+import { type ChangeEvent, useState } from "react";
 import {
   buildComposerSelection,
   type HostNotificationComposerDraft,
@@ -133,24 +133,53 @@ function ManualNotificationWorkbenchState({
     (template) => template.eventType === draft.eventType,
   );
   const buildOperationsSelection = () => buildComposerSelection(draft);
+  const handleSessionSelect = (event: ChangeEvent<HTMLSelectElement>) => {
+    const sessionId = event.currentTarget.value;
+    changeDraft({ ...draft, sessionId, selectedMembershipIds: [] });
+    setSearch("");
+    void runMemberLoad(async () => {
+      await onSessionChange?.(sessionId);
+    });
+  };
+  const handleSearch = async (value: string) => {
+    setSearch(value);
+    await runMemberLoad(async () => {
+      await onLoadManualOptions?.(
+        draft.sessionId || undefined,
+        value || undefined,
+      );
+    });
+  };
+  const handleLoadMore = async () => {
+    await runMemberLoad(async () => {
+      await onLoadMoreManualMembers?.(
+        draft.sessionId || undefined,
+        search || undefined,
+        options.members.nextCursor ?? undefined,
+      );
+    });
+  };
+  const handleConfirm = (resendConfirmed: boolean) => preview
+    ? onConfirm({
+        ...buildOperationsSelection(),
+        previewId: preview.previewId,
+        resendConfirmed,
+      })
+    : Promise.resolve();
 
   return (
     <section
-      className="rm-document-panel"
+      className="rm-notification-workbench"
       aria-labelledby="manual-notification-title"
-      style={{ padding: "22px 24px", marginBottom: 20 }}
     >
-      <div className="eyebrow">운영 · 수동 발송</div>
-      <h2
-        id="manual-notification-title"
-        className="h2 editorial"
-        style={{ margin: "6px 0 18px" }}
-      >
-        새 알림 발송
-      </h2>
+      <header className="rm-notification-workbench__header">
+        <span className="eyebrow">운영 · 수동 발송</span>
+        <h2 id="manual-notification-title">새 알림 발송</h2>
+      </header>
 
-      <div className="stack" style={{ "--stack": "16px" } as CSSProperties}>
-        <div>
+      <div className="rm-notification-workbench__primary-decisions">
+        <section aria-labelledby="manual-notification-session-title">
+          <h3 id="manual-notification-session-title">01 · 대상 회차</h3>
           <label className="label" htmlFor="manual-notification-session">
             세션 선택
           </label>
@@ -159,18 +188,7 @@ function ManualNotificationWorkbenchState({
             className="input"
             value={draft.sessionId}
             disabled={busy || hostSessions.length === 0}
-            onChange={(event) => {
-              const sessionId = event.currentTarget.value;
-              changeDraft({
-                ...draft,
-                sessionId,
-                selectedMembershipIds: [],
-              });
-              setSearch("");
-              void runMemberLoad(async () => {
-                await onSessionChange?.(sessionId);
-              });
-            }}
+            onChange={handleSessionSelect}
           >
             {hostSessions.map((session) => (
               <option key={session.sessionId} value={session.sessionId}>
@@ -187,72 +205,60 @@ function ManualNotificationWorkbenchState({
               <span> · {selectedSession.state} · {selectedSession.visibility}</span>
             </p>
           ) : null}
-        </div>
+        </section>
 
-        <div>
-          <span className="label">템플릿</span>
+        <section aria-labelledby="manual-notification-template-title">
+          <h3 id="manual-notification-template-title">02 · 알림 종류</h3>
           <div className="row wrap" style={{ gap: 8, marginTop: 8 }}>
-            {options.templates.map((template) => (
-              <button
-                key={template.eventType}
-                className={`btn btn-sm ${
-                  draft.eventType === template.eventType ? "btn-primary" : "btn-quiet"
-                }`}
-                type="button"
-                aria-label={
-                  template.disabledReason
-                    ? `${template.label}: ${template.disabledReason}`
-                    : template.label
-                }
-                disabled={busy || !template.enabled}
-                onClick={() => selectTemplate(template.eventType)}
-              >
-                {template.label}
-              </button>
-            ))}
+            {options.templates.map((template) => {
+              const reasonId = `manual-notification-template-${template.eventType}-reason`;
+              return (
+                <div key={template.eventType}>
+                  <button
+                    className={`btn btn-sm ${
+                      draft.eventType === template.eventType ? "btn-primary" : "btn-quiet"
+                    }`}
+                    type="button"
+                    aria-label={template.label}
+                    aria-describedby={template.disabledReason ? reasonId : undefined}
+                    disabled={busy || !template.enabled}
+                    onClick={() => selectTemplate(template.eventType)}
+                  >
+                    {template.label}
+                  </button>
+                  {template.disabledReason ? (
+                    <p
+                      id={reasonId}
+                      className="rm-notification-workbench__template-reason"
+                    >
+                      {template.disabledReason}
+                    </p>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
-        </div>
-
-        <HostNotificationComposer
-          options={options}
-          eventType={draft.eventType}
-          draft={draft}
-          preview={preview}
-          busy={busy}
-          error={error ?? memberError}
-          onDraftChange={changeDraft}
-          onSearch={async (value) => {
-            setSearch(value);
-            await runMemberLoad(async () => {
-              await onLoadManualOptions?.(
-                draft.sessionId || undefined,
-                value || undefined,
-              );
-            });
-          }}
-          onLoadMore={async () => {
-            await runMemberLoad(async () => {
-              await onLoadMoreManualMembers?.(
-                draft.sessionId || undefined,
-                search || undefined,
-                options.members.nextCursor ?? undefined,
-              );
-            });
-          }}
-          onPreview={() => onPreview(buildOperationsSelection())}
-          onConfirm={(resendConfirmed) => preview
-            ? onConfirm({
-                ...buildOperationsSelection(),
-                previewId: preview.previewId,
-                resendConfirmed,
-              })
-            : Promise.resolve()}
-          onSkip={() => undefined}
-          showSkip={false}
-          previewButtonLabel="미리보기"
-          recipientModes={currentTemplate?.allowedAudiences}
-        />
+        </section>
       </div>
+
+      <HostNotificationComposer
+        presentation="workbench"
+        previewButtonLabel="미리보기 열기"
+        options={options}
+        eventType={draft.eventType}
+        draft={draft}
+        preview={preview}
+        busy={busy}
+        error={error ?? memberError}
+        onDraftChange={changeDraft}
+        onSearch={handleSearch}
+        onLoadMore={handleLoadMore}
+        onPreview={() => onPreview(buildOperationsSelection())}
+        onConfirm={handleConfirm}
+        onSkip={() => undefined}
+        showSkip={false}
+        recipientModes={currentTemplate?.allowedAudiences}
+      />
     </section>
   );
 }

@@ -25,6 +25,46 @@
   border: 0;
 }
 
+.rm-notification-workbench {
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  background: var(--bg);
+  padding: 24px;
+}
+
+.rm-notification-workbench__primary-decisions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.rm-notification-workbench__step {
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.rm-notification-workbench__template-reason {
+  margin: 6px 0 0;
+  color: var(--text-3);
+  font-size: 0.75rem;
+}
+
+@media (max-width: 760px) {
+  .rm-notification-workbench {
+    padding: 20px 16px;
+  }
+
+  .rm-notification-workbench__primary-decisions {
+    grid-template-columns: 1fr;
+  }
+
+  .rm-notification-workbench .btn-primary {
+    min-height: 44px;
+    width: 100%;
+  }
+}
+
 .rm-club-pulse-entry__header {
   display: flex;
   align-items: center;

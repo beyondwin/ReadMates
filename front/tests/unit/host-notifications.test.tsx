@@ -736,7 +736,7 @@ describe("HostNotificationsRoute", () => {
     renderNotificationsRoute(client);
     await screen.findByRole("heading", { name: "새 알림 발송" });
 
-    const previewButton = screen.getByRole("button", { name: "미리보기" });
+    const previewButton = screen.getByRole("button", { name: "미리보기 열기" });
     expect(previewButton).not.toBeDisabled();
 
     const sessionSelect = screen.getByLabelText("세션 선택");
@@ -752,7 +752,7 @@ describe("HostNotificationsRoute", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "미리보기" })).not.toBeDisabled();
+      expect(screen.getByRole("button", { name: "미리보기 열기" })).not.toBeDisabled();
     });
   });
 
@@ -933,7 +933,7 @@ describe("HostNotificationsPage", () => {
     expect(screen.getAllByRole("radio", { name: /전체 활성 멤버/ })).toHaveLength(1);
     expect(screen.queryByRole("radio", { name: /추천 대상/ })).not.toBeInTheDocument();
     await user.click(screen.getByRole("radio", { name: "세션 참가자" }));
-    await user.click(screen.getByRole("button", { name: "미리보기" }));
+    await user.click(screen.getByRole("button", { name: "미리보기 열기" }));
 
     expect(onPreviewManual).toHaveBeenCalledWith(expect.objectContaining({
       audience: "SESSION_PARTICIPANTS",
@@ -1013,7 +1013,7 @@ describe("HostNotificationsPage", () => {
     });
 
     expect(screen.getByText("선택 가능한 세션이 없습니다.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "미리보기" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "미리보기 열기" })).toBeDisabled();
   });
 
   it("asks the route to reload manual options when the host changes the selected session", async () => {
@@ -1145,7 +1145,7 @@ describe("HostNotificationsPage", () => {
     renderPage({ onPreviewManual, onConfirmManual, manualOptions: manualOptionsFixture });
 
     await user.click(screen.getByRole("button", { name: "모임 전날 리마인더" }));
-    await user.click(screen.getByRole("button", { name: "미리보기" }));
+    await user.click(screen.getByRole("button", { name: "미리보기 열기" }));
 
     expect(await screen.findByText("앱 알림 3명")).toBeInTheDocument();
     expect(screen.getByText("이메일 2명")).toBeInTheDocument();
@@ -1408,7 +1408,7 @@ describe("HostNotificationsPage", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "미리보기" }));
+    await user.click(screen.getByRole("button", { name: "미리보기 열기" }));
     expect(await screen.findByRole("heading", { name: "발송 전 확인" })).toBeInTheDocument();
 
     rerender(
@@ -1472,7 +1472,7 @@ describe("HostNotificationsPage", () => {
 
     renderPage({ onPreviewManual, onConfirmManual });
 
-    await user.click(screen.getByRole("button", { name: "미리보기" }));
+    await user.click(screen.getByRole("button", { name: "미리보기 열기" }));
     await screen.findByRole("heading", { name: "발송 전 확인" });
 
     const confirmButton = screen.getByRole("button", { name: "발송 확인" });
