@@ -1,6 +1,7 @@
 package com.readmates.sessionrecord.application.service
 
 import com.readmates.sessionrecord.application.model.LiveSessionRecord
+import com.readmates.sessionrecord.application.model.RebaseSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.RestoreSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.SaveSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.SessionRecordDraft
@@ -47,6 +48,21 @@ class SessionRecordDraftService(
         host: AuthenticatedClubActor,
         command: SaveSessionRecordDraftCommand,
     ): SessionRecordDraft = saveSnapshot(host, command, requireExpectedRevision = true)
+
+    @Transactional
+    override fun rebase(
+        host: CurrentMember,
+        command: RebaseSessionRecordDraftCommand,
+    ): SessionRecordDraft {
+        requireHost(host)
+        val live = requireLive(host, command.sessionId, forUpdate = true)
+        live.requireReviewed(command)
+        val current =
+            store.loadDraft(host, command.sessionId, forUpdate = true)
+                ?: throw draftStale()
+        current.requireRevision(command.expectedDraftRevision)
+        return store.rebaseDraft(host, live, command.expectedDraftRevision) ?: throw draftStale()
+    }
 
     @Suppress("ThrowsCount")
     private fun saveSnapshot(
@@ -128,3 +144,17 @@ class SessionRecordDraftService(
 
 private fun SessionRecordDraft.isStaleAgainst(live: LiveSessionRecord): Boolean =
     baseLiveRevision != live.revision || baseSessionUpdatedAt != live.sessionUpdatedAt
+
+private fun LiveSessionRecord.requireReviewed(command: RebaseSessionRecordDraftCommand) {
+    if (revision != command.expectedLiveRevision ||
+        !sessionUpdatedAt.isEqual(command.expectedSessionUpdatedAt)
+    ) {
+        throw SessionRecordException(SessionRecordError.LIVE_STALE, "Session record live revision is stale")
+    }
+}
+
+private fun SessionRecordDraft.requireRevision(expectedDraftRevision: Long) {
+    if (draftRevision != expectedDraftRevision) {
+        throw SessionRecordException(SessionRecordError.DRAFT_STALE, "Session record draft is stale")
+    }
+}

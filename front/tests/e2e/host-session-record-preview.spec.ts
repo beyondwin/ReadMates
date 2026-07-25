@@ -150,6 +150,7 @@ async function routeHostSessionEditor(page: Page): Promise<void> {
     await json(route, 200, {
       sessionId: SESSION_ID,
       liveRevision: 0,
+      liveSessionUpdatedAt: "2026-05-16T12:00:00Z",
       liveSnapshot: {
         schema: "readmates-session-record:v1",
         visibility: "MEMBER",

@@ -21,6 +21,7 @@ import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportR
 import com.readmates.sessionimport.application.port.out.SessionImportRecordReplacement
 import com.readmates.sessionimport.application.port.out.SessionImportStoredFeedbackDocument
 import com.readmates.sessionimport.application.port.out.SessionImportWritePort
+import com.readmates.sessionrecord.application.model.RebaseSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.RestoreSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.SaveSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.SessionRecordDraft
@@ -336,6 +337,11 @@ class SessionImportDraftServiceTest {
         override fun save(
             host: CurrentMember,
             command: SaveSessionRecordDraftCommand,
+        ): SessionRecordDraft = error("Not used")
+
+        override fun rebase(
+            host: CurrentMember,
+            command: RebaseSessionRecordDraftCommand,
         ): SessionRecordDraft = error("Not used")
 
         override fun discard(

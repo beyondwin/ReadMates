@@ -601,6 +601,119 @@ class HostSessionRecordControllerDbTest(
     }
 }
 
+@SpringBootTest(
+    properties = [
+        "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
+        "readmates.host-action-confirmation.required=true",
+    ],
+)
+@AutoConfigureMockMvc
+@Tag("integration")
+@Sql(statements = [RESET_RECORD_API_FIXTURES], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
+@Sql(statements = [CLEAN_RECORD_API_FIXTURES], executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
+class HostSessionRecordDraftRebaseControllerDbTest(
+    @param:Autowired private val mockMvc: MockMvc,
+    @param:Autowired private val jdbcTemplate: JdbcTemplate,
+) : ReadmatesMySqlIntegrationTestSupport() {
+    @Test
+    fun `host rebases a stale draft only onto the live metadata version they reviewed`() {
+        val initialEditor = loadEditor(expectedStale = false)
+        saveInitialDraft(initialEditor.get("liveSnapshot"))
+        touchSession("호스트가 다시 확인할 책")
+        val staleEditor = loadEditor(expectedStale = true)
+        val reviewedSessionUpdatedAt = staleEditor.get("liveSessionUpdatedAt").asText()
+
+        val rebasedDraft = rebaseDraft(reviewedSessionUpdatedAt)
+
+        assertThat(rebasedDraft.get("snapshot")).isEqualTo(staleEditor.get("draft").get("snapshot"))
+        assertThat(loadEditor(expectedStale = false).get("draft").get("draftRevision").asLong()).isEqualTo(2)
+
+        touchSession("재확인 요청 중 다시 바뀐 책")
+        rejectRebaseWithStaleLive(reviewedSessionUpdatedAt)
+        assertThat(loadEditor(expectedStale = true).get("draft").get("draftRevision").asLong()).isEqualTo(2)
+    }
+
+    private fun loadEditor(expectedStale: Boolean): tools.jackson.databind.JsonNode =
+        mockMvc
+            .get("/api/host/sessions/$REBASE_SESSION_ID/record-editor") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.liveSessionUpdatedAt") { isString() }
+                jsonPath("$.draftLiveBaseStale") { value(expectedStale) }
+            }.andReturn()
+            .response.contentAsString
+            .let(tools.jackson.databind.ObjectMapper()::readTree)
+
+    private fun saveInitialDraft(snapshot: tools.jackson.databind.JsonNode) {
+        mockMvc
+            .patch("/api/host/sessions/$REBASE_SESSION_ID/record-draft") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"expectedDraftRevision":null,"snapshot":$snapshot}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.draftRevision") { value(1) }
+            }
+    }
+
+    private fun touchSession(bookTitle: String) {
+        jdbcTemplate.update(
+            """
+            update sessions
+            set book_title = ?,
+                updated_at = timestampadd(microsecond, 1, updated_at)
+            where id = ?
+            """.trimIndent(),
+            bookTitle,
+            REBASE_SESSION_ID,
+        )
+    }
+
+    private fun rebaseDraft(reviewedSessionUpdatedAt: String): tools.jackson.databind.JsonNode =
+        mockMvc
+            .post("/api/host/sessions/$REBASE_SESSION_ID/record-draft/rebase") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = rebaseJson(expectedDraftRevision = 1, reviewedSessionUpdatedAt)
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.draftRevision") { value(2) }
+            }.andReturn()
+            .response.contentAsString
+            .let(tools.jackson.databind.ObjectMapper()::readTree)
+
+    private fun rejectRebaseWithStaleLive(reviewedSessionUpdatedAt: String) {
+        mockMvc
+            .post("/api/host/sessions/$REBASE_SESSION_ID/record-draft/rebase") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = rebaseJson(expectedDraftRevision = 2, reviewedSessionUpdatedAt)
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("SESSION_RECORD_LIVE_STALE") }
+            }
+    }
+
+    private fun rebaseJson(
+        expectedDraftRevision: Long,
+        reviewedSessionUpdatedAt: String,
+    ) = """
+        {
+          "expectedDraftRevision": $expectedDraftRevision,
+          "expectedLiveRevision": 0,
+          "expectedSessionUpdatedAt": "$reviewedSessionUpdatedAt"
+        }
+        """.trimIndent()
+
+    private companion object {
+        const val REBASE_SESSION_ID = "00000000-0000-0000-0000-000000000301"
+    }
+}
+
 private data class RecordApplyState(
     val liveSession: List<Map<String, Any?>>,
     val publication: List<Map<String, Any?>>,

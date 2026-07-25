@@ -6,6 +6,7 @@ import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.sessionrecord.application.model.ApplySessionRecordCommand
 import com.readmates.sessionrecord.application.model.EncodedSessionRecordSnapshot
 import com.readmates.sessionrecord.application.model.LiveSessionRecord
+import com.readmates.sessionrecord.application.model.RebaseSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.RestoreSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.SaveSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.SessionRecordApplyReceipt
@@ -158,6 +159,87 @@ class SessionRecordDraftServiceTest {
         val editor: SessionRecordEditor = service.getEditor(host, sessionId)
 
         assertThat(editor.draftLiveBaseStale).isTrue()
+    }
+
+    @Test
+    fun `host acknowledgement rebases only the stale draft metadata onto the displayed live version`() {
+        val restoredFrom = UUID.randomUUID()
+        val currentLive = live(sessionUpdatedAt = NOW.plusSeconds(1))
+        val originalDraft =
+            draft(baseSessionUpdatedAt = NOW).copy(
+                source = SessionRecordDraftSource.RESTORED,
+                restoredFromRevisionId = restoredFrom,
+                snapshot = changedSnapshot(),
+            )
+        val store = FakeStore(live = currentLive, draft = originalDraft)
+        val service = SessionRecordDraftService(store, codec)
+
+        val rebased =
+            service.rebase(
+                host,
+                RebaseSessionRecordDraftCommand(
+                    sessionId = sessionId,
+                    expectedDraftRevision = originalDraft.draftRevision,
+                    expectedLiveRevision = currentLive.revision,
+                    expectedSessionUpdatedAt = currentLive.sessionUpdatedAt,
+                ),
+            )
+
+        assertThat(rebased.draftRevision).isEqualTo(originalDraft.draftRevision + 1)
+        assertThat(rebased.baseLiveRevision).isEqualTo(currentLive.revision)
+        assertThat(rebased.baseSessionUpdatedAt).isEqualTo(currentLive.sessionUpdatedAt)
+        assertThat(rebased.snapshot).isEqualTo(originalDraft.snapshot)
+        assertThat(rebased.source).isEqualTo(SessionRecordDraftSource.RESTORED)
+        assertThat(rebased.restoredFromRevisionId).isEqualTo(restoredFrom)
+        assertThat(service.getEditor(host, sessionId).draftLiveBaseStale).isFalse()
+    }
+
+    @Test
+    fun `rebase rejects live metadata changed after the host loaded it without touching the draft`() {
+        val currentLive = live(sessionUpdatedAt = NOW.plusSeconds(2))
+        val originalDraft = draft(baseSessionUpdatedAt = NOW)
+        val store = FakeStore(live = currentLive, draft = originalDraft)
+        val service = SessionRecordDraftService(store, codec)
+        val before = store.state()
+
+        assertThatThrownBy {
+            service.rebase(
+                host,
+                RebaseSessionRecordDraftCommand(
+                    sessionId = sessionId,
+                    expectedDraftRevision = originalDraft.draftRevision,
+                    expectedLiveRevision = currentLive.revision,
+                    expectedSessionUpdatedAt = NOW.plusSeconds(1),
+                ),
+            )
+        }.isInstanceOf(SessionRecordException::class.java)
+            .extracting { (it as SessionRecordException).error }
+            .isEqualTo(SessionRecordError.LIVE_STALE)
+        assertThat(store.state()).isEqualTo(before)
+    }
+
+    @Test
+    fun `rebase rejects a concurrently changed draft without touching either state`() {
+        val currentLive = live(sessionUpdatedAt = NOW.plusSeconds(1))
+        val originalDraft = draft(draftRevision = 2, baseSessionUpdatedAt = NOW)
+        val store = FakeStore(live = currentLive, draft = originalDraft)
+        val service = SessionRecordDraftService(store, codec)
+        val before = store.state()
+
+        assertThatThrownBy {
+            service.rebase(
+                host,
+                RebaseSessionRecordDraftCommand(
+                    sessionId = sessionId,
+                    expectedDraftRevision = 1,
+                    expectedLiveRevision = currentLive.revision,
+                    expectedSessionUpdatedAt = currentLive.sessionUpdatedAt,
+                ),
+            )
+        }.isInstanceOf(SessionRecordException::class.java)
+            .extracting { (it as SessionRecordException).error }
+            .isEqualTo(SessionRecordError.DRAFT_STALE)
+        assertThat(store.state()).isEqualTo(before)
     }
 
     private fun live(
@@ -327,6 +409,26 @@ class SessionRecordDraftServiceTest {
                     snapshot = codec.decode(encoded.json),
                     updatedAt = NOW,
                 ).also { draft = it }
+        }
+
+        override fun rebaseDraft(
+            host: AuthenticatedClubActor,
+            live: LiveSessionRecord,
+            expectedDraftRevision: Long,
+        ): SessionRecordDraft? {
+            val current = draft
+            return if (current == null || current.draftRevision != expectedDraftRevision) {
+                null
+            } else {
+                current
+                    .copy(
+                        baseLiveRevision = live.revision,
+                        baseSessionUpdatedAt = live.sessionUpdatedAt,
+                        draftRevision = current.draftRevision + 1,
+                        updatedByMembershipId = host.membershipId,
+                        updatedAt = NOW,
+                    ).also { draft = it }
+            }
         }
 
         @Suppress("ReturnCount")

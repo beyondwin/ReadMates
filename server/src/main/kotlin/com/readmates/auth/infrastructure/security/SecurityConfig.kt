@@ -64,6 +64,7 @@ class SecurityConfig(
                     methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/visibility-preview$")),
                     methodAndPath("PATCH", Regex("^/api/host/sessions/[^/]+/record-draft$")),
                     methodAndPath("DELETE", Regex("^/api/host/sessions/[^/]+/record-draft$")),
+                    methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/record-draft/rebase$")),
                     methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/record-apply-preview$")),
                     methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/record-apply$")),
                     methodAndPath(

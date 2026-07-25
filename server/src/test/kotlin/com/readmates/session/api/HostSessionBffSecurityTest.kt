@@ -322,6 +322,17 @@ class HostSessionBffSecurityTest(
                 ),
                 RecordMutationCase(
                     HttpMethod.POST,
+                    "/api/host/sessions/00000000-0000-0000-0000-000000009998/record-draft/rebase",
+                    """
+                    {
+                      "expectedDraftRevision":1,
+                      "expectedLiveRevision":0,
+                      "expectedSessionUpdatedAt":"2026-07-25T00:00:00Z"
+                    }
+                    """.trimIndent(),
+                ),
+                RecordMutationCase(
+                    HttpMethod.POST,
                     "/api/host/sessions/00000000-0000-0000-0000-000000009998/record-apply-preview",
                     """{"expectedDraftRevision":1,"expectedLiveRevision":0}""",
                 ),

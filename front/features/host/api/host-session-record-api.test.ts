@@ -13,6 +13,7 @@ import {
   fetchHostSessionRecordEditor,
   fetchHostSessionRecordLedger,
   previewHostSessionRecordApply,
+  rebaseHostSessionRecordDraft,
   restoreHostSessionRevisionToDraft,
   saveHostSessionRecordDraft,
 } from "./host-session-record-api";
@@ -52,6 +53,7 @@ describe("host session record API", () => {
         return Promise.resolve(jsonResponse({
           sessionId: "session-28",
           liveRevision: 2,
+          liveSessionUpdatedAt: "2026-07-23T10:00:00+09:00",
           liveSnapshot: snapshot(),
           draft: null,
           draftLiveBaseStale: false,
@@ -120,6 +122,37 @@ describe("host session record API", () => {
           expectedDraftRevision: 3,
           expectedLiveRevision: 2,
           expectedDraftHash: "a".repeat(64),
+        }),
+      }),
+    );
+  });
+
+  it("binds draft rebase to the exact live metadata version reviewed by the host", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
+      sessionId: "session-28",
+      baseLiveRevision: 2,
+      draftRevision: 4,
+      source: "MANUAL",
+      restoredFromRevisionId: null,
+      snapshot: snapshot(),
+      updatedAt: "2026-07-23T10:01:00+09:00",
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await rebaseHostSessionRecordDraft("session/28", {
+      expectedDraftRevision: 3,
+      expectedLiveRevision: 2,
+      expectedSessionUpdatedAt: "2026-07-23T10:00:00+09:00",
+    }, { clubSlug: "reading-sai" });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/host/sessions/session%2F28/record-draft/rebase?clubSlug=reading-sai",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          expectedDraftRevision: 3,
+          expectedLiveRevision: 2,
+          expectedSessionUpdatedAt: "2026-07-23T10:00:00+09:00",
         }),
       }),
     );
@@ -284,6 +317,7 @@ describe("host session record response schemas", () => {
     expect(HostSessionRecordEditorResponseSchema.safeParse({
       sessionId: "session-28",
       liveRevision: -1,
+      liveSessionUpdatedAt: "2026-07-23T10:00:00+09:00",
       liveSnapshot: snapshot(),
       draft: null,
       draftLiveBaseStale: false,

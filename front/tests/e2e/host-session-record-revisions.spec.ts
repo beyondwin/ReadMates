@@ -305,7 +305,42 @@ test("3. JSON import saves the shared draft while member and public live content
   await expect(page.getByText(RECORD_SUMMARY)).toHaveCount(0);
 });
 
-test("4. apply then composer skip creates a revision without a notification event", async ({ page }) => {
+test("4. stale draft requires an exact live metadata review before apply", async ({ page }) => {
+  await loginHost(page);
+  await openRecordEditor(page);
+  await page.getByLabel("저자").fill("Public Fixture Author Updated");
+  const basicSave = page.waitForResponse(
+    (response) =>
+      response.request().method() === "PATCH" &&
+      response.url().includes(`/host/sessions/${recordSessionId}`) &&
+      response.ok(),
+  );
+  await page.getByRole("button", { name: "변경 사항 저장" }).click();
+  expect((await basicSave).ok()).toBe(true);
+
+  await page.reload();
+  await expect(page.getByText(/세션 기본 정보 또는 live 기록이 변경되어/)).toBeVisible();
+  const reviewButton = page.getByRole("button", { name: "변경사항 검토" });
+  await expect(reviewButton).toBeDisabled();
+
+  const rebaseResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response.url().includes(`/host/sessions/${recordSessionId}/record-draft/rebase`),
+  );
+  await page.getByRole("button", { name: "최신 정보 확인 완료" }).click();
+  const rebased = await rebaseResponse;
+  expect(rebased.status(), await rebased.text()).toBe(200);
+  await expect(reviewButton).toBeEnabled();
+
+  await reviewButton.click();
+  const dialog = page.getByRole("dialog", { name: "기록 반영 확인" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "취소" }).click();
+  await expect(dialog).toBeHidden();
+});
+
+test("5. apply then composer skip creates a revision without a notification event", async ({ page }) => {
   await loginHost(page);
   await openRecordEditor(page);
   const before = await readSessionRecordRevisionCount(recordSessionId);
@@ -320,7 +355,7 @@ test("4. apply then composer skip creates a revision without a notification even
   await expect(page.getByRole("region", { name: "현재 적용된 공개 기록" })).toContainText(RECORD_SUMMARY);
 });
 
-test("5. apply then composer confirm creates exactly one session-record event", async ({ page }) => {
+test("6. apply then composer confirm creates exactly one session-record event", async ({ page }) => {
   await loginHost(page);
   await openRecordEditor(page);
   const before = await readSessionRecordRevisionCount(recordSessionId);
@@ -336,7 +371,7 @@ test("5. apply then composer confirm creates exactly one session-record event", 
   await expect(page.getByRole("region", { name: "현재 적용된 공개 기록" })).toContainText(UPDATED_SUMMARY);
 });
 
-test("6. restoring an immutable revision creates a new draft and a new applied revision", async ({ page }) => {
+test("7. restoring an immutable revision creates a new draft and a new applied revision", async ({ page }) => {
   await loginHost(page);
   await openRecordEditor(page);
   const before = await readSessionRecordRevisionCount(recordSessionId);
@@ -360,7 +395,7 @@ test("6. restoring an immutable revision creates a new draft and a new applied r
   await expect(page.getByText("과거 revision 복원").first()).toBeVisible();
 });
 
-test("7. 320px host record navigation and confirmation sheet remain accessible", async ({ page }) => {
+test("8. 320px host record navigation and confirmation sheet remain accessible", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 720 });
   await loginHost(page);
   await page.goto(`${HOST_PATH}/sessions`);

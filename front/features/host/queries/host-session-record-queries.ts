@@ -8,6 +8,7 @@ import {
   fetchHostSessionRecordEditor,
   fetchHostSessionRecordLedger,
   previewHostSessionRecordApply,
+  rebaseHostSessionRecordDraft,
   restoreHostSessionRevisionToDraft,
   saveHostSessionRecordDraft,
 } from "@/features/host/api/host-session-record-api";
@@ -19,6 +20,7 @@ import type {
   HostSessionRecordDraft,
   HostSessionRecordEditor,
   PreviewHostSessionRecordApplyRequest,
+  RebaseHostSessionRecordDraftRequest,
   RestoreHostSessionRecordDraftRequest,
   SaveHostSessionRecordDraftRequest,
 } from "@/features/host/api/host-session-record-contracts";
@@ -91,16 +93,27 @@ function updateEditorDraft(
   sessionId: string,
   context: ReadmatesApiContext | undefined,
   draft: HostSessionRecordDraft | null,
+  preserveExistingStaleness = false,
 ) {
   client.setQueryData<HostSessionRecordEditor>(
     hostSessionRecordKeys.editor(sessionId, context),
-    (editor) => editor
-      ? {
-          ...editor,
-          draft,
-          draftLiveBaseStale: draft ? draft.baseLiveRevision !== editor.liveRevision : false,
-        }
-      : editor,
+    (editor) => {
+      if (!editor) {
+        return editor;
+      }
+      const draftLiveBaseStale = draft
+        ? (preserveExistingStaleness && editor.draftLiveBaseStale)
+          || draft.baseLiveRevision !== editor.liveRevision
+        : false;
+      return {
+        ...editor,
+        draft,
+        draftLiveBaseStale,
+        validationSummary: draftLiveBaseStale
+          ? { valid: false, issues: ["LIVE_REVISION_STALE"] }
+          : { valid: true, issues: [] },
+      };
+    },
   );
 }
 
@@ -111,7 +124,57 @@ export function useSaveHostSessionRecordDraftMutation(context?: ReadmatesApiCont
       sessionId: string;
       request: SaveHostSessionRecordDraftRequest;
     }) => saveHostSessionRecordDraft(sessionId, request, context),
-    onSuccess: (draft, variables) => updateEditorDraft(client, variables.sessionId, context, draft),
+    onSuccess: (draft, variables) =>
+      updateEditorDraft(client, variables.sessionId, context, draft, true),
+  });
+}
+
+export function useRebaseHostSessionRecordDraftMutation(context?: ReadmatesApiContext) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sessionId, request }: {
+      sessionId: string;
+      request: RebaseHostSessionRecordDraftRequest;
+    }) => rebaseHostSessionRecordDraft(sessionId, request, context),
+    onSuccess: async (draft, variables) => {
+      const editorKey = hostSessionRecordKeys.editor(variables.sessionId, context);
+      let cacheAdvanced = false;
+      client.setQueryData<HostSessionRecordEditor>(
+        editorKey,
+        (editor) => {
+          if (!editor) {
+            return editor;
+          }
+          const liveStillMatches =
+            editor.liveRevision === variables.request.expectedLiveRevision
+            && editor.liveSessionUpdatedAt === variables.request.expectedSessionUpdatedAt;
+          const cachedDraftRevision = editor.draft?.draftRevision ?? null;
+          const draftStateStillMatches =
+            cachedDraftRevision === variables.request.expectedDraftRevision
+            || cachedDraftRevision === draft.draftRevision;
+          if (!liveStillMatches || !draftStateStillMatches) {
+            cacheAdvanced = true;
+            return {
+              ...editor,
+              draft: cachedDraftRevision === variables.request.expectedDraftRevision
+                ? draft
+                : editor.draft,
+              draftLiveBaseStale: true,
+              validationSummary: { valid: false, issues: ["LIVE_REVISION_STALE"] },
+            };
+          }
+          return {
+            ...editor,
+            draft,
+            draftLiveBaseStale: false,
+            validationSummary: { valid: true, issues: [] },
+          };
+        },
+      );
+      if (cacheAdvanced) {
+        await client.invalidateQueries({ queryKey: editorKey, exact: true });
+      }
+    },
   });
 }
 

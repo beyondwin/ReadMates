@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -9,6 +9,7 @@ vi.mock("@/features/host/api/host-session-record-api", () => ({
   fetchHostSessionRecordEditor: vi.fn(),
   fetchHostSessionRecordCapabilities: vi.fn(),
   fetchHostSessionRecordLedger: vi.fn(),
+  rebaseHostSessionRecordDraft: vi.fn(),
   saveHostSessionRecordDraft: vi.fn(),
 }));
 
@@ -21,6 +22,7 @@ import {
   fetchHostSessionHistory,
   fetchHostSessionRecordEditor,
   fetchHostSessionRecordLedger,
+  rebaseHostSessionRecordDraft,
   saveHostSessionRecordDraft,
 } from "@/features/host/api/host-session-record-api";
 import { hostSessionKeys } from "./host-session-queries";
@@ -30,6 +32,7 @@ import {
   hostSessionRecordKeys,
   hostSessionRecordLedgerQuery,
   useApplyHostSessionRecordMutation,
+  useRebaseHostSessionRecordDraftMutation,
   useSaveHostSessionRecordDraftMutation,
 } from "./host-session-record-queries";
 
@@ -77,6 +80,7 @@ function editor() {
   return {
     sessionId: "session-28",
     liveRevision: 2,
+    liveSessionUpdatedAt: "2026-07-23T10:00:00+09:00",
     liveSnapshot: draft().snapshot,
     draft: null,
     draftLiveBaseStale: false,
@@ -202,6 +206,40 @@ describe("host session record queries", () => {
     });
   });
 
+  it("does not clear metadata staleness when an already-stale draft autosaves", async () => {
+    vi.mocked(saveHostSessionRecordDraft).mockResolvedValue({
+      ...draft(),
+      draftRevision: 4,
+    });
+    const context = { clubSlug: "reading-sai" };
+    const { client, Wrapper } = createWrapper();
+    const key = hostSessionRecordKeys.editor("session-28", context);
+    client.setQueryData(key, {
+      ...editor(),
+      liveSessionUpdatedAt: "2026-07-23T10:00:00.000001+09:00",
+      draft: draft(),
+      draftLiveBaseStale: true,
+      validationSummary: { valid: false, issues: ["LIVE_REVISION_STALE"] },
+    });
+    const { result } = renderHook(
+      () => useSaveHostSessionRecordDraftMutation(context),
+      { wrapper: Wrapper },
+    );
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        sessionId: "session-28",
+        request: { expectedDraftRevision: 3, snapshot: draft().snapshot },
+      });
+    });
+
+    expect(client.getQueryData(key)).toMatchObject({
+      draft: { draftRevision: 4 },
+      draftLiveBaseStale: true,
+      validationSummary: { valid: false, issues: ["LIVE_REVISION_STALE"] },
+    });
+  });
+
   it("leaves the editor cache unchanged when draft save fails", async () => {
     vi.mocked(saveHostSessionRecordDraft).mockRejectedValue(new Error("draft conflict"));
     const context = { clubSlug: "reading-sai" };
@@ -215,6 +253,129 @@ describe("host session record queries", () => {
       request: { expectedDraftRevision: null, snapshot: draft().snapshot },
     })).rejects.toThrow("draft conflict");
 
+    expect(cacheState(client)).toEqual(before);
+  });
+
+  it("clears stale editor state only after an exact draft rebase succeeds", async () => {
+    vi.mocked(rebaseHostSessionRecordDraft).mockResolvedValue({
+      ...draft(),
+      draftRevision: 4,
+    });
+    const context = { clubSlug: "reading-sai" };
+    const { client, Wrapper } = createWrapper();
+    const key = hostSessionRecordKeys.editor("session-28", context);
+    client.setQueryData(key, {
+      ...editor(),
+      draft: draft(),
+      draftLiveBaseStale: true,
+      validationSummary: { valid: false, issues: ["LIVE_REVISION_STALE"] },
+    });
+    const { result } = renderHook(
+      () => useRebaseHostSessionRecordDraftMutation(context),
+      { wrapper: Wrapper },
+    );
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        sessionId: "session-28",
+        request: {
+          expectedDraftRevision: 3,
+          expectedLiveRevision: 2,
+          expectedSessionUpdatedAt: "2026-07-23T10:00:00+09:00",
+        },
+      });
+    });
+
+    expect(client.getQueryData(key)).toMatchObject({
+      draft: { draftRevision: 4 },
+      draftLiveBaseStale: false,
+      validationSummary: { valid: true, issues: [] },
+    });
+  });
+
+  it("does not clear stale state when the editor cache advances during rebase", async () => {
+    let resolveRebase: (value: ReturnType<typeof draft>) => void = () => undefined;
+    vi.mocked(rebaseHostSessionRecordDraft).mockImplementation(
+      () => new Promise((resolve) => {
+        resolveRebase = resolve;
+      }),
+    );
+    const context = { clubSlug: "reading-sai" };
+    const { client, Wrapper } = createWrapper();
+    const key = hostSessionRecordKeys.editor("session-28", context);
+    client.setQueryData(key, {
+      ...editor(),
+      liveSessionUpdatedAt: "2026-07-23T10:00:00.000001+09:00",
+      draft: draft(),
+      draftLiveBaseStale: true,
+      validationSummary: { valid: false, issues: ["LIVE_REVISION_STALE"] },
+    });
+    const { result } = renderHook(
+      () => useRebaseHostSessionRecordDraftMutation(context),
+      { wrapper: Wrapper },
+    );
+
+    let rebasePromise: Promise<ReturnType<typeof draft>>;
+    act(() => {
+      rebasePromise = result.current.mutateAsync({
+        sessionId: "session-28",
+        request: {
+          expectedDraftRevision: 3,
+          expectedLiveRevision: 2,
+          expectedSessionUpdatedAt: "2026-07-23T10:00:00.000001+09:00",
+        },
+      });
+    });
+    await waitFor(() => expect(rebaseHostSessionRecordDraft).toHaveBeenCalledTimes(1));
+    client.setQueryData(key, {
+      ...editor(),
+      liveSessionUpdatedAt: "2026-07-23T10:00:00.000002+09:00",
+      draft: { ...draft(), draftRevision: 4 },
+      draftLiveBaseStale: true,
+      validationSummary: { valid: false, issues: ["LIVE_REVISION_STALE"] },
+    });
+
+    await act(async () => {
+      resolveRebase({ ...draft(), draftRevision: 4 });
+      await rebasePromise;
+    });
+
+    expect(client.getQueryData(key)).toMatchObject({
+      liveSessionUpdatedAt: "2026-07-23T10:00:00.000002+09:00",
+      draft: { draftRevision: 4 },
+      draftLiveBaseStale: true,
+      validationSummary: { valid: false, issues: ["LIVE_REVISION_STALE"] },
+    });
+    expect(client.getQueryState(key)?.isInvalidated).toBe(true);
+  });
+
+  it("keeps stale editor state unchanged when draft rebase loses a race", async () => {
+    vi.mocked(rebaseHostSessionRecordDraft).mockRejectedValue(
+      new Error("live metadata changed"),
+    );
+    const context = { clubSlug: "reading-sai" };
+    const { client, Wrapper } = createWrapper();
+    const key = hostSessionRecordKeys.editor("session-28", context);
+    client.setQueryData(key, {
+      ...editor(),
+      draft: draft(),
+      draftLiveBaseStale: true,
+      validationSummary: { valid: false, issues: ["LIVE_REVISION_STALE"] },
+    });
+    const before = cacheState(client);
+    const { result } = renderHook(
+      () => useRebaseHostSessionRecordDraftMutation(context),
+      { wrapper: Wrapper },
+    );
+
+    await expect(result.current.mutateAsync({
+      sessionId: "session-28",
+      request: {
+        expectedDraftRevision: 3,
+        expectedLiveRevision: 2,
+        expectedSessionUpdatedAt: "2026-07-23T10:00:00+09:00",
+      },
+    })).rejects.toThrow("live metadata changed");
     expect(cacheState(client)).toEqual(before);
   });
 

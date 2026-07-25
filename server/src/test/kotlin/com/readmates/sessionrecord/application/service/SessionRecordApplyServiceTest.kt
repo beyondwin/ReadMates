@@ -515,6 +515,12 @@ private class FakeApplyStore(
         encoded: EncodedSessionRecordSnapshot,
     ) = draft
 
+    override fun rebaseDraft(
+        host: AuthenticatedClubActor,
+        live: LiveSessionRecord,
+        expectedDraftRevision: Long,
+    ) = draft
+
     override fun deleteDraft(
         host: AuthenticatedClubActor,
         sessionId: UUID,

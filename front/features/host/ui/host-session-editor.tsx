@@ -102,8 +102,11 @@ type HostSessionRecordWorkflow = {
   saveState: DraftSaveState;
   expectedDraftRevision: number | null;
   restoring: boolean;
+  rebasePending: boolean;
+  rebaseError: string | null;
   onSnapshotChange: (snapshot: SessionRecordDraftSnapshot) => void;
   onReloadDraft: () => void | Promise<void>;
+  onRebaseDraft: () => void | Promise<void>;
   onDraftCommitted: (result: {
     draftRevision: number;
     baseLiveRevision: number | null;
@@ -1115,6 +1118,9 @@ export default function HostSessionEditor({
                   onSnapshotChange={recordWorkflow.onSnapshotChange}
                   onReloadDraft={recordWorkflow.onReloadDraft}
                   onCopyInput={recordWorkflow.onCopyInput}
+                  onRebaseDraft={recordWorkflow.onRebaseDraft}
+                  rebasePending={recordWorkflow.rebasePending}
+                  rebaseError={recordWorkflow.rebaseError}
                   onReviewDraft={() => void recordWorkflow.confirmation.onReview()}
                 />
               ) : null}

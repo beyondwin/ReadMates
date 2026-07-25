@@ -28,6 +28,7 @@ import {
   hostSessionRecordHistoryQuery,
   useApplyHostSessionRecordMutation,
   usePreviewHostSessionRecordApplyMutation,
+  useRebaseHostSessionRecordDraftMutation,
   useRestoreHostSessionRevisionToDraftMutation,
   useSaveHostSessionRecordDraftMutation,
 } from "@/features/host/queries/host-session-record-queries";
@@ -305,6 +306,7 @@ export function EditHostSessionRecordWorkflow({
 }) {
   const queryClient = useQueryClient();
   const saveMutation = useSaveHostSessionRecordDraftMutation(context);
+  const rebaseMutation = useRebaseHostSessionRecordDraftMutation(context);
   const restoreMutation = useRestoreHostSessionRevisionToDraftMutation(context);
   const previewMutation = usePreviewHostSessionRecordApplyMutation(context);
   const applyMutation = useApplyHostSessionRecordMutation(context, async (event) => {
@@ -319,6 +321,7 @@ export function EditHostSessionRecordWorkflow({
     useState<HostNotificationComposerRequest | null>(null);
   const [confirmationOpen, setConfirmationOpen] = useState(false);
   const [applyPreviewRefreshing, setApplyPreviewRefreshing] = useState(false);
+  const [rebaseError, setRebaseError] = useState<string | null>(null);
   const [confirmationMessage, setConfirmationMessage] = useState<null | {
     kind: "alert" | "status";
     text: string;
@@ -346,6 +349,54 @@ export function EditHostSessionRecordWorkflow({
     onReload: reloadRecordEditor,
   });
   useDraftRouteNavigationGuard(controller.shouldBlockNavigation);
+
+  const rebaseDraft = useCallback(async () => {
+    if (controller.expectedDraftRevision === null) {
+      setRebaseError("먼저 공개 기록 초안을 저장해 주세요.");
+      return;
+    }
+    setRebaseError(null);
+    try {
+      const draft = await rebaseMutation.mutateAsync({
+        sessionId: recordEditor.sessionId,
+        request: {
+          expectedDraftRevision: controller.expectedDraftRevision,
+          expectedLiveRevision: recordEditor.liveRevision,
+          expectedSessionUpdatedAt: recordEditor.liveSessionUpdatedAt,
+        },
+      });
+      try {
+        const latest = await reloadRecordEditor();
+        if (latest) {
+          controller.adoptEditor(latest);
+          if (latest.draftLiveBaseStale) {
+            setRebaseError(
+              "재확인 중 세션이 다시 변경되었습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요.",
+            );
+          }
+        } else {
+          controller.adoptDraftRevision(draft.draftRevision);
+        }
+      } catch {
+        controller.adoptDraftRevision(draft.draftRevision);
+      }
+    } catch (error) {
+      try {
+        const latest = await reloadRecordEditor();
+        if (latest) {
+          controller.adoptEditor(latest);
+        }
+      } catch {
+        // Keep the current saved draft visible and leave the retry action available.
+      }
+      const code = apiErrorCode(error);
+      setRebaseError(
+        code === "SESSION_RECORD_DRAFT_STALE" || code === "SESSION_RECORD_LIVE_STALE"
+          ? "세션 또는 초안이 다시 변경되었습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요."
+          : "재확인 결과를 확인하지 못했습니다. 최신 상태를 불러온 뒤 다시 시도해 주세요.",
+      );
+    }
+  }, [controller, rebaseMutation, recordEditor, reloadRecordEditor]);
 
   const requestApplyPreview = useCallback(async () => {
     if (controller.expectedDraftRevision === null) {
@@ -490,8 +541,11 @@ export function EditHostSessionRecordWorkflow({
           saveState: controller.saveState,
           expectedDraftRevision: controller.expectedDraftRevision,
           restoring: restoreMutation.isPending,
+          rebasePending: rebaseMutation.isPending,
+          rebaseError,
           onSnapshotChange: controller.updateSnapshot,
           onReloadDraft: controller.reloadDraft,
+          onRebaseDraft: rebaseDraft,
           onDraftCommitted: async ({ draftRevision }) => {
             controller.adoptDraftRevision(draftRevision);
             await controller.reloadDraft();

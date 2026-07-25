@@ -380,6 +380,32 @@ class JdbcSessionRecordAdapter(
         return if (updated == 1) loadDraft(host, command.sessionId) else null
     }
 
+    override fun rebaseDraft(
+        host: AuthenticatedClubActor,
+        live: LiveSessionRecord,
+        expectedDraftRevision: Long,
+    ): SessionRecordDraft? {
+        val updated =
+            jdbcTemplate.update(
+                """
+                update session_record_drafts
+                set base_live_revision = ?,
+                    base_session_updated_at = ?,
+                    draft_revision = draft_revision + 1,
+                    updated_by_membership_id = ?,
+                    updated_at = utc_timestamp(6)
+                where club_id = ? and session_id = ? and draft_revision = ?
+                """.trimIndent(),
+                live.revision,
+                live.sessionUpdatedAt.toUtcLocalDateTime(),
+                host.membershipId.dbString(),
+                host.clubId.dbString(),
+                live.sessionId.dbString(),
+                expectedDraftRevision,
+            )
+        return if (updated == 1) loadDraft(host, live.sessionId) else null
+    }
+
     override fun deleteDraft(
         host: AuthenticatedClubActor,
         sessionId: UUID,

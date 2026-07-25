@@ -66,6 +66,9 @@ export function SessionRecordDraftPanel({
   onSnapshotChange,
   onReloadDraft,
   onCopyInput,
+  onRebaseDraft,
+  rebasePending = false,
+  rebaseError = null,
   onReviewDraft,
 }: {
   activeMobileSection: MobileEditorSection;
@@ -77,6 +80,9 @@ export function SessionRecordDraftPanel({
   onSnapshotChange: (snapshot: SessionRecordDraftSnapshot) => void;
   onReloadDraft: () => void | Promise<void>;
   onCopyInput: () => void | Promise<void>;
+  onRebaseDraft?: () => void | Promise<void>;
+  rebasePending?: boolean;
+  rebaseError?: string | null;
   onReviewDraft?: () => void;
 }) {
   const invalidSections = validationSections(validationIssues);
@@ -108,8 +114,26 @@ export function SessionRecordDraftPanel({
           data-navigation-blocked={saveState === "error" || saveState === "stale" || saveState === "dirty"}
           style={{ padding: 14 }}
         >
-          {draftLiveBaseStale ? "live revision이 변경되어 초안을 다시 확인해야 합니다. " : null}
+          {draftLiveBaseStale ? "세션 기본 정보 또는 live 기록이 변경되어 초안을 다시 확인해야 합니다. " : null}
           {saveStateMessage(saveState)}
+          {draftLiveBaseStale && onRebaseDraft ? (
+            <div className="stack" style={{ "--stack": "8px", marginTop: 10 } as CSSProperties}>
+              <p className="small" style={{ margin: 0 }}>
+                현재 적용된 기록과 최신 세션 정보를 확인한 뒤 초안의 기준을 갱신해 주세요.
+              </p>
+              <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+                <button
+                  className="btn btn-quiet btn-sm"
+                  type="button"
+                  disabled={rebasePending || saveState !== "saved"}
+                  onClick={() => void onRebaseDraft()}
+                >
+                  {rebasePending ? "최신 정보 확인 중…" : "최신 정보 확인 완료"}
+                </button>
+              </div>
+              {rebaseError ? <span className="small">{rebaseError}</span> : null}
+            </div>
+          ) : null}
           {saveState === "stale" ? (
             <div className="row" style={{ gap: 8, marginTop: 10, flexWrap: "wrap" }}>
               <button className="btn btn-quiet btn-sm" type="button" onClick={() => void onReloadDraft()}>

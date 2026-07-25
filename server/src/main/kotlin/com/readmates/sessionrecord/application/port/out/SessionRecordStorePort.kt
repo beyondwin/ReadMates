@@ -84,6 +84,12 @@ interface SessionRecordStorePort {
         encoded: EncodedSessionRecordSnapshot,
     ): SessionRecordDraft?
 
+    fun rebaseDraft(
+        host: AuthenticatedClubActor,
+        live: LiveSessionRecord,
+        expectedDraftRevision: Long,
+    ): SessionRecordDraft?
+
     fun deleteDraft(
         host: AuthenticatedClubActor,
         sessionId: UUID,

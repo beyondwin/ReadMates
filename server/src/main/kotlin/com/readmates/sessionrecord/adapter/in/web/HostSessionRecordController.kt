@@ -50,6 +50,13 @@ class HostSessionRecordController(
         @Valid @RequestBody request: SaveSessionRecordDraftRequest,
     ) = drafts.save(member, request.toCommand(parseRecordPathId(sessionId))).toResponse()
 
+    @PostMapping("/sessions/{sessionId}/record-draft/rebase")
+    fun rebaseDraft(
+        member: CurrentMember,
+        @PathVariable sessionId: String,
+        @Valid @RequestBody request: RebaseSessionRecordDraftRequest,
+    ) = drafts.rebase(member, request.toCommand(parseRecordPathId(sessionId))).toResponse()
+
     @DeleteMapping("/sessions/{sessionId}/record-draft")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun discardDraft(

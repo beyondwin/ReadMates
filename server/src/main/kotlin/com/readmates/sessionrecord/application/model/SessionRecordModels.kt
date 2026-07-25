@@ -108,6 +108,13 @@ data class SaveSessionRecordDraftCommand(
     val restoredFromRevisionId: UUID? = null,
 )
 
+data class RebaseSessionRecordDraftCommand(
+    val sessionId: UUID,
+    val expectedDraftRevision: Long,
+    val expectedLiveRevision: Long,
+    val expectedSessionUpdatedAt: OffsetDateTime,
+)
+
 data class RestoreSessionRecordDraftCommand(
     val sessionId: UUID,
     val revisionId: UUID,
