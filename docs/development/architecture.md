@@ -93,7 +93,7 @@ Feature-specific unavailable state는 feature가 계속 소유한다. 공개 세
 
 ## 멀티 클럽 context와 도메인 모델
 
-`clubs.slug`는 클럽의 내부 canonical key입니다. 무료 플랜에서도 항상 보장되는 공개 URL은 `https://readmates.pages.dev/clubs/:slug`이고, 같은 path 전략은 primary domain을 붙였을 때도 유지됩니다. `club_domains.hostname`은 외부 진입 alias입니다. 등록된 alias는 Cloudflare Pages custom domain에 연결된 뒤 `ACTIVE` 상태일 때 host 기반으로 같은 클럽을 resolve합니다. Primary domain path fallback은 slug로 resolve하며 별도 `club_domains` row를 만들지 않습니다.
+`clubs.slug`는 클럽의 내부 canonical key입니다. Primary app origin의 공개 경로는 `/clubs/:slug`이고, 같은 path 전략은 primary domain을 붙였을 때도 유지됩니다. `club_domains.hostname`은 외부 진입 alias입니다. 등록된 alias는 Cloudflare Pages custom domain에 연결된 뒤 `ACTIVE` 상태일 때 host 기반으로 같은 클럽을 resolve합니다. Primary domain path fallback은 slug로 resolve하며 별도 `club_domains` row를 만들지 않습니다.
 
 Platform admin의 domain 상태 확인은 `https://<hostname>/.well-known/readmates-domain-check.json` marker를 HTTPS로 가져와 `ACTIVE` 또는 `FAILED`로 저장합니다. Checker는 redirect를 따르지 않고, loopback/private/link-local/multicast/IPv6 ULA address와 4KB를 넘는 marker 응답을 실패로 처리합니다. 1차 구현은 Cloudflare account id, zone id, API token을 저장하지 않으며 Cloudflare API poller 대신 admin-triggered marker check를 사용합니다.
 
@@ -333,6 +333,14 @@ ReadMates는 클럽별로 하나의 현재 `OPEN` 세션과 여러 개의 예정
 이 contract를 따르는 목록은 archive의 `/api/archive/sessions`, `/api/archive/me/questions`, `/api/archive/me/reviews`, notes의 `/api/notes/sessions`, `/api/notes/feed`, feedback의 `/api/feedback-documents/me`, host의 `/api/host/sessions`, `/api/host/members`, `/api/host/members/viewers`, `/api/host/members/pending-approvals`, `/api/host/invitations`, notification의 `/api/me/notifications`, `/api/host/notifications/items`, `/api/host/notifications/events`, `/api/host/notifications/deliveries`, `/api/host/notifications/manual/dispatches`, `/api/host/notifications/test-mail/audit`, platform admin의 `/api/admin/notifications/events`, `/api/admin/notifications/deliveries`, `/api/admin/audit/events`입니다. `GET /api/host/notifications/manual/options`도 멤버 선택 목록을 같은 cursor page shape로 반환합니다. 예를 들어 `GET /api/host/members/pending-approvals?limit=2`는 pending viewer approval 목록의 첫 page를 반환하고, 다음 page는 응답의 `nextCursor`를 `cursor` query로 넘겨 요청합니다.
 
 위 scoped endpoint에는 legacy array response contract가 없습니다. 프런트엔드 loader와 route action은 `items`를 누적하고 `nextCursor`로 명시적인 더보기 control을 보여줘야 하며, 새 scoped 목록 API도 같은 공통 page field를 사용합니다.
+
+## 나의 서재와 개인 독서 여정
+
+`GET /api/archive/me/journey?limit=12&cursor=<cursor>`는 현재 멤버의 archive read projection입니다. 응답은 날짜·회차·ID 내림차순의 cursor `items`와, page 크기와 무관하게 같은 club의 전체 열람 가능 기록에서 계산한 `summary`를 함께 반환합니다. Item에는 책·회차 metadata, 본인의 독서 진도와 질문·장문 서평 수, 피드백 문서의 가용성·열람 가능 상태만 들어가며 피드백 본문이나 다른 멤버 정보는 포함하지 않습니다. `CLOSED`·`PUBLISHED` 중 `MEMBER`·`PUBLIC` 기록만 대상으로 하므로 `HOST_ONLY`와 다른 club row는 제외됩니다.
+
+Archive JDBC adapter는 요청마다 page query와 전체 summary query를 정확히 하나씩, 합계 두 statement로 실행하며 page 크기나 item 수에 따라 query 수가 늘지 않습니다. 이 projection은 기존 테이블만 읽으므로 Flyway migration이나 새 영속 상태를 추가하지 않습니다.
+
+`/app/me` loader는 profile과 journey를 필수 데이터로 병렬 로드하고 notification preferences만 선택 데이터로 격리합니다. 따라서 알림 설정을 불러오지 못해도 기록 화면은 유지됩니다. 화면은 desktop과 mobile이 공유하는 하나의 responsive, record-first DOM tree이고, 계정·알림·로그아웃·탈퇴 control과 email은 같은 route의 기본 닫힘 disclosure 안에서 기록 목록 뒤에 제공합니다.
 
 ## 멤버 프로필과 표시 이름
 

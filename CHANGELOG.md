@@ -10,10 +10,12 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 - **호스트 알림 발송 UI:** 자동 리마인더를 상태 문구가 있는 ON/OFF switch로 정리하고, 수동 발송의 알림 종류·대상·채널을 설명형 선택 카드와 최종 요약으로 개편했습니다. 기존 미리보기 후 명시적 발송, 중복 재발송 확인, 기본 OFF 정책은 유지합니다.
+- **나의 서재 중심의 내 공간:** 내 공간을 정확한 개인 독서 통계와 회차별 기록을 우선하는 `나의 서재`로 개편하고, 계정·알림 설정은 같은 화면의 보조 영역으로 정리했습니다.
 
 ### Changed
 
 - **멤버 알림함:** 큰 문서 패널과 중첩 카드를 간결한 편집형 목록으로 바꾸고, 영어 액션·회고 배지를 제거했습니다. 행 전체 이동, 읽지 않음 상태, 오류·빈 상태, 더 보기 흐름을 데스크톱과 모바일에서 같은 한국어 인터페이스로 제공합니다.
+- **개인 독서 여정 API:** 현재 멤버의 열람 가능한 전체 기록 summary와 cursor page를 함께 반환하는 additive `GET /api/archive/me/journey` projection을 추가했습니다. Page 크기와 무관한 두 개의 고정 query로 계산하며 DB migration이나 BFF 계약 변경은 없습니다.
 
 ## v2.0.1 - 2026-07-25
 
@@ -1062,7 +1064,7 @@ GET /api/bff/api/public/club                  (anonymous)              -> 200
 GET /api/bff/api/sessions/upcoming            (anonymous)              -> 401
 ```
 
-- **Production manual repro**: `https://readmates.pages.dev/clubs/reading-sai/app/session/current` 접근 → 멤버 로그인 → reading progress 조정 + 저장 → 빈 화면 미재발 확인.
+- **Production manual repro**: `/clubs/{club-slug}/app/session/current` 접근 → 멤버 로그인 → reading progress 조정 + 저장 → 빈 화면 미재발 확인.
 
 ### Verification
 
