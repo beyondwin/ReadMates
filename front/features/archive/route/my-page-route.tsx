@@ -26,7 +26,16 @@ function appendUniqueJourneyItems(
   incoming: MyJourneyItem[],
 ): MyJourneyItem[] {
   const seen = new Set(current.map((item) => item.sessionId));
-  return [...current, ...incoming.filter((item) => !seen.has(item.sessionId))];
+  const uniqueIncoming = incoming.filter((item) => {
+    if (seen.has(item.sessionId)) {
+      return false;
+    }
+
+    seen.add(item.sessionId);
+    return true;
+  });
+
+  return [...current, ...uniqueIncoming];
 }
 
 async function submitLeaveMembership() {

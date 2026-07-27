@@ -29,6 +29,8 @@ export function MyDesktop({
   onSaveNotificationPreferences,
   canManageNotificationPreferences,
   onLoadMoreReports,
+  settingsOpen,
+  onSettingsOpenChange,
 }: {
   data: MyPageProfile;
   reports: PagedResponse<FeedbackDocumentListItem>;
@@ -44,6 +46,8 @@ export function MyDesktop({
   onSaveNotificationPreferences: (preferences: NotificationPreferences) => Promise<NotificationPreferences>;
   canManageNotificationPreferences: boolean;
   onLoadMoreReports?: () => Promise<void>;
+  settingsOpen: boolean;
+  onSettingsOpenChange?: (open: boolean) => void;
 }) {
   return (
     <>
@@ -75,7 +79,17 @@ export function MyDesktop({
             {canManageNotificationPreferences ? (
               <NotificationsSection preferences={notificationPreferences} onSave={onSaveNotificationPreferences} />
             ) : null}
-            <PreferencesSection data={data} canEditProfile={canEditProfile} onUpdateProfile={onUpdateProfile} />
+            <section>
+              <button
+                type="button"
+                className="btn btn-quiet btn-sm"
+                aria-expanded={settingsOpen}
+                onClick={() => onSettingsOpenChange?.(!settingsOpen)}
+              >
+                {settingsOpen ? "개인 설정 닫기" : "개인 설정 열기"}
+              </button>
+              {settingsOpen ? <PreferencesSection data={data} canEditProfile={canEditProfile} onUpdateProfile={onUpdateProfile} /> : null}
+            </section>
             <DangerZone onLeaveMembership={onLeaveMembership} />
           </div>
         </div>

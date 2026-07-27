@@ -95,7 +95,8 @@ export default function MyPage({
   journeyPaginationError = false,
   notificationPreferencesError = false,
   onRetryNotificationPreferences,
-  settingsOpen = false,
+  settingsOpen = true,
+  onSettingsOpenChange,
 }: MyPageProps) {
   const [profileOverrideState, setProfileOverrideState] = useState<{
     sourceData: MyPageProfile;
@@ -158,6 +159,8 @@ export default function MyPage({
           onSaveNotificationPreferences={onSaveNotificationPreferences}
           canManageNotificationPreferences={notificationPreferencesEnabled}
           onLoadMoreReports={journey ? undefined : onLoadMoreReports}
+          settingsOpen={settingsOpen}
+          onSettingsOpenChange={onSettingsOpenChange}
         />
       </div>
       <div className="mobile-only">

@@ -13,6 +13,7 @@ import type {
   NotificationPreferencesResponse,
 } from "@/features/archive/api/archive-contracts";
 import { myPageLoader } from "@/features/archive/route/my-page-data";
+import { MyPageRoute } from "@/features/archive/route/my-page-route";
 import MyPage from "@/features/archive/ui/my-page";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { AuthActionsContext, AuthContext } from "@/src/app/auth-state";
@@ -761,6 +762,18 @@ describe("MyPage", () => {
               reviewCount: 0,
               feedbackDocument: { available: true, readable: true, lockedReason: null },
             },
+            {
+              sessionId: "session-2",
+              sessionNumber: 2,
+              bookTitle: "중복된 두 번째 회차",
+              bookAuthor: "윌리엄 맥어스킬",
+              bookImageUrl: null,
+              date: "2025-12-17",
+              readingProgress: 80,
+              questionCount: 1,
+              reviewCount: 0,
+              feedbackDocument: { available: true, readable: true, lockedReason: null },
+            },
           ],
         }),
       );
@@ -769,6 +782,55 @@ describe("MyPage", () => {
     const desktop = desktopScope(container);
     await waitFor(() => expect(desktop.getByText("냉정한 이타주의자")).toBeInTheDocument());
     expect(desktop.getAllByText("팩트풀니스")).toHaveLength(1);
+    expect(desktop.queryByText("중복된 두 번째 회차")).not.toBeInTheDocument();
+  });
+
+  it("keeps the controlled settings disclosure open after profile revalidation replaces loader data", async () => {
+    installRouterRequestShim();
+    const user = userEvent.setup();
+    let profileRequests = 0;
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") return Promise.resolve(jsonResponse(activeAuth));
+      if (url === "/api/bff/api/app/me") return Promise.resolve(jsonResponse({ ...data, displayName: profileRequests > 0 ? "새이름" : data.displayName }));
+      if (url === "/api/bff/api/archive/me/journey?limit=12") return Promise.resolve(jsonResponse(journeyPage()));
+      if (url === "/api/bff/api/me/notifications/preferences") return Promise.resolve(jsonResponse(notificationPreferences));
+      if (url === "/api/bff/api/me/profile") {
+        profileRequests += 1;
+        return Promise.resolve(jsonResponse(memberProfileResponse("새이름")));
+      }
+      return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/app/me",
+          element: <MyPageRoute LogoutButtonComponent={TestLogoutButton} canEditProfile onProfileUpdated={vi.fn().mockResolvedValue(undefined)} />,
+          loader: myPageLoader,
+          hydrateFallbackElement: <div>내 공간을 불러오는 중</div>,
+        },
+      ],
+      { initialEntries: ["/app/me"] },
+    );
+    const { container } = render(<RouterProvider router={router} />);
+
+    const desktop = desktopScope(container);
+    const settingsToggle = await desktop.findByRole("button", { name: "개인 설정 열기" });
+    await user.click(settingsToggle);
+    expect(desktop.getByRole("button", { name: "개인 설정 닫기" })).toHaveAttribute("aria-expanded", "true");
+
+    const settings = within(desktop.getByRole("heading", { level: 2, name: "개인 설정" }).closest("section") as HTMLElement);
+    await user.click(settings.getByRole("button", { name: "이름 변경" }));
+    await user.clear(settings.getByLabelText("이름"));
+    await user.type(settings.getByLabelText("이름"), "새이름");
+    await user.click(settings.getByRole("button", { name: "이름 저장" }));
+
+    await waitFor(() => expect(profileRequests).toBe(1));
+    await waitFor(() => expect(desktop.getByRole("button", { name: "개인 설정 닫기" })).toHaveAttribute("aria-expanded", "true"));
+    expect(desktop.getByRole("heading", { level: 2, name: "개인 설정" })).toBeInTheDocument();
   });
 
   it("preserves journey rows after a failed continuation and retries the same cursor once", async () => {
