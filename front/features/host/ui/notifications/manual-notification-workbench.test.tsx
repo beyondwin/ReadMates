@@ -229,4 +229,19 @@ describe("ManualNotificationWorkbench", () => {
     const dialog = screen.getByRole("dialog", { name: "발송 전 확인" });
     expect(within(dialog).getByRole("button", { name: "닫기" })).toBeDisabled();
   });
+
+  it("shows confirm errors inside the open side sheet and can refresh", async () => {
+    const user = userEvent.setup();
+    const onPreview = vi.fn().mockResolvedValue(undefined);
+    renderWorkbench({
+      preview: previewFixture,
+      error: "발송을 요청하지 못했습니다. 미리보기를 다시 확인해 주세요.",
+      onPreview,
+    });
+
+    const dialog = screen.getByRole("dialog", { name: "발송 전 확인" });
+    expect(within(dialog).getByRole("alert")).toBeVisible();
+    await user.click(within(dialog).getByRole("button", { name: "미리보기 다시 만들기" }));
+    expect(onPreview).toHaveBeenCalledTimes(1);
+  });
 });

@@ -344,6 +344,8 @@ function ManualNotificationWorkbenchState({
               preview={preview}
               busy={busy}
               presentation="side-sheet"
+              error={error ?? memberError}
+              onRefreshPreview={() => onPreview(buildOperationsSelection())}
               onConfirm={handleConfirm}
             />
           </>

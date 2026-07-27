@@ -200,6 +200,93 @@
   font-size: 0.875rem;
 }
 
+.rm-notification-preview {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 16px;
+}
+
+.rm-notification-preview__counts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0 0;
+}
+
+.rm-notification-preview__counts > div,
+.rm-notification-preview__message,
+.rm-notification-preview__warning,
+.rm-notification-preview__error {
+  padding: 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-2);
+  background: var(--bg-sub);
+}
+
+.rm-notification-preview__counts dt,
+.rm-notification-preview__message > span {
+  color: var(--text-3);
+  font-size: 0.75rem;
+}
+
+.rm-notification-preview__counts dd,
+.rm-notification-preview__message strong,
+.rm-notification-preview__message p,
+.rm-notification-preview__warning,
+.rm-notification-preview__error p,
+.rm-notification-preview__resend p {
+  margin: 0;
+}
+
+.rm-notification-preview__counts dd {
+  margin-top: 4px;
+  font-weight: 700;
+}
+
+.rm-notification-preview__message,
+.rm-notification-preview__warning,
+.rm-notification-preview__error {
+  margin-top: 12px;
+}
+
+.rm-notification-preview__message {
+  display: grid;
+  gap: 6px;
+}
+
+.rm-notification-preview__message p,
+.rm-notification-preview__warning {
+  color: var(--text-2);
+}
+
+.rm-notification-preview__error {
+  border-color: color-mix(in oklch, var(--danger) 35%, var(--line));
+}
+
+.rm-notification-preview__error .btn {
+  margin-top: 10px;
+}
+
+.rm-notification-preview__resend {
+  margin-top: 14px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+.rm-notification-preview__resend p {
+  font-weight: 700;
+}
+
+.rm-notification-preview__resend label {
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.rm-notification-preview__confirm {
+  min-height: 44px;
+  width: 100%;
+  margin-top: 14px;
+}
+
 .rm-notification-recipient-picker {
   display: grid;
   gap: 12px;
@@ -301,6 +388,10 @@
   .rm-notification-workbench .btn-primary {
     min-height: 44px;
     width: 100%;
+  }
+
+  .rm-notification-preview__counts {
+    grid-template-columns: 1fr;
   }
 }
 
