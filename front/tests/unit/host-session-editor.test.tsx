@@ -1867,6 +1867,71 @@ describe("HostSessionEditor", () => {
   });
 
   describe("record source navigation", () => {
+    it("exposes source tab relationships only while their lazy panels are mounted", async () => {
+      const user = userEvent.setup();
+      render(
+        <HostSessionEditorForTest
+          session={session}
+          clubSlug="club-a"
+          initialLocation={{ section: "records", source: "manual" }}
+          recordWorkflow={recordWorkflow("MEMBER")}
+        />,
+      );
+
+      const sourceTabs = screen.getByRole("tablist", { name: "기록 작성 방식" });
+      const manualTab = within(sourceTabs).getByRole("tab", { name: "직접 작성" });
+      const aiTab = within(sourceTabs).getByRole("tab", { name: "AI 초안" });
+      const jsonTab = within(sourceTabs).getByRole("tab", { name: "외부 JSON" });
+
+      expect(manualTab).toHaveAttribute("aria-controls", "host-editor-record-source-panel-manual");
+      expect(document.getElementById("host-editor-record-source-panel-manual")).not.toBeNull();
+      expect(aiTab).not.toHaveAttribute("aria-controls");
+      expect(document.getElementById("host-editor-record-source-panel-ai")).toBeNull();
+      expect(jsonTab).not.toHaveAttribute("aria-controls");
+      expect(document.getElementById("host-editor-record-source-panel-json")).toBeNull();
+
+      await user.click(aiTab);
+      expect(aiTab).toHaveAttribute("aria-controls", "host-editor-record-source-panel-ai");
+      expect(document.getElementById("host-editor-record-source-panel-ai")).not.toBeNull();
+      expect(jsonTab).not.toHaveAttribute("aria-controls");
+
+      await user.click(jsonTab);
+      expect(jsonTab).toHaveAttribute("aria-controls", "host-editor-record-source-panel-json");
+      expect(document.getElementById("host-editor-record-source-panel-json")).not.toBeNull();
+      expect(manualTab).toHaveAttribute("aria-controls", "host-editor-record-source-panel-manual");
+      expect(aiTab).toHaveAttribute("aria-controls", "host-editor-record-source-panel-ai");
+    });
+
+    it("keeps an enabled roving focus target when controlled AI selection is disabled", async () => {
+      const user = userEvent.setup();
+      render(
+        <HostSessionEditorForTest
+          session={session}
+          initialLocation={{ section: "records", source: "ai" }}
+          recordWorkflow={recordWorkflow("MEMBER")}
+        />,
+      );
+
+      const sourceTabs = screen.getByRole("tablist", { name: "기록 작성 방식" });
+      const manualTab = within(sourceTabs).getByRole("tab", { name: "직접 작성" });
+      const aiTab = within(sourceTabs).getByRole("tab", { name: "AI 초안" });
+      const jsonTab = within(sourceTabs).getByRole("tab", { name: "외부 JSON" });
+
+      expect(aiTab).toBeDisabled();
+      expect(aiTab).toHaveAttribute("aria-selected", "true");
+      expect(aiTab).toHaveAttribute("tabindex", "-1");
+      expect(manualTab).toBeEnabled();
+      expect(manualTab).toHaveAttribute("tabindex", "0");
+      expect(jsonTab).toHaveAttribute("tabindex", "-1");
+
+      manualTab.focus();
+      await user.keyboard("{ArrowRight}");
+
+      expect(jsonTab).toHaveFocus();
+      expect(jsonTab).toHaveAttribute("aria-selected", "true");
+      expect(jsonTab).toHaveAttribute("tabindex", "0");
+    });
+
     it("links each record source tab to a source-labelled panel with roving tab stops", () => {
       render(
         <HostSessionEditorForTest

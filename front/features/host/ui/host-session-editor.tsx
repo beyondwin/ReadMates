@@ -422,6 +422,9 @@ export default function HostSessionEditor({
   const canShowImportModeToggle = Boolean(sessionIdForAigen) && Boolean(clubSlug);
   const activeSection = navigation.location.section;
   const activeSource = navigation.location.source;
+  const recordSourceFocusTarget = activeSource === "ai" && !canShowImportModeToggle
+    ? "manual"
+    : activeSource;
 
   if (!visitedSections.has(activeSection)) {
     setVisitedSections((current) => new Set(current).add(activeSection));
@@ -1218,8 +1221,12 @@ export default function HostSessionEditor({
                             type="button"
                             role="tab"
                             aria-selected={activeSource === source}
-                            aria-controls={recordSourcePanelId(source)}
-                            tabIndex={activeSource === source ? 0 : -1}
+                            aria-controls={
+                              visitedSources.has(source) || activeSource === source
+                                ? recordSourcePanelId(source)
+                                : undefined
+                            }
+                            tabIndex={recordSourceFocusTarget === source ? 0 : -1}
                             className={`btn btn-sm${activeSource === source ? " btn-primary" : " btn-quiet"}`}
                             disabled={source === "ai" && !canShowImportModeToggle}
                             onClick={() => changeSource(source)}
