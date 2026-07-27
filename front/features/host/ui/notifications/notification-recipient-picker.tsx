@@ -1,5 +1,4 @@
 import {
-  type CSSProperties,
   type FormEvent,
   useState,
 } from "react";
@@ -30,7 +29,8 @@ export function NotificationRecipientPicker({
   );
 
   const selectedMembers = selectedMembershipIds.flatMap((membershipId) => {
-    const member = knownMembers.get(membershipId);
+    const member = members.find((item) => item.membershipId === membershipId)
+      ?? knownMembers.get(membershipId);
     return member ? [member] : [];
   });
 
@@ -41,7 +41,7 @@ export function NotificationRecipientPicker({
 
   const toggle = (membershipId: string) => {
     const member = members.find((item) => item.membershipId === membershipId);
-    if (member && !knownMembers.has(membershipId)) {
+    if (member) {
       setKnownMembers((current) => new Map(current).set(membershipId, member));
     }
     onSelectedMembershipIdsChange(
@@ -54,26 +54,24 @@ export function NotificationRecipientPicker({
   return (
     <section
       aria-labelledby="notification-recipient-picker-title"
-      className="stack"
-      style={{ "--stack": "12px" } as CSSProperties}
+      className="rm-notification-recipient-picker"
     >
-      <div className="row-between" style={{ gap: 12, flexWrap: "wrap" }}>
-        <h3 id="notification-recipient-picker-title" className="label" style={{ margin: 0 }}>
+      <header className="rm-notification-recipient-picker__header">
+        <h3 id="notification-recipient-picker-title" className="label">
           멤버 선택
         </h3>
         <span aria-live="polite" className="small">
           {selectedMembershipIds.length}명 선택됨
         </span>
-      </div>
+      </header>
 
       {selectedMembers.length > 0 ? (
         <section
           role="region"
           aria-label="선택한 멤버"
-          className="surface-subtle stack"
-          style={{ "--stack": "8px", padding: 12 } as CSSProperties}
+          className="rm-notification-recipient-picker__selected"
         >
-          <div className="row-between" style={{ gap: 8, flexWrap: "wrap" }}>
+          <div className="rm-notification-recipient-picker__selected-header">
             <strong className="small">선택한 멤버 {selectedMembershipIds.length}명</strong>
             <button
               type="button"
@@ -84,33 +82,29 @@ export function NotificationRecipientPicker({
               전체 해제
             </button>
           </div>
-          {selectedMembers.map((member) => (
-            <div
-              key={member.membershipId}
-              className="row-between"
-              style={{ gap: 8, flexWrap: "wrap", overflowWrap: "anywhere" }}
-            >
-              <span>
-                <strong>{member.displayName}</strong>
-                <span className="tiny muted" style={{ display: "block" }}>
-                  {member.maskedEmail}
-                </span>
-              </span>
+          <div className="rm-notification-recipient-picker__chips">
+            {selectedMembers.map((member) => (
               <button
+              key={member.membershipId}
                 type="button"
-                className="btn btn-quiet btn-sm"
+                className="rm-notification-recipient-picker__chip"
                 aria-label={`${member.displayName} 선택 해제`}
                 disabled={busy}
                 onClick={() => toggle(member.membershipId)}
               >
-                선택 해제
+                <span>{member.displayName}</span>
+                <span aria-hidden="true">×</span>
               </button>
-            </div>
-          ))}
+            ))}
+          </div>
         </section>
       ) : null}
 
-      <form role="search" className="row wrap" style={{ gap: 8 }} onSubmit={handleSearch}>
+      <form
+        role="search"
+        className="rm-notification-recipient-picker__search"
+        onSubmit={handleSearch}
+      >
         <input
           type="search"
           className="input"
@@ -119,7 +113,6 @@ export function NotificationRecipientPicker({
           value={search}
           disabled={busy}
           onChange={(event) => setSearch(event.currentTarget.value)}
-          style={{ minWidth: 200, flex: "1 1 200px" }}
         />
         <button type="submit" className="btn btn-quiet btn-sm" disabled={busy}>
           검색
@@ -127,23 +120,17 @@ export function NotificationRecipientPicker({
       </form>
 
       {members.length === 0 ? (
-        <p className="small muted" style={{ margin: 0 }}>
+        <p className="small muted rm-notification-recipient-picker__empty">
           표시할 멤버가 없습니다.
         </p>
       ) : (
-        <div className="stack" style={{ "--stack": "8px" } as CSSProperties}>
+        <div className="rm-notification-recipient-picker__results">
           {members.map((member) => {
             const checked = selectedMembershipIds.includes(member.membershipId);
             return (
               <label
                 key={member.membershipId}
-                className="surface-subtle row"
-                style={{
-                  padding: 12,
-                  gap: 10,
-                  alignItems: "flex-start",
-                  overflowWrap: "anywhere",
-                }}
+                className="rm-notification-recipient-picker__row"
               >
                 <input
                   type="checkbox"
@@ -153,7 +140,7 @@ export function NotificationRecipientPicker({
                 />
                 <span>
                   <strong>{member.displayName}</strong>
-                  <span className="tiny muted" style={{ display: "block" }}>
+                  <span className="tiny muted">
                     {member.maskedEmail}
                   </span>
                 </span>

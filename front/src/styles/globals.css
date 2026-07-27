@@ -186,6 +186,93 @@
   color: var(--danger) !important;
 }
 
+.rm-notification-choice-card .badge {
+  justify-self: start;
+}
+
+.rm-notification-workbench__summary {
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 18px;
+  color: var(--text-3);
+  font-size: 0.875rem;
+}
+
+.rm-notification-recipient-picker {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-2);
+  background: var(--bg-sub);
+}
+
+.rm-notification-recipient-picker__header,
+.rm-notification-recipient-picker__selected-header,
+.rm-notification-recipient-picker__search {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.rm-notification-recipient-picker__header h3,
+.rm-notification-recipient-picker__empty {
+  margin: 0;
+}
+
+.rm-notification-recipient-picker__selected {
+  display: grid;
+  gap: 8px;
+}
+
+.rm-notification-recipient-picker__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rm-notification-recipient-picker__chip {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.rm-notification-recipient-picker__search .input {
+  min-width: 200px;
+  flex: 1 1 200px;
+}
+
+.rm-notification-recipient-picker__results {
+  display: grid;
+  gap: 8px;
+}
+
+.rm-notification-recipient-picker__row {
+  min-height: 52px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-2);
+  background: var(--bg);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.rm-notification-recipient-picker__row .tiny {
+  display: block;
+}
+
 @media (max-width: 760px) {
   .rm-notification-workbench {
     padding: 20px 16px;
@@ -203,6 +290,11 @@
 
   .rm-notification-choice-grid {
     grid-template-columns: 1fr;
+  }
+
+  .rm-notification-workbench__summary {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .rm-notification-workbench .btn-primary {

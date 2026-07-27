@@ -5,7 +5,10 @@ import type {
   ManualNotificationOptionsResponse,
   ManualNotificationPreviewResponse,
 } from "@/features/host/model/host-view-types";
-import type { HostNotificationComposerDraft } from "@/features/host/model/host-notification-composer-model";
+import type {
+  HostNotificationComposerDraft,
+  HostNotificationRecipientMode,
+} from "@/features/host/model/host-notification-composer-model";
 import { HostNotificationComposer } from "./host-notification-composer";
 
 const contentRevision = "a".repeat(64);
@@ -91,12 +94,14 @@ function renderComposer({
   onDraftChange = vi.fn(),
   onConfirm = vi.fn(),
   presentation,
+  recipientModes,
 }: {
   currentDraft?: HostNotificationComposerDraft;
   preview?: ManualNotificationPreviewResponse | null;
   onDraftChange?: (next: HostNotificationComposerDraft) => void;
   onConfirm?: (resendConfirmed: boolean) => void;
   presentation?: "dialog" | "workbench";
+  recipientModes?: readonly HostNotificationRecipientMode[];
 } = {}) {
   render(
     <HostNotificationComposer
@@ -114,6 +119,7 @@ function renderComposer({
       onSkip={vi.fn()}
       showSkip
       presentation={presentation}
+      recipientModes={recipientModes}
     />,
   );
   return { onDraftChange, onConfirm };
@@ -232,5 +238,47 @@ describe("HostNotificationComposer", () => {
     });
 
     expect(screen.getByText("직접 선택 · 1명")).toBeInTheDocument();
+  });
+
+  it("renders workbench recipients as concrete descriptive choices", () => {
+    renderComposer({
+      currentDraft: {
+        ...draft,
+        recipientMode: "CONFIRMED_ATTENDEES",
+      },
+      presentation: "workbench",
+      recipientModes: [
+        "ALL_ACTIVE_MEMBERS",
+        "CONFIRMED_ATTENDEES",
+        "SELECTED_MEMBERS",
+      ],
+    });
+
+    const confirmed = screen.getByRole("radio", { name: "참석 확정자" });
+    expect(confirmed).toBeChecked();
+    expect(screen.getByText("이 회차 참석을 확정한 멤버")).toBeInTheDocument();
+    expect(screen.getByText("추천")).toBeInTheDocument();
+  });
+
+  it("renders workbench channels as descriptive choices and a safe summary", () => {
+    renderComposer({ presentation: "workbench" });
+
+    expect(screen.getByRole("radio", { name: "앱 + 이메일" })).toBeChecked();
+    expect(screen.getByText("가능한 두 채널 모두 사용")).toBeInTheDocument();
+    expect(screen.getByText("아직 발송되지 않음")).toBeInTheDocument();
+  });
+
+  it("explains why direct selection cannot preview with zero members", () => {
+    renderComposer({
+      currentDraft: {
+        ...draft,
+        recipientMode: "SELECTED_MEMBERS",
+        selectedMembershipIds: [],
+      },
+      presentation: "workbench",
+    });
+
+    expect(screen.getByText("한 명 이상 선택해 주세요.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "알림 미리보기" })).toBeDisabled();
   });
 });

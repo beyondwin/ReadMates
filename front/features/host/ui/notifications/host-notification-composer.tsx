@@ -12,7 +12,12 @@ import type {
   ManualNotificationRequestedChannels,
 } from "@/features/host/model/host-view-types";
 import { ManualNotificationPreviewConfirmation } from "./manual-notification-preview";
-import { manualAudienceLabels } from "./manual-notification-labels";
+import {
+  manualAudienceDescriptions,
+  manualAudienceLabels,
+  manualChannelDescriptions,
+  manualChannelLabels,
+} from "./manual-notification-labels";
 import { NotificationRecipientPicker } from "./notification-recipient-picker";
 
 export type HostNotificationComposerProps = {
@@ -75,6 +80,18 @@ export function HostNotificationComposer({
   const isWorkbench = presentation === "workbench";
   const template = options.templates.find((item) => item.eventType === eventType);
   const visibleRecipientModes = [...new Set(recipientModes)];
+  const recipientLabel = (mode: HostNotificationRecipientMode) => mode === "RECOMMENDED"
+    ? recommendedRecipientLabel
+    : manualAudienceLabels[mode];
+  const recipientDescription = (mode: HostNotificationRecipientMode) => mode === "RECOMMENDED"
+    ? `현재 알림에 맞는 추천 대상 · ${recommendedRecipientLabel}`
+    : manualAudienceDescriptions[mode];
+  const selectedRecipientLabel = draft.recipientMode === "SELECTED_MEMBERS"
+    ? `직접 선택 ${draft.selectedMembershipIds.length}명`
+    : recipientLabel(draft.recipientMode);
+  const selectedChannelLabel = manualChannelLabels[draft.requestedChannels];
+  const directSelectionEmpty = draft.recipientMode === "SELECTED_MEMBERS"
+    && draft.selectedMembershipIds.length === 0;
   const updateDraft = (patch: Partial<HostNotificationComposerDraft>) => {
     onDraftChange({ ...draft, ...patch });
   };
@@ -127,34 +144,62 @@ export function HostNotificationComposer({
             <span className="tiny muted">직접 선택 · {draft.selectedMembershipIds.length}명</span>
           ) : null}
         </legend>
-        <div
-          className="stack"
-          style={{ "--stack": "10px", marginTop: 10 } as CSSProperties}
-        >
-          {visibleRecipientModes.map((mode) => {
-            const label = mode === "RECOMMENDED"
-              ? "추천 대상"
-              : manualAudienceLabels[mode];
-            const ariaLabel = mode === "RECOMMENDED"
-              ? `${label} · ${recommendedRecipientLabel}`
-              : label;
-            return (
-              <label key={mode}>
-                <input
-                  type="radio"
-                  name="notification-recipient-mode"
-                  aria-label={ariaLabel}
-                  checked={draft.recipientMode === mode}
-                  onChange={() => updateDraft({ recipientMode: mode })}
-                />{" "}
-                {label}
-                {mode === "RECOMMENDED" ? (
-                  <> <span className="tiny muted">{recommendedRecipientLabel}</span></>
-                ) : null}
-              </label>
-            );
-          })}
-        </div>
+        {isWorkbench ? (
+          <div className="rm-notification-choice-grid">
+            {visibleRecipientModes.map((mode) => {
+              const recommended = mode !== "RECOMMENDED"
+                && mode === template?.defaultAudience;
+              return (
+                <label
+                  key={mode}
+                  className="rm-notification-choice-card"
+                  data-selected={draft.recipientMode === mode ? "true" : "false"}
+                >
+                  <input
+                    type="radio"
+                    name="notification-recipient-mode"
+                    aria-label={recipientLabel(mode)}
+                    checked={draft.recipientMode === mode}
+                    onChange={() => updateDraft({ recipientMode: mode })}
+                  />
+                  <span className="rm-notification-choice-card__mark" aria-hidden="true">✓</span>
+                  {recommended ? <span className="badge">추천</span> : null}
+                  <strong>{recipientLabel(mode)}</strong>
+                  <span>{recipientDescription(mode)}</span>
+                </label>
+              );
+            })}
+          </div>
+        ) : (
+          <div
+            className="stack"
+            style={{ "--stack": "10px", marginTop: 10 } as CSSProperties}
+          >
+            {visibleRecipientModes.map((mode) => {
+              const label = mode === "RECOMMENDED"
+                ? "추천 대상"
+                : manualAudienceLabels[mode];
+              const ariaLabel = mode === "RECOMMENDED"
+                ? `${label} · ${recommendedRecipientLabel}`
+                : label;
+              return (
+                <label key={mode}>
+                  <input
+                    type="radio"
+                    name="notification-recipient-mode"
+                    aria-label={ariaLabel}
+                    checked={draft.recipientMode === mode}
+                    onChange={() => updateDraft({ recipientMode: mode })}
+                  />{" "}
+                  {label}
+                  {mode === "RECOMMENDED" ? (
+                    <> <span className="tiny muted">{recommendedRecipientLabel}</span></>
+                  ) : null}
+                </label>
+              );
+            })}
+          </div>
+        )}
       </fieldset>
 
       {draft.recipientMode === "SELECTED_MEMBERS" ? (
@@ -172,23 +217,62 @@ export function HostNotificationComposer({
 
       <fieldset disabled={busy} style={{ border: 0, padding: 0, margin: 0 }}>
         <legend className="label">발송 채널</legend>
-        <div className="row wrap" style={{ gap: 12, marginTop: 10 }}>
-          {channelOptions.map(([value, label]) => (
-            <label key={value}>
-              <input
-                type="radio"
-                name="notification-channel"
-                aria-label={label}
-                checked={draft.requestedChannels === value}
-                onChange={() => updateDraft({ requestedChannels: value })}
-              />{" "}
-              {label}
-            </label>
-          ))}
-        </div>
+        {isWorkbench ? (
+          <div className="rm-notification-choice-grid">
+            {channelOptions.map(([value]) => {
+              const defaultChannel = value === template?.defaultChannels;
+              return (
+                <label
+                  key={value}
+                  className="rm-notification-choice-card"
+                  data-selected={draft.requestedChannels === value ? "true" : "false"}
+                >
+                  <input
+                    type="radio"
+                    name="notification-channel"
+                    aria-label={manualChannelLabels[value]}
+                    checked={draft.requestedChannels === value}
+                    onChange={() => updateDraft({ requestedChannels: value })}
+                  />
+                  <span className="rm-notification-choice-card__mark" aria-hidden="true">✓</span>
+                  {defaultChannel ? <span className="badge">기본</span> : null}
+                  <strong>{manualChannelLabels[value]}</strong>
+                  <span>{manualChannelDescriptions[value]}</span>
+                </label>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="row wrap" style={{ gap: 12, marginTop: 10 }}>
+            {channelOptions.map(([value, label]) => (
+              <label key={value}>
+                <input
+                  type="radio"
+                  name="notification-channel"
+                  aria-label={label}
+                  checked={draft.requestedChannels === value}
+                  onChange={() => updateDraft({ requestedChannels: value })}
+                />{" "}
+                {label}
+              </label>
+            ))}
+          </div>
+        )}
       </fieldset>
 
+      {isWorkbench ? (
+        <div className="rm-notification-workbench__summary" aria-live="polite">
+          <span>{selectedRecipientLabel} · {selectedChannelLabel}</span>
+          <span>아직 발송되지 않음</span>
+        </div>
+      ) : null}
+
       <div className="row wrap" style={{ gap: 8 }}>
+        {isWorkbench && directSelectionEmpty ? (
+          <p className="small muted" style={{ margin: 0 }}>
+            한 명 이상 선택해 주세요.
+          </p>
+        ) : null}
         <button
           type="button"
           className="btn btn-primary btn-sm"
