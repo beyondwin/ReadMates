@@ -2,6 +2,7 @@ import {
   type ChangeEvent,
   type CSSProperties,
   type FormEvent,
+  type KeyboardEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -284,8 +285,55 @@ function scopedHostRedirectHref(href: string) {
 
 type ImportMode = SessionRecordCompletionMode;
 
+const recordSources = [
+  { key: "manual", label: "직접 작성" },
+  { key: "ai", label: "AI 초안" },
+  { key: "json", label: "외부 JSON" },
+] as const satisfies readonly { key: HostSessionDraftSource; label: string }[];
+
 function importModeForSource(source: HostSessionDraftSource): ImportMode {
   return source === "ai" ? "aigen" : "json";
+}
+
+function recordSourceTabId(source: HostSessionDraftSource) {
+  return `host-editor-record-source-tab-${source}`;
+}
+
+function recordSourcePanelId(source: HostSessionDraftSource) {
+  return `host-editor-record-source-panel-${source}`;
+}
+
+function handleRecordSourceKeyDown(
+  event: KeyboardEvent<HTMLDivElement>,
+  activeSource: HostSessionDraftSource,
+  canUseAi: boolean,
+  onChange: (source: HostSessionDraftSource) => void,
+) {
+  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+    return;
+  }
+
+  event.preventDefault();
+  const availableSources = recordSources
+    .map(({ key }) => key)
+    .filter((source) => source !== "ai" || canUseAi);
+  const currentIndex = Math.max(availableSources.indexOf(activeSource), 0);
+  const lastIndex = availableSources.length - 1;
+  const nextIndex = event.key === "Home"
+    ? 0
+    : event.key === "End"
+      ? lastIndex
+      : event.key === "ArrowLeft"
+        ? (currentIndex - 1 + availableSources.length) % availableSources.length
+        : (currentIndex + 1) % availableSources.length;
+  const nextSource = availableSources[nextIndex];
+
+  if (!nextSource) {
+    return;
+  }
+
+  onChange(nextSource);
+  document.getElementById(recordSourceTabId(nextSource))?.focus();
 }
 
 export default function HostSessionEditor({
@@ -374,6 +422,13 @@ export default function HostSessionEditor({
   const canShowImportModeToggle = Boolean(sessionIdForAigen) && Boolean(clubSlug);
   const activeSection = navigation.location.section;
   const activeSource = navigation.location.source;
+
+  if (!visitedSections.has(activeSection)) {
+    setVisitedSections((current) => new Set(current).add(activeSection));
+  }
+  if (activeSection === "records" && !visitedSources.has(activeSource)) {
+    setVisitedSources((current) => new Set(current).add(activeSource));
+  }
 
   const changeLocation = useCallback((next: HostSessionEditorLocation) => {
     setVisitedSections((current) => current.has(next.section)
@@ -1047,14 +1102,14 @@ export default function HostSessionEditor({
               </div>
             ) : null}
 
-            <form
-              id="host-session-editor"
-              onSubmit={handleSubmit}
-              className="stack"
-              style={{ "--stack": "24px" } as CSSProperties}
-            >
-              {visitedSections.has("basic") || activeSection === "basic" ? (
-                <>
+            {visitedSections.has("basic") || activeSection === "basic" ? (
+              <form
+                id="host-session-editor"
+                onSubmit={handleSubmit}
+                hidden={activeSection !== "basic"}
+                className="stack"
+                style={{ "--stack": "24px" } as CSSProperties}
+              >
                   <BasicSessionPanel
                     activeSection={activeSection}
                     title={title}
@@ -1127,34 +1182,44 @@ export default function HostSessionEditor({
                       </section>
                     ) : null}
                   </div>
-                </>
-              ) : null}
+              </form>
+            ) : null}
 
-              {visitedSections.has("attendance") || activeSection === "attendance" ? (
-                <AttendancePanel
-                  activeSection={activeSection}
-                  session={session}
-                  attendanceStatuses={attendanceStatuses}
-                  emptyMessage={emptyManagementMessage}
-                  onUpdateAttendance={updateAttendance}
-                />
-              ) : null}
+            {visitedSections.has("attendance") || activeSection === "attendance" ? (
+              <AttendancePanel
+                activeSection={activeSection}
+                session={session}
+                attendanceStatuses={attendanceStatuses}
+                emptyMessage={emptyManagementMessage}
+                onUpdateAttendance={updateAttendance}
+              />
+            ) : null}
 
-              {visitedSections.has("records") || activeSection === "records" ? (
-                <div hidden={activeSection !== "records"} className="stack" style={{ "--stack": "18px" } as CSSProperties}>
-                  {session ? (
-                    <>
-                      <div className="row" role="tablist" aria-label="기록 작성 방식" style={{ gap: 8, flexWrap: "wrap" }}>
-                        {([
-                          ["manual", "직접 작성"],
-                          ["ai", "AI 초안"],
-                          ["json", "외부 JSON"],
-                        ] as const).map(([source, label]) => (
+            {visitedSections.has("records") || activeSection === "records" ? (
+              <div hidden={activeSection !== "records"} className="stack" style={{ "--stack": "18px" } as CSSProperties}>
+                {session ? (
+                  <>
+                    <div
+                      className="row"
+                      role="tablist"
+                      aria-label="기록 작성 방식"
+                      onKeyDown={(event) => handleRecordSourceKeyDown(
+                        event,
+                        activeSource,
+                        canShowImportModeToggle,
+                        changeSource,
+                      )}
+                      style={{ gap: 8, flexWrap: "wrap" }}
+                    >
+                        {recordSources.map(({ key: source, label }) => (
                           <button
                             key={source}
+                            id={recordSourceTabId(source)}
                             type="button"
                             role="tab"
                             aria-selected={activeSource === source}
+                            aria-controls={recordSourcePanelId(source)}
+                            tabIndex={activeSource === source ? 0 : -1}
                             className={`btn btn-sm${activeSource === source ? " btn-primary" : " btn-quiet"}`}
                             disabled={source === "ai" && !canShowImportModeToggle}
                             onClick={() => changeSource(source)}
@@ -1162,13 +1227,15 @@ export default function HostSessionEditor({
                             {label}
                           </button>
                         ))}
-                      </div>
+                    </div>
 
                       {visitedSources.has("manual") || activeSource === "manual" ? (
                         <div hidden={activeSource !== "manual"}>
                           {!recordWorkflow ? (
                             <PublicationPanel
                               activeSection={activeSection}
+                              panelId={recordSourcePanelId("manual")}
+                              labelledBy={recordSourceTabId("manual")}
                               session={session}
                               sessionState={sessionState}
                               recordVisibility={recordVisibility}
@@ -1187,6 +1254,8 @@ export default function HostSessionEditor({
                           ) : (
                             <SessionRecordDraftPanel
                               activeSection={activeSection}
+                              panelId={recordSourcePanelId("manual")}
+                              labelledBy={recordSourceTabId("manual")}
                               liveSnapshot={recordWorkflow.editor.liveSnapshot}
                               snapshot={recordWorkflow.snapshot}
                               saveState={recordWorkflow.saveState}
@@ -1209,7 +1278,8 @@ export default function HostSessionEditor({
                           <div key={source} hidden={activeSource !== source}>
                             <SessionRecordCompletionPanel
                               activeSection={activeSection}
-                              panelId={`host-editor-panel-records-${source}`}
+                              panelId={recordSourcePanelId(source)}
+                              labelledBy={recordSourceTabId(source)}
                               sessionId={session.sessionId}
                               clubSlug={clubSlug}
                               mode={importModeForSource(source)}
@@ -1231,38 +1301,37 @@ export default function HostSessionEditor({
                           </div>
                         ) : null
                       )}
-                    </>
-                  ) : (
-                    <div className="surface-quiet small" style={{ padding: 18 }}>
-                      기본 정보를 저장한 뒤 기록 작업대를 사용할 수 있습니다.
-                    </div>
-                  )}
-                </div>
-              ) : null}
+                  </>
+                ) : (
+                  <div className="surface-quiet small" style={{ padding: 18 }}>
+                    기본 정보를 저장한 뒤 기록 작업대를 사용할 수 있습니다.
+                  </div>
+                )}
+              </div>
+            ) : null}
 
-              {visitedSections.has("history") || activeSection === "history" ? (
-                <SessionHistoryPanel
-                  activeSection={activeSection}
-                  items={recordWorkflow?.history ?? []}
-                  nextCursor={recordWorkflow?.historyNextCursor ?? null}
-                  loadingMore={recordWorkflow?.historyLoadingMore ?? false}
-                  onLoadMore={recordWorkflow?.onLoadMoreHistory}
-                  expectedDraftRevision={recordWorkflow?.expectedDraftRevision ?? null}
-                  restoring={recordWorkflow?.restoring ?? false}
-                  onRestore={recordWorkflow?.onRestore ?? (() => undefined)}
-                />
-              ) : null}
+            {visitedSections.has("history") || activeSection === "history" ? (
+              <SessionHistoryPanel
+                activeSection={activeSection}
+                items={recordWorkflow?.history ?? []}
+                nextCursor={recordWorkflow?.historyNextCursor ?? null}
+                loadingMore={recordWorkflow?.historyLoadingMore ?? false}
+                onLoadMore={recordWorkflow?.onLoadMoreHistory}
+                expectedDraftRevision={recordWorkflow?.expectedDraftRevision ?? null}
+                restoring={recordWorkflow?.restoring ?? false}
+                onRestore={recordWorkflow?.onRestore ?? (() => undefined)}
+              />
+            ) : null}
 
-              {recordWorkflow?.confirmation.message ? (
-                <div
-                  className="surface-quiet small"
-                  role={recordWorkflow.confirmation.message.kind}
-                  style={{ padding: 14 }}
-                >
-                  {recordWorkflow.confirmation.message.text}
-                </div>
-              ) : null}
-            </form>
+            {recordWorkflow?.confirmation.message ? (
+              <div
+                className="surface-quiet small"
+                role={recordWorkflow.confirmation.message.kind}
+                style={{ padding: 14 }}
+              >
+                {recordWorkflow.confirmation.message.text}
+              </div>
+            ) : null}
           </div>
         </div>
       </section>

@@ -15,6 +15,8 @@ type PublicationFeedback = {
 
 export const PublicationPanel = memo(function PublicationPanel({
   activeSection,
+  panelId = "host-editor-panel-publish",
+  labelledBy,
   session,
   sessionState,
   recordVisibility,
@@ -31,6 +33,8 @@ export const PublicationPanel = memo(function PublicationPanel({
   onPublishRecord,
 }: {
   activeSection: HostSessionEditorSection;
+  panelId?: string;
+  labelledBy?: string;
   session?: HostSessionDetailResponse | null;
   sessionState?: HostSessionDetailResponse["state"];
   recordVisibility: SessionRecordVisibility;
@@ -52,7 +56,8 @@ export const PublicationPanel = memo(function PublicationPanel({
       title="기록 공개 범위"
       tone="warn"
       section="records"
-      panelId="host-editor-panel-publish"
+      panelId={panelId}
+      labelledBy={labelledBy}
       activeSection={activeSection}
     >
       <div className="stack" style={{ "--stack": "14px" } as CSSProperties}>

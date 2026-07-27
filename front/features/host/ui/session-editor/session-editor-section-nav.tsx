@@ -30,10 +30,9 @@ const sectionItems: readonly {
     desktopLabel: "기록 작업대",
     mobileLabel: "기록",
     panelIds: [
-      "host-editor-panel-publish",
-      "host-editor-panel-records",
-      "host-editor-panel-records-ai",
-      "host-editor-panel-records-json",
+      "host-editor-record-source-panel-manual",
+      "host-editor-record-source-panel-ai",
+      "host-editor-record-source-panel-json",
     ],
   },
   {

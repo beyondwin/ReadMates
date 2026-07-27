@@ -36,6 +36,7 @@ export type AiGenerateCommitResult = Parameters<
 type SessionRecordCompletionPanelProps = {
   activeSection: HostSessionEditorSection;
   panelId?: string;
+  labelledBy?: string;
   sessionId: string | undefined;
   clubSlug: string | undefined;
   mode: SessionRecordCompletionMode;
@@ -58,6 +59,7 @@ type SessionRecordCompletionPanelProps = {
 export function SessionRecordCompletionPanel({
   activeSection,
   panelId = "host-editor-panel-session-record-completion",
+  labelledBy,
   sessionId,
   clubSlug,
   mode,
@@ -84,6 +86,7 @@ export function SessionRecordCompletionPanel({
       title="세션 기록 완성"
       section="records"
       panelId={panelId}
+      labelledBy={labelledBy}
       activeSection={activeSection}
     >
       <div className="stack" style={{ "--stack": "14px" } as CSSProperties}>

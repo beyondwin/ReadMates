@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HostSessionEditorActions } from "@/features/host/route/host-session-editor-actions";
@@ -465,6 +465,60 @@ describe("HostSessionEditor", () => {
 
     await user.click(screen.getByRole("tab", { name: "기록 작업대" }));
     expect(screen.getByLabelText("기록 요약")).toHaveValue("수정 중인 공개 요약");
+  });
+
+  it("does not submit basic information when Enter is pressed in a record input", async () => {
+    const user = userEvent.setup();
+    const saveSession = vi.fn(async () => ({ ok: true }) as Response);
+    const workflow = recordWorkflow("MEMBER");
+    workflow.snapshot.oneLineReviews = [{
+      membershipId: "membership-reviewer",
+      authorDisplayName: "테스트 멤버",
+      text: "기존 한줄평",
+    }];
+
+    render(
+      <HostSessionEditorForTest
+        session={session}
+        initialLocation={{ section: "basic", source: "manual" }}
+        actions={{ ...hostSessionEditorTestActions, saveSession }}
+        recordWorkflow={workflow}
+      />,
+    );
+
+    await user.click(screen.getByRole("tab", { name: "기록 작업대" }));
+    await user.click(screen.getByLabelText("한줄평 1 · 테스트 멤버"));
+    await user.keyboard("{Enter}");
+
+    expect(saveSession).not.toHaveBeenCalled();
+  });
+
+  it("keeps externally activated record source state mounted after another controlled location arrives", () => {
+    const onChange = vi.fn();
+    const renderAt = (location: HostSessionEditorLocation) => (
+      <HostSessionEditor
+        session={session}
+        clubSlug="club-a"
+        actions={hostSessionEditorTestActions}
+        navigation={{ location, onChange }}
+      />
+    );
+    const { rerender } = render(renderAt({ section: "basic", source: "manual" }));
+
+    rerender(renderAt({ section: "records", source: "json" }));
+    const fileInput = screen.getByLabelText("AI 결과 JSON 가져오기", { selector: "input" });
+    const sourceFile = new File([sessionImportJson()], "controlled-source.json", {
+      type: "application/json",
+    });
+    fireEvent.change(fileInput, { target: { files: [sourceFile] } });
+    expect((fileInput as HTMLInputElement).files?.[0]?.name).toBe("controlled-source.json");
+
+    rerender(renderAt({ section: "history", source: "manual" }));
+
+    const keptAliveInput = screen.getByLabelText("AI 결과 JSON 가져오기", { selector: "input" });
+    expect(keptAliveInput).toBe(fileInput);
+    expect(keptAliveInput).not.toBeVisible();
+    expect((keptAliveInput as HTMLInputElement).files?.[0]?.name).toBe("controlled-source.json");
   });
 
   it("keeps basic save feedback beside the section-local action", async () => {
@@ -1813,6 +1867,64 @@ describe("HostSessionEditor", () => {
   });
 
   describe("record source navigation", () => {
+    it("links each record source tab to a source-labelled panel with roving tab stops", () => {
+      render(
+        <HostSessionEditorForTest
+          session={session}
+          clubSlug="club-a"
+          initialLocation={{ section: "records", source: "manual" }}
+          recordWorkflow={recordWorkflow("MEMBER")}
+        />,
+      );
+
+      const sourceTabs = screen.getByRole("tablist", { name: "기록 작성 방식" });
+      const manualTab = within(sourceTabs).getByRole("tab", { name: "직접 작성" });
+      const aiTab = within(sourceTabs).getByRole("tab", { name: "AI 초안" });
+      const jsonTab = within(sourceTabs).getByRole("tab", { name: "외부 JSON" });
+
+      expect(manualTab).toHaveAttribute("id", "host-editor-record-source-tab-manual");
+      expect(manualTab).toHaveAttribute("aria-controls", "host-editor-record-source-panel-manual");
+      expect(manualTab).toHaveAttribute("tabindex", "0");
+      expect(aiTab).toHaveAttribute("tabindex", "-1");
+      expect(jsonTab).toHaveAttribute("tabindex", "-1");
+      expect(screen.getByRole("tabpanel", { name: "직접 작성" })).toHaveAttribute(
+        "id",
+        "host-editor-record-source-panel-manual",
+      );
+    });
+
+    it("moves record source selection and focus with arrow, Home, and End keys", async () => {
+      const user = userEvent.setup();
+      render(
+        <HostSessionEditorForTest
+          session={session}
+          clubSlug="club-a"
+          initialLocation={{ section: "records", source: "manual" }}
+          recordWorkflow={recordWorkflow("MEMBER")}
+        />,
+      );
+
+      const sourceTabs = screen.getByRole("tablist", { name: "기록 작성 방식" });
+      const manualTab = within(sourceTabs).getByRole("tab", { name: "직접 작성" });
+      const aiTab = within(sourceTabs).getByRole("tab", { name: "AI 초안" });
+      const jsonTab = within(sourceTabs).getByRole("tab", { name: "외부 JSON" });
+
+      manualTab.focus();
+      await user.keyboard("{ArrowRight}");
+      expect(aiTab).toHaveFocus();
+      expect(aiTab).toHaveAttribute("aria-selected", "true");
+      expect(aiTab).toHaveAttribute("tabindex", "0");
+      expect(screen.getByRole("tabpanel", { name: "AI 초안" })).toBeVisible();
+
+      await user.keyboard("{End}");
+      expect(jsonTab).toHaveFocus();
+      expect(jsonTab).toHaveAttribute("aria-selected", "true");
+
+      await user.keyboard("{Home}");
+      expect(manualTab).toHaveFocus();
+      expect(manualTab).toHaveAttribute("aria-selected", "true");
+    });
+
     it("mounts only the selected AI source on first visit", () => {
       render(
         <HostSessionEditorForTest

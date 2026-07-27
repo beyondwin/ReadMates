@@ -58,6 +58,8 @@ function saveStateMessage(state: DraftSaveState) {
 
 export function SessionRecordDraftPanel({
   activeSection,
+  panelId = "host-editor-panel-records",
+  labelledBy,
   liveSnapshot,
   snapshot,
   saveState,
@@ -72,6 +74,8 @@ export function SessionRecordDraftPanel({
   onReviewDraft,
 }: {
   activeSection: HostSessionEditorSection;
+  panelId?: string;
+  labelledBy?: string;
   liveSnapshot: SessionRecordDraftSnapshot;
   snapshot: SessionRecordDraftSnapshot;
   saveState: DraftSaveState;
@@ -104,7 +108,8 @@ export function SessionRecordDraftPanel({
       eyebrow="공개 기록"
       title="공개 기록 초안"
       section="records"
-      panelId="host-editor-panel-records"
+      panelId={panelId}
+      labelledBy={labelledBy}
       activeSection={activeSection}
     >
       <div className="stack" style={{ "--stack": "18px", minWidth: 0 } as CSSProperties}>
