@@ -270,6 +270,43 @@ function recordWorkflow(
   };
 }
 
+function ApplyDialogDismissHarness({
+  onCancel,
+  onConfirm,
+}: {
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const workflow = recordWorkflow("MEMBER");
+  workflow.confirmation = {
+    open,
+    preview: {
+      eventType: "SESSION_RECORD_UPDATED",
+      changedSections: ["공개 요약"],
+      liveRevision: 2,
+      nextLiveRevision: 3,
+      draftRevision: 6,
+      visibility: "MEMBER",
+    },
+    submitting: false,
+    message: null,
+    onReview: vi.fn(),
+    onCancel: () => {
+      onCancel();
+      setOpen(false);
+    },
+    onConfirm,
+  };
+
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)}>반영 대화상자 열기</button>
+      <HostSessionEditorForTest session={session} recordWorkflow={workflow} />
+    </>
+  );
+}
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -418,7 +455,7 @@ describe("HostSessionEditor", () => {
 
     await user.click(history);
     expect(history).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("heading", { name: "revision과 작업 이력" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "변경 기록" })).toBeVisible();
   });
 
   it("supports keyboard selection in the five-section editor tablist", async () => {
@@ -937,7 +974,7 @@ describe("HostSessionEditor", () => {
     expect(screen.getByRole("button", { name: "반영 검토" })).toBeDisabled();
   });
 
-  it("shows a content-only apply review with revision and recovery context", async () => {
+  it("shows the approved version, visibility, and no-notification apply review", async () => {
     const user = userEvent.setup();
     const onConfirm = vi.fn();
     const workflow = recordWorkflow("MEMBER");
@@ -949,6 +986,7 @@ describe("HostSessionEditor", () => {
         liveRevision: 0,
         nextLiveRevision: 1,
         draftRevision: 4,
+        visibility: "MEMBER",
       },
       submitting: false,
       message: null,
@@ -964,49 +1002,46 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    const dialog = screen.getByRole("dialog", { name: "기록 반영 확인" });
+    const dialog = screen.getByRole("dialog", { name: "새 버전으로 반영" });
     expect(within(dialog).getByText("공개 요약")).toBeVisible();
     expect(within(dialog).getByText("피드백 문서")).toBeVisible();
-    expect(within(dialog).getByText(/live revision 0 → 1/)).toBeVisible();
-    expect(within(dialog).getByText(/revision 0은 변경 이력에서 복원/)).toBeVisible();
+    expect(within(dialog).getByText("현재 적용본 없음 → 버전 1")).toBeVisible();
+    expect(within(dialog).getByText("공개 범위")).toBeVisible();
+    expect(within(dialog).getByText("멤버 공개")).toBeVisible();
+    expect(within(dialog).getByText("이 단계에서는 알림을 만들거나 보내지 않습니다")).toBeVisible();
+    expect(dialog).not.toHaveTextContent(/revision|live|draft/i);
     expect(within(dialog).queryByRole("radio", { name: /알림/ })).not.toBeInTheDocument();
 
-    await user.click(within(dialog).getByRole("button", { name: "기록 반영" }));
+    await user.click(within(dialog).getByRole("button", { name: "새 버전으로 반영" }));
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
-  it("cancels content-only apply with Escape without applying", async () => {
-    const user = userEvent.setup();
-    const onCancel = vi.fn();
-    const onConfirm = vi.fn();
-    const workflow = recordWorkflow("MEMBER");
-    workflow.confirmation = {
-      open: true,
-      preview: {
-        eventType: "SESSION_RECORD_UPDATED",
-        changedSections: ["공개 요약"],
-        liveRevision: 2,
-        nextLiveRevision: 3,
-        draftRevision: 6,
-      },
-      submitting: false,
-      message: null,
-      onReview: vi.fn(),
-      onCancel,
-      onConfirm,
-    } as never;
+  it.each(["Escape", "cancel", "backdrop"] as const)(
+    "dismisses the apply dialog with %s without confirming and restores focus",
+    async (dismissal) => {
+      const user = userEvent.setup();
+      const onCancel = vi.fn();
+      const onConfirm = vi.fn();
+      render(<ApplyDialogDismissHarness onCancel={onCancel} onConfirm={onConfirm} />);
+      const trigger = screen.getByRole("button", { name: "반영 대화상자 열기" });
+      await user.click(trigger);
+      const dialog = screen.getByRole("dialog", { name: "새 버전으로 반영" });
+      expect(within(dialog).getByText("버전 2 → 버전 3")).toBeVisible();
 
-    render(
-      <HostSessionEditorForTest
-        session={session}
-        recordWorkflow={workflow}
-      />,
-    );
-    await user.keyboard("{Escape}");
+      if (dismissal === "Escape") {
+        await user.keyboard("{Escape}");
+      } else if (dismissal === "cancel") {
+        await user.click(within(dialog).getByRole("button", { name: "취소" }));
+      } else {
+        fireEvent.mouseDown(dialog.parentElement as HTMLElement);
+      }
 
-    expect(onCancel).toHaveBeenCalledTimes(1);
-    expect(onConfirm).not.toHaveBeenCalled();
-  });
+      expect(onCancel).toHaveBeenCalledTimes(1);
+      expect(onConfirm).not.toHaveBeenCalled();
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      await waitFor(() => expect(trigger).toHaveFocus());
+    },
+  );
 
   it("commits a valid session import preview and refreshes editor state", async () => {
     const user = userEvent.setup();

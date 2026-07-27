@@ -24,6 +24,8 @@ import {
   buildPublicationRequest,
   getDestructiveActionAvailability,
   questionDeadlineLabelForForm,
+  recordVisibilityLabel,
+  type SessionRecordVisibility,
 } from "@/features/host/model/host-session-editor-model";
 import type {
   HostSessionDraftSource,
@@ -80,8 +82,8 @@ import type {
 import { SessionRecordWorkspace } from "./session-editor/session-record-workspace";
 import {
   SessionHistoryPanel,
-  type SessionHistoryPanelItem,
 } from "./session-editor/session-history-panel";
+import type { SessionHistoryPanelItem } from "./session-editor/session-history-model";
 import { SessionEditorSectionNav } from "./session-editor/session-editor-section-nav";
 import { SessionOverviewSection } from "./session-editor/session-overview-section";
 
@@ -93,6 +95,7 @@ export type HostSessionRecordApplyReview = {
   liveRevision: number;
   nextLiveRevision: number;
   draftRevision: number;
+  visibility: SessionRecordVisibility;
 };
 
 type HostSessionRecordWorkflow = {
@@ -226,15 +229,21 @@ function SessionRecordApplyDialog({
         } as CSSProperties}
       >
         <div>
-          <div className="eyebrow">최종 반영</div>
+          <div className="eyebrow">반영 검토</div>
           <h2 id="session-record-apply-title" className="h3" style={{ margin: "6px 0 0" }}>
-            기록 반영 확인
+            새 버전으로 반영
           </h2>
         </div>
         <p id="session-record-apply-description" className="small" style={{ margin: 0 }}>
-          공유 초안을 live 기록에 반영합니다. 이 단계에서는 알림을 만들거나 보내지 않습니다.
+          저장된 작업 초안의 변경 사항을 새 버전으로 반영합니다.
         </p>
         <section className="surface-quiet stack" style={{ "--stack": "10px", padding: 14 } as CSSProperties}>
+          <div className="field-label">버전</div>
+          <div className="small">
+            {preview.liveRevision > 0
+              ? `버전 ${preview.liveRevision} → 버전 ${preview.nextLiveRevision}`
+              : `현재 적용본 없음 → 버전 ${preview.nextLiveRevision}`}
+          </div>
           <div className="field-label">변경 항목</div>
           {preview.changedSections.length > 0 ? (
             <ul className="small" style={{ margin: 0, paddingLeft: 18 }}>
@@ -243,14 +252,14 @@ function SessionRecordApplyDialog({
           ) : (
             <p className="small" style={{ margin: 0 }}>정규화된 초안 내용을 반영합니다.</p>
           )}
-          <div className="tiny">
-            live revision {preview.liveRevision} → {preview.nextLiveRevision}
-            {" · "}draft revision {preview.draftRevision}
-          </div>
-          <div className="tiny">
-            revision {preview.liveRevision}은 변경 이력에서 복원할 수 있습니다.
+          <div className="row-between" style={{ gap: 12, flexWrap: "wrap" }}>
+            <span className="field-label">공개 범위</span>
+            <strong className="small">{recordVisibilityLabel(preview.visibility)}</strong>
           </div>
         </section>
+        <p className="small" style={{ margin: 0 }}>
+          이 단계에서는 알림을 만들거나 보내지 않습니다
+        </p>
         <div className="row" style={{ gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
           <button
             className="btn btn-quiet"
@@ -266,7 +275,7 @@ function SessionRecordApplyDialog({
             disabled={submitting}
             onClick={onConfirm}
           >
-            {submitting ? "반영 중" : "기록 반영"}
+            {submitting ? "새 버전 반영 중" : "새 버전으로 반영"}
           </button>
         </div>
       </div>
@@ -1445,7 +1454,10 @@ export default function HostSessionEditor({
                 onLoadMore={recordWorkflow?.onLoadMoreHistory}
                 expectedDraftRevision={recordWorkflow?.expectedDraftRevision ?? null}
                 restoring={recordWorkflow?.restoring ?? false}
-                onRestore={recordWorkflow?.onRestore ?? (() => undefined)}
+                onRestore={recordWorkflow?.onRestore ?? (async () => undefined)}
+                onRestoreCompleted={() => {
+                  changeLocation({ section: "records", source: "manual" });
+                }}
               />
             ) : null}
 

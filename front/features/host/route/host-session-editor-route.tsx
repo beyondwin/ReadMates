@@ -465,6 +465,7 @@ export function EditHostSessionRecordWorkflow({
         liveRevision: recordEditor.liveRevision,
         nextLiveRevision: recordEditor.liveRevision + 1,
         draftRevision: controller.expectedDraftRevision,
+        visibility: controller.snapshot.visibility,
       });
       setConfirmationOpen(true);
       return preview;

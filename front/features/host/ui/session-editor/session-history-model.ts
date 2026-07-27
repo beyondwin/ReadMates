@@ -1,4 +1,13 @@
-import type { SessionHistoryPanelItem } from "./session-history-panel";
+import type { HostSessionHistoryItem } from "@/features/host/model/host-session-editor-view-model";
+
+export type SessionHistoryPanelItem = HostSessionHistoryItem & {
+  id: string;
+  createdAt: string;
+  actorMembershipId: string;
+  attendanceTransitions: Array<{ membershipId: string; from: string; to: string }>;
+  restoredFromRevisionId: string | null;
+  notificationEventId: string | null;
+};
 
 export function appendUniqueSessionHistory(
   current: SessionHistoryPanelItem[],
