@@ -254,7 +254,15 @@ internal class ArchiveListQueries {
                       and reading_checkins.membership_id = memberships.id
                       and reading_checkins.reading_progress >= 100
                       and sessions.state = 'PUBLISHED'
-                  ) as completed_reading_count
+                  ) as completed_reading_count,
+                  (
+                    select sessions.id
+                    from sessions
+                    where sessions.club_id = memberships.club_id
+                      and sessions.state = 'OPEN'
+                    order by sessions.number desc
+                    limit 1
+                  ) as current_session_id
                 from memberships
                 join clubs on clubs.id = memberships.club_id
                 where memberships.id = ?
@@ -272,6 +280,7 @@ internal class ArchiveListQueries {
                         sessionCount = resultSet.getInt("session_count"),
                         totalSessionCount = resultSet.getInt("total_session_count"),
                         completedReadingCount = resultSet.getInt("completed_reading_count"),
+                        currentSessionId = resultSet.getString("current_session_id"),
                         recentAttendances = recentAttendances,
                     )
                 },
@@ -292,6 +301,7 @@ internal class ArchiveListQueries {
             sessionCount = 0,
             totalSessionCount = 0,
             completedReadingCount = 0,
+            currentSessionId = null,
             recentAttendances = emptyList(),
         )
 }

@@ -165,6 +165,7 @@ data class MyPageResult(
     val sessionCount: Int,
     val totalSessionCount: Int,
     val completedReadingCount: Int,
+    val currentSessionId: String? = null,
     val recentAttendances: List<MyRecentAttendanceResult>,
 )
 

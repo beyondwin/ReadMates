@@ -68,15 +68,9 @@ function LatestJourneyItem({ item }: { item: MyJourneyItem }) {
   return (
     <section className="rm-my-shelf-latest" aria-label="최근 책별 기록">
       <h2 className="rm-my-shelf-kicker">최근 책별 기록</h2>
-      <div className="rm-my-shelf-latest__record">
-        <BookCover item={item} />
-        <div className="rm-my-shelf-latest__copy">
-          <p className="rm-my-shelf-meta">{sessionLabel(item)} · {dateLabel(item.date)}</p>
-          <h3>{item.bookTitle}</h3>
-          <p>{item.bookAuthor}</p>
-          <JourneyChips item={item} />
-        </div>
-      </div>
+      <p className="rm-my-shelf-latest__orientation">
+        마지막 기록은 {sessionLabel(item)} {item.bookTitle}입니다. 아래 책별 기록에서 다시 읽어 보세요.
+      </p>
     </section>
   );
 }

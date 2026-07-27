@@ -27,6 +27,7 @@ const profile: MyPageResponse = {
   sessionCount: 2,
   totalSessionCount: 3,
   completedReadingCount: 1,
+  currentSessionId: "session-current",
   recentAttendances: [],
 };
 

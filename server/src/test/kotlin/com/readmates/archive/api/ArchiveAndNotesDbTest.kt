@@ -1271,6 +1271,30 @@ class ArchiveAndNotesDbTest(
     @Test
     @Sql(
         statements = [
+            CLEANUP_VIEWER_ARCHIVE_VISIBILITY_SESSIONS_SQL,
+            INSERT_VIEWER_OPEN_SESSION_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            CLEANUP_VIEWER_ARCHIVE_VISIBILITY_SESSIONS_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `my page exposes the latest open session identifier without a second query`() {
+        mockMvc
+            .get("/api/app/me") {
+                with(user("member5@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.currentSessionId") { value("00000000-0000-0000-0000-000000009992") }
+            }
+    }
+
+    @Test
+    @Sql(
+        statements = [
             CLEANUP_MY_PAGE_READING_COMPLETION_SQL,
             INSERT_MY_PAGE_READING_COMPLETION_SQL,
         ],

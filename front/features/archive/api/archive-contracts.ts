@@ -183,6 +183,7 @@ export type MyPageResponse = {
   sessionCount: number;
   totalSessionCount: number;
   completedReadingCount: number;
+  currentSessionId: string | null;
   recentAttendances: Array<{
     sessionNumber: number;
     attended: boolean;

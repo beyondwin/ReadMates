@@ -153,6 +153,7 @@ data class MyPageResponse(
     val sessionCount: Int,
     val totalSessionCount: Int,
     val completedReadingCount: Int,
+    val currentSessionId: String?,
     val recentAttendances: List<MyRecentAttendanceItem>,
 )
 

@@ -53,12 +53,14 @@ describe("my reading shelf model", () => {
     ]);
   });
 
-  it("uses a stable unknown-year group for malformed or absent dates", () => {
+  it("uses a stable unknown-year group for malformed, impossible, or absent dates", () => {
     const malformed = journeyItem({ sessionId: "malformed", date: "not-a-date" });
+    const impossibleMonth = journeyItem({ sessionId: "impossible-month", date: "2026-99-99" });
+    const impossibleLeapDay = journeyItem({ sessionId: "impossible-leap-day", date: "2026-02-29" });
     const absent = journeyItem({ sessionId: "absent", date: "" });
 
-    expect(groupJourneyByYear([malformed, absent])).toEqual([
-      { year: "연도 미상", items: [malformed, absent] },
+    expect(groupJourneyByYear([malformed, impossibleMonth, impossibleLeapDay, absent])).toEqual([
+      { year: "연도 미상", items: [malformed, impossibleMonth, impossibleLeapDay, absent] },
     ]);
   });
 

@@ -35,13 +35,14 @@ function renderJourney(overrides: Partial<Parameters<typeof MyReadingJourney>[0]
 }
 
 describe("MyReadingJourney", () => {
-  it("keeps the canonical collection under 책별 기록 with h3 book titles", () => {
+  it("keeps the canonical collection under 책별 기록 and limits the latest block to orientation", () => {
     renderJourney();
 
     expect(screen.getByRole("heading", { level: 2, name: "책별 기록" })).toBeInTheDocument();
-    expect(screen.getAllByRole("heading", { level: 3, name: "보이지 않는 도시들" })).toHaveLength(2);
+    expect(screen.getAllByRole("heading", { level: 3, name: "보이지 않는 도시들" })).toHaveLength(1);
     expect(screen.getByLabelText("최근 책별 기록")).toBeInTheDocument();
     expect(screen.getByRole("list", { name: "책별 기록" })).toBeInTheDocument();
+    expect(screen.getAllByLabelText("보이지 않는 도시들 표지 없음")).toHaveLength(1);
   });
 
   it("keeps session and feedback actions as sibling links and skips zero-result chips", () => {
@@ -62,7 +63,7 @@ describe("MyReadingJourney", () => {
   it("uses a title-derived typographic cover when a book cover is missing", () => {
     renderJourney();
 
-    expect(screen.getAllByLabelText("보이지 않는 도시들 표지 없음")).toHaveLength(2);
+    expect(screen.getAllByLabelText("보이지 않는 도시들 표지 없음")).toHaveLength(1);
     expect(screen.getAllByText("보").length).toBeGreaterThan(0);
   });
 

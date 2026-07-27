@@ -1,10 +1,19 @@
-import { render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useState } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { useState, type CSSProperties, type ReactNode } from "react";
+import { createMemoryRouter, RouterProvider } from "react-router-dom";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { MemberProfileResponse } from "@/features/archive/api/archive-contracts";
 import type { MyPageProfile, NotificationPreferences } from "@/features/archive/model/archive-model";
 import type { MyJourneyPage } from "@/features/archive/model/my-reading-shelf-model";
+import { myPageLoader } from "@/features/archive/route/my-page-data";
+import { MyPageRoute } from "@/features/archive/route/my-page-route";
 import MyPage from "@/features/archive/ui/my-page";
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 const profile: MyPageProfile = {
   displayName: "샘플 멤버",
@@ -17,6 +26,7 @@ const profile: MyPageProfile = {
   sessionCount: 6,
   totalSessionCount: 9,
   completedReadingCount: 4,
+  currentSessionId: null,
   recentAttendances: [],
 };
 
@@ -76,7 +86,7 @@ describe("MyPage", () => {
 
     expect(screen.getByRole("heading", { level: 1, name: "나의 서재" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 2, name: "책별 기록" })).toBeInTheDocument();
-    expect(screen.getAllByRole("heading", { level: 3, name: "보이지 않는 도시들" })).toHaveLength(2);
+    expect(screen.getAllByRole("heading", { level: 3, name: "보이지 않는 도시들" })).toHaveLength(1);
     expect(screen.getByText("참여")).toBeInTheDocument();
     expect(screen.getByText("완독 4/6")).toBeInTheDocument();
     expect(screen.getByText("질문")).toBeInTheDocument();
@@ -118,6 +128,18 @@ describe("MyPage", () => {
     expect(screen.getByRole("link", { name: "아카이브 보기" })).toHaveAttribute("href", "/app/archive");
     expect(screen.queryByRole("article")).not.toBeInTheDocument();
   });
+
+  it("links active members with no records to their real current session", () => {
+    renderMyPage({
+      data: { ...profile, currentSessionId: "current-session" },
+      journey: { ...journey, items: [], nextCursor: null },
+    });
+
+    expect(screen.getByRole("link", { name: "이번 세션 보기" })).toHaveAttribute(
+      "href",
+      "/app/sessions/current-session",
+    );
+  });
 });
 
 function renderProps(): Parameters<typeof MyPage>[0] {
@@ -131,3 +153,283 @@ function renderProps(): Parameters<typeof MyPage>[0] {
     onLoadMoreJourney: async () => undefined,
   };
 }
+
+type Deferred<T> = {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason?: unknown) => void;
+};
+
+function createDeferred<T>(): Deferred<T> {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+
+  return { promise, resolve, reject };
+}
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+}
+
+function installRouterRequestShim() {
+  const NativeRequest = globalThis.Request;
+
+  vi.stubGlobal(
+    "Request",
+    class RouterTestRequest extends NativeRequest {
+      constructor(input: RequestInfo | URL, init?: RequestInit) {
+        super(input, init === undefined ? init : { ...init, signal: undefined });
+      }
+    },
+  );
+}
+
+function routeJourney(overrides: Partial<MyJourneyPage> = {}): MyJourneyPage {
+  return {
+    items: [
+      {
+        sessionId: "session-1",
+        sessionNumber: 1,
+        bookTitle: "첫 번째 책",
+        bookAuthor: "첫 저자",
+        bookImageUrl: null,
+        date: "2026-07-22",
+        readingProgress: 100,
+        questionCount: 1,
+        reviewCount: 0,
+        feedbackDocument: { available: true, readable: true, lockedReason: null },
+      },
+    ],
+    nextCursor: null,
+    summary: journey.summary,
+    ...overrides,
+  };
+}
+
+const routeAuth = {
+  authenticated: true,
+  userId: "member-user",
+  membershipId: "member-membership",
+  clubId: "club-id",
+  email: profile.email,
+  displayName: profile.displayName,
+  accountName: profile.accountName,
+  role: profile.role,
+  membershipStatus: profile.membershipStatus,
+  approvalState: "ACTIVE",
+};
+
+function TestLogoutButton({ className, style, children }: { className?: string; style?: CSSProperties; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      className={className}
+      style={style}
+      onClick={async () => {
+        const response = await fetch("/api/bff/api/auth/logout", { method: "POST" });
+        if (response.ok) globalThis.location.href = "/login";
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function renderMyPageRoute(fetchMock: ReturnType<typeof vi.fn>, canEditProfile = false) {
+  installRouterRequestShim();
+  vi.stubGlobal("fetch", fetchMock);
+  const router = createMemoryRouter(
+    [
+      {
+        path: "/app/me",
+        element: <MyPageRoute LogoutButtonComponent={TestLogoutButton} canEditProfile={canEditProfile} onProfileUpdated={async () => undefined} />,
+        loader: myPageLoader,
+        hydrateFallbackElement: <div>내 공간을 불러오는 중</div>,
+      },
+    ],
+    { initialEntries: ["/app/me"] },
+  );
+
+  return render(<RouterProvider router={router} />);
+}
+
+function defaultRouteFetch({
+  routeProfile = profile,
+  routeJourneyPage = routeJourney(),
+  notificationStatus = 200,
+}: {
+  routeProfile?: MyPageProfile;
+  routeJourneyPage?: MyJourneyPage;
+  notificationStatus?: number;
+} = {}) {
+  return vi.fn((input: RequestInfo | URL) => {
+    const url = input.toString();
+    if (url === "/api/bff/api/auth/me") return Promise.resolve(jsonResponse(routeAuth));
+    if (url === "/api/bff/api/app/me") return Promise.resolve(jsonResponse(routeProfile));
+    if (url === "/api/bff/api/archive/me/journey?limit=12") return Promise.resolve(jsonResponse(routeJourneyPage));
+    if (url === "/api/bff/api/me/notifications/preferences") return Promise.resolve(jsonResponse(notificationPreferences, notificationStatus));
+    return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+  });
+}
+
+describe("MyPage route regressions", () => {
+  it("continues with the same cursor once while pending and drops duplicate session rows", async () => {
+    const user = userEvent.setup();
+    const nextPage = createDeferred<MyJourneyPage>();
+    let continuationRequests = 0;
+    const fetchMock = defaultRouteFetch({ routeJourneyPage: routeJourney({ nextCursor: "cursor-2" }) });
+    fetchMock.mockImplementation((input: RequestInfo | URL) => {
+      const url = input.toString();
+      if (url === "/api/bff/api/auth/me") return Promise.resolve(jsonResponse(routeAuth));
+      if (url === "/api/bff/api/app/me") return Promise.resolve(jsonResponse(profile));
+      if (url === "/api/bff/api/archive/me/journey?limit=12") return Promise.resolve(jsonResponse(routeJourney({ nextCursor: "cursor-2" })));
+      if (url === "/api/bff/api/archive/me/journey?limit=12&cursor=cursor-2") {
+        continuationRequests += 1;
+        return nextPage.promise.then((page) => jsonResponse(page));
+      }
+      if (url === "/api/bff/api/me/notifications/preferences") return Promise.resolve(jsonResponse(notificationPreferences));
+      return Promise.resolve(jsonResponse({}, 404));
+    });
+    renderMyPageRoute(fetchMock);
+
+    await user.click(await screen.findByRole("button", { name: "기록 더 보기" }));
+    expect(screen.getByRole("button", { name: "기록을 불러오는 중" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "기록을 불러오는 중" }));
+    expect(continuationRequests).toBe(1);
+
+    await act(async () => {
+      nextPage.resolve(
+        routeJourney({
+          items: [
+            routeJourney().items[0],
+            { ...routeJourney().items[0], sessionId: "session-2", sessionNumber: 2, bookTitle: "두 번째 책" },
+            { ...routeJourney().items[0], sessionId: "session-2", sessionNumber: 2, bookTitle: "중복된 책" },
+          ],
+        }),
+      );
+    });
+
+    expect(await screen.findByRole("article", { name: "2차 두 번째 책" })).toBeInTheDocument();
+    expect(screen.queryByText("중복된 책")).not.toBeInTheDocument();
+  });
+
+  it("keeps existing rows after continuation failure and retries its cursor", async () => {
+    const user = userEvent.setup();
+    let continuationRequests = 0;
+    const fetchMock = defaultRouteFetch({ routeJourneyPage: routeJourney({ nextCursor: "cursor-2" }) });
+    fetchMock.mockImplementation((input: RequestInfo | URL) => {
+      const url = input.toString();
+      if (url === "/api/bff/api/auth/me") return Promise.resolve(jsonResponse(routeAuth));
+      if (url === "/api/bff/api/app/me") return Promise.resolve(jsonResponse(profile));
+      if (url === "/api/bff/api/archive/me/journey?limit=12") return Promise.resolve(jsonResponse(routeJourney({ nextCursor: "cursor-2" })));
+      if (url === "/api/bff/api/archive/me/journey?limit=12&cursor=cursor-2") {
+        continuationRequests += 1;
+        return continuationRequests === 1
+          ? Promise.reject(new Error("temporary failure"))
+          : Promise.resolve(jsonResponse(routeJourney({ items: [{ ...routeJourney().items[0], sessionId: "session-2", sessionNumber: 2, bookTitle: "재시도 책" }] })));
+      }
+      if (url === "/api/bff/api/me/notifications/preferences") return Promise.resolve(jsonResponse(notificationPreferences));
+      return Promise.resolve(jsonResponse({}, 404));
+    });
+    renderMyPageRoute(fetchMock);
+
+    await user.click(await screen.findByRole("button", { name: "기록 더 보기" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("기록을 더 불러오지 못했습니다.");
+    expect(screen.getByRole("article", { name: "1차 첫 번째 책" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "다시 시도" }));
+
+    expect(await screen.findByRole("article", { name: "2차 재시도 책" })).toBeInTheDocument();
+    expect(continuationRequests).toBe(2);
+  });
+
+  it("keeps the settings disclosure open after profile revalidation", async () => {
+    const user = userEvent.setup();
+    let myPageRequests = 0;
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+      if (url === "/api/bff/api/auth/me") return Promise.resolve(jsonResponse(routeAuth));
+      if (url === "/api/bff/api/app/me") {
+        myPageRequests += 1;
+        return Promise.resolve(jsonResponse(myPageRequests === 1 ? profile : { ...profile, displayName: "새이름" }));
+      }
+      if (url === "/api/bff/api/archive/me/journey?limit=12") return Promise.resolve(jsonResponse(routeJourney()));
+      if (url === "/api/bff/api/me/notifications/preferences") return Promise.resolve(jsonResponse(notificationPreferences));
+      if (url === "/api/bff/api/me/profile") {
+        const response: MemberProfileResponse = { membershipId: "member-membership", displayName: "새이름", accountName: profile.accountName, profileImageUrl: null };
+        return Promise.resolve(jsonResponse(response));
+      }
+      return Promise.resolve(jsonResponse({}, 404));
+    });
+    renderMyPageRoute(fetchMock, true);
+
+    const settings = await screen.findByRole("button", { name: "계정·알림 설정" });
+    await user.click(settings);
+    await user.click(screen.getByRole("button", { name: "이름 변경" }));
+    await user.clear(screen.getByLabelText("이름"));
+    await user.type(screen.getByLabelText("이름"), "새이름");
+    await user.click(screen.getByRole("button", { name: "이름 저장" }));
+
+    await waitFor(() => expect(myPageRequests).toBe(2));
+    expect(await screen.findByText("새이름")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "계정·알림 설정" })).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("shows optional notification failure and successfully retries the loader", async () => {
+    const user = userEvent.setup();
+    let notificationRequests = 0;
+    const fetchMock = defaultRouteFetch();
+    fetchMock.mockImplementation((input: RequestInfo | URL) => {
+      const url = input.toString();
+      if (url === "/api/bff/api/auth/me") return Promise.resolve(jsonResponse(routeAuth));
+      if (url === "/api/bff/api/app/me") return Promise.resolve(jsonResponse(profile));
+      if (url === "/api/bff/api/archive/me/journey?limit=12") return Promise.resolve(jsonResponse(routeJourney()));
+      if (url === "/api/bff/api/me/notifications/preferences") {
+        notificationRequests += 1;
+        return Promise.resolve(jsonResponse(notificationPreferences, notificationRequests === 1 ? 500 : 200));
+      }
+      return Promise.resolve(jsonResponse({}, 404));
+    });
+    renderMyPageRoute(fetchMock);
+
+    await user.click(await screen.findByRole("button", { name: "계정·알림 설정" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("알림 설정을 불러오지 못했습니다.");
+    await user.click(screen.getByRole("button", { name: "다시 시도" }));
+
+    await waitFor(() => expect(notificationRequests).toBe(2));
+    expect(await screen.findByRole("switch", { name: "이메일 알림" })).toBeInTheDocument();
+  });
+});
+
+describe("MyPage account controls", () => {
+  it("logs out through the BFF from the disclosed settings", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    const location = { href: "" };
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("location", location);
+    renderMyPage({ LogoutButtonComponent: TestLogoutButton, settingsOpen: true });
+
+    await user.click(screen.getByRole("button", { name: "로그아웃" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/auth/logout", { method: "POST" }));
+    expect(location.href).toBe("/login");
+  });
+
+  it("confirms membership leave without closing the settings surface", async () => {
+    const user = userEvent.setup();
+    const onLeaveMembership = vi.fn().mockResolvedValue(undefined);
+    globalThis.history.replaceState({}, "", "/about");
+    renderMyPage({ onLeaveMembership, settingsOpen: true });
+
+    await user.click(screen.getByRole("button", { name: "탈퇴" }));
+    expect(screen.getByText(/탈퇴하면 과거 기록은 보존되며/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "탈퇴 확인" }));
+
+    expect(onLeaveMembership).toHaveBeenCalledTimes(1);
+    expect(await screen.findByRole("status")).toHaveTextContent("탈퇴 처리되었습니다.");
+    expect(screen.getByRole("region", { name: "계정·알림 설정" })).toBeInTheDocument();
+  });
+});

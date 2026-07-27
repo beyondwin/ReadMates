@@ -59,7 +59,7 @@ export function groupJourneyByYear(items: MyJourneyItem[]): JourneyYearGroup[] {
   const groups = new Map<string, MyJourneyItem[]>();
 
   for (const item of items) {
-    const year = item.date.match(/^\d{4}(?=-)/)?.[0] ?? UNKNOWN_YEAR;
+    const year = validDateYear(item.date) ?? UNKNOWN_YEAR;
     const group = groups.get(year);
 
     if (group) {
@@ -70,6 +70,21 @@ export function groupJourneyByYear(items: MyJourneyItem[]): JourneyYearGroup[] {
   }
 
   return Array.from(groups, ([year, groupedItems]) => ({ year, items: groupedItems }));
+}
+
+function validDateYear(date: string): string | null {
+  const match = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+
+  const [, yearText, monthText, dayText] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+
+  return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day
+    ? yearText
+    : null;
 }
 
 export function journeyChips(item: MyJourneyItem): JourneyChip[] {

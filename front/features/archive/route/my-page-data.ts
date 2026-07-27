@@ -36,6 +36,7 @@ function inactiveMyPageData(auth: AuthMeResponse): MyPageResponse {
     sessionCount: 0,
     totalSessionCount: 0,
     completedReadingCount: 0,
+    currentSessionId: null,
     recentAttendances: [],
   };
 }

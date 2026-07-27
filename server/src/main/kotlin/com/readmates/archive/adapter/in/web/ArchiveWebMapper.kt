@@ -183,6 +183,7 @@ fun MyPageResult.toWebDto() =
         sessionCount = sessionCount,
         totalSessionCount = totalSessionCount,
         completedReadingCount = completedReadingCount,
+        currentSessionId = currentSessionId,
         recentAttendances = recentAttendances.map { it.toWebDto() },
     )
 

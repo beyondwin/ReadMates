@@ -34,7 +34,7 @@ export function MyReadingShelf({
   const emptyState = shelfEmptyState({
     membershipStatus: profile.membershipStatus,
     clubSlug,
-    currentSessionId: null,
+    currentSessionId: profile.currentSessionId,
   });
 
   return (
