@@ -76,7 +76,7 @@ describe("SessionRecordDraftPanel", () => {
       const [snapshot, setSnapshot] = useState(draftSnapshot);
       return (
         <SessionRecordDraftPanel
-          activeMobileSection="records"
+          activeSection="records"
           liveSnapshot={liveSnapshot}
           snapshot={snapshot}
           saveState="idle"
@@ -295,7 +295,7 @@ describe("SessionRecordDraftPanel", () => {
   it("maps validation issues to summary highlights reviews and feedback", () => {
     render(
       <SessionRecordDraftPanel
-        activeMobileSection="records"
+        activeSection="records"
         liveSnapshot={liveSnapshot}
         snapshot={draftSnapshot}
         saveState="saved"
@@ -323,7 +323,7 @@ describe("SessionRecordDraftPanel", () => {
     const onRebaseDraft = vi.fn().mockResolvedValue(undefined);
     render(
       <SessionRecordDraftPanel
-        activeMobileSection="records"
+        activeSection="records"
         liveSnapshot={liveSnapshot}
         snapshot={draftSnapshot}
         saveState="saved"

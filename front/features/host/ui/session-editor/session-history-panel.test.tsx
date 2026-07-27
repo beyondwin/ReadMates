@@ -10,7 +10,7 @@ describe("SessionHistoryPanel", () => {
     const onRestore = vi.fn().mockResolvedValue(undefined);
     render(
       <SessionHistoryPanel
-        activeMobileSection="history"
+        activeSection="history"
         items={[{
           id: "history-1",
           type: "RECORD_REVISION_APPLIED",
@@ -46,7 +46,7 @@ describe("SessionHistoryPanel", () => {
     const user = userEvent.setup();
     render(
       <SessionHistoryPanel
-        activeMobileSection="history"
+        activeSection="history"
         items={[historyItem()]}
         expectedDraftRevision={4}
         restoring={false}
@@ -71,7 +71,7 @@ describe("SessionHistoryPanel", () => {
     const user = userEvent.setup();
     render(
       <SessionHistoryPanel
-        activeMobileSection="history"
+        activeSection="history"
         items={[historyItem()]}
         expectedDraftRevision={4}
         restoring={false}
@@ -90,7 +90,7 @@ describe("SessionHistoryPanel", () => {
     const onLoadMore = vi.fn().mockRejectedValue(new Error("offline"));
     render(
       <SessionHistoryPanel
-        activeMobileSection="history"
+        activeSection="history"
         items={[historyItem()]}
         expectedDraftRevision={4}
         restoring={false}

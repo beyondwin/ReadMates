@@ -1,4 +1,5 @@
 import { memo, type CSSProperties } from "react";
+import type { HostSessionEditorSection } from "@/features/host/model/host-session-editor-navigation";
 import type { HostSessionDetailResponse } from "@/features/host/model/host-view-types";
 import {
   recordVisibilityDescription,
@@ -6,7 +7,6 @@ import {
   type SessionRecordVisibility,
 } from "@/features/host/model/host-session-editor-model";
 import { Panel } from "./session-editor-panel";
-import type { MobileEditorSection } from "./mobile-editor-tabs";
 
 type PublicationFeedback = {
   tone: "success" | "error";
@@ -14,7 +14,7 @@ type PublicationFeedback = {
 };
 
 export const PublicationPanel = memo(function PublicationPanel({
-  activeMobileSection,
+  activeSection,
   session,
   sessionState,
   recordVisibility,
@@ -30,7 +30,7 @@ export const PublicationPanel = memo(function PublicationPanel({
   onCloseSession,
   onPublishRecord,
 }: {
-  activeMobileSection: MobileEditorSection;
+  activeSection: HostSessionEditorSection;
   session?: HostSessionDetailResponse | null;
   sessionState?: HostSessionDetailResponse["state"];
   recordVisibility: SessionRecordVisibility;
@@ -51,9 +51,9 @@ export const PublicationPanel = memo(function PublicationPanel({
       eyebrow="기록 · 공개 범위"
       title="기록 공개 범위"
       tone="warn"
-      mobileSection="records"
+      section="records"
       panelId="host-editor-panel-publish"
-      activeMobileSection={activeMobileSection}
+      activeSection={activeSection}
     >
       <div className="stack" style={{ "--stack": "14px" } as CSSProperties}>
         <fieldset className="stack" style={{ "--stack": "10px", border: 0, padding: 0, margin: 0 } as CSSProperties}>

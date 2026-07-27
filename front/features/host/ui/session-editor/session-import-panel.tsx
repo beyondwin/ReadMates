@@ -1,4 +1,5 @@
 import type { ChangeEvent, CSSProperties } from "react";
+import type { HostSessionEditorSection } from "@/features/host/model/host-session-editor-navigation";
 import type {
   SessionImportPreviewResponse,
   SessionRecordVisibility,
@@ -10,7 +11,6 @@ import {
   type SessionImportReview,
 } from "@/features/host/model/session-import-model";
 import { Panel } from "./session-editor-panel";
-import type { MobileEditorSection } from "./mobile-editor-tabs";
 
 type SessionImportPanelBodyProps = {
   sessionId: string | undefined;
@@ -164,7 +164,7 @@ function SessionImportCommitResultCard({ result }: { result: SessionImportCommit
 }
 
 export function SessionImportPanel({
-  activeMobileSection,
+  activeSection,
   sessionId,
   recordVisibility,
   preview,
@@ -174,15 +174,15 @@ export function SessionImportPanel({
   onFileSelected,
   onCommit,
 }: SessionImportPanelBodyProps & {
-  activeMobileSection: MobileEditorSection;
+  activeSection: HostSessionEditorSection;
 }) {
   return (
     <Panel
       eyebrow="AI 결과 JSON"
       title="세션 기록 가져오기"
-      mobileSection="records"
+      section="records"
       panelId="host-editor-panel-session-import"
-      activeMobileSection={activeMobileSection}
+      activeSection={activeSection}
     >
       <SessionImportPanelBody
         sessionId={sessionId}

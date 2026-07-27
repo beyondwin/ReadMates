@@ -1,17 +1,17 @@
 import { memo } from "react";
+import type { HostSessionEditorSection } from "@/features/host/model/host-session-editor-navigation";
 import type { AttendanceStatus, HostSessionDetailResponse } from "@/features/host/model/host-view-types";
 import { HostSessionAttendanceEditor } from "../host-session-attendance-editor";
 import { Panel } from "./session-editor-panel";
-import type { MobileEditorSection } from "./mobile-editor-tabs";
 
 export const AttendancePanel = memo(function AttendancePanel({
-  activeMobileSection,
+  activeSection,
   session,
   attendanceStatuses,
   emptyMessage,
   onUpdateAttendance,
 }: {
-  activeMobileSection: MobileEditorSection;
+  activeSection: HostSessionEditorSection;
   session?: HostSessionDetailResponse | null;
   attendanceStatuses: Record<string, AttendanceStatus>;
   emptyMessage: string;
@@ -21,9 +21,9 @@ export const AttendancePanel = memo(function AttendancePanel({
     <Panel
       eyebrow="참석 명단"
       title="출석 확정 명단"
-      mobileSection="attendance"
+      section="attendance"
       panelId="host-editor-panel-attendance"
-      activeMobileSection={activeMobileSection}
+      activeSection={activeSection}
     >
       <HostSessionAttendanceEditor
         hasSession={Boolean(session)}

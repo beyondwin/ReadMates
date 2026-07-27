@@ -21,6 +21,11 @@ import type {
   ManualNotificationDispatchListItem,
 } from "@/features/host/api/host-contracts";
 import {
+  buildHostSessionEditorUrl,
+  parseHostSessionEditorLocation,
+  type HostSessionEditorLocation,
+} from "@/features/host/model/host-session-editor-navigation";
+import {
   hostNotificationKeys,
 } from "@/features/host/queries/host-notification-queries";
 import {
@@ -75,6 +80,23 @@ export type HostSessionRecordsChangedEvent = {
 
 function contextFromClubSlug(clubSlug?: string): ReadmatesApiContext {
   return { clubSlug };
+}
+
+function useHostSessionEditorNavigation() {
+  const [location, setLocation] = useState<HostSessionEditorLocation>(
+    () => parseHostSessionEditorLocation(globalThis.location?.search ?? ""),
+  );
+  const onChange = useCallback((next: HostSessionEditorLocation) => {
+    const currentUrl = `${globalThis.location?.pathname ?? ""}${globalThis.location?.search ?? ""}${globalThis.location?.hash ?? ""}`;
+    globalThis.history?.replaceState(
+      globalThis.history.state,
+      "",
+      buildHostSessionEditorUrl(currentUrl, next),
+    );
+    setLocation(next);
+  }, []);
+
+  return useMemo(() => ({ location, onChange }), [location, onChange]);
 }
 
 function apiErrorCode(error: unknown) {
@@ -187,6 +209,7 @@ export function NewHostSessionRoute({
 }: HostSessionEditorRouteProps) {
   const { clubSlug } = useParams<{ clubSlug: string }>();
   const context = useMemo(() => contextFromClubSlug(clubSlug), [clubSlug]);
+  const navigation = useHostSessionEditorNavigation();
   const queryClient = useQueryClient();
   const handleSessionRecordsChanged = useCallback(
     async (sessionId: string) => {
@@ -207,6 +230,7 @@ export function NewHostSessionRoute({
       hostDashboardReturnTarget={hostDashboardReturnTarget}
       readmatesReturnState={readmatesReturnState}
       onSessionRecordsChanged={handleSessionRecordsChanged}
+      navigation={navigation}
     />
   );
 }
@@ -222,6 +246,7 @@ export function EditHostSessionRoute({
   const { clubSlug, sessionId: routeSessionId } = useParams<{ clubSlug: string; sessionId: string }>();
   const sessionId = routeSessionId ?? loaderData.sessionId;
   const context = useMemo(() => contextFromClubSlug(clubSlug), [clubSlug]);
+  const navigation = useHostSessionEditorNavigation();
   const queryClient = useQueryClient();
   const handleSessionRecordsChanged = useCallback(
     async (changedSessionId: string) => {
@@ -269,6 +294,7 @@ export function EditHostSessionRoute({
       hostDashboardReturnTarget={hostDashboardReturnTarget}
       readmatesReturnState={readmatesReturnState}
       onSessionRecordsChanged={handleSessionRecordsChanged}
+      navigation={navigation}
     />
   );
 }
@@ -288,6 +314,10 @@ export function EditHostSessionRecordWorkflow({
   hostDashboardReturnTarget,
   readmatesReturnState,
   onSessionRecordsChanged,
+  navigation = {
+    location: { section: "overview", source: "manual" },
+    onChange: () => undefined,
+  },
 }: {
   session: HostSessionDetailResponse;
   recordEditor: HostSessionRecordEditor;
@@ -303,6 +333,10 @@ export function EditHostSessionRecordWorkflow({
   hostDashboardReturnTarget?: ReadmatesReturnTarget;
   readmatesReturnState?: (target: ReadmatesReturnTarget) => ReadmatesReturnState;
   onSessionRecordsChanged: (sessionId: string) => void | Promise<void>;
+  navigation?: {
+    location: HostSessionEditorLocation;
+    onChange: (next: HostSessionEditorLocation) => void;
+  };
 }) {
   const queryClient = useQueryClient();
   const saveMutation = useSaveHostSessionRecordDraftMutation(context);
@@ -532,6 +566,7 @@ export function EditHostSessionRecordWorkflow({
         hostDashboardReturnTarget={hostDashboardReturnTarget}
         readmatesReturnState={readmatesReturnState}
         onSessionRecordsChanged={onSessionRecordsChanged}
+        navigation={navigation}
         recordWorkflow={{
           editor: recordEditor,
           history: effectiveHistory.items,

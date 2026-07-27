@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
+import type { HostSessionEditorSection } from "@/features/host/model/host-session-editor-navigation";
 import type { DraftSaveState } from "@/features/host/hooks/use-session-record-draft-controller";
-import type { MobileEditorSection } from "./mobile-editor-tabs";
 import { Panel } from "./session-editor-panel";
 
 export type { DraftSaveState } from "@/features/host/hooks/use-session-record-draft-controller";
@@ -57,7 +57,7 @@ function saveStateMessage(state: DraftSaveState) {
 }
 
 export function SessionRecordDraftPanel({
-  activeMobileSection,
+  activeSection,
   liveSnapshot,
   snapshot,
   saveState,
@@ -71,7 +71,7 @@ export function SessionRecordDraftPanel({
   rebaseError = null,
   onReviewDraft,
 }: {
-  activeMobileSection: MobileEditorSection;
+  activeSection: HostSessionEditorSection;
   liveSnapshot: SessionRecordDraftSnapshot;
   snapshot: SessionRecordDraftSnapshot;
   saveState: DraftSaveState;
@@ -103,9 +103,9 @@ export function SessionRecordDraftPanel({
     <Panel
       eyebrow="공개 기록"
       title="공개 기록 초안"
-      mobileSection="records"
+      section="records"
       panelId="host-editor-panel-records"
-      activeMobileSection={activeMobileSection}
+      activeSection={activeSection}
     >
       <div className="stack" style={{ "--stack": "18px", minWidth: 0 } as CSSProperties}>
         <div

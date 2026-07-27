@@ -1,26 +1,17 @@
 import type { JSX, ReactNode } from "react";
 import type { HostSessionEditorSection } from "../../model/host-session-editor-navigation";
-import { mobileEditorSectionConfig, type MobileEditorSection } from "./mobile-editor-tabs";
 
-type PanelBaseProps = {
+type PanelProps = {
   eyebrow: string;
   title: string;
   children: ReactNode;
   tone?: "warn";
   panelId: string;
-};
-
-type SectionPanelProps = PanelBaseProps & {
   section: HostSessionEditorSection;
   activeSection: HostSessionEditorSection;
 };
 
-type LegacyMobilePanelProps = PanelBaseProps & {
-  mobileSection: MobileEditorSection;
-  activeMobileSection: MobileEditorSection;
-};
-
-export function Panel(props: SectionPanelProps | LegacyMobilePanelProps): JSX.Element {
+export function Panel(props: PanelProps): JSX.Element {
   const {
     eyebrow,
     title,
@@ -29,24 +20,16 @@ export function Panel(props: SectionPanelProps | LegacyMobilePanelProps): JSX.El
     panelId,
   } = props;
   const warn = tone === "warn";
-  const usesSectionNavigation = "section" in props;
-  const section = usesSectionNavigation ? props.section : props.mobileSection;
-  const isActive = usesSectionNavigation
-    ? props.section === props.activeSection
-    : props.mobileSection === props.activeMobileSection;
-  const labelledBy = usesSectionNavigation
-    ? `host-editor-tab-${props.section}`
-    : mobileEditorSectionConfig(props.mobileSection).tabId;
+  const isActive = props.section === props.activeSection;
 
   return (
     <section
       id={panelId}
       role="tabpanel"
-      aria-labelledby={labelledBy}
-      hidden={usesSectionNavigation && !isActive}
+      aria-labelledby={`host-editor-tab-${props.section}`}
+      hidden={!isActive}
       className={`surface rm-host-session-editor__section ${isActive ? "is-active is-mobile-active" : "is-inactive"}`}
-      data-editor-section={section}
-      data-mobile-editor-section={usesSectionNavigation ? undefined : props.mobileSection}
+      data-editor-section={props.section}
       style={{
         padding: "28px",
         borderColor: warn ? "color-mix(in oklch, var(--warn), var(--line) 70%)" : "var(--line)",

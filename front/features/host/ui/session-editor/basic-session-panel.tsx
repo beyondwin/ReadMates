@@ -1,10 +1,10 @@
 import { memo, type CSSProperties } from "react";
+import type { HostSessionEditorSection } from "@/features/host/model/host-session-editor-navigation";
 import { BookCover } from "@/shared/ui/book-cover";
 import { Panel } from "./session-editor-panel";
-import type { MobileEditorSection } from "./mobile-editor-tabs";
 
 export const BasicSessionPanel = memo(function BasicSessionPanel({
-  activeMobileSection,
+  activeSection,
   title,
   bookTitle,
   bookAuthor,
@@ -27,7 +27,7 @@ export const BasicSessionPanel = memo(function BasicSessionPanel({
   onMeetingUrlChange,
   onMeetingPasscodeChange,
 }: {
-  activeMobileSection: MobileEditorSection;
+  activeSection: HostSessionEditorSection;
   title: string;
   bookTitle: string;
   bookAuthor: string;
@@ -55,9 +55,9 @@ export const BasicSessionPanel = memo(function BasicSessionPanel({
       <Panel
         eyebrow="도서 정보"
         title="읽을 책"
-        mobileSection="basic"
+        section="basic"
         panelId="host-editor-panel-basic-info"
-        activeMobileSection={activeMobileSection}
+        activeSection={activeSection}
       >
         <div className="stack" style={{ "--stack": "14px" } as CSSProperties}>
           <div>
@@ -137,9 +137,9 @@ export const BasicSessionPanel = memo(function BasicSessionPanel({
       <Panel
         eyebrow="일정 정보"
         title="모임 일정과 접속 정보"
-        mobileSection="basic"
+        section="basic"
         panelId="host-editor-panel-basic-schedule"
-        activeMobileSection={activeMobileSection}
+        activeSection={activeSection}
       >
         <div className="grid-3">
           <div>

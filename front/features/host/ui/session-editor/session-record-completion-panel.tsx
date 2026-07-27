@@ -1,15 +1,20 @@
-import type { ChangeEvent, ComponentType, CSSProperties, ReactNode } from "react";
+import type {
+  ChangeEvent,
+  ComponentProps,
+  ComponentType,
+  CSSProperties,
+  ReactNode,
+} from "react";
+import type { HostSessionEditorSection } from "@/features/host/model/host-session-editor-navigation";
 import { AiGenerateTab } from "@/features/host/aigen/ui/AiGenerateTab";
 import type {
   SessionImportPreviewResponse,
   SessionRecordVisibility,
 } from "@/features/host/model/host-view-types";
 import type { SessionImportCommitResult } from "@/features/host/model/session-import-model";
-import type { AiCommitResponse } from "@/features/host/aigen/api/aigen-contracts";
 import type { ReadmatesReturnState } from "@/shared/routing/readmates-route-state";
 import { Panel } from "./session-editor-panel";
 import { SessionImportPanelBody } from "./session-import-panel";
-import type { MobileEditorSection } from "./mobile-editor-tabs";
 
 type FeedbackDocumentStatus = {
   uploaded: boolean;
@@ -24,9 +29,13 @@ type FeedbackPreviewLinkProps = {
 };
 
 export type SessionRecordCompletionMode = "aigen" | "json";
+export type AiGenerateCommitResult = Parameters<
+  ComponentProps<typeof AiGenerateTab>["onCommitted"]
+>[0];
 
 type SessionRecordCompletionPanelProps = {
-  activeMobileSection: MobileEditorSection;
+  activeSection: HostSessionEditorSection;
+  panelId?: string;
   sessionId: string | undefined;
   clubSlug: string | undefined;
   mode: SessionRecordCompletionMode;
@@ -41,13 +50,14 @@ type SessionRecordCompletionPanelProps = {
   error: string | null;
   expectedDraftRevision: number | null;
   onModeChange: (mode: SessionRecordCompletionMode) => void;
-  onAigenCommitted: (result: AiCommitResponse | null) => void;
+  onAigenCommitted: (result: AiGenerateCommitResult) => void;
   onFileSelected: (event: ChangeEvent<HTMLInputElement>) => void;
   onCommit: () => void;
 };
 
 export function SessionRecordCompletionPanel({
-  activeMobileSection,
+  activeSection,
+  panelId = "host-editor-panel-session-record-completion",
   sessionId,
   clubSlug,
   mode,
@@ -72,9 +82,9 @@ export function SessionRecordCompletionPanel({
     <Panel
       eyebrow="세션 기록"
       title="세션 기록 완성"
-      mobileSection="records"
-      panelId="host-editor-panel-session-record-completion"
-      activeMobileSection={activeMobileSection}
+      section="records"
+      panelId={panelId}
+      activeSection={activeSection}
     >
       <div className="stack" style={{ "--stack": "14px" } as CSSProperties}>
         <FeedbackDocumentStatusView

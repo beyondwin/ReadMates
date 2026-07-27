@@ -32,7 +32,8 @@ const sectionItems: readonly {
     panelIds: [
       "host-editor-panel-publish",
       "host-editor-panel-records",
-      "host-editor-panel-session-record-completion",
+      "host-editor-panel-records-ai",
+      "host-editor-panel-records-json",
     ],
   },
   {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
-import type { MobileEditorSection } from "./mobile-editor-tabs";
+import type { HostSessionEditorSection } from "@/features/host/model/host-session-editor-navigation";
 import { Panel } from "./session-editor-panel";
 
 export type SessionHistoryPanelItem = {
@@ -32,7 +32,7 @@ const historyTypeLabels: Record<SessionHistoryPanelItem["type"], string> = {
 };
 
 export function SessionHistoryPanel({
-  activeMobileSection,
+  activeSection,
   items,
   expectedDraftRevision,
   restoring,
@@ -41,7 +41,7 @@ export function SessionHistoryPanel({
   onLoadMore,
   onRestore,
 }: {
-  activeMobileSection: MobileEditorSection;
+  activeSection: HostSessionEditorSection;
   items: SessionHistoryPanelItem[];
   expectedDraftRevision: number | null;
   restoring: boolean;
@@ -95,9 +95,9 @@ export function SessionHistoryPanel({
       <Panel
         eyebrow="변경 이력"
         title="revision과 작업 이력"
-        mobileSection="history"
+        section="history"
         panelId="host-editor-panel-history"
-        activeMobileSection={activeMobileSection}
+        activeSection={activeSection}
       >
         <div className="stack" style={{ "--stack": "10px" } as CSSProperties}>
           {items.length === 0 ? (
