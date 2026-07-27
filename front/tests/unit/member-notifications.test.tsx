@@ -1,6 +1,6 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { createMemoryRouter, MemoryRouter, RouterProvider, useLocation } from "react-router-dom";
+import { createMemoryRouter, Link, MemoryRouter, RouterProvider, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MemberNotificationListResponse } from "@/features/notifications/api/notifications-contracts";
 import { memberNotificationsActions, memberNotificationsLoader } from "@/features/notifications/route/member-notifications-data";
@@ -36,6 +36,15 @@ const scopedUnreadNotification = {
   deepLinkPath: "/clubs/reading-sai/app/sessions/00000000-0000-0000-0000-000000000002",
 };
 
+const readReflectionNotification = {
+  ...unreadNotification,
+  id: "00000000-0000-0000-0000-000000000004",
+  eventType: "FEEDBACK_DOCUMENT_PUBLISHED" as const,
+  title: "지난 모임 회고가 준비되었습니다",
+  body: "모임 기록과 피드백을 다시 확인해 주세요.",
+  readAt: "2026-04-29T01:00:00Z",
+};
+
 const notificationData: MemberNotificationListResponse = {
   unreadCount: 1,
   items: [unreadNotification],
@@ -64,26 +73,46 @@ function jsonResponse(body: unknown) {
 
 function DestinationProbe() {
   const location = useLocation();
-  return <div>destination {location.pathname}</div>;
+  const state = location.state as {
+    readmatesReturnTo?: string;
+    readmatesReturnLabel?: string;
+  } | null;
+
+  return (
+    <div>
+      <div>destination {location.pathname}</div>
+      <div data-testid="return-to">{state?.readmatesReturnTo ?? ""}</div>
+      <div data-testid="return-label">{state?.readmatesReturnLabel ?? ""}</div>
+      {state?.readmatesReturnTo ? (
+        <Link to={state.readmatesReturnTo}>
+          {state.readmatesReturnLabel ?? "알림으로"} 돌아가기
+        </Link>
+      ) : null}
+    </div>
+  );
 }
 
-function renderMemberNotificationsRoute(data: MemberNotificationListResponse = notificationData) {
+function renderMemberNotificationsRoute(
+  data: MemberNotificationListResponse = notificationData,
+  initialEntry = "/app/notifications",
+) {
   installRouterRequestShim();
   const loader = vi.fn(() => data);
+  const isScoped = initialEntry.startsWith("/clubs/");
   const router = createMemoryRouter(
     [
       {
-        path: "/app/notifications",
+        path: isScoped ? "/clubs/:clubSlug/app/notifications" : "/app/notifications",
         element: <MemberNotificationsRoute />,
         loader,
         hydrateFallbackElement: <div>알림을 불러오는 중</div>,
       },
       {
-        path: "/app/sessions/:sessionId",
+        path: isScoped ? "/clubs/:clubSlug/app/sessions/:sessionId" : "/app/sessions/:sessionId",
         element: <DestinationProbe />,
       },
     ],
-    { initialEntries: ["/app/notifications"] },
+    { initialEntries: [initialEntry] },
   );
 
   render(<RouterProvider router={router} />);
@@ -263,6 +292,33 @@ describe("MemberNotificationsPage", () => {
 
     expect(markRead).toHaveBeenCalledWith(unreadNotification.id);
     expect(await screen.findByText("destination /app/sessions/00000000-0000-0000-0000-000000000002")).toBeInTheDocument();
+  });
+
+  it("opens an already-read reflection with scoped return state without marking it read again", async () => {
+    const user = userEvent.setup();
+    const markRead = vi.spyOn(memberNotificationsActions, "markRead").mockResolvedValue(undefined);
+    const { router } = renderMemberNotificationsRoute(
+      {
+        unreadCount: 0,
+        items: [readReflectionNotification],
+        nextCursor: null,
+      },
+      "/clubs/reading-sai/app/notifications",
+    );
+
+    await user.click(await screen.findByRole("link", {
+      name: "지난 모임 회고가 준비되었습니다 열기",
+    }));
+
+    expect(markRead).not.toHaveBeenCalled();
+    expect(await screen.findByTestId("return-to")).toHaveTextContent(
+      "/clubs/reading-sai/app/notifications",
+    );
+    expect(screen.getByTestId("return-label")).toHaveTextContent("지난 모임 회고");
+
+    await user.click(screen.getByRole("link", { name: "지난 모임 회고 돌아가기" }));
+
+    expect(router.state.location.pathname).toBe("/clubs/reading-sai/app/notifications");
   });
 
   it("keeps the user in the inbox when opening an unread row fails", async () => {

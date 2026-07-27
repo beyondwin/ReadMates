@@ -34,6 +34,10 @@ interface MemberNotificationsPageProps {
     href: string,
     state?: ReadmatesReturnState,
   ) => void;
+  onNavigateNotification?: (
+    href: string,
+    state: ReadmatesReturnState,
+  ) => void;
   onLoadMore?: () => void;
 }
 
@@ -105,6 +109,7 @@ function MemberNotificationsPageContent({
   actionError = null,
   onMarkAllRead,
   onOpenNotification,
+  onNavigateNotification,
   onLoadMore,
   routePathname,
 }: MemberNotificationsPageProps & { routePathname: string }) {
@@ -199,6 +204,12 @@ function MemberNotificationsPageContent({
                           event.preventDefault();
                           if (!readPending) openNotification();
                         }
+                      : !unread && state && onNavigateNotification
+                        ? (event) => {
+                            if (!isPrimaryLinkActivation(event)) return;
+                            event.preventDefault();
+                            onNavigateNotification(href, state);
+                          }
                       : undefined
                   }
                 >

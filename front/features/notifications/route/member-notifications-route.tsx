@@ -85,6 +85,10 @@ export function MemberNotificationsRoute() {
     })();
   };
 
+  const navigateNotification = (href: string, state: ReadmatesReturnState) => {
+    void navigate(href, { state });
+  };
+
   const loadMore = async () => {
     if (!page.nextCursor || isLoadingMore) {
       return;
@@ -122,6 +126,7 @@ export function MemberNotificationsRoute() {
         void markAllRead();
       }}
       onOpenNotification={openNotification}
+      onNavigateNotification={navigateNotification}
       onLoadMore={() => {
         void loadMore();
       }}

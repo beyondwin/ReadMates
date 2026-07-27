@@ -48,7 +48,9 @@ async function routeHostClosing(page: Page): Promise<void> {
   });
 }
 
-async function routeMemberNotifications(page: Page): Promise<void> {
+async function routeMemberNotifications(page: Page): Promise<{ readRequestIds: string[] }> {
+  const readRequestIds: string[] = [];
+
   await page.unroute("**/api/bff/api/auth/me**");
   await page.route("**/api/bff/api/auth/me**", async (route) => {
     await json(route, 200, {
@@ -89,12 +91,25 @@ async function routeMemberNotifications(page: Page): Promise<void> {
           readAt: null,
           createdAt: "2026-06-18T10:00:00Z",
         },
+        {
+          id: "notification-2",
+          eventType: "FEEDBACK_DOCUMENT_PUBLISHED",
+          title: "No.07 회고 다시 보기",
+          body: "이미 읽은 지난 모임 기록과 피드백을 다시 확인합니다.",
+          deepLinkPath: `/sessions/${SESSION_ID}`,
+          readAt: "2026-06-18T10:05:00Z",
+          createdAt: "2026-06-18T10:00:00Z",
+        },
       ],
     });
   });
-  await page.route("**/api/bff/api/me/notifications/notification-1/read**", async (route) => {
+  await page.route("**/api/bff/api/me/notifications/*/read**", async (route) => {
+    const match = new URL(route.request().url()).pathname.match(/\/notifications\/([^/]+)\/read$/);
+    readRequestIds.push(match?.[1] ?? "unknown");
     await json(route, 200, {});
   });
+
+  return { readRequestIds };
 }
 
 async function routeMemberReflectionSurfaces(page: Page): Promise<void> {
@@ -216,7 +231,7 @@ test("session closing flywheel links host member and public surfaces", async ({ 
   const screenshot = await page.screenshot({ path: testInfo.outputPath("session-closing-board.png"), fullPage: true });
   expect(screenshot.byteLength).toBeGreaterThan(10_000);
 
-  await routeMemberNotifications(page);
+  const { readRequestIds } = await routeMemberNotifications(page);
   await routeMemberReflectionSurfaces(page);
   await page.goto(`/clubs/${CLUB_SLUG}/app/notifications`);
 
@@ -268,6 +283,19 @@ test("session closing flywheel links host member and public surfaces", async ({ 
   await expect(page.getByRole("link", { name: "지난 모임 회고 돌아가기" })).toBeVisible();
   await page.getByRole("link", { name: "지난 모임 회고 돌아가기" }).click();
   await expect(page).toHaveURL(new RegExp(`/clubs/${CLUB_SLUG}/app/notifications$`));
+  expect(readRequestIds).toEqual(["notification-1"]);
+
+  const readReflectionRow = page.getByRole("link", {
+    name: "No.07 회고 다시 보기 열기",
+  });
+  await expect(readReflectionRow).toHaveAttribute("data-unread", "false");
+  await readReflectionRow.click();
+  await expect(page).toHaveURL(new RegExp(`/clubs/${CLUB_SLUG}/app/sessions/${SESSION_ID}$`));
+  await expect(page.getByRole("link", { name: "지난 모임 회고 돌아가기" })).toBeVisible();
+  await page.getByRole("link", { name: "지난 모임 회고 돌아가기" }).click();
+  await expect(page).toHaveURL(new RegExp(`/clubs/${CLUB_SLUG}/app/notifications$`));
+  expect(readRequestIds).toEqual(["notification-1"]);
+
   await expect(page.getByText("member1@example.com")).toHaveCount(0);
   await expect(page.getByText("ADMIN_ROUTE")).toHaveCount(0);
   await expect(page.getByText("{\"")).toHaveCount(0);
