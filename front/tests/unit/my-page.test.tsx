@@ -91,7 +91,7 @@ describe("MyPage", () => {
     expect(screen.getByText("완독 4/6")).toBeInTheDocument();
     expect(screen.getByText("질문")).toBeInTheDocument();
     expect(screen.getByText("서평")).toBeInTheDocument();
-    expect(screen.queryByText("member@example.com")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "계정과 알림" })).not.toBeInTheDocument();
   });
 
   it("keeps settings in a controlled disclosure after the record surface", async () => {
@@ -104,11 +104,11 @@ describe("MyPage", () => {
     render(<ControlledPage />);
     const trigger = screen.getByRole("button", { name: "계정·알림 설정" });
     expect(trigger).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByRole("region", { name: "계정·알림 설정" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "계정과 알림" })).not.toBeInTheDocument();
 
     await user.click(trigger);
     expect(trigger).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("region", { name: "계정·알림 설정" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "계정과 알림" })).toBeInTheDocument();
   });
 
   it("forwards the route-owned load-more callback without replacing rendered records", async () => {

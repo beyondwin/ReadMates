@@ -4,6 +4,7 @@ import { latestJourneyItem, shelfEmptyState, type MyJourneyPage } from "@/featur
 import { Link } from "@/features/archive/ui/archive-link";
 import { MyReadingJourney } from "./my-reading-journey";
 import { MyReadingSummary } from "./my-reading-summary";
+import { MyPageSettings } from "./my-page-settings";
 
 export type MyReadingShelfProps = {
   profile: MyPageProfile;
@@ -76,11 +77,7 @@ export function MyReadingShelf({
           ) : null}
         </section>
       ) : null}
-      {settingsOpen ? (
-        <section id="my-page-settings" className="rm-my-shelf-settings" aria-label="계정·알림 설정">
-          {settings}
-        </section>
-      ) : null}
+      <MyPageSettings open={settingsOpen}>{settings}</MyPageSettings>
     </main>
   );
 }

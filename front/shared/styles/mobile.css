@@ -1634,9 +1634,19 @@ body[data-home="stack"] .home-carousel { display: none; }
     padding: 18px;
   }
 
+  .rm-my-shelf-settings__membership dl > div {
+    grid-template-columns: minmax(78px, 0.4fr) minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .rm-my-shelf-settings__boundary {
+    padding-top: 22px;
+  }
+
   .rm-my-shelf-action,
   .rm-my-shelf-settings-trigger,
-  .rm-my-shelf-load-more {
+  .rm-my-shelf-load-more,
+  .rm-my-shelf-settings__logout .btn {
     min-block-size: 44px;
   }
 

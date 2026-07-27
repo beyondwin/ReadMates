@@ -32,9 +32,9 @@ export function DangerZone({
 
   return (
     <section className={isMobile ? "m-card-quiet" : "surface-quiet"} style={{ padding: isMobile ? "18px" : "22px" }}>
-      <div className="eyebrow" style={{ marginBottom: "10px" }}>
-        계정 경계
-      </div>
+      <h3 className="eyebrow" style={{ margin: "0 0 10px" }}>
+        멤버십 경계
+      </h3>
       <div className={isMobile ? "m-row-between" : "row-between"} style={{ gap: "16px", alignItems: "flex-start" }}>
         <div className="small" style={{ color: "var(--text-2)" }}>
           클럽 탈퇴 · 내 기록은 유지, 내 이름은 비공개 처리됩니다.
