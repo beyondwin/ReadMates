@@ -160,20 +160,8 @@ private data class MyJourneyCursor(
     }
 }
 
-private val PAGE_SQL =
+private val MY_JOURNEY_ACTIVITY_JOINS_SQL =
     """
-    select
-      sessions.id as session_id,
-      sessions.number as session_number,
-      sessions.book_title,
-      sessions.book_author,
-      sessions.book_image_url,
-      sessions.session_date,
-      my_checkin.reading_progress,
-      coalesce(my_questions.question_count, 0) as question_count,
-      coalesce(my_reviews.review_count, 0) as review_count,
-      latest_feedback_document.id as feedback_document_id
-    from sessions
     left join (
       select session_participants.session_id, session_participants.attendance_status
       from session_participants
@@ -219,7 +207,11 @@ private val PAGE_SQL =
       ) ranked_feedback_documents
       where ranked_feedback_documents.document_rank = 1
     ) latest_feedback_document on latest_feedback_document.session_id = sessions.id
-    where sessions.club_id = ?
+    """.trimIndent()
+
+private val MY_JOURNEY_ELIGIBILITY_SQL =
+    """
+    sessions.club_id = ?
       and sessions.state in ('CLOSED', 'PUBLISHED')
       and sessions.visibility in ('MEMBER', 'PUBLIC')
       and (
@@ -228,6 +220,24 @@ private val PAGE_SQL =
         or coalesce(my_reviews.review_count, 0) > 0
         or latest_feedback_document.id is not null
       )
+    """.trimIndent()
+
+private val PAGE_SQL =
+    """
+    select
+      sessions.id as session_id,
+      sessions.number as session_number,
+      sessions.book_title,
+      sessions.book_author,
+      sessions.book_image_url,
+      sessions.session_date,
+      my_checkin.reading_progress,
+      coalesce(my_questions.question_count, 0) as question_count,
+      coalesce(my_reviews.review_count, 0) as review_count,
+      latest_feedback_document.id as feedback_document_id
+    from sessions
+    $MY_JOURNEY_ACTIVITY_JOINS_SQL
+    where $MY_JOURNEY_ELIGIBILITY_SQL
       and (
         ? is null
         or sessions.session_date < ?
@@ -245,7 +255,8 @@ private val SUMMARY_SQL =
         when current_participant.attendance_status = 'ATTENDED' then sessions.id
       end) as attended_session_count,
       count(distinct case
-        when my_checkin.reading_progress >= 100 then sessions.id
+        when current_participant.attendance_status = 'ATTENDED'
+          and my_checkin.reading_progress >= 100 then sessions.id
       end) as completed_reading_count,
       coalesce(sum(my_questions.question_count), 0) as question_count,
       coalesce(sum(my_reviews.review_count), 0) as review_count,
@@ -253,58 +264,6 @@ private val SUMMARY_SQL =
         when ? = true and latest_feedback_document.id is not null then sessions.id
       end) as readable_feedback_document_count
     from sessions
-    left join (
-      select session_participants.session_id, session_participants.attendance_status
-      from session_participants
-      where session_participants.club_id = ?
-        and session_participants.membership_id = ?
-        and session_participants.participation_status = 'ACTIVE'
-    ) current_participant on current_participant.session_id = sessions.id
-    left join (
-      select questions.session_id, count(*) as question_count
-      from questions
-      where questions.club_id = ?
-        and questions.membership_id = ?
-      group by questions.session_id
-    ) my_questions on my_questions.session_id = sessions.id
-    left join (
-      select long_reviews.session_id, count(*) as review_count
-      from long_reviews
-      where long_reviews.club_id = ?
-        and long_reviews.membership_id = ?
-      group by long_reviews.session_id
-    ) my_reviews on my_reviews.session_id = sessions.id
-    left join (
-      select reading_checkins.session_id, reading_checkins.reading_progress
-      from reading_checkins
-      where reading_checkins.club_id = ?
-        and reading_checkins.membership_id = ?
-    ) my_checkin on my_checkin.session_id = sessions.id
-    left join (
-      select ranked_feedback_documents.id, ranked_feedback_documents.session_id
-      from (
-        select
-          session_feedback_documents.id,
-          session_feedback_documents.session_id,
-          row_number() over (
-            partition by session_feedback_documents.session_id
-            order by
-              session_feedback_documents.version desc,
-              session_feedback_documents.created_at desc,
-              session_feedback_documents.id desc
-          ) as document_rank
-        from session_feedback_documents
-        where session_feedback_documents.club_id = ?
-      ) ranked_feedback_documents
-      where ranked_feedback_documents.document_rank = 1
-    ) latest_feedback_document on latest_feedback_document.session_id = sessions.id
-    where sessions.club_id = ?
-      and sessions.state in ('CLOSED', 'PUBLISHED')
-      and sessions.visibility in ('MEMBER', 'PUBLIC')
-      and (
-        current_participant.attendance_status = 'ATTENDED'
-        or coalesce(my_questions.question_count, 0) > 0
-        or coalesce(my_reviews.review_count, 0) > 0
-        or latest_feedback_document.id is not null
-      )
+    $MY_JOURNEY_ACTIVITY_JOINS_SQL
+    where $MY_JOURNEY_ELIGIBILITY_SQL
     """.trimIndent()

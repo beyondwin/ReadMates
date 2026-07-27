@@ -34,9 +34,11 @@ class MyJourneyQueriesTest(
     fun seedJourneyFixtures() {
         insertFixtureClubs()
         insertFixtureMember()
+        insertOtherCurrentClubMember()
         insertVisibleJourneySessions()
         insertExcludedJourneySessions()
-        insertJourneyActivity()
+        insertCurrentMemberActivity()
+        insertOtherCurrentClubMemberActivity()
     }
 
     private fun insertVisibleJourneySessions() {
@@ -114,15 +116,26 @@ class MyJourneyQueriesTest(
             COVER_URL,
             OTHER_CLUB_ID,
         )
+        insertSession(
+            OTHER_CURRENT_MEMBER_ONLY_SESSION_ID,
+            913,
+            "2026-07-22",
+            "PUBLISHED",
+            "MEMBER",
+            "Other Member Book",
+            "Writer H",
+            COVER_URL,
+        )
     }
 
-    private fun insertJourneyActivity() {
+    private fun insertCurrentMemberActivity() {
         insertAttendedParticipant(ATTENDED_CLOSED_SESSION_ID, MEMBERSHIP_ID, CLUB_ID, ATTENDED_PARTICIPANT_ID)
         insertAttendedParticipant(SECOND_ATTENDED_SESSION_ID, MEMBERSHIP_ID, CLUB_ID, SECOND_ATTENDED_PARTICIPANT_ID)
         insertAttendedParticipant(HOST_ONLY_SESSION_ID, MEMBERSHIP_ID, CLUB_ID, HOST_ONLY_PARTICIPANT_ID)
         insertAttendedParticipant(OTHER_CLUB_SESSION_ID, OTHER_MEMBERSHIP_ID, OTHER_CLUB_ID, OTHER_CLUB_PARTICIPANT_ID)
 
         insertReadingCheckin(ATTENDED_CLOSED_SESSION_ID, MEMBERSHIP_ID, CLUB_ID, COMPLETED_CHECKIN_ID, 100)
+        insertReadingCheckin(FEEDBACK_ONLY_SESSION_ID, MEMBERSHIP_ID, CLUB_ID, UNATTENDED_COMPLETED_CHECKIN_ID, 100)
         insertReadingCheckin(HOST_ONLY_SESSION_ID, MEMBERSHIP_ID, CLUB_ID, HOST_ONLY_CHECKIN_ID, 100)
         insertReadingCheckin(OTHER_CLUB_SESSION_ID, OTHER_MEMBERSHIP_ID, OTHER_CLUB_ID, OTHER_CLUB_CHECKIN_ID, 100)
 
@@ -145,6 +158,35 @@ class MyJourneyQueriesTest(
         insertFeedbackDocument(FEEDBACK_ONLY_SESSION_ID, CLUB_ID, FEEDBACK_DOCUMENT_ID)
         insertFeedbackDocument(HOST_ONLY_SESSION_ID, CLUB_ID, HOST_ONLY_FEEDBACK_DOCUMENT_ID)
         insertFeedbackDocument(OTHER_CLUB_SESSION_ID, OTHER_CLUB_ID, OTHER_CLUB_FEEDBACK_DOCUMENT_ID)
+    }
+
+    private fun insertOtherCurrentClubMemberActivity() {
+        insertAttendedParticipant(
+            OTHER_CURRENT_MEMBER_ONLY_SESSION_ID,
+            OTHER_CURRENT_CLUB_MEMBERSHIP_ID,
+            CLUB_ID,
+            OTHER_CURRENT_CLUB_PARTICIPANT_ID,
+        )
+        insertReadingCheckin(
+            OTHER_CURRENT_MEMBER_ONLY_SESSION_ID,
+            OTHER_CURRENT_CLUB_MEMBERSHIP_ID,
+            CLUB_ID,
+            OTHER_CURRENT_CLUB_CHECKIN_ID,
+            100,
+        )
+        insertQuestion(
+            OTHER_CURRENT_MEMBER_ONLY_SESSION_ID,
+            OTHER_CURRENT_CLUB_MEMBERSHIP_ID,
+            CLUB_ID,
+            OTHER_CURRENT_CLUB_QUESTION_ID,
+            1,
+        )
+        insertLongReview(
+            OTHER_CURRENT_MEMBER_ONLY_SESSION_ID,
+            OTHER_CURRENT_CLUB_MEMBERSHIP_ID,
+            CLUB_ID,
+            OTHER_CURRENT_CLUB_REVIEW_ID,
+        )
     }
 
     @Test
@@ -180,6 +222,7 @@ class MyJourneyQueriesTest(
             .doesNotContain(
                 HOST_ONLY_SESSION_ID.toString(),
                 OTHER_CLUB_SESSION_ID.toString(),
+                OTHER_CURRENT_MEMBER_ONLY_SESSION_ID.toString(),
             )
 
         val sameTupleCursor =
@@ -226,6 +269,7 @@ class MyJourneyQueriesTest(
             )
         assertThat(secondPage.nextCursor).isNull()
         val readableFeedback = secondPage.items.first().feedbackDocument
+        assertThat(secondPage.items.first().readingProgress).isEqualTo(100)
         assertThat(readableFeedback.available).isTrue()
         assertThat(readableFeedback.readable).isTrue()
         assertThat(readableFeedback.lockedReason).isNull()
@@ -293,18 +337,38 @@ class MyJourneyQueriesTest(
         insertMembership(OTHER_MEMBERSHIP_ID, OTHER_CLUB_ID)
     }
 
+    private fun insertOtherCurrentClubMember() {
+        jdbcTemplate.update(
+            """
+            insert into users (id, google_subject_id, email, name, short_name, auth_provider)
+            values (?, 'readmates-test-other-journey-member', 'other-journey-member@example.com',
+              'Other Journey Member', 'Other Journey', 'GOOGLE')
+            """.trimIndent(),
+            OTHER_CURRENT_CLUB_USER_ID.toString(),
+        )
+        insertMembership(
+            OTHER_CURRENT_CLUB_MEMBERSHIP_ID,
+            CLUB_ID,
+            OTHER_CURRENT_CLUB_USER_ID,
+            "Other Journey",
+        )
+    }
+
     private fun insertMembership(
         membershipId: UUID,
         clubId: UUID,
+        userId: UUID = USER_ID,
+        shortName: String = "Journey",
     ) {
         jdbcTemplate.update(
             """
             insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
-            values (?, ?, ?, 'MEMBER', 'ACTIVE', '2026-01-01 00:00:00', 'Journey')
+            values (?, ?, ?, 'MEMBER', 'ACTIVE', '2026-01-01 00:00:00', ?)
             """.trimIndent(),
             membershipId.toString(),
             clubId.toString(),
-            USER_ID.toString(),
+            userId.toString(),
+            shortName,
         )
     }
 
@@ -443,6 +507,8 @@ private val OTHER_CLUB_ID: UUID = UUID.fromString("70000000-0000-0000-0000-00000
 private val USER_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000001")
 private val MEMBERSHIP_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000002")
 private val OTHER_MEMBERSHIP_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000003")
+private val OTHER_CURRENT_CLUB_USER_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000004")
+private val OTHER_CURRENT_CLUB_MEMBERSHIP_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000005")
 
 private val ATTENDED_CLOSED_SESSION_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000101")
 private val QUESTION_ONLY_SESSION_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000102")
@@ -451,22 +517,28 @@ private val FEEDBACK_ONLY_SESSION_ID: UUID = UUID.fromString("70000000-0000-0000
 private val SECOND_ATTENDED_SESSION_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000105")
 private val HOST_ONLY_SESSION_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000106")
 private val OTHER_CLUB_SESSION_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000107")
+private val OTHER_CURRENT_MEMBER_ONLY_SESSION_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000108")
 
 private val ATTENDED_PARTICIPANT_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000201")
 private val SECOND_ATTENDED_PARTICIPANT_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000202")
 private val HOST_ONLY_PARTICIPANT_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000203")
 private val OTHER_CLUB_PARTICIPANT_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000204")
+private val OTHER_CURRENT_CLUB_PARTICIPANT_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000205")
 
 private val COMPLETED_CHECKIN_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000301")
 private val HOST_ONLY_CHECKIN_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000302")
 private val OTHER_CLUB_CHECKIN_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000303")
+private val OTHER_CURRENT_CLUB_CHECKIN_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000304")
+private val UNATTENDED_COMPLETED_CHECKIN_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000305")
 
 private val LONG_REVIEW_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000401")
 private val HOST_ONLY_REVIEW_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000402")
 private val OTHER_CLUB_REVIEW_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000403")
+private val OTHER_CURRENT_CLUB_REVIEW_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000404")
 
 private val HOST_ONLY_QUESTION_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000501")
 private val OTHER_CLUB_QUESTION_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000502")
+private val OTHER_CURRENT_CLUB_QUESTION_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000503")
 
 private val FEEDBACK_DOCUMENT_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000601")
 private val HOST_ONLY_FEEDBACK_DOCUMENT_ID: UUID = UUID.fromString("70000000-0000-0000-0000-000000000602")
