@@ -133,8 +133,7 @@ export function buildHostSessionHistoryItemView(item: HostSessionHistoryItem): H
     versionLabel: item.revisionVersion && item.revisionVersion > 0 ? `버전 ${item.revisionVersion}` : null,
     detailItems: item.changedFields.flatMap((field) => changedFieldLabels[field] ? [changedFieldLabels[field]] : []),
     sourceLabel: item.revisionSource ? historySourceLabels[item.revisionSource] : null,
-    canCreateDraft: item.type === "RECORD_REVISION_APPLIED"
-      && item.revisionId !== null
+    canCreateDraft: item.revisionId !== null
       && item.revisionVersion !== null
       && item.revisionVersion > 0,
   };

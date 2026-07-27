@@ -170,7 +170,17 @@ describe("host session editor view model", () => {
       versionLabel: "버전 3",
       detailItems: ["공개 요약", "공개 범위", "하이라이트", "한줄평", "피드백 문서"],
       sourceLabel: "AI로 생성",
-      canCreateDraft: type === "RECORD_REVISION_APPLIED",
+      canCreateDraft: true,
     });
+  });
+
+  it("allows creating a draft from a restored version with a persisted identifier", () => {
+    expect(buildHostSessionHistoryItemView({
+      type: "RECORD_REVISION_RESTORED",
+      changedFields: [],
+      revisionId: "revision-3",
+      revisionVersion: 3,
+      revisionSource: "RESTORED",
+    }).canCreateDraft).toBe(true);
   });
 });
