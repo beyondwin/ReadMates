@@ -867,6 +867,59 @@ describe("HostSessionEditor", () => {
     },
   );
 
+  it("removes a rejected automatic re-preview and clears its error after recovery succeeds", async () => {
+    const user = userEvent.setup();
+    const previewSessionImport = vi
+      .fn(hostSessionEditorTestActions.previewSessionImport)
+      .mockImplementationOnce(hostSessionEditorTestActions.previewSessionImport)
+      .mockRejectedValueOnce(new Error("preview unavailable"))
+      .mockImplementationOnce(hostSessionEditorTestActions.previewSessionImport);
+    const initialWorkflow = recordWorkflow("MEMBER");
+    const renderEditor = (workflow: NonNullable<HostSessionEditorProps["recordWorkflow"]>) => (
+      <HostSessionEditorForTest
+        session={session}
+        initialLocation={{ section: "records", source: "json" }}
+        recordWorkflow={workflow}
+        actions={{ ...hostSessionEditorTestActions, previewSessionImport }}
+      />
+    );
+    const { rerender } = render(renderEditor(initialWorkflow));
+
+    await user.upload(
+      screen.getByLabelText("AI 결과 JSON 가져오기"),
+      new File([sessionImportJson()], "session-import.json", { type: "application/json" }),
+    );
+    await waitFor(() => expect(previewSessionImport).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("region", { name: "세션 기록 미리보기" })).toBeVisible();
+
+    const failedWorkflow = recordWorkflow("MEMBER");
+    failedWorkflow.expectedDraftRevision = 5;
+    rerender(renderEditor(failedWorkflow));
+
+    await waitFor(() => expect(previewSessionImport).toHaveBeenCalledTimes(2));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "가져온 JSON에서 수정할 항목이 있습니다.",
+    );
+    expect.soft(screen.queryByRole("region", { name: "세션 기록 미리보기" }))
+      .not.toBeInTheDocument();
+    expect.soft(screen.getByRole("button", { name: "초안으로 가져오기" })).toBeDisabled();
+
+    const recoveredWorkflow = recordWorkflow("MEMBER");
+    recoveredWorkflow.expectedDraftRevision = 6;
+    rerender(renderEditor(recoveredWorkflow));
+
+    await waitFor(() => expect(previewSessionImport).toHaveBeenCalledTimes(3));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "초안으로 가져오기" })).toBeEnabled();
+    });
+    expect(previewSessionImport.mock.calls[2]?.[1]).toMatchObject({
+      recordVisibility: "MEMBER",
+      expectedDraftRevision: 6,
+    });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "세션 기록 미리보기" })).toBeVisible();
+  });
+
   it("forwards apply-preview pending state to the sticky review action", () => {
     const workflow = recordWorkflow("MEMBER");
     workflow.confirmation.submitting = true;

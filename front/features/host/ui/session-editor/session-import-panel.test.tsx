@@ -60,6 +60,19 @@ describe("SessionImportPanelBody", () => {
     expect(screen.getByRole("button", { name: "초안으로 가져오기" })).toBeDisabled();
   });
 
+  it.each(["idle", "previewing", "error"] as const)(
+    "does not enable commit for a valid preview while status is %s",
+    (status) => {
+      const onCommit = vi.fn();
+      renderPanel({ preview: preview({ valid: true }), status, onCommit });
+
+      const button = screen.getByRole("button", { name: "초안으로 가져오기" });
+      expect(button).toBeDisabled();
+      fireEvent.click(button);
+      expect(onCommit).not.toHaveBeenCalled();
+    },
+  );
+
   it("keeps long imported names and summaries inside the review surface", () => {
     renderPanel({
       preview: {
@@ -86,17 +99,19 @@ function renderPanel({
   preview,
   recordVisibility = "MEMBER",
   onCommit = vi.fn(),
+  status = preview.valid ? "ready" : "error",
 }: {
   preview: SessionImportPreviewResponse;
   recordVisibility?: SessionRecordVisibility;
   onCommit?: () => void;
+  status?: "idle" | "previewing" | "ready" | "committing" | "error";
 }) {
   render(
     <SessionImportPanelBody
       sessionId="session-1"
       recordVisibility={recordVisibility}
       preview={preview}
-      status={preview.valid ? "ready" : "error"}
+      status={status}
       error={preview.valid ? null : "가져온 JSON에서 수정할 항목이 있습니다."}
       onFileSelected={() => {}}
       onCommit={onCommit}

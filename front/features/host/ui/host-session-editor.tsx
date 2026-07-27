@@ -1038,6 +1038,15 @@ export default function HostSessionEditor({
       expectedDraftRevision: sessionImportExpectedDraftRevision,
     };
 
+    queueMicrotask(() => {
+      if (cancelled) {
+        return;
+      }
+      setSessionImportPreview(null);
+      setSessionImportError(null);
+      setSessionImportStatus("previewing");
+    });
+
     void previewSessionImportAction(session.sessionId, refreshedRequest)
       .then((preview) => {
         if (cancelled) {
@@ -1046,15 +1055,16 @@ export default function HostSessionEditor({
         setSessionImportRequest(refreshedRequest);
         setSessionImportPreview(preview);
         setSessionImportStatus(preview.valid ? "ready" : "error");
-        if (!preview.valid) {
-          setSessionImportError(sessionImportFailureMessage("preview"));
-        }
+        setSessionImportError(
+          preview.valid ? null : sessionImportFailureMessage("preview"),
+        );
       })
       .catch(() => {
         if (cancelled) {
           return;
         }
         setSessionImportRequest(refreshedRequest);
+        setSessionImportPreview(null);
         setSessionImportStatus("error");
         setSessionImportError(sessionImportFailureMessage("preview"));
       });

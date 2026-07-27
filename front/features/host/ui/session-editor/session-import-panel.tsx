@@ -29,7 +29,7 @@ export function SessionImportPanelBody({
   onCommit,
 }: SessionImportPanelBodyProps) {
   const review = preview ? buildSessionImportReview(preview, recordVisibility) : null;
-  const canCommit = Boolean(sessionId) && status !== "committing" && review?.canCommit === true;
+  const canCommit = Boolean(sessionId) && status === "ready" && review?.canCommit === true;
 
   return (
     <div className="stack" style={{ "--stack": "14px" } as CSSProperties}>
