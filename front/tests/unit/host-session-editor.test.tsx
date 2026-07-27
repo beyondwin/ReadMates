@@ -50,6 +50,11 @@ import {
 } from "./api-contract-fixtures";
 
 const retiredPersonalFeedbackReportLabel = ["개인 피드백", "리포트"].join(" ");
+type HostSessionEditorRecordWorkflow =
+  NonNullable<Parameters<typeof HostSessionEditor>[0]["recordWorkflow"]>;
+type RestoreReturnsPromise =
+  ReturnType<HostSessionEditorRecordWorkflow["onRestore"]> extends Promise<void> ? true : false;
+const restoreReturnsPromise: RestoreReturnsPromise = true;
 
 const jsonHeaders = () => new Headers({ "Content-Type": "application/json" });
 
@@ -315,6 +320,10 @@ afterEach(() => {
 });
 
 describe("HostSessionEditor", () => {
+  it("requires restore workflows to expose completion as a promise", () => {
+    expect(restoreReturnsPromise).toBe(true);
+  });
+
   it("calculates the default session date as today", () => {
     expect(defaultSessionDateFrom(new Date(2026, 3, 21))).toBe("2026-04-21");
     expect(defaultSessionDateFrom(new Date(2026, 4, 20))).toBe("2026-05-20");
@@ -455,7 +464,7 @@ describe("HostSessionEditor", () => {
 
     await user.click(history);
     expect(history).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("heading", { name: "변경 기록" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "버전과 작업 기록" })).toBeVisible();
   });
 
   it("supports keyboard selection in the five-section editor tablist", async () => {

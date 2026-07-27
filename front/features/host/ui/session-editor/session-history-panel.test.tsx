@@ -1,7 +1,10 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { appendUniqueSessionHistory } from "./session-history-model";
+import {
+  appendUniqueSessionHistory,
+  type SessionHistoryPanelItem,
+} from "./session-history-model";
 import { SessionHistoryPanel } from "./session-history-panel";
 
 describe("SessionHistoryPanel", () => {
@@ -27,7 +30,8 @@ describe("SessionHistoryPanel", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "변경 기록" })).toBeVisible();
+    expect(screen.getByText("변경 기록")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "버전과 작업 기록" })).toBeVisible();
     expect(screen.getByText("새 버전 반영")).toBeVisible();
     expect(screen.getByText("버전 2")).toBeVisible();
     expect(screen.getByText("과거 버전으로 초안 생성")).toBeVisible();
@@ -195,14 +199,14 @@ describe("SessionHistoryPanel", () => {
   });
 
   it("appends a cursor page without duplicating an overlapping history item", () => {
-    const current = [historyItem()];
-    const next = [
+    const current: SessionHistoryPanelItem[] = [historyItem()];
+    const next: SessionHistoryPanelItem[] = [
       historyItem(),
       { ...historyItem(), id: "history-2", revisionId: "revision-1", revisionVersion: 1 },
     ];
+    const appended: SessionHistoryPanelItem[] = appendUniqueSessionHistory(current, next);
 
-    expect(appendUniqueSessionHistory(current, next).map((item) => item.id))
-      .toEqual(["history-1", "history-2"]);
+    expect(appended.map((item) => item.id)).toEqual(["history-1", "history-2"]);
   });
 });
 

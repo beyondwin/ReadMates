@@ -13,12 +13,18 @@ const routeMocks = vi.hoisted(() => ({
   reload: vi.fn(),
   adoptDraftRevision: vi.fn(),
   adoptEditor: vi.fn(),
+  expectedDraftRevision: 4 as number | null,
+  blocker: {
+    state: "unblocked",
+    proceed: vi.fn(),
+    reset: vi.fn(),
+  },
   capturedProps: null as Record<string, unknown> | null,
 }));
 
 vi.mock("react-router-dom", async (importOriginal) => ({
   ...(await importOriginal<typeof import("react-router-dom")>()),
-  useBlocker: () => ({ state: "unblocked" }),
+  useBlocker: () => routeMocks.blocker,
   useParams: () => ({ clubSlug: "club-a" }),
 }));
 
@@ -33,7 +39,7 @@ vi.mock("@/features/host/hooks/use-session-record-draft-controller", () => ({
   useSessionRecordDraftController: () => ({
     snapshot: recordEditor.liveSnapshot,
     saveState: "idle",
-    expectedDraftRevision: 4,
+    expectedDraftRevision: routeMocks.expectedDraftRevision,
     shouldBlockNavigation: false,
     updateSnapshot: vi.fn(),
     reloadDraft: routeMocks.reload,
@@ -132,6 +138,8 @@ import {
 } from "./host-session-editor-route";
 import { hostNotificationKeys } from "@/features/host/queries/host-notification-queries";
 import { hostSessionKeys } from "@/features/host/queries/host-session-queries";
+import type { HostSessionHistoryItem } from "@/features/host/api/host-session-record-contracts";
+import { appendUniqueSessionHistory } from "@/features/host/ui/session-editor/session-history-model";
 
 const snapshot = {
   schema: "readmates-session-record:v1" as const,
@@ -196,6 +204,22 @@ function workflow() {
   };
 }
 
+function historyTransportItem(): HostSessionHistoryItem {
+  return {
+    id: "history-1",
+    type: "RECORD_REVISION_APPLIED",
+    createdAt: "2026-07-27T10:00:00+09:00",
+    actorMembershipId: "membership-host",
+    changedFields: ["publicationSummary"],
+    attendanceTransitions: [],
+    revisionId: "revision-2",
+    revisionVersion: 2,
+    revisionSource: "MANUAL",
+    restoredFromRevisionId: null,
+    notificationEventId: null,
+  };
+}
+
 describe("EditHostSessionRecordWorkflow", () => {
   beforeEach(() => {
     routeMocks.apply.mockReset();
@@ -208,6 +232,10 @@ describe("EditHostSessionRecordWorkflow", () => {
     routeMocks.reload.mockReset();
     routeMocks.adoptDraftRevision.mockReset();
     routeMocks.adoptEditor.mockReset();
+    routeMocks.expectedDraftRevision = 4;
+    routeMocks.blocker.state = "unblocked";
+    routeMocks.blocker.proceed.mockReset();
+    routeMocks.blocker.reset.mockReset();
     routeMocks.capturedProps = null;
     routeMocks.commitImport.mockResolvedValue({
       sessionId: "session-1",
@@ -228,6 +256,47 @@ describe("EditHostSessionRecordWorkflow", () => {
     renderWorkflow();
 
     expect(screen.getByText("record workflow route ready")).toBeInTheDocument();
+  });
+
+  it("describes unsaved route work as a working draft", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    routeMocks.blocker.state = "blocked";
+
+    renderWorkflow();
+
+    await waitFor(() => {
+      expect(confirm).toHaveBeenCalledWith(
+        "저장되지 않은 작업 초안이 있습니다. 이 화면을 떠날까요?",
+      );
+    });
+    expect(routeMocks.blocker.reset).toHaveBeenCalledTimes(1);
+    expect(routeMocks.blocker.proceed).not.toHaveBeenCalled();
+    confirm.mockRestore();
+  });
+
+  it("asks for a saved working draft before rebase or apply review", async () => {
+    routeMocks.expectedDraftRevision = null;
+    renderWorkflow();
+
+    await act(async () => workflow().onRebaseDraft());
+    expect(workflow().rebaseError).toBe("먼저 작업 초안을 저장해 주세요.");
+
+    await act(async () => workflow().confirmation.onReview());
+    expect(workflow().confirmation.message?.text).toBe("먼저 작업 초안을 저장해 주세요.");
+  });
+
+  it("keeps API history transport items mutable while appending unique pages", () => {
+    const current: HostSessionHistoryItem[] = [historyTransportItem()];
+    const next: HostSessionHistoryItem[] = [
+      historyTransportItem(),
+      { ...historyTransportItem(), id: "history-2" },
+    ];
+    const appended: HostSessionHistoryItem[] = appendUniqueSessionHistory(current, next);
+
+    appended[0]?.changedFields.push("visibility");
+
+    expect(appended.map((item) => item.id)).toEqual(["history-1", "history-2"]);
+    expect(appended[0]?.changedFields).toEqual(["publicationSummary", "visibility"]);
   });
 
   it("rebases the draft against the exact live metadata version rendered to the host", async () => {
@@ -394,6 +463,10 @@ describe("EditHostSessionRecordWorkflow", () => {
     expect(screen.queryByRole("dialog", {
       name: "멤버에게 알림을 보낼까요?",
     })).not.toBeInTheDocument();
+    expect(workflow().confirmation.message?.text).toBe(
+      "변경사항을 반영하지 못했습니다. 현재 적용본은 바뀌지 않았습니다.",
+    );
+    expect(workflow().confirmation.message?.text).not.toContain("live");
   });
 
   it("keeps an ambiguous record apply retryable with the same apply request id", async () => {

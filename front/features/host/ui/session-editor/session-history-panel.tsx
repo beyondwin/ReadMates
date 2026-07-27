@@ -70,8 +70,8 @@ export function SessionHistoryPanel({
   return (
     <>
       <Panel
-        eyebrow="버전 기록"
-        title="변경 기록"
+        eyebrow="변경 기록"
+        title="버전과 작업 기록"
         section="history"
         panelId="host-editor-panel-history"
         activeSection={activeSection}

@@ -141,7 +141,7 @@ type HostSessionRecordWorkflow = {
   onRestore: (request: {
     revisionId: string;
     expectedDraftRevision: number | null;
-  }) => void | Promise<void>;
+  }) => Promise<void>;
 };
 
 function dialogFocusableElements(container: HTMLElement) {

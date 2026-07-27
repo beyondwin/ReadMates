@@ -143,7 +143,7 @@ function useDraftRouteNavigationGuard(shouldBlock: boolean) {
     if (blocker.state !== "blocked") {
       return;
     }
-    if (window.confirm("저장되지 않은 공개 기록 초안이 있습니다. 이 화면을 떠날까요?")) {
+    if (window.confirm("저장되지 않은 작업 초안이 있습니다. 이 화면을 떠날까요?")) {
       blocker.proceed();
     } else {
       blocker.reset();
@@ -386,7 +386,7 @@ export function EditHostSessionRecordWorkflow({
 
   const rebaseDraft = useCallback(async () => {
     if (controller.expectedDraftRevision === null) {
-      setRebaseError("먼저 공개 기록 초안을 저장해 주세요.");
+      setRebaseError("먼저 작업 초안을 저장해 주세요.");
       return;
     }
     setRebaseError(null);
@@ -434,7 +434,7 @@ export function EditHostSessionRecordWorkflow({
 
   const requestApplyPreview = useCallback(async () => {
     if (controller.expectedDraftRevision === null) {
-      setConfirmationMessage({ kind: "alert", text: "먼저 공개 기록 초안을 저장해 주세요." });
+      setConfirmationMessage({ kind: "alert", text: "먼저 작업 초안을 저장해 주세요." });
       return null;
     }
     setApplyPreviewRefreshing(true);
@@ -543,7 +543,7 @@ export function EditHostSessionRecordWorkflow({
       setPendingApply(null);
       setConfirmationMessage({
         kind: "alert",
-        text: "변경사항을 반영하지 못했습니다. live 기록은 변경되지 않았습니다.",
+        text: "변경사항을 반영하지 못했습니다. 현재 적용본은 바뀌지 않았습니다.",
       });
     }
   }, [
