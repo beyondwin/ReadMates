@@ -11,6 +11,7 @@ import type {
   MemberArchiveSessionDetailResponse,
   MyArchiveQuestionPage,
   MyArchiveReviewPage,
+  MyJourneyPage,
   MyPageResponse,
   NoteFeedPage,
   NoteSessionPage,
@@ -67,6 +68,10 @@ export async function fetchMemberArchiveSession(sessionId: string, context?: Rea
 
 export async function fetchMyPage(context?: ReadmatesApiContext) {
   return readmatesFetch<MyPageResponse>("/api/app/me", undefined, context);
+}
+
+export function fetchMyJourney(context?: ReadmatesApiContext, page?: PageRequest) {
+  return readmatesFetch<MyJourneyPage>(`/api/archive/me/journey${pagingSearchParams(page)}`, undefined, context);
 }
 
 export async function updateMyProfile(displayName: string) {

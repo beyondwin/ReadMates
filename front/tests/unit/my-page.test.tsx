@@ -8,6 +8,7 @@ import type {
   MemberProfileResponse,
   MyArchiveQuestionItem,
   MyArchiveReviewItem,
+  MyJourneyPage,
   MyPageResponse,
   NotificationPreferencesResponse,
 } from "@/features/archive/api/archive-contracts";
@@ -195,6 +196,33 @@ const reports: FeedbackDocumentListItem[] = [
 const reportPage = pageOf(reports);
 const reportReadLabel = "No.01 팩트풀니스 피드백 문서 읽기";
 
+function journeyPage({
+  items = [
+    {
+      sessionId: "session-1",
+      sessionNumber: 1,
+      bookTitle: "팩트풀니스",
+      bookAuthor: "한스 로슬링",
+      bookImageUrl: null,
+      date: "2025-11-26",
+      readingProgress: 100,
+      questionCount: 7,
+      reviewCount: 3,
+      feedbackDocument: { available: true, readable: true, lockedReason: null },
+    },
+  ],
+  nextCursor = null,
+  summary = {
+    attendedSessionCount: 6,
+    completedReadingCount: 4,
+    questionCount: 7,
+    reviewCount: 3,
+    readableFeedbackDocumentCount: 1,
+  },
+}: Partial<MyJourneyPage> = {}): MyJourneyPage {
+  return { items, nextCursor, summary };
+}
+
 const questionPage = pageOf<MyArchiveQuestionItem>([
   { sessionId: "session-9", sessionNumber: 9, bookTitle: "여정질문책", date: "2026-02-10", priority: 1, text: "왜 우리는 세상을 더 나쁘게 볼까?", draftThought: null },
 ]);
@@ -268,16 +296,8 @@ function renderMyRouteWithProfileFetch({
       return Promise.resolve(jsonResponse(myPageRequestCount > 1 ? nextMyPageData : initialMyPageData));
     }
 
-    if (url === "/api/bff/api/feedback-documents/me?limit=30") {
-      return Promise.resolve(jsonResponse(reportPage));
-    }
-
-    if (url === "/api/bff/api/archive/me/questions?limit=30") {
-      return Promise.resolve(jsonResponse(pageOf(new Array(7).fill(null))));
-    }
-
-    if (url === "/api/bff/api/archive/me/reviews?limit=30") {
-      return Promise.resolve(jsonResponse(pageOf(new Array(3).fill(null))));
+    if (url === "/api/bff/api/archive/me/journey?limit=12") {
+      return Promise.resolve(jsonResponse(journeyPage()));
     }
 
     if (url === "/api/bff/api/me/notifications/preferences") {
@@ -430,12 +450,8 @@ describe("MyPage", () => {
         );
       }
 
-      if (url === "/api/bff/api/feedback-documents/me?limit=30") {
-        return Promise.resolve(jsonResponse({ message: "forbidden" }, 403));
-      }
-
-      if (url === "/api/bff/api/archive/me/questions?limit=30" || url === "/api/bff/api/archive/me/reviews?limit=30") {
-        return Promise.resolve(jsonResponse(pageOf([])));
+      if (url === "/api/bff/api/archive/me/journey?limit=12") {
+        return Promise.resolve(jsonResponse(journeyPage({ items: [], summary: { ...journeyPage().summary, attendedSessionCount: 0, completedReadingCount: 0, questionCount: 0, reviewCount: 0, readableFeedbackDocumentCount: 0 } })));
       }
 
       if (url === "/api/bff/api/me/notifications/preferences") {
@@ -485,16 +501,8 @@ describe("MyPage", () => {
         return Promise.resolve(jsonResponse(data));
       }
 
-      if (url === "/api/bff/api/feedback-documents/me?limit=30") {
-        return Promise.resolve(jsonResponse(reportPage));
-      }
-
-      if (url === "/api/bff/api/archive/me/questions?limit=30") {
-        return Promise.resolve(jsonResponse(pageOf(new Array(30).fill(null), "questions-next")));
-      }
-
-      if (url === "/api/bff/api/archive/me/reviews?limit=30") {
-        return Promise.resolve(jsonResponse(pageOf(new Array(3).fill(null))));
+      if (url === "/api/bff/api/archive/me/journey?limit=12") {
+        return Promise.resolve(jsonResponse(journeyPage({ summary: { ...journeyPage().summary, questionCount: 30, reviewCount: 3 } })));
       }
 
       if (url === "/api/bff/api/me/notifications/preferences") {
@@ -519,10 +527,9 @@ describe("MyPage", () => {
     render(<RouterProvider router={router} />);
 
     expect(await screen.findByRole("heading", { level: 1, name: "계정과 기록" })).toBeInTheDocument();
-    expect(screen.getAllByText("30+").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("30").length).toBeGreaterThan(0);
     expect(screen.getAllByText("3").length).toBeGreaterThan(0);
-    expect(screen.getByRole("link", { name: "질문 30+" })).toHaveAttribute("href", "/app/archive?view=questions");
-    expect(screen.queryByRole("link", { name: "질문 30" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "질문 30" })).toHaveAttribute("href", "/app/archive?view=questions");
   });
 
   it("saves a trimmed display name through the profile editor", async () => {
@@ -701,6 +708,106 @@ describe("MyPage", () => {
     expect(scoped.getByText("팩트풀니스")).toBeInTheDocument();
     expect(scoped.getByText("냉정한 이타주의자")).toBeInTheDocument();
     expect(scoped.queryByRole("button", { name: "더 보기" })).not.toBeInTheDocument();
+  });
+
+  it("continues the journey with its cursor, blocks duplicate in-flight requests, and discards duplicate sessions", async () => {
+    installRouterRequestShim();
+    const user = userEvent.setup();
+    const nextPage = createDeferred<MyJourneyPage>();
+    let continuationRequests = 0;
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") return Promise.resolve(jsonResponse(activeAuth));
+      if (url === "/api/bff/api/app/me") return Promise.resolve(jsonResponse(data));
+      if (url === "/api/bff/api/archive/me/journey?limit=12") return Promise.resolve(jsonResponse(journeyPage({ nextCursor: "cursor-2" })));
+      if (url === "/api/bff/api/archive/me/journey?limit=12&cursor=cursor-2") {
+        continuationRequests += 1;
+        return nextPage.promise.then((page) => jsonResponse(page));
+      }
+      if (url === "/api/bff/api/me/notifications/preferences") return Promise.resolve(jsonResponse(notificationPreferences));
+      return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const router = createMemoryRouter(
+      [{ path: "/app/me", element: <MyRoutePage />, loader: myPageLoader, hydrateFallbackElement: <div>내 공간을 불러오는 중</div> }],
+      { initialEntries: ["/app/me"] },
+    );
+    const { container } = render(<RouterProvider router={router} />);
+
+    const loadMore = await screen.findByRole("button", { name: "기록 더 보기" });
+    await user.click(loadMore);
+
+    expect(continuationRequests).toBe(1);
+    expect(screen.getByRole("button", { name: "기록을 불러오는 중" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "기록을 불러오는 중" }));
+    expect(continuationRequests).toBe(1);
+
+    await act(async () => {
+      nextPage.resolve(
+        journeyPage({
+          items: [
+            journeyPage().items[0],
+            {
+              sessionId: "session-2",
+              sessionNumber: 2,
+              bookTitle: "냉정한 이타주의자",
+              bookAuthor: "윌리엄 맥어스킬",
+              bookImageUrl: null,
+              date: "2025-12-17",
+              readingProgress: 80,
+              questionCount: 1,
+              reviewCount: 0,
+              feedbackDocument: { available: true, readable: true, lockedReason: null },
+            },
+          ],
+        }),
+      );
+    });
+
+    const desktop = desktopScope(container);
+    await waitFor(() => expect(desktop.getByText("냉정한 이타주의자")).toBeInTheDocument());
+    expect(desktop.getAllByText("팩트풀니스")).toHaveLength(1);
+  });
+
+  it("preserves journey rows after a failed continuation and retries the same cursor once", async () => {
+    installRouterRequestShim();
+    const user = userEvent.setup();
+    const failedPage = createDeferred<MyJourneyPage>();
+    let continuationRequests = 0;
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") return Promise.resolve(jsonResponse(activeAuth));
+      if (url === "/api/bff/api/app/me") return Promise.resolve(jsonResponse(data));
+      if (url === "/api/bff/api/archive/me/journey?limit=12") return Promise.resolve(jsonResponse(journeyPage({ nextCursor: "cursor-2" })));
+      if (url === "/api/bff/api/archive/me/journey?limit=12&cursor=cursor-2") {
+        continuationRequests += 1;
+        return continuationRequests === 1
+          ? failedPage.promise.then((page) => jsonResponse(page))
+          : Promise.resolve(jsonResponse(journeyPage({ items: [{ ...journeyPage().items[0], sessionId: "session-2", sessionNumber: 2, bookTitle: "재시도 책" }] })));
+      }
+      if (url === "/api/bff/api/me/notifications/preferences") return Promise.resolve(jsonResponse(notificationPreferences));
+      return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const router = createMemoryRouter(
+      [{ path: "/app/me", element: <MyRoutePage />, loader: myPageLoader, hydrateFallbackElement: <div>내 공간을 불러오는 중</div> }],
+      { initialEntries: ["/app/me"] },
+    );
+    const { container } = render(<RouterProvider router={router} />);
+
+    await user.click(await screen.findByRole("button", { name: "기록 더 보기" }));
+    await act(async () => failedPage.reject(new Error("temporary failure")));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("기록을 더 불러오지 못했습니다.");
+    expect(desktopScope(container).getByText("팩트풀니스")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "다시 시도" }));
+
+    await waitFor(() => expect(continuationRequests).toBe(2));
+    expect(await desktopScope(container).findByText("재시도 책")).toBeInTheDocument();
   });
 
   it("encodes feedback document links from my page reports", () => {
@@ -1146,12 +1253,8 @@ describe("MyPage", () => {
         return Promise.resolve(jsonResponse(data));
       }
 
-      if (url === "/api/bff/api/feedback-documents/me?limit=30") {
-        return Promise.resolve(jsonResponse({ message: "forbidden" }, 403));
-      }
-
-      if (url === "/api/bff/api/archive/me/questions?limit=30" || url === "/api/bff/api/archive/me/reviews?limit=30") {
-        return Promise.resolve(jsonResponse(pageOf([])));
+      if (url === "/api/bff/api/archive/me/journey?limit=12") {
+        return Promise.resolve(jsonResponse(journeyPage({ items: [], summary: { ...journeyPage().summary, attendedSessionCount: 0, completedReadingCount: 0, questionCount: 0, reviewCount: 0, readableFeedbackDocumentCount: 0 } })));
       }
 
       if (url === "/api/bff/api/me/notifications/preferences") {

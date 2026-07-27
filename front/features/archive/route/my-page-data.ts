@@ -1,39 +1,28 @@
 import {
   fetchNotificationPreferences,
-  fetchMyArchiveQuestions,
-  fetchMyArchiveReviews,
-  fetchMyFeedbackDocuments,
+  fetchMyJourney,
   fetchMyPage,
 } from "@/features/archive/api/archive-api";
 import type {
-  FeedbackDocumentListPage,
-  MyArchiveQuestionPage,
-  MyArchiveReviewPage,
+  MyJourneyPage,
   MyPageResponse,
   NotificationPreferencesResponse,
 } from "@/features/archive/api/archive-contracts";
-import { defaultNotificationPreferences } from "@/features/archive/model/archive-model";
 import { loadArchiveMemberAuth } from "@/features/archive/route/archive-loader-auth";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 import type { LoaderFunctionArgs } from "react-router-dom";
 
+export type NotificationPreferencesLoadState =
+  | { status: "ready"; preferences: NotificationPreferencesResponse }
+  | { status: "unavailable" }
+  | { status: "error" };
+
 export type MyPageRouteData = {
-  data: MyPageResponse;
-  reports: FeedbackDocumentListPage;
-  questions: MyArchiveQuestionPage;
-  reviews: MyArchiveReviewPage;
-  questionCount: string;
-  reviewCount: string;
-  notificationPreferences: NotificationPreferencesResponse;
-  canManageNotificationPreferences: boolean;
+  profile: MyPageResponse;
+  journey: MyJourneyPage;
+  notificationPreferences: NotificationPreferencesLoadState;
 };
-
-const MY_PAGE_FIRST_PAGE_LIMIT = 30;
-
-function emptyPage<T>() {
-  return { items: [] as T[], nextCursor: null };
-}
 
 function inactiveMyPageData(auth: AuthMeResponse): MyPageResponse {
   return {
@@ -55,8 +44,18 @@ function canManageNotificationPreferences(auth: AuthMeResponse) {
   return auth.membershipStatus !== "VIEWER";
 }
 
-function countLabel<T>(page: { items: T[]; nextCursor: string | null }) {
-  return `${page.items.length}${page.nextCursor ? "+" : ""}`;
+function emptyJourney(): MyJourneyPage {
+  return {
+    items: [],
+    nextCursor: null,
+    summary: {
+      attendedSessionCount: 0,
+      completedReadingCount: 0,
+      questionCount: 0,
+      reviewCount: 0,
+      readableFeedbackDocumentCount: 0,
+    },
+  };
 }
 
 export async function myPageLoader(args?: LoaderFunctionArgs): Promise<MyPageRouteData> {
@@ -66,33 +65,27 @@ export async function myPageLoader(args?: LoaderFunctionArgs): Promise<MyPageRou
 
   if (!access.allowed) {
     return {
-      data: inactiveMyPageData(access.auth),
-      reports: emptyPage(),
-      questions: emptyPage(),
-      reviews: emptyPage(),
-      questionCount: "0",
-      reviewCount: "0",
-      notificationPreferences: defaultNotificationPreferences,
-      canManageNotificationPreferences: false,
+      profile: inactiveMyPageData(access.auth),
+      journey: emptyJourney(),
+      notificationPreferences: { status: "unavailable" },
     };
   }
 
-  const [data, reports, questions, reviews, notificationPreferences] = await Promise.all([
+  const notificationPreferencesPromise = notificationPreferencesAvailable
+    ? fetchNotificationPreferences(context)
+        .then((preferences) => ({ status: "ready", preferences }) as const)
+        .catch(() => ({ status: "error" }) as const)
+    : Promise.resolve({ status: "unavailable" } as const);
+
+  const [profile, journey, notificationPreferences] = await Promise.all([
     fetchMyPage(context),
-    fetchMyFeedbackDocuments(context, { limit: MY_PAGE_FIRST_PAGE_LIMIT }),
-    fetchMyArchiveQuestions(context, { limit: MY_PAGE_FIRST_PAGE_LIMIT }),
-    fetchMyArchiveReviews(context, { limit: MY_PAGE_FIRST_PAGE_LIMIT }),
-    notificationPreferencesAvailable ? fetchNotificationPreferences(context) : Promise.resolve(defaultNotificationPreferences),
+    fetchMyJourney(context, { limit: 12 }),
+    notificationPreferencesPromise,
   ]);
 
   return {
-    data,
-    reports,
-    questions,
-    reviews,
-    questionCount: countLabel(questions),
-    reviewCount: countLabel(reviews),
+    profile,
+    journey,
     notificationPreferences,
-    canManageNotificationPreferences: notificationPreferencesAvailable,
   };
 }

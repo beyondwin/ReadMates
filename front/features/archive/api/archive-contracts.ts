@@ -190,6 +190,37 @@ export type MyPageResponse = {
   }>;
 };
 
+export type MyJourneyFeedbackDocument = {
+  available: boolean;
+  readable: boolean;
+  lockedReason: "NOT_AVAILABLE" | "ACTIVE_MEMBERSHIP_REQUIRED" | null;
+};
+
+export type MyJourneyItem = {
+  sessionId: string;
+  sessionNumber: number;
+  bookTitle: string;
+  bookAuthor: string;
+  bookImageUrl: string | null;
+  date: string;
+  readingProgress: number | null;
+  questionCount: number;
+  reviewCount: number;
+  feedbackDocument: MyJourneyFeedbackDocument;
+};
+
+export type MyJourneySummary = {
+  attendedSessionCount: number;
+  completedReadingCount: number;
+  questionCount: number;
+  reviewCount: number;
+  readableFeedbackDocumentCount: number;
+};
+
+export type MyJourneyPage = PagedResponse<MyJourneyItem> & {
+  summary: MyJourneySummary;
+};
+
 export type NotificationEventType =
   | "NEXT_BOOK_PUBLISHED"
   | "SESSION_REMINDER_DUE"
