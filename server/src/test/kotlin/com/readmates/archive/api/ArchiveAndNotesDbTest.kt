@@ -1,9 +1,13 @@
 package com.readmates.archive.api
 
 import com.jayway.jsonpath.JsonPath
+import com.readmates.archive.application.port.`in`.GetMyPageSummaryUseCase
 import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
+import com.readmates.shared.security.CurrentMember
+import com.readmates.support.QueryCounter
+import com.readmates.support.QueryCountingDataSourcePostProcessor
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
 import org.assertj.core.api.Assertions.assertThat
@@ -21,8 +25,11 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.config.BeanPostProcessor
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.context.annotation.Bean
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.context.jdbc.Sql
@@ -42,6 +49,7 @@ class ArchiveAndNotesDbTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val authSessionService: AuthSessionService,
+    @param:Autowired private val getMyPageSummaryUseCase: GetMyPageSummaryUseCase,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     private val createdSessionParticipantIds = linkedSetOf<String>()
     private val createdMembershipIds = linkedSetOf<String>()
@@ -1271,25 +1279,67 @@ class ArchiveAndNotesDbTest(
     @Test
     @Sql(
         statements = [
-            CLEANUP_VIEWER_ARCHIVE_VISIBILITY_SESSIONS_SQL,
+            CLEANUP_SAMPLE_CLUB_ARCHIVE_ISOLATION_SQL,
+            CLEANUP_MY_PAGE_CURRENT_SESSION_SELECTION_SQL,
+            INSERT_SAMPLE_CLUB_MEMBER5_MEMBERSHIP_SQL,
             INSERT_VIEWER_OPEN_SESSION_SQL,
+            INSERT_MY_PAGE_NEWEST_CURRENT_CLUB_OPEN_SESSION_SQL,
+            INSERT_MY_PAGE_OTHER_CLUB_OPEN_SESSION_SQL,
         ],
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
     )
     @Sql(
         statements = [
-            CLEANUP_VIEWER_ARCHIVE_VISIBILITY_SESSIONS_SQL,
+            CLEANUP_MY_PAGE_CURRENT_SESSION_SELECTION_SQL,
+            CLEANUP_SAMPLE_CLUB_ARCHIVE_ISOLATION_SQL,
         ],
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
-    fun `my page exposes the latest open session identifier without a second query`() {
+    fun `my page chooses the latest open session in the current club within its fixed query budget`() {
         mockMvc
             .get("/api/app/me") {
+                header("X-Readmates-Club-Slug", "reading-sai")
                 with(user("member5@example.com"))
             }.andExpect {
                 status { isOk() }
-                jsonPath("$.currentSessionId") { value("00000000-0000-0000-0000-000000009992") }
+                jsonPath("$.currentSessionId") { value("00000000-0000-0000-0000-000000009994") }
             }
+
+        QueryCounter.reset()
+        val primaryClub =
+            getMyPageSummaryUseCase.getMyPageSummary(
+                CurrentMember(
+                    userId = UUID.fromString("00000000-0000-0000-0000-000000000106"),
+                    membershipId = UUID.fromString("00000000-0000-0000-0000-000000000206"),
+                    clubId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
+                    clubSlug = "reading-sai",
+                    email = "member5@example.com",
+                    displayName = "멤버5",
+                    accountName = "이멤버5",
+                    role = MembershipRole.MEMBER,
+                ),
+            )
+
+        assertThat(primaryClub.currentSessionId).isEqualTo("00000000-0000-0000-0000-000000009994")
+        assertThat(QueryCounter.count()).isEqualTo(2)
+
+        QueryCounter.reset()
+        val otherClub =
+            getMyPageSummaryUseCase.getMyPageSummary(
+                CurrentMember(
+                    userId = UUID.fromString("00000000-0000-0000-0000-000000000106"),
+                    membershipId = UUID.fromString("00000000-0000-0000-0000-000000009182"),
+                    clubId = UUID.fromString("00000000-0000-0000-0000-000000000002"),
+                    clubSlug = "sample-book-club",
+                    email = "member5@example.com",
+                    displayName = "샘플멤버5",
+                    accountName = "이멤버5",
+                    role = MembershipRole.MEMBER,
+                ),
+            )
+
+        assertThat(otherClub.currentSessionId).isEqualTo("00000000-0000-0000-0000-000000009995")
+        assertThat(QueryCounter.count()).isEqualTo(2)
     }
 
     @Test
@@ -1581,6 +1631,47 @@ class ArchiveAndNotesDbTest(
             where id = '00000000-0000-0000-0000-000000009181';
             delete from memberships
             where id = '00000000-0000-0000-0000-000000009182';
+        """
+
+        private const val CLEANUP_MY_PAGE_CURRENT_SESSION_SELECTION_SQL = """
+            delete from sessions
+            where id in (
+              '00000000-0000-0000-0000-000000009992',
+              '00000000-0000-0000-0000-000000009994',
+              '00000000-0000-0000-0000-000000009995'
+            );
+        """
+
+        private const val INSERT_MY_PAGE_NEWEST_CURRENT_CLUB_OPEN_SESSION_SQL = """
+            insert into sessions (
+              id, club_id, number, title, book_title, book_author,
+              book_translator, book_link, book_image_url, session_date,
+              start_time, end_time, location_label, meeting_url,
+              meeting_passcode, question_deadline_at, state, visibility
+            )
+            values (
+              '00000000-0000-0000-0000-000000009994',
+              '00000000-0000-0000-0000-000000000001',
+              1001, '1001회차 · 최신 진행 세션', '최신 진행 책', '테스트 저자',
+              null, null, null, '2030-05-01', '19:00:00', '21:00:00',
+              '온라인', null, null, '2030-04-30 14:59:00.000000', 'OPEN', 'PUBLIC'
+            );
+        """
+
+        private const val INSERT_MY_PAGE_OTHER_CLUB_OPEN_SESSION_SQL = """
+            insert into sessions (
+              id, club_id, number, title, book_title, book_author,
+              book_translator, book_link, book_image_url, session_date,
+              start_time, end_time, location_label, meeting_url,
+              meeting_passcode, question_deadline_at, state, visibility
+            )
+            values (
+              '00000000-0000-0000-0000-000000009995',
+              '00000000-0000-0000-0000-000000000002',
+              2000, '2000회차 · 다른 클럽 진행 세션', '다른 클럽 진행 책', '테스트 저자',
+              null, null, null, '2030-06-01', '19:00:00', '21:00:00',
+              '온라인', null, null, '2030-05-31 14:59:00.000000', 'OPEN', 'PUBLIC'
+            );
         """
 
         private const val INSERT_SAMPLE_CLUB_MEMBER5_MEMBERSHIP_SQL = """
@@ -2331,6 +2422,12 @@ class ArchiveAndNotesDbTest(
               '2030-03-01 00:00:00.000000'
             );
         """
+    }
+
+    @TestConfiguration
+    class QueryCountingConfig {
+        @Bean
+        fun queryCountingDataSourcePostProcessor(): BeanPostProcessor = QueryCountingDataSourcePostProcessor()
     }
 
     private fun viewerSessionCookie(email: String): Cookie = membershipSessionCookie(email, MembershipStatus.VIEWER)

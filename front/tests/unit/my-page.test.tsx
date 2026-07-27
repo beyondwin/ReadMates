@@ -239,19 +239,23 @@ function TestLogoutButton({ className, style, children }: { className?: string; 
   );
 }
 
-function renderMyPageRoute(fetchMock: ReturnType<typeof vi.fn>, canEditProfile = false) {
+function renderMyPageRoute(
+  fetchMock: ReturnType<typeof vi.fn>,
+  canEditProfile = false,
+  { path = "/app/me", initialEntry = path }: { path?: string; initialEntry?: string } = {},
+) {
   installRouterRequestShim();
   vi.stubGlobal("fetch", fetchMock);
   const router = createMemoryRouter(
     [
       {
-        path: "/app/me",
+        path,
         element: <MyPageRoute LogoutButtonComponent={TestLogoutButton} canEditProfile={canEditProfile} onProfileUpdated={async () => undefined} />,
         loader: myPageLoader,
         hydrateFallbackElement: <div>내 공간을 불러오는 중</div>,
       },
     ],
-    { initialEntries: ["/app/me"] },
+    { initialEntries: [initialEntry] },
   );
 
   return render(<RouterProvider router={router} />);
@@ -402,6 +406,38 @@ describe("MyPage route regressions", () => {
     await waitFor(() => expect(notificationRequests).toBe(2));
     expect(await screen.findByRole("switch", { name: "이메일 알림" })).toBeInTheDocument();
   });
+
+  it("leaves through the route API with the default policy and redirects to the scoped club public page", async () => {
+    const user = userEvent.setup();
+    const location = { href: "", pathname: "/clubs/reading-sai/app/me" };
+    vi.stubGlobal("location", location);
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+      if (url === "/api/bff/api/auth/me?clubSlug=reading-sai") return Promise.resolve(jsonResponse(routeAuth));
+      if (url === "/api/bff/api/app/me?clubSlug=reading-sai") return Promise.resolve(jsonResponse(profile));
+      if (url === "/api/bff/api/archive/me/journey?limit=12&clubSlug=reading-sai") return Promise.resolve(jsonResponse(routeJourney()));
+      if (url === "/api/bff/api/me/notifications/preferences?clubSlug=reading-sai") return Promise.resolve(jsonResponse(notificationPreferences));
+      if (url === "/api/bff/api/me/membership/leave?clubSlug=reading-sai") return Promise.resolve(jsonResponse({}));
+      return Promise.resolve(jsonResponse({}, 404));
+    });
+    renderMyPageRoute(fetchMock, false, {
+      path: "/clubs/:clubSlug/app/me",
+      initialEntry: "/clubs/reading-sai/app/me",
+    });
+
+    await user.click(await screen.findByRole("button", { name: "계정·알림 설정" }));
+    await user.click(screen.getByRole("button", { name: "탈퇴" }));
+    await user.click(screen.getByRole("button", { name: "탈퇴 확인" }));
+
+    const leaveRequest = fetchMock.mock.calls.find(([input]) => input.toString().includes("/membership/leave"));
+    expect(leaveRequest).toBeDefined();
+    expect(leaveRequest?.[0]).toBe("/api/bff/api/me/membership/leave?clubSlug=reading-sai");
+    expect(leaveRequest?.[1]).toMatchObject({
+      method: "POST",
+      body: JSON.stringify({ currentSessionPolicy: "APPLY_NOW" }),
+    });
+    expect(location.href).toBe("/clubs/reading-sai/about");
+  });
 });
 
 describe("MyPage account controls", () => {
@@ -418,18 +454,4 @@ describe("MyPage account controls", () => {
     expect(location.href).toBe("/login");
   });
 
-  it("confirms membership leave without closing the settings surface", async () => {
-    const user = userEvent.setup();
-    const onLeaveMembership = vi.fn().mockResolvedValue(undefined);
-    globalThis.history.replaceState({}, "", "/about");
-    renderMyPage({ onLeaveMembership, settingsOpen: true });
-
-    await user.click(screen.getByRole("button", { name: "탈퇴" }));
-    expect(screen.getByText(/탈퇴하면 과거 기록은 보존되며/)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "탈퇴 확인" }));
-
-    expect(onLeaveMembership).toHaveBeenCalledTimes(1);
-    expect(await screen.findByRole("status")).toHaveTextContent("탈퇴 처리되었습니다.");
-    expect(screen.getByRole("region", { name: "계정·알림 설정" })).toBeInTheDocument();
-  });
 });
