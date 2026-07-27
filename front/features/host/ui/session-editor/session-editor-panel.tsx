@@ -1,34 +1,52 @@
-import type { ReactNode } from "react";
+import type { JSX, ReactNode } from "react";
+import type { HostSessionEditorSection } from "../../model/host-session-editor-navigation";
 import { mobileEditorSectionConfig, type MobileEditorSection } from "./mobile-editor-tabs";
 
-export function Panel({
-  eyebrow,
-  title,
-  children,
-  tone,
-  mobileSection,
-  panelId,
-  activeMobileSection,
-}: {
+type PanelBaseProps = {
   eyebrow: string;
   title: string;
   children: ReactNode;
   tone?: "warn";
-  mobileSection: MobileEditorSection;
   panelId: string;
+};
+
+type SectionPanelProps = PanelBaseProps & {
+  section: HostSessionEditorSection;
+  activeSection: HostSessionEditorSection;
+};
+
+type LegacyMobilePanelProps = PanelBaseProps & {
+  mobileSection: MobileEditorSection;
   activeMobileSection: MobileEditorSection;
-}) {
+};
+
+export function Panel(props: SectionPanelProps | LegacyMobilePanelProps): JSX.Element {
+  const {
+    eyebrow,
+    title,
+    children,
+    tone,
+    panelId,
+  } = props;
   const warn = tone === "warn";
-  const isMobileActive = mobileSection === activeMobileSection;
-  const sectionConfig = mobileEditorSectionConfig(mobileSection);
+  const usesSectionNavigation = "section" in props;
+  const section = usesSectionNavigation ? props.section : props.mobileSection;
+  const isActive = usesSectionNavigation
+    ? props.section === props.activeSection
+    : props.mobileSection === props.activeMobileSection;
+  const labelledBy = usesSectionNavigation
+    ? `host-editor-tab-${props.section}`
+    : mobileEditorSectionConfig(props.mobileSection).tabId;
 
   return (
     <section
       id={panelId}
       role="tabpanel"
-      aria-labelledby={sectionConfig.tabId}
-      className={`surface rm-host-session-editor__section${isMobileActive ? " is-mobile-active" : ""}`}
-      data-mobile-editor-section={mobileSection}
+      aria-labelledby={labelledBy}
+      hidden={usesSectionNavigation && !isActive}
+      className={`surface rm-host-session-editor__section ${isActive ? "is-active is-mobile-active" : "is-inactive"}`}
+      data-editor-section={section}
+      data-mobile-editor-section={usesSectionNavigation ? undefined : props.mobileSection}
       style={{
         padding: "28px",
         borderColor: warn ? "color-mix(in oklch, var(--warn), var(--line) 70%)" : "var(--line)",
