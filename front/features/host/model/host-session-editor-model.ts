@@ -244,11 +244,11 @@ export function recordVisibilityLabel(visibility: SessionRecordVisibility) {
 
 export function recordVisibilityDescription(visibility: SessionRecordVisibility) {
   if (visibility === "MEMBER") {
-    return "기록 공개를 완료하면 멤버 앱 안에서만 볼 수 있습니다.";
+    return "새 버전으로 반영하면 멤버 앱 안에서만 볼 수 있습니다.";
   }
 
   if (visibility === "PUBLIC") {
-    return "기록 공개를 완료하면 멤버 앱과 공개 기록 목록에 표시됩니다.";
+    return "새 버전으로 반영하면 멤버 앱과 공개 기록 목록에 표시됩니다.";
   }
 
   return "호스트 편집 화면에서만 볼 수 있습니다.";
