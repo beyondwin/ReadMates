@@ -121,6 +121,39 @@ data class MemberArchiveFeedbackDocumentStatusResult(
     val uploadedAt: String?,
 )
 
+data class MyJourneyFeedbackDocumentResult(
+    val available: Boolean,
+    val readable: Boolean,
+    val lockedReason: String?,
+)
+
+data class MyJourneyItemResult(
+    val sessionId: String,
+    val sessionNumber: Int,
+    val bookTitle: String,
+    val bookAuthor: String,
+    val bookImageUrl: String?,
+    val date: String,
+    val readingProgress: Int?,
+    val questionCount: Int,
+    val reviewCount: Int,
+    val feedbackDocument: MyJourneyFeedbackDocumentResult,
+)
+
+data class MyJourneySummaryResult(
+    val attendedSessionCount: Int,
+    val completedReadingCount: Int,
+    val questionCount: Int,
+    val reviewCount: Int,
+    val readableFeedbackDocumentCount: Int,
+)
+
+data class MyJourneyResult(
+    val items: List<MyJourneyItemResult>,
+    val summary: MyJourneySummaryResult,
+    val nextCursor: String?,
+)
+
 data class MyPageResult(
     val displayName: String,
     val accountName: String,

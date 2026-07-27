@@ -8,6 +8,7 @@ import com.readmates.archive.application.port.`in`.GetMyPageSummaryUseCase
 import com.readmates.archive.application.port.`in`.ListArchiveSessionsUseCase
 import com.readmates.archive.application.port.`in`.ListMyArchiveQuestionsUseCase
 import com.readmates.archive.application.port.`in`.ListMyArchiveReviewsUseCase
+import com.readmates.archive.application.port.`in`.ListMyJourneyUseCase
 import com.readmates.archive.application.port.out.ArchiveDetailBatchReadPort
 import com.readmates.archive.application.port.out.LoadArchiveDataPort
 import com.readmates.shared.architecture.ReadOnlyApplicationService
@@ -25,6 +26,7 @@ class ArchiveQueryService(
     GetArchiveSessionDetailUseCase,
     ListMyArchiveQuestionsUseCase,
     ListMyArchiveReviewsUseCase,
+    ListMyJourneyUseCase,
     GetMyPageSummaryUseCase {
     override fun listArchiveSessions(
         currentMember: CurrentMember,
@@ -80,6 +82,13 @@ class ArchiveQueryService(
         currentMember: CurrentMember,
         pageRequest: PageRequest,
     ) = withMemberAppAccess(currentMember) { loadArchiveDataPort.loadMyReviews(currentMember, pageRequest) }
+
+    override fun listMyJourney(
+        currentMember: CurrentMember,
+        pageRequest: PageRequest,
+    ) = withMemberAppAccess(currentMember) {
+        loadArchiveDataPort.loadMyJourney(currentMember, pageRequest)
+    }
 
     override fun getMyPageSummary(currentMember: CurrentMember) = loadArchiveDataPort.loadMyPage(currentMember)
 

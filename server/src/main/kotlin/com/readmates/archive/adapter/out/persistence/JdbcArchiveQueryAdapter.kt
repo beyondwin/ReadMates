@@ -4,6 +4,7 @@ import com.readmates.archive.application.model.ArchiveSessionDetailHeader
 import com.readmates.archive.application.model.ArchiveSessionResult
 import com.readmates.archive.application.model.MyArchiveQuestionResult
 import com.readmates.archive.application.model.MyArchiveReviewResult
+import com.readmates.archive.application.model.MyJourneyResult
 import com.readmates.archive.application.model.MyPageResult
 import com.readmates.archive.application.port.out.LoadArchiveDataPort
 import com.readmates.shared.paging.CursorPage
@@ -19,6 +20,7 @@ class JdbcArchiveQueryAdapter(
 ) : LoadArchiveDataPort {
     private val detailQueries = ArchiveDetailQueries()
     private val listQueries = ArchiveListQueries()
+    private val myJourneyQueries = MyJourneyQueries()
 
     override fun loadArchiveSessions(
         currentMember: CurrentMember,
@@ -39,6 +41,11 @@ class JdbcArchiveQueryAdapter(
         currentMember: CurrentMember,
         pageRequest: PageRequest,
     ): CursorPage<MyArchiveReviewResult> = listQueries.loadMyReviews(jdbcTemplate, currentMember, pageRequest)
+
+    override fun loadMyJourney(
+        currentMember: CurrentMember,
+        pageRequest: PageRequest,
+    ): MyJourneyResult = myJourneyQueries.loadMyJourney(jdbcTemplate, currentMember, pageRequest)
 
     override fun loadMyPage(currentMember: CurrentMember): MyPageResult = listQueries.loadMyPage(jdbcTemplate, currentMember)
 }

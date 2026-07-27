@@ -4,6 +4,7 @@ import com.readmates.archive.application.model.ArchiveSessionResult
 import com.readmates.archive.application.model.MemberArchiveSessionDetailResult
 import com.readmates.archive.application.model.MyArchiveQuestionResult
 import com.readmates.archive.application.model.MyArchiveReviewResult
+import com.readmates.archive.application.model.MyJourneyResult
 import com.readmates.archive.application.model.MyPageResult
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
@@ -36,6 +37,13 @@ interface ListMyArchiveReviewsUseCase {
         currentMember: CurrentMember,
         pageRequest: PageRequest,
     ): CursorPage<MyArchiveReviewResult>
+}
+
+interface ListMyJourneyUseCase {
+    fun listMyJourney(
+        currentMember: CurrentMember,
+        pageRequest: PageRequest,
+    ): MyJourneyResult
 }
 
 interface GetMyPageSummaryUseCase {

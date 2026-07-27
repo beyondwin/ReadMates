@@ -4,6 +4,7 @@ import com.readmates.archive.application.model.ArchiveSessionDetailHeader
 import com.readmates.archive.application.model.ArchiveSessionResult
 import com.readmates.archive.application.model.MyArchiveQuestionResult
 import com.readmates.archive.application.model.MyArchiveReviewResult
+import com.readmates.archive.application.model.MyJourneyResult
 import com.readmates.archive.application.model.MyPageResult
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
@@ -30,6 +31,11 @@ interface LoadArchiveDataPort {
         currentMember: CurrentMember,
         pageRequest: PageRequest,
     ): CursorPage<MyArchiveReviewResult>
+
+    fun loadMyJourney(
+        currentMember: CurrentMember,
+        pageRequest: PageRequest,
+    ): MyJourneyResult
 
     fun loadMyPage(currentMember: CurrentMember): MyPageResult
 }
