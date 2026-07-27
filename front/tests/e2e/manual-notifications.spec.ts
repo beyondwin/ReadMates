@@ -108,7 +108,12 @@ test("host can open manual notification workbench", async ({ page }) => {
   await page.goto("/clubs/reading-sai/app/host/notifications");
 
   await expect(page.getByRole("heading", { name: "새 알림 발송" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "모임 전날 리마인더" })).toBeVisible();
+  await expect(page.getByRole("radio", { name: "모임 전날 리마인더" })).toBeVisible();
+  await expect(page.getByText(
+    "선택만으로는 발송되지 않습니다. 미리보기에서 최종 확인합니다.",
+  )).toBeVisible();
+  await expect(page.getByText("미리보기 후 발송")).toBeVisible();
+  await expect(page.getByRole("radio", { name: "앱 + 이메일" })).toBeChecked();
   const operationsDetail = page.getByRole("button", { name: /운영 상세/ });
   await expect(operationsDetail).toHaveAttribute("aria-expanded", "false");
   await operationsDetail.click();
@@ -124,14 +129,14 @@ test("host can preview a manual reminder from the notifications tab without typi
 
   await expect(page.getByLabel("세션 선택")).toBeVisible();
   await expect(page.getByLabel("세션 선택")).toHaveValue(sessionId);
-  await expect(page.getByText("E2E 현재 세션 책 · OPEN · HOST_ONLY", { exact: true })).toBeVisible();
+  await expect(page.getByText("진행 중 · 호스트 전용 · 피드백 문서 준비 전", { exact: true })).toBeVisible();
 
-  await page.getByRole("button", { name: "모임 전날 리마인더" }).click();
+  await page.getByRole("radio", { name: "모임 전날 리마인더" }).check();
   await page.getByRole("button", { name: "미리보기 열기" }).click();
 
   const previewDialog = page.getByRole("dialog", { name: "발송 전 확인" });
   await expect(previewDialog).toBeVisible();
-  await expect(previewDialog.getByText(/^최종 대상 \d+명$/)).toBeVisible();
+  await expect(previewDialog.getByText("최종 대상", { exact: true })).toBeVisible();
   expect(manualDispatchCount(sessionId, "SESSION_REMINDER_DUE")).toBe(0);
   expect(notificationEventCount(sessionId, "SESSION_REMINDER_DUE")).toBe(0);
   expect(hostActionDecisionCount(sessionId)).toBe(0);
@@ -187,9 +192,9 @@ test("host can change the selected session before previewing a manual reminder",
   await page.goto("/clubs/reading-sai/app/host/notifications");
 
   await page.getByLabel("세션 선택").selectOption(secondSessionId);
-  await expect(page.getByText("E2E 두 번째 세션 책 · OPEN · HOST_ONLY", { exact: true })).toBeVisible();
+  await expect(page.getByText("진행 중 · 호스트 전용 · 피드백 문서 준비 전", { exact: true })).toBeVisible();
 
-  await page.getByRole("button", { name: "모임 전날 리마인더" }).click();
+  await page.getByRole("radio", { name: "모임 전날 리마인더" }).check();
   await page.getByRole("button", { name: "미리보기 열기" }).click();
 
   await expect(page.getByRole("dialog", { name: "발송 전 확인" })).toBeVisible();
@@ -203,7 +208,7 @@ test("host previews and confirms a manual reminder, then duplicate requires rese
   await page.getByRole("button", { name: "미리보기 열기" }).click();
   const previewDialog = page.getByRole("dialog", { name: "발송 전 확인" });
   await expect(previewDialog).toBeVisible();
-  await expect(previewDialog.getByText(/^최종 대상 \d+명$/)).toBeVisible();
+  await expect(previewDialog.getByText("최종 대상", { exact: true })).toBeVisible();
 
   const confirm = page.getByRole("button", { name: /\d+명에게 알림 발송/ });
   await expect(confirm).toBeVisible();
@@ -242,7 +247,7 @@ test("default audience and channel are explicit and reminder policy requires opt
   });
   expect(clubReminderPolicy(CLUB_ID)).toBeNull();
 
-  const policyToggle = page.getByRole("checkbox", { name: "모임 전날 자동 리마인더" });
+  const policyToggle = page.getByRole("switch", { name: "모임 전날 자동 리마인더" });
   await expect(policyToggle).toBeEnabled();
   await expect(policyToggle).not.toBeChecked();
   const policyResponse = page.waitForResponse(

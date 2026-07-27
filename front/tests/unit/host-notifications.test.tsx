@@ -521,8 +521,9 @@ describe("HostNotificationsRoute", () => {
     expect(await screen.findByRole("heading", { name: "알림 발송 작업대" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "새 알림 발송" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "최근 수동 발송" })).toBeInTheDocument();
-    expect(screen.getAllByText("앱+이메일").length).toBeGreaterThan(0);
-    expect(screen.getByRole("checkbox", { name: "모임 전날 자동 리마인더" })).not.toBeChecked();
+    expect(screen.getByRole("radio", { name: "앱 + 이메일" })).toBeChecked();
+    expect(screen.getByRole("switch", { name: "모임 전날 자동 리마인더" })).not.toBeChecked();
+    expect(screen.queryByText(/OPEN|HOST_ONLY/)).not.toBeInTheDocument();
   });
 
   it("keeps the route policy truth when the club-scoped save fails", async () => {
@@ -555,7 +556,7 @@ describe("HostNotificationsRoute", () => {
     vi.stubGlobal("fetch", fetchMock);
     renderNotificationsRoute(client);
 
-    const reminder = await screen.findByRole("checkbox", { name: "모임 전날 자동 리마인더" });
+    const reminder = await screen.findByRole("switch", { name: "모임 전날 자동 리마인더" });
     await userEvent.click(reminder);
 
     expect(await screen.findByRole("alert")).toHaveTextContent("리마인더 정책을 저장하지 못했습니다");
@@ -607,11 +608,11 @@ describe("HostNotificationsRoute", () => {
     renderNotificationsRoute(client);
 
     await userEvent.click(
-      await screen.findByRole("checkbox", { name: "모임 전날 자동 리마인더" }),
+      await screen.findByRole("switch", { name: "모임 전날 자동 리마인더" }),
     );
 
     await waitFor(() => {
-      expect(screen.getByRole("checkbox", { name: "모임 전날 자동 리마인더" })).toBeChecked();
+      expect(screen.getByRole("switch", { name: "모임 전날 자동 리마인더" })).toBeChecked();
     });
     expect(client.getQueryData(
       hostNotificationPolicyQuery({ clubSlug: "reading-sai" }).queryKey,
@@ -655,7 +656,7 @@ describe("HostNotificationsRoute", () => {
     await userEvent.click(screen.getByRole("button", { name: "정책 다시 불러오기" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("checkbox", { name: "모임 전날 자동 리마인더" })).toBeChecked();
+      expect(screen.getByRole("switch", { name: "모임 전날 자동 리마인더" })).toBeChecked();
     });
     expect(policyGetCount).toBe(2);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
@@ -690,14 +691,14 @@ describe("HostNotificationsRoute", () => {
     renderNotificationsRoute(client);
 
     await userEvent.click(
-      await screen.findByRole("checkbox", { name: "모임 전날 자동 리마인더" }),
+      await screen.findByRole("switch", { name: "모임 전날 자동 리마인더" }),
     );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "리마인더 정책을 저장하지 못했습니다",
     );
     await waitFor(() => {
-      expect(screen.getByRole("checkbox", { name: "모임 전날 자동 리마인더" })).toBeChecked();
+      expect(screen.getByRole("switch", { name: "모임 전날 자동 리마인더" })).toBeChecked();
     });
     expect(client.getQueryData(
       hostNotificationPolicyQuery({ clubSlug: "reading-sai" }).queryKey,
@@ -811,7 +812,9 @@ describe("HostNotificationsRoute", () => {
       ).queryKey,
     });
 
-    expect(await screen.findByText("Example Book")).toBeInTheDocument();
+    expect(await screen.findByRole("option", {
+      name: "8회차 · Example Book · 2026-05-20",
+    })).toBeInTheDocument();
   });
 });
 
@@ -856,19 +859,15 @@ describe("HostNotificationsPage", () => {
       <ManualNotificationWorkbench {...workbenchProps} options={sessionOneOptions} />,
     );
 
-    await user.click(screen.getByRole("button", { name: "피드백 문서 등록" }));
-    expect(screen.getByRole("button", { name: "피드백 문서 등록" })).toHaveClass(
-      "btn-primary",
-    );
+    await user.click(screen.getByRole("radio", { name: "피드백 문서 등록" }));
+    expect(screen.getByRole("radio", { name: "피드백 문서 등록" })).toBeChecked();
 
     await user.selectOptions(screen.getByLabelText("세션 선택"), "session-draft");
     view.rerender(
       <ManualNotificationWorkbench {...workbenchProps} options={sessionTwoOptions} />,
     );
 
-    expect(screen.getByRole("button", { name: "피드백 문서 등록" })).toHaveClass(
-      "btn-primary",
-    );
+    expect(screen.getByRole("radio", { name: "피드백 문서 등록" })).toBeChecked();
   });
 
   it("falls back to the first enabled template when the selected template becomes invalid", async () => {
@@ -915,15 +914,13 @@ describe("HostNotificationsPage", () => {
       <ManualNotificationWorkbench {...workbenchProps} options={sessionOneOptions} />,
     );
 
-    await user.click(screen.getByRole("button", { name: "피드백 문서 등록" }));
+    await user.click(screen.getByRole("radio", { name: "피드백 문서 등록" }));
     await user.selectOptions(screen.getByLabelText("세션 선택"), "session-draft");
     view.rerender(
       <ManualNotificationWorkbench {...workbenchProps} options={sessionTwoOptions} />,
     );
 
-    expect(screen.getByRole("button", { name: "모임 전날 리마인더" })).toHaveClass(
-      "btn-primary",
-    );
+    expect(screen.getByRole("radio", { name: "모임 전날 리마인더" })).toBeChecked();
   });
 
   it("offers each allowed reminder audience once and previews session participants", async () => {
@@ -998,7 +995,7 @@ describe("HostNotificationsPage", () => {
     });
 
     expect(screen.getByRole("heading", { name: "최근 수동 발송" })).toBeInTheDocument();
-    expect(screen.getAllByText("앱+이메일").length).toBeGreaterThan(0);
+    expect(screen.getByRole("radio", { name: "앱 + 이메일" })).toBeChecked();
     expect(screen.getAllByText("수동").length).toBeGreaterThan(0);
   });
 
@@ -1007,8 +1004,11 @@ describe("HostNotificationsPage", () => {
 
     expect(screen.getByLabelText("세션 선택")).toHaveValue("session-1");
     expect(screen.queryByLabelText("세션 ID")).not.toBeInTheDocument();
-    expect(screen.getByText("Example Book")).toBeInTheDocument();
-    expect(screen.getByText(/OPEN/)).toBeInTheDocument();
+    expect(screen.getByRole("option", {
+      name: "8회차 · Example Book · 2026-05-20",
+    })).toBeInTheDocument();
+    expect(screen.getByText(/진행 중.*멤버 공개.*피드백 문서 준비됨/)).toBeInTheDocument();
+    expect(screen.queryByText(/OPEN|HOST_ONLY/)).not.toBeInTheDocument();
   });
 
   it("disables manual preview when there are no host sessions", () => {
@@ -1150,14 +1150,16 @@ describe("HostNotificationsPage", () => {
 
     renderPage({ onPreviewManual, onConfirmManual, manualOptions: manualOptionsFixture });
 
-    await user.click(screen.getByRole("button", { name: "모임 전날 리마인더" }));
+    await user.click(screen.getByRole("radio", { name: "모임 전날 리마인더" }));
     await user.click(screen.getByRole("button", { name: "미리보기 열기" }));
 
-    expect(await screen.findByText("앱 알림 3명")).toBeInTheDocument();
-    expect(screen.getByText("이메일 2명")).toBeInTheDocument();
+    expect(await screen.findByText("앱 알림 가능")).toBeInTheDocument();
+    expect(screen.getByText("이메일 가능")).toBeInTheDocument();
+    expect(screen.getAllByText("3명").length).toBeGreaterThan(0);
+    expect(screen.getByText("2명")).toBeInTheDocument();
     const previewPanel = screen.getByRole("heading", { name: "발송 전 확인" }).closest("section");
     expect(previewPanel).not.toBeNull();
-    expect(within(previewPanel as HTMLElement).getByText("모임 전날 리마인더")).toBeInTheDocument();
+    expect(within(previewPanel as HTMLElement).getAllByText("모임 전날 리마인더")).toHaveLength(2);
     expect(within(previewPanel as HTMLElement).getByText("모임 전 준비를 확인해 주세요.")).toBeInTheDocument();
     expect(screen.getByText("이미 발송된 알림입니다.")).toBeInTheDocument();
 

@@ -361,37 +361,52 @@
   display: block;
 }
 
-@media (max-width: 760px) {
-  .rm-notification-workbench {
-    padding: 20px 16px;
-  }
-
-  .rm-notification-workbench__header,
+@media (max-width: 900px) {
   .rm-notification-workbench__decision {
     grid-template-columns: 1fr;
     gap: 12px;
   }
 
+  .rm-notification-choice-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .rm-notification-workbench {
+    padding: 20px 16px;
+  }
+
   .rm-notification-workbench__header {
     display: grid;
   }
+}
 
-  .rm-notification-choice-grid {
+@media (max-width: 600px) {
+  .rm-host-notifications-policy {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+  }
+
+  .rm-notification-choice-grid,
+  .rm-notification-preview__counts {
     grid-template-columns: 1fr;
+  }
+
+  .rm-notification-choice-card,
+  .rm-notification-recipient-picker__row {
+    min-height: 52px;
   }
 
   .rm-notification-workbench__summary {
-    align-items: flex-start;
+    align-items: stretch;
     flex-direction: column;
   }
 
-  .rm-notification-workbench .btn-primary {
+  .rm-notification-workbench__summary .btn-primary,
+  .rm-notification-preview--side-sheet .btn-primary {
     min-height: 44px;
     width: 100%;
-  }
-
-  .rm-notification-preview__counts {
-    grid-template-columns: 1fr;
   }
 }
 
@@ -5465,7 +5480,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .rm-host-notifications-policy__track,
-  .rm-host-notifications-policy__thumb {
+  .rm-host-notifications-policy__thumb,
+  .rm-notification-choice-card {
     transition: none;
   }
 }
