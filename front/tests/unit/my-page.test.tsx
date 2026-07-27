@@ -789,11 +789,18 @@ describe("MyPage", () => {
     installRouterRequestShim();
     const user = userEvent.setup();
     let profileRequests = 0;
+    let myPageLoaderRequests = 0;
+    const revalidatedProfile = createDeferred<MyPageResponse>();
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = input.toString();
 
       if (url === "/api/bff/api/auth/me") return Promise.resolve(jsonResponse(activeAuth));
-      if (url === "/api/bff/api/app/me") return Promise.resolve(jsonResponse({ ...data, displayName: profileRequests > 0 ? "새이름" : data.displayName }));
+      if (url === "/api/bff/api/app/me") {
+        myPageLoaderRequests += 1;
+        return myPageLoaderRequests === 1
+          ? Promise.resolve(jsonResponse(data))
+          : revalidatedProfile.promise.then((profile) => jsonResponse(profile));
+      }
       if (url === "/api/bff/api/archive/me/journey?limit=12") return Promise.resolve(jsonResponse(journeyPage()));
       if (url === "/api/bff/api/me/notifications/preferences") return Promise.resolve(jsonResponse(notificationPreferences));
       if (url === "/api/bff/api/me/profile") {
@@ -829,6 +836,11 @@ describe("MyPage", () => {
     await user.click(settings.getByRole("button", { name: "이름 저장" }));
 
     await waitFor(() => expect(profileRequests).toBe(1));
+    await waitFor(() => expect(myPageLoaderRequests).toBe(2));
+    await act(async () => {
+      revalidatedProfile.resolve({ ...data, displayName: "새이름", clubName: "다시 읽는 사이" });
+    });
+    await waitFor(() => expect(desktop.getAllByText("다시 읽는 사이").length).toBeGreaterThan(0));
     await waitFor(() => expect(desktop.getByRole("button", { name: "개인 설정 닫기" })).toHaveAttribute("aria-expanded", "true"));
     expect(desktop.getByRole("heading", { level: 2, name: "개인 설정" })).toBeInTheDocument();
   });
