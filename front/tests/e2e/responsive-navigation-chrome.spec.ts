@@ -12,10 +12,21 @@ async function expectPracticalTapTarget(locator: Locator) {
 async function expectDomOrder(...locators: Locator[]) {
   const indexes = await Promise.all(
     locators.map((locator) =>
-      locator.evaluate((element) => Array.from(document.querySelectorAll("button, a, input")).indexOf(element)),
+      locator.evaluate((element) => Array.from(document.querySelectorAll("*")).indexOf(element)),
     ),
   );
   expect(indexes).toEqual([...indexes].sort((left, right) => left - right));
+}
+
+async function pressTabUntilFocused(page: Page, target: Locator, label: string) {
+  for (let attempt = 0; attempt < 24; attempt += 1) {
+    await page.keyboard.press("Tab");
+    if (await target.evaluate((element) => document.activeElement === element)) {
+      return;
+    }
+  }
+
+  throw new Error(`Tab did not reach ${label}`);
 }
 
 async function expectPublicRecordMetadataLayout(page: Page, width: number, stacked: boolean) {
@@ -338,6 +349,15 @@ test("reading shelf preserves semantic hierarchy and record order on desktop and
     await expect(sessionLink).toBeVisible();
     await expect(feedbackLink).toBeVisible();
     expect(await sessionLink.evaluate((element) => element.parentElement?.querySelectorAll("a").length === 2)).toBe(true);
+    await expectDomOrder(
+      shelf.getByRole("heading", { level: 1, name: "나의 서재" }),
+      shelf.getByRole("region", { name: "개인 요약" }),
+      shelf.getByRole("region", { name: "최근 책별 기록" }),
+      shelf.getByText("2026", { exact: true }),
+      rows.first(),
+      shelf.getByText("2025", { exact: true }),
+      rows.nth(1),
+    );
 
     if (viewport.width === 1440) {
       await expect(shelf.getByRole("region", { name: "계정과 알림" })).not.toBeVisible();
@@ -370,7 +390,7 @@ test("reading shelf keeps settings and retry failures reachable above mobile nav
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
-test("reading shelf keeps keyboard-reachable account controls after the record actions in DOM order", async ({ page }) => {
+test("reading shelf advances actual keyboard focus through record and account controls", async ({ page }) => {
   await mockMyReadingShelfJourney(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await loginWithGoogleFixture(page, "host@example.com");
@@ -383,14 +403,49 @@ test("reading shelf keeps keyboard-reachable account controls after the record a
   await settingsTrigger.click();
 
   const settings = page.getByRole("region", { name: "계정과 알림" });
-  await expect(settings.getByRole("heading", { name: "프로필" })).toBeVisible();
+  const profile = settings.getByRole("heading", { name: "프로필" });
+  await expect(profile).toBeVisible();
   await expect(settings.getByRole("button", { name: "이름 변경" })).toHaveCount(0);
   const notification = settings.getByRole("switch", { name: "이메일 알림" });
   const logout = settings.getByRole("button", { name: "로그아웃" });
   const leave = settings.getByRole("button", { name: "탈퇴" });
 
-  await expectDomOrder(settingsTrigger, sessionRecord, feedbackDocument, loadMore, notification, logout, leave);
+  await expectDomOrder(settingsTrigger, sessionRecord, feedbackDocument, loadMore, profile, notification, logout, leave);
   for (const locator of [settingsTrigger, sessionRecord, feedbackDocument, loadMore, notification, logout, leave]) {
     await expectPracticalTapTarget(locator);
   }
+
+  await settingsTrigger.focus();
+  await expect(settingsTrigger).toBeFocused();
+  await pressTabUntilFocused(page, sessionRecord, "session record");
+  await page.screenshot({ path: "test-results/task6-fix-round-1-keyboard-focus.png" });
+  await pressTabUntilFocused(page, feedbackDocument, "feedback document");
+  await pressTabUntilFocused(page, loadMore, "load more");
+  // This route intentionally denies self-profile editing, so the visible profile
+  // state replaces the absent edit button and focus advances to notification.
+  await expect(settings.getByLabel("이름 변경 준비 중")).toBeVisible();
+  await pressTabUntilFocused(page, notification, "notification preference");
+  await pressTabUntilFocused(page, logout, "logout");
+  await pressTabUntilFocused(page, leave, "membership action");
+});
+
+test("reading shelf disables switch motion when reduced motion is requested", async ({ page }) => {
+  await mockMyReadingShelfJourney(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await loginWithGoogleFixture(page, "host@example.com");
+  await page.goto("/app/me");
+  await page.getByRole("button", { name: "계정·알림 설정" }).click();
+
+  const transition = await page.locator(".rm-my-shelf-notification-switch__thumb").first().evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { duration: style.transitionDuration, property: style.transitionProperty };
+  });
+
+  expect(transition.property).toBe("none");
+  expect(Number.parseFloat(transition.duration)).toBeLessThanOrEqual(0.001);
+  await page.evaluate(() => {
+    document.body.style.zoom = "200%";
+  });
+  await page.screenshot({ path: "test-results/task6-fix-round-1-reduced-motion-zoom.png" });
 });

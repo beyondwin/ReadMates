@@ -155,6 +155,13 @@ test("viewer can read member routes but cannot use current-session write actions
   await expect(page.getByText("알림 수신은 현재 멤버십에서 제공되지 않습니다.")).toBeVisible();
   await expect(page.getByRole("button", { name: "탈퇴" })).toBeVisible();
   await expect(page.getByRole("button", { name: "로그아웃" })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page
+    .getByRole("region", { name: "계정과 알림" })
+    .getByText("알림 수신은 현재 멤버십에서 제공되지 않습니다.")
+    .scrollIntoViewIfNeeded();
+  await page.screenshot({ path: "test-results/task6-fix-round-1-viewer-settings.png" });
+  await page.setViewportSize({ width: 1280, height: 900 });
 
   await page.goto("/app/session/current");
   await expect(page.getByRole("heading", { level: 1, name: "E2E 현재 세션 책" })).toBeVisible();

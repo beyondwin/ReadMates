@@ -5964,6 +5964,11 @@
   .rm-my-shelf-settings * {
     scroll-behavior: auto;
   }
+
+  .rm-my-shelf-notification-switch__thumb,
+  .rm-my-shelf-notification-switch > span {
+    transition: none !important;
+  }
 }
 
 @media (max-width: 900px) {
