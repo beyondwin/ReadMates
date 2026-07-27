@@ -9,6 +9,10 @@ import {
 
 const SESSION_ID = "11111111-1111-1111-1111-111111111111";
 const CLUB_SLUG = "club-a";
+const LONG_FEEDBACK_FILE =
+  "session-7-feedback-아주-긴-한글-English-archive-record-name-without-breaking-layout.md";
+const LONG_PUBLIC_URL =
+  "https://example.test/public-safe/archive/very-long-path-segment-without-natural-breaks/세션-기록-검토";
 
 async function json(route: Route, status: number, body: unknown): Promise<void> {
   await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
@@ -42,7 +46,7 @@ function sessionResponse(): HostSessionDetailResponse {
     ],
     feedbackDocument: {
       uploaded: true,
-      fileName: "session-7-feedback.md",
+      fileName: LONG_FEEDBACK_FILE,
       uploadedAt: "2026-05-16T12:00:00Z",
     },
   };
@@ -56,7 +60,7 @@ function hostFeedbackDocumentPreviewResponse() {
     subtitle: "E2E 책 · 2026.05.16",
     bookTitle: "E2E 책",
     date: "2026-05-16",
-    fileName: "session-7-feedback.md",
+    fileName: LONG_FEEDBACK_FILE,
     uploadedAt: "2026-05-16T12:00:00Z",
     metadata: [{ label: "열람 범위", value: "호스트 미리보기" }],
     observerNotes: ["공개 안전한 호스트 미리보기입니다."],
@@ -72,8 +76,11 @@ function importJson() {
     highlights: [{ authorName: "독자A", text: "하이라이트입니다." }],
     oneLineReviews: [{ authorName: "독자B", text: "한줄평입니다." }],
     feedbackDocument: {
-      fileName: "session-7-feedback.md",
-      markdown: "<!-- readmates-feedback:v1 -->\n\n# 독서모임 7차 피드백\n\n## 참여자별 피드백",
+      fileName: LONG_FEEDBACK_FILE,
+      markdown:
+        `<!-- readmates-feedback:v1 -->\n\n# 독서모임 7차 피드백\n\n`
+        + `Korean English URL Markdown wrapping evidence: ${LONG_PUBLIC_URL}\n\n`
+        + "## 참여자별 피드백",
     },
     ignoredRawJsonSentinel: "{\"member1@example.com\":\"private.example.com\"}",
   };
@@ -101,7 +108,7 @@ function previewResponse(): SessionImportPreviewResponse {
       },
     ],
     feedbackDocument: {
-      fileName: "session-7-feedback.md",
+      fileName: LONG_FEEDBACK_FILE,
       title: "독서모임 7차 피드백",
       valid: true,
     },
@@ -179,7 +186,7 @@ async function routeHostSessionEditor(page: Page): Promise<void> {
                 { membershipId: "member-b", authorDisplayName: "독자B", text: "한줄평입니다." },
               ],
               feedbackDocument: {
-                fileName: "session-7-feedback.md",
+                fileName: LONG_FEEDBACK_FILE,
                 title: "독서모임 7차 피드백",
                 markdown: importJson().feedbackDocument.markdown,
               },
@@ -255,6 +262,37 @@ async function uploadSessionImportJson(page: Page): Promise<void> {
   });
 }
 
+async function expectNoHorizontalOverflow(page: Page): Promise<void> {
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+  ).toBe(true);
+}
+
+async function expectMobileEditorChrome(page: Page): Promise<void> {
+  const sectionNav = page.getByRole("tablist", { name: "호스트 편집 섹션" });
+  const sectionTabs = sectionNav.getByRole("tab");
+  await expect(sectionTabs).toHaveCount(5);
+  await expect(page.getByRole("tab", { name: "기록 작업대" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator(".rm-host-session-editor__aside:visible")).toHaveCount(0);
+  await expect(page.locator('[role="tabpanel"]:visible')).toHaveCount(1);
+  const sectionNavMetrics = await sectionNav.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }));
+  expect(sectionNavMetrics.scrollWidth).toBeGreaterThan(sectionNavMetrics.clientWidth);
+
+  const appNav = page.getByRole("navigation", { name: "앱 탭" });
+  const stickyAction = page.getByRole("region", { name: "반영 검토 작업" });
+  const [appNavBox, stickyBox] = await Promise.all([
+    appNav.boundingBox(),
+    stickyAction.boundingBox(),
+  ]);
+  expect(appNavBox).not.toBeNull();
+  expect(stickyBox).not.toBeNull();
+  expect(stickyBox!.y + stickyBox!.height).toBeLessThanOrEqual(appNavBox!.y);
+  await expectNoHorizontalOverflow(page);
+}
+
 async function expectSessionRecordPreviewPublicSafe(page: Page): Promise<void> {
   const review = page.getByRole("region", { name: "세션 기록 미리보기" });
   await expect(review).toBeVisible();
@@ -272,12 +310,13 @@ async function expectSessionRecordPreviewPublicSafe(page: Page): Promise<void> {
   await expect(page.getByText("{\"")).toHaveCount(0);
 }
 
-async function expectSessionImportCommitResultPublicSafe(page: Page): Promise<void> {
-  const commitResult = page.getByRole("region", { name: "세션 기록 초안 저장 결과" });
-  await expect(commitResult).toBeVisible();
-  await expect(commitResult.getByText("초안 저장 완료")).toBeVisible();
-  await expect(commitResult.getByText("피드백 문서 초안 저장: 독서모임 7차 피드백")).toBeVisible();
-  await expect(commitResult.getByText("검토 후 변경사항을 반영하기 전까지 멤버와 공개 화면은 바뀌지 않습니다.")).toBeVisible();
+async function expectSavedManualDraftPublicSafe(page: Page): Promise<void> {
+  await expect(page.getByRole("tab", { name: "직접 작성" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("region", { name: "공통 초안 편집기" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "작업 중인 초안" })).toContainText("작성 방식 · 외부 JSON");
+  await expect(page.getByText(LONG_FEEDBACK_FILE).first()).toBeVisible();
+  await expect(page.getByLabel("공개 요약")).toHaveValue("공개 가능한 세션 요약입니다.");
+  await expect(page.getByLabel("피드백 Markdown 본문")).toHaveValue(new RegExp(LONG_PUBLIC_URL));
   await expect(page.getByText("member1@example.com")).toHaveCount(0);
   await expect(page.getByText("private.example.com")).toHaveCount(0);
   await expect(page.getByText("{\"")).toHaveCount(0);
@@ -287,7 +326,12 @@ test("host captures public-safe session record preview evidence on desktop and m
   await routeHostSessionEditor(page);
 
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}/edit?records=json`);
+  await page.goto(
+    `/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}/edit?section=records&source=json`,
+  );
+  await expect(page).toHaveURL(/\?section=records&source=json$/);
+  await expect(page.getByRole("tab", { name: "기록 작업대" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("heading", { name: "기록 작업대" })).toBeVisible();
   await expect(page.getByLabel("AI 결과 JSON 가져오기")).toBeVisible({ timeout: 15000 });
   const previewPost = page.waitForResponse(
     (response) =>
@@ -297,6 +341,11 @@ test("host captures public-safe session record preview evidence on desktop and m
   await uploadSessionImportJson(page);
   expect((await previewPost).ok()).toBe(true);
   await expectSessionRecordPreviewPublicSafe(page);
+  const jsonPreviewScreenshot = await page.screenshot({
+    path: testInfo.outputPath("records-json-preview-1280x900.png"),
+    fullPage: true,
+  });
+  expect(jsonPreviewScreenshot.byteLength).toBeGreaterThan(10_000);
   const commitPost = page.waitForResponse(
     (response) =>
       response.request().method() === "POST" &&
@@ -304,18 +353,19 @@ test("host captures public-safe session record preview evidence on desktop and m
   );
   await page.getByRole("button", { name: "초안으로 가져오기" }).click();
   expect((await commitPost).ok()).toBe(true);
-  await expectSessionImportCommitResultPublicSafe(page);
+  await expectSavedManualDraftPublicSafe(page);
   const desktopScreenshot = await page.screenshot({
-    path: testInfo.outputPath("host-session-record-preview-desktop.png"),
+    path: testInfo.outputPath("records-manual-saved-1280x900.png"),
     fullPage: true,
   });
   expect(desktopScreenshot.byteLength).toBeGreaterThan(10_000);
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole("tab", { name: "공개 기록" }).click();
-  await expectSessionImportCommitResultPublicSafe(page);
+  await page.getByRole("tab", { name: "기록 작업대" }).click();
+  await expectSavedManualDraftPublicSafe(page);
+  await expectMobileEditorChrome(page);
   const mobileScreenshot = await page.screenshot({
-    path: testInfo.outputPath("host-session-record-preview-mobile.png"),
+    path: testInfo.outputPath("records-manual-saved-390x844.png"),
     fullPage: true,
   });
   expect(mobileScreenshot.byteLength).toBeGreaterThan(10_000);
@@ -370,4 +420,15 @@ test("host captures public-safe session record preview evidence on desktop and m
   );
   await expect(page.getByText("PRIVATE_MEMBER_EMAIL")).toHaveCount(0);
   await expect(page.getByText("{\"")).toHaveCount(0);
+});
+
+test("legacy records=json URL canonicalizes once and opens the JSON source", async ({ page }) => {
+  await routeHostSessionEditor(page);
+
+  await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}/edit?records=json`);
+
+  await expect(page).toHaveURL(/\?section=records&source=json$/);
+  await expect(page.getByRole("tab", { name: "기록 작업대" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "외부 JSON" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByLabel("AI 결과 JSON 가져오기")).toBeVisible();
 });

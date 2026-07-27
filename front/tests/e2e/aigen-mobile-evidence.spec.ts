@@ -37,8 +37,11 @@ test("mobile review keeps the ledger and editor usable and shows evidence in a f
     await route.fallback();
   });
 
-  await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}/edit?aigen=1`);
-  await page.getByRole("tab", { name: "공개 기록" }).click();
+  await page.goto(
+    `/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}/edit?section=records&source=ai`,
+  );
+  await expect(page.getByRole("tab", { name: "기록 작업대" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "AI로 생성" })).toHaveAttribute("aria-selected", "true");
   await page.getByLabel(/대본 파일/).setInputFiles({
     name: "transcript.txt", mimeType: "text/plain",
     buffer: Buffer.from(groundedTranscript([{ speaker: "공개 회원 A", at: "00:00", text: "공개 합성 발언입니다." }])),
