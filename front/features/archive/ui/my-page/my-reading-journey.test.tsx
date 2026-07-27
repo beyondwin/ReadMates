@@ -56,6 +56,7 @@ describe("MyReadingJourney", () => {
     expect(feedbackLink).toHaveAttribute("href", "/app/feedback/session-9");
     expect(sessionLink.contains(feedbackLink)).toBe(false);
     expect(feedbackLink.contains(sessionLink)).toBe(false);
+    expect(within(row).getByRole("heading", { level: 3, name: "보이지 않는 도시들" }).querySelector("a")).toBeNull();
     expect(screen.queryByText("질문 0")).not.toBeInTheDocument();
     expect(screen.queryByText("서평 0")).not.toBeInTheDocument();
   });
@@ -72,7 +73,7 @@ describe("MyReadingJourney", () => {
       items: [item({ feedbackDocument: { available: true, readable: false, lockedReason: "ACTIVE_MEMBERSHIP_REQUIRED" } })],
     });
 
-    expect(screen.getByText("정식 멤버가 되면 피드백 문서를 읽을 수 있습니다.")).toBeInTheDocument();
+    expect(screen.getByText("활성 멤버가 되면 피드백 문서를 읽을 수 있습니다.")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "피드백 문서" })).not.toBeInTheDocument();
 
     rerender(
@@ -86,7 +87,7 @@ describe("MyReadingJourney", () => {
       />,
     );
 
-    expect(screen.queryByText("정식 멤버가 되면 피드백 문서를 읽을 수 있습니다.")).not.toBeInTheDocument();
+    expect(screen.queryByText("활성 멤버가 되면 피드백 문서를 읽을 수 있습니다.")).not.toBeInTheDocument();
   });
 
   it("announces loading, preserves a keyboard-reachable retry, and exposes errors", async () => {

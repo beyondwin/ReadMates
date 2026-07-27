@@ -82,7 +82,7 @@ describe("my reading shelf model", () => {
     ).toMatchObject({ action: { label: "아카이브 둘러보기", href: "/app/archive" } });
     expect(
       shelfEmptyState({ membershipStatus: "ACTIVE", clubSlug: "sample-club", currentSessionId: "session-now" }),
-    ).toMatchObject({ action: { label: "이번 세션 보기", href: "/app/sessions/session-now" } });
+    ).toMatchObject({ action: { label: "이번 세션 보기", href: "/app/session/current" } });
     expect(
       shelfEmptyState({ membershipStatus: "ACTIVE", clubSlug: "sample-club", currentSessionId: null }),
     ).toMatchObject({ action: { label: "아카이브 보기", href: "/app/archive" } });

@@ -341,7 +341,7 @@ test("reading shelf preserves semantic hierarchy and record order on desktop and
     ]);
     await expect(shelf.getByText("2026", { exact: true })).toBeVisible();
     await expect(shelf.getByText("2025", { exact: true })).toBeVisible();
-    await expect(shelf.getByText("정식 멤버가 되면 피드백 문서를 읽을 수 있습니다.")).toBeVisible();
+    await expect(shelf.getByText("활성 멤버가 되면 피드백 문서를 읽을 수 있습니다.")).toBeVisible();
     await expect(shelf.getByLabel("아주 긴 한국어 제목과 An exceptionally long English subtitle for a responsive reading shelf 표지 없음")).toBeVisible();
 
     const sessionLink = rows.first().getByRole("link", { name: "회차 기록" });
@@ -369,6 +369,46 @@ test("reading shelf preserves semantic hierarchy and record order on desktop and
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     }
   }
+});
+
+test("reading shelf keeps its mobile summary priorities and record controls above the bottom navigation", async ({ page }) => {
+  await mockMyReadingShelfJourney(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await loginWithGoogleFixture(page, "host@example.com");
+  await page.goto("/app/me");
+
+  const layout = await page.locator(".rm-my-shelf-summary").evaluate((summary) => {
+    const list = summary.querySelector<HTMLElement>(".rm-my-shelf-summary__list")!;
+    const values = Array.from(summary.querySelectorAll<HTMLElement>(".rm-my-shelf-summary__item dd"));
+    const shelf = document.querySelector<HTMLElement>(".rm-my-shelf")!;
+    const style = getComputedStyle(summary);
+
+    return {
+      columns: getComputedStyle(list).gridTemplateColumns.trim().split(/\s+/).length,
+      paddingTop: style.paddingTop,
+      paddingBottom: style.paddingBottom,
+      completionFontSize: Number.parseFloat(getComputedStyle(values[1]).fontSize),
+      primaryFontSizes: [0, 2, 3].map((index) => Number.parseFloat(getComputedStyle(values[index]).fontSize)),
+      shelfBottomPadding: Number.parseFloat(getComputedStyle(shelf).paddingBottom),
+      bottomNavigationHeight: document.querySelector<HTMLElement>("nav[aria-label='앱 탭']")!.getBoundingClientRect().height,
+    };
+  });
+
+  expect(layout.columns).toBe(3);
+  expect(layout.paddingTop).toBe("18px");
+  expect(layout.paddingBottom).toBe("18px");
+  expect(layout.completionFontSize).toBeLessThan(Math.min(...layout.primaryFontSizes));
+  expect(layout.shelfBottomPadding).toBeGreaterThanOrEqual(layout.bottomNavigationHeight + 44);
+
+  const loadMore = page.getByRole("button", { name: "기록 더 보기" });
+  await loadMore.scrollIntoViewIfNeeded();
+  const [loadMoreBox, tabBarBox] = await Promise.all([
+    loadMore.boundingBox(),
+    page.getByRole("navigation", { name: "앱 탭" }).boundingBox(),
+  ]);
+  expect(loadMoreBox).not.toBeNull();
+  expect(tabBarBox).not.toBeNull();
+  expect(loadMoreBox!.y + loadMoreBox!.height).toBeLessThanOrEqual(tabBarBox!.y);
 });
 
 test("reading shelf keeps settings and retry failures reachable above mobile navigation", async ({ page }) => {

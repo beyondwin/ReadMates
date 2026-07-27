@@ -127,6 +127,9 @@ describe("MyPage", () => {
     expect(screen.getByText("아직 쌓인 개인 기록이 없습니다")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "아카이브 보기" })).toHaveAttribute("href", "/app/archive");
     expect(screen.queryByRole("article")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "개인 요약" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 2, name: "책별 기록" })).not.toBeInTheDocument();
+    expect(screen.queryByText("완독 0/0")).not.toBeInTheDocument();
   });
 
   it("links active members with no records to their real current session", () => {
@@ -137,8 +140,33 @@ describe("MyPage", () => {
 
     expect(screen.getByRole("link", { name: "이번 세션 보기" })).toHaveAttribute(
       "href",
-      "/app/sessions/current-session",
+      "/app/session/current",
     );
+  });
+
+  it("keeps a viewer's empty shelf free of personal-summary metrics and record chrome", () => {
+    renderMyPage({
+      data: { ...profile, membershipStatus: "VIEWER", currentSessionId: "current-session" },
+      journey: { ...journey, items: [], nextCursor: null, summary: { ...journey.summary, attendedSessionCount: 0, completedReadingCount: 0, questionCount: 0, reviewCount: 0 } },
+    });
+
+    expect(screen.getByRole("link", { name: "아카이브 둘러보기" })).toHaveAttribute("href", "/app/archive");
+    expect(screen.queryByRole("region", { name: "개인 요약" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 2, name: "책별 기록" })).not.toBeInTheDocument();
+    expect(screen.queryByText("완독 0/0")).not.toBeInTheDocument();
+  });
+
+  it("uses active-member feedback copy when a suspended member sees a locked document", () => {
+    renderMyPage({
+      data: { ...profile, membershipStatus: "SUSPENDED" },
+      journey: {
+        ...journey,
+        items: [{ ...journey.items[0], feedbackDocument: { available: true, readable: false, lockedReason: "ACTIVE_MEMBERSHIP_REQUIRED" } }],
+      },
+    });
+
+    expect(screen.getByText("활성 멤버가 되면 피드백 문서를 읽을 수 있습니다.")).toBeInTheDocument();
+    expect(screen.queryByText("정식 멤버가 되면 피드백 문서를 읽을 수 있습니다.")).not.toBeInTheDocument();
   });
 });
 

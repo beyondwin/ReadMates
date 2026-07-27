@@ -115,7 +115,7 @@ export function shelfEmptyState(input: {
     return {
       title: "아직 쌓인 개인 기록이 없습니다",
       body: "이번 모임의 기록이 쌓이면 이곳에서 책별로 다시 읽을 수 있습니다.",
-      action: { label: "이번 세션 보기", href: `/app/sessions/${encodeURIComponent(input.currentSessionId)}` },
+      action: { label: "이번 세션 보기", href: "/app/session/current" },
     };
   }
 

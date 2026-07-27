@@ -81,9 +81,7 @@ function JourneyRow({ item }: { item: MyJourneyItem }) {
       <BookCover item={item} />
       <div className="rm-my-shelf-row__content">
         <p className="rm-my-shelf-meta">{sessionLabel(item)} · {dateLabel(item.date)}</p>
-        <h3>
-          <Link to={`/app/sessions/${encodeURIComponent(item.sessionId)}`}>{item.bookTitle}</Link>
-        </h3>
+        <h3>{item.bookTitle}</h3>
         <p className="rm-my-shelf-row__author">{item.bookAuthor}</p>
         <JourneyChips item={item} />
         <div className="rm-my-shelf-row__actions">
@@ -97,7 +95,7 @@ function JourneyRow({ item }: { item: MyJourneyItem }) {
           ) : null}
         </div>
         {item.feedbackDocument.available && item.feedbackDocument.lockedReason === "ACTIVE_MEMBERSHIP_REQUIRED" ? (
-          <p className="rm-my-shelf-feedback-lock">정식 멤버가 되면 피드백 문서를 읽을 수 있습니다.</p>
+          <p className="rm-my-shelf-feedback-lock">활성 멤버가 되면 피드백 문서를 읽을 수 있습니다.</p>
         ) : null}
       </div>
     </article>

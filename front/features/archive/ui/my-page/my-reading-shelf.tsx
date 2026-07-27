@@ -57,16 +57,19 @@ export function MyReadingShelf({
         </button>
       </header>
 
-      <MyReadingSummary summary={journey.summary} />
-      <MyReadingJourney
-        items={journey.items}
-        hasMore={journey.nextCursor !== null}
-        loadMorePending={journeyLoadMorePending}
-        loadMoreError={journeyLoadMoreError}
-        onLoadMore={onLoadMoreJourney}
-        onRetryLoadMore={onRetryLoadMoreJourney}
-      />
-      {!hasJourney ? (
+      {hasJourney ? (
+        <>
+          <MyReadingSummary summary={journey.summary} />
+          <MyReadingJourney
+            items={journey.items}
+            hasMore={journey.nextCursor !== null}
+            loadMorePending={journeyLoadMorePending}
+            loadMoreError={journeyLoadMoreError}
+            onLoadMore={onLoadMoreJourney}
+            onRetryLoadMore={onRetryLoadMoreJourney}
+          />
+        </>
+      ) : (
         <section className="rm-my-shelf-empty" aria-labelledby="my-reading-empty-heading">
           <h2 id="my-reading-empty-heading">{emptyState.title}</h2>
           <p>{emptyState.body}</p>
@@ -76,7 +79,7 @@ export function MyReadingShelf({
             </Link>
           ) : null}
         </section>
-      ) : null}
+      )}
       <MyPageSettings open={settingsOpen}>{settings}</MyPageSettings>
     </main>
   );

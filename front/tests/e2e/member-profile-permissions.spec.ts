@@ -98,6 +98,18 @@ test("member cannot edit own profile display name from my page", async ({ page }
   await expect(personalSettings.getByRole("textbox", { name: "이름" })).toHaveCount(0);
 });
 
+test("an empty reading shelf navigates to the real current-session route", async ({ page }) => {
+  await mockMyReadingShelfJourney(page, "empty");
+  await loginWithGoogleFixture(page, hostEmail);
+  await page.goto("/app/me");
+
+  await expect(page.getByRole("region", { name: "개인 요약" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "책별 기록" })).toHaveCount(0);
+  await page.getByRole("link", { name: "이번 세션 보기" }).click();
+  await expect(page).toHaveURL(/\/app\/session\/current$/);
+  await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toBeVisible();
+});
+
 test("host edits a same-club member display name and sees the row update", async ({ page }) => {
   const updatedDisplayName = uniqueDisplayName("Host");
 
