@@ -2,13 +2,18 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { HostSessionEditorOverview } from "../../model/host-session-editor-view-model";
+import { SessionEditorSectionNav } from "./session-editor-section-nav";
 import { SessionOverviewSection } from "./session-overview-section";
 
 describe("SessionOverviewSection", () => {
-  it("connects the applied record, working draft, and next action as one ledger", () => {
+  it("is the tabpanel controlled by the actual overview navigation tab", () => {
     renderOverview();
 
-    const ledger = screen.getByRole("region", { name: "세션 편집 개요" });
+    const overviewTab = screen.getByRole("tab", { name: "개요" });
+    const ledger = screen.getByRole("tabpanel", { name: "개요" });
+    expect(overviewTab).toHaveAttribute("aria-controls", "host-editor-panel-overview");
+    expect(ledger).toHaveAttribute("id", "host-editor-panel-overview");
+    expect(ledger).toHaveAttribute("aria-labelledby", "host-editor-tab-overview");
     expect(within(ledger).getByRole("heading", { name: "현재 적용본" })).toBeInTheDocument();
     expect(within(ledger).getByRole("heading", { name: "작업 중인 초안" })).toBeInTheDocument();
     expect(within(ledger).getByRole("heading", { name: "다음 할 일" })).toBeInTheDocument();
@@ -34,6 +39,23 @@ describe("SessionOverviewSection", () => {
     expect(visibility).toHaveClass("badge");
     expect(visibility.parentElement).toHaveTextContent("기록 공개 범위");
     expect(visibility.closest("button")).toBeNull();
+  });
+
+  it("shows one clear empty-draft message without the projected idle status", () => {
+    renderOverview({
+      overview: overviewFixture({
+        draft: {
+          exists: false,
+          statusLabel: "초안 준비됨",
+          sourceLabel: null,
+          updatedAt: null,
+          tone: "neutral",
+        },
+      }),
+    });
+
+    expect(screen.getByText("준비된 초안이 없습니다")).toBeInTheDocument();
+    expect(screen.queryByText("초안 준비됨")).not.toBeInTheDocument();
   });
 
   it("reports the exact next-action target", async () => {
@@ -98,14 +120,17 @@ function renderOverview({
   onPublishSession?: () => void | Promise<void>;
 } = {}) {
   return render(
-    <SessionOverviewSection
-      overview={overview}
-      sessionState={sessionState}
-      onNextAction={onNextAction}
-      onCloseSession={onCloseSession}
-      onPublishSession={onPublishSession}
-      lifecyclePending={false}
-    />,
+    <>
+      <SessionEditorSectionNav activeSection="overview" onSectionChange={() => {}} />
+      <SessionOverviewSection
+        overview={overview}
+        sessionState={sessionState}
+        onNextAction={onNextAction}
+        onCloseSession={onCloseSession}
+        onPublishSession={onPublishSession}
+        lifecyclePending={false}
+      />
+    </>,
   );
 }
 

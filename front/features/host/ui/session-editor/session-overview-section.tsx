@@ -24,8 +24,10 @@ export function SessionOverviewSection({
 
   return (
     <section
+      id="host-editor-panel-overview"
+      role="tabpanel"
+      aria-labelledby="host-editor-tab-overview"
       className="surface rm-host-session-editor__overview"
-      aria-label="세션 편집 개요"
       style={{ padding: 0, overflow: "hidden" }}
     >
       <OverviewRow title="현재 적용본">
@@ -68,9 +70,11 @@ export function SessionOverviewSection({
               </p>
             )}
           </div>
-          <span className={draftToneClassName(overview.draft.tone)}>
-            {overview.draft.statusLabel}
-          </span>
+          {overview.draft.exists ? (
+            <span className={draftToneClassName(overview.draft.tone)}>
+              {overview.draft.statusLabel}
+            </span>
+          ) : null}
         </div>
         {overview.draft.updatedAt ? (
           <p className="tiny mono" style={{ margin: "10px 0 0", color: "var(--text-3)" }}>
