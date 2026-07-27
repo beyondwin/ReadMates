@@ -32,14 +32,14 @@ export function parseHostSessionEditorLocation(search: string): HostSessionEdito
     if (!isHostSessionEditorSection(section)) {
       return DEFAULT_LOCATION;
     }
-    if (section !== "records") {
-      return { section, source: "manual" };
-    }
-
     const source = params.get("source");
     if (source !== null && !isHostSessionDraftSource(source)) {
       return DEFAULT_LOCATION;
     }
+    if (section !== "records") {
+      return { section, source: "manual" };
+    }
+
     return { section, source: source ?? "manual" };
   }
 

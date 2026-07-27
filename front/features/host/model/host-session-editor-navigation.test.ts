@@ -17,6 +17,7 @@ describe("host session editor navigation", () => {
     ["history section", "?section=history", { section: "history", source: "manual" }],
     ["invalid section", "?section=unknown", { section: "overview", source: "manual" }],
     ["invalid records source", "?section=records&source=unknown", { section: "overview", source: "manual" }],
+    ["invalid non-record source", "?section=basic&source=unknown", { section: "overview", source: "manual" }],
     ["source outside records", "?section=basic&source=ai", { section: "basic", source: "manual" }],
     ["legacy AI", "?aigen=1", { section: "records", source: "ai" }],
     ["legacy JSON", "?records=json", { section: "records", source: "json" }],
