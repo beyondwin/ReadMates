@@ -112,30 +112,43 @@ function renderWorkbench(overrides: Partial<WorkbenchProps> = {}) {
 }
 
 describe("ManualNotificationWorkbench", () => {
-  it("renders the three sending decisions in order", () => {
+  it("renders the safe guided-ledger hierarchy without raw enums", () => {
     renderWorkbench();
 
     const workbench = screen.getByRole("region", { name: "새 알림 발송" });
+    expect(within(workbench).getByText(
+      "선택만으로는 발송되지 않습니다. 미리보기에서 최종 확인합니다.",
+    )).toBeInTheDocument();
+    expect(within(workbench).getByText("미리보기 후 발송")).toBeInTheDocument();
+    expect(within(workbench).getByText(
+      "진행 중 · 멤버 공개 · 피드백 문서 준비 전",
+    )).toBeInTheDocument();
+    expect(within(workbench).queryByText(/OPEN|HOST_ONLY/)).not.toBeInTheDocument();
+
     const decisionHeadings = within(workbench)
       .getAllByRole("heading", { level: 3 })
       .map((heading) => heading.textContent);
 
     expect(decisionHeadings).toEqual([
-      "01 · 대상 회차",
-      "02 · 알림 종류",
+      "대상 회차",
+      "알림 종류",
       "대상과 채널",
     ]);
-    expect(
-      within(workbench).getAllByText(/^03(?: · 대상과 채널)?$/),
-    ).toHaveLength(1);
+    expect(within(workbench).getAllByText(/^01$/)).toHaveLength(1);
+    expect(within(workbench).getAllByText(/^02$/)).toHaveLength(1);
+    expect(within(workbench).getAllByText(/^03$/)).toHaveLength(1);
     expect(within(workbench).getByRole("button", { name: "미리보기 열기" })).toBeEnabled();
     expect(within(workbench).queryByRole("heading", { name: "멤버에게 알림을 보낼까요?" })).not.toBeInTheDocument();
   });
 
-  it("shows why an unavailable template cannot be selected", () => {
+  it("renders notification types as descriptive radio cards", () => {
     renderWorkbench();
 
-    const unavailable = screen.getByRole("button", { name: "피드백 문서 등록" });
+    const reminder = screen.getByRole("radio", { name: /모임 전날 리마인더/ });
+    expect(reminder).toBeChecked();
+    expect(screen.getByText("일정과 참석 여부를 다시 안내합니다.")).toBeInTheDocument();
+
+    const unavailable = screen.getByRole("radio", { name: /피드백 문서 등록/ });
     const reason = screen.getByText("피드백 문서가 등록된 뒤 발송할 수 있습니다.");
     expect(unavailable).toBeDisabled();
     expect(unavailable).toHaveAttribute("aria-describedby", reason.id);

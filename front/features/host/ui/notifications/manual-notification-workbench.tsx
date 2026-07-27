@@ -13,6 +13,11 @@ import type {
 } from "@/features/host/model/host-view-types";
 import { HostNotificationComposer } from "./host-notification-composer";
 import { HostNotificationComposerDialog } from "./host-notification-composer-dialog";
+import {
+  manualSessionStateLabel,
+  manualSessionVisibilityLabel,
+  manualTemplateDescriptions,
+} from "./manual-notification-labels";
 import { ManualNotificationPreviewConfirmation } from "./manual-notification-preview";
 
 type ManualNotificationWorkbenchProps = {
@@ -177,70 +182,117 @@ function ManualNotificationWorkbenchState({
       aria-labelledby="manual-notification-title"
     >
       <header className="rm-notification-workbench__header">
-        <span className="eyebrow">운영 · 수동 발송</span>
-        <h2 id="manual-notification-title">새 알림 발송</h2>
+        <div>
+          <span className="eyebrow">운영 · 수동 발송</span>
+          <h2 id="manual-notification-title">새 알림 발송</h2>
+          <p>선택만으로는 발송되지 않습니다. 미리보기에서 최종 확인합니다.</p>
+        </div>
+        <span className="badge">미리보기 후 발송</span>
       </header>
 
       <div className="rm-notification-workbench__primary-decisions">
-        <section aria-labelledby="manual-notification-session-title">
-          <h3 id="manual-notification-session-title">01 · 대상 회차</h3>
-          <label className="label" htmlFor="manual-notification-session">
-            세션 선택
-          </label>
-          <select
-            id="manual-notification-session"
-            className="input"
-            value={draft.sessionId}
-            disabled={busy || hostSessions.length === 0}
-            onChange={handleSessionSelect}
-          >
-            {hostSessions.map((session) => (
-              <option key={session.sessionId} value={session.sessionId}>
-                {session.sessionNumber}회차 · {session.bookTitle} · {session.date}
-              </option>
-            ))}
-          </select>
-          {hostSessions.length === 0 ? (
-            <p className="tiny muted">선택 가능한 세션이 없습니다.</p>
-          ) : null}
-          {selectedSession ? (
-            <p className="tiny muted">
-              <span>{selectedSession.bookTitle}</span>
-              <span> · {selectedSession.state} · {selectedSession.visibility}</span>
-            </p>
-          ) : null}
+        <section
+          className="rm-notification-workbench__decision"
+          aria-labelledby="manual-notification-session-title"
+        >
+          <header className="rm-notification-workbench__decision-heading">
+            <span className="rm-notification-workbench__step">01</span>
+            <div>
+              <h3 id="manual-notification-session-title">대상 회차</h3>
+              <p>알림의 기준이 되는 모임</p>
+            </div>
+          </header>
+          <div className="rm-notification-workbench__decision-control">
+            {hostSessions.length === 0 ? (
+              <div className="rm-notification-workbench__empty">
+                <p>선택 가능한 세션이 없습니다.</p>
+                <a className="btn btn-quiet btn-sm" href="/app/host/sessions">
+                  세션 관리로 이동
+                </a>
+              </div>
+            ) : (
+              <>
+                <label className="label" htmlFor="manual-notification-session">
+                  세션 선택
+                </label>
+                <select
+                  id="manual-notification-session"
+                  className="input"
+                  value={draft.sessionId}
+                  disabled={busy}
+                  onChange={handleSessionSelect}
+                >
+                  {hostSessions.map((session) => (
+                    <option key={session.sessionId} value={session.sessionId}>
+                      {session.sessionNumber}회차 · {session.bookTitle} · {session.date}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+            {selectedSession ? (
+              <p className="rm-notification-workbench__session-context">
+                {manualSessionStateLabel(selectedSession.state)}
+                {" · "}
+                {manualSessionVisibilityLabel(selectedSession.visibility)}
+                {" · "}
+                {options.session?.feedbackDocumentUploaded
+                  ? "피드백 문서 준비됨"
+                  : "피드백 문서 준비 전"}
+              </p>
+            ) : null}
+          </div>
         </section>
 
-        <section aria-labelledby="manual-notification-template-title">
-          <h3 id="manual-notification-template-title">02 · 알림 종류</h3>
-          <div className="row wrap" style={{ gap: 8, marginTop: 8 }}>
+        <section
+          className="rm-notification-workbench__decision"
+          aria-labelledby="manual-notification-template-title"
+        >
+          <header className="rm-notification-workbench__decision-heading">
+            <span className="rm-notification-workbench__step">02</span>
+            <div>
+              <h3 id="manual-notification-template-title">알림 종류</h3>
+              <p>발송할 안내의 성격</p>
+            </div>
+          </header>
+          <div className="rm-notification-workbench__decision-control">
+            <fieldset
+              className="rm-notification-choice-grid"
+              aria-labelledby="manual-notification-template-title"
+            >
             {options.templates.map((template) => {
               const reasonId = `manual-notification-template-${template.eventType}-reason`;
               return (
-                <div key={template.eventType}>
-                  <button
-                    className={`btn btn-sm ${
-                      draft.eventType === template.eventType ? "btn-primary" : "btn-quiet"
-                    }`}
-                    type="button"
+                <label
+                  key={template.eventType}
+                  className="rm-notification-choice-card"
+                  data-selected={draft.eventType === template.eventType ? "true" : "false"}
+                  data-disabled={!template.enabled ? "true" : "false"}
+                >
+                  <input
+                    type="radio"
+                    name="manual-notification-template"
                     aria-label={template.label}
                     aria-describedby={template.disabledReason ? reasonId : undefined}
+                    checked={draft.eventType === template.eventType}
                     disabled={busy || !template.enabled}
-                    onClick={() => selectTemplate(template.eventType)}
-                  >
-                    {template.label}
-                  </button>
+                    onChange={() => selectTemplate(template.eventType)}
+                  />
+                  <span className="rm-notification-choice-card__mark" aria-hidden="true">✓</span>
+                  <strong>{template.label}</strong>
+                  <span>{manualTemplateDescriptions[template.eventType]}</span>
                   {template.disabledReason ? (
-                    <p
+                    <span
                       id={reasonId}
-                      className="rm-notification-workbench__template-reason"
+                      className="rm-notification-choice-card__reason"
                     >
                       {template.disabledReason}
-                    </p>
+                    </span>
                   ) : null}
-                </div>
+                </label>
               );
             })}
+            </fieldset>
           </div>
         </section>
       </div>
