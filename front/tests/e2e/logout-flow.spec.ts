@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { loginWithGoogleFixture, resetSeedGoogleLogins } from "./readmates-e2e-db";
+import { mockMyReadingShelfJourney } from "./my-reading-shelf-fixtures";
 
 test.beforeEach(() => {
   resetSeedGoogleLogins(["host@example.com"]);
@@ -10,10 +11,12 @@ test.afterEach(() => {
 });
 
 test("my page logout prevents re-entry through the public top navigation", async ({ page }) => {
+  await mockMyReadingShelfJourney(page);
   await loginWithGoogleFixture(page, "host@example.com");
   await page.goto("/app/me");
 
-  await page.locator(".desktop-only").getByRole("button", { name: "로그아웃" }).click();
+  await page.getByRole("button", { name: "계정·알림 설정" }).click();
+  await page.getByRole("button", { name: "로그아웃" }).click();
 
   await expect(page).toHaveURL(/\/login$/);
   const authMe = await page.evaluate(async () => {

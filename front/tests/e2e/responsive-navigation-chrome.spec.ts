@@ -1,11 +1,21 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { loginWithGoogleFixture, resetSeedGoogleLogins } from "./readmates-e2e-db";
+import { mockMyReadingShelfJourney, mockNotificationPreferencesError } from "./my-reading-shelf-fixtures";
 
 async function expectPracticalTapTarget(locator: Locator) {
   const box = await locator.boundingBox();
   expect(box).not.toBeNull();
   expect(box!.height).toBeGreaterThanOrEqual(44);
   expect(box!.width).toBeGreaterThanOrEqual(44);
+}
+
+async function expectDomOrder(...locators: Locator[]) {
+  const indexes = await Promise.all(
+    locators.map((locator) =>
+      locator.evaluate((element) => Array.from(document.querySelectorAll("button, a, input")).indexOf(element)),
+    ),
+  );
+  expect(indexes).toEqual([...indexes].sort((left, right) => left - right));
 }
 
 async function expectPublicRecordMetadataLayout(page: Page, width: number, stacked: boolean) {
@@ -291,4 +301,96 @@ test("mobile app route continuity returns to archive tabs and host dashboard sou
   await page.getByRole("banner").getByRole("link", { name: "뒤로" }).click();
   await expect(page).toHaveURL(/\/app\/host$/);
   await expect(page.getByRole("heading", { name: "모임 운영" })).toBeVisible();
+});
+
+test("reading shelf preserves semantic hierarchy and record order on desktop and mobile", async ({ page }) => {
+  await mockMyReadingShelfJourney(page);
+  await loginWithGoogleFixture(page, "host@example.com");
+
+  for (const viewport of [
+    { width: 1440, height: 1000 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/app/me");
+
+    const shelf = page.locator(".rm-my-shelf");
+    await expect(shelf.getByRole("heading", { level: 1, name: "나의 서재" })).toHaveCount(1);
+    await expect(shelf.getByRole("heading", { level: 2 })).toContainText(["최근 책별 기록", "책별 기록"]);
+    await expect(shelf.getByRole("heading", { level: 3 })).toContainText([
+      "아주 긴 한국어 제목과 An exceptionally long English subtitle for a responsive reading shelf",
+      "잠긴 피드백 문서가 있는 공개 안전 테스트 책",
+    ]);
+
+    const rows = shelf.getByRole("article");
+    await expect(rows).toHaveCount(2);
+    await expect(rows).toContainText([
+      "아주 긴 한국어 제목과 An exceptionally long English subtitle for a responsive reading shelf",
+      "잠긴 피드백 문서가 있는 공개 안전 테스트 책",
+    ]);
+    await expect(shelf.getByText("2026", { exact: true })).toBeVisible();
+    await expect(shelf.getByText("2025", { exact: true })).toBeVisible();
+    await expect(shelf.getByText("정식 멤버가 되면 피드백 문서를 읽을 수 있습니다.")).toBeVisible();
+    await expect(shelf.getByLabel("아주 긴 한국어 제목과 An exceptionally long English subtitle for a responsive reading shelf 표지 없음")).toBeVisible();
+
+    const sessionLink = rows.first().getByRole("link", { name: "회차 기록" });
+    const feedbackLink = rows.first().getByRole("link", { name: "피드백 문서" });
+    await expect(sessionLink).toBeVisible();
+    await expect(feedbackLink).toBeVisible();
+    expect(await sessionLink.evaluate((element) => element.parentElement?.querySelectorAll("a").length === 2)).toBe(true);
+
+    if (viewport.width === 1440) {
+      await expect(shelf.getByRole("region", { name: "계정과 알림" })).not.toBeVisible();
+      expect(await shelf.evaluate((element) => element.getBoundingClientRect().width)).toBeLessThanOrEqual(820);
+    } else {
+      await expectPracticalTapTarget(shelf.getByRole("button", { name: "계정·알림 설정" }));
+      await expectPracticalTapTarget(sessionLink);
+      await expectPracticalTapTarget(feedbackLink);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    }
+  }
+});
+
+test("reading shelf keeps settings and retry failures reachable above mobile navigation", async ({ page }) => {
+  await mockMyReadingShelfJourney(page, "load-more-error");
+  await mockNotificationPreferencesError(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await loginWithGoogleFixture(page, "host@example.com");
+  await page.goto("/app/me");
+
+  await page.getByRole("button", { name: "기록 더 보기" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "기록을 더 불러오지 못했습니다." })).toBeVisible();
+  await expectPracticalTapTarget(page.getByRole("button", { name: "다시 시도" }).first());
+
+  await page.getByRole("button", { name: "계정·알림 설정" }).click();
+  const settings = page.getByRole("region", { name: "계정과 알림" });
+  await expect(settings.getByRole("alert")).toContainText("알림 설정을 불러오지 못했습니다.");
+  await expect(settings.getByRole("button", { name: "로그아웃" })).toBeVisible();
+  await expect(settings.getByRole("button", { name: "탈퇴" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("reading shelf keeps keyboard-reachable account controls after the record actions in DOM order", async ({ page }) => {
+  await mockMyReadingShelfJourney(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await loginWithGoogleFixture(page, "host@example.com");
+  await page.goto("/app/me");
+
+  const settingsTrigger = page.getByRole("button", { name: "계정·알림 설정" });
+  const sessionRecord = page.getByRole("link", { name: "회차 기록" }).first();
+  const feedbackDocument = page.getByRole("link", { name: "피드백 문서" }).first();
+  const loadMore = page.getByRole("button", { name: "기록 더 보기" });
+  await settingsTrigger.click();
+
+  const settings = page.getByRole("region", { name: "계정과 알림" });
+  await expect(settings.getByRole("heading", { name: "프로필" })).toBeVisible();
+  await expect(settings.getByRole("button", { name: "이름 변경" })).toHaveCount(0);
+  const notification = settings.getByRole("switch", { name: "이메일 알림" });
+  const logout = settings.getByRole("button", { name: "로그아웃" });
+  const leave = settings.getByRole("button", { name: "탈퇴" });
+
+  await expectDomOrder(settingsTrigger, sessionRecord, feedbackDocument, loadMore, notification, logout, leave);
+  for (const locator of [settingsTrigger, sessionRecord, feedbackDocument, loadMore, notification, logout, leave]) {
+    await expectPracticalTapTarget(locator);
+  }
 });

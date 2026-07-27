@@ -5819,6 +5819,10 @@
   background: var(--bg-sub);
 }
 
+.rm-my-shelf-settings[hidden] {
+  display: none;
+}
+
 .rm-my-shelf-settings > h2,
 .rm-my-shelf-settings h3 {
   margin: 0;
@@ -5872,6 +5876,69 @@
   margin: 0;
   color: var(--text-2);
   line-height: 1.6;
+}
+
+.rm-my-shelf-notification-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 64px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.rm-my-shelf-notification-row:first-child {
+  border-top: 0;
+}
+
+.rm-my-shelf-notification-row > div {
+  min-width: 0;
+}
+
+.rm-my-shelf-notification-row p,
+.rm-my-shelf-notification-save-error {
+  margin: 4px 0 0;
+  color: var(--text-3);
+  overflow-wrap: anywhere;
+}
+
+.rm-my-shelf-notification-switch {
+  position: relative;
+  display: grid;
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  place-items: center;
+  cursor: pointer;
+}
+
+.rm-my-shelf-notification-switch input {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+
+.rm-my-shelf-notification-switch__thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--text-3);
+  transition: transform 140ms ease, background 140ms ease;
+}
+
+.rm-my-shelf-notification-switch__thumb.is-on {
+  transform: translateX(14px);
+  background: var(--accent);
+}
+
+.rm-my-shelf-notification-save {
+  display: flex;
+  justify-content: flex-end;
+  padding: 14px 12px 12px;
 }
 
 .rm-my-shelf-settings__logout {

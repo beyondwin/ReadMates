@@ -1562,6 +1562,12 @@ body[data-home="stack"] .home-carousel { display: none; }
   .rm-my-shelf-header {
     gap: 16px;
     padding-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  .rm-my-shelf-header > div {
+    min-width: 0;
+    flex: 1 1 220px;
   }
 
   .rm-my-shelf-header h1 {
