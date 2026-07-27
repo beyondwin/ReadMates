@@ -143,12 +143,15 @@ desktop과 mobile은 같은 의미의 section을 사용한다.
 
 desktop은 header 아래의 안정적인 horizontal section navigation을 사용한다. mobile은 thumb-friendly horizontal tab을 사용하고 320px에서 스크롤 가능해야 한다.
 
+선택하지 않은 section은 화면에서 노출하지 않지만 form, draft controller, mutation 상태는 section보다 상위 route/shell에서 유지한다. section을 바꿔도 저장되지 않은 기본 정보 입력, 자동 저장 대기 중인 기록 입력, AI/JSON 검토 상태가 초기화되지 않는다.
+
 section navigation은 다음을 만족한다.
 
 - role/tab/tabpanel 관계
 - ArrowLeft, ArrowRight, Home, End keyboard 이동
 - 선택한 tab만 `tabIndex=0`
 - section 변경 시 선택 tab focus 유지
+- section 변경 시 입력값과 scroll 복귀 지점 보존
 - 색상뿐 아니라 label과 selected semantics로 상태 구분
 
 ## 7. 기록 작업대
@@ -336,6 +339,8 @@ section은 query state로 표현한다.
 
 query가 없으면 `overview`와 같다. 기본 URL에 불필요한 query를 강제로 추가하지 않는다.
 
+section/source 전환은 현재 page data를 다시 로드하거나 browser history를 불필요하게 쌓지 않는 `replaceState` 성격으로 처리한다. browser Back은 이전 section이 아니라 edit route에 들어오기 전 화면으로 돌아가며, 실제 route 이탈에는 기존 unsaved-draft guard가 계속 적용된다.
+
 기록 생성 도구 deep link:
 
 ```text
@@ -368,6 +373,7 @@ query가 없으면 `overview`와 같다. 기본 URL에 불필요한 query를 강
 - history pagination
 - composer handoff
 - UI props와 callbacks 조립
+- section 전환 뒤에도 유지되어야 하는 form, draft, generation 검토 상태
 
 ### 11.2 model
 
@@ -596,6 +602,7 @@ ReadMates의 `Modern editorial · warm neutral · ink blue` 방향을 유지한�
 - desktop/mobile section navigation
 - keyboard tab 이동
 - 한 번에 선택 section만 노출
+- section 전환 후 저장되지 않은 기본 정보와 draft local input 보존
 - overview 상태 3종
 - 적용 기록 없음에서 `버전 0` 미노출
 - 초안 생성 수단 선택과 공통 editor 복귀
@@ -663,7 +670,7 @@ CI parity 또는 Corepack 미설치 환경에서는 repository guide의 fallback
 인접 high-risk row:
 
 - BFF/OAuth: endpoint, cookie, redirect, trusted header 동작은 변경하지 않으므로 직접 범위가 아니다.
-- Persistence/migration: 현재 API로 구현 가능하면 migration은 없다.
+- Persistence/migration: 현재 코드와 API inspection상 승인된 UI 상태를 이미 표현할 수 있으므로 baseline 구현에는 migration이 없다. 구현 중 구체적인 response gap이 확인되면 별도 additive task로 분리한다.
 - Async/provider: AI generation 내부 contract는 변경하지 않고 기존 결과가 공통 초안으로 수렴하는 UI만 검증한다.
 - Cursor collection: history pagination UI는 유지하지만 cursor API contract 자체는 변경하지 않는다.
 
