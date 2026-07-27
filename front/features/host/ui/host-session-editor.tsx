@@ -142,6 +142,7 @@ type HostSessionRecordWorkflow = {
     revisionId: string;
     expectedDraftRevision: number | null;
   }) => Promise<void>;
+  onRestoreCompleted?: () => void;
 };
 
 function dialogFocusableElements(container: HTMLElement) {
@@ -1455,9 +1456,7 @@ export default function HostSessionEditor({
                 expectedDraftRevision={recordWorkflow?.expectedDraftRevision ?? null}
                 restoring={recordWorkflow?.restoring ?? false}
                 onRestore={recordWorkflow?.onRestore ?? (async () => undefined)}
-                onRestoreCompleted={() => {
-                  changeLocation({ section: "records", source: "manual" });
-                }}
+                onRestoreCompleted={recordWorkflow?.onRestoreCompleted ?? (() => undefined)}
               />
             ) : null}
 

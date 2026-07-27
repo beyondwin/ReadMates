@@ -1,5 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useBlocker, useLoaderData, useParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useBlocker,
+  useLoaderData,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import HostSessionEditor, {
   type HostSessionEditorLinkComponent,
@@ -31,6 +37,7 @@ import {
 import {
   hostSessionRecordEditorQuery,
   hostSessionRecordHistoryQuery,
+  hostSessionRecordKeys,
   useApplyHostSessionRecordMutation,
   usePreviewHostSessionRecordApplyMutation,
   useRebaseHostSessionRecordDraftMutation,
@@ -41,6 +48,7 @@ import { useSessionRecordDraftController } from "@/features/host/hooks/use-sessi
 import {
   hostSessionDeletionPreviewQuery,
   hostSessionDetailQuery,
+  hostSessionKeys,
   invalidateHostSessionManualDispatches,
   invalidateHostSessionRecordSurfaces,
   hostSessionManualDispatchesQuery,
@@ -82,21 +90,48 @@ function contextFromClubSlug(clubSlug?: string): ReadmatesApiContext {
   return { clubSlug };
 }
 
-function useHostSessionEditorNavigation() {
-  const [location, setLocation] = useState<HostSessionEditorLocation>(
-    () => parseHostSessionEditorLocation(globalThis.location?.search ?? ""),
+function useHostSessionEditorLocation(): {
+  location: HostSessionEditorLocation;
+  replaceLocation: (next: HostSessionEditorLocation) => void;
+} {
+  const routerLocation = useLocation();
+  const navigate = useNavigate();
+  const currentUrl =
+    `${routerLocation.pathname}${routerLocation.search}${routerLocation.hash}`;
+  const currentUrlRef = useRef(currentUrl);
+  const location = useMemo(
+    () => parseHostSessionEditorLocation(routerLocation.search),
+    [routerLocation.search],
   );
-  const onChange = useCallback((next: HostSessionEditorLocation) => {
-    const currentUrl = `${globalThis.location?.pathname ?? ""}${globalThis.location?.search ?? ""}${globalThis.location?.hash ?? ""}`;
-    globalThis.history?.replaceState(
-      globalThis.history.state,
-      "",
-      buildHostSessionEditorUrl(currentUrl, next),
-    );
-    setLocation(next);
-  }, []);
+  const replaceLocation = useCallback((next: HostSessionEditorLocation) => {
+    const nextUrl = buildHostSessionEditorUrl(currentUrlRef.current, next);
+    if (nextUrl === currentUrlRef.current) {
+      return;
+    }
+    currentUrlRef.current = nextUrl;
+    void navigate(nextUrl, {
+      replace: true,
+      state: routerLocation.state,
+    });
+  }, [navigate, routerLocation.state]);
 
-  return useMemo(() => ({ location, onChange }), [location, onChange]);
+  useEffect(() => {
+    currentUrlRef.current = currentUrl;
+    const canonicalUrl = buildHostSessionEditorUrl(currentUrl, location);
+    if (canonicalUrl === currentUrl) {
+      return;
+    }
+    currentUrlRef.current = canonicalUrl;
+    void navigate(canonicalUrl, {
+      replace: true,
+      state: routerLocation.state,
+    });
+  }, [currentUrl, location, navigate, routerLocation.state]);
+
+  return useMemo(
+    () => ({ location, replaceLocation }),
+    [location, replaceLocation],
+  );
 }
 
 function apiErrorCode(error: unknown) {
@@ -138,7 +173,11 @@ function isFreshApplyRequired(code: string) {
 }
 
 function useDraftRouteNavigationGuard(shouldBlock: boolean) {
-  const blocker = useBlocker(shouldBlock);
+  const blocker = useBlocker(useCallback(
+    ({ currentLocation, nextLocation }) =>
+      shouldBlock && currentLocation.pathname !== nextLocation.pathname,
+    [shouldBlock],
+  ));
   useEffect(() => {
     if (blocker.state !== "blocked") {
       return;
@@ -149,6 +188,49 @@ function useDraftRouteNavigationGuard(shouldBlock: boolean) {
       blocker.reset();
     }
   }, [blocker]);
+}
+
+function HostSessionEditorQueryState({
+  status,
+  onRetry,
+}: {
+  status: "loading" | "error";
+  onRetry?: () => void;
+}) {
+  return (
+    <main className="rm-host-session-editor">
+      <section className="page-header-compact">
+        <div className="container">
+          <div className="eyebrow">세션 운영 문서</div>
+          <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
+            세션 문서 편집
+          </h1>
+        </div>
+      </section>
+      <section>
+        <div className="container">
+          {status === "loading" ? (
+            <div className="surface-quiet small" role="status" style={{ padding: 18 }}>
+              세션 기록 편집 정보를 불러오는 중입니다.
+            </div>
+          ) : (
+            <div className="surface-quiet stack" role="alert" style={{ padding: 18 }}>
+              <p className="small" style={{ margin: 0 }}>
+                세션 기록 편집 정보를 불러오지 못했습니다.
+              </p>
+              {onRetry ? (
+                <div>
+                  <button className="btn btn-quiet btn-sm" type="button" onClick={onRetry}>
+                    다시 시도
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          )}
+        </div>
+      </section>
+    </main>
+  );
 }
 
 function useHostSessionEditorActions(
@@ -209,7 +291,11 @@ export function NewHostSessionRoute({
 }: HostSessionEditorRouteProps) {
   const { clubSlug } = useParams<{ clubSlug: string }>();
   const context = useMemo(() => contextFromClubSlug(clubSlug), [clubSlug]);
-  const navigation = useHostSessionEditorNavigation();
+  const { location, replaceLocation } = useHostSessionEditorLocation();
+  const navigation = useMemo(
+    () => ({ location, onChange: replaceLocation }),
+    [location, replaceLocation],
+  );
   const queryClient = useQueryClient();
   const handleSessionRecordsChanged = useCallback(
     async (sessionId: string) => {
@@ -246,7 +332,11 @@ export function EditHostSessionRoute({
   const { clubSlug, sessionId: routeSessionId } = useParams<{ clubSlug: string; sessionId: string }>();
   const sessionId = routeSessionId ?? loaderData.sessionId;
   const context = useMemo(() => contextFromClubSlug(clubSlug), [clubSlug]);
-  const navigation = useHostSessionEditorNavigation();
+  const { location, replaceLocation } = useHostSessionEditorLocation();
+  const navigation = useMemo(
+    () => ({ location, onChange: replaceLocation }),
+    [location, replaceLocation],
+  );
   const queryClient = useQueryClient();
   const handleSessionRecordsChanged = useCallback(
     async (changedSessionId: string) => {
@@ -271,7 +361,20 @@ export function EditHostSessionRoute({
   ));
 
   if (!sessionQuery.data || !recordEditorQuery.data) {
-    return null;
+    if (sessionQuery.isError || recordEditorQuery.isError) {
+      return (
+        <HostSessionEditorQueryState
+          status="error"
+          onRetry={() => {
+            void Promise.all([
+              sessionQuery.refetch(),
+              recordEditorQuery.refetch(),
+            ]);
+          }}
+        />
+      );
+    }
+    return <HostSessionEditorQueryState status="loading" />;
   }
 
   return (
@@ -383,6 +486,19 @@ export function EditHostSessionRecordWorkflow({
     onReload: reloadRecordEditor,
   });
   useDraftRouteNavigationGuard(controller.shouldBlockNavigation);
+
+  const onApplyCompleted = useCallback(async () => {
+    await Promise.all([
+      controller.reloadDraft(),
+      queryClient.invalidateQueries({
+        queryKey: hostSessionRecordKeys.historyRoot(recordEditor.sessionId, context),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: hostSessionKeys.detail(recordEditor.sessionId, context),
+      }),
+    ]);
+    navigation.onChange({ section: "overview", source: "manual" });
+  }, [context, controller, navigation, queryClient, recordEditor.sessionId]);
 
   const rebaseDraft = useCallback(async () => {
     if (controller.expectedDraftRevision === null) {
@@ -502,7 +618,7 @@ export function EditHostSessionRecordWorkflow({
       setConfirmationOpen(false);
       setApplyPreview(null);
       setPendingApply(null);
-      await controller.reloadDraft();
+      await onApplyCompleted();
       if (result.composer) {
         queryClient.removeQueries({
           queryKey: hostNotificationKeys.manualOptionsRoot(context),
@@ -551,6 +667,7 @@ export function EditHostSessionRecordWorkflow({
     applyPreview,
     context,
     controller,
+    onApplyCompleted,
     pendingApply,
     queryClient,
   ]);
@@ -585,6 +702,7 @@ export function EditHostSessionRecordWorkflow({
           onDraftCommitted: async ({ draftRevision }) => {
             controller.adoptDraftRevision(draftRevision);
             await controller.reloadDraft();
+            navigation.onChange({ section: "records", source: "manual" });
           },
           onLoadMoreHistory: async (cursor) => {
             setHistoryLoadingMore(true);
@@ -624,6 +742,9 @@ export function EditHostSessionRecordWorkflow({
               draft,
               draftLiveBaseStale: draft.baseLiveRevision !== recordEditor.liveRevision,
             });
+          },
+          onRestoreCompleted: () => {
+            navigation.onChange({ section: "records", source: "manual" });
           },
         }}
       />
