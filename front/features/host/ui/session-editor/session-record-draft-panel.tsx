@@ -1,9 +1,7 @@
-import type { CSSProperties } from "react";
-import type { HostSessionEditorSection } from "@/features/host/model/host-session-editor-navigation";
-import type { DraftSaveState } from "@/features/host/hooks/use-session-record-draft-controller";
-import { Panel } from "./session-editor-panel";
+import type { CSSProperties, JSX } from "react";
+import type { DraftSaveState } from "@/features/host/model/host-session-record-editor-model";
 
-export type { DraftSaveState } from "@/features/host/hooks/use-session-record-draft-controller";
+export type { DraftSaveState } from "@/features/host/model/host-session-record-editor-model";
 
 export type SessionRecordDraftEntry = {
   membershipId: string;
@@ -47,36 +45,16 @@ function validationSections(issues: string[]) {
 
 function saveStateMessage(state: DraftSaveState) {
   return {
-    idle: "공개 기록을 수정하면 자동으로 초안에 저장합니다.",
+    idle: "내용을 수정하면 자동으로 저장합니다.",
     dirty: "저장 대기 중인 변경이 있습니다.",
-    saving: "공개 기록 초안을 저장하고 있습니다.",
-    saved: "초안 저장됨 · 검토 후 반영",
-    error: "저장되지 않은 변경이 있습니다. 이 화면을 떠나기 전에 다시 시도해 주세요.",
+    saving: "저장 중",
+    saved: "저장됨",
+    error: "저장되지 않은 변경이 있습니다.",
     stale: "다른 호스트가 먼저 수정했습니다.",
   }[state];
 }
 
-export function SessionRecordDraftPanel({
-  activeSection,
-  panelId = "host-editor-panel-records",
-  labelledBy,
-  liveSnapshot,
-  snapshot,
-  saveState,
-  validationIssues,
-  draftLiveBaseStale,
-  onSnapshotChange,
-  onReloadDraft,
-  onCopyInput,
-  onRebaseDraft,
-  rebasePending = false,
-  rebaseError = null,
-  onReviewDraft,
-}: {
-  activeSection: HostSessionEditorSection;
-  panelId?: string;
-  labelledBy?: string;
-  liveSnapshot: SessionRecordDraftSnapshot;
+export type SessionRecordDraftPanelBodyProps = {
   snapshot: SessionRecordDraftSnapshot;
   saveState: DraftSaveState;
   validationIssues: string[];
@@ -87,8 +65,20 @@ export function SessionRecordDraftPanel({
   onRebaseDraft?: () => void | Promise<void>;
   rebasePending?: boolean;
   rebaseError?: string | null;
-  onReviewDraft?: () => void;
-}) {
+};
+
+export function SessionRecordDraftPanelBody({
+  snapshot,
+  saveState,
+  validationIssues,
+  draftLiveBaseStale,
+  onSnapshotChange,
+  onReloadDraft,
+  onCopyInput,
+  onRebaseDraft,
+  rebasePending = false,
+  rebaseError = null,
+}: SessionRecordDraftPanelBodyProps): JSX.Element {
   const invalidSections = validationSections(validationIssues);
   const updateEntry = (
     key: "highlights" | "oneLineReviews",
@@ -104,217 +94,228 @@ export function SessionRecordDraftPanel({
   };
 
   return (
-    <Panel
-      eyebrow="공개 기록"
-      title="공개 기록 초안"
-      section="records"
-      panelId={panelId}
-      labelledBy={labelledBy}
-      activeSection={activeSection}
+    <div
+      role="region"
+      aria-label="공통 초안 편집기"
+      className="stack"
+      style={{ "--stack": "18px", minWidth: 0 } as CSSProperties}
     >
-      <div className="stack" style={{ "--stack": "18px", minWidth: 0 } as CSSProperties}>
-        <div
-          role={saveState === "error" || saveState === "stale" || draftLiveBaseStale ? "alert" : "status"}
-          className="surface-quiet small"
-          data-navigation-blocked={saveState === "error" || saveState === "stale" || saveState === "dirty"}
-          style={{ padding: 14 }}
-        >
-          {draftLiveBaseStale ? "세션 기본 정보 또는 live 기록이 변경되어 초안을 다시 확인해야 합니다. " : null}
-          {saveStateMessage(saveState)}
-          {draftLiveBaseStale && onRebaseDraft ? (
-            <div className="stack" style={{ "--stack": "8px", marginTop: 10 } as CSSProperties}>
-              <p className="small" style={{ margin: 0 }}>
-                현재 적용된 기록과 최신 세션 정보를 확인한 뒤 초안의 기준을 갱신해 주세요.
-              </p>
-              <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
-                <button
-                  className="btn btn-quiet btn-sm"
-                  type="button"
-                  disabled={rebasePending || saveState !== "saved"}
-                  onClick={() => void onRebaseDraft()}
-                >
-                  {rebasePending ? "최신 정보 확인 중…" : "최신 정보 확인 완료"}
-                </button>
-              </div>
-              {rebaseError ? <span className="small">{rebaseError}</span> : null}
-            </div>
-          ) : null}
-          {saveState === "stale" ? (
-            <div className="row" style={{ gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-              <button className="btn btn-quiet btn-sm" type="button" onClick={() => void onReloadDraft()}>
-                최신 초안 불러오기
-              </button>
-              <button className="btn btn-ghost btn-sm" type="button" onClick={() => void onCopyInput()}>
-                내 입력 복사
-              </button>
-            </div>
-          ) : null}
-        </div>
-
-        {invalidSections.length > 0 ? (
-          <nav aria-label="초안 검증 오류" className="surface-quiet" style={{ padding: 14 }}>
-            <div className="tiny" style={{ marginBottom: 8 }}>확인이 필요한 섹션</div>
+      <div
+        role={saveState === "error" || saveState === "stale" || draftLiveBaseStale ? "alert" : "status"}
+        className="surface-quiet small"
+        data-navigation-blocked={saveState === "error" || saveState === "stale" || saveState === "dirty"}
+        style={{ padding: 14, minWidth: 0, overflowWrap: "anywhere" }}
+      >
+        {draftLiveBaseStale ? "세션 기본 정보 또는 현재 적용본이 변경되어 초안을 다시 확인해야 합니다. " : null}
+        {saveStateMessage(saveState)}
+        {draftLiveBaseStale && onRebaseDraft ? (
+          <div className="stack" style={{ "--stack": "8px", marginTop: 10 } as CSSProperties}>
+            <p className="small" style={{ margin: 0 }}>
+              현재 적용된 기록과 최신 세션 정보를 확인한 뒤 초안의 기준을 갱신해 주세요.
+            </p>
             <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
-              {invalidSections.map((section) => (
-                <a
-                  key={section}
-                  className="btn btn-quiet btn-sm"
-                  href={`#session-record-${section}`}
-                >
-                  {validationSectionLabels[section]} 오류
-                </a>
-              ))}
+              <button
+                className="btn btn-quiet btn-sm"
+                type="button"
+                disabled={rebasePending || saveState !== "saved"}
+                onClick={() => void onRebaseDraft()}
+              >
+                {rebasePending ? "최신 정보 확인 중…" : "최신 정보 확인 완료"}
+              </button>
             </div>
-          </nav>
+            {rebaseError ? <span className="small">{rebaseError}</span> : null}
+          </div>
         ) : null}
+        {saveState === "error" ? (
+          <div className="row" style={{ gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+            <button
+              className="btn btn-quiet btn-sm"
+              type="button"
+              onClick={() => onSnapshotChange(snapshot)}
+            >
+              저장 다시 시도
+            </button>
+            <button className="btn btn-quiet btn-sm" type="button" onClick={() => void onReloadDraft()}>
+              최신 초안 불러오기
+            </button>
+            <button className="btn btn-ghost btn-sm" type="button" onClick={() => void onCopyInput()}>
+              내 입력 복사
+            </button>
+          </div>
+        ) : null}
+        {saveState === "stale" ? (
+          <div className="row" style={{ gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+            <button className="btn btn-quiet btn-sm" type="button" onClick={() => void onReloadDraft()}>
+              최신 초안 불러오기
+            </button>
+            <button className="btn btn-ghost btn-sm" type="button" onClick={() => void onCopyInput()}>
+              내 입력 복사
+            </button>
+          </div>
+        ) : null}
+      </div>
 
-        <section
-          role="region"
-          aria-label="현재 적용된 공개 기록"
-          className="surface-quiet"
-          style={{ padding: 14 }}
-        >
-          <div className="eyebrow">현재 live revision</div>
-          <p className="small" style={{ margin: "8px 0 0", whiteSpace: "pre-wrap" }}>
-            {liveSnapshot.publicationSummary || "적용된 공개 요약이 없습니다."}
-          </p>
-        </section>
-
-        <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
-          <legend className="field-label">공개 범위</legend>
-          <div className="row" style={{ gap: 12, flexWrap: "wrap" }}>
-            {[
-              ["HOST_ONLY", "호스트 전용"],
-              ["MEMBER", "멤버 공개"],
-              ["PUBLIC", "외부 공개"],
-            ].map(([value, label]) => (
-              <label className="small" key={value}>
-                <input
-                  type="radio"
-                  name="session-record-draft-visibility"
-                  checked={snapshot.visibility === value}
-                  onChange={() => onSnapshotChange({
-                    ...snapshot,
-                    visibility: value as SessionRecordDraftSnapshot["visibility"],
-                  })}
-                />{" "}
-                {label}
-              </label>
+      {invalidSections.length > 0 ? (
+        <nav aria-label="초안 검증 오류" className="surface-quiet" style={{ padding: 14 }}>
+          <div className="tiny" style={{ marginBottom: 8 }}>확인이 필요한 섹션</div>
+          <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+            {invalidSections.map((section) => (
+              <a
+                key={section}
+                className="btn btn-quiet btn-sm"
+                href={`#session-record-${section}`}
+              >
+                {validationSectionLabels[section]} 오류
+              </a>
             ))}
           </div>
-        </fieldset>
+        </nav>
+      ) : null}
 
-        <label id="session-record-summary" className="stack" style={{ "--stack": "6px" } as CSSProperties}>
-          <span className="field-label">공개 요약</span>
-          <textarea
+      <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
+        <legend className="field-label">공개 범위</legend>
+        <div className="row" style={{ gap: 12, flexWrap: "wrap" }}>
+          {[
+            ["HOST_ONLY", "호스트 전용"],
+            ["MEMBER", "멤버 공개"],
+            ["PUBLIC", "외부 공개"],
+          ].map(([value, label]) => (
+            <label className="small" key={value}>
+              <input
+                type="radio"
+                name="session-record-draft-visibility"
+                checked={snapshot.visibility === value}
+                onChange={() => onSnapshotChange({
+                  ...snapshot,
+                  visibility: value as SessionRecordDraftSnapshot["visibility"],
+                })}
+              />{" "}
+              {label}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <label
+        id="session-record-summary"
+        className="stack"
+        style={{ "--stack": "6px", minWidth: 0 } as CSSProperties}
+      >
+        <span className="field-label">공개 요약</span>
+        <textarea
+          id="session-record-summary-input"
+          className="input"
+          aria-label="공개 요약"
+          rows={6}
+          value={snapshot.publicationSummary}
+          style={{ minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere" }}
+          onChange={(event) => onSnapshotChange({
+            ...snapshot,
+            publicationSummary: event.target.value,
+          })}
+        />
+      </label>
+
+      <section
+        id="session-record-highlights"
+        className="stack"
+        style={{ "--stack": "8px", minWidth: 0 } as CSSProperties}
+      >
+        <h3 className="h4" style={{ margin: 0 }}>하이라이트</h3>
+        {snapshot.highlights.length === 0 ? (
+          <p className="small" style={{ margin: 0 }}>저장된 하이라이트가 없습니다.</p>
+        ) : snapshot.highlights.map((entry, index) => (
+          <label
+            key={`${entry.membershipId}-${index}`}
+            className="stack"
+            style={{ "--stack": "5px", minWidth: 0 } as CSSProperties}
+          >
+            <span className="tiny" style={{ overflowWrap: "anywhere" }}>{entry.authorDisplayName}</span>
+            <textarea
+              className="input"
+              aria-label={`하이라이트 ${index + 1} · ${entry.authorDisplayName}`}
+              rows={3}
+              value={entry.text}
+              style={{ minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere" }}
+              onChange={(event) => updateEntry("highlights", index, event.target.value)}
+            />
+          </label>
+        ))}
+      </section>
+
+      <section
+        id="session-record-reviews"
+        className="stack"
+        style={{ "--stack": "8px", minWidth: 0 } as CSSProperties}
+      >
+        <h3 className="h4" style={{ margin: 0 }}>한줄평</h3>
+        {snapshot.oneLineReviews.length === 0 ? (
+          <p className="small" style={{ margin: 0 }}>저장된 한줄평이 없습니다.</p>
+        ) : snapshot.oneLineReviews.map((entry, index) => (
+          <label
+            key={`${entry.membershipId}-${index}`}
+            className="stack"
+            style={{ "--stack": "5px", minWidth: 0 } as CSSProperties}
+          >
+            <span className="tiny" style={{ overflowWrap: "anywhere" }}>{entry.authorDisplayName}</span>
+            <input
+              className="input"
+              aria-label={`한줄평 ${index + 1} · ${entry.authorDisplayName}`}
+              value={entry.text}
+              style={{ minWidth: 0, maxWidth: "100%" }}
+              onChange={(event) => updateEntry("oneLineReviews", index, event.target.value)}
+            />
+          </label>
+        ))}
+      </section>
+
+      <section
+        id="session-record-feedback"
+        className="stack"
+        style={{ "--stack": "8px", minWidth: 0 } as CSSProperties}
+      >
+        <h3 className="h4" style={{ margin: 0 }}>피드백 문서</h3>
+        <label className="stack" style={{ "--stack": "5px", minWidth: 0 } as CSSProperties}>
+          <span className="tiny">파일 이름</span>
+          <input
             className="input"
-            aria-label="공개 요약"
-            rows={6}
-            value={snapshot.publicationSummary}
+            aria-label="피드백 파일 이름"
+            value={snapshot.feedbackDocument.fileName}
+            style={{ minWidth: 0, maxWidth: "100%" }}
             onChange={(event) => onSnapshotChange({
               ...snapshot,
-              publicationSummary: event.target.value,
+              feedbackDocument: { ...snapshot.feedbackDocument, fileName: event.target.value },
             })}
           />
         </label>
-
-        <section id="session-record-highlights" className="stack" style={{ "--stack": "8px" } as CSSProperties}>
-          <h3 className="h4" style={{ margin: 0 }}>하이라이트</h3>
-          {snapshot.highlights.length === 0 ? (
-            <p className="small" style={{ margin: 0 }}>저장된 하이라이트가 없습니다.</p>
-          ) : snapshot.highlights.map((entry, index) => (
-            <label key={`${entry.membershipId}-${index}`} className="stack" style={{ "--stack": "5px" } as CSSProperties}>
-              <span className="tiny">{entry.authorDisplayName}</span>
-              <textarea
-                className="input"
-                aria-label={`하이라이트 ${index + 1} · ${entry.authorDisplayName}`}
-                rows={3}
-                value={entry.text}
-                onChange={(event) => updateEntry("highlights", index, event.target.value)}
-              />
-            </label>
-          ))}
-        </section>
-
-        <section id="session-record-reviews" className="stack" style={{ "--stack": "8px" } as CSSProperties}>
-          <h3 className="h4" style={{ margin: 0 }}>한줄평</h3>
-          {snapshot.oneLineReviews.length === 0 ? (
-            <p className="small" style={{ margin: 0 }}>저장된 한줄평이 없습니다.</p>
-          ) : snapshot.oneLineReviews.map((entry, index) => (
-            <label key={`${entry.membershipId}-${index}`} className="stack" style={{ "--stack": "5px" } as CSSProperties}>
-              <span className="tiny">{entry.authorDisplayName}</span>
-              <input
-                className="input"
-                aria-label={`한줄평 ${index + 1} · ${entry.authorDisplayName}`}
-                value={entry.text}
-                onChange={(event) => updateEntry("oneLineReviews", index, event.target.value)}
-              />
-            </label>
-          ))}
-        </section>
-
-        <section id="session-record-feedback" className="stack" style={{ "--stack": "8px" } as CSSProperties}>
-          <h3 className="h4" style={{ margin: 0 }}>피드백 문서</h3>
-          <label className="stack" style={{ "--stack": "5px" } as CSSProperties}>
-            <span className="tiny">파일 이름</span>
-            <input
-              className="input"
-              value={snapshot.feedbackDocument.fileName}
-              onChange={(event) => onSnapshotChange({
-                ...snapshot,
-                feedbackDocument: { ...snapshot.feedbackDocument, fileName: event.target.value },
-              })}
-            />
-          </label>
-          <label className="stack" style={{ "--stack": "5px" } as CSSProperties}>
-            <span className="tiny">문서 제목</span>
-            <input
-              className="input"
-              value={snapshot.feedbackDocument.title}
-              onChange={(event) => onSnapshotChange({
-                ...snapshot,
-                feedbackDocument: { ...snapshot.feedbackDocument, title: event.target.value },
-              })}
-            />
-          </label>
-          <label className="stack" style={{ "--stack": "5px" } as CSSProperties}>
-            <span className="tiny">Markdown 본문</span>
-            <textarea
-              className="input"
-              rows={12}
-              value={snapshot.feedbackDocument.markdown}
-              onChange={(event) => onSnapshotChange({
-                ...snapshot,
-                feedbackDocument: { ...snapshot.feedbackDocument, markdown: event.target.value },
-              })}
-            />
-          </label>
-        </section>
-
-        <div
-          className="surface"
-          style={{
-            position: "sticky",
-            bottom: 8,
-            padding: 12,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 10,
-            flexWrap: "wrap",
-          }}
-        >
-          <span className="small">{saveStateMessage(saveState)}</span>
-          <button
-            className="btn btn-primary btn-sm"
-            type="button"
-            disabled={!onReviewDraft || saveState !== "saved" || draftLiveBaseStale}
-            onClick={onReviewDraft}
-          >
-            변경사항 검토
-          </button>
-        </div>
-      </div>
-    </Panel>
+        <label className="stack" style={{ "--stack": "5px", minWidth: 0 } as CSSProperties}>
+          <span className="tiny">문서 제목</span>
+          <input
+            className="input"
+            aria-label="피드백 문서 제목"
+            value={snapshot.feedbackDocument.title}
+            style={{ minWidth: 0, maxWidth: "100%" }}
+            onChange={(event) => onSnapshotChange({
+              ...snapshot,
+              feedbackDocument: { ...snapshot.feedbackDocument, title: event.target.value },
+            })}
+          />
+        </label>
+        <label className="stack" style={{ "--stack": "5px", minWidth: 0 } as CSSProperties}>
+          <span className="tiny">Markdown 본문</span>
+          <textarea
+            className="input"
+            aria-label="피드백 Markdown 본문"
+            rows={12}
+            value={snapshot.feedbackDocument.markdown}
+            style={{ minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere" }}
+            onChange={(event) => onSnapshotChange({
+              ...snapshot,
+              feedbackDocument: { ...snapshot.feedbackDocument, markdown: event.target.value },
+            })}
+          />
+        </label>
+      </section>
+    </div>
   );
 }

@@ -248,8 +248,11 @@ function recordWorkflow(
     saveState: "saved",
     expectedDraftRevision: 4,
     restoring: false,
+    rebasePending: false,
+    rebaseError: null,
     onSnapshotChange: vi.fn(),
     onReloadDraft: vi.fn(),
+    onRebaseDraft: vi.fn(),
     onDraftCommitted: vi.fn(),
     onLoadMoreHistory: vi.fn(),
     onCopyInput: vi.fn(),
@@ -640,23 +643,23 @@ describe("HostSessionEditor", () => {
   });
 
   it.each(["OPEN", "CLOSED", "PUBLISHED"] as const)(
-    "uses the club-scoped host preview for a %s session feedback document",
+    "keeps the %s session feedback document in the shared record context",
     (state) => {
+      const workflow = recordWorkflow("MEMBER");
+      workflow.editor.liveSnapshot.feedbackDocument.fileName = "251126 1차.md";
       render(
         <HostSessionEditorForTest
           session={{ ...session, state }}
           clubSlug="club-a"
           initialLocation={{ section: "records", source: "json" }}
+          recordWorkflow={workflow}
         />,
       );
 
-      expect(screen.getByText("세션 기록 완성")).toBeInTheDocument();
-      expect(screen.getByText("업로드 완료")).toBeInTheDocument();
-      expect(screen.getByText("251126 1차.md")).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "피드백 문서 미리보기" })).toHaveAttribute(
-        "href",
-        "/clubs/club-a/app/host/sessions/session-1/feedback-document",
-      );
+      expect(screen.getByRole("region", { name: "현재 적용본" }))
+        .toHaveTextContent("251126 1차.md");
+      expect(screen.queryByText("세션 기록 완성")).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "피드백 문서 미리보기" })).not.toBeInTheDocument();
       expect(screen.queryByLabelText("피드백 문서 파일")).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "교체" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "등록" })).not.toBeInTheDocument();
@@ -859,12 +862,14 @@ describe("HostSessionEditor", () => {
   it("commits a valid session import preview and refreshes editor state", async () => {
     const user = userEvent.setup();
     const commitSessionImport = vi.fn(hostSessionEditorTestActions.commitSessionImport);
+    const workflow = recordWorkflow("MEMBER");
 
     render(
       <HostSessionEditorForTest
         session={session}
         initialLocation={{ section: "records", source: "json" }}
         actions={{ ...hostSessionEditorTestActions, commitSessionImport }}
+        recordWorkflow={workflow}
       />,
     );
 
@@ -875,23 +880,36 @@ describe("HostSessionEditor", () => {
     await user.click(await screen.findByRole("button", { name: "초안으로 가져오기" }));
 
     await waitFor(() => expect(commitSessionImport).toHaveBeenCalledTimes(1));
-    expect(screen.getAllByText(/가져온 세션 기록을 (공유 )?초안으로 저장했습니다/).length).toBeGreaterThan(0);
+    expect(workflow.onDraftCommitted).toHaveBeenCalledWith({
+      sessionId: session.sessionId,
+      draftRevision: 1,
+      baseLiveRevision: 0,
+      liveApplied: false,
+    });
   });
 
-  it("shows the session import commit result inside the import panel", async () => {
+  it("waits for JSON draft refresh before returning to the focused common editor", async () => {
     const user = userEvent.setup();
+    let finishRefresh!: () => void;
+    const refreshFinished = new Promise<void>((resolve) => {
+      finishRefresh = resolve;
+    });
     const commitSessionImport = vi.fn(async (sessionId: string) => ({
       sessionId,
       draftRevision: 2,
       baseLiveRevision: 0,
       liveApplied: false,
     }));
+    const onSessionRecordsChanged = vi.fn(() => refreshFinished);
+    const workflow = recordWorkflow("MEMBER");
 
     render(
       <HostSessionEditorForTest
         session={session}
         initialLocation={{ section: "records", source: "json" }}
         actions={{ ...hostSessionEditorTestActions, commitSessionImport }}
+        onSessionRecordsChanged={onSessionRecordsChanged}
+        recordWorkflow={workflow}
       />,
     );
 
@@ -901,13 +919,22 @@ describe("HostSessionEditor", () => {
     );
     await user.click(await screen.findByRole("button", { name: "초안으로 가져오기" }));
 
-    const result = await screen.findByRole("region", { name: "세션 기록 초안 저장 결과" });
-    expect(within(result).getByText("초안 저장 완료")).toBeVisible();
-    expect(within(result).getByText(/외부 공개/)).toBeVisible();
-    expect(within(result).getByText("하이라이트 1개 초안 저장")).toBeVisible();
-    expect(within(result).getByText("한줄평 1개 초안 저장")).toBeVisible();
-    expect(within(result).getByText("피드백 문서 초안 저장: 독서모임 7차 피드백")).toBeVisible();
-    expect(screen.queryByText("PRIVATE_MEMBER_EMAIL")).not.toBeInTheDocument();
+    await waitFor(() => expect(onSessionRecordsChanged).toHaveBeenCalledWith(session.sessionId));
+    expect(screen.getByRole("tab", { name: "외부 JSON" })).toHaveAttribute("aria-selected", "true");
+    finishRefresh();
+
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: "직접 작성" })).toHaveAttribute("aria-selected", "true");
+    });
+    expect(screen.getByRole("textbox", { name: "공개 요약" })).toHaveFocus();
+    expect(workflow.onDraftCommitted).toHaveBeenCalledWith({
+      sessionId: session.sessionId,
+      draftRevision: 2,
+      baseLiveRevision: 0,
+      liveApplied: false,
+    });
+    expect(screen.queryByRole("region", { name: "세션 기록 초안 저장 결과" })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "현재 적용본" })).not.toHaveTextContent("Import summary.");
   });
 
   it("posts a new session through the BFF and redirects to the created session editor", async () => {
@@ -1878,9 +1905,9 @@ describe("HostSessionEditor", () => {
         />,
       );
 
-      const sourceTabs = screen.getByRole("tablist", { name: "기록 작성 방식" });
+      const sourceTabs = screen.getByRole("tablist", { name: "초안 만들기" });
       const manualTab = within(sourceTabs).getByRole("tab", { name: "직접 작성" });
-      const aiTab = within(sourceTabs).getByRole("tab", { name: "AI 초안" });
+      const aiTab = within(sourceTabs).getByRole("tab", { name: "AI로 생성" });
       const jsonTab = within(sourceTabs).getByRole("tab", { name: "외부 JSON" });
 
       expect(manualTab).toHaveAttribute("aria-controls", "host-editor-record-source-panel-manual");
@@ -1912,9 +1939,9 @@ describe("HostSessionEditor", () => {
         />,
       );
 
-      const sourceTabs = screen.getByRole("tablist", { name: "기록 작성 방식" });
+      const sourceTabs = screen.getByRole("tablist", { name: "초안 만들기" });
       const manualTab = within(sourceTabs).getByRole("tab", { name: "직접 작성" });
-      const aiTab = within(sourceTabs).getByRole("tab", { name: "AI 초안" });
+      const aiTab = within(sourceTabs).getByRole("tab", { name: "AI로 생성" });
       const jsonTab = within(sourceTabs).getByRole("tab", { name: "외부 JSON" });
 
       expect(aiTab).toBeDisabled();
@@ -1942,9 +1969,9 @@ describe("HostSessionEditor", () => {
         />,
       );
 
-      const sourceTabs = screen.getByRole("tablist", { name: "기록 작성 방식" });
+      const sourceTabs = screen.getByRole("tablist", { name: "초안 만들기" });
       const manualTab = within(sourceTabs).getByRole("tab", { name: "직접 작성" });
-      const aiTab = within(sourceTabs).getByRole("tab", { name: "AI 초안" });
+      const aiTab = within(sourceTabs).getByRole("tab", { name: "AI로 생성" });
       const jsonTab = within(sourceTabs).getByRole("tab", { name: "외부 JSON" });
 
       expect(manualTab).toHaveAttribute("id", "host-editor-record-source-tab-manual");
@@ -1969,9 +1996,9 @@ describe("HostSessionEditor", () => {
         />,
       );
 
-      const sourceTabs = screen.getByRole("tablist", { name: "기록 작성 방식" });
+      const sourceTabs = screen.getByRole("tablist", { name: "초안 만들기" });
       const manualTab = within(sourceTabs).getByRole("tab", { name: "직접 작성" });
-      const aiTab = within(sourceTabs).getByRole("tab", { name: "AI 초안" });
+      const aiTab = within(sourceTabs).getByRole("tab", { name: "AI로 생성" });
       const jsonTab = within(sourceTabs).getByRole("tab", { name: "외부 JSON" });
 
       manualTab.focus();
@@ -1979,7 +2006,7 @@ describe("HostSessionEditor", () => {
       expect(aiTab).toHaveFocus();
       expect(aiTab).toHaveAttribute("aria-selected", "true");
       expect(aiTab).toHaveAttribute("tabindex", "0");
-      expect(screen.getByRole("tabpanel", { name: "AI 초안" })).toBeVisible();
+      expect(screen.getByRole("tabpanel", { name: "AI로 생성" })).toBeVisible();
 
       await user.keyboard("{End}");
       expect(jsonTab).toHaveFocus();
@@ -1999,7 +2026,7 @@ describe("HostSessionEditor", () => {
         />,
       );
 
-      expect(screen.getByRole("tab", { name: "AI 초안" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByRole("tab", { name: "AI로 생성" })).toHaveAttribute("aria-selected", "true");
       expect(screen.getByTestId("aigen-tab")).toBeVisible();
       expect(screen.queryByLabelText("AI 결과 JSON 가져오기")).not.toBeInTheDocument();
     });
@@ -2018,6 +2045,28 @@ describe("HostSessionEditor", () => {
 
       expect(screen.getByLabelText("AI 결과 JSON 가져오기")).toBeVisible();
       expect(screen.getByTestId("aigen-tab")).not.toBeVisible();
+    });
+
+    it("keeps a visited AI review surface mounted across editor sections", async () => {
+      const user = userEvent.setup();
+      render(
+        <HostSessionEditorForTest
+          session={session}
+          clubSlug="club-a"
+          initialLocation={{ section: "records", source: "ai" }}
+          recordWorkflow={recordWorkflow("MEMBER")}
+        />,
+      );
+
+      const aiWorkspace = screen.getByTestId("aigen-tab");
+      await user.click(screen.getByRole("tab", { name: "기본 정보" }));
+      expect(aiWorkspace).not.toBeVisible();
+      await user.click(screen.getByRole("tab", { name: "기록 작업대" }));
+
+      expect(screen.getByTestId("aigen-tab")).toBe(aiWorkspace);
+      expect(aiWorkspace).not.toBeVisible();
+      await user.click(screen.getByRole("tab", { name: "AI로 생성" }));
+      expect(aiWorkspace).toBeVisible();
     });
 
     it("mounts only the selected JSON source on first visit", () => {
@@ -2044,16 +2093,20 @@ describe("HostSessionEditor", () => {
         />,
       );
 
-      await user.click(screen.getByRole("tab", { name: "AI 초안" }));
+      await user.click(screen.getByRole("tab", { name: "AI로 생성" }));
 
       expect(screen.getByTestId("aigen-tab")).toBeVisible();
       expect(screen.getByLabelText("AI 결과 JSON 가져오기", { selector: "input" })).not.toBeVisible();
     });
 
-    it("notifies the route after AI commit without reloading the page", async () => {
+    it("waits for AI draft refresh before returning to the focused common editor without reloading", async () => {
       const user = userEvent.setup();
       const reload = vi.fn();
-      const onSessionRecordsChanged = vi.fn().mockResolvedValue(undefined);
+      let finishRefresh!: () => void;
+      const refreshFinished = new Promise<void>((resolve) => {
+        finishRefresh = resolve;
+      });
+      const onSessionRecordsChanged = vi.fn(() => refreshFinished);
       const workflow = recordWorkflow("MEMBER");
       const onDraftCommitted = vi.fn().mockResolvedValue(undefined);
       workflow.onDraftCommitted = onDraftCommitted;
@@ -2079,12 +2132,20 @@ describe("HostSessionEditor", () => {
       await user.click(screen.getByRole("button", { name: "simulate AI commit" }));
 
       expect(reload).not.toHaveBeenCalled();
-      expect(onSessionRecordsChanged).toHaveBeenCalledWith(session.sessionId);
+      await waitFor(() => expect(onSessionRecordsChanged).toHaveBeenCalledWith(session.sessionId));
+      expect(screen.getByRole("tab", { name: "AI로 생성" })).toHaveAttribute("aria-selected", "true");
       expect(onDraftCommitted).toHaveBeenCalledWith({
         draftRevision: 5,
         baseLiveRevision: 0,
         liveApplied: false,
       });
+      finishRefresh();
+      await waitFor(() => {
+        expect(screen.getByRole("tab", { name: "직접 작성" })).toHaveAttribute("aria-selected", "true");
+      });
+      expect(screen.getByRole("textbox", { name: "공개 요약" })).toHaveFocus();
+      expect(screen.getByRole("region", { name: "현재 적용본" }))
+        .not.toHaveTextContent("공유 초안 요약");
       expect(screen.queryByRole("dialog", {
         name: "멤버에게 알림을 보낼까요?",
       })).not.toBeInTheDocument();

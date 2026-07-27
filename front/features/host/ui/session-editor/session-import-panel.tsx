@@ -1,5 +1,4 @@
 import type { ChangeEvent, CSSProperties } from "react";
-import type { HostSessionEditorSection } from "@/features/host/model/host-session-editor-navigation";
 import type {
   SessionImportPreviewResponse,
   SessionRecordVisibility,
@@ -7,16 +6,13 @@ import type {
 import {
   buildSessionImportReview,
   sessionImportReplacementWarning,
-  type SessionImportCommitResult,
   type SessionImportReview,
 } from "@/features/host/model/session-import-model";
-import { Panel } from "./session-editor-panel";
 
-type SessionImportPanelBodyProps = {
+export type SessionImportPanelBodyProps = {
   sessionId: string | undefined;
   recordVisibility: SessionRecordVisibility;
   preview: SessionImportPreviewResponse | null;
-  commitResult: SessionImportCommitResult | null;
   status: "idle" | "previewing" | "ready" | "committing" | "error";
   error: string | null;
   onFileSelected: (event: ChangeEvent<HTMLInputElement>) => void;
@@ -27,7 +23,6 @@ export function SessionImportPanelBody({
   sessionId,
   recordVisibility,
   preview,
-  commitResult,
   status,
   error,
   onFileSelected,
@@ -62,7 +57,6 @@ export function SessionImportPanelBody({
         </div>
       ) : null}
       {review && preview ? <SessionImportReviewCard review={review} summary={preview.publication.summary} /> : null}
-      {commitResult ? <SessionImportCommitResultCard result={commitResult} /> : null}
       <button className="btn btn-primary" type="button" disabled={!canCommit} onClick={onCommit}>
         {status === "committing" ? "초안으로 가져오는 중" : "초안으로 가져오기"}
       </button>
@@ -77,7 +71,7 @@ function SessionImportReviewCard({ review, summary }: { review: SessionImportRev
       className="surface-quiet"
       role="region"
       aria-label="세션 기록 미리보기"
-      style={{ padding: 16, overflowWrap: "anywhere" }}
+      style={{ padding: 16, minWidth: 0, overflowWrap: "anywhere" }}
     >
       <div className="row-between" style={{ gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
         <div className="stack" style={{ "--stack": "6px", minWidth: 0 } as CSSProperties}>
@@ -129,71 +123,5 @@ function SessionImportReviewCard({ review, summary }: { review: SessionImportRev
         ) : null}
       </div>
     </section>
-  );
-}
-
-function SessionImportCommitResultCard({ result }: { result: SessionImportCommitResult }) {
-  return (
-    <section
-      className="surface-quiet"
-      role="region"
-      aria-label="세션 기록 초안 저장 결과"
-      style={{ padding: 16, overflowWrap: "anywhere" }}
-    >
-      <div className="row-between" style={{ gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
-        <div className="stack" style={{ "--stack": "6px", minWidth: 0 } as CSSProperties}>
-          <div className="eyebrow">이번 저장 결과</div>
-          <div className="small">{result.message}</div>
-        </div>
-        <span className={`rm-state rm-state--${result.tone}`}>{result.title}</span>
-      </div>
-
-      <div className="stack" style={{ "--stack": "10px", marginTop: 14 } as CSSProperties}>
-        <div className="tiny">공개 범위: {result.visibilityLabel}</div>
-        <ul className="tiny" style={{ display: "grid", gap: 8, margin: 0, paddingLeft: 18 }}>
-          {result.items.map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
-        <p className="small" style={{ margin: 0, color: "var(--text-2)" }}>
-          {result.nextAction}
-        </p>
-      </div>
-    </section>
-  );
-}
-
-export function SessionImportPanel({
-  activeSection,
-  sessionId,
-  recordVisibility,
-  preview,
-  commitResult,
-  status,
-  error,
-  onFileSelected,
-  onCommit,
-}: SessionImportPanelBodyProps & {
-  activeSection: HostSessionEditorSection;
-}) {
-  return (
-    <Panel
-      eyebrow="AI 결과 JSON"
-      title="세션 기록 가져오기"
-      section="records"
-      panelId="host-editor-panel-session-import"
-      activeSection={activeSection}
-    >
-      <SessionImportPanelBody
-        sessionId={sessionId}
-        recordVisibility={recordVisibility}
-        preview={preview}
-        commitResult={commitResult}
-        status={status}
-        error={error}
-        onFileSelected={onFileSelected}
-        onCommit={onCommit}
-      />
-    </Panel>
   );
 }

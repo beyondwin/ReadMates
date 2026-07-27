@@ -6,7 +6,7 @@ import {
   useSessionRecordDraftController,
 } from "@/features/host/hooks/use-session-record-draft-controller";
 import {
-  SessionRecordDraftPanel,
+  SessionRecordDraftPanelBody,
   type SessionRecordDraftSnapshot,
 } from "./session-record-draft-panel";
 
@@ -58,7 +58,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("SessionRecordDraftPanel", () => {
+describe("SessionRecordDraftPanelBody", () => {
   it("treats a persisted draft as saved when the editor is reopened", () => {
     const { result } = renderHook(() => useSessionRecordDraftController({
       editor: editor(),
@@ -70,14 +70,12 @@ describe("SessionRecordDraftPanel", () => {
     expect(result.current.expectedDraftRevision).toBe(4);
   });
 
-  it("keeps live preview unchanged while editing a draft", async () => {
+  it("keeps draft inputs controlled by the shared snapshot", async () => {
     const user = userEvent.setup();
     function Harness() {
       const [snapshot, setSnapshot] = useState(draftSnapshot);
       return (
-        <SessionRecordDraftPanel
-          activeSection="records"
-          liveSnapshot={liveSnapshot}
+        <SessionRecordDraftPanelBody
           snapshot={snapshot}
           saveState="idle"
           validationIssues={[]}
@@ -94,10 +92,29 @@ describe("SessionRecordDraftPanel", () => {
     await user.type(screen.getByRole("textbox", { name: "공개 요약" }), "아직 적용하지 않은 초안");
 
     expect(screen.getByRole("textbox", { name: "공개 요약" })).toHaveValue("아직 적용하지 않은 초안");
-    expect(screen.getByRole("region", { name: "현재 적용된 공개 기록" }))
-      .toHaveTextContent("현재 멤버 화면에 적용된 요약");
-    expect(screen.getByRole("region", { name: "현재 적용된 공개 기록" }))
-      .not.toHaveTextContent("아직 적용하지 않은 초안");
+  });
+
+  it("changes public visibility only through the draft snapshot callback", async () => {
+    const user = userEvent.setup();
+    const onSnapshotChange = vi.fn();
+    render(
+      <SessionRecordDraftPanelBody
+        snapshot={draftSnapshot}
+        saveState="saved"
+        validationIssues={[]}
+        draftLiveBaseStale={false}
+        onSnapshotChange={onSnapshotChange}
+        onReloadDraft={vi.fn()}
+        onCopyInput={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("radio", { name: "외부 공개" }));
+
+    expect(onSnapshotChange).toHaveBeenCalledWith({
+      ...draftSnapshot,
+      visibility: "PUBLIC",
+    });
   });
 
   it("autosaves one section with the expected draft revision", async () => {
@@ -294,9 +311,7 @@ describe("SessionRecordDraftPanel", () => {
 
   it("maps validation issues to summary highlights reviews and feedback", () => {
     render(
-      <SessionRecordDraftPanel
-        activeSection="records"
-        liveSnapshot={liveSnapshot}
+      <SessionRecordDraftPanelBody
         snapshot={draftSnapshot}
         saveState="saved"
         validationIssues={[
@@ -322,9 +337,7 @@ describe("SessionRecordDraftPanel", () => {
     const user = userEvent.setup();
     const onRebaseDraft = vi.fn().mockResolvedValue(undefined);
     render(
-      <SessionRecordDraftPanel
-        activeSection="records"
-        liveSnapshot={liveSnapshot}
+      <SessionRecordDraftPanelBody
         snapshot={draftSnapshot}
         saveState="saved"
         validationIssues={["LIVE_REVISION_STALE"]}
@@ -340,8 +353,63 @@ describe("SessionRecordDraftPanel", () => {
     );
 
     expect(screen.getByRole("button", { name: "최신 정보 확인 완료" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "변경사항 검토" })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "최신 정보 확인 완료" }));
     expect(onRebaseDraft).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps failed input and exposes retry reload and copy recovery actions", async () => {
+    const user = userEvent.setup();
+    const onSnapshotChange = vi.fn();
+    const onReloadDraft = vi.fn();
+    const onCopyInput = vi.fn();
+    render(
+      <SessionRecordDraftPanelBody
+        snapshot={draftSnapshot}
+        saveState="error"
+        validationIssues={[]}
+        draftLiveBaseStale={false}
+        onSnapshotChange={onSnapshotChange}
+        onReloadDraft={onReloadDraft}
+        onCopyInput={onCopyInput}
+      />,
+    );
+
+    expect(screen.getByRole("textbox", { name: "공개 요약" }))
+      .toHaveValue("저장된 초안 요약");
+    await user.click(screen.getByRole("button", { name: "저장 다시 시도" }));
+    await user.click(screen.getByRole("button", { name: "최신 초안 불러오기" }));
+    await user.click(screen.getByRole("button", { name: "내 입력 복사" }));
+
+    expect(onSnapshotChange).toHaveBeenCalledWith(draftSnapshot);
+    expect(onReloadDraft).toHaveBeenCalledTimes(1);
+    expect(onCopyInput).toHaveBeenCalledTimes(1);
+  });
+
+  it("contains long file names URLs and Markdown inside overflow-safe fields", () => {
+    render(
+      <SessionRecordDraftPanelBody
+        snapshot={{
+          ...draftSnapshot,
+          feedbackDocument: {
+            fileName: "a-very-long-file-name-without-breaks-that-must-stay-inside-the-editor.md",
+            title: "https://example.com/a/very/long/unbroken/path/inside/the/title",
+            markdown: "# 긴 본문\n\nhttps://example.com/a/very/long/unbroken/path/inside/markdown",
+          },
+        }}
+        saveState="saved"
+        validationIssues={[]}
+        draftLiveBaseStale={false}
+        onSnapshotChange={vi.fn()}
+        onReloadDraft={vi.fn()}
+        onCopyInput={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("textbox", { name: "피드백 파일 이름" }))
+      .toHaveStyle({ minWidth: "0", maxWidth: "100%" });
+    expect(screen.getByRole("textbox", { name: "피드백 문서 제목" }))
+      .toHaveStyle({ minWidth: "0", maxWidth: "100%" });
+    expect(screen.getByRole("textbox", { name: "피드백 Markdown 본문" }))
+      .toHaveStyle({ minWidth: "0", maxWidth: "100%", overflowWrap: "anywhere" });
   });
 });

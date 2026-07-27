@@ -43,7 +43,6 @@ import {
 } from "@/features/host/model/host-session-editor-form-state";
 import type { BasicSessionField } from "@/features/host/model/host-session-editor-form-state";
 import { SessionIdentity } from "@/shared/ui/session-identity";
-import { readmatesReturnState as defaultReadmatesReturnState } from "@/shared/routing/readmates-route-state";
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 import { HostSessionDeletionPreviewDialog } from "./host-session-deletion-preview";
@@ -56,10 +55,6 @@ import {
   type SaveState,
 } from "./session-editor/session-editor-actions";
 import {
-  feedbackDocumentUploadStatus,
-  feedbackPreviewStateForSession,
-} from "./session-editor/session-editor-feedback";
-import {
   DefaultLinkComponent,
   type HostSessionEditorLinkComponent,
 } from "./session-editor/session-editor-links";
@@ -70,11 +65,11 @@ import {
   SessionRecordCompletionPanel,
   type SessionRecordCompletionMode,
 } from "./session-editor/session-record-completion-panel";
-import {
-  SessionRecordDraftPanel,
-  type DraftSaveState,
-  type SessionRecordDraftSnapshot,
+import type {
+  DraftSaveState,
+  SessionRecordDraftSnapshot,
 } from "./session-editor/session-record-draft-panel";
+import { SessionRecordWorkspace } from "./session-editor/session-record-workspace";
 import {
   SessionHistoryPanel,
   type SessionHistoryPanelItem,
@@ -287,12 +282,12 @@ type ImportMode = SessionRecordCompletionMode;
 
 const recordSources = [
   { key: "manual", label: "직접 작성" },
-  { key: "ai", label: "AI 초안" },
+  { key: "ai", label: "AI로 생성" },
   { key: "json", label: "외부 JSON" },
 ] as const satisfies readonly { key: HostSessionDraftSource; label: string }[];
 
 function importModeForSource(source: HostSessionDraftSource): ImportMode {
-  return source === "ai" ? "aigen" : "json";
+  return source === "ai" ? "ai" : "json";
 }
 
 function recordSourceTabId(source: HostSessionDraftSource) {
@@ -344,7 +339,6 @@ export default function HostSessionEditor({
   clubSlug,
   LinkComponent = DefaultLinkComponent,
   hostDashboardReturnTarget = defaultHostDashboardReturnTarget,
-  readmatesReturnState = defaultReadmatesReturnState,
   onSessionRecordsChanged,
   recordWorkflow,
   navigation,
@@ -390,7 +384,6 @@ export default function HostSessionEditor({
     sessionState,
     displaySessionSnapshot,
     attendanceStatuses,
-    feedbackDocument,
   } = formState;
 
   // ---------------------------------------------------------------------------
@@ -456,18 +449,18 @@ export default function HostSessionEditor({
     changeLocation({ section: "records", source });
   }, [changeLocation]);
 
-  const handleAigenCommitted = useCallback((result: AiGenerateCommitResult) => {
+  const handleAigenCommitted = useCallback(async (result: AiGenerateCommitResult) => {
     if (sessionIdForAigen) {
       if (recordWorkflow && result?.draftRevision !== null && result?.draftRevision !== undefined) {
-        void recordWorkflow.onDraftCommitted({
+        await recordWorkflow.onDraftCommitted({
           draftRevision: result.draftRevision,
           baseLiveRevision: result.baseLiveRevision,
           liveApplied: result.liveApplied,
         });
       } else {
-        void recordWorkflow?.onReloadDraft();
+        await recordWorkflow?.onReloadDraft();
       }
-      void onSessionRecordsChanged?.(sessionIdForAigen);
+      await onSessionRecordsChanged?.(sessionIdForAigen);
     }
   }, [onSessionRecordsChanged, recordWorkflow, sessionIdForAigen]);
 
@@ -497,7 +490,6 @@ export default function HostSessionEditor({
       : "기본 정보 저장";
   const showReturnLink =
     returnTarget.href !== hostDashboardReturnTarget.href || returnTarget.label !== hostDashboardReturnTarget.label;
-  const feedbackPreviewState = feedbackPreviewStateForSession(session, returnTarget, readmatesReturnState);
   const displaySession = useMemo(
     () => displaySessionSnapshot ?? (session ? { ...session, state: sessionState } : session),
     [displaySessionSnapshot, session, sessionState],
@@ -1021,6 +1013,7 @@ export default function HostSessionEditor({
       if (recordWorkflow) {
         await recordWorkflow.onDraftCommitted(committed);
       }
+      await onSessionRecordsChanged?.(session.sessionId);
       setSessionImportStatus("idle");
       setSessionImportPreview(null);
       setSessionImportRequest(null);
@@ -1030,9 +1023,16 @@ export default function HostSessionEditor({
       setSessionImportStatus("error");
       setSessionImportError(sessionImportFailureMessage("commit-network"));
     }
-  }, [session, sessionImportRequest, sessionImportPreview, sessionImportStatus, actions, flash, recordWorkflow]);
-
-  const feedbackDocumentForPanel = feedbackDocumentUploadStatus(feedbackDocument);
+  }, [
+    session,
+    sessionImportRequest,
+    sessionImportPreview,
+    sessionImportStatus,
+    actions,
+    flash,
+    recordWorkflow,
+    onSessionRecordsChanged,
+  ]);
 
   return (
     <main className="rm-host-session-editor">
@@ -1201,19 +1201,54 @@ export default function HostSessionEditor({
             {visitedSections.has("records") || activeSection === "records" ? (
               <div hidden={activeSection !== "records"} className="stack" style={{ "--stack": "18px" } as CSSProperties}>
                 {session ? (
-                  <>
-                    <div
-                      className="row"
-                      role="tablist"
-                      aria-label="기록 작성 방식"
-                      onKeyDown={(event) => handleRecordSourceKeyDown(
-                        event,
-                        activeSource,
-                        canShowImportModeToggle,
-                        changeSource,
-                      )}
-                      style={{ gap: 8, flexWrap: "wrap" }}
-                    >
+                  recordWorkflow ? (
+                    <SessionRecordWorkspace
+                      source={activeSource}
+                      onSourceChange={changeSource}
+                      liveRevision={recordWorkflow.editor.liveRevision}
+                      liveSnapshot={recordWorkflow.editor.liveSnapshot}
+                      draft={{
+                        snapshot: recordWorkflow.snapshot,
+                        source: recordWorkflow.editor.draft?.source ?? null,
+                        updatedAt: recordWorkflow.editor.draft?.updatedAt ?? null,
+                        saveState: recordWorkflow.saveState,
+                        validationIssues: recordWorkflow.editor.validationSummary.issues,
+                        liveBaseStale: recordWorkflow.editor.draftLiveBaseStale,
+                      }}
+                      creation={{
+                        sessionId: session.sessionId,
+                        clubSlug,
+                        expectedDraftRevision: recordWorkflow.expectedDraftRevision,
+                        importPreview: sessionImportPreview,
+                        importCommitResult: sessionImportCommitResult,
+                        importStatus: sessionImportStatus,
+                        importError: sessionImportError,
+                      }}
+                      actions={{
+                        onSnapshotChange: recordWorkflow.onSnapshotChange,
+                        onReloadDraft: recordWorkflow.onReloadDraft,
+                        onRebaseDraft: recordWorkflow.onRebaseDraft,
+                        onCopyInput: recordWorkflow.onCopyInput,
+                        onReviewDraft: recordWorkflow.confirmation.onReview,
+                        onAigenCommitted: handleAigenCommitted,
+                        onImportFileSelected: previewSessionImport,
+                        onImportCommit: commitSessionImport,
+                      }}
+                    />
+                  ) : (
+                    <>
+                      <div
+                        className="row"
+                        role="tablist"
+                        aria-label="초안 만들기"
+                        onKeyDown={(event) => handleRecordSourceKeyDown(
+                          event,
+                          activeSource,
+                          canShowImportModeToggle,
+                          changeSource,
+                        )}
+                        style={{ gap: 8, flexWrap: "wrap" }}
+                      >
                         {recordSources.map(({ key: source, label }) => (
                           <button
                             key={source}
@@ -1234,73 +1269,53 @@ export default function HostSessionEditor({
                             {label}
                           </button>
                         ))}
-                    </div>
+                      </div>
 
                       {visitedSources.has("manual") || activeSource === "manual" ? (
                         <div hidden={activeSource !== "manual"}>
-                          {!recordWorkflow ? (
-                            <PublicationPanel
-                              activeSection={activeSection}
-                              panelId={recordSourcePanelId("manual")}
-                              labelledBy={recordSourceTabId("manual")}
-                              session={session}
-                              sessionState={sessionState}
-                              recordVisibility={recordVisibility}
-                              recordSaveInFlight={recordSaveInFlight}
-                              lifecycleSaveState={lifecycleSaveState}
-                              summary={summary}
-                              publicationFeedback={publicationFeedback}
-                              publicationLifecycleHelp={publicationLifecycleHelp}
-                              onRecordVisibilityChange={onRecordVisibilityChange}
-                              onSummaryChange={onSummaryChange}
-                              onPublicationFeedbackChange={setPublicationFeedback}
-                              onSavePublication={savePublication}
-                              onCloseSession={closeSession}
-                              onPublishRecord={publishRecord}
-                            />
-                          ) : (
-                            <SessionRecordDraftPanel
-                              activeSection={activeSection}
-                              panelId={recordSourcePanelId("manual")}
-                              labelledBy={recordSourceTabId("manual")}
-                              liveSnapshot={recordWorkflow.editor.liveSnapshot}
-                              snapshot={recordWorkflow.snapshot}
-                              saveState={recordWorkflow.saveState}
-                              validationIssues={recordWorkflow.editor.validationSummary.issues}
-                              draftLiveBaseStale={recordWorkflow.editor.draftLiveBaseStale}
-                              onSnapshotChange={recordWorkflow.onSnapshotChange}
-                              onReloadDraft={recordWorkflow.onReloadDraft}
-                              onCopyInput={recordWorkflow.onCopyInput}
-                              onRebaseDraft={recordWorkflow.onRebaseDraft}
-                              rebasePending={recordWorkflow.rebasePending}
-                              rebaseError={recordWorkflow.rebaseError}
-                              onReviewDraft={() => void recordWorkflow.confirmation.onReview()}
-                            />
-                          )}
+                          <PublicationPanel
+                            activeSection={activeSection}
+                            panelId={recordSourcePanelId("manual")}
+                            labelledBy={recordSourceTabId("manual")}
+                            session={session}
+                            sessionState={sessionState}
+                            recordVisibility={recordVisibility}
+                            recordSaveInFlight={recordSaveInFlight}
+                            lifecycleSaveState={lifecycleSaveState}
+                            summary={summary}
+                            publicationFeedback={publicationFeedback}
+                            publicationLifecycleHelp={publicationLifecycleHelp}
+                            onRecordVisibilityChange={onRecordVisibilityChange}
+                            onSummaryChange={onSummaryChange}
+                            onPublicationFeedbackChange={setPublicationFeedback}
+                            onSavePublication={savePublication}
+                            onCloseSession={closeSession}
+                            onPublishRecord={publishRecord}
+                          />
                         </div>
                       ) : null}
 
                       {(["ai", "json"] as const).map((source) =>
                         visitedSources.has(source) || activeSource === source ? (
-                          <div key={source} hidden={activeSource !== source}>
+                          <div
+                            key={source}
+                            id={recordSourcePanelId(source)}
+                            role="tabpanel"
+                            aria-labelledby={recordSourceTabId(source)}
+                            hidden={activeSource !== source}
+                            className="surface"
+                            style={{ padding: 24 }}
+                          >
                             <SessionRecordCompletionPanel
-                              activeSection={activeSection}
-                              panelId={recordSourcePanelId(source)}
-                              labelledBy={recordSourceTabId(source)}
                               sessionId={session.sessionId}
                               clubSlug={clubSlug}
                               mode={importModeForSource(source)}
                               canUseAigen={canShowImportModeToggle}
-                              feedbackDocument={feedbackDocumentForPanel}
-                              previewState={feedbackPreviewState}
-                              LinkComponent={LinkComponent}
                               recordVisibility={sessionImportVisibility}
                               preview={sessionImportPreview}
-                              commitResult={sessionImportCommitResult}
                               status={sessionImportStatus}
                               error={sessionImportError}
-                              expectedDraftRevision={recordWorkflow?.expectedDraftRevision ?? null}
-                              onModeChange={(mode) => changeSource(mode === "aigen" ? "ai" : "json")}
+                              expectedDraftRevision={null}
                               onAigenCommitted={handleAigenCommitted}
                               onFileSelected={previewSessionImport}
                               onCommit={commitSessionImport}
@@ -1308,7 +1323,8 @@ export default function HostSessionEditor({
                           </div>
                         ) : null
                       )}
-                  </>
+                    </>
+                  )
                 ) : (
                   <div className="surface-quiet small" style={{ padding: 18 }}>
                     기본 정보를 저장한 뒤 기록 작업대를 사용할 수 있습니다.

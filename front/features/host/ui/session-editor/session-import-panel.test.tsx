@@ -1,7 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { SessionImportPreviewResponse, SessionImportRecordPreview, SessionRecordVisibility } from "@/features/host/model/host-view-types";
-import type { SessionImportCommitResult } from "@/features/host/model/session-import-model";
 import { SessionImportPanelBody } from "./session-import-panel";
 
 describe("SessionImportPanelBody", () => {
@@ -61,48 +60,35 @@ describe("SessionImportPanelBody", () => {
     expect(screen.getByRole("button", { name: "초안으로 가져오기" })).toBeDisabled();
   });
 
-  it("renders the commit result ledger after a successful import", () => {
+  it("keeps long imported names and summaries inside the review surface", () => {
     renderPanel({
-      preview: preview({ valid: true }),
-      commitResult: commitResult(),
-    });
-
-    const result = screen.getByRole("region", { name: "세션 기록 초안 저장 결과" });
-    expect(within(result).getByText("초안 저장 완료")).toBeInTheDocument();
-    expect(within(result).getByText("가져온 세션 기록을 공유 초안으로 저장했습니다.")).toBeInTheDocument();
-    expect(within(result).getByText(/멤버 공개/)).toBeInTheDocument();
-    expect(within(result).getByText("공개 요약 초안 교체")).toBeInTheDocument();
-    expect(within(result).getByText("하이라이트 1개 초안 저장")).toBeInTheDocument();
-    expect(within(result).getByText("한줄평 2개 초안 저장")).toBeInTheDocument();
-    expect(within(result).getByText("피드백 문서 초안 저장: 독서모임 7차 피드백")).toBeInTheDocument();
-    expect(within(result).getByText(/알림은 생성되지 않습니다/)).toBeInTheDocument();
-    expect(within(result).getByText(/변경사항을 반영하기 전까지 멤버와 공개 화면은 바뀌지 않습니다/)).toBeInTheDocument();
-  });
-
-  it("keeps commit result rendering public safe", () => {
-    renderPanel({
-      preview: preview({ valid: true }),
-      commitResult: {
-        ...commitResult(),
-        items: ["공개 요약 초안 교체", "피드백 문서 초안 저장: 독서모임 7차 피드백"],
+      preview: {
+        ...preview({ valid: true }),
+        publication: {
+          summary: "https://example.com/a/very/long/unbroken/path/that/must/not/overflow/the/review/surface",
+        },
+        feedbackDocument: {
+          fileName: "a-very-long-feedback-file-name-that-must-wrap-inside-the-review-surface.md",
+          title: "a-very-long-feedback-title-that-must-wrap-inside-the-review-surface",
+          valid: true,
+        },
       },
     });
 
-    expect(screen.getByRole("region", { name: "세션 기록 초안 저장 결과" })).toBeInTheDocument();
-    expect(screen.queryByText("PRIVATE_MEMBER_EMAIL")).not.toBeInTheDocument();
-    expect(screen.queryByText("{\"raw\"")).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "세션 기록 미리보기" }))
+      .toHaveStyle({ overflowWrap: "anywhere", minWidth: "0" });
+    expect(screen.queryByText("세션 기록 완성")).not.toBeInTheDocument();
+    expect(screen.queryByText("초안 저장 완료")).not.toBeInTheDocument();
   });
 });
 
 function renderPanel({
   preview,
   recordVisibility = "MEMBER",
-  commitResult = null,
   onCommit = vi.fn(),
 }: {
   preview: SessionImportPreviewResponse;
   recordVisibility?: SessionRecordVisibility;
-  commitResult?: SessionImportCommitResult | null;
   onCommit?: () => void;
 }) {
   render(
@@ -110,29 +96,12 @@ function renderPanel({
       sessionId="session-1"
       recordVisibility={recordVisibility}
       preview={preview}
-      commitResult={commitResult}
       status={preview.valid ? "ready" : "error"}
       error={preview.valid ? null : "가져온 JSON에서 수정할 항목이 있습니다."}
       onFileSelected={() => {}}
       onCommit={onCommit}
     />,
   );
-}
-
-function commitResult(): SessionImportCommitResult {
-  return {
-    tone: "success",
-    title: "초안 저장 완료",
-    message: "가져온 세션 기록을 공유 초안으로 저장했습니다.",
-    visibilityLabel: "멤버 공개",
-    items: [
-      "공개 요약 초안 교체",
-      "하이라이트 1개 초안 저장",
-      "한줄평 2개 초안 저장",
-      "피드백 문서 초안 저장: 독서모임 7차 피드백",
-    ],
-    nextAction: "알림은 생성되지 않습니다. 검토 후 변경사항을 반영하기 전까지 멤버와 공개 화면은 바뀌지 않습니다.",
-  };
 }
 
 function preview({
