@@ -219,9 +219,47 @@ test("session closing flywheel links host member and public surfaces", async ({ 
   await routeMemberNotifications(page);
   await routeMemberReflectionSurfaces(page);
   await page.goto(`/clubs/${CLUB_SLUG}/app/notifications`);
-  await expect(page.getByText("Past session reflection")).toBeVisible();
-  await expect(page.getByText("View record")).toBeVisible();
-  await page.getByRole("link", { name: "No.07 모임 기록이 준비되었습니다 열기" }).click();
+
+  await expect(page.getByText("새 알림 1개")).toBeVisible();
+  await expect(page.getByText("Past session reflection")).toHaveCount(0);
+  await expect(page.getByText("View record")).toHaveCount(0);
+
+  const notificationRow = page.getByRole("link", {
+    name: "읽지 않음 · No.07 모임 기록이 준비되었습니다 열기",
+  });
+  await expect(notificationRow).toBeVisible();
+  await expect(notificationRow).toHaveAttribute("data-unread", "true");
+
+  const desktopBodyBox = await page
+    .locator(".rm-member-notifications-page__body")
+    .boundingBox();
+  const desktopRowBox = await notificationRow.boundingBox();
+  expect(desktopBodyBox?.width).toBeLessThanOrEqual(880);
+  expect(desktopRowBox?.height).toBeGreaterThanOrEqual(56);
+  expect(desktopRowBox?.height).toBeLessThanOrEqual(96);
+
+  await notificationRow.focus();
+  await expect(notificationRow).toBeFocused();
+  const desktopInboxScreenshot = await page.screenshot({
+    path: testInfo.outputPath("member-notifications-desktop.png"),
+    fullPage: true,
+  });
+  expect(desktopInboxScreenshot.byteLength).toBeGreaterThan(10_000);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(notificationRow).toBeVisible();
+  const mobileRowBox = await notificationRow.boundingBox();
+  expect(mobileRowBox?.width).toBeLessThanOrEqual(390);
+  expect(mobileRowBox?.height).toBeGreaterThanOrEqual(56);
+
+  const mobileInboxScreenshot = await page.screenshot({
+    path: testInfo.outputPath("member-notifications-mobile.png"),
+    fullPage: true,
+  });
+  expect(mobileInboxScreenshot.byteLength).toBeGreaterThan(10_000);
+
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await notificationRow.click();
   await expect(page).toHaveURL(new RegExp(`/clubs/${CLUB_SLUG}/app/sessions/${SESSION_ID}$`));
   await expect(page.getByRole("link", { name: "지난 모임 회고 돌아가기" })).toBeVisible();
   await expect(page.getByRole("link", { name: "피드백 보기" })).toBeVisible();
