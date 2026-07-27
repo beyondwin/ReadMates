@@ -86,7 +86,7 @@ export function HostNotificationOperationsRail({
     >
       <div className="rm-host-notifications-rail__grid">
         <div className="rm-host-notifications-rail__cell rm-host-notifications-rail__policy">
-          <div className="rm-host-notifications-policy">
+          <label className="rm-host-notifications-policy">
             <div className="rm-host-notifications-policy__copy">
               <div className="eyebrow">자동화</div>
               <strong>모임 전날 자동 리마인더</strong>
@@ -94,7 +94,7 @@ export function HostNotificationOperationsRail({
             </div>
             <div className="rm-host-notifications-policy__control">
               <span aria-live="polite">{policyState}</span>
-              <label className="rm-host-notifications-policy__switch">
+              <span className="rm-host-notifications-policy__switch">
                 <input
                   id="host-session-reminder-policy"
                   type="checkbox"
@@ -108,9 +108,9 @@ export function HostNotificationOperationsRail({
                 <span aria-hidden="true" className="rm-host-notifications-policy__track">
                   <span className="rm-host-notifications-policy__thumb" />
                 </span>
-              </label>
+              </span>
             </div>
-          </div>
+          </label>
           {visibleError ? (
             <div style={{ marginTop: 10 }}>
               <p id={policyErrorId} role="alert" className="small" style={{ color: "var(--danger)", margin: 0 }}>

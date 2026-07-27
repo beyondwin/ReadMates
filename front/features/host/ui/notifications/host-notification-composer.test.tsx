@@ -225,6 +225,25 @@ describe("HostNotificationComposer", () => {
     expect(
       within(previewRegion).queryByRole("button", { name: "3명에게 알림 발송" }),
     ).not.toBeInTheDocument();
+    expect(previewRegion).not.toHaveClass("rm-notification-preview");
+    expect(
+      previewRegion.querySelector(".rm-notification-preview__counts"),
+    ).toBeNull();
+    expect(within(previewRegion).getByText("앱 알림 3명")).toHaveClass(
+      "badge",
+      "badge-accent",
+      "badge-dot",
+    );
+    expect(within(previewRegion).getByText("이메일 2명")).toHaveClass(
+      "badge",
+      "badge-accent",
+      "badge-dot",
+    );
+    expect(within(previewRegion).getByText("최종 대상 3명")).toHaveClass("badge");
+    expect(within(previewRegion).queryByText("피드백 문서 공개")).not.toBeInTheDocument();
+    expect(
+      within(previewRegion).getByRole("button", { name: "발송 확인" }),
+    ).not.toHaveClass("rm-notification-preview__confirm");
   });
 
   it("shows the selected member count in workbench presentation", () => {
@@ -266,6 +285,11 @@ describe("HostNotificationComposer", () => {
     expect(screen.getByRole("radio", { name: "앱 + 이메일" })).toBeChecked();
     expect(screen.getByText("가능한 두 채널 모두 사용")).toBeInTheDocument();
     expect(screen.getByText("아직 발송되지 않음")).toBeInTheDocument();
+    const previewAction = screen.getByRole("button", { name: "알림 미리보기" });
+    expect(previewAction.closest(".rm-notification-workbench__footer"))
+      .not.toBeNull();
+    expect(previewAction.parentElement)
+      .toHaveClass("rm-notification-workbench__actions");
   });
 
   it("explains why direct selection cannot preview with zero members", () => {

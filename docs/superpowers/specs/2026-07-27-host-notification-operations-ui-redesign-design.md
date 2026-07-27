@@ -309,6 +309,10 @@ switch는 시각적으로 숨긴 native checkbox와 연결된 label 또는 동�
 
 이번 변경은 `front/features/host/ui` 표현 계층과 namespaced runtime CSS에 한정한다. UI에서 새 fetch나 query 호출을 만들지 않는다.
 
+### 구현 결과 보정: 정책 저장 실패 전파
+
+2026-07-27 whole-branch review에서 실제 route의 policy callback이 mutation 실패를 화면 오류로 처리한 뒤 정상 resolve하여, `HostNotificationOperationsRail`의 실패 목표 보존과 `다시 시도`가 통합 화면에서는 도달 불가능함을 확인했다. 이에 한해 `front/features/host/route/host-notifications-route.tsx`는 기존 오류 문구와 server-truth reconciliation을 수행한 뒤 같은 오류를 다시 throw한다. mutation hook, query 소유권·무효화, PUT payload, policy API, 권한과 기본 OFF 계약은 바꾸지 않는다. 이 최소 예외는 OFF→ON과 ON→OFF 각각의 실패·복원·동일 목표 retry route 통합 테스트 및 whole-branch 추가 검토 대상으로 삼는다.
+
 ### 10.1 `HostNotificationOperationsRail`
 
 - 기존 policy 상태와 callback을 그대로 받는다.

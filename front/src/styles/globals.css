@@ -34,6 +34,7 @@
 
 .rm-notification-workbench__header,
 .rm-notification-workbench__decision-heading,
+.rm-notification-workbench__footer,
 .rm-notification-workbench__summary {
   display: flex;
 }
@@ -190,14 +191,30 @@
   justify-self: start;
 }
 
-.rm-notification-workbench__summary {
-  display: flex;
+.rm-notification-workbench__footer {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   padding-top: 18px;
+}
+
+.rm-notification-workbench__summary {
+  gap: 8px 16px;
+  flex-wrap: wrap;
   color: var(--text-3);
   font-size: 0.875rem;
+}
+
+.rm-notification-workbench__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.rm-notification-workbench__actions p {
+  margin: 0;
 }
 
 .rm-notification-preview {
@@ -383,11 +400,6 @@
 }
 
 @media (max-width: 600px) {
-  .rm-host-notifications-policy {
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 10px;
-  }
-
   .rm-notification-choice-grid,
   .rm-notification-preview__counts {
     grid-template-columns: 1fr;
@@ -398,12 +410,17 @@
     min-height: 52px;
   }
 
-  .rm-notification-workbench__summary {
+  .rm-notification-workbench__footer {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .rm-notification-workbench__summary .btn-primary,
+  .rm-notification-workbench__actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .rm-notification-workbench__actions .btn-primary,
   .rm-notification-preview--side-sheet .btn-primary {
     min-height: 44px;
     width: 100%;
@@ -5400,6 +5417,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 16px;
   align-items: center;
+  cursor: pointer;
 }
 
 .rm-host-notifications-policy__copy strong,
@@ -5421,8 +5439,9 @@
 .rm-host-notifications-policy__switch {
   position: relative;
   display: inline-flex;
+  align-items: center;
   width: 48px;
-  height: 28px;
+  height: 44px;
   flex: 0 0 auto;
 }
 
@@ -5437,6 +5456,7 @@
 }
 
 .rm-host-notifications-policy__track {
+  height: 28px;
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -5476,6 +5496,13 @@
 
 .rm-host-notifications-policy__switch input:disabled + .rm-host-notifications-policy__track {
   opacity: 0.56;
+}
+
+@media (max-width: 600px) {
+  .rm-host-notifications-policy {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

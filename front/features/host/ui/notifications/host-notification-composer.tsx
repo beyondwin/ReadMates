@@ -92,6 +92,10 @@ export function HostNotificationComposer({
   const selectedChannelLabel = manualChannelLabels[draft.requestedChannels];
   const directSelectionEmpty = draft.recipientMode === "SELECTED_MEMBERS"
     && draft.selectedMembershipIds.length === 0;
+  const previewDisabled = busy
+    || !draft.sessionId
+    || !template?.enabled
+    || !composerCanPreview(draft);
   const updateDraft = (patch: Partial<HostNotificationComposerDraft>) => {
     onDraftChange({ ...draft, ...patch });
   };
@@ -261,42 +265,49 @@ export function HostNotificationComposer({
       </fieldset>
 
       {isWorkbench ? (
-        <div className="rm-notification-workbench__summary" aria-live="polite">
-          <span>{selectedRecipientLabel} · {selectedChannelLabel}</span>
-          <span>아직 발송되지 않음</span>
-        </div>
-      ) : null}
-
-      <div className="row wrap" style={{ gap: 8 }}>
-        {isWorkbench && directSelectionEmpty ? (
-          <p className="small muted" style={{ margin: 0 }}>
-            한 명 이상 선택해 주세요.
-          </p>
-        ) : null}
-        <button
-          type="button"
-          className="btn btn-primary btn-sm"
-          disabled={
-            busy
-            || !draft.sessionId
-            || !template?.enabled
-            || !composerCanPreview(draft)
-          }
-          onClick={() => void onPreview()}
-        >
-          {busy ? "확인 중" : previewButtonLabel}
-        </button>
-        {showSkip ? (
+        <footer className="rm-notification-workbench__footer">
+          <div className="rm-notification-workbench__summary" aria-live="polite">
+            <span>{selectedRecipientLabel} · {selectedChannelLabel}</span>
+            <span>아직 발송되지 않음</span>
+          </div>
+          <div className="rm-notification-workbench__actions">
+            {directSelectionEmpty ? (
+              <p className="small muted">
+                한 명 이상 선택해 주세요.
+              </p>
+            ) : null}
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              disabled={previewDisabled}
+              onClick={() => void onPreview()}
+            >
+              {busy ? "확인 중" : previewButtonLabel}
+            </button>
+          </div>
+        </footer>
+      ) : (
+        <div className="row wrap" style={{ gap: 8 }}>
           <button
             type="button"
-            className="btn btn-quiet btn-sm"
-            disabled={busy}
-            onClick={onSkip}
+            className="btn btn-primary btn-sm"
+            disabled={previewDisabled}
+            onClick={() => void onPreview()}
           >
-            이번에는 보내지 않기
+            {busy ? "확인 중" : previewButtonLabel}
           </button>
-        ) : null}
-      </div>
+          {showSkip ? (
+            <button
+              type="button"
+              className="btn btn-quiet btn-sm"
+              disabled={busy}
+              onClick={onSkip}
+            >
+              이번에는 보내지 않기
+            </button>
+          ) : null}
+        </div>
+      )}
 
       {preview && presentation === "dialog" ? (
         <ManualNotificationPreviewConfirmation

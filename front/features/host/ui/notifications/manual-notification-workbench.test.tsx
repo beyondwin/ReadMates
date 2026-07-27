@@ -242,6 +242,16 @@ describe("ManualNotificationWorkbench", () => {
     const dialog = screen.getByRole("dialog", { name: "발송 전 확인" });
     expect(within(dialog).getByRole("alert")).toBeVisible();
     await user.click(within(dialog).getByRole("button", { name: "미리보기 다시 만들기" }));
-    expect(onPreview).toHaveBeenCalledTimes(1);
+    expect(onPreview).toHaveBeenCalledWith({
+      sessionId: "session-9",
+      eventType: "SESSION_REMINDER_DUE",
+      contentRevision,
+      audience: "ALL_ACTIVE_MEMBERS",
+      requestedChannels: "BOTH",
+      selectedMembershipIds: [],
+      excludedMembershipIds: [],
+      includedMembershipIds: [],
+      sendMode: "NOW",
+    });
   });
 });

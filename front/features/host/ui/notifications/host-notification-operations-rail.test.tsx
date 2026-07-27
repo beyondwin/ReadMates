@@ -77,7 +77,9 @@ describe("HostNotificationOperationsRail", () => {
     renderRail();
 
     const control = screen.getByRole("switch", { name: "모임 전날 자동 리마인더" });
+    const title = screen.getByText("모임 전날 자동 리마인더");
     expect(control).not.toBeChecked();
+    expect(title.closest("label")).toContainElement(control);
     expect(screen.getByText("꺼짐")).toBeInTheDocument();
     expect(
       screen.getByText("예정된 모임에 자동 알림을 보내지 않습니다."),

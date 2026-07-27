@@ -24,9 +24,19 @@ export function NotificationRecipientPicker({
   onLoadMore,
 }: NotificationRecipientPickerProps) {
   const [search, setSearch] = useState("");
+  const [previousMembers, setPreviousMembers] = useState(members);
   const [knownMembers, setKnownMembers] = useState(
     () => new Map(members.map((member) => [member.membershipId, member])),
   );
+
+  if (members !== previousMembers) {
+    setPreviousMembers(members);
+    setKnownMembers((current) => {
+      const next = new Map(current);
+      members.forEach((member) => next.set(member.membershipId, member));
+      return next;
+    });
+  }
 
   const selectedMembers = selectedMembershipIds.flatMap((membershipId) => {
     const member = members.find((item) => item.membershipId === membershipId)

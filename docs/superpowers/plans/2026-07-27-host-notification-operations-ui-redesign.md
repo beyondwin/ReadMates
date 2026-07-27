@@ -80,6 +80,10 @@
 
 If implementation requires a change in an explicitly unchanged surface, stop and revise the plan instead of widening scope silently.
 
+### Implementation-result exception: route policy rejection propagation
+
+The 2026-07-27 whole-branch review proved that the existing route callback handled a policy mutation rejection by setting route feedback and then resolving, so the rail could not retain the failed boolean or expose its retry action on the integrated page. The single approved exception is `front/features/host/route/host-notifications-route.tsx`: after the existing feedback and mutation-owned server-truth reconciliation, rethrow the same failure to the rail. Keep the mutation hook, query ownership/invalidation, request payload, API/auth/default-OFF contracts, and every manual-dispatch boundary unchanged. Add route-integrated OFF→ON and ON→OFF failure, rollback, and same-target retry coverage, and include this exception in the final whole-branch review.
+
 ## Task Dependencies
 
 ```text

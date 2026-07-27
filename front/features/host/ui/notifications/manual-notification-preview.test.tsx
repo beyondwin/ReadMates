@@ -64,9 +64,12 @@ describe("ManualNotificationPreviewConfirmation", () => {
   it("renders server-calculated counts and message content in side-sheet mode", () => {
     renderPreview();
 
-    expect(screen.getByText("최종 대상")).toBeInTheDocument();
-    expect(screen.getByText("앱 알림 가능")).toBeInTheDocument();
-    expect(screen.getByText("이메일 가능")).toBeInTheDocument();
+    expect(screen.getByText("최종 대상").nextElementSibling)
+      .toHaveTextContent("7명");
+    expect(screen.getByText("앱 알림 가능").nextElementSibling)
+      .toHaveTextContent("6명");
+    expect(screen.getByText("이메일 가능").nextElementSibling)
+      .toHaveTextContent("5명");
     expect(screen.getByText(previewFixture.template.subject)).toBeInTheDocument();
     expect(screen.getByText(previewFixture.template.bodyPreview)).toBeInTheDocument();
   });
@@ -101,5 +104,38 @@ describe("ManualNotificationPreviewConfirmation", () => {
     await user.click(screen.getByRole("checkbox", { name: "재발송을 확인했습니다" }));
     await user.click(send);
     expect(onConfirm).toHaveBeenCalledWith(true);
+  });
+
+  it("requires duplicate resend confirmation again when previewId changes", async () => {
+    const user = userEvent.setup();
+    const onConfirm = vi.fn();
+    const { rerender } = render(
+      <ManualNotificationPreviewConfirmation
+        preview={duplicatePreview}
+        busy={false}
+        presentation="side-sheet"
+        onConfirm={onConfirm}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole("checkbox", { name: "재발송을 확인했습니다" }),
+    );
+    expect(screen.getByRole("button", { name: /명에게 알림 발송/ }))
+      .toBeEnabled();
+
+    rerender(
+      <ManualNotificationPreviewConfirmation
+        preview={{ ...duplicatePreview, previewId: "preview-duplicate-new" }}
+        busy={false}
+        presentation="side-sheet"
+        onConfirm={onConfirm}
+      />,
+    );
+
+    expect(screen.getByRole("checkbox", { name: "재발송을 확인했습니다" }))
+      .not.toBeChecked();
+    expect(screen.getByRole("button", { name: /명에게 알림 발송/ }))
+      .toBeDisabled();
   });
 });

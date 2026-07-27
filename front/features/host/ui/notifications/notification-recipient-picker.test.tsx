@@ -85,33 +85,58 @@ describe("NotificationRecipientPicker", () => {
     expect(onLoadMore).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps selected member details when refreshed results arrive", async () => {
+  it("retains refreshed selected-member details after results are replaced", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const refreshedMember = {
+      ...memberOne,
+      displayName: "새 이름",
+      maskedEmail: "n***@example.com",
+    };
     const { rerender } = render(
       <NotificationRecipientPicker
-        members={[]}
+        members={[memberOne]}
         selectedMembershipIds={[]}
         hasMore={false}
         busy={false}
-        onSelectedMembershipIdsChange={vi.fn()}
+        onSelectedMembershipIdsChange={onChange}
         onSearch={vi.fn().mockResolvedValue(undefined)}
         onLoadMore={vi.fn().mockResolvedValue(undefined)}
       />,
     );
+
+    await user.click(screen.getByRole("checkbox", { name: /읽는 멤버/ }));
+    expect(onChange).toHaveBeenLastCalledWith([memberOne.membershipId]);
 
     rerender(
       <NotificationRecipientPicker
-        members={[memberOne]}
+        members={[refreshedMember]}
         selectedMembershipIds={[memberOne.membershipId]}
         hasMore={false}
         busy={false}
-        onSelectedMembershipIdsChange={vi.fn()}
+        onSelectedMembershipIdsChange={onChange}
+        onSearch={vi.fn().mockResolvedValue(undefined)}
+        onLoadMore={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "새 이름 선택 해제" }))
+      .toBeInTheDocument();
+
+    rerender(
+      <NotificationRecipientPicker
+        members={[memberTwo]}
+        selectedMembershipIds={[memberOne.membershipId]}
+        hasMore={false}
+        busy={false}
+        onSelectedMembershipIdsChange={onChange}
         onSearch={vi.fn().mockResolvedValue(undefined)}
         onLoadMore={vi.fn().mockResolvedValue(undefined)}
       />,
     );
 
-    expect(await screen.findByRole("button", {
-      name: `${memberOne.displayName} 선택 해제`,
-    })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "새 이름 선택 해제" }))
+      .toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "읽는 멤버 선택 해제" }))
+      .not.toBeInTheDocument();
   });
 });

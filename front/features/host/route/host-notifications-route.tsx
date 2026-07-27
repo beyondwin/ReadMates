@@ -217,8 +217,9 @@ export function HostNotificationsRoute() {
         setPolicyError(null);
         try {
           await updatePolicyMutation.mutateAsync({ sessionReminderEnabled: enabled });
-        } catch {
+        } catch (error) {
           setPolicyError("리마인더 정책을 저장하지 못했습니다. 다시 시도해 주세요.");
+          throw error;
         }
       }}
       onPolicyRetry={async () => {
