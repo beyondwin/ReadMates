@@ -313,7 +313,7 @@ function ManualNotificationWorkbenchState({
         onConfirm={handleConfirm}
         onSkip={() => undefined}
         showSkip={false}
-        recipientModes={currentTemplate?.allowedAudiences}
+        recipientModes={currentTemplate?.allowedAudiences ?? []}
       />
 
       <HostNotificationComposerDialog

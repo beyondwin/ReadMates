@@ -154,6 +154,18 @@ describe("ManualNotificationWorkbench", () => {
     expect(unavailable).toHaveAttribute("aria-describedby", reason.id);
   });
 
+  it("does not offer client-owned recipients when the active template is unavailable", () => {
+    renderWorkbench({
+      options: {
+        ...options,
+        templates: [],
+      },
+    });
+
+    expect(within(screen.getByRole("group", { name: "알림 대상" }))
+      .queryByRole("radio")).not.toBeInTheDocument();
+  });
+
   it("opens preview externally and Escape dismisses without confirming", async () => {
     const user = userEvent.setup();
     const onConfirm = vi.fn();
