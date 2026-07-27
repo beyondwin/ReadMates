@@ -99,6 +99,7 @@ function useHostSessionEditorLocation(): {
   const currentUrl =
     `${routerLocation.pathname}${routerLocation.search}${routerLocation.hash}`;
   const currentUrlRef = useRef(currentUrl);
+  const canonicalizedSourceUrlRef = useRef<string | null>(null);
   const location = useMemo(
     () => parseHostSessionEditorLocation(routerLocation.search),
     [routerLocation.search],
@@ -116,12 +117,17 @@ function useHostSessionEditorLocation(): {
   }, [navigate, routerLocation.state]);
 
   useEffect(() => {
-    currentUrlRef.current = currentUrl;
     const canonicalUrl = buildHostSessionEditorUrl(currentUrl, location);
     if (canonicalUrl === currentUrl) {
+      currentUrlRef.current = currentUrl;
+      canonicalizedSourceUrlRef.current = null;
       return;
     }
     currentUrlRef.current = canonicalUrl;
+    if (canonicalizedSourceUrlRef.current === currentUrl) {
+      return;
+    }
+    canonicalizedSourceUrlRef.current = currentUrl;
     void navigate(canonicalUrl, {
       replace: true,
       state: routerLocation.state,

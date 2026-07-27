@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, vi, describe, expect, it } from "vitest";
-import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router-dom";
+import { createMemoryRouter, MemoryRouter, Router, RouterProvider } from "react-router-dom";
+import { StrictMode } from "react";
 
 const routeMocks = vi.hoisted(() => ({
   apply: vi.fn(),
@@ -823,5 +824,72 @@ describe("host session editor route navigation", () => {
     expect(pushState).not.toHaveBeenCalled();
     expect(screen.getByText("record workflow route ready")).toBeInTheDocument();
     pushState.mockRestore();
+  });
+
+  it("canonicalizes each legacy source URL once under StrictMode without duplicate revalidation", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    const routeState = { returnTo: "/app/host/sessions" };
+    const replace = vi.fn();
+    const navigator = {
+      createHref: (to: string | {
+        pathname?: string;
+        search?: string;
+        hash?: string;
+      }) => typeof to === "string"
+        ? to
+        : `${to.pathname ?? ""}${to.search ?? ""}${to.hash ?? ""}`,
+      go: vi.fn(),
+      push: vi.fn(),
+      replace,
+    };
+    const renderAt = (location: {
+      pathname: string;
+      search: string;
+      hash: string;
+      state: Record<string, string>;
+      key: string;
+    }) => (
+      <StrictMode>
+        <QueryClientProvider client={client}>
+          <Router location={location} navigator={navigator}>
+            <NewHostSessionRoute onSessionRecordsChanged={vi.fn()} />
+          </Router>
+        </QueryClientProvider>
+      </StrictMode>
+    );
+    const rendered = render(renderAt({
+      pathname: "/app/host/sessions/new",
+      search: "?returnTo=%2Fapp%2Fhost&aigen=1",
+      hash: "#audit",
+      state: routeState,
+      key: "legacy-ai",
+    }));
+
+    expect(replace).toHaveBeenCalledTimes(1);
+    expect(replace.mock.calls[0]?.[0]).toEqual({
+      pathname: "/app/host/sessions/new",
+      search: "?returnTo=%2Fapp%2Fhost&section=records&source=ai",
+      hash: "#audit",
+    });
+    expect(replace.mock.calls[0]?.[1]).toBe(routeState);
+
+    const laterRouteState = { returnTo: "/app/host/sessions/session-1" };
+    rendered.rerender(renderAt({
+      pathname: "/app/host/sessions/new",
+      search: "?from=dashboard&records=json",
+      hash: "#history",
+      state: laterRouteState,
+      key: "legacy-json",
+    }));
+
+    await waitFor(() => expect(replace).toHaveBeenCalledTimes(2));
+    expect(replace.mock.calls[1]?.[0]).toEqual({
+      pathname: "/app/host/sessions/new",
+      search: "?from=dashboard&section=records&source=json",
+      hash: "#history",
+    });
+    expect(replace.mock.calls[1]?.[1]).toBe(laterRouteState);
   });
 });
