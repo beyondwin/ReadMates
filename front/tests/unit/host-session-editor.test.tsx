@@ -43,6 +43,7 @@ import type {
   HostSessionDeletionPreviewResponse,
   HostSessionDetailResponse,
   SessionImportRequest,
+  SessionImportPreviewResponse,
 } from "@/features/host/api/host-contracts";
 import {
   hostSessionDetailContractFixture,
@@ -658,8 +659,14 @@ describe("HostSessionEditor", () => {
 
       expect(screen.getByRole("region", { name: "현재 적용본" }))
         .toHaveTextContent("251126 1차.md");
+      expect(screen.getByRole("region", { name: "현재 적용본" }))
+        .toHaveTextContent("업로드 완료");
+      expect(screen.getByRole("link", { name: "피드백 문서 미리보기" }))
+        .toHaveAttribute(
+          "href",
+          "/clubs/club-a/app/host/sessions/session-1/feedback-document",
+        );
       expect(screen.queryByText("세션 기록 완성")).not.toBeInTheDocument();
-      expect(screen.queryByRole("link", { name: "피드백 문서 미리보기" })).not.toBeInTheDocument();
       expect(screen.queryByLabelText("피드백 문서 파일")).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "교체" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "등록" })).not.toBeInTheDocument();
@@ -786,6 +793,95 @@ describe("HostSessionEditor", () => {
       expectedDraftRevision: 4,
     });
     expect(screen.getByRole("button", { name: "초안으로 가져오기" })).toBeEnabled();
+  });
+
+  it.each([
+    {
+      changedContext: "visibility",
+      nextVisibility: "PUBLIC" as const,
+      nextDraftRevision: 4,
+    },
+    {
+      changedContext: "draft revision",
+      nextVisibility: "MEMBER" as const,
+      nextDraftRevision: 5,
+    },
+  ])(
+    "re-previews JSON when shared draft $changedContext changes and blocks a stale commit",
+    async ({ nextVisibility, nextDraftRevision }) => {
+      const user = userEvent.setup();
+      let resolveRepreview!: (value: SessionImportPreviewResponse) => void;
+      const repreviewPending = new Promise<SessionImportPreviewResponse>((resolve) => {
+        resolveRepreview = resolve;
+      });
+      const previewSessionImport = vi
+        .fn(hostSessionEditorTestActions.previewSessionImport)
+        .mockImplementationOnce(hostSessionEditorTestActions.previewSessionImport)
+        .mockImplementationOnce(() => repreviewPending);
+      const commitSessionImport = vi.fn(hostSessionEditorTestActions.commitSessionImport);
+      const initialWorkflow = recordWorkflow("MEMBER");
+      const nextWorkflow = recordWorkflow(nextVisibility);
+      nextWorkflow.expectedDraftRevision = nextDraftRevision;
+      const renderEditor = (workflow: NonNullable<HostSessionEditorProps["recordWorkflow"]>) => (
+        <HostSessionEditorForTest
+          session={session}
+          initialLocation={{ section: "records", source: "json" }}
+          recordWorkflow={workflow}
+          actions={{
+            ...hostSessionEditorTestActions,
+            previewSessionImport,
+            commitSessionImport,
+          }}
+        />
+      );
+      const { rerender } = render(renderEditor(initialWorkflow));
+
+      await user.upload(
+        screen.getByLabelText("AI 결과 JSON 가져오기"),
+        new File([sessionImportJson()], "session-import.json", { type: "application/json" }),
+      );
+      await waitFor(() => expect(previewSessionImport).toHaveBeenCalledTimes(1));
+      expect(screen.getByRole("button", { name: "초안으로 가져오기" })).toBeEnabled();
+
+      rerender(renderEditor(nextWorkflow));
+
+      await waitFor(() => expect(previewSessionImport).toHaveBeenCalledTimes(2));
+      const refreshedRequest = previewSessionImport.mock.calls[1]?.[1];
+      expect(refreshedRequest).toMatchObject({
+        recordVisibility: nextVisibility,
+        expectedDraftRevision: nextDraftRevision,
+      });
+      expect(screen.getByRole("button", { name: "초안으로 가져오기" })).toBeDisabled();
+      await user.click(screen.getByRole("button", { name: "초안으로 가져오기" }));
+      expect(commitSessionImport).not.toHaveBeenCalled();
+
+      resolveRepreview(
+        await hostSessionEditorTestActions.previewSessionImport(
+          session.sessionId,
+          refreshedRequest!,
+        ),
+      );
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "초안으로 가져오기" })).toBeEnabled();
+      });
+    },
+  );
+
+  it("forwards apply-preview pending state to the sticky review action", () => {
+    const workflow = recordWorkflow("MEMBER");
+    workflow.confirmation.submitting = true;
+
+    render(
+      <HostSessionEditorForTest
+        session={session}
+        initialLocation={{ section: "records", source: "manual" }}
+        recordWorkflow={workflow}
+      />,
+    );
+
+    expect(screen.getByRole("region", { name: "반영 검토 작업" }))
+      .toHaveTextContent("반영 검토 준비 중");
+    expect(screen.getByRole("button", { name: "반영 검토" })).toBeDisabled();
   });
 
   it("shows a content-only apply review with revision and recovery context", async () => {

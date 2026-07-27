@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { SessionImportPreviewResponse } from "@/features/host/model/host-view-types";
 import type { SessionImportCommitResult } from "@/features/host/model/session-import-model";
 import type { HostSessionDraftSource } from "@/features/host/model/host-session-editor-navigation";
+import type { HostSessionEditorLinkComponent } from "./session-editor-links";
 import {
   SessionRecordWorkspace,
   type SessionRecordWorkspaceProps,
@@ -90,6 +91,16 @@ const importCommitResult: SessionImportCommitResult = {
   nextAction: "공통 초안을 검토해 주세요.",
 };
 
+const TestLinkComponent: HostSessionEditorLinkComponent = ({
+  to,
+  state: _state,
+  children,
+  ...props
+}) => {
+  void _state;
+  return <a {...props} href={to}>{children}</a>;
+};
+
 function props(
   overrides: Partial<SessionRecordWorkspaceProps> = {},
 ): SessionRecordWorkspaceProps {
@@ -105,6 +116,15 @@ function props(
       saveState: "saved",
       validationIssues: [],
       liveBaseStale: false,
+      rebasePending: false,
+      rebaseError: null,
+    },
+    reviewPending: false,
+    feedbackDocument: {
+      uploaded: true,
+      fileName: "currently-applied.md",
+      previewState: undefined,
+      LinkComponent: TestLinkComponent,
     },
     creation: {
       sessionId: "session-1",
@@ -140,8 +160,20 @@ describe("SessionRecordWorkspace", () => {
 
     expect(within(applied).getByText("현재 멤버 화면에 적용된 요약")).toBeVisible();
     expect(within(applied).queryByText("아직 반영하지 않은 초안 요약")).not.toBeInTheDocument();
+    expect(within(applied).getByText("업로드 완료")).toBeVisible();
+    expect(within(applied).getByRole("link", { name: "피드백 문서 미리보기" }))
+      .toHaveAttribute(
+        "href",
+        "/clubs/club-a/app/host/sessions/session-1/feedback-document",
+      );
     expect(within(draft).getByText("저장됨")).toBeVisible();
-    expect(within(next).getByRole("button", { name: "반영 검토" })).toBeEnabled();
+    expect(within(draft).getByText("초안 문서")).toBeVisible();
+    expect(within(draft).getByText(draftSnapshot.feedbackDocument.fileName)).toBeVisible();
+    expect(within(next).queryByRole("button", { name: "반영 검토" })).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "반영 검토 작업" }))
+        .getByRole("button", { name: "반영 검토" }),
+    ).toBeEnabled();
     expect(within(sourceTabs).getByRole("tab", { name: "직접 작성" })).toBeVisible();
     expect(within(sourceTabs).getByRole("tab", { name: "AI로 생성" })).toBeVisible();
     expect(within(sourceTabs).getByRole("tab", { name: "외부 JSON" })).toBeVisible();
@@ -150,6 +182,104 @@ describe("SessionRecordWorkspace", () => {
     expect(screen.queryByText("공개 기록 초안")).not.toBeInTheDocument();
     expect(screen.queryByText(/live revision/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/draft revision/i)).not.toBeInTheDocument();
+  });
+
+  it("shows the missing feedback document state in the applied and common draft context", () => {
+    render(
+      <SessionRecordWorkspace
+        {...props({
+          liveSnapshot: {
+            ...liveSnapshot,
+            feedbackDocument: { fileName: "", title: "", markdown: "" },
+          },
+          draft: {
+            ...props().draft,
+            snapshot: {
+              ...draftSnapshot,
+              feedbackDocument: { fileName: "", title: "", markdown: "" },
+            },
+          },
+          feedbackDocument: {
+            uploaded: false,
+            fileName: null,
+            previewState: undefined,
+            LinkComponent: TestLinkComponent,
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByRole("region", { name: "현재 적용본" })).toHaveTextContent("미등록");
+    expect(screen.getByRole("region", { name: "작업 중인 초안" })).toHaveTextContent(
+      "초안 문서 없음",
+    );
+    expect(screen.queryByRole("link", { name: "피드백 문서 미리보기" }))
+      .not.toBeInTheDocument();
+  });
+
+  it("keeps one compact primary review action in a bottom sticky action bar", () => {
+    render(<SessionRecordWorkspace {...props()} />);
+
+    const stickyAction = screen.getByRole("region", { name: "반영 검토 작업" });
+    expect(stickyAction).toHaveClass("rm-session-record-workspace__sticky-action");
+    expect(stickyAction).toHaveStyle({ position: "sticky", bottom: "8px" });
+    expect(stickyAction).toHaveTextContent("저장된 초안을 반영 전에 검토해 주세요");
+    expect(screen.getAllByRole("button", { name: "반영 검토" })).toHaveLength(1);
+    expect(within(stickyAction).getByRole("button", { name: "반영 검토" })).toBeEnabled();
+  });
+
+  it("disables review while the apply preview is pending and ignores rapid repeat activation", async () => {
+    const user = userEvent.setup();
+    const onReviewDraft = vi.fn();
+    const ready = props({
+      actions: {
+        ...props().actions,
+        onReviewDraft,
+      },
+    });
+    const { rerender } = render(<SessionRecordWorkspace {...ready} />);
+
+    await user.click(screen.getByRole("button", { name: "반영 검토" }));
+    expect(onReviewDraft).toHaveBeenCalledTimes(1);
+
+    rerender(<SessionRecordWorkspace {...ready} reviewPending />);
+    expect(screen.getByRole("region", { name: "반영 검토 작업" }))
+      .toHaveTextContent("반영 검토 준비 중");
+    expect(screen.getByRole("button", { name: "반영 검토" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "반영 검토" }));
+    expect(onReviewDraft).toHaveBeenCalledTimes(1);
+  });
+
+  it("forwards rebase pending and error state to the common draft editor", () => {
+    const onRebaseDraft = vi.fn();
+    const pending = props({
+      draft: {
+        ...props().draft,
+        liveBaseStale: true,
+        rebasePending: true,
+        rebaseError: null,
+      },
+      actions: {
+        ...props().actions,
+        onRebaseDraft,
+      },
+    });
+    const { rerender } = render(<SessionRecordWorkspace {...pending} />);
+
+    expect(screen.getByRole("button", { name: "최신 정보 확인 중…" })).toBeDisabled();
+
+    rerender(
+      <SessionRecordWorkspace
+        {...pending}
+        draft={{
+          ...pending.draft,
+          rebasePending: false,
+          rebaseError: "최신 적용본을 불러오지 못했습니다.",
+        }}
+      />,
+    );
+    expect(screen.getByText("최신 적용본을 불러오지 못했습니다.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "최신 정보 확인 완료" })).toBeEnabled();
   });
 
   it("keeps the common draft editor and visited AI/JSON review surfaces mounted across source changes", async () => {

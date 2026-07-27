@@ -43,7 +43,11 @@ import {
 } from "@/features/host/model/host-session-editor-form-state";
 import type { BasicSessionField } from "@/features/host/model/host-session-editor-form-state";
 import { SessionIdentity } from "@/shared/ui/session-identity";
-import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
+import {
+  readmatesReturnState as defaultReadmatesReturnState,
+  type ReadmatesReturnState,
+  type ReadmatesReturnTarget,
+} from "@/shared/routing/readmates-route-state";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 import { HostSessionDeletionPreviewDialog } from "./host-session-deletion-preview";
 import { AttendancePanel } from "./session-editor/attendance-panel";
@@ -58,6 +62,10 @@ import {
   DefaultLinkComponent,
   type HostSessionEditorLinkComponent,
 } from "./session-editor/session-editor-links";
+import {
+  feedbackDocumentUploadStatus,
+  feedbackPreviewStateForSession,
+} from "./session-editor/session-editor-feedback";
 import { HostSessionNotificationActions } from "./session-editor/session-editor-notifications";
 import { PublicationPanel } from "./session-editor/publication-panel";
 import {
@@ -339,6 +347,7 @@ export default function HostSessionEditor({
   clubSlug,
   LinkComponent = DefaultLinkComponent,
   hostDashboardReturnTarget = defaultHostDashboardReturnTarget,
+  readmatesReturnState = defaultReadmatesReturnState,
   onSessionRecordsChanged,
   recordWorkflow,
   navigation,
@@ -384,6 +393,7 @@ export default function HostSessionEditor({
     sessionState,
     displaySessionSnapshot,
     attendanceStatuses,
+    feedbackDocument,
   } = formState;
 
   // ---------------------------------------------------------------------------
@@ -481,6 +491,21 @@ export default function HostSessionEditor({
   // ---------------------------------------------------------------------------
   const deadline = questionDeadlineLabelForForm(session, date);
   const sessionImportVisibility = recordWorkflow?.snapshot.visibility ?? recordVisibility;
+  const sessionImportExpectedDraftRevision = recordWorkflow?.expectedDraftRevision ?? null;
+  const sessionImportContextStale = Boolean(
+    sessionImportRequest
+    && (
+      sessionImportRequest.recordVisibility !== sessionImportVisibility
+      || sessionImportRequest.expectedDraftRevision !== sessionImportExpectedDraftRevision
+    ),
+  );
+  const previewSessionImportAction = actions.previewSessionImport;
+  const feedbackDocumentForWorkspace = feedbackDocumentUploadStatus(feedbackDocument);
+  const feedbackPreviewState = feedbackPreviewStateForSession(
+    session,
+    returnTarget,
+    readmatesReturnState,
+  );
   const isNewSession = session === null || session === undefined;
   const editorTitle = isNewSession ? "세션 문서 만들기" : "세션 문서 편집";
   const basicSaveLabel = saveState === "saving"
@@ -977,7 +1002,7 @@ export default function HostSessionEditor({
           sessionImportVisibility,
           recordWorkflow?.expectedDraftRevision ?? null,
         );
-        const preview = await actions.previewSessionImport(session.sessionId, request);
+        const preview = await previewSessionImportAction(session.sessionId, request);
         setSessionImportRequest(request);
         setSessionImportPreview(preview);
         setSessionImportStatus(preview.valid ? "ready" : "error");
@@ -991,11 +1016,69 @@ export default function HostSessionEditor({
         input.value = "";
       }
     },
-    [session, sessionImportVisibility, actions, recordWorkflow],
+    [session, sessionImportVisibility, previewSessionImportAction, recordWorkflow],
   );
 
+  useEffect(() => {
+    if (!session || !sessionImportRequest) {
+      return;
+    }
+
+    if (
+      sessionImportRequest.recordVisibility === sessionImportVisibility
+      && sessionImportRequest.expectedDraftRevision === sessionImportExpectedDraftRevision
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    const refreshedRequest: SessionImportRequest = {
+      ...sessionImportRequest,
+      recordVisibility: sessionImportVisibility,
+      expectedDraftRevision: sessionImportExpectedDraftRevision,
+    };
+
+    void previewSessionImportAction(session.sessionId, refreshedRequest)
+      .then((preview) => {
+        if (cancelled) {
+          return;
+        }
+        setSessionImportRequest(refreshedRequest);
+        setSessionImportPreview(preview);
+        setSessionImportStatus(preview.valid ? "ready" : "error");
+        if (!preview.valid) {
+          setSessionImportError(sessionImportFailureMessage("preview"));
+        }
+      })
+      .catch(() => {
+        if (cancelled) {
+          return;
+        }
+        setSessionImportRequest(refreshedRequest);
+        setSessionImportStatus("error");
+        setSessionImportError(sessionImportFailureMessage("preview"));
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    previewSessionImportAction,
+    session,
+    sessionImportExpectedDraftRevision,
+    sessionImportRequest,
+    sessionImportVisibility,
+  ]);
+
   const commitSessionImport = useCallback(async () => {
-    if (!session || !sessionImportRequest || !sessionImportPreview?.valid || sessionImportStatus === "committing") {
+    if (
+      !session
+      || !sessionImportRequest
+      || !sessionImportPreview?.valid
+      || sessionImportStatus !== "ready"
+      || sessionImportRequest.recordVisibility !== sessionImportVisibility
+      || sessionImportRequest.expectedDraftRevision !== sessionImportExpectedDraftRevision
+    ) {
       return;
     }
 
@@ -1028,6 +1111,8 @@ export default function HostSessionEditor({
     sessionImportRequest,
     sessionImportPreview,
     sessionImportStatus,
+    sessionImportVisibility,
+    sessionImportExpectedDraftRevision,
     actions,
     flash,
     recordWorkflow,
@@ -1214,15 +1299,23 @@ export default function HostSessionEditor({
                         saveState: recordWorkflow.saveState,
                         validationIssues: recordWorkflow.editor.validationSummary.issues,
                         liveBaseStale: recordWorkflow.editor.draftLiveBaseStale,
+                        rebasePending: recordWorkflow.rebasePending,
+                        rebaseError: recordWorkflow.rebaseError,
+                      }}
+                      reviewPending={recordWorkflow.confirmation.submitting}
+                      feedbackDocument={{
+                        ...feedbackDocumentForWorkspace,
+                        previewState: feedbackPreviewState,
+                        LinkComponent,
                       }}
                       creation={{
                         sessionId: session.sessionId,
                         clubSlug,
                         expectedDraftRevision: recordWorkflow.expectedDraftRevision,
-                        importPreview: sessionImportPreview,
+                        importPreview: sessionImportContextStale ? null : sessionImportPreview,
                         importCommitResult: sessionImportCommitResult,
-                        importStatus: sessionImportStatus,
-                        importError: sessionImportError,
+                        importStatus: sessionImportContextStale ? "previewing" : sessionImportStatus,
+                        importError: sessionImportContextStale ? null : sessionImportError,
                       }}
                       actions={{
                         onSnapshotChange: recordWorkflow.onSnapshotChange,

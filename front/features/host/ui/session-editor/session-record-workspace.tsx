@@ -12,6 +12,8 @@ import type { HostSessionDraftSource } from "@/features/host/model/host-session-
 import type { HostSessionRecordDraft } from "@/features/host/model/host-session-editor-view-model";
 import type { SessionImportPreviewResponse } from "@/features/host/model/host-view-types";
 import type { SessionImportCommitResult } from "@/features/host/model/session-import-model";
+import type { ReadmatesReturnState } from "@/shared/routing/readmates-route-state";
+import type { HostSessionEditorLinkComponent } from "./session-editor-links";
 import type { AiGenerateCommitResult } from "./session-record-completion-panel";
 import { SessionRecordCompletionPanel } from "./session-record-completion-panel";
 import type {
@@ -34,6 +36,15 @@ export type SessionRecordWorkspaceProps = {
     saveState: DraftSaveState;
     validationIssues: string[];
     liveBaseStale: boolean;
+    rebasePending: boolean;
+    rebaseError: string | null;
+  };
+  reviewPending: boolean;
+  feedbackDocument: {
+    uploaded: boolean;
+    fileName: string | null;
+    previewState?: ReadmatesReturnState;
+    LinkComponent: HostSessionEditorLinkComponent;
   };
   creation: {
     sessionId?: string;
@@ -110,9 +121,15 @@ function firstValidationAnchor(issues: string[]) {
   return null;
 }
 
-function nextActionPresentation(draft: SessionRecordWorkspaceProps["draft"]) {
+function nextActionPresentation(
+  draft: SessionRecordWorkspaceProps["draft"],
+  reviewPending: boolean,
+) {
   if (!draft.source) {
     return { guidance: "초안을 먼저 만들어 주세요", reviewEnabled: false };
+  }
+  if (reviewPending) {
+    return { guidance: "반영 검토 준비 중", reviewEnabled: false };
   }
   if (draft.saveState === "saving") {
     return { guidance: "저장 중", reviewEnabled: false };
@@ -173,6 +190,8 @@ export function SessionRecordWorkspace({
   liveRevision,
   liveSnapshot,
   draft,
+  reviewPending,
+  feedbackDocument,
   creation,
   actions,
 }: SessionRecordWorkspaceProps): JSX.Element {
@@ -182,8 +201,12 @@ export function SessionRecordWorkspace({
     () => new Set([source]),
   );
   const handledImportCommitResult = useRef<SessionImportCommitResult | null>(null);
-  const nextAction = nextActionPresentation(draft);
+  const nextAction = nextActionPresentation(draft, reviewPending);
   const validationAnchor = firstValidationAnchor(draft.validationIssues);
+  const FeedbackDocumentLink = feedbackDocument.LinkComponent;
+  const feedbackPreviewHref = creation.sessionId
+    ? `${creation.clubSlug ? `/clubs/${encodeURIComponent(creation.clubSlug)}` : ""}/app/host/sessions/${encodeURIComponent(creation.sessionId)}/feedback-document`
+    : null;
   if (!visitedSources.has(source)) {
     setVisitedSources((current) => new Set(current).add(source));
   }
@@ -236,14 +259,26 @@ export function SessionRecordWorkspace({
           <div className="row" style={{ gap: 8, flexWrap: "wrap", marginTop: 10 }}>
             {liveRevision > 0 ? <span className="badge">버전 {liveRevision}</span> : null}
             <span className="badge">{visibilityLabels[liveSnapshot.visibility]}</span>
+            <span className="badge">{feedbackDocument.uploaded ? "업로드 완료" : "미등록"}</span>
           </div>
           <p className="small" style={{ margin: "10px 0 0", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
             {liveSnapshot.publicationSummary || "아직 적용된 기록이 없습니다."}
           </p>
-          {liveSnapshot.feedbackDocument.fileName ? (
+          {feedbackDocument.uploaded
+          && (feedbackDocument.fileName || liveSnapshot.feedbackDocument.fileName) ? (
             <p className="tiny" style={{ margin: "8px 0 0", overflowWrap: "anywhere" }}>
-              {liveSnapshot.feedbackDocument.fileName}
+              {feedbackDocument.fileName || liveSnapshot.feedbackDocument.fileName}
             </p>
+          ) : null}
+          {feedbackDocument.uploaded && feedbackPreviewHref ? (
+            <FeedbackDocumentLink
+              className="btn btn-quiet btn-sm"
+              to={feedbackPreviewHref}
+              state={feedbackDocument.previewState}
+              style={{ marginTop: 8 }}
+            >
+              피드백 문서 미리보기
+            </FeedbackDocumentLink>
           ) : null}
         </section>
 
@@ -264,6 +299,9 @@ export function SessionRecordWorkspace({
             <span className="badge badge-dot">
               {draft.source ? draftStatusLabel(draft.saveState) : "준비된 초안 없음"}
             </span>
+            <span className="badge">
+              {draft.snapshot.feedbackDocument.fileName ? "초안 문서" : "초안 문서 없음"}
+            </span>
           </div>
           <p className="small" style={{ margin: "10px 0 0" }}>
             {draft.source ? `작성 방식 · ${draftSourceLabels[draft.source]}` : "오른쪽 도구에서 초안을 시작할 수 있습니다."}
@@ -271,6 +309,11 @@ export function SessionRecordWorkspace({
           {draft.updatedAt ? (
             <p className="tiny mono" style={{ margin: "8px 0 0", overflowWrap: "anywhere" }}>
               최근 저장 <time dateTime={draft.updatedAt}>{draft.updatedAt}</time>
+            </p>
+          ) : null}
+          {draft.snapshot.feedbackDocument.fileName ? (
+            <p className="tiny" style={{ margin: "8px 0 0", overflowWrap: "anywhere" }}>
+              {draft.snapshot.feedbackDocument.fileName}
             </p>
           ) : null}
         </section>
@@ -293,15 +336,6 @@ export function SessionRecordWorkspace({
               첫 오류 확인
             </a>
           ) : null}
-          <button
-            className="btn btn-primary btn-sm"
-            type="button"
-            disabled={!nextAction.reviewEnabled}
-            onClick={() => void actions.onReviewDraft()}
-            style={{ marginTop: validationAnchor ? 8 : 0 }}
-          >
-            반영 검토
-          </button>
         </section>
       </div>
 
@@ -361,6 +395,8 @@ export function SessionRecordWorkspace({
             onReloadDraft={actions.onReloadDraft}
             onCopyInput={actions.onCopyInput}
             onRebaseDraft={actions.onRebaseDraft}
+            rebasePending={draft.rebasePending}
+            rebaseError={draft.rebaseError}
           />
         </div>
 
@@ -408,6 +444,33 @@ export function SessionRecordWorkspace({
           )}
         </aside>
       </div>
+
+      <section
+        role="region"
+        aria-label="반영 검토 작업"
+        className="rm-session-record-workspace__sticky-action surface"
+        style={{
+          position: "sticky",
+          bottom: 8,
+          zIndex: 1,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+          padding: "12px 14px",
+        }}
+      >
+        <span className="small">{nextAction.guidance}</span>
+        <button
+          className="btn btn-primary btn-sm"
+          type="button"
+          disabled={!nextAction.reviewEnabled}
+          onClick={() => void actions.onReviewDraft()}
+        >
+          반영 검토
+        </button>
+      </section>
     </div>
   );
 }
