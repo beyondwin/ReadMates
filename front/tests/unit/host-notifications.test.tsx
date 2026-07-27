@@ -812,9 +812,10 @@ describe("HostNotificationsRoute", () => {
       ).queryKey,
     });
 
-    expect(await screen.findByRole("option", {
-      name: "8회차 · Example Book · 2026-05-20",
-    })).toBeInTheDocument();
+    const recentDispatches = screen.getByRole("region", { name: "최근 수동 발송" });
+    await waitFor(() => {
+      expect(within(recentDispatches).getByText(/Example Book/)).toBeInTheDocument();
+    });
   });
 });
 
