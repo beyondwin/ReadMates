@@ -41,6 +41,39 @@ data class MyArchiveReviewItem(
     val text: String,
 )
 
+data class MyJourneyPageResponse(
+    val items: List<MyJourneyItem>,
+    val summary: MyJourneySummary,
+    val nextCursor: String?,
+)
+
+data class MyJourneyItem(
+    val sessionId: String,
+    val sessionNumber: Int,
+    val bookTitle: String,
+    val bookAuthor: String,
+    val bookImageUrl: String?,
+    val date: String,
+    val readingProgress: Int?,
+    val questionCount: Int,
+    val reviewCount: Int,
+    val feedbackDocument: MyJourneyFeedbackDocument,
+)
+
+data class MyJourneyFeedbackDocument(
+    val available: Boolean,
+    val readable: Boolean,
+    val lockedReason: String?,
+)
+
+data class MyJourneySummary(
+    val attendedSessionCount: Int,
+    val completedReadingCount: Int,
+    val questionCount: Int,
+    val reviewCount: Int,
+    val readableFeedbackDocumentCount: Int,
+)
+
 data class MemberArchiveSessionDetailResponse(
     val sessionId: String,
     val sessionNumber: Int,

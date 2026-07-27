@@ -11,6 +11,10 @@ import com.readmates.archive.application.model.MemberArchiveQuestionResult
 import com.readmates.archive.application.model.MemberArchiveSessionDetailResult
 import com.readmates.archive.application.model.MyArchiveQuestionResult
 import com.readmates.archive.application.model.MyArchiveReviewResult
+import com.readmates.archive.application.model.MyJourneyFeedbackDocumentResult
+import com.readmates.archive.application.model.MyJourneyItemResult
+import com.readmates.archive.application.model.MyJourneyResult
+import com.readmates.archive.application.model.MyJourneySummaryResult
 import com.readmates.archive.application.model.MyPageResult
 import com.readmates.archive.application.model.MyRecentAttendanceResult
 import com.readmates.shared.paging.CursorPage
@@ -53,6 +57,43 @@ fun MyArchiveReviewResult.toWebDto() =
         date = date,
         kind = kind,
         text = text,
+    )
+
+fun MyJourneyResult.toWebDto() =
+    MyJourneyPageResponse(
+        items = items.map { it.toWebDto() },
+        summary = summary.toWebDto(),
+        nextCursor = nextCursor,
+    )
+
+private fun MyJourneyItemResult.toWebDto() =
+    MyJourneyItem(
+        sessionId = sessionId,
+        sessionNumber = sessionNumber,
+        bookTitle = bookTitle,
+        bookAuthor = bookAuthor,
+        bookImageUrl = bookImageUrl,
+        date = date,
+        readingProgress = readingProgress,
+        questionCount = questionCount,
+        reviewCount = reviewCount,
+        feedbackDocument = feedbackDocument.toWebDto(),
+    )
+
+private fun MyJourneyFeedbackDocumentResult.toWebDto() =
+    MyJourneyFeedbackDocument(
+        available = available,
+        readable = readable,
+        lockedReason = lockedReason,
+    )
+
+private fun MyJourneySummaryResult.toWebDto() =
+    MyJourneySummary(
+        attendedSessionCount = attendedSessionCount,
+        completedReadingCount = completedReadingCount,
+        questionCount = questionCount,
+        reviewCount = reviewCount,
+        readableFeedbackDocumentCount = readableFeedbackDocumentCount,
     )
 
 fun MemberArchiveSessionDetailResult.toWebDto() =

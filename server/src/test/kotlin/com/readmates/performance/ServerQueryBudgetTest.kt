@@ -1,6 +1,10 @@
 package com.readmates.performance
 
+import com.readmates.archive.application.port.`in`.ListMyJourneyUseCase
 import com.readmates.auth.application.service.AuthSessionService
+import com.readmates.auth.domain.MembershipRole
+import com.readmates.shared.paging.PageRequest
+import com.readmates.shared.security.CurrentMember
 import com.readmates.support.QueryCounter
 import com.readmates.support.QueryCountingDataSourcePostProcessor
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
@@ -54,6 +58,7 @@ class ServerQueryBudgetTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val authSessionService: AuthSessionService,
+    @param:Autowired private val listMyJourneyUseCase: ListMyJourneyUseCase,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     private val createdSessionTokenHashes = linkedSetOf<String>()
     private val largeFixture by lazy { LargeReadPathFixture(jdbcTemplate) }
@@ -152,6 +157,31 @@ class ServerQueryBudgetTest(
                     jsonPath("$.feedbackDocument.readable") { value(true) }
                 }
         }
+    }
+
+    @Test
+    fun `personal journey projection and endpoint keep fixed query counts across page sizes`() {
+        val smallProjectionQueries = measuredJourneyProjectionQueries(limit = 1)
+        val largeProjectionQueries = measuredJourneyProjectionQueries(limit = 12)
+
+        assertThat(smallProjectionQueries).isEqualTo(largeProjectionQueries)
+        assertThat(largeProjectionQueries)
+            .describedAs("journey page and whole-summary projections must remain exactly two JDBC statements")
+            .isEqualTo(2)
+
+        warmJourneyEndpoint()
+        val smallEndpointQueries = measuredJourneyEndpointQueries(limit = 1, expectedItems = 1)
+        val largeEndpointQueries = measuredJourneyEndpointQueries(limit = 12, expectedItems = 7)
+        val journeyProjectionQueryCount = 2
+        val fixedRequestContextQueryCount = 4
+        val fixedEndpointQueryCount = journeyProjectionQueryCount + fixedRequestContextQueryCount
+
+        assertThat(smallEndpointQueries).isEqualTo(largeEndpointQueries)
+        assertThat(largeEndpointQueries)
+            .describedAs(
+                "journey endpoint must remain two projection statements plus " +
+                    "four fixed security/member-context statements",
+            ).isEqualTo(fixedEndpointQueryCount)
     }
 
     @Test
@@ -286,6 +316,51 @@ class ServerQueryBudgetTest(
         assertThat(QueryCounter.count())
             .describedAs("$reason; prepareStatement count should stay <= $budget")
             .isLessThanOrEqualTo(budget)
+    }
+
+    private fun measuredJourneyProjectionQueries(limit: Int): Int {
+        QueryCounter.reset()
+        listMyJourneyUseCase.listMyJourney(
+            currentMember =
+                CurrentMember(
+                    userId = UUID.fromString("00000000-0000-0000-0000-000000000106"),
+                    membershipId = UUID.fromString("00000000-0000-0000-0000-000000000206"),
+                    clubId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
+                    clubSlug = "reading-sai",
+                    email = "member5@example.com",
+                    displayName = "멤버5",
+                    accountName = "이멤버5",
+                    role = MembershipRole.MEMBER,
+                ),
+            pageRequest = PageRequest.cursor(limit, null, defaultLimit = 12, maxLimit = 100),
+        )
+        return QueryCounter.count()
+    }
+
+    private fun warmJourneyEndpoint() {
+        mockMvc
+            .get("/api/archive/me/journey?limit=1") {
+                with(user("member5@example.com"))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+            }.andExpect {
+                status { isOk() }
+            }
+    }
+
+    private fun measuredJourneyEndpointQueries(
+        limit: Int,
+        expectedItems: Int,
+    ): Int {
+        QueryCounter.reset()
+        mockMvc
+            .get("/api/archive/me/journey?limit=$limit") {
+                with(user("member5@example.com"))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items.length()") { value(expectedItems) }
+            }
+        return QueryCounter.count()
     }
 
     private fun insertOpenSessionForDeletionPreview() {

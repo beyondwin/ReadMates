@@ -4,6 +4,7 @@ import com.readmates.archive.application.port.`in`.GetArchiveSessionDetailUseCas
 import com.readmates.archive.application.port.`in`.ListArchiveSessionsUseCase
 import com.readmates.archive.application.port.`in`.ListMyArchiveQuestionsUseCase
 import com.readmates.archive.application.port.`in`.ListMyArchiveReviewsUseCase
+import com.readmates.archive.application.port.`in`.ListMyJourneyUseCase
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.springframework.http.HttpStatus
@@ -22,6 +23,7 @@ class ArchiveController(
     private val getArchiveSessionDetailUseCase: GetArchiveSessionDetailUseCase,
     private val listMyArchiveQuestionsUseCase: ListMyArchiveQuestionsUseCase,
     private val listMyArchiveReviewsUseCase: ListMyArchiveReviewsUseCase,
+    private val listMyJourneyUseCase: ListMyJourneyUseCase,
 ) {
     @GetMapping("/sessions")
     fun sessions(
@@ -62,6 +64,18 @@ class ArchiveController(
         listMyArchiveReviewsUseCase
             .listMyReviews(currentMember, PageRequest.cursor(limit, cursor, defaultLimit = 30, maxLimit = 100))
             .mapItems { it.toWebDto() }
+
+    @GetMapping("/me/journey")
+    fun myJourney(
+        currentMember: CurrentMember,
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) cursor: String?,
+    ): MyJourneyPageResponse =
+        listMyJourneyUseCase
+            .listMyJourney(
+                currentMember,
+                PageRequest.cursor(limit, cursor, defaultLimit = 12, maxLimit = 100),
+            ).toWebDto()
 
     private fun parseSessionId(sessionId: String): UUID =
         runCatching { UUID.fromString(sessionId) }

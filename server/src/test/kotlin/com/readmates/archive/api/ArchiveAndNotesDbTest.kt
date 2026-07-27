@@ -1,8 +1,12 @@
 package com.readmates.archive.api
 
+import com.jayway.jsonpath.JsonPath
 import com.readmates.auth.application.service.AuthSessionService
+import com.readmates.auth.domain.MembershipRole
+import com.readmates.auth.domain.MembershipStatus
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
+import org.assertj.core.api.Assertions.assertThat
 import org.hamcrest.Matchers.empty
 import org.hamcrest.Matchers.emptyOrNullString
 import org.hamcrest.Matchers.equalTo
@@ -13,6 +17,7 @@ import org.hamcrest.Matchers.hasItems
 import org.hamcrest.Matchers.not
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -379,6 +384,236 @@ class ArchiveAndNotesDbTest(
             }.andExpect {
                 status { isForbidden() }
             }
+    }
+
+    @Test
+    @Sql(
+        statements = [
+            CLEANUP_MY_ARCHIVE_LONG_REVIEW_SQL,
+            INSERT_MY_ARCHIVE_LONG_REVIEW_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            CLEANUP_MY_ARCHIVE_LONG_REVIEW_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `personal journey keeps whole-summary metadata exact across limit one cursor pages`() {
+        mockMvc
+            .get("/api/archive/me/journey") {
+                param("limit", "1")
+                with(user("member5@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items.length()") { value(1) }
+                jsonPath("$.items[0].sessionId") { value("00000000-0000-0000-0000-000000000307") }
+                jsonPath("$.items[0].readingProgress") { value(null) }
+                jsonPath("$.summary.attendedSessionCount") { value(4) }
+                jsonPath("$.summary.completedReadingCount") { value(4) }
+                jsonPath("$.summary.questionCount") { value(9) }
+                jsonPath("$.summary.reviewCount") { value(1) }
+                jsonPath("$.summary.readableFeedbackDocumentCount") { value(7) }
+                jsonPath("$.nextCursor") { exists() }
+            }
+
+        assertThat(collectJourneySessionIds())
+            .containsExactly(
+                "00000000-0000-0000-0000-000000000307",
+                "00000000-0000-0000-0000-000000000306",
+                "00000000-0000-0000-0000-000000000305",
+                "00000000-0000-0000-0000-000000000304",
+                "00000000-0000-0000-0000-000000000303",
+                "00000000-0000-0000-0000-000000000302",
+                "00000000-0000-0000-0000-000000000301",
+            ).doesNotHaveDuplicates()
+    }
+
+    @Test
+    @Sql(
+        statements = [
+            CLEANUP_MY_ARCHIVE_LONG_REVIEW_SQL,
+            INSERT_MY_ARCHIVE_LONG_REVIEW_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            CLEANUP_MY_ARCHIVE_LONG_REVIEW_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `personal journey exposes only metadata and excludes private archive content`() {
+        val fullResponse =
+            mockMvc
+                .get("/api/archive/me/journey") {
+                    param("limit", "12")
+                    with(user("member5@example.com"))
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.items.length()") { value(7) }
+                    jsonPath("$.items[*].feedbackDocument.title") { doesNotExist() }
+                    jsonPath("$.items[*].feedbackDocument.uploadedAt") { doesNotExist() }
+                    jsonPath("$.items[*].feedbackDocument.content") { doesNotExist() }
+                    jsonPath("$.items[*].questionText") { doesNotExist() }
+                    jsonPath("$.items[*].reviewBody") { doesNotExist() }
+                    jsonPath("$.items[*].memberName") { doesNotExist() }
+                    jsonPath("$.items[*].email") { doesNotExist() }
+                }.andReturn()
+                .response
+                .contentAsString
+
+        assertThat(fullResponse)
+            .doesNotContain(
+                MY_ARCHIVE_LONG_REVIEW_TEXT,
+                "삶에서 진짜 실패란 무엇일까요?",
+                "이 회차는 책의 핵심 개념인 소득 4단계",
+                "김호스트",
+                "host@example.com",
+            )
+    }
+
+    @Test
+    @Sql(
+        statements = [
+            CLEANUP_VISIBILITY_ACTOR_MATRIX_SQL,
+            INSERT_VISIBILITY_ACTOR_MATRIX_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            CLEANUP_VISIBILITY_ACTOR_MATRIX_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `personal journey is club scoped and includes closed and published member-visible activity only`() {
+        mockMvc
+            .get("/api/archive/me/journey") {
+                param("limit", "100")
+                header("X-Readmates-Club-Slug", "reading-sai")
+                with(user("member5@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items[*].sessionId") {
+                    value(
+                        hasItems(
+                            "00000000-0000-0000-0000-0000000092b1",
+                            "00000000-0000-0000-0000-0000000092b2",
+                            "00000000-0000-0000-0000-000000000306",
+                        ),
+                    )
+                }
+                jsonPath("$.items[*].sessionId") {
+                    value(
+                        not(
+                            hasItems(
+                                "00000000-0000-0000-0000-0000000092b3",
+                                "00000000-0000-0000-0000-0000000092bb",
+                            ),
+                        ),
+                    )
+                }
+            }
+
+        mockMvc
+            .get("/api/archive/me/journey") {
+                param("limit", "100")
+                header("X-Readmates-Club-Slug", "sample-book-club")
+                with(user("member5@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items[*].sessionId") { value(hasItem("00000000-0000-0000-0000-0000000092bb")) }
+                jsonPath("$.items[*].sessionId") {
+                    value(
+                        not(
+                            hasItems(
+                                "00000000-0000-0000-0000-0000000092b1",
+                                "00000000-0000-0000-0000-0000000092b2",
+                                "00000000-0000-0000-0000-0000000092b3",
+                            ),
+                        ),
+                    )
+                }
+            }
+    }
+
+    private fun collectJourneySessionIds(): List<String> {
+        val collectedSessionIds = mutableListOf<String>()
+        var cursor: String? = null
+        var pageCount = 0
+        do {
+            val response =
+                mockMvc
+                    .get("/api/archive/me/journey") {
+                        param("limit", "1")
+                        cursor?.let { param("cursor", it) }
+                        with(user("member5@example.com"))
+                    }.andExpect {
+                        status { isOk() }
+                        jsonPath("$.items.length()") { value(1) }
+                    }.andReturn()
+                    .response
+                    .contentAsString
+            collectedSessionIds += JsonPath.read<List<String>>(response, "$.items[*].sessionId")
+            cursor = JsonPath.read<String?>(response, "$.nextCursor")
+            pageCount += 1
+            assertThat(pageCount).isLessThanOrEqualTo(7)
+        } while (cursor != null)
+        assertNull(cursor)
+        return collectedSessionIds
+    }
+
+    @Test
+    fun `personal journey follows member browsing access and keeps non-active feedback locked`() {
+        listOf("member5@example.com", "host@example.com").forEach { activeEmail ->
+            mockMvc
+                .get("/api/archive/me/journey") {
+                    with(user(activeEmail))
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.items.length()") { value(7) }
+                    jsonPath("$.items[*].feedbackDocument.readable") { value(everyItem(equalTo(true))) }
+                    jsonPath("$.summary.readableFeedbackDocumentCount") { value(7) }
+                }
+        }
+
+        listOf(MembershipStatus.VIEWER, MembershipStatus.SUSPENDED).forEach { status ->
+            val cookie =
+                membershipSessionCookie(
+                    email = "journey.${status.name.lowercase()}.${UUID.randomUUID()}@example.com",
+                    status = status,
+                )
+            mockMvc
+                .get("/api/archive/me/journey") {
+                    cookie(cookie)
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.items.length()") { value(7) }
+                    jsonPath("$.items[*].feedbackDocument.available") { value(everyItem(equalTo(true))) }
+                    jsonPath("$.items[*].feedbackDocument.readable") { value(everyItem(equalTo(false))) }
+                    jsonPath("$.items[*].feedbackDocument.lockedReason") {
+                        value(everyItem(equalTo("ACTIVE_MEMBERSHIP_REQUIRED")))
+                    }
+                    jsonPath("$.summary.readableFeedbackDocumentCount") { value(0) }
+                }
+        }
+
+        listOf(MembershipStatus.INVITED, MembershipStatus.LEFT, MembershipStatus.INACTIVE).forEach { status ->
+            val cookie =
+                membershipSessionCookie(
+                    email = "journey.${status.name.lowercase()}.${UUID.randomUUID()}@example.com",
+                    status = status,
+                )
+            mockMvc
+                .get("/api/archive/me/journey") {
+                    header("X-Readmates-Club-Slug", "reading-sai")
+                    cookie(cookie)
+                }.andExpect {
+                    status { isUnauthorized() }
+                }
+        }
     }
 
     @Test
@@ -1109,19 +1344,22 @@ class ArchiveAndNotesDbTest(
             where session_id in (
               '00000000-0000-0000-0000-0000000092b1',
               '00000000-0000-0000-0000-0000000092b2',
-              '00000000-0000-0000-0000-0000000092b3'
+              '00000000-0000-0000-0000-0000000092b3',
+              '00000000-0000-0000-0000-0000000092bb'
             );
             delete from session_participants
             where session_id in (
               '00000000-0000-0000-0000-0000000092b1',
               '00000000-0000-0000-0000-0000000092b2',
-              '00000000-0000-0000-0000-0000000092b3'
+              '00000000-0000-0000-0000-0000000092b3',
+              '00000000-0000-0000-0000-0000000092bb'
             );
             delete from sessions
             where id in (
               '00000000-0000-0000-0000-0000000092b1',
               '00000000-0000-0000-0000-0000000092b2',
-              '00000000-0000-0000-0000-0000000092b3'
+              '00000000-0000-0000-0000-0000000092b3',
+              '00000000-0000-0000-0000-0000000092bb'
             );
             delete from memberships
             where id = '00000000-0000-0000-0000-0000000092b9';
@@ -1157,7 +1395,7 @@ class ArchiveAndNotesDbTest(
                 '00000000-0000-0000-0000-000000000001',
                 922, '922회차 · 멤버 actor matrix', '멤버 actor matrix 책', '검증 저자',
                 '2026-12-22', '20:00:00', '22:00:00', '온라인',
-                '2026-12-21 14:59:00.000000', 'PUBLISHED', 'MEMBER'
+                '2026-12-21 14:59:00.000000', 'CLOSED', 'MEMBER'
               ),
               (
                 '00000000-0000-0000-0000-0000000092b3',
@@ -1165,6 +1403,13 @@ class ArchiveAndNotesDbTest(
                 923, '923회차 · 호스트 actor matrix', '호스트 actor matrix 책', '검증 저자',
                 '2026-12-23', '20:00:00', '22:00:00', '온라인',
                 '2026-12-22 14:59:00.000000', 'CLOSED', 'HOST_ONLY'
+              ),
+              (
+                '00000000-0000-0000-0000-0000000092bb',
+                '00000000-0000-0000-0000-000000000002',
+                924, '924회차 · 다른 클럽 actor matrix', '다른 클럽 actor matrix 책', '검증 저자',
+                '2026-12-24', '20:00:00', '22:00:00', '온라인',
+                '2026-12-23 14:59:00.000000', 'PUBLISHED', 'PUBLIC'
               );
             insert into public_session_publications (
               id, club_id, session_id, public_summary, is_public, visibility, published_at
@@ -1212,6 +1457,13 @@ class ArchiveAndNotesDbTest(
                 '00000000-0000-0000-0000-000000000001',
                 '00000000-0000-0000-0000-0000000092b3',
                 '00000000-0000-0000-0000-000000000206',
+                'GOING', 'ATTENDED', 'ACTIVE'
+              ),
+              (
+                '00000000-0000-0000-0000-0000000092bc',
+                '00000000-0000-0000-0000-000000000002',
+                '00000000-0000-0000-0000-0000000092bb',
+                '00000000-0000-0000-0000-0000000092b9',
                 'GOING', 'ATTENDED', 'ACTIVE'
               );
         """
@@ -2057,7 +2309,13 @@ class ArchiveAndNotesDbTest(
         """
     }
 
-    private fun viewerSessionCookie(email: String): Cookie {
+    private fun viewerSessionCookie(email: String): Cookie = membershipSessionCookie(email, MembershipStatus.VIEWER)
+
+    private fun membershipSessionCookie(
+        email: String,
+        status: MembershipStatus,
+        role: MembershipRole = MembershipRole.MEMBER,
+    ): Cookie {
         val userId = UUID.randomUUID().toString()
         val membershipId = UUID.randomUUID().toString()
         jdbcTemplate.update(
@@ -2073,10 +2331,13 @@ class ArchiveAndNotesDbTest(
         jdbcTemplate.update(
             """
             insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
-            values (?, '00000000-0000-0000-0000-000000000001', ?, 'MEMBER', 'VIEWER', null, 'Viewer')
+            values (?, '00000000-0000-0000-0000-000000000001', ?, ?, ?, null, ?)
             """.trimIndent(),
             membershipId,
             userId,
+            role.name,
+            status.name,
+            "Journey-${userId.takeLast(8)}",
         )
         createdMembershipIds += membershipId
         val issuedSession =
