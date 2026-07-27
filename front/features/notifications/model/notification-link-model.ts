@@ -8,8 +8,6 @@ export type NotificationEventType =
 
 export type MemberNotificationLinkView = {
   href: string;
-  primaryActionLabel: "Open" | "View record" | "View feedback" | "Next reading";
-  reflectionLabel: "Past session reflection" | null;
   state?: ReadmatesReturnState;
 };
 
@@ -33,8 +31,6 @@ export function getMemberNotificationLinkView(input: MemberNotificationLinkInput
   if (isFeedbackReflection(input.eventType, path)) {
     return {
       href: normalizeFeedbackPath(path),
-      primaryActionLabel: "View feedback",
-      reflectionLabel: "Past session reflection",
       state: reflectionState,
     };
   }
@@ -42,21 +38,19 @@ export function getMemberNotificationLinkView(input: MemberNotificationLinkInput
   if (isSessionReflection(input.eventType, path)) {
     return {
       href: normalizeSessionPath(path),
-      primaryActionLabel: "View record",
-      reflectionLabel: "Past session reflection",
       state: reflectionState,
     };
   }
 
   if (path.startsWith("/sessions/")) {
-    return { href: normalizeSessionPath(path), primaryActionLabel: "Open", reflectionLabel: null };
+    return { href: normalizeSessionPath(path) };
   }
 
   if (path.startsWith("/notes")) {
-    return { href: `/app${path}`, primaryActionLabel: "Next reading", reflectionLabel: null };
+    return { href: `/app${path}` };
   }
 
-  return { href: path, primaryActionLabel: "Open", reflectionLabel: null };
+  return { href: path };
 }
 
 function normalizeSafePath(value: string) {
@@ -115,5 +109,5 @@ function normalizeFeedbackPath(path: string) {
 }
 
 function fallback(): MemberNotificationLinkView {
-  return { href: "/app/notifications", primaryActionLabel: "Open", reflectionLabel: null };
+  return { href: "/app/notifications" };
 }
