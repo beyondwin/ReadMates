@@ -39,6 +39,7 @@ export function HostNotificationOperationsRail({
 }: HostNotificationOperationsRailProps) {
   const [submitting, setSubmitting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [failedTarget, setFailedTarget] = useState<boolean | null>(null);
   const metrics = [
     { label: "대기", value: Math.max(0, summary.pending), tone: summary.pending > 0 ? "accent" : "default" },
     { label: "실패", value: Math.max(0, summary.failed), tone: summary.failed > 0 ? "warn" : "default" },
@@ -48,25 +49,30 @@ export function HostNotificationOperationsRail({
   const enabled = policy?.sessionReminderEnabled ?? false;
   const busy = policyPending || policyLoading || submitting;
   const visibleError = policyError ?? policyLoadError ?? localError;
-  const policyStatus = policyLoading
+  const policyState = policyLoading
     ? "불러오는 중"
     : !policy
-      ? "정책 확인 필요"
+      ? "상태 확인 필요"
       : policyPending || submitting
         ? "저장 중"
         : enabled
-          ? "모임 전날 · 켜짐"
-          : "모임 전날 · 기본 꺼짐";
+          ? "켜짐"
+          : "꺼짐";
+  const policyDescription = enabled
+    ? "예정된 모임의 리마인더가 전날 자동 발송됩니다."
+    : "예정된 모임에 자동 알림을 보내지 않습니다.";
 
   const handlePolicyChange = async (nextEnabled: boolean) => {
     if (!policy || policyPending || policyLoading || submitting) return;
 
     setSubmitting(true);
     setLocalError(null);
+    setFailedTarget(null);
     try {
       await onPolicyChange(nextEnabled);
     } catch {
-      setLocalError("리마인더 정책을 저장하지 못했습니다. 다시 시도해 주세요.");
+      setFailedTarget(nextEnabled);
+      setLocalError("리마인더 정책을 저장하지 못했습니다.");
     } finally {
       setSubmitting(false);
     }
@@ -80,37 +86,31 @@ export function HostNotificationOperationsRail({
     >
       <div className="rm-host-notifications-rail__grid">
         <div className="rm-host-notifications-rail__cell rm-host-notifications-rail__policy">
-          <div className="eyebrow">자동 리마인더</div>
-          <div className="small" style={{ color: "var(--text-3)", marginTop: 4 }}>
-            {policyStatus}
+          <div className="rm-host-notifications-policy">
+            <div className="rm-host-notifications-policy__copy">
+              <div className="eyebrow">자동화</div>
+              <strong>모임 전날 자동 리마인더</strong>
+              <p>{policy ? policyDescription : "현재 설정을 확인한 뒤 변경할 수 있습니다."}</p>
+            </div>
+            <div className="rm-host-notifications-policy__control">
+              <span aria-live="polite">{policyState}</span>
+              <label className="rm-host-notifications-policy__switch">
+                <input
+                  id="host-session-reminder-policy"
+                  type="checkbox"
+                  role="switch"
+                  aria-label="모임 전날 자동 리마인더"
+                  aria-describedby={visibleError ? policyErrorId : undefined}
+                  checked={enabled}
+                  disabled={!policy || busy}
+                  onChange={(event) => void handlePolicyChange(event.currentTarget.checked)}
+                />
+                <span aria-hidden="true" className="rm-host-notifications-policy__track">
+                  <span className="rm-host-notifications-policy__thumb" />
+                </span>
+              </label>
+            </div>
           </div>
-          <label
-            htmlFor="host-session-reminder-policy"
-            className="surface-quiet"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-              marginTop: 14,
-              padding: "12px 14px",
-              cursor: policy && !busy ? "pointer" : "not-allowed",
-            }}
-          >
-            <span className="small" style={{ fontWeight: 650 }}>
-              모임 전날 자동 리마인더
-            </span>
-            <input
-              id="host-session-reminder-policy"
-              type="checkbox"
-              aria-label="모임 전날 자동 리마인더"
-              aria-describedby={visibleError ? policyErrorId : undefined}
-              checked={enabled}
-              disabled={!policy || busy}
-              onChange={(event) => void handlePolicyChange(event.currentTarget.checked)}
-              style={{ width: 20, height: 20, margin: 0, flex: "0 0 auto", accentColor: "var(--accent)" }}
-            />
-          </label>
           {visibleError ? (
             <div style={{ marginTop: 10 }}>
               <p id={policyErrorId} role="alert" className="small" style={{ color: "var(--danger)", margin: 0 }}>
@@ -124,6 +124,16 @@ export function HostNotificationOperationsRail({
                   style={{ marginTop: 8 }}
                 >
                   정책 다시 불러오기
+                </button>
+              ) : null}
+              {failedTarget !== null ? (
+                <button
+                  type="button"
+                  className="btn btn-quiet btn-sm"
+                  onClick={() => void handlePolicyChange(failedTarget)}
+                  style={{ marginTop: 8 }}
+                >
+                  다시 시도
                 </button>
               ) : null}
             </div>

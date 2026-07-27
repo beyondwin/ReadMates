@@ -5050,6 +5050,96 @@
   border-block-end: 1px solid var(--line);
 }
 
+.rm-host-notifications-policy {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+}
+
+.rm-host-notifications-policy__copy strong,
+.rm-host-notifications-policy__copy p {
+  display: block;
+  margin: 4px 0 0;
+}
+
+.rm-host-notifications-policy__copy p {
+  color: var(--text-3);
+}
+
+.rm-host-notifications-policy__control {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rm-host-notifications-policy__switch {
+  position: relative;
+  display: inline-flex;
+  width: 48px;
+  height: 28px;
+  flex: 0 0 auto;
+}
+
+.rm-host-notifications-policy__switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.rm-host-notifications-policy__track {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-sub);
+  transition: background-color var(--motion-fast) var(--ease-standard-refined);
+}
+
+.rm-host-notifications-policy__thumb {
+  display: block;
+  width: 20px;
+  height: 20px;
+  margin: 3px;
+  border-radius: 50%;
+  background: var(--text-3);
+  transition: transform var(--motion-fast) var(--ease-standard-refined);
+}
+
+.rm-host-notifications-policy__switch input:checked + .rm-host-notifications-policy__track {
+  border-color: var(--accent);
+  background: color-mix(in oklch, var(--accent) 28%, var(--bg-sub));
+}
+
+.rm-host-notifications-policy__switch input:checked + .rm-host-notifications-policy__track
+  .rm-host-notifications-policy__thumb {
+  transform: translateX(20px);
+  background: var(--accent);
+}
+
+.rm-host-notifications-policy__switch input:focus-visible + .rm-host-notifications-policy__track {
+  outline: 3px solid color-mix(in oklch, var(--accent) 28%, transparent);
+  outline-offset: 3px;
+}
+
+.rm-host-notifications-policy__switch input:disabled {
+  cursor: not-allowed;
+}
+
+.rm-host-notifications-policy__switch input:disabled + .rm-host-notifications-policy__track {
+  opacity: 0.56;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rm-host-notifications-policy__track,
+  .rm-host-notifications-policy__thumb {
+    transition: none;
+  }
+}
+
 .rm-notification-dispatch-row {
   display: grid;
   grid-template-columns: 70px minmax(0, 1.5fr) minmax(150px, 1fr) 110px auto;

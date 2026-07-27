@@ -44,8 +44,8 @@ describe("HostNotificationOperationsRail", () => {
     expect(
       grid?.querySelector(".rm-host-notifications-rail__policy"),
     ).toHaveClass("rm-host-notifications-rail__cell");
-    expect(within(rail).getByText("자동 리마인더")).toBeInTheDocument();
-    expect(within(rail).getByText("모임 전날 · 기본 꺼짐")).toBeInTheDocument();
+    expect(within(rail).getByText("자동화")).toBeInTheDocument();
+    expect(within(rail).getByText("꺼짐")).toBeInTheDocument();
     expect(within(rail).getByText("대기")).toBeInTheDocument();
     expect(within(rail).getByText("실패")).toBeInTheDocument();
     expect(within(rail).getByText("중단")).toBeInTheDocument();
@@ -73,18 +73,34 @@ describe("HostNotificationOperationsRail", () => {
     expect(screen.queryByRole("button", { name: /처리/ })).not.toBeInTheDocument();
   });
 
-  it("renders the server-confirmed enabled policy value", () => {
+  it("renders the reminder policy as a labeled switch with explicit off copy", () => {
+    renderRail();
+
+    const control = screen.getByRole("switch", { name: "모임 전날 자동 리마인더" });
+    expect(control).not.toBeChecked();
+    expect(screen.getByText("꺼짐")).toBeInTheDocument();
+    expect(
+      screen.getByText("예정된 모임에 자동 알림을 보내지 않습니다."),
+    ).toBeInTheDocument();
+  });
+
+  it("renders explicit on copy from the server-confirmed policy", () => {
     renderRail({
       policy: { sessionReminderEnabled: true, updatedAt: "2026-07-25T09:00:00Z" },
     });
 
-    expect(screen.getByRole("checkbox", { name: "모임 전날 자동 리마인더" })).toBeChecked();
+    expect(screen.getByRole("switch", { name: "모임 전날 자동 리마인더" }))
+      .toBeChecked();
+    expect(screen.getByText("켜짐")).toBeInTheDocument();
+    expect(
+      screen.getByText("예정된 모임의 리마인더가 전날 자동 발송됩니다."),
+    ).toBeInTheDocument();
   });
 
   it("disables the policy control while saving is pending", () => {
     renderRail({ policyPending: true });
 
-    expect(screen.getByRole("checkbox", { name: "모임 전날 자동 리마인더" })).toBeDisabled();
+    expect(screen.getByRole("switch", { name: "모임 전날 자동 리마인더" })).toBeDisabled();
   });
 
   it("does not present an unknown policy as off while loading", () => {
@@ -94,7 +110,7 @@ describe("HostNotificationOperationsRail", () => {
     });
 
     expect(screen.getByText("불러오는 중")).toBeInTheDocument();
-    expect(screen.queryByText("모임 전날 · 기본 꺼짐")).not.toBeInTheDocument();
+    expect(screen.queryByText("꺼짐")).not.toBeInTheDocument();
   });
 
   it("does not present a failed initial policy load as off", () => {
@@ -103,8 +119,8 @@ describe("HostNotificationOperationsRail", () => {
       policyLoadError: "정책을 불러오지 못했습니다.",
     });
 
-    expect(screen.getByText("정책 확인 필요")).toBeInTheDocument();
-    expect(screen.queryByText("모임 전날 · 기본 꺼짐")).not.toBeInTheDocument();
+    expect(screen.getByText("상태 확인 필요")).toBeInTheDocument();
+    expect(screen.queryByText("꺼짐")).not.toBeInTheDocument();
   });
 
   it("shows saving copy while waiting for server confirmation", async () => {
@@ -112,21 +128,37 @@ describe("HostNotificationOperationsRail", () => {
     const onPolicyChange = vi.fn(() => new Promise<unknown>(() => undefined));
     renderRail({ onPolicyChange });
 
-    await user.click(screen.getByRole("checkbox", { name: "모임 전날 자동 리마인더" }));
+    await user.click(screen.getByRole("switch", { name: "모임 전날 자동 리마인더" }));
 
     expect(screen.getByText("저장 중")).toBeInTheDocument();
-    expect(screen.queryByText("모임 전날 · 기본 꺼짐")).not.toBeInTheDocument();
+    expect(screen.queryByText("꺼짐")).not.toBeInTheDocument();
   });
 
   it("keeps the server-confirmed policy value when saving fails", async () => {
     const user = userEvent.setup();
     renderRail({ onPolicyChange: vi.fn().mockRejectedValue(new Error("save failed")) });
 
-    const reminder = screen.getByRole("checkbox", { name: "모임 전날 자동 리마인더" });
+    const reminder = screen.getByRole("switch", { name: "모임 전날 자동 리마인더" });
     await user.click(reminder);
 
     expect(await screen.findByRole("alert")).toHaveTextContent("저장하지 못했습니다");
     expect(reminder).not.toBeChecked();
+  });
+
+  it("retries the failed target without changing the confirmed value", async () => {
+    const user = userEvent.setup();
+    const onPolicyChange = vi.fn()
+      .mockRejectedValueOnce(new Error("save failed"))
+      .mockResolvedValueOnce(undefined);
+    renderRail({ onPolicyChange });
+
+    const control = screen.getByRole("switch", { name: "모임 전날 자동 리마인더" });
+    await user.click(control);
+    expect(control).not.toBeChecked();
+    await user.click(await screen.findByRole("button", { name: "다시 시도" }));
+
+    expect(onPolicyChange).toHaveBeenNthCalledWith(1, true);
+    expect(onPolicyChange).toHaveBeenNthCalledWith(2, true);
   });
 
   it("retries a failed initial policy load", async () => {
