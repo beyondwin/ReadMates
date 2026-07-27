@@ -118,9 +118,6 @@ export function MemberNotificationsRoute() {
       pendingReadIds={pendingReadIds}
       markAllReadPending={markAllReadPending}
       actionError={actionError}
-      onMarkRead={(id) => {
-        void markRead(id);
-      }}
       onMarkAllRead={() => {
         void markAllRead();
       }}

@@ -4812,6 +4812,216 @@
   }
 }
 
+.rm-member-notifications-page {
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+.rm-member-notifications-page__body {
+  max-width: 880px;
+  padding-top: 28px;
+  padding-bottom: 72px;
+}
+
+.rm-member-notifications-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 4px;
+}
+
+.rm-member-notifications-header__eyebrow {
+  color: var(--muted);
+  font-family: var(--f-mono);
+  font-feature-settings: "zero", "cv01";
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.rm-member-notifications-header__title {
+  margin: 6px 0 0;
+  font-size: clamp(30px, 4vw, 40px);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+}
+
+.rm-member-notifications-header__summary {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.rm-member-notifications-header__read-all,
+.rm-member-notifications-page__load-more {
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-weight: 700;
+  text-underline-offset: 3px;
+}
+
+.rm-member-notifications-header__read-all:disabled,
+.rm-member-notifications-page__load-more:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.rm-member-notifications-page__error {
+  margin: 0 4px 12px;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.rm-member-notifications-list {
+  display: grid;
+  border-block: 1px solid var(--line);
+}
+
+.rm-member-notifications-list__item {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 76px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.rm-member-notifications-list__item:last-child {
+  border-bottom: 0;
+}
+
+.rm-member-notifications-list__item:hover {
+  background: var(--bg-sub);
+}
+
+.rm-member-notifications-list__item:focus-visible,
+.rm-member-notifications-header__read-all:focus-visible,
+.rm-member-notifications-page__load-more:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.rm-member-notifications-list__item[aria-busy="true"] {
+  cursor: progress;
+}
+
+.rm-member-notifications-list__unread-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.rm-member-notifications-list__item[data-unread="true"]
+  .rm-member-notifications-list__unread-dot {
+  background: var(--accent);
+}
+
+.rm-member-notifications-list__content,
+.rm-member-notifications-list__meta,
+.rm-member-notifications-list__title,
+.rm-member-notifications-list__copy {
+  min-width: 0;
+}
+
+.rm-member-notifications-list__content {
+  display: grid;
+  gap: 4px;
+}
+
+.rm-member-notifications-list__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.rm-member-notifications-list__category {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.rm-member-notifications-list__title {
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  line-height: 1.3;
+}
+
+.rm-member-notifications-list__item[data-unread="true"]
+  .rm-member-notifications-list__title {
+  font-weight: 800;
+}
+
+.rm-member-notifications-list__copy {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.rm-member-notifications-list__arrow {
+  color: var(--muted);
+  font-size: 22px;
+}
+
+.rm-member-notifications-list__empty {
+  padding: 28px 4px;
+}
+
+.rm-member-notifications-list__empty-title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.rm-member-notifications-list__empty-copy {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.rm-member-notifications-page__load-more {
+  display: block;
+  margin: 12px auto 0;
+}
+
+@media (max-width: 600px) {
+  .rm-member-notifications-page__body {
+    padding-top: 12px;
+    padding-bottom: calc(72px + var(--m-safe-bottom));
+  }
+
+  .rm-member-notifications-header {
+    align-items: flex-end;
+    padding: 16px 0 12px;
+  }
+
+  .rm-member-notifications-header__title {
+    font-size: 30px;
+  }
+
+  .rm-member-notifications-list__item {
+    min-height: 76px;
+    padding: 12px 0;
+  }
+
+  .rm-member-notifications-list__copy {
+    font-size: 13px;
+  }
+}
+
 .rm-host-notifications-page {
   min-height: 100vh;
   background: var(--bg);

@@ -137,62 +137,36 @@ describe("MemberNotificationsPage", () => {
       <MemberNotificationsPage
         unreadCount={1}
         items={[unreadNotification]}
-        onMarkRead={() => undefined}
         onMarkAllRead={() => undefined}
       />,
     );
 
     expect(screen.getByText("알림")).toBeInTheDocument();
     expect(screen.getByText("다음 책이 공개되었습니다")).toBeInTheDocument();
-    expect(screen.getByText("읽지 않은 알림 1개")).toBeInTheDocument();
+    expect(screen.getByText("새 알림 1개")).toBeInTheDocument();
   });
 
-  it("uses product labels and row-level navigation affordance", () => {
-    render(
-      <MemberNotificationsPage
-        unreadCount={1}
-        items={[{ ...unreadNotification, eventType: "SESSION_REMINDER_DUE", title: "내일 모임이 있습니다" }]}
-        onMarkRead={() => undefined}
-        onMarkAllRead={() => undefined}
-      />,
-    );
-
-    expect(screen.getByText("모임 전날")).toBeInTheDocument();
-    expect(screen.getByText("읽지 않음")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /내일 모임이 있습니다/ })).toBeInTheDocument();
-  });
-
-  it("opens unread notification from the row body without triggering read button clicks", async () => {
+  it("uses the full unread row as the only individual action", async () => {
     const user = userEvent.setup();
     const onOpenNotification = vi.fn();
-    const onMarkRead = vi.fn();
-    window.history.pushState({}, "", "/clubs/reading-sai/app/notifications");
 
     render(
       <MemberNotificationsPage
         unreadCount={1}
-        items={[
-          {
-            ...unreadNotification,
-            id: "notification-1",
-            body: "알림 본문",
-          },
-        ]}
+        items={[unreadNotification]}
         onOpenNotification={onOpenNotification}
-        onMarkRead={onMarkRead}
-        onMarkAllRead={() => undefined}
+        onMarkAllRead={vi.fn()}
       />,
     );
 
-    await user.click(screen.getByText("알림 본문"));
+    await user.click(screen.getByRole("link", {
+      name: "읽지 않음 · 다음 책이 공개되었습니다 열기",
+    }));
     expect(onOpenNotification).toHaveBeenCalledWith(
-      "notification-1",
-      expect.stringContaining("/clubs/reading-sai/app"),
+      unreadNotification.id,
+      "/app/sessions/00000000-0000-0000-0000-000000000002",
     );
-
-    await user.click(screen.getByRole("button", { name: "읽음" }));
-    expect(onMarkRead).toHaveBeenCalledWith("notification-1");
-    expect(onOpenNotification).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: "읽음" })).toBeNull();
   });
 
   it("keeps notification deep links inside the scoped app route", () => {
@@ -201,7 +175,6 @@ describe("MemberNotificationsPage", () => {
         <MemberNotificationsPage
           unreadCount={1}
           items={[unreadNotification]}
-          onMarkRead={() => undefined}
           onMarkAllRead={() => undefined}
         />
       </MemoryRouter>,
@@ -219,7 +192,6 @@ describe("MemberNotificationsPage", () => {
         <MemberNotificationsPage
           unreadCount={1}
           items={[scopedUnreadNotification]}
-          onMarkRead={() => undefined}
           onMarkAllRead={() => undefined}
         />
       </MemoryRouter>,
@@ -231,7 +203,36 @@ describe("MemberNotificationsPage", () => {
     );
   });
 
-  it("renders pending read actions and route action failures from props", () => {
+  it("keeps a read notification as a native scoped link", () => {
+    const onOpenNotification = vi.fn();
+
+    render(
+      <MemoryRouter initialEntries={["/clubs/reading-sai/app/notifications"]}>
+        <MemberNotificationsPage
+          unreadCount={0}
+          items={[{
+            ...scopedUnreadNotification,
+            readAt: "2026-04-29T01:00:00Z",
+          }]}
+          onOpenNotification={onOpenNotification}
+          onMarkAllRead={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    const row = screen.getByRole("link", {
+      name: "다음 책이 공개되었습니다 열기",
+    });
+    expect(row).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/sessions/00000000-0000-0000-0000-000000000002",
+    );
+    expect(row).toHaveAttribute("data-unread", "false");
+    expect(row).not.toHaveAttribute("aria-busy");
+    expect(onOpenNotification).not.toHaveBeenCalled();
+  });
+
+  it("exposes pending and failure states without a standalone read button", () => {
     render(
       <MemberNotificationsPage
         unreadCount={1}
@@ -239,14 +240,17 @@ describe("MemberNotificationsPage", () => {
         pendingReadIds={new Set([unreadNotification.id])}
         markAllReadPending
         actionError="알림을 읽음 처리하지 못했습니다. 다시 시도해 주세요."
-        onMarkRead={() => undefined}
-        onMarkAllRead={() => undefined}
+        onMarkAllRead={vi.fn()}
       />,
     );
 
-    expect(screen.getByRole("button", { name: "읽음 처리 중" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "모두 읽음 처리 중" })).toBeDisabled();
-    expect(screen.getByRole("alert")).toHaveTextContent("알림을 읽음 처리하지 못했습니다. 다시 시도해 주세요.");
+    expect(screen.getByRole("link", {
+      name: "읽지 않음 · 다음 책이 공개되었습니다 열기",
+    })).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("button", { name: "읽음 처리 중…" })).toBeDisabled();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "알림을 읽음 처리하지 못했습니다. 다시 시도해 주세요.",
+    );
   });
 
   it("marks an unread notification read before following its primary link", async () => {
@@ -261,6 +265,22 @@ describe("MemberNotificationsPage", () => {
     expect(await screen.findByText("destination /app/sessions/00000000-0000-0000-0000-000000000002")).toBeInTheDocument();
   });
 
+  it("keeps the user in the inbox when opening an unread row fails", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(memberNotificationsActions, "markRead")
+      .mockRejectedValue(new Error("network failed"));
+
+    const { router } = renderMemberNotificationsRoute();
+    await user.click(await screen.findByRole("link", {
+      name: "읽지 않음 · 다음 책이 공개되었습니다 열기",
+    }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "알림을 읽음 처리하지 못했습니다. 다시 시도해 주세요.",
+    );
+    expect(router.state.location.pathname).toBe("/app/notifications");
+  });
+
   it("disables duplicate item read mutations while one is pending", async () => {
     const user = userEvent.setup();
     let resolveMarkRead!: () => void;
@@ -272,16 +292,20 @@ describe("MemberNotificationsPage", () => {
 
     renderMemberNotificationsRoute();
 
-    const readButton = await screen.findByRole("button", { name: "읽음" });
-    await user.click(readButton);
+    const row = await screen.findByRole("link", {
+      name: "읽지 않음 · 다음 책이 공개되었습니다 열기",
+    });
+    await user.click(row);
 
-    await waitFor(() => expect(readButton).toBeDisabled());
-    await user.click(readButton);
+    await waitFor(() => expect(row).toHaveAttribute("aria-busy", "true"));
+    await user.click(row);
 
     expect(markRead).toHaveBeenCalledTimes(1);
 
     resolveMarkRead();
-    await waitFor(() => expect(readButton).not.toBeDisabled());
+    expect(await screen.findByText(
+      "destination /app/sessions/00000000-0000-0000-0000-000000000002",
+    )).toBeInTheDocument();
   });
 
   it("shows an accessible error when marking all notifications read fails", async () => {
@@ -294,6 +318,20 @@ describe("MemberNotificationsPage", () => {
 
     expect(markAllRead).toHaveBeenCalledTimes(1);
     expect(await screen.findByRole("alert")).toHaveTextContent("알림을 읽음 처리하지 못했습니다. 다시 시도해 주세요.");
+  });
+
+  it("renders the quiet empty state", () => {
+    render(
+      <MemberNotificationsPage
+        unreadCount={0}
+        items={[]}
+        onMarkAllRead={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("새 알림이 없습니다")).toBeVisible();
+    expect(screen.getByText("아직 받은 알림이 없습니다.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "모두 읽음" })).toBeDisabled();
   });
 
   it("disables duplicate read-all mutations while one is pending", async () => {
@@ -340,6 +378,6 @@ describe("MemberNotificationsPage", () => {
     expect(loadMore).toHaveBeenCalledWith(undefined, { limit: 50, cursor: "cursor-1" });
     expect(await screen.findByText("새 알림")).toBeInTheDocument();
     expect(screen.getByText("다음 책이 공개되었습니다")).toBeInTheDocument();
-    expect(screen.getByText("읽지 않은 알림 2개")).toBeInTheDocument();
+    expect(screen.getByText("새 알림 2개")).toBeInTheDocument();
   });
 });

@@ -28,9 +28,12 @@ interface MemberNotificationsPageProps {
   pendingReadIds?: ReadonlySet<string>;
   markAllReadPending?: boolean;
   actionError?: string | null;
-  onMarkRead: (id: string) => void;
   onMarkAllRead: () => void;
-  onOpenNotification?: (id: string, href: string, state?: ReadmatesReturnState) => void;
+  onOpenNotification?: (
+    id: string,
+    href: string,
+    state?: ReadmatesReturnState,
+  ) => void;
   onLoadMore?: () => void;
 }
 
@@ -59,11 +62,14 @@ function formatNotificationDate(value: string) {
 }
 
 function isPrimaryLinkActivation(event: MouseEvent<HTMLAnchorElement>) {
-  return event.button === 0 && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && event.currentTarget.target !== "_blank";
-}
-
-function isInteractiveTarget(target: EventTarget | null) {
-  return target instanceof HTMLElement && Boolean(target.closest("a,button,input,select,textarea"));
+  return (
+    event.button === 0 &&
+    !event.altKey &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.shiftKey &&
+    event.currentTarget.target !== "_blank"
+  );
 }
 
 export function MemberNotificationsPage({
@@ -75,7 +81,12 @@ export function MemberNotificationsPage({
     return <RouterAwareMemberNotificationsPage {...props} />;
   }
 
-  return <MemberNotificationsPageContent {...props} routePathname={globalThis.location?.pathname ?? ""} />;
+  return (
+    <MemberNotificationsPageContent
+      {...props}
+      routePathname={globalThis.location?.pathname ?? ""}
+    />
+  );
 }
 
 function RouterAwareMemberNotificationsPage(props: MemberNotificationsPageProps) {
@@ -92,191 +103,145 @@ function MemberNotificationsPageContent({
   pendingReadIds = EMPTY_PENDING_READ_IDS,
   markAllReadPending = false,
   actionError = null,
-  onMarkRead,
   onMarkAllRead,
   onOpenNotification,
   onLoadMore,
   routePathname,
 }: MemberNotificationsPageProps & { routePathname: string }) {
-  const unreadLabel = unreadCount > 0 ? `읽지 않은 알림 ${unreadCount}개` : "새 알림이 없습니다";
-  const readAllDisabled = unreadCount === 0 || markAllReadPending;
+  const unreadLabel =
+    unreadCount > 0 ? `새 알림 ${unreadCount}개` : "새 알림이 없습니다";
+  const readAllDisabled =
+    unreadCount === 0 || markAllReadPending || pendingReadIds.size > 0;
 
   return (
     <main className="rm-member-notifications-page">
-      <section className="container" style={{ paddingTop: 36, paddingBottom: 72 }}>
-        <header
-          className="rm-document-panel"
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: 18,
-            padding: "24px 26px",
-            marginBottom: 18,
-          }}
-        >
+      <section className="container rm-member-notifications-page__body">
+        <header className="rm-member-notifications-header">
           <div>
-            <div className="eyebrow">읽는사이 · 알림함</div>
-            <h1 className="display editorial" style={{ margin: "8px 0 8px", fontSize: "clamp(30px, 5vw, 48px)" }}>
-              알림
-            </h1>
-            <p className="body muted" style={{ margin: 0 }}>
+            <div className="rm-member-notifications-header__eyebrow">
+              읽는사이 · 알림
+            </div>
+            <h1 className="rm-member-notifications-header__title">알림</h1>
+            <p className="rm-member-notifications-header__summary">
               {unreadLabel}
             </p>
           </div>
-          <button type="button" className="btn btn-quiet btn-sm" onClick={onMarkAllRead} disabled={readAllDisabled}>
-            {markAllReadPending ? "모두 읽음 처리 중" : "모두 읽음"}
+          <button
+            type="button"
+            className="rm-member-notifications-header__read-all"
+            onClick={onMarkAllRead}
+            disabled={readAllDisabled}
+            aria-busy={markAllReadPending || undefined}
+          >
+            {markAllReadPending ? "읽음 처리 중…" : "모두 읽음"}
           </button>
         </header>
 
         {actionError ? (
-          <p role="alert" className="small" style={{ color: "var(--danger)", margin: "0 0 14px" }}>
+          <p role="alert" className="rm-member-notifications-page__error">
             {actionError}
           </p>
         ) : null}
 
-        <section className="surface" aria-label="알림 목록" style={{ padding: 6 }}>
+        <section
+          className="rm-member-notifications-list"
+          aria-label="알림 목록"
+        >
           {items.length === 0 ? (
-            <div className="surface-quiet" style={{ padding: "28px 24px" }}>
-              <p className="body" style={{ margin: 0, fontWeight: 700 }}>
+            <div className="rm-member-notifications-list__empty">
+              <p className="rm-member-notifications-list__empty-title">
                 아직 받은 알림이 없습니다.
               </p>
-              <p className="tiny muted" style={{ margin: "8px 0 0" }}>
+              <p className="rm-member-notifications-list__empty-copy">
                 책, 모임, 피드백 문서 알림이 이곳에 차곡차곡 쌓입니다.
               </p>
             </div>
           ) : (
-            <div style={{ display: "grid", gap: 6 }}>
-              {items.map((item) => {
-                const unread = item.readAt === null;
-                const linkView = getMemberNotificationLinkView({
-                  eventType: item.eventType,
-                  deepLinkPath: item.deepLinkPath,
-                });
-                const href = scopedAppLinkTarget(routePathname, linkView.href);
-                const state = linkView.state
-                  ? {
-                      ...linkView.state,
-                      readmatesReturnTo: scopedAppLinkTarget(routePathname, linkView.state.readmatesReturnTo),
-                    }
-                  : undefined;
-                const readPending = pendingReadIds.has(item.id) || markAllReadPending;
-                const openNotification = () => {
-                  if (state) {
-                    onOpenNotification?.(item.id, href, state);
-                    return;
+            items.map((item) => {
+              const unread = item.readAt === null;
+              const readPending =
+                pendingReadIds.has(item.id) || markAllReadPending;
+              const linkView = getMemberNotificationLinkView({
+                eventType: item.eventType,
+                deepLinkPath: item.deepLinkPath,
+              });
+              const href = scopedAppLinkTarget(routePathname, linkView.href);
+              const state = linkView.state
+                ? {
+                    ...linkView.state,
+                    readmatesReturnTo: scopedAppLinkTarget(
+                      routePathname,
+                      linkView.state.readmatesReturnTo,
+                    ),
                   }
+                : undefined;
+              const openNotification = () => {
+                if (state) {
+                  onOpenNotification?.(item.id, href, state);
+                  return;
+                }
 
-                  onOpenNotification?.(item.id, href);
-                };
+                onOpenNotification?.(item.id, href);
+              };
 
-                return (
-                  <article
-                    key={item.id}
-                    className="surface-quiet"
-                    data-unread={unread ? "true" : "false"}
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "4px minmax(0, 1fr) auto",
-                      alignItems: "center",
-                      gap: 16,
-                      padding: "18px 20px",
-                      borderColor: unread ? "var(--line-strong)" : undefined,
-                      background: unread ? "var(--bg)" : undefined,
-                    }}
-                  >
-                    <span
-                      aria-hidden="true"
-                      style={{
-                        width: 4,
-                        alignSelf: "stretch",
-                        background: unread ? "var(--accent)" : "transparent",
-                        borderRadius: 999,
-                      }}
-                    />
-                    <div
-                      style={{ minWidth: 0, cursor: unread && onOpenNotification ? "pointer" : undefined }}
-                      onClick={
-                        unread && onOpenNotification
-                          ? (event) => {
-                              if (isInteractiveTarget(event.target)) {
-                                return;
-                              }
-                              openNotification();
-                            }
-                          : undefined
-                      }
-                    >
-                      <div className="row wrap" style={{ gap: 8, marginBottom: 8 }}>
-                        <span className="tiny mono">{eventLabels[item.eventType]}</span>
-                        <span className="tiny muted">{formatNotificationDate(item.createdAt)}</span>
-                        {unread ? (
-                          <span className="tiny" style={{ fontWeight: 800, color: "var(--accent)" }}>
-                            읽지 않음
-                          </span>
-                        ) : null}
-                      </div>
-                      <a
-                        href={href}
-                        className="h3 editorial"
-                        aria-label={`${item.title} 열기`}
-                        style={{ display: "inline-block", margin: 0, textDecoration: "none" }}
-                        onClick={
-                          unread && onOpenNotification
-                            ? (event) => {
-                                if (!isPrimaryLinkActivation(event)) {
-                                  return;
-                                }
-
-                                event.preventDefault();
-                                openNotification();
-                              }
-                            : undefined
+              return (
+                <a
+                  key={item.id}
+                  href={href}
+                  className="rm-member-notifications-list__item"
+                  data-unread={unread ? "true" : "false"}
+                  aria-label={`${unread ? "읽지 않음 · " : ""}${item.title} 열기`}
+                  aria-busy={readPending || undefined}
+                  onClick={
+                    unread && onOpenNotification
+                      ? (event) => {
+                          if (!isPrimaryLinkActivation(event)) return;
+                          event.preventDefault();
+                          if (!readPending) openNotification();
                         }
-                      >
-                        {item.title}
-                      </a>
-                      <p className="body muted" style={{ margin: "8px 0 0" }}>
-                        {item.body}
-                      </p>
-                      <div className="row wrap" style={{ gap: 8, marginTop: 10 }}>
-                        {linkView.reflectionLabel ? (
-                          <span className="badge badge-accent badge-dot">{linkView.reflectionLabel}</span>
-                        ) : null}
-                        <span className="tiny mono">{linkView.primaryActionLabel}</span>
-                      </div>
-                    </div>
-                    {unread ? (
-                      <button
-                        type="button"
-                        className="btn btn-quiet btn-sm"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onMarkRead(item.id);
-                        }}
-                        disabled={readPending}
-                      >
-                        {readPending ? "읽음 처리 중" : "읽음"}
-                      </button>
-                    ) : null}
-                  </article>
-                );
-              })}
-            </div>
+                      : undefined
+                  }
+                >
+                  <span
+                    className="rm-member-notifications-list__unread-dot"
+                    aria-hidden="true"
+                  />
+                  <span className="rm-member-notifications-list__content">
+                    <span className="rm-member-notifications-list__meta">
+                      <span className="rm-member-notifications-list__category">
+                        {eventLabels[item.eventType]}
+                      </span>
+                      <span>{formatNotificationDate(item.createdAt)}</span>
+                    </span>
+                    <span className="rm-member-notifications-list__title">
+                      {item.title}
+                    </span>
+                    <span className="rm-member-notifications-list__copy">
+                      {item.body}
+                    </span>
+                  </span>
+                  <span
+                    className="rm-member-notifications-list__arrow"
+                    aria-hidden="true"
+                  >
+                    ›
+                  </span>
+                </a>
+              );
+            })
           )}
-          {hasMore && onLoadMore ? (
-            <button
-              type="button"
-              className="btn btn-quiet btn-sm"
-              disabled={isLoadingMore}
-              style={{ marginTop: 12 }}
-              onClick={onLoadMore}
-            >
-              {isLoadingMore ? "불러오는 중" : "더 보기"}
-            </button>
-          ) : null}
         </section>
+
+        {hasMore && onLoadMore ? (
+          <button
+            type="button"
+            className="rm-member-notifications-page__load-more"
+            disabled={isLoadingMore}
+            onClick={onLoadMore}
+          >
+            {isLoadingMore ? "불러오는 중…" : "더 보기"}
+          </button>
+        ) : null}
       </section>
     </main>
   );
