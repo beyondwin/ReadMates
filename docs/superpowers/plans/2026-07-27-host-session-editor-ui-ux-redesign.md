@@ -985,4 +985,14 @@ The final whole-branch reviewer identified three load-bearing implementation fin
 | Draft validation fields lack programmatic error association | Summary, highlight, one-line-review, and feedback fields now expose section-specific `aria-invalid` and `aria-describedby`, linked to stable nearby human-readable error details. Existing summary anchors remain unchanged. | Focused component assertions cover linked IDs/messages and verify unaffected fields remain free of invalid/error associations. |
 | Section-tab and AI regenerate touch-target rulings are stale | Both deferred rows above are corrected to resolved based on current 44px CSS enforcement. | `.rm-host-session-editor__section-tab` has an explicit 44px rule; mobile `.btn` and `.btn-sm` both have a 44px minimum height. |
 
+### Exactly-once focused re-review follow-up
+
+The permitted exactly-once focused re-review found that the initial autosave fix wave was not fully resolved when an old-epoch request was already in flight. If a restored/server editor was adopted, a later edit queued under the new epoch, and the superseded request then rejected, its `catch` cleared the newer queued edit before `finally` could replay it.
+
+| Finding | Resolution | Evidence |
+| --- | --- | --- |
+| A superseded in-flight autosave rejection can strand a post-adoption edit | A failed save now clears `queuedSaveRef` only when its captured epoch still owns the controller. A stale-epoch failure leaves the new-epoch queue intact, and `finally` replays that snapshot against the adopted draft revision. | Deterministic deferred-rejection TDD: RED failed because `onSave` remained at one call; GREEN passes 16/16 focused tests and proves the post-adoption snapshot saves exactly once with expected revision 8, advances to revision 9, and does not surface the superseded stale error. The adjacent editor lane passes 131/131. |
+
+This follow-up resolves the blocking residual from the one permitted re-review. It does not request or perform another independent review.
+
 Final-review fix scope remains frontend and historical evidence only. It does not authorize or claim merge, rebase, push, PR, deploy, live AI, or notification/email activity.

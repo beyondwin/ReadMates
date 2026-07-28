@@ -282,6 +282,76 @@ describe("SessionRecordDraftPanelBody", () => {
     expect(result.current.saveState).toBe("saved");
   });
 
+  it("replays a post-adoption edit when the superseded in-flight autosave rejects", async () => {
+    vi.useFakeTimers();
+    let rejectSupersededSave!: (reason: unknown) => void;
+    let resolvePostAdoptionSave!: (value: NonNullable<ReturnType<typeof editor>["draft"]>) => void;
+    const supersededSave = new Promise<NonNullable<ReturnType<typeof editor>["draft"]>>(
+      (_resolve, reject) => {
+        rejectSupersededSave = reject;
+      },
+    );
+    const postAdoptionSave = new Promise<NonNullable<ReturnType<typeof editor>["draft"]>>(
+      (resolve) => {
+        resolvePostAdoptionSave = resolve;
+      },
+    );
+    const restoredSnapshot = {
+      ...draftSnapshot,
+      publicationSummary: "복원된 서버 초안",
+    };
+    const postAdoptionSnapshot = {
+      ...restoredSnapshot,
+      publicationSummary: "복원 후 새로 입력한 초안",
+    };
+    const onSave = vi.fn()
+      .mockImplementationOnce(() => supersededSave)
+      .mockImplementationOnce(() => postAdoptionSave);
+    const { result } = renderHook(() => useSessionRecordDraftController({
+      editor: editor(),
+      onSave,
+      onReload: vi.fn(),
+    }));
+
+    act(() => result.current.updateSnapshot({
+      ...draftSnapshot,
+      publicationSummary: "복원 전에 시작된 오래된 초안",
+    }));
+    await act(async () => vi.advanceTimersByTimeAsync(600));
+    expect(onSave).toHaveBeenCalledTimes(1);
+
+    act(() => result.current.adoptEditor(editor(restoredSnapshot, 8)));
+    act(() => result.current.updateSnapshot(postAdoptionSnapshot));
+    await act(async () => vi.advanceTimersByTimeAsync(600));
+    expect(onSave).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      rejectSupersededSave({ code: "SESSION_RECORD_DRAFT_STALE" });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(onSave).toHaveBeenCalledTimes(2);
+    expect(onSave).toHaveBeenLastCalledWith({
+      sessionId: "session-1",
+      request: {
+        expectedDraftRevision: 8,
+        snapshot: postAdoptionSnapshot,
+      },
+    });
+    expect(result.current.saveState).toBe("saving");
+    expect(result.current.shouldBlockNavigation).toBe(true);
+
+    await act(async () => {
+      resolvePostAdoptionSave(editor(postAdoptionSnapshot, 9).draft!);
+    });
+
+    expect(result.current.snapshot).toEqual(postAdoptionSnapshot);
+    expect(result.current.expectedDraftRevision).toBe(9);
+    expect(result.current.saveState).toBe("saved");
+    expect(result.current.shouldBlockNavigation).toBe(false);
+  });
+
   it("shows unsaved state and blocks navigation after autosave failure", async () => {
     vi.useFakeTimers();
     const { result } = renderHook(() => useSessionRecordDraftController({

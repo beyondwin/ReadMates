@@ -65,6 +65,8 @@ The final whole-branch reviewer identified three load-bearing frontend findings.
 
 The final-review evidence check also found two stale deferred rulings. Section tabs already receive an explicit 44px height, and mobile AI regenerate buttons already receive the shared `.btn`/`.btn-sm` 44px minimum height. The plan and residual-risk table now record both as resolved; no touch-target product patch was needed.
 
+The one permitted exactly-once focused re-review then found that the autosave finding was not fully resolved for an already in-flight old-epoch request. After restored/server-editor adoption, a new edit could queue behind that request, but the superseded request's rejection cleared the new-epoch queue before replay. The follow-up makes queue clearing epoch-aware: only the epoch that owns the failed request may discard its queue, while `finally` replays a post-adoption edit with the adopted revision. No second independent review was requested or performed.
+
 ### Final-review verification
 
 | Command | Result |
@@ -78,10 +80,15 @@ The final-review evidence check also found two stale deferred rulings. Section t
 | `corepack pnpm --dir front exec playwright test tests/e2e/aigen-mobile-evidence.spec.ts tests/e2e/host-session-record-preview.spec.ts` | PASS — 3/3. |
 | `corepack pnpm --dir front exec playwright test tests/e2e/responsive-navigation-chrome.spec.ts` | PASS — 5/5. |
 | dependency/terminology/public-safety scans and `git diff --check` | PASS — no production UI boundary/retired-term match, no private-looking value in the changed plan/report, and no whitespace error. |
+| `corepack pnpm --dir front exec vitest run features/host/ui/session-editor/session-record-draft-panel.test.tsx` before the exactly-once follow-up | RED as intended — the deferred stale rejection stranded the post-adoption edit, so the expected second `onSave` call was missing; 15 existing tests passed. |
+| Same focused Vitest command after the epoch-aware queue fix | PASS — 1 file, 16 tests. |
+| Focused test plus `session-record-workspace`, `host-session-editor-route`, and `tests/unit/host-session-editor` | PASS — 4 files, 131 tests. |
+| `corepack pnpm --dir front lint`, `corepack pnpm --dir front test`, and `corepack pnpm --dir front build` after the exactly-once follow-up | PASS — lint clean; 197 files and 1,649 tests passed; 540 modules transformed. |
+| `./scripts/build-public-release-candidate.sh` and `./scripts/public-release-check.sh .tmp/public-release-candidate` after the exactly-once follow-up | PASS — candidate mode completed and gitleaks reported no leaks. |
 
 ## Review status and residual risk
 
-Tasks 1–8 are marked complete in the SDD ledger and their recorded review rounds are clean after fixes. Fix Round 1 resolved the Task 4 header-contract issue; the host header no longer renders a feedback-document chip. The remaining ledger dispositions are recorded below.
+Tasks 1–8 are marked complete in the SDD ledger and their recorded review rounds are clean after fixes. Fix Round 1 resolved the Task 4 header-contract issue; the host header no longer renders a feedback-document chip. The exactly-once focused re-review's blocking autosave residual is resolved by the epoch-aware queue follow-up above. The remaining ledger dispositions are recorded below.
 
 | Ledger minor | Disposition |
 | --- | --- |

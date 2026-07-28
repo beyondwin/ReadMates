@@ -97,7 +97,9 @@ export function useSessionRecordDraftController({
         break;
       }
     } catch (error) {
-      queuedSaveRef.current = null;
+      if (epoch === controllerEpochRef.current) {
+        queuedSaveRef.current = null;
+      }
       if (mountedRef.current && epoch === controllerEpochRef.current) {
         setSaveState(isDraftStaleError(error) ? "stale" : "error");
       }
