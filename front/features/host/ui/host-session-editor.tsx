@@ -1160,7 +1160,6 @@ export default function HostSessionEditor({
                   state={displaySession.state}
                   date={displaySession.date}
                   published={displaySession.state === "PUBLISHED"}
-                  feedbackDocumentAvailable={displaySession.feedbackDocument.uploaded}
                 />
               ) : (
                 <div className="rm-session-identity">

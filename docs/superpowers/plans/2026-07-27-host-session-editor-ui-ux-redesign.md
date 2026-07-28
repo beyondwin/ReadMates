@@ -880,7 +880,7 @@ hook은 Task 1의 pure model을 사용하고 route module에 남긴다. UI에서
 - [x] `session-import-generator.md`를 현재 UI에 맞춘다.
 
   - `세션 기록 완성` 패널 → `기록 작업대`의 `초안 만들기`
-  - AI 기본 경로/외부 JSON fallback 설명 → 직접 작성·AI·JSON이 같은 공유 초안으로 수렴
+  - 직접 작성·AI·외부 JSON의 동등한 입력 설명 → 세 입력이 같은 공유 초안으로 수렴
   - JSON 절차 → `기록 작업대` → `외부 JSON` → preview → `초안으로 가져오기`
   - 내부 AI generation revision contract는 운영/기술 문맥이므로 그대로 유지
 
@@ -959,3 +959,17 @@ hook은 Task 1의 pure model을 사용하고 route module에 남긴다. UI에서
 - [x] 320px와 390px에서 tab, sticky action, dialog, bottom app navigation이 겹치지 않는다.
 - [x] UI module의 route-first dependency direction이 유지된다.
 - [x] focused unit/component/route tests, canonical lint/test/build, high-risk E2E, browser evidence가 최종 HEAD 기준으로 확인된다.
+
+### Task 9 Fix Round 1 — ledger deferred-minor disposition
+
+| Ledger note | Disposition | Evidence / reason |
+| --- | --- | --- |
+| Task 1 mutable `DEFAULT_LOCATION` | Still deferred | The parser still returns the shared mutable object for default/invalid input. No current caller mutates it, but a future defensive clone or readonly value is a separate model hardening change. |
+| Task 2 simultaneous overview precedence cases | Still deferred | The model suite fixes each priority state but does not yet combine competing error/stale/validation/draft inputs in precedence cases. |
+| Task 3 36px section-tab target | Still deferred | `SessionEditorSectionNav` retains its inline 36px height, so the Task 8 44px mobile target is not fully achieved there. |
+| Task 3 raw ISO overview time | Still deferred | The overview still receives the raw applied timestamp projection; localized display needs a dedicated presentation decision. |
+| Task 4 feedback-document header chip | Resolved in Fix Round 1 | The host editor no longer passes feedback-document availability into `SessionIdentity`; the header now contains identity/lifecycle and the adjacent visibility/draft status only. |
+| Task 5 legacy no-`recordWorkflow` fallback | Still deferred | Compatibility rendering remains for callers without the workflow contract; removing it would be a behavior and migration decision outside this fix. |
+| Task 8 390px dialog / 320px long-wrap combined matrix | Still deferred | Existing evidence covers both widths and critical states, but does not duplicate each named pairing. |
+| Task 8 CSS structural/shared-class fallback | Still deferred | The requested hooks exist, but some markup intentionally continues to use shared chip classes and structural fallback selectors. |
+| Task 8 AI regenerate pointer target | Still deferred | Keyboard activation is covered, but the pointer target remains below the preferred mobile size. |

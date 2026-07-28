@@ -404,12 +404,12 @@ describe("HostSessionEditor", () => {
     expect(screen.getByRole("heading", { name: "세션 문서 편집" })).toBeVisible();
     expect(screen.getByText("세션 운영 문서")).toBeVisible();
     expect(screen.queryByText("세션 운영 문서 · No.7")).not.toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "No.07 · 이번 세션 · 준비 중 · D-18 · 문서 있음" })).toBeVisible();
+    expect(screen.getByRole("group", { name: "No.07 · 이번 세션 · 준비 중 · D-18" })).toBeVisible();
     expect(screen.getByText("No.07")).toHaveClass("rm-session-identity__number");
     expect(screen.getByText("준비 중")).toHaveClass("rm-session-identity__chip", "rm-state", "rm-state--pending");
     expect(screen.getByText("D-18")).toHaveClass("rm-session-identity__chip", "rm-state", "rm-state--pending");
     expect(screen.getByText("이번 세션")).toHaveClass("rm-session-identity__chip");
-    expect(screen.getByText("문서 있음")).toHaveClass("rm-session-identity__chip", "rm-state", "rm-state--success");
+    expect(screen.queryByText("문서 있음")).not.toBeInTheDocument();
     expect(screen.queryByText("No.07 · D-18")).not.toBeInTheDocument();
     expect(screen.getByText("현재 적용본")).toBeVisible();
     expect(screen.getByText("작업 중인 초안")).toBeVisible();

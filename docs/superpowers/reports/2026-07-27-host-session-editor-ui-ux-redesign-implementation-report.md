@@ -55,7 +55,16 @@ The `test:e2e -- <files>` and `test -- <files>` semantic mismatch is intentional
 
 ## Review status and residual risk
 
-Tasks 1–8 are marked complete in the SDD ledger and their recorded review rounds are clean after fixes. Known minor review notes remain: some responsive evidence is not duplicated for every long-content/dialog combination at both mobile widths, CSS hooks retain a few structural/shared-class fallbacks, and the AI regenerate pointer target is below the preferred mobile target though its keyboard path is covered. Task 9 did not change product code to address those notes.
+Tasks 1–8 are marked complete in the SDD ledger and their recorded review rounds are clean after fixes. Fix Round 1 resolved the Task 4 header-contract issue; the host header no longer renders a feedback-document chip. The remaining ledger dispositions are recorded below.
+
+| Ledger minor | Disposition |
+| --- | --- |
+| Task 1 shared mutable `DEFAULT_LOCATION` | Still deferred; no current mutation, but future model hardening should return a fresh or readonly value. |
+| Task 2 simultaneous overview priority cases | Still deferred; tests cover individual priorities but not competing-state precedence combinations. |
+| Task 3 36px section tab; raw ISO time | Still deferred; inline 36px remains, and time localization needs a presentation decision. |
+| Task 4 feedback-document header chip | Resolved in Fix Round 1 by removing the host-editor `SessionIdentity` wiring. |
+| Task 5 no-`recordWorkflow` fallback | Still deferred as legacy compatibility behavior. |
+| Task 8 combined 390px-dialog/320px-wrap matrix; CSS fallback; regenerate pointer target | Still deferred; evidence is not a complete matrix, some structural fallbacks remain, and keyboard activation covers the smaller pointer target. |
 
 The task-level reviews are complete, but final local-main integration, an independent whole-branch release-readiness review, push, and cleanup remain controller closeout work. No final `main` SHA or remote success is claimed here. PR creation, tag creation, deploy, live AI quality calls, and live notification/email actions remain unauthorized.
 
