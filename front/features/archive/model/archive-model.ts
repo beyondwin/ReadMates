@@ -6,6 +6,15 @@ export type SessionState = "DRAFT" | "OPEN" | "PUBLISHED" | "CLOSED";
 export type MembershipStatus = "INVITED" | "VIEWER" | "ACTIVE" | "SUSPENDED" | "LEFT" | "INACTIVE";
 export type MemberRole = "HOST" | "MEMBER";
 
+export type MyRecentAttendanceStatus = "ATTENDED" | "ABSENT" | "UNKNOWN";
+
+export type MyRecentAttendance = {
+  sessionNumber: number;
+  attended: boolean;
+  attendanceStatus: MyRecentAttendanceStatus;
+  readingProgress: number;
+};
+
 export type ArchiveFeedbackDocumentStatus = {
   available: boolean;
   readable: boolean;
@@ -85,11 +94,7 @@ export type MyPageProfile = {
   totalSessionCount: number;
   completedReadingCount: number;
   currentSessionId: string | null;
-  recentAttendances: Array<{
-    sessionNumber: number;
-    attended: boolean;
-    readingProgress: number;
-  }>;
+  recentAttendances: MyRecentAttendance[];
 };
 
 export function inactiveMyPageProfile(auth: AuthMeResponse): MyPageProfile {

@@ -172,6 +172,15 @@ export type NoteSessionItem = {
 
 export type NoteSessionPage = PagedResponse<NoteSessionItem>;
 
+export type MyRecentAttendanceStatus = "ATTENDED" | "ABSENT" | "UNKNOWN";
+
+export type MyRecentAttendance = {
+  sessionNumber: number;
+  attended: boolean;
+  attendanceStatus: MyRecentAttendanceStatus;
+  readingProgress: number;
+};
+
 export type MyPageResponse = {
   displayName: string;
   accountName: string;
@@ -184,11 +193,7 @@ export type MyPageResponse = {
   totalSessionCount: number;
   completedReadingCount: number;
   currentSessionId: string | null;
-  recentAttendances: Array<{
-    sessionNumber: number;
-    attended: boolean;
-    readingProgress: number;
-  }>;
+  recentAttendances: MyRecentAttendance[];
 };
 
 export type MyJourneyFeedbackDocument = {
