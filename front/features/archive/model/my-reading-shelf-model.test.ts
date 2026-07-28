@@ -3,14 +3,12 @@ import type { MyPageProfile, MyRecentAttendance } from "./archive-model";
 import {
   appendUniqueJourneyItems,
   buildParticipationJourneyViewModel,
-  completionLabel,
   emptyMyJourneyPage,
   groupJourneyByYear,
   membershipDurationLabel,
   participationTimelineItem,
   type MyJourneyItem,
   type MyJourneySummary,
-  shelfEmptyState,
 } from "./my-reading-shelf-model";
 
 function journeyItem(overrides: Partial<MyJourneyItem> = {}): MyJourneyItem {
@@ -28,14 +26,6 @@ function journeyItem(overrides: Partial<MyJourneyItem> = {}): MyJourneyItem {
     ...overrides,
   };
 }
-
-const summary: MyJourneySummary = {
-  attendedSessionCount: 9,
-  completedReadingCount: 7,
-  questionCount: 11,
-  reviewCount: 4,
-  readableFeedbackDocumentCount: 3,
-};
 
 const participationSummary: MyJourneySummary = {
   attendedSessionCount: 9,
@@ -124,22 +114,6 @@ describe("my reading shelf model", () => {
     expect(groupJourneyByYear([malformed, impossibleMonth, impossibleLeapDay, absent])).toEqual([
       { year: "연도 미상", items: [malformed, impossibleMonth, impossibleLeapDay, absent] },
     ]);
-  });
-
-  it("formats completion with its attended-session denominator", () => {
-    expect(completionLabel(summary)).toBe("완독 7/9");
-  });
-
-  it("returns only membership-appropriate empty-state actions", () => {
-    expect(
-      shelfEmptyState({ membershipStatus: "VIEWER", currentSessionId: "session-now" }),
-    ).toMatchObject({ action: { label: "아카이브 둘러보기", href: "/app/archive" } });
-    expect(
-      shelfEmptyState({ membershipStatus: "ACTIVE", currentSessionId: "session-now" }),
-    ).toMatchObject({ action: { label: "이번 세션 보기", href: "/app/session/current" } });
-    expect(
-      shelfEmptyState({ membershipStatus: "ACTIVE", currentSessionId: null }),
-    ).toMatchObject({ action: { label: "아카이브 보기", href: "/app/archive" } });
   });
 
   it("formats membership duration and rejects invalid or future months", () => {

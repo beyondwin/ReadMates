@@ -2,7 +2,6 @@ import type {
   MyPageProfile,
   MyRecentAttendance,
   MyRecentAttendanceStatus,
-  MembershipStatus,
 } from "@/features/archive/model/archive-model";
 
 export type MyJourneyFeedbackDocument = {
@@ -41,12 +40,6 @@ export type MyJourneyPage = {
 export type JourneyYearGroup = {
   year: string;
   items: MyJourneyItem[];
-};
-
-export type ShelfEmptyState = {
-  title: string;
-  body: string;
-  action: { label: string; href: string } | null;
 };
 
 export type ParticipationTimelineItem = {
@@ -135,10 +128,6 @@ function validDateYear(date: string): string | null {
   return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day
     ? yearText
     : null;
-}
-
-export function completionLabel(summary: MyJourneySummary): string {
-  return `완독 ${summary.completedReadingCount}/${summary.attendedSessionCount}`;
 }
 
 export function membershipDurationLabel(joinedAt: string, today: Date): string | null {
@@ -236,32 +225,5 @@ export function buildParticipationJourneyViewModel(input: {
     timelineItems: rows.map(participationTimelineItem),
     nudge,
     supportingStats,
-  };
-}
-
-export function shelfEmptyState(input: {
-  membershipStatus: MembershipStatus;
-  currentSessionId: string | null;
-}): ShelfEmptyState {
-  if (input.membershipStatus === "VIEWER") {
-    return {
-      title: "아직 쌓인 개인 기록이 없습니다",
-      body: "둘러보기 멤버는 공개된 아카이브 기록을 읽을 수 있습니다.",
-      action: { label: "아카이브 둘러보기", href: "/app/archive" },
-    };
-  }
-
-  if (input.currentSessionId) {
-    return {
-      title: "아직 쌓인 개인 기록이 없습니다",
-      body: "이번 모임의 기록이 쌓이면 이곳에서 책별로 다시 읽을 수 있습니다.",
-      action: { label: "이번 세션 보기", href: "/app/session/current" },
-    };
-  }
-
-  return {
-    title: "아직 쌓인 개인 기록이 없습니다",
-    body: "참여한 회차의 기록이 생기면 이곳에 책별로 모입니다.",
-    action: { label: "아카이브 보기", href: "/app/archive" },
   };
 }

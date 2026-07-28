@@ -6027,13 +6027,18 @@
 .rm-member-space-account-actions__control {
   display: flex;
   flex: 0 0 auto;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   min-height: 44px;
 }
 
 .rm-member-space-account-actions__control > :is(a, button) {
   min-inline-size: 44px;
   min-height: 44px;
+}
+
+.rm-member-space-account-actions__control > [role="alert"] {
+  width: 100%;
 }
 
 .rm-participation-nudge__link:focus-visible,

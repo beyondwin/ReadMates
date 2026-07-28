@@ -261,6 +261,40 @@ test("member-space bottom logout returns to the unauthenticated public home", as
   await expect(page.getByRole("link", { name: "로그인" })).toBeVisible();
 });
 
+test("member-space logout failure stays stacked and full width on narrow screens", async ({
+  page,
+}) => {
+  await mockMemberParticipationProfile(page, "history");
+  await mockMyReadingShelfJourney(page);
+  await loginWithGoogleFixture(page, memberEmail);
+  await page.setViewportSize({ width: 320, height: 700 });
+  await page.goto("/app/me");
+  await page.route("**/api/bff/api/auth/logout", async (route) => {
+    await route.fulfill({ status: 500, body: "" });
+  });
+
+  const accountActions = page.locator(".rm-member-space-account-actions");
+  const control = accountActions.locator(".rm-member-space-account-actions__control");
+  const logout = accountActions.getByRole("button", { name: "로그아웃" });
+  await logout.click();
+
+  const alert = accountActions.getByRole("alert");
+  await expect(alert).toHaveText("로그아웃에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+  await expect(page).toHaveURL(/\/app\/me$/);
+
+  const [controlBox, logoutBox, alertBox] = await Promise.all([
+    control.boundingBox(),
+    logout.boundingBox(),
+    alert.boundingBox(),
+  ]);
+  expect(controlBox).not.toBeNull();
+  expect(logoutBox).not.toBeNull();
+  expect(alertBox).not.toBeNull();
+  expect(logoutBox!.width).toBeGreaterThanOrEqual(controlBox!.width - 1);
+  expect(alertBox!.width).toBeGreaterThanOrEqual(controlBox!.width - 1);
+  expect(alertBox!.y).toBeGreaterThanOrEqual(logoutBox!.y + logoutBox!.height);
+});
+
 test("club-scoped account and notification routes preserve navigation current state and history", async ({
   page,
 }) => {
