@@ -71,7 +71,7 @@ export function SessionEditorSectionNav({
             aria-selected={selected}
             aria-controls={item.panelIds.join(" ")}
             tabIndex={selected ? 0 : -1}
-            className={`m-chip${selected ? " is-on" : ""}`}
+            className={`m-chip rm-host-session-editor__section-tab${selected ? " is-on" : ""}`}
             onClick={() => onSectionChange(item.key)}
             style={{
               minHeight: 36,

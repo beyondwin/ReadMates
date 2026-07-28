@@ -341,6 +341,34 @@ test("host captures public-safe session record preview evidence on desktop and m
   await uploadSessionImportJson(page);
   expect((await previewPost).ok()).toBe(true);
   await expectSessionRecordPreviewPublicSafe(page);
+  await page.setViewportSize({ width: 320, height: 720 });
+  const jsonCreationPanel = page.locator(".rm-session-record-workspace__creation-panel:visible");
+  const jsonPreview = page.getByRole("region", { name: "세션 기록 미리보기" });
+  await expect(jsonCreationPanel).toBeVisible();
+  await expect(jsonPreview).toBeVisible();
+  const narrowJsonMetrics = await page.evaluate(() => {
+    const panel = document.querySelector<HTMLElement>(
+      ".rm-session-record-workspace__creation-panel:not([hidden])",
+    );
+    const preview = Array.from(document.querySelectorAll<HTMLElement>('[role="region"]'))
+      .find((element) => element.getAttribute("aria-label") === "세션 기록 미리보기");
+    return {
+      documentFits: document.documentElement.scrollWidth <= window.innerWidth,
+      panelFits: panel ? panel.scrollWidth <= panel.clientWidth : false,
+      previewFits: preview ? preview.scrollWidth <= preview.clientWidth : false,
+    };
+  });
+  expect(narrowJsonMetrics).toEqual({
+    documentFits: true,
+    panelFits: true,
+    previewFits: true,
+  });
+  const narrowJsonScreenshot = await page.screenshot({
+    path: testInfo.outputPath("records-json-preview-320x720.png"),
+    fullPage: true,
+  });
+  expect(narrowJsonScreenshot.byteLength).toBeGreaterThan(10_000);
+  await page.setViewportSize({ width: 1280, height: 900 });
   const jsonPreviewScreenshot = await page.screenshot({
     path: testInfo.outputPath("records-json-preview-1280x900.png"),
     fullPage: true,

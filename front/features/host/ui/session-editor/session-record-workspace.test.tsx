@@ -172,6 +172,10 @@ describe("SessionRecordWorkspace", () => {
       );
     expect(within(draft).getByText("저장됨")).toBeVisible();
     expect(within(draft).getByText("초안 문서")).toBeVisible();
+    expect(within(draft).getByText("2026.07.27 10:00")).toHaveAttribute(
+      "datetime",
+      "2026-07-27T10:00:00+09:00",
+    );
     expect(within(draft).getByText(draftSnapshot.feedbackDocument.fileName)).toBeVisible();
     expect(within(next).queryByRole("button", { name: "반영 검토" })).not.toBeInTheDocument();
     expect(

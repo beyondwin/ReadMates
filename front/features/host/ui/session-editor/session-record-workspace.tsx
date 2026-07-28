@@ -13,6 +13,7 @@ import type { HostSessionRecordDraft } from "@/features/host/model/host-session-
 import type { SessionImportPreviewResponse } from "@/features/host/model/host-view-types";
 import type { SessionImportCommitResult } from "@/features/host/model/session-import-model";
 import type { ReadmatesReturnState } from "@/shared/routing/readmates-route-state";
+import { formatDateTimeLabel } from "@/shared/ui/readmates-display";
 import type { HostSessionEditorLinkComponent } from "./session-editor-links";
 import type { AiGenerateCommitResult } from "./session-record-completion-panel";
 import { SessionRecordCompletionPanel } from "./session-record-completion-panel";
@@ -312,7 +313,8 @@ export function SessionRecordWorkspace({
           </p>
           {draft.updatedAt ? (
             <p className="tiny mono" style={{ margin: "8px 0 0", overflowWrap: "anywhere" }}>
-              최근 저장 <time dateTime={draft.updatedAt}>{draft.updatedAt}</time>
+              최근 저장{" "}
+              <time dateTime={draft.updatedAt}>{formatDateTimeLabel(draft.updatedAt)}</time>
             </p>
           ) : null}
           {draft.snapshot.feedbackDocument.fileName ? (

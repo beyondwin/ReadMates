@@ -100,6 +100,54 @@ describe("host session editor view model", () => {
     expect(overview.nextAction).toEqual({ kind, label, target, enabled });
   });
 
+  it.each([
+    [
+      "unsaved session before record recovery states",
+      {
+        isNewSession: true,
+        draft: { ...draft },
+        draftSaveState: "error" as const,
+        draftLiveBaseStale: true,
+        validationIssues: ["PUBLICATION_SUMMARY_REQUIRED"],
+      },
+      "SAVE_BASIC",
+    ],
+    [
+      "save error before stale base and validation",
+      {
+        draft: { ...draft },
+        draftSaveState: "error" as const,
+        draftLiveBaseStale: true,
+        validationIssues: ["PUBLICATION_SUMMARY_REQUIRED"],
+      },
+      "RESOLVE_DRAFT_SAVE",
+    ],
+    [
+      "stale base before validation and saved-draft review",
+      {
+        draft: { ...draft },
+        draftSaveState: "saved" as const,
+        draftLiveBaseStale: true,
+        validationIssues: ["PUBLICATION_SUMMARY_REQUIRED"],
+      },
+      "RESOLVE_STALE_BASE",
+    ],
+    [
+      "validation before saved-draft review",
+      {
+        draft: { ...draft },
+        draftSaveState: "saved" as const,
+        validationIssues: ["PUBLICATION_SUMMARY_REQUIRED"],
+      },
+      "FIX_VALIDATION",
+    ],
+  ] as const)("prioritizes %s", (_name, overrides, expectedKind) => {
+    expect(buildHostSessionEditorOverview({
+      ...overviewInput(),
+      ...overrides,
+    }).nextAction.kind).toBe(expectedKind);
+  });
+
   it("projects applied record labels without inventing an applied time", () => {
     expect(buildHostSessionEditorOverview({
       ...overviewInput(),

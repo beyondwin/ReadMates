@@ -2,7 +2,6 @@ import {
   type ChangeEvent,
   type CSSProperties,
   type FormEvent,
-  type KeyboardEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -21,7 +20,6 @@ import type {
 } from "@/features/host/model/host-view-types";
 import {
   buildHostSessionRequest,
-  buildPublicationRequest,
   getDestructiveActionAvailability,
   questionDeadlineLabelForForm,
   recordVisibilityLabel,
@@ -57,7 +55,6 @@ import { BasicSessionPanel } from "./session-editor/basic-session-panel";
 import {
   type AttendanceWriteState,
   type HostSessionEditorActions,
-  type PublicationFeedback,
   type SaveState,
 } from "./session-editor/session-editor-actions";
 import {
@@ -69,12 +66,7 @@ import {
   feedbackPreviewStateForSession,
 } from "./session-editor/session-editor-feedback";
 import { HostSessionNotificationActions } from "./session-editor/session-editor-notifications";
-import { PublicationPanel } from "./session-editor/publication-panel";
-import {
-  type AiGenerateCommitResult,
-  SessionRecordCompletionPanel,
-  type SessionRecordCompletionMode,
-} from "./session-editor/session-record-completion-panel";
+import type { AiGenerateCommitResult } from "./session-editor/session-record-completion-panel";
 import type {
   DraftSaveState,
   SessionRecordDraftSnapshot,
@@ -296,59 +288,6 @@ function scopedHostRedirectHref(href: string) {
   return scopedAppLinkTarget(globalThis.location.pathname, href);
 }
 
-type ImportMode = SessionRecordCompletionMode;
-
-const recordSources = [
-  { key: "manual", label: "직접 작성" },
-  { key: "ai", label: "AI로 생성" },
-  { key: "json", label: "외부 JSON" },
-] as const satisfies readonly { key: HostSessionDraftSource; label: string }[];
-
-function importModeForSource(source: HostSessionDraftSource): ImportMode {
-  return source === "ai" ? "ai" : "json";
-}
-
-function recordSourceTabId(source: HostSessionDraftSource) {
-  return `host-editor-record-source-tab-${source}`;
-}
-
-function recordSourcePanelId(source: HostSessionDraftSource) {
-  return `host-editor-record-source-panel-${source}`;
-}
-
-function handleRecordSourceKeyDown(
-  event: KeyboardEvent<HTMLDivElement>,
-  activeSource: HostSessionDraftSource,
-  canUseAi: boolean,
-  onChange: (source: HostSessionDraftSource) => void,
-) {
-  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
-    return;
-  }
-
-  event.preventDefault();
-  const availableSources = recordSources
-    .map(({ key }) => key)
-    .filter((source) => source !== "ai" || canUseAi);
-  const currentIndex = Math.max(availableSources.indexOf(activeSource), 0);
-  const lastIndex = availableSources.length - 1;
-  const nextIndex = event.key === "Home"
-    ? 0
-    : event.key === "End"
-      ? lastIndex
-      : event.key === "ArrowLeft"
-        ? (currentIndex - 1 + availableSources.length) % availableSources.length
-        : (currentIndex + 1) % availableSources.length;
-  const nextSource = availableSources[nextIndex];
-
-  if (!nextSource) {
-    return;
-  }
-
-  onChange(nextSource);
-  document.getElementById(recordSourceTabId(nextSource))?.focus();
-}
-
 export default function HostSessionEditor({
   session,
   notificationDispatches = [],
@@ -377,6 +316,10 @@ export default function HostSessionEditor({
     onChange: (next: HostSessionEditorLocation) => void;
   };
 }) {
+  if (session && !recordWorkflow) {
+    throw new Error("recordWorkflow is required for persisted sessions");
+  }
+
   // ---------------------------------------------------------------------------
   // Form state (reducer)
   // ---------------------------------------------------------------------------
@@ -397,9 +340,6 @@ export default function HostSessionEditor({
     locationLabel,
     meetingUrl,
     meetingPasscode,
-    recordVisibility,
-    summary,
-    hasPublicationRecord,
     sessionState,
     displaySessionSnapshot,
     attendanceStatuses,
@@ -410,9 +350,7 @@ export default function HostSessionEditor({
   // Transient UI state (separate useState — not form data)
   // ---------------------------------------------------------------------------
   const [saveState, setSaveState] = useState<SaveState>("idle");
-  const [recordSaveInFlight, setRecordSaveInFlight] = useState(false);
   const [lifecycleSaveState, setLifecycleSaveState] = useState<"idle" | "saving" | "error">("idle");
-  const [publicationFeedback, setPublicationFeedback] = useState<PublicationFeedback | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deletePreview, setDeletePreview] = useState<HostSessionDeletionPreviewResponse | null>(null);
@@ -432,12 +370,8 @@ export default function HostSessionEditor({
   );
 
   const sessionIdForAigen = session?.sessionId;
-  const canShowImportModeToggle = Boolean(sessionIdForAigen) && Boolean(clubSlug);
   const activeSection = navigation.location.section;
   const activeSource = navigation.location.source;
-  const recordSourceFocusTarget = activeSource === "ai" && !canShowImportModeToggle
-    ? "manual"
-    : activeSource;
 
   if (!visitedSections.has(activeSection)) {
     setVisitedSections((current) => new Set(current).add(activeSection));
@@ -500,7 +434,7 @@ export default function HostSessionEditor({
   // Derived values
   // ---------------------------------------------------------------------------
   const deadline = questionDeadlineLabelForForm(session, date);
-  const sessionImportVisibility = recordWorkflow?.snapshot.visibility ?? recordVisibility;
+  const sessionImportVisibility = recordWorkflow?.snapshot.visibility ?? "HOST_ONLY";
   const sessionImportExpectedDraftRevision = recordWorkflow?.expectedDraftRevision ?? null;
   const sessionImportContextStale = Boolean(
     sessionImportRequest
@@ -533,20 +467,11 @@ export default function HostSessionEditor({
     () => getDestructiveActionAvailability(displaySession),
     [displaySession],
   );
-  const publicationLifecycleHelp =
-    sessionState === "OPEN"
-      ? "진행 중인 세션은 먼저 마감한 뒤 기록 공개를 완료할 수 있습니다."
-      : sessionState === "CLOSED"
-        ? "요약과 공개 대상을 확인한 뒤 기록 공개를 완료하세요."
-        : sessionState === "PUBLISHED"
-          ? "공개된 기록입니다. 공개 대상은 저장 버튼으로 변경할 수 있습니다."
-          : "세션을 만든 뒤 기록 요약과 공개 범위를 저장할 수 있습니다.";
   const overview = useMemo(
     () => buildHostSessionEditorOverview({
       isNewSession,
-      liveRevision: recordWorkflow?.editor.liveRevision ?? (hasPublicationRecord ? 1 : 0),
-      liveSnapshot: recordWorkflow?.editor.liveSnapshot
-        ?? (hasPublicationRecord ? { visibility: recordVisibility, publicationSummary: summary } : null),
+      liveRevision: recordWorkflow?.editor.liveRevision ?? 0,
+      liveSnapshot: recordWorkflow?.editor.liveSnapshot ?? null,
       lastAppliedAt: recordWorkflow?.editor.liveSessionUpdatedAt ?? null,
       draft: recordWorkflow?.editor.draft
         ? {
@@ -558,13 +483,7 @@ export default function HostSessionEditor({
       draftLiveBaseStale: recordWorkflow?.editor.draftLiveBaseStale ?? false,
       validationIssues: recordWorkflow?.editor.validationSummary.issues ?? [],
     }),
-    [
-      hasPublicationRecord,
-      isNewSession,
-      recordVisibility,
-      recordWorkflow,
-      summary,
-    ],
+    [isNewSession, recordWorkflow],
   );
 
   // ---------------------------------------------------------------------------
@@ -585,19 +504,6 @@ export default function HostSessionEditor({
   const onLocationLabelChange = useCallback((value: string) => setField("locationLabel", value), [setField]);
   const onMeetingUrlChange = useCallback((value: string) => setField("meetingUrl", value), [setField]);
   const onMeetingPasscodeChange = useCallback((value: string) => setField("meetingPasscode", value), [setField]);
-
-  const onRecordVisibilityChange = useCallback((visibility: typeof recordVisibility) => {
-    dispatch({ type: "SET_RECORD_VISIBILITY", visibility });
-    setSessionImportRequest(null);
-    setSessionImportPreview(null);
-    setSessionImportCommitResult(null);
-    setSessionImportError(null);
-    setSessionImportStatus("idle");
-  }, []);
-  const onSummaryChange = useCallback(
-    (value: string) => setField("summary", value),
-    [setField],
-  );
 
   // ---------------------------------------------------------------------------
   // Utility helpers
@@ -736,57 +642,6 @@ export default function HostSessionEditor({
     ],
   );
 
-  const savePublication = useCallback(async () => {
-    if (!session || recordSaveInFlight) {
-      return;
-    }
-
-    const publicationRequest = buildPublicationRequest(summary, recordVisibility);
-
-    if (!publicationRequest) {
-      setPublicationFeedback({
-        tone: "error",
-        message: "기록 요약을 입력한 뒤 저장해주세요.",
-      });
-      return;
-    }
-
-    setRecordSaveInFlight(true);
-    setPublicationFeedback(null);
-
-    try {
-      const response = await actions.savePublication(session.sessionId, publicationRequest);
-
-      if (!response.ok) {
-        setPublicationFeedback({
-          tone: "error",
-          message:
-            response.status === 400
-              ? "기록 요약을 입력한 뒤 저장해주세요."
-              : "기록 공개 범위 저장에 실패했습니다. 입력값을 확인한 뒤 다시 시도해 주세요.",
-        });
-        return;
-      }
-
-      dispatch({
-        type: "PUBLICATION_SAVED",
-        publicSummary: publicationRequest.publicSummary,
-        visibility: publicationRequest.visibility,
-      });
-      setPublicationFeedback({
-        tone: "success",
-        message: "기록 공개 범위를 저장했습니다.",
-      });
-    } catch {
-      setPublicationFeedback({
-        tone: "error",
-        message: "기록 공개 범위 저장에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.",
-      });
-    } finally {
-      setRecordSaveInFlight(false);
-    }
-  }, [session, recordSaveInFlight, summary, recordVisibility, actions]);
-
   const closeSession = useCallback(async () => {
     if (!session || lifecycleSaveState === "saving") {
       return;
@@ -812,81 +667,7 @@ export default function HostSessionEditor({
     }
   }, [session, lifecycleSaveState, actions, flash]);
 
-  const publishRecord = useCallback(async () => {
-    if (!session || recordSaveInFlight || lifecycleSaveState === "saving") {
-      return;
-    }
-
-    if (recordVisibility === "HOST_ONLY") {
-      setPublicationFeedback({
-        tone: "error",
-        message: "기록 공개 전 멤버 공개 또는 외부 공개를 선택해 주세요.",
-      });
-      return;
-    }
-
-    const publicationRequest = buildPublicationRequest(summary, recordVisibility);
-
-    if (!publicationRequest) {
-      setPublicationFeedback({
-        tone: "error",
-        message: "기록 요약을 입력한 뒤 공개해 주세요.",
-      });
-      return;
-    }
-
-    setRecordSaveInFlight(true);
-    setLifecycleSaveState("saving");
-    setPublicationFeedback(null);
-
-    try {
-      const saveResponse = await actions.savePublication(session.sessionId, publicationRequest);
-
-      if (!saveResponse.ok) {
-        setPublicationFeedback({
-          tone: "error",
-          message: "기록 공개 범위 저장에 실패했습니다. 입력값을 확인한 뒤 다시 시도해 주세요.",
-        });
-        return;
-      }
-
-      const publishResponse = await actions.publishSession(session.sessionId);
-
-      if (!publishResponse.ok) {
-        setPublicationFeedback({
-          tone: "error",
-          message: "기록 공개에 실패했습니다. 세션이 마감되었는지 확인해 주세요.",
-        });
-        return;
-      }
-
-      const nextSession = await publishResponse.json();
-      dispatch({
-        type: "PUBLICATION_SAVED",
-        publicSummary: publicationRequest.publicSummary,
-        visibility: publicationRequest.visibility,
-      });
-      dispatch({ type: "SESSION_LIFECYCLE_UPDATED", snapshot: nextSession });
-      setPublicationFeedback({
-        tone: "success",
-        message: publicationRequest.visibility === "PUBLIC" ? "외부 공개가 완료되었습니다." : "멤버 기록 공개가 완료되었습니다.",
-      });
-    } catch {
-      setPublicationFeedback({
-        tone: "error",
-        message: "기록 공개에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.",
-      });
-    } finally {
-      setRecordSaveInFlight(false);
-      setLifecycleSaveState("idle");
-    }
-  }, [session, recordSaveInFlight, lifecycleSaveState, recordVisibility, summary, actions]);
-
   const publishSessionFromOverview = useCallback(async () => {
-    if (!recordWorkflow) {
-      await publishRecord();
-      return;
-    }
     if (!session || lifecycleSaveState === "saving") {
       return;
     }
@@ -906,7 +687,7 @@ export default function HostSessionEditor({
       setLifecycleSaveState("error");
       flash("세션 공개에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요");
     }
-  }, [actions, flash, lifecycleSaveState, publishRecord, recordWorkflow, session]);
+  }, [actions, flash, lifecycleSaveState, session]);
 
   const updateAttendance = useCallback(
     async (membershipId: string, attendanceStatus: AttendanceStatus) => {
@@ -1305,23 +1086,22 @@ export default function HostSessionEditor({
             {visitedSections.has("records") || activeSection === "records" ? (
               <div hidden={activeSection !== "records"} className="stack" style={{ "--stack": "18px" } as CSSProperties}>
                 {session ? (
-                  recordWorkflow ? (
-                    <SessionRecordWorkspace
+                  <SessionRecordWorkspace
                       source={activeSource}
                       onSourceChange={changeSource}
-                      liveRevision={recordWorkflow.editor.liveRevision}
-                      liveSnapshot={recordWorkflow.editor.liveSnapshot}
+                      liveRevision={recordWorkflow!.editor.liveRevision}
+                      liveSnapshot={recordWorkflow!.editor.liveSnapshot}
                       draft={{
-                        snapshot: recordWorkflow.snapshot,
-                        source: recordWorkflow.editor.draft?.source ?? null,
-                        updatedAt: recordWorkflow.editor.draft?.updatedAt ?? null,
-                        saveState: recordWorkflow.saveState,
-                        validationIssues: recordWorkflow.editor.validationSummary.issues,
-                        liveBaseStale: recordWorkflow.editor.draftLiveBaseStale,
-                        rebasePending: recordWorkflow.rebasePending,
-                        rebaseError: recordWorkflow.rebaseError,
+                        snapshot: recordWorkflow!.snapshot,
+                        source: recordWorkflow!.editor.draft?.source ?? null,
+                        updatedAt: recordWorkflow!.editor.draft?.updatedAt ?? null,
+                        saveState: recordWorkflow!.saveState,
+                        validationIssues: recordWorkflow!.editor.validationSummary.issues,
+                        liveBaseStale: recordWorkflow!.editor.draftLiveBaseStale,
+                        rebasePending: recordWorkflow!.rebasePending,
+                        rebaseError: recordWorkflow!.rebaseError,
                       }}
-                      reviewPending={recordWorkflow.confirmation.submitting}
+                      reviewPending={recordWorkflow!.confirmation.submitting}
                       feedbackDocument={{
                         ...feedbackDocumentForWorkspace,
                         previewState: feedbackPreviewState,
@@ -1330,113 +1110,23 @@ export default function HostSessionEditor({
                       creation={{
                         sessionId: session.sessionId,
                         clubSlug,
-                        expectedDraftRevision: recordWorkflow.expectedDraftRevision,
+                        expectedDraftRevision: recordWorkflow!.expectedDraftRevision,
                         importPreview: sessionImportContextStale ? null : sessionImportPreview,
                         importCommitResult: sessionImportCommitResult,
                         importStatus: sessionImportContextStale ? "previewing" : sessionImportStatus,
                         importError: sessionImportContextStale ? null : sessionImportError,
                       }}
                       actions={{
-                        onSnapshotChange: recordWorkflow.onSnapshotChange,
-                        onReloadDraft: recordWorkflow.onReloadDraft,
-                        onRebaseDraft: recordWorkflow.onRebaseDraft,
-                        onCopyInput: recordWorkflow.onCopyInput,
-                        onReviewDraft: recordWorkflow.confirmation.onReview,
+                        onSnapshotChange: recordWorkflow!.onSnapshotChange,
+                        onReloadDraft: recordWorkflow!.onReloadDraft,
+                        onRebaseDraft: recordWorkflow!.onRebaseDraft,
+                        onCopyInput: recordWorkflow!.onCopyInput,
+                        onReviewDraft: recordWorkflow!.confirmation.onReview,
                         onAigenCommitted: handleAigenCommitted,
                         onImportFileSelected: previewSessionImport,
                         onImportCommit: commitSessionImport,
                       }}
                     />
-                  ) : (
-                    <>
-                      <div
-                        className="row"
-                        role="tablist"
-                        aria-label="초안 만들기"
-                        onKeyDown={(event) => handleRecordSourceKeyDown(
-                          event,
-                          activeSource,
-                          canShowImportModeToggle,
-                          changeSource,
-                        )}
-                        style={{ gap: 8, flexWrap: "wrap" }}
-                      >
-                        {recordSources.map(({ key: source, label }) => (
-                          <button
-                            key={source}
-                            id={recordSourceTabId(source)}
-                            type="button"
-                            role="tab"
-                            aria-selected={activeSource === source}
-                            aria-controls={
-                              visitedSources.has(source) || activeSource === source
-                                ? recordSourcePanelId(source)
-                                : undefined
-                            }
-                            tabIndex={recordSourceFocusTarget === source ? 0 : -1}
-                            className={`btn btn-sm${activeSource === source ? " btn-primary" : " btn-quiet"}`}
-                            disabled={source === "ai" && !canShowImportModeToggle}
-                            onClick={() => changeSource(source)}
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-
-                      {visitedSources.has("manual") || activeSource === "manual" ? (
-                        <div hidden={activeSource !== "manual"}>
-                          <PublicationPanel
-                            activeSection={activeSection}
-                            panelId={recordSourcePanelId("manual")}
-                            labelledBy={recordSourceTabId("manual")}
-                            session={session}
-                            sessionState={sessionState}
-                            recordVisibility={recordVisibility}
-                            recordSaveInFlight={recordSaveInFlight}
-                            lifecycleSaveState={lifecycleSaveState}
-                            summary={summary}
-                            publicationFeedback={publicationFeedback}
-                            publicationLifecycleHelp={publicationLifecycleHelp}
-                            onRecordVisibilityChange={onRecordVisibilityChange}
-                            onSummaryChange={onSummaryChange}
-                            onPublicationFeedbackChange={setPublicationFeedback}
-                            onSavePublication={savePublication}
-                            onCloseSession={closeSession}
-                            onPublishRecord={publishRecord}
-                          />
-                        </div>
-                      ) : null}
-
-                      {(["ai", "json"] as const).map((source) =>
-                        visitedSources.has(source) || activeSource === source ? (
-                          <div
-                            key={source}
-                            id={recordSourcePanelId(source)}
-                            role="tabpanel"
-                            aria-labelledby={recordSourceTabId(source)}
-                            hidden={activeSource !== source}
-                            className="surface"
-                            style={{ padding: 24 }}
-                          >
-                            <SessionRecordCompletionPanel
-                              sessionId={session.sessionId}
-                              clubSlug={clubSlug}
-                              mode={importModeForSource(source)}
-                              canUseAigen={canShowImportModeToggle}
-                              recordVisibility={sessionImportVisibility}
-                              preview={sessionImportPreview}
-                              status={sessionImportStatus}
-                              error={sessionImportError}
-                              expectedDraftRevision={null}
-                              onAigenCommitted={handleAigenCommitted}
-                              onFileSelected={previewSessionImport}
-                              onCommit={commitSessionImport}
-                            />
-                          </div>
-                        ) : null
-                      )}
-                    </>
-                  )
                 ) : (
                   <div className="surface-quiet small" style={{ padding: 18 }}>
                     기본 정보를 저장한 뒤 기록 작업대를 사용할 수 있습니다.

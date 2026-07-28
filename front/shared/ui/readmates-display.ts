@@ -68,6 +68,40 @@ export function formatDateOnlyLabel(value: string | null | undefined, fallback =
   return isValidDateOnly(year, month, day) ? dateOnlyLabel(year, month, day) : fallback;
 }
 
+export function formatDateTimeLabel(
+  value: string | null | undefined,
+  fallback = "시간 미정",
+) {
+  const text = displayText(value, fallback);
+  const date = new Date(text);
+  if (text === fallback || Number.isNaN(date.getTime())) {
+    return fallback;
+  }
+
+  const parts = new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((item) => item.type === type)?.value;
+  const [year, month, day, hour, minute] = [
+    part("year"),
+    part("month"),
+    part("day"),
+    part("hour"),
+    part("minute"),
+  ];
+
+  return year && month && day && hour && minute
+    ? `${year}.${month}.${day} ${hour}:${minute}`
+    : fallback;
+}
+
 export function formatMobileTodayLabel(now = new Date()) {
   return new Intl.DateTimeFormat("ko-KR", {
     timeZone: "Asia/Seoul",

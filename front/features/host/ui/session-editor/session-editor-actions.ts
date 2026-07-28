@@ -6,17 +6,9 @@ import type {
   SessionImportPreviewResponse,
   SessionImportRequest,
 } from "@/features/host/model/host-view-types";
-import type {
-  HostSessionPublicationRequest,
-  HostSessionRequest,
-} from "@/features/host/model/host-session-editor-model";
+import type { HostSessionRequest } from "@/features/host/model/host-session-editor-model";
 
 export type SaveState = "idle" | "saving" | "saved" | "error";
-
-export type PublicationFeedback = {
-  tone: "success" | "error";
-  message: string;
-};
 
 export type AttendanceWriteState = {
   inFlight: boolean;
@@ -32,7 +24,6 @@ export type HostSessionEditorActions = {
   closeSession: (sessionId: string) => Promise<JsonResponse<HostSessionDetailResponse>>;
   publishSession: (sessionId: string) => Promise<JsonResponse<HostSessionDetailResponse>>;
   saveSession: (sessionId: string | null, request: HostSessionRequest) => Promise<Response>;
-  savePublication: (sessionId: string, request: HostSessionPublicationRequest) => Promise<Response>;
   updateAttendance: (
     sessionId: string,
     attendance: Array<{ membershipId: string; attendanceStatus: AttendanceStatus }>,

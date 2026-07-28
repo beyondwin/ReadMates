@@ -28,6 +28,9 @@ describe("SessionEditorSectionNav", () => {
     expect(Array.from(container.querySelectorAll("[data-mobile-label]"), (label) => label.textContent))
       .toEqual(["개요", "기본", "출석", "기록", "변경"]);
     expect(tablist).toHaveClass("m-hscroll");
+    tabs.forEach((tab) => {
+      expect(tab).toHaveClass("rm-host-session-editor__section-tab");
+    });
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");
     expect(tabs[0]).toHaveAttribute("tabindex", "0");
     tabs.slice(1).forEach((tab) => {

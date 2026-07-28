@@ -4,6 +4,7 @@ import {
   displayText,
   formatDateOnlyLabel,
   formatDateLabel,
+  formatDateTimeLabel,
   formatDeadlineLabel,
   formatMobileTodayLabel,
   hostAlertStateLabel,
@@ -42,6 +43,14 @@ describe("readmates display helpers", () => {
     expect(formatDateOnlyLabel("", "날짜 없음")).toBe("날짜 없음");
     expect(formatDateOnlyLabel(null, "날짜 없음")).toBe("날짜 없음");
     expect(formatDateOnlyLabel(undefined, "날짜 없음")).toBe("날짜 없음");
+  });
+
+  it("formats timestamps as stable Seoul date-time labels", () => {
+    expect(formatDateTimeLabel("2026-07-27T03:00:00Z")).toBe("2026.07.27 12:00");
+    expect(formatDateTimeLabel("2026-07-27T12:34:00+09:00")).toBe("2026.07.27 12:34");
+    expect(formatDateTimeLabel("bad-date")).toBe("시간 미정");
+    expect(formatDateTimeLabel("", "저장 시간 없음")).toBe("저장 시간 없음");
+    expect(formatDateTimeLabel(null, "저장 시간 없음")).toBe("저장 시간 없음");
   });
 
   it("formats deadline timestamps and preserves invalid values", () => {

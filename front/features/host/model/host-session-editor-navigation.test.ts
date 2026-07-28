@@ -6,6 +6,17 @@ import {
 } from "./host-session-editor-navigation";
 
 describe("host session editor navigation", () => {
+  it("returns an independent default location for each parse", () => {
+    const first = parseHostSessionEditorLocation("");
+    first.section = "records";
+    first.source = "json";
+
+    expect(parseHostSessionEditorLocation("")).toEqual({
+      section: "overview",
+      source: "manual",
+    });
+  });
+
   it.each([
     ["empty search", "", { section: "overview", source: "manual" }],
     ["overview section", "?section=overview", { section: "overview", source: "manual" }],

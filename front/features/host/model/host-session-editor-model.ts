@@ -62,11 +62,6 @@ export type HostSessionFeedbackDocumentStatus = {
   uploadedAt: string | null;
 };
 
-export type HostSessionPublicationRequest = {
-  publicSummary: string;
-  visibility: SessionRecordVisibility;
-};
-
 export type HostSessionDestructiveActionAvailability = {
   canDelete: boolean;
   guidance: string;
@@ -272,21 +267,6 @@ export function hostSessionStateLabel(state?: HostSessionState) {
   }
 
   return "저장 전";
-}
-
-export function buildPublicationRequest(
-  summary: string,
-  visibility: SessionRecordVisibility,
-): HostSessionPublicationRequest | null {
-  const publicSummary = summary.trim();
-  if (!publicSummary) {
-    return null;
-  }
-
-  return {
-    publicSummary,
-    visibility,
-  };
 }
 
 export function initialAttendanceStatuses(

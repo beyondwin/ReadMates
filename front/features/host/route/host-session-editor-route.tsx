@@ -57,7 +57,6 @@ import {
   useCreateHostSessionMutation,
   useDeleteHostSessionMutation,
   usePublishHostSessionMutation,
-  useSaveHostSessionPublicationMutation,
   useUpdateHostSessionAttendanceMutation,
   useUpdateHostSessionMutation,
 } from "@/features/host/queries/host-session-queries";
@@ -249,7 +248,6 @@ function useHostSessionEditorActions(
   const { mutateAsync: deleteSession } = useDeleteHostSessionMutation(context);
   const { mutateAsync: closeSession } = useCloseHostSessionMutation(context);
   const { mutateAsync: publishSession } = usePublishHostSessionMutation(context);
-  const { mutateAsync: savePublication } = useSaveHostSessionPublicationMutation(context);
   const { mutateAsync: updateAttendance } = useUpdateHostSessionAttendanceMutation(context);
   const { mutateAsync: commitImport } = useCommitHostSessionImportMutation(context);
 
@@ -263,8 +261,6 @@ function useHostSessionEditorActions(
       sessionId === null
         ? createSession(request)
         : updateSession({ sessionId, request }),
-    savePublication: (sessionId, request) =>
-      savePublication({ sessionId, request }),
     updateAttendance: (sessionId, attendance) =>
       updateAttendance({ sessionId, attendance }),
     previewSessionImport: hostSessionEditorPreviewActions.previewSessionImport,
@@ -281,7 +277,6 @@ function useHostSessionEditorActions(
     deleteSession,
     publishSession,
     queryClient,
-    savePublication,
     onSessionRecordsChanged,
     updateAttendance,
     updateSession,

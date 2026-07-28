@@ -93,13 +93,6 @@ const hostSessionEditorTestActions = {
         cache: "no-store",
       },
     ),
-  savePublication: (sessionId, request) =>
-    fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/publication`, {
-      method: "PUT",
-      headers: jsonHeaders(),
-      body: JSON.stringify(request),
-      cache: "no-store",
-    }),
   updateAttendance: (sessionId, attendance) =>
     fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/attendance`, {
       method: "POST",
@@ -138,6 +131,8 @@ function HostSessionEditorForTest({
   actions,
   navigation,
   initialLocation = { section: "overview", source: "manual" },
+  recordWorkflow: workflow,
+  session: testSession,
   ...props
 }: Omit<HostSessionEditorProps, "actions" | "navigation"> & {
   actions?: HostSessionEditorActions;
@@ -145,12 +140,25 @@ function HostSessionEditorForTest({
   initialLocation?: HostSessionEditorLocation;
 }) {
   const [location, setLocation] = useState(initialLocation);
+  const [defaultWorkflow, setDefaultWorkflow] = useState(
+    () => recordWorkflow(testSession?.visibility ?? "HOST_ONLY"),
+  );
+  const effectiveWorkflow = workflow ?? (testSession
+    ? {
+        ...defaultWorkflow,
+        onSnapshotChange: (snapshot: HostSessionEditorRecordWorkflow["snapshot"]) => {
+          setDefaultWorkflow((current) => ({ ...current, snapshot }));
+        },
+      }
+    : undefined);
 
   return (
     <HostSessionEditor
       {...props}
+      session={testSession}
       actions={actions ?? hostSessionEditorTestActions}
       navigation={navigation ?? { location, onChange: setLocation }}
+      recordWorkflow={effectiveWorkflow}
     />
   );
 }
@@ -416,6 +424,19 @@ describe("HostSessionEditor", () => {
     expect(screen.getByText("다음 할 일")).toBeVisible();
   });
 
+  it("fails fast when a persisted session is rendered without its record workflow", () => {
+    expect(() => render(
+      <HostSessionEditor
+        session={session}
+        actions={hostSessionEditorTestActions}
+        navigation={{
+          location: { section: "overview", source: "manual" },
+          onChange: vi.fn(),
+        }}
+      />,
+    )).toThrow("recordWorkflow is required for persisted sessions");
+  });
+
   it("shows only the overview by default without a global save action", () => {
     render(<HostSessionEditorForTest session={session} />);
 
@@ -455,7 +476,7 @@ describe("HostSessionEditor", () => {
     expect(screen.getByLabelText("세션 제목")).toBeVisible();
     await user.click(records);
     expect(records).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByLabelText("기록 요약")).toBeVisible();
+    expect(screen.getByLabelText("공개 요약")).toBeVisible();
     expect(screen.getByLabelText("세션 제목")).not.toBeVisible();
 
     await user.click(attendance);
@@ -506,15 +527,15 @@ describe("HostSessionEditor", () => {
     await user.type(screen.getByLabelText("세션 제목"), "수정 중인 세션 제목");
 
     await user.click(screen.getByRole("tab", { name: "기록 작업대" }));
-    await user.clear(screen.getByLabelText("기록 요약"));
-    await user.type(screen.getByLabelText("기록 요약"), "수정 중인 공개 요약");
+    await user.clear(screen.getByLabelText("공개 요약"));
+    await user.type(screen.getByLabelText("공개 요약"), "수정 중인 공개 요약");
 
     await user.click(screen.getByRole("tab", { name: "변경 기록" }));
     await user.click(screen.getByRole("tab", { name: "기본 정보" }));
     expect(screen.getByLabelText("세션 제목")).toHaveValue("수정 중인 세션 제목");
 
     await user.click(screen.getByRole("tab", { name: "기록 작업대" }));
-    expect(screen.getByLabelText("기록 요약")).toHaveValue("수정 중인 공개 요약");
+    expect(screen.getByLabelText("공개 요약")).toHaveValue("수정 중인 공개 요약");
   });
 
   it("does not submit basic information when Enter is pressed in a record input", async () => {
@@ -545,12 +566,14 @@ describe("HostSessionEditor", () => {
 
   it("keeps externally activated record source state mounted after another controlled location arrives", () => {
     const onChange = vi.fn();
+    const workflow = recordWorkflow("MEMBER");
     const renderAt = (location: HostSessionEditorLocation) => (
       <HostSessionEditor
         session={session}
         clubSlug="club-a"
         actions={hostSessionEditorTestActions}
         navigation={{ location, onChange }}
+        recordWorkflow={workflow}
       />
     );
     const { rerender } = render(renderAt({ section: "basic", source: "manual" }));
@@ -809,7 +832,7 @@ describe("HostSessionEditor", () => {
 
     await waitFor(() => expect(previewSessionImport).toHaveBeenCalledTimes(1));
     expect(previewSessionImport.mock.calls[0]?.[1]).toMatchObject({
-      expectedDraftRevision: null,
+      expectedDraftRevision: 4,
     });
     expect(screen.getByText("Import summary.")).toBeVisible();
     expect(screen.getByRole("button", { name: "초안으로 가져오기" })).toBeEnabled();
@@ -1366,30 +1389,6 @@ describe("HostSessionEditor", () => {
     expect(fetchMock).not.toHaveBeenCalledWith("/api/bff/api/host/sessions", expect.anything());
   });
 
-  it("initializes publication summary and visibility from the host session detail payload", () => {
-    render(
-      <HostSessionEditorForTest
-        initialLocation={{ section: "records", source: "manual" }}
-        session={{
-          ...session,
-          publication: {
-            publicSummary: "저장된 공개 요약입니다.",
-            visibility: "MEMBER",
-          },
-        }}
-      />,
-    );
-
-    expect(screen.getByRole("heading", { name: "기록 공개 범위" })).toBeVisible();
-    expect(screen.getByLabelText("기록 요약")).toHaveValue("저장된 공개 요약입니다.");
-    expect(screen.getByRole("radio", { name: /호스트 전용/ })).toBeVisible();
-    expect(screen.getByRole("radio", { name: /멤버 공개/ })).toBeChecked();
-    expect(screen.getByRole("radio", { name: /외부 공개/ })).toBeVisible();
-    expect(screen.getByRole("button", { name: "저장" })).toBeVisible();
-    expect(screen.queryByRole("button", { name: "요약 초안 저장" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "공개 기록 발행" })).not.toBeInTheDocument();
-  });
-
   it("does not label closed public-visibility records as published before lifecycle publish", () => {
     render(
       <HostSessionEditorForTest
@@ -1426,39 +1425,6 @@ describe("HostSessionEditor", () => {
     expect(screen.getByRole("group", { name: /No\.01 · 지난 회차 · 공개/ })).toBeVisible();
   });
 
-  it("saves publication summary and record visibility through the publication API without redirecting", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
-    const location = { href: "" };
-    vi.stubGlobal("fetch", fetchMock);
-    vi.stubGlobal("location", location);
-    const user = userEvent.setup();
-
-    render(
-      <HostSessionEditorForTest
-        session={{ ...session, publication: null }}
-        initialLocation={{ section: "records", source: "manual" }}
-      />,
-    );
-
-    await user.type(screen.getByLabelText("기록 요약"), "멤버에게 공유할 기록입니다.");
-    await user.click(screen.getByRole("radio", { name: /멤버 공개/ }));
-    await user.click(screen.getByRole("button", { name: "저장" }));
-
-    await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions/session-1/publication", expect.objectContaining({
-        cache: "no-store",
-        method: "PUT",
-        body: JSON.stringify({
-          publicSummary: "멤버에게 공유할 기록입니다.",
-          visibility: "MEMBER",
-        }),
-      })),
-    );
-    expect(location.href).toBe("");
-    expect(await screen.findByRole("status")).toHaveTextContent("기록 공개 범위를 저장했습니다.");
-    expect(screen.getAllByText("멤버 공개").length).toBeGreaterThan(0);
-  });
-
   it("lets hosts close an open session from the editor", async () => {
     const user = userEvent.setup();
     const closedSession = { ...openSession, state: "CLOSED" as const };
@@ -1485,106 +1451,43 @@ describe("HostSessionEditor", () => {
     expect(screen.getByRole("button", { name: "세션 공개" })).toBeEnabled();
   });
 
-  it("saves publication and publishes a closed record", async () => {
+  it("publishes the applied record through the session publish action", async () => {
     const user = userEvent.setup();
     const closedSession = { ...session, state: "CLOSED" as const, publication: null };
-    const savePublication = vi.fn(async () => new Response("{}", { status: 200 }));
     const publishSession = vi.fn(
       async () =>
         new Response(JSON.stringify({
           ...closedSession,
           state: "PUBLISHED",
           publication: {
-            publicSummary: "최종 공개 요약입니다.",
-            visibility: "PUBLIC",
+            publicSummary: "현재 적용본 요약입니다.",
+            visibility: "MEMBER",
           },
         }), {
           status: 200,
         }) as JsonResponse<HostSessionDetailResponse>,
     );
+    const workflow = recordWorkflow("MEMBER");
+    workflow.editor.liveRevision = 3;
+    workflow.editor.liveSnapshot = {
+      ...workflow.editor.liveSnapshot,
+      visibility: "MEMBER",
+      publicationSummary: "현재 적용본 요약입니다.",
+    };
 
     render(
       <HostSessionEditorForTest
         session={closedSession}
-        initialLocation={{ section: "records", source: "manual" }}
-        actions={{ ...hostSessionEditorTestActions, savePublication, publishSession }}
+        recordWorkflow={workflow}
+        actions={{ ...hostSessionEditorTestActions, publishSession }}
       />,
     );
 
-    expect(screen.getByText("요약과 공개 대상을 확인한 뒤 기록 공개를 완료하세요.")).toBeVisible();
-    await user.clear(screen.getByLabelText("기록 요약"));
-    await user.type(screen.getByLabelText("기록 요약"), "최종 공개 요약입니다.");
-    await user.click(screen.getByRole("radio", { name: /외부 공개/ }));
-    await user.click(screen.getByRole("button", { name: "기록 공개" }));
+    await user.click(screen.getByRole("button", { name: "세션 공개" }));
 
-    expect(savePublication).toHaveBeenCalledWith(closedSession.sessionId, {
-      publicSummary: "최종 공개 요약입니다.",
-      visibility: "PUBLIC",
-    });
     expect(publishSession).toHaveBeenCalledWith(closedSession.sessionId);
     expect(await screen.findByRole("group", { name: /No\.01 · 지난 회차 · 공개/ })).toBeVisible();
-    expect(screen.getByText("공개된 기록입니다. 공개 대상은 저장 버튼으로 변경할 수 있습니다.")).toBeVisible();
-    expect(screen.getByText("공개 완료")).toBeVisible();
-    expect(await screen.findByRole("status")).toHaveTextContent("외부 공개가 완료되었습니다.");
-  });
-
-  it("blocks publishing a closed record when host-only visibility is selected", async () => {
-    const user = userEvent.setup();
-    const closedSession = { ...session, state: "CLOSED" as const, publication: null };
-    const savePublication = vi.fn(async () => new Response("{}", { status: 200 }));
-    const publishSession = vi.fn(
-      async () =>
-        new Response(JSON.stringify({ ...closedSession, state: "PUBLISHED" }), {
-          status: 200,
-        }) as JsonResponse<HostSessionDetailResponse>,
-    );
-
-    render(
-      <HostSessionEditorForTest
-        session={closedSession}
-        initialLocation={{ section: "records", source: "manual" }}
-        actions={{ ...hostSessionEditorTestActions, savePublication, publishSession }}
-      />,
-    );
-
-    await user.type(screen.getByLabelText("기록 요약"), "호스트만 볼 수 있는 기록입니다.");
-    expect(screen.getByRole("radio", { name: /호스트 전용/ })).toBeChecked();
-    await user.click(screen.getByRole("button", { name: "기록 공개" }));
-
-    expect(savePublication).not.toHaveBeenCalled();
-    expect(publishSession).not.toHaveBeenCalled();
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "기록 공개 전 멤버 공개 또는 외부 공개를 선택해 주세요.",
-    );
-  });
-
-  it("disables publication editing controls while the record save is pending", async () => {
-    const saveResponse = deferredFetchResponse();
-    const fetchMock = vi.fn().mockReturnValue(saveResponse.promise);
-    vi.stubGlobal("fetch", fetchMock);
-    const user = userEvent.setup();
-
-    render(
-      <HostSessionEditorForTest
-        session={{ ...session, publication: null }}
-        initialLocation={{ section: "records", source: "manual" }}
-      />,
-    );
-
-    await user.type(screen.getByLabelText("기록 요약"), "저장 중에는 수정할 수 없는 기록입니다.");
-    await user.click(screen.getByRole("radio", { name: /멤버 공개/ }));
-    await user.click(screen.getByRole("button", { name: "저장" }));
-
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(screen.getByLabelText("기록 요약")).toBeDisabled();
-    expect(screen.getByRole("button", { name: "저장하는 중" })).toBeDisabled();
-    expect(screen.getByRole("radio", { name: /호스트 전용/ })).toBeDisabled();
-    expect(screen.getByRole("radio", { name: /멤버 공개/ })).toBeDisabled();
-    expect(screen.getByRole("radio", { name: /외부 공개/ })).toBeDisabled();
-
-    saveResponse.resolve({ ok: true });
-
-    expect(await screen.findByRole("status")).toHaveTextContent("기록 공개 범위를 저장했습니다.");
+    expect(await screen.findByRole("status")).toHaveTextContent("세션을 공개했습니다.");
   });
 
   it("disables publication actions for unsaved new sessions and explains why", () => {
@@ -1597,46 +1500,6 @@ describe("HostSessionEditor", () => {
     expect(screen.getByText("기본 정보를 저장한 뒤 기록 작업대를 사용할 수 있습니다.")).toBeVisible();
     expect(screen.queryByRole("heading", { name: "기록 공개 범위" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "저장" })).not.toBeInTheDocument();
-  });
-
-  it("shows publication validation feedback inside the publication section without sending a request", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
-    vi.stubGlobal("fetch", fetchMock);
-    const user = userEvent.setup();
-
-    render(
-      <HostSessionEditorForTest
-        session={{ ...session, publication: null }}
-        initialLocation={{ section: "records", source: "manual" }}
-      />,
-    );
-
-    await user.click(screen.getByRole("button", { name: "저장" }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent("기록 요약을 입력한 뒤 저장해주세요.");
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("shows publication API failure feedback inside the publication section", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 500 });
-    vi.stubGlobal("fetch", fetchMock);
-    const user = userEvent.setup();
-
-    render(
-      <HostSessionEditorForTest
-        session={{ ...session, publication: null }}
-        initialLocation={{ section: "records", source: "manual" }}
-      />,
-    );
-
-    await user.type(screen.getByLabelText("기록 요약"), "저장 실패를 확인할 공개 요약입니다.");
-    await user.click(screen.getByRole("radio", { name: /외부 공개/ }));
-    await user.click(screen.getByRole("button", { name: "저장" }));
-
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "기록 공개 범위 저장에 실패했습니다. 입력값을 확인한 뒤 다시 시도해 주세요.",
-    );
   });
 
   it("persists attendance toggles for the edited session and updates selected state", async () => {

@@ -2,6 +2,7 @@ import type { CSSProperties, JSX, ReactNode } from "react";
 import type { HostSessionState } from "../../model/host-session-editor-model";
 import type { HostSessionEditorLocation } from "../../model/host-session-editor-navigation";
 import type { HostSessionEditorOverview } from "../../model/host-session-editor-view-model";
+import { formatDateTimeLabel } from "@/shared/ui/readmates-display";
 
 const recordsTarget: HostSessionEditorLocation = { section: "records", source: "manual" };
 
@@ -49,7 +50,10 @@ export function SessionOverviewSection({
         </div>
         {overview.applied.appliedAt ? (
           <p className="tiny mono" style={{ margin: "10px 0 0", color: "var(--text-3)" }}>
-            최근 반영 <time dateTime={overview.applied.appliedAt}>{overview.applied.appliedAt}</time>
+            최근 반영{" "}
+            <time dateTime={overview.applied.appliedAt}>
+              {formatDateTimeLabel(overview.applied.appliedAt)}
+            </time>
           </p>
         ) : null}
       </OverviewRow>
@@ -78,7 +82,10 @@ export function SessionOverviewSection({
         </div>
         {overview.draft.updatedAt ? (
           <p className="tiny mono" style={{ margin: "10px 0 0", color: "var(--text-3)" }}>
-            최근 저장 <time dateTime={overview.draft.updatedAt}>{overview.draft.updatedAt}</time>
+            최근 저장{" "}
+            <time dateTime={overview.draft.updatedAt}>
+              {formatDateTimeLabel(overview.draft.updatedAt)}
+            </time>
           </p>
         ) : null}
       </OverviewRow>

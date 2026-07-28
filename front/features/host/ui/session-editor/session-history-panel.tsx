@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import type { HostSessionEditorSection } from "@/features/host/model/host-session-editor-navigation";
 import { buildHostSessionHistoryItemView } from "@/features/host/model/host-session-editor-view-model";
+import { formatDateTimeLabel } from "@/shared/ui/readmates-display";
 import { Panel } from "./session-editor-panel";
 import type { SessionHistoryPanelItem } from "./session-history-model";
 
@@ -81,7 +82,10 @@ export function SessionHistoryPanel({
             <div className="surface-quiet small" style={{ padding: 14 }}>아직 변경 기록이 없습니다</div>
           ) : items.map((item) => {
             const view = buildHostSessionHistoryItemView(item);
-            const metadata = [view.sourceLabel, item.createdAt].filter(Boolean);
+            const metadata = [
+              view.sourceLabel,
+              item.createdAt ? formatDateTimeLabel(item.createdAt) : null,
+            ].filter(Boolean);
             return (
               <article key={item.id} className="surface-quiet" style={{ padding: 14 }}>
                 <div className="row-between" style={{ gap: 10, flexWrap: "wrap" }}>

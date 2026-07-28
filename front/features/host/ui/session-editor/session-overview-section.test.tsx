@@ -58,6 +58,20 @@ describe("SessionOverviewSection", () => {
     expect(screen.queryByText("초안 준비됨")).not.toBeInTheDocument();
   });
 
+  it("shows applied and draft timestamps as Seoul date-time labels", () => {
+    renderOverview();
+
+    expect(screen.getByText("2026.07.27 12:00")).toHaveAttribute(
+      "datetime",
+      "2026-07-27T12:00:00+09:00",
+    );
+    expect(screen.getByText("2026.07.27 13:00")).toHaveAttribute(
+      "datetime",
+      "2026-07-27T13:00:00+09:00",
+    );
+    expect(screen.queryByText("2026-07-27T12:00:00+09:00")).not.toBeInTheDocument();
+  });
+
   it("reports the exact next-action target", async () => {
     const user = userEvent.setup();
     const onNextAction = vi.fn();

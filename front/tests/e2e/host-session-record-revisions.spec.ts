@@ -502,4 +502,20 @@ test("8. 320px host record navigation and confirmation sheet remain accessible",
   expect(applyDialogScreenshot.byteLength).toBeGreaterThan(10_000);
   await page.getByRole("button", { name: "취소" }).click();
   await expect(dialog).toBeHidden();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("button", { name: "반영 검토" }).click();
+  await expect(dialog).toBeVisible();
+  const wideMobileBox = await sheet.boundingBox();
+  expect(wideMobileBox).not.toBeNull();
+  expect(wideMobileBox!.x).toBeGreaterThanOrEqual(0);
+  expect(wideMobileBox!.x + wideMobileBox!.width).toBeLessThanOrEqual(390);
+  expect(Math.abs(wideMobileBox!.y + wideMobileBox!.height - 844)).toBeLessThanOrEqual(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const wideMobileDialogScreenshot = await page.screenshot({
+    path: testInfo.outputPath("apply-dialog-390x844.png"),
+  });
+  expect(wideMobileDialogScreenshot.byteLength).toBeGreaterThan(10_000);
+  await page.getByRole("button", { name: "취소" }).click();
+  await expect(dialog).toBeHidden();
 });

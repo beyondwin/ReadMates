@@ -18,6 +18,10 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - **멤버 알림함:** 큰 문서 패널과 중첩 카드를 간결한 편집형 목록으로 바꾸고, 영어 액션·회고 배지를 제거했습니다. 행 전체 이동, 읽지 않음 상태, 오류·빈 상태, 더 보기 흐름을 데스크톱과 모바일에서 같은 한국어 인터페이스로 제공합니다.
 - **개인 독서 여정 API:** 현재 멤버의 열람 가능한 전체 기록 summary와 cursor page를 함께 반환하는 additive `GET /api/archive/me/journey` projection을 추가했습니다. Page 크기와 무관한 두 개의 고정 query로 계산하며 DB migration이나 BFF 계약 변경은 없습니다.
 
+### Fixed
+
+- **호스트 세션 편집기 잔여 리스크:** URL 기본 위치가 호출 간 공유 객체를 노출하지 않도록 분리하고, 오류·stale·validation·review가 동시에 존재할 때의 다음 행동 우선순위를 조합 테스트로 고정했습니다. 적용·초안·변경 기록 시간은 `Asia/Seoul` 기준 `YYYY.MM.DD HH:mm`으로 표시하며 원본 ISO 값은 `<time dateTime>`에 보존합니다. 저장된 세션은 route-owned record workflow를 필수로 요구하고 구형 공개 패널 fallback과 전용 dead code를 제거했습니다. 모바일 CSS는 명시적 편집기 class만 사용하며, 320px JSON 긴 콘텐츠와 390px 반영 대화상자까지 실제 브라우저 overflow·screenshot 증거를 확장했습니다. Spring API, BFF, DB migration, 알림·provider 계약은 변경하지 않습니다.
+
 ## v2.0.1 - 2026-07-25
 
 ### Fixed

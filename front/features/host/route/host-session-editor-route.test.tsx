@@ -89,7 +89,6 @@ vi.mock("@/features/host/queries/host-session-queries", async (importOriginal) =
   useCreateHostSessionMutation: () => ({ mutateAsync: vi.fn() }),
   useDeleteHostSessionMutation: () => ({ mutateAsync: vi.fn() }),
   usePublishHostSessionMutation: () => ({ mutateAsync: vi.fn() }),
-  useSaveHostSessionPublicationMutation: () => ({ mutateAsync: vi.fn() }),
   useUpdateHostSessionAttendanceMutation: () => ({ mutateAsync: vi.fn() }),
   useUpdateHostSessionMutation: () => ({ mutateAsync: vi.fn() }),
 }));

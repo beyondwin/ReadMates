@@ -22,7 +22,9 @@ const HOST_SESSION_EDITOR_SECTION_ORDER: readonly HostSessionEditorSection[] = [
 
 const HOST_SESSION_DRAFT_SOURCES: readonly HostSessionDraftSource[] = ["manual", "ai", "json"];
 
-const DEFAULT_LOCATION: HostSessionEditorLocation = { section: "overview", source: "manual" };
+function defaultLocation(): HostSessionEditorLocation {
+  return { section: "overview", source: "manual" };
+}
 
 export function parseHostSessionEditorLocation(search: string): HostSessionEditorLocation {
   const params = new URLSearchParams(search);
@@ -30,11 +32,11 @@ export function parseHostSessionEditorLocation(search: string): HostSessionEdito
 
   if (section !== null) {
     if (!isHostSessionEditorSection(section)) {
-      return DEFAULT_LOCATION;
+      return defaultLocation();
     }
     const source = params.get("source");
     if (source !== null && !isHostSessionDraftSource(source)) {
-      return DEFAULT_LOCATION;
+      return defaultLocation();
     }
     if (section !== "records") {
       return { section, source: "manual" };
@@ -49,7 +51,7 @@ export function parseHostSessionEditorLocation(search: string): HostSessionEdito
   if (params.get("records") === "json") {
     return { section: "records", source: "json" };
   }
-  return DEFAULT_LOCATION;
+  return defaultLocation();
 }
 
 export function buildHostSessionEditorUrl(

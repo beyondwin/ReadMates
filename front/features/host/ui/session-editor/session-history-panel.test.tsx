@@ -35,6 +35,8 @@ describe("SessionHistoryPanel", () => {
     expect(screen.getByText("새 버전 반영")).toBeVisible();
     expect(screen.getByText("버전 2")).toBeVisible();
     expect(screen.getByText("과거 버전으로 초안 생성")).toBeVisible();
+    expect(screen.getAllByText(/직접 작성 · 2026\.07\.23 10:00|과거 버전에서 생성 · 2026\.07\.23 10:00/))
+      .toHaveLength(2);
     expect(screen.getAllByRole("button", { name: "이 버전으로 초안 만들기" })).toHaveLength(2);
     expect(screen.queryByText(/history-1|revision-2|membership-host/)).not.toBeInTheDocument();
   });

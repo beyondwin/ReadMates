@@ -6,10 +6,7 @@ import type {
   SessionImportPreviewResponse,
   SessionImportRequest,
 } from "@/features/host/api/host-contracts";
-import type {
-  HostSessionPublicationRequest,
-  HostSessionRequest,
-} from "@/features/host/model/host-session-editor-model";
+import type { HostSessionRequest } from "@/features/host/model/host-session-editor-model";
 
 type JsonResponse<T> = Response & { json(): Promise<T> };
 
@@ -19,7 +16,6 @@ export type HostSessionEditorActions = {
   closeSession: (sessionId: string) => Promise<JsonResponse<HostSessionDetailResponse>>;
   publishSession: (sessionId: string) => Promise<JsonResponse<HostSessionDetailResponse>>;
   saveSession: (sessionId: string | null, request: HostSessionRequest) => Promise<Response>;
-  savePublication: (sessionId: string, request: HostSessionPublicationRequest) => Promise<Response>;
   updateAttendance: (
     sessionId: string,
     attendance: Array<{ membershipId: string; attendanceStatus: AttendanceStatus }>,
