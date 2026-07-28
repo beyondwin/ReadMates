@@ -113,7 +113,6 @@ export function completionLabel(summary: MyJourneySummary): string {
 
 export function shelfEmptyState(input: {
   membershipStatus: MembershipStatus;
-  clubSlug: string;
   currentSessionId: string | null;
 }): ShelfEmptyState {
   if (input.membershipStatus === "VIEWER") {

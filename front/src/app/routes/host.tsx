@@ -3,10 +3,10 @@ import type { RouteObject } from "react-router-dom";
 import { requireHostLoaderAuth } from "@/features/host/route/host-loader-auth";
 import { HostRouteError } from "@/features/host/route/host-route-error";
 import { AppRouteLayout } from "@/src/app/layouts/app-route-layout";
+import { ClubHostAppRouteLayout } from "@/src/app/layouts/club-app-route-layout";
 import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
 import { RequireHost } from "@/src/app/route-guards";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
-
 
 function hostAppRoutes(queryClient: QueryClient): RouteObject[] {
   return [
@@ -158,11 +158,7 @@ export function hostRoutes(queryClient: QueryClient): RouteObject[] {
     {
       id: "club-app-host",
       path: "/clubs/:clubSlug/app/host",
-      element: (
-        <RequireHost>
-          <AppRouteLayout />
-        </RequireHost>
-      ),
+      element: <ClubHostAppRouteLayout />,
       loader: requireHostLoaderAuth,
       errorElement: <RouteErrorBoundary variant="host" />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="모임 운영 권한을 확인하는 중" variant="host" />,

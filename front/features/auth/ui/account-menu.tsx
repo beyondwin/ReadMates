@@ -38,9 +38,9 @@ export function AccountMenu({
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
   const focusReturnTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
-  const menuId = useId();
+  const dialogId = useId();
+  const dialogLabelId = useId();
 
   useEffect(
     () => () => {
@@ -106,16 +106,24 @@ export function AccountMenu({
         className="rm-account-menu__trigger"
         aria-label={`${memberName} 계정 메뉴`}
         aria-expanded={open}
-        aria-haspopup="menu"
-        aria-controls={menuId}
+        aria-haspopup="dialog"
+        aria-controls={dialogId}
         onClick={() => setOpen((current) => !current)}
       >
         <AvatarChip name={memberName} label="" size={28} />
       </button>
       {open ? (
-        <div ref={menuRef} id={menuId} className="rm-account-menu__popover" role="menu">
+        <div
+          id={dialogId}
+          className="rm-account-menu__popover"
+          role="dialog"
+          aria-modal="false"
+          aria-labelledby={dialogLabelId}
+        >
           <div className="rm-account-menu__identity">
-            <strong className="rm-account-menu__member-name">{memberName}</strong>
+            <strong id={dialogLabelId} className="rm-account-menu__member-name">
+              {memberName}
+            </strong>
             <span className="rm-account-menu__membership">{membershipLabel}</span>
           </div>
           <div className="rm-account-menu__items">

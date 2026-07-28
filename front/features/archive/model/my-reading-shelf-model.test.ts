@@ -88,13 +88,13 @@ describe("my reading shelf model", () => {
 
   it("returns only membership-appropriate empty-state actions", () => {
     expect(
-      shelfEmptyState({ membershipStatus: "VIEWER", clubSlug: "sample-club", currentSessionId: "session-now" }),
+      shelfEmptyState({ membershipStatus: "VIEWER", currentSessionId: "session-now" }),
     ).toMatchObject({ action: { label: "아카이브 둘러보기", href: "/app/archive" } });
     expect(
-      shelfEmptyState({ membershipStatus: "ACTIVE", clubSlug: "sample-club", currentSessionId: "session-now" }),
+      shelfEmptyState({ membershipStatus: "ACTIVE", currentSessionId: "session-now" }),
     ).toMatchObject({ action: { label: "이번 세션 보기", href: "/app/session/current" } });
     expect(
-      shelfEmptyState({ membershipStatus: "ACTIVE", clubSlug: "sample-club", currentSessionId: null }),
+      shelfEmptyState({ membershipStatus: "ACTIVE", currentSessionId: null }),
     ).toMatchObject({ action: { label: "아카이브 보기", href: "/app/archive" } });
   });
 });

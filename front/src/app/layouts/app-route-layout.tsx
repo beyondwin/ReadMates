@@ -21,7 +21,6 @@ import { Link } from "@/src/app/router-link";
 import { readmatesFetch } from "@/shared/api/client";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { canUseHostApp } from "@/shared/auth/member-app-access";
-import { authMePath } from "@/shared/auth/member-app-loader";
 import { MobileHeader } from "@/shared/ui/mobile-header";
 import { MobileTabBar } from "@/shared/ui/mobile-tab-bar";
 import { PublicFooter } from "@/shared/ui/public-footer";
@@ -139,7 +138,11 @@ function ClubSwitcher({
   );
 }
 
-export function AppRouteLayout() {
+export function AppRouteLayout({
+  scopedAuth,
+}: {
+  scopedAuth?: AuthMeResponse;
+} = {}) {
   const state = useAuth();
   const { markLoggedOut } = useAuthActions();
   const location = useLocation();
@@ -147,11 +150,8 @@ export function AppRouteLayout() {
   const appPath = appPathname(pathname);
   const basePath = appBasePath(pathname);
   const clubSlug = appClubSlug(pathname);
-  const [scopedAuth, setScopedAuth] = useState<{ clubSlug: string; auth: AuthMeResponse | null } | null>(null);
   const auth = clubSlug
-    ? scopedAuth?.clubSlug === clubSlug
-      ? scopedAuth.auth
-      : null
+    ? (scopedAuth ?? null)
     : state.status === "ready"
       ? state.auth
       : null;
@@ -178,30 +178,6 @@ export function AppRouteLayout() {
   } | null>(null);
   const currentSessionId =
     activeHostKey === null ? null : hostCurrentSession?.hostKey === activeHostKey ? hostCurrentSession.sessionId : undefined;
-
-  useEffect(() => {
-    let cancelled = false;
-
-    if (!clubSlug) {
-      return;
-    }
-
-    readmatesFetch<AuthMeResponse>(authMePath(clubSlug))
-      .then((nextAuth) => {
-        if (!cancelled) {
-          setScopedAuth({ clubSlug, auth: nextAuth });
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setScopedAuth({ clubSlug, auth: null });
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [clubSlug]);
 
   useEffect(() => {
     let cancelled = false;

@@ -31,7 +31,7 @@ function renderMenu(memberName = "멤버1") {
 afterEach(cleanup);
 
 describe("AccountMenu", () => {
-  it("opens from the account trigger, preserves natural tab order, and returns focus after Escape", async () => {
+  it("opens a labelled nonmodal dialog in natural tab order and returns focus after Escape", async () => {
     const user = userEvent.setup();
     renderMenu();
     const trigger = screen.getByRole("button", { name: "멤버1 계정 메뉴" });
@@ -39,16 +39,21 @@ describe("AccountMenu", () => {
     await user.click(trigger);
 
     expect(trigger).toHaveAttribute("aria-expanded", "true");
-    const menu = screen.getByRole("menu");
-    expect(menu).toBeVisible();
-    expect(within(menu).getByRole("link", { name: "내 공간" })).toHaveAttribute("href", "/app/me");
-    expect(within(menu).getByRole("link", { name: "계정 관리" })).toHaveAttribute("href", "/app/me/settings");
+    expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
+    const dialog = screen.getByRole("dialog", { name: "멤버1" });
+    expect(dialog).toBeVisible();
+    expect(dialog).toHaveAttribute("aria-modal", "false");
+    expect(trigger).toHaveAttribute("aria-controls", dialog.id);
+    expect(within(dialog).getByRole("link", { name: "내 공간" })).toHaveAttribute("href", "/app/me");
+    expect(within(dialog).getByRole("link", { name: "계정 관리" })).toHaveAttribute("href", "/app/me/settings");
+    expect(within(dialog).queryByRole("menuitem")).toBeNull();
+    expect(screen.queryByRole("menu")).toBeNull();
 
     await user.tab();
-    expect(within(menu).getByRole("link", { name: "내 공간" })).toHaveFocus();
+    expect(within(dialog).getByRole("link", { name: "내 공간" })).toHaveFocus();
 
     await user.keyboard("{Escape}");
-    expect(screen.queryByRole("menu")).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(trigger).toHaveFocus();
   });
 
@@ -58,10 +63,10 @@ describe("AccountMenu", () => {
     const trigger = screen.getByRole("button", { name: "멤버1 계정 메뉴" });
 
     await user.click(trigger);
-    expect(screen.getByRole("menu")).toBeVisible();
+    expect(screen.getByRole("dialog", { name: "멤버1" })).toBeVisible();
 
     await user.pointer({ keys: "[MouseLeft]", target: screen.getByRole("button", { name: "바깥 작업" }) });
-    expect(screen.queryByRole("menu")).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(trigger).toHaveFocus();
   });
 

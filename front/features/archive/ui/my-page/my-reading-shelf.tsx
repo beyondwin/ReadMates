@@ -13,7 +13,6 @@ export function MyReadingShelf({ profile, journey }: MyReadingShelfProps) {
   const hasJourney = journey.items.length > 0;
   const emptyState = shelfEmptyState({
     membershipStatus: profile.membershipStatus,
-    clubSlug: "",
     currentSessionId: profile.currentSessionId,
   });
 

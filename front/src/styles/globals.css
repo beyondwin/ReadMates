@@ -136,11 +136,15 @@
 }
 
 .rm-account-menu__item:hover,
+.rm-account-menu__logout:hover {
+  background: var(--bg-sub);
+}
+
 .rm-account-menu__item:focus-visible,
-.rm-account-menu__logout:hover,
 .rm-account-menu__logout:focus-visible {
   background: var(--bg-sub);
-  outline: none;
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .rm-account-menu__logout-control {
@@ -6290,11 +6294,6 @@
 
 .rm-member-notification-settings__save .btn {
   min-height: 44px;
-}
-
-.rm-my-shelf-settings__logout {
-  display: flex;
-  justify-content: flex-start;
 }
 
 .rm-account-settings-page__boundary {

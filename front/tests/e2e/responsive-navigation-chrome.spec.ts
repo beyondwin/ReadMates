@@ -120,13 +120,13 @@ test("desktop public and host pages show the expected top navigation", async ({ 
   await expect(accountMenu).toHaveCount(1);
   await expectPracticalTapTarget(accountMenu);
   await accountMenu.click();
-  await expect(page.getByRole("menu")).toBeVisible();
+  await expect(page.getByRole("dialog")).toBeVisible();
   await expect(page.getByRole("link", { name: "계정 관리" })).toHaveAttribute(
     "href",
     `${baselineClubAppPath}/me/settings`,
   );
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.locator(".mobile-only .rm-account-menu__trigger")).toBeHidden();
   const hostEntry = page.getByRole("banner").getByRole("link", { name: "호스트 화면" });
   await expect(hostEntry).toHaveAttribute("href", baselineClubHostPath);
@@ -187,13 +187,13 @@ test("mobile public pages hide app tabs and host app pages show mobile chrome", 
   await expect(accountMenu).toHaveCount(1);
   await expectPracticalTapTarget(accountMenu);
   await accountMenu.click();
-  await expect(page.getByRole("menu")).toBeVisible();
+  await expect(page.getByRole("dialog")).toBeVisible();
   await expect(page.getByRole("link", { name: "계정 관리" })).toHaveAttribute(
     "href",
     `${baselineClubAppPath}/me/settings`,
   );
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.locator(".desktop-only .rm-account-menu__trigger")).toBeHidden();
   await expect(mobileHeader.locator(".m-hdr-side")).toHaveCount(2);
   const memberTabs = page.getByRole("navigation", { name: "앱 탭" });
@@ -394,9 +394,9 @@ test("reading shelf preserves semantic hierarchy and record order on desktop and
     await expectPracticalTapTarget(accountMenu);
     await accountMenu.click();
     const currentAppBasePath = new URL(page.url()).pathname.replace(/\/me$/, "");
-    const menu = page.getByRole("menu");
-    await expect(menu.getByRole("link", { name: "내 공간" })).toHaveAttribute("href", `${currentAppBasePath}/me`);
-    await expect(menu.getByRole("link", { name: "계정 관리" })).toHaveAttribute("href", `${currentAppBasePath}/me/settings`);
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("link", { name: "내 공간" })).toHaveAttribute("href", `${currentAppBasePath}/me`);
+    await expect(dialog.getByRole("link", { name: "계정 관리" })).toHaveAttribute("href", `${currentAppBasePath}/me/settings`);
     await page.keyboard.press("Escape");
 
     if (viewport.width === 1440) {
@@ -480,10 +480,12 @@ test("account menu advances keyboard focus naturally and returns it after Escape
   const accountTrigger = page.getByRole("button", { name: /계정 메뉴$/ });
   await accountTrigger.focus();
   await page.keyboard.press("Enter");
-  const menu = page.getByRole("menu");
-  const mySpace = menu.getByRole("link", { name: "내 공간" });
-  const settings = menu.getByRole("link", { name: "계정 관리" });
-  const logout = menu.getByRole("button", { name: "로그아웃" });
+  await expect(accountTrigger).toHaveAttribute("aria-haspopup", "dialog");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toHaveAttribute("aria-modal", "false");
+  const mySpace = dialog.getByRole("link", { name: "내 공간" });
+  const settings = dialog.getByRole("link", { name: "계정 관리" });
+  const logout = dialog.getByRole("button", { name: "로그아웃" });
 
   await expectDomOrder(accountTrigger, mySpace, settings, logout);
   for (const locator of [accountTrigger, mySpace, settings, logout]) {
@@ -491,10 +493,22 @@ test("account menu advances keyboard focus naturally and returns it after Escape
   }
 
   await pressTabUntilFocused(page, mySpace, "my space");
+  const focusStyle = await mySpace.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      backgroundColor: style.backgroundColor,
+      outlineColor: style.outlineColor,
+      outlineStyle: style.outlineStyle,
+      outlineWidth: style.outlineWidth,
+    };
+  });
+  expect(focusStyle.outlineStyle).toBe("solid");
+  expect(Number.parseFloat(focusStyle.outlineWidth)).toBeGreaterThanOrEqual(2);
+  expect(focusStyle.outlineColor).not.toBe(focusStyle.backgroundColor);
   await pressTabUntilFocused(page, settings, "account settings");
   await pressTabUntilFocused(page, logout, "logout");
   await page.keyboard.press("Escape");
-  await expect(menu).toHaveCount(0);
+  await expect(dialog).toHaveCount(0);
   await expect(accountTrigger).toBeFocused();
 });
 
@@ -506,7 +520,7 @@ test("account menu disables popover motion when reduced motion is requested", as
   await page.goto("/app/me");
   await page.getByRole("button", { name: /계정 메뉴$/ }).click();
 
-  const motion = await page.getByRole("menu").evaluate((element) => {
+  const motion = await page.getByRole("dialog").evaluate((element) => {
     const style = getComputedStyle(element);
     return { duration: style.animationDuration, name: style.animationName };
   });

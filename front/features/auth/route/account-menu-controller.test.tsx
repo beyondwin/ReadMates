@@ -79,7 +79,7 @@ describe("AccountMenuController", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "로그아웃에 실패했습니다. 잠시 후 다시 시도해 주세요.",
     );
-    expect(screen.getByRole("menu")).toBeVisible();
+    expect(screen.getByRole("dialog", { name: "멤버1" })).toBeVisible();
     expect(onLoggedOut).not.toHaveBeenCalled();
   });
 

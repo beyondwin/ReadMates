@@ -172,4 +172,55 @@ describe("MyRecordsRoute", () => {
       { limit: 12, cursor: "club-b-cursor" },
     );
   });
+
+  it("loads the current club while the prior club continuation remains unresolved", async () => {
+    const user = userEvent.setup();
+    const stalePage = deferred<MyJourneyPage>();
+    const currentPage = deferred<MyJourneyPage>();
+    const secondClubJourney: MyJourneyPage = {
+      ...journey,
+      items: [item({ sessionId: "club-b-session", bookTitle: "두 번째 모임의 책" })],
+      nextCursor: "club-b-cursor",
+    };
+    const secondClubContinuation = item({
+      sessionId: "club-b-next-session",
+      sessionNumber: 8,
+      bookTitle: "두 번째 모임의 다음 책",
+    });
+    api.fetchMyJourney
+      .mockReturnValueOnce(stalePage.promise)
+      .mockReturnValueOnce(currentPage.promise);
+    const { router } = renderNavigableRoute();
+
+    await user.click(await screen.findByRole("button", { name: "기록 더 보기" }));
+
+    route.loaderData = secondClubJourney;
+    await act(async () => {
+      await router.navigate("/clubs/reading-gathering/app/me/records");
+    });
+    await user.click(await screen.findByRole("button", { name: "기록 더 보기" }));
+
+    await waitFor(() => expect(api.fetchMyJourney).toHaveBeenCalledTimes(2));
+    expect(api.fetchMyJourney).toHaveBeenLastCalledWith(
+      { clubSlug: "reading-gathering" },
+      { limit: 12, cursor: "club-b-cursor" },
+    );
+
+    await act(async () => {
+      currentPage.resolve({
+        ...secondClubJourney,
+        items: [secondClubContinuation],
+        nextCursor: null,
+      });
+      await currentPage.promise;
+    });
+    expect(screen.getByRole("article", { name: "8차 두 번째 모임의 다음 책" })).toBeVisible();
+
+    await act(async () => {
+      stalePage.reject(new Error("club A continuation failed late"));
+      await stalePage.promise.catch(() => undefined);
+    });
+    expect(screen.queryByRole("button", { name: "다시 시도" })).toBeNull();
+    expect(screen.getAllByRole("article")).toHaveLength(2);
+  });
 });

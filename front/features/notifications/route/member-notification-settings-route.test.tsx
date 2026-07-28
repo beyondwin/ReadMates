@@ -1,6 +1,10 @@
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import {
+  createMemoryRouter,
+  MemoryRouter,
+  RouterProvider,
+} from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { NotificationPreferences } from "../model/notification-preferences-model";
 import { MemberNotificationSettingsRoute } from "./member-notification-settings-route";
@@ -46,6 +50,20 @@ function renderRoute() {
       <MemberNotificationSettingsRoute />
     </MemoryRouter>,
   );
+}
+
+function renderNavigableRoute() {
+  const router = createMemoryRouter(
+    [
+      {
+        path: "/clubs/:clubSlug/app/notifications/settings",
+        element: <MemberNotificationSettingsRoute />,
+      },
+    ],
+    { initialEntries: ["/clubs/reading-sai/app/notifications/settings"] },
+  );
+
+  return { ...render(<RouterProvider router={router} />), router };
 }
 
 describe("MemberNotificationSettingsRoute", () => {
@@ -120,5 +138,68 @@ describe("MemberNotificationSettingsRoute", () => {
 
     expect(route.revalidate).toHaveBeenCalledOnce();
     expect(api.saveNotificationPreferences).not.toHaveBeenCalled();
+  });
+
+  it("saves the current club while the prior club save remains unresolved", async () => {
+    const user = userEvent.setup();
+    const staleSave = deferred<NotificationPreferences>();
+    const currentSave = deferred<NotificationPreferences>();
+    const secondClubPreferences: NotificationPreferences = {
+      ...preferences,
+      events: { ...preferences.events, REVIEW_PUBLISHED: false },
+    };
+    api.saveNotificationPreferences
+      .mockReturnValueOnce(staleSave.promise)
+      .mockReturnValueOnce(currentSave.promise);
+    const { router } = renderNavigableRoute();
+
+    await user.click(screen.getByRole("switch", { name: "이메일 알림" }));
+    await user.click(screen.getByRole("button", { name: "알림 설정 저장" }));
+    expect(screen.getByRole("button", { name: "저장 중" })).toBeDisabled();
+
+    route.loaderData = {
+      status: "ready",
+      preferences: secondClubPreferences,
+    };
+    await act(async () => {
+      await router.navigate("/clubs/reading-gathering/app/notifications/settings");
+    });
+
+    expect(screen.getByRole("button", { name: "알림 설정 저장" })).toBeEnabled();
+    await user.click(screen.getByRole("switch", { name: "다른 멤버의 서평 공개" }));
+    await user.click(screen.getByRole("button", { name: "알림 설정 저장" }));
+    await waitFor(() => {
+      expect(api.saveNotificationPreferences).toHaveBeenCalledTimes(2);
+    });
+    expect(api.saveNotificationPreferences).toHaveBeenLastCalledWith({
+      ...secondClubPreferences,
+      events: {
+        ...secondClubPreferences.events,
+        REVIEW_PUBLISHED: true,
+      },
+    });
+
+    await act(async () => {
+      staleSave.reject(new Error("club A save failed late"));
+      await staleSave.promise.catch(() => undefined);
+    });
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("button", { name: "저장 중" })).toBeDisabled();
+
+    await act(async () => {
+      currentSave.resolve({
+        ...secondClubPreferences,
+        emailEnabled: false,
+        events: {
+          ...secondClubPreferences.events,
+          REVIEW_PUBLISHED: true,
+        },
+      });
+      await currentSave.promise;
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("switch", { name: "이메일 알림" })).not.toBeChecked();
+    });
+    expect(screen.getByRole("button", { name: "알림 설정 저장" })).toBeEnabled();
   });
 });

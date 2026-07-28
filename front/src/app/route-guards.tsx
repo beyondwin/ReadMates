@@ -47,6 +47,20 @@ export function RequireMemberApp({ children }: { children: ReactNode }) {
 
 export const RequireActiveMember = RequireMemberApp;
 
+export function RequireScopedMemberApp({
+  allowed,
+  children,
+}: {
+  allowed: boolean;
+  children: ReactNode;
+}) {
+  if (!allowed) {
+    return <BlockedMemberApp />;
+  }
+
+  return <>{children}</>;
+}
+
 export function RequireHost({ children }: { children: ReactNode }) {
   const state = useAuth();
   const { clubSlug } = useParams();

@@ -50,8 +50,16 @@ export function MyRecordsRoute() {
 
   const loadMore = async () => {
     const cursor = failedCursor ?? page.nextCursor;
+    const pendingRequest = pendingRequestRef.current;
 
-    if (!cursor || pendingRequestRef.current !== null) {
+    if (
+      !cursor ||
+      (
+        pendingRequest?.source === loaderPage &&
+        pendingRequest.scope === scope &&
+        pendingRequest.cursor === cursor
+      )
+    ) {
       return;
     }
 

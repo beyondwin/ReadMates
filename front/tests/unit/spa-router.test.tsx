@@ -268,6 +268,113 @@ describe("SPA router", () => {
     expect(await screen.findByRole("heading", { name: heading })).toBeInTheDocument();
   });
 
+  it("keeps scoped host access when the unscoped session role is only member", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(
+          jsonResponse({
+            authenticated: true,
+            userId: "multi-club-user",
+            membershipId: "default-member-membership",
+            clubId: "default-club",
+            email: "multi-club@example.com",
+            displayName: "기본 클럽 멤버",
+            accountName: "멀티클럽",
+            role: "MEMBER",
+            membershipStatus: "ACTIVE",
+            approvalState: "ACTIVE",
+          }),
+        );
+      }
+
+      if (url === "/api/bff/api/auth/me?clubSlug=reading-sai") {
+        return Promise.resolve(
+          jsonResponse({
+            authenticated: true,
+            userId: "multi-club-user",
+            membershipId: "scoped-host-membership",
+            clubId: "reading-sai-club",
+            email: "multi-club@example.com",
+            displayName: "읽는사이 호스트",
+            accountName: "멀티클럽",
+            role: "HOST",
+            membershipStatus: "ACTIVE",
+            approvalState: "ACTIVE",
+          }),
+        );
+      }
+
+      return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
+    const router = createMemoryRouter(routes, {
+      initialEntries: ["/clubs/reading-sai/app/host/missing-page"],
+    });
+
+    renderWithRoutesQueryClient(
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "페이지를 찾을 수 없습니다." })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/clubs/reading-sai/app/host/missing-page");
+  });
+
+  it("blocks scoped member access when only the unscoped session is active", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(
+          jsonResponse({
+            authenticated: true,
+            userId: "multi-club-user",
+            membershipId: "default-member-membership",
+            clubId: "default-club",
+            email: "multi-club@example.com",
+            displayName: "기본 클럽 멤버",
+            accountName: "멀티클럽",
+            role: "MEMBER",
+            membershipStatus: "ACTIVE",
+            approvalState: "ACTIVE",
+          }),
+        );
+      }
+
+      if (url === "/api/bff/api/auth/me?clubSlug=reading-sai") {
+        return Promise.resolve(
+          jsonResponse({
+            ...inactiveAuth,
+            userId: "multi-club-user",
+            membershipId: "inactive-scoped-membership",
+            clubId: "reading-sai-club",
+            email: "multi-club@example.com",
+          }),
+        );
+      }
+
+      return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
+    const router = createMemoryRouter(routes, {
+      initialEntries: ["/clubs/reading-sai/app/missing-page"],
+    });
+
+    renderWithRoutesQueryClient(
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "멤버 공간에 들어갈 수 없습니다." })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/clubs/reading-sai/app/missing-page");
+  });
+
   it("renders permission denied copy from a structured API route error", async () => {
     vi.stubGlobal(
       "fetch",

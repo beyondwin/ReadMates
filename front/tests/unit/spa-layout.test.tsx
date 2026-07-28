@@ -1,7 +1,15 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import {
+  createMemoryRouter,
+  MemoryRouter,
+  Route,
+  RouterProvider,
+  Routes,
+  useLocation,
+  useLoaderData,
+} from "react-router-dom";
 import { AuthProvider } from "@/src/app/auth-context";
 import { AppRouteLayout, PublicRouteLayout } from "@/src/app/layouts";
 import { Link } from "@/src/app/router-link";
@@ -75,6 +83,15 @@ function CurrentLocationText() {
   const location = useLocation();
 
   return <span>{`${location.pathname}${location.search}${location.hash}`}</span>;
+}
+
+function ClubAppLayoutFromLoader() {
+  const access = useLoaderData() as {
+    auth: AuthMeResponse;
+    allowed: boolean;
+  };
+
+  return <AppRouteLayout scopedAuth={access.auth} />;
 }
 
 afterEach(() => {
@@ -217,7 +234,8 @@ describe("SPA AppRouteLayout", () => {
     expect(appContent?.querySelector(".topnav")).not.toBeInTheDocument();
   });
 
-  it("uses club-scoped auth for scoped app chrome decisions", async () => {
+  it("uses club-app loader auth while a redundant scoped request remains pending", async () => {
+    const redundantScopedRequest = createDeferred<Response>();
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = input.toString();
 
@@ -226,30 +244,38 @@ describe("SPA AppRouteLayout", () => {
       }
 
       if (url === "/api/bff/api/auth/me?clubSlug=reading-sai") {
-        return Promise.resolve(jsonResponse(activeMemberAuth));
+        return redundantScopedRequest.promise;
       }
 
       return Promise.reject(new Error(`Unexpected fetch: ${url}`));
     });
     vi.stubGlobal("fetch", fetchMock);
+    const router = createMemoryRouter(
+      [
+        {
+          id: "club-app",
+          path: "/clubs/:clubSlug/app",
+          loader: () => ({ auth: activeMemberAuth, allowed: true }),
+          element: <ClubAppLayoutFromLoader />,
+          children: [{ index: true, element: <main>scoped member child</main> }],
+        },
+      ],
+      { initialEntries: ["/clubs/reading-sai/app"] },
+    );
 
     render(
       <AuthProvider>
-        <MemoryRouter initialEntries={["/clubs/reading-sai/app"]}>
-          <Routes>
-            <Route path="/clubs/:clubSlug/app" element={<AppRouteLayout />}>
-              <Route index element={<main>scoped member child</main>} />
-            </Route>
-          </Routes>
-        </MemoryRouter>
+        <RouterProvider router={router} />
       </AuthProvider>,
     );
 
     expect(await screen.findByText("scoped member child")).toBeInTheDocument();
-    await waitFor(() => {
-      expect(screen.getAllByRole("button", { name: "클럽멤버 계정 메뉴" })).toHaveLength(2);
-    });
+    expect(screen.getAllByRole("button", { name: "클럽멤버 계정 메뉴" })).toHaveLength(2);
     expect(screen.queryByRole("link", { name: "호스트 화면" })).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      "/api/bff/api/auth/me?clubSlug=reading-sai",
+      expect.anything(),
+    );
   });
 
   it("switches clubs while keeping the same app-relative route", async () => {
@@ -293,10 +319,6 @@ describe("SPA AppRouteLayout", () => {
         return Promise.resolve(jsonResponse(hostAuth));
       }
 
-      if (url === "/api/bff/api/auth/me?clubSlug=reading-sai") {
-        return Promise.resolve(jsonResponse(scopedAuth));
-      }
-
       return Promise.reject(new Error(`Unexpected fetch: ${url}`));
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -305,7 +327,10 @@ describe("SPA AppRouteLayout", () => {
       <AuthProvider>
         <MemoryRouter initialEntries={["/clubs/reading-sai/app/archive"]}>
           <Routes>
-            <Route path="/clubs/:clubSlug/app" element={<AppRouteLayout />}>
+            <Route
+              path="/clubs/:clubSlug/app"
+              element={<AppRouteLayout scopedAuth={scopedAuth} />}
+            >
               <Route
                 path="archive"
                 element={

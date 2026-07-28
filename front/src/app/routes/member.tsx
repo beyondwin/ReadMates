@@ -8,6 +8,7 @@ import {
 import { FeedbackRouteError } from "@/features/feedback/route/feedback-route-state";
 import { loadMemberAppAuth } from "@/shared/auth/member-app-loader";
 import { AppRouteLayout } from "@/src/app/layouts/app-route-layout";
+import { ClubMemberAppRouteLayout } from "@/src/app/layouts/club-app-route-layout";
 import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
 import { RequireAuth, RequireMemberApp } from "@/src/app/route-guards";
 import { Link } from "@/src/app/router-link";
@@ -236,11 +237,7 @@ export function memberRoutes(queryClient: QueryClient): RouteObject[] {
     {
       id: "club-app",
       path: "/clubs/:clubSlug/app",
-      element: (
-        <RequireMemberApp>
-          <AppRouteLayout />
-        </RequireMemberApp>
-      ),
+      element: <ClubMemberAppRouteLayout />,
       loader: loadMemberAppAuth,
       errorElement: <RouteErrorBoundary variant="member" />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="멤버 공간을 불러오는 중" variant="member" />,
