@@ -115,7 +115,7 @@
 - 같은 달: `이번 달부터 함께`
 - 12개월 미만: `함께한 지 N개월`
 - 12개월 이상: `함께한 지 N년 M개월`
-- `joinedAt`이 유효한 `YYYY-MM`이 아니면 기간 문구를 렌더링하지 않는다.
+- `joinedAt`이 유효한 `YYYY-MM`이 아니거나 현재 월보다 미래면 기간 문구를 렌더링하지 않는다.
 
 전체 성취에는 다른 클럽, 이전 membership, 다른 멤버의 활동을 포함하지 않는다.
 
@@ -146,7 +146,18 @@
 - `ABSENT`: 불참
 - `UNKNOWN`: 출석 미확인
 
-기존 `attended: Boolean`만으로는 참여 정보가 없는 상태, 실제 불참, 출석 미확정을 구분할 수 없다. `/api/app/me`의 `recentAttendances` item에 `attendanceStatus`를 추가하고 프런트 참여 여정은 새 필드를 기준으로 계산한다. 기존 `attended` 필드는 이 변경에서 제거하지 않아 기존 소비자의 호환성을 유지한다.
+기존 `attended: Boolean`만으로는 참여 정보가 없는 상태, 실제 불참, 출석 미확정을 구분할 수 없다. `/api/app/me`의 `recentAttendances` item에 `attendanceStatus`를 추가하고 프런트 참여 여정은 새 필드를 기준으로 계산한다.
+
+```json
+{
+  "sessionNumber": 8,
+  "attended": false,
+  "attendanceStatus": "UNKNOWN",
+  "readingProgress": 0
+}
+```
+
+기존 `attended` 필드는 이 변경에서 제거하지 않는다. `attendanceStatus == "ATTENDED"`일 때만 `true`이고 `ABSENT` 또는 `UNKNOWN`이면 `false`다. 기존 소비자의 호환성을 위한 필드이며 새 참여 여정 계산에는 사용하지 않는다.
 
 서버 query는 최근 클럽 회차를 `left join`한 뒤 참여 정보 부재를 `false`로 치환하지 않는다. 현재 membership의 유효한 참여 대상 행을 기준으로 조회한다.
 
@@ -203,7 +214,7 @@ VIEWER, SUSPENDED, LEFT, INACTIVE 상태에는 쓰기 행동을 암시하는 참
 - 프로필: 가입 시점, 현재 세션 ID, 최근 참여 대상 회차
 - 개인 여정: 전체 참여, 완독, 질문, 서평 summary
 
-최근 책 목록을 렌더링하지 않으므로 개인 여정 item은 첫 항목만 요청하고 전체 수치는 서버 summary를 사용한다. 프런트는 일부 page 길이로 전체 통계를 추정하지 않는다.
+최근 책 목록을 렌더링하지 않으므로 `fetchMyJourney`는 `limit: 1`로 요청하고 전체 수치는 서버 summary를 사용한다. 응답의 item은 내 공간 UI에서 렌더링하지 않는다. 프런트는 일부 page 길이로 전체 통계를 추정하지 않는다.
 
 `MyPageRoute`는 기존 인증 route 계층의 `LogoutButton`을 구성하고, UI에는 `logoutControl` prop으로 전달한다. UI 계층은 auth API 또는 route module을 직접 import하지 않는다.
 
