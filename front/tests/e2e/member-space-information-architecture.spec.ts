@@ -139,8 +139,11 @@ test("participation journey keeps one responsive semantic order with practical k
       "참여",
       "참여",
     ]);
+    const markers = timeline.locator(".rm-participation-timeline__marker");
+    await expect(markers).toHaveText(["✓", "✓", "–", "✓", "✓", "✓"]);
     for (let index = 0; index < await statusLabels.count(); index += 1) {
       await expect(statusLabels.nth(index)).toBeVisible();
+      await expect(markers.nth(index)).toBeVisible();
     }
 
     expect(
@@ -220,6 +223,14 @@ test("unknown latest attendance stays visible without a current streak claim", a
 
   await expect(page.getByText("최근 확인된 5회 중 4회 함께했어요")).toBeVisible();
   await expect(page.getByText("미확인")).toBeVisible();
+  const unknownMarker = page.getByRole("list", {
+    name: "최근 참여 대상 회차",
+  }).locator(
+    'li[data-attendance-status="UNKNOWN"] .rm-participation-timeline__marker',
+  );
+  await expect(unknownMarker).toHaveCount(1);
+  await expect(unknownMarker).toHaveText("?");
+  await expect(unknownMarker).toBeVisible();
   await expect(page.getByText(/현재 \d+회 연속 참여/)).toHaveCount(0);
 });
 
