@@ -259,6 +259,10 @@ export type ClubAiDefaultResponse = {
   defaultModel: string | null;
 };
 
+export type AiGenerationCapabilitiesResponse = {
+  enabled: boolean;
+};
+
 export type ClubAiDefaultRequest = {
   defaultModel: string;
 };
@@ -391,6 +395,10 @@ export const ClubAiDefaultResponseSchema = import.meta.env.DEV
   ? z.object({ defaultModel: z.string().nullable() })
   : (null as never);
 
+export const AiGenerationCapabilitiesResponseSchema = import.meta.env.DEV
+  ? z.object({ enabled: z.boolean() })
+  : (null as never);
+
 export const AiGenerationProblemSchema = import.meta.env.DEV
   ? z.object({
       type: z.string(),
@@ -425,6 +433,10 @@ export const parseAiRecentJobResponse = (value: unknown): AiRecentJobResponse =>
   parseDev(AiRecentJobResponseSchema, value) as AiRecentJobResponse;
 export const parseClubAiDefaultResponse = (value: unknown): ClubAiDefaultResponse =>
   parseDev(ClubAiDefaultResponseSchema, value) as ClubAiDefaultResponse;
+export const parseAiGenerationCapabilitiesResponse = (
+  value: unknown,
+): AiGenerationCapabilitiesResponse =>
+  parseDev(AiGenerationCapabilitiesResponseSchema, value) as AiGenerationCapabilitiesResponse;
 
 /** RFC 7807 problem detail used by the AI generation error handler. */
 export type AiProblemDetail = {

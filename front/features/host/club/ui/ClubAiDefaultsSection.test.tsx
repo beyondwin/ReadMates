@@ -21,23 +21,26 @@ import {
 } from "./club-ai-model-options";
 
 vi.mock("@/features/host/aigen/api/aigen-api", () => ({
+  getAiGenerationCapabilities: vi.fn(),
   getClubAiDefault: vi.fn(),
   putClubAiDefault: vi.fn(),
 }));
 
 import {
+  getAiGenerationCapabilities,
   getClubAiDefault,
   putClubAiDefault,
 } from "@/features/host/aigen/api/aigen-api";
 import { ClubAiDefaultsSection } from "./ClubAiDefaultsSection";
 
+const mockedCapabilities = vi.mocked(getAiGenerationCapabilities);
 const mockedGet = vi.mocked(getClubAiDefault);
 const mockedPut = vi.mocked(putClubAiDefault);
 
-function createWrapper() {
+function createWrapper(staleTime = 0) {
   const client = new QueryClient({
     defaultOptions: {
-      queries: { retry: false, gcTime: 0, staleTime: 0 },
+      queries: { retry: false, gcTime: 0, staleTime },
       mutations: { retry: false },
     },
   });
@@ -49,6 +52,8 @@ function createWrapper() {
 
 describe("ClubAiDefaultsSection", () => {
   beforeEach(() => {
+    mockedCapabilities.mockReset();
+    mockedCapabilities.mockResolvedValue({ enabled: true });
     mockedGet.mockReset();
     mockedPut.mockReset();
   });
@@ -63,6 +68,73 @@ describe("ClubAiDefaultsSection", () => {
       .then((el) => el as HTMLSelectElement);
   }
 
+  it("does not request AI defaults when AI generation is disabled", async () => {
+    mockedCapabilities.mockResolvedValue({ enabled: false });
+    mockedGet.mockResolvedValue({ defaultModel: CLUB_AI_OPENAI_DEFAULT_MODEL_ID });
+    const { Wrapper } = createWrapper();
+
+    render(
+      <Wrapper>
+        <ClubAiDefaultsSection clubSlug="club-a" />
+      </Wrapper>,
+    );
+
+    expect(
+      await screen.findByText(
+        "AI 생성 기능이 현재 꺼져 있어 기본 모델을 변경할 수 없습니다.",
+      ),
+    ).toHaveAttribute("role", "status");
+    expect(screen.queryByRole("combobox", { name: /기본 모델/ })).not.toBeInTheDocument();
+    expect(mockedGet).not.toHaveBeenCalled();
+  });
+
+  it("fails closed without requesting AI defaults when capability lookup fails", async () => {
+    mockedCapabilities.mockRejectedValue(new Error("capability unavailable"));
+    mockedGet.mockResolvedValue({ defaultModel: CLUB_AI_OPENAI_DEFAULT_MODEL_ID });
+    const { Wrapper } = createWrapper();
+
+    render(
+      <Wrapper>
+        <ClubAiDefaultsSection clubSlug="club-a" />
+      </Wrapper>,
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "AI 기능 상태를 확인하지 못했습니다.",
+    );
+    expect(screen.queryByRole("combobox", { name: /기본 모델/ })).not.toBeInTheDocument();
+    expect(mockedGet).not.toHaveBeenCalled();
+  });
+
+  it("rechecks a cached capability before requesting defaults after remount", async () => {
+    mockedCapabilities
+      .mockResolvedValueOnce({ enabled: true })
+      .mockResolvedValueOnce({ enabled: false });
+    mockedGet.mockResolvedValue({ defaultModel: CLUB_AI_OPENAI_DEFAULT_MODEL_ID });
+    const { Wrapper } = createWrapper(30_000);
+
+    const firstRender = render(
+      <Wrapper>
+        <ClubAiDefaultsSection clubSlug="club-a" />
+      </Wrapper>,
+    );
+    expect(await screen.findByRole("combobox", { name: /기본 모델/ })).toBeInTheDocument();
+    firstRender.unmount();
+
+    render(
+      <Wrapper>
+        <ClubAiDefaultsSection clubSlug="club-a" />
+      </Wrapper>,
+    );
+
+    expect(
+      await screen.findByText(
+        "AI 생성 기능이 현재 꺼져 있어 기본 모델을 변경할 수 없습니다.",
+      ),
+    ).toHaveAttribute("role", "status");
+    expect(mockedCapabilities).toHaveBeenCalledTimes(2);
+  });
+
   it("renders the compact operations-tool variant without the standalone-card explanation", async () => {
     mockedGet.mockResolvedValue({ defaultModel: CLUB_AI_OPENAI_DEFAULT_MODEL_ID });
     const { Wrapper } = createWrapper();
@@ -74,7 +146,7 @@ describe("ClubAiDefaultsSection", () => {
     );
 
     expect(await screen.findByRole("heading", { name: "AI 기본 모델" })).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "기본 모델" })).toBeInTheDocument();
+    expect(await screen.findByRole("combobox", { name: "기본 모델" })).toBeInTheDocument();
     expect(screen.queryByText(/호스트가 업로드 시/)).not.toBeInTheDocument();
   });
 

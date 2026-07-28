@@ -12,6 +12,7 @@ import { apiErrorFromResponse } from "@/shared/api/errors";
 import { parseReadmatesResponse } from "@/shared/api/response";
 import type {
   AiGenerationProblem,
+  AiGenerationCapabilitiesResponse,
   AiCommitResponse,
   AiGenerationJobResponse,
   AiRecentJobResponse,
@@ -28,6 +29,7 @@ import type {
 } from "./aigen-contracts";
 import {
   parseAiCommitResponse,
+  parseAiGenerationCapabilitiesResponse,
   parseAiGenerationJobResponse,
   parseAiRecentJobResponse,
   parseAvailableGenerationModelsResponse,
@@ -135,6 +137,10 @@ function clubsPath(clubSlug: string): string {
   return `/api/host/clubs/${encodeURIComponent(clubSlug)}/ai-defaults`;
 }
 
+function capabilitiesPath(clubSlug: string): string {
+  return `/api/host/clubs/${encodeURIComponent(clubSlug)}/ai-generation/capabilities`;
+}
+
 export function startGeneration(
   sessionId: string,
   payload: StartGenerationRequest,
@@ -238,6 +244,14 @@ export async function getClubAiDefault(clubSlug: string): Promise<ClubAiDefaultR
   return response.defaultModel === LEGACY_GEMINI_MODEL_ID
     ? { defaultModel: CANONICAL_GEMINI_MODEL_ID }
     : response;
+}
+
+export function getAiGenerationCapabilities(
+  clubSlug: string,
+): Promise<AiGenerationCapabilitiesResponse> {
+  return readmatesFetch<unknown>(capabilitiesPath(clubSlug)).then(
+    parseAiGenerationCapabilitiesResponse,
+  );
 }
 
 export async function putClubAiDefault(

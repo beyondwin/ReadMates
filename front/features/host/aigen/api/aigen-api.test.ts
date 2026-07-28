@@ -4,6 +4,7 @@ import {
   cancelGeneration,
   commitGeneration,
   expandEvidence,
+  getAiGenerationCapabilities,
   getAvailableModels,
   getClubAiDefault,
   getJob,
@@ -512,6 +513,22 @@ describe("cancelGeneration", () => {
     );
 
     await expect(cancelGeneration("sid-1", "job-1")).rejects.toBeDefined();
+  });
+});
+
+describe("getAiGenerationCapabilities", () => {
+  it("GETs the club-scoped capability endpoint", async () => {
+    const fetchMock = captureFetch(jsonResponse({ enabled: false }));
+
+    await expect(getAiGenerationCapabilities("my-club")).resolves.toEqual({
+      enabled: false,
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit | undefined];
+    expect(url).toBe(
+      "/api/bff/api/host/clubs/my-club/ai-generation/capabilities",
+    );
+    expect(init?.method ?? "GET").toBe("GET");
   });
 });
 

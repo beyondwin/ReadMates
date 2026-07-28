@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   AiCommitResponseSchema,
+  AiGenerationCapabilitiesResponseSchema,
   AiGenerationJobResponseSchema,
   AiGenerationProblemSchema,
   AiRecentJobResponseSchema,
@@ -32,6 +33,7 @@ describe("grounded AI zod fixtures", () => {
     ["aigen-start.json", StartGenerationResponseSchema],
     ["aigen-recent-job.json", AiRecentJobResponseSchema],
     ["aigen-club-default.json", ClubAiDefaultResponseSchema],
+    ["aigen-capabilities.json", AiGenerationCapabilitiesResponseSchema],
   ])("parses %s with the corresponding runtime schema", (name, schema) => {
     expect(() => schema.parse(fixture(name))).not.toThrow();
   });

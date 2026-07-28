@@ -1059,6 +1059,41 @@ describe("stripCookieDomain", () => {
     );
   });
 
+  it("forwards GET /api/host/clubs/{clubSlug}/ai-generation/capabilities unchanged", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ enabled: false }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await onRequest(
+      context(
+        new Request(
+          "https://readmates.pages.dev/api/bff/api/host/clubs/my-club/ai-generation/capabilities?clubSlug=my-club",
+        ),
+        {
+          path: [
+            "api",
+            "host",
+            "clubs",
+            "my-club",
+            "ai-generation",
+            "capabilities",
+          ],
+        },
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/api/host/clubs/my-club/ai-generation/capabilities?clubSlug=my-club",
+      expect.objectContaining({ method: "GET" }),
+    );
+  });
+
   it("forwards PUT /api/host/clubs/{clubSlug}/ai-defaults with JSON body", async () => {
     let forwardedInit: RequestInit | undefined;
     vi.stubGlobal(
