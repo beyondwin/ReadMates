@@ -160,5 +160,6 @@ data class MyPageResponse(
 data class MyRecentAttendanceItem(
     val sessionNumber: Int,
     val attended: Boolean,
+    val attendanceStatus: String,
     val readingProgress: Int,
 )

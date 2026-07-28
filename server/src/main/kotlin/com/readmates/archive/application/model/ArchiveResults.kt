@@ -172,5 +172,6 @@ data class MyPageResult(
 data class MyRecentAttendanceResult(
     val sessionNumber: Int,
     val attended: Boolean,
+    val attendanceStatus: String,
     val readingProgress: Int,
 )

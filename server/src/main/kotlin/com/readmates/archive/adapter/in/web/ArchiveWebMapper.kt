@@ -191,5 +191,6 @@ fun MyRecentAttendanceResult.toWebDto() =
     MyRecentAttendanceItem(
         sessionNumber = sessionNumber,
         attended = attended,
+        attendanceStatus = attendanceStatus,
         readingProgress = readingProgress,
     )

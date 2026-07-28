@@ -1263,16 +1263,45 @@ class ArchiveAndNotesDbTest(
                 jsonPath("$.sessionCount") { value(4) }
                 jsonPath("$.totalSessionCount") { value(7) }
                 jsonPath("$.recentAttendances.length()") { value(6) }
-                jsonPath("$.recentAttendances[0].sessionNumber") { value(2) }
+                jsonPath("$.recentAttendances[*].sessionNumber") { value(equalTo(listOf(1, 2, 3, 4, 5, 6))) }
+                jsonPath("$.recentAttendances[*].attendanceStatus") {
+                    value(equalTo(listOf("ATTENDED", "ATTENDED", "ATTENDED", "ABSENT", "ABSENT", "ATTENDED")))
+                }
+                jsonPath("$.recentAttendances[*].attended") {
+                    value(equalTo(listOf(true, true, true, false, false, true)))
+                }
+            }
+    }
+
+    @Test
+    @Sql(
+        statements = [
+            CLEANUP_MY_PAGE_PARTICIPATION_TIMELINE_SQL,
+            INSERT_MY_PAGE_PARTICIPATION_TIMELINE_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [CLEANUP_MY_PAGE_PARTICIPATION_TIMELINE_SQL],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `my page recent attendance includes only active participation and preserves unknown`() {
+        mockMvc
+            .get("/api/app/me") {
+                header("X-Readmates-Club-Slug", "sample-book-club")
+                with(user("midjoin-member@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.recentAttendances.length()") { value(2) }
+                jsonPath("$.recentAttendances[0].sessionNumber") { value(1202) }
+                jsonPath("$.recentAttendances[0].attendanceStatus") { value("ATTENDED") }
                 jsonPath("$.recentAttendances[0].attended") { value(true) }
-                jsonPath("$.recentAttendances[2].sessionNumber") { value(4) }
-                jsonPath("$.recentAttendances[2].attended") { value(false) }
-                jsonPath("$.recentAttendances[3].sessionNumber") { value(5) }
-                jsonPath("$.recentAttendances[3].attended") { value(false) }
-                jsonPath("$.recentAttendances[4].sessionNumber") { value(6) }
-                jsonPath("$.recentAttendances[4].attended") { value(true) }
-                jsonPath("$.recentAttendances[5].sessionNumber") { value(7) }
-                jsonPath("$.recentAttendances[5].attended") { value(false) }
+                jsonPath("$.recentAttendances[0].readingProgress") { value(100) }
+                jsonPath("$.recentAttendances[1].sessionNumber") { value(1203) }
+                jsonPath("$.recentAttendances[1].attendanceStatus") { value("UNKNOWN") }
+                jsonPath("$.recentAttendances[1].attended") { value(false) }
+                jsonPath("$.recentAttendances[1].readingProgress") { value(40) }
+                jsonPath("$.recentAttendances[*].sessionNumber") { value(not(hasItems(1201, 1204))) }
             }
     }
 
@@ -1556,6 +1585,85 @@ class ArchiveAndNotesDbTest(
             where id = '00000000-0000-0000-0000-0000000092a0';
         """
 
+        private const val CLEANUP_MY_PAGE_PARTICIPATION_TIMELINE_SQL = """
+            delete from reading_checkins
+            where session_id in (
+              '00000000-0000-0000-0000-0000000093a1',
+              '00000000-0000-0000-0000-0000000093a2',
+              '00000000-0000-0000-0000-0000000093a3',
+              '00000000-0000-0000-0000-0000000093a4',
+              '00000000-0000-0000-0000-0000000093a5',
+              '00000000-0000-0000-0000-0000000093b1'
+            );
+            delete from session_participants
+            where session_id in (
+              '00000000-0000-0000-0000-0000000093a1',
+              '00000000-0000-0000-0000-0000000093a2',
+              '00000000-0000-0000-0000-0000000093a3',
+              '00000000-0000-0000-0000-0000000093a4',
+              '00000000-0000-0000-0000-0000000093a5',
+              '00000000-0000-0000-0000-0000000093b1'
+            );
+            delete from sessions
+            where id in (
+              '00000000-0000-0000-0000-0000000093a1',
+              '00000000-0000-0000-0000-0000000093a2',
+              '00000000-0000-0000-0000-0000000093a3',
+              '00000000-0000-0000-0000-0000000093a4',
+              '00000000-0000-0000-0000-0000000093a5',
+              '00000000-0000-0000-0000-0000000093b1'
+            );
+            delete from memberships
+            where id in (
+              '00000000-0000-0000-0000-0000000093a0',
+              '00000000-0000-0000-0000-0000000093a6',
+              '00000000-0000-0000-0000-0000000093a8'
+            );
+            delete from users
+            where id in (
+              '00000000-0000-0000-0000-0000000093a7',
+              '00000000-0000-0000-0000-0000000093a9'
+            );
+        """
+
+        private const val INSERT_MY_PAGE_PARTICIPATION_TIMELINE_SQL = """
+            insert into users (id, email, name, short_name, auth_provider)
+            values
+              ('00000000-0000-0000-0000-0000000093a9', 'midjoin-member@example.com', '중간 참여 멤버', '중간멤버', 'PASSWORD'),
+              ('00000000-0000-0000-0000-0000000093a7', 'other-timeline-member@example.com', '다른 참여 멤버', '다른멤버', 'PASSWORD');
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+            values
+              ('00000000-0000-0000-0000-0000000093a0', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-0000000093a9', 'MEMBER', 'ACTIVE', '2026-01-01 00:00:00.000000', '중간멤버'),
+              ('00000000-0000-0000-0000-0000000093a6', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000093a9', 'MEMBER', 'ACTIVE', '2026-01-01 00:00:00.000000', '다른클럽중간멤버'),
+              ('00000000-0000-0000-0000-0000000093a8', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-0000000093a7', 'MEMBER', 'ACTIVE', '2026-01-01 00:00:00.000000', '다른샘플멤버');
+            insert into sessions (
+              id, club_id, number, title, book_title, book_author,
+              session_date, start_time, end_time, location_label,
+              question_deadline_at, state, visibility
+            )
+            values
+              ('00000000-0000-0000-0000-0000000093a1', '00000000-0000-0000-0000-000000000002', 1201, '1201회차 · 참여 전', '참여 전 책', '검증 저자', '2026-12-01', '20:00:00', '22:00:00', '온라인', '2026-11-30 14:59:00.000000', 'PUBLISHED', 'PUBLIC'),
+              ('00000000-0000-0000-0000-0000000093a2', '00000000-0000-0000-0000-000000000002', 1202, '1202회차 · 출석', '출석 책', '검증 저자', '2026-12-02', '20:00:00', '22:00:00', '온라인', '2026-12-01 14:59:00.000000', 'PUBLISHED', 'PUBLIC'),
+              ('00000000-0000-0000-0000-0000000093a3', '00000000-0000-0000-0000-000000000002', 1203, '1203회차 · 미확정', '미확정 책', '검증 저자', '2026-12-03', '20:00:00', '22:00:00', '온라인', '2026-12-02 14:59:00.000000', 'PUBLISHED', 'PUBLIC'),
+              ('00000000-0000-0000-0000-0000000093a4', '00000000-0000-0000-0000-000000000002', 1204, '1204회차 · 제거됨', '제거된 책', '검증 저자', '2026-12-04', '20:00:00', '22:00:00', '온라인', '2026-12-03 14:59:00.000000', 'PUBLISHED', 'PUBLIC'),
+              ('00000000-0000-0000-0000-0000000093a5', '00000000-0000-0000-0000-000000000002', 1205, '1205회차 · 다른 멤버', '다른 멤버 책', '검증 저자', '2026-12-05', '20:00:00', '22:00:00', '온라인', '2026-12-04 14:59:00.000000', 'PUBLISHED', 'PUBLIC'),
+              ('00000000-0000-0000-0000-0000000093b1', '00000000-0000-0000-0000-000000000001', 1206, '1206회차 · 다른 클럽', '다른 클럽 책', '검증 저자', '2026-12-06', '20:00:00', '22:00:00', '온라인', '2026-12-05 14:59:00.000000', 'PUBLISHED', 'PUBLIC');
+            insert into session_participants (
+              id, club_id, session_id, membership_id,
+              rsvp_status, attendance_status, participation_status
+            )
+            values
+              ('00000000-0000-0000-0000-0000000093b2', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-0000000093a2', '00000000-0000-0000-0000-0000000093a0', 'GOING', 'ATTENDED', 'ACTIVE'),
+              ('00000000-0000-0000-0000-0000000093b3', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-0000000093a3', '00000000-0000-0000-0000-0000000093a0', 'GOING', 'UNKNOWN', 'ACTIVE'),
+              ('00000000-0000-0000-0000-0000000093b4', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-0000000093a4', '00000000-0000-0000-0000-0000000093a0', 'GOING', 'ATTENDED', 'REMOVED'),
+              ('00000000-0000-0000-0000-0000000093b5', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-0000000093a5', '00000000-0000-0000-0000-0000000093a8', 'GOING', 'ATTENDED', 'ACTIVE'),
+              ('00000000-0000-0000-0000-0000000093b6', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000093b1', '00000000-0000-0000-0000-0000000093a6', 'GOING', 'ATTENDED', 'ACTIVE');
+            insert into reading_checkins (id, club_id, session_id, membership_id, reading_progress)
+            values
+              ('00000000-0000-0000-0000-0000000093b7', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-0000000093a2', '00000000-0000-0000-0000-0000000093a0', 100),
+              ('00000000-0000-0000-0000-0000000093b8', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-0000000093a3', '00000000-0000-0000-0000-0000000093a0', 40);
+        """
+
         private const val INSERT_MY_PAGE_READING_COMPLETION_SQL = """
             insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
             select
@@ -1596,13 +1704,21 @@ class ArchiveAndNotesDbTest(
               id, club_id, session_id, membership_id,
               rsvp_status, attendance_status, participation_status
             )
-            values (
-              '00000000-0000-0000-0000-0000000092a3',
-              '00000000-0000-0000-0000-000000000002',
-              '00000000-0000-0000-0000-0000000092a1',
-              '00000000-0000-0000-0000-0000000092a0',
-              'GOING', 'ATTENDED', 'ACTIVE'
-            );
+            values
+              (
+                '00000000-0000-0000-0000-0000000092a3',
+                '00000000-0000-0000-0000-000000000002',
+                '00000000-0000-0000-0000-0000000092a1',
+                '00000000-0000-0000-0000-0000000092a0',
+                'GOING', 'ATTENDED', 'ACTIVE'
+              ),
+              (
+                '00000000-0000-0000-0000-0000000092a6',
+                '00000000-0000-0000-0000-000000000002',
+                '00000000-0000-0000-0000-0000000092a2',
+                '00000000-0000-0000-0000-0000000092a0',
+                'GOING', 'UNKNOWN', 'ACTIVE'
+              );
             insert into reading_checkins (id, club_id, session_id, membership_id, reading_progress)
             values
               (

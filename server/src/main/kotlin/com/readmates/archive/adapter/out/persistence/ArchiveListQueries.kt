@@ -197,19 +197,21 @@ internal class ArchiveListQueries {
         val recentAttendances =
             jdbcTemplate.query(
                 """
-                select session_number, attended, reading_progress
+                select session_number, attendance_status, attended, reading_progress
                 from (
                   select
                     sessions.number as session_number,
-                    coalesce(session_participants.attendance_status = 'ATTENDED', false) as attended,
+                    session_participants.attendance_status as attendance_status,
+                    session_participants.attendance_status = 'ATTENDED' as attended,
                     coalesce(reading_checkins.reading_progress, 0) as reading_progress
                   from sessions
-                  left join session_participants on session_participants.session_id = sessions.id
+                  join session_participants on session_participants.session_id = sessions.id
                     and session_participants.club_id = sessions.club_id
                     and session_participants.membership_id = ?
+                    and session_participants.participation_status = 'ACTIVE'
                   left join reading_checkins on reading_checkins.session_id = sessions.id
                     and reading_checkins.club_id = sessions.club_id
-                    and reading_checkins.membership_id = ?
+                    and reading_checkins.membership_id = session_participants.membership_id
                   where sessions.club_id = ?
                     and sessions.state = 'PUBLISHED'
                   order by sessions.number desc
@@ -218,7 +220,6 @@ internal class ArchiveListQueries {
                 order by session_number asc
                 """.trimIndent(),
                 { resultSet, _ -> resultSet.toMyRecentAttendanceResult() },
-                currentMember.membershipId.dbString(),
                 currentMember.membershipId.dbString(),
                 currentMember.clubId.dbString(),
             )

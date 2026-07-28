@@ -75,6 +75,7 @@ internal fun ResultSet.toMyRecentAttendanceResult() =
     MyRecentAttendanceResult(
         sessionNumber = getInt("session_number"),
         attended = getBoolean("attended"),
+        attendanceStatus = getString("attendance_status"),
         readingProgress = getInt("reading_progress"),
     )
 
