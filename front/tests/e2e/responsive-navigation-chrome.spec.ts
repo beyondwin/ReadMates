@@ -1,6 +1,9 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { loginWithGoogleFixture, resetSeedGoogleLogins } from "./readmates-e2e-db";
-import { mockMyReadingShelfJourney } from "./my-reading-shelf-fixtures";
+import {
+  mockMemberParticipationProfile,
+  mockMyReadingShelfJourney,
+} from "./my-reading-shelf-fixtures";
 
 async function expectPracticalTapTarget(locator: Locator) {
   const box = await locator.boundingBox();
@@ -346,7 +349,8 @@ test("mobile app route continuity returns to archive tabs and host dashboard sou
   await expect(page.getByRole("heading", { name: "모임 운영" })).toBeVisible();
 });
 
-test("reading shelf preserves semantic hierarchy and record order on desktop and mobile", async ({ page }) => {
+test("reading shelf preserves participation hierarchy on desktop and mobile", async ({ page }) => {
+  await mockMemberParticipationProfile(page, "history");
   await mockMyReadingShelfJourney(page);
   await loginWithGoogleFixture(page, "host@example.com");
 
@@ -359,35 +363,32 @@ test("reading shelf preserves semantic hierarchy and record order on desktop and
 
     const shelf = page.locator(".rm-my-shelf");
     await expect(shelf.getByRole("heading", { level: 1, name: "나의 서재" })).toHaveCount(1);
-    await expect(shelf.getByRole("heading", { level: 2 })).toContainText(["최근 책별 기록"]);
-    await expect(shelf.getByRole("heading", { level: 3 })).toContainText([
-      "아주 긴 한국어 제목과 An exceptionally long English subtitle for a responsive reading shelf",
-      "잠긴 피드백 문서가 있는 공개 안전 테스트 책",
+    await expect(shelf.getByRole("heading", { level: 2 })).toContainText([
+      "함께한 모임 8회",
+      "최근 6회 중 5회 함께했어요",
+      "다음 모임을 준비하고 있어요",
+      "나의 읽기 기록",
+      "계정",
     ]);
 
-    const rows = shelf.getByRole("article");
-    await expect(rows).toHaveCount(2);
-    await expect(rows).toContainText([
-      "아주 긴 한국어 제목과 An exceptionally long English subtitle for a responsive reading shelf",
-      "잠긴 피드백 문서가 있는 공개 안전 테스트 책",
-    ]);
-    await expect(shelf.getByText("열람 제한")).toBeVisible();
-    await expect(shelf.getByLabel("아주 긴 한국어 제목과 An exceptionally long English subtitle for a responsive reading shelf 표지 없음")).toBeVisible();
-
-    const sessionLink = rows.first().getByRole("link", { name: "회차 기록" });
-    const feedbackLink = rows.first().getByRole("link", { name: "피드백 문서" });
-    await expect(sessionLink).toBeVisible();
-    await expect(feedbackLink).toBeVisible();
-    expect(await sessionLink.evaluate((element) => element.parentElement?.querySelectorAll("a").length === 2)).toBe(true);
-    const allRecords = shelf.getByRole("link", { name: "내 기록 전체 보기" });
+    const timeline = shelf.getByRole("list", { name: "최근 참여 대상 회차" });
+    await expect(timeline).toHaveCount(1);
+    await expect(timeline.getByRole("listitem")).toHaveCount(6);
+    const currentSession = shelf.getByRole("link", { name: "이번 세션 보기" });
+    const allRecords = shelf.getByRole("link", { name: "내 책별 기록 전체 보기" });
+    const logout = shelf.getByRole("button", { name: "로그아웃" });
+    await expect(currentSession).toBeVisible();
     await expect(allRecords).toBeVisible();
+    await expect(logout).toBeVisible();
     await expectDomOrder(
       shelf.getByRole("heading", { level: 1, name: "나의 서재" }),
-      shelf.getByRole("region", { name: "개인 요약" }),
-      shelf.getByRole("region", { name: "최근 책별 기록" }),
+      shelf.getByRole("heading", { level: 2, name: "함께한 모임 8회" }),
+      timeline,
+      currentSession,
+      shelf.getByRole("heading", { level: 2, name: "나의 읽기 기록" }),
       allRecords,
-      rows.first(),
-      rows.nth(1),
+      shelf.getByRole("heading", { level: 2, name: "계정" }),
+      logout,
     );
 
     const accountMenu = page.getByRole("button", { name: /계정 메뉴$/ });
@@ -402,42 +403,49 @@ test("reading shelf preserves semantic hierarchy and record order on desktop and
     if (viewport.width === 1440) {
       expect(await shelf.evaluate((element) => element.getBoundingClientRect().width)).toBeLessThanOrEqual(820);
     } else {
-      await expectPracticalTapTarget(sessionLink);
-      await expectPracticalTapTarget(feedbackLink);
+      await expectPracticalTapTarget(currentSession);
       await expectPracticalTapTarget(allRecords);
+      await expectPracticalTapTarget(logout);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     }
   }
 });
 
-test("reading shelf keeps its mobile summary priorities and record controls above the bottom navigation", async ({ page }) => {
+test("reading shelf keeps its mobile participation controls above the bottom navigation", async ({ page }) => {
+  await mockMemberParticipationProfile(page, "history");
   await mockMyReadingShelfJourney(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await loginWithGoogleFixture(page, "host@example.com");
   await page.goto("/app/me");
 
-  const layout = await page.locator(".rm-my-shelf-summary").evaluate((summary) => {
-    const list = summary.querySelector<HTMLElement>(".rm-my-shelf-summary__list")!;
-    const values = Array.from(summary.querySelectorAll<HTMLElement>(".rm-my-shelf-summary__item dd"));
+  const layout = await page.getByRole("list", { name: "최근 참여 대상 회차" }).evaluate((list) => {
     const shelf = document.querySelector<HTMLElement>(".rm-my-shelf")!;
-    const style = getComputedStyle(summary);
 
     return {
       columns: getComputedStyle(list).gridTemplateColumns.trim().split(/\s+/).length,
-      paddingTop: style.paddingTop,
-      paddingBottom: style.paddingBottom,
-      completionFontSize: Number.parseFloat(getComputedStyle(values[1]).fontSize),
-      primaryFontSizes: [0, 2, 3].map((index) => Number.parseFloat(getComputedStyle(values[index]).fontSize)),
+      listClientWidth: list.clientWidth,
+      listScrollWidth: list.scrollWidth,
       shelfBottomPadding: Number.parseFloat(getComputedStyle(shelf).paddingBottom),
       bottomNavigationHeight: document.querySelector<HTMLElement>("nav[aria-label='앱 탭']")!.getBoundingClientRect().height,
     };
   });
 
-  expect(layout.columns).toBe(3);
-  expect(layout.paddingTop).toBe("18px");
-  expect(layout.paddingBottom).toBe("18px");
-  expect(layout.completionFontSize).toBeLessThan(Math.min(...layout.primaryFontSizes));
+  expect(layout.columns).toBe(6);
+  expect(layout.listScrollWidth).toBeLessThanOrEqual(layout.listClientWidth);
   expect(layout.shelfBottomPadding).toBeGreaterThanOrEqual(layout.bottomNavigationHeight + 44);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  const logout = page.locator(".rm-member-space-account-actions").getByRole("button", {
+    name: "로그아웃",
+  });
+  await logout.scrollIntoViewIfNeeded();
+  const [logoutBox, memberTabBarBox] = await Promise.all([
+    logout.boundingBox(),
+    page.getByRole("navigation", { name: "앱 탭" }).boundingBox(),
+  ]);
+  expect(logoutBox).not.toBeNull();
+  expect(memberTabBarBox).not.toBeNull();
+  expect(logoutBox!.y + logoutBox!.height).toBeLessThanOrEqual(memberTabBarBox!.y);
 
   await page.goto(`${baselineClubAppPath}/me/records`);
   const loadMore = page.getByRole("button", { name: "기록 더 보기" });

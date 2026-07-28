@@ -8,7 +8,10 @@ import {
   runMysql,
   setMembershipStatus,
 } from "./readmates-e2e-db";
-import { mockMyReadingShelfJourney } from "./my-reading-shelf-fixtures";
+import {
+  mockMemberParticipationProfile,
+  mockMyReadingShelfJourney,
+} from "./my-reading-shelf-fixtures";
 
 test.describe.configure({ mode: "serial" });
 
@@ -96,12 +99,22 @@ test("member cannot edit own profile display name from account settings", async 
 });
 
 test("an empty reading shelf navigates to the real current-session route", async ({ page }) => {
+  await mockMemberParticipationProfile(page, "empty");
   await mockMyReadingShelfJourney(page, "empty");
   await loginWithGoogleFixture(page, hostEmail);
   await page.goto("/app/me");
 
-  await expect(page.getByRole("region", { name: "개인 요약" })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "책별 기록" })).toHaveCount(0);
+  await expect(page.getByRole("heading", {
+    name: "첫 참여부터 이곳에 흐름이 쌓여요",
+  })).toBeVisible();
+  await expect(page.getByRole("list", {
+    name: "최근 참여 대상 회차",
+  })).toHaveCount(0);
+  await expect(page.locator(".rm-supporting-reading-stats dl > div")).toHaveCount(0);
+  await expect(page.getByText("0 / 0", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", {
+    name: "이번 세션 보기",
+  })).toBeVisible();
   await page.getByRole("link", { name: "이번 세션 보기" }).click();
   await expect(page).toHaveURL(/\/app\/session\/current$/);
   await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toBeVisible();
@@ -147,12 +160,29 @@ test("host edits a same-club member display name and sees the row update", async
   await expect(memberRow).not.toContainText(`@${updatedDisplayName}`);
 });
 
-test("viewer can read member routes but cannot use current-session write actions or host routes", async ({ page }) => {
+test("viewer can read member routes but cannot use current-session write actions or host routes", async ({
+  page,
+}, testInfo) => {
   const viewerEmail = uniqueViewerEmail("readonly");
   viewerEmails.push(viewerEmail);
 
-  await mockMyReadingShelfJourney(page);
+  await mockMemberParticipationProfile(page, "empty");
+  await mockMyReadingShelfJourney(page, "empty");
   await loginWithGoogleFixture(page, viewerEmail, { displayName: "E2E Profile Viewer" });
+  await page.goto("/app/me");
+
+  await expect(page.getByRole("heading", {
+    name: "첫 참여부터 이곳에 흐름이 쌓여요",
+  })).toBeVisible();
+  await expect(page.getByRole("link", {
+    name: "이번 세션 보기",
+  })).toHaveCount(0);
+  await expect(page.getByRole("list", {
+    name: "최근 참여 대상 회차",
+  })).toHaveCount(0);
+  await expect(page.locator(".rm-supporting-reading-stats dl > div")).toHaveCount(0);
+  await expect(page.getByText("0 / 0", { exact: true })).toHaveCount(0);
+
   await page.goto("/app/me/settings");
 
   await expect(page.getByRole("heading", { name: "계정 관리", level: 1 })).toBeVisible();
@@ -161,7 +191,9 @@ test("viewer can read member routes but cannot use current-session write actions
   await expect(page.getByRole("button", { name: "로그아웃" })).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: "탈퇴" }).scrollIntoViewIfNeeded();
-  await page.screenshot({ path: "test-results/task6-fix-round-1-viewer-settings.png" });
+  await page.screenshot({
+    path: testInfo.outputPath("viewer-settings.png"),
+  });
   await page.setViewportSize({ width: 1280, height: 900 });
 
   await page.goto("/app/notifications/settings");

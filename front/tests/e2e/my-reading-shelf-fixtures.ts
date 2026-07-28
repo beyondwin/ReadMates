@@ -1,6 +1,64 @@
 import type { Page } from "@playwright/test";
+import type { MyPageResponse } from "@/features/archive/api/archive-contracts";
 
 type JourneyFixtureMode = "normal" | "empty" | "load-more-error" | "fifteen-records";
+type ParticipationProfileMode = "history" | "mid-join" | "unknown" | "empty";
+
+const historyRecentAttendances: MyPageResponse["recentAttendances"] = [
+  { sessionNumber: 4, attended: true, attendanceStatus: "ATTENDED", readingProgress: 100 },
+  { sessionNumber: 5, attended: true, attendanceStatus: "ATTENDED", readingProgress: 80 },
+  { sessionNumber: 6, attended: false, attendanceStatus: "ABSENT", readingProgress: 0 },
+  { sessionNumber: 7, attended: true, attendanceStatus: "ATTENDED", readingProgress: 100 },
+  { sessionNumber: 8, attended: true, attendanceStatus: "ATTENDED", readingProgress: 70 },
+  { sessionNumber: 9, attended: true, attendanceStatus: "ATTENDED", readingProgress: 100 },
+];
+
+const recentAttendancesByMode: Record<
+  Exclude<ParticipationProfileMode, "empty">,
+  MyPageResponse["recentAttendances"]
+> = {
+  history: historyRecentAttendances,
+  "mid-join": historyRecentAttendances.slice(-2),
+  unknown: historyRecentAttendances.map((row, index) =>
+    index === historyRecentAttendances.length - 1
+      ? {
+          ...row,
+          attended: false,
+          attendanceStatus: "UNKNOWN",
+          readingProgress: 0,
+        }
+      : row,
+  ),
+};
+
+export async function mockMemberParticipationProfile(
+  page: Page,
+  mode: ParticipationProfileMode,
+): Promise<void> {
+  await page.route("**/api/bff/api/app/me**", async (route) => {
+    const upstream = await route.fetch();
+    const profile = (await upstream.json()) as MyPageResponse;
+    const recentAttendances = mode === "empty"
+      ? []
+      : recentAttendancesByMode[mode];
+
+    await route.fulfill({
+      response: upstream,
+      json: {
+        ...profile,
+        joinedAt: "2025-01",
+        sessionCount: mode === "empty" ? 0 : recentAttendances.length,
+        totalSessionCount: mode === "empty" ? 0 : recentAttendances.length,
+        completedReadingCount: mode === "empty" ? 0 : 4,
+        currentSessionId:
+          mode === "empty"
+            ? profile.currentSessionId
+            : "participation-current-session",
+        recentAttendances,
+      } satisfies MyPageResponse,
+    });
+  });
+}
 
 const firstPage = {
   items: [
