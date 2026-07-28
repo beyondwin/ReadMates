@@ -1,5 +1,9 @@
 import type { CSSProperties, JSX } from "react";
-import type { DraftSaveState } from "@/features/host/model/host-session-record-editor-model";
+import {
+  groupSessionRecordIssues,
+  type DraftSaveState,
+  type SessionRecordEditorSection,
+} from "@/features/host/model/host-session-record-editor-model";
 
 export type { DraftSaveState } from "@/features/host/model/host-session-record-editor-model";
 
@@ -22,7 +26,7 @@ export type SessionRecordDraftSnapshot = {
   };
 };
 
-type ValidationSection = "summary" | "highlights" | "reviews" | "feedback";
+type ValidationSection = Exclude<SessionRecordEditorSection, "general">;
 
 const validationSectionLabels: Record<ValidationSection, string> = {
   summary: "공개 요약",
@@ -31,16 +35,22 @@ const validationSectionLabels: Record<ValidationSection, string> = {
   feedback: "피드백 문서",
 };
 
-function validationSections(issues: string[]) {
-  const sections = new Set<ValidationSection>();
-  for (const issue of issues) {
-    const normalized = issue.toUpperCase();
-    if (normalized.includes("SUMMARY")) sections.add("summary");
-    if (normalized.includes("HIGHLIGHT")) sections.add("highlights");
-    if (normalized.includes("REVIEW")) sections.add("reviews");
-    if (normalized.includes("FEEDBACK")) sections.add("feedback");
-  }
-  return [...sections];
+const validationSectionMessages: Record<ValidationSection, string> = {
+  summary: "공개 요약을 입력하거나 내용을 확인해 주세요.",
+  highlights: "하이라이트의 작성자와 내용을 확인해 주세요.",
+  reviews: "한줄평의 작성자와 내용을 확인해 주세요.",
+  feedback: "피드백 문서의 파일 이름, 제목, Markdown 본문을 확인해 주세요.",
+};
+
+const validationSectionOrder: ValidationSection[] = [
+  "summary",
+  "highlights",
+  "reviews",
+  "feedback",
+];
+
+function validationErrorId(section: ValidationSection) {
+  return `session-record-${section}-error`;
 }
 
 function saveStateMessage(state: DraftSaveState) {
@@ -79,7 +89,14 @@ export function SessionRecordDraftPanelBody({
   rebasePending = false,
   rebaseError = null,
 }: SessionRecordDraftPanelBodyProps): JSX.Element {
-  const invalidSections = validationSections(validationIssues);
+  const issuesBySection = groupSessionRecordIssues(validationIssues);
+  const invalidSections = validationSectionOrder.filter(
+    (section) => issuesBySection[section].length > 0,
+  );
+  const isSectionInvalid = (section: ValidationSection) =>
+    issuesBySection[section].length > 0;
+  const errorDescriptionId = (section: ValidationSection) =>
+    isSectionInvalid(section) ? validationErrorId(section) : undefined;
   const updateEntry = (
     key: "highlights" | "oneLineReviews",
     index: number,
@@ -202,10 +219,21 @@ export function SessionRecordDraftPanelBody({
         style={{ "--stack": "6px", minWidth: 0 } as CSSProperties}
       >
         <span className="field-label">공개 요약</span>
+        {isSectionInvalid("summary") ? (
+          <span
+            id={validationErrorId("summary")}
+            className="small"
+            style={{ color: "var(--danger)" }}
+          >
+            {validationSectionMessages.summary}
+          </span>
+        ) : null}
         <textarea
           id="session-record-summary-input"
           className="input"
           aria-label="공개 요약"
+          aria-invalid={isSectionInvalid("summary") || undefined}
+          aria-describedby={errorDescriptionId("summary")}
           rows={6}
           value={snapshot.publicationSummary}
           style={{ minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere" }}
@@ -219,9 +247,19 @@ export function SessionRecordDraftPanelBody({
       <section
         id="session-record-highlights"
         className="stack"
+        aria-describedby={errorDescriptionId("highlights")}
         style={{ "--stack": "8px", minWidth: 0 } as CSSProperties}
       >
         <h3 className="h4" style={{ margin: 0 }}>하이라이트</h3>
+        {isSectionInvalid("highlights") ? (
+          <p
+            id={validationErrorId("highlights")}
+            className="small"
+            style={{ margin: 0, color: "var(--danger)" }}
+          >
+            {validationSectionMessages.highlights}
+          </p>
+        ) : null}
         {snapshot.highlights.length === 0 ? (
           <p className="small" style={{ margin: 0 }}>저장된 하이라이트가 없습니다.</p>
         ) : snapshot.highlights.map((entry, index) => (
@@ -234,6 +272,8 @@ export function SessionRecordDraftPanelBody({
             <textarea
               className="input"
               aria-label={`하이라이트 ${index + 1} · ${entry.authorDisplayName}`}
+              aria-invalid={isSectionInvalid("highlights") || undefined}
+              aria-describedby={errorDescriptionId("highlights")}
               rows={3}
               value={entry.text}
               style={{ minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere" }}
@@ -246,9 +286,19 @@ export function SessionRecordDraftPanelBody({
       <section
         id="session-record-reviews"
         className="stack"
+        aria-describedby={errorDescriptionId("reviews")}
         style={{ "--stack": "8px", minWidth: 0 } as CSSProperties}
       >
         <h3 className="h4" style={{ margin: 0 }}>한줄평</h3>
+        {isSectionInvalid("reviews") ? (
+          <p
+            id={validationErrorId("reviews")}
+            className="small"
+            style={{ margin: 0, color: "var(--danger)" }}
+          >
+            {validationSectionMessages.reviews}
+          </p>
+        ) : null}
         {snapshot.oneLineReviews.length === 0 ? (
           <p className="small" style={{ margin: 0 }}>저장된 한줄평이 없습니다.</p>
         ) : snapshot.oneLineReviews.map((entry, index) => (
@@ -261,6 +311,8 @@ export function SessionRecordDraftPanelBody({
             <input
               className="input"
               aria-label={`한줄평 ${index + 1} · ${entry.authorDisplayName}`}
+              aria-invalid={isSectionInvalid("reviews") || undefined}
+              aria-describedby={errorDescriptionId("reviews")}
               value={entry.text}
               style={{ minWidth: 0, maxWidth: "100%" }}
               onChange={(event) => updateEntry("oneLineReviews", index, event.target.value)}
@@ -272,14 +324,26 @@ export function SessionRecordDraftPanelBody({
       <section
         id="session-record-feedback"
         className="stack"
+        aria-describedby={errorDescriptionId("feedback")}
         style={{ "--stack": "8px", minWidth: 0 } as CSSProperties}
       >
         <h3 className="h4" style={{ margin: 0 }}>피드백 문서</h3>
+        {isSectionInvalid("feedback") ? (
+          <p
+            id={validationErrorId("feedback")}
+            className="small"
+            style={{ margin: 0, color: "var(--danger)" }}
+          >
+            {validationSectionMessages.feedback}
+          </p>
+        ) : null}
         <label className="stack" style={{ "--stack": "5px", minWidth: 0 } as CSSProperties}>
           <span className="tiny">파일 이름</span>
           <input
             className="input"
             aria-label="피드백 파일 이름"
+            aria-invalid={isSectionInvalid("feedback") || undefined}
+            aria-describedby={errorDescriptionId("feedback")}
             value={snapshot.feedbackDocument.fileName}
             style={{ minWidth: 0, maxWidth: "100%" }}
             onChange={(event) => onSnapshotChange({
@@ -293,6 +357,8 @@ export function SessionRecordDraftPanelBody({
           <input
             className="input"
             aria-label="피드백 문서 제목"
+            aria-invalid={isSectionInvalid("feedback") || undefined}
+            aria-describedby={errorDescriptionId("feedback")}
             value={snapshot.feedbackDocument.title}
             style={{ minWidth: 0, maxWidth: "100%" }}
             onChange={(event) => onSnapshotChange({
@@ -306,6 +372,8 @@ export function SessionRecordDraftPanelBody({
           <textarea
             className="input"
             aria-label="피드백 Markdown 본문"
+            aria-invalid={isSectionInvalid("feedback") || undefined}
+            aria-describedby={errorDescriptionId("feedback")}
             rows={12}
             value={snapshot.feedbackDocument.markdown}
             style={{ minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere" }}

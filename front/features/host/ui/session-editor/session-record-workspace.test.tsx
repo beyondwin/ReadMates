@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SessionImportPreviewResponse } from "@/features/host/model/host-view-types";
 import type { SessionImportCommitResult } from "@/features/host/model/session-import-model";
 import type { HostSessionDraftSource } from "@/features/host/model/host-session-editor-navigation";
@@ -100,6 +100,10 @@ const TestLinkComponent: HostSessionEditorLinkComponent = ({
   void _state;
   return <a {...props} href={to}>{children}</a>;
 };
+
+afterEach(() => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
+});
 
 function props(
   overrides: Partial<SessionRecordWorkspaceProps> = {},
@@ -227,6 +231,34 @@ describe("SessionRecordWorkspace", () => {
     expect(screen.getAllByRole("button", { name: "반영 검토" })).toHaveLength(1);
     expect(within(stickyAction).getByRole("button", { name: "반영 검토" })).toBeEnabled();
   });
+
+  it.each([
+    { width: 390, source: "ai" as const, sourceLabel: "AI로 생성" },
+    { width: 320, source: "json" as const, sourceLabel: "외부 JSON" },
+  ])(
+    "orders status, $sourceLabel creation controls, creation panel, and common editor at $width px",
+    ({ width, source, sourceLabel }) => {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
+      window.dispatchEvent(new Event("resize"));
+
+      render(<SessionRecordWorkspace {...props({ source })} />);
+
+      const appliedStatus = screen.getByRole("region", { name: "현재 적용본" });
+      const creationHeading = screen.getByRole("heading", { name: "시작 방법을 선택하세요" });
+      const creationPanel = screen.getByRole("tabpanel", { name: sourceLabel });
+      const editor = screen.getByRole("region", { name: "공통 초안 편집기" });
+      const follows = (earlier: Element, later: Element) =>
+        Boolean(earlier.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+      expect(follows(appliedStatus, creationHeading)).toBe(true);
+      expect(follows(creationHeading, creationPanel)).toBe(true);
+      expect(follows(creationPanel, editor)).toBe(true);
+      expect(creationPanel).toHaveClass("rm-session-record-workspace__creation-panel");
+      expect(editor.parentElement).toHaveClass("rm-session-record-workspace__draft-editor");
+      expect(document.querySelectorAll(".rm-session-record-workspace__creation-panel"))
+        .toHaveLength(1);
+    },
+  );
 
   it("disables review while the apply preview is pending and ignores rapid repeat activation", async () => {
     const user = userEvent.setup();

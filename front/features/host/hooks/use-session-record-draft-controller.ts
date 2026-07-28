@@ -130,6 +130,7 @@ export function useSessionRecordDraftController({
   }, [clearTimer, persistSnapshot]);
 
   const adoptEditor = useCallback((nextEditor: HostSessionRecordEditor) => {
+    clearTimer();
     controllerEpochRef.current += 1;
     queuedSaveRef.current = null;
     editVersionRef.current = 0;
@@ -137,7 +138,7 @@ export function useSessionRecordDraftController({
     setDraftRevision(nextEditor.draft?.draftRevision ?? null);
     setSnapshot(nextSnapshot);
     setSaveState(nextEditor.draft ? "saved" : "idle");
-  }, [setDraftRevision]);
+  }, [clearTimer, setDraftRevision]);
 
   const reloadDraft = useCallback(async () => {
     clearTimer();

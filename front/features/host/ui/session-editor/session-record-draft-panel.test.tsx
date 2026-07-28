@@ -237,6 +237,51 @@ describe("SessionRecordDraftPanelBody", () => {
     expect(result.current.expectedDraftRevision).toBe(6);
   });
 
+  it("cancels an older pending autosave when a restored editor is adopted and still saves later edits", async () => {
+    vi.useFakeTimers();
+    const restoredSnapshot = {
+      ...draftSnapshot,
+      publicationSummary: "복원된 서버 초안",
+    };
+    const laterSnapshot = {
+      ...restoredSnapshot,
+      publicationSummary: "복원 후 새로 입력한 초안",
+    };
+    const onSave = vi.fn().mockResolvedValue(editor(laterSnapshot, 9).draft);
+    const { result } = renderHook(() => useSessionRecordDraftController({
+      editor: editor(),
+      onSave,
+      onReload: vi.fn(),
+    }));
+
+    act(() => result.current.updateSnapshot({
+      ...draftSnapshot,
+      publicationSummary: "복원 전에 예약된 오래된 초안",
+    }));
+    act(() => result.current.adoptEditor(editor(restoredSnapshot, 8)));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600);
+    });
+    expect(result.current.snapshot.publicationSummary).toBe("복원된 서버 초안");
+    expect(result.current.expectedDraftRevision).toBe(8);
+    expect(onSave).not.toHaveBeenCalled();
+
+    act(() => result.current.updateSnapshot(laterSnapshot));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600);
+    });
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave).toHaveBeenCalledWith({
+      sessionId: "session-1",
+      request: {
+        expectedDraftRevision: 8,
+        snapshot: laterSnapshot,
+      },
+    });
+    expect(result.current.saveState).toBe("saved");
+  });
+
   it("shows unsaved state and blocks navigation after autosave failure", async () => {
     vi.useFakeTimers();
     const { result } = renderHook(() => useSessionRecordDraftController({
@@ -312,7 +357,14 @@ describe("SessionRecordDraftPanelBody", () => {
   it("maps validation issues to summary highlights reviews and feedback", () => {
     render(
       <SessionRecordDraftPanelBody
-        snapshot={draftSnapshot}
+        snapshot={{
+          ...draftSnapshot,
+          oneLineReviews: [{
+            membershipId: "membership-1",
+            authorDisplayName: "회원 1",
+            text: "확인이 필요한 한줄평",
+          }],
+        }}
         saveState="saved"
         validationIssues={[
           "SUMMARY_REQUIRED",
@@ -331,6 +383,55 @@ describe("SessionRecordDraftPanelBody", () => {
     expect(screen.getByRole("link", { name: "하이라이트 오류" })).toHaveAttribute("href", "#session-record-highlights");
     expect(screen.getByRole("link", { name: "한줄평 오류" })).toHaveAttribute("href", "#session-record-reviews");
     expect(screen.getByRole("link", { name: "피드백 문서 오류" })).toHaveAttribute("href", "#session-record-feedback");
+
+    const summary = screen.getByRole("textbox", { name: "공개 요약" });
+    expect(summary).toHaveAttribute("aria-invalid", "true");
+    expect(summary).toHaveAttribute("aria-describedby", "session-record-summary-error");
+    expect(document.getElementById("session-record-summary-error"))
+      .toHaveTextContent("공개 요약을 입력하거나 내용을 확인해 주세요.");
+
+    const highlight = screen.getByRole("textbox", { name: "하이라이트 1 · 회원 1" });
+    expect(highlight).toHaveAttribute("aria-invalid", "true");
+    expect(highlight).toHaveAttribute("aria-describedby", "session-record-highlights-error");
+    expect(document.getElementById("session-record-highlights-error"))
+      .toHaveTextContent("하이라이트의 작성자와 내용을 확인해 주세요.");
+
+    const review = screen.getByRole("textbox", { name: "한줄평 1 · 회원 1" });
+    expect(review).toHaveAttribute("aria-invalid", "true");
+    expect(review).toHaveAttribute("aria-describedby", "session-record-reviews-error");
+    expect(document.getElementById("session-record-reviews-error"))
+      .toHaveTextContent("한줄평의 작성자와 내용을 확인해 주세요.");
+
+    const feedbackFileName = screen.getByRole("textbox", { name: "피드백 파일 이름" });
+    const feedbackTitle = screen.getByRole("textbox", { name: "피드백 문서 제목" });
+    const feedbackMarkdown = screen.getByRole("textbox", { name: "피드백 Markdown 본문" });
+    for (const field of [feedbackFileName, feedbackTitle, feedbackMarkdown]) {
+      expect(field).toHaveAttribute("aria-invalid", "true");
+      expect(field).toHaveAttribute("aria-describedby", "session-record-feedback-error");
+    }
+    expect(document.getElementById("session-record-feedback-error"))
+      .toHaveTextContent("피드백 문서의 파일 이름, 제목, Markdown 본문을 확인해 주세요.");
+  });
+
+  it("does not mark fields invalid when their validation section has no issue", () => {
+    render(
+      <SessionRecordDraftPanelBody
+        snapshot={draftSnapshot}
+        saveState="saved"
+        validationIssues={["SUMMARY_REQUIRED"]}
+        draftLiveBaseStale={false}
+        onSnapshotChange={vi.fn()}
+        onReloadDraft={vi.fn()}
+        onCopyInput={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("textbox", { name: "공개 요약" }))
+      .toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("textbox", { name: "하이라이트 1 · 회원 1" }))
+      .not.toHaveAttribute("aria-invalid");
+    expect(screen.getByRole("textbox", { name: "피드백 파일 이름" }))
+      .not.toHaveAttribute("aria-describedby");
   });
 
   it("offers an explicit retryable rebase action while review remains blocked", async () => {

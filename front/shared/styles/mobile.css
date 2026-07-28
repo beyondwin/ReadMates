@@ -1223,6 +1223,19 @@
   min-width: 0;
   background: color-mix(in oklch, var(--bg-sub) 72%, transparent);
 }
+.rm-session-record-workspace__draft-layout {
+  display: grid;
+  grid-template-areas: "editor creation";
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  gap: 20px;
+  align-items: start;
+}
+.rm-session-record-workspace__creation-rail {
+  grid-area: creation;
+}
+.rm-session-record-workspace__draft-editor {
+  grid-area: editor;
+}
 .rm-host-session-editor :where(p, li, a, label, strong, time, .badge, .small, .tiny) {
   overflow-wrap: anywhere;
 }
@@ -1321,6 +1334,13 @@
     + section {
     border-top: 1px solid var(--line-soft);
     border-left: 0 !important;
+  }
+  .rm-session-record-workspace__draft-layout {
+    grid-template-areas:
+      "creation"
+      "editor";
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
   }
   .rm-session-record-workspace__sticky-action {
     bottom: calc(var(--m-nav-h) + var(--m-safe-bottom) + 12px) !important;

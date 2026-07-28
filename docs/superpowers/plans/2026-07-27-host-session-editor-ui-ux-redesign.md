@@ -966,10 +966,23 @@ hook은 Task 1의 pure model을 사용하고 route module에 남긴다. UI에서
 | --- | --- | --- |
 | Task 1 mutable `DEFAULT_LOCATION` | Still deferred | The parser still returns the shared mutable object for default/invalid input. No current caller mutates it, but a future defensive clone or readonly value is a separate model hardening change. |
 | Task 2 simultaneous overview precedence cases | Still deferred | The model suite fixes each priority state but does not yet combine competing error/stale/validation/draft inputs in precedence cases. |
-| Task 3 36px section-tab target | Still deferred | `SessionEditorSectionNav` retains its inline 36px height, so the Task 8 44px mobile target is not fully achieved there. |
+| Task 3 36px section-tab target | Resolved before final review; ledger corrected in final-review fix wave | Current CSS already overrides the inline size with `.rm-host-session-editor__section-tab { min-height: 44px !important; height: 44px !important; }`, including the 320–390px mobile range. No product-code change was needed for this ruling. |
 | Task 3 raw ISO overview time | Still deferred | The overview still receives the raw applied timestamp projection; localized display needs a dedicated presentation decision. |
 | Task 4 feedback-document header chip | Resolved in Fix Round 1 | The host editor no longer passes feedback-document availability into `SessionIdentity`; the header now contains identity/lifecycle and the adjacent visibility/draft status only. |
 | Task 5 legacy no-`recordWorkflow` fallback | Still deferred | Compatibility rendering remains for callers without the workflow contract; removing it would be a behavior and migration decision outside this fix. |
 | Task 8 390px dialog / 320px long-wrap combined matrix | Still deferred | Existing evidence covers both widths and critical states, but does not duplicate each named pairing. |
 | Task 8 CSS structural/shared-class fallback | Still deferred | The requested hooks exist, but some markup intentionally continues to use shared chip classes and structural fallback selectors. |
-| Task 8 AI regenerate pointer target | Still deferred | Keyboard activation is covered, but the pointer target remains below the preferred mobile size. |
+| Task 8 AI regenerate pointer target | Resolved before final review; ledger corrected in final-review fix wave | AI regenerate controls use the shared `.btn`/`.btn-sm` classes, and the current `max-width: 768px` CSS enforces a 44px minimum height for both classes. No product-code change was needed for this ruling. |
+
+### Final-review fix wave
+
+The final whole-branch reviewer identified three load-bearing implementation findings and one evidence-ledger correction. They were handled together with focused RED/GREEN evidence:
+
+| Finding | Resolution | Evidence |
+| --- | --- | --- |
+| Pending pre-restore autosave can overwrite a newly adopted restored draft | `adoptEditor` now clears the pending debounce timer before advancing the controller epoch and adopting the server/restored snapshot. A later edit still schedules and saves normally against the adopted draft revision. | Deterministic fake-timer regression in `session-record-draft-panel.test.tsx`: RED observed the stale save advance revision 8→9; GREEN proves zero pre-restore saves and one later save using expected revision 8. |
+| Mobile AI/JSON creation content follows the full draft editor | The record workspace now has one creation rail/panel and one draft editor in an explicit CSS grid. Desktop remains editor-left/creation-right; at `max-width: 768px`, grid areas place creation before editor. | Structural component regression covers AI at 390px and JSON at 320px, including status → source controls → active creation panel → draft editor DOM order and a single creation panel. |
+| Draft validation fields lack programmatic error association | Summary, highlight, one-line-review, and feedback fields now expose section-specific `aria-invalid` and `aria-describedby`, linked to stable nearby human-readable error details. Existing summary anchors remain unchanged. | Focused component assertions cover linked IDs/messages and verify unaffected fields remain free of invalid/error associations. |
+| Section-tab and AI regenerate touch-target rulings are stale | Both deferred rows above are corrected to resolved based on current 44px CSS enforcement. | `.rm-host-session-editor__section-tab` has an explicit 44px rule; mobile `.btn` and `.btn-sm` both have a 44px minimum height. |
+
+Final-review fix scope remains frontend and historical evidence only. It does not authorize or claim merge, rebase, push, PR, deploy, live AI, or notification/email activity.

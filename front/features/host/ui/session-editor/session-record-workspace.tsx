@@ -233,13 +233,17 @@ export function SessionRecordWorkspace({
   }, [creation.importCommitResult, returnToCommonEditor]);
 
   return (
-    <div className="surface stack" style={{ "--stack": "20px", padding: 24, minWidth: 0 } as CSSProperties}>
+    <div
+      className="surface stack rm-session-record-workspace"
+      style={{ "--stack": "20px", padding: 24, minWidth: 0 } as CSSProperties}
+    >
       <header>
         <div className="eyebrow">세션 기록</div>
         <h2 className="h3 editorial" style={{ margin: "6px 0 0" }}>기록 작업대</h2>
       </header>
 
       <div
+        className="rm-session-record-workspace__context"
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
@@ -377,37 +381,20 @@ export function SessionRecordWorkspace({
       </section>
 
       <div
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          flexWrap: "wrap",
-          gap: 20,
-          minWidth: 0,
-        }}
+        className="rm-session-record-workspace__draft-layout"
+        style={{ minWidth: 0 }}
       >
-        <div style={{ flex: "1 1 560px", minWidth: 0 }}>
-          <SessionRecordDraftPanelBody
-            snapshot={draft.snapshot}
-            saveState={draft.saveState}
-            validationIssues={draft.validationIssues}
-            draftLiveBaseStale={draft.liveBaseStale}
-            onSnapshotChange={actions.onSnapshotChange}
-            onReloadDraft={actions.onReloadDraft}
-            onCopyInput={actions.onCopyInput}
-            onRebaseDraft={actions.onRebaseDraft}
-            rebasePending={draft.rebasePending}
-            rebaseError={draft.rebaseError}
-          />
-        </div>
-
-        <aside style={{ flex: "0 1 340px", minWidth: "min(100%, 280px)", maxWidth: "100%" }}>
+        <aside
+          className="rm-session-record-workspace__creation-rail"
+          style={{ minWidth: "min(100%, 280px)", maxWidth: "100%" }}
+        >
           {visitedSources.has("manual") || source === "manual" ? (
             <div
               id={sourcePanelId("manual")}
               role="tabpanel"
               aria-labelledby={sourceTabId("manual")}
               hidden={source !== "manual"}
-              className="surface-quiet small"
+              className="surface-quiet small rm-session-record-workspace__creation-panel"
               style={{ padding: 16, overflowWrap: "anywhere" }}
             >
               공통 초안 편집기에서 직접 작성하세요. 입력은 같은 서버 초안에 자동으로 저장됩니다.
@@ -422,7 +409,7 @@ export function SessionRecordWorkspace({
                 role="tabpanel"
                 aria-labelledby={sourceTabId(creationSource)}
                 hidden={source !== creationSource}
-                className="surface-quiet"
+                className="surface-quiet rm-session-record-workspace__creation-panel"
                 style={{ padding: 16, minWidth: 0, overflowWrap: "anywhere" }}
               >
                 <SessionRecordCompletionPanel
@@ -443,6 +430,21 @@ export function SessionRecordWorkspace({
             ) : null
           )}
         </aside>
+
+        <div className="rm-session-record-workspace__draft-editor" style={{ minWidth: 0 }}>
+          <SessionRecordDraftPanelBody
+            snapshot={draft.snapshot}
+            saveState={draft.saveState}
+            validationIssues={draft.validationIssues}
+            draftLiveBaseStale={draft.liveBaseStale}
+            onSnapshotChange={actions.onSnapshotChange}
+            onReloadDraft={actions.onReloadDraft}
+            onCopyInput={actions.onCopyInput}
+            onRebaseDraft={actions.onRebaseDraft}
+            rebasePending={draft.rebasePending}
+            rebaseError={draft.rebaseError}
+          />
+        </div>
       </div>
 
       <section
