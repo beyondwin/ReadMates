@@ -6015,6 +6015,7 @@
 .rm-participation-records-action__link {
   display: inline-flex;
   align-items: center;
+  min-inline-size: 44px;
   min-height: 44px;
   color: var(--accent);
   font-size: 0.875rem;
@@ -6096,6 +6097,11 @@
   display: flex;
   flex: 0 0 auto;
   align-items: center;
+  min-height: 44px;
+}
+
+.rm-member-space-account-actions__control > :is(a, button) {
+  min-inline-size: 44px;
   min-height: 44px;
 }
 
