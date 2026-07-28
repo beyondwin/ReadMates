@@ -42,6 +42,9 @@ test("member shelf previews three books and opens the full personal history", as
   await expect(page.getByRole("button", {
     name: "계정·알림 설정",
   })).toHaveCount(0);
+  await expect(page.getByRole("region", {
+    name: "계정과 알림",
+  })).toHaveCount(0);
 
   await page.getByRole("link", {
     name: "내 기록 전체 보기",
