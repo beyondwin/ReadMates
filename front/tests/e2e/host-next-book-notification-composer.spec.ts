@@ -26,6 +26,7 @@ async function createDraftAndPublishNextBook(
   const bookTitle = `Next Book Composer ${suffix}`;
   await loginWithGoogleFixture(page, "host@example.com");
   await page.goto(`${HOST_PATH}/sessions/new`);
+  await page.getByRole("tab", { name: "기본 정보" }).click();
   await page.getByLabel("세션 제목").fill(`Next Book Composer Session ${suffix}`);
   await page.getByLabel("책 제목").fill(bookTitle);
   await page.getByLabel("저자").fill("Public Fixture Author");

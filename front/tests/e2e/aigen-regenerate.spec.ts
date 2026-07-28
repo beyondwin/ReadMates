@@ -147,8 +147,10 @@ test("regenerate summary: modal payload uses UPPER_SNAKE item and updates PREVIE
   for (const button of await page.getByRole("button", { name: "AI 근거 검토 완료" }).all()) await button.click();
   await expect(page.getByText("4/4 검토 완료")).toBeVisible();
 
-  // Click ✨ regenerate on the summary
-  await page.getByRole("button", { name: /요약 재생성/ }).click();
+  // Activate regenerate through its keyboard-accessible control.
+  const regenerateSummary = page.getByRole("button", { name: /요약 재생성/ });
+  await regenerateSummary.focus();
+  await page.keyboard.press("Enter");
 
   await page.getByLabel(/지시문/).fill("더 간결하게");
   await page.getByRole("button", { name: /^확인$/ }).click();

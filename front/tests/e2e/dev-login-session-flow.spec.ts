@@ -49,6 +49,7 @@ test("host creates member-visible upcoming session then starts it", async ({ pag
   await page.goto("/app/host");
 
   await page.getByRole("link", { name: "세션 문서 만들기" }).first().click();
+  await page.getByRole("tab", { name: "기본 정보" }).click();
   await page.getByLabel("세션 제목").fill("7회차 · E2E 예정 책");
   await page.getByLabel("책 제목").fill("E2E 예정 책");
   await page.getByLabel("저자").fill("E2E 저자");
@@ -95,6 +96,7 @@ test("host creates session seven and member sees current session", async ({ page
   await loginWithGoogleFixture(page, "host@example.com");
 
   await page.goto("/app/host/sessions/new");
+  await page.getByRole("tab", { name: "기본 정보" }).click();
   await page.getByLabel("세션 제목").fill("7회차 모임 · 테스트 책");
   await page.getByLabel("책 제목").fill("테스트 책");
   await page.getByLabel("저자").fill("테스트 저자");
@@ -125,6 +127,7 @@ test("host invites a new member and invite page uses Google acceptance", async (
   await loginWithGoogleFixture(page, "host@example.com");
 
   await page.goto("/app/host/sessions/new");
+  await page.getByRole("tab", { name: "기본 정보" }).click();
   await page.getByLabel("세션 제목").fill("7회차 모임 · 초대 테스트 책");
   await page.getByLabel("책 제목").fill("초대 테스트 책");
   await page.getByLabel("저자").fill("초대 테스트 저자");

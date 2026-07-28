@@ -209,8 +209,15 @@ async function installAiDraftRoutes(page: Page, sessionId: string, sessionNumber
 }
 
 async function waitForDraftSaved(page: Page) {
-  await expect(page.getByText("초안 저장됨 · 검토 후 반영").first())
-    .toBeVisible({ timeout: 15_000 });
+  await expect(
+    page.getByRole("region", { name: "공통 초안 편집기" }).getByRole("status"),
+  ).toHaveText("저장됨", { timeout: 15_000 });
+}
+
+async function openRecordWorkspace(page: Page) {
+  const tab = page.getByRole("tab", { name: "기록 작업대" });
+  await tab.click();
+  await expect(tab).toHaveAttribute("aria-selected", "true");
 }
 
 async function reviewAndApply(page: Page, sessionId: string) {
@@ -219,13 +226,13 @@ async function reviewAndApply(page: Page, sessionId: string) {
       response.request().method() === "POST"
       && response.url().includes(`/host/sessions/${sessionId}/record-apply-preview`),
   );
-  await page.getByRole("button", { name: "변경사항 검토" }).click();
+  await page.getByRole("button", { name: "반영 검토" }).click();
   const preview = await previewResponse;
   expect(preview.status(), await preview.text()).toBe(200);
-  const dialog = page.getByRole("dialog", { name: "기록 반영 확인" });
+  const dialog = page.getByRole("dialog", { name: "새 버전으로 반영" });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("radio", { name: /알림/ })).toHaveCount(0);
-  await expect(dialog.getByRole("button", { name: "기록 반영" })).toBeEnabled();
+  await expect(dialog.getByRole("button", { name: "새 버전으로 반영" })).toBeEnabled();
   return dialog;
 }
 
@@ -312,6 +319,7 @@ test("draft commits stay silent and final apply composes without automatic dispa
   test.setTimeout(90_000);
   await loginWithGoogleFixture(page, "host@example.com");
   await page.goto(`${HOST_PATH}/sessions/new`);
+  await page.getByRole("tab", { name: "기본 정보" }).click();
   await page.getByLabel("세션 제목").fill("Feedback Composer Contract Session");
   await page.getByLabel("책 제목").fill(RECORD_BOOK);
   await page.getByLabel("저자").fill("Public Fixture Author");
@@ -356,7 +364,8 @@ set state = 'CLOSED',
 where id = ${sqlValue(sessionId)};
 `);
 
-  await page.goto(`${HOST_PATH}/sessions/${sessionId}/edit?records=json`);
+  await page.goto(`${HOST_PATH}/sessions/${sessionId}/edit?section=records&source=json`);
+  await expect(page).toHaveURL(/\?section=records&source=json$/);
   const authors = activeParticipantNames(sessionId);
   expect(authors.length).toBeGreaterThanOrEqual(1);
   const firstAuthor = authors[0]!;
@@ -400,8 +409,12 @@ where id = ${sqlValue(sessionId)};
   await page.getByRole("button", { name: "초안으로 가져오기" }).click();
   const imported = await importResponse;
   expect(imported.status(), await imported.text()).toBe(200);
-  await expect(page.getByRole("region", { name: "세션 기록 초안 저장 결과" }))
-    .toContainText("알림은 생성되지 않습니다");
+  await expect(page.getByRole("tab", { name: "직접 작성" }))
+    .toHaveAttribute("aria-selected", "true");
+  await waitForDraftSaved(page);
+  await expect(page.getByRole("region", { name: "작업 중인 초안" }))
+    .toContainText("작성 방식 · 외부 JSON");
+  await expect(page.getByLabel("공개 요약")).toHaveValue(IMPORT_SUMMARY);
   await expect(page.getByRole("dialog", { name: "알림 보내기" })).toHaveCount(0);
   expect(await readNotificationEventCount(sessionId, "FEEDBACK_DOCUMENT_PUBLISHED")).toBe(0);
   expect(countManualNotificationEventsForSession(sessionId, "FEEDBACK_DOCUMENT_PUBLISHED")).toBe(0);
@@ -416,8 +429,9 @@ where id = ${sqlValue(sessionId)};
   await page.getByRole("button", { name: /생성 시작/ }).click();
   await expect(page.getByText(/AI가 생성한 기록 미리보기/)).toBeVisible({ timeout: 15_000 });
   await page.getByRole("button", { name: "초안으로 저장" }).click();
-  await expect(page.getByText(/AI 기록을 공유 초안으로 저장했습니다/))
-    .toContainText("알림은 생성되지 않습니다");
+  await expect(page.getByRole("tab", { name: "직접 작성" }))
+    .toHaveAttribute("aria-selected", "true");
+  await waitForDraftSaved(page);
   await expect(page.getByRole("dialog", { name: "알림 보내기" })).toHaveCount(0);
   expect(await readNotificationEventCount(sessionId, "FEEDBACK_DOCUMENT_PUBLISHED")).toBe(0);
 
@@ -444,11 +458,11 @@ where id = ${sqlValue(sessionId)};
   });
 
   const applyDialog = await reviewAndApply(page, sessionId);
-  await applyDialog.getByRole("button", { name: "기록 반영" }).click();
+  await applyDialog.getByRole("button", { name: "새 버전으로 반영" }).click();
   await expect(page.getByText(/처리 결과를 확인하지 못했습니다/)).toBeVisible();
   const revisionsAfterLostResponse = await readSessionRecordRevisionCount(sessionId);
   expect(revisionsAfterLostResponse).toBeGreaterThan(revisionsBeforeApply);
-  await applyDialog.getByRole("button", { name: "기록 반영" }).click();
+  await applyDialog.getByRole("button", { name: "새 버전으로 반영" }).click();
   await expect(page.getByRole("dialog", { name: "알림 보내기" })).toBeVisible();
   expect(applyRequestIds).toHaveLength(2);
   expect(new Set(applyRequestIds).size).toBe(1);
@@ -461,10 +475,11 @@ where id = ${sqlValue(sessionId)};
   expect(await readNotificationEventCount(sessionId, "FEEDBACK_DOCUMENT_PUBLISHED")).toBe(0);
   expect(countManualNotificationEventsForSession(sessionId, "FEEDBACK_DOCUMENT_PUBLISHED")).toBe(0);
 
+  await openRecordWorkspace(page);
   await page.getByLabel("공개 요약").fill(UPDATED_SUMMARY);
   await waitForDraftSaved(page);
   const secondApplyDialog = await reviewAndApply(page, sessionId);
-  await secondApplyDialog.getByRole("button", { name: "기록 반영" }).click();
+  await secondApplyDialog.getByRole("button", { name: "새 버전으로 반영" }).click();
   await expect(page.getByRole("dialog", { name: "알림 보내기" })).toBeVisible();
   expect(applyRequestIds.at(-1)).not.toBe(applyRequestIds[0]);
   expect(await readNotificationEventCount(sessionId, "SESSION_RECORD_UPDATED")).toBe(0);
@@ -522,10 +537,11 @@ where id = (
 
   await page.getByRole("button", { name: "이번에는 보내지 않기" }).click();
   await page.reload();
+  await openRecordWorkspace(page);
   await page.getByLabel("공개 요약").fill(FINAL_SUMMARY);
   await waitForDraftSaved(page);
   const finalApplyDialog = await reviewAndApply(page, sessionId);
-  await finalApplyDialog.getByRole("button", { name: "기록 반영" }).click();
+  await finalApplyDialog.getByRole("button", { name: "새 버전으로 반영" }).click();
   await expect(page.getByRole("dialog", { name: "알림 보내기" })).toBeVisible();
 
   const freshPreviewResponse = page.waitForResponse(

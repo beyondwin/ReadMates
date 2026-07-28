@@ -174,10 +174,15 @@ test("AI generation full flow: upload → poll → preview → commit", async ({
   );
 
   let trackingCommitNavigation = false;
-  let mainFrameNavigationsAfterCommit = 0;
-  page.on("framenavigated", (frame) => {
-    if (trackingCommitNavigation && frame === page.mainFrame()) {
-      mainFrameNavigationsAfterCommit += 1;
+  let documentRequestsAfterCommit = 0;
+  page.on("request", (request) => {
+    if (
+      trackingCommitNavigation
+      && request.isNavigationRequest()
+      && request.frame() === page.mainFrame()
+      && request.resourceType() === "document"
+    ) {
+      documentRequestsAfterCommit += 1;
     }
   });
 
@@ -185,9 +190,13 @@ test("AI generation full flow: upload → poll → preview → commit", async ({
   trackingCommitNavigation = true;
   await page.getByRole("button", { name: "초안으로 저장" }).click();
 
-  // Commit should refresh the editor through Query invalidation, not a full page reload.
-  await expect(page.getByText(/AI 기록을 공유 초안으로 저장했습니다|AI로 세션 기록 생성/)).toBeVisible({ timeout: 15000 });
-  await expect.poll(() => mainFrameNavigationsAfterCommit).toBe(0);
+  // Commit returns to the common editor through client navigation, without a document reload.
+  await expect(page).toHaveURL(/\?section=records$/);
+  await expect(page.getByRole("tab", { name: "직접 작성" }))
+    .toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("region", { name: "공통 초안 편집기" }))
+    .toBeVisible({ timeout: 15_000 });
+  await expect.poll(() => documentRequestsAfterCommit).toBe(0);
   await expect(page.getByRole("dialog", { name: "알림 보내기" })).toHaveCount(0);
   expect(notificationMutations()).toEqual([]);
 });

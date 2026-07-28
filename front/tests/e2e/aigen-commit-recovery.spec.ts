@@ -45,7 +45,11 @@ test("receipt-backed COMMIT_RETRY converges to COMMITTED without exposing conten
   await expect(page.getByText("COMMIT_RETRY")).toBeVisible();
   await page.getByRole("button", { name: "Commit 재시도" }).click();
   await expect(page.getByText("커밋 확인 중")).toBeVisible();
-  await expect(page.getByText(/AI 기록을 공유 초안으로 저장했습니다/)).toBeVisible({ timeout: 10_000 });
+  await expect(page).toHaveURL(/\?section=records$/);
+  await expect(page.getByRole("tab", { name: "직접 작성" }))
+    .toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("region", { name: "공통 초안 편집기" }))
+    .toBeVisible({ timeout: 10_000 });
   expect(polls).toBeGreaterThanOrEqual(2);
   await expect(page.getByText(/공개 합성|대본|근거 발언/)).toHaveCount(0);
   await expect(page.getByRole("dialog", { name: "알림 보내기" })).toHaveCount(0);

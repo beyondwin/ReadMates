@@ -16,6 +16,7 @@ function resetLifecycleState() {
 
 async function createOpenSessionThroughUi(page: Page) {
   await page.goto("/app/host/sessions/new");
+  await page.getByRole("tab", { name: "기본 정보" }).click();
   await page.getByLabel("세션 제목").fill("7회차 모임 · 생명주기 테스트");
   await page.getByLabel("책 제목").fill(lifecycleBookTitle);
   await page.getByLabel("저자").fill("테스트 저자");
