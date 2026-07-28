@@ -1,7 +1,7 @@
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { createMemoryRouter, MemoryRouter, Route, RouterProvider, Routes } from "react-router-dom";
 import type { MyJourneyItem, MyJourneyPage } from "@/features/archive/model/my-reading-shelf-model";
 import { MyRecordsRoute } from "./my-records-route";
 
@@ -62,6 +62,17 @@ function renderRoute() {
       </Routes>
     </MemoryRouter>,
   );
+}
+
+function renderNavigableRoute() {
+  const router = createMemoryRouter([
+    {
+      path: "/clubs/:clubSlug/app/me/records",
+      element: <MyRecordsRoute />,
+    },
+  ], { initialEntries: ["/clubs/reading-sai/app/me/records"] });
+
+  return { ...render(<RouterProvider router={router} />), router };
 }
 
 describe("MyRecordsRoute", () => {
@@ -125,5 +136,40 @@ describe("MyRecordsRoute", () => {
       retryPage.resolve({ ...journey, nextCursor: null });
       await retryPage.promise;
     });
+  });
+
+  it("ignores a stale club continuation failure before loading the new club cursor", async () => {
+    const user = userEvent.setup();
+    const stalePage = deferred<MyJourneyPage>();
+    const secondClubJourney: MyJourneyPage = {
+      ...journey,
+      items: [item({ sessionId: "club-b-session", bookTitle: "두 번째 모임의 책" })],
+      nextCursor: "club-b-cursor",
+    };
+    api.fetchMyJourney
+      .mockReturnValueOnce(stalePage.promise)
+      .mockResolvedValueOnce({ ...secondClubJourney, nextCursor: null });
+    const { router } = renderNavigableRoute();
+
+    await user.click(await screen.findByRole("button", { name: "기록 더 보기" }));
+
+    route.loaderData = secondClubJourney;
+    await act(async () => {
+      await router.navigate("/clubs/reading-gathering/app/me/records");
+    });
+    expect(await screen.findByRole("article", { name: "9차 두 번째 모임의 책" })).toBeVisible();
+
+    await act(async () => {
+      stalePage.reject(new Error("club A continuation failed"));
+      await stalePage.promise.catch(() => undefined);
+    });
+
+    expect(screen.queryByRole("button", { name: "다시 시도" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "기록 더 보기" }));
+    await waitFor(() => expect(api.fetchMyJourney).toHaveBeenCalledTimes(2));
+    expect(api.fetchMyJourney).toHaveBeenLastCalledWith(
+      { clubSlug: "reading-gathering" },
+      { limit: 12, cursor: "club-b-cursor" },
+    );
   });
 });

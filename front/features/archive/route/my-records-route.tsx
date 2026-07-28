@@ -9,68 +9,92 @@ import { MyRecordsPage } from "@/features/archive/ui/my-records-page";
 
 type MyRecordsPaginationState = {
   source: MyJourneyPage;
+  scope: string | null;
   page: MyJourneyPage;
   pendingCursor: string | null;
   failedCursor: string | null;
 };
 
-function initialPaginationState(source: MyJourneyPage): MyRecordsPaginationState {
-  return { source, page: source, pendingCursor: null, failedCursor: null };
+type MyRecordsRequestToken = {
+  source: MyJourneyPage;
+  scope: string | null;
+  cursor: string;
+};
+
+function initialPaginationState(source: MyJourneyPage, scope: string | null): MyRecordsPaginationState {
+  return { source, scope, page: source, pendingCursor: null, failedCursor: null };
+}
+
+function matchesRequestScope(
+  state: MyRecordsPaginationState,
+  token: MyRecordsRequestToken,
+) {
+  return state.source === token.source && state.scope === token.scope;
 }
 
 export function MyRecordsRoute() {
   const loaderPage = useLoaderData() as MyJourneyPage;
   const { clubSlug } = useParams();
-  const pendingCursorRef = useRef<string | null>(null);
-  const [state, setState] = useState(() => initialPaginationState(loaderPage));
+  const scope = clubSlug ?? null;
+  const pendingRequestRef = useRef<MyRecordsRequestToken | null>(null);
+  const [state, setState] = useState(() => initialPaginationState(loaderPage, scope));
 
-  if (state.source !== loaderPage) {
-    setState(initialPaginationState(loaderPage));
+  if (state.source !== loaderPage || state.scope !== scope) {
+    setState(initialPaginationState(loaderPage, scope));
   }
 
-  const page = state.source === loaderPage ? state.page : loaderPage;
-  const pendingCursor = state.source === loaderPage ? state.pendingCursor : null;
-  const failedCursor = state.source === loaderPage ? state.failedCursor : null;
+  const stateMatchesLoader = state.source === loaderPage && state.scope === scope;
+  const page = stateMatchesLoader ? state.page : loaderPage;
+  const pendingCursor = stateMatchesLoader ? state.pendingCursor : null;
+  const failedCursor = stateMatchesLoader ? state.failedCursor : null;
 
   const loadMore = async () => {
     const cursor = failedCursor ?? page.nextCursor;
 
-    if (!cursor || pendingCursorRef.current === cursor) {
+    if (!cursor || pendingRequestRef.current !== null) {
       return;
     }
 
-    pendingCursorRef.current = cursor;
-    setState((current) => ({
-      ...current,
-      pendingCursor: cursor,
-      failedCursor: null,
-    }));
+    const requestToken = { source: loaderPage, scope, cursor };
+    pendingRequestRef.current = requestToken;
+    setState((current) => (
+      matchesRequestScope(current, requestToken)
+        ? { ...current, pendingCursor: cursor, failedCursor: null }
+        : current
+    ));
 
     try {
       const nextPage = await fetchMyJourney(
-        clubSlug ? { clubSlug } : undefined,
+        scope ? { clubSlug: scope } : undefined,
         { limit: 12, cursor },
       );
 
-      setState((current) => ({
-        source: loaderPage,
-        page: {
-          ...current.page,
-          items: appendUniqueJourneyItems(current.page.items, nextPage.items),
-          nextCursor: nextPage.nextCursor,
-        },
-        pendingCursor: null,
-        failedCursor: null,
-      }));
+      setState((current) => {
+        if (!matchesRequestScope(current, requestToken)) {
+          return current;
+        }
+
+        return {
+          source: requestToken.source,
+          scope: requestToken.scope,
+          page: {
+            ...current.page,
+            items: appendUniqueJourneyItems(current.page.items, nextPage.items),
+            nextCursor: nextPage.nextCursor,
+          },
+          pendingCursor: null,
+          failedCursor: null,
+        };
+      });
     } catch {
-      setState((current) => ({
-        ...current,
-        pendingCursor: null,
-        failedCursor: cursor,
-      }));
+      setState((current) => (
+        matchesRequestScope(current, requestToken)
+          ? { ...current, pendingCursor: null, failedCursor: cursor }
+          : current
+      ));
     } finally {
-      if (pendingCursorRef.current === cursor) {
-        pendingCursorRef.current = null;
+      if (pendingRequestRef.current === requestToken) {
+        pendingRequestRef.current = null;
       }
     }
   };
