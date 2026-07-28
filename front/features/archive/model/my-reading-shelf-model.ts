@@ -188,7 +188,7 @@ export function buildParticipationJourneyViewModel(input: {
   summary: MyJourneySummary;
   today: Date;
 }): ParticipationJourneyViewModel {
-  const rows = input.profile.recentAttendances;
+  const rows = input.profile.recentAttendances.slice(-6);
   const confirmed = rows.filter((row) => row.attendanceStatus !== "UNKNOWN");
   const recentAttended = confirmed.filter((row) => row.attendanceStatus === "ATTENDED").length;
   const hasUnknown = rows.some((row) => row.attendanceStatus === "UNKNOWN");

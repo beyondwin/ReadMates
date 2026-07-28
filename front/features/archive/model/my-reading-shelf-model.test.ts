@@ -319,4 +319,22 @@ describe("my reading shelf model", () => {
       profile: { recentAttendances: [recentAttendances[0], recentAttendances[1]] },
     }).recentSummaryLabel).toBe("최근 2회 중 2회 함께했어요");
   });
+
+  it("uses only the newest six eligible rows while preserving chronological order", () => {
+    const sevenEligibleRows: MyRecentAttendance[] = [
+      { sessionNumber: 3, attended: true, attendanceStatus: "ATTENDED", readingProgress: 100 },
+      ...recentAttendances,
+    ];
+    const viewModel = participationViewModel({
+      profile: { recentAttendances: sevenEligibleRows },
+    });
+
+    expect(viewModel.timelineItems.map((item) => item.sessionNumber)).toEqual([4, 5, 6, 7, 8, 9]);
+    expect(viewModel.timelineItems).toHaveLength(6);
+    expect(viewModel.recentSummaryLabel).toBe("최근 6회 중 5회 함께했어요");
+    expect(viewModel.streakLabel).toBe("현재 3회 연속 참여");
+    expect(viewModel.nudge).toMatchObject({
+      body: "다음 모임에도 함께하면 4회 연속 참여가 됩니다.",
+    });
+  });
 });
