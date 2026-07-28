@@ -1,47 +1,25 @@
-import type { MyPageProfile } from "@/features/archive/model/archive-model";
-import { shelfEmptyState, type MyJourneyPage } from "@/features/archive/model/my-reading-shelf-model";
-import { Link } from "@/features/archive/ui/archive-link";
-import { RecentBookRecords } from "./recent-book-records";
-import { MyReadingSummary } from "./my-reading-summary";
+import type { ReactNode } from "react";
+import type { ParticipationJourneyViewModel } from "@/features/archive/model/my-reading-shelf-model";
+import { MemberSpaceAccountActions } from "./member-space-account-actions";
+import { ParticipationJourney } from "./participation-journey";
 
 export type MyReadingShelfProps = {
-  profile: MyPageProfile;
-  journey: MyJourneyPage;
+  viewModel: ParticipationJourneyViewModel;
+  logoutControl: ReactNode;
 };
 
-export function MyReadingShelf({ profile, journey }: MyReadingShelfProps) {
-  const hasJourney = journey.items.length > 0;
-  const emptyState = shelfEmptyState({
-    membershipStatus: profile.membershipStatus,
-    currentSessionId: profile.currentSessionId,
-  });
-
+export function MyReadingShelf({ viewModel, logoutControl }: MyReadingShelfProps) {
   return (
     <main className="rm-my-shelf">
       <header className="rm-my-shelf-header">
         <div>
           <p className="rm-my-shelf-kicker">내 공간</p>
           <h1>나의 서재</h1>
-          <p>함께 읽은 책과 내가 남긴 기록을 다시 읽어 보세요.</p>
+          <p>함께 읽어 온 시간과 나의 참여 흐름을 돌아보세요.</p>
         </div>
       </header>
-
-      {hasJourney ? (
-        <>
-          <MyReadingSummary summary={journey.summary} />
-          <RecentBookRecords items={journey.items} />
-        </>
-      ) : (
-        <section className="rm-my-shelf-empty" aria-labelledby="my-reading-empty-heading">
-          <h2 id="my-reading-empty-heading">{emptyState.title}</h2>
-          <p>{emptyState.body}</p>
-          {emptyState.action ? (
-            <Link className="rm-my-shelf-action" to={emptyState.action.href}>
-              {emptyState.action.label}
-            </Link>
-          ) : null}
-        </section>
-      )}
+      <ParticipationJourney viewModel={viewModel} />
+      <MemberSpaceAccountActions logoutControl={logoutControl} />
     </main>
   );
 }

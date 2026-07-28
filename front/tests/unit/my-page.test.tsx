@@ -1,97 +1,80 @@
 import { cleanup, render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
-import type { MyPageProfile } from "@/features/archive/model/archive-model";
-import type { MyJourneyPage } from "@/features/archive/model/my-reading-shelf-model";
+import type { ParticipationJourneyViewModel } from "@/features/archive/model/my-reading-shelf-model";
 import MyPage from "@/features/archive/ui/my-page";
 
 afterEach(cleanup);
 
-const profile: MyPageProfile = {
-  displayName: "샘플 멤버",
-  accountName: "sample-member",
-  email: "member@example.com",
-  role: "MEMBER",
-  membershipStatus: "ACTIVE",
-  clubName: "샘플 독서모임",
-  joinedAt: "2026-01",
-  sessionCount: 6,
-  totalSessionCount: 9,
-  completedReadingCount: 4,
-  currentSessionId: null,
-  recentAttendances: [],
-};
-
-const journey: MyJourneyPage = {
-  items: [
+const viewModel: ParticipationJourneyViewModel = {
+  hasParticipationHistory: true,
+  achievementLabel: "함께한 모임 9회",
+  membershipDurationLabel: "함께한 지 1년 8개월",
+  recentSummaryLabel: "최근 6회 중 5회 함께했어요",
+  streakLabel: "현재 3회 연속 참여",
+  timelineItems: [
     {
-      sessionId: "session-9",
       sessionNumber: 9,
-      bookTitle: "보이지 않는 도시들",
-      bookAuthor: "이탈로 칼비노",
-      bookImageUrl: null,
-      date: "2026-07-22",
-      readingProgress: 100,
-      questionCount: 2,
-      reviewCount: 1,
-      feedbackDocument: { available: true, readable: true, lockedReason: null },
+      attendanceStatus: "ATTENDED",
+      statusLabel: "참여",
+      readingLabel: "완독",
     },
   ],
-  nextCursor: null,
-  summary: {
-    attendedSessionCount: 6,
-    completedReadingCount: 4,
-    questionCount: 11,
-    reviewCount: 3,
-    readableFeedbackDocumentCount: 1,
+  nudge: {
+    body: "다음 모임에도 함께하면 4회 연속 참여가 됩니다.",
+    label: "이번 세션 보기",
+    href: "/app/session/current",
   },
+  supportingStats: [
+    { label: "완독", value: "7 / 9" },
+    { label: "질문", value: "28" },
+    { label: "서평", value: "3" },
+  ],
 };
 
-function renderMyPage(overrides: Partial<Parameters<typeof MyPage>[0]> = {}) {
-  return render(<MyPage data={profile} journey={journey} {...overrides} />);
+function renderMyPage({
+  pageViewModel = viewModel,
+  logoutControl = <button type="button">로그아웃</button>,
+}: {
+  pageViewModel?: ParticipationJourneyViewModel;
+  logoutControl?: ReactNode;
+} = {}) {
+  return render(<MyPage viewModel={pageViewModel} logoutControl={logoutControl} />);
 }
 
 describe("MyPage", () => {
-  it("renders only the summary and recent-book shelf hierarchy", () => {
+  it("renders the participation journey and route-owned account control", () => {
     renderMyPage();
 
-    expect(screen.getByRole("heading", {
-      level: 1,
-      name: "나의 서재",
-    })).toBeVisible();
-    expect(screen.getByRole("heading", {
-      level: 2,
-      name: "최근 책별 기록",
-    })).toBeVisible();
-    expect(screen.queryByRole("button", {
-      name: "계정·알림 설정",
-    })).toBeNull();
-    expect(screen.queryByRole("region", {
-      name: "계정과 알림",
-    })).toBeNull();
-    expect(screen.queryByText(/마지막 기록은/)).toBeNull();
-    expect(screen.queryByRole("button", {
-      name: "기록 더 보기",
-    })).toBeNull();
+    expect(screen.getByRole("heading", { level: 1, name: "나의 서재" })).toBeVisible();
+    expect(screen.getByText("함께한 모임 9회")).toBeVisible();
+    expect(screen.getByRole("button", { name: "로그아웃" })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "최근 책별 기록" })).toBeNull();
   });
 
-  it("shows the membership-aware empty action instead of zero-value record rows", () => {
-    renderMyPage({ journey: { ...journey, items: [], nextCursor: null } });
-
-    expect(screen.getByText("아직 쌓인 개인 기록이 없습니다")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "아카이브 보기" })).toHaveAttribute("href", "/app/archive");
-    expect(screen.queryByRole("article")).not.toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "개인 요약" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { level: 2, name: "최근 책별 기록" })).not.toBeInTheDocument();
-  });
-
-  it("keeps a viewer's empty shelf free of personal-summary metrics and record chrome", () => {
+  it("renders the first-participation state from a pure view model", () => {
     renderMyPage({
-      data: { ...profile, membershipStatus: "VIEWER", currentSessionId: "current-session" },
-      journey: { ...journey, items: [], nextCursor: null, summary: { ...journey.summary, attendedSessionCount: 0, completedReadingCount: 0, questionCount: 0, reviewCount: 0 } },
+      pageViewModel: {
+        ...viewModel,
+        hasParticipationHistory: false,
+        achievementLabel: "함께한 모임 0회",
+        membershipDurationLabel: null,
+        recentSummaryLabel: null,
+        streakLabel: null,
+        timelineItems: [],
+        nudge: null,
+        supportingStats: [],
+      },
     });
 
-    expect(screen.getByRole("link", { name: "아카이브 둘러보기" })).toHaveAttribute("href", "/app/archive");
-    expect(screen.queryByRole("region", { name: "개인 요약" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { level: 2, name: "최근 책별 기록" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "첫 참여부터 이곳에 흐름이 쌓여요" })).toBeVisible();
+    expect(screen.queryByText("함께한 모임 0회")).toBeNull();
+  });
+
+  it("does not replace or duplicate the route-owned account control", () => {
+    renderMyPage({ logoutControl: <a href="/account/security">보안 설정</a> });
+
+    expect(screen.getByRole("link", { name: "보안 설정" })).toHaveAttribute("href", "/account/security");
+    expect(screen.queryByRole("button", { name: "로그아웃" })).toBeNull();
   });
 });

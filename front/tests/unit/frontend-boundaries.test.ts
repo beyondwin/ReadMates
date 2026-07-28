@@ -20,7 +20,15 @@ type BoundaryRuleId =
   | "readmates-api-compat"
   | "feature-components-public";
 
-const legacyBoundaryExceptions = [] satisfies Array<{
+const legacyBoundaryExceptions = [
+  {
+    sourcePath: "features/archive/route/my-page-route.tsx",
+    importPath: "features/auth/route/logout-button",
+    ruleId: "feature-to-feature",
+    reason: "The approved member-space route composes the established auth-owned logout controller.",
+    removeWhen: "Member-space logout composition moves to a shared app-level route boundary.",
+  },
+] satisfies Array<{
   sourcePath: string;
   importPath: string;
   ruleId: BoundaryRuleId;

@@ -30,7 +30,7 @@ export async function myPageLoader(args?: LoaderFunctionArgs): Promise<MyPageRou
   const context = { clubSlug: clubSlugFromLoaderArgs(args) };
   const [profile, journey] = await Promise.all([
     fetchMyPage(context),
-    fetchMyJourney(context, { limit: 3 }),
+    fetchMyJourney(context, { limit: 1 }),
   ]);
 
   return { profile, journey };
