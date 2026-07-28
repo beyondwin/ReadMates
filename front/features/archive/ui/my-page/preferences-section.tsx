@@ -25,7 +25,7 @@ export function PreferencesSection({
 
 export function MembershipIdentity({ data }: { data: MyPageProfile }) {
   return (
-    <section className="rm-my-shelf-settings__membership" aria-labelledby="my-page-membership-heading">
+    <section className="rm-account-settings-page__membership" aria-labelledby="my-page-membership-heading">
       <h3 id="my-page-membership-heading">멤버십</h3>
       <dl>
         <div>

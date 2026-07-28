@@ -102,6 +102,18 @@ function memberAppRoutes(queryClient: QueryClient, options: { includeIndex?: boo
       },
     },
     {
+      path: "me/settings",
+      errorElement: <ArchiveRouteError />,
+      hydrateFallbackElement: <ArchiveRouteLoading label="계정 정보를 불러오는 중" />,
+      lazy: async () => {
+        const [{ default: AccountSettingsRoutePage }, { accountSettingsLoader }] = await Promise.all([
+          import("@/src/pages/account-settings"),
+          import("@/features/archive/route/account-settings-data"),
+        ]);
+        return { Component: AccountSettingsRoutePage, loader: accountSettingsLoader };
+      },
+    },
+    {
       path: "me",
       errorElement: <ArchiveRouteError />,
       hydrateFallbackElement: <ArchiveRouteLoading label="내 공간을 불러오는 중" />,

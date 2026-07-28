@@ -5899,46 +5899,58 @@
   margin-top: 14px;
 }
 
-.rm-my-shelf-settings {
-  display: grid;
-  gap: 28px;
-  margin-top: 44px;
-  padding: 24px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-3);
-  background: var(--bg-sub);
+.rm-account-settings-page {
+  width: min(100% - 32px, 820px);
+  margin: 0 auto;
+  padding: 48px 0 88px;
 }
 
-.rm-my-shelf-settings[hidden] {
-  display: none;
+.rm-account-settings-page__header {
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--line);
 }
 
-.rm-my-shelf-settings > h2,
-.rm-my-shelf-settings h3 {
+.rm-account-settings-page__header h1,
+.rm-account-settings-page h3 {
   margin: 0;
   color: var(--text);
   font-family: var(--font-editorial);
 }
 
-.rm-my-shelf-settings > h2 {
-  font-size: 1.7rem;
-  line-height: 1.2;
+.rm-account-settings-page__header h1 {
+  margin-top: 6px;
+  font-size: 2.35rem;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
 }
 
-.rm-my-shelf-settings h3 {
+.rm-account-settings-page__header > p:not(.rm-my-shelf-kicker) {
+  max-width: 52ch;
+  margin: 10px 0 0;
+  color: var(--text-2);
+  line-height: 1.6;
+}
+
+.rm-account-settings-page__content {
+  display: grid;
+  gap: 28px;
+  margin-top: 44px;
+}
+
+.rm-account-settings-page h3 {
   margin-bottom: 12px;
   font-size: 1.1rem;
   line-height: 1.3;
 }
 
-.rm-my-shelf-settings__membership dl {
+.rm-account-settings-page__membership dl {
   display: grid;
   gap: 0;
   margin: 0;
   border-top: 1px solid var(--line-soft);
 }
 
-.rm-my-shelf-settings__membership dl > div {
+.rm-account-settings-page__membership dl > div {
   display: grid;
   grid-template-columns: minmax(88px, 0.45fr) minmax(0, 1fr);
   gap: 14px;
@@ -5946,12 +5958,12 @@
   border-bottom: 1px solid var(--line-soft);
 }
 
-.rm-my-shelf-settings__membership dt {
+.rm-account-settings-page__membership dt {
   color: var(--text-3);
   font-size: 0.8125rem;
 }
 
-.rm-my-shelf-settings__membership dd {
+.rm-account-settings-page__membership dd {
   min-width: 0;
   margin: 0;
   overflow-wrap: anywhere;
@@ -6040,7 +6052,7 @@
   justify-content: flex-start;
 }
 
-.rm-my-shelf-settings__boundary {
+.rm-account-settings-page__boundary {
   padding-top: 28px;
   border-top: 1px solid var(--line);
 }
@@ -6048,14 +6060,14 @@
 .rm-my-shelf-action:focus-visible,
 .rm-my-records-load-more:focus-visible,
 .rm-my-shelf-all-records:focus-visible,
-.rm-my-shelf-settings > h2:focus-visible {
+.rm-account-settings-page__header h1:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 3px;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rm-my-shelf-settings,
-  .rm-my-shelf-settings * {
+  .rm-account-settings-page,
+  .rm-account-settings-page * {
     scroll-behavior: auto;
   }
 
@@ -6192,24 +6204,43 @@
     font-size: 0.8125rem;
   }
 
-  .rm-my-shelf-settings {
-    gap: 22px;
-    margin-top: 34px;
-    padding: 18px;
+  .rm-account-settings-page {
+    width: auto;
+    margin: 0 var(--m-page-x);
+    padding-top: var(--m-page-top);
+    padding-bottom: calc(var(--m-nav-h) + 44px + var(--m-safe-bottom));
   }
 
-  .rm-my-shelf-settings__membership dl > div {
+  .rm-account-settings-page__header {
+    padding-bottom: 20px;
+  }
+
+  .rm-account-settings-page__header h1 {
+    font-size: 1.85rem;
+  }
+
+  .rm-account-settings-page__header > p:not(.rm-my-shelf-kicker) {
+    margin-top: 8px;
+    font-size: 0.875rem;
+  }
+
+  .rm-account-settings-page__content {
+    gap: 22px;
+    margin-top: 34px;
+  }
+
+  .rm-account-settings-page__membership dl > div {
     grid-template-columns: minmax(78px, 0.4fr) minmax(0, 1fr);
     gap: 10px;
   }
 
-  .rm-my-shelf-settings__boundary {
+  .rm-account-settings-page__boundary {
     padding-top: 22px;
   }
 
   .rm-my-shelf-action,
   .rm-my-records-load-more,
-  .rm-my-shelf-settings__logout .btn {
+  .rm-account-settings-page .btn {
     min-block-size: 44px;
   }
 

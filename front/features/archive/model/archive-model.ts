@@ -1,3 +1,5 @@
+import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+
 export type ArchiveView = "sessions" | "reviews" | "questions" | "report";
 export type AttendanceStatus = "UNKNOWN" | "ATTENDED" | "ABSENT";
 export type SessionState = "DRAFT" | "OPEN" | "PUBLISHED" | "CLOSED";
@@ -99,6 +101,23 @@ export type MyPageProfile = {
     readingProgress: number;
   }>;
 };
+
+export function inactiveMyPageProfile(auth: AuthMeResponse): MyPageProfile {
+  return {
+    displayName: auth.displayName ?? "",
+    accountName: auth.accountName ?? "",
+    email: auth.email ?? "",
+    role: auth.role ?? "MEMBER",
+    membershipStatus: auth.membershipStatus ?? "INACTIVE",
+    clubName: null,
+    joinedAt: "",
+    sessionCount: 0,
+    totalSessionCount: 0,
+    completedReadingCount: 0,
+    currentSessionId: null,
+    recentAttendances: [],
+  };
+}
 
 export type MemberArchiveSessionDetail = {
   myQuestions: readonly unknown[];
