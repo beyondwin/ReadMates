@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  appendUniqueJourneyItems,
   completionLabel,
+  emptyMyJourneyPage,
   groupJourneyByYear,
-  journeyChips,
-  latestJourneyItem,
   type MyJourneyItem,
   type MyJourneySummary,
   shelfEmptyState,
@@ -34,12 +34,30 @@ const summary: MyJourneySummary = {
 };
 
 describe("my reading shelf model", () => {
-  it("keeps the server's first row as the latest journey item", () => {
-    const first = journeyItem({ sessionId: "first", sessionNumber: 12 });
-    const second = journeyItem({ sessionId: "second", sessionNumber: 11 });
+  it("creates a stable empty journey page", () => {
+    expect(emptyMyJourneyPage()).toEqual({
+      items: [],
+      nextCursor: null,
+      summary: {
+        attendedSessionCount: 0,
+        completedReadingCount: 0,
+        questionCount: 0,
+        reviewCount: 0,
+        readableFeedbackDocumentCount: 0,
+      },
+    });
+  });
 
-    expect(latestJourneyItem([first, second])).toBe(first);
-    expect(latestJourneyItem([])).toBeNull();
+  it("appends only unseen session rows while preserving order", () => {
+    const first = journeyItem({ sessionId: "first" });
+    const second = journeyItem({ sessionId: "second" });
+    const third = journeyItem({ sessionId: "third" });
+
+    expect(appendUniqueJourneyItems([first, second], [second, third])).toEqual([
+      first,
+      second,
+      third,
+    ]);
   });
 
   it("groups rows by date year without changing their server order", () => {
@@ -62,14 +80,6 @@ describe("my reading shelf model", () => {
     expect(groupJourneyByYear([malformed, impossibleMonth, impossibleLeapDay, absent])).toEqual([
       { year: "연도 미상", items: [malformed, impossibleMonth, impossibleLeapDay, absent] },
     ]);
-  });
-
-  it("only creates chips for positive question and review counts", () => {
-    expect(journeyChips(journeyItem({ questionCount: 2, reviewCount: 1 }))).toEqual([
-      { kind: "QUESTION", label: "질문 2" },
-      { kind: "REVIEW", label: "서평 1" },
-    ]);
-    expect(journeyChips(journeyItem({ questionCount: 0, reviewCount: 0 }))).toEqual([]);
   });
 
   it("formats completion with its attended-session denominator", () => {

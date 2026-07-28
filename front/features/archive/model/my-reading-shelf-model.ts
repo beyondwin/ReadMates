@@ -51,6 +51,35 @@ export type ShelfEmptyState = {
 
 const UNKNOWN_YEAR = "연도 미상";
 
+export function emptyMyJourneyPage(): MyJourneyPage {
+  return {
+    items: [],
+    nextCursor: null,
+    summary: {
+      attendedSessionCount: 0,
+      completedReadingCount: 0,
+      questionCount: 0,
+      reviewCount: 0,
+      readableFeedbackDocumentCount: 0,
+    },
+  };
+}
+
+export function appendUniqueJourneyItems(
+  current: MyJourneyItem[],
+  incoming: MyJourneyItem[],
+): MyJourneyItem[] {
+  const seen = new Set(current.map((item) => item.sessionId));
+  return [
+    ...current,
+    ...incoming.filter((item) => {
+      if (seen.has(item.sessionId)) return false;
+      seen.add(item.sessionId);
+      return true;
+    }),
+  ];
+}
+
 export function latestJourneyItem(items: MyJourneyItem[]): MyJourneyItem | null {
   return items[0] ?? null;
 }
