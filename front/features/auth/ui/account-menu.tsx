@@ -39,20 +39,43 @@ export function AccountMenu({
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const focusReturnTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
   const menuId = useId();
+
+  useEffect(
+    () => () => {
+      if (focusReturnTimerRef.current !== null) {
+        globalThis.clearTimeout(focusReturnTimerRef.current);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!open) {
       return;
     }
 
-    const dismissAndReturnFocus = () => {
-      setOpen(false);
+    const returnFocus = () => {
       triggerRef.current?.focus();
+    };
+    const dismissAndReturnFocus = (deferFocus = false) => {
+      setOpen(false);
+      if (deferFocus) {
+        if (focusReturnTimerRef.current !== null) {
+          globalThis.clearTimeout(focusReturnTimerRef.current);
+        }
+        focusReturnTimerRef.current = globalThis.setTimeout(() => {
+          focusReturnTimerRef.current = null;
+          returnFocus();
+        }, 0);
+      } else {
+        returnFocus();
+      }
     };
     const handlePointerDown = (event: PointerEvent) => {
       if (event.target instanceof Node && !rootRef.current?.contains(event.target)) {
-        dismissAndReturnFocus();
+        dismissAndReturnFocus(true);
       }
     };
     const handleKeyDown = (event: KeyboardEvent) => {

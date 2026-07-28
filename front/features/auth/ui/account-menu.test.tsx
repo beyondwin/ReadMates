@@ -62,6 +62,7 @@ describe("AccountMenu", () => {
 
     await user.pointer({ keys: "[MouseLeft]", target: screen.getByRole("button", { name: "바깥 작업" }) });
     expect(screen.queryByRole("menu")).toBeNull();
+    expect(trigger).toHaveFocus();
   });
 
   it("keeps long Korean and English member names in a wrapping identity block", async () => {
