@@ -5556,8 +5556,7 @@
 }
 
 .rm-my-shelf-kicker,
-.rm-my-shelf-year,
-.rm-my-shelf-meta {
+.rm-my-shelf-year {
   margin: 0;
   color: var(--text-3);
   font-family: var(--font-mono);
@@ -5566,7 +5565,6 @@
 }
 
 .rm-my-shelf-header h1,
-.rm-my-shelf-row h3,
 .rm-my-shelf-empty h2 {
   margin: 0;
   font-family: var(--font-editorial);
@@ -5617,30 +5615,6 @@
   overflow-wrap: anywhere;
 }
 
-.rm-my-shelf-row {
-  display: grid;
-  grid-template-columns: 56px minmax(0, 1fr);
-  gap: 16px;
-}
-
-.rm-my-shelf-row h3 {
-  margin-top: 4px;
-  font-size: 1.35rem;
-  line-height: 1.25;
-  overflow-wrap: anywhere;
-}
-
-.rm-my-shelf-row__author {
-  margin: 5px 0 0;
-  color: var(--text-2);
-  font-size: 0.875rem;
-  overflow-wrap: anywhere;
-}
-
-.rm-my-shelf-journey {
-  margin-top: 44px;
-}
-
 .rm-my-shelf-recent {
   margin-top: 32px;
 }
@@ -5679,7 +5653,38 @@
   list-style: none;
 }
 
-.rm-my-shelf-section-heading {
+.rm-my-records-page {
+  width: min(100% - 32px, 820px);
+  margin: 0 auto;
+  padding: 48px 0 88px;
+}
+
+.rm-my-records-page__header {
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--line);
+}
+
+.rm-my-records-page__header h1 {
+  margin: 6px 0 0;
+  color: var(--text);
+  font-family: var(--font-editorial);
+  font-size: 2.35rem;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+}
+
+.rm-my-records-page__header > p:not(.rm-my-shelf-kicker) {
+  max-width: 52ch;
+  margin: 10px 0 0;
+  color: var(--text-2);
+  line-height: 1.6;
+}
+
+.rm-my-records-journey {
+  margin-top: 44px;
+}
+
+.rm-my-records-section-heading {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
@@ -5687,7 +5692,7 @@
   flex-wrap: wrap;
 }
 
-.rm-my-shelf-section-heading h2 {
+.rm-my-records-section-heading h2 {
   margin: 0;
   color: var(--text);
   font-family: var(--font-editorial);
@@ -5695,17 +5700,17 @@
   line-height: 1.2;
 }
 
-.rm-my-shelf-section-heading p {
+.rm-my-records-section-heading p {
   margin: 0;
   color: var(--text-3);
   font-size: 0.875rem;
 }
 
-.rm-my-shelf-year-groups {
+.rm-my-records-year-groups {
   margin-top: 22px;
 }
 
-.rm-my-shelf-year-group + .rm-my-shelf-year-group {
+.rm-my-records-year-group + .rm-my-records-year-group {
   margin-top: 30px;
 }
 
@@ -5714,57 +5719,10 @@
   border-bottom: 1px solid var(--line);
 }
 
-.rm-my-shelf-journey-list,
-.rm-my-shelf-chips {
+.rm-my-records-list {
   margin: 0;
   padding: 0;
   list-style: none;
-}
-
-.rm-my-shelf-row {
-  padding: 18px 0;
-  border-bottom: 1px solid var(--line-soft);
-}
-
-.rm-my-shelf-cover {
-  display: grid;
-  width: 56px;
-  aspect-ratio: 2 / 3;
-  place-items: center;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: var(--r-1);
-  background: var(--bg);
-  color: var(--text-2);
-  font-family: var(--font-editorial);
-  font-size: 1.3rem;
-  object-fit: cover;
-}
-
-.rm-my-shelf-cover--fallback {
-  background: var(--bg-sub);
-}
-
-.rm-my-shelf-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 12px;
-}
-
-.rm-my-shelf-chips li {
-  padding: 3px 7px;
-  border: 1px solid var(--line-soft);
-  border-radius: var(--r-2);
-  color: var(--text-2);
-  font-size: 0.75rem;
-}
-
-.rm-my-shelf-row__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 14px;
-  margin-top: 14px;
 }
 
 .rm-my-shelf-action {
@@ -5775,13 +5733,6 @@
   font-weight: 650;
   text-decoration: underline;
   text-underline-offset: 3px;
-}
-
-.rm-my-shelf-feedback-lock {
-  margin: 10px 0 0;
-  color: var(--text-3);
-  font-size: 0.8125rem;
-  overflow-wrap: anywhere;
 }
 
 .rm-book-record-row {
@@ -5864,6 +5815,38 @@
 }
 
 @media (max-width: 768px) {
+  .rm-my-records-page {
+    width: auto;
+    margin: 0 var(--m-page-x);
+    padding-top: var(--m-page-top);
+    padding-bottom: calc(var(--m-nav-h) + 44px + var(--m-safe-bottom));
+  }
+
+  .rm-my-records-page__header {
+    padding-bottom: 20px;
+  }
+
+  .rm-my-records-page__header h1 {
+    font-size: 1.85rem;
+  }
+
+  .rm-my-records-page__header > p:not(.rm-my-shelf-kicker) {
+    margin-top: 8px;
+    font-size: 0.875rem;
+  }
+
+  .rm-my-records-journey {
+    margin-top: 34px;
+  }
+
+  .rm-my-records-section-heading {
+    display: block;
+  }
+
+  .rm-my-records-section-heading p {
+    margin-top: 7px;
+  }
+
   .rm-book-record-row {
     grid-template-columns: 44px minmax(0, 1fr) 72px;
     gap: 10px;
@@ -5876,7 +5859,7 @@
   }
 }
 
-.rm-my-shelf-load-state {
+.rm-my-records-load-state {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5885,13 +5868,13 @@
   margin-top: 22px;
 }
 
-.rm-my-shelf-load-state p {
+.rm-my-records-load-state p {
   margin: 0;
   color: var(--text-2);
   font-size: 0.875rem;
 }
 
-.rm-my-shelf-load-state [role="alert"] {
+.rm-my-records-load-state [role="alert"] {
   color: var(--danger);
 }
 
@@ -6063,7 +6046,7 @@
 }
 
 .rm-my-shelf-action:focus-visible,
-.rm-my-shelf-load-more:focus-visible,
+.rm-my-records-load-more:focus-visible,
 .rm-my-shelf-all-records:focus-visible,
 .rm-my-shelf-settings > h2:focus-visible {
   outline: 2px solid var(--focus-ring);
@@ -6192,10 +6175,6 @@
     font-size: 1.125rem;
   }
 
-  .rm-my-shelf-journey {
-    margin-top: 34px;
-  }
-
   .rm-my-shelf-recent {
     margin-top: 28px;
   }
@@ -6211,24 +6190,6 @@
 
   .rm-my-shelf-all-records {
     font-size: 0.8125rem;
-  }
-
-  .rm-my-shelf-section-heading {
-    display: block;
-  }
-
-  .rm-my-shelf-section-heading p {
-    margin-top: 7px;
-  }
-
-  .rm-my-shelf-row {
-    gap: 12px;
-    padding: 16px 0;
-  }
-
-  .rm-my-shelf-row__actions {
-    gap: 4px 12px;
-    margin-top: 10px;
   }
 
   .rm-my-shelf-settings {
@@ -6247,7 +6208,7 @@
   }
 
   .rm-my-shelf-action,
-  .rm-my-shelf-load-more,
+  .rm-my-records-load-more,
   .rm-my-shelf-settings__logout .btn {
     min-block-size: 44px;
   }

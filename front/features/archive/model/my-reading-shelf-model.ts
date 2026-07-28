@@ -33,11 +33,6 @@ export type MyJourneyPage = {
   nextCursor: string | null;
 };
 
-export type JourneyChip = {
-  kind: "QUESTION" | "REVIEW";
-  label: string;
-};
-
 export type JourneyYearGroup = {
   year: string;
   items: MyJourneyItem[];
@@ -80,10 +75,6 @@ export function appendUniqueJourneyItems(
   ];
 }
 
-export function latestJourneyItem(items: MyJourneyItem[]): MyJourneyItem | null {
-  return items[0] ?? null;
-}
-
 export function groupJourneyByYear(items: MyJourneyItem[]): JourneyYearGroup[] {
   const groups = new Map<string, MyJourneyItem[]>();
 
@@ -114,13 +105,6 @@ function validDateYear(date: string): string | null {
   return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day
     ? yearText
     : null;
-}
-
-export function journeyChips(item: MyJourneyItem): JourneyChip[] {
-  const chips: JourneyChip[] = [];
-  if (item.questionCount > 0) chips.push({ kind: "QUESTION", label: `질문 ${item.questionCount}` });
-  if (item.reviewCount > 0) chips.push({ kind: "REVIEW", label: `서평 ${item.reviewCount}` });
-  return chips;
 }
 
 export function completionLabel(summary: MyJourneySummary): string {

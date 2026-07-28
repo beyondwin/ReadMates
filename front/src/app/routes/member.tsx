@@ -90,6 +90,18 @@ function memberAppRoutes(queryClient: QueryClient, options: { includeIndex?: boo
       },
     },
     {
+      path: "me/records",
+      errorElement: <ArchiveRouteError />,
+      hydrateFallbackElement: <ArchiveRouteLoading label="내 책별 기록을 불러오는 중" />,
+      lazy: async () => {
+        const [{ default: MyRecordsRoutePage }, { myRecordsLoader }] = await Promise.all([
+          import("@/src/pages/my-records"),
+          import("@/features/archive/route/my-records-data"),
+        ]);
+        return { Component: MyRecordsRoutePage, loader: myRecordsLoader };
+      },
+    },
+    {
       path: "me",
       errorElement: <ArchiveRouteError />,
       hydrateFallbackElement: <ArchiveRouteLoading label="내 공간을 불러오는 중" />,

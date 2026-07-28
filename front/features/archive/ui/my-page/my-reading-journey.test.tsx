@@ -35,14 +35,15 @@ function renderJourney(overrides: Partial<Parameters<typeof MyReadingJourney>[0]
 }
 
 describe("MyReadingJourney", () => {
-  it("keeps the canonical collection under 책별 기록 and limits the latest block to orientation", () => {
-    renderJourney();
+  it("renders each journey item in the grouped full-record row", () => {
+    renderJourney({ items: [item(), item({ sessionId: "session-8", sessionNumber: 8, bookTitle: "두 번째 책" })] });
 
-    expect(screen.getByRole("heading", { level: 2, name: "책별 기록" })).toBeInTheDocument();
-    expect(screen.getAllByRole("heading", { level: 3, name: "보이지 않는 도시들" })).toHaveLength(1);
-    expect(screen.getByLabelText("최근 책별 기록")).toBeInTheDocument();
-    expect(screen.getByRole("list", { name: "책별 기록" })).toBeInTheDocument();
-    expect(screen.getAllByLabelText("보이지 않는 도시들 표지 없음")).toHaveLength(1);
+    expect(screen.getByRole("heading", { level: 2, name: "내 책별 기록" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "2026년 기록" })).toBeVisible();
+    expect(screen.getAllByRole("article")).toHaveLength(2);
+    expect(screen.queryByText(/마지막 기록은/)).toBeNull();
+    expect(screen.queryByText("질문 2")).toBeNull();
+    expect(screen.queryByText("서평 1")).toBeNull();
   });
 
   it("keeps session and feedback actions as sibling links and skips zero-result chips", () => {
@@ -68,12 +69,24 @@ describe("MyReadingJourney", () => {
     expect(screen.getAllByText("보").length).toBeGreaterThan(0);
   });
 
-  it("only explains an actionable feedback lock", () => {
+  it("groups malformed and impossible dates under an unknown-year section", () => {
+    renderJourney({
+      items: [
+        item({ date: "2026-02-30" }),
+        item({ sessionId: "session-8", date: "unknown" }),
+      ],
+    });
+
+    expect(screen.getByRole("region", { name: "연도 미상 기록" })).toBeVisible();
+    expect(screen.getAllByRole("article")).toHaveLength(2);
+  });
+
+  it("keeps feedback permission limits compact in the shared record row", () => {
     const { rerender } = renderJourney({
       items: [item({ feedbackDocument: { available: true, readable: false, lockedReason: "ACTIVE_MEMBERSHIP_REQUIRED" } })],
     });
 
-    expect(screen.getByText("활성 멤버가 되면 피드백 문서를 읽을 수 있습니다.")).toBeInTheDocument();
+    expect(screen.getByText("열람 제한")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "피드백 문서" })).not.toBeInTheDocument();
 
     rerender(
@@ -87,7 +100,7 @@ describe("MyReadingJourney", () => {
       />,
     );
 
-    expect(screen.queryByText("활성 멤버가 되면 피드백 문서를 읽을 수 있습니다.")).not.toBeInTheDocument();
+    expect(screen.queryByText("열람 제한")).not.toBeInTheDocument();
   });
 
   it("announces loading, preserves a keyboard-reachable retry, and exposes errors", async () => {
