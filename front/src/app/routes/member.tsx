@@ -138,6 +138,21 @@ function memberAppRoutes(queryClient: QueryClient, options: { includeIndex?: boo
       },
     },
     {
+      path: "notifications/settings",
+      errorElement: <ArchiveRouteError />,
+      hydrateFallbackElement: <ArchiveRouteLoading label="알림 수신 설정을 불러오는 중" />,
+      lazy: async () => {
+        const [{ default: MemberNotificationSettingsRoutePage }, { memberNotificationSettingsLoader }] = await Promise.all([
+          import("@/src/pages/member-notification-settings"),
+          import("@/features/notifications/route/member-notification-settings-data"),
+        ]);
+        return {
+          Component: MemberNotificationSettingsRoutePage,
+          loader: memberNotificationSettingsLoader,
+        };
+      },
+    },
+    {
       path: "sessions/:sessionId",
       errorElement: <ArchiveRouteError />,
       hydrateFallbackElement: <ArchiveRouteLoading label="지난 세션 기록을 불러오는 중" />,

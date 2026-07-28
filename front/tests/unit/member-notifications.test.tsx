@@ -173,6 +173,11 @@ describe("MemberNotificationsPage", () => {
     expect(screen.getByText("알림")).toBeInTheDocument();
     expect(screen.getByText("다음 책이 공개되었습니다")).toBeInTheDocument();
     expect(screen.getByText("새 알림 1개")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "받은 알림" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "수신 설정" })).toHaveAttribute(
+      "href",
+      "/app/notifications/settings",
+    );
   });
 
   it("uses the full unread row as the only individual action", async () => {

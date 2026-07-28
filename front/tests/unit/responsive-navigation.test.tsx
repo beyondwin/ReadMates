@@ -62,6 +62,16 @@ describe("TopNav responsive variants", () => {
     expect(screen.getByLabelText("이멤버5")).toHaveTextContent("이");
   });
 
+  it.each([
+    "/app/notifications",
+    "/app/notifications/settings",
+  ])("keeps the desktop notification item current on %s", (pathname) => {
+    renderAt(pathname, <TopNav variant="member" memberName="이멤버5" />);
+
+    const nav = screen.getByRole("navigation", { name: "앱 내비게이션" });
+    expect(within(nav).getByRole("link", { name: "알림" })).toHaveAttribute("aria-current", "page");
+  });
+
   it("keeps member desktop navigation inside the scoped app route", () => {
     renderAt("/clubs/reading-sai/app/archive", <TopNav variant="member" memberName="이멤버5" appBasePath="/clubs/reading-sai/app" />);
 
@@ -517,8 +527,11 @@ describe("MobileTabBar app tabs", () => {
     expect(within(tabs).queryByRole("link", { name: "운영" })).not.toBeInTheDocument();
   });
 
-  it("marks the member notification tab active on notification routes", () => {
-    renderAt("/app/notifications", <MobileTabBar variant="member" />);
+  it.each([
+    "/app/notifications",
+    "/app/notifications/settings",
+  ])("marks the member notification tab active on %s", (pathname) => {
+    renderAt(pathname, <MobileTabBar variant="member" />);
 
     const tabs = screen.getByRole("navigation", { name: "앱 탭" });
     expect(within(tabs).getByRole("link", { name: "알림" })).toHaveAttribute("aria-current", "page");

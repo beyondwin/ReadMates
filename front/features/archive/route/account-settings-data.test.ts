@@ -5,7 +5,6 @@ import { accountSettingsLoader } from "./account-settings-data";
 const api = vi.hoisted(() => ({
   fetchMyPage: vi.fn(),
   fetchMyJourney: vi.fn(),
-  fetchNotificationPreferences: vi.fn(),
 }));
 const auth = vi.hoisted(() => ({ loadArchiveMemberAuth: vi.fn() }));
 
@@ -55,7 +54,6 @@ describe("accountSettingsLoader", () => {
 
     expect(api.fetchMyPage).toHaveBeenCalledWith({ clubSlug: undefined });
     expect(api.fetchMyJourney).not.toHaveBeenCalled();
-    expect(api.fetchNotificationPreferences).not.toHaveBeenCalled();
   });
 
   it("returns an inactive profile without requesting club account data", async () => {

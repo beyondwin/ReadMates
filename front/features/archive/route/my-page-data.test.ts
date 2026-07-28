@@ -6,7 +6,6 @@ import { myPageLoader } from "./my-page-data";
 const api = vi.hoisted(() => ({
   fetchMyPage: vi.fn(),
   fetchMyJourney: vi.fn(),
-  fetchNotificationPreferences: vi.fn(),
   fetchMyFeedbackDocuments: vi.fn(),
   fetchMyArchiveQuestions: vi.fn(),
   fetchMyArchiveReviews: vi.fn(),
@@ -90,7 +89,6 @@ describe("myPageLoader", () => {
       { clubSlug: undefined },
       { limit: 3 },
     );
-    expect(api.fetchNotificationPreferences).not.toHaveBeenCalled();
     expect(api.fetchMyFeedbackDocuments).not.toHaveBeenCalled();
     expect(api.fetchMyArchiveQuestions).not.toHaveBeenCalled();
     expect(api.fetchMyArchiveReviews).not.toHaveBeenCalled();
@@ -127,6 +125,5 @@ describe("myPageLoader", () => {
     });
     expect(api.fetchMyPage).not.toHaveBeenCalled();
     expect(api.fetchMyJourney).not.toHaveBeenCalled();
-    expect(api.fetchNotificationPreferences).not.toHaveBeenCalled();
   });
 });

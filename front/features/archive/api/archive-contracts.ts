@@ -221,16 +221,3 @@ export type MyJourneySummary = {
 export type MyJourneyPage = PagedResponse<MyJourneyItem> & {
   summary: MyJourneySummary;
 };
-
-export type NotificationEventType =
-  | "NEXT_BOOK_PUBLISHED"
-  | "SESSION_REMINDER_DUE"
-  | "FEEDBACK_DOCUMENT_PUBLISHED"
-  | "REVIEW_PUBLISHED";
-
-export type NotificationPreferencesResponse = {
-  emailEnabled: boolean;
-  events: Record<NotificationEventType, boolean>;
-};
-
-export type NotificationPreferencesRequest = NotificationPreferencesResponse;

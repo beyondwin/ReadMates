@@ -3,6 +3,7 @@ import { useInRouterContext, useLocation } from "react-router-dom";
 import { getMemberNotificationLinkView } from "@/features/notifications/model/notification-link-model";
 import type { ReadmatesReturnState } from "@/shared/routing/readmates-route-state";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
+import { MemberNotificationTabs } from "./member-notification-tabs";
 
 type NotificationEventType =
   | "NEXT_BOOK_PUBLISHED"
@@ -141,6 +142,11 @@ function MemberNotificationsPageContent({
             {markAllReadPending ? "읽음 처리 중…" : "모두 읽음"}
           </button>
         </header>
+
+        <MemberNotificationTabs
+          active="inbox"
+          basePath={scopedAppLinkTarget(routePathname, "/app")}
+        />
 
         {actionError ? (
           <p role="alert" className="rm-member-notifications-page__error">
