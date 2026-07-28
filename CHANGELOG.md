@@ -21,6 +21,8 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Fixed
 
+- **Java 25 서버 런타임 준비:** Gradle test/bootRun과 로컬·release 서버 이미지에 동일한 Java 25 runtime policy를 적용했습니다. Netty가 포함된 classpath(`ALL-UNNAMED`)의 native access는 명시적으로 허용하고 그 밖의 module에서 발생하는 illegal native access는 거절하며, `protobuf-java` 4.34.2의 안전한 fallback으로 제거 예정인 `sun.misc.Unsafe` 메모리 접근 없이 OTLP payload를 직렬화합니다. 서버 image layer 추출도 Spring Boot 4의 지원되는 `tools` jarmode로 전환했습니다.
+- **내 공간 프런트 경계 부채:** 내 공간 하단 로그아웃 조합을 page composition boundary로 옮겨 archive feature의 auth feature 직접 import와 이를 위한 architecture-test 예외를 제거했습니다.
 - **중도 합류와 출석 미확인 참여 여정:** 최근 참여 row를 현재 club·현재 membership의 활성 participant `PUBLISHED` 회차로만 제한하고, `UNKNOWN` 출석 상태를 보존해 과거·제거된 참여나 미확인 출석을 참여로 계산하지 않습니다.
 - **호스트 세션 편집기 잔여 리스크:** URL 기본 위치가 호출 간 공유 객체를 노출하지 않도록 분리하고, 오류·stale·validation·review가 동시에 존재할 때의 다음 행동 우선순위를 조합 테스트로 고정했습니다. 적용·초안·변경 기록 시간은 `Asia/Seoul` 기준 `YYYY.MM.DD HH:mm`으로 표시하며 원본 ISO 값은 `<time dateTime>`에 보존합니다. 저장된 세션은 route-owned record workflow를 필수로 요구하고 구형 공개 패널 fallback과 전용 dead code를 제거했습니다. 모바일 CSS는 명시적 편집기 class만 사용하며, 320px JSON 긴 콘텐츠와 390px 반영 대화상자까지 실제 브라우저 overflow·screenshot 증거를 확장했습니다. Spring API, BFF, DB migration, 알림·provider 계약은 변경하지 않습니다.
 

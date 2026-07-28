@@ -342,7 +342,7 @@ Archive JDBC adapter는 요청마다 page query와 전체 summary query를 정�
 
 `/app/me` loader는 profile과 `limit=1` journey를 병렬 로드해 page 크기와 무관한 전체 `summary`를 받습니다. Profile의 최근 출석 row는 현재 club·현재 membership의 `participation_status=ACTIVE` participant가 있는 `PUBLISHED` 회차만 최신순으로 최대 6개 가져온 뒤 회차순으로 보여 줍니다. `attendanceStatus`는 `ATTENDED`·`ABSENT`·`UNKNOWN`을 보존하고, 기존 consumer 호환을 위해 `attended` boolean도 함께 제공합니다. 화면은 전체 참여 성취, 최근 참여 timeline, 다음 참여 nudge, 보조 읽기 통계, 전체 책별 기록 link와 하단 로그아웃을 렌더링합니다. `/app/me/records`만 `limit=12`부터 cursor continuation을 누적해 연도별 전체 개인 책 목록을 보여줍니다.
 
-계정·멤버십 정보와 탈퇴는 `/app/me/settings`, 알림 수신 설정은 알림함과 나란한 `/app/notifications/settings`가 소유합니다. member와 host chrome이 공유하는 전역 계정 메뉴의 로그아웃은 계속 사용할 수 있고, `/app/me`에도 승인된 하단 로그아웃을 둡니다. 이 하단 control은 현재 `features/archive/route/my-page-route.tsx`가 established auth-owned logout controller를 조합하는 단일 self-pruning boundary exception입니다. `frontend-boundaries.test.ts`가 source/import/rule을 고정하고 shared app-level route boundary로 옮길 때 제거하도록 강제하므로, 일반적인 feature-to-feature import 허용으로 해석하지 않습니다.
+계정·멤버십 정보와 탈퇴는 `/app/me/settings`, 알림 수신 설정은 알림함과 나란한 `/app/notifications/settings`가 소유합니다. member와 host chrome이 공유하는 전역 계정 메뉴의 로그아웃은 계속 사용할 수 있고, `/app/me`에도 승인된 하단 로그아웃을 둡니다. `src/pages/my-page.tsx`의 page composition boundary가 archive-owned 참여 여정과 auth-owned logout controller를 조합하므로 feature끼리 직접 import하지 않으며, `frontend-boundaries.test.ts`에도 이 흐름을 위한 예외가 없습니다.
 
 ## 멤버 프로필과 표시 이름
 

@@ -1,18 +1,15 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import type { MyPageRouteData } from "./my-page-data";
 import { MyPageRoute } from "./my-page-route";
 
 const route = vi.hoisted(() => ({ loaderData: null as unknown }));
-const authApi = vi.hoisted(() => ({ logout: vi.fn() }));
 
 vi.mock("react-router-dom", async (importOriginal) => ({
   ...(await importOriginal<typeof import("react-router-dom")>()),
   useLoaderData: () => route.loaderData,
 }));
-vi.mock("@/features/auth/api/auth-api", () => authApi);
 
 const data: MyPageRouteData = {
   profile: {
@@ -49,25 +46,16 @@ const data: MyPageRouteData = {
   },
 };
 
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((promiseResolve) => {
-    resolve = promiseResolve;
-  });
-  return { promise, resolve };
-}
-
 function renderRoute() {
   return render(
     <MemoryRouter initialEntries={["/clubs/reading-sai/app/me"]}>
-      <MyPageRoute />
+      <MyPageRoute logoutControl={<button type="button">주입된 계정 작업</button>} />
     </MemoryRouter>,
   );
 }
 
 describe("MyPageRoute", () => {
   beforeEach(() => {
-    vi.resetAllMocks();
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(2026, 6, 29));
     route.loaderData = data;
@@ -76,57 +64,13 @@ describe("MyPageRoute", () => {
   afterEach(() => {
     cleanup();
     vi.useRealTimers();
-    vi.unstubAllGlobals();
   });
 
-  it("builds the participation journey and injects member-space logout", () => {
+  it("builds the participation journey and renders its injected account action", () => {
     renderRoute();
 
     expect(screen.getByText("함께한 모임 9회")).toBeVisible();
-    expect(screen.getByRole("button", { name: "로그아웃" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "주입된 계정 작업" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "최근 책별 기록" })).toBeNull();
-  });
-
-  it.each([204, 401])("redirects member-space logout to public home for %s", async (status) => {
-    authApi.logout.mockResolvedValue(new Response(null, { status }));
-    const location = { href: "" };
-    vi.stubGlobal("location", location);
-    const user = userEvent.setup();
-    renderRoute();
-
-    await user.click(screen.getByRole("button", { name: "로그아웃" }));
-
-    await waitFor(() => expect(location.href).toBe("/"));
-  });
-
-  it("keeps the current page and shows inline feedback when logout fails", async () => {
-    authApi.logout.mockResolvedValue(new Response(null, { status: 500 }));
-    const location = { href: "/clubs/reading-sai/app/me" };
-    vi.stubGlobal("location", location);
-    const user = userEvent.setup();
-    renderRoute();
-
-    await user.click(screen.getByRole("button", { name: "로그아웃" }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "로그아웃에 실패했습니다. 잠시 후 다시 시도해 주세요.",
-    );
-    expect(location.href).toBe("/clubs/reading-sai/app/me");
-  });
-
-  it("deduplicates member-space logout while the first request is pending", async () => {
-    const pendingLogout = deferred<Response>();
-    authApi.logout.mockReturnValue(pendingLogout.promise);
-    const user = userEvent.setup();
-    renderRoute();
-    const button = screen.getByRole("button", { name: "로그아웃" });
-
-    await user.dblClick(button);
-
-    expect(authApi.logout).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("button", { name: "로그아웃 중" })).toBeDisabled();
-
-    pendingLogout.resolve(new Response(null, { status: 500 }));
-    expect(await screen.findByRole("alert")).toBeVisible();
   });
 });

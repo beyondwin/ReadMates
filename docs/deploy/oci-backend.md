@@ -40,7 +40,7 @@ Caddy 포함 최종 backend runtime은 [compose-stack.md](compose-stack.md)를 �
 
 서버 이미지는 release tag와 같은 tag로 GHCR에 게시합니다. 운영 compose는 `ghcr.io/<owner>/<repo>/readmates-server:<git-tag>` 형태의 이미지를 pull해야 하며, 임의의 로컬 빌드 산출물을 운영 서버에서 다시 빌드하지 않습니다.
 
-`server/Dockerfile`은 로컬에서 이미 검증한 `bootJar` 산출물을 포장하는 image build용입니다. `server/Dockerfile.release`는 server image publish workflow가 `clean check bootJar`를 통과한 뒤 사용하며, scan되는 digest가 CI에서 검증된 jar와 정확히 일치하게 합니다. 두 파일의 runtime instruction은 계속 정렬되어 있어야 합니다.
+`server/Dockerfile`은 로컬에서 이미 검증한 `bootJar` 산출물을 포장하는 image build용입니다. `server/Dockerfile.release`는 server image publish workflow가 `clean check bootJar`를 통과한 뒤 사용하며, scan되는 digest가 CI에서 검증된 jar와 정확히 일치하게 합니다. 두 파일의 runtime instruction은 계속 정렬되어 있어야 합니다. Java 25 runtime은 Netty가 포함된 classpath(`ALL-UNNAMED`)의 native access를 명시적으로 허용하고 그 밖의 module에서 발생하는 illegal native access를 거절하며, protobuf가 제거 예정인 `sun.misc.Unsafe` 메모리 접근 없이 fallback 경로로 실행되도록 고정합니다.
 
 운영 전환 순서:
 

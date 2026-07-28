@@ -291,7 +291,7 @@ Backend test suite에는 MySQL 기반 persistence adapter/controller 검증이 �
 
 Backend `integrationTest`는 Testcontainers가 필요한 MySQL lifecycle을 직접 관리합니다. 로컬 `compose.yml`의 MySQL은 서버를 수동으로 띄우거나 Playwright E2E database를 준비할 때 쓰며, integration lane을 실행하기 전에 `docker compose up`을 먼저 실행할 필요는 없습니다.
 
-로컬 image 재현성 검증은 `./server/gradlew -p server bootJar` 후 `docker build -t readmates-server:local server`를 사용하며, 이 명령은 `server/Dockerfile`을 사용합니다. Release workflow는 CI가 jar를 빌드한 뒤 `server/Dockerfile.release`로 이미지를 만들고, 같은 digest를 scan한 다음 promote합니다.
+로컬 image 재현성 검증은 `./server/gradlew -p server bootJar` 후 `docker build -t readmates-server:local server`를 사용하며, 이 명령은 `server/Dockerfile`을 사용합니다. Release workflow는 CI가 jar를 빌드한 뒤 `server/Dockerfile.release`로 이미지를 만들고, 같은 digest를 scan한 다음 promote합니다. Java 25 test JVM은 Netty가 포함된 classpath(`ALL-UNNAMED`)의 native access를 명시적으로 허용하고 그 밖의 module에서 발생하는 illegal native access를 거절하며, `ProtobufJava25CompatibilityTest`가 제거 예정인 `sun.misc.Unsafe` 메모리 접근 없이 OTLP payload를 직렬화하는 fallback을 고정합니다.
 
 ### Testcontainers 재사용 (로컬 전용)
 

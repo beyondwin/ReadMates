@@ -88,6 +88,9 @@ dependencies {
         implementation("org.springframework.kafka:spring-kafka:4.0.6") {
             because("Trivy flags CVE-2026-41731 in spring-kafka 4.0.5.")
         }
+        implementation("com.google.protobuf:protobuf-java:4.34.2") {
+            because("Protobuf 4.34+ falls back safely when Java 25 denies sun.misc.Unsafe memory access.")
+        }
     }
 
     implementation("net.logstash.logback:logstash-logback-encoder:7.4")
@@ -126,6 +129,7 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers-kafka:2.0.2")
     testImplementation("org.testcontainers:testcontainers-mysql:2.0.2")
     testImplementation("com.tngtech.archunit:archunit-junit5:1.3.2")
+    testImplementation("io.opentelemetry.proto:opentelemetry-proto:1.8.0-alpha")
 }
 
 tasks.named<org.gradle.jvm.tasks.Jar>("jar") {
@@ -150,6 +154,13 @@ val serverTestJavaLauncher =
 
 val testSourceSet = sourceSets.named("test")
 
+val readmatesJava25RuntimeArgs =
+    listOf(
+        "--enable-native-access=ALL-UNNAMED",
+        "--illegal-native-access=deny",
+        "--sun-misc-unsafe-memory-access=deny",
+    )
+
 fun Test.configureReadmatesTestRuntime() {
     useJUnitPlatform()
     javaLauncher.set(serverTestJavaLauncher)
@@ -160,7 +171,7 @@ fun Test.configureReadmatesTestRuntime() {
         (project.findProperty("testMaxHeap") as String?)
             ?: System.getenv("READMATES_TEST_MAX_HEAP")
             ?: "1536m"
-    jvmArgs("-Xshare:off")
+    jvmArgs(listOf("-Xshare:off") + readmatesJava25RuntimeArgs)
     systemProperty(
         "readmates.frontend.fixtures.dir",
         rootProject.file("../front/tests/unit/__fixtures__").absolutePath,
@@ -174,6 +185,10 @@ fun Test.configureReadmatesTestRuntime() {
         environment("DOCKER_HOST", "unix://${colimaDockerSocket.absolutePath}")
         environment("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE", "/var/run/docker.sock")
     }
+}
+
+tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
+    jvmArgs(readmatesJava25RuntimeArgs)
 }
 
 fun Test.useReadmatesTestClasses() {
