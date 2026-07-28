@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 
-type JourneyFixtureMode = "normal" | "empty" | "load-more-error";
+type JourneyFixtureMode = "normal" | "empty" | "load-more-error" | "fifteen-records";
 
 const firstPage = {
   items: [
@@ -70,10 +70,81 @@ const emptyPage = {
   },
 };
 
+const fifteenRecordSummary = {
+  attendedSessionCount: 15,
+  completedReadingCount: 7,
+  questionCount: 12,
+  reviewCount: 1,
+  readableFeedbackDocumentCount: 15,
+};
+
+const fifteenRecordDates = [
+  "2026-07-15",
+  "2026-06-14",
+  "2026-05-13",
+  "2026-04-12",
+  "2026-03-11",
+  "2026-02-10",
+  "2026-01-09",
+  "2025-12-08",
+  "2025-11-07",
+  "2025-10-06",
+  "2025-09-05",
+  "2025-08-04",
+  "2025-07-03",
+  "2025-06-02",
+  "2025-05-01",
+] as const;
+
+const fifteenRecords = fifteenRecordDates.map((date, index) => {
+  const sessionNumber = fifteenRecordDates.length - index;
+
+  return {
+    sessionId: `journey-fifteen-${sessionNumber}`,
+    sessionNumber,
+    bookTitle:
+      index === 0
+        ? "아주 긴 한국어 제목과 An exceptionally long English subtitle for the integrated member shelf"
+        : `공개 안전 독서 기록 ${sessionNumber}`,
+    bookAuthor: `공개 안전 테스트 저자 ${sessionNumber}`,
+    bookImageUrl: null,
+    date,
+    readingProgress: index < 7 ? 100 : 70,
+    questionCount: index < 12 ? 1 : 0,
+    reviewCount: index === 0 ? 1 : 0,
+    feedbackDocument: {
+      available: true,
+      readable: true,
+      lockedReason: null,
+    },
+  };
+});
+
 export async function mockMyReadingShelfJourney(page: Page, mode: JourneyFixtureMode = "normal") {
   await page.route("**/api/bff/api/archive/me/journey**", async (route) => {
     const url = new URL(route.request().url());
     const cursor = url.searchParams.get("cursor");
+
+    if (mode === "fifteen-records") {
+      const limit = Number.parseInt(url.searchParams.get("limit") ?? "12", 10);
+      const offset = cursor?.match(/^journey-cursor-(\d+)$/)?.[1];
+      const start = offset ? Number.parseInt(offset, 10) : 0;
+      const items = fifteenRecords.slice(start, start + limit);
+      const nextOffset = start + items.length;
+
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          items,
+          nextCursor:
+            nextOffset < fifteenRecords.length
+              ? `journey-cursor-${nextOffset}`
+              : null,
+          summary: fifteenRecordSummary,
+        }),
+      });
+      return;
+    }
 
     if (mode === "empty") {
       await route.fulfill({ contentType: "application/json", body: JSON.stringify(emptyPage) });
@@ -91,11 +162,5 @@ export async function mockMyReadingShelfJourney(page: Page, mode: JourneyFixture
     }
 
     await route.fulfill({ contentType: "application/json", body: JSON.stringify(firstPage) });
-  });
-}
-
-export async function mockNotificationPreferencesError(page: Page) {
-  await page.route("**/api/bff/api/me/notifications/preferences**", async (route) => {
-    await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ code: "TEMPORARY_UNAVAILABLE" }) });
   });
 }
