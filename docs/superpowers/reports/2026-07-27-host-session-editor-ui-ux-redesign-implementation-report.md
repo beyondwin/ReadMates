@@ -70,4 +70,4 @@ The task-level reviews are complete, but final local-main integration, an indepe
 
 ## Skips
 
-No server CI, Testcontainers integration, BFF smoke, or migration validation was run because no server, BFF, API, persistence, or migration path changed. Browser screenshots were not re-captured in Task 9 because this task changes documentation only; Task 8's existing desktop/390px/320px evidence plus the fresh high-risk browser regression lane are recorded above.
+No server CI, Testcontainers integration, BFF smoke, or migration validation was run because no server, BFF, API, persistence, or migration path changed. Task 8's browser evidence remains valid for the layout and workflow states it exercised. Fix Round 1 then made a narrow host-header status wiring removal and added its regression test; focused/full frontend tests, lint, and build covered that change, but no additional screenshot was captured. The remaining visual risk is limited to the uninspected desktop/mobile spacing and appearance after one header chip is removed; Task 8 screenshots do not themselves prove that final header variant.
