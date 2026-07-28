@@ -5539,7 +5539,7 @@
   text-align: left;
 }
 
-/* My reading shelf: one responsive record surface, with settings kept secondary. */
+/* My reading shelf: a personal summary with a compact recent-record preview. */
 .rm-my-shelf {
   width: min(100% - 32px, 820px);
   margin: 0 auto;
@@ -5556,7 +5556,6 @@
 }
 
 .rm-my-shelf-kicker,
-.rm-my-shelf-latest > .rm-my-shelf-kicker,
 .rm-my-shelf-year,
 .rm-my-shelf-meta {
   margin: 0;
@@ -5567,7 +5566,6 @@
 }
 
 .rm-my-shelf-header h1,
-.rm-my-shelf-latest h3,
 .rm-my-shelf-row h3,
 .rm-my-shelf-empty h2 {
   margin: 0;
@@ -5587,11 +5585,6 @@
   margin: 10px 0 0;
   color: var(--text-2);
   line-height: 1.6;
-}
-
-.rm-my-shelf-settings-trigger {
-  flex: 0 0 auto;
-  margin-top: 4px;
 }
 
 .rm-my-shelf-summary {
@@ -5624,27 +5617,12 @@
   overflow-wrap: anywhere;
 }
 
-.rm-my-shelf-latest {
-  margin-top: 32px;
-  padding: 22px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-3);
-  background: var(--bg-sub);
-}
-
-.rm-my-shelf-latest__record,
 .rm-my-shelf-row {
   display: grid;
   grid-template-columns: 56px minmax(0, 1fr);
   gap: 16px;
 }
 
-.rm-my-shelf-latest__record {
-  align-items: center;
-  margin-top: 14px;
-}
-
-.rm-my-shelf-latest h3,
 .rm-my-shelf-row h3 {
   margin-top: 4px;
   font-size: 1.35rem;
@@ -5652,7 +5630,6 @@
   overflow-wrap: anywhere;
 }
 
-.rm-my-shelf-latest__copy > p:not(.rm-my-shelf-meta),
 .rm-my-shelf-row__author {
   margin: 5px 0 0;
   color: var(--text-2);
@@ -5662,6 +5639,44 @@
 
 .rm-my-shelf-journey {
   margin-top: 44px;
+}
+
+.rm-my-shelf-recent {
+  margin-top: 32px;
+}
+
+.rm-my-shelf-recent__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.rm-my-shelf-recent__header h2 {
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+  font-family: var(--font-editorial);
+  font-size: 1.7rem;
+  line-height: 1.2;
+}
+
+.rm-my-shelf-all-records {
+  flex: 0 0 auto;
+  min-height: 44px;
+  color: var(--accent);
+  font-size: 0.875rem;
+  font-weight: 650;
+  line-height: 44px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+
+.rm-my-shelf-recent__list {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
 }
 
 .rm-my-shelf-section-heading {
@@ -6048,8 +6063,8 @@
 }
 
 .rm-my-shelf-action:focus-visible,
-.rm-my-shelf-settings-trigger:focus-visible,
 .rm-my-shelf-load-more:focus-visible,
+.rm-my-shelf-all-records:focus-visible,
 .rm-my-shelf-settings > h2:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 3px;
@@ -6132,11 +6147,6 @@
     font-size: 0.875rem;
   }
 
-  .rm-my-shelf-settings-trigger {
-    padding-inline: 10px;
-    font-size: 0.8125rem;
-  }
-
   .rm-my-shelf-summary {
     padding: 18px 0;
   }
@@ -6182,13 +6192,25 @@
     font-size: 1.125rem;
   }
 
-  .rm-my-shelf-latest {
-    margin-top: 24px;
-    padding: 18px;
-  }
-
   .rm-my-shelf-journey {
     margin-top: 34px;
+  }
+
+  .rm-my-shelf-recent {
+    margin-top: 28px;
+  }
+
+  .rm-my-shelf-recent__header {
+    gap: 10px;
+    flex-wrap: nowrap;
+  }
+
+  .rm-my-shelf-recent__header h2 {
+    font-size: 1.35rem;
+  }
+
+  .rm-my-shelf-all-records {
+    font-size: 0.8125rem;
   }
 
   .rm-my-shelf-section-heading {
@@ -6225,7 +6247,6 @@
   }
 
   .rm-my-shelf-action,
-  .rm-my-shelf-settings-trigger,
   .rm-my-shelf-load-more,
   .rm-my-shelf-settings__logout .btn {
     min-block-size: 44px;

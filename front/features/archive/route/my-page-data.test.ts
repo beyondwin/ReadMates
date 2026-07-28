@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { MyJourneyPage, MyPageResponse, NotificationPreferencesResponse } from "@/features/archive/api/archive-contracts";
+import type { MyJourneyPage, MyPageResponse } from "@/features/archive/api/archive-contracts";
+import { emptyMyJourneyPage } from "@/features/archive/model/my-reading-shelf-model";
 import { myPageLoader } from "./my-page-data";
 
 const api = vi.hoisted(() => ({
@@ -56,16 +57,6 @@ const journey: MyJourneyPage = {
   },
 };
 
-const preferences: NotificationPreferencesResponse = {
-  emailEnabled: true,
-  events: {
-    NEXT_BOOK_PUBLISHED: true,
-    SESSION_REMINDER_DUE: true,
-    FEEDBACK_DOCUMENT_PUBLISHED: true,
-    REVIEW_PUBLISHED: true,
-  },
-};
-
 function activeAccess(membershipStatus: "ACTIVE" | "VIEWER" = "ACTIVE") {
   return {
     allowed: true,
@@ -90,20 +81,16 @@ describe("myPageLoader", () => {
     auth.loadArchiveMemberAuth.mockResolvedValue(activeAccess());
     api.fetchMyPage.mockResolvedValue(profile);
     api.fetchMyJourney.mockResolvedValue(journey);
-    api.fetchNotificationPreferences.mockResolvedValue(preferences);
   });
 
-  it("loads the required profile and journey with optional notification preferences", async () => {
-    const result = await myPageLoader();
-
-    expect(result).toEqual({
-      profile,
-      journey,
-      notificationPreferences: { status: "ready", preferences },
-    });
-    expect(api.fetchMyPage).toHaveBeenCalledTimes(1);
-    expect(api.fetchMyJourney).toHaveBeenCalledWith({ clubSlug: undefined }, { limit: 12 });
-    expect(api.fetchNotificationPreferences).toHaveBeenCalledTimes(1);
+  it("loads the profile and the three-item journey preview", async () => {
+    await expect(myPageLoader()).resolves.toEqual({ profile, journey });
+    expect(api.fetchMyPage).toHaveBeenCalledWith({ clubSlug: undefined });
+    expect(api.fetchMyJourney).toHaveBeenCalledWith(
+      { clubSlug: undefined },
+      { limit: 3 },
+    );
+    expect(api.fetchNotificationPreferences).not.toHaveBeenCalled();
     expect(api.fetchMyFeedbackDocuments).not.toHaveBeenCalled();
     expect(api.fetchMyArchiveQuestions).not.toHaveBeenCalled();
     expect(api.fetchMyArchiveReviews).not.toHaveBeenCalled();
@@ -112,30 +99,34 @@ describe("myPageLoader", () => {
   it.each([
     ["profile", "fetchMyPage"],
     ["journey", "fetchMyJourney"],
-  ] as const)("rejects when the required %s request fails", async (_name, request) => {
-    api[request].mockRejectedValueOnce(new Error("required request failed"));
+  ] as const)("rejects when required %s data fails", async (_label, key) => {
+    api[key].mockRejectedValueOnce(new Error("required request failed"));
 
     await expect(myPageLoader()).rejects.toThrow("required request failed");
   });
 
-  it("keeps the shelf route available when notification preferences fail", async () => {
-    api.fetchNotificationPreferences.mockRejectedValueOnce(new Error("preferences unavailable"));
+  it("keeps an inactive shelf membership-aware without starting profile requests", async () => {
+    const inactiveProfile = {
+      ...profile,
+      membershipStatus: "INACTIVE" as const,
+      clubName: null,
+      joinedAt: "",
+      sessionCount: 0,
+      totalSessionCount: 0,
+      completedReadingCount: 0,
+      currentSessionId: null,
+    };
+    auth.loadArchiveMemberAuth.mockResolvedValue({
+      allowed: false,
+      auth: { ...activeAccess("VIEWER").auth, membershipStatus: "INACTIVE" },
+    });
 
     await expect(myPageLoader()).resolves.toEqual({
-      profile,
-      journey,
-      notificationPreferences: { status: "error" },
+      profile: inactiveProfile,
+      journey: emptyMyJourneyPage(),
     });
-  });
-
-  it("does not request writable notification preferences for a viewer", async () => {
-    auth.loadArchiveMemberAuth.mockResolvedValue(activeAccess("VIEWER"));
-
-    await expect(myPageLoader()).resolves.toEqual({
-      profile,
-      journey,
-      notificationPreferences: { status: "unavailable" },
-    });
+    expect(api.fetchMyPage).not.toHaveBeenCalled();
+    expect(api.fetchMyJourney).not.toHaveBeenCalled();
     expect(api.fetchNotificationPreferences).not.toHaveBeenCalled();
   });
 });
