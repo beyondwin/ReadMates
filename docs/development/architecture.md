@@ -400,14 +400,14 @@ Readable response for active full member or host
 
 ## 세션 기록 JSON 가져오기
 
-호스트는 앱 밖에서 정리한 세션 기록 JSON을 `/app/host/sessions/:sessionId/edit`의 세션 기록 가져오기 패널로 불러올 수 있습니다. 이 기능은 production 앱에서 AI API를 호출하지 않습니다. 앱은 최종 JSON만 preview/commit API로 전달합니다.
+호스트는 앱 밖에서 정리한 세션 기록 JSON을 `/app/host/sessions/:sessionId/edit`의 `기록 작업대`에서 `초안 만들기` → `외부 JSON`으로 불러올 수 있습니다. 이 기능은 production 앱에서 AI API를 호출하지 않습니다. 앱은 최종 JSON만 preview/commit API로 전달하고, commit 뒤에는 공통 작업 중 초안에서 직접 작성·AI 결과와 같은 방식으로 검토합니다.
 
 ```text
 External transcript/AI workflow
   |
   | readmates-session-import:v1 JSON
   v
-Host editor preview
+Host editor records workspace preview
   |
   | POST /api/host/sessions/{sessionId}/session-import/preview
   v
@@ -415,11 +415,11 @@ Spring validation
   |
   | session metadata, record visibility, attendee author names, feedback parser
   v
-Host commit
+Import into shared draft
   |
   | POST /api/host/sessions/{sessionId}/session-import/commit
   v
-Replace staged draft; live record remains unchanged until session-record apply
+Replace shared staged draft; live record remains unchanged until separate session-record apply
 ```
 
 Commit은 활성 호스트만 사용할 수 있고, `HOST_ONLY` 공개 범위에서는 저장을 거절합니다. JSON의 회차 번호, 책 제목, 모임 날짜는 현재 편집 중인 세션과 일치해야 하며, 하이라이트와 한줄평의 `authorName`은 해당 회차의 활성 참석자 이름과 매칭되어야 합니다. Commit은 기존 live 공개 요약, 하이라이트, 한줄평, 피드백 문서를 직접 바꾸지 않고 공통 staged draft를 교체합니다. 이후 session-record apply가 expected draft/live revision과 draft hash를 검증해 live content와 immutable revision을 갱신하고, public/notes cache invalidation을 best-effort로 실행합니다. 파일 형식과 운영 검토 체크는 [session-import-generator.md](session-import-generator.md)를 기준으로 합니다.

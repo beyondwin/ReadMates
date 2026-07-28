@@ -15,20 +15,21 @@
 2. 녹취록을 로컬 파일로 준비합니다. 원본 녹취록과 중간 산출물은 Git 밖에 둡니다.
 3. 아래 [생성 프롬프트 템플릿](#생성-프롬프트-템플릿)에 회차 정보와 참석자 목록을 채워 LLM에 전달합니다.
 4. 모델 출력은 설명 없이 JSON 하나만 받아 `.json` 파일로 저장합니다.
-5. [로컬 검수 체크](#로컬-검수-체크)와 호스트 편집기 preview를 모두 통과한 뒤 저장합니다.
+5. [로컬 검수 체크](#로컬-검수-체크)와 호스트 편집기의 preview를 통과한 뒤 공유 초안으로 가져오고, 내용을 검토한 다음 별도의 반영 절차를 진행합니다.
 
 반복 작업을 줄이려면 매 회차마다 새 규칙을 만들지 말고, 이 문서의 템플릿에서 `{...}` placeholder만 바꿉니다. 문체 수정이 필요하면 JSON 전체를 다시 만들기보다 `publication.summary`, `highlights`, `oneLineReviews`, `feedbackDocument.markdown`의 문장만 부분 재생성합니다.
 
 ## 모드 병존 안내 (in-app AI 생성과의 관계)
 
-호스트 세션 편집기는 `세션 기록 완성` 패널에서 AI 생성을 기본 경로로 보여주고, 외부 JSON 가져오기를 fallback으로 제공합니다. 단독 `.md` 또는 `.txt` 피드백 문서 업로드는 더 이상 제공하지 않습니다.
+호스트 세션 편집기의 `기록 작업대`에는 `초안 만들기` 아래에 직접 작성, AI로 생성, 외부 JSON 세 입력이 있습니다. 어느 입력으로 시작해도 같은 작업 중 초안으로 수렴하며, AI와 JSON은 직접 작성 화면으로 돌아와 이어서 검토하고 고칠 수 있습니다. 단독 `.md` 또는 `.txt` 피드백 문서 업로드는 더 이상 제공하지 않습니다.
 
-| 모드 | 입력 | LLM 호출 위치 | 운영 게이트 |
-| --- | --- | --- | --- |
-| 외부 JSON 업로드 | 호스트가 로컬에서 정리한 `readmates-session-import:v1` JSON | 앱 외부 | 항상 사용 가능 |
-| In-app AI 생성 | UTF-8/BOM TXT(≤ 1 MiB, ≤ 3시간) + 서버가 제공한 모델 ID | 서버 측 Spring AI adapter (Claude/OpenAI/Gemini) | kill switch + provider allowlist + provider key + provider retention 확인 |
+| 모드 | 입력 | LLM 호출 위치 | 운영 게이트 | 공유 초안으로의 결과 |
+| --- | --- | --- | --- | --- |
+| 직접 작성 | 호스트가 작업대에서 직접 작성·수정한 내용 | 호출 없음 | 해당 없음 | 자동 저장되는 공통 작업 중 초안 |
+| 외부 JSON 업로드 | 호스트가 로컬에서 정리한 `readmates-session-import:v1` JSON | 앱 외부 | 항상 사용 가능 | preview 뒤 공통 작업 중 초안으로 가져오기 |
+| In-app AI 생성 | UTF-8/BOM TXT(≤ 1 MiB, ≤ 3시간) + 서버가 제공한 모델 ID | 서버 측 Spring AI adapter (Claude/OpenAI/Gemini) | kill switch + provider allowlist + provider key + provider retention 확인 | 검토 완료 commit 뒤 공통 작업 중 초안으로 가져오기 |
 
-두 모드의 commit은 같은 validation과 `SaveValidatedSessionRecordDraftUseCase.saveValidated(...)` 경계를 사용해 검토 완료 snapshot을 공통 `session_record_drafts`에 저장합니다. 이 단계는 live 기록을 바꾸지 않으며, 별도 session-record apply가 draft revision/hash와 live revision을 검증한 뒤 immutable revision과 live 콘텐츠를 갱신합니다. 현재 동작은 [architecture.md의 In-app AI 세션 생성 컴포넌트](architecture.md#in-app-ai-세션-생성-컴포넌트), 운영 rollout과 장애 대응은 [AI session generation runbook](../operations/runbooks/ai-session-generation.md)을 기준으로 합니다. `docs/superpowers/**`의 spec과 plan은 설계 이력이며 현재 동작의 source of truth가 아닙니다.
+AI와 JSON commit은 같은 validation과 `SaveValidatedSessionRecordDraftUseCase.saveValidated(...)` 경계를 사용해 검토 완료 snapshot을 공통 `session_record_drafts`에 저장합니다. 직접 작성도 이 초안을 계속 편집합니다. 초안을 만드는 일은 live 기록을 바꾸지 않으며, 별도 `반영 검토`와 확인이 draft revision/hash 및 live revision을 검증한 뒤 immutable revision과 live 콘텐츠를 갱신합니다. 현재 동작은 [architecture.md의 In-app AI 세션 생성 컴포넌트](architecture.md#in-app-ai-세션-생성-컴포넌트), 운영 rollout과 장애 대응은 [AI session generation runbook](../operations/runbooks/ai-session-generation.md)을 기준으로 합니다. `docs/superpowers/**`의 spec과 plan은 설계 이력이며 현재 동작의 source of truth가 아닙니다.
 
 ## In-app 근거 기반 AI 생성
 
@@ -256,12 +257,13 @@ jq -e '.feedbackDocument.markdown | contains("<!-- readmates-feedback:v1 -->") a
 
 ## 호스트 편집기 사용
 
-1. 호스트 세션 편집기에서 기록 공개 범위를 먼저 선택합니다.
-2. `세션 기록 완성` 패널에서 `외부 JSON 가져오기`를 선택하고 파일을 고릅니다.
-3. 미리보기에서 회차, 책, 날짜, 작성자 매칭, 피드백 문서 상태를 확인합니다.
-4. 저장 가능 상태일 때 `가져온 기록 저장`을 누릅니다.
+1. 호스트 세션 편집기에서 `기록 작업대`를 열고, 현재 적용본과 작업 중인 초안을 구분해 확인합니다.
+2. `초안 만들기`에서 `외부 JSON`을 선택하고 파일을 고릅니다.
+3. preview에서 회차, 책, 날짜, 작성자 매칭, 피드백 문서 상태를 확인합니다.
+4. 저장 가능 상태일 때 `초안으로 가져오기`를 누릅니다.
+5. 공통 초안에 가져온 내용을 직접 작성 화면에서 필요한 만큼 고친 뒤, `반영 검토`에서 다음 버전·공개 범위·알림을 분리해 확인합니다.
 
-저장은 해당 회차의 요약, 하이라이트, 한줄평, 피드백 문서를 교체합니다. 서버는 저장 직전에 같은 검증을 다시 실행하고, 실패하면 아무 레코드도 일부 저장하지 않습니다.
+가져오기는 해당 회차의 공유 초안을 바꾸지만 현재 적용본은 바꾸지 않습니다. 서버는 가져오기 직전에 같은 검증을 다시 실행하고, 실패하면 아무 레코드도 일부 저장하지 않습니다. 현재 적용본의 요약, 하이라이트, 한줄평, 피드백 문서는 별도의 반영 확인이 성공할 때만 교체됩니다.
 
 호스트 편집기는 내부적으로 두 API를 사용합니다.
 
