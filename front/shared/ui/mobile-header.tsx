@@ -50,6 +50,7 @@ type MobileHeaderProps = {
   appBasePath?: string;
   LinkComponent?: AppLinkComponent;
   navigationContinuity?: ReadmatesNavigationContinuity;
+  accountControl?: ReactNode;
 };
 
 const defaultArchiveSessionsReturnTarget: ReadmatesReturnTarget = {
@@ -356,6 +357,7 @@ function HeaderShell({
   kicker,
   backTarget,
   rightAction,
+  accountControl,
   brandHref,
   LinkComponent,
 }: {
@@ -364,6 +366,7 @@ function HeaderShell({
   kicker?: string | null;
   backTarget?: HeaderBackTarget | null;
   rightAction?: HeaderAction | null;
+  accountControl?: ReactNode;
   brandHref?: string;
   LinkComponent: AppLinkComponent;
 }) {
@@ -405,6 +408,7 @@ function HeaderShell({
             {rightAction.icon === "workspace-switch" ? <WorkspaceSwitchIcon /> : rightAction.label}
           </LinkComponent>
         ) : null}
+        {accountControl}
       </div>
     </header>
   );
@@ -479,12 +483,14 @@ function AppMobileHeader({
   appBasePath = "",
   LinkComponent,
   navigationContinuity,
+  accountControl,
 }: {
   variant: Exclude<MobileHeaderVariant, "guest">;
   showHostEntry?: boolean;
   appBasePath?: string;
   LinkComponent: AppLinkComponent;
   navigationContinuity: ReadmatesNavigationContinuity;
+  accountControl?: ReactNode;
 }) {
   const location = useLocation();
   const pathname = location.pathname;
@@ -497,6 +503,7 @@ function AppMobileHeader({
       title={appTitle(variant, appPath)}
       backTarget={scopeAppBackTarget(appBackTarget(variant, appPath, location.state, navigationContinuity), appBasePath)}
       rightAction={appRightAction(variant, showHostEntry, appBasePath)}
+      accountControl={accountControl}
       brandHref={prefixedAppPath(appBasePath, variant === "host" ? "/app/host" : "/app")}
       LinkComponent={LinkComponent}
     />
@@ -511,6 +518,7 @@ export function MobileHeader({
   appBasePath,
   LinkComponent = DefaultLink,
   navigationContinuity = defaultNavigationContinuity,
+  accountControl,
 }: MobileHeaderProps) {
   if (variant === "guest") {
     return (
@@ -530,6 +538,7 @@ export function MobileHeader({
       appBasePath={appBasePath}
       LinkComponent={LinkComponent}
       navigationContinuity={navigationContinuity}
+      accountControl={accountControl}
     />
   );
 }

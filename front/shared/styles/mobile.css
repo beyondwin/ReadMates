@@ -72,6 +72,8 @@
 }
 .m-hdr-side--right {
   justify-content: flex-end;
+  gap: 2px;
+  overflow: visible;
 }
 .m-hdr-heading {
   min-width: 0;
@@ -183,6 +185,19 @@
 }
 .m-hdr-link--icon svg path {
   stroke-width: 1.55;
+}
+
+.m-hdr-side--right .rm-account-menu__trigger {
+  width: 45px;
+  min-width: 45px;
+  height: 45px;
+}
+
+.m-hdr-side--right .rm-account-menu__popover {
+  width: min(264px, calc(100vw - 28px));
+  max-height: calc(100vh - var(--m-hdr-h) - var(--m-safe-top) - 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .m-hdr--host .m-hdr-link {
   color: var(--accent);

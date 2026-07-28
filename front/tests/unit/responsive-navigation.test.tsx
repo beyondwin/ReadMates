@@ -16,6 +16,21 @@ function renderAt(pathname: string, element: ReactElement) {
 }
 
 describe("TopNav responsive variants", () => {
+  it("renders an account control after the desktop workspace action", () => {
+    const accountControl = <button type="button">계정 메뉴</button>;
+    const { container } = renderAt(
+      "/app",
+      <TopNav variant="member" memberName="김호스트" showHostEntry accountControl={accountControl} />,
+    );
+
+    const rightChrome = container.querySelector(".topnav-account-actions");
+    expect(rightChrome).toBeInTheDocument();
+    expect(within(rightChrome as HTMLElement).getByRole("link", { name: "호스트 화면" })).toHaveClass(
+      "rm-workspace-switch",
+    );
+    expect(within(rightChrome as HTMLElement).getByRole("button", { name: "계정 메뉴" })).toBeInTheDocument();
+  });
+
   it("links the guest public record tab to the public record entry route", () => {
     renderAt("/", <TopNav />);
 
@@ -128,6 +143,30 @@ describe("TopNav responsive variants", () => {
 });
 
 describe("MobileHeader route titles and actions", () => {
+  it.each([
+    ["member", "호스트 화면"],
+    ["host", "멤버 화면으로"],
+  ] as const)("keeps the %s workspace switch and account control in mobile right chrome", (variant, workspaceLabel) => {
+    const accountControl = <button type="button" className="rm-account-menu__trigger">계정 메뉴</button>;
+    const { container } = renderAt(
+      variant === "host" ? "/app/host" : "/app",
+      <MobileHeader
+        variant={variant}
+        showHostEntry={variant === "member"}
+        accountControl={accountControl}
+      />,
+    );
+
+    const rightChrome = container.querySelector(".m-hdr-side--right");
+    expect(rightChrome).toBeInTheDocument();
+    expect(within(rightChrome as HTMLElement).getByRole("link", { name: workspaceLabel })).toHaveClass(
+      "m-hdr-link--icon",
+    );
+    expect(within(rightChrome as HTMLElement).getByRole("button", { name: "계정 메뉴" })).toHaveClass(
+      "rm-account-menu__trigger",
+    );
+  });
+
   it("keeps mobile header side rails present when actions change", () => {
     const { container } = render(
       <MemoryRouter initialEntries={["/app/host/sessions/session-6/edit"]}>

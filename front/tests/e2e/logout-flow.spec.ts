@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test";
 import { loginWithGoogleFixture, resetSeedGoogleLogins } from "./readmates-e2e-db";
-import { mockMyReadingShelfJourney } from "./my-reading-shelf-fixtures";
 
 test.beforeEach(() => {
   resetSeedGoogleLogins(["host@example.com"]);
@@ -10,12 +9,15 @@ test.afterEach(() => {
   resetSeedGoogleLogins(["host@example.com"]);
 });
 
-test("my page logout prevents re-entry through the public top navigation", async ({ page }) => {
-  await mockMyReadingShelfJourney(page);
+test("app chrome logout prevents re-entry through the public top navigation", async ({ page }) => {
   await loginWithGoogleFixture(page, "host@example.com");
-  await page.goto("/app/me");
+  await page.goto("/app");
+  const authMeBeforeLogout = await page.evaluate(async () => {
+    const response = await fetch("/api/bff/api/auth/me", { cache: "no-store" });
+    return (await response.json()) as { displayName: string };
+  });
 
-  await page.getByRole("button", { name: "계정·알림 설정" }).click();
+  await page.getByRole("button", { name: `${authMeBeforeLogout.displayName} 계정 메뉴` }).click();
   await page.getByRole("button", { name: "로그아웃" }).click();
 
   await expect(page).toHaveURL(/\/login$/);

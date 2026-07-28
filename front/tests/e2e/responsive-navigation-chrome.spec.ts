@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { loginWithGoogleFixture, resetSeedGoogleLogins } from "./readmates-e2e-db";
-import { mockMyReadingShelfJourney, mockNotificationPreferencesError } from "./my-reading-shelf-fixtures";
+import { mockMyReadingShelfJourney } from "./my-reading-shelf-fixtures";
 
 async function expectPracticalTapTarget(locator: Locator) {
   const box = await locator.boundingBox();
@@ -116,6 +116,18 @@ test("desktop public and host pages show the expected top navigation", async ({ 
   await expect(appNav.getByRole("link", { name: "클럽 노트" })).toBeVisible();
   await expect(appNav.getByRole("link", { name: "아카이브" })).toBeVisible();
   await expect(appNav.getByRole("link", { name: "내 공간" })).toBeVisible();
+  const accountMenu = page.getByRole("button", { name: /계정 메뉴$/ });
+  await expect(accountMenu).toHaveCount(1);
+  await expectPracticalTapTarget(accountMenu);
+  await accountMenu.click();
+  await expect(page.getByRole("menu")).toBeVisible();
+  await expect(page.getByRole("link", { name: "계정 관리" })).toHaveAttribute(
+    "href",
+    `${baselineClubAppPath}/me/settings`,
+  );
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(page.locator(".mobile-only .rm-account-menu__trigger")).toBeHidden();
   const hostEntry = page.getByRole("banner").getByRole("link", { name: "호스트 화면" });
   await expect(hostEntry).toHaveAttribute("href", baselineClubHostPath);
 
@@ -171,6 +183,18 @@ test("mobile public pages hide app tabs and host app pages show mobile chrome", 
   await expect(mobileHeader.getByRole("link", { name: "호스트 화면" })).toHaveText("");
   await expect(mobileHeader.getByRole("link", { name: "호스트 화면" })).toHaveClass(/m-hdr-link--icon/);
   await expectPracticalTapTarget(mobileHeader.getByRole("link", { name: "호스트 화면" }));
+  const accountMenu = page.getByRole("button", { name: /계정 메뉴$/ });
+  await expect(accountMenu).toHaveCount(1);
+  await expectPracticalTapTarget(accountMenu);
+  await accountMenu.click();
+  await expect(page.getByRole("menu")).toBeVisible();
+  await expect(page.getByRole("link", { name: "계정 관리" })).toHaveAttribute(
+    "href",
+    `${baselineClubAppPath}/me/settings`,
+  );
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(page.locator(".desktop-only .rm-account-menu__trigger")).toBeHidden();
   await expect(mobileHeader.locator(".m-hdr-side")).toHaveCount(2);
   const memberTabs = page.getByRole("navigation", { name: "앱 탭" });
   await expect(memberTabs.getByRole("link")).toHaveText(memberMobileTabs);
@@ -335,7 +359,7 @@ test("reading shelf preserves semantic hierarchy and record order on desktop and
 
     const shelf = page.locator(".rm-my-shelf");
     await expect(shelf.getByRole("heading", { level: 1, name: "나의 서재" })).toHaveCount(1);
-    await expect(shelf.getByRole("heading", { level: 2 })).toContainText(["최근 책별 기록", "책별 기록"]);
+    await expect(shelf.getByRole("heading", { level: 2 })).toContainText(["최근 책별 기록"]);
     await expect(shelf.getByRole("heading", { level: 3 })).toContainText([
       "아주 긴 한국어 제목과 An exceptionally long English subtitle for a responsive reading shelf",
       "잠긴 피드백 문서가 있는 공개 안전 테스트 책",
@@ -347,9 +371,7 @@ test("reading shelf preserves semantic hierarchy and record order on desktop and
       "아주 긴 한국어 제목과 An exceptionally long English subtitle for a responsive reading shelf",
       "잠긴 피드백 문서가 있는 공개 안전 테스트 책",
     ]);
-    await expect(shelf.getByText("2026", { exact: true })).toBeVisible();
-    await expect(shelf.getByText("2025", { exact: true })).toBeVisible();
-    await expect(shelf.getByText("활성 멤버가 되면 피드백 문서를 읽을 수 있습니다.")).toBeVisible();
+    await expect(shelf.getByText("열람 제한")).toBeVisible();
     await expect(shelf.getByLabel("아주 긴 한국어 제목과 An exceptionally long English subtitle for a responsive reading shelf 표지 없음")).toBeVisible();
 
     const sessionLink = rows.first().getByRole("link", { name: "회차 기록" });
@@ -357,23 +379,32 @@ test("reading shelf preserves semantic hierarchy and record order on desktop and
     await expect(sessionLink).toBeVisible();
     await expect(feedbackLink).toBeVisible();
     expect(await sessionLink.evaluate((element) => element.parentElement?.querySelectorAll("a").length === 2)).toBe(true);
+    const allRecords = shelf.getByRole("link", { name: "내 기록 전체 보기" });
+    await expect(allRecords).toBeVisible();
     await expectDomOrder(
       shelf.getByRole("heading", { level: 1, name: "나의 서재" }),
       shelf.getByRole("region", { name: "개인 요약" }),
       shelf.getByRole("region", { name: "최근 책별 기록" }),
-      shelf.getByText("2026", { exact: true }),
+      allRecords,
       rows.first(),
-      shelf.getByText("2025", { exact: true }),
       rows.nth(1),
     );
 
+    const accountMenu = page.getByRole("button", { name: /계정 메뉴$/ });
+    await expectPracticalTapTarget(accountMenu);
+    await accountMenu.click();
+    const currentAppBasePath = new URL(page.url()).pathname.replace(/\/me$/, "");
+    const menu = page.getByRole("menu");
+    await expect(menu.getByRole("link", { name: "내 공간" })).toHaveAttribute("href", `${currentAppBasePath}/me`);
+    await expect(menu.getByRole("link", { name: "계정 관리" })).toHaveAttribute("href", `${currentAppBasePath}/me/settings`);
+    await page.keyboard.press("Escape");
+
     if (viewport.width === 1440) {
-      await expect(shelf.getByRole("region", { name: "계정과 알림" })).not.toBeVisible();
       expect(await shelf.evaluate((element) => element.getBoundingClientRect().width)).toBeLessThanOrEqual(820);
     } else {
-      await expectPracticalTapTarget(shelf.getByRole("button", { name: "계정·알림 설정" }));
       await expectPracticalTapTarget(sessionLink);
       await expectPracticalTapTarget(feedbackLink);
+      await expectPracticalTapTarget(allRecords);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     }
   }
@@ -408,6 +439,7 @@ test("reading shelf keeps its mobile summary priorities and record controls abov
   expect(layout.completionFontSize).toBeLessThan(Math.min(...layout.primaryFontSizes));
   expect(layout.shelfBottomPadding).toBeGreaterThanOrEqual(layout.bottomNavigationHeight + 44);
 
+  await page.goto(`${baselineClubAppPath}/me/records`);
   const loadMore = page.getByRole("button", { name: "기록 더 보기" });
   await loadMore.scrollIntoViewIfNeeded();
   const [loadMoreBox, tabBarBox] = await Promise.all([
@@ -419,81 +451,70 @@ test("reading shelf keeps its mobile summary priorities and record controls abov
   expect(loadMoreBox!.y + loadMoreBox!.height).toBeLessThanOrEqual(tabBarBox!.y);
 });
 
-test("reading shelf keeps settings and retry failures reachable above mobile navigation", async ({ page }) => {
+test("dedicated records and account settings stay reachable above mobile navigation", async ({ page }) => {
   await mockMyReadingShelfJourney(page, "load-more-error");
-  await mockNotificationPreferencesError(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await loginWithGoogleFixture(page, "host@example.com");
-  await page.goto("/app/me");
+  await page.goto(`${baselineClubAppPath}/me/records`);
 
   await page.getByRole("button", { name: "기록 더 보기" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "기록을 더 불러오지 못했습니다." })).toBeVisible();
   await expectPracticalTapTarget(page.getByRole("button", { name: "다시 시도" }).first());
 
-  await page.getByRole("button", { name: "계정·알림 설정" }).click();
-  const settings = page.getByRole("region", { name: "계정과 알림" });
-  await expect(settings.getByRole("alert")).toContainText("알림 설정을 불러오지 못했습니다.");
-  await expect(settings.getByRole("button", { name: "로그아웃" })).toBeVisible();
+  await page.getByRole("button", { name: /계정 메뉴$/ }).click();
+  await page.getByRole("link", { name: "계정 관리" }).click();
+  await expect(page).toHaveURL(new RegExp(`${baselineClubAppPath}/me/settings$`));
+  const settings = page.locator(".rm-account-settings-page");
+  await expect(settings.getByRole("heading", { level: 1, name: "계정 관리" })).toBeVisible();
   await expect(settings.getByRole("button", { name: "탈퇴" })).toBeVisible();
+  await expect(settings.getByRole("button", { name: "로그아웃" })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
-test("reading shelf advances actual keyboard focus through record and account controls", async ({ page }) => {
+test("account menu advances keyboard focus naturally and returns it after Escape", async ({ page }) => {
   await mockMyReadingShelfJourney(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await loginWithGoogleFixture(page, "host@example.com");
   await page.goto("/app/me");
 
-  const settingsTrigger = page.getByRole("button", { name: "계정·알림 설정" });
-  const sessionRecord = page.getByRole("link", { name: "회차 기록" }).first();
-  const feedbackDocument = page.getByRole("link", { name: "피드백 문서" }).first();
-  const loadMore = page.getByRole("button", { name: "기록 더 보기" });
-  await settingsTrigger.click();
+  const accountTrigger = page.getByRole("button", { name: /계정 메뉴$/ });
+  await accountTrigger.focus();
+  await page.keyboard.press("Enter");
+  const menu = page.getByRole("menu");
+  const mySpace = menu.getByRole("link", { name: "내 공간" });
+  const settings = menu.getByRole("link", { name: "계정 관리" });
+  const logout = menu.getByRole("button", { name: "로그아웃" });
 
-  const settings = page.getByRole("region", { name: "계정과 알림" });
-  const profile = settings.getByRole("heading", { name: "프로필" });
-  await expect(profile).toBeVisible();
-  await expect(settings.getByRole("button", { name: "이름 변경" })).toHaveCount(0);
-  const notification = settings.getByRole("switch", { name: "이메일 알림" });
-  const logout = settings.getByRole("button", { name: "로그아웃" });
-  const leave = settings.getByRole("button", { name: "탈퇴" });
-
-  await expectDomOrder(settingsTrigger, sessionRecord, feedbackDocument, loadMore, profile, notification, logout, leave);
-  for (const locator of [settingsTrigger, sessionRecord, feedbackDocument, loadMore, notification, logout, leave]) {
+  await expectDomOrder(accountTrigger, mySpace, settings, logout);
+  for (const locator of [accountTrigger, mySpace, settings, logout]) {
     await expectPracticalTapTarget(locator);
   }
 
-  await settingsTrigger.focus();
-  await expect(settingsTrigger).toBeFocused();
-  await pressTabUntilFocused(page, sessionRecord, "session record");
-  await page.screenshot({ path: "test-results/task6-fix-round-1-keyboard-focus.png" });
-  await pressTabUntilFocused(page, feedbackDocument, "feedback document");
-  await pressTabUntilFocused(page, loadMore, "load more");
-  // This route intentionally denies self-profile editing, so the visible profile
-  // state replaces the absent edit button and focus advances to notification.
-  await expect(settings.getByLabel("이름 변경 준비 중")).toBeVisible();
-  await pressTabUntilFocused(page, notification, "notification preference");
+  await pressTabUntilFocused(page, mySpace, "my space");
+  await pressTabUntilFocused(page, settings, "account settings");
   await pressTabUntilFocused(page, logout, "logout");
-  await pressTabUntilFocused(page, leave, "membership action");
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await expect(accountTrigger).toBeFocused();
 });
 
-test("reading shelf disables switch motion when reduced motion is requested", async ({ page }) => {
+test("account menu disables popover motion when reduced motion is requested", async ({ page }) => {
   await mockMyReadingShelfJourney(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await loginWithGoogleFixture(page, "host@example.com");
   await page.goto("/app/me");
-  await page.getByRole("button", { name: "계정·알림 설정" }).click();
+  await page.getByRole("button", { name: /계정 메뉴$/ }).click();
 
-  const transition = await page.locator(".rm-my-shelf-notification-switch__thumb").first().evaluate((element) => {
+  const motion = await page.getByRole("menu").evaluate((element) => {
     const style = getComputedStyle(element);
-    return { duration: style.transitionDuration, property: style.transitionProperty };
+    return { duration: style.animationDuration, name: style.animationName };
   });
 
-  expect(transition.property).toBe("none");
-  expect(Number.parseFloat(transition.duration)).toBeLessThanOrEqual(0.001);
+  expect(motion.name).toBe("none");
+  expect(Number.parseFloat(motion.duration)).toBeLessThanOrEqual(0.001);
   await page.evaluate(() => {
     document.body.style.zoom = "200%";
   });
-  await page.screenshot({ path: "test-results/task6-fix-round-1-reduced-motion-zoom.png" });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });

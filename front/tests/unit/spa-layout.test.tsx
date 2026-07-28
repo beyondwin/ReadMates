@@ -194,6 +194,11 @@ describe("SPA AppRouteLayout", () => {
       "/app/host",
     ]);
     expect(screen.getAllByRole("link", { name: "호스트 화면" }).map((link) => link.textContent)).toEqual(["", ""]);
+    const accountTriggers = screen.getAllByRole("button", { name: "김호스트 계정 메뉴" });
+    expect(accountTriggers).toHaveLength(2);
+    expect(new Set(accountTriggers.map((trigger) => trigger.getAttribute("aria-controls"))).size).toBe(2);
+    expect(accountTriggers[0].closest(".desktop-only")).toBeInTheDocument();
+    expect(accountTriggers[1].closest(".mobile-only")).toBeInTheDocument();
 
     const tabs = screen.getByRole("navigation", { name: "앱 탭" });
     expect(within(tabs).getAllByRole("link").map((tab) => tab.textContent)).toEqual([
@@ -242,7 +247,7 @@ describe("SPA AppRouteLayout", () => {
 
     expect(await screen.findByText("scoped member child")).toBeInTheDocument();
     await waitFor(() => {
-      expect(screen.getByLabelText("클럽멤버")).toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: "클럽멤버 계정 메뉴" })).toHaveLength(2);
     });
     expect(screen.queryByRole("link", { name: "호스트 화면" })).not.toBeInTheDocument();
   });

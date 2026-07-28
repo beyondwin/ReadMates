@@ -36,6 +36,7 @@ type TopNavProps = {
   publicBasePath?: string;
   appBasePath?: string;
   LinkComponent?: AppLinkComponent;
+  accountControl?: ReactNode;
 };
 
 const memberLinks: NavLink[] = [
@@ -200,6 +201,7 @@ function TopNavFrame({
   pathname,
   memberName,
   workspaceAction,
+  accountControl,
   LinkComponent,
 }: {
   brandHref: string;
@@ -208,6 +210,7 @@ function TopNavFrame({
   pathname: string;
   memberName?: string | null;
   workspaceAction?: NavLink | null;
+  accountControl?: ReactNode;
   LinkComponent: AppLinkComponent;
 }) {
   return (
@@ -228,18 +231,20 @@ function TopNavFrame({
               </LinkComponent>
             ))}
           </nav>
-          {workspaceAction ? (
-            <LinkComponent
-              to={workspaceAction.href}
-              className="rm-workspace-switch"
-              aria-label={workspaceAction.label}
-              title={workspaceAction.label}
-            >
-              <WorkspaceSwitchIcon size={17} />
-            </LinkComponent>
-          ) : null}
-          {memberName ? (
-            <AvatarChip name={memberName} label={memberName} size={28} />
+          {workspaceAction || accountControl || memberName ? (
+            <div className="topnav-account-actions">
+              {workspaceAction ? (
+                <LinkComponent
+                  to={workspaceAction.href}
+                  className="rm-workspace-switch"
+                  aria-label={workspaceAction.label}
+                  title={workspaceAction.label}
+                >
+                  <WorkspaceSwitchIcon size={17} />
+                </LinkComponent>
+              ) : null}
+              {accountControl ?? (memberName ? <AvatarChip name={memberName} label={memberName} size={28} /> : null)}
+            </div>
           ) : null}
         </div>
       </div>
@@ -290,12 +295,14 @@ function AppTopNav({
   showHostEntry,
   appBasePath = "",
   LinkComponent,
+  accountControl,
 }: {
   variant: Exclude<TopNavVariant, "guest">;
   memberName?: string | null;
   showHostEntry?: boolean;
   appBasePath?: string;
   LinkComponent: AppLinkComponent;
+  accountControl?: ReactNode;
 }) {
   const pathname = useLocation().pathname;
   const appPath = appPathname(pathname);
@@ -311,6 +318,7 @@ function AppTopNav({
       pathname={appPath}
       memberName={memberName}
       workspaceAction={scopedWorkspaceAction}
+      accountControl={accountControl}
       LinkComponent={LinkComponent}
     />
   );
@@ -324,6 +332,7 @@ export function TopNav({
   publicBasePath,
   appBasePath,
   LinkComponent = DefaultLink,
+  accountControl,
 }: TopNavProps) {
   if (variant === "guest") {
     return <GuestTopNav authenticated={authenticated} publicBasePath={publicBasePath} LinkComponent={LinkComponent} />;
@@ -336,6 +345,7 @@ export function TopNav({
       showHostEntry={showHostEntry}
       appBasePath={appBasePath}
       LinkComponent={LinkComponent}
+      accountControl={accountControl}
     />
   );
 }

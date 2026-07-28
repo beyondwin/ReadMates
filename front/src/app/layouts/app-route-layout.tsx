@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import type { CurrentSessionResponse } from "@/features/current-session/api/current-session-contracts";
 import { usableJoinedClubs } from "@/features/club-selection/model/club-entry";
-import { useAuth } from "@/src/app/auth-state";
+import { AccountMenuController } from "@/features/auth/route/account-menu-controller";
+import { useAuth, useAuthActions } from "@/src/app/auth-state";
 import {
   archiveReportReturnTarget,
   archiveSessionsReturnTarget,
@@ -140,6 +141,7 @@ function ClubSwitcher({
 
 export function AppRouteLayout() {
   const state = useAuth();
+  const { markLoggedOut } = useAuthActions();
   const location = useLocation();
   const pathname = location.pathname;
   const appPath = appPathname(pathname);
@@ -248,6 +250,16 @@ export function AppRouteLayout() {
           showHostEntry={showHostEntry}
           appBasePath={basePath}
           LinkComponent={Link}
+          accountControl={
+            auth?.authenticated ? (
+              <AccountMenuController
+                auth={auth}
+                appBasePath={basePath}
+                LinkComponent={Link}
+                onLoggedOut={markLoggedOut}
+              />
+            ) : null
+          }
         />
       </div>
       <div className="mobile-only">
@@ -257,6 +269,16 @@ export function AppRouteLayout() {
           appBasePath={basePath}
           LinkComponent={Link}
           navigationContinuity={readmatesNavigationContinuity}
+          accountControl={
+            auth?.authenticated ? (
+              <AccountMenuController
+                auth={auth}
+                appBasePath={basePath}
+                LinkComponent={Link}
+                onLoggedOut={markLoggedOut}
+              />
+            ) : null
+          }
         />
       </div>
       <div className="app-content">
