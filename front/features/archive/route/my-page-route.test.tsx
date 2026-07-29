@@ -38,7 +38,22 @@ const data: MyPageRouteData = {
     ],
   },
   journey: {
-    items: [],
+    items: [{
+      sessionId: "session / 9",
+      sessionNumber: 9,
+      bookTitle: "최근 함께 읽은 책",
+      bookAuthor: "테스트 저자",
+      bookImageUrl: null,
+      date: "2026-07-20",
+      readingProgress: 100,
+      questionCount: 2,
+      reviewCount: 1,
+      feedbackDocument: {
+        available: true,
+        readable: true,
+        lockedReason: null,
+      },
+    }],
     nextCursor: null,
     summary: {
       attendedSessionCount: 9,
@@ -79,9 +94,18 @@ describe("MyPageRoute", () => {
       "href",
       "/clubs/reading-sai/app/me/settings",
     );
+    expect(screen.getByRole("link", { name: "전체 기록 보기" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/me/records",
+    );
+    expect(screen.getByRole("link", {
+      name: "최근 함께 읽은 책 회차 기록",
+    })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/sessions/session%20%2F%209",
+    );
     expect(screen.queryByRole("list", { name: "최근 참여 대상 회차" })).toBeNull();
     expect(screen.queryByRole("link", { name: "이번 세션 보기" })).toBeNull();
-    expect(screen.queryByRole("link", { name: "내 책별 기록 전체 보기" })).toBeNull();
     expect(screen.queryByRole("button", { name: "로그아웃" })).toBeNull();
   });
 });

@@ -31,8 +31,13 @@ export function MemberProfileSummary({
         variant="member-space"
         headingId="member-profile-name"
         memberSpaceActions={(
-          <a className="rm-member-profile__settings" href={accountSettingsHref}>
-            계정 관리
+          <a
+            className="rm-member-profile__settings"
+            href={accountSettingsHref}
+            aria-label="계정 관리"
+          >
+            <span>계정 관리</span>
+            <span aria-hidden="true">→</span>
           </a>
         )}
       />

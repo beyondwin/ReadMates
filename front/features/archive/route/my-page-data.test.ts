@@ -82,12 +82,12 @@ describe("myPageLoader", () => {
     api.fetchMyJourney.mockResolvedValue(journey);
   });
 
-  it("loads the profile and one journey item only to obtain the exact summary", async () => {
+  it("loads the profile and three journey items for summary and recent records", async () => {
     await expect(myPageLoader()).resolves.toEqual({ profile, journey });
     expect(api.fetchMyPage).toHaveBeenCalledWith({ clubSlug: undefined });
     expect(api.fetchMyJourney).toHaveBeenCalledWith(
       { clubSlug: undefined },
-      { limit: 1 },
+      { limit: 3 },
     );
     expect(api.fetchMyFeedbackDocuments).not.toHaveBeenCalled();
     expect(api.fetchMyArchiveQuestions).not.toHaveBeenCalled();

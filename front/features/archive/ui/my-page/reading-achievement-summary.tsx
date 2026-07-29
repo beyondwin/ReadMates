@@ -14,12 +14,6 @@ export function ReadingAchievementSummary({ viewModel }: { viewModel: MemberSpac
           </div>
         ))}
       </dl>
-      {viewModel.joinedMonthLabel ? (
-        <p className="rm-reading-achievement__joined">
-          <span>멤버십 시작</span>
-          <strong>{viewModel.joinedMonthLabel}</strong>
-        </p>
-      ) : null}
     </section>
   );
 }

@@ -1,5 +1,8 @@
 import { useLoaderData, useLocation, useRevalidator } from "react-router-dom";
-import { buildMemberSpaceViewModel } from "@/features/archive/model/my-reading-shelf-model";
+import {
+  buildMemberSpaceViewModel,
+  buildRecentReadingPreview,
+} from "@/features/archive/model/my-reading-shelf-model";
 import type { MyPageRouteData } from "@/features/archive/route/my-page-data";
 import MyPage from "@/features/archive/ui/my-page";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
@@ -25,13 +28,23 @@ export function MyPageRoute({ canEditProfile, onProfileUpdated }: MyPageRoutePro
     summary: journey.summary,
     today: new Date(),
   });
+  const scopedHref = (target: string) =>
+    scopedAppLinkTarget(location.pathname, target);
+  const recentReadings = buildRecentReadingPreview(journey.items).map((item) => ({
+    ...item,
+    href: scopedHref(
+      `/app/sessions/${encodeURIComponent(item.sessionId)}`,
+    ),
+  }));
 
   return (
     <MyPage
       profile={profile}
       viewModel={viewModel}
+      recentReadings={recentReadings}
       canEditProfile={canEditProfile}
-      accountSettingsHref={scopedAppLinkTarget(location.pathname, "/app/me/settings")}
+      accountSettingsHref={scopedHref("/app/me/settings")}
+      recordsHref={scopedHref("/app/me/records")}
       onUpdateProfile={updateProfile}
     />
   );

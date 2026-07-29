@@ -4,7 +4,9 @@ import { describe, expect, it, vi } from "vitest";
 import type { MyPageProfile } from "@/features/archive/model/archive-model";
 import type { MemberSpaceViewModel } from "@/features/archive/model/my-reading-shelf-model";
 import { MemberProfileSummary } from "./member-profile-summary";
+import { MemberSpaceOverview } from "./member-space-overview";
 import { ReadingAchievementSummary } from "./reading-achievement-summary";
+import type { ProfileUpdateResult } from "./types";
 
 const profile: MyPageProfile = {
   displayName: "멤버1",
@@ -23,8 +25,7 @@ const profile: MyPageProfile = {
 
 const viewModel: MemberSpaceViewModel = {
   avatarLabel: "멤",
-  profileMetaLabel: "읽는사이 · 멤버 · 함께한 지 8개월",
-  joinedMonthLabel: "2025년 11월",
+  profileMetaLabel: "읽는사이 · 멤버 · 2025.11부터 함께",
   achievementHeading: "일곱 번의 모임에서 세 권을 끝까지 읽었어요.",
   achievementBody: "함께 읽는 시간이 차분히 쌓이고 있습니다.",
   metrics: [
@@ -53,9 +54,11 @@ describe("member-space presentation sections", () => {
 
     expect(screen.getByText("내 프로필")).toBeVisible();
     expect(screen.getByRole("heading", { level: 1, name: "멤버1" })).toBeVisible();
-    expect(screen.getByText("읽는사이 · 멤버 · 함께한 지 8개월")).toBeVisible();
+    expect(screen.getByText("읽는사이 · 멤버 · 2025.11부터 함께")).toBeVisible();
     expect(screen.getByRole("button", { name: "프로필 수정" })).toBeVisible();
     expect(screen.getByRole("link", { name: "계정 관리" })).toHaveAttribute("href", "/app/me/settings");
+    expect(screen.getByText("계정 관리")).toBeVisible();
+    expect(container.querySelector(".rm-member-profile__settings")).not.toBeNull();
     expect(container.querySelector(".rm-member-profile > .rm-member-profile__actions")).not.toBeNull();
   });
 
@@ -80,6 +83,78 @@ describe("member-space presentation sections", () => {
     expect(screen.getByRole("button", { name: "취소" })).toBeVisible();
   });
 
+  it("keeps the member-space editor stable while a save is pending", async () => {
+    const pendingSave = new Promise<ProfileUpdateResult>(() => undefined);
+    const user = userEvent.setup();
+    render(
+      <MemberProfileSummary
+        profile={profile}
+        viewModel={viewModel}
+        canEditProfile
+        accountSettingsHref="/app/me/settings"
+        onUpdateProfile={() => pendingSave}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "프로필 수정" }));
+    await user.click(screen.getByRole("button", { name: "이름 저장" }));
+
+    expect(screen.getByRole("button", { name: "이름 저장" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "취소" })).toBeDisabled();
+    expect(screen.getByText("저장 중")).toBeVisible();
+  });
+
+  it("keeps the editor open and exposes a nearby save error", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemberProfileSummary
+        profile={profile}
+        viewModel={viewModel}
+        canEditProfile
+        accountSettingsHref="/app/me/settings"
+        onUpdateProfile={vi.fn().mockRejectedValue(
+          new Error("같은 클럽에서 이미 쓰고 있는 이름입니다."),
+        )}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "프로필 수정" }));
+    await user.click(screen.getByRole("button", { name: "이름 저장" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "같은 클럽에서 이미 쓰고 있는 이름입니다.",
+    );
+    expect(screen.getByLabelText("이름")).toBeVisible();
+  });
+
+  it("places the profile before achievements inside the member-space overview", () => {
+    const { container } = render(
+      <MemberSpaceOverview>
+        <MemberProfileSummary
+          profile={profile}
+          viewModel={viewModel}
+          canEditProfile
+          accountSettingsHref="/app/me/settings"
+          onUpdateProfile={vi.fn().mockResolvedValue({
+            displayName: profile.displayName,
+            accountName: profile.accountName,
+          })}
+        />
+        <ReadingAchievementSummary viewModel={viewModel} />
+      </MemberSpaceOverview>,
+    );
+    const overview = container.querySelector(".rm-member-space__overview")!;
+    const profileSection = within(overview).getByRole("region", { name: "멤버1" });
+    const achievementSection = within(overview).getByRole("region", {
+      name: "일곱 번의 모임에서 세 권을 끝까지 읽었어요.",
+    });
+
+    expect(
+      profileSection.compareDocumentPosition(achievementSection) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it("presents cumulative achievements as ordered definition-list metrics only", () => {
     const { container } = render(<ReadingAchievementSummary viewModel={viewModel} />);
     const section = screen.getByRole("region", { name: "일곱 번의 모임에서 세 권을 끝까지 읽었어요." });
@@ -91,8 +166,7 @@ describe("member-space presentation sections", () => {
     expect(metrics).not.toBeNull();
     expect(Array.from(metrics?.querySelectorAll("dt") ?? [], (item) => item.textContent)).toEqual(["함께한 모임", "완독", "질문", "서평"]);
     expect(Array.from(metrics?.querySelectorAll("dd") ?? [], (item) => item.textContent)).toEqual(["7", "3", "5", "2"]);
-    expect(within(section).getByText("멤버십 시작")).toBeVisible();
-    expect(within(section).getByText("2025년 11월")).toBeVisible();
+    expect(within(section).queryByText("멤버십 시작")).toBeNull();
     expect(container.querySelectorAll("ol, ul, [role='img'], svg")).toHaveLength(0);
     expect(screen.queryByText(/2026|최근|연속/)).toBeNull();
     expect(screen.queryByRole("link", { name: /기록/ })).toBeNull();

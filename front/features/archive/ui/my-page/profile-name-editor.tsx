@@ -87,7 +87,10 @@ export function ProfileNameEditor({
   if (!isSettings) {
     return (
       <>
-        <div className="rm-member-profile__name">
+        <div
+          className="rm-member-profile__name"
+          data-editing={editing || undefined}
+        >
           <h1 id={headingId}>{data.displayName}</h1>
           {editing ? (
             <form className="rm-member-profile__form" onSubmit={submitProfile}>
