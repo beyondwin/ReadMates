@@ -349,114 +349,40 @@ test("mobile app route continuity returns to archive tabs and host dashboard sou
   await expect(page.getByRole("heading", { name: "모임 운영" })).toBeVisible();
 });
 
-test("reading shelf preserves participation hierarchy on desktop and mobile", async ({ page }) => {
+test("member space preserves a profile-first layout from desktop to narrow mobile", async ({ page }) => {
   await mockMemberParticipationProfile(page, "history");
-  await mockMyReadingShelfJourney(page);
+  await mockMyReadingShelfJourney(page, "three-achievements");
   await loginWithGoogleFixture(page, "host@example.com");
 
   for (const viewport of [
     { width: 1440, height: 1000 },
     { width: 390, height: 844 },
+    { width: 320, height: 700 },
   ]) {
     await page.setViewportSize(viewport);
     await page.goto("/app/me");
 
-    const shelf = page.locator(".rm-my-shelf");
-    await expect(shelf.getByRole("heading", { level: 1, name: "나의 서재" })).toHaveCount(1);
-    await expect(shelf.getByRole("heading", { level: 2 })).toContainText([
-      "함께한 모임 8회",
-      "최근 6회 중 5회 함께했어요",
-      "다음 모임을 준비하고 있어요",
-      "나의 읽기 기록",
-      "계정",
-    ]);
-
-    const timeline = shelf.getByRole("list", { name: "최근 참여 대상 회차" });
-    await expect(timeline).toHaveCount(1);
-    await expect(timeline.getByRole("listitem")).toHaveCount(6);
-    const currentSession = shelf.getByRole("link", { name: "이번 세션 보기" });
-    const allRecords = shelf.getByRole("link", { name: "내 책별 기록 전체 보기" });
-    const logout = shelf.getByRole("button", { name: "로그아웃" });
-    await expect(currentSession).toBeVisible();
-    await expect(allRecords).toBeVisible();
-    await expect(logout).toBeVisible();
+    const shelf = page.locator(".rm-member-space");
+    const actions = shelf.locator(".rm-member-profile__actions");
+    await expect(shelf.getByRole("heading", { level: 1, name: "호스트" })).toHaveCount(1);
+    await expect(shelf.getByRole("heading", { level: 2, name: "세 번의 모임에서 세 권을 끝까지 읽었어요." })).toHaveCount(1);
+    await expect(actions).toHaveCount(1);
     await expectDomOrder(
-      shelf.getByRole("heading", { level: 1, name: "나의 서재" }),
-      shelf.getByRole("heading", { level: 2, name: "함께한 모임 8회" }),
-      timeline,
-      currentSession,
-      shelf.getByRole("heading", { level: 2, name: "나의 읽기 기록" }),
-      allRecords,
-      shelf.getByRole("heading", { level: 2, name: "계정" }),
-      logout,
+      shelf.getByRole("heading", { level: 1, name: "호스트" }),
+      shelf.getByRole("link", { name: "계정 관리" }),
+      shelf.getByRole("heading", { level: 2, name: "세 번의 모임에서 세 권을 끝까지 읽었어요." }),
+      shelf.locator(".rm-reading-achievement__metrics"),
     );
 
-    const accountMenu = page.getByRole("button", { name: /계정 메뉴$/ });
-    await expectPracticalTapTarget(accountMenu);
-    await accountMenu.click();
-    const currentAppBasePath = new URL(page.url()).pathname.replace(/\/me$/, "");
-    const dialog = page.getByRole("dialog");
-    await expect(dialog.getByRole("link", { name: "내 공간" })).toHaveAttribute("href", `${currentAppBasePath}/me`);
-    await expect(dialog.getByRole("link", { name: "계정 관리" })).toHaveAttribute("href", `${currentAppBasePath}/me/settings`);
-    await page.keyboard.press("Escape");
-
     if (viewport.width === 1440) {
-      expect(await shelf.evaluate((element) => element.getBoundingClientRect().width)).toBeLessThanOrEqual(820);
+      expect(await shelf.evaluate((element) => element.getBoundingClientRect().width)).toBeLessThanOrEqual(920);
     } else {
-      await expectPracticalTapTarget(currentSession);
-      await expectPracticalTapTarget(allRecords);
-      await expectPracticalTapTarget(logout);
+      await expectPracticalTapTarget(shelf.getByRole("button", { name: "프로필 수정" }));
+      await expectPracticalTapTarget(shelf.getByRole("link", { name: "계정 관리" }));
+      expect(await actions.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length)).toBe(2);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     }
   }
-});
-
-test("reading shelf keeps its mobile participation controls above the bottom navigation", async ({ page }) => {
-  await mockMemberParticipationProfile(page, "history");
-  await mockMyReadingShelfJourney(page);
-  await page.setViewportSize({ width: 390, height: 844 });
-  await loginWithGoogleFixture(page, "host@example.com");
-  await page.goto("/app/me");
-
-  const layout = await page.getByRole("list", { name: "최근 참여 대상 회차" }).evaluate((list) => {
-    const shelf = document.querySelector<HTMLElement>(".rm-my-shelf")!;
-
-    return {
-      columns: getComputedStyle(list).gridTemplateColumns.trim().split(/\s+/).length,
-      listClientWidth: list.clientWidth,
-      listScrollWidth: list.scrollWidth,
-      shelfBottomPadding: Number.parseFloat(getComputedStyle(shelf).paddingBottom),
-      bottomNavigationHeight: document.querySelector<HTMLElement>("nav[aria-label='앱 탭']")!.getBoundingClientRect().height,
-    };
-  });
-
-  expect(layout.columns).toBe(6);
-  expect(layout.listScrollWidth).toBeLessThanOrEqual(layout.listClientWidth);
-  expect(layout.shelfBottomPadding).toBeGreaterThanOrEqual(layout.bottomNavigationHeight + 44);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-
-  const logout = page.locator(".rm-member-space-account-actions").getByRole("button", {
-    name: "로그아웃",
-  });
-  await logout.scrollIntoViewIfNeeded();
-  const [logoutBox, memberTabBarBox] = await Promise.all([
-    logout.boundingBox(),
-    page.getByRole("navigation", { name: "앱 탭" }).boundingBox(),
-  ]);
-  expect(logoutBox).not.toBeNull();
-  expect(memberTabBarBox).not.toBeNull();
-  expect(logoutBox!.y + logoutBox!.height).toBeLessThanOrEqual(memberTabBarBox!.y);
-
-  await page.goto(`${baselineClubAppPath}/me/records`);
-  const loadMore = page.getByRole("button", { name: "기록 더 보기" });
-  await loadMore.scrollIntoViewIfNeeded();
-  const [loadMoreBox, tabBarBox] = await Promise.all([
-    loadMore.boundingBox(),
-    page.getByRole("navigation", { name: "앱 탭" }).boundingBox(),
-  ]);
-  expect(loadMoreBox).not.toBeNull();
-  expect(tabBarBox).not.toBeNull();
-  expect(loadMoreBox!.y + loadMoreBox!.height).toBeLessThanOrEqual(tabBarBox!.y);
 });
 
 test("dedicated records and account settings stay reachable above mobile navigation", async ({ page }) => {

@@ -31,12 +31,14 @@ export function MemberProfileSummary({
           onUpdateProfile={onUpdateProfile}
           variant="member-space"
           headingId="member-profile-name"
+          memberSpaceActions={(
+            <a className="rm-member-profile__settings" href={accountSettingsHref}>
+              계정 관리
+            </a>
+          )}
         />
         <p className="rm-member-profile__meta">{viewModel.profileMetaLabel}</p>
       </div>
-      <a className="rm-member-profile__settings" href={accountSettingsHref}>
-        계정 관리
-      </a>
     </section>
   );
 }

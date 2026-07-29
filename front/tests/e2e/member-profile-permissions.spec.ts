@@ -85,7 +85,7 @@ test.afterEach(() => {
   resetSeededProfiles();
 });
 
-test("member cannot edit own profile display name from account settings", async ({ page }) => {
+test("active member account settings expose their editable profile identity", async ({ page }) => {
   await mockMyReadingShelfJourney(page);
   await loginWithGoogleFixture(page, selfEditMemberEmail);
   await page.goto("/app/me/settings");
@@ -94,8 +94,61 @@ test("member cannot edit own profile display name from account settings", async 
   await expect(page.getByText(selfEditMemberEmail)).toBeVisible();
   await expect(page.getByText("멤버5", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("@멤버5")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "이름 변경" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "이름 변경" })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "이름" })).toHaveCount(0);
+});
+
+test("active members edit their profile from member space and refresh the account-menu name", async ({ page }) => {
+  const updatedDisplayName = uniqueDisplayName("Member");
+  let refreshedDisplayName: string | null = null;
+  let authPayload: Record<string, unknown> | null = null;
+
+  await page.route("**/api/bff/api/auth/me", async (route) => {
+    if (!authPayload) {
+      const upstream = await route.fetch();
+      authPayload = await upstream.json() as Record<string, unknown>;
+    }
+
+    await route.fulfill({
+      json: { ...authPayload, displayName: refreshedDisplayName ?? authPayload.displayName },
+    });
+  });
+  await page.route("**/api/bff/api/me/profile", async (route) => {
+    expect(route.request().method()).toBe("PATCH");
+    expect(route.request().postDataJSON()).toEqual({ displayName: updatedDisplayName });
+    refreshedDisplayName = updatedDisplayName;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        membershipId: "e2e-member-profile",
+        displayName: updatedDisplayName,
+        accountName: selfEditMemberEmail,
+        profileImageUrl: null,
+      }),
+    });
+  });
+  await mockMyReadingShelfJourney(page, "three-achievements");
+  await loginWithGoogleFixture(page, selfEditMemberEmail);
+  await page.goto("/app/me");
+
+  await page.getByRole("button", { name: "프로필 수정" }).click();
+  await page.getByRole("textbox", { name: "이름" }).fill(updatedDisplayName);
+  await page.getByRole("button", { name: "이름 저장" }).click();
+
+  await expect(page.getByRole("heading", { level: 1, name: updatedDisplayName })).toBeVisible();
+  await expect(page.getByRole("button", { name: `${updatedDisplayName} 계정 메뉴` })).toBeVisible();
+});
+
+test("suspended members retain account management without a profile edit action", async ({ page }) => {
+  setMembershipStatus(selfEditMemberEmail, "SUSPENDED");
+  await mockMyReadingShelfJourney(page, "three-achievements");
+  await loginWithGoogleFixture(page, selfEditMemberEmail);
+  await page.goto("/app/me");
+
+  const shelf = page.locator(".rm-member-space");
+  await expect(shelf.getByRole("link", { name: "계정 관리" })).toBeVisible();
+  await expect(shelf.getByRole("button", { name: "프로필 수정" })).toHaveCount(0);
 });
 
 test("an empty reading shelf navigates to the real current-session route", async ({ page }) => {
@@ -105,19 +158,10 @@ test("an empty reading shelf navigates to the real current-session route", async
   await page.goto("/app/me");
 
   await expect(page.getByRole("heading", {
-    name: "첫 참여부터 이곳에 흐름이 쌓여요",
+    name: "첫 모임부터 이곳에 독서 기록이 쌓여요.",
   })).toBeVisible();
-  await expect(page.getByRole("list", {
-    name: "최근 참여 대상 회차",
-  })).toHaveCount(0);
-  await expect(page.locator(".rm-supporting-reading-stats dl > div")).toHaveCount(0);
-  await expect(page.getByText("0 / 0", { exact: true })).toHaveCount(0);
-  await expect(page.getByRole("link", {
-    name: "이번 세션 보기",
-  })).toBeVisible();
-  await page.getByRole("link", { name: "이번 세션 보기" }).click();
-  await expect(page).toHaveURL(/\/app\/session\/current$/);
-  await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.getByRole("link", { name: "계정 관리" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "최근 참여 대상 회차" })).toHaveCount(0);
 });
 
 test("host edits a same-club member display name and sees the row update", async ({ page }) => {
@@ -129,7 +173,7 @@ test("host edits a same-club member display name and sees the row update", async
 
   await expect(page.getByRole("heading", { name: "계정 관리", level: 1 })).toBeVisible();
   await expect(page.getByText("호스트", { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "이름 변경" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "이름 변경" })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "이름" })).toHaveCount(0);
 
   await page.goto("/app/host/members");
@@ -171,17 +215,10 @@ test("viewer can read member routes but cannot use current-session write actions
   await loginWithGoogleFixture(page, viewerEmail, { displayName: "E2E Profile Viewer" });
   await page.goto("/app/me");
 
-  await expect(page.getByRole("heading", {
-    name: "첫 참여부터 이곳에 흐름이 쌓여요",
-  })).toBeVisible();
-  await expect(page.getByRole("link", {
-    name: "이번 세션 보기",
-  })).toHaveCount(0);
-  await expect(page.getByRole("list", {
-    name: "최근 참여 대상 회차",
-  })).toHaveCount(0);
-  await expect(page.locator(".rm-supporting-reading-stats dl > div")).toHaveCount(0);
-  await expect(page.getByText("0 / 0", { exact: true })).toHaveCount(0);
+  const viewerShelf = page.locator(".rm-member-space");
+  await expect(viewerShelf.getByRole("link", { name: "계정 관리" })).toBeVisible();
+  await expect(viewerShelf.getByRole("button", { name: "프로필 수정" })).toHaveCount(0);
+  await expect(viewerShelf.getByRole("list", { name: "최근 참여 대상 회차" })).toHaveCount(0);
 
   await page.goto("/app/me/settings");
 

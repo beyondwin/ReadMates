@@ -6,7 +6,7 @@ export function ReadingAchievementSummary({ viewModel }: { viewModel: MemberSpac
       <p className="rm-member-space-kicker">함께 읽어 온 기록</p>
       <h2 id="reading-achievement-heading">{viewModel.achievementHeading}</h2>
       <p>{viewModel.achievementBody}</p>
-      <dl>
+      <dl className="rm-reading-achievement__metrics">
         {viewModel.metrics.map((metric) => (
           <div key={metric.label}>
             <dt>{metric.label}</dt>

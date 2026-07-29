@@ -63,6 +63,30 @@ describe("useProfileUpdateController", () => {
     expect(result.current.profile.displayName).toBe("새 이름");
   });
 
+  it("retains the optimistic name when revalidation returns a fresh stale profile object", async () => {
+    const onProfileUpdated = vi.fn().mockResolvedValue(undefined);
+    const onRevalidate = vi.fn();
+    api.updateMyProfile.mockResolvedValue(response(true, updatedProfile));
+    const { result, rerender } = renderHook(
+      ({ sourceProfile }) =>
+        useProfileUpdateController({
+          sourceProfile,
+          canEditProfile: true,
+          onProfileUpdated,
+          onRevalidate,
+        }),
+      { initialProps: { sourceProfile: profile } },
+    );
+
+    await act(async () => {
+      await result.current.updateProfile("새 이름");
+    });
+
+    rerender({ sourceProfile: { ...profile } });
+
+    expect(result.current.profile.displayName).toBe("새 이름");
+  });
+
   it("rejects a profile update when the membership cannot edit", async () => {
     const denied = renderHook(() =>
       useProfileUpdateController({

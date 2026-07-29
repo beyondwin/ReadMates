@@ -13,7 +13,7 @@ export type MyReadingShelfProps = {
 
 export function MyReadingShelf({ profile, viewModel, canEditProfile, onUpdateProfile }: MyReadingShelfProps) {
   return (
-    <main className="rm-my-shelf">
+    <main className="rm-my-shelf rm-member-space">
       <MemberProfileSummary
         profile={profile}
         viewModel={viewModel}

@@ -1,4 +1,4 @@
-import { type CSSProperties, type FormEvent, useId, useRef, useState } from "react";
+import { type CSSProperties, type FormEvent, type ReactNode, useId, useRef, useState } from "react";
 import type { MyPageProfile } from "@/features/archive/model/archive-model";
 import { profileSaveErrorMessage } from "@/features/archive/model/archive-model";
 import type { ProfileUpdateResult } from "./types";
@@ -9,6 +9,7 @@ export type ProfileNameEditorProps = {
   onUpdateProfile: (displayName: string) => Promise<ProfileUpdateResult>;
   variant: "settings" | "member-space";
   headingId?: string;
+  memberSpaceActions?: ReactNode;
 };
 
 const profileFailureMessages = new Set([
@@ -27,6 +28,7 @@ export function ProfileNameEditor({
   onUpdateProfile,
   variant,
   headingId,
+  memberSpaceActions,
 }: ProfileNameEditorProps) {
   const inputId = useId();
   const errorId = useId();
@@ -62,47 +64,37 @@ export function ProfileNameEditor({
   }
 
   const isSettings = variant === "settings";
-  const rowStyle: CSSProperties =
-    isSettings
-      ? {
-          display: "grid",
-          gridTemplateColumns: "28px minmax(0, 1fr)",
-          gap: "14px",
-          padding: "16px 18px",
-          alignItems: "center",
-        }
-      : {
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr)",
-          gap: "10px",
-          marginTop: "14px",
-          padding: "13px 14px",
-          border: "1px solid var(--line-soft)",
-          background: "var(--bg-sub)",
-          borderRadius: "8px",
-        };
+  const rowStyle: CSSProperties | undefined = isSettings
+    ? {
+        display: "grid",
+        gridTemplateColumns: "28px minmax(0, 1fr)",
+        gap: "14px",
+        padding: "16px 18px",
+        alignItems: "center",
+      }
+    : undefined;
 
   const bodyStyle: CSSProperties =
     isSettings
       ? { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: "14px", alignItems: "center" }
-      : { display: "grid", gap: "10px" };
+      : undefined;
 
   const formStyle: CSSProperties =
     isSettings
       ? { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto auto", gap: "8px", alignItems: "end" }
-      : { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto auto", gap: "8px", alignItems: "end" };
+      : undefined;
 
   return (
-    <div style={rowStyle}>
+    <div className={isSettings ? undefined : "rm-member-profile__editor"} style={rowStyle}>
       {isSettings ? (
         <span aria-hidden style={{ color: "var(--text-3)" }}>
           <Icon name="me" size={16} />
         </span>
       ) : null}
-      <div style={{ minWidth: 0 }}>
+      <div className={isSettings ? undefined : "rm-member-profile__name"} style={isSettings ? { minWidth: 0 } : undefined}>
         {isSettings ? null : <h1 id={headingId}>{data.displayName}</h1>}
         {editing ? (
-          <form onSubmit={submitProfile} style={formStyle}>
+          <form className={isSettings ? undefined : "rm-member-profile__form"} onSubmit={submitProfile} style={formStyle}>
             <div style={{ minWidth: 0 }}>
               <label htmlFor={inputId} className="body" style={{ display: "block", fontSize: "14px" }}>
                 이름
@@ -144,7 +136,7 @@ export function ProfileNameEditor({
             </button>
           </form>
         ) : (
-          <div style={bodyStyle}>
+          <div className={isSettings ? undefined : "rm-member-profile__actions"} style={bodyStyle}>
             {isSettings ? (
               <div style={{ minWidth: 0 }}>
                 <div className="body" style={{ fontSize: "14px" }}>
@@ -171,6 +163,7 @@ export function ProfileNameEditor({
                 변경 준비 중
               </span>
             ) : null}
+            {!isSettings ? memberSpaceActions : null}
           </div>
         )}
       </div>

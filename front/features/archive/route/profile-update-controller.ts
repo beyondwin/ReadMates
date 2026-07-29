@@ -35,10 +35,15 @@ export function useProfileUpdateController({
   updateProfile: (displayName: string) => Promise<MemberProfileResponse>;
 } {
   const [profileOverrideState, setProfileOverrideState] = useState<{
-    sourceData: MyPageResponse;
+    sourceDisplayName: string;
     profile: MemberProfileResponse;
   } | null>(null);
-  const profileOverride = profileOverrideState?.sourceData === sourceProfile ? profileOverrideState.profile : null;
+  const profileOverride =
+    profileOverrideState &&
+    (sourceProfile.displayName === profileOverrideState.sourceDisplayName ||
+      sourceProfile.displayName === profileOverrideState.profile.displayName)
+      ? profileOverrideState.profile
+      : null;
   const profile = profileOverride ? { ...sourceProfile, ...profileOverride } : sourceProfile;
 
   const updateProfile = useCallback(
@@ -55,7 +60,7 @@ export function useProfileUpdateController({
 
       const updatedProfile = await response.json();
       await onProfileUpdated();
-      setProfileOverrideState({ sourceData: sourceProfile, profile: updatedProfile });
+      setProfileOverrideState({ sourceDisplayName: sourceProfile.displayName, profile: updatedProfile });
       onRevalidate();
       return updatedProfile;
     },

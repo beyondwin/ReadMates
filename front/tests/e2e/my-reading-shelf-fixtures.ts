@@ -1,7 +1,13 @@
 import type { Page } from "@playwright/test";
 import type { MyPageResponse } from "@/features/archive/api/archive-contracts";
 
-type JourneyFixtureMode = "normal" | "empty" | "load-more-error" | "fifteen-records";
+type JourneyFixtureMode =
+  | "normal"
+  | "empty"
+  | "load-more-error"
+  | "fifteen-records"
+  | "three-achievements"
+  | "zero-questions-reviews";
 type ParticipationProfileMode = "history" | "mid-join" | "unknown" | "empty";
 
 const historyRecentAttendances: MyPageResponse["recentAttendances"] = [
@@ -136,6 +142,22 @@ const fifteenRecordSummary = {
   readableFeedbackDocumentCount: 15,
 };
 
+const threeAchievementSummary = {
+  attendedSessionCount: 3,
+  completedReadingCount: 3,
+  questionCount: 2,
+  reviewCount: 1,
+  readableFeedbackDocumentCount: 1,
+};
+
+const zeroQuestionsAndReviewsSummary = {
+  attendedSessionCount: 3,
+  completedReadingCount: 2,
+  questionCount: 0,
+  reviewCount: 0,
+  readableFeedbackDocumentCount: 0,
+};
+
 const fifteenRecordDates = [
   "2026-07-15",
   "2026-06-14",
@@ -206,6 +228,20 @@ export async function mockMyReadingShelfJourney(page: Page, mode: JourneyFixture
 
     if (mode === "empty") {
       await route.fulfill({ contentType: "application/json", body: JSON.stringify(emptyPage) });
+      return;
+    }
+
+    if (mode === "three-achievements" || mode === "zero-questions-reviews") {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          items: firstPage.items,
+          nextCursor: null,
+          summary: mode === "three-achievements"
+            ? threeAchievementSummary
+            : zeroQuestionsAndReviewsSummary,
+        }),
+      });
       return;
     }
 
