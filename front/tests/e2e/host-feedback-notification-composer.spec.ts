@@ -491,22 +491,16 @@ where id = ${sqlValue(sessionId)};
   );
   await page.getByRole("button", { name: "알림 미리보기" }).click();
   const stalePreview = await stalePreviewResponse;
-  expect(stalePreview.status(), await stalePreview.text()).toBe(200);
+  const stalePreviewPayload = (await stalePreview.json()) as { previewId: string };
+  expect(stalePreview.status(), JSON.stringify(stalePreviewPayload)).toBe(200);
+  expect(stalePreviewPayload.previewId).toMatch(/^[0-9a-f-]{36}$/i);
   await expect(page.getByRole("region", { name: "발송 전 확인" })).toBeVisible();
   expect(await readNotificationEventCount(sessionId, "SESSION_RECORD_UPDATED")).toBe(0);
 
   runMysql(`
 update notification_manual_dispatch_previews
 set expires_at = date_sub(utc_timestamp(6), interval 1 second)
-where id = (
-  select preview_id
-  from (
-    select id as preview_id
-    from notification_manual_dispatch_previews
-    order by created_at desc
-    limit 1
-  ) as latest_preview
-);
+where id = '${stalePreviewPayload.previewId}';
 `);
   await page.getByRole("button", { name: "발송 확인" }).click();
   await expect(
