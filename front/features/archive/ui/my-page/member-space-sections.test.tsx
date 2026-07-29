@@ -1,5 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { MyPageProfile } from "@/features/archive/model/archive-model";
 import type { MemberSpaceViewModel } from "@/features/archive/model/my-reading-shelf-model";
@@ -37,14 +37,13 @@ const viewModel: MemberSpaceViewModel = {
 
 function renderProfileSummary(canEditProfile = true) {
   return render(
-    <MemoryRouter>
-      <MemberProfileSummary
-        profile={profile}
-        viewModel={viewModel}
-        canEditProfile={canEditProfile}
-        onUpdateProfile={vi.fn().mockResolvedValue({ displayName: profile.displayName, accountName: profile.accountName })}
-      />
-    </MemoryRouter>,
+    <MemberProfileSummary
+      profile={profile}
+      viewModel={viewModel}
+      canEditProfile={canEditProfile}
+      accountSettingsHref="/app/me/settings"
+      onUpdateProfile={vi.fn().mockResolvedValue({ displayName: profile.displayName, accountName: profile.accountName })}
+    />,
   );
 }
 
@@ -65,6 +64,19 @@ describe("member-space presentation sections", () => {
     expect(screen.queryByRole("button", { name: "프로필 수정" })).toBeNull();
     expect(screen.queryByLabelText("이름 변경 준비 중")).toBeNull();
     expect(screen.getByRole("link", { name: "계정 관리" })).toBeVisible();
+  });
+
+  it("keeps the labelled profile heading available while editing the display name", async () => {
+    const user = userEvent.setup();
+    renderProfileSummary();
+
+    await user.click(screen.getByRole("button", { name: "프로필 수정" }));
+
+    expect(screen.getByRole("heading", { level: 1, name: "멤버1" })).toHaveAttribute("id", "member-profile-name");
+    expect(screen.getByRole("region", { name: "멤버1" })).toBeVisible();
+    expect(screen.getByLabelText("이름")).toBeVisible();
+    expect(screen.getByRole("button", { name: "이름 저장" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "취소" })).toBeVisible();
   });
 
   it("presents cumulative achievements as ordered definition-list metrics only", () => {

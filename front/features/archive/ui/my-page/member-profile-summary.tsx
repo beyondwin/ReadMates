@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import type { MyPageProfile } from "@/features/archive/model/archive-model";
 import type { MemberSpaceViewModel } from "@/features/archive/model/my-reading-shelf-model";
 import { ProfileNameEditor } from "./profile-name-editor";
@@ -8,6 +7,7 @@ export type MemberProfileSummaryProps = {
   profile: MyPageProfile;
   viewModel: MemberSpaceViewModel;
   canEditProfile: boolean;
+  accountSettingsHref: string;
   onUpdateProfile: (displayName: string) => Promise<ProfileUpdateResult>;
 };
 
@@ -15,6 +15,7 @@ export function MemberProfileSummary({
   profile,
   viewModel,
   canEditProfile,
+  accountSettingsHref,
   onUpdateProfile,
 }: MemberProfileSummaryProps) {
   return (
@@ -33,9 +34,9 @@ export function MemberProfileSummary({
         />
         <p className="rm-member-profile__meta">{viewModel.profileMetaLabel}</p>
       </div>
-      <Link className="rm-member-profile__settings" to="/app/me/settings">
+      <a className="rm-member-profile__settings" href={accountSettingsHref}>
         계정 관리
-      </Link>
+      </a>
     </section>
   );
 }

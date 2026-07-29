@@ -100,6 +100,7 @@ export function ProfileNameEditor({
         </span>
       ) : null}
       <div style={{ minWidth: 0 }}>
+        {isSettings ? null : <h1 id={headingId}>{data.displayName}</h1>}
         {editing ? (
           <form onSubmit={submitProfile} style={formStyle}>
             <div style={{ minWidth: 0 }}>
@@ -151,9 +152,7 @@ export function ProfileNameEditor({
                 </div>
                 <div className="tiny">{data.displayName}</div>
               </div>
-            ) : (
-              <h1 id={headingId}>{data.displayName}</h1>
-            )}
+            ) : null}
             {canEditProfile ? (
               <button
                 type="button"
