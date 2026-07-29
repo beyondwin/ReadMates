@@ -60,9 +60,13 @@ async function expectMemberSpaceSemanticOrder(page: Page) {
     shelf.getByRole("heading", { level: 1, name: "멤버1" }),
     shelf.getByRole("link", { name: "계정 관리" }),
     shelf.getByRole("heading", { level: 2, name: "세 번의 모임에서 세 권을 끝까지 읽었어요." }),
-    shelf.getByText("함께한 모임"),
-    shelf.getByText("완독"),
-    shelf.getByText("질문"),
+    shelf.getByText("함께한 모임", { exact: true }),
+    shelf.getByText("완독", { exact: true }),
+    shelf.getByText("질문", { exact: true }),
+    shelf.getByRole("heading", { level: 2, name: "최근 함께 읽은 기록" }),
+    shelf.getByRole("link", {
+      name: /responsive reading shelf 회차 기록/,
+    }),
   );
 }
 
@@ -98,7 +102,7 @@ test("member space keeps the profile-first semantic order and usable actions acr
   page,
 }, testInfo) => {
   await mockMemberParticipationProfile(page, "history");
-  await mockMyReadingShelfJourney(page, "three-achievements");
+  await mockMyReadingShelfJourney(page, "three-recent-readings");
   await loginWithGoogleFixture(page, memberEmail);
 
   for (const viewport of [
@@ -110,12 +114,32 @@ test("member space keeps the profile-first semantic order and usable actions acr
     await page.goto("/app/me");
 
     const shelf = page.locator(".rm-member-space");
-    await expect(shelf.locator(".rm-member-profile")).toHaveCount(1);
-    await expect(shelf.locator(".rm-reading-achievement")).toHaveCount(1);
+    const overview = shelf.locator(".rm-member-space__overview");
+    await expect(overview).toHaveCount(1);
     await expect(shelf.locator(".rm-reading-achievement__metrics")).toHaveCount(1);
-    await expect(shelf.getByRole("list", { name: "최근 참여 대상 회차" })).toHaveCount(0);
-    await expect(shelf.getByRole("link", { name: "내 책별 기록 전체 보기" })).toHaveCount(0);
+    await expect(shelf.getByRole("list", {
+      name: "최근 함께 읽은 기록",
+    }).getByRole("listitem")).toHaveCount(3);
+    await expect(shelf.getByRole("link", {
+      name: "전체 기록 보기",
+    })).toBeVisible();
     await expect(shelf.getByRole("button", { name: "로그아웃" })).toHaveCount(0);
+
+    const overviewStyle = await overview.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        display: style.display,
+        columns: style.gridTemplateColumns.split(" ").length,
+        width: element.getBoundingClientRect().width,
+      };
+    });
+    if (viewport.width === 1280) {
+      expect(overviewStyle.display).toBe("grid");
+      expect(overviewStyle.columns).toBe(2);
+      expect(overviewStyle.width).toBeLessThanOrEqual(1080);
+    } else {
+      expect(overviewStyle.columns).toBe(1);
+    }
 
     expect(
       await page.evaluate(
@@ -126,6 +150,7 @@ test("member space keeps the profile-first semantic order and usable actions acr
 
     const editProfile = shelf.getByRole("button", { name: "프로필 수정" });
     const accountSettings = shelf.getByRole("link", { name: "계정 관리" });
+    await expect(accountSettings).toHaveCSS("text-decoration-line", "none");
     for (const action of [editProfile, accountSettings]) {
       await expectPracticalTapTarget(action);
     }
@@ -143,6 +168,14 @@ test("member space keeps the profile-first semantic order and usable actions acr
       fullPage: true,
     });
   }
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const firstRecent = page.getByRole("link", {
+    name: /responsive reading shelf 회차 기록/,
+  });
+  await firstRecent.hover();
+  await expect(firstRecent.locator(".rm-recent-reading-row__arrow"))
+    .toHaveCSS("transform", "none");
 
   await page.setViewportSize({ width: 640, height: 900 });
   await page.goto("/app/me");
@@ -184,7 +217,7 @@ test("unknown latest attendance stays visible without a current streak claim", a
   const shelf = page.locator(".rm-member-space");
   await expect(shelf).not.toContainText("?");
   await expect(shelf).not.toContainText("미확인");
-  await expect(shelf).not.toContainText("최근");
+  await expect(shelf.locator(".rm-reading-achievement")).not.toContainText("최근");
   await expect(shelf).not.toContainText("연속");
   await expect(shelf.getByText("함께한 모임")).toBeVisible();
   await expect(shelf.getByText("완독")).toBeVisible();

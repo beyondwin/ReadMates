@@ -7,6 +7,7 @@ type JourneyFixtureMode =
   | "load-more-error"
   | "fifteen-records"
   | "three-achievements"
+  | "three-recent-readings"
   | "zero-questions-reviews";
 type ParticipationProfileMode = "history" | "mid-join" | "unknown" | "empty";
 
@@ -122,6 +123,11 @@ const secondPage = {
   summary: firstPage.summary,
 };
 
+const threeRecentReadingItems = [
+  ...firstPage.items,
+  secondPage.items[0],
+];
+
 const emptyPage = {
   items: [],
   nextCursor: null,
@@ -228,6 +234,18 @@ export async function mockMyReadingShelfJourney(page: Page, mode: JourneyFixture
 
     if (mode === "empty") {
       await route.fulfill({ contentType: "application/json", body: JSON.stringify(emptyPage) });
+      return;
+    }
+
+    if (mode === "three-recent-readings") {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          items: threeRecentReadingItems,
+          nextCursor: null,
+          summary: threeAchievementSummary,
+        }),
+      });
       return;
     }
 
