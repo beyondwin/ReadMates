@@ -1,12 +1,24 @@
-import type { ReactNode } from "react";
-import { useLoaderData } from "react-router-dom";
-import { buildParticipationJourneyViewModel } from "@/features/archive/model/my-reading-shelf-model";
+import { useLoaderData, useRevalidator } from "react-router-dom";
+import { buildMemberSpaceViewModel } from "@/features/archive/model/my-reading-shelf-model";
 import type { MyPageRouteData } from "@/features/archive/route/my-page-data";
 import MyPage from "@/features/archive/ui/my-page";
+import { useProfileUpdateController } from "./profile-update-controller";
 
-export function MyPageRoute({ logoutControl }: { logoutControl: ReactNode }) {
-  const { profile, journey } = useLoaderData() as MyPageRouteData;
-  const viewModel = buildParticipationJourneyViewModel({
+export type MyPageRouteProps = {
+  canEditProfile: boolean;
+  onProfileUpdated: () => Promise<void>;
+};
+
+export function MyPageRoute({ canEditProfile, onProfileUpdated }: MyPageRouteProps) {
+  const { profile: sourceProfile, journey } = useLoaderData() as MyPageRouteData;
+  const revalidator = useRevalidator();
+  const { profile, updateProfile } = useProfileUpdateController({
+    sourceProfile,
+    canEditProfile,
+    onProfileUpdated,
+    onRevalidate: revalidator.revalidate,
+  });
+  const viewModel = buildMemberSpaceViewModel({
     profile,
     summary: journey.summary,
     today: new Date(),
@@ -14,8 +26,10 @@ export function MyPageRoute({ logoutControl }: { logoutControl: ReactNode }) {
 
   return (
     <MyPage
+      profile={profile}
       viewModel={viewModel}
-      logoutControl={logoutControl}
+      canEditProfile={canEditProfile}
+      onUpdateProfile={updateProfile}
     />
   );
 }

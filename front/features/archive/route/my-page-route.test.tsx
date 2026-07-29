@@ -4,11 +4,15 @@ import { MemoryRouter } from "react-router-dom";
 import type { MyPageRouteData } from "./my-page-data";
 import { MyPageRoute } from "./my-page-route";
 
-const route = vi.hoisted(() => ({ loaderData: null as unknown }));
+const route = vi.hoisted(() => ({
+  loaderData: null as unknown,
+  revalidate: vi.fn(),
+}));
 
 vi.mock("react-router-dom", async (importOriginal) => ({
   ...(await importOriginal<typeof import("react-router-dom")>()),
   useLoaderData: () => route.loaderData,
+  useRevalidator: () => ({ revalidate: route.revalidate }),
 }));
 
 const data: MyPageRouteData = {
@@ -49,7 +53,7 @@ const data: MyPageRouteData = {
 function renderRoute() {
   return render(
     <MemoryRouter initialEntries={["/clubs/reading-sai/app/me"]}>
-      <MyPageRoute logoutControl={<button type="button">주입된 계정 작업</button>} />
+      <MyPageRoute canEditProfile onProfileUpdated={vi.fn().mockResolvedValue(undefined)} />
     </MemoryRouter>,
   );
 }
@@ -66,11 +70,15 @@ describe("MyPageRoute", () => {
     vi.useRealTimers();
   });
 
-  it("builds the participation journey and renders its injected account action", () => {
+  it("renders the profile before cumulative achievements without participation-only controls", () => {
     renderRoute();
 
-    expect(screen.getByText("함께한 모임 9회")).toBeVisible();
-    expect(screen.getByRole("button", { name: "주입된 계정 작업" })).toBeVisible();
-    expect(screen.queryByRole("heading", { name: "최근 책별 기록" })).toBeNull();
+    expect(screen.getByRole("heading", { level: 1, name: "샘플 멤버" })).toBeVisible();
+    expect(screen.getByText("9번의 모임에서 7권을 끝까지 읽었어요.")).toBeVisible();
+    expect(screen.getByRole("link", { name: "계정 관리" })).toBeVisible();
+    expect(screen.queryByRole("list", { name: "최근 참여 대상 회차" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "이번 세션 보기" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "내 책별 기록 전체 보기" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "로그아웃" })).toBeNull();
   });
 });

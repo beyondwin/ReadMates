@@ -1,14 +1,11 @@
 import { MyPageRoute } from "@/features/archive/route/my-page-route";
-import { LogoutButton } from "@/features/auth/route/logout-button";
+import { useAuth, useAuthActions } from "@/src/app/auth-state";
+import { canEditOwnProfile } from "@/shared/auth/member-app-access";
 
 export default function MyRoutePage() {
-  return (
-    <MyPageRoute
-      logoutControl={
-        <LogoutButton className="rm-member-space-logout" redirectHref="/">
-          로그아웃
-        </LogoutButton>
-      }
-    />
-  );
+  const authState = useAuth();
+  const { refreshAuth } = useAuthActions();
+  const canEditProfile = authState.status === "ready" && canEditOwnProfile(authState.auth);
+
+  return <MyPageRoute canEditProfile={canEditProfile} onProfileUpdated={refreshAuth} />;
 }

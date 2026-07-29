@@ -1,25 +1,27 @@
-import type { ReactNode } from "react";
-import type { ParticipationJourneyViewModel } from "@/features/archive/model/my-reading-shelf-model";
-import { MemberSpaceAccountActions } from "./member-space-account-actions";
-import { ParticipationJourney } from "./participation-journey";
+import type { MyPageProfile } from "@/features/archive/model/archive-model";
+import type { MemberSpaceViewModel } from "@/features/archive/model/my-reading-shelf-model";
+import { MemberProfileSummary } from "./member-profile-summary";
+import { ReadingAchievementSummary } from "./reading-achievement-summary";
+import type { ProfileUpdateResult } from "./types";
 
 export type MyReadingShelfProps = {
-  viewModel: ParticipationJourneyViewModel;
-  logoutControl: ReactNode;
+  profile: MyPageProfile;
+  viewModel: MemberSpaceViewModel;
+  canEditProfile: boolean;
+  onUpdateProfile: (displayName: string) => Promise<ProfileUpdateResult>;
 };
 
-export function MyReadingShelf({ viewModel, logoutControl }: MyReadingShelfProps) {
+export function MyReadingShelf({ profile, viewModel, canEditProfile, onUpdateProfile }: MyReadingShelfProps) {
   return (
     <main className="rm-my-shelf">
-      <header className="rm-my-shelf-header">
-        <div>
-          <p className="rm-my-shelf-kicker">내 공간</p>
-          <h1>나의 서재</h1>
-          <p>함께 읽어 온 시간과 나의 참여 흐름을 돌아보세요.</p>
-        </div>
-      </header>
-      <ParticipationJourney viewModel={viewModel} />
-      <MemberSpaceAccountActions logoutControl={logoutControl} />
+      <MemberProfileSummary
+        profile={profile}
+        viewModel={viewModel}
+        canEditProfile={canEditProfile}
+        accountSettingsHref="/app/me/settings"
+        onUpdateProfile={onUpdateProfile}
+      />
+      <ReadingAchievementSummary viewModel={viewModel} />
     </main>
   );
 }
