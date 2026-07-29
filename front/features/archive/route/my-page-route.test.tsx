@@ -75,7 +75,10 @@ describe("MyPageRoute", () => {
 
     expect(screen.getByRole("heading", { level: 1, name: "샘플 멤버" })).toBeVisible();
     expect(screen.getByText("9번의 모임에서 7권을 끝까지 읽었어요.")).toBeVisible();
-    expect(screen.getByRole("link", { name: "계정 관리" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "계정 관리" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/me/settings",
+    );
     expect(screen.queryByRole("list", { name: "최근 참여 대상 회차" })).toBeNull();
     expect(screen.queryByRole("link", { name: "이번 세션 보기" })).toBeNull();
     expect(screen.queryByRole("link", { name: "내 책별 기록 전체 보기" })).toBeNull();

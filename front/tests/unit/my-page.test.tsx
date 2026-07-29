@@ -40,6 +40,7 @@ describe("MyPage", () => {
         profile={profile}
         viewModel={viewModel}
         canEditProfile
+        accountSettingsHref="/app/me/settings"
         onUpdateProfile={vi.fn().mockResolvedValue({ displayName: profile.displayName, accountName: profile.accountName })}
       />,
     );

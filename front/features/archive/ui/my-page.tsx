@@ -7,15 +7,23 @@ type MyPageProps = {
   profile: MyPageProfile;
   viewModel: MemberSpaceViewModel;
   canEditProfile: boolean;
+  accountSettingsHref: string;
   onUpdateProfile: (displayName: string) => Promise<ProfileUpdateResult>;
 };
 
-export default function MyPage({ profile, viewModel, canEditProfile, onUpdateProfile }: MyPageProps) {
+export default function MyPage({
+  profile,
+  viewModel,
+  canEditProfile,
+  accountSettingsHref,
+  onUpdateProfile,
+}: MyPageProps) {
   return (
     <MyReadingShelf
       profile={profile}
       viewModel={viewModel}
       canEditProfile={canEditProfile}
+      accountSettingsHref={accountSettingsHref}
       onUpdateProfile={onUpdateProfile}
     />
   );

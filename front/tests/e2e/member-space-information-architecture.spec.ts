@@ -211,8 +211,14 @@ test("club-scoped account and notification routes preserve navigation current st
   await loginWithGoogleFixture(page, memberEmail);
   await page.goto(`${scopedAppPath}/me`);
 
-  await page.getByRole("button", { name: /계정 메뉴$/ }).click();
-  await page.getByRole("dialog").getByRole("link", { name: "계정 관리" }).click();
+  const memberSpaceSettings = page
+    .locator(".rm-member-space")
+    .getByRole("link", { name: "계정 관리" });
+  await expect(memberSpaceSettings).toHaveAttribute(
+    "href",
+    `${scopedAppPath}/me/settings`,
+  );
+  await memberSpaceSettings.click();
   await expect(page).toHaveURL(new RegExp(`${scopedAppPath}/me/settings$`));
 
   const appNavigation = page.getByRole("navigation", {

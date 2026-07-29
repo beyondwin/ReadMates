@@ -8,17 +8,24 @@ export type MyReadingShelfProps = {
   profile: MyPageProfile;
   viewModel: MemberSpaceViewModel;
   canEditProfile: boolean;
+  accountSettingsHref: string;
   onUpdateProfile: (displayName: string) => Promise<ProfileUpdateResult>;
 };
 
-export function MyReadingShelf({ profile, viewModel, canEditProfile, onUpdateProfile }: MyReadingShelfProps) {
+export function MyReadingShelf({
+  profile,
+  viewModel,
+  canEditProfile,
+  accountSettingsHref,
+  onUpdateProfile,
+}: MyReadingShelfProps) {
   return (
     <main className="rm-my-shelf rm-member-space">
       <MemberProfileSummary
         profile={profile}
         viewModel={viewModel}
         canEditProfile={canEditProfile}
-        accountSettingsHref="/app/me/settings"
+        accountSettingsHref={accountSettingsHref}
         onUpdateProfile={onUpdateProfile}
       />
       <ReadingAchievementSummary viewModel={viewModel} />
