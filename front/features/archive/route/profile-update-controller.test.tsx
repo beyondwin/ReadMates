@@ -63,6 +63,32 @@ describe("useProfileUpdateController", () => {
     expect(result.current.profile.displayName).toBe("새 이름");
   });
 
+  it("refreshes auth before revalidation and then exposes the saved profile", async () => {
+    const callbackOrder: string[] = [];
+    const onProfileUpdated = vi.fn().mockImplementation(async () => {
+      callbackOrder.push("auth-refresh");
+    });
+    const onRevalidate = vi.fn().mockImplementation(() => {
+      callbackOrder.push("revalidate");
+    });
+    api.updateMyProfile.mockResolvedValue(response(true, updatedProfile));
+    const { result } = renderHook(() =>
+      useProfileUpdateController({
+        sourceProfile: profile,
+        canEditProfile: true,
+        onProfileUpdated,
+        onRevalidate,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.updateProfile("새 이름");
+    });
+
+    expect(callbackOrder).toEqual(["auth-refresh", "revalidate"]);
+    expect(result.current.profile.displayName).toBe("새 이름");
+  });
+
   it("retains the optimistic name when revalidation returns a fresh stale profile object", async () => {
     const onProfileUpdated = vi.fn().mockResolvedValue(undefined);
     const onRevalidate = vi.fn();
