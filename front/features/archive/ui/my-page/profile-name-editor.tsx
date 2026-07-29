@@ -1,8 +1,15 @@
 import { type CSSProperties, type FormEvent, useId, useRef, useState } from "react";
 import type { MyPageProfile } from "@/features/archive/model/archive-model";
 import { profileSaveErrorMessage } from "@/features/archive/model/archive-model";
+import type { ProfileUpdateResult } from "./types";
 
-type ProfileUpdateResult = Pick<MyPageProfile, "displayName" | "accountName">;
+export type ProfileNameEditorProps = {
+  data: MyPageProfile;
+  canEditProfile?: boolean;
+  onUpdateProfile: (displayName: string) => Promise<ProfileUpdateResult>;
+  variant: "settings" | "member-space";
+  headingId?: string;
+};
 
 const profileFailureMessages = new Set([
   profileSaveErrorMessage("DISPLAY_NAME_REQUIRED"),
@@ -19,12 +26,8 @@ export function ProfileNameEditor({
   canEditProfile = true,
   onUpdateProfile,
   variant,
-}: {
-  data: MyPageProfile;
-  canEditProfile?: boolean;
-  onUpdateProfile: (displayName: string) => Promise<ProfileUpdateResult>;
-  variant: "desktop" | "mobile";
-}) {
+  headingId,
+}: ProfileNameEditorProps) {
   const inputId = useId();
   const errorId = useId();
   const [editing, setEditing] = useState(false);
@@ -58,8 +61,9 @@ export function ProfileNameEditor({
     }
   }
 
+  const isSettings = variant === "settings";
   const rowStyle: CSSProperties =
-    variant === "desktop"
+    isSettings
       ? {
           display: "grid",
           gridTemplateColumns: "28px minmax(0, 1fr)",
@@ -79,18 +83,18 @@ export function ProfileNameEditor({
         };
 
   const bodyStyle: CSSProperties =
-    variant === "desktop"
+    isSettings
       ? { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: "14px", alignItems: "center" }
       : { display: "grid", gap: "10px" };
 
   const formStyle: CSSProperties =
-    variant === "desktop"
+    isSettings
       ? { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto auto", gap: "8px", alignItems: "end" }
       : { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto auto", gap: "8px", alignItems: "end" };
 
   return (
     <div style={rowStyle}>
-      {variant === "desktop" ? (
+      {isSettings ? (
         <span aria-hidden style={{ color: "var(--text-3)" }}>
           <Icon name="me" size={16} />
         </span>
@@ -113,7 +117,7 @@ export function ProfileNameEditor({
                   width: "100%",
                   minWidth: 0,
                   marginTop: "7px",
-                  height: variant === "desktop" ? "36px" : "40px",
+                  height: isSettings ? "36px" : "40px",
                 }}
               />
               {error ? (
@@ -140,30 +144,34 @@ export function ProfileNameEditor({
           </form>
         ) : (
           <div style={bodyStyle}>
-            <div style={{ minWidth: 0 }}>
-              <div className="body" style={{ fontSize: "14px" }}>
-                이름
+            {isSettings ? (
+              <div style={{ minWidth: 0 }}>
+                <div className="body" style={{ fontSize: "14px" }}>
+                  이름
+                </div>
+                <div className="tiny">{data.displayName}</div>
               </div>
-              <div className="tiny">{data.displayName}</div>
-            </div>
+            ) : (
+              <h1 id={headingId}>{data.displayName}</h1>
+            )}
             {canEditProfile ? (
               <button
                 type="button"
                 className="btn btn-quiet btn-sm"
-                aria-label="이름 변경"
+                aria-label={isSettings ? "이름 변경" : "프로필 수정"}
                 onClick={() => {
                   setEditing(true);
                   setError(null);
                 }}
               >
                 <Icon name="edit" size={13} />
-                <span>변경</span>
+                <span>{isSettings ? "변경" : "프로필 수정"}</span>
               </button>
-            ) : (
+            ) : isSettings ? (
               <span className="tiny" aria-label="이름 변경 준비 중" style={{ color: "var(--text-3)" }}>
                 변경 준비 중
               </span>
-            )}
+            ) : null}
           </div>
         )}
       </div>
