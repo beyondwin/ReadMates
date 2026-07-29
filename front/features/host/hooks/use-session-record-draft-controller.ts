@@ -191,6 +191,7 @@ export function useSessionRecordDraftController({
     snapshot,
     saveState,
     expectedDraftRevision,
+    getExpectedDraftRevision: () => expectedDraftRevisionRef.current,
     shouldBlockNavigation,
     updateSnapshot,
     reloadDraft,

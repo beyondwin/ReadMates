@@ -460,6 +460,7 @@ export function EditHostSessionRecordWorkflow({
   const [confirmationOpen, setConfirmationOpen] = useState(false);
   const [applyPreviewRefreshing, setApplyPreviewRefreshing] = useState(false);
   const [rebaseError, setRebaseError] = useState<string | null>(null);
+  const rebasedDraftRevisionRef = useRef<number | null>(null);
   const [confirmationMessage, setConfirmationMessage] = useState<null | {
     kind: "alert" | "status";
     text: string;
@@ -516,6 +517,7 @@ export function EditHostSessionRecordWorkflow({
           expectedSessionUpdatedAt: recordEditor.liveSessionUpdatedAt,
         },
       });
+      rebasedDraftRevisionRef.current = draft.draftRevision;
       try {
         const latest = await reloadRecordEditor();
         if (latest) {
@@ -525,12 +527,11 @@ export function EditHostSessionRecordWorkflow({
               "재확인 중 세션이 다시 변경되었습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요.",
             );
           }
-        } else {
-          controller.adoptDraftRevision(draft.draftRevision);
         }
       } catch {
-        controller.adoptDraftRevision(draft.draftRevision);
+        // Keep the successful rebase response as the revision authority when refresh fails.
       }
+      controller.adoptDraftRevision(draft.draftRevision);
     } catch (error) {
       try {
         const latest = await reloadRecordEditor();
@@ -550,7 +551,9 @@ export function EditHostSessionRecordWorkflow({
   }, [controller, rebaseMutation, recordEditor, reloadRecordEditor]);
 
   const requestApplyPreview = useCallback(async () => {
-    if (controller.expectedDraftRevision === null) {
+    const expectedDraftRevision =
+      rebasedDraftRevisionRef.current ?? controller.getExpectedDraftRevision();
+    if (expectedDraftRevision === null) {
       setConfirmationMessage({ kind: "alert", text: "먼저 작업 초안을 저장해 주세요." });
       return null;
     }
@@ -559,13 +562,13 @@ export function EditHostSessionRecordWorkflow({
       const preview = await previewMutation.mutateAsync({
         sessionId: recordEditor.sessionId,
         request: {
-          expectedDraftRevision: controller.expectedDraftRevision,
+          expectedDraftRevision,
           expectedLiveRevision: recordEditor.liveRevision,
         },
       });
       const request = {
         applyRequestId: crypto.randomUUID(),
-        expectedDraftRevision: controller.expectedDraftRevision,
+        expectedDraftRevision,
         expectedLiveRevision: recordEditor.liveRevision,
         expectedDraftHash: preview.expectedDraftHash,
       };
@@ -581,7 +584,7 @@ export function EditHostSessionRecordWorkflow({
         ),
         liveRevision: recordEditor.liveRevision,
         nextLiveRevision: recordEditor.liveRevision + 1,
-        draftRevision: controller.expectedDraftRevision,
+        draftRevision: expectedDraftRevision,
         visibility: controller.snapshot.visibility,
       });
       setConfirmationOpen(true);
@@ -590,7 +593,6 @@ export function EditHostSessionRecordWorkflow({
       setApplyPreviewRefreshing(false);
     }
   }, [
-    controller.expectedDraftRevision,
     controller.snapshot,
     previewMutation,
     recordEditor.liveRevision,
@@ -697,10 +699,14 @@ export function EditHostSessionRecordWorkflow({
           restoring: restoreMutation.isPending,
           rebasePending: rebaseMutation.isPending,
           rebaseError,
-          onSnapshotChange: controller.updateSnapshot,
+          onSnapshotChange: (nextSnapshot) => {
+            rebasedDraftRevisionRef.current = null;
+            controller.updateSnapshot(nextSnapshot);
+          },
           onReloadDraft: controller.reloadDraft,
           onRebaseDraft: rebaseDraft,
           onDraftCommitted: async ({ draftRevision }) => {
+            rebasedDraftRevisionRef.current = null;
             controller.adoptDraftRevision(draftRevision);
             await controller.reloadDraft();
             navigation.onChange({ section: "records", source: "manual" });
@@ -738,6 +744,7 @@ export function EditHostSessionRecordWorkflow({
               revisionId,
               request: { expectedDraftRevision },
             });
+            rebasedDraftRevisionRef.current = null;
             controller.adoptEditor({
               ...recordEditor,
               draft,

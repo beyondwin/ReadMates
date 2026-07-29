@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, vi, describe, expect, it } from "vitest";
 import { createMemoryRouter, MemoryRouter, Router, RouterProvider } from "react-router-dom";
-import { StrictMode } from "react";
+import { StrictMode, useState } from "react";
 
 const routeMocks = vi.hoisted(() => ({
   apply: vi.fn(),
@@ -48,17 +48,26 @@ vi.mock("@/features/host/ui/host-session-editor", () => ({
 }));
 
 vi.mock("@/features/host/hooks/use-session-record-draft-controller", () => ({
-  useSessionRecordDraftController: () => ({
-    snapshot: recordEditor.liveSnapshot,
-    saveState: routeMocks.saveState,
-    expectedDraftRevision: routeMocks.expectedDraftRevision,
-    shouldBlockNavigation: routeMocks.shouldBlockNavigation,
-    updateSnapshot: vi.fn(),
-    reloadDraft: routeMocks.reload,
-    adoptDraftRevision: routeMocks.adoptDraftRevision,
-    copyInput: vi.fn(),
-    adoptEditor: routeMocks.adoptEditor,
-  }),
+  useSessionRecordDraftController: () => {
+    const [expectedDraftRevision, setExpectedDraftRevision] = useState(
+      routeMocks.expectedDraftRevision,
+    );
+    return {
+      snapshot: recordEditor.liveSnapshot,
+      saveState: routeMocks.saveState,
+      expectedDraftRevision,
+      getExpectedDraftRevision: () => expectedDraftRevision,
+      shouldBlockNavigation: routeMocks.shouldBlockNavigation,
+      updateSnapshot: vi.fn(),
+      reloadDraft: routeMocks.reload,
+      adoptDraftRevision: (revision: number) => {
+        routeMocks.adoptDraftRevision(revision);
+        setExpectedDraftRevision(revision);
+      },
+      copyInput: vi.fn(),
+      adoptEditor: routeMocks.adoptEditor,
+    };
+  },
 }));
 
 vi.mock("@/features/host/queries/host-session-record-queries", async (importOriginal) => ({
@@ -427,6 +436,42 @@ describe("EditHostSessionRecordWorkflow", () => {
     expect(routeMocks.adoptDraftRevision).toHaveBeenCalledWith(5);
   });
 
+  it("uses the rebased draft revision for the next apply preview when reload returns an older editor", async () => {
+    const staleEditor = {
+      ...recordEditor,
+      draft: {
+        sessionId: "session-1",
+        baseLiveRevision: 0,
+        draftRevision: 4,
+        source: "MANUAL" as const,
+        restoredFromRevisionId: null,
+        snapshot,
+        updatedAt: "2026-07-25T00:01:00Z",
+      },
+      draftLiveBaseStale: true,
+      validationSummary: { valid: false, issues: ["LIVE_REVISION_STALE"] },
+    };
+    const rebasedDraft = { ...staleEditor.draft, draftRevision: 5 };
+    routeMocks.rebase.mockResolvedValue(rebasedDraft);
+    routeMocks.preview.mockResolvedValue({
+      eventType: "SESSION_RECORD_PUBLISHED",
+      expectedDraftHash: "draft-hash",
+    });
+    const reloadRecordEditor = vi.fn().mockResolvedValue(staleEditor);
+    renderWorkflow(staleEditor, reloadRecordEditor);
+
+    await act(async () => workflow().onRebaseDraft());
+    await act(async () => workflow().confirmation.onReview());
+
+    expect(routeMocks.preview).toHaveBeenCalledWith({
+      sessionId: "session-1",
+      request: {
+        expectedDraftRevision: 5,
+        expectedLiveRevision: 0,
+      },
+    });
+  });
+
   it("reloads authoritative state and keeps rebase retryable when live metadata changes again", async () => {
     const latestEditor = {
       ...recordEditor,
@@ -596,7 +641,7 @@ describe("EditHostSessionRecordWorkflow", () => {
       sessionId: "session-1",
       request: {
         applyRequestId: "00000000-0000-4000-8000-000000000001",
-        expectedDraftRevision: 4,
+        expectedDraftRevision: 5,
         expectedLiveRevision: 0,
         expectedDraftHash: "a".repeat(64),
       },

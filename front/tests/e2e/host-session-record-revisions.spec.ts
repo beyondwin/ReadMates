@@ -369,11 +369,11 @@ test("4. stale draft requires an exact live metadata review before apply", async
   const previewResponse = page.waitForResponse(
     (response) =>
       response.request().method() === "POST"
-      && response.url().includes(`/host/sessions/${recordSessionId}/record-apply-preview`)
-      && response.ok(),
+      && response.url().includes(`/host/sessions/${recordSessionId}/record-apply-preview`),
   );
   await reviewButton.click();
-  expect((await previewResponse).ok()).toBe(true);
+  const preview = await previewResponse;
+  expect(preview.status(), await preview.text()).toBe(200);
   const dialog = page.getByRole("dialog", { name: "새 버전으로 반영" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "취소" }).click();
