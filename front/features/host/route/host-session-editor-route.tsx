@@ -489,9 +489,14 @@ export function EditHostSessionRecordWorkflow({
   });
   useDraftRouteNavigationGuard(controller.shouldBlockNavigation);
 
+  const reloadAuthoritativeDraft = useCallback(async () => {
+    rebasedDraftRevisionRef.current = null;
+    await controller.reloadDraft();
+  }, [controller]);
+
   const onApplyCompleted = useCallback(async () => {
     await Promise.all([
-      controller.reloadDraft(),
+      reloadAuthoritativeDraft(),
       queryClient.invalidateQueries({
         queryKey: hostSessionRecordKeys.historyRoot(recordEditor.sessionId, context),
       }),
@@ -500,12 +505,7 @@ export function EditHostSessionRecordWorkflow({
       }),
     ]);
     navigation.onChange({ section: "overview", source: "manual" });
-  }, [context, controller, navigation, queryClient, recordEditor.sessionId]);
-
-  const reloadDraft = useCallback(async () => {
-    rebasedDraftRevisionRef.current = null;
-    await controller.reloadDraft();
-  }, [controller]);
+  }, [context, navigation, queryClient, recordEditor.sessionId, reloadAuthoritativeDraft]);
 
   const rebaseDraft = useCallback(async () => {
     if (controller.expectedDraftRevision === null) {
@@ -523,10 +523,16 @@ export function EditHostSessionRecordWorkflow({
         },
       });
       rebasedDraftRevisionRef.current = draft.draftRevision;
+      let previewDraftRevision = draft.draftRevision;
       try {
         const latest = await reloadRecordEditor();
         if (latest) {
           controller.adoptEditor(latest);
+          const latestDraftRevision = latest.draft?.draftRevision;
+          if (latestDraftRevision !== undefined && latestDraftRevision > draft.draftRevision) {
+            previewDraftRevision = latestDraftRevision;
+            rebasedDraftRevisionRef.current = null;
+          }
           if (latest.draftLiveBaseStale) {
             setRebaseError(
               "재확인 중 세션이 다시 변경되었습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요.",
@@ -536,7 +542,7 @@ export function EditHostSessionRecordWorkflow({
       } catch {
         // Keep the successful rebase response as the revision authority when refresh fails.
       }
-      controller.adoptDraftRevision(draft.draftRevision);
+      controller.adoptDraftRevision(previewDraftRevision);
     } catch (error) {
       try {
         const latest = await reloadRecordEditor();
@@ -598,7 +604,7 @@ export function EditHostSessionRecordWorkflow({
       setApplyPreviewRefreshing(false);
     }
   }, [
-    controller.snapshot,
+    controller,
     previewMutation,
     recordEditor.liveRevision,
     recordEditor.liveSnapshot,
@@ -648,7 +654,7 @@ export function EditHostSessionRecordWorkflow({
         setConfirmationOpen(false);
         setApplyPreview(null);
         setPendingApply(null);
-        await controller.reloadDraft();
+        await reloadAuthoritativeDraft();
         setConfirmationMessage({
           kind: "alert",
           text: "기록 상태가 변경되었습니다. 최신 초안을 확인한 뒤 새 반영 요청을 만들어 주세요.",
@@ -674,10 +680,10 @@ export function EditHostSessionRecordWorkflow({
     applyMutation,
     applyPreview,
     context,
-    controller,
     onApplyCompleted,
     pendingApply,
     queryClient,
+    reloadAuthoritativeDraft,
   ]);
 
   return (
@@ -708,12 +714,12 @@ export function EditHostSessionRecordWorkflow({
             rebasedDraftRevisionRef.current = null;
             controller.updateSnapshot(nextSnapshot);
           },
-          onReloadDraft: reloadDraft,
+          onReloadDraft: reloadAuthoritativeDraft,
           onRebaseDraft: rebaseDraft,
           onDraftCommitted: async ({ draftRevision }) => {
             rebasedDraftRevisionRef.current = null;
             controller.adoptDraftRevision(draftRevision);
-            await controller.reloadDraft();
+            await reloadAuthoritativeDraft();
             navigation.onChange({ section: "records", source: "manual" });
           },
           onLoadMoreHistory: async (cursor) => {

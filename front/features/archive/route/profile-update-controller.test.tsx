@@ -87,6 +87,33 @@ describe("useProfileUpdateController", () => {
     expect(result.current.profile.displayName).toBe("새 이름");
   });
 
+  it("retires an optimistic override after authoritative data moves past it", async () => {
+    const onProfileUpdated = vi.fn().mockResolvedValue(undefined);
+    const onRevalidate = vi.fn();
+    api.updateMyProfile.mockResolvedValue(response(true, updatedProfile));
+    const { result, rerender } = renderHook(
+      ({ sourceProfile }) =>
+        useProfileUpdateController({
+          sourceProfile,
+          canEditProfile: true,
+          onProfileUpdated,
+          onRevalidate,
+        }),
+      { initialProps: { sourceProfile: profile } },
+    );
+
+    await act(async () => {
+      await result.current.updateProfile("새 이름");
+    });
+    expect(result.current.profile.displayName).toBe("새 이름");
+
+    rerender({ sourceProfile: { ...profile, displayName: "권위 이름" } });
+    expect(result.current.profile.displayName).toBe("권위 이름");
+
+    rerender({ sourceProfile: { ...profile } });
+    expect(result.current.profile.displayName).toBe("기존 이름");
+  });
+
   it("rejects a profile update when the membership cannot edit", async () => {
     const denied = renderHook(() =>
       useProfileUpdateController({

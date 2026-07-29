@@ -38,12 +38,14 @@ export function useProfileUpdateController({
     sourceDisplayName: string;
     profile: MemberProfileResponse;
   } | null>(null);
-  const profileOverride =
+  const profileOverrideIsCurrent =
     profileOverrideState &&
     (sourceProfile.displayName === profileOverrideState.sourceDisplayName ||
-      sourceProfile.displayName === profileOverrideState.profile.displayName)
-      ? profileOverrideState.profile
-      : null;
+      sourceProfile.displayName === profileOverrideState.profile.displayName);
+  if (profileOverrideState && !profileOverrideIsCurrent) {
+    setProfileOverrideState(null);
+  }
+  const profileOverride = profileOverrideIsCurrent ? profileOverrideState.profile : null;
   const profile = profileOverride ? { ...sourceProfile, ...profileOverride } : sourceProfile;
 
   const updateProfile = useCallback(

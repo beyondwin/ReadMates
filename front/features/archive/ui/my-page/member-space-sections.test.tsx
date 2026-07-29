@@ -49,13 +49,14 @@ function renderProfileSummary(canEditProfile = true) {
 
 describe("member-space presentation sections", () => {
   it("renders the editable profile summary before its account-management destination", () => {
-    renderProfileSummary();
+    const { container } = renderProfileSummary();
 
     expect(screen.getByText("내 프로필")).toBeVisible();
     expect(screen.getByRole("heading", { level: 1, name: "멤버1" })).toBeVisible();
     expect(screen.getByText("읽는사이 · 멤버 · 함께한 지 8개월")).toBeVisible();
     expect(screen.getByRole("button", { name: "프로필 수정" })).toBeVisible();
     expect(screen.getByRole("link", { name: "계정 관리" })).toHaveAttribute("href", "/app/me/settings");
+    expect(container.querySelector(".rm-member-profile > .rm-member-profile__actions")).not.toBeNull();
   });
 
   it("keeps account management available while omitting profile editing without permission", () => {

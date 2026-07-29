@@ -23,22 +23,20 @@ export function MemberProfileSummary({
       <div className="rm-member-profile__avatar" aria-hidden>
         {viewModel.avatarLabel}
       </div>
-      <div className="rm-member-profile__body">
-        <p className="rm-member-space-kicker">내 프로필</p>
-        <ProfileNameEditor
-          data={profile}
-          canEditProfile={canEditProfile}
-          onUpdateProfile={onUpdateProfile}
-          variant="member-space"
-          headingId="member-profile-name"
-          memberSpaceActions={(
-            <a className="rm-member-profile__settings" href={accountSettingsHref}>
-              계정 관리
-            </a>
-          )}
-        />
-        <p className="rm-member-profile__meta">{viewModel.profileMetaLabel}</p>
-      </div>
+      <p className="rm-member-space-kicker">내 프로필</p>
+      <ProfileNameEditor
+        data={profile}
+        canEditProfile={canEditProfile}
+        onUpdateProfile={onUpdateProfile}
+        variant="member-space"
+        headingId="member-profile-name"
+        memberSpaceActions={(
+          <a className="rm-member-profile__settings" href={accountSettingsHref}>
+            계정 관리
+          </a>
+        )}
+      />
+      <p className="rm-member-profile__meta">{viewModel.profileMetaLabel}</p>
     </section>
   );
 }

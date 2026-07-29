@@ -376,6 +376,12 @@ test("member space preserves a profile-first layout from desktop to narrow mobil
 
     if (viewport.width === 1440) {
       expect(await shelf.evaluate((element) => element.getBoundingClientRect().width)).toBeLessThanOrEqual(920);
+      const layout = await shelf.evaluate((element) => {
+        const shelfBox = element.getBoundingClientRect();
+        const actionsBox = element.querySelector(".rm-member-profile__actions")!.getBoundingClientRect();
+        return { shelfRight: shelfBox.right, actionsRight: actionsBox.right };
+      });
+      expect(layout.actionsRight).toBeGreaterThanOrEqual(layout.shelfRight - 1);
     } else {
       await expectPracticalTapTarget(shelf.getByRole("button", { name: "프로필 수정" }));
       await expectPracticalTapTarget(shelf.getByRole("link", { name: "계정 관리" }));
