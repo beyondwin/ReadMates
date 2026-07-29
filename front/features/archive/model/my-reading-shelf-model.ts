@@ -50,16 +50,33 @@ export type MemberSpaceMetric = {
   value: string;
 };
 
+export type RecentReadingFeedbackStatus =
+  | "피드백 열림"
+  | "피드백 제한"
+  | null;
+
+export type RecentReadingPreviewItem = {
+  sessionId: string;
+  sessionNumberLabel: string;
+  dateLabel: string;
+  bookTitle: string;
+  bookAuthor: string | null;
+  bookImageUrl: string | null;
+  coverFallbackLabel: string;
+  activityLabels: string[];
+  feedbackStatus: RecentReadingFeedbackStatus;
+};
+
 export type MemberSpaceViewModel = {
   avatarLabel: string;
   profileMetaLabel: string;
-  joinedMonthLabel: string | null;
   achievementHeading: string;
   achievementBody: "함께 읽는 시간이 차분히 쌓이고 있습니다.";
   metrics: MemberSpaceMetric[];
 };
 
 const UNKNOWN_YEAR = "연도 미상";
+const RECENT_READING_LIMIT = 3;
 
 export function emptyMyJourneyPage(): MyJourneyPage {
   return {
@@ -107,38 +124,67 @@ export function groupJourneyByYear(items: MyJourneyItem[]): JourneyYearGroup[] {
   return Array.from(groups, ([year, groupedItems]) => ({ year, items: groupedItems }));
 }
 
+export function buildRecentReadingPreview(
+  items: MyJourneyItem[],
+): RecentReadingPreviewItem[] {
+  return items.slice(0, RECENT_READING_LIMIT).map((item) => {
+    const rawTitle = item.bookTitle.trim();
+    const bookTitle = rawTitle || "제목 없는 책";
+
+    return {
+      sessionId: item.sessionId,
+      sessionNumberLabel: `${item.sessionNumber}차`,
+      dateLabel: journeyDateLabel(item.date),
+      bookTitle,
+      bookAuthor: item.bookAuthor.trim() || null,
+      bookImageUrl: item.bookImageUrl,
+      coverFallbackLabel: rawTitle.charAt(0) || "책",
+      activityLabels: [
+        ...(item.questionCount > 0 ? [`질문 ${item.questionCount}`] : []),
+        ...(item.reviewCount > 0 ? [`서평 ${item.reviewCount}`] : []),
+      ],
+      feedbackStatus: item.feedbackDocument.readable
+        ? "피드백 열림"
+        : item.feedbackDocument.available &&
+            item.feedbackDocument.lockedReason === "ACTIVE_MEMBERSHIP_REQUIRED"
+          ? "피드백 제한"
+          : null,
+    };
+  });
+}
+
 function validDateYear(date: string): string | null {
+  return validJourneyDate(date)?.year ?? null;
+}
+
+function validJourneyDate(date: string) {
   const match = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return null;
 
-  const [, yearText, monthText, dayText] = match;
-  const year = Number(yearText);
-  const month = Number(monthText);
-  const day = Number(dayText);
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
   const parsed = new Date(Date.UTC(year, month - 1, day));
 
   return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day
-    ? yearText
+    ? { year: match[1], label: `${match[1]}.${match[2]}.${match[3]}` }
     : null;
 }
 
-export function membershipDurationLabel(joinedAt: string, today: Date): string | null {
+function journeyDateLabel(date: string) {
+  return validJourneyDate(date)?.label ?? "날짜 미상";
+}
+
+function validJoinedMonthLabel(joinedAt: string, today: Date) {
   const match = joinedAt.match(/^(\d{4})-(\d{2})$/);
   if (!match) return null;
 
   const year = Number(match[1]);
   const month = Number(match[2]);
-  if (!Number.isInteger(year) || month < 1 || month > 12) return null;
+  if (month < 1 || month > 12) return null;
 
   const monthDifference = (today.getFullYear() - year) * 12 + today.getMonth() - (month - 1);
-  if (monthDifference < 0) return null;
-  if (monthDifference === 0) return "이번 달부터 함께";
-
-  const years = Math.floor(monthDifference / 12);
-  const months = monthDifference % 12;
-  if (years === 0) return `함께한 지 ${months}개월`;
-  if (months === 0) return `함께한 지 ${years}년`;
-  return `함께한 지 ${years}년 ${months}개월`;
+  return monthDifference < 0 ? null : formatJoinedMonth(joinedAt);
 }
 
 export function buildMemberSpaceViewModel(input: {
@@ -146,15 +192,14 @@ export function buildMemberSpaceViewModel(input: {
   summary: MyJourneySummary;
   today: Date;
 }): MemberSpaceViewModel {
-  const durationLabel = membershipDurationLabel(input.profile.joinedAt, input.today);
+  const joinedMonthLabel = validJoinedMonthLabel(input.profile.joinedAt, input.today);
   const membershipLabel = membershipIdentityLabel(input.profile).replace(/^정식 /, "");
   const profileMetaParts = [clubDisplayName(input.profile), membershipLabel];
-  if (durationLabel) profileMetaParts.push(durationLabel);
+  if (joinedMonthLabel) profileMetaParts.push(`${joinedMonthLabel}부터 함께`);
 
   return {
     avatarLabel: input.profile.displayName.trim().charAt(0) || "멤",
     profileMetaLabel: profileMetaParts.join(" · "),
-    joinedMonthLabel: durationLabel ? formatJoinedMonth(input.profile.joinedAt) : null,
     achievementHeading: achievementHeading(input.summary),
     achievementBody: "함께 읽는 시간이 차분히 쌓이고 있습니다.",
     metrics: memberSpaceMetrics(input.summary),

@@ -3,9 +3,9 @@ import type { MyPageProfile } from "./archive-model";
 import {
   appendUniqueJourneyItems,
   buildMemberSpaceViewModel,
+  buildRecentReadingPreview,
   emptyMyJourneyPage,
   groupJourneyByYear,
-  membershipDurationLabel,
   type MyJourneyItem,
   type MyJourneySummary,
 } from "./my-reading-shelf-model";
@@ -105,21 +105,10 @@ describe("my reading shelf model", () => {
     ]);
   });
 
-  it("formats membership duration and rejects invalid or future months", () => {
-    const today = new Date(2026, 6, 15);
-
-    expect(membershipDurationLabel("2026-07", today)).toBe("이번 달부터 함께");
-    expect(membershipDurationLabel("2025-11", today)).toBe("함께한 지 8개월");
-    expect(membershipDurationLabel("2024-11", today)).toBe("함께한 지 1년 8개월");
-    expect(membershipDurationLabel("not-a-month", today)).toBeNull();
-    expect(membershipDurationLabel("2026-08", today)).toBeNull();
-  });
-
   it("builds a cumulative member-space profile and achievement summary", () => {
     expect(memberSpaceViewModel()).toEqual({
       avatarLabel: "멤",
-      profileMetaLabel: "읽는사이 · 멤버 · 함께한 지 8개월",
-      joinedMonthLabel: "2025.11",
+      profileMetaLabel: "읽는사이 · 멤버 · 2025.11부터 함께",
       achievementHeading: "세 번의 모임에서 세 권을 끝까지 읽었어요.",
       achievementBody: "함께 읽는 시간이 차분히 쌓이고 있습니다.",
       metrics: [
@@ -169,13 +158,91 @@ describe("my reading shelf model", () => {
     ]);
   });
 
-  it("omits an invalid or future joined-month label while retaining valid profile details", () => {
-    expect(memberSpaceViewModel({ profile: { joinedAt: "2026-08" } }).joinedMonthLabel).toBeNull();
+  it("uses an exact valid joined month once and omits invalid or future months", () => {
+    expect(memberSpaceViewModel({ profile: { joinedAt: "2025-11" } }).profileMetaLabel)
+      .toBe("읽는사이 · 멤버 · 2025.11부터 함께");
     expect(memberSpaceViewModel({ profile: { joinedAt: "not-a-month" } }).profileMetaLabel)
-      .not.toContain("함께한 지");
+      .toBe("읽는사이 · 멤버");
+    expect(memberSpaceViewModel({ profile: { joinedAt: "2026-08" } }).profileMetaLabel)
+      .toBe("읽는사이 · 멤버");
   });
 
   it("uses the membership fallback initial when the display name is blank", () => {
     expect(memberSpaceViewModel({ profile: { displayName: "   " } }).avatarLabel).toBe("멤");
+  });
+
+  it("maps at most three recent readings in server order", () => {
+    const fourth = journeyItem({ sessionId: "fourth", bookTitle: "네 번째 책" });
+    expect(buildRecentReadingPreview([
+      journeyItem({
+        sessionId: "first",
+        sessionNumber: 12,
+        bookTitle: "  첫 번째 책  ",
+        bookAuthor: "  첫 저자  ",
+        bookImageUrl: "https://example.com/public-safe-cover.jpg",
+        date: "2026-07-20",
+        questionCount: 2,
+        reviewCount: 1,
+        feedbackDocument: { available: true, readable: true, lockedReason: null },
+      }),
+      journeyItem({
+        sessionId: "second",
+        bookTitle: "두 번째 책",
+        feedbackDocument: {
+          available: true,
+          readable: false,
+          lockedReason: "ACTIVE_MEMBERSHIP_REQUIRED",
+        },
+      }),
+      journeyItem({ sessionId: "third", bookTitle: "세 번째 책" }),
+      fourth,
+    ])).toEqual([
+      {
+        sessionId: "first",
+        sessionNumberLabel: "12차",
+        dateLabel: "2026.07.20",
+        bookTitle: "첫 번째 책",
+        bookAuthor: "첫 저자",
+        bookImageUrl: "https://example.com/public-safe-cover.jpg",
+        coverFallbackLabel: "첫",
+        activityLabels: ["질문 2", "서평 1"],
+        feedbackStatus: "피드백 열림",
+      },
+      expect.objectContaining({
+        sessionId: "second",
+        feedbackStatus: "피드백 제한",
+      }),
+      expect.objectContaining({
+        sessionId: "third",
+        feedbackStatus: null,
+      }),
+    ]);
+  });
+
+  it("uses safe title, author, cover, date, and empty-activity fallbacks", () => {
+    expect(buildRecentReadingPreview([
+      journeyItem({
+        bookTitle: "   ",
+        bookAuthor: "   ",
+        bookImageUrl: null,
+        date: "2026-02-29",
+        questionCount: 0,
+        reviewCount: 0,
+        feedbackDocument: {
+          available: false,
+          readable: false,
+          lockedReason: "NOT_AVAILABLE",
+        },
+      }),
+    ])).toEqual([
+      expect.objectContaining({
+        bookTitle: "제목 없는 책",
+        bookAuthor: null,
+        coverFallbackLabel: "책",
+        dateLabel: "날짜 미상",
+        activityLabels: [],
+        feedbackStatus: null,
+      }),
+    ]);
   });
 });
