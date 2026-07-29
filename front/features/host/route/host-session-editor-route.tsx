@@ -502,6 +502,11 @@ export function EditHostSessionRecordWorkflow({
     navigation.onChange({ section: "overview", source: "manual" });
   }, [context, controller, navigation, queryClient, recordEditor.sessionId]);
 
+  const reloadDraft = useCallback(async () => {
+    rebasedDraftRevisionRef.current = null;
+    await controller.reloadDraft();
+  }, [controller]);
+
   const rebaseDraft = useCallback(async () => {
     if (controller.expectedDraftRevision === null) {
       setRebaseError("먼저 작업 초안을 저장해 주세요.");
@@ -703,7 +708,7 @@ export function EditHostSessionRecordWorkflow({
             rebasedDraftRevisionRef.current = null;
             controller.updateSnapshot(nextSnapshot);
           },
-          onReloadDraft: controller.reloadDraft,
+          onReloadDraft: reloadDraft,
           onRebaseDraft: rebaseDraft,
           onDraftCommitted: async ({ draftRevision }) => {
             rebasedDraftRevisionRef.current = null;

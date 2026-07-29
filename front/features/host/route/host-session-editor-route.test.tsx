@@ -59,7 +59,13 @@ vi.mock("@/features/host/hooks/use-session-record-draft-controller", () => ({
       getExpectedDraftRevision: () => expectedDraftRevision,
       shouldBlockNavigation: routeMocks.shouldBlockNavigation,
       updateSnapshot: vi.fn(),
-      reloadDraft: routeMocks.reload,
+      reloadDraft: async () => {
+        const latest = await routeMocks.reload();
+        const revision = latest?.draft?.draftRevision;
+        if (revision !== undefined) {
+          setExpectedDraftRevision(revision);
+        }
+      },
       adoptDraftRevision: (revision: number) => {
         routeMocks.adoptDraftRevision(revision);
         setExpectedDraftRevision(revision);
@@ -230,6 +236,7 @@ function workflow() {
       baseLiveRevision: number | null;
       liveApplied: boolean;
     }) => Promise<void>;
+    onReloadDraft: () => Promise<void>;
     onRebaseDraft: () => Promise<void>;
     onRestore: (request: {
       revisionId: string;
@@ -467,6 +474,47 @@ describe("EditHostSessionRecordWorkflow", () => {
       sessionId: "session-1",
       request: {
         expectedDraftRevision: 5,
+        expectedLiveRevision: 0,
+      },
+    });
+  });
+
+  it("uses a manually reloaded draft revision after a successful rebase", async () => {
+    const staleEditor = {
+      ...recordEditor,
+      draft: {
+        sessionId: "session-1",
+        baseLiveRevision: 0,
+        draftRevision: 4,
+        source: "MANUAL" as const,
+        restoredFromRevisionId: null,
+        snapshot,
+        updatedAt: "2026-07-25T00:01:00Z",
+      },
+      draftLiveBaseStale: true,
+      validationSummary: { valid: false, issues: ["LIVE_REVISION_STALE"] },
+    };
+    const rebasedDraft = { ...staleEditor.draft, draftRevision: 5 };
+    const latestEditor = {
+      ...staleEditor,
+      draft: { ...rebasedDraft, draftRevision: 6 },
+    };
+    routeMocks.rebase.mockResolvedValue(rebasedDraft);
+    routeMocks.reload.mockResolvedValue(latestEditor);
+    routeMocks.preview.mockResolvedValue({
+      eventType: "SESSION_RECORD_PUBLISHED",
+      expectedDraftHash: "draft-hash",
+    });
+    renderWorkflow(staleEditor, vi.fn().mockResolvedValue(staleEditor));
+
+    await act(async () => workflow().onRebaseDraft());
+    await act(async () => workflow().onReloadDraft());
+    await act(async () => workflow().confirmation.onReview());
+
+    expect(routeMocks.preview).toHaveBeenCalledWith({
+      sessionId: "session-1",
+      request: {
+        expectedDraftRevision: 6,
         expectedLiveRevision: 0,
       },
     });
