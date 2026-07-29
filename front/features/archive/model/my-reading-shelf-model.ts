@@ -1,7 +1,10 @@
 import type {
   MyPageProfile,
-  MyRecentAttendance,
-  MyRecentAttendanceStatus,
+} from "@/features/archive/model/archive-model";
+import {
+  clubDisplayName,
+  formatJoinedMonth,
+  membershipIdentityLabel,
 } from "@/features/archive/model/archive-model";
 
 export type MyJourneyFeedbackDocument = {
@@ -42,29 +45,18 @@ export type JourneyYearGroup = {
   items: MyJourneyItem[];
 };
 
-export type ParticipationTimelineItem = {
-  sessionNumber: number;
-  attendanceStatus: MyRecentAttendanceStatus;
-  statusLabel: "참여" | "불참" | "미확인";
-  readingLabel: string | null;
+export type MemberSpaceMetric = {
+  label: "함께한 모임" | "완독" | "질문" | "서평";
+  value: string;
 };
 
-export type ParticipationJourneyViewModel = {
-  hasParticipationHistory: boolean;
-  achievementLabel: string;
-  membershipDurationLabel: string | null;
-  recentSummaryLabel: string | null;
-  streakLabel: string | null;
-  timelineItems: ParticipationTimelineItem[];
-  nudge: {
-    body: string;
-    label: "이번 세션 보기";
-    href: "/app/session/current";
-  } | null;
-  supportingStats: Array<{
-    label: "완독" | "질문" | "서평";
-    value: string;
-  }>;
+export type MemberSpaceViewModel = {
+  avatarLabel: string;
+  profileMetaLabel: string;
+  joinedMonthLabel: string | null;
+  achievementHeading: string;
+  achievementBody: "함께 읽는 시간이 차분히 쌓이고 있습니다.";
+  metrics: MemberSpaceMetric[];
 };
 
 const UNKNOWN_YEAR = "연도 미상";
@@ -149,81 +141,47 @@ export function membershipDurationLabel(joinedAt: string, today: Date): string |
   return `함께한 지 ${years}년 ${months}개월`;
 }
 
-export function participationTimelineItem(row: MyRecentAttendance): ParticipationTimelineItem {
-  const statusLabel = row.attendanceStatus === "ATTENDED"
-    ? "참여"
-    : row.attendanceStatus === "ABSENT"
-      ? "불참"
-      : "미확인";
-  const readingLabel = row.attendanceStatus !== "ATTENDED" || row.readingProgress <= 0
-    ? null
-    : row.readingProgress >= 100
-      ? "완독"
-      : `${row.readingProgress}%`;
+export function buildMemberSpaceViewModel(input: {
+  profile: Pick<MyPageProfile, "displayName" | "clubName" | "role" | "membershipStatus" | "joinedAt">;
+  summary: MyJourneySummary;
+  today: Date;
+}): MemberSpaceViewModel {
+  const durationLabel = membershipDurationLabel(input.profile.joinedAt, input.today);
+  const membershipLabel = membershipIdentityLabel(input.profile).replace(/^정식 /, "");
+  const profileMetaParts = [clubDisplayName(input.profile), membershipLabel];
+  if (durationLabel) profileMetaParts.push(durationLabel);
 
   return {
-    sessionNumber: row.sessionNumber,
-    attendanceStatus: row.attendanceStatus,
-    statusLabel,
-    readingLabel,
+    avatarLabel: input.profile.displayName.trim().charAt(0) || "멤",
+    profileMetaLabel: profileMetaParts.join(" · "),
+    joinedMonthLabel: durationLabel ? formatJoinedMonth(input.profile.joinedAt) : null,
+    achievementHeading: achievementHeading(input.summary),
+    achievementBody: "함께 읽는 시간이 차분히 쌓이고 있습니다.",
+    metrics: memberSpaceMetrics(input.summary),
   };
 }
 
-export function buildParticipationJourneyViewModel(input: {
-  profile: Pick<
-    MyPageProfile,
-    "joinedAt" | "membershipStatus" | "currentSessionId" | "recentAttendances"
-  >;
-  summary: MyJourneySummary;
-  today: Date;
-}): ParticipationJourneyViewModel {
-  const rows = input.profile.recentAttendances.slice(-6);
-  const confirmed = rows.filter((row) => row.attendanceStatus !== "UNKNOWN");
-  const recentAttended = confirmed.filter((row) => row.attendanceStatus === "ATTENDED").length;
-  const hasUnknown = rows.some((row) => row.attendanceStatus === "UNKNOWN");
-  const recentSummaryLabel = rows.length === 0
-    ? null
-    : confirmed.length === 0
-      ? "출석 확인을 기다리고 있어요"
-      : hasUnknown
-        ? `최근 확인된 ${confirmed.length}회 중 ${recentAttended}회 함께했어요`
-        : `최근 ${confirmed.length}회 중 ${recentAttended}회 함께했어요`;
-  const currentStreak = rows.toReversed().findIndex((row) => row.attendanceStatus !== "ATTENDED");
-  const streakCount = currentStreak === -1 ? rows.length : currentStreak;
-  const streakLabel = streakCount >= 2 ? `현재 ${streakCount}회 연속 참여` : null;
-  const hasParticipationHistory = input.summary.attendedSessionCount > 0 || rows.length > 0;
-  const allSupportingStats = [
-    {
-      label: "완독" as const,
-      value: `${input.summary.completedReadingCount} / ${input.summary.attendedSessionCount}`,
-      count: input.summary.attendedSessionCount,
-    },
-    { label: "질문" as const, value: String(input.summary.questionCount), count: input.summary.questionCount },
-    { label: "서평" as const, value: String(input.summary.reviewCount), count: input.summary.reviewCount },
-  ];
-  const supportingStats = hasParticipationHistory
-    ? allSupportingStats.map(({ label, value }) => ({ label, value }))
-    : allSupportingStats
-      .filter(({ count }) => count > 0)
-      .map(({ label, value }) => ({ label, value }));
-  const nudge = input.profile.membershipStatus === "ACTIVE" && input.profile.currentSessionId
-    ? {
-      body: streakCount >= 2
-        ? `다음 모임에도 함께하면 ${streakCount + 1}회 연속 참여가 됩니다.`
-        : "다음 모임부터 새로운 참여 흐름을 이어가 보세요.",
-      label: "이번 세션 보기" as const,
-      href: "/app/session/current" as const,
-    }
-    : null;
+function countWord(count: number, counter: "번" | "권") {
+  const native = count === 1 ? "한" : count === 2 ? "두" : count === 3 ? "세" : String(count);
+  return `${native}${count <= 3 ? " " : ""}${counter}`;
+}
 
-  return {
-    hasParticipationHistory,
-    achievementLabel: `함께한 모임 ${input.summary.attendedSessionCount}회`,
-    membershipDurationLabel: membershipDurationLabel(input.profile.joinedAt, input.today),
-    recentSummaryLabel,
-    streakLabel,
-    timelineItems: rows.map(participationTimelineItem),
-    nudge,
-    supportingStats,
-  };
+function achievementHeading(summary: MyJourneySummary) {
+  if (summary.attendedSessionCount === 0) {
+    return "첫 모임부터 이곳에 독서 기록이 쌓여요.";
+  }
+  if (summary.completedReadingCount === 0) {
+    return `${countWord(summary.attendedSessionCount, "번")}의 모임을 함께했어요.`;
+  }
+  return `${countWord(summary.attendedSessionCount, "번")}의 모임에서 ${countWord(summary.completedReadingCount, "권")}을 끝까지 읽었어요.`;
+}
+
+function memberSpaceMetrics(summary: MyJourneySummary): MemberSpaceMetric[] {
+  const metrics: MemberSpaceMetric[] = [
+    { label: "함께한 모임", value: String(summary.attendedSessionCount) },
+    { label: "완독", value: String(summary.completedReadingCount) },
+  ];
+  if (summary.questionCount > 0) metrics.push({ label: "질문", value: String(summary.questionCount) });
+  if (summary.reviewCount > 0) metrics.push({ label: "서평", value: String(summary.reviewCount) });
+  return metrics;
 }

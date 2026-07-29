@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { MyPageProfile, MyRecentAttendance } from "./archive-model";
+import type { MyPageProfile } from "./archive-model";
 import {
   appendUniqueJourneyItems,
-  buildParticipationJourneyViewModel,
+  buildMemberSpaceViewModel,
   emptyMyJourneyPage,
   groupJourneyByYear,
   membershipDurationLabel,
-  participationTimelineItem,
   type MyJourneyItem,
   type MyJourneySummary,
 } from "./my-reading-shelf-model";
@@ -27,43 +26,33 @@ function journeyItem(overrides: Partial<MyJourneyItem> = {}): MyJourneyItem {
   };
 }
 
-const participationSummary: MyJourneySummary = {
-  attendedSessionCount: 9,
-  completedReadingCount: 7,
-  questionCount: 28,
-  reviewCount: 3,
-  readableFeedbackDocumentCount: 3,
-};
-
-const recentAttendances: MyRecentAttendance[] = [
-  { sessionNumber: 4, attended: true, attendanceStatus: "ATTENDED", readingProgress: 100 },
-  { sessionNumber: 5, attended: true, attendanceStatus: "ATTENDED", readingProgress: 80 },
-  { sessionNumber: 6, attended: false, attendanceStatus: "ABSENT", readingProgress: 0 },
-  { sessionNumber: 7, attended: true, attendanceStatus: "ATTENDED", readingProgress: 100 },
-  { sessionNumber: 8, attended: true, attendanceStatus: "ATTENDED", readingProgress: 70 },
-  { sessionNumber: 9, attended: true, attendanceStatus: "ATTENDED", readingProgress: 100 },
-];
-
-function participationProfile(
-  overrides: Partial<Pick<MyPageProfile, "joinedAt" | "membershipStatus" | "currentSessionId" | "recentAttendances">> = {},
-): Pick<MyPageProfile, "joinedAt" | "membershipStatus" | "currentSessionId" | "recentAttendances"> {
+function memberProfile(
+  overrides: Partial<Pick<MyPageProfile, "displayName" | "clubName" | "role" | "membershipStatus" | "joinedAt">> = {},
+): Pick<MyPageProfile, "displayName" | "clubName" | "role" | "membershipStatus" | "joinedAt"> {
   return {
-    joinedAt: "2024-11",
+    displayName: "멤버1",
+    clubName: "읽는사이",
+    role: "MEMBER",
     membershipStatus: "ACTIVE",
-    currentSessionId: "session-current",
-    recentAttendances,
+    joinedAt: "2025-11",
     ...overrides,
   };
 }
 
-function participationViewModel(input: {
-  profile?: Partial<Pick<MyPageProfile, "joinedAt" | "membershipStatus" | "currentSessionId" | "recentAttendances">>;
+function memberSpaceViewModel(input: {
+  profile?: Partial<Pick<MyPageProfile, "displayName" | "clubName" | "role" | "membershipStatus" | "joinedAt">>;
   summary?: MyJourneySummary;
 } = {}) {
-  return buildParticipationJourneyViewModel({
-    profile: participationProfile(input.profile),
-    summary: input.summary ?? participationSummary,
-    today: new Date(2026, 6, 15),
+  return buildMemberSpaceViewModel({
+    profile: memberProfile(input.profile),
+    summary: input.summary ?? {
+      attendedSessionCount: 3,
+      completedReadingCount: 3,
+      questionCount: 12,
+      reviewCount: 0,
+      readableFeedbackDocumentCount: 2,
+    },
+    today: new Date(2026, 6, 29),
   });
 }
 
@@ -126,189 +115,67 @@ describe("my reading shelf model", () => {
     expect(membershipDurationLabel("2026-08", today)).toBeNull();
   });
 
-  it("maps attendance and reading progress without treating absence as progress", () => {
-    expect(participationTimelineItem({
-      sessionNumber: 7,
-      attended: true,
-      attendanceStatus: "ATTENDED",
-      readingProgress: 100,
-    })).toMatchObject({ statusLabel: "참여", readingLabel: "완독" });
-
-    expect(participationTimelineItem({
-      sessionNumber: 8,
-      attended: false,
-      attendanceStatus: "ABSENT",
-      readingProgress: 40,
-    })).toMatchObject({ statusLabel: "불참", readingLabel: null });
-
-    expect(participationTimelineItem({
-      sessionNumber: 9,
-      attended: false,
-      attendanceStatus: "UNKNOWN",
-      readingProgress: 80,
-    })).toMatchObject({ statusLabel: "미확인", readingLabel: null });
+  it("builds a cumulative member-space profile and achievement summary", () => {
+    expect(memberSpaceViewModel()).toEqual({
+      avatarLabel: "멤",
+      profileMetaLabel: "읽는사이 · 멤버 · 함께한 지 8개월",
+      joinedMonthLabel: "2025.11",
+      achievementHeading: "세 번의 모임에서 세 권을 끝까지 읽었어요.",
+      achievementBody: "함께 읽는 시간이 차분히 쌓이고 있습니다.",
+      metrics: [
+        { label: "함께한 모임", value: "3" },
+        { label: "완독", value: "3" },
+        { label: "질문", value: "12" },
+      ],
+    });
   });
 
   it.each([
-    [0, null],
-    [40, "40%"],
-    [100, "완독"],
-  ])("maps attended reading progress %i to %s", (readingProgress, readingLabel) => {
-    expect(participationTimelineItem({
-      sessionNumber: 7,
-      attended: true,
-      attendanceStatus: "ATTENDED",
-      readingProgress,
-    }).readingLabel).toBe(readingLabel);
+    [0, 0, "첫 모임부터 이곳에 독서 기록이 쌓여요."],
+    [3, 0, "세 번의 모임을 함께했어요."],
+    [9, 7, "9번의 모임에서 7권을 끝까지 읽었어요."],
+  ])("uses the cumulative narrative for %i sessions and %i completed books", (attended, completed, heading) => {
+    expect(memberSpaceViewModel({ summary: {
+      attendedSessionCount: attended,
+      completedReadingCount: completed,
+      questionCount: 0,
+      reviewCount: 0,
+      readableFeedbackDocumentCount: 0,
+    } }).achievementHeading).toBe(heading);
   });
 
-  it("builds the participation summary, streak, nudge, and supporting stats from their distinct sources", () => {
-    const viewModel = participationViewModel();
-
-    expect(viewModel.achievementLabel).toBe("함께한 모임 9회");
-    expect(viewModel.membershipDurationLabel).toBe("함께한 지 1년 8개월");
-    expect(viewModel.recentSummaryLabel).toBe("최근 6회 중 5회 함께했어요");
-    expect(viewModel.streakLabel).toBe("현재 3회 연속 참여");
-    expect(viewModel.nudge).toEqual({
-      body: "다음 모임에도 함께하면 4회 연속 참여가 됩니다.",
-      label: "이번 세션 보기",
-      href: "/app/session/current",
-    });
-    expect(viewModel.supportingStats).toEqual([
-      { label: "완독", value: "7 / 9" },
-      { label: "질문", value: "28" },
-      { label: "서평", value: "3" },
-    ]);
-  });
-
-  it.each([1, 2, 3, 4, 5])("retains exactly the provided %i recent attendance rows", (count) => {
-    expect(participationViewModel({
-      profile: { recentAttendances: recentAttendances.slice(0, count) },
-    }).timelineItems).toHaveLength(count);
-  });
-
-  it("excludes an unconfirmed newest row from the denominator and streak", () => {
-    const rows = recentAttendances.map((row, index) => index === 5
-      ? { ...row, attended: false, attendanceStatus: "UNKNOWN" as const }
-      : row);
-    const viewModel = participationViewModel({ profile: { recentAttendances: rows } });
-
-    expect(viewModel.recentSummaryLabel).toBe("최근 확인된 5회 중 4회 함께했어요");
-    expect(viewModel.streakLabel).toBeNull();
-  });
-
-  it("waits for attendance confirmation when every recent row is unknown", () => {
-    const rows: MyRecentAttendance[] = [
-      { sessionNumber: 8, attended: false, attendanceStatus: "UNKNOWN", readingProgress: 0 },
-      { sessionNumber: 9, attended: false, attendanceStatus: "UNKNOWN", readingProgress: 0 },
-    ];
-
-    expect(participationViewModel({ profile: { recentAttendances: rows } }).recentSummaryLabel)
-      .toBe("출석 확인을 기다리고 있어요");
-  });
-
-  it("withholds the streak after a newest absence or a single attendance", () => {
-    expect(participationViewModel({
-      profile: { recentAttendances: [...recentAttendances.slice(0, 5), {
-        ...recentAttendances[5], attended: false, attendanceStatus: "ABSENT",
-      }] },
-    }).streakLabel).toBeNull();
-
-    expect(participationViewModel({
-      profile: { recentAttendances: [recentAttendances[0]] },
-    }).streakLabel).toBeNull();
-  });
-
-  it("stops the backward streak scan at an unknown row", () => {
-    const rows: MyRecentAttendance[] = [
-      { sessionNumber: 6, attended: true, attendanceStatus: "ATTENDED", readingProgress: 100 },
-      { sessionNumber: 7, attended: false, attendanceStatus: "UNKNOWN", readingProgress: 0 },
-      { sessionNumber: 8, attended: true, attendanceStatus: "ATTENDED", readingProgress: 100 },
-      { sessionNumber: 9, attended: true, attendanceStatus: "ATTENDED", readingProgress: 100 },
-    ];
-
-    expect(participationViewModel({ profile: { recentAttendances: rows } }).streakLabel)
-      .toBe("현재 2회 연속 참여");
-  });
-
-  it("hides participation history when neither the summary nor rows record attendance", () => {
-    const zeroSummary: MyJourneySummary = {
+  it("keeps the required metrics first when optional metrics are empty", () => {
+    expect(memberSpaceViewModel({ summary: {
       attendedSessionCount: 0,
       completedReadingCount: 0,
       questionCount: 0,
       reviewCount: 0,
       readableFeedbackDocumentCount: 0,
-    };
-
-    expect(participationViewModel({
-      profile: { recentAttendances: [] },
-      summary: zeroSummary,
-    }).hasParticipationHistory).toBe(false);
+    } }).metrics.map(({ label }) => label)).toEqual(["함께한 모임", "완독"]);
   });
 
-  it("keeps nonzero supporting stats even without participation history", () => {
-    const noParticipationSummary: MyJourneySummary = {
-      attendedSessionCount: 0,
-      completedReadingCount: 0,
-      questionCount: 2,
-      reviewCount: 1,
+  it("appends positive question and review metrics in semantic order", () => {
+    expect(memberSpaceViewModel({ summary: {
+      attendedSessionCount: 3,
+      completedReadingCount: 2,
+      questionCount: 12,
+      reviewCount: 4,
       readableFeedbackDocumentCount: 0,
-    };
-
-    expect(participationViewModel({
-      profile: { recentAttendances: [] },
-      summary: noParticipationSummary,
-    }).supportingStats).toEqual([
-      { label: "질문", value: "2" },
-      { label: "서평", value: "1" },
+    } }).metrics).toEqual([
+      { label: "함께한 모임", value: "3" },
+      { label: "완독", value: "2" },
+      { label: "질문", value: "12" },
+      { label: "서평", value: "4" },
     ]);
   });
 
-  it.each([
-    "INVITED",
-    "VIEWER",
-    "SUSPENDED",
-    "LEFT",
-    "INACTIVE",
-  ] as const)("does not offer a nudge to %s memberships", (membershipStatus) => {
-    expect(participationViewModel({ profile: { membershipStatus } }).nudge).toBeNull();
+  it("omits an invalid or future joined-month label while retaining valid profile details", () => {
+    expect(memberSpaceViewModel({ profile: { joinedAt: "2026-08" } }).joinedMonthLabel).toBeNull();
+    expect(memberSpaceViewModel({ profile: { joinedAt: "not-a-month" } }).profileMetaLabel)
+      .not.toContain("함께한 지");
   });
 
-  it("does not offer a nudge without a current session", () => {
-    expect(participationViewModel({ profile: { currentSessionId: null } }).nudge).toBeNull();
-  });
-
-  it("offers a fresh-flow nudge to active members without a streak", () => {
-    expect(participationViewModel({
-      profile: { recentAttendances: [recentAttendances[2]] },
-    }).nudge).toEqual({
-      body: "다음 모임부터 새로운 참여 흐름을 이어가 보세요.",
-      label: "이번 세션 보기",
-      href: "/app/session/current",
-    });
-  });
-
-  it("uses only mid-join rows in the recent participation denominator", () => {
-    expect(participationViewModel({
-      profile: { recentAttendances: [recentAttendances[0], recentAttendances[1]] },
-    }).recentSummaryLabel).toBe("최근 2회 중 2회 함께했어요");
-  });
-
-  it("uses only the newest six eligible rows while preserving chronological order", () => {
-    const sevenEligibleRows: MyRecentAttendance[] = [
-      { sessionNumber: 3, attended: true, attendanceStatus: "ATTENDED", readingProgress: 100 },
-      ...recentAttendances,
-    ];
-    const viewModel = participationViewModel({
-      profile: { recentAttendances: sevenEligibleRows },
-    });
-
-    expect(viewModel.timelineItems.map((item) => item.sessionNumber)).toEqual([4, 5, 6, 7, 8, 9]);
-    expect(viewModel.timelineItems).toHaveLength(6);
-    expect(viewModel.recentSummaryLabel).toBe("최근 6회 중 5회 함께했어요");
-    expect(viewModel.streakLabel).toBe("현재 3회 연속 참여");
-    expect(viewModel.nudge).toMatchObject({
-      body: "다음 모임에도 함께하면 4회 연속 참여가 됩니다.",
-    });
+  it("uses the membership fallback initial when the display name is blank", () => {
+    expect(memberSpaceViewModel({ profile: { displayName: "   " } }).avatarLabel).toBe("멤");
   });
 });
