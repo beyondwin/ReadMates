@@ -375,13 +375,23 @@ test("member space preserves a profile-first layout from desktop to narrow mobil
     );
 
     if (viewport.width === 1440) {
-      expect(await shelf.evaluate((element) => element.getBoundingClientRect().width)).toBeLessThanOrEqual(920);
       const layout = await shelf.evaluate((element) => {
-        const shelfBox = element.getBoundingClientRect();
+        const overviewBox = element.querySelector(".rm-member-space__overview")!.getBoundingClientRect();
+        const profileBox = element.querySelector(".rm-member-profile")!.getBoundingClientRect();
         const actionsBox = element.querySelector(".rm-member-profile__actions")!.getBoundingClientRect();
-        return { shelfRight: shelfBox.right, actionsRight: actionsBox.right };
+        return {
+          overviewWidth: overviewBox.width,
+          overviewRight: overviewBox.right,
+          profileLeft: profileBox.left,
+          profileRight: profileBox.right,
+          actionsLeft: actionsBox.left,
+          actionsRight: actionsBox.right,
+        };
       });
-      expect(layout.actionsRight).toBeGreaterThanOrEqual(layout.shelfRight - 1);
+      expect(layout.overviewWidth).toBeLessThanOrEqual(1080);
+      expect(layout.profileRight).toBeLessThan(layout.overviewRight);
+      expect(layout.actionsLeft).toBeGreaterThanOrEqual(layout.profileLeft - 1);
+      expect(layout.actionsRight).toBeLessThanOrEqual(layout.profileRight + 1);
     } else {
       await expectPracticalTapTarget(shelf.getByRole("button", { name: "프로필 수정" }));
       await expectPracticalTapTarget(shelf.getByRole("link", { name: "계정 관리" }));
