@@ -131,7 +131,7 @@ export function AccountMenu({
               내 공간
             </LinkComponent>
             <LinkComponent to={settingsHref} className="rm-account-menu__item" onClick={closeMenu}>
-              계정 관리
+              계정 설정
             </LinkComponent>
           </div>
           <div className="rm-account-menu__logout-control">{LogoutControl}</div>

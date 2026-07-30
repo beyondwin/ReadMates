@@ -44,8 +44,11 @@ describe("AccountMenu", () => {
     expect(dialog).toBeVisible();
     expect(dialog).toHaveAttribute("aria-modal", "false");
     expect(trigger).toHaveAttribute("aria-controls", dialog.id);
-    expect(within(dialog).getByRole("link", { name: "내 공간" })).toHaveAttribute("href", "/app/me");
-    expect(within(dialog).getByRole("link", { name: "계정 관리" })).toHaveAttribute("href", "/app/me/settings");
+    const items = within(dialog).getAllByRole("link");
+    expect(items.map((item) => item.textContent)).toEqual(["내 공간", "계정 설정"]);
+    expect(within(dialog).getByRole("link", { name: "계정 설정" })).toHaveAttribute("href", "/app/me/settings");
+    expect(within(dialog).queryByRole("link", { name: "계정 관리" })).toBeNull();
+    expect(within(dialog).getByRole("button", { name: "로그아웃" })).toBeVisible();
     expect(within(dialog).queryByRole("menuitem")).toBeNull();
     expect(screen.queryByRole("menu")).toBeNull();
 

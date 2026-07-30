@@ -550,7 +550,7 @@ git commit -m "fix(front): route member history to archive sessions"
 - Consumes: existing `mySpaceHref`, `settingsHref`, `LinkComponent`, and `LogoutControl`.
 - Produces: identity, `내 공간`, `계정 설정`, and logout in the existing DOM order with no focus or dismiss behavior changes.
 
-- [ ] **Step 1: Update account-menu tests to the approved name and order**
+- [x] **Step 1: Update account-menu tests to the approved name and order**
 
 In `account-menu.test.tsx`, assert within the dialog:
 
@@ -573,7 +573,7 @@ expect(screen.getByRole("link", { name: "계정 설정" })).toHaveAttribute(
 );
 ```
 
-- [ ] **Step 2: Run the two focused account-menu suites**
+- [x] **Step 2: Run the two focused account-menu suites**
 
 Run:
 
@@ -585,7 +585,7 @@ corepack pnpm --dir front exec vitest run \
 
 Expected: FAIL because `AccountMenu` still renders `계정 관리`.
 
-- [ ] **Step 3: Rename the menu item without changing behavior**
+- [x] **Step 3: Rename the menu item without changing behavior**
 
 Replace only the settings link copy:
 
@@ -601,7 +601,7 @@ Replace only the settings link copy:
 
 Keep the item order, pointer-outside dismissal, Escape dismissal, trigger focus restoration, shared member/host usage, and logout control unchanged.
 
-- [ ] **Step 4: Run the account-menu suites**
+- [x] **Step 4: Run the account-menu suites**
 
 Run:
 
@@ -613,7 +613,7 @@ corepack pnpm --dir front exec vitest run \
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit the global navigation copy**
+- [x] **Step 5: Commit the global navigation copy**
 
 ```bash
 git add \
