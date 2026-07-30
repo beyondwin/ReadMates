@@ -63,8 +63,8 @@ describe("AccountSettingsRoute", () => {
     api.leaveMembership.mockResolvedValue({ ok: false });
     renderRoute();
 
-    await user.click(screen.getByRole("button", { name: "탈퇴" }));
-    await user.click(screen.getByRole("button", { name: "탈퇴 확인" }));
+    await user.click(screen.getByRole("button", { name: "클럽 탈퇴…" }));
+    await user.click(screen.getByRole("button", { name: "클럽 탈퇴" }));
 
     expect(api.leaveMembership).toHaveBeenCalledOnce();
     expect(await screen.findByRole("alert")).toHaveTextContent("탈퇴 처리에 실패했습니다. 잠시 후 다시 시도해 주세요.");

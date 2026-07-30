@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import type { MyPageProfile } from "@/features/archive/model/archive-model";
@@ -45,9 +46,30 @@ describe("AccountSettingsPage", () => {
     expect(screen.getByText(profile.email)).toBeVisible();
     expect(screen.getByText(profile.displayName)).toBeVisible();
     expect(screen.getByText("읽는 사이")).toBeVisible();
-    expect(screen.getByRole("button", { name: "탈퇴" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "클럽 탈퇴…" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "이름 변경" })).toBeNull();
     expect(screen.queryByRole("textbox", { name: "이름" })).toBeNull();
     expect(screen.queryByRole("button", { name: "로그아웃" })).toBeNull();
+  });
+
+  it("reveals a specific final danger action only after the initial leave action", async () => {
+    const user = userEvent.setup();
+    renderAccountSettings();
+
+    expect(screen.getByRole("heading", {
+      level: 2,
+      name: "멤버십 종료",
+    })).toBeVisible();
+    expect(screen.getByRole("button", { name: "클럽 탈퇴…" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "클럽 탈퇴" })).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "클럽 탈퇴…" }));
+
+    const confirm = screen.getByRole("button", { name: "클럽 탈퇴" });
+    expect(confirm).toHaveClass("rm-account-settings-page__danger-action");
+    expect(screen.getByRole("button", { name: "취소" })).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "취소" }));
+    expect(screen.queryByRole("button", { name: "클럽 탈퇴" })).toBeNull();
   });
 });

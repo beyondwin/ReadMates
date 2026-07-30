@@ -944,7 +944,7 @@ git commit -m "refactor(front): clarify account settings ownership"
 - Consumes: unchanged `onLeaveMembership: () => Promise<void>`.
 - Produces: `멤버십 종료` section, `클럽 탈퇴…` disclosure button, `취소`, final `클럽 탈퇴` danger button, existing status/error messages, and existing public-about redirect.
 
-- [ ] **Step 1: Add the two-step semantics to the component test**
+- [x] **Step 1: Add the two-step semantics to the component test**
 
 Extend `account-settings-page.test.tsx`:
 
@@ -973,7 +973,7 @@ it("reveals a specific final danger action only after the initial leave action",
 
 Import `userEvent` in the test file.
 
-- [ ] **Step 2: Run the settings component and route suites**
+- [x] **Step 2: Run the settings component and route suites**
 
 Run:
 
@@ -985,7 +985,7 @@ corepack pnpm --dir front exec vitest run \
 
 Expected: FAIL on the old `멤버십 경계`, `탈퇴`, and `탈퇴 확인` labels.
 
-- [ ] **Step 3: Update `DangerZone` labels and final action class**
+- [x] **Step 3: Update `DangerZone` labels and final action class**
 
 The component is only used by account settings, so remove the unused `variant` branch and use one semantic section:
 
@@ -1050,7 +1050,7 @@ return (
 
 Keep `handleLeave`, `scopedPublicLinkTarget`, success copy, failure copy, and redirect behavior unchanged.
 
-- [ ] **Step 4: Run the focused settings tests**
+- [x] **Step 4: Run the focused settings tests**
 
 Run:
 
@@ -1062,7 +1062,7 @@ corepack pnpm --dir front exec vitest run \
 
 Expected: PASS. The route test must still prove a failed response leaves the settings page visible and reports the existing alert.
 
-- [ ] **Step 5: Commit the termination semantics**
+- [x] **Step 5: Commit the termination semantics**
 
 ```bash
 git add \
