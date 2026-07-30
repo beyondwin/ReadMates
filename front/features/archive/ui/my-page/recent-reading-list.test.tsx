@@ -104,6 +104,32 @@ describe("RecentReadingList", () => {
     expect(heading.parentElement?.tagName).toBe("DIV");
   });
 
+  it("renders decorative chevrons instead of text arrows for navigation", () => {
+    const { container } = render(
+      <RecentReadingList
+        items={[recentItem()]}
+        archiveSessionsHref="/app/archive?view=sessions"
+      />,
+    );
+
+    const chevrons = container.querySelectorAll(
+      "svg.rm-recent-reading-chevron",
+    );
+
+    expect(chevrons).toHaveLength(2);
+    chevrons.forEach((chevron) => {
+      expect(chevron).toHaveAttribute("aria-hidden", "true");
+      expect(chevron).toHaveAttribute("focusable", "false");
+    });
+    expect(container).not.toHaveTextContent("→");
+    expect(screen.getByRole("link", {
+      name: "전체 세션 기록 보기",
+    })).toBeVisible();
+    expect(screen.getByRole("link", {
+      name: "샘플 도서 회차 기록",
+    })).toBeVisible();
+  });
+
   it("renders a quiet empty state without a records action", () => {
     render(
       <RecentReadingList

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { RecentReadingChevron } from "./recent-reading-chevron";
 import type { RecentReadingListItem } from "./recent-reading-list";
 
 export function RecentReadingRow(
@@ -29,7 +30,7 @@ export function RecentReadingRow(
           </span>
         ) : null}
       </div>
-      <span className="rm-recent-reading-row__arrow" aria-hidden="true">→</span>
+      <RecentReadingChevron className="rm-recent-reading-row__arrow" />
     </a>
   );
 }

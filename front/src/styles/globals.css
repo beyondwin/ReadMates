@@ -5951,6 +5951,11 @@
   text-decoration: none;
 }
 
+.rm-recent-reading-chevron {
+  display: block;
+  flex: none;
+}
+
 .rm-recent-readings__list {
   margin: 14px 0 0;
   padding: 0;
