@@ -89,6 +89,18 @@ describe("RecentReadingList", () => {
     expect(container.querySelector("[aria-hidden='true']")).toHaveTextContent("샘");
   });
 
+  it("places the book heading in a flow-content container", () => {
+    render(<RecentReadingRow item={recentItem()} />);
+
+    const heading = screen.getByRole("heading", {
+      level: 3,
+      name: "샘플 도서",
+    });
+
+    expect(heading.parentElement).toHaveClass("rm-recent-reading-row__book");
+    expect(heading.parentElement?.tagName).toBe("DIV");
+  });
+
   it("renders a quiet empty state without a records action", () => {
     render(<RecentReadingList items={[]} recordsHref="/app/me/records" />);
 

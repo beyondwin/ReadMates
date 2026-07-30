@@ -11,7 +11,7 @@ export function RecentReadingRow(
       aria-label={`${item.bookTitle} 회차 기록`}
     >
       <RecentReadingCover item={item} />
-      <span className="rm-recent-reading-row__book">
+      <div className="rm-recent-reading-row__book">
         <span className="rm-recent-reading-row__meta">
           {item.sessionNumberLabel} · {item.dateLabel}
         </span>
@@ -28,7 +28,7 @@ export function RecentReadingRow(
               .join(" · ")}
           </span>
         ) : null}
-      </span>
+      </div>
       <span className="rm-recent-reading-row__arrow" aria-hidden="true">→</span>
     </a>
   );
