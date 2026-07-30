@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import {
   mockMemberParticipationProfile,
   mockMyReadingShelfJourney,
+  mockRecentReadingSessionDetail,
 } from "./my-reading-shelf-fixtures";
 import {
   loginWithGoogleFixture,
@@ -241,9 +242,37 @@ test("zero-question and review summaries omit empty metrics", async ({
 test("club-scoped account and notification routes preserve navigation current state and history", async ({
   page,
 }) => {
+  await mockMyReadingShelfJourney(page, "three-recent-readings");
+  await mockRecentReadingSessionDetail(page);
   await loginWithGoogleFixture(page, memberEmail);
   await page.goto(`${scopedAppPath}/me`);
 
+  const fullRecords = page.getByRole("link", {
+    name: "전체 기록 보기",
+  });
+  await expect(fullRecords).toHaveAttribute(
+    "href",
+    `${scopedAppPath}/me/records`,
+  );
+
+  const recentSession = page.getByRole("link", {
+    name: "아주 긴 한국어 제목과 An exceptionally long English subtitle for a responsive reading shelf 회차 기록",
+  });
+  await expect(recentSession).toHaveAttribute(
+    "href",
+    `${scopedAppPath}/sessions/journey-2026-03`,
+  );
+  await recentSession.click();
+  await expect(page).toHaveURL(
+    new RegExp(`${scopedAppPath}/sessions/journey-2026-03$`),
+  );
+  await expect(page.getByText("최근 함께 읽은 책").first()).toBeVisible();
+
+  await page.goto(`${scopedAppPath}/me`);
+  await page.getByRole("link", { name: "전체 기록 보기" }).click();
+  await expect(page).toHaveURL(new RegExp(`${scopedAppPath}/me/records$`));
+
+  await page.goto(`${scopedAppPath}/me`);
   const memberSpaceSettings = page
     .locator(".rm-member-space")
     .getByRole("link", { name: "계정 관리" });

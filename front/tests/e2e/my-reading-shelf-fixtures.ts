@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 import type { MyPageResponse } from "@/features/archive/api/archive-contracts";
+import { archiveSessionDetailContractFixture } from "../unit/api-contract-fixtures";
 
 type JourneyFixtureMode =
   | "normal"
@@ -65,6 +66,26 @@ export async function mockMemberParticipationProfile(
       } satisfies MyPageResponse,
     });
   });
+}
+
+export async function mockRecentReadingSessionDetail(page: Page) {
+  await page.route(
+    "**/api/bff/api/archive/sessions/journey-2026-03**",
+    async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          ...archiveSessionDetailContractFixture,
+          sessionId: "journey-2026-03",
+          sessionNumber: 12,
+          title: "12회차 모임 · 최근 함께 읽은 책",
+          bookTitle: "최근 함께 읽은 책",
+          bookAuthor: "공개 안전 테스트 저자",
+          date: "2026-07-20",
+        }),
+      });
+    },
+  );
 }
 
 const firstPage = {
