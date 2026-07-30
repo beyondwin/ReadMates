@@ -17,7 +17,12 @@ export function PreferencesSection({
     <section aria-labelledby="my-page-profile-heading">
       <h3 id="my-page-profile-heading">프로필</h3>
       <div className="surface" style={{ padding: "4px" }}>
-        <ProfileNameEditor data={data} canEditProfile={canEditProfile} onUpdateProfile={onUpdateProfile} variant="settings" />
+        <ProfileNameEditor
+          data={data}
+          canEditProfile={canEditProfile}
+          onUpdateProfile={onUpdateProfile}
+          headingId="account-settings-profile-name"
+        />
       </div>
     </section>
   );

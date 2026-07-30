@@ -37,6 +37,10 @@ describe("AccountSettingsPage", () => {
     renderAccountSettings();
 
     expect(screen.getByRole("heading", { level: 1, name: "계정 관리" })).toBeVisible();
+    expect(screen.getByRole("heading", { level: 1, name: profile.displayName })).toHaveAttribute(
+      "id",
+      "account-settings-profile-name",
+    );
     expect(screen.getByText(profile.email)).toBeVisible();
     expect(screen.getByRole("heading", { name: "멤버십" })).toBeVisible();
     expect(screen.getByRole("button", { name: "탈퇴" })).toBeVisible();
