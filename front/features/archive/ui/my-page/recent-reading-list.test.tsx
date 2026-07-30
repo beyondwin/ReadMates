@@ -26,7 +26,7 @@ describe("RecentReadingList", () => {
   it("renders a three-row semantic list with one session anchor per row", () => {
     render(
       <RecentReadingList
-        recordsHref="/app/me/records"
+        archiveSessionsHref="/app/archive?view=sessions"
         items={[
           recentItem({
             sessionId: "session-12",
@@ -64,8 +64,11 @@ describe("RecentReadingList", () => {
       link.getAttribute("href")?.includes("/app/sessions/"),
     )).toHaveLength(3);
     expect(screen.getByRole("link", {
+      name: "전체 세션 기록 보기",
+    })).toHaveAttribute("href", "/app/archive?view=sessions");
+    expect(screen.queryByRole("link", {
       name: "전체 기록 보기",
-    })).toHaveAttribute("href", "/app/me/records");
+    })).toBeNull();
     expect(screen.getByText(/질문 2/)).toBeVisible();
     expect(screen.getByText(/서평 1/)).toBeVisible();
     expect(screen.getByText(/피드백 열림/)).toBeVisible();
@@ -102,12 +105,19 @@ describe("RecentReadingList", () => {
   });
 
   it("renders a quiet empty state without a records action", () => {
-    render(<RecentReadingList items={[]} recordsHref="/app/me/records" />);
+    render(
+      <RecentReadingList
+        items={[]}
+        archiveSessionsHref="/app/archive?view=sessions"
+      />,
+    );
 
     expect(screen.getByText(
       "첫 모임 이후 이곳에 읽은 기록이 이어집니다.",
     )).toBeVisible();
     expect(screen.queryByRole("list")).toBeNull();
-    expect(screen.queryByRole("link", { name: "전체 기록 보기" })).toBeNull();
+    expect(screen.queryByRole("link", {
+      name: "전체 세션 기록 보기",
+    })).toBeNull();
   });
 });

@@ -54,7 +54,7 @@ describe("MyPage", () => {
         viewModel={viewModel}
         recentReadings={recentReadings}
         canEditProfile
-        recordsHref="/app/me/records"
+        archiveSessionsHref="/app/archive?view=sessions"
         onUpdateProfile={vi.fn().mockResolvedValue({ displayName: profile.displayName, accountName: profile.accountName })}
       />,
     );

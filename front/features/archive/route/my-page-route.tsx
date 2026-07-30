@@ -43,7 +43,7 @@ export function MyPageRoute({ canEditProfile, onProfileUpdated }: MyPageRoutePro
       viewModel={viewModel}
       recentReadings={recentReadings}
       canEditProfile={canEditProfile}
-      recordsHref={scopedHref("/app/me/records")}
+      archiveSessionsHref={scopedHref("/app/archive?view=sessions")}
       onUpdateProfile={updateProfile}
     />
   );

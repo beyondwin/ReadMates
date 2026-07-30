@@ -7,12 +7,12 @@ export type RecentReadingListItem = RecentReadingPreviewItem & {
 
 export type RecentReadingListProps = {
   items: RecentReadingListItem[];
-  recordsHref: string;
+  archiveSessionsHref: string;
 };
 
 export function RecentReadingList({
   items,
-  recordsHref,
+  archiveSessionsHref,
 }: RecentReadingListProps): JSX.Element {
   return (
     <section
@@ -27,10 +27,9 @@ export function RecentReadingList({
         {items.length > 0 ? (
           <a
             className="rm-recent-readings__all"
-            href={recordsHref}
-            aria-label="전체 기록 보기"
+            href={archiveSessionsHref}
           >
-            전체 기록 보기 <span aria-hidden="true">→</span>
+            전체 세션 기록 보기 <span aria-hidden="true">→</span>
           </a>
         ) : null}
       </header>

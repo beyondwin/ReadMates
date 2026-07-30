@@ -418,7 +418,7 @@ const archiveSessionsHref = scopedAppLinkTarget(
 
 - Guarantees: the CTA is present only for a non-empty recent preview, its visible and accessible names are both `전체 세션 기록 보기`, the club slug and query string are preserved, and direct `/app/me/records` behavior is untouched.
 
-- [ ] **Step 1: Change the component and route assertions first**
+- [x] **Step 1: Change the component and route assertions first**
 
 In `recent-reading-list.test.tsx`, rename the prop and assert:
 
@@ -463,7 +463,7 @@ expect(screen.getByRole("link", {
 
 Keep the encoded session-detail assertion unchanged.
 
-- [ ] **Step 2: Run the route and component tests to confirm the destination mismatch**
+- [x] **Step 2: Run the route and component tests to confirm the destination mismatch**
 
 Run:
 
@@ -476,7 +476,7 @@ corepack pnpm --dir front exec vitest run \
 
 Expected: FAIL because the current prop is `recordsHref`, the copy is `전체 기록 보기`, and the route still points at `/app/me/records`.
 
-- [ ] **Step 3: Rename the prop through the page composition**
+- [x] **Step 3: Rename the prop through the page composition**
 
 Replace the CTA in `RecentReadingList` with:
 
@@ -493,7 +493,7 @@ Replace the CTA in `RecentReadingList` with:
 
 Rename `recordsHref` to `archiveSessionsHref` in `RecentReadingListProps`, `MyReadingShelfProps`, `MyPageProps`, destructuring, and JSX forwarding. Do not change `RecentReadingListItem.href`; recent rows still open session details.
 
-- [ ] **Step 4: Construct the canonical scoped href in `MyPageRoute`**
+- [x] **Step 4: Construct the canonical scoped href in `MyPageRoute`**
 
 Keep the existing `scopedHref` helper and replace the removed page props with:
 
@@ -510,7 +510,7 @@ Keep the existing `scopedHref` helper and replace the removed page props with:
 
 Do not modify `front/src/app/routes/member.tsx`; its `me/records` route must remain registered.
 
-- [ ] **Step 5: Run the focused navigation tests**
+- [x] **Step 5: Run the focused navigation tests**
 
 Run:
 
@@ -523,7 +523,7 @@ corepack pnpm --dir front exec vitest run \
 
 Expected: PASS with the scoped query string intact.
 
-- [ ] **Step 6: Commit the archive CTA**
+- [x] **Step 6: Commit the archive CTA**
 
 ```bash
 git add \
