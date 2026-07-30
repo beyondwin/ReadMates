@@ -124,7 +124,7 @@ test("desktop public and host pages show the expected top navigation", async ({ 
   await expectPracticalTapTarget(accountMenu);
   await accountMenu.click();
   await expect(page.getByRole("dialog")).toBeVisible();
-  await expect(page.getByRole("link", { name: "계정 관리" })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: "계정 설정" })).toHaveAttribute(
     "href",
     `${baselineClubAppPath}/me/settings`,
   );
@@ -191,7 +191,7 @@ test("mobile public pages hide app tabs and host app pages show mobile chrome", 
   await expectPracticalTapTarget(accountMenu);
   await accountMenu.click();
   await expect(page.getByRole("dialog")).toBeVisible();
-  await expect(page.getByRole("link", { name: "계정 관리" })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: "계정 설정" })).toHaveAttribute(
     "href",
     `${baselineClubAppPath}/me/settings`,
   );
@@ -363,41 +363,20 @@ test("member space preserves a profile-first layout from desktop to narrow mobil
     await page.goto("/app/me");
 
     const shelf = page.locator(".rm-member-space");
-    const actions = shelf.locator(".rm-member-profile__actions");
+    const nameRow = shelf.locator(".rm-member-profile__name-row");
+    const editProfile = shelf.getByRole("button", { name: "이름 변경" });
     await expect(shelf.getByRole("heading", { level: 1, name: "호스트" })).toHaveCount(1);
     await expect(shelf.getByRole("heading", { level: 2, name: "세 번의 모임에서 세 권을 끝까지 읽었어요." })).toHaveCount(1);
-    await expect(actions).toHaveCount(1);
+    await expect(nameRow).toHaveCount(1);
     await expectDomOrder(
       shelf.getByRole("heading", { level: 1, name: "호스트" }),
-      shelf.getByRole("link", { name: "계정 관리" }),
+      editProfile,
       shelf.getByRole("heading", { level: 2, name: "세 번의 모임에서 세 권을 끝까지 읽었어요." }),
       shelf.locator(".rm-reading-achievement__metrics"),
     );
 
-    if (viewport.width === 1440) {
-      const layout = await shelf.evaluate((element) => {
-        const overviewBox = element.querySelector(".rm-member-space__overview")!.getBoundingClientRect();
-        const profileBox = element.querySelector(".rm-member-profile")!.getBoundingClientRect();
-        const actionsBox = element.querySelector(".rm-member-profile__actions")!.getBoundingClientRect();
-        return {
-          overviewWidth: overviewBox.width,
-          overviewRight: overviewBox.right,
-          profileLeft: profileBox.left,
-          profileRight: profileBox.right,
-          actionsLeft: actionsBox.left,
-          actionsRight: actionsBox.right,
-        };
-      });
-      expect(layout.overviewWidth).toBeLessThanOrEqual(1080);
-      expect(layout.profileRight).toBeLessThan(layout.overviewRight);
-      expect(layout.actionsLeft).toBeGreaterThanOrEqual(layout.profileLeft - 1);
-      expect(layout.actionsRight).toBeLessThanOrEqual(layout.profileRight + 1);
-    } else {
-      await expectPracticalTapTarget(shelf.getByRole("button", { name: "프로필 수정" }));
-      await expectPracticalTapTarget(shelf.getByRole("link", { name: "계정 관리" }));
-      expect(await actions.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length)).toBe(2);
-      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    }
+    await expectPracticalTapTarget(editProfile);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   }
 });
 
@@ -412,13 +391,31 @@ test("dedicated records and account settings stay reachable above mobile navigat
   await expectPracticalTapTarget(page.getByRole("button", { name: "다시 시도" }).first());
 
   await page.getByRole("button", { name: /계정 메뉴$/ }).click();
-  await page.getByRole("link", { name: "계정 관리" }).click();
+  await page.getByRole("link", { name: "계정 설정" }).click();
   await expect(page).toHaveURL(new RegExp(`${baselineClubAppPath}/me/settings$`));
+
+  await page.goBack();
+  await expect(page).toHaveURL(new RegExp(`${baselineClubAppPath}/me/records$`));
+  await page.getByRole("button", { name: /계정 메뉴$/ }).click();
+  await page.getByRole("link", { name: "계정 설정" }).click();
+  await expect(page).toHaveURL(
+    new RegExp(`${baselineClubAppPath}/me/settings$`),
+  );
+
   const settings = page.locator(".rm-account-settings-page");
-  await expect(settings.getByRole("heading", { level: 1, name: "계정 관리" })).toBeVisible();
-  await expect(settings.getByRole("button", { name: "탈퇴" })).toBeVisible();
+  const backToMySpace = settings.getByRole("link", { name: "내 공간" });
+  await expect(backToMySpace).toContainText("←");
+  await expect(backToMySpace).toHaveAttribute(
+    "href",
+    `${baselineClubAppPath}/me`,
+  );
+  await expectPracticalTapTarget(backToMySpace);
+  await expect(settings.getByRole("heading", { level: 1, name: "계정 설정" })).toBeVisible();
+  await expect(settings.getByRole("button", { name: "클럽 탈퇴…" })).toBeVisible();
   await expect(settings.getByRole("button", { name: "로그아웃" })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await backToMySpace.click();
+  await expect(page).toHaveURL(new RegExp(`${baselineClubAppPath}/me$`));
 });
 
 test("account menu advances keyboard focus naturally and returns it after Escape", async ({ page }) => {
@@ -434,7 +431,7 @@ test("account menu advances keyboard focus naturally and returns it after Escape
   const dialog = page.getByRole("dialog");
   await expect(dialog).toHaveAttribute("aria-modal", "false");
   const mySpace = dialog.getByRole("link", { name: "내 공간" });
-  const settings = dialog.getByRole("link", { name: "계정 관리" });
+  const settings = dialog.getByRole("link", { name: "계정 설정" });
   const logout = dialog.getByRole("button", { name: "로그아웃" });
 
   await expectDomOrder(accountTrigger, mySpace, settings, logout);

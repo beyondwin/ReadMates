@@ -85,17 +85,18 @@ test.afterEach(() => {
   resetSeededProfiles();
 });
 
-test("active member account settings expose their editable profile identity", async ({ page }) => {
+test("active member account settings expose read-only profile identity", async ({ page }) => {
   await mockMyReadingShelfJourney(page);
   await loginWithGoogleFixture(page, selfEditMemberEmail);
   await page.goto("/app/me/settings");
 
-  await expect(page.getByRole("heading", { name: "계정 관리", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "계정 설정", level: 1 })).toBeVisible();
   await expect(page.getByText(selfEditMemberEmail)).toBeVisible();
   await expect(page.getByText("멤버5", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("@멤버5")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "이름 변경" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "이름 변경" })).toHaveCount(0);
   await expect(page.getByRole("textbox", { name: "이름" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "클럽 탈퇴…" })).toBeVisible();
 });
 
 test("active members edit their profile from member space and refresh the account-menu name", async ({ page }) => {
@@ -132,7 +133,7 @@ test("active members edit their profile from member space and refresh the accoun
   await loginWithGoogleFixture(page, selfEditMemberEmail);
   await page.goto("/app/me");
 
-  await page.getByRole("button", { name: "프로필 수정" }).click();
+  await page.getByRole("button", { name: "이름 변경" }).click();
   await page.getByRole("textbox", { name: "이름" }).fill(updatedDisplayName);
   await page.getByRole("button", { name: "이름 저장" }).click();
 
@@ -140,15 +141,17 @@ test("active members edit their profile from member space and refresh the accoun
   await expect(page.getByRole("button", { name: `${updatedDisplayName} 계정 메뉴` })).toBeVisible();
 });
 
-test("suspended members retain account management without a profile edit action", async ({ page }) => {
+test("suspended members omit account navigation and profile editing from member space", async ({ page }) => {
   setMembershipStatus(selfEditMemberEmail, "SUSPENDED");
   await mockMyReadingShelfJourney(page, "three-recent-readings");
   await loginWithGoogleFixture(page, selfEditMemberEmail);
   await page.goto("/app/me");
 
   const shelf = page.locator(".rm-member-space");
-  await expect(shelf.getByRole("link", { name: "계정 관리" })).toBeVisible();
-  await expect(shelf.getByRole("button", { name: "프로필 수정" })).toHaveCount(0);
+  await expect(shelf.getByRole("button", { name: "이름 변경" })).toHaveCount(0);
+  await expect(shelf.getByRole("link", {
+    name: /계정 (관리|설정)/,
+  })).toHaveCount(0);
   await expect(shelf.getByRole("list", {
     name: "최근 함께 읽은 기록",
   })).toBeVisible();
@@ -163,12 +166,14 @@ test("an empty reading shelf omits recent-session navigation", async ({ page }) 
   await expect(page.getByText(
     "첫 모임 이후 이곳에 읽은 기록이 이어집니다.",
   )).toBeVisible();
-  await expect(page.getByRole("link", { name: "계정 관리" })).toBeVisible();
+  await expect(page.getByRole("link", {
+    name: /계정 (관리|설정)/,
+  })).toHaveCount(0);
   await expect(page.getByRole("list", {
     name: "최근 함께 읽은 기록",
   })).toHaveCount(0);
   await expect(page.getByRole("link", {
-    name: "전체 기록 보기",
+    name: "전체 세션 기록 보기",
   })).toHaveCount(0);
 });
 
@@ -179,10 +184,11 @@ test("host edits a same-club member display name and sees the row update", async
   await loginWithGoogleFixture(page, hostEmail);
   await page.goto("/app/me/settings");
 
-  await expect(page.getByRole("heading", { name: "계정 관리", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "계정 설정", level: 1 })).toBeVisible();
   await expect(page.getByText("호스트", { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "이름 변경" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "이름 변경" })).toHaveCount(0);
   await expect(page.getByRole("textbox", { name: "이름" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "클럽 탈퇴…" })).toBeVisible();
 
   await page.goto("/app/host/members");
 
@@ -224,20 +230,23 @@ test("viewer can read member routes but cannot use current-session write actions
   await page.goto("/app/me");
 
   const viewerShelf = page.locator(".rm-member-space");
-  await expect(viewerShelf.getByRole("link", { name: "계정 관리" })).toBeVisible();
-  await expect(viewerShelf.getByRole("button", { name: "프로필 수정" })).toHaveCount(0);
+  await expect(viewerShelf.getByRole("button", { name: "이름 변경" })).toHaveCount(0);
+  await expect(viewerShelf.getByRole("link", {
+    name: /계정 (관리|설정)/,
+  })).toHaveCount(0);
   await expect(viewerShelf.getByRole("list", {
     name: "최근 함께 읽은 기록",
   })).toBeVisible();
 
   await page.goto("/app/me/settings");
 
-  await expect(page.getByRole("heading", { name: "계정 관리", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "계정 설정", level: 1 })).toBeVisible();
   await expect(page.getByText("둘러보기 멤버").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "탈퇴" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "이름 변경" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "클럽 탈퇴…" })).toBeVisible();
   await expect(page.getByRole("button", { name: "로그아웃" })).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole("button", { name: "탈퇴" }).scrollIntoViewIfNeeded();
+  await page.getByRole("button", { name: "클럽 탈퇴…" }).scrollIntoViewIfNeeded();
   await page.screenshot({
     path: testInfo.outputPath("viewer-settings.png"),
   });

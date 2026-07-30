@@ -1089,7 +1089,7 @@ git commit -m "fix(front): clarify membership termination"
 - Consumes: Task 1 `.rm-member-profile__name-row`, `.rm-member-profile__edit`, `.rm-member-profile__field`; Task 4 settings summary/back classes; Task 5 termination classes.
 - Produces: a single bordered paper surface with profile above achievements, responsive identity wrapping, 44px actions, settings summaries, visible focus, final danger treatment, and browser-level evidence.
 
-- [ ] **Step 1: Update the information-architecture E2E expectations**
+- [x] **Step 1: Update the information-architecture E2E expectations**
 
 In `expectMemberSpaceSemanticOrder`, use:
 
@@ -1159,7 +1159,7 @@ expect(Math.abs(layout.profileLeft - layout.achievementLeft)).toBeLessThanOrEqua
 
 Keep the existing 1280px, 390px, 320px, 200% zoom, overflow, screenshot, focus-visible, and reduced-motion checks.
 
-- [ ] **Step 2: Update navigation and permission E2E copy**
+- [x] **Step 2: Update navigation and permission E2E copy**
 
 In `member-profile-permissions.spec.ts`:
 
@@ -1228,7 +1228,7 @@ await expect(page.getByRole("button", { name: "세션" }))
 
 Keep the direct `/app/me/records` pagination test at the start of the file.
 
-- [ ] **Step 3: Add public-safe long-identity and missing-month browser coverage**
+- [x] **Step 3: Add public-safe long-identity and missing-month browser coverage**
 
 Extend `ParticipationProfileMode` in `my-reading-shelf-fixtures.ts`:
 
@@ -1293,7 +1293,7 @@ test("long identity wraps without inventing a missing joined month", async ({
 });
 ```
 
-- [ ] **Step 4: Run the focused E2E files and confirm CSS and copy failures**
+- [x] **Step 4: Run the focused E2E files and confirm CSS and copy failures**
 
 Run:
 
@@ -1306,7 +1306,7 @@ corepack pnpm --dir front exec playwright test \
 
 Expected: FAIL before CSS updates because the overview is still a two-column grid, old selectors remain, settings has no back styling, and the final leave action has no danger treatment.
 
-- [ ] **Step 5: Replace the split overview and action-row CSS**
+- [x] **Step 5: Replace the split overview and action-row CSS**
 
 Use a block paper surface:
 
@@ -1392,7 +1392,7 @@ Use a block paper surface:
 
 Delete `.rm-member-profile__actions`, `.rm-member-profile__settings`, their hover/focus rules, the `:only-child` rule, and the old `:has()` row-shifting rule. Include `.rm-member-profile__edit` in the focus-visible selector.
 
-- [ ] **Step 6: Add settings, return-link, and termination CSS**
+- [x] **Step 6: Add settings, return-link, and termination CSS**
 
 Use:
 
@@ -1503,7 +1503,7 @@ Use:
 
 Replace the old membership-only summary selectors with the shared summary selectors above.
 
-- [ ] **Step 7: Update the mobile composition without changing DOM order**
+- [x] **Step 7: Update the mobile composition without changing DOM order**
 
 Inside the existing `@media (max-width: 768px)` block, use:
 
@@ -1556,7 +1556,7 @@ Inside the existing `@media (max-width: 768px)` block, use:
 
 Delete the old mobile `.rm-member-profile__actions` two-column grid rules. Keep safe-area bottom padding and `.rm-account-settings-page .btn { min-block-size: 44px; }`.
 
-- [ ] **Step 8: Run focused unit tests and the three E2E files**
+- [x] **Step 8: Run focused unit tests and the three E2E files**
 
 Run:
 
@@ -1579,7 +1579,7 @@ corepack pnpm --dir front exec playwright test \
 
 Expected: PASS, including 320px, 390px, desktop, 200% zoom, keyboard focus, scoped archive navigation, settings return, and direct personal-record pagination.
 
-- [ ] **Step 9: Commit responsive and browser evidence**
+- [x] **Step 9: Commit responsive and browser evidence**
 
 ```bash
 git add \

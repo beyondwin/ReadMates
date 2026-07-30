@@ -10,7 +10,12 @@ type JourneyFixtureMode =
   | "three-achievements"
   | "three-recent-readings"
   | "zero-questions-reviews";
-type ParticipationProfileMode = "history" | "mid-join" | "unknown" | "empty";
+type ParticipationProfileMode =
+  | "history"
+  | "mid-join"
+  | "unknown"
+  | "empty"
+  | "long-identity";
 
 const historyRecentAttendances: MyPageResponse["recentAttendances"] = [
   { sessionNumber: 4, attended: true, attendanceStatus: "ATTENDED", readingProgress: 100 },
@@ -27,6 +32,7 @@ const recentAttendancesByMode: Record<
 > = {
   history: historyRecentAttendances,
   "mid-join": historyRecentAttendances.slice(-2),
+  "long-identity": historyRecentAttendances,
   unknown: historyRecentAttendances.map((row, index) =>
     index === historyRecentAttendances.length - 1
       ? {
@@ -54,7 +60,15 @@ export async function mockMemberParticipationProfile(
       response: upstream,
       json: {
         ...profile,
-        joinedAt: "2025-01",
+        displayName:
+          mode === "long-identity"
+            ? "아주 긴 한국어 표시 이름과 Long English Display Name"
+            : profile.displayName,
+        clubName:
+          mode === "long-identity"
+            ? "아주 긴 한국어 독서 모임과 Long English Reading Club"
+            : profile.clubName,
+        joinedAt: mode === "long-identity" ? "" : "2025-11",
         sessionCount: mode === "empty" ? 0 : recentAttendances.length,
         totalSessionCount: mode === "empty" ? 0 : recentAttendances.length,
         completedReadingCount: mode === "empty" ? 0 : 4,

@@ -59,7 +59,8 @@ async function expectMemberSpaceSemanticOrder(page: Page) {
   const shelf = page.locator(".rm-member-space");
   await expectDomOrder(
     shelf.getByRole("heading", { level: 1, name: "멤버1" }),
-    shelf.getByRole("link", { name: "계정 관리" }),
+    shelf.getByRole("button", { name: "이름 변경" }),
+    shelf.getByText("읽는사이 · 멤버 · 2025.11부터 함께"),
     shelf.getByRole("heading", { level: 2, name: "세 번의 모임에서 세 권을 끝까지 읽었어요." }),
     shelf.getByText("함께한 모임", { exact: true }),
     shelf.getByText("완독", { exact: true }),
@@ -112,7 +113,7 @@ test("member space keeps the profile-first semantic order and usable actions acr
     { width: 320, height: 700 },
   ]) {
     await page.setViewportSize(viewport);
-    await page.goto("/app/me");
+    await page.goto(`${scopedAppPath}/me`);
 
     const shelf = page.locator(".rm-member-space");
     const overview = shelf.locator(".rm-member-space__overview");
@@ -122,25 +123,39 @@ test("member space keeps the profile-first semantic order and usable actions acr
       name: "최근 함께 읽은 기록",
     }).getByRole("listitem")).toHaveCount(3);
     await expect(shelf.getByRole("link", {
-      name: "전체 기록 보기",
-    })).toBeVisible();
+      name: "전체 세션 기록 보기",
+    })).toHaveAttribute(
+      "href",
+      `${scopedAppPath}/archive?view=sessions`,
+    );
+    await expect(shelf.getByRole("link", {
+      name: /계정 (관리|설정)/,
+    })).toHaveCount(0);
     await expect(shelf.getByRole("button", { name: "로그아웃" })).toHaveCount(0);
 
-    const overviewStyle = await overview.evaluate((element) => {
-      const style = getComputedStyle(element);
+    const layout = await overview.evaluate((element) => {
+      const profile = element.querySelector(".rm-member-profile")!;
+      const achievement = element.querySelector(".rm-reading-achievement")!;
+      const overviewBox = element.getBoundingClientRect();
+      const profileBox = profile.getBoundingClientRect();
+      const achievementBox = achievement.getBoundingClientRect();
+
       return {
-        display: style.display,
-        columns: style.gridTemplateColumns.split(" ").length,
-        width: element.getBoundingClientRect().width,
+        display: getComputedStyle(element).display,
+        width: overviewBox.width,
+        profileTop: profileBox.top,
+        profileBottom: profileBox.bottom,
+        achievementTop: achievementBox.top,
+        profileLeft: profileBox.left,
+        achievementLeft: achievementBox.left,
       };
     });
-    if (viewport.width === 1280) {
-      expect(overviewStyle.display).toBe("grid");
-      expect(overviewStyle.columns).toBe(2);
-      expect(overviewStyle.width).toBeLessThanOrEqual(1080);
-    } else {
-      expect(overviewStyle.columns).toBe(1);
-    }
+
+    expect(layout.display).toBe("block");
+    expect(layout.width).toBeLessThanOrEqual(1080);
+    expect(layout.profileTop).toBeLessThan(layout.achievementTop);
+    expect(layout.profileBottom).toBeLessThanOrEqual(layout.achievementTop + 1);
+    expect(Math.abs(layout.profileLeft - layout.achievementLeft)).toBeLessThanOrEqual(1);
 
     expect(
       await page.evaluate(
@@ -149,18 +164,13 @@ test("member space keeps the profile-first semantic order and usable actions acr
     ).toBe(true);
     await expectMemberSpaceSemanticOrder(page);
 
-    const editProfile = shelf.getByRole("button", { name: "프로필 수정" });
-    const accountSettings = shelf.getByRole("link", { name: "계정 관리" });
-    await expect(accountSettings).toHaveCSS("text-decoration-line", "none");
-    for (const action of [editProfile, accountSettings]) {
-      await expectPracticalTapTarget(action);
-    }
+    const editProfile = shelf.getByRole("button", { name: "이름 변경" });
+    await expectPracticalTapTarget(editProfile);
 
     await page.evaluate(() => {
       (document.activeElement as HTMLElement | null)?.blur();
     });
     await pressTabUntilFocused(page, editProfile, "edit profile");
-    await pressTabUntilFocused(page, accountSettings, "account settings");
 
     await page.screenshot({
       path: testInfo.outputPath(
@@ -179,7 +189,7 @@ test("member space keeps the profile-first semantic order and usable actions acr
     .toHaveCSS("transform", "none");
 
   await page.setViewportSize({ width: 640, height: 900 });
-  await page.goto("/app/me");
+  await page.goto(`${scopedAppPath}/me`);
   await page.evaluate(() => {
     document.body.style.zoom = "200%";
   });
@@ -193,6 +203,34 @@ test("member space keeps the profile-first semantic order and usable actions acr
     path: testInfo.outputPath("member-space-200-percent-zoom.png"),
     fullPage: true,
   });
+});
+
+test("long identity wraps without inventing a missing joined month", async ({
+  page,
+}) => {
+  await mockMemberParticipationProfile(page, "long-identity");
+  await mockMyReadingShelfJourney(page, "three-recent-readings");
+  await loginWithGoogleFixture(page, memberEmail);
+  await page.setViewportSize({ width: 320, height: 700 });
+  await page.goto("/app/me");
+
+  const shelf = page.locator(".rm-member-space");
+  await expect(shelf.getByRole("heading", {
+    level: 1,
+    name: "아주 긴 한국어 표시 이름과 Long English Display Name",
+  })).toBeVisible();
+  await expect(shelf.getByText(
+    "아주 긴 한국어 독서 모임과 Long English Reading Club · 멤버",
+  )).toBeVisible();
+  await expect(shelf.getByText(/부터 함께/)).toHaveCount(0);
+  await expectPracticalTapTarget(
+    shelf.getByRole("button", { name: "이름 변경" }),
+  );
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
 });
 
 test("mid-join member history starts with the first eligible participation", async ({
@@ -248,11 +286,11 @@ test("club-scoped account and notification routes preserve navigation current st
   await page.goto(`${scopedAppPath}/me`);
 
   const fullRecords = page.getByRole("link", {
-    name: "전체 기록 보기",
+    name: "전체 세션 기록 보기",
   });
   await expect(fullRecords).toHaveAttribute(
     "href",
-    `${scopedAppPath}/me/records`,
+    `${scopedAppPath}/archive?view=sessions`,
   );
 
   const recentSession = page.getByRole("link", {
@@ -269,20 +307,16 @@ test("club-scoped account and notification routes preserve navigation current st
   await expect(page.getByText("최근 함께 읽은 책").first()).toBeVisible();
 
   await page.goto(`${scopedAppPath}/me`);
-  await page.getByRole("link", { name: "전체 기록 보기" }).click();
-  await expect(page).toHaveURL(new RegExp(`${scopedAppPath}/me/records$`));
-
-  await page.goto(`${scopedAppPath}/me`);
-  const memberSpaceSettings = page
-    .locator(".rm-member-space")
-    .getByRole("link", { name: "계정 관리" });
-  await expect(memberSpaceSettings).toHaveAttribute(
-    "href",
-    `${scopedAppPath}/me/settings`,
+  await page.getByRole("link", {
+    name: "전체 세션 기록 보기",
+  }).click();
+  await expect(page).toHaveURL(
+    new RegExp(`${scopedAppPath}/archive\\?view=sessions$`),
   );
-  await memberSpaceSettings.click();
-  await expect(page).toHaveURL(new RegExp(`${scopedAppPath}/me/settings$`));
+  await expect(page.getByRole("button", { name: "세션" }))
+    .toHaveAttribute("aria-pressed", "true");
 
+  await page.goto(`${scopedAppPath}/me/settings`);
   const appNavigation = page.getByRole("navigation", {
     name: "앱 내비게이션",
   });
