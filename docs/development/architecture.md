@@ -340,9 +340,9 @@ ReadMates는 클럽별로 하나의 현재 `OPEN` 세션과 여러 개의 예정
 
 Archive JDBC adapter는 요청마다 page query와 전체 summary query를 정확히 하나씩, 합계 두 statement로 실행하며 page 크기나 item 수에 따라 query 수가 늘지 않습니다. 이 projection은 기존 테이블만 읽으므로 Flyway migration이나 새 영속 상태를 추가하지 않습니다.
 
-`/app/me` loader는 profile과 `limit=1` journey를 병렬 로드해 page 크기와 무관한 전체 `summary`를 받습니다. Profile의 최근 출석 row는 현재 club·현재 membership의 `participation_status=ACTIVE` participant가 있는 `PUBLISHED` 회차만 최신순으로 최대 6개 가져온 뒤 회차순으로 보여 줍니다. `attendanceStatus`는 `ATTENDED`·`ABSENT`·`UNKNOWN`을 보존하고, 기존 consumer 호환을 위해 `attended` boolean도 함께 제공합니다. 화면은 전체 참여 성취, 최근 참여 timeline, 다음 참여 nudge, 보조 읽기 통계, 전체 책별 기록 link와 하단 로그아웃을 렌더링합니다. `/app/me/records`만 `limit=12`부터 cursor continuation을 누적해 연도별 전체 개인 책 목록을 보여줍니다.
+`/app/me` loader는 profile과 `limit=3` journey를 병렬 로드하며, 누적 `summary`는 page 크기와 무관하게 유지됩니다. 화면은 하나의 profile·독서 성취 overview와 서버 정렬 순서를 따르는 최근 개인 기록을 최대 3건 보여줍니다. 최근 row는 club scope를 유지한 회차 상세로 연결되고, section의 `전체 기록 보기`는 `/app/me/records`로 이어집니다. `/app/me/records`만 `limit=12`부터 cursor continuation을 누적해 연도별 전체 개인 책 목록을 보여줍니다.
 
-계정·멤버십 정보와 탈퇴는 `/app/me/settings`, 알림 수신 설정은 알림함과 나란한 `/app/notifications/settings`가 소유합니다. member와 host chrome이 공유하는 전역 계정 메뉴의 로그아웃은 계속 사용할 수 있고, `/app/me`에도 승인된 하단 로그아웃을 둡니다. `src/pages/my-page.tsx`의 page composition boundary가 archive-owned 참여 여정과 auth-owned logout controller를 조합하므로 feature끼리 직접 import하지 않으며, `frontend-boundaries.test.ts`에도 이 흐름을 위한 예외가 없습니다.
+계정·멤버십 정보와 탈퇴는 `/app/me/settings`, 알림 수신 설정은 알림함과 나란한 `/app/notifications/settings`가 소유합니다. 로그아웃은 member와 host chrome이 공유하는 전역 계정 메뉴에만 두며 `/app/me`와 `/app/me/settings`에는 별도 로그아웃을 두지 않습니다. Profile update controller는 `/app/me`와 `/app/me/settings`가 공유하고, archive feature에서 auth feature를 직접 import하거나 `frontend-boundaries.test.ts`에 예외를 추가하지 않습니다.
 
 ## 멤버 프로필과 표시 이름
 
