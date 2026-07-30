@@ -25,7 +25,7 @@ export function AccountSettingsPage({
       <header className="rm-account-settings-page__header">
         <p className="rm-my-shelf-kicker">내 공간</p>
         <h1>계정 설정</h1>
-        <p>현재 계정과 읽는사이 멤버십 정보를 확인합니다.</p>
+        <p>현재 계정과 현재 클럽의 멤버십 정보를 확인합니다.</p>
       </header>
       <div className="rm-account-settings-page__content">
         <AccountInformation data={data} />

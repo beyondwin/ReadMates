@@ -43,10 +43,15 @@ describe("AccountSettingsPage", () => {
     expect(screen.getByRole("heading", { level: 1, name: "계정 설정" })).toBeVisible();
     expect(screen.getByRole("heading", { level: 2, name: "계정 정보" })).toBeVisible();
     expect(screen.getByRole("heading", { level: 2, name: "클럽 멤버십" })).toBeVisible();
+    expect(
+      screen.getByText("현재 계정과 현재 클럽의 멤버십 정보를 확인합니다."),
+    ).toBeVisible();
     expect(screen.getByText(profile.email)).toBeVisible();
     expect(screen.getByText(profile.displayName)).toBeVisible();
     expect(screen.getByText("읽는 사이")).toBeVisible();
-    expect(screen.getByRole("button", { name: "클럽 탈퇴…" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "클럽 탈퇴…" })).not.toHaveClass(
+      "rm-account-settings-page__danger-action",
+    );
     expect(screen.queryByRole("button", { name: "이름 변경" })).toBeNull();
     expect(screen.queryByRole("textbox", { name: "이름" })).toBeNull();
     expect(screen.queryByRole("button", { name: "로그아웃" })).toBeNull();

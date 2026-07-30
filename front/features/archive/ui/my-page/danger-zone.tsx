@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { scopedPublicLinkTarget } from "@/shared/routing/scoped-app-link-target";
 
 export function DangerZone({
@@ -6,10 +6,21 @@ export function DangerZone({
 }: {
   onLeaveMembership: () => Promise<void>;
 }) {
+  const confirmationId = useId();
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [leaveMessage, setLeaveMessage] = useState<string | null>(null);
   const [leaveError, setLeaveError] = useState<string | null>(null);
   const [isLeaving, setIsLeaving] = useState(false);
+  const leaveTriggerRef = useRef<HTMLButtonElement>(null);
+  const shouldRestoreFocusRef = useRef(false);
+
+  useEffect(() => {
+    if (!leaveOpen && shouldRestoreFocusRef.current) {
+      shouldRestoreFocusRef.current = false;
+      leaveTriggerRef.current?.focus();
+    }
+  }, [leaveOpen]);
+
   const handleLeave = async () => {
     setIsLeaving(true);
     setLeaveError(null);
@@ -36,15 +47,21 @@ export function DangerZone({
           클럽 탈퇴 · 내 기록은 유지, 내 이름은 비공개 처리됩니다.
         </p>
         <button
+          ref={leaveTriggerRef}
           type="button"
           className="btn btn-ghost btn-sm"
+          aria-expanded={leaveOpen}
+          aria-controls={confirmationId}
           onClick={() => setLeaveOpen((current) => !current)}
         >
           클럽 탈퇴…
         </button>
       </div>
       {leaveOpen ? (
-        <div className="surface rm-account-settings-page__termination-confirm">
+        <div
+          id={confirmationId}
+          className="surface rm-account-settings-page__termination-confirm"
+        >
           <p>
             탈퇴하면 과거 기록은 보존되며, 다른 멤버에게는 작성자가
             &quot;탈퇴한 멤버&quot;로 표시됩니다.
@@ -54,7 +71,10 @@ export function DangerZone({
               type="button"
               className="btn btn-quiet btn-sm"
               disabled={isLeaving}
-              onClick={() => setLeaveOpen(false)}
+              onClick={() => {
+                shouldRestoreFocusRef.current = true;
+                setLeaveOpen(false);
+              }}
             >
               취소
             </button>

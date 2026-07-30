@@ -1,4 +1,4 @@
-import { type FormEvent, useId, useRef, useState } from "react";
+import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import type { MyPageProfile } from "@/features/archive/model/archive-model";
 import { profileSaveErrorMessage } from "@/features/archive/model/archive-model";
 import type { ProfileUpdateResult } from "./types";
@@ -36,10 +36,25 @@ export function ProfileNameEditor({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
+  const editButtonRef = useRef<HTMLButtonElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const shouldRestoreFocusRef = useRef(false);
   const value =
     draft.sourceDisplayName === data.displayName
       ? draft.value
       : data.displayName;
+
+  useEffect(() => {
+    if (editing) {
+      inputRef.current?.focus();
+      return;
+    }
+
+    if (shouldRestoreFocusRef.current) {
+      shouldRestoreFocusRef.current = false;
+      editButtonRef.current?.focus();
+    }
+  }, [editing]);
 
   async function submitProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -59,6 +74,7 @@ export function ProfileNameEditor({
         sourceDisplayName: profile.displayName,
         value: profile.displayName,
       });
+      shouldRestoreFocusRef.current = true;
       setEditing(false);
     } catch (profileError) {
       setError(profileFailureMessage(profileError));
@@ -74,6 +90,7 @@ export function ProfileNameEditor({
         <h1 id={headingId}>{data.displayName}</h1>
         {!editing && canEditProfile ? (
           <button
+            ref={editButtonRef}
             type="button"
             className="btn btn-quiet btn-sm rm-member-profile__edit"
             aria-label="이름 변경"
@@ -94,6 +111,7 @@ export function ProfileNameEditor({
               이름
             </label>
             <input
+              ref={inputRef}
               id={inputId}
               className="input"
               value={value}
@@ -125,6 +143,7 @@ export function ProfileNameEditor({
             className="btn btn-quiet btn-sm"
             disabled={saving}
             onClick={() => {
+              shouldRestoreFocusRef.current = true;
               setEditing(false);
               setError(null);
               setDraft({

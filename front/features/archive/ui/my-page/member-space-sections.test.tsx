@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { MyPageProfile } from "@/features/archive/model/archive-model";
@@ -49,15 +49,19 @@ function renderProfileSummary(canEditProfile = true) {
 
 describe("member-space presentation sections", () => {
   it("renders identity, inline name editing, and membership context without account navigation", () => {
-    renderProfileSummary();
+    const { container } = renderProfileSummary();
     const section = screen.getByRole("region", { name: "멤버1" });
+    const avatar = section.querySelector(".rm-member-profile__avatar")!;
+    const kicker = within(section).getByText("내 프로필");
     const heading = within(section).getByRole("heading", { level: 1, name: "멤버1" });
     const edit = within(section).getByRole("button", { name: "이름 변경" });
     const byline = within(section).getByText("읽는사이 · 멤버 · 2025.11부터 함께");
 
-    expect(screen.getByText("내 프로필")).toBeVisible();
+    expect(avatar.compareDocumentPosition(kicker) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(kicker.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(heading.compareDocumentPosition(edit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(edit.compareDocumentPosition(byline) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(container.querySelectorAll("h1")).toHaveLength(1);
     expect(screen.queryByRole("link", { name: /계정 (관리|설정)/ })).toBeNull();
   });
 
@@ -82,6 +86,37 @@ describe("member-space presentation sections", () => {
     expect(screen.getByLabelText("이름")).toBeVisible();
     expect(screen.getByRole("button", { name: "이름 저장" })).toBeVisible();
     expect(screen.getByRole("button", { name: "취소" })).toBeVisible();
+  });
+
+  it("moves focus from the name-change control to the name input when editing opens", async () => {
+    const user = userEvent.setup();
+    renderProfileSummary();
+
+    await user.click(screen.getByRole("button", { name: "이름 변경" }));
+
+    expect(screen.getByRole("textbox", { name: "이름" })).toHaveFocus();
+  });
+
+  it("returns focus to the name-change control after cancelling", async () => {
+    const user = userEvent.setup();
+    renderProfileSummary();
+
+    await user.click(screen.getByRole("button", { name: "이름 변경" }));
+    await user.click(screen.getByRole("button", { name: "취소" }));
+
+    expect(screen.getByRole("button", { name: "이름 변경" })).toHaveFocus();
+  });
+
+  it("returns focus to the name-change control after a successful save", async () => {
+    const user = userEvent.setup();
+    renderProfileSummary();
+
+    await user.click(screen.getByRole("button", { name: "이름 변경" }));
+    await user.click(screen.getByRole("button", { name: "이름 저장" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "이름 변경" })).toHaveFocus();
+    });
   });
 
   it("keeps the member-space editor stable while a save is pending", async () => {
