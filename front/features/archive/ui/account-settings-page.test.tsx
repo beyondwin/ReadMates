@@ -24,8 +24,7 @@ function renderAccountSettings() {
     <MemoryRouter>
       <AccountSettingsPage
         data={profile}
-        canEditProfile={false}
-        onUpdateProfile={vi.fn().mockResolvedValue({ displayName: profile.displayName, accountName: profile.accountName })}
+        mySpaceHref="/clubs/reading-sai/app/me"
         onLeaveMembership={vi.fn()}
       />
     </MemoryRouter>,
@@ -33,18 +32,22 @@ function renderAccountSettings() {
 }
 
 describe("AccountSettingsPage", () => {
-  it("renders profile, membership, and leave controls without notifications or logout", () => {
+  it("renders read-only account and membership information with a stable return link", () => {
     renderAccountSettings();
 
-    expect(screen.getByRole("heading", { level: 1, name: "계정 관리" })).toBeVisible();
-    expect(screen.getByRole("heading", { level: 1, name: profile.displayName })).toHaveAttribute(
-      "id",
-      "account-settings-profile-name",
+    expect(screen.getByRole("link", { name: "내 공간" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/me",
     );
+    expect(screen.getByRole("heading", { level: 1, name: "계정 설정" })).toBeVisible();
+    expect(screen.getByRole("heading", { level: 2, name: "계정 정보" })).toBeVisible();
+    expect(screen.getByRole("heading", { level: 2, name: "클럽 멤버십" })).toBeVisible();
     expect(screen.getByText(profile.email)).toBeVisible();
-    expect(screen.getByRole("heading", { name: "멤버십" })).toBeVisible();
+    expect(screen.getByText(profile.displayName)).toBeVisible();
+    expect(screen.getByText("읽는 사이")).toBeVisible();
     expect(screen.getByRole("button", { name: "탈퇴" })).toBeVisible();
-    expect(screen.queryByRole("switch")).toBeNull();
+    expect(screen.queryByRole("button", { name: "이름 변경" })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "이름" })).toBeNull();
     expect(screen.queryByRole("button", { name: "로그아웃" })).toBeNull();
   });
 });

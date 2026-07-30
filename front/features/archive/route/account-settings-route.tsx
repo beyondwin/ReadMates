@@ -1,13 +1,8 @@
-import { useLoaderData, useRevalidator } from "react-router-dom";
+import { useLoaderData, useLocation } from "react-router-dom";
 import { leaveMembership } from "@/features/archive/api/archive-api";
 import type { MyPageResponse } from "@/features/archive/api/archive-contracts";
 import { AccountSettingsPage } from "@/features/archive/ui/account-settings-page";
-import { useProfileUpdateController } from "./profile-update-controller";
-
-export type AccountSettingsRouteProps = {
-  canEditProfile: boolean;
-  onProfileUpdated: () => Promise<void>;
-};
+import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 
 async function submitLeaveMembership() {
   const response = await leaveMembership();
@@ -17,21 +12,14 @@ async function submitLeaveMembership() {
   }
 }
 
-export function AccountSettingsRoute({ canEditProfile, onProfileUpdated }: AccountSettingsRouteProps) {
+export function AccountSettingsRoute() {
   const data = useLoaderData() as MyPageResponse;
-  const revalidator = useRevalidator();
-  const { profile, updateProfile } = useProfileUpdateController({
-    sourceProfile: data,
-    canEditProfile,
-    onProfileUpdated,
-    onRevalidate: revalidator.revalidate,
-  });
+  const location = useLocation();
 
   return (
     <AccountSettingsPage
-      data={profile}
-      canEditProfile={canEditProfile}
-      onUpdateProfile={updateProfile}
+      data={data}
+      mySpaceHref={scopedAppLinkTarget(location.pathname, "/app/me")}
       onLeaveMembership={submitLeaveMembership}
     />
   );

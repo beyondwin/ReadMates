@@ -656,7 +656,7 @@ export function AccountSettingsRoute(): JSX.Element;
 - Removes: account-settings profile update controller, `canEditProfile`, `onProfileUpdated`, `onUpdateProfile`, `useRevalidator`, auth-state imports from the page adapter, and the duplicate settings editor.
 - Guarantees: a deterministic scoped `← 내 공간` anchor precedes the title, settings remain directly loadable, and leave membership remains route-owned.
 
-- [ ] **Step 1: Rewrite the settings page test around information ownership**
+- [x] **Step 1: Rewrite the settings page test around information ownership**
 
 Render with `mySpaceHref="/clubs/reading-sai/app/me"` and assert:
 
@@ -678,7 +678,7 @@ expect(screen.queryByRole("button", { name: "로그아웃" })).toBeNull();
 
 Use level-two headings for the three page sections because `계정 설정` is the page `h1`.
 
-- [ ] **Step 2: Replace profile-update route tests with scoped-return tests**
+- [x] **Step 2: Replace profile-update route tests with scoped-return tests**
 
 Change the hoisted router state to:
 
@@ -732,7 +732,7 @@ expect(await screen.findByRole("alert")).toHaveTextContent(
 );
 ```
 
-- [ ] **Step 3: Run settings tests and verify the duplicate editor is still present**
+- [x] **Step 3: Run settings tests and verify the duplicate editor is still present**
 
 Run:
 
@@ -745,7 +745,7 @@ corepack pnpm --dir front exec vitest run \
 
 Expected: FAIL because the title is `계정 관리`, no return link exists, and settings still mount the profile editor.
 
-- [ ] **Step 4: Create focused read-only setting sections**
+- [x] **Step 4: Create focused read-only setting sections**
 
 Create `account-settings-sections.tsx` with:
 
@@ -814,7 +814,7 @@ export function MembershipIdentity({
 
 Delete `preferences-section.tsx`; no file should import `ProfileNameEditor` for settings after this step.
 
-- [ ] **Step 5: Recompose `AccountSettingsPage`**
+- [x] **Step 5: Recompose `AccountSettingsPage`**
 
 Replace its props and JSX with:
 
@@ -860,7 +860,7 @@ export function AccountSettingsPage({
 }
 ```
 
-- [ ] **Step 6: Simplify the route and page adapter**
+- [x] **Step 6: Simplify the route and page adapter**
 
 Use the pathname to build a deterministic return destination:
 
@@ -903,7 +903,7 @@ export default function AccountSettingsRoutePage() {
 }
 ```
 
-- [ ] **Step 7: Run settings and boundary tests**
+- [x] **Step 7: Run settings and boundary tests**
 
 Run:
 
@@ -917,7 +917,7 @@ corepack pnpm --dir front exec vitest run \
 
 Expected: PASS with no new architecture exception.
 
-- [ ] **Step 8: Commit the settings ownership change**
+- [x] **Step 8: Commit the settings ownership change**
 
 ```bash
 git add \
