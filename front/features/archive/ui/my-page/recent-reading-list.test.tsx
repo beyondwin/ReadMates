@@ -66,6 +66,9 @@ describe("RecentReadingList", () => {
     expect(screen.getByRole("link", {
       name: "전체 세션 기록 보기",
     })).toHaveAttribute("href", "/app/archive?view=sessions");
+    expect(screen.getAllByRole("link").some((link) =>
+      link.getAttribute("href")?.endsWith("/app/me/records"),
+    )).toBe(false);
     expect(screen.getByText(/질문 2/)).toBeVisible();
     expect(screen.getByText(/서평 1/)).toBeVisible();
     expect(screen.getByText(/피드백 열림/)).toBeVisible();
