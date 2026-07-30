@@ -14,7 +14,6 @@ export type MyReadingShelfProps = {
   viewModel: MemberSpaceViewModel;
   recentReadings: RecentReadingListItem[];
   canEditProfile: boolean;
-  accountSettingsHref: string;
   recordsHref: string;
   onUpdateProfile: (displayName: string) => Promise<ProfileUpdateResult>;
 };
@@ -24,7 +23,6 @@ export function MyReadingShelf({
   viewModel,
   recentReadings,
   canEditProfile,
-  accountSettingsHref,
   recordsHref,
   onUpdateProfile,
 }: MyReadingShelfProps) {
@@ -35,7 +33,6 @@ export function MyReadingShelf({
           profile={profile}
           viewModel={viewModel}
           canEditProfile={canEditProfile}
-          accountSettingsHref={accountSettingsHref}
           onUpdateProfile={onUpdateProfile}
         />
         <ReadingAchievementSummary viewModel={viewModel} />

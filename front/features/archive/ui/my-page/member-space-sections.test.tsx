@@ -42,39 +42,41 @@ function renderProfileSummary(canEditProfile = true) {
       profile={profile}
       viewModel={viewModel}
       canEditProfile={canEditProfile}
-      accountSettingsHref="/app/me/settings"
       onUpdateProfile={vi.fn().mockResolvedValue({ displayName: profile.displayName, accountName: profile.accountName })}
     />,
   );
 }
 
 describe("member-space presentation sections", () => {
-  it("renders the editable profile summary before its account-management destination", () => {
+  it("renders identity, inline name editing, and membership context without account navigation", () => {
     const { container } = renderProfileSummary();
+    const section = screen.getByRole("region", { name: "멤버1" });
+    const heading = within(section).getByRole("heading", { level: 1, name: "멤버1" });
+    const edit = within(section).getByRole("button", { name: "이름 변경" });
+    const byline = within(section).getByText("읽는사이 · 멤버 · 2025.11부터 함께");
 
     expect(screen.getByText("내 프로필")).toBeVisible();
-    expect(screen.getByRole("heading", { level: 1, name: "멤버1" })).toBeVisible();
-    expect(screen.getByText("읽는사이 · 멤버 · 2025.11부터 함께")).toBeVisible();
-    expect(screen.getByRole("button", { name: "프로필 수정" })).toBeVisible();
-    expect(screen.getByRole("link", { name: "계정 관리" })).toHaveAttribute("href", "/app/me/settings");
-    expect(screen.getByText("계정 관리")).toBeVisible();
-    expect(container.querySelector(".rm-member-profile__settings")).not.toBeNull();
-    expect(container.querySelector(".rm-member-profile > .rm-member-profile__actions")).not.toBeNull();
+    expect(heading.compareDocumentPosition(edit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(edit.compareDocumentPosition(byline) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByRole("link", { name: /계정 (관리|설정)/ })).toBeNull();
+    expect(container.querySelector(".rm-member-profile__actions")).toBeNull();
   });
 
-  it("keeps account management available while omitting profile editing without permission", () => {
+  it("omits only the name-change control when profile editing is not allowed", () => {
     renderProfileSummary(false);
 
-    expect(screen.queryByRole("button", { name: "프로필 수정" })).toBeNull();
+    expect(screen.getByRole("heading", { level: 1, name: "멤버1" })).toBeVisible();
+    expect(screen.getByText("읽는사이 · 멤버 · 2025.11부터 함께")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "이름 변경" })).toBeNull();
     expect(screen.queryByLabelText("이름 변경 준비 중")).toBeNull();
-    expect(screen.getByRole("link", { name: "계정 관리" })).toBeVisible();
+    expect(screen.queryByRole("link", { name: /계정 (관리|설정)/ })).toBeNull();
   });
 
   it("keeps the labelled profile heading available while editing the display name", async () => {
     const user = userEvent.setup();
     renderProfileSummary();
 
-    await user.click(screen.getByRole("button", { name: "프로필 수정" }));
+    await user.click(screen.getByRole("button", { name: "이름 변경" }));
 
     expect(screen.getByRole("heading", { level: 1, name: "멤버1" })).toHaveAttribute("id", "member-profile-name");
     expect(screen.getByRole("region", { name: "멤버1" })).toBeVisible();
@@ -91,12 +93,11 @@ describe("member-space presentation sections", () => {
         profile={profile}
         viewModel={viewModel}
         canEditProfile
-        accountSettingsHref="/app/me/settings"
         onUpdateProfile={() => pendingSave}
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "프로필 수정" }));
+    await user.click(screen.getByRole("button", { name: "이름 변경" }));
     await user.click(screen.getByRole("button", { name: "이름 저장" }));
 
     expect(screen.getByRole("button", { name: "이름 저장" })).toBeDisabled();
@@ -111,14 +112,13 @@ describe("member-space presentation sections", () => {
         profile={profile}
         viewModel={viewModel}
         canEditProfile
-        accountSettingsHref="/app/me/settings"
         onUpdateProfile={vi.fn().mockRejectedValue(
           new Error("같은 클럽에서 이미 쓰고 있는 이름입니다."),
         )}
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "프로필 수정" }));
+    await user.click(screen.getByRole("button", { name: "이름 변경" }));
     await user.click(screen.getByRole("button", { name: "이름 저장" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -134,7 +134,6 @@ describe("member-space presentation sections", () => {
           profile={profile}
           viewModel={viewModel}
           canEditProfile
-          accountSettingsHref="/app/me/settings"
           onUpdateProfile={vi.fn().mockResolvedValue({
             displayName: profile.displayName,
             accountName: profile.accountName,

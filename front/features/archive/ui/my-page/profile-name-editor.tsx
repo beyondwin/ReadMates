@@ -1,4 +1,4 @@
-import { type CSSProperties, type FormEvent, type ReactNode, useId, useRef, useState } from "react";
+import { type FormEvent, useId, useRef, useState } from "react";
 import type { MyPageProfile } from "@/features/archive/model/archive-model";
 import { profileSaveErrorMessage } from "@/features/archive/model/archive-model";
 import type { ProfileUpdateResult } from "./types";
@@ -7,9 +7,7 @@ export type ProfileNameEditorProps = {
   data: MyPageProfile;
   canEditProfile?: boolean;
   onUpdateProfile: (displayName: string) => Promise<ProfileUpdateResult>;
-  variant: "settings" | "member-space";
-  headingId?: string;
-  memberSpaceActions?: ReactNode;
+  headingId: string;
 };
 
 const profileFailureMessages = new Set([
@@ -26,18 +24,22 @@ export function ProfileNameEditor({
   data,
   canEditProfile = true,
   onUpdateProfile,
-  variant,
   headingId,
-  memberSpaceActions,
 }: ProfileNameEditorProps) {
   const inputId = useId();
   const errorId = useId();
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState({ sourceDisplayName: data.displayName, value: data.displayName });
+  const [draft, setDraft] = useState({
+    sourceDisplayName: data.displayName,
+    value: data.displayName,
+  });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
-  const value = draft.sourceDisplayName === data.displayName ? draft.value : data.displayName;
+  const value =
+    draft.sourceDisplayName === data.displayName
+      ? draft.value
+      : data.displayName;
 
   async function submitProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -53,7 +55,10 @@ export function ProfileNameEditor({
 
     try {
       const profile = await onUpdateProfile(trimmedValue);
-      setDraft({ sourceDisplayName: profile.displayName, value: profile.displayName });
+      setDraft({
+        sourceDisplayName: profile.displayName,
+        value: profile.displayName,
+      });
       setEditing(false);
     } catch (profileError) {
       setError(profileFailureMessage(profileError));
@@ -63,176 +68,75 @@ export function ProfileNameEditor({
     }
   }
 
-  const isSettings = variant === "settings";
-  const rowStyle: CSSProperties | undefined = isSettings
-    ? {
-        display: "grid",
-        gridTemplateColumns: "28px minmax(0, 1fr)",
-        gap: "14px",
-        padding: "16px 18px",
-        alignItems: "center",
-      }
-    : undefined;
-
-  const bodyStyle: CSSProperties =
-    isSettings
-      ? { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: "14px", alignItems: "center" }
-      : undefined;
-
-  const formStyle: CSSProperties =
-    isSettings
-      ? { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto auto", gap: "8px", alignItems: "end" }
-      : undefined;
-
-  if (!isSettings) {
-    return (
-      <>
-        <div
-          className="rm-member-profile__name"
-          data-editing={editing || undefined}
-        >
-          <h1 id={headingId}>{data.displayName}</h1>
-          {editing ? (
-            <form className="rm-member-profile__form" onSubmit={submitProfile}>
-              <div style={{ minWidth: 0 }}>
-                <label htmlFor={inputId} className="body" style={{ display: "block", fontSize: "14px" }}>
-                  이름
-                </label>
-                <input
-                  id={inputId}
-                  className="input"
-                  value={value}
-                  disabled={saving}
-                  aria-describedby={error ? errorId : undefined}
-                  onChange={(event) => setDraft({ sourceDisplayName: data.displayName, value: event.currentTarget.value })}
-                  style={{ width: "100%", minWidth: 0, marginTop: "7px", height: "40px" }}
-                />
-                {error ? (
-                  <div id={errorId} role="alert" className="tiny" style={{ color: "var(--danger)", marginTop: "7px" }}>
-                    {error}
-                  </div>
-                ) : null}
-              </div>
-              <button type="submit" className="btn btn-primary btn-sm" aria-label="이름 저장" disabled={saving}>
-                {saving ? "저장 중" : "저장"}
-              </button>
-              <button
-                type="button"
-                className="btn btn-quiet btn-sm"
-                disabled={saving}
-                onClick={() => {
-                  setEditing(false);
-                  setError(null);
-                  setDraft({ sourceDisplayName: data.displayName, value: data.displayName });
-                }}
-              >
-                취소
-              </button>
-            </form>
-          ) : null}
-        </div>
-        {!editing ? (
-          <div className="rm-member-profile__actions">
-            {canEditProfile ? (
-              <button
-                type="button"
-                className="btn btn-quiet btn-sm"
-                aria-label="프로필 수정"
-                onClick={() => {
-                  setEditing(true);
-                  setError(null);
-                }}
-              >
-                <Icon name="edit" size={13} />
-                <span>프로필 수정</span>
-              </button>
-            ) : null}
-            {memberSpaceActions}
-          </div>
-        ) : null}
-      </>
-    );
-  }
-
   return (
-    <div className={isSettings ? undefined : "rm-member-profile__editor"} style={rowStyle}>
-      {isSettings ? (
-        <span aria-hidden style={{ color: "var(--text-3)" }}>
-          <Icon name="me" size={16} />
-        </span>
-      ) : null}
-      <div style={{ minWidth: 0 }}>
-        {editing ? (
-          <form onSubmit={submitProfile} style={formStyle}>
-            <div style={{ minWidth: 0 }}>
-              <label htmlFor={inputId} className="body" style={{ display: "block", fontSize: "14px" }}>
-                이름
-              </label>
-              <input
-                id={inputId}
-                className="input"
-                value={value}
-                disabled={saving}
-                aria-describedby={error ? errorId : undefined}
-                onChange={(event) => setDraft({ sourceDisplayName: data.displayName, value: event.currentTarget.value })}
-                style={{
-                  width: "100%",
-                  minWidth: 0,
-                  marginTop: "7px",
-                  height: "36px",
-                }}
-              />
-              {error ? (
-                <div id={errorId} role="alert" className="tiny" style={{ color: "var(--danger)", marginTop: "7px" }}>
-                  {error}
-                </div>
-              ) : null}
-            </div>
-            <button type="submit" className="btn btn-primary btn-sm" aria-label="이름 저장" disabled={saving}>
-              {saving ? "저장 중" : "저장"}
-            </button>
-            <button
-              type="button"
-              className="btn btn-quiet btn-sm"
-              disabled={saving}
-              onClick={() => {
-                setEditing(false);
-                setError(null);
-                setDraft({ sourceDisplayName: data.displayName, value: data.displayName });
-              }}
-            >
-              취소
-            </button>
-          </form>
-        ) : (
-          <div style={bodyStyle}>
-            <div style={{ minWidth: 0 }}>
-              <div className="body" style={{ fontSize: "14px" }}>
-                이름
-              </div>
-              <div className="tiny">{data.displayName}</div>
-            </div>
-            {canEditProfile ? (
-              <button
-                type="button"
-                className="btn btn-quiet btn-sm"
-                aria-label="이름 변경"
-                onClick={() => {
-                  setEditing(true);
-                  setError(null);
-                }}
-              >
-                <Icon name="edit" size={13} />
-                <span>변경</span>
-              </button>
-            ) : (
-              <span className="tiny" aria-label="이름 변경 준비 중" style={{ color: "var(--text-3)" }}>
-                변경 준비 중
-              </span>
-            )}
-          </div>
-        )}
+    <div className="rm-member-profile__name" data-editing={editing || undefined}>
+      <div className="rm-member-profile__name-row">
+        <h1 id={headingId}>{data.displayName}</h1>
+        {!editing && canEditProfile ? (
+          <button
+            type="button"
+            className="btn btn-quiet btn-sm rm-member-profile__edit"
+            aria-label="이름 변경"
+            onClick={() => {
+              setEditing(true);
+              setError(null);
+            }}
+          >
+            <Icon size={13} />
+            <span>이름 변경</span>
+          </button>
+        ) : null}
       </div>
+      {editing ? (
+        <form className="rm-member-profile__form" onSubmit={submitProfile}>
+          <div className="rm-member-profile__field">
+            <label htmlFor={inputId} className="body">
+              이름
+            </label>
+            <input
+              id={inputId}
+              className="input"
+              value={value}
+              disabled={saving}
+              aria-describedby={error ? errorId : undefined}
+              onChange={(event) =>
+                setDraft({
+                  sourceDisplayName: data.displayName,
+                  value: event.currentTarget.value,
+                })
+              }
+            />
+            {error ? (
+              <div id={errorId} role="alert" className="tiny rm-member-profile__error">
+                {error}
+              </div>
+            ) : null}
+          </div>
+          <button
+            type="submit"
+            className="btn btn-primary btn-sm"
+            aria-label="이름 저장"
+            disabled={saving}
+          >
+            {saving ? "저장 중" : "저장"}
+          </button>
+          <button
+            type="button"
+            className="btn btn-quiet btn-sm"
+            disabled={saving}
+            onClick={() => {
+              setEditing(false);
+              setError(null);
+              setDraft({
+                sourceDisplayName: data.displayName,
+                value: data.displayName,
+              });
+            }}
+          >
+            취소
+          </button>
+        </form>
+      ) : null}
     </div>
   );
 }
@@ -247,37 +151,20 @@ function profileFailureMessage(error: unknown) {
   return profileSaveErrorMessage(null);
 }
 
-function Icon({
-  name,
-  size = 16,
-}: {
-  name: "edit" | "me";
-  size?: number;
-}) {
-  const common = {
-    width: size,
-    height: size,
-    viewBox: "0 0 20 20",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: 1.7,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-    "aria-hidden": true,
-  };
-
-  if (name === "edit") {
-    return (
-      <svg {...common}>
-        <path d="M4 16h3l8-8-3-3-8 8v3zM12 5l3 3" />
-      </svg>
-    );
-  }
-
+function Icon({ size = 16 }: { size?: number }) {
   return (
-    <svg {...common}>
-      <path d="M10 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
-      <path d="M4 17a6 6 0 0 1 12 0" />
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.7}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M4 16h3l8-8-3-3-8 8v3zM12 5l3 3" />
     </svg>
   );
 }

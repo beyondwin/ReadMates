@@ -105,7 +105,7 @@ export type MemberProfileSummaryProps = {
 - Removes: `variant`, `memberSpaceActions`, `accountSettingsHref`, the settings-only editor branch, and the `rm-member-profile__actions` action row.
 - Guarantees: `h1` precedes the `이름 변경` button, the byline follows the editor block, pending/error/cancel behavior is unchanged, and read-only users see no edit affordance or placeholder.
 
-- [ ] **Step 1: Replace the profile-section assertions with the approved hierarchy**
+- [x] **Step 1: Replace the profile-section assertions with the approved hierarchy**
 
 In `member-space-sections.test.tsx`, remove every `accountSettingsHref` prop and replace the first two tests with:
 
@@ -154,7 +154,7 @@ expect(screen.queryByRole("link", { name: /계정 (관리|설정)/ })).toBeNull(
 expect(screen.getByRole("button", { name: "이름 변경" })).toBeVisible();
 ```
 
-- [ ] **Step 2: Run the focused tests and verify the old component contract fails**
+- [x] **Step 2: Run the focused tests and verify the old component contract fails**
 
 Run:
 
@@ -166,7 +166,7 @@ corepack pnpm --dir front exec vitest run \
 
 Expected: FAIL because the profile still renders `프로필 수정`, injects `계정 관리`, and requires `accountSettingsHref`.
 
-- [ ] **Step 3: Simplify `ProfileNameEditor` to the member-space editor only**
+- [x] **Step 3: Simplify `ProfileNameEditor` to the member-space editor only**
 
 Remove `CSSProperties` and `ReactNode` from the React import. Replace the props and render branches with this structure while retaining the current `submitProfile`, `profileFailureMessage`, draft, pending, error, and cancel logic:
 
@@ -318,7 +318,7 @@ function Icon({ size = 16 }: { size?: number }) {
 }
 ```
 
-- [ ] **Step 4: Remove account-settings navigation from the profile composition**
+- [x] **Step 4: Remove account-settings navigation from the profile composition**
 
 Make `MemberProfileSummary` render only:
 
@@ -349,7 +349,7 @@ export function MemberProfileSummary({
 
 Delete `accountSettingsHref` from `MemberProfileSummaryProps`, `MyReadingShelfProps`, `MyPageProps`, and every corresponding call site. Keep `canEditProfile` and `onUpdateProfile` unchanged so `front/src/pages/my-page.tsx` continues to refresh auth after a successful edit.
 
-- [ ] **Step 5: Run the focused tests and verify the new profile contract passes**
+- [x] **Step 5: Run the focused tests and verify the new profile contract passes**
 
 Run:
 
@@ -362,7 +362,7 @@ corepack pnpm --dir front exec vitest run \
 
 Expected: PASS. The page-adapter tests must still prove ACTIVE receives editing and VIEWER/SUSPENDED do not.
 
-- [ ] **Step 6: Commit the profile hierarchy**
+- [x] **Step 6: Commit the profile hierarchy**
 
 ```bash
 git add \
