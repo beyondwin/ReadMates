@@ -15,7 +15,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Changed
 
-- **멤버 내 공간 경로:** `/app/me`는 개인 기록 3건을 미리 보여주고 `전체 기록 보기`를 `/app/me/records`의 전체 cursor 기록으로 연결합니다. 계정 관리는 `/app/me/settings`, 로그아웃은 전역 계정 메뉴, 알림 수신 설정은 알림함 옆 `/app/notifications/settings`에서 제공합니다.
+- **멤버 내 공간·계정·기록 동선:** `/app/me`는 표시 이름과 inline `이름 변경`, 현재 클럽 맥락, 누적 성취가 한 지면에서 이어지며 프로필 안의 중복 계정 설정 action을 제거합니다. 전역 계정 메뉴는 `내 공간`, `계정 설정`, `로그아웃`을 제공하고, `/app/me/settings`는 읽기 전용 계정·멤버십 정보와 `← 내 공간`, 단계형 클럽 탈퇴를 제공합니다. 최근 개인 기록의 `전체 세션 기록 보기`는 `/app/archive?view=sessions`로 연결하며 `/app/me/records` direct deep link와 cursor pagination은 유지합니다.
 - **멤버 알림함:** 큰 문서 패널과 중첩 카드를 간결한 편집형 목록으로 바꾸고, 영어 액션·회고 배지를 제거했습니다. 행 전체 이동, 읽지 않음 상태, 오류·빈 상태, 더 보기 흐름을 데스크톱과 모바일에서 같은 한국어 인터페이스로 제공합니다.
 - **개인 독서 여정 API:** 현재 멤버의 열람 가능한 전체 기록 summary와 cursor page를 함께 반환하는 additive `GET /api/archive/me/journey` projection을 추가했습니다. Page 크기와 무관한 두 개의 고정 query로 계산하며 DB migration이나 BFF 계약 변경은 없습니다.
 

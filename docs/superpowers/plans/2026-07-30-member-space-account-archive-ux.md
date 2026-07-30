@@ -1604,7 +1604,7 @@ git commit -m "feat(front): polish member account and archive UX"
 - Documents the exact shipped ownership and compatibility contract.
 - Adds no product code.
 
-- [ ] **Step 1: Update the architecture facts**
+- [x] **Step 1: Update the architecture facts**
 
 Replace the current `/app/me` navigation paragraph with:
 
@@ -1616,7 +1616,7 @@ Replace the current `/app/me` navigation paragraph with:
 계정·멤버십 정보와 탈퇴는 `/app/me/settings`, 알림 수신 설정은 알림함과 나란한 `/app/notifications/settings`가 소유합니다. 전역 계정 메뉴는 `내 공간`, `계정 설정`, `로그아웃`을 제공하고, `/app/me/settings`는 scoped `← 내 공간` 복귀 링크를 제공합니다. 표시 이름 편집은 `/app/me`만 소유하며 profile update controller, auth refresh, route revalidation 계약을 유지합니다. `/app/me/settings`에는 이름 편집과 로그아웃을 중복하지 않습니다.
 ```
 
-- [ ] **Step 2: Update `CHANGELOG.md` Unreleased**
+- [x] **Step 2: Update `CHANGELOG.md` Unreleased**
 
 Replace the current `멤버 내 공간 경로` entry with:
 
@@ -1624,7 +1624,7 @@ Replace the current `멤버 내 공간 경로` entry with:
 - **멤버 내 공간·계정·기록 동선:** `/app/me`는 표시 이름과 inline `이름 변경`, 현재 클럽 맥락, 누적 성취가 한 지면에서 이어지며 프로필 안의 중복 계정 설정 action을 제거합니다. 전역 계정 메뉴는 `내 공간`, `계정 설정`, `로그아웃`을 제공하고, `/app/me/settings`는 읽기 전용 계정·멤버십 정보와 `← 내 공간`, 단계형 클럽 탈퇴를 제공합니다. 최근 개인 기록의 `전체 세션 기록 보기`는 `/app/archive?view=sessions`로 연결하며 `/app/me/records` direct deep link와 cursor pagination은 유지합니다.
 ```
 
-- [ ] **Step 3: Scan the diff for stale copy, props, and accidental scope expansion**
+- [x] **Step 3: Scan the diff for stale copy, props, and accidental scope expansion**
 
 Run:
 
@@ -1643,7 +1643,7 @@ git diff -- \
 
 Expected: the first command reports no stale product/test occurrences in the touched member-account surfaces. Any deliberate historical text outside the touched files is not rewritten. The diff contains no server, BFF, migration, dependency, or route deletion.
 
-- [ ] **Step 4: Run formatting and focused architecture checks**
+- [x] **Step 4: Run formatting and focused architecture checks**
 
 Run:
 
@@ -1654,7 +1654,7 @@ corepack pnpm --dir front exec vitest run tests/unit/frontend-boundaries.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 5: Run all canonical frontend gates**
+- [x] **Step 5: Run all canonical frontend gates**
 
 Run:
 
@@ -1667,7 +1667,7 @@ corepack pnpm --dir front test:e2e
 
 Expected: PASS. Do not run server or public-release gates because this slice changes no server, BFF, deployment, public-release, migration, or package contract.
 
-- [ ] **Step 6: Inspect the built UI at bounded viewports**
+- [x] **Step 6: Inspect the built UI at bounded viewports**
 
 Using the existing local frontend runtime, verify:
 
@@ -1683,14 +1683,14 @@ Using the existing local frontend runtime, verify:
 
 For each viewport confirm no horizontal overflow, visible focus, 44px controls, the approved DOM order, settings return, archive sessions selected state, and no duplicated account/edit/logout action.
 
-- [ ] **Step 7: Commit documentation and gate evidence**
+- [x] **Step 7: Commit documentation and gate evidence**
 
 ```bash
 git add docs/development/architecture.md CHANGELOG.md
 git commit -m "docs: align member account and archive navigation"
 ```
 
-- [ ] **Step 8: Record the final verification state**
+- [x] **Step 8: Record the final verification state**
 
 Run:
 
