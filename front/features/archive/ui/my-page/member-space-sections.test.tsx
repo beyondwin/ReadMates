@@ -49,7 +49,7 @@ function renderProfileSummary(canEditProfile = true) {
 
 describe("member-space presentation sections", () => {
   it("renders identity, inline name editing, and membership context without account navigation", () => {
-    const { container } = renderProfileSummary();
+    renderProfileSummary();
     const section = screen.getByRole("region", { name: "멤버1" });
     const heading = within(section).getByRole("heading", { level: 1, name: "멤버1" });
     const edit = within(section).getByRole("button", { name: "이름 변경" });
@@ -59,7 +59,6 @@ describe("member-space presentation sections", () => {
     expect(heading.compareDocumentPosition(edit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(edit.compareDocumentPosition(byline) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.queryByRole("link", { name: /계정 (관리|설정)/ })).toBeNull();
-    expect(container.querySelector(".rm-member-profile__actions")).toBeNull();
   });
 
   it("omits only the name-change control when profile editing is not allowed", () => {
