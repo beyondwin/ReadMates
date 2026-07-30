@@ -1,6 +1,6 @@
 # ReadMates 내 공간 계정·아카이브 UX 정리
 
-작성일: 2026-07-30  
+작성일: 2026-07-30
 상태: 디자인 승인 완료, 작성본 검토 대기
 
 ## 1. 요약
@@ -71,18 +71,12 @@
 
 ### 5.1 조사한 원칙
 
-- Apple은 저빈도·전역 설정은 독립 settings 영역에 두고, 현재 작업에만 영향을 주는 편집은 해당 문맥에서 제공하도록 안내한다.  
-  [Apple Human Interface Guidelines — Settings](https://developer.apple.com/design/human-interface-guidelines/settings)
-- Carbon은 profile menu를 계정·세션 정보, settings, logout 같은 전역 기능의 일관된 진입점으로 정의한다.  
-  [Carbon Design System — Disclosures](https://carbondesignsystem.com/patterns/disclosures-pattern/)
-- GOV.UK는 브라우저 Back을 모르거나 신뢰하지 않는 사용자를 위해 명시적 back link를 제공하고, 복잡한 문맥에서는 돌아갈 목적지를 문구로 설명하도록 권장한다.  
-  [GOV.UK Design System — Back link](https://design-system.service.gov.uk/components/back-link/)
-- GitLab Pajamas는 파괴적 행동을 다른 action과 분리하고, 결과 설명과 취소가 있는 확인 단계 뒤에서 최종 danger action을 제공하도록 안내한다.  
-  [Pajamas Design System — Destructive actions](https://design.gitlab.com/patterns/destructive-actions/)
-- Material navigation은 recent items에서 complete history로 이동하는 관계를 문맥 내 navigation의 대표 사례로 든다.  
-  [Material Design — Navigation](https://m1.material.io/patterns/navigation.html)
-- W3C는 같은 기능을 반복해서 제공할 때 일관된 이름을 사용해 예측 가능성을 유지하도록 요구한다.  
-  [W3C — Consistent Identification](https://www.w3.org/WAI/WCAG22/Understanding/consistent-identification)
+- Apple은 저빈도·전역 설정은 독립 settings 영역에 두고, 현재 작업에만 영향을 주는 편집은 해당 문맥에서 제공하도록 안내한다. [Apple Human Interface Guidelines — Settings](https://developer.apple.com/design/human-interface-guidelines/settings)
+- Carbon은 profile menu를 계정·세션 정보, settings, logout 같은 전역 기능의 일관된 진입점으로 정의한다. [Carbon Design System — Disclosures](https://carbondesignsystem.com/patterns/disclosures-pattern/)
+- GOV.UK는 브라우저 Back을 모르거나 신뢰하지 않는 사용자를 위해 명시적 back link를 제공하고, 복잡한 문맥에서는 돌아갈 목적지를 문구로 설명하도록 권장한다. [GOV.UK Design System — Back link](https://design-system.service.gov.uk/components/back-link/)
+- GitLab Pajamas는 파괴적 행동을 다른 action과 분리하고, 결과 설명과 취소가 있는 확인 단계 뒤에서 최종 danger action을 제공하도록 안내한다. [Pajamas Design System — Destructive actions](https://design.gitlab.com/patterns/destructive-actions/)
+- Material navigation은 recent items에서 complete history로 이동하는 관계를 문맥 내 navigation의 대표 사례로 든다. [Material Design — Navigation](https://m1.material.io/patterns/navigation.html)
+- W3C는 같은 기능을 반복해서 제공할 때 일관된 이름을 사용해 예측 가능성을 유지하도록 요구한다. [W3C — Consistent Identification](https://www.w3.org/WAI/WCAG22/Understanding/consistent-identification)
 
 ### 5.2 선택: 역할 분리
 
