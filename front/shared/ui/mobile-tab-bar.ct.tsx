@@ -22,6 +22,12 @@ test("MobileTabBar wraps deliberately long Korean and English labels at a narrow
     const box = element.getBoundingClientRect();
     return { top: box.top, bottom: box.bottom, left: box.left, right: box.right };
   });
+  const tabMetrics = await tabBar.locator(".m-tab").evaluateAll((elements) =>
+    elements.map((element) => {
+      const box = element.getBoundingClientRect();
+      return { width: box.width, height: box.height };
+    }),
+  );
   const labelMetrics = await labels.evaluateAll((elements) =>
     elements.slice(0, 2).map((element) => {
       const label = element as HTMLElement;
@@ -58,4 +64,8 @@ test("MobileTabBar wraps deliberately long Korean and English labels at a narrow
   expect(tabBarBounds.left).toBeGreaterThanOrEqual(0);
   expect(tabBarBounds.right).toBeLessThanOrEqual(320);
   expect(tabBarBounds.bottom).toBeLessThanOrEqual(480);
+  for (const metric of tabMetrics) {
+    expect(metric.width).toBeGreaterThanOrEqual(44);
+    expect(metric.height).toBeGreaterThanOrEqual(44);
+  }
 });
