@@ -197,10 +197,7 @@ export function AppRouteLayout({
       })
       .catch(() => {
         if (!cancelled) {
-          setHostCurrentSession({
-            hostKey: activeHostKey,
-            sessionId: null,
-          });
+          setHostCurrentSession(null);
         }
       });
 
@@ -225,6 +222,7 @@ export function AppRouteLayout({
           memberName={memberName}
           showHostEntry={showHostEntry}
           appBasePath={basePath}
+          currentSessionId={desktopVariant === "host" ? currentSessionId : null}
           LinkComponent={Link}
           accountControl={
             auth?.authenticated ? (

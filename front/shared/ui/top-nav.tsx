@@ -4,7 +4,11 @@ import { useLocation } from "react-router-dom";
 import { AvatarChip } from "./avatar-chip";
 import { usePublicAuthAction, type PublicAuthAction } from "./public-auth-action-state";
 import { ReadmatesBrandMark } from "./readmates-brand-mark";
-import { READMATES_NAV_LABELS, READMATES_WORKSPACE_LABELS } from "./readmates-copy";
+import {
+  READMATES_NAV_LABELS,
+  READMATES_PRIMARY_NAV_LABELS,
+  READMATES_WORKSPACE_LABELS,
+} from "./readmates-copy";
 import { WorkspaceSwitchIcon } from "./workspace-switch-icon";
 
 export type TopNavVariant = "guest" | "member" | "host";
@@ -23,8 +27,9 @@ export type AppLinkComponent = ComponentType<AppLinkProps>;
 
 type NavLink = {
   key: string;
-  href: string;
+  href: string | null;
   label: string;
+  pendingLabel?: string;
   current: (pathname: string) => boolean;
 };
 
@@ -35,38 +40,38 @@ type TopNavProps = {
   authenticated?: boolean;
   publicBasePath?: string;
   appBasePath?: string;
+  currentSessionId?: string | null;
   LinkComponent?: AppLinkComponent;
   accountControl?: ReactNode;
 };
 
 const memberLinks: NavLink[] = [
-  { key: "home", href: "/app", label: READMATES_NAV_LABELS.member.home, current: (pathname) => pathname === "/app" },
   {
-    key: "session",
-    href: "/app/session/current",
-    label: READMATES_NAV_LABELS.member.currentSession,
-    current: (pathname) => pathname === "/app/session" || pathname.startsWith("/app/session/"),
+    key: "home",
+    href: "/app",
+    label: READMATES_PRIMARY_NAV_LABELS.member.today,
+    current: (pathname) =>
+      pathname === "/app" || pathname === "/app/session" || pathname.startsWith("/app/session/"),
   },
   {
     key: "notes",
     href: "/app/notes",
-    label: READMATES_NAV_LABELS.member.clubNotes,
+    label: READMATES_PRIMARY_NAV_LABELS.member.notes,
     current: (pathname) => pathname === "/app/notes",
   },
   {
     key: "archive",
     href: "/app/archive",
-    label: READMATES_NAV_LABELS.member.archive,
+    label: READMATES_PRIMARY_NAV_LABELS.member.records,
     current: (pathname) =>
       pathname.startsWith("/app/archive") || pathname.startsWith("/app/sessions/") || pathname.startsWith("/app/feedback/"),
   },
   {
-    key: "notifications",
-    href: "/app/notifications",
-    label: READMATES_NAV_LABELS.member.notifications,
-    current: (pathname) => pathname.startsWith("/app/notifications"),
+    key: "me",
+    href: "/app/me",
+    label: READMATES_PRIMARY_NAV_LABELS.member.mySpace,
+    current: (pathname) => pathname.startsWith("/app/me") || pathname.startsWith("/app/notifications"),
   },
-  { key: "me", href: "/app/me", label: READMATES_NAV_LABELS.member.mySpace, current: (pathname) => pathname.startsWith("/app/me") },
 ];
 
 const hostEntryLink: NavLink = {
@@ -76,38 +81,45 @@ const hostEntryLink: NavLink = {
   current: (pathname) => pathname.startsWith("/app/host"),
 };
 
-const hostLinks: NavLink[] = [
-  {
-    key: "host-operations",
-    href: "/app/host",
-    label: READMATES_NAV_LABELS.host.operations,
-    current: (pathname) => pathname === "/app/host",
-  },
-  {
-    key: "host-session-records",
-    href: "/app/host/sessions",
-    label: READMATES_NAV_LABELS.host.sessionRecords,
-    current: (pathname) => pathname === "/app/host/sessions" || pathname.startsWith("/app/host/sessions/"),
-  },
-  {
-    key: "host-notifications",
-    href: "/app/host/notifications",
-    label: READMATES_NAV_LABELS.host.notifications,
-    current: (pathname) => pathname === "/app/host/notifications",
-  },
-  {
-    key: "host-invitations",
-    href: "/app/host/invitations",
-    label: READMATES_NAV_LABELS.host.invitations,
-    current: (pathname) => pathname === "/app/host/invitations",
-  },
-  {
-    key: "host-members",
-    href: "/app/host/members",
-    label: READMATES_NAV_LABELS.host.memberApproval,
-    current: (pathname) => pathname === "/app/host/members",
-  },
-];
+function hostLinks(currentSessionId?: string | null): NavLink[] {
+  const sessionHref =
+    currentSessionId === undefined
+      ? null
+      : currentSessionId
+        ? `/app/host/sessions/${currentSessionId}/edit`
+        : "/app/host/sessions/new";
+
+  return [
+    {
+      key: "host-operations",
+      href: "/app/host",
+      label: READMATES_PRIMARY_NAV_LABELS.host.today,
+      current: (pathname) => pathname === "/app/host" || pathname === "/app/host/notifications",
+    },
+    {
+      key: "host-session",
+      href: sessionHref,
+      label: READMATES_PRIMARY_NAV_LABELS.host.session,
+      pendingLabel: "확인 중",
+      current: (pathname) =>
+        pathname === "/app/host/sessions/new" || /^\/app\/host\/sessions\/[^/]+\/edit$/.test(pathname),
+    },
+    {
+      key: "host-members",
+      href: "/app/host/members",
+      label: READMATES_PRIMARY_NAV_LABELS.host.members,
+      current: (pathname) => pathname === "/app/host/members" || pathname === "/app/host/invitations",
+    },
+    {
+      key: "host-records",
+      href: "/app/host/sessions",
+      label: READMATES_PRIMARY_NAV_LABELS.host.records,
+      current: (pathname) =>
+        pathname === "/app/host/sessions" ||
+        /^\/app\/host\/sessions\/[^/]+\/(?:closing|feedback-document)$/.test(pathname),
+    },
+  ];
+}
 
 const memberReturnLink: NavLink = {
   key: "member-workspace",
@@ -139,7 +151,7 @@ function appPathname(pathname: string) {
 function scopedAppLink(link: NavLink, appBasePath: string): NavLink {
   return {
     ...link,
-    href: prefixedAppPath(appBasePath, link.href),
+    href: link.href ? prefixedAppPath(appBasePath, link.href) : null,
   };
 }
 
@@ -220,22 +232,34 @@ function TopNavFrame({
 
         <div className="row" style={{ gap: "12px" }}>
           <nav className="nav-links" aria-label={navLabel}>
-            {links.map((link) => (
-              <LinkComponent
-                key={link.key}
-                to={link.href}
-                className="nav-link"
-                aria-current={link.current(pathname) ? "page" : undefined}
-              >
-                {link.label}
-              </LinkComponent>
-            ))}
+            {links.map((link) =>
+              link.href ? (
+                <LinkComponent
+                  key={link.key}
+                  to={link.href}
+                  className="nav-link"
+                  aria-current={link.current(pathname) ? "page" : undefined}
+                >
+                  {link.label}
+                </LinkComponent>
+              ) : (
+                <span
+                  key={link.key}
+                  className="nav-link is-pending"
+                  aria-disabled="true"
+                  aria-current={link.current(pathname) ? "page" : undefined}
+                  aria-label={`${link.label} 불러오는 중`}
+                >
+                  {link.pendingLabel ?? link.label}
+                </span>
+              ),
+            )}
           </nav>
           {workspaceAction || accountControl || memberName ? (
             <div className="topnav-account-actions">
               {workspaceAction ? (
                 <LinkComponent
-                  to={workspaceAction.href}
+                  to={workspaceAction.href!}
                   className="rm-workspace-switch"
                   aria-label={workspaceAction.label}
                   title={workspaceAction.label}
@@ -293,6 +317,7 @@ function AppTopNav({
   variant,
   memberName,
   showHostEntry,
+  currentSessionId,
   appBasePath = "",
   LinkComponent,
   accountControl,
@@ -300,13 +325,16 @@ function AppTopNav({
   variant: Exclude<TopNavVariant, "guest">;
   memberName?: string | null;
   showHostEntry?: boolean;
+  currentSessionId?: string | null;
   appBasePath?: string;
   LinkComponent: AppLinkComponent;
   accountControl?: ReactNode;
 }) {
   const pathname = useLocation().pathname;
   const appPath = appPathname(pathname);
-  const links = (variant === "host" ? hostLinks : memberLinks).map((link) => scopedAppLink(link, appBasePath));
+  const links = (variant === "host" ? hostLinks(currentSessionId) : memberLinks).map((link) =>
+    scopedAppLink(link, appBasePath),
+  );
   const workspaceAction = variant === "host" ? memberReturnLink : showHostEntry ? hostEntryLink : null;
   const scopedWorkspaceAction = workspaceAction ? scopedAppLink(workspaceAction, appBasePath) : null;
 
@@ -331,6 +359,7 @@ export function TopNav({
   authenticated,
   publicBasePath,
   appBasePath,
+  currentSessionId,
   LinkComponent = DefaultLink,
   accountControl,
 }: TopNavProps) {
@@ -344,6 +373,7 @@ export function TopNav({
       memberName={memberName}
       showHostEntry={showHostEntry}
       appBasePath={appBasePath}
+      currentSessionId={currentSessionId}
       LinkComponent={LinkComponent}
       accountControl={accountControl}
     />

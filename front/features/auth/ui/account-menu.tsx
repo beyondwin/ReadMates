@@ -22,6 +22,7 @@ export type AccountMenuProps = {
   memberName: string;
   membershipLabel: string;
   mySpaceHref: string;
+  notificationsHref: string;
   settingsHref: string;
   LinkComponent: AccountMenuLinkComponent;
   LogoutControl: ReactNode;
@@ -31,6 +32,7 @@ export function AccountMenu({
   memberName,
   membershipLabel,
   mySpaceHref,
+  notificationsHref,
   settingsHref,
   LinkComponent,
   LogoutControl,
@@ -129,6 +131,9 @@ export function AccountMenu({
           <div className="rm-account-menu__items">
             <LinkComponent to={mySpaceHref} className="rm-account-menu__item" onClick={closeMenu}>
               내 공간
+            </LinkComponent>
+            <LinkComponent to={notificationsHref} className="rm-account-menu__item" onClick={closeMenu}>
+              알림
             </LinkComponent>
             <LinkComponent to={settingsHref} className="rm-account-menu__item" onClick={closeMenu}>
               계정 설정

@@ -1,7 +1,10 @@
 
 import type { ComponentType, ReactNode } from "react";
 import { useLocation } from "react-router-dom";
-import { READMATES_MOBILE_TAB_LABELS, READMATES_NAV_LABELS } from "./readmates-copy";
+import {
+  READMATES_MOBILE_TAB_LABELS,
+  READMATES_PRIMARY_NAV_LABELS,
+} from "./readmates-copy";
 
 export type MobileTabBarVariant = "member" | "host";
 
@@ -56,42 +59,35 @@ function DefaultLink({ to, state: _state, children, ...props }: AppLinkProps) {
 }
 
 const memberTabs: TabLink[] = [
-  { key: "home", href: "/app", label: READMATES_NAV_LABELS.member.home, icon: "home", current: (pathname) => pathname === "/app" },
   {
-    key: "session",
-    href: "/app/session/current",
-    label: READMATES_NAV_LABELS.member.currentSession,
-    icon: "session",
-    current: (pathname) => pathname === "/app/session" || pathname.startsWith("/app/session/"),
+    key: "home",
+    href: "/app",
+    label: READMATES_PRIMARY_NAV_LABELS.member.today,
+    icon: "home",
+    current: (pathname) =>
+      pathname === "/app" || pathname === "/app/session" || pathname.startsWith("/app/session/"),
   },
   {
     key: "notes",
     href: "/app/notes",
-    label: READMATES_NAV_LABELS.member.clubNotes,
+    label: READMATES_PRIMARY_NAV_LABELS.member.notes,
     icon: "notes",
     current: (pathname) => pathname === "/app/notes",
   },
   {
     key: "archive",
     href: "/app/archive",
-    label: READMATES_NAV_LABELS.member.archive,
+    label: READMATES_PRIMARY_NAV_LABELS.member.records,
     icon: "archive",
     current: (pathname) =>
       pathname.startsWith("/app/archive") || pathname.startsWith("/app/sessions/") || pathname.startsWith("/app/feedback/"),
   },
   {
-    key: "notifications",
-    href: "/app/notifications",
-    label: READMATES_NAV_LABELS.member.notifications,
-    icon: "notifications",
-    current: (pathname) => pathname.startsWith("/app/notifications"),
-  },
-  {
     key: "me",
     href: "/app/me",
-    label: READMATES_NAV_LABELS.member.mySpace,
+    label: READMATES_PRIMARY_NAV_LABELS.member.mySpace,
     icon: "me",
-    current: (pathname) => pathname.startsWith("/app/me"),
+    current: (pathname) => pathname.startsWith("/app/me") || pathname.startsWith("/app/notifications"),
   },
 ];
 
@@ -124,7 +120,7 @@ function hostTabs(currentSessionId?: string | null): TabLink[] {
       href: "/app/host",
       label: READMATES_MOBILE_TAB_LABELS.hostToday,
       icon: "host",
-      current: (pathname) => pathname === "/app/host",
+      current: (pathname) => pathname === "/app/host" || pathname === "/app/host/notifications",
     },
     {
       key: "host-edit",
@@ -133,13 +129,6 @@ function hostTabs(currentSessionId?: string | null): TabLink[] {
       pendingLabel: currentSessionId === undefined ? READMATES_MOBILE_TAB_LABELS.hostSessionPending : undefined,
       icon: "edit",
       current: (pathname) => pathname === "/app/host/sessions/new" || /^\/app\/host\/sessions\/[^/]+\/edit$/.test(pathname),
-    },
-    {
-      key: "host-notifications",
-      href: "/app/host/notifications",
-      label: READMATES_MOBILE_TAB_LABELS.hostNotifications,
-      icon: "notify",
-      current: (pathname) => pathname === "/app/host/notifications",
     },
     {
       key: "host-members",
@@ -153,7 +142,9 @@ function hostTabs(currentSessionId?: string | null): TabLink[] {
       href: "/app/host/sessions",
       label: READMATES_MOBILE_TAB_LABELS.hostRecords,
       icon: "archive",
-      current: (pathname) => pathname === "/app/host/sessions",
+      current: (pathname) =>
+        pathname === "/app/host/sessions" ||
+        /^\/app\/host\/sessions\/[^/]+\/(?:closing|feedback-document)$/.test(pathname),
     },
   ];
 }

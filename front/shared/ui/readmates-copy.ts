@@ -31,10 +31,25 @@ export const READMATES_WORKSPACE_LABELS = {
 } as const;
 
 export const READMATES_MOBILE_TAB_LABELS = {
-  hostToday: "홈",
+  hostToday: "오늘",
   hostSession: "세션",
   hostSessionPending: "확인 중",
   hostNotifications: "알림",
   hostMembers: "멤버",
   hostRecords: "기록",
+} as const;
+
+export const READMATES_PRIMARY_NAV_LABELS = {
+  member: {
+    today: "오늘",
+    notes: "노트",
+    records: "기록",
+    mySpace: "내 공간",
+  },
+  host: {
+    today: "오늘",
+    session: "세션",
+    members: "멤버",
+    records: "기록",
+  },
 } as const;
