@@ -197,7 +197,7 @@ export function MobileHostDashboard({
                 {getHostDashboardSessionMetrics(session).map(([label, value]) => (
                   <div key={label}>
                     <dt className="eyebrow">{label}</dt>
-                    <dd>{value}</dd>
+                    <dd className="ledger-number">{value}</dd>
                   </div>
                 ))}
               </dl>

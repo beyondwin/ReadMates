@@ -63,19 +63,19 @@ function LatestRecordFeature({ publicBasePath, session }: { publicBasePath: stri
   const display = sessionDisplay(session);
 
   return (
-    <Link to={publicSessionHref(session, publicBasePath)} className="rm-document-panel public-latest-record">
+    <Link to={publicSessionHref(session, publicBasePath)} className="public-latest-record">
       <div className="public-latest-record__cover">
         <BookCover title={display.title} author={display.author} imageUrl={session.bookImageUrl} width={132} />
       </div>
       <div className="public-latest-record__body">
         <div className="eyebrow">최근 공개 기록 · No.{session.sessionNumber}</div>
-        <h2 className="h2 editorial" style={{ margin: "10px 0 0" }}>
+        <h2 className="h2 editorial reading-editorial" style={{ margin: "10px 0 0" }}>
           {display.title}
         </h2>
         <p className="small" style={{ margin: "6px 0 0", color: "var(--text-2)" }}>
           {display.author} · {display.date}
         </p>
-        <p className="body" style={{ margin: "18px 0 0", color: "var(--text-2)" }}>
+        <p className="body reading-editorial" style={{ margin: "18px 0 0", color: "var(--text-2)" }}>
           {display.summary}
         </p>
         <RecordBadges session={session} />
@@ -98,7 +98,7 @@ function ArchiveRecordRow({ publicBasePath, session }: { publicBasePath: string;
         decorative
       />
       <span className="public-archive-row__main">
-        <span className="editorial public-archive-row__title">{display.title}</span>
+        <span className="editorial reading-editorial public-archive-row__title">{display.title}</span>
         <span className="small public-archive-row__meta">
           {display.author} · {display.date}
         </span>
@@ -125,7 +125,7 @@ function SummaryExcerpt({ publicBasePath, session }: { publicBasePath: string; s
         decorative
       />
       <span>
-        <span className="quote-card__quote editorial">{display.summary}</span>
+        <span className="quote-card__quote editorial reading-editorial">{display.summary}</span>
         <span className="small" style={{ display: "block", marginTop: 10, color: "var(--text-3)" }}>
           {display.title} · {display.author}
         </span>
@@ -173,9 +173,19 @@ function PublicRecordGuide({ hasPublishedRecords, publicBasePath }: { hasPublish
         ))}
       </div>
       <div className="public-membership-panel__actions">
-        <Link to={publicRecordsHref(publicBasePath)} className="btn btn-primary">
-          {hasPublishedRecords ? "공개 기록 보기" : "공개 기록 준비 중"}
-        </Link>
+        {hasPublishedRecords ? (
+          <Link to={publicRecordsHref(publicBasePath)} className="btn btn-primary">
+            공개 기록 보기
+          </Link>
+        ) : (
+          <p
+            className="small public-record-preparing"
+            role="status"
+            aria-label="공개 기록 준비 중"
+          >
+            첫 공개 기록을 정리하고 있습니다.
+          </p>
+        )}
       </div>
     </div>
   );

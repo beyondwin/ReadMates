@@ -153,6 +153,7 @@ describe("HostClubOperationsCard", () => {
 
       const delta = screen.getByText("+2");
       const style = getComputedStyle(delta);
+      expect(delta).toHaveClass("ledger-number");
       expect(style.fontFamily).toBe("var(--f-mono)");
       expect(style.fontVariantNumeric).toBe("tabular-nums");
     } finally {

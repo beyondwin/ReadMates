@@ -1420,6 +1420,9 @@ describe("HostDashboard", () => {
     expect(current.currentSession?.board).not.toHaveProperty("checkins");
     expect(mobile.getByText("질문").parentElement).toHaveTextContent("2/10");
     expect(mobile.getByText("읽기").parentElement).toHaveTextContent("1/2");
+    for (const value of container.querySelectorAll(".rm-host-dashboard-mobile__session-metrics dd")) {
+      expect(value).toHaveClass("ledger-number");
+    }
     expect(mobile.getAllByText("참석 1명 · 미응답 1명").length).toBeGreaterThan(0);
     expect(mobile.queryByText("김호스트")).not.toBeInTheDocument();
     expect(mobile.queryByText("안멤버1")).not.toBeInTheDocument();
@@ -1458,6 +1461,9 @@ describe("HostDashboard", () => {
     expect(desktop.getByText("2026.05.20 20:00 · 온라인")).toBeInTheDocument();
     expect(desktop.getByText("질문").parentElement).toHaveTextContent("2/10");
     expect(desktop.getByText("읽기").parentElement).toHaveTextContent("1/2");
+    for (const value of container.querySelectorAll(".rm-host-current__metrics dd")) {
+      expect(value).toHaveClass("ledger-number");
+    }
     expect(desktop.getByRole("img", { name: "테스트 책 표지" })).toHaveAttribute(
       "src",
       "https://example.com/covers/test-book.jpg",

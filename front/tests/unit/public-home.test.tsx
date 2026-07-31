@@ -61,6 +61,17 @@ describe("PublicHome", () => {
     expect(
       container.querySelectorAll('a.public-latest-record[href="/sessions/00000000-0000-0000-0000-000000000306"]'),
     ).toHaveLength(1);
+    expect(container.querySelector(".public-latest-record")).not.toHaveClass("rm-document-panel");
+    expect(container.querySelector(".public-latest-record .h2")).toHaveClass("reading-editorial");
+    expect(container.querySelector(".public-latest-record .body")).toHaveClass("reading-editorial");
+    expect(container.querySelector(".public-archive-row__title")).toHaveClass("reading-editorial");
+    expect(container.querySelector(".quote-card__quote")).toHaveClass("reading-editorial");
+    expect(
+      screen.getByText("책을 읽고 각자 나누고 싶은 질문을 준비합니다."),
+    ).not.toHaveClass("reading-editorial");
+    expect(
+      screen.getByText("가장 최근에 공개한 기록을 먼저 펼쳐, 함께 읽은 흔적을 보여줍니다."),
+    ).not.toHaveClass("reading-editorial");
     expect(container.querySelectorAll('a[href="/sessions/00000000-0000-0000-0000-000000000306"]')).toHaveLength(3);
     expect(screen.getByText("공개한 모임 기록을 모았습니다")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "공개 기록 보기" })).toHaveAttribute("href", "/records");
@@ -189,6 +200,11 @@ describe("PublicHome", () => {
     expect(container).toHaveTextContent("공개 소개가 아직 준비되지 않았습니다.");
     expect(container).toHaveTextContent("0공개 모임");
     expect(screen.getByRole("link", { name: "클럽 소개 보기" })).toHaveAttribute("href", "/about");
+    expect(screen.queryByRole("link", { name: "공개 기록 준비 중" })).not.toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "공개 기록 준비 중" })).not.toHaveClass(
+      "btn",
+      "btn-primary",
+    );
     expect(container.innerHTML).not.toContain("물고기는 존재하지 않는다");
     expect(container.innerHTML).not.toContain("session-13");
   });

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -44,6 +45,44 @@ const actions = {
 } satisfies HostDashboardProps["actions"];
 
 describe("HostDashboard", () => {
+  it("marks operational values as mono tabular ledger numbers while headings stay sans", () => {
+    const stylesheet = document.createElement("style");
+    stylesheet.textContent = readFileSync("src/styles/globals.css", "utf8");
+    document.head.append(stylesheet);
+
+    try {
+      const { container } = render(
+        <HostDashboard
+          data={{
+            ...dashboard,
+            rsvpPending: 2,
+            checkinMissing: 1,
+            publishPending: 3,
+            feedbackPending: 4,
+          }}
+          current={{ currentSession: null }}
+          hostSessions={hostSessions}
+          actions={actions}
+        />,
+      );
+
+      const ledgerValues = Array.from(
+        container.querySelectorAll<HTMLElement>(".rm-host-ledger__metric strong"),
+      );
+      expect(ledgerValues.length).toBeGreaterThan(0);
+      for (const value of ledgerValues) {
+        expect(value).toHaveClass("ledger-number");
+        expect(getComputedStyle(value).fontFamily).toBe("var(--f-mono)");
+        expect(getComputedStyle(value).fontVariantNumeric).toBe("tabular-nums");
+      }
+      expect(screen.getByRole("heading", { name: "모임 운영", level: 1 })).not.toHaveClass(
+        "ledger-number",
+      );
+    } finally {
+      stylesheet.remove();
+    }
+  });
+
   it("uses the approved priority-ledger hierarchy without the global two-column grid", () => {
     const { container } = render(
       <HostDashboard

@@ -75,7 +75,7 @@ export function HostPriorityLedger({
             <div key={metric.id} className={`rm-host-ledger__metric rm-host-ledger__metric--${metric.tone}`}>
               <dt>{metric.label}</dt>
               <dd>
-                <strong>{metric.value}</strong>
+                <strong className="ledger-number">{metric.value}</strong>
                 <span>{metric.stateLabel}</span>
               </dd>
             </div>

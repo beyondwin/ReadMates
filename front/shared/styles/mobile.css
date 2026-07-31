@@ -18,6 +18,10 @@
     overscroll-behavior-y: contain;
     -webkit-tap-highlight-color: transparent;
   }
+
+  .reading-editorial {
+    line-height: 1.7;
+  }
 }
 
 .m-app {
@@ -789,7 +793,7 @@
   margin: 0;
   color: var(--text-2);
   font-size: 14.5px;
-  line-height: 1.62;
+  line-height: 1.7;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;

@@ -3810,7 +3810,8 @@
   display: grid;
   grid-template-columns: 132px minmax(0, 1fr);
   gap: 28px;
-  padding: 28px;
+  padding: 28px 0;
+  border-block: 1px solid var(--line);
 }
 
 .public-latest-record__cover {
@@ -3831,16 +3832,18 @@
 .public-record-facts {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  border-block: 1px solid var(--line);
 }
 
 .public-record-facts > div {
   display: grid;
   gap: 6px;
   padding: 16px 18px;
-  background: var(--bg-raised);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--r-3);
+  border-left: 1px solid var(--line-soft);
+}
+
+.public-record-facts > div:first-child {
+  border-left: 0;
 }
 
 .public-record-facts strong {
@@ -3884,6 +3887,14 @@
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 22px;
+}
+
+.public-record-preparing {
+  min-height: 44px;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-2);
 }
 
 .public-archive-row {
@@ -4908,7 +4919,7 @@
 
   .public-home-hero .public-latest-record {
     grid-template-columns: 84px minmax(0, 1fr);
-    padding: 16px;
+    padding: 16px 0;
     gap: 14px;
   }
 

@@ -345,7 +345,7 @@ export default function HostDashboard({
                         {getHostDashboardSessionMetrics(session).map(([label, value]) => (
                           <div key={label}>
                             <dt>{label}</dt>
-                            <dd>{value}</dd>
+                            <dd className="ledger-number">{value}</dd>
                           </div>
                         ))}
                       </dl>

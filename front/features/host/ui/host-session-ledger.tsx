@@ -345,7 +345,7 @@ export function HostSessionAttentionSummary({
               className="rm-host-attention__row"
               aria-label={`${item.sessionNumber}회차 기록 열기`}
             >
-              <span className="rm-host-attention__number">No.{item.sessionNumber}</span>
+              <span className="rm-host-attention__number ledger-number">No.{item.sessionNumber}</span>
               <span className="rm-host-attention__copy">
                 <strong>{item.bookTitle}</strong>
                 <span>{item.bookAuthor}</span>
