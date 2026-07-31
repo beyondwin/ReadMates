@@ -878,13 +878,13 @@ describe("HostDashboard", () => {
 
     await user.click(desktop.getByRole("button", { name: /멤버 공개/ }));
 
-    expect(desktop.getByRole("button", { name: /처리 중/ })).toBeDisabled();
+    expect(desktop.getByRole("button", { name: /공개 범위를 저장하는 중/ })).toBeDisabled();
     expect(actions.updateSessionVisibility).toHaveBeenCalledWith("session-8", { visibility: "MEMBER" });
 
     visibilityUpdate.resolve();
 
     await waitFor(() => expect(desktop.getByRole("button", { name: /비공개/ })).toBeInTheDocument());
-    expect(desktop.queryByRole("button", { name: /처리 중/ })).not.toBeInTheDocument();
+    expect(desktop.queryByRole("button", { name: /공개 범위를 저장하는 중/ })).not.toBeInTheDocument();
   });
 
   it("disables all upcoming controls while an upcoming action is pending", async () => {
@@ -938,7 +938,7 @@ describe("HostDashboard", () => {
 
     await user.click(desktop.getByRole("button", { name: /현재로 시작/ }));
 
-    expect(desktop.getByRole("button", { name: /처리 중/ })).toBeDisabled();
+    expect(desktop.getByRole("button", { name: /세션을 시작하는 중/ })).toBeDisabled();
     expect(actions.openSession).toHaveBeenCalledWith("session-8");
     expect(screen.getAllByText("다음 책")).toHaveLength(2);
 
@@ -980,7 +980,7 @@ describe("HostDashboard", () => {
     expect(mobile.queryByRole("button", { name: /현재 세션 있음/ })).not.toBeInTheDocument();
     expect(desktop.getByText("현재 열린 세션이 있어 예정 세션을 바로 시작할 수 없습니다.")).toBeInTheDocument();
     expect(mobile.getByText("현재 열린 세션이 있어 예정 세션을 바로 시작할 수 없습니다.")).toBeInTheDocument();
-    expect(screen.getAllByText("현재 세션 시작됨")).toHaveLength(2);
+    expect(screen.getAllByText("현재 세션을 시작했습니다.")).toHaveLength(2);
 
     expect(actions.openSession).toHaveBeenCalledTimes(1);
   });
@@ -1049,7 +1049,10 @@ describe("HostDashboard", () => {
     await user.click(screen.getAllByRole("button", { name: /멤버 공개/ })[0]);
 
     const alerts = await screen.findAllByRole("alert");
-    expect(alerts.map((alert) => alert.textContent)).toEqual(["저장하지 못했습니다", "저장하지 못했습니다"]);
+    expect(alerts.map((alert) => alert.textContent)).toEqual([
+      "공개 범위를 저장하지 못했습니다. 기존 공개 범위는 유지됩니다. 다시 시도해 주세요.",
+      "공개 범위를 저장하지 못했습니다. 기존 공개 범위는 유지됩니다. 다시 시도해 주세요.",
+    ]);
     expect(screen.getAllByRole("button", { name: /멤버 공개/ })[0]).toBeEnabled();
   });
 

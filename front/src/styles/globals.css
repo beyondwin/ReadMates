@@ -2496,6 +2496,8 @@
 
 .rm-host-current__metrics dd {
   margin: 3px 0 0;
+  font-family: var(--f-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 17px;
   font-weight: 700;
 }
@@ -2578,6 +2580,55 @@
   margin-bottom: 16px;
 }
 
+.rm-host-desktop-disclosure > summary {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 56px;
+  margin-bottom: 0;
+  cursor: pointer;
+  list-style: none;
+}
+
+.rm-host-desktop-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.rm-host-desktop-disclosure > summary::after {
+  content: "+";
+  flex: 0 0 auto;
+  color: var(--text-3);
+  font-family: var(--f-mono);
+  font-size: 18px;
+}
+
+.rm-host-desktop-disclosure[open] > summary::after {
+  content: "−";
+}
+
+.rm-host-desktop-disclosure > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.rm-host-desktop-disclosure__hint {
+  margin-left: auto;
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.rm-host-desktop-disclosure__body {
+  padding-top: 16px;
+}
+
+.rm-host-desktop-disclosure__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
 .rm-host-ledger__metrics {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -2611,6 +2662,8 @@
 }
 
 .rm-host-ledger__metric dd strong {
+  font-family: var(--f-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 21px;
 }
 

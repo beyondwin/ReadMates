@@ -216,7 +216,7 @@ export default function HostDashboard({
     }
 
     setPendingUpcomingAction(key);
-    setUpcomingMessage({ kind: "status", text: "처리 중" });
+    setUpcomingMessage({ kind: "status", text: "공개 범위를 저장하는 중" });
 
     try {
       await actions.updateSessionVisibility(sessionId, request);
@@ -228,7 +228,7 @@ export default function HostDashboard({
     } catch {
       setUpcomingMessage({
         kind: "alert",
-        text: "저장하지 못했습니다",
+        text: "공개 범위를 저장하지 못했습니다. 기존 공개 범위는 유지됩니다. 다시 시도해 주세요.",
       });
     } finally {
       setPendingUpcomingAction(null);
@@ -246,14 +246,17 @@ export default function HostDashboard({
     }
 
     setPendingUpcomingAction(key);
-    setUpcomingMessage({ kind: "status", text: "처리 중" });
+    setUpcomingMessage({ kind: "status", text: "세션을 시작하는 중" });
 
     try {
       await actions.openSession(sessionId);
       setLocallyOpenedSessionId(sessionId);
-      setUpcomingMessage({ kind: "status", text: "현재 세션 시작됨" });
+      setUpcomingMessage({ kind: "status", text: "현재 세션을 시작했습니다." });
     } catch {
-      setUpcomingMessage({ kind: "alert", text: "저장하지 못했습니다" });
+      setUpcomingMessage({
+        kind: "alert",
+        text: "세션을 시작하지 못했습니다. 기존 세션 상태는 유지됩니다. 다시 시도해 주세요.",
+      });
     } finally {
       setPendingUpcomingAction(null);
     }
@@ -275,7 +278,10 @@ export default function HostDashboard({
         nextCursor: nextPage.nextCursor,
       }));
     } catch {
-      setUpcomingMessage({ kind: "alert", text: "예정 세션을 더 불러오지 못했습니다" });
+      setUpcomingMessage({
+        kind: "alert",
+        text: "예정 세션을 더 불러오지 못했습니다. 기존 목록은 유지됩니다.",
+      });
     } finally {
       setIsLoadingMoreHostSessions(false);
     }

@@ -31,12 +31,12 @@ export function UpcomingSessionRow({
   const openPending = actions.isPending(session.sessionId, "open");
   const controlsDisabled = actions.isBusy;
   const currentVisibilityLabel = upcomingVisibilityStatusLabel(session.visibility);
-  const visibilityActionLabel = visibilityPending ? "처리 중" : isMemberVisible ? "비공개" : "공개";
+  const visibilityActionLabel = visibilityPending ? "저장 중" : isMemberVisible ? "비공개" : "공개";
   const visibilityActionAriaLabel = visibilityPending
-    ? `처리 중 · ${session.bookTitle}`
+    ? `공개 범위를 저장하는 중 · ${session.bookTitle}`
     : `${session.bookTitle} 공개 범위를 ${isMemberVisible ? "비공개" : "멤버 공개"}로 변경`;
   const showOpenAction = actions.canOpenSession || openPending;
-  const openLabel = openPending ? "처리 중" : "현재로 시작";
+  const openLabel = openPending ? "세션을 시작하는 중" : "현재로 시작";
 
   return (
     <div
@@ -102,12 +102,12 @@ export function UpcomingSessionMobileCard({
   const openPending = actions.isPending(session.sessionId, "open");
   const controlsDisabled = actions.isBusy;
   const currentVisibilityLabel = upcomingVisibilityStatusLabel(session.visibility);
-  const visibilityActionLabel = visibilityPending ? "처리 중" : isMemberVisible ? "비공개" : "공개";
+  const visibilityActionLabel = visibilityPending ? "저장 중" : isMemberVisible ? "비공개" : "공개";
   const visibilityActionAriaLabel = visibilityPending
-    ? `처리 중 · ${session.bookTitle}`
+    ? `공개 범위를 저장하는 중 · ${session.bookTitle}`
     : `${session.bookTitle} 공개 범위를 ${isMemberVisible ? "비공개" : "멤버 공개"}로 변경`;
   const showOpenAction = actions.canOpenSession || openPending;
-  const openLabel = openPending ? "처리 중" : "현재로 시작";
+  const openLabel = openPending ? "세션을 시작하는 중" : "현재로 시작";
 
   return (
     <div className="m-card-quiet">

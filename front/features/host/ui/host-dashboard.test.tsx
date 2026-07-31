@@ -63,10 +63,65 @@ describe("HostDashboard", () => {
     const desktopView = desktop as HTMLElement;
 
     expect(within(desktopView).getByRole("region", { name: "오늘의 운영" })).toBeInTheDocument();
-    expect(within(desktopView).getByRole("region", { name: "처리 대기 원장" })).toBeInTheDocument();
-    expect(within(desktopView).getByRole("region", { name: "다음 세션과 운영 흐름" })).toBeInTheDocument();
-    expect(within(desktopView).getByRole("region", { name: "운영 도구" })).toBeInTheDocument();
+    for (const title of ["처리 대기 원장", "다음 세션과 운영 흐름", "운영 도구"]) {
+      const disclosure = within(desktopView).getByText(title).closest("details");
+      expect(disclosure).toHaveClass("rm-host-desktop-disclosure");
+      expect(disclosure).not.toHaveAttribute("open");
+    }
     expect(desktopView.querySelector(".home-grid")).toBeNull();
+  });
+
+  it("keeps primary work direct while preserving secondary actions in closed disclosures", () => {
+    const { container } = render(
+      <HostDashboard
+        data={{
+          ...dashboard,
+          rsvpPending: 2,
+          publishPending: 1,
+        }}
+        current={{ currentSession: null }}
+        hostSessions={draftHostSessions}
+        actions={actions}
+      />,
+    );
+
+    const desktop = container.querySelector(".rm-host-dashboard-desktop");
+    expect(desktop).not.toBeNull();
+    const desktopView = desktop as HTMLElement;
+    const today = within(desktopView).getByRole("region", { name: "오늘의 운영" });
+
+    expect(within(today).getByRole("article", { name: "현재 세션" })).toBeInTheDocument();
+    expect(within(today).getByRole("region", { name: "지금 처리할 일" })).toBeInTheDocument();
+    expect(today.closest("details")).toBeNull();
+
+    const ledger = within(desktopView).getByText("처리 대기 원장").closest("details");
+    const lifecycle = within(desktopView).getByText("다음 세션과 운영 흐름").closest("details");
+    const tools = within(desktopView).getByText("운영 도구").closest("details");
+
+    expect(ledger).not.toHaveAttribute("open");
+    expect(lifecycle).not.toHaveAttribute("open");
+    expect(tools).not.toHaveAttribute("open");
+    expect(within(ledger as HTMLElement).getByText("마감·공개·피드백 상태")).toBeInTheDocument();
+    expect(within(lifecycle as HTMLElement).getByText("예정 세션·운영 일정")).toBeInTheDocument();
+    expect(within(tools as HTMLElement).getByText("알림·멤버·초대·AI 설정")).toBeInTheDocument();
+    expect(
+      within(ledger as HTMLElement).getByRole("link", {
+        name: "세션 기록 전체 보기",
+        hidden: true,
+      }),
+    ).toHaveAttribute("href", "/app/host/sessions");
+    expect(
+      within(lifecycle as HTMLElement).getByRole("button", {
+        name: /현재로 시작/,
+        hidden: true,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(tools as HTMLElement).getByRole("link", {
+        name: "멤버 보기",
+        hidden: true,
+      }),
+    ).toHaveAttribute("href", "/app/host/members");
   });
 
   it("places mobile priority work before the current-session summary", () => {
@@ -159,7 +214,55 @@ describe("HostDashboard", () => {
     await waitFor(() => expect(failingActions.updateSessionVisibility).toHaveBeenCalledWith("session-next", {
       visibility: "MEMBER",
     }));
-    expect((await screen.findAllByRole("alert"))[0]).toHaveTextContent("저장하지 못했습니다");
+    expect((await screen.findAllByRole("alert"))[0]).toHaveTextContent(
+      "공개 범위를 저장하지 못했습니다. 기존 공개 범위는 유지됩니다. 다시 시도해 주세요.",
+    );
     expect(screen.getAllByText("비공개").length).toBeGreaterThan(0);
+  });
+
+  it("keeps the previous session state and names the failed start operation", async () => {
+    const user = userEvent.setup();
+    const failingActions = {
+      ...actions,
+      openSession: vi.fn().mockRejectedValue(new Error("open failed")),
+    };
+    render(
+      <HostDashboard
+        data={dashboard}
+        current={{ currentSession: null }}
+        hostSessions={draftHostSessions}
+        actions={failingActions}
+      />,
+    );
+
+    await user.click(screen.getAllByRole("button", { name: /현재로 시작/ })[0]);
+
+    expect((await screen.findAllByRole("alert"))[0]).toHaveTextContent(
+      "세션을 시작하지 못했습니다. 기존 세션 상태는 유지됩니다. 다시 시도해 주세요.",
+    );
+    expect(screen.getAllByText("다음 책").length).toBeGreaterThan(0);
+  });
+
+  it("keeps the existing upcoming list when loading another page fails", async () => {
+    const user = userEvent.setup();
+    const failingActions = {
+      ...actions,
+      loadHostSessions: vi.fn().mockRejectedValue(new Error("load failed")),
+    };
+    render(
+      <HostDashboard
+        data={dashboard}
+        current={{ currentSession: null }}
+        hostSessions={{ ...draftHostSessions, nextCursor: "cursor-1" }}
+        actions={failingActions}
+      />,
+    );
+
+    await user.click(screen.getAllByRole("button", { name: "더 보기" })[0]);
+
+    expect((await screen.findAllByRole("alert"))[0]).toHaveTextContent(
+      "예정 세션을 더 불러오지 못했습니다. 기존 목록은 유지됩니다.",
+    );
+    expect(screen.getAllByText("다음 책").length).toBeGreaterThan(0);
   });
 });

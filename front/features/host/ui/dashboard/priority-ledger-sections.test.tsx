@@ -94,7 +94,7 @@ describe("priority-ledger sections", () => {
   it("renders compact metrics, record rows, and a direct records action", () => {
     renderLedger();
 
-    const ledger = screen.getByRole("region", { name: "처리 대기 원장" });
+    const ledger = screen.getByRole("group", { name: "처리 대기 원장" });
     expect(within(ledger).getByText("RSVP 미응답")).toBeInTheDocument();
     expect(within(ledger).getByText("2")).toBeInTheDocument();
     expect(within(ledger).getByText("8회차 기록")).toBeInTheDocument();
@@ -148,7 +148,7 @@ describe("priority-ledger sections", () => {
       />,
     );
 
-    const tools = screen.getByRole("region", { name: "운영 도구" });
+    const tools = screen.getByRole("group", { name: "운영 도구" });
     expect(within(tools).getByText("알림 장부")).toBeInTheDocument();
     expect(within(tools).getByText("멤버 관리")).toBeInTheDocument();
     expect(within(tools).getByText("초대 관리")).toBeInTheDocument();
