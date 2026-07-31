@@ -324,10 +324,11 @@ test("club-scoped account and notification routes preserve navigation current st
     name: "내 공간",
   })).toHaveAttribute("aria-current", "page");
 
-  await appNavigation.getByRole("link", { name: "알림" }).click();
+  await page.getByRole("button", { name: /계정 메뉴$/ }).click();
+  await page.getByRole("dialog").getByRole("link", { name: "알림" }).click();
   await expect(page).toHaveURL(new RegExp(`${scopedAppPath}/notifications$`));
   await expect(appNavigation.getByRole("link", {
-    name: "알림",
+    name: "내 공간",
   })).toHaveAttribute("aria-current", "page");
 
   const notificationTabs = page.getByRole("navigation", {
@@ -344,7 +345,7 @@ test("club-scoped account and notification routes preserve navigation current st
     name: "수신 설정",
   })).toHaveAttribute("aria-current", "page");
   await expect(appNavigation.getByRole("link", {
-    name: "알림",
+    name: "내 공간",
   })).toHaveAttribute("aria-current", "page");
 
   await page.goBack();

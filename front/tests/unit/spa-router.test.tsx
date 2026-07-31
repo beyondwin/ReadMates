@@ -426,7 +426,7 @@ describe("SPA router", () => {
     renderWithRoutesQueryClient(<RouterProvider router={router} />);
 
     expect(await screen.findByRole("heading", { name: "읽는사이 들어가기" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "시작하기" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Google로 시작하기" })).toHaveAttribute(
       "href",
       "/oauth2/authorization/google",
     );

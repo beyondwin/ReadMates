@@ -38,6 +38,7 @@ export function GenerationProgressView({ job, cancelling, onCancel }: Generation
 
   const stageText = job?.stage ? STAGE_LABEL[job.stage] ?? "생성 진행 중" : "준비 중";
   const progressPct = job?.progressPct ?? 0;
+  const clampedProgressPct = Math.min(100, Math.max(0, progressPct));
 
   return (
     <div className="stack" style={{ "--stack": "14px" } as CSSProperties}>
@@ -51,7 +52,7 @@ export function GenerationProgressView({ job, cancelling, onCancel }: Generation
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-valuenow={progressPct}
+        aria-valuenow={clampedProgressPct}
         style={{
           width: "100%",
           height: 8,
@@ -62,10 +63,12 @@ export function GenerationProgressView({ job, cancelling, onCancel }: Generation
       >
         <div
           style={{
-            width: `${Math.min(100, Math.max(0, progressPct))}%`,
+            width: "100%",
             height: "100%",
             background: "var(--accent, #3a7afe)",
-            transition: "width 200ms linear",
+            transform: `scaleX(${clampedProgressPct / 100})`,
+            transformOrigin: "left center",
+            transition: "transform 200ms linear",
           }}
         />
       </div>
