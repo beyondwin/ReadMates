@@ -1423,7 +1423,15 @@ describe("HostDashboard", () => {
     for (const value of container.querySelectorAll(".rm-host-dashboard-mobile__session-metrics dd")) {
       expect(value).toHaveClass("ledger-number");
     }
-    expect(mobile.getAllByText("참석 1명 · 미응답 1명").length).toBeGreaterThan(0);
+    const mobileSessionCard = mobile.getByRole("heading", { name: "테스트 책" }).closest("article");
+    expect(mobileSessionCard).not.toBeNull();
+    const attendanceSummary = Array.from((mobileSessionCard as HTMLElement).querySelectorAll("p")).find(
+      (paragraph) => paragraph.textContent === "참석 1명 · 미응답 1명",
+    );
+    expect(attendanceSummary).toBeDefined();
+    expect(
+      Array.from(attendanceSummary!.querySelectorAll(".ledger-number")).map((number) => number.textContent),
+    ).toEqual(["1", "1"]);
     expect(mobile.queryByText("김호스트")).not.toBeInTheDocument();
     expect(mobile.queryByText("안멤버1")).not.toBeInTheDocument();
     expect(mobile.queryByRole("link", { name: "공개 요약 편집" })).not.toBeInTheDocument();

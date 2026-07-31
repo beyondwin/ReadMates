@@ -55,7 +55,15 @@ function actionLabelForVariant(variant: RouteErrorVariant) {
   }
 }
 
-function classifyStatus(status: number, variant: RouteErrorVariant): RouteErrorView {
+function isRetryablePublicStatus(status: number) {
+  return status === 429 || status >= 500;
+}
+
+function classifyStatus(
+  status: number,
+  variant: RouteErrorVariant,
+  canRetryPublicLoad: boolean,
+): RouteErrorView {
   const actionHref = fallbackPathForVariant(variant);
   const actionLabel = actionLabelForVariant(variant);
 
@@ -99,12 +107,27 @@ function classifyStatus(status: number, variant: RouteErrorVariant): RouteErrorV
     };
   }
 
+  if (status === 429) {
+    return {
+      eyebrow: "잠시 후 다시",
+      heading: "요청이 잠시 제한되었습니다.",
+      body: canRetryPublicLoad
+        ? "요청이 잠시 많습니다. 잠시 기다린 뒤 다시 시도해 주세요."
+        : "요청이 잠시 많습니다. 공개 기록에서 다른 기록을 확인해 주세요.",
+      reassurance: "입력하거나 변경한 내용은 없습니다.",
+      actionHref,
+      actionLabel,
+    };
+  }
+
   return {
     eyebrow: "불러오기 실패",
     heading: "페이지를 불러오지 못했습니다.",
     body:
       variant === "public"
-        ? "네트워크 연결을 확인한 뒤 다시 시도하거나 공개 기록으로 이동해 주세요."
+        ? canRetryPublicLoad
+          ? "네트워크 연결을 확인한 뒤 다시 시도하거나 공개 기록으로 이동해 주세요."
+          : "페이지를 불러오지 못했습니다. 공개 기록에서 다른 기록을 확인해 주세요."
         : "네트워크 연결 또는 서비스 상태를 확인한 뒤 새로고침해 주세요.",
     reassurance: variant === "public" ? "입력하거나 변경한 내용은 없습니다." : undefined,
     actionHref,
@@ -147,10 +170,11 @@ export function RouteErrorPage({
   onRetry,
 }: RouteErrorPageProps) {
   const location = useLocation();
-  const view = classifyStatus(status, variant);
+  const canRetryPublicLoad =
+    variant === "public" && isRetryablePublicStatus(status) && typeof onRetry === "function";
+  const view = classifyStatus(status, variant, canRetryPublicLoad);
   const metadata = metadataForRouteError(variant, status);
   const actionHref = scopedAppLinkTarget(location.pathname, view.actionHref);
-  const canRetryPublicLoad = variant === "public" && status >= 500 && onRetry;
 
   return (
     <>

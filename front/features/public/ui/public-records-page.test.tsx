@@ -4,7 +4,7 @@ import PublicRecordsPage from "./public-records-page";
 
 describe("PublicRecordsPage showcase", () => {
   it("renders record density labels without private surfaces", () => {
-    render(
+    const { container } = render(
       <PublicRecordsPage
         routePathname="/records"
         routeSearch=""
@@ -32,6 +32,10 @@ describe("PublicRecordsPage showcase", () => {
 
     expect(screen.getByText("기록 준비됨")).toBeVisible();
     expect(screen.getByText("하이라이트 3 · 한줄평 2")).toBeVisible();
+    expect(container.querySelector(".public-record-index-row__title")).toHaveClass("reading-editorial");
+    expect(container.querySelector(".public-record-index-row__summary")).toHaveClass("reading-editorial");
+    expect(screen.getByRole("heading", { name: "공개 기록" })).not.toHaveClass("reading-editorial");
+    expect(screen.getByRole("heading", { name: "발행된 기록" })).not.toHaveClass("reading-editorial");
     expect(screen.queryByText(/피드백 문서/)).toBeNull();
     expect(screen.queryByText("ADMIN_ROUTE")).toBeNull();
   });

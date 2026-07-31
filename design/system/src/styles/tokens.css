@@ -903,6 +903,16 @@ button.rm-record-row:hover {
   word-break: keep-all;
   flex-shrink: 0;
 }
+.nav-link:is(button) {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.nav-link:is(button):disabled {
+  cursor: wait;
+}
 .nav-link:hover { color: var(--text); background: var(--bg-sub); }
 .nav-link[aria-current="page"] {
   color: var(--text);

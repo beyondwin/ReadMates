@@ -62,3 +62,39 @@ test("PublicRecordsPage renders public record index", async ({ mount }) => {
 
   await expect(component).toHaveScreenshot("public-records-index.png");
 });
+
+for (const viewport of [
+  { name: "desktop", width: 1200, expectedLineHeight: 1.65 },
+  { name: "mobile", width: 320, expectedLineHeight: 1.7 },
+]) {
+  test(`PublicRecordsPage keeps reading typography scoped on ${viewport.name}`, async ({ mount, page }) => {
+    await page.setViewportSize({ width: viewport.width, height: 800 });
+    const component = await mount(
+      <PublicRecordsPage
+        data={publicRecordsView}
+        publicBasePath="/clubs/reading-sai"
+        routePathname="/clubs/reading-sai/records"
+        routeSearch=""
+      />,
+    );
+    const title = component.locator(".public-record-index-row__title").first();
+    const summary = component.locator(".public-record-index-row__summary").first();
+    const interfaceHeading = component.getByRole("heading", { name: "발행된 기록" });
+
+    await expect(title).toHaveClass(/reading-editorial/);
+    await expect(summary).toHaveClass(/reading-editorial/);
+    await expect(interfaceHeading).not.toHaveClass(/reading-editorial/);
+
+    const typography = await title.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        fontFamily: style.fontFamily,
+        fontSize: Number.parseFloat(style.fontSize),
+        lineHeight: Number.parseFloat(style.lineHeight),
+      };
+    });
+    expect(typography.fontFamily).toContain("ui-serif");
+    expect(typography.lineHeight / typography.fontSize).toBeCloseTo(viewport.expectedLineHeight, 1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+}

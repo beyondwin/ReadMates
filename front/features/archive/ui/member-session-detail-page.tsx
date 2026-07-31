@@ -358,7 +358,7 @@ function SummaryBlock({ summary }: { summary: string | null }) {
   }
 
   return (
-    <p className="body-lg" style={{ margin: 0, color: "var(--text-2)", whiteSpace: "pre-wrap" }}>
+    <p className="body-lg reading-editorial" style={{ margin: 0, color: "var(--text-2)", whiteSpace: "pre-wrap" }}>
       {summary}
     </p>
   );
@@ -475,7 +475,7 @@ function HighlightsList({
           key={`${highlight.sortOrder}-${highlight.text}`}
           className="rm-session-highlight-row"
         >
-          <p className="rm-session-highlight-row__quote editorial">{highlight.text}</p>
+          <p className="rm-session-highlight-row__quote editorial reading-editorial">{highlight.text}</p>
           {highlight.authorName ? (
             <div className="row rm-session-highlight-row__source">
               <AvatarChip
@@ -582,7 +582,7 @@ function SessionHighlightListStyles() {
         color: var(--text);
         font-size: 18px;
         font-weight: 600;
-        line-height: 1.45;
+        line-height: 1.65;
         letter-spacing: 0;
       }
 
@@ -612,7 +612,7 @@ function SessionHighlightListStyles() {
         .rm-session-highlight-row__quote {
           padding-left: 22px;
           font-size: 16px;
-          line-height: 1.48;
+          line-height: 1.7;
         }
 
         .rm-session-highlight-row__quote::before {
@@ -656,11 +656,11 @@ function QuestionList({
           <div className="tiny mono" style={{ color: "var(--text-3)" }}>
             Q{question.priority} · {question.authorName}
           </div>
-          <h4 className="body editorial" style={{ fontSize: mobile ? 15 : 17, margin: "6px 0 0", lineHeight: 1.58 }}>
+          <h4 className="body editorial reading-editorial" style={{ fontSize: mobile ? 15 : 17, margin: "6px 0 0" }}>
             {question.text}
           </h4>
           {question.draftThought ? (
-            <p className="small" style={{ margin: "8px 0 0", color: "var(--text-3)" }}>
+            <p className="small reading-editorial" style={{ margin: "8px 0 0", color: "var(--text-3)" }}>
               {question.draftThought}
             </p>
           ) : null}
@@ -683,7 +683,7 @@ function OneLinerList({ oneLiners, mobile = false }: { oneLiners: MemberArchiveO
           className={mobile ? "m-card-quiet" : "surface-quiet"}
           style={mobile ? undefined : { padding: "16px 18px" }}
         >
-          <p className="body editorial" style={{ fontSize: mobile ? 15 : 16, margin: 0 }}>
+          <p className="body editorial reading-editorial" style={{ fontSize: mobile ? 15 : 16, margin: 0 }}>
             {oneLiner.text}
           </p>
           <div className="row tiny" style={{ marginTop: 8, gap: 8, color: "var(--text-3)" }}>

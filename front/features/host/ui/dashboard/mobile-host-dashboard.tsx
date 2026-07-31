@@ -201,7 +201,10 @@ export function MobileHostDashboard({
                   </div>
                 ))}
               </dl>
-              <p className="tiny">참석 {goingCount}명 · 미응답 {noResponseCount}명</p>
+              <p className="tiny">
+                참석 <span className="ledger-number">{goingCount}</span>명 · 미응답{" "}
+                <span className="ledger-number">{noResponseCount}</span>명
+              </p>
             </>
           ) : (
             <>

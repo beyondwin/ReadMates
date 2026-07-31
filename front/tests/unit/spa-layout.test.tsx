@@ -1,5 +1,7 @@
-import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, cleanup, render as testingLibraryRender, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createMemoryRouter,
@@ -92,6 +94,19 @@ function ClubAppLayoutFromLoader() {
   };
 
   return <AppRouteLayout scopedAuth={access.auth} />;
+}
+
+function render(ui: ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+      mutations: { retry: false },
+    },
+  });
+
+  return testingLibraryRender(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+  );
 }
 
 afterEach(() => {
@@ -620,7 +635,7 @@ describe("SPA AppRouteLayout", () => {
 
     const tabs = screen.getByRole("navigation", { name: "앱 탭" });
     expect(within(tabs).queryByRole("link", { name: "세션" })).not.toBeInTheDocument();
-    expect(within(tabs).getByLabelText("세션 불러오는 중")).toHaveAttribute("aria-disabled", "true");
+    expect(await within(tabs).findByRole("button", { name: "세션 다시 확인" })).toBeEnabled();
   });
 
   it("renders a shell-aware member loading skeleton while auth is unresolved", () => {

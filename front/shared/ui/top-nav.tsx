@@ -30,8 +30,15 @@ type NavLink = {
   href: string | null;
   label: string;
   pendingLabel?: string;
+  pendingAriaLabel?: string;
+  retry?: {
+    onRetry: () => void;
+    pending: boolean;
+  };
   current: (pathname: string) => boolean;
 };
+
+export type CurrentSessionNavigationStatus = "ready" | "loading" | "error" | "retrying";
 
 type TopNavProps = {
   variant?: TopNavVariant;
@@ -41,6 +48,8 @@ type TopNavProps = {
   publicBasePath?: string;
   appBasePath?: string;
   currentSessionId?: string | null;
+  currentSessionStatus?: CurrentSessionNavigationStatus;
+  onRetryCurrentSession?: () => void;
   LinkComponent?: AppLinkComponent;
   accountControl?: ReactNode;
 };
@@ -81,13 +90,28 @@ const hostEntryLink: NavLink = {
   current: (pathname) => pathname.startsWith("/app/host"),
 };
 
-function hostLinks(currentSessionId?: string | null): NavLink[] {
+function hostLinks({
+  currentSessionId,
+  currentSessionStatus,
+  onRetryCurrentSession,
+}: {
+  currentSessionId?: string | null;
+  currentSessionStatus: CurrentSessionNavigationStatus;
+  onRetryCurrentSession?: () => void;
+}): NavLink[] {
   const sessionHref =
-    currentSessionId === undefined
+    currentSessionStatus !== "ready"
       ? null
       : currentSessionId
-        ? `/app/host/sessions/${currentSessionId}/edit`
-        : "/app/host/sessions/new";
+          ? `/app/host/sessions/${currentSessionId}/edit`
+          : "/app/host/sessions/new";
+  const retry =
+    onRetryCurrentSession && (currentSessionStatus === "error" || currentSessionStatus === "retrying")
+      ? {
+          onRetry: onRetryCurrentSession,
+          pending: currentSessionStatus === "retrying",
+        }
+      : undefined;
 
   return [
     {
@@ -100,7 +124,14 @@ function hostLinks(currentSessionId?: string | null): NavLink[] {
       key: "host-session",
       href: sessionHref,
       label: READMATES_PRIMARY_NAV_LABELS.host.session,
-      pendingLabel: "확인 중",
+      pendingLabel: currentSessionStatus === "error" ? "다시 확인" : "확인 중",
+      pendingAriaLabel:
+        currentSessionStatus === "error"
+          ? "세션 다시 확인"
+          : currentSessionStatus === "retrying"
+            ? "세션 다시 확인 중"
+            : "세션 불러오는 중",
+      retry,
       current: (pathname) =>
         pathname === "/app/host/sessions/new" || /^\/app\/host\/sessions\/[^/]+\/edit$/.test(pathname),
     },
@@ -242,13 +273,25 @@ function TopNavFrame({
                 >
                   {link.label}
                 </LinkComponent>
+              ) : link.retry ? (
+                <button
+                  key={link.key}
+                  type="button"
+                  className="nav-link is-pending"
+                  aria-current={link.current(pathname) ? "page" : undefined}
+                  aria-label={link.pendingAriaLabel}
+                  disabled={link.retry.pending}
+                  onClick={link.retry.onRetry}
+                >
+                  {link.pendingLabel ?? link.label}
+                </button>
               ) : (
                 <span
                   key={link.key}
                   className="nav-link is-pending"
                   aria-disabled="true"
                   aria-current={link.current(pathname) ? "page" : undefined}
-                  aria-label={`${link.label} 불러오는 중`}
+                  aria-label={link.pendingAriaLabel ?? `${link.label} 불러오는 중`}
                 >
                   {link.pendingLabel ?? link.label}
                 </span>
@@ -318,6 +361,8 @@ function AppTopNav({
   memberName,
   showHostEntry,
   currentSessionId,
+  currentSessionStatus,
+  onRetryCurrentSession,
   appBasePath = "",
   LinkComponent,
   accountControl,
@@ -326,15 +371,25 @@ function AppTopNav({
   memberName?: string | null;
   showHostEntry?: boolean;
   currentSessionId?: string | null;
+  currentSessionStatus?: CurrentSessionNavigationStatus;
+  onRetryCurrentSession?: () => void;
   appBasePath?: string;
   LinkComponent: AppLinkComponent;
   accountControl?: ReactNode;
 }) {
   const pathname = useLocation().pathname;
   const appPath = appPathname(pathname);
-  const links = (variant === "host" ? hostLinks(currentSessionId) : memberLinks).map((link) =>
-    scopedAppLink(link, appBasePath),
-  );
+  const resolvedCurrentSessionStatus =
+    currentSessionStatus ?? (currentSessionId === undefined ? "loading" : "ready");
+  const links = (
+    variant === "host"
+      ? hostLinks({
+          currentSessionId,
+          currentSessionStatus: resolvedCurrentSessionStatus,
+          onRetryCurrentSession,
+        })
+      : memberLinks
+  ).map((link) => scopedAppLink(link, appBasePath));
   const workspaceAction = variant === "host" ? memberReturnLink : showHostEntry ? hostEntryLink : null;
   const scopedWorkspaceAction = workspaceAction ? scopedAppLink(workspaceAction, appBasePath) : null;
 
@@ -360,6 +415,8 @@ export function TopNav({
   publicBasePath,
   appBasePath,
   currentSessionId,
+  currentSessionStatus,
+  onRetryCurrentSession,
   LinkComponent = DefaultLink,
   accountControl,
 }: TopNavProps) {
@@ -374,6 +431,8 @@ export function TopNav({
       showHostEntry={showHostEntry}
       appBasePath={appBasePath}
       currentSessionId={currentSessionId}
+      currentSessionStatus={currentSessionStatus}
+      onRetryCurrentSession={onRetryCurrentSession}
       LinkComponent={LinkComponent}
       accountControl={accountControl}
     />

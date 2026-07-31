@@ -57,11 +57,13 @@ export function HostPriorityLedger({
   return (
     <details className="rm-host-ledger rm-host-desktop-disclosure" aria-labelledby="host-ledger-title">
       <summary className="rm-host-section-heading">
-        <div>
-          <div className="eyebrow">기록과 마감</div>
-          <h2 id="host-ledger-title">처리 대기 원장</h2>
-        </div>
-        <span className="rm-host-desktop-disclosure__hint">마감·공개·피드백 상태</span>
+        <h2 id="host-ledger-title" className="rm-host-desktop-disclosure__summary-heading">
+          <span className="eyebrow" aria-hidden="true">기록과 마감</span>
+          <span>처리 대기 원장</span>
+          <span className="rm-host-desktop-disclosure__hint" aria-hidden="true">
+            마감·공개·피드백 상태
+          </span>
+        </h2>
       </summary>
 
       <div className="rm-host-desktop-disclosure__body">
@@ -107,11 +109,13 @@ export function HostOperationFlow({
   return (
     <details className="rm-host-flow rm-host-desktop-disclosure" aria-labelledby="host-flow-title">
       <summary className="rm-host-section-heading">
-        <div>
-          <div className="eyebrow">다음 순서</div>
-          <h2 id="host-flow-title">다음 세션과 운영 흐름</h2>
-        </div>
-        <span className="rm-host-desktop-disclosure__hint">예정 세션·운영 일정</span>
+        <h2 id="host-flow-title" className="rm-host-desktop-disclosure__summary-heading">
+          <span className="eyebrow" aria-hidden="true">다음 순서</span>
+          <span>다음 세션과 운영 흐름</span>
+          <span className="rm-host-desktop-disclosure__hint" aria-hidden="true">
+            예정 세션·운영 일정
+          </span>
+        </h2>
       </summary>
 
       <div className="rm-host-desktop-disclosure__body">
@@ -144,11 +148,13 @@ export function HostOperationsTools({
   return (
     <details className="rm-host-tools rm-host-desktop-disclosure" aria-labelledby="host-tools-title">
       <summary className="rm-host-section-heading">
-        <div>
-          <div className="eyebrow">관리</div>
-          <h2 id="host-tools-title">운영 도구</h2>
-        </div>
-        <span className="rm-host-desktop-disclosure__hint">알림·멤버·초대·AI 설정</span>
+        <h2 id="host-tools-title" className="rm-host-desktop-disclosure__summary-heading">
+          <span className="eyebrow" aria-hidden="true">관리</span>
+          <span>운영 도구</span>
+          <span className="rm-host-desktop-disclosure__hint" aria-hidden="true">
+            알림·멤버·초대·AI 설정
+          </span>
+        </h2>
       </summary>
       <div className="rm-host-desktop-disclosure__body">
         <div className="rm-host-tools__list">
