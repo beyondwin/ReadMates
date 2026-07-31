@@ -5081,6 +5081,20 @@
   }
 }
 
+.public-home .public-latest-record .reading-editorial,
+.public-home .public-note-row .reading-editorial,
+.public-home .public-archive-row .reading-editorial {
+  line-height: 1.65;
+}
+
+@media (max-width: 768px) {
+  .public-home .public-latest-record .reading-editorial,
+  .public-home .public-note-row .reading-editorial,
+  .public-home .public-archive-row .reading-editorial {
+    line-height: 1.7;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rm-route-reveal {
     animation: none !important;

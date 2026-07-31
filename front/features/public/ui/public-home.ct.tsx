@@ -40,6 +40,8 @@ for (const viewport of [
     const latestRecord = component.locator(".public-latest-record");
     const readingTitle = latestRecord.locator(".reading-editorial").first();
     const readingExcerpt = latestRecord.locator(".body.reading-editorial");
+    const archiveTitle = component.locator(".public-archive-row__title").first();
+    const summaryQuotation = component.locator(".quote-card__quote").first();
     const globalHeading = component.getByRole("heading", { name: "읽는사이", level: 1 });
 
     const recordStyle = await latestRecord.evaluate((element) => {
@@ -56,24 +58,27 @@ for (const viewport of [
         right: bounds.right,
       };
     });
-    const titleMetrics = await readingTitle.evaluate((element) => {
-      const node = element as HTMLElement;
-      const style = getComputedStyle(node);
-      return {
-        fontFamily: style.fontFamily,
-        lineHeight: style.lineHeight,
-        clientWidth: node.clientWidth,
-        scrollWidth: node.scrollWidth,
-      };
-    });
-    const excerptMetrics = await readingExcerpt.evaluate((element) => {
-      const node = element as HTMLElement;
-      return {
-        lineHeight: Number.parseFloat(getComputedStyle(node).lineHeight),
-        clientWidth: node.clientWidth,
-        scrollWidth: node.scrollWidth,
-      };
-    });
+    const expectedReadingRatio = viewport.name === "mobile" ? 1.7 : 1.65;
+    const readingRoleMetrics = await Promise.all(
+      [
+        ["latest title", readingTitle],
+        ["latest excerpt", readingExcerpt],
+        ["archive title", archiveTitle],
+        ["summary quotation", summaryQuotation],
+      ].map(async ([name, locator]) => ({
+        name,
+        ...(await locator.evaluate((element) => {
+          const node = element as HTMLElement;
+          const style = getComputedStyle(node);
+          return {
+            fontFamily: style.fontFamily,
+            lineHeightRatio: Number.parseFloat(style.lineHeight) / Number.parseFloat(style.fontSize),
+            clientWidth: node.clientWidth,
+            scrollWidth: node.scrollWidth,
+          };
+        })),
+      })),
+    );
 
     expect(recordStyle.borderLeftWidth).toBe("0px");
     expect(recordStyle.borderRightWidth).toBe("0px");
@@ -83,11 +88,11 @@ for (const viewport of [
     expect(recordStyle.paddingRight).toBe("0px");
     expect(recordStyle.left).toBeGreaterThanOrEqual(0);
     expect(recordStyle.right).toBeLessThanOrEqual(viewport.width);
-    expect(titleMetrics.fontFamily).toContain("Iowan Old Style");
-    expect(Number.parseFloat(titleMetrics.lineHeight)).toBeGreaterThan(24);
-    expect(titleMetrics.scrollWidth).toBeLessThanOrEqual(titleMetrics.clientWidth);
-    expect(excerptMetrics.lineHeight).toBeGreaterThanOrEqual(viewport.name === "mobile" ? 27 : 26);
-    expect(excerptMetrics.scrollWidth).toBeLessThanOrEqual(excerptMetrics.clientWidth);
+    for (const metrics of readingRoleMetrics) {
+      expect(metrics.fontFamily, metrics.name).toContain("Iowan Old Style");
+      expect.soft(metrics.lineHeightRatio, metrics.name).toBeCloseTo(expectedReadingRatio, 2);
+      expect(metrics.scrollWidth, metrics.name).toBeLessThanOrEqual(metrics.clientWidth);
+    }
     await expect(globalHeading).not.toHaveClass(/reading-editorial/);
     expect(await globalHeading.evaluate((element) => getComputedStyle(element).fontFamily)).not.toContain(
       "Iowan Old Style",
