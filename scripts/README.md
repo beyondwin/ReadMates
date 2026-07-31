@@ -58,10 +58,10 @@ Repository-local planning support, when available in a full source checkout, doe
 
 `pre-push-check.sh`는 루트 `package.json`의 `packageManager`를 읽고 해당 pnpm을 Corepack으로 활성화한 뒤, 해석된 Corepack launcher로 frontend checks를 실행합니다. 로컬 Node 설치가 `corepack`을 PATH에 노출하지 않으면 스크립트는 `npx --yes corepack@0.35.0`을 사용합니다. 다른 major version의 globally installed pnpm으로 우회하지 않습니다.
 
-`docs/`, `scripts/`, `deploy/`, `.github/`, 공개 release 설정 파일처럼 공개 후보에 영향을 주는 경로가 바뀌면 clean 후보를 만들고 public-release scanner도 실행합니다. Historical 작업 기록인 `docs/superpowers/` 하위 문서는 현재 동작의 source of truth가 아니므로 whitespace gate에서 제외합니다.
+`docs/`, `scripts/`, `deploy/`, `.github/`, 공개 release 설정 파일처럼 공개 후보에 영향을 주는 경로가 바뀌면 fixture 검증과 함께 clean 후보를 만들고 public-release scanner도 실행합니다. Historical 작업 기록인 `docs/superpowers/` 하위 문서는 현재 동작의 source of truth가 아니므로 whitespace gate에서 제외합니다.
 
 ```bash
-./scripts/build-public-release-candidate.sh
+./scripts/verify-public-release-fixtures.sh
 ./scripts/public-release-check.sh .tmp/public-release-candidate
 ```
 
@@ -280,12 +280,12 @@ scanner pattern을 바꾼 뒤 fixture 검증을 실행합니다.
 ./scripts/verify-public-release-fixtures.sh
 ```
 
-이 스크립트는 fixture 디렉터리를 `.tmp/public-release-fixtures` 아래에 만들고 `public-release-check.sh`를 호출합니다. 검증 범위는 다음과 같습니다.
+이 스크립트는 고유한 nested `front/.tmp` source fixture를 만든 상태에서 공개 후보를 한 번 생성하고, fixture 디렉터리를 `.tmp/public-release-fixtures` 아래에 만들어 `public-release-check.sh`를 호출합니다. 생성한 source fixture는 종료 시 제거하며 기존 `front/.tmp` 내용은 건드리지 않습니다. 검증 범위는 다음과 같습니다.
 
 - dollar 문자가 포함된 DB password assignment가 차단되는지 확인합니다.
 - comment에 placeholder를 적어도 실제처럼 보이는 secret value가 allowlist되지 않는지 확인합니다.
 - 문서화된 placeholder와 environment variable indirection은 통과하는지 확인합니다.
-- root 또는 nested `.tmp`가 공개 후보 금지 경로로 거부되는지 확인합니다.
+- builder가 nested source `.tmp`를 후보에서 제외하고 checker가 root 또는 nested `.tmp`를 공개 후보 금지 경로로 거부하는지 확인합니다.
 - `.tmp` parent가 symlink이면 실행을 거부합니다. 이 기준은 공개 릴리즈 후보 builder의 cleanup guard와 맞춥니다.
 - 후보의 top-level manifest와 루트 pnpm 계약, `front`, `design/system`, `design/docs` package manifest가 모두 포함되는지 확인합니다.
 - 후보 안의 shipped instruction이 제외된 contributor-only 경로를 요구하지 않는지 확인합니다.
