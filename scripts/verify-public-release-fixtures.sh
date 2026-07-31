@@ -157,6 +157,20 @@ if ./scripts/public-release-check.sh "$artifact_fixture" > "$artifact_fixture.ou
 fi
 assert_file_contains "$artifact_fixture.err" "forbidden candidate path: front/test-results/.last-run.json"
 
+nested_tmp_fixture="$fixture_root/nested-tmp-path"
+mkdir -p "$nested_tmp_fixture/front/.tmp/test-audit-plan-check"
+printf 'generated audit metadata\n' \
+  > "$nested_tmp_fixture/front/.tmp/test-audit-plan-check/front-node.json"
+
+if ./scripts/public-release-check.sh "$nested_tmp_fixture" \
+  > "$nested_tmp_fixture.out" 2> "$nested_tmp_fixture.err"
+then
+  fail "public release check should reject nested .tmp directories"
+fi
+assert_file_contains \
+  "$nested_tmp_fixture.err" \
+  "forbidden candidate path: front/.tmp"
+
 playwright_cache_fixture="$fixture_root/playwright-cache-path"
 mkdir -p "$playwright_cache_fixture/front/playwright/.cache/assets"
 printf 'generated component-test bundle\n' \

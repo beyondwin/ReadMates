@@ -183,7 +183,7 @@ is_forbidden_path() {
     .superpowers|.superpowers/*) return 0 ;;
     .idea|.idea/*) return 0 ;;
     .playwright-cli|.playwright-cli/*) return 0 ;;
-    .tmp|.tmp/*) return 0 ;;
+    .tmp|.tmp/*|*/.tmp|*/.tmp/*) return 0 ;;
     recode|recode/*) return 0 ;;
     deploy/oci/.deploy-state|deploy/oci/*.state) return 0 ;;
     .wrangler|.wrangler/*|*/.wrangler|*/.wrangler/*) return 0 ;;

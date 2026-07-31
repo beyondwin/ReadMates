@@ -22,6 +22,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Fixed
 
+- **공개 릴리스 후보의 nested scratch 제외:** `front/.tmp`처럼 승인된 source root 안쪽에 남은 ignored `.tmp` 산출물을 후보 생성 단계에서 모든 깊이에 걸쳐 제외하고, 후보 검사기도 nested `.tmp`를 별도 금지 경로로 거부합니다. 로컬 테스트 결과의 절대 경로가 공개 후보에 들어가는 것을 생성기와 스캐너 양쪽에서 차단합니다.
 - **프런트엔드 복구 문맥과 탐색 정렬:** member·host·auth의 429 오류가 공개 기록 안내를 노출하지 않고 현재 역할의 복구 동선만 제시하며, 호스트 세션 조회 실패 시 나타나는 재시도 control은 인접 탐색 링크와 같은 글자 크기·행간을 유지합니다.
 - **Java 25 서버 런타임 준비:** Gradle test/bootRun과 로컬·release 서버 이미지에 동일한 Java 25 runtime policy를 적용했습니다. Netty가 포함된 classpath(`ALL-UNNAMED`)의 native access는 명시적으로 허용하고 그 밖의 module에서 발생하는 illegal native access는 거절하며, `protobuf-java` 4.34.2의 안전한 fallback으로 제거 예정인 `sun.misc.Unsafe` 메모리 접근 없이 OTLP payload를 직렬화합니다. 서버 image layer 추출도 Spring Boot 4의 지원되는 `tools` jarmode로 전환했습니다.
 - **내 공간 프런트 경계 부채:** 내 공간의 페이지 로컬 로그아웃을 제거하고 전역 계정 메뉴에만 유지해 archive feature의 auth feature 직접 import와 이를 위한 architecture-test 예외를 제거했습니다.
