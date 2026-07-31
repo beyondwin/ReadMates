@@ -37,6 +37,7 @@ async function createDraftAndPublishNextBook(
   expect(sessionId).not.toBe("");
 
   await page.goto(HOST_PATH);
+  await page.locator("main.rm-host-dashboard-desktop details.rm-host-flow > summary").click();
   const visibilityResponse = page.waitForResponse(
     (response) =>
       response.request().method() === "PATCH"

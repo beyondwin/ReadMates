@@ -27,6 +27,34 @@ function collectSourceFiles(directory: string): string[] {
 }
 
 describe("design-system boundaries", () => {
+  it("exposes the exact dependency-free Korean-capable reading stack with longer reading rhythm", () => {
+    const tokens = fs.readFileSync(path.join(packageRoot, "src/styles/tokens.css"), "utf8");
+    const stylesheet = document.createElement("style");
+    const sample = document.createElement("p");
+    const ledgerValue = document.createElement("strong");
+    stylesheet.textContent = tokens;
+    sample.className = "reading-editorial";
+    ledgerValue.className = "ledger-number";
+    document.head.append(stylesheet);
+    document.body.append(sample);
+    document.body.append(ledgerValue);
+
+    try {
+      expect(getComputedStyle(document.documentElement).getPropertyValue("--f-reading").trim()).toBe(
+        'ui-serif, "Iowan Old Style", "Noto Serif KR", "AppleMyungjo", "Batang", serif',
+      );
+      expect(getComputedStyle(sample).fontFamily).toBe("var(--f-reading)");
+      expect(getComputedStyle(sample).lineHeight).toBe("1.65");
+      expect(getComputedStyle(ledgerValue).fontFamily).toBe("var(--f-mono)");
+      expect(getComputedStyle(ledgerValue).fontVariantNumeric).toBe("tabular-nums");
+      expect(tokens).not.toMatch(/url\(|https?:\/\//);
+    } finally {
+      ledgerValue.remove();
+      sample.remove();
+      stylesheet.remove();
+    }
+  });
+
   it("does not import product app, feature, server, BFF, or router modules", () => {
     const forbiddenPatterns = [
       /from\s+["']@\/src\//,

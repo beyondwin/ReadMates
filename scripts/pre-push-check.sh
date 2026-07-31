@@ -234,7 +234,7 @@ run_step "Validate production AI config" bash ./scripts/validate-production-ai-c
 run_step "Verify production AI config fixtures" bash ./scripts/verify-production-ai-config-fixtures.sh
 
 if should_run_public_release_check; then
-  run_step "Build public release candidate" ./scripts/build-public-release-candidate.sh
+  run_step "Build candidate and verify public release fixtures" ./scripts/verify-public-release-fixtures.sh
   run_step "Run public release check" ./scripts/public-release-check.sh .tmp/public-release-candidate
 else
   printf '\n==> Public release check skipped\n'

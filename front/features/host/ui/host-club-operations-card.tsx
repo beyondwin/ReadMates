@@ -104,7 +104,7 @@ export function HostClubOperationsCard({
         {metrics.map((metric) => (
           <div key={metric.label} className="host-club-ops__metric">
             <dt>{metric.label}</dt>
-            <dd>{metric.value}</dd>
+            <dd className="ledger-number">{metric.value}</dd>
             <span>{metric.helper}</span>
           </div>
         ))}

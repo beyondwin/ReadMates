@@ -216,7 +216,7 @@ export default function HostDashboard({
     }
 
     setPendingUpcomingAction(key);
-    setUpcomingMessage({ kind: "status", text: "처리 중" });
+    setUpcomingMessage({ kind: "status", text: "공개 범위를 저장하는 중" });
 
     try {
       await actions.updateSessionVisibility(sessionId, request);
@@ -228,7 +228,7 @@ export default function HostDashboard({
     } catch {
       setUpcomingMessage({
         kind: "alert",
-        text: "저장하지 못했습니다",
+        text: "공개 범위를 저장하지 못했습니다. 기존 공개 범위는 유지됩니다. 다시 시도해 주세요.",
       });
     } finally {
       setPendingUpcomingAction(null);
@@ -246,14 +246,17 @@ export default function HostDashboard({
     }
 
     setPendingUpcomingAction(key);
-    setUpcomingMessage({ kind: "status", text: "처리 중" });
+    setUpcomingMessage({ kind: "status", text: "세션을 시작하는 중" });
 
     try {
       await actions.openSession(sessionId);
       setLocallyOpenedSessionId(sessionId);
-      setUpcomingMessage({ kind: "status", text: "현재 세션 시작됨" });
+      setUpcomingMessage({ kind: "status", text: "현재 세션을 시작했습니다." });
     } catch {
-      setUpcomingMessage({ kind: "alert", text: "저장하지 못했습니다" });
+      setUpcomingMessage({
+        kind: "alert",
+        text: "세션을 시작하지 못했습니다. 기존 세션 상태는 유지됩니다. 다시 시도해 주세요.",
+      });
     } finally {
       setPendingUpcomingAction(null);
     }
@@ -265,7 +268,7 @@ export default function HostDashboard({
     }
 
     setIsLoadingMoreHostSessions(true);
-    setUpcomingMessage(null);
+    setUpcomingMessage({ kind: "status", text: "예정 세션을 더 불러오는 중" });
 
     try {
       const nextPage = await actions.loadHostSessions({ limit: 50, cursor: nextHostSessionsCursor });
@@ -274,8 +277,12 @@ export default function HostDashboard({
         items: [...(current?.base === hostSessions ? current.items : []), ...nextPage.items],
         nextCursor: nextPage.nextCursor,
       }));
+      setUpcomingMessage(null);
     } catch {
-      setUpcomingMessage({ kind: "alert", text: "예정 세션을 더 불러오지 못했습니다" });
+      setUpcomingMessage({
+        kind: "alert",
+        text: "예정 세션을 더 불러오지 못했습니다. 기존 목록은 유지됩니다.",
+      });
     } finally {
       setIsLoadingMoreHostSessions(false);
     }
@@ -338,7 +345,7 @@ export default function HostDashboard({
                         {getHostDashboardSessionMetrics(session).map(([label, value]) => (
                           <div key={label}>
                             <dt>{label}</dt>
-                            <dd>{value}</dd>
+                            <dd className="ledger-number">{value}</dd>
                           </div>
                         ))}
                       </dl>
@@ -463,7 +470,7 @@ export default function HostDashboard({
                     disabled={isLoadingMoreHostSessions}
                     onClick={() => void handleLoadMoreHostSessions()}
                   >
-                    {isLoadingMoreHostSessions ? "불러오는 중" : "더 보기"}
+                    {isLoadingMoreHostSessions ? "예정 세션을 더 불러오는 중" : "더 보기"}
                   </button>
                 ) : null}
                 {upcomingMessage ? <UpcomingActionMessage message={upcomingMessage} /> : null}

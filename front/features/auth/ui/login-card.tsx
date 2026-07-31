@@ -45,7 +45,7 @@ export function LoginCard({
       </p>
       <div className="auth-card__actions auth-card__actions--primary">
         <a className="btn btn-primary btn-lg" href={googleLoginHref}>
-          시작하기
+          Google로 시작하기
         </a>
       </div>
       {error ? (

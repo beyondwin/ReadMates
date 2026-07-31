@@ -28,6 +28,7 @@ async function loginAsDevAccount(page: Page, accountName: RegExp) {
 
 async function startUpcomingSession(page: Page, bookTitle: string) {
   await page.goto("/app/host");
+  await page.locator("main.rm-host-dashboard-desktop details.rm-host-flow > summary").click();
   const openResponse = page.waitForResponse(
     (response) => response.url().includes("/api/bff/api/host/sessions/") && response.url().includes("/open") && response.status() === 200,
   );
@@ -58,6 +59,7 @@ test("host creates member-visible upcoming session then starts it", async ({ pag
 
   await expect(page).toHaveURL(/\/app\/host\/sessions\/.+\/edit/);
   await page.goto("/app/host");
+  await page.locator("main.rm-host-dashboard-desktop details.rm-host-flow > summary").click();
   const visibilityResponse = page.waitForResponse(
     (response) => response.url().includes("/api/bff/api/host/sessions/") && response.url().includes("/visibility") && response.status() === 200,
   );
@@ -72,6 +74,7 @@ test("host creates member-visible upcoming session then starts it", async ({ pag
 
   await loginAsDevAccount(page, /호스트/);
   await page.goto("/app/host");
+  await page.locator("main.rm-host-dashboard-desktop details.rm-host-flow > summary").click();
   const openResponse = page.waitForResponse(
     (response) => response.url().includes("/api/bff/api/host/sessions/") && response.url().includes("/open") && response.status() === 200,
   );

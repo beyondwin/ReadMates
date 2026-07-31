@@ -23,6 +23,9 @@ repo_abs="$(pwd -P)"
 tmp_dir="$repo_abs/.tmp"
 fixture_root="$tmp_dir/public-release-fixtures"
 candidate_dir="$tmp_dir/public-release-candidate"
+source_tmp_parent="$repo_abs/front/.tmp"
+source_nested_tmp_dir=""
+source_tmp_parent_created="false"
 
 prepare_tmp_dir() {
   if [[ -L "$tmp_dir" ]]; then
@@ -70,16 +73,37 @@ safe_remove_fixture_root() {
   rm -rf -- "$fixture_root" || true
 }
 
+safe_remove_source_nested_tmp() {
+  [[ -n "${source_nested_tmp_dir:-}" ]] || return 0
+
+  case "$source_nested_tmp_dir" in
+    "$source_tmp_parent"/public-release-builder-fixture.*)
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+
+  if [[ -L "$source_tmp_parent" || -L "$source_nested_tmp_dir" ]]; then
+    return 0
+  fi
+
+  [[ -d "$source_nested_tmp_dir" ]] || return 0
+  rm -rf -- "$source_nested_tmp_dir" || true
+  source_nested_tmp_dir=""
+
+  if [[ "$source_tmp_parent_created" == "true" ]]; then
+    rmdir "$source_tmp_parent" 2>/dev/null || true
+  fi
+}
+
 cleanup() {
+  safe_remove_source_nested_tmp
   safe_remove_fixture_root
 }
 trap cleanup EXIT
 
 prepare_tmp_dir
-
-if [[ ! -d "$candidate_dir" ]]; then
-  fail "public-release candidate not found at $candidate_dir; run scripts/build-public-release-candidate.sh first"
-fi
 
 if [[ -L "$fixture_root" ]]; then
   fail ".tmp/public-release-fixtures is a symlink; refusing to use it"
@@ -87,6 +111,39 @@ fi
 
 safe_remove_fixture_root
 mkdir -p "$fixture_root/secret-dollar" "$fixture_root/secret-comment" "$fixture_root/placeholders"
+
+if [[ -L "$source_tmp_parent" ]]; then
+  fail "front/.tmp is a symlink; refusing to use it for the builder fixture"
+fi
+
+if [[ -e "$source_tmp_parent" && ! -d "$source_tmp_parent" ]]; then
+  fail "front/.tmp exists but is not a directory"
+fi
+
+if [[ ! -d "$source_tmp_parent" ]]; then
+  mkdir -p "$source_tmp_parent"
+  source_tmp_parent_created="true"
+fi
+
+source_nested_tmp_dir="$(mktemp -d "$source_tmp_parent/public-release-builder-fixture.XXXXXX")" \
+  || fail "could not create nested .tmp builder fixture"
+source_nested_tmp_name="$(basename "$source_nested_tmp_dir")"
+source_nested_tmp_marker="front/.tmp/$source_nested_tmp_name/generated-audit.json"
+printf '{"kind":"generated audit metadata"}\n' > "$repo_abs/$source_nested_tmp_marker"
+
+if ! ./scripts/build-public-release-candidate.sh \
+  > "$fixture_root/builder.out" 2> "$fixture_root/builder.err"
+then
+  sed 's/^/  /' "$fixture_root/builder.out" >&2
+  sed 's/^/  /' "$fixture_root/builder.err" >&2
+  fail "public release candidate build failed with nested .tmp source fixture"
+fi
+
+if [[ -e "$candidate_dir/$source_nested_tmp_marker" ]]; then
+  fail "public release candidate copied nested .tmp source fixture: $source_nested_tmp_marker"
+fi
+
+safe_remove_source_nested_tmp
 
 secret_dollar_value="$(printf 'Abc\\044123Def456Gh!')"
 printf 'SPRING_DATASOURCE_PASSWORD=%s\n' "$secret_dollar_value" > "$fixture_root/secret-dollar/.env.example"
@@ -156,6 +213,20 @@ if ./scripts/public-release-check.sh "$artifact_fixture" > "$artifact_fixture.ou
   fail "public release check should reject front/test-results"
 fi
 assert_file_contains "$artifact_fixture.err" "forbidden candidate path: front/test-results/.last-run.json"
+
+nested_tmp_fixture="$fixture_root/nested-tmp-path"
+mkdir -p "$nested_tmp_fixture/front/.tmp/test-audit-plan-check"
+printf 'generated audit metadata\n' \
+  > "$nested_tmp_fixture/front/.tmp/test-audit-plan-check/front-node.json"
+
+if ./scripts/public-release-check.sh "$nested_tmp_fixture" \
+  > "$nested_tmp_fixture.out" 2> "$nested_tmp_fixture.err"
+then
+  fail "public release check should reject nested .tmp directories"
+fi
+assert_file_contains \
+  "$nested_tmp_fixture.err" \
+  "forbidden candidate path: front/.tmp"
 
 playwright_cache_fixture="$fixture_root/playwright-cache-path"
 mkdir -p "$playwright_cache_fixture/front/playwright/.cache/assets"

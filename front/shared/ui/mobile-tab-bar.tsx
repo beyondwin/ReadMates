@@ -1,7 +1,10 @@
 
 import type { ComponentType, ReactNode } from "react";
 import { useLocation } from "react-router-dom";
-import { READMATES_MOBILE_TAB_LABELS, READMATES_NAV_LABELS } from "./readmates-copy";
+import {
+  READMATES_MOBILE_TAB_LABELS,
+  READMATES_PRIMARY_NAV_LABELS,
+} from "./readmates-copy";
 
 export type MobileTabBarVariant = "member" | "host";
 
@@ -18,6 +21,8 @@ export type AppLinkComponent = ComponentType<AppLinkProps>;
 type MobileTabBarProps = {
   variant: MobileTabBarVariant;
   currentSessionId?: string | null | undefined;
+  currentSessionStatus?: "ready" | "loading" | "error" | "retrying";
+  onRetryCurrentSession?: () => void;
   appBasePath?: string;
   LinkComponent?: AppLinkComponent;
 };
@@ -40,6 +45,11 @@ type TabLink = {
   href: string | null;
   label: string;
   pendingLabel?: string;
+  pendingAriaLabel?: string;
+  retry?: {
+    onRetry: () => void;
+    pending: boolean;
+  };
   icon: TabIconName;
   state?: { readmatesWorkspace: "host" | "member" };
   current: (pathname: string) => boolean;
@@ -56,42 +66,35 @@ function DefaultLink({ to, state: _state, children, ...props }: AppLinkProps) {
 }
 
 const memberTabs: TabLink[] = [
-  { key: "home", href: "/app", label: READMATES_NAV_LABELS.member.home, icon: "home", current: (pathname) => pathname === "/app" },
   {
-    key: "session",
-    href: "/app/session/current",
-    label: READMATES_NAV_LABELS.member.currentSession,
-    icon: "session",
-    current: (pathname) => pathname === "/app/session" || pathname.startsWith("/app/session/"),
+    key: "home",
+    href: "/app",
+    label: READMATES_PRIMARY_NAV_LABELS.member.today,
+    icon: "home",
+    current: (pathname) =>
+      pathname === "/app" || pathname === "/app/session" || pathname.startsWith("/app/session/"),
   },
   {
     key: "notes",
     href: "/app/notes",
-    label: READMATES_NAV_LABELS.member.clubNotes,
+    label: READMATES_PRIMARY_NAV_LABELS.member.notes,
     icon: "notes",
     current: (pathname) => pathname === "/app/notes",
   },
   {
     key: "archive",
     href: "/app/archive",
-    label: READMATES_NAV_LABELS.member.archive,
+    label: READMATES_PRIMARY_NAV_LABELS.member.records,
     icon: "archive",
     current: (pathname) =>
       pathname.startsWith("/app/archive") || pathname.startsWith("/app/sessions/") || pathname.startsWith("/app/feedback/"),
   },
   {
-    key: "notifications",
-    href: "/app/notifications",
-    label: READMATES_NAV_LABELS.member.notifications,
-    icon: "notifications",
-    current: (pathname) => pathname.startsWith("/app/notifications"),
-  },
-  {
     key: "me",
     href: "/app/me",
-    label: READMATES_NAV_LABELS.member.mySpace,
+    label: READMATES_PRIMARY_NAV_LABELS.member.mySpace,
     icon: "me",
-    current: (pathname) => pathname.startsWith("/app/me"),
+    current: (pathname) => pathname.startsWith("/app/me") || pathname.startsWith("/app/notifications"),
   },
 ];
 
@@ -110,13 +113,28 @@ function scopedTabs(tabs: TabLink[], appBasePath: string): TabLink[] {
   }));
 }
 
-function hostTabs(currentSessionId?: string | null): TabLink[] {
+function hostTabs({
+  currentSessionId,
+  currentSessionStatus,
+  onRetryCurrentSession,
+}: {
+  currentSessionId?: string | null;
+  currentSessionStatus: "ready" | "loading" | "error" | "retrying";
+  onRetryCurrentSession?: () => void;
+}): TabLink[] {
   const editHref =
-    currentSessionId === undefined
+    currentSessionStatus !== "ready"
       ? null
       : currentSessionId
-        ? `/app/host/sessions/${currentSessionId}/edit`
-        : "/app/host/sessions/new";
+          ? `/app/host/sessions/${currentSessionId}/edit`
+          : "/app/host/sessions/new";
+  const retry =
+    onRetryCurrentSession && (currentSessionStatus === "error" || currentSessionStatus === "retrying")
+      ? {
+          onRetry: onRetryCurrentSession,
+          pending: currentSessionStatus === "retrying",
+        }
+      : undefined;
 
   return [
     {
@@ -124,22 +142,27 @@ function hostTabs(currentSessionId?: string | null): TabLink[] {
       href: "/app/host",
       label: READMATES_MOBILE_TAB_LABELS.hostToday,
       icon: "host",
-      current: (pathname) => pathname === "/app/host",
+      current: (pathname) => pathname === "/app/host" || pathname === "/app/host/notifications",
     },
     {
       key: "host-edit",
       href: editHref,
       label: READMATES_MOBILE_TAB_LABELS.hostSession,
-      pendingLabel: currentSessionId === undefined ? READMATES_MOBILE_TAB_LABELS.hostSessionPending : undefined,
+      pendingLabel:
+        currentSessionStatus === "error"
+          ? "다시 확인"
+          : currentSessionStatus === "ready"
+            ? undefined
+            : READMATES_MOBILE_TAB_LABELS.hostSessionPending,
+      pendingAriaLabel:
+        currentSessionStatus === "error"
+          ? "세션 다시 확인"
+          : currentSessionStatus === "retrying"
+            ? "세션 다시 확인 중"
+            : "세션 불러오는 중",
+      retry,
       icon: "edit",
       current: (pathname) => pathname === "/app/host/sessions/new" || /^\/app\/host\/sessions\/[^/]+\/edit$/.test(pathname),
-    },
-    {
-      key: "host-notifications",
-      href: "/app/host/notifications",
-      label: READMATES_MOBILE_TAB_LABELS.hostNotifications,
-      icon: "notify",
-      current: (pathname) => pathname === "/app/host/notifications",
     },
     {
       key: "host-members",
@@ -153,7 +176,9 @@ function hostTabs(currentSessionId?: string | null): TabLink[] {
       href: "/app/host/sessions",
       label: READMATES_MOBILE_TAB_LABELS.hostRecords,
       icon: "archive",
-      current: (pathname) => pathname === "/app/host/sessions",
+      current: (pathname) =>
+        pathname === "/app/host/sessions" ||
+        /^\/app\/host\/sessions\/[^/]+\/(?:closing|feedback-document)$/.test(pathname),
     },
   ];
 }
@@ -250,10 +275,28 @@ export function TabIcon({ name }: { name: TabIconName }) {
   }
 }
 
-export function MobileTabBar({ variant, currentSessionId, appBasePath = "", LinkComponent = DefaultLink }: MobileTabBarProps) {
+export function MobileTabBar({
+  variant,
+  currentSessionId,
+  currentSessionStatus,
+  onRetryCurrentSession,
+  appBasePath = "",
+  LinkComponent = DefaultLink,
+}: MobileTabBarProps) {
   const pathname = useLocation().pathname;
   const appPath = appPathname(pathname);
-  const tabs = scopedTabs(variant === "host" ? hostTabs(currentSessionId) : memberTabs, appBasePath);
+  const resolvedCurrentSessionStatus =
+    currentSessionStatus ?? (currentSessionId === undefined ? "loading" : "ready");
+  const tabs = scopedTabs(
+    variant === "host"
+      ? hostTabs({
+          currentSessionId,
+          currentSessionStatus: resolvedCurrentSessionStatus,
+          onRetryCurrentSession,
+        })
+      : memberTabs,
+    appBasePath,
+  );
 
   return (
     <nav
@@ -274,19 +317,34 @@ export function MobileTabBar({ variant, currentSessionId, appBasePath = "", Link
             <TabIcon name={tab.icon} />
             <span className="m-tab-label">{tab.label}</span>
           </LinkComponent>
+        ) : tab.retry ? (
+          <button
+            key={tab.key}
+            type="button"
+            className="m-tab is-pending"
+            aria-current={tab.current(appPath) ? "page" : undefined}
+            aria-label={tab.pendingAriaLabel}
+            disabled={tab.retry.pending}
+            onClick={tab.retry.onRetry}
+          >
+            <TabIcon name={tab.icon} />
+            <span className="m-tab-label" aria-hidden="true">
+              {tab.pendingLabel ?? tab.label}
+            </span>
+          </button>
         ) : (
           <span
             key={tab.key}
             className="m-tab is-pending"
             aria-disabled="true"
             aria-current={tab.current(appPath) ? "page" : undefined}
-            aria-label={`${tab.label} 불러오는 중`}
+            aria-label={tab.pendingAriaLabel ?? `${tab.label} 불러오는 중`}
           >
             <TabIcon name={tab.icon} />
             <span className="m-tab-label" aria-hidden="true">
               {tab.pendingLabel ?? tab.label}
             </span>
-            <span className="rm-sr-only">{tab.label} 불러오는 중</span>
+            <span className="rm-sr-only">{tab.pendingAriaLabel ?? `${tab.label} 불러오는 중`}</span>
           </span>
         ),
       )}

@@ -94,7 +94,7 @@ describe("priority-ledger sections", () => {
   it("renders compact metrics, record rows, and a direct records action", () => {
     renderLedger();
 
-    const ledger = screen.getByRole("region", { name: "처리 대기 원장" });
+    const ledger = screen.getByRole("group", { name: "처리 대기 원장" });
     expect(within(ledger).getByText("RSVP 미응답")).toBeInTheDocument();
     expect(within(ledger).getByText("2")).toBeInTheDocument();
     expect(within(ledger).getByText("8회차 기록")).toBeInTheDocument();
@@ -148,10 +148,47 @@ describe("priority-ledger sections", () => {
       />,
     );
 
-    const tools = screen.getByRole("region", { name: "운영 도구" });
+    const tools = screen.getByRole("group", { name: "운영 도구" });
     expect(within(tools).getByText("알림 장부")).toBeInTheDocument();
     expect(within(tools).getByText("멤버 관리")).toBeInTheDocument();
     expect(within(tools).getByText("초대 관리")).toBeInTheDocument();
     expect(within(tools).getByText("빠른 실행")).toBeInTheDocument();
+  });
+
+  it("uses one conforming heading child for each desktop disclosure summary", () => {
+    const { container } = render(
+      <>
+        <HostPriorityLedger
+          metrics={metrics}
+          recordRows={<div>8회차 기록</div>}
+          recordError={false}
+          LinkComponent={TestLink}
+        />
+        <HostOperationFlow
+          upcomingSessions={<div>9회차 예정</div>}
+          checklist={{ highlighted: checklist.slice(1), all: checklist }}
+        />
+        <HostOperationsTools
+          notifications={<div>알림 장부</div>}
+          members={<div>멤버 관리</div>}
+          invitations={<div>초대 관리</div>}
+          quickActions={<div>빠른 실행</div>}
+        />
+      </>,
+    );
+
+    const summaries = Array.from(
+      container.querySelectorAll<HTMLElement>(".rm-host-desktop-disclosure > summary"),
+    );
+    expect(summaries).toHaveLength(3);
+    for (const summary of summaries) {
+      expect(summary.children).toHaveLength(1);
+      expect(summary.firstElementChild?.tagName).toBe("H2");
+      expect(summary.querySelector(":scope > div")).toBeNull();
+      expect(summary.tabIndex).toBe(0);
+    }
+    expect(screen.getByRole("group", { name: "처리 대기 원장" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "다음 세션과 운영 흐름" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "운영 도구" })).toBeInTheDocument();
   });
 });

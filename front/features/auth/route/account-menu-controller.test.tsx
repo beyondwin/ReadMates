@@ -62,6 +62,10 @@ describe("AccountMenuController", () => {
     await renderOpenController({ appBasePath: "/clubs/reading-sai/app" });
 
     expect(screen.getByRole("link", { name: "내 공간" })).toHaveAttribute("href", "/clubs/reading-sai/app/me");
+    expect(screen.getByRole("link", { name: "알림" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/notifications",
+    );
     expect(screen.getByRole("link", { name: "계정 설정" })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/me/settings",

@@ -28,7 +28,7 @@ describe("LoginRoute", () => {
     expect(screen.getByText("둘러보기부터 멤버 참여까지")).toBeVisible();
     expect(screen.getByRole("heading", { name: "읽는사이 들어가기" })).toBeVisible();
     expect(screen.getByText(/초대 링크가 없다면 둘러보기 멤버로 시작해 기록을 읽을 수 있고/)).toBeVisible();
-    expect(screen.getByRole("link", { name: "시작하기" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Google로 시작하기" })).toHaveAttribute(
       "href",
       "/oauth2/authorization/google",
     );
@@ -42,7 +42,7 @@ describe("LoginRoute", () => {
 
     render(<LoginRoute />);
 
-    expect(screen.getByRole("link", { name: "시작하기" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Google로 시작하기" })).toHaveAttribute(
       "href",
       "/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp%2Ffeedback%2Fsession-1%3Ffrom%3Demail",
     );
@@ -53,7 +53,7 @@ describe("LoginRoute", () => {
 
     render(<LoginRoute />);
 
-    expect(screen.getByRole("link", { name: "시작하기" })).toHaveAttribute("href", "/oauth2/authorization/google");
+    expect(screen.getByRole("link", { name: "Google로 시작하기" })).toHaveAttribute("href", "/oauth2/authorization/google");
   });
 
   it("hides dev login shortcuts in production builds even when the flag is true", () => {
@@ -63,7 +63,7 @@ describe("LoginRoute", () => {
 
     render(<LoginRoute />);
 
-    expect(screen.getByRole("link", { name: "시작하기" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Google로 시작하기" })).toBeInTheDocument();
     expect(screen.queryByText("Local development only")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "김호스트 · 호스트" })).not.toBeInTheDocument();
   });
@@ -73,7 +73,7 @@ describe("LoginRoute", () => {
 
     render(<LoginRoute />);
 
-    expect(screen.getByRole("link", { name: "시작하기" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Google로 시작하기" })).toBeInTheDocument();
     expect(screen.getByText("Local development only")).toBeInTheDocument();
     expect(screen.getByText("프로덕션 제외")).toBeInTheDocument();
     expect(screen.getByText(/실제 운영 로그인은 위 Google OAuth 경로를 사용합니다/)).toBeInTheDocument();

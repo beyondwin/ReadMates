@@ -25,6 +25,7 @@ async function createOpenSessionThroughUi(page: Page) {
 
   await expect(page).toHaveURL(/\/app\/host\/sessions\/.+\/edit/);
   await page.goto("/app/host");
+  await page.locator("main.rm-host-dashboard-desktop details.rm-host-flow > summary").click();
   const openResponse = page.waitForResponse(
     (response) => response.url().includes("/api/bff/api/host/sessions/") && response.url().includes("/open") && response.status() === 200,
   );

@@ -95,6 +95,7 @@
 
   /* Type */
   --f-sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --f-reading: ui-serif, "Iowan Old Style", "Noto Serif KR", "AppleMyungjo", "Batang", serif;
   --f-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
 
   /* Radius */
@@ -247,10 +248,22 @@ img { max-width: 100%; display: block; }
 .h3, .h4 { word-break: keep-all; }
 .mono { font-family: var(--f-mono); font-feature-settings: "zero", "cv01"; }
 
-/* Serif-like editorial emphasis via letterspacing — no serif font */
+/* Interface emphasis stays sans; long-form reading copy opts into the system serif stack. */
 .editorial {
   font-weight: 500;
   letter-spacing: -0.025em;
+}
+
+.reading-editorial {
+  font-family: var(--f-reading);
+  font-weight: 500;
+  line-height: 1.65;
+  letter-spacing: -0.018em;
+}
+
+.ledger-number {
+  font-family: var(--f-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ============================================
@@ -889,6 +902,16 @@ button.rm-record-row:hover {
   white-space: nowrap;
   word-break: keep-all;
   flex-shrink: 0;
+}
+.nav-link:is(button) {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+}
+.nav-link:is(button):disabled {
+  cursor: wait;
 }
 .nav-link:hover { color: var(--text); background: var(--bg-sub); }
 .nav-link[aria-current="page"] {

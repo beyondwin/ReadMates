@@ -158,7 +158,7 @@ describe("HostSessionLedger", () => {
     expect(within(rows[0]).getByRole("link", { name: "1회차 기록 열기" })).toHaveClass(
       "rm-host-attention__row",
     );
-    expect(rows[0]).toHaveTextContent("No.1");
+    expect(within(rows[0]).getByText("No.1")).toHaveClass("ledger-number");
     expect(rows[0]).toHaveTextContent("책 1");
     expect(rows[0]).toHaveTextContent("확인 필요");
     expect(rows[0]).toHaveTextContent("기록 열기");

@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import type { CurrentSessionResponse } from "@/features/current-session/api/current-session-contracts";
 import { usableJoinedClubs } from "@/features/club-selection/model/club-entry";
 import { AccountMenuController } from "@/features/auth/route/account-menu-controller";
+import { hostCurrentSessionQuery } from "@/features/host/queries/host-session-queries";
 import { useAuth, useAuthActions } from "@/src/app/auth-state";
 import {
   archiveReportReturnTarget,
@@ -18,7 +19,6 @@ import {
   type ReadmatesMobileWorkspace,
 } from "@/src/app/route-continuity";
 import { Link } from "@/src/app/router-link";
-import { readmatesFetch } from "@/shared/api/client";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { canUseHostApp } from "@/shared/auth/member-app-access";
 import { MobileHeader } from "@/shared/ui/mobile-header";
@@ -172,42 +172,33 @@ export function AppRouteLayout({
   const showHostEntry = Boolean(isActiveHost && !isHostWorkspace);
   const memberName = auth?.displayName ?? null;
   const activeHostKey = isActiveHost && mobileWorkspace === "host" ? auth.membershipId : null;
-  const [hostCurrentSession, setHostCurrentSession] = useState<{
-    hostKey: string | null;
-    sessionId: string | null;
-  } | null>(null);
+  const currentSessionQuery = useQuery({
+    ...hostCurrentSessionQuery(clubSlug ? { clubSlug } : undefined),
+    enabled: activeHostKey !== null,
+  });
+  const [isRetryingCurrentSession, setIsRetryingCurrentSession] = useState(false);
+  const currentSessionStatus =
+    activeHostKey === null
+      ? "ready"
+      : currentSessionQuery.isFetching
+        ? isRetryingCurrentSession
+          ? "retrying"
+          : "loading"
+        : currentSessionQuery.isError
+          ? "error"
+          : "ready";
   const currentSessionId =
-    activeHostKey === null ? null : hostCurrentSession?.hostKey === activeHostKey ? hostCurrentSession.sessionId : undefined;
-
-  useEffect(() => {
-    let cancelled = false;
-
-    if (activeHostKey === null) {
-      return;
-    }
-
-    readmatesFetch<CurrentSessionResponse>("/api/sessions/current")
-      .then((current) => {
-        if (!cancelled) {
-          setHostCurrentSession({
-            hostKey: activeHostKey,
-            sessionId: current.currentSession?.sessionId ?? null,
-          });
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setHostCurrentSession({
-            hostKey: activeHostKey,
-            sessionId: null,
-          });
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeHostKey]);
+    activeHostKey === null
+      ? null
+      : currentSessionStatus === "ready"
+        ? (currentSessionQuery.data?.currentSession?.sessionId ?? null)
+        : undefined;
+  const retryCurrentSession = () => {
+    setIsRetryingCurrentSession(true);
+    void currentSessionQuery.refetch().finally(() => {
+      setIsRetryingCurrentSession(false);
+    });
+  };
 
   useEffect(() => {
     if (!isActiveHost) {
@@ -225,6 +216,9 @@ export function AppRouteLayout({
           memberName={memberName}
           showHostEntry={showHostEntry}
           appBasePath={basePath}
+          currentSessionId={desktopVariant === "host" ? currentSessionId : null}
+          currentSessionStatus={desktopVariant === "host" ? currentSessionStatus : "ready"}
+          onRetryCurrentSession={desktopVariant === "host" ? retryCurrentSession : undefined}
           LinkComponent={Link}
           accountControl={
             auth?.authenticated ? (
@@ -274,6 +268,8 @@ export function AppRouteLayout({
         <MobileTabBar
           variant={mobileVariant}
           currentSessionId={currentSessionId}
+          currentSessionStatus={currentSessionStatus}
+          onRetryCurrentSession={retryCurrentSession}
           appBasePath={basePath}
           LinkComponent={Link}
         />

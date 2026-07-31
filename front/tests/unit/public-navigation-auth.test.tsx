@@ -120,6 +120,7 @@ describe("public navigation auth state", () => {
     expect(inviteCta).toHaveAttribute("aria-disabled", "true");
     expect(inviteCta).toHaveTextContent("초대 메일의 개인 링크에서만 열립니다.");
     expect(screen.queryByRole("link", { name: /초대 수락하기/ })).not.toBeInTheDocument();
+    expect(screen.getByText(`© ${new Date().getFullYear()} · 읽는사이`)).toBeInTheDocument();
   });
 
   it("hides footer guest login actions when mounted for authenticated app users", () => {

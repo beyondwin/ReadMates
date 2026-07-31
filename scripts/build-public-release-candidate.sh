@@ -392,6 +392,7 @@ copy_dir() {
     --exclude='*.dump' \
     --exclude='*.tsbuildinfo' \
     --exclude='.DS_Store' \
+    --exclude='.tmp/' \
     --exclude='/.wrangler/' \
     --exclude='/.cloudflare/' \
     --exclude='/.vercel/' \
@@ -532,7 +533,7 @@ is_forbidden_candidate_path() {
     .superpowers|.superpowers/*) return 0 ;;
     .idea|.idea/*) return 0 ;;
     .playwright-cli|.playwright-cli/*) return 0 ;;
-    .tmp|.tmp/*) return 0 ;;
+    .tmp|.tmp/*|*/.tmp|*/.tmp/*) return 0 ;;
     # Deployment state
     deploy/oci/.deploy-state|deploy/oci/*.state) return 0 ;;
     # Cloud / infra tool caches

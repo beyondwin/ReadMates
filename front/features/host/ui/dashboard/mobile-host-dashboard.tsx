@@ -197,11 +197,14 @@ export function MobileHostDashboard({
                 {getHostDashboardSessionMetrics(session).map(([label, value]) => (
                   <div key={label}>
                     <dt className="eyebrow">{label}</dt>
-                    <dd>{value}</dd>
+                    <dd className="ledger-number">{value}</dd>
                   </div>
                 ))}
               </dl>
-              <p className="tiny">참석 {goingCount}명 · 미응답 {noResponseCount}명</p>
+              <p className="tiny">
+                참석 <span className="ledger-number">{goingCount}</span>명 · 미응답{" "}
+                <span className="ledger-number">{noResponseCount}</span>명
+              </p>
             </>
           ) : (
             <>
@@ -285,7 +288,7 @@ export function MobileHostDashboard({
             disabled={isLoadingMoreHostSessions}
             onClick={() => onLoadMoreHostSessions()}
           >
-            {isLoadingMoreHostSessions ? "불러오는 중" : "더 보기"}
+            {isLoadingMoreHostSessions ? "예정 세션을 더 불러오는 중" : "더 보기"}
           </button>
         ) : null}
         {upcomingMessage ? <UpcomingActionMessage message={upcomingMessage} mobile /> : null}

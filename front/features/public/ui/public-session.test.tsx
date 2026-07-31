@@ -4,7 +4,7 @@ import PublicSession from "./public-session";
 
 describe("PublicSession showcase", () => {
   it("renders showcase labels without private surfaces", () => {
-    render(
+    const { container } = render(
       <PublicSession
         session={{
           sessionId: "s1",
@@ -22,6 +22,11 @@ describe("PublicSession showcase", () => {
 
     expect(screen.getByText("기록 준비됨")).toBeVisible();
     expect(screen.getByText("하이라이트 1 · 한줄평 1")).toBeVisible();
+    expect(container.querySelector(".public-session-record__identity h1")).toHaveClass("reading-editorial");
+    expect(container.querySelector(".public-session-summary-text")).toHaveClass("reading-editorial");
+    expect(container.querySelector(".public-note-highlight-row__quote")).toHaveClass("reading-editorial");
+    expect(container.querySelector(".public-note-oneliner-card__quote")).toHaveClass("reading-editorial");
+    expect(screen.getByRole("heading", { name: "회차 기록" })).not.toHaveClass("reading-editorial");
     expect(screen.queryByText(/피드백 문서/)).toBeNull();
     expect(screen.queryByText("ADMIN_ROUTE")).toBeNull();
   });

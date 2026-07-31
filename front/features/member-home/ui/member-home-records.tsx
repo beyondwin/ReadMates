@@ -125,7 +125,7 @@ export function ClubPulse({
                   No.{String(item.sessionNumber).padStart(2, "0")} · {noteKindLabel(item.kind)}
                 </span>
               </div>
-              <div className="body editorial" style={{ fontSize: "17px", lineHeight: 1.55 }}>
+              <div className="body editorial reading-editorial" style={{ fontSize: "17px" }}>
                 {item.text}
               </div>
             </article>
@@ -155,7 +155,7 @@ export function RecentRecordEntry({
           <h2 className="h3 editorial" style={{ margin: "6px 0 0" }}>
             No.{String(entry.sessionNumber).padStart(2, "0")} · {entry.bookTitle}
           </h2>
-          <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
+          <p className="small reading-editorial" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
             {entry.summary}
           </p>
           <div className="tiny" style={{ color: "var(--text-3)", marginTop: 8 }}>
@@ -191,7 +191,7 @@ export function MobileRecentRecordEntry({
         <div className="body editorial" style={{ fontSize: 15, marginTop: 6 }}>
           No.{String(entry.sessionNumber).padStart(2, "0")} · {entry.bookTitle}
         </div>
-        <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
+        <p className="small reading-editorial" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
           {entry.summary}
         </p>
         <div className="tiny" style={{ color: "var(--text-3)", marginTop: 8 }}>
@@ -263,7 +263,7 @@ export function MobileMemberActivity({
                     </div>
                   </div>
                 </div>
-                <p className="rm-member-activity-card__text editorial">{item.text}</p>
+                <p className="rm-member-activity-card__text editorial reading-editorial">{item.text}</p>
               </article>
             );
           })}

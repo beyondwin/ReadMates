@@ -643,7 +643,7 @@ describe("frontend architecture boundaries", () => {
     addUnusedLegacyExceptionViolations(violations, consumedLegacyExceptions);
 
     expect(violations, violations.join("\n")).toEqual([]);
-  });
+  }, 15_000);
 
   it("keeps host presentation components free of API-backed defaults", () => {
     const hostPresentationComponents = [

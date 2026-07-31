@@ -9,22 +9,45 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 ### Highlights
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
+
+## v2.1.0 - 2026-07-31
+
+### Highlights
+
 - **호스트 알림 발송 UI:** 자동 리마인더를 상태 문구가 있는 ON/OFF switch로 정리하고, 수동 발송의 알림 종류·대상·채널을 설명형 선택 카드와 최종 요약으로 개편했습니다. 기존 미리보기 후 명시적 발송, 중복 재발송 확인, 기본 OFF 정책은 유지합니다.
 - **프로필 중심의 내 공간:** 내 공간을 표시 이름·멤버십 맥락과 누적 참여·완독·질문·서평 성취가 이어지는 하나의 개요로 구성하고, 그 아래에 서버 정렬 순서를 따르는 최근 개인 독서 기록을 최대 3건 보여줍니다.
 - **호스트 세션 편집 작업대:** 호스트 세션 편집 화면을 개요·기본 정보·출석·기록 작업대·변경 기록의 한 section 흐름으로 재구성했습니다. 직접 작성, AI 생성, 외부 JSON은 같은 작업 중 초안으로 수렴하고, 현재 적용본·공개 범위·별도 반영 검토를 분명히 구분합니다. 과거 버전 복원은 새 초안을 만들며 즉시 적용하지 않고, 닫기·Escape·화면 이동·알림 보내지 않기는 apply 또는 알림 발송을 만들지 않습니다.
 
 ### Changed
 
-- **멤버 내 공간·계정·기록 동선:** `/app/me`는 표시 이름과 inline `이름 변경`, 현재 클럽 맥락, 누적 성취가 한 지면에서 이어지며 프로필 안의 중복 계정 설정 action을 제거합니다. 전역 계정 메뉴는 `내 공간`, `계정 설정`, `로그아웃`을 제공하고, `/app/me/settings`는 읽기 전용 계정·멤버십 정보와 `← 내 공간`, 단계형 클럽 탈퇴를 제공합니다. 최근 개인 기록의 `전체 세션 기록 보기`는 `/app/archive?view=sessions`로 연결하며 `/app/me/records` direct deep link와 cursor pagination은 유지합니다.
+- **멤버 내 공간·계정·기록 동선:** `/app/me`는 표시 이름과 inline `이름 변경`, 현재 클럽 맥락, 누적 성취가 한 지면에서 이어지며 프로필 안의 중복 계정 설정 action을 제거합니다. 전역 계정 메뉴는 `내 공간`, `알림`, `계정 설정`, `로그아웃`을 제공하고, `/app/me/settings`는 읽기 전용 계정·멤버십 정보와 `← 내 공간`, 단계형 클럽 탈퇴를 제공합니다. 최근 개인 기록의 `전체 세션 기록 보기`는 `/app/archive?view=sessions`로 연결하며 `/app/me/records` direct deep link와 cursor pagination은 유지합니다.
 - **멤버 알림함:** 큰 문서 패널과 중첩 카드를 간결한 편집형 목록으로 바꾸고, 영어 액션·회고 배지를 제거했습니다. 행 전체 이동, 읽지 않음 상태, 오류·빈 상태, 더 보기 흐름을 데스크톱과 모바일에서 같은 한국어 인터페이스로 제공합니다.
+- **프런트엔드 디자인 하드닝:** 멤버·호스트 기본 탐색을 역할별 핵심 4개 목적지로 정리했습니다. 공개 화면은 범위가 유지되는 복구 링크와 재시도·대기 상태를 구분하고, 호스트 보조 원장과 운영 도구는 접힌 disclosure 및 실행 가능한 실패 상태로 제공합니다. 공개 기록과 멤버 회고의 제목·요약·인용·감상은 데스크톱과 모바일에서 읽기 서체와 행간을 사용합니다.
 - **개인 독서 여정 API:** 현재 멤버의 열람 가능한 전체 기록 summary와 cursor page를 함께 반환하는 additive `GET /api/archive/me/journey` projection을 추가했습니다. Page 크기와 무관한 두 개의 고정 query로 계산하며 DB migration이나 BFF 계약 변경은 없습니다.
 
 ### Fixed
 
+- **서버 프레임워크 보안 업데이트:** Spring Boot를 `4.0.7`로 올려 Spring Framework `7.0.8`을 사용합니다. 릴리즈 이미지에서 수정 가능한 Spring Expression/WebFlux/WebMVC HIGH 취약점(CVE-2026-41842, CVE-2026-41845, CVE-2026-41850)을 제거하고, Spring Mail이 STARTTLS/SSL 서버 인증서의 hostname을 검증하지 않던 CVE-2026-40992를 수정합니다. 공급자 계약 테스트의 로컬 wire timeout 여유도 넓혀 CI 부하에서 단일 요청·무재시도 검증이 안정적으로 완료되게 했으며 Production의 4분 provider timeout과 재시도 정책은 바뀌지 않습니다.
+- **공개 릴리스 후보의 nested scratch 제외:** `front/.tmp`처럼 승인된 source root 안쪽에 남은 ignored `.tmp` 산출물을 후보 생성 단계에서 모든 깊이에 걸쳐 제외하고, 후보 검사기도 nested `.tmp`를 별도 금지 경로로 거부합니다. Fixture harness가 실제 builder exclusion을 회귀 검증하며 CI와 pre-push의 기존 공개 릴리스 게이트에서 실행되어 로컬 테스트 결과의 절대 경로가 공개 후보에 들어가는 것을 생성기와 스캐너 양쪽에서 차단합니다.
+- **프런트엔드 복구 문맥과 탐색 정렬:** member·host·auth의 429 오류가 공개 기록 안내를 노출하지 않고 현재 역할의 복구 동선만 제시하며, 호스트 세션 조회 실패 시 나타나는 재시도 control은 인접 탐색 링크와 같은 글자 크기·행간을 유지합니다.
 - **Java 25 서버 런타임 준비:** Gradle test/bootRun과 로컬·release 서버 이미지에 동일한 Java 25 runtime policy를 적용했습니다. Netty가 포함된 classpath(`ALL-UNNAMED`)의 native access는 명시적으로 허용하고 그 밖의 module에서 발생하는 illegal native access는 거절하며, `protobuf-java` 4.34.2의 안전한 fallback으로 제거 예정인 `sun.misc.Unsafe` 메모리 접근 없이 OTLP payload를 직렬화합니다. 서버 image layer 추출도 Spring Boot 4의 지원되는 `tools` jarmode로 전환했습니다.
 - **내 공간 프런트 경계 부채:** 내 공간의 페이지 로컬 로그아웃을 제거하고 전역 계정 메뉴에만 유지해 archive feature의 auth feature 직접 import와 이를 위한 architecture-test 예외를 제거했습니다.
 - **중도 합류와 출석 미확인 참여 여정:** 최근 참여 row를 현재 club·현재 membership의 활성 participant `PUBLISHED` 회차로만 제한하고, `UNKNOWN` 출석 상태를 보존해 과거·제거된 참여나 미확인 출석을 참여로 계산하지 않습니다.
 - **호스트 세션 편집기 잔여 리스크:** URL 기본 위치가 호출 간 공유 객체를 노출하지 않도록 분리하고, 오류·stale·validation·review가 동시에 존재할 때의 다음 행동 우선순위를 조합 테스트로 고정했습니다. 적용·초안·변경 기록 시간은 `Asia/Seoul` 기준 `YYYY.MM.DD HH:mm`으로 표시하며 원본 ISO 값은 `<time dateTime>`에 보존합니다. 저장된 세션은 route-owned record workflow를 필수로 요구하고 구형 공개 패널 fallback과 전용 dead code를 제거했습니다. 모바일 CSS는 명시적 편집기 class만 사용하며, 320px JSON 긴 콘텐츠와 390px 반영 대화상자까지 실제 브라우저 overflow·screenshot 증거를 확장했습니다. Spring API, BFF, DB migration, 알림·provider 계약은 변경하지 않습니다.
+
+### Deployment Notes
+
+- `v2.0.1` 이후 새 Flyway migration은 없으며 schema baseline은 V42입니다. 개인 독서 여정 `GET /api/archive/me/journey`는 기존 멤버 열람 권한을 유지하는 additive API입니다. `GET /api/host/clubs/{clubSlug}/ai-generation/capabilities`는 현재 클럽 호스트에게 `{enabled}`를 반환하고 member·다른 클럽 접근은 403으로 거절하는 additive API이며 frontend Zod fixture가 응답을 고정합니다. Pages Functions BFF는 두 GET을 그대로 전달하고 OAuth scope, cookie, runtime secret 계약은 바뀌지 않습니다.
+- 릴리즈 PR과 merge SHA의 CI 성공을 확인한 뒤 annotated `v2.1.0` tag를 발행합니다. Tag-triggered `Deploy Server Image`가 동일 commit의 ARM64 image를 만들고 HIGH/CRITICAL scan을 통과해 GHCR tag로 승격한 뒤 OCI backend를 같은 tag로 교체하고 `/internal/health`를 확인합니다. 이후에만 `Deploy Front(release_tag=v2.1.0)`을 실행하고 GitHub Release와 production smoke를 완료합니다.
+- Runtime config render 변경이 없으므로 이 릴리즈에 `sync-config` mutation은 필요하지 않습니다. Spring Boot 4.0.7이 SMTP hostname verification을 기본으로 적용하므로 backend promotion 전에 운영 SMTP STARTTLS endpoint의 인증서 hostname을 자격 증명·메일 발송 없이 검증하고, 실패하면 production promotion을 중단합니다. Rollback은 V42 schema를 유지한 채 직전 호환 image와 frontend tag로 되돌리거나 forward-fix tag를 발행하며, release tag는 이동하거나 덮어쓰지 않습니다.
+- Production smoke는 공개 앱, anonymous auth status, OAuth start redirect, backend health, member journey read, 호스트 AI capability의 200/403 경계와 SMTP STARTTLS hostname을 확인합니다. 실제 알림 발송, live provider 품질 호출, private transcript와 실제 member data는 실행하거나 릴리즈 증거에 기록하지 않습니다.
+
+### Verification
+
+- `./scripts/pre-push-check.sh --full --release`의 CHANGELOG guard, frontend lint/coverage/build, Zod fixture, server quality, AI/privacy config, public candidate/gitleaks, Testcontainers, Chromium E2E와 observability lanes가 통과했습니다. Frontend coverage는 223 files, 1,776 tests이며 statements 83.41%, branches 78.47%, functions 83.91%, lines 84.12%입니다.
+- 기본 E2E 포트와 MySQL CLI가 로컬의 관련 없는 프로세스와 충돌해, 전용 Docker MySQL과 격리 포트로 `corepack pnpm --dir front test:e2e`를 실행했고 Chromium 107/107이 통과했습니다. `corepack pnpm --dir front test:ct:docker` 17/17, root `corepack pnpm design:check`의 design-system 14/14와 design-docs 2/2도 통과했습니다.
+- Spring Boot `4.0.7` 상태에서 `./scripts/server-ci-check.sh`, `./server/gradlew -p server integrationTest bootJar`가 통과했습니다. `linux/arm64` release image를 로컬에서 빌드하고 Trivy `0.70.0`의 `HIGH,CRITICAL --ignore-unfixed` scan을 실행해 Ubuntu packages 0, application JARs 0을 확인했습니다.
+- Actionlint, tracked shell Bash syntax와 ShellCheck, AI PII/config fixtures, Prometheus/Tempo/Grafana/Alertmanager validators, public release candidate scanner, `git diff --check`를 별도로 확인했습니다. Live provider 호출과 production mutation은 tag 이후 운영 단계에서만 수행합니다.
 
 ## v2.0.1 - 2026-07-25
 

@@ -1,7 +1,12 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { MemberHomeRecentRecordEntry } from "@/features/member-home/model/member-home-view-model";
-import { MobileRecentRecordEntry, RecentRecordEntry } from "@/features/member-home/ui/member-home-records";
+import {
+  ClubPulse,
+  MobileMemberActivity,
+  MobileRecentRecordEntry,
+  RecentRecordEntry,
+} from "@/features/member-home/ui/member-home-records";
 
 const entry: MemberHomeRecentRecordEntry = {
   sessionId: "session-8",
@@ -18,6 +23,25 @@ const entry: MemberHomeRecentRecordEntry = {
 };
 
 describe("member home record reflection cards", () => {
+  it("scopes the reading face to desktop and mobile reflection content", () => {
+    const reflection = {
+      sessionNumber: 8,
+      kind: "HIGHLIGHT" as const,
+      text: "같은 문장을 서로 다른 경험으로 읽은 기록입니다.",
+      authorName: null,
+      authorShortName: null,
+      bookTitle: "긴 제목의 다음 책",
+      createdAt: "2026-06-18T12:00:00Z",
+    };
+
+    const { unmount } = render(<ClubPulse items={[reflection]} />);
+    expect(screen.getByText(reflection.text)).toHaveClass("reading-editorial");
+    unmount();
+
+    render(<MobileMemberActivity items={[reflection]} />);
+    expect(screen.getByText(reflection.text)).toHaveClass("reading-editorial");
+  });
+
   it("renders the desktop reflection card with record and feedback actions", () => {
     render(<RecentRecordEntry entry={entry} />);
 
@@ -25,7 +49,9 @@ describe("member home record reflection cards", () => {
     expect(region).toBeInTheDocument();
     expect(screen.getByText("지난 모임 회고")).toBeInTheDocument();
     expect(screen.getByText("No.08 · 긴 제목의 다음 책")).toBeInTheDocument();
-    expect(screen.getByText("긴 제목의 다음 책의 기록과 피드백을 이어 읽을 수 있어요.")).toBeInTheDocument();
+    expect(screen.getByText("긴 제목의 다음 책의 기록과 피드백을 이어 읽을 수 있어요.")).toHaveClass(
+      "reading-editorial",
+    );
     expect(screen.getByText("질문 · 하이라이트")).toBeInTheDocument();
     expect(screen.getByText("피드백 문서는 열람 화면에서 확인합니다.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "기록 보기" })).toHaveAttribute("href", "/app/sessions/session-8");
@@ -68,6 +94,9 @@ describe("member home record reflection cards", () => {
     expect(screen.getByRole("region", { name: "지난 모임 회고" })).toBeInTheDocument();
     expect(screen.getByText("지난 모임 회고")).toBeInTheDocument();
     expect(screen.getByText("No.08 · 긴 제목의 다음 책")).toBeInTheDocument();
+    expect(screen.getByText("긴 제목의 다음 책의 기록과 피드백을 이어 읽을 수 있어요.")).toHaveClass(
+      "reading-editorial",
+    );
     expect(screen.getByText("질문 · 하이라이트")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "기록 보기" })).toHaveAttribute("href", "/app/sessions/session-8");
     expect(screen.getByRole("link", { name: "피드백 보기" })).toHaveAttribute("href", "/app/feedback/session-8");

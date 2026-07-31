@@ -58,10 +58,10 @@ Repository-local planning support, when available in a full source checkout, doe
 
 `pre-push-check.sh`는 루트 `package.json`의 `packageManager`를 읽고 해당 pnpm을 Corepack으로 활성화한 뒤, 해석된 Corepack launcher로 frontend checks를 실행합니다. 로컬 Node 설치가 `corepack`을 PATH에 노출하지 않으면 스크립트는 `npx --yes corepack@0.35.0`을 사용합니다. 다른 major version의 globally installed pnpm으로 우회하지 않습니다.
 
-`docs/`, `scripts/`, `deploy/`, `.github/`, 공개 release 설정 파일처럼 공개 후보에 영향을 주는 경로가 바뀌면 clean 후보를 만들고 public-release scanner도 실행합니다. Historical 작업 기록인 `docs/superpowers/` 하위 문서는 현재 동작의 source of truth가 아니므로 whitespace gate에서 제외합니다.
+`docs/`, `scripts/`, `deploy/`, `.github/`, 공개 release 설정 파일처럼 공개 후보에 영향을 주는 경로가 바뀌면 fixture 검증과 함께 clean 후보를 만들고 public-release scanner도 실행합니다. Historical 작업 기록인 `docs/superpowers/` 하위 문서는 현재 동작의 source of truth가 아니므로 whitespace gate에서 제외합니다.
 
 ```bash
-./scripts/build-public-release-candidate.sh
+./scripts/verify-public-release-fixtures.sh
 ./scripts/public-release-check.sh .tmp/public-release-candidate
 ```
 
@@ -216,7 +216,7 @@ Provider key, transcript, 응답 전문, 운영 domain은 Git에 남기지 않�
 - 푸시 전 CI 사전 점검 스크립트: `scripts/pre-push-check.sh`
 - 배포 후 공개 연동 smoke script: `scripts/smoke-production-integrations.sh`
 
-디렉터리를 복사할 때 `copy_dir` 공통 exclude는 `.env*`, `*.env`, key material, dump, `.DS_Store`를 제외합니다. manifest별 exclude는 `design/standalone`, `design/*/node_modules`, `design/*/dist`, `front/output`, `front/node_modules`, `front/dist`, `front/test-results`, `front/playwright/.cache`, `front/playwright-report`, `front/coverage`, `front/.nyc_output`, `server/build`, `server/.gradle`, `server/.kotlin`, `deploy/oci/.deploy-state`, `deploy/oci/*.state`를 복사하지 않습니다. `docs/superpowers/` 하위 문서는 private historical 작업 기록으로 간주해 공개 후보에 포함하지 않습니다. provider state, screenshot, `.gstack`, `.superpowers`, `.idea`, `.playwright-cli`, `.tmp`, `recode`처럼 공개 후보 금지 경로로 분류되는 항목은 복사 중 조용히 제외된다고 가정하지 않고, staging 후보 검증에서 발견되면 거부되어 빌드가 실패합니다.
+디렉터리를 복사할 때 `copy_dir` 공통 exclude는 `.env*`, `*.env`, key material, dump, `.DS_Store`, 모든 깊이의 `.tmp` 디렉터리를 제외합니다. manifest별 exclude는 `design/standalone`, `design/*/node_modules`, `design/*/dist`, `front/output`, `front/node_modules`, `front/dist`, `front/test-results`, `front/playwright/.cache`, `front/playwright-report`, `front/coverage`, `front/.nyc_output`, `server/build`, `server/.gradle`, `server/.kotlin`, `deploy/oci/.deploy-state`, `deploy/oci/*.state`를 복사하지 않습니다. `docs/superpowers/` 하위 문서는 private historical 작업 기록으로 간주해 공개 후보에 포함하지 않습니다. provider state, screenshot, `.gstack`, `.superpowers`, `.idea`, `.playwright-cli`, `.tmp`, `recode`처럼 공개 후보 금지 경로로 분류되는 항목은 복사 중 조용히 제외된다고 가정하지 않고, staging 후보 검증에서 발견되면 거부되어 빌드가 실패합니다.
 
 루트 `.env.example`만 의도적으로 포함되는 environment file입니다. 필수 파일과 디렉터리 root는 symlink일 수 없고, 승인된 source root 안에서 발견되는 symlink도 복사 전에 거부합니다. staging 후보 검증 단계에서도 승인된 manifest 밖의 경로, 금지 경로, `.envrc*`, symlink가 남아 있으면 실패합니다.
 
@@ -280,11 +280,12 @@ scanner pattern을 바꾼 뒤 fixture 검증을 실행합니다.
 ./scripts/verify-public-release-fixtures.sh
 ```
 
-이 스크립트는 fixture 디렉터리를 `.tmp/public-release-fixtures` 아래에 만들고 `public-release-check.sh`를 호출합니다. 검증 범위는 다음과 같습니다.
+이 스크립트는 고유한 nested `front/.tmp` source fixture를 만든 상태에서 공개 후보를 한 번 생성하고, fixture 디렉터리를 `.tmp/public-release-fixtures` 아래에 만들어 `public-release-check.sh`를 호출합니다. 생성한 source fixture는 종료 시 제거하며 기존 `front/.tmp` 내용은 건드리지 않습니다. 검증 범위는 다음과 같습니다.
 
 - dollar 문자가 포함된 DB password assignment가 차단되는지 확인합니다.
 - comment에 placeholder를 적어도 실제처럼 보이는 secret value가 allowlist되지 않는지 확인합니다.
 - 문서화된 placeholder와 environment variable indirection은 통과하는지 확인합니다.
+- builder가 nested source `.tmp`를 후보에서 제외하고 checker가 root 또는 nested `.tmp`를 공개 후보 금지 경로로 거부하는지 확인합니다.
 - `.tmp` parent가 symlink이면 실행을 거부합니다. 이 기준은 공개 릴리즈 후보 builder의 cleanup guard와 맞춥니다.
 - 후보의 top-level manifest와 루트 pnpm 계약, `front`, `design/system`, `design/docs` package manifest가 모두 포함되는지 확인합니다.
 - 후보 안의 shipped instruction이 제외된 contributor-only 경로를 요구하지 않는지 확인합니다.

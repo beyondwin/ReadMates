@@ -26,11 +26,11 @@ function PublicRecordIndexRow({ publicBasePath, session }: { publicBasePath: str
           <span className="badge badge-dot">{display.showcaseStateLabel}</span>
           <span>{display.recordDensityLabel}</span>
         </span>
-        <span className="editorial public-record-index-row__title">{display.title}</span>
+        <span className="editorial reading-editorial public-record-index-row__title">{display.title}</span>
         <span className="small public-record-index-row__author" style={{ color: "var(--text-2)" }}>
           {display.author}
         </span>
-        <span className="body public-record-index-row__summary">{display.summary}</span>
+        <span className="body reading-editorial public-record-index-row__summary">{display.summary}</span>
       </span>
     </Link>
   );

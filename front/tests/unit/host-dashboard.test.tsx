@@ -802,6 +802,53 @@ describe("HostDashboard", () => {
     expect(within(upcomingSection as HTMLElement).queryByRole("button", { name: "더 보기" })).not.toBeInTheDocument();
   });
 
+  it("names the upcoming-session pagination operation while desktop and mobile are pending", async () => {
+    const user = userEvent.setup();
+    let resolvePage!: (page: HostSessionListPage) => void;
+    const pendingPage = new Promise<HostSessionListPage>((resolve) => {
+      resolvePage = resolve;
+    });
+    const actions = {
+      ...noopHostDashboardActions,
+      loadHostSessions: vi.fn(() => pendingPage),
+    } satisfies HostDashboardActions;
+    const { container } = render(
+      <HostDashboardForTest
+        auth={hostAuth}
+        current={noCurrent}
+        data={dashboard}
+        hostSessions={{ items: [hostSessions[1]], nextCursor: "cursor-1" }}
+        actions={actions}
+      />,
+    );
+    const desktop = getDesktopView(container);
+    const mobile = getMobileView(container);
+
+    await user.click(desktop.getByRole("button", { name: "더 보기" }));
+
+    expect(desktop.getByRole("status")).toHaveTextContent(
+      "예정 세션을 더 불러오는 중",
+    );
+    expect(mobile.getByRole("status")).toHaveTextContent(
+      "예정 세션을 더 불러오는 중",
+    );
+    expect(
+      desktop.getByRole("button", { name: "예정 세션을 더 불러오는 중" }),
+    ).toBeDisabled();
+    expect(
+      mobile.getByRole("button", { name: "예정 세션을 더 불러오는 중" }),
+    ).toBeDisabled();
+
+    resolvePage({ items: [], nextCursor: null });
+    await waitFor(() => {
+      expect(
+        desktop.queryByRole("button", { name: "예정 세션을 더 불러오는 중" }),
+      ).not.toBeInTheDocument();
+      expect(desktop.queryByRole("status")).not.toBeInTheDocument();
+      expect(mobile.queryByRole("status")).not.toBeInTheDocument();
+    });
+  });
+
   it("drops the appended host sessions buffer when the base list reference advances", async () => {
     const user = userEvent.setup();
     const nextSession = twoDraftHostSessions[1];
@@ -878,13 +925,13 @@ describe("HostDashboard", () => {
 
     await user.click(desktop.getByRole("button", { name: /멤버 공개/ }));
 
-    expect(desktop.getByRole("button", { name: /처리 중/ })).toBeDisabled();
+    expect(desktop.getByRole("button", { name: /공개 범위를 저장하는 중/ })).toBeDisabled();
     expect(actions.updateSessionVisibility).toHaveBeenCalledWith("session-8", { visibility: "MEMBER" });
 
     visibilityUpdate.resolve();
 
     await waitFor(() => expect(desktop.getByRole("button", { name: /비공개/ })).toBeInTheDocument());
-    expect(desktop.queryByRole("button", { name: /처리 중/ })).not.toBeInTheDocument();
+    expect(desktop.queryByRole("button", { name: /공개 범위를 저장하는 중/ })).not.toBeInTheDocument();
   });
 
   it("disables all upcoming controls while an upcoming action is pending", async () => {
@@ -938,7 +985,7 @@ describe("HostDashboard", () => {
 
     await user.click(desktop.getByRole("button", { name: /현재로 시작/ }));
 
-    expect(desktop.getByRole("button", { name: /처리 중/ })).toBeDisabled();
+    expect(desktop.getByRole("button", { name: /세션을 시작하는 중/ })).toBeDisabled();
     expect(actions.openSession).toHaveBeenCalledWith("session-8");
     expect(screen.getAllByText("다음 책")).toHaveLength(2);
 
@@ -980,7 +1027,7 @@ describe("HostDashboard", () => {
     expect(mobile.queryByRole("button", { name: /현재 세션 있음/ })).not.toBeInTheDocument();
     expect(desktop.getByText("현재 열린 세션이 있어 예정 세션을 바로 시작할 수 없습니다.")).toBeInTheDocument();
     expect(mobile.getByText("현재 열린 세션이 있어 예정 세션을 바로 시작할 수 없습니다.")).toBeInTheDocument();
-    expect(screen.getAllByText("현재 세션 시작됨")).toHaveLength(2);
+    expect(screen.getAllByText("현재 세션을 시작했습니다.")).toHaveLength(2);
 
     expect(actions.openSession).toHaveBeenCalledTimes(1);
   });
@@ -1049,7 +1096,10 @@ describe("HostDashboard", () => {
     await user.click(screen.getAllByRole("button", { name: /멤버 공개/ })[0]);
 
     const alerts = await screen.findAllByRole("alert");
-    expect(alerts.map((alert) => alert.textContent)).toEqual(["저장하지 못했습니다", "저장하지 못했습니다"]);
+    expect(alerts.map((alert) => alert.textContent)).toEqual([
+      "공개 범위를 저장하지 못했습니다. 기존 공개 범위는 유지됩니다. 다시 시도해 주세요.",
+      "공개 범위를 저장하지 못했습니다. 기존 공개 범위는 유지됩니다. 다시 시도해 주세요.",
+    ]);
     expect(screen.getAllByRole("button", { name: /멤버 공개/ })[0]).toBeEnabled();
   });
 
@@ -1370,7 +1420,18 @@ describe("HostDashboard", () => {
     expect(current.currentSession?.board).not.toHaveProperty("checkins");
     expect(mobile.getByText("질문").parentElement).toHaveTextContent("2/10");
     expect(mobile.getByText("읽기").parentElement).toHaveTextContent("1/2");
-    expect(mobile.getAllByText("참석 1명 · 미응답 1명").length).toBeGreaterThan(0);
+    for (const value of container.querySelectorAll(".rm-host-dashboard-mobile__session-metrics dd")) {
+      expect(value).toHaveClass("ledger-number");
+    }
+    const mobileSessionCard = mobile.getByRole("heading", { name: "테스트 책" }).closest("article");
+    expect(mobileSessionCard).not.toBeNull();
+    const attendanceSummary = Array.from((mobileSessionCard as HTMLElement).querySelectorAll("p")).find(
+      (paragraph) => paragraph.textContent === "참석 1명 · 미응답 1명",
+    );
+    expect(attendanceSummary).toBeDefined();
+    expect(
+      Array.from(attendanceSummary!.querySelectorAll(".ledger-number")).map((number) => number.textContent),
+    ).toEqual(["1", "1"]);
     expect(mobile.queryByText("김호스트")).not.toBeInTheDocument();
     expect(mobile.queryByText("안멤버1")).not.toBeInTheDocument();
     expect(mobile.queryByRole("link", { name: "공개 요약 편집" })).not.toBeInTheDocument();
@@ -1408,6 +1469,9 @@ describe("HostDashboard", () => {
     expect(desktop.getByText("2026.05.20 20:00 · 온라인")).toBeInTheDocument();
     expect(desktop.getByText("질문").parentElement).toHaveTextContent("2/10");
     expect(desktop.getByText("읽기").parentElement).toHaveTextContent("1/2");
+    for (const value of container.querySelectorAll(".rm-host-current__metrics dd")) {
+      expect(value).toHaveClass("ledger-number");
+    }
     expect(desktop.getByRole("img", { name: "테스트 책 표지" })).toHaveAttribute(
       "src",
       "https://example.com/covers/test-book.jpg",

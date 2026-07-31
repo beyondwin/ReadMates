@@ -1,5 +1,11 @@
 import { useEffect } from "react";
-import { isRouteErrorResponse, Link, useLocation, useRouteError } from "react-router-dom";
+import {
+  isRouteErrorResponse,
+  Link,
+  useLocation,
+  useRevalidator,
+  useRouteError,
+} from "react-router-dom";
 import { isReadmatesApiError } from "@/shared/api/errors";
 import { recordFrontendRuntimeError } from "@/shared/observability/frontend-observability";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
@@ -11,8 +17,16 @@ type RouteErrorView = {
   eyebrow: string;
   heading: string;
   body: string;
+  reassurance?: string;
   actionHref: string;
   actionLabel: string;
+};
+
+type RouteErrorPageProps = {
+  variant: RouteErrorVariant;
+  status: number;
+  retryState?: "idle" | "loading";
+  onRetry?: () => void;
 };
 
 function fallbackPathForVariant(variant: RouteErrorVariant) {
@@ -41,7 +55,15 @@ function actionLabelForVariant(variant: RouteErrorVariant) {
   }
 }
 
-function classifyStatus(status: number, variant: RouteErrorVariant): RouteErrorView {
+function isRetryablePublicStatus(status: number) {
+  return status === 429 || status >= 500;
+}
+
+function classifyStatus(
+  status: number,
+  variant: RouteErrorVariant,
+  canRetryPublicLoad: boolean,
+): RouteErrorView {
   const actionHref = fallbackPathForVariant(variant);
   const actionLabel = actionLabelForVariant(variant);
 
@@ -85,10 +107,32 @@ function classifyStatus(status: number, variant: RouteErrorVariant): RouteErrorV
     };
   }
 
+  if (status === 429) {
+    const isPublic = variant === "public";
+
+    return {
+      eyebrow: "잠시 후 다시",
+      heading: "요청이 잠시 제한되었습니다.",
+      body:
+        isPublic && !canRetryPublicLoad
+          ? "요청이 잠시 많습니다. 공개 기록에서 다른 기록을 확인해 주세요."
+          : "요청이 잠시 많습니다. 잠시 기다린 뒤 다시 시도해 주세요.",
+      reassurance: isPublic ? "입력하거나 변경한 내용은 없습니다." : undefined,
+      actionHref,
+      actionLabel,
+    };
+  }
+
   return {
     eyebrow: "불러오기 실패",
     heading: "페이지를 불러오지 못했습니다.",
-    body: "네트워크 연결 또는 서비스 상태를 확인한 뒤 새로고침해 주세요.",
+    body:
+      variant === "public"
+        ? canRetryPublicLoad
+          ? "네트워크 연결을 확인한 뒤 다시 시도하거나 공개 기록으로 이동해 주세요."
+          : "페이지를 불러오지 못했습니다. 공개 기록에서 다른 기록을 확인해 주세요."
+        : "네트워크 연결 또는 서비스 상태를 확인한 뒤 새로고침해 주세요.",
+    reassurance: variant === "public" ? "입력하거나 변경한 내용은 없습니다." : undefined,
     actionHref,
     actionLabel,
   };
@@ -117,9 +161,21 @@ function metadataForRouteError(variant: RouteErrorVariant, status: number): Page
   return null;
 }
 
-export function RouteErrorPage({ variant, status }: { variant: RouteErrorVariant; status: number }) {
+function publicRecordsTarget(pathname: string) {
+  const clubMatch = /^\/clubs\/([^/]+)(?:\/|$)/.exec(pathname);
+  return clubMatch ? `/clubs/${clubMatch[1]}/records` : "/records";
+}
+
+export function RouteErrorPage({
+  variant,
+  status,
+  retryState = "idle",
+  onRetry,
+}: RouteErrorPageProps) {
   const location = useLocation();
-  const view = classifyStatus(status, variant);
+  const canRetryPublicLoad =
+    variant === "public" && isRetryablePublicStatus(status) && typeof onRetry === "function";
+  const view = classifyStatus(status, variant, canRetryPublicLoad);
   const metadata = metadataForRouteError(variant, status);
   const actionHref = scopedAppLinkTarget(location.pathname, view.actionHref);
 
@@ -135,10 +191,31 @@ export function RouteErrorPage({ variant, status }: { variant: RouteErrorVariant
           <p className="body" style={{ color: "var(--text-2)" }}>
             {view.body}
           </p>
+          {view.reassurance ? (
+            <p className="small" style={{ color: "var(--text-3)" }}>
+              {view.reassurance}
+            </p>
+          ) : null}
           <div className="auth-card__actions auth-card__actions--primary">
-            <Link className="btn btn-primary" to={actionHref}>
-              {view.actionLabel}
-            </Link>
+            {canRetryPublicLoad ? (
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={retryState === "loading"}
+                onClick={onRetry}
+              >
+                {retryState === "loading" ? "다시 불러오는 중" : "다시 시도"}
+              </button>
+            ) : (
+              <Link className="btn btn-primary" to={actionHref}>
+                {view.actionLabel}
+              </Link>
+            )}
+            {variant === "public" ? (
+              <Link className="btn btn-quiet" to={publicRecordsTarget(location.pathname)}>
+                공개 기록으로 이동
+              </Link>
+            ) : null}
           </div>
         </section>
       </main>
@@ -149,6 +226,7 @@ export function RouteErrorPage({ variant, status }: { variant: RouteErrorVariant
 export function RouteErrorBoundary({ variant }: { variant: RouteErrorVariant }) {
   const error = useRouteError();
   const status = statusFromRouteError(error);
+  const revalidator = useRevalidator();
 
   useEffect(() => {
     recordFrontendRuntimeError({
@@ -159,7 +237,14 @@ export function RouteErrorBoundary({ variant }: { variant: RouteErrorVariant }) 
     });
   }, [error, status]);
 
-  return <RouteErrorPage variant={variant} status={status} />;
+  return (
+    <RouteErrorPage
+      variant={variant}
+      status={status}
+      retryState={revalidator.state === "idle" ? "idle" : "loading"}
+      onRetry={revalidator.revalidate}
+    />
+  );
 }
 
 export function NotFoundRoute({ variant }: { variant: RouteErrorVariant }) {

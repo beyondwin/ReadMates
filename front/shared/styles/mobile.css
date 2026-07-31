@@ -18,6 +18,10 @@
     overscroll-behavior-y: contain;
     -webkit-tap-highlight-color: transparent;
   }
+
+  .reading-editorial {
+    line-height: 1.7;
+  }
 }
 
 .m-app {
@@ -465,7 +469,7 @@
   bottom: 0; left: 50%;
   transform: translateX(-50%);
   width: 100%; max-width: 480px;
-  height: calc(var(--m-nav-h) + var(--m-safe-bottom));
+  min-height: calc(var(--m-nav-h) + var(--m-safe-bottom));
   padding: 6px 8px var(--m-safe-bottom);
   background: color-mix(in oklch, var(--bg) 94%, transparent);
   backdrop-filter: saturate(1.45) blur(14px);
@@ -480,7 +484,7 @@
 }
 .m-tab {
   min-width: 0;
-  min-height: 52px;
+  min-height: 56px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -490,6 +494,17 @@
   position: relative;
   padding: 5px 4px 4px;
   border-radius: var(--r-3);
+}
+.m-tab:is(button) {
+  appearance: none;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.m-tab:is(button):disabled {
+  cursor: wait;
 }
 .m-tab[aria-current="page"] {
   color: var(--text);
@@ -516,11 +531,14 @@
   transform: translateY(-1px);
 }
 .m-tab-label {
+  display: block;
+  min-width: 0;
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  text-align: center;
   font-size: 10.5px;
+  line-height: 1.1;
   letter-spacing: 0;
   font-weight: 600;
 }
@@ -786,7 +804,7 @@
   margin: 0;
   color: var(--text-2);
   font-size: 14.5px;
-  line-height: 1.62;
+  line-height: 1.7;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
