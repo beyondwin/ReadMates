@@ -840,11 +840,13 @@ describe("HostDashboard", () => {
     ).toBeDisabled();
 
     resolvePage({ items: [], nextCursor: null });
-    await waitFor(() =>
+    await waitFor(() => {
       expect(
         desktop.queryByRole("button", { name: "예정 세션을 더 불러오는 중" }),
-      ).not.toBeInTheDocument(),
-    );
+      ).not.toBeInTheDocument();
+      expect(desktop.queryByRole("status")).not.toBeInTheDocument();
+      expect(mobile.queryByRole("status")).not.toBeInTheDocument();
+    });
   });
 
   it("drops the appended host sessions buffer when the base list reference advances", async () => {

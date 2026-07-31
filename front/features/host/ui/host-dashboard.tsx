@@ -277,6 +277,7 @@ export default function HostDashboard({
         items: [...(current?.base === hostSessions ? current.items : []), ...nextPage.items],
         nextCursor: nextPage.nextCursor,
       }));
+      setUpcomingMessage(null);
     } catch {
       setUpcomingMessage({
         kind: "alert",
