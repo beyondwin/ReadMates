@@ -171,24 +171,24 @@ export function RouteErrorPage({
           ) : null}
           <div className="auth-card__actions auth-card__actions--primary">
             {canRetryPublicLoad ? (
-              <>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  disabled={retryState === "loading"}
-                  onClick={onRetry}
-                >
-                  {retryState === "loading" ? "다시 불러오는 중" : "다시 시도"}
-                </button>
-                <Link className="btn btn-quiet" to={publicRecordsTarget(location.pathname)}>
-                  공개 기록으로 이동
-                </Link>
-              </>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={retryState === "loading"}
+                onClick={onRetry}
+              >
+                {retryState === "loading" ? "다시 불러오는 중" : "다시 시도"}
+              </button>
             ) : (
               <Link className="btn btn-primary" to={actionHref}>
                 {view.actionLabel}
               </Link>
             )}
+            {variant === "public" ? (
+              <Link className="btn btn-quiet" to={publicRecordsTarget(location.pathname)}>
+                공개 기록으로 이동
+              </Link>
+            ) : null}
           </div>
         </section>
       </main>

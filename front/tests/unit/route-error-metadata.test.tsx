@@ -73,14 +73,32 @@ describe("route error metadata", () => {
     expect(screen.getByRole("button", { name: "다시 불러오는 중" })).toBeDisabled();
   });
 
-  it("keeps public not-found recovery destination-based instead of offering retry", () => {
+  it("keeps scoped public not-found recovery destination-based while retaining public records", () => {
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={["/clubs/reading-sai/missing"]}>
         <RouteErrorPage variant="public" status={404} onRetry={() => undefined} />
       </MemoryRouter>,
     );
 
     expect(screen.queryByRole("button", { name: "다시 시도" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "공개 홈" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "공개 기록으로 이동" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/records",
+    );
+  });
+
+  it.each([403, 409, 410])("keeps public records available without retry for public status %i", (status) => {
+    render(
+      <MemoryRouter initialEntries={["/clubs/reading-sai/missing"]}>
+        <RouteErrorPage variant="public" status={status} onRetry={() => undefined} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole("button", { name: "다시 시도" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "공개 기록으로 이동" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/records",
+    );
   });
 });
