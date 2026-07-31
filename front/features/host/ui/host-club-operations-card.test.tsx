@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { HostClubOperationsSnapshot } from "@/shared/model/club-operations";
@@ -127,6 +128,36 @@ describe("HostClubOperationsCard", () => {
     const card = screen.getByRole("region", { name: "운영 신호" });
     expect(within(card).getByText("최근 AI 실패가 늘었습니다. 알림 장부와 세션 준비 상태를 함께 확인하세요.")).toBeInTheDocument();
     expect(within(card).getByText("+2")).toBeInTheDocument();
+  });
+
+  it("renders operating counts and deltas with the mono tabular numeral stack", () => {
+    const stylesheet = document.createElement("style");
+    stylesheet.textContent = readFileSync("src/styles/globals.css", "utf8");
+    document.head.append(stylesheet);
+
+    try {
+      render(
+        <HostClubOperationsCard
+          snapshot={snapshot({
+            aiUsage: {
+              activeJobs: 0,
+              failedRecentJobs: 3,
+              staleCandidates: 0,
+              costEstimateUsd: "0.5000",
+              state: "DEGRADED",
+              priorFailedJobs7d: 1,
+            },
+          })}
+        />,
+      );
+
+      const delta = screen.getByText("+2");
+      const style = getComputedStyle(delta);
+      expect(style.fontFamily).toBe("var(--f-mono)");
+      expect(style.fontVariantNumeric).toBe("tabular-nums");
+    } finally {
+      stylesheet.remove();
+    }
   });
 
   it("does not create admin or mutation controls", () => {

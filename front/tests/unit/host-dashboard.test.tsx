@@ -802,6 +802,51 @@ describe("HostDashboard", () => {
     expect(within(upcomingSection as HTMLElement).queryByRole("button", { name: "더 보기" })).not.toBeInTheDocument();
   });
 
+  it("names the upcoming-session pagination operation while desktop and mobile are pending", async () => {
+    const user = userEvent.setup();
+    let resolvePage!: (page: HostSessionListPage) => void;
+    const pendingPage = new Promise<HostSessionListPage>((resolve) => {
+      resolvePage = resolve;
+    });
+    const actions = {
+      ...noopHostDashboardActions,
+      loadHostSessions: vi.fn(() => pendingPage),
+    } satisfies HostDashboardActions;
+    const { container } = render(
+      <HostDashboardForTest
+        auth={hostAuth}
+        current={noCurrent}
+        data={dashboard}
+        hostSessions={{ items: [hostSessions[1]], nextCursor: "cursor-1" }}
+        actions={actions}
+      />,
+    );
+    const desktop = getDesktopView(container);
+    const mobile = getMobileView(container);
+
+    await user.click(desktop.getByRole("button", { name: "더 보기" }));
+
+    expect(desktop.getByRole("status")).toHaveTextContent(
+      "예정 세션을 더 불러오는 중",
+    );
+    expect(mobile.getByRole("status")).toHaveTextContent(
+      "예정 세션을 더 불러오는 중",
+    );
+    expect(
+      desktop.getByRole("button", { name: "예정 세션을 더 불러오는 중" }),
+    ).toBeDisabled();
+    expect(
+      mobile.getByRole("button", { name: "예정 세션을 더 불러오는 중" }),
+    ).toBeDisabled();
+
+    resolvePage({ items: [], nextCursor: null });
+    await waitFor(() =>
+      expect(
+        desktop.queryByRole("button", { name: "예정 세션을 더 불러오는 중" }),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
   it("drops the appended host sessions buffer when the base list reference advances", async () => {
     const user = userEvent.setup();
     const nextSession = twoDraftHostSessions[1];

@@ -268,7 +268,7 @@ export default function HostDashboard({
     }
 
     setIsLoadingMoreHostSessions(true);
-    setUpcomingMessage(null);
+    setUpcomingMessage({ kind: "status", text: "예정 세션을 더 불러오는 중" });
 
     try {
       const nextPage = await actions.loadHostSessions({ limit: 50, cursor: nextHostSessionsCursor });
@@ -469,7 +469,7 @@ export default function HostDashboard({
                     disabled={isLoadingMoreHostSessions}
                     onClick={() => void handleLoadMoreHostSessions()}
                   >
-                    {isLoadingMoreHostSessions ? "불러오는 중" : "더 보기"}
+                    {isLoadingMoreHostSessions ? "예정 세션을 더 불러오는 중" : "더 보기"}
                   </button>
                 ) : null}
                 {upcomingMessage ? <UpcomingActionMessage message={upcomingMessage} /> : null}

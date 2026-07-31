@@ -3449,7 +3449,8 @@
 .host-club-ops__metric dd {
   margin: 0;
   color: var(--text);
-  font-family: var(--font-editorial);
+  font-family: var(--f-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 20px;
   line-height: 1.15;
 }

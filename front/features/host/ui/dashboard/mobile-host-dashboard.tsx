@@ -285,7 +285,7 @@ export function MobileHostDashboard({
             disabled={isLoadingMoreHostSessions}
             onClick={() => onLoadMoreHostSessions()}
           >
-            {isLoadingMoreHostSessions ? "불러오는 중" : "더 보기"}
+            {isLoadingMoreHostSessions ? "예정 세션을 더 불러오는 중" : "더 보기"}
           </button>
         ) : null}
         {upcomingMessage ? <UpcomingActionMessage message={upcomingMessage} mobile /> : null}
