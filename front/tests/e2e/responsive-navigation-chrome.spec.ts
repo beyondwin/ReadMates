@@ -91,8 +91,8 @@ test("desktop public and host pages show the expected top navigation", async ({ 
 
   await page.goto("/");
   const publicNav = page.getByRole("navigation", { name: "공개 내비게이션" });
-  await expect(publicNav.getByRole("link", { name: "소개" })).toBeVisible();
-  await expect(publicNav.getByRole("link", { name: "클럽" })).toBeVisible();
+  await expect(publicNav.getByRole("link", { name: "홈" })).toBeVisible();
+  await expect(publicNav.getByRole("link", { name: "클럽 소개" })).toBeVisible();
   await expect(publicNav.getByRole("link", { name: "공개 기록" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "앱 탭" })).toHaveCount(0);
 

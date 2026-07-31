@@ -42,8 +42,8 @@ describe("TopNav responsive variants", () => {
     renderAt("/clubs/reading-sai", <TopNav publicBasePath="/clubs/reading-sai" />);
 
     const nav = screen.getByRole("navigation", { name: "공개 내비게이션" });
-    expect(within(nav).getByRole("link", { name: "소개" })).toHaveAttribute("href", "/clubs/reading-sai");
-    expect(within(nav).getByRole("link", { name: "클럽" })).toHaveAttribute("href", "/clubs/reading-sai/about");
+    expect(within(nav).getByRole("link", { name: "홈" })).toHaveAttribute("href", "/clubs/reading-sai");
+    expect(within(nav).getByRole("link", { name: "클럽 소개" })).toHaveAttribute("href", "/clubs/reading-sai/about");
     expect(within(nav).getByRole("link", { name: "공개 기록" })).toHaveAttribute("href", "/clubs/reading-sai/records");
   });
 

@@ -1,7 +1,7 @@
 export const READMATES_NAV_LABELS = {
   public: {
-    intro: "소개",
-    club: "클럽",
+    intro: "홈",
+    club: "클럽 소개",
     publicRecords: "공개 기록",
     login: "로그인",
     appEntry: "멤버 화면",

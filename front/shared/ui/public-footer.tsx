@@ -36,6 +36,8 @@ function prefixedPath(publicBasePath: string, path: string) {
 }
 
 export function PublicFooter({ publicBasePath = "", showGuestMemberActions = true, LinkComponent = DefaultLink }: PublicFooterProps) {
+  const currentYear = new Date().getFullYear();
+
   return (
     <footer className="public-footer">
       <div className="container public-footer__inner">
@@ -79,7 +81,7 @@ export function PublicFooter({ publicBasePath = "", showGuestMemberActions = tru
       </div>
       <div className="container" style={{ marginTop: 40 }}>
         <div className="rule">
-          <span className="mono">© 2025 · 읽는사이</span>
+          <span className="mono">© {currentYear} · 읽는사이</span>
         </div>
       </div>
     </footer>
