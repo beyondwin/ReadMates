@@ -165,13 +165,13 @@ class AnthropicSpringAiContractTest {
                 ProviderMockHttpServer.Response(
                     200,
                     successResponse().body,
-                    delay = Duration.ofMillis(250),
+                    delay = Duration.ofSeconds(3),
                 ),
             )
 
         scenarios.forEachIndexed { index, response ->
             ProviderMockHttpServer.start(response, ANTHROPIC_MESSAGES_PATH).use { server ->
-                val timeout = if (index == scenarios.lastIndex) Duration.ofMillis(50) else Duration.ofSeconds(2)
+                val timeout = if (index == scenarios.lastIndex) Duration.ofSeconds(1) else Duration.ofSeconds(2)
 
                 assertThatThrownBy {
                     generator(model(server.origin, timeout)).generate(MODEL, request())

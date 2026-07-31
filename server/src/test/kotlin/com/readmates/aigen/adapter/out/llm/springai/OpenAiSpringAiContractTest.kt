@@ -100,13 +100,13 @@ class OpenAiSpringAiContractTest {
                 ProviderMockHttpServer.Response(
                     200,
                     successResponse().body,
-                    delay = Duration.ofMillis(250),
+                    delay = Duration.ofSeconds(3),
                 ),
             )
 
         scenarios.forEachIndexed { index, response ->
             ProviderMockHttpServer.start(response).use { server ->
-                val timeout = if (index == scenarios.lastIndex) Duration.ofMillis(50) else Duration.ofSeconds(2)
+                val timeout = if (index == scenarios.lastIndex) Duration.ofSeconds(1) else Duration.ofSeconds(2)
                 val model = OpenAiSpringAiModelFactory.create("test-api-key", server.baseUrl, timeout)
 
                 assertThatThrownBy {

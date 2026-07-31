@@ -123,10 +123,10 @@ class GoogleGenAiSpringAiContractTest {
             ProviderMockHttpServer.Response(429, errorBody(429, "provider unavailable; retry in 7200 s")),
             ProviderMockHttpServer.Response(500, errorBody(500)),
             successResponse(text = "not-json"),
-            successResponse(delay = Duration.ofMillis(250)),
+            successResponse(delay = Duration.ofSeconds(3)),
         ).forEachIndexed { index, response ->
             ProviderMockHttpServer.start(response, GOOGLE_PATH).use { server ->
-                val timeout = if (index == 3) Duration.ofMillis(30) else Duration.ofSeconds(10)
+                val timeout = if (index == 3) Duration.ofSeconds(1) else Duration.ofSeconds(10)
                 assertThatThrownBy { generator(model(server.origin, timeout)).generate(MODEL, request()) }
                     .isInstanceOfSatisfying(ProviderCallException::class.java) { failure ->
                         assertThat(failure.cause).isNull()

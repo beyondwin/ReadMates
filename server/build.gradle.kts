@@ -1,7 +1,7 @@
 plugins {
     kotlin("jvm") version "2.4.0"
     kotlin("plugin.spring") version "2.4.0"
-    id("org.springframework.boot") version "4.0.6"
+    id("org.springframework.boot") version "4.0.7"
     id("io.spring.dependency-management") version "1.1.7"
     id("org.flywaydb.flyway") version "11.7.2"
     id("org.jlleitschuh.gradle.ktlint") version "12.1.1"

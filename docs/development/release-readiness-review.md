@@ -99,6 +99,49 @@ findings를 우선순위별로 보고합니다.
 - 실행한 검증과 skipped validation이 구분되어 있습니다.
 - “테스트 통과”만을 근거로 운영/릴리즈 리스크가 없다고 결론내리지 않았습니다.
 
+## v2.1.0 release evidence — 2026-07-31
+
+### 범위와 결정
+
+- 범위는 `v2.0.1..codex/release-v2.1.0`과 publication 직전 `origin/main..HEAD`이며 frontend, additive API, Java 25 runtime, public candidate, CI와 release docs를 포함합니다.
+- Release class는 **minor**입니다. 새 `GET /api/archive/me/journey`는 현재 멤버의 기존 열람 범위를 합산하고, 새 `GET /api/host/clubs/{clubSlug}/ai-generation/capabilities`는 현재 클럽 호스트에게 AI 활성화 상태를 제공하는 additive endpoint입니다. 기존 endpoint나 request schema를 제거하지 않으며 Pages Functions BFF는 두 route를 기존 trusted proxy 경계로 전달합니다.
+- Local decision은 **GO after release PR/main CI and GHCR scan**입니다. Release PR CI와 merge SHA의 CI를 모두 확인한 뒤 annotated `v2.1.0` tag를 만들고, tag image scan/promote가 성공하기 전에는 OCI/backend 및 frontend production promotion을 시작하지 않습니다.
+
+### Migration, API와 운영 계약
+
+- `v2.0.1` 이후 migration 변경은 없고 production schema baseline은 V42입니다.
+- `GET /api/archive/me/journey`는 current membership의 개인 기록 summary와 cursor page를 고정 query 수로 반환합니다. `/app/me`는 최근 3건을 쓰고 전체 기록은 기존 archive route를 유지합니다.
+- Additive `GET /api/host/clubs/{clubSlug}/ai-generation/capabilities`는 current-club host에게 `200 {"enabled": boolean}`을 반환합니다. Member와 cross-club host는 403으로 fail closed하고, frontend Zod `AiGenerationCapabilitiesResponseSchema`와 exported fixture가 wire shape를 고정합니다. Backend-first 배포 동안 구 frontend는 이 endpoint를 호출하지 않으며, 같은-tag frontend가 배포된 뒤 host defaults 화면이 활성화 상태를 읽습니다.
+- Spring Boot `4.0.7`이 Spring Framework `7.0.8`을 관리해 CVE-2026-41842, CVE-2026-41845, CVE-2026-41850의 수정 버전을 릴리즈 이미지에 포함합니다. Boot 4.0.7은 CVE-2026-40992 수정으로 Spring Mail STARTTLS/SSL hostname verification을 기본 활성화하므로 production SMTP certificate mismatch는 이제 fail closed합니다. Production provider의 4분 timeout, SDK retry off, single-wire-request 계약은 바뀌지 않으며 테스트용 timeout fixture만 CI scheduling 여유를 갖게 했습니다.
+- Secret/env/OAuth/cookie/permission/provider activation과 `sync-config` rendering은 바뀌지 않습니다. 실제 메일과 live provider 호출은 smoke에서 제외합니다.
+
+### CI/CD와 review path
+
+- 순서는 release PR merge → merge SHA CI → annotated tag → `Deploy Server Image` scan/promote → credential-free production SMTP STARTTLS hostname probe → same-tag OCI Compose backend promotion/health → `Deploy Front(release_tag=v2.1.0)` → GitHub Release → production smoke입니다.
+- CI는 fixture가 만든 동일 public candidate를 최종 scan합니다. Deploy Server/Front와 sync-config 계약은 바뀌지 않았습니다.
+- Active ruleset이 없고 branch protection도 확인되지 않아 `POLICY_MISMATCH`입니다. Release PR과 두 단계 CI를 수동 강제합니다.
+- Builder fixture와 scanner가 nested `.tmp`, local path, token형 값, private member/transcript/deploy state를 거절합니다.
+
+### Local verification
+
+| Evidence | Result |
+| --- | --- |
+| `./scripts/pre-push-check.sh --full --release` | PASS — CHANGELOG guard, frontend lint/coverage/build, Zod fixtures, server quality, AI/privacy/config, public candidate/gitleaks, Testcontainers, Chromium E2E, observability |
+| Frontend coverage | PASS — 223 files / 1,776 tests; 83.41% statements, 78.47% branches, 83.91% functions, 84.12% lines |
+| Isolated Chromium E2E | PASS — 107/107 with owned Docker MySQL and non-conflicting local ports |
+| Component/design gates | PASS — Chromium CT 17/17, design-system 14/14, design-docs 2/2 and builds |
+| `./scripts/server-ci-check.sh` | PASS after Spring Boot `4.0.7` update and timeout-fixture stabilization |
+| `./server/gradlew -p server integrationTest bootJar` | PASS |
+| Local `linux/arm64` release image + Trivy `0.70.0` | PASS — Ubuntu packages 0, application JARs 0 HIGH/CRITICAL findings |
+| Workflow/shell/config/public safety | PASS — Actionlint, Bash, ShellCheck, AI PII/config, observability validators, candidate fixtures/gitleaks |
+
+### Production-only pending and residual risk
+
+- Release PR CI, merge SHA CI, tag-triggered GHCR build/scan/promote, OCI backend promotion and health, same-tag frontend dispatch, GitHub Release, production smoke는 로컬 evidence로 대체하지 않고 실제 실행 결과로 닫습니다.
+- 기본 로컬 E2E 포트와 MySQL CLI는 개발 머신의 관련 없는 SSH tunnel/서비스와 충돌했습니다. 관련 없는 프로세스를 종료하지 않고 전용 Docker MySQL과 격리 포트로 동일 Chromium suite를 통과시켰으며 이 환경 차이를 release evidence에 보존합니다.
+- Spring Boot 4.0.7은 SMTP hostname verification을 새로 기본 적용합니다. Tag image의 production promotion 전에 운영 SMTP host의 STARTTLS certificate hostname을 자격 증명·메일 발송 없이 검사하고, mismatch 또는 handshake 실패는 `CHECK_FAILURE`로 분류해 backend promotion을 중단합니다.
+- Live provider account retention/paid-tier와 실제 member/host write는 CI가 증명하지 않습니다. 기존 fail-closed allowlist를 유지하고, 인증된 smoke는 read-only 또는 no-send 경로로 제한하며 private value를 Git이나 GitHub Release에 기록하지 않습니다.
+
 ## v2.0.1 release evidence — 2026-07-25
 
 ### Patch scope and decision
