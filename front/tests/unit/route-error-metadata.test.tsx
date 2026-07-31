@@ -45,6 +45,28 @@ describe("route error metadata", () => {
     );
   });
 
+  it.each([
+    ["member", "내 클럽으로", "/app"],
+    ["host", "호스트 홈", "/app/host"],
+    ["auth", "로그인", "/login"],
+  ] as const)(
+    "keeps non-public 429 recovery copy inside the %s context",
+    (variant, actionLabel, actionHref) => {
+      render(
+        <MemoryRouter>
+          <RouteErrorPage variant={variant} status={429} />
+        </MemoryRouter>,
+      );
+
+      expect(
+        screen.getByText("요청이 잠시 많습니다. 잠시 기다린 뒤 다시 시도해 주세요."),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/공개 기록에서/)).not.toBeInTheDocument();
+      expect(screen.queryByText("입력하거나 변경한 내용은 없습니다.")).not.toBeInTheDocument();
+      expect(screen.getByRole("link", { name: actionLabel })).toHaveAttribute("href", actionHref);
+    },
+  );
+
   it("retries a failed public loader without leaving the scoped route", async () => {
     const user = userEvent.setup();
     const successfulLoad = deferred<{ ok: true }>();

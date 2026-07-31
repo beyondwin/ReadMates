@@ -907,7 +907,7 @@ button.rm-record-row:hover {
   appearance: none;
   border: 0;
   background: transparent;
-  font: inherit;
+  font-family: inherit;
   cursor: pointer;
 }
 .nav-link:is(button):disabled {

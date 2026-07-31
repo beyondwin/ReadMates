@@ -22,6 +22,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Fixed
 
+- **프런트엔드 복구 문맥과 탐색 정렬:** member·host·auth의 429 오류가 공개 기록 안내를 노출하지 않고 현재 역할의 복구 동선만 제시하며, 호스트 세션 조회 실패 시 나타나는 재시도 control은 인접 탐색 링크와 같은 글자 크기·행간을 유지합니다.
 - **Java 25 서버 런타임 준비:** Gradle test/bootRun과 로컬·release 서버 이미지에 동일한 Java 25 runtime policy를 적용했습니다. Netty가 포함된 classpath(`ALL-UNNAMED`)의 native access는 명시적으로 허용하고 그 밖의 module에서 발생하는 illegal native access는 거절하며, `protobuf-java` 4.34.2의 안전한 fallback으로 제거 예정인 `sun.misc.Unsafe` 메모리 접근 없이 OTLP payload를 직렬화합니다. 서버 image layer 추출도 Spring Boot 4의 지원되는 `tools` jarmode로 전환했습니다.
 - **내 공간 프런트 경계 부채:** 내 공간의 페이지 로컬 로그아웃을 제거하고 전역 계정 메뉴에만 유지해 archive feature의 auth feature 직접 import와 이를 위한 architecture-test 예외를 제거했습니다.
 - **중도 합류와 출석 미확인 참여 여정:** 최근 참여 row를 현재 club·현재 membership의 활성 participant `PUBLISHED` 회차로만 제한하고, `UNKNOWN` 출석 상태를 보존해 과거·제거된 참여나 미확인 출석을 참여로 계산하지 않습니다.

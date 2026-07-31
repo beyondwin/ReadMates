@@ -108,13 +108,16 @@ function classifyStatus(
   }
 
   if (status === 429) {
+    const isPublic = variant === "public";
+
     return {
       eyebrow: "잠시 후 다시",
       heading: "요청이 잠시 제한되었습니다.",
-      body: canRetryPublicLoad
-        ? "요청이 잠시 많습니다. 잠시 기다린 뒤 다시 시도해 주세요."
-        : "요청이 잠시 많습니다. 공개 기록에서 다른 기록을 확인해 주세요.",
-      reassurance: "입력하거나 변경한 내용은 없습니다.",
+      body:
+        isPublic && !canRetryPublicLoad
+          ? "요청이 잠시 많습니다. 공개 기록에서 다른 기록을 확인해 주세요."
+          : "요청이 잠시 많습니다. 잠시 기다린 뒤 다시 시도해 주세요.",
+      reassurance: isPublic ? "입력하거나 변경한 내용은 없습니다." : undefined,
       actionHref,
       actionLabel,
     };
