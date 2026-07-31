@@ -465,7 +465,7 @@
   bottom: 0; left: 50%;
   transform: translateX(-50%);
   width: 100%; max-width: 480px;
-  height: calc(var(--m-nav-h) + var(--m-safe-bottom));
+  min-height: calc(var(--m-nav-h) + var(--m-safe-bottom));
   padding: 6px 8px var(--m-safe-bottom);
   background: color-mix(in oklch, var(--bg) 94%, transparent);
   backdrop-filter: saturate(1.45) blur(14px);
