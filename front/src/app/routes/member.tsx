@@ -2,6 +2,8 @@ import { lazy, Suspense, type ComponentType, type ReactNode } from "react";
 import type { QueryClient } from "@tanstack/react-query";
 import { useLoaderData, type LoaderFunction, type RouteObject } from "react-router-dom";
 import type { InternalLinkComponent } from "@/features/current-session";
+import { CurrentSessionRouteError } from "@/features/current-session/route/current-session-route";
+import { notesFeedShouldRevalidate } from "@/features/archive/route/notes-feed-revalidation";
 import {
   ArchiveRouteError,
   ArchiveRouteLoading,
@@ -14,6 +16,7 @@ import {
 } from "@/features/guest-browse/route/club-app-audience-loader";
 import { GuestScopedAppRoute } from "@/features/guest-browse/route/guest-scoped-app-route";
 import { AppRouteLayout } from "@/src/app/layouts/app-route-layout";
+import { memoizeRouteModule } from "@/src/app/routes/route-module-loader";
 import { ClubMemberAppRouteLayout } from "@/src/app/layouts/club-app-route-layout";
 import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
 import { RequireAuth, RequireMemberApp } from "@/src/app/route-guards";
@@ -42,16 +45,21 @@ function scopedMemberRoute({
   path,
   index,
   errorElement,
+  ErrorBoundary,
+  shouldRevalidate,
   fallback,
   load,
 }: {
   path?: string;
   index?: true;
   errorElement?: ReactNode;
+  ErrorBoundary?: ComponentType;
+  shouldRevalidate?: RouteObject["shouldRevalidate"];
   fallback: ReactNode;
   load: () => Promise<ScopedRouteModule>;
 }): RouteObject {
-  const ProtectedComponent = lazy(async () => ({ default: (await load()).Component }));
+  const loadOnce = memoizeRouteModule(load);
+  const ProtectedComponent = lazy(async () => ({ default: (await loadOnce()).Component }));
 
   function ScopedAudienceRouteComponent() {
     const data = useLoaderData();
@@ -69,8 +77,10 @@ function scopedMemberRoute({
     ...(path ? { path } : {}),
     ...(index ? { index } : {}),
     ...(errorElement ? { errorElement } : {}),
+    ...(ErrorBoundary ? { ErrorBoundary } : {}),
+    ...(shouldRevalidate ? { shouldRevalidate } : {}),
     hydrateFallbackElement: fallback,
-    loader: scopedGuestRouteLoader(async () => (await load()).loader),
+    loader: scopedGuestRouteLoader(async () => (await loadOnce()).loader),
     element: <ScopedAudienceRouteComponent />,
   };
 }
@@ -117,6 +127,7 @@ function scopedMemberAppRoutes(queryClient: QueryClient): RouteObject[] {
     }),
     scopedMemberRoute({
       path: "session/current",
+      ErrorBoundary: CurrentSessionRouteError,
       fallback: <ReadmatesRouteLoading label="세션을 불러오는 중" variant="member" />,
       load: async () => {
         const { CurrentSessionRoute, currentSessionLoaderFactory } = await import("@/features/current-session");
@@ -129,6 +140,7 @@ function scopedMemberAppRoutes(queryClient: QueryClient): RouteObject[] {
     scopedMemberRoute({
       path: "notes",
       errorElement: <ArchiveRouteError />,
+      shouldRevalidate: notesFeedShouldRevalidate,
       fallback: <ArchiveRouteLoading label="클럽 노트를 불러오는 중" />,
       load: async () => {
         const [{ default: Component }, { notesFeedLoader: loader }] = await Promise.all([

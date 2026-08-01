@@ -125,6 +125,23 @@ describe("guest route loaders", () => {
     expect(importProtectedLoader).not.toHaveBeenCalled();
   });
 
+  it("deduplicates concurrent audience reads for the same navigation request only", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(anonymousAuth))
+      .mockResolvedValueOnce(jsonResponse(shell));
+    vi.stubGlobal("fetch", fetchMock);
+    const request = new Request("https://readmates.local/clubs/alpha/app/feedback/s1");
+
+    const [parentAccess, childAccess] = await Promise.all([
+      loadClubAppAudience({ params: { clubSlug: "alpha" }, request }),
+      loadClubAppAudience({ params: { clubSlug: "alpha" }, request }),
+    ]);
+
+    expect(parentAccess).toBe(childAccess);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("keeps child guest loaders on browse endpoints only", async () => {
     const fetchMock = vi.fn((path: string) =>
       Promise.resolve(jsonResponse(path.endsWith("/sessions/current") ? currentSession : { items: [], nextCursor: null })),

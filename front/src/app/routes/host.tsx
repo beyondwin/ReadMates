@@ -4,6 +4,7 @@ import { type LoaderFunction, type RouteObject } from "react-router-dom";
 import { requireHostLoaderAuth } from "@/features/host/route/host-loader-auth";
 import { HostRouteError } from "@/features/host/route/host-route-error";
 import { AppRouteLayout } from "@/src/app/layouts/app-route-layout";
+import { memoizeRouteModule } from "@/src/app/routes/route-module-loader";
 import { ClubHostAppRouteLayout } from "@/src/app/layouts/club-app-route-layout";
 import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
 import { RequireHost } from "@/src/app/route-guards";
@@ -27,7 +28,8 @@ function scopedHostRoute({
   fallback: ReactNode;
   load: () => Promise<ScopedHostRouteModule>;
 }): RouteObject {
-  const ProtectedComponent = lazy(async () => ({ default: (await load()).Component }));
+  const loadOnce = memoizeRouteModule(load);
+  const ProtectedComponent = lazy(async () => ({ default: (await loadOnce()).Component }));
 
   return {
     ...(path ? { path } : {}),
@@ -36,7 +38,7 @@ function scopedHostRoute({
     hydrateFallbackElement: fallback,
     loader: async (args) => {
       await requireHostLoaderAuth(args);
-      const module = await load();
+      const module = await loadOnce();
       return module.loader?.(args) ?? null;
     },
     element: (

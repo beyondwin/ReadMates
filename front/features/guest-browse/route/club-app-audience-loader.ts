@@ -16,6 +16,8 @@ export type GuestScopedRouteData = {
   guestRoute: true;
 };
 
+const pendingAudienceAccesses = new WeakMap<Request, Promise<ClubAppAccess>>();
+
 function requiredClubSlug(args?: ClubScopedLoaderArgs) {
   const clubSlug = clubSlugFromLoaderArgs(args);
   if (!clubSlug) {
@@ -24,7 +26,7 @@ function requiredClubSlug(args?: ClubScopedLoaderArgs) {
   return clubSlug;
 }
 
-export async function loadClubAppAudience(args?: Pick<LoaderFunctionArgs, "params">): Promise<ClubAppAccess> {
+async function loadClubAppAudienceForRequest(args?: Pick<LoaderFunctionArgs, "params" | "request">): Promise<ClubAppAccess> {
   const clubSlug = requiredClubSlug(args);
   const auth = await readmatesPublicFetch<AuthMeResponse>(authMePath(clubSlug));
   const audience = deriveClubAppAudience(auth);
@@ -36,6 +38,26 @@ export async function loadClubAppAudience(args?: Pick<LoaderFunctionArgs, "param
   const club = await fetchGuestBrowseShell(clubSlug);
 
   return { audience, auth, club };
+}
+
+export function loadClubAppAudience(args?: Pick<LoaderFunctionArgs, "params" | "request">): Promise<ClubAppAccess> {
+  const request = args?.request;
+  if (!request) {
+    return loadClubAppAudienceForRequest(args);
+  }
+
+  const existing = pendingAudienceAccesses.get(request);
+  if (existing) {
+    return existing;
+  }
+
+  const pending = loadClubAppAudienceForRequest(args);
+  pendingAudienceAccesses.set(request, pending);
+  void pending.then(
+    () => pendingAudienceAccesses.delete(request),
+    () => pendingAudienceAccesses.delete(request),
+  );
+  return pending;
 }
 
 export async function loadScopedClubAppAccess(args?: LoaderFunctionArgs): Promise<ClubAppAccess> {

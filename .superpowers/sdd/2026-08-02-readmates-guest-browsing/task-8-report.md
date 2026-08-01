@@ -117,3 +117,39 @@ preview, or member-only lock as determined by the guest capability matrix.
 - The dedicated public browse content for OPEN routes remains Task 9 scope;
   this round only strengthens the Task 8 shell boundary and never exposes
   protected route data to guest-equivalent audiences.
+
+## Review-fix round 2 — scoped route contract preservation
+
+### RED → GREEN
+
+- RED: the new scoped-route metadata test found `ErrorBoundary` undefined on
+  scoped `session/current`; scoped notes also had no `shouldRevalidate`.
+- RED: concurrent `loadClubAppAudience` calls with one navigation `Request`
+  performed four fetches, exhausting the two-response fixture.
+- GREEN: focused router, guest route/UI, and module-loader tests passed with
+  5 files and 64 tests after the fixes.
+
+### Resolutions
+
+1. `scopedMemberRoute` now accepts and preserves `ErrorBoundary` and
+   `shouldRevalidate`. Scoped current session uses `CurrentSessionRouteError`;
+   scoped notes reuses the identical `notesFeedShouldRevalidate` function as
+   unscoped notes. The pure revalidation function moved out of the protected
+   notes data-loader module, so the guest graph never imports that module.
+2. Member and host scoped route builders use `memoizeRouteModule`, a single
+   promise shared by static loader and `React.lazy` element. Its co-located
+   test proves concurrent loader/element callers assemble a module once.
+3. Audience access now uses a `WeakMap<Request, Promise<ClubAppAccess>>` only
+   while the exact router `Request` is pending. It deduplicates parent/child
+   reads in one navigation, deletes both successful and failed entries, and
+   cannot become a stale cross-navigation auth cache. The request-count test
+   verifies one auth plus one public-shell fetch for two concurrent calls.
+
+### Round 2 verification
+
+- Focused routes/UI/router/module helper: 5 files, 64 tests passed.
+- Architecture boundary and app-layout regression: 2 files, 19 tests passed.
+- `corepack pnpm --dir front test`: 234 files, 1869 tests passed.
+- `corepack pnpm --dir front lint`: passed.
+- `corepack pnpm --dir front build`: passed.
+- `git diff --check`: passed.
