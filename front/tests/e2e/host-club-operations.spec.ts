@@ -20,7 +20,7 @@ test.afterEach(() => {
 });
 
 async function routeHostClubOperations(page: Page): Promise<void> {
-  await page.route("**/api/bff/api/host/club-operations", async (route) => {
+  await page.route("**/api/bff/api/host/club-operations**", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -50,7 +50,7 @@ async function routeHostClubOperations(page: Page): Promise<void> {
 }
 
 async function routeHostDashboardPublicSafe(page: Page): Promise<void> {
-  await page.route("**/api/bff/api/host/dashboard", async (route) => {
+  await page.route("**/api/bff/api/host/dashboard**", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -61,6 +61,38 @@ async function routeHostDashboardPublicSafe(page: Page): Promise<void> {
         feedbackPending: 0,
         currentSessionMissingMemberCount: 0,
         currentSessionMissingMembers: [],
+      }),
+    });
+  });
+}
+
+async function routeHostSessionsPublicSafe(page: Page): Promise<void> {
+  await page.route("**/api/bff/api/host/sessions?limit=50**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        items: [{
+          sessionId: "e2e-upcoming-session",
+          sessionNumber: 8,
+          title: "8회차 모임 · E2E 예정 세션 책",
+          bookTitle: "E2E 예정 세션 책",
+          bookAuthor: "테스트 저자",
+          bookImageUrl: null,
+          date: "2026-08-20",
+          startTime: "20:00",
+          endTime: "22:00",
+          locationLabel: "온라인",
+          state: "DRAFT",
+          visibility: "HOST_ONLY",
+          recordStatus: "INCOMPLETE",
+          needsAttention: false,
+          hasDraft: false,
+          liveRevision: 0,
+          draftRevision: null,
+          lastModifiedAt: null,
+        }],
+        nextCursor: null,
       }),
     });
   });
@@ -103,6 +135,7 @@ test("host dashboard renders read-only operating-signal card without leaking adm
   await loginWithGoogleFixture(page, "host@example.com");
   await routeHostDashboardPublicSafe(page);
   await routeHostClubOperations(page);
+  await routeHostSessionsPublicSafe(page);
 
   await page.goto("/app/host");
   await expect(
@@ -116,6 +149,7 @@ test("host dashboard keeps operating-signal actions inside the scoped club works
   await loginWithGoogleFixture(page, "host@example.com");
   await routeHostDashboardPublicSafe(page);
   await routeHostClubOperations(page);
+  await routeHostSessionsPublicSafe(page);
 
   await page.goto("/clubs/reading-sai/app/host");
 
@@ -134,30 +168,61 @@ test("host dashboard captures public-safe operating-signal and priority-ledger v
   await loginWithGoogleFixture(page, "host@example.com");
   await routeHostDashboardPublicSafe(page);
   await routeHostClubOperations(page);
+  await routeHostSessionsPublicSafe(page);
 
-  await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto("/app/host");
-  await expectHostOperatingSignalCardPublicSafe(page);
-  const desktopScreenshot = await page.screenshot({
-    path: testInfo.outputPath("host-dashboard-operating-signal-desktop.png"),
-    fullPage: true,
-  });
-  expect(desktopScreenshot.byteLength).toBeGreaterThan(10_000);
+  for (const viewport of [
+    { name: "mobile-320", width: 320, height: 844 },
+    { name: "mobile-390", width: 390, height: 844 },
+    { name: "tablet-768", width: 768, height: 1024 },
+    { name: "desktop-1280", width: 1280, height: 720 },
+  ]) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/clubs/reading-sai/app/host");
 
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/app/host");
-  await expectHostMobilePriorityLedgerPublicSafe(page);
-  const mobileScreenshot = await page.screenshot({
-    path: testInfo.outputPath("host-dashboard-operating-signal-mobile.png"),
-    fullPage: true,
-  });
-  expect(mobileScreenshot.byteLength).toBeGreaterThan(10_000);
+    if (viewport.width <= 768) {
+      await expectHostMobilePriorityLedgerPublicSafe(page);
+      await expect(page.getByRole("article", { name: "현재 세션 요약" })).toBeVisible();
+    } else {
+      await expectHostOperatingSignalCardPublicSafe(page);
+    }
+
+    if (viewport.name === "mobile-390") {
+      const disclosure = page.getByText("확인할 운영 항목").locator("xpath=ancestor::details");
+      const summary = disclosure.locator("summary");
+      await summary.focus();
+      await expect(summary).toBeFocused();
+      await page.keyboard.press("Enter");
+      await expect(disclosure).toHaveAttribute("open", "");
+
+      const currentAction = page.getByRole("link", { name: "세션 문서 열기" });
+      const actionBox = await currentAction.boundingBox();
+      expect(actionBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+
+      for (const action of [
+        page.getByRole("button", { name: /현재로 시작|멤버 공개로 변경|비공개로 변경/ }).first(),
+        page.getByRole("link", { name: /세션 편집|날짜 수정/ }).first(),
+      ]) {
+        await action.focus();
+        await expect(action).toBeFocused();
+        const box = await action.boundingBox();
+        expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+      }
+    }
+
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    const screenshot = await page.screenshot({
+      path: testInfo.outputPath(`host-dashboard-${viewport.name}.png`),
+      fullPage: true,
+    });
+    expect(screenshot.byteLength).toBeGreaterThan(10_000);
+  }
 });
 
 test("host current-session card keeps balanced metrics at 320px", async ({ page }) => {
   await loginWithGoogleFixture(page, "host@example.com");
   await routeHostDashboardPublicSafe(page);
   await routeHostClubOperations(page);
+  await routeHostSessionsPublicSafe(page);
   await page.setViewportSize({ width: 320, height: 844 });
   await page.goto("/clubs/reading-sai/app/host");
 
