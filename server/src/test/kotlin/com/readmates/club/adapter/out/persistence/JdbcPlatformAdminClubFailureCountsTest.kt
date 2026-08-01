@@ -35,9 +35,8 @@ private const val CLEANUP_SQL = """
 @Tag("integration")
 class JdbcPlatformAdminClubFailureCountsTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
+    @param:Autowired private val adapter: JdbcPlatformAdminClubAdapter,
 ) : ReadmatesMySqlIntegrationTestSupport() {
-    private val adapter by lazy { JdbcPlatformAdminClubAdapter(jdbcTemplate) }
-
     @Test
     fun `counts only recent failed notification deliveries and failed ai generations`() {
         seedClubWithMember()

@@ -1,6 +1,6 @@
 package com.readmates.club.adapter.out.persistence
 
-import com.readmates.auth.domain.BookClubAvatarKey
+import com.readmates.auth.application.port.out.MemberAvatarAllocationPort
 import com.readmates.club.application.model.FirstHostOnboardingState
 import com.readmates.club.application.model.PlatformAdminClubListItem
 import com.readmates.club.application.port.out.CreatePlatformAdminClubCommand
@@ -24,6 +24,7 @@ import java.util.UUID
 @Repository
 class JdbcPlatformAdminClubAdapter(
     private val jdbcTemplate: JdbcTemplate,
+    private val avatarAllocation: MemberAvatarAllocationPort,
 ) : LoadPlatformAdminClubsPort,
     UpdatePlatformAdminClubPort,
     PlatformAdminOnboardingPort {
@@ -122,6 +123,7 @@ class JdbcPlatformAdminClubAdapter(
         return command.clubId
     }
 
+    @Transactional
     override fun upsertHostMembership(
         clubId: UUID,
         userId: UUID,
@@ -152,6 +154,7 @@ class JdbcPlatformAdminClubAdapter(
             return existing
         }
 
+        val avatarKey = avatarAllocation.allocate(clubId, userId)
         val membershipId = UUID.randomUUID()
         jdbcTemplate.update(
             """
@@ -162,7 +165,7 @@ class JdbcPlatformAdminClubAdapter(
             clubId.dbString(),
             userId.dbString(),
             displayName.take(HOST_DISPLAY_NAME_MAX_LENGTH),
-            BookClubAvatarKey.SQUIRREL_ACORN.wireValue,
+            avatarKey.wireValue,
         )
         return membershipId
     }
