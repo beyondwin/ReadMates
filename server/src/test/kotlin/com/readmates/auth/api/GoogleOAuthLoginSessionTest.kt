@@ -32,6 +32,8 @@ import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.web.util.UriComponentsBuilder
+import org.springframework.web.util.UriUtils
+import java.nio.charset.StandardCharsets
 import java.time.Instant
 
 @SpringBootTest(
@@ -290,10 +292,11 @@ class GoogleOAuthLoginSessionTest(
 
     @Test
     fun `google authentication failure preserves safe return context without exposing exception`() {
+        val safeReturnTarget = "/clubs/reading-sai/app?from=login#note"
         val servletSession = securitySession()
         servletSession.setAttribute(
             OAuthReturnState.SESSION_ATTRIBUTE,
-            oauthReturnState.signReturnTarget("/clubs/reading-sai/app"),
+            oauthReturnState.signReturnTarget(safeReturnTarget),
         )
         val request = MockHttpServletRequest("GET", "/login/oauth2/code/google")
         request.setSession(servletSession)
@@ -306,8 +309,13 @@ class GoogleOAuthLoginSessionTest(
         )
 
         val redirect = UriComponentsBuilder.fromUriString(response.redirectedUrl!!).build()
+        assertEquals(setOf("error", "returnTo"), redirect.queryParams.keys)
+        assertNull(redirect.fragment)
         assertEquals("google", redirect.queryParams.getFirst("error"))
-        assertEquals("/clubs/reading-sai/app", redirect.queryParams.getFirst("returnTo"))
+        assertEquals(
+            listOf(safeReturnTarget),
+            redirect.queryParams["returnTo"]?.map { UriUtils.decode(it, StandardCharsets.UTF_8) },
+        )
         assertTrue(response.redirectedUrl!!.contains("provider detail").not())
         assertTrue(servletSession.isInvalid)
     }

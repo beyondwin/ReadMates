@@ -3,7 +3,12 @@ package com.readmates.auth.infrastructure.security
 import com.readmates.auth.application.port.out.TrustedReturnHostPort
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
+import java.io.ByteArrayOutputStream
 import java.net.URI
+import java.nio.ByteBuffer
+import java.nio.charset.CharacterCodingException
+import java.nio.charset.CodingErrorAction
+import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.time.Duration
 import java.time.Instant
@@ -66,9 +71,14 @@ class OAuthReturnState(
 
     fun loginRetryReturnTarget(signedState: String?): String? =
         verifiedReturnTarget(signedState)
-            ?.takeIf { target ->
-                target.startsWith("/") &&
-                    LOGIN_RETRY_EXCLUDED_PATHS.none { pattern -> pattern.containsMatchIn(target) }
+            ?.takeIf { it.startsWith("/") }
+            ?.let { target ->
+                canonicalRoutePath(target)?.let { canonicalPath ->
+                    target.takeIf {
+                        canonicalPath != "/" &&
+                            LOGIN_RETRY_EXCLUDED_PATHS.none { pattern -> pattern.containsMatchIn(canonicalPath) }
+                    }
+                }
             }
 
     fun inviteReturnTarget(
@@ -127,6 +137,7 @@ class OAuthReturnState(
                 ?.trim()
                 ?.takeIf { it.isNotEmpty() && it.length <= MAX_RETURN_TO_LENGTH }
                 ?.takeIf { it.none(Char::isISOControl) }
+                ?.takeIf(::hasOnlyValidPercentEscapes)
                 ?: return null
 
         return if (candidate.startsWith("/")) {
@@ -168,6 +179,71 @@ class OAuthReturnState(
     }
 
     private fun isActiveClubDomain(host: String): Boolean = activeClubSlugForDomain(host) != null
+
+    private fun canonicalRoutePath(target: String): String? {
+        val rawPath = target.substringBeforeAny('?', '#')
+        val canonicalSegments = mutableListOf<String>()
+        var valid = true
+        for (rawSegment in rawPath.split('/').drop(1)) {
+            val decodedSegment = decodeRouteSegment(rawSegment)
+            if (decodedSegment == null || decodedSegment.contains('\\') || decodedSegment.any(Char::isISOControl)) {
+                valid = false
+                break
+            }
+            when (decodedSegment) {
+                "." -> Unit
+                ".." -> if (canonicalSegments.isNotEmpty()) canonicalSegments.removeLast()
+                else -> canonicalSegments += decodedSegment.replace("/", "%2F")
+            }
+        }
+        return if (valid) "/${canonicalSegments.joinToString("/")}" else null
+    }
+
+    private fun decodeRouteSegment(segment: String): String? {
+        val decoded = StringBuilder()
+        var index = 0
+        var valid = true
+        while (index < segment.length && valid) {
+            if (segment[index] != '%') {
+                decoded.append(segment[index])
+                index += 1
+                continue
+            }
+
+            val encodedBytes = ByteArrayOutputStream()
+            while (index < segment.length && segment[index] == '%' && valid) {
+                val byteValue = segment.hexByteAt(index)
+                if (byteValue == null) {
+                    valid = false
+                } else {
+                    encodedBytes.write(byteValue)
+                    index += PERCENT_ESCAPE_WIDTH
+                }
+            }
+            if (valid) {
+                val decodedBytes = encodedBytes.toByteArray().decodeUtf8OrNull()
+                if (decodedBytes == null) {
+                    valid = false
+                } else {
+                    decoded.append(decodedBytes)
+                }
+            }
+        }
+        return decoded.toString().takeIf { valid }
+    }
+
+    private fun hasOnlyValidPercentEscapes(value: String): Boolean {
+        var index = 0
+        while (index < value.length) {
+            if (value[index] == '%') {
+                if (value.hexByteAt(index) == null) return false
+                index += PERCENT_ESCAPE_WIDTH
+            } else {
+                index += 1
+            }
+        }
+        return true
+    }
 
     private fun inviteClubSlug(
         returnTarget: String,
@@ -252,15 +328,45 @@ class OAuthReturnState(
         private const val MAX_RETURN_TO_LENGTH = 2048
         private val LOGIN_RETRY_EXCLUDED_PATHS =
             listOf(
-                Regex("^/(?:[?#]|$)"),
-                Regex("^/login(?:[/?#]|$)"),
-                Regex("^/oauth2(?:[/?#]|$)"),
-                Regex("^/login/oauth2(?:[/?#]|$)"),
-                Regex("^/reset-password(?:[/?#]|$)"),
-                Regex("^/invite(?:[/?#]|$)"),
-                Regex("^/clubs/[^/]+/invite(?:[/?#]|$)"),
+                Regex("^/login(?:[/?#]|$)", RegexOption.IGNORE_CASE),
+                Regex("^/oauth2(?:[/?#]|$)", RegexOption.IGNORE_CASE),
+                Regex("^/login/oauth2(?:[/?#]|$)", RegexOption.IGNORE_CASE),
+                Regex("^/reset-password(?:[/?#]|$)", RegexOption.IGNORE_CASE),
+                Regex("^/invite(?:[/?#]|$)", RegexOption.IGNORE_CASE),
+                Regex("^/clubs/[^/]+/invite(?:[/?#]|$)", RegexOption.IGNORE_CASE),
             )
         private val CLUB_INVITE_PATH = Regex("^/clubs/([^/]+)/invite/([^/]+)$")
         private val LEGACY_INVITE_PATH = Regex("^/invite/([^/]+)$")
     }
 }
+
+private fun String.substringBeforeAny(vararg delimiters: Char): String {
+    val end = indexOfFirst { it in delimiters }
+    return if (end == -1) this else substring(0, end)
+}
+
+private fun String.hexByteAt(percentIndex: Int): Int? {
+    val high = getOrNull(percentIndex + 1)?.digitToIntOrNull(HEX_RADIX)
+    val low = getOrNull(percentIndex + 2)?.digitToIntOrNull(HEX_RADIX)
+    return if (getOrNull(percentIndex) == '%' && high != null && low != null) {
+        (high shl BITS_PER_HEX_DIGIT) or low
+    } else {
+        null
+    }
+}
+
+private fun ByteArray.decodeUtf8OrNull(): String? =
+    try {
+        StandardCharsets.UTF_8
+            .newDecoder()
+            .onMalformedInput(CodingErrorAction.REPORT)
+            .onUnmappableCharacter(CodingErrorAction.REPORT)
+            .decode(ByteBuffer.wrap(this))
+            .toString()
+    } catch (_: CharacterCodingException) {
+        null
+    }
+
+private const val PERCENT_ESCAPE_WIDTH = 3
+private const val HEX_RADIX = 16
+private const val BITS_PER_HEX_DIGIT = 4
