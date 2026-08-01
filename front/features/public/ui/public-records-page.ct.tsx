@@ -107,6 +107,9 @@ for (const viewport of [
       expect(metrics.fontFamily, metrics.name).toContain("Pretendard");
       expect(metrics.fontFamily, metrics.name).not.toContain("Iowan Old Style");
       expect(metrics.fontSize, metrics.name).toBeGreaterThanOrEqual(16);
+      if (metrics.name === "summary") {
+        expect(metrics.fontSize, metrics.name).toBeLessThanOrEqual(17);
+      }
       expect(metrics.lineHeightRatio, metrics.name).toBeGreaterThanOrEqual(1.6);
       expect(metrics.scrollWidth, metrics.name).toBeLessThanOrEqual(metrics.clientWidth);
     }

@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/experimental-ct-react";
-import type { PublicClubView } from "@/features/public/model/public-display-model";
+import type { PublicClubView, PublicSessionDetailView } from "@/features/public/model/public-display-model";
 import PublicHome from "./public-home";
+import PublicSession from "./public-session";
 
 const publicHomeView: PublicClubView = {
   clubName: "읽는사이",
@@ -26,6 +27,66 @@ const publicHomeView: PublicClubView = {
     },
   ],
 };
+
+const publicSessionView: PublicSessionDetailView = {
+  sessionId: "00000000-0000-0000-0000-000000000301",
+  sessionNumber: 8,
+  bookTitle: "긴 한국어 제목과 An Expansive English Title",
+  bookAuthor: "테스트 저자",
+  bookImageUrl: null,
+  date: "2026-06-18",
+  summary: "회차 전체를 아우르는 긴 요약은 공공 기록에서 다른 본문과 같은 읽기 크기를 유지해야 합니다.",
+  highlights: [
+    {
+      text: "긴 하이라이트 문장도 독자가 작은 화면과 큰 화면에서 부담 없이 읽을 수 있는 본문 크기를 유지해야 합니다.",
+      sortOrder: 1,
+      authorName: "테스트 독자",
+      authorShortName: "테",
+      avatarKey: "reading-lamp",
+    },
+  ],
+  oneLiners: [
+    {
+      text: "긴 한줄평도 같은 본문 크기 범위 안에서 자연스럽게 줄바꿈됩니다.",
+      authorName: "테스트 멤버",
+      authorShortName: "테",
+      avatarKey: "book-tote",
+    },
+  ],
+};
+
+test("PublicSession keeps long public copy within the body scale", async ({ mount, page }) => {
+  await page.setViewportSize({ width: 1200, height: 900 });
+  const component = await mount(<PublicSession session={publicSessionView} />);
+  const longCopyMetrics = await Promise.all(
+    [
+      ["session summary", component.locator(".public-session-summary-text")],
+      ["highlight quote", component.locator(".public-note-highlight-row__quote")],
+      ["one-liner quote", component.locator(".public-note-oneliner-card__quote")],
+    ].map(async ([name, locator]) => ({
+      name,
+      ...(await locator.evaluate((element) => {
+        const node = element as HTMLElement;
+        const style = getComputedStyle(node);
+        return {
+          fontFamily: style.fontFamily,
+          fontSize: Number.parseFloat(style.fontSize),
+          lineHeightRatio: Number.parseFloat(style.lineHeight) / Number.parseFloat(style.fontSize),
+          clientWidth: node.clientWidth,
+          scrollWidth: node.scrollWidth,
+        };
+      })),
+    })),
+  );
+
+  for (const metrics of longCopyMetrics) {
+    expect(metrics.fontFamily, metrics.name).toContain("Pretendard");
+    expect(metrics.fontSize, metrics.name).toBeGreaterThanOrEqual(16);
+    expect(metrics.fontSize, metrics.name).toBeLessThanOrEqual(17);
+    expect(metrics.lineHeightRatio, metrics.name).toBeGreaterThanOrEqual(1.6);
+    expect(metrics.scrollWidth, metrics.name).toBeLessThanOrEqual(metrics.clientWidth);
+  }
+});
 
 for (const viewport of [
   { name: "desktop", width: 1200, height: 900 },

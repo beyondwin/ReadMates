@@ -4180,7 +4180,7 @@ a.rm-recent-record__destination:hover {
 .public-session-summary-text {
   max-width: 680px;
   margin: 28px 0 0;
-  font-size: 22px;
+  font-size: var(--type-size-body);
   line-height: 1.65;
 }
 
@@ -4218,7 +4218,7 @@ a.rm-recent-record__destination:hover {
   margin: 0;
   padding-left: 34px;
   color: var(--text);
-  font-size: 20px;
+  font-size: var(--type-size-body);
   font-weight: 600;
   line-height: 1.65;
   letter-spacing: 0;
@@ -4254,7 +4254,7 @@ a.rm-recent-record__destination:hover {
   margin: 0;
   padding-left: 34px;
   color: var(--text);
-  font-size: 17px;
+  font-size: var(--type-size-body);
   font-weight: 600;
   line-height: 1.65;
   letter-spacing: 0;
@@ -5204,7 +5204,7 @@ a.rm-recent-record__destination:hover {
   }
 
   .public-session-summary-text {
-    font-size: 18px;
+    font-size: var(--type-size-body);
     line-height: 1.7;
   }
 
@@ -5232,7 +5232,7 @@ a.rm-recent-record__destination:hover {
   .public-note-oneliner-card__quote,
   .public-note-highlight-row__quote {
     padding-left: 22px;
-    font-size: 16px;
+    font-size: var(--type-size-body);
     line-height: 1.7;
   }
 
