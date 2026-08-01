@@ -373,16 +373,6 @@ class JdbcCurrentSessionAdapter(
             member.membershipId.dbString(),
         )
 
-    private fun ResultSet.presentationAvatarKey(
-        avatarKeyColumn: String,
-        membershipStatusColumn: String,
-    ): String =
-        if (getString(membershipStatusColumn) == "LEFT") {
-            BookClubAvatarKey.fallback.wireValue
-        } else {
-            getString(avatarKeyColumn) ?: BookClubAvatarKey.fallback.wireValue
-        }
-
     private fun findBoardHighlights(
         jdbcTemplate: JdbcTemplate,
         sessionId: UUID,
@@ -464,3 +454,13 @@ class JdbcCurrentSessionAdapter(
         )
     }
 }
+
+private fun ResultSet.presentationAvatarKey(
+    avatarKeyColumn: String,
+    membershipStatusColumn: String,
+): String =
+    if (getString(membershipStatusColumn) == "LEFT") {
+        BookClubAvatarKey.fallback.wireValue
+    } else {
+        getString(avatarKeyColumn) ?: BookClubAvatarKey.fallback.wireValue
+    }

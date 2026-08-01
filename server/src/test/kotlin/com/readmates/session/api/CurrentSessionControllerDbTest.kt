@@ -392,7 +392,9 @@ class CurrentSessionControllerDbTest(
                 jsonPath("$.currentSession.attendees[*].displayName") { value(not(hasItem("멤버1"))) }
                 jsonPath("$.currentSession.attendees[*].accountName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.currentSession.attendees[*].accountName") { value(not(hasItem("안멤버1"))) }
-                jsonPath("$.currentSession.attendees[?(@.membershipId == '00000000-0000-0000-0000-000000000202')].avatarKey") {
+                jsonPath(
+                    "$.currentSession.attendees[?(@.membershipId == '00000000-0000-0000-0000-000000000202')].avatarKey",
+                ) {
                     value(hasItem("archive-box"))
                 }
                 jsonPath("$.currentSession.attendees[*].shortName") { doesNotExist() }
