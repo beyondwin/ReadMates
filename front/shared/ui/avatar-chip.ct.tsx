@@ -17,16 +17,18 @@ test("AvatarChip renders every local avatar decoratively at supported sizes", as
 
   const images = component.locator("img");
   await expect(images).toHaveCount(BOOK_CLUB_AVATAR_KEYS.length * avatarSizes.length);
-  expect(await images.evaluateAll((nodes) =>
-    nodes.every(
-      (node) =>
-        node instanceof HTMLImageElement &&
-        node.naturalWidth === 256 &&
-        node.naturalHeight === 256 &&
-        node.alt === "" &&
-        node.getAttribute("aria-hidden") === "true",
+  await expect.poll(() =>
+    images.evaluateAll((nodes) =>
+      nodes.every(
+        (node) =>
+          node instanceof HTMLImageElement &&
+          node.naturalWidth === 256 &&
+          node.naturalHeight === 256 &&
+          node.alt === "" &&
+          node.getAttribute("aria-hidden") === "true",
+      ),
     ),
-  )).toBe(true);
+  ).toBe(true);
   await component.screenshot({ path: testInfo.outputPath("avatar-chip-contact-sheet.png") });
 });
 
