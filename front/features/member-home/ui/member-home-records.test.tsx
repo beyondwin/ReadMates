@@ -45,6 +45,28 @@ describe("member home record reflection cards", () => {
     expect(screen.getByText(reflection.text)).toHaveClass("reading-editorial");
   });
 
+  it("uses the projected safe avatar key for a mobile null-author highlight", () => {
+    const reflection = {
+      sessionId: "session-8",
+      sessionNumber: 8,
+      date: "2026-06-18",
+      kind: "HIGHLIGHT" as const,
+      text: "이름 없이 보존된 하이라이트입니다.",
+      authorName: null,
+      authorShortName: null,
+      avatarKey: "archive-box",
+      bookTitle: "긴 제목의 다음 책",
+    };
+
+    const { container } = render(<MobileMemberActivity items={[reflection]} />);
+
+    expect(container.querySelector(".rm-member-activity-card__author .rm-avatar-chip img")).toHaveAttribute(
+      "src",
+      "/assets/avatars/book-club/archive-box.webp",
+    );
+    expect(screen.getByText("회차 하이라이트")).toBeVisible();
+  });
+
   it("renders the desktop reflection card with record and feedback actions", () => {
     render(<RecentRecordEntry entry={entry} />);
 

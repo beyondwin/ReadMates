@@ -186,6 +186,7 @@ export type MyRecentAttendance = {
 };
 
 export type MyPageResponse = {
+  avatarKey: string;
   displayName: string;
   accountName: string;
   email: string;

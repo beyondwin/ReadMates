@@ -1,5 +1,6 @@
 import type { MyPageProfile } from "@/features/archive/model/archive-model";
 import type { MemberSpaceViewModel } from "@/features/archive/model/my-reading-shelf-model";
+import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { ProfileNameEditor } from "./profile-name-editor";
 import type { ProfileUpdateResult } from "./types";
 
@@ -19,7 +20,7 @@ export function MemberProfileSummary({
   return (
     <section className="rm-member-profile" aria-labelledby="member-profile-name">
       <div className="rm-member-profile__avatar" aria-hidden>
-        {viewModel.avatarLabel}
+        <AvatarChip avatarKey={profile.avatarKey} name={profile.displayName} label="" size={46} />
       </div>
       <p className="rm-member-space-kicker">내 프로필</p>
       <ProfileNameEditor

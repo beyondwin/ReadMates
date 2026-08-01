@@ -12,6 +12,7 @@ vi.mock("@/features/archive/api/archive-api", () => api);
 vi.mock("@/features/archive/route/archive-loader-auth", () => auth);
 
 const profile: MyPageResponse = {
+  avatarKey: "reading-lamp",
   displayName: "독자",
   accountName: "book-friend",
   email: "reader@example.com",

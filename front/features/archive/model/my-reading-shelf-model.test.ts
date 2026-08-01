@@ -107,7 +107,6 @@ describe("my reading shelf model", () => {
 
   it("builds a cumulative member-space profile and achievement summary", () => {
     expect(memberSpaceViewModel()).toEqual({
-      avatarLabel: "멤",
       profileMetaLabel: "읽는사이 · 멤버 · 2025.11부터 함께",
       achievementHeading: "세 번의 모임에서 세 권을 끝까지 읽었어요.",
       achievementBody: "함께 읽는 시간이 차분히 쌓이고 있습니다.",
@@ -165,10 +164,6 @@ describe("my reading shelf model", () => {
       .toBe("읽는사이 · 멤버");
     expect(memberSpaceViewModel({ profile: { joinedAt: "2026-08" } }).profileMetaLabel)
       .toBe("읽는사이 · 멤버");
-  });
-
-  it("uses the membership fallback initial when the display name is blank", () => {
-    expect(memberSpaceViewModel({ profile: { displayName: "   " } }).avatarLabel).toBe("멤");
   });
 
   it("maps at most three recent readings in server order", () => {

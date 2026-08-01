@@ -9,6 +9,7 @@ import { ReadingAchievementSummary } from "./reading-achievement-summary";
 import type { ProfileUpdateResult } from "./types";
 
 const profile: MyPageProfile = {
+  avatarKey: "reading-lamp",
   displayName: "멤버1",
   accountName: "member-one",
   email: "member1@example.com",
@@ -24,7 +25,6 @@ const profile: MyPageProfile = {
 };
 
 const viewModel: MemberSpaceViewModel = {
-  avatarLabel: "멤",
   profileMetaLabel: "읽는사이 · 멤버 · 2025.11부터 함께",
   achievementHeading: "일곱 번의 모임에서 세 권을 끝까지 읽었어요.",
   achievementBody: "함께 읽는 시간이 차분히 쌓이고 있습니다.",
@@ -48,6 +48,22 @@ function renderProfileSummary(canEditProfile = true) {
 }
 
 describe("member-space presentation sections", () => {
+  it.each([
+    ["reading-lamp", "/assets/avatars/book-club/reading-lamp.webp"],
+    ["future-avatar", "/assets/avatars/book-club/archive-box.webp"],
+  ])("renders the stored %s profile key through AvatarChip", (avatarKey, expectedSrc) => {
+    const { container } = render(
+      <MemberProfileSummary
+        profile={{ ...profile, avatarKey }}
+        viewModel={viewModel}
+        canEditProfile
+        onUpdateProfile={vi.fn().mockResolvedValue({ displayName: profile.displayName, accountName: profile.accountName })}
+      />,
+    );
+
+    expect(container.querySelector(".rm-member-profile__avatar .rm-avatar-chip img")).toHaveAttribute("src", expectedSrc);
+  });
+
   it("renders identity, inline name editing, and membership context without account navigation", () => {
     const { container } = renderProfileSummary();
     const section = screen.getByRole("region", { name: "멤버1" });

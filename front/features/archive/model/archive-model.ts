@@ -83,6 +83,7 @@ export type FeedbackDocumentListItem = {
 };
 
 export type MyPageProfile = {
+  avatarKey: string;
   displayName: string;
   accountName: string;
   email: string;
@@ -99,6 +100,7 @@ export type MyPageProfile = {
 
 export function inactiveMyPageProfile(auth: AuthMeResponse): MyPageProfile {
   return {
+    avatarKey: auth.currentMembership?.avatarKey ?? auth.avatarKey ?? "archive-box",
     displayName: auth.displayName ?? "",
     accountName: auth.accountName ?? "",
     email: auth.email ?? "",

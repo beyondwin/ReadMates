@@ -18,6 +18,7 @@ describe("inactiveMyPageProfile", () => {
     };
 
     expect(inactiveMyPageProfile(auth)).toEqual({
+      avatarKey: "archive-box",
       displayName: "독자",
       accountName: "book-friend",
       email: "reader@example.com",

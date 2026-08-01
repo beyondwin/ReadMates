@@ -8,6 +8,7 @@ import type { RecentReadingListItem } from "@/features/archive/ui/my-page/recent
 afterEach(cleanup);
 
 const profile: MyPageProfile = {
+  avatarKey: "reading-lamp",
   displayName: "샘플 멤버",
   accountName: "sample-member",
   email: "member@example.com",
@@ -23,7 +24,6 @@ const profile: MyPageProfile = {
 };
 
 const viewModel: MemberSpaceViewModel = {
-  avatarLabel: "샘",
   profileMetaLabel: "샘플 독서모임 · 멤버 · 2024.11부터 함께",
   achievementHeading: "9번의 모임에서 7권을 끝까지 읽었어요.",
   achievementBody: "함께 읽는 시간이 차분히 쌓이고 있습니다.",

@@ -6,6 +6,7 @@ import type { MyPageProfile } from "@/features/archive/model/archive-model";
 import { AccountSettingsPage } from "./account-settings-page";
 
 const profile: MyPageProfile = {
+  avatarKey: "reading-lamp",
   displayName: "독자",
   accountName: "book-friend",
   email: "reader@example.com",

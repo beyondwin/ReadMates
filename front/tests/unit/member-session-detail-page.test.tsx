@@ -161,7 +161,6 @@ describe("MemberSessionDetailPage", () => {
           authorName: "이멤버5",
           authorShortName: "수",
           avatarKey: "book-tote",
-          avatarKey: "book-tote",
         },
       ],
     );

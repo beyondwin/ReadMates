@@ -244,13 +244,7 @@ export function MobileMemberActivity({
               >
                 <div className="rm-member-activity-card__top">
                   <div className="rm-member-activity-card__author">
-                    {authorName ? (
-                      <AvatarChip avatarKey={item.avatarKey} name={authorName} label="" size={26} />
-                    ) : (
-                      <span className="m-avatar accent rm-member-activity-card__avatar" aria-hidden>
-                        H
-                      </span>
-                    )}
+                    <AvatarChip avatarKey={item.avatarKey} name={authorName} label="" size={26} />
                     <div className="rm-member-activity-card__author-copy">
                       <div className="rm-member-activity-card__author-name">{authorName ?? "회차 하이라이트"}</div>
                       <div className="rm-member-activity-card__book">{item.bookTitle}</div>

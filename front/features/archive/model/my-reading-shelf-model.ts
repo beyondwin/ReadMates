@@ -68,7 +68,6 @@ export type RecentReadingPreviewItem = {
 };
 
 export type MemberSpaceViewModel = {
-  avatarLabel: string;
   profileMetaLabel: string;
   achievementHeading: string;
   achievementBody: "함께 읽는 시간이 차분히 쌓이고 있습니다.";
@@ -198,7 +197,6 @@ export function buildMemberSpaceViewModel(input: {
   if (joinedMonthLabel) profileMetaParts.push(`${joinedMonthLabel}부터 함께`);
 
   return {
-    avatarLabel: input.profile.displayName.trim().charAt(0) || "멤",
     profileMetaLabel: profileMetaParts.join(" · "),
     achievementHeading: achievementHeading(input.summary),
     achievementBody: "함께 읽는 시간이 차분히 쌓이고 있습니다.",
