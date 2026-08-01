@@ -28,6 +28,7 @@ export function AccountMenuController({
   return (
     <AccountMenu
       memberName={memberName}
+      avatarKey={auth.currentMembership?.avatarKey ?? auth.avatarKey}
       membershipLabel={accountMembershipLabel(auth.membershipStatus)}
       mySpaceHref={scopedAccountPath(appBasePath, "/me")}
       notificationsHref={scopedAccountPath(appBasePath, "/notifications")}

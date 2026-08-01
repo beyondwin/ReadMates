@@ -13,6 +13,7 @@ export type AuthMeResponse = {
   role: MemberRole | null;
   membershipStatus: MembershipStatus | null;
   approvalState: ApprovalState;
+  avatarKey?: string | null;
   currentMembership?: AuthCurrentMembership | null;
   joinedClubs?: AuthJoinedClub[];
   platformAdmin?: AuthPlatformAdmin | null;
@@ -27,6 +28,7 @@ export type AuthCurrentMembership = {
   role: MemberRole;
   membershipStatus: MembershipStatus;
   approvalState: ApprovalState;
+  avatarKey: string;
 };
 
 export type AuthJoinedClub = {

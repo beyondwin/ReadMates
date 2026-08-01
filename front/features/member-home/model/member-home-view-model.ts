@@ -21,6 +21,7 @@ export type MemberHomeNoteFeedItemView = {
   date: string;
   authorName: string | null;
   authorShortName: string | null;
+  avatarKey: string;
   kind: "QUESTION" | "ONE_LINE_REVIEW" | "HIGHLIGHT";
   text: string;
 };

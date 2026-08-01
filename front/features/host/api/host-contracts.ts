@@ -619,6 +619,7 @@ export type HostSessionDetailResponse = {
   state: SessionState;
   attendees: Array<{
     membershipId: string;
+    avatarKey: string;
     displayName: string;
     accountName: string;
     rsvpStatus: RsvpStatus;
@@ -730,6 +731,7 @@ export const HostSessionDetailResponseSchema = z.object({
       attendees: z.array(
         z.object({
           membershipId: z.string(),
+          avatarKey: z.string(),
           displayName: z.string(),
           accountName: z.string(),
           rsvpStatus: z.enum(["NO_RESPONSE", "GOING", "MAYBE", "DECLINED"]),

@@ -17,6 +17,7 @@ const memberAuth: AuthMeResponse = {
     clubId: "club-one",
     clubSlug: "club-one",
     displayName: "멤버",
+    avatarKey: "book-tote",
     role: "MEMBER",
     membershipStatus: "ACTIVE",
     approvalState: "ACTIVE",

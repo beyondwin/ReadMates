@@ -25,6 +25,7 @@ export type PublicClubResponse = {
 export type PublicOneLiner = {
   authorName: string;
   authorShortName: string;
+  avatarKey: string;
   text: string;
 };
 
@@ -33,6 +34,7 @@ export type PublicHighlight = {
   sortOrder: number;
   authorName: string | null;
   authorShortName: string | null;
+  avatarKey: string;
 };
 
 export type PublicSessionDetailResponse = {

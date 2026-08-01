@@ -28,6 +28,7 @@ const auth: AuthMeResponse = {
   role: "MEMBER",
   membershipStatus: "ACTIVE",
   approvalState: "ACTIVE",
+  avatarKey: "reading-lamp",
 };
 
 const current: CurrentSessionResponse = {
@@ -58,6 +59,7 @@ const current: CurrentSessionResponse = {
     attendees: [
       {
         membershipId: "member-1",
+        avatarKey: "reading-lamp",
         displayName: "수",
         accountName: "이멤버5",
         role: "MEMBER",
@@ -76,6 +78,7 @@ const noteFeedItems: NoteFeedItem[] = [
     date: "2026-05-20",
     authorName: "이멤버5",
     authorShortName: "수",
+    avatarKey: "reading-lamp",
     kind: "QUESTION",
     text: "내가 직접 넣은 질문만 최근 클럽 흐름에 보여야 합니다.",
   },
@@ -86,6 +89,7 @@ const noteFeedItems: NoteFeedItem[] = [
     date: "2026-04-15",
     authorName: "김호스트",
     authorShortName: "호스트",
+    avatarKey: "book-tote",
     kind: "ONE_LINE_REVIEW",
     text: "실제 피드의 두 번째 기록입니다.",
   },
@@ -325,6 +329,7 @@ describe("MemberHome", () => {
             date: "2026-04-15",
             authorName: "E2E 멤버",
             authorShortName: "멤",
+            avatarKey: "calendar-book",
             kind: "ONE_LINE_REVIEW",
             text: "지난 세션 기록입니다.",
           },
@@ -360,6 +365,7 @@ describe("MemberHome", () => {
                 draftThought: null,
                 authorName: "이멤버5",
                 authorShortName: "수",
+                avatarKey: "book-tote",
               },
               {
                 priority: 2,
@@ -367,6 +373,7 @@ describe("MemberHome", () => {
                 draftThought: null,
                 authorName: "이멤버5",
                 authorShortName: "수",
+                avatarKey: "calendar-book",
               },
             ],
             myOneLineReview: {
@@ -513,6 +520,7 @@ describe("MemberHome", () => {
                 draftThought: null,
                 authorName: "이멤버5",
                 authorShortName: "수",
+                avatarKey: "book-tote",
               },
               {
                 priority: 2,
@@ -520,6 +528,7 @@ describe("MemberHome", () => {
                 draftThought: null,
                 authorName: "이멤버5",
                 authorShortName: "수",
+                avatarKey: "calendar-book",
               },
             ],
             myOneLineReview: null,
@@ -558,6 +567,7 @@ describe("MemberHome", () => {
             attendees: [
               {
                 membershipId: "member-1",
+                avatarKey: "reading-lamp",
                 displayName: "수",
                 accountName: "이멤버5",
                 role: "MEMBER",
@@ -566,6 +576,7 @@ describe("MemberHome", () => {
               },
               {
                 membershipId: "member-2",
+                avatarKey: "book-tote",
                 displayName: "호스트",
                 accountName: "김호스트",
                 role: "HOST",
@@ -574,6 +585,7 @@ describe("MemberHome", () => {
               },
               {
                 membershipId: "member-3",
+                avatarKey: "calendar-book",
                 displayName: "멤버4",
                 accountName: "송멤버4",
                 role: "MEMBER",
@@ -582,6 +594,7 @@ describe("MemberHome", () => {
               },
               {
                 membershipId: "member-4",
+                avatarKey: "archive-box",
                 displayName: "멤버1",
                 accountName: "안멤버1",
                 role: "MEMBER",
@@ -590,6 +603,7 @@ describe("MemberHome", () => {
               },
               {
                 membershipId: "member-5",
+                avatarKey: "book-tote",
                 displayName: "멤버3",
                 accountName: "김멤버3",
                 role: "MEMBER",
@@ -598,6 +612,7 @@ describe("MemberHome", () => {
               },
               {
                 membershipId: "member-6",
+                avatarKey: "reading-lamp",
                 displayName: "멤버2",
                 accountName: "최멤버2",
                 role: "MEMBER",
@@ -606,6 +621,7 @@ describe("MemberHome", () => {
               },
               {
                 membershipId: "member-removed",
+                avatarKey: "archive-box",
                 displayName: "제외",
                 accountName: "제외멤버",
                 role: "MEMBER",
@@ -746,6 +762,7 @@ describe("MemberHome", () => {
               current.currentSession!.attendees[0],
               {
                 membershipId: "member-2",
+                avatarKey: "book-tote",
                 displayName: "멤버3",
                 accountName: "김멤버3",
                 role: "MEMBER",
@@ -760,12 +777,12 @@ describe("MemberHome", () => {
       />,
     );
 
-    const attendingChip = screen.getByLabelText("수 · 참석");
-    const pendingChip = screen.getByLabelText("멤버3 · 미응답");
+    const attendingChip = screen.getByTitle("수 · 참석");
+    const pendingChip = screen.getByTitle("멤버3 · 미응답");
 
     expect(attendingChip).toHaveAttribute("data-rsvp-status", "GOING");
-    expect(attendingChip).toHaveTextContent("수");
-    expect(pendingChip).toHaveTextContent("멤");
+    expect(attendingChip.querySelector("img")).toHaveAttribute("src", "/assets/avatars/book-club/reading-lamp.webp");
+    expect(pendingChip.querySelector("img")).toHaveAttribute("src", "/assets/avatars/book-club/book-tote.webp");
   });
 
   it("uses the shared MAYBE RSVP label in roster labels", () => {
@@ -778,6 +795,7 @@ describe("MemberHome", () => {
             attendees: [
               {
                 membershipId: "member-maybe",
+                avatarKey: "calendar-book",
                 displayName: "미",
                 accountName: "박미정",
                 role: "MEMBER",
@@ -792,7 +810,7 @@ describe("MemberHome", () => {
       />,
     );
 
-    expect(screen.getByLabelText("미 · 미정")).toHaveAttribute("data-rsvp-status", "MAYBE");
+    expect(screen.getByTitle("미 · 미정")).toHaveAttribute("data-rsvp-status", "MAYBE");
   });
 
   it("does not show the host session operations shortcut inside member home content", () => {

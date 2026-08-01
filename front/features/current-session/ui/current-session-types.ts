@@ -42,6 +42,7 @@ export type CurrentSession = {
     draftThought: string | null;
     authorName: string;
     authorShortName: string;
+    avatarKey: string;
   }>;
   myOneLineReview: null | {
     text: string;
@@ -56,15 +57,18 @@ export type CurrentSession = {
       draftThought: string | null;
       authorName: string;
       authorShortName: string;
+      avatarKey: string;
     }>;
     longReviews: Array<{
       authorName: string;
       authorShortName: string;
+      avatarKey: string;
       body: string;
     }>;
   };
   attendees: Array<{
     membershipId: string;
+    avatarKey: string;
     displayName: string;
     accountName: string;
     role: CurrentSessionMemberRole;

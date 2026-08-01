@@ -116,7 +116,7 @@ export function ClubPulse({
                 <div className="rm-club-pulse-entry__author">
                   {authorName ? (
                     <>
-                      <AvatarChip name={authorName} fallbackInitial={item.authorShortName} label={authorName} size={22} />
+                      <AvatarChip avatarKey={item.avatarKey} name={authorName} label="" size={22} />
                       <span className="small rm-club-pulse-entry__author-name">{authorName}</span>
                     </>
                   ) : null}
@@ -245,7 +245,7 @@ export function MobileMemberActivity({
                 <div className="rm-member-activity-card__top">
                   <div className="rm-member-activity-card__author">
                     {authorName ? (
-                      <AvatarChip name={authorName} fallbackInitial={item.authorShortName} label={authorName} size={26} />
+                      <AvatarChip avatarKey={item.avatarKey} name={authorName} label="" size={26} />
                     ) : (
                       <span className="m-avatar accent rm-member-activity-card__avatar" aria-hidden>
                         H
@@ -327,8 +327,8 @@ export function RosterSummary({ current }: { current: CurrentSessionResponse }) 
           {attendees.map((member) => (
             <AvatarChip
               key={member.membershipId}
+              avatarKey={member.avatarKey}
               name={member.displayName}
-              fallbackInitial={member.displayName}
               label={`${member.displayName} · ${rsvpLabel(member.rsvpStatus)}`}
               rsvpStatus={member.rsvpStatus}
               size={26}

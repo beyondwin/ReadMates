@@ -299,6 +299,7 @@ describe("SPA AppRouteLayout", () => {
         clubId: "club-2",
         clubSlug: "reading-sai",
         displayName: "클럽멤버",
+        avatarKey: "book-tote",
         role: "MEMBER",
         membershipStatus: "ACTIVE",
         approvalState: "ACTIVE",

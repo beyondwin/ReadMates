@@ -125,7 +125,7 @@ export default function PublicClub({ data, publicBasePath = "" }: PublicClubProp
           </div>
           <div className="rm-document-panel public-host-note">
             <div className="row" style={{ gap: 12 }}>
-              <AvatarChip name={STATIC_OPERATION_INTRO.hostName} label={STATIC_OPERATION_INTRO.hostName} size={32} />
+              <AvatarChip avatarKey="archive-box" name={STATIC_OPERATION_INTRO.hostName} label="" size={32} />
               <div>
                 <div className="h4 editorial">{STATIC_OPERATION_INTRO.hostName}</div>
                 <div className="tiny">호스트 · {STATIC_OPERATION_INTRO.hostSince}~</div>

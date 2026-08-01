@@ -423,7 +423,7 @@ export function RosterList({ session }: { session: CurrentSession }) {
         {attendees.map((member) => (
           <div key={member.membershipId} className="row-between">
             <span className="row" style={{ gap: "10px" }}>
-              <AvatarChip name={member.displayName} fallbackInitial={member.displayName} label={member.displayName} rsvpStatus={member.rsvpStatus} size={24} />
+              <AvatarChip avatarKey={member.avatarKey} name={member.displayName} label="" rsvpStatus={member.rsvpStatus} size={24} />
               <span className="body" style={{ fontSize: "13.5px" }}>
                 {member.displayName}
                 {member.role === "HOST" ? (
@@ -473,7 +473,7 @@ export function BoardQuestions({ questions }: { questions: BoardQuestion[] }) {
         >
           <div className="row-between" style={{ alignItems: "flex-start", marginBottom: "12px" }}>
             <div className="row" style={{ gap: "10px", flexWrap: "wrap" }}>
-              <AvatarChip name={question.authorName} fallbackInitial={question.authorShortName} label={question.authorName} size={24} />
+              <AvatarChip avatarKey={question.avatarKey} name={question.authorName} label="" size={24} />
               <span className="body" style={{ fontSize: "14px", fontWeight: 500 }}>
                 {question.authorName}
               </span>
@@ -532,7 +532,7 @@ export function BoardLongReviews({ longReviews }: { longReviews: BoardLongReview
             {review.body}
           </p>
           <div className="row tiny" style={{ marginTop: 12, gap: 8, color: "var(--text-3)", minWidth: 0 }}>
-            <AvatarChip name={review.authorName} fallbackInitial={review.authorShortName} label={review.authorName} size={22} />
+            <AvatarChip avatarKey={review.avatarKey} name={review.authorName} label="" size={22} />
             <span style={{ minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word" }}>{review.authorName}</span>
           </div>
         </article>

@@ -69,7 +69,9 @@ export async function loadNotesFeedRouteData(requestedSessionId: string | null, 
   }
 
   const selectedSession = selectNoteSession(noteSessions.items, requestedSessionIdValue);
-  const items = selectedSession ? await fetchNotesFeed(selectedSession.sessionId, context, { limit: NOTES_FEED_FIRST_PAGE_LIMIT }) : emptyPage();
+  const items = selectedSession
+    ? await fetchNotesFeed(selectedSession.sessionId, context, { limit: NOTES_FEED_FIRST_PAGE_LIMIT })
+    : emptyPage<NoteFeedPage["items"][number]>();
 
   return { noteSessions, selectedSessionId: selectedSession?.sessionId ?? null, selectedSession, items };
 }
@@ -79,7 +81,12 @@ export async function notesFeedLoader(args: LoaderFunctionArgs): Promise<NotesFe
   const access = await loadArchiveMemberAuth(args);
 
   if (!access.allowed) {
-    return { noteSessions: emptyPage(), selectedSessionId: null, selectedSession: null, items: emptyPage() };
+    return {
+      noteSessions: emptyPage<NoteSessionItem>(),
+      selectedSessionId: null,
+      selectedSession: null,
+      items: emptyPage<NoteFeedPage["items"][number]>(),
+    };
   }
 
   const url = new URL(request.url);

@@ -31,6 +31,7 @@ export type CurrentSessionResponse = {
       draftThought: string | null;
       authorName: string;
       authorShortName: string;
+      avatarKey: string;
     }>;
     myOneLineReview: null | {
       text: string;
@@ -45,15 +46,18 @@ export type CurrentSessionResponse = {
         draftThought: string | null;
         authorName: string;
         authorShortName: string;
+        avatarKey: string;
       }>;
       longReviews: Array<{
         authorName: string;
         authorShortName: string;
+        avatarKey: string;
         body: string;
       }>;
     };
     attendees: Array<{
       membershipId: string;
+      avatarKey: string;
       displayName: string;
       accountName: string;
       role: CurrentSessionMemberRole;
@@ -95,6 +99,7 @@ export const CurrentSessionResponseSchema = import.meta.env.DEV
               draftThought: z.string().nullable(),
               authorName: z.string(),
               authorShortName: z.string(),
+              avatarKey: z.string(),
             }),
           ),
           myOneLineReview: z
@@ -115,12 +120,14 @@ export const CurrentSessionResponseSchema = import.meta.env.DEV
                 draftThought: z.string().nullable(),
                 authorName: z.string(),
                 authorShortName: z.string(),
+                avatarKey: z.string(),
               }),
             ),
             longReviews: z.array(
               z.object({
                 authorName: z.string(),
                 authorShortName: z.string(),
+                avatarKey: z.string(),
                 body: z.string(),
               }),
             ),
@@ -128,6 +135,7 @@ export const CurrentSessionResponseSchema = import.meta.env.DEV
           attendees: z.array(
             z.object({
               membershipId: z.string(),
+              avatarKey: z.string(),
               displayName: z.string(),
               accountName: z.string(),
               role: z.enum(["HOST", "MEMBER"]),

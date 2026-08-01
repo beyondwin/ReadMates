@@ -161,12 +161,14 @@ describe("PublicSession", () => {
           sortOrder: 0,
           authorName: "이멤버5",
           authorShortName: "멤버5",
+          avatarKey: "reading-lamp",
         },
       ],
       oneLiners: [
         {
           authorName: "김호스트",
           authorShortName: "우",
+          avatarKey: "book-tote",
           text: "낙관이 아니라 정확함의 문제였다.",
         },
       ],
@@ -191,7 +193,10 @@ describe("PublicSession", () => {
     const highlightRow = screen.getByText("세계를 오해하게 만드는 본능을 점검했습니다.").closest(".public-note-highlight-row");
     expect(highlightRow).not.toBeNull();
     expect(within(highlightRow as HTMLElement).getByText("이멤버5")).toBeInTheDocument();
-    expect(within(highlightRow as HTMLElement).getByLabelText("이멤버5")).toHaveTextContent("이");
+    expect((highlightRow as HTMLElement).querySelector(".rm-avatar-chip img")).toHaveAttribute(
+      "src",
+      "/assets/avatars/book-club/reading-lamp.webp",
+    );
     expect(container.querySelector(".public-note-oneliner-card")).not.toBeNull();
     expect(container).not.toHaveTextContent("H01");
     expect(container).not.toHaveTextContent("R01");
@@ -203,8 +208,10 @@ describe("PublicSession", () => {
     expect(screen.queryByText("초대 메일의 개인 링크에서만 열립니다.")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "공개 기록 →" })).not.toBeInTheDocument();
     expect(screen.getByText("김호스트")).toBeInTheDocument();
-    expect(screen.getByText("김")).toBeInTheDocument();
-    expect(screen.queryByText("우")).not.toBeInTheDocument();
+    expect(container.querySelector(".public-note-oneliner-card .rm-avatar-chip img")).toHaveAttribute(
+      "src",
+      "/assets/avatars/book-club/book-tote.webp",
+    );
     expect(container).not.toHaveTextContent("readmates");
     expect(container).not.toHaveTextContent("meet.google.com");
   });

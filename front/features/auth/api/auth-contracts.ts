@@ -13,6 +13,7 @@ export type AuthMeResponse = {
   role: MemberRole | null;
   membershipStatus: MembershipStatus | null;
   approvalState: ApprovalState;
+  avatarKey?: string | null;
 };
 
 export type InvitationStatus = "PENDING" | "ACCEPTED" | "EXPIRED" | "REVOKED";

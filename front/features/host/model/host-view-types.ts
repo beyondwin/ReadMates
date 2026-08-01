@@ -409,6 +409,7 @@ export type HostSessionDetailResponse = {
   state: SessionState;
   attendees: Array<{
     membershipId: string;
+    avatarKey: string;
     displayName: string;
     accountName: string;
     rsvpStatus: RsvpStatus;

@@ -32,6 +32,7 @@ const currentSessionData: CurrentSessionResponse = {
           ...currentSessionContractFixture.currentSession.attendees,
           {
             membershipId: "member-removed",
+            avatarKey: "calendar-book",
             displayName: "제외",
             accountName: "제외",
             role: "MEMBER",
@@ -586,8 +587,11 @@ describe("CurrentSession", () => {
     expect(desktopScope.getByText("Passcode currentpass")).toBeInTheDocument();
     expect(desktopScope.getByText("녹음을 원하지 않으면 모임 중 언제든 알려 주세요.")).toBeInTheDocument();
     expect(desktopScope.getByText("음성만 · 자동 정리 참고용")).toBeInTheDocument();
-    expect(desktopScope.getAllByTitle("우")[0]).toHaveTextContent("우");
-    expect(desktopScope.getAllByTitle("수")[0]).toHaveTextContent("수");
+    expect([...container.querySelectorAll(".desktop-only .rm-avatar-chip img")].map((image) => image.getAttribute("src"))).toContain(
+      "/assets/avatars/book-club/book-tote.webp",
+    );
+    expect(desktopScope.getByText("우")).toBeVisible();
+    expect(desktopScope.getByText("수")).toBeVisible();
   });
 
   it("omits the meeting action when no meeting details are registered", () => {
@@ -625,6 +629,7 @@ describe("CurrentSession", () => {
             draftThought: "새 세션 초안",
             authorName: "이멤버5",
             authorShortName: "수",
+            avatarKey: "book-tote",
           },
         ],
         myOneLineReview: {
@@ -863,6 +868,7 @@ describe("CurrentSession", () => {
             draftThought: "Q1 저장 초안",
             authorName: "이멤버5",
             authorShortName: "수",
+            avatarKey: "book-tote",
           },
           {
             priority: 2,
@@ -870,6 +876,7 @@ describe("CurrentSession", () => {
             draftThought: "Q2 저장 초안",
             authorName: "이멤버5",
             authorShortName: "수",
+            avatarKey: "calendar-book",
           },
         ],
       },

@@ -27,6 +27,7 @@ export type PublicClubView = {
 export type PublicOneLinerView = {
   authorName: string;
   authorShortName: string;
+  avatarKey: string;
   text: string;
 };
 
@@ -35,6 +36,7 @@ export type PublicHighlightView = {
   sortOrder: number;
   authorName: string | null;
   authorShortName: string | null;
+  avatarKey: string;
 };
 
 export type PublicSessionDetailView = {

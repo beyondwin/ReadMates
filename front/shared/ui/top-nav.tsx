@@ -43,6 +43,7 @@ export type CurrentSessionNavigationStatus = "ready" | "loading" | "error" | "re
 type TopNavProps = {
   variant?: TopNavVariant;
   memberName?: string | null;
+  memberAvatarKey?: string | null;
   showHostEntry?: boolean;
   authenticated?: boolean;
   publicBasePath?: string;
@@ -243,6 +244,7 @@ function TopNavFrame({
   links,
   pathname,
   memberName,
+  memberAvatarKey,
   workspaceAction,
   accountControl,
   LinkComponent,
@@ -252,6 +254,7 @@ function TopNavFrame({
   links: NavLink[];
   pathname: string;
   memberName?: string | null;
+  memberAvatarKey?: string | null;
   workspaceAction?: NavLink | null;
   accountControl?: ReactNode;
   LinkComponent: AppLinkComponent;
@@ -310,7 +313,7 @@ function TopNavFrame({
                   <WorkspaceSwitchIcon size={17} />
                 </LinkComponent>
               ) : null}
-              {accountControl ?? (memberName ? <AvatarChip name={memberName} label={memberName} size={28} /> : null)}
+              {accountControl ?? (memberName ? <AvatarChip avatarKey={memberAvatarKey} name={memberName} label="" size={28} /> : null)}
             </div>
           ) : null}
         </div>
@@ -359,6 +362,7 @@ function GuestTopNav({
 function AppTopNav({
   variant,
   memberName,
+  memberAvatarKey,
   showHostEntry,
   currentSessionId,
   currentSessionStatus,
@@ -369,6 +373,7 @@ function AppTopNav({
 }: {
   variant: Exclude<TopNavVariant, "guest">;
   memberName?: string | null;
+  memberAvatarKey?: string | null;
   showHostEntry?: boolean;
   currentSessionId?: string | null;
   currentSessionStatus?: CurrentSessionNavigationStatus;
@@ -400,6 +405,7 @@ function AppTopNav({
       links={links}
       pathname={appPath}
       memberName={memberName}
+      memberAvatarKey={memberAvatarKey}
       workspaceAction={scopedWorkspaceAction}
       accountControl={accountControl}
       LinkComponent={LinkComponent}
@@ -410,6 +416,7 @@ function AppTopNav({
 export function TopNav({
   variant = "guest",
   memberName,
+  memberAvatarKey,
   showHostEntry,
   authenticated,
   publicBasePath,
@@ -428,6 +435,7 @@ export function TopNav({
     <AppTopNav
       variant={variant}
       memberName={memberName}
+      memberAvatarKey={memberAvatarKey}
       showHostEntry={showHostEntry}
       appBasePath={appBasePath}
       currentSessionId={currentSessionId}

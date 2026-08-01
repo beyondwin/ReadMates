@@ -13,6 +13,7 @@ export type MemberHomeNoteFeedItem = {
   date: string;
   authorName: string | null;
   authorShortName: string | null;
+  avatarKey: string;
   kind: "QUESTION" | "ONE_LINE_REVIEW" | "LONG_REVIEW" | "HIGHLIGHT";
   text: string;
 };

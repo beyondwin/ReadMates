@@ -38,6 +38,7 @@ export function hostAuthResponse(clubSlug: string): AuthMeResponse {
       clubId: "club-a-id",
       clubSlug,
       displayName: "E2E 호스트",
+      avatarKey: "reading-lamp",
       role: "HOST",
       membershipStatus: "ACTIVE",
       approvalState: "ACTIVE",

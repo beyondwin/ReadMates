@@ -146,6 +146,7 @@ describe("MemberSessionDetailPage", () => {
             sortOrder: 0,
             authorName: null,
             authorShortName: null,
+            avatarKey: "archive-box",
           },
         ],
       },
@@ -159,6 +160,8 @@ describe("MemberSessionDetailPage", () => {
           text: "작성자 보강이 필요한 하이라이트",
           authorName: "이멤버5",
           authorShortName: "수",
+          avatarKey: "book-tote",
+          avatarKey: "book-tote",
         },
       ],
     );
@@ -205,7 +208,10 @@ describe("MemberSessionDetailPage", () => {
       .closest(".rm-session-highlight-row");
     expect(desktopHighlightRow).not.toBeNull();
     expect(within(desktopHighlightRow as HTMLElement).getByText("안멤버1")).toBeInTheDocument();
-    expect(within(desktopHighlightRow as HTMLElement).getByLabelText("안멤버1")).toBeInTheDocument();
+    expect((desktopHighlightRow as HTMLElement).querySelector(".rm-avatar-chip img")).toHaveAttribute(
+      "src",
+      "/assets/avatars/book-club/calendar-book.webp",
+    );
     expect(desktop.getByRole("heading", { name: "한줄평 · 1" })).toBeInTheDocument();
     expect(desktop.getByRole("heading", { name: "함께 남긴 질문" })).toBeInTheDocument();
     expect(desktop.getByText("Q1 · 이멤버5")).toHaveStyle({ color: "var(--text-3)" });
@@ -241,7 +247,10 @@ describe("MemberSessionDetailPage", () => {
       .closest(".rm-session-highlight-row");
     expect(mobileHighlightRow).not.toBeNull();
     expect(within(mobileHighlightRow as HTMLElement).getByText("안멤버1")).toBeInTheDocument();
-    expect(within(mobileHighlightRow as HTMLElement).getByLabelText("안멤버1")).toBeInTheDocument();
+    expect((mobileHighlightRow as HTMLElement).querySelector(".rm-avatar-chip img")).toHaveAttribute(
+      "src",
+      "/assets/avatars/book-club/calendar-book.webp",
+    );
     expect(mobile.getByRole("heading", { name: "한줄평 · 1" })).toBeInTheDocument();
     expect(mobile.getByRole("heading", { name: "함께 남긴 질문" })).toBeInTheDocument();
     expect(mobile.getByText("Q1 · 이멤버5")).toHaveStyle({ color: "var(--text-3)" });
@@ -519,6 +528,7 @@ describe("MemberSessionDetailPage", () => {
           draftThought: null,
           authorName: "이멤버5",
           authorShortName: "수",
+          avatarKey: "book-tote",
         },
       ],
     });
@@ -548,6 +558,7 @@ describe("MemberSessionDetailPage", () => {
         {
           authorName: "김호스트",
           authorShortName: "호스트",
+          avatarKey: "book-tote",
           text: "낙관이 아니라 정확함의 문제였다.",
         },
       ],
@@ -555,6 +566,7 @@ describe("MemberSessionDetailPage", () => {
         {
           authorName: "김호스트",
           authorShortName: "호스트",
+          avatarKey: "book-tote",
           text: "정확함의 문제였다.",
         },
       ],
@@ -562,9 +574,9 @@ describe("MemberSessionDetailPage", () => {
 
     expect(screen.queryByText("체크인")).not.toBeInTheDocument();
     expect(screen.getAllByText("낙관이 아니라 정확함의 문제였다.").length).toBeGreaterThan(0);
-    const authorAvatars = screen.getAllByLabelText("김호스트");
+    const authorAvatars = screen.getAllByText("김호스트").map((name) => name.parentElement?.querySelector(".rm-avatar-chip img"));
     expect(authorAvatars.length).toBeGreaterThan(0);
-    expect(authorAvatars.every((avatar) => avatar.textContent === "김")).toBe(true);
+    expect(authorAvatars.every((avatar) => avatar?.getAttribute("src") === "/assets/avatars/book-club/book-tote.webp")).toBe(true);
   });
 
   it("shows a host edit link in the desktop rail for hosts", () => {

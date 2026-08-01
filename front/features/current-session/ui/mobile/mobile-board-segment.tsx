@@ -38,7 +38,7 @@ function MobileQuestionList({ questions }: { questions: BoardQuestion[] }) {
         <article key={`${question.priority}-${question.authorName}-${question.text}`} className="m-card">
           <div className="m-row-between" style={{ alignItems: "flex-start", marginBottom: 10 }}>
             <div className="m-row" style={{ gap: 10 }}>
-              <AvatarChip name={question.authorName} fallbackInitial={question.authorShortName} label={question.authorName} size={24} />
+              <AvatarChip avatarKey={question.avatarKey} name={question.authorName} label="" size={24} />
               <span className="body" style={{ fontSize: 14, fontWeight: 500 }}>
                 {question.authorName}
               </span>
@@ -70,7 +70,7 @@ function MobileLongReviewList({ longReviews }: { longReviews: BoardLongReview[] 
         <article key={`${review.authorName}-${review.body}`} className="m-card">
           <div className="body editorial rm-current-session-mobile__board-text">{review.body}</div>
           <div className="m-row" style={{ gap: 8, marginTop: 10, color: "var(--text-3)" }}>
-            <AvatarChip name={review.authorName} fallbackInitial={review.authorShortName} label={review.authorName} size={24} />
+            <AvatarChip avatarKey={review.avatarKey} name={review.authorName} label="" size={24} />
             <span className="tiny">{review.authorName}</span>
           </div>
         </article>

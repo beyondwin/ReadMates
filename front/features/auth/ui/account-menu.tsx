@@ -20,6 +20,7 @@ export type AccountMenuLinkComponent = ComponentType<AccountMenuLinkProps>;
 
 export type AccountMenuProps = {
   memberName: string;
+  avatarKey?: string | null;
   membershipLabel: string;
   mySpaceHref: string;
   notificationsHref: string;
@@ -30,6 +31,7 @@ export type AccountMenuProps = {
 
 export function AccountMenu({
   memberName,
+  avatarKey,
   membershipLabel,
   mySpaceHref,
   notificationsHref,
@@ -112,7 +114,7 @@ export function AccountMenu({
         aria-controls={dialogId}
         onClick={() => setOpen((current) => !current)}
       >
-        <AvatarChip name={memberName} label="" size={28} />
+        <AvatarChip avatarKey={avatarKey} name={memberName} label="" size={28} />
       </button>
       {open ? (
         <div

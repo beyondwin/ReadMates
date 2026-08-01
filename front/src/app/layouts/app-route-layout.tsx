@@ -171,6 +171,7 @@ export function AppRouteLayout({
   const mobileVariant = mobileWorkspace;
   const showHostEntry = Boolean(isActiveHost && !isHostWorkspace);
   const memberName = auth?.displayName ?? null;
+  const memberAvatarKey = auth?.currentMembership?.avatarKey ?? auth?.avatarKey ?? null;
   const activeHostKey = isActiveHost && mobileWorkspace === "host" ? auth.membershipId : null;
   const currentSessionQuery = useQuery({
     ...hostCurrentSessionQuery(clubSlug ? { clubSlug } : undefined),
@@ -214,6 +215,7 @@ export function AppRouteLayout({
         <TopNav
           variant={desktopVariant}
           memberName={memberName}
+          memberAvatarKey={memberAvatarKey}
           showHostEntry={showHostEntry}
           appBasePath={basePath}
           currentSessionId={desktopVariant === "host" ? currentSessionId : null}

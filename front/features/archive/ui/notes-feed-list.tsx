@@ -379,7 +379,7 @@ function FeedAuthorRow({
   return (
     <div className="row" style={{ gap: "8px", color: "var(--text-3)", ...style }}>
       {item.authorName ? (
-        <AvatarChip name={item.authorName} fallbackInitial={item.authorShortName} label={item.authorName} size={markerSize} />
+        <AvatarChip avatarKey={item.avatarKey} name={item.authorName} label="" size={markerSize} />
       ) : null}
       {item.authorName ? <span className="small">{item.authorName}</span> : null}
       {children}

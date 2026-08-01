@@ -23,7 +23,7 @@ export function AvatarChip({
 }) {
   const requestedKey = normalizeBookClubAvatarKey(avatarKey);
   const [renderedKey, setRenderedKey] = useState<BookClubAvatarKey | null>(requestedKey);
-  const safeLabel = displayText(label, displayText(name, ""));
+  const safeLabel = label === undefined ? displayText(name, "") : displayText(label, "");
 
   useEffect(() => {
     // Resetting the local failure state is required when a caller requests a new asset.

@@ -2,11 +2,14 @@ import { expect, test } from "@playwright/experimental-ct-react";
 import { ClubPulse, MobileMemberActivity } from "./member-home-records";
 
 const reflection = {
+  sessionId: "session-8",
   sessionNumber: 8,
+  date: "2026-06-18",
   kind: "HIGHLIGHT" as const,
   text: "긴 한국어 회고와 deliberately expansive English reflection이 작은 화면에서도 자연스럽게 이어집니다.",
   authorName: null,
   authorShortName: null,
+  avatarKey: "archive-box",
   bookTitle: "긴 제목의 다음 책",
   createdAt: "2026-06-18T12:00:00Z",
 };

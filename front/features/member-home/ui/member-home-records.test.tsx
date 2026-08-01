@@ -25,11 +25,14 @@ const entry: MemberHomeRecentRecordEntry = {
 describe("member home record reflection cards", () => {
   it("scopes the reading face to desktop and mobile reflection content", () => {
     const reflection = {
+      sessionId: "session-8",
       sessionNumber: 8,
+      date: "2026-06-18",
       kind: "HIGHLIGHT" as const,
       text: "같은 문장을 서로 다른 경험으로 읽은 기록입니다.",
       authorName: null,
       authorShortName: null,
+      avatarKey: "archive-box",
       bookTitle: "긴 제목의 다음 책",
       createdAt: "2026-06-18T12:00:00Z",
     };

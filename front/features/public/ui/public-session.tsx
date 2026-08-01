@@ -87,14 +87,13 @@ export default function PublicSession({ session, returnTarget = publicRecordsRet
             <div className="public-note-highlight-list">
               {session.highlights.map((highlight, index) => {
                 const authorName = displayText(highlight.authorName, "읽는사이");
-                const authorShortName = displayText(highlight.authorShortName, authorName === "읽는사이" ? "읽" : authorName);
                 const text = displayText(highlight.text, "회차 하이라이트가 준비 중입니다.");
 
                 return (
                   <article className="public-note-highlight-row" key={`${index}-${highlight.sortOrder}-${highlight.authorName ?? "readmates"}-${highlight.text}`}>
                     <p className="public-note-highlight-row__quote editorial reading-editorial">{text}</p>
                     <div className="row public-note-author-row">
-                      <AvatarChip name={authorName} fallbackInitial={authorShortName} label={authorName} size={20} />
+                      <AvatarChip avatarKey={highlight.avatarKey} name={authorName} label="" size={20} />
                       <span className="small">{authorName}</span>
                     </div>
                   </article>
@@ -131,14 +130,13 @@ export default function PublicSession({ session, returnTarget = publicRecordsRet
             <div className="public-note-oneliner-grid">
               {session.oneLiners.map((oneLiner, index) => {
                 const authorName = displayText(oneLiner.authorName, "익명");
-                const authorShortName = displayText(oneLiner.authorShortName, authorName);
                 const text = displayText(oneLiner.text, "한줄평이 준비 중입니다.");
 
                 return (
                   <article className="public-note-oneliner-card" key={`${index}-${oneLiner.authorName}-${oneLiner.text}`}>
                     <p className="public-note-oneliner-card__quote editorial reading-editorial">{text}</p>
                     <div className="row public-note-author-row">
-                      <AvatarChip name={authorName} fallbackInitial={authorShortName} label={authorName} size={22} />
+                      <AvatarChip avatarKey={oneLiner.avatarKey} name={authorName} label="" size={22} />
                       <span className="small">{authorName}</span>
                     </div>
                   </article>

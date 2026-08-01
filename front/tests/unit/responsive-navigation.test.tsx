@@ -48,7 +48,10 @@ describe("TopNav responsive variants", () => {
   });
 
   it("renders member desktop navigation with the current app section marked", () => {
-    renderAt("/app/session/current", <TopNav variant="member" memberName="이멤버5" />);
+    const { container } = renderAt(
+      "/app/session/current",
+      <TopNav variant="member" memberName="이멤버5" memberAvatarKey="reading-lamp" />,
+    );
 
     const nav = screen.getByRole("navigation", { name: "앱 내비게이션" });
     expect(within(nav).getAllByRole("link").map((link) => link.textContent)).toEqual([
@@ -63,7 +66,7 @@ describe("TopNav responsive variants", () => {
     expect(within(nav).getByRole("link", { name: "내 공간" })).toHaveAttribute("href", "/app/me");
     expect(within(nav).getByRole("link", { name: "오늘" })).toHaveAttribute("aria-current", "page");
     expect(screen.queryByRole("link", { name: "호스트 화면" })).not.toBeInTheDocument();
-    expect(screen.getByLabelText("이멤버5")).toHaveTextContent("이");
+    expect(container.querySelector(".rm-avatar-chip img")).toHaveAttribute("src", "/assets/avatars/book-club/reading-lamp.webp");
   });
 
   it.each([
@@ -119,7 +122,10 @@ describe("TopNav responsive variants", () => {
   });
 
   it("renders host desktop workspace navigation with the required labels and member return action", () => {
-    renderAt("/app/host/sessions/new", <TopNav variant="host" memberName="김호스트" currentSessionId="session-6" />);
+    const { container } = renderAt(
+      "/app/host/sessions/new",
+      <TopNav variant="host" memberName="김호스트" memberAvatarKey="book-tote" currentSessionId="session-6" />,
+    );
 
     const nav = screen.getByRole("navigation", { name: "앱 내비게이션" });
     expect(within(nav).getAllByRole("link").map((link) => link.textContent)).toEqual([
@@ -141,7 +147,7 @@ describe("TopNav responsive variants", () => {
     expect(memberReturn).toHaveClass("rm-workspace-switch");
     expect(memberReturn.textContent).toBe("");
     expect(screen.getByRole("link", { name: /읽는사이/ })).toHaveAttribute("href", "/app/host");
-    expect(screen.getByLabelText("김호스트")).toHaveTextContent("김");
+    expect(container.querySelector(".rm-avatar-chip img")).toHaveAttribute("src", "/assets/avatars/book-club/book-tote.webp");
   });
 
   it.each([

@@ -40,4 +40,19 @@ describe("parseCurrentSessionResponse", () => {
 
     expect(() => parseCurrentSessionResponse(invalidPayload)).toThrow();
   });
+
+  it("preserves unknown future avatar keys at the API boundary", () => {
+    const payload = structuredClone(currentSessionContractFixture);
+    const currentSession = payload.currentSession;
+
+    if (!currentSession) {
+      throw new Error("fixture must include a current session");
+    }
+
+    currentSession.attendees[0].avatarKey = "future-avatar";
+    currentSession.board.questions[0].avatarKey = "future-avatar";
+    currentSession.board.longReviews[0].avatarKey = "future-avatar";
+
+    expect(parseCurrentSessionResponse(payload)).toEqual(payload);
+  });
 });

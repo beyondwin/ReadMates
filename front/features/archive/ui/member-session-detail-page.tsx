@@ -479,9 +479,9 @@ function HighlightsList({
           {highlight.authorName ? (
             <div className="row rm-session-highlight-row__source">
               <AvatarChip
+                avatarKey={highlight.avatarKey}
                 name={highlight.authorName}
-                fallbackInitial={highlight.authorShortName}
-                label={highlight.authorName}
+                label=""
                 size={mobile ? 18 : 20}
               />
               <span className="small">{highlight.authorName}</span>
@@ -688,9 +688,9 @@ function OneLinerList({ oneLiners, mobile = false }: { oneLiners: MemberArchiveO
           </p>
           <div className="row tiny" style={{ marginTop: 8, gap: 8, color: "var(--text-3)" }}>
             <AvatarChip
+              avatarKey={oneLiner.avatarKey}
               name={oneLiner.authorName}
-              fallbackInitial={oneLiner.authorShortName}
-              label={oneLiner.authorName}
+              label=""
               size={22}
             />
             {oneLiner.authorName}

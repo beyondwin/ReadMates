@@ -46,6 +46,7 @@ export type MemberArchiveHighlightItem = {
   sortOrder: number;
   authorName: string | null;
   authorShortName: string | null;
+  avatarKey: string;
 };
 
 export type MemberArchiveQuestionItem = {
@@ -54,6 +55,7 @@ export type MemberArchiveQuestionItem = {
   draftThought: string | null;
   authorName: string;
   authorShortName: string;
+  avatarKey: string;
 };
 
 export type MemberArchiveCheckinItem = {
@@ -63,6 +65,7 @@ export type MemberArchiveCheckinItem = {
 export type MemberArchiveOneLinerItem = {
   authorName: string;
   authorShortName: string;
+  avatarKey: string;
   text: string;
 };
 
@@ -152,6 +155,7 @@ export type NoteFeedItem = {
   date: string;
   authorName: string | null;
   authorShortName: string | null;
+  avatarKey: string;
   kind: "QUESTION" | "ONE_LINE_REVIEW" | "LONG_REVIEW" | "HIGHLIGHT";
   text: string;
 };
