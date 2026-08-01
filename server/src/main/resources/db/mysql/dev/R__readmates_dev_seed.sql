@@ -53,19 +53,19 @@ on duplicate key update
   profile_image_url = values(profile_image_url),
   updated_at = utc_timestamp(6);
 
-insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
 with seed as (
-  select 201 as id_suffix, 'host@example.com' as email, 'HOST' as role
+  select 201 as id_suffix, 'host@example.com' as email, 'HOST' as role, 'reading-lamp' as avatar_key
   union all
-  select 202, 'member1@example.com', 'MEMBER'
+  select 202, 'member1@example.com', 'MEMBER', 'open-book-pencil'
   union all
-  select 203, 'member2@example.com', 'MEMBER'
+  select 203, 'member2@example.com', 'MEMBER', 'book-spines'
   union all
-  select 204, 'member3@example.com', 'MEMBER'
+  select 204, 'member3@example.com', 'MEMBER', 'bookmark-page'
   union all
-  select 205, 'member4@example.com', 'MEMBER'
+  select 205, 'member4@example.com', 'MEMBER', 'notebook-pen'
   union all
-  select 206, 'member5@example.com', 'MEMBER'
+  select 206, 'member5@example.com', 'MEMBER', 'library-stamp'
 ),
 resolved as (
   select
@@ -75,7 +75,8 @@ resolved as (
     seed.role,
     'ACTIVE' as status,
     '2025-11-01 00:00:00.000000' as joined_at,
-    users.short_name
+    users.short_name,
+    seed.avatar_key
   from seed
   join clubs on clubs.slug = 'reading-sai'
   join users on users.email = seed.email
@@ -87,13 +88,15 @@ select
   role,
   status,
   joined_at,
-  short_name
+  short_name,
+  avatar_key
 from resolved
 on duplicate key update
   role = values(role),
   status = values(status),
   joined_at = values(joined_at),
-  short_name = values(short_name);
+  short_name = values(short_name),
+  avatar_key = values(avatar_key);
 
 insert into sessions (
   id,

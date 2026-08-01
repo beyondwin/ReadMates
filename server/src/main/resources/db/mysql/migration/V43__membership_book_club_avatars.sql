@@ -1,5 +1,5 @@
 alter table memberships
-  add column avatar_key varchar(40) null;
+  add column avatar_key varchar(40) character set ascii collate ascii_bin null;
 
 update memberships
 join (
@@ -43,7 +43,7 @@ join (
 set memberships.avatar_key = assigned_avatars.avatar_key;
 
 alter table memberships
-  modify column avatar_key varchar(40) not null default 'archive-box';
+  modify column avatar_key varchar(40) character set ascii collate ascii_bin not null;
 
 alter table memberships
   add constraint memberships_avatar_key_check check (

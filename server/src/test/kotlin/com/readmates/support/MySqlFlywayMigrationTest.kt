@@ -158,18 +158,20 @@ class MySqlFlywayMigrationTest(
                     Int::class.java,
                 )
             assertThat(nullAvatarKeyCount).isZero()
-            assertThat(
-                upgradeJdbc.queryForObject(
+            val avatarColumnMetadata =
+                upgradeJdbc.queryForMap(
                     """
-                    select is_nullable
+                    select is_nullable, column_default, character_set_name, collation_name
                     from information_schema.columns
                     where table_schema = database()
                       and table_name = 'memberships'
                       and column_name = 'avatar_key'
                     """.trimIndent(),
-                    String::class.java,
-                ),
-            ).isEqualTo("NO")
+                )
+            assertThat(avatarColumnMetadata["IS_NULLABLE"]).isEqualTo("NO")
+            assertThat(avatarColumnMetadata["COLUMN_DEFAULT"]).isNull()
+            assertThat(avatarColumnMetadata["CHARACTER_SET_NAME"]).isEqualTo("ascii")
+            assertThat(avatarColumnMetadata["COLLATION_NAME"]).isEqualTo("ascii_bin")
 
             val visibleKeysForFirstClub =
                 upgradeJdbc
@@ -188,6 +190,40 @@ class MySqlFlywayMigrationTest(
                     ).filterNotNull()
             assertThat(visibleKeysForFirstClub.take(20).distinct()).hasSize(20)
             assertThat(visibleKeysForFirstClub[20]).isEqualTo("reading-lamp")
+            val hiddenFixtureOrderingViolationCount =
+                upgradeJdbc.queryForObject(
+                    """
+                    select count(*)
+                    from memberships hidden
+                    join memberships visible on visible.club_id = hidden.club_id
+                    where hidden.club_id = ?
+                      and hidden.status in ('LEFT', 'INACTIVE')
+                      and visible.status in ('INVITED', 'VIEWER', 'ACTIVE', 'SUSPENDED')
+                      and (hidden.created_at >= visible.created_at or hidden.id >= visible.id)
+                    """.trimIndent(),
+                    Int::class.java,
+                    AVATAR_FIXTURE_FIRST_CLUB_ID,
+                )
+            assertThat(hiddenFixtureOrderingViolationCount).isZero()
+            val rankedStatusAndKeysForFirstClub =
+                upgradeJdbc
+                    .queryForList(
+                        """
+                        select concat(status, ':', avatar_key)
+                        from memberships
+                        where club_id = ?
+                        order by
+                          case when status in ('INVITED', 'VIEWER', 'ACTIVE', 'SUSPENDED') then 0 else 1 end,
+                          created_at,
+                          id
+                        """.trimIndent(),
+                        String::class.java,
+                        AVATAR_FIXTURE_FIRST_CLUB_ID,
+                    ).filterNotNull()
+            assertThat(rankedStatusAndKeysForFirstClub.takeLast(2)).containsExactly(
+                "LEFT:open-book-pencil",
+                "INACTIVE:book-spines",
+            )
 
             val keysOrderedByCreatedAt =
                 upgradeJdbc
@@ -220,23 +256,49 @@ class MySqlFlywayMigrationTest(
             )
 
             val invalidAvatarError =
+                assertInvalidAvatarKeyRejected(upgradeJdbc, "member-id")
+            assertThat(invalidAvatarError.mostSpecificCause.message).contains("memberships_avatar_key_check")
+            val uppercaseAvatarError =
+                assertInvalidAvatarKeyRejected(upgradeJdbc, "READING-LAMP")
+            assertThat(uppercaseAvatarError.mostSpecificCause.message).contains("memberships_avatar_key_check")
+            assertInvalidAvatarKeyRejected(upgradeJdbc, "réading-lamp")
+            val omittedAvatarError =
                 assertThrows(UncategorizedSQLException::class.java) {
                     upgradeJdbc.update(
                         """
                         insert into memberships (
-                          id, club_id, user_id, role, status, short_name, avatar_key, joined_at,
-                          created_at, updated_at
-                        ) values (?, ?, ?, 'MEMBER', 'ACTIVE', 'Invalid Avatar', 'member-id', null,
+                          id, club_id, user_id, role, status, short_name, joined_at, created_at, updated_at
+                        ) values (?, ?, ?, 'MEMBER', 'ACTIVE', 'Missing Avatar', null,
                                   '2026-08-01 12:00:00.000000', '2026-08-01 12:00:00.000000')
                         """.trimIndent(),
-                        "33000000-0000-0000-0000-000000000001",
+                        "33000000-0000-0000-0000-000000000002",
                         AVATAR_FIXTURE_FIRST_CLUB_ID,
-                        avatarFixtureUserId(clubNumber = 2, memberNumber = 1),
+                        avatarFixtureUserId(clubNumber = 2, memberNumber = 2),
                     )
                 }
-            assertThat(invalidAvatarError.mostSpecificCause.message).contains("memberships_avatar_key_check")
+            assertThat(omittedAvatarError.mostSpecificCause.message).contains("avatar_key")
         }
     }
+
+    private fun assertInvalidAvatarKeyRejected(
+        jdbcTemplate: JdbcTemplate,
+        avatarKey: String,
+    ): UncategorizedSQLException =
+        assertThrows(UncategorizedSQLException::class.java) {
+            jdbcTemplate.update(
+                """
+                insert into memberships (
+                  id, club_id, user_id, role, status, short_name, avatar_key, joined_at,
+                  created_at, updated_at
+                ) values (?, ?, ?, 'MEMBER', 'ACTIVE', 'Invalid Avatar', ?, null,
+                          '2026-08-01 12:00:00.000000', '2026-08-01 12:00:00.000000')
+                """.trimIndent(),
+                "33000000-0000-0000-0000-000000000001",
+                AVATAR_FIXTURE_FIRST_CLUB_ID,
+                avatarFixtureUserId(clubNumber = 2, memberNumber = 1),
+                avatarKey,
+            )
+        }
 
     private fun insertAvatarBackfillFixtures(jdbcTemplate: JdbcTemplate) {
         (1..2).forEach { clubNumber ->
@@ -257,7 +319,12 @@ class MySqlFlywayMigrationTest(
             memberNumbersInInsertOrder.forEach { memberNumber ->
                 val userId = avatarFixtureUserId(clubNumber, memberNumber)
                 val createdMinute = if (memberNumber <= 2) 0 else memberNumber - 2
-                val createdAt = "2026-07-01 09:${createdMinute.toString().padStart(2, '0')}:00.000000"
+                val createdAt =
+                    if (memberNumber >= 22) {
+                        "2026-06-01 08:00:00.000000"
+                    } else {
+                        "2026-07-01 09:${createdMinute.toString().padStart(2, '0')}:00.000000"
+                    }
                 val status =
                     when {
                         memberNumber == 22 -> "LEFT"
@@ -309,7 +376,10 @@ class MySqlFlywayMigrationTest(
     private fun avatarFixtureMembershipId(
         clubNumber: Int,
         memberNumber: Int,
-    ): String = "31000000-0000-0000-${clubNumber.toString().padStart(4, '0')}-${memberNumber.toString().padStart(12, '0')}"
+    ): String {
+        val prefix = if (memberNumber >= 22) "30000000" else "31000000"
+        return "$prefix-0000-0000-${clubNumber.toString().padStart(4, '0')}-${memberNumber.toString().padStart(12, '0')}"
+    }
 
     @Test
     fun `mysql creates host session record revision and notification confirmation tables`() {
@@ -1208,8 +1278,8 @@ class MySqlFlywayMigrationTest(
     ) {
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
-            values (?, ?, ?, 'MEMBER', 'ACTIVE', utc_timestamp(6), ?)
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+            values (?, ?, ?, 'MEMBER', 'ACTIVE', utc_timestamp(6), ?, 'reading-lamp')
             """.trimIndent(),
             membershipId,
             clubId,
