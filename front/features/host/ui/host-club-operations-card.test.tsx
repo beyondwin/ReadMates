@@ -136,7 +136,7 @@ describe("HostClubOperationsCard", () => {
     document.head.append(stylesheet);
 
     try {
-      render(
+      const { container } = render(
         <HostClubOperationsCard
           snapshot={snapshot({
             aiUsage: {
@@ -156,6 +156,10 @@ describe("HostClubOperationsCard", () => {
       expect(delta).toHaveClass("ledger-number");
       expect(style.fontFamily).toBe("var(--f-mono)");
       expect(style.fontVariantNumeric).toBe("tabular-nums");
+      expect(screen.getByText("AI 실패 변화")).not.toHaveClass("ledger-number");
+      for (const value of container.querySelectorAll(".ledger-number")) {
+        expect(value.textContent).toMatch(/(?:No\.\d+|\d)/);
+      }
     } finally {
       stylesheet.remove();
     }

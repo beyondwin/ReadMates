@@ -65,12 +65,12 @@ function MemberCount({
   return (
     <div className="surface-quiet" style={{ padding: "12px 14px" }}>
       <div className="row-between" style={{ gap: 8 }}>
-        <span className="body" style={{ fontSize: "13px", fontWeight: 600 }}>
+        <span className="tiny" style={{ color: "var(--text)", fontWeight: 600 }}>
           {label}
         </span>
-        <span className={className}>{value}</span>
+        <span className={`${className} ledger-number`}>{value}</span>
       </div>
-      <div className="tiny" style={{ marginTop: 4 }}>
+      <div className="small" style={{ marginTop: 4 }}>
         {helper}
       </div>
     </div>

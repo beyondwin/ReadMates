@@ -78,6 +78,9 @@ describe("HostDashboard", () => {
       expect(screen.getByRole("heading", { name: "모임 운영", level: 1 })).not.toHaveClass(
         "ledger-number",
       );
+      for (const value of container.querySelectorAll(".ledger-number")) {
+        expect(value.textContent).toMatch(/(?:No\.\d+|\d)/);
+      }
     } finally {
       stylesheet.remove();
     }

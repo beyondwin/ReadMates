@@ -75,10 +75,10 @@ export function HostPriorityLedger({
         <dl className="rm-host-ledger__metrics">
           {metrics.map((metric) => (
             <div key={metric.id} className={`rm-host-ledger__metric rm-host-ledger__metric--${metric.tone}`}>
-              <dt>{metric.label}</dt>
+              <dt className="tiny rm-host-ledger__label">{metric.label}</dt>
               <dd>
                 <strong className="ledger-number">{metric.value}</strong>
-                <span>{metric.stateLabel}</span>
+                <span className="tiny">{metric.stateLabel}</span>
               </dd>
             </div>
           ))}

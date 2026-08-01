@@ -159,6 +159,10 @@ describe("HostSessionLedger", () => {
       "rm-host-attention__row",
     );
     expect(within(rows[0]).getByText("No.1")).toHaveClass("ledger-number");
+    expect(within(rows[0]).getByText("확인 필요")).not.toHaveClass("ledger-number");
+    for (const value of container.querySelectorAll(".ledger-number")) {
+      expect(value.textContent).toMatch(/(?:No\.\d+|\d)/);
+    }
     expect(rows[0]).toHaveTextContent("책 1");
     expect(rows[0]).toHaveTextContent("확인 필요");
     expect(rows[0]).toHaveTextContent("기록 열기");

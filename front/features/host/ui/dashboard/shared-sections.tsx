@@ -94,7 +94,7 @@ export function MissingCurrentSessionMembersAlert({
               {memberNames}
             </p>
           ) : null}
-          <p className="tiny" style={{ margin: "8px 0 0", color: "var(--text-3)" }}>
+          <p className="small" style={{ margin: "8px 0 0", color: "var(--text-3)" }}>
             승인된 멤버 목록과 현재 세션 참석 명단을 비교한 결과입니다. 처리하면 이 알림에서 사라집니다.
           </p>
         </div>
@@ -192,7 +192,7 @@ export function NextActionCard({
       <p className="small" style={{ margin: "8px 0 0", color: "var(--text-2)" }}>
         {action.helper}
       </p>
-      <p className="tiny" style={{ margin: "8px 0 0", color: "var(--text-3)" }}>
+      <p className="small" style={{ margin: "8px 0 0", color: "var(--text-3)" }}>
         {action.loopBridge}
       </p>
       <HostPrepPaceNote pace={pace} />
@@ -215,7 +215,7 @@ export function NextActionCard({
         </div>
       ) : null}
       {!action.href && action.unavailableReason ? (
-        <p className="tiny" style={{ margin: "8px 0 0", color: "var(--text-3)" }}>
+        <p className="small" style={{ margin: "8px 0 0", color: "var(--text-3)" }}>
           {action.unavailableReason}
         </p>
       ) : null}
@@ -251,10 +251,10 @@ export function PublicationFeedbackSection({ data, mobile = false }: { data: Hos
           }}
         >
           <div style={{ minWidth: 0 }}>
-            <div className="body" style={{ fontSize: "13.5px", fontWeight: 600 }}>
+            <div className="small" style={{ color: "var(--text)", fontWeight: 600 }}>
               {row.label}
             </div>
-            <div className="tiny" style={{ marginTop: 2 }}>
+            <div className="small" style={{ marginTop: 2 }}>
               {row.helper}
             </div>
           </div>

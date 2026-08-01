@@ -38,7 +38,7 @@ export function QuickAction({
     return (
       <LinkComponent to={href} state={readmatesReturnState(hostDashboardReturnTarget)} style={style}>
         <Icon name={icon} size={14} style={{ color: "var(--text-3)" }} />
-        <span className="body" style={{ fontSize: "13.5px", flex: 1 }}>
+        <span className="small rm-host-quick-action__copy" style={{ flex: 1, color: "var(--text)" }}>
           {label}
         </span>
         <Icon name="arrow-right" size={13} style={{ color: "var(--text-4)" }} />
@@ -59,10 +59,10 @@ export function QuickAction({
     >
       <Icon name={icon} size={14} style={{ color: "var(--text-4)" }} />
       <span style={{ flex: 1, minWidth: 0 }}>
-        <span className="body" style={{ display: "block", fontSize: "13.5px" }}>
+        <span className="small rm-host-quick-action__copy" style={{ display: "block", color: "var(--text)" }}>
           {label}
         </span>
-        <span className="tiny" style={{ display: "block", marginTop: 2, color: "var(--text-3)" }}>
+        <span className="small" style={{ display: "block", marginTop: 2, color: "var(--text-3)" }}>
           {unavailableReason}
         </span>
       </span>

@@ -136,7 +136,7 @@ export function MobileHostDashboard({
         </div>
         <div className="rm-host-mobile-priority__state">
           <span className="badge badge-accent badge-dot">{_nextAction.loopLabel}</span>
-          <span className="tiny">{_nextAction.loopBridge}</span>
+          <span className="small">{_nextAction.loopBridge}</span>
         </div>
         <HostPrepPaceNote pace={prepPace} />
         <ol className="rm-host-mobile-priority__list">
@@ -190,7 +190,7 @@ export function MobileHostDashboard({
                 phaseLabel="이번 세션"
               />
               <h3 className="h4 editorial">{session.bookTitle}</h3>
-              <p className="tiny">
+              <p className="small">
                 {formatDateOnlyLabel(session.date)} · {session.startTime} · {session.locationLabel}
               </p>
               <dl className="rm-host-dashboard-mobile__session-metrics">
@@ -201,7 +201,7 @@ export function MobileHostDashboard({
                   </div>
                 ))}
               </dl>
-              <p className="tiny">
+              <p className="small">
                 참석 <span className="ledger-number">{goingCount}</span>명 · 미응답{" "}
                 <span className="ledger-number">{noResponseCount}</span>명
               </p>
@@ -209,7 +209,7 @@ export function MobileHostDashboard({
           ) : (
             <>
               <h3 className="h4 editorial">열린 세션 없음</h3>
-              <p className="tiny">새 세션을 등록하면 RSVP와 질문 작성이 열립니다.</p>
+              <p className="small">새 세션을 등록하면 RSVP와 질문 작성이 열립니다.</p>
             </>
           )}
           <LinkComponent
@@ -233,10 +233,10 @@ export function MobileHostDashboard({
         <dl className="rm-host-mobile-ledger">
           {ledgerMetrics.map((metric) => (
             <div key={metric.id}>
-              <dt>{metric.label}</dt>
+              <dt className="tiny">{metric.label}</dt>
               <dd>
-                <strong>{metric.value}</strong>
-                <span>{metric.stateLabel}</span>
+                <strong className="ledger-number">{metric.value}</strong>
+                <span className="tiny">{metric.stateLabel}</span>
               </dd>
             </div>
           ))}
@@ -260,7 +260,7 @@ export function MobileHostDashboard({
       <section className="m-sec rm-host-mobile-flow" aria-labelledby="host-mobile-flow-title">
         <div className="m-eyebrow-row">
           <h2 id="host-mobile-flow-title">다음 세션과 운영 흐름</h2>
-          <LinkComponent to={newSessionHref} className="tiny">
+          <LinkComponent to={newSessionHref} className="small">
             문서 만들기
           </LinkComponent>
         </div>

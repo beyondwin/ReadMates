@@ -63,11 +63,11 @@ export function SessionClosingBoard({ view, LinkComponent = PlainSessionClosingL
                 </div>
                 <p className="small muted">{item.detail}</p>
                 {item.href ? (
-                  <LinkComponent className="tiny mono" to={item.href}>
+                  <LinkComponent className="small rm-host-closing-board__item-action" to={item.href}>
                     {item.actionLabel}
                   </LinkComponent>
                 ) : (
-                  <span className="tiny muted">{item.actionLabel}</span>
+                  <span className="small muted rm-host-closing-board__item-action">{item.actionLabel}</span>
                 )}
               </article>
             ))}

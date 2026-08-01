@@ -73,7 +73,7 @@ export function HostSessionAttendanceEditor({
             <span className="body" style={{ fontSize: "14px" }}>
               {attendee.displayName}
             </span>
-            <span className="tiny mono" style={{ color: rsvp === "미응답" ? "var(--warn)" : "var(--text-3)" }}>
+            <span className="small" style={{ color: rsvp === "미응답" ? "var(--warn)" : "var(--text-3)" }}>
               RSVP {rsvp}
             </span>
             <div
@@ -103,7 +103,7 @@ export function HostSessionAttendanceEditor({
                     style={{
                       height: "24px",
                       padding: "0 10px",
-                      fontSize: "12px",
+                      fontSize: "var(--type-size-control)",
                       borderRadius: "999px",
                       background: selected ? "var(--bg)" : "transparent",
                       color: selected ? "var(--text)" : "var(--text-3)",

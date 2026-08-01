@@ -191,10 +191,10 @@ function DesktopLedger({
         <tbody>
           {items.map((item) => (
             <tr key={item.sessionId}>
-              <td className="mono small" style={{ padding: 16, verticalAlign: "top" }}>No.{item.sessionNumber}</td>
+              <td className="ledger-number small" style={{ padding: 16, verticalAlign: "top" }}>No.{item.sessionNumber}</td>
               <td style={{ padding: 16, minWidth: 220, verticalAlign: "top", overflowWrap: "anywhere" }}>
                 <strong className="body">{item.bookTitle}</strong>
-                <div className="tiny" style={{ marginTop: 3 }}>{item.bookAuthor} · {item.title}</div>
+                <div className="small" style={{ marginTop: 3 }}>{item.bookAuthor} · {item.title}</div>
               </td>
               <td className="small" style={{ padding: 16, verticalAlign: "top" }}>
                 {formatDateOnlyLabel(item.date)}
@@ -243,7 +243,7 @@ function MobileLedger({
             <div style={{ minWidth: 0 }}>
               <div className="eyebrow">No.{item.sessionNumber} · {stateLabel(item.state)}</div>
               <h2 className="h4 editorial" style={{ margin: "5px 0 2px", overflowWrap: "anywhere" }}>{item.bookTitle}</h2>
-              <div className="tiny">{item.bookAuthor}</div>
+              <div className="small">{item.bookAuthor}</div>
             </div>
             <span className="badge">{visibilityLabel(item.visibility)}</span>
           </div>

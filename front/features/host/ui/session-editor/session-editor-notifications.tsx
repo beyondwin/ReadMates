@@ -86,7 +86,7 @@ export function HostSessionNotificationActions({
               }}
             >
               <span style={{ minWidth: 0 }}>
-                <span className="body" style={{ display: "block", fontSize: "13.5px", fontWeight: 600 }}>
+                <span className="small" style={{ display: "block", color: "var(--text)", fontWeight: 600 }}>
                   {action.label}
                 </span>
                 {latestDispatch ? (

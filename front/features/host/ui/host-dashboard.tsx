@@ -344,7 +344,7 @@ export default function HostDashboard({
                       <dl className="rm-host-current__metrics">
                         {getHostDashboardSessionMetrics(session).map(([label, value]) => (
                           <div key={label}>
-                            <dt>{label}</dt>
+                            <dt className="tiny">{label}</dt>
                             <dd className="ledger-number">{value}</dd>
                           </div>
                         ))}
@@ -359,9 +359,12 @@ export default function HostDashboard({
                 )}
                 <div className="rm-host-current__footer">
                   <span>
-                    {session
-                      ? `참석 ${goingCount}명 · 미응답 ${noResponseCount}명`
-                      : "새 세션을 만들면 RSVP와 질문 작성이 열립니다."}
+                    {session ? (
+                      <>
+                        참석 <span className="ledger-number">{goingCount}</span>명 · 미응답{" "}
+                        <span className="ledger-number">{noResponseCount}</span>명
+                      </>
+                    ) : "새 세션을 만들면 RSVP와 질문 작성이 열립니다."}
                   </span>
                   <LinkComponent
                     to={sessionEditHref}

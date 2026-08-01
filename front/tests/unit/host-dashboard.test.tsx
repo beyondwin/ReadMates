@@ -1210,6 +1210,7 @@ describe("HostDashboard", () => {
     const mobile = getMobileView(container);
 
     expect(desktop.getByText("모임 운영")).toBeInTheDocument();
+    expect(desktop.getByText("모임 운영")).not.toHaveClass("ledger-number");
     expect(desktop.getByRole("heading", { name: "오늘의 운영" })).toBeInTheDocument();
     expect(desktop.getByRole("heading", { name: "처리 대기 원장" })).toBeInTheDocument();
     expect(desktop.getByRole("heading", { name: "다음 세션과 운영 흐름" })).toBeInTheDocument();
@@ -1221,11 +1222,15 @@ describe("HostDashboard", () => {
     expect(mobile.getByRole("heading", { name: "다음 세션과 운영 흐름" })).toBeInTheDocument();
     expect(mobile.getByText("운영 도구")).toBeInTheDocument();
     expect(desktop.getByText("RSVP 미응답")).toBeInTheDocument();
+    expect(desktop.getByText("RSVP 미응답")).not.toHaveClass("ledger-number");
     expect(desktop.getByText("진행률 미작성")).toBeInTheDocument();
     expect(desktop.getByText("공개·피드백 대기")).toBeInTheDocument();
     expect(desktop.getAllByText("수정 필요 회차").length).toBeGreaterThan(0);
     expect(desktop.getAllByText("3").length).toBeGreaterThan(0);
     expect(desktop.getByText("4")).toBeInTheDocument();
+    for (const value of container.querySelectorAll(".ledger-number")) {
+      expect(value.textContent).toMatch(/(?:No\.\d+|\d)/);
+    }
     expect(desktop.queryByRole("link", { name: "+ 새 세션" })).not.toBeInTheDocument();
     expect(desktop.queryByRole("link", { name: "멤버 초대" })).not.toBeInTheDocument();
     expect(desktop.queryByRole("link", { name: "멤버 화면으로" })).not.toBeInTheDocument();
@@ -1481,7 +1486,13 @@ describe("HostDashboard", () => {
       "src",
       "https://example.com/covers/test-book.jpg",
     );
-    expect(desktop.getByText("참석 1명 · 미응답 1명")).toBeInTheDocument();
+    const desktopSessionFooter = container.querySelector(
+      ".rm-host-dashboard-desktop .rm-host-current__footer",
+    );
+    expect(desktopSessionFooter).toHaveTextContent("참석 1명 · 미응답 1명");
+    expect(
+      Array.from(desktopSessionFooter!.querySelectorAll(".ledger-number")).map((number) => number.textContent),
+    ).toEqual(["1", "1"]);
     expect(desktop.queryByText("김호스트")).not.toBeInTheDocument();
     expect(desktop.queryByText("안멤버1")).not.toBeInTheDocument();
     expect(desktop.queryByText("읽는 중")).not.toBeInTheDocument();

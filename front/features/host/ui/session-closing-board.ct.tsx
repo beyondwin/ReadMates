@@ -165,6 +165,14 @@ test("SessionClosingBoard renders blocked host closing state", async ({ mount })
     </div>,
   );
 
+  for (const copy of await component.locator(".rm-host-closing-board__checklist-item .small").all()) {
+    const fontSize = await copy.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
+    expect(fontSize).toBeGreaterThanOrEqual(14);
+  }
+  for (const action of await component.locator(".rm-host-closing-board__checklist-item a").all()) {
+    const fontSize = await action.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
+    expect(fontSize).toBeGreaterThanOrEqual(14);
+  }
   await expect(component).toHaveScreenshot("host-closing-board-blocked.png");
 });
 
@@ -175,5 +183,13 @@ test("SessionClosingBoard renders published host closing state", async ({ mount 
     </div>,
   );
 
+  for (const copy of await component.locator(".rm-host-closing-board__checklist-item .small").all()) {
+    const fontSize = await copy.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
+    expect(fontSize).toBeGreaterThanOrEqual(14);
+  }
+  for (const action of await component.locator(".rm-host-closing-board__checklist-item a").all()) {
+    const fontSize = await action.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
+    expect(fontSize).toBeGreaterThanOrEqual(14);
+  }
   await expect(component).toHaveScreenshot("host-closing-board-published.png");
 });

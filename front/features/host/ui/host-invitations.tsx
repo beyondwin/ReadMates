@@ -367,7 +367,7 @@ export default function HostInvitations({
               </button>
             </div>
             {createDisabledReason ? (
-              <p id="invite-create-disabled-reason" className="tiny" style={{ margin: "-8px 0 12px", color: "var(--text-3)" }}>
+              <p id="invite-create-disabled-reason" className="small" style={{ margin: "-8px 0 12px", color: "var(--text-3)" }}>
                 {createDisabledReason}
               </p>
             ) : null}
@@ -447,11 +447,11 @@ export default function HostInvitations({
                     </a>
                   ) : null}
                 </div>
-                <p className="tiny" style={{ margin: "8px 0 0", color: "var(--text-3)" }}>
+                <p className="small" style={{ margin: "8px 0 0", color: "var(--text-3)" }}>
                   이 URL은 생성 직후에만 표시됩니다. 나중에 다시 공유해야 하면 새 링크를 발급하세요.
                 </p>
                 {copyDisabledReason ? (
-                  <p id="invite-copy-disabled-reason" className="tiny" style={{ margin: "4px 0 0", color: "var(--text-3)" }}>
+                  <p id="invite-copy-disabled-reason" className="small" style={{ margin: "4px 0 0", color: "var(--text-3)" }}>
                     {copyDisabledReason}
                   </p>
                 ) : null}
@@ -505,11 +505,11 @@ export default function HostInvitations({
                       <div className="small" style={{ marginTop: 2 }}>
                         {invitation.email} · 만료 {formatDateOnlyLabel(invitation.expiresAt)}
                       </div>
-                      <div className="tiny" style={{ marginTop: 4, color: "var(--text-3)" }}>
+                      <div className="small" style={{ marginTop: 4, color: "var(--text-3)" }}>
                         {statusDetailLabels[invitation.effectiveStatus]}
                       </div>
                       {invitation.effectiveStatus === "PENDING" ? (
-                        <div className="tiny" style={{ marginTop: 4, color: "var(--text-3)" }}>
+                        <div className="small" style={{ marginTop: 4, color: "var(--text-3)" }}>
                           보안을 위해 기존 초대 링크는 다시 표시하지 않습니다. 새 공유가 필요하면 새 링크 발급을 사용하세요.
                         </div>
                       ) : null}
@@ -586,12 +586,12 @@ function InviteCount({
   return (
     <div className="surface-quiet" style={{ padding: "12px 14px" }}>
       <div className="row-between" style={{ gap: 8 }}>
-        <span className="body" style={{ fontSize: 13, fontWeight: 600 }}>
+        <span className="tiny" style={{ color: "var(--text)", fontWeight: 600 }}>
           {label}
         </span>
-        <span className={className}>{value}</span>
+        <span className={`${className} ledger-number`}>{value}</span>
       </div>
-      <div className="tiny" style={{ marginTop: 4 }}>
+      <div className="small" style={{ marginTop: 4 }}>
         {helper}
       </div>
     </div>

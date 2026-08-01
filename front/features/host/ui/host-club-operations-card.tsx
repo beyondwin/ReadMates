@@ -103,9 +103,9 @@ export function HostClubOperationsCard({
       <dl className="host-club-ops__grid">
         {metrics.map((metric) => (
           <div key={metric.label} className="host-club-ops__metric">
-            <dt>{metric.label}</dt>
+            <dt className="tiny">{metric.label}</dt>
             <dd className="ledger-number">{metric.value}</dd>
-            <span>{metric.helper}</span>
+            <span className="small">{metric.helper}</span>
           </div>
         ))}
       </dl>
