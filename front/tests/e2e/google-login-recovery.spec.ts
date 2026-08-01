@@ -26,8 +26,54 @@ test("KakaoTalk browser receives copy-first recovery without horizontal overflow
     `${appOrigin}/login?error=google&returnTo=${encodeURIComponent(memberReturnTo)}`,
   );
 
-  await expect(page.getByRole("heading", { name: "외부 브라우저에서 로그인해 주세요" })).toBeVisible();
+  const advisory = page.getByRole("complementary", { name: "외부 브라우저에서 로그인해 주세요" });
+  const advisoryHeading = page.getByRole("heading", { name: "외부 브라우저에서 로그인해 주세요" });
   const copyButton = page.getByRole("button", { name: "로그인 주소 복사" });
+  const googleAction = page.getByRole("link", { name: "Google 로그인 시도" });
+
+  await expect(advisory).toBeInViewport();
+  await expect(advisoryHeading).toBeInViewport();
+  await expect(copyButton).toBeInViewport({ ratio: 0.75 });
+  await expect(googleAction).toBeVisible();
+  await expect(googleAction).toHaveAttribute(
+    "href",
+    `/oauth2/authorization/google?returnTo=${encodeURIComponent(memberReturnTo)}&chooseAccount=true`,
+  );
+
+  const copyElement = await copyButton.elementHandle();
+  const googleElement = await googleAction.elementHandle();
+  if (!copyElement || !googleElement) {
+    throw new Error("Kakao login recovery actions must be attached to the document");
+  }
+  expect(
+    await advisoryHeading.evaluate(
+      (heading, copy) => Boolean(heading.compareDocumentPosition(copy) & Node.DOCUMENT_POSITION_FOLLOWING),
+      copyElement,
+    ),
+  ).toBe(true);
+  expect(
+    await copyButton.evaluate(
+      (copy, google) => Boolean(copy.compareDocumentPosition(google) & Node.DOCUMENT_POSITION_FOLLOWING),
+      googleElement,
+    ),
+  ).toBe(true);
+
+  const [headingBox, copyBox, googleBox, viewportHeight] = await Promise.all([
+    advisoryHeading.boundingBox(),
+    copyButton.boundingBox(),
+    googleAction.boundingBox(),
+    page.evaluate(() => window.innerHeight),
+  ]);
+  if (!headingBox || !copyBox || !googleBox) {
+    throw new Error("Kakao login recovery guidance must have a rendered layout box");
+  }
+  expect(headingBox.y).toBeGreaterThanOrEqual(0);
+  expect(headingBox.y + headingBox.height).toBeLessThanOrEqual(viewportHeight);
+  expect(copyBox.y).toBeGreaterThanOrEqual(0);
+  expect(copyBox.y + copyBox.height / 2).toBeLessThanOrEqual(viewportHeight);
+  expect(headingBox.y + headingBox.height).toBeLessThanOrEqual(copyBox.y);
+  expect(copyBox.y + copyBox.height).toBeLessThanOrEqual(googleBox.y);
+
   await copyButton.focus();
   await expect(copyButton).toBeFocused();
   await copyButton.click();
