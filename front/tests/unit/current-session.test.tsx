@@ -783,6 +783,7 @@ describe("CurrentSession", () => {
     expect(await mobileScope.findByText("질문 저장됨")).toHaveClass("small");
 
     await user.click(mobileScope.getByRole("button", { name: "내 기록" }));
+    expect(mobileScope.getByText("모임 전후로 떠오른 생각을 자유롭게 남겨 주세요.")).toHaveClass("small");
     await user.click(mobileScope.getByRole("button", { name: "서평 저장" }));
     expect(await mobileScope.findByText("서평 저장됨")).toHaveClass("small");
 

@@ -35,7 +35,7 @@ export function MobileRecordsSegment({
           <label className="label rm-sr-only" htmlFor="mobile-long-review">
             서평 내용
           </label>
-          <p className="tiny" style={{ color: "var(--text-3)", margin: "0 0 8px" }}>
+          <p className="small" style={{ color: "var(--text-3)", margin: "0 0 8px" }}>
             모임 전후로 떠오른 생각을 자유롭게 남겨 주세요.
           </p>
           <textarea
