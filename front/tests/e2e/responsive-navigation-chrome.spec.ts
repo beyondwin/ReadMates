@@ -21,15 +21,16 @@ async function expectDomOrder(...locators: Locator[]) {
   expect(indexes).toEqual([...indexes].sort((left, right) => left - right));
 }
 
-async function pressTabUntilFocused(page: Page, target: Locator, label: string) {
-  for (let attempt = 0; attempt < 24; attempt += 1) {
-    await page.keyboard.press("Tab");
-    if (await target.evaluate((element) => document.activeElement === element)) {
-      return;
-    }
-  }
-
-  throw new Error(`Tab did not reach ${label}`);
+async function expectReducedAccountDialog(dialog: Locator, settingsHref: string) {
+  await expect(dialog.locator(".rm-account-menu__member-name")).toBeVisible();
+  await expect(dialog.locator(".rm-account-menu__member-name")).not.toHaveText("");
+  await expect(dialog.locator(".rm-account-menu__membership")).toBeVisible();
+  await expect(dialog.locator(".rm-account-menu__membership")).not.toHaveText("");
+  await expect(dialog.getByRole("link")).toHaveCount(1);
+  await expect(dialog.getByRole("link", { name: "계정 설정" })).toHaveAttribute("href", settingsHref);
+  await expect(dialog.getByRole("button", { name: "로그아웃" })).toBeVisible();
+  await expect(dialog.getByRole("link", { name: "내 공간" })).toHaveCount(0);
+  await expect(dialog.getByRole("link", { name: "알림" })).toHaveCount(0);
 }
 
 async function expectPublicRecordMetadataLayout(page: Page, width: number, stacked: boolean) {
@@ -122,15 +123,9 @@ test("desktop public and host pages show the expected top navigation", async ({ 
   await expect(accountMenu).toHaveCount(1);
   await expectPracticalTapTarget(accountMenu);
   await accountMenu.click();
-  await expect(page.getByRole("dialog")).toBeVisible();
-  await expect(page.getByRole("link", { name: "계정 설정" })).toHaveAttribute(
-    "href",
-    `${baselineClubAppPath}/me/settings`,
-  );
-  await expect(page.getByRole("link", { name: "알림" })).toHaveAttribute(
-    "href",
-    `${baselineClubAppPath}/notifications`,
-  );
+  const accountDialog = page.getByRole("dialog");
+  await expect(accountDialog).toBeVisible();
+  await expectReducedAccountDialog(accountDialog, `${baselineClubAppPath}/me/settings`);
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.locator(".mobile-only .rm-account-menu__trigger")).toBeHidden();
@@ -193,24 +188,27 @@ test("mobile public pages hide app tabs and host app pages show mobile chrome", 
   await expect(accountMenu).toHaveCount(1);
   await expectPracticalTapTarget(accountMenu);
   await accountMenu.click();
-  await expect(page.getByRole("dialog")).toBeVisible();
-  await expect(page.getByRole("link", { name: "계정 설정" })).toHaveAttribute(
-    "href",
-    `${baselineClubAppPath}/me/settings`,
-  );
-  await expect(page.getByRole("link", { name: "알림" })).toHaveAttribute(
-    "href",
-    `${baselineClubAppPath}/notifications`,
-  );
-  await page.getByRole("link", { name: "알림" }).click();
+  const accountDialog = page.getByRole("dialog");
+  await expect(accountDialog).toBeVisible();
+  await expectReducedAccountDialog(accountDialog, `${baselineClubAppPath}/me/settings`);
+  await page.keyboard.press("Escape");
+  await expect(accountDialog).toHaveCount(0);
+
+  const memberTabs = page.getByRole("navigation", { name: "앱 탭" });
+  await memberTabs.getByRole("link", { name: "내 공간" }).click();
+  await expect(page).toHaveURL(new RegExp(`${baselineClubAppPath}/me$`));
+  await page
+    .getByRole("region", { name: "내 공간 관리" })
+    .getByRole("link", { name: /알림.*받은 알림과 수신 설정/ })
+    .click();
   await expect(page).toHaveURL(new RegExp(`${baselineClubAppPath}/notifications$`));
   await expect(page.getByRole("heading", { name: "알림" })).toBeVisible();
   await expect(page.getByText("아직 받은 알림이 없습니다.")).toBeVisible();
+  await expect(memberTabs.getByRole("link", { name: "내 공간" })).toHaveAttribute("aria-current", "page");
   await page.goto(baselineClubAppPath);
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.locator(".desktop-only .rm-account-menu__trigger")).toBeHidden();
   await expect(mobileHeader.locator(".m-hdr-side")).toHaveCount(2);
-  const memberTabs = page.getByRole("navigation", { name: "앱 탭" });
   await expect(memberTabs.getByRole("link")).toHaveText(memberMobileTabs);
   await expectPracticalTapTarget(memberTabs.getByRole("link", { name: "오늘" }));
   await mobileHeader.getByRole("link", { name: "호스트 화면" }).click();
@@ -434,17 +432,18 @@ test("account menu advances keyboard focus naturally and returns it after Escape
   await expect(accountTrigger).toHaveAttribute("aria-haspopup", "dialog");
   const dialog = page.getByRole("dialog");
   await expect(dialog).toHaveAttribute("aria-modal", "false");
-  const mySpace = dialog.getByRole("link", { name: "내 공간" });
+  await expectReducedAccountDialog(dialog, "/app/me/settings");
   const settings = dialog.getByRole("link", { name: "계정 설정" });
   const logout = dialog.getByRole("button", { name: "로그아웃" });
 
-  await expectDomOrder(accountTrigger, mySpace, settings, logout);
-  for (const locator of [accountTrigger, mySpace, settings, logout]) {
+  await expectDomOrder(accountTrigger, settings, logout);
+  for (const locator of [accountTrigger, settings, logout]) {
     await expectPracticalTapTarget(locator);
   }
 
-  await pressTabUntilFocused(page, mySpace, "my space");
-  const focusStyle = await mySpace.evaluate((element) => {
+  await page.keyboard.press("Tab");
+  await expect(settings).toBeFocused();
+  const focusStyle = await settings.evaluate((element) => {
     const style = getComputedStyle(element);
     return {
       backgroundColor: style.backgroundColor,
@@ -456,8 +455,8 @@ test("account menu advances keyboard focus naturally and returns it after Escape
   expect(focusStyle.outlineStyle).toBe("solid");
   expect(Number.parseFloat(focusStyle.outlineWidth)).toBeGreaterThanOrEqual(2);
   expect(focusStyle.outlineColor).not.toBe(focusStyle.backgroundColor);
-  await pressTabUntilFocused(page, settings, "account settings");
-  await pressTabUntilFocused(page, logout, "logout");
+  await page.keyboard.press("Tab");
+  await expect(logout).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
   await expect(accountTrigger).toBeFocused();
