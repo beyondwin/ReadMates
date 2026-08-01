@@ -1,6 +1,8 @@
 package com.readmates.sessionimport.adapter.out.persistence
 
 import com.readmates.session.application.SessionRecordVisibility
+import com.readmates.session.domain.SessionExposure
+import com.readmates.session.domain.toCompatibility
 import com.readmates.sessionimport.application.model.SessionImportAttendee
 import com.readmates.sessionimport.application.model.SessionImportRecordPreview
 import com.readmates.sessionimport.application.model.SessionImportTarget
@@ -78,18 +80,26 @@ class JdbcSessionImportWriteAdapter(
     }
 
     override fun replaceRecords(command: SessionImportRecordReplacement): SessionImportStoredFeedbackDocument {
-        lockSession(command)
-        updateSessionVisibility(command)
-        upsertPublication(command)
+        val state = lockSession(command)
+        val exposure =
+            SessionExposure.fromCompatibility(
+                state,
+                command.visibility.name,
+                command.visibility.name,
+                command.visibility == SessionRecordVisibility.PUBLIC,
+            )
+        val compatibility = exposure.toCompatibility(state)
+        updateSessionVisibility(command, exposure, compatibility)
+        upsertPublication(command, exposure, compatibility)
         replaceHighlights(command)
-        replaceOneLineReviews(command)
+        replaceOneLineReviews(command, compatibility.isPublic)
         return storeFeedbackDocument(command)
     }
 
-    private fun lockSession(command: SessionImportRecordReplacement) {
+    private fun lockSession(command: SessionImportRecordReplacement): String =
         jdbcTemplate.queryForObject(
             """
-            select id
+            select state
             from sessions
             where id = ?
               and club_id = ?
@@ -98,36 +108,45 @@ class JdbcSessionImportWriteAdapter(
             String::class.java,
             command.sessionId.dbString(),
             command.host.clubId.dbString(),
-        )
-    }
+        ) ?: error("Session did not exist")
 
-    private fun updateSessionVisibility(command: SessionImportRecordReplacement) {
+    private fun updateSessionVisibility(
+        command: SessionImportRecordReplacement,
+        exposure: SessionExposure,
+        compatibility: com.readmates.session.domain.CompatibilityExposure,
+    ) {
         jdbcTemplate.update(
             """
             update sessions
-            set visibility = ?,
+            set access_scope = ?,
+                visibility = ?,
                 updated_at = utc_timestamp(6)
             where id = ?
               and club_id = ?
             """.trimIndent(),
-            command.visibility.name,
+            exposure.accessScope.name,
+            compatibility.sessionVisibility,
             command.sessionId.dbString(),
             command.host.clubId.dbString(),
         )
     }
 
-    private fun upsertPublication(command: SessionImportRecordReplacement) {
-        val publicationIsPublic = command.visibility == SessionRecordVisibility.PUBLIC
+    private fun upsertPublication(
+        command: SessionImportRecordReplacement,
+        exposure: SessionExposure,
+        compatibility: com.readmates.session.domain.CompatibilityExposure,
+    ) {
         jdbcTemplate.update(
             """
             insert into public_session_publications (
-              id, club_id, session_id, public_summary, is_public, visibility, published_at
+              id, club_id, session_id, public_summary, is_public, visibility, site_visibility, published_at
             )
-            values (?, ?, ?, ?, ?, ?, case when ? then utc_timestamp(6) else null end)
+            values (?, ?, ?, ?, ?, ?, ?, case when ? then utc_timestamp(6) else null end)
             on duplicate key update
               public_summary = values(public_summary),
               is_public = values(is_public),
               visibility = values(visibility),
+              site_visibility = values(site_visibility),
               published_at = values(published_at),
               updated_at = utc_timestamp(6)
             """.trimIndent(),
@@ -135,9 +154,10 @@ class JdbcSessionImportWriteAdapter(
             command.host.clubId.dbString(),
             command.sessionId.dbString(),
             command.publicationSummary,
-            publicationIsPublic,
-            command.visibility.name,
-            publicationIsPublic,
+            compatibility.isPublic,
+            compatibility.publicationVisibility,
+            exposure.siteVisibility.name,
+            compatibility.isPublic,
         )
     }
 
@@ -163,13 +183,16 @@ class JdbcSessionImportWriteAdapter(
         }
     }
 
-    private fun replaceOneLineReviews(command: SessionImportRecordReplacement) {
+    private fun replaceOneLineReviews(
+        command: SessionImportRecordReplacement,
+        isPublic: Boolean,
+    ) {
         jdbcTemplate.update(
             "delete from one_line_reviews where club_id = ? and session_id = ?",
             command.host.clubId.dbString(),
             command.sessionId.dbString(),
         )
-        val oneLineVisibility = if (command.visibility == SessionRecordVisibility.PUBLIC) "PUBLIC" else "SESSION"
+        val oneLineVisibility = if (isPublic) "PUBLIC" else "SESSION"
         command.oneLineReviews.forEach { review ->
             jdbcTemplate.update(
                 """

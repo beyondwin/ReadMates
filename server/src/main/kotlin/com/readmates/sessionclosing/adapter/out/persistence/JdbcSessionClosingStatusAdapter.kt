@@ -1,6 +1,10 @@
 package com.readmates.sessionclosing.adapter.out.persistence
 
 import com.readmates.session.application.SessionRecordVisibility
+import com.readmates.session.domain.PublicSiteVisibility
+import com.readmates.session.domain.SessionAccessScope
+import com.readmates.session.domain.SessionExposure
+import com.readmates.session.domain.toCompatibility
 import com.readmates.sessionclosing.application.model.FeedbackDocumentClosingState
 import com.readmates.sessionclosing.application.model.NotificationClosingEvent
 import com.readmates.sessionclosing.application.model.NotificationClosingStatus
@@ -25,8 +29,10 @@ internal object SessionClosingStatusSql {
           sessions.session_date,
           sessions.state,
           sessions.visibility,
+          sessions.access_scope,
           public_session_publications.public_summary,
           public_session_publications.is_public,
+          public_session_publications.site_visibility,
           public_session_publications.published_at,
           exists (
             select 1
@@ -108,19 +114,22 @@ class JdbcSessionClosingStatusAdapter(
 
 private fun ResultSet.toClosingBase(clubSlug: String): SessionClosingSnapshot {
     val sessionId = UUID.fromString(getString("id"))
-    val visibility = SessionRecordVisibility.valueOf(getString("visibility"))
+    val state = getString("state")
+    val exposure =
+        SessionExposure(
+            SessionAccessScope.valueOf(getString("access_scope")),
+            getString("site_visibility")?.let(PublicSiteVisibility::valueOf) ?: PublicSiteVisibility.HIDDEN,
+        )
+    val visibility = SessionRecordVisibility.valueOf(exposure.toCompatibility(state).sessionVisibility)
     val publicSummary = getString("public_summary")
-    val isPublic =
-        getBoolean("is_public") &&
-            getTimestamp("published_at") != null &&
-            visibility == SessionRecordVisibility.PUBLIC
+    val publicReady = state == "PUBLISHED" && exposure.siteVisibility == PublicSiteVisibility.PUBLIC_RECORD
 
     return SessionClosingSnapshot(
         sessionId = sessionId,
         sessionNumber = getInt("number"),
         bookTitle = getString("book_title"),
         meetingDate = getObject("session_date", LocalDate::class.java),
-        state = getString("state"),
+        state = state,
         recordVisibility = visibility,
         summaryPublished = !publicSummary.isNullOrBlank(),
         highlightCount = getInt("highlight_count"),
@@ -132,8 +141,8 @@ private fun ResultSet.toClosingBase(clubSlug: String): SessionClosingSnapshot {
                 FeedbackDocumentClosingState.MISSING
             },
         latestNotificationEvent = null,
-        publicVisible = isPublic,
-        publicRecordHref = if (isPublic) "/clubs/$clubSlug/sessions/$sessionId" else null,
+        publicVisible = publicReady,
+        publicRecordHref = if (publicReady) "/clubs/$clubSlug/sessions/$sessionId" else null,
         memberReflectionHref = "/clubs/$clubSlug/app/sessions/$sessionId",
     )
 }

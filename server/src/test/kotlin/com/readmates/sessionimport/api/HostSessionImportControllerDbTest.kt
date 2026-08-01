@@ -71,19 +71,19 @@ values
 insert into sessions (
   id, club_id, number, title, book_title, book_author, book_translator, book_link, book_image_url,
   session_date, start_time, end_time, location_label, meeting_url, meeting_passcode,
-  question_deadline_at, state, visibility
+  question_deadline_at, state, visibility, access_scope
 )
 values (
   '$SESSION_ID', '$CLUB_ID', 7951, '7951회차 · Import Test Book', 'Import Test Book', 'Import Author',
   null, null, null, '2026-05-14', '20:00:00', '22:00:00', '온라인', null, null,
-  '2026-05-13 14:59:00.000000', 'CLOSED', 'MEMBER'
+  '2026-05-13 14:59:00.000000', 'CLOSED', 'MEMBER', 'GUEST_READABLE'
 );
 insert into session_participants (id, club_id, session_id, membership_id, rsvp_status, attendance_status, participation_status)
 values
   ('00000000-0000-0000-0000-000000079531', '$CLUB_ID', '$SESSION_ID', '$HOST_MEMBERSHIP_ID', 'GOING', 'ATTENDED', 'ACTIVE'),
   ('00000000-0000-0000-0000-000000079532', '$CLUB_ID', '$SESSION_ID', '$MEMBER_MEMBERSHIP_ID', 'GOING', 'ATTENDED', 'ACTIVE');
-insert into public_session_publications (id, club_id, session_id, public_summary, is_public, visibility, published_at)
-values ('00000000-0000-0000-0000-000000079541', '$CLUB_ID', '$SESSION_ID', 'Existing summary.', false, 'MEMBER', null);
+insert into public_session_publications (id, club_id, session_id, public_summary, is_public, visibility, site_visibility, published_at)
+values ('00000000-0000-0000-0000-000000079541', '$CLUB_ID', '$SESSION_ID', 'Existing summary.', false, 'MEMBER', 'HIDDEN', null);
 insert into highlights (id, club_id, session_id, membership_id, text, sort_order)
 values
   ('00000000-0000-0000-0000-000000079551', '$CLUB_ID', '$SESSION_ID', '$HOST_MEMBERSHIP_ID', 'Existing highlight 1.', 0),

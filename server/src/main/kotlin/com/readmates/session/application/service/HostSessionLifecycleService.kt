@@ -33,12 +33,21 @@ class HostSessionLifecycleService(
     @Transactional
     override fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionVisibilityUpdateResult {
         val current = draftPort.lockVisibilitySnapshot(HostSessionIdCommand(command.host, command.sessionId))
-        requireLegacyVisibilityWriteAllowed(current, command.visibility)
+        if (command.accessScope == null) {
+            requireLegacyVisibilityWriteAllowed(current, command.visibility)
+        }
         val firstPublication =
-            isFirstMemberPublication(current.detail.state, current.detail.visibility, command.visibility)
+            if (command.accessScope == null) {
+                isFirstMemberPublication(current.detail.state, current.detail.visibility, command.visibility)
+            } else {
+                false
+            }
         draftPort.updateVisibility(command)
         val applied = draftPort.lockVisibilitySnapshot(HostSessionIdCommand(command.host, command.sessionId))
-        if (applied.detail.visibility != command.visibility) {
+        if (command.accessScope == null && applied.detail.visibility != command.visibility) {
+            throw HostActionNotificationException(HostActionNotificationError.PREVIEW_MISMATCH)
+        }
+        if (command.accessScope != null && applied.detail.accessScope != command.accessScope) {
             throw HostActionNotificationException(HostActionNotificationError.PREVIEW_MISMATCH)
         }
         cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)

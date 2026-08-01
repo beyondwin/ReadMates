@@ -72,10 +72,10 @@ class JdbcSessionClosingStatusAdapterTest(
             """
             insert into sessions (
               id, club_id, number, title, book_title, book_author, session_date,
-              start_time, end_time, question_deadline_at, location_label, state, visibility
+              start_time, end_time, question_deadline_at, location_label, state, visibility, access_scope
             )
             values (?, '00000000-0000-0000-0000-000000000001', 77, '77 session', 'Test Book', 'Test Author',
-              '2026-06-18', '19:30:00', '21:30:00', '2026-06-18 12:00:00', 'Online', 'PUBLISHED', 'PUBLIC')
+              '2026-06-18', '19:30:00', '21:30:00', '2026-06-18 12:00:00', 'Online', 'PUBLISHED', 'PUBLIC', 'GUEST_READABLE')
             """.trimIndent(),
             sessionId.toString(),
         )
@@ -85,7 +85,7 @@ class JdbcSessionClosingStatusAdapterTest(
         jdbcTemplate.update(
             """
             insert into public_session_publications (
-              id, club_id, session_id, public_summary, visibility, is_public, published_at
+              id, club_id, session_id, public_summary, visibility, site_visibility, is_public, published_at
             )
             values (
               '33333333-3333-3333-3333-333333333333',
@@ -93,6 +93,7 @@ class JdbcSessionClosingStatusAdapterTest(
               ?,
               'Public summary.',
               'PUBLIC',
+              'PUBLIC_RECORD',
               true,
               current_timestamp(6)
             )

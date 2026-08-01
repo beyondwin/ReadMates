@@ -1,5 +1,7 @@
 package com.readmates.session.application
 
+import com.readmates.session.domain.PublicSiteVisibility
+import com.readmates.session.domain.SessionAccessScope
 import com.readmates.session.domain.SessionParticipationStatus
 import com.readmates.sessionrecord.application.model.HostNotificationComposerContext
 import com.readmates.sessionrecord.application.model.SessionRecordStatus
@@ -108,6 +110,8 @@ data class CreatedSessionResponse(
     val meetingPasscode: String?,
     val state: String,
     val visibility: SessionRecordVisibility,
+    val accessScope: SessionAccessScope = SessionAccessScope.HOST_ONLY,
+    val siteVisibility: PublicSiteVisibility = PublicSiteVisibility.HIDDEN,
 )
 
 data class HostSessionDetailResponse(
@@ -130,6 +134,8 @@ data class HostSessionDetailResponse(
     val attendees: List<HostSessionAttendee>,
     val feedbackDocument: HostSessionFeedbackDocument,
     val visibility: SessionRecordVisibility,
+    val accessScope: SessionAccessScope = SessionAccessScope.HOST_ONLY,
+    val siteVisibility: PublicSiteVisibility = PublicSiteVisibility.HIDDEN,
 )
 
 data class HostSessionAttendee(
@@ -167,6 +173,8 @@ data class HostSessionListItem(
     val locationLabel: String,
     val state: String,
     val visibility: SessionRecordVisibility,
+    val accessScope: SessionAccessScope = SessionAccessScope.HOST_ONLY,
+    val siteVisibility: PublicSiteVisibility = PublicSiteVisibility.HIDDEN,
     val recordStatus: SessionRecordStatus = SessionRecordStatus.NOT_STARTED,
     val needsAttention: Boolean = false,
     val hasDraft: Boolean = false,
@@ -237,6 +245,7 @@ data class UpcomingSessionItem(
 data class HostSessionPublication(
     val publicSummary: String,
     val visibility: SessionRecordVisibility,
+    val siteVisibility: PublicSiteVisibility = PublicSiteVisibility.HIDDEN,
 )
 
 data class HostSessionDeletionPreviewResponse(
@@ -277,4 +286,6 @@ data class HostPublicationResponse(
     val sessionId: String,
     val publicSummary: String,
     val visibility: SessionRecordVisibility,
+    val accessScope: SessionAccessScope = SessionAccessScope.HOST_ONLY,
+    val siteVisibility: PublicSiteVisibility = PublicSiteVisibility.HIDDEN,
 )

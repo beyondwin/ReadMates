@@ -116,7 +116,8 @@ insert into sessions (
   meeting_passcode,
   question_deadline_at,
   state,
-  visibility
+  visibility,
+  access_scope
 )
 with seed as (
   select 301 as id_suffix, 1 as number, '1회차 · 팩트풀니스' as title, '팩트풀니스' as book_title, '한스 로슬링' as book_author, '이창신' as book_translator, 'https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=373510599' as book_link, 'https://image.aladin.co.kr/product/34538/43/cover500/8934933879_1.jpg' as book_image_url, '2025-11-26' as session_date, '2025-11-25 14:59:00.000000' as question_deadline_at
@@ -174,7 +175,8 @@ select
   meeting_passcode,
   question_deadline_at,
   state,
-  visibility
+  visibility,
+  'GUEST_READABLE'
 from resolved
 on duplicate key update
   title = values(title),
@@ -191,7 +193,8 @@ on duplicate key update
   meeting_passcode = values(meeting_passcode),
   question_deadline_at = values(question_deadline_at),
   state = values(state),
-  visibility = values(visibility);
+  visibility = values(visibility),
+  access_scope = values(access_scope);
 
 insert into session_feedback_documents (id, club_id, session_id, version, source_text, file_name, content_type, file_size)
 with seed as (
@@ -1656,7 +1659,7 @@ on duplicate key update
   file_size = values(file_size),
   updated_at = utc_timestamp(6);
 
-insert into public_session_publications (id, club_id, session_id, public_summary, is_public, visibility, published_at)
+insert into public_session_publications (id, club_id, session_id, public_summary, is_public, visibility, site_visibility, published_at)
 with seed as (
   select 501 as id_suffix, 1 as session_number, '팩트풀니스 모임에서는 소득 4단계, 10가지 본능, 데이터 기반 사고가 실제 일상 판단과 얼마나 멀리 있는지 나눴습니다. 익숙한 인상과 사실 확인 사이에서 각자가 자주 빠지는 편향을 돌아본 시간이었습니다.' as public_summary, '2025-11-27 03:00:00.000000' as published_at
   union all
@@ -1690,12 +1693,14 @@ select
   public_summary,
   is_public,
   visibility,
+  'PUBLIC_RECORD',
   published_at
 from resolved
 on duplicate key update
   public_summary = values(public_summary),
   is_public = values(is_public),
   visibility = values(visibility),
+  site_visibility = values(site_visibility),
   published_at = values(published_at);
 
 insert into highlights (id, club_id, session_id, membership_id, text, sort_order)

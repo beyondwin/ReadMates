@@ -9,6 +9,8 @@ import com.readmates.session.application.HostSessionPublication
 import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.model.HostDashboardMissingMemberResult
+import com.readmates.session.domain.PublicSiteVisibility
+import com.readmates.session.domain.SessionAccessScope
 import com.readmates.session.domain.SessionParticipationStatus
 import com.readmates.sessionclosing.application.model.SessionRecordReadinessPolicy
 import com.readmates.sessionrecord.application.model.SessionRecordStatus
@@ -69,6 +71,8 @@ internal fun ResultSet.toHostSessionDetailBase() =
         publication = null,
         state = getString("state"),
         visibility = SessionRecordVisibility.valueOf(getString("visibility")),
+        accessScope = SessionAccessScope.valueOf(getString("access_scope")),
+        siteVisibility = PublicSiteVisibility.valueOf(getString("site_visibility")),
         attendees = emptyList(),
         feedbackDocument =
             HostSessionFeedbackDocument(
@@ -110,6 +114,7 @@ internal fun ResultSet.toHostSessionPublication() =
     HostSessionPublication(
         publicSummary = getString("public_summary"),
         visibility = SessionRecordVisibility.valueOf(getString("visibility")),
+        siteVisibility = PublicSiteVisibility.valueOf(getString("site_visibility")),
     )
 
 internal fun ResultSet.toHostSessionListItem() =
@@ -135,6 +140,8 @@ internal fun ResultSet.toHostSessionListItem() =
             locationLabel = getString("location_label"),
             state = getString("state"),
             visibility = SessionRecordVisibility.valueOf(getString("visibility")),
+            accessScope = SessionAccessScope.valueOf(getString("access_scope")),
+            siteVisibility = PublicSiteVisibility.valueOf(getString("site_visibility")),
             recordStatus = recordStatus,
             needsAttention = SessionRecordReadinessPolicy.needsAttention(getString("state"), recordStatus, hasDraft),
             hasDraft = hasDraft,

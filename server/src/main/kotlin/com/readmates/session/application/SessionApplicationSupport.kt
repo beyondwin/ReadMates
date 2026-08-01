@@ -51,4 +51,6 @@ class InvalidSessionScheduleException : RuntimeException("Session end time must 
 
 class InvalidQuestionSetException : RuntimeException("Questions must include up to 5 non-empty items")
 
+class InvalidSessionExposureException : RuntimeException("Session exposure is invalid for its lifecycle state")
+
 class InvalidHostSessionCursorException : RuntimeException("Invalid host session cursor")

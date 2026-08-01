@@ -41,3 +41,19 @@ data class SessionExposure(
         }
     }
 }
+
+data class CompatibilityExposure(
+    val sessionVisibility: String,
+    val publicationVisibility: String,
+    val isPublic: Boolean,
+)
+
+fun SessionExposure.toCompatibility(state: String): CompatibilityExposure {
+    require(!(accessScope == SessionAccessScope.HOST_ONLY && siteVisibility == PublicSiteVisibility.PUBLIC_RECORD))
+    require(siteVisibility != PublicSiteVisibility.PUBLIC_RECORD || state in setOf("CLOSED", "PUBLISHED"))
+    return when {
+        accessScope == SessionAccessScope.HOST_ONLY -> CompatibilityExposure("HOST_ONLY", "MEMBER", false)
+        siteVisibility == PublicSiteVisibility.PUBLIC_RECORD -> CompatibilityExposure("PUBLIC", "PUBLIC", true)
+        else -> CompatibilityExposure("MEMBER", "MEMBER", false)
+    }
+}

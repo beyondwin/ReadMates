@@ -3,6 +3,10 @@ package com.readmates.sessionrecord.adapter.out.persistence
 import com.readmates.notification.application.model.NotificationDecision
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.session.application.SessionRecordVisibility
+import com.readmates.session.domain.PublicSiteVisibility
+import com.readmates.session.domain.SessionAccessScope
+import com.readmates.session.domain.SessionExposure
+import com.readmates.session.domain.toCompatibility
 import com.readmates.sessionrecord.application.model.ApplySessionRecordCommand
 import com.readmates.sessionrecord.application.model.CompletedSessionRecordApply
 import com.readmates.sessionrecord.application.model.EncodedSessionRecordSnapshot
@@ -242,19 +246,26 @@ class JdbcSessionRecordAdapter(
             jdbcTemplate
                 .query(
                     """
-                    select s.visibility, s.number, s.book_title, s.session_date, s.updated_at,
+                    select s.state, s.visibility, s.access_scope,
+                           coalesce(p.site_visibility, 'HIDDEN') as site_visibility,
+                           s.number, s.book_title, s.session_date, s.updated_at,
                            coalesce((
                              select max(r.version)
                              from session_record_revisions r
                              where r.club_id = s.club_id and r.session_id = s.id
                            ), 0) as live_revision
                     from sessions s
+                    left join public_session_publications p
+                      on p.club_id = s.club_id and p.session_id = s.id
                     where s.id = ? and s.club_id = ?
                     ${if (forUpdate) "for update" else ""}
                     """.trimIndent(),
                     { rs, _ ->
                         LiveRow(
+                            state = rs.getString("state"),
                             visibility = rs.getString("visibility"),
+                            accessScope = rs.getString("access_scope"),
+                            siteVisibility = rs.getString("site_visibility"),
                             revision = rs.getLong("live_revision"),
                             sessionNumber = rs.getInt("number"),
                             bookTitle = rs.getString("book_title"),
@@ -289,7 +300,13 @@ class JdbcSessionRecordAdapter(
             revision = session.revision,
             snapshot =
                 SessionRecordSnapshot(
-                    visibility = SessionRecordVisibility.valueOf(session.visibility),
+                    visibility =
+                        SessionRecordVisibility.valueOf(
+                            SessionExposure(
+                                SessionAccessScope.valueOf(session.accessScope),
+                                PublicSiteVisibility.valueOf(session.siteVisibility),
+                            ).toCompatibility(session.state).sessionVisibility,
+                        ),
                     publicationSummary = publicationSummary,
                     highlights = highlights,
                     oneLineReviews = oneLineReviews,
@@ -582,7 +599,10 @@ class JdbcSessionRecordAdapter(
         )
 
     private data class LiveRow(
+        val state: String,
         val visibility: String,
+        val accessScope: String,
+        val siteVisibility: String,
         val revision: Long,
         val sessionNumber: Int,
         val bookTitle: String,
