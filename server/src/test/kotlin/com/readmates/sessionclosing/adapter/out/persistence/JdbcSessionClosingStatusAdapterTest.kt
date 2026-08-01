@@ -46,6 +46,27 @@ class JdbcSessionClosingStatusAdapterTest(
         assertThat(snapshot.publicRecordHref).isEqualTo("/clubs/reading-sai/sessions/$sessionId")
     }
 
+    @Test
+    fun `closing status follows canonical public exposure over stale legacy columns`() {
+        seedClosedPublishedSession()
+        jdbcTemplate.update("update sessions set visibility = 'MEMBER' where id = ?", sessionId.toString())
+        jdbcTemplate.update(
+            """
+            update public_session_publications
+            set visibility = 'MEMBER', is_public = false
+            where session_id = ?
+            """.trimIndent(),
+            sessionId.toString(),
+        )
+
+        val snapshot = adapter.loadHostSessionClosingSnapshot(host(), sessionId)
+
+        assertThat(snapshot).isNotNull
+        assertThat(snapshot!!.recordVisibility).isEqualTo(SessionRecordVisibility.PUBLIC)
+        assertThat(snapshot.publicVisible).isTrue()
+        assertThat(snapshot.publicRecordHref).isEqualTo("/clubs/reading-sai/sessions/$sessionId")
+    }
+
     private fun host() =
         CurrentMember(
             userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),

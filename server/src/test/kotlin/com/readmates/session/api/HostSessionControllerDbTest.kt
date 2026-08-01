@@ -628,11 +628,7 @@ class HostSessionControllerDbTest(
                 jsonPath("$.visibility") { value("MEMBER") }
             }
 
-        assertEquals("GUEST_READABLE", sessionAccessScope(sessionId))
-        assertEquals("MEMBER", sessionVisibility(sessionId))
-        assertEquals("HIDDEN", publicationSiteVisibility(sessionId))
-        assertEquals("MEMBER", publicationVisibility(sessionId))
-        assertEquals("0", publicationIsPublic(sessionId))
+        assertExposureColumns(sessionId, "GUEST_READABLE", "MEMBER", "HIDDEN", "MEMBER", "0")
 
         updateSessionState(sessionId, "CLOSED")
         mockMvc
@@ -648,11 +644,20 @@ class HostSessionControllerDbTest(
                 jsonPath("$.visibility") { value("PUBLIC") }
             }
 
-        assertEquals("GUEST_READABLE", sessionAccessScope(sessionId))
-        assertEquals("PUBLIC", sessionVisibility(sessionId))
-        assertEquals("PUBLIC_RECORD", publicationSiteVisibility(sessionId))
-        assertEquals("PUBLIC", publicationVisibility(sessionId))
-        assertEquals("1", publicationIsPublic(sessionId))
+        assertExposureColumns(sessionId, "GUEST_READABLE", "PUBLIC", "PUBLIC_RECORD", "PUBLIC", "1")
+
+        mockMvc
+            .patch("/api/host/sessions/$sessionId/access-scope") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"accessScope":"HOST_ONLY"}"""
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("SESSION_EXPOSURE_INVALID") }
+            }
+
+        assertExposureColumns(sessionId, "GUEST_READABLE", "PUBLIC", "PUBLIC_RECORD", "PUBLIC", "1")
 
         updateSessionState(sessionId, "OPEN")
         mockMvc
@@ -666,9 +671,7 @@ class HostSessionControllerDbTest(
                 jsonPath("$.code") { value("SESSION_EXPOSURE_INVALID") }
             }
 
-        assertEquals("PUBLIC_RECORD", publicationSiteVisibility(sessionId))
-        assertEquals("PUBLIC", publicationVisibility(sessionId))
-        assertEquals("1", publicationIsPublic(sessionId))
+        assertExposureColumns(sessionId, "GUEST_READABLE", "PUBLIC", "PUBLIC_RECORD", "PUBLIC", "1")
     }
 
     @Test
@@ -732,6 +735,9 @@ class HostSessionControllerDbTest(
             }
 
         val publicPublication = findPublicationRow(sessionId)
+        assertEquals("GUEST_READABLE", sessionAccessScope(sessionId))
+        assertEquals("PUBLIC", sessionVisibility(sessionId))
+        assertEquals("PUBLIC_RECORD", publicationSiteVisibility(sessionId))
         assertEquals("PUBLIC", publicPublication["visibility"])
         assertEquals(true, publicPublication["is_public"])
         assertNotNull(publicPublication["published_at"])
@@ -748,7 +754,10 @@ class HostSessionControllerDbTest(
             }
 
         val hostOnlyPublication = findPublicationRow(sessionId)
-        assertEquals("HOST_ONLY", hostOnlyPublication["visibility"])
+        assertEquals("HOST_ONLY", sessionAccessScope(sessionId))
+        assertEquals("HOST_ONLY", sessionVisibility(sessionId))
+        assertEquals("HIDDEN", publicationSiteVisibility(sessionId))
+        assertEquals("MEMBER", hostOnlyPublication["visibility"])
         assertEquals(false, hostOnlyPublication["is_public"])
         assertNull(hostOnlyPublication["published_at"])
     }
@@ -992,6 +1001,7 @@ class HostSessionControllerDbTest(
     @Test
     fun `host publishes closed session with member or public publication`() {
         createSessionSeven()
+        updateSessionState("00000000-0000-0000-0000-000000009777", "CLOSED")
 
         mockMvc
             .put("/api/host/sessions/00000000-0000-0000-0000-000000009777/publication") {
@@ -1008,8 +1018,6 @@ class HostSessionControllerDbTest(
             }.andExpect {
                 status { isOk() }
             }
-        updateSessionState("00000000-0000-0000-0000-000000009777", "CLOSED")
-
         mockMvc
             .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/publish") {
                 with(user("host@example.com"))
@@ -1621,6 +1629,7 @@ class HostSessionControllerDbTest(
         assertEquals(false, memberPublication["is_public"])
         assertNull(memberPublication["published_at"])
         assertEquals("MEMBER", findSessionVisibility("00000000-0000-0000-0000-000000009777"))
+        updateSessionState("00000000-0000-0000-0000-000000009777", "CLOSED")
 
         mockMvc
             .put("/api/host/sessions/00000000-0000-0000-0000-000000009777/publication") {
@@ -1669,7 +1678,7 @@ class HostSessionControllerDbTest(
             }
 
         val hostOnlyPublication = findPublicationRow()
-        assertEquals("HOST_ONLY", hostOnlyPublication["visibility"])
+        assertEquals("MEMBER", hostOnlyPublication["visibility"])
         assertEquals(false, hostOnlyPublication["is_public"])
         assertNull(hostOnlyPublication["published_at"])
         assertEquals("HOST_ONLY", findSessionVisibility("00000000-0000-0000-0000-000000009777"))
@@ -2441,11 +2450,10 @@ class HostSessionControllerDbTest(
             sessionId,
         ) ?: error("session $sessionId did not exist")
 
-    private fun sessionAccessScope(sessionId: String) =
-        scalar("select access_scope from sessions where id = '$sessionId'")
+    @Suppress("MaxLineLength")
+    private fun sessionAccessScope(sessionId: String): String = scalar("select access_scope from sessions where id = '$sessionId'")
 
-    private fun sessionVisibility(sessionId: String) =
-        scalar("select visibility from sessions where id = '$sessionId'")
+    private fun sessionVisibility(sessionId: String) = scalar("select visibility from sessions where id = '$sessionId'")
 
     private fun publicationSiteVisibility(sessionId: String) =
         scalar(
@@ -2460,8 +2468,23 @@ class HostSessionControllerDbTest(
             "select cast(is_public as char) from public_session_publications where session_id = '$sessionId'",
         )
 
-    private fun scalar(sql: String): String =
-        jdbcTemplate.queryForObject(sql, String::class.java) ?: error("scalar query returned null")
+    private fun assertExposureColumns(
+        sessionId: String,
+        accessScope: String,
+        expectedSessionVisibility: String,
+        expectedSiteVisibility: String,
+        expectedPublicationVisibility: String,
+        isPublic: String,
+    ) {
+        assertEquals(accessScope, sessionAccessScope(sessionId))
+        assertEquals(expectedSessionVisibility, sessionVisibility(sessionId))
+        assertEquals(expectedSiteVisibility, publicationSiteVisibility(sessionId))
+        assertEquals(expectedPublicationVisibility, publicationVisibility(sessionId))
+        assertEquals(isPublic, publicationIsPublic(sessionId))
+    }
+
+    @Suppress("MaxLineLength")
+    private fun scalar(sql: String): String = jdbcTemplate.queryForObject(sql, String::class.java) ?: error("scalar query returned null")
 
     private fun findSessionState(sessionId: String): String =
         jdbcTemplate.queryForObject(

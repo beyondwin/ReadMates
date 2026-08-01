@@ -22,7 +22,6 @@ import com.readmates.session.application.model.UpsertPublicationCommand
 import com.readmates.session.application.port.out.HostSessionTransitionResult
 import com.readmates.session.application.port.out.HostSessionVisibilityUpdateResult
 import com.readmates.session.application.requireHost
-import com.readmates.session.domain.CompatibilityExposure
 import com.readmates.session.domain.PublicSiteVisibility
 import com.readmates.session.domain.SessionAccessScope
 import com.readmates.session.domain.SessionExposure
@@ -293,12 +292,7 @@ internal class HostSessionWriteOperations(
                         command.visibility == SessionRecordVisibility.PUBLIC,
                     )
             }
-        val compatibility =
-            if (command.siteVisibility == null) {
-                legacyCompatibility(command.visibility)
-            } else {
-                compatibilityOrInvalid(exposure, locked.state)
-            }
+        val compatibility = compatibilityOrInvalid(exposure, locked.state)
         jdbcTemplate.update(
             """
             update sessions
@@ -399,12 +393,7 @@ internal class HostSessionWriteOperations(
                         command.visibility == SessionRecordVisibility.PUBLIC,
                     )
             }
-        val compatibility =
-            if (command.accessScope == null) {
-                legacyCompatibility(command.visibility)
-            } else {
-                compatibilityOrInvalid(exposure, locked.state)
-            }
+        val compatibility = compatibilityOrInvalid(exposure, locked.state)
         jdbcTemplate.update(
             """
             update sessions
@@ -489,13 +478,6 @@ internal class HostSessionWriteOperations(
         state: String,
     ) = runCatching { exposure.toCompatibility(state) }
         .getOrElse { throw InvalidSessionExposureException() }
-
-    private fun legacyCompatibility(visibility: SessionRecordVisibility) =
-        CompatibilityExposure(
-            sessionVisibility = visibility.name,
-            publicationVisibility = visibility.name,
-            isPublic = visibility == SessionRecordVisibility.PUBLIC,
-        )
 
     private data class LockedExposure(
         val state: String,

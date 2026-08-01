@@ -63,6 +63,26 @@ class HostSessionRecordControllerDbTest(
     }
 
     @Test
+    fun `record editor derives legacy member visibility from guest hidden exposure`() {
+        jdbcTemplate.update(
+            """
+            update sessions
+            set state = 'CLOSED', access_scope = 'GUEST_READABLE', visibility = 'PUBLIC'
+            where id = ?
+            """.trimIndent(),
+            VISIBILITY_SESSION_ID,
+        )
+
+        mockMvc
+            .get("/api/host/sessions/$VISIBILITY_SESSION_ID/record-editor") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.liveSnapshot.visibility") { value("MEMBER") }
+            }
+    }
+
+    @Test
     @Suppress("LongMethod")
     fun `draft cas apply confirmation history and restore fail closed`() {
         mockMvc

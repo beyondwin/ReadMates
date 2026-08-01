@@ -233,6 +233,20 @@ class HostSessionImportControllerDbTest(
             "JSON_IMPORT",
             scalar("select source from session_record_revisions where session_id = '$SESSION_ID' and version = 2"),
         )
+        assertEquals("GUEST_READABLE", scalar("select access_scope from sessions where id = '$SESSION_ID'"))
+        assertEquals("PUBLIC", scalar("select visibility from sessions where id = '$SESSION_ID'"))
+        assertEquals(
+            "PUBLIC_RECORD",
+            scalar("select site_visibility from public_session_publications where session_id = '$SESSION_ID'"),
+        )
+        assertEquals(
+            "PUBLIC",
+            scalar("select visibility from public_session_publications where session_id = '$SESSION_ID'"),
+        )
+        assertEquals(
+            "1",
+            scalar("select cast(is_public as char) from public_session_publications where session_id = '$SESSION_ID'"),
+        )
         assertEquals(0, countRows("session_record_drafts"))
     }
 
