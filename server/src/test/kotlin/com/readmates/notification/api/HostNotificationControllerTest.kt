@@ -856,7 +856,7 @@ class HostNotificationControllerTest(
             jdbcTemplate.update(
                 """
                 update notification_manual_dispatch_previews
-                set expires_at = date_sub(utc_timestamp(6), interval 1 second)
+                set expires_at = date_sub(expires_at, interval 1 day)
                 where id = ?
                 """.trimIndent(),
                 expiredPreviewId,
