@@ -150,6 +150,25 @@ describe("Cloudflare OAuth proxy functions", () => {
     );
   });
 
+  it("forwards the ReadMates account-choice intent without interpreting it", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 302 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await authorizationGet(
+      context(
+        new Request(
+          "https://readmates.pages.dev/oauth2/authorization/google?returnTo=%2Fapp&chooseAccount=true",
+        ),
+        "google",
+      ),
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/oauth2/authorization/google?returnTo=%2Fapp&chooseAccount=true",
+      expect.objectContaining({ method: "GET", redirect: "manual" }),
+    );
+  });
+
   it("proxies OAuth callback requests to backend OAuth with query, cookies, and forwarded host headers", async () => {
     const fetchMock = vi.fn(async () => (
       new Response(null, {
