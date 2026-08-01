@@ -13,10 +13,7 @@ import {
   normalizeBookClubAvatarKey,
   type BookClubAvatarKey,
 } from "@/shared/ui/book-club-avatar";
-
-type AvatarUpdateResult = {
-  avatarKey: string;
-};
+import type { AvatarUpdateResult } from "./types";
 
 export type AvatarPickerProps = {
   avatarKey: unknown;

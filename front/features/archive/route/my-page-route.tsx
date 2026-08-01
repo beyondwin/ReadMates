@@ -17,7 +17,7 @@ export function MyPageRoute({ canEditProfile, onProfileUpdated }: MyPageRoutePro
   const { profile: sourceProfile, journey } = useLoaderData() as MyPageRouteData;
   const location = useLocation();
   const revalidator = useRevalidator();
-  const { profile, updateProfile } = useProfileUpdateController({
+  const { profile, updateProfile, updateAvatar } = useProfileUpdateController({
     sourceProfile,
     canEditProfile,
     onProfileUpdated,
@@ -47,6 +47,7 @@ export function MyPageRoute({ canEditProfile, onProfileUpdated }: MyPageRoutePro
       settingsHref={scopedHref("/app/me/settings")}
       archiveSessionsHref={scopedHref("/app/archive?view=sessions")}
       onUpdateProfile={updateProfile}
+      onUpdateAvatar={updateAvatar}
     />
   );
 }

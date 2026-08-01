@@ -6097,6 +6097,12 @@ a.rm-recent-record__destination:hover {
   display: inline-flex;
 }
 
+.rm-avatar-picker--decorative {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  align-self: start;
+}
+
 .rm-avatar-picker__opener {
   grid-column: 1;
   grid-row: 1 / span 2;

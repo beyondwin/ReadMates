@@ -96,7 +96,7 @@ function currentSessionResponse() {
   };
 }
 
-function authResponse(role: FixtureRole = "HOST") {
+function authResponse(role: FixtureRole = "HOST", avatarKey = "squirrel-acorn") {
   const currentMembership = avatarKeyFor({
     membershipId: "member-squirrel-acorn",
     clubId: "club-reading-sai",
@@ -105,7 +105,7 @@ function authResponse(role: FixtureRole = "HOST") {
     role,
     membershipStatus: "ACTIVE" as const,
     approvalState: "ACTIVE" as const,
-    avatarKey: "squirrel-acorn",
+    avatarKey,
   });
 
   return {
@@ -119,7 +119,7 @@ function authResponse(role: FixtureRole = "HOST") {
     role,
     membershipStatus: "ACTIVE",
     approvalState: "ACTIVE",
-    avatarKey: "squirrel-acorn",
+    avatarKey,
     currentMembership,
     joinedClubs: [
       {
@@ -137,9 +137,9 @@ function authResponse(role: FixtureRole = "HOST") {
   };
 }
 
-function memberProfile(role: FixtureRole = "HOST") {
+function memberProfile(role: FixtureRole = "HOST", avatarKey = "squirrel-acorn") {
   return avatarKeyFor({
-    avatarKey: "squirrel-acorn",
+    avatarKey,
     displayName: MEMBER_NAME,
     accountName: MEMBER_NAME,
     email: "reader@example.test",
@@ -170,14 +170,27 @@ function journeyResponse() {
 }
 
 async function routeSyntheticApp(page: Page, role: FixtureRole = "HOST") {
+  let savedAvatarKey = "squirrel-acorn";
+
   await page.route("**/api/bff/api/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
 
-    if (path.endsWith("/api/auth/me")) return json(route, authResponse(role));
+    if (path.endsWith("/api/me/avatar") && route.request().method() === "PATCH") {
+      const body = route.request().postDataJSON() as { avatarKey: string };
+      savedAvatarKey = body.avatarKey;
+      return json(route, {
+        membershipId: "member-squirrel-acorn",
+        displayName: MEMBER_NAME,
+        accountName: MEMBER_NAME,
+        profileImageUrl: null,
+        avatarKey: savedAvatarKey,
+      });
+    }
+    if (path.endsWith("/api/auth/me")) return json(route, authResponse(role, savedAvatarKey));
     if (path.endsWith("/api/me/notifications")) {
       return json(route, { items: [], unreadCount: 0, nextCursor: null });
     }
-    if (path.endsWith("/api/app/me")) return json(route, memberProfile(role));
+    if (path.endsWith("/api/app/me")) return json(route, memberProfile(role, savedAvatarKey));
     if (path.endsWith("/api/archive/me/journey")) return json(route, journeyResponse());
     if (path.endsWith("/api/sessions/current")) return json(route, currentSessionResponse());
 
@@ -300,6 +313,69 @@ test("non-host member keeps the explicit account action without a workspace swit
     await expect(page.getByRole("link", { name: "호스트 화면" })).toHaveCount(0);
     await expectVisibleUnclippedMobileAccount(page, width);
     await page.screenshot({ path: testInfo.outputPath(`${width}-non-host-account.png`), fullPage: true });
+  }
+});
+
+test("My Space avatar save refreshes the account identity and persists at mobile and desktop widths", async ({ browser }, testInfo) => {
+  const savedAvatarSrc = "/assets/avatars/book-club/hedgehog-green-mug.webp";
+
+  for (const width of [390, 1280]) {
+    const context = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 } });
+    const page = await context.newPage();
+    await routeSyntheticApp(page);
+    await page.goto(`${APP_BASE}/me`);
+
+    const opener = page.getByRole("button", { name: "아바타 바꾸기" });
+    const account = page.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` });
+    await expect(opener.locator("img")).toHaveAttribute(
+      "src",
+      "/assets/avatars/book-club/squirrel-acorn.webp",
+    );
+    await expect(account.locator("img")).toHaveAttribute(
+      "src",
+      "/assets/avatars/book-club/squirrel-acorn.webp",
+    );
+
+    await opener.click();
+    const dialog = page.getByRole("dialog", { name: "나의 아바타 선택" });
+    await expect(dialog).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath(`${width}-my-space-avatar-picker.png`),
+      fullPage: true,
+    });
+    await dialog.getByRole("button", { name: "초록 찻잔을 든 고슴도치 선택" }).click();
+
+    await expect(opener.locator("img")).toHaveAttribute(
+      "src",
+      "/assets/avatars/book-club/squirrel-acorn.webp",
+    );
+    await expect(account.locator("img")).toHaveAttribute(
+      "src",
+      "/assets/avatars/book-club/squirrel-acorn.webp",
+    );
+
+    await dialog.getByRole("button", { name: "이 아바타로 변경" }).click();
+
+    await expect(dialog).toHaveCount(0);
+    await expect(opener.locator("img")).toHaveAttribute("src", savedAvatarSrc);
+    await expect(account.locator("img")).toHaveAttribute("src", savedAvatarSrc);
+    await page.screenshot({
+      path: testInfo.outputPath(`${width}-my-space-avatar-saved.png`),
+      fullPage: true,
+    });
+
+    await page.reload();
+
+    await expect(page.getByRole("button", { name: "아바타 바꾸기" }).locator("img")).toHaveAttribute(
+      "src",
+      savedAvatarSrc,
+    );
+    await expect(page.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` }).locator("img")).toHaveAttribute(
+      "src",
+      savedAvatarSrc,
+    );
+
+    await context.close();
   }
 });
 

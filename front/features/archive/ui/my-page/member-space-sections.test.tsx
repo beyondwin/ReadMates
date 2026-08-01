@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -8,7 +9,7 @@ import { MemberSpaceOverview } from "./member-space-overview";
 import { MyReadingShelf } from "./my-reading-shelf";
 import { ReadingAchievementSummary } from "./reading-achievement-summary";
 import type { RecentReadingListItem } from "./recent-reading-list";
-import type { ProfileUpdateResult } from "./types";
+import type { AvatarUpdateResult, ProfileUpdateResult } from "./types";
 
 const profile: MyPageProfile = {
   avatarKey: "squirrel-acorn",
@@ -58,6 +59,7 @@ function renderProfileSummary(canEditProfile = true) {
       viewModel={viewModel}
       canEditProfile={canEditProfile}
       onUpdateProfile={vi.fn().mockResolvedValue({ displayName: profile.displayName, accountName: profile.accountName })}
+      onUpdateAvatar={vi.fn().mockResolvedValue({ avatarKey: profile.avatarKey })}
     />,
   );
 }
@@ -73,16 +75,17 @@ describe("member-space presentation sections", () => {
         viewModel={viewModel}
         canEditProfile
         onUpdateProfile={vi.fn().mockResolvedValue({ displayName: profile.displayName, accountName: profile.accountName })}
+        onUpdateAvatar={vi.fn().mockResolvedValue({ avatarKey })}
       />,
     );
 
-    expect(container.querySelector(".rm-member-profile__avatar .rm-avatar-chip img")).toHaveAttribute("src", expectedSrc);
+    expect(container.querySelector(".rm-avatar-picker .rm-avatar-chip img, .rm-avatar-picker__opener .rm-avatar-chip img")).toHaveAttribute("src", expectedSrc);
   });
 
-  it("renders identity, inline name editing, and membership context without account navigation", () => {
+  it("renders one avatar opener before identity, inline name editing, and membership context", () => {
     const { container } = renderProfileSummary();
     const section = screen.getByRole("region", { name: "멤버1" });
-    const avatar = section.querySelector(".rm-member-profile__avatar")!;
+    const avatar = within(section).getByRole("button", { name: "아바타 바꾸기" });
     const kicker = within(section).getByText("내 프로필");
     const heading = within(section).getByRole("heading", { level: 1, name: "멤버1" });
     const edit = within(section).getByRole("button", { name: "이름 변경" });
@@ -92,18 +95,84 @@ describe("member-space presentation sections", () => {
     expect(kicker.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(heading.compareDocumentPosition(edit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(edit.compareDocumentPosition(byline) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(section).getAllByRole("button", { name: "아바타 바꾸기" })).toHaveLength(1);
     expect(container.querySelectorAll("h1")).toHaveLength(1);
     expect(screen.queryByRole("link", { name: /계정 (관리|설정)/ })).toBeNull();
   });
 
-  it("omits only the name-change control when profile editing is not allowed", () => {
-    renderProfileSummary(false);
+  it("renders only a decorative avatar when profile editing is not allowed", () => {
+    const { container } = renderProfileSummary(false);
 
     expect(screen.getByRole("heading", { level: 1, name: "멤버1" })).toBeVisible();
     expect(screen.getByText("읽는사이 · 멤버 · 2025.11부터 함께")).toBeVisible();
     expect(screen.queryByRole("button", { name: "이름 변경" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "아바타 바꾸기" })).toBeNull();
+    expect(container.querySelector(".rm-avatar-picker--decorative .rm-avatar-chip img")).toHaveAttribute(
+      "src",
+      "/assets/avatars/book-club/squirrel-acorn.webp",
+    );
     expect(screen.queryByLabelText("이름 변경 준비 중")).toBeNull();
     expect(screen.queryByRole("link", { name: /계정 (관리|설정)/ })).toBeNull();
+  });
+
+  it("keeps the source avatar until explicit save and then renders the saved key", async () => {
+    const onUpdateAvatar = vi.fn(async (avatarKey: string) => ({
+      displayName: profile.displayName,
+      accountName: profile.accountName,
+      avatarKey,
+    }));
+
+    function StatefulProfileSummary() {
+      const [currentProfile, setCurrentProfile] = useState(profile);
+      const saveAvatar = async (avatarKey: string): Promise<AvatarUpdateResult> => {
+        const updated = await onUpdateAvatar(avatarKey);
+        setCurrentProfile((current) => ({ ...current, avatarKey: updated.avatarKey }));
+        return updated;
+      };
+
+      return (
+        <MemberProfileSummary
+          profile={currentProfile}
+          viewModel={viewModel}
+          canEditProfile
+          onUpdateProfile={vi.fn().mockResolvedValue({
+            displayName: profile.displayName,
+            accountName: profile.accountName,
+          })}
+          onUpdateAvatar={saveAvatar}
+        />
+      );
+    }
+
+    const user = userEvent.setup();
+    render(<StatefulProfileSummary />);
+    const opener = screen.getByRole("button", { name: "아바타 바꾸기" });
+
+    expect(opener.querySelector("img")).toHaveAttribute(
+      "src",
+      "/assets/avatars/book-club/squirrel-acorn.webp",
+    );
+    await user.click(opener);
+    const dialog = screen.getByRole("dialog", { name: "나의 아바타 선택" });
+    await user.click(within(dialog).getByRole("button", {
+      name: "초록 찻잔을 든 고슴도치 선택",
+    }));
+
+    expect(onUpdateAvatar).not.toHaveBeenCalled();
+    expect(opener.querySelector("img")).toHaveAttribute(
+      "src",
+      "/assets/avatars/book-club/squirrel-acorn.webp",
+    );
+
+    await user.click(within(dialog).getByRole("button", { name: "이 아바타로 변경" }));
+
+    expect(onUpdateAvatar).toHaveBeenCalledWith("hedgehog-green-mug");
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "아바타 바꾸기" }).querySelector("img")).toHaveAttribute(
+        "src",
+        "/assets/avatars/book-club/hedgehog-green-mug.webp",
+      );
+    });
   });
 
   it("replaces the visible name row with a labelled editor while preserving the profile heading", async () => {
@@ -176,6 +245,7 @@ describe("member-space presentation sections", () => {
         viewModel={viewModel}
         canEditProfile
         onUpdateProfile={() => pendingSave}
+        onUpdateAvatar={vi.fn().mockResolvedValue({ avatarKey: profile.avatarKey })}
       />,
     );
 
@@ -199,6 +269,7 @@ describe("member-space presentation sections", () => {
         onUpdateProfile={vi.fn().mockRejectedValue(
           new Error("같은 클럽에서 이미 쓰고 있는 이름입니다."),
         )}
+        onUpdateAvatar={vi.fn().mockResolvedValue({ avatarKey: profile.avatarKey })}
       />,
     );
 
@@ -228,6 +299,7 @@ describe("member-space presentation sections", () => {
             displayName: profile.displayName,
             accountName: profile.accountName,
           })}
+          onUpdateAvatar={vi.fn().mockResolvedValue({ avatarKey: profile.avatarKey })}
         />
         <ReadingAchievementSummary viewModel={viewModel} />
       </MemberSpaceOverview>,
@@ -258,6 +330,7 @@ describe("member-space presentation sections", () => {
           displayName: profile.displayName,
           accountName: profile.accountName,
         })}
+        onUpdateAvatar={vi.fn().mockResolvedValue({ avatarKey: profile.avatarKey })}
       />,
     );
 

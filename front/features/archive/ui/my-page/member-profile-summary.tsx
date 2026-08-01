@@ -1,14 +1,15 @@
 import type { MyPageProfile } from "@/features/archive/model/archive-model";
 import type { MemberSpaceViewModel } from "@/features/archive/model/my-reading-shelf-model";
-import { AvatarChip } from "@/shared/ui/avatar-chip";
+import { AvatarPicker } from "./avatar-picker";
 import { ProfileNameEditor } from "./profile-name-editor";
-import type { ProfileUpdateResult } from "./types";
+import type { AvatarUpdateResult, ProfileUpdateResult } from "./types";
 
 export type MemberProfileSummaryProps = {
   profile: MyPageProfile;
   viewModel: MemberSpaceViewModel;
   canEditProfile: boolean;
   onUpdateProfile: (displayName: string) => Promise<ProfileUpdateResult>;
+  onUpdateAvatar: (avatarKey: string) => Promise<AvatarUpdateResult>;
 };
 
 export function MemberProfileSummary({
@@ -16,12 +17,15 @@ export function MemberProfileSummary({
   viewModel,
   canEditProfile,
   onUpdateProfile,
+  onUpdateAvatar,
 }: MemberProfileSummaryProps) {
   return (
     <section className="rm-member-profile" aria-labelledby="member-profile-name">
-      <div className="rm-member-profile__avatar" aria-hidden>
-        <AvatarChip avatarKey={profile.avatarKey} name={profile.displayName} label="" size={46} />
-      </div>
+      <AvatarPicker
+        avatarKey={profile.avatarKey}
+        canEditProfile={canEditProfile}
+        onUpdateAvatar={onUpdateAvatar}
+      />
       <p className="rm-member-space-kicker">내 프로필</p>
       <ProfileNameEditor
         data={profile}
