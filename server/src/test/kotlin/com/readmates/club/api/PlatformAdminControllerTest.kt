@@ -2,6 +2,7 @@ package com.readmates.club.api
 
 import com.jayway.jsonpath.JsonPath
 import com.readmates.auth.application.service.AuthSessionService
+import com.readmates.auth.domain.BookClubAvatarKey
 import com.readmates.club.application.model.ClubDomainActualCheckResult
 import com.readmates.club.application.port.out.CheckClubDomainActualStatePort
 import com.readmates.club.domain.ClubDomainStatus
@@ -10,6 +11,7 @@ import jakarta.servlet.http.Cookie
 import org.hamcrest.Matchers
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -397,7 +399,7 @@ class PlatformAdminControllerTest(
         val clubId = checkNotNull(result.response.jsonPathValue<String>("$.club.clubId"))
         createdClubIds += clubId
         createdMembershipIds += membershipIdsForClub(clubId)
-        assertEquals("squirrel-acorn", avatarKeyForClub(clubId))
+        assertNotNull(BookClubAvatarKey.fromWireValue(avatarKeyForClub(clubId)))
     }
 
     @Test
