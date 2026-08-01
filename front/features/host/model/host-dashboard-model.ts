@@ -334,6 +334,30 @@ export function formatHostSessionDday(sessionDate: string, now: Date) {
   return diffDays > 0 ? `D-${diffDays}` : `D+${Math.abs(diffDays)}`;
 }
 
+export type HostUpcomingSessionTiming = {
+  state: "upcoming" | "today" | "overdue" | "unknown";
+  statusLabel: "예정" | "오늘" | "일정 지남" | "일정 확인";
+  editLabel: "세션 편집" | "날짜 수정";
+};
+
+export function getHostUpcomingSessionTiming(
+  sessionDate: string,
+  now = new Date(),
+): HostUpcomingSessionTiming {
+  const dday = formatHostSessionDday(sessionDate, now);
+
+  if (dday === null) {
+    return { state: "unknown", statusLabel: "일정 확인", editLabel: "날짜 수정" };
+  }
+  if (dday === "D-day") {
+    return { state: "today", statusLabel: "오늘", editLabel: "세션 편집" };
+  }
+  if (dday.startsWith("D-")) {
+    return { state: "upcoming", statusLabel: "예정", editLabel: "세션 편집" };
+  }
+  return { state: "overdue", statusLabel: "일정 지남", editLabel: "날짜 수정" };
+}
+
 export function getHostDashboardSessionPhase(
   session: HostDashboardCurrentSession | null,
   now = new Date(),

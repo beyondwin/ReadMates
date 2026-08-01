@@ -6,7 +6,6 @@ import { AccountSettingsRoute } from "./account-settings-route";
 
 const route = vi.hoisted(() => ({
   loaderData: null as unknown,
-  pathname: "/clubs/reading-sai/app/me/settings",
 }));
 const api = vi.hoisted(() => ({
   leaveMembership: vi.fn(),
@@ -15,7 +14,6 @@ const api = vi.hoisted(() => ({
 vi.mock("react-router-dom", async (importOriginal) => ({
   ...(await importOriginal<typeof import("react-router-dom")>()),
   useLoaderData: () => route.loaderData,
-  useLocation: () => ({ pathname: route.pathname }),
 }));
 vi.mock("@/features/archive/api/archive-api", () => api);
 
@@ -43,20 +41,16 @@ describe("AccountSettingsRoute", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     route.loaderData = profile;
-    route.pathname = "/clubs/reading-sai/app/me/settings";
     api.leaveMembership.mockResolvedValue({ ok: true });
   });
 
   afterEach(cleanup);
 
-  it.each([
-    ["/clubs/reading-sai/app/me/settings", "/clubs/reading-sai/app/me"],
-    ["/app/me/settings", "/app/me"],
-  ])("builds a stable my-space return from %s", (pathname, expectedHref) => {
-    route.pathname = pathname;
+  it("omits redundant desktop return chrome while preserving the page heading", () => {
     renderRoute();
 
-    expect(screen.getByRole("link", { name: "내 공간" })).toHaveAttribute("href", expectedHref);
+    expect(screen.queryByRole("link", { name: "내 공간" })).toBeNull();
+    expect(screen.getByRole("heading", { level: 1, name: "계정 설정" })).toBeVisible();
   });
 
   it("keeps the leave failure visible instead of redirecting", async () => {

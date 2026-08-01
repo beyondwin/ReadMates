@@ -134,7 +134,7 @@ test("active members edit their profile from member space and refresh the accoun
   await page.goto("/app/me");
 
   await page.getByRole("button", { name: "이름 변경" }).click();
-  await page.getByRole("textbox", { name: "이름" }).fill(updatedDisplayName);
+  await page.getByRole("textbox", { name: "표시 이름" }).fill(updatedDisplayName);
   await page.getByRole("button", { name: "이름 저장" }).click();
 
   await expect(page.getByRole("heading", { level: 1, name: updatedDisplayName })).toBeVisible();
@@ -153,7 +153,7 @@ test("suspended members omit account navigation and profile editing from member 
     name: /계정 (관리|설정)/,
   })).toHaveCount(0);
   await expect(shelf.getByRole("list", {
-    name: "최근 함께 읽은 기록",
+    name: "최근 독서 기록",
   })).toBeVisible();
 });
 
@@ -176,10 +176,10 @@ test("an empty reading shelf omits recent-session navigation", async ({ page }) 
     exact: true,
   })).toHaveAttribute("href", "/app/me/settings");
   await expect(page.getByRole("list", {
-    name: "최근 함께 읽은 기록",
+    name: "최근 독서 기록",
   })).toHaveCount(0);
   await expect(page.getByRole("link", {
-    name: "전체 세션 기록 보기",
+    name: "전체 보기",
   })).toHaveCount(0);
 });
 
@@ -241,7 +241,7 @@ test("viewer can read member routes but cannot use current-session write actions
     name: /계정 (관리|설정)/,
   })).toHaveCount(0);
   await expect(viewerShelf.getByRole("list", {
-    name: "최근 함께 읽은 기록",
+    name: "최근 독서 기록",
   })).toBeVisible();
 
   await page.goto("/app/me/settings");

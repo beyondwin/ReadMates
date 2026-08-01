@@ -19,6 +19,7 @@ function renderMenu(memberName = "멤버1") {
         memberName={memberName}
         avatarKey="reading-lamp"
         membershipLabel="정식 멤버"
+        notificationsHref="/app/notifications"
         settingsHref="/app/me/settings"
         LinkComponent={TestLink}
         LogoutControl={<button type="button">로그아웃</button>}
@@ -45,16 +46,16 @@ describe("AccountMenu", () => {
     expect(dialog).toHaveAttribute("aria-modal", "false");
     expect(trigger).toHaveAttribute("aria-controls", dialog.id);
     const items = within(dialog).getAllByRole("link");
-    expect(items.map((item) => item.textContent)).toEqual(["계정 설정"]);
+    expect(items.map((item) => item.textContent)).toEqual(["알림", "계정 설정"]);
+    expect(within(dialog).getByRole("link", { name: "알림" })).toHaveAttribute("href", "/app/notifications");
     expect(within(dialog).getByRole("link", { name: "계정 설정" })).toHaveAttribute("href", "/app/me/settings");
     expect(within(dialog).getByRole("button", { name: "로그아웃" })).toBeVisible();
     expect(within(dialog).queryByRole("link", { name: "내 공간" })).toBeNull();
-    expect(within(dialog).queryByRole("link", { name: "알림" })).toBeNull();
     expect(within(dialog).queryByRole("menuitem")).toBeNull();
     expect(screen.queryByRole("menu")).toBeNull();
 
     await user.tab();
-    expect(within(dialog).getByRole("link", { name: "계정 설정" })).toHaveFocus();
+    expect(within(dialog).getByRole("link", { name: "알림" })).toHaveFocus();
 
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();

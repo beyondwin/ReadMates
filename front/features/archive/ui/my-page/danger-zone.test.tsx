@@ -11,7 +11,7 @@ describe("DangerZone", () => {
   it("exposes a stable relationship between the disclosure trigger and confirmation panel", async () => {
     const user = userEvent.setup();
     renderDangerZone();
-    const trigger = screen.getByRole("button", { name: "클럽 탈퇴…" });
+    const trigger = screen.getByText("클럽탈퇴");
     const confirmationId = trigger.getAttribute("aria-controls");
 
     expect(trigger).toHaveAttribute("aria-expanded", "false");
@@ -36,7 +36,7 @@ describe("DangerZone", () => {
   it("collapses the confirmation and returns focus to the trigger after cancel", async () => {
     const user = userEvent.setup();
     renderDangerZone();
-    const trigger = screen.getByRole("button", { name: "클럽 탈퇴…" });
+    const trigger = screen.getByText("클럽탈퇴");
     const confirmationId = trigger.getAttribute("aria-controls");
 
     await user.click(trigger);

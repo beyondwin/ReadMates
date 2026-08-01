@@ -97,7 +97,7 @@ describe("MyPageRoute", () => {
     expect(screen.getByText("9번의 모임에서 7권을 끝까지 읽었어요.")).toBeVisible();
     expect(screen.queryByRole("link", { name: "계정 관리" })).toBeNull();
     expect(screen.getByRole("link", {
-      name: "전체 세션 기록 보기",
+      name: "전체 보기",
     })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/archive?view=sessions",

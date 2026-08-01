@@ -255,7 +255,7 @@ describe("ArchivePage", () => {
     expect(desktop.queryByText("문서 있음")).not.toBeInTheDocument();
     expect(desktop.getAllByText("공개")).toHaveLength(seededSessions.length);
     expect(desktop.getByText("피드백 O")).toBeInTheDocument();
-    expect(desktop.getAllByText("피드백 없음").length).toBe(seededSessions.length - 1);
+    expect(desktop.getAllByText("피드백 준비중").length).toBe(seededSessions.length - 1);
   });
 
   it("appends archive sessions when 더 보기 is clicked", async () => {
@@ -487,7 +487,7 @@ describe("ArchivePage", () => {
     expect(scoped.getByText("가난한 찰리의 연감")).toBeInTheDocument();
     expect(scoped.getAllByText("공개")).toHaveLength(seededSessions.length);
     expect(scoped.getByText("피드백 O")).toBeInTheDocument();
-    expect(scoped.getAllByText("피드백 없음").length).toBe(seededSessions.length - 1);
+    expect(scoped.getAllByText("피드백 준비중").length).toBe(seededSessions.length - 1);
     expect(latestSessionCard).toHaveAttribute(
       "href",
       "/app/sessions/session-6",

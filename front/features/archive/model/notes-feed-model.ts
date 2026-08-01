@@ -45,6 +45,22 @@ export function noteSessionNumberLabel(session: Pick<NoteSessionItem, "sessionNu
   return `No.${String(session.sessionNumber).padStart(2, "0")}`;
 }
 
+export function noteSessionSearchPlaceholder(
+  sessions: ReadonlyArray<Pick<NoteSessionItem, "sessionNumber">>,
+) {
+  const latestSessionNumber = sessions.reduce<number | null>((latest, session) => {
+    if (!Number.isFinite(session.sessionNumber)) {
+      return latest;
+    }
+
+    return latest === null ? session.sessionNumber : Math.max(latest, session.sessionNumber);
+  }, null);
+
+  return latestSessionNumber === null
+    ? "책 제목 또는 세션 번호"
+    : `책 제목 또는 ${noteSessionNumberLabel({ sessionNumber: latestSessionNumber })}`;
+}
+
 export function sessionBookTitle(session: Pick<NoteSessionItem, "sessionNumber" | "bookTitle">) {
   return session.bookTitle || noteSessionNumberLabel(session);
 }

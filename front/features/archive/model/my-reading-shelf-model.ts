@@ -51,8 +51,9 @@ export type MemberSpaceMetric = {
 };
 
 export type RecentReadingFeedbackStatus =
-  | "피드백 열림"
+  | "피드백 O"
   | "피드백 제한"
+  | "피드백 준비중"
   | null;
 
 export type RecentReadingPreviewItem = {
@@ -143,11 +144,11 @@ export function buildRecentReadingPreview(
         ...(item.reviewCount > 0 ? [`서평 ${item.reviewCount}`] : []),
       ],
       feedbackStatus: item.feedbackDocument.readable
-        ? "피드백 열림"
+        ? "피드백 O"
         : item.feedbackDocument.available &&
             item.feedbackDocument.lockedReason === "ACTIVE_MEMBERSHIP_REQUIRED"
           ? "피드백 제한"
-          : null,
+          : "피드백 준비중",
     };
   });
 }

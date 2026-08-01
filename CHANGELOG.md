@@ -12,6 +12,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Fixed
 
+- 호스트 모바일 대시보드의 현재 세션 여백과 3열 운영 수치를 복구하고, 처리 항목·예정 세션 행동을 더 명확한 단일 primary action 흐름으로 정돈했습니다.
 - **Google 로그인 복구:** 종료된 멤버십 또는 Google 인증 실패 뒤에는 다른 Google 계정을 명시적으로 선택해 다시 로그인할 수 있습니다. 카카오톡 인앱 브라우저에서는 외부 브라우저 안내와 로그인 주소 복사를 제공하며, 안전한 멤버 복귀 경로와 기존 OAuth·세션 보안 경계는 유지합니다. 로컬 dev-login은 명시적으로 활성화된 Google OAuth 설정이 없으면 깨진 provider 링크를 노출하지 않고, macOS Keychain의 localhost 전용 credential을 backend에만 주입하는 공개 저장소 안전 실행 경로를 제공합니다.
 One-command local OAuth stack + redacted smoke verifier로 기존 서비스 보존 상태에서 localhost 기반 Google login 회귀 점검을 반복 가능하게 했습니다.
 
@@ -29,7 +30,7 @@ One-command local OAuth stack + redacted smoke verifier로 기존 서비스 보�
 
 ### Changed
 
-- **멤버 내 공간·계정·기록 동선:** `/app/me`는 표시 이름과 inline `이름 변경`, 현재 클럽 맥락, 누적 성취가 한 지면에서 이어지며 프로필 안의 중복 계정 설정 action을 제거합니다. 전역 계정 메뉴는 `내 공간`, `알림`, `계정 설정`, `로그아웃`을 제공하고, `/app/me/settings`는 읽기 전용 계정·멤버십 정보와 `← 내 공간`, 단계형 클럽 탈퇴를 제공합니다. 최근 개인 기록의 `전체 세션 기록 보기`는 `/app/archive?view=sessions`로 연결하며 `/app/me/records` direct deep link와 cursor pagination은 유지합니다.
+- **멤버 내 공간·계정·기록 동선:** `/app/me`는 표시 이름과 inline `이름 변경`, 현재 클럽 맥락, 누적 성취가 한 지면에서 이어지며 프로필 안의 중복 계정 설정 action을 제거합니다. 전역 계정 메뉴는 `알림`, `계정 설정`, `로그아웃`을 제공하고, `/app/me/settings`는 읽기 전용 계정·멤버십 정보와 `← 내 공간`, 단계형 클럽 탈퇴를 제공합니다. 최근 개인 기록의 `전체 보기`는 `/app/archive?view=sessions`로 연결하며 `/app/me/records` direct deep link와 cursor pagination은 유지합니다.
 - **멤버 알림함:** 큰 문서 패널과 중첩 카드를 간결한 편집형 목록으로 바꾸고, 영어 액션·회고 배지를 제거했습니다. 행 전체 이동, 읽지 않음 상태, 오류·빈 상태, 더 보기 흐름을 데스크톱과 모바일에서 같은 한국어 인터페이스로 제공합니다.
 - **프런트엔드 디자인 하드닝:** 멤버·호스트 기본 탐색을 역할별 핵심 4개 목적지로 정리했습니다. 공개 화면은 범위가 유지되는 복구 링크와 재시도·대기 상태를 구분하고, 호스트 보조 원장과 운영 도구는 접힌 disclosure 및 실행 가능한 실패 상태로 제공합니다. 공개 기록과 멤버 회고의 제목·요약·인용·감상은 데스크톱과 모바일에서 읽기 서체와 행간을 사용합니다.
 - **개인 독서 여정 API:** 현재 멤버의 열람 가능한 전체 기록 summary와 cursor page를 함께 반환하는 additive `GET /api/archive/me/journey` projection을 추가했습니다. Page 크기와 무관한 두 개의 고정 query로 계산하며 DB migration이나 BFF 계약 변경은 없습니다.

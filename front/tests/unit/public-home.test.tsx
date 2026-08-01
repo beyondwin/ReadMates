@@ -88,9 +88,11 @@ describe("PublicHome", () => {
     expect(container.querySelector(".public-record-list")).not.toHaveTextContent("No.6");
     expect(container.querySelectorAll(".public-record-list .public-archive-row__cover img")).toHaveLength(2);
     expect(container.querySelector(".public-record-list")).toHaveTextContent("지대넓얕 무한");
+    expect(container.querySelector(".public-record-list")).toHaveTextContent("하이라이트 3 · 한줄평 5");
     expect(screen.getAllByText("공개 요약").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("하이라이트 3").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("한줄평 5").length).toBeGreaterThan(0);
+    expect(container.querySelector(".public-record-badges")).toHaveTextContent("공개 요약하이라이트 3 · 한줄평 5");
+    expect(screen.queryByText("하이라이트 3")).not.toBeInTheDocument();
+    expect(screen.queryByText("한줄평 5")).not.toBeInTheDocument();
     expect(screen.getByText("함께 읽는 자리")).toBeInTheDocument();
     expect(screen.getByText("공개 기록은 누구나 읽고, 함께 읽는 자리는 초대받은 멤버와 이어갑니다")).toBeInTheDocument();
     expect(screen.getByText("함께 읽기")).toBeInTheDocument();
@@ -103,7 +105,7 @@ describe("PublicHome", () => {
     expect(container.querySelector('a[href="/login"]')).not.toHaveTextContent("초대 수락하기");
     expect(screen.getByText("기록 모음")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "공개 기록", level: 2 })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "공개 기록 전체 보기" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "전체 보기" })).toHaveAttribute(
       "href",
       "/records",
     );

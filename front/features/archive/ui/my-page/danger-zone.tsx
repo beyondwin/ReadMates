@@ -50,11 +50,12 @@ export function DangerZone({
           ref={leaveTriggerRef}
           type="button"
           className="btn btn-ghost btn-sm"
+          aria-label="클럽 탈퇴…"
           aria-expanded={leaveOpen}
           aria-controls={confirmationId}
           onClick={() => setLeaveOpen((current) => !current)}
         >
-          클럽 탈퇴…
+          클럽탈퇴
         </button>
       </div>
       {leaveOpen ? (

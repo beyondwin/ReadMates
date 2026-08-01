@@ -22,17 +22,30 @@ export function RecentReadingRow(
             {item.bookAuthor}
           </span>
         ) : null}
-        {item.activityLabels.length > 0 || item.feedbackStatus ? (
-          <span className="rm-recent-reading-row__activity">
-            {[...item.activityLabels, item.feedbackStatus]
-              .filter(Boolean)
-              .join(" · ")}
-          </span>
-        ) : null}
       </div>
+      {item.activityLabels.length > 0 || item.feedbackStatus ? (
+        <span className="rm-recent-reading-row__activity">
+          {item.activityLabels.map((label) => (
+            <span className="badge" key={label}>{label}</span>
+          ))}
+          {item.feedbackStatus ? (
+            <span className={feedbackBadgeClass(item.feedbackStatus)}>
+              {item.feedbackStatus}
+            </span>
+          ) : null}
+        </span>
+      ) : null}
       <RecentReadingChevron className="rm-recent-reading-row__arrow" />
     </a>
   );
+}
+
+function feedbackBadgeClass(
+  status: NonNullable<RecentReadingListItem["feedbackStatus"]>,
+) {
+  return status === "피드백 O"
+    ? "badge badge-ok badge-dot"
+    : "badge badge-readonly badge-dot";
 }
 
 function RecentReadingCover(

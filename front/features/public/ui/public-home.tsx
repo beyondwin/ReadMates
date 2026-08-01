@@ -2,7 +2,7 @@ import { Link } from "@/features/public/ui/public-link";
 import type { PublicClubView, PublicSessionListItemView } from "@/features/public/model/public-display-model";
 import { BookCover } from "@/shared/ui/book-cover";
 import { PublicGuestOnlyActions } from "@/shared/ui/public-auth-action";
-import { getPublicClubDisplay, getPublicSessionListItemDisplay } from "@/features/public/model/public-display-model";
+import { getPublicClubDisplay, getPublicRecordShowcaseDisplay } from "@/features/public/model/public-display-model";
 import { PUBLIC_MEMBERSHIP_NOTE } from "@/features/public/model/public-copy";
 import { publicAboutHref, publicRecordsHref, publicSessionHref } from "@/features/public/model/public-paths";
 
@@ -12,7 +12,7 @@ type PublicHomeProps = {
 };
 
 function sessionDisplay(session: PublicSessionListItemView) {
-  return getPublicSessionListItemDisplay(session);
+  return getPublicRecordShowcaseDisplay(session);
 }
 
 function RecordBadges({ session }: { session: PublicSessionListItemView }) {
@@ -21,8 +21,7 @@ function RecordBadges({ session }: { session: PublicSessionListItemView }) {
   return (
     <div className="row public-record-badges">
       <span className="badge">공개 요약</span>
-      <span className="badge">하이라이트 {display.highlightCount}</span>
-      <span className="badge">한줄평 {display.oneLinerCount}</span>
+      <span className="badge">{display.recordDensityLabel}</span>
     </div>
   );
 }
@@ -104,8 +103,7 @@ function ArchiveRecordRow({ publicBasePath, session }: { publicBasePath: string;
         </span>
       </span>
       <span className="public-archive-row__counts">
-        <span>하이라이트 {display.highlightCount}</span>
-        <span>한줄평 {display.oneLinerCount}</span>
+        <span>{display.recordDensityLabel}</span>
       </span>
     </Link>
   );
@@ -347,7 +345,7 @@ export default function PublicHome({ data, publicBasePath = "" }: PublicHomeProp
               </h2>
             </div>
             <Link to={publicRecordsHref(publicBasePath)} className="public-records-link">
-              공개 기록 전체 보기
+              전체 보기
             </Link>
           </div>
           {publicRecordPreviewSessions.length > 0 ? (

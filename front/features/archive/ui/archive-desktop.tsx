@@ -9,6 +9,7 @@ import type {
 import {
   archiveTabs,
   feedbackArchiveBadgeClass,
+  feedbackArchiveLabel,
   feedbackDocumentCopy,
   feedbackReportActionLabel,
   formatSessionMonthDayLabel,
@@ -272,7 +273,7 @@ function ArchiveSessions({ sessions }: { sessions: ArchiveSessionRecord[] }) {
                       title={feedbackCopy.ariaLabel}
                       aria-label={feedbackCopy.ariaLabel}
                     >
-                      {feedbackCopy.badge}
+                      {feedbackArchiveLabel(session.feedbackDocument)}
                     </span>
                   </div>
                   <SessionAction />

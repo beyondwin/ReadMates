@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { RecentReadingListItem } from "./recent-reading-list";
 import { RecentReadingList } from "./recent-reading-list";
@@ -32,7 +32,7 @@ describe("RecentReadingList", () => {
             sessionId: "session-12",
             href: "/app/sessions/session-12",
             activityLabels: ["질문 2", "서평 1"],
-            feedbackStatus: "피드백 열림",
+            feedbackStatus: "피드백 O",
           }),
           recentItem({
             sessionId: "session-11",
@@ -44,7 +44,7 @@ describe("RecentReadingList", () => {
             sessionId: "session-10",
             href: "/app/sessions/session-10",
             bookTitle: "세 번째 도서",
-            feedbackStatus: null,
+            feedbackStatus: "피드백 준비중",
           }),
         ]}
       />,
@@ -52,10 +52,10 @@ describe("RecentReadingList", () => {
 
     expect(screen.getByRole("heading", {
       level: 2,
-      name: "최근 함께 읽은 기록",
+      name: "최근 독서 기록",
     })).toBeVisible();
     expect(screen.getByRole("list", {
-      name: "최근 함께 읽은 기록",
+      name: "최근 독서 기록",
     }).querySelectorAll("li")).toHaveLength(3);
     expect(screen.getByRole("link", {
       name: "샘플 도서 회차 기록",
@@ -64,15 +64,27 @@ describe("RecentReadingList", () => {
       link.getAttribute("href")?.includes("/app/sessions/"),
     )).toHaveLength(3);
     expect(screen.getByRole("link", {
-      name: "전체 세션 기록 보기",
+      name: "전체 보기",
     })).toHaveAttribute("href", "/app/archive?view=sessions");
     expect(screen.getAllByRole("link").some((link) =>
       link.getAttribute("href")?.endsWith("/app/me/records"),
     )).toBe(false);
-    expect(screen.getByText(/질문 2/)).toBeVisible();
-    expect(screen.getByText(/서평 1/)).toBeVisible();
-    expect(screen.getByText(/피드백 열림/)).toBeVisible();
+    const readableRow = screen.getByRole("link", {
+      name: "샘플 도서 회차 기록",
+    });
+    expect(within(readableRow).getByText("질문 2")).toHaveClass("badge");
+    expect(within(readableRow).getByText("서평 1")).toHaveClass("badge");
+    expect(within(readableRow).getByText("피드백 O")).toHaveClass(
+      "badge",
+      "badge-ok",
+      "badge-dot",
+    );
     expect(screen.getByText("피드백 제한")).toBeVisible();
+    expect(screen.getByText("피드백 준비중")).toHaveClass(
+      "badge",
+      "badge-readonly",
+      "badge-dot",
+    );
   });
 
   it("keeps covers decorative and replaces a failed remote cover locally", () => {
@@ -93,7 +105,10 @@ describe("RecentReadingList", () => {
   });
 
   it("places the book heading in a flow-content container", () => {
-    render(<RecentReadingRow item={recentItem()} />);
+    render(<RecentReadingRow item={recentItem({
+      activityLabels: ["질문 2"],
+      feedbackStatus: "피드백 O",
+    })} />);
 
     const heading = screen.getByRole("heading", {
       level: 3,
@@ -102,9 +117,13 @@ describe("RecentReadingList", () => {
 
     expect(heading.parentElement).toHaveClass("rm-recent-reading-row__book");
     expect(heading.parentElement?.tagName).toBe("DIV");
+    const activity = screen.getByText("질문 2").parentElement;
+    expect(activity).toHaveClass("rm-recent-reading-row__activity");
+    expect(activity?.parentElement).toHaveClass("rm-recent-reading-row");
+    expect(activity).not.toBe(heading.parentElement);
   });
 
-  it("renders decorative chevrons instead of text arrows for navigation", () => {
+  it("matches the public records text link while keeping row navigation chevrons", () => {
     const { container } = render(
       <RecentReadingList
         items={[recentItem()]}
@@ -116,15 +135,18 @@ describe("RecentReadingList", () => {
       "svg.rm-recent-reading-chevron",
     );
 
-    expect(chevrons).toHaveLength(2);
+    expect(chevrons).toHaveLength(1);
     chevrons.forEach((chevron) => {
       expect(chevron).toHaveAttribute("aria-hidden", "true");
       expect(chevron).toHaveAttribute("focusable", "false");
     });
     expect(container).not.toHaveTextContent("→");
-    expect(screen.getByRole("link", {
-      name: "전체 세션 기록 보기",
-    })).toBeVisible();
+    const allRecordsLink = screen.getByRole("link", {
+      name: "전체 보기",
+    });
+    expect(allRecordsLink).toBeVisible();
+    expect(allRecordsLink).toHaveClass("public-records-link");
+    expect(allRecordsLink.querySelector("svg")).toBeNull();
     expect(screen.getByRole("link", {
       name: "샘플 도서 회차 기록",
     })).toBeVisible();
@@ -143,7 +165,7 @@ describe("RecentReadingList", () => {
     )).toBeVisible();
     expect(screen.queryByRole("list")).toBeNull();
     expect(screen.queryByRole("link", {
-      name: "전체 세션 기록 보기",
+      name: "전체 보기",
     })).toBeNull();
   });
 });

@@ -360,7 +360,8 @@ export function publicationLabel(published: boolean, variant: "desktop" | "mobil
 }
 
 export function feedbackArchiveLabel(feedbackDocument: ArchiveFeedbackDocumentStatus) {
-  return feedbackDocumentCopy(feedbackDocument).badge;
+  const badge = feedbackDocumentCopy(feedbackDocument).badge;
+  return badge === "피드백 없음" ? "피드백 준비중" : badge;
 }
 
 export function feedbackArchiveDescription(feedbackDocument: ArchiveFeedbackDocumentStatus) {

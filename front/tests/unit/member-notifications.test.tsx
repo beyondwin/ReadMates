@@ -166,7 +166,6 @@ describe("MemberNotificationsPage", () => {
       <MemberNotificationsPage
         unreadCount={1}
         items={[unreadNotification]}
-        mySpaceHref="/app/me"
         onMarkAllRead={() => undefined}
       />,
     );
@@ -189,7 +188,6 @@ describe("MemberNotificationsPage", () => {
       <MemberNotificationsPage
         unreadCount={1}
         items={[unreadNotification]}
-        mySpaceHref="/app/me"
         onOpenNotification={onOpenNotification}
         onMarkAllRead={vi.fn()}
       />,
@@ -211,7 +209,6 @@ describe("MemberNotificationsPage", () => {
         <MemberNotificationsPage
           unreadCount={1}
           items={[unreadNotification]}
-          mySpaceHref="/clubs/reading-sai/app/me"
           onMarkAllRead={() => undefined}
         />
       </MemoryRouter>,
@@ -229,7 +226,6 @@ describe("MemberNotificationsPage", () => {
         <MemberNotificationsPage
           unreadCount={1}
           items={[scopedUnreadNotification]}
-          mySpaceHref="/clubs/reading-sai/app/me"
           onMarkAllRead={() => undefined}
         />
       </MemoryRouter>,
@@ -252,7 +248,6 @@ describe("MemberNotificationsPage", () => {
             ...scopedUnreadNotification,
             readAt: "2026-04-29T01:00:00Z",
           }]}
-          mySpaceHref="/clubs/reading-sai/app/me"
           onOpenNotification={onOpenNotification}
           onMarkAllRead={vi.fn()}
         />
@@ -276,7 +271,6 @@ describe("MemberNotificationsPage", () => {
       <MemberNotificationsPage
         unreadCount={1}
         items={[unreadNotification]}
-        mySpaceHref="/app/me"
         pendingReadIds={new Set([unreadNotification.id])}
         markAllReadPending
         actionError="알림을 읽음 처리하지 못했습니다. 다시 시도해 주세요."
@@ -392,7 +386,6 @@ describe("MemberNotificationsPage", () => {
       <MemberNotificationsPage
         unreadCount={0}
         items={[]}
-        mySpaceHref="/app/me"
         onMarkAllRead={vi.fn()}
       />,
     );

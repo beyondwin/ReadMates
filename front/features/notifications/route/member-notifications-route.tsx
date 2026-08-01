@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
-import { useLoaderData, useLocation, useNavigate, useRevalidator } from "react-router-dom";
+import { useLoaderData, useNavigate, useRevalidator } from "react-router-dom";
 import type { ReadmatesReturnState } from "@/shared/routing/readmates-route-state";
-import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 import { MemberNotificationsPage } from "../ui/member-notifications-page";
 import { memberNotificationsActions, type MemberNotificationsRouteData } from "./member-notifications-data";
 
@@ -9,7 +8,6 @@ const READ_ACTION_ERROR = "알림을 읽음 처리하지 못했습니다. 다시
 
 export function MemberNotificationsRoute() {
   const data = useLoaderData() as MemberNotificationsRouteData;
-  const location = useLocation();
   const navigate = useNavigate();
   const revalidator = useRevalidator();
   const pendingReadIdsRef = useRef(new Set<string>());
@@ -119,7 +117,6 @@ export function MemberNotificationsRoute() {
     <MemberNotificationsPage
       unreadCount={page.unreadCount}
       items={page.items}
-      mySpaceHref={scopedAppLinkTarget(location.pathname, "/app/me")}
       hasMore={Boolean(page.nextCursor)}
       isLoadingMore={isLoadingMore}
       pendingReadIds={pendingReadIds}

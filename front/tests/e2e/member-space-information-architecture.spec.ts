@@ -19,6 +19,53 @@ async function expectPracticalTapTarget(locator: Locator) {
   expect(box!.width).toBeGreaterThanOrEqual(44);
 }
 
+async function expectCompactProfileEditor(shelf: Locator, viewportWidth: number) {
+  const form = shelf.locator(".rm-member-profile__form");
+  const input = shelf.getByRole("textbox", { name: "표시 이름" });
+  const save = shelf.getByRole("button", { name: "이름 저장" });
+  const cancel = shelf.getByRole("button", { name: "취소" });
+
+  await expectPracticalTapTarget(input);
+  await expectPracticalTapTarget(save);
+  await expectPracticalTapTarget(cancel);
+
+  const [formBox, inputBox, saveBox, cancelBox] = await Promise.all([
+    form.boundingBox(),
+    input.boundingBox(),
+    save.boundingBox(),
+    cancel.boundingBox(),
+  ]);
+  expect(formBox).not.toBeNull();
+  expect(inputBox).not.toBeNull();
+  expect(saveBox).not.toBeNull();
+  expect(cancelBox).not.toBeNull();
+  expect(formBox!.width).toBeLessThanOrEqual(480.5);
+  expect(Math.abs(saveBox!.width - cancelBox!.width)).toBeLessThanOrEqual(1);
+  expect(saveBox!.width).toBeGreaterThanOrEqual(71.5);
+
+  if (viewportWidth > 768) {
+    expect(inputBox!.width).toBeLessThanOrEqual(320.5);
+    expect(Math.abs(
+      (inputBox!.y + inputBox!.height) - (saveBox!.y + saveBox!.height),
+    )).toBeLessThanOrEqual(1);
+  } else {
+    expect(saveBox!.y).toBeGreaterThanOrEqual(inputBox!.y + inputBox!.height + 7);
+    expect(Math.abs(saveBox!.y - cancelBox!.y)).toBeLessThanOrEqual(1);
+  }
+
+  const focusStyle = await input.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      boxShadow: style.boxShadow,
+      outlineStyle: style.outlineStyle,
+      outlineWidth: Number.parseFloat(style.outlineWidth),
+    };
+  });
+  expect(focusStyle.boxShadow).toBe("none");
+  expect(focusStyle.outlineStyle).toBe("solid");
+  expect(focusStyle.outlineWidth).toBeGreaterThanOrEqual(2);
+}
+
 async function expectDomOrder(...locators: Locator[]) {
   const indexes = await Promise.all(
     locators.map((locator) =>
@@ -59,7 +106,7 @@ async function expectMemberSpaceSemanticOrder(page: Page) {
   const shelf = page.locator(".rm-member-space");
   const overview = shelf.locator(".rm-member-space__overview");
   const utilities = shelf.getByRole("region", { name: "내 공간 관리" });
-  const recentReadings = shelf.getByRole("region", { name: "최근 함께 읽은 기록" });
+  const recentReadings = shelf.getByRole("region", { name: "최근 독서 기록" });
   await expectDomOrder(
     overview,
     shelf.getByRole("heading", { level: 1, name: "멤버1" }),
@@ -71,7 +118,7 @@ async function expectMemberSpaceSemanticOrder(page: Page) {
     shelf.getByText("질문", { exact: true }),
     utilities,
     recentReadings,
-    shelf.getByRole("heading", { level: 2, name: "최근 함께 읽은 기록" }),
+    shelf.getByRole("heading", { level: 2, name: "최근 독서 기록" }),
     shelf.getByRole("link", {
       name: /responsive reading shelf 회차 기록/,
     }),
@@ -126,10 +173,10 @@ test("member space keeps the profile-first semantic order and usable actions acr
     await expect(overview).toHaveCount(1);
     await expect(shelf.locator(".rm-reading-achievement__metrics")).toHaveCount(1);
     await expect(shelf.getByRole("list", {
-      name: "최근 함께 읽은 기록",
+      name: "최근 독서 기록",
     }).getByRole("listitem")).toHaveCount(3);
     await expect(shelf.getByRole("link", {
-      name: "전체 세션 기록 보기",
+      name: "전체 보기",
     })).toHaveAttribute(
       "href",
       `${scopedAppPath}/archive?view=sessions`,
@@ -202,6 +249,25 @@ test("member space keeps the profile-first semantic order and usable actions acr
     });
     await pressTabUntilFocused(page, editProfile, "edit profile");
 
+    await editProfile.click();
+    await expect(
+      shelf.getByRole("heading", { level: 1, name: "멤버1" }),
+    ).toHaveClass(/rm-sr-only/);
+    await expectCompactProfileEditor(shelf, viewport.width);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: testInfo.outputPath(
+        `member-space-name-editor-${viewport.width}x${viewport.height}.png`,
+      ),
+      fullPage: true,
+    });
+    await page.keyboard.press("Escape");
+    await expect(editProfile).toBeFocused();
+
     await page.screenshot({
       path: testInfo.outputPath(
         `member-space-${viewport.width}x${viewport.height}.png`,
@@ -224,11 +290,21 @@ test("member space keeps the profile-first semantic order and usable actions acr
     document.body.style.zoom = "200%";
   });
   await expectMemberSpaceSemanticOrder(page);
+  const shelf = page.locator(".rm-member-space");
+  const editProfile = shelf.getByRole("button", { name: "이름 변경" });
+  await editProfile.click();
+  await expectCompactProfileEditor(shelf, 320);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
+  await page.screenshot({
+    path: testInfo.outputPath("member-space-name-editor-200-percent-zoom.png"),
+    fullPage: true,
+  });
+  await page.keyboard.press("Escape");
+  await expect(editProfile).toBeFocused();
   await page.screenshot({
     path: testInfo.outputPath("member-space-200-percent-zoom.png"),
     fullPage: true,
@@ -316,7 +392,7 @@ test("club-scoped account and notification routes preserve navigation current st
   await page.goto(`${scopedAppPath}/me`);
 
   const fullRecords = page.getByRole("link", {
-    name: "전체 세션 기록 보기",
+    name: "전체 보기",
   });
   await expect(fullRecords).toHaveAttribute(
     "href",
@@ -338,7 +414,7 @@ test("club-scoped account and notification routes preserve navigation current st
 
   await page.goto(`${scopedAppPath}/me`);
   await page.getByRole("link", {
-    name: "전체 세션 기록 보기",
+    name: "전체 보기",
   }).click();
   await expect(page).toHaveURL(
     new RegExp(`${scopedAppPath}/archive\\?view=sessions$`),
@@ -363,11 +439,10 @@ test("club-scoped account and notification routes preserve navigation current st
     name: "내 공간",
   })).toHaveAttribute("aria-current", "page");
 
-  const settingsParent = page.locator(".rm-account-settings-page").getByRole("link", {
+  await expect(page.locator(".rm-account-settings-page").getByRole("link", {
     name: "내 공간",
-  });
-  await expect(settingsParent).toHaveAttribute("href", `${scopedAppPath}/me`);
-  await settingsParent.click();
+  })).toHaveCount(0);
+  await appNavigation.getByRole("link", { name: "내 공간" }).click();
   await expect(page).toHaveURL(new RegExp(`${scopedAppPath}/me$`));
 
   const notificationLink = page.getByRole("region", {
@@ -383,11 +458,7 @@ test("club-scoped account and notification routes preserve navigation current st
     name: "내 공간",
   })).toHaveAttribute("aria-current", "page");
 
-  const notificationParent = page.getByRole("navigation", { name: "현재 위치" });
-  await expect(notificationParent.getByRole("link", { name: "내 공간" })).toHaveAttribute(
-    "href",
-    `${scopedAppPath}/me`,
-  );
+  await expect(page.getByRole("navigation", { name: "현재 위치" })).toHaveCount(0);
 
   const notificationTabs = page.getByRole("navigation", {
     name: "알림 보기",

@@ -30,7 +30,8 @@ describe("PublicRecordsPage showcase", () => {
       />,
     );
 
-    expect(screen.getByText("기록 준비됨")).toBeVisible();
+    expect(screen.queryByText("기록 준비됨")).toBeNull();
+    expect(screen.queryByText("요약 중심 기록")).toBeNull();
     expect(screen.getByText("하이라이트 3 · 한줄평 2")).toBeVisible();
     expect(container.querySelector(".public-record-index-row__title")).toHaveClass("editorial");
     expect(container.querySelector(".public-record-index-row__title")).not.toHaveClass("reading-editorial");

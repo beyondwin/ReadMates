@@ -23,7 +23,6 @@ function PublicRecordIndexRow({ publicBasePath, session }: { publicBasePath: str
           <span>{display.date}</span>
         </span>
         <span className="public-archive-row__counts public-record-index-row__counts">
-          <span className="badge badge-dot">{display.showcaseStateLabel}</span>
           <span>{display.recordDensityLabel}</span>
         </span>
         <span className="editorial public-record-index-row__title">{display.title}</span>

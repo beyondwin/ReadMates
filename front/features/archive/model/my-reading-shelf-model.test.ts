@@ -201,7 +201,7 @@ describe("my reading shelf model", () => {
         bookImageUrl: "https://example.com/public-safe-cover.jpg",
         coverFallbackLabel: "첫",
         activityLabels: ["질문 2", "서평 1"],
-        feedbackStatus: "피드백 열림",
+        feedbackStatus: "피드백 O",
       },
       expect.objectContaining({
         sessionId: "second",
@@ -209,7 +209,7 @@ describe("my reading shelf model", () => {
       }),
       expect.objectContaining({
         sessionId: "third",
-        feedbackStatus: null,
+        feedbackStatus: "피드백 준비중",
       }),
     ]);
   });
@@ -236,7 +236,7 @@ describe("my reading shelf model", () => {
         coverFallbackLabel: "책",
         dateLabel: "날짜 미상",
         activityLabels: [],
-        feedbackStatus: null,
+        feedbackStatus: "피드백 준비중",
       }),
     ]);
   });

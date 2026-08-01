@@ -3,7 +3,6 @@ import { useInRouterContext, useLocation } from "react-router-dom";
 import { getMemberNotificationLinkView } from "@/features/notifications/model/notification-link-model";
 import type { ReadmatesReturnState } from "@/shared/routing/readmates-route-state";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
-import { MemberSpaceBreadcrumb } from "./member-space-breadcrumb";
 import { MemberNotificationTabs } from "./member-notification-tabs";
 
 type NotificationEventType =
@@ -25,7 +24,6 @@ interface MemberNotificationItem {
 interface MemberNotificationsPageProps {
   unreadCount: number;
   items: MemberNotificationItem[];
-  mySpaceHref: string;
   hasMore?: boolean;
   isLoadingMore?: boolean;
   pendingReadIds?: ReadonlySet<string>;
@@ -105,7 +103,6 @@ function RouterAwareMemberNotificationsPage(props: MemberNotificationsPageProps)
 function MemberNotificationsPageContent({
   unreadCount,
   items,
-  mySpaceHref,
   hasMore = false,
   isLoadingMore = false,
   pendingReadIds = EMPTY_PENDING_READ_IDS,
@@ -127,10 +124,6 @@ function MemberNotificationsPageContent({
       <section className="container rm-member-notifications-page__body">
         <header className="rm-member-notifications-header">
           <div>
-            <MemberSpaceBreadcrumb mySpaceHref={mySpaceHref} currentLabel="알림" />
-            <div className="rm-member-notifications-header__eyebrow">
-              읽는사이 · 알림
-            </div>
             <h1 className="rm-member-notifications-header__title">알림</h1>
             <p className="rm-member-notifications-header__summary">
               {unreadLabel}

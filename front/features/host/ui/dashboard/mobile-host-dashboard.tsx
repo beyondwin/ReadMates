@@ -117,6 +117,11 @@ export function MobileHostDashboard({
     recordAttention,
   });
   const ledgerMetrics = getHostDashboardLedgerMetrics(data, recordAttention);
+  const ledgerTotal = ledgerMetrics.reduce((sum, metric) => sum + metric.value, 0);
+  const firstLedgerItem = ledgerMetrics.find((metric) => metric.value > 0);
+  const ledgerSummary = firstLedgerItem
+    ? `${firstLedgerItem.label} ${firstLedgerItem.value}건 · ${firstLedgerItem.stateLabel}`
+    : "확인할 항목 없음";
   const checklistView = getHostDashboardChecklistView(checklist);
   const goingCount = session?.attendees.filter((member) => member.rsvpStatus === "GOING").length ?? 0;
   const noResponseCount = session?.attendees.filter((member) => member.rsvpStatus === "NO_RESPONSE").length ?? 0;
@@ -181,43 +186,48 @@ export function MobileHostDashboard({
           <h2 id="host-mobile-current-title">현재 세션</h2>
           <span className={badgeClass(phase.tone === "warn" ? 1 : 0, phase.tone)}>{phase.status}</span>
         </div>
-        <article className="m-card rm-host-dashboard-mobile__session-card">
-          {session ? (
-            <>
-              <SessionTimingIdentity
-                sessionNumber={session.sessionNumber}
-                date={session.date}
-                phaseLabel="이번 세션"
-              />
-              <h3 className="h4 editorial">{session.bookTitle}</h3>
-              <p className="small">
-                {formatDateOnlyLabel(session.date)} · {session.startTime} · {session.locationLabel}
-              </p>
-              <dl className="rm-host-dashboard-mobile__session-metrics">
-                {getHostDashboardSessionMetrics(session).map(([label, value]) => (
-                  <div key={label}>
-                    <dt className="eyebrow">{label}</dt>
-                    <dd className="ledger-number">{value}</dd>
-                  </div>
-                ))}
-              </dl>
-              <p className="small">
-                참석 <span className="ledger-number">{goingCount}</span>명 · 미응답{" "}
-                <span className="ledger-number">{noResponseCount}</span>명
-              </p>
-            </>
-          ) : (
-            <>
-              <h3 className="h4 editorial">열린 세션 없음</h3>
-              <p className="small">새 세션을 등록하면 RSVP와 질문 작성이 열립니다.</p>
-            </>
-          )}
+        <article
+          className="m-card rm-host-dashboard-mobile__session-card"
+          aria-label="현재 세션 요약"
+        >
+          <div className="rm-host-dashboard-mobile__session-head">
+            {session ? (
+              <>
+                <SessionTimingIdentity
+                  sessionNumber={session.sessionNumber}
+                  date={session.date}
+                />
+                <h3 className="h4 editorial">{session.bookTitle}</h3>
+                <p className="small">
+                  {formatDateOnlyLabel(session.date)} · {session.startTime} · {session.locationLabel}
+                </p>
+                <dl className="rm-host-dashboard-mobile__session-metrics">
+                  {getHostDashboardSessionMetrics(session).map(([label, value]) => (
+                    <div key={label}>
+                      <dt className="eyebrow">{label}</dt>
+                      <dd className="ledger-number">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+                {noResponseCount > 0 ? (
+                  <p className="small rm-host-dashboard-mobile__session-note">
+                    미응답 <span className="ledger-number">{noResponseCount}</span>명
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <h3 className="h4 editorial">열린 세션 없음</h3>
+                <p className="small">새 세션을 등록하면 RSVP와 질문 작성이 열립니다.</p>
+              </>
+            )}
+          </div>
           <LinkComponent
             to={sessionEditHref}
             state={sessionEditState}
             className="btn btn-primary rm-host-dashboard-mobile__session-cta"
           >
-            <span>{session ? "세션 문서 편집" : "세션 문서 만들기"}</span>
+            <span>{session ? "세션 문서 열기" : "세션 문서 만들기"}</span>
             <Icon name="arrow-right" size={14} />
           </LinkComponent>
         </article>
@@ -226,9 +236,10 @@ export function MobileHostDashboard({
       <details className="m-sec rm-host-mobile-disclosure">
         <summary>
           <span>
-            <strong>처리 대기 원장</strong>
-            <small>상태 {ledgerMetrics.reduce((sum, metric) => sum + metric.value, 0)}건</small>
+            <strong>확인할 운영 항목</strong>
+            <small>{ledgerSummary}</small>
           </span>
+          <span className="badge rm-host-mobile-disclosure__count">{ledgerTotal}건</span>
         </summary>
         <dl className="rm-host-mobile-ledger">
           {ledgerMetrics.map((metric) => (
@@ -259,9 +270,9 @@ export function MobileHostDashboard({
 
       <section className="m-sec rm-host-mobile-flow" aria-labelledby="host-mobile-flow-title">
         <div className="m-eyebrow-row">
-          <h2 id="host-mobile-flow-title">다음 세션과 운영 흐름</h2>
-          <LinkComponent to={newSessionHref} className="small">
-            문서 만들기
+          <h2 id="host-mobile-flow-title">예정 세션</h2>
+          <LinkComponent to={newSessionHref} className="small rm-host-mobile-flow__create-link">
+            세션 문서 만들기
           </LinkComponent>
         </div>
         {upcomingSessions.length > 0 ? (
@@ -292,6 +303,7 @@ export function MobileHostDashboard({
           </button>
         ) : null}
         {upcomingMessage ? <UpcomingActionMessage message={upcomingMessage} mobile /> : null}
+        <h3 className="rm-host-mobile-flow__subheading">운영 흐름</h3>
         <ol className="rm-host-mobile-flow__steps" aria-label="현재 운영 단계">
           {checklistView.highlighted.map((item) => (
             <MobileChecklistRow key={item.id} item={item} />

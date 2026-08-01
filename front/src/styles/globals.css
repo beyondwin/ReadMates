@@ -719,7 +719,7 @@ a.rm-recent-record__destination:hover {
   color: var(--text-2);
 }
 
-.rm-recent-record__destination-arrow {
+.rm-recent-record__destination-chevron {
   flex: 0 0 auto;
   color: var(--accent);
   font-size: 16px;
@@ -3892,8 +3892,14 @@ a.rm-recent-record__destination:hover {
 }
 
 .public-records-link {
+  display: inline-flex;
+  min-height: 44px;
   align-items: center;
   gap: 8px;
+  color: inherit;
+  font-size: 0.875rem;
+  font-weight: 650;
+  text-decoration: none;
 }
 
 .public-record-badges {
@@ -6218,6 +6224,7 @@ a.rm-recent-record__destination:hover {
 }
 
 .rm-member-profile__field {
+  grid-area: field;
   min-width: 0;
 }
 
@@ -6229,21 +6236,42 @@ a.rm-recent-record__destination:hover {
 .rm-member-profile__field .input {
   width: 100%;
   min-width: 0;
-  height: 40px;
+  height: 44px;
   margin-top: 7px;
 }
 
 .rm-member-profile__error {
-  margin-top: 7px;
+  grid-area: error;
+  margin-top: 0;
   color: var(--danger);
 }
 
 .rm-member-profile__form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "field save cancel"
+    "error error error";
+  grid-template-columns: minmax(240px, 320px) 72px 72px;
   gap: 8px;
   align-items: end;
-  margin-top: 12px;
+  width: min(100%, 480px);
+  margin-top: 0;
+}
+
+.rm-member-profile__save,
+.rm-member-profile__cancel {
+  width: 72px;
+  min-width: 72px;
+  min-height: 44px;
+  white-space: nowrap;
+}
+
+.rm-member-profile__save {
+  grid-area: save;
+}
+
+.rm-member-profile__cancel {
+  grid-area: cancel;
 }
 
 .rm-reading-achievement {
@@ -6410,7 +6438,7 @@ a.rm-recent-record__destination:hover {
 
 .rm-recent-reading-row {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) auto;
+  grid-template-columns: 48px minmax(0, 1fr) minmax(132px, auto) auto;
   gap: 16px;
   align-items: center;
   min-height: 104px;
@@ -6446,12 +6474,21 @@ a.rm-recent-record__destination:hover {
 }
 
 .rm-recent-reading-row__meta,
-.rm-recent-reading-row__author,
-.rm-recent-reading-row__activity {
+.rm-recent-reading-row__author {
   display: block;
   color: var(--text-3);
   font-size: var(--type-size-supporting);
   overflow-wrap: anywhere;
+}
+
+.rm-recent-reading-row__activity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  justify-self: end;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .rm-recent-reading-row__arrow {
@@ -6471,12 +6508,19 @@ a.rm-recent-record__destination:hover {
 }
 
 .rm-member-profile__edit:focus-visible,
-.rm-member-profile__form :is(input, button):focus-visible,
+.rm-member-profile__form button:focus-visible,
 .rm-member-space-utilities__link:focus-visible,
 .rm-recent-readings__all:focus-visible,
 .rm-recent-reading-row:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 3px;
+}
+
+.rm-member-profile__form .input:focus-visible {
+  border-color: var(--accent);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  box-shadow: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -7076,7 +7120,13 @@ a.rm-recent-record__destination:hover {
   }
 
   .rm-member-profile__form {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "field field field"
+      "save cancel ."
+      "error error error";
+    grid-template-columns: 72px 72px minmax(0, 1fr);
+    align-items: start;
+    width: 100%;
   }
 
   .rm-member-space-kicker {
@@ -7092,10 +7142,6 @@ a.rm-recent-record__destination:hover {
   .rm-member-profile__meta {
     grid-column: 1 / -1;
     grid-row: auto;
-  }
-
-  .rm-member-profile__form > .rm-member-profile__field {
-    grid-column: 1 / -1;
   }
 
   .rm-reading-achievement {
@@ -7133,6 +7179,24 @@ a.rm-recent-record__destination:hover {
     gap: 11px;
     min-height: 96px;
     padding-inline: 0;
+  }
+
+  .rm-recent-reading-row__cover {
+    grid-row: 1 / span 2;
+  }
+
+  .rm-recent-reading-row__book {
+    grid-column: 2;
+  }
+
+  .rm-recent-reading-row__activity {
+    grid-column: 2;
+    justify-self: end;
+  }
+
+  .rm-recent-reading-row__arrow {
+    grid-column: 3;
+    grid-row: 1 / span 2;
   }
 
   .rm-recent-reading-row__cover {
