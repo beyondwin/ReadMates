@@ -302,7 +302,8 @@ test("session closing flywheel links host member and public surfaces", async ({ 
 
   await routePublicRecords(page);
   await page.goto(`/clubs/${CLUB_SLUG}/records`);
-  await expect(page.getByText("기록 준비됨")).toBeVisible();
+  await expect(page.getByText("기록 준비됨")).toHaveCount(0);
+  await expect(page.getByText("요약 중심 기록")).toHaveCount(0);
   await expect(page.getByText("하이라이트 2 · 한줄평 1")).toBeVisible();
   await expect(page.getByText("피드백 문서")).toHaveCount(0);
 });
