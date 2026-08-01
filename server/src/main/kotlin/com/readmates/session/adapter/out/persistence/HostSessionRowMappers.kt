@@ -1,5 +1,6 @@
 package com.readmates.session.adapter.out.persistence
 
+import com.readmates.auth.domain.BookClubAvatarKey
 import com.readmates.session.application.HostSessionAttendee
 import com.readmates.session.application.HostSessionDetailResponse
 import com.readmates.session.application.HostSessionFeedbackDocument
@@ -82,6 +83,7 @@ internal fun ResultSet.toHostSessionAttendee() =
         membershipId = uuid("membership_id").toString(),
         displayName = getString("display_name"),
         accountName = getString("account_name"),
+        avatarKey = getString("attendee_avatar_key") ?: BookClubAvatarKey.fallback.wireValue,
         rsvpStatus = getString("rsvp_status"),
         attendanceStatus = getString("attendance_status"),
         participationStatus = SessionParticipationStatus.valueOf(getString("participation_status")),

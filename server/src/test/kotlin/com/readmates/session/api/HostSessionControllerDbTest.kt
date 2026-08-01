@@ -190,6 +190,14 @@ private const val CLEANUP_GENERATED_SESSIONS_SQL = """
        or slug = 'outside-readmates-test';
 """
 
+private const val RESET_HOST_AVATAR_KEY_SQL = """
+    update memberships
+    join users on users.id = memberships.user_id
+    set memberships.avatar_key = 'reading-lamp'
+    where memberships.club_id = '00000000-0000-0000-0000-000000000001'
+      and users.email = 'host@example.com';
+"""
+
 @SpringBootTest(
     properties = [
         "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
@@ -725,6 +733,35 @@ class HostSessionControllerDbTest(
 
         val participantCount = participantCountForSessionNumber(7)
         assertEquals(6, participantCount)
+    }
+
+    @Test
+    @Sql(
+        statements = [
+            RESET_HOST_AVATAR_KEY_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `host session attendee returns stored avatar key`() {
+        createSessionSeven()
+        jdbcTemplate.update(
+            """
+            update memberships
+            join users on users.id = memberships.user_id
+            set memberships.avatar_key = 'book-tote'
+            where memberships.club_id = '00000000-0000-0000-0000-000000000001'
+              and users.email = 'host@example.com'
+            """.trimIndent(),
+        )
+
+        mockMvc
+            .get("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.attendees[0].avatarKey") { value("book-tote") }
+                jsonPath("$.attendees[0].profileImageUrl") { doesNotExist() }
+            }
     }
 
     @Test
@@ -1774,7 +1811,7 @@ class HostSessionControllerDbTest(
         )
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
             values
               (
                 '00000000-0000-0000-0000-000000019211',
@@ -1783,7 +1820,8 @@ class HostSessionControllerDbTest(
                 'MEMBER',
                 'SUSPENDED',
                 utc_timestamp(6),
-                '정지'
+                '정지',
+                'reading-lamp'
               ),
               (
                 '00000000-0000-0000-0000-000000019212',
@@ -1792,7 +1830,8 @@ class HostSessionControllerDbTest(
                 'MEMBER',
                 'LEFT',
                 utc_timestamp(6),
-                '탈퇴'
+                '탈퇴',
+                'book-tote'
               ),
               (
                 '00000000-0000-0000-0000-000000019213',
@@ -1801,7 +1840,8 @@ class HostSessionControllerDbTest(
                 'MEMBER',
                 'INACTIVE',
                 utc_timestamp(6),
-                '비활성'
+                '비활성',
+                'book-spines'
               )
             """.trimIndent(),
         )
@@ -1889,7 +1929,7 @@ class HostSessionControllerDbTest(
         )
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
             values (
               '00000000-0000-0000-0000-000000019201',
               '00000000-0000-0000-0000-000000019001',
@@ -1897,7 +1937,8 @@ class HostSessionControllerDbTest(
               'HOST',
               'ACTIVE',
               utc_timestamp(6),
-              '외부'
+              '외부',
+              'reading-lamp'
             )
             """.trimIndent(),
         )

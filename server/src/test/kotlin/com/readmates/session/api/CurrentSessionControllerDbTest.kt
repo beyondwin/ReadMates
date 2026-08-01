@@ -67,6 +67,7 @@ class CurrentSessionControllerDbTest(
     @Sql(
         statements = [
             CLEANUP_GENERATED_SESSIONS_SQL,
+            SEED_CURRENT_SESSION_AVATAR_KEYS_SQL,
             """
             insert into sessions (
               id, club_id, number, title, book_title, book_author, book_translator, book_link,
@@ -105,11 +106,19 @@ class CurrentSessionControllerDbTest(
             on duplicate key update reading_progress = values(reading_progress);
             """,
             """
+            insert into one_line_reviews (id, club_id, session_id, membership_id, text, visibility)
+            select '00000000-0000-0000-0000-000000009003', memberships.club_id, '00000000-0000-0000-0000-000000000777', memberships.id,
+                   '현재 세션 hydrate 한줄평', 'PRIVATE'
+            from memberships join users on users.id = memberships.user_id
+            where users.email = 'member5@example.com'
+            on duplicate key update text = values(text), visibility = values(visibility);
+            """,
+            """
             insert into long_reviews (id, club_id, session_id, membership_id, body, visibility)
             select '00000000-0000-0000-0000-000000009004', memberships.club_id, '00000000-0000-0000-0000-000000000777', memberships.id,
                    '현재 세션 hydrate 서평', 'PRIVATE'
             from memberships join users on users.id = memberships.user_id
-            where users.email = 'member1@example.com'
+            where users.email = 'member5@example.com'
             on duplicate key update body = values(body), visibility = values(visibility);
             """,
         ],
@@ -118,9 +127,11 @@ class CurrentSessionControllerDbTest(
     @Sql(
         statements = [
             CLEANUP_GENERATED_SESSIONS_SQL,
+            RESET_CURRENT_SESSION_AVATAR_KEYS_SQL,
         ],
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
+    @Suppress("LongMethod")
     fun `current session returns my saved notes and shared board`() {
         mockMvc
             .get("/api/sessions/current") {
@@ -147,12 +158,18 @@ class CurrentSessionControllerDbTest(
                 jsonPath("$.currentSession.myQuestions[0].priority") { value(1) }
                 jsonPath("$.currentSession.myQuestions[0].text") { value("현재 세션 hydrate 질문") }
                 jsonPath("$.currentSession.myQuestions[0].draftThought") { value("hydrate 초안") }
-                jsonPath("$.currentSession.myQuestions[0].authorName") { value("멤버5") }
-                jsonPath("$.currentSession.myQuestions[0].authorShortName") { value("멤버5") }
-                jsonPath("$.currentSession.myOneLineReview") { value(null) }
-                jsonPath("$.currentSession.myLongReview") { value(null) }
-                jsonPath("$.currentSession.board.questions[0].authorName") { value("멤버5") }
-                jsonPath("$.currentSession.board.questions[0].authorShortName") { value("멤버5") }
+                jsonPath("$.currentSession.myQuestions[0].authorName") { value("김멤버") }
+                jsonPath("$.currentSession.myQuestions[0].authorShortName") { value("김멤버") }
+                jsonPath("$.currentSession.myQuestions[0].avatarKey") { value("book-tote") }
+                jsonPath("$.currentSession.myQuestions[0].profileImageUrl") { doesNotExist() }
+                jsonPath("$.currentSession.myOneLineReview.text") { value("현재 세션 hydrate 한줄평") }
+                jsonPath("$.currentSession.myOneLineReview.avatarKey") { value("book-tote") }
+                jsonPath("$.currentSession.myOneLineReview.profileImageUrl") { doesNotExist() }
+                jsonPath("$.currentSession.myLongReview.body") { value("현재 세션 hydrate 서평") }
+                jsonPath("$.currentSession.myLongReview.avatarKey") { value("book-tote") }
+                jsonPath("$.currentSession.myLongReview.profileImageUrl") { doesNotExist() }
+                jsonPath("$.currentSession.board.questions[0].authorName") { value("김멤버") }
+                jsonPath("$.currentSession.board.questions[0].authorShortName") { value("김멤버") }
                 jsonPath("$.currentSession.board.questions[0].priority") { value(1) }
                 jsonPath("$.currentSession.board.questions[0].text") { value("현재 세션 hydrate 질문") }
                 jsonPath("$.currentSession.board.questions[0].draftThought") { value("hydrate 초안") }
@@ -161,17 +178,19 @@ class CurrentSessionControllerDbTest(
                 jsonPath("$.currentSession.board.highlights") { doesNotExist() }
                 jsonPath("$.currentSession.board.longReviews.length()") { value(greaterThan(0)) }
                 jsonPath("$.currentSession.board.longReviews[?(@.body == '현재 세션 hydrate 서평')].authorName") {
-                    value(hasItem("멤버1"))
+                    value(hasItem("김멤버"))
                 }
                 jsonPath("$.currentSession.board.longReviews[?(@.body == '현재 세션 hydrate 서평')].authorShortName") {
-                    value(hasItem("멤버1"))
+                    value(hasItem("김멤버"))
                 }
                 jsonPath("$.currentSession.board.longReviews[?(@.body == '현재 세션 hydrate 서평')].body") {
                     value(hasItem("현재 세션 hydrate 서평"))
                 }
                 jsonPath("$.currentSession.attendees[0].membershipId") { exists() }
-                jsonPath("$.currentSession.attendees[0].displayName") { value("호스트") }
-                jsonPath("$.currentSession.attendees[0].accountName") { value("김호스트") }
+                jsonPath("$.currentSession.attendees[0].displayName") { value("김호스트") }
+                jsonPath("$.currentSession.attendees[0].accountName") { value("김호스트키") }
+                jsonPath("$.currentSession.attendees[0].avatarKey") { value("reading-lamp") }
+                jsonPath("$.currentSession.attendees[0].profileImageUrl") { doesNotExist() }
                 jsonPath("$.currentSession.attendees[0].shortName") { doesNotExist() }
                 jsonPath("$.currentSession.attendees[0].role") { value("HOST") }
                 jsonPath("$.currentSession.attendees[0].rsvpStatus") { value("GOING") }
@@ -410,6 +429,42 @@ class CurrentSessionControllerDbTest(
             set memberships.status = 'LEFT'
             where users.email = 'member1@example.com'
               and memberships.club_id = '00000000-0000-0000-0000-000000000001';
+        """
+        private const val SEED_CURRENT_SESSION_AVATAR_KEYS_SQL = """
+            update memberships
+            join users on users.id = memberships.user_id
+            set memberships.avatar_key = case users.email
+                  when 'host@example.com' then 'reading-lamp'
+                  when 'member5@example.com' then 'book-tote'
+                end,
+                memberships.short_name = case users.email
+                  when 'host@example.com' then '김호스트'
+                  when 'member5@example.com' then '김멤버'
+                end,
+                users.name = case users.email
+                  when 'host@example.com' then '김호스트키'
+                  when 'member5@example.com' then '김멤버키'
+                end
+            where memberships.club_id = '00000000-0000-0000-0000-000000000001'
+              and users.email in ('host@example.com', 'member5@example.com');
+        """
+        private const val RESET_CURRENT_SESSION_AVATAR_KEYS_SQL = """
+            update memberships
+            join users on users.id = memberships.user_id
+            set memberships.avatar_key = case users.email
+                  when 'host@example.com' then 'reading-lamp'
+                  when 'member5@example.com' then 'library-stamp'
+                end,
+                memberships.short_name = case users.email
+                  when 'host@example.com' then '호스트'
+                  when 'member5@example.com' then '멤버5'
+                end,
+                users.name = case users.email
+                  when 'host@example.com' then '김호스트'
+                  when 'member5@example.com' then '이멤버5'
+                end
+            where memberships.club_id = '00000000-0000-0000-0000-000000000001'
+              and users.email in ('host@example.com', 'member5@example.com');
         """
         private const val RESET_MEMBER1_ACTIVE_SQL = """
             update memberships

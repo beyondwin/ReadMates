@@ -1,5 +1,6 @@
 package com.readmates.session.adapter.out.persistence
 
+import com.readmates.auth.domain.BookClubAvatarKey
 import com.readmates.session.application.BoardHighlight
 import com.readmates.session.application.BoardLongReview
 import com.readmates.session.application.BoardOneLineReview
@@ -90,6 +91,7 @@ class JdbcCurrentSessionAdapter(
               memberships.id as membership_id,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as display_name,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as account_name,
+              memberships.avatar_key as attendee_avatar_key,
               memberships.role,
               session_participants.rsvp_status,
               session_participants.attendance_status,
@@ -109,6 +111,7 @@ class JdbcCurrentSessionAdapter(
                     membershipId = resultSet.uuid("membership_id").toString(),
                     displayName = resultSet.getString("display_name"),
                     accountName = resultSet.getString("account_name"),
+                    avatarKey = resultSet.getString("attendee_avatar_key") ?: BookClubAvatarKey.fallback.wireValue,
                     role = resultSet.getString("role"),
                     rsvpStatus = resultSet.getString("rsvp_status"),
                     attendanceStatus = resultSet.getString("attendance_status"),
@@ -170,7 +173,8 @@ class JdbcCurrentSessionAdapter(
               questions.text,
               questions.draft_thought,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_name,
-              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name,
+              memberships.avatar_key as question_author_avatar_key
             from questions
             join memberships on memberships.id = questions.membership_id
               and memberships.club_id = questions.club_id
@@ -191,6 +195,9 @@ class JdbcCurrentSessionAdapter(
                     draftThought = resultSet.getString("draft_thought"),
                     authorName = resultSet.getString("author_name"),
                     authorShortName = resultSet.getString("author_short_name"),
+                    avatarKey =
+                        resultSet.getString("question_author_avatar_key")
+                            ?: BookClubAvatarKey.fallback.wireValue,
                 )
             },
             *args.toTypedArray(),
@@ -205,8 +212,12 @@ class JdbcCurrentSessionAdapter(
         jdbcTemplate
             .query(
                 """
-                select text
+                select
+                  one_line_reviews.text,
+                  memberships.avatar_key as one_line_review_author_avatar_key
                 from one_line_reviews
+                left join memberships on memberships.id = one_line_reviews.membership_id
+                  and memberships.club_id = one_line_reviews.club_id
                 where one_line_reviews.session_id = ?
                   and one_line_reviews.club_id = ?
                   and membership_id = ?
@@ -219,7 +230,14 @@ class JdbcCurrentSessionAdapter(
                       and session_participants.participation_status = 'ACTIVE'
                   )
                 """.trimIndent(),
-                { resultSet, _ -> CurrentSessionOneLineReview(text = resultSet.getString("text")) },
+                { resultSet, _ ->
+                    CurrentSessionOneLineReview(
+                        text = resultSet.getString("text"),
+                        avatarKey =
+                            resultSet.getString("one_line_review_author_avatar_key")
+                                ?: BookClubAvatarKey.fallback.wireValue,
+                    )
+                },
                 sessionId.dbString(),
                 member.clubId.dbString(),
                 member.membershipId.dbString(),
@@ -233,8 +251,12 @@ class JdbcCurrentSessionAdapter(
         jdbcTemplate
             .query(
                 """
-                select body
+                select
+                  long_reviews.body,
+                  memberships.avatar_key as long_review_author_avatar_key
                 from long_reviews
+                left join memberships on memberships.id = long_reviews.membership_id
+                  and memberships.club_id = long_reviews.club_id
                 where long_reviews.session_id = ?
                   and long_reviews.club_id = ?
                   and membership_id = ?
@@ -247,7 +269,14 @@ class JdbcCurrentSessionAdapter(
                       and session_participants.participation_status = 'ACTIVE'
                   )
                 """.trimIndent(),
-                { resultSet, _ -> CurrentSessionLongReview(body = resultSet.getString("body")) },
+                { resultSet, _ ->
+                    CurrentSessionLongReview(
+                        body = resultSet.getString("body"),
+                        avatarKey =
+                            resultSet.getString("long_review_author_avatar_key")
+                                ?: BookClubAvatarKey.fallback.wireValue,
+                    )
+                },
                 sessionId.dbString(),
                 member.clubId.dbString(),
                 member.membershipId.dbString(),

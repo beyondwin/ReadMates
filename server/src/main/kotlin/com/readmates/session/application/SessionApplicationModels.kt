@@ -38,6 +38,7 @@ data class SessionAttendee(
     val membershipId: String,
     val displayName: String,
     val accountName: String,
+    val avatarKey: String,
     val role: String,
     val rsvpStatus: String,
     val attendanceStatus: String,
@@ -54,14 +55,17 @@ data class CurrentSessionQuestion(
     val draftThought: String?,
     val authorName: String,
     val authorShortName: String,
+    val avatarKey: String,
 )
 
 data class CurrentSessionOneLineReview(
     val text: String,
+    val avatarKey: String,
 )
 
 data class CurrentSessionLongReview(
     val body: String,
+    val avatarKey: String,
 )
 
 data class CurrentSessionBoard(
@@ -131,6 +135,7 @@ data class HostSessionAttendee(
     val membershipId: String,
     val displayName: String,
     val accountName: String,
+    val avatarKey: String,
     val rsvpStatus: String,
     val attendanceStatus: String,
     val participationStatus: SessionParticipationStatus = SessionParticipationStatus.ACTIVE,
