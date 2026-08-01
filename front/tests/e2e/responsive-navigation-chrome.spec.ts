@@ -428,11 +428,7 @@ test("dedicated records and account settings stay reachable above mobile navigat
 
   const settings = page.locator(".rm-account-settings-page");
   const backToMySpace = settings.locator(".rm-account-settings-page__back");
-  await expect(backToMySpace).toBeHidden();
-  await expect(backToMySpace).toHaveAttribute(
-    "href",
-    `${baselineClubAppPath}/me`,
-  );
+  await expect(backToMySpace).toHaveCount(0);
   const settingsBack = page.getByRole("banner").getByRole("link", { name: "뒤로" });
   await expect(settingsBack).toHaveAttribute("href", `${baselineClubAppPath}/me`);
   await expect(settingsBack).toHaveText("뒤로");

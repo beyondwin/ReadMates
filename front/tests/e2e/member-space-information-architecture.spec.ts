@@ -439,11 +439,10 @@ test("club-scoped account and notification routes preserve navigation current st
     name: "내 공간",
   })).toHaveAttribute("aria-current", "page");
 
-  const settingsParent = page.locator(".rm-account-settings-page").getByRole("link", {
+  await expect(page.locator(".rm-account-settings-page").getByRole("link", {
     name: "내 공간",
-  });
-  await expect(settingsParent).toHaveAttribute("href", `${scopedAppPath}/me`);
-  await settingsParent.click();
+  })).toHaveCount(0);
+  await appNavigation.getByRole("link", { name: "내 공간" }).click();
   await expect(page).toHaveURL(new RegExp(`${scopedAppPath}/me$`));
 
   const notificationLink = page.getByRole("region", {
@@ -459,11 +458,7 @@ test("club-scoped account and notification routes preserve navigation current st
     name: "내 공간",
   })).toHaveAttribute("aria-current", "page");
 
-  const notificationParent = page.getByRole("navigation", { name: "현재 위치" });
-  await expect(notificationParent.getByRole("link", { name: "내 공간" })).toHaveAttribute(
-    "href",
-    `${scopedAppPath}/me`,
-  );
+  await expect(page.getByRole("navigation", { name: "현재 위치" })).toHaveCount(0);
 
   const notificationTabs = page.getByRole("navigation", {
     name: "알림 보기",

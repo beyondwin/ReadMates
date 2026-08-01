@@ -26,7 +26,6 @@ function renderAccountSettings() {
     <MemoryRouter>
       <AccountSettingsPage
         data={profile}
-        mySpaceHref="/clubs/reading-sai/app/me"
         onLeaveMembership={vi.fn()}
       />
     </MemoryRouter>,
@@ -34,17 +33,11 @@ function renderAccountSettings() {
 }
 
 describe("AccountSettingsPage", () => {
-  it("renders read-only account and membership information with a stable return link", () => {
+  it("renders account and membership information without redundant desktop return chrome", () => {
     renderAccountSettings();
 
-    expect(screen.getByRole("link", { name: "내 공간" })).toHaveAttribute(
-      "href",
-      "/clubs/reading-sai/app/me",
-    );
-    expect(screen.getByRole("link", { name: "내 공간" })).toHaveClass("desktop-only");
-    expect(screen.getByText("내 공간", { selector: ".rm-my-shelf-kicker" })).toHaveClass(
-      "desktop-only",
-    );
+    expect(screen.queryByRole("link", { name: "내 공간" })).toBeNull();
+    expect(screen.queryByText("내 공간", { selector: ".rm-my-shelf-kicker" })).toBeNull();
     expect(screen.getByRole("heading", { level: 1, name: "계정 설정" })).toBeVisible();
     expect(screen.getByRole("heading", { level: 2, name: "계정 정보" })).toBeVisible();
     expect(screen.getByRole("heading", { level: 2, name: "클럽 멤버십" })).toBeVisible();
