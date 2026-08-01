@@ -6,6 +6,10 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ## Unreleased
 
+### Fixed
+
+- **Google 로그인 복구:** 종료된 멤버십 또는 Google 인증 실패 뒤에는 다른 Google 계정을 명시적으로 선택해 다시 로그인할 수 있습니다. 카카오톡 인앱 브라우저에서는 외부 브라우저 안내와 로그인 주소 복사를 제공하며, 안전한 멤버 복귀 경로와 기존 OAuth·세션 보안 경계는 유지합니다.
+
 ### Highlights
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
