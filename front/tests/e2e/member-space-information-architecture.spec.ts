@@ -106,7 +106,7 @@ async function expectMemberSpaceSemanticOrder(page: Page) {
   const shelf = page.locator(".rm-member-space");
   const overview = shelf.locator(".rm-member-space__overview");
   const utilities = shelf.getByRole("region", { name: "내 공간 관리" });
-  const recentReadings = shelf.getByRole("region", { name: "최근 함께 읽은 기록" });
+  const recentReadings = shelf.getByRole("region", { name: "최근 독서 기록" });
   await expectDomOrder(
     overview,
     shelf.getByRole("heading", { level: 1, name: "멤버1" }),
@@ -118,7 +118,7 @@ async function expectMemberSpaceSemanticOrder(page: Page) {
     shelf.getByText("질문", { exact: true }),
     utilities,
     recentReadings,
-    shelf.getByRole("heading", { level: 2, name: "최근 함께 읽은 기록" }),
+    shelf.getByRole("heading", { level: 2, name: "최근 독서 기록" }),
     shelf.getByRole("link", {
       name: /responsive reading shelf 회차 기록/,
     }),
@@ -173,10 +173,10 @@ test("member space keeps the profile-first semantic order and usable actions acr
     await expect(overview).toHaveCount(1);
     await expect(shelf.locator(".rm-reading-achievement__metrics")).toHaveCount(1);
     await expect(shelf.getByRole("list", {
-      name: "최근 함께 읽은 기록",
+      name: "최근 독서 기록",
     }).getByRole("listitem")).toHaveCount(3);
     await expect(shelf.getByRole("link", {
-      name: "전체 세션 기록 보기",
+      name: "전체 기록 보기",
     })).toHaveAttribute(
       "href",
       `${scopedAppPath}/archive?view=sessions`,
@@ -392,7 +392,7 @@ test("club-scoped account and notification routes preserve navigation current st
   await page.goto(`${scopedAppPath}/me`);
 
   const fullRecords = page.getByRole("link", {
-    name: "전체 세션 기록 보기",
+    name: "전체 기록 보기",
   });
   await expect(fullRecords).toHaveAttribute(
     "href",
@@ -414,7 +414,7 @@ test("club-scoped account and notification routes preserve navigation current st
 
   await page.goto(`${scopedAppPath}/me`);
   await page.getByRole("link", {
-    name: "전체 세션 기록 보기",
+    name: "전체 기록 보기",
   }).click();
   await expect(page).toHaveURL(
     new RegExp(`${scopedAppPath}/archive\\?view=sessions$`),

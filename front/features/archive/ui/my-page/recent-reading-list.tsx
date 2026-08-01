@@ -23,20 +23,20 @@ export function RecentReadingList({
       <header className="rm-recent-readings__header">
         <div>
           <p className="rm-member-space-kicker">나의 독서 기록</p>
-          <h2 id="recent-readings-heading">최근 함께 읽은 기록</h2>
+          <h2 id="recent-readings-heading">최근 독서 기록</h2>
         </div>
         {items.length > 0 ? (
           <a
             className="rm-recent-readings__all"
             href={archiveSessionsHref}
           >
-            전체 세션 기록 보기
+            전체 기록 보기
             <RecentReadingChevron />
           </a>
         ) : null}
       </header>
       {items.length > 0 ? (
-        <ol className="rm-recent-readings__list" aria-label="최근 함께 읽은 기록">
+        <ol className="rm-recent-readings__list" aria-label="최근 독서 기록">
           {items.map((item) => (
             <li key={item.sessionId}>
               <RecentReadingRow item={item} />

@@ -62,7 +62,7 @@ describe("MyPage", () => {
     );
 
     const overview = container.querySelector(".rm-member-space__overview")!;
-    const recent = screen.getByRole("region", { name: "최근 함께 읽은 기록" });
+    const recent = screen.getByRole("region", { name: "최근 독서 기록" });
     const profileSection = screen.getByRole("region", { name: "샘플 멤버" });
     const achievementSection = screen.getByRole("region", { name: "9번의 모임에서 7권을 끝까지 읽었어요." });
 

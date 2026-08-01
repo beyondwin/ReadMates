@@ -340,7 +340,7 @@ ReadMates는 클럽별로 하나의 현재 `OPEN` 세션과 여러 개의 예정
 
 Archive JDBC adapter는 요청마다 page query와 전체 summary query를 정확히 하나씩, 합계 두 statement로 실행하며 page 크기나 item 수에 따라 query 수가 늘지 않습니다. 이 projection은 기존 테이블만 읽으므로 Flyway migration이나 새 영속 상태를 추가하지 않습니다.
 
-`/app/me` loader는 profile과 `limit=3` journey를 병렬 로드하며, 누적 `summary`는 page 크기와 무관하게 유지됩니다. 화면은 표시 이름과 inline `이름 변경`, 현재 클럽 멤버십 맥락, 누적 독서 성취가 이어지는 하나의 overview와 서버 정렬 순서를 따르는 최근 개인 기록을 최대 3건 보여줍니다. 최근 row는 club scope를 유지한 회차 상세로 연결되고, section의 `전체 세션 기록 보기`는 canonical `/app/archive?view=sessions`로 이어집니다.
+`/app/me` loader는 profile과 `limit=3` journey를 병렬 로드하며, 누적 `summary`는 page 크기와 무관하게 유지됩니다. 화면은 표시 이름과 inline `이름 변경`, 현재 클럽 멤버십 맥락, 누적 독서 성취가 이어지는 하나의 overview와 서버 정렬 순서를 따르는 최근 개인 기록을 최대 3건 보여줍니다. 최근 row는 club scope를 유지한 회차 상세로 연결되고, section의 `전체 기록 보기`는 canonical `/app/archive?view=sessions`로 이어집니다.
 
 `/app/me/records`는 `limit=12`부터 cursor continuation을 누적하는 개인 활동 기반 전체 목록으로 직접 접근과 기존 deep link를 유지하지만 `/app/me`의 새 사용자 진입점으로 노출하지 않습니다. 개인 journey와 archive sessions의 포함 조건이 다르므로 이 route를 삭제하거나 archive로 redirect하지 않습니다.
 
