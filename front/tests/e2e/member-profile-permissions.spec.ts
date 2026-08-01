@@ -179,7 +179,7 @@ test("an empty reading shelf omits recent-session navigation", async ({ page }) 
     name: "최근 독서 기록",
   })).toHaveCount(0);
   await expect(page.getByRole("link", {
-    name: "전체 기록 보기",
+    name: "전체 보기",
   })).toHaveCount(0);
 });
 

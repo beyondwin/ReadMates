@@ -68,7 +68,7 @@ describe("member home record reflection cards", () => {
   });
 
   it("renders the desktop reflection card with record and feedback actions", () => {
-    render(<RecentRecordEntry entry={entry} />);
+    const { container } = render(<RecentRecordEntry entry={entry} />);
 
     const region = screen.getByRole("region", { name: "지난 모임 회고" });
     const documents = within(region).getByRole("navigation", { name: "지난 모임 문서" });
@@ -88,6 +88,9 @@ describe("member home record reflection cards", () => {
       "href",
       "/app/feedback/session-8",
     );
+    expect(container).not.toHaveTextContent("→");
+    expect(container.querySelectorAll(".rm-recent-record__destination-chevron")).toHaveLength(2);
+    expect(container.querySelectorAll(".rm-recent-record__destination-chevron")[0]).toHaveTextContent("›");
   });
 
   it("renders locked feedback state without a feedback action", () => {

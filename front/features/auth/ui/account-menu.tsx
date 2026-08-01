@@ -22,6 +22,7 @@ export type AccountMenuProps = {
   memberName: string;
   avatarKey?: string | null;
   membershipLabel: string;
+  notificationsHref: string;
   settingsHref: string;
   LinkComponent: AccountMenuLinkComponent;
   LogoutControl: ReactNode;
@@ -31,6 +32,7 @@ export function AccountMenu({
   memberName,
   avatarKey,
   membershipLabel,
+  notificationsHref,
   settingsHref,
   LinkComponent,
   LogoutControl,
@@ -134,6 +136,9 @@ export function AccountMenu({
             <span className="rm-account-menu__membership">{membershipLabel}</span>
           </div>
           <div className="rm-account-menu__items">
+            <LinkComponent to={notificationsHref} className="rm-account-menu__item" onClick={closeMenu}>
+              알림
+            </LinkComponent>
             <LinkComponent to={settingsHref} className="rm-account-menu__item" onClick={closeMenu}>
               계정 설정
             </LinkComponent>

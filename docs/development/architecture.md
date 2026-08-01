@@ -340,11 +340,11 @@ ReadMates는 클럽별로 하나의 현재 `OPEN` 세션과 여러 개의 예정
 
 Archive JDBC adapter는 요청마다 page query와 전체 summary query를 정확히 하나씩, 합계 두 statement로 실행하며 page 크기나 item 수에 따라 query 수가 늘지 않습니다. 이 projection은 기존 테이블만 읽으므로 Flyway migration이나 새 영속 상태를 추가하지 않습니다.
 
-`/app/me` loader는 profile과 `limit=3` journey를 병렬 로드하며, 누적 `summary`는 page 크기와 무관하게 유지됩니다. 화면은 표시 이름과 inline `이름 변경`, 현재 클럽 멤버십 맥락, 누적 독서 성취가 이어지는 하나의 overview와 서버 정렬 순서를 따르는 최근 개인 기록을 최대 3건 보여줍니다. 최근 row는 club scope를 유지한 회차 상세로 연결되고, section의 `전체 기록 보기`는 canonical `/app/archive?view=sessions`로 이어집니다.
+`/app/me` loader는 profile과 `limit=3` journey를 병렬 로드하며, 누적 `summary`는 page 크기와 무관하게 유지됩니다. 화면은 표시 이름과 inline `이름 변경`, 현재 클럽 멤버십 맥락, 누적 독서 성취가 이어지는 하나의 overview와 서버 정렬 순서를 따르는 최근 개인 기록을 최대 3건 보여줍니다. 최근 row는 club scope를 유지한 회차 상세로 연결되고, section의 `전체 보기`는 canonical `/app/archive?view=sessions`로 이어집니다.
 
 `/app/me/records`는 `limit=12`부터 cursor continuation을 누적하는 개인 활동 기반 전체 목록으로 직접 접근과 기존 deep link를 유지하지만 `/app/me`의 새 사용자 진입점으로 노출하지 않습니다. 개인 journey와 archive sessions의 포함 조건이 다르므로 이 route를 삭제하거나 archive로 redirect하지 않습니다.
 
-계정·멤버십 정보와 탈퇴는 `/app/me/settings`, 알림 수신 설정은 알림함과 나란한 `/app/notifications/settings`가 소유합니다. `/app/me`는 `알림`과 `계정 설정` utility를 제공하고, 두 알림 route와 `/app/me/settings`는 scoped `내 공간`을 고정 상위 경로로 사용합니다. 전역 계정 메뉴는 identity, `계정 설정`, `로그아웃`만 소유하며 멤버 콘텐츠 탐색을 중복하지 않습니다. 호스트 권한이 있을 때만 계정 control과 분리된 작업 공간 전환 control을 노출합니다. 표시 이름 편집은 `/app/me`만 소유하며 profile update controller, auth refresh, route revalidation 계약을 유지합니다. `/app/me/settings`에는 이름 편집과 로그아웃을 중복하지 않습니다.
+계정·멤버십 정보와 탈퇴는 `/app/me/settings`, 알림 수신 설정은 알림함과 나란한 `/app/notifications/settings`가 소유합니다. `/app/me`는 `알림`과 `계정 설정` utility를 제공하고, 두 알림 route와 `/app/me/settings`는 scoped `내 공간`을 고정 상위 경로로 사용합니다. 전역 계정 메뉴는 identity, `알림`, `계정 설정`, `로그아웃`을 소유하며 `알림`은 club-scoped 알림함으로 연결합니다. 호스트 권한이 있을 때만 계정 control과 분리된 작업 공간 전환 control을 노출합니다. 표시 이름 편집은 `/app/me`만 소유하며 profile update controller, auth refresh, route revalidation 계약을 유지합니다. `/app/me/settings`에는 이름 편집과 로그아웃을 중복하지 않습니다.
 
 ## 멤버 프로필과 표시 이름
 

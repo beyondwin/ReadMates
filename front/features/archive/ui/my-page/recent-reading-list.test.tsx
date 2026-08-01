@@ -64,7 +64,7 @@ describe("RecentReadingList", () => {
       link.getAttribute("href")?.includes("/app/sessions/"),
     )).toHaveLength(3);
     expect(screen.getByRole("link", {
-      name: "전체 기록 보기",
+      name: "전체 보기",
     })).toHaveAttribute("href", "/app/archive?view=sessions");
     expect(screen.getAllByRole("link").some((link) =>
       link.getAttribute("href")?.endsWith("/app/me/records"),
@@ -123,7 +123,7 @@ describe("RecentReadingList", () => {
     });
     expect(container).not.toHaveTextContent("→");
     expect(screen.getByRole("link", {
-      name: "전체 기록 보기",
+      name: "전체 보기",
     })).toBeVisible();
     expect(screen.getByRole("link", {
       name: "샘플 도서 회차 기록",
@@ -143,7 +143,7 @@ describe("RecentReadingList", () => {
     )).toBeVisible();
     expect(screen.queryByRole("list")).toBeNull();
     expect(screen.queryByRole("link", {
-      name: "전체 기록 보기",
+      name: "전체 보기",
     })).toBeNull();
   });
 });

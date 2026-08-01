@@ -64,8 +64,8 @@ function RecentRecordDestination({
         <span>{description}</span>
       </span>
       {to ? (
-        <span className="rm-recent-record__destination-arrow" aria-hidden="true">
-          →
+        <span className="rm-recent-record__destination-chevron" aria-hidden="true">
+          ›
         </span>
       ) : null}
     </>

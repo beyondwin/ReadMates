@@ -176,7 +176,7 @@ test("member space keeps the profile-first semantic order and usable actions acr
       name: "최근 독서 기록",
     }).getByRole("listitem")).toHaveCount(3);
     await expect(shelf.getByRole("link", {
-      name: "전체 기록 보기",
+      name: "전체 보기",
     })).toHaveAttribute(
       "href",
       `${scopedAppPath}/archive?view=sessions`,
@@ -392,7 +392,7 @@ test("club-scoped account and notification routes preserve navigation current st
   await page.goto(`${scopedAppPath}/me`);
 
   const fullRecords = page.getByRole("link", {
-    name: "전체 기록 보기",
+    name: "전체 보기",
   });
   await expect(fullRecords).toHaveAttribute(
     "href",
@@ -414,7 +414,7 @@ test("club-scoped account and notification routes preserve navigation current st
 
   await page.goto(`${scopedAppPath}/me`);
   await page.getByRole("link", {
-    name: "전체 기록 보기",
+    name: "전체 보기",
   }).click();
   await expect(page).toHaveURL(
     new RegExp(`${scopedAppPath}/archive\\?view=sessions$`),

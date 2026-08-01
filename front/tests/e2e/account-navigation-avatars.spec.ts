@@ -332,7 +332,10 @@ test("scoped account navigation preserves local avatar identity across mobile an
   const dialog = page.getByRole("dialog", { name: MEMBER_NAME });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("link", { name: "내 공간" })).toHaveCount(0);
-  await expect(dialog.getByRole("link", { name: "알림" })).toHaveCount(0);
+  await expect(dialog.getByRole("link", { name: "알림" })).toHaveAttribute(
+    "href",
+    `${APP_BASE}/notifications`,
+  );
   await page.screenshot({ path: testInfo.outputPath("390-account-popover.png"), fullPage: true });
   await dialog.getByRole("link", { name: "계정 설정" }).click();
   await expect(page).toHaveURL(`${APP_BASE}/me/settings`);

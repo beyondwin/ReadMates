@@ -99,7 +99,7 @@ describe("PublicHome", () => {
     expect(container.querySelector('a[href="/login"]')).not.toHaveTextContent("초대 수락하기");
     expect(screen.getByText("기록 모음")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "공개 기록", level: 2 })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "공개 기록 전체 보기" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "전체 보기" })).toHaveAttribute(
       "href",
       "/records",
     );

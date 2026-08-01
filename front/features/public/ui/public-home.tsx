@@ -347,7 +347,7 @@ export default function PublicHome({ data, publicBasePath = "" }: PublicHomeProp
               </h2>
             </div>
             <Link to={publicRecordsHref(publicBasePath)} className="public-records-link">
-              공개 기록 전체 보기
+              전체 보기
             </Link>
           </div>
           {publicRecordPreviewSessions.length > 0 ? (

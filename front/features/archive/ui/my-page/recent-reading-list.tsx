@@ -30,7 +30,7 @@ export function RecentReadingList({
             className="rm-recent-readings__all"
             href={archiveSessionsHref}
           >
-            전체 기록 보기
+            전체 보기
             <RecentReadingChevron />
           </a>
         ) : null}
