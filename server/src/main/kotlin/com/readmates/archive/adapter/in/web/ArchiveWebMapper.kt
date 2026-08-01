@@ -190,6 +190,7 @@ fun MemberArchiveFeedbackDocumentStatusResult.toWebDto() =
 
 fun MyPageResult.toWebDto() =
     MyPageResponse(
+        avatarKey = BookClubAvatarKey.fromWireValue(avatarKey)?.wireValue ?: BookClubAvatarKey.fallback.wireValue,
         displayName = displayName,
         accountName = accountName,
         email = email,

@@ -229,6 +229,7 @@ internal class ArchiveListQueries {
                 """
                 select
                   clubs.name as club_name,
+                  memberships.avatar_key,
                   coalesce(date_format(date_add(memberships.joined_at, interval 9 hour), '%Y-%m'), '') as joined_at,
                   (
                     select count(*)
@@ -271,6 +272,7 @@ internal class ArchiveListQueries {
                 """.trimIndent(),
                 { resultSet, _ ->
                     MyPageResult(
+                        avatarKey = resultSet.getString("avatar_key"),
                         displayName = currentMember.displayName,
                         accountName = currentMember.accountName,
                         email = currentMember.email,

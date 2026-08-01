@@ -1269,6 +1269,8 @@ class ArchiveAndNotesDbTest(
                 status { isOk() }
                 jsonPath("$.displayName") { value("멤버5") }
                 jsonPath("$.accountName") { value("이멤버5") }
+                jsonPath("$.avatarKey") { value("library-stamp") }
+                jsonPath("$.profileImageUrl") { doesNotExist() }
                 jsonPath("$.shortName") { doesNotExist() }
                 jsonPath("$.email") { value("member5@example.com") }
                 jsonPath("$.role") { value("MEMBER") }

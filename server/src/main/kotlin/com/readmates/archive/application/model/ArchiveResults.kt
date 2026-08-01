@@ -158,6 +158,7 @@ data class MyJourneyResult(
 )
 
 data class MyPageResult(
+    val avatarKey: String? = null,
     val displayName: String,
     val accountName: String,
     val email: String,

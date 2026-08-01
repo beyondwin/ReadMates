@@ -146,6 +146,7 @@ data class MemberArchiveFeedbackDocumentStatus(
 )
 
 data class MyPageResponse(
+    val avatarKey: String,
     val displayName: String,
     val accountName: String,
     val email: String,
