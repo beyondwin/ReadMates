@@ -1,6 +1,18 @@
 import { expect, test } from "@playwright/experimental-ct-react";
+import type { Locator } from "@playwright/test";
 import { MemoryRouter } from "react-router-dom";
 import { TopNav } from "./top-nav";
+
+const fontMetrics = async (locator: Locator) =>
+  locator.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      family: style.fontFamily,
+      size: Number.parseFloat(style.fontSize),
+      clientWidth: (element as HTMLElement).clientWidth,
+      scrollWidth: (element as HTMLElement).scrollWidth,
+    };
+  });
 
 test("TopNav keeps the host retry control typographically aligned with destination links", async ({
   mount,
@@ -63,5 +75,7 @@ test("TopNav shows the desktop avatar and preserves a long account name in its a
   );
   await expect(account.locator(".rm-account-menu__trigger-name")).toHaveText(memberName);
   await expect(account.locator(".rm-account-menu__trigger-name")).toHaveCSS("text-overflow", "ellipsis");
+  const accountName = account.locator(".rm-account-menu__trigger-name");
+  expect((await fontMetrics(accountName)).size).toBeGreaterThanOrEqual(14);
   await expect(navigation).toHaveScreenshot("top-nav-long-account-name-1280.png");
 });

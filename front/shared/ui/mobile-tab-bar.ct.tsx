@@ -1,6 +1,18 @@
 import { expect, test } from "@playwright/experimental-ct-react";
+import type { Locator } from "@playwright/test";
 import { MemoryRouter } from "react-router-dom";
 import { MobileTabBar } from "./mobile-tab-bar";
+
+const fontMetrics = async (locator: Locator) =>
+  locator.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      family: style.fontFamily,
+      size: Number.parseFloat(style.fontSize),
+      clientWidth: (element as HTMLElement).clientWidth,
+      scrollWidth: (element as HTMLElement).scrollWidth,
+    };
+  });
 
 test("MobileTabBar wraps deliberately long Korean and English labels at a narrow viewport", async ({ mount, page }) => {
   await page.setViewportSize({ width: 320, height: 480 });
@@ -13,6 +25,7 @@ test("MobileTabBar wraps deliberately long Korean and English labels at a narrow
   );
 
   const labels = tabBar.locator(".m-tab-label");
+  expect((await fontMetrics(labels.first())).size).toBeGreaterThanOrEqual(12);
   await labels.evaluateAll((elements) => {
     elements[0].textContent = "회원이 함께 읽고 남긴 독서 기록 보관함";
     elements[1].textContent = "A deliberately expansive navigation destination";
