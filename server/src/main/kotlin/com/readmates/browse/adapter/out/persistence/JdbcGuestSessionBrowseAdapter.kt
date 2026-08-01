@@ -112,14 +112,13 @@ class JdbcGuestSessionBrowseAdapter(
         jdbcTemplate.query(
             """
             select
-              coalesce(memberships.short_name, users.name) as display_name,
+              memberships.short_name as display_name,
               memberships.avatar_key,
               session_participants.rsvp_status,
               session_participants.attendance_status
             from session_participants
             join memberships on memberships.id = session_participants.membership_id
               and memberships.club_id = session_participants.club_id
-            join users on users.id = memberships.user_id
             where session_participants.session_id = ?
               and session_participants.participation_status = 'ACTIVE'
               and memberships.status = 'ACTIVE'
@@ -143,13 +142,12 @@ class JdbcGuestSessionBrowseAdapter(
               questions.priority,
               questions.text,
               questions.draft_thought,
-              coalesce(memberships.short_name, users.name) as author_name,
+              memberships.short_name as author_name,
               memberships.short_name as author_short_name,
               memberships.avatar_key
             from questions
             join memberships on memberships.id = questions.membership_id
               and memberships.club_id = questions.club_id
-            join users on users.id = memberships.user_id
             join session_participants on session_participants.session_id = questions.session_id
               and session_participants.club_id = questions.club_id
               and session_participants.membership_id = questions.membership_id
@@ -176,13 +174,12 @@ class JdbcGuestSessionBrowseAdapter(
             """
             select
               long_reviews.body,
-              coalesce(memberships.short_name, users.name) as author_name,
+              memberships.short_name as author_name,
               memberships.short_name as author_short_name,
               memberships.avatar_key
             from long_reviews
             join memberships on memberships.id = long_reviews.membership_id
               and memberships.club_id = long_reviews.club_id
-            join users on users.id = memberships.user_id
             join session_participants on session_participants.session_id = long_reviews.session_id
               and session_participants.club_id = long_reviews.club_id
               and session_participants.membership_id = long_reviews.membership_id

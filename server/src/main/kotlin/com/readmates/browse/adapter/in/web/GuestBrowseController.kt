@@ -2,7 +2,7 @@
 
 package com.readmates.browse.adapter.`in`.web
 
-import com.readmates.browse.application.GuestBrowseInvalidCursorException
+import com.readmates.browse.application.GuestBrowseInvalidRequestException
 import com.readmates.browse.application.port.`in`.GetGuestBrowseShellUseCase
 import com.readmates.browse.application.port.`in`.GetGuestCurrentSessionUseCase
 import com.readmates.browse.application.port.`in`.ListGuestUpcomingSessionsUseCase
@@ -46,7 +46,7 @@ class GuestBrowseController(
         val page =
             try {
                 listGuestUpcomingSessionsUseCase.listUpcomingSessions(clubSlug, limit, cursor)
-            } catch (_: GuestBrowseInvalidCursorException) {
+            } catch (_: GuestBrowseInvalidRequestException) {
                 throw ResponseStatusException(HttpStatus.BAD_REQUEST)
             }
         return page?.toResponse()?.let(::noStore) ?: notFound()

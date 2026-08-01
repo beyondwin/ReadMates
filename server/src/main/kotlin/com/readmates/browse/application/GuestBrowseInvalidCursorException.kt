@@ -1,3 +1,3 @@
 package com.readmates.browse.application
 
-class GuestBrowseInvalidCursorException : IllegalArgumentException("Invalid guest browse cursor")
+class GuestBrowseInvalidCursorException : GuestBrowseInvalidRequestException("Invalid guest browse cursor")

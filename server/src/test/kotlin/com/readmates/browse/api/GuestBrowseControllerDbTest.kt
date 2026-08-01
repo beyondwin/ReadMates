@@ -14,7 +14,9 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.http.HttpHeaders
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 
@@ -165,14 +167,21 @@ class GuestBrowseControllerDbTest(
 
     @Test
     fun `anonymous browse shell returns only active public club capability`() {
-        mockMvc.get("/api/public/clubs/guest-test/browse").andExpect {
-            status { isOk() }
-            header { string("Cache-Control", "no-store") }
-            jsonPath("$.clubName") { value("게스트 테스트 클럽") }
-            jsonPath("$.navigation.home") { value("OPEN") }
-            jsonPath("$.navigation.feedback") { value("LOCKED") }
-            jsonPath("$.navigation.host") { value("DENY") }
-        }
+        val response =
+            mockMvc
+                .get("/api/public/clubs/guest-test/browse")
+                .andExpect {
+                    status { isOk() }
+                    header { string("Cache-Control", "no-store") }
+                    jsonPath("$.clubName") { value("게스트 테스트 클럽") }
+                    jsonPath("$.navigation.home") { value("OPEN") }
+                    jsonPath("$.navigation.feedback") { value("LOCKED") }
+                    jsonPath("$.navigation.host") { value("DENY") }
+                }.andReturn()
+                .response
+
+        assertForbiddenKeysAbsent(response.contentAsString, FORBIDDEN_GUEST_KEYS)
+        assertGuestResponseHeaders(response)
 
         listOf("guest-private", "guest-inactive", "missing-club").forEach { slug ->
             mockMvc.get("/api/public/clubs/$slug/browse").andExpect {
@@ -184,7 +193,7 @@ class GuestBrowseControllerDbTest(
 
     @Test
     fun `anonymous current session returns approved fields and no sensitive keys`() {
-        val body =
+        val response =
             mockMvc
                 .get("/api/public/clubs/guest-test/browse/sessions/current")
                 .andExpect {
@@ -200,9 +209,12 @@ class GuestBrowseControllerDbTest(
                         value(not(hasItem("게스트에게 숨기는 비공개 서평")))
                     }
                 }.andReturn()
-                .response.contentAsString
+                .response
 
-        assertForbiddenKeysAbsent(body, FORBIDDEN_GUEST_KEYS)
+        assertForbiddenKeysAbsent(response.contentAsString, FORBIDDEN_GUEST_KEYS)
+        assertGuestResponseHeaders(response)
+        assertFalse(response.contentAsString.contains("게스트 작성자 하나"))
+        assertFalse(response.contentAsString.contains("게스트 작성자 둘"))
     }
 
     @Test
@@ -221,17 +233,41 @@ class GuestBrowseControllerDbTest(
 
     @Test
     fun `draft guest-readable session appears only in upcoming browse`() {
-        mockMvc.get("/api/public/clubs/guest-test/browse/sessions/upcoming").andExpect {
-            status { isOk() }
-            header { string("Cache-Control", "no-store") }
-            jsonPath("$.items[*].sessionId") { value(hasItem(DRAFT_ID)) }
-            jsonPath("$.items[*].sessionId") { value(not(hasItem(HOST_ONLY_DRAFT_ID))) }
-            jsonPath("$.items[*].sessionId") { value(not(hasItem(OPEN_ID))) }
-            jsonPath("$.items[*].sessionId") { value(not(hasItem(OUTSIDE_DRAFT_ID))) }
-            jsonPath("$.nextCursor") { value(null) }
-        }
+        val response =
+            mockMvc
+                .get("/api/public/clubs/guest-test/browse/sessions/upcoming")
+                .andExpect {
+                    status { isOk() }
+                    header { string("Cache-Control", "no-store") }
+                    jsonPath("$.items[*].sessionId") { value(hasItem(DRAFT_ID)) }
+                    jsonPath("$.items[*].sessionId") { value(not(hasItem(HOST_ONLY_DRAFT_ID))) }
+                    jsonPath("$.items[*].sessionId") { value(not(hasItem(OPEN_ID))) }
+                    jsonPath("$.items[*].sessionId") { value(not(hasItem(OUTSIDE_DRAFT_ID))) }
+                    jsonPath("$.nextCursor") { value(null) }
+                }.andReturn()
+                .response
+
+        assertForbiddenKeysAbsent(response.contentAsString, FORBIDDEN_GUEST_KEYS)
+        assertGuestResponseHeaders(response)
         mockMvc.get("/api/public/clubs/guest-test/sessions/$DRAFT_ID").andExpect {
             status { isNotFound() }
+        }
+    }
+
+    @Test
+    fun `upcoming browse accepts fifty and rejects fifty one`() {
+        val validResponse =
+            mockMvc
+                .get("/api/public/clubs/guest-test/browse/sessions/upcoming?limit=50")
+                .andExpect { status { isOk() } }
+                .andReturn()
+                .response
+        assertGuestResponseHeaders(validResponse)
+
+        mockMvc.get("/api/public/clubs/guest-test/browse/sessions/upcoming?limit=51").andExpect {
+            status { isBadRequest() }
+            jsonPath("$.code") { value("INVALID_REQUEST") }
+            jsonPath("$.status") { value(400) }
         }
     }
 
@@ -299,6 +335,17 @@ class GuestBrowseControllerDbTest(
         assertFalse(body.contains("노출되면 안 되는 정확한 장소"))
         assertFalse(body.contains("https://meeting.example.test/private"))
         assertFalse(body.contains("private-passcode"))
+    }
+
+    private fun assertGuestResponseHeaders(response: MockHttpServletResponse) {
+        assertTrue(response.getHeader(HttpHeaders.CACHE_CONTROL) == "no-store")
+        val varyTokens =
+            response
+                .getHeaders(HttpHeaders.VARY)
+                .flatMap { it.split(',') }
+                .map { it.trim().lowercase() }
+        assertFalse("cookie" in varyTokens, "Guest response must not vary on Cookie: $varyTokens")
+        assertFalse("authorization" in varyTokens, "Guest response must not vary on Authorization: $varyTokens")
     }
 
     private companion object {

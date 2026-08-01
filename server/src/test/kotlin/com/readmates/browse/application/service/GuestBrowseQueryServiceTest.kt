@@ -35,14 +35,23 @@ class GuestBrowseQueryServiceTest {
     }
 
     @Test
-    fun `upcoming caps the requested limit at fifty`() {
+    fun `upcoming accepts the maximum limit of fifty`() {
         val port = FakeGuestSessionBrowsePort(upcoming = upcomingRows(51))
         val service = GuestBrowseQueryService(port)
 
-        val page = requireNotNull(service.listUpcomingSessions("guest-test", requestedLimit = 500, rawCursor = null))
+        val page = requireNotNull(service.listUpcomingSessions("guest-test", requestedLimit = 50, rawCursor = null))
 
         assertThat(page.items).hasSize(50)
         assertThat(page.nextCursor).isNotNull()
+    }
+
+    @Test
+    fun `upcoming rejects a requested limit above fifty`() {
+        val service = GuestBrowseQueryService(FakeGuestSessionBrowsePort())
+
+        assertThatThrownBy {
+            service.listUpcomingSessions("guest-test", requestedLimit = 51, rawCursor = null)
+        }.isInstanceOf(IllegalArgumentException::class.java)
     }
 
     @Test

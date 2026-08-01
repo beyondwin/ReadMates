@@ -1,6 +1,7 @@
 package com.readmates.browse.application.service
 
 import com.readmates.browse.application.GuestBrowseInvalidCursorException
+import com.readmates.browse.application.GuestBrowseInvalidLimitException
 import com.readmates.browse.application.model.GuestBrowseShellResult
 import com.readmates.browse.application.model.GuestCurrentSessionResult
 import com.readmates.browse.application.model.GuestCursorPage
@@ -37,6 +38,7 @@ class GuestBrowseQueryService(
         rawCursor: String?,
     ): GuestCursorPage<GuestUpcomingSessionResult>? {
         if (loadGuestSessionBrowsePort.loadShell(clubSlug) == null) return null
+        if (requestedLimit != null && requestedLimit > MAX_LIMIT) throw GuestBrowseInvalidLimitException()
         val pageLimit = (requestedLimit ?: DEFAULT_LIMIT).coerceIn(1, MAX_LIMIT)
         val cursor = parseCursor(clubSlug, rawCursor)
         val rows = loadGuestSessionBrowsePort.loadUpcomingSessions(clubSlug, cursor, pageLimit + 1)
