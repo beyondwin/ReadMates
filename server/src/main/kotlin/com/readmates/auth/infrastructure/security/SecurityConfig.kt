@@ -21,6 +21,10 @@ import org.springframework.web.filter.ForwardedHeaderFilter
 
 private val AI_GENERATE_MUTATION_PATH =
     Regex("^/api/host/sessions/[^/]+/ai-generate/jobs/[^/]+/(regenerate|commit)$")
+private val PUBLIC_CLUB_PATH = Regex("^/api/public/clubs/[^/]+$")
+private val PUBLIC_SESSION_PATH = Regex("^/api/public/sessions/[^/]+$")
+private val PUBLIC_CLUB_SESSION_PATH = Regex("^/api/public/clubs/[^/]+/sessions/[^/]+$")
+private val GUEST_BROWSE_PATH = Regex("^/api/public/clubs/[^/]+/browse(?:/.*)?$")
 
 @Configuration
 @Suppress("LongParameterList")
@@ -134,8 +138,13 @@ class SecurityConfig(
                     .permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/auth/me")
                     .permitAll()
-                    .requestMatchers(HttpMethod.GET, "/api/public/**")
-                    .permitAll()
+                    .requestMatchers(
+                        methodAndPath("GET", Regex("^/api/public/club$")),
+                        methodAndPath("GET", PUBLIC_CLUB_PATH),
+                        methodAndPath("GET", PUBLIC_SESSION_PATH),
+                        methodAndPath("GET", PUBLIC_CLUB_SESSION_PATH),
+                        methodAndPath("GET", GUEST_BROWSE_PATH),
+                    ).permitAll()
                     .requestMatchers("/api/invitations/**")
                     .permitAll()
                     .requestMatchers(methodAndPath("GET", Regex("^/api/clubs/[^/]+/invitations/[^/]+$")))

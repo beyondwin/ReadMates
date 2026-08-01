@@ -323,10 +323,15 @@ class GuestBrowseControllerDbTest(
         assertGuestResponseHeaders(response)
 
         listOf("guest-private", "guest-inactive", "missing-club").forEach { slug ->
-            mockMvc.get("/api/public/clubs/$slug/browse").andExpect {
-                status { isNotFound() }
-                jsonPath("$.code") { value("RESOURCE_NOT_FOUND") }
-            }
+            val errorResponse =
+                mockMvc
+                    .get("/api/public/clubs/$slug/browse")
+                    .andExpect {
+                        status { isNotFound() }
+                        jsonPath("$.code") { value("RESOURCE_NOT_FOUND") }
+                    }.andReturn()
+                    .response
+            assertGuestResponseHeaders(errorResponse)
         }
     }
 
@@ -403,20 +408,30 @@ class GuestBrowseControllerDbTest(
                 .response
         assertGuestResponseHeaders(validResponse)
 
-        mockMvc.get("/api/public/clubs/guest-test/browse/sessions/upcoming?limit=51").andExpect {
-            status { isBadRequest() }
-            jsonPath("$.code") { value("INVALID_REQUEST") }
-            jsonPath("$.status") { value(400) }
-        }
+        val errorResponse =
+            mockMvc
+                .get("/api/public/clubs/guest-test/browse/sessions/upcoming?limit=51")
+                .andExpect {
+                    status { isBadRequest() }
+                    jsonPath("$.code") { value("INVALID_REQUEST") }
+                    jsonPath("$.status") { value(400) }
+                }.andReturn()
+                .response
+        assertGuestResponseHeaders(errorResponse)
     }
 
     @Test
     fun `upcoming browse rejects malformed cursor with stable error contract`() {
-        mockMvc.get("/api/public/clubs/guest-test/browse/sessions/upcoming?cursor=not-a-cursor").andExpect {
-            status { isBadRequest() }
-            jsonPath("$.code") { value("INVALID_REQUEST") }
-            jsonPath("$.status") { value(400) }
-        }
+        val errorResponse =
+            mockMvc
+                .get("/api/public/clubs/guest-test/browse/sessions/upcoming?cursor=not-a-cursor")
+                .andExpect {
+                    status { isBadRequest() }
+                    jsonPath("$.code") { value("INVALID_REQUEST") }
+                    jsonPath("$.status") { value(400) }
+                }.andReturn()
+                .response
+        assertGuestResponseHeaders(errorResponse)
     }
 
     @Test

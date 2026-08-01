@@ -10,9 +10,13 @@ import com.readmates.browse.application.port.`in`.ListGuestArchiveSessionsUseCas
 import com.readmates.browse.application.port.`in`.ListGuestNoteSessionsUseCase
 import com.readmates.browse.application.port.`in`.ListGuestNotesFeedUseCase
 import com.readmates.browse.application.port.`in`.ListGuestUpcomingSessionsUseCase
+import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
+import com.readmates.shared.adapter.`in`.web.apiErrorResponse
+import com.readmates.shared.adapter.`in`.web.defaultApiErrorCode
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
@@ -113,6 +117,16 @@ class GuestBrowseController(
             .ok()
             .header(HttpHeaders.CACHE_CONTROL, "no-store")
             .body(body)
+
+    @ExceptionHandler(ResponseStatusException::class)
+    fun handleGuestBrowseError(error: ResponseStatusException): ResponseEntity<ApiErrorResponse> {
+        val status = HttpStatus.resolve(error.statusCode.value()) ?: HttpStatus.INTERNAL_SERVER_ERROR
+        val body = apiErrorResponse(status, status.defaultApiErrorCode()).body
+        return ResponseEntity
+            .status(status)
+            .header(HttpHeaders.CACHE_CONTROL, "no-store")
+            .body(body)
+    }
 
     private fun notFound(): Nothing = throw ResponseStatusException(HttpStatus.NOT_FOUND)
 }

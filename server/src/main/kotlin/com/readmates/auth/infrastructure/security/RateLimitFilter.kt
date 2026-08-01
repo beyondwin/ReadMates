@@ -2,6 +2,7 @@ package com.readmates.auth.infrastructure.security
 
 import com.readmates.auth.application.port.out.RateLimitCheck
 import com.readmates.auth.application.port.out.RateLimitPort
+import com.readmates.club.application.model.ClubSlug
 import com.readmates.shared.cache.RateLimitProperties
 import com.readmates.shared.security.ClientIpHashing
 import com.readmates.shared.security.ClientIpHashingProperties
@@ -76,6 +77,17 @@ class RateLimitFilter(
 
             method == "GET" && path.startsWith("/login/oauth2/code/") ->
                 RateLimitCheck("rl:ip:$ipHash:oauth-callback", 30, Duration.ofMinutes(1), sensitive = false)
+
+            method == "GET" && GUEST_BROWSE.matches(path) -> {
+                val rawSlug = GUEST_BROWSE.matchEntire(path)!!.groupValues[1]
+                val clubSlug = runCatching { ClubSlug.parse(rawSlug).value }.getOrNull() ?: return null
+                RateLimitCheck(
+                    "rl:ip:$ipHash:guest-browse:${stableHash(clubSlug).take(12)}",
+                    GUEST_BROWSE_LIMIT,
+                    Duration.ofMinutes(1),
+                    sensitive = false,
+                )
+            }
 
             method == "GET" && INVITATION_PREVIEW.matches(path) -> {
                 val token = INVITATION_PREVIEW.matchEntire(path)!!.groupValues[1]
@@ -176,11 +188,13 @@ class RateLimitFilter(
         const val BFF_SECRET_HEADER = "X-Readmates-Bff-Secret"
         const val CLIENT_IP_HEADER = "X-Readmates-Client-IP"
         const val MAX_IDENTIFIER_LENGTH = 128
+        const val GUEST_BROWSE_LIMIT = 120L
         val MUTATING_METHODS = setOf("POST", "PUT", "PATCH", "DELETE")
         val INVITATION_PREVIEW = Regex("^/api/invitations/([^/]+)$")
         val INVITATION_ACCEPT = Regex("^/api/invitations/([^/]+)/accept$")
         val CLUB_INVITATION_PREVIEW = Regex("^/api/clubs/([^/]+)/invitations/([^/]+)$")
         val CLUB_INVITATION_ACCEPT = Regex("^/api/clubs/([^/]+)/invitations/([^/]+)/accept$")
         val FEEDBACK_UPLOAD = Regex("^/api/host/sessions/([^/]+)/feedback-document$")
+        val GUEST_BROWSE = Regex("^/api/public/clubs/([^/]+)/browse(?:/.*)?$")
     }
 }

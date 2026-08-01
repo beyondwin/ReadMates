@@ -11,8 +11,10 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.post
 import java.util.UUID
 
 @SpringBootTest(
@@ -94,6 +96,29 @@ class SecurityRoleHierarchyTest(
             }.andExpect {
                 status { isForbidden() }
             }
+    }
+
+    @Test
+    fun `anonymous guest browse is allowed but mutation and member endpoints remain protected`() {
+        mockMvc.get("/api/public/clubs/reading-sai/browse").andExpect {
+            status { isOk() }
+        }
+        mockMvc
+            .post("/api/public/clubs/reading-sai/browse") {
+                with(csrf())
+            }.andExpect {
+                status { isUnauthorized() }
+            }
+        mockMvc.get("/api/sessions/current").andExpect {
+            status { isUnauthorized() }
+        }
+    }
+
+    @Test
+    fun `anonymous access is not granted to unregistered public api paths`() {
+        mockMvc.get("/api/public/not-a-registered-endpoint").andExpect {
+            status { isUnauthorized() }
+        }
     }
 
     private fun viewerSessionCookie(emailPrefix: String): Cookie {
