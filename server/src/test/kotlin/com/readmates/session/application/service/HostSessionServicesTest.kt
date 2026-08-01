@@ -45,6 +45,7 @@ import com.readmates.session.application.port.out.HostSessionQueryPort
 import com.readmates.session.application.port.out.HostSessionTransitionResult
 import com.readmates.session.application.port.out.HostSessionVisibilitySnapshot
 import com.readmates.session.application.port.out.HostSessionVisibilityUpdateResult
+import com.readmates.session.domain.SessionAccessScope
 import com.readmates.sessionrecord.config.HostActionConfirmationProperties
 import com.readmates.shared.cache.ReadCacheInvalidationPort
 import com.readmates.shared.paging.PageRequest
@@ -214,6 +215,67 @@ class HostSessionServicesTest {
 
         assertThat(result.session.visibility).isEqualTo(SessionRecordVisibility.MEMBER)
         assertThat(result.composer?.eventType).isEqualTo(NotificationEventType.NEXT_BOOK_PUBLISHED)
+        assertLifecycleHasNoNotificationDispatchCollaborator()
+    }
+
+    @Test
+    fun `canonical first guest publication returns composer without notification dispatch`() {
+        val port =
+            RecordingHostSessionPorts().apply {
+                visibilityState = "DRAFT"
+                currentVisibility = SessionRecordVisibility.HOST_ONLY
+                currentAccessScope = SessionAccessScope.HOST_ONLY
+            }
+        val service = HostSessionLifecycleService(port, port, port)
+
+        val result =
+            service.updateVisibility(
+                UpdateHostSessionVisibilityCommand(
+                    host = host,
+                    sessionId = sessionId,
+                    accessScope = SessionAccessScope.GUEST_READABLE,
+                ),
+            )
+
+        assertThat(result.session.accessScope).isEqualTo(SessionAccessScope.GUEST_READABLE)
+        assertThat(result.composer?.eventType).isEqualTo(NotificationEventType.NEXT_BOOK_PUBLISHED)
+        assertLifecycleHasNoNotificationDispatchCollaborator()
+    }
+
+    @Test
+    fun `canonical non first guest access changes do not fabricate composer`() {
+        listOf(
+            Triple(SessionAccessScope.GUEST_READABLE, SessionAccessScope.HOST_ONLY, "DRAFT"),
+            Triple(SessionAccessScope.HOST_ONLY, SessionAccessScope.HOST_ONLY, "DRAFT"),
+            Triple(SessionAccessScope.GUEST_READABLE, SessionAccessScope.GUEST_READABLE, "DRAFT"),
+            Triple(SessionAccessScope.HOST_ONLY, SessionAccessScope.GUEST_READABLE, "OPEN"),
+        ).forEach { (currentAccessScope, requestedAccessScope, state) ->
+            val port =
+                RecordingHostSessionPorts().apply {
+                    visibilityState = state
+                    currentVisibility =
+                        if (currentAccessScope == SessionAccessScope.GUEST_READABLE) {
+                            SessionRecordVisibility.MEMBER
+                        } else {
+                            SessionRecordVisibility.HOST_ONLY
+                        }
+                    this.currentAccessScope = currentAccessScope
+                }
+            val service = HostSessionLifecycleService(port, port, port)
+
+            val result =
+                service.updateVisibility(
+                    UpdateHostSessionVisibilityCommand(
+                        host = host,
+                        sessionId = sessionId,
+                        accessScope = requestedAccessScope,
+                    ),
+                )
+
+            assertThat(result.composer)
+                .describedAs("$state $currentAccessScope -> $requestedAccessScope")
+                .isNull()
+        }
         assertLifecycleHasNoNotificationDispatchCollaborator()
     }
 
@@ -610,6 +672,7 @@ class HostSessionServicesTest {
         var throwOnUpsertPublication = false
         var visibilityState = "OPEN"
         var currentVisibility = SessionRecordVisibility.HOST_ONLY
+        var currentAccessScope = SessionAccessScope.HOST_ONLY
         var visibilityBookTitle = "테스트 책"
         var visibilityUpdatedAt = OffsetDateTime.parse("2026-07-23T10:00:00Z")
         var visibilityUpdateCount = 0
@@ -692,6 +755,7 @@ class HostSessionServicesTest {
                     hostSessionDetail(command.sessionId).copy(
                         state = visibilityState,
                         visibility = currentVisibility,
+                        accessScope = currentAccessScope,
                         bookTitle = visibilityBookTitle,
                     ),
                 contentUpdatedAt = visibilityUpdatedAt,
@@ -702,14 +766,31 @@ class HostSessionServicesTest {
             visibilityCommand = command
             visibilityUpdateCount += 1
             val previous = currentVisibility
-            currentVisibility = command.visibility
+            if (command.accessScope != null) {
+                currentAccessScope = command.accessScope
+                currentVisibility =
+                    if (command.accessScope == SessionAccessScope.GUEST_READABLE) {
+                        SessionRecordVisibility.MEMBER
+                    } else {
+                        SessionRecordVisibility.HOST_ONLY
+                    }
+            } else {
+                currentVisibility = command.visibility
+                currentAccessScope =
+                    if (command.visibility == SessionRecordVisibility.HOST_ONLY) {
+                        SessionAccessScope.HOST_ONLY
+                    } else {
+                        SessionAccessScope.GUEST_READABLE
+                    }
+            }
             visibilityUpdatedAt = visibilityUpdatedAt.plusNanos(1_000)
             return HostSessionVisibilityUpdateResult(
                 previousVisibility = previous,
                 detail =
                     hostSessionDetail(command.sessionId).copy(
                         state = visibilityState,
-                        visibility = command.visibility,
+                        visibility = currentVisibility,
+                        accessScope = currentAccessScope,
                         bookTitle = visibilityBookTitle,
                     ),
             )

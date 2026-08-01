@@ -376,7 +376,7 @@ where id = ${sqlValue(sessionId)};
       response.request().method() === "PATCH"
       && response.url().includes(`/host/sessions/${sessionId}/record-draft`),
   );
-  await page.getByRole("radio", { name: "멤버 공개" }).click();
+  await page.getByRole("radio", { name: "게스트 공개" }).click();
   const initialDraft = await initialDraftSave;
   expect(initialDraft.status(), await initialDraft.text()).toBe(200);
   await waitForDraftSaved(page);

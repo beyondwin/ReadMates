@@ -283,7 +283,7 @@ test("3. JSON import saves the shared draft while member and public live content
       response.request().method() === "PATCH" &&
       response.url().includes(`/host/sessions/${recordSessionId}/record-draft`),
   );
-  await page.getByRole("radio", { name: "멤버 공개" }).click();
+  await page.getByRole("radio", { name: "게스트 공개" }).click();
   const initialDraftSaveResponse = await initialDraftSave;
   expect(initialDraftSaveResponse.status(), await initialDraftSaveResponse.text()).toBe(200);
   await waitForDraftSaved(page);

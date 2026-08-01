@@ -121,7 +121,7 @@ class HostSessionController(
         @PathVariable sessionId: String,
         @Valid @RequestBody request: HostSessionAccessScopeRequest,
         member: CurrentMember,
-    ) = hostSessionLifecycleUseCase.updateVisibility(request.toCommand(member, parseHostSessionId(sessionId))).session
+    ) = hostSessionLifecycleUseCase.updateVisibility(request.toCommand(member, parseHostSessionId(sessionId)))
 
     @PostMapping("/{sessionId}/open")
     fun open(

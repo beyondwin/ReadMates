@@ -695,6 +695,27 @@ class HostSessionControllerDbTest(
     }
 
     @Test
+    fun `canonical guest readable draft returns composer without notification or decision rows`() {
+        val sessionId = createDraftSessionSeven()
+
+        mockMvc
+            .patch("/api/host/sessions/$sessionId/access-scope") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"accessScope":"GUEST_READABLE"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.session.accessScope") { value("GUEST_READABLE") }
+                jsonPath("$.session.visibility") { value("MEMBER") }
+                jsonPath("$.composer.eventType") { value("NEXT_BOOK_PUBLISHED") }
+            }
+
+        assertEquals(0, countRows("notification_event_outbox", "aggregate_id = '$sessionId'"))
+        assertEquals(0, countRows("host_action_notification_decisions", "session_id = '$sessionId'"))
+    }
+
+    @Test
     fun `legacy visibility notification fields are rejected before mutation`() {
         val sessionId = createDraftSessionSeven()
 

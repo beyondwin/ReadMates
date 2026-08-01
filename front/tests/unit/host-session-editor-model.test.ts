@@ -128,8 +128,8 @@ describe("host session editor model", () => {
       questionDeadlineAt: "2026-05-19T23:59:00+09:00",
     });
     expect(recordVisibilityLabel("HOST_ONLY")).toBe("호스트 전용");
-    expect(recordVisibilityLabel("MEMBER")).toBe("멤버 공개");
-    expect(recordVisibilityLabel("PUBLIC")).toBe("외부 공개");
+    expect(recordVisibilityLabel("MEMBER")).toBe("게스트 공개");
+    expect(recordVisibilityLabel("PUBLIC")).toBe("게스트 공개 · 공개 기록에 게시");
     expect(recordVisibilityDescription("MEMBER")).toBe("새 버전으로 반영하면 멤버 앱 안에서만 볼 수 있습니다.");
     expect(recordVisibilityDescription("PUBLIC")).toBe("새 버전으로 반영하면 멤버 앱과 공개 기록 목록에 표시됩니다.");
   });

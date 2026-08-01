@@ -41,10 +41,10 @@ async function createDraftAndPublishNextBook(
   const visibilityResponse = page.waitForResponse(
     (response) =>
       response.request().method() === "PATCH"
-      && response.url().includes(`/host/sessions/${sessionId}/visibility`),
+      && response.url().includes(`/host/sessions/${sessionId}/access-scope`),
   );
   await page.getByRole("button", {
-    name: new RegExp(`${bookTitle} 공개 범위를 멤버 공개로 변경`),
+    name: new RegExp(`${bookTitle} 게스트 접근을 게스트 공개로 변경`),
   }).click();
   const saved = await visibilityResponse;
   expect(saved.status(), await saved.text()).toBe(200);

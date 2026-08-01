@@ -1039,7 +1039,7 @@ describe("HostSessionEditor", () => {
     expect(within(dialog).getByText("피드백 문서")).toBeVisible();
     expect(within(dialog).getByText("현재 적용본 없음 → 버전 1")).toBeVisible();
     expect(within(dialog).getByText("공개 범위")).toBeVisible();
-    expect(within(dialog).getByText("멤버 공개")).toBeVisible();
+    expect(within(dialog).getByText("게스트 공개")).toBeVisible();
     expect(within(dialog).getByText("이 단계에서는 알림을 만들거나 보내지 않습니다")).toBeVisible();
     expect(dialog).not.toHaveTextContent(/revision|live|draft/i);
     expect(within(dialog).queryByRole("radio", { name: /알림/ })).not.toBeInTheDocument();

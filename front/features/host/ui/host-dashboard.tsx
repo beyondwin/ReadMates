@@ -163,7 +163,7 @@ export default function HostDashboard({
     .filter((item) => item.sessionId !== locallyOpenedSessionId)
     .map((item) => {
       const accessScope = hostSessionAccessScopeOverrides[item.sessionId];
-      return accessScope ? { ...item, accessScope } : item;
+      return accessScope ? { ...item, accessScope, siteVisibility: "HIDDEN" as const } : item;
     });
   const upcomingSessions = localHostSessions.filter((item) => item.state === "DRAFT");
   const nextHostSessionsCursor = hostSessionPage.nextCursor;

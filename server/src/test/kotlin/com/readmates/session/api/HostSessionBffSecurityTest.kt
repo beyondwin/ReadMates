@@ -142,6 +142,47 @@ class HostSessionBffSecurityTest(
     }
 
     @Test
+    fun `host access scope bff request reaches controller without weakening trusted write boundaries`() {
+        createDraftSession()
+
+        fun accessScopeRequest(
+            username: String,
+            secret: String? = "test-bff-secret",
+        ) = request(
+            HttpMethod.PATCH,
+            "/api/host/sessions/00000000-0000-0000-0000-000000009888/access-scope",
+        ).with(user(username))
+            .header("X-Readmates-Client-Contract", "v2")
+            .header("Origin", "http://localhost:3000")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""{"accessScope":"GUEST_READABLE"}""")
+            .also { builder -> secret?.let { builder.header("X-Readmates-Bff-Secret", it) } }
+
+        mockMvc.perform(accessScopeRequest("host@example.com")).andExpect(status().isOk)
+        assertEquals(
+            "GUEST_READABLE",
+            jdbcTemplate.queryForObject(
+                "select access_scope from sessions where id = '00000000-0000-0000-0000-000000009888'",
+                String::class.java,
+            ),
+        )
+
+        mockMvc
+            .perform(
+                request(
+                    HttpMethod.PATCH,
+                    "/api/host/sessions/00000000-0000-0000-0000-000000009888/access-scope",
+                ).header("X-Readmates-Bff-Secret", "test-bff-secret")
+                    .header("X-Readmates-Client-Contract", "v2")
+                    .header("Origin", "http://localhost:3000")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"accessScope":"HOST_ONLY"}"""),
+            ).andExpect(status().isUnauthorized)
+        mockMvc.perform(accessScopeRequest("host@example.com", null)).andExpect(status().isUnauthorized)
+        mockMvc.perform(accessScopeRequest("member5@example.com")).andExpect(status().isForbidden)
+    }
+
+    @Test
     fun `host open bff request reaches controller without spring csrf token`() {
         createDraftSession()
 

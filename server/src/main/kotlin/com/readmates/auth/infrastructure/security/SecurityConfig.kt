@@ -65,6 +65,7 @@ class SecurityConfig(
                 it.ignoringRequestMatchers(
                     methodAndPath("PATCH", Regex("^/api/host/sessions/[^/]+$")),
                     methodAndPath("PATCH", Regex("^/api/host/sessions/[^/]+/visibility$")),
+                    methodAndPath("PATCH", Regex("^/api/host/sessions/[^/]+/access-scope$")),
                     methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/visibility-preview$")),
                     methodAndPath("PATCH", Regex("^/api/host/sessions/[^/]+/record-draft$")),
                     methodAndPath("DELETE", Regex("^/api/host/sessions/[^/]+/record-draft$")),

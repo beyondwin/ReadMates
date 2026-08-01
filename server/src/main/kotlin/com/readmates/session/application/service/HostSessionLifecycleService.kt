@@ -15,6 +15,7 @@ import com.readmates.session.application.port.out.HostSessionDeletionPort
 import com.readmates.session.application.port.out.HostSessionDraftPort
 import com.readmates.session.application.port.out.HostSessionLifecyclePort
 import com.readmates.session.application.port.out.HostSessionVisibilitySnapshot
+import com.readmates.session.domain.SessionAccessScope
 import com.readmates.sessionrecord.application.model.HostNotificationComposerContext
 import com.readmates.sessionrecord.config.HostActionConfirmationProperties
 import com.readmates.shared.cache.ReadCacheInvalidationPort
@@ -40,7 +41,9 @@ class HostSessionLifecycleService(
             if (command.accessScope == null) {
                 isFirstMemberPublication(current.detail.state, current.detail.visibility, command.visibility)
             } else {
-                false
+                current.detail.state == "DRAFT" &&
+                    current.detail.accessScope == SessionAccessScope.HOST_ONLY &&
+                    command.accessScope == SessionAccessScope.GUEST_READABLE
             }
         draftPort.updateVisibility(command)
         val applied = draftPort.lockVisibilitySnapshot(HostSessionIdCommand(command.host, command.sessionId))
