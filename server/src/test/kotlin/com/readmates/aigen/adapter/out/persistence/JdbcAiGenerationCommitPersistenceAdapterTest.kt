@@ -90,7 +90,7 @@ class JdbcAiGenerationCommitPersistenceAdapterTest(
                 rawName,
             )
             jdbc.update(
-                "insert into memberships (id,club_id,user_id,role,status,short_name,joined_at) values (?,?,?,'MEMBER','ACTIVE',?,utc_timestamp(6))",
+                "insert into memberships (id,club_id,user_id,role,status,short_name,joined_at,avatar_key) values (?,?,?,'MEMBER','ACTIVE',?,utc_timestamp(6),'archive-box')",
                 membershipId.toString(),
                 fixture.clubId.toString(),
                 userId.toString(),
@@ -205,7 +205,7 @@ class JdbcAiGenerationCommitPersistenceAdapterTest(
             "테스트회원",
         )
         jdbc.update(
-            "insert into memberships (id,club_id,user_id,role,status,short_name,joined_at) values (?,?,?,'MEMBER','ACTIVE',?,utc_timestamp(6))",
+            "insert into memberships (id,club_id,user_id,role,status,short_name,joined_at,avatar_key) values (?,?,?,'MEMBER','ACTIVE',?,utc_timestamp(6),'archive-box')",
             membershipId.toString(),
             clubId.toString(),
             userId.toString(),

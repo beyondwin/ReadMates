@@ -1197,7 +1197,7 @@ class HostNotificationControllerTest(
         )
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
             values (
               '00000000-0000-0000-0000-000000000292',
               '00000000-0000-0000-0000-000000000902',
@@ -1205,7 +1205,8 @@ class HostNotificationControllerTest(
               'MEMBER',
               'ACTIVE',
               utc_timestamp(6),
-              'Other'
+              'Other',
+              'archive-box'
             )
             """.trimIndent(),
         )

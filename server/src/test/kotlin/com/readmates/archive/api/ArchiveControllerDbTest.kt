@@ -500,7 +500,7 @@ class ArchiveControllerDbTest(
         """
 
         private const val INSERT_SAMPLE_CLUB_MEMBER5_DETAIL_MEMBERSHIP_SQL = """
-            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
             select
               '00000000-0000-0000-0000-000000009282',
               clubs.id,
@@ -508,7 +508,8 @@ class ArchiveControllerDbTest(
               'MEMBER',
               'ACTIVE',
               '2026-01-01 00:00:00.000000',
-              '샘플멤버5'
+              '샘플멤버5',
+              'archive-box'
             from clubs
             join users on users.email = 'member5@example.com'
             where clubs.slug = 'sample-book-club';

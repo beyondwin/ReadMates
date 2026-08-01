@@ -139,7 +139,7 @@ private const val CREATE_FOREIGN_CLUB_HOST_SQL = """
       '외부',
       'PASSWORD'
     );
-    insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+    insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
     values (
       '00000000-0000-0000-0000-000000000992',
       '00000000-0000-0000-0000-000000000002',
@@ -147,7 +147,8 @@ private const val CREATE_FOREIGN_CLUB_HOST_SQL = """
       'HOST',
       'ACTIVE',
       utc_timestamp(6),
-      '외부'
+      '외부',
+      'archive-box'
     );
 """
 

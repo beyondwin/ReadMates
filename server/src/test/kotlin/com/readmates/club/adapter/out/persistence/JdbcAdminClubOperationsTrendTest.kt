@@ -93,8 +93,8 @@ class JdbcAdminClubOperationsTrendTest(
             USER_ID,
         )
         jdbcTemplate.update(
-            "insert into memberships (id, club_id, user_id, role, status, joined_at, short_name) " +
-                "values (?, ?, ?, 'HOST', 'ACTIVE', utc_timestamp(6), 'OT')",
+            "insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key) " +
+                "values (?, ?, ?, 'HOST', 'ACTIVE', utc_timestamp(6), 'OT', 'archive-box')",
             MEMBERSHIP_ID,
             CLUB_ID,
             USER_ID,

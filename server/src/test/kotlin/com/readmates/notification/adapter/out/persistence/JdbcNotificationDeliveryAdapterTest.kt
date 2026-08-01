@@ -597,8 +597,8 @@ class JdbcNotificationDeliveryAdapterTest(
         )
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
-            values (?, ?, ?, 'MEMBER', ?, utc_timestamp(6), ?)
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+            values (?, ?, ?, 'MEMBER', ?, utc_timestamp(6), ?, 'archive-box')
             """.trimIndent(),
             membershipId.toString(),
             clubId.toString(),

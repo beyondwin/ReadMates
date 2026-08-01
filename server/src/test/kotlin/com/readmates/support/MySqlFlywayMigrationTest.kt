@@ -266,6 +266,7 @@ class MySqlFlywayMigrationTest(
                 assertThrows(UncategorizedSQLException::class.java) {
                     upgradeJdbc.update(
                         """
+                        -- membership-avatar-key-omission: verify V43 rejects omitted keys after migration
                         insert into memberships (
                           id, club_id, user_id, role, status, short_name, joined_at, created_at, updated_at
                         ) values (?, ?, ?, 'MEMBER', 'ACTIVE', 'Missing Avatar', null,
@@ -359,6 +360,7 @@ class MySqlFlywayMigrationTest(
             )
             jdbcTemplate.update(
                 """
+                -- membership-avatar-key-omission: seed the V42 schema for deterministic V43 backfill
                 insert into memberships (
                   id, club_id, user_id, role, status, short_name, joined_at, created_at, updated_at
                 ) values (?, ?, ?, 'MEMBER', ?, ?, null, ?, ?)

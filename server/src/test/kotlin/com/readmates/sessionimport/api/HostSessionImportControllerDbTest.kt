@@ -64,10 +64,10 @@ insert into users (id, email, name, short_name, auth_provider)
 values
   ('$HOST_USER_ID', 'session-import-host@example.test', 'Import Host', 'Host', 'PASSWORD'),
   ('$MEMBER_USER_ID', 'session-import-member@example.test', 'Import Member', 'Member', 'PASSWORD');
-insert into memberships (id, club_id, user_id, role, status, short_name, joined_at)
+insert into memberships (id, club_id, user_id, role, status, short_name, joined_at, avatar_key)
 values
-  ('$HOST_MEMBERSHIP_ID', '$CLUB_ID', '$HOST_USER_ID', 'HOST', 'ACTIVE', 'Host', '2026-05-01 00:00:00.000000'),
-  ('$MEMBER_MEMBERSHIP_ID', '$CLUB_ID', '$MEMBER_USER_ID', 'MEMBER', 'ACTIVE', 'Member', '2026-05-01 00:00:00.000000');
+  ('$HOST_MEMBERSHIP_ID', '$CLUB_ID', '$HOST_USER_ID', 'HOST', 'ACTIVE', 'Host', '2026-05-01 00:00:00.000000', 'archive-box'),
+  ('$MEMBER_MEMBERSHIP_ID', '$CLUB_ID', '$MEMBER_USER_ID', 'MEMBER', 'ACTIVE', 'Member', '2026-05-01 00:00:00.000000', 'archive-box');
 insert into sessions (
   id, club_id, number, title, book_title, book_author, book_translator, book_link, book_image_url,
   session_date, start_time, end_time, location_label, meeting_url, meeting_passcode,

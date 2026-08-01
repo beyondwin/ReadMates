@@ -134,8 +134,8 @@ class JdbcAdminNotificationOperationsAdapterTest(
         )
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
-            values (?, ?, ?, 'MEMBER', 'ACTIVE', utc_timestamp(6), 'Second')
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+            values (?, ?, ?, 'MEMBER', 'ACTIVE', utc_timestamp(6), 'Second', 'archive-box')
             on duplicate key update status = values(status), short_name = values(short_name)
             """.trimIndent(),
             SECOND_MEMBERSHIP_ID.toString(),

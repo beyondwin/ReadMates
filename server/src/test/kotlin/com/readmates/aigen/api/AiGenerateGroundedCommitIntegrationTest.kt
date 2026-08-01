@@ -84,11 +84,11 @@ private const val GROUNDED_SEED_SQL = """
       ('$GROUNDED_HOST_USER_ID', '$GROUNDED_HOST_EMAIL', 'PublicHost', 'PublicHost', 'PASSWORD'),
       ('$GROUNDED_MEMBER_A_USER_ID', 'grounded-a@example.test', 'PublicMemberA', 'PublicMemberA', 'PASSWORD'),
       ('$GROUNDED_MEMBER_B_USER_ID', 'grounded-b@example.test', 'PublicMemberB', 'PublicMemberB', 'PASSWORD');
-    insert into memberships (id, club_id, user_id, role, status, short_name, joined_at)
+    insert into memberships (id, club_id, user_id, role, status, short_name, joined_at, avatar_key)
     values
-      ('$GROUNDED_HOST_MEMBERSHIP_ID', '$GROUNDED_CLUB_ID', '$GROUNDED_HOST_USER_ID', 'HOST', 'ACTIVE', 'PublicHost', '2026-07-01 00:00:00.000000'),
-      ('$GROUNDED_MEMBER_A_MEMBERSHIP_ID', '$GROUNDED_CLUB_ID', '$GROUNDED_MEMBER_A_USER_ID', 'MEMBER', 'ACTIVE', 'PublicMemberA', '2026-07-01 00:00:00.000000'),
-      ('$GROUNDED_MEMBER_B_MEMBERSHIP_ID', '$GROUNDED_CLUB_ID', '$GROUNDED_MEMBER_B_USER_ID', 'MEMBER', 'ACTIVE', 'PublicMemberB', '2026-07-01 00:00:00.000000');
+      ('$GROUNDED_HOST_MEMBERSHIP_ID', '$GROUNDED_CLUB_ID', '$GROUNDED_HOST_USER_ID', 'HOST', 'ACTIVE', 'PublicHost', '2026-07-01 00:00:00.000000', 'archive-box'),
+      ('$GROUNDED_MEMBER_A_MEMBERSHIP_ID', '$GROUNDED_CLUB_ID', '$GROUNDED_MEMBER_A_USER_ID', 'MEMBER', 'ACTIVE', 'PublicMemberA', '2026-07-01 00:00:00.000000', 'archive-box'),
+      ('$GROUNDED_MEMBER_B_MEMBERSHIP_ID', '$GROUNDED_CLUB_ID', '$GROUNDED_MEMBER_B_USER_ID', 'MEMBER', 'ACTIVE', 'PublicMemberB', '2026-07-01 00:00:00.000000', 'archive-box');
     insert into sessions (
       id, club_id, number, title, book_title, book_author, book_translator, book_link, book_image_url,
       session_date, start_time, end_time, location_label, meeting_url, meeting_passcode,

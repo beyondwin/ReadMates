@@ -21,6 +21,7 @@ insert into users (
   'GOOGLE'
 );
 
+-- membership-avatar-key-omission: seed the V42 schema before V43 adds the column
 insert into memberships (
   id, club_id, user_id, role, status, short_name, joined_at
 ) values (

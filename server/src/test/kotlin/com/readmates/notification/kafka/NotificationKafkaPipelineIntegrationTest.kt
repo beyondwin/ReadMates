@@ -222,8 +222,8 @@ class NotificationKafkaPipelineIntegrationTest(
         )
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
-            values (?, ?, ?, 'MEMBER', 'ACTIVE', utc_timestamp(6), 'Recipient')
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+            values (?, ?, ?, 'MEMBER', 'ACTIVE', utc_timestamp(6), 'Recipient', 'archive-box')
             """.trimIndent(),
             PIPELINE_MEMBERSHIP_ID,
             PIPELINE_CLUB_ID,

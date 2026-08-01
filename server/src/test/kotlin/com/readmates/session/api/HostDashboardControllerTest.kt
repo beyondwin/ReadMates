@@ -1167,8 +1167,8 @@ class HostDashboardControllerTest(
         )
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
-            values (?, '00000000-0000-0000-0000-000000000001', ?, 'MEMBER', 'ACTIVE', utc_timestamp(6), '대시보드')
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+            values (?, '00000000-0000-0000-0000-000000000001', ?, 'MEMBER', 'ACTIVE', utc_timestamp(6), '대시보드', 'archive-box')
             """.trimIndent(),
             DASHBOARD_MISSING_MEMBERSHIP_ID,
             DASHBOARD_MISSING_USER_ID,

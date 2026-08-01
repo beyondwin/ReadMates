@@ -13,6 +13,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.name
 import kotlin.io.path.readLines
+import kotlin.io.path.readText
 import kotlin.io.path.relativeTo
 
 private val importedClasses =
@@ -295,6 +296,45 @@ class ServerArchitectureBoundaryTest {
 
 @Tag("architecture")
 class ServerArchitectureSourceBoundaryTest {
+    @Test
+    fun `test membership inserts declare avatar keys`() {
+        val membershipInsert =
+            Regex(
+                """\binsert\s+into\s+`?memberships`?\s*\(([^)]*)\)""",
+                setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+            )
+        val violations =
+            testFixtureFiles()
+                .flatMap { fixtureFile ->
+                    val source = fixtureFile.readText()
+                    membershipInsert.findAll(source).mapNotNull { match ->
+                        val declaredColumns =
+                            match
+                                .groupValues[1]
+                                .split(',')
+                                .map { column -> column.trim().trim('`').lowercase() }
+                        val insertLineStart = source.lastIndexOf('\n', match.range.first).let { it + 1 }
+                        val markerLineEnd = (insertLineStart - 1).coerceAtLeast(0)
+                        val markerLineStart = source.lastIndexOf('\n', markerLineEnd - 1).let { it + 1 }
+                        val explicitlyAllowedOmission =
+                            source
+                                .substring(markerLineStart, markerLineEnd)
+                                .contains(AVATAR_KEY_OMISSION_MARKER)
+                        if ("avatar_key" in declaredColumns || explicitlyAllowedOmission) {
+                            null
+                        } else {
+                            val line = source.take(match.range.first).count { it == '\n' } + 1
+                            "${fixtureFile.relativeTo(projectRoot())}:$line"
+                        }
+                    }
+                }.sorted()
+
+        assertTrue(
+            violations.isEmpty(),
+            "Test membership INSERT fixtures must declare avatar_key:\n" + violations.joinToString("\n"),
+        )
+    }
+
     @Test
     fun `session application does not depend on removed host session write port`() {
         val forbiddenTypeName = "HostSessionWritePort"
@@ -620,6 +660,29 @@ class ServerArchitectureSourceBoundaryTest {
     private fun sourceRoot(): Path =
         listOf(Path.of("src/main/kotlin"), Path.of("server/src/main/kotlin"))
             .first(Files::exists)
+
+    private fun testFixtureFiles(): List<Path> =
+        listOf(
+            projectRoot().resolve("server/src/test/kotlin"),
+            projectRoot().resolve("server/src/test/resources"),
+        ).filter(Files::exists)
+            .flatMap { root ->
+                Files.walk(root).use { paths ->
+                    paths
+                        .filter(Files::isRegularFile)
+                        .filter { path -> path.name.endsWith(".kt") || path.name.endsWith(".sql") }
+                        .toList()
+                }
+            }
+
+    private fun projectRoot(): Path =
+        listOf(Path.of("."), Path.of(".."))
+            .map { candidate -> candidate.toAbsolutePath().normalize() }
+            .first { candidate -> Files.exists(candidate.resolve("server/build.gradle.kts")) }
+
+    private companion object {
+        const val AVATAR_KEY_OMISSION_MARKER = "membership-avatar-key-omission"
+    }
 
     @Test
     fun `auth application services live in application service package`() {

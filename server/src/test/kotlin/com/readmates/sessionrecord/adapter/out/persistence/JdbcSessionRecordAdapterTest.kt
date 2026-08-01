@@ -388,8 +388,8 @@ class JdbcSessionRecordAdapterTest(
         )
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, short_name, joined_at)
-            values (?, ?, ?, 'HOST', 'ACTIVE', '호스트', utc_timestamp(6))
+            insert into memberships (id, club_id, user_id, role, status, short_name, joined_at, avatar_key)
+            values (?, ?, ?, 'HOST', 'ACTIVE', '호스트', utc_timestamp(6), 'archive-box')
             """.trimIndent(),
             membershipId.toString(),
             clubId.toString(),
