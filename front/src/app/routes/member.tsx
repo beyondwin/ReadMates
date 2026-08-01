@@ -14,6 +14,13 @@ import {
   isGuestScopedRouteData,
   scopedGuestRouteLoader,
 } from "@/features/guest-browse/route/club-app-audience-loader";
+import {
+  guestArchiveDetailLoader,
+  guestArchiveLoader,
+  guestCurrentSessionLoader,
+  guestHomeLoader,
+  guestNotesLoader,
+} from "@/features/guest-browse/route/guest-route-data";
 import { GuestScopedAppRoute } from "@/features/guest-browse/route/guest-scoped-app-route";
 import { AppRouteLayout } from "@/src/app/layouts/app-route-layout";
 import { memoizeRouteModule } from "@/src/app/routes/route-module-loader";
@@ -49,6 +56,7 @@ function scopedMemberRoute({
   shouldRevalidate,
   fallback,
   load,
+  guestLoader,
 }: {
   path?: string;
   index?: true;
@@ -57,6 +65,7 @@ function scopedMemberRoute({
   shouldRevalidate?: RouteObject["shouldRevalidate"];
   fallback: ReactNode;
   load: () => Promise<ScopedRouteModule>;
+  guestLoader?: LoaderFunction;
 }): RouteObject {
   const loadOnce = memoizeRouteModule(load);
   const ProtectedComponent = lazy(async () => ({ default: (await loadOnce()).Component }));
@@ -80,7 +89,7 @@ function scopedMemberRoute({
     ...(ErrorBoundary ? { ErrorBoundary } : {}),
     ...(shouldRevalidate ? { shouldRevalidate } : {}),
     hydrateFallbackElement: fallback,
-    loader: scopedGuestRouteLoader(async () => (await loadOnce()).loader),
+    loader: scopedGuestRouteLoader(async () => (await loadOnce()).loader, guestLoader),
     element: <ScopedAudienceRouteComponent />,
   };
 }
@@ -117,6 +126,7 @@ function scopedMemberAppRoutes(queryClient: QueryClient): RouteObject[] {
       index: true,
       errorElement: <ArchiveRouteError />,
       fallback: <ReadmatesRouteLoading label="멤버 홈을 불러오는 중" variant="member" />,
+      guestLoader: guestHomeLoader,
       load: async () => {
         const [{ default: Component }, { memberHomeLoader: loader }] = await Promise.all([
           import("@/src/pages/app-home"),
@@ -129,6 +139,7 @@ function scopedMemberAppRoutes(queryClient: QueryClient): RouteObject[] {
       path: "session/current",
       ErrorBoundary: CurrentSessionRouteError,
       fallback: <ReadmatesRouteLoading label="세션을 불러오는 중" variant="member" />,
+      guestLoader: guestCurrentSessionLoader,
       load: async () => {
         const { CurrentSessionRoute, currentSessionLoaderFactory } = await import("@/features/current-session");
         return {
@@ -142,6 +153,7 @@ function scopedMemberAppRoutes(queryClient: QueryClient): RouteObject[] {
       errorElement: <ArchiveRouteError />,
       shouldRevalidate: notesFeedShouldRevalidate,
       fallback: <ArchiveRouteLoading label="클럽 노트를 불러오는 중" />,
+      guestLoader: guestNotesLoader,
       load: async () => {
         const [{ default: Component }, { notesFeedLoader: loader }] = await Promise.all([
           import("@/src/pages/notes"),
@@ -154,6 +166,7 @@ function scopedMemberAppRoutes(queryClient: QueryClient): RouteObject[] {
       path: "archive",
       errorElement: <ArchiveRouteError />,
       fallback: <ArchiveRouteLoading label="아카이브를 불러오는 중" />,
+      guestLoader: guestArchiveLoader,
       load: async () => {
         const [{ default: Component }, { archiveListLoaderFactory }] = await Promise.all([
           import("@/src/pages/archive"),
@@ -226,6 +239,7 @@ function scopedMemberAppRoutes(queryClient: QueryClient): RouteObject[] {
       path: "sessions/:sessionId",
       errorElement: <ArchiveRouteError />,
       fallback: <ArchiveRouteLoading label="지난 세션 기록을 불러오는 중" />,
+      guestLoader: guestArchiveDetailLoader,
       load: async () => {
         const [{ default: Component }, { memberSessionDetailLoaderFactory }] = await Promise.all([
           import("@/src/pages/member-session"),

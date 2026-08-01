@@ -49,6 +49,9 @@ export function MobileRecordsSegment({
           />
           <div className="rm-current-session-mobile__save-row" style={{ justifyContent: "flex-end" }}>
             <div className="m-row" style={{ gap: 10, justifyContent: "flex-end" }}>
+              <span className="tiny" style={{ color: "var(--text-3)" }}>
+                작성한 글은 게스트에게도 공개돼요.
+              </span>
               <SaveFeedback scope="longReview" status={longReviewSaveStatus} />
               <button
                 type="button"

@@ -14,6 +14,7 @@ export type ClubAppAccess = {
 
 export type GuestScopedRouteData = {
   guestRoute: true;
+  guestData?: unknown;
 };
 
 const pendingAudienceAccesses = new WeakMap<Request, Promise<ClubAppAccess>>();
@@ -64,12 +65,18 @@ export async function loadScopedClubAppAccess(args?: LoaderFunctionArgs): Promis
   return loadClubAppAudience(args);
 }
 
-export function scopedGuestRouteLoader(loadProtectedLoader: () => Promise<LoaderFunction>) {
+export function scopedGuestRouteLoader(
+  loadProtectedLoader: () => Promise<LoaderFunction>,
+  loadGuestLoader?: LoaderFunction,
+) {
   return async function guardedScopedRouteLoader(args: LoaderFunctionArgs) {
     const access = await loadClubAppAudience(args);
 
     if (access.audience === "GUEST") {
-      return { guestRoute: true } satisfies GuestScopedRouteData;
+      const guestData = loadGuestLoader ? await loadGuestLoader(args) : undefined;
+      return guestData === undefined
+        ? ({ guestRoute: true } satisfies GuestScopedRouteData)
+        : ({ guestRoute: true, guestData } satisfies GuestScopedRouteData);
     }
 
     const protectedLoader = await loadProtectedLoader();
