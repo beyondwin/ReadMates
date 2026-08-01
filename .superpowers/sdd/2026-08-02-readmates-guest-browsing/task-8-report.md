@@ -153,3 +153,47 @@ preview, or member-only lock as determined by the guest capability matrix.
 - `corepack pnpm --dir front lint`: passed.
 - `corepack pnpm --dir front build`: passed.
 - `git diff --check`: passed.
+
+## Review-fix round 3 — scoped retry and guest bundle boundaries
+
+### RED → GREEN
+
+- RED: `memoizeRouteModule` retained a rejected promise forever; two callers
+  shared that rejection, but a third call could not reload the route module.
+- RED: scoped host parent/child/inner loaders each issued their own authorization
+  request, and a failed request could not be verified as a shared, retryable
+  attempt.
+- RED: `current-session-route-error.test.tsx` could not resolve the lightweight
+  error module before extraction.
+- GREEN: focused module, host authorization, route-error, guest-route, and
+  router tests passed: 5 files, 20 tests.
+
+### Resolutions
+
+1. `memoizeRouteModule` now shares one in-flight promise, including a failing
+   attempt, then clears it on rejection. A later caller retries normally;
+   the exact concurrent-failure/retry test records the behavior.
+2. `CurrentSessionRouteError` moved to
+   `current-session-route-error.tsx`, which imports only the shared route-error
+   view. The protected route re-exports that same function, preserving export
+   identity and behavior, while scoped member routing imports the lightweight
+   module instead of the current-session query/API graph. Its data-router test
+   proves the original member fallback and the architecture-boundary regression
+   test passed.
+3. Scoped host authorization now uses a request-identity `WeakMap` only for
+   active work. Parent/static-child/inner loaders share success or failure for
+   one router `Request`; either outcome deletes the entry, allowing a later
+   retry with no stale cross-navigation cache. Unscoped requests remain
+   independent. Dedicated request-count tests cover success and failure/retry.
+
+### Round 3 verification
+
+- Focused route/module/host/error regression: 5 files, 20 tests passed.
+- Frontend boundary and app-layout regression: 2 files, 12 tests passed.
+- `corepack pnpm --dir front test`: 236 files, 1874 tests passed.
+- `corepack pnpm --dir front lint`: passed.
+- `corepack pnpm --dir front build`: passed. Production output keeps the
+  current-session feature as its own lazy chunk (`52.24 kB`); the entry chunk
+  is `122.18 kB`, confirming the scoped guest shell no longer statically pulls
+  the current-session route/query graph.
+- `git diff --check`: passed.

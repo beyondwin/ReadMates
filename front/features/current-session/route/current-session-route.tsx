@@ -13,7 +13,7 @@ import type { CurrentSessionRouteData } from "@/features/current-session/route/c
 import { CurrentSessionPage, type CurrentSessionSaveActions } from "@/features/current-session/ui/current-session-page";
 import type { CurrentSessionInternalLinkProps, InternalLinkComponent } from "@/features/current-session/ui/current-session-types";
 import type { ReadmatesApiContext } from "@/shared/api/client";
-import { RouteErrorBoundary } from "@/shared/ui/route-error";
+export { CurrentSessionRouteError } from "./current-session-route-error";
 
 function contextFromClubSlug(clubSlug?: string): ReadmatesApiContext | undefined {
   return clubSlug ? { clubSlug } : undefined;
@@ -67,8 +67,4 @@ export function CurrentSessionRoute({
       internalLinkComponent={internalLinkComponent}
     />
   );
-}
-
-export function CurrentSessionRouteError() {
-  return <RouteErrorBoundary variant="member" />;
 }

@@ -1,7 +1,7 @@
 export {
   CurrentSessionRoute,
-  CurrentSessionRouteError,
 } from "@/features/current-session/route/current-session-route";
+export { CurrentSessionRouteError } from "@/features/current-session/route/current-session-route-error";
 export {
   CurrentSessionBoard,
   CurrentSessionEmpty,
