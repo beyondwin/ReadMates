@@ -15,6 +15,7 @@ import {
   openHostSession,
   publishHostSession,
   saveHostSessionAttendance,
+  saveHostSessionAccessScope,
   saveHostSessionPublication,
   saveHostSessionVisibility,
   updateHostSession,
@@ -29,6 +30,7 @@ import type {
   HostSessionPublicationRequest,
   HostSessionRequest,
   HostSessionVisibilityRequest,
+  HostSessionAccessScopeRequest,
   HostSessionVisibilityUpdateResult,
   ManualNotificationDispatchListResponse,
   HostNotificationEventType,
@@ -295,6 +297,27 @@ export function useSaveHostSessionVisibilityMutation(context?: ReadmatesApiConte
         client.removeQueries({
           queryKey: hostNotificationManualOptionsRootKey(context),
         });
+      }
+      return Promise.all([
+        invalidateHostSessionLists(client, context),
+        invalidateHostSessionDashboard(client, context),
+      ]);
+    },
+  });
+}
+
+export function useSaveHostSessionAccessScopeMutation(context?: ReadmatesApiContext) {
+  const client = useQueryClient();
+  return useMutation<
+    HostSessionVisibilityUpdateResult,
+    Error,
+    { sessionId: string; request: HostSessionAccessScopeRequest }
+  >({
+    mutationFn: ({ sessionId, request }) => saveHostSessionAccessScope(sessionId, request, context),
+    onSuccess: (result, variables) => {
+      client.setQueryData(hostSessionKeys.detail(variables.sessionId, context), result.session);
+      if (result.composer) {
+        client.removeQueries({ queryKey: hostNotificationManualOptionsRootKey(context) });
       }
       return Promise.all([
         invalidateHostSessionLists(client, context),

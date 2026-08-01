@@ -7,6 +7,7 @@ import {
   type HostSessionLedgerFilters,
   type HostSessionLedgerItem,
 } from "@/features/host/model/host-session-ledger-model";
+import { resolvedSessionExposure, sessionExposureCopy } from "@/features/host/model/session-exposure-model";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 
 type LedgerLinkProps = {
@@ -50,12 +51,10 @@ function stateLabel(state: HostSessionLedgerItem["state"]) {
   }[state];
 }
 
-function visibilityLabel(visibility: HostSessionLedgerItem["visibility"]) {
-  return {
-    HOST_ONLY: "호스트 전용",
-    MEMBER: "멤버 공개",
-    PUBLIC: "전체 공개",
-  }[visibility];
+function exposureLabel(item: HostSessionLedgerItem) {
+  const exposure = resolvedSessionExposure(item);
+  const copy = sessionExposureCopy(exposure.accessScope, exposure.siteVisibility);
+  return `${copy.accessLabel} · ${copy.siteLabel}`;
 }
 
 function LedgerBadges({ item }: { item: HostSessionLedgerItem }) {
@@ -202,7 +201,7 @@ function DesktopLedger({
               </td>
               <td className="small" style={{ padding: 16, verticalAlign: "top" }}>{stateLabel(item.state)}</td>
               <td style={{ padding: 16, verticalAlign: "top" }}><LedgerBadges item={item} /></td>
-              <td className="small" style={{ padding: 16, verticalAlign: "top" }}>{visibilityLabel(item.visibility)}</td>
+              <td className="small" style={{ padding: 16, verticalAlign: "top" }}>{exposureLabel(item)}</td>
               <td className="tiny" style={{ padding: 16, verticalAlign: "top", whiteSpace: "nowrap" }}>
                 {hostSessionLedgerModifiedAtLabel(item.lastModifiedAt)}
               </td>
@@ -245,7 +244,7 @@ function MobileLedger({
               <h2 className="h4 editorial" style={{ margin: "5px 0 2px", overflowWrap: "anywhere" }}>{item.bookTitle}</h2>
               <div className="tiny">{item.bookAuthor}</div>
             </div>
-            <span className="badge">{visibilityLabel(item.visibility)}</span>
+            <span className="badge">{exposureLabel(item)}</span>
           </div>
           <div className="tiny" style={{ marginTop: 10 }}>
             {formatDateOnlyLabel(item.date)} · {item.startTime}–{item.endTime} · {item.locationLabel}

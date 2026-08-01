@@ -86,7 +86,7 @@ const importCommitResult: SessionImportCommitResult = {
   tone: "success",
   title: "초안 저장 완료",
   message: "가져온 세션 기록을 공유 초안으로 저장했습니다.",
-  visibilityLabel: "멤버 공개",
+  visibilityLabel: "게스트 공개",
   items: ["공개 요약 초안 교체"],
   nextAction: "공통 초안을 검토해 주세요.",
 };
@@ -109,6 +109,9 @@ function props(
   overrides: Partial<SessionRecordWorkspaceProps> = {},
 ): SessionRecordWorkspaceProps {
   return {
+    state: "CLOSED",
+    accessScope: "GUEST_READABLE",
+    siteVisibility: "HIDDEN",
     source: "manual",
     onSourceChange: vi.fn(),
     liveRevision: 0,
@@ -335,7 +338,7 @@ describe("SessionRecordWorkspace", () => {
             },
             actions: {
               ...props().actions,
-              onSnapshotChange: setSnapshot,
+              onSnapshotChange: (nextSnapshot) => setSnapshot(nextSnapshot),
             },
           })}
         />

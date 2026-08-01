@@ -31,6 +31,7 @@ import {
   revokeHostInvitation,
   saveHostSessionAttendance,
   saveHostSessionPublication,
+  saveHostSessionAccessScope,
   saveHostSessionVisibility,
   sendHostNotificationTestMail,
   submitHostMemberLifecycle,
@@ -100,7 +101,7 @@ function hostMemberListItem(avatarKey: unknown = "reading-lamp") {
 function stubFetch() {
   const fetchMock = vi.fn().mockImplementation((url: string) =>
     Promise.resolve(jsonResponse(
-      url.includes("/visibility")
+      url.includes("/visibility") || url.includes("/access-scope")
         ? { session: hostSessionDetail(), composer: null }
         : { items: [], nextCursor: null },
     )));
@@ -128,6 +129,24 @@ describe("host api wrappers", () => {
       expect.objectContaining({
         method: "PATCH",
         body: JSON.stringify({ visibility: "MEMBER" }),
+      }),
+    );
+  });
+
+  it("sends canonical guest access to the access-scope endpoint", async () => {
+    const fetchMock = stubFetch();
+
+    await saveHostSessionAccessScope(
+      "session 7",
+      { accessScope: "GUEST_READABLE" },
+      { clubSlug: "reading-sai" },
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/host/sessions/session%207/access-scope?clubSlug=reading-sai",
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ accessScope: "GUEST_READABLE" }),
       }),
     );
   });

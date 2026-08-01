@@ -157,14 +157,14 @@ describe("host session editor view model", () => {
     }).applied).toEqual({
       exists: false,
       versionLabel: null,
-      visibilityLabel: "외부 공개",
+      visibilityLabel: "게스트 공개 · 공개 기록에 게시",
       appliedAt: null,
       summary: "요약이 아직 없습니다",
     });
     expect(buildHostSessionEditorOverview(overviewInput()).applied).toEqual({
       exists: true,
       versionLabel: "버전 3",
-      visibilityLabel: "멤버 공개",
+      visibilityLabel: "게스트 공개",
       appliedAt: "2026-07-27T09:00:00+09:00",
       summary: "함께 읽은 기록입니다.",
     });

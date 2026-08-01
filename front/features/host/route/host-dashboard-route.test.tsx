@@ -60,7 +60,7 @@ vi.mock("@/features/host/queries/host-session-queries", () => ({
   }),
   hostSessionListQuery: () => ({ testData: { items: [], nextCursor: null } }),
   useOpenHostSessionMutation: () => routeMocks.openMutation,
-  useSaveHostSessionVisibilityMutation: () => routeMocks.visibilityMutation,
+  useSaveHostSessionAccessScopeMutation: () => routeMocks.visibilityMutation,
 }));
 
 vi.mock("@/features/host/queries/host-notification-queries", () => ({
@@ -104,20 +104,20 @@ vi.mock("@/features/host/ui/host-dashboard", () => ({
     actions,
   }: {
     actions: {
-      updateSessionVisibility: (
+      updateSessionAccessScope: (
         sessionId: string,
-        request: { visibility: "MEMBER" },
+        request: { accessScope: "GUEST_READABLE" },
       ) => Promise<void>;
     };
   }) => (
     <button
       type="button"
       onClick={() => {
-        void actions.updateSessionVisibility("session-next", { visibility: "MEMBER" })
+        void actions.updateSessionAccessScope("session-next", { accessScope: "GUEST_READABLE" })
           .catch(() => undefined);
       }}
     >
-      멤버에게 공개
+      게스트에게 공개
     </button>
   ),
 }));
@@ -190,7 +190,7 @@ describe("HostDashboardRoute next-book composer", () => {
       });
     renderRoute();
 
-    await userEvent.click(screen.getByRole("button", { name: "멤버에게 공개" }));
+    await userEvent.click(screen.getByRole("button", { name: "게스트에게 공개" }));
 
     expect(await screen.findByRole("dialog", {
       name: "멤버에게 알림을 보낼까요?",
@@ -201,7 +201,7 @@ describe("HostDashboardRoute next-book composer", () => {
     await userEvent.click(screen.getByRole("button", {
       name: "이번에는 보내지 않기",
     }));
-    await userEvent.click(screen.getByRole("button", { name: "멤버에게 공개" }));
+    await userEvent.click(screen.getByRole("button", { name: "게스트에게 공개" }));
 
     expect(screen.queryByRole("dialog", {
       name: "멤버에게 알림을 보낼까요?",
@@ -214,7 +214,7 @@ describe("HostDashboardRoute next-book composer", () => {
     );
     renderRoute();
 
-    await userEvent.click(screen.getByRole("button", { name: "멤버에게 공개" }));
+    await userEvent.click(screen.getByRole("button", { name: "게스트에게 공개" }));
 
     expect(screen.queryByRole("dialog", {
       name: "멤버에게 알림을 보낼까요?",

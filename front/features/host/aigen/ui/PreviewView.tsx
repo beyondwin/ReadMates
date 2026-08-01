@@ -25,6 +25,7 @@ import { FeedbackDocumentSection } from "./sections/FeedbackDocumentSection";
 import { HighlightsSection } from "./sections/HighlightsSection";
 import { OneLineReviewsSection } from "./sections/OneLineReviewsSection";
 import { SummarySection } from "./sections/SummarySection";
+import { compatibilityExposureLabel } from "@/features/host/model/session-exposure-model";
 
 const SECTION_ID: Record<ReviewSection, string> = {
   SUMMARY: "aigen-review-summary",
@@ -310,9 +311,9 @@ export function PreviewView(props: PreviewViewProps) {
       ) : null}
 
       <fieldset className="stack" style={{ "--stack": "6px", border: "none", padding: 0, margin: 0 } as CSSProperties}>
-        <legend className="field-label">공개 범위</legend>
-        <label className="small"><input type="radio" name="aigen-visibility" value="MEMBER" checked={recordVisibility === "MEMBER"} onChange={() => onVisibilityChange("MEMBER")} disabled={committing} /> 멤버 공개 (MEMBER)</label>
-        <label className="small"><input type="radio" name="aigen-visibility" value="PUBLIC" checked={recordVisibility === "PUBLIC"} onChange={() => onVisibilityChange("PUBLIC")} disabled={committing} /> 전체 공개 (PUBLIC)</label>
+        <legend className="field-label">게스트 접근</legend>
+        <label className="small"><input type="radio" name="aigen-visibility" value="MEMBER" checked={recordVisibility === "MEMBER"} onChange={() => onVisibilityChange("MEMBER")} disabled={committing} /> {compatibilityExposureLabel.MEMBER}</label>
+        <label className="small"><input type="radio" name="aigen-visibility" value="PUBLIC" checked={recordVisibility === "PUBLIC"} onChange={() => onVisibilityChange("PUBLIC")} disabled={committing} /> {compatibilityExposureLabel.PUBLIC}</label>
       </fieldset>
 
       {storageWarning ? <div className="small" role="status">이 브라우저에서 임시저장되지 않음</div> : null}

@@ -8,6 +8,13 @@ import {
   useRef,
   useState,
 } from "react";
+import type { SessionState } from "@/shared/model/readmates-types";
+import {
+  resolvedSessionExposure,
+  sessionExposureCopy,
+  type PublicSiteVisibility,
+  type SessionAccessScope,
+} from "@/features/host/model/session-exposure-model";
 import type { HostSessionDraftSource } from "@/features/host/model/host-session-editor-navigation";
 import type { HostSessionRecordDraft } from "@/features/host/model/host-session-editor-view-model";
 import type { SessionImportPreviewResponse } from "@/features/host/model/host-view-types";
@@ -26,6 +33,9 @@ import {
 } from "./session-record-draft-panel";
 
 export type SessionRecordWorkspaceProps = {
+  state: SessionState;
+  accessScope?: SessionAccessScope;
+  siteVisibility?: PublicSiteVisibility;
   source: HostSessionDraftSource;
   onSourceChange: (source: HostSessionDraftSource) => void;
   liveRevision: number;
@@ -79,12 +89,6 @@ const draftSourceLabels: Record<HostSessionRecordDraft["source"], string> = {
   AI_GENERATED: "AI로 생성",
   JSON_IMPORT: "외부 JSON",
   RESTORED: "과거 버전에서 생성",
-};
-
-const visibilityLabels: Record<SessionRecordDraftSnapshot["visibility"], string> = {
-  HOST_ONLY: "호스트 전용",
-  MEMBER: "멤버 공개",
-  PUBLIC: "외부 공개",
 };
 
 function sourceTabId(source: HostSessionDraftSource) {
@@ -186,6 +190,9 @@ function handleSourceKeyDown(
 }
 
 export function SessionRecordWorkspace({
+  state,
+  accessScope,
+  siteVisibility,
   source,
   onSourceChange,
   liveRevision,
@@ -203,6 +210,13 @@ export function SessionRecordWorkspace({
   );
   const handledImportCommitResult = useRef<SessionImportCommitResult | null>(null);
   const nextAction = nextActionPresentation(draft, reviewPending);
+  const exposure = resolvedSessionExposure({
+    state,
+    visibility: liveSnapshot.visibility,
+    accessScope,
+    siteVisibility,
+  });
+  const exposureCopy = sessionExposureCopy(exposure.accessScope, exposure.siteVisibility);
   const validationAnchor = firstValidationAnchor(draft.validationIssues);
   const FeedbackDocumentLink = feedbackDocument.LinkComponent;
   const feedbackPreviewHref = creation.sessionId
@@ -263,7 +277,8 @@ export function SessionRecordWorkspace({
           </h3>
           <div className="row" style={{ gap: 8, flexWrap: "wrap", marginTop: 10 }}>
             {liveRevision > 0 ? <span className="badge">버전 {liveRevision}</span> : null}
-            <span className="badge">{visibilityLabels[liveSnapshot.visibility]}</span>
+            <span className="badge">{exposureCopy.accessLabel}</span>
+            <span className="badge">{exposureCopy.siteLabel}</span>
             <span className="badge">{feedbackDocument.uploaded ? "업로드 완료" : "미등록"}</span>
           </div>
           <p className="small" style={{ margin: "10px 0 0", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
@@ -434,8 +449,11 @@ export function SessionRecordWorkspace({
         </aside>
 
         <div className="rm-session-record-workspace__draft-editor" style={{ minWidth: 0 }}>
-          <SessionRecordDraftPanelBody
-            snapshot={draft.snapshot}
+                  <SessionRecordDraftPanelBody
+                    snapshot={draft.snapshot}
+                    state={state}
+                    accessScope={accessScope}
+                    siteVisibility={siteVisibility}
             saveState={draft.saveState}
             validationIssues={draft.validationIssues}
             draftLiveBaseStale={draft.liveBaseStale}

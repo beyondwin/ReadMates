@@ -168,7 +168,7 @@ describe("session import model", () => {
       tone: "success",
       title: "초안 저장 완료",
       message: "가져온 세션 기록을 공유 초안으로 저장했습니다.",
-      visibilityLabel: "멤버 공개",
+      visibilityLabel: "게스트 공개",
       items: [
         "공개 요약 초안 교체",
         "하이라이트 1개 초안 저장",
@@ -203,7 +203,7 @@ describe("session import model", () => {
 
     expect(result.items.join(" ")).not.toContain("PRIVATE_MEMBER_EMAIL");
     expect(result.items.join(" ")).not.toContain("{\"raw\"");
-    expect(result.visibilityLabel).toBe("외부 공개");
+    expect(result.visibilityLabel).toBe("게스트 공개 · 공개 기록에 게시");
   });
 
   it("classifies session import failure copy by stage", () => {

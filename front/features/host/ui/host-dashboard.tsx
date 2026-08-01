@@ -6,9 +6,8 @@ import type {
   HostNotificationSummary,
   HostSessionListPage,
   HostSessionListItem,
-  HostSessionVisibilityRequest,
-  SessionRecordVisibility,
 } from "@/features/host/model/host-view-types";
+import type { SessionAccessScope } from "@/features/host/model/session-exposure-model";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import type { HostClubOperationsSnapshot } from "@/shared/model/club-operations";
 import { HostClubOperationsCard } from "@/features/host/ui/host-club-operations-card";
@@ -147,7 +146,7 @@ export default function HostDashboard({
   // so the buffer's items are dropped on the first render after the prop reference
   // advances. Regression covered in host-dashboard.test.tsx ("drops the appended host
   // sessions buffer when the base list reference advances").
-  const [hostSessionVisibilityOverrides, setHostSessionVisibilityOverrides] = useState<Record<string, SessionRecordVisibility>>({});
+  const [hostSessionAccessScopeOverrides, setHostSessionAccessScopeOverrides] = useState<Record<string, SessionAccessScope>>({});
   const [locallyOpenedSessionId, setLocallyOpenedSessionId] = useState<string | null>(null);
   const [pendingUpcomingAction, setPendingUpcomingAction] = useState<string | null>(null);
   const [isLoadingMoreHostSessions, setIsLoadingMoreHostSessions] = useState(false);
@@ -163,8 +162,8 @@ export default function HostDashboard({
   const localHostSessions = hostSessionPage.items
     .filter((item) => item.sessionId !== locallyOpenedSessionId)
     .map((item) => {
-      const visibility = hostSessionVisibilityOverrides[item.sessionId];
-      return visibility ? { ...item, visibility } : item;
+      const accessScope = hostSessionAccessScopeOverrides[item.sessionId];
+      return accessScope ? { ...item, accessScope } : item;
     });
   const upcomingSessions = localHostSessions.filter((item) => item.state === "DRAFT");
   const nextHostSessionsCursor = hostSessionPage.nextCursor;
@@ -206,9 +205,9 @@ export default function HostDashboard({
   const isUpcomingActionPending = (sessionId: string, action: UpcomingActionKind) =>
     pendingUpcomingAction === upcomingActionKey(sessionId, action);
 
-  const saveUpcomingVisibility = async (
+  const saveUpcomingAccessScope = async (
     sessionId: string,
-    request: HostSessionVisibilityRequest,
+    request: { accessScope: SessionAccessScope },
   ) => {
     const key = upcomingActionKey(sessionId, "visibility");
     if (pendingUpcomingAction !== null) {
@@ -216,27 +215,27 @@ export default function HostDashboard({
     }
 
     setPendingUpcomingAction(key);
-    setUpcomingMessage({ kind: "status", text: "공개 범위를 저장하는 중" });
+    setUpcomingMessage({ kind: "status", text: "게스트 접근을 저장하는 중" });
 
     try {
-      await actions.updateSessionVisibility(sessionId, request);
-      setHostSessionVisibilityOverrides((current) => ({
+      await actions.updateSessionAccessScope(sessionId, request);
+      setHostSessionAccessScopeOverrides((current) => ({
         ...current,
-        [sessionId]: request.visibility,
+        [sessionId]: request.accessScope,
       }));
       setUpcomingMessage(null);
     } catch {
       setUpcomingMessage({
         kind: "alert",
-        text: "공개 범위를 저장하지 못했습니다. 기존 공개 범위는 유지됩니다. 다시 시도해 주세요.",
+        text: "게스트 접근을 저장하지 못했습니다. 기존 접근 범위는 유지됩니다. 다시 시도해 주세요.",
       });
     } finally {
       setPendingUpcomingAction(null);
     }
   };
 
-  const handleUpdateUpcomingVisibility = async (sessionId: string, visibility: SessionRecordVisibility) => {
-    await saveUpcomingVisibility(sessionId, { visibility });
+  const handleUpdateUpcomingAccessScope = async (sessionId: string, accessScope: SessionAccessScope) => {
+    await saveUpcomingAccessScope(sessionId, { accessScope });
   };
 
   const handleOpenUpcomingSession = async (sessionId: string) => {
@@ -289,7 +288,7 @@ export default function HostDashboard({
   };
 
   const upcomingActions: UpcomingActionHandlers = {
-    updateVisibility: handleUpdateUpcomingVisibility,
+    updateAccessScope: handleUpdateUpcomingAccessScope,
     openSession: handleOpenUpcomingSession,
     isPending: isUpcomingActionPending,
     isBusy: pendingUpcomingAction !== null,

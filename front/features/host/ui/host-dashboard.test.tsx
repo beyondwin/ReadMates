@@ -33,13 +33,15 @@ const draftHostSessions = {
     locationLabel: "온라인",
     state: "DRAFT" as const,
     visibility: "HOST_ONLY" as const,
+    accessScope: "HOST_ONLY" as const,
+    siteVisibility: "HIDDEN" as const,
   }],
   nextCursor: null,
 } satisfies HostDashboardProps["hostSessions"];
 
 const actions = {
   updateCurrentSessionParticipation: async () => undefined,
-  updateSessionVisibility: async () => undefined,
+  updateSessionAccessScope: async () => undefined,
   openSession: async () => undefined,
   loadHostSessions: async () => ({ items: [], nextCursor: null }),
 } satisfies HostDashboardProps["actions"];
@@ -209,11 +211,11 @@ describe("HostDashboard", () => {
     expect(screen.getAllByLabelText(/준비 페이스:/).length).toBeGreaterThan(0);
   });
 
-  it("saves visibility directly and reflects the successful result", async () => {
+  it("saves guest access directly and reflects the successful result", async () => {
     const user = userEvent.setup();
     const directActions = {
       ...actions,
-      updateSessionVisibility: vi.fn(actions.updateSessionVisibility),
+      updateSessionAccessScope: vi.fn(actions.updateSessionAccessScope),
     };
     render(
       <HostDashboard
@@ -224,21 +226,21 @@ describe("HostDashboard", () => {
       />,
     );
 
-    await user.click(screen.getAllByRole("button", { name: /멤버 공개/ })[0]);
-    await waitFor(() => expect(directActions.updateSessionVisibility).toHaveBeenCalledWith("session-next", {
-      visibility: "MEMBER",
+    await user.click(screen.getAllByRole("button", { name: /게스트 공개/ })[0]);
+    await waitFor(() => expect(directActions.updateSessionAccessScope).toHaveBeenCalledWith("session-next", {
+      accessScope: "GUEST_READABLE",
     }));
     expect(screen.queryByRole("dialog", {
       name: "반영 방법을 선택해 주세요",
     })).not.toBeInTheDocument();
-    expect(screen.getAllByText("멤버 공개").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("게스트 공개").length).toBeGreaterThan(0);
   });
 
   it("does not reflect visibility when the save fails", async () => {
     const user = userEvent.setup();
     const failingActions = {
       ...actions,
-      updateSessionVisibility: vi.fn().mockRejectedValue(new Error("save failed")),
+      updateSessionAccessScope: vi.fn().mockRejectedValue(new Error("save failed")),
     };
     render(
       <HostDashboard
@@ -249,14 +251,14 @@ describe("HostDashboard", () => {
       />,
     );
 
-    await user.click(screen.getAllByRole("button", { name: /멤버 공개/ })[0]);
-    await waitFor(() => expect(failingActions.updateSessionVisibility).toHaveBeenCalledWith("session-next", {
-      visibility: "MEMBER",
+    await user.click(screen.getAllByRole("button", { name: /게스트 공개/ })[0]);
+    await waitFor(() => expect(failingActions.updateSessionAccessScope).toHaveBeenCalledWith("session-next", {
+      accessScope: "GUEST_READABLE",
     }));
     expect((await screen.findAllByRole("alert"))[0]).toHaveTextContent(
-      "공개 범위를 저장하지 못했습니다. 기존 공개 범위는 유지됩니다. 다시 시도해 주세요.",
+      "게스트 접근을 저장하지 못했습니다. 기존 접근 범위는 유지됩니다. 다시 시도해 주세요.",
     );
-    expect(screen.getAllByText("비공개").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("호스트 전용").length).toBeGreaterThan(0);
   });
 
   it("keeps the previous session state and names the failed start operation", async () => {

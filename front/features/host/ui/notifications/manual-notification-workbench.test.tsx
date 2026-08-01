@@ -121,7 +121,7 @@ describe("ManualNotificationWorkbench", () => {
     )).toBeInTheDocument();
     expect(within(workbench).getByText("미리보기 후 발송")).toBeInTheDocument();
     expect(within(workbench).getByText(
-      "진행 중 · 멤버 공개 · 피드백 문서 준비 전",
+      "진행 중 · 게스트 공개 · 피드백 문서 준비 전",
     )).toBeInTheDocument();
     expect(within(workbench).queryByText(/OPEN|HOST_ONLY/)).not.toBeInTheDocument();
 

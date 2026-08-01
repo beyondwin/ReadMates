@@ -94,12 +94,15 @@ describe("SessionRecordDraftPanelBody", () => {
     expect(screen.getByRole("textbox", { name: "공개 요약" })).toHaveValue("아직 적용하지 않은 초안");
   });
 
-  it("changes public visibility only through the draft snapshot callback", async () => {
+  it("maps public-record placement to the legacy draft payload only after closing", async () => {
     const user = userEvent.setup();
     const onSnapshotChange = vi.fn();
     render(
       <SessionRecordDraftPanelBody
         snapshot={draftSnapshot}
+        state="CLOSED"
+        accessScope="GUEST_READABLE"
+        siteVisibility="HIDDEN"
         saveState="saved"
         validationIssues={[]}
         draftLiveBaseStale={false}
@@ -109,7 +112,7 @@ describe("SessionRecordDraftPanelBody", () => {
       />,
     );
 
-    await user.click(screen.getByRole("radio", { name: "외부 공개" }));
+    await user.click(screen.getByRole("checkbox", { name: "공개 기록에 게시" }));
 
     expect(onSnapshotChange).toHaveBeenCalledWith({
       ...draftSnapshot,

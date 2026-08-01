@@ -2,10 +2,9 @@ import type { ComponentType, CSSProperties, ReactNode } from "react";
 import type { ReadmatesReturnState } from "@/shared/routing/readmates-route-state";
 import type {
   HostDashboardResponse,
-  HostSessionVisibilityRequest,
   HostSessionListPage,
-  SessionRecordVisibility,
 } from "@/features/host/model/host-view-types";
+import type { SessionAccessScope } from "@/features/host/model/session-exposure-model";
 import type { PageRequest } from "@/shared/model/paging";
 
 export type HostDashboardLinkProps = {
@@ -22,7 +21,7 @@ export type HostDashboardLinkComponent = ComponentType<HostDashboardLinkProps>;
 export type UpcomingActionKind = "visibility" | "open";
 
 export type UpcomingActionHandlers = {
-  updateVisibility: (sessionId: string, visibility: SessionRecordVisibility) => Promise<void>;
+  updateAccessScope: (sessionId: string, accessScope: SessionAccessScope) => Promise<void>;
   openSession: (sessionId: string) => Promise<void>;
   isPending: (sessionId: string, action: UpcomingActionKind) => boolean;
   isBusy: boolean;
@@ -40,7 +39,7 @@ export type HostDashboardActions = {
     membershipId: string,
     action: HostDashboardMissingMemberAction,
   ) => Promise<void>;
-  updateSessionVisibility: (sessionId: string, request: HostSessionVisibilityRequest) => Promise<void>;
+  updateSessionAccessScope: (sessionId: string, request: { accessScope: SessionAccessScope }) => Promise<void>;
   openSession: (sessionId: string) => Promise<void>;
   loadHostSessions: (page?: PageRequest) => Promise<HostSessionListPage>;
 };
