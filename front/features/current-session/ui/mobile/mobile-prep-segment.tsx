@@ -156,7 +156,7 @@ export function MobilePrepSegment({
             })}
           </div>
           <div className="rm-current-session-mobile__save-row">
-            <div className="tiny" style={{ color: "var(--text-3)" }}>
+            <div className="small" style={{ color: "var(--text-3)" }}>
               현재 {rsvpLabel(rsvp)} · 질문 제출 마감 {formatDeadlineLabel(session.questionDeadlineAt)}
             </div>
             <SaveFeedback scope="rsvp" status={rsvpSaveStatus} />
@@ -196,7 +196,7 @@ export function MobilePrepSegment({
           />
           <ReadingPaceNote readingProgress={readingProgress} sessionDate={session.date} />
           <div className="rm-current-session-mobile__save-row">
-            <span className="tiny" style={{ color: "var(--text-3)" }}>
+            <span className="small" style={{ color: "var(--text-3)" }}>
               내 준비 상태와 호스트 운영 확인에 사용됩니다.
             </span>
             <SaveFeedback scope="checkin" status={checkinSaveStatus} />
@@ -304,7 +304,7 @@ function MobilePrepMeta({
           <hr className="divider-soft" style={{ margin: "14px 0" }} />
           <div className="m-row" style={{ gap: 8 }}>
             <Icon name="mic" size={14} style={{ color: "var(--text-3)" }} />
-            <span className="tiny" style={{ color: "var(--text-3)" }}>
+            <span className="small" style={{ color: "var(--text-3)" }}>
               녹음을 원하지 않으면 모임 중 언제든 알려 주세요.
             </span>
           </div>
@@ -326,7 +326,7 @@ function MobilePrepMeta({
                   {member.displayName}
                 </span>
               </span>
-              <span className="tiny" style={{ color: member.rsvpStatus === "GOING" ? "var(--ok)" : "var(--text-3)" }}>
+              <span className="small" style={{ color: member.rsvpStatus === "GOING" ? "var(--ok)" : "var(--text-3)" }}>
                 {rsvpLabel(member.rsvpStatus)}
               </span>
             </div>

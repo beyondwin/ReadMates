@@ -43,7 +43,7 @@ export function MemberHomeNextActionPace({ pace }: { pace: ReadingPace | null })
       >
         {pace.label}
       </span>
-      <span className="tiny" style={{ color: "var(--text-3)" }}>
+      <span className="small" style={{ color: "var(--text-3)" }}>
         {pace.message}
       </span>
     </div>
@@ -259,7 +259,7 @@ export function MobileCurrentSessionCard({
             </span>
           ))}
         </div>
-        <div className="tiny" style={{ color: "var(--text-3)", marginTop: 12 }}>
+        <div className="small" style={{ color: "var(--text-3)", marginTop: 12 }}>
           참석 {attendance.attended}/{attendance.total} · 현재 RSVP {rsvpLabel(session.myRsvpStatus)}
         </div>
         {isViewer ? (
@@ -442,7 +442,7 @@ function MobileActionTile({
         <span className="small m-action-tile__label" style={{ display: "block", color: "var(--text)", fontWeight: 600 }}>
           {label}
         </span>
-        <span className="tiny m-action-tile__sub" style={{ display: "block", color: "var(--text-3)", marginTop: 3 }}>
+        <span className="small m-action-tile__sub" style={{ display: "block", color: "var(--text-3)", marginTop: 3 }}>
           {sub}
         </span>
       </span>

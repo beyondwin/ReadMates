@@ -15,7 +15,7 @@ describe("MemberHomeNextActionPace", () => {
     render(<MemberHomeNextActionPace pace={urgentPace} />);
 
     expect(screen.getByText("서둘러요")).toBeInTheDocument();
-    expect(screen.getByText(/속도를 올려야/)).toBeInTheDocument();
+    expect(screen.getByText(/속도를 올려야/)).toHaveClass("small");
   });
 
   it("renders nothing when pace is null", () => {

@@ -299,12 +299,6 @@ function NotesFeedListStyles() {
       }
 
       @media (max-width: 768px) {
-        .rm-notes-section-title {
-          gap: 2px;
-          font-size: 13px;
-          line-height: 1.25;
-        }
-
         .rm-notes-oneliner-grid {
           grid-template-columns: 1fr;
           gap: 12px;

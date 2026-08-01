@@ -451,8 +451,8 @@ describe("CurrentSession", () => {
     expect(desktopScope.getAllByText("보존된 서평").length).toBeGreaterThan(0);
     expect(desktopScope.getAllByText("피드백 문서 접근").length).toBeGreaterThan(0);
     expect(desktopScope.getAllByText("72%").length).toBeGreaterThan(0);
-    expect(desktopScope.getByText("API에서 온 내 질문")).toBeVisible();
-    expect(desktopScope.getByText("API에서 온 장문 서평")).toBeVisible();
+    expect(desktopScope.getByText("API에서 온 내 질문")).toHaveClass("body", "editorial");
+    expect(desktopScope.getByText("API에서 온 장문 서평")).toHaveClass("body", "editorial");
     expect(desktopScope.queryByRole("button", { name: "참석" })).not.toBeInTheDocument();
     expect(desktopScope.queryByRole("button", { name: "진행률 저장" })).not.toBeInTheDocument();
     expect(desktopScope.queryByRole("button", { name: "질문 저장" })).not.toBeInTheDocument();
@@ -502,8 +502,8 @@ describe("CurrentSession", () => {
     await user.click(mobileScope.getByRole("button", { name: "내 기록" }));
 
     expect(mobileScope.getByText("내 기록은 읽기 전용입니다")).toBeVisible();
-    expect(mobileScope.getByText("API에서 온 한줄평")).toBeVisible();
-    expect(mobileScope.getByText("API에서 온 장문 서평")).toBeVisible();
+    expect(mobileScope.getByText("API에서 온 한줄평")).toHaveClass("body", "editorial");
+    expect(mobileScope.getByText("API에서 온 장문 서평")).toHaveClass("body", "editorial");
     expect(mobileScope.queryByRole("button", { name: "한줄평 저장" })).not.toBeInTheDocument();
     expect(mobileScope.queryByRole("button", { name: "서평 저장" })).not.toBeInTheDocument();
     expect(mobileScope.queryByRole("textbox")).not.toBeInTheDocument();
@@ -539,6 +539,9 @@ describe("CurrentSession", () => {
     }
     expect(within(mobile).getByRole("textbox", { name: "질문 1 내용" })).toHaveValue("API에서 온 내 질문");
     expect(within(mobile).getByText("참석자 · 1/2")).toBeInTheDocument();
+    expect(within(mobile).getByText(/현재 미응답 · 질문 제출 마감/)).toHaveClass("small");
+    expect(within(mobile).getByText("내 준비 상태와 호스트 운영 확인에 사용됩니다.")).toHaveClass("small");
+    expect(within(mobile).getByText("녹음을 원하지 않으면 모임 중 언제든 알려 주세요.")).toHaveClass("small");
     expect(within(mobile).queryByText("제외")).not.toBeInTheDocument();
 
     const ids = Array.from(container.querySelectorAll("[id]"), (element) => element.id);
@@ -585,7 +588,7 @@ describe("CurrentSession", () => {
       "https://meet.google.com/readmates-test",
     );
     expect(desktopScope.getByText("Passcode currentpass")).toBeInTheDocument();
-    expect(desktopScope.getByText("녹음을 원하지 않으면 모임 중 언제든 알려 주세요.")).toBeInTheDocument();
+    expect(desktopScope.getByText("녹음을 원하지 않으면 모임 중 언제든 알려 주세요.")).toHaveClass("small");
     expect(desktopScope.getByText("음성만 · 자동 정리 참고용")).toBeInTheDocument();
     expect([...container.querySelectorAll(".desktop-only .rm-avatar-chip img")].map((image) => image.getAttribute("src"))).toContain(
       "/assets/avatars/book-club/book-tote.webp",
@@ -774,14 +777,14 @@ describe("CurrentSession", () => {
     const mobileScope = within(await screen.findByTestId("current-session-mobile"));
 
     await user.click(mobileScope.getByRole("button", { name: "진행률 저장" }));
-    expect(await mobileScope.findByText("진행률 저장됨")).toBeInTheDocument();
+    expect(await mobileScope.findByText("진행률 저장됨")).toHaveClass("small");
 
     await user.click(mobileScope.getByRole("button", { name: "질문 저장" }));
-    expect(await mobileScope.findByText("질문 저장됨")).toBeInTheDocument();
+    expect(await mobileScope.findByText("질문 저장됨")).toHaveClass("small");
 
     await user.click(mobileScope.getByRole("button", { name: "내 기록" }));
     await user.click(mobileScope.getByRole("button", { name: "서평 저장" }));
-    expect(await mobileScope.findByText("서평 저장됨")).toBeInTheDocument();
+    expect(await mobileScope.findByText("서평 저장됨")).toHaveClass("small");
 
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/bff/api/sessions/current/checkin",
@@ -987,16 +990,16 @@ describe("CurrentSession", () => {
     const desktopScope = within(getDesktop(container));
 
     await user.click(desktopScope.getByRole("button", { name: "참석" }));
-    expect(await desktopScope.findByText("RSVP 저장됨")).toBeInTheDocument();
+    expect(await desktopScope.findByText("RSVP 저장됨")).toHaveClass("small");
 
     await user.click(desktopScope.getByRole("button", { name: "진행률 저장" }));
-    expect(await desktopScope.findByText("진행률 저장됨")).toBeInTheDocument();
+    expect(await desktopScope.findByText("진행률 저장됨")).toHaveClass("small");
 
     await user.click(desktopScope.getByRole("button", { name: "질문 저장" }));
-    expect(await desktopScope.findByText("질문 저장됨")).toBeInTheDocument();
+    expect(await desktopScope.findByText("질문 저장됨")).toHaveClass("small");
 
     await user.click(desktopScope.getByRole("button", { name: "서평 저장" }));
-    expect(await desktopScope.findByText("서평 저장됨")).toBeInTheDocument();
+    expect(await desktopScope.findByText("서평 저장됨")).toHaveClass("small");
 
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/bff/api/sessions/current/rsvp",

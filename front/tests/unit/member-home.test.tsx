@@ -275,6 +275,9 @@ describe("MemberHome", () => {
 
     expect(mobileView.getByRole("link", { name: /읽기 진행률/ })).toHaveAttribute("href", "/app/session/current");
     expect(mobileView.getByRole("link", { name: /질문 쓰기/ })).toHaveAttribute("href", "/app/session/current");
+    expect(within(mobileView.getByRole("link", { name: "RSVP 미응답" })).getByText("미응답")).toHaveClass("small");
+    expect(within(mobileView.getByRole("link", { name: "읽기 진행률 0%" })).getByText("0%")).toHaveClass("small");
+    expect(within(mobileView.getByRole("link", { name: "질문 쓰기 0/5 작성" })).getByText("0/5 작성")).toHaveClass("small");
     expect(mobileView.queryByRole("link", { name: /한줄평/ })).not.toBeInTheDocument();
     expect(mobileView.getByRole("link", { name: /모임 링크 열기/ })).toHaveAttribute(
       "href",
@@ -650,7 +653,7 @@ describe("MemberHome", () => {
     expect(desktop.queryByText("참석 3 / 전체 7")).not.toBeInTheDocument();
     expect(desktop.queryByText("참석 3 / 전체 6")).not.toBeInTheDocument();
     expect(desktop.getByText("현재 RSVP: 미응답")).toBeInTheDocument();
-    expect(mobile.getByText("참석 2/6 · 현재 RSVP 미응답")).toBeInTheDocument();
+    expect(mobile.getByText("참석 2/6 · 현재 RSVP 미응답")).toHaveClass("small");
     expect(mobile.queryByText("참석 3/7 · 현재 RSVP 미응답")).not.toBeInTheDocument();
     expect(mobile.queryByText("3/6")).not.toBeInTheDocument();
   });

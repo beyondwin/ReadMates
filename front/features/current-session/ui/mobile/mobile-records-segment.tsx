@@ -94,7 +94,7 @@ export function MobileViewerRecordsSegment({ longReview, oneLineReview }: { long
       <section className="m-sec">
         <div className="m-card-quiet">
           <div className="eyebrow">한줄평</div>
-          <p className="small editorial" style={{ color: "var(--text)", margin: "8px 0 0", whiteSpace: "pre-wrap" }}>
+          <p className="body editorial" style={{ color: "var(--text)", margin: "8px 0 0", whiteSpace: "pre-wrap" }}>
             {oneLineReview.trim() || "아직 남긴 한줄평이 없습니다."}
           </p>
         </div>
@@ -103,7 +103,7 @@ export function MobileViewerRecordsSegment({ longReview, oneLineReview }: { long
       <section className="m-sec">
         <div className="m-card-quiet">
           <div className="eyebrow">서평</div>
-          <p className="small editorial" style={{ color: "var(--text)", margin: "8px 0 0", whiteSpace: "pre-wrap" }}>
+          <p className="body editorial" style={{ color: "var(--text)", margin: "8px 0 0", whiteSpace: "pre-wrap" }}>
             {longReview.trim() || "아직 남긴 서평이 없습니다."}
           </p>
         </div>

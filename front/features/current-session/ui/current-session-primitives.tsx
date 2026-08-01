@@ -9,7 +9,7 @@ export function SaveFeedback({ scope, status }: { scope: SaveScope; status: Save
     <span
       role="status"
       aria-live="polite"
-      className="tiny"
+      className="small"
       style={{
         color: status === "error" ? "var(--danger)" : status === "saved" ? "var(--ok)" : "var(--text-3)",
         minWidth: "88px",

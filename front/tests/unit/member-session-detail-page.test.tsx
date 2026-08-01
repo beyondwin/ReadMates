@@ -484,7 +484,12 @@ describe("MemberSessionDetailPage", () => {
       },
     });
 
-    expect(screen.getAllByText("피드백 문서는 active 정식 멤버에게만 열립니다.").length).toBeGreaterThan(0);
+    const feedbackHelpers = screen.getAllByText("피드백 문서는 active 정식 멤버에게만 열립니다.");
+    expect(feedbackHelpers.length).toBeGreaterThan(0);
+    feedbackHelpers.forEach((helper) => {
+      expect(helper).toHaveClass("small");
+      expect(helper).not.toHaveClass("tiny");
+    });
     expect(screen.queryByRole("link", { name: "피드백 보기" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "PDF 저장" })).not.toBeInTheDocument();
     expect(container.querySelector('a[href="/app/feedback/00000000-0000-0000-0000-000000000301"]')).toBeNull();

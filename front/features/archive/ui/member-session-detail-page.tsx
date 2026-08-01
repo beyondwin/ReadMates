@@ -733,7 +733,7 @@ function FeedbackStatusCard({
           {formatDateOnlyLabel(feedback.uploadedAt)} 등록
         </div>
       ) : null}
-      <p className="tiny" style={{ margin: "10px 0 0", color: "var(--text-3)" }}>
+      <p className="small" style={{ margin: "10px 0 0", color: "var(--text-3)" }}>
         {feedbackCopy.helper}
       </p>
       {feedback.readable ? (

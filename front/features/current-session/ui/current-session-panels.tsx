@@ -53,7 +53,7 @@ export function ReadingPaceNote({
       >
         {pace.label}
       </span>
-      <span className="tiny" style={{ color: "var(--text-3)" }}>
+      <span className="small" style={{ color: "var(--text-3)" }}>
         {pace.message}
       </span>
     </div>
@@ -221,7 +221,7 @@ export function LongReviewPanel({
       <label className="label rm-sr-only" htmlFor={reviewId}>
         서평 내용
       </label>
-      <p className="tiny" style={{ color: "var(--text-3)", margin: "0 0 8px" }}>
+      <p className="small" style={{ color: "var(--text-3)", margin: "0 0 8px" }}>
         모임 전후로 떠오른 생각을 자유롭게 남겨 주세요.
       </p>
       <textarea
@@ -345,7 +345,7 @@ export function SessionMeta({ session }: { session: CurrentSession }) {
       <hr className="divider-soft" style={{ margin: "14px 0" }} />
       <div className="row" style={{ gap: "8px" }}>
         <Icon name="mic" size={14} style={{ color: "var(--text-3)" }} />
-        <span className="tiny" style={{ color: "var(--text-3)" }}>
+        <span className="small" style={{ color: "var(--text-3)" }}>
           녹음을 원하지 않으면 모임 중 언제든 알려 주세요.
         </span>
       </div>
@@ -433,7 +433,7 @@ export function RosterList({ session }: { session: CurrentSession }) {
                 ) : null}
               </span>
             </span>
-            <span className="tiny" style={{ color: member.rsvpStatus === "GOING" ? "var(--ok)" : "var(--text-3)" }}>
+            <span className="small" style={{ color: member.rsvpStatus === "GOING" ? "var(--ok)" : "var(--text-3)" }}>
               {rsvpLabel(member.rsvpStatus)}
             </span>
           </div>

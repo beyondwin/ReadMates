@@ -666,7 +666,7 @@ function ViewerSessionReadOnly({
                 <div className="tiny mono" style={{ color: "var(--text-3)", marginBottom: "6px" }}>
                   Q{question.priority}
                 </div>
-                <div className="small editorial" style={{ color: "var(--text)" }}>
+                <div className="body editorial" style={{ color: "var(--text)" }}>
                   {question.text}
                 </div>
               </article>
@@ -689,7 +689,7 @@ function ViewerSessionReadOnly({
               <div className="tiny mono" style={{ color: "var(--text-3)", marginBottom: "6px" }}>
                 {item.title}
               </div>
-              <p className="small editorial" style={{ color: "var(--text)", margin: 0, whiteSpace: "pre-wrap" }}>
+              <p className="body editorial" style={{ color: "var(--text)", margin: 0, whiteSpace: "pre-wrap" }}>
                 {item.body}
               </p>
             </article>
