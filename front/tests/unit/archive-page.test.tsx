@@ -523,6 +523,7 @@ describe("ArchivePage", () => {
     });
     expect(within(mobileReviewLink).getByText("›")).toHaveAttribute("aria-hidden", "true");
     expect(within(mobileReviewLink).queryByText("한줄평")).not.toBeInTheDocument();
+    expect(scoped.getByText("2026.04.15 · 가난한 찰리의 연감")).not.toHaveClass("mono");
 
     await user.click(scoped.getByRole("button", { name: "내 질문" }));
     expect(scoped.getByRole("button", { name: "내 질문" })).toHaveClass("is-on");
@@ -552,6 +553,24 @@ describe("ArchivePage", () => {
     expect(readAction).not.toHaveTextContent("읽기");
     expect(scoped.queryByRole("link", { name: seededReportPdfLabel })).not.toBeInTheDocument();
     expect(scoped.queryByText("feedback-6-suhan.html")).not.toBeInTheDocument();
+  });
+
+  it("keeps archive question book copy sans while retaining numeric session semantics", () => {
+    const { container } = render(
+      <ArchivePage
+        sessions={seededSessionPage}
+        questions={seededQuestionPage}
+        reviews={seededReviewPage}
+        reports={seededReportPage}
+        initialView="questions"
+      />,
+    );
+    const desktop = getDesktop(container);
+    const questionLink = desktop.getByRole("link", { name: "Q1 팩트풀니스 세션으로" });
+    const sessionMeta = within(questionLink).getByText(/팩트풀니스/, { selector: ".tiny" });
+
+    expect(sessionMeta).not.toHaveClass("mono");
+    expect(sessionMeta.querySelector(".ledger-number")).toHaveTextContent("No.01");
   });
 
   it("navigates when clicking the mobile feedback document row content", async () => {

@@ -371,8 +371,8 @@ function ArchiveQuestions({ questions }: { questions: ArchiveQuestionItem[] }) {
             <span className="tiny mono" style={{ color: "var(--text-3)" }}>
               Q{question.priority} · {formatDateOnlyLabel(question.date)}
             </span>
-            <span className="tiny mono">
-              No.{String(question.sessionNumber).padStart(2, "0")} · {question.bookTitle}
+            <span className="tiny">
+              <span className="ledger-number">No.{String(question.sessionNumber).padStart(2, "0")}</span> · {question.bookTitle}
             </span>
           </div>
           <h2 className="body-lg editorial" style={{ margin: 0 }}>

@@ -1138,7 +1138,7 @@
 }
 .mobile-only .rm-current-session-mobile__board-text {
   font-size: 16px;
-  line-height: 1.55;
+  line-height: var(--type-leading-body);
   letter-spacing: 0;
   overflow-wrap: anywhere;
 }

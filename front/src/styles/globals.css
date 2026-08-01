@@ -5404,7 +5404,8 @@ a.rm-recent-record__destination:hover {
 .admin-clubs__triage-reasons {
   display: block;
   margin-top: 0.2rem;
-  font-size: 0.72rem;
+  font-size: var(--type-size-supporting);
+  line-height: var(--type-leading-supporting);
   color: var(--color-text-muted, #6b6b6b);
 }
 

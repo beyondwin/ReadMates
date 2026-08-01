@@ -158,13 +158,21 @@ const publishedView: SessionClosingBoardView = {
   ],
 };
 
-test("SessionClosingBoard renders blocked host closing state", async ({ mount }) => {
+test("SessionClosingBoard renders blocked host closing state", async ({ mount, page }) => {
+  await page.setViewportSize({ width: 480, height: 900 });
   const component = await mount(
-    <div style={{ width: 480 }}>
+    <div style={{ width: "100%" }}>
       <SessionClosingBoard view={blockedView} />
     </div>,
   );
 
+  expect(await page.evaluate(() => window.innerWidth)).toBe(480);
+  expect(await component.locator(".rm-host-closing-board__surfaces").evaluate((element) =>
+    getComputedStyle(element).gridTemplateColumns.split(" ").length,
+  )).toBe(1);
+  expect(await component.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
   for (const copy of await component.locator(".rm-host-closing-board__checklist-item .small").all()) {
     const fontSize = await copy.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
     expect(fontSize).toBeGreaterThanOrEqual(14);
@@ -172,16 +180,28 @@ test("SessionClosingBoard renders blocked host closing state", async ({ mount })
   for (const action of await component.locator(".rm-host-closing-board__checklist-item a").all()) {
     const fontSize = await action.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
     expect(fontSize).toBeGreaterThanOrEqual(14);
+  }
+  for (const copy of await component.locator(".rm-host-closing-board__surface .body").all()) {
+    const fontSize = await copy.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
+    expect(fontSize).toBeGreaterThanOrEqual(16);
   }
   await expect(component).toHaveScreenshot("host-closing-board-blocked.png");
 });
 
-test("SessionClosingBoard renders published host closing state", async ({ mount }) => {
+test("SessionClosingBoard renders published host closing state", async ({ mount, page }) => {
+  await page.setViewportSize({ width: 480, height: 900 });
   const component = await mount(
-    <div style={{ width: 480 }}>
+    <div style={{ width: "100%" }}>
       <SessionClosingBoard view={publishedView} />
     </div>,
   );
+
+  expect(await page.evaluate(() => window.innerWidth)).toBe(480);
+  expect(await component.locator(".rm-host-closing-board__surfaces").evaluate((element) =>
+    getComputedStyle(element).gridTemplateColumns.split(" ").length,
+  )).toBe(1);
+  expect(await component.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
   for (const copy of await component.locator(".rm-host-closing-board__checklist-item .small").all()) {
     const fontSize = await copy.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
@@ -190,6 +210,10 @@ test("SessionClosingBoard renders published host closing state", async ({ mount 
   for (const action of await component.locator(".rm-host-closing-board__checklist-item a").all()) {
     const fontSize = await action.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
     expect(fontSize).toBeGreaterThanOrEqual(14);
+  }
+  for (const copy of await component.locator(".rm-host-closing-board__surface .body").all()) {
+    const fontSize = await copy.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
+    expect(fontSize).toBeGreaterThanOrEqual(16);
   }
   await expect(component).toHaveScreenshot("host-closing-board-published.png");
 });

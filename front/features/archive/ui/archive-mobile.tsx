@@ -278,7 +278,7 @@ function ArchiveMobileReviews({ reviews }: { reviews: ArchiveReviewItem[] }) {
             aria-label={`No.${review.sessionNumber} ${review.bookTitle} 세션으로`}
           >
             <div style={{ minWidth: 0 }}>
-              <div className="tiny mono" style={{ color: "var(--text-3)" }}>
+              <div className="tiny" style={{ color: "var(--text-3)" }}>
                 {formatDateOnlyLabel(review.date)} · {review.bookTitle}
               </div>
               <div className="body editorial" style={{ marginTop: 8 }}>

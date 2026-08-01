@@ -12,6 +12,13 @@ const sourceRoots = [
   path.join(repoRoot, "design/system/src"),
 ];
 const activeExtensions = new Set([".css", ".ts", ".tsx"]);
+const rootFontSizePx = 16;
+const minimumVisualTextSizePx = 12;
+
+type TypographySource = {
+  file: string;
+  source: string;
+};
 
 function collectActiveFiles(directory: string): string[] {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -23,8 +30,131 @@ function collectActiveFiles(directory: string): string[] {
   });
 }
 
-function numericMatches(source: string, pattern: RegExp): number[] {
-  return Array.from(source.matchAll(pattern), (match) => Number.parseFloat(match[1]));
+type CssDeclaration = {
+  property: string;
+  value: string;
+};
+
+type CustomPropertyDefinition = {
+  value: string;
+};
+
+type SizeResolution = {
+  sizes: number[];
+  unresolvedProperties: string[];
+};
+
+function collectCssDeclarations(source: string): CssDeclaration[] {
+  const uncommented = source.replace(/\/\*[\s\S]*?\*\//g, "");
+  return Array.from(
+    uncommented.matchAll(/(?:^|[;{])\s*(--[\w-]+|font-size|font-family|font)\s*:\s*([^;}]+)/gim),
+    (match) => ({ property: match[1].toLowerCase(), value: match[2].trim() }),
+  );
+}
+
+function normalizeSizeToPx(value: string, unit: string): number {
+  const size = Number.parseFloat(value);
+  return unit.toLowerCase() === "px" ? size : size * rootFontSizePx;
+}
+
+function literalSizesInPx(value: string): number[] {
+  return Array.from(value.matchAll(/(-?(?:\d+(?:\.\d+)?|\.\d+))(px|rem|em)\b/gi), (match) =>
+    normalizeSizeToPx(match[1], match[2]),
+  );
+}
+
+function sizesResolvedFromValue(
+  value: string,
+  customProperties: Map<string, CustomPropertyDefinition[]>,
+  resolving = new Set<string>(),
+): SizeResolution {
+  const sizes = literalSizesInPx(value);
+  const unresolvedProperties: string[] = [];
+  for (const reference of value.matchAll(/var\(\s*(--[\w-]+)/g)) {
+    const property = reference[1];
+    if (resolving.has(property)) {
+      unresolvedProperties.push(property);
+      continue;
+    }
+    const definitions = customProperties.get(property);
+    if (!definitions || definitions.length === 0) {
+      unresolvedProperties.push(property);
+      continue;
+    }
+    const nextResolving = new Set(resolving).add(property);
+    for (const definition of definitions) {
+      const resolution = sizesResolvedFromValue(definition.value, customProperties, nextResolving);
+      sizes.push(...resolution.sizes);
+      unresolvedProperties.push(...resolution.unresolvedProperties);
+    }
+  }
+  return { sizes, unresolvedProperties };
+}
+
+function usesGenericSerif(value: string): boolean {
+  return /(?:^|[\s,])serif(?=$|[\s,])/i.test(value);
+}
+
+function findTypographyViolations(sources: TypographySource[]): string[] {
+  const cssSources = sources.filter(({ file }) => path.extname(file) === ".css");
+  const scriptSources = sources.filter(({ file }) => path.extname(file) !== ".css");
+  const customProperties = new Map<string, CustomPropertyDefinition[]>();
+  for (const { source } of cssSources) {
+    for (const declaration of collectCssDeclarations(source)) {
+      if (!declaration.property.startsWith("--")) continue;
+      const definitions = customProperties.get(declaration.property) ?? [];
+      definitions.push({ value: declaration.value });
+      customProperties.set(declaration.property, definitions);
+    }
+  }
+  for (const { source } of scriptSources) {
+    for (const match of source.matchAll(/(["'])(--[\w-]+)\1\s*:\s*(["'])([^"']+)\3/g)) {
+      const definitions = customProperties.get(match[2]) ?? [];
+      definitions.push({ value: match[4] });
+      customProperties.set(match[2], definitions);
+    }
+  }
+
+  const violations: string[] = [];
+  const recordSubFloorSizes = (file: string, property: string, value: string) => {
+    const resolution = sizesResolvedFromValue(value, customProperties);
+    for (const size of resolution.sizes) {
+      if (size < minimumVisualTextSizePx) {
+        violations.push(`${file}: ${property} ${value} resolves to ${size}px`);
+      }
+    }
+    for (const unresolvedProperty of resolution.unresolvedProperties) {
+      violations.push(`${file}: ${property} ${value} cannot resolve ${unresolvedProperty}`);
+    }
+  };
+
+  for (const { file, source } of cssSources) {
+    for (const declaration of collectCssDeclarations(source)) {
+      if (declaration.property === "font-size" || declaration.property === "font") {
+        recordSubFloorSizes(file, declaration.property, declaration.value);
+      }
+      if (
+        (declaration.property === "font-family" || declaration.property === "font") &&
+        usesGenericSerif(declaration.value)
+      ) {
+        violations.push(`${file}: ${declaration.property} uses generic serif`);
+      }
+    }
+  }
+
+  for (const { file, source } of scriptSources) {
+    for (const match of source.matchAll(/\bfontSize\s*:\s*(?:(["'])([^"']+)\1|(-?(?:\d+(?:\.\d+)?|\.\d+)))(?=\s*[,}])/g)) {
+      const value = match[2] ?? `${match[3]}px`;
+      recordSubFloorSizes(file, "fontSize", value);
+    }
+    for (const match of source.matchAll(/\bfontFamily\s*:\s*(["'])([^"']+)\1/g)) {
+      if (usesGenericSerif(match[2])) {
+        violations.push(`${file}: fontFamily uses generic serif`);
+      }
+    }
+  }
+
+  return [...new Set(violations)];
 }
 
 describe("frontend typography contract", () => {
@@ -42,11 +172,47 @@ describe("frontend typography contract", () => {
   });
 
   it("does not render active visual text below 12px", () => {
-    const violations = sources.flatMap(({ file, source }) => {
-      const cssSizes = numericMatches(source, /font-size:\s*(\d+(?:\.\d+)?)px/g);
-      const inlineSizes = numericMatches(source, /fontSize:\s*["']?(\d+(?:\.\d+)?)(?:px)?["']?/g);
-      return [...cssSizes, ...inlineSizes].filter((size) => size < 12).map((size) => `${file}: ${size}px`);
-    });
+    const violations = findTypographyViolations(sources);
     expect(violations, violations.join("\n")).toEqual([]);
+  });
+
+  it.each([
+    ["rem font-size", "fixture.css", ".compact { font-size: 0.72rem; }"],
+    ["em font-size", "fixture.css", ".compact { font-size: 0.72em; }"],
+    ["font shorthand", "fixture.css", ".compact { font: 600 10px/1 sans-serif; }"],
+    [
+      "custom-property indirection",
+      "fixture.css",
+      ":root { --compact-type: 0.72rem; } .compact { font-size: var(--compact-type); }",
+    ],
+    [
+      "TSX custom-property indirection",
+      "fixture.tsx",
+      'const compact = <span style={{ "--compact-type": "0.72rem", fontSize: "var(--compact-type)" }}>copy</span>;',
+    ],
+    ["TSX inline fontSize", "fixture.tsx", 'const compact = <span style={{ fontSize: "0.72rem" }}>copy</span>;'],
+  ])("detects sub-floor %s declarations", (_caseName, file, source) => {
+    expect(findTypographyViolations([{ file, source }])).not.toEqual([]);
+  });
+
+  it("fails closed when a font-size custom property cannot be resolved", () => {
+    expect(
+      findTypographyViolations([{ file: "fixture.css", source: ".copy { font-size: var(--missing-type); }" }]),
+    ).toContain("fixture.css: font-size var(--missing-type) cannot resolve --missing-type");
+  });
+
+  it("detects generic serif declarations without treating sans-serif as serif", () => {
+    expect(
+      findTypographyViolations([{ file: "serif.css", source: ".copy { font-family: Georgia, serif; }" }]),
+    ).not.toEqual([]);
+    expect(
+      findTypographyViolations([{ file: "serif.css", source: ".copy { font: 16px/1.6 Georgia, serif; }" }]),
+    ).not.toEqual([]);
+    expect(
+      findTypographyViolations([{ file: "sans.css", source: ".copy { font-family: Pretendard, sans-serif; }" }]),
+    ).toEqual([]);
+    expect(
+      findTypographyViolations([{ file: "sans.css", source: ".copy { font: 16px/1.6 Pretendard, sans-serif; }" }]),
+    ).toEqual([]);
   });
 });

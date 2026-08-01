@@ -341,7 +341,9 @@ export function RosterSummary({ current }: { current: CurrentSessionResponse }) 
           <div className="body-lg editorial">
             참석 {goingMembers.length}명
           </div>
-          <div className="small mono">미응답 {noResponseCount}</div>
+          <div className="small">
+            미응답 <span className="ledger-number">{noResponseCount}</span>
+          </div>
         </div>
         <div className="row" style={{ gap: "6px", marginTop: "14px", flexWrap: "wrap" }}>
           {attendees.map((member) => (

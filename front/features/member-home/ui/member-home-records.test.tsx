@@ -6,6 +6,7 @@ import {
   MobileMemberActivity,
   MobileRecentRecordEntry,
   RecentRecordEntry,
+  RosterSummary,
 } from "@/features/member-home/ui/member-home-records";
 
 const entry: MemberHomeRecentRecordEntry = {
@@ -154,5 +155,51 @@ describe("member home record reflection cards", () => {
 
     expect(desktop).toBeEmptyDOMElement();
     expect(mobile).toBeEmptyDOMElement();
+  });
+
+  it("keeps unanswered RSVP prose sans while retaining numeric count semantics", () => {
+    render(
+      <RosterSummary
+        current={{
+          currentSession: {
+            sessionId: "session-8",
+            sessionNumber: 8,
+            title: "8회차 모임",
+            bookTitle: "긴 제목의 다음 책",
+            bookAuthor: "저자",
+            bookLink: null,
+            bookImageUrl: null,
+            date: "2026-06-18",
+            startTime: "19:00",
+            endTime: "21:00",
+            locationLabel: "모임 공간",
+            meetingUrl: null,
+            meetingPasscode: null,
+            questionDeadlineAt: "2026-06-17T12:00:00Z",
+            myRsvpStatus: "GOING",
+            myCheckin: null,
+            myQuestions: [],
+            myOneLineReview: null,
+            myLongReview: null,
+            board: { questions: [], longReviews: [] },
+            attendees: [
+              {
+                membershipId: "membership-1",
+                avatarKey: "book-tote",
+                displayName: "응답 전 멤버",
+                accountName: "member@example.com",
+                role: "MEMBER",
+                rsvpStatus: "NO_RESPONSE",
+                attendanceStatus: "UNKNOWN",
+              },
+            ],
+          },
+        }}
+      />,
+    );
+    const noResponse = screen.getByText(/미응답/, { selector: ".small" });
+
+    expect(noResponse).not.toHaveClass("mono");
+    expect(noResponse.querySelector(".ledger-number")).toHaveTextContent("1");
   });
 });
