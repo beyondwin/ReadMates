@@ -24,14 +24,17 @@
         "text": "계약 테스트 질문",
         "draftThought": "계약 테스트 초안",
         "authorName": "멤버5",
-        "authorShortName": "멤버5"
+        "authorShortName": "멤버5",
+        "avatarKey": "library-stamp"
       }
     ],
     "myOneLineReview": {
-      "text": "계약 테스트 한줄평"
+      "text": "계약 테스트 한줄평",
+      "avatarKey": "library-stamp"
     },
     "myLongReview": {
-      "body": "계약 테스트 내 서평"
+      "body": "계약 테스트 내 서평",
+      "avatarKey": "library-stamp"
     },
     "board": {
       "questions": [
@@ -40,7 +43,8 @@
           "text": "계약 테스트 질문",
           "draftThought": "계약 테스트 초안",
           "authorName": "멤버5",
-          "authorShortName": "멤버5"
+          "authorShortName": "멤버5",
+          "avatarKey": "library-stamp"
         }
       ],
       "longReviews": [
@@ -59,7 +63,8 @@
         "role": "HOST",
         "rsvpStatus": "GOING",
         "attendanceStatus": "UNKNOWN",
-        "participationStatus": "ACTIVE"
+        "participationStatus": "ACTIVE",
+        "avatarKey": "reading-lamp"
       }
     ]
   }

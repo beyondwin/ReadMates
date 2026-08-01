@@ -132,13 +132,16 @@ const currentSession = {
         draftThought: "계약 테스트 초안",
         authorName: "멤버5",
         authorShortName: "멤버5",
+        avatarKey: "library-stamp",
       },
     ],
     myOneLineReview: {
       text: "계약 테스트 한줄평",
+      avatarKey: "library-stamp",
     },
     myLongReview: {
       body: "계약 테스트 내 서평",
+      avatarKey: "library-stamp",
     },
     board: {
       questions: [
@@ -148,6 +151,7 @@ const currentSession = {
           draftThought: "계약 테스트 초안",
           authorName: "멤버5",
           authorShortName: "멤버5",
+          avatarKey: "library-stamp",
         },
       ],
       longReviews: [
@@ -167,6 +171,7 @@ const currentSession = {
         rsvpStatus: "GOING",
         attendanceStatus: "UNKNOWN",
         participationStatus: "ACTIVE",
+        avatarKey: "reading-lamp",
       },
     ],
   },
