@@ -1147,20 +1147,26 @@ class ArchiveAndNotesDbTest(
                 jsonPath("$.clubQuestions[*].authorName") { value(not(hasItem("안멤버1"))) }
                 jsonPath("$.clubQuestions[*].authorShortName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.clubQuestions[*].authorShortName") { value(not(hasItem("멤버1"))) }
-                jsonPath("$.clubQuestions[?(@.authorName == '탈퇴한 멤버')].avatarKey") { value(hasItem("hedgehog-green-book")) }
+                jsonPath("$.clubQuestions[?(@.authorName == '탈퇴한 멤버')].avatarKey") {
+                    value(hasItem("hedgehog-green-book"))
+                }
                 jsonPath("$.clubQuestions[*].avatarKey") { value(not(hasItem("deer-brown-book"))) }
                 jsonPath(removedJsonPath("$.", "club", "Checkins")) { doesNotExist() }
                 jsonPath("$.clubOneLiners[*].authorName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.clubOneLiners[*].authorName") { value(not(hasItem("안멤버1"))) }
                 jsonPath("$.clubOneLiners[*].authorShortName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.clubOneLiners[*].authorShortName") { value(not(hasItem("멤버1"))) }
-                jsonPath("$.clubOneLiners[?(@.authorName == '탈퇴한 멤버')].avatarKey") { value(hasItem("hedgehog-green-book")) }
+                jsonPath("$.clubOneLiners[?(@.authorName == '탈퇴한 멤버')].avatarKey") {
+                    value(hasItem("hedgehog-green-book"))
+                }
                 jsonPath("$.clubOneLiners[*].avatarKey") { value(not(hasItem("deer-brown-book"))) }
                 jsonPath("$.publicOneLiners[*].authorName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.publicOneLiners[*].authorName") { value(not(hasItem("안멤버1"))) }
                 jsonPath("$.publicOneLiners[*].authorShortName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.publicOneLiners[*].authorShortName") { value(not(hasItem("멤버1"))) }
-                jsonPath("$.publicOneLiners[?(@.authorName == '탈퇴한 멤버')].avatarKey") { value(hasItem("hedgehog-green-book")) }
+                jsonPath("$.publicOneLiners[?(@.authorName == '탈퇴한 멤버')].avatarKey") {
+                    value(hasItem("hedgehog-green-book"))
+                }
                 jsonPath("$.publicOneLiners[*].avatarKey") { value(not(hasItem("deer-brown-book"))) }
             }
 

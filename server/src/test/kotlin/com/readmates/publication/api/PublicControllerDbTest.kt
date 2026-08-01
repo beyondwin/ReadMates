@@ -163,7 +163,9 @@ class PublicControllerDbTest(
                 jsonPath("$.highlights[*].authorName") { value(not(hasItem("안멤버1"))) }
                 jsonPath("$.highlights[*].authorShortName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.highlights[*].authorShortName") { value(not(hasItem("멤버1"))) }
-                jsonPath("$.highlights[?(@.authorName == '탈퇴한 멤버')].avatarKey") { value(hasItem("hedgehog-green-book")) }
+                jsonPath("$.highlights[?(@.authorName == '탈퇴한 멤버')].avatarKey") {
+                    value(hasItem("hedgehog-green-book"))
+                }
                 jsonPath("$.highlights[*].avatarKey") { value(not(hasItem("deer-brown-book"))) }
                 jsonPath("$.oneLiners[*].authorName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.oneLiners[*].authorName") { value(not(hasItem("안멤버1"))) }
