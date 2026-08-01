@@ -148,7 +148,7 @@ class RateLimitFilterTest {
     }
 
     @Test
-    fun `malformed encoded club segment is not classified as guest browse`() {
+    fun `invalid plain guest browse slugs are rejected without reaching rate limit storage`() {
         val port = RecordingRateLimitPort(RateLimitDecision.allowed())
         val filter =
             RateLimitFilter(
@@ -157,13 +157,68 @@ class RateLimitFilterTest {
                 ipHashingProperties = testIpHashingProperties,
             )
 
+        listOf("Reading-sai", "reading_sai", "a".repeat(41)).forEach { invalidSlug ->
+            val response = MockHttpServletResponse()
+
+            filter.doFilter(
+                MockHttpServletRequest("GET", "/api/public/clubs/$invalidSlug/browse/archive"),
+                response,
+                MockFilterChain(),
+            )
+
+            assertInvalidGuestBrowseResponse(response, invalidSlug)
+        }
+
+        assertTrue(port.checks.isEmpty())
+    }
+
+    @Test
+    fun `encoded guest browse slug is rejected without exposing the raw segment`() {
+        val port = RecordingRateLimitPort(RateLimitDecision.allowed())
+        val filter =
+            RateLimitFilter(
+                rateLimitPort = port,
+                properties = RateLimitProperties(enabled = true),
+                ipHashingProperties = testIpHashingProperties,
+            )
+        val invalidSlug = "reading-sai%2Foutside"
+        val response = MockHttpServletResponse()
+
         filter.doFilter(
-            MockHttpServletRequest("GET", "/api/public/clubs/reading-sai%2Foutside/browse/archive"),
-            MockHttpServletResponse(),
+            MockHttpServletRequest("GET", "/api/public/clubs/$invalidSlug/browse/archive"),
+            response,
             MockFilterChain(),
         )
 
+        assertInvalidGuestBrowseResponse(response, invalidSlug)
         assertTrue(port.checks.isEmpty())
+    }
+
+    @Test
+    fun `denied guest browse response is no-store and public safe`() {
+        val port = RecordingRateLimitPort(RateLimitDecision.denied(retryAfterSeconds = 60))
+        val filter =
+            RateLimitFilter(
+                rateLimitPort = port,
+                properties = RateLimitProperties(enabled = true),
+                ipHashingProperties = testIpHashingProperties,
+            )
+        val request =
+            MockHttpServletRequest("GET", "/api/public/clubs/reading-sai/browse/archive").apply {
+                remoteAddr = "203.0.113.10"
+            }
+        val response = MockHttpServletResponse()
+
+        filter.doFilter(request, response, MockFilterChain())
+
+        assertEquals(429, response.status)
+        assertEquals("60", response.getHeader("Retry-After"))
+        assertEquals("no-store", response.getHeader("Cache-Control"))
+        assertNoSensitiveVary(response)
+        assertEquals("""{"code":"RATE_LIMITED","message":"Too many requests"}""", response.contentAsString)
+        assertFalse(response.contentAsString.contains("reading-sai"))
+        assertFalse(response.contentAsString.contains("203.0.113.10"))
+        assertFalse(response.contentAsString.contains("rl:"))
     }
 
     @Test
@@ -325,6 +380,29 @@ class RateLimitFilterTest {
     }
 
     private fun invitationPreviewRequest(token: String) = MockHttpServletRequest("GET", "/api/invitations/$token")
+
+    private fun assertInvalidGuestBrowseResponse(
+        response: MockHttpServletResponse,
+        rawSlug: String,
+    ) {
+        assertEquals(400, response.status)
+        assertEquals("application/json", response.contentType)
+        assertEquals("no-store", response.getHeader("Cache-Control"))
+        assertNoSensitiveVary(response)
+        assertEquals("""{"code":"INVALID_REQUEST","message":"Invalid request"}""", response.contentAsString)
+        assertFalse(response.contentAsString.contains(rawSlug))
+        assertFalse(response.contentAsString.contains("rl:"))
+    }
+
+    private fun assertNoSensitiveVary(response: MockHttpServletResponse) {
+        val varyTokens =
+            response
+                .getHeaders("Vary")
+                .flatMap { it.split(',') }
+                .map { it.trim().lowercase() }
+        assertFalse("cookie" in varyTokens)
+        assertFalse("authorization" in varyTokens)
+    }
 
     private class RecordingRateLimitPort(
         private val decision: RateLimitDecision,

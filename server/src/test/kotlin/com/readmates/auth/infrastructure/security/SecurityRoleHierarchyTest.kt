@@ -4,6 +4,7 @@ import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -118,6 +119,30 @@ class SecurityRoleHierarchyTest(
     fun `anonymous access is not granted to unregistered public api paths`() {
         mockMvc.get("/api/public/not-a-registered-endpoint").andExpect {
             status { isUnauthorized() }
+        }
+    }
+
+    @Test
+    fun `invalid guest browse slug is rejected before controller access`() {
+        listOf("Reading-sai", "a".repeat(41)).forEach { invalidSlug ->
+            val response =
+                mockMvc
+                    .get("/api/public/clubs/$invalidSlug/browse")
+                    .andExpect {
+                        status { isBadRequest() }
+                        header { string("Cache-Control", "no-store") }
+                        jsonPath("$.code") { value("INVALID_REQUEST") }
+                    }.andReturn()
+                    .response
+
+            val varyTokens =
+                response
+                    .getHeaders("Vary")
+                    .flatMap { it.split(',') }
+                    .map { it.trim().lowercase() }
+            assertFalse(response.contentAsString.contains(invalidSlug))
+            assertFalse("cookie" in varyTokens)
+            assertFalse("authorization" in varyTokens)
         }
     }
 
