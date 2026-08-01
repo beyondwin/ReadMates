@@ -635,6 +635,10 @@ function FeedbackDocumentStyles() {
       }
 
       @media (max-width: 768px) {
+        .rm-feedback-document-kicker {
+          display: none;
+        }
+
         .rm-feedback-document-meta-row {
           gap: 10px;
         }

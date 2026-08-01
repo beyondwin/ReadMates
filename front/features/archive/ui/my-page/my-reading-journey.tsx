@@ -3,6 +3,7 @@ import { BookRecordRow } from "./book-record-row";
 
 export type MyReadingJourneyProps = {
   items: MyJourneyItem[];
+  heading?: string;
   hasMore: boolean;
   loadMorePending: boolean;
   loadMoreError: boolean;
@@ -12,6 +13,7 @@ export type MyReadingJourneyProps = {
 
 export function MyReadingJourney({
   items,
+  heading = "내 책별 기록",
   hasMore,
   loadMorePending,
   loadMoreError,
@@ -23,7 +25,7 @@ export function MyReadingJourney({
   return (
     <section className="rm-my-records-journey" aria-labelledby="my-reading-journey-heading">
       <div className="rm-my-records-section-heading">
-        <h2 id="my-reading-journey-heading">내 책별 기록</h2>
+        <h2 id="my-reading-journey-heading">{heading}</h2>
       </div>
       <div className="rm-my-records-year-groups">
         {groups.map((group) => (

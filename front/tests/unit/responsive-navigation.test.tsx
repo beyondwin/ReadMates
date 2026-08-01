@@ -380,9 +380,11 @@ describe("MobileHeader route titles and actions", () => {
   });
 
   it.each([
+    ["/app/me/records", "/app/me"],
     ["/app/notifications", "/app/me"],
     ["/app/notifications/settings", "/app/me"],
     ["/app/me/settings", "/app/me"],
+    ["/clubs/reading-sai/app/me/records", "/clubs/reading-sai/app/me"],
     ["/clubs/reading-sai/app/notifications", "/clubs/reading-sai/app/me"],
     ["/clubs/reading-sai/app/notifications/settings", "/clubs/reading-sai/app/me"],
     ["/clubs/reading-sai/app/me/settings", "/clubs/reading-sai/app/me"],
@@ -397,7 +399,8 @@ describe("MobileHeader route titles and actions", () => {
 
     const backLink = screen.getByRole("link", { name: "뒤로" });
     expect(backLink).toHaveAttribute("href", expectedHref);
-    expect(backLink).toHaveTextContent("내 공간");
+    expect(backLink).toHaveTextContent("뒤로");
+    expect(document.querySelector(".m-hdr-title")).toHaveTextContent("내 공간");
   });
 
   it("shows a compact mobile host workspace entry from member screens when requested", () => {

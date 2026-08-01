@@ -388,6 +388,12 @@ test("dedicated records and account settings stay reachable above mobile navigat
   await loginWithGoogleFixture(page, "host@example.com");
   await page.goto(`${baselineClubAppPath}/me/records`);
 
+  const recordsBack = page.getByRole("banner").getByRole("link", { name: "뒤로" });
+  await expect(recordsBack).toHaveAttribute("href", `${baselineClubAppPath}/me`);
+  await expect(recordsBack).toHaveText("뒤로");
+  await expect(page.getByRole("banner").locator(".m-hdr-title")).toHaveText("내 공간");
+  await expect(page.locator(".rm-my-records-page .rm-my-shelf-kicker")).toBeHidden();
+
   await page.getByRole("button", { name: "기록 더 보기" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "기록을 더 불러오지 못했습니다." })).toBeVisible();
   await expectPracticalTapTarget(page.getByRole("button", { name: "다시 시도" }).first());
@@ -405,18 +411,22 @@ test("dedicated records and account settings stay reachable above mobile navigat
   );
 
   const settings = page.locator(".rm-account-settings-page");
-  const backToMySpace = settings.getByRole("link", { name: "내 공간" });
-  await expect(backToMySpace).toContainText("←");
+  const backToMySpace = settings.locator(".rm-account-settings-page__back");
+  await expect(backToMySpace).toBeHidden();
   await expect(backToMySpace).toHaveAttribute(
     "href",
     `${baselineClubAppPath}/me`,
   );
-  await expectPracticalTapTarget(backToMySpace);
+  const settingsBack = page.getByRole("banner").getByRole("link", { name: "뒤로" });
+  await expect(settingsBack).toHaveAttribute("href", `${baselineClubAppPath}/me`);
+  await expect(settingsBack).toHaveText("뒤로");
+  await expect(page.getByRole("banner").locator(".m-hdr-title")).toHaveText("내 공간");
+  await expect(settings.locator(".rm-my-shelf-kicker")).toBeHidden();
   await expect(settings.getByRole("heading", { level: 1, name: "계정 설정" })).toBeVisible();
   await expect(settings.getByRole("button", { name: "클럽 탈퇴…" })).toBeVisible();
   await expect(settings.getByRole("button", { name: "로그아웃" })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  await backToMySpace.click();
+  await settingsBack.click();
   await expect(page).toHaveURL(new RegExp(`${baselineClubAppPath}/me$`));
 });
 

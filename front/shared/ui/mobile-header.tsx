@@ -256,7 +256,7 @@ function appTitle(variant: Exclude<MobileHeaderVariant, "guest">, pathname: stri
   }
 
   if (pathname.startsWith("/app/notifications")) {
-    return READMATES_NAV_LABELS.member.notifications;
+    return READMATES_NAV_LABELS.member.mySpace;
   }
 
   if (pathname.startsWith("/app/me")) {
@@ -328,12 +328,13 @@ function appBackTarget(
     return { href: target.href, state: target.state, label: "뒤로" };
   }
 
-  if (pathname === "/app/notifications" || pathname === "/app/notifications/settings") {
-    return { href: "/app/me", label: "내 공간" };
-  }
-
-  if (pathname === "/app/me/settings") {
-    return { href: "/app/me", label: "내 공간" };
+  if (
+    pathname === "/app/me/records" ||
+    pathname === "/app/me/settings" ||
+    pathname === "/app/notifications" ||
+    pathname === "/app/notifications/settings"
+  ) {
+    return { href: "/app/me", label: "뒤로" };
   }
 
   return null;

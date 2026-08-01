@@ -7090,6 +7090,14 @@ a.rm-recent-record__destination:hover {
     padding-bottom: calc(var(--m-nav-h) + 44px + var(--m-safe-bottom));
   }
 
+  .rm-account-settings-page__back,
+  .rm-account-settings-page .rm-my-shelf-kicker,
+  .rm-my-records-page .rm-my-shelf-kicker,
+  .rm-member-space-breadcrumb,
+  .rm-member-notifications-header__eyebrow {
+    display: none;
+  }
+
   .rm-account-settings-page__header {
     padding-bottom: 20px;
   }

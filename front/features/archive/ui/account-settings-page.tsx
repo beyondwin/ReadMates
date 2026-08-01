@@ -23,7 +23,7 @@ export function AccountSettingsPage({
         <span>내 공간</span>
       </a>
       <header className="rm-account-settings-page__header">
-        <p className="rm-my-shelf-kicker">내 공간</p>
+        <p className="rm-my-shelf-kicker desktop-only">내 공간</p>
         <h1>계정 설정</h1>
         <p>현재 계정과 현재 클럽의 멤버십 정보를 확인합니다.</p>
       </header>

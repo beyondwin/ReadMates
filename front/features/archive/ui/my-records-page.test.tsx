@@ -36,8 +36,11 @@ describe("MyRecordsPage", () => {
     );
 
     expect(screen.getByRole("heading", { level: 1, name: "내 책별 기록" })).toBeVisible();
+    expect(screen.getByText("내 공간", { selector: ".rm-my-shelf-kicker" })).toHaveClass(
+      "desktop-only",
+    );
     expect(screen.getByText("함께 읽은 책을 최근 기록부터 다시 살펴보세요.")).toBeVisible();
-    expect(screen.getByRole("heading", { level: 2, name: "내 책별 기록" })).toBeVisible();
+    expect(screen.getByRole("heading", { level: 2, name: "전체 기록" })).toBeVisible();
     expect(screen.getByRole("region", { name: "2026년 기록" })).toBeVisible();
   });
 });
