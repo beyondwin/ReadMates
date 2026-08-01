@@ -9,18 +9,17 @@ type GuestLinkProps = {
 
 type GuestAccountControlProps = {
   clubSlug: string;
-  appPath: string;
+  returnTo: string;
   LinkComponent: ComponentType<GuestLinkProps>;
 };
 
-export function GuestAccountControl({ clubSlug, appPath, LinkComponent }: GuestAccountControlProps) {
-  const scopedAppPath = `/clubs/${encodeURIComponent(clubSlug)}${appPath}`;
+export function GuestAccountControl({ clubSlug, returnTo, LinkComponent }: GuestAccountControlProps) {
   const publicHomePath = `/clubs/${encodeURIComponent(clubSlug)}`;
 
   return (
     <div className="rm-guest-account-control" aria-label="게스트 계정">
       <span className="rm-guest-account-control__badge">게스트</span>
-      <LinkComponent className="rm-guest-account-control__action" to={loginPathForReturnTo(scopedAppPath)}>
+      <LinkComponent className="rm-guest-account-control__action" to={loginPathForReturnTo(returnTo)}>
         멤버로 시작
       </LinkComponent>
       <LinkComponent className="rm-guest-account-control__action" to={publicHomePath}>

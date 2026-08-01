@@ -29,7 +29,7 @@ export async function loadClubAppAudience(args?: Pick<LoaderFunctionArgs, "param
   const auth = await readmatesPublicFetch<AuthMeResponse>(authMePath(clubSlug));
   const audience = deriveClubAppAudience(auth);
 
-  if (audience !== "GUEST" || auth.authenticated) {
+  if (audience !== "GUEST") {
     return { audience, auth, club: null };
   }
 
@@ -46,7 +46,7 @@ export function scopedGuestRouteLoader(loadProtectedLoader: () => Promise<Loader
   return async function guardedScopedRouteLoader(args: LoaderFunctionArgs) {
     const access = await loadClubAppAudience(args);
 
-    if (access.audience === "GUEST" && !access.auth.authenticated) {
+    if (access.audience === "GUEST") {
       return { guestRoute: true } satisfies GuestScopedRouteData;
     }
 

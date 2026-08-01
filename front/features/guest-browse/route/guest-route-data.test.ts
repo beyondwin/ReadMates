@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { loadClubAppAudience } from "./club-app-audience-loader";
+import { loadClubAppAudience, scopedGuestRouteLoader } from "./club-app-audience-loader";
 import { guestArchiveLoader, guestCurrentSessionLoader, guestNotesLoader } from "./guest-route-data";
 
 afterEach(() => {
@@ -36,6 +36,20 @@ const anonymousAuth = {
   role: null,
   membershipStatus: null,
   approvalState: "ANONYMOUS",
+};
+
+const inactiveAuth = {
+  ...anonymousAuth,
+  authenticated: true,
+  userId: "former-member",
+  membershipId: "former-membership",
+  clubId: "former-club",
+  email: "former@example.com",
+  displayName: "지난 멤버",
+  accountName: "지난 멤버",
+  role: "MEMBER",
+  membershipStatus: "INACTIVE",
+  approvalState: "INACTIVE",
 };
 
 function jsonResponse(value: unknown) {
@@ -77,6 +91,38 @@ describe("guest route loaders", () => {
       "/api/bff/api/public/clubs/alpha/browse",
     ]);
     expect(assign).not.toHaveBeenCalled();
+  });
+
+  it("loads the public shell for an authenticated guest-equivalent membership", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(inactiveAuth))
+      .mockResolvedValueOnce(jsonResponse(shell));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(loadClubAppAudience({ params: { clubSlug: "alpha" } })).resolves.toMatchObject({
+      audience: "GUEST",
+      auth: inactiveAuth,
+      club: shell,
+    });
+    expect(fetchMock.mock.calls.map(([path]) => path)).toEqual([
+      "/api/bff/api/auth/me?clubSlug=alpha",
+      "/api/bff/api/public/clubs/alpha/browse",
+    ]);
+  });
+
+  it("does not import a protected child loader for any GUEST audience", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(inactiveAuth))
+      .mockResolvedValueOnce(jsonResponse(shell));
+    const importProtectedLoader = vi.fn(async () => async () => ({ protected: true }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const loader = scopedGuestRouteLoader(importProtectedLoader);
+
+    await expect(loader({ params: { clubSlug: "alpha" } } as never)).resolves.toEqual({ guestRoute: true });
+    expect(importProtectedLoader).not.toHaveBeenCalled();
   });
 
   it("keeps child guest loaders on browse endpoints only", async () => {

@@ -12,7 +12,7 @@ export type GuestLockKind = "feedback" | "settings" | "notifications" | "member"
 const lockCopy: Record<GuestLockKind, { title: string; description: string }> = {
   feedback: {
     title: "정식 멤버에게 열립니다",
-    description: "Google로 멤버를 시작하면 먼저 보기 멤버가 되고, 호스트 승인 후 정식 멤버가 됩니다.",
+    description: "Google로 시작한 뒤 호스트의 정식 멤버 승인이 필요합니다.",
   },
   settings: {
     title: "정식 멤버에게 열립니다",

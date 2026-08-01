@@ -372,7 +372,7 @@ describe("SPA router", () => {
     expect(router.state.location.pathname).toBe("/clubs/reading-sai/app/host/missing-page");
   });
 
-  it("blocks scoped member access when only the unscoped session is active", async () => {
+  it("returns a private scoped club as not found when the authenticated membership is inactive", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = input.toString();
 
@@ -419,8 +419,9 @@ describe("SPA router", () => {
       </AuthProvider>,
     );
 
-    expect(await screen.findByRole("heading", { name: "멤버 공간에 들어갈 수 없습니다." })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "페이지를 찾을 수 없습니다." })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/clubs/reading-sai/app/missing-page");
+    expect(fetchMock.mock.calls.map(([input]) => input.toString())).toContain("/api/bff/api/public/clubs/reading-sai/browse");
   });
 
   it("renders permission denied copy from a structured API route error", async () => {
@@ -798,6 +799,29 @@ describe("SPA router", () => {
       expect(protectedApiCalls(fetchMock)).toEqual([]);
     },
   );
+
+  it("uses the guest projection for an authenticated inactive scoped membership", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+      if (url === "/api/bff/api/auth/me" || url === "/api/bff/api/auth/me?clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse(inactiveAuth));
+      }
+      if (url === "/api/bff/api/public/clubs/reading-sai/browse") {
+        return Promise.resolve(jsonResponse(guestBrowseShell));
+      }
+      return Promise.resolve(jsonResponse({ message: `unexpected request: ${url}` }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
+
+    const router = renderGuestRouter("/clubs/reading-sai/app/feedback/session-1?from=archive#document");
+
+    expect(await screen.findByRole("heading", { name: "정식 멤버에게 열립니다" })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/clubs/reading-sai/app/feedback/session-1");
+    expect(router.state.location.search).toBe("?from=archive");
+    expect(router.state.location.hash).toBe("#document");
+    expect(protectedApiCalls(fetchMock)).toEqual([]);
+  });
 
   it("returns a guest host deep link to the scoped club browse home before host loaders run", async () => {
     const fetchMock = vi.fn(guestScopedFetchMock);

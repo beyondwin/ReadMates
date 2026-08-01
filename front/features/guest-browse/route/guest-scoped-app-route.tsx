@@ -24,17 +24,18 @@ function lockKind(path: string): GuestLockKind {
 export function GuestScopedAppRoute({ LinkComponent }: { LinkComponent: ComponentType<GuestLinkProps> }) {
   const location = useLocation();
   const appPath = requestedAppPath(location.pathname);
+  const returnTo = `${location.pathname}${location.search}${location.hash}`;
   const capability = guestNavigationCapability(appPath);
 
   if (capability === "PREVIEW") {
-    return <GuestMySpace returnTo={location.pathname} LinkComponent={LinkComponent} />;
+    return <GuestMySpace returnTo={returnTo} LinkComponent={LinkComponent} />;
   }
 
   if (capability === "LOCKED") {
     return (
       <GuestLockedPage
         kind={lockKind(appPath)}
-        returnTo={location.pathname}
+        returnTo={returnTo}
         LinkComponent={LinkComponent}
       />
     );

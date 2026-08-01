@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from "react";
 import { guestNavigationCapability } from "@/features/guest-browse/model/club-app-audience";
 import { loginPathForReturnTo } from "@/shared/auth/login-return";
 
@@ -27,7 +27,7 @@ const GuestNavigationDialogContext = createContext<GuestNavigationDialogContextV
 
 function lockDescription(path: string) {
   if (path.includes("/feedback/")) {
-    return "Google로 멤버를 시작하면 먼저 보기 멤버가 되고, 호스트 승인 후 정식 멤버가 됩니다.";
+    return "Google로 시작한 뒤 호스트의 정식 멤버 승인이 필요합니다.";
   }
 
   if (path.includes("/notifications")) {
@@ -47,6 +47,12 @@ function GuestLockedDialog({
   LinkComponent: ComponentType<GuestNavigationLinkProps>;
 }) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
+
+  const closeAndRestoreFocus = useCallback(() => {
+    onClose();
+    target.opener.focus();
+  }, [onClose, target.opener]);
 
   useEffect(() => {
     closeButtonRef.current?.focus();
@@ -54,22 +60,39 @@ function GuestLockedDialog({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        closeAndRestoreFocus();
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const focusable = Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? [],
+      );
+      const first = focusable.at(0);
+      const last = focusable.at(-1);
+
+      if (!first || !last) {
+        event.preventDefault();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
       }
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
-
-  const closeAndRestoreFocus = () => {
-    onClose();
-    target.opener.focus();
-  };
+  }, [closeAndRestoreFocus]);
 
   return (
     <div className="rm-guest-lock-dialog-backdrop" role="presentation" onMouseDown={closeAndRestoreFocus}>
       <section
+        ref={dialogRef}
         className="surface rm-guest-lock-dialog"
         role="dialog"
         aria-modal="true"

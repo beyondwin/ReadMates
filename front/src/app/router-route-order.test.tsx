@@ -54,6 +54,16 @@ describe("router route order", () => {
     expect(routePathsFor("/clubs/reading-sai/app/host/members")).not.toEqual(expect.arrayContaining(["*"]));
   });
 
+  it("keeps guest-equivalent scoped routes out of protected lazy data graphs", () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const routes = buildRoutes(queryClient);
+    const scopedMember = routes.find((route) => route.id === "club-app");
+    const scopedHost = routes.find((route) => route.id === "club-app-host");
+
+    expect(scopedMember?.children?.filter((route) => route.path !== "*").every((route) => !route.lazy && Boolean(route.loader))).toBe(true);
+    expect(scopedHost?.children?.filter((route) => route.path !== "*").every((route) => !route.lazy && Boolean(route.loader))).toBe(true);
+  });
+
   it("matches host session detail routes before host and member wildcards", () => {
     const hostPaths = [
       { pathname: "/app/host/sessions", routeId: "app-host" },

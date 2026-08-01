@@ -1,6 +1,6 @@
-import type { ComponentType } from "react";
+import { lazy, Suspense, type ComponentType, type ReactNode } from "react";
 import type { QueryClient } from "@tanstack/react-query";
-import { useLoaderData, type RouteObject } from "react-router-dom";
+import { useLoaderData, type LoaderFunction, type RouteObject } from "react-router-dom";
 import type { InternalLinkComponent } from "@/features/current-session";
 import {
   ArchiveRouteError,
@@ -28,15 +28,50 @@ const currentSessionInternalLink: InternalLinkComponent = ({ href, children, ...
   );
 };
 
-function componentForScopedAudience(Component: ComponentType, scoped: boolean) {
-  if (!scoped) {
-    return Component;
-  }
+type ScopedRouteModule = {
+  Component: ComponentType;
+  loader: LoaderFunction;
+};
 
-  return function ScopedAudienceRouteComponent() {
+function componentForScopedAudience(Component: ComponentType, _scoped: boolean) {
+  void _scoped;
+  return Component;
+}
+
+function scopedMemberRoute({
+  path,
+  index,
+  errorElement,
+  fallback,
+  load,
+}: {
+  path?: string;
+  index?: true;
+  errorElement?: ReactNode;
+  fallback: ReactNode;
+  load: () => Promise<ScopedRouteModule>;
+}): RouteObject {
+  const ProtectedComponent = lazy(async () => ({ default: (await load()).Component }));
+
+  function ScopedAudienceRouteComponent() {
     const data = useLoaderData();
 
-    return isGuestScopedRouteData(data) ? <GuestScopedAppRoute LinkComponent={Link} /> : <Component />;
+    return isGuestScopedRouteData(data) ? (
+      <GuestScopedAppRoute LinkComponent={Link} />
+    ) : (
+      <Suspense fallback={fallback}>
+        <ProtectedComponent />
+      </Suspense>
+    );
+  };
+
+  return {
+    ...(path ? { path } : {}),
+    ...(index ? { index } : {}),
+    ...(errorElement ? { errorElement } : {}),
+    hydrateFallbackElement: fallback,
+    loader: scopedGuestRouteLoader(async () => (await load()).loader),
+    element: <ScopedAudienceRouteComponent />,
   };
 }
 
@@ -66,10 +101,169 @@ function memberHomeRoute(scoped: boolean): RouteObject {
   };
 }
 
+function scopedMemberAppRoutes(queryClient: QueryClient): RouteObject[] {
+  return [
+    scopedMemberRoute({
+      index: true,
+      errorElement: <ArchiveRouteError />,
+      fallback: <ReadmatesRouteLoading label="멤버 홈을 불러오는 중" variant="member" />,
+      load: async () => {
+        const [{ default: Component }, { memberHomeLoader: loader }] = await Promise.all([
+          import("@/src/pages/app-home"),
+          import("@/features/member-home/route/member-home-data"),
+        ]);
+        return { Component, loader };
+      },
+    }),
+    scopedMemberRoute({
+      path: "session/current",
+      fallback: <ReadmatesRouteLoading label="세션을 불러오는 중" variant="member" />,
+      load: async () => {
+        const { CurrentSessionRoute, currentSessionLoaderFactory } = await import("@/features/current-session");
+        return {
+          Component: () => <CurrentSessionRoute internalLinkComponent={currentSessionInternalLink} />,
+          loader: currentSessionLoaderFactory(queryClient),
+        };
+      },
+    }),
+    scopedMemberRoute({
+      path: "notes",
+      errorElement: <ArchiveRouteError />,
+      fallback: <ArchiveRouteLoading label="클럽 노트를 불러오는 중" />,
+      load: async () => {
+        const [{ default: Component }, { notesFeedLoader: loader }] = await Promise.all([
+          import("@/src/pages/notes"),
+          import("@/features/archive/route/notes-feed-data"),
+        ]);
+        return { Component, loader };
+      },
+    }),
+    scopedMemberRoute({
+      path: "archive",
+      errorElement: <ArchiveRouteError />,
+      fallback: <ArchiveRouteLoading label="아카이브를 불러오는 중" />,
+      load: async () => {
+        const [{ default: Component }, { archiveListLoaderFactory }] = await Promise.all([
+          import("@/src/pages/archive"),
+          import("@/features/archive/route/archive-list-data"),
+        ]);
+        return { Component, loader: archiveListLoaderFactory(queryClient) };
+      },
+    }),
+    scopedMemberRoute({
+      path: "me/records",
+      errorElement: <ArchiveRouteError />,
+      fallback: <ArchiveRouteLoading label="내 책별 기록을 불러오는 중" />,
+      load: async () => {
+        const [{ default: Component }, { myRecordsLoader: loader }] = await Promise.all([
+          import("@/src/pages/my-records"),
+          import("@/features/archive/route/my-records-data"),
+        ]);
+        return { Component, loader };
+      },
+    }),
+    scopedMemberRoute({
+      path: "me/settings",
+      errorElement: <ArchiveRouteError />,
+      fallback: <ArchiveRouteLoading label="계정 정보를 불러오는 중" />,
+      load: async () => {
+        const [{ default: Component }, { accountSettingsLoader: loader }] = await Promise.all([
+          import("@/src/pages/account-settings"),
+          import("@/features/archive/route/account-settings-data"),
+        ]);
+        return { Component, loader };
+      },
+    }),
+    scopedMemberRoute({
+      path: "me",
+      errorElement: <ArchiveRouteError />,
+      fallback: <ArchiveRouteLoading label="내 공간을 불러오는 중" />,
+      load: async () => {
+        const [{ default: Component }, { myPageLoader: loader }] = await Promise.all([
+          import("@/src/pages/my-page"),
+          import("@/features/archive/route/my-page-data"),
+        ]);
+        return { Component, loader };
+      },
+    }),
+    scopedMemberRoute({
+      path: "notifications",
+      errorElement: <ArchiveRouteError />,
+      fallback: <ArchiveRouteLoading label="알림을 불러오는 중" />,
+      load: async () => {
+        const [{ MemberNotificationsRoute: Component }, { memberNotificationsLoader: loader }] = await Promise.all([
+          import("@/features/notifications/route/member-notifications-route"),
+          import("@/features/notifications/route/member-notifications-data"),
+        ]);
+        return { Component, loader };
+      },
+    }),
+    scopedMemberRoute({
+      path: "notifications/settings",
+      errorElement: <ArchiveRouteError />,
+      fallback: <ArchiveRouteLoading label="알림 수신 설정을 불러오는 중" />,
+      load: async () => {
+        const [{ default: Component }, { memberNotificationSettingsLoader: loader }] = await Promise.all([
+          import("@/src/pages/member-notification-settings"),
+          import("@/features/notifications/route/member-notification-settings-data"),
+        ]);
+        return { Component, loader };
+      },
+    }),
+    scopedMemberRoute({
+      path: "sessions/:sessionId",
+      errorElement: <ArchiveRouteError />,
+      fallback: <ArchiveRouteLoading label="지난 세션 기록을 불러오는 중" />,
+      load: async () => {
+        const [{ default: Component }, { memberSessionDetailLoaderFactory }] = await Promise.all([
+          import("@/src/pages/member-session"),
+          import("@/features/archive/route/member-session-detail-data"),
+        ]);
+        return { Component, loader: memberSessionDetailLoaderFactory(queryClient) };
+      },
+    }),
+    scopedMemberRoute({
+      path: "feedback/:sessionId",
+      errorElement: <FeedbackRouteError />,
+      fallback: <ReadmatesRouteLoading label="피드백 문서를 불러오는 중" variant="member" />,
+      load: async () => {
+        const [{ default: Component }, { feedbackDocumentLoaderFactory }] = await Promise.all([
+          import("@/src/pages/feedback-document"),
+          import("@/features/feedback/route/feedback-document-data"),
+        ]);
+        return { Component, loader: feedbackDocumentLoaderFactory(queryClient) };
+      },
+    }),
+    scopedMemberRoute({
+      path: "feedback/:sessionId/print",
+      errorElement: <FeedbackRouteError />,
+      fallback: <ReadmatesRouteLoading label="피드백 문서를 불러오는 중" variant="member" />,
+      load: async () => {
+        const [{ default: Component }, { feedbackDocumentLoaderFactory }] = await Promise.all([
+          import("@/src/pages/feedback-print"),
+          import("@/features/feedback/route/feedback-document-data"),
+        ]);
+        return { Component, loader: feedbackDocumentLoaderFactory(queryClient) };
+      },
+    }),
+    {
+      path: "*",
+      loader: scopedGuestRouteLoader(async () => async () => null),
+      hydrateFallbackElement: <ReadmatesRouteLoading label="페이지를 불러오는 중" variant="member" />,
+      element: <ScopedAudienceNotFoundRoute />,
+    },
+  ];
+}
+
 function memberAppRoutes(queryClient: QueryClient, options: { includeIndex?: boolean; scoped?: boolean } = {}): RouteObject[] {
   const { includeIndex = true, scoped = false } = options;
+
+  if (scoped) {
+    return scopedMemberAppRoutes(queryClient);
+  }
+
   return [
-    ...(includeIndex ? [memberHomeRoute(scoped)] : []),
+    ...(includeIndex ? [memberHomeRoute(false)] : []),
     {
       path: "session/current",
       hydrateFallbackElement: <ReadmatesRouteLoading label="세션을 불러오는 중" variant="member" />,

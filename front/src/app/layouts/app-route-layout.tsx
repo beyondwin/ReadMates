@@ -153,6 +153,7 @@ export function AppRouteLayout({
   const location = useLocation();
   const pathname = location.pathname;
   const appPath = appPathname(pathname);
+  const returnTo = `${location.pathname}${location.search}${location.hash}`;
   const basePath = appBasePath(pathname);
   const clubSlug = appClubSlug(pathname);
   const auth = clubSlug
@@ -231,7 +232,7 @@ export function AppRouteLayout({
           LinkComponent={AppLinkComponent}
           accountControl={
             isGuestAudience && clubSlug ? (
-              <GuestAccountControl clubSlug={clubSlug} appPath={appPath} LinkComponent={Link} />
+              <GuestAccountControl clubSlug={clubSlug} returnTo={returnTo} LinkComponent={Link} />
             ) : auth?.authenticated ? (
               <AccountMenuController
                 auth={auth}
@@ -252,7 +253,7 @@ export function AppRouteLayout({
           navigationContinuity={readmatesNavigationContinuity}
           accountControl={
             isGuestAudience && clubSlug ? (
-              <GuestAccountControl clubSlug={clubSlug} appPath={appPath} LinkComponent={Link} />
+              <GuestAccountControl clubSlug={clubSlug} returnTo={returnTo} LinkComponent={Link} />
             ) : auth?.authenticated ? (
               <AccountMenuController
                 auth={auth}

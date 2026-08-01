@@ -4,16 +4,11 @@ import type { ClubAppAccess } from "@/features/guest-browse/route/club-app-audie
 import { ClubAppAudienceProvider } from "@/features/guest-browse/route/club-app-audience-context";
 import { GuestAppHead } from "@/features/guest-browse/ui/guest-app-head";
 import { GuestNavigationProvider } from "@/features/guest-browse/ui/guest-navigation-dialog";
-import { RequireScopedMemberApp } from "@/src/app/route-guards";
 import { Link } from "@/src/app/router-link";
 import { AppRouteLayout } from "./app-route-layout";
 
 export function ClubMemberAppRouteLayout() {
   const access = useLoaderData() as ClubAppAccess;
-
-  if (access.audience === "GUEST" && access.auth.authenticated) {
-    return <RequireScopedMemberApp allowed={false}>{null}</RequireScopedMemberApp>;
-  }
 
   const shell = (
     <ClubAppAudienceProvider value={access}>

@@ -63,3 +63,57 @@ preview, or member-only lock as determined by the guest capability matrix.
 - Task 9 will replace the browse landing on OPEN routes with safe guest home,
   current-session, notes, and archive data surfaces. This task deliberately
   provides only the shell, capability gate, preview, and locks.
+
+## Review-fix round — guest route bypass closure
+
+### RED evidence
+
+- Added `loads the public shell for an authenticated guest-equivalent
+  membership` and `does not import a protected child loader for any GUEST
+  audience` to `guest-route-data.test.ts`.
+- Before the fix, the focused route test failed twice: an authenticated
+  `INACTIVE` membership produced `club: null`, and the protected-loader
+  importer was invoked instead of returning `{ guestRoute: true }`.
+
+### Resolutions
+
+1. Every `GUEST` audience, authenticated or anonymous, now fetches the public
+   shell. Its shell 404 remains the authoritative result for an inaccessible
+   private or inactive club. The scoped app layout no longer renders the
+   blocked-member branch for guest-equivalent authentication.
+2. Scoped member and scoped host children use static loaders and a post-loader
+   `Suspense` component boundary. Guest-equivalent navigation returns before
+   either `*-data` importer runs, while unscoped and authorized scoped routes
+   retain their original loader behavior. Router-graph assertions require
+   scoped member and host children to have a static loader and no `lazy`
+   property.
+3. Scoped host child loaders call the scoped host authorization gate before
+   their route module importer. Guest DENY redirects to scoped app root; the
+   unscoped `/app/host` tree is unchanged. The direct host test continues to
+   assert no protected API fetch, and the static-route graph assertion prevents
+   child lazy module execution for the scoped tree.
+4. Guest lock dialog dismissal now restores opener focus for Escape, close and
+   backdrop. Tab and Shift+Tab cycle between the close and conversion controls.
+5. Lock, preview, and account conversion targets preserve pathname, search,
+   and hash. The exact approved feedback copy is `Google로 시작한 뒤 호스트의
+   정식 멤버 승인이 필요합니다.`
+6. Added co-located shell tests for noindex single-node lifecycle, preview,
+   account/no-logout behavior, desktop/mobile navigation, direct feedback
+   conversion, and dialog focus behavior. The noindex head helper is now
+   reference-counted so multiple mounted guest shells keep exactly one node.
+7. Confirmed `MobileTabBar` has no injected `appPath` prop.
+
+### Review-fix verification
+
+- Focused guest route/UI/router run: 4 files, 61 tests passed.
+- Architecture boundary and app-layout regression: 2 files, 19 tests passed.
+- `corepack pnpm --dir front test`: 233 files, 1866 tests passed.
+- `corepack pnpm --dir front lint`: passed.
+- `corepack pnpm --dir front build`: passed.
+- `git diff --check`: passed.
+
+### Remaining concern
+
+- The dedicated public browse content for OPEN routes remains Task 9 scope;
+  this round only strengthens the Task 8 shell boundary and never exposes
+  protected route data to guest-equivalent audiences.
