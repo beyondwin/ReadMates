@@ -1,10 +1,14 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { RouterProvider, createMemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { GuestArchiveRoute, GuestHomeRoute, GuestNotesRoute } from "./guest-scoped-app-route";
+import { scopedGuestRouteLoader } from "./club-app-audience-loader";
+import { GuestArchiveRoute, GuestHomeRoute, GuestNotesRoute, GuestScopedAppRoute } from "./guest-scoped-app-route";
 
 const LinkComponent = ({ to, children, ...props }: { to: string; children: React.ReactNode; className?: string; style?: React.CSSProperties }) => <a {...props} href={to}>{children}</a>;
+const anonymousAuth = { authenticated: false, userId: null, membershipId: null, clubId: null, email: null, displayName: null, accountName: null, role: null, membershipStatus: null, approvalState: "ANONYMOUS" };
+const guestShell = { clubName: "읽는 모임", tagline: "함께 읽습니다", navigation: { home: "OPEN", current: "OPEN", notes: "OPEN", archive: "OPEN", sessionDetail: "OPEN", personalSpace: "PREVIEW", personalRecords: "PREVIEW", settings: "LOCKED", notifications: "LOCKED", feedback: "LOCKED", host: "DENY" } };
 const notes = (text = "처음") => ({
   sessions: { items: [{ sessionId: "s1", sessionNumber: 1, bookTitle: "책", date: "2026-08-02", questionCount: 0, oneLinerCount: 0, longReviewCount: 0, highlightCount: 1, totalCount: 1 }], nextCursor: null },
   feed: { items: [{ sessionId: "s1", sessionNumber: 1, bookTitle: "책", date: "2026-08-02", authorName: "이름", authorShortName: "이", avatarKey: "book", kind: "HIGHLIGHT" as const, text }], nextCursor: "cursor-1" },
@@ -19,6 +23,20 @@ function mount(initialData = notes(), clubSlug = "alpha") {
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe("guest notes route pagination", () => {
+  it("resets through GuestScopedAppRoute on club navigation and fresh same-club loader data", async () => {
+    const dataByClub: Record<string, ReturnType<typeof notes>> = { alpha: notes("alpha 처음"), beta: notes("beta 기록") };
+    const router = createMemoryRouter([{ path: "/clubs/:clubSlug/app/notes", loader: ({ params }) => ({ guestRoute: true, guestData: dataByClub[params.clubSlug ?? "alpha"] }), element: <GuestScopedAppRoute LinkComponent={LinkComponent} /> }], { initialEntries: ["/clubs/alpha/app/notes"] });
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><RouterProvider router={router} /></QueryClientProvider>);
+    expect(await screen.findByText("alpha 처음")).toBeVisible();
+    dataByClub.alpha = notes("alpha 새 loader");
+    await act(async () => { router.revalidate(); });
+    expect(await screen.findByText("alpha 새 loader")).toBeVisible();
+    expect(screen.queryByText("alpha 처음")).not.toBeInTheDocument();
+    await act(async () => { await router.navigate("/clubs/beta/app/notes"); });
+    expect(await screen.findByText("beta 기록")).toBeVisible();
+    expect(screen.queryByText("alpha 새 loader")).not.toBeInTheDocument();
+  });
+
   it("uses one fetch and one append for rapid load-more clicks", async () => {
     const user = userEvent.setup();
     let resolve!: (value: Response) => void;
@@ -46,15 +64,68 @@ describe("guest notes route pagination", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("resets visible notes for a different club and fresh same-club loader result", () => {
-    const mounted = mount(notes("alpha 기록"), "alpha");
-    expect(screen.getByText("alpha 기록")).toBeVisible();
-    mounted.rerender(<QueryClientProvider client={new QueryClient()}><GuestNotesRoute key="beta:2" initialData={notes("beta 기록")} clubSlug="beta" appBasePath="/clubs/beta/app" LinkComponent={LinkComponent} selectedSessionId="s1" /></QueryClientProvider>);
-    expect(screen.getByText("beta 기록")).toBeVisible();
-    expect(screen.queryByText("alpha 기록")).not.toBeInTheDocument();
-    mounted.rerender(<QueryClientProvider client={new QueryClient()}><GuestNotesRoute key="beta:3" initialData={notes("새 loader 기록")} clubSlug="beta" appBasePath="/clubs/beta/app" LinkComponent={LinkComponent} selectedSessionId="s1" /></QueryClientProvider>);
-    expect(screen.getByText("새 loader 기록")).toBeVisible();
-    expect(screen.queryByText("beta 기록")).not.toBeInTheDocument();
+  it("deduplicates and appends the note-session next page through the QueryClient controller", async () => {
+    let resolve!: (value: Response) => void;
+    const fetchMock = vi.fn(() => new Promise<Response>((done) => { resolve = done; }));
+    vi.stubGlobal("fetch", fetchMock);
+    mount({ ...notes(), sessions: { ...notes().sessions, nextCursor: "session-cursor" }, feed: { ...notes().feed, nextCursor: null } });
+    const loadMore = screen.getAllByRole("button", { name: "더 보기" })[0];
+    fireEvent.click(loadMore);
+    fireEvent.click(loadMore);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    resolve(new Response(JSON.stringify({ items: [{ sessionId: "s2", sessionNumber: 2, bookTitle: "다음 세션 책", date: "2026-08-09", questionCount: 0, oneLinerCount: 0, longReviewCount: 0, highlightCount: 0, totalCount: 0 }], nextCursor: null }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    expect((await screen.findAllByText("다음 세션 책")).length).toBe(2);
+  });
+
+  it("keeps note-session pagination retryable after rejection", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("busy", { status: 503 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ items: [{ sessionId: "s2", sessionNumber: 2, bookTitle: "복구 세션 책", date: "2026-08-09", questionCount: 0, oneLinerCount: 0, longReviewCount: 0, highlightCount: 0, totalCount: 0 }], nextCursor: null }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    mount({ ...notes(), sessions: { ...notes().sessions, nextCursor: "session-cursor" }, feed: { ...notes().feed, nextCursor: null } });
+    await user.click(screen.getAllByRole("button", { name: "더 보기" })[0]);
+    await user.click(await screen.findByRole("button", { name: "다시 시도" }));
+    expect((await screen.findAllByText("복구 세션 책")).length).toBe(2);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("guest public route errors", () => {
+  function mountPublicFailure(failure: { status: number; retryAfterSeconds?: number }) {
+    const loader = vi.fn(() => ({ guestRoute: true, guestFailure: failure }));
+    const router = createMemoryRouter([{ path: "/clubs/:clubSlug/app/notes", loader, element: <GuestScopedAppRoute LinkComponent={LinkComponent} /> }], { initialEntries: ["/clubs/alpha/app/notes"] });
+    render(<RouterProvider router={router} />);
+    return loader;
+  }
+
+  it("renders a zero-second Retry-After and revalidates a guest 429", async () => {
+    const loader = mountPublicFailure({ status: 429, retryAfterSeconds: 0 });
+    expect(await screen.findByText("0초 뒤에 다시 시도해 주세요.")).toBeVisible();
+    await userEvent.setup().click(screen.getByRole("button", { name: "다시 시도" }));
+    await waitFor(() => expect(loader).toHaveBeenCalledTimes(2));
+  });
+
+  it("renders a public 5xx failure and revalidates without member-only messaging", async () => {
+    const loader = mountPublicFailure({ status: 503 });
+    expect(await screen.findByText("잠시 후 다시 시도해 주세요.")).toBeVisible();
+    expect(screen.queryByText(/로그인|멤버/)).not.toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: "다시 시도" }));
+    await waitFor(() => expect(loader).toHaveBeenCalledTimes(2));
+  });
+
+  it.each([new Response("missing", { status: 404 }), new Error("programming failure")])("renders the normal error boundary for a rethrown guest child failure", async (failure) => {
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(anonymousAuth), { status: 200, headers: { "Content-Type": "application/json" } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(guestShell), { status: 200, headers: { "Content-Type": "application/json" } })));
+    const router = createMemoryRouter([{
+      path: "/clubs/:clubSlug/app/notes",
+      loader: scopedGuestRouteLoader(async () => async () => ({ member: true }), async () => { throw failure; }),
+      element: <GuestScopedAppRoute LinkComponent={LinkComponent} />,
+      errorElement: <p>normal route boundary</p>,
+    }], { initialEntries: ["/clubs/alpha/app/notes"] });
+    render(<RouterProvider router={router} />);
+    expect(await screen.findByText("normal route boundary")).toBeVisible();
   });
 });
 

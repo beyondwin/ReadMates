@@ -54,6 +54,12 @@ const inactiveAuth = {
   approvalState: "INACTIVE",
 };
 
+const activeAuth = {
+  ...inactiveAuth,
+  membershipStatus: "ACTIVE",
+  approvalState: "APPROVED",
+};
+
 function jsonResponse(value: unknown) {
   return new Response(JSON.stringify(value), { status: 200, headers: { "Content-Type": "application/json" } });
 }
@@ -143,6 +149,49 @@ describe("guest route loaders", () => {
 
     await expect(scopedGuestRouteLoader(protectedLoader, guestLoader)({ params: { clubSlug: "alpha" } } as never)).resolves.toEqual({ guestRoute: true, guestFailure: { status: 429 } });
     expect(protectedLoader).not.toHaveBeenCalled();
+  });
+
+  it("rethrows guest 404 and arbitrary child failures into the normal route boundary", async () => {
+    const protectedLoader = vi.fn(async () => async () => ({ member: true }));
+    for (const failure of [new Response("missing", { status: 404 }), new Error("programming failure")]) {
+      const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(anonymousAuth)).mockResolvedValueOnce(jsonResponse(shell));
+      vi.stubGlobal("fetch", fetchMock);
+      await expect(scopedGuestRouteLoader(protectedLoader, async () => { throw failure; })({ params: { clubSlug: "alpha" } } as never)).rejects.toBe(failure);
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("turns only a guest shell 429/5xx into public retry data and preserves auth failures", async () => {
+    const protectedLoader = vi.fn(async () => async () => ({ member: true }));
+    for (const [status, headers, expected] of [
+      [429, { "Retry-After": "0" }, { status: 429, retryAfterSeconds: 0 }],
+      [503, {}, { status: 503 }],
+    ] as const) {
+      const shellFailure = vi.fn().mockResolvedValueOnce(jsonResponse(anonymousAuth)).mockResolvedValueOnce(new Response("unavailable", { status, headers }));
+      vi.stubGlobal("fetch", shellFailure);
+      await expect(scopedGuestRouteLoader(protectedLoader)({ params: { clubSlug: "alpha" } } as never)).resolves.toEqual({ guestRoute: true, guestFailure: expected });
+      vi.unstubAllGlobals();
+    }
+
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(new Response("auth", { status: 503 })));
+    await expect(scopedGuestRouteLoader(protectedLoader)({ params: { clubSlug: "alpha" } } as never)).rejects.toBeInstanceOf(ReadmatesApiError);
+  });
+
+  it("rethrows a guest shell 404 instead of converting it into public retry data", async () => {
+    const shellNotFound = new Response("missing", { status: 404 });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(jsonResponse(anonymousAuth)).mockResolvedValueOnce(shellNotFound));
+
+    await expect(scopedGuestRouteLoader(async () => async () => ({ member: true }))({ params: { clubSlug: "alpha" } } as never)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("keeps an active member on the protected loader branch", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(activeAuth));
+    vi.stubGlobal("fetch", fetchMock);
+    const protectedLoader = vi.fn(async () => async () => ({ member: true }));
+
+    await expect(scopedGuestRouteLoader(protectedLoader)({ params: { clubSlug: "alpha" } } as never)).resolves.toEqual({ member: true });
+    expect(protectedLoader).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("deduplicates concurrent audience reads for the same navigation request only", async () => {

@@ -66,9 +66,9 @@ export function GuestScopedAppRoute({ LinkComponent }: { LinkComponent: Componen
   );
 }
 
-function GuestPublicRouteError({ failure }: { failure: { status?: number } }) {
+export function GuestPublicRouteError({ failure }: { failure: { status: number; retryAfterSeconds?: number } }) {
   const revalidator = useRevalidator();
-  return <main className="container" style={{ padding: "40px 0" }}><section className="surface-quiet" role="status" style={{ padding: 24 }}><h1 className="h3 editorial" style={{ margin: 0 }}>공개 기록을 불러오지 못했습니다.</h1><p className="small" style={{ color: "var(--text-2)" }}>{failure.status === 429 ? "요청이 많습니다. 잠시 뒤에 다시 시도해 주세요." : "잠시 후 다시 시도해 주세요."}</p><button type="button" className="btn btn-quiet" onClick={() => revalidator.revalidate()} disabled={revalidator.state !== "idle"}>{revalidator.state === "idle" ? "다시 시도" : "불러오는 중"}</button></section></main>;
+  return <main className="container" style={{ padding: "40px 0" }}><section className="surface-quiet" role="status" style={{ padding: 24 }}><h1 className="h3 editorial" style={{ margin: 0 }}>공개 기록을 불러오지 못했습니다.</h1><p className="small" style={{ color: "var(--text-2)" }}>{failure.status === 429 ? failure.retryAfterSeconds !== undefined ? `${failure.retryAfterSeconds}초 뒤에 다시 시도해 주세요.` : "요청이 많습니다. 잠시 뒤에 다시 시도해 주세요." : "잠시 후 다시 시도해 주세요."}</p><button type="button" className="btn btn-quiet" onClick={() => revalidator.revalidate()} disabled={revalidator.state !== "idle"}>{revalidator.state === "idle" ? "다시 시도" : "불러오는 중"}</button></section></main>;
 }
 
 function guestBrowseContent(

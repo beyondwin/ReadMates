@@ -18,7 +18,7 @@ export type GuestScopedRouteData = {
   guestData?: unknown;
 };
 
-export type GuestPublicRouteFailure = { status?: number };
+export type GuestPublicRouteFailure = { status: number; retryAfterSeconds?: number };
 export type GuestScopedRouteFailureData = GuestScopedRouteData & { guestFailure: GuestPublicRouteFailure };
 
 const pendingAudienceAccesses = new WeakMap<Request, Promise<ClubAppAccess>>();
@@ -40,9 +40,21 @@ async function loadClubAppAudienceForRequest(args?: Pick<LoaderFunctionArgs, "pa
     return { audience, auth, club: null };
   }
 
-  const club = await fetchGuestBrowseShell(clubSlug);
+  let club: GuestBrowseShell;
+  try {
+    club = await fetchGuestBrowseShell(clubSlug);
+  } catch (error) {
+    if (guestFailure(error)) {
+      throw new GuestShellBrowseError(error);
+    }
+    throw error;
+  }
 
   return { audience, auth, club };
+}
+
+class GuestShellBrowseError {
+  constructor(readonly cause: unknown) {}
 }
 
 export function loadClubAppAudience(args?: Pick<LoaderFunctionArgs, "params" | "request">): Promise<ClubAppAccess> {
@@ -74,14 +86,25 @@ export function scopedGuestRouteLoader(
   loadGuestLoader?: LoaderFunction,
 ) {
   return async function guardedScopedRouteLoader(args: LoaderFunctionArgs) {
-    const access = await loadClubAppAudience(args);
+    let access: ClubAppAccess;
+    try {
+      access = await loadClubAppAudience(args);
+    } catch (error) {
+      if (error instanceof GuestShellBrowseError) {
+        const failure = guestFailure(error.cause);
+        if (failure) return { guestRoute: true, guestFailure: failure } satisfies GuestScopedRouteFailureData;
+      }
+      throw error;
+    }
 
     if (access.audience === "GUEST") {
       let guestData: unknown;
       try {
         guestData = loadGuestLoader ? await loadGuestLoader(args) : undefined;
       } catch (error) {
-        return { guestRoute: true, guestFailure: guestFailure(error) } satisfies GuestScopedRouteFailureData;
+        const failure = guestFailure(error);
+        if (failure) return { guestRoute: true, guestFailure: failure } satisfies GuestScopedRouteFailureData;
+        throw error;
       }
       return guestData === undefined
         ? ({ guestRoute: true } satisfies GuestScopedRouteData)
@@ -93,10 +116,18 @@ export function scopedGuestRouteLoader(
   };
 }
 
-function guestFailure(error: unknown): GuestPublicRouteFailure {
-  if (isReadmatesApiError(error)) return { status: error.status };
-  if (error instanceof Response) return { status: error.status };
-  return {};
+function guestFailure(error: unknown): GuestPublicRouteFailure | null {
+  const status = isReadmatesApiError(error) ? error.status : error instanceof Response ? error.status : null;
+  if (status !== 429 && (status === null || status < 500 || status >= 600)) return null;
+  const retryAfter = isReadmatesApiError(error) ? retryAfterSeconds(error.response.headers.get("Retry-After")) : error instanceof Response ? retryAfterSeconds(error.headers.get("Retry-After")) : undefined;
+  return { status, ...(retryAfter !== undefined ? { retryAfterSeconds: retryAfter } : {}) };
+}
+
+function retryAfterSeconds(value: string | null, now = Date.now()) {
+  if (!value) return undefined;
+  const delta = Number(value);
+  const seconds = Number.isFinite(delta) && delta >= 0 ? Math.ceil(delta) : Math.ceil((Date.parse(value) - now) / 1000);
+  return Number.isFinite(seconds) && seconds >= 0 ? Math.min(seconds, 3600) : undefined;
 }
 
 export function isGuestScopedRouteData(data: unknown): data is GuestScopedRouteData {
