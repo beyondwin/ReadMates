@@ -3792,7 +3792,7 @@ a.rm-recent-record__destination:hover {
 }
 
 .public-invite-guidance__note {
-  font-size: 11.5px;
+  font-size: var(--type-size-supporting);
   line-height: 1.35;
 }
 
@@ -4085,7 +4085,7 @@ a.rm-recent-record__destination:hover {
   display: flex;
   gap: 14px;
   color: var(--text-3);
-  font-size: 13px;
+  font-size: var(--type-size-supporting);
   white-space: nowrap;
 }
 
@@ -4166,7 +4166,8 @@ a.rm-recent-record__destination:hover {
 
 .public-session-meta dt {
   color: var(--text-3);
-  font-size: 11px;
+  font-size: var(--type-size-label);
+  font-weight: 600;
 }
 
 .public-session-meta dd {
@@ -5289,18 +5290,30 @@ a.rm-recent-record__destination:hover {
   }
 }
 
-.public-home .public-latest-record .reading-editorial,
-.public-home .public-note-row .reading-editorial,
-.public-home .public-archive-row .reading-editorial {
-  line-height: 1.65;
+.public-reading-copy,
+.public-session-summary-text,
+.public-note-highlight-row__quote,
+.public-note-oneliner-card__quote {
+  font-family: var(--f-sans);
+  line-height: var(--type-leading-body);
 }
 
-@media (max-width: 768px) {
-  .public-home .public-latest-record .reading-editorial,
-  .public-home .public-note-row .reading-editorial,
-  .public-home .public-archive-row .reading-editorial {
-    line-height: 1.7;
-  }
+.public-latest-record__body .h2,
+.public-archive-row__title,
+.quote-card__quote,
+.public-record-index-row__title,
+.public-record-index-row__summary,
+.public-session-summary-text,
+.public-note-highlight-row__quote,
+.public-note-oneliner-card__quote {
+  overflow-wrap: anywhere;
+}
+
+.public-home .public-latest-record__body .h2,
+.public-archive-row__title,
+.quote-card__quote,
+.public-record-index-row__title {
+  line-height: 1.61;
 }
 
 @media (prefers-reduced-motion: reduce) {

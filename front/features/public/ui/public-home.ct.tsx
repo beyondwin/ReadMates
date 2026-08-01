@@ -38,8 +38,8 @@ for (const viewport of [
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     const component = await mount(<PublicHome data={publicHomeView} />);
     const latestRecord = component.locator(".public-latest-record");
-    const readingTitle = latestRecord.locator(".reading-editorial").first();
-    const readingExcerpt = latestRecord.locator(".body.reading-editorial");
+    const latestTitle = latestRecord.locator(".h2.editorial");
+    const latestExcerpt = latestRecord.locator(".body");
     const archiveTitle = component.locator(".public-archive-row__title").first();
     const summaryQuotation = component.locator(".quote-card__quote").first();
     const globalHeading = component.getByRole("heading", { name: "읽는사이", level: 1 });
@@ -58,11 +58,10 @@ for (const viewport of [
         right: bounds.right,
       };
     });
-    const expectedReadingRatio = viewport.name === "mobile" ? 1.7 : 1.65;
-    const readingRoleMetrics = await Promise.all(
+    const publicCopyMetrics = await Promise.all(
       [
-        ["latest title", readingTitle],
-        ["latest excerpt", readingExcerpt],
+        ["latest title", latestTitle],
+        ["latest excerpt", latestExcerpt],
         ["archive title", archiveTitle],
         ["summary quotation", summaryQuotation],
       ].map(async ([name, locator]) => ({
@@ -72,6 +71,7 @@ for (const viewport of [
           const style = getComputedStyle(node);
           return {
             fontFamily: style.fontFamily,
+            fontSize: Number.parseFloat(style.fontSize),
             lineHeightRatio: Number.parseFloat(style.lineHeight) / Number.parseFloat(style.fontSize),
             clientWidth: node.clientWidth,
             scrollWidth: node.scrollWidth,
@@ -88,9 +88,11 @@ for (const viewport of [
     expect(recordStyle.paddingRight).toBe("0px");
     expect(recordStyle.left).toBeGreaterThanOrEqual(0);
     expect(recordStyle.right).toBeLessThanOrEqual(viewport.width);
-    for (const metrics of readingRoleMetrics) {
-      expect(metrics.fontFamily, metrics.name).toContain("Iowan Old Style");
-      expect.soft(metrics.lineHeightRatio, metrics.name).toBeCloseTo(expectedReadingRatio, 2);
+    for (const metrics of publicCopyMetrics) {
+      expect(metrics.fontFamily, metrics.name).toContain("Pretendard");
+      expect(metrics.fontFamily, metrics.name).not.toContain("Iowan Old Style");
+      expect(metrics.fontSize, metrics.name).toBeGreaterThanOrEqual(16);
+      expect(metrics.lineHeightRatio, metrics.name).toBeGreaterThanOrEqual(1.6);
       expect(metrics.scrollWidth, metrics.name).toBeLessThanOrEqual(metrics.clientWidth);
     }
     await expect(globalHeading).not.toHaveClass(/reading-editorial/);

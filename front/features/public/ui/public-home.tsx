@@ -69,13 +69,13 @@ function LatestRecordFeature({ publicBasePath, session }: { publicBasePath: stri
       </div>
       <div className="public-latest-record__body">
         <div className="eyebrow">최근 공개 기록 · No.{session.sessionNumber}</div>
-        <h2 className="h2 editorial reading-editorial" style={{ margin: "10px 0 0" }}>
+        <h2 className="h2 editorial" style={{ margin: "10px 0 0" }}>
           {display.title}
         </h2>
         <p className="small" style={{ margin: "6px 0 0", color: "var(--text-2)" }}>
           {display.author} · {display.date}
         </p>
-        <p className="body reading-editorial" style={{ margin: "18px 0 0", color: "var(--text-2)" }}>
+        <p className="body public-reading-copy" style={{ margin: "18px 0 0", color: "var(--text-2)" }}>
           {display.summary}
         </p>
         <RecordBadges session={session} />
@@ -98,7 +98,7 @@ function ArchiveRecordRow({ publicBasePath, session }: { publicBasePath: string;
         decorative
       />
       <span className="public-archive-row__main">
-        <span className="editorial reading-editorial public-archive-row__title">{display.title}</span>
+        <span className="editorial public-archive-row__title">{display.title}</span>
         <span className="small public-archive-row__meta">
           {display.author} · {display.date}
         </span>
@@ -125,7 +125,7 @@ function SummaryExcerpt({ publicBasePath, session }: { publicBasePath: string; s
         decorative
       />
       <span>
-        <span className="quote-card__quote editorial reading-editorial">{display.summary}</span>
+        <span className="quote-card__quote editorial">{display.summary}</span>
         <span className="small" style={{ display: "block", marginTop: 10, color: "var(--text-3)" }}>
           {display.title} · {display.author}
         </span>

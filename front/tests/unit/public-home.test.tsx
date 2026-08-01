@@ -62,10 +62,14 @@ describe("PublicHome", () => {
       container.querySelectorAll('a.public-latest-record[href="/sessions/00000000-0000-0000-0000-000000000306"]'),
     ).toHaveLength(1);
     expect(container.querySelector(".public-latest-record")).not.toHaveClass("rm-document-panel");
-    expect(container.querySelector(".public-latest-record .h2")).toHaveClass("reading-editorial");
-    expect(container.querySelector(".public-latest-record .body")).toHaveClass("reading-editorial");
-    expect(container.querySelector(".public-archive-row__title")).toHaveClass("reading-editorial");
-    expect(container.querySelector(".quote-card__quote")).toHaveClass("reading-editorial");
+    expect(container.querySelector(".public-latest-record .h2")).toHaveClass("editorial");
+    expect(container.querySelector(".public-latest-record .h2")).not.toHaveClass("reading-editorial");
+    expect(container.querySelector(".public-latest-record .body")).toHaveClass("body");
+    expect(container.querySelector(".public-latest-record .body")).not.toHaveClass("reading-editorial");
+    expect(container.querySelector(".public-archive-row__title")).toHaveClass("editorial");
+    expect(container.querySelector(".public-archive-row__title")).not.toHaveClass("reading-editorial");
+    expect(container.querySelector(".quote-card__quote")).toHaveClass("editorial");
+    expect(container.querySelector(".quote-card__quote")).not.toHaveClass("reading-editorial");
     expect(
       screen.getByText("책을 읽고 각자 나누고 싶은 질문을 준비합니다."),
     ).not.toHaveClass("reading-editorial");

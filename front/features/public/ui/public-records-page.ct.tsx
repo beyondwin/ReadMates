@@ -64,10 +64,10 @@ test("PublicRecordsPage renders public record index", async ({ mount }) => {
 });
 
 for (const viewport of [
-  { name: "desktop", width: 1200, expectedLineHeight: 1.65 },
-  { name: "mobile", width: 320, expectedLineHeight: 1.7 },
+  { name: "desktop", width: 1200 },
+  { name: "mobile", width: 320 },
 ]) {
-  test(`PublicRecordsPage keeps reading typography scoped on ${viewport.name}`, async ({ mount, page }) => {
+  test(`PublicRecordsPage keeps public record typography readable on ${viewport.name}`, async ({ mount, page }) => {
     await page.setViewportSize({ width: viewport.width, height: 800 });
     const component = await mount(
       <PublicRecordsPage
@@ -81,20 +81,35 @@ for (const viewport of [
     const summary = component.locator(".public-record-index-row__summary").first();
     const interfaceHeading = component.getByRole("heading", { name: "발행된 기록" });
 
-    await expect(title).toHaveClass(/reading-editorial/);
-    await expect(summary).toHaveClass(/reading-editorial/);
+    await expect(title).toHaveClass(/editorial/);
+    await expect(title).not.toHaveClass(/reading-editorial/);
+    await expect(summary).toHaveClass(/body/);
+    await expect(summary).not.toHaveClass(/reading-editorial/);
     await expect(interfaceHeading).not.toHaveClass(/reading-editorial/);
 
-    const typography = await title.evaluate((element) => {
-      const style = getComputedStyle(element);
-      return {
-        fontFamily: style.fontFamily,
-        fontSize: Number.parseFloat(style.fontSize),
-        lineHeight: Number.parseFloat(style.lineHeight),
-      };
-    });
-    expect(typography.fontFamily).toContain("ui-serif");
-    expect(typography.lineHeight / typography.fontSize).toBeCloseTo(viewport.expectedLineHeight, 1);
+    const publicCopyMetrics = await Promise.all(
+      [["title", title], ["summary", summary]].map(async ([name, locator]) => ({
+        name,
+        ...(await locator.evaluate((element) => {
+          const node = element as HTMLElement;
+          const style = getComputedStyle(node);
+          return {
+            fontFamily: style.fontFamily,
+            fontSize: Number.parseFloat(style.fontSize),
+            lineHeightRatio: Number.parseFloat(style.lineHeight) / Number.parseFloat(style.fontSize),
+            clientWidth: node.clientWidth,
+            scrollWidth: node.scrollWidth,
+          };
+        })),
+      })),
+    );
+    for (const metrics of publicCopyMetrics) {
+      expect(metrics.fontFamily, metrics.name).toContain("Pretendard");
+      expect(metrics.fontFamily, metrics.name).not.toContain("Iowan Old Style");
+      expect(metrics.fontSize, metrics.name).toBeGreaterThanOrEqual(16);
+      expect(metrics.lineHeightRatio, metrics.name).toBeGreaterThanOrEqual(1.6);
+      expect(metrics.scrollWidth, metrics.name).toBeLessThanOrEqual(metrics.clientWidth);
+    }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 }

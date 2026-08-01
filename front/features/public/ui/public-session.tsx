@@ -30,7 +30,7 @@ export default function PublicSession({ session, returnTarget = publicRecordsRet
               <div className="eyebrow" style={{ marginBottom: 14 }}>
                 공개 기록 · No.{session.sessionNumber} · {dateLabel}
               </div>
-              <h1 className="h1 editorial reading-editorial" style={{ margin: 0 }}>
+              <h1 className="h1 editorial" style={{ margin: 0 }}>
                 {bookTitle}
               </h1>
               <div className="small" style={{ marginTop: 10 }}>
@@ -66,7 +66,7 @@ export default function PublicSession({ session, returnTarget = publicRecordsRet
                 </div>
               </dl>
             </header>
-            <p className="public-session-summary-text editorial reading-editorial">{summary}</p>
+            <p className="public-session-summary-text editorial">{summary}</p>
           </article>
         </div>
       </section>
@@ -91,7 +91,7 @@ export default function PublicSession({ session, returnTarget = publicRecordsRet
 
                 return (
                   <article className="public-note-highlight-row" key={`${index}-${highlight.sortOrder}-${highlight.authorName ?? "readmates"}-${highlight.text}`}>
-                    <p className="public-note-highlight-row__quote editorial reading-editorial">{text}</p>
+                    <p className="public-note-highlight-row__quote editorial">{text}</p>
                     <div className="row public-note-author-row">
                       <AvatarChip avatarKey={highlight.avatarKey} name={authorName} label="" size={20} />
                       <span className="small">{authorName}</span>
@@ -134,7 +134,7 @@ export default function PublicSession({ session, returnTarget = publicRecordsRet
 
                 return (
                   <article className="public-note-oneliner-card" key={`${index}-${oneLiner.authorName}-${oneLiner.text}`}>
-                    <p className="public-note-oneliner-card__quote editorial reading-editorial">{text}</p>
+                    <p className="public-note-oneliner-card__quote editorial">{text}</p>
                     <div className="row public-note-author-row">
                       <AvatarChip avatarKey={oneLiner.avatarKey} name={authorName} label="" size={22} />
                       <span className="small">{authorName}</span>
