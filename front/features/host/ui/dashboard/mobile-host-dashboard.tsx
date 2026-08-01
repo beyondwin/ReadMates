@@ -117,6 +117,11 @@ export function MobileHostDashboard({
     recordAttention,
   });
   const ledgerMetrics = getHostDashboardLedgerMetrics(data, recordAttention);
+  const ledgerTotal = ledgerMetrics.reduce((sum, metric) => sum + metric.value, 0);
+  const firstLedgerItem = ledgerMetrics.find((metric) => metric.value > 0);
+  const ledgerSummary = firstLedgerItem
+    ? `${firstLedgerItem.label} ${firstLedgerItem.value}건 · ${firstLedgerItem.stateLabel}`
+    : "확인할 항목 없음";
   const checklistView = getHostDashboardChecklistView(checklist);
   const goingCount = session?.attendees.filter((member) => member.rsvpStatus === "GOING").length ?? 0;
   const noResponseCount = session?.attendees.filter((member) => member.rsvpStatus === "NO_RESPONSE").length ?? 0;
@@ -231,9 +236,10 @@ export function MobileHostDashboard({
       <details className="m-sec rm-host-mobile-disclosure">
         <summary>
           <span>
-            <strong>처리 대기 원장</strong>
-            <small>상태 {ledgerMetrics.reduce((sum, metric) => sum + metric.value, 0)}건</small>
+            <strong>확인할 운영 항목</strong>
+            <small>{ledgerSummary}</small>
           </span>
+          <span className="badge rm-host-mobile-disclosure__count">{ledgerTotal}건</span>
         </summary>
         <dl className="rm-host-mobile-ledger">
           {ledgerMetrics.map((metric) => (
@@ -264,9 +270,9 @@ export function MobileHostDashboard({
 
       <section className="m-sec rm-host-mobile-flow" aria-labelledby="host-mobile-flow-title">
         <div className="m-eyebrow-row">
-          <h2 id="host-mobile-flow-title">다음 세션과 운영 흐름</h2>
+          <h2 id="host-mobile-flow-title">예정 세션</h2>
           <LinkComponent to={newSessionHref} className="tiny">
-            문서 만들기
+            세션 문서 만들기
           </LinkComponent>
         </div>
         {upcomingSessions.length > 0 ? (
@@ -297,6 +303,7 @@ export function MobileHostDashboard({
           </button>
         ) : null}
         {upcomingMessage ? <UpcomingActionMessage message={upcomingMessage} mobile /> : null}
+        <h3 className="rm-host-mobile-flow__subheading">운영 흐름</h3>
         <ol className="rm-host-mobile-flow__steps" aria-label="현재 운영 단계">
           {checklistView.highlighted.map((item) => (
             <MobileChecklistRow key={item.id} item={item} />

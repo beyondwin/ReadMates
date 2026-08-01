@@ -770,13 +770,14 @@ describe("HostDashboard", () => {
     expect(within(desktopUpcomingRow as HTMLElement).getByText("비공개")).toBeInTheDocument();
     expect(within(desktopUpcomingRow as HTMLElement).getByRole("button", { name: /멤버 공개/ })).toHaveTextContent("공개");
     expect(desktop.getByRole("button", { name: /현재로 시작/ })).toBeInTheDocument();
-    expect(mobile.getByRole("heading", { name: "다음 세션과 운영 흐름" })).toBeInTheDocument();
+    expect(mobile.getByRole("heading", { name: "예정 세션", exact: true })).toBeInTheDocument();
+    expect(mobile.getByRole("heading", { name: "운영 흐름", exact: true })).toBeInTheDocument();
     expect(mobile.getByText("다음 책")).toBeInTheDocument();
     const mobileUpcomingCard = mobile.getByText("다음 책").closest(".m-card-quiet");
     expect(mobileUpcomingCard).not.toBeNull();
     expect(within(mobileUpcomingCard as HTMLElement).getByText("공개 범위")).toBeInTheDocument();
     expect(within(mobileUpcomingCard as HTMLElement).getByText("비공개")).toBeInTheDocument();
-    expect(within(mobileUpcomingCard as HTMLElement).getByRole("button", { name: /멤버 공개/ })).toHaveTextContent("공개");
+    expect(within(mobileUpcomingCard as HTMLElement).getByRole("button", { name: /멤버 공개/ })).toHaveTextContent("멤버 공개로 변경");
   });
 
   it("loads and appends more upcoming sessions from the host sessions cursor", async () => {
@@ -1048,7 +1049,7 @@ describe("HostDashboard", () => {
     const desktop = getDesktopView(container);
     const mobile = getMobileView(container);
     const desktopUpcoming = desktop.getByRole("heading", { name: "앞으로 읽을 세션" }).closest("section");
-    const mobileUpcoming = mobile.getByRole("heading", { name: "다음 세션과 운영 흐름" }).closest("section");
+    const mobileUpcoming = mobile.getByRole("heading", { name: "예정 세션", exact: true }).closest("section");
 
     expect(desktop.queryByRole("button", { name: /현재 세션 있음/ })).not.toBeInTheDocument();
     expect(mobile.queryByRole("button", { name: /현재 세션 있음/ })).not.toBeInTheDocument();
@@ -1084,7 +1085,7 @@ describe("HostDashboard", () => {
     expect(within(desktopRow as HTMLElement).queryByText("예정 세션")).not.toBeInTheDocument();
     expect(within(desktopRow as HTMLElement).queryByText("예정")).not.toBeInTheDocument();
     expect(within(mobileCard as HTMLElement).getByRole("group", { name: "No.08 · D-53" })).toBeInTheDocument();
-    expect(within(mobileCard as HTMLElement).queryByText("예정")).not.toBeInTheDocument();
+    expect(within(mobileCard as HTMLElement).getByText("예정")).toHaveClass("rm-host-upcoming-mobile__timing--upcoming");
   });
 
   it("shows a compact error when an upcoming action fails", async () => {
@@ -1118,12 +1119,12 @@ describe("HostDashboard", () => {
     expect(nextBookCard).not.toBeNull();
     const visibilityButton = within(nextBookCard as HTMLElement).getByRole("button", { name: /멤버 공개/ });
     const openButton = within(nextBookCard as HTMLElement).getByRole("button", { name: /현재로 시작/ });
-    const editLink = within(nextBookCard as HTMLElement).getByRole("link", { name: "편집 · 다음 책" });
-    expect(openButton).toHaveStyle({ minWidth: "64px", paddingLeft: "10px", paddingRight: "10px" });
-    expect(openButton.closest(".row")).toBe(visibilityButton.closest(".row"));
+    const editLink = within(nextBookCard as HTMLElement).getByRole("link", { name: "날짜 수정 · 다음 책" });
+    const actionGroup = openButton.closest(".rm-host-upcoming-mobile__actions");
+    expect(actionGroup).toBe(visibilityButton.closest(".rm-host-upcoming-mobile__actions"));
     expect(visibilityButton).toBeInTheDocument();
-    expect(visibilityButton).toHaveStyle({ minWidth: "64px", paddingLeft: "10px", paddingRight: "10px" });
-    expect(editLink).toHaveStyle({ minWidth: "64px", paddingLeft: "10px", paddingRight: "10px" });
+    expect(editLink).toHaveClass("btn-primary");
+    expect(actionGroup?.querySelectorAll(".btn-primary")).toHaveLength(1);
     expect(editLink).toHaveAttribute("href", "/app/host/sessions/session-8/edit");
   });
 
@@ -1153,7 +1154,7 @@ describe("HostDashboard", () => {
     expect(desktop.getByText("열린 세션이 없습니다")).toBeInTheDocument();
     expect(mobile.getByText("열린 세션 없음")).toBeInTheDocument();
     expect(desktop.getByRole("heading", { name: "처리 대기 원장" })).toBeInTheDocument();
-    expect(mobile.getByText("상태 0건")).toBeInTheDocument();
+    expect(mobile.getByText("확인할 항목 없음")).toBeInTheDocument();
     expect(desktop.getAllByText("안정").length).toBeGreaterThanOrEqual(4);
     const desktopNewSessionLinks = desktop.getAllByRole("link", { name: "세션 문서 만들기" });
     const mobileNewSessionLinks = mobile.getAllByRole("link", { name: "세션 문서 만들기" });
@@ -1164,7 +1165,8 @@ describe("HostDashboard", () => {
     expect(desktop.getByText("책, 일정, 장소를 등록하면 멤버의 RSVP와 질문 작성 흐름이 열립니다.")).toBeInTheDocument();
     expect(mobile.getByText("책, 일정, 장소를 등록하면 멤버의 RSVP와 질문 작성 흐름이 열립니다.")).toBeInTheDocument();
     expect(desktop.getByRole("heading", { name: "다음 세션과 운영 흐름" })).toBeInTheDocument();
-    expect(mobile.getByRole("heading", { name: "다음 세션과 운영 흐름" })).toBeInTheDocument();
+    expect(mobile.getByRole("heading", { name: "예정 세션", exact: true })).toBeInTheDocument();
+    expect(mobile.getByRole("heading", { name: "운영 흐름", exact: true })).toBeInTheDocument();
   });
 
   it("keeps host dashboard CTAs inside the scoped app route", () => {
@@ -1217,8 +1219,9 @@ describe("HostDashboard", () => {
     expect(mobile.getByText(/호스트님, 우선 행동부터 확인하세요/)).toBeInTheDocument();
     expect(mobile.getByText("모임 운영")).toBeInTheDocument();
     expect(mobile.getByRole("heading", { name: "지금 처리할 일" })).toBeInTheDocument();
-    expect(mobile.getByText("처리 대기 원장")).toBeInTheDocument();
-    expect(mobile.getByRole("heading", { name: "다음 세션과 운영 흐름" })).toBeInTheDocument();
+    expect(mobile.getByText("확인할 운영 항목")).toBeInTheDocument();
+    expect(mobile.getByRole("heading", { name: "예정 세션", exact: true })).toBeInTheDocument();
+    expect(mobile.getByRole("heading", { name: "운영 흐름", exact: true })).toBeInTheDocument();
     expect(mobile.getByText("운영 도구")).toBeInTheDocument();
     expect(desktop.getByText("RSVP 미응답")).toBeInTheDocument();
     expect(desktop.getByText("진행률 미작성")).toBeInTheDocument();
@@ -1406,8 +1409,9 @@ describe("HostDashboard", () => {
     const orderedLabels = [
       "지금 처리할 일",
       "현재 세션",
-      "처리 대기 원장",
-      "다음 세션과 운영 흐름",
+      "확인할 운영 항목",
+      "예정 세션",
+      "운영 흐름",
       "운영 도구",
     ];
     const html = container.querySelector(".rm-host-dashboard-mobile")?.textContent ?? "";
@@ -1449,7 +1453,7 @@ describe("HostDashboard", () => {
     const disclosures = container.querySelectorAll(
       ".rm-host-dashboard-mobile details.rm-host-mobile-disclosure",
     );
-    const ledger = mobile.getByText("처리 대기 원장").closest("details");
+    const ledger = mobile.getByText("확인할 운영 항목").closest("details");
     const tools = mobile.getByText("운영 도구").closest("details");
 
     expect(disclosures).toHaveLength(2);

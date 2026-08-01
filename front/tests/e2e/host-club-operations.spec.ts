@@ -92,7 +92,9 @@ async function expectHostMobilePriorityLedgerPublicSafe(page: Page): Promise<voi
   await expect(mobileDashboard.getByRole("heading", { name: "모임 운영" })).toBeVisible();
   await expect(mobileDashboard.getByRole("heading", { name: "지금 처리할 일" })).toBeVisible();
   await expect(mobileDashboard.getByRole("heading", { name: "현재 세션", exact: true })).toBeVisible();
-  await expect(mobileDashboard.getByText("처리 대기 원장")).toBeVisible();
+  await expect(mobileDashboard.getByText("확인할 운영 항목")).toBeVisible();
+  await expect(mobileDashboard.getByRole("heading", { name: "예정 세션", exact: true })).toBeVisible();
+  await expect(mobileDashboard.getByRole("heading", { name: "운영 흐름", exact: true })).toBeVisible();
   await expect(mobileDashboard.getByText("운영 도구", { exact: true })).toBeVisible();
   await expectNoHostPrivateSentinels(page);
 }

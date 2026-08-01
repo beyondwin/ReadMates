@@ -1258,6 +1258,61 @@
 .mobile-only .rm-host-dashboard-mobile__quick-actions > button {
   border-radius: 0 !important;
 }
+.mobile-only.rm-host-dashboard-mobile > .m-sec + .m-sec {
+  /* Inherited 20px section padding + 8px = 28px visual rhythm. */
+  margin-top: 8px;
+}
+.mobile-only .rm-host-mobile-disclosure > summary {
+  position: relative;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  list-style: none;
+}
+.mobile-only .rm-host-mobile-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.mobile-only .rm-host-mobile-disclosure > summary::after {
+  content: "+";
+  flex: 0 0 auto;
+  color: var(--text-3);
+  font-family: var(--f-mono);
+}
+.mobile-only .rm-host-mobile-disclosure[open] > summary::after {
+  content: "−";
+}
+.mobile-only .rm-host-mobile-disclosure__count {
+  margin-left: auto;
+}
+.mobile-only .rm-host-mobile-flow__subheading {
+  margin: 24px 0 0;
+  font-size: 14px;
+}
+.mobile-only .rm-host-upcoming-mobile__date-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+}
+.mobile-only .rm-host-upcoming-mobile__timing--overdue,
+.mobile-only .rm-host-upcoming-mobile__timing--unknown {
+  color: var(--danger);
+}
+.mobile-only .rm-host-upcoming-mobile__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.mobile-only .rm-host-upcoming-mobile__actions .btn {
+  flex: 1 1 0;
+  min-height: 44px;
+  white-space: normal;
+}
+.mobile-only .rm-host-upcoming-mobile__actions .btn-primary {
+  flex-basis: 100%;
+}
 
 @media (max-width: 768px) {
   .rm-host-members-page__body {

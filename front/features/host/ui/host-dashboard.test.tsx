@@ -232,9 +232,30 @@ describe("HostDashboard", () => {
     );
 
     const mobileText = container.querySelector(".rm-host-dashboard-mobile")?.textContent ?? "";
+    const mobile = container.querySelector(".rm-host-dashboard-mobile") as HTMLElement;
     expect(mobileText.indexOf("지금 처리할 일")).toBeGreaterThanOrEqual(0);
     expect(mobileText.indexOf("현재 세션")).toBeGreaterThanOrEqual(0);
     expect(mobileText.indexOf("지금 처리할 일")).toBeLessThan(mobileText.indexOf("현재 세션"));
+    expect(within(mobile).getByText("확인할 운영 항목")).toBeInTheDocument();
+    expect(within(mobile).getByText("예정 세션", { exact: true })).toBeInTheDocument();
+    expect(within(mobile).getByRole("heading", { name: "운영 흐름", level: 3 })).toBeInTheDocument();
+    expect(within(mobile).queryByText("다음 세션과 운영 흐름")).not.toBeInTheDocument();
+  });
+
+  it("summarizes the highest mobile ledger item in the disclosure", () => {
+    const { container } = render(
+      <HostDashboard
+        data={{ ...dashboard, rsvpPending: 4, checkinMissing: 2 }}
+        current={currentSession}
+        hostSessions={hostSessions}
+        actions={actions}
+      />,
+    );
+
+    const mobile = container.querySelector(".rm-host-dashboard-mobile") as HTMLElement;
+    const disclosure = within(mobile).getByText("확인할 운영 항목").closest("details") as HTMLElement;
+    expect(within(disclosure).getByText("6건")).toBeInTheDocument();
+    expect(within(disclosure).getByText(/RSVP.*4건/)).toBeInTheDocument();
   });
 
   it("groups mobile current-session content and removes duplicate attendance copy", () => {
