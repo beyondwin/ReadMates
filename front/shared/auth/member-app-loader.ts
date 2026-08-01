@@ -4,7 +4,7 @@ import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { loginPathForReturnTo } from "@/shared/auth/login-return";
 import { canUseMemberApp } from "@/shared/auth/member-app-access";
 
-type ClubScopedLoaderArgs = {
+export type ClubScopedLoaderArgs = {
   clubSlug?: string;
   params?: {
     clubSlug?: string;

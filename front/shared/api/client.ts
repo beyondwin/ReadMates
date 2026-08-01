@@ -95,3 +95,34 @@ export async function readmatesFetch<T>(path: string, init?: RequestInit, contex
 
   return parseReadmatesResponse<T>(response);
 }
+
+/**
+ * Fetches an anonymous-safe endpoint without treating a 401 as a session-expiry
+ * redirect. Public callers must provide their own path context explicitly.
+ */
+export async function readmatesPublicFetchResponse(path: string, init?: RequestInit): Promise<Response> {
+  const headers = new Headers(init?.headers);
+  const bodyIsFormData = typeof FormData !== "undefined" && init?.body instanceof FormData;
+
+  if (!headers.has("Content-Type") && !bodyIsFormData) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  return fetch(`/api/bff${readmatesApiPath(path, { clubSlug: undefined })}`, {
+    ...init,
+    headers,
+    cache: "no-store",
+  });
+}
+
+export async function readmatesPublicFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await readmatesPublicFetchResponse(path, init);
+
+  if (!response.ok) {
+    const error = await apiErrorFromResponse(response);
+    recordFrontendApiFailure({ path, status: error.status, errorCode: error.code });
+    throw error;
+  }
+
+  return parseReadmatesResponse<T>(response);
+}
