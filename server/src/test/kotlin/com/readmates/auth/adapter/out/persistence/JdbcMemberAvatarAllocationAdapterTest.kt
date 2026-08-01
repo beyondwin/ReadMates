@@ -133,6 +133,40 @@ class JdbcMemberAvatarAllocationAdapterTest(
         )
     }
 
+    @Test
+    fun `parallel allocations read current memberships after repeatable read snapshots exist`() {
+        val snapshotsReady = CountDownLatch(2)
+        val startAllocations = CountDownLatch(1)
+        val results = ConcurrentLinkedQueue<BookClubAvatarKey>()
+        val futures =
+            listOf(FIRST_USER_ID, SECOND_USER_ID).map { userId ->
+                executor.submit {
+                    transactionTemplate.executeWithoutResult {
+                        jdbcTemplate.queryForObject(
+                            "select count(*) from memberships where club_id = ?",
+                            Int::class.java,
+                            CLUB_ID.dbString(),
+                        )
+                        snapshotsReady.countDown()
+                        check(startAllocations.await(5, TimeUnit.SECONDS))
+
+                        val key = adapter.allocate(CLUB_ID, userId)
+                        persistMembership(userId, MembershipStatus.ACTIVE, key)
+                        results += key
+                    }
+                }
+            }
+
+        check(snapshotsReady.await(5, TimeUnit.SECONDS))
+        startAllocations.countDown()
+        futures.forEach { it.get(10, TimeUnit.SECONDS) }
+
+        assertThat(results).containsExactlyInAnyOrder(
+            BookClubAvatarKey.READING_LAMP,
+            BookClubAvatarKey.OPEN_BOOK_PENCIL,
+        )
+    }
+
     private fun persistMembership(
         userId: UUID,
         status: MembershipStatus,

@@ -50,7 +50,7 @@ class JdbcMemberAvatarAllocationAdapter(
             userId?.let {
                 jdbcTemplate
                     .query(
-                        "select avatar_key from memberships where club_id = ? and user_id = ? limit 1",
+                        "select avatar_key from memberships where club_id = ? and user_id = ? limit 1 for update",
                         { resultSet, _ -> BookClubAvatarKey.fromWireValue(resultSet.getString("avatar_key")) },
                         clubId.dbString(),
                         it.dbString(),
@@ -81,6 +81,7 @@ class JdbcMemberAvatarAllocationAdapter(
                 if (userId != null) {
                     append("\n  and user_id <> ?")
                 }
+                append("\nfor update")
             }
         val arguments =
             if (userId == null) {
