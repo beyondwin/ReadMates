@@ -47,6 +47,7 @@ export function AvatarPicker({
   const [error, setError] = useState<string | null>(null);
   const openerRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
+  const saveButtonRef = useRef<HTMLButtonElement>(null);
   const savingRef = useRef(false);
 
   useEffect(() => {
@@ -73,8 +74,13 @@ export function AvatarPicker({
   useEffect(() => {
     if (saving) {
       dialogRef.current?.focus();
+      return;
     }
-  }, [saving]);
+
+    if (error) {
+      saveButtonRef.current?.focus();
+    }
+  }, [error, saving]);
 
   function openPicker() {
     setDraftKey(normalizedAvatarKey);
@@ -269,6 +275,7 @@ export function AvatarPicker({
                       취소
                     </button>
                     <button
+                      ref={saveButtonRef}
                       type="button"
                       className="btn btn-primary rm-avatar-picker__save"
                       disabled={saving || draftKey === normalizedAvatarKey}

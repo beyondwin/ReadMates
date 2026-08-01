@@ -213,6 +213,28 @@ describe("AvatarPicker", () => {
     expect(opener).toHaveFocus();
   });
 
+  it("restores failed-save focus to retry so Shift+Tab stays inside the dialog", async () => {
+    const user = userEvent.setup();
+    renderPicker({
+      onUpdateAvatar: vi.fn().mockRejectedValue(new Error("temporary failure")),
+    });
+    const { dialog } = await openPicker(user);
+    await user.click(
+      within(dialog).getByRole("button", {
+        name: "초록 찻잔을 든 고슴도치 선택",
+      }),
+    );
+
+    await user.click(within(dialog).getByRole("button", { name: "이 아바타로 변경" }));
+
+    await within(dialog).findByRole("alert");
+    const retry = within(dialog).getByRole("button", { name: "이 아바타로 변경" });
+    expect(retry).toHaveFocus();
+
+    await user.tab({ shift: true });
+    expect(within(dialog).getByRole("button", { name: "취소" })).toHaveFocus();
+  });
+
   it("renders a decorative avatar without an opener when profile editing is unavailable", () => {
     const { container } = renderPicker({ canEditProfile: false });
 
