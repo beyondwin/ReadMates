@@ -2,12 +2,15 @@ package com.readmates.auth.application.service
 
 import com.readmates.auth.application.HostMemberListItem
 import com.readmates.auth.application.model.MemberProfile
+import com.readmates.auth.application.model.UpdateMemberAvatarCommand
 import com.readmates.auth.application.model.UpdateMemberProfileCommand
 import com.readmates.auth.application.port.`in`.UpdateHostMemberProfileUseCase
+import com.readmates.auth.application.port.`in`.UpdateOwnMemberAvatarUseCase
 import com.readmates.auth.application.port.`in`.UpdateOwnMemberProfileUseCase
 import com.readmates.auth.application.port.out.MemberProfileRow
 import com.readmates.auth.application.port.out.MemberProfileStorePort
 import com.readmates.auth.application.toHostMemberListItem
+import com.readmates.auth.domain.BookClubAvatarKey
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.shared.cache.ReadCacheInvalidationPort
 import com.readmates.shared.security.CurrentMember
@@ -21,6 +24,7 @@ class MemberProfileService(
     private val memberProfileStore: MemberProfileStorePort,
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
 ) : UpdateOwnMemberProfileUseCase,
+    UpdateOwnMemberAvatarUseCase,
     UpdateHostMemberProfileUseCase {
     @Transactional
     override fun updateOwnProfile(
@@ -43,6 +47,26 @@ class MemberProfileService(
 
         val displayName = validateDisplayName(command.displayName)
         updateOwnDisplayName(member.clubId, member.membershipId, displayName)
+        val profile =
+            memberProfileStore
+                .findProfileMemberByEmail(email)
+                ?.toMemberProfile()
+                ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+        cacheInvalidation.evictClubContentAfterCommit(member.clubId)
+        return profile
+    }
+
+    @Transactional
+    override fun updateOwnAvatar(
+        authenticationEmail: String?,
+        command: UpdateMemberAvatarCommand,
+    ): MemberProfile {
+        val email = authenticatedEmail(authenticationEmail)
+        val member = memberProfileStore.findOwnAvatarMutableMember(email)
+        val avatarKey = validateAvatarKey(command.avatarKey)
+        if (!memberProfileStore.updateOwnAvatarKey(member.clubId, member.membershipId, avatarKey)) {
+            memberProfileStore.recheckAvatarUpdateFailure(member.clubId, member.membershipId)
+        }
         val profile =
             memberProfileStore
                 .findProfileMemberByEmail(email)
@@ -157,19 +181,21 @@ class MemberProfileService(
         return displayName
     }
 
-    private fun MemberProfileRow.toCurrentMember(): CurrentMember =
-        CurrentMember(
-            userId = userId,
-            membershipId = membershipId,
-            clubId = clubId,
-            clubSlug = clubSlug,
-            email = email.lowercase(Locale.ROOT),
-            displayName = displayName,
-            accountName = accountName,
-            role = role,
-            membershipStatus = status,
-            avatarKey = avatarKey,
-        )
+    private fun authenticatedEmail(authenticationEmail: String?): String =
+        authenticationEmail
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.lowercase(Locale.ROOT)
+            ?: throw MemberProfileException(MemberProfileError.AUTHENTICATION_REQUIRED)
+
+    private fun validateAvatarKey(rawAvatarKey: String?): String {
+        val avatarKey = rawAvatarKey?.trim()
+        if (avatarKey.isNullOrEmpty()) {
+            throw MemberProfileException(MemberProfileError.AVATAR_KEY_REQUIRED)
+        }
+        return BookClubAvatarKey.fromWireValue(avatarKey)?.wireValue
+            ?: throw MemberProfileException(MemberProfileError.AVATAR_KEY_INVALID)
+    }
 
     private fun MemberProfileRow.toMemberProfile(): MemberProfile =
         MemberProfile(
@@ -199,6 +225,47 @@ class MemberProfileService(
     }
 }
 
+private fun MemberProfileStorePort.findOwnAvatarMutableMember(email: String): MemberProfileRow {
+    val member =
+        findProfileMemberByEmail(email)
+            ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+    if (!member.toCurrentMember().canEditOwnProfile) {
+        throw MemberProfileException(MemberProfileError.MEMBERSHIP_NOT_ALLOWED)
+    }
+    return member
+}
+
+private fun MemberProfileStorePort.recheckAvatarUpdateFailure(
+    clubId: UUID,
+    membershipId: UUID,
+): Nothing {
+    val currentMember = findProfileMemberInClubForUpdate(clubId, membershipId)
+    if (currentMember?.toCurrentMember()?.canEditOwnProfile != true) {
+        val error =
+            if (currentMember == null) {
+                MemberProfileError.MEMBER_NOT_FOUND
+            } else {
+                MemberProfileError.MEMBERSHIP_NOT_ALLOWED
+            }
+        throw MemberProfileException(error)
+    }
+    throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+}
+
+private fun MemberProfileRow.toCurrentMember(): CurrentMember =
+    CurrentMember(
+        userId = userId,
+        membershipId = membershipId,
+        clubId = clubId,
+        clubSlug = clubSlug,
+        email = email.lowercase(Locale.ROOT),
+        displayName = displayName,
+        accountName = accountName,
+        role = role,
+        membershipStatus = status,
+        avatarKey = avatarKey,
+    )
+
 class MemberProfileException(
     val error: MemberProfileError,
 ) : RuntimeException(error.code)
@@ -213,6 +280,8 @@ enum class MemberProfileError {
     DISPLAY_NAME_INVALID,
     DISPLAY_NAME_RESERVED,
     DISPLAY_NAME_DUPLICATE,
+    AVATAR_KEY_REQUIRED,
+    AVATAR_KEY_INVALID,
     ;
 
     val code: String

@@ -1,7 +1,9 @@
 package com.readmates.auth.adapter.`in`.web
 
+import com.readmates.auth.application.model.UpdateMemberAvatarCommand
 import com.readmates.auth.application.model.UpdateMemberProfileCommand
 import com.readmates.auth.application.port.`in`.UpdateHostMemberProfileUseCase
+import com.readmates.auth.application.port.`in`.UpdateOwnMemberAvatarUseCase
 import com.readmates.auth.application.port.`in`.UpdateOwnMemberProfileUseCase
 import com.readmates.auth.application.service.MemberProfileError
 import com.readmates.auth.application.service.MemberProfileException
@@ -23,6 +25,7 @@ import java.util.UUID
 @RequestMapping("/api")
 class MemberProfileController(
     private val updateOwnMemberProfile: UpdateOwnMemberProfileUseCase,
+    private val updateOwnMemberAvatar: UpdateOwnMemberAvatarUseCase,
     private val updateHostMemberProfileUseCase: UpdateHostMemberProfileUseCase,
 ) {
     @PatchMapping("/me/profile")
@@ -34,6 +37,21 @@ class MemberProfileController(
             updateOwnMemberProfile.updateOwnProfile(
                 authentication.emailOrNull(),
                 request.toCommand(),
+            )
+        return MemberProfileResponse.from(profile)
+    }
+
+    @PatchMapping("/me/avatar")
+    fun updateOwnAvatar(
+        authentication: Authentication?,
+        @RequestBody request: MemberAvatarUpdateRequest,
+    ): MemberProfileResponse {
+        val profile =
+            updateOwnMemberAvatar.updateOwnAvatar(
+                authentication.emailOrNull(),
+                UpdateMemberAvatarCommand(
+                    avatarKey = request.avatarKey,
+                ),
             )
         return MemberProfileResponse.from(profile)
     }
@@ -70,6 +88,8 @@ class MemberProfileController(
             MemberProfileError.DISPLAY_NAME_TOO_LONG,
             MemberProfileError.DISPLAY_NAME_INVALID,
             MemberProfileError.DISPLAY_NAME_RESERVED,
+            MemberProfileError.AVATAR_KEY_REQUIRED,
+            MemberProfileError.AVATAR_KEY_INVALID,
             -> HttpStatus.BAD_REQUEST
             MemberProfileError.DISPLAY_NAME_DUPLICATE -> HttpStatus.CONFLICT
         }
@@ -85,5 +105,7 @@ class MemberProfileController(
             MemberProfileError.DISPLAY_NAME_INVALID -> "Display name is invalid"
             MemberProfileError.DISPLAY_NAME_RESERVED -> "Display name is reserved"
             MemberProfileError.DISPLAY_NAME_DUPLICATE -> "Display name is already used in this club"
+            MemberProfileError.AVATAR_KEY_REQUIRED -> "Avatar key is required"
+            MemberProfileError.AVATAR_KEY_INVALID -> "Avatar key is invalid"
         }
 }

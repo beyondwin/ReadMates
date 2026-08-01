@@ -6,6 +6,10 @@ data class UpdateMemberProfileCommand(
     val displayName: String?,
 )
 
+data class UpdateMemberAvatarCommand(
+    val avatarKey: String?,
+)
+
 data class MemberProfile(
     val membershipId: UUID,
     val displayName: String,

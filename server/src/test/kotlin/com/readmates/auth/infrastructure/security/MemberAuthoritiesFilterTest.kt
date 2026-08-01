@@ -300,6 +300,12 @@ class MemberAuthoritiesFilterTest {
             displayName: String,
         ): Boolean = false
 
+        override fun updateOwnAvatarKey(
+            clubId: UUID,
+            membershipId: UUID,
+            avatarKey: String,
+        ): Boolean = false
+
         override fun updateDisplayName(
             clubId: UUID,
             membershipId: UUID,
