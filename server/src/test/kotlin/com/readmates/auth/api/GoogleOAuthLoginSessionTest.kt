@@ -140,7 +140,7 @@ class GoogleOAuthLoginSessionTest(
         val servletSession = securitySession()
         servletSession.setAttribute(
             OAuthReturnState.SESSION_ATTRIBUTE,
-            oauthReturnState.signReturnTarget("/clubs/sample-book-club/app/archive"),
+            oauthReturnState.signReturnTarget("/clubs/sample-book-club/app/archive?tab=all#session-1"),
         )
         servletSession.setAttribute(OAuthGuestJoinSession.CLUB_SLUG_ATTRIBUTE, "sample-book-club")
         val request = MockHttpServletRequest("GET", "/login/oauth2/code/google")
@@ -154,7 +154,10 @@ class GoogleOAuthLoginSessionTest(
 
         successHandler.onAuthenticationSuccess(request, response, authentication)
 
-        assertEquals("https://readmates.pages.dev/clubs/sample-book-club/app/archive", response.redirectedUrl)
+        assertEquals(
+            "https://readmates.pages.dev/clubs/sample-book-club/app/archive?tab=all#session-1",
+            response.redirectedUrl,
+        )
         assertEquals(
             listOf("sample-book-club:VIEWER"),
             membershipStates("oauth.guest.join.target@example.com"),
@@ -212,6 +215,42 @@ class GoogleOAuthLoginSessionTest(
         assertEquals("https://readmates.pages.dev/clubs/reading-sai/app", response.redirectedUrl)
         assertEquals(emptyList<String>(), membershipStates("oauth.guest.join.mismatch@example.com"))
         assertTrue(servletSession.isInvalid)
+    }
+
+    @Test
+    fun `noncanonical signed scoped paths cannot enroll their resolved club`() {
+        listOf(
+            Triple(
+                "/clubs/other/../sample-book-club/app",
+                "google-oauth-guest-join-dot-path",
+                "oauth.guest.join.dot.path@example.com",
+            ),
+            Triple(
+                "/clubs/sample%2Dbook%2Dclub/app",
+                "google-oauth-guest-join-encoded-path",
+                "oauth.guest.join.encoded.path@example.com",
+            ),
+        ).forEach { (returnTo, googleSubjectId, email) ->
+            val servletSession = securitySession()
+            servletSession.setAttribute(
+                OAuthReturnState.SESSION_ATTRIBUTE,
+                oauthReturnState.signReturnTarget(returnTo),
+            )
+            servletSession.setAttribute(OAuthGuestJoinSession.CLUB_SLUG_ATTRIBUTE, "sample-book-club")
+            val request = MockHttpServletRequest("GET", "/login/oauth2/code/google")
+            request.setSession(servletSession)
+            val response = MockHttpServletResponse()
+            val authentication =
+                TestingAuthenticationToken(
+                    googleOidcUser(googleSubjectId, email, "Noncanonical Guest Join"),
+                    "credentials",
+                )
+
+            successHandler.onAuthenticationSuccess(request, response, authentication)
+
+            assertEquals(emptyList<String>(), membershipStates(email))
+            assertTrue(servletSession.isInvalid)
+        }
     }
 
     @Test
@@ -733,10 +772,12 @@ class GoogleOAuthLoginSessionTest(
                 'oauth.invite.wrong.club@example.com',
                 'oauth.invite.domain@example.com',
                 'oauth.invite.owner@example.com',
-                'oauth.invite.other@example.com'
-                ,'oauth.guest.join.target@example.com'
-                ,'oauth.guest.join.generic@example.com'
-                ,'oauth.guest.join.mismatch@example.com'
+                'oauth.invite.other@example.com',
+                'oauth.guest.join.target@example.com',
+                'oauth.guest.join.generic@example.com',
+                'oauth.guest.join.mismatch@example.com',
+                'oauth.guest.join.dot.path@example.com',
+                'oauth.guest.join.encoded.path@example.com'
               )
                  or google_subject_id in (
                    'google-oauth-session-existing',
@@ -781,10 +822,12 @@ class GoogleOAuthLoginSessionTest(
                 'oauth.invite.wrong.club@example.com',
                 'oauth.invite.domain@example.com',
                 'oauth.invite.owner@example.com',
-                'oauth.invite.other@example.com'
-                ,'oauth.guest.join.target@example.com'
-                ,'oauth.guest.join.generic@example.com'
-                ,'oauth.guest.join.mismatch@example.com'
+                'oauth.invite.other@example.com',
+                'oauth.guest.join.target@example.com',
+                'oauth.guest.join.generic@example.com',
+                'oauth.guest.join.mismatch@example.com',
+                'oauth.guest.join.dot.path@example.com',
+                'oauth.guest.join.encoded.path@example.com'
               )
                  or users.google_subject_id in (
                    'google-oauth-session-existing',
@@ -830,10 +873,12 @@ class GoogleOAuthLoginSessionTest(
                 'oauth.invite.wrong.club@example.com',
                 'oauth.invite.domain@example.com',
                 'oauth.invite.owner@example.com',
-                'oauth.invite.other@example.com'
-                ,'oauth.guest.join.target@example.com'
-                ,'oauth.guest.join.generic@example.com'
-                ,'oauth.guest.join.mismatch@example.com'
+                'oauth.invite.other@example.com',
+                'oauth.guest.join.target@example.com',
+                'oauth.guest.join.generic@example.com',
+                'oauth.guest.join.mismatch@example.com',
+                'oauth.guest.join.dot.path@example.com',
+                'oauth.guest.join.encoded.path@example.com'
               )
                  or google_subject_id in (
                    'google-oauth-session-existing',
@@ -862,10 +907,12 @@ class GoogleOAuthLoginSessionTest(
               'oauth.invite.wrong.club@example.com',
               'oauth.invite.domain@example.com',
               'oauth.invite.owner@example.com',
-              'oauth.invite.other@example.com'
-              ,'oauth.guest.join.target@example.com'
-              ,'oauth.guest.join.generic@example.com'
-              ,'oauth.guest.join.mismatch@example.com'
+              'oauth.invite.other@example.com',
+              'oauth.guest.join.target@example.com',
+              'oauth.guest.join.generic@example.com',
+              'oauth.guest.join.mismatch@example.com',
+              'oauth.guest.join.dot.path@example.com',
+              'oauth.guest.join.encoded.path@example.com'
             )
                or google_subject_id in (
                  'google-oauth-session-existing',

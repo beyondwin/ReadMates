@@ -77,3 +77,43 @@ public target club.
 - Verification used repository fixtures and the local OAuth success-handler
   integration boundary. It did not contact Google's live OAuth service or
   perform a deployment.
+
+## Review fix round 1 — exact raw join authorization
+
+The review found that member-start authorization reused navigation path
+canonicalization. A dot-resolving or percent-encoded raw `returnTo` could
+therefore become the target club's canonical route and retain a captured join
+intent. Redirect safety and membership authorization now have separate
+boundaries: redirects keep their existing safe canonicalization, while a join
+is authorized only from the exact raw `/clubs/{canonical-slug}/app/**` shape.
+
+### RED evidence
+
+- Frontend focused tests reproduced the issue: 1 failed and 11 passed because a
+  noncanonical raw target still emitted `joinClub`.
+- Server capture and callback tests reproduced both stages: 2 tests ran and 2
+  failed because the target attribute was captured and membership was created.
+- The rejection matrix covers dot segments, percent-encoded slugs/fixed
+  segments/dot segments, mixed-case slugs, repeated separators, and backslashes.
+  Exact canonical targets with query and hash remain eligible.
+- Callback integration covers one dot-resolving path and one percent-encoded
+  path and asserts zero memberships for both.
+
+### GREEN evidence
+
+- `corepack pnpm --dir front exec vitest run tests/unit/login-return.test.ts tests/unit/login-card.test.tsx`
+  — 2 files, 28 tests passed.
+- `corepack pnpm --dir front exec vitest run features/auth features/public tests/unit/login-return.test.ts tests/unit/login-card.test.tsx tests/unit/public-home.test.tsx tests/unit/public-club.test.tsx`
+  — 13 files, 84 tests passed.
+- `corepack pnpm --dir front test` — 241 files, 1,909 tests passed.
+- `corepack pnpm --dir front lint` — passed.
+- `corepack pnpm --dir front build` — passed.
+- `./scripts/server-ci-check.sh` — detekt, ktlint, compile, unit,
+  architecture, coverage, and `check` passed.
+- `./server/gradlew -p server integrationTest --tests 'com.readmates.auth.application.service.GoogleLoginServiceTest' --tests 'com.readmates.auth.infrastructure.security.InviteAwareOAuthTest' --tests 'com.readmates.auth.api.GoogleOAuthLoginSessionTest'`
+  — 36 focused integration tests passed.
+- `git diff --check` — passed.
+
+The review fix did not contact Google's live OAuth service, deploy the app, or
+rerun the unchanged browser E2E surface; the original Task 10 full E2E gate
+remains 113 tests passed.

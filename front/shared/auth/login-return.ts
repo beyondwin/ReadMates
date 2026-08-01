@@ -61,11 +61,22 @@ export function oauthHrefForReturnTo(
 
 export function scopedAppClubSlug(rawValue: string | null | undefined) {
   const returnTo = safeRelativeReturnTo(rawValue);
-  const canonicalPath = returnTo ? new URL(returnTo, returnPathClassificationOrigin).pathname : null;
-  const match = canonicalPath?.match(/^\/clubs\/([^/]+)\/app(?:\/|$)/);
-  if (!match) return null;
-  const clubSlug = normalizedClubSlug(match[1]);
-  return clubSlug && clubSlug === match[1] ? clubSlug : null;
+  const rawPath = returnTo?.split(/[?#]/, 1)[0];
+  if (!rawPath) return null;
+
+  const rawSegments = rawPath.split("/").slice(1);
+  const pathSegments = rawSegments.at(-1) === "" ? rawSegments.slice(0, -1) : rawSegments;
+  if (
+    pathSegments.length < 3 ||
+    pathSegments[0] !== "clubs" ||
+    pathSegments[2] !== "app" ||
+    pathSegments.some((segment) => !canonicalRawPathSegment.test(segment) || segment === "." || segment === "..")
+  ) {
+    return null;
+  }
+
+  const clubSlug = normalizedClubSlug(pathSegments[1]);
+  return clubSlug && clubSlug === pathSegments[1] ? clubSlug : null;
 }
 
 function isRootPath(value: string) {
@@ -107,3 +118,5 @@ function hasControlCharacter(value: string) {
   }
   return false;
 }
+
+const canonicalRawPathSegment = /^[a-zA-Z0-9._~-]+$/;

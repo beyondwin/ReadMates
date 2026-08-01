@@ -53,7 +53,7 @@ class InviteAwareOAuthTest(
     @Test
     fun `authorization capture stores guest join only when it matches the signed scoped app target`() {
         val matching = MockHttpServletRequest("GET", "/oauth2/authorization/google")
-        matching.setParameter("returnTo", "/clubs/reading-sai/app/archive")
+        matching.setParameter("returnTo", "/clubs/reading-sai/app/archive?tab=all#session-1")
         matching.setParameter("joinClub", "reading-sai")
 
         captureFilter.doFilter(matching, MockHttpServletResponse(), RecordingFilterChain())
@@ -72,8 +72,17 @@ class InviteAwareOAuthTest(
         assertNull(mismatched.getSession(false)?.getAttribute(OAuthGuestJoinSession.CLUB_SLUG_ATTRIBUTE))
 
         listOf(
+            "/clubs/other/../reading-sai/app",
+            "/clubs/reading-sai/./app",
+            "/clubs/reading%2Dsai/app",
+            "/%63lubs/reading-sai/app",
+            "/clubs/reading-sai/%61pp",
+            "/clubs/other/%2e%2e/reading-sai/app",
             "/clubs/READING-SAI/app",
-            "/clubs/reading-sai/app/../about",
+            "/clubs//reading-sai/app",
+            "/clubs/reading-sai//app",
+            "/clubs/reading-sai/app//archive",
+            "/clubs/reading-sai\\app",
         ).forEach { unsafeReturnTo ->
             val nonCanonical = MockHttpServletRequest("GET", "/oauth2/authorization/google")
             nonCanonical.setParameter("returnTo", unsafeReturnTo)

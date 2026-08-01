@@ -89,13 +89,7 @@ class OAuthReturnState(
     fun scopedAppClubSlugFromState(signedState: String?): String? =
         verifiedReturnTarget(signedState)
             ?.takeIf { it.startsWith("/") }
-            ?.let(::canonicalRoutePath)
-            ?.let(CLUB_APP_PATH::matchEntire)
-            ?.groupValues
-            ?.get(1)
-            ?.let { pathClubSlug ->
-                OAuthGuestJoinSession.normalize(pathClubSlug).takeIf { it == pathClubSlug }
-            }
+            ?.let(::rawScopedAppClubSlug)
 
     fun inviteClubSlugFromReturnState(
         signedState: String?,
@@ -347,9 +341,24 @@ class OAuthReturnState(
                 Regex("^/clubs/[^/]+/invite(?:[/?#]|$)", RegexOption.IGNORE_CASE),
             )
         private val CLUB_INVITE_PATH = Regex("^/clubs/([^/]+)/invite/([^/]+)$")
-        private val CLUB_APP_PATH = Regex("^/clubs/([^/]+)/app(?:/.*)?$")
         private val LEGACY_INVITE_PATH = Regex("^/invite/([^/]+)$")
     }
+}
+
+private fun rawScopedAppClubSlug(returnTarget: String): String? {
+    val rawPath = returnTarget.substringBeforeAny('?', '#')
+    val rawSegments = rawPath.split('/').drop(1)
+    val pathSegments = if (rawSegments.lastOrNull().isNullOrEmpty()) rawSegments.dropLast(1) else rawSegments
+    val hasScopedAppPrefix =
+        pathSegments.size >= MIN_SCOPED_APP_PATH_SEGMENTS &&
+            pathSegments[0] == "clubs" &&
+            pathSegments[2] == "app"
+    val hasOnlyCanonicalSegments =
+        pathSegments.all { RAW_ROUTE_SEGMENT.matches(it) && it != "." && it != ".." }
+    if (!hasScopedAppPrefix || !hasOnlyCanonicalSegments) return null
+
+    val pathClubSlug = pathSegments[1]
+    return OAuthGuestJoinSession.normalize(pathClubSlug).takeIf { it == pathClubSlug }
 }
 
 private fun String.substringBeforeAny(vararg delimiters: Char): String {
@@ -382,3 +391,5 @@ private fun ByteArray.decodeUtf8OrNull(): String? =
 private const val PERCENT_ESCAPE_WIDTH = 3
 private const val HEX_RADIX = 16
 private const val BITS_PER_HEX_DIGIT = 4
+private const val MIN_SCOPED_APP_PATH_SEGMENTS = 3
+private val RAW_ROUTE_SEGMENT = Regex("^[A-Za-z0-9._~-]+$")
