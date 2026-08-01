@@ -17,11 +17,16 @@ export type UpdateMemberProfileRequest = {
   displayName: string;
 };
 
+export type UpdateMemberAvatarRequest = {
+  avatarKey: string;
+};
+
 export type MemberProfileResponse = {
   membershipId: string;
   displayName: string;
   accountName: string;
   profileImageUrl: string | null;
+  avatarKey: string;
 };
 
 export type ArchiveSessionItem = {

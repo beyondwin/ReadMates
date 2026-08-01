@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -67,10 +68,16 @@ const data: MyPageRouteData = {
 };
 
 function renderRoute(initialEntry = "/clubs/reading-sai/app/me") {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+
   return render(
-    <MemoryRouter initialEntries={[initialEntry]}>
-      <MyPageRoute canEditProfile onProfileUpdated={vi.fn().mockResolvedValue(undefined)} />
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <MyPageRoute canEditProfile onProfileUpdated={vi.fn().mockResolvedValue(undefined)} />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 

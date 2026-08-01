@@ -1,13 +1,20 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MemberProfileResponse, MyPageResponse } from "@/features/archive/api/archive-contracts";
+import { ReadmatesApiError } from "@/shared/api/errors";
 import { useProfileUpdateController } from "./profile-update-controller";
 
-const api = vi.hoisted(() => ({
+const mutations = vi.hoisted(() => ({
   updateMyProfile: vi.fn(),
+  updateMyAvatar: vi.fn(),
+  useUpdateMyProfileMutation: vi.fn(),
+  useUpdateMyAvatarMutation: vi.fn(),
 }));
 
-vi.mock("@/features/archive/api/archive-api", () => api);
+vi.mock("@/features/archive/queries/profile-queries", () => ({
+  useUpdateMyProfileMutation: mutations.useUpdateMyProfileMutation,
+  useUpdateMyAvatarMutation: mutations.useUpdateMyAvatarMutation,
+}));
 
 const profile: MyPageResponse = {
   avatarKey: "squirrel-acorn",
@@ -30,21 +37,28 @@ const updatedProfile: MemberProfileResponse = {
   displayName: "새 이름",
   accountName: "book-friend",
   profileImageUrl: null,
+  avatarKey: "squirrel-acorn",
 };
 
-function response(ok: boolean, body: unknown) {
-  return { ok, json: vi.fn().mockResolvedValue(body) } as unknown as Response;
-}
+const updatedAvatar: MemberProfileResponse = {
+  membershipId: "membership-1",
+  displayName: "기존 이름",
+  accountName: "book-friend",
+  profileImageUrl: null,
+  avatarKey: "hedgehog-green-mug",
+};
 
 describe("useProfileUpdateController", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    mutations.useUpdateMyProfileMutation.mockReturnValue({ mutateAsync: mutations.updateMyProfile });
+    mutations.useUpdateMyAvatarMutation.mockReturnValue({ mutateAsync: mutations.updateMyAvatar });
   });
 
   it("updates the profile after refreshing auth and retains the optimistic name", async () => {
     const onProfileUpdated = vi.fn().mockResolvedValue(undefined);
     const onRevalidate = vi.fn();
-    api.updateMyProfile.mockResolvedValue(response(true, updatedProfile));
+    mutations.updateMyProfile.mockResolvedValue(updatedProfile);
     const { result } = renderHook(() =>
       useProfileUpdateController({
         sourceProfile: profile,
@@ -58,7 +72,7 @@ describe("useProfileUpdateController", () => {
       await expect(result.current.updateProfile("새 이름")).resolves.toEqual(updatedProfile);
     });
 
-    expect(api.updateMyProfile).toHaveBeenCalledWith("새 이름");
+    expect(mutations.updateMyProfile).toHaveBeenCalledWith("새 이름");
     expect(onProfileUpdated).toHaveBeenCalledOnce();
     expect(onRevalidate).toHaveBeenCalledOnce();
     expect(result.current.profile.displayName).toBe("새 이름");
@@ -72,7 +86,7 @@ describe("useProfileUpdateController", () => {
     const onRevalidate = vi.fn().mockImplementation(() => {
       callbackOrder.push("revalidate");
     });
-    api.updateMyProfile.mockResolvedValue(response(true, updatedProfile));
+    mutations.updateMyProfile.mockResolvedValue(updatedProfile);
     const { result } = renderHook(() =>
       useProfileUpdateController({
         sourceProfile: profile,
@@ -93,7 +107,7 @@ describe("useProfileUpdateController", () => {
   it("retains the optimistic name when revalidation returns a fresh stale profile object", async () => {
     const onProfileUpdated = vi.fn().mockResolvedValue(undefined);
     const onRevalidate = vi.fn();
-    api.updateMyProfile.mockResolvedValue(response(true, updatedProfile));
+    mutations.updateMyProfile.mockResolvedValue(updatedProfile);
     const { result, rerender } = renderHook(
       ({ sourceProfile }) =>
         useProfileUpdateController({
@@ -117,7 +131,7 @@ describe("useProfileUpdateController", () => {
   it("retires an optimistic override after authoritative data moves past it", async () => {
     const onProfileUpdated = vi.fn().mockResolvedValue(undefined);
     const onRevalidate = vi.fn();
-    api.updateMyProfile.mockResolvedValue(response(true, updatedProfile));
+    mutations.updateMyProfile.mockResolvedValue(updatedProfile);
     const { result, rerender } = renderHook(
       ({ sourceProfile }) =>
         useProfileUpdateController({
@@ -153,11 +167,16 @@ describe("useProfileUpdateController", () => {
 
     await expect(denied.result.current.updateProfile("새 이름")).rejects.toThrow("현재 상태에서는 프로필을 수정할 수 없습니다.");
 
-    expect(api.updateMyProfile).not.toHaveBeenCalled();
+    expect(mutations.updateMyProfile).not.toHaveBeenCalled();
   });
 
   it("decodes a rejected API response into the profile save error", async () => {
-    api.updateMyProfile.mockResolvedValue(response(false, { code: "DISPLAY_NAME_DUPLICATE" }));
+    mutations.updateMyProfile.mockRejectedValue(
+      new ReadmatesApiError(
+        { code: "DISPLAY_NAME_DUPLICATE", message: "duplicate", status: 409, fallback: false },
+        new Response(JSON.stringify({ code: "DISPLAY_NAME_DUPLICATE" }), { status: 409 }),
+      ),
+    );
     const onProfileUpdated = vi.fn().mockResolvedValue(undefined);
     const onRevalidate = vi.fn();
     const { result } = renderHook(() =>
@@ -171,6 +190,86 @@ describe("useProfileUpdateController", () => {
 
     await expect(result.current.updateProfile("중복 이름")).rejects.toThrow("같은 클럽에서 이미 쓰고 있는 이름입니다.");
 
+    expect(onProfileUpdated).not.toHaveBeenCalled();
+    expect(onRevalidate).not.toHaveBeenCalled();
+  });
+
+  it("updates only the avatar after refreshing auth and leaves the saved name alone", async () => {
+    const callbackOrder: string[] = [];
+    const onProfileUpdated = vi.fn().mockImplementation(async () => {
+      callbackOrder.push("auth-refresh");
+    });
+    const onRevalidate = vi.fn().mockImplementation(() => {
+      callbackOrder.push("revalidate");
+    });
+    mutations.updateMyAvatar.mockResolvedValue(updatedAvatar);
+    const { result } = renderHook(() =>
+      useProfileUpdateController({
+        sourceProfile: profile,
+        canEditProfile: true,
+        onProfileUpdated,
+        onRevalidate,
+      }),
+    );
+
+    await act(async () => {
+      await expect(result.current.updateAvatar("hedgehog-green-mug")).resolves.toEqual(updatedAvatar);
+    });
+
+    expect(mutations.updateMyAvatar).toHaveBeenCalledWith("hedgehog-green-mug");
+    expect(result.current.profile.avatarKey).toBe("hedgehog-green-mug");
+    expect(result.current.profile.displayName).toBe("기존 이름");
+    expect(callbackOrder).toEqual(["auth-refresh", "revalidate"]);
+  });
+
+  it("retires name and avatar overrides independently when the corresponding source field changes", async () => {
+    const onProfileUpdated = vi.fn().mockResolvedValue(undefined);
+    const onRevalidate = vi.fn();
+    mutations.updateMyProfile.mockResolvedValue(updatedProfile);
+    mutations.updateMyAvatar.mockResolvedValue(updatedAvatar);
+    const { result, rerender } = renderHook(
+      ({ sourceProfile }) =>
+        useProfileUpdateController({
+          sourceProfile,
+          canEditProfile: true,
+          onProfileUpdated,
+          onRevalidate,
+        }),
+      { initialProps: { sourceProfile: profile } },
+    );
+
+    await act(async () => {
+      await result.current.updateProfile("새 이름");
+      await result.current.updateAvatar("hedgehog-green-mug");
+    });
+    expect(result.current.profile).toMatchObject({ displayName: "새 이름", avatarKey: "hedgehog-green-mug" });
+
+    rerender({ sourceProfile: { ...profile, displayName: "권위 이름" } });
+    expect(result.current.profile).toMatchObject({ displayName: "권위 이름", avatarKey: "hedgehog-green-mug" });
+
+    rerender({ sourceProfile: { ...profile } });
+    expect(result.current.profile).toMatchObject({ displayName: "기존 이름", avatarKey: "hedgehog-green-mug" });
+
+    rerender({ sourceProfile: { ...profile, avatarKey: "권위 아바타" } });
+    expect(result.current.profile).toMatchObject({ displayName: "기존 이름", avatarKey: "권위 아바타" });
+  });
+
+  it("does not set an avatar override or refresh route state when the avatar update fails", async () => {
+    const onProfileUpdated = vi.fn().mockResolvedValue(undefined);
+    const onRevalidate = vi.fn();
+    mutations.updateMyAvatar.mockRejectedValue(new Error("avatar save failed"));
+    const { result } = renderHook(() =>
+      useProfileUpdateController({
+        sourceProfile: profile,
+        canEditProfile: true,
+        onProfileUpdated,
+        onRevalidate,
+      }),
+    );
+
+    await expect(result.current.updateAvatar("hedgehog-green-mug")).rejects.toThrow("이름 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+
+    expect(result.current.profile.avatarKey).toBe("squirrel-acorn");
     expect(onProfileUpdated).not.toHaveBeenCalled();
     expect(onRevalidate).not.toHaveBeenCalled();
   });
