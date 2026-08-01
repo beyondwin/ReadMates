@@ -377,6 +377,9 @@ class CurrentSessionControllerDbTest(
                     value(hasItem("탈퇴한 멤버"))
                 }
                 jsonPath("$.currentSession.board.questions[*].authorShortName") { value(not(hasItem("멤버1"))) }
+                jsonPath("$.currentSession.board.questions[?(@.text == '탈퇴 회원 기존 질문')].avatarKey") {
+                    value(hasItem("archive-box"))
+                }
                 jsonPath("$.currentSession.board.longReviews[?(@.body == '탈퇴 회원 기존 서평')].authorName") {
                     value(hasItem("탈퇴한 멤버"))
                 }
@@ -389,6 +392,9 @@ class CurrentSessionControllerDbTest(
                 jsonPath("$.currentSession.attendees[*].displayName") { value(not(hasItem("멤버1"))) }
                 jsonPath("$.currentSession.attendees[*].accountName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.currentSession.attendees[*].accountName") { value(not(hasItem("안멤버1"))) }
+                jsonPath("$.currentSession.attendees[?(@.membershipId == '00000000-0000-0000-0000-000000000202')].avatarKey") {
+                    value(hasItem("archive-box"))
+                }
                 jsonPath("$.currentSession.attendees[*].shortName") { doesNotExist() }
             }
     }
@@ -426,7 +432,8 @@ class CurrentSessionControllerDbTest(
         private const val MARK_MEMBER1_LEFT_SQL = """
             update memberships
             join users on users.id = memberships.user_id
-            set memberships.status = 'LEFT'
+            set memberships.status = 'LEFT',
+                memberships.avatar_key = 'book-tote'
             where users.email = 'member1@example.com'
               and memberships.club_id = '00000000-0000-0000-0000-000000000001';
         """
@@ -469,7 +476,8 @@ class CurrentSessionControllerDbTest(
         private const val RESET_MEMBER1_ACTIVE_SQL = """
             update memberships
             join users on users.id = memberships.user_id
-            set memberships.status = 'ACTIVE'
+            set memberships.status = 'ACTIVE',
+                memberships.avatar_key = 'open-book-pencil'
             where users.email = 'member1@example.com'
               and memberships.club_id = '00000000-0000-0000-0000-000000000001';
         """

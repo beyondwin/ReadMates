@@ -92,6 +92,7 @@ class JdbcCurrentSessionAdapter(
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as display_name,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as account_name,
               memberships.avatar_key as attendee_avatar_key,
+              memberships.status as attendee_membership_status,
               memberships.role,
               session_participants.rsvp_status,
               session_participants.attendance_status,
@@ -111,7 +112,7 @@ class JdbcCurrentSessionAdapter(
                     membershipId = resultSet.uuid("membership_id").toString(),
                     displayName = resultSet.getString("display_name"),
                     accountName = resultSet.getString("account_name"),
-                    avatarKey = resultSet.getString("attendee_avatar_key") ?: BookClubAvatarKey.fallback.wireValue,
+                    avatarKey = resultSet.presentationAvatarKey("attendee_avatar_key", "attendee_membership_status"),
                     role = resultSet.getString("role"),
                     rsvpStatus = resultSet.getString("rsvp_status"),
                     attendanceStatus = resultSet.getString("attendance_status"),
@@ -174,7 +175,8 @@ class JdbcCurrentSessionAdapter(
               questions.draft_thought,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_name,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name,
-              memberships.avatar_key as question_author_avatar_key
+              memberships.avatar_key as question_author_avatar_key,
+              memberships.status as question_author_membership_status
             from questions
             join memberships on memberships.id = questions.membership_id
               and memberships.club_id = questions.club_id
@@ -196,8 +198,10 @@ class JdbcCurrentSessionAdapter(
                     authorName = resultSet.getString("author_name"),
                     authorShortName = resultSet.getString("author_short_name"),
                     avatarKey =
-                        resultSet.getString("question_author_avatar_key")
-                            ?: BookClubAvatarKey.fallback.wireValue,
+                        resultSet.presentationAvatarKey(
+                            "question_author_avatar_key",
+                            "question_author_membership_status",
+                        ),
                 )
             },
             *args.toTypedArray(),
@@ -368,6 +372,16 @@ class JdbcCurrentSessionAdapter(
             member.clubId.dbString(),
             member.membershipId.dbString(),
         )
+
+    private fun ResultSet.presentationAvatarKey(
+        avatarKeyColumn: String,
+        membershipStatusColumn: String,
+    ): String =
+        if (getString(membershipStatusColumn) == "LEFT") {
+            BookClubAvatarKey.fallback.wireValue
+        } else {
+            getString(avatarKeyColumn) ?: BookClubAvatarKey.fallback.wireValue
+        }
 
     private fun findBoardHighlights(
         jdbcTemplate: JdbcTemplate,

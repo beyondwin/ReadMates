@@ -440,6 +440,7 @@ internal class HostSessionQueries {
           coalesce(memberships.short_name, users.name) as display_name,
           users.name as account_name,
           memberships.avatar_key as attendee_avatar_key,
+          memberships.status as attendee_membership_status,
           session_participants.rsvp_status,
           session_participants.attendance_status,
           session_participants.participation_status

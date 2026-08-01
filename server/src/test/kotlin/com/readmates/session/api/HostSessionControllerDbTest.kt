@@ -3,6 +3,7 @@ package com.readmates.session.api
 import com.readmates.shared.paging.CursorCodec
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
+import org.hamcrest.Matchers.hasItem
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
@@ -196,6 +197,15 @@ private const val RESET_HOST_AVATAR_KEY_SQL = """
     set memberships.avatar_key = 'reading-lamp'
     where memberships.club_id = '00000000-0000-0000-0000-000000000001'
       and users.email = 'host@example.com';
+"""
+
+private const val RESET_MEMBER1_ACTIVE_AVATAR_KEY_SQL = """
+    update memberships
+    join users on users.id = memberships.user_id
+    set memberships.status = 'ACTIVE',
+        memberships.avatar_key = 'open-book-pencil'
+    where memberships.club_id = '00000000-0000-0000-0000-000000000001'
+      and users.email = 'member1@example.com';
 """
 
 @SpringBootTest(
@@ -761,6 +771,37 @@ class HostSessionControllerDbTest(
                 status { isOk() }
                 jsonPath("$.attendees[0].avatarKey") { value("book-tote") }
                 jsonPath("$.attendees[0].profileImageUrl") { doesNotExist() }
+            }
+    }
+
+    @Test
+    @Sql(
+        statements = [
+            RESET_MEMBER1_ACTIVE_AVATAR_KEY_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `host session attendee hides departed stored avatar key`() {
+        createSessionSeven()
+        jdbcTemplate.update(
+            """
+            update memberships
+            join users on users.id = memberships.user_id
+            set memberships.status = 'LEFT',
+                memberships.avatar_key = 'discussion-circle'
+            where memberships.club_id = '00000000-0000-0000-0000-000000000001'
+              and users.email = 'member1@example.com'
+            """.trimIndent(),
+        )
+
+        mockMvc
+            .get("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.attendees[?(@.membershipId == '00000000-0000-0000-0000-000000000202')].avatarKey") {
+                    value(hasItem("archive-box"))
+                }
             }
     }
 

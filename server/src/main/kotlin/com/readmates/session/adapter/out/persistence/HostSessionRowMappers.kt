@@ -83,7 +83,7 @@ internal fun ResultSet.toHostSessionAttendee() =
         membershipId = uuid("membership_id").toString(),
         displayName = getString("display_name"),
         accountName = getString("account_name"),
-        avatarKey = getString("attendee_avatar_key") ?: BookClubAvatarKey.fallback.wireValue,
+        avatarKey = presentationAvatarKey("attendee_avatar_key", "attendee_membership_status"),
         rsvpStatus = getString("rsvp_status"),
         attendanceStatus = getString("attendance_status"),
         participationStatus = SessionParticipationStatus.valueOf(getString("participation_status")),
@@ -95,6 +95,16 @@ internal fun ResultSet.toHostSessionFeedbackDocument() =
         fileName = getString("file_name"),
         uploadedAt = utcOffsetDateTime("created_at").toString(),
     )
+
+private fun ResultSet.presentationAvatarKey(
+    avatarKeyColumn: String,
+    membershipStatusColumn: String,
+): String =
+    if (getString(membershipStatusColumn) == "LEFT") {
+        BookClubAvatarKey.fallback.wireValue
+    } else {
+        getString(avatarKeyColumn) ?: BookClubAvatarKey.fallback.wireValue
+    }
 
 internal fun ResultSet.toHostSessionPublication() =
     HostSessionPublication(
