@@ -27,30 +27,54 @@ function collectSourceFiles(directory: string): string[] {
 }
 
 describe("design-system boundaries", () => {
-  it("exposes the exact dependency-free Korean-capable reading stack with longer reading rhythm", () => {
+  it("exposes the Pretendard readability scale without a separate reading face", () => {
     const tokens = fs.readFileSync(path.join(packageRoot, "src/styles/tokens.css"), "utf8");
     const stylesheet = document.createElement("style");
-    const sample = document.createElement("p");
-    const ledgerValue = document.createElement("strong");
     stylesheet.textContent = tokens;
-    sample.className = "reading-editorial";
-    ledgerValue.className = "ledger-number";
     document.head.append(stylesheet);
-    document.body.append(sample);
-    document.body.append(ledgerValue);
+
+    const role = (className: string) => {
+      const element = document.createElement("p");
+      element.className = className;
+      document.body.append(element);
+      return element;
+    };
+    const h1 = role("h1");
+    const h2 = role("h2");
+    const body = role("body");
+    const bodyLarge = role("body-lg");
+    const supporting = role("small");
+    const label = role("tiny");
+    const eyebrow = role("eyebrow");
+    const ledger = role("ledger-number");
 
     try {
-      expect(getComputedStyle(document.documentElement).getPropertyValue("--f-reading").trim()).toBe(
-        'ui-serif, "Iowan Old Style", "Noto Serif KR", "AppleMyungjo", "Batang", serif',
-      );
-      expect(getComputedStyle(sample).fontFamily).toBe("var(--f-reading)");
-      expect(getComputedStyle(sample).lineHeight).toBe("1.65");
-      expect(getComputedStyle(ledgerValue).fontFamily).toBe("var(--f-mono)");
-      expect(getComputedStyle(ledgerValue).fontVariantNumeric).toBe("tabular-nums");
+      const root = getComputedStyle(document.documentElement);
+      expect(tokens).not.toContain("--f-reading");
+      expect(tokens).not.toContain("reading-editorial");
+      expect(tokens).not.toContain("Iowan Old Style");
+      expect(root.getPropertyValue("--type-size-h1").trim()).toBe("36px");
+      expect(root.getPropertyValue("--type-size-h2").trim()).toBe("28px");
+      expect(root.getPropertyValue("--type-size-body").trim()).toBe("16px");
+      expect(root.getPropertyValue("--type-size-body-emphasis").trim()).toBe("17px");
+      expect(root.getPropertyValue("--type-size-supporting").trim()).toBe("14px");
+      expect(root.getPropertyValue("--type-size-label").trim()).toBe("12px");
+      expect(root.getPropertyValue("--type-leading-body").trim()).toBe("1.6");
+      expect(getComputedStyle(h1).fontSize).toBe("var(--type-size-h1)");
+      expect(getComputedStyle(h2).fontSize).toBe("var(--type-size-h2)");
+      expect(getComputedStyle(body).fontSize).toBe("var(--type-size-body)");
+      expect(getComputedStyle(bodyLarge).fontSize).toBe("var(--type-size-body-emphasis)");
+      expect(getComputedStyle(supporting).fontSize).toBe("var(--type-size-supporting)");
+      expect(getComputedStyle(label).fontSize).toBe("var(--type-size-label)");
+      expect(getComputedStyle(eyebrow).fontFamily).toBe("var(--f-sans)");
+      expect(getComputedStyle(eyebrow).fontSize).toBe("var(--type-size-label)");
+      expect(getComputedStyle(ledger).fontFamily).toBe("var(--f-mono)");
+      expect(getComputedStyle(ledger).fontVariantNumeric).toBe("tabular-nums");
       expect(tokens).not.toMatch(/url\(|https?:\/\//);
     } finally {
-      ledgerValue.remove();
-      sample.remove();
+      for (const element of [h1, h2, body, bodyLarge, supporting, label, eyebrow, ledger]) {
+        element.remove();
+      }
       stylesheet.remove();
     }
   });
