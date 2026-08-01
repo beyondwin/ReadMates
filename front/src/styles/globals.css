@@ -721,7 +721,7 @@ a.rm-recent-record__destination:hover {
 
 .rm-recent-record__destination-chevron {
   flex: 0 0 auto;
-  color: inherit;
+  color: var(--accent);
   font-size: 16px;
   line-height: 1;
 }
@@ -3896,7 +3896,7 @@ a.rm-recent-record__destination:hover {
   min-height: 44px;
   align-items: center;
   gap: 8px;
-  color: var(--accent);
+  color: inherit;
   font-size: 0.875rem;
   font-weight: 650;
   text-decoration: none;
