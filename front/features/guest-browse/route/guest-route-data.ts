@@ -34,12 +34,27 @@ function requiredSessionId(args?: Pick<LoaderFunctionArgs, "params">) {
 
 export async function guestHomeLoader(args?: Pick<LoaderFunctionArgs, "params">) {
   const clubSlug = requiredClubSlug(args);
-  const [current, upcoming, recentNotes] = await Promise.all([
+  const [current, upcoming, recentNotes] = await Promise.allSettled([
     fetchGuestCurrentSession(clubSlug),
     fetchGuestUpcomingSessions(clubSlug),
     fetchGuestNoteFeed(clubSlug, { limit: 5 }),
   ]);
-  return guestHomeReadView(current, upcoming, recentNotes);
+  const widgetErrors = {
+    ...(current.status === "rejected" ? { current: widgetError(current.reason) } : {}),
+    ...(upcoming.status === "rejected" ? { upcoming: widgetError(upcoming.reason) } : {}),
+    ...(recentNotes.status === "rejected" ? { recentNotes: widgetError(recentNotes.reason) } : {}),
+  };
+  return guestHomeReadView(
+    current.status === "fulfilled" ? current.value : { currentSession: null },
+    upcoming.status === "fulfilled" ? upcoming.value : { items: [], nextCursor: null },
+    recentNotes.status === "fulfilled" ? recentNotes.value : { items: [], nextCursor: null },
+    widgetErrors,
+  );
+}
+
+function widgetError(reason: unknown) {
+  if (reason && typeof reason === "object" && "status" in reason && typeof reason.status === "number") return { status: reason.status };
+  return {};
 }
 
 export async function guestCurrentSessionLoader(args?: Pick<LoaderFunctionArgs, "params">) {

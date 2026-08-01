@@ -232,8 +232,8 @@ export function LongReviewPanel({
         onChange={(event) => onChange(event.target.value)}
         placeholder="완독 후, 모임 이후, 시간이 지난 뒤에 떠오른 문장을 적어 주세요."
       />
-      <div className="row" style={{ marginTop: "12px", gap: "10px", justifyContent: "flex-end" }}>
-        <span className="tiny" style={{ color: "var(--text-3)" }}>
+      <div className="row" style={{ marginTop: "12px", gap: "10px", justifyContent: "flex-end", flexWrap: "wrap" }}>
+        <span className="tiny" style={{ color: "var(--text-3)", flex: "1 1 180px" }}>
           작성한 글은 게스트에게도 공개돼요.
         </span>
         <SaveFeedback scope="longReview" status={saveStatus} />

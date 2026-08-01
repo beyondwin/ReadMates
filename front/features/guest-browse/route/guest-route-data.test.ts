@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadClubAppAudience, scopedGuestRouteLoader } from "./club-app-audience-loader";
-import { guestArchiveLoader, guestCurrentSessionLoader, guestNotesLoader } from "./guest-route-data";
+import { guestArchiveLoader, guestCurrentSessionLoader, guestHomeLoader, guestNotesLoader } from "./guest-route-data";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -158,5 +158,21 @@ describe("guest route loaders", () => {
       "/api/bff/api/public/clubs/alpha/browse/archive?limit=20",
     ]);
     expect(fetchMock.mock.calls.every(([path]) => String(path).includes("/api/public/clubs/alpha/browse"))).toBe(true);
+  });
+
+  it("keeps successful home widgets visible when another public widget is rate limited", async () => {
+    const fetchMock = vi.fn((path: string) => {
+      if (path.includes("/sessions/current")) return Promise.resolve(jsonResponse(currentSession));
+      if (path.includes("/upcoming")) return Promise.resolve(new Response("slow down", { status: 429 }));
+      return Promise.resolve(jsonResponse({ items: [{ sessionId: "s1", sessionNumber: 1, bookTitle: "책", date: "2026-08-02", authorName: "이름", authorShortName: "이", avatarKey: "book", kind: "HIGHLIGHT", text: "문장" }], nextCursor: null }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const data = await guestHomeLoader({ params: { clubSlug: "alpha" } });
+
+    expect(data.current.currentSession?.bookTitle).toBe("책");
+    expect(data.recentNotes.items).toHaveLength(1);
+    expect(data.upcoming.items).toEqual([]);
+    expect(data.widgetErrors?.upcoming?.status).toBe(429);
   });
 });

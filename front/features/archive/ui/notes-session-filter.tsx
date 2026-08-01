@@ -11,6 +11,7 @@ import {
 } from "@/features/archive/model/notes-feed-model";
 import { Link } from "@/features/archive/ui/archive-link";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
+import { noteSessionIsSelected } from "@/shared/ui/notes-read-page";
 
 const mobileSessionCardWidth = "156px";
 
@@ -117,7 +118,7 @@ export function SessionRail({
           <SessionRow
             key={session.sessionId}
             session={session}
-            selected={session.sessionId === selectedSessionId}
+            selected={noteSessionIsSelected(session.sessionId, selectedSessionId)}
             filter={filter}
             showStrongTopBorder={index === 0}
           />

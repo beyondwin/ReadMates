@@ -1,4 +1,41 @@
 export type GuestCapabilities = { canWrite: false };
+export type GuestNoteKind = "QUESTION" | "ONE_LINE_REVIEW" | "LONG_REVIEW" | "HIGHLIGHT";
+export type GuestNoteFilter = "all" | "highlights" | "oneliners" | "questions";
+
+export function guestNoteKind(value: string): GuestNoteKind {
+  if (value === "QUESTION" || value === "ONE_LINE_REVIEW" || value === "LONG_REVIEW" || value === "HIGHLIGHT") return value;
+  return "HIGHLIGHT";
+}
+
+export function guestNoteKindLabel(kind: GuestNoteKind) {
+  if (kind === "QUESTION") return "질문";
+  if (kind === "ONE_LINE_REVIEW") return "한줄평";
+  if (kind === "LONG_REVIEW") return "서평";
+  return "하이라이트";
+}
+
+export function guestNoteMatchesFilter(kind: GuestNoteKind, filter: GuestNoteFilter) {
+  if (filter === "all") return true;
+  if (filter === "highlights") return kind === "HIGHLIGHT";
+  if (filter === "oneliners") return kind === "ONE_LINE_REVIEW";
+  return kind === "QUESTION";
+}
+
+export type GuestRsvpLabel = "참석" | "미정" | "불참" | "응답 전";
+export type GuestAttendanceLabel = "참석 확인" | "불참 확인" | "미확인";
+
+export function guestRsvpLabel(status: string): GuestRsvpLabel {
+  if (status === "GOING") return "참석";
+  if (status === "MAYBE") return "미정";
+  if (status === "DECLINED") return "불참";
+  return "응답 전";
+}
+
+export function guestAttendanceLabel(status: string): GuestAttendanceLabel {
+  if (status === "ATTENDED") return "참석 확인";
+  if (status === "ABSENT") return "불참 확인";
+  return "미확인";
+}
 
 export type GuestPage<T> = { items: T[]; nextCursor: string | null };
 
@@ -69,7 +106,7 @@ export type GuestNoteFeedItemReadView = {
   authorName: string | null;
   authorShortName: string | null;
   avatarKey: string | null;
-  kind: string;
+  kind: GuestNoteKind;
   text: string;
 };
 
@@ -98,12 +135,14 @@ export type GuestHomeReadView = {
   current: { currentSession: GuestSessionReadView | null };
   upcoming: GuestPage<GuestUpcomingSessionReadView>;
   recentNotes: GuestPage<GuestNoteFeedItemReadView>;
+  widgetErrors?: Partial<Record<"current" | "upcoming" | "recentNotes", { status?: number; retryAfterSeconds?: number }>>;
 };
 
 export type GuestNotesReadView = {
   sessions: GuestPage<GuestNoteSessionReadView>;
   feed: GuestPage<GuestNoteFeedItemReadView>;
 };
+type GuestNoteFeedInput = Omit<GuestNoteFeedItemReadView, "kind"> & { kind: string };
 
 type GuestCurrentSessionInput = { currentSession: Omit<GuestSessionReadView, "capabilities" | "board"> & { board: { questions: GuestQuestionReadView[]; longReviews: GuestLongReviewReadView[] } } };
 
@@ -134,22 +173,38 @@ export function guestSessionReadView(response: GuestCurrentSessionInput): { curr
 export function guestHomeReadView(
   current: GuestCurrentSessionInput,
   upcoming: GuestPage<GuestUpcomingSessionReadView>,
-  recentNotes: GuestPage<GuestNoteFeedItemReadView>,
+  recentNotes: GuestPage<GuestNoteFeedInput>,
+  widgetErrors?: GuestHomeReadView["widgetErrors"],
 ): GuestHomeReadView {
-  return { current: guestSessionReadView(current), upcoming, recentNotes };
+  return {
+    current: guestSessionReadView(current),
+    upcoming: { items: upcoming.items.map((session) => ({ sessionId: session.sessionId, sessionNumber: session.sessionNumber, title: session.title, bookTitle: session.bookTitle, bookAuthor: session.bookAuthor, bookImageUrl: session.bookImageUrl, date: session.date, startTime: session.startTime, endTime: session.endTime, questionDeadlineAt: session.questionDeadlineAt, state: session.state })), nextCursor: upcoming.nextCursor },
+    recentNotes: { items: recentNotes.items.map((item) => ({ sessionId: item.sessionId, sessionNumber: item.sessionNumber, bookTitle: item.bookTitle, date: item.date, authorName: item.authorName, authorShortName: item.authorShortName, avatarKey: item.avatarKey, kind: guestNoteKind(item.kind), text: item.text })), nextCursor: recentNotes.nextCursor },
+    ...(widgetErrors && Object.keys(widgetErrors).length ? { widgetErrors } : {}),
+  };
 }
 
 export function guestNotesReadView(
   sessions: GuestPage<GuestNoteSessionReadView>,
-  feed: GuestPage<GuestNoteFeedItemReadView>,
+  feed: GuestPage<GuestNoteFeedInput>,
 ): GuestNotesReadView {
-  return { sessions, feed };
+  return {
+    sessions: { items: sessions.items.map((session) => ({ sessionId: session.sessionId, sessionNumber: session.sessionNumber, bookTitle: session.bookTitle, date: session.date, questionCount: session.questionCount, oneLinerCount: session.oneLinerCount, longReviewCount: session.longReviewCount, highlightCount: session.highlightCount, totalCount: session.totalCount })), nextCursor: sessions.nextCursor },
+    feed: { items: feed.items.map((item) => ({ sessionId: item.sessionId, sessionNumber: item.sessionNumber, bookTitle: item.bookTitle, date: item.date, authorName: item.authorName, authorShortName: item.authorShortName, avatarKey: item.avatarKey, kind: guestNoteKind(item.kind), text: item.text })), nextCursor: feed.nextCursor },
+  };
 }
 
-export function guestArchiveReadView(page: GuestPage<GuestArchiveSessionReadView>): GuestPage<GuestArchiveSessionReadView> {
-  return page;
+export function guestArchiveReadView(page: GuestPage<GuestArchiveSessionReadView>): GuestPage<GuestArchiveSessionReadView> & { capabilities: GuestCapabilities } {
+  return { items: page.items.map((session) => ({ sessionId: session.sessionId, sessionNumber: session.sessionNumber, title: session.title, bookTitle: session.bookTitle, bookAuthor: session.bookAuthor, bookImageUrl: session.bookImageUrl, date: session.date, attendance: session.attendance, total: session.total, state: session.state })), nextCursor: page.nextCursor, capabilities: { canWrite: false } };
 }
 
-export function guestArchiveDetailReadView(detail: GuestArchiveDetailReadView): GuestArchiveDetailReadView {
-  return detail;
+export function guestArchiveDetailReadView(detail: GuestArchiveDetailReadView): GuestArchiveDetailReadView & { capabilities: GuestCapabilities } {
+  return {
+    sessionId: detail.sessionId, sessionNumber: detail.sessionNumber, title: detail.title, bookTitle: detail.bookTitle, bookAuthor: detail.bookAuthor, bookImageUrl: detail.bookImageUrl, date: detail.date, attendance: detail.attendance, total: detail.total, state: detail.state, summary: detail.summary,
+    highlights: detail.highlights.map((item) => ({ text: item.text, sortOrder: item.sortOrder, authorName: item.authorName, authorShortName: item.authorShortName, avatarKey: item.avatarKey })),
+    questions: detail.questions.map((item) => ({ priority: item.priority, text: item.text, draftThought: item.draftThought, authorName: item.authorName, authorShortName: item.authorShortName, avatarKey: item.avatarKey })),
+    oneLiners: detail.oneLiners.map((item) => ({ text: item.text, authorName: item.authorName, authorShortName: item.authorShortName, avatarKey: item.avatarKey })),
+    longReviews: detail.longReviews.map((item) => ({ title: item.title, content: item.content, authorName: item.authorName, authorShortName: item.authorShortName, avatarKey: item.avatarKey })),
+    capabilities: { canWrite: false },
+  };
 }

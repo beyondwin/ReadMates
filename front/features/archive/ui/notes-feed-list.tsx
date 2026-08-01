@@ -10,6 +10,7 @@ import {
 } from "@/features/archive/model/notes-feed-model";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
+import { NotesFilterChoices } from "@/shared/ui/notes-read-page";
 
 export type { FeedFilter };
 
@@ -23,31 +24,16 @@ export function NotesFilterBar({
   selectedSession: NoteSessionItem | null;
 }) {
   return (
-    <div className="row" style={{ marginTop: "24px", gap: "6px", flexWrap: "wrap" }} aria-label="클럽 노트 필터">
-      {noteFeedFilters.map((item) => {
+    <NotesFilterChoices
+      className="row"
+      style={{ marginTop: "24px", gap: "6px", flexWrap: "wrap" }}
+      selected={filter}
+      onSelect={onFilterChange}
+      filters={noteFeedFilters.map((item) => {
         const count = selectedSession ? noteFilterCount(selectedSession, item.key) : null;
-
-        return (
-          <button
-            key={item.key}
-            type="button"
-            aria-pressed={filter === item.key}
-            onClick={() => onFilterChange(item.key)}
-            style={{
-              height: "32px",
-              padding: "0 14px",
-              fontSize: "13px",
-              borderRadius: "999px",
-              border: `1px solid ${filter === item.key ? "var(--text)" : "var(--line)"}`,
-              background: filter === item.key ? "var(--text)" : "transparent",
-              color: filter === item.key ? "var(--bg)" : "var(--text-2)",
-            }}
-          >
-            {count === null ? item.label : `${item.label} ${count}`}
-          </button>
-        );
+        return { id: item.key, label: count === null ? item.label : `${item.label} ${count}` };
       })}
-    </div>
+    />
   );
 }
 
