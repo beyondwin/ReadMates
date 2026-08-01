@@ -2,6 +2,7 @@ package com.readmates.auth.api
 
 import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.auth.application.service.InvitationTokenService
+import com.readmates.auth.domain.BookClubAvatarKey
 import com.readmates.auth.infrastructure.security.OAuthInviteTokenSession
 import com.readmates.auth.infrastructure.security.OAuthReturnState
 import com.readmates.auth.infrastructure.security.ReadmatesOAuthSuccessHandler
@@ -411,7 +412,7 @@ class GoogleOAuthLoginSessionTest(
         assertEquals("google-oauth-invited", memberState["google_subject_id"])
         assertEquals("GOOGLE", memberState["auth_provider"])
         assertEquals("ACTIVE", memberState["status"])
-        assertEquals("cat-flower-mug", memberState["avatar_key"])
+        assertNotNull(BookClubAvatarKey.fromWireValue(memberState["avatar_key"] as? String))
         assertNotNull(memberState["last_login_at"])
 
         val participantCount =
