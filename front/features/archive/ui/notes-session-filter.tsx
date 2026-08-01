@@ -4,6 +4,7 @@ import type { FeedFilter, NoteSessionItem } from "@/features/archive/model/notes
 import {
   mobileRecentSessions,
   noteSessionNumberLabel,
+  noteSessionSearchPlaceholder,
   sessionBookTitle,
   sessionHref,
   sessionMatchesQuery,
@@ -90,7 +91,7 @@ export function SessionRail({
           type="search"
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
-          placeholder="책 제목 또는 No.06"
+          placeholder={noteSessionSearchPlaceholder(noteSessions)}
           style={{
             width: "100%",
             height: "38px",
@@ -158,6 +159,8 @@ function SessionRow({
 }) {
   return (
     <Link
+      viewTransition
+      className="rm-notes-session-link"
       to={sessionHref(session, filter)}
       aria-current={selected ? "page" : undefined}
       aria-label={`${noteSessionNumberLabel(session)} ${sessionBookTitle(session)} 세션 보기`}
@@ -243,6 +246,8 @@ export function MobileSessionPicker({
             return (
               <Link
                 key={session.sessionId}
+                viewTransition
+                className="rm-notes-session-link"
                 to={sessionHref(session, filter)}
                 aria-current={selected ? "page" : undefined}
                 aria-label={`${noteSessionNumberLabel(session)} ${sessionBookTitle(session)} 세션 보기`}
@@ -398,7 +403,7 @@ export function MobileSessionSheet({
             ref={searchInputRef}
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
-            placeholder="책 제목 또는 No.06"
+            placeholder={noteSessionSearchPlaceholder(noteSessions)}
             style={{
               width: "100%",
               height: "40px",

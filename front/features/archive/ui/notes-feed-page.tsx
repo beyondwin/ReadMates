@@ -74,6 +74,74 @@ export default function NotesFeedPage({
           margin-top: 18px;
         }
 
+        .rm-notes-session-link {
+          transition:
+            background-color var(--motion-fast) var(--ease-out-refined),
+            border-color var(--motion-fast) var(--ease-out-refined);
+        }
+
+        @supports (view-transition-name: none) {
+          .rm-notes-session-context-transition {
+            view-transition-name: rm-notes-session-context;
+          }
+
+          .rm-notes-feed-content-transition {
+            view-transition-name: rm-notes-feed-content;
+          }
+
+          ::view-transition-group(root),
+          ::view-transition-old(root),
+          ::view-transition-new(root) {
+            animation: none;
+          }
+
+          ::view-transition-group(rm-notes-session-context),
+          ::view-transition-group(rm-notes-feed-content) {
+            animation-duration: var(--motion-page);
+            animation-timing-function: var(--ease-out-refined);
+          }
+
+          ::view-transition-old(rm-notes-session-context),
+          ::view-transition-old(rm-notes-feed-content) {
+            animation: rm-notes-content-out var(--motion-page) var(--ease-out-refined) both;
+          }
+
+          ::view-transition-new(rm-notes-session-context),
+          ::view-transition-new(rm-notes-feed-content) {
+            animation: rm-notes-content-in var(--motion-page) var(--ease-out-refined) both;
+          }
+        }
+
+        @keyframes rm-notes-content-out {
+          to {
+            opacity: 0;
+            transform: translateY(-4px);
+          }
+        }
+
+        @keyframes rm-notes-content-in {
+          from {
+            opacity: 0;
+            transform: translateY(4px);
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .rm-notes-session-link {
+            transition: none;
+          }
+
+          ::view-transition-group(root),
+          ::view-transition-group(rm-notes-session-context),
+          ::view-transition-group(rm-notes-feed-content),
+          ::view-transition-old(rm-notes-session-context),
+          ::view-transition-new(rm-notes-session-context),
+          ::view-transition-old(rm-notes-feed-content),
+          ::view-transition-new(rm-notes-feed-content) {
+            animation: none;
+          }
+        }
+
         @media (max-width: 768px) {
           .rm-notes-feed-page .page-header-compact.rm-notes-feed-page__header {
             padding: 24px 0 0;
@@ -91,11 +159,13 @@ export default function NotesFeedPage({
 
       <section className="page-header-compact rm-notes-feed-page__header">
         <div className="container">
-          <SelectedSessionHeader session={displayedSession} />
-          <p className="small" style={{ color: "var(--text-2)", margin: "10px 0 0", maxWidth: 620 }}>
-            세션을 먼저 고르고, 하이라이트·한줄평·질문을 작성자와 함께 훑는 클럽 기록장입니다.
-          </p>
-          <NotesFilterBar filter={filter} onFilterChange={handleFilterChange} selectedSession={displayedSession} />
+          <div className="rm-notes-session-context-transition">
+            <SelectedSessionHeader session={displayedSession} />
+            <p className="small" style={{ color: "var(--text-2)", margin: "10px 0 0", maxWidth: 620 }}>
+              세션을 먼저 고르고, 하이라이트·한줄평·질문을 작성자와 함께 훑는 클럽 기록장입니다.
+            </p>
+            <NotesFilterBar filter={filter} onFilterChange={handleFilterChange} selectedSession={displayedSession} />
+          </div>
           <MobileSessionPicker
             noteSessions={noteSessionItems}
             selectedSessionId={activeSessionId}
@@ -112,7 +182,7 @@ export default function NotesFeedPage({
       <section className="rm-notes-feed-page__body">
         <div className="container">
           <div className="rm-notes-feed-page__layout">
-            <div className="stack" style={{ "--stack": "0px" } as CSSProperties}>
+            <div className="stack rm-notes-feed-content-transition" style={{ "--stack": "0px" } as CSSProperties}>
               <FeedSections items={selectedSessionItems} filter={filter} selectedSession={displayedSession} hasNoteSessions={noteSessionItems.length > 0} />
               <LoadMoreButton visible={Boolean(items.nextCursor)} onLoadMore={onLoadMoreItems} />
             </div>

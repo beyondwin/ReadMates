@@ -1,7 +1,13 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { MemoryRouter, useLocation, useSearchParams } from "react-router-dom";
+import {
+  createMemoryRouter,
+  MemoryRouter,
+  RouterProvider,
+  useLocation,
+  useSearchParams,
+} from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { NoteFeedItem, NoteSessionItem } from "@/features/archive/api/archive-contracts";
 import {
@@ -289,6 +295,40 @@ function desktopRail() {
 }
 
 describe("NotesFeedPage", () => {
+  it("uses the latest session number in desktop and mobile search examples", async () => {
+    const user = userEvent.setup();
+
+    renderNotesFeedPage({
+      renderNoteSessions: [noteSessions[3], noteSessions[0], noteSessions[1]],
+    });
+
+    expect(screen.getByLabelText("세션 검색")).toHaveAttribute(
+      "placeholder",
+      "책 제목 또는 No.09",
+    );
+
+    await user.click(screen.getByRole("button", { name: "전체 보기" }));
+
+    expect(screen.getByLabelText("세션 목록 검색")).toHaveAttribute(
+      "placeholder",
+      "책 제목 또는 No.09",
+    );
+  });
+
+  it("uses a generic search example when there are no note sessions", () => {
+    renderNotesFeedPage({
+      renderItems: [],
+      renderNoteSessions: [],
+      selectedSessionId: null,
+      renderSelectedSession: null,
+    });
+
+    expect(screen.getByLabelText("세션 검색")).toHaveAttribute(
+      "placeholder",
+      "책 제목 또는 세션 번호",
+    );
+  });
+
   it("resolves selected sessions without changing fallback order", () => {
     expect(resolveSelectedSession({ noteSessions, selectedSessionId: "session-1", selectedSession: noteSessions[8] })).toBe(noteSessions[8]);
     expect(resolveSelectedSession({ noteSessions, selectedSessionId: "session-8", selectedSession: null })).toBe(noteSessions[1]);
@@ -483,6 +523,57 @@ describe("NotesFeedPage", () => {
 
     expect(screen.getByLabelText("current route")).toHaveTextContent("/app/notes?sessionId=session-6&filter=questions");
     expect(screen.queryByText("AI-assisted")).not.toBeInTheDocument();
+  });
+
+  it("requests a view transition for desktop session navigation", async () => {
+    const user = userEvent.setup();
+    const startViewTransition = vi.fn((update: () => void | Promise<void>) => {
+      const updateCallbackDone = Promise.resolve().then(update);
+
+      return {
+        ready: Promise.resolve(),
+        updateCallbackDone,
+        finished: updateCallbackDone,
+        skipTransition: vi.fn(),
+      };
+    });
+
+    Object.defineProperty(document, "startViewTransition", {
+      configurable: true,
+      value: startViewTransition,
+    });
+
+    try {
+      const router = createMemoryRouter(
+        [
+          {
+            path: "/app/notes",
+            element: (
+              <>
+                {notesFeedPageElement()}
+                <LocationProbe />
+              </>
+            ),
+          },
+        ],
+        { initialEntries: ["/app/notes?sessionId=session-6"] },
+      );
+
+      render(<RouterProvider router={router} />);
+
+      await user.click(
+        within(desktopRail()).getByRole("link", {
+          name: "No.09 다정한 것이 살아남는다 세션 보기",
+        }),
+      );
+
+      await waitFor(() => expect(startViewTransition).toHaveBeenCalledTimes(1));
+      expect(screen.getByLabelText("current route")).toHaveTextContent(
+        "/app/notes?sessionId=session-9",
+      );
+    } finally {
+      Reflect.deleteProperty(document, "startViewTransition");
+    }
   });
 
   it("shows the oneliner detail label on oneliner note filter views", () => {
