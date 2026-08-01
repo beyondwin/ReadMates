@@ -7,6 +7,7 @@ import { isReadmatesApiError } from "@/shared/api/errors";
 type ProfileUpdateControllerInput = {
   sourceProfile: MyPageResponse;
   canEditProfile: boolean;
+  clubSlug?: string | null;
   onProfileUpdated: () => Promise<void>;
   onRevalidate: () => void;
 };
@@ -57,6 +58,7 @@ function profileUpdateErrorMessage(error: unknown) {
 export function useProfileUpdateController({
   sourceProfile,
   canEditProfile,
+  clubSlug,
   onProfileUpdated,
   onRevalidate,
 }: ProfileUpdateControllerInput): {
@@ -65,7 +67,7 @@ export function useProfileUpdateController({
   updateAvatar: (avatarKey: string) => Promise<MemberProfileResponse>;
 } {
   const { mutateAsync: updateMyProfile } = useUpdateMyProfileMutation();
-  const { mutateAsync: updateMyAvatar } = useUpdateMyAvatarMutation();
+  const { mutateAsync: updateMyAvatar } = useUpdateMyAvatarMutation(clubSlug ? { clubSlug } : undefined);
   const [displayNameOverride, setDisplayNameOverride] = useState<SavedFieldOverride | null>(null);
   const [avatarKeyOverride, setAvatarKeyOverride] = useState<SavedFieldOverride | null>(null);
   const displayNameOverrideIsCurrent = savedFieldOverrideIsCurrent(displayNameOverride, sourceProfile.displayName);

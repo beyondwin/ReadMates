@@ -43,9 +43,9 @@ function mysqlScalar(sql: string) {
   return runMysql(sql).trim().split(/\s+/).at(-1) ?? "";
 }
 
-async function updateAvatarDirect(page: Page, avatarKey: string, clubSlug?: string) {
+async function updateAvatarDirect(page: Page, avatarKey: string, clubSlug: string) {
   return page.evaluate(async ({ avatarKey: selectedAvatarKey, clubSlug: selectedClubSlug }) => {
-    const query = selectedClubSlug ? `?clubSlug=${encodeURIComponent(selectedClubSlug)}` : "";
+    const query = `?clubSlug=${encodeURIComponent(selectedClubSlug)}`;
     const response = await fetch(`/api/bff/api/me/avatar${query}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -240,7 +240,7 @@ test("suspended members omit account navigation and profile editing from member 
     name: "최근 독서 기록",
   })).toBeVisible();
 
-  const directUpdate = await updateAvatarDirect(page, "hedgehog-green-mug");
+  const directUpdate = await updateAvatarDirect(page, "hedgehog-green-mug", "reading-sai");
   expect(directUpdate.status).toBe(200);
   expect(directUpdate.body?.avatarKey).toBe("hedgehog-green-mug");
 });
@@ -253,7 +253,7 @@ test("left and inactive members cannot open or directly mutate the avatar picker
     setMembershipStatus(email, status);
     await page.goto("/");
 
-    const directUpdate = await updateAvatarDirect(page, "hedgehog-green-mug");
+    const directUpdate = await updateAvatarDirect(page, "hedgehog-green-mug", "reading-sai");
     expect(directUpdate.status).toBe(403);
     expect(directUpdate.body?.code).toBe("MEMBERSHIP_NOT_ALLOWED");
 
@@ -288,7 +288,7 @@ where memberships.club_id = '00000000-0000-0000-0000-000000000001'
 `)).toBe("2");
 });
 
-test("avatar updates remain independent across club memberships", async ({ page }) => {
+test("mixed membership edit gates and avatar updates remain independent across clubs", async ({ page }) => {
   const email = uniqueViewerEmail("cross-club-avatar");
   fixtureEmails.push(email);
   await loginWithGoogleFixture(page, email, { displayName: "E2E Cross Club Avatar" });
@@ -296,16 +296,21 @@ test("avatar updates remain independent across club memberships", async ({ page 
   ensureSecondClubFixture();
   runMysql(`
 insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
-select uuid(), clubs.id, users.id, 'MEMBER', 'ACTIVE', utc_timestamp(6), users.short_name, 'turtle-winter-book'
+select uuid(), clubs.id, users.id, 'MEMBER', 'VIEWER', utc_timestamp(6), users.short_name, 'turtle-winter-book'
 from users
 join clubs on clubs.slug = 'sample-book-club'
 where lower(users.email) = ${sqlString(email)}
 on duplicate key update
-  status = 'ACTIVE',
+  status = 'VIEWER',
   avatar_key = 'turtle-winter-book',
   updated_at = utc_timestamp(6);
 `);
   await page.goto("/");
+
+  await page.goto("/clubs/reading-sai/app/me");
+  await expect(page.getByRole("button", { name: "아바타 바꾸기" })).toBeVisible();
+  await page.goto("/clubs/sample-book-club/app/me");
+  await expect(page.getByRole("button", { name: "아바타 바꾸기" })).toHaveCount(0);
 
   const readingSaiUpdate = await updateAvatarDirect(page, "hedgehog-green-mug", "reading-sai");
   expect(readingSaiUpdate.status).toBe(200);
@@ -411,7 +416,7 @@ test("viewer can read member routes but cannot use current-session write actions
   await expect(viewerShelf.getByRole("list", {
     name: "최근 독서 기록",
   })).toBeVisible();
-  const directUpdate = await updateAvatarDirect(page, "hedgehog-green-mug");
+  const directUpdate = await updateAvatarDirect(page, "hedgehog-green-mug", "reading-sai");
   expect(directUpdate.status).toBe(200);
   expect(directUpdate.body?.avatarKey).toBe("hedgehog-green-mug");
 

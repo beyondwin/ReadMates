@@ -82,12 +82,13 @@ export async function updateMyProfile(displayName: string) {
   ) as Promise<Response & { json(): Promise<MemberProfileResponse> }>;
 }
 
-export async function updateMyAvatar(avatarKey: string) {
+export async function updateMyAvatar(avatarKey: string, context?: ReadmatesApiContext) {
   const request: UpdateMemberAvatarRequest = { avatarKey };
 
   return readmatesFetchResponse(
     "/api/me/avatar",
     jsonRequest({ method: "PATCH" }, request),
+    context,
   ) as Promise<Response & { json(): Promise<MemberProfileResponse> }>;
 }
 

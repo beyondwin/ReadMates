@@ -61,7 +61,7 @@ describe("profile mutations", () => {
   it("sends an avatar update to the own-avatar endpoint", async () => {
     vi.mocked(readmatesFetchResponse).mockResolvedValue(profileResponse(savedProfile));
 
-    await updateMyAvatar("hedgehog-green-mug");
+    await updateMyAvatar("hedgehog-green-mug", { clubSlug: "reading-sai" });
 
     expect(readmatesFetchResponse).toHaveBeenCalledWith(
       "/api/me/avatar",
@@ -69,6 +69,7 @@ describe("profile mutations", () => {
         method: "PATCH",
         body: JSON.stringify({ avatarKey: "hedgehog-green-mug" }),
       }),
+      { clubSlug: "reading-sai" },
     );
   });
 

@@ -90,7 +90,7 @@ function renderRoute(
     ...render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initialEntry]}>
-        <MyPageRoute canEditProfile onProfileUpdated={onProfileUpdated} />
+        <MyPageRoute canEditProfile clubSlug="reading-sai" onProfileUpdated={onProfileUpdated} />
       </MemoryRouter>
     </QueryClientProvider>,
     ),

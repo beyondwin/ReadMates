@@ -10,16 +10,18 @@ import { useProfileUpdateController } from "./profile-update-controller";
 
 export type MyPageRouteProps = {
   canEditProfile: boolean;
+  clubSlug: string | null;
   onProfileUpdated: () => Promise<void>;
 };
 
-export function MyPageRoute({ canEditProfile, onProfileUpdated }: MyPageRouteProps) {
+export function MyPageRoute({ canEditProfile, clubSlug, onProfileUpdated }: MyPageRouteProps) {
   const { profile: sourceProfile, journey } = useLoaderData() as MyPageRouteData;
   const location = useLocation();
   const revalidator = useRevalidator();
   const { profile, updateProfile, updateAvatar } = useProfileUpdateController({
     sourceProfile,
     canEditProfile,
+    clubSlug,
     onProfileUpdated,
     onRevalidate: revalidator.revalidate,
   });

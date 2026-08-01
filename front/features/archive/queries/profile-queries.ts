@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateMyAvatar, updateMyProfile } from "@/features/archive/api/archive-api";
 import type { MemberProfileResponse } from "@/features/archive/api/archive-contracts";
+import type { ReadmatesApiContext } from "@/shared/api/client";
 import { apiErrorFromResponse } from "@/shared/api/errors";
 import { archiveKeys } from "./archive-queries";
 
@@ -21,11 +22,11 @@ export function useUpdateMyProfileMutation() {
   });
 }
 
-export function useUpdateMyAvatarMutation() {
+export function useUpdateMyAvatarMutation(context?: ReadmatesApiContext) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (avatarKey: string) => updatedProfileFromResponse(await updateMyAvatar(avatarKey)),
+    mutationFn: async (avatarKey: string) => updatedProfileFromResponse(await updateMyAvatar(avatarKey, context)),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: archiveKeys.all }),
   });
 }
