@@ -30,11 +30,16 @@ export function loginPathForReturnTo(rawValue: string | null | undefined) {
   return returnTo ? `/login?returnTo=${encodeURIComponent(returnTo)}` : "/login";
 }
 
-export function oauthHrefForReturnTo(rawValue: string | null | undefined) {
+export function oauthHrefForReturnTo(
+  rawValue: string | null | undefined,
+  { chooseAccount = false }: { chooseAccount?: boolean } = {},
+) {
   const returnTo = safeRelativeReturnTo(rawValue);
-  return returnTo
-    ? `/oauth2/authorization/google?returnTo=${encodeURIComponent(returnTo)}`
-    : "/oauth2/authorization/google";
+  const query = new URLSearchParams();
+  if (returnTo) query.set("returnTo", returnTo);
+  if (chooseAccount) query.set("chooseAccount", "true");
+  const search = query.toString();
+  return `/oauth2/authorization/google${search ? `?${search}` : ""}`;
 }
 
 function isRootPath(value: string) {

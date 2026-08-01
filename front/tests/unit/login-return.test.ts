@@ -33,4 +33,16 @@ describe("login return helpers", () => {
     expect(loginPathForReturnTo("https://evil.example/app")).toBe("/login");
     expect(oauthHrefForReturnTo("//evil.example/app")).toBe("/oauth2/authorization/google");
   });
+
+  it("adds only the ReadMates account-choice intent when recovery requests it", () => {
+    expect(oauthHrefForReturnTo("/clubs/reading-sai/app", { chooseAccount: true })).toBe(
+      "/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp&chooseAccount=true",
+    );
+    expect(oauthHrefForReturnTo(null, { chooseAccount: true })).toBe(
+      "/oauth2/authorization/google?chooseAccount=true",
+    );
+    expect(oauthHrefForReturnTo("https://evil.example/app", { chooseAccount: true })).toBe(
+      "/oauth2/authorization/google?chooseAccount=true",
+    );
+  });
 });
