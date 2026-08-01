@@ -538,7 +538,7 @@ export function CurrentSessionBoard({
                     style={{
                       height: "30px",
                       padding: "0 14px",
-                      fontSize: "13px",
+                      fontSize: "var(--type-size-control)",
                       borderRadius: "999px",
                       background: boardTab === tab.key ? "var(--accent-soft)" : "transparent",
                       color: boardTab === tab.key ? "var(--accent)" : "var(--text-2)",

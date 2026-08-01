@@ -243,7 +243,7 @@ export function MobileCurrentSessionCard({
 
       <div className="rm-member-session-card__body">
         <div className="m-row-between" style={{ alignItems: "baseline", gap: 10 }}>
-          <div className="eyebrow" style={{ fontSize: 10 }}>
+          <div className="eyebrow">
             내 준비
           </div>
           <div className="tiny mono" style={{ color: "var(--text-3)" }}>
@@ -439,7 +439,7 @@ function MobileActionTile({
         {icon}
       </span>
       <span className="m-action-tile__text">
-        <span className="body m-action-tile__label" style={{ display: "block", fontSize: 13.5, fontWeight: 600, lineHeight: 1.35 }}>
+        <span className="small m-action-tile__label" style={{ display: "block", color: "var(--text)", fontWeight: 600 }}>
           {label}
         </span>
         <span className="tiny m-action-tile__sub" style={{ display: "block", color: "var(--text-3)", marginTop: 3 }}>

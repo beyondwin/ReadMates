@@ -531,7 +531,7 @@ describe("CurrentSession", () => {
         minHeight: "32px",
         height: "32px",
         padding: "0 14px",
-        fontSize: "13px",
+        fontSize: "var(--type-size-control)",
         borderColor: "var(--line)",
         background: "transparent",
         color: "var(--text-2)",

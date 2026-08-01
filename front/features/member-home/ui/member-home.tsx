@@ -157,7 +157,7 @@ function HomeAnswerStrip({
     <section className="rm-home-answer-strip" aria-label="홈 요약">
       <div className="surface-quiet rm-home-answer-strip__item">
         <div className="eyebrow">지금 읽는 책</div>
-        <div className="body editorial" style={{ fontSize: "17px", marginTop: "8px" }}>
+        <div className="body-lg editorial" style={{ marginTop: "8px" }}>
           {session ? session.bookTitle : "다음 책을 기다리는 중"}
         </div>
         <p className="tiny" style={{ color: "var(--text-3)", margin: "6px 0 0" }}>
@@ -292,7 +292,7 @@ function MobileQuickLinks({ LinkComponent }: { LinkComponent: MemberHomeLinkComp
             <span className="rm-mobile-shortcuts__icon" aria-hidden>
               <MobileIcon name={item.icon} size={18} />
             </span>
-            <span className="body" style={{ display: "block", fontSize: 13.5, fontWeight: 500 }}>
+            <span className="small" style={{ display: "block", color: "var(--text)", fontWeight: 500 }}>
               {item.label}
             </span>
             <span className="tiny" style={{ color: "var(--text-3)" }}>
@@ -319,7 +319,7 @@ function MobileUpcomingSessions({ upcomingSessions }: { upcomingSessions: Member
         {upcomingSessions.slice(0, 4).map((session) => (
           <div key={session.sessionId} className="m-card-quiet">
             <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} tone="muted" />
-            <span className="body editorial" style={{ display: "block", fontSize: 13.5, marginTop: 6 }}>
+            <span className="body editorial" style={{ display: "block", marginTop: 6 }}>
               {session.bookTitle}
             </span>
             <span className="tiny" style={{ color: "var(--text-3)" }}>
@@ -344,7 +344,7 @@ function NextBookHint({ upcomingSessions }: { upcomingSessions: MemberHomeUpcomi
             {upcomingSessions.slice(0, 3).map((session) => (
               <div key={session.sessionId}>
                 <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} tone="muted" />
-                <div className="body editorial" style={{ fontSize: "15px", marginTop: 4 }}>
+                <div className="body editorial" style={{ marginTop: 4 }}>
                   {session.bookTitle}
                 </div>
                 <div className="tiny" style={{ marginTop: 3 }}>
@@ -354,7 +354,7 @@ function NextBookHint({ upcomingSessions }: { upcomingSessions: MemberHomeUpcomi
             ))}
           </div>
         ) : (
-          <div className="body" style={{ fontSize: "14px" }}>
+          <div className="small" style={{ color: "var(--text)" }}>
             아직 등록된 다음 달 후보가 없습니다.
           </div>
         )}

@@ -131,7 +131,7 @@ export function ArchiveMobile({
                 minHeight: 32,
                 height: 32,
                 padding: "0 14px",
-                fontSize: 13,
+                fontSize: "var(--type-size-control)",
                 borderColor: selected ? "var(--text)" : "var(--line)",
                 background: selected ? "var(--text)" : "transparent",
                 color: selected ? "var(--bg)" : "var(--text-2)",
@@ -214,7 +214,7 @@ function ArchiveMobileSessions({ sessions }: { sessions: ArchiveSessionRecord[] 
                 <div className="tiny mono" style={{ color: "var(--text-3)" }}>
                   No.{String(session.number).padStart(2, "0")} · {formatDateOnlyLabel(session.date)}
                 </div>
-                <div className="editorial" style={{ fontSize: 16, margin: "6px 0 2px", lineHeight: 1.3 }}>
+                <div className="body editorial" style={{ margin: "6px 0 2px" }}>
                   {session.book}
                 </div>
                 <div className="tiny" style={{ color: "var(--text-3)" }}>
@@ -281,7 +281,7 @@ function ArchiveMobileReviews({ reviews }: { reviews: ArchiveReviewItem[] }) {
               <div className="tiny mono" style={{ color: "var(--text-3)" }}>
                 {formatDateOnlyLabel(review.date)} · {review.bookTitle}
               </div>
-              <div className="body editorial" style={{ fontSize: 15, marginTop: 8, lineHeight: 1.6 }}>
+              <div className="body editorial" style={{ marginTop: 8 }}>
                 {review.text}
               </div>
             </div>
@@ -315,11 +315,11 @@ function ArchiveMobileQuestions({ questions }: { questions: ArchiveQuestionItem[
             <div className="tiny mono" style={{ color: "var(--text-3)" }}>
               Q{question.priority} · {formatDateOnlyLabel(question.date)}
             </div>
-            <div className="body editorial" style={{ fontSize: 15, marginTop: 6, lineHeight: 1.55 }}>
+            <div className="body editorial" style={{ marginTop: 6 }}>
               {question.text}
             </div>
             {question.draftThought ? (
-              <div className="tiny" style={{ color: "var(--text-3)", marginTop: 8 }}>
+              <div className="small" style={{ color: "var(--text-3)", marginTop: 8 }}>
                 {question.draftThought}
               </div>
             ) : null}
@@ -365,7 +365,7 @@ function ArchiveMobileReports({ reports, sessions }: { reports: FeedbackDocument
             <>
               <BookCover title={report.bookTitle} author={cover.author} imageUrl={cover.imageUrl} width={36} decorative />
               <div style={{ minWidth: 0 }}>
-                <div className="body" style={{ fontSize: 14 }}>
+                <div className="body">
                   {report.bookTitle}
                 </div>
                 <div className="tiny mono" style={{ color: "var(--text-3)" }}>

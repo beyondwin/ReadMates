@@ -140,7 +140,7 @@ export function ArchiveDesktop({
                   style={{
                     height: "32px",
                     padding: "0 14px",
-                    fontSize: "13px",
+                    fontSize: "var(--type-size-control)",
                     borderRadius: "999px",
                     border: `1px solid ${selected ? "var(--text)" : "var(--line)"}`,
                     background: selected ? "var(--text)" : "transparent",
@@ -252,7 +252,7 @@ function ArchiveSessions({ sessions }: { sessions: ArchiveSessionRecord[] }) {
                   <div style={{ display: "grid", gridTemplateColumns: "46px minmax(0, 1fr)", gap: "14px", alignItems: "center" }}>
                     <BookCover title={session.book} author={session.author} imageUrl={session.bookImageUrl} width={46} />
                     <div style={{ minWidth: 0 }}>
-                      <h3 className="editorial" style={{ fontSize: "19px", margin: 0 }}>
+                      <h3 className="h3 editorial" style={{ margin: 0 }}>
                         {session.book}
                       </h3>
                       <div className="small" style={{ marginTop: "4px" }}>
@@ -324,7 +324,7 @@ function ArchiveReviews({ reviews, reviewAuthorName }: { reviews: ArchiveReviewI
             {review.bookTitle}
           </h2>
           <p
-            className="editorial"
+            className="body-lg editorial"
             style={{
               display: "-webkit-box",
               WebkitBoxOrient: "vertical",
@@ -332,8 +332,6 @@ function ArchiveReviews({ reviews, reviewAuthorName }: { reviews: ArchiveReviewI
               alignSelf: "start",
               overflow: "hidden",
               color: "var(--text-2)",
-              fontSize: "18px",
-              lineHeight: 1.55,
               margin: "20px 0 0",
               wordBreak: "keep-all",
               overflowWrap: "anywhere",
@@ -377,7 +375,7 @@ function ArchiveQuestions({ questions }: { questions: ArchiveQuestionItem[] }) {
               No.{String(question.sessionNumber).padStart(2, "0")} · {question.bookTitle}
             </span>
           </div>
-          <h2 className="body editorial" style={{ fontSize: "18px", margin: 0, lineHeight: 1.58 }}>
+          <h2 className="body-lg editorial" style={{ margin: 0 }}>
             {question.text}
           </h2>
           {question.draftThought ? (
@@ -418,7 +416,7 @@ function ArchiveReports({ reports, sessions }: { reports: FeedbackDocumentListIt
           <>
             <BookCover title={report.bookTitle} author={cover.author} imageUrl={cover.imageUrl} width={48} decorative />
             <div>
-              <h2 className="editorial" style={{ fontSize: "16px", margin: 0 }}>
+              <h2 className="body editorial" style={{ margin: 0 }}>
                 {report.bookTitle}
               </h2>
               <div className="tiny mono" style={{ color: "var(--text-3)", marginTop: "4px" }}>

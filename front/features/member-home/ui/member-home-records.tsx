@@ -120,7 +120,7 @@ function RecentRecordCopy({ entry }: { entry: MemberHomeRecentRecordEntry }) {
       <h2 className="h3 editorial rm-recent-record__title">
         No.{String(entry.sessionNumber).padStart(2, "0")} · {entry.bookTitle}
       </h2>
-      <p className="small reading-editorial rm-recent-record__summary">{entry.summary}</p>
+      <p className="body rm-recent-record__summary">{entry.summary}</p>
       {entry.kindLabels.length > 0 ? (
         <div className="tiny rm-recent-record__kinds">보존된 내용 · {entry.kindLabels.join(" · ")}</div>
       ) : null}
@@ -178,7 +178,7 @@ export function ClubPulse({
                   No.{String(item.sessionNumber).padStart(2, "0")} · {noteKindLabel(item.kind)}
                 </span>
               </div>
-              <div className="body editorial reading-editorial" style={{ fontSize: "17px" }}>
+              <div className="body-lg editorial" style={{ lineHeight: 1.65 }}>
                 {item.text}
               </div>
             </article>
@@ -283,7 +283,7 @@ export function MobileMemberActivity({
                     </div>
                   </div>
                 </div>
-                <p className="rm-member-activity-card__text editorial reading-editorial">{item.text}</p>
+                <p className="rm-member-activity-card__text body editorial">{item.text}</p>
               </article>
             );
           })}
@@ -300,7 +300,7 @@ export function RosterSummary({ current }: { current: CurrentSessionResponse }) 
     return (
       <section>
         <div className="surface-quiet" style={{ padding: "20px" }}>
-          <div className="body editorial" style={{ fontSize: "18px" }}>
+          <div className="body-lg editorial">
             참석 현황 준비 중
           </div>
           <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
@@ -317,7 +317,7 @@ export function RosterSummary({ current }: { current: CurrentSessionResponse }) 
     return (
       <section>
         <div className="surface-quiet" style={{ padding: "20px" }}>
-          <div className="body editorial" style={{ fontSize: "18px" }}>
+          <div className="body-lg editorial">
             참석 현황 준비 중
           </div>
           <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
@@ -338,7 +338,7 @@ export function RosterSummary({ current }: { current: CurrentSessionResponse }) 
       </div>
       <div className="surface" style={{ padding: "20px" }}>
         <div className="row-between">
-          <div className="body editorial" style={{ fontSize: "18px" }}>
+          <div className="body-lg editorial">
             참석 {goingMembers.length}명
           </div>
           <div className="small mono">미응답 {noResponseCount}</div>

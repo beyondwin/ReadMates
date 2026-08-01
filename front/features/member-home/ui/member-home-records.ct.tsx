@@ -43,14 +43,17 @@ test("member reflection keeps the reading stack and rhythm on desktop", async ({
     const style = getComputedStyle(node);
     return {
       fontFamily: style.fontFamily,
+      fontSize: Number.parseFloat(style.fontSize),
       lineHeight: Number.parseFloat(style.lineHeight),
       clientWidth: node.clientWidth,
       scrollWidth: node.scrollWidth,
     };
   });
 
-  expect(metrics.fontFamily).toContain("Iowan Old Style");
-  expect(metrics.lineHeight).toBeGreaterThanOrEqual(28);
+  expect(metrics.fontFamily).toContain("Pretendard");
+  expect(metrics.fontFamily).not.toContain("Iowan Old Style");
+  expect(metrics.fontSize).toBeGreaterThanOrEqual(16);
+  expect(metrics.lineHeight / metrics.fontSize).toBeGreaterThanOrEqual(1.6);
   expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth);
 });
 
@@ -67,14 +70,17 @@ test("member reflection keeps the reading stack and rhythm on mobile", async ({ 
     const style = getComputedStyle(node);
     return {
       fontFamily: style.fontFamily,
+      fontSize: Number.parseFloat(style.fontSize),
       lineHeight: Number.parseFloat(style.lineHeight),
       clientWidth: node.clientWidth,
       scrollWidth: node.scrollWidth,
     };
   });
 
-  expect(metrics.fontFamily).toContain("Iowan Old Style");
-  expect(metrics.lineHeight).toBeGreaterThanOrEqual(24);
+  expect(metrics.fontFamily).toContain("Pretendard");
+  expect(metrics.fontFamily).not.toContain("Iowan Old Style");
+  expect(metrics.fontSize).toBeGreaterThanOrEqual(16);
+  expect(metrics.lineHeight / metrics.fontSize).toBeGreaterThanOrEqual(1.6);
   expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth);
 });
 

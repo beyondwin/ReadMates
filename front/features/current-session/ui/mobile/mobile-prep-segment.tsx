@@ -26,7 +26,7 @@ function MobileReadOnlyStat({ label, value }: { label: string; value: string }) 
       <div className="tiny mono" style={{ color: "var(--text-3)", marginBottom: 6 }}>
         {label}
       </div>
-      <div className="body" style={{ fontSize: 14, fontWeight: 500 }}>
+      <div className="small" style={{ color: "var(--text)", fontWeight: 500 }}>
         {value}
       </div>
     </div>
@@ -144,7 +144,7 @@ export function MobilePrepSegment({
                     minHeight: 32,
                     height: 32,
                     padding: "0 14px",
-                    fontSize: 13,
+                    fontSize: "var(--type-size-control)",
                     borderColor: selected ? "var(--text)" : "var(--line)",
                     background: selected ? "var(--text)" : "transparent",
                     color: selected ? "var(--bg)" : "var(--text-2)",
@@ -268,7 +268,7 @@ function MobilePrepMeta({
                 {item.label}
               </span>
               <span className="m-row" style={{ gap: 8 }}>
-                <span className="body" style={{ fontSize: 14, fontWeight: 500, color: item.ok ? "var(--ok)" : "var(--text)" }}>
+                <span className="small" style={{ fontWeight: 500, color: item.ok ? "var(--ok)" : "var(--text)" }}>
                   {item.value}
                 </span>
                 <span
@@ -322,7 +322,7 @@ function MobilePrepMeta({
             <div key={member.membershipId} className="m-row-between">
               <span className="m-row" style={{ gap: 10 }}>
                 <AvatarChip avatarKey={member.avatarKey} name={member.displayName} label="" rsvpStatus={member.rsvpStatus} size={24} />
-                <span className="body" style={{ fontSize: 13.5 }}>
+                <span className="small" style={{ color: "var(--text)" }}>
                   {member.displayName}
                 </span>
               </span>

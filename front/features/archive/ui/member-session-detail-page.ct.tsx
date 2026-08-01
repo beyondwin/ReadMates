@@ -3,8 +3,8 @@ import { archiveSessionDetailContractFixture } from "@/tests/unit/api-contract-f
 import MemberSessionDetailPage from "./member-session-detail-page";
 
 for (const viewport of [
-  { name: "desktop", width: 1200, scope: ".desktop-only", expectedLineHeight: 1.65 },
-  { name: "mobile", width: 320, scope: ".mobile-only", expectedLineHeight: 1.7 },
+  { name: "desktop", width: 1200, scope: ".desktop-only" },
+  { name: "mobile", width: 320, scope: ".mobile-only" },
 ]) {
   test(`MemberSessionDetailPage scopes reading typography on ${viewport.name}`, async ({ mount, page }) => {
     await page.setViewportSize({ width: viewport.width, height: 900 });
@@ -19,8 +19,8 @@ for (const viewport of [
     const interfaceHeading = scope.getByRole("heading", { name: "함께 남긴 질문", exact: true });
 
     await expect(scope).toBeVisible();
-    await expect(summary).toHaveClass(/reading-editorial/);
-    await expect(question).toHaveClass(/reading-editorial/);
+    await expect(summary).not.toHaveClass(/reading-editorial/);
+    await expect(question).not.toHaveClass(/reading-editorial/);
     await expect(interfaceHeading).not.toHaveClass(/reading-editorial/);
 
     const typography = await question.evaluate((element) => {
@@ -29,10 +29,15 @@ for (const viewport of [
         fontFamily: style.fontFamily,
         fontSize: Number.parseFloat(style.fontSize),
         lineHeight: Number.parseFloat(style.lineHeight),
+        clientWidth: (element as HTMLElement).clientWidth,
+        scrollWidth: (element as HTMLElement).scrollWidth,
       };
     });
-    expect(typography.fontFamily).toContain("ui-serif");
-    expect(typography.lineHeight / typography.fontSize).toBeCloseTo(viewport.expectedLineHeight, 1);
+    expect(typography.fontFamily).toContain("Pretendard");
+    expect(typography.fontFamily).not.toContain("Iowan Old Style");
+    expect(typography.fontSize).toBeGreaterThanOrEqual(16);
+    expect(typography.lineHeight / typography.fontSize).toBeGreaterThanOrEqual(1.6);
+    expect(typography.scrollWidth).toBeLessThanOrEqual(typography.clientWidth);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 }

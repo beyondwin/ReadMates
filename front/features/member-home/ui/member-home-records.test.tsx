@@ -38,11 +38,13 @@ describe("member home record reflection cards", () => {
     };
 
     const { unmount } = render(<ClubPulse items={[reflection]} />);
-    expect(screen.getByText(reflection.text)).toHaveClass("reading-editorial");
+    expect(screen.getByText(reflection.text)).toHaveClass("body-lg", "editorial");
+    expect(screen.getByText(reflection.text)).not.toHaveClass("reading-editorial");
     unmount();
 
     render(<MobileMemberActivity items={[reflection]} />);
-    expect(screen.getByText(reflection.text)).toHaveClass("reading-editorial");
+    expect(screen.getByText(reflection.text)).toHaveClass("body", "editorial");
+    expect(screen.getByText(reflection.text)).not.toHaveClass("reading-editorial");
   });
 
   it("uses the projected safe avatar key for a mobile null-author highlight", () => {
@@ -75,7 +77,8 @@ describe("member home record reflection cards", () => {
     expect(region).toBeInTheDocument();
     expect(screen.getByText("지난 모임 회고")).toBeInTheDocument();
     expect(screen.getByText("No.08 · 긴 제목의 다음 책")).toBeInTheDocument();
-    expect(screen.getByText("긴 제목의 다음 책의 기록과 피드백을 이어 읽을 수 있어요.")).toHaveClass(
+    expect(screen.getByText("긴 제목의 다음 책의 기록과 피드백을 이어 읽을 수 있어요.")).toHaveClass("body");
+    expect(screen.getByText("긴 제목의 다음 책의 기록과 피드백을 이어 읽을 수 있어요.")).not.toHaveClass(
       "reading-editorial",
     );
     expect(screen.getByText("보존된 내용 · 질문 · 하이라이트")).toBeInTheDocument();
@@ -130,7 +133,8 @@ describe("member home record reflection cards", () => {
 
     expect(screen.getByText("지난 모임 회고")).toBeInTheDocument();
     expect(screen.getByText("No.08 · 긴 제목의 다음 책")).toBeInTheDocument();
-    expect(screen.getByText("긴 제목의 다음 책의 기록과 피드백을 이어 읽을 수 있어요.")).toHaveClass(
+    expect(screen.getByText("긴 제목의 다음 책의 기록과 피드백을 이어 읽을 수 있어요.")).toHaveClass("body");
+    expect(screen.getByText("긴 제목의 다음 책의 기록과 피드백을 이어 읽을 수 있어요.")).not.toHaveClass(
       "reading-editorial",
     );
     expect(screen.getByText("보존된 내용 · 질문 · 하이라이트")).toBeInTheDocument();

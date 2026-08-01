@@ -799,8 +799,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11.5px;
-  line-height: 1.35;
+  font-size: var(--type-size-supporting);
+  line-height: var(--type-leading-supporting);
   color: var(--text-3);
 }
 .mobile-only .rm-member-activity-card__meta {
@@ -819,8 +819,8 @@
 .mobile-only .rm-member-activity-card__text {
   margin: 0;
   color: var(--text-2);
-  font-size: 14.5px;
-  line-height: 1.7;
+  font-size: var(--type-size-body);
+  line-height: var(--type-leading-body);
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -867,7 +867,7 @@
 }
 
 .mobile-only .rm-recent-record--mobile .rm-recent-record__title {
-  font-size: 15px;
+  font-size: var(--type-size-body-emphasis);
   line-height: 1.45;
   letter-spacing: 0;
 }
@@ -884,11 +884,11 @@
 }
 
 .mobile-only .rm-recent-record--mobile .rm-recent-record__destination-copy strong {
-  font-size: 13.5px;
+  font-size: var(--type-size-control);
 }
 
 .mobile-only .rm-recent-record--mobile .rm-recent-record__destination-copy > span {
-  font-size: 11.5px;
+  font-size: var(--type-size-supporting);
 }
 
 /* Member home mobile */
@@ -948,6 +948,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
   gap: 4px;
   margin-top: 12px;
   padding: 10px 12px;
@@ -955,7 +956,7 @@
   border: 1px solid var(--accent-line);
   border-radius: 8px;
   color: var(--accent);
-  font-size: 13px;
+  font-size: var(--type-size-supporting);
   font-weight: 500;
   overflow-wrap: anywhere;
 }
@@ -1004,6 +1005,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
   padding: 12px 14px;
   margin-top: 14px;
@@ -1011,7 +1013,7 @@
   border: 1px solid var(--accent-line);
   border-radius: var(--r-3);
   color: var(--accent);
-  font-size: 13px;
+  font-size: var(--type-size-supporting);
   font-weight: 500;
 }
 .mobile-only .rm-current-session-mobile__host-link {
@@ -1024,7 +1026,7 @@
   border-radius: var(--r-3);
   background: var(--bg-sub);
   color: var(--text-2);
-  font-size: 13px;
+  font-size: var(--type-size-supporting);
   font-weight: 500;
 }
 .mobile-only .rm-current-session-mobile__seg-wrap {
@@ -1116,9 +1118,7 @@
   margin: 0;
 }
 .mobile-only .rm-current-session-mobile__details dt {
-  font-family: var(--f-mono);
-  font-size: 10.5px;
-  line-height: 1.2;
+  font: 600 var(--type-size-label)/var(--type-leading-label) var(--f-sans);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-3);

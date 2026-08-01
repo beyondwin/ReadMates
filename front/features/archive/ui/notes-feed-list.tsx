@@ -36,7 +36,7 @@ export function NotesFilterBar({
             style={{
               height: "32px",
               padding: "0 14px",
-              fontSize: "13px",
+              fontSize: "var(--type-size-control)",
               borderRadius: "999px",
               border: `1px solid ${filter === item.key ? "var(--text)" : "var(--line)"}`,
               background: filter === item.key ? "var(--text)" : "transparent",
@@ -138,7 +138,7 @@ function FeedQuestions({ items }: { items: NoteFeedItem[] }) {
             }}
           >
             <FeedAuthorRow item={item} rightLabel={formatDateOnlyLabel(item.date)} markerSize={22} style={{ gap: "10px", marginBottom: "12px" }} />
-            <div className="body editorial rm-notes-question-text" style={{ fontSize: "16px", lineHeight: 1.58 }}>
+            <div className="body editorial rm-notes-question-text">
               {item.text}
             </div>
           </article>
@@ -154,7 +154,7 @@ function FeedOneLiners({ items }: { items: NoteFeedItem[] }) {
       <div className="rm-notes-oneliner-grid">
         {items.map((item) => (
           <article key={itemKey(item)} className="rm-notes-oneliner-card">
-            <p className="rm-notes-oneliner-card__quote editorial">{item.text}</p>
+            <p className="rm-notes-oneliner-card__quote body-lg editorial">{item.text}</p>
             <FeedAuthorRow item={item} markerSize={22} style={{ gap: "10px", marginTop: "12px", paddingLeft: "34px" }} />
           </article>
         ))}
@@ -169,7 +169,7 @@ function FeedHighlights({ items }: { items: NoteFeedItem[] }) {
       <div className="rm-notes-highlight-list">
         {items.map((item) => (
           <article key={itemKey(item)} className="rm-notes-highlight-row">
-            <p className="rm-notes-highlight-row__quote editorial">{item.text}</p>
+            <p className="rm-notes-highlight-row__quote body-lg editorial">{item.text}</p>
             <FeedAuthorRow item={item} markerSize={20} style={{ gap: "10px", marginTop: "10px", paddingLeft: "34px" }} />
           </article>
         ))}
@@ -236,9 +236,8 @@ function NotesFeedListStyles() {
         margin: 0;
         padding-left: 34px;
         color: var(--text);
-        font-size: 17px;
         font-weight: 600;
-        line-height: 1.45;
+        line-height: var(--type-leading-body);
         letter-spacing: 0;
       }
 
@@ -268,9 +267,8 @@ function NotesFeedListStyles() {
         margin: 0;
         padding-left: 34px;
         color: var(--text);
-        font-size: 18px;
         font-weight: 600;
-        line-height: 1.45;
+        line-height: var(--type-leading-body);
         letter-spacing: 0;
       }
 
@@ -307,11 +305,6 @@ function NotesFeedListStyles() {
           line-height: 1.25;
         }
 
-        .rm-notes-question-text {
-          font-size: 15px !important;
-          line-height: 1.58 !important;
-        }
-
         .rm-notes-oneliner-grid {
           grid-template-columns: 1fr;
           gap: 12px;
@@ -324,8 +317,6 @@ function NotesFeedListStyles() {
 
         .rm-notes-oneliner-card__quote {
           padding-left: 22px;
-          font-size: 15px;
-          line-height: 1.48;
         }
 
         .rm-notes-oneliner-card__quote::before {
@@ -343,8 +334,6 @@ function NotesFeedListStyles() {
 
         .rm-notes-highlight-row__quote {
           padding-left: 22px;
-          font-size: 16px;
-          line-height: 1.48;
         }
 
         .rm-notes-highlight-row__quote::before {

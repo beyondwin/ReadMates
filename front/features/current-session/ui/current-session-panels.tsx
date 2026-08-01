@@ -115,7 +115,7 @@ export function RsvpPanel({
               height: "40px",
               padding: "0 18px",
               borderRadius: "8px",
-              fontSize: "14px",
+              fontSize: "var(--type-size-control)",
               border: `1px solid ${rsvp === option.status ? "var(--accent)" : "var(--line)"}`,
               background: rsvp === option.status ? "var(--accent-soft)" : "var(--bg)",
               color: rsvp === option.status ? "var(--accent)" : "var(--text-2)",
@@ -275,7 +275,7 @@ export function MyStatusCard({
           <div key={item.label} className="rm-session-status-row">
             <dt className="small">{item.label}</dt>
             <dd>
-              <span className="body" style={{ fontSize: "14px", fontWeight: 500, color: item.ok ? "var(--ok)" : "var(--text)" }}>
+              <span className="small" style={{ fontWeight: 500, color: item.ok ? "var(--ok)" : "var(--text)" }}>
                 {item.value}
               </span>
               <span
@@ -369,7 +369,7 @@ export function FeedbackAccessPanel({
       <div className="eyebrow" style={{ marginBottom: "10px" }}>
         피드백 문서 접근
       </div>
-      <div className="body editorial" style={{ fontSize: "17px" }}>
+      <div className="body-lg editorial">
         {feedbackAccess.title}
       </div>
       <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
@@ -396,7 +396,7 @@ export function HostContextPanel({
       <div className="eyebrow" style={{ marginBottom: "10px" }}>
         호스트 맥락
       </div>
-      <div className="body editorial" style={{ fontSize: "17px" }}>
+      <div className="body-lg editorial">
         멤버 준비를 유지한 채 운영 문서로 이동
       </div>
       <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
@@ -424,7 +424,7 @@ export function RosterList({ session }: { session: CurrentSession }) {
           <div key={member.membershipId} className="row-between">
             <span className="row" style={{ gap: "10px" }}>
               <AvatarChip avatarKey={member.avatarKey} name={member.displayName} label="" rsvpStatus={member.rsvpStatus} size={24} />
-              <span className="body" style={{ fontSize: "13.5px" }}>
+              <span className="small" style={{ color: "var(--text)" }}>
                 {member.displayName}
                 {member.role === "HOST" ? (
                   <span className="tiny mono" style={{ marginLeft: "6px" }}>
@@ -474,13 +474,13 @@ export function BoardQuestions({ questions }: { questions: BoardQuestion[] }) {
           <div className="row-between" style={{ alignItems: "flex-start", marginBottom: "12px" }}>
             <div className="row" style={{ gap: "10px", flexWrap: "wrap" }}>
               <AvatarChip avatarKey={question.avatarKey} name={question.authorName} label="" size={24} />
-              <span className="body" style={{ fontSize: "14px", fontWeight: 500 }}>
+              <span className="small" style={{ color: "var(--text)", fontWeight: 500 }}>
                 {question.authorName}
               </span>
             </div>
             <span className="badge badge-accent">Q{question.priority}</span>
           </div>
-          <div className="body editorial" style={{ fontSize: "18px", lineHeight: 1.5, color: "var(--text)" }}>
+          <div className="body-lg editorial" style={{ color: "var(--text)" }}>
             {question.text}
           </div>
           {question.draftThought ? (
@@ -528,7 +528,7 @@ export function BoardLongReviews({ longReviews }: { longReviews: BoardLongReview
             minWidth: 0,
           }}
         >
-          <p className="body editorial" style={{ fontSize: "17px", margin: 0, overflowWrap: "anywhere", wordBreak: "break-word" }}>
+          <p className="body-lg editorial" style={{ margin: 0, overflowWrap: "anywhere", wordBreak: "break-word" }}>
             {review.body}
           </p>
           <div className="row tiny" style={{ marginTop: 12, gap: 8, color: "var(--text-3)", minWidth: 0 }}>

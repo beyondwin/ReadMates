@@ -703,15 +703,15 @@ a.rm-recent-record__destination:hover {
 
 .rm-recent-record__destination-copy strong {
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--type-size-control);
   font-weight: 600;
   line-height: 1.3;
 }
 
 .rm-recent-record__destination-copy > span {
   color: var(--text-3);
-  font-size: 11px;
-  line-height: 1.45;
+  font-size: var(--type-size-supporting);
+  line-height: var(--type-leading-supporting);
   overflow-wrap: anywhere;
 }
 
@@ -5642,7 +5642,7 @@ a.rm-recent-record__destination:hover {
   gap: 8px;
   margin-bottom: 12px;
   color: var(--muted);
-  font-size: 0.8125rem;
+  font-size: var(--type-size-supporting);
   font-weight: 650;
 }
 
@@ -5664,9 +5664,8 @@ a.rm-recent-record__destination:hover {
 
 .rm-member-notifications-header__eyebrow {
   color: var(--muted);
-  font-family: var(--f-mono);
+  font: 600 var(--type-size-label)/var(--type-leading-label) var(--f-sans);
   font-feature-settings: "zero", "cv01";
-  font-size: 11px;
   letter-spacing: 0.08em;
 }
 
@@ -5681,7 +5680,7 @@ a.rm-recent-record__destination:hover {
 .rm-member-notifications-header__summary {
   margin: 8px 0 0;
   color: var(--muted);
-  font-size: 14px;
+  font-size: var(--type-size-supporting);
 }
 
 .rm-member-notification-tabs {
@@ -5728,6 +5727,7 @@ a.rm-recent-record__destination:hover {
   border: 0;
   background: transparent;
   color: var(--accent);
+  font-size: var(--type-size-control);
   font-weight: 700;
   text-underline-offset: 3px;
 }
@@ -5741,7 +5741,7 @@ a.rm-recent-record__destination:hover {
 .rm-member-notifications-page__error {
   margin: 0 4px 12px;
   color: var(--danger);
-  font-size: 13px;
+  font-size: var(--type-size-supporting);
 }
 
 .rm-member-notifications-list {
@@ -5755,7 +5755,7 @@ a.rm-recent-record__destination:hover {
   align-items: center;
   gap: 12px;
   min-height: 76px;
-  padding: 12px 4px;
+  padding: 10px 4px;
   border-bottom: 1px solid var(--line-soft);
   color: var(--text);
   text-decoration: none;
@@ -5810,7 +5810,7 @@ a.rm-recent-record__destination:hover {
   flex-wrap: wrap;
   gap: 6px 10px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--type-size-supporting);
 }
 
 .rm-member-notifications-list__category {
@@ -5834,8 +5834,8 @@ a.rm-recent-record__destination:hover {
   display: -webkit-box;
   overflow: hidden;
   color: var(--muted);
-  font-size: 14px;
-  line-height: 1.45;
+  font-size: var(--type-size-supporting);
+  line-height: var(--type-leading-supporting);
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -5858,12 +5858,13 @@ a.rm-recent-record__destination:hover {
 .rm-member-notifications-list__empty-copy {
   margin: 8px 0 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--type-size-supporting);
 }
 
 .rm-member-notifications-page__load-more {
   display: block;
   margin: 12px auto 0;
+  font-size: var(--type-size-supporting);
 }
 
 @media (max-width: 600px) {
@@ -5893,7 +5894,7 @@ a.rm-recent-record__destination:hover {
   }
 
   .rm-member-notifications-list__copy {
-    font-size: 13px;
+    font-size: var(--type-size-supporting);
   }
 }
 
@@ -6085,7 +6086,7 @@ a.rm-recent-record__destination:hover {
   border: 1px solid var(--line);
   border-radius: 50%;
   color: var(--text);
-  font-family: var(--font-editorial);
+  font-family: var(--f-sans);
   font-size: 1.4rem;
 }
 
@@ -6136,14 +6137,24 @@ a.rm-recent-record__destination:hover {
 .rm-reading-achievement h2 {
   margin: 0;
   color: var(--text);
-  font-family: var(--font-editorial);
   overflow-wrap: anywhere;
 }
 
-.rm-member-profile h1 {
-  font-size: clamp(1.9rem, 4vw, 2.45rem);
-  line-height: 1.12;
-  letter-spacing: -0.035em;
+.rm-member-profile h1,
+.rm-my-records-page__header h1,
+.rm-account-settings-page__header h1 {
+  font-family: var(--f-sans);
+  font-size: var(--type-size-h1);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.rm-reading-achievement h2,
+.rm-my-records-section-heading h2,
+.rm-recent-readings__header h2 {
+  font-family: var(--f-sans);
+  font-size: var(--type-size-h2);
+  letter-spacing: -0.015em;
 }
 
 .rm-member-profile__meta {
@@ -6200,9 +6211,7 @@ a.rm-recent-record__destination:hover {
 .rm-reading-achievement h2 {
   max-width: 24ch;
   margin-top: 8px;
-  font-size: clamp(1.75rem, 4vw, 2.35rem);
   line-height: 1.18;
-  letter-spacing: -0.03em;
   text-wrap: balance;
 }
 
@@ -6235,14 +6244,14 @@ a.rm-recent-record__destination:hover {
 
 .rm-reading-achievement__metrics dt {
   color: var(--text-3);
-  font-size: 0.8125rem;
+  font-size: var(--type-size-supporting);
   line-height: 1.4;
 }
 
 .rm-reading-achievement__metrics dd {
   margin: 5px 0 0;
   color: var(--text);
-  font-family: var(--font-editorial);
+  font-family: var(--f-sans);
   font-size: 1.6rem;
   line-height: 1.1;
   overflow-wrap: anywhere;
@@ -6303,7 +6312,7 @@ a.rm-recent-record__destination:hover {
 .rm-member-space-utilities__description {
   margin-top: 3px;
   color: var(--text-3);
-  font-size: 0.8125rem;
+  font-size: var(--type-size-supporting);
   line-height: 1.45;
 }
 
@@ -6323,8 +6332,6 @@ a.rm-recent-record__destination:hover {
 
 .rm-recent-readings__header h2 {
   margin: 7px 0 0;
-  font-family: var(--font-editorial);
-  font-size: 1.7rem;
   line-height: 1.2;
 }
 
@@ -6393,7 +6400,7 @@ a.rm-recent-record__destination:hover {
 .rm-recent-reading-row__activity {
   display: block;
   color: var(--text-3);
-  font-size: 0.8125rem;
+  font-size: var(--type-size-supporting);
   overflow-wrap: anywhere;
 }
 
@@ -6446,10 +6453,6 @@ a.rm-recent-record__destination:hover {
 .rm-my-records-page__header h1 {
   margin: 6px 0 0;
   color: var(--text);
-  font-family: var(--font-editorial);
-  font-size: 2.35rem;
-  line-height: 1.1;
-  letter-spacing: -0.035em;
 }
 
 .rm-my-records-page__header > p:not(.rm-my-shelf-kicker) {
@@ -6474,8 +6477,6 @@ a.rm-recent-record__destination:hover {
 .rm-my-records-section-heading h2 {
   margin: 0;
   color: var(--text);
-  font-family: var(--font-editorial);
-  font-size: 1.7rem;
   line-height: 1.2;
 }
 
@@ -6524,7 +6525,7 @@ a.rm-recent-record__destination:hover {
   border-radius: var(--r-1);
   background: var(--bg);
   color: var(--text-2);
-  font-family: var(--font-editorial);
+  font-family: var(--f-sans);
   font-size: 1.3rem;
   object-fit: cover;
 }
@@ -6545,7 +6546,7 @@ a.rm-recent-record__destination:hover {
 }
 
 .rm-book-record-row__meta {
-  font-size: 0.8125rem;
+  font-size: var(--type-size-supporting);
 }
 
 .rm-book-record-row__book h3 {
@@ -6593,10 +6594,6 @@ a.rm-recent-record__destination:hover {
 
   .rm-my-records-page__header {
     padding-bottom: 20px;
-  }
-
-  .rm-my-records-page__header h1 {
-    font-size: 1.85rem;
   }
 
   .rm-my-records-page__header > p:not(.rm-my-shelf-kicker) {
@@ -6674,14 +6671,10 @@ a.rm-recent-record__destination:hover {
 .rm-account-settings-page__header h1 {
   margin: 0;
   color: var(--text);
-  font-family: var(--font-editorial);
 }
 
 .rm-account-settings-page__header h1 {
   margin-top: 6px;
-  font-size: 2.35rem;
-  line-height: 1.1;
-  letter-spacing: -0.035em;
 }
 
 .rm-account-settings-page__header > p:not(.rm-my-shelf-kicker) {
@@ -6700,8 +6693,8 @@ a.rm-recent-record__destination:hover {
 .rm-account-settings-page h2 {
   margin: 0 0 12px;
   color: var(--text);
-  font-family: var(--font-editorial);
-  font-size: 1.1rem;
+  font-family: var(--f-sans);
+  font-size: var(--type-size-h4);
   line-height: 1.3;
 }
 
@@ -6721,7 +6714,7 @@ a.rm-recent-record__destination:hover {
 
 .rm-account-settings-page__summary dt {
   color: var(--text-3);
-  font-size: 0.8125rem;
+  font-size: var(--type-size-supporting);
 }
 
 .rm-account-settings-page__summary dd {
@@ -7113,10 +7106,6 @@ a.rm-recent-record__destination:hover {
 
   .rm-account-settings-page__header {
     padding-bottom: 20px;
-  }
-
-  .rm-account-settings-page__header h1 {
-    font-size: 1.85rem;
   }
 
   .rm-account-settings-page__header > p:not(.rm-my-shelf-kicker) {

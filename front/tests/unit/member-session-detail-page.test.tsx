@@ -256,21 +256,22 @@ describe("MemberSessionDetailPage", () => {
     expect(mobile.queryByText("함께 남긴 질문 Q1 · 이멤버5")).not.toBeInTheDocument();
     expect(mobile.getByText("2026.04.20 등록")).toBeInTheDocument();
     for (const scope of [desktop, mobile]) {
-      expect(scope.getByText("데이터로 세상을 더 정확하게 보는 태도를 이야기했습니다.")).toHaveClass(
-        "reading-editorial",
-      );
-      expect(
-        scope.getByText("세계는 생각보다 나아지고 있지만, 우리의 감각은 느리게 따라온다."),
-      ).toHaveClass("reading-editorial");
-      expect(
-        scope.getByRole("heading", {
-          name: "10가지 본능 중에서 본인에게 가장 강하게 작용한다고 느낀 것은 무엇인가요?",
-        }),
-      ).toHaveClass("reading-editorial");
-      expect(scope.getByText("데이터 기반 사고가 일상 판단과 멀어지는 순간을 묻는다.")).toHaveClass(
-        "reading-editorial",
-      );
-      expect(scope.getByText("낙관이 아니라 정확함의 문제였다.")).toHaveClass("reading-editorial");
+      const summary = scope.getByText("데이터로 세상을 더 정확하게 보는 태도를 이야기했습니다.");
+      const highlight = scope.getByText("세계는 생각보다 나아지고 있지만, 우리의 감각은 느리게 따라온다.");
+      const question = scope.getByRole("heading", {
+        name: "10가지 본능 중에서 본인에게 가장 강하게 작용한다고 느낀 것은 무엇인가요?",
+      });
+      const questionContext = scope.getByText("데이터 기반 사고가 일상 판단과 멀어지는 순간을 묻는다.");
+      const oneLiner = scope.getByText("낙관이 아니라 정확함의 문제였다.");
+
+      expect(summary).toHaveClass("body-lg");
+      expect(highlight).toHaveClass("body-lg", "editorial");
+      expect(question).toHaveClass("body-lg", "editorial");
+      expect(questionContext).toHaveClass("body");
+      expect(oneLiner).toHaveClass("body", "editorial");
+      for (const readingNode of [summary, highlight, question, questionContext, oneLiner]) {
+        expect(readingNode).not.toHaveClass("reading-editorial");
+      }
       expect(scope.getByRole("heading", { name: "회차 기록" })).not.toHaveClass("reading-editorial");
     }
     expect(container).not.toHaveTextContent("Join the reading");
