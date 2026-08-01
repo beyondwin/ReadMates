@@ -18,7 +18,7 @@ export function AccountSettingsPage({
 }: AccountSettingsPageProps) {
   return (
     <main className="rm-account-settings-page">
-      <a className="rm-account-settings-page__back" href={mySpaceHref}>
+      <a className="rm-account-settings-page__back desktop-only" href={mySpaceHref}>
         <span aria-hidden="true">←</span>
         <span>내 공간</span>
       </a>

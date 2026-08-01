@@ -5469,6 +5469,32 @@
   padding: 18px 4px;
 }
 
+.rm-member-space-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+
+.rm-member-space-breadcrumb a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.rm-member-space-breadcrumb a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.rm-member-space-breadcrumb a:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
 .rm-member-notifications-header__eyebrow {
   color: var(--muted);
   font-family: var(--f-mono);

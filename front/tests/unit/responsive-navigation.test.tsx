@@ -379,6 +379,27 @@ describe("MobileHeader route titles and actions", () => {
     expect(screen.getByRole("link", { name: "뒤로" }).querySelector(".rm-brand-mark")).toBeInTheDocument();
   });
 
+  it.each([
+    ["/app/notifications", "/app/me"],
+    ["/app/notifications/settings", "/app/me"],
+    ["/app/me/settings", "/app/me"],
+    ["/clubs/reading-sai/app/notifications", "/clubs/reading-sai/app/me"],
+    ["/clubs/reading-sai/app/notifications/settings", "/clubs/reading-sai/app/me"],
+    ["/clubs/reading-sai/app/me/settings", "/clubs/reading-sai/app/me"],
+  ])("returns %s to the fixed My Space parent on direct entry", (pathname, expectedHref) => {
+    renderAt(
+      pathname,
+      <MobileHeader
+        variant="member"
+        appBasePath={pathname.startsWith("/clubs/") ? "/clubs/reading-sai/app" : undefined}
+      />,
+    );
+
+    const backLink = screen.getByRole("link", { name: "뒤로" });
+    expect(backLink).toHaveAttribute("href", expectedHref);
+    expect(backLink).toHaveTextContent("내 공간");
+  });
+
   it("shows a compact mobile host workspace entry from member screens when requested", () => {
     renderAt("/app", <MobileHeader variant="member" showHostEntry />);
 

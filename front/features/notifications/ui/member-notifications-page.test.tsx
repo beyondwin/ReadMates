@@ -17,7 +17,8 @@ describe("MemberNotificationsPage", () => {
             deepLinkPath: "/sessions/11111111-1111-1111-1111-111111111111",
             readAt: null,
             createdAt: "2026-06-18T10:00:00Z",
-          }]}
+        }]}
+          mySpaceHref="/app/me"
           onMarkAllRead={vi.fn()}
         />
       </MemoryRouter>,
@@ -32,6 +33,10 @@ describe("MemberNotificationsPage", () => {
       "/app/sessions/11111111-1111-1111-1111-111111111111",
     );
     expect(screen.getByText("새 알림 1개")).toBeVisible();
+    const breadcrumb = screen.getByRole("navigation", { name: "현재 위치" });
+    expect(breadcrumb).toHaveClass("desktop-only");
+    expect(screen.getByRole("link", { name: "내 공간" })).toHaveAttribute("href", "/app/me");
+    expect(screen.getByText("알림", { selector: "[aria-current=page]" })).toBeVisible();
     expect(screen.getByRole("link", { name: "받은 알림" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "수신 설정" })).toHaveAttribute(
       "href",
@@ -57,7 +62,8 @@ describe("MemberNotificationsPage", () => {
           deepLinkPath: "/sessions/11111111-1111-1111-1111-111111111111",
           readAt: null,
           createdAt: "2026-06-18T10:00:00Z",
-        }]}
+          }]}
+        mySpaceHref="/app/me"
         onMarkAllRead={vi.fn()}
         onOpenNotification={onOpenNotification}
       />,

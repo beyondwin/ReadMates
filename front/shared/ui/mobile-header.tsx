@@ -328,6 +328,14 @@ function appBackTarget(
     return { href: target.href, state: target.state, label: "뒤로" };
   }
 
+  if (pathname === "/app/notifications" || pathname === "/app/notifications/settings") {
+    return { href: "/app/me", label: "내 공간" };
+  }
+
+  if (pathname === "/app/me/settings") {
+    return { href: "/app/me", label: "내 공간" };
+  }
+
   return null;
 }
 

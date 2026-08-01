@@ -6,10 +6,12 @@ import {
   type NotificationPreferencesLoadState,
 } from "../model/notification-preferences-model";
 import { MemberNotificationTabs } from "./member-notification-tabs";
+import { MemberSpaceBreadcrumb } from "./member-space-breadcrumb";
 
 export type MemberNotificationSettingsPageProps = {
   state: NotificationPreferencesLoadState;
   basePath: string;
+  mySpaceHref: string;
   saving: boolean;
   saveError: string | null;
   onEmailEnabledChange: (enabled: boolean) => void;
@@ -24,6 +26,7 @@ export type MemberNotificationSettingsPageProps = {
 export function MemberNotificationSettingsPage({
   state,
   basePath,
+  mySpaceHref,
   saving,
   saveError,
   onEmailEnabledChange,
@@ -36,6 +39,7 @@ export function MemberNotificationSettingsPage({
       <section className="container rm-member-notifications-page__body">
         <header className="rm-member-notifications-header">
           <div>
+            <MemberSpaceBreadcrumb mySpaceHref={mySpaceHref} currentLabel="알림" />
             <div className="rm-member-notifications-header__eyebrow">
               읽는사이 · 알림
             </div>

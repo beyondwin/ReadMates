@@ -1619,6 +1619,10 @@ body[data-home="stack"] .home-carousel { display: none; }
 .m-row-between { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 
 @media (max-width: 768px) {
+  .rm-account-settings-page__back {
+    display: none;
+  }
+
   .public-shell.m-app,
   .app-shell,
   .m-app {

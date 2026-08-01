@@ -22,6 +22,7 @@ function renderPage(
   const props: Parameters<typeof MemberNotificationSettingsPage>[0] = {
     state,
     basePath: "/app",
+    mySpaceHref: "/app/me",
     saving: false,
     saveError: null,
     onEmailEnabledChange: vi.fn(),
@@ -44,6 +45,10 @@ describe("MemberNotificationSettingsPage", () => {
     const user = userEvent.setup();
     const props = renderPage({ status: "ready", preferences });
 
+    const breadcrumb = screen.getByRole("navigation", { name: "현재 위치" });
+    expect(breadcrumb).toHaveClass("desktop-only");
+    expect(screen.getByRole("link", { name: "내 공간" })).toHaveAttribute("href", "/app/me");
+    expect(screen.getByText("알림", { selector: "[aria-current=page]" })).toBeVisible();
     expect(screen.getByRole("link", { name: "수신 설정" })).toHaveAttribute("aria-current", "page");
     expect(screen.getAllByRole("switch")).toHaveLength(5);
     await user.click(screen.getByRole("switch", { name: "이메일 알림" }));
