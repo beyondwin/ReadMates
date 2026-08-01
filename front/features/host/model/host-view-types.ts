@@ -89,6 +89,7 @@ export type HostMemberListItem = {
   displayName: string;
   accountName: string;
   profileImageUrl: string | null;
+  avatarKey?: string;
   role: MemberRole;
   status: MembershipStatus;
   joinedAt: string | null;

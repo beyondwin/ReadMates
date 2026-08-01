@@ -27,6 +27,7 @@ const members: HostMemberListItem[] = [
     displayName: "멤버1",
     accountName: "안멤버1",
     profileImageUrl: null,
+    avatarKey: "reading-lamp",
     role: "MEMBER",
     status: "ACTIVE",
     joinedAt: "2026-04-18T12:00:00Z",
@@ -63,6 +64,7 @@ const members: HostMemberListItem[] = [
     displayName: "정",
     accountName: "정지 멤버",
     profileImageUrl: null,
+    avatarKey: "calendar-book",
     role: "MEMBER",
     status: "SUSPENDED",
     joinedAt: "2026-04-14T12:00:00Z",
@@ -81,6 +83,7 @@ const members: HostMemberListItem[] = [
     displayName: "탈",
     accountName: "탈퇴 멤버",
     profileImageUrl: null,
+    avatarKey: "book-tote",
     role: "MEMBER",
     status: "LEFT",
     joinedAt: "2026-04-10T12:00:00Z",
@@ -99,6 +102,7 @@ const members: HostMemberListItem[] = [
     displayName: "새",
     accountName: "새 멤버",
     profileImageUrl: null,
+    avatarKey: "future-avatar",
     role: "MEMBER",
     status: "ACTIVE",
     joinedAt: "2026-04-21T12:00:00Z",
@@ -164,7 +168,7 @@ function memberListItemResponse(member: HostMemberListItem, status = 200) {
 }
 
 function memberListResponse(items: HostMemberListItem[]) {
-  return new Response(JSON.stringify(items), {
+  return new Response(JSON.stringify({ items, nextCursor: null }), {
     status: 200,
     headers: { "Content-Type": "application/json" },
   });
@@ -263,14 +267,24 @@ describe("HostMembersPage", () => {
     const user = userEvent.setup();
     renderHostMembersPage();
 
-    const activeRow = within((await screen.findByText("멤버1")).closest("article") as HTMLElement);
+    const activeArticle = (await screen.findByText("멤버1")).closest("article") as HTMLElement;
+    const activeRow = within(activeArticle);
     expect(activeRow.getByRole("heading", { name: "멤버1" })).toBeInTheDocument();
+    expect(activeArticle.querySelector(".rm-avatar-chip img")).toHaveAttribute(
+      "src",
+      "/assets/avatars/book-club/reading-lamp.webp",
+    );
     expect(activeRow.queryByText("@멤버1")).not.toBeInTheDocument();
     expect(activeRow.getByText("active@example.com · 정식 멤버")).toBeInTheDocument();
     expect(activeRow.getByText("활성")).toBeInTheDocument();
     expect(activeRow.getByText("이번 세션 참여")).toBeInTheDocument();
 
-    const outsideRow = within(screen.getByText("새").closest("article") as HTMLElement);
+    const outsideArticle = screen.getByText("새").closest("article") as HTMLElement;
+    const outsideRow = within(outsideArticle);
+    expect(outsideArticle.querySelector(".rm-avatar-chip img")).toHaveAttribute(
+      "src",
+      "/assets/avatars/book-club/archive-box.webp",
+    );
     expect(outsideRow.queryByText("@새")).not.toBeInTheDocument();
     expect(outsideRow.getByText("new@example.com · 정식 멤버")).toBeInTheDocument();
     expect(outsideRow.getByText("이번 세션 미포함")).toBeInTheDocument();
@@ -282,8 +296,20 @@ describe("HostMembersPage", () => {
     expect(suspendedRow.getByText("정지")).toBeInTheDocument();
     expect(suspendedRow.getByText("이번 세션 제외")).toBeInTheDocument();
 
+    await user.click(screen.getByRole("tab", { name: "둘러보기 멤버" }));
+    const pendingArticle = screen.getByText("둘").closest("article") as HTMLElement;
+    expect(pendingArticle.querySelector(".rm-avatar-chip img")).toHaveAttribute(
+      "src",
+      "/assets/avatars/book-club/archive-box.webp",
+    );
+
     await user.click(screen.getByRole("tab", { name: "탈퇴/비활성" }));
-    const inactiveRow = within(screen.getByText("탈").closest("article") as HTMLElement);
+    const inactiveArticle = screen.getByText("탈").closest("article") as HTMLElement;
+    const inactiveRow = within(inactiveArticle);
+    expect(inactiveArticle.querySelector(".rm-avatar-chip img")).toHaveAttribute(
+      "src",
+      "/assets/avatars/book-club/archive-box.webp",
+    );
     expect(inactiveRow.getByText("left@example.com · 참여 2026.04.10")).toBeInTheDocument();
     expect(inactiveRow.getByText("탈퇴")).toBeInTheDocument();
     expect(inactiveRow.getByText("기록 보존")).toBeInTheDocument();

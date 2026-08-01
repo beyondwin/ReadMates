@@ -1,5 +1,6 @@
 import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import type { HostMemberListItem, MembershipStatus } from "@/features/host/model/host-view-types";
+import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { isMembershipPending, memberActionPendingReason } from "./member-action-rules";
 import type { HostMemberLifecyclePath } from "./types";
 
@@ -156,6 +157,12 @@ export function MemberList({
           <div className="row-between" style={{ alignItems: "center", gap: 18, flexWrap: "wrap" }}>
             <div style={{ minWidth: 0 }}>
               <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <AvatarChip
+                  avatarKey={member.status === "LEFT" ? "archive-box" : member.avatarKey}
+                  name={member.displayName}
+                  label=""
+                  size={32}
+                />
                 <h2 className="h4 editorial" style={{ margin: 0 }}>
                   {member.displayName}
                 </h2>

@@ -75,6 +75,28 @@ function hostSessionDetail() {
   };
 }
 
+function hostMemberListItem(avatarKey: unknown = "reading-lamp") {
+  return {
+    membershipId: "membership-active",
+    userId: "user-active",
+    email: "active@example.com",
+    displayName: "멤버1",
+    accountName: "안멤버1",
+    profileImageUrl: null,
+    avatarKey,
+    role: "MEMBER",
+    status: "ACTIVE",
+    joinedAt: "2026-04-18T12:00:00Z",
+    createdAt: "2026-04-17T12:00:00Z",
+    currentSessionParticipationStatus: "ACTIVE",
+    canSuspend: true,
+    canRestore: false,
+    canDeactivate: true,
+    canAddToCurrentSession: false,
+    canRemoveFromCurrentSession: true,
+  };
+}
+
 function stubFetch() {
   const fetchMock = vi.fn().mockImplementation((url: string) =>
     Promise.resolve(jsonResponse(
@@ -150,6 +172,18 @@ describe("host api wrappers", () => {
       "/api/bff/api/host/sessions?limit=50&clubSlug=reading-sai",
       "/api/bff/api/host/members?limit=25&cursor=m2&clubSlug=reading-sai",
     ]);
+  });
+
+  it("validates host member avatar keys as strings while preserving future keys", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ items: [hostMemberListItem("future-avatar")], nextCursor: null }))
+      .mockResolvedValueOnce(jsonResponse({ items: [hostMemberListItem(42)], nextCursor: null }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchHostMembers()).resolves.toMatchObject({
+      items: [{ avatarKey: "future-avatar" }],
+    });
+    await expect(fetchHostMembers()).rejects.toThrow();
   });
 
   it("encodes host mutation paths and request bodies", async () => {

@@ -186,6 +186,10 @@ class CurrentSessionControllerDbTest(
                 jsonPath("$.currentSession.board.longReviews[?(@.body == '현재 세션 hydrate 서평')].body") {
                     value(hasItem("현재 세션 hydrate 서평"))
                 }
+                jsonPath("$.currentSession.board.longReviews[?(@.body == '현재 세션 hydrate 서평')].avatarKey") {
+                    value(hasItem("book-tote"))
+                }
+                jsonPath("$.currentSession.board.longReviews[*].profileImageUrl") { doesNotExist() }
                 jsonPath("$.currentSession.attendees[0].membershipId") { exists() }
                 jsonPath("$.currentSession.attendees[0].displayName") { value("김호스트") }
                 jsonPath("$.currentSession.attendees[0].accountName") { value("김호스트키") }
@@ -388,6 +392,10 @@ class CurrentSessionControllerDbTest(
                     value(hasItem("탈퇴한 멤버"))
                 }
                 jsonPath("$.currentSession.board.longReviews[*].authorShortName") { value(not(hasItem("멤버1"))) }
+                jsonPath("$.currentSession.board.longReviews[?(@.body == '탈퇴 회원 기존 서평')].avatarKey") {
+                    value(hasItem("archive-box"))
+                }
+                jsonPath("$.currentSession.board.longReviews[*].avatarKey") { value(not(hasItem("open-book-pencil"))) }
                 jsonPath("$.currentSession.attendees[*].displayName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.currentSession.attendees[*].displayName") { value(not(hasItem("멤버1"))) }
                 jsonPath("$.currentSession.attendees[*].accountName") { value(hasItem("탈퇴한 멤버")) }

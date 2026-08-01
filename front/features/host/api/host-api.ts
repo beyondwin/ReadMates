@@ -49,6 +49,7 @@ import type {
 import {
   HostSessionVisibilityUpdateResponseSchema,
   parseHostSessionDetailResponse,
+  parseHostMemberListPage,
   parseHostNotificationDeliveryListResponse,
   parseHostInvitationListPage,
   parseSessionImportPreviewResponse,
@@ -343,7 +344,11 @@ export function commitHostSessionImport(sessionId: string, request: SessionImpor
 }
 
 export function fetchHostMembers(context?: ReadmatesApiContext, page?: PageRequest) {
-  return readmatesFetch<HostMemberListPage>(`/api/host/members${pagingSearchParams(page)}`, undefined, context);
+  return readmatesFetch<HostMemberListPage>(
+    `/api/host/members${pagingSearchParams(page)}`,
+    undefined,
+    context,
+  ).then(parseHostMemberListPage);
 }
 
 export function submitHostMemberLifecycle(

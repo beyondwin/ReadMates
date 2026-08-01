@@ -158,6 +158,7 @@ const currentSession = {
         {
           authorName: "멤버5",
           authorShortName: "멤버5",
+          avatarKey: "library-stamp",
           body: "계약 테스트 내 서평",
         },
       ],

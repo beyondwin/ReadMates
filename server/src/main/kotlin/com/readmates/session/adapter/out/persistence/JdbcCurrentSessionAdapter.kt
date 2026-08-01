@@ -340,6 +340,8 @@ class JdbcCurrentSessionAdapter(
             select
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_name,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name,
+              memberships.avatar_key as long_review_author_avatar_key,
+              memberships.status as long_review_author_membership_status,
               long_reviews.body
             from long_reviews
             join memberships on memberships.id = long_reviews.membership_id
@@ -365,6 +367,11 @@ class JdbcCurrentSessionAdapter(
                 BoardLongReview(
                     authorName = resultSet.getString("author_name"),
                     authorShortName = resultSet.getString("author_short_name"),
+                    avatarKey =
+                        resultSet.presentationAvatarKey(
+                            "long_review_author_avatar_key",
+                            "long_review_author_membership_status",
+                        ),
                     body = resultSet.getString("body"),
                 )
             },
@@ -462,5 +469,6 @@ private fun ResultSet.presentationAvatarKey(
     if (getString(membershipStatusColumn) == "LEFT") {
         BookClubAvatarKey.fallback.wireValue
     } else {
-        getString(avatarKeyColumn) ?: BookClubAvatarKey.fallback.wireValue
+        BookClubAvatarKey.fromWireValue(getString(avatarKeyColumn))?.wireValue
+            ?: BookClubAvatarKey.fallback.wireValue
     }

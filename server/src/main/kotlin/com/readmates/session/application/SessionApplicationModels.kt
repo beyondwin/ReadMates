@@ -82,6 +82,7 @@ data class BoardOneLineReview(
 data class BoardLongReview(
     val authorName: String,
     val authorShortName: String,
+    val avatarKey: String,
     val body: String,
 )
 

@@ -107,6 +107,7 @@ export type HostMemberListItem = {
   displayName: string;
   accountName: string;
   profileImageUrl: string | null;
+  avatarKey?: string;
   role: MemberRole;
   status: MembershipStatus;
   joinedAt: string | null;
@@ -746,6 +747,33 @@ export const HostSessionDetailResponseSchema = z.object({
       }),
     });
 
+export const HostMemberListItemSchema = z.object({
+  membershipId: z.string(),
+  userId: z.string(),
+  email: z.string(),
+  displayName: z.string(),
+  accountName: z.string(),
+  profileImageUrl: z.string().nullable(),
+  avatarKey: z.string().optional(),
+  role: z.enum(["HOST", "MEMBER"]),
+  status: z.enum(["INVITED", "VIEWER", "ACTIVE", "SUSPENDED", "LEFT", "INACTIVE"]),
+  joinedAt: z.string().nullable(),
+  createdAt: z.string(),
+  currentSessionParticipationStatus: z.enum(["ACTIVE", "REMOVED"]).nullable(),
+  canSuspend: z.boolean(),
+  canRestore: z.boolean(),
+  canDeactivate: z.boolean(),
+  canAddToCurrentSession: z.boolean(),
+  canRemoveFromCurrentSession: z.boolean(),
+});
+
+export const HostMemberListPageSchema = import.meta.env.DEV
+  ? z.object({
+      items: z.array(HostMemberListItemSchema),
+      nextCursor: z.string().nullable(),
+    })
+  : (null as never);
+
 export const HostSessionVisibilityUpdateResponseSchema = z.object({
       session: HostSessionDetailResponseSchema,
       composer: z.object({
@@ -842,6 +870,7 @@ export const HostInvitationListPageSchema = import.meta.env.DEV
 
 // Type aliases — erased at build time, z.infer<> resolves from the truthy branch
 export type HostSessionDetailResponseParsed = z.infer<typeof HostSessionDetailResponseSchema>;
+export type HostMemberListPageParsed = z.infer<typeof HostMemberListPageSchema>;
 export type HostSessionVisibilityUpdateResponseParsed = z.infer<typeof HostSessionVisibilityUpdateResponseSchema>;
 export type HostNotificationDeliveryListResponseParsed = z.infer<typeof HostNotificationDeliveryListResponseSchema>;
 export type HostInvitationListPageParsed = z.infer<typeof HostInvitationListPageSchema>;
@@ -852,6 +881,13 @@ export function parseHostSessionDetailResponse(value: unknown): HostSessionDetai
     return HostSessionDetailResponseSchema.parse(value) as HostSessionDetailResponse;
   }
   return value as HostSessionDetailResponse;
+}
+
+export function parseHostMemberListPage(value: unknown): HostMemberListPage {
+  if (import.meta.env.DEV) {
+    return HostMemberListPageSchema.parse(value) as HostMemberListPage;
+  }
+  return value as HostMemberListPage;
 }
 
 export function parseHostNotificationDeliveryListResponse(value: unknown): HostNotificationDeliveryListResponse {
