@@ -19,8 +19,29 @@ test.afterEach(() => {
   resetSeedGoogleLogins(["host@example.com"]);
 });
 
+function matchesExactBffUrl(
+  url: URL,
+  pathname: string,
+  allowedSearchParams: ReadonlyArray<Readonly<Record<string, string>>>,
+): boolean {
+  if (url.pathname !== pathname) {
+    return false;
+  }
+
+  return allowedSearchParams.some((expected) => {
+    const entries = Array.from(url.searchParams.entries());
+    return entries.length === Object.keys(expected).length
+      && Object.entries(expected).every(([key, value]) => url.searchParams.get(key) === value);
+  });
+}
+
 async function routeHostClubOperations(page: Page): Promise<void> {
-  await page.route("**/api/bff/api/host/club-operations**", async (route) => {
+  await page.route((url) => matchesExactBffUrl(
+    url,
+    "/api/bff/api/host/club-operations",
+    [{}, { clubSlug: "reading-sai" }],
+  ), async (route) => {
+    expect(route.request().method()).toBe("GET");
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -50,7 +71,12 @@ async function routeHostClubOperations(page: Page): Promise<void> {
 }
 
 async function routeHostDashboardPublicSafe(page: Page): Promise<void> {
-  await page.route("**/api/bff/api/host/dashboard**", async (route) => {
+  await page.route((url) => matchesExactBffUrl(
+    url,
+    "/api/bff/api/host/dashboard",
+    [{}, { clubSlug: "reading-sai" }],
+  ), async (route) => {
+    expect(route.request().method()).toBe("GET");
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -67,7 +93,12 @@ async function routeHostDashboardPublicSafe(page: Page): Promise<void> {
 }
 
 async function routeHostSessionsPublicSafe(page: Page): Promise<void> {
-  await page.route("**/api/bff/api/host/sessions?limit=50**", async (route) => {
+  await page.route((url) => matchesExactBffUrl(
+    url,
+    "/api/bff/api/host/sessions",
+    [{ limit: "50" }, { limit: "50", clubSlug: "reading-sai" }],
+  ), async (route) => {
+    expect(route.request().method()).toBe("GET");
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -195,12 +226,23 @@ test("host dashboard captures public-safe operating-signal and priority-ledger v
       await expect(disclosure).toHaveAttribute("open", "");
 
       const currentAction = page.getByRole("link", { name: "세션 문서 열기" });
+      await currentAction.focus();
+      await expect(currentAction).toBeFocused();
       const actionBox = await currentAction.boundingBox();
       expect(actionBox?.height ?? 0).toBeGreaterThanOrEqual(44);
 
+      const upcomingSection = page
+        .locator("main.rm-host-dashboard-mobile")
+        .getByRole("region", { name: "예정 세션", exact: true });
       for (const action of [
-        page.getByRole("button", { name: /현재로 시작|멤버 공개로 변경|비공개로 변경/ }).first(),
-        page.getByRole("link", { name: /세션 편집|날짜 수정/ }).first(),
+        upcomingSection.getByRole("button", {
+          name: "멤버 공개로 변경 · E2E 예정 세션 책",
+          exact: true,
+        }),
+        upcomingSection.getByRole("link", {
+          name: "세션 편집 · E2E 예정 세션 책",
+          exact: true,
+        }),
       ]) {
         await action.focus();
         await expect(action).toBeFocused();
