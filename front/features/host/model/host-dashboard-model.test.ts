@@ -5,10 +5,24 @@ import {
   getHostDashboardLedgerMetrics,
   getHostDashboardNextOperationAction,
   getHostDashboardPriorityItems,
+  getHostUpcomingSessionTiming,
   type HostDashboardCurrentSession,
   type HostDashboardData,
   type MissingCurrentSessionMembersSummary,
 } from "./host-dashboard-model";
+
+describe("getHostUpcomingSessionTiming", () => {
+  const now = new Date(2026, 7, 1, 12, 0, 0);
+
+  it.each([
+    ["2026-08-20", { state: "upcoming", statusLabel: "예정", editLabel: "세션 편집" }],
+    ["2026-08-01", { state: "today", statusLabel: "오늘", editLabel: "세션 편집" }],
+    ["2026-05-19", { state: "overdue", statusLabel: "일정 지남", editLabel: "날짜 수정" }],
+    ["invalid", { state: "unknown", statusLabel: "일정 확인", editLabel: "날짜 수정" }],
+  ] as const)("projects the timing state for %s", (date, expected) => {
+    expect(getHostUpcomingSessionTiming(date, now)).toEqual(expected);
+  });
+});
 
 const cleanDashboard = {
   rsvpPending: 0,
