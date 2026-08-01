@@ -11,6 +11,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.RowMapper
 import org.springframework.test.context.jdbc.Sql
+import java.util.UUID
 
 @SpringBootTest(
     properties = [
@@ -146,6 +147,33 @@ class JdbcPublicQueryAdapterTest(
             .isEqualTo(3)
     }
 
+    @Test
+    @Sql(
+        statements = [MARK_MEMBER1_LEFT_SQL],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [RESET_MEMBER1_ACTIVE_SQL],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `public detail projects active avatar keys without retaining departed keys`() {
+        val result =
+            JdbcPublicQueryAdapter(jdbcTemplate)
+                .loadSession(UUID.fromString("00000000-0000-0000-0000-000000000301"))!!
+
+        assertThat(result.highlights)
+            .anySatisfy { highlight ->
+                assertThat(highlight.authorName).isEqualTo("이멤버5")
+                assertThat(highlight.avatarKey).isEqualTo("library-stamp")
+            }
+        assertThat(result.highlights.filter { it.authorName == "탈퇴한 멤버" })
+            .isNotEmpty
+            .allSatisfy { highlight -> assertThat(highlight.avatarKey).isNull() }
+        assertThat(result.oneLiners.filter { it.authorName == "탈퇴한 멤버" })
+            .isNotEmpty
+            .allSatisfy { oneLiner -> assertThat(oneLiner.avatarKey).isNull() }
+    }
+
     companion object {
         private const val CLUB_SLUG = "reading-sai"
 
@@ -189,6 +217,22 @@ class JdbcPublicQueryAdapterTest(
         private const val DELETE_NULL_MEMBERSHIP_HIGHLIGHT_SQL = """
             delete from highlights
             where id = '00000000-0000-0000-ffff-000000000001';
+        """
+
+        private const val MARK_MEMBER1_LEFT_SQL = """
+            update memberships
+            join users on users.id = memberships.user_id
+            set memberships.status = 'LEFT'
+            where users.email = 'member1@example.com'
+              and memberships.club_id = '00000000-0000-0000-0000-000000000001';
+        """
+
+        private const val RESET_MEMBER1_ACTIVE_SQL = """
+            update memberships
+            join users on users.id = memberships.user_id
+            set memberships.status = 'ACTIVE'
+            where users.email = 'member1@example.com'
+              and memberships.club_id = '00000000-0000-0000-0000-000000000001';
         """
     }
 }

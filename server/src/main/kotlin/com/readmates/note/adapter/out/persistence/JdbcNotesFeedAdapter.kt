@@ -145,7 +145,7 @@ class JdbcNotesFeedAdapter(
         val rows =
             jdbcTemplate.query(
                 """
-                select id, session_id, session_number, book_title, session_date, author_name, author_short_name_source,
+                select id, session_id, session_number, book_title, session_date, author_name, author_short_name_source, avatar_key,
                        kind, text, created_at, source_order, item_order
                 from (
                   select
@@ -156,6 +156,7 @@ class JdbcNotesFeedAdapter(
                     sessions.session_date as session_date,
                     case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_name,
                     case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name_source,
+                    case when memberships.status = 'LEFT' then null else memberships.avatar_key end as avatar_key,
                     'QUESTION' as kind,
                     questions.text as text,
                     questions.created_at as created_at,
@@ -185,6 +186,7 @@ class JdbcNotesFeedAdapter(
                     sessions.session_date as session_date,
                     case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_name,
                     case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name_source,
+                    case when memberships.status = 'LEFT' then null else memberships.avatar_key end as avatar_key,
                     'LONG_REVIEW' as kind,
                     long_reviews.body as text,
                     long_reviews.created_at as created_at,
@@ -215,6 +217,7 @@ class JdbcNotesFeedAdapter(
                     sessions.session_date as session_date,
                     case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_name,
                     case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name_source,
+                    case when memberships.status = 'LEFT' then null else memberships.avatar_key end as avatar_key,
                     'ONE_LINE_REVIEW' as kind,
                     one_line_reviews.text as text,
                     one_line_reviews.created_at as created_at,
@@ -245,6 +248,7 @@ class JdbcNotesFeedAdapter(
                     sessions.session_date as session_date,
                     case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_name,
                     case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name_source,
+                    case when memberships.status = 'LEFT' then null else memberships.avatar_key end as avatar_key,
                     'HIGHLIGHT' as kind,
                     highlights.text as text,
                     highlights.created_at as created_at,
@@ -319,7 +323,7 @@ class JdbcNotesFeedAdapter(
         val rows =
             jdbcTemplate.query(
                 """
-                select id, session_id, session_number, book_title, session_date, author_name, author_short_name_source,
+                select id, session_id, session_number, book_title, session_date, author_name, author_short_name_source, avatar_key,
                        kind, text, created_at, source_order, item_order
                 from (
                   select
@@ -330,6 +334,7 @@ class JdbcNotesFeedAdapter(
                     sessions.session_date as session_date,
                     case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_name,
                     case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name_source,
+                    case when memberships.status = 'LEFT' then null else memberships.avatar_key end as avatar_key,
                     'QUESTION' as kind,
                     questions.text as text,
                     questions.created_at as created_at,
@@ -360,6 +365,7 @@ class JdbcNotesFeedAdapter(
                     sessions.session_date as session_date,
                     case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_name,
                     case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name_source,
+                    case when memberships.status = 'LEFT' then null else memberships.avatar_key end as avatar_key,
                     'LONG_REVIEW' as kind,
                     long_reviews.body as text,
                     long_reviews.created_at as created_at,
@@ -391,6 +397,7 @@ class JdbcNotesFeedAdapter(
                     sessions.session_date as session_date,
                     case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_name,
                     case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name_source,
+                    case when memberships.status = 'LEFT' then null else memberships.avatar_key end as avatar_key,
                     'ONE_LINE_REVIEW' as kind,
                     one_line_reviews.text as text,
                     one_line_reviews.created_at as created_at,
@@ -422,6 +429,7 @@ class JdbcNotesFeedAdapter(
                     sessions.session_date as session_date,
                     case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_name,
                     case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name_source,
+                    case when memberships.status = 'LEFT' then null else memberships.avatar_key end as avatar_key,
                     'HIGHLIGHT' as kind,
                     highlights.text as text,
                     highlights.created_at as created_at,
@@ -506,6 +514,7 @@ class JdbcNotesFeedAdapter(
             date = getObject("session_date", LocalDate::class.java).toString(),
             authorName = authorName,
             authorShortName = authorShortNameSource?.let(::shortNameFor),
+            avatarKey = getString("avatar_key"),
             kind = getString("kind"),
             text = getString("text"),
         )

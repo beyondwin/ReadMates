@@ -43,10 +43,12 @@ data class PublicHighlight(
     val sortOrder: Int,
     val authorName: String?,
     val authorShortName: String?,
+    val avatarKey: String,
 )
 
 data class PublicOneLiner(
     val authorName: String,
     val authorShortName: String,
+    val avatarKey: String,
     val text: String,
 )

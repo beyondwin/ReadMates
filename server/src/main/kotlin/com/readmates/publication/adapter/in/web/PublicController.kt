@@ -1,5 +1,6 @@
 package com.readmates.publication.adapter.`in`.web
 
+import com.readmates.auth.domain.BookClubAvatarKey
 import com.readmates.publication.application.model.LEGACY_PUBLIC_CLUB_SLUG
 import com.readmates.publication.application.model.PublicClubResult
 import com.readmates.publication.application.model.PublicClubStatsResult
@@ -113,12 +114,24 @@ class PublicController(
             sortOrder = sortOrder,
             authorName = authorName,
             authorShortName = authorShortName,
+            avatarKey = safeAvatarKey(authorName, avatarKey),
         )
 
     private fun PublicOneLinerResult.toResponse() =
         PublicOneLiner(
             authorName = authorName,
             authorShortName = authorShortName,
+            avatarKey = safeAvatarKey(authorName, avatarKey),
             text = text,
         )
+
+    private fun safeAvatarKey(
+        authorName: String?,
+        storedAvatarKey: String?,
+    ): String =
+        if (authorName == null) {
+            BookClubAvatarKey.fallback.wireValue
+        } else {
+            BookClubAvatarKey.fromWireValue(storedAvatarKey)?.wireValue ?: BookClubAvatarKey.fallback.wireValue
+        }
 }

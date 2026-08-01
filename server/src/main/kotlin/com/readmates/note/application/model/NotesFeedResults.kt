@@ -11,6 +11,7 @@ data class NoteFeedResult(
     val date: String,
     val authorName: String?,
     val authorShortName: String?,
+    val avatarKey: String? = null,
     val kind: String,
     val text: String,
 )

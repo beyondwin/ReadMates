@@ -1,5 +1,6 @@
 package com.readmates.note.adapter.`in`.web
 
+import com.readmates.auth.domain.BookClubAvatarKey
 import com.readmates.note.application.model.NoteFeedResult
 import com.readmates.note.application.model.NoteSessionResult
 import com.readmates.shared.paging.CursorPage
@@ -16,6 +17,7 @@ data class NoteFeedItem(
     val date: String,
     val authorName: String?,
     val authorShortName: String?,
+    val avatarKey: String,
     val kind: String,
     val text: String,
 )
@@ -40,6 +42,12 @@ internal fun NoteFeedResult.toNoteFeedItem() =
         date = date,
         authorName = authorName,
         authorShortName = authorShortName,
+        avatarKey =
+            if (authorName == null) {
+                BookClubAvatarKey.fallback.wireValue
+            } else {
+                BookClubAvatarKey.fromWireValue(avatarKey)?.wireValue ?: BookClubAvatarKey.fallback.wireValue
+            },
         kind = kind,
         text = text,
     )

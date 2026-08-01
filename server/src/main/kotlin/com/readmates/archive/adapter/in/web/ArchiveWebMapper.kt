@@ -17,6 +17,7 @@ import com.readmates.archive.application.model.MyJourneyResult
 import com.readmates.archive.application.model.MyJourneySummaryResult
 import com.readmates.archive.application.model.MyPageResult
 import com.readmates.archive.application.model.MyRecentAttendanceResult
+import com.readmates.auth.domain.BookClubAvatarKey
 import com.readmates.shared.paging.CursorPage
 
 fun <T, R> CursorPage<T>.mapItems(mapper: (T) -> R): CursorPageResponse<R> =
@@ -129,6 +130,7 @@ fun MemberArchiveHighlightResult.toWebDto() =
         sortOrder = sortOrder,
         authorName = authorName,
         authorShortName = authorShortName,
+        avatarKey = safeAvatarKey(avatarKey),
     )
 
 fun MemberArchiveQuestionResult.toWebDto() =
@@ -138,6 +140,7 @@ fun MemberArchiveQuestionResult.toWebDto() =
         draftThought = draftThought,
         authorName = authorName,
         authorShortName = authorShortName,
+        avatarKey = safeAvatarKey(avatarKey),
     )
 
 fun MemberArchiveCheckinResult.toWebDto() =
@@ -149,8 +152,22 @@ fun MemberArchiveOneLinerResult.toWebDto() =
     MemberArchiveOneLinerItem(
         authorName = authorName,
         authorShortName = authorShortName,
+        avatarKey = safeAvatarKey(avatarKey),
         text = text,
     )
+
+private fun MemberArchiveHighlightResult.safeAvatarKey(storedAvatarKey: String?): String =
+    if (authorName == null) {
+        BookClubAvatarKey.fallback.wireValue
+    } else {
+        BookClubAvatarKey.fromWireValue(storedAvatarKey)?.wireValue ?: BookClubAvatarKey.fallback.wireValue
+    }
+
+private fun MemberArchiveQuestionResult.safeAvatarKey(storedAvatarKey: String?): String =
+    BookClubAvatarKey.fromWireValue(storedAvatarKey)?.wireValue ?: BookClubAvatarKey.fallback.wireValue
+
+private fun MemberArchiveOneLinerResult.safeAvatarKey(storedAvatarKey: String?): String =
+    BookClubAvatarKey.fromWireValue(storedAvatarKey)?.wireValue ?: BookClubAvatarKey.fallback.wireValue
 
 fun MemberArchiveOneLineReviewResult.toWebDto() =
     MemberArchiveOneLineReview(

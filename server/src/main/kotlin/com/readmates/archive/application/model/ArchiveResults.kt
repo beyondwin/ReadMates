@@ -85,6 +85,7 @@ data class MemberArchiveHighlightResult(
     val sortOrder: Int,
     val authorName: String?,
     val authorShortName: String?,
+    val avatarKey: String? = null,
 )
 
 data class MemberArchiveQuestionResult(
@@ -93,6 +94,7 @@ data class MemberArchiveQuestionResult(
     val draftThought: String?,
     val authorName: String,
     val authorShortName: String,
+    val avatarKey: String? = null,
 )
 
 data class MemberArchiveCheckinResult(
@@ -102,6 +104,7 @@ data class MemberArchiveCheckinResult(
 data class MemberArchiveOneLinerResult(
     val authorName: String,
     val authorShortName: String,
+    val avatarKey: String? = null,
     val text: String,
 )
 

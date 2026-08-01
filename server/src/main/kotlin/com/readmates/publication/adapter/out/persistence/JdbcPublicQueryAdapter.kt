@@ -209,7 +209,8 @@ class JdbcPublicQueryAdapter(
               highlights.text,
               highlights.sort_order,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as author_name,
-              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name,
+              case when memberships.status = 'LEFT' then null else memberships.avatar_key end as avatar_key
             from highlights
             left join memberships on memberships.id = highlights.membership_id
               and memberships.club_id = highlights.club_id
@@ -231,6 +232,7 @@ class JdbcPublicQueryAdapter(
                     sortOrder = rs.getInt("sort_order"),
                     authorName = rs.getString("author_name"),
                     authorShortName = rs.getString("author_short_name"),
+                    avatarKey = rs.getString("avatar_key"),
                 )
             },
             clubId.dbString(),
@@ -247,6 +249,7 @@ class JdbcPublicQueryAdapter(
             select
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as author_name,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name,
+              case when memberships.status = 'LEFT' then null else memberships.avatar_key end as avatar_key,
               one_line_reviews.text
             from one_line_reviews
             join memberships on memberships.id = one_line_reviews.membership_id
@@ -265,6 +268,7 @@ class JdbcPublicQueryAdapter(
                 PublicOneLinerResult(
                     authorName = rs.getString("author_name"),
                     authorShortName = rs.getString("author_short_name"),
+                    avatarKey = rs.getString("avatar_key"),
                     text = rs.getString("text"),
                 )
             },

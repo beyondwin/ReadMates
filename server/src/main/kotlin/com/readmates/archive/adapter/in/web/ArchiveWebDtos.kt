@@ -106,6 +106,7 @@ data class MemberArchiveHighlightItem(
     val sortOrder: Int,
     val authorName: String?,
     val authorShortName: String?,
+    val avatarKey: String,
 )
 
 data class MemberArchiveQuestionItem(
@@ -114,6 +115,7 @@ data class MemberArchiveQuestionItem(
     val draftThought: String?,
     val authorName: String,
     val authorShortName: String,
+    val avatarKey: String,
 )
 
 data class MemberArchiveCheckinItem(
@@ -123,6 +125,7 @@ data class MemberArchiveCheckinItem(
 data class MemberArchiveOneLinerItem(
     val authorName: String,
     val authorShortName: String,
+    val avatarKey: String,
     val text: String,
 )
 

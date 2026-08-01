@@ -46,10 +46,12 @@ data class PublicHighlightResult(
     val sortOrder: Int,
     val authorName: String?,
     val authorShortName: String?,
+    val avatarKey: String? = null,
 )
 
 data class PublicOneLinerResult(
     val authorName: String,
     val authorShortName: String,
+    val avatarKey: String? = null,
     val text: String,
 )

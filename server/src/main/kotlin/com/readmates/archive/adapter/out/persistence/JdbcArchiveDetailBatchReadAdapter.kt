@@ -39,6 +39,7 @@ class JdbcArchiveDetailBatchReadAdapter(
                         sortOrder = row.sortOrder ?: 0,
                         authorName = row.authorName,
                         authorShortName = row.authorShortName,
+                        avatarKey = row.avatarKey,
                     )
                 }
 
@@ -52,6 +53,7 @@ class JdbcArchiveDetailBatchReadAdapter(
                         draftThought = row.draftThought,
                         authorName = row.authorName ?: "",
                         authorShortName = row.authorShortName ?: "",
+                        avatarKey = row.avatarKey,
                     )
                 }
 
@@ -62,6 +64,7 @@ class JdbcArchiveDetailBatchReadAdapter(
                     MemberArchiveOneLinerResult(
                         authorName = row.authorName ?: "",
                         authorShortName = row.authorShortName ?: "",
+                        avatarKey = row.avatarKey,
                         text = row.text ?: "",
                     )
                 }
@@ -73,6 +76,7 @@ class JdbcArchiveDetailBatchReadAdapter(
                     MemberArchiveOneLinerResult(
                         authorName = row.authorName ?: "",
                         authorShortName = row.authorShortName ?: "",
+                        avatarKey = row.avatarKey,
                         text = row.text ?: "",
                     )
                 }
@@ -87,6 +91,7 @@ class JdbcArchiveDetailBatchReadAdapter(
                         draftThought = row.draftThought,
                         authorName = row.authorName ?: "",
                         authorShortName = row.authorShortName ?: row.authorName ?: "",
+                        avatarKey = row.avatarKey,
                     )
                 }
 
@@ -129,6 +134,7 @@ class JdbcArchiveDetailBatchReadAdapter(
         val draftThought: String?,
         val authorName: String?,
         val authorShortName: String?,
+        val avatarKey: String?,
     )
 
     private data class PersonalBatchRow(
@@ -140,6 +146,7 @@ class JdbcArchiveDetailBatchReadAdapter(
         val body: String?,
         val authorName: String?,
         val authorShortName: String?,
+        val avatarKey: String?,
     )
 
     private fun loadPublicBatch(
@@ -154,7 +161,8 @@ class JdbcArchiveDetailBatchReadAdapter(
               highlights.text,
               null as draft_thought,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_name,
-              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name,
+              case when memberships.status = 'LEFT' then null else memberships.avatar_key end as avatar_key
             from highlights
             left join memberships on memberships.id = highlights.membership_id
               and memberships.club_id = highlights.club_id
@@ -177,7 +185,8 @@ class JdbcArchiveDetailBatchReadAdapter(
               questions.text,
               questions.draft_thought,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_name,
-              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name,
+              case when memberships.status = 'LEFT' then null else memberships.avatar_key end as avatar_key
             from questions
             join memberships on memberships.id = questions.membership_id
               and memberships.club_id = questions.club_id
@@ -197,7 +206,8 @@ class JdbcArchiveDetailBatchReadAdapter(
               one_line_reviews.text,
               null as draft_thought,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_name,
-              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name,
+              case when memberships.status = 'LEFT' then null else memberships.avatar_key end as avatar_key
             from one_line_reviews
             join memberships on memberships.id = one_line_reviews.membership_id
               and memberships.club_id = one_line_reviews.club_id
@@ -218,7 +228,8 @@ class JdbcArchiveDetailBatchReadAdapter(
               one_line_reviews.text,
               null as draft_thought,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_name,
-              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name,
+              case when memberships.status = 'LEFT' then null else memberships.avatar_key end as avatar_key
             from one_line_reviews
             join memberships on memberships.id = one_line_reviews.membership_id
               and memberships.club_id = one_line_reviews.club_id
@@ -240,6 +251,7 @@ class JdbcArchiveDetailBatchReadAdapter(
                     draftThought = rs.getString("draft_thought"),
                     authorName = rs.getString("author_name"),
                     authorShortName = rs.getString("author_short_name"),
+                    avatarKey = rs.getString("avatar_key"),
                 )
             },
             clubId.dbString(),
@@ -265,7 +277,8 @@ class JdbcArchiveDetailBatchReadAdapter(
               null as reading_progress,
               null as body,
               coalesce(memberships.short_name, users.name) as author_name,
-              CASE WHEN memberships.status = 'LEFT' THEN '탈퇴한 멤버' ELSE coalesce(memberships.short_name, users.name) END as author_short_name
+              CASE WHEN memberships.status = 'LEFT' THEN '탈퇴한 멤버' ELSE coalesce(memberships.short_name, users.name) END as author_short_name,
+              case when memberships.status = 'LEFT' then null else memberships.avatar_key end as avatar_key
             from questions
             join memberships on memberships.id = questions.membership_id
               and memberships.club_id = questions.club_id
@@ -287,7 +300,8 @@ class JdbcArchiveDetailBatchReadAdapter(
               reading_checkins.reading_progress,
               null as body,
               null as author_name,
-              null as author_short_name
+              null as author_short_name,
+              null as avatar_key
             from reading_checkins
             join session_participants on session_participants.session_id = reading_checkins.session_id
               and session_participants.club_id = reading_checkins.club_id
@@ -306,7 +320,8 @@ class JdbcArchiveDetailBatchReadAdapter(
               null as reading_progress,
               null as body,
               coalesce(memberships.short_name, users.name) as author_name,
-              CASE WHEN memberships.status = 'LEFT' THEN '탈퇴한 멤버' ELSE coalesce(memberships.short_name, users.name) END as author_short_name
+              CASE WHEN memberships.status = 'LEFT' THEN '탈퇴한 멤버' ELSE coalesce(memberships.short_name, users.name) END as author_short_name,
+              case when memberships.status = 'LEFT' then null else memberships.avatar_key end as avatar_key
             from one_line_reviews
             join memberships on memberships.id = one_line_reviews.membership_id
               and memberships.club_id = one_line_reviews.club_id
@@ -332,7 +347,8 @@ class JdbcArchiveDetailBatchReadAdapter(
               null as reading_progress,
               long_reviews.body,
               null as author_name,
-              null as author_short_name
+              null as author_short_name,
+              null as avatar_key
             from long_reviews
             where long_reviews.club_id = ?
               and long_reviews.session_id = ?
@@ -356,6 +372,7 @@ class JdbcArchiveDetailBatchReadAdapter(
                     body = rs.getString("body"),
                     authorName = rs.getString("author_name"),
                     authorShortName = rs.getString("author_short_name"),
+                    avatarKey = rs.getString("avatar_key"),
                 )
             },
             currentMember.clubId.dbString(),
