@@ -6078,7 +6078,7 @@ a.rm-recent-record__destination:hover {
   border: 1px solid var(--line);
   border-radius: 50%;
   color: var(--text);
-  font-family: var(--font-editorial);
+  font-family: var(--f-reading);
   font-size: 1.4rem;
 }
 
@@ -6206,7 +6206,7 @@ a.rm-recent-record__destination:hover {
 }
 
 .rm-avatar-picker__header h2 {
-  font-family: var(--font-editorial);
+  font-family: var(--f-reading);
   font-size: 1.45rem;
   line-height: 1.25;
   letter-spacing: -0.025em;
@@ -6389,7 +6389,7 @@ a.rm-recent-record__destination:hover {
 .rm-reading-achievement h2 {
   margin: 0;
   color: var(--text);
-  font-family: var(--font-editorial);
+  font-family: var(--f-reading);
   overflow-wrap: anywhere;
 }
 
@@ -6517,7 +6517,7 @@ a.rm-recent-record__destination:hover {
 .rm-reading-achievement__metrics dd {
   margin: 5px 0 0;
   color: var(--text);
-  font-family: var(--font-editorial);
+  font-family: var(--f-reading);
   font-size: 1.6rem;
   line-height: 1.1;
   overflow-wrap: anywhere;
@@ -6598,7 +6598,7 @@ a.rm-recent-record__destination:hover {
 
 .rm-recent-readings__header h2 {
   margin: 7px 0 0;
-  font-family: var(--font-editorial);
+  font-family: var(--f-reading);
   font-size: 1.7rem;
   line-height: 1.2;
 }
@@ -6737,7 +6737,7 @@ a.rm-recent-record__destination:hover {
 .rm-my-records-page__header h1 {
   margin: 6px 0 0;
   color: var(--text);
-  font-family: var(--font-editorial);
+  font-family: var(--f-reading);
   font-size: 2.35rem;
   line-height: 1.1;
   letter-spacing: -0.035em;
@@ -6765,7 +6765,7 @@ a.rm-recent-record__destination:hover {
 .rm-my-records-section-heading h2 {
   margin: 0;
   color: var(--text);
-  font-family: var(--font-editorial);
+  font-family: var(--f-reading);
   font-size: 1.7rem;
   line-height: 1.2;
 }
@@ -6815,7 +6815,7 @@ a.rm-recent-record__destination:hover {
   border-radius: var(--r-1);
   background: var(--bg);
   color: var(--text-2);
-  font-family: var(--font-editorial);
+  font-family: var(--f-reading);
   font-size: 1.3rem;
   object-fit: cover;
 }
@@ -6965,7 +6965,7 @@ a.rm-recent-record__destination:hover {
 .rm-account-settings-page__header h1 {
   margin: 0;
   color: var(--text);
-  font-family: var(--font-editorial);
+  font-family: var(--f-reading);
 }
 
 .rm-account-settings-page__header h1 {
@@ -6991,7 +6991,7 @@ a.rm-recent-record__destination:hover {
 .rm-account-settings-page h2 {
   margin: 0 0 12px;
   color: var(--text);
-  font-family: var(--font-editorial);
+  font-family: var(--f-reading);
   font-size: 1.1rem;
   line-height: 1.3;
 }

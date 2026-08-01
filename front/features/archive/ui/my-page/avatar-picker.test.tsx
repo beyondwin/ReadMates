@@ -63,9 +63,10 @@ describe("AvatarPicker", () => {
     const onUpdateAvatar = vi.fn().mockResolvedValue({ avatarKey: "hedgehog-green-mug" });
     renderPicker({ onUpdateAvatar });
     const { user, opener, dialog } = await openPicker();
+    const choices = within(dialog).getByRole("group", { name: "아바타 목록" });
     const save = within(dialog).getByRole("button", { name: "이 아바타로 변경" });
 
-    expect(within(dialog).getAllByRole("button", { name: /선택$/ })).toHaveLength(40);
+    expect(within(choices).getAllByRole("button", { name: /선택$/ })).toHaveLength(40);
     expect(save).toBeDisabled();
 
     await user.click(
@@ -99,6 +100,7 @@ describe("AvatarPicker", () => {
       name: "초록 찻잔을 든 고슴도치 선택",
     });
 
+    expect(current).toHaveFocus();
     expect(current).toHaveAttribute("aria-pressed", "true");
     expect(current.querySelector(".rm-avatar-picker__check")).toBeVisible();
     expect(next).toHaveAttribute("aria-pressed", "false");
@@ -174,7 +176,12 @@ describe("AvatarPicker", () => {
 
     expect(onUpdateAvatar).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("dialog", { name: "나의 아바타 선택" })).toBeVisible();
-    expect(within(dialog).getByRole("button", { name: "변경 중…" })).toBeDisabled();
+    const pendingAction = within(dialog).getByRole("button", { name: "이 아바타로 변경" });
+    expect(pendingAction).toHaveAttribute("aria-busy", "true");
+    expect(pendingAction).toHaveTextContent("변경 중…");
+    expect(within(dialog).getAllByRole("status")).toHaveLength(1);
+    expect(within(dialog).getByRole("status")).toHaveTextContent("아바타 변경 중");
+    expect(pendingAction).toBeDisabled();
     expect(within(dialog).getByRole("button", { name: "취소" })).toBeDisabled();
     for (const tile of within(dialog).getAllByRole("button", { name: /선택$/ })) {
       expect(tile).toBeDisabled();

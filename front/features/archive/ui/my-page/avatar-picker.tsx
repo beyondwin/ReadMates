@@ -230,7 +230,11 @@ export function AvatarPicker({
                   </button>
                 </header>
                 <div className="rm-avatar-picker__body">
-                  <div className="rm-avatar-picker__grid" aria-label="아바타 목록">
+                  <div
+                    className="rm-avatar-picker__grid"
+                    role="group"
+                    aria-label="아바타 목록"
+                  >
                     {BOOK_CLUB_AVATARS.map(({ key, label }) => {
                       const selected = key === draftKey;
                       return (
@@ -263,6 +267,9 @@ export function AvatarPicker({
                     <span />
                   )}
                   <div className="rm-avatar-picker__actions">
+                    <p role="status" className="rm-sr-only">
+                      {saving ? "아바타 변경 중" : ""}
+                    </p>
                     <button
                       type="button"
                       className="btn btn-quiet rm-avatar-picker__cancel"
@@ -275,10 +282,14 @@ export function AvatarPicker({
                       ref={saveButtonRef}
                       type="button"
                       className="btn btn-primary rm-avatar-picker__save"
+                      aria-busy={saving}
+                      aria-label="이 아바타로 변경"
                       disabled={saving || draftKey === normalizedAvatarKey}
                       onClick={saveDraft}
                     >
-                      {saving ? "변경 중…" : "이 아바타로 변경"}
+                      <span aria-hidden="true">
+                        {saving ? "변경 중…" : "이 아바타로 변경"}
+                      </span>
                     </button>
                   </div>
                 </footer>

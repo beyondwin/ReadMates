@@ -79,10 +79,12 @@ for (const { width, height, screenshot } of viewports) {
         columnCount: getComputedStyle(grid).gridTemplateColumns.split(" ").length,
         dialogOverflow: getComputedStyle(element).overflow,
         bodyOverflowY: getComputedStyle(scrollBody).overflowY,
+        headingFontFamily: getComputedStyle(element.querySelector("h2")!).fontFamily,
       };
     });
     expect(responsiveLayout.dialogOverflow).toBe("hidden");
     expect(responsiveLayout.bodyOverflowY).toBe("auto");
+    expect(responsiveLayout.headingFontFamily).toContain("Iowan Old Style");
     if (width <= 768) {
       expect(responsiveLayout.columnCount).toBe(4);
       expect(Math.abs(dialogBox!.y + dialogBox!.height - height)).toBeLessThanOrEqual(1);
