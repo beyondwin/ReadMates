@@ -23,7 +23,7 @@ test("MobileHeader keeps host workspace switching and the explicit account trigg
         accountControl={
           <button type="button" className="rm-account-menu__trigger" aria-label="아주 긴 호스트 이름 계정 메뉴">
             <span className="rm-account-menu__trigger-avatar" aria-hidden="true">
-              <span className="rm-avatar-chip"><img src="/assets/avatars/book-club/reading-lamp.webp" alt="" /></span>
+              <span className="rm-avatar-chip"><img src="/assets/avatars/book-club/squirrel-acorn.webp" alt="" /></span>
             </span>
             <span className="rm-account-menu__trigger-name">아주 긴 호스트 이름</span>
             <span className="rm-account-menu__trigger-mobile-label">계정</span>
@@ -53,7 +53,7 @@ test("MobileHeader keeps the member account label visible without reserving a ho
         accountControl={
           <button type="button" className="rm-account-menu__trigger" aria-label="멤버1 계정 메뉴">
             <span className="rm-account-menu__trigger-avatar" aria-hidden="true">
-              <span className="rm-avatar-chip"><img src="/assets/avatars/book-club/reading-lamp.webp" alt="" /></span>
+              <span className="rm-avatar-chip"><img src="/assets/avatars/book-club/squirrel-acorn.webp" alt="" /></span>
             </span>
             <span className="rm-account-menu__trigger-name">멤버1</span>
             <span className="rm-account-menu__trigger-mobile-label">계정</span>

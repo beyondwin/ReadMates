@@ -148,7 +148,7 @@ private const val CREATE_FOREIGN_CLUB_HOST_SQL = """
       'ACTIVE',
       utc_timestamp(6),
       '외부',
-      'archive-box'
+      'hedgehog-green-book'
     );
 """
 

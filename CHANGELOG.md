@@ -18,7 +18,14 @@ One-command local OAuth stack + redacted smoke verifier로 기존 서비스 보�
 
 ### Highlights
 
-- **반응형 계정·내 공간·북클럽 아바타:** 모바일과 데스크톱에서 계정 접근과 호스트 공간 전환을 명시적으로 구분하고, 알림·계정 설정에 고정된 `내 공간` 상위 동선을 제공합니다. 멤버 식별은 외부 프로필 사진 대신 클럽 가입 시 고정되는 privacy-safe 중성적 독서 도구 아바타를 사용합니다.
+- **반응형 계정·내 공간·북클럽 아바타:** 모바일과 데스크톱에서 계정 접근과 호스트 공간 전환을 명시적으로 구분하고, 알림·계정 설정에 고정된 `내 공간` 상위 동선을 제공합니다. 멤버 식별은 외부 프로필 사진 대신 privacy-safe 로컬 동물 캐릭터 40종을 사용하며, 미사용 아바타 우선 자동 배정 후에도 멤버가 `내 공간`에서 원하는 캐릭터로 변경할 수 있습니다.
+
+### Deployment Notes
+
+- 배포 전 최근 DB backup과 backend readiness 기준을 확인합니다. V43은 수정하지 않으며, V44는 forward-only로 모든 기존 membership의 avatar key를 새 40-key 집합으로 한 번 다시 쓰고 named check constraint를 새 집합으로 교체합니다.
+- `PATCH /api/me/avatar`는 인증된 현재 club membership의 avatar key만 바꾸는 additive scoped API입니다. V44 이후 구 backend는 제거된 legacy key를 다시 쓸 수 있고 새 constraint가 이를 거절하므로, 같은 release tag의 server image를 먼저 배포해 Flyway V44와 backend health를 확인한 뒤 frontend를 배포합니다. 반대로 구 frontend는 새 key를 알 수 없어도 안전한 기본 avatar로 normalize합니다.
+- 배포 후에는 현재 club의 avatar 변경·재조회와 허용된 public author avatar 표시를 smoke하고, 권한과 `LEFT`/anonymous masking이 유지되는지 확인합니다. 실제 member data나 private identifier는 공개 release evidence에 기록하지 않습니다.
+- Rollback은 V44가 바꾼 schema와 이미 migration된 data를 보존합니다. Migration을 되돌리지 않고 V44와 호환되는 server/frontend image로 전환하거나 새 forward-fix release를 발행합니다.
 
 ## v2.1.0 - 2026-07-31
 

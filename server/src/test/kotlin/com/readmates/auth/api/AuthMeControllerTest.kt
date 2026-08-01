@@ -100,8 +100,8 @@ class AuthMeControllerTest(
                 jsonPath("$.role") { value("MEMBER") }
                 jsonPath("$.displayName") { value("멤버5") }
                 jsonPath("$.accountName") { value("이멤버5") }
-                jsonPath("$.currentMembership.avatarKey") { value("library-stamp") }
-                jsonPath("$.avatarKey") { value("library-stamp") }
+                jsonPath("$.currentMembership.avatarKey") { value("penguin-beret-book") }
+                jsonPath("$.avatarKey") { value("penguin-beret-book") }
                 jsonPath("$.shortName") { doesNotExist() }
                 jsonPath("$.membershipStatus") { value("ACTIVE") }
                 jsonPath("$.approvalState") { value("ACTIVE") }
@@ -128,8 +128,8 @@ class AuthMeControllerTest(
                 jsonPath("$.role") { value("MEMBER") }
                 jsonPath("$.membershipStatus") { value("ACTIVE") }
                 jsonPath("$.approvalState") { value("ACTIVE") }
-                jsonPath("$.currentMembership.avatarKey") { value("reading-lamp") }
-                jsonPath("$.avatarKey") { value("reading-lamp") }
+                jsonPath("$.currentMembership.avatarKey") { value("squirrel-acorn") }
+                jsonPath("$.avatarKey") { value("squirrel-acorn") }
             }
     }
 
@@ -487,8 +487,8 @@ class AuthMeControllerTest(
                 jsonPath("$.authenticated") { value(true) }
                 jsonPath("$.membershipStatus") { value("ACTIVE") }
                 jsonPath("$.approvalState") { value("ACTIVE") }
-                jsonPath("$.currentMembership.avatarKey") { value("reading-lamp") }
-                jsonPath("$.avatarKey") { value("reading-lamp") }
+                jsonPath("$.currentMembership.avatarKey") { value("squirrel-acorn") }
+                jsonPath("$.avatarKey") { value("squirrel-acorn") }
             }
     }
 
@@ -539,7 +539,7 @@ class AuthMeControllerTest(
         jdbcTemplate.update(
             """
             insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
-            select ?, clubs.id, ?, 'MEMBER', 'VIEWER', null, ?, 'reading-lamp'
+            select ?, clubs.id, ?, 'MEMBER', 'VIEWER', null, ?, 'squirrel-acorn'
             from clubs
             where clubs.slug = 'reading-sai'
             """.trimIndent(),
@@ -557,7 +557,7 @@ class AuthMeControllerTest(
         jdbcTemplate.update(
             """
             insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
-            select ?, clubs.id, users.id, 'MEMBER', 'ACTIVE', utc_timestamp(6), '샘플멤버5', 'reading-lamp'
+            select ?, clubs.id, users.id, 'MEMBER', 'ACTIVE', utc_timestamp(6), '샘플멤버5', 'squirrel-acorn'
             from clubs
             join users on users.email = 'member5@example.com'
             where clubs.slug = 'sample-book-club'
@@ -573,7 +573,7 @@ class AuthMeControllerTest(
         jdbcTemplate.update(
             """
             insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
-            select ?, clubs.id, users.id, ?, 'ACTIVE', utc_timestamp(6), '샘플호스트', 'reading-lamp'
+            select ?, clubs.id, users.id, ?, 'ACTIVE', utc_timestamp(6), '샘플호스트', 'squirrel-acorn'
             from clubs
             join users on users.email = 'host@example.com'
             where clubs.slug = 'sample-book-club'
@@ -605,7 +605,7 @@ class AuthMeControllerTest(
         jdbcTemplate.update(
             """
             insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
-            select ?, clubs.id, ?, 'MEMBER', ?, utc_timestamp(6), ?, 'reading-lamp'
+            select ?, clubs.id, ?, 'MEMBER', ?, utc_timestamp(6), ?, 'squirrel-acorn'
             from clubs
             where clubs.slug = 'reading-sai'
             """.trimIndent(),

@@ -1,13 +1,18 @@
 package com.readmates.auth.adapter.`in`.web
 
+import com.readmates.auth.application.model.UpdateMemberAvatarCommand
 import com.readmates.auth.application.model.UpdateMemberProfileCommand
 import com.readmates.auth.application.port.`in`.UpdateHostMemberProfileUseCase
+import com.readmates.auth.application.port.`in`.UpdateOwnMemberAvatarUseCase
 import com.readmates.auth.application.port.`in`.UpdateOwnMemberProfileUseCase
 import com.readmates.auth.application.service.MemberProfileError
 import com.readmates.auth.application.service.MemberProfileException
+import com.readmates.club.adapter.`in`.web.resolveClubContext
+import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
 import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
 import com.readmates.shared.adapter.`in`.web.apiErrorResponse
 import com.readmates.shared.security.emailOrNull
+import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.Authentication
@@ -23,7 +28,9 @@ import java.util.UUID
 @RequestMapping("/api")
 class MemberProfileController(
     private val updateOwnMemberProfile: UpdateOwnMemberProfileUseCase,
+    private val updateOwnMemberAvatar: UpdateOwnMemberAvatarUseCase,
     private val updateHostMemberProfileUseCase: UpdateHostMemberProfileUseCase,
+    private val resolveClubContextUseCase: ResolveClubContextUseCase,
 ) {
     @PatchMapping("/me/profile")
     fun updateOwnProfile(
@@ -34,6 +41,29 @@ class MemberProfileController(
             updateOwnMemberProfile.updateOwnProfile(
                 authentication.emailOrNull(),
                 request.toCommand(),
+            )
+        return MemberProfileResponse.from(profile)
+    }
+
+    @PatchMapping("/me/avatar")
+    fun updateOwnAvatar(
+        authentication: Authentication?,
+        request: HttpServletRequest,
+        @RequestBody payload: MemberAvatarUpdateRequest,
+    ): MemberProfileResponse {
+        val currentClubId =
+            request
+                .resolveClubContext(resolveClubContextUseCase)
+                .context
+                ?.clubId
+                ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+        val profile =
+            updateOwnMemberAvatar.updateOwnAvatar(
+                authentication.emailOrNull(),
+                currentClubId,
+                UpdateMemberAvatarCommand(
+                    avatarKey = payload.avatarKey,
+                ),
             )
         return MemberProfileResponse.from(profile)
     }
@@ -70,6 +100,8 @@ class MemberProfileController(
             MemberProfileError.DISPLAY_NAME_TOO_LONG,
             MemberProfileError.DISPLAY_NAME_INVALID,
             MemberProfileError.DISPLAY_NAME_RESERVED,
+            MemberProfileError.AVATAR_KEY_REQUIRED,
+            MemberProfileError.AVATAR_KEY_INVALID,
             -> HttpStatus.BAD_REQUEST
             MemberProfileError.DISPLAY_NAME_DUPLICATE -> HttpStatus.CONFLICT
         }
@@ -85,5 +117,7 @@ class MemberProfileController(
             MemberProfileError.DISPLAY_NAME_INVALID -> "Display name is invalid"
             MemberProfileError.DISPLAY_NAME_RESERVED -> "Display name is reserved"
             MemberProfileError.DISPLAY_NAME_DUPLICATE -> "Display name is already used in this club"
+            MemberProfileError.AVATAR_KEY_REQUIRED -> "Avatar key is required"
+            MemberProfileError.AVATAR_KEY_INVALID -> "Avatar key is invalid"
         }
 }

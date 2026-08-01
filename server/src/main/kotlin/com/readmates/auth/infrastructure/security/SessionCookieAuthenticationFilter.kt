@@ -54,7 +54,7 @@ class SessionCookieAuthenticationFilter(
                             null,
                             listOf(SimpleGrantedAuthority(member.roleAuthority())),
                         )
-                    } else if (request.isOwnProfilePatch()) {
+                    } else if (request.isOwnProfileMutation()) {
                         authenticatedMemberResolver
                             .resolveProfileByUserId(session.userId)
                             ?.let { profileMember ->
@@ -117,7 +117,8 @@ class SessionCookieAuthenticationFilter(
             "ROLE_$role"
         }
 
-    private fun HttpServletRequest.isOwnProfilePatch(): Boolean = method == "PATCH" && requestURI == "/api/me/profile"
+    private fun HttpServletRequest.isOwnProfileMutation(): Boolean =
+        method == "PATCH" && requestURI in setOf("/api/me/profile", "/api/me/avatar")
 
     private fun HttpServletRequest.isAuthMeGet(): Boolean = method == "GET" && requestURI == "/api/auth/me"
 

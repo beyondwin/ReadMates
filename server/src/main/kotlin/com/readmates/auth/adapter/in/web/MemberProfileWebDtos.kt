@@ -6,6 +6,10 @@ data class MemberProfileUpdateRequest(
     val displayName: String? = null,
 )
 
+data class MemberAvatarUpdateRequest(
+    val avatarKey: String? = null,
+)
+
 data class MemberProfileResponse(
     val membershipId: String,
     val displayName: String,

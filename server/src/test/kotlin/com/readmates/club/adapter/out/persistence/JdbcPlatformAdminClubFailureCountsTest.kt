@@ -35,9 +35,8 @@ private const val CLEANUP_SQL = """
 @Tag("integration")
 class JdbcPlatformAdminClubFailureCountsTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
+    @param:Autowired private val adapter: JdbcPlatformAdminClubAdapter,
 ) : ReadmatesMySqlIntegrationTestSupport() {
-    private val adapter by lazy { JdbcPlatformAdminClubAdapter(jdbcTemplate) }
-
     @Test
     fun `counts only recent failed notification deliveries and failed ai generations`() {
         seedClubWithMember()
@@ -92,7 +91,7 @@ class JdbcPlatformAdminClubFailureCountsTest(
         )
         jdbcTemplate.update(
             "insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key) " +
-                "values (?, ?, ?, 'MEMBER', 'ACTIVE', utc_timestamp(6), 'FC', 'archive-box')",
+                "values (?, ?, ?, 'MEMBER', 'ACTIVE', utc_timestamp(6), 'FC', 'hedgehog-green-book')",
             MEMBERSHIP_ID,
             CLUB_ID,
             USER_ID,

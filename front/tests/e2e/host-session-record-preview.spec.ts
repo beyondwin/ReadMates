@@ -29,7 +29,7 @@ function sessionResponse(): HostSessionDetailResponse {
     attendees: [
       {
         membershipId: "member-a",
-        avatarKey: "reading-lamp",
+        avatarKey: "squirrel-acorn",
         displayName: "독자A",
         accountName: "독자A",
         rsvpStatus: "GOING",
@@ -38,7 +38,7 @@ function sessionResponse(): HostSessionDetailResponse {
       },
       {
         membershipId: "member-b",
-        avatarKey: "book-tote",
+        avatarKey: "fennec-heart-mug",
         displayName: "독자B",
         accountName: "독자B",
         rsvpStatus: "GOING",

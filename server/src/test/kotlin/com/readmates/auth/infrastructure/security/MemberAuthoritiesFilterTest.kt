@@ -277,7 +277,10 @@ class MemberAuthoritiesFilterTest {
      * A no-op profile store that never finds any profile.
      */
     private class NoOpMemberProfileStorePort : MemberProfileStorePort {
-        override fun findProfileMemberByEmail(email: String) = null
+        override fun findProfileMemberByEmail(
+            email: String,
+            clubId: UUID?,
+        ) = null
 
         override fun findProfileMemberByUserId(userId: UUID) = null
 
@@ -298,6 +301,12 @@ class MemberAuthoritiesFilterTest {
             clubId: UUID,
             membershipId: UUID,
             displayName: String,
+        ): Boolean = false
+
+        override fun updateOwnAvatarKey(
+            clubId: UUID,
+            membershipId: UUID,
+            avatarKey: String,
         ): Boolean = false
 
         override fun updateDisplayName(

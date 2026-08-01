@@ -32,6 +32,7 @@ import javax.sql.DataSource
 )
 @AutoConfigureMockMvc
 @Tag("integration")
+@Suppress("LargeClass")
 class MemberProfileControllerTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
@@ -85,7 +86,7 @@ class MemberProfileControllerTest(
                 jsonPath("$.membershipId") { value(membershipId) }
                 jsonPath("$.displayName") { value("After") }
                 jsonPath("$.accountName") { value("self.active") }
-                jsonPath("$.avatarKey") { value("reading-lamp") }
+                jsonPath("$.avatarKey") { value("squirrel-acorn") }
                 jsonPath("$.shortName") { doesNotExist() }
                 jsonPath("$.profileImageUrl") { value("https://cdn.example.test/profiles/self-active.png") }
                 jsonPath("$.authenticated") { doesNotExist() }
@@ -94,7 +95,196 @@ class MemberProfileControllerTest(
             }
 
         assertEquals("After", shortNameForEmail(email))
-        assertEquals("reading-lamp", avatarKeyForMembership(membershipId))
+        assertEquals("squirrel-acorn", avatarKeyForMembership(membershipId))
+    }
+
+    @Test
+    fun `member updates own avatar after trimming input`() {
+        val email = insertProfileMember("self.avatar.active", "ACTIVE", shortName = "AvatarBefore")
+        val cookie = sessionCookieForEmail(email)
+        val membershipId = membershipIdForEmail(email)
+
+        mockMvc
+            .patch("/api/me/avatar") {
+                cookie(cookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("X-Readmates-Club-Slug", "reading-sai")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"avatarKey":"  hedgehog-green-mug  "}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.membershipId") { value(membershipId) }
+                jsonPath("$.avatarKey") { value("hedgehog-green-mug") }
+                jsonPath("$.email") { doesNotExist() }
+            }
+
+        assertEquals("hedgehog-green-mug", avatarKeyForMembership(membershipId))
+    }
+
+    @Test
+    fun `own avatar update uses the membership selected by request club context`() {
+        val email = insertProfileMember("self.avatar.multi", "ACTIVE", shortName = "PrimaryAvatar")
+        val primaryMembershipId = membershipIdForEmail(email)
+        val otherMembershipId = insertSecondClubMembership(email, "turtle-winter-book")
+        val cookie = sessionCookieForEmail(email)
+
+        mockMvc
+            .patch("/api/me/avatar") {
+                cookie(cookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("X-Readmates-Club-Slug", "reading-sai")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"avatarKey":"hedgehog-green-mug"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.membershipId") { value(primaryMembershipId) }
+                jsonPath("$.avatarKey") { value("hedgehog-green-mug") }
+            }
+
+        assertEquals("hedgehog-green-mug", avatarKeyForMembership(primaryMembershipId))
+        assertEquals("turtle-winter-book", avatarKeyForMembership(otherMembershipId))
+    }
+
+    @Test
+    fun `own avatar update rejects missing trusted club context for a multi club identity`() {
+        val email = insertProfileMember("self.avatar.missing.context", "ACTIVE", shortName = "PrimaryAvatar")
+        val primaryMembershipId = membershipIdForEmail(email)
+        val otherMembershipId = insertSecondClubMembership(email, "turtle-winter-book")
+        val cookie = sessionCookieForEmail(email)
+
+        mockMvc
+            .patch("/api/me/avatar") {
+                cookie(cookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"avatarKey":"hedgehog-green-mug"}"""
+            }.andExpect {
+                status { isNotFound() }
+                jsonPath("$.code") { value("MEMBER_NOT_FOUND") }
+            }
+
+        assertEquals("squirrel-acorn", avatarKeyForMembership(primaryMembershipId))
+        assertEquals("turtle-winter-book", avatarKeyForMembership(otherMembershipId))
+    }
+
+    @Test
+    fun `viewer updates own avatar`() {
+        val email = insertProfileMember("self.avatar.viewer", "VIEWER", shortName = "ViewerAvatar")
+        val cookie = sessionCookieForEmail(email)
+        val membershipId = membershipIdForEmail(email)
+
+        mockMvc
+            .patch("/api/me/avatar") {
+                cookie(cookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("X-Readmates-Club-Slug", "reading-sai")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"avatarKey":"hedgehog-green-mug"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.avatarKey") { value("hedgehog-green-mug") }
+            }
+
+        assertEquals("hedgehog-green-mug", avatarKeyForMembership(membershipId))
+    }
+
+    @Test
+    fun `own avatar update requires Spring Security authentication`() {
+        mockMvc
+            .patch("/api/me/avatar") {
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("X-Readmates-Club-Slug", "reading-sai")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"avatarKey":"hedgehog-green-mug"}"""
+            }.andExpect {
+                status { isUnauthorized() }
+                content { string("") }
+            }
+    }
+
+    @Test
+    fun `left and inactive members cannot update their own avatar`() {
+        listOf("LEFT", "INACTIVE").forEach { status ->
+            val email = insertProfileMember("self.avatar.${status.lowercase()}", status, shortName = "Avatar$status")
+            val cookie = sessionCookieForEmail(email)
+            val membershipId = membershipIdForEmail(email)
+
+            mockMvc
+                .patch("/api/me/avatar") {
+                    cookie(cookie)
+                    header("X-Readmates-Bff-Secret", "test-bff-secret")
+                    header("X-Readmates-Club-Slug", "reading-sai")
+                    header("Origin", "http://localhost:3000")
+                    with(csrf())
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"avatarKey":"hedgehog-green-mug"}"""
+                }.andExpect {
+                    status { isForbidden() }
+                    jsonPath("$.code") { value("MEMBERSHIP_NOT_ALLOWED") }
+                }
+
+            assertEquals("squirrel-acorn", avatarKeyForMembership(membershipId))
+        }
+    }
+
+    @Test
+    fun `own avatar update rejects invalid keys with a structured bad request`() {
+        val email = insertProfileMember("self.avatar.invalid", "ACTIVE", shortName = "AvatarInvalid")
+        val cookie = sessionCookieForEmail(email)
+
+        mockMvc
+            .patch("/api/me/avatar") {
+                cookie(cookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("X-Readmates-Club-Slug", "reading-sai")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"avatarKey":"HEDGEHOG-GREEN-MUG"}"""
+            }.andExpect {
+                status { isBadRequest() }
+                jsonPath("$.code") { value("AVATAR_KEY_INVALID") }
+            }
+    }
+
+    @Test
+    fun `own avatar update allows duplicate avatar keys in the same club`() {
+        val email =
+            insertProfileMember(
+                "self.avatar.duplicate",
+                "ACTIVE",
+                shortName = "AvatarDuplicate",
+                avatarKey = "hedgehog-green-mug",
+            )
+        insertProfileMember("self.avatar.taken", "ACTIVE", shortName = "AvatarTaken")
+        val cookie = sessionCookieForEmail(email)
+        val membershipId = membershipIdForEmail(email)
+
+        mockMvc
+            .patch("/api/me/avatar") {
+                cookie(cookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("X-Readmates-Club-Slug", "reading-sai")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"avatarKey":"squirrel-acorn"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.avatarKey") { value("squirrel-acorn") }
+            }
+
+        assertEquals("squirrel-acorn", avatarKeyForMembership(membershipId))
     }
 
     @Test
@@ -387,14 +577,14 @@ class MemberProfileControllerTest(
                     status { isOk() }
                     jsonPath("$.membershipId") { value(membershipId) }
                     jsonPath("$.displayName") { value(newShortName) }
-                    jsonPath("$.avatarKey") { value("reading-lamp") }
+                    jsonPath("$.avatarKey") { value("squirrel-acorn") }
                     jsonPath("$.shortName") { doesNotExist() }
                     jsonPath("$.status") { value(status) }
                     jsonPath("$.canDeactivate") { exists() }
                 }
 
             assertEquals(newShortName, shortNameForMembership(membershipId))
-            assertEquals("reading-lamp", avatarKeyForMembership(membershipId))
+            assertEquals("squirrel-acorn", avatarKeyForMembership(membershipId))
         }
     }
 
@@ -467,6 +657,7 @@ class MemberProfileControllerTest(
         status: String,
         shortName: String = prefix,
         profileImageUrl: String? = null,
+        avatarKey: String = "squirrel-acorn",
     ): String {
         val userId = UUID.randomUUID().toString()
         val membershipId = UUID.randomUUID().toString()
@@ -487,12 +678,13 @@ class MemberProfileControllerTest(
         jdbcTemplate.update(
             """
             insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
-            values (?, '00000000-0000-0000-0000-000000000001', ?, 'MEMBER', ?, utc_timestamp(6), ?, 'reading-lamp')
+            values (?, '00000000-0000-0000-0000-000000000001', ?, 'MEMBER', ?, utc_timestamp(6), ?, ?)
             """.trimIndent(),
             membershipId,
             userId,
             status,
             shortName,
+            avatarKey,
         )
         createdMembershipIds += membershipId
         return email
@@ -532,7 +724,7 @@ class MemberProfileControllerTest(
         jdbcTemplate.update(
             """
             insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
-            values (?, ?, ?, 'MEMBER', ?, utc_timestamp(6), ?, 'reading-lamp')
+            values (?, ?, ?, 'MEMBER', ?, utc_timestamp(6), ?, 'squirrel-acorn')
             """.trimIndent(),
             membershipId,
             clubId,
@@ -542,6 +734,38 @@ class MemberProfileControllerTest(
         )
         createdMembershipIds += membershipId
         return email
+    }
+
+    private fun insertSecondClubMembership(
+        email: String,
+        avatarKey: String,
+    ): String {
+        val clubId = UUID.randomUUID().toString()
+        val clubSlug = "profile-scope-${UUID.randomUUID()}"
+        val membershipId = UUID.randomUUID().toString()
+        jdbcTemplate.update(
+            """
+            insert into clubs (id, slug, name, tagline, about)
+            values (?, ?, '다른 프로필 클럽', '다른 프로필 클럽', '다른 프로필 클럽입니다.')
+            """.trimIndent(),
+            clubId,
+            clubSlug,
+        )
+        createdClubIds += clubId
+        jdbcTemplate.update(
+            """
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+            select ?, ?, users.id, 'MEMBER', 'ACTIVE', timestampadd(second, 1, utc_timestamp(6)), 'OtherAvatar', ?
+            from users
+            where users.email = ?
+            """.trimIndent(),
+            membershipId,
+            clubId,
+            avatarKey,
+            email,
+        )
+        createdMembershipIds += membershipId
+        return membershipId
     }
 
     private fun sessionCookieForEmail(email: String): Cookie {

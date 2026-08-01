@@ -1,8 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
   cleanupGeneratedSessions,
+  cleanupSecondClubFixture,
   cleanupViewerGoogleUserFixtures,
   createOpenSessionFixture,
+  ensureSecondClubFixture,
   loginWithGoogleFixture,
   resetSeedGoogleLogins,
   runMysql,
@@ -19,7 +21,7 @@ const hostEmail = "host@example.com";
 const selfEditMemberEmail = "member5@example.com";
 const hostTargetMemberEmail = "member4@example.com";
 const seededEmails = [hostEmail, selfEditMemberEmail, hostTargetMemberEmail];
-const viewerEmails: string[] = [];
+const fixtureEmails: string[] = [];
 
 let uniqueCounter = 0;
 
@@ -34,7 +36,37 @@ function uniqueDisplayName(prefix: string) {
 
 function uniqueViewerEmail(label: string) {
   uniqueCounter += 1;
-  return `e2e.profile.${label}.${Date.now()}.${uniqueCounter}@example.com`;
+  return `e2e.profile.${label}.${Date.now()}.${uniqueCounter}@example.test`;
+}
+
+function mysqlScalar(sql: string) {
+  return runMysql(sql).trim().split(/\s+/).at(-1) ?? "";
+}
+
+async function updateAvatarDirect(page: Page, avatarKey: string, clubSlug: string) {
+  return page.evaluate(async ({ avatarKey: selectedAvatarKey, clubSlug: selectedClubSlug }) => {
+    const query = `?clubSlug=${encodeURIComponent(selectedClubSlug)}`;
+    const response = await fetch(`/api/bff/api/me/avatar${query}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ avatarKey: selectedAvatarKey }),
+    });
+    const body = await response.json().catch(() => null) as Record<string, unknown> | null;
+    return { status: response.status, body };
+  }, { avatarKey, clubSlug });
+}
+
+async function scopedProfile(page: Page, clubSlug: string) {
+  return page.evaluate(async (selectedClubSlug) => {
+    const response = await fetch(
+      `/api/bff/api/app/me?clubSlug=${encodeURIComponent(selectedClubSlug)}`,
+      { cache: "no-store" },
+    );
+    return {
+      status: response.status,
+      body: await response.json() as { avatarKey?: string },
+    };
+  }, clubSlug);
 }
 
 function resetSeededProfiles() {
@@ -71,16 +103,25 @@ async function logout(page: Page) {
 }
 
 test.beforeEach(() => {
-  viewerEmails.length = 0;
+  fixtureEmails.length = 0;
   cleanupGeneratedSessions();
   createOpenSessionFixture();
   resetSeededProfiles();
 });
 
 test.afterEach(() => {
-  if (viewerEmails.length > 0) {
-    cleanupViewerGoogleUserFixtures(viewerEmails);
+  if (fixtureEmails.length > 0) {
+    runMysql(`
+delete memberships
+from memberships
+join users on users.id = memberships.user_id
+join clubs on clubs.id = memberships.club_id
+where clubs.slug = 'sample-book-club'
+  and lower(users.email) in (${fixtureEmails.map(sqlString).join(", ")});
+`);
+    cleanupViewerGoogleUserFixtures(fixtureEmails);
   }
+  cleanupSecondClubFixture();
   cleanupGeneratedSessions();
   resetSeededProfiles();
 });
@@ -141,20 +182,151 @@ test("active members edit their profile from member space and refresh the accoun
   await expect(page.getByRole("button", { name: `${updatedDisplayName} 계정 메뉴` })).toBeVisible();
 });
 
-test("suspended members omit account navigation and profile editing from member space", async ({ page }) => {
-  setMembershipStatus(selfEditMemberEmail, "SUSPENDED");
+test("active members save an allowlisted avatar from My Space and refresh account identity", async ({ page }) => {
+  const email = uniqueViewerEmail("active-avatar-ui");
+  fixtureEmails.push(email);
   await mockMyReadingShelfJourney(page, "three-recent-readings");
-  await loginWithGoogleFixture(page, selfEditMemberEmail);
+  await loginWithGoogleFixture(page, email, { displayName: "E2E Active Avatar" });
+  setMembershipStatus(email, "ACTIVE");
+  await page.goto("/app/me");
+
+  const opener = page.getByRole("button", { name: "아바타 바꾸기" });
+  await opener.click();
+  const dialog = page.getByRole("dialog", { name: "나의 아바타 선택" });
+  await dialog.getByRole("button", { name: "초록 찻잔을 든 고슴도치 선택" }).click();
+  const saved = page.waitForResponse(
+    (response) => response.request().method() === "PATCH" && response.url().includes("/api/bff/api/me/avatar"),
+  );
+  await dialog.getByRole("button", { name: "이 아바타로 변경" }).click();
+
+  expect((await saved).status()).toBe(200);
+  await expect(opener.locator("img")).toHaveAttribute(
+    "src",
+    "/assets/avatars/book-club/hedgehog-green-mug.webp",
+  );
+  await expect(page.getByRole("button", { name: "E2E Active Avatar 계정 메뉴" }).locator("img")).toHaveAttribute(
+    "src",
+    "/assets/avatars/book-club/hedgehog-green-mug.webp",
+  );
+  expect(mysqlScalar(`
+select avatar_key
+from memberships
+join users on users.id = memberships.user_id
+where lower(users.email) = ${sqlString(email)}
+  and memberships.club_id = '00000000-0000-0000-0000-000000000001';
+`)).toBe("hedgehog-green-mug");
+});
+
+test("suspended members omit account navigation and profile editing from member space", async ({ page }) => {
+  const email = uniqueViewerEmail("suspended-avatar");
+  fixtureEmails.push(email);
+  await mockMyReadingShelfJourney(page, "three-recent-readings");
+  await loginWithGoogleFixture(page, email, { displayName: "E2E Suspended Avatar" });
+  setMembershipStatus(email, "SUSPENDED");
   await page.goto("/app/me");
 
   const shelf = page.locator(".rm-member-space");
   await expect(shelf.getByRole("button", { name: "이름 변경" })).toHaveCount(0);
+  await expect(shelf.getByRole("button", { name: "아바타 바꾸기" })).toHaveCount(0);
   await expect(shelf.getByRole("link", {
     name: /계정 (관리|설정)/,
   })).toHaveCount(0);
+  const decorativeAvatar = shelf.locator(".rm-avatar-picker--decorative");
+  await expect(decorativeAvatar).toHaveCSS("grid-column-start", "1");
+  await expect(decorativeAvatar).toHaveCSS("grid-row-start", "1");
+  await expect(decorativeAvatar).toHaveCSS("grid-row-end", "span 2");
+  await expect(decorativeAvatar).toHaveCSS("align-self", "start");
   await expect(shelf.getByRole("list", {
     name: "최근 독서 기록",
   })).toBeVisible();
+
+  const directUpdate = await updateAvatarDirect(page, "hedgehog-green-mug", "reading-sai");
+  expect(directUpdate.status).toBe(200);
+  expect(directUpdate.body?.avatarKey).toBe("hedgehog-green-mug");
+});
+
+test("left and inactive members cannot open or directly mutate the avatar picker", async ({ page }) => {
+  for (const status of ["LEFT", "INACTIVE"] as const) {
+    const email = uniqueViewerEmail(`${status.toLowerCase()}-avatar`);
+    fixtureEmails.push(email);
+    await loginWithGoogleFixture(page, email, { displayName: `E2E ${status} Avatar` });
+    setMembershipStatus(email, status);
+    await page.goto("/");
+
+    const directUpdate = await updateAvatarDirect(page, "hedgehog-green-mug", "reading-sai");
+    expect(directUpdate.status).toBe(403);
+    expect(directUpdate.body?.code).toBe("MEMBERSHIP_NOT_ALLOWED");
+
+    await page.goto("/app/me");
+    await expect(page.getByRole("button", { name: "아바타 바꾸기" })).toHaveCount(0);
+    await logout(page);
+  }
+});
+
+test("two active members may store the same avatar key in one club", async ({ page }) => {
+  const emails = [uniqueViewerEmail("duplicate-a"), uniqueViewerEmail("duplicate-b")];
+  fixtureEmails.push(...emails);
+
+  for (const [index, email] of emails.entries()) {
+    await loginWithGoogleFixture(page, email, { displayName: `E2E Duplicate ${index + 1}` });
+    setMembershipStatus(email, "ACTIVE");
+    await page.goto("/");
+
+    const directUpdate = await updateAvatarDirect(page, "hedgehog-green-mug", "reading-sai");
+    expect(directUpdate.status).toBe(200);
+    expect(directUpdate.body?.avatarKey).toBe("hedgehog-green-mug");
+    await logout(page);
+  }
+
+  expect(mysqlScalar(`
+select count(*)
+from memberships
+join users on users.id = memberships.user_id
+where memberships.club_id = '00000000-0000-0000-0000-000000000001'
+  and lower(users.email) in (${emails.map(sqlString).join(", ")})
+  and memberships.avatar_key = 'hedgehog-green-mug';
+`)).toBe("2");
+});
+
+test("mixed membership edit gates and avatar updates remain independent across clubs", async ({ page }) => {
+  const email = uniqueViewerEmail("cross-club-avatar");
+  fixtureEmails.push(email);
+  await loginWithGoogleFixture(page, email, { displayName: "E2E Cross Club Avatar" });
+  setMembershipStatus(email, "ACTIVE");
+  ensureSecondClubFixture();
+  runMysql(`
+insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+select uuid(), clubs.id, users.id, 'MEMBER', 'VIEWER', utc_timestamp(6), users.short_name, 'turtle-winter-book'
+from users
+join clubs on clubs.slug = 'sample-book-club'
+where lower(users.email) = ${sqlString(email)}
+on duplicate key update
+  status = 'VIEWER',
+  avatar_key = 'turtle-winter-book',
+  updated_at = utc_timestamp(6);
+`);
+  await page.goto("/");
+
+  await page.goto("/clubs/reading-sai/app/me");
+  await expect(page.getByRole("button", { name: "아바타 바꾸기" })).toBeVisible();
+  await page.goto("/clubs/sample-book-club/app/me");
+  await expect(page.getByRole("button", { name: "아바타 바꾸기" })).toHaveCount(0);
+
+  const readingSaiUpdate = await updateAvatarDirect(page, "hedgehog-green-mug", "reading-sai");
+  expect(readingSaiUpdate.status).toBe(200);
+  const sampleClubUpdate = await updateAvatarDirect(page, "fox-glasses-mug", "sample-book-club");
+  expect(sampleClubUpdate.status).toBe(200);
+
+  const readingSaiProfile = await scopedProfile(page, "reading-sai");
+  const sampleClubProfile = await scopedProfile(page, "sample-book-club");
+  expect(readingSaiProfile).toEqual({
+    status: 200,
+    body: expect.objectContaining({ avatarKey: "hedgehog-green-mug" }),
+  });
+  expect(sampleClubProfile).toEqual({
+    status: 200,
+    body: expect.objectContaining({ avatarKey: "fox-glasses-mug" }),
+  });
 });
 
 test("an empty reading shelf omits recent-session navigation", async ({ page }) => {
@@ -228,7 +400,7 @@ test("viewer can read member routes but cannot use current-session write actions
   page,
 }, testInfo) => {
   const viewerEmail = uniqueViewerEmail("readonly");
-  viewerEmails.push(viewerEmail);
+  fixtureEmails.push(viewerEmail);
 
   await mockMemberParticipationProfile(page, "empty");
   await mockMyReadingShelfJourney(page, "three-recent-readings");
@@ -237,12 +409,16 @@ test("viewer can read member routes but cannot use current-session write actions
 
   const viewerShelf = page.locator(".rm-member-space");
   await expect(viewerShelf.getByRole("button", { name: "이름 변경" })).toHaveCount(0);
+  await expect(viewerShelf.getByRole("button", { name: "아바타 바꾸기" })).toHaveCount(0);
   await expect(viewerShelf.getByRole("link", {
     name: /계정 (관리|설정)/,
   })).toHaveCount(0);
   await expect(viewerShelf.getByRole("list", {
     name: "최근 독서 기록",
   })).toBeVisible();
+  const directUpdate = await updateAvatarDirect(page, "hedgehog-green-mug", "reading-sai");
+  expect(directUpdate.status).toBe(200);
+  expect(directUpdate.body?.avatarKey).toBe("hedgehog-green-mug");
 
   await page.goto("/app/me/settings");
 

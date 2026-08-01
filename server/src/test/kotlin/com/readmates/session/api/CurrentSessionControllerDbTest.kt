@@ -160,13 +160,13 @@ class CurrentSessionControllerDbTest(
                 jsonPath("$.currentSession.myQuestions[0].draftThought") { value("hydrate 초안") }
                 jsonPath("$.currentSession.myQuestions[0].authorName") { value("김멤버") }
                 jsonPath("$.currentSession.myQuestions[0].authorShortName") { value("김멤버") }
-                jsonPath("$.currentSession.myQuestions[0].avatarKey") { value("book-tote") }
+                jsonPath("$.currentSession.myQuestions[0].avatarKey") { value("fennec-heart-mug") }
                 jsonPath("$.currentSession.myQuestions[0].profileImageUrl") { doesNotExist() }
                 jsonPath("$.currentSession.myOneLineReview.text") { value("현재 세션 hydrate 한줄평") }
-                jsonPath("$.currentSession.myOneLineReview.avatarKey") { value("book-tote") }
+                jsonPath("$.currentSession.myOneLineReview.avatarKey") { value("fennec-heart-mug") }
                 jsonPath("$.currentSession.myOneLineReview.profileImageUrl") { doesNotExist() }
                 jsonPath("$.currentSession.myLongReview.body") { value("현재 세션 hydrate 서평") }
-                jsonPath("$.currentSession.myLongReview.avatarKey") { value("book-tote") }
+                jsonPath("$.currentSession.myLongReview.avatarKey") { value("fennec-heart-mug") }
                 jsonPath("$.currentSession.myLongReview.profileImageUrl") { doesNotExist() }
                 jsonPath("$.currentSession.board.questions[0].authorName") { value("김멤버") }
                 jsonPath("$.currentSession.board.questions[0].authorShortName") { value("김멤버") }
@@ -187,13 +187,13 @@ class CurrentSessionControllerDbTest(
                     value(hasItem("현재 세션 hydrate 서평"))
                 }
                 jsonPath("$.currentSession.board.longReviews[?(@.body == '현재 세션 hydrate 서평')].avatarKey") {
-                    value(hasItem("book-tote"))
+                    value(hasItem("fennec-heart-mug"))
                 }
                 jsonPath("$.currentSession.board.longReviews[*].profileImageUrl") { doesNotExist() }
                 jsonPath("$.currentSession.attendees[0].membershipId") { exists() }
                 jsonPath("$.currentSession.attendees[0].displayName") { value("김호스트") }
                 jsonPath("$.currentSession.attendees[0].accountName") { value("김호스트키") }
-                jsonPath("$.currentSession.attendees[0].avatarKey") { value("reading-lamp") }
+                jsonPath("$.currentSession.attendees[0].avatarKey") { value("squirrel-acorn") }
                 jsonPath("$.currentSession.attendees[0].profileImageUrl") { doesNotExist() }
                 jsonPath("$.currentSession.attendees[0].shortName") { doesNotExist() }
                 jsonPath("$.currentSession.attendees[0].role") { value("HOST") }
@@ -382,7 +382,7 @@ class CurrentSessionControllerDbTest(
                 }
                 jsonPath("$.currentSession.board.questions[*].authorShortName") { value(not(hasItem("멤버1"))) }
                 jsonPath("$.currentSession.board.questions[?(@.text == '탈퇴 회원 기존 질문')].avatarKey") {
-                    value(hasItem("archive-box"))
+                    value(hasItem("hedgehog-green-book"))
                 }
                 jsonPath("$.currentSession.board.longReviews[?(@.body == '탈퇴 회원 기존 서평')].authorName") {
                     value(hasItem("탈퇴한 멤버"))
@@ -393,9 +393,9 @@ class CurrentSessionControllerDbTest(
                 }
                 jsonPath("$.currentSession.board.longReviews[*].authorShortName") { value(not(hasItem("멤버1"))) }
                 jsonPath("$.currentSession.board.longReviews[?(@.body == '탈퇴 회원 기존 서평')].avatarKey") {
-                    value(hasItem("archive-box"))
+                    value(hasItem("hedgehog-green-book"))
                 }
-                jsonPath("$.currentSession.board.longReviews[*].avatarKey") { value(not(hasItem("open-book-pencil"))) }
+                jsonPath("$.currentSession.board.longReviews[*].avatarKey") { value(not(hasItem("deer-brown-book"))) }
                 jsonPath("$.currentSession.attendees[*].displayName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.currentSession.attendees[*].displayName") { value(not(hasItem("멤버1"))) }
                 jsonPath("$.currentSession.attendees[*].accountName") { value(hasItem("탈퇴한 멤버")) }
@@ -403,7 +403,7 @@ class CurrentSessionControllerDbTest(
                 jsonPath(
                     "$.currentSession.attendees[?(@.membershipId == '00000000-0000-0000-0000-000000000202')].avatarKey",
                 ) {
-                    value(hasItem("archive-box"))
+                    value(hasItem("hedgehog-green-book"))
                 }
                 jsonPath("$.currentSession.attendees[*].shortName") { doesNotExist() }
             }
@@ -443,7 +443,7 @@ class CurrentSessionControllerDbTest(
             update memberships
             join users on users.id = memberships.user_id
             set memberships.status = 'LEFT',
-                memberships.avatar_key = 'book-tote'
+                memberships.avatar_key = 'fennec-heart-mug'
             where users.email = 'member1@example.com'
               and memberships.club_id = '00000000-0000-0000-0000-000000000001';
         """
@@ -451,8 +451,8 @@ class CurrentSessionControllerDbTest(
             update memberships
             join users on users.id = memberships.user_id
             set memberships.avatar_key = case users.email
-                  when 'host@example.com' then 'reading-lamp'
-                  when 'member5@example.com' then 'book-tote'
+                  when 'host@example.com' then 'squirrel-acorn'
+                  when 'member5@example.com' then 'fennec-heart-mug'
                 end,
                 memberships.short_name = case users.email
                   when 'host@example.com' then '김호스트'
@@ -469,8 +469,8 @@ class CurrentSessionControllerDbTest(
             update memberships
             join users on users.id = memberships.user_id
             set memberships.avatar_key = case users.email
-                  when 'host@example.com' then 'reading-lamp'
-                  when 'member5@example.com' then 'library-stamp'
+                  when 'host@example.com' then 'squirrel-acorn'
+                  when 'member5@example.com' then 'penguin-beret-book'
                 end,
                 memberships.short_name = case users.email
                   when 'host@example.com' then '호스트'
@@ -487,7 +487,7 @@ class CurrentSessionControllerDbTest(
             update memberships
             join users on users.id = memberships.user_id
             set memberships.status = 'ACTIVE',
-                memberships.avatar_key = 'open-book-pencil'
+                memberships.avatar_key = 'deer-brown-book'
             where users.email = 'member1@example.com'
               and memberships.club_id = '00000000-0000-0000-0000-000000000001';
         """

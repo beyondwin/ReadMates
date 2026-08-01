@@ -67,7 +67,7 @@ class PublicControllerDbTest(
                 jsonPath("$.highlights[0].text") { value("모르는 영역을 피하는 전략과 배움을 확장하는 전략의 장단점을 비교했다.") }
                 jsonPath("$.highlights[*].authorName") { value(hasItems("이멤버5", "최멤버2", "김호스트")) }
                 jsonPath("$.highlights[*].authorShortName") { value(hasItems("멤버5", "멤버2", "호스트")) }
-                jsonPath("$.highlights[*].avatarKey") { value(hasItem("library-stamp")) }
+                jsonPath("$.highlights[*].avatarKey") { value(hasItem("penguin-beret-book")) }
                 jsonPath("$.oneLiners.length()") { value(3) }
             }
     }
@@ -163,14 +163,16 @@ class PublicControllerDbTest(
                 jsonPath("$.highlights[*].authorName") { value(not(hasItem("안멤버1"))) }
                 jsonPath("$.highlights[*].authorShortName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.highlights[*].authorShortName") { value(not(hasItem("멤버1"))) }
-                jsonPath("$.highlights[?(@.authorName == '탈퇴한 멤버')].avatarKey") { value(hasItem("archive-box")) }
-                jsonPath("$.highlights[*].avatarKey") { value(not(hasItem("open-book-pencil"))) }
+                jsonPath("$.highlights[?(@.authorName == '탈퇴한 멤버')].avatarKey") {
+                    value(hasItem("hedgehog-green-book"))
+                }
+                jsonPath("$.highlights[*].avatarKey") { value(not(hasItem("deer-brown-book"))) }
                 jsonPath("$.oneLiners[*].authorName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.oneLiners[*].authorName") { value(not(hasItem("안멤버1"))) }
                 jsonPath("$.oneLiners[*].authorShortName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.oneLiners[*].authorShortName") { value(not(hasItem("멤버1"))) }
-                jsonPath("$.oneLiners[?(@.authorName == '탈퇴한 멤버')].avatarKey") { value(hasItem("archive-box")) }
-                jsonPath("$.oneLiners[*].avatarKey") { value(not(hasItem("open-book-pencil"))) }
+                jsonPath("$.oneLiners[?(@.authorName == '탈퇴한 멤버')].avatarKey") { value(hasItem("hedgehog-green-book")) }
+                jsonPath("$.oneLiners[*].avatarKey") { value(not(hasItem("deer-brown-book"))) }
             }
     }
 

@@ -45,7 +45,7 @@ class GoogleLoginServiceTest(
         val googleAccountStore = mock(GoogleAccountStorePort::class.java)
         val platformAdminLookup = mock(PlatformAdminLookupPort::class.java)
         val avatarAllocation = mock(MemberAvatarAllocationPort::class.java)
-        val allocatedKey = BookClubAvatarKey.OPEN_BOOK_PENCIL
+        val allocatedKey = BookClubAvatarKey.DEER_BROWN_BOOK
         val createdMember =
             CurrentMember(
                 userId = UUID.randomUUID(),
@@ -182,7 +182,7 @@ class GoogleLoginServiceTest(
                     .prepareStatement(
                         """
                         insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
-                        values (?, '00000000-0000-0000-0000-000000000001', ?, 'MEMBER', 'VIEWER', null, 'Race Viewer', 'reading-lamp')
+                        values (?, '00000000-0000-0000-0000-000000000001', ?, 'MEMBER', 'VIEWER', null, 'Race Viewer', 'squirrel-acorn')
                         """.trimIndent(),
                     ).use { statement ->
                         statement.setString(1, membershipId)

@@ -18,6 +18,84 @@
     overscroll-behavior-y: contain;
     -webkit-tap-highlight-color: transparent;
   }
+  html .rm-avatar-picker__scrim {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  html .rm-avatar-picker__dialog {
+    width: 100%;
+    max-height: min(90dvh, 760px);
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: var(--r-3) var(--r-3) 0 0;
+    padding-bottom: var(--m-safe-bottom);
+  }
+
+  html .rm-avatar-picker__header {
+    position: sticky;
+    top: 0;
+    min-height: 78px;
+    padding: 16px 16px 13px;
+  }
+
+  html .rm-avatar-picker__header h2 {
+    font-size: 1.25rem;
+  }
+
+  html .rm-avatar-picker__header p {
+    max-width: 240px;
+    font-size: 0.75rem;
+  }
+
+  html .rm-avatar-picker__body {
+    padding: 14px 14px 18px;
+    scrollbar-gutter: auto;
+  }
+
+  html .rm-avatar-picker__grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  html .rm-avatar-picker__tile {
+    min-height: 70px;
+    padding: 7px;
+  }
+
+  html .rm-avatar-picker__tile .rm-avatar-chip {
+    --avatar-size: 48px !important;
+  }
+
+  html .rm-avatar-picker__check {
+    top: 3px;
+    right: 3px;
+    width: 20px;
+    height: 20px;
+  }
+
+  html .rm-avatar-picker__footer {
+    position: sticky;
+    bottom: 0;
+    min-height: 70px;
+    padding: 12px 14px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  html .rm-avatar-picker__footer > span:empty {
+    display: none;
+  }
+
+  html .rm-avatar-picker__actions {
+    display: grid;
+    grid-template-columns: minmax(76px, auto) minmax(0, 1fr);
+  }
+
+  html .rm-avatar-picker__save {
+    width: 100%;
+  }
 }
 
 .m-app {

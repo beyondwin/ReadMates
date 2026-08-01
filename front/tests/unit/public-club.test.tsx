@@ -109,7 +109,7 @@ describe("PublicClub", () => {
     expect(screen.getByText("김호스트")).toBeInTheDocument();
     expect(screen.getByText("김호스트").closest(".public-host-note")?.querySelector(".rm-avatar-chip img")).toHaveAttribute(
       "src",
-      "/assets/avatars/book-club/archive-box.webp",
+      "/assets/avatars/book-club/hedgehog-green-book.webp",
     );
     expect(screen.getByText("호스트 · 2025.11~")).toBeInTheDocument();
     expect(screen.getByText("함께 읽기")).toBeInTheDocument();

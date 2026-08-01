@@ -1,4 +1,6 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { cleanup, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import type { MyPageRouteData } from "./my-page-data";
@@ -9,15 +11,25 @@ const route = vi.hoisted(() => ({
   revalidate: vi.fn(),
 }));
 
+const mutations = vi.hoisted(() => ({
+  profile: vi.fn(),
+  avatar: vi.fn(),
+}));
+
 vi.mock("react-router-dom", async (importOriginal) => ({
   ...(await importOriginal<typeof import("react-router-dom")>()),
   useLoaderData: () => route.loaderData,
   useRevalidator: () => ({ revalidate: route.revalidate }),
 }));
 
+vi.mock("@/features/archive/queries/profile-queries", () => ({
+  useUpdateMyProfileMutation: () => ({ mutateAsync: mutations.profile }),
+  useUpdateMyAvatarMutation: () => ({ mutateAsync: mutations.avatar }),
+}));
+
 const data: MyPageRouteData = {
   profile: {
-    avatarKey: "book-tote",
+    avatarKey: "fennec-heart-mug",
     displayName: "샘플 멤버",
     accountName: "sample-member",
     email: "member@example.com",
@@ -66,12 +78,24 @@ const data: MyPageRouteData = {
   },
 };
 
-function renderRoute(initialEntry = "/clubs/reading-sai/app/me") {
-  return render(
-    <MemoryRouter initialEntries={[initialEntry]}>
-      <MyPageRoute canEditProfile onProfileUpdated={vi.fn().mockResolvedValue(undefined)} />
-    </MemoryRouter>,
-  );
+function renderRoute(
+  initialEntry = "/clubs/reading-sai/app/me",
+  onProfileUpdated = vi.fn().mockResolvedValue(undefined),
+) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+
+  return {
+    ...render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <MyPageRoute canEditProfile clubSlug="reading-sai" onProfileUpdated={onProfileUpdated} />
+      </MemoryRouter>
+    </QueryClientProvider>,
+    ),
+    onProfileUpdated,
+  };
 }
 
 describe("MyPageRoute", () => {
@@ -79,6 +103,21 @@ describe("MyPageRoute", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(2026, 6, 29));
     route.loaderData = data;
+    route.revalidate.mockReset();
+    mutations.profile.mockReset().mockImplementation(async (displayName: string) => ({
+      membershipId: "member-route-profile",
+      displayName,
+      accountName: data.profile.accountName,
+      profileImageUrl: null,
+      avatarKey: data.profile.avatarKey,
+    }));
+    mutations.avatar.mockReset().mockImplementation(async (avatarKey: string) => ({
+      membershipId: "member-route-profile",
+      displayName: data.profile.displayName,
+      accountName: data.profile.accountName,
+      profileImageUrl: null,
+      avatarKey,
+    }));
   });
 
   afterEach(() => {
@@ -90,9 +129,9 @@ describe("MyPageRoute", () => {
     renderRoute();
 
     expect(screen.getByRole("heading", { level: 1, name: "샘플 멤버" })).toBeVisible();
-    expect(document.querySelector(".rm-member-profile__avatar .rm-avatar-chip img")).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "아바타 바꾸기" }).querySelector("img")).toHaveAttribute(
       "src",
-      "/assets/avatars/book-club/book-tote.webp",
+      "/assets/avatars/book-club/fennec-heart-mug.webp",
     );
     expect(screen.getByText("9번의 모임에서 7권을 끝까지 읽었어요.")).toBeVisible();
     expect(screen.queryByRole("link", { name: "계정 관리" })).toBeNull();
@@ -127,5 +166,31 @@ describe("MyPageRoute", () => {
       "href",
       `${appBasePath}/me/settings`,
     );
+  });
+
+  it("wires independent display-name and avatar callbacks through the My Space route", async () => {
+    const user = userEvent.setup();
+    const onProfileUpdated = vi.fn().mockResolvedValue(undefined);
+    renderRoute("/clubs/reading-sai/app/me", onProfileUpdated);
+
+    await user.click(screen.getByRole("button", { name: "이름 변경" }));
+    const displayName = screen.getByRole("textbox", { name: "표시 이름" });
+    await user.clear(displayName);
+    await user.type(displayName, "변경한 멤버");
+    await user.click(screen.getByRole("button", { name: "이름 저장" }));
+
+    expect(mutations.profile).toHaveBeenCalledWith("변경한 멤버");
+    expect(await screen.findByRole("heading", { level: 1, name: "변경한 멤버" })).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "아바타 바꾸기" }));
+    const dialog = screen.getByRole("dialog", { name: "나의 아바타 선택" });
+    await user.click(within(dialog).getByRole("button", {
+      name: "초록 찻잔을 든 고슴도치 선택",
+    }));
+    await user.click(within(dialog).getByRole("button", { name: "이 아바타로 변경" }));
+
+    expect(mutations.avatar).toHaveBeenCalledWith("hedgehog-green-mug");
+    expect(onProfileUpdated).toHaveBeenCalledTimes(2);
+    expect(route.revalidate).toHaveBeenCalledTimes(2);
   });
 });

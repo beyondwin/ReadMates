@@ -1,6 +1,7 @@
 package com.readmates.auth.adapter.out.persistence
 
 import com.readmates.auth.application.port.out.MemberAvatarAllocationPort
+import com.readmates.auth.application.port.out.MemberAvatarRandomIndexPort
 import com.readmates.auth.domain.BookClubAvatarKey
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.uuid
@@ -11,6 +12,7 @@ import java.util.UUID
 @Repository
 class JdbcMemberAvatarAllocationAdapter(
     private val jdbcTemplate: JdbcTemplate,
+    private val randomIndex: MemberAvatarRandomIndexPort,
 ) : MemberAvatarAllocationPort {
     override fun allocate(
         clubId: UUID,
@@ -56,12 +58,14 @@ class JdbcMemberAvatarAllocationAdapter(
                         it.dbString(),
                     ).firstOrNull()
             }
-        val usedKeyValues = visibleAvatarKeysUsedByOtherMembers(clubId, userId)
-        val usedKeys = usedKeyValues.mapNotNull(BookClubAvatarKey::fromWireValue).toSet()
+        previousKey?.let { return it }
 
-        return previousKey?.takeIf { it !in usedKeys }
-            ?: BookClubAvatarKey.ordered.firstOrNull { it !in usedKeys }
-            ?: BookClubAvatarKey.ordered[usedKeyValues.size % BookClubAvatarKey.ordered.size]
+        val usedKeys =
+            visibleAvatarKeysUsedByOtherMembers(clubId, userId)
+                .mapNotNull(BookClubAvatarKey::fromWireValue)
+                .toSet()
+        val candidates = BookClubAvatarKey.ordered.filterNot(usedKeys::contains).ifEmpty { BookClubAvatarKey.ordered }
+        return candidates[randomIndex.nextIndex(candidates.size)]
     }
 
     private fun visibleAvatarKeysUsedByOtherMembers(

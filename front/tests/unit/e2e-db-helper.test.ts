@@ -48,9 +48,9 @@ describe("E2E database helper batching", () => {
     const viewerSql = execFileSyncMock.mock.calls[1]?.[1]?.at(-1);
 
     expect(secondClubSql).toContain("avatar_key");
-    expect(secondClubSql).toContain("'reading-lamp'");
+    expect(secondClubSql).toContain("'squirrel-acorn'");
     expect(viewerSql).toContain("avatar_key");
-    expect(viewerSql).toContain("'question-card'");
+    expect(viewerSql).toContain("'mouse-blue-book'");
   });
 
   it("assigns intentional stable avatar keys in Google login membership fixtures", async () => {
@@ -62,12 +62,12 @@ describe("E2E database helper batching", () => {
     await loginWithGoogleFixture(page, "fixture.uninvited@example.test");
     const viewerSql = execFileSyncMock.mock.calls[0]?.[1]?.at(-1);
     expect(viewerSql).toContain("avatar_key");
-    expect(viewerSql).toContain("'archive-box'");
+    expect(viewerSql).toContain("'hedgehog-green-book'");
 
     execFileSyncMock.mockClear();
     await loginWithGoogleFixture(page, "fixture.invited@example.test", { inviteToken: "fixture-token" });
     const acceptedInviteSql = execFileSyncMock.mock.calls[0]?.[1]?.at(-1);
     expect(acceptedInviteSql).toContain("avatar_key");
-    expect(acceptedInviteSql).toContain("'open-book-pencil'");
+    expect(acceptedInviteSql).toContain("'deer-brown-book'");
   });
 });

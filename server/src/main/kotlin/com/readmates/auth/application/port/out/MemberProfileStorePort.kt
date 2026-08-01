@@ -19,7 +19,10 @@ data class MemberProfileRow(
 )
 
 interface MemberProfileStorePort {
-    fun findProfileMemberByEmail(email: String): MemberProfileRow?
+    fun findProfileMemberByEmail(
+        email: String,
+        clubId: UUID? = null,
+    ): MemberProfileRow?
 
     fun findProfileMemberByUserId(userId: UUID): MemberProfileRow?
 
@@ -40,6 +43,12 @@ interface MemberProfileStorePort {
         clubId: UUID,
         membershipId: UUID,
         displayName: String,
+    ): Boolean
+
+    fun updateOwnAvatarKey(
+        clubId: UUID,
+        membershipId: UUID,
+        avatarKey: String,
     ): Boolean
 
     fun updateDisplayName(

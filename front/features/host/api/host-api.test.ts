@@ -75,7 +75,7 @@ function hostSessionDetail() {
   };
 }
 
-function hostMemberListItem(avatarKey: unknown = "reading-lamp") {
+function hostMemberListItem(avatarKey: unknown = "squirrel-acorn") {
   return {
     membershipId: "membership-active",
     userId: "user-active",

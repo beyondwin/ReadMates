@@ -363,7 +363,7 @@ class MyJourneyQueriesTest(
         jdbcTemplate.update(
             """
             insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
-            values (?, ?, ?, 'MEMBER', 'ACTIVE', '2026-01-01 00:00:00', ?, 'archive-box')
+            values (?, ?, ?, 'MEMBER', 'ACTIVE', '2026-01-01 00:00:00', ?, 'hedgehog-green-book')
             """.trimIndent(),
             membershipId.toString(),
             clubId.toString(),

@@ -20,8 +20,12 @@ import java.util.UUID
 class JdbcMemberProfileStoreAdapter(
     private val jdbcTemplate: JdbcTemplate,
 ) : MemberProfileStorePort {
-    override fun findProfileMemberByEmail(email: String): MemberProfileRow? {
+    override fun findProfileMemberByEmail(
+        email: String,
+        clubId: UUID?,
+    ): MemberProfileRow? {
         val normalizedEmail = email.trim().lowercase(Locale.ROOT).takeIf { it.isNotEmpty() } ?: return null
+        val scopedClubId = clubId?.dbString()
         return jdbcTemplate
             .query(
                 """
@@ -41,12 +45,15 @@ class JdbcMemberProfileStoreAdapter(
                 join memberships on memberships.user_id = users.id
                 join clubs on clubs.id = memberships.club_id
                 where lower(users.email) = ?
+                  and (? is null or memberships.club_id = ?)
                   and memberships.status in ('VIEWER', 'ACTIVE', 'SUSPENDED', 'LEFT', 'INACTIVE')
                 order by memberships.joined_at is null, memberships.joined_at desc, memberships.created_at desc
                 limit 1
                 """.trimIndent(),
                 { resultSet, _ -> resultSet.toMemberProfileRow() },
                 normalizedEmail,
+                scopedClubId,
+                scopedClubId,
             ).firstOrNull()
     }
 
@@ -161,6 +168,25 @@ class JdbcMemberProfileStoreAdapter(
               and memberships.status in ('VIEWER', 'ACTIVE', 'SUSPENDED')
             """.trimIndent(),
             displayName,
+            membershipId.dbString(),
+            clubId.dbString(),
+        ) == 1
+
+    override fun updateOwnAvatarKey(
+        clubId: UUID,
+        membershipId: UUID,
+        avatarKey: String,
+    ): Boolean =
+        jdbcTemplate.update(
+            """
+            update memberships
+            set avatar_key = ?,
+                updated_at = utc_timestamp(6)
+            where id = ?
+              and club_id = ?
+              and status in ('VIEWER', 'ACTIVE', 'SUSPENDED')
+            """.trimIndent(),
+            avatarKey,
             membershipId.dbString(),
             clubId.dbString(),
         ) == 1

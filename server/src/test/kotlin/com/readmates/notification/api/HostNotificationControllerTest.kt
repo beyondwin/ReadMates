@@ -1206,7 +1206,7 @@ class HostNotificationControllerTest(
               'ACTIVE',
               utc_timestamp(6),
               'Other',
-              'archive-box'
+              'hedgehog-green-book'
             )
             """.trimIndent(),
         )

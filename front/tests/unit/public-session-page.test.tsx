@@ -161,14 +161,14 @@ describe("PublicSession", () => {
           sortOrder: 0,
           authorName: "이멤버5",
           authorShortName: "멤버5",
-          avatarKey: "reading-lamp",
+          avatarKey: "squirrel-acorn",
         },
       ],
       oneLiners: [
         {
           authorName: "김호스트",
           authorShortName: "우",
-          avatarKey: "book-tote",
+          avatarKey: "fennec-heart-mug",
           text: "낙관이 아니라 정확함의 문제였다.",
         },
       ],
@@ -195,7 +195,7 @@ describe("PublicSession", () => {
     expect(within(highlightRow as HTMLElement).getByText("이멤버5")).toBeInTheDocument();
     expect((highlightRow as HTMLElement).querySelector(".rm-avatar-chip img")).toHaveAttribute(
       "src",
-      "/assets/avatars/book-club/reading-lamp.webp",
+      "/assets/avatars/book-club/squirrel-acorn.webp",
     );
     expect(container.querySelector(".public-note-oneliner-card")).not.toBeNull();
     expect(container).not.toHaveTextContent("H01");
@@ -210,7 +210,7 @@ describe("PublicSession", () => {
     expect(screen.getByText("김호스트")).toBeInTheDocument();
     expect(container.querySelector(".public-note-oneliner-card .rm-avatar-chip img")).toHaveAttribute(
       "src",
-      "/assets/avatars/book-club/book-tote.webp",
+      "/assets/avatars/book-club/fennec-heart-mug.webp",
     );
     expect(container).not.toHaveTextContent("readmates");
     expect(container).not.toHaveTextContent("meet.google.com");

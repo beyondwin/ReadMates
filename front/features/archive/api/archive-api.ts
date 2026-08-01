@@ -5,6 +5,7 @@ import type {
   CurrentSessionPolicy,
   FeedbackDocumentListPage,
   MemberProfileResponse,
+  UpdateMemberAvatarRequest,
   UpdateMemberProfileRequest,
   MemberArchiveSessionDetailResponse,
   MyArchiveQuestionPage,
@@ -78,6 +79,16 @@ export async function updateMyProfile(displayName: string) {
   return readmatesFetchResponse(
     "/api/me/profile",
     jsonRequest({ method: "PATCH" }, request),
+  ) as Promise<Response & { json(): Promise<MemberProfileResponse> }>;
+}
+
+export async function updateMyAvatar(avatarKey: string, context?: ReadmatesApiContext) {
+  const request: UpdateMemberAvatarRequest = { avatarKey };
+
+  return readmatesFetchResponse(
+    "/api/me/avatar",
+    jsonRequest({ method: "PATCH" }, request),
+    context,
   ) as Promise<Response & { json(): Promise<MemberProfileResponse> }>;
 }
 

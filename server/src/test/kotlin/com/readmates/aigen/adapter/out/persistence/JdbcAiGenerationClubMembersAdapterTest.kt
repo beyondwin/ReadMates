@@ -63,7 +63,7 @@ class JdbcAiGenerationClubMembersAdapterTest(
         jdbcTemplate.update(
             """
             insert into memberships (id, club_id, user_id, role, status, short_name, joined_at, avatar_key)
-            values (?, ?, ?, 'MEMBER', ?, ?, utc_timestamp(6), 'archive-box')
+            values (?, ?, ?, 'MEMBER', ?, ?, utc_timestamp(6), 'hedgehog-green-book')
             """.trimIndent(),
             membershipId.toString(),
             clubId.toString(),

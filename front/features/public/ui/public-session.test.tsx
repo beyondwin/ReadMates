@@ -15,11 +15,11 @@ describe("PublicSession showcase", () => {
           date: "2026-06-18",
           summary: "공개 요약",
           highlights: [
-            { text: "문장", sortOrder: 1, authorName: "김독자", authorShortName: "김", avatarKey: "reading-lamp" },
+            { text: "문장", sortOrder: 1, authorName: "김독자", authorShortName: "김", avatarKey: "squirrel-acorn" },
           ],
           oneLiners: [
-            { authorName: "김회원", authorShortName: "김", avatarKey: "book-tote", text: "한줄평" },
-            { authorName: "김기록", authorShortName: "김", avatarKey: "calendar-book", text: "또 다른 한줄평" },
+            { authorName: "김회원", authorShortName: "김", avatarKey: "fennec-heart-mug", text: "한줄평" },
+            { authorName: "김기록", authorShortName: "김", avatarKey: "turtle-winter-book", text: "또 다른 한줄평" },
           ],
         }}
       />,
@@ -52,11 +52,11 @@ describe("PublicSession showcase", () => {
           date: "2026-06-18",
           summary: "공개 요약",
           highlights: [
-            { text: "문장", sortOrder: 1, authorName: "김독자", authorShortName: "김", avatarKey: "reading-lamp" },
+            { text: "문장", sortOrder: 1, authorName: "김독자", authorShortName: "김", avatarKey: "squirrel-acorn" },
           ],
           oneLiners: [
-            { authorName: "김회원", authorShortName: "김", avatarKey: "book-tote", text: "한줄평" },
-            { authorName: "김기록", authorShortName: "김", avatarKey: "calendar-book", text: "또 다른 한줄평" },
+            { authorName: "김회원", authorShortName: "김", avatarKey: "fennec-heart-mug", text: "한줄평" },
+            { authorName: "김기록", authorShortName: "김", avatarKey: "turtle-winter-book", text: "또 다른 한줄평" },
           ],
         }}
       />,
@@ -66,9 +66,9 @@ describe("PublicSession showcase", () => {
     expect(screen.getByText("김회원")).toBeVisible();
     expect(screen.getByText("김기록")).toBeVisible();
     expect([...container.querySelectorAll(".rm-avatar-chip img")].map((image) => image.getAttribute("src"))).toEqual([
-      "/assets/avatars/book-club/reading-lamp.webp",
-      "/assets/avatars/book-club/book-tote.webp",
-      "/assets/avatars/book-club/calendar-book.webp",
+      "/assets/avatars/book-club/squirrel-acorn.webp",
+      "/assets/avatars/book-club/fennec-heart-mug.webp",
+      "/assets/avatars/book-club/turtle-winter-book.webp",
     ]);
   });
 });

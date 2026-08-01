@@ -1,5 +1,6 @@
 package com.readmates.support
 
+import com.readmates.auth.domain.BookClubAvatarKey
 import org.assertj.core.api.Assertions.assertThat
 import org.flywaydb.core.Flyway
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -78,7 +79,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(1)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(2)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -90,7 +91,7 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("43")
+            assertThat(latestVersion).isEqualTo("44")
             assertThat(
                 upgradeJdbc.queryForObject(
                     """
@@ -189,7 +190,7 @@ class MySqlFlywayMigrationTest(
                         AVATAR_FIXTURE_FIRST_CLUB_ID,
                     ).filterNotNull()
             assertThat(visibleKeysForFirstClub.take(20).distinct()).hasSize(20)
-            assertThat(visibleKeysForFirstClub[20]).isEqualTo("reading-lamp")
+            assertThat(visibleKeysForFirstClub).allMatch(::isWireValue)
             val hiddenFixtureOrderingViolationCount =
                 upgradeJdbc.queryForObject(
                     """
@@ -220,10 +221,9 @@ class MySqlFlywayMigrationTest(
                         String::class.java,
                         AVATAR_FIXTURE_FIRST_CLUB_ID,
                     ).filterNotNull()
-            assertThat(rankedStatusAndKeysForFirstClub.takeLast(2)).containsExactly(
-                "LEFT:open-book-pencil",
-                "INACTIVE:book-spines",
-            )
+            assertThat(rankedStatusAndKeysForFirstClub.takeLast(2)).allMatch {
+                it.startsWith("LEFT:") || it.startsWith("INACTIVE:")
+            }
 
             val keysOrderedByCreatedAt =
                 upgradeJdbc
@@ -238,35 +238,34 @@ class MySqlFlywayMigrationTest(
                         String::class.java,
                         AVATAR_FIXTURE_FIRST_CLUB_ID,
                     ).filterNotNull()
-            assertThat(keysOrderedByCreatedAt.take(3)).containsExactly(
-                "reading-lamp",
-                "open-book-pencil",
-                "book-spines",
-            )
+            assertThat(keysOrderedByCreatedAt.take(3)).allMatch(::isWireValue)
             assertThat(
                 upgradeJdbc.queryForObject(
                     "select avatar_key from memberships where id = ?",
                     String::class.java,
                     avatarFixtureMembershipId(clubNumber = 2, memberNumber = 1),
                 ),
-            ).isEqualTo("reading-lamp")
+            ).matches(::isWireValue)
             assertEquals(
                 "club_id,status,avatar_key",
                 indexColumns(upgradeJdbc, "memberships", "memberships_club_status_avatar_idx"),
             )
 
             val invalidAvatarError =
-                assertInvalidAvatarKeyRejected(upgradeJdbc, "member-id")
+                assertInvalidAvatarKeyRejected(upgradeJdbc, v43AvatarKeys().first())
             assertThat(invalidAvatarError.mostSpecificCause.message).contains("memberships_avatar_key_check")
+            val arbitraryAvatarError =
+                assertInvalidAvatarKeyRejected(upgradeJdbc, "member-id")
+            assertThat(arbitraryAvatarError.mostSpecificCause.message).contains("memberships_avatar_key_check")
             val uppercaseAvatarError =
-                assertInvalidAvatarKeyRejected(upgradeJdbc, "READING-LAMP")
+                assertInvalidAvatarKeyRejected(upgradeJdbc, "HEDGEHOG-GREEN-BOOK")
             assertThat(uppercaseAvatarError.mostSpecificCause.message).contains("memberships_avatar_key_check")
-            assertInvalidAvatarKeyRejected(upgradeJdbc, "réading-lamp")
+            assertInvalidAvatarKeyRejected(upgradeJdbc, "hédgehog-green-book")
             val omittedAvatarError =
                 assertThrows(UncategorizedSQLException::class.java) {
                     upgradeJdbc.update(
                         """
-                        -- membership-avatar-key-omission: verify V43 rejects omitted keys after migration
+                        -- membership-avatar-key-omission: verify V44 rejects omitted keys after migration
                         insert into memberships (
                           id, club_id, user_id, role, status, short_name, joined_at, created_at, updated_at
                         ) values (?, ?, ?, 'MEMBER', 'ACTIVE', 'Missing Avatar', null,
@@ -278,6 +277,62 @@ class MySqlFlywayMigrationTest(
                     )
                 }
             assertThat(omittedAvatarError.mostSpecificCause.message).contains("avatar_key")
+        }
+    }
+
+    @Test
+    fun `mysql upgrades populated v43 schema to animal membership avatar keys`() {
+        FlywayUpgradeMySqlContainer().use { database ->
+            database.start()
+            val dataSource = DriverManagerDataSource(database.jdbcUrl, database.username, database.password)
+            val v43Flyway =
+                Flyway
+                    .configure()
+                    .dataSource(dataSource)
+                    .locations("classpath:db/mysql/migration")
+                    .target("43")
+                    .load()
+
+            assertThat(v43Flyway.migrate().targetSchemaVersion.toString()).isEqualTo("43")
+            val upgradeJdbc = JdbcTemplate(dataSource)
+            insertV43AvatarUpgradeFixtures(upgradeJdbc)
+
+            val upgradeResult =
+                Flyway
+                    .configure()
+                    .dataSource(dataSource)
+                    .locations("classpath:db/mysql/migration")
+                    .load()
+                    .migrate()
+
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(1)
+            val latestVersion =
+                upgradeJdbc.queryForObject(
+                    """
+                    select version
+                    from flyway_schema_history
+                    where success = true
+                    order by installed_rank desc
+                    limit 1
+                    """.trimIndent(),
+                    String::class.java,
+                )
+            assertThat(latestVersion).isEqualTo("44")
+
+            val newAssignmentsForFirstClub =
+                animalAvatarAssignmentsForClub(upgradeJdbc, AVATAR_FIXTURE_FIRST_CLUB_ID)
+            val newAssignmentsForSecondClub =
+                animalAvatarAssignmentsForClub(upgradeJdbc, avatarFixtureClubId(clubNumber = 2))
+            assertThat(newAssignmentsForFirstClub).containsExactlyElementsOf(EXPECTED_FIRST_CLUB_ANIMAL_ASSIGNMENTS)
+            assertThat(newAssignmentsForSecondClub).containsExactlyElementsOf(EXPECTED_SECOND_CLUB_ANIMAL_ASSIGNMENTS)
+            assertThat(newAssignmentsForFirstClub.indexOf("40:INVITED:dog-green-book"))
+                .isLessThan(newAssignmentsForFirstClub.indexOf("41:LEFT:hedgehog-green-book"))
+            assertThat(newAssignmentsForFirstClub.indexOf("40:INVITED:dog-green-book"))
+                .isLessThan(newAssignmentsForFirstClub.indexOf("42:INACTIVE:squirrel-acorn"))
+            assertThat(newAssignmentsForFirstClub.map { it.substringAfterLast(':') }.take(40).distinct()).hasSize(40)
+            assertThat(newAssignmentsForFirstClub.map { it.substringAfterLast(':') }).allMatch(::isWireValue)
+            assertThat(checkConstraintClause(upgradeJdbc, "memberships_avatar_key_check"))
+                .contains("hedgehog-green-book", "hedgehog-green-mug")
         }
     }
 
@@ -319,6 +374,96 @@ class MySqlFlywayMigrationTest(
             insertAvatarBackfillMembershipFixtures(jdbcTemplate, clubNumber, clubId)
         }
     }
+
+    private fun insertV43AvatarUpgradeFixtures(jdbcTemplate: JdbcTemplate) {
+        val preUpgradeAvatarKeys = v43AvatarKeys()
+        (1..2).forEach { clubNumber ->
+            val clubId = avatarFixtureClubId(clubNumber)
+            jdbcTemplate.update(
+                """
+                insert into clubs (
+                  id, slug, name, tagline, about, status, public_visibility, created_at, updated_at
+                ) values (?, ?, ?, 'Avatar migration fixture', 'Synthetic migration test data.',
+                          'ACTIVE', 'PRIVATE', '2026-07-01 00:00:00.000000', '2026-07-01 00:00:00.000000')
+                """.trimIndent(),
+                clubId,
+                "avatar-fixture-$clubNumber",
+                "Avatar Fixture Club $clubNumber",
+            )
+            (1..42).forEach { memberNumber ->
+                val userId = avatarFixtureUserId(clubNumber, memberNumber)
+                val status =
+                    when {
+                        memberNumber == 40 -> "INVITED"
+                        memberNumber == 41 -> "LEFT"
+                        memberNumber == 42 -> "INACTIVE"
+                        memberNumber % 3 == 1 -> "ACTIVE"
+                        memberNumber % 3 == 2 -> "SUSPENDED"
+                        else -> "VIEWER"
+                    }
+                jdbcTemplate.update(
+                    """
+                    insert into users (
+                      id, google_subject_id, email, name, short_name, auth_provider, created_at, updated_at
+                    ) values (?, ?, ?, ?, ?, 'GOOGLE', '2026-07-01 09:00:00.000000', '2026-07-01 09:00:00.000000')
+                    """.trimIndent(),
+                    userId,
+                    "avatar-fixture-$clubNumber-$memberNumber",
+                    "avatar-$clubNumber-$memberNumber@example.test",
+                    "Avatar Member $clubNumber-$memberNumber",
+                    "Avatar $clubNumber-$memberNumber",
+                )
+                jdbcTemplate.update(
+                    """
+                    insert into memberships (
+                      id, club_id, user_id, role, status, short_name, avatar_key, joined_at, created_at, updated_at
+                    ) values (?, ?, ?, 'MEMBER', ?, ?, ?, null,
+                              '2026-07-01 09:00:00.000000', '2026-07-01 09:00:00.000000')
+                    """.trimIndent(),
+                    avatarFixtureMembershipId(clubNumber, memberNumber),
+                    clubId,
+                    userId,
+                    status,
+                    "Avatar $clubNumber-$memberNumber",
+                    preUpgradeAvatarKeys[(memberNumber - 1) % preUpgradeAvatarKeys.size],
+                )
+            }
+        }
+    }
+
+    private fun v43AvatarKeys(): List<String> {
+        val migrationSql =
+            checkNotNull(javaClass.classLoader.getResourceAsStream(V43_MEMBERSHIP_AVATARS))
+                .bufferedReader()
+                .use { it.readText() }
+        val constraintSql = migrationSql.substringAfter("add constraint memberships_avatar_key_check")
+        return V43_AVATAR_KEY_REGEX
+            .findAll(constraintSql)
+            .map { it.groupValues[1] }
+            .toList()
+            .also { check(it.isNotEmpty()) { "V43 avatar constraint must declare keys" } }
+    }
+
+    private fun isWireValue(value: String): Boolean = BookClubAvatarKey.fromWireValue(value) != null
+
+    private fun animalAvatarAssignmentsForClub(
+        jdbcTemplate: JdbcTemplate,
+        clubId: String,
+    ): List<String> =
+        jdbcTemplate
+            .queryForList(
+                """
+                select concat(cast(right(id, 12) as unsigned), ':', status, ':', avatar_key)
+                from memberships
+                where club_id = ?
+                order by
+                  case when status in ('INVITED', 'VIEWER', 'ACTIVE', 'SUSPENDED') then 0 else 1 end,
+                  sha2(concat(club_id, ':', id, ':animal-avatar-v1'), 256),
+                  id
+                """.trimIndent(),
+                String::class.java,
+                clubId,
+            ).filterNotNull()
 
     private fun insertAvatarBackfillMembershipFixtures(
         jdbcTemplate: JdbcTemplate,
@@ -1292,7 +1437,7 @@ class MySqlFlywayMigrationTest(
         jdbcTemplate.update(
             """
             insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
-            values (?, ?, ?, 'MEMBER', 'ACTIVE', utc_timestamp(6), ?, 'reading-lamp')
+            values (?, ?, ?, 'MEMBER', 'ACTIVE', utc_timestamp(6), ?, 'squirrel-acorn')
             """.trimIndent(),
             membershipId,
             clubId,
@@ -1486,9 +1631,102 @@ class MySqlFlywayMigrationTest(
 
     companion object {
         private const val AVATAR_FIXTURE_FIRST_CLUB_ID = "20000000-0000-0000-0000-000000000001"
+        private val EXPECTED_FIRST_CLUB_ANIMAL_ASSIGNMENTS =
+            listOf(
+                "37:ACTIVE:hedgehog-green-book",
+                "27:VIEWER:squirrel-acorn",
+                "6:VIEWER:deer-brown-book",
+                "16:ACTIVE:fox-glasses-mug",
+                "35:SUSPENDED:koala-book-sprig",
+                "3:VIEWER:polar-bear-snowflake-mug",
+                "31:ACTIVE:penguin-beret-book",
+                "11:SUSPENDED:cat-flower-mug",
+                "9:VIEWER:alpaca-winter-sprig",
+                "22:ACTIVE:squirrel-green-book",
+                "1:ACTIVE:penguin-orange-mug",
+                "12:VIEWER:panda-green-book",
+                "2:SUSPENDED:mouse-blue-book",
+                "23:SUSPENDED:turtle-winter-book",
+                "20:SUSPENDED:ladybug-green-book",
+                "8:SUSPENDED:snail-green-book",
+                "30:VIEWER:sloth-orange-mug",
+                "17:SUSPENDED:alpaca-brown-book",
+                "14:SUSPENDED:fennec-heart-mug",
+                "7:ACTIVE:hedgehog-glasses-book",
+                "36:VIEWER:squirrel-autumn-book",
+                "34:ACTIVE:penguin-heart-mug",
+                "25:ACTIVE:deer-plaid-book",
+                "4:ACTIVE:alpaca-heart-mug",
+                "19:ACTIVE:turtle-glasses-book",
+                "5:SUSPENDED:owl-beret-book",
+                "28:ACTIVE:bear-green-book",
+                "18:VIEWER:rabbit-brown-book",
+                "32:SUSPENDED:cat-heart-mug",
+                "40:INVITED:dog-green-book",
+                "15:VIEWER:chick-beret-book",
+                "24:VIEWER:duck-green-mug",
+                "10:ACTIVE:hamster-green-book",
+                "33:VIEWER:red-panda-orange-mug",
+                "38:SUSPENDED:sheep-brown-book",
+                "21:VIEWER:fox-side-book",
+                "26:SUSPENDED:winter-bird",
+                "39:VIEWER:mallard-orange-mug",
+                "29:SUSPENDED:owl-glasses-book",
+                "13:ACTIVE:hedgehog-green-mug",
+                "41:LEFT:hedgehog-green-book",
+                "42:INACTIVE:squirrel-acorn",
+            )
+        private val EXPECTED_SECOND_CLUB_ANIMAL_ASSIGNMENTS =
+            listOf(
+                "30:VIEWER:hedgehog-green-book",
+                "6:VIEWER:squirrel-acorn",
+                "39:VIEWER:deer-brown-book",
+                "13:ACTIVE:fox-glasses-mug",
+                "25:ACTIVE:koala-book-sprig",
+                "11:SUSPENDED:polar-bear-snowflake-mug",
+                "23:SUSPENDED:penguin-beret-book",
+                "7:ACTIVE:cat-flower-mug",
+                "40:INVITED:alpaca-winter-sprig",
+                "12:VIEWER:squirrel-green-book",
+                "38:SUSPENDED:penguin-orange-mug",
+                "3:VIEWER:panda-green-book",
+                "2:SUSPENDED:mouse-blue-book",
+                "10:ACTIVE:turtle-winter-book",
+                "21:VIEWER:ladybug-green-book",
+                "20:SUSPENDED:snail-green-book",
+                "33:VIEWER:sloth-orange-mug",
+                "9:VIEWER:alpaca-brown-book",
+                "19:ACTIVE:fennec-heart-mug",
+                "24:VIEWER:hedgehog-glasses-book",
+                "4:ACTIVE:squirrel-autumn-book",
+                "29:SUSPENDED:penguin-heart-mug",
+                "14:SUSPENDED:deer-plaid-book",
+                "15:VIEWER:alpaca-heart-mug",
+                "17:SUSPENDED:turtle-glasses-book",
+                "31:ACTIVE:owl-beret-book",
+                "22:ACTIVE:bear-green-book",
+                "36:VIEWER:rabbit-brown-book",
+                "26:SUSPENDED:cat-heart-mug",
+                "8:SUSPENDED:dog-green-book",
+                "34:ACTIVE:chick-beret-book",
+                "1:ACTIVE:duck-green-mug",
+                "16:ACTIVE:hamster-green-book",
+                "18:VIEWER:red-panda-orange-mug",
+                "27:VIEWER:sheep-brown-book",
+                "35:SUSPENDED:fox-side-book",
+                "5:SUSPENDED:winter-bird",
+                "32:SUSPENDED:mallard-orange-mug",
+                "28:ACTIVE:owl-glasses-book",
+                "37:ACTIVE:hedgehog-green-mug",
+                "41:LEFT:hedgehog-green-book",
+                "42:INACTIVE:squirrel-acorn",
+            )
         private const val V38_AI_PROVIDER_ATTEMPT_AUDIT =
             "db/mysql/migration/V38__ai_generation_provider_attempt_audit.sql"
+        private const val V43_MEMBERSHIP_AVATARS =
+            "db/mysql/migration/V43__membership_book_club_avatars.sql"
         private val ADD_COLUMN_NAME_REGEX = Regex("(?i)\\bADD\\s+COLUMN\\s+`?([a-z0-9_]+)`?")
+        private val V43_AVATAR_KEY_REGEX = Regex("'([a-z0-9-]+)'")
     }
 
     private fun uniqueIndexCount(

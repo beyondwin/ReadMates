@@ -350,11 +350,12 @@ Archive JDBC adapter는 요청마다 page query와 전체 summary query를 정�
 
 ReadMates에서 멤버를 부르는 앱 표시 이름은 `displayName`입니다. `displayName`은 현재 클럽 membership에 붙은 이름이며, 현재 스키마에서는 기존 `memberships.short_name` 컬럼에 저장합니다. Google 계정이나 초대에서 온 원본 이름은 `accountName`으로만 다루고, 멤버를 식별할 때는 `email`을 우선 보여줍니다.
 
-멤버 아바타는 `memberships.avatar_key`에 저장한 20개 allowlist key 중 하나입니다. Membership 생성 또는 재활성화 transaction에서 key를 배정하고 이후에는 안정적으로 유지합니다. 서버의 auth, 현재·호스트 세션, archive, notes, public record projection은 필요한 멤버 표시 이름과 함께 `avatarKey`를 전달합니다. 프런트엔드는 이를 로컬 `/assets/avatars/book-club/*.webp`로만 해석하고, 누락·알 수 없는 key·이미지 decode 실패는 로컬 기본 아바타로 정규화합니다. Google 프로필 이미지 URL은 멤버 아바타 렌더링에 사용하지 않습니다.
+멤버 아바타는 `memberships.avatar_key`에 저장한 40개 allowlist 로컬 동물 key 중 하나입니다. V44는 기존 membership을 클럽별 안정적 순서에 따라 새 40개 key로 결정적 재배정합니다. Membership 생성 또는 재활성화 transaction은 유효한 이전 저장 key를 우선 보존하고, 그렇지 않으면 현재 노출 대상 멤버가 쓰지 않는 key 중 하나를 무작위로 배정해 영속화합니다. 40개가 모두 사용 중이면 전체 후보에서 무작위로 고릅니다. `/app/me`의 아바타 선택기는 명시적으로 해석된 현재 클럽 context와 `PATCH /api/me/avatar`를 사용해 본인 membership만 변경하며, 현재 클럽 context가 없으면 fail closed합니다. 수동 선택은 같은 클럽 안의 아바타 key 중복을 허용합니다. 서버의 auth, 현재·호스트 세션, archive, notes, public record projection은 필요한 멤버 표시 이름과 함께 `avatarKey`를 전달합니다. 프런트엔드는 이를 privacy-safe 로컬 `/assets/avatars/book-club/*.webp`로만 해석하고, 누락·알 수 없는 key·이미지 decode 실패는 로컬 기본 아바타로 정규화합니다. Google 프로필 이미지 URL은 멤버 아바타 렌더링에 사용하지 않습니다.
 
-프로필 수정 API는 두 개입니다.
+프로필 수정 API는 세 개입니다.
 
 - `PATCH /api/me/profile`: 인증된 사용자가 본인 membership의 `displayName`을 수정합니다. `VIEWER`, `ACTIVE`, `SUSPENDED`처럼 멤버 앱을 읽을 수 있는 상태에서만 허용합니다.
+- `PATCH /api/me/avatar`: 인증된 사용자가 명시적인 현재 클럽 context에 속한 본인 membership의 `avatarKey`를 40개 allowlist 안에서 수정합니다. 자동 배정과 달리 같은 클럽 멤버 간 key 중복을 허용합니다.
 - `PATCH /api/host/members/{membershipId}/profile`: 활성 호스트가 같은 클럽 멤버의 `displayName`을 수정합니다. 호스트 멤버 목록 row를 갱신할 수 있도록 `HostMemberListItem` 형태를 반환합니다.
 
 서버는 표시 이름을 trim한 뒤 필수값, 20자 이하, 제어문자, 이메일 형태, URL/domain 형태, 예약어(`탈퇴한 멤버`, `관리자`, `호스트`, `운영자`)를 검증합니다. 같은 클럽 안의 `displayName` 중복은 현재 `memberships(club_id, short_name)` unique constraint와 application-level lock/check로 막습니다. 공개 문서와 seed에는 실제 멤버 이름 대신 public-safe sample name만 둡니다.
