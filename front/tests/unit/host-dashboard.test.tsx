@@ -744,6 +744,18 @@ describe("HostDashboard", () => {
     expect(desktop.getByText("m***@example.com")).toBeInTheDocument();
     expect(mobile.getByText("최근 24시간 5건")).toBeInTheDocument();
     expect(screen.queryByText("member@example.com")).not.toBeInTheDocument();
+
+    for (const view of [desktop, mobile]) {
+      const eventType = view.getByText("FEEDBACK_DOCUMENT_PUBLISHED");
+      const failure = eventType.closest("li") as HTMLElement;
+      const attempt = failure.lastElementChild as HTMLElement;
+
+      expect(eventType).toHaveClass("mono");
+      expect(attempt).toHaveTextContent("3회 시도");
+      expect(attempt).not.toHaveClass("mono");
+      expect(Array.from(attempt.querySelectorAll(".ledger-number")).map((value) => value.textContent))
+        .toEqual(["3"]);
+    }
   });
 
   it("renders the mobile notification summary as an equal metric rail without nested cards", () => {

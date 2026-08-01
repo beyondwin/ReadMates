@@ -49,8 +49,8 @@ export function HostNotificationLedger({
                   <strong className="mono">{failure.eventType}</strong>
                   <small>{maskEmail(failure.recipientEmail)}</small>
                 </span>
-                <small className="mono">
-                  {nonNegativeCount(failure.attemptCount)}회 시도
+                <small>
+                  <span className="ledger-number">{nonNegativeCount(failure.attemptCount)}</span>회 시도
                 </small>
               </li>
             ))}
@@ -129,8 +129,8 @@ export function HostNotificationLedger({
                     {maskEmail(failure.recipientEmail)}
                   </span>
                 </span>
-                <span className="tiny mono" style={{ color: "var(--text-3)", whiteSpace: "nowrap" }}>
-                  {nonNegativeCount(failure.attemptCount)}회 시도
+                <span className="tiny" style={{ color: "var(--text-3)", whiteSpace: "nowrap" }}>
+                  <span className="ledger-number">{nonNegativeCount(failure.attemptCount)}</span>회 시도
                 </span>
               </li>
             ))}

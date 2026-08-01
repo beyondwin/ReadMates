@@ -192,7 +192,10 @@ async function expectHostMobilePriorityLedgerPublicSafe(page: Page): Promise<voi
   await expectNoHostPrivateSentinels(page);
 }
 
-async function expectHostMobileNotificationSummaryLayout(page: Page): Promise<void> {
+async function expectHostMobileNotificationSummaryLayout(
+  page: Page,
+  { withFailureDetails = false }: { withFailureDetails?: boolean } = {},
+): Promise<void> {
   const mobileDashboard = page.locator("main.rm-host-dashboard-mobile");
   const tools = mobileDashboard
     .getByText("운영 도구", { exact: true })
@@ -200,6 +203,14 @@ async function expectHostMobileNotificationSummaryLayout(page: Page): Promise<vo
   await tools.locator("summary").click();
 
   const notifications = tools.getByRole("region", { name: "알림 발송" });
+  const heading = notifications.getByRole("heading", { name: "알림 발송" });
+  const headerMeta = notifications.getByText(/최근 24시간 \d+건/);
+  expect(await heading.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)))
+    .toBeGreaterThanOrEqual(17);
+  await expect(headerMeta).toHaveCSS("white-space", "nowrap");
+  expect(await headerMeta.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)))
+    .toBeGreaterThanOrEqual(12);
+
   const metrics = notifications.locator(".rm-host-mobile-notifications__metrics");
   const metricCells = metrics.locator(":scope > div");
   await expect(metricCells).toHaveCount(3);
@@ -215,12 +226,31 @@ async function expectHostMobileNotificationSummaryLayout(page: Page): Promise<vo
   expect(Math.max(...metricBoxes.map(({ width }) => width)) - Math.min(...metricBoxes.map(({ width }) => width)))
     .toBeLessThanOrEqual(1);
   expect(new Set(metricBoxes.map(({ top }) => Math.round(top))).size).toBe(1);
+  for (const label of await metrics.locator("dt").all()) {
+    expect(await label.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)))
+      .toBeGreaterThanOrEqual(12);
+  }
   await expect(notifications).toHaveCSS("border-top-width", "0px");
   await expect(notifications).toHaveCSS("border-bottom-width", "0px");
+
+  if (withFailureDetails) {
+    const failureDetails = [
+      notifications.getByText("FEEDBACK_DOCUMENT_PUBLISHED"),
+      notifications.getByText("m***@example.com"),
+      notifications.getByText("3회 시도"),
+    ];
+    for (const detail of failureDetails) {
+      expect(await detail.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)))
+        .toBeGreaterThanOrEqual(14);
+    }
+  }
 
   const ledgerLink = notifications.getByRole("link", { name: "알림 발송 장부 열기" });
   const ledgerLinkBox = await ledgerLink.boundingBox();
   expect(ledgerLinkBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+  expect(await ledgerLink.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)))
+    .toBeGreaterThanOrEqual(14);
+  expect(await notifications.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
 }
 
 test("host dashboard renders read-only operating-signal card without leaking admin-only signals", async ({ page }) => {
@@ -359,7 +389,7 @@ test("host mobile notification summary keeps active states and failures readable
   await page.setViewportSize({ width: 320, height: 844 });
   await page.goto("/clubs/reading-sai/app/host");
 
-  await expectHostMobileNotificationSummaryLayout(page);
+  await expectHostMobileNotificationSummaryLayout(page, { withFailureDetails: true });
   const notifications = page.getByRole("region", { name: "알림 발송" });
   await expect(notifications.getByText("최근 24시간 5건")).toBeVisible();
   await expect(notifications.locator('[data-status="pending"]')).toContainText("대기2");
