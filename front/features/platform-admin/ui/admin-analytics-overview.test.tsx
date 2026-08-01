@@ -51,6 +51,8 @@ describe("AdminAnalyticsOverviewView", () => {
     expect(screen.getAllByRole("link", { name: "클럽 운영 보기" }).at(0)).toHaveAttribute("href", "/admin/clubs");
     expect(screen.getByRole("link", { name: "AI Ops 보기" })).toHaveAttribute("href", "/admin/ai-ops");
     expect(screen.getByRole("link", { name: "알림 운영 보기" })).toHaveAttribute("href", "/admin/notifications");
+    expect(screen.getByRole("link", { name: "AI Ops 보기" })).toHaveClass("small");
+    expect(screen.getByRole("link", { name: "알림 운영 보기" })).toHaveClass("small");
     const exportLink = screen.getByRole("link", { name: "CSV 내려받기" });
     expect(exportLink).toHaveAttribute("download", "readmates-admin-analytics-30d-2026-05-30.csv");
     expect(exportLink.getAttribute("href")).toContain("data:text/csv");

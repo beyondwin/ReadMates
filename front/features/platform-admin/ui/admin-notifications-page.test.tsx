@@ -87,6 +87,14 @@ describe("AdminNotificationsPage", () => {
     expect(screen.getAllByText("mailbox_unavailable").length).toBeGreaterThan(0);
   });
 
+  it("uses supporting copy for replay expiry and runtime summaries", () => {
+    renderPage({ replayPreview });
+
+    expect(screen.getByText(/^만료 /)).toHaveClass("small");
+    expect(screen.getByText(/^AUTOMATIC · attempts 2 ·/)).toHaveClass("small");
+    expect(screen.getByText(/^attempts 2 ·/)).toHaveClass("small");
+  });
+
   it("renders masked recipients without raw email fixture", () => {
     const { container } = renderPage();
     const deliveryLedger = screen.getByRole("region", { name: "Delivery ledger" });

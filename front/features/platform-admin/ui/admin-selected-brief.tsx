@@ -20,7 +20,7 @@ export function AdminSelectedBrief({ brief }: Props) {
       <div className="admin-selected-brief__header">
         <p className="eyebrow">Selected brief</p>
         <h2 className="h3 editorial">{brief.item.name}</h2>
-        <p className="tiny muted">
+        <p className="small muted">
           {brief.item.slug} · {brief.item.primaryActionLabel} · {brief.item.reason}
         </p>
       </div>
@@ -71,7 +71,7 @@ export function AdminSelectedBrief({ brief }: Props) {
       )}
 
       {primary.reason && !brief.permissionNote ? (
-        <p className="tiny muted">{primary.reason}</p>
+        <p className="small muted">{primary.reason}</p>
       ) : null}
 
       <div className="admin-selected-brief__links" aria-label="관련 화면">

@@ -115,6 +115,33 @@ describe("AdminTodayLedger", () => {
     );
   });
 
+  it("uses supporting copy for selected summaries", () => {
+    renderLedger();
+
+    expect(screen.getByText("platform · 알림 운영 · 실패/정체 신호 3건")).toHaveClass("small");
+  });
+
+  it("uses supporting copy for queue actions", () => {
+    renderLedger();
+
+    expect(screen.getByText("공개 전환")).toHaveClass("small");
+  });
+
+  it("uses supporting copy for a primary action reason", () => {
+    renderLedger({
+      ...baseWorkbench,
+      selectedBrief: {
+        ...baseWorkbench.selectedBrief!,
+        primaryAction: {
+          ...baseWorkbench.selectedBrief!.primaryAction,
+          reason: "알림 운영 상태를 먼저 확인하세요.",
+        },
+      },
+    });
+
+    expect(screen.getByText("알림 운영 상태를 먼저 확인하세요.")).toHaveClass("small");
+  });
+
   it("emits item ids when a queue row is selected", async () => {
     const user = userEvent.setup();
     const { onSelectItem } = renderLedger();

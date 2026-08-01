@@ -1566,11 +1566,14 @@ a.rm-recent-record__destination:hover {
   border-radius: 8px;
   padding: 4px 7px;
   color: var(--text-2);
-  font-size: var(--type-size-label);
-  line-height: var(--type-leading-label);
   font-weight: 900;
   text-decoration: none;
   white-space: nowrap;
+}
+
+.admin-work-queue__severity {
+  font-size: var(--type-size-label);
+  line-height: var(--type-leading-label);
 }
 
 .admin-selected-brief__checklist {
@@ -5512,6 +5515,7 @@ a.rm-recent-record__destination:hover {
 .platform-admin-ai-ops__small-list ul,
 .admin-selected-brief__notice,
 .admin-work-queue__reason,
+.admin-work-queue__action,
 .admin-selected-brief__link,
 .admin-selected-brief__check span,
 .admin-health-grid__timestamp,
@@ -5526,7 +5530,8 @@ a.rm-recent-record__destination:hover {
 .admin-club-operations__closing-risk-overflow,
 .admin-support-workbench__results em,
 .admin-analytics__kpi-label,
-.admin-analytics__kpi-delta {
+.admin-analytics__kpi-delta,
+.admin-analytics__kpi-action {
   font-size: var(--type-size-supporting);
   line-height: var(--type-leading-supporting);
 }
@@ -5547,7 +5552,6 @@ a.rm-recent-record__destination:hover {
 .admin-analytics__kpi-action {
   align-self: flex-start;
   color: #4f3f2b;
-  font-size: 0.84rem;
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 3px;

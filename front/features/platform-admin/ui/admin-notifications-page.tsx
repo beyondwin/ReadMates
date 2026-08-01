@@ -92,7 +92,7 @@ export function AdminNotificationsPage({
               <p>
                 대상 <strong>{replayPreview.matchedCount}</strong>건 · 제외 {replayPreview.excludedCount}건
               </p>
-              <p className="tiny muted">만료 {formatTimestamp(replayPreview.expiresAt)}</p>
+              <p className="small muted">만료 {formatTimestamp(replayPreview.expiresAt)}</p>
             </div>
           ) : (
             <p className="muted">실패/Dead delivery를 확인한 뒤 사유를 남기고 재처리합니다.</p>
@@ -122,7 +122,7 @@ export function AdminNotificationsPage({
           <article key={event.eventId} className="admin-notifications__row">
             <div>
               <p className="admin-notifications__row-title">{event.club.name} · {event.eventType}</p>
-              <p className="tiny muted">{event.source} · attempts {event.attemptCount} · {formatTimestamp(event.updatedAt)}</p>
+              <p className="small muted">{event.source} · attempts {event.attemptCount} · {formatTimestamp(event.updatedAt)}</p>
             </div>
             <span className="platform-admin-domain-status">{event.status}</span>
             {event.safeErrorCode ? <span className="admin-notifications__safe-code">{event.safeErrorCode}</span> : null}
@@ -137,7 +137,7 @@ export function AdminNotificationsPage({
               <p className="admin-notifications__row-title">
                 {delivery.club.name} · {delivery.channel} · {delivery.maskedRecipient ?? "recipient masked"}
               </p>
-              <p className="tiny muted">attempts {delivery.attemptCount} · {formatTimestamp(delivery.updatedAt)}</p>
+              <p className="small muted">attempts {delivery.attemptCount} · {formatTimestamp(delivery.updatedAt)}</p>
             </div>
             <span className="platform-admin-domain-status">{delivery.status}</span>
             {delivery.safeErrorCode ? <span className="admin-notifications__safe-code">{delivery.safeErrorCode}</span> : null}

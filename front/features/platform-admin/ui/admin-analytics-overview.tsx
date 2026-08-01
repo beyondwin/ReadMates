@@ -85,7 +85,7 @@ function AdminAnalyticsKpiTile({ card }: { card: AdminAnalyticsKpiCard }) {
       <span className="admin-analytics__kpi-label">{labelKpi(card.key)}</span>
       <span className="admin-analytics__kpi-value">{formatKpiValue(card)}</span>
       <span className="admin-analytics__kpi-delta">{deltaLabel(card)}</span>
-      <a className="admin-analytics__kpi-action" href={action.href}>
+      <a className="admin-analytics__kpi-action small" href={action.href}>
         {action.label}
       </a>
     </li>

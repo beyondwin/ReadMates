@@ -45,7 +45,7 @@ export function AdminWorkQueue({ items, selectedItemId, onSelectItem }: Props) {
               </span>
               <span className="admin-work-queue__meta">
                 <span className="admin-work-queue__severity">{severityLabel[item.severity]}</span>
-                <span className="admin-work-queue__action">{item.primaryActionLabel}</span>
+                <span className="admin-work-queue__action small">{item.primaryActionLabel}</span>
               </span>
             </button>
           ))}
