@@ -166,9 +166,15 @@ test("an empty reading shelf omits recent-session navigation", async ({ page }) 
   await expect(page.getByText(
     "첫 모임 이후 이곳에 읽은 기록이 이어집니다.",
   )).toBeVisible();
-  await expect(page.getByRole("link", {
-    name: /계정 (관리|설정)/,
-  })).toHaveCount(0);
+  const utilities = page.getByRole("region", { name: "내 공간 관리" });
+  await expect(utilities.getByRole("link", {
+    name: "알림 받은 알림과 수신 설정",
+    exact: true,
+  })).toHaveAttribute("href", "/app/notifications");
+  await expect(utilities.getByRole("link", {
+    name: "계정 설정 프로필과 멤버십 정보",
+    exact: true,
+  })).toHaveAttribute("href", "/app/me/settings");
   await expect(page.getByRole("list", {
     name: "최근 함께 읽은 기록",
   })).toHaveCount(0);

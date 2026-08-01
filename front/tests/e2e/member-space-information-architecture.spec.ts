@@ -57,7 +57,11 @@ async function pressTabUntilFocused(
 
 async function expectMemberSpaceSemanticOrder(page: Page) {
   const shelf = page.locator(".rm-member-space");
+  const overview = shelf.locator(".rm-member-space__overview");
+  const utilities = shelf.getByRole("region", { name: "내 공간 관리" });
+  const recentReadings = shelf.getByRole("region", { name: "최근 함께 읽은 기록" });
   await expectDomOrder(
+    overview,
     shelf.getByRole("heading", { level: 1, name: "멤버1" }),
     shelf.getByRole("button", { name: "이름 변경" }),
     shelf.getByText("읽는사이 · 멤버 · 2025.11부터 함께"),
@@ -65,6 +69,8 @@ async function expectMemberSpaceSemanticOrder(page: Page) {
     shelf.getByText("함께한 모임", { exact: true }),
     shelf.getByText("완독", { exact: true }),
     shelf.getByText("질문", { exact: true }),
+    utilities,
+    recentReadings,
     shelf.getByRole("heading", { level: 2, name: "최근 함께 읽은 기록" }),
     shelf.getByRole("link", {
       name: /responsive reading shelf 회차 기록/,
@@ -128,9 +134,33 @@ test("member space keeps the profile-first semantic order and usable actions acr
       "href",
       `${scopedAppPath}/archive?view=sessions`,
     );
-    await expect(shelf.getByRole("link", {
-      name: /계정 (관리|설정)/,
-    })).toHaveCount(0);
+    const utilities = shelf.getByRole("region", { name: "내 공간 관리" });
+    const notificationsLink = utilities.getByRole("link", {
+      name: "알림 받은 알림과 수신 설정",
+      exact: true,
+    });
+    const settingsLink = utilities.getByRole("link", {
+      name: "계정 설정 프로필과 멤버십 정보",
+      exact: true,
+    });
+    await expect(notificationsLink).toHaveAttribute(
+      "href",
+      `${scopedAppPath}/notifications`,
+    );
+    await expect(settingsLink).toHaveAttribute(
+      "href",
+      `${scopedAppPath}/me/settings`,
+    );
+    await expect(utilities.locator(".rm-member-space-utilities__label")).toHaveText([
+      "알림",
+      "계정 설정",
+    ]);
+    await expect(utilities.locator(".rm-member-space-utilities__description")).toHaveText([
+      "받은 알림과 수신 설정",
+      "프로필과 멤버십 정보",
+    ]);
+    await expectPracticalTapTarget(notificationsLink);
+    await expectPracticalTapTarget(settingsLink);
     await expect(shelf.getByRole("button", { name: "로그아웃" })).toHaveCount(0);
 
     const layout = await overview.evaluate((element) => {
@@ -316,7 +346,16 @@ test("club-scoped account and notification routes preserve navigation current st
   await expect(page.getByRole("button", { name: "세션" }))
     .toHaveAttribute("aria-pressed", "true");
 
-  await page.goto(`${scopedAppPath}/me/settings`);
+  await page.goto(`${scopedAppPath}/me`);
+  const utilityNavigation = page.getByRole("region", { name: "내 공간 관리" });
+  const settingsLink = utilityNavigation.getByRole("link", {
+    name: "계정 설정 프로필과 멤버십 정보",
+    exact: true,
+  });
+  await expect(settingsLink).toHaveAttribute("href", `${scopedAppPath}/me/settings`);
+  await settingsLink.click();
+  await expect(page).toHaveURL(new RegExp(`${scopedAppPath}/me/settings$`));
+  await expect(page.getByRole("heading", { level: 1, name: "계정 설정" })).toBeVisible();
   const appNavigation = page.getByRole("navigation", {
     name: "앱 내비게이션",
   });
@@ -324,12 +363,31 @@ test("club-scoped account and notification routes preserve navigation current st
     name: "내 공간",
   })).toHaveAttribute("aria-current", "page");
 
-  await page.getByRole("button", { name: /계정 메뉴$/ }).click();
-  await page.getByRole("dialog").getByRole("link", { name: "알림" }).click();
+  const settingsParent = page.locator(".rm-account-settings-page").getByRole("link", {
+    name: "내 공간",
+  });
+  await expect(settingsParent).toHaveAttribute("href", `${scopedAppPath}/me`);
+  await settingsParent.click();
+  await expect(page).toHaveURL(new RegExp(`${scopedAppPath}/me$`));
+
+  const notificationLink = page.getByRole("region", {
+    name: "내 공간 관리",
+  }).getByRole("link", {
+    name: "알림 받은 알림과 수신 설정",
+    exact: true,
+  });
+  await expect(notificationLink).toHaveAttribute("href", `${scopedAppPath}/notifications`);
+  await notificationLink.click();
   await expect(page).toHaveURL(new RegExp(`${scopedAppPath}/notifications$`));
   await expect(appNavigation.getByRole("link", {
     name: "내 공간",
   })).toHaveAttribute("aria-current", "page");
+
+  const notificationParent = page.getByRole("navigation", { name: "현재 위치" });
+  await expect(notificationParent.getByRole("link", { name: "내 공간" })).toHaveAttribute(
+    "href",
+    `${scopedAppPath}/me`,
+  );
 
   const notificationTabs = page.getByRole("navigation", {
     name: "알림 보기",
@@ -347,6 +405,12 @@ test("club-scoped account and notification routes preserve navigation current st
   await expect(appNavigation.getByRole("link", {
     name: "내 공간",
   })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("navigation", {
+    name: "현재 위치",
+  }).getByRole("link", { name: "내 공간" })).toHaveAttribute(
+    "href",
+    `${scopedAppPath}/me`,
+  );
 
   await page.goBack();
   await expect(page).toHaveURL(new RegExp(`${scopedAppPath}/notifications$`));
