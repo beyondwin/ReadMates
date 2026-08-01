@@ -2,6 +2,7 @@ import { readmatesFetch } from "@/shared/api/client";
 import type {
   CreatePlatformAdminDomainRequest,
   CreateSupportAccessGrantRequest,
+  PlatformAdminAiGenerationCapabilitiesResponse,
   PlatformAdminAiOpsActionResponse,
   PlatformAdminAiOpsFilters,
   PlatformAdminAiOpsJobListResponse,
@@ -117,6 +118,14 @@ export function fetchPlatformAdminAiOpsSummary(window?: string) {
   const search = window ? `?window=${encodeURIComponent(window)}` : "";
   return readmatesFetch<PlatformAdminAiOpsSummaryResponse>(
     `/api/admin/ai-generation/summary${search}`,
+    undefined,
+    { clubSlug: undefined },
+  );
+}
+
+export function fetchPlatformAdminAiGenerationCapabilities() {
+  return readmatesFetch<PlatformAdminAiGenerationCapabilitiesResponse>(
+    "/api/admin/ai-generation/capabilities",
     undefined,
     { clubSlug: undefined },
   );

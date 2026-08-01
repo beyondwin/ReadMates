@@ -55,6 +55,19 @@ class AiGenerationKillSwitchFilterTest {
     }
 
     @Test
+    fun `passes through admin capabilities path when disabled`() {
+        val filter = AiGenerationKillSwitchFilter(properties(enabled = false))
+        val request = MockHttpServletRequest("GET", "/api/admin/ai-generation/capabilities")
+        val response = MockHttpServletResponse()
+        val chain = MockFilterChain()
+
+        filter.doFilter(request, response, chain)
+
+        assertThat(chain.request).isSameAs(request)
+        assertThat(response.status).isEqualTo(200)
+    }
+
+    @Test
     fun `passes through unrelated paths even when disabled`() {
         val filter = AiGenerationKillSwitchFilter(properties(enabled = false))
         val request = MockHttpServletRequest("POST", "/api/host/sessions/abc-123/import")

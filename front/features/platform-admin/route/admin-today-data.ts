@@ -1,5 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import {
+  platformAdminAiGenerationCapabilitiesQuery,
   platformAdminAiOpsJobsQuery,
   platformAdminAiOpsSummaryQuery,
 } from "@/features/platform-admin/queries/platform-admin-ai-ops-queries";
@@ -10,17 +11,6 @@ import {
   platformAdminTodayClosingRisksQuery,
 } from "@/features/platform-admin/queries/platform-admin-queries";
 import { ReadmatesApiError } from "@/shared/api/errors";
-
-const disabledAiSummary = {
-  activeJobCount: 0,
-  failedLast24h: 0,
-  monthToDateCostEstimateUsd: "0.0000",
-  failureCodes: [],
-  providerCosts: [],
-  staleCandidateCount: 0,
-};
-
-const emptyAiJobs = { items: [], nextCursor: null };
 
 const emptyClosingRisks = {
   schema: "admin.today_closing_risks.v1" as const,
@@ -41,9 +31,14 @@ export function adminTodayLoaderFactory(queryClient: QueryClient) {
 }
 
 async function loadOptionalAiOps(queryClient: QueryClient) {
+  const capabilitiesQuery = platformAdminAiGenerationCapabilitiesQuery();
   const summaryQuery = platformAdminAiOpsSummaryQuery();
   const jobsQuery = platformAdminAiOpsJobsQuery();
   try {
+    const capabilities = await queryClient.fetchQuery(capabilitiesQuery);
+    if (!capabilities.enabled) {
+      return;
+    }
     await Promise.all([
       queryClient.fetchQuery(summaryQuery),
       queryClient.fetchQuery(jobsQuery),
@@ -52,8 +47,7 @@ async function loadOptionalAiOps(queryClient: QueryClient) {
     if (!(error instanceof ReadmatesApiError) || error.status !== 503) {
       throw error;
     }
-    queryClient.setQueryData(summaryQuery.queryKey, disabledAiSummary);
-    queryClient.setQueryData(jobsQuery.queryKey, emptyAiJobs);
+    queryClient.setQueryData(capabilitiesQuery.queryKey, { enabled: false });
   }
 }
 

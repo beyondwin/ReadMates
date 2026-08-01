@@ -67,6 +67,9 @@ async function routeAdminTodayClosingRisks(page: Page): Promise<void> {
       recentManualDispatches: [],
     });
   });
+  await page.route("**/api/bff/api/admin/ai-generation/capabilities", async (route) => {
+    await json(route, 200, { enabled: true });
+  });
   await page.route("**/api/bff/api/admin/ai-generation/summary", async (route) => {
     await json(route, 200, {
       activeJobCount: 0,

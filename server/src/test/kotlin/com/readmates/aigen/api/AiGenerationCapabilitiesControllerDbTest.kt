@@ -48,4 +48,22 @@ class AiGenerationCapabilitiesControllerDbTest(
                 status { isForbidden() }
             }
     }
+
+    @Test
+    fun `platform admin capability stays readable while AI generation is disabled`() {
+        mockMvc
+            .get("/api/admin/ai-generation/capabilities") {
+                with(user("admin-owner@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.enabled") { value(false) }
+            }
+
+        mockMvc
+            .get("/api/admin/ai-generation/capabilities") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isForbidden() }
+            }
+    }
 }

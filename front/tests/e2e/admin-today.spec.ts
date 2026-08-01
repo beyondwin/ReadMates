@@ -30,7 +30,11 @@ async function json(route: Route, status: number, body: unknown): Promise<void> 
   await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
 }
 
-async function routePlatformAdminToday(page: Page, role: PlatformAdminRole): Promise<void> {
+async function routePlatformAdminToday(
+  page: Page,
+  role: PlatformAdminRole,
+  aiEnabled = true,
+): Promise<void> {
   const actionRequiredDomain = {
     id: "domain-1",
     clubId: "club-domain",
@@ -132,6 +136,10 @@ async function routePlatformAdminToday(page: Page, role: PlatformAdminRole): Pro
     });
   });
 
+  await page.route("**/api/bff/api/admin/ai-generation/capabilities", async (route) => {
+    await json(route, 200, { enabled: aiEnabled });
+  });
+
   await page.route("**/api/bff/api/admin/ai-generation/summary", async (route) => {
     await json(route, 200, {
       activeJobCount: 0,
@@ -189,6 +197,21 @@ test("owner sees the admin today operations ledger inside the admin shell", asyn
   const brief = page.getByRole("region", { name: "선택 항목 브리프" });
   await expect(brief.getByRole("heading", { name: "Ready Club" })).toBeVisible();
   await expect(brief.getByRole("button", { name: "공개 전환" })).toBeEnabled();
+});
+
+test("owner sees AI disabled state without requesting disabled AI Ops endpoints", async ({ page }) => {
+  await routePlatformAdminToday(page, "OWNER", false);
+  const disabledRequests: string[] = [];
+  page.on("request", (request) => {
+    if (/\/api\/admin\/ai-generation\/(summary|jobs)/.test(request.url())) {
+      disabledRequests.push(request.url());
+    }
+  });
+
+  await page.goto("/admin/today");
+
+  await expect(page.getByText("AI generation이 비활성 상태입니다.")).toBeVisible();
+  expect(disabledRequests).toEqual([]);
 });
 
 test("support can read the ledger but cannot execute mutation actions", async ({ page }) => {

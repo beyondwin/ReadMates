@@ -37,9 +37,12 @@ class AiGenerationKillSwitchFilter(
     }
 
     private fun String.matchesAiGenerationPath(): Boolean =
-        AI_GENERATE_PATH.matches(this) ||
-            AI_DEFAULTS_PATH.matches(this) ||
-            AI_ADMIN_OPS_PATH.matches(this)
+        !AI_ADMIN_CAPABILITIES_PATH.matches(this) &&
+            (
+                AI_GENERATE_PATH.matches(this) ||
+                    AI_DEFAULTS_PATH.matches(this) ||
+                    AI_ADMIN_OPS_PATH.matches(this)
+            )
 
     private companion object {
         const val PROBLEM_JSON_CONTENT_TYPE = "application/problem+json"
@@ -51,6 +54,7 @@ class AiGenerationKillSwitchFilter(
                 """"code":"AI_DISABLED"}"""
         val AI_GENERATE_PATH = Regex("^/api/host/sessions/[^/]+/ai-generate(/.*)?$")
         val AI_DEFAULTS_PATH = Regex("^/api/host/clubs/[^/]+/ai-defaults(/.*)?$")
+        val AI_ADMIN_CAPABILITIES_PATH = Regex("^/api/admin/ai-generation/capabilities/?$")
         val AI_ADMIN_OPS_PATH = Regex("^/api/admin/ai-generation(/.*)?$")
     }
 }

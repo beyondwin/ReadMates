@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import {
+  platformAdminAiGenerationCapabilitiesQuery,
   platformAdminAiOpsJobsQuery,
   platformAdminAiOpsSummaryQuery,
 } from "@/features/platform-admin/queries/platform-admin-ai-ops-queries";
@@ -60,6 +61,7 @@ function seededClient() {
     clubHealth: [],
     recentManualDispatches: [],
   });
+  queryClient.setQueryData(platformAdminAiGenerationCapabilitiesQuery().queryKey, { enabled: true });
   queryClient.setQueryData(platformAdminAiOpsSummaryQuery().queryKey, {
     activeJobCount: 0,
     failedLast24h: 0,
@@ -158,5 +160,15 @@ describe("AdminTodayRoute", () => {
 
     expect(screen.getAllByText("Ready Club").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/알림 실패 1건/).length).toBeGreaterThan(0);
+  });
+
+  it("renders AI disabled state from the capability query", () => {
+    const client = seededClient();
+    client.setQueryData(platformAdminAiGenerationCapabilitiesQuery().queryKey, { enabled: false });
+
+    renderRoute(client);
+
+    expect(screen.getByText("AI generation이 비활성 상태입니다.")).toBeInTheDocument();
+    expect(screen.getByText("AI 비활성")).toBeInTheDocument();
   });
 });

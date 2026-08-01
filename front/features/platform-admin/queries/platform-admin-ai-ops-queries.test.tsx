@@ -8,6 +8,7 @@ import type {
 } from "@/features/platform-admin/api/platform-admin-contracts";
 
 vi.mock("@/features/platform-admin/api/platform-admin-api", () => ({
+  fetchPlatformAdminAiGenerationCapabilities: vi.fn(),
   fetchPlatformAdminAiOpsJobs: vi.fn(),
   fetchPlatformAdminAiOpsSummary: vi.fn(),
   forceCancelPlatformAdminAiJob: vi.fn(),
@@ -15,12 +16,14 @@ vi.mock("@/features/platform-admin/api/platform-admin-api", () => ({
 }));
 
 import {
+  fetchPlatformAdminAiGenerationCapabilities,
   fetchPlatformAdminAiOpsJobs,
   fetchPlatformAdminAiOpsSummary,
   forceCancelPlatformAdminAiJob,
   retryCommitPlatformAdminAiJob,
 } from "@/features/platform-admin/api/platform-admin-api";
 import {
+  platformAdminAiGenerationCapabilitiesQuery,
   platformAdminAiOpsJobsQuery,
   platformAdminAiOpsKeys,
   platformAdminAiOpsSummaryQuery,
@@ -72,6 +75,7 @@ async function runQuery(query: { queryFn?: (context: never) => unknown }) {
 }
 
 beforeEach(() => {
+  vi.mocked(fetchPlatformAdminAiGenerationCapabilities).mockReset();
   vi.mocked(fetchPlatformAdminAiOpsSummary).mockReset();
   vi.mocked(fetchPlatformAdminAiOpsJobs).mockReset();
   vi.mocked(forceCancelPlatformAdminAiJob).mockReset();
@@ -102,12 +106,15 @@ describe("platform admin AI Ops query keys", () => {
   });
 
   it("query functions call AI Ops API wrappers", async () => {
+    vi.mocked(fetchPlatformAdminAiGenerationCapabilities).mockResolvedValue({ enabled: false });
     vi.mocked(fetchPlatformAdminAiOpsSummary).mockResolvedValue(summary);
     vi.mocked(fetchPlatformAdminAiOpsJobs).mockResolvedValue(jobs);
 
+    await runQuery(platformAdminAiGenerationCapabilitiesQuery());
     await runQuery(platformAdminAiOpsSummaryQuery());
     await runQuery(platformAdminAiOpsJobsQuery({ errorCode: "RATE_LIMITED" }));
 
+    expect(fetchPlatformAdminAiGenerationCapabilities).toHaveBeenCalledOnce();
     expect(fetchPlatformAdminAiOpsSummary).toHaveBeenCalledOnce();
     expect(fetchPlatformAdminAiOpsJobs).toHaveBeenCalledWith({ errorCode: "RATE_LIMITED" });
   });

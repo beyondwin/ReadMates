@@ -71,6 +71,13 @@ async function routePlatformAdminHostWorkspace(page: Page) {
       body: JSON.stringify({ items: [] }),
     });
   });
+  await page.route("**/api/bff/api/admin/ai-generation/capabilities", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ enabled: true }),
+    });
+  });
   await page.route("**/api/bff/api/admin/ai-generation/summary", async (route) => {
     await route.fulfill({
       status: 200,

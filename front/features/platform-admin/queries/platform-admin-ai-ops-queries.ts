@@ -1,5 +1,6 @@
 import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
+  fetchPlatformAdminAiGenerationCapabilities,
   fetchPlatformAdminAiOpsJobs,
   fetchPlatformAdminAiOpsSummary,
   forceCancelPlatformAdminAiJob,
@@ -18,10 +19,19 @@ function normalizeFilters(filters: PlatformAdminAiOpsFilters = {}) {
 
 export const platformAdminAiOpsKeys = {
   all: ["platform-admin", "ai-ops"] as const,
+  capabilities: () => [...platformAdminAiOpsKeys.all, "capabilities"] as const,
   summary: (window?: string) => [...platformAdminAiOpsKeys.all, "summary", window ?? null] as const,
   jobs: (filters?: PlatformAdminAiOpsFilters) =>
     [...platformAdminAiOpsKeys.all, "jobs", normalizeFilters(filters)] as const,
 } as const;
+
+export function platformAdminAiGenerationCapabilitiesQuery() {
+  return queryOptions({
+    queryKey: platformAdminAiOpsKeys.capabilities(),
+    queryFn: fetchPlatformAdminAiGenerationCapabilities,
+    staleTime: 0,
+  });
+}
 
 export function platformAdminAiOpsSummaryQuery(window?: string) {
   return queryOptions({

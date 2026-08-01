@@ -51,6 +51,7 @@ export type {
   PlatformAdminOnboardingPreviewResponse,
   PlatformAdminOnboardingResultResponse,
   PlatformAdminAiOpsAction,
+  PlatformAdminAiGenerationCapabilitiesResponse,
   PlatformAdminAiOpsSummaryResponse,
   PlatformAdminAiOpsJob,
   PlatformAdminAiOpsJobListResponse,

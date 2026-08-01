@@ -173,6 +173,10 @@ export type PlatformAdminOnboardingResultResponse = {
 
 export type PlatformAdminAiOpsAction = "FORCE_CANCEL" | "RETRY_COMMIT";
 
+export type PlatformAdminAiGenerationCapabilitiesResponse = {
+  enabled: boolean;
+};
+
 export type PlatformAdminAiOpsSummaryResponse = {
   activeJobCount: number;
   failedLast24h: number;

@@ -1,6 +1,10 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
-import { platformAdminAiOpsJobsQuery, platformAdminAiOpsSummaryQuery } from "@/features/platform-admin/queries/platform-admin-ai-ops-queries";
+import {
+  platformAdminAiGenerationCapabilitiesQuery,
+  platformAdminAiOpsJobsQuery,
+  platformAdminAiOpsSummaryQuery,
+} from "@/features/platform-admin/queries/platform-admin-ai-ops-queries";
 import { platformAdminNotificationSnapshotQuery } from "@/features/platform-admin/queries/platform-admin-notifications-queries";
 import {
   platformAdminClubsQuery,
@@ -19,8 +23,10 @@ export function AdminTodayRoute() {
   const summaryQuery = useQuery(platformAdminSummaryQuery());
   const clubsQuery = useQuery(platformAdminClubsQuery());
   const notificationQuery = useQuery(platformAdminNotificationSnapshotQuery());
-  const aiSummaryQuery = useQuery(platformAdminAiOpsSummaryQuery());
-  const aiJobsQuery = useQuery(platformAdminAiOpsJobsQuery());
+  const aiCapabilitiesQuery = useQuery(platformAdminAiGenerationCapabilitiesQuery());
+  const aiEnabled = aiCapabilitiesQuery.data?.enabled === true;
+  const aiSummaryQuery = useQuery({ ...platformAdminAiOpsSummaryQuery(), enabled: aiEnabled });
+  const aiJobsQuery = useQuery({ ...platformAdminAiOpsJobsQuery(), enabled: aiEnabled });
   const closingRisksQuery = useQuery(platformAdminTodayClosingRisksQuery());
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -45,7 +51,10 @@ export function AdminTodayRoute() {
     );
   }
 
-  const aiDisabled = isReadmatesApiError(aiSummaryQuery.error) && aiSummaryQuery.error.status === 503;
+  const aiDisabled =
+    aiCapabilitiesQuery.data?.enabled === false ||
+    (isReadmatesApiError(aiSummaryQuery.error) && aiSummaryQuery.error.status === 503) ||
+    (isReadmatesApiError(aiJobsQuery.error) && aiJobsQuery.error.status === 503);
   const closingRisksUnavailable =
     closingRisksQuery.isError ||
     closingRisksQuery.isRefetchError ||
@@ -94,7 +103,8 @@ export function AdminTodayRoute() {
       startedAt: job.createdAt,
     })),
     aiDisabled,
-    aiUnavailable: (aiSummaryQuery.isError || aiJobsQuery.isError) && !aiDisabled,
+    aiUnavailable:
+      (aiCapabilitiesQuery.isError || aiSummaryQuery.isError || aiJobsQuery.isError) && !aiDisabled,
     closingRisks: closingRisksQuery.data?.items ?? [],
     closingRisksUnavailable,
   };
