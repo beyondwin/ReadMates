@@ -22,14 +22,14 @@ export function RecentReadingRow(
             {item.bookAuthor}
           </span>
         ) : null}
-        {item.activityLabels.length > 0 || item.feedbackStatus ? (
-          <span className="rm-recent-reading-row__activity">
-            {[...item.activityLabels, item.feedbackStatus]
-              .filter(Boolean)
-              .join(" · ")}
-          </span>
-        ) : null}
       </div>
+      {item.activityLabels.length > 0 || item.feedbackStatus ? (
+        <span className="rm-recent-reading-row__activity">
+          {[...item.activityLabels, item.feedbackStatus]
+            .filter(Boolean)
+            .join(" · ")}
+        </span>
+      ) : null}
       <RecentReadingChevron className="rm-recent-reading-row__arrow" />
     </a>
   );

@@ -209,7 +209,7 @@ describe("my reading shelf model", () => {
       }),
       expect.objectContaining({
         sessionId: "third",
-        feedbackStatus: null,
+        feedbackStatus: "피드백 준비중",
       }),
     ]);
   });
@@ -236,7 +236,7 @@ describe("my reading shelf model", () => {
         coverFallbackLabel: "책",
         dateLabel: "날짜 미상",
         activityLabels: [],
-        feedbackStatus: null,
+        feedbackStatus: "피드백 준비중",
       }),
     ]);
   });

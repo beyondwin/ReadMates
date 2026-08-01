@@ -6362,7 +6362,7 @@ a.rm-recent-record__destination:hover {
 
 .rm-recent-reading-row {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) auto;
+  grid-template-columns: 48px minmax(0, 1fr) minmax(132px, auto) auto;
   gap: 16px;
   align-items: center;
   min-height: 104px;
@@ -6398,11 +6398,18 @@ a.rm-recent-record__destination:hover {
 }
 
 .rm-recent-reading-row__meta,
-.rm-recent-reading-row__author,
-.rm-recent-reading-row__activity {
+.rm-recent-reading-row__author {
   display: block;
   color: var(--text-3);
   font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+
+.rm-recent-reading-row__activity {
+  justify-self: end;
+  color: var(--text-3);
+  font-size: 0.8125rem;
+  text-align: right;
   overflow-wrap: anywhere;
 }
 
@@ -7108,6 +7115,24 @@ a.rm-recent-record__destination:hover {
     gap: 11px;
     min-height: 96px;
     padding-inline: 0;
+  }
+
+  .rm-recent-reading-row__cover {
+    grid-row: 1 / span 2;
+  }
+
+  .rm-recent-reading-row__book {
+    grid-column: 2;
+  }
+
+  .rm-recent-reading-row__activity {
+    grid-column: 2;
+    justify-self: end;
+  }
+
+  .rm-recent-reading-row__arrow {
+    grid-column: 3;
+    grid-row: 1 / span 2;
   }
 
   .rm-recent-reading-row__cover {

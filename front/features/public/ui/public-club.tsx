@@ -3,7 +3,7 @@ import type { PublicClubView, PublicSessionListItemView } from "@/features/publi
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { BookCover } from "@/shared/ui/book-cover";
 import { PublicGuestOnlyActions } from "@/shared/ui/public-auth-action";
-import { getPublicClubDisplay, getPublicSessionListItemDisplay } from "@/features/public/model/public-display-model";
+import { getPublicClubDisplay, getPublicRecordShowcaseDisplay } from "@/features/public/model/public-display-model";
 import { PUBLIC_MEMBERSHIP_NOTE, STATIC_OPERATION_INTRO } from "@/features/public/model/public-copy";
 import { publicRecordsHref, publicSessionHref } from "@/features/public/model/public-paths";
 
@@ -13,7 +13,7 @@ type PublicClubProps = {
 };
 
 function sessionDisplay(session: PublicSessionListItemView) {
-  return getPublicSessionListItemDisplay(session);
+  return getPublicRecordShowcaseDisplay(session);
 }
 
 function PublicRecordLink({ publicBasePath, session }: { publicBasePath: string; session: PublicSessionListItemView }) {
@@ -36,8 +36,7 @@ function PublicRecordLink({ publicBasePath, session }: { publicBasePath: string;
         </span>
       </span>
       <span className="public-archive-row__counts">
-        <span>하이라이트 {display.highlightCount}</span>
-        <span>한줄평 {display.oneLinerCount}</span>
+        <span>{display.recordDensityLabel}</span>
       </span>
     </Link>
   );

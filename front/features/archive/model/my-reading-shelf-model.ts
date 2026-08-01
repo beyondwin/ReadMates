@@ -53,6 +53,7 @@ export type MemberSpaceMetric = {
 export type RecentReadingFeedbackStatus =
   | "피드백 열림"
   | "피드백 제한"
+  | "피드백 준비중"
   | null;
 
 export type RecentReadingPreviewItem = {
@@ -147,7 +148,7 @@ export function buildRecentReadingPreview(
         : item.feedbackDocument.available &&
             item.feedbackDocument.lockedReason === "ACTIVE_MEMBERSHIP_REQUIRED"
           ? "피드백 제한"
-          : null,
+          : "피드백 준비중",
     };
   });
 }

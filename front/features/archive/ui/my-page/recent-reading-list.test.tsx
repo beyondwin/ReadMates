@@ -93,7 +93,10 @@ describe("RecentReadingList", () => {
   });
 
   it("places the book heading in a flow-content container", () => {
-    render(<RecentReadingRow item={recentItem()} />);
+    render(<RecentReadingRow item={recentItem({
+      activityLabels: ["질문 2"],
+      feedbackStatus: "피드백 열림",
+    })} />);
 
     const heading = screen.getByRole("heading", {
       level: 3,
@@ -102,6 +105,10 @@ describe("RecentReadingList", () => {
 
     expect(heading.parentElement).toHaveClass("rm-recent-reading-row__book");
     expect(heading.parentElement?.tagName).toBe("DIV");
+    const activity = screen.getByText("질문 2 · 피드백 열림");
+    expect(activity).toHaveClass("rm-recent-reading-row__activity");
+    expect(activity.parentElement).toHaveClass("rm-recent-reading-row");
+    expect(activity.parentElement).not.toBe(heading.parentElement);
   });
 
   it("matches the public records text link while keeping row navigation chevrons", () => {

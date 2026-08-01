@@ -212,6 +212,7 @@ describe("PublicClub", () => {
     expect(scoped.queryByText("Book 3")).not.toBeInTheDocument();
     expect(recordList).not.toHaveTextContent("No.6");
     expect(recordList.querySelectorAll(".public-archive-row__cover img")).toHaveLength(3);
+    expect(recordList).toHaveTextContent("하이라이트 3 · 한줄평 5");
   });
 
   it("renders a neutral public introduction fallback when API about is blank", () => {

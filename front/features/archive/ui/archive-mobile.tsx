@@ -9,6 +9,7 @@ import type {
 import {
   archiveSummary,
   feedbackArchiveBadgeClass,
+  feedbackArchiveLabel,
   feedbackDocumentCopy,
   feedbackReportActionLabel,
   mobileArchiveTabs,
@@ -232,7 +233,7 @@ function ArchiveMobileSessions({ sessions }: { sessions: ArchiveSessionRecord[] 
                     title={feedbackCopy.ariaLabel}
                     aria-label={feedbackCopy.ariaLabel}
                   >
-                    {feedbackCopy.badge}
+                    {feedbackArchiveLabel(session.feedbackDocument)}
                   </span>
                 </div>
               </div>
