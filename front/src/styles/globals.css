@@ -879,8 +879,6 @@ a.rm-recent-record__destination:hover {
   background: var(--bg-raised);
   padding: 7px 10px;
   color: var(--text-2);
-  font-size: 12px;
-  font-weight: 900;
 }
 
 .admin-workspace-switcher {
@@ -944,8 +942,6 @@ a.rm-recent-record__destination:hover {
   gap: 6px;
   align-items: center;
   color: var(--text-3);
-  font-size: 12px;
-  font-weight: 800;
 }
 
 .admin-workspace-switcher__empty {
@@ -990,8 +986,6 @@ a.rm-recent-record__destination:hover {
 
 .admin-status-strip__label {
   color: var(--text-3);
-  font-size: 11px;
-  font-weight: 800;
   text-transform: uppercase;
 }
 
@@ -1032,8 +1026,6 @@ a.rm-recent-record__destination:hover {
 
 .admin-layout-nav__group-header {
   color: var(--text-4);
-  font-size: 11px;
-  font-weight: 900;
   text-transform: uppercase;
 }
 
@@ -1070,8 +1062,6 @@ a.rm-recent-record__destination:hover {
   border-radius: var(--r-2);
   padding: 2px 6px;
   color: var(--text-4);
-  font-size: 10px;
-  font-weight: 900;
   white-space: nowrap;
 }
 
@@ -1176,8 +1166,6 @@ a.rm-recent-record__destination:hover {
   border-radius: var(--r-2);
   padding: 4px 8px;
   background: var(--surface);
-  font-size: 12px;
-  font-weight: 800;
   letter-spacing: 0;
 }
 
@@ -1578,7 +1566,8 @@ a.rm-recent-record__destination:hover {
   border-radius: 8px;
   padding: 4px 7px;
   color: var(--text-2);
-  font-size: 11px;
+  font-size: var(--type-size-label);
+  line-height: var(--type-leading-label);
   font-weight: 900;
   text-decoration: none;
   white-space: nowrap;
@@ -1662,8 +1651,6 @@ a.rm-recent-record__destination:hover {
   background: var(--bg-raised);
   padding: 0 10px;
   color: var(--text);
-  font-size: 12px;
-  font-weight: 800;
   white-space: nowrap;
 }
 
@@ -1761,8 +1748,6 @@ a.rm-recent-record__destination:hover {
   border: 1px solid var(--line);
   border-radius: var(--r-2);
   padding: 4px 8px;
-  font-size: 12px;
-  font-weight: 800;
 }
 
 .admin-health-card__pill--ok {
@@ -1920,6 +1905,10 @@ a.rm-recent-record__destination:hover {
 .admin-notifications__safe-code {
   color: var(--muted);
   font-size: 13px;
+}
+
+.admin-notifications__safe-code {
+  font: 600 var(--type-size-label)/var(--type-leading-label) var(--f-mono);
 }
 
 .admin-notifications__focus,
@@ -2310,8 +2299,6 @@ a.rm-recent-record__destination:hover {
   border-radius: 999px;
   padding: 4px 9px;
   color: var(--text-2);
-  font-size: 12px;
-  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -5507,6 +5494,54 @@ a.rm-recent-record__destination:hover {
 .admin-analytics__kpi-delta {
   font-size: 13px;
   color: var(--muted);
+}
+
+.admin-shell__role-badge,
+.admin-workspace-switcher__meta,
+.admin-status-strip__label,
+.admin-layout-nav__group-header,
+.admin-layout-nav__pill,
+.platform-admin-domain-status,
+.admin-health-grid__stale,
+.admin-health-card__pill,
+.admin-club-operations__closing-risk-badge {
+  font: 600 var(--type-size-label)/var(--type-leading-label) var(--f-sans);
+}
+
+.admin-breadcrumb,
+.platform-admin-ai-ops__small-list ul,
+.admin-selected-brief__notice,
+.admin-work-queue__reason,
+.admin-selected-brief__link,
+.admin-selected-brief__check span,
+.admin-health-grid__timestamp,
+.admin-health-card__time,
+.admin-health-card__drill,
+.admin-health-deploy-strip__time,
+.admin-notifications__cluster-list em,
+.admin-notifications__reason span,
+.admin-audit__row-time,
+.admin-club-operations__link,
+.admin-club-operations__stat span,
+.admin-club-operations__closing-risk-overflow,
+.admin-support-workbench__results em,
+.admin-analytics__kpi-label,
+.admin-analytics__kpi-delta {
+  font-size: var(--type-size-supporting);
+  line-height: var(--type-leading-supporting);
+}
+
+.admin-work-queue__row,
+.admin-selected-brief,
+.admin-health-card,
+.admin-club-operations__closing-risk {
+  min-width: 0;
+}
+
+.admin-work-queue__reason,
+.admin-selected-brief__notice,
+.admin-club-operations__closing-risk-overflow {
+  overflow-wrap: anywhere;
 }
 
 .admin-analytics__kpi-action {

@@ -115,6 +115,30 @@ describe("AdminSupportWorkbench", () => {
     expect(onRevokeGrant).toHaveBeenCalledWith("grant-1");
   });
 
+  it("uses supporting copy for the selected target and ledger metadata", () => {
+    renderWorkbench({
+      selectedResult: result,
+      ledger: [{
+        grantId: "grant-1",
+        clubId: "club-1",
+        clubName: "읽는사이",
+        granteeUserId: "user-1",
+        granteeDisplayName: "지원관리자",
+        granteeMaskedEmail: "a***@example.com",
+        scope: "HOST_SUPPORT_READ",
+        reason: "고객 문의 재현 지원",
+        expiresAt: "2026-05-27T11:00:00Z",
+        createdAt: "2026-05-27T10:00:00Z",
+        revokedAt: null,
+        status: "ACTIVE",
+        createdByRole: "OWNER",
+      }],
+    });
+
+    expect(screen.getByText(/^대상: 지원관리자/)).toHaveClass("small");
+    expect(screen.getByText(/ACTIVE · 고객 문의 재현 지원/)).toHaveClass("small");
+  });
+
   it("renders support risk summary and reason presets for a selected result", async () => {
     const onReasonChange = vi.fn();
     const user = userEvent.setup();

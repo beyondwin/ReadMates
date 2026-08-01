@@ -107,7 +107,7 @@ export function AdminSupportWorkbench(props: AdminSupportWorkbenchProps) {
       {props.selectedResult ? (
         <section className="admin-support-workbench__panel" aria-labelledby="support-grant-title">
           <h2 id="support-grant-title" className="h3 editorial">지원 접근 권한 발급</h2>
-          <p className="tiny muted">
+          <p className="small muted">
             대상: {props.selectedResult.displayName} · {props.selectedResult.maskedEmail}
           </p>
           <SupportRiskSummaryView summary={riskSummary} />
@@ -152,7 +152,7 @@ export function AdminSupportWorkbench(props: AdminSupportWorkbenchProps) {
               <article key={item.grantId} className="admin-support-workbench__ledger-row">
                 <div>
                   <p>{item.clubName} · {item.granteeDisplayName}</p>
-                  <p className="tiny muted">{item.granteeMaskedEmail} · {item.status} · {item.reason}</p>
+                  <p className="small muted">{item.granteeMaskedEmail} · {item.status} · {item.reason}</p>
                 </div>
                 {item.status === "ACTIVE" ? (
                   <button type="button" className="btn btn-ghost btn-sm" onClick={() => void props.onRevokeGrant(item.grantId)}>

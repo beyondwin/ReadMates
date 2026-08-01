@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/experimental-ct-react";
+import type { Locator } from "@playwright/test";
 import { AdminSupportWorkbench, type AdminSupportWorkbenchProps } from "./admin-support-workbench";
+
+const sizeOf = (locator: Locator) =>
+  locator.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
 
 const selectedSupportProps: AdminSupportWorkbenchProps = {
   clubs: [
@@ -88,5 +92,9 @@ test("AdminSupportWorkbench renders selected support grant risk review", async (
     </div>,
   );
 
+  expect(await sizeOf(component.locator(".label").first())).toBeGreaterThanOrEqual(14);
+  expect(await sizeOf(component.locator(".admin-support-workbench__results em").first())).toBeGreaterThanOrEqual(14);
+  expect(await sizeOf(component.locator(".admin-support-workbench__ledger-row .small").first())).toBeGreaterThanOrEqual(14);
+  expect(await sizeOf(component.getByRole("button", { name: "발급" }))).toBeGreaterThanOrEqual(14);
   await expect(component).toHaveScreenshot("admin-support-workbench-selected.png");
 });
