@@ -22,7 +22,7 @@ const items: NoteFeedItem[] = [
     date: selectedSession.date,
     authorName: "읽는사이",
     authorShortName: "읽",
-    avatarKey: "book-tote",
+    avatarKey: "hedgehog-green-book",
     kind: "HIGHLIGHT",
     text: "오래 읽어도 편안한 문장이어야 합니다.",
   },

@@ -188,7 +188,7 @@ describe("member home record reflection cards", () => {
             attendees: [
               {
                 membershipId: "membership-1",
-                avatarKey: "book-tote",
+                avatarKey: "hedgehog-green-book",
                 displayName: "응답 전 멤버",
                 accountName: "member@example.com",
                 role: "MEMBER",

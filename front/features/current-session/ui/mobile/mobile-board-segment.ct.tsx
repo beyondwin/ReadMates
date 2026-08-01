@@ -33,14 +33,14 @@ const session = {
         draftThought: null,
         authorName: "질문한 멤버",
         authorShortName: "질",
-        avatarKey: "book-tote",
+        avatarKey: "hedgehog-green-book",
       },
     ],
     longReviews: [
       {
         authorName: "서평 쓴 멤버",
         authorShortName: "서",
-        avatarKey: "calendar-book",
+        avatarKey: "hedgehog-green-book",
         body: reviewText,
       },
     ],
