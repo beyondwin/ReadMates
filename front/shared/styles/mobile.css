@@ -18,10 +18,6 @@
     overscroll-behavior-y: contain;
     -webkit-tap-highlight-color: transparent;
   }
-
-  .reading-editorial {
-    line-height: 1.7;
-  }
 }
 
 .m-app {
@@ -777,7 +773,7 @@
 .mobile-only .rm-member-activity-card__avatar {
   width: 26px;
   height: 26px;
-  font-size: 11px;
+  font-size: var(--type-size-label);
 }
 .mobile-only .rm-member-activity-card__author-copy {
   min-width: 0;
