@@ -1,0 +1,62 @@
+@file:Suppress("ktlint:standard:package-name")
+
+package com.readmates.browse.adapter.`in`.web
+
+import com.readmates.browse.application.GuestBrowseInvalidCursorException
+import com.readmates.browse.application.port.`in`.GetGuestBrowseShellUseCase
+import com.readmates.browse.application.port.`in`.GetGuestCurrentSessionUseCase
+import com.readmates.browse.application.port.`in`.ListGuestUpcomingSessionsUseCase
+import org.springframework.http.HttpHeaders
+import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.server.ResponseStatusException
+
+@RestController
+@RequestMapping("/api/public/clubs/{clubSlug}/browse")
+class GuestBrowseController(
+    private val getGuestBrowseShellUseCase: GetGuestBrowseShellUseCase,
+    private val getGuestCurrentSessionUseCase: GetGuestCurrentSessionUseCase,
+    private val listGuestUpcomingSessionsUseCase: ListGuestUpcomingSessionsUseCase,
+) {
+    @GetMapping
+    fun shell(
+        @PathVariable clubSlug: String,
+    ): ResponseEntity<GuestBrowseShellResponse> =
+        getGuestBrowseShellUseCase.getShell(clubSlug)?.toResponse()?.let(::noStore)
+            ?: notFound()
+
+    @GetMapping("/sessions/current")
+    fun currentSession(
+        @PathVariable clubSlug: String,
+    ): ResponseEntity<GuestCurrentSessionResponse> =
+        getGuestCurrentSessionUseCase.getCurrentSession(clubSlug)?.toResponse()?.let(::noStore)
+            ?: notFound()
+
+    @GetMapping("/sessions/upcoming")
+    fun upcomingSessions(
+        @PathVariable clubSlug: String,
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) cursor: String?,
+    ): ResponseEntity<GuestCursorPageResponse<GuestUpcomingSessionResponse>> {
+        val page =
+            try {
+                listGuestUpcomingSessionsUseCase.listUpcomingSessions(clubSlug, limit, cursor)
+            } catch (_: GuestBrowseInvalidCursorException) {
+                throw ResponseStatusException(HttpStatus.BAD_REQUEST)
+            }
+        return page?.toResponse()?.let(::noStore) ?: notFound()
+    }
+
+    private fun <T : Any> noStore(body: T): ResponseEntity<T> =
+        ResponseEntity
+            .ok()
+            .header(HttpHeaders.CACHE_CONTROL, "no-store")
+            .body(body)
+
+    private fun notFound(): Nothing = throw ResponseStatusException(HttpStatus.NOT_FOUND)
+}
