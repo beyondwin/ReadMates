@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.hamcrest.Matchers.hasItem
+import org.hamcrest.Matchers.hasItems
 import org.hamcrest.Matchers.not
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -69,7 +70,7 @@ class GuestBrowseControllerDbTest(
             """
             insert into memberships (id, club_id, user_id, role, status, short_name, avatar_key)
             values
-              (?, ?, ?, 'MEMBER', 'ACTIVE', '작성자 하나', 'reading-lamp'),
+              (?, ?, ?, 'MEMBER', 'LEFT', '작성자 하나', 'reading-lamp'),
               (?, ?, ?, 'MEMBER', 'ACTIVE', '작성자 둘', 'open-book-pencil')
             """.trimIndent(),
             AUTHOR_ONE_MEMBERSHIP_ID,
@@ -81,9 +82,13 @@ class GuestBrowseControllerDbTest(
         )
     }
 
+    @Suppress("LongMethod")
     private fun seedSessionsAndContent() {
         insertSession(OPEN_ID, CLUB_ID, 41, "OPEN", "GUEST_READABLE", "MEMBER", "현재 공개 세션")
         insertSession(DRAFT_ID, CLUB_ID, 42, "DRAFT", "GUEST_READABLE", "MEMBER", "예정 공개 세션")
+        insertSession(CLOSED_ID, CLUB_ID, 40, "CLOSED", "GUEST_READABLE", "MEMBER", "종료 공개 세션")
+        insertSession(PUBLISHED_ID, CLUB_ID, 39, "PUBLISHED", "GUEST_READABLE", "PUBLIC", "발행 공개 세션")
+        insertSession(HOST_ONLY_CLOSED_ID, CLUB_ID, 38, "CLOSED", "HOST_ONLY", "HOST_ONLY", "숨은 종료 세션")
         insertSession(HOST_ONLY_OPEN_ID, CLUB_ID, 43, "OPEN", "HOST_ONLY", "HOST_ONLY", "숨은 현재 세션")
         insertSession(HOST_ONLY_DRAFT_ID, CLUB_ID, 44, "DRAFT", "HOST_ONLY", "HOST_ONLY", "숨은 예정 세션")
         insertSession(OUTSIDE_DRAFT_ID, OUTSIDE_CLUB_ID, 41, "DRAFT", "GUEST_READABLE", "MEMBER", "다른 클럽 예정 세션")
@@ -94,7 +99,9 @@ class GuestBrowseControllerDbTest(
             )
             values
               (?, ?, ?, ?, 'GOING', 'ATTENDED', 'ACTIVE'),
-              (?, ?, ?, ?, 'MAYBE', 'UNKNOWN', 'ACTIVE')
+              (?, ?, ?, ?, 'MAYBE', 'UNKNOWN', 'ACTIVE'),
+              (?, ?, ?, ?, 'GOING', 'ATTENDED', 'ACTIVE'),
+              (?, ?, ?, ?, 'GOING', 'ABSENT', 'REMOVED')
             """.trimIndent(),
             PARTICIPANT_ONE_ID,
             CLUB_ID,
@@ -103,6 +110,14 @@ class GuestBrowseControllerDbTest(
             PARTICIPANT_TWO_ID,
             CLUB_ID,
             OPEN_ID,
+            AUTHOR_TWO_MEMBERSHIP_ID,
+            PUBLISHED_PARTICIPANT_ONE_ID,
+            CLUB_ID,
+            PUBLISHED_ID,
+            AUTHOR_ONE_MEMBERSHIP_ID,
+            PUBLISHED_PARTICIPANT_TWO_ID,
+            CLUB_ID,
+            PUBLISHED_ID,
             AUTHOR_TWO_MEMBERSHIP_ID,
         )
         jdbcTemplate.update(
@@ -131,21 +146,145 @@ class GuestBrowseControllerDbTest(
             OPEN_ID,
             AUTHOR_TWO_MEMBERSHIP_ID,
         )
+        jdbcTemplate.update(
+            """
+            insert into questions (id, club_id, session_id, membership_id, priority, text, draft_thought)
+            values (?, ?, ?, ?, 1, ?, ?)
+            """.trimIndent(),
+            ARCHIVE_QUESTION_ID,
+            CLUB_ID,
+            PUBLISHED_ID,
+            AUTHOR_ONE_MEMBERSHIP_ID,
+            ARCHIVE_QUESTION,
+            DRAFT_THOUGHT,
+        )
+        jdbcTemplate.update(
+            """
+            insert into questions (id, club_id, session_id, membership_id, priority, text, draft_thought)
+            values (?, ?, ?, ?, 2, ?, '제외되어야 하는 초안')
+            """.trimIndent(),
+            REMOVED_QUESTION_ID,
+            CLUB_ID,
+            PUBLISHED_ID,
+            AUTHOR_TWO_MEMBERSHIP_ID,
+            REMOVED_QUESTION,
+        )
+        jdbcTemplate.update(
+            """
+            insert into one_line_reviews (id, club_id, session_id, membership_id, text, visibility)
+            values
+              (?, ?, ?, ?, ?, 'PUBLIC'),
+              (?, ?, ?, ?, ?, 'SESSION')
+            """.trimIndent(),
+            PUBLIC_ONE_LINE_REVIEW_ID,
+            CLUB_ID,
+            PUBLISHED_ID,
+            AUTHOR_ONE_MEMBERSHIP_ID,
+            PUBLIC_ONE_LINE_REVIEW,
+            SESSION_ONE_LINE_REVIEW_ID,
+            CLUB_ID,
+            PUBLISHED_ID,
+            AUTHOR_TWO_MEMBERSHIP_ID,
+            SESSION_ONE_LINE_REVIEW,
+        )
+        jdbcTemplate.update(
+            """
+            insert into highlights (id, club_id, session_id, membership_id, text, sort_order)
+            values (?, ?, ?, null, ?, 1)
+            """.trimIndent(),
+            HIGHLIGHT_ID,
+            CLUB_ID,
+            PUBLISHED_ID,
+            PUBLIC_HIGHLIGHT,
+        )
+        jdbcTemplate.update(
+            """
+            insert into long_reviews (id, club_id, session_id, membership_id, body, visibility)
+            values
+              (?, ?, ?, ?, ?, 'PUBLIC'),
+              (?, ?, ?, ?, ?, 'PRIVATE')
+            """.trimIndent(),
+            ARCHIVE_PUBLIC_LONG_REVIEW_ID,
+            CLUB_ID,
+            PUBLISHED_ID,
+            AUTHOR_ONE_MEMBERSHIP_ID,
+            PUBLIC_LONG_REVIEW,
+            ARCHIVE_PRIVATE_LONG_REVIEW_ID,
+            CLUB_ID,
+            PUBLISHED_ID,
+            AUTHOR_TWO_MEMBERSHIP_ID,
+            PRIVATE_LONG_REVIEW,
+        )
+        jdbcTemplate.update(
+            """
+            insert into public_session_publications (
+              id, club_id, session_id, public_summary, is_public, visibility, site_visibility, published_at
+            )
+            values (?, ?, ?, ?, true, 'PUBLIC', 'PUBLIC_RECORD', utc_timestamp(6))
+            """.trimIndent(),
+            PUBLICATION_ID,
+            CLUB_ID,
+            PUBLISHED_ID,
+            PUBLIC_SUMMARY,
+        )
+        jdbcTemplate.update(
+            "update questions set created_at = ? where id = ?",
+            FIXED_FEED_CREATED_AT,
+            ARCHIVE_QUESTION_ID,
+        )
+        jdbcTemplate.update(
+            "update highlights set created_at = ? where id = ?",
+            FIXED_FEED_CREATED_AT,
+            HIGHLIGHT_ID,
+        )
+        jdbcTemplate.update(
+            "update one_line_reviews set created_at = ? where id = ?",
+            FIXED_FEED_CREATED_AT,
+            PUBLIC_ONE_LINE_REVIEW_ID,
+        )
+        jdbcTemplate.update(
+            "update long_reviews set created_at = ? where id = ?",
+            FIXED_FEED_CREATED_AT,
+            ARCHIVE_PUBLIC_LONG_REVIEW_ID,
+        )
     }
 
     @AfterEach
     fun cleanupGuestBrowseMatrix() {
-        jdbcTemplate.update("delete from long_reviews where id in (?, ?)", PUBLIC_REVIEW_ID, PRIVATE_REVIEW_ID)
-        jdbcTemplate.update("delete from questions where id = ?", QUESTION_ID)
+        jdbcTemplate.update("delete from public_session_publications where id = ?", PUBLICATION_ID)
+        jdbcTemplate.update("delete from highlights where id = ?", HIGHLIGHT_ID)
         jdbcTemplate.update(
-            "delete from session_participants where id in (?, ?)",
-            PARTICIPANT_ONE_ID,
-            PARTICIPANT_TWO_ID,
+            "delete from one_line_reviews where id in (?, ?)",
+            PUBLIC_ONE_LINE_REVIEW_ID,
+            SESSION_ONE_LINE_REVIEW_ID,
         )
         jdbcTemplate.update(
-            "delete from sessions where id in (?, ?, ?, ?, ?)",
+            "delete from long_reviews where id in (?, ?, ?, ?)",
+            PUBLIC_REVIEW_ID,
+            PRIVATE_REVIEW_ID,
+            ARCHIVE_PUBLIC_LONG_REVIEW_ID,
+            ARCHIVE_PRIVATE_LONG_REVIEW_ID,
+        )
+        jdbcTemplate.update(
+            "delete from questions where id in (?, ?, ?)",
+            QUESTION_ID,
+            ARCHIVE_QUESTION_ID,
+            REMOVED_QUESTION_ID,
+        )
+        jdbcTemplate.update(
+            "delete from session_participants where id in (?, ?, ?, ?)",
+            PARTICIPANT_ONE_ID,
+            PARTICIPANT_TWO_ID,
+            PUBLISHED_PARTICIPANT_ONE_ID,
+            PUBLISHED_PARTICIPANT_TWO_ID,
+        )
+        jdbcTemplate.update(
+            "delete from sessions where id in (?, ?, ?, ?, ?, ?, ?, ?)",
             OPEN_ID,
             DRAFT_ID,
+            CLOSED_ID,
+            PUBLISHED_ID,
+            HOST_ONLY_CLOSED_ID,
             HOST_ONLY_OPEN_ID,
             HOST_ONLY_DRAFT_ID,
             OUTSIDE_DRAFT_ID,
@@ -280,6 +419,140 @@ class GuestBrowseControllerDbTest(
         }
     }
 
+    @Test
+    fun `guest notes expose only published guest readable public content`() {
+        val sessionsResponse =
+            mockMvc
+                .get("/api/public/clubs/guest-test/browse/notes/sessions?limit=20")
+                .andExpect {
+                    status { isOk() }
+                    jsonPath("$.items[*].sessionId") { value(hasItem(PUBLISHED_ID)) }
+                    jsonPath("$.items[*].sessionId") { value(not(hasItems(CLOSED_ID, OPEN_ID, HOST_ONLY_CLOSED_ID))) }
+                    jsonPath("$.items[0].oneLinerCount") { value(1) }
+                    jsonPath("$.items[0].longReviewCount") { value(1) }
+                }.andReturn()
+                .response
+
+        val feedResponse =
+            mockMvc
+                .get("/api/public/clubs/guest-test/browse/notes/feed?limit=20")
+                .andExpect {
+                    status { isOk() }
+                    jsonPath("$.items[*].text") {
+                        value(hasItems(ARCHIVE_QUESTION, PUBLIC_ONE_LINE_REVIEW, PUBLIC_HIGHLIGHT))
+                    }
+                    jsonPath("$.items[*].text") { value(not(hasItem(SESSION_ONE_LINE_REVIEW))) }
+                    jsonPath("$.items[*].text") { value(not(hasItem(REMOVED_QUESTION))) }
+                }.andReturn()
+                .response
+
+        assertForbiddenKeysAbsent(sessionsResponse.contentAsString, FORBIDDEN_GUEST_KEYS)
+        assertForbiddenKeysAbsent(feedResponse.contentAsString, FORBIDDEN_GUEST_KEYS)
+        assertGuestResponseHeaders(sessionsResponse)
+        assertGuestResponseHeaders(feedResponse)
+    }
+
+    @Test
+    fun `guest notes feed composite cursor preserves mixed kind order without duplicates`() {
+        val seen = mutableListOf<String>()
+        var cursor: String? = null
+
+        repeat(4) {
+            val cursorQuery = cursor?.let { value -> "&cursor=$value" }.orEmpty()
+            val page =
+                mockMvc
+                    .get("/api/public/clubs/guest-test/browse/notes/feed?limit=1$cursorQuery")
+                    .andExpect {
+                        status { isOk() }
+                        jsonPath("$.items.length()") { value(1) }
+                    }.andReturn()
+                    .response
+            val body = objectMapper.readTree(page.contentAsString)
+            seen +=
+                body
+                    .get("items")
+                    .first()
+                    .get("text")
+                    .asText()
+            cursor = body.get("nextCursor").takeUnless(JsonNode::isNull)?.asText()
+        }
+
+        assertTrue(cursor == null)
+        assertTrue(
+            seen == listOf(ARCHIVE_QUESTION, PUBLIC_HIGHLIGHT, PUBLIC_ONE_LINE_REVIEW, PUBLIC_LONG_REVIEW),
+            "Unexpected guest note feed order or duplicate: $seen",
+        )
+    }
+
+    @Test
+    fun `guest archive includes closed and published guest readable sessions`() {
+        val response =
+            mockMvc
+                .get("/api/public/clubs/guest-test/browse/archive?limit=20")
+                .andExpect {
+                    status { isOk() }
+                    jsonPath("$.items[*].state") { value(hasItems("CLOSED", "PUBLISHED")) }
+                    jsonPath("$.items[*].sessionId") { value(not(hasItems(HOST_ONLY_CLOSED_ID, OPEN_ID, DRAFT_ID))) }
+                    jsonPath("$.items[*].feedbackDocument") { doesNotExist() }
+                }.andReturn()
+                .response
+
+        assertForbiddenKeysAbsent(response.contentAsString, FORBIDDEN_GUEST_KEYS)
+        assertGuestResponseHeaders(response)
+    }
+
+    @Test
+    fun `guest archive cursor continues without duplicating the previous item`() {
+        val firstPage =
+            mockMvc
+                .get("/api/public/clubs/guest-test/browse/archive?limit=1")
+                .andExpect {
+                    status { isOk() }
+                    jsonPath("$.items[0].sessionId") { value(CLOSED_ID) }
+                    jsonPath("$.nextCursor") { isString() }
+                }.andReturn()
+                .response
+        val cursor = objectMapper.readTree(firstPage.contentAsString).get("nextCursor").asText()
+
+        mockMvc
+            .get("/api/public/clubs/guest-test/browse/archive?limit=1&cursor=$cursor")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.items[0].sessionId") { value(PUBLISHED_ID) }
+                jsonPath("$.items[*].sessionId") { value(not(hasItem(CLOSED_ID))) }
+                jsonPath("$.nextCursor") { value(null) }
+            }
+    }
+
+    @Test
+    fun `guest archive detail includes public records and omits private session and feedback fields`() {
+        val response =
+            mockMvc
+                .get("/api/public/clubs/guest-test/browse/archive/$PUBLISHED_ID")
+                .andExpect {
+                    status { isOk() }
+                    jsonPath("$.summary") { value(PUBLIC_SUMMARY) }
+                    jsonPath("$.attendance") { value(1) }
+                    jsonPath("$.total") { value(1) }
+                    jsonPath("$.highlights[*].text") { value(hasItem(PUBLIC_HIGHLIGHT)) }
+                    jsonPath("$.oneLiners[*].text") { value(hasItem(PUBLIC_ONE_LINE_REVIEW)) }
+                    jsonPath("$.oneLiners[*].text") { value(not(hasItem(SESSION_ONE_LINE_REVIEW))) }
+                    jsonPath("$.longReviews[*].content") { value(hasItem(PUBLIC_LONG_REVIEW)) }
+                    jsonPath("$.longReviews[*].content") { value(not(hasItem(PRIVATE_LONG_REVIEW))) }
+                    jsonPath("$.questions[0].draftThought") { value(DRAFT_THOUGHT) }
+                    jsonPath("$.questions[0].authorName") { value("탈퇴한 멤버") }
+                    jsonPath("$.questions[0].avatarKey") { value("archive-box") }
+                    jsonPath("$.questions[*].text") { value(not(hasItem(REMOVED_QUESTION))) }
+                    jsonPath("$.feedbackDocument") { doesNotExist() }
+                }.andReturn()
+                .response
+
+        assertForbiddenKeysAbsent(response.contentAsString, FORBIDDEN_GUEST_KEYS)
+        assertGuestResponseHeaders(response)
+        assertFalse(response.contentAsString.contains("guest-author-one@example.test"))
+        assertFalse(response.contentAsString.contains("게스트 작성자 하나"))
+    }
+
     private fun insertSession(
         id: String,
         clubId: String,
@@ -375,13 +648,36 @@ class GuestBrowseControllerDbTest(
         const val AUTHOR_TWO_MEMBERSHIP_ID = "00000000-0000-0000-0000-000000007421"
         const val OPEN_ID = "00000000-0000-0000-0000-000000007430"
         const val DRAFT_ID = "00000000-0000-0000-0000-000000007431"
+        const val CLOSED_ID = "00000000-0000-0000-0000-000000007435"
+        const val PUBLISHED_ID = "00000000-0000-0000-0000-000000007436"
+        const val HOST_ONLY_CLOSED_ID = "00000000-0000-0000-0000-000000007437"
         const val HOST_ONLY_OPEN_ID = "00000000-0000-0000-0000-000000007432"
         const val HOST_ONLY_DRAFT_ID = "00000000-0000-0000-0000-000000007433"
         const val OUTSIDE_DRAFT_ID = "00000000-0000-0000-0000-000000007434"
         const val PARTICIPANT_ONE_ID = "00000000-0000-0000-0000-000000007440"
         const val PARTICIPANT_TWO_ID = "00000000-0000-0000-0000-000000007441"
+        const val PUBLISHED_PARTICIPANT_ONE_ID = "00000000-0000-0000-0000-000000007442"
+        const val PUBLISHED_PARTICIPANT_TWO_ID = "00000000-0000-0000-0000-000000007443"
         const val QUESTION_ID = "00000000-0000-0000-0000-000000007450"
+        const val ARCHIVE_QUESTION_ID = "00000000-0000-0000-0000-000000007451"
+        const val REMOVED_QUESTION_ID = "00000000-0000-0000-0000-000000007452"
         const val PUBLIC_REVIEW_ID = "00000000-0000-0000-0000-000000007460"
         const val PRIVATE_REVIEW_ID = "00000000-0000-0000-0000-000000007461"
+        const val PUBLIC_ONE_LINE_REVIEW_ID = "00000000-0000-0000-0000-000000007462"
+        const val SESSION_ONE_LINE_REVIEW_ID = "00000000-0000-0000-0000-000000007463"
+        const val ARCHIVE_PUBLIC_LONG_REVIEW_ID = "00000000-0000-0000-0000-000000007464"
+        const val ARCHIVE_PRIVATE_LONG_REVIEW_ID = "00000000-0000-0000-0000-000000007465"
+        const val HIGHLIGHT_ID = "00000000-0000-0000-0000-000000007470"
+        const val PUBLICATION_ID = "00000000-0000-0000-0000-000000007480"
+        const val ARCHIVE_QUESTION = "기록에서 보이는 질문"
+        const val REMOVED_QUESTION = "제외된 참가자의 숨겨야 하는 질문"
+        const val DRAFT_THOUGHT = "기록에서 보이는 생각 초안"
+        const val PUBLIC_ONE_LINE_REVIEW = "게스트에게 보이는 공개 한줄평"
+        const val SESSION_ONE_LINE_REVIEW = "게스트에게 숨기는 세션 한줄평"
+        const val PUBLIC_LONG_REVIEW = "게스트에게 보이는 공개 서평 기록"
+        const val PRIVATE_LONG_REVIEW = "게스트에게 숨기는 비공개 서평 기록"
+        const val PUBLIC_HIGHLIGHT = "게스트에게 보이는 하이라이트"
+        const val PUBLIC_SUMMARY = "게스트에게 보이는 세션 요약"
+        const val FIXED_FEED_CREATED_AT = "2026-08-01 12:00:00.000000"
     }
 }

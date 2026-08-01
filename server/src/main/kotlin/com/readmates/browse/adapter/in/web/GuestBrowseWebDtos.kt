@@ -1,13 +1,19 @@
-@file:Suppress("ktlint:standard:package-name")
+@file:Suppress("TooManyFunctions", "ktlint:standard:package-name")
 
 package com.readmates.browse.adapter.`in`.web
 
+import com.readmates.browse.application.model.GuestArchiveDetailResult
+import com.readmates.browse.application.model.GuestArchiveSessionResult
 import com.readmates.browse.application.model.GuestAttendeeResult
 import com.readmates.browse.application.model.GuestBrowseNavigationResult
 import com.readmates.browse.application.model.GuestBrowseShellResult
 import com.readmates.browse.application.model.GuestCurrentSessionResult
 import com.readmates.browse.application.model.GuestCursorPage
+import com.readmates.browse.application.model.GuestHighlightResult
 import com.readmates.browse.application.model.GuestLongReviewResult
+import com.readmates.browse.application.model.GuestNoteFeedResult
+import com.readmates.browse.application.model.GuestNoteSessionResult
+import com.readmates.browse.application.model.GuestOneLinerResult
 import com.readmates.browse.application.model.GuestQuestionResult
 import com.readmates.browse.application.model.GuestUpcomingSessionResult
 
@@ -100,6 +106,76 @@ data class GuestCursorPageResponse<T>(
     val nextCursor: String?,
 )
 
+data class GuestNoteSessionResponse(
+    val sessionId: String,
+    val sessionNumber: Int,
+    val bookTitle: String,
+    val date: String,
+    val questionCount: Int,
+    val oneLinerCount: Int,
+    val longReviewCount: Int,
+    val highlightCount: Int,
+    val totalCount: Int,
+)
+
+data class GuestNoteFeedItemResponse(
+    val sessionId: String,
+    val sessionNumber: Int,
+    val bookTitle: String,
+    val date: String,
+    val authorName: String?,
+    val authorShortName: String?,
+    val avatarKey: String?,
+    val kind: String,
+    val text: String,
+)
+
+data class GuestArchiveSessionResponse(
+    val sessionId: String,
+    val sessionNumber: Int,
+    val title: String,
+    val bookTitle: String,
+    val bookAuthor: String,
+    val bookImageUrl: String?,
+    val date: String,
+    val attendance: Int,
+    val total: Int,
+    val state: String,
+)
+
+data class GuestHighlightResponse(
+    val text: String,
+    val sortOrder: Int,
+    val authorName: String?,
+    val authorShortName: String?,
+    val avatarKey: String?,
+)
+
+data class GuestOneLinerResponse(
+    val text: String,
+    val authorName: String,
+    val authorShortName: String,
+    val avatarKey: String,
+)
+
+data class GuestArchiveDetailResponse(
+    val sessionId: String,
+    val sessionNumber: Int,
+    val title: String,
+    val bookTitle: String,
+    val bookAuthor: String,
+    val bookImageUrl: String?,
+    val date: String,
+    val attendance: Int,
+    val total: Int,
+    val state: String,
+    val summary: String?,
+    val highlights: List<GuestHighlightResponse>,
+    val questions: List<GuestQuestion>,
+    val oneLiners: List<GuestOneLinerResponse>,
+    val longReviews: List<GuestLongReview>,
+)
+
 internal fun GuestBrowseShellResult.toResponse() =
     GuestBrowseShellResponse(
         clubName = clubName,
@@ -181,3 +257,82 @@ private fun GuestUpcomingSessionResult.toResponse() =
         questionDeadlineAt = questionDeadlineAt,
         state = state,
     )
+
+internal fun GuestCursorPage<GuestNoteSessionResult>.toNoteSessionsResponse() =
+    GuestCursorPageResponse(items.map(GuestNoteSessionResult::toResponse), nextCursor)
+
+private fun GuestNoteSessionResult.toResponse() =
+    GuestNoteSessionResponse(
+        sessionId,
+        sessionNumber,
+        bookTitle,
+        date,
+        questionCount,
+        oneLinerCount,
+        longReviewCount,
+        highlightCount,
+        totalCount,
+    )
+
+internal fun GuestCursorPage<GuestNoteFeedResult>.toNotesFeedResponse() =
+    GuestCursorPageResponse(items.map(GuestNoteFeedResult::toResponse), nextCursor)
+
+private fun GuestNoteFeedResult.toResponse() =
+    GuestNoteFeedItemResponse(
+        sessionId,
+        sessionNumber,
+        bookTitle,
+        date,
+        authorName,
+        authorShortName,
+        avatarKey,
+        kind,
+        text,
+    )
+
+internal fun GuestCursorPage<GuestArchiveSessionResult>.toArchiveResponse() =
+    GuestCursorPageResponse(items.map(GuestArchiveSessionResult::toResponse), nextCursor)
+
+private fun GuestArchiveSessionResult.toResponse() =
+    GuestArchiveSessionResponse(
+        sessionId,
+        sessionNumber,
+        title,
+        bookTitle,
+        bookAuthor,
+        bookImageUrl,
+        date,
+        attendance,
+        total,
+        state,
+    )
+
+internal fun GuestArchiveDetailResult.toResponse() =
+    GuestArchiveDetailResponse(
+        sessionId,
+        sessionNumber,
+        title,
+        bookTitle,
+        bookAuthor,
+        bookImageUrl,
+        date,
+        attendance,
+        total,
+        state,
+        summary,
+        highlights.map(GuestHighlightResult::toResponse),
+        questions.map(GuestQuestionResult::toResponse),
+        oneLiners.map(GuestOneLinerResult::toResponse),
+        longReviews.map(GuestLongReviewResult::toResponse),
+    )
+
+private fun GuestHighlightResult.toResponse() =
+    GuestHighlightResponse(
+        text,
+        sortOrder,
+        authorName,
+        authorShortName,
+        avatarKey,
+    )
+
+private fun GuestOneLinerResult.toResponse() = GuestOneLinerResponse(text, authorName, authorShortName, avatarKey)

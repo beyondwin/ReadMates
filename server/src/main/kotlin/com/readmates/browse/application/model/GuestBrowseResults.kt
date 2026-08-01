@@ -86,3 +86,90 @@ data class GuestCursorPage<T>(
     val items: List<T>,
     val nextCursor: String?,
 )
+
+data class GuestRecordCursor(
+    val sessionNumber: Int,
+    val sessionId: String,
+)
+
+data class GuestNoteFeedCursor(
+    val sessionNumber: Int,
+    val createdAt: String,
+    val sourceOrder: Int,
+    val itemOrder: Int,
+    val itemId: String,
+)
+
+data class GuestNoteSessionResult(
+    val sessionId: String,
+    val sessionNumber: Int,
+    val bookTitle: String,
+    val date: String,
+    val questionCount: Int,
+    val oneLinerCount: Int,
+    val longReviewCount: Int,
+    val highlightCount: Int,
+    val totalCount: Int,
+)
+
+data class GuestNoteFeedResult(
+    val itemId: String,
+    val createdAt: String,
+    val sourceOrder: Int,
+    val itemOrder: Int,
+    val sessionId: String,
+    val sessionNumber: Int,
+    val bookTitle: String,
+    val date: String,
+    val authorName: String?,
+    val authorShortName: String?,
+    val avatarKey: String?,
+    val kind: String,
+    val text: String,
+)
+
+data class GuestArchiveSessionResult(
+    val sessionId: String,
+    val sessionNumber: Int,
+    val title: String,
+    val bookTitle: String,
+    val bookAuthor: String,
+    val bookImageUrl: String?,
+    val date: String,
+    val attendance: Int,
+    val total: Int,
+    val state: String,
+)
+
+data class GuestHighlightResult(
+    val text: String,
+    val sortOrder: Int,
+    val authorName: String?,
+    val authorShortName: String?,
+    val avatarKey: String?,
+)
+
+data class GuestOneLinerResult(
+    val text: String,
+    val authorName: String,
+    val authorShortName: String,
+    val avatarKey: String,
+)
+
+data class GuestArchiveDetailResult(
+    val sessionId: String,
+    val sessionNumber: Int,
+    val title: String,
+    val bookTitle: String,
+    val bookAuthor: String,
+    val bookImageUrl: String?,
+    val date: String,
+    val attendance: Int,
+    val total: Int,
+    val state: String,
+    val summary: String?,
+    val highlights: List<GuestHighlightResult>,
+    val questions: List<GuestQuestionResult>,
+    val oneLiners: List<GuestOneLinerResult>,
+    val longReviews: List<GuestLongReviewResult>,
+)

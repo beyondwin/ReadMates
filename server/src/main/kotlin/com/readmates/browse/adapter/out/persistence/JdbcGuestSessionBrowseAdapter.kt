@@ -112,8 +112,8 @@ class JdbcGuestSessionBrowseAdapter(
         jdbcTemplate.query(
             """
             select
-              memberships.short_name as display_name,
-              memberships.avatar_key,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else memberships.short_name end as display_name,
+              case when memberships.status = 'LEFT' then 'archive-box' else memberships.avatar_key end as avatar_key,
               session_participants.rsvp_status,
               session_participants.attendance_status
             from session_participants
@@ -121,8 +121,8 @@ class JdbcGuestSessionBrowseAdapter(
               and memberships.club_id = session_participants.club_id
             where session_participants.session_id = ?
               and session_participants.participation_status = 'ACTIVE'
-              and memberships.status = 'ACTIVE'
             order by display_name, memberships.avatar_key
+            limit 100
             """.trimIndent(),
             { resultSet, _ ->
                 GuestAttendeeResult(
@@ -142,9 +142,9 @@ class JdbcGuestSessionBrowseAdapter(
               questions.priority,
               questions.text,
               questions.draft_thought,
-              memberships.short_name as author_name,
-              memberships.short_name as author_short_name,
-              memberships.avatar_key
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else memberships.short_name end as author_name,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else memberships.short_name end as author_short_name,
+              case when memberships.status = 'LEFT' then 'archive-box' else memberships.avatar_key end as avatar_key
             from questions
             join memberships on memberships.id = questions.membership_id
               and memberships.club_id = questions.club_id
@@ -153,8 +153,8 @@ class JdbcGuestSessionBrowseAdapter(
               and session_participants.membership_id = questions.membership_id
             where questions.session_id = ?
               and session_participants.participation_status = 'ACTIVE'
-              and memberships.status = 'ACTIVE'
             order by questions.priority, questions.created_at
+            limit 100
             """.trimIndent(),
             { resultSet, _ ->
                 GuestQuestionResult(
@@ -174,9 +174,9 @@ class JdbcGuestSessionBrowseAdapter(
             """
             select
               long_reviews.body,
-              memberships.short_name as author_name,
-              memberships.short_name as author_short_name,
-              memberships.avatar_key
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else memberships.short_name end as author_name,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else memberships.short_name end as author_short_name,
+              case when memberships.status = 'LEFT' then 'archive-box' else memberships.avatar_key end as avatar_key
             from long_reviews
             join memberships on memberships.id = long_reviews.membership_id
               and memberships.club_id = long_reviews.club_id
@@ -186,8 +186,8 @@ class JdbcGuestSessionBrowseAdapter(
             where long_reviews.session_id = ?
               and long_reviews.visibility = 'PUBLIC'
               and session_participants.participation_status = 'ACTIVE'
-              and memberships.status = 'ACTIVE'
             order by long_reviews.created_at, author_name
+            limit 100
             """.trimIndent(),
             { resultSet, _ ->
                 val authorShortName = resultSet.getString("author_short_name")

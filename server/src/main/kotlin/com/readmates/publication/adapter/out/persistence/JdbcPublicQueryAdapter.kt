@@ -64,7 +64,7 @@ class JdbcPublicQueryAdapter(
                   and clubs.public_visibility = 'PUBLIC'
                   and sessions.id = ?
                   and sessions.state = 'PUBLISHED'
-                  and public_session_publications.visibility = 'PUBLIC'
+                  and public_session_publications.site_visibility = 'PUBLIC_RECORD'
                 """.trimIndent(),
                 { rs, _ ->
                     PublicSessionDetailResult(
@@ -98,7 +98,7 @@ class JdbcPublicQueryAdapter(
                   and public_session_publications.club_id = sessions.club_id
                 where sessions.club_id = ?
                   and sessions.state = 'PUBLISHED'
-                  and public_session_publications.visibility = 'PUBLIC'
+                  and public_session_publications.site_visibility = 'PUBLIC_RECORD'
               ) as session_count,
               (
                 select count(distinct sessions.book_title)
@@ -107,7 +107,7 @@ class JdbcPublicQueryAdapter(
                   and public_session_publications.club_id = sessions.club_id
                 where sessions.club_id = ?
                   and sessions.state = 'PUBLISHED'
-                  and public_session_publications.visibility = 'PUBLIC'
+                  and public_session_publications.site_visibility = 'PUBLIC_RECORD'
               ) as book_count,
               (
                 select count(*)
@@ -175,7 +175,7 @@ class JdbcPublicQueryAdapter(
             ) one_liner_counts on one_liner_counts.session_id = sessions.id
             where sessions.club_id = ?
               and sessions.state = 'PUBLISHED'
-              and public_session_publications.visibility = 'PUBLIC'
+              and public_session_publications.site_visibility = 'PUBLIC_RECORD'
             order by sessions.number desc
             limit 6
             """.trimIndent(),

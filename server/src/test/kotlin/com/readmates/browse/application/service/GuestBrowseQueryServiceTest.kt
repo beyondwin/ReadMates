@@ -1,11 +1,18 @@
 package com.readmates.browse.application.service
 
 import com.readmates.browse.application.GuestBrowseInvalidCursorException
+import com.readmates.browse.application.model.GuestArchiveDetailResult
+import com.readmates.browse.application.model.GuestArchiveSessionResult
 import com.readmates.browse.application.model.GuestBrowseNavigationResult
 import com.readmates.browse.application.model.GuestBrowseShellResult
 import com.readmates.browse.application.model.GuestCurrentSessionResult
+import com.readmates.browse.application.model.GuestNoteFeedCursor
+import com.readmates.browse.application.model.GuestNoteFeedResult
+import com.readmates.browse.application.model.GuestNoteSessionResult
+import com.readmates.browse.application.model.GuestRecordCursor
 import com.readmates.browse.application.model.GuestUpcomingSessionCursor
 import com.readmates.browse.application.model.GuestUpcomingSessionResult
+import com.readmates.browse.application.port.out.LoadGuestRecordBrowsePort
 import com.readmates.browse.application.port.out.LoadGuestSessionBrowsePort
 import com.readmates.shared.paging.CursorCodec
 import org.assertj.core.api.Assertions.assertThat
@@ -16,7 +23,7 @@ class GuestBrowseQueryServiceTest {
     @Test
     fun `upcoming defaults to twenty items and emits a club scoped cursor`() {
         val port = FakeGuestSessionBrowsePort(upcoming = upcomingRows(21))
-        val service = GuestBrowseQueryService(port)
+        val service = GuestBrowseQueryService(port, FakeGuestRecordBrowsePort())
 
         val page = requireNotNull(service.listUpcomingSessions("guest-test", requestedLimit = null, rawCursor = null))
 
@@ -37,7 +44,7 @@ class GuestBrowseQueryServiceTest {
     @Test
     fun `upcoming accepts the maximum limit of fifty`() {
         val port = FakeGuestSessionBrowsePort(upcoming = upcomingRows(51))
-        val service = GuestBrowseQueryService(port)
+        val service = GuestBrowseQueryService(port, FakeGuestRecordBrowsePort())
 
         val page = requireNotNull(service.listUpcomingSessions("guest-test", requestedLimit = 50, rawCursor = null))
 
@@ -47,7 +54,7 @@ class GuestBrowseQueryServiceTest {
 
     @Test
     fun `upcoming rejects a requested limit above fifty`() {
-        val service = GuestBrowseQueryService(FakeGuestSessionBrowsePort())
+        val service = GuestBrowseQueryService(FakeGuestSessionBrowsePort(), FakeGuestRecordBrowsePort())
 
         assertThatThrownBy {
             service.listUpcomingSessions("guest-test", requestedLimit = 51, rawCursor = null)
@@ -56,7 +63,7 @@ class GuestBrowseQueryServiceTest {
 
     @Test
     fun `upcoming rejects malformed and cross club cursors`() {
-        val service = GuestBrowseQueryService(FakeGuestSessionBrowsePort())
+        val service = GuestBrowseQueryService(FakeGuestSessionBrowsePort(), FakeGuestRecordBrowsePort())
         val crossClubCursor =
             CursorCodec.encode(
                 mapOf(
@@ -78,10 +85,46 @@ class GuestBrowseQueryServiceTest {
     @Test
     fun `hidden club short circuits current and upcoming reads`() {
         val port = FakeGuestSessionBrowsePort(shell = null)
-        val service = GuestBrowseQueryService(port)
+        val service = GuestBrowseQueryService(port, FakeGuestRecordBrowsePort())
 
         assertThat(service.getCurrentSession("hidden-club")).isNull()
         assertThat(service.listUpcomingSessions("hidden-club", null, null)).isNull()
+    }
+
+    @Test
+    fun `archive uses the shared max limit and emits a club scoped record cursor`() {
+        val rows =
+            (1..21).map { number ->
+                GuestArchiveSessionResult(
+                    sessionId = sessionId(number),
+                    sessionNumber = number,
+                    title = "$number 회차",
+                    bookTitle = "$number 번째 책",
+                    bookAuthor = "테스트 저자",
+                    bookImageUrl = null,
+                    date = "2026-08-20",
+                    attendance = 1,
+                    total = 2,
+                    state = "PUBLISHED",
+                )
+            }
+        val service =
+            GuestBrowseQueryService(
+                FakeGuestSessionBrowsePort(),
+                FakeGuestRecordBrowsePort(archive = rows),
+            )
+
+        val page = requireNotNull(service.listArchiveSessions("guest-test", null, null))
+
+        assertThat(page.items).hasSize(20)
+        assertThat(CursorCodec.decodeStrict(page.nextCursor))
+            .containsExactlyInAnyOrderEntriesOf(
+                mapOf(
+                    "clubSlug" to "guest-test",
+                    "sessionNumber" to "20",
+                    "sessionId" to sessionId(20),
+                ),
+            )
     }
 
     private class FakeGuestSessionBrowsePort(
@@ -98,6 +141,33 @@ class GuestBrowseQueryServiceTest {
             cursor: GuestUpcomingSessionCursor?,
             limit: Int,
         ): List<GuestUpcomingSessionResult> = upcoming.take(limit)
+    }
+
+    private class FakeGuestRecordBrowsePort(
+        private val archive: List<GuestArchiveSessionResult> = emptyList(),
+    ) : LoadGuestRecordBrowsePort {
+        override fun loadNoteSessions(
+            clubSlug: String,
+            cursor: GuestRecordCursor?,
+            limit: Int,
+        ): List<GuestNoteSessionResult> = emptyList()
+
+        override fun loadNotesFeed(
+            clubSlug: String,
+            cursor: GuestNoteFeedCursor?,
+            limit: Int,
+        ): List<GuestNoteFeedResult> = emptyList()
+
+        override fun loadArchiveSessions(
+            clubSlug: String,
+            cursor: GuestRecordCursor?,
+            limit: Int,
+        ): List<GuestArchiveSessionResult> = archive.take(limit)
+
+        override fun loadArchiveDetail(
+            clubSlug: String,
+            sessionId: String,
+        ): GuestArchiveDetailResult? = null
     }
 
     private companion object {

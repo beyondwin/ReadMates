@@ -3,8 +3,12 @@
 package com.readmates.browse.adapter.`in`.web
 
 import com.readmates.browse.application.GuestBrowseInvalidRequestException
+import com.readmates.browse.application.port.`in`.GetGuestArchiveDetailUseCase
 import com.readmates.browse.application.port.`in`.GetGuestBrowseShellUseCase
 import com.readmates.browse.application.port.`in`.GetGuestCurrentSessionUseCase
+import com.readmates.browse.application.port.`in`.ListGuestArchiveSessionsUseCase
+import com.readmates.browse.application.port.`in`.ListGuestNoteSessionsUseCase
+import com.readmates.browse.application.port.`in`.ListGuestNotesFeedUseCase
 import com.readmates.browse.application.port.`in`.ListGuestUpcomingSessionsUseCase
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
@@ -22,6 +26,10 @@ class GuestBrowseController(
     private val getGuestBrowseShellUseCase: GetGuestBrowseShellUseCase,
     private val getGuestCurrentSessionUseCase: GetGuestCurrentSessionUseCase,
     private val listGuestUpcomingSessionsUseCase: ListGuestUpcomingSessionsUseCase,
+    private val listGuestNoteSessionsUseCase: ListGuestNoteSessionsUseCase,
+    private val listGuestNotesFeedUseCase: ListGuestNotesFeedUseCase,
+    private val listGuestArchiveSessionsUseCase: ListGuestArchiveSessionsUseCase,
+    private val getGuestArchiveDetailUseCase: GetGuestArchiveDetailUseCase,
 ) {
     @GetMapping
     fun shell(
@@ -50,6 +58,54 @@ class GuestBrowseController(
                 throw ResponseStatusException(HttpStatus.BAD_REQUEST)
             }
         return page?.toResponse()?.let(::noStore) ?: notFound()
+    }
+
+    @GetMapping("/notes/sessions")
+    fun noteSessions(
+        @PathVariable clubSlug: String,
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) cursor: String?,
+    ): ResponseEntity<GuestCursorPageResponse<GuestNoteSessionResponse>> =
+        paged { listGuestNoteSessionsUseCase.listNoteSessions(clubSlug, limit, cursor)?.toNoteSessionsResponse() }
+
+    @GetMapping("/notes/feed")
+    fun notesFeed(
+        @PathVariable clubSlug: String,
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) cursor: String?,
+    ): ResponseEntity<GuestCursorPageResponse<GuestNoteFeedItemResponse>> =
+        paged { listGuestNotesFeedUseCase.listNotesFeed(clubSlug, limit, cursor)?.toNotesFeedResponse() }
+
+    @GetMapping("/archive")
+    fun archive(
+        @PathVariable clubSlug: String,
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) cursor: String?,
+    ): ResponseEntity<GuestCursorPageResponse<GuestArchiveSessionResponse>> =
+        paged { listGuestArchiveSessionsUseCase.listArchiveSessions(clubSlug, limit, cursor)?.toArchiveResponse() }
+
+    @GetMapping("/archive/{sessionId}")
+    fun archiveDetail(
+        @PathVariable clubSlug: String,
+        @PathVariable sessionId: String,
+    ): ResponseEntity<GuestArchiveDetailResponse> {
+        val detail =
+            try {
+                getGuestArchiveDetailUseCase.getArchiveDetail(clubSlug, sessionId)
+            } catch (_: GuestBrowseInvalidRequestException) {
+                throw ResponseStatusException(HttpStatus.BAD_REQUEST)
+            }
+        return detail?.toResponse()?.let(::noStore) ?: notFound()
+    }
+
+    private fun <T : Any> paged(load: () -> T?): ResponseEntity<T> {
+        val body =
+            try {
+                load()
+            } catch (_: GuestBrowseInvalidRequestException) {
+                throw ResponseStatusException(HttpStatus.BAD_REQUEST)
+            }
+        return body?.let(::noStore) ?: notFound()
     }
 
     private fun <T : Any> noStore(body: T): ResponseEntity<T> =
