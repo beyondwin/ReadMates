@@ -315,58 +315,68 @@ class MySqlFlywayMigrationTest(
                 "Avatar Fixture Club $clubNumber",
             )
 
-            val memberNumbersInInsertOrder = listOf(3, 2, 1) + (4..23)
-            memberNumbersInInsertOrder.forEach { memberNumber ->
-                val userId = avatarFixtureUserId(clubNumber, memberNumber)
-                val createdMinute = if (memberNumber <= 2) 0 else memberNumber - 2
-                val createdAt =
-                    if (memberNumber >= 22) {
-                        "2026-06-01 08:00:00.000000"
-                    } else {
-                        "2026-07-01 09:${createdMinute.toString().padStart(2, '0')}:00.000000"
-                    }
-                val status =
-                    when {
-                        memberNumber == 22 -> "LEFT"
-                        memberNumber == 23 -> "INACTIVE"
-                        memberNumber % 3 == 1 -> "ACTIVE"
-                        memberNumber % 3 == 2 -> "SUSPENDED"
-                        else -> "VIEWER"
-                    }
-
-                jdbcTemplate.update(
-                    """
-                    insert into users (
-                      id, google_subject_id, email, name, short_name, auth_provider, created_at, updated_at
-                    ) values (?, ?, ?, ?, ?, 'GOOGLE', ?, ?)
-                    """.trimIndent(),
-                    userId,
-                    "avatar-fixture-$clubNumber-$memberNumber",
-                    "avatar-$clubNumber-$memberNumber@example.test",
-                    "Avatar Member $clubNumber-$memberNumber",
-                    "Avatar $clubNumber-$memberNumber",
-                    createdAt,
-                    createdAt,
-                )
-                jdbcTemplate.update(
-                    """
-                    insert into memberships (
-                      id, club_id, user_id, role, status, short_name, joined_at, created_at, updated_at
-                    ) values (?, ?, ?, 'MEMBER', ?, ?, null, ?, ?)
-                    """.trimIndent(),
-                    avatarFixtureMembershipId(clubNumber, memberNumber),
-                    clubId,
-                    userId,
-                    status,
-                    "Avatar $clubNumber-$memberNumber",
-                    createdAt,
-                    createdAt,
-                )
-            }
+            insertAvatarBackfillMembershipFixtures(jdbcTemplate, clubNumber, clubId)
         }
     }
 
-    private fun avatarFixtureClubId(clubNumber: Int): String = "20000000-0000-0000-0000-${clubNumber.toString().padStart(12, '0')}"
+    private fun insertAvatarBackfillMembershipFixtures(
+        jdbcTemplate: JdbcTemplate,
+        clubNumber: Int,
+        clubId: String,
+    ) {
+        val memberNumbersInInsertOrder = listOf(3, 2, 1) + (4..23)
+        memberNumbersInInsertOrder.forEach { memberNumber ->
+            val userId = avatarFixtureUserId(clubNumber, memberNumber)
+            val createdMinute = if (memberNumber <= 2) 0 else memberNumber - 2
+            val createdAt =
+                if (memberNumber >= 22) {
+                    "2026-06-01 08:00:00.000000"
+                } else {
+                    "2026-07-01 09:${createdMinute.toString().padStart(2, '0')}:00.000000"
+                }
+            val status =
+                when {
+                    memberNumber == 22 -> "LEFT"
+                    memberNumber == 23 -> "INACTIVE"
+                    memberNumber % 3 == 1 -> "ACTIVE"
+                    memberNumber % 3 == 2 -> "SUSPENDED"
+                    else -> "VIEWER"
+                }
+
+            jdbcTemplate.update(
+                """
+                insert into users (
+                  id, google_subject_id, email, name, short_name, auth_provider, created_at, updated_at
+                ) values (?, ?, ?, ?, ?, 'GOOGLE', ?, ?)
+                """.trimIndent(),
+                userId,
+                "avatar-fixture-$clubNumber-$memberNumber",
+                "avatar-$clubNumber-$memberNumber@example.test",
+                "Avatar Member $clubNumber-$memberNumber",
+                "Avatar $clubNumber-$memberNumber",
+                createdAt,
+                createdAt,
+            )
+            jdbcTemplate.update(
+                """
+                insert into memberships (
+                  id, club_id, user_id, role, status, short_name, joined_at, created_at, updated_at
+                ) values (?, ?, ?, 'MEMBER', ?, ?, null, ?, ?)
+                """.trimIndent(),
+                avatarFixtureMembershipId(clubNumber, memberNumber),
+                clubId,
+                userId,
+                status,
+                "Avatar $clubNumber-$memberNumber",
+                createdAt,
+                createdAt,
+            )
+        }
+    }
+
+    private fun avatarFixtureClubId(clubNumber: Int): String =
+        "20000000-0000-0000-0000-" +
+            clubNumber.toString().padStart(12, '0')
 
     private fun avatarFixtureUserId(
         clubNumber: Int,
@@ -378,7 +388,8 @@ class MySqlFlywayMigrationTest(
         memberNumber: Int,
     ): String {
         val prefix = if (memberNumber >= 22) "30000000" else "31000000"
-        return "$prefix-0000-0000-${clubNumber.toString().padStart(4, '0')}-${memberNumber.toString().padStart(12, '0')}"
+        return "$prefix-0000-0000-${clubNumber.toString().padStart(4, '0')}-" +
+            memberNumber.toString().padStart(12, '0')
     }
 
     @Test
