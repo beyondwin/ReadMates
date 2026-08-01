@@ -181,43 +181,48 @@ export function MobileHostDashboard({
           <h2 id="host-mobile-current-title">현재 세션</h2>
           <span className={badgeClass(phase.tone === "warn" ? 1 : 0, phase.tone)}>{phase.status}</span>
         </div>
-        <article className="m-card rm-host-dashboard-mobile__session-card">
-          {session ? (
-            <>
-              <SessionTimingIdentity
-                sessionNumber={session.sessionNumber}
-                date={session.date}
-                phaseLabel="이번 세션"
-              />
-              <h3 className="h4 editorial">{session.bookTitle}</h3>
-              <p className="tiny">
-                {formatDateOnlyLabel(session.date)} · {session.startTime} · {session.locationLabel}
-              </p>
-              <dl className="rm-host-dashboard-mobile__session-metrics">
-                {getHostDashboardSessionMetrics(session).map(([label, value]) => (
-                  <div key={label}>
-                    <dt className="eyebrow">{label}</dt>
-                    <dd className="ledger-number">{value}</dd>
-                  </div>
-                ))}
-              </dl>
-              <p className="tiny">
-                참석 <span className="ledger-number">{goingCount}</span>명 · 미응답{" "}
-                <span className="ledger-number">{noResponseCount}</span>명
-              </p>
-            </>
-          ) : (
-            <>
-              <h3 className="h4 editorial">열린 세션 없음</h3>
-              <p className="tiny">새 세션을 등록하면 RSVP와 질문 작성이 열립니다.</p>
-            </>
-          )}
+        <article
+          className="m-card rm-host-dashboard-mobile__session-card"
+          aria-label="현재 세션 요약"
+        >
+          <div className="rm-host-dashboard-mobile__session-head">
+            {session ? (
+              <>
+                <SessionTimingIdentity
+                  sessionNumber={session.sessionNumber}
+                  date={session.date}
+                />
+                <h3 className="h4 editorial">{session.bookTitle}</h3>
+                <p className="tiny">
+                  {formatDateOnlyLabel(session.date)} · {session.startTime} · {session.locationLabel}
+                </p>
+                <dl className="rm-host-dashboard-mobile__session-metrics">
+                  {getHostDashboardSessionMetrics(session).map(([label, value]) => (
+                    <div key={label}>
+                      <dt className="eyebrow">{label}</dt>
+                      <dd className="ledger-number">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+                {noResponseCount > 0 ? (
+                  <p className="tiny rm-host-dashboard-mobile__session-note">
+                    미응답 <span className="ledger-number">{noResponseCount}</span>명
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <h3 className="h4 editorial">열린 세션 없음</h3>
+                <p className="tiny">새 세션을 등록하면 RSVP와 질문 작성이 열립니다.</p>
+              </>
+            )}
+          </div>
           <LinkComponent
             to={sessionEditHref}
             state={sessionEditState}
             className="btn btn-primary rm-host-dashboard-mobile__session-cta"
           >
-            <span>{session ? "세션 문서 편집" : "세션 문서 만들기"}</span>
+            <span>{session ? "세션 문서 열기" : "세션 문서 만들기"}</span>
             <Icon name="arrow-right" size={14} />
           </LinkComponent>
         </article>

@@ -7,6 +7,61 @@ import HostDashboard from "./host-dashboard";
 
 type HostDashboardProps = Parameters<typeof HostDashboard>[0];
 
+const currentSession = {
+  currentSession: {
+    sessionId: "session-9",
+    sessionNumber: 9,
+    title: "9회차 모임 · 돈의 심리학",
+    bookTitle: "돈의 심리학 (당신은 왜 부자가 되지 못했는가)",
+    bookAuthor: "모건 하우절",
+    bookLink: null,
+    bookImageUrl: null,
+    date: "2026-07-15",
+    startTime: "20:00",
+    endTime: "22:00",
+    locationLabel: "온라인",
+    meetingUrl: null,
+    meetingPasscode: null,
+    questionDeadlineAt: "2026-07-14T14:59:00Z",
+    myRsvpStatus: "GOING" as const,
+    myCheckin: { readingProgress: 100 },
+    myQuestions: [],
+    myOneLineReview: null,
+    myLongReview: null,
+    board: {
+      questions: [{
+        priority: 1,
+        text: "돈을 대하는 태도는 어떻게 만들어지는가?",
+        draftThought: null,
+        authorName: "호스트",
+        authorShortName: "호스트",
+        avatarKey: "open-book-pencil",
+      }],
+      longReviews: [],
+    },
+    attendees: [
+      {
+        membershipId: "membership-host",
+        avatarKey: "open-book-pencil",
+        displayName: "호스트",
+        accountName: "호스트",
+        role: "HOST" as const,
+        rsvpStatus: "GOING" as const,
+        attendanceStatus: "UNKNOWN" as const,
+      },
+      {
+        membershipId: "membership-member",
+        avatarKey: "reading-lamp",
+        displayName: "멤버",
+        accountName: "멤버",
+        role: "MEMBER" as const,
+        rsvpStatus: "NO_RESPONSE" as const,
+        attendanceStatus: "UNKNOWN" as const,
+      },
+    ],
+  },
+} satisfies NonNullable<HostDashboardProps["current"]>;
+
 const dashboard = {
   rsvpPending: 0,
   checkinMissing: 0,
@@ -180,6 +235,47 @@ describe("HostDashboard", () => {
     expect(mobileText.indexOf("지금 처리할 일")).toBeGreaterThanOrEqual(0);
     expect(mobileText.indexOf("현재 세션")).toBeGreaterThanOrEqual(0);
     expect(mobileText.indexOf("지금 처리할 일")).toBeLessThan(mobileText.indexOf("현재 세션"));
+  });
+
+  it("groups mobile current-session content and removes duplicate attendance copy", () => {
+    const { container } = render(
+      <HostDashboard
+        data={{ ...dashboard, rsvpPending: 1 }}
+        current={currentSession}
+        hostSessions={hostSessions}
+        actions={actions}
+      />,
+    );
+
+    const mobile = container.querySelector(".rm-host-dashboard-mobile") as HTMLElement;
+    const card = within(mobile).getByRole("article", { name: "현재 세션 요약" });
+    const head = card.querySelector(".rm-host-dashboard-mobile__session-head") as HTMLElement;
+    const note = head.querySelector(".rm-host-dashboard-mobile__session-note") as HTMLElement;
+
+    expect(head).toBeInTheDocument();
+    expect(within(head).getByRole("group", { name: /No\.09/ })).not.toHaveTextContent("이번 세션");
+    expect(note).toHaveTextContent("미응답 1명");
+    expect(head).not.toHaveTextContent("참석 1명");
+    expect(within(card).getByRole("link", { name: "세션 문서 열기" })).toHaveAttribute(
+      "href",
+      "/app/host/sessions/session-9/edit",
+    );
+  });
+
+  it("keeps the mobile current-session empty state actionable", () => {
+    const { container } = render(
+      <HostDashboard
+        data={dashboard}
+        current={{ currentSession: null }}
+        hostSessions={hostSessions}
+        actions={actions}
+      />,
+    );
+
+    const mobile = container.querySelector(".rm-host-dashboard-mobile") as HTMLElement;
+    const card = within(mobile).getByRole("article", { name: "현재 세션 요약" });
+    expect(within(card).getByText("열린 세션 없음")).toBeInTheDocument();
+    expect(within(card).getByRole("link", { name: "세션 문서 만들기" })).toBeInTheDocument();
   });
 
   it("renders headings without unnamed interactive elements", () => {

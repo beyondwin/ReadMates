@@ -1397,6 +1397,7 @@ describe("HostDashboard", () => {
 
     const { container } = render(<HostDashboardForTest auth={hostAuth} current={current} data={dashboard} />);
     const mobile = getMobileView(container);
+    const mobileSessionCard = mobile.getByRole("article", { name: "현재 세션 요약" });
 
     expect(mobile.getByText("5월 17일 (일)")).toBeInTheDocument();
     expect(mobile.getByText("모임 운영")).toBeInTheDocument();
@@ -1417,10 +1418,13 @@ describe("HostDashboard", () => {
       cursor = next;
     }
 
-    expect(mobile.getByRole("group", { name: "No.07 · D-3 · 이번 세션" })).toBeInTheDocument();
+    expect(mobile.getByRole("group", { name: "No.07 · D-3" })).toBeInTheDocument();
     expect(mobile.queryByRole("group", { name: /No.07 · 이번 세션 · 준비 중 · D-3/ })).not.toBeInTheDocument();
     expect(mobile.getByText("2026.05.20 · 20:00 · 온라인")).toBeInTheDocument();
-    expect(mobile.getByRole("link", { name: "세션 문서 편집" })).toHaveAttribute("href", "/app/host/sessions/session-7/edit");
+    expect(within(mobileSessionCard).getByRole("link", { name: "세션 문서 열기" })).toHaveAttribute(
+      "href",
+      "/app/host/sessions/session-7/edit",
+    );
     expect(current.currentSession?.myCheckin).not.toHaveProperty("note");
     expect(current.currentSession?.board).not.toHaveProperty("checkins");
     expect(mobile.getByText("질문").parentElement).toHaveTextContent("2/10");
@@ -1428,15 +1432,11 @@ describe("HostDashboard", () => {
     for (const value of container.querySelectorAll(".rm-host-dashboard-mobile__session-metrics dd")) {
       expect(value).toHaveClass("ledger-number");
     }
-    const mobileSessionCard = mobile.getByRole("heading", { name: "테스트 책" }).closest("article");
-    expect(mobileSessionCard).not.toBeNull();
-    const attendanceSummary = Array.from((mobileSessionCard as HTMLElement).querySelectorAll("p")).find(
-      (paragraph) => paragraph.textContent === "참석 1명 · 미응답 1명",
+    const noResponseSummary = Array.from(mobileSessionCard.querySelectorAll("p")).find(
+      (paragraph) => paragraph.textContent === "미응답 1명",
     );
-    expect(attendanceSummary).toBeDefined();
-    expect(
-      Array.from(attendanceSummary!.querySelectorAll(".ledger-number")).map((number) => number.textContent),
-    ).toEqual(["1", "1"]);
+    expect(noResponseSummary).toBeDefined();
+    expect(noResponseSummary).not.toHaveTextContent("참석 1명");
     expect(mobile.queryByText("김호스트")).not.toBeInTheDocument();
     expect(mobile.queryByText("안멤버1")).not.toBeInTheDocument();
     expect(mobile.queryByRole("link", { name: "공개 요약 편집" })).not.toBeInTheDocument();
@@ -1529,7 +1529,11 @@ describe("HostDashboard", () => {
     const expectedHref = "/app/host/sessions/session%2F7%3Fdraft%3Dtrue/edit";
 
     expect(desktop.getByRole("link", { name: "세션 문서 편집" })).toHaveAttribute("href", expectedHref);
-    expect(mobile.getByRole("link", { name: "세션 문서 편집" })).toHaveAttribute("href", expectedHref);
+    expect(
+      within(mobile.getByRole("article", { name: "현재 세션 요약" })).getByRole("link", {
+        name: "세션 문서 열기",
+      }),
+    ).toHaveAttribute("href", expectedHref);
     expect(desktop.getByRole("link", { name: "참석 확정 마감" })).toHaveAttribute("href", expectedHref);
     expect(mobile.getByRole("link", { name: "참석 확정 마감" })).toHaveAttribute("href", expectedHref);
     expect(desktop.queryByRole("link", { name: "공개 요약 편집" })).not.toBeInTheDocument();
