@@ -22,6 +22,7 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.mock.web.MockHttpSession
+import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.authentication.TestingAuthenticationToken
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.context.SecurityContextHolder
@@ -30,6 +31,7 @@ import org.springframework.security.oauth2.core.oidc.StandardClaimNames
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository
 import org.springframework.test.context.jdbc.Sql
+import org.springframework.web.util.UriComponentsBuilder
 import java.time.Instant
 
 @SpringBootTest(
@@ -256,6 +258,10 @@ class GoogleOAuthLoginSessionTest(
             status = "LEFT",
         )
         val servletSession = securitySession()
+        servletSession.setAttribute(
+            OAuthReturnState.SESSION_ATTRIBUTE,
+            oauthReturnState.signReturnTarget("/clubs/reading-sai/app/sessions/current"),
+        )
         val request = MockHttpServletRequest("GET", "/login/oauth2/code/google")
         request.setSession(servletSession)
         val response = MockHttpServletResponse()
@@ -272,12 +278,64 @@ class GoogleOAuthLoginSessionTest(
 
         successHandler.onAuthenticationSuccess(request, response, authentication)
 
-        assertEquals("https://readmates.pages.dev/login?error=membership-left", response.redirectedUrl)
+        val redirect = UriComponentsBuilder.fromUriString(response.redirectedUrl!!).build()
+        assertEquals("membership-left", redirect.queryParams.getFirst("error"))
+        assertEquals("/clubs/reading-sai/app/sessions/current", redirect.queryParams.getFirst("returnTo"))
         val setCookie = response.getHeader(HttpHeaders.SET_COOKIE)
         assertNotNull(setCookie)
         assertTrue(setCookie!!.startsWith("${AuthSessionService.COOKIE_NAME}=;"))
         assertTrue(servletSession.isInvalid)
         assertNull(SecurityContextHolder.getContext().authentication)
+    }
+
+    @Test
+    fun `google authentication failure preserves safe return context without exposing exception`() {
+        val servletSession = securitySession()
+        servletSession.setAttribute(
+            OAuthReturnState.SESSION_ATTRIBUTE,
+            oauthReturnState.signReturnTarget("/clubs/reading-sai/app"),
+        )
+        val request = MockHttpServletRequest("GET", "/login/oauth2/code/google")
+        request.setSession(servletSession)
+        val response = MockHttpServletResponse()
+
+        successHandler.onAuthenticationFailure(
+            request,
+            response,
+            BadCredentialsException("provider detail must remain private"),
+        )
+
+        val redirect = UriComponentsBuilder.fromUriString(response.redirectedUrl!!).build()
+        assertEquals("google", redirect.queryParams.getFirst("error"))
+        assertEquals("/clubs/reading-sai/app", redirect.queryParams.getFirst("returnTo"))
+        assertTrue(response.redirectedUrl!!.contains("provider detail").not())
+        assertTrue(servletSession.isInvalid)
+    }
+
+    @Test
+    fun `google authentication failure omits invalid and invite return context`() {
+        listOf(
+            requireNotNull(oauthReturnState.signReturnTarget("/clubs/reading-sai/invite/example")),
+            "not-a-valid-state",
+        ).forEach { signedReturnState ->
+            val servletSession = securitySession()
+            servletSession.setAttribute(OAuthReturnState.SESSION_ATTRIBUTE, signedReturnState)
+            val request = MockHttpServletRequest("GET", "/login/oauth2/code/google")
+            request.setSession(servletSession)
+            val response = MockHttpServletResponse()
+
+            successHandler.onAuthenticationFailure(
+                request,
+                response,
+                BadCredentialsException("provider detail must remain private"),
+            )
+
+            val redirect = UriComponentsBuilder.fromUriString(response.redirectedUrl!!).build()
+            assertEquals("google", redirect.queryParams.getFirst("error"))
+            assertNull(redirect.queryParams.getFirst("returnTo"))
+            assertTrue(response.redirectedUrl!!.contains("provider detail").not())
+            assertTrue(servletSession.isInvalid)
+        }
     }
 
     @Test

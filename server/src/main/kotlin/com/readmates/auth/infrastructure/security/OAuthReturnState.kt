@@ -64,6 +64,13 @@ class OAuthReturnState(
         return trustedReturnTo ?: fallback
     }
 
+    fun loginRetryReturnTarget(signedState: String?): String? =
+        verifiedReturnTarget(signedState)
+            ?.takeIf { target ->
+                target.startsWith("/") &&
+                    LOGIN_RETRY_EXCLUDED_PATHS.none { pattern -> pattern.containsMatchIn(target) }
+            }
+
     fun inviteReturnTarget(
         clubSlug: String,
         inviteToken: String,
@@ -243,6 +250,16 @@ class OAuthReturnState(
         private const val HMAC_ALGORITHM = "HmacSHA256"
         private const val PAGES_PREVIEW_HOST = "readmates.pages.dev"
         private const val MAX_RETURN_TO_LENGTH = 2048
+        private val LOGIN_RETRY_EXCLUDED_PATHS =
+            listOf(
+                Regex("^/(?:[?#]|$)"),
+                Regex("^/login(?:[/?#]|$)"),
+                Regex("^/oauth2(?:[/?#]|$)"),
+                Regex("^/login/oauth2(?:[/?#]|$)"),
+                Regex("^/reset-password(?:[/?#]|$)"),
+                Regex("^/invite(?:[/?#]|$)"),
+                Regex("^/clubs/[^/]+/invite(?:[/?#]|$)"),
+            )
         private val CLUB_INVITE_PATH = Regex("^/clubs/([^/]+)/invite/([^/]+)$")
         private val LEGACY_INVITE_PATH = Regex("^/invite/([^/]+)$")
     }

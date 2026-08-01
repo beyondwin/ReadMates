@@ -48,6 +48,32 @@ class OAuthReturnStateTest {
     }
 
     @Test
+    fun `login retry target keeps only verified frontend-compatible relative paths`() {
+        val safeTarget = "/clubs/$CLUB_SLUG/app/sessions/current?from=login"
+        val safeState = returnState.signReturnTarget(safeTarget, VALID_EXPIRY)
+        val absoluteState = returnState.signReturnTarget("$APP_ORIGIN/app", VALID_EXPIRY)
+
+        assertEquals(safeTarget, returnState.loginRetryReturnTarget(safeState))
+        assertNull(returnState.loginRetryReturnTarget(absoluteState))
+    }
+
+    @Test
+    fun `login retry target excludes auth root reset and invite paths`() {
+        listOf(
+            "/",
+            "/login",
+            "/oauth2/authorization/google",
+            "/login/oauth2/code/google",
+            "/reset-password/example",
+            "/invite/example",
+            "/clubs/$CLUB_SLUG/invite/example",
+        ).forEach { excludedTarget ->
+            val signedState = returnState.signReturnTarget(excludedTarget, VALID_EXPIRY)
+            assertNull(returnState.loginRetryReturnTarget(signedState), excludedTarget)
+        }
+    }
+
+    @Test
     fun `tampered payload and signature fall back without exposing invite state`() {
         val signedState = requireNotNull(returnState.signReturnTarget("/app", VALID_EXPIRY))
         val parts = signedState.split(".")
