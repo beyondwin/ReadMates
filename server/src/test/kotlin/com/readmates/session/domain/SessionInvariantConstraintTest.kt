@@ -87,11 +87,25 @@ class SessionInvariantConstraintTest(
         createdSessionIds += "00000000-0000-0000-0000-000000099005"
     }
 
+    @Test
+    fun `invalid access scope violates constraint`() {
+        assertThrows(UncategorizedSQLException::class.java) {
+            insertSession(
+                id = "00000000-0000-0000-0000-000000099006",
+                state = "OPEN",
+                visibility = "MEMBER",
+                accessScope = "PUBLIC",
+            )
+        }
+    }
+
     private fun insertSession(
         id: String,
         state: String,
         visibility: String,
+        accessScope: String? = null,
     ) {
+        val accessScopeValue = if (accessScope == null) "default" else "?"
         jdbcTemplate.update(
             """
             insert into sessions (
@@ -99,7 +113,7 @@ class SessionInvariantConstraintTest(
               book_translator, book_link, book_image_url,
               session_date, start_time, end_time, location_label,
               meeting_url, meeting_passcode, question_deadline_at,
-              state, visibility
+              state, visibility, access_scope
             )
             values (
               ?, '00000000-0000-0000-0000-000000000001',
@@ -107,13 +121,14 @@ class SessionInvariantConstraintTest(
               null, null, null,
               '2099-01-01', '20:00:00', '22:00:00', '온라인',
               null, null, '2098-12-31 14:59:00.000000',
-              ?, ?
+              ?, ?, $accessScopeValue
             )
             """.trimIndent(),
             id,
             idSuffix(id),
             state,
             visibility,
+            *listOfNotNull(accessScope).toTypedArray(),
         )
     }
 
