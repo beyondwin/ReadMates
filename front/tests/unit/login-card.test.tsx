@@ -161,6 +161,49 @@ describe("LoginRoute", () => {
     );
   });
 
+  it("prioritizes external-browser recovery in KakaoTalk", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const origin = window.location.origin;
+    vi.stubGlobal("navigator", {
+      userAgent: "Mozilla/5.0 KAKAOTALK/25.7.0",
+      clipboard: { writeText },
+    });
+    window.history.pushState(
+      {},
+      "",
+      "/login?error=membership-left&returnTo=%2Fclubs%2Freading-sai%2Fapp",
+    );
+
+    render(<LoginRoute />);
+
+    expect(screen.getByRole("heading", { name: "외부 브라우저에서 로그인해 주세요" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "로그인 주소 복사" }));
+    expect(writeText).toHaveBeenCalledWith(
+      `${origin}/login?error=membership-left&returnTo=%2Fclubs%2Freading-sai%2Fapp`,
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("로그인 주소를 복사했습니다");
+    expect(screen.getByRole("link", { name: "Google 로그인 시도" })).toHaveAttribute(
+      "href",
+      "/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp&chooseAccount=true",
+    );
+  });
+
+  it("explains clipboard failure without hiding the browser-menu recovery", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal("navigator", {
+      userAgent: "Mozilla/5.0 KAKAOTALK/25.7.0",
+      clipboard: { writeText: vi.fn().mockRejectedValue(new Error("denied")) },
+    });
+
+    render(<LoginRoute />);
+    await user.click(screen.getByRole("button", { name: "로그인 주소 복사" }));
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "주소를 복사하지 못했습니다. 브라우저 메뉴에서 다른 브라우저로 열어 주세요",
+    );
+  });
+
   it("offers account selection after a generic Google failure", () => {
     window.history.pushState({}, "", "/login?error=google");
 

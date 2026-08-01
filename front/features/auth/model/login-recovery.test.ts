@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loginRecoveryFromSearch } from "./login-recovery";
+import { canonicalLoginUrl, isKakaoInAppBrowser, loginRecoveryFromSearch } from "./login-recovery";
 
 describe("login recovery model", () => {
   it("keeps normal login fast", () => {
@@ -31,5 +31,22 @@ describe("login recovery model", () => {
 
   it("does not trust unknown error codes", () => {
     expect(loginRecoveryFromSearch("?error=provider-detail")).toEqual(loginRecoveryFromSearch(""));
+  });
+
+  it("recognizes only the case-insensitive KakaoTalk marker", () => {
+    expect(isKakaoInAppBrowser("Mozilla/5.0 KAKAOTALK/25.7.0")).toBe(true);
+    expect(isKakaoInAppBrowser("Mozilla/5.0 kakaotalk/25.7.0")).toBe(true);
+    expect(isKakaoInAppBrowser("Mozilla/5.0 Chrome/140.0 Mobile Safari/537.36")).toBe(false);
+  });
+
+  it("builds a canonical copy URL from allowlisted recovery state only", () => {
+    const recovery = loginRecoveryFromSearch("?error=membership-left&ignored=secret");
+
+    expect(canonicalLoginUrl("https://app.example.test", "/clubs/reading-sai/app", recovery)).toBe(
+      "https://app.example.test/login?error=membership-left&returnTo=%2Fclubs%2Freading-sai%2Fapp",
+    );
+    expect(canonicalLoginUrl("https://app.example.test", "https://evil.example/app", recovery)).toBe(
+      "https://app.example.test/login?error=membership-left",
+    );
   });
 });

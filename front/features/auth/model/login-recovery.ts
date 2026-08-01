@@ -1,3 +1,5 @@
+import { safeRelativeReturnTo } from "@/shared/auth/login-return";
+
 export type LoginRecoveryCode = "membership-left" | "google" | null;
 
 export type LoginRecoveryView = {
@@ -33,4 +35,24 @@ export function loginRecoveryFromSearch(search: string): LoginRecoveryView {
     };
   }
   return NORMAL_LOGIN;
+}
+
+export function isKakaoInAppBrowser(userAgent: string) {
+  return userAgent.toUpperCase().includes("KAKAOTALK");
+}
+
+export function canonicalLoginUrl(
+  origin: string,
+  rawReturnTo: string | null | undefined,
+  recovery: LoginRecoveryView,
+) {
+  const url = new URL("/login", origin);
+  if (recovery.code) {
+    url.searchParams.set("error", recovery.code);
+  }
+  const returnTo = safeRelativeReturnTo(rawReturnTo);
+  if (returnTo) {
+    url.searchParams.set("returnTo", returnTo);
+  }
+  return url.toString();
 }

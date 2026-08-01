@@ -13,6 +13,9 @@ export function LoginCard({
   googleLoginLabel = "Google로 시작하기",
   initialError = null,
   showDevLogin = false,
+  showExternalBrowserGuidance = false,
+  copyStatus = null,
+  onCopyLoginUrl,
   onDevLogin,
 }: {
   devAccounts?: DevAccount[];
@@ -20,6 +23,9 @@ export function LoginCard({
   googleLoginLabel?: string;
   initialError?: string | null;
   showDevLogin?: boolean;
+  showExternalBrowserGuidance?: boolean;
+  copyStatus?: string | null;
+  onCopyLoginUrl?: () => Promise<void>;
   onDevLogin?: (email: string, defaultRedirectPath?: string) => Promise<void>;
 }) {
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
@@ -50,11 +56,36 @@ export function LoginCard({
           {error}
         </p>
       ) : null}
-      <div className="auth-card__actions auth-card__actions--primary">
-        <a className="btn btn-primary btn-lg" href={googleLoginHref}>
-          {googleLoginLabel}
-        </a>
-      </div>
+      {showExternalBrowserGuidance ? (
+        <aside className="auth-browser-guidance" aria-labelledby="external-browser-guidance-title">
+          <p className="eyebrow">카카오톡 브라우저</p>
+          <h2 className="h3 editorial" id="external-browser-guidance-title">
+            외부 브라우저에서 로그인해 주세요
+          </h2>
+          <p className="small auth-browser-guidance__copy">
+            카카오톡 안의 브라우저에서는 Google 로그인이 제한될 수 있습니다. 카카오톡 메뉴에서 다른 브라우저로 열어 주세요.
+          </p>
+          <div className="auth-browser-guidance__actions">
+            <button className="btn btn-primary btn-lg" type="button" onClick={() => void onCopyLoginUrl?.()}>
+              로그인 주소 복사
+            </button>
+            <a className="btn btn-ghost btn-lg" href={googleLoginHref}>
+              {googleLoginLabel}
+            </a>
+          </div>
+          {copyStatus ? (
+            <p className="small auth-browser-guidance__status" role="status" aria-live="polite">
+              {copyStatus}
+            </p>
+          ) : null}
+        </aside>
+      ) : (
+        <div className="auth-card__actions auth-card__actions--primary">
+          <a className="btn btn-primary btn-lg" href={googleLoginHref}>
+            {googleLoginLabel}
+          </a>
+        </div>
+      )}
       {showDevLogin ? (
         <div className="auth-dev-panel" aria-label="로컬 개발 전용 로그인">
           <div className="row-between auth-dev-panel__head">

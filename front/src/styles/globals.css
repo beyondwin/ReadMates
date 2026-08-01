@@ -4332,6 +4332,31 @@
   color: var(--danger);
 }
 
+.auth-browser-guidance {
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid var(--warning-line);
+  border-radius: 14px;
+  background: var(--paper-200);
+}
+
+.auth-browser-guidance .h3 {
+  margin: 8px 0 0;
+}
+
+.auth-browser-guidance__copy,
+.auth-browser-guidance__status {
+  margin: 10px 0 0;
+  color: var(--text-2);
+}
+
+.auth-browser-guidance__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
 .auth-pending-content {
   min-height: 100vh;
 }
@@ -4801,6 +4826,24 @@
     min-height: 46px;
     height: auto;
     padding: 12px 14px;
+    text-align: center;
+  }
+
+  .auth-browser-guidance {
+    padding: 18px;
+  }
+
+  .auth-browser-guidance__actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .auth-browser-guidance__actions .btn {
+    width: 100%;
+    min-height: 46px;
+    height: auto;
+    padding: 12px 14px;
+    white-space: normal;
     text-align: center;
   }
 

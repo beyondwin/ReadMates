@@ -1,5 +1,10 @@
+import { useState } from "react";
 import { submitDevLogin } from "@/features/auth/api/auth-api";
-import { loginRecoveryFromSearch } from "@/features/auth/model/login-recovery";
+import {
+  canonicalLoginUrl,
+  isKakaoInAppBrowser,
+  loginRecoveryFromSearch,
+} from "@/features/auth/model/login-recovery";
 import { LoginCard, type DevAccount } from "@/features/auth/ui/login-card";
 import { oauthHrefForReturnTo, safeRelativeReturnTo } from "@/shared/auth/login-return";
 import { PageMetadataHead } from "@/shared/ui/page-metadata-head";
@@ -35,6 +40,21 @@ export function LoginRouteContent() {
   const search = globalThis.location.search;
   const recovery = loginRecoveryFromSearch(search);
   const returnTo = loginReturnTo(globalThis.location.search);
+  const isKakaoBrowser = isKakaoInAppBrowser(globalThis.navigator.userAgent);
+  const [copyStatus, setCopyStatus] = useState<string | null>(null);
+  const loginUrl = isKakaoBrowser ? canonicalLoginUrl(globalThis.location.origin, returnTo, recovery) : null;
+  const copyLoginUrl = async () => {
+    if (!loginUrl) {
+      return;
+    }
+
+    try {
+      await globalThis.navigator.clipboard.writeText(loginUrl);
+      setCopyStatus("로그인 주소를 복사했습니다.");
+    } catch {
+      setCopyStatus("주소를 복사하지 못했습니다. 브라우저 메뉴에서 다른 브라우저로 열어 주세요.");
+    }
+  };
   const loginAsDevAccount = async (email: string, defaultRedirectPath?: string) => {
     const response = await submitDevLogin(email);
 
@@ -49,9 +69,12 @@ export function LoginRouteContent() {
     <LoginCard
       devAccounts={devAccounts}
       googleLoginHref={oauthHrefForReturnTo(returnTo, { chooseAccount: recovery.chooseAccount })}
-      googleLoginLabel={recovery.googleActionLabel}
+      googleLoginLabel={isKakaoBrowser ? "Google 로그인 시도" : recovery.googleActionLabel}
       initialError={recovery.errorMessage}
       showDevLogin={isDevLoginEnabled()}
+      showExternalBrowserGuidance={isKakaoBrowser}
+      copyStatus={copyStatus}
+      onCopyLoginUrl={isKakaoBrowser ? copyLoginUrl : undefined}
       onDevLogin={loginAsDevAccount}
     />
   );
