@@ -33,6 +33,19 @@ const draft = (date: string): HostSessionListItem => ({
 });
 
 describe("UpcomingSessionMobileCard", () => {
+  it("uses the card book title as a level-three heading", () => {
+    render(
+      <UpcomingSessionMobileCard
+        session={draft("2026-08-20")}
+        actions={actions(true)}
+        LinkComponent={TestLink}
+        now={new Date(2026, 7, 1, 12)}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { level: 3, name: "다음 책" })).toBeInTheDocument();
+  });
+
   it("prioritizes date repair for an overdue draft", () => {
     const { container } = render(
       <UpcomingSessionMobileCard

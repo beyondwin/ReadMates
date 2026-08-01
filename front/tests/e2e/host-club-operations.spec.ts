@@ -8,7 +8,10 @@ import {
 
 test.describe.configure({ mode: "serial" });
 
-test.beforeEach(() => {
+const HOST_DASHBOARD_FIXED_TIME = new Date("2026-08-01T12:00:00+09:00");
+
+test.beforeEach(async ({ page }) => {
+  await page.clock.setFixedTime(HOST_DASHBOARD_FIXED_TIME);
   cleanupGeneratedSessions();
   createOpenSessionFixture();
   resetSeedGoogleLogins(["host@example.com"]);
@@ -235,6 +238,10 @@ test("host dashboard captures public-safe operating-signal and priority-ledger v
         .locator("main.rm-host-dashboard-mobile")
         .getByRole("region", { name: "예정 세션", exact: true });
       for (const action of [
+        upcomingSection.getByRole("link", {
+          name: "세션 문서 만들기",
+          exact: true,
+        }),
         upcomingSection.getByRole("button", {
           name: "멤버 공개로 변경 · E2E 예정 세션 책",
           exact: true,

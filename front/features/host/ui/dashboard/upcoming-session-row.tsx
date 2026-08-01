@@ -110,9 +110,9 @@ export function UpcomingSessionMobileCard({
   return (
     <div className="m-card-quiet">
       <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} tone="muted" />
-      <div className="body editorial" style={{ marginTop: 6 }}>
+      <h3 className="body editorial" style={{ margin: "6px 0 0" }}>
         {session.bookTitle}
-      </div>
+      </h3>
       <div className="tiny rm-host-upcoming-mobile__date-row">
         <span>{formatDateOnlyLabel(session.date)}</span>
         <span className={`badge rm-host-upcoming-mobile__timing rm-host-upcoming-mobile__timing--${timing.state}`}>

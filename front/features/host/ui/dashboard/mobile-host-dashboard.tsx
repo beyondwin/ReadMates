@@ -271,7 +271,7 @@ export function MobileHostDashboard({
       <section className="m-sec rm-host-mobile-flow" aria-labelledby="host-mobile-flow-title">
         <div className="m-eyebrow-row">
           <h2 id="host-mobile-flow-title">예정 세션</h2>
-          <LinkComponent to={newSessionHref} className="tiny">
+          <LinkComponent to={newSessionHref} className="tiny rm-host-mobile-flow__create-link">
             세션 문서 만들기
           </LinkComponent>
         </div>
