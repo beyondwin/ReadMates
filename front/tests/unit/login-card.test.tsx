@@ -145,13 +145,43 @@ describe("LoginRoute", () => {
     expect(assignMock).toHaveBeenCalledWith("/admin");
   });
 
-  it("shows a specific message when a left member returns from Google login", () => {
-    window.history.pushState({}, "", "/login?error=membership-left");
+  it("offers another Google account after a left-membership login", () => {
+    window.history.pushState(
+      {},
+      "",
+      "/login?error=membership-left&returnTo=%2Fclubs%2Freading-sai%2Fapp",
+    );
 
     render(<LoginRoute />);
 
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "이전 멤버십이 종료된 계정입니다. 다시 참여하려면 호스트의 새 초대가 필요합니다.",
+    expect(screen.getByRole("alert")).toHaveTextContent("이전 멤버십이 종료된 계정입니다.");
+    expect(screen.getByRole("link", { name: "다른 Google 계정으로 로그인" })).toHaveAttribute(
+      "href",
+      "/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp&chooseAccount=true",
+    );
+  });
+
+  it("offers account selection after a generic Google failure", () => {
+    window.history.pushState({}, "", "/login?error=google");
+
+    render(<LoginRoute />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Google 인증을 완료하지 못했습니다.");
+    expect(screen.getByRole("link", { name: "Google 로그인 다시 시도" })).toHaveAttribute(
+      "href",
+      "/oauth2/authorization/google?chooseAccount=true",
+    );
+  });
+
+  it("ignores unknown OAuth errors without changing the normal action", () => {
+    window.history.pushState({}, "", "/login?error=provider-detail");
+
+    render(<LoginRoute />);
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Google로 시작하기" })).toHaveAttribute(
+      "href",
+      "/oauth2/authorization/google",
     );
   });
 

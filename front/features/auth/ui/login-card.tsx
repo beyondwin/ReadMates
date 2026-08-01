@@ -10,12 +10,14 @@ export type DevAccount = {
 export function LoginCard({
   devAccounts = [],
   googleLoginHref = "/oauth2/authorization/google",
+  googleLoginLabel = "Google로 시작하기",
   initialError = null,
   showDevLogin = false,
   onDevLogin,
 }: {
   devAccounts?: DevAccount[];
   googleLoginHref?: string;
+  googleLoginLabel?: string;
   initialError?: string | null;
   showDevLogin?: boolean;
   onDevLogin?: (email: string, defaultRedirectPath?: string) => Promise<void>;
@@ -43,16 +45,16 @@ export function LoginCard({
         Google 계정으로 읽는사이에 입장합니다. 초대 링크가 없다면 둘러보기 멤버로 시작해 기록을 읽을 수 있고, 호스트
         승인 뒤 참여 권한이 열립니다.
       </p>
-      <div className="auth-card__actions auth-card__actions--primary">
-        <a className="btn btn-primary btn-lg" href={googleLoginHref}>
-          Google로 시작하기
-        </a>
-      </div>
       {error ? (
         <p className="small auth-card__error" role="alert">
           {error}
         </p>
       ) : null}
+      <div className="auth-card__actions auth-card__actions--primary">
+        <a className="btn btn-primary btn-lg" href={googleLoginHref}>
+          {googleLoginLabel}
+        </a>
+      </div>
       {showDevLogin ? (
         <div className="auth-dev-panel" aria-label="로컬 개발 전용 로그인">
           <div className="row-between auth-dev-panel__head">
