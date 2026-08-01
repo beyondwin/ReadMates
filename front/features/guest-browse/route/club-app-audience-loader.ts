@@ -5,6 +5,7 @@ import { deriveClubAppAudience, type ClubAppAudience } from "@/features/guest-br
 import { readmatesPublicFetch } from "@/shared/api/client";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { authMePath, clubSlugFromLoaderArgs, type ClubScopedLoaderArgs } from "@/shared/auth/member-app-loader";
+import { isReadmatesApiError } from "@/shared/api/errors";
 
 export type ClubAppAccess = {
   audience: ClubAppAudience;
@@ -16,6 +17,9 @@ export type GuestScopedRouteData = {
   guestRoute: true;
   guestData?: unknown;
 };
+
+export type GuestPublicRouteFailure = { status?: number };
+export type GuestScopedRouteFailureData = GuestScopedRouteData & { guestFailure: GuestPublicRouteFailure };
 
 const pendingAudienceAccesses = new WeakMap<Request, Promise<ClubAppAccess>>();
 
@@ -73,7 +77,12 @@ export function scopedGuestRouteLoader(
     const access = await loadClubAppAudience(args);
 
     if (access.audience === "GUEST") {
-      const guestData = loadGuestLoader ? await loadGuestLoader(args) : undefined;
+      let guestData: unknown;
+      try {
+        guestData = loadGuestLoader ? await loadGuestLoader(args) : undefined;
+      } catch (error) {
+        return { guestRoute: true, guestFailure: guestFailure(error) } satisfies GuestScopedRouteFailureData;
+      }
       return guestData === undefined
         ? ({ guestRoute: true } satisfies GuestScopedRouteData)
         : ({ guestRoute: true, guestData } satisfies GuestScopedRouteData);
@@ -82,6 +91,12 @@ export function scopedGuestRouteLoader(
     const protectedLoader = await loadProtectedLoader();
     return protectedLoader(args);
   };
+}
+
+function guestFailure(error: unknown): GuestPublicRouteFailure {
+  if (isReadmatesApiError(error)) return { status: error.status };
+  if (error instanceof Response) return { status: error.status };
+  return {};
 }
 
 export function isGuestScopedRouteData(data: unknown): data is GuestScopedRouteData {

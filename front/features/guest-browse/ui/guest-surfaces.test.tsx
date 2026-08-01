@@ -1,7 +1,8 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
-import { describe, expect, it } from "vitest";
-import { GuestCurrentSession, GuestHome } from "./guest-surfaces";
+import { describe, expect, it, vi } from "vitest";
+import { GuestArchive, GuestCurrentSession, GuestHome, GuestNotes } from "./guest-surfaces";
 
 const guestSessionFixture = {
   sessionId: "session-open",
@@ -107,4 +108,50 @@ describe("guest browse surfaces", () => {
     expect(screen.getByRole("link", { name: "멤버로 시작" })).toHaveAttribute("href", "/login?returnTo=%2Fclubs%2Falpha%2Fapp%3Ftab%3Dnotes%23recent");
     expect(screen.getByRole("link", { name: "노트 더 보기" })).toHaveAttribute("data-router-link", "true");
   });
+
+  it("keeps successful home widgets visible and gives bounded 429 guidance only to the failed widget", () => {
+    render(<GuestHome data={{ current: { currentSession: guestSessionFixture }, upcoming: { items: [], nextCursor: null }, recentNotes: { items: [], nextCursor: null }, capabilities: { canWrite: false }, widgetErrors: { upcoming: { status: 429, retryAfterSeconds: 45 } } }} />);
+
+    expect(screen.getAllByText("파도")).not.toHaveLength(0);
+    expect(screen.getByText("45초 뒤에 다시 시도해 주세요.")).toBeVisible();
+    expect(document.querySelector("section[aria-labelledby='guest-home-current']")).toBeTruthy();
+  });
+
+  it("disables a guest notes page request during rapid clicks and offers a visible retry after rejection", async () => {
+    const user = userEvent.setup();
+    let rejectFirst!: (error: Error) => void;
+    const onLoadMoreFeed = vi.fn(() => new Promise<void>((_, reject) => { rejectFirst = reject; }));
+    render(<GuestNotes data={notesFixture()} onLoadMoreFeed={onLoadMoreFeed} />);
+
+    const more = screen.getByRole("button", { name: "더 보기" });
+    await user.dblClick(more);
+    expect(onLoadMoreFeed).toHaveBeenCalledTimes(1);
+    rejectFirst(new Error("network"));
+    expect(await screen.findByRole("button", { name: "다시 시도" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(onLoadMoreFeed).toHaveBeenCalledTimes(2);
+  });
+
+  it("disables archive pagination during rapid clicks", async () => {
+    const user = userEvent.setup();
+    const onLoadMore = vi.fn(() => new Promise<void>(() => {}));
+    render(<GuestArchive data={{ items: [{ sessionId: "s1", sessionNumber: 1, title: "기록", bookTitle: "책", bookAuthor: "작가", bookImageUrl: null, date: "2026-08-02", attendance: 1, total: 2, state: "CLOSED" }], nextCursor: "next" }} onLoadMore={onLoadMore} />);
+    await user.dblClick(screen.getByRole("button", { name: "더 보기" }));
+    expect(onLoadMore).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses non-personal note copy for guest records", () => {
+    render(<GuestNotes data={{ ...notesFixture(), feed: { items: [{ ...notesFixture().feed.items[0], kind: "QUESTION", text: "공개 질문" }], nextCursor: null } }} />);
+    expect(screen.getByText("공개된 하이라이트·한줄평·질문을 세션별로 읽어 볼 수 있습니다.")).toBeVisible();
+    expect(screen.queryByText("내 질문")).not.toBeInTheDocument();
+    expect(screen.queryByText(/세션을 먼저 고르고/)).not.toBeInTheDocument();
+  });
 });
+
+function notesFixture() {
+  return {
+    sessions: { items: [{ sessionId: "s1", sessionNumber: 1, bookTitle: "책", date: "2026-08-02", questionCount: 0, oneLinerCount: 0, longReviewCount: 0, highlightCount: 1, totalCount: 1 }], nextCursor: "sessions-next" },
+    feed: { items: [{ sessionId: "s1", sessionNumber: 1, bookTitle: "책", date: "2026-08-02", authorName: "이름", authorShortName: "이", avatarKey: "book", kind: "HIGHLIGHT" as const, text: "문장" }], nextCursor: "feed-next" },
+    capabilities: { canWrite: false as const },
+  };
+}

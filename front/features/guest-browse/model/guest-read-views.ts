@@ -2,9 +2,9 @@ export type GuestCapabilities = { canWrite: false };
 export type GuestNoteKind = "QUESTION" | "ONE_LINE_REVIEW" | "LONG_REVIEW" | "HIGHLIGHT";
 export type GuestNoteFilter = "all" | "highlights" | "oneliners" | "questions";
 
-export function guestNoteKind(value: string): GuestNoteKind {
+export function guestNoteKind(value: string): GuestNoteKind | null {
   if (value === "QUESTION" || value === "ONE_LINE_REVIEW" || value === "LONG_REVIEW" || value === "HIGHLIGHT") return value;
-  return "HIGHLIGHT";
+  return null;
 }
 
 export function guestNoteKindLabel(kind: GuestNoteKind) {
@@ -136,11 +136,13 @@ export type GuestHomeReadView = {
   upcoming: GuestPage<GuestUpcomingSessionReadView>;
   recentNotes: GuestPage<GuestNoteFeedItemReadView>;
   widgetErrors?: Partial<Record<"current" | "upcoming" | "recentNotes", { status?: number; retryAfterSeconds?: number }>>;
+  capabilities: GuestCapabilities;
 };
 
 export type GuestNotesReadView = {
   sessions: GuestPage<GuestNoteSessionReadView>;
   feed: GuestPage<GuestNoteFeedItemReadView>;
+  capabilities: GuestCapabilities;
 };
 type GuestNoteFeedInput = Omit<GuestNoteFeedItemReadView, "kind"> & { kind: string };
 
@@ -178,10 +180,15 @@ export function guestHomeReadView(
 ): GuestHomeReadView {
   return {
     current: guestSessionReadView(current),
-    upcoming: { items: upcoming.items.map((session) => ({ sessionId: session.sessionId, sessionNumber: session.sessionNumber, title: session.title, bookTitle: session.bookTitle, bookAuthor: session.bookAuthor, bookImageUrl: session.bookImageUrl, date: session.date, startTime: session.startTime, endTime: session.endTime, questionDeadlineAt: session.questionDeadlineAt, state: session.state })), nextCursor: upcoming.nextCursor },
-    recentNotes: { items: recentNotes.items.map((item) => ({ sessionId: item.sessionId, sessionNumber: item.sessionNumber, bookTitle: item.bookTitle, date: item.date, authorName: item.authorName, authorShortName: item.authorShortName, avatarKey: item.avatarKey, kind: guestNoteKind(item.kind), text: item.text })), nextCursor: recentNotes.nextCursor },
+    upcoming: guestUpcomingPageReadView(upcoming),
+    recentNotes: guestNoteFeedPageReadView(recentNotes),
+    capabilities: { canWrite: false },
     ...(widgetErrors && Object.keys(widgetErrors).length ? { widgetErrors } : {}),
   };
+}
+
+export function guestUpcomingPageReadView(upcoming: GuestPage<GuestUpcomingSessionReadView>): GuestPage<GuestUpcomingSessionReadView> {
+  return { items: upcoming.items.map((session) => ({ sessionId: session.sessionId, sessionNumber: session.sessionNumber, title: session.title, bookTitle: session.bookTitle, bookAuthor: session.bookAuthor, bookImageUrl: session.bookImageUrl, date: session.date, startTime: session.startTime, endTime: session.endTime, questionDeadlineAt: session.questionDeadlineAt, state: session.state })), nextCursor: upcoming.nextCursor };
 }
 
 export function guestNotesReadView(
@@ -189,13 +196,29 @@ export function guestNotesReadView(
   feed: GuestPage<GuestNoteFeedInput>,
 ): GuestNotesReadView {
   return {
-    sessions: { items: sessions.items.map((session) => ({ sessionId: session.sessionId, sessionNumber: session.sessionNumber, bookTitle: session.bookTitle, date: session.date, questionCount: session.questionCount, oneLinerCount: session.oneLinerCount, longReviewCount: session.longReviewCount, highlightCount: session.highlightCount, totalCount: session.totalCount })), nextCursor: sessions.nextCursor },
-    feed: { items: feed.items.map((item) => ({ sessionId: item.sessionId, sessionNumber: item.sessionNumber, bookTitle: item.bookTitle, date: item.date, authorName: item.authorName, authorShortName: item.authorShortName, avatarKey: item.avatarKey, kind: guestNoteKind(item.kind), text: item.text })), nextCursor: feed.nextCursor },
+    sessions: guestNoteSessionsPageReadView(sessions),
+    feed: guestNoteFeedPageReadView(feed),
+    capabilities: { canWrite: false },
   };
 }
 
+export function guestNoteSessionsPageReadView(sessions: GuestPage<GuestNoteSessionReadView>): GuestPage<GuestNoteSessionReadView> {
+  return { items: sessions.items.map((session) => ({ sessionId: session.sessionId, sessionNumber: session.sessionNumber, bookTitle: session.bookTitle, date: session.date, questionCount: session.questionCount, oneLinerCount: session.oneLinerCount, longReviewCount: session.longReviewCount, highlightCount: session.highlightCount, totalCount: session.totalCount })), nextCursor: sessions.nextCursor };
+}
+
+export function guestNoteFeedPageReadView(feed: GuestPage<GuestNoteFeedInput>): GuestPage<GuestNoteFeedItemReadView> {
+  return { items: feed.items.flatMap((item) => {
+    const kind = guestNoteKind(item.kind);
+    return kind ? [{ sessionId: item.sessionId, sessionNumber: item.sessionNumber, bookTitle: item.bookTitle, date: item.date, authorName: item.authorName, authorShortName: item.authorShortName, avatarKey: item.avatarKey, kind, text: item.text }] : [];
+  }), nextCursor: feed.nextCursor };
+}
+
+export function guestArchivePageReadView(page: GuestPage<GuestArchiveSessionReadView>): GuestPage<GuestArchiveSessionReadView> {
+  return { items: page.items.map((session) => ({ sessionId: session.sessionId, sessionNumber: session.sessionNumber, title: session.title, bookTitle: session.bookTitle, bookAuthor: session.bookAuthor, bookImageUrl: session.bookImageUrl, date: session.date, attendance: session.attendance, total: session.total, state: session.state })), nextCursor: page.nextCursor };
+}
+
 export function guestArchiveReadView(page: GuestPage<GuestArchiveSessionReadView>): GuestPage<GuestArchiveSessionReadView> & { capabilities: GuestCapabilities } {
-  return { items: page.items.map((session) => ({ sessionId: session.sessionId, sessionNumber: session.sessionNumber, title: session.title, bookTitle: session.bookTitle, bookAuthor: session.bookAuthor, bookImageUrl: session.bookImageUrl, date: session.date, attendance: session.attendance, total: session.total, state: session.state })), nextCursor: page.nextCursor, capabilities: { canWrite: false } };
+  return { ...guestArchivePageReadView(page), capabilities: { canWrite: false } };
 }
 
 export function guestArchiveDetailReadView(detail: GuestArchiveDetailReadView): GuestArchiveDetailReadView & { capabilities: GuestCapabilities } {

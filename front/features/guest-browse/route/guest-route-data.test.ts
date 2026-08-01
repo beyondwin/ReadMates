@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadClubAppAudience, scopedGuestRouteLoader } from "./club-app-audience-loader";
 import { guestArchiveLoader, guestCurrentSessionLoader, guestHomeLoader, guestNotesLoader } from "./guest-route-data";
+import { guestWidgetError } from "./guest-route-data";
+import { ReadmatesApiError } from "@/shared/api/errors";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -75,6 +77,11 @@ const currentSession = {
 };
 
 describe("guest route loaders", () => {
+  it("bounds Retry-After guidance from public rate-limit errors", () => {
+    const response = new Response("", { status: 429, headers: { "Retry-After": "99999" } });
+    const error = new ReadmatesApiError({ code: "RATE_LIMITED", message: "slow", status: 429, fallback: false }, response);
+    expect(guestWidgetError(error, Date.now())).toEqual({ status: 429, retryAfterSeconds: 3600 });
+  });
   it("loads scoped auth and shell without a member redirect", async () => {
     const assign = vi.fn();
     const fetchMock = vi
@@ -123,6 +130,19 @@ describe("guest route loaders", () => {
 
     await expect(loader({ params: { clubSlug: "alpha" } } as never)).resolves.toEqual({ guestRoute: true });
     expect(importProtectedLoader).not.toHaveBeenCalled();
+  });
+
+  it("turns a guest child loader failure into public route data without changing the member loader path", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(anonymousAuth))
+      .mockResolvedValueOnce(jsonResponse(shell));
+    vi.stubGlobal("fetch", fetchMock);
+    const protectedLoader = vi.fn(async () => async () => ({ member: true }));
+    const guestLoader = vi.fn(async () => { throw new Response("busy", { status: 429 }); });
+
+    await expect(scopedGuestRouteLoader(protectedLoader, guestLoader)({ params: { clubSlug: "alpha" } } as never)).resolves.toEqual({ guestRoute: true, guestFailure: { status: 429 } });
+    expect(protectedLoader).not.toHaveBeenCalled();
   });
 
   it("deduplicates concurrent audience reads for the same navigation request only", async () => {

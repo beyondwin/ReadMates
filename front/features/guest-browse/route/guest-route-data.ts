@@ -15,6 +15,7 @@ import {
   guestSessionReadView,
 } from "@/features/guest-browse/model/guest-read-views";
 import { clubSlugFromLoaderArgs, type ClubScopedLoaderArgs } from "@/shared/auth/member-app-loader";
+import { isReadmatesApiError } from "@/shared/api/errors";
 
 function requiredClubSlug(args?: ClubScopedLoaderArgs) {
   const clubSlug = clubSlugFromLoaderArgs(args);
@@ -40,9 +41,9 @@ export async function guestHomeLoader(args?: Pick<LoaderFunctionArgs, "params">)
     fetchGuestNoteFeed(clubSlug, { limit: 5 }),
   ]);
   const widgetErrors = {
-    ...(current.status === "rejected" ? { current: widgetError(current.reason) } : {}),
-    ...(upcoming.status === "rejected" ? { upcoming: widgetError(upcoming.reason) } : {}),
-    ...(recentNotes.status === "rejected" ? { recentNotes: widgetError(recentNotes.reason) } : {}),
+    ...(current.status === "rejected" ? { current: guestWidgetError(current.reason) } : {}),
+    ...(upcoming.status === "rejected" ? { upcoming: guestWidgetError(upcoming.reason) } : {}),
+    ...(recentNotes.status === "rejected" ? { recentNotes: guestWidgetError(recentNotes.reason) } : {}),
   };
   return guestHomeReadView(
     current.status === "fulfilled" ? current.value : { currentSession: null },
@@ -52,9 +53,20 @@ export async function guestHomeLoader(args?: Pick<LoaderFunctionArgs, "params">)
   );
 }
 
-function widgetError(reason: unknown) {
+export function guestWidgetError(reason: unknown, now = Date.now()) {
+  if (isReadmatesApiError(reason)) {
+    const retryAfterSeconds = reason.status === 429 ? boundedRetryAfterSeconds(reason.response.headers.get("Retry-After"), now) : undefined;
+    return { status: reason.status, ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}) };
+  }
   if (reason && typeof reason === "object" && "status" in reason && typeof reason.status === "number") return { status: reason.status };
   return {};
+}
+
+function boundedRetryAfterSeconds(value: string | null, now: number) {
+  if (!value) return undefined;
+  const delta = Number(value);
+  const seconds = Number.isFinite(delta) && delta >= 0 ? Math.ceil(delta) : Math.ceil((Date.parse(value) - now) / 1000);
+  return Number.isFinite(seconds) && seconds >= 0 ? Math.min(seconds, 3600) : undefined;
 }
 
 export async function guestCurrentSessionLoader(args?: Pick<LoaderFunctionArgs, "params">) {

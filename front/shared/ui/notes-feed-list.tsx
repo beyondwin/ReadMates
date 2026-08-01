@@ -1,5 +1,5 @@
 import { type CSSProperties } from "react";
-import type { FeedFilter, NoteFeedItem, NoteSessionItem } from "@/features/archive/model/notes-feed-model";
+import type { FeedFilter, NoteFeedItem, NoteSessionItem } from "@/shared/model/notes-feed-model";
 import {
   byKind,
   filterKind,
@@ -7,12 +7,13 @@ import {
   noteFeedFilters,
   noteCountOrZero,
   visibleNoteCount,
-} from "@/features/archive/model/notes-feed-model";
+} from "@/shared/model/notes-feed-model";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 import { NotesFilterChoices } from "@/shared/ui/notes-read-page";
 
 export type { FeedFilter };
+export type NotesFeedCopy = { questionLabel?: string; oneLinerLabel?: string };
 
 export function NotesFilterBar({
   filter,
@@ -58,11 +59,13 @@ export function FeedSections({
   filter,
   selectedSession,
   hasNoteSessions,
+  copy,
 }: {
   items: NoteFeedItem[];
   filter: FeedFilter;
   selectedSession: NoteSessionItem | null;
   hasNoteSessions: boolean;
+  copy?: NotesFeedCopy;
 }) {
   if (!hasNoteSessions || !selectedSession) {
     return <NotesEmptyState message={hasNoteSessions ? "이 세션에는 해당 기록이 없습니다." : "아직 발행된 세션 기록이 없습니다."} />;
@@ -89,8 +92,8 @@ export function FeedSections({
     <>
       <NotesFeedListStyles />
       {((filter === "all" && highlights.length > 0) || filter === "highlights") && <FeedHighlights items={highlights} />}
-      {((filter === "all" && oneLiners.length > 0) || filter === "oneliners") && <FeedOneLiners items={oneLiners} />}
-      {((filter === "all" && questions.length > 0) || filter === "questions") && <FeedQuestions items={questions} />}
+      {((filter === "all" && oneLiners.length > 0) || filter === "oneliners") && <FeedOneLiners items={oneLiners} label={copy?.oneLinerLabel ?? "내 한줄평"} />}
+      {((filter === "all" && questions.length > 0) || filter === "questions") && <FeedQuestions items={questions} label={copy?.questionLabel ?? "내 질문"} />}
     </>
   );
 }
@@ -111,9 +114,9 @@ function NotesEmptyState({ message }: { message: string }) {
   );
 }
 
-function FeedQuestions({ items }: { items: NoteFeedItem[] }) {
+function FeedQuestions({ items, label }: { items: NoteFeedItem[]; label: string }) {
   return (
-    <FeedSection label="내 질문" count={items.length} detail="읽으며 붙든 질문">
+    <FeedSection label={label} count={items.length} detail="읽으며 붙든 질문">
       <div className="stack" style={{ "--stack": "0px" } as CSSProperties}>
         {items.map((item, index) => (
           <article
@@ -134,9 +137,9 @@ function FeedQuestions({ items }: { items: NoteFeedItem[] }) {
   );
 }
 
-function FeedOneLiners({ items }: { items: NoteFeedItem[] }) {
+function FeedOneLiners({ items, label }: { items: NoteFeedItem[]; label: string }) {
   return (
-    <FeedSection label="내 한줄평" count={items.length} detail="짧게 남긴 감상">
+    <FeedSection label={label} count={items.length} detail="짧게 남긴 감상">
       <div className="rm-notes-oneliner-grid">
         {items.map((item) => (
           <article key={itemKey(item)} className="rm-notes-oneliner-card">
