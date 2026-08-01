@@ -2,9 +2,7 @@ import type { CSSProperties, JSX } from "react";
 import type { SessionState } from "@/shared/model/readmates-types";
 import {
   compatibilityVisibilityForExposure,
-  resolvedSessionExposure,
-  type PublicSiteVisibility,
-  type SessionAccessScope,
+  sessionExposureFromCompatibility,
 } from "@/features/host/model/session-exposure-model";
 import { SessionExposureControls } from "../session-exposure-controls";
 import {
@@ -75,8 +73,6 @@ function saveStateMessage(state: DraftSaveState) {
 export type SessionRecordDraftPanelBodyProps = {
   snapshot: SessionRecordDraftSnapshot;
   state?: SessionState;
-  accessScope?: SessionAccessScope;
-  siteVisibility?: PublicSiteVisibility;
   saveState: DraftSaveState;
   validationIssues: string[];
   draftLiveBaseStale: boolean;
@@ -91,8 +87,6 @@ export type SessionRecordDraftPanelBodyProps = {
 export function SessionRecordDraftPanelBody({
   snapshot,
   state,
-  accessScope,
-  siteVisibility,
   saveState,
   validationIssues,
   draftLiveBaseStale,
@@ -111,12 +105,7 @@ export function SessionRecordDraftPanelBody({
     issuesBySection[section].length > 0;
   const errorDescriptionId = (section: ValidationSection) =>
     isSectionInvalid(section) ? validationErrorId(section) : undefined;
-  const exposure = resolvedSessionExposure({
-    state: state ?? "DRAFT",
-    visibility: snapshot.visibility,
-    accessScope,
-    siteVisibility,
-  });
+  const exposure = sessionExposureFromCompatibility(state ?? "DRAFT", snapshot.visibility);
   const updateEntry = (
     key: "highlights" | "oneLineReviews",
     index: number,

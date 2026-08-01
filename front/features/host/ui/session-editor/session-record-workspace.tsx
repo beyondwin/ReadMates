@@ -452,8 +452,6 @@ export function SessionRecordWorkspace({
                   <SessionRecordDraftPanelBody
                     snapshot={draft.snapshot}
                     state={state}
-                    accessScope={accessScope}
-                    siteVisibility={siteVisibility}
             saveState={draft.saveState}
             validationIssues={draft.validationIssues}
             draftLiveBaseStale={draft.liveBaseStale}

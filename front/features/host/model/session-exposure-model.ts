@@ -47,9 +47,15 @@ export function resolvedSessionExposure(input: {
   siteVisibility?: PublicSiteVisibility;
 }): SessionExposure {
   const compatibility = sessionExposureFromCompatibility(input.state, input.visibility);
+  const canonical = input.accessScope !== undefined && input.siteVisibility !== undefined
+    ? { accessScope: input.accessScope, siteVisibility: input.siteVisibility }
+    : compatibility;
   return {
-    accessScope: input.accessScope ?? compatibility.accessScope,
-    siteVisibility: input.siteVisibility ?? compatibility.siteVisibility,
+    accessScope: canonical.accessScope,
+    siteVisibility: canonical.accessScope === "GUEST_READABLE"
+      && (input.state === "CLOSED" || input.state === "PUBLISHED")
+      ? canonical.siteVisibility
+      : "HIDDEN",
   };
 }
 

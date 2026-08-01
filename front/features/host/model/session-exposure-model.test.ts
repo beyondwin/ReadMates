@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildSessionAccessScopeRequest,
   buildSessionPublicationRequest,
+  resolvedSessionExposure,
   sessionExposureCopy,
 } from "./session-exposure-model";
 import { SessionExposureControls } from "../ui/session-exposure-controls";
@@ -49,5 +50,40 @@ describe("session exposure model", () => {
     }));
 
     expect((screen.getByRole("checkbox", { name: "공개 기록에 게시" }) as HTMLInputElement).checked).toBe(true);
+  });
+
+  it.each([
+    {
+      name: "falls back atomically when only canonical access is present",
+      input: { state: "CLOSED" as const, visibility: "PUBLIC" as const, accessScope: "HOST_ONLY" as const },
+      expected: { accessScope: "GUEST_READABLE", siteVisibility: "PUBLIC_RECORD" },
+    },
+    {
+      name: "falls back atomically when only canonical placement is present",
+      input: { state: "CLOSED" as const, visibility: "HOST_ONLY" as const, siteVisibility: "PUBLIC_RECORD" as const },
+      expected: { accessScope: "HOST_ONLY", siteVisibility: "HIDDEN" },
+    },
+    {
+      name: "hides public placement when the canonical pair denies guest access",
+      input: {
+        state: "CLOSED" as const,
+        visibility: "PUBLIC" as const,
+        accessScope: "HOST_ONLY" as const,
+        siteVisibility: "PUBLIC_RECORD" as const,
+      },
+      expected: { accessScope: "HOST_ONLY", siteVisibility: "HIDDEN" },
+    },
+    {
+      name: "hides public placement before the session closes",
+      input: {
+        state: "DRAFT" as const,
+        visibility: "PUBLIC" as const,
+        accessScope: "GUEST_READABLE" as const,
+        siteVisibility: "PUBLIC_RECORD" as const,
+      },
+      expected: { accessScope: "GUEST_READABLE", siteVisibility: "HIDDEN" },
+    },
+  ])("$name", ({ input, expected }) => {
+    expect(resolvedSessionExposure(input)).toEqual(expected);
   });
 });

@@ -101,8 +101,6 @@ describe("SessionRecordDraftPanelBody", () => {
       <SessionRecordDraftPanelBody
         snapshot={draftSnapshot}
         state="CLOSED"
-        accessScope="GUEST_READABLE"
-        siteVisibility="HIDDEN"
         saveState="saved"
         validationIssues={[]}
         draftLiveBaseStale={false}
@@ -118,6 +116,52 @@ describe("SessionRecordDraftPanelBody", () => {
       ...draftSnapshot,
       visibility: "PUBLIC",
     });
+  });
+
+  it("rerenders both exposure controls from the editable draft snapshot", async () => {
+    const user = userEvent.setup();
+    function Harness() {
+      const [snapshot, setSnapshot] = useState<SessionRecordDraftSnapshot>({
+        ...draftSnapshot,
+        visibility: "HOST_ONLY",
+      });
+      return (
+        <SessionRecordDraftPanelBody
+          snapshot={snapshot}
+          state="CLOSED"
+          saveState="saved"
+          validationIssues={[]}
+          draftLiveBaseStale={false}
+          onSnapshotChange={setSnapshot}
+          onReloadDraft={vi.fn()}
+          onCopyInput={vi.fn()}
+        />
+      );
+    }
+
+    render(<Harness />);
+
+    const hostOnly = screen.getByRole("radio", { name: "호스트 전용" }) as HTMLInputElement;
+    const guestReadable = screen.getByRole("radio", { name: "게스트 공개" }) as HTMLInputElement;
+    const publicRecord = screen.getByRole("checkbox", { name: "공개 기록에 게시" }) as HTMLInputElement;
+    expect(hostOnly.checked).toBe(true);
+    expect(publicRecord.checked).toBe(false);
+    expect(publicRecord.disabled).toBe(true);
+
+    await user.click(guestReadable);
+    expect(guestReadable.checked).toBe(true);
+    expect(publicRecord.disabled).toBe(false);
+
+    await user.click(publicRecord);
+    expect(publicRecord.checked).toBe(true);
+
+    await user.click(publicRecord);
+    expect(publicRecord.checked).toBe(false);
+
+    await user.click(hostOnly);
+    expect(hostOnly.checked).toBe(true);
+    expect(publicRecord.checked).toBe(false);
+    expect(publicRecord.disabled).toBe(true);
   });
 
   it("autosaves one section with the expected draft revision", async () => {
