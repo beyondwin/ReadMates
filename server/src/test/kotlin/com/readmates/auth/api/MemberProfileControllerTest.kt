@@ -123,6 +123,32 @@ class MemberProfileControllerTest(
     }
 
     @Test
+    fun `own avatar update uses the membership selected by request club context`() {
+        val email = insertProfileMember("self.avatar.multi", "ACTIVE", shortName = "PrimaryAvatar")
+        val primaryMembershipId = membershipIdForEmail(email)
+        val otherMembershipId = insertSecondClubMembership(email, "turtle-winter-book")
+        val cookie = sessionCookieForEmail(email)
+
+        mockMvc
+            .patch("/api/me/avatar") {
+                cookie(cookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("X-Readmates-Club-Slug", "reading-sai")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"avatarKey":"hedgehog-green-mug"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.membershipId") { value(primaryMembershipId) }
+                jsonPath("$.avatarKey") { value("hedgehog-green-mug") }
+            }
+
+        assertEquals("hedgehog-green-mug", avatarKeyForMembership(primaryMembershipId))
+        assertEquals("turtle-winter-book", avatarKeyForMembership(otherMembershipId))
+    }
+
+    @Test
     fun `viewer updates own avatar`() {
         val email = insertProfileMember("self.avatar.viewer", "VIEWER", shortName = "ViewerAvatar")
         val cookie = sessionCookieForEmail(email)
@@ -678,6 +704,38 @@ class MemberProfileControllerTest(
         )
         createdMembershipIds += membershipId
         return email
+    }
+
+    private fun insertSecondClubMembership(
+        email: String,
+        avatarKey: String,
+    ): String {
+        val clubId = UUID.randomUUID().toString()
+        val clubSlug = "profile-scope-${UUID.randomUUID()}"
+        val membershipId = UUID.randomUUID().toString()
+        jdbcTemplate.update(
+            """
+            insert into clubs (id, slug, name, tagline, about)
+            values (?, ?, '다른 프로필 클럽', '다른 프로필 클럽', '다른 프로필 클럽입니다.')
+            """.trimIndent(),
+            clubId,
+            clubSlug,
+        )
+        createdClubIds += clubId
+        jdbcTemplate.update(
+            """
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+            select ?, ?, users.id, 'MEMBER', 'ACTIVE', timestampadd(second, 1, utc_timestamp(6)), 'OtherAvatar', ?
+            from users
+            where users.email = ?
+            """.trimIndent(),
+            membershipId,
+            clubId,
+            avatarKey,
+            email,
+        )
+        createdMembershipIds += membershipId
+        return membershipId
     }
 
     private fun sessionCookieForEmail(email: String): Cookie {

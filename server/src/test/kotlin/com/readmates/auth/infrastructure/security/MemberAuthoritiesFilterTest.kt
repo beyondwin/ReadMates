@@ -277,7 +277,10 @@ class MemberAuthoritiesFilterTest {
      * A no-op profile store that never finds any profile.
      */
     private class NoOpMemberProfileStorePort : MemberProfileStorePort {
-        override fun findProfileMemberByEmail(email: String) = null
+        override fun findProfileMemberByEmail(
+            email: String,
+            clubId: UUID?,
+        ) = null
 
         override fun findProfileMemberByUserId(userId: UUID) = null
 

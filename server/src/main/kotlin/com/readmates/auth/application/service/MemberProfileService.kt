@@ -59,17 +59,18 @@ class MemberProfileService(
     @Transactional
     override fun updateOwnAvatar(
         authenticationEmail: String?,
+        currentClubId: UUID?,
         command: UpdateMemberAvatarCommand,
     ): MemberProfile {
         val email = authenticatedEmail(authenticationEmail)
-        val member = memberProfileStore.findOwnAvatarMutableMember(email)
+        val member = memberProfileStore.findOwnAvatarMutableMember(email, currentClubId)
         val avatarKey = validateAvatarKey(command.avatarKey)
         if (!memberProfileStore.updateOwnAvatarKey(member.clubId, member.membershipId, avatarKey)) {
             memberProfileStore.recheckAvatarUpdateFailure(member.clubId, member.membershipId)
         }
         val profile =
             memberProfileStore
-                .findProfileMemberByEmail(email)
+                .findProfileMemberByEmail(email, currentClubId)
                 ?.toMemberProfile()
                 ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
         cacheInvalidation.evictClubContentAfterCommit(member.clubId)
@@ -225,9 +226,12 @@ class MemberProfileService(
     }
 }
 
-private fun MemberProfileStorePort.findOwnAvatarMutableMember(email: String): MemberProfileRow {
+private fun MemberProfileStorePort.findOwnAvatarMutableMember(
+    email: String,
+    clubId: UUID?,
+): MemberProfileRow {
     val member =
-        findProfileMemberByEmail(email)
+        findProfileMemberByEmail(email, clubId)
             ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
     if (!member.toCurrentMember().canEditOwnProfile) {
         throw MemberProfileException(MemberProfileError.MEMBERSHIP_NOT_ALLOWED)

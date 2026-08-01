@@ -19,7 +19,10 @@ data class MemberProfileRow(
 )
 
 interface MemberProfileStorePort {
-    fun findProfileMemberByEmail(email: String): MemberProfileRow?
+    fun findProfileMemberByEmail(
+        email: String,
+        clubId: UUID? = null,
+    ): MemberProfileRow?
 
     fun findProfileMemberByUserId(userId: UUID): MemberProfileRow?
 

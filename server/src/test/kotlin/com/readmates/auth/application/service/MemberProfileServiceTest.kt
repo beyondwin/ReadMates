@@ -38,6 +38,7 @@ class MemberProfileServiceTest {
         val profile =
             service.updateOwnAvatar(
                 "member@example.com",
+                null,
                 UpdateMemberAvatarCommand("  hedgehog-green-mug  "),
             )
 
@@ -56,6 +57,7 @@ class MemberProfileServiceTest {
                 assertThrows(MemberProfileException::class.java) {
                     MemberProfileService(RecordingMemberProfileStorePort()).updateOwnAvatar(
                         "member@example.com",
+                        null,
                         UpdateMemberAvatarCommand(avatarKey),
                     )
                 }
@@ -71,6 +73,7 @@ class MemberProfileServiceTest {
                 assertThrows(MemberProfileException::class.java) {
                     MemberProfileService(RecordingMemberProfileStorePort()).updateOwnAvatar(
                         "member@example.com",
+                        null,
                         UpdateMemberAvatarCommand(avatarKey),
                     )
                 }
@@ -86,6 +89,7 @@ class MemberProfileServiceTest {
                 assertThrows(MemberProfileException::class.java) {
                     MemberProfileService(RecordingMemberProfileStorePort(status = status)).updateOwnAvatar(
                         "member@example.com",
+                        null,
                         UpdateMemberAvatarCommand("hedgehog-green-mug"),
                     )
                 }
@@ -101,6 +105,7 @@ class MemberProfileServiceTest {
         val profile =
             MemberProfileService(store).updateOwnAvatar(
                 "member@example.com",
+                null,
                 UpdateMemberAvatarCommand("hedgehog-green-mug"),
             )
 
@@ -116,6 +121,7 @@ class MemberProfileServiceTest {
             assertThrows(MemberProfileException::class.java) {
                 service.updateOwnAvatar(
                     "member@example.com",
+                    null,
                     UpdateMemberAvatarCommand("hedgehog-green-mug"),
                 )
             }
@@ -137,6 +143,7 @@ class MemberProfileServiceTest {
             assertThrows(MemberProfileException::class.java) {
                 service.updateOwnAvatar(
                     "member@example.com",
+                    null,
                     UpdateMemberAvatarCommand("hedgehog-green-mug"),
                 )
             }
@@ -168,7 +175,10 @@ class MemberProfileServiceTest {
                 status = status,
             )
 
-        override fun findProfileMemberByEmail(email: String) = row.takeIf { it.email == email }
+        override fun findProfileMemberByEmail(
+            email: String,
+            clubId: UUID?,
+        ) = row.takeIf { it.email == email && (clubId == null || it.clubId == clubId) }
 
         override fun findProfileMemberByUserId(userId: UUID) = row.takeIf { it.userId == userId }
 

@@ -7,9 +7,13 @@ import com.readmates.auth.application.port.`in`.UpdateOwnMemberAvatarUseCase
 import com.readmates.auth.application.port.`in`.UpdateOwnMemberProfileUseCase
 import com.readmates.auth.application.service.MemberProfileError
 import com.readmates.auth.application.service.MemberProfileException
+import com.readmates.club.adapter.`in`.web.ClubContextSource
+import com.readmates.club.adapter.`in`.web.resolveClubContext
+import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
 import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
 import com.readmates.shared.adapter.`in`.web.apiErrorResponse
 import com.readmates.shared.security.emailOrNull
+import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.Authentication
@@ -27,6 +31,7 @@ class MemberProfileController(
     private val updateOwnMemberProfile: UpdateOwnMemberProfileUseCase,
     private val updateOwnMemberAvatar: UpdateOwnMemberAvatarUseCase,
     private val updateHostMemberProfileUseCase: UpdateHostMemberProfileUseCase,
+    private val resolveClubContextUseCase: ResolveClubContextUseCase,
 ) {
     @PatchMapping("/me/profile")
     fun updateOwnProfile(
@@ -44,13 +49,23 @@ class MemberProfileController(
     @PatchMapping("/me/avatar")
     fun updateOwnAvatar(
         authentication: Authentication?,
-        @RequestBody request: MemberAvatarUpdateRequest,
+        request: HttpServletRequest,
+        @RequestBody payload: MemberAvatarUpdateRequest,
     ): MemberProfileResponse {
+        val requestedClubContext = request.resolveClubContext(resolveClubContextUseCase)
+        val currentClubId =
+            when {
+                requestedClubContext.context != null -> requestedClubContext.context.clubId
+                requestedClubContext.source == ClubContextSource.SLUG ->
+                    throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+                else -> null
+            }
         val profile =
             updateOwnMemberAvatar.updateOwnAvatar(
                 authentication.emailOrNull(),
+                currentClubId,
                 UpdateMemberAvatarCommand(
-                    avatarKey = request.avatarKey,
+                    avatarKey = payload.avatarKey,
                 ),
             )
         return MemberProfileResponse.from(profile)
