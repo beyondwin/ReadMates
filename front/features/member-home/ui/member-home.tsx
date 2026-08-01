@@ -393,8 +393,8 @@ function QuickLinks({ LinkComponent }: { LinkComponent: MemberHomeLinkComponent 
               </span>
               <span className="tiny">{item.sub}</span>
             </span>
-            <span className="tiny" aria-hidden>
-              &gt;
+            <span className="rm-recent-record__destination-chevron" aria-hidden>
+              ›
             </span>
           </Link>
         ))}

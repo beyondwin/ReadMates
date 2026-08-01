@@ -104,7 +104,7 @@ describe("RecentReadingList", () => {
     expect(heading.parentElement?.tagName).toBe("DIV");
   });
 
-  it("renders decorative chevrons instead of text arrows for navigation", () => {
+  it("matches the public records text link while keeping row navigation chevrons", () => {
     const { container } = render(
       <RecentReadingList
         items={[recentItem()]}
@@ -116,15 +116,18 @@ describe("RecentReadingList", () => {
       "svg.rm-recent-reading-chevron",
     );
 
-    expect(chevrons).toHaveLength(2);
+    expect(chevrons).toHaveLength(1);
     chevrons.forEach((chevron) => {
       expect(chevron).toHaveAttribute("aria-hidden", "true");
       expect(chevron).toHaveAttribute("focusable", "false");
     });
     expect(container).not.toHaveTextContent("→");
-    expect(screen.getByRole("link", {
+    const allRecordsLink = screen.getByRole("link", {
       name: "전체 보기",
-    })).toBeVisible();
+    });
+    expect(allRecordsLink).toBeVisible();
+    expect(allRecordsLink).toHaveClass("public-records-link");
+    expect(allRecordsLink.querySelector("svg")).toBeNull();
     expect(screen.getByRole("link", {
       name: "샘플 도서 회차 기록",
     })).toBeVisible();

@@ -1,5 +1,4 @@
 import type { RecentReadingPreviewItem } from "@/features/archive/model/my-reading-shelf-model";
-import { RecentReadingChevron } from "./recent-reading-chevron";
 import { RecentReadingRow } from "./recent-reading-row";
 
 export type RecentReadingListItem = RecentReadingPreviewItem & {
@@ -27,11 +26,10 @@ export function RecentReadingList({
         </div>
         {items.length > 0 ? (
           <a
-            className="rm-recent-readings__all"
+            className="public-records-link"
             href={archiveSessionsHref}
           >
             전체 보기
-            <RecentReadingChevron />
           </a>
         ) : null}
       </header>

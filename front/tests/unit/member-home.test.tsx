@@ -694,11 +694,17 @@ describe("MemberHome", () => {
     expect(desktop.getByText("다음 달 선정")).toBeInTheDocument();
     expect(desktop.getByText("바로가기")).toBeInTheDocument();
     expect(desktop.getByRole("link", { name: "전체 보기" })).toHaveAttribute("href", "/app/notes");
-    expect(desktop.getByRole("link", { name: "피드백 문서 회차 피드백" })).toHaveAttribute(
+    const feedbackQuickLink = desktop.getByRole("link", { name: "피드백 문서 회차 피드백" });
+    expect(feedbackQuickLink).toHaveAttribute(
       "href",
       "/app/archive?view=report",
     );
-    expect(desktop.getByRole("link", { name: /안내문/ })).toHaveAttribute("href", "/about");
+    const guideQuickLink = desktop.getByRole("link", { name: /안내문/ });
+    expect(guideQuickLink).toHaveAttribute("href", "/about");
+    expect(feedbackQuickLink.querySelector(".rm-recent-record__destination-chevron"))
+      .toHaveTextContent("›");
+    expect(guideQuickLink.querySelector(".rm-recent-record__destination-chevron"))
+      .toHaveTextContent("›");
     expect(desktop.queryByRole("link", { name: "이번 세션" })).not.toBeInTheDocument();
     expect(desktop.queryByRole("link", { name: "아카이브 →" })).not.toBeInTheDocument();
     expect(desktop.queryByRole("link", { name: "호스트 화면" })).not.toBeInTheDocument();
