@@ -33,7 +33,7 @@ test("KakaoTalk browser receives copy-first recovery without horizontal overflow
 
   await expect(advisory).toBeInViewport();
   await expect(advisoryHeading).toBeInViewport();
-  await expect(copyButton).toBeInViewport({ ratio: 0.75 });
+  await expect(copyButton).toBeInViewport({ ratio: 1 });
   await expect(googleAction).toBeVisible();
   await expect(googleAction).toHaveAttribute(
     "href",
@@ -70,7 +70,7 @@ test("KakaoTalk browser receives copy-first recovery without horizontal overflow
   expect(headingBox.y).toBeGreaterThanOrEqual(0);
   expect(headingBox.y + headingBox.height).toBeLessThanOrEqual(viewportHeight);
   expect(copyBox.y).toBeGreaterThanOrEqual(0);
-  expect(copyBox.y + copyBox.height / 2).toBeLessThanOrEqual(viewportHeight);
+  expect(copyBox.y + copyBox.height).toBeLessThanOrEqual(viewportHeight);
   expect(headingBox.y + headingBox.height).toBeLessThanOrEqual(copyBox.y);
   expect(copyBox.y + copyBox.height).toBeLessThanOrEqual(googleBox.y);
 
