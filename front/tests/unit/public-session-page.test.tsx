@@ -202,7 +202,11 @@ describe("PublicSession", () => {
     expect(container).not.toHaveTextContent("R01");
     expect(container).not.toHaveTextContent("발행 요약");
     expect(container).not.toHaveTextContent("공개된 세션 기록");
-    expect(screen.getByRole("link", { name: "시작하기" })).toHaveAttribute("href", "/login");
+    expect(screen.getByRole("link", { name: "둘러보기" })).toHaveAttribute("href", "/clubs/reading-sai/app");
+    expect(screen.getByRole("link", { name: "멤버로 시작" })).toHaveAttribute(
+      "href",
+      "/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp&joinClub=reading-sai",
+    );
     expect(screen.queryByRole("button", { name: /초대 수락하기/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /초대 수락하기/ })).not.toBeInTheDocument();
     expect(screen.queryByText("초대 메일의 개인 링크에서만 열립니다.")).not.toBeInTheDocument();

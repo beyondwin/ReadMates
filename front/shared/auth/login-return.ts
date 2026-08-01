@@ -1,3 +1,5 @@
+import { normalizedClubSlug } from "@/shared/security/club-slug";
+
 const excludedReturnPathPatterns = [
   /^\/login(?:[/?#]|$)/i,
   /^\/oauth2(?:[/?#]|$)/i,
@@ -44,14 +46,26 @@ export function loginPathForReturnTo(rawValue: string | null | undefined) {
 
 export function oauthHrefForReturnTo(
   rawValue: string | null | undefined,
-  { chooseAccount = false }: { chooseAccount?: boolean } = {},
+  { chooseAccount = false, joinClub }: { chooseAccount?: boolean; joinClub?: string } = {},
 ) {
   const returnTo = safeRelativeReturnTo(rawValue);
   const query = new URLSearchParams();
   if (returnTo) query.set("returnTo", returnTo);
   if (chooseAccount) query.set("chooseAccount", "true");
+  const scopedClubSlug = scopedAppClubSlug(returnTo);
+  const normalizedJoinClub = normalizedClubSlug(joinClub);
+  if (scopedClubSlug && normalizedJoinClub === scopedClubSlug) query.set("joinClub", scopedClubSlug);
   const search = query.toString();
   return `/oauth2/authorization/google${search ? `?${search}` : ""}`;
+}
+
+export function scopedAppClubSlug(rawValue: string | null | undefined) {
+  const returnTo = safeRelativeReturnTo(rawValue);
+  const canonicalPath = returnTo ? new URL(returnTo, returnPathClassificationOrigin).pathname : null;
+  const match = canonicalPath?.match(/^\/clubs\/([^/]+)\/app(?:\/|$)/);
+  if (!match) return null;
+  const clubSlug = normalizedClubSlug(match[1]);
+  return clubSlug && clubSlug === match[1] ? clubSlug : null;
 }
 
 function isRootPath(value: string) {

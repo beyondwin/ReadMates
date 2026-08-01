@@ -5,6 +5,7 @@ import com.readmates.auth.application.port.out.DevSeedMemberLookupPort
 import com.readmates.auth.application.port.out.GoogleAccountStorePort
 import com.readmates.auth.application.port.out.MemberAccountDuplicateException
 import com.readmates.auth.application.port.out.MemberIdentityLookupPort
+import com.readmates.auth.application.port.out.MembershipDuplicateException
 import com.readmates.auth.application.port.out.PlatformAdminLookupPort
 import com.readmates.auth.domain.BookClubAvatarKey
 import com.readmates.auth.domain.MembershipRole
@@ -74,6 +75,8 @@ class JdbcMemberAccountAdapter(
     }
 
     companion object {
+        private const val DISPLAY_NAME_COLLISION_PREFIX_LENGTH = 13
+
         @JvmField
         internal val DEV_SEED_EMAILS: Set<String> =
             setOf(
@@ -274,6 +277,16 @@ class JdbcMemberAccountAdapter(
             ).firstOrNull()
     }
 
+    override fun findUserIdByGoogleSubject(googleSubjectId: String): UUID? {
+        val normalizedSubject = googleSubjectId.trim().takeIf { it.isNotEmpty() } ?: return null
+        return jdbcTemplate
+            .query(
+                "select id from users where google_subject_id = ? limit 1",
+                { resultSet, _ -> resultSet.uuid("id") },
+                normalizedSubject,
+            ).firstOrNull()
+    }
+
     override fun findAnyUserIdByEmail(email: String): UUID? {
         val normalizedEmail = email.trim().lowercase(Locale.ROOT).takeIf { it.isNotEmpty() } ?: return null
         return jdbcTemplate
@@ -319,6 +332,18 @@ class JdbcMemberAccountAdapter(
                 """.trimIndent(),
                 { resultSet, _ -> MembershipStatus.valueOf(resultSet.getString("status")) },
                 userId.dbString(),
+            ).firstOrNull()
+
+    override fun findMembershipStatusByUserIdAndClubId(
+        userId: UUID,
+        clubId: UUID,
+    ): MembershipStatus? =
+        jdbcTemplate
+            .query(
+                "select status from memberships where user_id = ? and club_id = ? limit 1",
+                { resultSet, _ -> MembershipStatus.valueOf(resultSet.getString("status")) },
+                userId.dbString(),
+                clubId.dbString(),
             ).firstOrNull()
 
     override fun connectGoogleSubject(
@@ -394,71 +419,67 @@ class JdbcMemberAccountAdapter(
         return userId
     }
 
-    override fun createViewerGoogleMember(
-        googleSubjectId: String,
-        email: String,
-        displayName: String?,
-        profileImageUrl: String?,
+    override fun findActivePublicClubIdBySlug(clubSlug: String): UUID? =
+        jdbcTemplate
+            .query(
+                "select id from clubs where slug = ? and status = 'ACTIVE' and public_visibility = 'PUBLIC' limit 1",
+                { resultSet, _ -> resultSet.uuid("id") },
+                clubSlug,
+            ).firstOrNull()
+
+    override fun createViewerMembershipForExistingUser(
+        userId: UUID,
+        clubSlug: String,
         avatarKey: BookClubAvatarKey,
-    ): CurrentMember {
-        val normalizedSubject =
-            googleSubjectId.trim().takeIf { it.isNotEmpty() }
-                ?: throw IllegalArgumentException("Google subject is required")
-        val normalizedEmail =
-            email.trim().lowercase(Locale.ROOT).takeIf { it.isNotEmpty() }
-                ?: throw IllegalArgumentException("Google email is required")
-        val normalizedName =
-            displayName
-                ?.trim()
-                ?.takeIf { it.isNotEmpty() }
-                ?: normalizedEmail.substringBefore("@").takeIf { it.isNotEmpty() }
-                ?: "Google User"
-        val normalizedProfileImageUrl = profileImageUrl?.trim()?.takeIf { it.isNotEmpty() }
-        val memberDisplayName = defaultDisplayNameFor(normalizedName)
-        val userId = UUID.randomUUID()
-        val membershipId = UUID.randomUUID()
+    ): CurrentMember? {
+        val user = findUserById(userId)
+        val clubId = findActivePublicClubIdBySlug(clubSlug)
+        if (user == null || clubId == null) return null
 
-        try {
-            jdbcTemplate.update(
-                """
-                insert into users (id, google_subject_id, email, name, short_name, profile_image_url, auth_provider)
-                values (?, ?, ?, ?, ?, ?, 'GOOGLE')
-                """.trimIndent(),
+        val accountName =
+            jdbcTemplate.queryForObject(
+                "select name from users where id = ?",
+                String::class.java,
                 userId.dbString(),
-                normalizedSubject,
-                normalizedEmail,
-                normalizedName,
-                memberDisplayName,
-                normalizedProfileImageUrl,
-            )
-
-            jdbcTemplate.update(
-                """
-                insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
-                select
-                  ?,
-                  clubs.id,
-                  ?,
-                  'MEMBER',
-                  'VIEWER',
-                  null,
-                  ?,
-                  ?
-                from clubs
-                where clubs.slug = 'reading-sai'
-                """.trimIndent(),
-                membershipId.dbString(),
-                userId.dbString(),
-                memberDisplayName,
-                avatarKey.wireValue,
-            )
-        } catch (exception: DuplicateKeyException) {
-            throw MemberAccountDuplicateException(exception)
-        }
-
-        return findMemberByUserIdIncludingViewer(userId)
-            ?: throw IllegalStateException("Created Google user has no membership")
+            ) ?: user.email.substringBefore('@')
+        val displayName = defaultDisplayNameFor(accountName)
+        val inserted =
+            try {
+                insertViewerMembership(userId, clubSlug, displayName, avatarKey)
+            } catch (exception: DuplicateKeyException) {
+                if (findMembershipStatusByUserIdAndClubId(userId, clubId) != null) {
+                    throw MembershipDuplicateException(exception)
+                }
+                val collisionSafeName = "${displayName.take(DISPLAY_NAME_COLLISION_PREFIX_LENGTH)}-$userId"
+                try {
+                    insertViewerMembership(userId, clubSlug, collisionSafeName, avatarKey)
+                } catch (retryException: DuplicateKeyException) {
+                    throw MembershipDuplicateException(retryException)
+                }
+            }
+        return if (inserted == 1) findMemberByUserIdAndClubId(userId, clubId) else null
     }
+
+    private fun insertViewerMembership(
+        userId: UUID,
+        clubSlug: String,
+        displayName: String,
+        avatarKey: BookClubAvatarKey,
+    ): Int =
+        jdbcTemplate.update(
+            """
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+            select uuid(), clubs.id, ?, 'MEMBER', 'VIEWER', null, ?, ?
+            from clubs
+            where clubs.slug = ?
+              and clubs.status = 'ACTIVE'
+              and clubs.public_visibility = 'PUBLIC'
+            """.trimIndent(),
+            userId.dbString(),
+            displayName,
+            avatarKey.wireValue,
+            clubSlug,
+        )
 
     override fun findMemberByUserIdIncludingViewer(userId: UUID): CurrentMember? =
         jdbcTemplate

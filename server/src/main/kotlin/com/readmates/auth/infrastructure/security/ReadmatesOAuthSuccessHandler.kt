@@ -40,6 +40,11 @@ class ReadmatesOAuthSuccessHandler(
         val oidcUser = authentication.principal as OidcUser
         val inviteToken = capturedInviteToken(request)
         val signedReturnState = capturedReturnState(request)
+        val capturedTargetClubSlug = capturedGuestJoinClub(request)
+        val targetClubSlug =
+            capturedTargetClubSlug?.takeIf {
+                it == oauthReturnState.scopedAppClubSlugFromState(signedReturnState)
+            }
         try {
             val login =
                 if (inviteToken != null) {
@@ -68,6 +73,7 @@ class ReadmatesOAuthSuccessHandler(
                             email = oidcUser.email,
                             displayName = oidcUser.fullName ?: oidcUser.getClaimAsString("name"),
                             profileImageUrl = oidcUser.getClaimAsString("picture"),
+                            targetClubSlug = targetClubSlug,
                         )
                     OAuthLoginRedirect(
                         userId = loginResult.userId,
@@ -95,6 +101,8 @@ class ReadmatesOAuthSuccessHandler(
         exception: AuthenticationException,
     ) {
         val signedReturnState = capturedReturnState(request)
+        capturedGuestJoinClub(request)
+        capturedInviteToken(request)
         redirectToLoginError(
             request,
             response,
@@ -163,6 +171,16 @@ class ReadmatesOAuthSuccessHandler(
         val signedState = session.getAttribute(OAuthReturnState.SESSION_ATTRIBUTE)?.toString()
         session.removeAttribute(OAuthReturnState.SESSION_ATTRIBUTE)
         return signedState
+    }
+
+    private fun capturedGuestJoinClub(request: HttpServletRequest): String? {
+        val session = request.getSession(false) ?: return null
+        val clubSlug =
+            OAuthGuestJoinSession.normalize(
+                session.getAttribute(OAuthGuestJoinSession.CLUB_SLUG_ATTRIBUTE)?.toString(),
+            )
+        session.removeAttribute(OAuthGuestJoinSession.CLUB_SLUG_ATTRIBUTE)
+        return clubSlug
     }
 
     private fun clearServletAuthenticationState(request: HttpServletRequest) {

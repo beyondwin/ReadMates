@@ -2,6 +2,7 @@ package com.readmates.auth.api
 
 import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.auth.application.service.InvitationTokenService
+import com.readmates.auth.infrastructure.security.OAuthGuestJoinSession
 import com.readmates.auth.infrastructure.security.OAuthInviteTokenSession
 import com.readmates.auth.infrastructure.security.OAuthReturnState
 import com.readmates.auth.infrastructure.security.ReadmatesOAuthSuccessHandler
@@ -132,6 +133,85 @@ class GoogleOAuthLoginSessionTest(
         assertTrue(setCookie!!.startsWith("${AuthSessionService.COOKIE_NAME}="))
         assertTrue(servletSession.isInvalid)
         assertNull(SecurityContextHolder.getContext().authentication)
+    }
+
+    @Test
+    fun `explicit signed target creates viewer only in that public club`() {
+        val servletSession = securitySession()
+        servletSession.setAttribute(
+            OAuthReturnState.SESSION_ATTRIBUTE,
+            oauthReturnState.signReturnTarget("/clubs/sample-book-club/app/archive"),
+        )
+        servletSession.setAttribute(OAuthGuestJoinSession.CLUB_SLUG_ATTRIBUTE, "sample-book-club")
+        val request = MockHttpServletRequest("GET", "/login/oauth2/code/google")
+        request.setSession(servletSession)
+        val response = MockHttpServletResponse()
+        val authentication =
+            TestingAuthenticationToken(
+                googleOidcUser("google-oauth-guest-join-target", "oauth.guest.join.target@example.com", "Guest Target"),
+                "credentials",
+            )
+
+        successHandler.onAuthenticationSuccess(request, response, authentication)
+
+        assertEquals("https://readmates.pages.dev/clubs/sample-book-club/app/archive", response.redirectedUrl)
+        assertEquals(
+            listOf("sample-book-club:VIEWER"),
+            membershipStates("oauth.guest.join.target@example.com"),
+        )
+        assertTrue(servletSession.isInvalid)
+    }
+
+    @Test
+    fun `generic google login creates an authenticated account without unintended membership`() {
+        val servletSession = securitySession()
+        val request = MockHttpServletRequest("GET", "/login/oauth2/code/google")
+        request.setSession(servletSession)
+        val response = MockHttpServletResponse()
+        val authentication =
+            TestingAuthenticationToken(
+                googleOidcUser(
+                    "google-oauth-guest-join-generic",
+                    "oauth.guest.join.generic@example.com",
+                    "Guest Generic",
+                ),
+                "credentials",
+            )
+
+        successHandler.onAuthenticationSuccess(request, response, authentication)
+
+        assertEquals("https://readmates.pages.dev/app", response.redirectedUrl)
+        assertTrue(response.getHeader(HttpHeaders.SET_COOKIE)!!.startsWith("${AuthSessionService.COOKIE_NAME}="))
+        assertEquals(emptyList<String>(), membershipStates("oauth.guest.join.generic@example.com"))
+        assertTrue(servletSession.isInvalid)
+    }
+
+    @Test
+    fun `mismatched guest join session cannot enroll a different signed return club`() {
+        val servletSession = securitySession()
+        servletSession.setAttribute(
+            OAuthReturnState.SESSION_ATTRIBUTE,
+            oauthReturnState.signReturnTarget("/clubs/reading-sai/app"),
+        )
+        servletSession.setAttribute(OAuthGuestJoinSession.CLUB_SLUG_ATTRIBUTE, "sample-book-club")
+        val request = MockHttpServletRequest("GET", "/login/oauth2/code/google")
+        request.setSession(servletSession)
+        val response = MockHttpServletResponse()
+        val authentication =
+            TestingAuthenticationToken(
+                googleOidcUser(
+                    "google-oauth-guest-join-mismatch",
+                    "oauth.guest.join.mismatch@example.com",
+                    "Guest Mismatch",
+                ),
+                "credentials",
+            )
+
+        successHandler.onAuthenticationSuccess(request, response, authentication)
+
+        assertEquals("https://readmates.pages.dev/clubs/reading-sai/app", response.redirectedUrl)
+        assertEquals(emptyList<String>(), membershipStates("oauth.guest.join.mismatch@example.com"))
+        assertTrue(servletSession.isInvalid)
     }
 
     @Test
@@ -357,6 +437,7 @@ class GoogleOAuthLoginSessionTest(
         createOpenSession()
         val servletSession = securitySession()
         servletSession.setAttribute(OAuthInviteTokenSession.INVITE_TOKEN_SESSION_ATTRIBUTE, token)
+        servletSession.setAttribute(OAuthGuestJoinSession.CLUB_SLUG_ATTRIBUTE, "sample-book-club")
         servletSession.setAttribute(
             OAuthReturnState.SESSION_ATTRIBUTE,
             oauthReturnState.signReturnTarget("/clubs/reading-sai/invite/$token"),
@@ -429,6 +510,7 @@ class GoogleOAuthLoginSessionTest(
                 "oauth.invited@example.com",
             )
         assertEquals(1, participantCount)
+        assertEquals(listOf("reading-sai:ACTIVE"), membershipStates("oauth.invited@example.com"))
     }
 
     @Test
@@ -652,6 +734,9 @@ class GoogleOAuthLoginSessionTest(
                 'oauth.invite.domain@example.com',
                 'oauth.invite.owner@example.com',
                 'oauth.invite.other@example.com'
+                ,'oauth.guest.join.target@example.com'
+                ,'oauth.guest.join.generic@example.com'
+                ,'oauth.guest.join.mismatch@example.com'
               )
                  or google_subject_id in (
                    'google-oauth-session-existing',
@@ -697,6 +782,9 @@ class GoogleOAuthLoginSessionTest(
                 'oauth.invite.domain@example.com',
                 'oauth.invite.owner@example.com',
                 'oauth.invite.other@example.com'
+                ,'oauth.guest.join.target@example.com'
+                ,'oauth.guest.join.generic@example.com'
+                ,'oauth.guest.join.mismatch@example.com'
               )
                  or users.google_subject_id in (
                    'google-oauth-session-existing',
@@ -743,6 +831,9 @@ class GoogleOAuthLoginSessionTest(
                 'oauth.invite.domain@example.com',
                 'oauth.invite.owner@example.com',
                 'oauth.invite.other@example.com'
+                ,'oauth.guest.join.target@example.com'
+                ,'oauth.guest.join.generic@example.com'
+                ,'oauth.guest.join.mismatch@example.com'
               )
                  or google_subject_id in (
                    'google-oauth-session-existing',
@@ -772,6 +863,9 @@ class GoogleOAuthLoginSessionTest(
               'oauth.invite.domain@example.com',
               'oauth.invite.owner@example.com',
               'oauth.invite.other@example.com'
+              ,'oauth.guest.join.target@example.com'
+              ,'oauth.guest.join.generic@example.com'
+              ,'oauth.guest.join.mismatch@example.com'
             )
                or google_subject_id in (
                  'google-oauth-session-existing',
@@ -824,6 +918,21 @@ class GoogleOAuthLoginSessionTest(
             email,
         )
     }
+
+    private fun membershipStates(email: String): List<String> =
+        jdbcTemplate
+            .queryForList(
+                """
+                select concat(clubs.slug, ':', memberships.status)
+                from memberships
+                join clubs on clubs.id = memberships.club_id
+                join users on users.id = memberships.user_id
+                where users.email = ?
+                order by clubs.slug
+                """.trimIndent(),
+                String::class.java,
+                email,
+            ).filterNotNull()
 
     private fun createPlatformAdminUser(
         googleSubjectId: String,

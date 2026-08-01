@@ -16,7 +16,11 @@ class OAuthInviteTokenCaptureFilter(
         filterChain: FilterChain,
     ) {
         if (request.method == "GET" && request.requestURI.startsWith("/oauth2/authorization/")) {
-            val inviteToken = InviteTokenFormat.normalize(request.getParameter("inviteToken"))
+            val existingSession = request.getSession(false)
+            existingSession?.removeAttribute(OAuthInviteTokenSession.INVITE_TOKEN_SESSION_ATTRIBUTE)
+            existingSession?.removeAttribute(OAuthGuestJoinSession.CLUB_SLUG_ATTRIBUTE)
+            val rawInviteToken = request.getParameter("inviteToken")
+            val inviteToken = InviteTokenFormat.normalize(rawInviteToken)
             if (inviteToken != null) {
                 request.session.setAttribute(
                     OAuthInviteTokenSession.INVITE_TOKEN_SESSION_ATTRIBUTE,
@@ -30,6 +34,14 @@ class OAuthInviteTokenCaptureFilter(
                 request.session.setAttribute(OAuthReturnState.SESSION_ATTRIBUTE, signedReturnState)
             } else {
                 session?.removeAttribute(OAuthReturnState.SESSION_ATTRIBUTE)
+            }
+
+            if (rawInviteToken == null && signedReturnState != null) {
+                val signedClubSlug = oauthReturnState.scopedAppClubSlugFromState(signedReturnState)
+                val requestedClubSlug = OAuthGuestJoinSession.normalize(request.getParameter("joinClub"))
+                if (signedClubSlug != null && requestedClubSlug == signedClubSlug) {
+                    request.session.setAttribute(OAuthGuestJoinSession.CLUB_SLUG_ATTRIBUTE, signedClubSlug)
+                }
             }
         }
 

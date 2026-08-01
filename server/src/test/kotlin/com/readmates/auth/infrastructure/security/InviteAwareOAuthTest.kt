@@ -51,6 +51,56 @@ class InviteAwareOAuthTest(
     }
 
     @Test
+    fun `authorization capture stores guest join only when it matches the signed scoped app target`() {
+        val matching = MockHttpServletRequest("GET", "/oauth2/authorization/google")
+        matching.setParameter("returnTo", "/clubs/reading-sai/app/archive")
+        matching.setParameter("joinClub", "reading-sai")
+
+        captureFilter.doFilter(matching, MockHttpServletResponse(), RecordingFilterChain())
+
+        assertEquals(
+            "reading-sai",
+            matching.getSession(false)!!.getAttribute(OAuthGuestJoinSession.CLUB_SLUG_ATTRIBUTE),
+        )
+
+        val mismatched = MockHttpServletRequest("GET", "/oauth2/authorization/google")
+        mismatched.setParameter("returnTo", "/clubs/sample-book-club/app")
+        mismatched.setParameter("joinClub", "reading-sai")
+
+        captureFilter.doFilter(mismatched, MockHttpServletResponse(), RecordingFilterChain())
+
+        assertNull(mismatched.getSession(false)?.getAttribute(OAuthGuestJoinSession.CLUB_SLUG_ATTRIBUTE))
+
+        listOf(
+            "/clubs/READING-SAI/app",
+            "/clubs/reading-sai/app/../about",
+        ).forEach { unsafeReturnTo ->
+            val nonCanonical = MockHttpServletRequest("GET", "/oauth2/authorization/google")
+            nonCanonical.setParameter("returnTo", unsafeReturnTo)
+            nonCanonical.setParameter("joinClub", "reading-sai")
+
+            captureFilter.doFilter(nonCanonical, MockHttpServletResponse(), RecordingFilterChain())
+
+            assertNull(nonCanonical.getSession(false)?.getAttribute(OAuthGuestJoinSession.CLUB_SLUG_ATTRIBUTE))
+        }
+    }
+
+    @Test
+    fun `invite capture suppresses and clears any guest join intent`() {
+        listOf("oauthInviteCaptureToken000000000000000000000000", "invalid").forEach { inviteToken ->
+            val request = MockHttpServletRequest("GET", "/oauth2/authorization/google")
+            request.getSession(true)!!.setAttribute(OAuthGuestJoinSession.CLUB_SLUG_ATTRIBUTE, "stale-club")
+            request.setParameter("returnTo", "/clubs/reading-sai/app")
+            request.setParameter("joinClub", "reading-sai")
+            request.setParameter("inviteToken", inviteToken)
+
+            captureFilter.doFilter(request, MockHttpServletResponse(), RecordingFilterChain())
+
+            assertNull(request.getSession(false)?.getAttribute(OAuthGuestJoinSession.CLUB_SLUG_ATTRIBUTE))
+        }
+    }
+
+    @Test
     fun `return target validation rejects protocol-relative and untrusted absolute urls`() {
         assertNull(oauthReturnState.signReturnTarget("//evil.example/app"))
         assertNull(oauthReturnState.signReturnTarget("https://evil.example/app"))

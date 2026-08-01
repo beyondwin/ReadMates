@@ -11,7 +11,7 @@ test("failed Google login offers explicit account selection", async ({ page }) =
   await expect(page.getByRole("alert")).toContainText("이전 멤버십이 종료된 계정입니다");
   await expect(page.getByRole("link", { name: "다른 Google 계정으로 로그인" })).toHaveAttribute(
     "href",
-    `/oauth2/authorization/google?returnTo=${encodeURIComponent(memberReturnTo)}&chooseAccount=true`,
+    `/oauth2/authorization/google?returnTo=${encodeURIComponent(memberReturnTo)}&chooseAccount=true&joinClub=reading-sai`,
   );
 });
 
@@ -37,7 +37,7 @@ test("KakaoTalk browser receives copy-first recovery without horizontal overflow
   await expect(googleAction).toBeVisible();
   await expect(googleAction).toHaveAttribute(
     "href",
-    `/oauth2/authorization/google?returnTo=${encodeURIComponent(memberReturnTo)}&chooseAccount=true`,
+    `/oauth2/authorization/google?returnTo=${encodeURIComponent(memberReturnTo)}&chooseAccount=true&joinClub=reading-sai`,
   );
 
   const copyElement = await copyButton.elementHandle();

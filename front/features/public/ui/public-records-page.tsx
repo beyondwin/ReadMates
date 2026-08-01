@@ -5,6 +5,7 @@ import type { PublicClubView, PublicSessionListItemView } from "@/features/publi
 import { getPublicRecordShowcaseDisplay, getPublicRecordsDisplay } from "@/features/public/model/public-display-model";
 import { BookCover } from "@/shared/ui/book-cover";
 import { publicAboutHref, publicRecordsHref, publicSessionHref } from "@/features/public/model/public-paths";
+import { PublicEntryActions } from "@/features/public/ui/public-entry-actions";
 
 function PublicRecordIndexRow({ publicBasePath, session }: { publicBasePath: string; session: PublicSessionListItemView }) {
   const display = getPublicRecordShowcaseDisplay(session);
@@ -72,6 +73,9 @@ export default function PublicRecordsPage({
           <p className="body" style={{ color: "var(--text-2)", marginTop: 12, maxWidth: 620 }}>
             공개 기록은 누구나 읽을 수 있고, 모임 참여는 초대받은 멤버에게만 열려 있습니다.
           </p>
+          <div className="public-membership-panel__actions">
+            <PublicEntryActions publicBasePath={publicBasePath} />
+          </div>
         </div>
       </section>
 

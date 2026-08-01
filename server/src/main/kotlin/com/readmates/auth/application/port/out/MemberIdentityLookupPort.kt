@@ -29,5 +29,10 @@ interface MemberIdentityLookupPort {
 
     fun findMembershipStatusByUserId(userId: UUID): MembershipStatus?
 
+    fun findMembershipStatusByUserIdAndClubId(
+        userId: UUID,
+        clubId: UUID,
+    ): MembershipStatus? = null
+
     fun listJoinedClubs(userId: UUID): List<JoinedClubSummary>
 }

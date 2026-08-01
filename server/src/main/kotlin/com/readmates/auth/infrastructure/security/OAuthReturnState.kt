@@ -86,6 +86,17 @@ class OAuthReturnState(
         inviteToken: String,
     ): String = "/clubs/$clubSlug/invite/$inviteToken"
 
+    fun scopedAppClubSlugFromState(signedState: String?): String? =
+        verifiedReturnTarget(signedState)
+            ?.takeIf { it.startsWith("/") }
+            ?.let(::canonicalRoutePath)
+            ?.let(CLUB_APP_PATH::matchEntire)
+            ?.groupValues
+            ?.get(1)
+            ?.let { pathClubSlug ->
+                OAuthGuestJoinSession.normalize(pathClubSlug).takeIf { it == pathClubSlug }
+            }
+
     fun inviteClubSlugFromReturnState(
         signedState: String?,
         inviteToken: String,
@@ -336,6 +347,7 @@ class OAuthReturnState(
                 Regex("^/clubs/[^/]+/invite(?:[/?#]|$)", RegexOption.IGNORE_CASE),
             )
         private val CLUB_INVITE_PATH = Regex("^/clubs/([^/]+)/invite/([^/]+)$")
+        private val CLUB_APP_PATH = Regex("^/clubs/([^/]+)/app(?:/.*)?$")
         private val LEGACY_INVITE_PATH = Regex("^/invite/([^/]+)$")
     }
 }

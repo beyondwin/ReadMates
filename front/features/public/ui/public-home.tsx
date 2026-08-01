@@ -1,10 +1,10 @@
 import { Link } from "@/features/public/ui/public-link";
 import type { PublicClubView, PublicSessionListItemView } from "@/features/public/model/public-display-model";
 import { BookCover } from "@/shared/ui/book-cover";
-import { PublicGuestOnlyActions } from "@/shared/ui/public-auth-action";
 import { getPublicClubDisplay, getPublicSessionListItemDisplay } from "@/features/public/model/public-display-model";
 import { PUBLIC_MEMBERSHIP_NOTE } from "@/features/public/model/public-copy";
 import { publicAboutHref, publicRecordsHref, publicSessionHref } from "@/features/public/model/public-paths";
+import { PublicEntryActions } from "@/features/public/ui/public-entry-actions";
 
 type PublicHomeProps = {
   data: PublicClubView;
@@ -325,11 +325,7 @@ export default function PublicHome({ data, publicBasePath = "" }: PublicHomeProp
               {PUBLIC_MEMBERSHIP_NOTE}
             </p>
             <div className="public-membership-panel__actions">
-              <PublicGuestOnlyActions>
-                <Link to="/login" className="btn btn-primary">
-                  시작하기
-                </Link>
-              </PublicGuestOnlyActions>
+              <PublicEntryActions publicBasePath={publicBasePath} />
             </div>
           </div>
         </div>

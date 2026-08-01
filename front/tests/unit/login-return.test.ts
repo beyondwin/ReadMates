@@ -83,4 +83,20 @@ describe("login return helpers", () => {
       "/oauth2/authorization/google?chooseAccount=true",
     );
   });
+
+  it("builds a same-club explicit member-start intent only for a scoped app return", () => {
+    expect(oauthHrefForReturnTo("/clubs/reading-sai/app/archive", { joinClub: "reading-sai" })).toBe(
+      "/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp%2Farchive&joinClub=reading-sai",
+    );
+    expect(oauthHrefForReturnTo("/clubs/other/app", { joinClub: "reading-sai" })).toBe(
+      "/oauth2/authorization/google?returnTo=%2Fclubs%2Fother%2Fapp",
+    );
+    expect(oauthHrefForReturnTo("/clubs/reading-sai/app", { joinClub: "../reading-sai" })).toBe(
+      "/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp",
+    );
+    expect(oauthHrefForReturnTo(null, { joinClub: "reading-sai" })).toBe("/oauth2/authorization/google");
+    expect(oauthHrefForReturnTo("/clubs/reading-sai/app/../about", { joinClub: "reading-sai" })).toBe(
+      "/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp%2F..%2Fabout",
+    );
+  });
 });

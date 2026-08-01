@@ -3,16 +3,17 @@ import { publicRecordsReturnTarget, type ReadmatesReturnTarget } from "@/feature
 import type { PublicSessionDetailView } from "@/features/public/model/public-display-model";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { BookCover } from "@/shared/ui/book-cover";
-import { PublicGuestOnlyActions } from "@/shared/ui/public-auth-action";
 import { displayText, getPublicSessionShowcaseDisplay } from "@/features/public/model/public-display-model";
 import { PUBLIC_MEMBERSHIP_NOTE } from "@/features/public/model/public-copy";
+import { PublicEntryActions } from "@/features/public/ui/public-entry-actions";
 
 type PublicSessionProps = {
   session: PublicSessionDetailView;
   returnTarget?: ReadmatesReturnTarget;
+  publicBasePath?: string;
 };
 
-export default function PublicSession({ session, returnTarget = publicRecordsReturnTarget }: PublicSessionProps) {
+export default function PublicSession({ session, returnTarget = publicRecordsReturnTarget, publicBasePath = "" }: PublicSessionProps) {
   const { bookTitle, bookAuthor, dateLabel, summary, recordDensityLabel, showcaseStateLabel } = getPublicSessionShowcaseDisplay(session);
   const highlightCount = session.highlights.length;
   const oneLinerCount = session.oneLiners.length;
@@ -168,11 +169,7 @@ export default function PublicSession({ session, returnTarget = publicRecordsRet
               {PUBLIC_MEMBERSHIP_NOTE}
             </p>
             <div className="public-membership-panel__actions">
-              <PublicGuestOnlyActions>
-                <Link to="/login" className="btn btn-primary">
-                  시작하기
-                </Link>
-              </PublicGuestOnlyActions>
+              <PublicEntryActions publicBasePath={publicBasePath} />
             </div>
           </div>
         </div>

@@ -31,7 +31,7 @@ export function PublicSessionRoute() {
   return session ? (
     <>
       <PublicPageMetadataHead metadata={buildPublicSessionPageMetadata(session)} />
-      <PublicSession session={session} returnTarget={returnTarget} />
+      <PublicSession session={session} returnTarget={returnTarget} publicBasePath={data.publicBasePath} />
     </>
   ) : (
     <>
