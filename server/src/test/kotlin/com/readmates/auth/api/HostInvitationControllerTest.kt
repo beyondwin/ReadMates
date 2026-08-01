@@ -357,7 +357,7 @@ class HostInvitationControllerTest(
               'ACTIVE',
               utc_timestamp(6),
               users.short_name,
-              'reading-lamp'
+              'squirrel-acorn'
             from users
             where users.email = ?
             on duplicate key update

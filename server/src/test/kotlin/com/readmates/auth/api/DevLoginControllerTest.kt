@@ -145,7 +145,7 @@ class DevLoginControllerTest(
               'ACTIVE',
               utc_timestamp(6),
               users.short_name,
-              'reading-lamp'
+              'squirrel-acorn'
             from clubs
             join users on users.email = 'active.nonseed@example.com'
             where clubs.slug = 'reading-sai'

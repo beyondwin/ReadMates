@@ -411,7 +411,7 @@ class GoogleOAuthLoginSessionTest(
         assertEquals("google-oauth-invited", memberState["google_subject_id"])
         assertEquals("GOOGLE", memberState["auth_provider"])
         assertEquals("ACTIVE", memberState["status"])
-        assertEquals("books-glasses", memberState["avatar_key"])
+        assertEquals("cat-flower-mug", memberState["avatar_key"])
         assertNotNull(memberState["last_login_at"])
 
         val participantCount =
@@ -815,7 +815,7 @@ class GoogleOAuthLoginSessionTest(
               ?,
               utc_timestamp(6),
               users.short_name,
-              'reading-lamp'
+              'squirrel-acorn'
             from clubs
             join users on users.email = ?
             where clubs.slug = 'reading-sai'

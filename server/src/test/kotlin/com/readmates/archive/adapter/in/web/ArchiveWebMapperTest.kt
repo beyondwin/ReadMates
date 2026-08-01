@@ -9,13 +9,13 @@ import org.junit.jupiter.api.Test
 class ArchiveWebMapperTest {
     @Test
     fun `my page preserves a stored recognized avatar key`() {
-        assertEquals("book-tote", myPageResult("book-tote").toWebDto().avatarKey)
+        assertEquals("fennec-heart-mug", myPageResult("fennec-heart-mug").toWebDto().avatarKey)
     }
 
     @Test
     fun `my page falls back for missing or unknown avatar keys`() {
-        assertEquals("archive-box", myPageResult(null).toWebDto().avatarKey)
-        assertEquals("archive-box", myPageResult("future-avatar").toWebDto().avatarKey)
+        assertEquals("hedgehog-green-book", myPageResult(null).toWebDto().avatarKey)
+        assertEquals("hedgehog-green-book", myPageResult("future-avatar").toWebDto().avatarKey)
     }
 }
 

@@ -397,7 +397,7 @@ class PlatformAdminControllerTest(
         val clubId = checkNotNull(result.response.jsonPathValue<String>("$.club.clubId"))
         createdClubIds += clubId
         createdMembershipIds += membershipIdsForClub(clubId)
-        assertEquals("reading-lamp", avatarKeyForClub(clubId))
+        assertEquals("squirrel-acorn", avatarKeyForClub(clubId))
     }
 
     @Test
@@ -559,7 +559,7 @@ class PlatformAdminControllerTest(
         jdbcTemplate.update(
             """
             insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
-            values (?, ?, ?, 'HOST', 'ACTIVE', utc_timestamp(6), 'Host', 'reading-lamp')
+            values (?, ?, ?, 'HOST', 'ACTIVE', utc_timestamp(6), 'Host', 'squirrel-acorn')
             """.trimIndent(),
             membershipId,
             clubId,

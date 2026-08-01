@@ -94,7 +94,7 @@ class JdbcAdminClubOperationsClosingRiskTest(
         )
         jdbcTemplate.update(
             "insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key) " +
-                "values (?, ?, ?, 'HOST', 'ACTIVE', utc_timestamp(6), 'AC', 'archive-box')",
+                "values (?, ?, ?, 'HOST', 'ACTIVE', utc_timestamp(6), 'AC', 'hedgehog-green-book')",
             CLOSING_RISK_MEMBERSHIP_ID,
             CLOSING_RISK_CLUB_ID,
             CLOSING_RISK_USER_ID,

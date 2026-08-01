@@ -162,7 +162,7 @@ class JdbcPlatformAdminClubAdapter(
             clubId.dbString(),
             userId.dbString(),
             displayName.take(HOST_DISPLAY_NAME_MAX_LENGTH),
-            BookClubAvatarKey.READING_LAMP.wireValue,
+            BookClubAvatarKey.SQUIRREL_ACORN.wireValue,
         )
         return membershipId
     }

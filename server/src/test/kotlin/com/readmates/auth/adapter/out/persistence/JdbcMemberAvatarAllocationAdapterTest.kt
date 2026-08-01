@@ -57,17 +57,17 @@ class JdbcMemberAvatarAllocationAdapterTest(
     }
 
     @Test
-    fun `first twenty visible memberships receive distinct ordered keys then cycle`() {
+    fun `first forty visible memberships receive distinct ordered keys then cycle`() {
         val assigned =
-            (0 until 21).map { index ->
+            (0 until 41).map { index ->
                 val key = adapter.allocate(CLUB_ID)
                 persistMembership(userId = userId(index), status = MembershipStatus.ACTIVE, avatarKey = key)
                 key
             }
 
-        assertThat(assigned.take(20)).containsExactlyElementsOf(BookClubAvatarKey.ordered)
-        assertThat(assigned.take(20).distinct()).hasSize(20)
-        assertThat(assigned[20]).isEqualTo(BookClubAvatarKey.READING_LAMP)
+        assertThat(assigned.take(40)).containsExactlyElementsOf(BookClubAvatarKey.ordered)
+        assertThat(assigned.take(40).distinct()).hasSize(40)
+        assertThat(assigned[40]).isEqualTo(BookClubAvatarKey.HEDGEHOG_GREEN_BOOK)
     }
 
     @Test
@@ -80,30 +80,30 @@ class JdbcMemberAvatarAllocationAdapterTest(
         ).forEachIndexed { index, status ->
             persistMembership(userId(index), status, BookClubAvatarKey.ordered[index])
         }
-        persistMembership(userId(10), MembershipStatus.LEFT, BookClubAvatarKey.NOTEBOOK_PEN)
-        persistMembership(userId(11), MembershipStatus.INACTIVE, BookClubAvatarKey.LIBRARY_STAMP)
+        persistMembership(userId(10), MembershipStatus.LEFT, BookClubAvatarKey.POLAR_BEAR_SNOWFLAKE_MUG)
+        persistMembership(userId(11), MembershipStatus.INACTIVE, BookClubAvatarKey.PENGUIN_BERET_BOOK)
 
-        assertThat(adapter.allocate(CLUB_ID)).isEqualTo(BookClubAvatarKey.NOTEBOOK_PEN)
+        assertThat(adapter.allocate(CLUB_ID)).isEqualTo(BookClubAvatarKey.POLAR_BEAR_SNOWFLAKE_MUG)
     }
 
     @Test
     fun `left membership frees its key and rejoin retains a free previous key`() {
-        persistMembership(REJOINING_USER_ID, MembershipStatus.LEFT, BookClubAvatarKey.READING_LAMP)
+        persistMembership(REJOINING_USER_ID, MembershipStatus.LEFT, BookClubAvatarKey.HEDGEHOG_GREEN_BOOK)
 
-        assertThat(adapter.allocate(CLUB_ID, REJOINING_USER_ID)).isEqualTo(BookClubAvatarKey.READING_LAMP)
+        assertThat(adapter.allocate(CLUB_ID, REJOINING_USER_ID)).isEqualTo(BookClubAvatarKey.HEDGEHOG_GREEN_BOOK)
     }
 
     @Test
     fun `rejoin chooses first unused key when previous key is occupied`() {
-        persistMembership(REJOINING_USER_ID, MembershipStatus.LEFT, BookClubAvatarKey.READING_LAMP)
-        persistMembership(OTHER_USER_ID, MembershipStatus.ACTIVE, BookClubAvatarKey.READING_LAMP)
+        persistMembership(REJOINING_USER_ID, MembershipStatus.LEFT, BookClubAvatarKey.HEDGEHOG_GREEN_BOOK)
+        persistMembership(OTHER_USER_ID, MembershipStatus.ACTIVE, BookClubAvatarKey.HEDGEHOG_GREEN_BOOK)
 
-        assertThat(adapter.allocate(CLUB_ID, REJOINING_USER_ID)).isEqualTo(BookClubAvatarKey.OPEN_BOOK_PENCIL)
+        assertThat(adapter.allocate(CLUB_ID, REJOINING_USER_ID)).isEqualTo(BookClubAvatarKey.SQUIRREL_ACORN)
     }
 
     @Test
     fun `club slug allocation resolves the exact club and missing clubs fail`() {
-        assertThat(adapter.allocateForClubSlug(CLUB_SLUG)).isEqualTo(BookClubAvatarKey.READING_LAMP)
+        assertThat(adapter.allocateForClubSlug(CLUB_SLUG)).isEqualTo(BookClubAvatarKey.HEDGEHOG_GREEN_BOOK)
         assertThatThrownBy { adapter.allocateForClubSlug("missing-avatar-club") }
             .isInstanceOf(IllegalArgumentException::class.java)
     }
@@ -128,8 +128,8 @@ class JdbcMemberAvatarAllocationAdapterTest(
         futures.forEach { it.get(10, TimeUnit.SECONDS) }
 
         assertThat(results).containsExactlyInAnyOrder(
-            BookClubAvatarKey.READING_LAMP,
-            BookClubAvatarKey.OPEN_BOOK_PENCIL,
+            BookClubAvatarKey.HEDGEHOG_GREEN_BOOK,
+            BookClubAvatarKey.SQUIRREL_ACORN,
         )
     }
 
@@ -162,8 +162,8 @@ class JdbcMemberAvatarAllocationAdapterTest(
         futures.forEach { it.get(10, TimeUnit.SECONDS) }
 
         assertThat(results).containsExactlyInAnyOrder(
-            BookClubAvatarKey.READING_LAMP,
-            BookClubAvatarKey.OPEN_BOOK_PENCIL,
+            BookClubAvatarKey.HEDGEHOG_GREEN_BOOK,
+            BookClubAvatarKey.SQUIRREL_ACORN,
         )
     }
 

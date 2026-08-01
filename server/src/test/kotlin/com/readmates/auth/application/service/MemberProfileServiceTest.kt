@@ -38,7 +38,7 @@ class MemberProfileServiceTest {
                 displayName = "멤버",
                 accountName = "계정",
                 profileImageUrl = null,
-                avatarKey = "reading-lamp",
+                avatarKey = "squirrel-acorn",
                 role = MembershipRole.MEMBER,
                 status = MembershipStatus.ACTIVE,
             )

@@ -1097,7 +1097,7 @@ class ArchiveAndNotesDbTest(
                 jsonPath("$.items[?(@.kind == 'ONE_LINE_REVIEW')].authorName") { value(hasItem("새멤버5")) }
                 jsonPath("$.items[?(@.kind == 'HIGHLIGHT')].authorName") { value(hasItem("새멤버5")) }
                 jsonPath("$.items[*].authorName") { value(not(hasItem("이멤버5"))) }
-                jsonPath("$.items[*].avatarKey") { value(hasItem("library-stamp")) }
+                jsonPath("$.items[*].avatarKey") { value(hasItem("penguin-beret-book")) }
             }
 
         mockMvc
@@ -1115,11 +1115,11 @@ class ArchiveAndNotesDbTest(
                 jsonPath("$.clubOneLiners[*].authorName") { value(not(hasItem("이멤버5"))) }
                 jsonPath("$.publicOneLiners[*].authorName") { value(not(hasItem("이멤버5"))) }
                 jsonPath("$.myQuestions[*].authorName") { value(not(hasItem("이멤버5"))) }
-                jsonPath("$.publicHighlights[*].avatarKey") { value(hasItem("library-stamp")) }
-                jsonPath("$.clubQuestions[*].avatarKey") { value(hasItem("library-stamp")) }
-                jsonPath("$.clubOneLiners[*].avatarKey") { value(hasItem("library-stamp")) }
-                jsonPath("$.publicOneLiners[*].avatarKey") { value(hasItem("library-stamp")) }
-                jsonPath("$.myQuestions[*].avatarKey") { value(hasItem("library-stamp")) }
+                jsonPath("$.publicHighlights[*].avatarKey") { value(hasItem("penguin-beret-book")) }
+                jsonPath("$.clubQuestions[*].avatarKey") { value(hasItem("penguin-beret-book")) }
+                jsonPath("$.clubOneLiners[*].avatarKey") { value(hasItem("penguin-beret-book")) }
+                jsonPath("$.publicOneLiners[*].avatarKey") { value(hasItem("penguin-beret-book")) }
+                jsonPath("$.myQuestions[*].avatarKey") { value(hasItem("penguin-beret-book")) }
             }
     }
 
@@ -1147,21 +1147,21 @@ class ArchiveAndNotesDbTest(
                 jsonPath("$.clubQuestions[*].authorName") { value(not(hasItem("안멤버1"))) }
                 jsonPath("$.clubQuestions[*].authorShortName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.clubQuestions[*].authorShortName") { value(not(hasItem("멤버1"))) }
-                jsonPath("$.clubQuestions[?(@.authorName == '탈퇴한 멤버')].avatarKey") { value(hasItem("archive-box")) }
-                jsonPath("$.clubQuestions[*].avatarKey") { value(not(hasItem("open-book-pencil"))) }
+                jsonPath("$.clubQuestions[?(@.authorName == '탈퇴한 멤버')].avatarKey") { value(hasItem("hedgehog-green-book")) }
+                jsonPath("$.clubQuestions[*].avatarKey") { value(not(hasItem("deer-brown-book"))) }
                 jsonPath(removedJsonPath("$.", "club", "Checkins")) { doesNotExist() }
                 jsonPath("$.clubOneLiners[*].authorName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.clubOneLiners[*].authorName") { value(not(hasItem("안멤버1"))) }
                 jsonPath("$.clubOneLiners[*].authorShortName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.clubOneLiners[*].authorShortName") { value(not(hasItem("멤버1"))) }
-                jsonPath("$.clubOneLiners[?(@.authorName == '탈퇴한 멤버')].avatarKey") { value(hasItem("archive-box")) }
-                jsonPath("$.clubOneLiners[*].avatarKey") { value(not(hasItem("open-book-pencil"))) }
+                jsonPath("$.clubOneLiners[?(@.authorName == '탈퇴한 멤버')].avatarKey") { value(hasItem("hedgehog-green-book")) }
+                jsonPath("$.clubOneLiners[*].avatarKey") { value(not(hasItem("deer-brown-book"))) }
                 jsonPath("$.publicOneLiners[*].authorName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.publicOneLiners[*].authorName") { value(not(hasItem("안멤버1"))) }
                 jsonPath("$.publicOneLiners[*].authorShortName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.publicOneLiners[*].authorShortName") { value(not(hasItem("멤버1"))) }
-                jsonPath("$.publicOneLiners[?(@.authorName == '탈퇴한 멤버')].avatarKey") { value(hasItem("archive-box")) }
-                jsonPath("$.publicOneLiners[*].avatarKey") { value(not(hasItem("open-book-pencil"))) }
+                jsonPath("$.publicOneLiners[?(@.authorName == '탈퇴한 멤버')].avatarKey") { value(hasItem("hedgehog-green-book")) }
+                jsonPath("$.publicOneLiners[*].avatarKey") { value(not(hasItem("deer-brown-book"))) }
             }
 
         mockMvc
@@ -1178,8 +1178,8 @@ class ArchiveAndNotesDbTest(
                 }
                 jsonPath("$.items[*].authorName") { value(not(hasItem("안멤버1"))) }
                 jsonPath("$.items[*].authorShortName") { value(not(hasItem("멤버1"))) }
-                jsonPath("$.items[?(@.authorName == '탈퇴한 멤버')].avatarKey") { value(hasItems("archive-box")) }
-                jsonPath("$.items[*].avatarKey") { value(not(hasItem("open-book-pencil"))) }
+                jsonPath("$.items[?(@.authorName == '탈퇴한 멤버')].avatarKey") { value(hasItems("hedgehog-green-book")) }
+                jsonPath("$.items[*].avatarKey") { value(not(hasItem("deer-brown-book"))) }
             }
     }
 
@@ -1269,7 +1269,7 @@ class ArchiveAndNotesDbTest(
                 status { isOk() }
                 jsonPath("$.displayName") { value("멤버5") }
                 jsonPath("$.accountName") { value("이멤버5") }
-                jsonPath("$.avatarKey") { value("library-stamp") }
+                jsonPath("$.avatarKey") { value("penguin-beret-book") }
                 jsonPath("$.profileImageUrl") { doesNotExist() }
                 jsonPath("$.shortName") { doesNotExist() }
                 jsonPath("$.email") { value("member5@example.com") }
@@ -1494,7 +1494,7 @@ class ArchiveAndNotesDbTest(
               'ACTIVE',
               '2026-01-01 00:00:00.000000',
               '다른클럽멤버5',
-              'discussion-circle'
+              'hedgehog-glasses-book'
             from users
             where users.email = 'member5@example.com';
             insert into sessions (
@@ -1650,9 +1650,9 @@ class ArchiveAndNotesDbTest(
               ('00000000-0000-0000-0000-0000000093a7', 'other-timeline-member@example.com', '다른 참여 멤버', '다른멤버', 'PASSWORD');
             insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
             values
-              ('00000000-0000-0000-0000-0000000093a0', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-0000000093a9', 'MEMBER', 'ACTIVE', '2026-01-01 00:00:00.000000', '중간멤버', 'archive-box'),
-              ('00000000-0000-0000-0000-0000000093a6', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000093a9', 'MEMBER', 'ACTIVE', '2026-01-01 00:00:00.000000', '다른클럽중간멤버', 'book-tote'),
-              ('00000000-0000-0000-0000-0000000093a8', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-0000000093a7', 'MEMBER', 'ACTIVE', '2026-01-01 00:00:00.000000', '다른샘플멤버', 'discussion-circle');
+              ('00000000-0000-0000-0000-0000000093a0', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-0000000093a9', 'MEMBER', 'ACTIVE', '2026-01-01 00:00:00.000000', '중간멤버', 'hedgehog-green-book'),
+              ('00000000-0000-0000-0000-0000000093a6', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000093a9', 'MEMBER', 'ACTIVE', '2026-01-01 00:00:00.000000', '다른클럽중간멤버', 'fennec-heart-mug'),
+              ('00000000-0000-0000-0000-0000000093a8', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-0000000093a7', 'MEMBER', 'ACTIVE', '2026-01-01 00:00:00.000000', '다른샘플멤버', 'hedgehog-glasses-book');
             insert into sessions (
               id, club_id, number, title, book_title, book_author,
               session_date, start_time, end_time, location_label,
@@ -1691,7 +1691,7 @@ class ArchiveAndNotesDbTest(
               'ACTIVE',
               '2026-01-01 00:00:00.000000',
               '완독멤버5',
-              'archive-box'
+              'hedgehog-green-book'
             from clubs
             join users on users.email = 'member5@example.com'
             where clubs.slug = 'sample-book-club';
@@ -1818,7 +1818,7 @@ class ArchiveAndNotesDbTest(
               'ACTIVE',
               '2026-01-01 00:00:00.000000',
               '샘플멤버5',
-              'archive-box'
+              'hedgehog-green-book'
             from clubs
             join users on users.email = 'member5@example.com'
             where clubs.slug = 'sample-book-club';
@@ -2490,7 +2490,7 @@ class ArchiveAndNotesDbTest(
               'ACTIVE',
               '2029-01-01 00:00:00.000000',
               '다른',
-              'archive-box'
+              'hedgehog-green-book'
             );
 
             insert into sessions (
@@ -2588,7 +2588,7 @@ class ArchiveAndNotesDbTest(
         jdbcTemplate.update(
             """
             insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
-            values (?, '00000000-0000-0000-0000-000000000001', ?, ?, ?, null, ?, 'archive-box')
+            values (?, '00000000-0000-0000-0000-000000000001', ?, ?, ?, null, ?, 'hedgehog-green-book')
             """.trimIndent(),
             membershipId,
             userId,
