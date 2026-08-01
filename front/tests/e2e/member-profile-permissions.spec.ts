@@ -134,7 +134,7 @@ test("active members edit their profile from member space and refresh the accoun
   await page.goto("/app/me");
 
   await page.getByRole("button", { name: "이름 변경" }).click();
-  await page.getByRole("textbox", { name: "이름" }).fill(updatedDisplayName);
+  await page.getByRole("textbox", { name: "표시 이름" }).fill(updatedDisplayName);
   await page.getByRole("button", { name: "이름 저장" }).click();
 
   await expect(page.getByRole("heading", { level: 1, name: updatedDisplayName })).toBeVisible();
