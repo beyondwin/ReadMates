@@ -3,6 +3,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 const CLUB_SLUG = "reading-sai";
 const APP_BASE = `/clubs/${CLUB_SLUG}/app`;
 const MEMBER_NAME = "김독서";
+const PUBLIC_AVATAR_SESSION_ID = "public-avatar-record";
 type FixtureRole = "HOST" | "MEMBER";
 
 // The initial RED run used false here, proving that a fixture missing these
@@ -206,11 +207,79 @@ async function routeSyntheticApp(page: Page, role: FixtureRole = "HOST") {
   });
 }
 
-function assertNoImageRequestEscaped(imageRequestUrls: string[], localHost: string) {
-  const parsed = imageRequestUrls.map((url) => new URL(url));
-  expect(parsed.length).toBeGreaterThan(0);
-  expect(new Set(parsed.map((url) => url.host))).toEqual(new Set([localHost]));
-  expect(parsed.every((url) => url.pathname.startsWith("/assets/avatars/book-club/") && url.pathname.endsWith(".webp"))).toBe(true);
+async function routeSyntheticPublicRecord(page: Page) {
+  await page.route("**/api/bff/api/auth/me", (route) => json(route, { authenticated: false }));
+  await page.route(`**/api/bff/api/public/clubs/${CLUB_SLUG}/sessions/${PUBLIC_AVATAR_SESSION_ID}`, (route) =>
+    json(route, {
+      sessionId: PUBLIC_AVATAR_SESSION_ID,
+      sessionNumber: 8,
+      bookTitle: "공개 아바타 기록",
+      bookAuthor: "합성 저자",
+      bookImageUrl: null,
+      date: "2026-08-01",
+      summary: "공개 가능한 합성 기록입니다.",
+      highlights: [
+        {
+          text: "함께 읽은 문장",
+          sortOrder: 1,
+          authorName: "공개 독자",
+          authorShortName: "독자",
+          avatarKey: "reading-notes",
+        },
+        {
+          text: "알 수 없는 키도 안전합니다",
+          sortOrder: 2,
+          authorName: "안전 독자",
+          authorShortName: "안전",
+          avatarKey: "not-allowlisted",
+        },
+      ],
+      oneLiners: [
+        {
+          authorName: "공개 한줄평",
+          authorShortName: "한줄",
+          avatarKey: "calendar-book",
+          text: "짧은 공개 감상",
+        },
+      ],
+    }),
+  );
+}
+
+type ImageNetworkEvidence = {
+  requests: string[];
+  responses: Array<{ url: string; contentType: string }>;
+};
+
+function observeImageNetwork(page: Page): ImageNetworkEvidence {
+  const evidence: ImageNetworkEvidence = { requests: [], responses: [] };
+  page.on("request", (request) => {
+    if (request.resourceType() === "image") evidence.requests.push(request.url());
+  });
+  page.on("response", (response) => {
+    if (response.request().resourceType() === "image") {
+      evidence.responses.push({ url: response.url(), contentType: response.headers()["content-type"] ?? "" });
+    }
+  });
+  return evidence;
+}
+
+function resetImageNetwork(evidence: ImageNetworkEvidence) {
+  evidence.requests.length = 0;
+  evidence.responses.length = 0;
+}
+
+async function assertVisibleAvatarNetwork(evidence: ImageNetworkEvidence, localHost: string, expectedPaths: string[]) {
+  await expect.poll(() => new Set(evidence.responses.map(({ url }) => new URL(url).pathname)).size).toBe(expectedPaths.length);
+  const requested = evidence.requests.map((url) => new URL(url));
+  const responded = evidence.responses.map(({ url }) => new URL(url));
+  expect(requested.length).toBeGreaterThan(0);
+  expect(new Set(requested.map((url) => url.host))).toEqual(new Set([localHost]));
+  expect(requested.every((url) => url.pathname.startsWith("/assets/avatars/book-club/") && url.pathname.endsWith(".webp"))).toBe(true);
+  expect(new Set(requested.map((url) => url.pathname))).toEqual(new Set(expectedPaths));
+  expect(new Set(requested.map((url) => url.pathname)).size).toBeLessThan(20);
+  expect(new Set(responded.map((url) => url.pathname))).toEqual(new Set(expectedPaths));
+  expect(evidence.responses.every(({ contentType }) => contentType.startsWith("image/webp"))).toBe(true);
 }
 
 async function expectVisibleUnclippedMobileAccount(page: Page, width: number) {
@@ -235,10 +304,7 @@ test("non-host member keeps the explicit account action without a workspace swit
 });
 
 test("scoped account navigation preserves local avatar identity across mobile and desktop", async ({ page }, testInfo) => {
-  const imageRequestUrls: string[] = [];
-  page.on("request", (request) => {
-    if (request.resourceType() === "image") imageRequestUrls.push(request.url());
-  });
+  const imageEvidence = observeImageNetwork(page);
   await routeSyntheticApp(page);
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -296,6 +362,9 @@ test("scoped account navigation preserves local avatar identity across mobile an
   await expect(desktopNotificationAccount.locator("img")).toHaveAttribute("src", "/assets/avatars/book-club/reading-lamp.webp");
   await page.screenshot({ path: testInfo.outputPath("1280-notifications-account.png"), fullPage: true });
 
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Network.setCacheDisabled", { cacheDisabled: true });
+  resetImageNetwork(imageEvidence);
   await page.goto(`${APP_BASE}/session/current`);
   const desktopAccount = page.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` });
   await expect(desktopAccount).toContainText(MEMBER_NAME);
@@ -313,9 +382,13 @@ test("scoped account navigation preserves local avatar identity across mobile an
     "/assets/avatars/book-club/calendar-book.webp",
   ]);
   await page.screenshot({ path: testInfo.outputPath("1280-desktop-account-roster.png"), fullPage: true });
+  await assertVisibleAvatarNetwork(imageEvidence, new URL(page.url()).host, [
+    "/assets/avatars/book-club/reading-lamp.webp",
+    "/assets/avatars/book-club/book-tote.webp",
+    "/assets/avatars/book-club/calendar-book.webp",
+  ]);
 
-  const cdp = await page.context().newCDPSession(page);
-  await cdp.send("Network.setCacheDisabled", { cacheDisabled: true });
+  resetImageNetwork(imageEvidence);
   await page.route("**/assets/avatars/book-club/reading-lamp.webp", (route) => route.abort());
   await page.reload();
   await expect(page.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` })).toBeVisible();
@@ -325,6 +398,27 @@ test("scoped account navigation preserves local avatar identity across mobile an
   );
   await page.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` }).click();
   await expect(page.getByRole("dialog", { name: MEMBER_NAME }).getByRole("button", { name: "로그아웃" })).toBeVisible();
+});
 
-  assertNoImageRequestEscaped(imageRequestUrls, new URL(page.url()).host);
+test("public record requests exactly its visible local WebP avatars", async ({ page }, testInfo) => {
+  const imageEvidence = observeImageNetwork(page);
+  await routeSyntheticPublicRecord(page);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`/clubs/${CLUB_SLUG}/sessions/${PUBLIC_AVATAR_SESSION_ID}`);
+
+  await expect(page.getByRole("heading", { name: "공개 아바타 기록" })).toBeVisible();
+  await expect(page.getByText("공개 독자", { exact: true })).toBeVisible();
+  await expect(page.getByText("안전 독자", { exact: true })).toBeVisible();
+  await expect(page.getByText("공개 한줄평", { exact: true })).toBeVisible();
+  expect(await page.locator("main img").evaluateAll((images) => images.map((image) => image.getAttribute("src")))).toEqual([
+    "/assets/avatars/book-club/reading-notes.webp",
+    "/assets/avatars/book-club/archive-box.webp",
+    "/assets/avatars/book-club/calendar-book.webp",
+  ]);
+  await assertVisibleAvatarNetwork(imageEvidence, new URL(page.url()).host, [
+    "/assets/avatars/book-club/reading-notes.webp",
+    "/assets/avatars/book-club/archive-box.webp",
+    "/assets/avatars/book-club/calendar-book.webp",
+  ]);
+  await page.screenshot({ path: testInfo.outputPath("1280-public-record-avatars.png"), fullPage: true });
 });
