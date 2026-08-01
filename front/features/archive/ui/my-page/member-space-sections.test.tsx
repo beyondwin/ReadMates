@@ -11,7 +11,7 @@ import type { RecentReadingListItem } from "./recent-reading-list";
 import type { ProfileUpdateResult } from "./types";
 
 const profile: MyPageProfile = {
-  avatarKey: "reading-lamp",
+  avatarKey: "squirrel-acorn",
   displayName: "멤버1",
   accountName: "member-one",
   email: "member1@example.com",
@@ -64,8 +64,8 @@ function renderProfileSummary(canEditProfile = true) {
 
 describe("member-space presentation sections", () => {
   it.each([
-    ["reading-lamp", "/assets/avatars/book-club/reading-lamp.webp"],
-    ["future-avatar", "/assets/avatars/book-club/archive-box.webp"],
+    ["squirrel-acorn", "/assets/avatars/book-club/squirrel-acorn.webp"],
+    ["future-avatar", "/assets/avatars/book-club/hedgehog-green-book.webp"],
   ])("renders the stored %s profile key through AvatarChip", (avatarKey, expectedSrc) => {
     const { container } = render(
       <MemberProfileSummary

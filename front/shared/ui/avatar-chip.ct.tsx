@@ -31,14 +31,14 @@ test("AvatarChip renders every local avatar decoratively at supported sizes", as
 });
 
 test("AvatarChip falls back once and keeps its tile after both image failures", async ({ mount, page }) => {
-  await page.route("**/reading-lamp.webp", (route) => route.fulfill({ status: 404 }));
-  await page.route("**/archive-box.webp", (route) => route.fulfill({ status: 404 }));
+  await page.route("**/squirrel-acorn.webp", (route) => route.fulfill({ status: 404 }));
+  await page.route("**/hedgehog-green-book.webp", (route) => route.fulfill({ status: 404 }));
 
   const component = await mount(
-    <AvatarChip avatarKey="reading-lamp" label="" name="회원" size={24} />,
+    <AvatarChip avatarKey="squirrel-acorn" label="" name="회원" size={24} />,
   );
 
-  await expect(component.locator("img")).toHaveAttribute("src", /archive-box\.webp$/);
+  await expect(component.locator("img")).toHaveAttribute("src", /hedgehog-green-book\.webp$/);
   await expect(component.locator("img")).toHaveCount(0);
   await expect(component).toBeVisible();
 });

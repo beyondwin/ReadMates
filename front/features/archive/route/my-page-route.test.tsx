@@ -17,7 +17,7 @@ vi.mock("react-router-dom", async (importOriginal) => ({
 
 const data: MyPageRouteData = {
   profile: {
-    avatarKey: "book-tote",
+    avatarKey: "fennec-heart-mug",
     displayName: "샘플 멤버",
     accountName: "sample-member",
     email: "member@example.com",
@@ -92,7 +92,7 @@ describe("MyPageRoute", () => {
     expect(screen.getByRole("heading", { level: 1, name: "샘플 멤버" })).toBeVisible();
     expect(document.querySelector(".rm-member-profile__avatar .rm-avatar-chip img")).toHaveAttribute(
       "src",
-      "/assets/avatars/book-club/book-tote.webp",
+      "/assets/avatars/book-club/fennec-heart-mug.webp",
     );
     expect(screen.getByText("9번의 모임에서 7권을 끝까지 읽었어요.")).toBeVisible();
     expect(screen.queryByRole("link", { name: "계정 관리" })).toBeNull();

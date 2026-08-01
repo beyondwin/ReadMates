@@ -1540,7 +1540,7 @@ describe("HostSessionEditor", () => {
             ...session.attendees,
             {
               membershipId: "membership-removed",
-              avatarKey: "archive-box",
+              avatarKey: "hedgehog-green-book",
               displayName: "제외",
               accountName: "제외된 멤버",
               rsvpStatus: "GOING",

@@ -8,7 +8,7 @@ import type { RecentReadingListItem } from "@/features/archive/ui/my-page/recent
 afterEach(cleanup);
 
 const profile: MyPageProfile = {
-  avatarKey: "reading-lamp",
+  avatarKey: "squirrel-acorn",
   displayName: "샘플 멤버",
   accountName: "sample-member",
   email: "member@example.com",
