@@ -189,7 +189,7 @@ describe("member-space presentation sections", () => {
     expect(screen.getByText("저장 중…")).toBeVisible();
   });
 
-  it("keeps the editor open and exposes a nearby save error", async () => {
+  it("keeps the edited draft focused and linked to a nearby save error", async () => {
     const user = userEvent.setup();
     render(
       <MemberProfileSummary
@@ -203,12 +203,18 @@ describe("member-space presentation sections", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "이름 변경" }));
+    const input = screen.getByRole("textbox", { name: "표시 이름" });
+    await user.clear(input);
+    await user.type(input, "새 표시 이름");
     await user.click(screen.getByRole("button", { name: "이름 저장" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(
       "같은 클럽에서 이미 쓰고 있는 이름입니다.",
     );
-    expect(screen.getByLabelText("표시 이름")).toBeVisible();
+    expect(input).toHaveValue("새 표시 이름");
+    expect(input).toHaveAttribute("aria-describedby", alert.id);
+    expect(input).toHaveFocus();
   });
 
   it("places the profile before achievements inside the member-space overview", () => {

@@ -45,7 +45,7 @@ export function ProfileNameEditor({
       : data.displayName;
 
   useEffect(() => {
-    if (editing) {
+    if (editing && !saving) {
       inputRef.current?.focus();
       return;
     }
@@ -54,7 +54,7 @@ export function ProfileNameEditor({
       shouldRestoreFocusRef.current = false;
       editButtonRef.current?.focus();
     }
-  }, [editing]);
+  }, [editing, saving]);
 
   function cancelEditing() {
     if (savingRef.current) {
