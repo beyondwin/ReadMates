@@ -147,11 +147,11 @@ WAI-ARIA menu button pattern은 trigger가 메뉴를 연다는 시각적 단서�
 
 데스크톱 trigger는 다음을 한 button 안에 표시한다.
 
-- 실제 사용자 표시 이름 기반 avatar 또는 이니셜
+- `docs/superpowers/specs/2026-08-01-neutral-book-club-avatars-design.md`에서 정의한 고정 북클럽 아바타
 - 표시 이름
 - chevron
 
-역할명 `호스트`를 avatar identity로 대신하지 않는다. 긴 한국어·영어 이름은 header 폭을 침범하지 않도록 최대 폭과 ellipsis를 적용하며 접근 가능한 이름에는 전체 표시 이름을 유지한다.
+역할명 `호스트`나 이름의 첫 글자를 avatar identity로 대신하지 않는다. 긴 한국어·영어 이름은 header 폭을 침범하지 않도록 최대 폭과 ellipsis를 적용하며 접근 가능한 이름에는 전체 표시 이름을 유지한다. 아바타의 생성·배정·fallback·공개 안전 규칙은 중성적 북클럽 아바타 설계가 소유한다.
 
 ### 7.3 popover
 
