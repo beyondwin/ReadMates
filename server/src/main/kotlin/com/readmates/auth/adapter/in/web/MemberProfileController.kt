@@ -7,7 +7,6 @@ import com.readmates.auth.application.port.`in`.UpdateOwnMemberAvatarUseCase
 import com.readmates.auth.application.port.`in`.UpdateOwnMemberProfileUseCase
 import com.readmates.auth.application.service.MemberProfileError
 import com.readmates.auth.application.service.MemberProfileException
-import com.readmates.club.adapter.`in`.web.ClubContextSource
 import com.readmates.club.adapter.`in`.web.resolveClubContext
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
 import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
@@ -52,14 +51,12 @@ class MemberProfileController(
         request: HttpServletRequest,
         @RequestBody payload: MemberAvatarUpdateRequest,
     ): MemberProfileResponse {
-        val requestedClubContext = request.resolveClubContext(resolveClubContextUseCase)
         val currentClubId =
-            when {
-                requestedClubContext.context != null -> requestedClubContext.context.clubId
-                requestedClubContext.source == ClubContextSource.SLUG ->
-                    throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
-                else -> null
-            }
+            request
+                .resolveClubContext(resolveClubContextUseCase)
+                .context
+                ?.clubId
+                ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
         val profile =
             updateOwnMemberAvatar.updateOwnAvatar(
                 authentication.emailOrNull(),

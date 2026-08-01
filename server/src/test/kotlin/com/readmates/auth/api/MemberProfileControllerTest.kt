@@ -108,6 +108,7 @@ class MemberProfileControllerTest(
             .patch("/api/me/avatar") {
                 cookie(cookie)
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("X-Readmates-Club-Slug", "reading-sai")
                 header("Origin", "http://localhost:3000")
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
@@ -149,6 +150,30 @@ class MemberProfileControllerTest(
     }
 
     @Test
+    fun `own avatar update rejects missing trusted club context for a multi club identity`() {
+        val email = insertProfileMember("self.avatar.missing.context", "ACTIVE", shortName = "PrimaryAvatar")
+        val primaryMembershipId = membershipIdForEmail(email)
+        val otherMembershipId = insertSecondClubMembership(email, "turtle-winter-book")
+        val cookie = sessionCookieForEmail(email)
+
+        mockMvc
+            .patch("/api/me/avatar") {
+                cookie(cookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"avatarKey":"hedgehog-green-mug"}"""
+            }.andExpect {
+                status { isNotFound() }
+                jsonPath("$.code") { value("MEMBER_NOT_FOUND") }
+            }
+
+        assertEquals("squirrel-acorn", avatarKeyForMembership(primaryMembershipId))
+        assertEquals("turtle-winter-book", avatarKeyForMembership(otherMembershipId))
+    }
+
+    @Test
     fun `viewer updates own avatar`() {
         val email = insertProfileMember("self.avatar.viewer", "VIEWER", shortName = "ViewerAvatar")
         val cookie = sessionCookieForEmail(email)
@@ -158,6 +183,7 @@ class MemberProfileControllerTest(
             .patch("/api/me/avatar") {
                 cookie(cookie)
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("X-Readmates-Club-Slug", "reading-sai")
                 header("Origin", "http://localhost:3000")
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
@@ -175,6 +201,7 @@ class MemberProfileControllerTest(
         mockMvc
             .patch("/api/me/avatar") {
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("X-Readmates-Club-Slug", "reading-sai")
                 header("Origin", "http://localhost:3000")
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
@@ -196,6 +223,7 @@ class MemberProfileControllerTest(
                 .patch("/api/me/avatar") {
                     cookie(cookie)
                     header("X-Readmates-Bff-Secret", "test-bff-secret")
+                    header("X-Readmates-Club-Slug", "reading-sai")
                     header("Origin", "http://localhost:3000")
                     with(csrf())
                     contentType = MediaType.APPLICATION_JSON
@@ -218,6 +246,7 @@ class MemberProfileControllerTest(
             .patch("/api/me/avatar") {
                 cookie(cookie)
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("X-Readmates-Club-Slug", "reading-sai")
                 header("Origin", "http://localhost:3000")
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
@@ -245,6 +274,7 @@ class MemberProfileControllerTest(
             .patch("/api/me/avatar") {
                 cookie(cookie)
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("X-Readmates-Club-Slug", "reading-sai")
                 header("Origin", "http://localhost:3000")
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON

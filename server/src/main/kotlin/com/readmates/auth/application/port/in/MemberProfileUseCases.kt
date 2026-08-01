@@ -16,7 +16,7 @@ interface UpdateOwnMemberProfileUseCase {
 interface UpdateOwnMemberAvatarUseCase {
     fun updateOwnAvatar(
         authenticationEmail: String?,
-        currentClubId: UUID?,
+        currentClubId: UUID,
         command: UpdateMemberAvatarCommand,
     ): MemberProfile
 }

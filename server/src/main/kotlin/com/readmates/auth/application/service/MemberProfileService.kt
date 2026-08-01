@@ -59,7 +59,7 @@ class MemberProfileService(
     @Transactional
     override fun updateOwnAvatar(
         authenticationEmail: String?,
-        currentClubId: UUID?,
+        currentClubId: UUID,
         command: UpdateMemberAvatarCommand,
     ): MemberProfile {
         val email = authenticatedEmail(authenticationEmail)
@@ -70,7 +70,7 @@ class MemberProfileService(
         }
         val profile =
             memberProfileStore
-                .findProfileMemberByEmail(email, currentClubId)
+                .findProfileMemberByEmail(email, member.clubId)
                 ?.toMemberProfile()
                 ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
         cacheInvalidation.evictClubContentAfterCommit(member.clubId)
@@ -228,7 +228,7 @@ class MemberProfileService(
 
 private fun MemberProfileStorePort.findOwnAvatarMutableMember(
     email: String,
-    clubId: UUID?,
+    clubId: UUID,
 ): MemberProfileRow {
     val member =
         findProfileMemberByEmail(email, clubId)
