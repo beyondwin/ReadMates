@@ -3,6 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { usableJoinedClubs } from "@/features/club-selection/model/club-entry";
 import { AccountMenuController } from "@/features/auth/route/account-menu-controller";
+import { GuestAccountControl } from "@/features/guest-browse/ui/guest-account-control";
+import { GuestNavigationLink } from "@/features/guest-browse/ui/guest-navigation-dialog";
+import type { ClubAppAudience } from "@/features/guest-browse/model/club-app-audience";
 import { hostCurrentSessionQuery } from "@/features/host/queries/host-session-queries";
 import { useAuth, useAuthActions } from "@/src/app/auth-state";
 import {
@@ -140,8 +143,10 @@ function ClubSwitcher({
 
 export function AppRouteLayout({
   scopedAuth,
+  audience,
 }: {
   scopedAuth?: AuthMeResponse;
+  audience?: ClubAppAudience;
 } = {}) {
   const state = useAuth();
   const { markLoggedOut } = useAuthActions();
@@ -155,10 +160,12 @@ export function AppRouteLayout({
     : state.status === "ready"
       ? state.auth
       : null;
+  const isGuestAudience = audience === "GUEST";
+  const AppLinkComponent = isGuestAudience ? GuestNavigationLink : Link;
   const isHostWorkspace = appPath.startsWith("/app/host");
   const isHostRecordRoute =
     appPath.startsWith("/app/archive") || appPath.startsWith("/app/sessions/") || appPath.startsWith("/app/feedback/");
-  const isActiveHost = auth ? canUseHostApp(auth) : false;
+  const isActiveHost = !isGuestAudience && auth ? canUseHostApp(auth) : false;
   const desktopVariant = isHostWorkspace ? "host" : "member";
   const explicitWorkspace = readReadmatesWorkspaceState(location.state);
   const storedWorkspace = readStoredReadmatesMobileWorkspace();
@@ -221,9 +228,11 @@ export function AppRouteLayout({
           currentSessionId={desktopVariant === "host" ? currentSessionId : null}
           currentSessionStatus={desktopVariant === "host" ? currentSessionStatus : "ready"}
           onRetryCurrentSession={desktopVariant === "host" ? retryCurrentSession : undefined}
-          LinkComponent={Link}
+          LinkComponent={AppLinkComponent}
           accountControl={
-            auth?.authenticated ? (
+            isGuestAudience && clubSlug ? (
+              <GuestAccountControl clubSlug={clubSlug} appPath={appPath} LinkComponent={Link} />
+            ) : auth?.authenticated ? (
               <AccountMenuController
                 auth={auth}
                 appBasePath={basePath}
@@ -239,10 +248,12 @@ export function AppRouteLayout({
           variant={mobileVariant}
           showHostEntry={showHostEntry}
           appBasePath={basePath}
-          LinkComponent={Link}
+          LinkComponent={AppLinkComponent}
           navigationContinuity={readmatesNavigationContinuity}
           accountControl={
-            auth?.authenticated ? (
+            isGuestAudience && clubSlug ? (
+              <GuestAccountControl clubSlug={clubSlug} appPath={appPath} LinkComponent={Link} />
+            ) : auth?.authenticated ? (
               <AccountMenuController
                 auth={auth}
                 appBasePath={basePath}
@@ -264,7 +275,11 @@ export function AppRouteLayout({
         <RouteOutlet />
       </div>
       <div className="desktop-only">
-        <PublicFooter showGuestMemberActions={false} LinkComponent={Link} />
+        <PublicFooter
+          publicBasePath={isGuestAudience && clubSlug ? `/clubs/${encodeURIComponent(clubSlug)}` : ""}
+          showGuestMemberActions={false}
+          LinkComponent={AppLinkComponent}
+        />
       </div>
       <div className="mobile-only">
         <MobileTabBar
@@ -273,7 +288,8 @@ export function AppRouteLayout({
           currentSessionStatus={currentSessionStatus}
           onRetryCurrentSession={retryCurrentSession}
           appBasePath={basePath}
-          LinkComponent={Link}
+          appPath={appPath}
+          LinkComponent={AppLinkComponent}
         />
       </div>
     </div>

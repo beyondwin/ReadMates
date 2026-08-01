@@ -1,4 +1,4 @@
-import type { LoaderFunctionArgs } from "react-router-dom";
+import type { LoaderFunction, LoaderFunctionArgs } from "react-router-dom";
 import { fetchGuestBrowseShell } from "@/features/guest-browse/api/guest-browse-api";
 import type { GuestBrowseShell } from "@/features/guest-browse/api/guest-browse-contracts";
 import { deriveClubAppAudience, type ClubAppAudience } from "@/features/guest-browse/model/club-app-audience";
@@ -9,7 +9,11 @@ import { authMePath, clubSlugFromLoaderArgs, type ClubScopedLoaderArgs } from "@
 export type ClubAppAccess = {
   audience: ClubAppAudience;
   auth: AuthMeResponse;
-  club: GuestBrowseShell;
+  club: GuestBrowseShell | null;
+};
+
+export type GuestScopedRouteData = {
+  guestRoute: true;
 };
 
 function requiredClubSlug(args?: ClubScopedLoaderArgs) {
@@ -22,10 +26,35 @@ function requiredClubSlug(args?: ClubScopedLoaderArgs) {
 
 export async function loadClubAppAudience(args?: Pick<LoaderFunctionArgs, "params">): Promise<ClubAppAccess> {
   const clubSlug = requiredClubSlug(args);
-  const [auth, club] = await Promise.all([
-    readmatesPublicFetch<AuthMeResponse>(authMePath(clubSlug)),
-    fetchGuestBrowseShell(clubSlug),
-  ]);
+  const auth = await readmatesPublicFetch<AuthMeResponse>(authMePath(clubSlug));
+  const audience = deriveClubAppAudience(auth);
 
-  return { audience: deriveClubAppAudience(auth), auth, club };
+  if (audience !== "GUEST" || auth.authenticated) {
+    return { audience, auth, club: null };
+  }
+
+  const club = await fetchGuestBrowseShell(clubSlug);
+
+  return { audience, auth, club };
+}
+
+export async function loadScopedClubAppAccess(args?: LoaderFunctionArgs): Promise<ClubAppAccess> {
+  return loadClubAppAudience(args);
+}
+
+export function scopedGuestRouteLoader(loadProtectedLoader: () => Promise<LoaderFunction>) {
+  return async function guardedScopedRouteLoader(args: LoaderFunctionArgs) {
+    const access = await loadClubAppAudience(args);
+
+    if (access.audience === "GUEST" && !access.auth.authenticated) {
+      return { guestRoute: true } satisfies GuestScopedRouteData;
+    }
+
+    const protectedLoader = await loadProtectedLoader();
+    return protectedLoader(args);
+  };
+}
+
+export function isGuestScopedRouteData(data: unknown): data is GuestScopedRouteData {
+  return Boolean(data && typeof data === "object" && "guestRoute" in data && data.guestRoute === true);
 }
