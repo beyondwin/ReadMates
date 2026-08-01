@@ -9,6 +9,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 ### Fixed
 
 - **Google 로그인 복구:** 종료된 멤버십 또는 Google 인증 실패 뒤에는 다른 Google 계정을 명시적으로 선택해 다시 로그인할 수 있습니다. 카카오톡 인앱 브라우저에서는 외부 브라우저 안내와 로그인 주소 복사를 제공하며, 안전한 멤버 복귀 경로와 기존 OAuth·세션 보안 경계는 유지합니다. 로컬 dev-login은 명시적으로 활성화된 Google OAuth 설정이 없으면 깨진 provider 링크를 노출하지 않고, macOS Keychain의 localhost 전용 credential을 backend에만 주입하는 공개 저장소 안전 실행 경로를 제공합니다.
+One-command local OAuth stack + redacted smoke verifier로 기존 서비스 보존 상태에서 localhost 기반 Google login 회귀 점검을 반복 가능하게 했습니다.
 
 ### Highlights
 

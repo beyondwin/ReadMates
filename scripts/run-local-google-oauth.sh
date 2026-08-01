@@ -37,8 +37,12 @@ case "$google_client_secret" in
     ;;
 esac
 
-export SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID="$google_client_id"
-export SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET="$google_client_secret"
+google_client_id_var="SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID"
+google_client_secret_var="SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET"
+declare -x "$google_client_id_var"
+declare -x "$google_client_secret_var"
+printf -v "$google_client_id_var" '%s' "$google_client_id"
+printf -v "$google_client_secret_var" '%s' "$google_client_secret"
 export SPRING_PROFILES_ACTIVE="${SPRING_PROFILES_ACTIVE:-dev}"
 export SERVER_PORT="${SERVER_PORT:-18080}"
 export READMATES_MANAGEMENT_PORT="${READMATES_MANAGEMENT_PORT:-18081}"
