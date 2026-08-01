@@ -334,7 +334,8 @@ class GoogleOAuthLoginSessionTest(
                 select users.google_subject_id,
                        users.auth_provider,
                        users.last_login_at,
-                       memberships.status
+                       memberships.status,
+                       memberships.avatar_key
                 from users
                 join memberships on memberships.user_id = users.id
                 where users.email = ?
@@ -344,6 +345,7 @@ class GoogleOAuthLoginSessionTest(
         assertEquals("google-oauth-invited", memberState["google_subject_id"])
         assertEquals("GOOGLE", memberState["auth_provider"])
         assertEquals("ACTIVE", memberState["status"])
+        assertEquals("books-glasses", memberState["avatar_key"])
         assertNotNull(memberState["last_login_at"])
 
         val participantCount =
@@ -738,7 +740,7 @@ class GoogleOAuthLoginSessionTest(
         )
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
             select
               uuid(),
               clubs.id,
@@ -746,7 +748,8 @@ class GoogleOAuthLoginSessionTest(
               'MEMBER',
               ?,
               utc_timestamp(6),
-              users.short_name
+              users.short_name,
+              'reading-lamp'
             from clubs
             join users on users.email = ?
             where clubs.slug = 'reading-sai'

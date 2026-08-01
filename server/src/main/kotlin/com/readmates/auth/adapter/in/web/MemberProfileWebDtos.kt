@@ -11,6 +11,7 @@ data class MemberProfileResponse(
     val displayName: String,
     val accountName: String,
     val profileImageUrl: String?,
+    val avatarKey: String,
 ) {
     companion object {
         fun from(profile: MemberProfile) =
@@ -19,6 +20,7 @@ data class MemberProfileResponse(
                 displayName = profile.displayName,
                 accountName = profile.accountName,
                 profileImageUrl = profile.profileImageUrl,
+                avatarKey = profile.avatarKey,
             )
     }
 }

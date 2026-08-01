@@ -9,6 +9,7 @@ import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
 import org.hamcrest.Matchers
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -396,6 +397,7 @@ class PlatformAdminControllerTest(
         val clubId = checkNotNull(result.response.jsonPathValue<String>("$.club.clubId"))
         createdClubIds += clubId
         createdMembershipIds += membershipIdsForClub(clubId)
+        assertEquals("reading-lamp", avatarKeyForClub(clubId))
     }
 
     @Test
@@ -556,8 +558,8 @@ class PlatformAdminControllerTest(
         createdUserIds += hostUserId
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
-            values (?, ?, ?, 'HOST', 'ACTIVE', utc_timestamp(6), 'Host')
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+            values (?, ?, ?, 'HOST', 'ACTIVE', utc_timestamp(6), 'Host', 'reading-lamp')
             """.trimIndent(),
             membershipId,
             clubId,
@@ -619,6 +621,13 @@ class PlatformAdminControllerTest(
             .queryForList("select id from memberships where club_id = ?", String::class.java, clubId)
             .filterNotNull()
             .toSet()
+
+    private fun avatarKeyForClub(clubId: String): String =
+        jdbcTemplate.queryForObject(
+            "select avatar_key from memberships where club_id = ?",
+            String::class.java,
+            clubId,
+        ) ?: error("Expected avatar key for club $clubId")
 
     private fun sessionCookieForUser(userId: String): Cookie {
         val issuedSession =

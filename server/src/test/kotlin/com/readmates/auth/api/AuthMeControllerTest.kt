@@ -100,6 +100,8 @@ class AuthMeControllerTest(
                 jsonPath("$.role") { value("MEMBER") }
                 jsonPath("$.displayName") { value("멤버5") }
                 jsonPath("$.accountName") { value("이멤버5") }
+                jsonPath("$.currentMembership.avatarKey") { value("library-stamp") }
+                jsonPath("$.avatarKey") { value("library-stamp") }
                 jsonPath("$.shortName") { doesNotExist() }
                 jsonPath("$.membershipStatus") { value("ACTIVE") }
                 jsonPath("$.approvalState") { value("ACTIVE") }
@@ -126,6 +128,8 @@ class AuthMeControllerTest(
                 jsonPath("$.role") { value("MEMBER") }
                 jsonPath("$.membershipStatus") { value("ACTIVE") }
                 jsonPath("$.approvalState") { value("ACTIVE") }
+                jsonPath("$.currentMembership.avatarKey") { value("reading-lamp") }
+                jsonPath("$.avatarKey") { value("reading-lamp") }
             }
     }
 
@@ -483,6 +487,8 @@ class AuthMeControllerTest(
                 jsonPath("$.authenticated") { value(true) }
                 jsonPath("$.membershipStatus") { value("ACTIVE") }
                 jsonPath("$.approvalState") { value("ACTIVE") }
+                jsonPath("$.currentMembership.avatarKey") { value("reading-lamp") }
+                jsonPath("$.avatarKey") { value("reading-lamp") }
             }
     }
 
@@ -532,8 +538,8 @@ class AuthMeControllerTest(
         createdUserIds += userId
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
-            select ?, clubs.id, ?, 'MEMBER', 'VIEWER', null, ?
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+            select ?, clubs.id, ?, 'MEMBER', 'VIEWER', null, ?, 'reading-lamp'
             from clubs
             where clubs.slug = 'reading-sai'
             """.trimIndent(),
@@ -550,8 +556,8 @@ class AuthMeControllerTest(
         val membershipId = UUID.randomUUID().toString()
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
-            select ?, clubs.id, users.id, 'MEMBER', 'ACTIVE', utc_timestamp(6), '샘플멤버5'
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+            select ?, clubs.id, users.id, 'MEMBER', 'ACTIVE', utc_timestamp(6), '샘플멤버5', 'reading-lamp'
             from clubs
             join users on users.email = 'member5@example.com'
             where clubs.slug = 'sample-book-club'
@@ -566,8 +572,8 @@ class AuthMeControllerTest(
         val membershipId = UUID.randomUUID().toString()
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
-            select ?, clubs.id, users.id, ?, 'ACTIVE', utc_timestamp(6), '샘플호스트'
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+            select ?, clubs.id, users.id, ?, 'ACTIVE', utc_timestamp(6), '샘플호스트', 'reading-lamp'
             from clubs
             join users on users.email = 'host@example.com'
             where clubs.slug = 'sample-book-club'
@@ -598,8 +604,8 @@ class AuthMeControllerTest(
         createdUserIds += userId
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
-            select ?, clubs.id, ?, 'MEMBER', ?, utc_timestamp(6), ?
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+            select ?, clubs.id, ?, 'MEMBER', ?, utc_timestamp(6), ?, 'reading-lamp'
             from clubs
             where clubs.slug = 'reading-sai'
             """.trimIndent(),

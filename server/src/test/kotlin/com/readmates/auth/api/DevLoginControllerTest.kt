@@ -136,7 +136,7 @@ class DevLoginControllerTest(
         )
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
             select
               '00000000-0000-0000-0000-000000009902',
               clubs.id,
@@ -144,7 +144,8 @@ class DevLoginControllerTest(
               'MEMBER',
               'ACTIVE',
               utc_timestamp(6),
-              users.short_name
+              users.short_name,
+              'reading-lamp'
             from clubs
             join users on users.email = 'active.nonseed@example.com'
             where clubs.slug = 'reading-sai'

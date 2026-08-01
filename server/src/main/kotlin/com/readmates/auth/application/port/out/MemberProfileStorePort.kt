@@ -13,6 +13,7 @@ data class MemberProfileRow(
     val displayName: String,
     val accountName: String,
     val profileImageUrl: String?,
+    val avatarKey: String,
     val role: MembershipRole,
     val status: MembershipStatus,
 )

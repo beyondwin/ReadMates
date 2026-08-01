@@ -2,6 +2,7 @@ package com.readmates.auth.application.service
 
 import com.readmates.auth.application.port.out.GoogleAccountStorePort
 import com.readmates.auth.application.port.out.MemberAccountDuplicateException
+import com.readmates.auth.application.port.out.MemberAvatarAllocationPort
 import com.readmates.auth.application.port.out.MemberIdentityLookupPort
 import com.readmates.auth.application.port.out.PlatformAdminLookupPort
 import com.readmates.auth.domain.MembershipStatus
@@ -27,6 +28,7 @@ class GoogleLoginService(
     private val memberIdentityLookup: MemberIdentityLookupPort,
     private val googleAccountStore: GoogleAccountStorePort,
     private val platformAdminLookup: PlatformAdminLookupPort,
+    private val avatarAllocation: MemberAvatarAllocationPort,
 ) {
     @Transactional(isolation = Isolation.READ_COMMITTED)
     fun loginVerifiedGoogleUser(
@@ -87,17 +89,20 @@ class GoogleLoginService(
         normalizedEmail: String,
         displayName: String?,
         profileImageUrl: String?,
-    ): CurrentMember =
-        try {
+    ): CurrentMember {
+        val avatarKey = avatarAllocation.allocateForClubSlug("reading-sai", null)
+        return try {
             googleAccountStore.createViewerGoogleMember(
                 googleSubjectId = googleSubjectId,
                 email = normalizedEmail,
                 displayName = displayName,
                 profileImageUrl = profileImageUrl,
+                avatarKey = avatarKey,
             )
         } catch (exception: MemberAccountDuplicateException) {
             resolveDuplicateViewerGoogleMember(googleSubjectId, normalizedEmail, profileImageUrl, exception)
         }
+    }
 
     private fun resolveDuplicateViewerGoogleMember(
         googleSubjectId: String,

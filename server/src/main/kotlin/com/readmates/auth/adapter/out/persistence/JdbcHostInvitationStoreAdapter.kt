@@ -6,6 +6,7 @@ import com.readmates.auth.application.port.out.CreateHostInvitationCommand
 import com.readmates.auth.application.port.out.HostInvitationListRow
 import com.readmates.auth.application.port.out.HostInvitationStorePort
 import com.readmates.auth.application.port.out.InvitationTokenRow
+import com.readmates.auth.domain.BookClubAvatarKey
 import com.readmates.auth.domain.InvitationStatus
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
@@ -294,6 +295,7 @@ class JdbcHostInvitationStoreAdapter(
         clubId: UUID,
         userId: UUID,
         role: MembershipRole,
+        avatarKey: BookClubAvatarKey,
     ): UUID {
         val existingMembershipId =
             jdbcTemplate
@@ -317,10 +319,12 @@ class JdbcHostInvitationStoreAdapter(
                 set role = ?,
                     status = 'ACTIVE',
                     joined_at = coalesce(joined_at, utc_timestamp(6)),
+                    avatar_key = ?,
                     updated_at = utc_timestamp(6)
                 where id = ?
                 """.trimIndent(),
                 role.name,
+                avatarKey.wireValue,
                 existingMembershipId.dbString(),
             )
             return existingMembershipId
@@ -329,14 +333,15 @@ class JdbcHostInvitationStoreAdapter(
         val membershipId = UUID.randomUUID()
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
-            select ?, ?, users.id, ?, 'ACTIVE', utc_timestamp(6), users.short_name
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+            select ?, ?, users.id, ?, 'ACTIVE', utc_timestamp(6), users.short_name, ?
             from users
             where users.id = ?
             """.trimIndent(),
             membershipId.dbString(),
             clubId.dbString(),
             role.name,
+            avatarKey.wireValue,
             userId.dbString(),
         )
         return membershipId
@@ -408,7 +413,8 @@ class JdbcHostInvitationStoreAdapter(
                   users.name as account_name,
                   coalesce(memberships.short_name, users.name) as display_name,
                   memberships.role,
-                  memberships.status as membership_status
+                  memberships.status as membership_status,
+                  memberships.avatar_key
                 from memberships
                 join users on users.id = memberships.user_id
                 join clubs on clubs.id = memberships.club_id
@@ -427,6 +433,7 @@ class JdbcHostInvitationStoreAdapter(
                         role = MembershipRole.valueOf(resultSet.getString("role")),
                         membershipStatus = MembershipStatus.valueOf(resultSet.getString("membership_status")),
                         clubName = resultSet.getString("club_name"),
+                        avatarKey = resultSet.getString("avatar_key"),
                     )
                 },
                 membershipId.dbString(),

@@ -254,8 +254,8 @@ class SelfMembershipControllerTest(
         createdUserIds += userId
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
-            values (?, '00000000-0000-0000-0000-000000000001', ?, 'HOST', 'ACTIVE', utc_timestamp(6), ?)
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+            values (?, '00000000-0000-0000-0000-000000000001', ?, 'HOST', 'ACTIVE', utc_timestamp(6), ?, 'reading-lamp')
             """.trimIndent(),
             membershipId,
             userId,

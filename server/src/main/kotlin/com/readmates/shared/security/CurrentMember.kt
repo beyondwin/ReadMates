@@ -1,5 +1,6 @@
 package com.readmates.shared.security
 
+import com.readmates.auth.domain.BookClubAvatarKey
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
 import org.springframework.security.authentication.AnonymousAuthenticationToken
@@ -28,6 +29,7 @@ data class CurrentMember(
     val role: MembershipRole,
     val membershipStatus: MembershipStatus = MembershipStatus.ACTIVE,
     val clubName: String = clubSlug,
+    val avatarKey: String = BookClubAvatarKey.fallback.wireValue,
 ) : AuthenticatedClubActor {
     override val isHost: Boolean
         get() = role == MembershipRole.HOST && membershipStatus == MembershipStatus.ACTIVE

@@ -11,4 +11,5 @@ data class MemberProfile(
     val displayName: String,
     val accountName: String,
     val profileImageUrl: String?,
+    val avatarKey: String,
 )

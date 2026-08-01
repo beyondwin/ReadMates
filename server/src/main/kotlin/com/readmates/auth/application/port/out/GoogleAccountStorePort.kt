@@ -1,5 +1,6 @@
 package com.readmates.auth.application.port.out
 
+import com.readmates.auth.domain.BookClubAvatarKey
 import com.readmates.shared.security.CurrentMember
 import java.util.UUID
 
@@ -26,6 +27,7 @@ interface GoogleAccountStorePort {
         email: String,
         displayName: String?,
         profileImageUrl: String?,
+        avatarKey: BookClubAvatarKey,
     ): CurrentMember
 
     fun recordLastLogin(userId: UUID)

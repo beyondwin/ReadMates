@@ -66,5 +66,6 @@ class AuthenticatedMemberResolver(
             accountName = accountName,
             role = role,
             membershipStatus = status,
+            avatarKey = avatarKey,
         )
 }

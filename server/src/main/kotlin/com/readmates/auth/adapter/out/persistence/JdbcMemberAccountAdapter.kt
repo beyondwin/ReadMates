@@ -6,6 +6,7 @@ import com.readmates.auth.application.port.out.GoogleAccountStorePort
 import com.readmates.auth.application.port.out.MemberAccountDuplicateException
 import com.readmates.auth.application.port.out.MemberIdentityLookupPort
 import com.readmates.auth.application.port.out.PlatformAdminLookupPort
+import com.readmates.auth.domain.BookClubAvatarKey
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.club.application.model.JoinedClubSummary
@@ -103,7 +104,8 @@ class JdbcMemberAccountAdapter(
                   users.name as account_name,
                   coalesce(memberships.short_name, users.name) as display_name,
                   memberships.role,
-                  memberships.status as membership_status
+                  memberships.status as membership_status,
+                  memberships.avatar_key
                 from users
                 join memberships on memberships.user_id = users.id
                 join clubs on clubs.id = memberships.club_id
@@ -134,7 +136,8 @@ class JdbcMemberAccountAdapter(
                   users.name as account_name,
                   coalesce(memberships.short_name, users.name) as display_name,
                   memberships.role,
-                  memberships.status as membership_status
+                  memberships.status as membership_status,
+                  memberships.avatar_key
                 from users
                 join memberships on memberships.user_id = users.id
                 join clubs on clubs.id = memberships.club_id
@@ -166,7 +169,8 @@ class JdbcMemberAccountAdapter(
                   users.name as account_name,
                   coalesce(memberships.short_name, users.name) as display_name,
                   memberships.role,
-                  memberships.status as membership_status
+                  memberships.status as membership_status,
+                  memberships.avatar_key
                 from users
                 join memberships on memberships.user_id = users.id
                 join clubs on clubs.id = memberships.club_id
@@ -255,7 +259,8 @@ class JdbcMemberAccountAdapter(
                   users.name as account_name,
                   coalesce(memberships.short_name, users.name) as display_name,
                   memberships.role,
-                  memberships.status as membership_status
+                  memberships.status as membership_status,
+                  memberships.avatar_key
                 from users
                 join memberships on memberships.user_id = users.id
                 join clubs on clubs.id = memberships.club_id
@@ -394,6 +399,7 @@ class JdbcMemberAccountAdapter(
         email: String,
         displayName: String?,
         profileImageUrl: String?,
+        avatarKey: BookClubAvatarKey,
     ): CurrentMember {
         val normalizedSubject =
             googleSubjectId.trim().takeIf { it.isNotEmpty() }
@@ -428,7 +434,7 @@ class JdbcMemberAccountAdapter(
 
             jdbcTemplate.update(
                 """
-                insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+                insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
                 select
                   ?,
                   clubs.id,
@@ -436,6 +442,7 @@ class JdbcMemberAccountAdapter(
                   'MEMBER',
                   'VIEWER',
                   null,
+                  ?,
                   ?
                 from clubs
                 where clubs.slug = 'reading-sai'
@@ -443,6 +450,7 @@ class JdbcMemberAccountAdapter(
                 membershipId.dbString(),
                 userId.dbString(),
                 memberDisplayName,
+                avatarKey.wireValue,
             )
         } catch (exception: DuplicateKeyException) {
             throw MemberAccountDuplicateException(exception)
@@ -466,7 +474,8 @@ class JdbcMemberAccountAdapter(
                   users.name as account_name,
                   coalesce(memberships.short_name, users.name) as display_name,
                   memberships.role,
-                  memberships.status as membership_status
+                  memberships.status as membership_status,
+                  memberships.avatar_key
                 from users
                 join memberships on memberships.user_id = users.id
                 join clubs on clubs.id = memberships.club_id
@@ -525,7 +534,8 @@ class JdbcMemberAccountAdapter(
                   users.name as account_name,
                   coalesce(memberships.short_name, users.name) as display_name,
                   memberships.role,
-                  memberships.status as membership_status
+                  memberships.status as membership_status,
+                  memberships.avatar_key
                 from users
                 join memberships on memberships.user_id = users.id
                 join clubs on clubs.id = memberships.club_id
@@ -576,6 +586,7 @@ class JdbcMemberAccountAdapter(
             role = MembershipRole.valueOf(getString("role")),
             membershipStatus = MembershipStatus.valueOf(getString("membership_status")),
             clubName = getStringOrNull("club_name") ?: getString("club_slug"),
+            avatarKey = getString("avatar_key"),
         )
     }
 

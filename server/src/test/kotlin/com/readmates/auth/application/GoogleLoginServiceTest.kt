@@ -1,5 +1,11 @@
 package com.readmates.auth.application.service
 
+import com.readmates.auth.application.port.out.GoogleAccountStorePort
+import com.readmates.auth.application.port.out.MemberAvatarAllocationPort
+import com.readmates.auth.application.port.out.MemberIdentityLookupPort
+import com.readmates.auth.application.port.out.PlatformAdminLookupPort
+import com.readmates.auth.domain.BookClubAvatarKey
+import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.shared.security.CurrentMember
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
@@ -8,6 +14,9 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.inOrder
+import org.mockito.Mockito.mock
+import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
@@ -30,6 +39,65 @@ class GoogleLoginServiceTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val dataSource: DataSource,
 ) : ReadmatesMySqlIntegrationTestSupport() {
+    @Test
+    fun `allocates default club avatar before persisting a new viewer membership`() {
+        val memberIdentityLookup = mock(MemberIdentityLookupPort::class.java)
+        val googleAccountStore = mock(GoogleAccountStorePort::class.java)
+        val platformAdminLookup = mock(PlatformAdminLookupPort::class.java)
+        val avatarAllocation = mock(MemberAvatarAllocationPort::class.java)
+        val allocatedKey = BookClubAvatarKey.OPEN_BOOK_PENCIL
+        val createdMember =
+            CurrentMember(
+                userId = UUID.randomUUID(),
+                membershipId = UUID.randomUUID(),
+                clubId = UUID.randomUUID(),
+                clubSlug = "reading-sai",
+                email = "allocated.viewer@example.com",
+                displayName = "Allocated Viewer",
+                accountName = "Allocated Viewer",
+                role = MembershipRole.MEMBER,
+                membershipStatus = MembershipStatus.VIEWER,
+                avatarKey = allocatedKey.wireValue,
+            )
+        `when`(avatarAllocation.allocateForClubSlug("reading-sai", null)).thenReturn(allocatedKey)
+        `when`(
+            googleAccountStore.createViewerGoogleMember(
+                "google-allocated-viewer",
+                "allocated.viewer@example.com",
+                "Allocated Viewer",
+                "https://example.com/profile.png",
+                allocatedKey,
+            ),
+        ).thenReturn(createdMember)
+        val service =
+            GoogleLoginService(
+                memberIdentityLookup,
+                googleAccountStore,
+                platformAdminLookup,
+                avatarAllocation,
+            )
+
+        val actual =
+            service.loginVerifiedGoogleUser(
+                googleSubjectId = "google-allocated-viewer",
+                email = "allocated.viewer@example.com",
+                displayName = "Allocated Viewer",
+                profileImageUrl = "https://example.com/profile.png",
+            )
+
+        assertEquals(createdMember, actual)
+        inOrder(avatarAllocation, googleAccountStore).apply {
+            verify(avatarAllocation).allocateForClubSlug("reading-sai", null)
+            verify(googleAccountStore).createViewerGoogleMember(
+                "google-allocated-viewer",
+                "allocated.viewer@example.com",
+                "Allocated Viewer",
+                "https://example.com/profile.png",
+                allocatedKey,
+            )
+        }
+    }
+
     @Test
     fun `connects existing gmail user and preserves active membership`() {
         val member =
@@ -113,8 +181,8 @@ class GoogleLoginServiceTest(
                 connection
                     .prepareStatement(
                         """
-                        insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
-                        values (?, '00000000-0000-0000-0000-000000000001', ?, 'MEMBER', 'VIEWER', null, 'Race Viewer')
+                        insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+                        values (?, '00000000-0000-0000-0000-000000000001', ?, 'MEMBER', 'VIEWER', null, 'Race Viewer', 'reading-lamp')
                         """.trimIndent(),
                     ).use { statement ->
                         statement.setString(1, membershipId)

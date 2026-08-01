@@ -168,6 +168,7 @@ class MemberProfileService(
             accountName = accountName,
             role = role,
             membershipStatus = status,
+            avatarKey = avatarKey,
         )
 
     private fun MemberProfileRow.toMemberProfile(): MemberProfile =
@@ -176,6 +177,7 @@ class MemberProfileService(
             displayName = displayName,
             accountName = accountName,
             profileImageUrl = profileImageUrl,
+            avatarKey = avatarKey,
         )
 
     private companion object {

@@ -10,6 +10,7 @@ import com.readmates.auth.application.port.out.HostInvitationListRow
 import com.readmates.auth.application.port.out.HostInvitationStorePort
 import com.readmates.auth.application.port.out.InvitationTokenRow
 import com.readmates.auth.application.port.out.MemberAccountDuplicateException
+import com.readmates.auth.application.port.out.MemberAvatarAllocationPort
 import com.readmates.auth.application.port.out.MemberIdentityLookupPort
 import com.readmates.auth.domain.InvitationStatus
 import com.readmates.auth.domain.MembershipRole
@@ -63,6 +64,7 @@ class InvitationService(
     private val tokenService: InvitationTokenService,
     private val memberIdentityLookup: MemberIdentityLookupPort,
     private val googleAccountStore: GoogleAccountStorePort,
+    private val avatarAllocation: MemberAvatarAllocationPort,
     @param:Value("\${readmates.app-base-url:http://localhost:3000}")
     private val appBaseUrl: String,
 ) : ManageHostInvitationsUseCase,
@@ -178,7 +180,8 @@ class InvitationService(
                 displayName = displayName ?: invitation.name,
                 profileImageUrl = profileImageUrl,
             )
-        val membershipId = invitationStore.upsertActiveMembership(invitation.clubId, userId, invitation.role)
+        val avatarKey = avatarAllocation.allocate(invitation.clubId, userId)
+        val membershipId = invitationStore.upsertActiveMembership(invitation.clubId, userId, invitation.role, avatarKey)
 
         if (!invitationStore.acceptInvitation(invitation.id, userId)) {
             throw InvitationDomainException(

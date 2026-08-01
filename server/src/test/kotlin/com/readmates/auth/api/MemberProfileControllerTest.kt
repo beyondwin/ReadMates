@@ -85,6 +85,7 @@ class MemberProfileControllerTest(
                 jsonPath("$.membershipId") { value(membershipId) }
                 jsonPath("$.displayName") { value("After") }
                 jsonPath("$.accountName") { value("self.active") }
+                jsonPath("$.avatarKey") { value("reading-lamp") }
                 jsonPath("$.shortName") { doesNotExist() }
                 jsonPath("$.profileImageUrl") { value("https://cdn.example.test/profiles/self-active.png") }
                 jsonPath("$.authenticated") { doesNotExist() }
@@ -93,6 +94,7 @@ class MemberProfileControllerTest(
             }
 
         assertEquals("After", shortNameForEmail(email))
+        assertEquals("reading-lamp", avatarKeyForMembership(membershipId))
     }
 
     @Test
@@ -385,12 +387,14 @@ class MemberProfileControllerTest(
                     status { isOk() }
                     jsonPath("$.membershipId") { value(membershipId) }
                     jsonPath("$.displayName") { value(newShortName) }
+                    jsonPath("$.avatarKey") { value("reading-lamp") }
                     jsonPath("$.shortName") { doesNotExist() }
                     jsonPath("$.status") { value(status) }
                     jsonPath("$.canDeactivate") { exists() }
                 }
 
             assertEquals(newShortName, shortNameForMembership(membershipId))
+            assertEquals("reading-lamp", avatarKeyForMembership(membershipId))
         }
     }
 
@@ -482,8 +486,8 @@ class MemberProfileControllerTest(
         createdUserIds += userId
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
-            values (?, '00000000-0000-0000-0000-000000000001', ?, 'MEMBER', ?, utc_timestamp(6), ?)
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+            values (?, '00000000-0000-0000-0000-000000000001', ?, 'MEMBER', ?, utc_timestamp(6), ?, 'reading-lamp')
             """.trimIndent(),
             membershipId,
             userId,
@@ -527,8 +531,8 @@ class MemberProfileControllerTest(
         createdUserIds += userId
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
-            values (?, ?, ?, 'MEMBER', ?, utc_timestamp(6), ?)
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+            values (?, ?, ?, 'MEMBER', ?, utc_timestamp(6), ?, 'reading-lamp')
             """.trimIndent(),
             membershipId,
             clubId,
@@ -591,6 +595,13 @@ class MemberProfileControllerTest(
             String::class.java,
             membershipId,
         ) ?: error("Expected display name for $membershipId")
+
+    private fun avatarKeyForMembership(membershipId: String): String =
+        jdbcTemplate.queryForObject(
+            "select avatar_key from memberships where id = ?",
+            String::class.java,
+            membershipId,
+        ) ?: error("Expected avatar key for $membershipId")
 
     private fun jsonString(value: String): String = "\"${value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")}\""
 

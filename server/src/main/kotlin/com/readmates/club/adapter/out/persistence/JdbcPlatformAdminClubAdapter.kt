@@ -1,5 +1,6 @@
 package com.readmates.club.adapter.out.persistence
 
+import com.readmates.auth.domain.BookClubAvatarKey
 import com.readmates.club.application.model.FirstHostOnboardingState
 import com.readmates.club.application.model.PlatformAdminClubListItem
 import com.readmates.club.application.port.out.CreatePlatformAdminClubCommand
@@ -154,13 +155,14 @@ class JdbcPlatformAdminClubAdapter(
         val membershipId = UUID.randomUUID()
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
-            values (?, ?, ?, 'HOST', 'ACTIVE', utc_timestamp(6), ?)
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+            values (?, ?, ?, 'HOST', 'ACTIVE', utc_timestamp(6), ?, ?)
             """.trimIndent(),
             membershipId.dbString(),
             clubId.dbString(),
             userId.dbString(),
             displayName.take(HOST_DISPLAY_NAME_MAX_LENGTH),
+            BookClubAvatarKey.READING_LAMP.wireValue,
         )
         return membershipId
     }

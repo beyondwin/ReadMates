@@ -79,6 +79,7 @@ class HostMemberLifecycleControllerTest(
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.items[?(@.membershipId == '$activeMembershipId')].status") { value("ACTIVE") }
+                jsonPath("$.items[?(@.membershipId == '$activeMembershipId')].avatarKey") { value("reading-lamp") }
                 jsonPath("$.items[?(@.membershipId == '$activeMembershipId')].currentSessionParticipationStatus") {
                     value("ACTIVE")
                 }
@@ -124,10 +125,12 @@ class HostMemberLifecycleControllerTest(
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.member.status") { value("SUSPENDED") }
+                jsonPath("$.member.avatarKey") { value("reading-lamp") }
                 jsonPath("$.currentSessionPolicyResult") { value("APPLIED") }
             }
 
         assertEquals("SUSPENDED", membershipStatus(membershipId))
+        assertEquals("reading-lamp", avatarKey(membershipId))
         assertEquals("REMOVED", participationStatus(sessionId, membershipId))
     }
 
@@ -171,11 +174,13 @@ class HostMemberLifecycleControllerTest(
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.member.status") { value("ACTIVE") }
+                jsonPath("$.member.avatarKey") { value("reading-lamp") }
                 jsonPath("$.member.currentSessionParticipationStatus") { doesNotExist() }
                 jsonPath("$.currentSessionPolicyResult") { value("NOT_APPLICABLE") }
             }
 
         assertEquals("ACTIVE", membershipStatus(membershipId))
+        assertEquals("reading-lamp", avatarKey(membershipId))
         assertEquals(null, participationStatusOrNull(sessionId, membershipId))
     }
 
@@ -498,8 +503,8 @@ class HostMemberLifecycleControllerTest(
         createdUserIds += userId
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
-            values (?, '00000000-0000-0000-0000-000000000001', ?, ?, ?, utc_timestamp(6), ?)
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+            values (?, '00000000-0000-0000-0000-000000000001', ?, ?, ?, utc_timestamp(6), ?, 'reading-lamp')
             """.trimIndent(),
             membershipId,
             userId,
@@ -544,8 +549,8 @@ class HostMemberLifecycleControllerTest(
         createdUserIds += userId
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
-            values (?, ?, ?, 'MEMBER', ?, utc_timestamp(6), ?)
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+            values (?, ?, ?, 'MEMBER', ?, utc_timestamp(6), ?, 'reading-lamp')
             """.trimIndent(),
             membershipId,
             clubId,
@@ -686,6 +691,13 @@ class HostMemberLifecycleControllerTest(
             String::class.java,
             membershipId,
         ) ?: error("Expected membership status for $membershipId")
+
+    private fun avatarKey(membershipId: String): String =
+        jdbcTemplate.queryForObject(
+            "select avatar_key from memberships where id = ?",
+            String::class.java,
+            membershipId,
+        ) ?: error("Expected avatar key for $membershipId")
 
     private fun participationStatus(
         sessionId: String,

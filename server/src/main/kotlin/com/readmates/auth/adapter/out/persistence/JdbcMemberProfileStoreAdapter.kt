@@ -34,6 +34,7 @@ class JdbcMemberProfileStoreAdapter(
                   users.name as account_name,
                   coalesce(memberships.short_name, users.name) as display_name,
                   users.profile_image_url,
+                  memberships.avatar_key,
                   memberships.role,
                   memberships.status
                 from users
@@ -62,6 +63,7 @@ class JdbcMemberProfileStoreAdapter(
                   users.name as account_name,
                   coalesce(memberships.short_name, users.name) as display_name,
                   users.profile_image_url,
+                  memberships.avatar_key,
                   memberships.role,
                   memberships.status
                 from users
@@ -92,6 +94,7 @@ class JdbcMemberProfileStoreAdapter(
                   users.name as account_name,
                   coalesce(memberships.short_name, users.name) as display_name,
                   users.profile_image_url,
+                  memberships.avatar_key,
                   memberships.role,
                   memberships.status
                 from memberships
@@ -195,6 +198,7 @@ class JdbcMemberProfileStoreAdapter(
                   users.name as account_name,
                   coalesce(memberships.short_name, users.name) as display_name,
                   users.profile_image_url,
+                  memberships.avatar_key,
                   memberships.role,
                   memberships.status,
                   memberships.joined_at,
@@ -234,6 +238,7 @@ class JdbcMemberProfileStoreAdapter(
             displayName = getString("display_name"),
             accountName = getString("account_name"),
             profileImageUrl = getString("profile_image_url"),
+            avatarKey = getString("avatar_key"),
             role = MembershipRole.valueOf(getString("role")),
             status = MembershipStatus.valueOf(getString("status")),
         )
@@ -250,6 +255,7 @@ class JdbcMemberProfileStoreAdapter(
             displayName = getString("display_name"),
             accountName = getString("account_name"),
             profileImageUrl = getString("profile_image_url"),
+            avatarKey = getString("avatar_key"),
             role = MembershipRole.valueOf(getString("role")),
             status = MembershipStatus.valueOf(getString("status")),
             joinedAt = utcOffsetDateTimeOrNull("joined_at"),

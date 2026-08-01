@@ -33,6 +33,7 @@ data class AuthMemberResponse(
     val displayName: String? = currentMembership?.displayName,
     val role: MembershipRole? = currentMembership?.role,
     val membershipStatus: MembershipStatus? = currentMembership?.membershipStatus,
+    val avatarKey: String? = currentMembership?.avatarKey,
     val approvalState: ApprovalState,
 ) {
     companion object {
@@ -112,6 +113,7 @@ data class AuthCurrentMembership(
     val displayName: String,
     val role: MembershipRole,
     val membershipStatus: MembershipStatus,
+    val avatarKey: String,
     val approvalState: ApprovalState,
 ) {
     companion object {
@@ -123,6 +125,7 @@ data class AuthCurrentMembership(
                 displayName = member.displayName,
                 role = member.role,
                 membershipStatus = member.membershipStatus,
+                avatarKey = member.avatarKey,
                 approvalState = member.membershipStatus.toApprovalState(),
             )
     }

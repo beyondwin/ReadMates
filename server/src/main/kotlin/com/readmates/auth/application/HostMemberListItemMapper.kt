@@ -16,6 +16,7 @@ fun HostMemberListRow.toHostMemberListItem(currentMembershipId: UUID): HostMembe
         displayName = displayName,
         accountName = accountName,
         profileImageUrl = profileImageUrl,
+        avatarKey = avatarKey,
         role = role,
         status = status,
         joinedAt = joinedAt?.toString(),

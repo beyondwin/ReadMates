@@ -1,5 +1,6 @@
 package com.readmates.auth.application.port.out
 
+import com.readmates.auth.domain.BookClubAvatarKey
 import com.readmates.auth.domain.InvitationStatus
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.shared.paging.CursorPage
@@ -86,6 +87,7 @@ interface HostInvitationStorePort {
         clubId: UUID,
         userId: UUID,
         role: MembershipRole,
+        avatarKey: BookClubAvatarKey,
     ): UUID
 
     fun acceptInvitation(
