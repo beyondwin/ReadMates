@@ -47,7 +47,7 @@ const recentReadings: RecentReadingListItem[] = [{
   bookImageUrl: null,
   coverFallbackLabel: "최",
   activityLabels: ["질문 2"],
-  feedbackStatus: "피드백 열림",
+  feedbackStatus: "피드백 O",
   href: "/app/sessions/session-7",
 }];
 
