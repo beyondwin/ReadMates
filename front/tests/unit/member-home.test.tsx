@@ -283,7 +283,7 @@ describe("MemberHome", () => {
     expect(mobileElement.querySelector(".m-timeline-dot")).not.toBeInTheDocument();
     expect(mobileElement.querySelectorAll(".rm-mobile-shortcuts__icon")).toHaveLength(2);
     expect(screen.queryByRole("link", { name: "호스트 화면" })).not.toBeInTheDocument();
-    expect(mobileView.getByRole("link", { name: /피드백 문서/ })).toHaveAttribute(
+    expect(mobileView.getByRole("link", { name: "피드백 문서 회차 피드백" })).toHaveAttribute(
       "href",
       "/app/archive?view=report",
     );
@@ -342,8 +342,14 @@ describe("MemberHome", () => {
     const mobile = within(container.querySelector(".rm-member-home-mobile") as HTMLElement);
 
     expect(desktop.getByRole("region", { name: "지난 모임 회고" })).toBeInTheDocument();
-    expect(desktop.getByRole("link", { name: "기록 보기" })).toHaveAttribute("href", "/app/sessions/session-6");
-    expect(desktop.getByRole("link", { name: "피드백 보기" })).toHaveAttribute("href", "/app/feedback/session-6");
+    expect(desktop.getByRole("link", { name: /모임 기록 보기/ })).toHaveAttribute(
+      "href",
+      "/app/sessions/session-6",
+    );
+    expect(desktop.getByRole("link", { name: /피드백 문서 보기/ })).toHaveAttribute(
+      "href",
+      "/app/feedback/session-6",
+    );
     expect(mobile.getByRole("region", { name: "지난 모임 회고" })).toBeInTheDocument();
     expect(screen.queryByText("PRIVATE_MEMBER_EMAIL")).not.toBeInTheDocument();
   });
@@ -688,7 +694,7 @@ describe("MemberHome", () => {
     expect(desktop.getByText("다음 달 선정")).toBeInTheDocument();
     expect(desktop.getByText("바로가기")).toBeInTheDocument();
     expect(desktop.getByRole("link", { name: "전체 보기" })).toHaveAttribute("href", "/app/notes");
-    expect(desktop.getByRole("link", { name: /피드백 문서/ })).toHaveAttribute(
+    expect(desktop.getByRole("link", { name: "피드백 문서 회차 피드백" })).toHaveAttribute(
       "href",
       "/app/archive?view=report",
     );
