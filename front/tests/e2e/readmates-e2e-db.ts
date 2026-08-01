@@ -8,6 +8,14 @@ const secondClubId = "00000000-0000-0000-0000-000000000002";
 const secondClubHostMembershipId = "00000000-0000-0000-0000-000000009902";
 const appOrigin = `http://localhost:${process.env.PLAYWRIGHT_PORT ?? 3100}`;
 
+// Stable synthetic mappings are fixture-role based, never derived from member identity or UUIDs.
+const fixtureAvatarKeys = {
+  secondClubHost: "reading-lamp",
+  googleViewer: "archive-box",
+  acceptedGoogleInvite: "open-book-pencil",
+  standaloneViewer: "question-card",
+} as const;
+
 const devGoogleSubjects: Record<string, string> = {
   "host@example.com": "readmates-dev-google-host",
   "member1@example.com": "readmates-dev-google-member-1",
@@ -170,7 +178,8 @@ insert into memberships (
   role,
   status,
   joined_at,
-  short_name
+  short_name,
+  avatar_key
 )
 select
   ${sqlString(secondClubHostMembershipId)},
@@ -179,7 +188,8 @@ select
   'MEMBER',
   'ACTIVE',
   utc_timestamp(6),
-  users.short_name
+  users.short_name,
+  ${sqlString(fixtureAvatarKeys.secondClubHost)}
 from users
 where lower(users.email) = 'host@example.com'
 on duplicate key update
@@ -187,6 +197,7 @@ on duplicate key update
   status = 'ACTIVE',
   joined_at = coalesce(joined_at, utc_timestamp(6)),
   short_name = values(short_name),
+  avatar_key = values(avatar_key),
   updated_at = utc_timestamp(6);
 `);
 }
@@ -308,7 +319,8 @@ insert into memberships (
   role,
   status,
   joined_at,
-  short_name
+  short_name,
+  avatar_key
 )
 select
   ${sqlString(membershipId)},
@@ -317,7 +329,8 @@ select
   'MEMBER',
   'VIEWER',
   null,
-  ${sqlString(shortName)}
+  ${sqlString(shortName)},
+  ${sqlString(fixtureAvatarKeys.googleViewer)}
 from users
 where lower(users.email) = ${sqlString(normalizedEmail)}
   and not exists (
@@ -393,7 +406,8 @@ insert into memberships (
   role,
   status,
   joined_at,
-  short_name
+  short_name,
+  avatar_key
 )
 select
   ${sqlString(membershipId)},
@@ -402,7 +416,8 @@ select
   invitations.role,
   'ACTIVE',
   utc_timestamp(6),
-  users.short_name
+  users.short_name,
+  ${sqlString(fixtureAvatarKeys.acceptedGoogleInvite)}
 from invitations
 join users on lower(users.email) = lower(invitations.invited_email)
 where invitations.token_hash = ${sqlString(tokenHash)}
@@ -411,6 +426,7 @@ on duplicate key update
   role = values(role),
   status = 'ACTIVE',
   joined_at = coalesce(joined_at, utc_timestamp(6)),
+  avatar_key = values(avatar_key),
   updated_at = utc_timestamp(6);
 
 update invitations
@@ -1139,7 +1155,8 @@ insert into memberships (
   user_id,
   role,
   status,
-  joined_at
+  joined_at,
+  avatar_key
 )
 values (
   ${sqlString(membershipId)},
@@ -1147,7 +1164,8 @@ values (
   ${sqlString(userId)},
   'MEMBER',
   'VIEWER',
-  null
+  null,
+  ${sqlString(fixtureAvatarKeys.standaloneViewer)}
 );
 `);
 }
