@@ -1,6 +1,7 @@
 import type { HostNotificationSummary } from "@/features/host/model/host-view-types";
 import type { HostDashboardAlertTone as HostAlertTone } from "@/features/host/model/host-dashboard-model";
 import { nonNegativeCount } from "@/shared/ui/readmates-display";
+import { Icon } from "./shared-sections";
 import type { HostDashboardLinkComponent } from "./types";
 
 const HOST_DASHBOARD_NOTIFICATIONS_LABEL = "알림 발송";
@@ -15,23 +16,80 @@ export function HostNotificationLedger({
   LinkComponent: HostDashboardLinkComponent;
 }) {
   const failures = notifications.latestFailures.slice(0, 3);
-  const body = (
-    <>
-      <div className="row-between" style={{ alignItems: "baseline", gap: 12, marginBottom: mobile ? 10 : 12 }}>
-        <h2 id={mobile ? undefined : "host-notifications-title"} className={mobile ? "body" : "eyebrow"} style={{ margin: 0 }}>
+
+  if (mobile) {
+    const metrics = [
+      { key: "pending", label: "대기", value: notifications.pending },
+      { key: "failed", label: "실패", value: notifications.failed },
+      { key: "dead", label: "중단", value: notifications.dead },
+    ] as const;
+
+    return (
+      <section
+        className="rm-host-mobile-notifications"
+        aria-labelledby="host-mobile-notifications-title"
+      >
+        <header className="rm-host-mobile-notifications__header">
+          <h2 id="host-mobile-notifications-title">{HOST_DASHBOARD_NOTIFICATIONS_LABEL}</h2>
+          <span>최근 24시간 {nonNegativeCount(notifications.sentLast24h)}건</span>
+        </header>
+        <dl className="rm-host-mobile-notifications__metrics">
+          {metrics.map(({ key, label, value }) => (
+            <div key={key} data-status={key} data-active={value > 0 ? "true" : "false"}>
+              <dt>{label}</dt>
+              <dd className="ledger-number">{nonNegativeCount(value)}</dd>
+            </div>
+          ))}
+        </dl>
+        {failures.length > 0 ? (
+          <ul className="rm-host-mobile-notifications__failures" aria-label="최근 실패 알림">
+            {failures.map((failure) => (
+              <li key={failure.id}>
+                <span>
+                  <strong className="mono">{failure.eventType}</strong>
+                  <small>{maskEmail(failure.recipientEmail)}</small>
+                </span>
+                <small className="mono">
+                  {nonNegativeCount(failure.attemptCount)}회 시도
+                </small>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <LinkComponent
+          to="/app/host/notifications"
+          className="rm-host-mobile-notifications__ledger-link"
+        >
+          <span>알림 발송 장부 열기</span>
+          <span aria-hidden="true" className="rm-host-mobile-notifications__chevron">
+            <Icon name="arrow-right" size={14} />
+          </span>
+        </LinkComponent>
+      </section>
+    );
+  }
+
+  return (
+    <section
+      className="rm-reading-desk"
+      aria-labelledby="host-notifications-title"
+      style={{ padding: "18px" }}
+    >
+      <div className="row-between" style={{ alignItems: "baseline", gap: 12, marginBottom: 12 }}>
+        <h2 id="host-notifications-title" className="eyebrow" style={{ margin: 0 }}>
           {HOST_DASHBOARD_NOTIFICATIONS_LABEL}
         </h2>
         <span className="tiny" style={{ color: "var(--text-3)", whiteSpace: "nowrap" }}>
           최근 24시간 {nonNegativeCount(notifications.sentLast24h)}건
         </span>
       </div>
-      <div className={mobile ? "m-list" : undefined}>
+      <div>
         <div
-          className={mobile ? "m-list-row rm-host-dashboard-mobile__two-column-row" : "row"}
+          className="row"
           style={{
-            gap: mobile ? undefined : 8,
+            gap: 8,
             flexWrap: "wrap",
-            padding: mobile ? undefined : "0 0 10px",
+            padding: "0 0 10px",
           }}
         >
           {[
@@ -48,20 +106,19 @@ export function HostNotificationLedger({
           to="/app/host/notifications"
           className="btn btn-quiet btn-sm"
           style={{ marginTop: 12 }}
-          aria-label={mobile ? "알림 발송 장부 열기" : undefined}
         >
           알림 발송 장부
         </LinkComponent>
         {failures.length > 0 ? (
-          <ul style={{ margin: mobile ? "10px 0 0" : "4px 0 0", padding: 0, listStyle: "none" }}>
+          <ul style={{ margin: "4px 0 0", padding: 0, listStyle: "none" }}>
             {failures.map((failure, index) => (
               <li
                 key={failure.id}
-                className={mobile ? "m-list-row rm-host-dashboard-mobile__two-column-row" : "row-between"}
+                className="row-between"
                 style={{
                   gap: 10,
-                  padding: mobile ? undefined : "10px 0",
-                  borderTop: index === 0 || mobile ? undefined : "1px solid var(--line-soft)",
+                  padding: "10px 0",
+                  borderTop: index === 0 ? undefined : "1px solid var(--line-soft)",
                 }}
               >
                 <span style={{ minWidth: 0 }}>
@@ -80,16 +137,6 @@ export function HostNotificationLedger({
           </ul>
         ) : null}
       </div>
-    </>
-  );
-
-  return (
-    <section
-      className={mobile ? "m-card-quiet" : "rm-reading-desk"}
-      aria-labelledby={mobile ? undefined : "host-notifications-title"}
-      style={{ padding: mobile ? undefined : "18px" }}
-    >
-      {body}
     </section>
   );
 }

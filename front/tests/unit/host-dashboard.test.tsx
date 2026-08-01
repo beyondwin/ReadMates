@@ -746,6 +746,30 @@ describe("HostDashboard", () => {
     expect(screen.queryByText("member@example.com")).not.toBeInTheDocument();
   });
 
+  it("renders the mobile notification summary as an equal metric rail without nested cards", () => {
+    const { container } = render(
+      <HostDashboardForTest
+        current={current}
+        data={dashboard}
+        notifications={notificationSummary}
+      />,
+    );
+    const mobile = getMobileView(container);
+    const region = mobile.getByRole("region", { name: "알림 발송" });
+
+    expect(region).toHaveClass("rm-host-mobile-notifications");
+    expect(region).not.toHaveClass("m-card-quiet");
+    const metrics = region.querySelector(".rm-host-mobile-notifications__metrics");
+    expect(metrics?.querySelectorAll(":scope > div")).toHaveLength(3);
+    expect(within(region).getByText("대기").parentElement).toHaveTextContent("2");
+    expect(within(region).getByText("실패").parentElement).toHaveTextContent("1");
+    expect(within(region).getByText("중단").parentElement).toHaveTextContent("1");
+    expect(region.querySelector(".badge")).toBeNull();
+    expect(
+      within(region).getByRole("link", { name: "알림 발송 장부 열기" }),
+    ).toHaveAttribute("href", "/app/host/notifications");
+  });
+
   it("links to the host notification operations page", () => {
     render(
       <HostDashboardForTest current={current} data={dashboard} notifications={notificationSummary} />,

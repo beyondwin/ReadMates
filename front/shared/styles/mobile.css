@@ -1184,6 +1184,122 @@
 .mobile-only .rm-host-dashboard-mobile__two-column-row {
   grid-template-columns: minmax(0, 1fr) auto;
 }
+.mobile-only .rm-host-mobile-notifications {
+  padding: 16px 0 0;
+}
+.mobile-only .rm-host-mobile-notifications__header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 12px;
+}
+.mobile-only .rm-host-mobile-notifications__header h2 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.4;
+}
+.mobile-only .rm-host-mobile-notifications__header > span {
+  display: block;
+  color: var(--text-3);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.mobile-only .rm-host-mobile-notifications__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 14px 0 0;
+  padding: 14px 0;
+  border-block: 1px solid var(--line-soft);
+}
+.mobile-only .rm-host-mobile-notifications__metrics > div {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border-left: 1px solid var(--line-soft);
+}
+.mobile-only .rm-host-mobile-notifications__metrics > div:first-child {
+  border-left: 0;
+}
+.mobile-only .rm-host-mobile-notifications__metrics dt {
+  color: var(--text-3);
+  font-size: 11px;
+  line-height: 1.3;
+}
+.mobile-only .rm-host-mobile-notifications__metrics dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+.mobile-only .rm-host-mobile-notifications__metrics [data-status="pending"][data-active="true"] dd {
+  color: var(--accent);
+}
+.mobile-only .rm-host-mobile-notifications__metrics [data-status="failed"][data-active="true"] dd,
+.mobile-only .rm-host-mobile-notifications__metrics [data-status="dead"][data-active="true"] dd {
+  color: var(--danger);
+}
+.mobile-only .rm-host-mobile-notifications__failures {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mobile-only .rm-host-mobile-notifications__failures li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 2px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.mobile-only .rm-host-mobile-notifications__failures li > span {
+  display: grid;
+  gap: 2px;
+}
+.mobile-only .rm-host-mobile-notifications__failures strong {
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 10px;
+  line-height: 1.35;
+}
+.mobile-only .rm-host-mobile-notifications__failures small {
+  color: var(--text-3);
+  font-size: 10px;
+  line-height: 1.35;
+}
+.mobile-only .rm-host-mobile-notifications__failures li > small {
+  white-space: nowrap;
+}
+.mobile-only .rm-host-mobile-notifications__ledger-link {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 2px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.mobile-only .rm-host-mobile-notifications__ledger-link > span {
+  display: block;
+}
+.mobile-only .rm-host-mobile-notifications__ledger-link:focus-visible {
+  border-radius: var(--r-2);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.mobile-only .rm-host-mobile-notifications__chevron {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  place-items: center;
+  color: var(--text-3);
+}
 .mobile-only .rm-host-dashboard-mobile__metric .badge {
   max-width: 74px;
   overflow: hidden;

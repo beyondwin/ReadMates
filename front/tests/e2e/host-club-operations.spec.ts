@@ -132,6 +132,33 @@ async function routeHostSessionsPublicSafe(page: Page): Promise<void> {
   });
 }
 
+async function routeHostNotificationSummaryWithFailures(page: Page): Promise<void> {
+  await page.route((url) => matchesExactBffUrl(
+    url,
+    "/api/bff/api/host/notifications/summary",
+    [{}, { clubSlug: "reading-sai" }],
+  ), async (route) => {
+    expect(route.request().method()).toBe("GET");
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        pending: 2,
+        failed: 1,
+        dead: 1,
+        sentLast24h: 5,
+        latestFailures: [{
+          id: "notification-failed-1",
+          eventType: "FEEDBACK_DOCUMENT_PUBLISHED",
+          recipientEmail: "member@example.com",
+          attemptCount: 3,
+          updatedAt: "2026-05-31T00:00:00Z",
+        }],
+      }),
+    });
+  });
+}
+
 async function expectNoHostPrivateSentinels(page: Page): Promise<void> {
   await expect(page.getByText("member1@example.com")).toHaveCount(0);
   await expect(page.getByText("ADMIN_ROUTE")).toHaveCount(0);
@@ -163,6 +190,37 @@ async function expectHostMobilePriorityLedgerPublicSafe(page: Page): Promise<voi
   await expect(mobileDashboard.getByRole("heading", { name: "운영 흐름", exact: true })).toBeVisible();
   await expect(mobileDashboard.getByText("운영 도구", { exact: true })).toBeVisible();
   await expectNoHostPrivateSentinels(page);
+}
+
+async function expectHostMobileNotificationSummaryLayout(page: Page): Promise<void> {
+  const mobileDashboard = page.locator("main.rm-host-dashboard-mobile");
+  const tools = mobileDashboard
+    .getByText("운영 도구", { exact: true })
+    .locator("xpath=ancestor::details");
+  await tools.locator("summary").click();
+
+  const notifications = tools.getByRole("region", { name: "알림 발송" });
+  const metrics = notifications.locator(".rm-host-mobile-notifications__metrics");
+  const metricCells = metrics.locator(":scope > div");
+  await expect(metricCells).toHaveCount(3);
+  expect(
+    await metrics.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length),
+  ).toBe(3);
+  const metricBoxes = await metricCells.evaluateAll((cells) => (
+    cells.map((cell) => {
+      const rect = cell.getBoundingClientRect();
+      return { width: rect.width, top: rect.top };
+    })
+  ));
+  expect(Math.max(...metricBoxes.map(({ width }) => width)) - Math.min(...metricBoxes.map(({ width }) => width)))
+    .toBeLessThanOrEqual(1);
+  expect(new Set(metricBoxes.map(({ top }) => Math.round(top))).size).toBe(1);
+  await expect(notifications).toHaveCSS("border-top-width", "0px");
+  await expect(notifications).toHaveCSS("border-bottom-width", "0px");
+
+  const ledgerLink = notifications.getByRole("link", { name: "알림 발송 장부 열기" });
+  const ledgerLinkBox = await ledgerLink.boundingBox();
+  expect(ledgerLinkBox?.height ?? 0).toBeGreaterThanOrEqual(44);
 }
 
 test("host dashboard renders read-only operating-signal card without leaking admin-only signals", async ({ page }) => {
@@ -216,6 +274,7 @@ test("host dashboard captures public-safe operating-signal and priority-ledger v
     if (viewport.width <= 768) {
       await expectHostMobilePriorityLedgerPublicSafe(page);
       await expect(page.getByRole("article", { name: "현재 세션 요약" })).toBeVisible();
+      await expectHostMobileNotificationSummaryLayout(page);
     } else {
       await expectHostOperatingSignalCardPublicSafe(page);
     }
@@ -288,5 +347,26 @@ test("host current-session card keeps balanced metrics at 320px", async ({ page 
   await expect(metrics.locator(":scope > div")).toHaveCount(3);
   expect(await metrics.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length)).toBe(3);
   await expect(cta).toHaveCSS("height", "48px");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("host mobile notification summary keeps active states and failures readable at 320px", async ({ page }) => {
+  await loginWithGoogleFixture(page, "host@example.com");
+  await routeHostDashboardPublicSafe(page);
+  await routeHostClubOperations(page);
+  await routeHostSessionsPublicSafe(page);
+  await routeHostNotificationSummaryWithFailures(page);
+  await page.setViewportSize({ width: 320, height: 844 });
+  await page.goto("/clubs/reading-sai/app/host");
+
+  await expectHostMobileNotificationSummaryLayout(page);
+  const notifications = page.getByRole("region", { name: "알림 발송" });
+  await expect(notifications.getByText("최근 24시간 5건")).toBeVisible();
+  await expect(notifications.locator('[data-status="pending"]')).toContainText("대기2");
+  await expect(notifications.locator('[data-status="failed"]')).toContainText("실패1");
+  await expect(notifications.locator('[data-status="dead"]')).toContainText("중단1");
+  await expect(notifications.getByText("FEEDBACK_DOCUMENT_PUBLISHED")).toBeVisible();
+  await expect(notifications.getByText("m***@example.com")).toBeVisible();
+  await expect(page.getByText("member@example.com")).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
