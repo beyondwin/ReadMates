@@ -344,11 +344,13 @@ Archive JDBC adapter는 요청마다 page query와 전체 summary query를 정�
 
 `/app/me/records`는 `limit=12`부터 cursor continuation을 누적하는 개인 활동 기반 전체 목록으로 직접 접근과 기존 deep link를 유지하지만 `/app/me`의 새 사용자 진입점으로 노출하지 않습니다. 개인 journey와 archive sessions의 포함 조건이 다르므로 이 route를 삭제하거나 archive로 redirect하지 않습니다.
 
-계정·멤버십 정보와 탈퇴는 `/app/me/settings`, 알림 수신 설정은 알림함과 나란한 `/app/notifications/settings`가 소유합니다. 전역 계정 메뉴는 `내 공간`, `알림`, `계정 설정`, `로그아웃`을 제공하고, `/app/me/settings`는 scoped `← 내 공간` 복귀 링크를 제공합니다. 표시 이름 편집은 `/app/me`만 소유하며 profile update controller, auth refresh, route revalidation 계약을 유지합니다. `/app/me/settings`에는 이름 편집과 로그아웃을 중복하지 않습니다.
+계정·멤버십 정보와 탈퇴는 `/app/me/settings`, 알림 수신 설정은 알림함과 나란한 `/app/notifications/settings`가 소유합니다. `/app/me`는 `알림`과 `계정 설정` utility를 제공하고, 두 알림 route와 `/app/me/settings`는 scoped `내 공간`을 고정 상위 경로로 사용합니다. 전역 계정 메뉴는 identity, `계정 설정`, `로그아웃`만 소유하며 멤버 콘텐츠 탐색을 중복하지 않습니다. 호스트 권한이 있을 때만 계정 control과 분리된 작업 공간 전환 control을 노출합니다. 표시 이름 편집은 `/app/me`만 소유하며 profile update controller, auth refresh, route revalidation 계약을 유지합니다. `/app/me/settings`에는 이름 편집과 로그아웃을 중복하지 않습니다.
 
 ## 멤버 프로필과 표시 이름
 
 ReadMates에서 멤버를 부르는 앱 표시 이름은 `displayName`입니다. `displayName`은 현재 클럽 membership에 붙은 이름이며, 현재 스키마에서는 기존 `memberships.short_name` 컬럼에 저장합니다. Google 계정이나 초대에서 온 원본 이름은 `accountName`으로만 다루고, 멤버를 식별할 때는 `email`을 우선 보여줍니다.
+
+멤버 아바타는 `memberships.avatar_key`에 저장한 20개 allowlist key 중 하나이며 가입 승인 시 고정됩니다. 서버의 auth, 현재·호스트 세션, archive, notes, public record projection은 필요한 멤버 표시 이름과 함께 `avatarKey`를 전달합니다. 프런트엔드는 이를 로컬 `/assets/avatars/book-club/*.webp`로만 해석하고, 누락·알 수 없는 key·이미지 decode 실패는 로컬 기본 아바타로 정규화합니다. Google 프로필 이미지 URL은 멤버 아바타 렌더링에 사용하지 않습니다.
 
 프로필 수정 API는 두 개입니다.
 
