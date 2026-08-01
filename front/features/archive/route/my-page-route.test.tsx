@@ -66,9 +66,9 @@ const data: MyPageRouteData = {
   },
 };
 
-function renderRoute() {
+function renderRoute(initialEntry = "/clubs/reading-sai/app/me") {
   return render(
-    <MemoryRouter initialEntries={["/clubs/reading-sai/app/me"]}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <MyPageRoute canEditProfile onProfileUpdated={vi.fn().mockResolvedValue(undefined)} />
     </MemoryRouter>,
   );
@@ -95,7 +95,7 @@ describe("MyPageRoute", () => {
       "/assets/avatars/book-club/book-tote.webp",
     );
     expect(screen.getByText("9번의 모임에서 7권을 끝까지 읽었어요.")).toBeVisible();
-    expect(screen.queryByRole("link", { name: /계정 (관리|설정)/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: "계정 관리" })).toBeNull();
     expect(screen.getByRole("link", {
       name: "전체 세션 기록 보기",
     })).toHaveAttribute(
@@ -111,5 +111,21 @@ describe("MyPageRoute", () => {
     expect(screen.queryByRole("list", { name: "최근 참여 대상 회차" })).toBeNull();
     expect(screen.queryByRole("link", { name: "이번 세션 보기" })).toBeNull();
     expect(screen.queryByRole("button", { name: "로그아웃" })).toBeNull();
+  });
+
+  it.each([
+    ["scoped", "/clubs/reading-sai/app/me", "/clubs/reading-sai/app"],
+    ["unscoped", "/app/me", "/app"],
+  ])("assembles utility links from the %s My Space route", (_, initialEntry, appBasePath) => {
+    renderRoute(initialEntry);
+
+    expect(screen.getByRole("link", { name: /알림.*받은 알림과 수신 설정/ })).toHaveAttribute(
+      "href",
+      `${appBasePath}/notifications`,
+    );
+    expect(screen.getByRole("link", { name: /계정 설정.*프로필과 멤버십 정보/ })).toHaveAttribute(
+      "href",
+      `${appBasePath}/me/settings`,
+    );
   });
 });

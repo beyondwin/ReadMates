@@ -9,6 +9,8 @@ type MyPageProps = {
   viewModel: MemberSpaceViewModel;
   recentReadings: RecentReadingListItem[];
   canEditProfile: boolean;
+  notificationsHref: string;
+  settingsHref: string;
   archiveSessionsHref: string;
   onUpdateProfile: (displayName: string) => Promise<ProfileUpdateResult>;
 };
@@ -18,6 +20,8 @@ export default function MyPage({
   viewModel,
   recentReadings,
   canEditProfile,
+  notificationsHref,
+  settingsHref,
   archiveSessionsHref,
   onUpdateProfile,
 }: MyPageProps) {
@@ -27,6 +31,8 @@ export default function MyPage({
       viewModel={viewModel}
       recentReadings={recentReadings}
       canEditProfile={canEditProfile}
+      notificationsHref={notificationsHref}
+      settingsHref={settingsHref}
       archiveSessionsHref={archiveSessionsHref}
       onUpdateProfile={onUpdateProfile}
     />

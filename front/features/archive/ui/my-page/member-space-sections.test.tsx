@@ -5,7 +5,9 @@ import type { MyPageProfile } from "@/features/archive/model/archive-model";
 import type { MemberSpaceViewModel } from "@/features/archive/model/my-reading-shelf-model";
 import { MemberProfileSummary } from "./member-profile-summary";
 import { MemberSpaceOverview } from "./member-space-overview";
+import { MyReadingShelf } from "./my-reading-shelf";
 import { ReadingAchievementSummary } from "./reading-achievement-summary";
+import type { RecentReadingListItem } from "./recent-reading-list";
 import type { ProfileUpdateResult } from "./types";
 
 const profile: MyPageProfile = {
@@ -35,6 +37,19 @@ const viewModel: MemberSpaceViewModel = {
     { label: "서평", value: "2" },
   ],
 };
+
+const recentReadings: RecentReadingListItem[] = [{
+  sessionId: "session-7",
+  sessionNumberLabel: "7차",
+  dateLabel: "2026.07.20",
+  bookTitle: "최근 함께 읽은 책",
+  bookAuthor: "테스트 저자",
+  bookImageUrl: null,
+  coverFallbackLabel: "최",
+  activityLabels: ["질문 2"],
+  feedbackStatus: "피드백 열림",
+  href: "/app/sessions/session-7",
+}];
 
 function renderProfileSummary(canEditProfile = true) {
   return render(
@@ -202,6 +217,37 @@ describe("member-space presentation sections", () => {
       profileSection.compareDocumentPosition(achievementSection) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+
+  it("places the My Space utility links between the overview and reading records", () => {
+    const { container } = render(
+      <MyReadingShelf
+        profile={profile}
+        viewModel={viewModel}
+        recentReadings={recentReadings}
+        canEditProfile
+        notificationsHref="/clubs/reading-sai/app/notifications"
+        settingsHref="/clubs/reading-sai/app/me/settings"
+        archiveSessionsHref="/clubs/reading-sai/app/archive?view=sessions"
+        onUpdateProfile={vi.fn().mockResolvedValue({
+          displayName: profile.displayName,
+          accountName: profile.accountName,
+        })}
+      />,
+    );
+
+    const overview = container.querySelector(".rm-member-space__overview")!;
+    const utilities = screen.getByRole("region", { name: "내 공간 관리" });
+    const recordsKicker = screen.getByText("나의 독서 기록");
+    const notificationLink = screen.getByRole("link", { name: /알림.*받은 알림과 수신 설정/ });
+    const settingsLink = screen.getByRole("link", { name: /계정 설정.*프로필과 멤버십 정보/ });
+
+    expect(overview.compareDocumentPosition(utilities) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(utilities.compareDocumentPosition(recordsKicker) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(notificationLink).toHaveAttribute("href", "/clubs/reading-sai/app/notifications");
+    expect(settingsLink).toHaveAttribute("href", "/clubs/reading-sai/app/me/settings");
+    expect(notificationLink.querySelectorAll("[aria-hidden=\"true\"]")).toHaveLength(1);
+    expect(settingsLink.querySelectorAll("[aria-hidden=\"true\"]")).toHaveLength(1);
   });
 
   it("presents cumulative achievements as ordered definition-list metrics only", () => {
