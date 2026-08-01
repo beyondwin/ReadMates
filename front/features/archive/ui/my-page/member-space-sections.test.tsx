@@ -106,16 +106,18 @@ describe("member-space presentation sections", () => {
     expect(screen.queryByRole("link", { name: /계정 (관리|설정)/ })).toBeNull();
   });
 
-  it("keeps the labelled profile heading available while editing the display name", async () => {
+  it("replaces the visible name row with a labelled editor while preserving the profile heading", async () => {
     const user = userEvent.setup();
     renderProfileSummary();
 
     await user.click(screen.getByRole("button", { name: "이름 변경" }));
 
-    expect(screen.getByRole("heading", { level: 1, name: "멤버1" })).toHaveAttribute("id", "member-profile-name");
+    const heading = screen.getByRole("heading", { level: 1, name: "멤버1" });
+    expect(heading).toHaveAttribute("id", "member-profile-name");
+    expect(heading).toHaveClass("rm-sr-only");
     expect(screen.getByRole("region", { name: "멤버1" })).toBeVisible();
-    expect(screen.getByLabelText("이름")).toBeVisible();
-    expect(screen.getByRole("button", { name: "이름 저장" })).toBeVisible();
+    expect(screen.getByRole("textbox", { name: "표시 이름" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "이름 저장" })).toHaveTextContent("저장");
     expect(screen.getByRole("button", { name: "취소" })).toBeVisible();
   });
 
@@ -125,7 +127,7 @@ describe("member-space presentation sections", () => {
 
     await user.click(screen.getByRole("button", { name: "이름 변경" }));
 
-    expect(screen.getByRole("textbox", { name: "이름" })).toHaveFocus();
+    expect(screen.getByRole("textbox", { name: "표시 이름" })).toHaveFocus();
   });
 
   it("returns focus to the name-change control after cancelling", async () => {
@@ -135,6 +137,21 @@ describe("member-space presentation sections", () => {
     await user.click(screen.getByRole("button", { name: "이름 변경" }));
     await user.click(screen.getByRole("button", { name: "취소" }));
 
+    expect(screen.getByRole("button", { name: "이름 변경" })).toHaveFocus();
+  });
+
+  it("cancels an edited draft with Escape and restores focus", async () => {
+    const user = userEvent.setup();
+    renderProfileSummary();
+
+    await user.click(screen.getByRole("button", { name: "이름 변경" }));
+    const input = screen.getByRole("textbox", { name: "표시 이름" });
+    await user.clear(input);
+    await user.type(input, "바꾸려던 이름");
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("textbox", { name: "표시 이름" })).toBeNull();
+    expect(screen.getByRole("heading", { level: 1, name: "멤버1" })).not.toHaveClass("rm-sr-only");
     expect(screen.getByRole("button", { name: "이름 변경" })).toHaveFocus();
   });
 
@@ -164,10 +181,12 @@ describe("member-space presentation sections", () => {
 
     await user.click(screen.getByRole("button", { name: "이름 변경" }));
     await user.click(screen.getByRole("button", { name: "이름 저장" }));
+    await user.keyboard("{Escape}");
 
+    expect(screen.getByRole("textbox", { name: "표시 이름" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "이름 저장" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "취소" })).toBeDisabled();
-    expect(screen.getByText("저장 중")).toBeVisible();
+    expect(screen.getByText("저장 중…")).toBeVisible();
   });
 
   it("keeps the editor open and exposes a nearby save error", async () => {
@@ -189,7 +208,7 @@ describe("member-space presentation sections", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "같은 클럽에서 이미 쓰고 있는 이름입니다.",
     );
-    expect(screen.getByLabelText("이름")).toBeVisible();
+    expect(screen.getByLabelText("표시 이름")).toBeVisible();
   });
 
   it("places the profile before achievements inside the member-space overview", () => {

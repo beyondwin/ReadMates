@@ -56,6 +56,20 @@ export function ProfileNameEditor({
     }
   }, [editing]);
 
+  function cancelEditing() {
+    if (savingRef.current) {
+      return;
+    }
+
+    shouldRestoreFocusRef.current = true;
+    setEditing(false);
+    setError(null);
+    setDraft({
+      sourceDisplayName: data.displayName,
+      value: data.displayName,
+    });
+  }
+
   async function submitProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -87,7 +101,9 @@ export function ProfileNameEditor({
   return (
     <div className="rm-member-profile__name" data-editing={editing || undefined}>
       <div className="rm-member-profile__name-row">
-        <h1 id={headingId}>{data.displayName}</h1>
+        <h1 id={headingId} className={editing ? "rm-sr-only" : undefined}>
+          {data.displayName}
+        </h1>
         {!editing && canEditProfile ? (
           <button
             ref={editButtonRef}
@@ -105,10 +121,19 @@ export function ProfileNameEditor({
         ) : null}
       </div>
       {editing ? (
-        <form className="rm-member-profile__form" onSubmit={submitProfile}>
+        <form
+          className="rm-member-profile__form"
+          onSubmit={submitProfile}
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && !savingRef.current) {
+              event.preventDefault();
+              cancelEditing();
+            }
+          }}
+        >
           <div className="rm-member-profile__field">
             <label htmlFor={inputId} className="body">
-              이름
+              표시 이름
             </label>
             <input
               ref={inputRef}
@@ -124,36 +149,28 @@ export function ProfileNameEditor({
                 })
               }
             />
-            {error ? (
-              <div id={errorId} role="alert" className="tiny rm-member-profile__error">
-                {error}
-              </div>
-            ) : null}
           </div>
           <button
             type="submit"
-            className="btn btn-primary btn-sm"
+            className="btn btn-primary btn-sm rm-member-profile__save"
             aria-label="이름 저장"
             disabled={saving}
           >
-            {saving ? "저장 중" : "저장"}
+            {saving ? "저장 중…" : "저장"}
           </button>
           <button
             type="button"
-            className="btn btn-quiet btn-sm"
+            className="btn btn-quiet btn-sm rm-member-profile__cancel"
             disabled={saving}
-            onClick={() => {
-              shouldRestoreFocusRef.current = true;
-              setEditing(false);
-              setError(null);
-              setDraft({
-                sourceDisplayName: data.displayName,
-                value: data.displayName,
-              });
-            }}
+            onClick={cancelEditing}
           >
             취소
           </button>
+          {error ? (
+            <div id={errorId} role="alert" className="tiny rm-member-profile__error">
+              {error}
+            </div>
+          ) : null}
         </form>
       ) : null}
     </div>
