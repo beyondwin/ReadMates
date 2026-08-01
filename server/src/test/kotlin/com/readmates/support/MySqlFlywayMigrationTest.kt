@@ -252,7 +252,7 @@ class MySqlFlywayMigrationTest(
             )
 
             val invalidAvatarError =
-                assertInvalidAvatarKeyRejected(upgradeJdbc, "archive-box")
+                assertInvalidAvatarKeyRejected(upgradeJdbc, v43AvatarKeys().first())
             assertThat(invalidAvatarError.mostSpecificCause.message).contains("memberships_avatar_key_check")
             val arbitraryAvatarError =
                 assertInvalidAvatarKeyRejected(upgradeJdbc, "member-id")
@@ -376,6 +376,7 @@ class MySqlFlywayMigrationTest(
     }
 
     private fun insertV43AvatarUpgradeFixtures(jdbcTemplate: JdbcTemplate) {
+        val preUpgradeAvatarKeys = v43AvatarKeys()
         (1..2).forEach { clubNumber ->
             val clubId = avatarFixtureClubId(clubNumber)
             jdbcTemplate.update(
@@ -424,10 +425,23 @@ class MySqlFlywayMigrationTest(
                     userId,
                     status,
                     "Avatar $clubNumber-$memberNumber",
-                    LEGACY_AVATAR_KEYS[(memberNumber - 1) % LEGACY_AVATAR_KEYS.size],
+                    preUpgradeAvatarKeys[(memberNumber - 1) % preUpgradeAvatarKeys.size],
                 )
             }
         }
+    }
+
+    private fun v43AvatarKeys(): List<String> {
+        val migrationSql =
+            checkNotNull(javaClass.classLoader.getResourceAsStream(V43_MEMBERSHIP_AVATARS))
+                .bufferedReader()
+                .use { it.readText() }
+        val constraintSql = migrationSql.substringAfter("add constraint memberships_avatar_key_check")
+        return V43_AVATAR_KEY_REGEX
+            .findAll(constraintSql)
+            .map { it.groupValues[1] }
+            .toList()
+            .also { check(it.isNotEmpty()) { "V43 avatar constraint must declare keys" } }
     }
 
     private fun isWireValue(value: String): Boolean = BookClubAvatarKey.fromWireValue(value) != null
@@ -1707,32 +1721,12 @@ class MySqlFlywayMigrationTest(
                 "41:LEFT:hedgehog-green-book",
                 "42:INACTIVE:squirrel-acorn",
             )
-        private val LEGACY_AVATAR_KEYS =
-            listOf(
-                "reading-lamp",
-                "open-book-pencil",
-                "book-spines",
-                "bookmark-page",
-                "notebook-pen",
-                "library-stamp",
-                "books-glasses",
-                "index-cards",
-                "archive-box",
-                "round-table-books",
-                "paired-bookmarks",
-                "book-dialogue",
-                "question-card",
-                "calendar-book",
-                "feedback-sheet",
-                "reading-notes",
-                "banded-book",
-                "desk-clock-book",
-                "book-tote",
-                "discussion-circle",
-            )
         private const val V38_AI_PROVIDER_ATTEMPT_AUDIT =
             "db/mysql/migration/V38__ai_generation_provider_attempt_audit.sql"
+        private const val V43_MEMBERSHIP_AVATARS =
+            "db/mysql/migration/V43__membership_book_club_avatars.sql"
         private val ADD_COLUMN_NAME_REGEX = Regex("(?i)\\bADD\\s+COLUMN\\s+`?([a-z0-9_]+)`?")
+        private val V43_AVATAR_KEY_REGEX = Regex("'([a-z0-9-]+)'")
     }
 
     private fun uniqueIndexCount(

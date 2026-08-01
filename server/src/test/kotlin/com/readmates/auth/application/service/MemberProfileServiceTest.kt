@@ -67,8 +67,8 @@ class MemberProfileServiceTest {
     }
 
     @Test
-    fun `rejects legacy traversal and uppercase avatar keys`() {
-        listOf("book-spines", "../hedgehog-green-mug", "HEDGEHOG-GREEN-MUG").forEach { avatarKey ->
+    fun `rejects unknown traversal and uppercase avatar keys`() {
+        listOf("unknown-avatar-key", "../hedgehog-green-mug", "HEDGEHOG-GREEN-MUG").forEach { avatarKey ->
             val exception =
                 assertThrows(MemberProfileException::class.java) {
                     MemberProfileService(RecordingMemberProfileStorePort()).updateOwnAvatar(
