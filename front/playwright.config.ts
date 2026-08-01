@@ -67,6 +67,7 @@ export default defineConfig({
       command:
         `${envAssignment("READMATES_API_BASE_URL", apiBaseURL)} ` +
         `${envAssignment("READMATES_BFF_SECRET", "e2e-secret")} ` +
+        `${envAssignment("VITE_ENABLE_GOOGLE_LOGIN", "true")} ` +
         `pnpm exec vite --host 127.0.0.1 --port ${shellQuote(port)}`,
       url: `${baseURL}/login`,
       reuseExistingServer: false,

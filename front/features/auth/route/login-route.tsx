@@ -1,5 +1,10 @@
-import { useCallback } from "react";
+import { useState } from "react";
 import { submitDevLogin } from "@/features/auth/api/auth-api";
+import {
+  canonicalLoginUrl,
+  isKakaoInAppBrowser,
+  loginRecoveryFromSearch,
+} from "@/features/auth/model/login-recovery";
 import { LoginCard, type DevAccount } from "@/features/auth/ui/login-card";
 import { oauthHrefForReturnTo, safeRelativeReturnTo } from "@/shared/auth/login-return";
 import { PageMetadataHead } from "@/shared/ui/page-metadata-head";
@@ -27,15 +32,8 @@ function isDevLoginEnabled() {
   );
 }
 
-function loginErrorMessage(search: string) {
-  const error = new URLSearchParams(search).get("error");
-  if (error === "membership-left") {
-    return "이전 멤버십이 종료된 계정입니다. 다시 참여하려면 호스트의 새 초대가 필요합니다.";
-  }
-  if (error === "google") {
-    return "Google 로그인에 실패했습니다. 가입했던 Gmail 계정인지 확인한 뒤 다시 시도해 주세요.";
-  }
-  return null;
+function isGoogleLoginEnabled(showDevLogin: boolean) {
+  return !showDevLogin || import.meta.env.VITE_ENABLE_GOOGLE_LOGIN === "true";
 }
 
 function loginReturnTo(search: string) {
@@ -43,8 +41,26 @@ function loginReturnTo(search: string) {
 }
 
 export function LoginRouteContent() {
+  const search = globalThis.location.search;
+  const recovery = loginRecoveryFromSearch(search);
   const returnTo = loginReturnTo(globalThis.location.search);
-  const loginAsDevAccount = useCallback(async (email: string, defaultRedirectPath?: string) => {
+  const isKakaoBrowser = isKakaoInAppBrowser(globalThis.navigator.userAgent);
+  const [copyStatus, setCopyStatus] = useState<string | null>(null);
+  const showDevLogin = isDevLoginEnabled();
+  const loginUrl = isKakaoBrowser ? canonicalLoginUrl(globalThis.location.origin, returnTo, recovery) : null;
+  const copyLoginUrl = async () => {
+    if (!loginUrl) {
+      return;
+    }
+
+    try {
+      await globalThis.navigator.clipboard.writeText(loginUrl);
+      setCopyStatus("로그인 주소를 복사했습니다.");
+    } catch {
+      setCopyStatus("주소를 복사하지 못했습니다. 브라우저 메뉴에서 다른 브라우저로 열어 주세요.");
+    }
+  };
+  const loginAsDevAccount = async (email: string, defaultRedirectPath?: string) => {
     const response = await submitDevLogin(email);
 
     if (!response.ok) {
@@ -52,14 +68,19 @@ export function LoginRouteContent() {
     }
 
     globalThis.location.assign(returnTo ?? defaultRedirectPath ?? "/app");
-  }, [returnTo]);
+  };
 
   return (
     <LoginCard
       devAccounts={devAccounts}
-      googleLoginHref={oauthHrefForReturnTo(returnTo)}
-      initialError={loginErrorMessage(globalThis.location.search)}
-      showDevLogin={isDevLoginEnabled()}
+      googleLoginHref={oauthHrefForReturnTo(returnTo, { chooseAccount: recovery.chooseAccount })}
+      googleLoginLabel={isKakaoBrowser ? "Google 로그인 시도" : recovery.googleActionLabel}
+      initialError={recovery.errorMessage}
+      showDevLogin={showDevLogin}
+      showGoogleLogin={isGoogleLoginEnabled(showDevLogin)}
+      showExternalBrowserGuidance={isKakaoBrowser}
+      copyStatus={copyStatus}
+      onCopyLoginUrl={isKakaoBrowser ? copyLoginUrl : undefined}
       onDevLogin={loginAsDevAccount}
     />
   );

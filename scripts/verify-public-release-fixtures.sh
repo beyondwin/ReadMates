@@ -311,4 +311,17 @@ do
   fi
 done
 
+for required_oauth_file in \
+  "scripts/run-local-google-oauth.sh" \
+  "scripts/check-local-google-oauth-redirect.py" \
+  "scripts/run-local-google-oauth-stack.sh" \
+  "scripts/verify-local-google-oauth-keychain-fixtures.sh" \
+  "scripts/verify-local-google-oauth-stack-fixtures.sh" \
+  "scripts/verify-local-google-oauth-stack.sh"
+do
+  if [[ ! -f "$candidate_dir/$required_oauth_file" ]]; then
+    fail "public release candidate is missing required Google OAuth harness file: $required_oauth_file"
+  fi
+done
+
 printf 'Public-release fixture checks passed.\n'

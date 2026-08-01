@@ -16,6 +16,7 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser
 import org.springframework.security.web.authentication.AuthenticationFailureHandler
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler
 import org.springframework.stereotype.Component
+import org.springframework.web.util.UriComponentsBuilder
 import java.net.URI
 import java.util.Locale
 
@@ -37,9 +38,9 @@ class ReadmatesOAuthSuccessHandler(
         authentication: Authentication,
     ) {
         val oidcUser = authentication.principal as OidcUser
+        val inviteToken = capturedInviteToken(request)
+        val signedReturnState = capturedReturnState(request)
         try {
-            val inviteToken = capturedInviteToken(request)
-            val signedReturnState = capturedReturnState(request)
             val login =
                 if (inviteToken != null) {
                     val acceptedMember =
@@ -84,16 +85,7 @@ class ReadmatesOAuthSuccessHandler(
             clearServletAuthenticationState(request)
             response.sendRedirect(oauthReturnState.redirectUrl(login.returnTarget))
         } catch (exception: RuntimeException) {
-            if (exception !is GoogleLoginException && exception !is InvitationDomainException) {
-                throw exception
-            }
-            val error =
-                if (exception is GoogleLoginException) {
-                    exception.redirectError
-                } else {
-                    "google"
-                }
-            redirectToLoginError(request, response, error)
+            redirectDomainLoginError(request, response, exception, signedReturnState)
         }
     }
 
@@ -102,17 +94,56 @@ class ReadmatesOAuthSuccessHandler(
         response: HttpServletResponse,
         exception: AuthenticationException,
     ) {
-        redirectToLoginError(request, response, "google")
+        val signedReturnState = capturedReturnState(request)
+        redirectToLoginError(
+            request,
+            response,
+            "google",
+            oauthReturnState.loginRetryReturnTarget(signedReturnState),
+        )
+    }
+
+    private fun redirectDomainLoginError(
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+        exception: RuntimeException,
+        signedReturnState: String?,
+    ) {
+        if (exception !is GoogleLoginException && exception !is InvitationDomainException) {
+            throw exception
+        }
+        val error =
+            if (exception is GoogleLoginException && exception.redirectError == "membership-left") {
+                "membership-left"
+            } else {
+                "google"
+            }
+        redirectToLoginError(
+            request,
+            response,
+            error,
+            oauthReturnState.loginRetryReturnTarget(signedReturnState),
+        )
     }
 
     private fun redirectToLoginError(
         request: HttpServletRequest,
         response: HttpServletResponse,
         error: String,
+        returnTarget: String? = null,
     ) {
         response.addHeader(HttpHeaders.SET_COOKIE, authSessionService.clearedSessionCookie())
         clearServletAuthenticationState(request)
-        response.sendRedirect("$appOrigin/login?error=$error")
+        val redirect =
+            UriComponentsBuilder
+                .fromUriString("$appOrigin/login")
+                .queryParam("error", error)
+                .apply {
+                    if (returnTarget != null) queryParam("returnTo", returnTarget)
+                }.build()
+                .encode()
+                .toUriString()
+        response.sendRedirect(redirect)
     }
 
     private fun capturedInviteToken(request: HttpServletRequest): String? {

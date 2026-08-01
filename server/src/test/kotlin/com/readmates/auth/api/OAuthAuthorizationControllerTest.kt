@@ -3,6 +3,7 @@ package com.readmates.auth.api
 import com.readmates.auth.infrastructure.security.OAuthInviteTokenSession
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -64,6 +65,49 @@ class OAuthAuthorizationControllerTest(
                 .getFirst("redirect_uri")
 
         assertEquals("https://auth.readmates.example/login/oauth2/code/google", redirectUri)
+    }
+
+    @Test
+    fun `google account recovery requests provider account selection`() {
+        val result =
+            mockMvc
+                .get("/oauth2/authorization/google") {
+                    param("chooseAccount", "true")
+                }.andExpect {
+                    status { is3xxRedirection() }
+                }.andReturn()
+
+        val parameters =
+            UriComponentsBuilder
+                .fromUriString(result.response.getHeader(HttpHeaders.LOCATION)!!)
+                .build()
+                .queryParams
+
+        assertEquals("select_account", parameters.getFirst("prompt"))
+    }
+
+    @Test
+    fun `google authorization ignores arbitrary browser provider parameters`() {
+        val result =
+            mockMvc
+                .get("/oauth2/authorization/google") {
+                    param("chooseAccount", "TRUE")
+                    param("prompt", "consent")
+                    param("login_hint", "attacker@example.test")
+                    param("hd", "example.test")
+                }.andExpect {
+                    status { is3xxRedirection() }
+                }.andReturn()
+
+        val parameters =
+            UriComponentsBuilder
+                .fromUriString(result.response.getHeader(HttpHeaders.LOCATION)!!)
+                .build()
+                .queryParams
+
+        assertNull(parameters.getFirst("prompt"))
+        assertNull(parameters.getFirst("login_hint"))
+        assertNull(parameters.getFirst("hd"))
     }
 
     @Test

@@ -14,6 +14,73 @@ A full source checkout can provide repository-local contributor routing, preflig
 
 The clean public release candidate intentionally omits contributor-only guidance. Its shipped release helpers are self-contained and do not require a particular local agent tool.
 
+## `run-local-google-oauth.sh`
+
+macOS 로컬 Google OAuth credential을 Git이나 `.env`에 저장하지 않고 Keychain에서 Spring backend 프로세스로만 주입합니다. 운영 OAuth client와 분리된 localhost 전용 Web client를 사용하고, 등록과 frontend 비민감 switch 절차는 [로컬 개발 환경](../docs/development/local-setup.md#macos-keychain으로-로컬-google-oauth-실행)을 따릅니다.
+
+```bash
+./scripts/run-local-google-oauth.sh
+```
+
+실행기는 client ID 형식과 client secret의 누락·대표 placeholder를 fail closed로 거부하고 값 자체는 출력하지 않습니다. 실제 backend를 띄우지 않고 Keychain 조회와 형식만 확인할 때는 다음 dry-run을 사용합니다.
+
+```bash
+READMATES_LOCAL_GOOGLE_OAUTH_DRY_RUN=true ./scripts/run-local-google-oauth.sh
+```
+
+공개 fixture 검증은 mock Keychain 응답으로 누락·placeholder·성공 경계를 확인하며 실제 Keychain이나 Google 공급자를 호출하지 않습니다.
+
+```bash
+./scripts/verify-local-google-oauth-keychain-fixtures.sh
+```
+
+## `run-local-google-oauth-stack.sh`
+
+두 터미널 없이 frontend + backend를 한 번에 띄우고 포트 충돌/health readiness/정리 동작을 한 번에 검증하는 supervisor입니다.
+
+```bash
+./scripts/run-local-google-oauth-stack.sh
+```
+
+필요 시 포트를 override하고 로그/열기 동작을 제어할 수 있습니다.
+
+```bash
+READMATES_LOCAL_GOOGLE_OAUTH_FRONTEND_PORT=5174 \
+READMATES_LOCAL_GOOGLE_OAUTH_BACKEND_PORT=28080 \
+READMATES_LOCAL_GOOGLE_OAUTH_MANAGEMENT_PORT=28081 \
+READMATES_LOCAL_GOOGLE_OAUTH_STARTUP_TIMEOUT_SECONDS=180 \
+READMATES_LOCAL_GOOGLE_OAUTH_OPEN_BROWSER=false \
+./scripts/run-local-google-oauth-stack.sh
+```
+
+실행 성공 시 frontend/login 경로와 backend health가 준비되면 `Ctrl+C`로 종료할 수 있으며, 종료 시 시작한 frontend/backend만 정리합니다.
+`run-local-google-oauth-stack.sh`는 임시 런타임 로그를 운영체제 temp에 두고, 시작한 자식 프로세스 그룹만 종료합니다.
+
+## `verify-local-google-oauth-stack.sh`
+
+실행 중인 stack에 대해 OAuth redirect contract를 비밀 노출 없이 검증합니다.
+
+```bash
+./scripts/verify-local-google-oauth-stack.sh
+```
+
+필요 시 포트 오버라이드:
+
+```bash
+READMATES_LOCAL_GOOGLE_OAUTH_FRONTEND_PORT=5174 \
+READMATES_LOCAL_GOOGLE_OAUTH_BACKEND_PORT=28080 \
+READMATES_LOCAL_GOOGLE_OAUTH_MANAGEMENT_PORT=28081 \
+./scripts/verify-local-google-oauth-stack.sh
+```
+
+공개 fixture는 runner 없이도 redirect contract 경계를 포트 충돌/timeout/정리/redaction으로 검증합니다.
+
+```bash
+./scripts/verify-local-google-oauth-stack-fixtures.sh
+```
+
+Smoke verifier는 provider redirect URL을 터미널에 출력하지 않고 redirect contract만 검사합니다. 실제 Google 로그인 완료 또는 callback 코드는 확인 대상이 아닙니다.
+
 ## `server-ci-check.sh`
 
 서버 코드를 수정한 뒤 GitHub Actions Backend job과 같은 품질 게이트를 로컬에서 먼저 확인합니다.

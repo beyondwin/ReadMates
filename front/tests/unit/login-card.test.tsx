@@ -73,10 +73,9 @@ describe("LoginRoute", () => {
 
     render(<LoginRoute />);
 
-    expect(screen.getByRole("link", { name: "Google로 시작하기" })).toBeInTheDocument();
-    expect(screen.getByText("Local development only")).toBeInTheDocument();
+    expect(screen.getByLabelText("로컬 개발 전용 로그인")).toBeInTheDocument();
     expect(screen.getByText("프로덕션 제외")).toBeInTheDocument();
-    expect(screen.getByText(/실제 운영 로그인은 위 Google OAuth 경로를 사용합니다/)).toBeInTheDocument();
+    expect(screen.getByText(/실제 Google 자격 증명은 브라우저에 노출하지 않습니다/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "김호스트 · 호스트" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "플랫폼 관리자 · OWNER" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "안멤버1" })).toBeInTheDocument();
@@ -84,6 +83,30 @@ describe("LoginRoute", () => {
     expect(screen.getByRole("button", { name: "김멤버3" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "송멤버4" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "이멤버5" })).toBeInTheDocument();
+  });
+
+  it("does not offer a broken Google OAuth link in local dev mode unless it is explicitly enabled", () => {
+    vi.stubEnv("VITE_ENABLE_DEV_LOGIN", "true");
+
+    render(<LoginRoute />);
+
+    expect(screen.queryByRole("link", { name: "Google로 시작하기" })).not.toBeInTheDocument();
+    expect(screen.getByRole("note", { name: "로컬 Google 로그인 설정 안내" })).toHaveTextContent(
+      "Google OAuth 자격 증명을 안전하게 설정한 뒤에만 활성화할 수 있습니다",
+    );
+  });
+
+  it("offers Google OAuth in local dev mode only after the explicit public flag is enabled", () => {
+    vi.stubEnv("VITE_ENABLE_DEV_LOGIN", "true");
+    vi.stubEnv("VITE_ENABLE_GOOGLE_LOGIN", "true");
+
+    render(<LoginRoute />);
+
+    expect(screen.getByRole("link", { name: "Google로 시작하기" })).toHaveAttribute(
+      "href",
+      "/oauth2/authorization/google",
+    );
+    expect(screen.queryByRole("note", { name: "로컬 Google 로그인 설정 안내" })).not.toBeInTheDocument();
   });
 
   it("submits dev login through the shared BFF client and preserves the user redirect", async () => {
@@ -145,13 +168,86 @@ describe("LoginRoute", () => {
     expect(assignMock).toHaveBeenCalledWith("/admin");
   });
 
-  it("shows a specific message when a left member returns from Google login", () => {
-    window.history.pushState({}, "", "/login?error=membership-left");
+  it("offers another Google account after a left-membership login", () => {
+    window.history.pushState(
+      {},
+      "",
+      "/login?error=membership-left&returnTo=%2Fclubs%2Freading-sai%2Fapp",
+    );
 
     render(<LoginRoute />);
 
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "이전 멤버십이 종료된 계정입니다. 다시 참여하려면 호스트의 새 초대가 필요합니다.",
+    expect(screen.getByRole("alert")).toHaveTextContent("이전 멤버십이 종료된 계정입니다.");
+    expect(screen.getByRole("link", { name: "다른 Google 계정으로 로그인" })).toHaveAttribute(
+      "href",
+      "/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp&chooseAccount=true",
+    );
+  });
+
+  it("prioritizes external-browser recovery in KakaoTalk", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const origin = window.location.origin;
+    vi.stubGlobal("navigator", {
+      userAgent: "Mozilla/5.0 KAKAOTALK/25.7.0",
+      clipboard: { writeText },
+    });
+    window.history.pushState(
+      {},
+      "",
+      "/login?error=membership-left&returnTo=%2Fclubs%2Freading-sai%2Fapp",
+    );
+
+    render(<LoginRoute />);
+
+    expect(screen.getByRole("heading", { name: "외부 브라우저에서 로그인해 주세요" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "로그인 주소 복사" }));
+    expect(writeText).toHaveBeenCalledWith(
+      `${origin}/login?error=membership-left&returnTo=%2Fclubs%2Freading-sai%2Fapp`,
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("로그인 주소를 복사했습니다");
+    expect(screen.getByRole("link", { name: "Google 로그인 시도" })).toHaveAttribute(
+      "href",
+      "/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp&chooseAccount=true",
+    );
+  });
+
+  it("explains clipboard failure without hiding the browser-menu recovery", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal("navigator", {
+      userAgent: "Mozilla/5.0 KAKAOTALK/25.7.0",
+      clipboard: { writeText: vi.fn().mockRejectedValue(new Error("denied")) },
+    });
+
+    render(<LoginRoute />);
+    await user.click(screen.getByRole("button", { name: "로그인 주소 복사" }));
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "주소를 복사하지 못했습니다. 브라우저 메뉴에서 다른 브라우저로 열어 주세요",
+    );
+  });
+
+  it("offers account selection after a generic Google failure", () => {
+    window.history.pushState({}, "", "/login?error=google");
+
+    render(<LoginRoute />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Google 인증을 완료하지 못했습니다.");
+    expect(screen.getByRole("link", { name: "Google 로그인 다시 시도" })).toHaveAttribute(
+      "href",
+      "/oauth2/authorization/google?chooseAccount=true",
+    );
+  });
+
+  it("ignores unknown OAuth errors without changing the normal action", () => {
+    window.history.pushState({}, "", "/login?error=provider-detail");
+
+    render(<LoginRoute />);
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Google로 시작하기" })).toHaveAttribute(
+      "href",
+      "/oauth2/authorization/google",
     );
   });
 

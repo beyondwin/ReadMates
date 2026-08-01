@@ -48,6 +48,80 @@ class OAuthReturnStateTest {
     }
 
     @Test
+    fun `login retry target keeps only verified frontend-compatible relative paths`() {
+        val safeTarget = "/clubs/$CLUB_SLUG/app?from=login#note"
+        val safeState = returnState.signReturnTarget(safeTarget, VALID_EXPIRY)
+        val absoluteState = returnState.signReturnTarget("$APP_ORIGIN/app", VALID_EXPIRY)
+
+        assertEquals(safeTarget, returnState.loginRetryReturnTarget(safeState))
+        assertNull(returnState.loginRetryReturnTarget(absoluteState))
+    }
+
+    @Test
+    fun `login retry target excludes auth root reset and invite paths`() {
+        listOf(
+            "/",
+            "/login",
+            "/oauth2/authorization/google",
+            "/login/oauth2/code/google",
+            "/reset-password/example",
+            "/invite/example",
+            "/clubs/$CLUB_SLUG/invite/example",
+        ).forEach { excludedTarget ->
+            val signedState = returnState.signReturnTarget(excludedTarget, VALID_EXPIRY)
+            assertNull(returnState.loginRetryReturnTarget(signedState), excludedTarget)
+        }
+    }
+
+    @Test
+    fun `login retry target excludes browser-normalized dot-segment route families`() {
+        listOf(
+            "/member/..",
+            "/member/../login",
+            "/member/../oauth2/authorization/google",
+            "/member/../login/oauth2/code/google",
+            "/member/../reset-password/example",
+            "/member/../invite/example",
+            "/clubs/$CLUB_SLUG/app/../invite/example",
+        ).forEach { excludedTarget ->
+            val signedState = returnState.signReturnTarget(excludedTarget, VALID_EXPIRY)
+            assertNull(returnState.loginRetryReturnTarget(signedState), excludedTarget)
+        }
+    }
+
+    @Test
+    fun `login retry target excludes percent-encoded static route families`() {
+        listOf(
+            "/LOGIN",
+            "/%4Cogin",
+            "/%2e%2e",
+            "/%6Cogin",
+            "/%6fauth2/authorization/google",
+            "/%6cogin/%6fauth2/code/google",
+            "/%72eset-password/example",
+            "/%69nvite/example",
+            "/clubs/$CLUB_SLUG/%69nvite/example",
+            "/%5Clogin",
+            "/%0Alogin",
+        ).forEach { excludedTarget ->
+            val signedState = returnState.signReturnTarget(excludedTarget, VALID_EXPIRY)
+            assertNull(returnState.loginRetryReturnTarget(signedState), excludedTarget)
+        }
+    }
+
+    @Test
+    fun `malformed percent escapes are rejected before signing`() {
+        listOf(
+            "/%",
+            "/%2",
+            "/%GG",
+            "/clubs/$CLUB_SLUG/app?from=%GG",
+        ).forEach { malformedTarget ->
+            assertNull(returnState.signReturnTarget(malformedTarget, VALID_EXPIRY), malformedTarget)
+        }
+    }
+
+    @Test
     fun `tampered payload and signature fall back without exposing invite state`() {
         val signedState = requireNotNull(returnState.signReturnTarget("/app", VALID_EXPIRY))
         val parts = signedState.split(".")
@@ -84,6 +158,8 @@ class OAuthReturnStateTest {
             "ftp://app.example.test/app",
             "https://external.example/app",
             "https://inactive-club.example.test/app",
+            "/app\nnext",
+            "/${"a".repeat(2048)}",
         ).forEach { unsafeTarget ->
             assertNull(returnState.signReturnTarget(unsafeTarget, VALID_EXPIRY))
         }

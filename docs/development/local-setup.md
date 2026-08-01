@@ -181,15 +181,82 @@ READMATES_AUTH_SESSION_COOKIE_SECURE=false \
 | `SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET` | Google OAuth를 로컬에서 직접 시험할 때 필요한 client secret입니다. dev-login만 쓰면 필요하지 않습니다. |
 | `SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_SCOPE` | Google OAuth scope입니다. 기본 운영 예시는 `openid,email,profile`입니다. |
 
+### macOS Keychain으로 로컬 Google OAuth 실행
+
+실제 Google 로그인을 로컬에서 확인할 때는 운영 OAuth client를 재사용하지 않고 별도 Web client를 만듭니다. Google Cloud의 승인된 redirect URI에는 다음 callback만 추가합니다.
+
+```text
+http://localhost:5174/login/oauth2/code/google
+http://localhost:5173/login/oauth2/code/google
+```
+
+Client ID와 client secret은 `.env`, 프런트 `VITE_*`, shell history에 기록하지 않습니다. macOS에서는 아래 명령이 각 값을 대화형으로 요청해 Keychain에 저장합니다. `-w`를 마지막 인자로 유지해야 값이 명령행 인자에 들어가지 않습니다.
+
+```bash
+security add-generic-password -U -a "$USER" -s readmates.local.google-oauth.client-id -w
+security add-generic-password -U -a "$USER" -s readmates.local.google-oauth.client-secret -w
+```
+
+### 로컬 Google OAuth one-command stack
+
+아래 한 줄 실행기로 backend + frontend를 함께 띄우고 포트 충돌, health readiness, signal 정리를 처리합니다.
+
+```bash
+./scripts/run-local-google-oauth-stack.sh
+```
+
+권장 실행 예시:
+
+```bash
+READMATES_LOCAL_GOOGLE_OAUTH_FRONTEND_PORT=5174 \
+READMATES_LOCAL_GOOGLE_OAUTH_BACKEND_PORT=28080 \
+READMATES_LOCAL_GOOGLE_OAUTH_MANAGEMENT_PORT=28081 \
+READMATES_LOCAL_GOOGLE_OAUTH_STARTUP_TIMEOUT_SECONDS=180 \
+READMATES_LOCAL_GOOGLE_OAUTH_OPEN_BROWSER=false \
+./scripts/run-local-google-oauth-stack.sh
+```
+
+다음 검증 명령은 실제 redirect 계약만 점검합니다.
+
+```bash
+./scripts/verify-local-google-oauth-stack.sh
+```
+
+수동 검증(브라우저):
+
+1. stack 실행 완료 후 출력된 Login URL로 이동해 Google 화면 진입을 확인합니다.
+2. 등록된 테스트 계정으로 로그인 후 ReadMates로 복귀하는지 확인합니다.
+3. `chooseAccount=true` 시작 URL로 동일 계정 재선택 흐름을 확인합니다.
+4. `Ctrl+C` 종료 후 기존 서비스와 기존 포트가 유지되는지 확인합니다.
+
+수동 확인은 localhost 5174 callback이 Google Cloud에 등록된 경우에만 수행합니다. 다른 프론트 포트는 Login/redirect contract 자동 검증으로만 제한합니다.
+
+### Troubleshooting
+
+| 이슈 | 대응 |
+| --- | --- |
+| Keychain 누락/포맷 오류 | `security find-generic-password -a "$USER" -s readmates.local.google-oauth.client-id -w`로 존재 여부를 점검하고, 필요하면 대화형 `security add-generic-password ... -w`로 재등록합니다. |
+| `invalid_client` | client ID를 교체하지 말고, Google Cloud 승인 callback과 현재 localhost callback을 동일하게 등록했는지 확인합니다. |
+| `redirect_uri_mismatch` | `http://localhost:5174/login/oauth2/code/google` (or 5173 flow callback) 정확히 일치하는지 확인하고 다른 callback를 허용하지 않습니다. |
+| 포트 충돌 | `lsof -nP -iTCP:5174 -sTCP:LISTEN`로 listener만 조회해 현재 충돌 포트를 파악하고 오버라이드 포트를 설정해 다시 실행합니다. 기존 서비스는 종료하지 않습니다. |
+| readiness timeout | `READMATES_LOCAL_GOOGLE_OAUTH_STARTUP_TIMEOUT_SECONDS`를 조정하고 management health + `/login` 응답을 확인해 선행 실패 원인을 좁힙니다. |
+
+로그/출력은 client ID, client secret, OAuth code/state, 쿠키를 노출하지 않습니다.
+
+### 기존 방식(고급 사용)
+
+고급자가 직접 backend/frontend를 분리 실행해야 할 때만 아래 순서를 사용합니다.
+
+```bash
+./scripts/run-local-google-oauth.sh
+VITE_ENABLE_GOOGLE_LOGIN=true corepack pnpm --dir front dev
+```
+
+`VITE_ENABLE_GOOGLE_LOGIN`은 표시/숨김 switch일 뿐 credential이 프론트엔드로 전달되지 않습니다. 기존 dev-login은 `VITE_ENABLE_DEV_LOGIN`로 별도 제어합니다.
+
 운영 migration은 `server/src/main/resources/db/mysql/migration`에만 추가합니다. `server/src/main/resources/db/migration`은 사용하지 않으며, 새 파일을 그 위치에 만들면 운영 Flyway가 읽지 않습니다.
 
 Server 로그는 JSON 형식이므로 `./server/gradlew bootRun 2>&1 | jq '.'`로 보기 좋게 볼 수 있습니다.
-
-Backend health check:
-
-```bash
-curl -sS http://localhost:8080/internal/health
-```
 
 ## Frontend 실행
 
@@ -211,6 +278,7 @@ pnpm --dir front dev
 | `READMATES_API_BASE_URL` | Vite dev proxy와 Cloudflare Pages Functions가 바라볼 Spring API origin입니다. 문서 예시는 로컬 `http://localhost:8080` 또는 placeholder `https://api.example.com`만 사용합니다. |
 | `READMATES_BFF_SECRET` | Vite dev proxy 또는 Pages Functions가 Spring으로 보낼 `X-Readmates-Bff-Secret` 값입니다. 브라우저 bundle에 들어가는 `VITE_` 변수로 만들지 않습니다. |
 | `VITE_ENABLE_DEV_LOGIN` | 로컬 dev-login 버튼 표시를 명시적으로 켭니다. `import.meta.env.DEV`에서도 표시되지만, 로컬 의도를 분명히 하기 위해 설정할 수 있습니다. |
+| `VITE_ENABLE_GOOGLE_LOGIN` | 실제 Google credential을 backend에 안전하게 주입한 로컬 환경에서만 Google action을 표시하는 비민감 switch입니다. credential 자체를 넣지 않습니다. |
 | `NEXT_PUBLIC_ENABLE_DEV_LOGIN` | 이전 로컬 env 파일 호환을 위한 legacy 변수입니다. 새 설정에는 `VITE_ENABLE_DEV_LOGIN`을 사용합니다. |
 
 ## Dev-login 흐름
