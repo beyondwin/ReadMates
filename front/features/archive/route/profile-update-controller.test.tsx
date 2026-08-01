@@ -48,6 +48,15 @@ const updatedAvatar: MemberProfileResponse = {
   avatarKey: "hedgehog-green-mug",
 };
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+
+  return { promise, resolve };
+}
+
 describe("useProfileUpdateController", () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -155,6 +164,53 @@ describe("useProfileUpdateController", () => {
     expect(result.current.profile.displayName).toBe("기존 이름");
   });
 
+  it("retains the latest successful display name when an earlier revalidation arrives late", async () => {
+    const firstSave = deferred<MemberProfileResponse>();
+    const secondSave = deferred<MemberProfileResponse>();
+    const callbackOrder: string[] = [];
+    const onProfileUpdated = vi.fn().mockImplementation(async () => {
+      callbackOrder.push("auth-refresh");
+    });
+    const onRevalidate = vi.fn().mockImplementation(() => {
+      callbackOrder.push("revalidate");
+    });
+    mutations.updateMyProfile
+      .mockReturnValueOnce(firstSave.promise)
+      .mockReturnValueOnce(secondSave.promise);
+    const { result, rerender } = renderHook(
+      ({ sourceProfile }) =>
+        useProfileUpdateController({
+          sourceProfile,
+          canEditProfile: true,
+          onProfileUpdated,
+          onRevalidate,
+        }),
+      { initialProps: { sourceProfile: profile } },
+    );
+
+    let saveFirst!: Promise<MemberProfileResponse>;
+    let saveSecond!: Promise<MemberProfileResponse>;
+    act(() => {
+      saveFirst = result.current.updateProfile("첫 이름");
+      saveSecond = result.current.updateProfile("둘째 이름");
+    });
+
+    firstSave.resolve({ ...updatedProfile, displayName: "첫 이름" });
+    await act(async () => {
+      await saveFirst;
+    });
+    secondSave.resolve({ ...updatedProfile, displayName: "둘째 이름" });
+    await act(async () => {
+      await saveSecond;
+    });
+    expect(result.current.profile.displayName).toBe("둘째 이름");
+
+    rerender({ sourceProfile: { ...profile, displayName: "첫 이름" } });
+
+    expect(result.current.profile.displayName).toBe("둘째 이름");
+    expect(callbackOrder).toEqual(["auth-refresh", "revalidate", "auth-refresh", "revalidate"]);
+  });
+
   it("rejects a profile update when the membership cannot edit", async () => {
     const denied = renderHook(() =>
       useProfileUpdateController({
@@ -220,6 +276,53 @@ describe("useProfileUpdateController", () => {
     expect(result.current.profile.avatarKey).toBe("hedgehog-green-mug");
     expect(result.current.profile.displayName).toBe("기존 이름");
     expect(callbackOrder).toEqual(["auth-refresh", "revalidate"]);
+  });
+
+  it("retains the latest successful avatar when an earlier revalidation arrives late", async () => {
+    const firstSave = deferred<MemberProfileResponse>();
+    const secondSave = deferred<MemberProfileResponse>();
+    const callbackOrder: string[] = [];
+    const onProfileUpdated = vi.fn().mockImplementation(async () => {
+      callbackOrder.push("auth-refresh");
+    });
+    const onRevalidate = vi.fn().mockImplementation(() => {
+      callbackOrder.push("revalidate");
+    });
+    mutations.updateMyAvatar
+      .mockReturnValueOnce(firstSave.promise)
+      .mockReturnValueOnce(secondSave.promise);
+    const { result, rerender } = renderHook(
+      ({ sourceProfile }) =>
+        useProfileUpdateController({
+          sourceProfile,
+          canEditProfile: true,
+          onProfileUpdated,
+          onRevalidate,
+        }),
+      { initialProps: { sourceProfile: profile } },
+    );
+
+    let saveFirst!: Promise<MemberProfileResponse>;
+    let saveSecond!: Promise<MemberProfileResponse>;
+    act(() => {
+      saveFirst = result.current.updateAvatar("hedgehog-green-book");
+      saveSecond = result.current.updateAvatar("hedgehog-green-mug");
+    });
+
+    firstSave.resolve({ ...updatedAvatar, avatarKey: "hedgehog-green-book" });
+    await act(async () => {
+      await saveFirst;
+    });
+    secondSave.resolve(updatedAvatar);
+    await act(async () => {
+      await saveSecond;
+    });
+    expect(result.current.profile.avatarKey).toBe("hedgehog-green-mug");
+
+    rerender({ sourceProfile: { ...profile, avatarKey: "hedgehog-green-book" } });
+
+    expect(result.current.profile.avatarKey).toBe("hedgehog-green-mug");
+    expect(callbackOrder).toEqual(["auth-refresh", "revalidate", "auth-refresh", "revalidate"]);
   });
 
   it("retires name and avatar overrides independently when the corresponding source field changes", async () => {

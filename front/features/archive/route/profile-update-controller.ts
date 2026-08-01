@@ -14,10 +14,40 @@ type ProfileUpdateControllerInput = {
 type SavedFieldOverride = {
   source: string;
   saved: string;
+  generation: number;
+  staleRevalidationSources: Array<{
+    value: string;
+    generation: number;
+  }>;
 };
 
 function savedFieldOverrideIsCurrent(override: SavedFieldOverride | null, source: string) {
-  return override !== null && (source === override.source || source === override.saved);
+  return (
+    override !== null &&
+    (source === override.source ||
+      source === override.saved ||
+      override.staleRevalidationSources.some(
+        (candidate) => candidate.value === source && candidate.generation < override.generation,
+      ))
+  );
+}
+
+function nextSavedFieldOverride(
+  current: SavedFieldOverride | null,
+  source: string,
+  saved: string,
+): SavedFieldOverride {
+  return {
+    source,
+    saved,
+    generation: (current?.generation ?? 0) + 1,
+    staleRevalidationSources: current
+      ? [
+          ...current.staleRevalidationSources,
+          { value: current.saved, generation: current.generation },
+        ]
+      : [],
+  };
 }
 
 function profileUpdateErrorMessage(error: unknown) {
@@ -62,7 +92,9 @@ export function useProfileUpdateController({
       try {
         const updatedProfile = await updateMyProfile(displayName);
         await onProfileUpdated();
-        setDisplayNameOverride({ source: sourceProfile.displayName, saved: updatedProfile.displayName });
+        setDisplayNameOverride((current) =>
+          nextSavedFieldOverride(current, sourceProfile.displayName, updatedProfile.displayName),
+        );
         onRevalidate();
         return updatedProfile;
       } catch (error) {
@@ -81,7 +113,9 @@ export function useProfileUpdateController({
       try {
         const updatedProfile = await updateMyAvatar(avatarKey);
         await onProfileUpdated();
-        setAvatarKeyOverride({ source: sourceProfile.avatarKey, saved: updatedProfile.avatarKey });
+        setAvatarKeyOverride((current) =>
+          nextSavedFieldOverride(current, sourceProfile.avatarKey, updatedProfile.avatarKey),
+        );
         onRevalidate();
         return updatedProfile;
       } catch (error) {
