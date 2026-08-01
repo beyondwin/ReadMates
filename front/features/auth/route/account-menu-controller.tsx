@@ -13,7 +13,7 @@ export type AccountMenuControllerProps = {
   onLoggedOut: () => void;
 };
 
-function scopedAccountPath(appBasePath: string, suffix: "/me" | "/me/settings" | "/notifications") {
+function scopedAccountPath(appBasePath: string, suffix: "/me/settings") {
   return appBasePath ? `${appBasePath}${suffix}` : `/app${suffix}`;
 }
 
@@ -30,8 +30,6 @@ export function AccountMenuController({
       memberName={memberName}
       avatarKey={auth.currentMembership?.avatarKey ?? auth.avatarKey}
       membershipLabel={accountMembershipLabel(auth.membershipStatus)}
-      mySpaceHref={scopedAccountPath(appBasePath, "/me")}
-      notificationsHref={scopedAccountPath(appBasePath, "/notifications")}
       settingsHref={scopedAccountPath(appBasePath, "/me/settings")}
       LinkComponent={LinkComponent}
       LogoutControl={

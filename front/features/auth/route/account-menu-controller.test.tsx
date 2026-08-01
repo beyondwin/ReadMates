@@ -58,18 +58,15 @@ afterEach(() => {
 });
 
 describe("AccountMenuController", () => {
-  it("keeps club-scoped account destinations inside the current app", async () => {
+  it("keeps only the club-scoped account settings destination inside the popover", async () => {
     await renderOpenController({ appBasePath: "/clubs/reading-sai/app" });
 
-    expect(screen.getByRole("link", { name: "내 공간" })).toHaveAttribute("href", "/clubs/reading-sai/app/me");
-    expect(screen.getByRole("link", { name: "알림" })).toHaveAttribute(
-      "href",
-      "/clubs/reading-sai/app/notifications",
-    );
     expect(screen.getByRole("link", { name: "계정 설정" })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/me/settings",
     );
+    expect(screen.queryByRole("link", { name: "내 공간" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "알림" })).not.toBeInTheDocument();
     expect(screen.getByText("정식 멤버")).toBeVisible();
   });
 

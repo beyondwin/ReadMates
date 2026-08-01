@@ -192,9 +192,21 @@
 }
 
 .m-hdr-side--right .rm-account-menu__trigger {
-  width: 45px;
-  min-width: 45px;
-  height: 45px;
+  min-width: 44px;
+  min-height: 44px;
+  max-width: none;
+  height: 44px;
+  padding: 0 8px;
+  gap: 4px;
+}
+
+.m-hdr-side--right .rm-account-menu__trigger-avatar,
+.m-hdr-side--right .rm-account-menu__trigger-name {
+  display: none;
+}
+
+.m-hdr-side--right .rm-account-menu__trigger-mobile-label {
+  display: inline;
 }
 
 .m-hdr-side--right .rm-account-menu__popover {

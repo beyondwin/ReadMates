@@ -38,19 +38,45 @@
 }
 
 .rm-account-menu__trigger {
-  width: 45px;
-  min-width: 45px;
-  height: 45px;
-  min-height: 45px;
-  padding: 0;
-  display: inline-grid;
-  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  max-width: 220px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   border: 0;
   border-radius: var(--r-3);
   background: transparent;
   color: var(--text);
   cursor: pointer;
   transition: background var(--motion-fast) var(--ease-standard-refined);
+}
+
+.rm-account-menu__trigger-avatar {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.rm-account-menu__trigger-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.rm-account-menu__trigger-mobile-label {
+  display: none;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.rm-account-menu__chevron {
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  line-height: 1;
 }
 
 .rm-account-menu__trigger:hover,

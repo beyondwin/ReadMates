@@ -22,8 +22,6 @@ export type AccountMenuProps = {
   memberName: string;
   avatarKey?: string | null;
   membershipLabel: string;
-  mySpaceHref: string;
-  notificationsHref: string;
   settingsHref: string;
   LinkComponent: AccountMenuLinkComponent;
   LogoutControl: ReactNode;
@@ -33,8 +31,6 @@ export function AccountMenu({
   memberName,
   avatarKey,
   membershipLabel,
-  mySpaceHref,
-  notificationsHref,
   settingsHref,
   LinkComponent,
   LogoutControl,
@@ -114,7 +110,14 @@ export function AccountMenu({
         aria-controls={dialogId}
         onClick={() => setOpen((current) => !current)}
       >
-        <AvatarChip avatarKey={avatarKey} name={memberName} label="" size={28} />
+        <span className="rm-account-menu__trigger-avatar" aria-hidden="true">
+          <AvatarChip avatarKey={avatarKey} name={memberName} label="" size={28} />
+        </span>
+        <span className="rm-account-menu__trigger-name">{memberName}</span>
+        <span className="rm-account-menu__trigger-mobile-label">계정</span>
+        <span className="rm-account-menu__chevron" aria-hidden="true">
+          {open ? "▴" : "▾"}
+        </span>
       </button>
       {open ? (
         <div
@@ -131,12 +134,6 @@ export function AccountMenu({
             <span className="rm-account-menu__membership">{membershipLabel}</span>
           </div>
           <div className="rm-account-menu__items">
-            <LinkComponent to={mySpaceHref} className="rm-account-menu__item" onClick={closeMenu}>
-              내 공간
-            </LinkComponent>
-            <LinkComponent to={notificationsHref} className="rm-account-menu__item" onClick={closeMenu}>
-              알림
-            </LinkComponent>
             <LinkComponent to={settingsHref} className="rm-account-menu__item" onClick={closeMenu}>
               계정 설정
             </LinkComponent>
