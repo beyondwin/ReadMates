@@ -456,7 +456,9 @@ describe("MemberHome", () => {
     expect(desktop.getByText("세션 기록은 읽을 수 있어요. 정식 멤버가 되면 RSVP, 읽기 진행률, 질문 작성 기능이 열립니다.")).toBeInTheDocument();
     expect(mobile.getAllByText("둘러보기 멤버").length).toBeGreaterThan(0);
     expect(mobile.getAllByText("세션 기록은 읽을 수 있어요. 정식 멤버가 되면 RSVP, 읽기 진행률, 질문 작성 기능이 열립니다.").length).toBeGreaterThan(0);
-    expect(mobile.getByText("읽기 전용")).toBeInTheDocument();
+    const readOnlyState = mobile.getByText("읽기 전용");
+    expect(readOnlyState).toHaveClass("small");
+    expect(readOnlyState).not.toHaveClass("tiny", "mono");
     expect(mobile.getByRole("link", { name: /세션 읽기/ })).toHaveAttribute("href", "/app/session/current");
     expect(mobile.queryByRole("link", { name: /질문 쓰기/ })).not.toBeInTheDocument();
   });

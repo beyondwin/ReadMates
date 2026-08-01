@@ -338,7 +338,7 @@ export function MobileTodayActions({
       <section className="m-sec">
         <div className="m-eyebrow-row">
           <span className="eyebrow">오늘 할 일</span>
-          <span className="tiny mono" style={{ color: "var(--text-3)" }}>
+          <span className="small" style={{ color: "var(--text-3)" }}>
             읽기 전용
           </span>
         </div>

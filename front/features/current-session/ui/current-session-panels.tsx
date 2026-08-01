@@ -102,7 +102,7 @@ export function RsvpPanel({
             이번 모임에 참석하시나요?
           </div>
         </div>
-        <span className="tiny mono">변경 가능 · 모임 당일까지</span>
+        <span className="small">변경 가능 · 모임 당일까지</span>
       </div>
       <div className="row" style={{ gap: "8px", flexWrap: "wrap" }}>
         {rsvpOptions.map((option) => (

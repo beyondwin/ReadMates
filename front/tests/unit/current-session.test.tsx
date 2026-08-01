@@ -369,8 +369,11 @@ describe("CurrentSession", () => {
   it("shows RSVP, check-in, and question sections", () => {
     const { container } = render(<CurrentSession data={currentSessionData} />);
     const desktop = getDesktop(container);
+    const rsvpEditWindow = within(desktop).getByText("변경 가능 · 모임 당일까지");
 
     expect(within(desktop).getAllByText("RSVP").length).toBeGreaterThan(0);
+    expect(rsvpEditWindow).toHaveClass("small");
+    expect(rsvpEditWindow).not.toHaveClass("tiny", "mono");
     expect(within(desktop).getByText("참석 여부")).toBeInTheDocument();
     expect(within(desktop).queryByText("읽기 기록")).not.toBeInTheDocument();
     expect(within(desktop).getAllByText("읽기 진행률").length).toBeGreaterThan(0);

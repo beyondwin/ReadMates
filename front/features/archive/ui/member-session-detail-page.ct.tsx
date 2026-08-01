@@ -17,11 +17,26 @@ for (const viewport of [
       name: "10가지 본능 중에서 본인에게 가장 강하게 작용한다고 느낀 것은 무엇인가요?",
     });
     const interfaceHeading = scope.getByRole("heading", { name: "함께 남긴 질문", exact: true });
+    const recordHeading = scope.getByRole("heading", { name: "회차 하이라이트 · 1" });
 
     await expect(scope).toBeVisible();
     await expect(summary).not.toHaveClass(/reading-editorial/);
     await expect(question).not.toHaveClass(/reading-editorial/);
     await expect(interfaceHeading).not.toHaveClass(/reading-editorial/);
+    await expect(recordHeading).not.toHaveClass(/mono/);
+
+    if (viewport.name === "mobile") {
+      const recordHeadingTypography = await recordHeading.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          fontFamily: style.fontFamily,
+          fontSize: Number.parseFloat(style.fontSize),
+        };
+      });
+      expect(recordHeadingTypography.fontFamily).toContain("Pretendard");
+      expect(recordHeadingTypography.fontFamily).not.toContain("JetBrains Mono");
+      expect(recordHeadingTypography.fontSize).toBe(17);
+    }
 
     const typography = await question.evaluate((element) => {
       const style = getComputedStyle(element);

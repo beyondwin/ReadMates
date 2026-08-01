@@ -260,7 +260,7 @@
 
 .rm-notification-workbench__step {
   color: var(--text-3);
-  font-family: var(--font-mono);
+  font-family: var(--f-sans);
   font-size: 0.75rem;
   line-height: 1.5;
 }
@@ -2981,7 +2981,7 @@ a.rm-recent-record__destination:hover {
 
 .rm-host-flow__when {
   color: var(--text-3);
-  font-family: var(--font-mono);
+  font-family: var(--f-sans);
   font-size: var(--type-size-label);
 }
 
@@ -6161,7 +6161,7 @@ a.rm-recent-record__destination:hover {
   grid-row: 1;
   margin: 0;
   color: var(--text-3);
-  font-family: var(--font-mono);
+  font-family: var(--f-sans);
   font-size: 0.75rem;
   line-height: 1.4;
 }

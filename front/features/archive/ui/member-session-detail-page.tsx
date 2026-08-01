@@ -448,7 +448,7 @@ function RecordGroup({ title, count, mobile = false, children }: { title: string
 
   return (
     <section style={mobile ? { padding: "2px 0 4px" } : undefined}>
-      <h3 className={mobile ? "small mono" : "h4 editorial"} style={{ margin: mobile ? "0 0 10px" : "0 0 10px", color: mobile ? "var(--text-3)" : undefined }}>
+      <h3 className={mobile ? "h4" : "h4 editorial"} style={{ margin: "0 0 10px", color: mobile ? "var(--text-3)" : undefined }}>
         {heading}
       </h3>
       {children}

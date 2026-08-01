@@ -44,6 +44,16 @@ type SizeResolution = {
   unresolvedProperties: string[];
 };
 
+type ValueResolution = {
+  values: string[];
+  unresolvedProperties: string[];
+};
+
+type CssValueToken = {
+  value: string;
+  index: number;
+};
+
 function collectCssDeclarations(source: string): CssDeclaration[] {
   const uncommented = source.replace(/\/\*[\s\S]*?\*\//g, "");
   return Array.from(
@@ -61,6 +71,39 @@ function literalSizesInPx(value: string): number[] {
   return Array.from(value.matchAll(/(-?(?:\d+(?:\.\d+)?|\.\d+))(px|rem|em)\b/gi), (match) =>
     normalizeSizeToPx(match[1], match[2]),
   );
+}
+
+function tokenizeCssValue(value: string): CssValueToken[] {
+  return Array.from(
+    value.matchAll(/("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|var\([^)]*\)|\/|[^\s/]+)/g),
+    (match) => ({ value: match[0], index: match.index }),
+  );
+}
+
+function isFontSizeToken(value: string): boolean {
+  return (
+    /^-?(?:\d+(?:\.\d+)?|\.\d+)(?:px|rem|em)$/i.test(value) ||
+    /^var\(\s*--[\w-]+/.test(value) ||
+    /^(?:xx-small|x-small|small|medium|large|x-large|xx-large|xxx-large|smaller|larger)$/i.test(value)
+  );
+}
+
+function fontShorthandParts(value: string): { fontSize: string; fontFamily: string } | null {
+  const tokens = tokenizeCssValue(value);
+  const sizeIndex = tokens.findIndex((token) => isFontSizeToken(token.value));
+  if (sizeIndex < 0) return null;
+
+  let familyIndex = sizeIndex + 1;
+  if (tokens[familyIndex]?.value === "/") {
+    familyIndex += 2;
+  }
+  const familyToken = tokens[familyIndex];
+  if (!familyToken) return null;
+
+  return {
+    fontSize: tokens[sizeIndex].value,
+    fontFamily: value.slice(familyToken.index).trim(),
+  };
 }
 
 function sizesResolvedFromValue(
@@ -89,6 +132,34 @@ function sizesResolvedFromValue(
     }
   }
   return { sizes, unresolvedProperties };
+}
+
+function valuesResolvedFromValue(
+  value: string,
+  customProperties: Map<string, CustomPropertyDefinition[]>,
+  resolving = new Set<string>(),
+): ValueResolution {
+  const values = [value];
+  const unresolvedProperties: string[] = [];
+  for (const reference of value.matchAll(/var\(\s*(--[\w-]+)/g)) {
+    const property = reference[1];
+    if (resolving.has(property)) {
+      unresolvedProperties.push(property);
+      continue;
+    }
+    const definitions = customProperties.get(property);
+    if (!definitions || definitions.length === 0) {
+      unresolvedProperties.push(property);
+      continue;
+    }
+    const nextResolving = new Set(resolving).add(property);
+    for (const definition of definitions) {
+      const resolution = valuesResolvedFromValue(definition.value, customProperties, nextResolving);
+      values.push(...resolution.values);
+      unresolvedProperties.push(...resolution.unresolvedProperties);
+    }
+  }
+  return { values, unresolvedProperties };
 }
 
 function usesGenericSerif(value: string): boolean {
@@ -127,17 +198,30 @@ function findTypographyViolations(sources: TypographySource[]): string[] {
       violations.push(`${file}: ${property} ${value} cannot resolve ${unresolvedProperty}`);
     }
   };
+  const recordFontFamily = (file: string, property: string, value: string) => {
+    const resolution = valuesResolvedFromValue(value, customProperties);
+    if (resolution.values.some(usesGenericSerif)) {
+      violations.push(`${file}: ${property} uses generic serif`);
+    }
+    for (const unresolvedProperty of resolution.unresolvedProperties) {
+      violations.push(`${file}: ${property} ${value} cannot resolve ${unresolvedProperty}`);
+    }
+  };
 
   for (const { file, source } of cssSources) {
     for (const declaration of collectCssDeclarations(source)) {
-      if (declaration.property === "font-size" || declaration.property === "font") {
+      if (declaration.property === "font-size") {
         recordSubFloorSizes(file, declaration.property, declaration.value);
       }
-      if (
-        (declaration.property === "font-family" || declaration.property === "font") &&
-        usesGenericSerif(declaration.value)
-      ) {
-        violations.push(`${file}: ${declaration.property} uses generic serif`);
+      if (declaration.property === "font-family") {
+        recordFontFamily(file, declaration.property, declaration.value);
+      }
+      if (declaration.property === "font") {
+        const parts = fontShorthandParts(declaration.value);
+        if (parts) {
+          recordSubFloorSizes(file, declaration.property, parts.fontSize);
+          recordFontFamily(file, declaration.property, parts.fontFamily);
+        }
       }
     }
   }
@@ -148,9 +232,7 @@ function findTypographyViolations(sources: TypographySource[]): string[] {
       recordSubFloorSizes(file, "fontSize", value);
     }
     for (const match of source.matchAll(/\bfontFamily\s*:\s*(["'])([^"']+)\1/g)) {
-      if (usesGenericSerif(match[2])) {
-        violations.push(`${file}: fontFamily uses generic serif`);
-      }
+      recordFontFamily(file, "fontFamily", match[2]);
     }
   }
 
@@ -201,6 +283,14 @@ describe("frontend typography contract", () => {
     ).toContain("fixture.css: font-size var(--missing-type) cannot resolve --missing-type");
   });
 
+  it("checks only the font-size component of a font shorthand", () => {
+    expect(
+      findTypographyViolations([
+        { file: "fixture.css", source: ".copy { font: 600 14px/10px sans-serif; }" },
+      ]),
+    ).toEqual([]);
+  });
+
   it("detects generic serif declarations without treating sans-serif as serif", () => {
     expect(
       findTypographyViolations([{ file: "serif.css", source: ".copy { font-family: Georgia, serif; }" }]),
@@ -214,5 +304,40 @@ describe("frontend typography contract", () => {
     expect(
       findTypographyViolations([{ file: "sans.css", source: ".copy { font: 16px/1.6 Pretendard, sans-serif; }" }]),
     ).toEqual([]);
+  });
+
+  it("recursively resolves font-family custom properties", () => {
+    expect(
+      findTypographyViolations([
+        {
+          file: "serif.css",
+          source: ":root { --reading-face-base: Georgia, serif; --reading-face: var(--reading-face-base); } .copy { font-family: var(--reading-face); }",
+        },
+      ]),
+    ).toContain("serif.css: font-family uses generic serif");
+    expect(
+      findTypographyViolations([
+        {
+          file: "sans.css",
+          source: ":root { --ui-face: Pretendard, sans-serif; } .copy { font-family: var(--ui-face); }",
+        },
+      ]),
+    ).toEqual([]);
+  });
+
+  it("fails closed when a font-family custom property is missing or cyclic", () => {
+    expect(
+      findTypographyViolations([
+        { file: "missing.css", source: ".copy { font-family: var(--missing-face); }" },
+      ]),
+    ).toContain("missing.css: font-family var(--missing-face) cannot resolve --missing-face");
+    expect(
+      findTypographyViolations([
+        {
+          file: "cycle.css",
+          source: ":root { --face-a: var(--face-b); --face-b: var(--face-a); } .copy { font-family: var(--face-a); }",
+        },
+      ]),
+    ).toContain("cycle.css: font-family var(--face-a) cannot resolve --face-a");
   });
 });

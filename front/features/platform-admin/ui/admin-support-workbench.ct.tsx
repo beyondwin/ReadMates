@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/experimental-ct-react";
 import type { Locator } from "@playwright/test";
 import { AdminSupportWorkbench, type AdminSupportWorkbenchProps } from "./admin-support-workbench";
 
+test.use({ timezoneId: "UTC" });
+
 const sizeOf = (locator: Locator) =>
   locator.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
 
@@ -92,6 +94,8 @@ test("AdminSupportWorkbench renders selected support grant risk review", async (
     </div>,
   );
 
+  await expect(component.getByText("지원 접근 권한을 발급할 준비가 되었습니다.")).toBeVisible();
+  await expect(component.getByRole("button", { name: "발급" })).toBeEnabled();
   expect(await sizeOf(component.locator(".label").first())).toBeGreaterThanOrEqual(14);
   expect(await sizeOf(component.locator(".admin-support-workbench__results em").first())).toBeGreaterThanOrEqual(14);
   expect(await sizeOf(component.locator(".admin-support-workbench__ledger-row .small").first())).toBeGreaterThanOrEqual(14);

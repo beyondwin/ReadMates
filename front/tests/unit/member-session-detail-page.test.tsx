@@ -240,7 +240,9 @@ describe("MemberSessionDetailPage", () => {
     expect(mobile.queryByRole("link", { name: "내 기록" })).not.toBeInTheDocument();
     expect(mobile.queryAllByRole("heading", { name: "요약" })).toHaveLength(1);
     expect(mobile.getByRole("heading", { name: "회차 기록" })).toBeInTheDocument();
-    expect(mobile.getByRole("heading", { name: "회차 하이라이트 · 1" })).toBeInTheDocument();
+    const mobileHighlightHeading = mobile.getByRole("heading", { name: "회차 하이라이트 · 1" });
+    expect(mobileHighlightHeading).toHaveClass("h4");
+    expect(mobileHighlightHeading).not.toHaveClass("small", "mono");
     const mobileHighlightRow = mobile
       .getByText("세계는 생각보다 나아지고 있지만, 우리의 감각은 느리게 따라온다.")
       .closest(".rm-session-highlight-row");
@@ -250,7 +252,9 @@ describe("MemberSessionDetailPage", () => {
       "src",
       "/assets/avatars/book-club/calendar-book.webp",
     );
-    expect(mobile.getByRole("heading", { name: "한줄평 · 1" })).toBeInTheDocument();
+    const mobileOneLinerHeading = mobile.getByRole("heading", { name: "한줄평 · 1" });
+    expect(mobileOneLinerHeading).toHaveClass("h4");
+    expect(mobileOneLinerHeading).not.toHaveClass("small", "mono");
     expect(mobile.getByRole("heading", { name: "함께 남긴 질문" })).toBeInTheDocument();
     expect(mobile.getByText("Q1 · 이멤버5")).toHaveStyle({ color: "var(--text-3)" });
     expect(mobile.queryByText("함께 남긴 질문 Q1 · 이멤버5")).not.toBeInTheDocument();
