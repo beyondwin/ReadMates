@@ -319,23 +319,18 @@ class MySqlFlywayMigrationTest(
                 )
             assertThat(latestVersion).isEqualTo("44")
 
-            val newKeysForFirstClub =
-                upgradeJdbc
-                    .queryForList(
-                        """
-                        select avatar_key
-                        from memberships
-                        where club_id = ?
-                        order by
-                          case when status in ('INVITED', 'VIEWER', 'ACTIVE', 'SUSPENDED') then 0 else 1 end,
-                          sha2(concat(club_id, ':', id, ':animal-avatar-v1'), 256),
-                          id
-                        """.trimIndent(),
-                        String::class.java,
-                        AVATAR_FIXTURE_FIRST_CLUB_ID,
-                    ).filterNotNull()
-            assertThat(newKeysForFirstClub.take(40).distinct()).hasSize(40)
-            assertThat(newKeysForFirstClub).allMatch(::isWireValue)
+            val newAssignmentsForFirstClub =
+                animalAvatarAssignmentsForClub(upgradeJdbc, AVATAR_FIXTURE_FIRST_CLUB_ID)
+            val newAssignmentsForSecondClub =
+                animalAvatarAssignmentsForClub(upgradeJdbc, avatarFixtureClubId(clubNumber = 2))
+            assertThat(newAssignmentsForFirstClub).containsExactlyElementsOf(EXPECTED_FIRST_CLUB_ANIMAL_ASSIGNMENTS)
+            assertThat(newAssignmentsForSecondClub).containsExactlyElementsOf(EXPECTED_SECOND_CLUB_ANIMAL_ASSIGNMENTS)
+            assertThat(newAssignmentsForFirstClub.indexOf("40:INVITED:dog-green-book"))
+                .isLessThan(newAssignmentsForFirstClub.indexOf("41:LEFT:hedgehog-green-book"))
+            assertThat(newAssignmentsForFirstClub.indexOf("40:INVITED:dog-green-book"))
+                .isLessThan(newAssignmentsForFirstClub.indexOf("42:INACTIVE:squirrel-acorn"))
+            assertThat(newAssignmentsForFirstClub.map { it.substringAfterLast(':') }.take(40).distinct()).hasSize(40)
+            assertThat(newAssignmentsForFirstClub.map { it.substringAfterLast(':') }).allMatch(::isWireValue)
             assertThat(checkConstraintClause(upgradeJdbc, "memberships_avatar_key_check"))
                 .contains("hedgehog-green-book", "hedgehog-green-mug")
         }
@@ -398,6 +393,7 @@ class MySqlFlywayMigrationTest(
                 val userId = avatarFixtureUserId(clubNumber, memberNumber)
                 val status =
                     when {
+                        memberNumber == 40 -> "INVITED"
                         memberNumber == 41 -> "LEFT"
                         memberNumber == 42 -> "INACTIVE"
                         memberNumber % 3 == 1 -> "ACTIVE"
@@ -435,6 +431,25 @@ class MySqlFlywayMigrationTest(
     }
 
     private fun isWireValue(value: String): Boolean = BookClubAvatarKey.fromWireValue(value) != null
+
+    private fun animalAvatarAssignmentsForClub(
+        jdbcTemplate: JdbcTemplate,
+        clubId: String,
+    ): List<String> =
+        jdbcTemplate
+            .queryForList(
+                """
+                select concat(cast(right(id, 12) as unsigned), ':', status, ':', avatar_key)
+                from memberships
+                where club_id = ?
+                order by
+                  case when status in ('INVITED', 'VIEWER', 'ACTIVE', 'SUSPENDED') then 0 else 1 end,
+                  sha2(concat(club_id, ':', id, ':animal-avatar-v1'), 256),
+                  id
+                """.trimIndent(),
+                String::class.java,
+                clubId,
+            ).filterNotNull()
 
     private fun insertAvatarBackfillMembershipFixtures(
         jdbcTemplate: JdbcTemplate,
@@ -1602,6 +1617,96 @@ class MySqlFlywayMigrationTest(
 
     companion object {
         private const val AVATAR_FIXTURE_FIRST_CLUB_ID = "20000000-0000-0000-0000-000000000001"
+        private val EXPECTED_FIRST_CLUB_ANIMAL_ASSIGNMENTS =
+            listOf(
+                "37:ACTIVE:hedgehog-green-book",
+                "27:VIEWER:squirrel-acorn",
+                "6:VIEWER:deer-brown-book",
+                "16:ACTIVE:fox-glasses-mug",
+                "35:SUSPENDED:koala-book-sprig",
+                "3:VIEWER:polar-bear-snowflake-mug",
+                "31:ACTIVE:penguin-beret-book",
+                "11:SUSPENDED:cat-flower-mug",
+                "9:VIEWER:alpaca-winter-sprig",
+                "22:ACTIVE:squirrel-green-book",
+                "1:ACTIVE:penguin-orange-mug",
+                "12:VIEWER:panda-green-book",
+                "2:SUSPENDED:mouse-blue-book",
+                "23:SUSPENDED:turtle-winter-book",
+                "20:SUSPENDED:ladybug-green-book",
+                "8:SUSPENDED:snail-green-book",
+                "30:VIEWER:sloth-orange-mug",
+                "17:SUSPENDED:alpaca-brown-book",
+                "14:SUSPENDED:fennec-heart-mug",
+                "7:ACTIVE:hedgehog-glasses-book",
+                "36:VIEWER:squirrel-autumn-book",
+                "34:ACTIVE:penguin-heart-mug",
+                "25:ACTIVE:deer-plaid-book",
+                "4:ACTIVE:alpaca-heart-mug",
+                "19:ACTIVE:turtle-glasses-book",
+                "5:SUSPENDED:owl-beret-book",
+                "28:ACTIVE:bear-green-book",
+                "18:VIEWER:rabbit-brown-book",
+                "32:SUSPENDED:cat-heart-mug",
+                "40:INVITED:dog-green-book",
+                "15:VIEWER:chick-beret-book",
+                "24:VIEWER:duck-green-mug",
+                "10:ACTIVE:hamster-green-book",
+                "33:VIEWER:red-panda-orange-mug",
+                "38:SUSPENDED:sheep-brown-book",
+                "21:VIEWER:fox-side-book",
+                "26:SUSPENDED:winter-bird",
+                "39:VIEWER:mallard-orange-mug",
+                "29:SUSPENDED:owl-glasses-book",
+                "13:ACTIVE:hedgehog-green-mug",
+                "41:LEFT:hedgehog-green-book",
+                "42:INACTIVE:squirrel-acorn",
+            )
+        private val EXPECTED_SECOND_CLUB_ANIMAL_ASSIGNMENTS =
+            listOf(
+                "30:VIEWER:hedgehog-green-book",
+                "6:VIEWER:squirrel-acorn",
+                "39:VIEWER:deer-brown-book",
+                "13:ACTIVE:fox-glasses-mug",
+                "25:ACTIVE:koala-book-sprig",
+                "11:SUSPENDED:polar-bear-snowflake-mug",
+                "23:SUSPENDED:penguin-beret-book",
+                "7:ACTIVE:cat-flower-mug",
+                "40:INVITED:alpaca-winter-sprig",
+                "12:VIEWER:squirrel-green-book",
+                "38:SUSPENDED:penguin-orange-mug",
+                "3:VIEWER:panda-green-book",
+                "2:SUSPENDED:mouse-blue-book",
+                "10:ACTIVE:turtle-winter-book",
+                "21:VIEWER:ladybug-green-book",
+                "20:SUSPENDED:snail-green-book",
+                "33:VIEWER:sloth-orange-mug",
+                "9:VIEWER:alpaca-brown-book",
+                "19:ACTIVE:fennec-heart-mug",
+                "24:VIEWER:hedgehog-glasses-book",
+                "4:ACTIVE:squirrel-autumn-book",
+                "29:SUSPENDED:penguin-heart-mug",
+                "14:SUSPENDED:deer-plaid-book",
+                "15:VIEWER:alpaca-heart-mug",
+                "17:SUSPENDED:turtle-glasses-book",
+                "31:ACTIVE:owl-beret-book",
+                "22:ACTIVE:bear-green-book",
+                "36:VIEWER:rabbit-brown-book",
+                "26:SUSPENDED:cat-heart-mug",
+                "8:SUSPENDED:dog-green-book",
+                "34:ACTIVE:chick-beret-book",
+                "1:ACTIVE:duck-green-mug",
+                "16:ACTIVE:hamster-green-book",
+                "18:VIEWER:red-panda-orange-mug",
+                "27:VIEWER:sheep-brown-book",
+                "35:SUSPENDED:fox-side-book",
+                "5:SUSPENDED:winter-bird",
+                "32:SUSPENDED:mallard-orange-mug",
+                "28:ACTIVE:owl-glasses-book",
+                "37:ACTIVE:hedgehog-green-mug",
+                "41:LEFT:hedgehog-green-book",
+                "42:INACTIVE:squirrel-acorn",
+            )
         private val LEGACY_AVATAR_KEYS =
             listOf(
                 "reading-lamp",
