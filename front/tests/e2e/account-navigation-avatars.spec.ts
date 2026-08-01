@@ -3,6 +3,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 const CLUB_SLUG = "reading-sai";
 const APP_BASE = `/clubs/${CLUB_SLUG}/app`;
 const MEMBER_NAME = "김독서";
+type FixtureRole = "HOST" | "MEMBER";
 
 // The initial RED run used false here, proving that a fixture missing these
 // contract fields cannot complete the member-space journey.
@@ -94,16 +95,16 @@ function currentSessionResponse() {
   };
 }
 
-function authResponse() {
+function authResponse(role: FixtureRole = "HOST") {
   const currentMembership = avatarKeyFor({
     membershipId: "member-reading-lamp",
     clubId: "club-reading-sai",
     clubSlug: CLUB_SLUG,
     displayName: MEMBER_NAME,
-    role: "HOST" as const,
+    role,
     membershipStatus: "ACTIVE" as const,
     approvalState: "ACTIVE" as const,
-    avatarKey: "book-tote",
+    avatarKey: "reading-lamp",
   });
 
   return {
@@ -114,9 +115,10 @@ function authResponse() {
     email: "reader@example.test",
     displayName: MEMBER_NAME,
     accountName: MEMBER_NAME,
-    role: "HOST",
+    role,
     membershipStatus: "ACTIVE",
     approvalState: "ACTIVE",
+    avatarKey: "reading-lamp",
     currentMembership,
     joinedClubs: [
       {
@@ -124,7 +126,7 @@ function authResponse() {
         clubSlug: CLUB_SLUG,
         clubName: "읽는사이",
         membershipId: "member-reading-lamp",
-        role: "HOST",
+        role,
         status: "ACTIVE",
         primaryHost: null,
       },
@@ -134,13 +136,13 @@ function authResponse() {
   };
 }
 
-function memberProfile() {
+function memberProfile(role: FixtureRole = "HOST") {
   return avatarKeyFor({
-    avatarKey: "book-tote",
+    avatarKey: "reading-lamp",
     displayName: MEMBER_NAME,
     accountName: MEMBER_NAME,
     email: "reader@example.test",
-    role: "HOST",
+    role,
     membershipStatus: "ACTIVE",
     clubName: "읽는사이",
     joinedAt: "2026-01",
@@ -166,15 +168,15 @@ function journeyResponse() {
   };
 }
 
-async function routeSyntheticApp(page: Page) {
+async function routeSyntheticApp(page: Page, role: FixtureRole = "HOST") {
   await page.route("**/api/bff/api/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
 
-    if (path.endsWith("/api/auth/me")) return json(route, authResponse());
+    if (path.endsWith("/api/auth/me")) return json(route, authResponse(role));
     if (path.endsWith("/api/me/notifications")) {
       return json(route, { items: [], unreadCount: 0, nextCursor: null });
     }
-    if (path.endsWith("/api/app/me")) return json(route, memberProfile());
+    if (path.endsWith("/api/app/me")) return json(route, memberProfile(role));
     if (path.endsWith("/api/archive/me/journey")) return json(route, journeyResponse());
     if (path.endsWith("/api/sessions/current")) return json(route, currentSessionResponse());
 
@@ -206,9 +208,31 @@ async function routeSyntheticApp(page: Page) {
 
 function assertNoImageRequestEscaped(imageRequestUrls: string[], localHost: string) {
   const parsed = imageRequestUrls.map((url) => new URL(url));
+  expect(parsed.length).toBeGreaterThan(0);
   expect(new Set(parsed.map((url) => url.host))).toEqual(new Set([localHost]));
   expect(parsed.every((url) => url.pathname.startsWith("/assets/avatars/book-club/") && url.pathname.endsWith(".webp"))).toBe(true);
 }
+
+async function expectVisibleUnclippedMobileAccount(page: Page, width: number) {
+  const account = page.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` });
+  await expect(account).toBeVisible();
+  await expect(account).toContainText("계정");
+  const box = await account.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+}
+
+test("non-host member keeps the explicit account action without a workspace switch on mobile", async ({ page }, testInfo) => {
+  await routeSyntheticApp(page, "MEMBER");
+
+  for (const width of [320, 390]) {
+    await page.setViewportSize({ width, height: 700 });
+    await page.goto(`${APP_BASE}/me`);
+    await expect(page.getByRole("link", { name: "호스트 화면" })).toHaveCount(0);
+    await expectVisibleUnclippedMobileAccount(page, width);
+    await page.screenshot({ path: testInfo.outputPath(`${width}-non-host-account.png`), fullPage: true });
+  }
+});
 
 test("scoped account navigation preserves local avatar identity across mobile and desktop", async ({ page }, testInfo) => {
   const imageRequestUrls: string[] = [];
@@ -226,8 +250,15 @@ test("scoped account navigation preserves local avatar identity across mobile an
 
   await page.getByRole("link", { name: "내 공간" }).first().click();
   await expect(page).toHaveURL(`${APP_BASE}/me`);
-  await expect(page.getByRole("link", { name: /^알림/ })).toHaveAttribute("href", `${APP_BASE}/notifications`);
+  const utilityNotifications = page.getByRole("link", { name: /^알림/ });
+  await expect(utilityNotifications).toHaveAttribute("href", `${APP_BASE}/notifications`);
   await page.screenshot({ path: testInfo.outputPath("390-my-space-utilities.png"), fullPage: true });
+  await utilityNotifications.click();
+  await expect(page).toHaveURL(`${APP_BASE}/notifications`);
+  await expect(mobileTabs.getByRole("link", { name: "내 공간" })).toHaveAttribute("aria-current", "page");
+  await page.screenshot({ path: testInfo.outputPath("390-utility-notifications.png"), fullPage: true });
+  await page.getByRole("link", { name: "내 공간" }).first().click();
+  await expect(page).toHaveURL(`${APP_BASE}/me`);
 
   const account = page.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` });
   await expect(account).toContainText("계정");
@@ -257,12 +288,24 @@ test("scoped account navigation preserves local avatar identity across mobile an
   await page.screenshot({ path: testInfo.outputPath("320-host-account-popover.png"), fullPage: true });
 
   await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`${APP_BASE}/notifications`);
+  const desktopNavigation = page.getByRole("navigation", { name: "앱 내비게이션" });
+  await expect(desktopNavigation.getByRole("link", { name: "내 공간" })).toHaveAttribute("aria-current", "page");
+  const desktopNotificationAccount = page.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` });
+  await expect(desktopNotificationAccount).toContainText(MEMBER_NAME);
+  await expect(desktopNotificationAccount.locator("img")).toHaveAttribute("src", "/assets/avatars/book-club/reading-lamp.webp");
+  await page.screenshot({ path: testInfo.outputPath("1280-notifications-account.png"), fullPage: true });
+
   await page.goto(`${APP_BASE}/session/current`);
   const desktopAccount = page.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` });
   await expect(desktopAccount).toContainText(MEMBER_NAME);
-  await expect(desktopAccount.locator("img")).toHaveAttribute("src", "/assets/avatars/book-club/book-tote.webp");
-  const roster = page.locator(".rm-current-session-desktop").getByText("참석자 · 3/3").locator("..").locator("..");
-  const rosterImages = roster.locator(".rm-avatar-chip img");
+  await expect(desktopAccount.locator("img")).toHaveAttribute("src", "/assets/avatars/book-club/reading-lamp.webp");
+  const roster = page.getByRole("main").filter({ hasText: "참석자 · 3/3" });
+  await expect(roster).toHaveCount(1);
+  await expect(roster.getByText(/^김독서/)).toBeVisible();
+  await expect(roster.getByText("김책가방", { exact: true })).toBeVisible();
+  await expect(roster.getByText("김달력책", { exact: true })).toBeVisible();
+  const rosterImages = roster.locator("img");
   await expect(rosterImages).toHaveCount(3);
   expect(await rosterImages.evaluateAll((images) => images.map((image) => image.getAttribute("src")))).toEqual([
     "/assets/avatars/book-club/reading-lamp.webp",
@@ -273,7 +316,7 @@ test("scoped account navigation preserves local avatar identity across mobile an
 
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("Network.setCacheDisabled", { cacheDisabled: true });
-  await page.route("**/assets/avatars/book-club/book-tote.webp", (route) => route.abort());
+  await page.route("**/assets/avatars/book-club/reading-lamp.webp", (route) => route.abort());
   await page.reload();
   await expect(page.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` })).toBeVisible();
   await expect(page.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` }).locator("img")).toHaveAttribute(
