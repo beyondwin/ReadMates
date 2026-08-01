@@ -151,3 +151,26 @@ test("host dashboard captures public-safe operating-signal and priority-ledger v
   });
   expect(mobileScreenshot.byteLength).toBeGreaterThan(10_000);
 });
+
+test("host current-session card keeps balanced metrics at 320px", async ({ page }) => {
+  await loginWithGoogleFixture(page, "host@example.com");
+  await routeHostDashboardPublicSafe(page);
+  await routeHostClubOperations(page);
+  await page.setViewportSize({ width: 320, height: 844 });
+  await page.goto("/clubs/reading-sai/app/host");
+
+  const mobile = page.locator("main.rm-host-dashboard-mobile");
+  const card = mobile.getByRole("article", { name: "현재 세션 요약" });
+  const head = card.locator(".rm-host-dashboard-mobile__session-head");
+  const metrics = card.locator(".rm-host-dashboard-mobile__session-metrics");
+  const cta = card.getByRole("link", { name: "세션 문서 열기" });
+
+  await expect(head).toHaveCSS("padding-left", "18px");
+  await expect(head).toHaveCSS("padding-right", "18px");
+  await expect(head).toHaveCSS("padding-top", "18px");
+  await expect(head).toHaveCSS("padding-bottom", "16px");
+  await expect(metrics.locator(":scope > div")).toHaveCount(3);
+  expect(await metrics.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length)).toBe(3);
+  await expect(cta).toHaveCSS("height", "48px");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});

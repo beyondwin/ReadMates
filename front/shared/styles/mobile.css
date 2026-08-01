@@ -1195,16 +1195,36 @@
   overflow: hidden;
 }
 .mobile-only .rm-host-dashboard-mobile__session-head {
-  padding: 18px 18px 14px;
+  padding: 18px 18px 16px;
   border-bottom: 1px solid var(--line-soft);
+}
+.mobile-only .rm-host-dashboard-mobile__session-head h3 {
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 .mobile-only .rm-host-dashboard-mobile__session-metrics {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin-top: 16px;
   padding-top: 14px;
   border-top: 1px solid var(--line-soft);
+}
+.mobile-only .rm-host-dashboard-mobile__session-metrics > div {
+  min-width: 0;
+  padding: 0 10px;
+  border-left: 1px solid var(--line-soft);
+}
+.mobile-only .rm-host-dashboard-mobile__session-metrics > div:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+.mobile-only .rm-host-dashboard-mobile__session-metrics > div:last-child {
+  padding-right: 0;
+}
+.mobile-only .rm-host-dashboard-mobile__session-note {
+  margin-top: 16px;
+  color: var(--text-2);
 }
 .mobile-only .rm-host-dashboard-mobile__session-cta {
   width: 100%;
