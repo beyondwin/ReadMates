@@ -46,7 +46,47 @@ function SectionHeader({
   );
 }
 
-function FeedbackAction({
+function RecentRecordDestination({
+  label,
+  description,
+  to,
+  LinkComponent,
+}: {
+  label: string;
+  description: string;
+  to?: string;
+  LinkComponent: MemberHomeLinkComponent;
+}) {
+  const content = (
+    <>
+      <span className="rm-recent-record__destination-copy">
+        <strong>{label}</strong>
+        <span>{description}</span>
+      </span>
+      {to ? (
+        <span className="rm-recent-record__destination-arrow" aria-hidden="true">
+          →
+        </span>
+      ) : null}
+    </>
+  );
+
+  if (!to) {
+    return (
+      <div className="rm-recent-record__destination rm-recent-record__destination--static">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Link to={to} className="rm-recent-record__destination" LinkComponent={LinkComponent}>
+      {content}
+    </Link>
+  );
+}
+
+function RecentRecordDocuments({
   entry,
   LinkComponent,
 }: {
@@ -55,23 +95,36 @@ function FeedbackAction({
 }) {
   const canOpenFeedback = entry.feedbackState === "AVAILABLE" || entry.feedbackState === "UNKNOWN";
 
-  if (!canOpenFeedback) {
-    return (
-      <span className="small" style={{ color: "var(--text-2)" }}>
-        {entry.feedbackStatusLabel}
-      </span>
-    );
-  }
-
   return (
-    <>
-      <Link to={entry.feedbackHref} className="btn btn-quiet btn-sm" LinkComponent={LinkComponent}>
-        피드백 보기
-      </Link>
-      <span className="tiny" style={{ color: "var(--text-3)", flexBasis: "100%" }}>
-        {entry.feedbackStatusLabel}
-      </span>
-    </>
+    <nav className="rm-recent-record__documents" aria-label="지난 모임 문서">
+      <RecentRecordDestination
+        label="모임 기록 보기"
+        description="질문과 회고를 이어 읽기"
+        to={entry.href}
+        LinkComponent={LinkComponent}
+      />
+      <RecentRecordDestination
+        label="피드백 문서 보기"
+        description={entry.feedbackStatusLabel}
+        to={canOpenFeedback ? entry.feedbackHref : undefined}
+        LinkComponent={LinkComponent}
+      />
+    </nav>
+  );
+}
+
+function RecentRecordCopy({ entry }: { entry: MemberHomeRecentRecordEntry }) {
+  return (
+    <div className="rm-recent-record__copy">
+      <div className="eyebrow">지난 모임 회고</div>
+      <h2 className="h3 editorial rm-recent-record__title">
+        No.{String(entry.sessionNumber).padStart(2, "0")} · {entry.bookTitle}
+      </h2>
+      <p className="small reading-editorial rm-recent-record__summary">{entry.summary}</p>
+      {entry.kindLabels.length > 0 ? (
+        <div className="tiny rm-recent-record__kinds">보존된 내용 · {entry.kindLabels.join(" · ")}</div>
+      ) : null}
+    </div>
   );
 }
 
@@ -148,26 +201,13 @@ export function RecentRecordEntry({
   }
 
   return (
-    <section className="surface-quiet" aria-label="지난 모임 회고" style={{ padding: 20, overflowWrap: "anywhere" }}>
-      <div className="row-between" style={{ gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
-        <div style={{ minWidth: 0 }}>
-          <div className="eyebrow">지난 모임 회고</div>
-          <h2 className="h3 editorial" style={{ margin: "6px 0 0" }}>
-            No.{String(entry.sessionNumber).padStart(2, "0")} · {entry.bookTitle}
-          </h2>
-          <p className="small reading-editorial" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
-            {entry.summary}
-          </p>
-          <div className="tiny" style={{ color: "var(--text-3)", marginTop: 8 }}>
-            {entry.kindLabels.join(" · ")}
-          </div>
-        </div>
-        <div className="row" style={{ gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          <Link to={entry.href} className="btn btn-primary btn-sm" LinkComponent={LinkComponent}>
-            기록 보기
-          </Link>
-          <FeedbackAction entry={entry} LinkComponent={LinkComponent} />
-        </div>
+    <section
+      className="surface-quiet rm-recent-record rm-recent-record--desktop"
+      aria-label="지난 모임 회고"
+    >
+      <div className="rm-recent-record__layout">
+        <RecentRecordCopy entry={entry} />
+        <RecentRecordDocuments entry={entry} LinkComponent={LinkComponent} />
       </div>
     </section>
   );
@@ -186,23 +226,9 @@ export function MobileRecentRecordEntry({
 
   return (
     <section className="m-sec" aria-label="지난 모임 회고">
-      <div className="m-card-quiet" style={{ overflowWrap: "anywhere" }}>
-        <div className="eyebrow">지난 모임 회고</div>
-        <div className="body editorial" style={{ fontSize: 15, marginTop: 6 }}>
-          No.{String(entry.sessionNumber).padStart(2, "0")} · {entry.bookTitle}
-        </div>
-        <p className="small reading-editorial" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
-          {entry.summary}
-        </p>
-        <div className="tiny" style={{ color: "var(--text-3)", marginTop: 8 }}>
-          {entry.kindLabels.join(" · ")}
-        </div>
-        <div className="m-row" style={{ gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-          <Link to={entry.href} className="btn btn-primary btn-sm" LinkComponent={LinkComponent}>
-            기록 보기
-          </Link>
-          <FeedbackAction entry={entry} LinkComponent={LinkComponent} />
-        </div>
+      <div className="m-card-quiet rm-recent-record rm-recent-record--mobile">
+        <RecentRecordCopy entry={entry} />
+        <RecentRecordDocuments entry={entry} LinkComponent={LinkComponent} />
       </div>
     </section>
   );

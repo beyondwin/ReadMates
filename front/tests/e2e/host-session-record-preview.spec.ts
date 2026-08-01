@@ -440,11 +440,11 @@ test("host captures public-safe session record preview evidence on desktop and m
   await expect(page.getByText("공개 가능한 세션 요약입니다.")).toHaveCount(0);
   await expect(page.getByText("한줄평입니다.", { exact: true })).toHaveCount(0);
   await expect(recentRecord.getByText("피드백 문서는 열람 화면에서 확인합니다.")).toBeVisible();
-  await expect(recentRecord.getByRole("link", { name: "기록 보기" })).toHaveAttribute(
+  await expect(recentRecord.getByRole("link", { name: /모임 기록 보기/ })).toHaveAttribute(
     "href",
     `/clubs/${CLUB_SLUG}/app/sessions/${SESSION_ID}`,
   );
-  await expect(recentRecord.getByRole("link", { name: "피드백 보기" })).toHaveAttribute(
+  await expect(recentRecord.getByRole("link", { name: /피드백 문서 보기/ })).toHaveAttribute(
     "href",
     `/clubs/${CLUB_SLUG}/app/feedback/${SESSION_ID}`,
   );
