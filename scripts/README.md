@@ -14,6 +14,26 @@ A full source checkout can provide repository-local contributor routing, preflig
 
 The clean public release candidate intentionally omits contributor-only guidance. Its shipped release helpers are self-contained and do not require a particular local agent tool.
 
+## `run-local-google-oauth.sh`
+
+macOS 로컬 Google OAuth credential을 Git이나 `.env`에 저장하지 않고 Keychain에서 Spring backend 프로세스로만 주입합니다. 운영 OAuth client와 분리된 localhost 전용 Web client를 사용하고, 등록과 frontend 비민감 switch 절차는 [로컬 개발 환경](../docs/development/local-setup.md#macos-keychain으로-로컬-google-oauth-실행)을 따릅니다.
+
+```bash
+./scripts/run-local-google-oauth.sh
+```
+
+실행기는 client ID 형식과 client secret의 누락·대표 placeholder를 fail closed로 거부하고 값 자체는 출력하지 않습니다. 실제 backend를 띄우지 않고 Keychain 조회와 형식만 확인할 때는 다음 dry-run을 사용합니다.
+
+```bash
+READMATES_LOCAL_GOOGLE_OAUTH_DRY_RUN=true ./scripts/run-local-google-oauth.sh
+```
+
+공개 fixture 검증은 mock Keychain 응답으로 누락·placeholder·성공 경계를 확인하며 실제 Keychain이나 Google 공급자를 호출하지 않습니다.
+
+```bash
+./scripts/verify-local-google-oauth-keychain-fixtures.sh
+```
+
 ## `server-ci-check.sh`
 
 서버 코드를 수정한 뒤 GitHub Actions Backend job과 같은 품질 게이트를 로컬에서 먼저 확인합니다.

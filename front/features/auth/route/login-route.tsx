@@ -32,6 +32,10 @@ function isDevLoginEnabled() {
   );
 }
 
+function isGoogleLoginEnabled(showDevLogin: boolean) {
+  return !showDevLogin || import.meta.env.VITE_ENABLE_GOOGLE_LOGIN === "true";
+}
+
 function loginReturnTo(search: string) {
   return safeRelativeReturnTo(new URLSearchParams(search).get("returnTo"));
 }
@@ -42,6 +46,7 @@ export function LoginRouteContent() {
   const returnTo = loginReturnTo(globalThis.location.search);
   const isKakaoBrowser = isKakaoInAppBrowser(globalThis.navigator.userAgent);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
+  const showDevLogin = isDevLoginEnabled();
   const loginUrl = isKakaoBrowser ? canonicalLoginUrl(globalThis.location.origin, returnTo, recovery) : null;
   const copyLoginUrl = async () => {
     if (!loginUrl) {
@@ -71,7 +76,8 @@ export function LoginRouteContent() {
       googleLoginHref={oauthHrefForReturnTo(returnTo, { chooseAccount: recovery.chooseAccount })}
       googleLoginLabel={isKakaoBrowser ? "Google 로그인 시도" : recovery.googleActionLabel}
       initialError={recovery.errorMessage}
-      showDevLogin={isDevLoginEnabled()}
+      showDevLogin={showDevLogin}
+      showGoogleLogin={isGoogleLoginEnabled(showDevLogin)}
       showExternalBrowserGuidance={isKakaoBrowser}
       copyStatus={copyStatus}
       onCopyLoginUrl={isKakaoBrowser ? copyLoginUrl : undefined}

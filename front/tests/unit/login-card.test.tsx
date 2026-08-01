@@ -73,10 +73,9 @@ describe("LoginRoute", () => {
 
     render(<LoginRoute />);
 
-    expect(screen.getByRole("link", { name: "Google로 시작하기" })).toBeInTheDocument();
-    expect(screen.getByText("Local development only")).toBeInTheDocument();
+    expect(screen.getByLabelText("로컬 개발 전용 로그인")).toBeInTheDocument();
     expect(screen.getByText("프로덕션 제외")).toBeInTheDocument();
-    expect(screen.getByText(/실제 운영 로그인은 위 Google OAuth 경로를 사용합니다/)).toBeInTheDocument();
+    expect(screen.getByText(/실제 Google 자격 증명은 브라우저에 노출하지 않습니다/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "김호스트 · 호스트" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "플랫폼 관리자 · OWNER" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "안멤버1" })).toBeInTheDocument();
@@ -84,6 +83,30 @@ describe("LoginRoute", () => {
     expect(screen.getByRole("button", { name: "김멤버3" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "송멤버4" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "이멤버5" })).toBeInTheDocument();
+  });
+
+  it("does not offer a broken Google OAuth link in local dev mode unless it is explicitly enabled", () => {
+    vi.stubEnv("VITE_ENABLE_DEV_LOGIN", "true");
+
+    render(<LoginRoute />);
+
+    expect(screen.queryByRole("link", { name: "Google로 시작하기" })).not.toBeInTheDocument();
+    expect(screen.getByRole("note", { name: "로컬 Google 로그인 설정 안내" })).toHaveTextContent(
+      "Google OAuth 자격 증명을 안전하게 설정한 뒤에만 활성화할 수 있습니다",
+    );
+  });
+
+  it("offers Google OAuth in local dev mode only after the explicit public flag is enabled", () => {
+    vi.stubEnv("VITE_ENABLE_DEV_LOGIN", "true");
+    vi.stubEnv("VITE_ENABLE_GOOGLE_LOGIN", "true");
+
+    render(<LoginRoute />);
+
+    expect(screen.getByRole("link", { name: "Google로 시작하기" })).toHaveAttribute(
+      "href",
+      "/oauth2/authorization/google",
+    );
+    expect(screen.queryByRole("note", { name: "로컬 Google 로그인 설정 안내" })).not.toBeInTheDocument();
   });
 
   it("submits dev login through the shared BFF client and preserves the user redirect", async () => {

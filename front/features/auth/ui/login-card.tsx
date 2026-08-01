@@ -13,6 +13,7 @@ export function LoginCard({
   googleLoginLabel = "Google로 시작하기",
   initialError = null,
   showDevLogin = false,
+  showGoogleLogin = true,
   showExternalBrowserGuidance = false,
   copyStatus = null,
   onCopyLoginUrl,
@@ -23,6 +24,7 @@ export function LoginCard({
   googleLoginLabel?: string;
   initialError?: string | null;
   showDevLogin?: boolean;
+  showGoogleLogin?: boolean;
   showExternalBrowserGuidance?: boolean;
   copyStatus?: string | null;
   onCopyLoginUrl?: () => Promise<void>;
@@ -56,7 +58,16 @@ export function LoginCard({
           {error}
         </p>
       ) : null}
-      {showExternalBrowserGuidance ? (
+      {!showGoogleLogin ? (
+        <aside className="auth-browser-guidance" role="note" aria-label="로컬 Google 로그인 설정 안내">
+          <p className="eyebrow">Local development only</p>
+          <h2 className="h3 editorial">Google 로그인은 명시적으로 활성화합니다</h2>
+          <p className="small auth-browser-guidance__copy">
+            Google OAuth 자격 증명을 안전하게 설정한 뒤에만 활성화할 수 있습니다. 지금은 아래 로컬 fixture 계정으로
+            확인해 주세요.
+          </p>
+        </aside>
+      ) : showExternalBrowserGuidance ? (
         <aside className="auth-browser-guidance" aria-labelledby="external-browser-guidance-title">
           <p className="eyebrow">카카오톡 브라우저</p>
           <h2 className="h3 editorial" id="external-browser-guidance-title">
@@ -93,7 +104,9 @@ export function LoginCard({
             <span className="badge badge-warning">프로덕션 제외</span>
           </div>
           <p className="small auth-dev-panel__copy">
-            로컬 fixture 계정으로만 사용하는 개발용 shortcut입니다. 실제 운영 로그인은 위 Google OAuth 경로를 사용합니다.
+            {showGoogleLogin
+              ? "로컬 fixture 계정으로만 사용하는 개발용 shortcut입니다. 실제 운영 로그인은 위 Google OAuth 경로를 사용합니다."
+              : "로컬 fixture 계정으로만 사용하는 개발용 shortcut입니다. 실제 Google 자격 증명은 브라우저에 노출하지 않습니다."}
           </p>
           <div className="auth-card__actions auth-dev-panel__actions">
             {devAccounts.map((account) => (

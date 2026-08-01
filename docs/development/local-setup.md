@@ -181,6 +181,35 @@ READMATES_AUTH_SESSION_COOKIE_SECURE=false \
 | `SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET` | Google OAuth를 로컬에서 직접 시험할 때 필요한 client secret입니다. dev-login만 쓰면 필요하지 않습니다. |
 | `SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_SCOPE` | Google OAuth scope입니다. 기본 운영 예시는 `openid,email,profile`입니다. |
 
+### macOS Keychain으로 로컬 Google OAuth 실행
+
+실제 Google 로그인을 로컬에서 확인할 때는 운영 OAuth client를 재사용하지 않고 별도 Web client를 만듭니다. Google Cloud의 승인된 redirect URI에는 다음 callback만 추가합니다.
+
+```text
+http://localhost:5173/login/oauth2/code/google
+```
+
+Client ID와 client secret은 `.env`, 프런트 `VITE_*`, shell history에 기록하지 않습니다. macOS에서는 아래 명령이 각 값을 대화형으로 요청해 Keychain에 저장합니다. `-w`를 마지막 인자로 유지해야 값이 명령행 인자에 들어가지 않습니다.
+
+```bash
+security add-generic-password -U -a "$USER" -s readmates.local.google-oauth.client-id -w
+security add-generic-password -U -a "$USER" -s readmates.local.google-oauth.client-secret -w
+```
+
+첫 번째 터미널에서 Keychain 값을 Spring backend 프로세스에만 주입합니다. 실행기는 기본적으로 dev profile, API `18080`, callback origin `http://localhost:5173`을 사용하며 credential 값을 출력하지 않습니다.
+
+```bash
+./scripts/run-local-google-oauth.sh
+```
+
+두 번째 터미널에서 비민감 frontend switch만 명시해 Vite를 실행합니다.
+
+```bash
+VITE_ENABLE_GOOGLE_LOGIN=true corepack pnpm --dir front dev
+```
+
+`VITE_ENABLE_GOOGLE_LOGIN`은 링크 표시 여부만 제어하며 OAuth client ID나 secret을 포함하지 않습니다. 플래그가 없으면 로컬 dev-login은 유지하되 Google 링크를 숨겨 placeholder client가 Google로 전송되지 않게 합니다. 운영 build는 이 로컬 switch와 무관하게 기존 Google 로그인 action을 유지합니다.
+
 운영 migration은 `server/src/main/resources/db/mysql/migration`에만 추가합니다. `server/src/main/resources/db/migration`은 사용하지 않으며, 새 파일을 그 위치에 만들면 운영 Flyway가 읽지 않습니다.
 
 Server 로그는 JSON 형식이므로 `./server/gradlew bootRun 2>&1 | jq '.'`로 보기 좋게 볼 수 있습니다.
@@ -211,6 +240,7 @@ pnpm --dir front dev
 | `READMATES_API_BASE_URL` | Vite dev proxy와 Cloudflare Pages Functions가 바라볼 Spring API origin입니다. 문서 예시는 로컬 `http://localhost:8080` 또는 placeholder `https://api.example.com`만 사용합니다. |
 | `READMATES_BFF_SECRET` | Vite dev proxy 또는 Pages Functions가 Spring으로 보낼 `X-Readmates-Bff-Secret` 값입니다. 브라우저 bundle에 들어가는 `VITE_` 변수로 만들지 않습니다. |
 | `VITE_ENABLE_DEV_LOGIN` | 로컬 dev-login 버튼 표시를 명시적으로 켭니다. `import.meta.env.DEV`에서도 표시되지만, 로컬 의도를 분명히 하기 위해 설정할 수 있습니다. |
+| `VITE_ENABLE_GOOGLE_LOGIN` | 실제 Google credential을 backend에 안전하게 주입한 로컬 환경에서만 Google action을 표시하는 비민감 switch입니다. credential 자체를 넣지 않습니다. |
 | `NEXT_PUBLIC_ENABLE_DEV_LOGIN` | 이전 로컬 env 파일 호환을 위한 legacy 변수입니다. 새 설정에는 `VITE_ENABLE_DEV_LOGIN`을 사용합니다. |
 
 ## Dev-login 흐름
