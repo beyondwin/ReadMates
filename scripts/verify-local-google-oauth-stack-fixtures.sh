@@ -226,9 +226,11 @@ cat > "$fixture_root/bin/corepack" <<'SCRIPT'
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ "$1" == "pnpm" ]]; then
-  shift
+if [[ "${1:-}" != "pnpm" ]]; then
+  printf 'fixture corepack requires an explicit pnpm command\n' >&2
+  exit 64
 fi
+shift
 
 if [[ "$1" == "--dir" ]]; then
   shift 2
@@ -388,6 +390,59 @@ run_stack_case_interrupt() {
   wait "$stack_pid" 2>/dev/null || true
 }
 
+run_stack_case_with_verifier() {
+  local case_name="$1"
+  local stack_path="$2"
+  shift 2
+  local -a env_assignments=("${@}")
+  local output_file="$fixture_root/$case_name.out"
+  local verify_output_file="$fixture_root/$case_name.verify.out"
+  local state_dir="${fixture_root}/state/$case_name"
+  local stack_pid=""
+  local attempt
+
+  mkdir -p "$state_dir"
+  : >"$output_file"
+  : >"$verify_output_file"
+
+  (
+    cd "$fixture_root" && \
+    env \
+      "PATH=$fixture_root/bin:$PATH" \
+      "READMATES_LOCAL_GOOGLE_OAUTH_FIXTURE_STATE_DIR=$state_dir" \
+      "${env_assignments[@]}" \
+      "$stack_path" >"$output_file" 2>&1
+  ) &
+  stack_pid=$!
+
+  for attempt in 1 2 3 4 5 6 7 8 9 10; do
+    [[ -f "$state_dir/frontend.ready" ]] && break
+    kill -0 "$stack_pid" >/dev/null 2>&1 || break
+    sleep 1
+  done
+
+  if [[ -f "$state_dir/frontend.ready" ]]; then
+    (
+      cd "$fixture_root" && \
+      env \
+        "PATH=$fixture_root/bin:$PATH" \
+        "READMATES_LOCAL_GOOGLE_OAUTH_FIXTURE_STATE_DIR=$state_dir" \
+        "${env_assignments[@]}" \
+        "$fixture_root/scripts/verify-local-google-oauth-stack.sh" >"$verify_output_file" 2>&1
+    ) || true
+  fi
+
+  kill -INT "$stack_pid" >/dev/null 2>&1 || true
+  for attempt in 1 2 3 4 5; do
+    if ! kill -0 "$stack_pid" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  kill -TERM "$stack_pid" >/dev/null 2>&1 || true
+  wait "$stack_pid" 2>/dev/null || true
+}
+
 expect_fail_case() {
   local case_name="$1"
   shift
@@ -420,6 +475,12 @@ backend_timeout_frontend_port="$(pick_free_port)"
 frontend_exit_backend_port="$(pick_free_port)"
 frontend_exit_management_port="$(pick_free_port)"
 frontend_exit_frontend_port="$(pick_free_port)"
+corepack_contract_backend_port="$(pick_free_port)"
+corepack_contract_management_port="$(pick_free_port)"
+corepack_contract_frontend_port="$(pick_free_port)"
+verifier_health_backend_port="$(pick_free_port)"
+verifier_health_management_port="$(pick_free_port)"
+verifier_health_frontend_port="$(pick_free_port)"
 no_open_default_backend_port="$(pick_free_port)"
 no_open_default_management_port="$(pick_free_port)"
 no_open_default_frontend_port="$(pick_free_port)"
@@ -485,6 +546,22 @@ expect_fail_case "frontend_exit" \
   "READMATES_LOCAL_GOOGLE_OAUTH_MANAGEMENT_PORT=$frontend_exit_management_port" \
   "READMATES_LOCAL_GOOGLE_OAUTH_FRONTEND_PORT=$frontend_exit_frontend_port"
 assert_contains "$fixture_root/frontend_exit.out" "frontend process exited before readiness"
+
+expect_interrupt_case "corepack_pnpm_contract" \
+  "READMATES_LOCAL_GOOGLE_OAUTH_BACKEND_PORT=$corepack_contract_backend_port" \
+  "READMATES_LOCAL_GOOGLE_OAUTH_MANAGEMENT_PORT=$corepack_contract_management_port" \
+  "READMATES_LOCAL_GOOGLE_OAUTH_FRONTEND_PORT=$corepack_contract_frontend_port"
+assert_file_exists "$fixture_root/state/corepack_pnpm_contract/frontend.started"
+assert_contains "$fixture_root/corepack_pnpm_contract.out" "Open in browser: http://localhost:$corepack_contract_frontend_port"
+assert_contains "$fixture_root/corepack_pnpm_contract.out" "Backend API: http://127.0.0.1:$corepack_contract_backend_port"
+assert_contains "$fixture_root/corepack_pnpm_contract.out" "Backend health: http://127.0.0.1:$corepack_contract_management_port/actuator/health"
+assert_contains "$fixture_root/corepack_pnpm_contract.out" "Google OAuth login: http://localhost:$corepack_contract_frontend_port/oauth2/authorization/google?returnTo=%2Fapp"
+
+run_stack_case_with_verifier "verifier_management_health" "$stack_script_source" \
+  "READMATES_LOCAL_GOOGLE_OAUTH_BACKEND_PORT=$verifier_health_backend_port" \
+  "READMATES_LOCAL_GOOGLE_OAUTH_MANAGEMENT_PORT=$verifier_health_management_port" \
+  "READMATES_LOCAL_GOOGLE_OAUTH_FRONTEND_PORT=$verifier_health_frontend_port"
+assert_contains "$fixture_root/verifier_management_health.verify.out" "local Google OAuth stack smoke checks passed."
 
 expect_interrupt_case "no_open_default" \
   "READMATES_LOCAL_GOOGLE_OAUTH_OPEN_BROWSER=false" \

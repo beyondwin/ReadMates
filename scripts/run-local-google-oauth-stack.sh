@@ -214,7 +214,7 @@ main() {
   env \
     READMATES_API_BASE_URL="http://127.0.0.1:$backend_port" \
     VITE_ENABLE_GOOGLE_LOGIN=true \
-    "${corepack_cmd[@]}" --dir front exec vite \
+    "${corepack_cmd[@]}" pnpm --dir front exec vite \
     --host localhost --port "$frontend_port" --strictPort \
     >"$runtime_dir/frontend.log" 2>&1 &
   frontend_pid=$!
@@ -224,10 +224,10 @@ main() {
 
   local_login_url="http://localhost:$frontend_port/oauth2/authorization/google?returnTo=%2Fapp"
   printf 'Local Google OAuth stack is running.\n'
+  printf 'Open in browser: http://localhost:%s\n' "$frontend_port"
   printf 'Backend API: http://127.0.0.1:%s\n' "$backend_port"
-  printf 'Backend management: http://127.0.0.1:%s/actuator/health\n' "$management_port"
-  printf 'Frontend: http://localhost:%s\n' "$frontend_port"
-  printf 'Login URL: %s\n' "$local_login_url"
+  printf 'Backend health: http://127.0.0.1:%s/actuator/health\n' "$management_port"
+  printf 'Google OAuth login: %s\n' "$local_login_url"
   printf 'Smoke check: READMATES_LOCAL_GOOGLE_OAUTH_FRONTEND_PORT=%s READMATES_LOCAL_GOOGLE_OAUTH_BACKEND_PORT=%s READMATES_LOCAL_GOOGLE_OAUTH_MANAGEMENT_PORT=%s ./scripts/verify-local-google-oauth-stack.sh\n' \
     "$frontend_port" "$backend_port" "$management_port"
   printf 'Runtime logs: %s\n' "$runtime_dir"

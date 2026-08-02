@@ -32,7 +32,7 @@ fi
 
 READMATES_LOCAL_GOOGLE_OAUTH_DRY_RUN=true "$runner" >/dev/null || fail "local Google OAuth credential preflight failed"
 
-backend_health="http://127.0.0.1:$backend_port/actuator/health"
+backend_health="http://127.0.0.1:$management_port/actuator/health"
 frontend_login="http://localhost:$frontend_port/login"
 callback="http://localhost:$frontend_port/login/oauth2/code/google"
 start_url="http://localhost:$frontend_port/oauth2/authorization/google?returnTo=%2Fapp"
