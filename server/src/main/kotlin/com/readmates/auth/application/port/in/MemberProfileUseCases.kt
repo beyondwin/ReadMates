@@ -2,6 +2,7 @@ package com.readmates.auth.application.port.`in`
 
 import com.readmates.auth.application.HostMemberListItem
 import com.readmates.auth.application.model.MemberProfile
+import com.readmates.auth.application.model.ReplaceOwnMemberProfileCommand
 import com.readmates.auth.application.model.UpdateMemberAvatarCommand
 import com.readmates.auth.application.model.UpdateMemberProfileCommand
 import java.util.UUID
@@ -10,6 +11,14 @@ interface UpdateOwnMemberProfileUseCase {
     fun updateOwnProfile(
         authenticationEmail: String?,
         command: UpdateMemberProfileCommand,
+    ): MemberProfile
+}
+
+interface ReplaceOwnMemberProfileUseCase {
+    fun replaceOwnProfile(
+        authenticationEmail: String?,
+        currentClubId: UUID,
+        command: ReplaceOwnMemberProfileCommand,
     ): MemberProfile
 }
 

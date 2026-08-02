@@ -191,6 +191,28 @@ class JdbcMemberProfileStoreAdapter(
             clubId.dbString(),
         ) == 1
 
+    override fun updateOwnProfile(
+        clubId: UUID,
+        membershipId: UUID,
+        displayName: String,
+        avatarKey: String,
+    ): Boolean =
+        jdbcTemplate.update(
+            """
+            update memberships
+            set short_name = ?,
+                avatar_key = ?,
+                updated_at = utc_timestamp(6)
+            where id = ?
+              and club_id = ?
+              and status in ('VIEWER', 'ACTIVE', 'SUSPENDED')
+            """.trimIndent(),
+            displayName,
+            avatarKey,
+            membershipId.dbString(),
+            clubId.dbString(),
+        ) == 1
+
     override fun updateDisplayName(
         clubId: UUID,
         membershipId: UUID,

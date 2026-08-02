@@ -51,6 +51,13 @@ interface MemberProfileStorePort {
         avatarKey: String,
     ): Boolean
 
+    fun updateOwnProfile(
+        clubId: UUID,
+        membershipId: UUID,
+        displayName: String,
+        avatarKey: String,
+    ): Boolean
+
     fun updateDisplayName(
         clubId: UUID,
         membershipId: UUID,

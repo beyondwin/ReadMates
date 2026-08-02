@@ -2,8 +2,10 @@ package com.readmates.auth.application.service
 
 import com.readmates.auth.application.HostMemberListItem
 import com.readmates.auth.application.model.MemberProfile
+import com.readmates.auth.application.model.ReplaceOwnMemberProfileCommand
 import com.readmates.auth.application.model.UpdateMemberAvatarCommand
 import com.readmates.auth.application.model.UpdateMemberProfileCommand
+import com.readmates.auth.application.port.`in`.ReplaceOwnMemberProfileUseCase
 import com.readmates.auth.application.port.`in`.UpdateHostMemberProfileUseCase
 import com.readmates.auth.application.port.`in`.UpdateOwnMemberAvatarUseCase
 import com.readmates.auth.application.port.`in`.UpdateOwnMemberProfileUseCase
@@ -23,9 +25,46 @@ import java.util.UUID
 class MemberProfileService(
     private val memberProfileStore: MemberProfileStorePort,
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
-) : UpdateOwnMemberProfileUseCase,
+) : ReplaceOwnMemberProfileUseCase,
+    UpdateOwnMemberProfileUseCase,
     UpdateOwnMemberAvatarUseCase,
     UpdateHostMemberProfileUseCase {
+    @Transactional
+    override fun replaceOwnProfile(
+        authenticationEmail: String?,
+        currentClubId: UUID,
+        command: ReplaceOwnMemberProfileCommand,
+    ): MemberProfile {
+        val email = authenticatedEmail(authenticationEmail)
+        val member =
+            memberProfileStore.findProfileMemberByEmail(email, currentClubId)
+                ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+        val displayName = validateDisplayName(command.displayName)
+        val avatarKey = validateAvatarKey(command.avatarKey)
+        if (!memberProfileStore.lockClubProfileNames(currentClubId)) {
+            throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+        }
+        val lockedMember =
+            memberProfileStore.findProfileMemberInClubForUpdate(currentClubId, member.membershipId)
+                ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+        if (!lockedMember.toCurrentMember().canEditOwnProfile) {
+            throw MemberProfileException(MemberProfileError.MEMBERSHIP_NOT_ALLOWED)
+        }
+        if (memberProfileStore.displayNameExistsInClub(currentClubId, displayName, member.membershipId)) {
+            throw MemberProfileException(MemberProfileError.DISPLAY_NAME_DUPLICATE)
+        }
+        if (!memberProfileStore.updateOwnProfile(currentClubId, member.membershipId, displayName, avatarKey)) {
+            memberProfileStore.recheckOwnProfileUpdateFailure(currentClubId, member.membershipId)
+        }
+        val profile =
+            memberProfileStore
+                .findProfileMemberByEmail(email, currentClubId)
+                ?.toMemberProfile()
+                ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+        cacheInvalidation.evictClubContentAfterCommit(currentClubId)
+        return profile
+    }
+
     @Transactional
     override fun updateOwnProfile(
         authenticationEmail: String?,
@@ -237,6 +276,23 @@ private fun MemberProfileStorePort.findOwnAvatarMutableMember(
         throw MemberProfileException(MemberProfileError.MEMBERSHIP_NOT_ALLOWED)
     }
     return member
+}
+
+private fun MemberProfileStorePort.recheckOwnProfileUpdateFailure(
+    clubId: UUID,
+    membershipId: UUID,
+): Nothing {
+    val currentMember = findProfileMemberInClubForUpdate(clubId, membershipId)
+    if (currentMember?.toCurrentMember()?.canEditOwnProfile != true) {
+        val error =
+            if (currentMember == null) {
+                MemberProfileError.MEMBER_NOT_FOUND
+            } else {
+                MemberProfileError.MEMBERSHIP_NOT_ALLOWED
+            }
+        throw MemberProfileException(error)
+    }
+    throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
 }
 
 private fun MemberProfileStorePort.recheckAvatarUpdateFailure(

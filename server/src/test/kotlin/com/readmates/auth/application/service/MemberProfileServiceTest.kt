@@ -1,5 +1,6 @@
 package com.readmates.auth.application.service
 
+import com.readmates.auth.application.model.ReplaceOwnMemberProfileCommand
 import com.readmates.auth.application.model.UpdateMemberAvatarCommand
 import com.readmates.auth.application.model.UpdateMemberProfileCommand
 import com.readmates.auth.application.port.out.HostMemberListRow
@@ -16,6 +17,157 @@ import java.util.UUID
 class MemberProfileServiceTest {
     private val clubId = UUID.fromString("00000000-0000-0000-0000-000000000001")
     private val membershipId = UUID.fromString("00000000-0000-0000-0000-000000000201")
+
+    @Test
+    fun `replaces own club profile with one normalized update`() {
+        val store = RecordingMemberProfileStorePort()
+        val invalidation = RecordingReadCacheInvalidationPort()
+        val service = MemberProfileService(store, invalidation)
+
+        val profile =
+            service.replaceOwnProfile(
+                " MEMBER@example.com ",
+                clubId,
+                ReplaceOwnMemberProfileCommand("  새이름  ", "  cloud-green-book  "),
+            )
+
+        assertEquals("새이름", profile.displayName)
+        assertEquals("cloud-green-book", profile.avatarKey)
+        assertEquals(
+            listOf(OwnProfileUpdate(clubId, membershipId, "새이름", "cloud-green-book")),
+            store.profileUpdates,
+        )
+        assertEquals(listOf(clubId), invalidation.clubs)
+    }
+
+    @Test
+    fun `rejects invalid combined profile fields before writing`() {
+        val cases =
+            listOf(
+                ReplaceOwnMemberProfileCommand(null, "cloud-green-book") to MemberProfileError.DISPLAY_NAME_REQUIRED,
+                ReplaceOwnMemberProfileCommand("   ", "cloud-green-book") to MemberProfileError.DISPLAY_NAME_REQUIRED,
+                ReplaceOwnMemberProfileCommand("member@example.com", "cloud-green-book") to
+                    MemberProfileError.DISPLAY_NAME_INVALID,
+                ReplaceOwnMemberProfileCommand("관리자", "cloud-green-book") to
+                    MemberProfileError.DISPLAY_NAME_RESERVED,
+                ReplaceOwnMemberProfileCommand("새이름", null) to MemberProfileError.AVATAR_KEY_REQUIRED,
+                ReplaceOwnMemberProfileCommand("새이름", "   ") to MemberProfileError.AVATAR_KEY_REQUIRED,
+                ReplaceOwnMemberProfileCommand("새이름", "hedgehog-green-mug") to
+                    MemberProfileError.AVATAR_KEY_INVALID,
+                ReplaceOwnMemberProfileCommand("새이름", "../cloud-green-book") to
+                    MemberProfileError.AVATAR_KEY_INVALID,
+                ReplaceOwnMemberProfileCommand("새이름", "CLOUD-GREEN-BOOK") to
+                    MemberProfileError.AVATAR_KEY_INVALID,
+            )
+
+        cases.forEach { (command, expectedError) ->
+            val store = RecordingMemberProfileStorePort()
+            val invalidation = RecordingReadCacheInvalidationPort()
+
+            val exception =
+                assertThrows(MemberProfileException::class.java) {
+                    MemberProfileService(store, invalidation).replaceOwnProfile("member@example.com", clubId, command)
+                }
+
+            assertEquals(expectedError, exception.error)
+            assertEquals(emptyList<OwnProfileUpdate>(), store.profileUpdates)
+            assertEquals(emptyList<UUID>(), invalidation.clubs)
+        }
+    }
+
+    @Test
+    fun `rejects duplicate combined profile name before writing`() {
+        val store = RecordingMemberProfileStorePort(duplicateDisplayName = true)
+        val invalidation = RecordingReadCacheInvalidationPort()
+
+        val exception =
+            assertThrows(MemberProfileException::class.java) {
+                MemberProfileService(store, invalidation).replaceOwnProfile(
+                    "member@example.com",
+                    clubId,
+                    ReplaceOwnMemberProfileCommand("새이름", "cloud-green-book"),
+                )
+            }
+
+        assertEquals(MemberProfileError.DISPLAY_NAME_DUPLICATE, exception.error)
+        assertEquals(emptyList<OwnProfileUpdate>(), store.profileUpdates)
+        assertEquals(emptyList<UUID>(), invalidation.clubs)
+    }
+
+    @Test
+    fun `rejects unauthenticated wrong-club and non-editable combined profile requests without writing`() {
+        val otherClubId = UUID.fromString("00000000-0000-0000-0000-000000000002")
+        val cases =
+            listOf(
+                Triple(null, clubId, MembershipStatus.ACTIVE) to MemberProfileError.AUTHENTICATION_REQUIRED,
+                Triple("member@example.com", otherClubId, MembershipStatus.ACTIVE) to
+                    MemberProfileError.MEMBER_NOT_FOUND,
+                Triple("member@example.com", clubId, MembershipStatus.LEFT) to
+                    MemberProfileError.MEMBERSHIP_NOT_ALLOWED,
+                Triple("member@example.com", clubId, MembershipStatus.INACTIVE) to
+                    MemberProfileError.MEMBERSHIP_NOT_ALLOWED,
+            )
+
+        cases.forEach { (request, expectedError) ->
+            val store = RecordingMemberProfileStorePort(status = request.third)
+            val invalidation = RecordingReadCacheInvalidationPort()
+
+            val exception =
+                assertThrows(MemberProfileException::class.java) {
+                    MemberProfileService(store, invalidation).replaceOwnProfile(
+                        request.first,
+                        request.second,
+                        ReplaceOwnMemberProfileCommand("새이름", "cloud-green-book"),
+                    )
+                }
+
+            assertEquals(expectedError, exception.error)
+            assertEquals(emptyList<OwnProfileUpdate>(), store.profileUpdates)
+            assertEquals(emptyList<UUID>(), invalidation.clubs)
+        }
+    }
+
+    @Test
+    fun `allows viewer active and suspended members to replace their combined profile`() {
+        listOf(MembershipStatus.VIEWER, MembershipStatus.ACTIVE, MembershipStatus.SUSPENDED).forEach { status ->
+            val store = RecordingMemberProfileStorePort(status = status)
+
+            val profile =
+                MemberProfileService(store).replaceOwnProfile(
+                    "member@example.com",
+                    clubId,
+                    ReplaceOwnMemberProfileCommand("새이름", "cloud-green-book"),
+                )
+
+            assertEquals("새이름", profile.displayName)
+            assertEquals("cloud-green-book", profile.avatarKey)
+            assertEquals(1, store.profileUpdates.size)
+        }
+    }
+
+    @Test
+    fun `rechecks locked membership when combined conditional update loses eligibility`() {
+        val store =
+            RecordingMemberProfileStorePort(
+                updateOwnProfileResult = false,
+                statusAfterFailedProfileUpdate = MembershipStatus.LEFT,
+            )
+        val invalidation = RecordingReadCacheInvalidationPort()
+
+        val exception =
+            assertThrows(MemberProfileException::class.java) {
+                MemberProfileService(store, invalidation).replaceOwnProfile(
+                    "member@example.com",
+                    clubId,
+                    ReplaceOwnMemberProfileCommand("새이름", "cloud-green-book"),
+                )
+            }
+
+        assertEquals(MemberProfileError.MEMBERSHIP_NOT_ALLOWED, exception.error)
+        assertEquals(emptyList<OwnProfileUpdate>(), store.profileUpdates)
+        assertEquals(2, store.profileMemberForUpdateLookups)
+        assertEquals(emptyList<UUID>(), invalidation.clubs)
+    }
 
     @Test
     fun `evicts club content after own profile update`() {
@@ -156,8 +308,12 @@ class MemberProfileServiceTest {
         status: MembershipStatus = MembershipStatus.ACTIVE,
         private val updateOwnAvatarResult: Boolean = true,
         private val statusAfterFailedAvatarUpdate: MembershipStatus? = null,
+        private val duplicateDisplayName: Boolean = false,
+        private val updateOwnProfileResult: Boolean = true,
+        private val statusAfterFailedProfileUpdate: MembershipStatus? = null,
     ) : MemberProfileStorePort {
         val avatarUpdates = mutableListOf<AvatarUpdate>()
+        val profileUpdates = mutableListOf<OwnProfileUpdate>()
         var profileMemberForUpdateLookups = 0
 
         private var row =
@@ -196,7 +352,22 @@ class MemberProfileServiceTest {
             clubId: UUID,
             displayName: String,
             excludingMembershipId: UUID,
-        ) = false
+        ) = duplicateDisplayName
+
+        override fun updateOwnProfile(
+            clubId: UUID,
+            membershipId: UUID,
+            displayName: String,
+            avatarKey: String,
+        ): Boolean {
+            if (updateOwnProfileResult) {
+                profileUpdates += OwnProfileUpdate(clubId, membershipId, displayName, avatarKey)
+                row = row.copy(displayName = displayName, avatarKey = avatarKey)
+            } else if (statusAfterFailedProfileUpdate != null) {
+                row = row.copy(status = statusAfterFailedProfileUpdate)
+            }
+            return updateOwnProfileResult
+        }
 
         override fun updateOwnDisplayName(
             clubId: UUID,
@@ -239,6 +410,13 @@ class MemberProfileServiceTest {
     private data class AvatarUpdate(
         val clubId: UUID,
         val membershipId: UUID,
+        val avatarKey: String,
+    )
+
+    private data class OwnProfileUpdate(
+        val clubId: UUID,
+        val membershipId: UUID,
+        val displayName: String,
         val avatarKey: String,
     )
 

@@ -309,6 +309,13 @@ class MemberAuthoritiesFilterTest {
             avatarKey: String,
         ): Boolean = false
 
+        override fun updateOwnProfile(
+            clubId: UUID,
+            membershipId: UUID,
+            displayName: String,
+            avatarKey: String,
+        ): Boolean = false
+
         override fun updateDisplayName(
             clubId: UUID,
             membershipId: UUID,
