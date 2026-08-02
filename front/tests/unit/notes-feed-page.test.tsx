@@ -9,7 +9,7 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { NoteFeedItem, NoteSessionItem } from "@/features/archive/api/archive-contracts";
+import type { NoteFeedItem, NoteSessionItem } from "@/shared/model/notes-feed-model";
 import {
   feedFilterFromSearchParam,
   resolveSelectedSession,

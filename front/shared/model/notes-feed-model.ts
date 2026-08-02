@@ -9,7 +9,7 @@ export type NoteFeedItem = {
   date: string;
   authorName: string | null;
   authorShortName: string | null;
-  avatarKey: string;
+  avatarKey: string | null;
   kind: NoteFeedKind;
   text: string;
 };

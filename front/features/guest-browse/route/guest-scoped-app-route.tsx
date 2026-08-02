@@ -1,14 +1,16 @@
 import { useCallback, useRef, useState, type ComponentType } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useLoaderData, useLocation, useParams, useRevalidator } from "react-router-dom";
+import { useLoaderData, useLocation, useParams, useRevalidator, useSearchParams } from "react-router-dom";
 import { guestNavigationCapability } from "@/features/guest-browse/model/club-app-audience";
 import { guestLoaderSourceKey } from "@/features/guest-browse/model/guest-loader-source-key";
-import { guestArchivePageReadView, guestHomeReadView, guestNoteFeedPageReadView, guestNoteSessionsPageReadView, guestSessionReadView, guestUpcomingPageReadView, type GuestArchiveDetailReadView, type GuestArchiveSessionReadView, type GuestHomeReadView, type GuestNotesReadView, type GuestPage } from "@/features/guest-browse/model/guest-read-views";
+import { guestArchivePageReadView, guestHomeReadView, guestNoteFeedReadPage, guestNoteSessionsReadPage, guestSessionReadView, guestUpcomingPageReadView, type GuestArchiveDetailReadView, type GuestArchiveSessionReadView, type GuestHomeReadView, type GuestNotesReadView, type GuestPage } from "@/features/guest-browse/model/guest-read-views";
 import { guestArchiveQuery, guestCurrentSessionQuery, guestNoteFeedQuery, guestNoteSessionsQuery, guestUpcomingSessionsQuery } from "@/features/guest-browse/queries/guest-browse-queries";
 import type { GuestScopedRouteData, GuestScopedRouteFailureData } from "@/features/guest-browse/route/club-app-audience-loader";
 import { GuestLockedPage, type GuestLockKind } from "@/features/guest-browse/ui/guest-locked-page";
 import { GuestMySpace } from "@/features/guest-browse/ui/guest-my-space";
-import { GuestArchive, GuestArchiveDetail, GuestHome, GuestNotes, type GuestSurfaceLinkProps } from "@/features/guest-browse/ui/guest-surfaces";
+import { GuestArchive, GuestArchiveDetail, GuestHome, type GuestSurfaceLinkProps } from "@/features/guest-browse/ui/guest-surfaces";
+import { feedFilterFromSearchParam, type FeedFilter } from "@/shared/model/notes-feed-model";
+import NotesFeedPage from "@/shared/ui/notes-feed-page";
 
 type GuestLinkProps = GuestSurfaceLinkProps;
 export type GuestCurrentSessionContentProps = {
@@ -134,15 +136,30 @@ export function GuestHomeRoute({ initialData, clubSlug, appBasePath, returnTo, L
 export function GuestNotesRoute({ initialData, clubSlug, appBasePath, LinkComponent, selectedSessionId }: { initialData: GuestNotesReadView; clubSlug: string; appBasePath: string; LinkComponent: ComponentType<GuestLinkProps>; selectedSessionId: string | null }) {
   const queryClient = useQueryClient();
   const [data, setData] = useState(initialData);
+  const [searchParams, setSearchParams] = useSearchParams();
   const feedInFlight = useRef<string | null>(null);
   const sessionsInFlight = useRef<string | null>(null);
+  const selectedSession = data.sessions.items.find((session) => session.sessionId === selectedSessionId) ?? null;
+  const handleFilterChange = useCallback((filter: FeedFilter) => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+
+      if (filter === "all") {
+        next.delete("filter");
+      } else {
+        next.set("filter", filter);
+      }
+
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
   const loadMoreFeed = useCallback(async () => {
     const cursor = data.feed.nextCursor;
     if (!cursor || feedInFlight.current === cursor) return;
     feedInFlight.current = cursor;
     try {
       const next = await queryClient.fetchQuery(guestNoteFeedQuery(clubSlug, { limit: 20, cursor }));
-      setData((current) => current.feed.nextCursor === cursor ? { ...current, feed: appendPage(current.feed, guestNoteFeedPageReadView(next)) } : current);
+      setData((current) => current.feed.nextCursor === cursor ? { ...current, feed: appendPage(current.feed, guestNoteFeedReadPage(next)) } : current);
     } finally { feedInFlight.current = null; }
   }, [clubSlug, data.feed.nextCursor, queryClient]);
   const loadMoreSessions = useCallback(async () => {
@@ -151,10 +168,24 @@ export function GuestNotesRoute({ initialData, clubSlug, appBasePath, LinkCompon
     sessionsInFlight.current = cursor;
     try {
       const next = await queryClient.fetchQuery(guestNoteSessionsQuery(clubSlug, { limit: 20, cursor }));
-      setData((current) => current.sessions.nextCursor === cursor ? { ...current, sessions: appendPage(current.sessions, guestNoteSessionsPageReadView(next)) } : current);
+      setData((current) => current.sessions.nextCursor === cursor ? { ...current, sessions: appendPage(current.sessions, guestNoteSessionsReadPage(next)) } : current);
     } finally { sessionsInFlight.current = null; }
   }, [clubSlug, data.sessions.nextCursor, queryClient]);
-  return <GuestNotes data={data} selectedSessionId={selectedSessionId} appBasePath={appBasePath} LinkComponent={LinkComponent} onLoadMoreFeed={loadMoreFeed} onLoadMoreSessions={loadMoreSessions} />;
+  const GuestNotesLink = ({ to, ...props }: GuestSurfaceLinkProps) => <LinkComponent {...props} to={`${appBasePath}${to.replace(/^\/app/, "")}`} />;
+
+  return (
+    <NotesFeedPage
+      items={guestNoteFeedReadPage(data.feed)}
+      noteSessions={guestNoteSessionsReadPage(data.sessions)}
+      selectedSessionId={selectedSessionId}
+      selectedSession={selectedSession}
+      initialFilter={feedFilterFromSearchParam(searchParams.get("filter"))}
+      onFilterChange={handleFilterChange}
+      onLoadMoreItems={loadMoreFeed}
+      onLoadMoreNoteSessions={loadMoreSessions}
+      LinkComponent={GuestNotesLink}
+    />
+  );
 }
 
 export function GuestArchiveRoute({ initialData, clubSlug, appBasePath, LinkComponent }: { initialData: GuestPage<GuestArchiveSessionReadView>; clubSlug: string; appBasePath: string; LinkComponent: ComponentType<GuestLinkProps> }) {

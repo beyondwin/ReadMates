@@ -1,3 +1,6 @@
+import type { NoteFeedItem, NoteSessionItem } from "@/shared/model/notes-feed-model";
+import type { PagedResponse } from "@/shared/model/paging";
+
 export type GuestCapabilities = { canWrite: false };
 export type GuestNoteKind = "QUESTION" | "ONE_LINE_REVIEW" | "LONG_REVIEW" | "HIGHLIGHT";
 export type GuestNoteFilter = "all" | "highlights" | "oneliners" | "questions";
@@ -204,14 +207,52 @@ export function guestNotesReadView(
 }
 
 export function guestNoteSessionsPageReadView(sessions: GuestPage<GuestNoteSessionReadView>): GuestPage<GuestNoteSessionReadView> {
-  return { items: sessions.items.map((session) => ({ sessionId: session.sessionId, sessionNumber: session.sessionNumber, bookTitle: session.bookTitle, date: session.date, questionCount: session.questionCount, oneLinerCount: session.oneLinerCount, longReviewCount: session.longReviewCount, highlightCount: session.highlightCount, totalCount: session.totalCount })), nextCursor: sessions.nextCursor };
+  return guestNoteSessionsReadPage(sessions);
 }
 
 export function guestNoteFeedPageReadView(feed: GuestPage<GuestNoteFeedInput>): GuestPage<GuestNoteFeedItemReadView> {
-  return { items: feed.items.flatMap((item) => {
+  return guestNoteFeedReadPage(feed);
+}
+
+export function guestNoteSessionsReadPage(sessions: GuestPage<GuestNoteSessionReadView>): PagedResponse<NoteSessionItem> {
+  return {
+    items: sessions.items.map((session) => ({
+      sessionId: session.sessionId,
+      sessionNumber: session.sessionNumber,
+      bookTitle: session.bookTitle,
+      date: session.date,
+      questionCount: session.questionCount,
+      oneLinerCount: session.oneLinerCount,
+      longReviewCount: session.longReviewCount,
+      highlightCount: session.highlightCount,
+      totalCount: session.totalCount,
+    })),
+    nextCursor: sessions.nextCursor,
+  };
+}
+
+export function guestNoteFeedReadPage(feed: GuestPage<GuestNoteFeedInput>): PagedResponse<NoteFeedItem> {
+  return {
+    items: feed.items.flatMap((item): NoteFeedItem[] => {
     const kind = guestNoteKind(item.kind);
-    return kind ? [{ sessionId: item.sessionId, sessionNumber: item.sessionNumber, bookTitle: item.bookTitle, date: item.date, authorName: item.authorName, authorShortName: item.authorShortName, avatarKey: item.avatarKey, kind, text: item.text }] : [];
-  }), nextCursor: feed.nextCursor };
+    if (!kind) {
+      return [];
+    }
+
+    return [{
+      sessionId: item.sessionId,
+      sessionNumber: item.sessionNumber,
+      bookTitle: item.bookTitle,
+      date: item.date,
+      authorName: item.authorName,
+      authorShortName: item.authorShortName,
+      avatarKey: item.avatarKey,
+      kind,
+      text: item.text,
+    }];
+  }),
+    nextCursor: feed.nextCursor,
+  };
 }
 
 export function guestArchivePageReadView(page: GuestPage<GuestArchiveSessionReadView>): GuestPage<GuestArchiveSessionReadView> {

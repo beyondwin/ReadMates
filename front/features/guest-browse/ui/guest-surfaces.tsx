@@ -4,7 +4,6 @@ import type {
   GuestArchiveSessionReadView,
   GuestHomeReadView,
   GuestNoteFeedItemReadView,
-  GuestNotesReadView,
   GuestPage,
   GuestSessionReadView,
 } from "@/features/guest-browse/model/guest-read-views";
@@ -13,7 +12,6 @@ import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { BookCover } from "@/shared/ui/book-cover";
 import { formatDateLabel } from "@/shared/ui/readmates-display";
 import { loginPathForReturnTo } from "@/shared/auth/login-return";
-import SharedNotesFeedPage from "@/shared/ui/notes-feed-page";
 
 type LoadMore = () => Promise<void>;
 export type GuestSurfaceLinkProps = { to: string; className?: string; style?: CSSProperties; children: ReactNode; "aria-label"?: string };
@@ -106,14 +104,6 @@ function GuestQuestions({ questions }: { questions: GuestSessionReadView["board"
 
 function GuestLongReviews({ reviews }: { reviews: GuestSessionReadView["board"]["longReviews"] }) {
   return reviews.length ? <div className="stack" style={{ "--stack": "10px" }}>{reviews.map((review) => <article key={`${review.authorShortName}-${review.title}-${review.content}`} className="surface" style={{ padding: 18 }}><p className="eyebrow" style={{ margin: 0 }}>{review.title}</p><p className="body editorial" style={{ margin: "8px 0 0", whiteSpace: "pre-wrap" }}>{review.content}</p><p className="tiny" style={{ color: "var(--text-3)", margin: "10px 0 0" }}>{review.authorName}</p></article>)}</div> : <Empty message="공개된 서평이 없습니다." />;
-}
-
-export function GuestNotes({ data, selectedSessionId, appBasePath = "/app", LinkComponent = BrowserLink, onLoadMoreFeed, onLoadMoreSessions }: { data: GuestNotesReadView; selectedSessionId?: string | null; onLoadMoreFeed?: LoadMore; onLoadMoreSessions?: LoadMore } & GuestSurfaceProps) {
-  const sessions = { items: data.sessions.items.map((session) => ({ ...session })), nextCursor: data.sessions.nextCursor };
-  const items = { items: data.feed.items.map((item) => ({ ...item, avatarKey: item.avatarKey ?? "book" })), nextCursor: data.feed.nextCursor };
-  const selectedSession = sessions.items.find((session) => session.sessionId === selectedSessionId) ?? sessions.items[0] ?? null;
-  const GuestNotesLink = ({ to, ...props }: GuestSurfaceLinkProps) => <LinkComponent {...props} to={appHref(appBasePath, to.replace(/^\/app/, ""))} />;
-  return <SharedNotesFeedPage items={items} noteSessions={sessions} selectedSessionId={selectedSession?.sessionId ?? null} selectedSession={selectedSession} LinkComponent={GuestNotesLink} copy={{ questionLabel: "질문", oneLinerLabel: "한줄평", description: "공개된 하이라이트·한줄평·질문을 세션별로 읽어 볼 수 있습니다." }} onLoadMoreItems={onLoadMoreFeed} onLoadMoreNoteSessions={onLoadMoreSessions} />;
 }
 
 function GuestNoteList({ items }: { items: GuestNoteFeedItemReadView[] }) {

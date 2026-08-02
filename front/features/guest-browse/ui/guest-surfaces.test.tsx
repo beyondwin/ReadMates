@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { GuestArchive, GuestHome, GuestNotes } from "./guest-surfaces";
+import { GuestArchive, GuestHome } from "./guest-surfaces";
 
 const guestSessionFixture = {
   sessionId: "session-open",
@@ -108,21 +108,6 @@ describe("guest browse surfaces", () => {
     expect(document.querySelector("section[aria-labelledby='guest-home-current']")).toBeTruthy();
   });
 
-  it("disables a guest notes page request during rapid clicks and offers a visible retry after rejection", async () => {
-    const user = userEvent.setup();
-    let rejectFirst!: (error: Error) => void;
-    const onLoadMoreFeed = vi.fn(() => new Promise<void>((_, reject) => { rejectFirst = reject; }));
-    render(<GuestNotes data={notesFixture()} onLoadMoreFeed={onLoadMoreFeed} />);
-
-    const more = screen.getByRole("button", { name: "더 보기" });
-    await user.dblClick(more);
-    expect(onLoadMoreFeed).toHaveBeenCalledTimes(1);
-    rejectFirst(new Error("network"));
-    expect(await screen.findByRole("button", { name: "다시 시도" })).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "다시 시도" }));
-    expect(onLoadMoreFeed).toHaveBeenCalledTimes(2);
-  });
-
   it("disables archive pagination during rapid clicks", async () => {
     const user = userEvent.setup();
     const onLoadMore = vi.fn(() => new Promise<void>(() => {}));
@@ -131,18 +116,4 @@ describe("guest browse surfaces", () => {
     expect(onLoadMore).toHaveBeenCalledTimes(1);
   });
 
-  it("uses non-personal note copy for guest records", () => {
-    render(<GuestNotes data={{ ...notesFixture(), feed: { items: [{ ...notesFixture().feed.items[0], kind: "QUESTION", text: "공개 질문" }], nextCursor: null } }} />);
-    expect(screen.getByText("공개된 하이라이트·한줄평·질문을 세션별로 읽어 볼 수 있습니다.")).toBeVisible();
-    expect(screen.queryByText("내 질문")).not.toBeInTheDocument();
-    expect(screen.queryByText(/세션을 먼저 고르고/)).not.toBeInTheDocument();
-  });
 });
-
-function notesFixture() {
-  return {
-    sessions: { items: [{ sessionId: "s1", sessionNumber: 1, bookTitle: "책", date: "2026-08-02", questionCount: 0, oneLinerCount: 0, longReviewCount: 0, highlightCount: 1, totalCount: 1 }], nextCursor: "sessions-next" },
-    feed: { items: [{ sessionId: "s1", sessionNumber: 1, bookTitle: "책", date: "2026-08-02", authorName: "이름", authorShortName: "이", avatarKey: "book", kind: "HIGHLIGHT" as const, text: "문장" }], nextCursor: "feed-next" },
-    capabilities: { canWrite: false as const },
-  };
-}

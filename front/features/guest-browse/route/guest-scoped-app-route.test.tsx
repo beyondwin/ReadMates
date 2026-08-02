@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { RouterProvider, createMemoryRouter } from "react-router-dom";
+import { MemoryRouter, RouterProvider, createMemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { scopedGuestRouteLoader } from "./club-app-audience-loader";
 import { GuestArchiveRoute, GuestHomeRoute, GuestNotesRoute, GuestScopedAppRoute, type GuestCurrentSessionContentProps } from "./guest-scoped-app-route";
@@ -38,12 +38,34 @@ const guestCurrentSession = {
 
 function mount(initialData = notes(), clubSlug = "alpha") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={client}><GuestNotesRoute initialData={initialData} clubSlug={clubSlug} appBasePath={`/clubs/${clubSlug}/app`} LinkComponent={LinkComponent} selectedSessionId="s1" /></QueryClientProvider>);
+  return render(<MemoryRouter initialEntries={[`/clubs/${clubSlug}/app/notes?sessionId=s1&source=guest`]}><GuestRouteLocation /><QueryClientProvider client={client}><GuestNotesRoute initialData={initialData} clubSlug={clubSlug} appBasePath={`/clubs/${clubSlug}/app`} LinkComponent={LinkComponent} selectedSessionId="s1" /></QueryClientProvider></MemoryRouter>);
+}
+
+function GuestRouteLocation() {
+  const location = useLocation();
+
+  return <output aria-label="guest notes route">{`${location.pathname}${location.search}`}</output>;
 }
 
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe("guest notes route pagination", () => {
+  it("uses the shared feed controls while preserving the guest session and filter URL state", async () => {
+    const user = userEvent.setup();
+    mount();
+
+    expect(screen.getByText("세션을 먼저 고르고, 하이라이트·한줄평·질문을 작성자와 함께 훑는 클럽 기록장입니다.")).toBeVisible();
+    expect(screen.getByLabelText("세션 검색")).toBeVisible();
+    expect(screen.getByRole("button", { name: "전체 보기" })).toBeVisible();
+    expect(screen.getByLabelText("클럽 노트 필터")).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "하이라이트 1" }));
+
+    expect(screen.getByLabelText("guest notes route")).toHaveTextContent("/clubs/alpha/app/notes?sessionId=s1&source=guest&filter=highlights");
+    const selectedLinks = screen.getAllByRole("link", { name: "No.01 책 세션 보기" });
+    expect(selectedLinks.some((link) => link.getAttribute("href") === "/clubs/alpha/app/notes?sessionId=s1&filter=highlights")).toBe(true);
+  });
+
   it("resets through GuestScopedAppRoute on club navigation and fresh same-club loader data", async () => {
     const dataByClub: Record<string, ReturnType<typeof notes>> = { alpha: notes("alpha 처음"), beta: notes("beta 기록") };
     const router = createMemoryRouter([{ path: "/clubs/:clubSlug/app/notes", loader: ({ params }) => ({ guestRoute: true, guestData: dataByClub[params.clubSlug ?? "alpha"] }), element: <GuestScopedAppRoute LinkComponent={LinkComponent} /> }], { initialEntries: ["/clubs/alpha/app/notes"] });
