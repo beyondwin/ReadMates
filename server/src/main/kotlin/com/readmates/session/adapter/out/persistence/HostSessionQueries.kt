@@ -76,7 +76,8 @@ internal class HostSessionQueries {
                       select sessions.id, sessions.club_id, sessions.number, sessions.title,
                              sessions.book_title, sessions.book_author, sessions.book_image_url,
                              sessions.session_date, sessions.start_time, sessions.end_time,
-                             sessions.location_label, sessions.state, sessions.visibility,
+                             sessions.location_label, sessions.state, sessions.visibility, sessions.access_scope,
+                             coalesce(publication.site_visibility, 'HIDDEN') as site_visibility,
                              publication.public_summary,
                              (select count(*) from highlights
                               where highlights.club_id = sessions.club_id
@@ -194,7 +195,7 @@ internal class HostSessionQueries {
             from sessions
             where club_id = ?
               and state = 'DRAFT'
-              and visibility in ('MEMBER', 'PUBLIC')
+              and access_scope = 'GUEST_READABLE'
             order by session_date, number
             """.trimIndent(),
             { resultSet, _ -> resultSet.toUpcomingSessionItem() },
@@ -353,7 +354,15 @@ internal class HostSessionQueries {
               meeting_url,
               meeting_passcode,
               state,
-              visibility
+              visibility,
+              access_scope,
+              coalesce((
+                select site_visibility
+                from public_session_publications
+                where public_session_publications.club_id = sessions.club_id
+                  and public_session_publications.session_id = sessions.id
+                limit 1
+              ), 'HIDDEN') as site_visibility
             from sessions
             where id = ?
               and club_id = ?
@@ -495,7 +504,8 @@ internal class HostSessionQueries {
                 """
                 select
                   public_summary,
-                  visibility
+                  visibility,
+                  site_visibility
                 from public_session_publications
                 where session_id = ?
                   and club_id = ?

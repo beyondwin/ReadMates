@@ -1051,7 +1051,8 @@ where notification_event_outbox.club_id = ${sqlString(clubId)}
 export function createOpenSessionFixture({
   number = 7,
   bookTitle = "E2E 현재 세션 책",
-}: { number?: number; bookTitle?: string } = {}) {
+  accessScope = "HOST_ONLY",
+}: { number?: number; bookTitle?: string; accessScope?: "HOST_ONLY" | "GUEST_READABLE" } = {}) {
   const sessionId = randomUUID();
 
   runMysql(`
@@ -1072,7 +1073,8 @@ insert into sessions (
   meeting_url,
   meeting_passcode,
   question_deadline_at,
-  state
+  state,
+  access_scope
 )
 values (
   ${sqlString(sessionId)},
@@ -1091,7 +1093,8 @@ values (
   null,
   null,
   timestampadd(day, 14, utc_timestamp(6)),
-  'OPEN'
+  'OPEN',
+  ${sqlString(accessScope)}
 );
 `);
 

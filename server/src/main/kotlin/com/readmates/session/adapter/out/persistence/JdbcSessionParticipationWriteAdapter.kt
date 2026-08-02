@@ -326,7 +326,7 @@ class JdbcSessionParticipationWriteAdapter(
             jdbcTemplate.update(
                 """
                 insert into one_line_reviews (id, club_id, session_id, membership_id, text, visibility)
-                select ?, current_session.club_id, current_session.id, session_participants.membership_id, ?, 'SESSION'
+                select ?, current_session.club_id, current_session.id, session_participants.membership_id, ?, 'PUBLIC'
                 from (
                   select id, club_id
                   from sessions
@@ -412,7 +412,7 @@ class JdbcSessionParticipationWriteAdapter(
             jdbcTemplate.update(
                 """
                 insert into long_reviews (id, club_id, session_id, membership_id, body, visibility)
-                values (?, ?, ?, ?, ?, 'PRIVATE')
+                values (?, ?, ?, ?, ?, 'PUBLIC')
                 on duplicate key update
                   body = values(body),
                   visibility = values(visibility),

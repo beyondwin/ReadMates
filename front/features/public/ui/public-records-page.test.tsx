@@ -42,4 +42,21 @@ describe("PublicRecordsPage showcase", () => {
     expect(screen.queryByText(/피드백 문서/)).toBeNull();
     expect(screen.queryByText("ADMIN_ROUTE")).toBeNull();
   });
+
+  it("offers scoped guest browsing and explicit member start", () => {
+    render(
+      <PublicRecordsPage
+        data={{ clubName: "읽는사이", tagline: "", about: "", stats: { sessions: 0, books: 0, members: 0 }, recentSessions: [] }}
+        publicBasePath="/clubs/reading-sai"
+        routePathname="/clubs/reading-sai/records"
+        routeSearch=""
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "둘러보기" })).toHaveAttribute("href", "/clubs/reading-sai/app");
+    expect(screen.getByRole("link", { name: "멤버로 시작" })).toHaveAttribute(
+      "href",
+      "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp",
+    );
+  });
 });

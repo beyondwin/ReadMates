@@ -4,6 +4,7 @@ import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -11,8 +12,10 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.post
 import java.util.UUID
 
 @SpringBootTest(
@@ -94,6 +97,53 @@ class SecurityRoleHierarchyTest(
             }.andExpect {
                 status { isForbidden() }
             }
+    }
+
+    @Test
+    fun `anonymous guest browse is allowed but mutation and member endpoints remain protected`() {
+        mockMvc.get("/api/public/clubs/reading-sai/browse").andExpect {
+            status { isOk() }
+        }
+        mockMvc
+            .post("/api/public/clubs/reading-sai/browse") {
+                with(csrf())
+            }.andExpect {
+                status { isUnauthorized() }
+            }
+        mockMvc.get("/api/sessions/current").andExpect {
+            status { isUnauthorized() }
+        }
+    }
+
+    @Test
+    fun `anonymous access is not granted to unregistered public api paths`() {
+        mockMvc.get("/api/public/not-a-registered-endpoint").andExpect {
+            status { isUnauthorized() }
+        }
+    }
+
+    @Test
+    fun `invalid guest browse slug is rejected before controller access`() {
+        listOf("Reading-sai", "a".repeat(41)).forEach { invalidSlug ->
+            val response =
+                mockMvc
+                    .get("/api/public/clubs/$invalidSlug/browse")
+                    .andExpect {
+                        status { isBadRequest() }
+                        header { string("Cache-Control", "no-store") }
+                        jsonPath("$.code") { value("INVALID_REQUEST") }
+                    }.andReturn()
+                    .response
+
+            val varyTokens =
+                response
+                    .getHeaders("Vary")
+                    .flatMap { it.split(',') }
+                    .map { it.trim().lowercase() }
+            assertFalse(response.contentAsString.contains(invalidSlug))
+            assertFalse("cookie" in varyTokens)
+            assertFalse("authorization" in varyTokens)
+        }
     }
 
     private fun viewerSessionCookie(emailPrefix: String): Cookie {

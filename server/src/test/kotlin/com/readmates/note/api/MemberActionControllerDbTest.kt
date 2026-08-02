@@ -309,7 +309,7 @@ class MemberActionControllerDbTest(
                 ).firstOrNull()
 
         assertEquals("저장된 한줄평", oneLineReview)
-        assertEquals("SESSION", oneLineReviewVisibility)
+        assertEquals("PUBLIC", oneLineReviewVisibility)
         assertEquals("저장된 장문 서평", longReview)
 
         val oneLineReviewSessionNumbers =

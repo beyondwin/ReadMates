@@ -5,6 +5,7 @@ import type {
   SessionImportRecordPreview,
   SessionRecordVisibility,
 } from "./host-view-types";
+import { compatibilityExposureLabel } from "./session-exposure-model";
 
 type SessionImportFileRequest = Omit<SessionImportRequest, "recordVisibility" | "expectedDraftRevision">;
 
@@ -244,15 +245,7 @@ function isSaveableVisibility(recordVisibility: SessionRecordVisibility): boolea
 }
 
 function recordVisibilityLabel(recordVisibility: SessionRecordVisibility): string {
-  if (recordVisibility === "PUBLIC") {
-    return "외부 공개";
-  }
-
-  if (recordVisibility === "MEMBER") {
-    return "멤버 공개";
-  }
-
-  return "호스트 전용";
+  return compatibilityExposureLabel[recordVisibility];
 }
 
 function buildSessionImportStatusTone(canCommit: boolean): SessionImportReview["statusTone"] {

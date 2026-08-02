@@ -10,9 +10,10 @@ ReadMates는 여러 정기 독서모임의 공개 소개, 멤버 세션 준비, 
 
 | 표면 | 주요 route | 사용자 | 역할 |
 | --- | --- | --- | --- |
-| 공개 사이트 | `/clubs/:slug`, `/clubs/:slug/about`, `/clubs/:slug/records`, `/clubs/:slug/sessions/:sessionId`, `/`, `/about`, `/records`, `/sessions/:sessionId`, `/login`, `/clubs/:slug/invite/:token`, `/invite/:token`, `/reset-password/:token` | 게스트, 로그인 사용자 | 클럽 소개, 공개 기록, 공개 세션 상세, Google OAuth 시작, 클럽 context가 있는 초대 수락 진입, 종료된 비밀번호 경로 안내. Unscoped public route는 호환성을 위해 baseline club을 사용 |
+| 공개 사이트 | `/clubs/:slug`, `/clubs/:slug/about`, `/clubs/:slug/records`, `/clubs/:slug/sessions/:sessionId`, `/`, `/about`, `/records`, `/sessions/:sessionId`, `/login`, `/clubs/:slug/invite/:token`, `/invite/:token`, `/reset-password/:token` | 게스트, 로그인 사용자 | 클럽 소개와 `PUBLIC_RECORD`로 배치된 공개 기록, Google OAuth 시작, 클럽 context가 있는 초대 수락 진입, 종료된 비밀번호 경로 안내. Unscoped public route는 호환성을 위해 baseline club을 사용 |
+| 클럽 게스트 앱 | `/clubs/:slug/app`, `/clubs/:slug/app/session/current`, `/clubs/:slug/app/notes`, `/clubs/:slug/app/archive`, `/clubs/:slug/app/sessions/:sessionId`, `/clubs/:slug/app/me`, `/clubs/:slug/app/me/records` | 로그인하지 않은 게스트 | `ACTIVE + PUBLIC` 클럽에서 `GUEST_READABLE` 현재·예정 세션과 기록을 읽습니다. 개인 화면은 preview, 설정·알림·피드백은 정식 멤버 안내, 호스트 route는 거절합니다. 공개 사이트의 `PUBLIC_RECORD` 배치와는 별도 표면입니다. |
 | 로그인 후 진입 | `/app`, `/clubs/:slug/app`, 등록된 club host의 `/app` | 로그인 사용자 | 가입 클럽이 하나면 해당 클럽 앱으로 이동하고, 여러 개면 클럽 선택 화면을 보여주며, 선택한 클럽 context로 앱에 진입 |
-| 멤버 앱 | `/clubs/:slug/app`, `/clubs/:slug/app/pending`, `/clubs/:slug/app/session/current`, `/clubs/:slug/app/notes`, `/clubs/:slug/app/archive`, `/clubs/:slug/app/sessions/:sessionId`, `/clubs/:slug/app/feedback/:sessionId`, `/clubs/:slug/app/feedback/:sessionId/print`, `/clubs/:slug/app/me`, `/clubs/:slug/app/me/records`, `/clubs/:slug/app/me/settings`, `/clubs/:slug/app/notifications`, `/clubs/:slug/app/notifications/settings`, 등록된 club host의 `/app/**` | 둘러보기 멤버, 정식 멤버, 호스트 | 현재 세션 확인, 멤버 공개 예정 세션 확인, 둘러보기 멤버 안내, RSVP, 읽은 분량, 질문, 한줄평, 장문 서평, 아카이브, 참석 회차 피드백 문서, 개인 기록과 계정·멤버십 정보 확인, 알림 수신 설정 변경, 클럽별 멤버 알림함 확인 |
+| 멤버 앱 | `/clubs/:slug/app`, `/clubs/:slug/app/pending`, `/clubs/:slug/app/session/current`, `/clubs/:slug/app/notes`, `/clubs/:slug/app/archive`, `/clubs/:slug/app/sessions/:sessionId`, `/clubs/:slug/app/feedback/:sessionId`, `/clubs/:slug/app/feedback/:sessionId/print`, `/clubs/:slug/app/me`, `/clubs/:slug/app/me/records`, `/clubs/:slug/app/me/settings`, `/clubs/:slug/app/notifications`, `/clubs/:slug/app/notifications/settings`, 등록된 club host의 `/app/**` | 둘러보기 멤버(`VIEWER`), 정식 멤버, 호스트 | 현재 세션 확인, 게스트 공개 예정 세션 확인, 둘러보기 멤버 승인 안내, 정식 멤버의 RSVP·읽은 분량·질문·서평, 아카이브, 참석 회차 피드백 문서, 개인 기록과 계정·멤버십 정보, 알림 설정과 알림함을 제공합니다. |
 | 호스트 앱 | `/clubs/:slug/app/host`, `/clubs/:slug/app/host/notifications`, `/clubs/:slug/app/host/members`, `/clubs/:slug/app/host/invitations`, `/clubs/:slug/app/host/sessions`, `/clubs/:slug/app/host/sessions/new`, `/clubs/:slug/app/host/sessions/:sessionId/edit`, `/clubs/:slug/app/host/sessions/:sessionId/closing`, 등록된 club host의 `/app/host/**` | 현재 클럽의 호스트 | 전용 세션 기록 장부에서 과거/예정 회차 검색, 예정 세션 생성/수정, 공개 범위 설정, 현재 세션 시작, 참석 확정, 진행 세션 닫기, staged 기록 초안 검토·적용·revision 복원, AI 생성 또는 외부 JSON을 공통 초안으로 가져오기, 회차별 클로징 상태 확인, 초대 관리, 멤버 상태와 표시 이름 관리, 알림 발송 운영 |
 | 플랫폼 관리 | `/admin`, `/admin/today`, `/admin/health`, `/admin/notifications`, `/admin/clubs`, `/admin/clubs/:clubId`, `/admin/support`, `/admin/ai-ops`, `/admin/audit`, `/admin/analytics` | platform admin | `/admin/today`의 운영 ledger에서 클럽 공개 readiness, domain action, 알림 실패, AI job 이상을 오늘 처리할 queue로 모아 보고, 클럽 생성, 클럽 목록 확인, 공개/비공개 상태 관리, 공개 소개 정보 관리, 등록형 domain alias 요청과 상태 확인, 첫 호스트 온보딩 상태 확인, 운영 health와 알림 outbox/delivery 상태 확인, 클럽 운영 readiness 집계, 제한된 support access grant 관리, AI job 운영 조회와 강제 취소, 통합 감사 ledger 조회를 수행합니다. `/admin/analytics`는 활성 멤버, 세션 완료율, RSVP 응답률, AI 비용/세션, 알림 도달률을 7/30/90일 window와 series/benchmark로 보여주는 aggregate-only 운영 분석 표면입니다. 세션/멤버/알림 발송 같은 클럽 내부 운영은 기본적으로 호스트 앱 책임이고, platform admin 표면은 aggregate/read-only 진단과 감사 가능한 복구 작업만 다룹니다. |
 
@@ -87,7 +88,9 @@ Spring API의 application service는 Spring Web/HTTP type에 의존하지 않는
 
 Cloudflare Pages Functions BFF가 upstream Spring API에 도달하기 전에 거절하는 요청도 같은 shape를 사용한다. 예를 들어 invalid `/api/bff/**` path는 `404 RESOURCE_NOT_FOUND`, cross-origin mutation은 `403 PERMISSION_DENIED`, invalid `clubSlug`는 `400 INVALID_REQUEST`, 구 host-write client contract는 `409 HOST_CLIENT_UPGRADE_REQUIRED`를 반환한다. Upstream Spring API 응답은 status와 안전한 body를 유지하되, 내부 `x-readmates-*` response header와 secret은 계속 제거한다.
 
-프런트엔드 `shared/api`는 non-OK 응답을 `ReadmatesApiError`로 변환하고 status, code, message, fallback 여부, response metadata를 보존한다. JSON body가 비어 있거나 잘못된 형태여도 HTTP status를 기준으로 안전한 fallback code/message를 만든다. React Router route boundary는 HTTP status와 public/member/host/auth context를 기준으로 404, 403, 409, 410, 5xx 화면을 보여주며, code와 message는 `ReadmatesApiError`에 보존한다. 정상적인 401 session 만료는 기존 login return flow를 유지한다.
+프런트엔드 `shared/api`는 non-OK 응답을 `ReadmatesApiError`로 변환하고 status, code, message, fallback 여부, response metadata를 보존한다. JSON body가 비어 있거나 잘못된 형태여도 HTTP status를 기준으로 안전한 fallback code/message를 만든다. React Router route boundary는 HTTP status와 public/member/host/auth context를 기준으로 404, 403, 409, 410, 5xx 화면을 보여주며, code와 message는 `ReadmatesApiError`에 보존한다.
+
+보호 API의 401 기본값은 안전한 `returnTo`를 가진 login redirect입니다. 이미 성공한 내용을 화면에 유지하는 mounted current-session/archive/notes read만 `recover-read`, 작성 중 입력을 유지할 current-session mutation만 `recover-write`를 명시적으로 opt-in합니다. Read recovery는 현재 exact scoped URL의 guest capability와 public resource를 매 episode마다 다시 확인한 경우에만 `게스트로 계속 보기`를 제공하고, write recovery는 재로그인만 제공합니다. Host/admin/feedback/personal/profile/notification, loader-only member home과 opt-in하지 않은 호출은 기본 401 redirect를 유지합니다. Write expiry는 같은 episode의 후속 read 401로 guest 전환 상태로 낮아지지 않습니다.
 
 Feature-specific unavailable state는 feature가 계속 소유한다. 공개 세션이 없는 상태, 피드백 문서가 없거나 권한이 없는 상태, 초대 링크 검증 오류처럼 제품 맥락이 있는 화면은 generic route error page로 대체하지 않는다.
 
@@ -101,7 +104,9 @@ Platform admin의 domain 상태 확인은 `https://<hostname>/.well-known/readma
 
 클럽 context resolve 순서는 trusted `X-Readmates-Club-Slug`가 먼저이고, 없으면 trusted `X-Readmates-Club-Host`입니다. Spring은 BFF secret을 통과한 요청에서만 `X-Readmates-Club-Slug`와 `X-Readmates-Club-Host`를 신뢰합니다. browser가 직접 보낸 같은 이름의 header는 Pages Functions 또는 Vite proxy에서 제거되며, Spring API origin을 직접 호출하는 요청은 운영에서 BFF secret 검증을 통과할 수 없습니다.
 
-로그인 세션은 플랫폼 전체에서 공유합니다. OAuth start는 현재 Pages 또는 registered host에서 시작될 수 있지만, Google callback `redirect_uri`는 `READMATES_AUTH_BASE_URL`의 primary auth origin으로 모읍니다. 성공 후 `returnTo`가 signed return state로 검증되면 클럽 path 또는 등록 host로 되돌리고, 없으면 `/app` smart entry로 이동합니다. Frontend guarded route, loader, API 401 흐름은 같은 origin의 안전한 relative path만 `/login?returnTo=...`와 OAuth start로 전달하고, absolute URL, protocol-relative URL, login/reset/invite/OAuth/root path, backslash, control character가 포함된 값은 버립니다. Absolute return URL은 primary app host, `readmates.pages.dev`, 또는 `ACTIVE` club domain이면서 session cookie domain 정책으로 세션을 공유할 수 있는 host만 허용합니다. 초대 링크는 token만으로 전역 membership을 만들지 않고, 초대가 속한 club context로 돌아오도록 return URL을 보존합니다.
+로그인 세션은 플랫폼 전체에서 공유합니다. OAuth start는 현재 Pages 또는 registered host에서 시작될 수 있지만, Google callback `redirect_uri`는 `READMATES_AUTH_BASE_URL`의 primary auth origin으로 모읍니다. 성공 후 `returnTo`가 signed return state로 검증되면 클럽 path 또는 등록 host로 되돌리고, 없으면 `/app` smart entry로 이동합니다. Frontend guarded route, loader, API 401 흐름은 같은 origin의 안전한 relative path만 `/login?returnTo=...`와 OAuth start로 전달하고, absolute URL, protocol-relative URL, login/reset/invite/OAuth/root path, backslash, control character가 포함된 값은 버립니다. Absolute return URL은 primary app host, `readmates.pages.dev`, 또는 `ACTIVE` club domain이면서 session cookie domain 정책으로 세션을 공유할 수 있는 host만 허용합니다.
+
+`멤버로 시작`은 일반 Google 로그인의 별칭이 아니라 명시적인 target-club join입니다. 브라우저는 먼저 same-origin JSON POST로 만료·1회용 join intent를 발급받고, 그 nonce와 `joinClub`을 OAuth start에 함께 전달합니다. 서버는 서명된 `returnTo`의 **exact raw** 경로가 `/clubs/{같은 canonical slug}/app` 또는 그 하위 경로이고 같은 session의 intent가 club·raw return path와 모두 일치할 때만 join context를 실제 provider OAuth `state`에 결합합니다. Callback은 해당 state의 context를 한 번만 소비하므로 crafted top-level GET, nonce 재사용, 다른 탭의 state 혼선, dot segment, percent-encoding, 대소문자 변형, 중복 separator, cross-club target은 join 권한을 만들지 않습니다. 한 탭의 성공 또는 실패 callback은 정상 redirect뿐 아니라 principal 해석이나 응답 작성 중 예상 밖 예외에서도 하나의 `finally` 경계로 소비한 state와 request-local context만 정리하고, Spring Security context를 제거한 뒤 servlet session ID를 정확히 한 번 회전합니다. 따라서 다른 탭의 pending authorization request/context는 보존됩니다. Provider 취소와 인지된 도메인 오류는 요청에 실린 기존 `readmates_session`이 여전히 유효하면 유지하며, 서버 검증에서 invalid/stale로 판명된 cookie만 명시적으로 만료합니다. 성공 시에도 target club이 `ACTIVE + PUBLIC`이고 정확한 `(user_id, club_id)` membership이 없을 때만 계정 이름·사용자 ID와 무관한 중립 표시 이름의 `VIEWER`를 생성합니다. 기존 `VIEWER`·`ACTIVE`는 보존하고 `LEFT`·`SUSPENDED`·`INACTIVE`·`INVITED`는 fail closed합니다. 같은 row의 동시 생성은 unique conflict 뒤 exact target을 다시 읽어 수렴합니다. raw `inviteToken` parameter가 존재하면 blank·malformed를 포함해 유효성 여부와 관계없이 guest join intent를 억제하며, 초대 수락 흐름이 항상 우선합니다. 초대 링크는 token만으로 전역 membership을 만들지 않고 초대가 속한 club context로 돌아오도록 return URL을 보존합니다.
 
 사용자 역할은 club membership마다 독립적입니다. 현재 club membership role은 `HOST`와 `MEMBER`이고, platform admin 권한은 `platform_admins`의 `OWNER`, `OPERATOR`, `SUPPORT`로 별도 판정합니다. Platform `OPERATOR`는 club host가 아니며, 특정 클럽의 호스트 도구를 쓰려면 그 클럽 membership에서도 `HOST` 권한이 있어야 합니다.
 
@@ -276,6 +281,7 @@ ReadMates의 사용자 상태는 club membership의 status와 role을 함께 봅
 
 | 상태/역할 | 의미 |
 | --- | --- |
+| `GUEST` | 로그인과 membership row가 없는 익명 audience입니다. 공개 사이트와 club-scoped 게스트 앱의 허용된 읽기만 사용하며 모든 응답 capability는 `canWrite=false`입니다. |
 | `VIEWER` | Google 로그인은 했지만 정식 초대를 수락하지 않은 둘러보기 멤버입니다. 읽기 가능한 일부 멤버 화면과 멤버 공개 예정 세션은 볼 수 있지만 현재 세션 쓰기, 피드백 문서 열람, 호스트 도구는 제한됩니다. |
 | `ACTIVE` + `MEMBER` | 정식 멤버입니다. 현재 세션 참여, 멤버 공개 예정 세션 확인, RSVP, 체크인, 질문, 한줄평, 장문 서평, 클럽 피드백 문서 열람이 가능합니다. |
 | `ACTIVE` + `HOST` | 호스트입니다. 정식 멤버 권한에 운영 권한이 추가됩니다. |
@@ -285,34 +291,40 @@ ReadMates의 사용자 상태는 club membership의 status와 role을 함께 봅
 
 같은 사용자라도 클럽마다 다른 role과 status를 가질 수 있습니다. 예를 들어 한 사용자는 `reading-sai`에서는 `HOST`, `sample-book-club`에서는 `MEMBER`일 수 있고, platform admin이라도 특정 클럽에서 호스트 API를 쓰려면 해당 클럽 membership 권한을 별도로 통과해야 합니다.
 
+프런트엔드의 club app audience는 `GUEST | VIEWER | MEMBER | HOST` 네 가지입니다. 익명 `GUEST`는 membership status가 아니며, 로그인된 `VIEWER`와 같은 것으로 취급하지 않습니다. 네 audience의 `/clubs/:slug/app/**`는 모두 검색 결과용 공개 페이지가 아니므로 route가 mount된 동안 `robots=noindex`를 적용합니다. 서버가 반환하는 게스트 내비게이션 capability는 홈·현재 세션·노트·아카이브·회차 상세를 `OPEN`, 내 공간·개인 기록을 `PREVIEW`, 설정·알림·피드백을 `LOCKED`, 호스트를 `DENY`로 고정합니다. 게스트 direct URL도 같은 capability를 적용하므로 메뉴를 숨겨 우회시키지 않고, 잠긴 표면은 정식 멤버 안내를 보여주며 protected API를 호출하지 않습니다.
+
 현재 세션 참여 여부는 `session_participants`와 `SessionParticipationStatus`로 관리합니다. 호스트는 같은 클럽의 정식 멤버를 현재 세션에 추가하거나 제거할 수 있고, 참석 확정 후 공개 기록과 멤버 활동 통계에 반영됩니다.
 
 ## 세션 lifecycle과 공개 범위
 
-ReadMates는 클럽별로 하나의 현재 `OPEN` 세션과 여러 개의 예정 `DRAFT` 세션을 함께 다룹니다. 호스트가 새 세션을 만들면 기본 상태는 `DRAFT`, 기본 공개 범위는 `HOST_ONLY`입니다. 호스트는 `/api/host/sessions`와 `/api/host/sessions/{sessionId}`에서 책/회차 metadata를 만들고 수정하며, `/api/host/sessions/{sessionId}/visibility`로 `HOST_ONLY`, `MEMBER`, `PUBLIC` 중 하나를 저장합니다. 호스트 세션 목록과 상세 응답은 `state`와 `visibility`를 함께 반환하므로, 프런트엔드는 예정 세션 카드, 현재 세션 카드, 닫힌 기록, 발행된 기록, 기록 공개 범위 UI를 같은 contract로 조립합니다.
+ReadMates는 클럽별로 하나의 현재 `OPEN` 세션과 여러 개의 예정 `DRAFT` 세션을 함께 다룹니다. 호스트가 새 세션을 만들면 기본 상태는 `DRAFT`, canonical app access는 `HOST_ONLY`, public-site placement는 `HIDDEN`입니다. 앱 열람과 공개 사이트 배치는 서로 독립된 두 축입니다.
+
+- `sessions.access_scope`: `HOST_ONLY | GUEST_READABLE`. `GUEST_READABLE`은 익명 게스트 앱, `VIEWER`, 정식 멤버와 호스트의 공통 읽기 후보입니다.
+- `public_session_publications.site_visibility`: `HIDDEN | PUBLIC_RECORD`. `PUBLIC_RECORD`는 `CLOSED` 또는 `PUBLISHED`에서만 저장할 수 있고, 실제 공개 사이트 query는 `PUBLISHED + PUBLIC_RECORD`만 반환합니다.
+- 호스트는 `/api/host/sessions/{sessionId}/access-scope`로 app access를, publication request의 `siteVisibility`로 public-site placement를 저장합니다. 호스트 목록·상세 응답은 `accessScope`, `siteVisibility`와 rolling-deploy용 legacy `visibility`를 함께 반환합니다.
 
 `sessions.state`는 운영 단계를 구분합니다.
 
 | 상태 | 의미 | 주요 전환 |
 | --- | --- | --- |
-| `DRAFT` | 예정 세션입니다. 멤버에게 보이려면 `visibility`가 `MEMBER` 또는 `PUBLIC`이어야 합니다. | `/api/host/sessions/{sessionId}/open`으로 `OPEN` 전환 |
+| `DRAFT` | 예정 세션입니다. `GUEST_READABLE`이면 scoped 게스트 앱과 로그인된 reader의 예정 목록에 보입니다. Public site record가 될 수는 없습니다. | `/api/host/sessions/{sessionId}/open`으로 `OPEN` 전환 |
 | `OPEN` | 현재 참여 세션입니다. RSVP, 읽은 분량, 질문, 서평, 참석 확정이 이 상태를 기준으로 동작합니다. | `/api/host/sessions/{sessionId}/close`로 `CLOSED` 전환 |
-| `CLOSED` | 모임은 끝났지만 기록은 아직 최종 발행 전입니다. 멤버 archive에는 `MEMBER`/`PUBLIC` 범위로 보일 수 있지만, notes feed와 public surface에는 아직 발행되지 않습니다. | 공개 요약과 `MEMBER` 또는 `PUBLIC` 범위를 저장한 뒤 `/api/host/sessions/{sessionId}/publish`로 `PUBLISHED` 전환 |
-| `PUBLISHED` | 기록 발행이 완료된 세션입니다. `PUBLIC` 범위는 public route/API에, `MEMBER`/`PUBLIC` 범위는 멤버 notes feed와 archive에 노출됩니다. | 되돌림 API는 없습니다. |
+| `CLOSED` | 모임은 끝났지만 기록은 아직 최종 발행 전입니다. `GUEST_READABLE`이면 게스트·멤버 archive에서 읽을 수 있지만 notes와 공개 사이트에는 아직 나오지 않습니다. | 공개 요약과 허용된 exposure를 저장한 뒤 `/api/host/sessions/{sessionId}/publish`로 `PUBLISHED` 전환 |
+| `PUBLISHED` | 기록 발행이 완료된 세션입니다. `GUEST_READABLE`은 게스트·멤버 notes/archive를 열고, `PUBLIC_RECORD`가 추가된 경우에만 공개 사이트에도 배치됩니다. | 되돌림 API는 없습니다. |
 
-`sessions.visibility`가 세션 공개 범위의 DB source of truth입니다. `PUT /api/host/sessions/{sessionId}/publication`은 공개 요약과 기록 공개 범위를 저장하면서 `sessions.visibility`, `public_session_publications.visibility`, legacy `is_public` 값을 함께 맞춥니다. `public_session_publications.visibility`와 legacy `is_public` 값은 공개 기록 호환 경로를 위해 남아 있지만, archive, notes, upcoming session 조회는 `sessions.visibility`를 기준으로 `HOST_ONLY` 항목을 숨깁니다.
+Canonical source of truth는 `access_scope`와 `site_visibility`입니다. V44는 기존 `sessions.visibility in (MEMBER, PUBLIC)`을 `GUEST_READABLE`로 backfill하고, 기존 공개 publication 중 허용된 lifecycle만 `PUBLIC_RECORD`로 backfill합니다. 한 릴리즈의 rolling deploy와 rollback을 위해 `sessions.visibility`, `public_session_publications.visibility`, `is_public`을 유지하며 모든 새 host write가 같은 transaction에서 dual-write합니다. Mapping은 `HOST_ONLY + HIDDEN -> HOST_ONLY/MEMBER/false`, `GUEST_READABLE + HIDDEN -> MEMBER/MEMBER/false`, `GUEST_READABLE + PUBLIC_RECORD -> PUBLIC/PUBLIC/true`입니다. `HOST_ONLY + PUBLIC_RECORD`와 `DRAFT/OPEN + PUBLIC_RECORD`는 거절합니다. 구 `{visibility}` request도 이 호환 기간에만 받으며, 다음 릴리즈에서 old frontend 사용이 없음을 확인한 뒤 request parser와 compatibility column read/write를 별도 migration으로 제거합니다. V44 column을 이번 rollout에서 즉시 제거하거나 legacy 값만 source of truth로 되돌리지 않습니다.
 
 호스트는 `/api/host/sessions/{sessionId}/open`으로 `DRAFT` 세션 하나를 현재 세션으로 시작합니다. 같은 클럽에 이미 `OPEN` 세션이 있으면 다른 draft를 동시에 열 수 없습니다. 이미 열린 세션에 대한 open 요청은 같은 세션 detail을 반환하고, `CLOSED`나 `PUBLISHED` 세션을 현재 세션으로 되돌리지는 않습니다.
 
 호스트는 `/api/host/sessions/{sessionId}/close`로 `OPEN` 세션을 닫습니다. 이미 `CLOSED`인 세션에 대한 close 요청은 같은 detail을 반환하지만, `DRAFT`나 `PUBLISHED` 세션은 닫을 수 없습니다. 닫기 SQL은 `state='OPEN'` 조건이 맞을 때만 `CLOSED`로 바꾸므로, 다른 트랜잭션이 먼저 `PUBLISHED`로 바꾼 상태를 덮어쓰지 않습니다.
 
-호스트는 `/api/host/sessions/{sessionId}/publish`로 `CLOSED` 세션을 발행합니다. 발행은 같은 club의 publication row가 있고, `visibility`가 `MEMBER` 또는 `PUBLIC`이며, `public_summary`가 비어 있지 않을 때만 허용됩니다. `HOST_ONLY`, `DRAFT`, `OPEN`, publication row가 없는 `CLOSED` 세션은 발행할 수 없습니다. `PUBLIC`으로 발행하면 compatibility column인 `public_session_publications.is_public`과 `published_at`도 함께 맞춥니다.
+호스트는 `/api/host/sessions/{sessionId}/publish`로 `CLOSED` 세션을 발행합니다. 발행은 같은 club의 publication row가 있고, canonical `access_scope=GUEST_READABLE`이며, `public_summary`가 비어 있지 않을 때만 허용됩니다. `HOST_ONLY`, `DRAFT`, `OPEN`, publication row가 없는 `CLOSED` 세션은 발행할 수 없습니다. `site_visibility=PUBLIC_RECORD`면 compatibility `is_public`과 `published_at`도 함께 맞춥니다.
 
 호스트 앱은 `/clubs/:slug/app/host/sessions/:sessionId/closing`에서 회차별 클로징 상태를 보여줍니다. 이 화면은 세션 종료, 기록 패키지, 피드백 문서, 멤버 알림, 공개 기록 노출을 하나의 host-safe read model로 묶고, member/public 표면에는 권한에 맞는 진입과 공개 가능한 기록만 노출합니다. 서버의 `sessionclosing` slice는 새 영속 상태나 DB migration 없이 기존 세션·공개 기록·피드백 문서·알림 outbox/inbox 데이터를 읽어 checklist, next action, Host/Member/Public surface 상태, evidence ledger를 계산합니다.
 
-멤버 홈은 `/api/sessions/upcoming`을 통해 멤버에게 보이는 예정 세션을 가져옵니다. 이 endpoint는 `DRAFT`이면서 `MEMBER` 또는 `PUBLIC`인 같은 클럽 세션만 반환합니다. `VIEWER`도 이 읽기 목록은 볼 수 있지만, RSVP/체크인/질문/서평 쓰기와 `/api/host/**` 운영 도구는 사용할 수 없습니다.
+로그인 audience의 멤버 홈은 `/api/sessions/upcoming`, 익명 audience의 scoped guest app은 `/api/public/clubs/{slug}/browse/sessions/upcoming`을 사용합니다. 두 경로 모두 `DRAFT + GUEST_READABLE`인 같은 클럽 세션을 반환하며 public-site placement를 요구하지 않습니다. 공개 클럽에 `OPEN + GUEST_READABLE` current session이 없으면 guest current API는 `404`가 아니라 `{currentSession:null}`을 반환해 정상 empty state를 표시하고, 존재하지 않거나 비공개·비활성인 클럽만 `404`로 숨깁니다. `GUEST`와 `VIEWER`는 읽을 수 있지만 RSVP/체크인/질문/서평 쓰기와 `/api/host/**` 운영 도구는 사용할 수 없습니다.
 
-발행된 회차의 장문 서평은 archive-owned endpoint인 `PUT /api/archive/sessions/{sessionId}/my-long-review`에서 저장합니다. 이 경로는 `PUBLISHED` 상태이고 `MEMBER` 또는 `PUBLIC` 범위인 세션에 참여한 정식 멤버만 사용할 수 있으며, 저장된 서평은 `PUBLIC` long review가 됩니다. 같은 작성자의 같은 세션 서평은 처음 공개 상태가 될 때만 `REVIEW_PUBLISHED` 알림을 만들고, 작성자 본인은 수신 대상에서 제외합니다.
+발행된 회차의 장문 서평은 archive-owned endpoint인 `PUT /api/archive/sessions/{sessionId}/my-long-review`에서 저장합니다. 이 경로는 `PUBLISHED + GUEST_READABLE` 세션에 참여한 정식 멤버만 사용할 수 있으며, 새로 저장한 서평은 `PUBLIC` long review가 됩니다. 기존 `PRIVATE`/`SESSION` row를 migration으로 일괄 공개하지 않고 작성자가 다시 저장한 뒤부터 guest projection에 포함합니다. 같은 작성자의 같은 세션 서평은 처음 공개 상태가 될 때만 `REVIEW_PUBLISHED` 알림을 만들고, 작성자 본인은 수신 대상에서 제외합니다.
 
 ## 이메일 알림, 멤버 알림함, 호스트 운영
 
@@ -330,13 +342,13 @@ ReadMates는 클럽별로 하나의 현재 `OPEN` 세션과 여러 개의 예정
 
 범위가 있는 목록 endpoint는 cursor 기반 page object를 반환합니다. 공통 응답 필드는 `{ "items": [...], "nextCursor": string | null }`이고, 다음 page가 없으면 `nextCursor`는 `null`입니다. Endpoint에 따라 `/api/me/notifications`의 `unreadCount`처럼 목록 전체 상태를 나타내는 추가 field가 붙을 수 있습니다. Request query는 endpoint별 기본값과 최대값을 둔 `limit`, `cursor`를 사용합니다.
 
-이 contract를 따르는 목록은 archive의 `/api/archive/sessions`, `/api/archive/me/questions`, `/api/archive/me/reviews`, notes의 `/api/notes/sessions`, `/api/notes/feed`, feedback의 `/api/feedback-documents/me`, host의 `/api/host/sessions`, `/api/host/members`, `/api/host/members/viewers`, `/api/host/members/pending-approvals`, `/api/host/invitations`, notification의 `/api/me/notifications`, `/api/host/notifications/items`, `/api/host/notifications/events`, `/api/host/notifications/deliveries`, `/api/host/notifications/manual/dispatches`, `/api/host/notifications/test-mail/audit`, platform admin의 `/api/admin/notifications/events`, `/api/admin/notifications/deliveries`, `/api/admin/audit/events`입니다. `GET /api/host/notifications/manual/options`도 멤버 선택 목록을 같은 cursor page shape로 반환합니다. 예를 들어 `GET /api/host/members/pending-approvals?limit=2`는 pending viewer approval 목록의 첫 page를 반환하고, 다음 page는 응답의 `nextCursor`를 `cursor` query로 넘겨 요청합니다.
+이 contract를 따르는 목록은 guest browse의 upcoming/notes/archive, archive의 `/api/archive/sessions`, `/api/archive/me/questions`, `/api/archive/me/reviews`, notes의 `/api/notes/sessions`, `/api/notes/feed`, feedback의 `/api/feedback-documents/me`, host의 `/api/host/sessions`, `/api/host/members`, `/api/host/members/viewers`, `/api/host/members/pending-approvals`, `/api/host/invitations`, notification의 `/api/me/notifications`, `/api/host/notifications/items`, `/api/host/notifications/events`, `/api/host/notifications/deliveries`, `/api/host/notifications/manual/dispatches`, `/api/host/notifications/test-mail/audit`, platform admin의 `/api/admin/notifications/events`, `/api/admin/notifications/deliveries`, `/api/admin/audit/events`입니다. Guest cursor는 opaque payload에 club slug와 exact key set을 포함해 다른 club에서 재사용하거나 key가 더해진 cursor를 거절합니다. `GET /api/host/notifications/manual/options`도 멤버 선택 목록을 같은 cursor page shape로 반환합니다. 예를 들어 `GET /api/host/members/pending-approvals?limit=2`는 pending viewer approval 목록의 첫 page를 반환하고, 다음 page는 응답의 `nextCursor`를 `cursor` query로 넘겨 요청합니다.
 
 위 scoped endpoint에는 legacy array response contract가 없습니다. 프런트엔드 loader와 route action은 `items`를 누적하고 `nextCursor`로 명시적인 더보기 control을 보여줘야 하며, 새 scoped 목록 API도 같은 공통 page field를 사용합니다.
 
 ## 나의 서재와 개인 독서 여정
 
-`GET /api/archive/me/journey?limit=12&cursor=<cursor>`는 현재 멤버의 archive read projection입니다. 응답은 날짜·회차·ID 내림차순의 cursor `items`와, page 크기와 무관하게 같은 club의 전체 열람 가능 기록에서 계산한 `summary`를 함께 반환합니다. Item에는 책·회차 metadata, 본인의 독서 진도와 질문·장문 서평 수, 피드백 문서의 가용성·열람 가능 상태만 들어가며 피드백 본문이나 다른 멤버 정보는 포함하지 않습니다. `CLOSED`·`PUBLISHED` 중 `MEMBER`·`PUBLIC` 기록만 대상으로 하므로 `HOST_ONLY`와 다른 club row는 제외됩니다.
+`GET /api/archive/me/journey?limit=12&cursor=<cursor>`는 현재 멤버의 archive read projection입니다. 응답은 날짜·회차·ID 내림차순의 cursor `items`와, page 크기와 무관하게 같은 club의 전체 열람 가능 기록에서 계산한 `summary`를 함께 반환합니다. Item에는 책·회차 metadata, 본인의 독서 진도와 질문·장문 서평 수, 피드백 문서의 가용성·열람 가능 상태만 들어가며 피드백 본문이나 다른 멤버 정보는 포함하지 않습니다. Canonical 의미는 `CLOSED|PUBLISHED + GUEST_READABLE`이며 `HOST_ONLY`와 다른 club row는 제외됩니다. 한 릴리즈 호환 기간에는 기존 member archive adapter가 dual-write된 `MEMBER|PUBLIC` compatibility 값을 읽을 수 있지만, 새 product decision은 `access_scope`로 기록합니다.
 
 Archive JDBC adapter는 요청마다 page query와 전체 summary query를 정확히 하나씩, 합계 두 statement로 실행하며 page 크기나 item 수에 따라 query 수가 늘지 않습니다. 이 projection은 기존 테이블만 읽으므로 Flyway migration이나 새 영속 상태를 추가하지 않습니다.
 
@@ -360,18 +372,19 @@ ReadMates에서 멤버를 부르는 앱 표시 이름은 `displayName`입니다.
 
 서버는 표시 이름을 trim한 뒤 필수값, 20자 이하, 제어문자, 이메일 형태, URL/domain 형태, 예약어(`탈퇴한 멤버`, `관리자`, `호스트`, `운영자`)를 검증합니다. 같은 클럽 안의 `displayName` 중복은 현재 `memberships(club_id, short_name)` unique constraint와 application-level lock/check로 막습니다. 공개 문서와 seed에는 실제 멤버 이름 대신 public-safe sample name만 둡니다.
 
-## 공개 기록과 비공개 기록 경계
+## 공개 사이트, 게스트 앱, 비공개 기록 경계
 
-Public route/API에는 명시적으로 공개된 데이터만 나갑니다.
+공개 사이트와 scoped 게스트 앱은 모두 anonymous-safe이지만 같은 projection이 아닙니다.
 
-- 공개 사이트는 `/api/public/clubs/{slug}`, `/api/public/clubs/{slug}/sessions/{sessionId}` 같은 club-scoped public API를 사용합니다. Explicit slug endpoint에서는 slug가 public data boundary의 기준입니다.
-- 공개 기록에는 `sessions.state=PUBLISHED`이고 `public_session_publications.visibility=PUBLIC`인 세션 요약, 공개 가능한 하이라이트, 한줄평, 책/회차 정보만 포함합니다.
-- 예정 세션 목록은 멤버 앱의 `/api/sessions/upcoming`에서만 제공하며, `HOST_ONLY` draft는 멤버, 둘러보기 멤버, archive, notes, public route/API에 노출하지 않습니다.
-- 멤버 archive는 `CLOSED` 또는 `PUBLISHED`이면서 `sessions.visibility`가 `MEMBER` 또는 `PUBLIC`인 기록을 보여줍니다. `CLOSED` 기록은 멤버 archive에서 읽을 수 있지만 notes feed와 public route/API에는 아직 나오지 않습니다.
-- 멤버 notes feed는 `PUBLISHED`이면서 `sessions.visibility`가 `MEMBER` 또는 `PUBLIC`인 기록만 보여줍니다.
-- 현재 세션의 RSVP, 읽은 분량, private notes, meeting data, 피드백 문서 본문은 public API로 노출하지 않습니다.
-- 멤버 앱의 `/api/archive/**`, `/api/notes/**`, `/api/sessions/current/**`는 인증과 membership 상태를 확인합니다.
-- 호스트 API인 `/api/host/**`는 현재 club context의 active `HOST` role이 필요합니다.
+- 공개 사이트는 `/api/public/clubs/{slug}`, `/api/public/clubs/{slug}/sessions/{sessionId}`를 사용하고 `PUBLISHED + PUBLIC_RECORD`만 반환합니다. `site_visibility=HIDDEN`인 `GUEST_READABLE` 기록은 공개 사이트 목록·상세에 나오지 않습니다.
+- scoped 게스트 앱은 `/api/public/clubs/{slug}/browse/**` 전용 read slice를 사용합니다. `ACTIVE + PUBLIC` 클럽에서 current는 `OPEN`, upcoming은 `DRAFT`, archive는 `CLOSED|PUBLISHED`, notes는 `PUBLISHED`인 `access_scope=GUEST_READABLE` 세션만 반환합니다. 게스트 앱은 멤버 `/api/sessions/**`, `/api/archive/**`, `/api/notes/**`를 호출하지 않습니다.
+- 게스트 현재 세션에는 책·회차·시간·질문 마감, 참석자의 표시 이름·로컬 avatar key·RSVP·실제 참석 상태, 작성자 이름이 붙은 질문·`draftThought`·공개 장문 서평을 포함할 수 있습니다. Archive/detail과 notes에는 공개 가능한 질문, 하이라이트, 새 `PUBLIC` 한줄평·장문 서평과 참석 집계가 포함됩니다.
+- 게스트 DTO는 `userId`, `membershipId`, `email`, `accountName`, 정확한 `locationLabel`, `meetingUrl`, `meetingPasscode`, 읽은 분량, 피드백 문서 본문과 host/admin metadata를 포함하지 않습니다. 정확한 장소·접속 링크·비밀번호는 공개 소개용 별도 요약으로 대체하지 않고 응답에서 제외합니다.
+- 모든 guest view model은 `canWrite=false`입니다. 개인 공간은 샘플 preview이고 계정 설정·알림·피드백은 locked 안내만 보여줍니다. 피드백 direct URL도 protected API를 호출하지 않으며, 호스트 direct URL은 scoped guest home으로 돌아갑니다.
+- `HOST_ONLY`는 guest/member read projection에서 제외합니다. `CLOSED + GUEST_READABLE`은 archive에서 읽을 수 있지만 notes와 공개 사이트에는 아직 나오지 않습니다.
+- 로그인 멤버 앱의 `/api/archive/**`, `/api/notes/**`, `/api/sessions/current/**`는 인증과 membership 상태를 확인하고, 호스트 `/api/host/**`는 현재 club context의 active `HOST` role을 요구합니다.
+
+Guest browse GET은 Spring Security의 anonymous permit 경로지만 검증된 club slug를 사용하고, rate limit이 켜진 환경에서는 trusted client IP hash와 club hash를 합친 key로 분당 120회 제한합니다. 거절 응답은 `429`, bounded `Retry-After`, `Cache-Control: no-store`를 반환합니다. Guest controller의 정상·오류 응답도 `no-store`이며, Pages BFF는 upstream `Cache-Control` directive를 대소문자와 무관하게 해석해 `no-store`/`private`, `Set-Cookie`, `Vary: Cookie|Authorization` 응답을 cache하지 않습니다. 공개 marketing cache prefix 안에 browse URL이 들어가더라도 이 upstream 정책 때문에 guest DTO는 edge cache에 저장되지 않습니다.
 
 이 경계는 공개 저장소 전환에도 중요합니다. 문서와 예시는 실제 멤버 데이터나 실제 운영 club domain을 사용하지 않고, API origin은 `https://api.example.com` 같은 placeholder를 사용합니다.
 
@@ -402,7 +415,7 @@ Readable response for active full member or host
 
 - 호스트는 같은 club의 세션 피드백 문서 상태와 본문을 관리할 수 있습니다.
 - active 정식 멤버는 같은 club의 피드백 문서를 읽을 수 있습니다.
-- 둘러보기 멤버는 피드백 문서를 읽을 수 없습니다.
+- 익명 `GUEST`와 둘러보기 멤버 `VIEWER`는 피드백 문서를 읽을 수 없습니다.
 - 문서가 없거나 권한이 없으면 UI는 locked 또는 unavailable state를 보여야 합니다.
 
 ## 세션 기록 JSON 가져오기

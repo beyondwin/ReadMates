@@ -2,10 +2,10 @@ import { Link } from "@/features/public/ui/public-link";
 import type { PublicClubView, PublicSessionListItemView } from "@/features/public/model/public-display-model";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { BookCover } from "@/shared/ui/book-cover";
-import { PublicGuestOnlyActions } from "@/shared/ui/public-auth-action";
 import { getPublicClubDisplay, getPublicRecordShowcaseDisplay } from "@/features/public/model/public-display-model";
 import { PUBLIC_MEMBERSHIP_NOTE, STATIC_OPERATION_INTRO } from "@/features/public/model/public-copy";
 import { publicRecordsHref, publicSessionHref } from "@/features/public/model/public-paths";
+import { PublicEntryActions } from "@/features/public/ui/public-entry-actions";
 
 type PublicClubProps = {
   data: PublicClubView;
@@ -150,11 +150,7 @@ export default function PublicClub({ data, publicBasePath = "" }: PublicClubProp
               {PUBLIC_MEMBERSHIP_NOTE}
             </p>
             <div className="public-membership-panel__actions">
-              <PublicGuestOnlyActions>
-                <Link to="/login" className="btn btn-primary">
-                  시작하기
-                </Link>
-              </PublicGuestOnlyActions>
+              <PublicEntryActions publicBasePath={publicBasePath} />
             </div>
           </div>
         </div>

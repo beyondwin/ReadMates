@@ -23,6 +23,7 @@ import type {
   HostSessionDeletionResponse,
   HostSessionClosingStatusResponse,
   HostSessionDetailResponse,
+  HostSessionAccessScopeRequest,
   HostSessionListPage,
   HostSessionPublicationRequest,
   HostSessionRequest,
@@ -54,6 +55,7 @@ import {
   parseHostInvitationListPage,
   parseSessionImportPreviewResponse,
 } from "./host-contracts";
+import { buildSessionAccessScopeRequest } from "../model/session-exposure-model";
 import { pagingSearchParams, type PageRequest } from "@/shared/model/paging";
 
 export function fetchHostCurrentSession(context?: ReadmatesApiContext) {
@@ -301,6 +303,22 @@ export async function saveHostSessionVisibility(
   return HostSessionVisibilityUpdateResponseSchema.parse(
     await response.json(),
   );
+}
+
+export async function saveHostSessionAccessScope(
+  sessionId: string,
+  request: HostSessionAccessScopeRequest,
+  context?: ReadmatesApiContext,
+): Promise<HostSessionVisibilityUpdateResult> {
+  const response = await readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/access-scope`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(buildSessionAccessScopeRequest(request.accessScope)),
+  }, context);
+  if (!response.ok) {
+    throw await apiErrorFromResponse(response);
+  }
+  return HostSessionVisibilityUpdateResponseSchema.parse(await response.json());
 }
 
 export function openHostSession(sessionId: string) {

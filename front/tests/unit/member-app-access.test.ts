@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AuthMeResponse, MembershipStatus } from "@/shared/auth/auth-contracts";
 import { loadMemberAppAuth } from "@/shared/auth/member-app-loader";
+import { ReadMatesSessionExpiredError, __resetRedirectGuardForTest } from "@/shared/api/client";
 import {
   canEditOwnProfile,
   canReadMemberContent,
@@ -10,6 +11,7 @@ import {
 } from "@/shared/auth/member-app-access";
 
 afterEach(() => {
+  __resetRedirectGuardForTest();
   vi.unstubAllGlobals();
   window.history.pushState({}, "", "/");
 });
@@ -149,5 +151,27 @@ describe("member app access helpers", () => {
         "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp%2Ffeedback%2Fsession-1%3Ffrom%3Demail",
       );
     }
+  });
+
+  it("forces login recovery when an actual member loader auth request returns 401", async () => {
+    const assignMock = vi.fn();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 401 })));
+    vi.stubGlobal("location", {
+      assign: assignMock,
+      pathname: "/clubs/reading-sai/app/archive",
+      search: "?view=reviews",
+      hash: "#latest",
+    });
+
+    await expect(
+      loadMemberAppAuth({
+        params: { clubSlug: "reading-sai" },
+        request: new Request("https://app.readmates.example/clubs/reading-sai/app/archive?view=reviews#latest"),
+      }),
+    ).rejects.toBeInstanceOf(ReadMatesSessionExpiredError);
+
+    expect(assignMock).toHaveBeenCalledWith(
+      "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp%2Farchive%3Fview%3Dreviews%23latest",
+    );
   });
 });

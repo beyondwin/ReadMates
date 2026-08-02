@@ -17,6 +17,7 @@ import java.util.Locale
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
+@Suppress("TooManyFunctions")
 @Component
 class OAuthReturnState(
     @Value("\${readmates.auth.return-state-secret}")
@@ -28,7 +29,7 @@ class OAuthReturnState(
     @Value("\${readmates.auth.session-cookie-domain:}")
     sessionCookieDomain: String,
     private val trustedReturnHostPort: TrustedReturnHostPort,
-) {
+) : OAuthReturnStateContract {
     private val normalizedSecret =
         secret.trim().also {
             require(it.isNotEmpty()) {
@@ -48,7 +49,7 @@ class OAuthReturnState(
     private val decoder = Base64.getUrlDecoder()
     private val signingKey = SecretKeySpec(normalizedSecret.toByteArray(Charsets.UTF_8), HMAC_ALGORITHM)
 
-    fun signReturnTarget(returnTo: String?): String? = signReturnTarget(returnTo, Instant.now().plus(ttl))
+    override fun signReturnTarget(returnTo: String?): String? = signReturnTarget(returnTo, Instant.now().plus(ttl))
 
     fun signReturnTarget(
         returnTo: String?,
@@ -85,6 +86,11 @@ class OAuthReturnState(
         clubSlug: String,
         inviteToken: String,
     ): String = "/clubs/$clubSlug/invite/$inviteToken"
+
+    override fun scopedAppClubSlugFromState(signedState: String?): String? =
+        verifiedReturnTarget(signedState)
+            ?.takeIf { it.startsWith("/") }
+            ?.let(::rawScopedAppClubSlug)
 
     fun inviteClubSlugFromReturnState(
         signedState: String?,
@@ -340,6 +346,28 @@ class OAuthReturnState(
     }
 }
 
+interface OAuthReturnStateContract {
+    fun signReturnTarget(returnTo: String?): String?
+
+    fun scopedAppClubSlugFromState(signedState: String?): String?
+}
+
+private fun rawScopedAppClubSlug(returnTarget: String): String? {
+    val rawPath = returnTarget.substringBeforeAny('?', '#')
+    val rawSegments = rawPath.split('/').drop(1)
+    val pathSegments = if (rawSegments.lastOrNull().isNullOrEmpty()) rawSegments.dropLast(1) else rawSegments
+    val hasScopedAppPrefix =
+        pathSegments.size >= MIN_SCOPED_APP_PATH_SEGMENTS &&
+            pathSegments[0] == "clubs" &&
+            pathSegments[2] == "app"
+    val hasOnlyCanonicalSegments =
+        pathSegments.all { RAW_ROUTE_SEGMENT.matches(it) && it != "." && it != ".." }
+    if (!hasScopedAppPrefix || !hasOnlyCanonicalSegments) return null
+
+    val pathClubSlug = pathSegments[1]
+    return OAuthGuestJoinSession.normalize(pathClubSlug).takeIf { it == pathClubSlug }
+}
+
 private fun String.substringBeforeAny(vararg delimiters: Char): String {
     val end = indexOfFirst { it in delimiters }
     return if (end == -1) this else substring(0, end)
@@ -370,3 +398,5 @@ private fun ByteArray.decodeUtf8OrNull(): String? =
 private const val PERCENT_ESCAPE_WIDTH = 3
 private const val HEX_RADIX = 16
 private const val BITS_PER_HEX_DIGIT = 4
+private const val MIN_SCOPED_APP_PATH_SEGMENTS = 3
+private val RAW_ROUTE_SEGMENT = Regex("^[A-Za-z0-9._~-]+$")

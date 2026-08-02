@@ -98,11 +98,14 @@ describe("PublicHome", () => {
     expect(screen.getByText("함께 읽기")).toBeInTheDocument();
     expect(screen.getByText("기록은 누구나 읽고, 참여는 초대받은 멤버가 합니다")).toBeInTheDocument();
     expect(screen.getByText("읽는사이는 초대 기반 모임입니다. 기록은 누구나 읽을 수 있고, 참여 권한은 초대 수락 또는 호스트 승인 뒤 열립니다.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "시작하기" })).toHaveAttribute("href", "/login");
+    expect(screen.getByRole("link", { name: "둘러보기" })).toHaveAttribute("href", "/clubs/reading-sai/app");
+    expect(screen.getByRole("link", { name: "멤버로 시작" })).toHaveAttribute(
+      "href",
+      "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp",
+    );
     expect(screen.queryByRole("button", { name: /초대 수락하기/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /초대 수락하기/ })).not.toBeInTheDocument();
-    expect(container.querySelector('a[href="/login"]')).toHaveTextContent("시작하기");
-    expect(container.querySelector('a[href="/login"]')).not.toHaveTextContent("초대 수락하기");
+    expect(container.querySelector('a[href="/clubs/reading-sai/app"]')).toHaveTextContent("둘러보기");
     expect(screen.getByText("기록 모음")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "공개 기록", level: 2 })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "전체 보기" })).toHaveAttribute(
@@ -111,6 +114,16 @@ describe("PublicHome", () => {
     );
     expect(container.innerHTML).not.toContain("물고기는 존재하지 않는다");
     expect(container.innerHTML).not.toContain("session-13");
+  });
+
+  it("keeps guest and member-start actions scoped to the rendered club", () => {
+    render(<PublicHome data={publicClubFixture} publicBasePath="/clubs/other-club" />);
+
+    expect(screen.getByRole("link", { name: "둘러보기" })).toHaveAttribute("href", "/clubs/other-club/app");
+    expect(screen.getByRole("link", { name: "멤버로 시작" })).toHaveAttribute(
+      "href",
+      "/login?returnTo=%2Fclubs%2Fother-club%2Fapp",
+    );
   });
 
   it("limits the home public note and record lists to the latest three sessions", () => {

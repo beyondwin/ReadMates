@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { RECOVER_READ_SESSION_EXPIRY } from "@/shared/api/client";
 
 vi.mock("@/features/current-session/api/current-session-api", () => ({
   getCurrentSession: vi.fn(),
@@ -89,6 +90,17 @@ describe("current session query keys", () => {
     expect(options.queryKey).toEqual(currentSessionKeys.current(context));
     expect(getCurrentSession).toHaveBeenCalledWith(context);
     expect(client.getQueryData(currentSessionKeys.current(context))).toEqual(response);
+  });
+
+  it("opts only an explicitly mounted current-session query into read recovery", async () => {
+    const response = { currentSession: null };
+    const context = { clubSlug: "reading-sai" };
+    vi.mocked(getCurrentSession).mockResolvedValue(response);
+    const { client } = createWrapper();
+
+    await client.fetchQuery(currentSessionQuery(context, RECOVER_READ_SESSION_EXPIRY));
+
+    expect(getCurrentSession).toHaveBeenCalledWith(context, RECOVER_READ_SESSION_EXPIRY);
   });
 
   it("invalidates only the selected current-session scope while preserving values", async () => {

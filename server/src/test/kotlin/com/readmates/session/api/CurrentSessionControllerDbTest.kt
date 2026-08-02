@@ -4,16 +4,20 @@ import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.hamcrest.Matchers.greaterThan
 import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.not
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.post
 import java.util.UUID
 
 @SpringBootTest(
@@ -37,6 +41,133 @@ class CurrentSessionControllerDbTest(
                 jsonPath("$.currentSession") { value(null) }
             }
     }
+
+    @Test
+    @Sql(
+        statements = [CLEANUP_GENERATED_SESSIONS_SQL],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [CLEANUP_GENERATED_SESSIONS_SQL],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `new current session reviews default to public without rewriting legacy visibility`() {
+        val memberId = membershipIdFor("member5@example.com")
+        insertReviewVisibilitySession(CURRENT_REVIEW_SESSION_ID, 78, "OPEN")
+        insertReviewVisibilitySession(LEGACY_REVIEW_SESSION_ID, 77, "CLOSED")
+        insertReviewParticipant(CURRENT_REVIEW_SESSION_ID, memberId)
+        insertReviewParticipant(LEGACY_REVIEW_SESSION_ID, memberId)
+        jdbcTemplate.update(
+            """
+            insert into one_line_reviews (id, club_id, session_id, membership_id, text, visibility)
+            values (?, ?, ?, ?, '기존 세션 한줄평', 'SESSION')
+            """.trimIndent(),
+            LEGACY_ONE_LINE_REVIEW_ID,
+            READING_SAI_CLUB_ID,
+            LEGACY_REVIEW_SESSION_ID,
+            memberId,
+        )
+        jdbcTemplate.update(
+            """
+            insert into long_reviews (id, club_id, session_id, membership_id, body, visibility)
+            values (?, ?, ?, ?, '기존 비공개 서평', 'PRIVATE')
+            """.trimIndent(),
+            LEGACY_LONG_REVIEW_ID,
+            READING_SAI_CLUB_ID,
+            LEGACY_REVIEW_SESSION_ID,
+            memberId,
+        )
+
+        mockMvc
+            .post("/api/sessions/current/one-line-reviews") {
+                with(user("member5@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"text":"새 한줄평"}"""
+            }.andExpect { status { isOk() } }
+        mockMvc
+            .post("/api/sessions/current/reviews") {
+                with(user("member5@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"body":"새 서평"}"""
+            }.andExpect { status { isOk() } }
+
+        assertEquals("PUBLIC", reviewVisibility("one_line_reviews", CURRENT_REVIEW_SESSION_ID, memberId))
+        assertEquals("PUBLIC", reviewVisibility("long_reviews", CURRENT_REVIEW_SESSION_ID, memberId))
+        assertEquals("SESSION", reviewVisibility("one_line_reviews", LEGACY_REVIEW_SESSION_ID, memberId))
+        assertEquals("PRIVATE", reviewVisibility("long_reviews", LEGACY_REVIEW_SESSION_ID, memberId))
+    }
+
+    private fun membershipIdFor(email: String): String =
+        requireNotNull(
+            jdbcTemplate.queryForObject(
+                """
+                select memberships.id
+                from memberships
+                join users on users.id = memberships.user_id
+                where users.email = ?
+                  and memberships.club_id = ?
+                """.trimIndent(),
+                String::class.java,
+                email,
+                READING_SAI_CLUB_ID,
+            ),
+        )
+
+    private fun insertReviewVisibilitySession(
+        sessionId: String,
+        number: Int,
+        state: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into sessions (
+              id, club_id, number, title, book_title, book_author, session_date,
+              start_time, end_time, location_label, question_deadline_at, state
+            )
+            values (?, ?, ?, ?, ?, '테스트 저자', '2026-08-20',
+                    '20:00:00', '22:00:00', '온라인', '2026-08-19 18:00:00', ?)
+            """.trimIndent(),
+            sessionId,
+            READING_SAI_CLUB_ID,
+            number,
+            "$number 회차 리뷰 공개 기본값",
+            "$number 회차 리뷰 책",
+            state,
+        )
+    }
+
+    private fun insertReviewParticipant(
+        sessionId: String,
+        membershipId: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into session_participants (
+              id, club_id, session_id, membership_id, rsvp_status, attendance_status, participation_status
+            )
+            values (uuid(), ?, ?, ?, 'GOING', 'UNKNOWN', 'ACTIVE')
+            """.trimIndent(),
+            READING_SAI_CLUB_ID,
+            sessionId,
+            membershipId,
+        )
+    }
+
+    private fun reviewVisibility(
+        table: String,
+        sessionId: String,
+        membershipId: String,
+    ): String =
+        requireNotNull(
+            jdbcTemplate.queryForObject(
+                "select visibility from $table where session_id = ? and membership_id = ?",
+                String::class.java,
+                sessionId,
+                membershipId,
+            ),
+        )
 
     @Test
     @Sql(
@@ -438,6 +569,12 @@ class CurrentSessionControllerDbTest(
 
     companion object {
         private fun removedJsonPath(vararg parts: String) = parts.joinToString(separator = "")
+
+        private const val READING_SAI_CLUB_ID = "00000000-0000-0000-0000-000000000001"
+        private const val CURRENT_REVIEW_SESSION_ID = "00000000-0000-0000-0000-000000000780"
+        private const val LEGACY_REVIEW_SESSION_ID = "00000000-0000-0000-0000-000000000781"
+        private const val LEGACY_ONE_LINE_REVIEW_ID = "00000000-0000-0000-0000-000000009031"
+        private const val LEGACY_LONG_REVIEW_ID = "00000000-0000-0000-0000-000000009032"
 
         private const val MARK_MEMBER1_LEFT_SQL = """
             update memberships

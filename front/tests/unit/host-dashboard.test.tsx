@@ -245,7 +245,7 @@ const twoDraftHostSessions = [
 
 const noopHostDashboardActions = {
   updateCurrentSessionParticipation: vi.fn(async () => undefined),
-  updateSessionVisibility: vi.fn(async () => undefined),
+  updateSessionAccessScope: vi.fn(async () => undefined),
   openSession: vi.fn(async () => undefined),
   loadHostSessions: vi.fn(async () => ({ items: [], nextCursor: null })),
 } satisfies HostDashboardActions;
@@ -802,18 +802,18 @@ describe("HostDashboard", () => {
     expect(desktop.getByText("다음 책")).toBeInTheDocument();
     const desktopUpcomingRow = desktop.getByText("다음 책").closest(".row-between");
     expect(desktopUpcomingRow).not.toBeNull();
-    expect(within(desktopUpcomingRow as HTMLElement).getByText("공개 범위")).toBeInTheDocument();
-    expect(within(desktopUpcomingRow as HTMLElement).getByText("비공개")).toBeInTheDocument();
-    expect(within(desktopUpcomingRow as HTMLElement).getByRole("button", { name: /멤버 공개/ })).toHaveTextContent("공개");
+    expect(within(desktopUpcomingRow as HTMLElement).getByText("게스트 접근")).toBeInTheDocument();
+    expect(within(desktopUpcomingRow as HTMLElement).getByText("호스트 전용")).toBeInTheDocument();
+    expect(within(desktopUpcomingRow as HTMLElement).getByRole("button", { name: /게스트 공개/ })).toHaveTextContent("게스트 공개");
     expect(desktop.getByRole("button", { name: /현재로 시작/ })).toBeInTheDocument();
     expect(mobile.getByRole("heading", { name: "예정 세션", exact: true })).toBeInTheDocument();
     expect(mobile.getByRole("heading", { name: "운영 흐름", exact: true })).toBeInTheDocument();
     expect(mobile.getByText("다음 책")).toBeInTheDocument();
     const mobileUpcomingCard = mobile.getByText("다음 책").closest(".m-card-quiet");
     expect(mobileUpcomingCard).not.toBeNull();
-    expect(within(mobileUpcomingCard as HTMLElement).getByText("공개 범위")).toBeInTheDocument();
-    expect(within(mobileUpcomingCard as HTMLElement).getByText("비공개")).toBeInTheDocument();
-    expect(within(mobileUpcomingCard as HTMLElement).getByRole("button", { name: /멤버 공개/ })).toHaveTextContent("멤버 공개로 변경");
+    expect(within(mobileUpcomingCard as HTMLElement).getByText("게스트 접근")).toBeInTheDocument();
+    expect(within(mobileUpcomingCard as HTMLElement).getByText("호스트 전용")).toBeInTheDocument();
+    expect(within(mobileUpcomingCard as HTMLElement).getByRole("button", { name: /게스트 공개/ })).toHaveTextContent("게스트 공개");
   });
 
   it("loads and appends more upcoming sessions from the host sessions cursor", async () => {
@@ -934,11 +934,11 @@ describe("HostDashboard", () => {
     expect(within(refreshedSection).getByText("다음 책")).toBeInTheDocument();
   });
 
-  it("calls visibility and open actions from upcoming session rows", async () => {
+  it("calls guest-access and open actions from upcoming session rows", async () => {
     const user = userEvent.setup();
     const actions = {
       ...noopHostDashboardActions,
-      updateSessionVisibility: vi.fn(async () => undefined),
+      updateSessionAccessScope: vi.fn(async () => undefined),
       openSession: vi.fn(async () => undefined),
     } satisfies HostDashboardActions;
 
@@ -946,34 +946,34 @@ describe("HostDashboard", () => {
       <HostDashboardForTest auth={hostAuth} current={noCurrent} data={dashboard} hostSessions={hostSessions} actions={actions} />,
     );
 
-    await user.click(screen.getAllByRole("button", { name: /멤버 공개/ })[0]);
-    expect(actions.updateSessionVisibility).toHaveBeenCalledWith("session-8", { visibility: "MEMBER" });
+    await user.click(screen.getAllByRole("button", { name: /게스트 공개/ })[0]);
+    expect(actions.updateSessionAccessScope).toHaveBeenCalledWith("session-8", { accessScope: "GUEST_READABLE" });
 
     await user.click(screen.getAllByRole("button", { name: /현재로 시작/ })[0]);
     expect(actions.openSession).toHaveBeenCalledWith("session-8");
   });
 
-  it("disables upcoming visibility action while pending and flips local state on success", async () => {
+  it("disables upcoming guest-access action while pending and flips local state on success", async () => {
     const user = userEvent.setup();
     const visibilityUpdate = deferredAction();
     const actions = {
       ...noopHostDashboardActions,
-      updateSessionVisibility: vi.fn(() => visibilityUpdate.promise),
+      updateSessionAccessScope: vi.fn(() => visibilityUpdate.promise),
     } satisfies HostDashboardActions;
     const { container } = render(
       <HostDashboardForTest auth={hostAuth} current={current} data={dashboard} hostSessions={hostSessions} actions={actions} />,
     );
     const desktop = getDesktopView(container);
 
-    await user.click(desktop.getByRole("button", { name: /멤버 공개/ }));
+    await user.click(desktop.getByRole("button", { name: /게스트 공개/ }));
 
-    expect(desktop.getByRole("button", { name: /공개 범위를 저장하는 중/ })).toBeDisabled();
-    expect(actions.updateSessionVisibility).toHaveBeenCalledWith("session-8", { visibility: "MEMBER" });
+    expect(desktop.getByRole("button", { name: /게스트 접근을 저장하는 중/ })).toBeDisabled();
+    expect(actions.updateSessionAccessScope).toHaveBeenCalledWith("session-8", { accessScope: "GUEST_READABLE" });
 
     visibilityUpdate.resolve();
 
-    await waitFor(() => expect(desktop.getByRole("button", { name: /비공개/ })).toBeInTheDocument());
-    expect(desktop.queryByRole("button", { name: /공개 범위를 저장하는 중/ })).not.toBeInTheDocument();
+    await waitFor(() => expect(desktop.getByRole("button", { name: /호스트 전용/ })).toBeInTheDocument());
+    expect(desktop.queryByRole("button", { name: /게스트 접근을 저장하는 중/ })).not.toBeInTheDocument();
   });
 
   it("disables all upcoming controls while an upcoming action is pending", async () => {
@@ -981,7 +981,7 @@ describe("HostDashboard", () => {
     const visibilityUpdate = deferredAction();
     const actions = {
       ...noopHostDashboardActions,
-      updateSessionVisibility: vi.fn(() => visibilityUpdate.promise),
+      updateSessionAccessScope: vi.fn(() => visibilityUpdate.promise),
     } satisfies HostDashboardActions;
     const { container } = render(
       <HostDashboardForTest
@@ -995,21 +995,21 @@ describe("HostDashboard", () => {
     const desktop = getDesktopView(container);
     const mobile = getMobileView(container);
 
-    await user.click(desktop.getByRole("button", { name: /멤버 공개/ }));
+    await user.click(desktop.getByRole("button", { name: /게스트 공개/ }));
 
     const desktopRemaining = desktop.getByText("그 다음 책").closest(".row-between");
     const mobileRemaining = mobile.getByText("그 다음 책").closest(".m-card-quiet");
     expect(desktopRemaining).not.toBeNull();
     expect(mobileRemaining).not.toBeNull();
-    expect(within(desktopRemaining as HTMLElement).getByRole("button", { name: /비공개/ })).toBeDisabled();
+    expect(within(desktopRemaining as HTMLElement).getByRole("button", { name: /호스트 전용/ })).toBeDisabled();
     expect(within(desktopRemaining as HTMLElement).getByRole("button", { name: /현재로 시작/ })).toBeDisabled();
-    expect(within(mobileRemaining as HTMLElement).getByRole("button", { name: /비공개/ })).toBeDisabled();
+    expect(within(mobileRemaining as HTMLElement).getByRole("button", { name: /호스트 전용/ })).toBeDisabled();
     expect(within(mobileRemaining as HTMLElement).getByRole("button", { name: /현재로 시작/ })).toBeDisabled();
 
     visibilityUpdate.resolve();
 
     await waitFor(() =>
-      expect(within(desktopRemaining as HTMLElement).getByRole("button", { name: /비공개/ })).toBeEnabled(),
+      expect(within(desktopRemaining as HTMLElement).getByRole("button", { name: /호스트 전용/ })).toBeEnabled(),
     );
   });
 
@@ -1091,8 +1091,8 @@ describe("HostDashboard", () => {
     expect(mobile.queryByRole("button", { name: /현재 세션 있음/ })).not.toBeInTheDocument();
     expect(within(desktopUpcoming as HTMLElement).getByText("현재 열린 세션이 있어 예정 세션을 바로 시작할 수 없습니다.")).toBeInTheDocument();
     expect(within(mobileUpcoming as HTMLElement).getByText("현재 열린 세션이 있어 예정 세션을 바로 시작할 수 없습니다.")).toBeInTheDocument();
-    expect(within(desktopUpcoming as HTMLElement).getByRole("button", { name: /멤버 공개|비공개/ })).toBeEnabled();
-    expect(within(mobileUpcoming as HTMLElement).getByRole("button", { name: /멤버 공개|비공개/ })).toBeEnabled();
+    expect(within(desktopUpcoming as HTMLElement).getByRole("button", { name: /게스트 공개|호스트 전용/ })).toBeEnabled();
+    expect(within(mobileUpcoming as HTMLElement).getByRole("button", { name: /게스트 공개|호스트 전용/ })).toBeEnabled();
 
     expect(actions.openSession).not.toHaveBeenCalled();
   });
@@ -1128,21 +1128,21 @@ describe("HostDashboard", () => {
     const user = userEvent.setup();
     const actions = {
       ...noopHostDashboardActions,
-      updateSessionVisibility: vi.fn(async () => {
+      updateSessionAccessScope: vi.fn(async () => {
         throw new Error("visibility failed");
       }),
     } satisfies HostDashboardActions;
 
     render(<HostDashboardForTest auth={hostAuth} current={current} data={dashboard} hostSessions={hostSessions} actions={actions} />);
 
-    await user.click(screen.getAllByRole("button", { name: /멤버 공개/ })[0]);
+    await user.click(screen.getAllByRole("button", { name: /게스트 공개/ })[0]);
 
     const alerts = await screen.findAllByRole("alert");
     expect(alerts.map((alert) => alert.textContent)).toEqual([
-      "공개 범위를 저장하지 못했습니다. 기존 공개 범위는 유지됩니다. 다시 시도해 주세요.",
-      "공개 범위를 저장하지 못했습니다. 기존 공개 범위는 유지됩니다. 다시 시도해 주세요.",
+      "게스트 접근을 저장하지 못했습니다. 기존 접근 범위는 유지됩니다. 다시 시도해 주세요.",
+      "게스트 접근을 저장하지 못했습니다. 기존 접근 범위는 유지됩니다. 다시 시도해 주세요.",
     ]);
-    expect(screen.getAllByRole("button", { name: /멤버 공개/ })[0]).toBeEnabled();
+    expect(screen.getAllByRole("button", { name: /게스트 공개/ })[0]).toBeEnabled();
   });
 
   it("keeps mobile upcoming cards operational with visibility, open, and edit controls", () => {
@@ -1153,7 +1153,7 @@ describe("HostDashboard", () => {
     const nextBookCard = mobile.getByText("다음 책").closest(".m-card-quiet");
 
     expect(nextBookCard).not.toBeNull();
-    const visibilityButton = within(nextBookCard as HTMLElement).getByRole("button", { name: /멤버 공개/ });
+    const visibilityButton = within(nextBookCard as HTMLElement).getByRole("button", { name: /게스트 공개/ });
     const openButton = within(nextBookCard as HTMLElement).getByRole("button", { name: /현재로 시작/ });
     const editLink = within(nextBookCard as HTMLElement).getByRole("link", { name: "날짜 수정 · 다음 책" });
     const actionGroup = openButton.closest(".rm-host-upcoming-mobile__actions");

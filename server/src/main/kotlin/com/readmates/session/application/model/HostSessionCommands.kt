@@ -1,6 +1,8 @@
 package com.readmates.session.application.model
 
 import com.readmates.session.application.SessionRecordVisibility
+import com.readmates.session.domain.PublicSiteVisibility
+import com.readmates.session.domain.SessionAccessScope
 import com.readmates.shared.security.CurrentMember
 import java.util.UUID
 
@@ -34,7 +36,8 @@ data class UpdateHostSessionCommand(
 data class UpdateHostSessionVisibilityCommand(
     val host: CurrentMember,
     val sessionId: UUID,
-    val visibility: SessionRecordVisibility,
+    val visibility: SessionRecordVisibility = SessionRecordVisibility.HOST_ONLY,
+    val accessScope: SessionAccessScope? = null,
 )
 
 data class AttendanceEntryCommand(
@@ -52,5 +55,6 @@ data class UpsertPublicationCommand(
     val host: CurrentMember,
     val sessionId: UUID,
     val publicSummary: String,
-    val visibility: SessionRecordVisibility,
+    val visibility: SessionRecordVisibility = SessionRecordVisibility.HOST_ONLY,
+    val siteVisibility: PublicSiteVisibility? = null,
 )

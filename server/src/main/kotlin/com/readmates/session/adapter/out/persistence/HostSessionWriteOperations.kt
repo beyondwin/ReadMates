@@ -11,6 +11,7 @@ import com.readmates.session.application.HostSessionParticipantNotFoundException
 import com.readmates.session.application.HostSessionPublishNotAllowedException
 import com.readmates.session.application.HostSessionRecordStagingRequiredException
 import com.readmates.session.application.InvalidMembershipIdException
+import com.readmates.session.application.InvalidSessionExposureException
 import com.readmates.session.application.InvalidSessionScheduleException
 import com.readmates.session.application.OpenSessionAlreadyExistsException
 import com.readmates.session.application.SessionRecordVisibility
@@ -21,6 +22,10 @@ import com.readmates.session.application.model.UpsertPublicationCommand
 import com.readmates.session.application.port.out.HostSessionTransitionResult
 import com.readmates.session.application.port.out.HostSessionVisibilityUpdateResult
 import com.readmates.session.application.requireHost
+import com.readmates.session.domain.PublicSiteVisibility
+import com.readmates.session.domain.SessionAccessScope
+import com.readmates.session.domain.SessionExposure
+import com.readmates.session.domain.toCompatibility
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.toUtcLocalDateTime
 import com.readmates.shared.db.toUtcOffsetDateTime
@@ -38,6 +43,7 @@ import java.util.UUID
 private const val DEFAULT_START_TIME = "20:00"
 private const val DEFAULT_END_TIME = "22:00"
 
+@Suppress("LargeClass")
 internal class HostSessionWriteOperations(
     private val queries: HostSessionQueries,
 ) {
@@ -97,9 +103,10 @@ internal class HostSessionWriteOperations(
               meeting_passcode,
               question_deadline_at,
               state,
-              visibility
+              visibility,
+              access_scope
             )
-            values (?, ?, ?, ?, ?, ?, null, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            values (?, ?, ?, ?, ?, ?, null, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent(),
             sessionId.dbString(),
             host.clubId.dbString(),
@@ -118,6 +125,7 @@ internal class HostSessionWriteOperations(
             questionDeadlineAt,
             state,
             visibility.name,
+            SessionAccessScope.HOST_ONLY.name,
         )
 
         return CreatedSessionResponse(
@@ -137,6 +145,8 @@ internal class HostSessionWriteOperations(
             meetingPasscode = meetingPasscode,
             state = state,
             visibility = visibility,
+            accessScope = SessionAccessScope.HOST_ONLY,
+            siteVisibility = PublicSiteVisibility.HIDDEN,
         )
     }
 
@@ -261,25 +271,39 @@ internal class HostSessionWriteOperations(
         )
     }
 
+    @Suppress("LongMethod")
     fun upsertHostPublication(
         jdbcTemplate: JdbcTemplate,
         command: UpsertPublicationCommand,
         stagingRequired: Boolean,
     ): HostPublicationResponse {
-        queries.requireHostSession(jdbcTemplate, command.host, command.sessionId)
-        if (stagingRequired) {
+        val locked = lockExposure(jdbcTemplate, command.host, command.sessionId)
+        if (stagingRequired && command.siteVisibility == null) {
             requireLegacyPublicationWriteAllowed(jdbcTemplate, command)
         }
-        val isPublic = command.visibility == SessionRecordVisibility.PUBLIC
+        val exposure =
+            when {
+                command.siteVisibility != null -> locked.exposure.copy(siteVisibility = command.siteVisibility)
+                else ->
+                    SessionExposure.fromCompatibility(
+                        locked.state,
+                        command.visibility.name,
+                        command.visibility.name,
+                        command.visibility == SessionRecordVisibility.PUBLIC,
+                    )
+            }
+        val compatibility = compatibilityOrInvalid(exposure, locked.state)
         jdbcTemplate.update(
             """
             update sessions
-            set visibility = ?,
+            set access_scope = ?,
+                visibility = ?,
                 updated_at = utc_timestamp(6)
             where id = ?
               and club_id = ?
             """.trimIndent(),
-            command.visibility.name,
+            exposure.accessScope.name,
+            compatibility.sessionVisibility,
             command.sessionId.dbString(),
             command.host.clubId.dbString(),
         )
@@ -292,9 +316,11 @@ internal class HostSessionWriteOperations(
               public_summary,
               is_public,
               visibility,
+              site_visibility,
               published_at
             )
             values (
+              ?,
               ?,
               ?,
               ?,
@@ -307,6 +333,7 @@ internal class HostSessionWriteOperations(
               public_summary = values(public_summary),
               is_public = values(is_public),
               visibility = values(visibility),
+              site_visibility = values(site_visibility),
               published_at = values(published_at),
               updated_at = utc_timestamp(6)
             """.trimIndent(),
@@ -314,15 +341,18 @@ internal class HostSessionWriteOperations(
             command.host.clubId.dbString(),
             command.sessionId.dbString(),
             command.publicSummary,
-            isPublic,
-            command.visibility.name,
-            isPublic,
+            compatibility.isPublic,
+            compatibility.publicationVisibility,
+            exposure.siteVisibility.name,
+            compatibility.isPublic,
         )
 
         return HostPublicationResponse(
             sessionId = command.sessionId.toString(),
             publicSummary = command.publicSummary,
-            visibility = command.visibility,
+            visibility = SessionRecordVisibility.valueOf(compatibility.sessionVisibility),
+            accessScope = exposure.accessScope,
+            siteVisibility = exposure.siteVisibility,
         )
     }
 
@@ -351,53 +381,109 @@ internal class HostSessionWriteOperations(
         jdbcTemplate: JdbcTemplate,
         command: com.readmates.session.application.model.UpdateHostSessionVisibilityCommand,
     ): HostSessionVisibilityUpdateResult {
-        queries.requireHostSession(jdbcTemplate, command.host, command.sessionId)
-        val previousVisibility =
-            jdbcTemplate
-                .queryForObject(
-                    """
-                    select visibility
-                    from sessions
-                    where id = ? and club_id = ?
-                    for update
-                    """.trimIndent(),
-                    String::class.java,
-                    command.sessionId.dbString(),
-                    command.host.clubId.dbString(),
-                )?.let(SessionRecordVisibility::valueOf) ?: throw HostSessionNotFoundException()
+        val locked = lockExposure(jdbcTemplate, command.host, command.sessionId)
+        val exposure =
+            when {
+                command.accessScope != null -> locked.exposure.copy(accessScope = command.accessScope)
+                else ->
+                    SessionExposure.fromCompatibility(
+                        locked.state,
+                        command.visibility.name,
+                        command.visibility.name,
+                        command.visibility == SessionRecordVisibility.PUBLIC,
+                    )
+            }
+        val compatibility = compatibilityOrInvalid(exposure, locked.state)
         jdbcTemplate.update(
             """
             update sessions
-            set visibility = ?,
+            set access_scope = ?,
+                visibility = ?,
                 updated_at = utc_timestamp(6)
             where id = ?
               and club_id = ?
             """.trimIndent(),
-            command.visibility.name,
+            exposure.accessScope.name,
+            compatibility.sessionVisibility,
             command.sessionId.dbString(),
             command.host.clubId.dbString(),
         )
         jdbcTemplate.update(
             """
             update public_session_publications
-            set visibility = ?,
+            set site_visibility = ?,
+                visibility = ?,
                 is_public = ?,
                 published_at = case when ? then coalesce(published_at, utc_timestamp(6)) else null end,
                 updated_at = utc_timestamp(6)
             where session_id = ?
               and club_id = ?
             """.trimIndent(),
-            command.visibility.name,
-            command.visibility == SessionRecordVisibility.PUBLIC,
-            command.visibility == SessionRecordVisibility.PUBLIC,
+            exposure.siteVisibility.name,
+            compatibility.publicationVisibility,
+            compatibility.isPublic,
+            compatibility.isPublic,
             command.sessionId.dbString(),
             command.host.clubId.dbString(),
         )
         return HostSessionVisibilityUpdateResult(
-            previousVisibility = previousVisibility,
+            previousVisibility = SessionRecordVisibility.valueOf(locked.sessionVisibility),
             detail = queries.findHostSessionAfterHostCheck(jdbcTemplate, command.host, command.sessionId),
         )
     }
+
+    private fun lockExposure(
+        jdbcTemplate: JdbcTemplate,
+        host: CurrentMember,
+        sessionId: UUID,
+    ): LockedExposure =
+        jdbcTemplate
+            .query(
+                """
+                select sessions.state,
+                       sessions.visibility as session_visibility,
+                       sessions.access_scope,
+                       public_session_publications.visibility as publication_visibility,
+                       public_session_publications.site_visibility,
+                       public_session_publications.is_public
+                from sessions
+                left join public_session_publications
+                  on public_session_publications.club_id = sessions.club_id
+                 and public_session_publications.session_id = sessions.id
+                where sessions.id = ?
+                  and sessions.club_id = ?
+                for update
+                """.trimIndent(),
+                { rs, _ ->
+                    LockedExposure(
+                        state = rs.getString("state"),
+                        sessionVisibility = rs.getString("session_visibility"),
+                        exposure =
+                            SessionExposure(
+                                accessScope = SessionAccessScope.valueOf(rs.getString("access_scope")),
+                                siteVisibility =
+                                    rs
+                                        .getString("site_visibility")
+                                        ?.let(PublicSiteVisibility::valueOf)
+                                        ?: PublicSiteVisibility.HIDDEN,
+                            ),
+                    )
+                },
+                sessionId.dbString(),
+                host.clubId.dbString(),
+            ).firstOrNull() ?: throw HostSessionNotFoundException()
+
+    private fun compatibilityOrInvalid(
+        exposure: SessionExposure,
+        state: String,
+    ) = runCatching { exposure.toCompatibility(state) }
+        .getOrElse { throw InvalidSessionExposureException() }
+
+    private data class LockedExposure(
+        val state: String,
+        val sessionVisibility: String,
+        val exposure: SessionExposure,
+    )
 
     fun open(
         jdbcTemplate: JdbcTemplate,
@@ -507,6 +593,7 @@ internal class HostSessionWriteOperations(
                 where id = ?
                   and club_id = ?
                   and state = 'CLOSED'
+                  and access_scope = 'GUEST_READABLE'
                   and exists (
                     select 1
                     from public_session_publications
@@ -537,6 +624,7 @@ internal class HostSessionWriteOperations(
             """
             update public_session_publications
             set is_public = true,
+                site_visibility = 'PUBLIC_RECORD',
                 published_at = coalesce(published_at, utc_timestamp(6)),
                 updated_at = utc_timestamp(6)
             where session_id = ?

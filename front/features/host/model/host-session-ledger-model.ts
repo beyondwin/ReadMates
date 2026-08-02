@@ -1,4 +1,5 @@
 import type { SessionState } from "@/shared/model/readmates-types";
+import type { PublicSiteVisibility, SessionAccessScope } from "./session-exposure-model";
 
 export type HostSessionLedgerRecordStatus = "NOT_STARTED" | "INCOMPLETE" | "COMPLETE";
 
@@ -27,6 +28,8 @@ export type HostSessionLedgerItem = {
   locationLabel: string;
   state: SessionState;
   visibility: "HOST_ONLY" | "MEMBER" | "PUBLIC";
+  accessScope?: SessionAccessScope;
+  siteVisibility?: PublicSiteVisibility;
   recordStatus: HostSessionLedgerRecordStatus;
   needsAttention: boolean;
   hasDraft: boolean;

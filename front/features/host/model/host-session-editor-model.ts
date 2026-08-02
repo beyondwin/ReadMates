@@ -1,3 +1,5 @@
+import { compatibilityExposureLabel } from "./session-exposure-model";
+
 export type HostSessionAttendanceStatus = "UNKNOWN" | "ATTENDED" | "ABSENT";
 export type HostSessionState = "DRAFT" | "OPEN" | "CLOSED" | "PUBLISHED";
 export type SessionRecordVisibility = "HOST_ONLY" | "MEMBER" | "PUBLIC";
@@ -226,15 +228,7 @@ export function initialPublicationSummary(session?: Pick<HostSessionEditorSessio
 }
 
 export function recordVisibilityLabel(visibility: SessionRecordVisibility) {
-  if (visibility === "MEMBER") {
-    return "멤버 공개";
-  }
-
-  if (visibility === "PUBLIC") {
-    return "외부 공개";
-  }
-
-  return "호스트 전용";
+  return compatibilityExposureLabel[visibility];
 }
 
 export function recordVisibilityDescription(visibility: SessionRecordVisibility) {

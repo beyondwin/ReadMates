@@ -90,7 +90,7 @@ describe("SessionOverviewSection", () => {
     expect(screen.getByText("모임이 끝났다면 세션을 마감한 뒤 기록을 정리하세요.")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "세션 마감" }));
     expect(onCloseSession).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole("button", { name: /멤버 공개/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /게스트 공개/ })).not.toBeInTheDocument();
   });
 
   it("guides a closed session through the record workbench before session publication", async () => {
@@ -155,7 +155,7 @@ function overviewFixture(
     applied: {
       exists: true,
       versionLabel: "버전 3",
-      visibilityLabel: "멤버 공개",
+      visibilityLabel: "게스트 공개",
       appliedAt: "2026-07-27T12:00:00+09:00",
       summary: "세 번째 적용본 요약",
     },

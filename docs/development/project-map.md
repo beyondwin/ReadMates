@@ -29,6 +29,7 @@
 | 표면 | 대표 경로 | 먼저 볼 문서 |
 | --- | --- | --- |
 | Public site | `/`, `/clubs/:slug`, `/records`, `/sessions/:sessionId` | `docs/development/architecture.md`, `docs/showcase/README.md` |
+| Guest app | `/clubs/:slug/app/**` for anonymous users, `/api/public/clubs/:slug/browse/**` | `docs/development/architecture.md`, `docs/development/vertical-slice-checklist.md` |
 | Member app | `/clubs/:slug/app/**` | `docs/development/architecture.md`, `docs/development/vertical-slice-checklist.md` |
 | Host app | `/clubs/:slug/app/host/**` | `docs/development/architecture.md`, `docs/development/vertical-slice-checklist.md` |
 | Platform admin | `/admin/**` | `docs/development/architecture.md`, `docs/development/admin-hardening-baseline.md` |
@@ -60,6 +61,8 @@
 | Deploy/public-release/security | repository-local contributor guidance(있는 경우) -> deploy docs -> scripts/workflows 직접 확인 | public release candidate checks와 targeted safety scans를 우선합니다. |
 | Docs-only | repository-local contributor guidance(있는 경우) -> 관련 active docs | `git diff --check -- <changed-docs>`와 targeted public-safety scan을 실행합니다. |
 | Release readiness/residual risk | `docs/development/release-readiness-review.md` -> branch diff | 테스트 통과만으로 닫지 않고 CHANGELOG, CI/deploy, operator-facing change, public safety를 함께 봅니다. |
+
+Guest browsing vertical slice는 `front/features/guest-browse`의 audience-aware route/API/model/UI, `server/.../browse`의 anonymous-safe read slice, V44의 `sessions.access_scope`와 `public_session_publications.site_visibility`, 그리고 target-club OAuth join을 소유하는 `auth` slice로 구성됩니다. Public marketing route의 `PUBLIC_RECORD` projection과 guest app의 `GUEST_READABLE` projection을 같은 공개 범위로 합치지 않습니다. 기존 `visibility`/`is_public`은 한 릴리즈 dual-write compatibility일 뿐 새 app-access decision의 source of truth가 아닙니다.
 
 ## 계획에서 실행으로 넘길 때
 

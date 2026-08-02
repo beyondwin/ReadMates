@@ -10,7 +10,7 @@ import {
 } from "@/features/current-session/api/current-session-api";
 import type { RsvpStatus } from "@/features/current-session/api/current-session-contracts";
 import type { CurrentSessionQuestionPayloadItem } from "@/features/current-session/model/current-session-form-model";
-import type { ReadmatesApiContext } from "@/shared/api/client";
+import type { ReadmatesApiContext, ReadmatesRequestPolicy } from "@/shared/api/client";
 
 function scopeKey(context?: ReadmatesApiContext): string | null {
   return context?.clubSlug ?? null;
@@ -28,10 +28,13 @@ export const currentSessionKeys = {
   current: (context?: ReadmatesApiContext) => [...currentSessionKeys.scope(context), "current"] as const,
 } as const;
 
-export function currentSessionQuery(context?: ReadmatesApiContext) {
+export function currentSessionQuery(
+  context?: ReadmatesApiContext,
+  policy?: ReadmatesRequestPolicy,
+) {
   return queryOptions({
     queryKey: currentSessionKeys.current(context),
-    queryFn: () => getCurrentSession(context),
+    queryFn: () => policy ? getCurrentSession(context, policy) : getCurrentSession(context),
   });
 }
 

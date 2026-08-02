@@ -9,6 +9,7 @@ import com.readmates.session.application.model.UpdateHostSessionVisibilityComman
 import com.readmates.session.application.port.`in`.HostSessionDraftUseCase
 import com.readmates.session.application.port.`in`.HostSessionLifecycleUseCase
 import com.readmates.session.application.port.`in`.HostSessionQueryUseCase
+import com.readmates.session.domain.SessionAccessScope
 import com.readmates.sessionrecord.application.model.SessionRecordStatus
 import com.readmates.shared.paging.CursorCodec
 import com.readmates.shared.paging.PageRequest
@@ -49,6 +50,15 @@ data class HostSessionVisibilityRequest(
             visibility = visibility,
         )
     }
+}
+
+data class HostSessionAccessScopeRequest(
+    val accessScope: SessionAccessScope,
+) {
+    fun toCommand(
+        host: CurrentMember,
+        sessionId: UUID,
+    ) = UpdateHostSessionVisibilityCommand(host = host, sessionId = sessionId, accessScope = accessScope)
 }
 
 @RestController
@@ -103,6 +113,13 @@ class HostSessionController(
     fun visibility(
         @PathVariable sessionId: String,
         @Valid @RequestBody request: HostSessionVisibilityRequest,
+        member: CurrentMember,
+    ) = hostSessionLifecycleUseCase.updateVisibility(request.toCommand(member, parseHostSessionId(sessionId)))
+
+    @PatchMapping("/{sessionId}/access-scope")
+    fun accessScope(
+        @PathVariable sessionId: String,
+        @Valid @RequestBody request: HostSessionAccessScopeRequest,
         member: CurrentMember,
     ) = hostSessionLifecycleUseCase.updateVisibility(request.toCommand(member, parseHostSessionId(sessionId)))
 

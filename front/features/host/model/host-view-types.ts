@@ -1,5 +1,9 @@
 import type { PagedResponse } from "@/shared/model/paging";
 import type { AttendanceStatus, RsvpStatus, SessionState } from "@/shared/model/readmates-types";
+import type {
+  PublicSiteVisibility,
+  SessionAccessScope,
+} from "./session-exposure-model";
 
 export type { CurrentSessionResponse } from "@/shared/model/current-session-contracts";
 export type { AttendanceStatus } from "@/shared/model/readmates-types";
@@ -14,6 +18,10 @@ export type SessionRecordVisibility = "HOST_ONLY" | "MEMBER" | "PUBLIC";
 
 export type HostSessionVisibilityRequest = {
   visibility: SessionRecordVisibility;
+};
+
+export type HostSessionAccessScopeRequest = {
+  accessScope: SessionAccessScope;
 };
 
 export type HostNotificationComposerContext = {
@@ -319,6 +327,8 @@ export type HostSessionListItem = {
   locationLabel: string;
   state: SessionState;
   visibility: SessionRecordVisibility;
+  accessScope?: SessionAccessScope;
+  siteVisibility?: PublicSiteVisibility;
 };
 
 export type HostSessionListPage = PagedResponse<HostSessionListItem>;
@@ -326,6 +336,7 @@ export type HostSessionListPage = PagedResponse<HostSessionListItem>;
 export type HostSessionPublication = {
   publicSummary: string;
   visibility: SessionRecordVisibility;
+  siteVisibility?: PublicSiteVisibility;
 };
 
 export type SessionImportRecordRequest = {
@@ -406,6 +417,8 @@ export type HostSessionDetailResponse = {
   endTime: string;
   questionDeadlineAt: string;
   visibility: SessionRecordVisibility;
+  accessScope?: SessionAccessScope;
+  siteVisibility?: PublicSiteVisibility;
   publication: HostSessionPublication | null;
   state: SessionState;
   attendees: Array<{

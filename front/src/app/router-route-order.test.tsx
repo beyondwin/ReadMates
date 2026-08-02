@@ -54,6 +54,49 @@ describe("router route order", () => {
     expect(routePathsFor("/clubs/reading-sai/app/host/members")).not.toEqual(expect.arrayContaining(["*"]));
   });
 
+  it("keeps guest-equivalent scoped routes out of protected lazy data graphs", () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const routes = buildRoutes(queryClient);
+    const scopedMember = routes.find((route) => route.id === "club-app");
+    const scopedHost = routes.find((route) => route.id === "club-app-host");
+
+    expect(scopedMember?.children?.filter((route) => route.path !== "*").every((route) => !route.lazy && Boolean(route.loader))).toBe(true);
+    expect(scopedHost?.children?.filter((route) => route.path !== "*").every((route) => !route.lazy && Boolean(route.loader))).toBe(true);
+  });
+
+  it("preserves scoped current-session errors and notes revalidation metadata", async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const routes = buildRoutes(queryClient);
+    const scopedMember = routes.find((route) => route.id === "club-app");
+    const unscopedMember = routes.find((route) => route.path === "/app");
+    const scopedCurrent = scopedMember?.children?.find((route) => route.path === "session/current");
+    const scopedNotes = scopedMember?.children?.find((route) => route.path === "notes");
+    const unscopedNotes = unscopedMember?.children?.find((route) => route.id === "app")?.children?.find((route) => route.path === "notes");
+
+    expect(scopedCurrent?.ErrorBoundary).toBeTypeOf("function");
+    expect(scopedNotes?.shouldRevalidate).toBeTypeOf("function");
+
+    const scopedShouldRevalidate = scopedNotes?.shouldRevalidate;
+    if (!scopedShouldRevalidate) {
+      throw new Error("scoped notes route must define shouldRevalidate");
+    }
+    expect(
+      scopedShouldRevalidate({
+        currentUrl: new URL("https://readmates.local/clubs/alpha/app/notes?sessionId=s1"),
+        nextUrl: new URL("https://readmates.local/clubs/alpha/app/notes?sessionId=s1"),
+      } as never),
+    ).toBe(false);
+    expect(
+      scopedShouldRevalidate({
+        currentUrl: new URL("https://readmates.local/clubs/alpha/app/notes?sessionId=s1"),
+        nextUrl: new URL("https://readmates.local/clubs/alpha/app/notes?sessionId=s2"),
+      } as never),
+    ).toBe(true);
+
+    const unscopedNotesModule = await unscopedNotes?.lazy?.();
+    expect(scopedNotes?.shouldRevalidate).toBe(unscopedNotesModule?.shouldRevalidate);
+  });
+
   it("matches host session detail routes before host and member wildcards", () => {
     const hostPaths = [
       { pathname: "/app/host/sessions", routeId: "app-host" },

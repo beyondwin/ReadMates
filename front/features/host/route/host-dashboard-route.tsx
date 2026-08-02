@@ -22,7 +22,7 @@ import {
   hostDashboardQuery,
   hostSessionListQuery,
   useOpenHostSessionMutation,
-  useSaveHostSessionVisibilityMutation,
+  useSaveHostSessionAccessScopeMutation,
 } from "@/features/host/queries/host-session-queries";
 import {
   hostSessionRecordLedgerQuery,
@@ -58,7 +58,7 @@ export function HostDashboardRoute({
   const sessionsQuery = useQuery(hostSessionListQuery({ limit: DEFAULT_HOST_SESSION_LIST_LIMIT }, context));
   const notificationsQuery = useQuery(hostNotificationSummaryQuery(context));
   const clubOperationsQuery = useQuery(hostClubOperationsQuery(context));
-  const visibilityMutation = useSaveHostSessionVisibilityMutation(context);
+  const accessScopeMutation = useSaveHostSessionAccessScopeMutation(context);
   const openMutation = useOpenHostSessionMutation(context);
   const [composerRequest, setComposerRequest] =
     useState<HostNotificationComposerRequest | null>(null);
@@ -70,8 +70,8 @@ export function HostDashboardRoute({
 
   const actions = useMemo<HostDashboardActions>(() => ({
     updateCurrentSessionParticipation: hostDashboardActions.updateCurrentSessionParticipation,
-    updateSessionVisibility: async (sessionId, request) => {
-      const result = await visibilityMutation.mutateAsync({ sessionId, request });
+    updateSessionAccessScope: async (sessionId, request) => {
+      const result = await accessScopeMutation.mutateAsync({ sessionId, request });
       if (result.composer) {
         setComposerRequest({
           sessionId: result.composer.sessionId,
@@ -88,7 +88,7 @@ export function HostDashboardRoute({
       }
     },
     loadHostSessions: (page) => queryClient.fetchQuery(hostSessionListQuery(page, context)),
-  }), [context, openMutation, queryClient, visibilityMutation]);
+  }), [accessScopeMutation, context, openMutation, queryClient]);
 
   return (
     <>

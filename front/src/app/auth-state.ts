@@ -1,10 +1,16 @@
 import { createContext, useContext } from "react";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import type { SessionExpiryCause } from "@/shared/auth/session-expiry";
 
 export type AuthState =
   | { status: "loading" }
   | { status: "ready"; auth: AuthMeResponse }
-  | { status: "session_expired"; lastAuth?: AuthMeResponse };
+  | {
+      status: "session_expired";
+      lastAuth?: AuthMeResponse;
+      cause?: SessionExpiryCause;
+      episode?: number;
+    };
 
 export type AuthActions = {
   markLoggedOut: () => void;

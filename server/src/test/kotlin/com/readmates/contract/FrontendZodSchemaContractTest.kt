@@ -190,6 +190,55 @@ class FrontendZodSchemaContractTest
         }
 
         @Test
+        @Sql(
+            statements = [
+                CLEANUP_CONTRACT_GUEST_ARCHIVE_SQL,
+                INSERT_CONTRACT_GUEST_ARCHIVE_LONG_REVIEW_SQL,
+            ],
+            executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+        )
+        @Sql(
+            statements = [CLEANUP_CONTRACT_GUEST_ARCHIVE_SQL],
+            executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+        )
+        fun `guest archive DTO matches frontend zod shape and excludes sensitive lineage`() {
+            val response =
+                mockMvc
+                    .get("/api/public/clubs/reading-sai/browse/archive/$seededHostSessionId")
+                    .andExpect { status { isOk() } }
+                    .andReturn()
+                    .response.contentAsString
+
+            assertJsonShapeMatches(response, "guest-archive-detail.json")
+            val forbidden =
+                setOf(
+                    "membershipId",
+                    "accountName",
+                    "email",
+                    "locationLabel",
+                    "meetingUrl",
+                    "meetingPasscode",
+                    "feedbackDocument",
+                    "userId",
+                    "clubId",
+                )
+            val discovered = linkedSetOf<String>()
+
+            fun visit(node: JsonNode) {
+                if (node.isObject) {
+                    node.propertyNames().forEach { key ->
+                        if (key in forbidden) discovered += key
+                        visit(node.get(key))
+                    }
+                } else if (node.isArray) {
+                    node.forEach(::visit)
+                }
+            }
+            visit(objectMapper.readTree(response))
+            assertThat(discovered).isEmpty()
+        }
+
+        @Test
         @Suppress("LongMethod")
         fun `grounded AI response DTOs match zod schema fixture key sets`() {
             val result =
@@ -525,6 +574,23 @@ class FrontendZodSchemaContractTest
         private companion object {
             private const val OWNER_USER_ID = "00000000-0000-0000-0000-000000000901"
             private const val MEMBER_USER_ID = "00000000-0000-0000-0000-000000000106"
+
+            private const val CLEANUP_CONTRACT_GUEST_ARCHIVE_SQL = """
+                delete from long_reviews
+                where id = '00000000-0000-0000-0000-000000001998';
+            """
+
+            private const val INSERT_CONTRACT_GUEST_ARCHIVE_LONG_REVIEW_SQL = """
+                insert into long_reviews (id, club_id, session_id, membership_id, body, visibility)
+                values (
+                    '00000000-0000-0000-0000-000000001998',
+                    '00000000-0000-0000-0000-000000000001',
+                    '00000000-0000-0000-0000-000000000301',
+                    '00000000-0000-0000-0000-000000000201',
+                    '게스트 DTO 계약용 공개 서평',
+                    'PUBLIC'
+                );
+            """
 
             private const val CLEANUP_CONTRACT_CURRENT_SESSION_SQL = """
                 delete from long_reviews

@@ -1,14 +1,166 @@
+import { lazy, Suspense, type ComponentType, type ReactNode } from "react";
 import type { QueryClient } from "@tanstack/react-query";
-import type { RouteObject } from "react-router-dom";
+import { type LoaderFunction, type RouteObject } from "react-router-dom";
 import { requireHostLoaderAuth } from "@/features/host/route/host-loader-auth";
 import { HostRouteError } from "@/features/host/route/host-route-error";
 import { AppRouteLayout } from "@/src/app/layouts/app-route-layout";
+import { memoizeRouteModule } from "@/src/app/routes/route-module-loader";
 import { ClubHostAppRouteLayout } from "@/src/app/layouts/club-app-route-layout";
 import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
 import { RequireHost } from "@/src/app/route-guards";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
 
-function hostAppRoutes(queryClient: QueryClient): RouteObject[] {
+type ScopedHostRouteModule = {
+  Component: ComponentType;
+  loader?: LoaderFunction;
+};
+
+function scopedHostRoute({
+  path,
+  index,
+  errorElement,
+  fallback,
+  load,
+}: {
+  path?: string;
+  index?: true;
+  errorElement?: ReactNode;
+  fallback: ReactNode;
+  load: () => Promise<ScopedHostRouteModule>;
+}): RouteObject {
+  const loadOnce = memoizeRouteModule(load);
+  const ProtectedComponent = lazy(async () => ({ default: (await loadOnce()).Component }));
+
+  return {
+    ...(path ? { path } : {}),
+    ...(index ? { index } : {}),
+    ...(errorElement ? { errorElement } : {}),
+    hydrateFallbackElement: fallback,
+    loader: async (args) => {
+      await requireHostLoaderAuth(args);
+      const module = await loadOnce();
+      return module.loader?.(args) ?? null;
+    },
+    element: (
+      <Suspense fallback={fallback}>
+        <ProtectedComponent />
+      </Suspense>
+    ),
+  };
+}
+
+function scopedHostAppRoutes(queryClient: QueryClient): RouteObject[] {
+  return [
+    scopedHostRoute({
+      index: true,
+      errorElement: <HostRouteError />,
+      fallback: <ReadmatesRouteLoading label="모임 운영 화면을 불러오는 중" variant="host" />,
+      load: async () => {
+        const [{ HostDashboardRouteElement: Component }, { hostDashboardLoaderFactory }] = await Promise.all([
+          import("@/src/app/host-routes/dashboard-route-element"),
+          import("@/features/host/route/host-dashboard-data"),
+        ]);
+        return { Component, loader: hostDashboardLoaderFactory(queryClient) };
+      },
+    }),
+    scopedHostRoute({
+      path: "members",
+      errorElement: <HostRouteError />,
+      fallback: <ReadmatesRouteLoading label="멤버 목록을 불러오는 중" variant="host" />,
+      load: async () => {
+        const [{ HostMembersRouteElement: Component }, { hostMembersLoaderFactory }] = await Promise.all([
+          import("@/src/app/host-routes/members-route-element"),
+          import("@/features/host/route/host-members-data"),
+        ]);
+        return { Component, loader: hostMembersLoaderFactory(queryClient) };
+      },
+    }),
+    scopedHostRoute({
+      path: "invitations",
+      errorElement: <HostRouteError />,
+      fallback: <ReadmatesRouteLoading label="초대 목록을 불러오는 중" variant="host" />,
+      load: async () => {
+        const [{ HostInvitationsRouteElement: Component }, { hostInvitationsLoaderFactory }] = await Promise.all([
+          import("@/src/app/host-routes/invitations-route-element"),
+          import("@/features/host/route/host-invitations-data"),
+        ]);
+        return { Component, loader: hostInvitationsLoaderFactory(queryClient) };
+      },
+    }),
+    scopedHostRoute({
+      path: "notifications",
+      errorElement: <HostRouteError />,
+      fallback: <ReadmatesRouteLoading label="알림 발송 장부를 불러오는 중" variant="host" />,
+      load: async () => {
+        const [{ HostNotificationsRouteElement: Component }, { hostNotificationsLoaderFactory }] = await Promise.all([
+          import("@/src/app/host-routes/notifications-route-element"),
+          import("@/features/host/route/host-notifications-data"),
+        ]);
+        return { Component, loader: hostNotificationsLoaderFactory(queryClient) };
+      },
+    }),
+    scopedHostRoute({
+      path: "sessions",
+      errorElement: <HostRouteError />,
+      fallback: <ReadmatesRouteLoading label="세션 기록 장부를 불러오는 중" variant="host" />,
+      load: async () => {
+        const [{ HostSessionLedgerRouteElement: Component }, { hostSessionLedgerLoaderFactory }] = await Promise.all([
+          import("@/src/app/host-routes/session-ledger-route-element"),
+          import("@/features/host/route/host-session-ledger-data"),
+        ]);
+        return { Component, loader: hostSessionLedgerLoaderFactory(queryClient) };
+      },
+    }),
+    scopedHostRoute({
+      path: "sessions/new",
+      errorElement: <HostRouteError />,
+      fallback: <ReadmatesRouteLoading label="세션 편집 화면을 불러오는 중" variant="host" />,
+      load: async () => ({ Component: (await import("@/src/app/host-routes/new-session-route-element")).NewHostSessionRouteElement }),
+    }),
+    scopedHostRoute({
+      path: "sessions/:sessionId/closing",
+      errorElement: <HostRouteError />,
+      fallback: <ReadmatesRouteLoading label="세션 클로징 상태를 불러오는 중" variant="host" />,
+      load: async () => {
+        const [{ HostSessionClosingRouteElement: Component }, { hostSessionClosingLoaderFactory }] = await Promise.all([
+          import("@/src/app/host-routes/session-closing-route-element"),
+          import("@/features/host/route/host-session-closing-data"),
+        ]);
+        return { Component, loader: hostSessionClosingLoaderFactory(queryClient) };
+      },
+    }),
+    scopedHostRoute({
+      path: "sessions/:sessionId/feedback-document",
+      errorElement: <HostRouteError />,
+      fallback: <ReadmatesRouteLoading label="피드백 문서 미리보기를 불러오는 중" variant="host" />,
+      load: async () => {
+        const [{ HostFeedbackDocumentPreviewRouteElement: Component }, { hostFeedbackDocumentPreviewLoaderFactory }] = await Promise.all([
+          import("@/src/app/host-routes/feedback-document-preview-route-element"),
+          import("@/src/app/host-routes/feedback-document-preview-data"),
+        ]);
+        return { Component, loader: hostFeedbackDocumentPreviewLoaderFactory(queryClient) };
+      },
+    }),
+    scopedHostRoute({
+      path: "sessions/:sessionId/edit",
+      errorElement: <HostRouteError />,
+      fallback: <ReadmatesRouteLoading label="세션 문서 정보를 불러오는 중" variant="host" />,
+      load: async () => {
+        const [{ EditHostSessionRouteElement: Component }, { hostSessionEditorLoaderFactory }] = await Promise.all([
+          import("@/src/app/host-routes/edit-session-route-element"),
+          import("@/features/host/route/host-session-editor-data"),
+        ]);
+        return { Component, loader: hostSessionEditorLoaderFactory(queryClient) };
+      },
+    }),
+    { path: "*", element: <NotFoundRoute variant="host" /> },
+  ];
+}
+
+function hostAppRoutes(queryClient: QueryClient, scoped = false): RouteObject[] {
+  if (scoped) {
+    return scopedHostAppRoutes(queryClient);
+  }
   return [
     {
       index: true,
@@ -162,7 +314,7 @@ export function hostRoutes(queryClient: QueryClient): RouteObject[] {
       loader: requireHostLoaderAuth,
       errorElement: <RouteErrorBoundary variant="host" />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="모임 운영 권한을 확인하는 중" variant="host" />,
-      children: hostAppRoutes(queryClient),
+      children: hostAppRoutes(queryClient, true),
     },
   ];
 }

@@ -806,6 +806,58 @@ describe("Cloudflare BFF cache layer", () => {
     expect(ctx.waitUntil).not.toHaveBeenCalled();
   });
 
+  it("returns the same no-store guest browse DTO across cookies without caching it", async () => {
+    const forwardedCookies: Array<string | null> = [];
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      forwardedCookies.push((init?.headers as Headers).get("Cookie"));
+      return new Response('{"clubName":"Reading Sai","navigation":{"home":"OPEN"}}', {
+        status: 200,
+        headers: { "Cache-Control": "no-store" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const cacheMatch = vi.fn(async () => undefined);
+    const cachePut = vi.fn(async () => undefined);
+    vi.stubGlobal("caches", { default: { match: cacheMatch, put: cachePut } });
+    const firstContext = context(
+      new Request(
+        "https://readmates.pages.dev/api/bff/api/public/clubs/reading-sai/browse",
+        { headers: { Cookie: "RM_SESSION=first-placeholder" } },
+      ),
+      { path: ["api", "public", "clubs", "reading-sai", "browse"] },
+    );
+    const secondContext = context(
+      new Request(
+        "https://readmates.pages.dev/api/bff/api/public/clubs/reading-sai/browse",
+        { headers: { Cookie: "RM_SESSION=second-placeholder" } },
+      ),
+      { path: ["api", "public", "clubs", "reading-sai", "browse"] },
+    );
+
+    const firstResponse = await onRequest(firstContext);
+    const secondResponse = await onRequest(secondContext);
+
+    await expect(firstResponse.json()).resolves.toEqual({
+      clubName: "Reading Sai",
+      navigation: { home: "OPEN" },
+    });
+    await expect(secondResponse.json()).resolves.toEqual({
+      clubName: "Reading Sai",
+      navigation: { home: "OPEN" },
+    });
+    expect(firstResponse.headers.get("Cache-Control")).toBe("no-store");
+    expect(secondResponse.headers.get("Cache-Control")).toBe("no-store");
+    expect(forwardedCookies).toEqual([
+      "RM_SESSION=first-placeholder",
+      "RM_SESSION=second-placeholder",
+    ]);
+    expect(cacheMatch).toHaveBeenCalledTimes(2);
+    expect(cachePut).not.toHaveBeenCalled();
+    expect(firstContext.waitUntil).not.toHaveBeenCalled();
+    expect(secondContext.waitUntil).not.toHaveBeenCalled();
+  });
+
   it("does not use cache for mutation requests on public paths", async () => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);

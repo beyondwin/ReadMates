@@ -1057,7 +1057,7 @@ describe("HostNotificationsPage", () => {
     expect(screen.getByRole("option", {
       name: "8회차 · Example Book · 2026-05-20",
     })).toBeInTheDocument();
-    expect(screen.getByText(/진행 중.*멤버 공개.*피드백 문서 준비됨/)).toBeInTheDocument();
+    expect(screen.getByText(/진행 중.*게스트 공개.*피드백 문서 준비됨/)).toBeInTheDocument();
     expect(screen.queryByText(/OPEN|HOST_ONLY/)).not.toBeInTheDocument();
   });
 

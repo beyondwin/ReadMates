@@ -5,6 +5,8 @@ import com.readmates.shared.security.CurrentMember
 import java.util.UUID
 
 interface GoogleAccountStorePort {
+    fun findUserIdByGoogleSubject(googleSubjectId: String): UUID?
+
     fun findMemberByGoogleSubject(googleSubjectId: String): CurrentMember?
 
     fun googleSubjectOwnerEmail(googleSubjectId: String): String?
@@ -22,13 +24,17 @@ interface GoogleAccountStorePort {
         profileImageUrl: String?,
     ): UUID
 
-    fun createViewerGoogleMember(
-        googleSubjectId: String,
-        email: String,
-        displayName: String?,
-        profileImageUrl: String?,
+    fun findActivePublicClubIdBySlug(clubSlug: String): UUID?
+
+    fun createViewerMembershipForExistingUser(
+        userId: UUID,
+        clubSlug: String,
         avatarKey: BookClubAvatarKey,
-    ): CurrentMember
+    ): CurrentMember?
 
     fun recordLastLogin(userId: UUID)
 }
+
+class MembershipDuplicateException(
+    cause: Throwable,
+) : RuntimeException(cause)

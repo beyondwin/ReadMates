@@ -63,6 +63,12 @@ private val serverSlices =
             applicationPackages = listOf("com.readmates.archive.application.."),
         ),
         ServerSlice(
+            name = "browse",
+            type = ServerSliceType.READ,
+            webAdapterPackages = listOf("com.readmates.browse.adapter.in.web.."),
+            applicationPackages = listOf("com.readmates.browse.application.."),
+        ),
+        ServerSlice(
             name = "sessionclosing",
             type = ServerSliceType.READ,
             webAdapterPackages = listOf("com.readmates.sessionclosing.adapter.in.web.."),
@@ -158,6 +164,7 @@ class ServerArchitectureBoundaryTest {
                     "admin.health",
                     "admin.analytics",
                     "aigen",
+                    "browse",
                     "sessionclosing",
                     "sessionrecord",
                     "observability",

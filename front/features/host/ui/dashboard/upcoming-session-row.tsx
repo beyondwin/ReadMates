@@ -1,8 +1,9 @@
-import type { HostSessionListItem, SessionRecordVisibility } from "@/features/host/model/host-view-types";
+import type { HostSessionListItem } from "@/features/host/model/host-view-types";
 import {
   getHostUpcomingSessionTiming,
   hostSessionEditHref,
 } from "@/features/host/model/host-dashboard-model";
+import { resolvedSessionExposure, sessionExposureCopy } from "@/features/host/model/session-exposure-model";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 import { SessionTimingIdentity } from "@/shared/ui/session-identity";
 import type { HostDashboardLinkComponent, UpcomingActionHandlers } from "./types";
@@ -19,15 +20,16 @@ export function UpcomingSessionRow({
   showSeparator?: boolean;
   LinkComponent: HostDashboardLinkComponent;
 }) {
-  const isMemberVisible = session.visibility !== "HOST_ONLY";
+  const exposure = resolvedSessionExposure(session);
+  const isGuestReadable = exposure.accessScope === "GUEST_READABLE";
   const visibilityPending = actions.isPending(session.sessionId, "visibility");
   const openPending = actions.isPending(session.sessionId, "open");
   const controlsDisabled = actions.isBusy;
-  const currentVisibilityLabel = upcomingVisibilityStatusLabel(session.visibility);
-  const visibilityActionLabel = visibilityPending ? "저장 중" : isMemberVisible ? "비공개" : "공개";
+  const currentVisibilityLabel = sessionExposureCopy(exposure.accessScope, exposure.siteVisibility).accessLabel;
+  const visibilityActionLabel = visibilityPending ? "저장 중" : isGuestReadable ? "호스트 전용" : "게스트 공개";
   const visibilityActionAriaLabel = visibilityPending
-    ? `공개 범위를 저장하는 중 · ${session.bookTitle}`
-    : `${session.bookTitle} 공개 범위를 ${isMemberVisible ? "비공개" : "멤버 공개"}로 변경`;
+    ? `게스트 접근을 저장하는 중 · ${session.bookTitle}`
+    : `${session.bookTitle} 게스트 접근을 ${isGuestReadable ? "호스트 전용" : "게스트 공개"}로 변경`;
   const showOpenAction = actions.canOpenSession || openPending;
   const openLabel = openPending ? "세션을 시작하는 중" : "현재로 시작";
 
@@ -45,7 +47,7 @@ export function UpcomingSessionRow({
           {session.bookAuthor} · {formatDateOnlyLabel(session.date)} · {session.locationLabel}
         </div>
         <div className="tiny" style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 8 }}>
-          <span style={{ color: "var(--text-3)" }}>공개 범위</span>
+          <span style={{ color: "var(--text-3)" }}>게스트 접근</span>
           <span aria-hidden="true" style={{ color: "var(--text-3)" }}>
             ·
           </span>
@@ -69,7 +71,7 @@ export function UpcomingSessionRow({
           type="button"
           disabled={controlsDisabled}
           aria-label={visibilityActionAriaLabel}
-          onClick={() => actions.updateVisibility(session.sessionId, isMemberVisible ? "HOST_ONLY" : "MEMBER")}
+          onClick={() => actions.updateAccessScope(session.sessionId, isGuestReadable ? "HOST_ONLY" : "GUEST_READABLE")}
         >
           {visibilityActionLabel}
         </button>
@@ -93,19 +95,19 @@ export function UpcomingSessionMobileCard({
   now?: Date;
 }) {
   const timing = getHostUpcomingSessionTiming(session.date, now);
-  const isMemberVisible = session.visibility !== "HOST_ONLY";
+  const exposure = resolvedSessionExposure(session);
+  const isGuestReadable = exposure.accessScope === "GUEST_READABLE";
   const visibilityPending = actions.isPending(session.sessionId, "visibility");
   const openPending = actions.isPending(session.sessionId, "open");
   const controlsDisabled = actions.isBusy;
-  const currentVisibilityLabel = upcomingVisibilityStatusLabel(session.visibility);
+  const currentVisibilityLabel = sessionExposureCopy(exposure.accessScope, exposure.siteVisibility).accessLabel;
+  const visibilityActionLabel = visibilityPending ? "저장 중" : isGuestReadable ? "호스트 전용" : "게스트 공개";
+  const visibilityActionAriaLabel = visibilityPending
+    ? `게스트 접근을 저장하는 중 · ${session.bookTitle}`
+    : `${session.bookTitle} 게스트 접근을 ${isGuestReadable ? "호스트 전용" : "게스트 공개"}로 변경`;
   const showOpenAction = actions.canOpenSession || openPending;
   const editIsPrimary = timing.state === "overdue" || timing.state === "unknown" || !showOpenAction;
   const openLabel = openPending ? "세션을 시작하는 중" : "현재로 시작";
-  const visibilityActionLabel = visibilityPending
-    ? "공개 범위 저장 중"
-    : isMemberVisible
-      ? "비공개로 변경"
-      : "멤버 공개로 변경";
 
   return (
     <div className="m-card-quiet">
@@ -120,7 +122,7 @@ export function UpcomingSessionMobileCard({
         </span>
       </div>
       <div className="tiny" style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 8 }}>
-        <span style={{ color: "var(--text-3)" }}>공개 범위</span>
+        <span style={{ color: "var(--text-3)" }}>게스트 접근</span>
         <span aria-hidden="true" style={{ color: "var(--text-3)" }}>
           ·
         </span>
@@ -169,26 +171,14 @@ export function UpcomingSessionMobileCard({
           className="btn btn-ghost btn-sm"
           type="button"
           disabled={controlsDisabled}
-          aria-label={`${visibilityActionLabel} · ${session.bookTitle}`}
-          onClick={() => actions.updateVisibility(session.sessionId, isMemberVisible ? "HOST_ONLY" : "MEMBER")}
+          aria-label={visibilityActionAriaLabel}
+          onClick={() => actions.updateAccessScope(session.sessionId, isGuestReadable ? "HOST_ONLY" : "GUEST_READABLE")}
         >
           {visibilityActionLabel}
         </button>
       </div>
     </div>
   );
-}
-
-function upcomingVisibilityStatusLabel(visibility: SessionRecordVisibility) {
-  if (visibility === "HOST_ONLY") {
-    return "비공개";
-  }
-
-  if (visibility === "PUBLIC") {
-    return "전체 공개";
-  }
-
-  return "멤버 공개";
 }
 
 export function UpcomingStartBlockedNotice({ mobile = false }: { mobile?: boolean }) {

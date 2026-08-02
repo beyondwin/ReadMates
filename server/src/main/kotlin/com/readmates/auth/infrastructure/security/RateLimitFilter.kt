@@ -2,6 +2,7 @@ package com.readmates.auth.infrastructure.security
 
 import com.readmates.auth.application.port.out.RateLimitCheck
 import com.readmates.auth.application.port.out.RateLimitPort
+import com.readmates.club.application.model.ClubSlug
 import com.readmates.shared.cache.RateLimitProperties
 import com.readmates.shared.security.ClientIpHashing
 import com.readmates.shared.security.ClientIpHashingProperties
@@ -46,14 +47,23 @@ class RateLimitFilter(
         response: HttpServletResponse,
         filterChain: FilterChain,
     ) {
-        val check = if (properties.enabled) request.toRateLimitCheck() else null
+        val guestBrowseMatch = request.guestBrowseMatch()
+        val guestBrowseClubSlug =
+            guestBrowseMatch
+                ?.groupValues
+                ?.get(1)
+                ?.let { rawSlug -> runCatching { ClubSlug.parse(rawSlug).value }.getOrNull() }
+        if (guestBrowseMatch != null && guestBrowseClubSlug == null) {
+            response.writeJsonError(HTTP_BAD_REQUEST, INVALID_REQUEST_BODY)
+            return
+        }
+
+        val check = if (properties.enabled) request.toRateLimitCheck(guestBrowseClubSlug) else null
         if (check != null) {
             val decision = rateLimitPort.check(check)
             if (!decision.allowed) {
                 decision.retryAfterSeconds?.let { response.setHeader("Retry-After", it.toString()) }
-                response.status = HTTP_TOO_MANY_REQUESTS
-                response.contentType = "application/json"
-                response.writer.write("""{"code":"RATE_LIMITED","message":"Too many requests"}""")
+                response.writeJsonError(HTTP_TOO_MANY_REQUESTS, RATE_LIMITED_BODY)
                 return
             }
         }
@@ -61,7 +71,7 @@ class RateLimitFilter(
         filterChain.doFilter(request, response)
     }
 
-    private fun HttpServletRequest.toRateLimitCheck(): RateLimitCheck? {
+    private fun HttpServletRequest.toRateLimitCheck(guestBrowseClubSlug: String?): RateLimitCheck? {
         val path = requestURI
         val ipHash =
             ClientIpHashing.hashClientIp(
@@ -76,6 +86,15 @@ class RateLimitFilter(
 
             method == "GET" && path.startsWith("/login/oauth2/code/") ->
                 RateLimitCheck("rl:ip:$ipHash:oauth-callback", 30, Duration.ofMinutes(1), sensitive = false)
+
+            guestBrowseClubSlug != null -> {
+                RateLimitCheck(
+                    "rl:ip:$ipHash:guest-browse:${stableHash(guestBrowseClubSlug).take(12)}",
+                    GUEST_BROWSE_LIMIT,
+                    Duration.ofMinutes(1),
+                    sensitive = false,
+                )
+            }
 
             method == "GET" && INVITATION_PREVIEW.matches(path) -> {
                 val token = INVITATION_PREVIEW.matchEntire(path)!!.groupValues[1]
@@ -144,6 +163,23 @@ class RateLimitFilter(
         }
     }
 
+    private fun HttpServletRequest.guestBrowseMatch(): MatchResult? =
+        if (method == "GET") {
+            GUEST_BROWSE.matchEntire(requestURI)
+        } else {
+            null
+        }
+
+    private fun HttpServletResponse.writeJsonError(
+        statusCode: Int,
+        body: String,
+    ) {
+        status = statusCode
+        contentType = "application/json"
+        setHeader("Cache-Control", "no-store")
+        writer.write(body)
+    }
+
     private fun stableHash(value: String): String =
         HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8)))
 
@@ -173,14 +209,19 @@ class RateLimitFilter(
 
     private companion object {
         const val HTTP_TOO_MANY_REQUESTS = 429
+        const val HTTP_BAD_REQUEST = 400
         const val BFF_SECRET_HEADER = "X-Readmates-Bff-Secret"
         const val CLIENT_IP_HEADER = "X-Readmates-Client-IP"
         const val MAX_IDENTIFIER_LENGTH = 128
+        const val GUEST_BROWSE_LIMIT = 120L
+        const val INVALID_REQUEST_BODY = """{"code":"INVALID_REQUEST","message":"Invalid request"}"""
+        const val RATE_LIMITED_BODY = """{"code":"RATE_LIMITED","message":"Too many requests"}"""
         val MUTATING_METHODS = setOf("POST", "PUT", "PATCH", "DELETE")
         val INVITATION_PREVIEW = Regex("^/api/invitations/([^/]+)$")
         val INVITATION_ACCEPT = Regex("^/api/invitations/([^/]+)/accept$")
         val CLUB_INVITATION_PREVIEW = Regex("^/api/clubs/([^/]+)/invitations/([^/]+)$")
         val CLUB_INVITATION_ACCEPT = Regex("^/api/clubs/([^/]+)/invitations/([^/]+)/accept$")
         val FEEDBACK_UPLOAD = Regex("^/api/host/sessions/([^/]+)/feedback-document$")
+        val GUEST_BROWSE = Regex("^/api/public/clubs/([^/]+)/browse(?:/.*)?$")
     }
 }

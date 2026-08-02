@@ -105,6 +105,82 @@ const publicClubResponse = {
   ],
 };
 
+const guestBrowseShell = {
+  clubName: "읽는사이",
+  tagline: "함께 읽고 각자의 언어로 남기는 독서모임",
+  navigation: {
+    home: "OPEN",
+    current: "OPEN",
+    notes: "OPEN",
+    archive: "OPEN",
+    sessionDetail: "OPEN",
+    personalSpace: "PREVIEW",
+    personalRecords: "PREVIEW",
+    settings: "LOCKED",
+    notifications: "LOCKED",
+    feedback: "LOCKED",
+    host: "DENY",
+  },
+};
+
+function renderGuestRouter(path: string) {
+  const router = createMemoryRouter(routes, { initialEntries: [path] });
+  renderWithRoutesQueryClient(
+    <AuthProvider>
+      <RouterProvider router={router} />
+    </AuthProvider>,
+  );
+  return router;
+}
+
+function guestScopedFetchMock(input: RequestInfo | URL) {
+  const url = input.toString();
+
+  if (url === "/api/bff/api/auth/me?clubSlug=reading-sai" || url === "/api/bff/api/auth/me") {
+    return Promise.resolve(jsonResponse(anonymousAuth));
+  }
+
+  if (url === "/api/bff/api/public/clubs/reading-sai/browse") {
+    return Promise.resolve(jsonResponse(guestBrowseShell));
+  }
+
+  if (url === "/api/bff/api/public/clubs/reading-sai/browse/sessions/current") {
+    return Promise.resolve(jsonResponse({
+      currentSession: {
+        sessionId: "guest-session-current",
+        sessionNumber: 12,
+        title: "게스트 현재 세션",
+        bookTitle: "게스트 책",
+        bookAuthor: "게스트 작가",
+        bookLink: null,
+        bookImageUrl: null,
+        date: "2026-08-09",
+        startTime: "19:00",
+        endTime: "21:00",
+        questionDeadlineAt: "2026-08-08T23:59:00",
+        attendees: [],
+        board: { questions: [], longReviews: [] },
+      },
+    }));
+  }
+
+  if (url === "/api/bff/api/public/clubs/reading-sai/browse/sessions/upcoming?limit=20") {
+    return Promise.resolve(jsonResponse(pageOf([])));
+  }
+
+  if (url === "/api/bff/api/public/clubs/reading-sai/browse/notes/feed?limit=5") {
+    return Promise.resolve(jsonResponse(pageOf([])));
+  }
+
+  return Promise.resolve(jsonResponse({ message: `unexpected request: ${url}` }, 404));
+}
+
+function protectedApiCalls(fetchMock: ReturnType<typeof vi.fn>) {
+  return fetchMock.mock.calls
+    .map(([input]) => input.toString())
+    .filter((url) => !url.startsWith("/api/bff/api/auth/me") && !url.startsWith("/api/bff/api/public/"));
+}
+
 function isArchiveChildDataEndpoint(url: string) {
   return (
     url.startsWith("/api/bff/api/archive/sessions?") ||
@@ -268,7 +344,7 @@ describe("SPA router", () => {
     expect(await screen.findByRole("heading", { name: heading })).toBeInTheDocument();
   });
 
-  it("keeps scoped host access when the unscoped session role is only member", async () => {
+  it("keeps scoped host access noindex and restores indexable public marketing on navigation", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = input.toString();
 
@@ -306,6 +382,10 @@ describe("SPA router", () => {
         );
       }
 
+      if (url === "/api/bff/api/public/clubs/reading-sai") {
+        return Promise.resolve(jsonResponse(publicClubResponse));
+      }
+
       return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -322,9 +402,18 @@ describe("SPA router", () => {
 
     expect(await screen.findByRole("heading", { name: "페이지를 찾을 수 없습니다." })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/clubs/reading-sai/app/host/missing-page");
+    expect(document.head.querySelector('meta[name="robots"][data-readmates-club-app="true"]')).toHaveAttribute(
+      "content",
+      "noindex",
+    );
+
+    await router.navigate("/clubs/reading-sai");
+
+    expect(await screen.findByRole("heading", { name: "읽는사이" })).toBeInTheDocument();
+    expect(document.head.querySelector('meta[name="robots"][data-readmates-club-app="true"]')).toBeNull();
   });
 
-  it("blocks scoped member access when only the unscoped session is active", async () => {
+  it("returns a private scoped club as not found when the authenticated membership is inactive", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = input.toString();
 
@@ -371,8 +460,9 @@ describe("SPA router", () => {
       </AuthProvider>,
     );
 
-    expect(await screen.findByRole("heading", { name: "멤버 공간에 들어갈 수 없습니다." })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "페이지를 찾을 수 없습니다." })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/clubs/reading-sai/app/missing-page");
+    expect(fetchMock.mock.calls.map(([input]) => input.toString())).toContain("/api/bff/api/public/clubs/reading-sai/browse");
   });
 
   it("renders permission denied copy from a structured API route error", async () => {
@@ -736,33 +826,54 @@ describe("SPA router", () => {
     expect(fetchMock.mock.calls.map(([input]) => input.toString())).not.toContain("/api/bff/api/sessions/current");
   });
 
-  it("redirects anonymous club app navigation to login with returnTo", async () => {
+  it.each(["/clubs/reading-sai/app/feedback/session-1", "/clubs/reading-sai/app/feedback/session-1/print"])(
+    "renders a guest lock without protected API calls for %s",
+    async (path) => {
+      const fetchMock = vi.fn(guestScopedFetchMock);
+      vi.stubGlobal("fetch", fetchMock);
+      installRouterRequestShim();
+
+      const router = renderGuestRouter(path);
+
+      expect(await screen.findByRole("heading", { name: "정식 멤버에게 열립니다" })).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe(path);
+      expect(protectedApiCalls(fetchMock)).toEqual([]);
+    },
+  );
+
+  it("uses the guest projection for an authenticated inactive scoped membership", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = input.toString();
-
       if (url === "/api/bff/api/auth/me" || url === "/api/bff/api/auth/me?clubSlug=reading-sai") {
-        return Promise.resolve(jsonResponse(anonymousAuth));
+        return Promise.resolve(jsonResponse(inactiveAuth));
       }
-
-      return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+      if (url === "/api/bff/api/public/clubs/reading-sai/browse") {
+        return Promise.resolve(jsonResponse(guestBrowseShell));
+      }
+      return Promise.resolve(jsonResponse({ message: `unexpected request: ${url}` }, 404));
     });
     vi.stubGlobal("fetch", fetchMock);
     installRouterRequestShim();
-    const router = createMemoryRouter(routes, {
-      initialEntries: ["/clubs/reading-sai/app/feedback/session-1?from=email"],
-    });
 
-    renderWithRoutesQueryClient(
-      <AuthProvider>
-        <RouterProvider router={router} />
-      </AuthProvider>,
-    );
+    const router = renderGuestRouter("/clubs/reading-sai/app/feedback/session-1?from=archive#document");
 
-    expect(await screen.findByRole("heading", { name: "읽는사이 들어가기" })).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/login");
-    expect(router.state.location.search).toBe(
-      "?returnTo=%2Fclubs%2Freading-sai%2Fapp%2Ffeedback%2Fsession-1%3Ffrom%3Demail",
-    );
+    expect(await screen.findByRole("heading", { name: "정식 멤버에게 열립니다" })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/clubs/reading-sai/app/feedback/session-1");
+    expect(router.state.location.search).toBe("?from=archive");
+    expect(router.state.location.hash).toBe("#document");
+    expect(protectedApiCalls(fetchMock)).toEqual([]);
+  });
+
+  it("returns a guest host deep link to the scoped club browse home before host loaders run", async () => {
+    const fetchMock = vi.fn(guestScopedFetchMock);
+    vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
+
+    const router = renderGuestRouter("/clubs/reading-sai/app/host/members");
+
+    expect(await screen.findByRole("heading", { name: "함께 읽어 온 장면들" })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/clubs/reading-sai/app");
+    expect(protectedApiCalls(fetchMock)).toEqual([]);
   });
 
   it("blocks disallowed authenticated current session navigation without fetching current session data", async () => {

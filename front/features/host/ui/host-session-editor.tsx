@@ -1087,6 +1087,9 @@ export default function HostSessionEditor({
               <div hidden={activeSection !== "records"} className="stack" style={{ "--stack": "18px" } as CSSProperties}>
                 {session ? (
                   <SessionRecordWorkspace
+                      state={session.state}
+                      accessScope={session.accessScope}
+                      siteVisibility={session.siteVisibility}
                       source={activeSource}
                       onSourceChange={changeSource}
                       liveRevision={recordWorkflow!.editor.liveRevision}

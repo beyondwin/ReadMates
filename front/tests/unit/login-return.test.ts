@@ -83,4 +83,56 @@ describe("login return helpers", () => {
       "/oauth2/authorization/google?chooseAccount=true",
     );
   });
+
+  it("builds a same-club explicit member-start intent only for a scoped app return", () => {
+    expect(oauthHrefForReturnTo("/clubs/reading-sai/app/archive", { joinClub: "reading-sai", joinIntent: "issued-nonce-00000000000000000000" })).toBe(
+      "/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp%2Farchive&joinClub=reading-sai&joinIntent=issued-nonce-00000000000000000000",
+    );
+    expect(oauthHrefForReturnTo("/clubs/reading-sai/app/archive", { joinClub: "reading-sai" })).toBe(
+      "/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp%2Farchive",
+    );
+    expect(oauthHrefForReturnTo("/clubs/other/app", { joinClub: "reading-sai" })).toBe(
+      "/oauth2/authorization/google?returnTo=%2Fclubs%2Fother%2Fapp",
+    );
+    expect(oauthHrefForReturnTo("/clubs/reading-sai/app", { joinClub: "../reading-sai" })).toBe(
+      "/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp",
+    );
+    expect(oauthHrefForReturnTo(null, { joinClub: "reading-sai" })).toBe("/oauth2/authorization/google");
+    expect(oauthHrefForReturnTo("/clubs/reading-sai/app/../about", { joinClub: "reading-sai" })).toBe(
+      "/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp%2F..%2Fabout",
+    );
+  });
+
+  it("never authorizes member-start from a noncanonical raw scoped path", () => {
+    const noncanonicalReturnTargets = [
+      "/clubs/other/../reading-sai/app",
+      "/clubs/reading-sai/./app",
+      "/clubs/reading%2Dsai/app",
+      "/%63lubs/reading-sai/app",
+      "/clubs/reading-sai/%61pp",
+      "/clubs/other/%2e%2e/reading-sai/app",
+      "/clubs/READING-SAI/app",
+      "/clubs//reading-sai/app",
+      "/clubs/reading-sai//app",
+      "/clubs/reading-sai/app//archive",
+    ];
+
+    noncanonicalReturnTargets.forEach((returnTo) => {
+      const href = oauthHrefForReturnTo(returnTo, { joinClub: "reading-sai", joinIntent: "issued-nonce-00000000000000000000" });
+      const query = new URL(href, "https://readmates.example").searchParams;
+      expect(query.get("returnTo")).toBe(returnTo);
+      expect(query.has("joinClub")).toBe(false);
+    });
+
+    expect(oauthHrefForReturnTo("/clubs/reading-sai\\app", { joinClub: "reading-sai" })).toBe(
+      "/oauth2/authorization/google",
+    );
+  });
+
+  it("authorizes an exact canonical raw scoped path with query and hash", () => {
+    const returnTo = "/clubs/reading-sai/app/archive?tab=all#session-1";
+    expect(oauthHrefForReturnTo(returnTo, { joinClub: "reading-sai", joinIntent: "issued-nonce-00000000000000000000" })).toBe(
+      `/oauth2/authorization/google?returnTo=${encodeURIComponent(returnTo)}&joinClub=reading-sai&joinIntent=issued-nonce-00000000000000000000`,
+    );
+  });
 });

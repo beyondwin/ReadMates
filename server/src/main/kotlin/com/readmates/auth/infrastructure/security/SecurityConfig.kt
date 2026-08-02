@@ -21,6 +21,10 @@ import org.springframework.web.filter.ForwardedHeaderFilter
 
 private val AI_GENERATE_MUTATION_PATH =
     Regex("^/api/host/sessions/[^/]+/ai-generate/jobs/[^/]+/(regenerate|commit)$")
+private val PUBLIC_CLUB_PATH = Regex("^/api/public/clubs/[^/]+$")
+private val PUBLIC_SESSION_PATH = Regex("^/api/public/sessions/[^/]+$")
+private val PUBLIC_CLUB_SESSION_PATH = Regex("^/api/public/clubs/[^/]+/sessions/[^/]+$")
+private val GUEST_BROWSE_PATH = Regex("^/api/public/clubs/[^/]+/browse(?:/.*)?$")
 
 @Configuration
 @Suppress("LongParameterList")
@@ -30,7 +34,7 @@ class SecurityConfig(
     private val rateLimitFilter: RateLimitFilter,
     private val memberAuthoritiesFilter: MemberAuthoritiesFilter,
     private val platformAdminAuthoritiesFilter: PlatformAdminAuthoritiesFilter,
-    private val oAuthInviteTokenCaptureFilter: OAuthInviteTokenCaptureFilter,
+    private val oAuthFlowContextRepository: OAuthFlowContextRepository,
     private val googleOidcUserService: GoogleOidcUserService,
     private val readmatesOAuthSuccessHandler: ReadmatesOAuthSuccessHandler,
     private val clientRegistrationRepository: ObjectProvider<ClientRegistrationRepository>,
@@ -50,6 +54,7 @@ class SecurityConfig(
                     "/api/dev/logout",
                     "/api/auth/login",
                     "/api/auth/logout",
+                    "/api/auth/oauth/join-intent",
                     "/api/sessions/current/rsvp",
                     "/api/sessions/current/checkin",
                     "/api/sessions/current/questions",
@@ -61,6 +66,7 @@ class SecurityConfig(
                 it.ignoringRequestMatchers(
                     methodAndPath("PATCH", Regex("^/api/host/sessions/[^/]+$")),
                     methodAndPath("PATCH", Regex("^/api/host/sessions/[^/]+/visibility$")),
+                    methodAndPath("PATCH", Regex("^/api/host/sessions/[^/]+/access-scope$")),
                     methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/visibility-preview$")),
                     methodAndPath("PATCH", Regex("^/api/host/sessions/[^/]+/record-draft$")),
                     methodAndPath("DELETE", Regex("^/api/host/sessions/[^/]+/record-draft$")),
@@ -126,6 +132,7 @@ class SecurityConfig(
                         "/internal/health",
                         "/api/auth/login",
                         "/api/auth/logout",
+                        "/api/auth/oauth/join-intent",
                         "/api/dev/login",
                         "/api/dev/logout",
                         "/oauth2/**",
@@ -135,8 +142,13 @@ class SecurityConfig(
                     .permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/auth/me")
                     .permitAll()
-                    .requestMatchers(HttpMethod.GET, "/api/public/**")
-                    .permitAll()
+                    .requestMatchers(
+                        methodAndPath("GET", Regex("^/api/public/club$")),
+                        methodAndPath("GET", PUBLIC_CLUB_PATH),
+                        methodAndPath("GET", PUBLIC_SESSION_PATH),
+                        methodAndPath("GET", PUBLIC_CLUB_SESSION_PATH),
+                        methodAndPath("GET", GUEST_BROWSE_PATH),
+                    ).permitAll()
                     .requestMatchers("/api/invitations/**")
                     .permitAll()
                     .requestMatchers(methodAndPath("GET", Regex("^/api/clubs/[^/]+/invitations/[^/]+$")))
@@ -186,7 +198,6 @@ class SecurityConfig(
             .addFilterAfter(platformAdminAuthoritiesFilter, SessionCookieAuthenticationFilter::class.java)
             .addFilterAfter(rateLimitFilter, SessionCookieAuthenticationFilter::class.java)
             .addFilterBefore(oAuthForwardedHeaderFilter, OAuth2AuthorizationRequestRedirectFilter::class.java)
-            .addFilterBefore(oAuthInviteTokenCaptureFilter, OAuth2AuthorizationRequestRedirectFilter::class.java)
             .addFilterAfter(memberAuthoritiesFilter, AnonymousAuthenticationFilter::class.java)
 
         val registrations = clientRegistrationRepository.ifAvailable
@@ -196,6 +207,7 @@ class SecurityConfig(
                     endpoint.authorizationRequestResolver(
                         PrimaryOriginOAuthAuthorizationRequestResolver(registrations, authBaseUrl),
                     )
+                    endpoint.authorizationRequestRepository(oAuthFlowContextRepository)
                 }
                 it.userInfoEndpoint { endpoint ->
                     endpoint.oidcUserService(googleOidcUserService)

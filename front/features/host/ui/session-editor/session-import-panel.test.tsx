@@ -17,7 +17,7 @@ describe("SessionImportPanelBody", () => {
     expect(within(review).getByText("작성자 매칭 완료")).toBeInTheDocument();
     expect(within(review).getByText(/매칭 2개 \/ 전체 2개/)).toBeInTheDocument();
     expect(within(review).getByText("피드백 문서 구조 확인 완료")).toBeInTheDocument();
-    expect(screen.getByText("현재 선택한 공개 범위: MEMBER")).toBeInTheDocument();
+    expect(screen.getByText("현재 선택한 게스트 접근: 게스트 공개")).toBeInTheDocument();
 
     const button = screen.getByRole("button", { name: "초안으로 가져오기" });
     expect(button).toBeEnabled();

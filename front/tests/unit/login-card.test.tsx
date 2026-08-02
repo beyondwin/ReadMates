@@ -27,7 +27,7 @@ describe("LoginRoute", () => {
 
     expect(screen.getByText("둘러보기부터 멤버 참여까지")).toBeVisible();
     expect(screen.getByRole("heading", { name: "읽는사이 들어가기" })).toBeVisible();
-    expect(screen.getByText(/초대 링크가 없다면 둘러보기 멤버로 시작해 기록을 읽을 수 있고/)).toBeVisible();
+    expect(screen.getByText(/로그인 없이 공개된 클럽 기록을 둘러볼 수 있습니다/)).toBeVisible();
     expect(screen.getByRole("link", { name: "Google로 시작하기" })).toHaveAttribute(
       "href",
       "/oauth2/authorization/google",
@@ -42,9 +42,23 @@ describe("LoginRoute", () => {
 
     render(<LoginRoute />);
 
+    expect(screen.getByRole("link", { name: "둘러보기" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/feedback/session-1?from=email",
+    );
+    expect(screen.getByRole("link", { name: "멤버로 시작" })).toHaveAttribute(
+      "href",
+      "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp%2Ffeedback%2Fsession-1%3Ffrom%3Demail",
+    );
+  });
+
+  it("keeps generic login unscoped and without an implicit club join", () => {
+    render(<LoginRoute />);
+
+    expect(screen.queryByRole("link", { name: "둘러보기" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Google로 시작하기" })).toHaveAttribute(
       "href",
-      "/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp%2Ffeedback%2Fsession-1%3Ffrom%3Demail",
+      "/oauth2/authorization/google",
     );
   });
 
@@ -180,7 +194,7 @@ describe("LoginRoute", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("이전 멤버십이 종료된 계정입니다.");
     expect(screen.getByRole("link", { name: "다른 Google 계정으로 로그인" })).toHaveAttribute(
       "href",
-      "/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp&chooseAccount=true",
+      "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp",
     );
   });
 
@@ -206,9 +220,10 @@ describe("LoginRoute", () => {
       `${origin}/login?error=membership-left&returnTo=%2Fclubs%2Freading-sai%2Fapp`,
     );
     expect(screen.getByRole("status")).toHaveTextContent("로그인 주소를 복사했습니다");
+    expect(screen.getByRole("link", { name: "둘러보기" })).toHaveAttribute("href", "/clubs/reading-sai/app");
     expect(screen.getByRole("link", { name: "Google 로그인 시도" })).toHaveAttribute(
       "href",
-      "/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp&chooseAccount=true",
+      "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp",
     );
   });
 

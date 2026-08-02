@@ -1,6 +1,6 @@
 
-import { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type RefObject, useEffect, useRef } from "react";
-import type { FeedFilter, NoteSessionItem } from "@/features/archive/model/notes-feed-model";
+import { createContext, createElement, useContext, type AnchorHTMLAttributes, type ComponentType, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject, useEffect, useRef } from "react";
+import type { FeedFilter, NoteSessionItem } from "@/shared/model/notes-feed-model";
 import {
   mobileRecentSessions,
   noteSessionNumberLabel,
@@ -9,11 +9,16 @@ import {
   sessionHref,
   sessionMatchesQuery,
   sessionRecordSummary,
-} from "@/features/archive/model/notes-feed-model";
-import { Link } from "@/features/archive/ui/archive-link";
+} from "@/shared/model/notes-feed-model";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
+import { noteSessionIsSelected } from "@/shared/model/notes-read-primitives";
 
 const mobileSessionCardWidth = "156px";
+export type NotesLinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & { to: string; children: ReactNode };
+function DefaultNotesLink({ to, children, ...props }: NotesLinkProps) { return <a {...props} href={to}>{children}</a>; }
+const NotesLinkContext = createContext<ComponentType<NotesLinkProps>>(DefaultNotesLink);
+export function NotesLinkProvider({ LinkComponent, children }: { LinkComponent?: ComponentType<NotesLinkProps>; children: ReactNode }) { return <NotesLinkContext.Provider value={LinkComponent ?? DefaultNotesLink}>{children}</NotesLinkContext.Provider>; }
+function Link(props: NotesLinkProps) { return createElement(useContext(NotesLinkContext), props); }
 
 export function SelectedSessionHeader({ session }: { session: NoteSessionItem | null }) {
   const sessionNumber = session ? noteSessionNumberLabel(session) : null;
@@ -118,7 +123,7 @@ export function SessionRail({
           <SessionRow
             key={session.sessionId}
             session={session}
-            selected={session.sessionId === selectedSessionId}
+            selected={noteSessionIsSelected(session.sessionId, selectedSessionId)}
             filter={filter}
             showStrongTopBorder={index === 0}
           />

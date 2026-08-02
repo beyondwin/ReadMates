@@ -1,10 +1,11 @@
-import type { LoaderFunctionArgs, ShouldRevalidateFunctionArgs } from "react-router-dom";
+import type { LoaderFunctionArgs } from "react-router-dom";
 import { fetchNoteSessions, fetchNotesFeed } from "@/features/archive/api/archive-api";
 import type { NoteFeedPage, NoteSessionItem, NoteSessionPage } from "@/features/archive/api/archive-contracts";
 import { selectNoteSession } from "@/features/archive/model/notes-feed-model";
 import { loadArchiveMemberAuth } from "@/features/archive/route/archive-loader-auth";
 import type { ReadmatesApiContext } from "@/shared/api/client";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
+export { notesFeedShouldRevalidate } from "./notes-feed-revalidation";
 
 export type NotesFeedRouteData = {
   noteSessions: NoteSessionPage;
@@ -92,11 +93,4 @@ export async function notesFeedLoader(args: LoaderFunctionArgs): Promise<NotesFe
   const url = new URL(request.url);
 
   return loadNotesFeedRouteData(url.searchParams.get("sessionId"), { clubSlug: clubSlugFromLoaderArgs({ params }) });
-}
-
-export function notesFeedShouldRevalidate({
-  currentUrl,
-  nextUrl,
-}: ShouldRevalidateFunctionArgs) {
-  return currentUrl.searchParams.get("sessionId") !== nextUrl.searchParams.get("sessionId");
 }

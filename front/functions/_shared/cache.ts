@@ -16,7 +16,7 @@ export function buildPublicCacheKey(request: Request): Request {
 
 export function isCacheableUpstreamResponse(response: Response): boolean {
   if (!response.ok) return false;
-  const cacheControl = response.headers.get("Cache-Control") ?? "";
+  const cacheControl = response.headers.get("Cache-Control")?.toLowerCase() ?? "";
   if (cacheControl.includes("no-store") || cacheControl.includes("private")) return false;
   const setCookies = (response.headers as Headers & { getSetCookie?: () => string[] })
     .getSetCookie?.() ?? [];

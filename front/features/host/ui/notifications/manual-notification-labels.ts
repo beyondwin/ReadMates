@@ -3,6 +3,7 @@ import type {
   ManualNotificationAudience,
   ManualNotificationRequestedChannels,
 } from "@/features/host/model/host-view-types";
+import { compatibilityExposureLabel } from "@/features/host/model/session-exposure-model";
 
 export const manualChannelLabels: Record<ManualNotificationRequestedChannels, string> = {
   BOTH: "앱 + 이메일",
@@ -45,16 +46,10 @@ const sessionStateLabels: Record<string, string> = {
   CLOSED: "종료",
 };
 
-const sessionVisibilityLabels: Record<string, string> = {
-  HOST_ONLY: "호스트 전용",
-  MEMBER: "멤버 공개",
-  PUBLIC: "전체 공개",
-};
-
 export function manualSessionStateLabel(value: string): string {
   return sessionStateLabels[value] ?? "상태 확인 필요";
 }
 
 export function manualSessionVisibilityLabel(value: string): string {
-  return sessionVisibilityLabels[value] ?? "공개 범위 확인 필요";
+  return compatibilityExposureLabel[value as keyof typeof compatibilityExposureLabel] ?? "공개 범위 확인 필요";
 }

@@ -22,6 +22,6 @@ run_step() {
 
 cd "$repo_root"
 
-run_step "Server CI quality gate" ./server/gradlew -p server check
+run_step "Server CI quality gate" ./server/gradlew -p server --no-build-cache --rerun-tasks check
 
 printf '\nServer CI checks passed.\n'

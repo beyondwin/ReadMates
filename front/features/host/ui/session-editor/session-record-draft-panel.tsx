@@ -1,4 +1,10 @@
 import type { CSSProperties, JSX } from "react";
+import type { SessionState } from "@/shared/model/readmates-types";
+import {
+  compatibilityVisibilityForExposure,
+  sessionExposureFromCompatibility,
+} from "@/features/host/model/session-exposure-model";
+import { SessionExposureControls } from "../session-exposure-controls";
 import {
   groupSessionRecordIssues,
   type DraftSaveState,
@@ -66,6 +72,7 @@ function saveStateMessage(state: DraftSaveState) {
 
 export type SessionRecordDraftPanelBodyProps = {
   snapshot: SessionRecordDraftSnapshot;
+  state?: SessionState;
   saveState: DraftSaveState;
   validationIssues: string[];
   draftLiveBaseStale: boolean;
@@ -79,6 +86,7 @@ export type SessionRecordDraftPanelBodyProps = {
 
 export function SessionRecordDraftPanelBody({
   snapshot,
+  state,
   saveState,
   validationIssues,
   draftLiveBaseStale,
@@ -97,6 +105,7 @@ export function SessionRecordDraftPanelBody({
     issuesBySection[section].length > 0;
   const errorDescriptionId = (section: ValidationSection) =>
     isSectionInvalid(section) ? validationErrorId(section) : undefined;
+  const exposure = sessionExposureFromCompatibility(state ?? "DRAFT", snapshot.visibility);
   const updateEntry = (
     key: "highlights" | "oneLineReviews",
     index: number,
@@ -189,29 +198,20 @@ export function SessionRecordDraftPanelBody({
         </nav>
       ) : null}
 
-      <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
-        <legend className="field-label">공개 범위</legend>
-        <div className="row" style={{ gap: 12, flexWrap: "wrap" }}>
-          {[
-            ["HOST_ONLY", "호스트 전용"],
-            ["MEMBER", "멤버 공개"],
-            ["PUBLIC", "외부 공개"],
-          ].map(([value, label]) => (
-            <label className="small" key={value}>
-              <input
-                type="radio"
-                name="session-record-draft-visibility"
-                checked={snapshot.visibility === value}
-                onChange={() => onSnapshotChange({
-                  ...snapshot,
-                  visibility: value as SessionRecordDraftSnapshot["visibility"],
-                })}
-              />{" "}
-              {label}
-            </label>
-          ))}
-        </div>
-      </fieldset>
+      <SessionExposureControls
+        state={state ?? "DRAFT"}
+        accessScope={exposure.accessScope}
+        siteVisibility={exposure.siteVisibility}
+        disabled={saveState === "saving"}
+        onAccessScopeChange={(nextAccessScope) => onSnapshotChange({
+          ...snapshot,
+          visibility: compatibilityVisibilityForExposure(nextAccessScope, exposure.siteVisibility),
+        })}
+        onSiteVisibilityChange={(nextSiteVisibility) => onSnapshotChange({
+          ...snapshot,
+          visibility: compatibilityVisibilityForExposure(exposure.accessScope, nextSiteVisibility),
+        })}
+      />
 
       <label
         id="session-record-summary"

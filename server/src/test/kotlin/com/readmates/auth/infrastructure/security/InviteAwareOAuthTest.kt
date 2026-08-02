@@ -1,9 +1,6 @@
 package com.readmates.auth.infrastructure.security
 
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import jakarta.servlet.FilterChain
-import jakarta.servlet.ServletRequest
-import jakarta.servlet.ServletResponse
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
@@ -12,8 +9,6 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.mock.web.MockHttpServletRequest
-import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.test.context.jdbc.Sql
 import java.time.Instant
 import java.util.UUID
@@ -31,25 +26,8 @@ import java.util.UUID
 @Tag("integration")
 class InviteAwareOAuthTest(
     @param:Autowired private val oauthReturnState: OAuthReturnState,
-    @param:Autowired private val captureFilter: OAuthInviteTokenCaptureFilter,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
 ) : ReadmatesMySqlIntegrationTestSupport() {
-    @Test
-    fun `authorization capture signs trusted relative return target`() {
-        val request = MockHttpServletRequest("GET", "/oauth2/authorization/google")
-        request.setParameter("returnTo", "/clubs/reading-sai/app?tab=current")
-        val response = MockHttpServletResponse()
-
-        captureFilter.doFilter(request, response, RecordingFilterChain())
-
-        val signedState = request.getSession(false)!!.getAttribute(OAuthReturnState.SESSION_ATTRIBUTE)
-        assertNotNull(signedState)
-        assertEquals(
-            "/clubs/reading-sai/app?tab=current",
-            oauthReturnState.validatedReturnTarget(signedState.toString(), fallback = "/app"),
-        )
-    }
-
     @Test
     fun `return target validation rejects protocol-relative and untrusted absolute urls`() {
         assertNull(oauthReturnState.signReturnTarget("//evil.example/app"))
@@ -108,17 +86,6 @@ class InviteAwareOAuthTest(
             hostname,
             status,
         )
-    }
-
-    private class RecordingFilterChain : FilterChain {
-        var invoked = false
-
-        override fun doFilter(
-            request: ServletRequest,
-            response: ServletResponse,
-        ) {
-            invoked = true
-        }
     }
 
     companion object {

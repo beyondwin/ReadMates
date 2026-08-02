@@ -16,9 +16,12 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - 호스트 모바일 대시보드의 현재 세션 여백과 3열 운영 수치를 복구하고, 처리 항목·예정 세션 행동을 더 명확한 단일 primary action 흐름으로 정돈했습니다.
 - **Google 로그인 복구:** 종료된 멤버십 또는 Google 인증 실패 뒤에는 다른 Google 계정을 명시적으로 선택해 다시 로그인할 수 있습니다. 카카오톡 인앱 브라우저에서는 외부 브라우저 안내와 로그인 주소 복사를 제공하며, 안전한 멤버 복귀 경로와 기존 OAuth·세션 보안 경계는 유지합니다. 로컬 dev-login은 명시적으로 활성화된 Google OAuth 설정이 없으면 깨진 provider 링크를 노출하지 않고, macOS Keychain의 localhost 전용 credential을 backend에만 주입하는 공개 저장소 안전 실행 경로를 제공합니다.
 One-command local OAuth stack + redacted smoke verifier로 기존 서비스 보존 상태에서 localhost 기반 Google login 회귀 점검을 반복 가능하게 했습니다.
+- **게스트 read/cache 경계:** guest browse 응답은 항상 `no-store`이며 Pages BFF가 `No-Store`와 `Private` 같은 혼합 대소문자 Cache-Control directive도 cache 금지로 해석합니다. Guest cursor는 다른 club에서 재사용할 수 없고 429는 bounded `Retry-After`와 복구 가능한 공개 오류 UI를 유지합니다.
+- **세션 만료 복구:** 보호 API의 기본 401 login redirect를 유지하면서, 이미 성공한 current/archive/notes read와 작성 중 current-session mutation만 명시적으로 in-place recovery를 사용합니다. Read는 exact public resource가 다시 확인될 때만 게스트 전환을 제공하고 write는 입력을 보존한 채 재로그인만 허용합니다.
 
 ### Highlights
 
+- **로그인 없는 게스트 앱:** 공개 클럽의 `/clubs/:slug/app/**`에서 현재·예정 세션, 노트, 아카이브와 회차 상세를 로그인 없이 둘러볼 수 있습니다. 개인 공간은 preview로, 설정·알림·피드백은 정식 멤버 전용 안내로 보여주고 호스트 route와 모든 write를 차단합니다.
 - **반응형 계정·내 공간·북클럽 아바타:** 모바일과 데스크톱에서 계정 접근과 호스트 공간 전환을 명시적으로 구분하고, 알림·계정 설정에 고정된 `내 공간` 상위 동선을 제공합니다. 멤버 식별은 외부 프로필 사진 대신 privacy-safe 로컬 동물 캐릭터 40종을 사용하며, 미사용 아바타 우선 자동 배정 후에도 멤버가 `내 공간`에서 원하는 캐릭터로 변경할 수 있습니다.
 
 ### Deployment Notes
@@ -27,6 +30,22 @@ One-command local OAuth stack + redacted smoke verifier로 기존 서비스 보�
 - `PATCH /api/me/avatar`는 인증된 현재 club membership의 avatar key만 바꾸는 additive scoped API입니다. V44 이후 구 backend는 제거된 legacy key를 다시 쓸 수 있고 새 constraint가 이를 거절하므로, 같은 release tag의 server image를 먼저 배포해 Flyway V44와 backend health를 확인한 뒤 frontend를 배포합니다. 반대로 구 frontend는 새 key를 알 수 없어도 안전한 기본 avatar로 normalize합니다.
 - 배포 후에는 현재 club의 avatar 변경·재조회와 허용된 public author avatar 표시를 smoke하고, 권한과 `LEFT`/anonymous masking이 유지되는지 확인합니다. 실제 member data나 private identifier는 공개 release evidence에 기록하지 않습니다.
 - Rollback은 V44가 바꾼 schema와 이미 migration된 data를 보존합니다. Migration을 되돌리지 않고 V44와 호환되는 server/frontend image로 전환하거나 새 forward-fix release를 발행합니다.
+
+### Changed
+
+- **독립 exposure 모델:** app access의 canonical field를 `sessions.access_scope(HOST_ONLY|GUEST_READABLE)`, public marketing placement를 `public_session_publications.site_visibility(HIDDEN|PUBLIC_RECORD)`로 분리했습니다. 기존 `visibility`와 `is_public`은 rolling deploy/rollback을 위해 한 릴리즈 dual-write하고 새 host UI와 API는 canonical field를 사용합니다.
+- **공개 진입과 target-club join:** 공개 홈·소개·기록·회차와 scoped login에 `둘러보기`와 `멤버로 시작`을 제공합니다. `멤버로 시작`은 서명된 exact raw scoped return path와 같은 `ACTIVE + PUBLIC` club에서만 `VIEWER` membership을 만들며 기존 membership과 초대 흐름을 우선·보존합니다.
+- **OAuth 가입 의도·CI 재실행 경계:** target-club `VIEWER` 생성은 same-origin JSON POST가 발급한 만료·1회용 의도를 실제 OAuth `state`에 결합한 경우에만 수행합니다. 역순 multi-tab callback은 성공·실패와 예상 밖 처리 예외에서도 소비한 state만 정리하고 session ID를 정확히 한 번 회전해 나머지 pending flow를 보존합니다. Provider 취소와 인지된 도메인 오류는 유효한 기존 앱 세션을 유지하고 서버가 invalid/stale로 확인한 cookie만 만료합니다. raw `inviteToken`이 있으면 blank·malformed도 join보다 우선합니다. 서버 PR gate는 stale Gradle 산출물에 의존하지 않도록 `--no-build-cache --rerun-tasks check`를 실행하므로, 로컬 반복 실행도 전체 품질 검사를 새로 수행합니다.
+- **Guest-safe records:** guest DTO는 참석자 표시 이름, RSVP·실제 참석 상태, 질문의 `draftThought`, 작성자 이름이 붙은 질문·서평을 허용합니다. Membership/account ID, email/account name, 정확한 장소, 접속 URL·비밀번호, 읽은 분량, 피드백 본문은 제외합니다. 새 한줄평·장문 서평은 guest-readable record에 공개되며 기존 private/session 예외 row는 일괄 재작성하지 않습니다.
+
+### Database
+
+- **Flyway V45:** `sessions.access_scope`와 `public_session_publications.site_visibility`를 additive하게 추가하고 기존 member/public exposure를 canonical 두 축으로 backfill합니다. Compatibility column은 이번 릴리즈에서 제거하지 않으며 rollback은 V45 schema를 보존한 호환 image 또는 forward-fix를 사용합니다.
+
+### Deployment Notes
+
+- V45를 포함한 backend를 먼저 배포해 Flyway와 dual-write를 활성화한 뒤 같은 commit의 Pages Functions/frontend를 배포합니다. 한 릴리즈 동안 old `{visibility}` request와 compatibility read/write를 유지하고, 다음 릴리즈에서 old frontend가 남지 않았다는 운영 증거를 확인한 뒤 별도 migration으로 제거합니다.
+- Production smoke는 anonymous public/guest reads, exact scoped OAuth start marker, viewer/member/host route 경계, guest 429/no-store를 확인합니다. Live Google OAuth 완료, 실제 이메일, AI provider 호출과 production data mutation은 별도 승인 없이 실행하지 않습니다.
 
 ## v2.1.0 - 2026-07-31
 

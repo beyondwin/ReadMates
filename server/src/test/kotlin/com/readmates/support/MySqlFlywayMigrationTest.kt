@@ -37,7 +37,7 @@ class MySqlFlywayMigrationTest(
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     @Suppress("LongMethod")
-    fun `mysql upgrades populated v42 schema with deterministic membership avatar keys`() {
+    fun `mysql upgrades populated v42 schema with deterministic avatars and guest exposure`() {
         FlywayUpgradeMySqlContainer().use { database ->
             database.start()
             val dataSource = DriverManagerDataSource(database.jdbcUrl, database.username, database.password)
@@ -70,6 +70,7 @@ class MySqlFlywayMigrationTest(
                 ),
             ).isZero()
             insertAvatarBackfillFixtures(upgradeJdbc)
+            insertExposureBackfillFixtures(upgradeJdbc)
 
             val upgradeResult =
                 Flyway
@@ -79,7 +80,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(2)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(3)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -91,7 +92,7 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("44")
+            assertThat(latestVersion).isEqualTo("45")
             assertThat(
                 upgradeJdbc.queryForObject(
                     """
@@ -250,6 +251,65 @@ class MySqlFlywayMigrationTest(
                 "club_id,status,avatar_key",
                 indexColumns(upgradeJdbc, "memberships", "memberships_club_status_avatar_idx"),
             )
+            assertEquals(
+                "NO",
+                upgradeJdbc.queryForObject(
+                    """
+                    select is_nullable
+                    from information_schema.columns
+                    where table_schema = database()
+                      and table_name = 'sessions'
+                      and column_name = 'access_scope'
+                    """.trimIndent(),
+                    String::class.java,
+                ),
+            )
+            assertEquals(
+                "NO",
+                upgradeJdbc.queryForObject(
+                    """
+                    select is_nullable
+                    from information_schema.columns
+                    where table_schema = database()
+                      and table_name = 'public_session_publications'
+                      and column_name = 'site_visibility'
+                    """.trimIndent(),
+                    String::class.java,
+                ),
+            )
+            assertThat(checkConstraintClause(upgradeJdbc, "sessions_access_scope_check"))
+                .contains("HOST_ONLY", "GUEST_READABLE")
+            assertThat(checkConstraintClause(upgradeJdbc, "public_session_publications_site_visibility_check"))
+                .contains("HIDDEN", "PUBLIC_RECORD")
+            assertEquals(
+                "club_id,access_scope,state,number",
+                indexColumns(upgradeJdbc, "sessions", "sessions_club_access_state_number_idx"),
+            )
+            assertEquals(
+                0,
+                upgradeJdbc.queryForObject(
+                    """
+                    select count(*)
+                    from sessions
+                    where (id = '10000000-0000-0000-0000-000000000003' and access_scope <> 'GUEST_READABLE')
+                       or (id = '10000000-0000-0000-0000-000000000005' and access_scope <> 'GUEST_READABLE')
+                       or (id = '10000000-0000-0000-0000-000000000007' and access_scope <> 'GUEST_READABLE')
+                    """.trimIndent(),
+                    Int::class.java,
+                ),
+            )
+            assertEquals(
+                0,
+                upgradeJdbc.queryForObject(
+                    """
+                    select count(*)
+                    from public_session_publications
+                    where (session_id = '10000000-0000-0000-0000-000000000005' and site_visibility <> 'PUBLIC_RECORD')
+                       or (session_id = '10000000-0000-0000-0000-000000000007' and site_visibility <> 'HIDDEN')
+                    """.trimIndent(),
+                    Int::class.java,
+                ),
+            )
 
             val invalidAvatarError =
                 assertInvalidAvatarKeyRejected(upgradeJdbc, v43AvatarKeys().first())
@@ -302,6 +362,7 @@ class MySqlFlywayMigrationTest(
                     .configure()
                     .dataSource(dataSource)
                     .locations("classpath:db/mysql/migration")
+                    .target("44")
                     .load()
                     .migrate()
 
@@ -464,6 +525,38 @@ class MySqlFlywayMigrationTest(
                 String::class.java,
                 clubId,
             ).filterNotNull()
+
+    private fun insertExposureBackfillFixtures(jdbcTemplate: JdbcTemplate) {
+        listOf(
+            Triple("10000000-0000-0000-0000-000000000005", "PUBLISHED", "PUBLIC"),
+            Triple("10000000-0000-0000-0000-000000000007", "OPEN", "PUBLIC"),
+        ).forEachIndexed { index, (sessionId, state, visibility) ->
+            jdbcTemplate.update(
+                """
+                insert into sessions (
+                  id, club_id, number, title, book_title, book_author, session_date,
+                  start_time, end_time, location_label, question_deadline_at, state, visibility
+                ) values (?, '10000000-0000-0000-0000-000000000001', ?, 'Exposure fixture session',
+                          'Exposure fixture book', 'Example Author', '2026-07-24', '19:00:00', '21:00:00',
+                          'Example Room', '2026-07-23 12:00:00.000000', ?, ?)
+                """.trimIndent(),
+                sessionId,
+                index + 2,
+                state,
+                visibility,
+            )
+            jdbcTemplate.update(
+                """
+                insert into public_session_publications (
+                  id, club_id, session_id, public_summary, is_public, visibility, published_at
+                ) values (?, '10000000-0000-0000-0000-000000000001', ?, 'Exposure migration fixture',
+                          true, 'PUBLIC', '2026-07-24 22:00:00.000000')
+                """.trimIndent(),
+                if (index == 0) "10000000-0000-0000-0000-000000000006" else "10000000-0000-0000-0000-000000000008",
+                sessionId,
+            )
+        }
+    }
 
     private fun insertAvatarBackfillMembershipFixtures(
         jdbcTemplate: JdbcTemplate,

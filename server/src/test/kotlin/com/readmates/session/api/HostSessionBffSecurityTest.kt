@@ -142,6 +142,47 @@ class HostSessionBffSecurityTest(
     }
 
     @Test
+    fun `host access scope accepts trusted host bff and rejects missing identity secret or host role`() {
+        createDraftSession()
+
+        fun accessScopeRequest(
+            username: String,
+            secret: String? = "test-bff-secret",
+        ) = request(
+            HttpMethod.PATCH,
+            "/api/host/sessions/00000000-0000-0000-0000-000000009888/access-scope",
+        ).with(user(username))
+            .header("X-Readmates-Client-Contract", "v2")
+            .header("Origin", "http://localhost:3000")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""{"accessScope":"GUEST_READABLE"}""")
+            .also { builder -> secret?.let { builder.header("X-Readmates-Bff-Secret", it) } }
+
+        mockMvc.perform(accessScopeRequest("host@example.com")).andExpect(status().isOk)
+        assertEquals(
+            "GUEST_READABLE",
+            jdbcTemplate.queryForObject(
+                "select access_scope from sessions where id = '00000000-0000-0000-0000-000000009888'",
+                String::class.java,
+            ),
+        )
+
+        mockMvc
+            .perform(
+                request(
+                    HttpMethod.PATCH,
+                    "/api/host/sessions/00000000-0000-0000-0000-000000009888/access-scope",
+                ).header("X-Readmates-Bff-Secret", "test-bff-secret")
+                    .header("X-Readmates-Client-Contract", "v2")
+                    .header("Origin", "http://localhost:3000")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"accessScope":"HOST_ONLY"}"""),
+            ).andExpect(status().isUnauthorized)
+        mockMvc.perform(accessScopeRequest("host@example.com", null)).andExpect(status().isUnauthorized)
+        mockMvc.perform(accessScopeRequest("member5@example.com")).andExpect(status().isForbidden)
+    }
+
+    @Test
     fun `host open bff request reaches controller without spring csrf token`() {
         createDraftSession()
 
@@ -193,11 +234,11 @@ class HostSessionBffSecurityTest(
     }
 
     private fun createDraftSession() {
-        createSession(state = "DRAFT", visibility = "HOST_ONLY")
+        createSession(state = "DRAFT", visibility = "HOST_ONLY", accessScope = "HOST_ONLY")
     }
 
     private fun createOpenSession() {
-        createSession(state = "OPEN", visibility = "HOST_ONLY")
+        createSession(state = "OPEN", visibility = "HOST_ONLY", accessScope = "HOST_ONLY")
         jdbcTemplate.update(
             """
             insert into session_participants (id, club_id, session_id, membership_id, rsvp_status, attendance_status)
@@ -210,7 +251,7 @@ class HostSessionBffSecurityTest(
     }
 
     private fun createClosedPublicSession() {
-        createSession(state = "CLOSED", visibility = "PUBLIC")
+        createSession(state = "CLOSED", visibility = "PUBLIC", accessScope = "GUEST_READABLE")
         jdbcTemplate.update(
             """
             insert into public_session_publications (
@@ -220,6 +261,7 @@ class HostSessionBffSecurityTest(
               public_summary,
               is_public,
               visibility,
+              site_visibility,
               published_at
             )
             values (
@@ -229,6 +271,7 @@ class HostSessionBffSecurityTest(
               'BFF 공개 전환 테스트 요약입니다.',
               false,
               'PUBLIC',
+              'PUBLIC_RECORD',
               null
             )
             """.trimIndent(),
@@ -238,6 +281,7 @@ class HostSessionBffSecurityTest(
     private fun createSession(
         state: String,
         visibility: String,
+        accessScope: String,
     ) {
         jdbcTemplate.update(
             """
@@ -254,7 +298,8 @@ class HostSessionBffSecurityTest(
               location_label,
               question_deadline_at,
               state,
-              visibility
+              visibility,
+              access_scope
             )
             values (
               '00000000-0000-0000-0000-000000009888',
@@ -269,11 +314,13 @@ class HostSessionBffSecurityTest(
               '온라인',
               '2026-06-30 14:59:00',
               ?,
+              ?,
               ?
             )
             """.trimIndent(),
             state,
             visibility,
+            accessScope,
         )
     }
 

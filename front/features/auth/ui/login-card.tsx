@@ -1,5 +1,6 @@
 
 import { useState } from "react";
+import { MemberStartLink } from "@/shared/ui/member-start-link";
 
 export type DevAccount = {
   label: string;
@@ -9,6 +10,7 @@ export type DevAccount = {
 
 export function LoginCard({
   devAccounts = [],
+  browseHref,
   googleLoginHref = "/oauth2/authorization/google",
   googleLoginLabel = "Google로 시작하기",
   initialError = null,
@@ -18,8 +20,12 @@ export function LoginCard({
   copyStatus = null,
   onCopyLoginUrl,
   onDevLogin,
+  joinClub,
+  joinReturnTo,
+  chooseAccount = false,
 }: {
   devAccounts?: DevAccount[];
+  browseHref?: string;
   googleLoginHref?: string;
   googleLoginLabel?: string;
   initialError?: string | null;
@@ -29,6 +35,9 @@ export function LoginCard({
   copyStatus?: string | null;
   onCopyLoginUrl?: () => Promise<void>;
   onDevLogin?: (email: string, defaultRedirectPath?: string) => Promise<void>;
+  joinClub?: string;
+  joinReturnTo?: string;
+  chooseAccount?: boolean;
 }) {
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(initialError);
@@ -50,8 +59,8 @@ export function LoginCard({
       <p className="eyebrow">둘러보기부터 멤버 참여까지</p>
       <h1 className="h1 editorial">읽는사이 들어가기</h1>
       <p className="body auth-card__lede">
-        Google 계정으로 읽는사이에 입장합니다. 초대 링크가 없다면 둘러보기 멤버로 시작해 기록을 읽을 수 있고, 호스트
-        승인 뒤 참여 권한이 열립니다.
+        로그인 없이 공개된 클럽 기록을 둘러볼 수 있습니다. 멤버로 시작하면 Google 계정으로 참여 대기 상태가 열리고,
+        호스트 승인 뒤 활동 권한이 생깁니다.
       </p>
       {error ? (
         <p className="small auth-card__error" role="alert">
@@ -80,9 +89,16 @@ export function LoginCard({
             <button className="btn btn-primary btn-lg" type="button" onClick={() => void onCopyLoginUrl?.()}>
               로그인 주소 복사
             </button>
-            <a className="btn btn-ghost btn-lg" href={googleLoginHref}>
-              {googleLoginLabel}
-            </a>
+            {browseHref ? (
+              <a className="btn btn-ghost btn-lg" href={browseHref}>
+                둘러보기
+              </a>
+            ) : null}
+            {joinClub && joinReturnTo ? (
+              <MemberStartLink className="btn btn-ghost btn-lg" returnTo={joinReturnTo} clubSlug={joinClub} chooseAccount={chooseAccount}>
+                {googleLoginLabel}
+              </MemberStartLink>
+            ) : <a className="btn btn-ghost btn-lg" href={googleLoginHref}>{googleLoginLabel}</a>}
           </div>
           {copyStatus ? (
             <p className="small auth-browser-guidance__status" role="status" aria-live="polite">
@@ -92,9 +108,16 @@ export function LoginCard({
         </aside>
       ) : (
         <div className="auth-card__actions auth-card__actions--primary">
-          <a className="btn btn-primary btn-lg" href={googleLoginHref}>
-            {googleLoginLabel}
-          </a>
+          {browseHref ? (
+            <a className="btn btn-primary btn-lg" href={browseHref}>
+              둘러보기
+            </a>
+          ) : null}
+          {joinClub && joinReturnTo ? (
+            <MemberStartLink className={browseHref ? "btn btn-ghost btn-lg" : "btn btn-primary btn-lg"} returnTo={joinReturnTo} clubSlug={joinClub} chooseAccount={chooseAccount}>
+              {googleLoginLabel}
+            </MemberStartLink>
+          ) : <a className={browseHref ? "btn btn-ghost btn-lg" : "btn btn-primary btn-lg"} href={googleLoginHref}>{googleLoginLabel}</a>}
         </div>
       )}
       {showDevLogin ? (

@@ -3,6 +3,7 @@ package com.readmates.session.adapter.`in`.web
 import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.application.model.UpsertPublicationCommand
 import com.readmates.session.application.port.`in`.UpsertPublicationUseCase
+import com.readmates.session.domain.PublicSiteVisibility
 import com.readmates.shared.security.CurrentMember
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
@@ -13,14 +14,22 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
-data class PublicationRequest(
+data class HostSessionPublicationRequest(
     @field:NotBlank val publicSummary: String,
-    val visibility: SessionRecordVisibility,
+    val siteVisibility: PublicSiteVisibility? = null,
+    val visibility: SessionRecordVisibility? = null,
 ) {
     fun toCommand(
         host: CurrentMember,
         sessionId: UUID,
-    ): UpsertPublicationCommand = UpsertPublicationCommand(host, sessionId, publicSummary.trim(), visibility)
+    ): UpsertPublicationCommand =
+        UpsertPublicationCommand(
+            host,
+            sessionId,
+            publicSummary.trim(),
+            visibility ?: SessionRecordVisibility.HOST_ONLY,
+            siteVisibility,
+        )
 }
 
 @RestController
@@ -31,7 +40,7 @@ class PublicationController(
     @PutMapping
     fun publish(
         @PathVariable sessionId: String,
-        @Valid @RequestBody request: PublicationRequest,
+        @Valid @RequestBody request: HostSessionPublicationRequest,
         member: CurrentMember,
     ) = upsertPublicationUseCase.upsertPublication(request.toCommand(member, parseHostSessionId(sessionId)))
 }

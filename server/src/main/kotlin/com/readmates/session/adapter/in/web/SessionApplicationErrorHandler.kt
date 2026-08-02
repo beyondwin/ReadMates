@@ -12,6 +12,7 @@ import com.readmates.session.application.HostSessionRecordStagingRequiredExcepti
 import com.readmates.session.application.InvalidHostSessionCursorException
 import com.readmates.session.application.InvalidMembershipIdException
 import com.readmates.session.application.InvalidQuestionSetException
+import com.readmates.session.application.InvalidSessionExposureException
 import com.readmates.session.application.InvalidSessionScheduleException
 import com.readmates.session.application.OpenSessionAlreadyExistsException
 import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
@@ -37,6 +38,14 @@ class SessionApplicationErrorHandler {
             status = HttpStatus.CONFLICT,
             code = "SESSION_RECORD_STAGING_REQUIRED",
             message = "종료된 세션 기록은 초안에서 수정한 뒤 적용해 주세요.",
+        )
+
+    @ExceptionHandler(InvalidSessionExposureException::class)
+    fun handleInvalidExposure(): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            status = HttpStatus.CONFLICT,
+            code = "SESSION_EXPOSURE_INVALID",
+            message = "세션 공개 범위가 현재 세션 상태와 맞지 않습니다.",
         )
 
     @ExceptionHandler(

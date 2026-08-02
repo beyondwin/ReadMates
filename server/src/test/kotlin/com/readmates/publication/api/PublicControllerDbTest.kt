@@ -634,7 +634,7 @@ class PublicControllerDbTest(
 
         private const val INSERT_PUBLIC_PUBLICATION_MATRIX_PUBLICATIONS_SQL = """
             insert into public_session_publications (
-              id, club_id, session_id, public_summary, is_public, visibility, published_at
+              id, club_id, session_id, public_summary, is_public, visibility, site_visibility, published_at
             )
             values
             (
@@ -644,6 +644,7 @@ class PublicControllerDbTest(
               '호스트 전용 세션은 공개 상세에 노출되지 않습니다.',
               false,
               'HOST_ONLY',
+              'HIDDEN',
               null
             ),
             (
@@ -652,7 +653,8 @@ class PublicControllerDbTest(
               '00000000-0000-0000-0000-000000000991',
               '발행 공개 세션만 공개 상세에 노출됩니다.',
               true,
-              'PUBLIC',
+              'MEMBER',
+              'PUBLIC_RECORD',
               '2026-11-06 00:00:00.000000'
             ),
             (
@@ -662,6 +664,7 @@ class PublicControllerDbTest(
               '멤버 공개 세션은 공개 상세에 노출되지 않습니다.',
               false,
               'MEMBER',
+              'HIDDEN',
               null
             ),
             (
@@ -671,6 +674,7 @@ class PublicControllerDbTest(
               '종료 공개 세션은 발행 전 공개 상세에 노출되지 않습니다.',
               false,
               'PUBLIC',
+              'HIDDEN',
               null
             ),
             (
@@ -680,6 +684,7 @@ class PublicControllerDbTest(
               '예정 공개 세션은 공개 상세에 노출되지 않습니다.',
               false,
               'PUBLIC',
+              'HIDDEN',
               null
             ),
             (
@@ -689,6 +694,7 @@ class PublicControllerDbTest(
               '진행 공개 세션은 공개 상세에 노출되지 않습니다.',
               false,
               'PUBLIC',
+              'HIDDEN',
               null
             );
         """
@@ -709,7 +715,7 @@ class PublicControllerDbTest(
 
         private const val INSERT_PUBLIC_OPEN_PUBLICATION_SQL = """
             insert into public_session_publications (
-              id, club_id, session_id, public_summary, is_public, visibility, published_at
+              id, club_id, session_id, public_summary, is_public, visibility, site_visibility, published_at
             )
             values (
               '00000000-0000-0000-0000-000000001998',
@@ -718,6 +724,7 @@ class PublicControllerDbTest(
               '외부 공개 테스트 요약입니다.',
               true,
               'PUBLIC',
+              'PUBLIC_RECORD',
               '2026-04-25 00:00:00.000000'
             );
         """
@@ -738,7 +745,7 @@ class PublicControllerDbTest(
 
         private const val INSERT_MEMBER_PUBLISHED_PUBLICATION_SQL = """
             insert into public_session_publications (
-              id, club_id, session_id, public_summary, is_public, visibility, published_at
+              id, club_id, session_id, public_summary, is_public, visibility, site_visibility, published_at
             )
             values (
               '00000000-0000-0000-0000-000000001997',
@@ -747,6 +754,7 @@ class PublicControllerDbTest(
               '멤버 공개 테스트 요약입니다.',
               true,
               'MEMBER',
+              'HIDDEN',
               '2026-04-25 00:00:00.000000'
             );
         """
@@ -767,7 +775,7 @@ class PublicControllerDbTest(
 
         private const val INSERT_HOST_ONLY_PUBLISHED_PUBLICATION_SQL = """
             insert into public_session_publications (
-              id, club_id, session_id, public_summary, is_public, visibility, published_at
+              id, club_id, session_id, public_summary, is_public, visibility, site_visibility, published_at
             )
             values (
               '00000000-0000-0000-0000-000000001996',
@@ -776,6 +784,7 @@ class PublicControllerDbTest(
               '호스트 공개 테스트 요약입니다.',
               true,
               'HOST_ONLY',
+              'HIDDEN',
               '2026-04-25 00:00:00.000000'
             );
         """

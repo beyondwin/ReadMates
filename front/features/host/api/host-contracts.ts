@@ -6,6 +6,10 @@ import type {
   HostNotificationComposerContext,
   SessionRecordStatus,
 } from "./host-session-record-contracts";
+import type {
+  PublicSiteVisibility,
+  SessionAccessScope,
+} from "../model/session-exposure-model";
 export type { AttendanceStatus, RsvpStatus, SessionState } from "@/shared/model/readmates-types";
 export type { CurrentSessionResponse } from "@/shared/model/current-session-contracts";
 
@@ -494,6 +498,8 @@ export type HostSessionListItem = {
   locationLabel: string;
   state: SessionState;
   visibility: SessionRecordVisibility;
+  accessScope?: SessionAccessScope;
+  siteVisibility?: PublicSiteVisibility;
   recordStatus: SessionRecordStatus;
   needsAttention: boolean;
   hasDraft: boolean;
@@ -518,6 +524,10 @@ export type HostSessionVisibilityRequest = {
   visibility: SessionRecordVisibility;
 };
 
+export type HostSessionAccessScopeRequest = {
+  accessScope: SessionAccessScope;
+};
+
 export type HostSessionVisibilityUpdateResult = {
   session: HostSessionDetailResponse;
   composer: HostNotificationComposerContext | null;
@@ -526,12 +536,20 @@ export type HostSessionVisibilityUpdateResult = {
 export type HostSessionPublication = {
   publicSummary: string;
   visibility: SessionRecordVisibility;
+  siteVisibility?: PublicSiteVisibility;
 };
 
-export type HostSessionPublicationRequest = {
-  publicSummary: string;
-  visibility: SessionRecordVisibility;
-};
+export type HostSessionPublicationRequest =
+  | {
+      publicSummary: string;
+      siteVisibility: PublicSiteVisibility;
+      visibility?: SessionRecordVisibility;
+    }
+  | {
+      publicSummary: string;
+      visibility: SessionRecordVisibility;
+      siteVisibility?: PublicSiteVisibility;
+    };
 
 export type SessionImportRecordRequest = {
   authorName: string;
@@ -616,6 +634,8 @@ export type HostSessionDetailResponse = {
   endTime: string;
   questionDeadlineAt: string;
   visibility: SessionRecordVisibility;
+  accessScope?: SessionAccessScope;
+  siteVisibility?: PublicSiteVisibility;
   publication: HostSessionPublication | null;
   state: SessionState;
   attendees: Array<{
@@ -722,10 +742,13 @@ export const HostSessionDetailResponseSchema = z.object({
       endTime: z.string(),
       questionDeadlineAt: z.string(),
       visibility: z.enum(["HOST_ONLY", "MEMBER", "PUBLIC"]),
+      accessScope: z.enum(["HOST_ONLY", "GUEST_READABLE"]).optional(),
+      siteVisibility: z.enum(["HIDDEN", "PUBLIC_RECORD"]).optional(),
       publication: z
         .object({
           publicSummary: z.string(),
           visibility: z.enum(["HOST_ONLY", "MEMBER", "PUBLIC"]),
+          siteVisibility: z.enum(["HIDDEN", "PUBLIC_RECORD"]).optional(),
         })
         .nullable(),
       state: z.enum(["DRAFT", "OPEN", "PUBLISHED", "CLOSED"]),

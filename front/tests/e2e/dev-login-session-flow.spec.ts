@@ -61,9 +61,9 @@ test("host creates member-visible upcoming session then starts it", async ({ pag
   await page.goto("/app/host");
   await page.locator("main.rm-host-dashboard-desktop details.rm-host-flow > summary").click();
   const visibilityResponse = page.waitForResponse(
-    (response) => response.url().includes("/api/bff/api/host/sessions/") && response.url().includes("/visibility") && response.status() === 200,
+    (response) => response.url().includes("/api/bff/api/host/sessions/") && response.url().includes("/access-scope") && response.status() === 200,
   );
-  await page.getByRole("button", { name: /E2E 예정 책 공개 범위를 멤버 공개로 변경/ }).click();
+  await page.getByRole("button", { name: /E2E 예정 책 게스트 접근을 게스트 공개로 변경/ }).click();
   await visibilityResponse;
   await expect(page.getByRole("dialog", { name: "알림 보내기" })).toBeVisible();
   await page.getByRole("button", { name: "이번에는 보내지 않기" }).click();

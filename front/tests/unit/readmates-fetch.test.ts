@@ -19,9 +19,13 @@ describe("readmatesFetchResponse", () => {
     expect(normalizedClubSlug(null)).toBe("");
   });
 
-  it("redirects to login and rejects when the BFF returns 401", async () => {
+  it("redirects to login with the exact return target by default when the BFF returns 401", async () => {
     const assignMock = vi.fn();
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 401 }));
+    const causes: string[] = [];
+    window.addEventListener("readmates:session-expired", ((event: CustomEvent) => {
+      causes.push(event.detail.cause);
+    }) as EventListener, { once: true });
     vi.stubGlobal("fetch", fetchMock);
     vi.stubGlobal("location", {
       assign: assignMock,
@@ -46,6 +50,7 @@ describe("readmatesFetchResponse", () => {
     expect(assignMock).toHaveBeenCalledWith(
       "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp%2Ffeedback%2Fsession-1%3Ffrom%3Demail",
     );
+    expect(causes).toEqual([]);
   });
 
   it("preserves FormData uploads by leaving Content-Type unset", async () => {

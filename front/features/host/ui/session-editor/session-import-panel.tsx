@@ -8,6 +8,7 @@ import {
   sessionImportReplacementWarning,
   type SessionImportReview,
 } from "@/features/host/model/session-import-model";
+import { compatibilityExposureLabel } from "@/features/host/model/session-exposure-model";
 
 export type SessionImportPanelBodyProps = {
   sessionId: string | undefined;
@@ -60,7 +61,7 @@ export function SessionImportPanelBody({
       <button className="btn btn-primary" type="button" disabled={!canCommit} onClick={onCommit}>
         {status === "committing" ? "초안으로 가져오는 중" : "초안으로 가져오기"}
       </button>
-      <div className="tiny">현재 선택한 공개 범위: {recordVisibility}</div>
+      <div className="tiny">현재 선택한 게스트 접근: {compatibilityExposureLabel[recordVisibility]}</div>
     </div>
   );
 }

@@ -1,3 +1,5 @@
+import { normalizedClubSlug } from "@/shared/security/club-slug";
+
 const excludedReturnPathPatterns = [
   /^\/login(?:[/?#]|$)/i,
   /^\/oauth2(?:[/?#]|$)/i,
@@ -44,14 +46,40 @@ export function loginPathForReturnTo(rawValue: string | null | undefined) {
 
 export function oauthHrefForReturnTo(
   rawValue: string | null | undefined,
-  { chooseAccount = false }: { chooseAccount?: boolean } = {},
+  { chooseAccount = false, joinClub, joinIntent }: { chooseAccount?: boolean; joinClub?: string; joinIntent?: string } = {},
 ) {
   const returnTo = safeRelativeReturnTo(rawValue);
   const query = new URLSearchParams();
   if (returnTo) query.set("returnTo", returnTo);
   if (chooseAccount) query.set("chooseAccount", "true");
+  const scopedClubSlug = scopedAppClubSlug(returnTo);
+  const normalizedJoinClub = normalizedClubSlug(joinClub);
+  if (scopedClubSlug && normalizedJoinClub === scopedClubSlug && joinIntent && /^[A-Za-z0-9_-]{32,128}$/.test(joinIntent)) {
+    query.set("joinClub", scopedClubSlug);
+    query.set("joinIntent", joinIntent);
+  }
   const search = query.toString();
   return `/oauth2/authorization/google${search ? `?${search}` : ""}`;
+}
+
+export function scopedAppClubSlug(rawValue: string | null | undefined) {
+  const returnTo = safeRelativeReturnTo(rawValue);
+  const rawPath = returnTo?.split(/[?#]/, 1)[0];
+  if (!rawPath) return null;
+
+  const rawSegments = rawPath.split("/").slice(1);
+  const pathSegments = rawSegments.at(-1) === "" ? rawSegments.slice(0, -1) : rawSegments;
+  if (
+    pathSegments.length < 3 ||
+    pathSegments[0] !== "clubs" ||
+    pathSegments[2] !== "app" ||
+    pathSegments.some((segment) => !canonicalRawPathSegment.test(segment) || segment === "." || segment === "..")
+  ) {
+    return null;
+  }
+
+  const clubSlug = normalizedClubSlug(pathSegments[1]);
+  return clubSlug && clubSlug === pathSegments[1] ? clubSlug : null;
 }
 
 function isRootPath(value: string) {
@@ -93,3 +121,5 @@ function hasControlCharacter(value: string) {
   }
   return false;
 }
+
+const canonicalRawPathSegment = /^[a-zA-Z0-9._~-]+$/;

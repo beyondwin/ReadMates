@@ -6,7 +6,7 @@ import {
   loginRecoveryFromSearch,
 } from "@/features/auth/model/login-recovery";
 import { LoginCard, type DevAccount } from "@/features/auth/ui/login-card";
-import { oauthHrefForReturnTo, safeRelativeReturnTo } from "@/shared/auth/login-return";
+import { oauthHrefForReturnTo, safeRelativeReturnTo, scopedAppClubSlug } from "@/shared/auth/login-return";
 import { PageMetadataHead } from "@/shared/ui/page-metadata-head";
 
 const devAccounts: DevAccount[] = [
@@ -44,6 +44,7 @@ export function LoginRouteContent() {
   const search = globalThis.location.search;
   const recovery = loginRecoveryFromSearch(search);
   const returnTo = loginReturnTo(globalThis.location.search);
+  const joinClub = scopedAppClubSlug(returnTo);
   const isKakaoBrowser = isKakaoInAppBrowser(globalThis.navigator.userAgent);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const showDevLogin = isDevLoginEnabled();
@@ -73,8 +74,9 @@ export function LoginRouteContent() {
   return (
     <LoginCard
       devAccounts={devAccounts}
-      googleLoginHref={oauthHrefForReturnTo(returnTo, { chooseAccount: recovery.chooseAccount })}
-      googleLoginLabel={isKakaoBrowser ? "Google 로그인 시도" : recovery.googleActionLabel}
+      browseHref={joinClub ? returnTo ?? undefined : undefined}
+      googleLoginHref={oauthHrefForReturnTo(returnTo, { chooseAccount: recovery.chooseAccount, joinClub: joinClub ?? undefined })}
+      googleLoginLabel={isKakaoBrowser ? "Google 로그인 시도" : recovery.chooseAccount ? recovery.googleActionLabel : joinClub ? "멤버로 시작" : recovery.googleActionLabel}
       initialError={recovery.errorMessage}
       showDevLogin={showDevLogin}
       showGoogleLogin={isGoogleLoginEnabled(showDevLogin)}
@@ -82,6 +84,9 @@ export function LoginRouteContent() {
       copyStatus={copyStatus}
       onCopyLoginUrl={isKakaoBrowser ? copyLoginUrl : undefined}
       onDevLogin={loginAsDevAccount}
+      joinClub={joinClub ?? undefined}
+      joinReturnTo={joinClub ? returnTo ?? undefined : undefined}
+      chooseAccount={recovery.chooseAccount}
     />
   );
 }

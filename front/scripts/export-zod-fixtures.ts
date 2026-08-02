@@ -37,6 +37,8 @@ const hostSessionDetail = {
   endTime: "21:30",
   questionDeadlineAt: "2025-11-25T14:59:00Z",
   visibility: "PUBLIC",
+  accessScope: "GUEST_READABLE",
+  siteVisibility: "PUBLIC_RECORD",
   publication: null,
   state: "PUBLISHED",
   attendees: [],
@@ -284,6 +286,24 @@ const aigenRecentJob = {
 
 const aigenClubDefault = { defaultModel: "gemini-3-flash-preview" };
 
+const guestArchiveDetail = {
+  sessionId: "00000000-0000-0000-0000-000000000301",
+  sessionNumber: 1,
+  title: "1회차 · 팩트풀니스",
+  bookTitle: "팩트풀니스",
+  bookAuthor: "한스 로슬링",
+  bookImageUrl: null,
+  date: "2025-11-26",
+  attendance: 1,
+  total: 1,
+  state: "PUBLISHED",
+  summary: "공개 요약",
+  highlights: [{ text: "공개 하이라이트", sortOrder: 1, authorName: null, authorShortName: null, avatarKey: null }],
+  questions: [{ priority: 1, text: "공개 질문", draftThought: null, authorName: "가람", authorShortName: "가람", avatarKey: "open-book" }],
+  oneLiners: [{ text: "공개 한줄평", authorName: "가람", authorShortName: "가람", avatarKey: "open-book" }],
+  longReviews: [{ title: "가람의 서평", content: "공개 서평", authorName: "가람", authorShortName: "가람", avatarKey: "open-book" }],
+};
+
 function write(filename: string, data: unknown): void {
   const path = join(fixturesDir, filename);
   writeFileSync(path, JSON.stringify(data, null, 2) + "\n", "utf-8");
@@ -303,3 +323,4 @@ write("aigen-problem.json", aigenProblem);
 write("aigen-start.json", aigenStart);
 write("aigen-recent-job.json", aigenRecentJob);
 write("aigen-club-default.json", aigenClubDefault);
+write("guest-archive-detail.json", guestArchiveDetail);

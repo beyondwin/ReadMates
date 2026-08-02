@@ -91,7 +91,7 @@ Smoke verifier는 provider redirect URL을 터미널에 출력하지 않고 redi
 
 실행 순서는 다음과 같습니다.
 
-- `./server/gradlew -p server check`
+- `./server/gradlew -p server --no-build-cache --rerun-tasks check`
 
 `check`는 `unitTest`, `architectureTest`, ktlint, detekt, JaCoCo verification을 함께 실행합니다. Docker/Testcontainers가 필요한 `integrationTest`는 의도적으로 별도 lane으로 유지합니다.
 
