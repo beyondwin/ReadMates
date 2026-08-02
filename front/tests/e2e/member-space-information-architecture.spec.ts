@@ -19,39 +19,33 @@ async function expectPracticalTapTarget(locator: Locator) {
   expect(box!.width).toBeGreaterThanOrEqual(44);
 }
 
-async function expectCompactProfileEditor(shelf: Locator, viewportWidth: number) {
-  const form = shelf.locator(".rm-member-profile__form");
-  const input = shelf.getByRole("textbox", { name: "표시 이름" });
-  const save = shelf.getByRole("button", { name: "이름 저장" });
-  const cancel = shelf.getByRole("button", { name: "취소" });
+async function expectProfileEditorDialog(page: Page, viewportWidth: number) {
+  const dialog = page.getByRole("dialog", { name: "프로필 편집" });
+  const input = dialog.getByRole("textbox", { name: "표시 이름" });
+  const avatar = dialog.getByRole("button", { name: "아바타 선택" });
+  const save = dialog.getByRole("button", { name: "변경사항 저장" });
+  const cancel = dialog.getByRole("button", { name: "취소" });
 
+  await expect(dialog).toBeVisible();
+  await expect(input).toBeFocused();
   await expectPracticalTapTarget(input);
+  await expectPracticalTapTarget(avatar);
   await expectPracticalTapTarget(save);
   await expectPracticalTapTarget(cancel);
 
-  const [formBox, inputBox, saveBox, cancelBox] = await Promise.all([
-    form.boundingBox(),
+  const [dialogBox, inputBox, saveBox, cancelBox] = await Promise.all([
+    dialog.boundingBox(),
     input.boundingBox(),
     save.boundingBox(),
     cancel.boundingBox(),
   ]);
-  expect(formBox).not.toBeNull();
+  expect(dialogBox).not.toBeNull();
   expect(inputBox).not.toBeNull();
   expect(saveBox).not.toBeNull();
   expect(cancelBox).not.toBeNull();
-  expect(formBox!.width).toBeLessThanOrEqual(480.5);
-  expect(Math.abs(saveBox!.width - cancelBox!.width)).toBeLessThanOrEqual(1);
-  expect(saveBox!.width).toBeGreaterThanOrEqual(71.5);
-
-  if (viewportWidth > 768) {
-    expect(inputBox!.width).toBeLessThanOrEqual(320.5);
-    expect(Math.abs(
-      (inputBox!.y + inputBox!.height) - (saveBox!.y + saveBox!.height),
-    )).toBeLessThanOrEqual(1);
-  } else {
-    expect(saveBox!.y).toBeGreaterThanOrEqual(inputBox!.y + inputBox!.height + 7);
-    expect(Math.abs(saveBox!.y - cancelBox!.y)).toBeLessThanOrEqual(1);
-  }
+  expect(dialogBox!.width).toBeLessThanOrEqual(viewportWidth + 0.5);
+  expect(Math.abs(saveBox!.y - cancelBox!.y)).toBeLessThanOrEqual(1);
+  expect(await page.evaluate(() => document.body.style.overflow)).toBe("hidden");
 
   const focusStyle = await input.evaluate((element) => {
     const style = getComputedStyle(element);
@@ -61,9 +55,8 @@ async function expectCompactProfileEditor(shelf: Locator, viewportWidth: number)
       outlineWidth: Number.parseFloat(style.outlineWidth),
     };
   });
-  expect(focusStyle.boxShadow).toBe("none");
-  expect(focusStyle.outlineStyle).toBe("solid");
-  expect(focusStyle.outlineWidth).toBeGreaterThanOrEqual(2);
+  const hasVisibleOutline = focusStyle.outlineStyle === "solid" && focusStyle.outlineWidth >= 2;
+  expect(hasVisibleOutline || focusStyle.boxShadow !== "none").toBe(true);
 }
 
 async function expectDomOrder(...locators: Locator[]) {
@@ -110,8 +103,8 @@ async function expectMemberSpaceSemanticOrder(page: Page) {
   await expectDomOrder(
     overview,
     shelf.getByRole("heading", { level: 1, name: "멤버1" }),
-    shelf.getByRole("button", { name: "이름 변경" }),
     shelf.getByText("읽는사이 · 멤버 · 2025.11부터 함께"),
+    shelf.getByRole("button", { name: "프로필 편집" }),
     shelf.getByRole("heading", { level: 2, name: "세 번의 모임에서 세 권을 끝까지 읽었어요." }),
     shelf.getByText("함께한 모임", { exact: true }),
     shelf.getByText("완독", { exact: true }),
@@ -241,7 +234,7 @@ test("member space keeps the profile-first semantic order and usable actions acr
     ).toBe(true);
     await expectMemberSpaceSemanticOrder(page);
 
-    const editProfile = shelf.getByRole("button", { name: "이름 변경" });
+    const editProfile = shelf.getByRole("button", { name: "프로필 편집" });
     await expectPracticalTapTarget(editProfile);
 
     await page.evaluate(() => {
@@ -250,10 +243,7 @@ test("member space keeps the profile-first semantic order and usable actions acr
     await pressTabUntilFocused(page, editProfile, "edit profile");
 
     await editProfile.click();
-    await expect(
-      shelf.getByRole("heading", { level: 1, name: "멤버1" }),
-    ).toHaveClass(/rm-sr-only/);
-    await expectCompactProfileEditor(shelf, viewport.width);
+    await expectProfileEditorDialog(page, viewport.width);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -284,16 +274,13 @@ test("member space keeps the profile-first semantic order and usable actions acr
   await expect(firstRecent.locator(".rm-recent-reading-row__arrow"))
     .toHaveCSS("transform", "none");
 
-  await page.setViewportSize({ width: 640, height: 900 });
+  await page.setViewportSize({ width: 320, height: 700 });
   await page.goto(`${scopedAppPath}/me`);
-  await page.evaluate(() => {
-    document.body.style.zoom = "200%";
-  });
   await expectMemberSpaceSemanticOrder(page);
   const shelf = page.locator(".rm-member-space");
-  const editProfile = shelf.getByRole("button", { name: "이름 변경" });
+  const editProfile = shelf.getByRole("button", { name: "프로필 편집" });
   await editProfile.click();
-  await expectCompactProfileEditor(shelf, 320);
+  await expectProfileEditorDialog(page, 320);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -330,7 +317,7 @@ test("long identity wraps without inventing a missing joined month", async ({
   )).toBeVisible();
   await expect(shelf.getByText(/부터 함께/)).toHaveCount(0);
   await expectPracticalTapTarget(
-    shelf.getByRole("button", { name: "이름 변경" }),
+    shelf.getByRole("button", { name: "프로필 편집" }),
   );
   expect(
     await page.evaluate(

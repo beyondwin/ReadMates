@@ -50,6 +50,7 @@ test("mobile review keeps the ledger and editor usable and shows evidence in a f
   await expect(page.getByText("검토 원장")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText("0/4 검토 완료")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(await page.evaluate(() => window.matchMedia("(max-width: 768px)").matches)).toBe(true);
 
   const evidenceButton = page.getByRole("button", { name: "요약 문단 1 근거 보기" });
   await evidenceButton.focus();

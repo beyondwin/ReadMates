@@ -381,11 +381,9 @@ test("member space preserves a profile-first layout from desktop to narrow mobil
     await page.goto("/app/me");
 
     const shelf = page.locator(".rm-member-space");
-    const nameRow = shelf.locator(".rm-member-profile__name-row");
-    const editProfile = shelf.getByRole("button", { name: "이름 변경" });
+    const editProfile = shelf.getByRole("button", { name: "프로필 편집" });
     await expect(shelf.getByRole("heading", { level: 1, name: "호스트" })).toHaveCount(1);
     await expect(shelf.getByRole("heading", { level: 2, name: "세 번의 모임에서 세 권을 끝까지 읽었어요." })).toHaveCount(1);
-    await expect(nameRow).toHaveCount(1);
     await expectDomOrder(
       shelf.getByRole("heading", { level: 1, name: "호스트" }),
       editProfile,
