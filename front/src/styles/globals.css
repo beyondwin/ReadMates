@@ -5850,41 +5850,8 @@ a.rm-recent-record__destination:hover {
   padding: 18px 4px;
 }
 
-.rm-member-space-breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  color: var(--muted);
-  font-size: var(--type-size-supporting);
-  font-weight: 650;
-}
-
-.rm-member-space-breadcrumb a {
-  color: var(--accent);
-  text-decoration: none;
-}
-
-.rm-member-space-breadcrumb a:hover {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.rm-member-space-breadcrumb a:focus-visible {
-  border-radius: 4px;
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 3px;
-}
-
-.rm-member-notifications-header__eyebrow {
-  color: var(--muted);
-  font: 600 var(--type-size-label)/var(--type-leading-label) var(--f-sans);
-  font-feature-settings: "zero", "cv01";
-  letter-spacing: 0.08em;
-}
-
 .rm-member-notifications-header__title {
-  margin: 6px 0 0;
+  margin: 0;
   font-size: clamp(30px, 4vw, 40px);
   font-weight: 500;
   letter-spacing: -0.025em;
@@ -7674,7 +7641,8 @@ a.rm-recent-record__destination:hover {
 
 .rm-member-notification-settings__surface {
   margin-top: 18px;
-  border-block: 1px solid var(--line);
+  border-top: 1px solid var(--line);
+  border-bottom: 0;
 }
 
 .rm-member-notification-settings__row {
@@ -7991,9 +7959,7 @@ a.rm-recent-record__destination:hover {
 
   .rm-account-settings-page__back,
   .rm-account-settings-page .rm-my-shelf-kicker,
-  .rm-my-records-page .rm-my-shelf-kicker,
-  .rm-member-space-breadcrumb,
-  .rm-member-notifications-header__eyebrow {
+  .rm-my-records-page .rm-my-shelf-kicker {
     display: none;
   }
 

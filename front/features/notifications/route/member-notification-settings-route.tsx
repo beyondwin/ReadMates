@@ -28,7 +28,6 @@ export function MemberNotificationSettingsRoute() {
   const location = useLocation();
   const revalidator = useRevalidator();
   const basePath = scopedAppLinkTarget(location.pathname, "/app");
-  const mySpaceHref = scopedAppLinkTarget(location.pathname, "/app/me");
   const currentSource = useMemo(
     () => ({ source: data, scope: basePath }),
     [data, basePath],
@@ -108,7 +107,6 @@ export function MemberNotificationSettingsRoute() {
     <MemberNotificationSettingsPage
       state={state}
       basePath={basePath}
-      mySpaceHref={mySpaceHref}
       saving={saving}
       saveError={saveError}
       onEmailEnabledChange={(enabled) => {
