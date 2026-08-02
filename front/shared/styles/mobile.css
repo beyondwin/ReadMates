@@ -96,6 +96,46 @@
   html .rm-avatar-picker__save {
     width: 100%;
   }
+
+  html .rm-profile-editor__scrim {
+    display: block;
+  }
+
+  html .rm-profile-editor {
+    width: 100vw;
+    height: 100dvh;
+    box-shadow: none;
+  }
+
+  html .rm-profile-editor__header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: max(14px, var(--m-safe-top)) 14px 12px;
+  }
+
+  html .rm-profile-editor__body {
+    padding: 22px 16px 32px;
+    scrollbar-gutter: auto;
+  }
+
+  html .rm-profile-editor__footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    padding: 12px 16px max(12px, var(--m-safe-bottom));
+  }
+
+  html .rm-profile-editor .rm-avatar-picker__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  html .rm-profile-editor .rm-avatar-picker__tile {
+    min-width: 44px;
+    min-height: 76px;
+    padding: 7px;
+  }
 }
 
 .m-app {

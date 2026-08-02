@@ -120,7 +120,7 @@ describe("MyPageRoute", () => {
     renderRoute();
 
     expect(screen.getByRole("heading", { level: 1, name: "샘플 멤버" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "아바타 바꾸기" }).querySelector("img")).toHaveAttribute(
+    expect(screen.getByRole("img", { name: /아바타/ })).toHaveAttribute(
       "src",
       "/assets/avatars/book-club/cloud-green-book.webp",
     );
@@ -164,30 +164,24 @@ describe("MyPageRoute", () => {
     const onProfileUpdated = vi.fn().mockResolvedValue(undefined);
     renderRoute("/clubs/reading-sai/app/me", onProfileUpdated);
 
-    await user.click(screen.getByRole("button", { name: "이름 변경" }));
+    await user.click(screen.getByRole("button", { name: "프로필 편집" }));
     const displayName = screen.getByRole("textbox", { name: "표시 이름" });
     await user.clear(displayName);
     await user.type(displayName, "변경한 멤버");
-    await user.click(screen.getByRole("button", { name: "이름 저장" }));
-
-    expect(mutations.profile).toHaveBeenCalledWith({
-      displayName: "변경한 멤버",
-      avatarKey: "cloud-green-book",
-    });
-    expect(await screen.findByRole("heading", { level: 1, name: "변경한 멤버" })).toBeVisible();
-
-    await user.click(screen.getByRole("button", { name: "아바타 바꾸기" }));
-    const dialog = screen.getByRole("dialog", { name: "나의 아바타 선택" });
+    await user.click(screen.getByRole("button", { name: "아바타 선택" }));
+    const dialog = screen.getByRole("dialog", { name: "아바타 선택" });
     await user.click(within(dialog).getByRole("button", {
       name: "초록 책을 읽는 바나나 선택",
     }));
-    await user.click(within(dialog).getByRole("button", { name: "이 아바타로 변경" }));
+    expect(mutations.profile).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole("button", { name: "프로필로 돌아가기" }));
+    await user.click(screen.getByRole("button", { name: "변경사항 저장" }));
 
     expect(mutations.profile).toHaveBeenLastCalledWith({
       displayName: "변경한 멤버",
       avatarKey: "banana-green-book",
     });
-    expect(onProfileUpdated).toHaveBeenCalledTimes(2);
-    expect(route.revalidate).toHaveBeenCalledTimes(2);
+    expect(onProfileUpdated).toHaveBeenCalledTimes(1);
+    expect(route.revalidate).toHaveBeenCalledTimes(1);
   });
 });
