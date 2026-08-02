@@ -24,8 +24,16 @@ export function AvatarPicker({ value, onChange, disabled, errorId }: AvatarPicke
             disabled={disabled}
             onClick={() => onChange(key)}
           >
-            <AvatarChip avatarKey={key} name={null} label="" size={52} />
-            {selected ? <span className="rm-avatar-picker__check" aria-hidden="true"><CheckIcon /></span> : null}
+            <AvatarChip avatarKey={key} name={null} label="" sizeRole="picker" />
+            <span className="rm-avatar-picker__label">{label}</span>
+            {selected ? (
+              <span
+                className="rm-avatar-picker__check rm-avatar-picker__check--filled"
+                aria-hidden="true"
+              >
+                <CheckIcon />
+              </span>
+            ) : null}
           </button>
         );
       })}
@@ -34,5 +42,9 @@ export function AvatarPicker({ value, onChange, disabled, errorId }: AvatarPicke
 }
 
 function CheckIcon() {
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 10 3 3 7-7" /></svg>;
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6.2 12.2 10.1 16 18 7.8" />
+    </svg>
+  );
 }

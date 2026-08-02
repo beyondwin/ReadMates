@@ -280,7 +280,7 @@ test("AvatarPicker alone owns the selected and focus ring", async ({ mount }) =>
   const component = await mount(
     <div className="rm-profile-editor">
       <button type="button" className="rm-avatar-picker__tile" aria-label="한 장 더 읽는 바나나, 초록 책을 읽는 바나나 선택" aria-pressed="true">
-        <AvatarChip avatarKey="banana-green-book" name={null} label="" size={52} />
+        <AvatarChip avatarKey="banana-green-book" name={null} label="" sizeRole="picker" />
       </button>
     </div>,
   );
@@ -290,6 +290,7 @@ test("AvatarPicker alone owns the selected and focus ring", async ({ mount }) =>
   await selected.focus();
   await expect(selected).toBeFocused();
   await expectFrameFreeArtwork(avatar);
-  expect(await selected.evaluate((element) => getComputedStyle(element, "::after").borderTopWidth)).toBe("2px");
-  expect(await selected.evaluate((element) => getComputedStyle(element, "::after").borderTopColor)).not.toBe("rgba(0, 0, 0, 0)");
+  expect(await selected.evaluate((element) => getComputedStyle(element).borderTopWidth)).toBe("2px");
+  expect(await selected.evaluate((element) => getComputedStyle(element).outlineStyle)).not.toBe("none");
+  expect(await selected.evaluate((element) => getComputedStyle(element).outlineWidth)).toBe("2px");
 });

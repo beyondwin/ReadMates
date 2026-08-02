@@ -64,17 +64,6 @@
     padding: 7px;
   }
 
-  html .rm-avatar-picker__tile .rm-avatar-chip {
-    --avatar-size: 48px !important;
-  }
-
-  html .rm-avatar-picker__check {
-    top: 3px;
-    right: 3px;
-    width: 20px;
-    height: 20px;
-  }
-
   html .rm-avatar-picker__footer {
     position: sticky;
     bottom: 0;
@@ -137,8 +126,8 @@
 
   html .rm-profile-editor .rm-avatar-picker__tile {
     min-width: 44px;
-    min-height: 76px;
-    padding: 7px;
+    min-height: 148px;
+    padding: 38px 6px 10px;
   }
 }
 

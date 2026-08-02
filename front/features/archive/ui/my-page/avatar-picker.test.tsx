@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { AvatarPicker } from "./avatar-picker";
@@ -13,9 +13,21 @@ describe("AvatarPicker", () => {
 
     const choices = screen.getAllByRole("button", { name: /선택$/ });
     expect(choices).toHaveLength(30);
-    expect(screen.getByRole("button", {
+    const selected = screen.getByRole("button", {
       name: "한 장 더 읽는 바나나, 초록 책을 읽는 바나나 선택",
-    })).toHaveAttribute("aria-pressed", "true");
+    });
+    expect(selected).toHaveAttribute("aria-pressed", "true");
+    expect(within(selected).getByText("한 장 더 읽는 바나나")).toHaveClass(
+      "rm-avatar-picker__label",
+    );
+    expect(selected.querySelector(".rm-avatar-chip")).toHaveAttribute(
+      "data-avatar-size-role",
+      "picker",
+    );
+    expect(selected.querySelector(".rm-avatar-picker__check")).toHaveClass(
+      "rm-avatar-picker__check--filled",
+    );
+    expect(screen.getAllByText(/./, { selector: ".rm-avatar-picker__label" })).toHaveLength(30);
     expect(container.querySelectorAll(".rm-avatar-picker__check")).toHaveLength(1);
 
     await user.click(screen.getByRole("button", {
