@@ -45,9 +45,19 @@ export type JourneyYearGroup = {
   items: MyJourneyItem[];
 };
 
-export type MemberSpaceMetric = {
-  label: "함께한 모임" | "완독" | "질문" | "서평";
+export type MemberSpaceJourneyStat = {
+  kind: "sessions" | "completed";
+  label: "함께한 모임" | "함께 완독한 책";
   value: string;
+  unit: "회" | "권";
+};
+
+export type MemberSpaceRecordTrace = {
+  kind: "questions" | "reviews";
+  label: "대화를 연 질문" | "남긴 서평";
+  description: "책에서 시작된 생각의 기록" | "읽고 난 마음을 풀어낸 기록";
+  value: string;
+  unit: "개" | "편";
 };
 
 export type RecentReadingFeedbackStatus =
@@ -70,9 +80,9 @@ export type RecentReadingPreviewItem = {
 
 export type MemberSpaceViewModel = {
   profileMetaLabel: string;
-  achievementHeading: string;
-  achievementBody: "함께 읽는 시간이 차분히 쌓이고 있습니다.";
-  metrics: MemberSpaceMetric[];
+  achievementHeading: "읽고, 묻고, 기록해 온 시간";
+  journeyStats: MemberSpaceJourneyStat[];
+  recordTraces: MemberSpaceRecordTrace[];
 };
 
 const UNKNOWN_YEAR = "연도 미상";
@@ -199,33 +209,36 @@ export function buildMemberSpaceViewModel(input: {
 
   return {
     profileMetaLabel: profileMetaParts.join(" · "),
-    achievementHeading: achievementHeading(input.summary),
-    achievementBody: "함께 읽는 시간이 차분히 쌓이고 있습니다.",
-    metrics: memberSpaceMetrics(input.summary),
+    achievementHeading: "읽고, 묻고, 기록해 온 시간",
+    journeyStats: [
+      {
+        kind: "sessions",
+        label: "함께한 모임",
+        value: String(input.summary.attendedSessionCount),
+        unit: "회",
+      },
+      {
+        kind: "completed",
+        label: "함께 완독한 책",
+        value: String(input.summary.completedReadingCount),
+        unit: "권",
+      },
+    ],
+    recordTraces: [
+      {
+        kind: "questions",
+        label: "대화를 연 질문",
+        description: "책에서 시작된 생각의 기록",
+        value: String(input.summary.questionCount),
+        unit: "개",
+      },
+      {
+        kind: "reviews",
+        label: "남긴 서평",
+        description: "읽고 난 마음을 풀어낸 기록",
+        value: String(input.summary.reviewCount),
+        unit: "편",
+      },
+    ],
   };
-}
-
-function countWord(count: number, counter: "번" | "권") {
-  const native = count === 1 ? "한" : count === 2 ? "두" : count === 3 ? "세" : String(count);
-  return `${native}${count <= 3 ? " " : ""}${counter}`;
-}
-
-function achievementHeading(summary: MyJourneySummary) {
-  if (summary.attendedSessionCount === 0) {
-    return "첫 모임부터 이곳에 독서 기록이 쌓여요.";
-  }
-  if (summary.completedReadingCount === 0) {
-    return `${countWord(summary.attendedSessionCount, "번")}의 모임을 함께했어요.`;
-  }
-  return `${countWord(summary.attendedSessionCount, "번")}의 모임에서 ${countWord(summary.completedReadingCount, "권")}을 끝까지 읽었어요.`;
-}
-
-function memberSpaceMetrics(summary: MyJourneySummary): MemberSpaceMetric[] {
-  const metrics: MemberSpaceMetric[] = [
-    { label: "함께한 모임", value: String(summary.attendedSessionCount) },
-    { label: "완독", value: String(summary.completedReadingCount) },
-  ];
-  if (summary.questionCount > 0) metrics.push({ label: "질문", value: String(summary.questionCount) });
-  if (summary.reviewCount > 0) metrics.push({ label: "서평", value: String(summary.reviewCount) });
-  return metrics;
 }

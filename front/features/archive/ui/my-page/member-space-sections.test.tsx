@@ -12,8 +12,16 @@ const profile: MyPageProfile = {
   currentSessionId: null, recentAttendances: [],
 };
 const viewModel: MemberSpaceViewModel = {
-  profileMetaLabel: "읽는사이 · 멤버 · 2025.11부터 함께", achievementHeading: "함께 읽은 기록",
-  achievementBody: "차분히 쌓이고 있습니다.", metrics: [],
+  profileMetaLabel: "읽는사이 · 멤버 · 2025.11부터 함께",
+  achievementHeading: "읽고, 묻고, 기록해 온 시간",
+  journeyStats: [
+    { kind: "sessions", label: "함께한 모임", value: "7", unit: "회" },
+    { kind: "completed", label: "함께 완독한 책", value: "3", unit: "권" },
+  ],
+  recordTraces: [
+    { kind: "questions", label: "대화를 연 질문", description: "책에서 시작된 생각의 기록", value: "5", unit: "개" },
+    { kind: "reviews", label: "남긴 서평", description: "읽고 난 마음을 풀어낸 기록", value: "0", unit: "편" },
+  ],
 };
 
 describe("MemberProfileSummary", () => {

@@ -9,7 +9,18 @@ import { ReadingAchievementSummary } from "./reading-achievement-summary";
 import type { RecentReadingListItem } from "./recent-reading-list";
 
 const profile: MyPageProfile = { avatarKey: "banana-green-book", displayName: "멤버1", accountName: "member-one", email: "member1@example.com", role: "MEMBER", membershipStatus: "ACTIVE", clubName: "읽는사이", joinedAt: "2025-11", sessionCount: 7, totalSessionCount: 7, completedReadingCount: 3, currentSessionId: null, recentAttendances: [] };
-const viewModel: MemberSpaceViewModel = { profileMetaLabel: "읽는사이 · 멤버 · 2025.11부터 함께", achievementHeading: "일곱 번의 모임에서 세 권을 끝까지 읽었어요.", achievementBody: "함께 읽는 시간이 차분히 쌓이고 있습니다.", metrics: [{ label: "함께한 모임", value: "7" }, { label: "완독", value: "3" }, { label: "질문", value: "5" }, { label: "서평", value: "2" }] };
+const viewModel: MemberSpaceViewModel = {
+  profileMetaLabel: "읽는사이 · 멤버 · 2025.11부터 함께",
+  achievementHeading: "읽고, 묻고, 기록해 온 시간",
+  journeyStats: [
+    { kind: "sessions", label: "함께한 모임", value: "7", unit: "회" },
+    { kind: "completed", label: "함께 완독한 책", value: "3", unit: "권" },
+  ],
+  recordTraces: [
+    { kind: "questions", label: "대화를 연 질문", description: "책에서 시작된 생각의 기록", value: "5", unit: "개" },
+    { kind: "reviews", label: "남긴 서평", description: "읽고 난 마음을 풀어낸 기록", value: "0", unit: "편" },
+  ],
+};
 const recentReadings: RecentReadingListItem[] = [{ sessionId: "session-7", sessionNumberLabel: "7차", dateLabel: "2026.07.20", bookTitle: "최근 함께 읽은 책", bookAuthor: "테스트 저자", bookImageUrl: null, coverFallbackLabel: "최", activityLabels: ["질문 2"], feedbackStatus: "피드백 O", href: "/app/sessions/session-7" }];
 const save = vi.fn(async (editable) => ({ ...editable, accountName: profile.accountName }));
 
