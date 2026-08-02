@@ -1,5 +1,48 @@
-import { describe, expect, it } from "vitest";
-import { combineArchiveListPages } from "./archive-queries";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { MemberArchiveSessionDetailResponse } from "@/features/archive/api/archive-contracts";
+
+const archiveApi = vi.hoisted(() => ({
+  fetchArchiveSessions: vi.fn(),
+  fetchMemberArchiveSession: vi.fn(),
+  fetchMyArchiveQuestions: vi.fn(),
+  fetchMyArchiveReviews: vi.fn(),
+  fetchMyFeedbackDocuments: vi.fn(),
+  fetchNotesFeed: vi.fn(),
+}));
+
+vi.mock("@/features/archive/api/archive-api", () => archiveApi);
+
+import { combineArchiveListPages, fetchMemberArchiveSessionQueryData } from "./archive-queries";
+
+const session: MemberArchiveSessionDetailResponse = {
+  sessionId: "session-7",
+  sessionNumber: 7,
+  title: "지난 모임",
+  bookTitle: "기록 책",
+  bookAuthor: "기록 작가",
+  bookImageUrl: null,
+  date: "2026-07-01",
+  state: "CLOSED",
+  locationLabel: "Room 7",
+  attendance: 4,
+  total: 5,
+  myAttendanceStatus: "ATTENDED",
+  isHost: false,
+  publicSummary: "공개 요약",
+  publicHighlights: [{ text: "작성자가 있는 문장", sortOrder: 1, authorName: "기존 작성자", authorShortName: "기존", avatarKey: "book" }],
+  clubQuestions: [],
+  clubOneLiners: [],
+  publicOneLiners: [],
+  myQuestions: [],
+  myCheckin: null,
+  myOneLineReview: null,
+  myLongReview: null,
+  feedbackDocument: { available: false, readable: false, lockedReason: "NOT_AVAILABLE", title: null, uploadedAt: null },
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 describe("combineArchiveListPages", () => {
   it("appends next-page items per archive surface and keeps the trailing cursor", () => {
@@ -20,5 +63,41 @@ describe("combineArchiveListPages", () => {
 
     expect(combined.sessions.items.map((item) => item.sessionId)).toEqual(["s1", "s2"]);
     expect(combined.sessions.nextCursor).toBeNull();
+  });
+});
+
+describe("fetchMemberArchiveSessionQueryData", () => {
+  it("does not derive public long reviews from one protected notes page", async () => {
+    archiveApi.fetchMemberArchiveSession.mockResolvedValue(session);
+    archiveApi.fetchNotesFeed.mockResolvedValue({
+      items: Array.from({ length: 60 }, (_, index) => ({
+          sessionId: "session-7",
+          sessionNumber: 7,
+          bookTitle: "기록 책",
+          date: "2026-07-01",
+          authorName: `서평 작성자 ${index + 1}`,
+          authorShortName: `서평 ${index + 1}`,
+          avatarKey: "turtle",
+          kind: "LONG_REVIEW",
+          text: `보호 피드의 서평 ${index + 1}`,
+      })),
+      nextCursor: "protected-notes-page-2",
+    });
+
+    const result = await fetchMemberArchiveSessionQueryData("session-7", { clubSlug: "reading-sai" });
+
+    expect(result).not.toHaveProperty("clubLongReviews");
+  });
+
+  it("keeps protected session detail available when optional notes enrichment fails", async () => {
+    archiveApi.fetchMemberArchiveSession.mockResolvedValue({
+      ...session,
+      publicHighlights: [{ ...session.publicHighlights[0], authorName: null, authorShortName: null }],
+    });
+    archiveApi.fetchNotesFeed.mockRejectedValue(new Error("notes unavailable"));
+
+    await expect(fetchMemberArchiveSessionQueryData("session-7")).resolves.toMatchObject({
+      sessionId: "session-7",
+    });
   });
 });

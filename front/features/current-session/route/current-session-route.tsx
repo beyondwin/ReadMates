@@ -9,6 +9,7 @@ import {
   useSaveCurrentSessionQuestionsMutation,
   useUpdateCurrentSessionRsvpMutation,
 } from "@/features/current-session/queries/current-session-queries";
+import { memberCurrentSessionReadPage } from "@/features/current-session/model/current-session-read-view";
 import type { CurrentSessionRouteData } from "@/features/current-session/route/current-session-data";
 import { CurrentSessionPage, type CurrentSessionSaveActions } from "@/features/current-session/ui/current-session-page";
 import type { CurrentSessionInternalLinkProps, InternalLinkComponent } from "@/features/current-session/ui/current-session-types";
@@ -16,6 +17,7 @@ import {
   RECOVER_READ_SESSION_EXPIRY,
   type ReadmatesApiContext,
 } from "@/shared/api/client";
+import { readSurfaceCapabilitiesForAuth } from "@/shared/model/read-surface-capabilities";
 export { CurrentSessionRouteError } from "./current-session-route-error";
 
 function contextFromClubSlug(clubSlug?: string): ReadmatesApiContext | undefined {
@@ -44,6 +46,11 @@ export function CurrentSessionRoute({
   const saveQuestionsMutation = useSaveCurrentSessionQuestionsMutation(context);
   const saveLongReviewMutation = useSaveCurrentSessionLongReviewMutation(context);
   const saveOneLineReviewMutation = useSaveCurrentSessionOneLineReviewMutation(context);
+  const currentData = currentQuery.data ?? loaderData.current;
+  const currentSessionPage = memberCurrentSessionReadPage(
+    currentData,
+    readSurfaceCapabilitiesForAuth(loaderData.auth),
+  );
 
   const currentSessionSaveActions = useMemo<CurrentSessionSaveActions>(
     () => ({
@@ -65,7 +72,7 @@ export function CurrentSessionRoute({
   return (
     <CurrentSessionPage
       auth={loaderData.auth}
-      data={currentQuery.data ?? loaderData.current}
+      data={currentSessionPage}
       actions={currentSessionSaveActions}
       internalLinkComponent={internalLinkComponent}
     />

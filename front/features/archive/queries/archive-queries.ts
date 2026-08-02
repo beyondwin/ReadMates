@@ -115,7 +115,11 @@ export async function fetchMemberArchiveSessionQueryData(
 ): Promise<MemberArchiveSessionDetailResponse | null> {
   const session = await fetchMemberArchiveSession(sessionId, context, policy);
 
-  if (!session || session.publicHighlights.every((highlight) => highlight.authorName)) {
+  if (!session) {
+    return null;
+  }
+
+  if (session.publicHighlights.every((highlight) => highlight.authorName)) {
     return session;
   }
 

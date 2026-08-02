@@ -1,4 +1,4 @@
-import { type CSSProperties, type KeyboardEvent } from "react";
+import { type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import type {
   ArchiveQuestionItem,
   ArchiveReviewItem,
@@ -74,6 +74,8 @@ export function ArchiveMobile({
   questions,
   reviews,
   reports,
+  canReadFeedback,
+  feedbackLockedAction,
   hasMoreSessions,
   hasMoreQuestions,
   hasMoreReviews,
@@ -90,6 +92,8 @@ export function ArchiveMobile({
   questions: ArchiveQuestionItem[];
   reviews: ArchiveReviewItem[];
   reports: FeedbackDocumentListItem[];
+  canReadFeedback: boolean;
+  feedbackLockedAction?: ReactNode;
   hasMoreSessions: boolean;
   hasMoreQuestions: boolean;
   hasMoreReviews: boolean;
@@ -147,7 +151,7 @@ export function ArchiveMobile({
       <MobileArchiveSectionIntro view={view} />
       {view === "sessions" ? (
         <>
-          <ArchiveMobileSessions sessions={sessions} />
+          <ArchiveMobileSessions sessions={sessions} canReadFeedback={canReadFeedback} />
           <MobileLoadMoreButton visible={hasMoreSessions} onLoadMore={onLoadMoreSessions} />
         </>
       ) : null}
@@ -164,10 +168,14 @@ export function ArchiveMobile({
         </>
       ) : null}
       {view === "report" ? (
-        <>
-          <ArchiveMobileReports reports={reports} sessions={sessions} />
-          <MobileLoadMoreButton visible={hasMoreReports} onLoadMore={onLoadMoreReports} />
-        </>
+        canReadFeedback ? (
+          <>
+            <ArchiveMobileReports reports={reports} sessions={sessions} />
+            <MobileLoadMoreButton visible={hasMoreReports} onLoadMore={onLoadMoreReports} />
+          </>
+        ) : (
+          <ArchiveMobileFeedbackLocked action={feedbackLockedAction} />
+        )
       ) : null}
     </div>
   );
@@ -190,7 +198,7 @@ function MobileArchiveSectionIntro({ view }: { view: ArchiveView }) {
   );
 }
 
-function ArchiveMobileSessions({ sessions }: { sessions: ArchiveSessionRecord[] }) {
+function ArchiveMobileSessions({ sessions, canReadFeedback }: { sessions: ArchiveSessionRecord[]; canReadFeedback: boolean }) {
   if (sessions.length === 0) {
     return <MobileEmptyState message="아직 저장된 모임 기록이 없습니다." />;
   }
@@ -198,10 +206,7 @@ function ArchiveMobileSessions({ sessions }: { sessions: ArchiveSessionRecord[] 
   return (
     <section className="m-sec">
       <div className="stack" style={{ "--stack": "10px" } as CSSProperties}>
-        {sessions.map((session) => {
-          const feedbackCopy = feedbackDocumentCopy(session.feedbackDocument);
-
-          return (
+        {sessions.map((session) => (
             <Link
               key={session.id}
               to={appSessionHref(session.id)}
@@ -228,19 +233,39 @@ function ArchiveMobileSessions({ sessions }: { sessions: ArchiveSessionRecord[] 
                   <span className={session.published ? "badge badge-ok badge-dot" : "badge badge-readonly badge-dot"}>
                     {publicationLabel(session.published, "mobile")}
                   </span>
-                  <span
-                    className={feedbackArchiveBadgeClass(session.feedbackDocument)}
-                    title={feedbackCopy.ariaLabel}
-                    aria-label={feedbackCopy.ariaLabel}
-                  >
-                    {feedbackArchiveLabel(session.feedbackDocument)}
-                  </span>
+                  {canReadFeedback ? <ArchiveMobileSessionFeedbackBadge session={session} /> : null}
                 </div>
               </div>
               <SessionAction />
             </Link>
-          );
-        })}
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ArchiveMobileSessionFeedbackBadge({ session }: { session: ArchiveSessionRecord }) {
+  const feedbackCopy = feedbackDocumentCopy(session.feedbackDocument);
+
+  return (
+    <span
+      className={feedbackArchiveBadgeClass(session.feedbackDocument)}
+      title={feedbackCopy.ariaLabel}
+      aria-label={feedbackCopy.ariaLabel}
+    >
+      {feedbackArchiveLabel(session.feedbackDocument)}
+    </span>
+  );
+}
+
+function ArchiveMobileFeedbackLocked({ action }: { action?: ReactNode }) {
+  return (
+    <section className="m-sec">
+      <div className="m-card-quiet" role="note" style={{ padding: "18px" }}>
+        <p className="body editorial" style={{ margin: 0, overflowWrap: "anywhere" }}>
+          피드백 문서는 정식 멤버에게 열립니다
+        </p>
+        {action ? <div style={{ marginTop: "14px" }}>{action}</div> : null}
       </div>
     </section>
   );

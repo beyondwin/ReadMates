@@ -1,12 +1,18 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import MemberHome from "@/features/member-home/ui/member-home";
+import MemberHomeReadSurface from "@/features/member-home/ui/member-home";
+import {
+  guestMemberHomeReadView,
+  memberHomeReadViewFromRouteData,
+  type MemberHomeReadView,
+} from "@/features/member-home/model/member-home-read-view";
 import { memberHomeLoader } from "@/features/member-home/route/member-home-data";
 import type {
   MemberHomeAuth as AuthMeResponse,
   MemberHomeCurrentSessionView as CurrentSessionResponse,
   MemberHomeNoteFeedItemView as NoteFeedItem,
   MemberHomeUpcomingSessionView as MemberHomeUpcomingSession,
+  MemberHomeView,
 } from "@/features/member-home/model/member-home-view-model";
 import type { MemberHomeLinkComponent } from "@/features/member-home/ui/member-home-link";
 import type { PagedResponse } from "@/shared/model/paging";
@@ -134,7 +140,46 @@ const TrackingLink: MemberHomeLinkComponent = ({ to, children, ...props }) => (
   </a>
 );
 
+type MemberHomeTestProps =
+  | { view: MemberHomeReadView; LinkComponent?: MemberHomeLinkComponent }
+  | (MemberHomeView & { LinkComponent?: MemberHomeLinkComponent });
+
+function MemberHome(props: MemberHomeTestProps) {
+  if ("view" in props) {
+    return <MemberHomeReadSurface {...props} />;
+  }
+
+  const { LinkComponent, ...routeData } = props;
+  return (
+    <MemberHomeReadSurface
+      view={memberHomeReadViewFromRouteData(routeData)}
+      LinkComponent={LinkComponent}
+    />
+  );
+}
+
 describe("MemberHome", () => {
+  it.each([
+    [
+      "member",
+      memberHomeReadViewFromRouteData({ auth, current, noteFeedItems, upcomingSessions }),
+    ],
+    [
+      "guest",
+      guestMemberHomeReadView({
+        current: { currentSession: null },
+        upcoming: { items: [], nextCursor: null },
+        recentNotes: { items: [], nextCursor: null },
+      }),
+    ],
+  ])("keeps the regular home section structure for a %s read view", (_audience, view) => {
+    render(<MemberHome view={view} />);
+
+    for (const sectionName of ["홈 요약", "이번 세션", "최근 기록", "예정 세션"]) {
+      expect(screen.getAllByRole("region", { name: sectionName }).length).toBeGreaterThan(0);
+    }
+  });
+
   it("loads upcoming sessions for member home", async () => {
     const fetchMock = vi.fn((url: string) => {
       if (url === "/api/bff/api/auth/me") return Promise.resolve(jsonResponse(auth));

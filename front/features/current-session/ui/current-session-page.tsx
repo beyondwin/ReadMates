@@ -9,6 +9,7 @@ import {
   CheckinPanel,
   LongReviewPanel,
   MyStatusCard,
+  OneLineReviewPanel,
   RosterList,
   RsvpPanel,
   SessionMeta,
@@ -19,6 +20,7 @@ import type {
   CurrentSessionInternalLinkProps,
   CurrentSessionPageData,
   InternalLinkComponent,
+  RsvpStatus,
   RsvpUpdateStatus,
   SaveScope,
   SaveState,
@@ -41,7 +43,7 @@ import {
   type CurrentSessionBoardTab,
 } from "@/features/current-session/model/current-session-view-model";
 import { BookCover } from "@/shared/ui/book-cover";
-import { formatDateLabel, formatDeadlineLabel, rsvpLabel } from "@/shared/ui/readmates-display";
+import { formatDateLabel, formatDeadlineLabel } from "@/shared/ui/readmates-display";
 import { SessionTimingIdentity } from "@/shared/ui/session-identity";
 
 const emptySaveStatuses: Record<SaveScope, SaveState> = {
@@ -71,7 +73,7 @@ function AnchorInternalLink({ href, children, ...props }: CurrentSessionInternal
 type CurrentSessionPageProps = {
   auth?: CurrentSessionAuth;
   data: CurrentSessionPageData;
-  actions: CurrentSessionSaveActions;
+  actions?: CurrentSessionSaveActions;
   internalLinkComponent: InternalLinkComponent;
   onSaveSuccess?: () => void;
 };
@@ -135,21 +137,22 @@ export function CurrentSessionBoard({
 }: {
   session: CurrentSession;
   auth?: CurrentSessionAuth;
-  actions: CurrentSessionSaveActions;
+  actions?: CurrentSessionSaveActions;
   onSaveSuccess?: () => void;
 }) {
-  const [rsvp, setRsvp] = useState<CurrentSession["myRsvpStatus"]>(session.myRsvpStatus);
+  const [rsvp, setRsvp] = useState<RsvpStatus>(session.myRsvpStatus ?? "NO_RESPONSE");
   const [readingProgress, setReadingProgress] = useState(session.myCheckin?.readingProgress ?? 0);
   const [questionInputs, setQuestionInputs] = useState<QuestionInput[]>(() => initialQuestionInputs(session.myQuestions));
   const [questionValidationMessage, setQuestionValidationMessage] = useState("");
   const [longReview, setLongReview] = useState(session.myLongReview?.body ?? "");
-  const oneLineReview = session.myOneLineReview?.text ?? "";
+  const [oneLineReview, setOneLineReview] = useState(session.myOneLineReview?.text ?? "");
   const [saveStatuses, setSaveStatuses] = useState<Record<SaveScope, SaveState>>(emptySaveStatuses);
   const [boardTab, setBoardTab] = useState<CurrentSessionBoardTab>("questions");
   const [mobileTab, setMobileTab] = useState<MobileSessionTab>("prep");
   const writtenQuestionCount = countWrittenQuestions(questionInputs);
-  const accessState = getCurrentSessionAccessState(auth);
-  const { isViewer, canWrite } = accessState;
+  const accessState = getCurrentSessionAccessState(auth, session.capabilities);
+  const { isViewer, canReadFeedback } = accessState;
+  const canWrite = accessState.canWrite && actions !== undefined;
   const memberNotice = getCurrentSessionMemberNotice(accessState);
   const boardTabs = getCurrentSessionBoardTabs(session.board);
   const readingLoopSummary = getCurrentSessionReadingLoopSummary({
@@ -242,10 +245,10 @@ export function CurrentSessionBoard({
     }
 
     setQuestionValidationMessage("");
-    void runSave("question", () => actions.saveQuestions(validQuestionPayload));
+    void runSave("question", () => actions?.saveQuestions(validQuestionPayload));
   };
 
-  const runSave = async (scope: SaveScope, operation: () => Promise<void>) => {
+  const runSave = async (scope: SaveScope, operation: () => Promise<void> | undefined) => {
     setSaveStatus(scope, "saving");
 
     try {
@@ -265,15 +268,16 @@ export function CurrentSessionBoard({
     const previousRsvp = rsvp;
     setRsvp(status);
     setSaveStatus("rsvp", "saving");
-    void actions.updateRsvp(status)
-      .then(() => {
+    void (async () => {
+      try {
+        await actions?.updateRsvp(status);
         setSaveStatus("rsvp", "saved");
         onSaveSuccess?.();
-      })
-      .catch(() => {
+      } catch {
         setRsvp(previousRsvp);
         setSaveStatus("rsvp", "error");
-      });
+      }
+    })();
   };
 
   const handleBoardTab = (tab: CurrentSessionBoardTab) => {
@@ -333,12 +337,21 @@ export function CurrentSessionBoard({
     setLongReview(value);
   };
 
+  const handleOneLineReviewChange = (value: string) => {
+    if (!canWrite) {
+      return;
+    }
+
+    resetSaveStatus("oneLineReview");
+    setOneLineReview(value);
+  };
+
   const handleSaveCheckin = () => {
     if (blockReadOnlyWrite()) {
       return;
     }
 
-    void runSave("checkin", () => actions.saveCheckin(readingProgress));
+    void runSave("checkin", () => actions?.saveCheckin(readingProgress));
   };
 
   const handleSaveLongReview = () => {
@@ -346,7 +359,15 @@ export function CurrentSessionBoard({
       return;
     }
 
-    void runSave("longReview", () => actions.saveLongReview(longReview));
+    void runSave("longReview", () => actions?.saveLongReview(longReview));
+  };
+
+  const handleSaveOneLineReview = () => {
+    if (blockReadOnlyWrite()) {
+      return;
+    }
+
+    void runSave("oneLineReview", () => actions?.saveOneLineReview(oneLineReview));
   };
 
   return (
@@ -366,18 +387,22 @@ export function CurrentSessionBoard({
         longReview={longReview}
         onLongReviewChange={handleLongReviewChange}
         oneLineReview={oneLineReview}
+        onOneLineReviewChange={handleOneLineReviewChange}
         checkinSaveStatus={saveStatuses.checkin}
         questionSaveStatus={saveStatuses.question}
         longReviewSaveStatus={saveStatuses.longReview}
+        oneLineReviewSaveStatus={saveStatuses.oneLineReview}
         rsvpSaveStatus={saveStatuses.rsvp}
         onRsvpChange={handleRsvp}
         mobileTab={mobileTab}
         onMobileTabChange={handleMobileTab}
         onSaveCheckin={handleSaveCheckin}
         onSaveLongReview={handleSaveLongReview}
-        isViewer={isViewer}
+        onSaveOneLineReview={handleSaveOneLineReview}
         memberNotice={memberNotice}
         canWrite={canWrite}
+        canReadFeedback={canReadFeedback}
+        isViewer={isViewer}
         readingLoopSummary={readingLoopSummary}
       />
 
@@ -393,8 +418,8 @@ export function CurrentSessionBoard({
                     {session.bookTitle}
                   </h1>
                   <div className="small">
-                    {session.bookAuthor} · {formatDateLabel(session.date)} · {session.startTime} – {session.endTime} ·{" "}
-                    {session.locationLabel}
+                    {session.bookAuthor} · {formatDateLabel(session.date)} · {session.startTime} – {session.endTime}
+                    {session.locationLabel ? ` · ${session.locationLabel}` : ""}
                   </div>
                 </div>
               </div>
@@ -424,28 +449,20 @@ export function CurrentSessionBoard({
             </div>
 
             <div className="ws-grid">
-              {isViewer ? (
-                <ViewerSessionReadOnly
-                  session={session}
-                  rsvp={rsvp}
-                  readingProgress={readingProgress}
-                  longReview={longReview}
-                  oneLineReview={oneLineReview}
-                  memberNotice={memberNotice}
-                />
-              ) : (
+              <div className="stack" style={{ "--stack": "20px" } as CSSProperties}>
+                {!canWrite ? <ReadOnlyMemberNotice message={memberNotice?.message ?? "현재 세션은 읽기 전용입니다."} /> : null}
                 <fieldset
                   className="stack"
                   disabled={!canWrite}
+                  aria-describedby={!canWrite ? "current-session-read-only-note" : undefined}
                   style={{ "--stack": "20px", border: 0, margin: 0, padding: 0, minWidth: 0 } as CSSProperties}
                 >
-                  {memberNotice?.kind === "suspended" ? <SuspendedMemberNotice message={memberNotice.message} /> : null}
 
                   <section aria-labelledby="attendance-rsvp-heading">
                     <div className="eyebrow" id="attendance-rsvp-heading" style={{ marginBottom: "10px" }}>
                       참석 여부
                     </div>
-                    <RsvpPanel rsvp={rsvp} saveStatus={saveStatuses.rsvp} onRsvp={handleRsvp} />
+                    <RsvpPanel rsvp={rsvp} saveStatus={saveStatuses.rsvp} onRsvp={handleRsvp} disabled={!canWrite} />
                   </section>
 
                   <section aria-labelledby="reading-record-heading">
@@ -458,6 +475,7 @@ export function CurrentSessionBoard({
                       saveStatus={saveStatuses.checkin}
                       onReadingProgressChange={handleReadingProgressChange}
                       onSave={handleSaveCheckin}
+                      disabled={!canWrite}
                     />
                   </section>
 
@@ -475,6 +493,20 @@ export function CurrentSessionBoard({
                       onAddQuestion={addQuestionInput}
                       onRemoveQuestion={removeQuestionInput}
                       onSaveQuestions={handleSaveQuestions}
+                      disabled={!canWrite}
+                    />
+                  </section>
+
+                  <section aria-labelledby="one-line-review-heading">
+                    <div className="eyebrow" id="one-line-review-heading" style={{ marginBottom: "10px" }}>
+                      한줄평
+                    </div>
+                    <OneLineReviewPanel
+                      oneLineReview={oneLineReview}
+                      saveStatus={saveStatuses.oneLineReview}
+                      onChange={handleOneLineReviewChange}
+                      onSave={handleSaveOneLineReview}
+                      disabled={!canWrite}
                     />
                   </section>
 
@@ -483,9 +515,10 @@ export function CurrentSessionBoard({
                     saveStatus={saveStatuses.longReview}
                     onChange={handleLongReviewChange}
                     onSave={handleSaveLongReview}
+                    disabled={!canWrite}
                   />
                 </fieldset>
-              )}
+              </div>
 
               <aside className="stack" style={{ "--stack": "20px" } as CSSProperties}>
                 <MyStatusCard
@@ -560,162 +593,15 @@ export function CurrentSessionBoard({
   );
 }
 
-function SuspendedMemberNotice({ message }: { message: string }) {
+function ReadOnlyMemberNotice({ message }: { message: string }) {
   return (
-    <div
-      className="surface-quiet"
-      role="note"
-      style={{
-        padding: "16px 18px",
-        borderColor: "var(--danger)",
-        color: "var(--danger)",
-      }}
-    >
-      <p className="small" style={{ margin: 0 }}>
-        {message}
-      </p>
-    </div>
-  );
-}
-
-function ViewerMemberNotice({ message }: { message: string }) {
-  return (
-    <div className="surface-quiet" role="note" style={{ padding: "16px 18px" }}>
+    <div className="surface-quiet" role="note" id="current-session-read-only-note" style={{ padding: "16px 18px" }}>
       <p className="eyebrow" style={{ margin: 0 }}>
-        둘러보기 멤버
+        읽기 전용
       </p>
       <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
         {message}
       </p>
-      <p className="small" style={{ color: "var(--text-2)", margin: "4px 0 0" }}>
-        정식 멤버가 되면 RSVP와 질문 작성 기능이 열립니다.
-      </p>
-    </div>
-  );
-}
-
-function ViewerSessionReadOnly({
-  session,
-  rsvp,
-  readingProgress,
-  longReview,
-  oneLineReview,
-  memberNotice,
-}: {
-  session: CurrentSession;
-  rsvp: CurrentSession["myRsvpStatus"];
-  readingProgress: number;
-  longReview: string;
-  oneLineReview: string;
-  memberNotice: ReturnType<typeof getCurrentSessionMemberNotice>;
-}) {
-  const questions = session.myQuestions.filter((question) => question.text.trim());
-  const reviewItems = [
-    {
-      label: "한줄평",
-      title: "보존된 한줄평",
-      body: oneLineReview.trim() || "아직 남긴 한줄평이 없습니다.",
-    },
-    {
-      label: "서평",
-      title: "보존된 서평",
-      body: longReview.trim() || "아직 남긴 서평이 없습니다.",
-    },
-  ];
-
-  return (
-    <div className="stack" style={{ "--stack": "20px" } as CSSProperties}>
-      {memberNotice?.kind === "viewer" ? <ViewerMemberNotice message={memberNotice.message} /> : null}
-
-      <section className="surface" aria-labelledby="viewer-session-detail-heading" style={{ padding: "28px" }}>
-        <div className="eyebrow">읽기 전용 세션 상세</div>
-        <h2 id="viewer-session-detail-heading" className="h4 editorial" style={{ margin: "6px 0 0" }}>
-          기록은 읽을 수 있고, 새 참여 기록은 정식 멤버만 남길 수 있습니다
-        </h2>
-        <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
-          둘러보기 멤버는 RSVP, 읽기 진행률, 질문, 서평을 저장할 수 없습니다. 기존 기록과 공동 보드, 피드백 문서 접근 상태는 읽기 전용으로 확인할 수 있어요.
-        </p>
-        <div className="grid-2" style={{ marginTop: "18px" }}>
-          <ReadOnlyMetric label="RSVP" value={rsvpLabel(rsvp)} />
-          <ReadOnlyMetric label="읽기 진행률" value={`${readingProgress}%`} />
-          <ReadOnlyMetric label="토론 질문" value={`${questions.length}개`} />
-          <ReadOnlyMetric label="피드백 문서" value="정식 멤버 전환 후" />
-        </div>
-      </section>
-
-      <section className="surface" aria-labelledby="viewer-checkin-heading" style={{ padding: "28px" }}>
-        <div className="eyebrow" id="viewer-checkin-heading">
-          읽기 진행률
-        </div>
-        <div className="h4 editorial" style={{ marginTop: "6px" }}>
-          {readingProgress}%
-        </div>
-        <p className="small" style={{ color: "var(--text-2)", margin: "10px 0 0", whiteSpace: "pre-wrap" }}>
-          진행률은 내 준비 상태와 호스트 운영 확인에 사용됩니다.
-        </p>
-      </section>
-
-      <section className="surface" aria-labelledby="viewer-questions-heading" style={{ padding: "28px" }}>
-        <div className="eyebrow" id="viewer-questions-heading">
-          보존된 질문
-        </div>
-        <div className="stack" style={{ "--stack": "10px", marginTop: "12px" } as CSSProperties}>
-          {questions.length > 0 ? (
-            questions.map((question) => (
-              <article key={`${question.priority}-${question.text}`} className="surface-quiet" style={{ padding: "14px" }}>
-                <div className="tiny mono" style={{ color: "var(--text-3)", marginBottom: "6px" }}>
-                  Q{question.priority}
-                </div>
-                <div className="body editorial" style={{ color: "var(--text)" }}>
-                  {question.text}
-                </div>
-              </article>
-            ))
-          ) : (
-            <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-              아직 남긴 질문이 없습니다. 공동 보드의 다른 멤버 질문은 아래에서 볼 수 있어요.
-            </p>
-          )}
-        </div>
-      </section>
-
-      <section className="surface" aria-labelledby="viewer-reviews-heading" style={{ padding: "28px" }}>
-        <div className="eyebrow" id="viewer-reviews-heading">
-          보존된 서평
-        </div>
-        <div className="stack" style={{ "--stack": "12px", marginTop: "12px" } as CSSProperties}>
-          {reviewItems.map((item) => (
-            <article key={item.label} className="surface-quiet" style={{ padding: "14px" }}>
-              <div className="tiny mono" style={{ color: "var(--text-3)", marginBottom: "6px" }}>
-                {item.title}
-              </div>
-              <p className="body editorial" style={{ color: "var(--text)", margin: 0, whiteSpace: "pre-wrap" }}>
-                {item.body}
-              </p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="surface-quiet rm-locked-state" role="note" style={{ padding: "22px" }}>
-        <div className="eyebrow">피드백 문서 접근</div>
-        <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
-          피드백 문서는 active 정식 멤버에게 열립니다. 둘러보기 상태에서는 문서 등록 여부와 접근 제한만 확인할 수 있어요.
-        </p>
-      </section>
-    </div>
-  );
-}
-
-function ReadOnlyMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="surface-quiet" style={{ padding: "14px" }}>
-      <div className="tiny mono" style={{ color: "var(--text-3)", marginBottom: "6px" }}>
-        {label}
-      </div>
-      <div className="body" style={{ fontWeight: 500 }}>
-        {value}
-      </div>
     </div>
   );
 }

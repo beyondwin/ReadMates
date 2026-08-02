@@ -1,4 +1,4 @@
-import { type CSSProperties } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import {
   MemberHomeNextActionPace,
   MobileCurrentSessionCard,
@@ -18,12 +18,14 @@ import { PrepCard } from "@/features/member-home/ui/prep-card";
 import {
   getMemberHomeNextReadingAction,
   getMemberHomeRecentRecordEntry,
-  type MemberHomeAuth as AuthMeResponse,
-  type MemberHomeCurrentSessionView as CurrentSessionResponse,
-  type MemberHomeNoteFeedItemView as NoteFeedItem,
-  type MemberHomeUpcomingSessionView as MemberHomeUpcomingSession,
 } from "@/features/member-home/model/member-home-view-model";
-import { canWriteMemberActivity } from "@/shared/auth/member-app-access";
+import type {
+  MemberHomeReadView,
+  MemberHomeRetryHandlers,
+  MemberHomeWidgetErrors,
+} from "@/features/member-home/model/member-home-read-view";
+import type { CurrentSessionReadPageData } from "@/shared/model/current-session-read-view";
+import type { NoteFeedItem } from "@/shared/model/notes-feed-model";
 import { formatMobileTodayLabel, rsvpLabel } from "@/shared/ui/readmates-display";
 import { SessionTimingIdentity } from "@/shared/ui/session-identity";
 
@@ -38,23 +40,25 @@ const quickLinks = [
 }>;
 
 export default function MemberHome({
-  auth,
-  current,
-  noteFeedItems,
-  upcomingSessions,
+  view,
   LinkComponent = PlainMemberHomeLink,
+  widgetErrors,
+  onRetry,
 }: {
-  auth: AuthMeResponse;
-  current: CurrentSessionResponse;
-  noteFeedItems: NoteFeedItem[];
-  upcomingSessions: MemberHomeUpcomingSession[];
+  view: MemberHomeReadView;
   LinkComponent?: MemberHomeLinkComponent;
+  widgetErrors?: MemberHomeWidgetErrors;
+  onRetry?: MemberHomeRetryHandlers;
 }) {
+  const { displayName, isHost, current, noteFeedItems, upcomingSessions, capabilities } = view;
   const currentSession = current.currentSession;
-  const memberName = auth.displayName ?? "멤버";
-  const isViewer = auth.membershipStatus === "VIEWER";
-  const canWrite = canWriteMemberActivity(auth);
-  const recentRecordEntry = getMemberHomeRecentRecordEntry(noteFeedItems);
+  const memberName = displayName ?? "게스트";
+  const canWrite = capabilities.canWrite;
+  const isViewer = capabilities.canViewPersonalState && !canWrite;
+  const feedbackStates = capabilities.canReadFeedback
+    ? undefined
+    : new Map(noteFeedItems.map((item) => [item.sessionId, "LOCKED" as const]));
+  const recentRecordEntry = getMemberHomeRecentRecordEntry(noteFeedItems, { feedbackStates });
 
   return (
     <main>
@@ -93,12 +97,20 @@ export default function MemberHome({
               canWrite={canWrite}
             />
 
-            <PrepCard
-              session={currentSession}
-              isHost={auth.role === "HOST"}
-              isViewer={isViewer}
-              LinkComponent={LinkComponent}
-            />
+            <section aria-label="이번 세션">
+              {widgetErrors?.current ? (
+                <MemberHomeWidgetFailure error={widgetErrors.current} onRetry={onRetry?.current} />
+              ) : (
+                <PrepCard
+                  session={currentSession}
+                  isHost={isHost}
+                  isViewer={isViewer}
+                  canWrite={canWrite}
+                  canViewPersonalState={capabilities.canViewPersonalState}
+                  LinkComponent={LinkComponent}
+                />
+              )}
+            </section>
           </div>
         </section>
 
@@ -106,12 +118,26 @@ export default function MemberHome({
           <div className="container">
             <div className="home-grid">
               <div className="stack" style={{ "--stack": "40px" } as CSSProperties}>
-                <RecentRecordEntry entry={recentRecordEntry} LinkComponent={LinkComponent} />
-                <ClubPulse items={noteFeedItems.slice(0, 3)} LinkComponent={LinkComponent} />
+                <section aria-label="최근 기록">
+                  {widgetErrors?.recentNotes ? (
+                    <MemberHomeWidgetFailure error={widgetErrors.recentNotes} onRetry={onRetry?.recentNotes} />
+                  ) : (
+                    <>
+                      <RecentRecordEntry entry={recentRecordEntry} LinkComponent={LinkComponent} />
+                      <ClubPulse items={noteFeedItems.slice(0, 3)} LinkComponent={LinkComponent} />
+                    </>
+                  )}
+                </section>
               </div>
               <div className="stack" style={{ "--stack": "24px" } as CSSProperties}>
                 <RosterSummary current={current} />
-                <NextBookHint upcomingSessions={upcomingSessions} />
+                <section aria-label="예정 세션">
+                  {widgetErrors?.upcoming ? (
+                    <MemberHomeWidgetFailure error={widgetErrors.upcoming} onRetry={onRetry?.upcoming} />
+                  ) : (
+                    <NextBookHint upcomingSessions={upcomingSessions} />
+                  )}
+                </section>
                 <QuickLinks LinkComponent={LinkComponent} />
               </div>
             </div>
@@ -120,14 +146,17 @@ export default function MemberHome({
       </div>
 
       <MobileMemberHome
-        auth={auth}
         current={current}
         noteFeedItems={noteFeedItems}
         upcomingSessions={upcomingSessions}
         memberName={memberName}
+        isHost={isHost}
         isViewer={isViewer}
         canWrite={canWrite}
+        canViewPersonalState={capabilities.canViewPersonalState}
         LinkComponent={LinkComponent}
+        widgetErrors={widgetErrors}
+        onRetry={onRetry}
       />
     </main>
   );
@@ -139,7 +168,7 @@ function HomeAnswerStrip({
   isViewer,
   canWrite,
 }: {
-  session: CurrentSessionResponse["currentSession"];
+  session: CurrentSessionReadPageData["currentSession"];
   noteFeedItems: NoteFeedItem[];
   isViewer: boolean;
   canWrite: boolean;
@@ -184,23 +213,29 @@ function HomeAnswerStrip({
 }
 
 function MobileMemberHome({
-  auth,
   current,
   noteFeedItems,
   upcomingSessions,
   memberName,
+  isHost,
   isViewer,
   canWrite,
+  canViewPersonalState,
   LinkComponent,
+  widgetErrors,
+  onRetry,
 }: {
-  auth: AuthMeResponse;
-  current: CurrentSessionResponse;
+  current: CurrentSessionReadPageData;
   noteFeedItems: NoteFeedItem[];
-  upcomingSessions: MemberHomeUpcomingSession[];
+  upcomingSessions: MemberHomeReadView["upcomingSessions"];
   memberName: string;
+  isHost: boolean;
   isViewer: boolean;
   canWrite: boolean;
+  canViewPersonalState: boolean;
   LinkComponent: MemberHomeLinkComponent;
+  widgetErrors?: MemberHomeWidgetErrors;
+  onRetry?: MemberHomeRetryHandlers;
 }) {
   const session = current.currentSession;
   const nextAction = getMemberHomeNextReadingAction({
@@ -226,16 +261,22 @@ function MobileMemberHome({
         {isViewer ? <MobileViewerMemberHomeNotice /> : null}
       </section>
 
-      <section className="m-sec">
+      <section className="m-sec" aria-label="이번 세션">
         <div className="m-eyebrow-row">
           <span className="eyebrow">이번 세션</span>
         </div>
-        <MobileCurrentSessionCard
-          session={session}
-          isHost={auth.role === "HOST"}
-          isViewer={isViewer}
-          LinkComponent={LinkComponent}
-        />
+        {widgetErrors?.current ? (
+          <MemberHomeWidgetFailure error={widgetErrors.current} onRetry={onRetry?.current} />
+        ) : (
+          <MobileCurrentSessionCard
+            session={session}
+            isHost={isHost}
+            isViewer={isViewer}
+            canWrite={canWrite}
+            canViewPersonalState={canViewPersonalState}
+            LinkComponent={LinkComponent}
+          />
+        )}
       </section>
 
       <MobileTodayActions
@@ -246,9 +287,23 @@ function MobileMemberHome({
         pace={nextAction.pace}
         LinkComponent={LinkComponent}
       />
-      <MobileUpcomingSessions upcomingSessions={upcomingSessions} />
-      <MobileRecentRecordEntry entry={recentRecordEntry} LinkComponent={LinkComponent} />
-      <MobileMemberActivity items={noteFeedItems.slice(0, 4)} LinkComponent={LinkComponent} />
+      <section aria-label="예정 세션">
+        {widgetErrors?.upcoming ? (
+          <MemberHomeWidgetFailure error={widgetErrors.upcoming} onRetry={onRetry?.upcoming} />
+        ) : (
+          <MobileUpcomingSessions upcomingSessions={upcomingSessions} />
+        )}
+      </section>
+      <section aria-label="최근 기록">
+        {widgetErrors?.recentNotes ? (
+          <MemberHomeWidgetFailure error={widgetErrors.recentNotes} onRetry={onRetry?.recentNotes} />
+        ) : (
+          <>
+            <MobileRecentRecordEntry entry={recentRecordEntry} LinkComponent={LinkComponent} />
+            <MobileMemberActivity items={noteFeedItems.slice(0, 4)} LinkComponent={LinkComponent} />
+          </>
+        )}
+      </section>
       <MobileQuickLinks LinkComponent={LinkComponent} />
     </div>
   );
@@ -305,7 +360,7 @@ function MobileQuickLinks({ LinkComponent }: { LinkComponent: MemberHomeLinkComp
   );
 }
 
-function MobileUpcomingSessions({ upcomingSessions }: { upcomingSessions: MemberHomeUpcomingSession[] }) {
+function MobileUpcomingSessions({ upcomingSessions }: { upcomingSessions: MemberHomeReadView["upcomingSessions"] }) {
   if (upcomingSessions.length === 0) {
     return null;
   }
@@ -323,7 +378,8 @@ function MobileUpcomingSessions({ upcomingSessions }: { upcomingSessions: Member
               {session.bookTitle}
             </span>
             <span className="tiny" style={{ color: "var(--text-3)" }}>
-              {session.date} · {session.locationLabel}
+              {session.date}
+              {session.locationLabel ? ` · ${session.locationLabel}` : ""}
             </span>
           </div>
         ))}
@@ -332,7 +388,7 @@ function MobileUpcomingSessions({ upcomingSessions }: { upcomingSessions: Member
   );
 }
 
-function NextBookHint({ upcomingSessions }: { upcomingSessions: MemberHomeUpcomingSession[] }) {
+function NextBookHint({ upcomingSessions }: { upcomingSessions: MemberHomeReadView["upcomingSessions"] }) {
   return (
     <section>
       <div className="eyebrow" style={{ marginBottom: "10px" }}>
@@ -348,7 +404,8 @@ function NextBookHint({ upcomingSessions }: { upcomingSessions: MemberHomeUpcomi
                   {session.bookTitle}
                 </div>
                 <div className="tiny" style={{ marginTop: 3 }}>
-                  {session.bookAuthor} · {session.date} · {session.locationLabel}
+                  {session.bookAuthor} · {session.date}
+                  {session.locationLabel ? ` · ${session.locationLabel}` : ""}
                 </div>
               </div>
             ))}
@@ -360,6 +417,54 @@ function NextBookHint({ upcomingSessions }: { upcomingSessions: MemberHomeUpcomi
         )}
       </div>
     </section>
+  );
+}
+
+function MemberHomeWidgetFailure({
+  error,
+  onRetry,
+}: {
+  error: { status?: number; retryAfterSeconds?: number };
+  onRetry?: () => Promise<void>;
+}) {
+  const [pending, setPending] = useState(false);
+  const [retryFailed, setRetryFailed] = useState(false);
+  let message: ReactNode = "기록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
+
+  if (error.status === 429) {
+    message = error.retryAfterSeconds !== undefined
+      ? `${error.retryAfterSeconds}초 뒤에 다시 시도해 주세요.`
+      : "요청이 많습니다. 잠시 뒤에 다시 시도해 주세요.";
+  }
+
+  return (
+    <div className="surface-quiet" role="status" style={{ padding: 18, color: "var(--text-2)" }}>
+      <p style={{ margin: 0 }}>{message}</p>
+      {retryFailed ? (
+        <p className="small" style={{ margin: "8px 0 0" }}>
+          다시 불러오지 못했습니다. 재시도해 주세요.
+        </p>
+      ) : null}
+      {onRetry ? (
+        <button
+          type="button"
+          className="btn btn-quiet"
+          disabled={pending}
+          aria-busy={pending}
+          style={{ marginTop: 14, minHeight: 44 }}
+          onClick={() => {
+            if (pending) return;
+            setPending(true);
+            setRetryFailed(false);
+            void onRetry()
+              .catch(() => setRetryFailed(true))
+              .finally(() => setPending(false));
+          }}
+        >
+          {pending ? "불러오는 중" : "다시 시도"}
+        </button>
+      ) : null}
+    </div>
   );
 }
 

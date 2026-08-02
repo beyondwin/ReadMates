@@ -21,7 +21,7 @@ import {
   guestHomeLoader,
   guestNotesLoader,
 } from "@/features/guest-browse/route/guest-route-data";
-import { GuestScopedAppRoute } from "@/features/guest-browse/route/guest-scoped-app-route";
+import { GuestScopedAppRoute, type GuestArchiveContentProps, type GuestCurrentSessionContentProps, type GuestHomeContentProps, type GuestSessionDetailContentProps } from "@/features/guest-browse/route/guest-scoped-app-route";
 import { GuestNavigationLink } from "@/features/guest-browse/ui/guest-navigation-dialog";
 import { AppRouteLayout } from "@/src/app/layouts/app-route-layout";
 import { memoizeRouteModule } from "@/src/app/routes/route-module-loader";
@@ -29,7 +29,39 @@ import { ClubMemberAppRouteLayout } from "@/src/app/layouts/club-app-route-layou
 import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
 import { RequireAuth, RequireMemberApp } from "@/src/app/route-guards";
 import { Link } from "@/src/app/router-link";
+import { GuestCurrentSessionContent } from "@/src/pages/guest-current-session";
+import { GuestHomeContent } from "@/src/pages/guest-home";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
+
+// This route-only boundary is intentionally colocated with the router configuration.
+// eslint-disable-next-line react-refresh/only-export-components
+const LazyGuestArchiveContent = lazy(async () => ({
+  default: (await import("@/src/pages/guest-archive")).GuestArchiveContent,
+}));
+
+// eslint-disable-next-line react-refresh/only-export-components
+function GuestArchiveContentBoundary(props: GuestArchiveContentProps) {
+  return (
+    <Suspense fallback={<ArchiveRouteLoading label="아카이브를 불러오는 중" />}>
+      <LazyGuestArchiveContent {...props} />
+    </Suspense>
+  );
+}
+
+// This route-only boundary keeps the protected session-detail chunk lazy.
+// eslint-disable-next-line react-refresh/only-export-components
+const LazyGuestSessionDetailContent = lazy(async () => ({
+  default: (await import("@/src/pages/member-session")).GuestSessionDetailContent,
+}));
+
+// eslint-disable-next-line react-refresh/only-export-components
+function GuestSessionDetailContentBoundary(props: GuestSessionDetailContentProps) {
+  return (
+    <Suspense fallback={<ArchiveRouteLoading label="지난 세션 기록을 불러오는 중" />}>
+      <LazyGuestSessionDetailContent {...props} />
+    </Suspense>
+  );
+}
 
 const currentSessionInternalLink: InternalLinkComponent = ({ href, children, ...props }) => {
   return (
@@ -58,6 +90,10 @@ function scopedMemberRoute({
   fallback,
   load,
   guestLoader,
+  GuestHomeContent: GuestHomeContentOverride,
+  GuestCurrentSessionContent: GuestCurrentSessionContentOverride,
+  GuestArchiveContent: GuestArchiveContentOverride,
+  GuestSessionDetailContent: GuestSessionDetailContentOverride,
 }: {
   path?: string;
   index?: true;
@@ -67,6 +103,10 @@ function scopedMemberRoute({
   fallback: ReactNode;
   load: () => Promise<ScopedRouteModule>;
   guestLoader?: LoaderFunction;
+  GuestHomeContent?: ComponentType<GuestHomeContentProps>;
+  GuestCurrentSessionContent?: ComponentType<GuestCurrentSessionContentProps>;
+  GuestArchiveContent?: ComponentType<GuestArchiveContentProps>;
+  GuestSessionDetailContent?: ComponentType<GuestSessionDetailContentProps>;
 }): RouteObject {
   const loadOnce = memoizeRouteModule(load);
   const ProtectedComponent = lazy(async () => ({ default: (await loadOnce()).Component }));
@@ -75,7 +115,13 @@ function scopedMemberRoute({
     const data = useLoaderData();
 
     return isGuestScopedRouteData(data) ? (
-      <GuestScopedAppRoute LinkComponent={GuestNavigationLink} />
+      <GuestScopedAppRoute
+        LinkComponent={GuestNavigationLink}
+        GuestHomeContent={GuestHomeContentOverride}
+        GuestCurrentSessionContent={GuestCurrentSessionContentOverride}
+        GuestArchiveContent={GuestArchiveContentOverride}
+        GuestSessionDetailContent={GuestSessionDetailContentOverride}
+      />
     ) : (
       <Suspense fallback={fallback}>
         <ProtectedComponent />
@@ -128,6 +174,7 @@ function scopedMemberAppRoutes(queryClient: QueryClient): RouteObject[] {
       errorElement: <ArchiveRouteError />,
       fallback: <ReadmatesRouteLoading label="멤버 홈을 불러오는 중" variant="member" />,
       guestLoader: guestHomeLoader,
+      GuestHomeContent,
       load: async () => {
         const [{ default: Component }, { memberHomeLoader: loader }] = await Promise.all([
           import("@/src/pages/app-home"),
@@ -141,8 +188,15 @@ function scopedMemberAppRoutes(queryClient: QueryClient): RouteObject[] {
       ErrorBoundary: CurrentSessionRouteError,
       fallback: <ReadmatesRouteLoading label="세션을 불러오는 중" variant="member" />,
       guestLoader: guestCurrentSessionLoader,
+      GuestCurrentSessionContent,
       load: async () => {
-        const { CurrentSessionRoute, currentSessionLoaderFactory } = await import("@/features/current-session");
+        const [
+          { CurrentSessionRoute },
+          { currentSessionLoaderFactory },
+        ] = await Promise.all([
+          import("@/features/current-session/route/current-session-route"),
+          import("@/features/current-session/route/current-session-data"),
+        ]);
         return {
           Component: () => <CurrentSessionRoute internalLinkComponent={currentSessionInternalLink} />,
           loader: currentSessionLoaderFactory(queryClient),
@@ -168,6 +222,7 @@ function scopedMemberAppRoutes(queryClient: QueryClient): RouteObject[] {
       errorElement: <ArchiveRouteError />,
       fallback: <ArchiveRouteLoading label="아카이브를 불러오는 중" />,
       guestLoader: guestArchiveLoader,
+      GuestArchiveContent: GuestArchiveContentBoundary,
       load: async () => {
         const [{ default: Component }, { archiveListLoaderFactory }] = await Promise.all([
           import("@/src/pages/archive"),
@@ -241,6 +296,7 @@ function scopedMemberAppRoutes(queryClient: QueryClient): RouteObject[] {
       errorElement: <ArchiveRouteError />,
       fallback: <ArchiveRouteLoading label="지난 세션 기록을 불러오는 중" />,
       guestLoader: guestArchiveDetailLoader,
+      GuestSessionDetailContent: GuestSessionDetailContentBoundary,
       load: async () => {
         const [{ default: Component }, { memberSessionDetailLoaderFactory }] = await Promise.all([
           import("@/src/pages/member-session"),

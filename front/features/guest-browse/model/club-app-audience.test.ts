@@ -33,6 +33,7 @@ describe("club app audience", () => {
     ["/clubs/alpha/app", "OPEN"],
     ["/clubs/alpha/app/session/current", "OPEN"],
     ["/clubs/alpha/app/notes", "OPEN"],
+    ["/clubs/alpha/app/notes?sessionId=session-8&filter=highlights", "OPEN"],
     ["/clubs/alpha/app/archive/session-8", "OPEN"],
     ["/clubs/alpha/app/sessions/session-8", "OPEN"],
     ["/clubs/alpha/app/me", "PREVIEW"],

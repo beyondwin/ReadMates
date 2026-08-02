@@ -6,6 +6,7 @@ import type {
   CurrentSession,
   CurrentSessionInternalLinkProps,
   InternalLinkComponent,
+  RsvpStatus,
   RsvpUpdateStatus,
   SaveState,
 } from "@/features/current-session/ui/current-session-types";
@@ -86,10 +87,12 @@ export function RsvpPanel({
   rsvp,
   saveStatus,
   onRsvp,
+  disabled = false,
 }: {
-  rsvp: CurrentSession["myRsvpStatus"];
+  rsvp: RsvpStatus;
   saveStatus: SaveState;
   onRsvp: (status: RsvpUpdateStatus) => void;
+  disabled?: boolean;
 }) {
   return (
     <section className="surface" style={{ padding: "28px" }}>
@@ -109,7 +112,7 @@ export function RsvpPanel({
           <button
             key={option.status}
             type="button"
-            disabled={saveStatus === "saving"}
+            disabled={disabled || saveStatus === "saving"}
             onClick={() => onRsvp(option.status)}
             style={{
               height: "40px",
@@ -142,12 +145,14 @@ export function CheckinPanel({
   saveStatus,
   onReadingProgressChange,
   onSave,
+  disabled = false,
 }: {
   readingProgress: number;
   sessionDate: string | null | undefined;
   saveStatus: SaveState;
   onReadingProgressChange: (value: number) => void;
   onSave: () => void;
+  disabled?: boolean;
 }) {
   const progressId = "desktop-checkin-progress";
 
@@ -175,6 +180,7 @@ export function CheckinPanel({
         min={0}
         max={100}
         value={readingProgress}
+        disabled={disabled}
         onChange={(event) => onReadingProgressChange(Number(event.target.value))}
         style={{ width: "100%", accentColor: "var(--accent)" }}
       />
@@ -185,8 +191,69 @@ export function CheckinPanel({
         </p>
         <div className="row" style={{ gap: "10px", justifyContent: "flex-end" }}>
           <SaveFeedback scope="checkin" status={saveStatus} />
-          <button type="button" className="btn btn-primary btn-sm" disabled={saveStatus === "saving"} onClick={onSave}>
+          <button type="button" className="btn btn-primary btn-sm" disabled={disabled || saveStatus === "saving"} onClick={onSave}>
             진행률 저장
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function OneLineReviewPanel({
+  oneLineReview,
+  saveStatus,
+  onChange,
+  onSave,
+  disabled = false,
+}: {
+  oneLineReview: string;
+  saveStatus: SaveState;
+  onChange: (value: string) => void;
+  onSave: () => void;
+  disabled?: boolean;
+}) {
+  const reviewId = "desktop-one-line-review";
+
+  return (
+    <section className="surface" style={{ padding: "24px" }}>
+      <div className="row-between" style={{ alignItems: "flex-start", marginBottom: "14px" }}>
+        <div>
+          <div className="eyebrow">한줄평</div>
+          <h2 className="h4 editorial" style={{ margin: "4px 0 0" }}>
+            이 책을 한 문장으로
+          </h2>
+        </div>
+        <span className="badge">언제든 작성 가능</span>
+      </div>
+      <label className="label" htmlFor={reviewId}>
+        한줄평 내용
+      </label>
+      <p className="tiny" style={{ color: "var(--text-3)", margin: "0 0 8px" }}>
+        저장하면 이번 세션 참여자가 함께 볼 수 있습니다.
+      </p>
+      <input
+        id={reviewId}
+        className="input"
+        value={oneLineReview}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder="예: 떠난 자리에 남은 온기를 만지는 책."
+      />
+      <div className="row-between" style={{ marginTop: "10px" }}>
+        <div className="tiny" style={{ color: "var(--text-3)" }}>
+          세션 참여자 공개
+        </div>
+        <div className="row" style={{ gap: "10px", justifyContent: "flex-end" }}>
+          <SaveFeedback scope="oneLineReview" status={saveStatus} />
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            disabled={disabled || saveStatus === "saving"}
+            aria-disabled={disabled || saveStatus === "saving"}
+            onClick={onSave}
+          >
+            한줄평 저장
           </button>
         </div>
       </div>
@@ -199,11 +266,13 @@ export function LongReviewPanel({
   saveStatus,
   onChange,
   onSave,
+  disabled = false,
 }: {
   longReview: string;
   saveStatus: SaveState;
   onChange: (value: string) => void;
   onSave: () => void;
+  disabled?: boolean;
 }) {
   const reviewId = "desktop-long-review";
 
@@ -229,6 +298,7 @@ export function LongReviewPanel({
         className="textarea"
         rows={4}
         value={longReview}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
         placeholder="완독 후, 모임 이후, 시간이 지난 뒤에 떠오른 문장을 적어 주세요."
       />
@@ -237,7 +307,7 @@ export function LongReviewPanel({
           작성한 글은 게스트에게도 공개돼요.
         </span>
         <SaveFeedback scope="longReview" status={saveStatus} />
-        <button type="button" className="btn btn-primary btn-sm" disabled={saveStatus === "saving"} onClick={onSave}>
+        <button type="button" className="btn btn-primary btn-sm" disabled={disabled || saveStatus === "saving"} onClick={onSave}>
           서평 저장
         </button>
       </div>
@@ -317,10 +387,12 @@ export function SessionMeta({ session }: { session: CurrentSession }) {
             {session.startTime} – {session.endTime}
           </dd>
         </div>
-        <div className="rm-session-meta-row">
-          <dt className="eyebrow">장소</dt>
-          <dd>{session.locationLabel}</dd>
-        </div>
+        {session.locationLabel ? (
+          <div className="rm-session-meta-row">
+            <dt className="eyebrow">장소</dt>
+            <dd>{session.locationLabel}</dd>
+          </div>
+        ) : null}
         <div className="rm-session-meta-row">
           <dt className="eyebrow">질문 마감</dt>
           <dd>{formatDeadlineLabel(session.questionDeadlineAt)}</dd>
@@ -424,7 +496,7 @@ export function RosterList({ session }: { session: CurrentSession }) {
       </div>
       <div className="stack" style={{ "--stack": "10px" } as CSSProperties}>
         {attendees.map((member) => (
-          <div key={member.membershipId} className="row-between">
+          <div key={member.renderKey} className="row-between">
             <span className="row" style={{ gap: "10px" }}>
               <AvatarChip avatarKey={member.avatarKey} name={member.displayName} label="" size={24} />
               <span className="small" style={{ color: "var(--text)" }}>

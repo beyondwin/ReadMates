@@ -185,14 +185,6 @@
   overflow-wrap: anywhere;
 }
 
-.rm-guest-account-control {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
 .rm-session-expiry {
   width: min(calc(100% - 32px), 1120px);
   margin: 16px auto 0;
@@ -242,16 +234,6 @@
   color: var(--danger);
 }
 
-.rm-guest-account-control__badge {
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 5px 9px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.rm-guest-account-control__action,
 .rm-guest-lock__action,
 .rm-guest-my-space__action {
   min-height: 44px;
@@ -260,14 +242,6 @@
   justify-content: center;
 }
 
-.rm-guest-account-control__action {
-  color: var(--accent);
-  font-size: 13px;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.rm-guest-account-control__action:focus-visible,
 .rm-guest-lock__action:focus-visible,
 .rm-guest-my-space__action:focus-visible {
   outline: 2px solid var(--focus-ring);
@@ -342,18 +316,6 @@
 
   .rm-session-expiry__actions .btn {
     flex: 1 1 132px;
-  }
-
-  .rm-guest-account-control {
-    gap: 4px;
-  }
-
-  .rm-guest-account-control__badge {
-    padding: 4px 7px;
-  }
-
-  .rm-guest-account-control__action {
-    font-size: 12px;
   }
 
   .rm-guest-route {

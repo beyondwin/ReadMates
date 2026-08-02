@@ -8,11 +8,9 @@ import {
   fetchGuestUpcomingSessions,
 } from "@/features/guest-browse/api/guest-browse-api";
 import {
-  guestArchiveDetailReadView,
-  guestArchiveReadView,
+  guestArchivePageReadView,
   guestHomeReadView,
   guestNotesReadView,
-  guestSessionReadView,
 } from "@/features/guest-browse/model/guest-read-views";
 import { clubSlugFromLoaderArgs, type ClubScopedLoaderArgs } from "@/shared/auth/member-app-loader";
 import { isReadmatesApiError } from "@/shared/api/errors";
@@ -70,7 +68,7 @@ function boundedRetryAfterSeconds(value: string | null, now: number) {
 }
 
 export async function guestCurrentSessionLoader(args?: Pick<LoaderFunctionArgs, "params">) {
-  return guestSessionReadView(await fetchGuestCurrentSession(requiredClubSlug(args)));
+  return fetchGuestCurrentSession(requiredClubSlug(args));
 }
 
 export async function guestNotesLoader(args?: Pick<LoaderFunctionArgs, "params">) {
@@ -80,9 +78,9 @@ export async function guestNotesLoader(args?: Pick<LoaderFunctionArgs, "params">
 }
 
 export async function guestArchiveLoader(args?: Pick<LoaderFunctionArgs, "params">) {
-  return guestArchiveReadView(await fetchGuestArchive(requiredClubSlug(args)));
+  return guestArchivePageReadView(await fetchGuestArchive(requiredClubSlug(args)));
 }
 
 export async function guestArchiveDetailLoader(args?: Pick<LoaderFunctionArgs, "params">) {
-  return guestArchiveDetailReadView(await fetchGuestArchiveDetail(requiredClubSlug(args), requiredSessionId(args)));
+  return fetchGuestArchiveDetail(requiredClubSlug(args), requiredSessionId(args));
 }

@@ -5,7 +5,6 @@ import { logout } from "@/features/auth/api/auth-api";
 import { SessionExpiryRecovery } from "@/features/auth/ui/session-expiry-recovery";
 import { usableJoinedClubs } from "@/features/club-selection/model/club-entry";
 import { AccountMenuController } from "@/features/auth/route/account-menu-controller";
-import { GuestAccountControl } from "@/features/guest-browse/ui/guest-account-control";
 import { GuestNavigationLink } from "@/features/guest-browse/ui/guest-navigation-dialog";
 import type { ClubAppAudience } from "@/features/guest-browse/model/club-app-audience";
 import { guestNavigationCapability } from "@/features/guest-browse/model/club-app-audience";
@@ -412,9 +411,7 @@ export function AppRouteLayout({
           onRetryCurrentSession={desktopVariant === "host" ? retryCurrentSession : undefined}
           LinkComponent={AppLinkComponent}
           accountControl={
-            isGuestAudience && clubSlug ? (
-              <GuestAccountControl clubSlug={clubSlug} returnTo={returnTo} LinkComponent={Link} />
-            ) : auth?.authenticated ? (
+            auth?.authenticated ? (
               <AccountMenuController
                 auth={auth}
                 appBasePath={basePath}
@@ -433,9 +430,7 @@ export function AppRouteLayout({
           LinkComponent={AppLinkComponent}
           navigationContinuity={readmatesNavigationContinuity}
           accountControl={
-            isGuestAudience && clubSlug ? (
-              <GuestAccountControl clubSlug={clubSlug} returnTo={returnTo} LinkComponent={Link} />
-            ) : auth?.authenticated ? (
+            auth?.authenticated ? (
               <AccountMenuController
                 auth={auth}
                 appBasePath={basePath}
