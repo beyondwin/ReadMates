@@ -1,6 +1,49 @@
 import { expect, test } from "@playwright/experimental-ct-react";
 import { AvatarPickerStory } from "./avatar-picker.story";
 
+test("selected check stays near-white on the accent fill in dark theme", async ({ mount }) => {
+  const component = await mount(
+    <div data-theme="dark" className="rm-profile-editor">
+      <AvatarPickerStory />
+    </div>,
+  );
+  const check = component.locator(".rm-avatar-picker__check");
+  const rendered = await check.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const canvas = document.createElement("canvas");
+    canvas.width = 1;
+    canvas.height = 1;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) throw new Error("avatar check color canvas is unavailable");
+    const rgb = (color: string) => {
+      context.clearRect(0, 0, 1, 1);
+      context.fillStyle = color;
+      context.fillRect(0, 0, 1, 1);
+      return Array.from(context.getImageData(0, 0, 1, 1).data.slice(0, 3));
+    };
+    const luminance = ([red, green, blue]: number[]) =>
+      [red, green, blue]
+        .map((channel) => channel / 255)
+        .map((channel) => channel <= 0.04045
+          ? channel / 12.92
+          : ((channel + 0.055) / 1.055) ** 2.4)
+        .reduce((total, channel, index) => total + channel * [0.2126, 0.7152, 0.0722][index], 0);
+    const foreground = rgb(style.color);
+    const background = rgb(style.backgroundColor);
+    const foregroundLuminance = luminance(foreground);
+    const backgroundLuminance = luminance(background);
+    return {
+      foreground,
+      contrast:
+        (Math.max(foregroundLuminance, backgroundLuminance) + 0.05)
+        / (Math.min(foregroundLuminance, backgroundLuminance) + 0.05),
+    };
+  });
+
+  expect(rendered.foreground.every((channel) => channel >= 245)).toBe(true);
+  expect(rendered.contrast).toBeGreaterThan(2.3);
+});
+
 for (const viewport of [{ width: 320, height: 700 }, { width: 390, height: 844 }, { width: 1280, height: 900 }]) {
   test(`avatar grid remains usable at ${viewport.width}px`, async ({ mount, page }, testInfo) => {
     await page.setViewportSize(viewport);

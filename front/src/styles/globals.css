@@ -6995,7 +6995,7 @@ a.rm-recent-record__destination:hover {
   height: 30px;
   border: 0;
   background: var(--accent);
-  color: var(--paper-50);
+  color: var(--on-accent);
   box-shadow: 0 3px 7px oklch(0.35 0.08 255 / 0.2);
 }
 

@@ -25,6 +25,7 @@
   --accent-hover: oklch(0.32 0.10 255);
   --accent-soft: oklch(0.94 0.030 255);
   --accent-line: oklch(0.80 0.050 255);
+  --on-accent: oklch(0.988 0.006 85);
 
   /* State */
   --warn:   oklch(0.52 0.10 62);
