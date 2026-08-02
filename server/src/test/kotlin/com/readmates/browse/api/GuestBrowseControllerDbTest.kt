@@ -71,8 +71,8 @@ class GuestBrowseControllerDbTest(
             """
             insert into memberships (id, club_id, user_id, role, status, short_name, avatar_key)
             values
-              (?, ?, ?, 'MEMBER', 'LEFT', '작성자 하나', 'reading-lamp'),
-              (?, ?, ?, 'MEMBER', 'ACTIVE', '작성자 둘', 'open-book-pencil')
+              (?, ?, ?, 'MEMBER', 'LEFT', '작성자 하나', 'hedgehog-green-book'),
+              (?, ?, ?, 'MEMBER', 'ACTIVE', '작성자 둘', 'squirrel-acorn')
             """.trimIndent(),
             AUTHOR_ONE_MEMBERSHIP_ID,
             CLUB_ID,
@@ -578,7 +578,7 @@ class GuestBrowseControllerDbTest(
                     jsonPath("$.longReviews[*].content") { value(not(hasItem(PRIVATE_LONG_REVIEW))) }
                     jsonPath("$.questions[0].draftThought") { value(DRAFT_THOUGHT) }
                     jsonPath("$.questions[0].authorName") { value("탈퇴한 멤버") }
-                    jsonPath("$.questions[0].avatarKey") { value("archive-box") }
+                    jsonPath("$.questions[0].avatarKey") { value("hedgehog-green-book") }
                     jsonPath("$.questions[*].text") { value(not(hasItem(REMOVED_QUESTION))) }
                     jsonPath("$.feedbackDocument") { doesNotExist() }
                 }.andReturn()

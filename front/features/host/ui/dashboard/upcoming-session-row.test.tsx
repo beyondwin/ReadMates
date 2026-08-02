@@ -58,7 +58,7 @@ describe("UpcomingSessionMobileCard", () => {
 
     expect(screen.getByText("일정 지남")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "날짜 수정 · 다음 책" })).toHaveClass("btn-primary");
-    expect(screen.getByRole("button", { name: "멤버 공개로 변경 · 다음 책" })).not.toHaveClass("btn-primary");
+    expect(screen.getByRole("button", { name: "다음 책 게스트 접근을 게스트 공개로 변경" })).not.toHaveClass("btn-primary");
     expect(container.querySelectorAll(".btn-primary")).toHaveLength(1);
   });
 

@@ -1,5 +1,6 @@
 package com.readmates.browse.adapter.out.persistence
 
+import com.readmates.auth.domain.BookClubAvatarKey
 import com.readmates.browse.application.model.GuestArchiveDetailResult
 import com.readmates.browse.application.model.GuestArchiveSessionResult
 import com.readmates.browse.application.model.GuestHighlightResult
@@ -16,6 +17,8 @@ import org.springframework.stereotype.Component
 import java.sql.ResultSet
 import java.sql.Timestamp
 import java.time.OffsetDateTime
+
+private val maskedAvatarKey = BookClubAvatarKey.fallback.wireValue
 
 @Component
 @Suppress("LongMethod", "TooManyFunctions")
@@ -170,7 +173,7 @@ class JdbcGuestRecordBrowseAdapter(
                 eligible_sessions.book_title, eligible_sessions.session_date,
                 case when memberships.status = 'LEFT' then '탈퇴한 멤버' else memberships.short_name end as author_name,
                 case when memberships.status = 'LEFT' then '탈퇴한 멤버' else memberships.short_name end as author_short_name,
-                case when memberships.status = 'LEFT' then 'archive-box' else memberships.avatar_key end as avatar_key,
+                case when memberships.status = 'LEFT' then '$maskedAvatarKey' else memberships.avatar_key end as avatar_key,
                 'QUESTION' as kind, questions.text, questions.created_at, 10 as source_order, questions.priority as item_order
               from questions
               join eligible_sessions on eligible_sessions.id = questions.session_id
@@ -188,7 +191,7 @@ class JdbcGuestRecordBrowseAdapter(
                 eligible_sessions.book_title, eligible_sessions.session_date,
                 case when memberships.status = 'LEFT' then '탈퇴한 멤버' else memberships.short_name end,
                 case when memberships.status = 'LEFT' then '탈퇴한 멤버' else memberships.short_name end,
-                case when memberships.status = 'LEFT' then 'archive-box' else memberships.avatar_key end,
+                case when memberships.status = 'LEFT' then '$maskedAvatarKey' else memberships.avatar_key end,
                 'HIGHLIGHT', highlights.text, highlights.created_at, 20, highlights.sort_order
               from highlights
               join eligible_sessions on eligible_sessions.id = highlights.session_id
@@ -206,7 +209,7 @@ class JdbcGuestRecordBrowseAdapter(
                 eligible_sessions.book_title, eligible_sessions.session_date,
                 case when memberships.status = 'LEFT' then '탈퇴한 멤버' else memberships.short_name end,
                 case when memberships.status = 'LEFT' then '탈퇴한 멤버' else memberships.short_name end,
-                case when memberships.status = 'LEFT' then 'archive-box' else memberships.avatar_key end,
+                case when memberships.status = 'LEFT' then '$maskedAvatarKey' else memberships.avatar_key end,
                 'ONE_LINE_REVIEW', one_line_reviews.text, one_line_reviews.created_at, 30, 0
               from one_line_reviews
               join eligible_sessions on eligible_sessions.id = one_line_reviews.session_id
@@ -225,7 +228,7 @@ class JdbcGuestRecordBrowseAdapter(
                 eligible_sessions.book_title, eligible_sessions.session_date,
                 case when memberships.status = 'LEFT' then '탈퇴한 멤버' else memberships.short_name end,
                 case when memberships.status = 'LEFT' then '탈퇴한 멤버' else memberships.short_name end,
-                case when memberships.status = 'LEFT' then 'archive-box' else memberships.avatar_key end,
+                case when memberships.status = 'LEFT' then '$maskedAvatarKey' else memberships.avatar_key end,
                 'LONG_REVIEW', long_reviews.body, long_reviews.created_at, 40, 0
               from long_reviews
               join eligible_sessions on eligible_sessions.id = long_reviews.session_id
@@ -334,7 +337,7 @@ class JdbcGuestRecordBrowseAdapter(
             select highlights.text, highlights.sort_order,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else memberships.short_name end as author_name,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else memberships.short_name end as author_short_name,
-              case when memberships.status = 'LEFT' then 'archive-box' else memberships.avatar_key end as avatar_key
+              case when memberships.status = 'LEFT' then '$maskedAvatarKey' else memberships.avatar_key end as avatar_key
             from highlights
             left join memberships on memberships.id = highlights.membership_id and memberships.club_id = highlights.club_id
             left join session_participants on session_participants.session_id = highlights.session_id
@@ -363,7 +366,7 @@ class JdbcGuestRecordBrowseAdapter(
             select questions.priority, questions.text, questions.draft_thought,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else memberships.short_name end as author_name,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else memberships.short_name end as author_short_name,
-              case when memberships.status = 'LEFT' then 'archive-box' else memberships.avatar_key end as avatar_key
+              case when memberships.status = 'LEFT' then '$maskedAvatarKey' else memberships.avatar_key end as avatar_key
             from questions
             join memberships on memberships.id = questions.membership_id and memberships.club_id = questions.club_id
             join session_participants on session_participants.session_id = questions.session_id
@@ -384,7 +387,7 @@ class JdbcGuestRecordBrowseAdapter(
             select one_line_reviews.text,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else memberships.short_name end as author_name,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else memberships.short_name end as author_short_name,
-              case when memberships.status = 'LEFT' then 'archive-box' else memberships.avatar_key end as avatar_key
+              case when memberships.status = 'LEFT' then '$maskedAvatarKey' else memberships.avatar_key end as avatar_key
             from one_line_reviews
             join memberships on memberships.id = one_line_reviews.membership_id and memberships.club_id = one_line_reviews.club_id
             join session_participants on session_participants.session_id = one_line_reviews.session_id
@@ -413,7 +416,7 @@ class JdbcGuestRecordBrowseAdapter(
             select long_reviews.body,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else memberships.short_name end as author_name,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else memberships.short_name end as author_short_name,
-              case when memberships.status = 'LEFT' then 'archive-box' else memberships.avatar_key end as avatar_key
+              case when memberships.status = 'LEFT' then '$maskedAvatarKey' else memberships.avatar_key end as avatar_key
             from long_reviews
             join memberships on memberships.id = long_reviews.membership_id and memberships.club_id = long_reviews.club_id
             join session_participants on session_participants.session_id = long_reviews.session_id

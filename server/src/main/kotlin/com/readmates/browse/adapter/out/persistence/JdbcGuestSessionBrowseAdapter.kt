@@ -1,5 +1,6 @@
 package com.readmates.browse.adapter.out.persistence
 
+import com.readmates.auth.domain.BookClubAvatarKey
 import com.readmates.browse.application.model.GuestAttendeeResult
 import com.readmates.browse.application.model.GuestBrowseNavigationResult
 import com.readmates.browse.application.model.GuestBrowseShellResult
@@ -11,6 +12,8 @@ import com.readmates.browse.application.model.GuestUpcomingSessionResult
 import com.readmates.browse.application.port.out.LoadGuestSessionBrowsePort
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Component
+
+private val maskedAvatarKey = BookClubAvatarKey.fallback.wireValue
 
 @Component
 class JdbcGuestSessionBrowseAdapter(
@@ -113,7 +116,7 @@ class JdbcGuestSessionBrowseAdapter(
             """
             select
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else memberships.short_name end as display_name,
-              case when memberships.status = 'LEFT' then 'archive-box' else memberships.avatar_key end as avatar_key,
+              case when memberships.status = 'LEFT' then '$maskedAvatarKey' else memberships.avatar_key end as avatar_key,
               session_participants.rsvp_status,
               session_participants.attendance_status
             from session_participants
@@ -144,7 +147,7 @@ class JdbcGuestSessionBrowseAdapter(
               questions.draft_thought,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else memberships.short_name end as author_name,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else memberships.short_name end as author_short_name,
-              case when memberships.status = 'LEFT' then 'archive-box' else memberships.avatar_key end as avatar_key
+              case when memberships.status = 'LEFT' then '$maskedAvatarKey' else memberships.avatar_key end as avatar_key
             from questions
             join memberships on memberships.id = questions.membership_id
               and memberships.club_id = questions.club_id
@@ -176,7 +179,7 @@ class JdbcGuestSessionBrowseAdapter(
               long_reviews.body,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else memberships.short_name end as author_name,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else memberships.short_name end as author_short_name,
-              case when memberships.status = 'LEFT' then 'archive-box' else memberships.avatar_key end as avatar_key
+              case when memberships.status = 'LEFT' then '$maskedAvatarKey' else memberships.avatar_key end as avatar_key
             from long_reviews
             join memberships on memberships.id = long_reviews.membership_id
               and memberships.club_id = long_reviews.club_id

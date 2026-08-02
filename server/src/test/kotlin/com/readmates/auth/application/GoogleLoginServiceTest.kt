@@ -452,7 +452,7 @@ class GoogleLoginServiceTest(
                     .prepareStatement(
                         """
                         insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
-                        values (?, '00000000-0000-0000-0000-000000000002', ?, 'MEMBER', 'VIEWER', null, 'Target Race', 'reading-lamp')
+                        values (?, '00000000-0000-0000-0000-000000000002', ?, 'MEMBER', 'VIEWER', null, 'Target Race', 'hedgehog-green-book')
                         """.trimIndent(),
                     ).use { statement ->
                         statement.setString(1, membershipId)
@@ -538,7 +538,7 @@ class GoogleLoginServiceTest(
         jdbcTemplate.update(
             """
             insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
-            select uuid(), clubs.id, users.id, 'MEMBER', ?, utc_timestamp(6), users.short_name, 'reading-lamp'
+            select uuid(), clubs.id, users.id, 'MEMBER', ?, utc_timestamp(6), users.short_name, 'hedgehog-green-book'
             from clubs join users on users.email = ?
             where clubs.slug = 'sample-book-club'
             """.trimIndent(),
