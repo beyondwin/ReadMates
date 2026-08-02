@@ -13,8 +13,10 @@ describe("member review visibility helper", () => {
           longReviewSaveStatus="idle"
           onLongReviewChange={() => undefined}
           onSaveLongReview={() => undefined}
+          isViewer={false}
           isSuspended={false}
           canWrite
+          canReadFeedback
         />
       </>,
     );

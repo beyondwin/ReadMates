@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { getCurrentSessionReadingLoopSummary } from "@/features/current-session/model/current-session-view-model";
+import {
+  getCurrentSessionAccessState,
+  getCurrentSessionReadingLoopSummary,
+} from "@/features/current-session/model/current-session-view-model";
+import {
+  GUEST_READ_SURFACE_CAPABILITIES,
+  VIEWER_READ_SURFACE_CAPABILITIES,
+} from "@/shared/model/read-surface-capabilities";
 
 describe("getCurrentSessionReadingLoopSummary", () => {
   it("summarizes active member prep when RSVP, reading progress, and questions are missing", () => {
@@ -71,6 +78,23 @@ describe("getCurrentSessionReadingLoopSummary", () => {
       state: "SESSION_READY",
       label: "세션 준비됨",
       body: "세션 내용을 읽고 공동 보드를 확인할 수 있습니다.",
+    });
+  });
+});
+
+describe("getCurrentSessionAccessState", () => {
+  it.each([
+    ["guest", GUEST_READ_SURFACE_CAPABILITIES],
+    ["viewer", VIEWER_READ_SURFACE_CAPABILITIES],
+  ] as const)("does not upgrade an unauthenticated %s read capability into write access", (_audience, capabilities) => {
+    // Production break caught: omitting the explicit read-surface capability lets a guest route
+    // fall back to the legacy unauthenticated write default and enables mutation controls.
+    expect(getCurrentSessionAccessState(undefined, capabilities)).toMatchObject({
+      isViewer: false,
+      isSuspended: false,
+      isHost: false,
+      canWrite: false,
+      canReadFeedback: false,
     });
   });
 });

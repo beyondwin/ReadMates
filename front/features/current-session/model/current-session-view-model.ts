@@ -5,6 +5,7 @@ import {
   type ReadingLoopRsvpStatus,
   type ReadingLoopState,
 } from "@/shared/model/reading-loop";
+import type { ReadSurfaceCapabilities } from "@/shared/model/read-surface-capabilities";
 
 export const SUSPENDED_MEMBER_NOTICE = "멤버십이 일시 정지되어 새 기록을 남길 수 없습니다.";
 export const VIEWER_MEMBER_NOTICE = "둘러보기 멤버입니다. 정식 멤버가 되면 RSVP와 질문 작성 기능이 열립니다.";
@@ -50,17 +51,20 @@ const saveScopeLabels: Record<CurrentSessionSaveScope, string> = {
   oneLineReview: "한줄평",
 };
 
-export function getCurrentSessionAccessState(auth?: CurrentSessionAccessAuth) {
+export function getCurrentSessionAccessState(auth?: CurrentSessionAccessAuth, capabilities?: ReadSurfaceCapabilities) {
   const isViewer = auth?.membershipStatus === "VIEWER";
   const isSuspended = auth?.membershipStatus === "SUSPENDED";
   const isHost = auth?.role === "HOST";
-  const canWrite = auth ? auth.membershipStatus === "ACTIVE" && auth.approvalState === "ACTIVE" : true;
+  const canWrite = capabilities?.canWrite
+    ?? (auth ? auth.membershipStatus === "ACTIVE" && auth.approvalState === "ACTIVE" : true);
+  const canReadFeedback = capabilities?.canReadFeedback ?? (!isViewer && !isSuspended);
 
   return {
     isViewer,
     isSuspended,
     isHost,
     canWrite,
+    canReadFeedback,
   };
 }
 

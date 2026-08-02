@@ -92,12 +92,13 @@ describe("current session form model", () => {
 });
 
 describe("current session view model", () => {
-  it("derives write access and member role flags from auth state", () => {
+  it("derives write and feedback access with member role flags from auth state", () => {
     expect(getCurrentSessionAccessState()).toEqual({
       isViewer: false,
       isSuspended: false,
       isHost: false,
       canWrite: true,
+      canReadFeedback: true,
     });
     expect(
       getCurrentSessionAccessState({
@@ -110,6 +111,7 @@ describe("current session view model", () => {
       isSuspended: false,
       isHost: true,
       canWrite: true,
+      canReadFeedback: true,
     });
     expect(
       getCurrentSessionAccessState({
@@ -117,14 +119,14 @@ describe("current session view model", () => {
         approvalState: "VIEWER",
         role: "MEMBER",
       }),
-    ).toMatchObject({ isViewer: true, isSuspended: false, isHost: false, canWrite: false });
+    ).toMatchObject({ isViewer: true, isSuspended: false, isHost: false, canWrite: false, canReadFeedback: false });
     expect(
       getCurrentSessionAccessState({
         membershipStatus: "SUSPENDED",
         approvalState: "SUSPENDED",
         role: "MEMBER",
       }),
-    ).toMatchObject({ isViewer: false, isSuspended: true, isHost: false, canWrite: false });
+    ).toMatchObject({ isViewer: false, isSuspended: true, isHost: false, canWrite: false, canReadFeedback: false });
   });
 
   it("selects viewer and suspended notices without changing existing Korean copy", () => {

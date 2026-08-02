@@ -7,17 +7,21 @@ export function MobileRecordsSegment({
   onLongReviewChange,
   longReviewSaveStatus,
   onSaveLongReview,
+  isViewer,
   isSuspended,
   canWrite,
+  canReadFeedback,
 }: {
   longReview: string;
   onLongReviewChange: (value: string) => void;
   longReviewSaveStatus: SaveState;
   onSaveLongReview: () => void;
+  isViewer: boolean;
   isSuspended: boolean;
   canWrite: boolean;
+  canReadFeedback: boolean;
 }) {
-  const feedbackAccess = getCurrentSessionFeedbackAccessState({ isViewer: false, isSuspended });
+  const feedbackAccess = getCurrentSessionFeedbackAccessState({ isViewer, isSuspended });
 
   return (
     <>
@@ -68,55 +72,10 @@ export function MobileRecordsSegment({
       </section>
 
       <section className="m-sec">
-        <div className={canWrite ? "m-card-quiet" : "m-card-quiet rm-locked-state"} role="note">
+        <div className={canReadFeedback ? "m-card-quiet" : "m-card-quiet rm-locked-state"} role="note">
           <div className="eyebrow">피드백 문서 접근</div>
           <p className="small" style={{ color: "var(--text-2)", margin: "6px 0 0" }}>
-            {canWrite ? "세션 후 호스트가 피드백 문서를 업로드하면 active 정식 멤버에게 열립니다." : feedbackAccess.body}
-          </p>
-        </div>
-      </section>
-    </>
-  );
-}
-
-export function MobileViewerRecordsSegment({ longReview, oneLineReview }: { longReview: string; oneLineReview: string }) {
-  return (
-    <>
-      <section className="m-sec">
-        <div className="m-card">
-          <div className="eyebrow">보존된 서평</div>
-          <div className="h4 editorial" style={{ marginTop: 6 }}>
-            내 기록은 읽기 전용입니다
-          </div>
-          <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
-            정식 멤버가 되면 한줄평과 서평을 새로 저장할 수 있습니다.
-          </p>
-        </div>
-      </section>
-
-      <section className="m-sec">
-        <div className="m-card-quiet">
-          <div className="eyebrow">한줄평</div>
-          <p className="body editorial" style={{ color: "var(--text)", margin: "8px 0 0", whiteSpace: "pre-wrap" }}>
-            {oneLineReview.trim() || "아직 남긴 한줄평이 없습니다."}
-          </p>
-        </div>
-      </section>
-
-      <section className="m-sec">
-        <div className="m-card-quiet">
-          <div className="eyebrow">서평</div>
-          <p className="body editorial" style={{ color: "var(--text)", margin: "8px 0 0", whiteSpace: "pre-wrap" }}>
-            {longReview.trim() || "아직 남긴 서평이 없습니다."}
-          </p>
-        </div>
-      </section>
-
-      <section className="m-sec">
-        <div className="m-card-quiet rm-locked-state" role="note">
-          <div className="eyebrow">피드백 문서 접근</div>
-          <p className="small" style={{ color: "var(--text-2)", margin: "6px 0 0" }}>
-            피드백 문서는 active 정식 멤버에게 열립니다. 둘러보기 상태에서는 문서 등록 여부와 접근 제한만 확인할 수 있어요.
+            {canReadFeedback ? "세션 후 호스트가 피드백 문서를 업로드하면 active 정식 멤버에게 열립니다." : feedbackAccess.body}
           </p>
         </div>
       </section>

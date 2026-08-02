@@ -1,7 +1,7 @@
 import type { KeyboardEvent, ReactNode } from "react";
 import { Icon } from "@/features/current-session/ui/current-session-primitives";
 import type { QuestionInput } from "@/features/current-session/ui/current-session-question-editor";
-import type { CurrentSession, RsvpUpdateStatus, SaveState } from "@/features/current-session/ui/current-session-types";
+import type { CurrentSession, RsvpStatus, RsvpUpdateStatus, SaveState } from "@/features/current-session/ui/current-session-types";
 import type {
   CurrentSessionReadingLoopSummary,
   getCurrentSessionMemberNotice,
@@ -11,8 +11,8 @@ import { BookCover } from "@/shared/ui/book-cover";
 import { formatDateLabel } from "@/shared/ui/readmates-display";
 import { SessionTimingIdentity } from "@/shared/ui/session-identity";
 import { MobileBoardSegment } from "./mobile-board-segment";
-import { MobilePrepSegment, MobileViewerPrepSegment } from "./mobile-prep-segment";
-import { MobileRecordsSegment, MobileViewerRecordsSegment } from "./mobile-records-segment";
+import { MobilePrepSegment } from "./mobile-prep-segment";
+import { MobileRecordsSegment } from "./mobile-records-segment";
 import type { MobileSessionTab } from "./mobile-session-tabs";
 
 function focusMobileSessionTab(tab: MobileSessionTab) {
@@ -51,9 +51,13 @@ function handleMobileSessionTabKeyDown(
   focusMobileSessionTab(nextTab);
 }
 
-function SuspendedFieldset({ disabled, children }: { disabled: boolean; children: ReactNode }) {
+function ReadOnlyFieldset({ disabled, children }: { disabled: boolean; children: ReactNode }) {
   return (
-    <fieldset disabled={disabled} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}>
+    <fieldset
+      disabled={disabled}
+      aria-describedby={disabled ? "mobile-current-session-read-only-note" : undefined}
+      style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}
+    >
       {children}
     </fieldset>
   );
@@ -71,13 +75,13 @@ function MobileSuspendedMemberNotice({ message }: { message: string }) {
   );
 }
 
-function MobileViewerMemberNotice() {
+function MobileReadOnlyNotice({ message }: { message: string }) {
   return (
     <section className="m-sec">
-      <div className="m-card-quiet" role="note">
-        <div className="eyebrow">둘러보기 멤버</div>
+      <div className="m-card-quiet" role="note" id="mobile-current-session-read-only-note">
+        <div className="eyebrow">읽기 전용</div>
         <p className="small" style={{ margin: "6px 0 0" }}>
-          세션 기록은 읽을 수 있어요. RSVP, 진행률, 질문, 서평 작성은 정식 멤버에게 열립니다.
+          {message}
         </p>
       </div>
     </section>
@@ -98,7 +102,6 @@ export function MobileCurrentSessionBoard({
   writtenQuestionCount,
   longReview,
   onLongReviewChange,
-  oneLineReview,
   checkinSaveStatus,
   questionSaveStatus,
   longReviewSaveStatus,
@@ -108,13 +111,14 @@ export function MobileCurrentSessionBoard({
   onMobileTabChange,
   onSaveCheckin,
   onSaveLongReview,
-  isViewer,
   memberNotice,
   canWrite,
+  canReadFeedback,
+  isViewer,
   readingLoopSummary,
 }: {
   session: CurrentSession;
-  rsvp: CurrentSession["myRsvpStatus"];
+  rsvp: RsvpStatus;
   readingProgress: number;
   onReadingProgressChange: (value: number) => void;
   questionInputs: QuestionInput[];
@@ -126,7 +130,6 @@ export function MobileCurrentSessionBoard({
   writtenQuestionCount: number;
   longReview: string;
   onLongReviewChange: (value: string) => void;
-  oneLineReview: string;
   checkinSaveStatus: SaveState;
   questionSaveStatus: SaveState;
   longReviewSaveStatus: SaveState;
@@ -136,9 +139,10 @@ export function MobileCurrentSessionBoard({
   onMobileTabChange: (tab: MobileSessionTab) => void;
   onSaveCheckin: () => void;
   onSaveLongReview: () => void;
-  isViewer: boolean;
   memberNotice: ReturnType<typeof getCurrentSessionMemberNotice>;
   canWrite: boolean;
+  canReadFeedback: boolean;
+  isViewer: boolean;
   readingLoopSummary: CurrentSessionReadingLoopSummary;
 }) {
   const tabs: Array<{ key: MobileSessionTab; label: string }> = [
@@ -160,7 +164,8 @@ export function MobileCurrentSessionBoard({
               {session.bookAuthor}
             </div>
             <div className="tiny mono rm-current-session-mobile__meta-line">
-              {formatDateLabel(session.date)} · {session.startTime} – {session.endTime} · {session.locationLabel}
+              {formatDateLabel(session.date)} · {session.startTime} – {session.endTime}
+              {session.locationLabel ? ` · ${session.locationLabel}` : ""}
             </div>
           </div>
           <BookCover title={session.bookTitle} author={session.bookAuthor} imageUrl={session.bookImageUrl} width={68} />
@@ -212,18 +217,10 @@ export function MobileCurrentSessionBoard({
       </div>
 
       {memberNotice?.kind === "suspended" ? <MobileSuspendedMemberNotice message={memberNotice.message} /> : null}
-      {memberNotice?.kind === "viewer" ? <MobileViewerMemberNotice /> : null}
+      {!canWrite ? <MobileReadOnlyNotice message={memberNotice?.message ?? "현재 세션은 읽기 전용입니다."} /> : null}
 
-      {mobileTab === "prep" && isViewer ? (
-        <MobileViewerPrepSegment
-          session={session}
-          rsvp={rsvp}
-          readingProgress={readingProgress}
-          writtenQuestionCount={writtenQuestionCount}
-        />
-      ) : null}
-      {mobileTab === "prep" && !isViewer ? (
-        <SuspendedFieldset disabled={!canWrite}>
+      {mobileTab === "prep" ? (
+        <ReadOnlyFieldset disabled={!canWrite}>
           <MobilePrepSegment
             session={session}
             rsvp={rsvp}
@@ -243,23 +240,22 @@ export function MobileCurrentSessionBoard({
             onSaveCheckin={onSaveCheckin}
             canWrite={canWrite}
           />
-        </SuspendedFieldset>
+        </ReadOnlyFieldset>
       ) : null}
       {mobileTab === "board" ? <MobileBoardSegment session={session} /> : null}
-      {mobileTab === "after" && isViewer ? (
-        <MobileViewerRecordsSegment longReview={longReview} oneLineReview={oneLineReview} />
-      ) : null}
-      {mobileTab === "after" && !isViewer ? (
-        <SuspendedFieldset disabled={!canWrite}>
+      {mobileTab === "after" ? (
+        <ReadOnlyFieldset disabled={!canWrite}>
           <MobileRecordsSegment
             longReview={longReview}
             onLongReviewChange={onLongReviewChange}
             longReviewSaveStatus={longReviewSaveStatus}
             onSaveLongReview={onSaveLongReview}
+            isViewer={isViewer}
             isSuspended={isSuspended}
             canWrite={canWrite}
+            canReadFeedback={canReadFeedback}
           />
-        </SuspendedFieldset>
+        </ReadOnlyFieldset>
       ) : null}
     </main>
   );
