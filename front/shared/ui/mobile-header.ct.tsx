@@ -44,7 +44,9 @@ test("MobileHeader keeps host workspace switching and the explicit account trigg
   expect((await fontMetrics(header.locator(".m-hdr-kicker"))).size).toBeGreaterThanOrEqual(12);
   expect((await fontMetrics(header.locator(".m-hdr-title"))).size).toBeGreaterThanOrEqual(15);
   expect((await account.boundingBox())!.x + (await account.boundingBox())!.width).toBeLessThanOrEqual(320);
-  await expect(header).toHaveScreenshot("mobile-header-host-320.png");
+  await expect(header).toHaveScreenshot("mobile-header-host-320.png", {
+    maxDiffPixelRatio: 0,
+  });
 });
 
 test("MobileHeader keeps the member account label visible without reserving a host switch at 390px", async ({ mount, page }) => {
@@ -74,7 +76,9 @@ test("MobileHeader keeps the member account label visible without reserving a ho
   await expect(account.locator(".rm-avatar-chip")).toHaveAttribute("data-avatar-size-role", "navigation");
   expect((await account.locator(".rm-avatar-chip").boundingBox())?.width).toBe(36);
   expect((await account.boundingBox())!.x + (await account.boundingBox())!.width).toBeLessThanOrEqual(390);
-  await expect(header).toHaveScreenshot("mobile-header-member-390.png");
+  await expect(header).toHaveScreenshot("mobile-header-member-390.png", {
+    maxDiffPixelRatio: 0,
+  });
 });
 
 test("MobileHeader keeps the member settings back control readable and inside a 320px viewport", async ({ mount, page }) => {
