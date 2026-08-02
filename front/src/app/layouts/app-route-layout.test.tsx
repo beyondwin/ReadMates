@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
@@ -11,9 +11,12 @@ import {
 import {
   AuthActionsContext,
   AuthContext,
+  anonymousAuth,
+  type AuthState,
 } from "@/src/app/auth-state";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
-import type { AuthState } from "@/src/app/auth-state";
+import { GuestNavigationProvider } from "@/features/guest-browse/ui/guest-navigation-dialog";
+import { Link } from "@/src/app/router-link";
 import { AppRouteLayout } from "./app-route-layout";
 
 const hostAuth: AuthMeResponse = {
@@ -336,6 +339,51 @@ describe("AppRouteLayout host session navigation", () => {
 
     await waitFor(() => expectSessionLinks("/app/host/sessions/session-9/edit"));
     expect(currentRequest).toBe(2);
+  });
+});
+
+describe("AppRouteLayout guest shell", () => {
+  it("omits persistent conversion and public-home actions from both guest headers", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AuthActionsContext.Provider value={{ markLoggedOut: vi.fn(), refreshAuth: vi.fn() }}>
+          <AuthContext.Provider value={{ status: "ready", auth: anonymousAuth }}>
+            <MemoryRouter initialEntries={["/clubs/reading-sai/app/archive?view=report#sessions"]}>
+              <GuestNavigationProvider LinkComponent={Link}>
+                <Routes>
+                  <Route
+                    path="/clubs/:clubSlug/app/archive"
+                    element={<AppRouteLayout scopedAuth={anonymousAuth} audience="GUEST" />}
+                  >
+                    <Route index element={<main>guest archive</main>} />
+                  </Route>
+                </Routes>
+              </GuestNavigationProvider>
+            </MemoryRouter>
+          </AuthContext.Provider>
+        </AuthActionsContext.Provider>
+      </QueryClientProvider>,
+    );
+
+    const desktopHeader = document.querySelector<HTMLElement>(".desktop-only .topnav");
+    const mobileHeader = document.querySelector<HTMLElement>(".mobile-only .m-hdr");
+    expect(desktopHeader).not.toBeNull();
+    expect(mobileHeader).not.toBeNull();
+    for (const header of [desktopHeader!, mobileHeader!]) {
+      expect(within(header).queryByLabelText("게스트 계정")).not.toBeInTheDocument();
+      expect(within(header).queryByRole("link", { name: "공개 홈으로 나가기" })).not.toBeInTheDocument();
+      expect(within(header).queryByRole("link", { name: "멤버로 시작" })).not.toBeInTheDocument();
+    }
+    expect(screen.queryByLabelText("게스트 계정")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "공개 홈으로 나가기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "멤버로 시작" })).not.toBeInTheDocument();
   });
 });
 

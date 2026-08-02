@@ -14,8 +14,10 @@ import {
 } from "react-router-dom";
 import { AuthProvider } from "@/src/app/auth-context";
 import { AppRouteLayout, PublicRouteLayout } from "@/src/app/layouts";
+import { ClubMemberAppRouteLayout } from "@/src/app/layouts/club-app-route-layout";
 import { Link } from "@/src/app/router-link";
 import { RequireMemberApp } from "@/src/app/route-guards";
+import { anonymousAuth } from "@/src/app/auth-state";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 
 const hostAuth: AuthMeResponse = {
@@ -288,6 +290,29 @@ describe("SPA AppRouteLayout", () => {
       "/api/bff/api/auth/me?clubSlug=reading-sai",
       expect.anything(),
     );
+  });
+
+  it("keeps both guest club-app headers free of persistent conversion actions", async () => {
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/clubs/:clubSlug/app",
+          loader: () => ({ audience: "GUEST", auth: anonymousAuth, club: null }),
+          element: <ClubMemberAppRouteLayout />,
+          children: [{ path: "archive", element: <main>guest archive child</main> }],
+        },
+      ],
+      { initialEntries: ["/clubs/reading-sai/app/archive?view=report#sessions"] },
+    );
+
+    render(<RouterProvider router={router} />);
+
+    expect(await screen.findByText("guest archive child")).toBeInTheDocument();
+    expect(document.querySelector(".desktop-only .topnav")).toBeInTheDocument();
+    expect(document.querySelector(".mobile-only .m-hdr")).toBeInTheDocument();
+    expect(screen.queryByLabelText("게스트 계정")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "공개 홈으로 나가기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "멤버로 시작" })).not.toBeInTheDocument();
   });
 
   it("switches clubs while keeping the same app-relative route", async () => {

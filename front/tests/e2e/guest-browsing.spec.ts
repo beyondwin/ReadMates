@@ -64,6 +64,19 @@ async function expectMobileNavigationClearance(page: Page, target: Locator) {
   for (const tab of await tabbar.locator(".m-tab").all()) await expectTapTarget(tab);
 }
 
+test("guest app headers omit persistent conversion and public-home actions", async ({ page }) => {
+  for (const width of [390, 1366]) {
+    await page.setViewportSize({ width, height: width < 720 ? 844 : 900 });
+    await page.goto(`${appBase}/archive?view=report#sessions`);
+
+    const header = page.locator(width < 720 ? ".mobile-only .m-hdr" : ".desktop-only .topnav");
+    await expect(header).toBeVisible();
+    await expect(header.getByLabel("게스트 계정")).toHaveCount(0);
+    await expect(header.getByRole("link", { name: "공개 홈으로 나가기" })).toHaveCount(0);
+    await expect(header.getByRole("link", { name: "멤버로 시작", exact: true })).toHaveCount(0);
+  }
+});
+
 test("anonymous visitors enter from public surfaces and browse guest-readable club records", async ({ page }) => {
   const nonPublicRequests: string[] = [];
   const runtimeErrors: string[] = [];
@@ -95,7 +108,10 @@ test("anonymous visitors enter from public surfaces and browse guest-readable cl
   await expect(failedResponses).toEqual([]);
   await expect(page.locator(".rm-member-home-desktop").getByRole("heading", { name: /게스트님,.*E2E 현재 세션 책.*함께 읽어요/ })).toBeVisible();
   await expect(page.locator(".rm-member-home-desktop").getByText("다음 달 선정", { exact: true })).toBeVisible();
-  await expect(page.getByText("게스트", { exact: true }).first()).toBeVisible();
+  const desktopHeader = page.locator(".desktop-only .topnav");
+  await expect(desktopHeader.getByLabel("게스트 계정")).toHaveCount(0);
+  await expect(desktopHeader.getByRole("link", { name: "공개 홈으로 나가기" })).toHaveCount(0);
+  await expect(desktopHeader.getByRole("link", { name: "멤버로 시작", exact: true })).toHaveCount(0);
 
   const nav = page.getByRole("navigation", { name: "앱 내비게이션" });
   await expect(nav.getByRole("link", { name: "노트" })).toBeVisible();
@@ -114,7 +130,7 @@ test("anonymous visitors enter from public surfaces and browse guest-readable cl
 
   await page.goto(seededArchivePath);
   await expect(page.getByRole("heading", { name: "요약" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "피드백 보기, 정식 멤버 전용" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "피드백 보기", exact: true })).toBeVisible();
 
   await page.goto(`${appBase}/feedback/${seededArchiveSessionId}`);
   await expect(page.getByRole("heading", { name: "정식 멤버에게 열립니다" })).toBeVisible();
@@ -128,10 +144,8 @@ test("anonymous visitors enter from public surfaces and browse guest-readable cl
   expect(nonPublicRequests).toEqual([]);
 
   const navBox = await page.locator(".nav-links").boundingBox();
-  const accountBox = await page.locator(".topnav-account-actions").boundingBox();
   expect(navBox).not.toBeNull();
-  expect(accountBox).not.toBeNull();
-  expect(navBox!.x + navBox!.width).toBeLessThanOrEqual(accountBox!.x);
+  await expect(page.locator(".topnav-account-actions")).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
 });
 
@@ -172,13 +186,13 @@ test("authenticated users keep public browse and explicit target join actions", 
   expect(oauthStartUrl).toContain("joinIntent=browser-issued-intent-000000000000000");
 });
 
-test("mobile guest lock sheet traps and restores focus without hiding conversion controls", async ({ page }) => {
+test("mobile guest lock sheet traps and restores focus while keeping one contextual conversion action", async ({ page }) => {
   for (const width of [320, 390]) {
     await page.setViewportSize({ width, height: 844 });
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto(seededArchivePath);
 
-    const feedbackAction = page.getByRole("button", { name: "피드백 보기, 정식 멤버 전용" });
+    const feedbackAction = page.getByRole("button", { name: "피드백 보기", exact: true });
     await feedbackAction.scrollIntoViewIfNeeded();
     await expect(feedbackAction).toBeVisible();
     await expectTapTarget(feedbackAction);
@@ -216,11 +230,14 @@ test("mobile guest lock sheet traps and restores focus without hiding conversion
     await expect(dialog).toBeHidden();
     await expect(feedbackAction).toBeFocused();
 
-    const conversion = page.getByRole("link", { name: "멤버로 시작", exact: true }).last();
+    await feedbackAction.click();
+    await expect(dialog).toBeVisible();
+    const conversion = dialog.getByRole("link", { name: "멤버로 시작", exact: true });
+    await expect(conversion).toHaveCount(1);
     await conversion.scrollIntoViewIfNeeded();
     await expect(conversion).toHaveAttribute(
       "href",
-      `/login?returnTo=${encodeURIComponent(seededArchivePath)}`,
+      `/login?returnTo=${encodeURIComponent(`${appBase}/feedback/${seededArchiveSessionId}`)}`,
     );
     await expectTapTarget(conversion);
   }
@@ -229,11 +246,11 @@ test("mobile guest lock sheet traps and restores focus without hiding conversion
 test("public entry and every guest reading surface remain responsive at mobile and desktop widths", async ({ page }) => {
   const surfaces = [
     { path: clubBase, target: () => page.getByRole("link", { name: "둘러보기", exact: true }).first(), clearanceTarget: () => page.getByRole("link", { name: "둘러보기", exact: true }).first(), app: false },
-    { path: appBase, target: () => page.locator(".rm-member-home-desktop:visible h1, .rm-member-home-mobile:visible h1").first(), clearanceTarget: () => page.getByRole("link", { name: "멤버로 시작", exact: true }).last(), app: true },
-    { path: `${appBase}/session/current`, target: () => page.getByRole("heading", { name: "E2E 현재 세션 책" }), clearanceTarget: () => page.getByRole("link", { name: "멤버로 시작", exact: true }).last(), app: true },
+    { path: appBase, target: () => page.locator(".rm-member-home-desktop:visible h1, .rm-member-home-mobile:visible h1").first(), clearanceTarget: () => page.locator(".rm-member-home-desktop:visible h1, .rm-member-home-mobile:visible h1").first(), app: true },
+    { path: `${appBase}/session/current`, target: () => page.getByRole("heading", { name: "E2E 현재 세션 책" }), clearanceTarget: () => page.getByRole("heading", { name: "E2E 현재 세션 책" }), app: true },
     { path: `${appBase}/notes`, target: () => page.getByText("세션을 먼저 고르고, 하이라이트·한줄평·질문을 작성자와 함께 훑는 클럽 기록장입니다."), clearanceTarget: () => page.getByRole("button", { name: /^전체/ }).first(), app: true },
     { path: `${appBase}/archive`, target: () => page.getByRole("heading", { name: "읽어 온 자리" }), clearanceTarget: () => page.locator("main a.surface").last(), app: true },
-    { path: seededArchivePath, target: () => page.getByRole("button", { name: "피드백 보기, 정식 멤버 전용" }), clearanceTarget: () => page.getByRole("link", { name: "멤버로 시작", exact: true }).last(), app: true },
+    { path: seededArchivePath, target: () => page.getByRole("button", { name: "피드백 보기", exact: true }), clearanceTarget: () => page.getByRole("button", { name: "피드백 보기", exact: true }), app: true },
   ];
 
   for (const width of [320, 390, 1366]) {
@@ -296,7 +313,10 @@ test("a mounted production read expiry preserves content and offers exact-route 
 
   await expect(page).toHaveURL(new RegExp(`${seededArchiveSessionId}\\?view=summary#questions$`));
   await expect(page.getByRole("heading", { name: "요약" })).toBeVisible();
-  await expect(page.getByText("게스트", { exact: true }).first()).toBeVisible();
+  const guestHeader = page.locator(".desktop-only .topnav");
+  await expect(guestHeader.getByLabel("게스트 계정")).toHaveCount(0);
+  await expect(guestHeader.getByRole("link", { name: "공개 홈으로 나가기" })).toHaveCount(0);
+  await expect(guestHeader.getByRole("link", { name: "멤버로 시작", exact: true })).toHaveCount(0);
   await expect(recovery).toBeHidden();
 });
 
