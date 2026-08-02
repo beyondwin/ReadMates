@@ -59,3 +59,13 @@ It reported eight pre-existing `side-tab` warnings in unrelated legacy sections 
 - GREEN evidence: focused suite now passes 5 files / 26 tests; full frontend ESLint and Vite production build pass.
 - Component test retry compiled the seven cases, then remained sandbox-blocked by `listen EPERM: operation not permitted ::1:3100`; 7 did not run.
 - The Impeccable detector was not rerun: this was a targeted state/focus correction and the one required detector pass had already completed. This preserves the bounded-pass ceiling.
+
+## Review fix round 2
+
+- Replaced disconnected-element restoration with stable logical focus identities for name, avatar, save, close, cancel, and mobile-back controls. Recreated controls now receive focus after `계속 편집` regardless of React DOM reuse/remount behavior.
+- Added capture-phase document Tab containment, covering the real case where focus already sits outside the dialog and no key event bubbles through it.
+- Initial focus now targets the name input ref explicitly instead of querying the first button, so the CSS-hidden desktop mobile-back control cannot receive focus.
+- RED evidence: 4 focused failures reproduced hidden-mobile-back initial focus, recreated close/cancel restoration, and document-level focus escape.
+- GREEN evidence: focused suite passes 5 files / 30 tests; full frontend ESLint and Vite production build pass.
+- Component tests compiled all seven cases, then remained sandbox-blocked by `listen EPERM: operation not permitted ::1:3100`; 7 did not run.
+- Detector was not rerun because this correction changed focus mechanics only and the bounded detector pass had already completed.

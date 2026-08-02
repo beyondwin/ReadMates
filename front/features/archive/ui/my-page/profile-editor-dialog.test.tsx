@@ -24,6 +24,13 @@ function renderEditor(overrides: Partial<React.ComponentProps<typeof ProfileEdit
 }
 
 describe("ProfileEditorDialog", () => {
+  it("focuses the name input initially even when mobile-back is CSS-hidden", () => {
+    renderEditor();
+    const mobileBack = screen.getByRole("button", { name: "프로필 편집 뒤로" });
+    Object.defineProperty(mobileBack, "getClientRects", { value: () => [] });
+    expect(screen.getByRole("textbox", { name: "표시 이름" })).toHaveFocus();
+  });
+
   it("initializes one atomic draft and saves both fields only from the final action", async () => {
     const user = userEvent.setup();
     const { onSaveProfile, onClose, opener } = renderEditor();
@@ -98,6 +105,21 @@ describe("ProfileEditorDialog", () => {
   });
 
   it.each([
+    ["close", "프로필 편집 닫기"],
+    ["cancel", "취소"],
+    ["mobile-back", "프로필 편집 뒤로"],
+  ])("restores the recreated logical %s control after continuing", async (_method, label) => {
+    const user = userEvent.setup();
+    renderEditor();
+    await user.type(screen.getByRole("textbox", { name: "표시 이름" }), " 변경");
+    const original = screen.getByRole("button", { name: label });
+    await user.click(original);
+    await user.click(screen.getByRole("button", { name: "계속 편집" }));
+    const recreated = screen.getByRole("button", { name: label });
+    expect(recreated).toHaveFocus();
+  });
+
+  it.each([
     ["displayName", "같은 클럽에서 이미 쓰고 있는 이름입니다.", "textbox"],
     ["avatarKey", "선택한 아바타를 사용할 수 없습니다.", "avatar"],
     ["form", "프로필을 저장하지 못했습니다.", "form"],
@@ -144,7 +166,7 @@ describe("ProfileEditorDialog", () => {
     const outsider = document.createElement("button");
     document.body.append(outsider);
     outsider.focus();
-    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Tab" });
+    fireEvent.keyDown(document, { key: "Tab" });
     expect(screen.getByRole("button", { name: "계속 편집" })).toHaveFocus();
   });
 });

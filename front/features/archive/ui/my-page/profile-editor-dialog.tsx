@@ -10,6 +10,7 @@ import type { SaveProfile } from "./types";
 type ProfileEditorStep = "profile" | "avatar" | "discard";
 type ProfileDraft = EditableMemberProfile;
 type ProfileFieldErrors = Partial<Record<"displayName" | "avatarKey" | "form", string>>;
+type ProfileFocusTarget = "name" | "avatar" | "save" | "close" | "cancel" | "mobile-back";
 
 export type ProfileEditorDialogProps = {
   profile: EditableMemberProfile;
@@ -45,7 +46,7 @@ export function ProfileEditorDialog({
   const nameRef = useRef<HTMLInputElement>(null);
   const avatarControlRef = useRef<HTMLButtonElement>(null);
   const discardContinueRef = useRef<HTMLButtonElement>(null);
-  const focusBeforeDiscardRef = useRef<HTMLElement | null>(null);
+  const focusBeforeDiscardRef = useRef<ProfileFocusTarget>("name");
   const stepBeforeDiscardRef = useRef<Exclude<ProfileEditorStep, "discard">>("profile");
   const restoreAfterDiscardRef = useRef(false);
   const titleId = useId();
@@ -60,15 +61,47 @@ export function ProfileEditorDialog({
     if (opener?.isConnected) opener.focus();
   }
 
+  function focusLogicalTarget(target: ProfileFocusTarget) {
+    dialogRef.current
+      ?.querySelector<HTMLElement>(`[data-focus-target="${target}"]`)
+      ?.focus();
+  }
+
+  function containTabFocus(event: Pick<globalThis.KeyboardEvent, "key" | "shiftKey" | "preventDefault">) {
+    if (event.key !== "Tab") return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const controls = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelector));
+    const first = controls[0];
+    const last = controls.at(-1);
+    if (!first || !last) return;
+    const focusIsInside = document.activeElement instanceof Node && dialog.contains(document.activeElement);
+    if (!focusIsInside) {
+      event.preventDefault();
+      first.focus();
+      return;
+    }
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  }
+
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    dialogRef.current?.querySelector<HTMLElement>("input, button")?.focus();
+    nameRef.current?.focus();
     return () => {
       document.body.style.overflow = previousOverflow;
       if (opener?.isConnected) opener.focus();
     };
   }, [opener]);
+
+  useEffect(() => {
+    function containDocumentFocus(event: globalThis.KeyboardEvent) {
+      if (event.key === "Tab") containTabFocus(event);
+    }
+    document.addEventListener("keydown", containDocumentFocus, true);
+    return () => document.removeEventListener("keydown", containDocumentFocus, true);
+  });
 
   useEffect(() => {
     if (step === "discard") {
@@ -77,10 +110,7 @@ export function ProfileEditorDialog({
     }
     if (restoreAfterDiscardRef.current) {
       restoreAfterDiscardRef.current = false;
-      const focusTarget = focusBeforeDiscardRef.current;
-      if (focusTarget?.isConnected) focusTarget.focus();
-      else if (focusTarget?.id) document.getElementById(focusTarget.id)?.focus();
-      else dialogRef.current?.querySelector<HTMLElement>(focusableSelector)?.focus();
+      focusLogicalTarget(focusBeforeDiscardRef.current);
     }
   }, [step]);
 
@@ -94,9 +124,10 @@ export function ProfileEditorDialog({
   function requestClose() {
     if (savingRef.current) return;
     if (dirty) {
-      focusBeforeDiscardRef.current = document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
+      const activeTarget = document.activeElement instanceof HTMLElement
+        ? document.activeElement.dataset.focusTarget as ProfileFocusTarget | undefined
+        : undefined;
+      focusBeforeDiscardRef.current = activeTarget ?? "name";
       if (step !== "discard") stepBeforeDiscardRef.current = step;
       setStep("discard");
     }
@@ -118,21 +149,6 @@ export function ProfileEditorDialog({
       requestClose();
       return;
     }
-    if (event.key !== "Tab") return;
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const controls = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelector));
-    const first = controls[0];
-    const last = controls.at(-1);
-    if (!first || !last) return;
-    const focusIsInside = document.activeElement instanceof Node && dialog.contains(document.activeElement);
-    if (!focusIsInside) {
-      event.preventDefault();
-      first.focus();
-      return;
-    }
-    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
   }
 
   async function save() {
@@ -169,13 +185,13 @@ export function ProfileEditorDialog({
           {step === "avatar" ? (
             <button type="button" className="rm-profile-editor__icon-action" aria-label="프로필로 돌아가기" disabled={saving} onClick={() => setStep("profile")}><BackIcon /></button>
           ) : step === "profile" ? (
-            <button type="button" className="rm-profile-editor__icon-action rm-profile-editor__mobile-back" aria-label="프로필 편집 뒤로" disabled={saving} onClick={requestClose}><BackIcon /></button>
+            <button data-focus-target="mobile-back" type="button" className="rm-profile-editor__icon-action rm-profile-editor__mobile-back" aria-label="프로필 편집 뒤로" disabled={saving} onClick={requestClose}><BackIcon /></button>
           ) : <span />}
           <div>
             <h2 id={titleId}>{step === "discard" ? "변경사항을 버릴까요?" : step === "avatar" ? "아바타 선택" : "프로필 편집"}</h2>
             <p id={descriptionId}>{step === "discard" ? "저장하지 않은 이름과 아바타 선택이 사라집니다." : step === "avatar" ? "나를 표현할 아바타를 하나 골라 주세요." : "내 공간과 모임 기록에 보이는 프로필입니다."}</p>
           </div>
-          {step !== "discard" ? <button type="button" className="rm-profile-editor__icon-action" aria-label="프로필 편집 닫기" disabled={saving} onClick={requestClose}><CloseIcon /></button> : <span />}
+          {step !== "discard" ? <button data-focus-target="close" type="button" className="rm-profile-editor__icon-action" aria-label="프로필 편집 닫기" disabled={saving} onClick={requestClose}><CloseIcon /></button> : <span />}
         </header>
 
         <div className="rm-profile-editor__body">
@@ -183,13 +199,13 @@ export function ProfileEditorDialog({
             <>
               <div className="rm-profile-editor__field">
                 <label htmlFor="profile-display-name">표시 이름</label>
-                <input ref={nameRef} id="profile-display-name" className="input" value={draft.displayName} maxLength={20} disabled={saving} aria-invalid={Boolean(errors.displayName)} aria-describedby={errors.displayName ? nameErrorId : "profile-name-help"} onChange={(event) => { setDraft({ ...draft, displayName: event.target.value }); setErrors({ ...errors, displayName: undefined }); }} />
+                <input ref={nameRef} data-focus-target="name" id="profile-display-name" className="input" value={draft.displayName} maxLength={20} disabled={saving} aria-invalid={Boolean(errors.displayName)} aria-describedby={errors.displayName ? nameErrorId : "profile-name-help"} onChange={(event) => { setDraft({ ...draft, displayName: event.target.value }); setErrors({ ...errors, displayName: undefined }); }} />
                 <small id="profile-name-help">20자 이내로 입력해 주세요.</small>
               </div>
               {errors.displayName ? <p className="rm-profile-editor__error" id={nameErrorId} role="alert">{errors.displayName}</p> : null}
               <div className="rm-profile-editor__avatar-field">
                 <span>아바타</span>
-                <button ref={avatarControlRef} type="button" className="rm-profile-editor__avatar-action" aria-label="아바타 선택" disabled={saving} aria-describedby={errors.avatarKey ? avatarErrorId : undefined} onClick={() => setStep("avatar")}>
+                <button ref={avatarControlRef} data-focus-target="avatar" type="button" className="rm-profile-editor__avatar-action" aria-label="아바타 선택" disabled={saving} aria-describedby={errors.avatarKey ? avatarErrorId : undefined} onClick={() => setStep("avatar")}>
                   <AvatarChip avatarKey={draft.avatarKey} name={null} label="" size={64} />
                   <span><strong>{bookClubAvatarLabel(draft.avatarKey)}</strong><small>아바타 선택</small></span>
                 </button>
@@ -211,8 +227,8 @@ export function ProfileEditorDialog({
             </div>
           ) : step === "profile" ? (
             <div className="rm-profile-editor__footer-actions">
-              <button type="button" className="button button--secondary" disabled={saving} onClick={requestClose}>취소</button>
-              <button ref={saveRef} type="button" className="button button--primary rm-profile-editor__save" aria-busy={saving} disabled={saving} onClick={save}>{saving ? "저장 중…" : "변경사항 저장"}</button>
+              <button data-focus-target="cancel" type="button" className="button button--secondary" disabled={saving} onClick={requestClose}>취소</button>
+              <button ref={saveRef} data-focus-target="save" type="button" className="button button--primary rm-profile-editor__save" aria-busy={saving} disabled={saving} onClick={save}>{saving ? "저장 중…" : "변경사항 저장"}</button>
             </div>
           ) : (
             <button type="button" className="button button--primary rm-profile-editor__save" disabled={saving} onClick={() => setStep("profile")}>선택 완료</button>
