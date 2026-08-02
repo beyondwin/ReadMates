@@ -8,6 +8,11 @@
   --font-sans: var(--f-sans);
   --text-1: var(--text);
   --bg-softer: var(--bg-sub);
+  --avatar-picker-selected-badge: var(--accent);
+}
+
+[data-theme="dark"] {
+  --avatar-picker-selected-badge: oklch(0.64 0.11 255);
 }
 
 .rm-app-shell {
@@ -6994,7 +6999,7 @@ a.rm-recent-record__destination:hover {
   width: 30px;
   height: 30px;
   border: 0;
-  background: var(--accent);
+  background: var(--avatar-picker-selected-badge);
   color: var(--on-accent);
   box-shadow: 0 3px 7px oklch(0.35 0.08 255 / 0.2);
 }

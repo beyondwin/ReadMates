@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/experimental-ct-react";
 import { AvatarPickerStory } from "./avatar-picker.story";
 
-test("selected check stays near-white on the accent fill in dark theme", async ({ mount }) => {
+test("selected check stays near-white with 3:1 contrast in dark theme", async ({ mount }) => {
   const component = await mount(
     <div data-theme="dark" className="rm-profile-editor">
       <AvatarPickerStory />
@@ -41,7 +41,7 @@ test("selected check stays near-white on the accent fill in dark theme", async (
   });
 
   expect(rendered.foreground.every((channel) => channel >= 245)).toBe(true);
-  expect(rendered.contrast).toBeGreaterThan(2.3);
+  expect(rendered.contrast).toBeGreaterThanOrEqual(3);
 });
 
 for (const viewport of [{ width: 320, height: 700 }, { width: 390, height: 844 }, { width: 1280, height: 900 }]) {

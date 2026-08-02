@@ -80,7 +80,9 @@ test("TopNav shows the desktop avatar and preserves a long account name in its a
   expect((await account.locator(".rm-avatar-chip").boundingBox())?.width).toBe(36);
   const accountName = account.locator(".rm-account-menu__trigger-name");
   expect((await fontMetrics(accountName)).size).toBeGreaterThanOrEqual(14);
-  await expect(navigation).toHaveScreenshot("top-nav-long-account-name-1280.png");
+  await expect(navigation).toHaveScreenshot("top-nav-long-account-name-1280.png", {
+    maxDiffPixelRatio: 0,
+  });
 });
 
 test("TopNav gives the workspace switch the approved desktop icon scale", async ({ mount, page }) => {
