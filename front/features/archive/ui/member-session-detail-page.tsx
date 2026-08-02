@@ -397,7 +397,7 @@ function SessionHighlights({ session, mobile = false }: { session: MemberArchive
       <div className="rm-mobile-record-list">
         {hasHighlights ? (
           <RecordGroup title="회차 하이라이트" count={session.publicHighlights.length} mobile>
-            <HighlightsList highlights={session.publicHighlights} mobile />
+            <HighlightsList highlights={session.publicHighlights} />
           </RecordGroup>
         ) : null}
         {hasOneLiners ? (
@@ -456,12 +456,8 @@ function RecordGroup({ title, count, mobile = false, children }: { title: string
   );
 }
 
-function HighlightsList({
-  highlights,
-  mobile = false,
-}: {
+function HighlightsList({ highlights }: {
   highlights: MemberArchiveSessionDetailResponse["publicHighlights"];
-  mobile?: boolean;
 }) {
   if (highlights.length === 0) {
     return null;
@@ -482,7 +478,7 @@ function HighlightsList({
                 avatarKey={highlight.avatarKey}
                 name={highlight.authorName}
                 label=""
-                size={mobile ? 18 : 20}
+                sizeRole="dense"
               />
               <span className="small">{highlight.authorName}</span>
             </div>
@@ -687,7 +683,7 @@ function OneLinerList({ oneLiners, mobile = false }: { oneLiners: MemberArchiveO
               avatarKey={oneLiner.avatarKey}
               name={oneLiner.authorName}
               label=""
-              size={22}
+              sizeRole="dense"
             />
             {oneLiner.authorName}
           </div>

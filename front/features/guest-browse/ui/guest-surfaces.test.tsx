@@ -45,6 +45,12 @@ describe("guest browse surfaces", () => {
     expect(screen.getByText("여름의 독서")).toBeVisible();
     expect(screen.getAllByText("읽는이")).toHaveLength(3);
     expect(screen.getByText((_, element) => element?.textContent === "RSVP · 참석출석 · 미확인")).toBeVisible();
+    expect(
+      screen
+        .getByText((_, element) => element?.textContent === "RSVP · 참석출석 · 미확인")
+        .closest("div")
+        ?.querySelector(".rm-avatar-chip"),
+    ).toHaveAttribute("data-avatar-size-role", "member");
     expect(screen.getByText("참석 현황")).toBeVisible();
     expect(screen.queryByRole("button", { name: /RSVP|저장|질문 추가/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/접속 링크|비밀번호|정확한 장소/)).not.toBeInTheDocument();
@@ -67,6 +73,9 @@ describe("guest browse surfaces", () => {
     expect(screen.getByText("한 줄 감상")).toBeVisible();
     expect(screen.getByText("전체 이름")).toBeVisible();
     expect(screen.getByTitle("전체 이름")).toBeVisible();
+    expect(
+      screen.getByText("한 줄 감상").closest("article")?.querySelector(".rm-avatar-chip"),
+    ).toHaveAttribute("data-avatar-size-role", "dense");
     expect(screen.getByRole("link", { name: "피드백 보기, 정식 멤버 전용" })).toHaveAttribute(
       "href",
       "/app/feedback/closed-1",

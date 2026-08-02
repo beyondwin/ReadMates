@@ -379,9 +379,9 @@ describe("NotesFeedPage", () => {
     expect(screen.queryByText("문장마다 판단의 습관을 되묻게 만드는 장문 기록을 남겼다.")).not.toBeInTheDocument();
     const avatars = Array.from(container.querySelectorAll<HTMLElement>(".rm-avatar-chip"));
     expect(avatars.length).toBeGreaterThan(0);
-    expect(
-      avatars.every((avatar) => avatar.style.getPropertyValue("--avatar-size") === "30px"),
-    ).toBe(true);
+    avatars.forEach((avatar) => {
+      expect(avatar).toHaveAttribute("data-avatar-size-role", "author");
+    });
     const searchIcon = screen.getByLabelText("세션 검색").parentElement?.querySelector("svg");
     expect(searchIcon).toHaveAttribute("width", "20");
     expect(searchIcon).toHaveAttribute("height", "20");

@@ -426,7 +426,7 @@ export function RosterList({ session }: { session: CurrentSession }) {
         {attendees.map((member) => (
           <div key={member.membershipId} className="row-between">
             <span className="row" style={{ gap: "10px" }}>
-              <AvatarChip avatarKey={member.avatarKey} name={member.displayName} label="" size={24} />
+              <AvatarChip avatarKey={member.avatarKey} name={member.displayName} label="" sizeRole="member" />
               <span className="small" style={{ color: "var(--text)" }}>
                 {member.displayName}
                 {member.role === "HOST" ? (
@@ -476,7 +476,7 @@ export function BoardQuestions({ questions }: { questions: BoardQuestion[] }) {
         >
           <div className="row-between" style={{ alignItems: "flex-start", marginBottom: "12px" }}>
             <div className="row" style={{ gap: "10px", flexWrap: "wrap" }}>
-              <AvatarChip avatarKey={question.avatarKey} name={question.authorName} label="" size={24} />
+              <AvatarChip avatarKey={question.avatarKey} name={question.authorName} label="" sizeRole="dense" />
               <span className="small" style={{ color: "var(--text)", fontWeight: 500 }}>
                 {question.authorName}
               </span>
@@ -535,7 +535,7 @@ export function BoardLongReviews({ longReviews }: { longReviews: BoardLongReview
             {review.body}
           </p>
           <div className="row tiny" style={{ marginTop: 12, gap: 8, color: "var(--text-3)", minWidth: 0 }}>
-            <AvatarChip avatarKey={review.avatarKey} name={review.authorName} label="" size={22} />
+            <AvatarChip avatarKey={review.avatarKey} name={review.authorName} label="" sizeRole="dense" />
             <span style={{ minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word" }}>{review.authorName}</span>
           </div>
         </article>

@@ -55,7 +55,7 @@ test("member reflection keeps the reading stack and rhythm on desktop", async ({
   expect(metrics.fontSize).toBeGreaterThanOrEqual(16);
   expect(metrics.lineHeight / metrics.fontSize).toBeGreaterThanOrEqual(1.6);
   expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth);
-  expect((await component.locator(".rm-avatar-chip").boundingBox())?.width).toBe(30);
+  expect((await component.locator(".rm-avatar-chip").boundingBox())?.width).toBe(36);
   expect(await component.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
 });
 
@@ -84,7 +84,7 @@ test("member reflection keeps the reading stack and rhythm on mobile", async ({ 
   expect(metrics.fontSize).toBeGreaterThanOrEqual(16);
   expect(metrics.lineHeight / metrics.fontSize).toBeGreaterThanOrEqual(1.6);
   expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth);
-  expect((await component.locator(".rm-avatar-chip").boundingBox())?.width).toBe(32);
+  expect((await component.locator(".rm-avatar-chip").boundingBox())?.width).toBe(36);
   expect(await component.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
 });
 

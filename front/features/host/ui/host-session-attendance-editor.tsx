@@ -62,14 +62,14 @@ export function HostSessionAttendanceEditor({
             key={attendee.membershipId}
             style={{
               display: "grid",
-              gridTemplateColumns: "32px 1fr auto auto",
+              gridTemplateColumns: "46px minmax(0, 1fr) auto auto",
               gap: "14px",
               padding: "12px 0",
               borderTop: index === 0 ? "1px solid var(--line)" : "1px solid var(--line-soft)",
               alignItems: "center",
             }}
           >
-            <AvatarChip avatarKey={attendee.avatarKey} name={attendee.displayName} label="" size={24} />
+            <AvatarChip avatarKey={attendee.avatarKey} name={attendee.displayName} label="" sizeRole="member" />
             <span className="body" style={{ fontSize: "14px" }}>
               {attendee.displayName}
             </span>

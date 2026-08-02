@@ -275,6 +275,7 @@ describe("HostMembersPage", () => {
       "/assets/avatars/book-club/banana-green-book.webp",
     );
     expect(activeArticle.querySelector(".rm-avatar-chip")).toHaveClass("rm-avatar-chip--artwork");
+    expect(activeArticle.querySelector(".rm-avatar-chip")).toHaveAttribute("data-avatar-size-role", "member");
     expect(activeRow.queryByText("@멤버1")).not.toBeInTheDocument();
     expect(activeRow.getByText("active@example.com · 정식 멤버")).toBeInTheDocument();
     expect(activeRow.getByText("활성")).toBeInTheDocument();
@@ -286,12 +287,15 @@ describe("HostMembersPage", () => {
       "src",
       "/assets/avatars/book-club/cloud-green-book.webp",
     );
+    expect(outsideArticle.querySelector(".rm-avatar-chip")).toHaveAttribute("data-avatar-size-role", "member");
     expect(outsideRow.queryByText("@새")).not.toBeInTheDocument();
     expect(outsideRow.getByText("new@example.com · 정식 멤버")).toBeInTheDocument();
     expect(outsideRow.getByText("이번 세션 미포함")).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "정지됨" }));
-    const suspendedRow = within(screen.getByText("정").closest("article") as HTMLElement);
+    const suspendedArticle = screen.getByText("정").closest("article") as HTMLElement;
+    const suspendedRow = within(suspendedArticle);
+    expect(suspendedArticle.querySelector(".rm-avatar-chip")).toHaveAttribute("data-avatar-size-role", "member");
     expect(suspendedRow.queryByText("@정")).not.toBeInTheDocument();
     expect(suspendedRow.getByText("suspended@example.com · 정지됨 · 참여 2026.04.14")).toBeInTheDocument();
     expect(suspendedRow.getByText("정지")).toBeInTheDocument();
@@ -303,6 +307,7 @@ describe("HostMembersPage", () => {
       "src",
       "/assets/avatars/book-club/cloud-green-book.webp",
     );
+    expect(pendingArticle.querySelector(".rm-avatar-chip")).toHaveAttribute("data-avatar-size-role", "member");
 
     await user.click(screen.getByRole("tab", { name: "탈퇴/비활성" }));
     const inactiveArticle = screen.getByText("탈").closest("article") as HTMLElement;
@@ -311,6 +316,7 @@ describe("HostMembersPage", () => {
       "src",
       "/assets/avatars/book-club/cloud-green-book.webp",
     );
+    expect(inactiveArticle.querySelector(".rm-avatar-chip")).toHaveAttribute("data-avatar-size-role", "member");
     expect(inactiveRow.getByText("left@example.com · 참여 2026.04.10")).toBeInTheDocument();
     expect(inactiveRow.getByText("탈퇴")).toBeInTheDocument();
     expect(inactiveRow.getByText("기록 보존")).toBeInTheDocument();

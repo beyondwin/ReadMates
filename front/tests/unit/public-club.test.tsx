@@ -111,6 +111,10 @@ describe("PublicClub", () => {
       "src",
       "/assets/avatars/book-club/cloud-green-book.webp",
     );
+    expect(screen.getByText("김호스트").closest(".public-host-note")?.querySelector(".rm-avatar-chip")).toHaveAttribute(
+      "data-avatar-size-role",
+      "author",
+    );
     expect(screen.getByText("호스트 · 2025.11~")).toBeInTheDocument();
     expect(screen.getByText("함께 읽기")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "기록은 누구나 읽고, 참여는 초대받은 멤버가 합니다" })).toBeInTheDocument();

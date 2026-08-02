@@ -598,6 +598,9 @@ describe("CurrentSession", () => {
     );
     expect(container.querySelector(".desktop-only .rm-avatar-chip")).toHaveClass("rm-avatar-chip--artwork");
     expect(container.querySelector(".desktop-only .rm-avatar-chip")).not.toHaveAttribute("data-rsvp-status");
+    expect(
+      desktopScope.getByText("참석자 · 1/2").closest("section")?.querySelector(".rm-avatar-chip"),
+    ).toHaveAttribute("data-avatar-size-role", "member");
     expect(desktopScope.getByText("우")).toBeVisible();
     expect(desktopScope.getByText("수")).toBeVisible();
   });
@@ -686,10 +689,16 @@ describe("CurrentSession", () => {
     expect(desktopScope.queryByRole("button", { name: /한줄평/ })).not.toBeInTheDocument();
     expect(desktopScope.queryByRole("button", { name: /하이라이트/ })).not.toBeInTheDocument();
     expect(desktopScope.getByText("API에서 온 질문")).toBeInTheDocument();
+    expect(
+      desktopScope.getByText("API에서 온 질문").closest("article")?.querySelector(".rm-avatar-chip"),
+    ).toHaveAttribute("data-avatar-size-role", "dense");
     expect(desktopScope.queryByText(/분류는 세계를 이해하기 위한 도구일까요/)).not.toBeInTheDocument();
 
     await user.click(desktopScope.getByRole("button", { name: /서평 · 1/ }));
     expect(desktopScope.getByText("API에서 온 공동 서평")).toBeInTheDocument();
+    expect(
+      desktopScope.getByText("API에서 온 공동 서평").closest("article")?.querySelector(".rm-avatar-chip"),
+    ).toHaveAttribute("data-avatar-size-role", "dense");
   });
 
   it("moves the shared board tabs with keyboard arrow keys", async () => {

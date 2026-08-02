@@ -212,7 +212,14 @@ describe("MemberSessionDetailPage", () => {
       "/assets/avatars/book-club/cloud-green-book.webp",
     );
     expect((desktopHighlightRow as HTMLElement).querySelector(".rm-avatar-chip")).toHaveClass("rm-avatar-chip--artwork");
+    expect((desktopHighlightRow as HTMLElement).querySelector(".rm-avatar-chip")).toHaveAttribute(
+      "data-avatar-size-role",
+      "dense",
+    );
     expect(desktop.getByRole("heading", { name: "한줄평 · 1" })).toBeInTheDocument();
+    expect(
+      desktop.getByText("낙관이 아니라 정확함의 문제였다.").closest("article")?.querySelector(".rm-avatar-chip"),
+    ).toHaveAttribute("data-avatar-size-role", "dense");
     expect(desktop.getByRole("heading", { name: "함께 남긴 질문" })).toBeInTheDocument();
     expect(desktop.getByText("Q1 · 이멤버5")).toHaveStyle({ color: "var(--text-3)" });
     expect(desktop.queryByText("함께 남긴 질문 Q1 · 이멤버5")).not.toBeInTheDocument();

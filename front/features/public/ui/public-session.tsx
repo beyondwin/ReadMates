@@ -94,7 +94,7 @@ export default function PublicSession({ session, returnTarget = publicRecordsRet
                   <article className="public-note-highlight-row" key={`${index}-${highlight.sortOrder}-${highlight.authorName ?? "readmates"}-${highlight.text}`}>
                     <p className="public-note-highlight-row__quote editorial">{text}</p>
                     <div className="row public-note-author-row">
-                      <AvatarChip avatarKey={highlight.avatarKey} name={authorName} label="" size={20} />
+                      <AvatarChip avatarKey={highlight.avatarKey} name={authorName} label="" sizeRole="dense" />
                       <span className="small">{authorName}</span>
                     </div>
                   </article>
@@ -137,7 +137,7 @@ export default function PublicSession({ session, returnTarget = publicRecordsRet
                   <article className="public-note-oneliner-card" key={`${index}-${oneLiner.authorName}-${oneLiner.text}`}>
                     <p className="public-note-oneliner-card__quote editorial">{text}</p>
                     <div className="row public-note-author-row">
-                      <AvatarChip avatarKey={oneLiner.avatarKey} name={authorName} label="" size={22} />
+                      <AvatarChip avatarKey={oneLiner.avatarKey} name={authorName} label="" sizeRole="dense" />
                       <span className="small">{authorName}</span>
                     </div>
                   </article>

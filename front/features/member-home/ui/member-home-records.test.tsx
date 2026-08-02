@@ -37,21 +37,17 @@ const authoredQuestion = {
 };
 
 describe("member home record reflection cards", () => {
-  it("uses the approved desktop and mobile activity avatar scales", () => {
+  it("uses the author role for desktop and mobile activity avatars", () => {
     const pulse = render(<ClubPulse items={[authoredQuestion]} />);
     expect(
-      pulse.container
-        .querySelector<HTMLElement>(".rm-club-pulse-entry__author .rm-avatar-chip")
-        ?.style.getPropertyValue("--avatar-size"),
-    ).toBe("30px");
+      pulse.container.querySelector(".rm-club-pulse-entry__author .rm-avatar-chip"),
+    ).toHaveAttribute("data-avatar-size-role", "author");
     pulse.unmount();
 
     const mobile = render(<MobileMemberActivity items={[authoredQuestion]} />);
     expect(
-      mobile.container
-        .querySelector<HTMLElement>(".rm-member-activity-card__author .rm-avatar-chip")
-        ?.style.getPropertyValue("--avatar-size"),
-    ).toBe("32px");
+      mobile.container.querySelector(".rm-member-activity-card__author .rm-avatar-chip"),
+    ).toHaveAttribute("data-avatar-size-role", "author");
   });
 
   it("scopes the reading face to desktop and mobile reflection content", () => {
@@ -235,8 +231,6 @@ describe("member home record reflection cards", () => {
 
     expect(noResponse).not.toHaveClass("mono");
     expect(noResponse.querySelector(".ledger-number")).toHaveTextContent("1");
-    expect(
-      container.querySelector<HTMLElement>(".rm-avatar-chip")?.style.getPropertyValue("--avatar-size"),
-    ).toBe("34px");
+    expect(container.querySelector(".rm-avatar-chip")).toHaveAttribute("data-avatar-size-role", "roster");
   });
 });

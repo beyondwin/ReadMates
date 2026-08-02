@@ -169,7 +169,7 @@ export function ClubPulse({
                 <div className="rm-club-pulse-entry__author">
                   {authorName ? (
                     <>
-                      <AvatarChip avatarKey={item.avatarKey} name={authorName} label="" size={30} />
+                      <AvatarChip avatarKey={item.avatarKey} name={authorName} label="" sizeRole="author" />
                       <span className="small rm-club-pulse-entry__author-name">{authorName}</span>
                     </>
                   ) : null}
@@ -270,7 +270,7 @@ export function MobileMemberActivity({
               >
                 <div className="rm-member-activity-card__top">
                   <div className="rm-member-activity-card__author">
-                    <AvatarChip avatarKey={item.avatarKey} name={authorName} label="" size={32} />
+                    <AvatarChip avatarKey={item.avatarKey} name={authorName} label="" sizeRole="author" />
                     <div className="rm-member-activity-card__author-copy">
                       <div className="rm-member-activity-card__author-name">{authorName ?? "회차 하이라이트"}</div>
                       <div className="rm-member-activity-card__book">{item.bookTitle}</div>
@@ -345,14 +345,14 @@ export function RosterSummary({ current }: { current: CurrentSessionResponse }) 
             미응답 <span className="ledger-number">{noResponseCount}</span>
           </div>
         </div>
-        <div className="row" style={{ gap: "6px", marginTop: "14px", flexWrap: "wrap" }}>
+        <div className="row" style={{ gap: "8px", marginTop: "14px", flexWrap: "wrap" }}>
           {attendees.map((member) => (
             <AvatarChip
               key={member.membershipId}
               avatarKey={member.avatarKey}
               name={member.displayName}
               label={`${member.displayName} · ${rsvpLabel(member.rsvpStatus)}`}
-              size={34}
+              sizeRole="roster"
             />
           ))}
         </div>

@@ -126,7 +126,7 @@ function FeedQuestions({ items, label }: { items: NoteFeedItem[]; label: string 
               borderTop: index === 0 ? "1px solid var(--line)" : "1px solid var(--line-soft)",
             }}
           >
-            <FeedAuthorRow item={item} rightLabel={formatDateOnlyLabel(item.date)} markerSize={30} style={{ gap: "10px", marginBottom: "12px" }} />
+            <FeedAuthorRow item={item} rightLabel={formatDateOnlyLabel(item.date)} style={{ gap: "10px", marginBottom: "12px" }} />
             <div className="body editorial rm-notes-question-text">
               {item.text}
             </div>
@@ -144,7 +144,7 @@ function FeedOneLiners({ items, label }: { items: NoteFeedItem[]; label: string 
         {items.map((item) => (
           <article key={itemKey(item)} className="rm-notes-oneliner-card">
             <p className="rm-notes-oneliner-card__quote body-lg editorial">{item.text}</p>
-            <FeedAuthorRow item={item} markerSize={30} style={{ gap: "10px", marginTop: "12px", paddingLeft: "34px" }} />
+            <FeedAuthorRow item={item} style={{ gap: "10px", marginTop: "12px", paddingLeft: "46px" }} />
           </article>
         ))}
       </div>
@@ -159,7 +159,7 @@ function FeedHighlights({ items }: { items: NoteFeedItem[] }) {
         {items.map((item) => (
           <article key={itemKey(item)} className="rm-notes-highlight-row">
             <p className="rm-notes-highlight-row__quote body-lg editorial">{item.text}</p>
-            <FeedAuthorRow item={item} markerSize={30} style={{ gap: "10px", marginTop: "10px", paddingLeft: "34px" }} />
+            <FeedAuthorRow item={item} style={{ gap: "10px", marginTop: "10px", paddingLeft: "46px" }} />
           </article>
         ))}
       </div>
@@ -338,20 +338,18 @@ function NotesFeedListStyles() {
 function FeedAuthorRow({
   item,
   rightLabel,
-  markerSize,
   children,
   style,
 }: {
   item: NoteFeedItem;
   rightLabel?: string;
-  markerSize: number;
   children?: React.ReactNode;
   style?: CSSProperties;
 }) {
   return (
     <div className="row" style={{ gap: "8px", color: "var(--text-3)", ...style }}>
       {item.authorName ? (
-        <AvatarChip avatarKey={item.avatarKey} name={item.authorName} label="" size={markerSize} />
+        <AvatarChip avatarKey={item.avatarKey} name={item.authorName} label="" sizeRole="author" />
       ) : null}
       {item.authorName ? <span className="small">{item.authorName}</span> : null}
       {children}

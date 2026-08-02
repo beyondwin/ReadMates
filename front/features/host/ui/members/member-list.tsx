@@ -161,7 +161,7 @@ export function MemberList({
                   avatarKey={member.status === "LEFT" ? "cloud-green-book" : member.avatarKey}
                   name={member.displayName}
                   label=""
-                  size={32}
+                  sizeRole="member"
                 />
                 <h2 className="h4 editorial" style={{ margin: 0 }}>
                   {member.displayName}
