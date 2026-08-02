@@ -497,6 +497,8 @@ describe("CurrentSession", () => {
       expect(mobileScope.getByRole("button", { name: label })).toBeDisabled();
     }
     expect(mobileScope.getByRole("slider", { name: "읽기 진행률" })).toBeDisabled();
+    // Production break caught: replacing the saved progress with a default value hides a viewer's actual check-in.
+    expect(mobileScope.getByDisplayValue("72")).toBeDisabled();
     expect(mobileScope.getAllByRole("textbox").every((input) => input.hasAttribute("disabled"))).toBe(true);
     expect(mobileScope.getByRole("button", { name: "참석" })).toHaveStyle({ background: "var(--text)" });
     expect(mobileScope.getByRole("textbox", { name: "질문 1 내용" })).toHaveValue("API에서 온 내 질문");
