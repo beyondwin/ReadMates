@@ -1679,10 +1679,10 @@ step is historical Task 9 evidence rather than final-HEAD recertification.
 - [x] The single scoped re-review of the fix diff was clean.
 - [x] Fix-wave focused regression (103/103), frontend boundary (8/8), full unit (2,041/2,041), lint, build, diff, and targeted public-safety checks passed.
 - [x] Tracked implementation report and Task 1-9 checkbox closeout prepared in one docs-only commit.
-- [ ] Controller: rerun targeted guest/viewer/member E2E at the exact final docs HEAD.
-- [ ] Controller: rerun full frontend E2E at the exact final docs HEAD.
-- [ ] Controller: recapture or revalidate desktop/mobile/reduced-motion browser evidence at the exact final docs HEAD.
-- [ ] Controller: record one exact final-HEAD lint, full unit, build, diff, and public-safety snapshot after the docs commit.
+- [x] Controller: rerun targeted guest/viewer/member E2E at the exact final docs HEAD.
+- [x] Controller: rerun full frontend E2E at the exact final docs HEAD.
+- [x] Controller: recapture or revalidate desktop/mobile/reduced-motion browser evidence at the exact final docs HEAD.
+- [x] Controller: record one exact final-HEAD lint, full unit, build, diff, and public-safety snapshot after the docs commit.
 
 ---
 

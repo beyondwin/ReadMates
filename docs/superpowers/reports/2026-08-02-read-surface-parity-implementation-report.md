@@ -6,7 +6,7 @@ Branch: `codex/read-surface-parity`
 
 Program base: `5215b845`
 
-Implementation snapshot reviewed for this report: `8fea0e17`
+Implementation snapshot reviewed for this report: `34220889`
 
 Evidence scope: repository-local frontend tests and isolated local Playwright fixtures
 
@@ -16,7 +16,7 @@ The approved read-surface parity program is implemented through Task 9. Anonymou
 
 The implementation retained separate anonymous guest and authenticated member data lanes. It did not intentionally change Spring API code, Cloudflare Pages Functions BFF code, database schema, Flyway migrations, deployment configuration, or public API DTO contracts.
 
-Task 9's pre-final-review canonical snapshot passed 2,038 frontend unit tests and 131 Playwright E2E tests. The final whole-branch review then identified three Important findings. One fix wave resolved all three in `8fea0e17`, and its scoped re-review was clean. That fix-wave snapshot passed 103 focused tests, 8 frontend-boundary tests, 2,041 full frontend unit tests, lint, build, diff hygiene, and a targeted public-safety scan. Because the fix wave changed runtime code after Task 9's browser and E2E evidence, the controller-owned final-HEAD targeted E2E, full E2E, and browser evidence reruns remain pending at this documentation commit; their earlier results are not presented as final-HEAD proof.
+Task 9's pre-final-review canonical snapshot passed 2,038 frontend unit tests and 131 Playwright E2E tests. The final whole-branch review then identified three Important findings. One fix wave resolved all three in `8fea0e17`, and its scoped re-review was clean. The controller subsequently recertified the docs-closeout HEAD `34220889`: 2,041 frontend unit tests, 24 targeted E2E tests, 131 full E2E tests, and 3 focused browser-evidence scenarios all passed together with lint, build, diff hygiene, and the public-safety scan.
 
 ## User-visible behavior
 
@@ -84,7 +84,20 @@ The Task 1-9 reports and SDD ledger are ignored working evidence. This tracked r
 - `git diff --check`: passed.
 - Public-safety scan over the changed tracked files returned no matches.
 
-The fix implementer did not rerun Playwright or browser evidence. Therefore the earlier 24 targeted, 131 full E2E, and 3 browser-evidence results prove the pre-fix Task 9 snapshot, not the final docs HEAD.
+The fix implementer did not rerun Playwright or browser evidence. The controller therefore reran those gates after the fix and the first tracked documentation closeout.
+
+### Final docs-HEAD canonical snapshot at `34220889`
+
+- `corepack pnpm --dir front lint`: passed.
+- `corepack pnpm --dir front test`: 262 files, 2,041/2,041 tests passed.
+- `corepack pnpm --dir front build`: passed, 605 modules transformed.
+- Isolated targeted guest/viewer/member Playwright: 24/24 passed in 41.7 seconds.
+- Isolated full `corepack pnpm --dir front test:e2e`: 131/131 passed in 2.6 minutes.
+- Final focused browser evidence: 3/3 passed and produced 9 ignored PNGs. It recaptured guest/viewer/member current-session at 1280x900 and 390x844, viewer archive feedback at both widths, and guest notes at 390x844 with reduced motion. The scenarios asserted one-line-review enabled/disabled capability, generic viewer feedback locking without availability badges, effective transition duration at or below 0.001 seconds, and no horizontal overflow.
+- The first focused evidence attempt passed the two capability scenarios and failed only because the reduced-motion assertion expected the literal string `0s`; Chromium returned the equivalent `1e-06s`. The evidence assertion was corrected to the approved numeric threshold and the complete 3/3 set was rerun green. No product code changed.
+- Representative guest desktop, member mobile, viewer-archive mobile, and reduced-motion notes mobile screenshots were visually inspected without a layout, clipping, or permission-presentation finding.
+- `git diff --check` and `git diff --check 5215b845..HEAD`: passed.
+- The approved token, private-key, OCID, local-absolute-path, and private-looking-value scan returned no matches across the changed frontend, tests, CHANGELOG, and tracked program documents.
 
 ## Final whole-branch review and fix wave
 
@@ -121,22 +134,16 @@ The program began from `5215b845` and produced these commits before this report 
 13. `9331ee08` — `fix(frontend): remove persistent guest conversion actions`
 14. `d2f5087c` — `test(frontend): prove guest member surface parity`
 15. `8fea0e17` — `fix(frontend): close read surface parity gaps`
+16. `34220889` — `docs: close read surface parity implementation`
 
-At the implementation snapshot used for this report, the branch was clean and pointed to `8fea0e17`. The documentation closeout commit is intentionally not self-referenced here; its hash must be read from Git after commit creation.
+Runtime changes end at `8fea0e17`; the final canonical gates ran from the clean first documentation-closeout snapshot `34220889`. The evidence-recording commit that updates this report and the last four plan checkboxes is intentionally not self-referenced because its hash is created afterward.
 
-## Pending final gates and residual risk
+## Final gate status and residual risk
 
-Controller-owned checks still pending after this docs commit:
+All controller-owned final gates are complete at the docs-closeout snapshot `34220889`. The evidence-recording commit after that snapshot changes only this report and plan checkbox state; it receives docs-only diff and public-safety validation rather than another recursive browser run.
 
-- targeted guest/viewer/member E2E at the exact final docs HEAD;
-- full frontend E2E at the exact final docs HEAD;
-- responsive/reduced-motion browser evidence at the exact final docs HEAD;
-- exact final-HEAD canonical frontend lint, unit, build, diff, and public-safety record if the controller requires a single post-doc snapshot.
-
-The controller should append or amend this section if final-HEAD counts differ from the pre-doc evidence above. Until those reruns complete, the branch is implementation-complete with final browser/E2E recertification pending, not fully final-gate certified.
-
-No server CI, Testcontainers integration, BFF smoke, database integration, or Flyway validation was run for this frontend-only program because the branch intentionally changes none of those surfaces. Residual validation risk is limited to production data variety not represented by synthetic fixtures, manual assistive-technology behavior beyond automated keyboard/focus checks, and the final review wave not yet being re-exercised through Playwright at the docs commit.
+No server CI, Testcontainers integration, BFF smoke, database integration, or Flyway validation was run for this frontend-only program because the branch intentionally changes none of those surfaces. Residual validation risk is limited to production data variety not represented by synthetic fixtures and manual assistive-technology behavior beyond the automated keyboard, focus, responsive, and reduced-motion checks.
 
 ## Integration boundary
 
-No local `main` merge, push, pull request, tag, release, deploy, production mutation, live provider call, email, notification, or outbox action was performed. The branch remains a local feature branch for controller-owned final verification and later integration under separate authority.
+No local `main` merge, push, pull request, tag, release, deploy, production mutation, live provider call, email, notification, or outbox action was performed. The branch remains a clean local feature branch ready for later integration under separate authority.
