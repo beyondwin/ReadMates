@@ -13,7 +13,6 @@ const route = vi.hoisted(() => ({
 
 const mutations = vi.hoisted(() => ({
   profile: vi.fn(),
-  avatar: vi.fn(),
 }));
 
 vi.mock("react-router-dom", async (importOriginal) => ({
@@ -24,7 +23,6 @@ vi.mock("react-router-dom", async (importOriginal) => ({
 
 vi.mock("@/features/archive/queries/profile-queries", () => ({
   useUpdateMyProfileMutation: () => ({ mutateAsync: mutations.profile }),
-  useUpdateMyAvatarMutation: () => ({ mutateAsync: mutations.avatar }),
 }));
 
 const data: MyPageRouteData = {
@@ -104,19 +102,12 @@ describe("MyPageRoute", () => {
     vi.setSystemTime(new Date(2026, 6, 29));
     route.loaderData = data;
     route.revalidate.mockReset();
-    mutations.profile.mockReset().mockImplementation(async (displayName: string) => ({
+    mutations.profile.mockReset().mockImplementation(async (profile: { displayName: string; avatarKey: string }) => ({
       membershipId: "member-route-profile",
-      displayName,
+      displayName: profile.displayName,
       accountName: data.profile.accountName,
       profileImageUrl: null,
-      avatarKey: data.profile.avatarKey,
-    }));
-    mutations.avatar.mockReset().mockImplementation(async (avatarKey: string) => ({
-      membershipId: "member-route-profile",
-      displayName: data.profile.displayName,
-      accountName: data.profile.accountName,
-      profileImageUrl: null,
-      avatarKey,
+      avatarKey: profile.avatarKey,
     }));
   });
 
@@ -168,7 +159,7 @@ describe("MyPageRoute", () => {
     );
   });
 
-  it("wires independent display-name and avatar callbacks through the My Space route", async () => {
+  it("wires one combined profile callback through the My Space route", async () => {
     const user = userEvent.setup();
     const onProfileUpdated = vi.fn().mockResolvedValue(undefined);
     renderRoute("/clubs/reading-sai/app/me", onProfileUpdated);
@@ -179,7 +170,10 @@ describe("MyPageRoute", () => {
     await user.type(displayName, "변경한 멤버");
     await user.click(screen.getByRole("button", { name: "이름 저장" }));
 
-    expect(mutations.profile).toHaveBeenCalledWith("변경한 멤버");
+    expect(mutations.profile).toHaveBeenCalledWith({
+      displayName: "변경한 멤버",
+      avatarKey: "cloud-green-book",
+    });
     expect(await screen.findByRole("heading", { level: 1, name: "변경한 멤버" })).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: "아바타 바꾸기" }));
@@ -189,7 +183,10 @@ describe("MyPageRoute", () => {
     }));
     await user.click(within(dialog).getByRole("button", { name: "이 아바타로 변경" }));
 
-    expect(mutations.avatar).toHaveBeenCalledWith("banana-green-book");
+    expect(mutations.profile).toHaveBeenLastCalledWith({
+      displayName: "변경한 멤버",
+      avatarKey: "banana-green-book",
+    });
     expect(onProfileUpdated).toHaveBeenCalledTimes(2);
     expect(route.revalidate).toHaveBeenCalledTimes(2);
   });

@@ -18,7 +18,7 @@ export function MyPageRoute({ canEditProfile, clubSlug, onProfileUpdated }: MyPa
   const { profile: sourceProfile, journey } = useLoaderData() as MyPageRouteData;
   const location = useLocation();
   const revalidator = useRevalidator();
-  const { profile, updateProfile, updateAvatar } = useProfileUpdateController({
+  const { profile, saveProfile } = useProfileUpdateController({
     sourceProfile,
     canEditProfile,
     clubSlug,
@@ -48,8 +48,7 @@ export function MyPageRoute({ canEditProfile, clubSlug, onProfileUpdated }: MyPa
       notificationsHref={scopedHref("/app/notifications")}
       settingsHref={scopedHref("/app/me/settings")}
       archiveSessionsHref={scopedHref("/app/archive?view=sessions")}
-      onUpdateProfile={updateProfile}
-      onUpdateAvatar={updateAvatar}
+      onSaveProfile={saveProfile}
     />
   );
 }

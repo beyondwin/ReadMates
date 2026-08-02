@@ -57,7 +57,7 @@ describe("MyPage", () => {
         notificationsHref="/app/notifications"
         settingsHref="/app/me/settings"
         archiveSessionsHref="/app/archive?view=sessions"
-        onUpdateProfile={vi.fn().mockResolvedValue({ displayName: profile.displayName, accountName: profile.accountName })}
+        onSaveProfile={vi.fn().mockImplementation(async (editable) => ({ ...editable, accountName: profile.accountName }))}
       />,
     );
 

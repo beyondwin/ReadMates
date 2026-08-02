@@ -1,8 +1,14 @@
 import { useCallback, useState } from "react";
 import type { MemberProfileResponse, MyPageResponse } from "@/features/archive/api/archive-contracts";
 import { profileSaveErrorMessage } from "@/features/archive/model/archive-model";
-import { useUpdateMyAvatarMutation, useUpdateMyProfileMutation } from "@/features/archive/queries/profile-queries";
+import {
+  type EditableMemberProfile,
+  profileFailureField,
+  ProfileUpdateFailure,
+} from "@/features/archive/model/profile-update";
+import { useUpdateMyProfileMutation } from "@/features/archive/queries/profile-queries";
 import { isReadmatesApiError } from "@/shared/api/errors";
+import { normalizeBookClubAvatarKey } from "@/shared/ui/book-club-avatar";
 
 type ProfileUpdateControllerInput = {
   sourceProfile: MyPageResponse;
@@ -12,47 +18,25 @@ type ProfileUpdateControllerInput = {
   onRevalidate: () => void;
 };
 
-type SavedFieldOverride = {
-  source: string;
-  saved: string;
+type SavedProfileOverride = {
+  source: EditableMemberProfile;
+  saved: EditableMemberProfile;
   generation: number;
-  staleRevalidationSources: Array<{
-    value: string;
-    generation: number;
-  }>;
+  staleSources: Array<EditableMemberProfile & { generation: number }>;
 };
 
-function savedFieldOverrideIsCurrent(override: SavedFieldOverride | null, source: string) {
-  return (
-    override !== null &&
-    (source === override.source ||
-      source === override.saved ||
-      override.staleRevalidationSources.some(
-        (candidate) => candidate.value === source && candidate.generation < override.generation,
-      ))
+function editableProfile(profile: Pick<MyPageResponse, "displayName" | "avatarKey">): EditableMemberProfile {
+  return { displayName: profile.displayName, avatarKey: normalizeBookClubAvatarKey(profile.avatarKey) };
+}
+
+function profilesEqual(left: EditableMemberProfile, right: EditableMemberProfile) {
+  return left.displayName === right.displayName && left.avatarKey === right.avatarKey;
+}
+
+function overrideIsCurrent(override: SavedProfileOverride, source: EditableMemberProfile) {
+  return profilesEqual(source, override.source) || override.staleSources.some(
+    (candidate) => candidate.generation < override.generation && profilesEqual(source, candidate),
   );
-}
-
-function nextSavedFieldOverride(
-  current: SavedFieldOverride | null,
-  source: string,
-  saved: string,
-): SavedFieldOverride {
-  return {
-    source,
-    saved,
-    generation: (current?.generation ?? 0) + 1,
-    staleRevalidationSources: current
-      ? [
-          ...current.staleRevalidationSources,
-          { value: current.saved, generation: current.generation },
-        ]
-      : [],
-  };
-}
-
-function profileUpdateErrorMessage(error: unknown) {
-  return profileSaveErrorMessage(isReadmatesApiError(error) ? error.code : null);
 }
 
 export function useProfileUpdateController({
@@ -63,69 +47,62 @@ export function useProfileUpdateController({
   onRevalidate,
 }: ProfileUpdateControllerInput): {
   profile: MyPageResponse;
-  updateProfile: (displayName: string) => Promise<MemberProfileResponse>;
-  updateAvatar: (avatarKey: string) => Promise<MemberProfileResponse>;
+  saveProfile: (profile: EditableMemberProfile) => Promise<MemberProfileResponse>;
 } {
-  const { mutateAsync: updateMyProfile } = useUpdateMyProfileMutation();
-  const { mutateAsync: updateMyAvatar } = useUpdateMyAvatarMutation(clubSlug ? { clubSlug } : undefined);
-  const [displayNameOverride, setDisplayNameOverride] = useState<SavedFieldOverride | null>(null);
-  const [avatarKeyOverride, setAvatarKeyOverride] = useState<SavedFieldOverride | null>(null);
-  const displayNameOverrideIsCurrent = savedFieldOverrideIsCurrent(displayNameOverride, sourceProfile.displayName);
-  const avatarKeyOverrideIsCurrent = savedFieldOverrideIsCurrent(avatarKeyOverride, sourceProfile.avatarKey);
+  const { mutateAsync: updateMyProfile } = useUpdateMyProfileMutation(clubSlug ? { clubSlug } : undefined);
+  const [savedState, setSavedState] = useState<{
+    clubSlug: string | null | undefined;
+    override: SavedProfileOverride;
+  } | null>(null);
+  const savedOverride = savedState?.clubSlug === clubSlug ? savedState.override : null;
+  const source = editableProfile(sourceProfile);
 
-  if (displayNameOverride && !displayNameOverrideIsCurrent) {
-    setDisplayNameOverride(null);
+  const sourceIsAuthoritative = savedOverride !== null && profilesEqual(source, savedOverride.saved);
+  const overrideCurrent = savedOverride !== null && overrideIsCurrent(savedOverride, source);
+  if (savedOverride && (sourceIsAuthoritative || !overrideCurrent)) {
+    setSavedState(null);
   }
-  if (avatarKeyOverride && !avatarKeyOverrideIsCurrent) {
-    setAvatarKeyOverride(null);
-  }
-  const profile: MyPageResponse = {
-    ...sourceProfile,
-    displayName: displayNameOverrideIsCurrent ? displayNameOverride.saved : sourceProfile.displayName,
-    avatarKey: avatarKeyOverrideIsCurrent ? avatarKeyOverride.saved : sourceProfile.avatarKey,
-  };
+  const profile = overrideCurrent
+    ? { ...sourceProfile, ...savedOverride.saved }
+    : sourceProfile;
 
-  const updateProfile = useCallback(
-    async (displayName: string): Promise<MemberProfileResponse> => {
-      if (!canEditProfile) {
-        throw new Error(profileSaveErrorMessage("MEMBERSHIP_NOT_ALLOWED"));
-      }
+  const saveProfile = useCallback(async (editable: EditableMemberProfile) => {
+    const code = canEditProfile ? null : "MEMBERSHIP_NOT_ALLOWED" as const;
+    if (code) {
+      throw new ProfileUpdateFailure(profileSaveErrorMessage(code), code, "form");
+    }
 
-      try {
-        const updatedProfile = await updateMyProfile(displayName);
-        await onProfileUpdated();
-        setDisplayNameOverride((current) =>
-          nextSavedFieldOverride(current, sourceProfile.displayName, updatedProfile.displayName),
-        );
-        onRevalidate();
-        return updatedProfile;
-      } catch (error) {
-        throw new Error(profileUpdateErrorMessage(error), { cause: error });
-      }
-    },
-    [canEditProfile, onProfileUpdated, onRevalidate, sourceProfile.displayName, updateMyProfile],
-  );
+    try {
+      const updated = await updateMyProfile(editable);
+      const saved = editableProfile(updated as MyPageResponse);
+      await onProfileUpdated();
+      setSavedState((currentState) => {
+        const current = currentState?.clubSlug === clubSlug ? currentState.override : null;
+        return {
+          clubSlug,
+          override: {
+            source: editableProfile(sourceProfile),
+            saved,
+            generation: (current?.generation ?? 0) + 1,
+            staleSources: current
+              ? [...current.staleSources, { ...current.saved, generation: current.generation }]
+              : [],
+          },
+        };
+      });
+      onRevalidate();
+      return updated;
+    } catch (error) {
+      if (error instanceof ProfileUpdateFailure) throw error;
+      const errorCode = isReadmatesApiError(error) ? error.code : null;
+      throw new ProfileUpdateFailure(
+        profileSaveErrorMessage(errorCode),
+        errorCode,
+        profileFailureField(errorCode),
+        { cause: error },
+      );
+    }
+  }, [canEditProfile, clubSlug, onProfileUpdated, onRevalidate, sourceProfile, updateMyProfile]);
 
-  const updateAvatar = useCallback(
-    async (avatarKey: string): Promise<MemberProfileResponse> => {
-      if (!canEditProfile) {
-        throw new Error(profileSaveErrorMessage("MEMBERSHIP_NOT_ALLOWED"));
-      }
-
-      try {
-        const updatedProfile = await updateMyAvatar(avatarKey);
-        await onProfileUpdated();
-        setAvatarKeyOverride((current) =>
-          nextSavedFieldOverride(current, sourceProfile.avatarKey, updatedProfile.avatarKey),
-        );
-        onRevalidate();
-        return updatedProfile;
-      } catch (error) {
-        throw new Error(profileUpdateErrorMessage(error), { cause: error });
-      }
-    },
-    [canEditProfile, onProfileUpdated, onRevalidate, sourceProfile.avatarKey, updateMyAvatar],
-  );
-
-  return { profile, updateProfile, updateAvatar };
+  return { profile, saveProfile };
 }

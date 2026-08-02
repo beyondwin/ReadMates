@@ -2,7 +2,7 @@ import type { MyPageProfile } from "@/features/archive/model/archive-model";
 import type { MemberSpaceViewModel } from "@/features/archive/model/my-reading-shelf-model";
 import { MyReadingShelf } from "./my-page/my-reading-shelf";
 import type { RecentReadingListItem } from "./my-page/recent-reading-list";
-import type { AvatarUpdateResult, ProfileUpdateResult } from "./my-page/types";
+import type { SaveProfile } from "./my-page/types";
 
 type MyPageProps = {
   profile: MyPageProfile;
@@ -12,8 +12,7 @@ type MyPageProps = {
   notificationsHref: string;
   settingsHref: string;
   archiveSessionsHref: string;
-  onUpdateProfile: (displayName: string) => Promise<ProfileUpdateResult>;
-  onUpdateAvatar: (avatarKey: string) => Promise<AvatarUpdateResult>;
+  onSaveProfile: SaveProfile;
 };
 
 export default function MyPage({
@@ -24,8 +23,7 @@ export default function MyPage({
   notificationsHref,
   settingsHref,
   archiveSessionsHref,
-  onUpdateProfile,
-  onUpdateAvatar,
+  onSaveProfile,
 }: MyPageProps) {
   return (
     <MyReadingShelf
@@ -36,8 +34,7 @@ export default function MyPage({
       notificationsHref={notificationsHref}
       settingsHref={settingsHref}
       archiveSessionsHref={archiveSessionsHref}
-      onUpdateProfile={onUpdateProfile}
-      onUpdateAvatar={onUpdateAvatar}
+      onSaveProfile={onSaveProfile}
     />
   );
 }

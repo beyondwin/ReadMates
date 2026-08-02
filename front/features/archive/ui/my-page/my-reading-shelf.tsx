@@ -8,7 +8,7 @@ import {
   type RecentReadingListItem,
 } from "./recent-reading-list";
 import { ReadingAchievementSummary } from "./reading-achievement-summary";
-import type { AvatarUpdateResult, ProfileUpdateResult } from "./types";
+import type { SaveProfile } from "./types";
 
 export type MyReadingShelfProps = {
   profile: MyPageProfile;
@@ -18,8 +18,7 @@ export type MyReadingShelfProps = {
   notificationsHref: string;
   settingsHref: string;
   archiveSessionsHref: string;
-  onUpdateProfile: (displayName: string) => Promise<ProfileUpdateResult>;
-  onUpdateAvatar: (avatarKey: string) => Promise<AvatarUpdateResult>;
+  onSaveProfile: SaveProfile;
 };
 
 export function MyReadingShelf({
@@ -30,8 +29,7 @@ export function MyReadingShelf({
   notificationsHref,
   settingsHref,
   archiveSessionsHref,
-  onUpdateProfile,
-  onUpdateAvatar,
+  onSaveProfile,
 }: MyReadingShelfProps) {
   return (
     <main className="rm-my-shelf rm-member-space">
@@ -40,8 +38,7 @@ export function MyReadingShelf({
           profile={profile}
           viewModel={viewModel}
           canEditProfile={canEditProfile}
-          onUpdateProfile={onUpdateProfile}
-          onUpdateAvatar={onUpdateAvatar}
+          onSaveProfile={onSaveProfile}
         />
         <ReadingAchievementSummary viewModel={viewModel} />
       </MemberSpaceOverview>

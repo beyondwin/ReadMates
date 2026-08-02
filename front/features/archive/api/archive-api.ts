@@ -20,6 +20,7 @@ import type {
   NoteFeedPage,
   NoteSessionPage,
 } from "@/features/archive/api/archive-contracts";
+import type { EditableMemberProfile } from "@/features/archive/model/profile-update";
 import { pagingSearchParams, type PageRequest } from "@/shared/model/paging";
 
 function jsonRequest(init: Omit<RequestInit, "headers" | "body">, body: unknown): RequestInit {
@@ -123,12 +124,13 @@ export function fetchMyJourney(context?: ReadmatesApiContext, page?: PageRequest
   return readmatesFetch<MyJourneyPage>(`/api/archive/me/journey${pagingSearchParams(page)}`, undefined, context);
 }
 
-export async function updateMyProfile(displayName: string) {
-  const request: UpdateMemberProfileRequest = { displayName };
+export async function updateMyProfile(profile: EditableMemberProfile, context?: ReadmatesApiContext) {
+  const request: UpdateMemberProfileRequest = profile;
 
   return readmatesFetchResponse(
     "/api/me/profile",
-    jsonRequest({ method: "PATCH" }, request),
+    jsonRequest({ method: "PUT" }, request),
+    context,
   ) as Promise<Response & { json(): Promise<MemberProfileResponse> }>;
 }
 

@@ -4,12 +4,13 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { MyPageProfile } from "@/features/archive/model/archive-model";
 import type { MemberSpaceViewModel } from "@/features/archive/model/my-reading-shelf-model";
+import type { EditableMemberProfile } from "@/features/archive/model/profile-update";
 import { MemberProfileSummary } from "./member-profile-summary";
 import { MemberSpaceOverview } from "./member-space-overview";
 import { MyReadingShelf } from "./my-reading-shelf";
 import { ReadingAchievementSummary } from "./reading-achievement-summary";
 import type { RecentReadingListItem } from "./recent-reading-list";
-import type { AvatarUpdateResult, ProfileUpdateResult } from "./types";
+import type { ProfileSaveResult } from "./types";
 
 const profile: MyPageProfile = {
   avatarKey: "banana-green-book",
@@ -58,8 +59,7 @@ function renderProfileSummary(canEditProfile = true) {
       profile={profile}
       viewModel={viewModel}
       canEditProfile={canEditProfile}
-      onUpdateProfile={vi.fn().mockResolvedValue({ displayName: profile.displayName, accountName: profile.accountName })}
-      onUpdateAvatar={vi.fn().mockResolvedValue({ avatarKey: profile.avatarKey })}
+      onSaveProfile={vi.fn().mockImplementation(async (editable) => ({ ...editable, accountName: profile.accountName }))}
     />,
   );
 }
@@ -74,8 +74,7 @@ describe("member-space presentation sections", () => {
         profile={{ ...profile, avatarKey }}
         viewModel={viewModel}
         canEditProfile
-        onUpdateProfile={vi.fn().mockResolvedValue({ displayName: profile.displayName, accountName: profile.accountName })}
-        onUpdateAvatar={vi.fn().mockResolvedValue({ avatarKey })}
+        onSaveProfile={vi.fn().mockImplementation(async (editable) => ({ ...editable, accountName: profile.accountName }))}
       />,
     );
 
@@ -124,8 +123,8 @@ describe("member-space presentation sections", () => {
 
     function StatefulProfileSummary() {
       const [currentProfile, setCurrentProfile] = useState(profile);
-      const saveAvatar = async (avatarKey: string): Promise<AvatarUpdateResult> => {
-        const updated = await onUpdateAvatar(avatarKey);
+      const saveProfile = async (editable: EditableMemberProfile): Promise<ProfileSaveResult> => {
+        const updated = await onUpdateAvatar(editable.avatarKey);
         setCurrentProfile((current) => ({ ...current, avatarKey: updated.avatarKey }));
         return updated;
       };
@@ -135,11 +134,7 @@ describe("member-space presentation sections", () => {
           profile={currentProfile}
           viewModel={viewModel}
           canEditProfile
-          onUpdateProfile={vi.fn().mockResolvedValue({
-            displayName: profile.displayName,
-            accountName: profile.accountName,
-          })}
-          onUpdateAvatar={saveAvatar}
+          onSaveProfile={saveProfile}
         />
       );
     }
@@ -237,15 +232,14 @@ describe("member-space presentation sections", () => {
   });
 
   it("keeps the member-space editor stable while a save is pending", async () => {
-    const pendingSave = new Promise<ProfileUpdateResult>(() => undefined);
+    const pendingSave = new Promise<ProfileSaveResult>(() => undefined);
     const user = userEvent.setup();
     render(
       <MemberProfileSummary
         profile={profile}
         viewModel={viewModel}
         canEditProfile
-        onUpdateProfile={() => pendingSave}
-        onUpdateAvatar={vi.fn().mockResolvedValue({ avatarKey: profile.avatarKey })}
+        onSaveProfile={() => pendingSave}
       />,
     );
 
@@ -266,10 +260,9 @@ describe("member-space presentation sections", () => {
         profile={profile}
         viewModel={viewModel}
         canEditProfile
-        onUpdateProfile={vi.fn().mockRejectedValue(
+        onSaveProfile={vi.fn().mockRejectedValue(
           new Error("같은 클럽에서 이미 쓰고 있는 이름입니다."),
         )}
-        onUpdateAvatar={vi.fn().mockResolvedValue({ avatarKey: profile.avatarKey })}
       />,
     );
 
@@ -295,11 +288,7 @@ describe("member-space presentation sections", () => {
           profile={profile}
           viewModel={viewModel}
           canEditProfile
-          onUpdateProfile={vi.fn().mockResolvedValue({
-            displayName: profile.displayName,
-            accountName: profile.accountName,
-          })}
-          onUpdateAvatar={vi.fn().mockResolvedValue({ avatarKey: profile.avatarKey })}
+          onSaveProfile={vi.fn().mockImplementation(async (editable) => ({ ...editable, accountName: profile.accountName }))}
         />
         <ReadingAchievementSummary viewModel={viewModel} />
       </MemberSpaceOverview>,
@@ -326,11 +315,7 @@ describe("member-space presentation sections", () => {
         notificationsHref="/clubs/reading-sai/app/notifications"
         settingsHref="/clubs/reading-sai/app/me/settings"
         archiveSessionsHref="/clubs/reading-sai/app/archive?view=sessions"
-        onUpdateProfile={vi.fn().mockResolvedValue({
-          displayName: profile.displayName,
-          accountName: profile.accountName,
-        })}
-        onUpdateAvatar={vi.fn().mockResolvedValue({ avatarKey: profile.avatarKey })}
+        onSaveProfile={vi.fn().mockImplementation(async (editable) => ({ ...editable, accountName: profile.accountName }))}
       />,
     );
 

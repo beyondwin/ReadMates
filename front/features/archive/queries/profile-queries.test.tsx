@@ -12,7 +12,7 @@ import { updateMyAvatar } from "@/features/archive/api/archive-api";
 import type { MemberProfileResponse } from "@/features/archive/api/archive-contracts";
 import { readmatesFetchResponse } from "@/shared/api/client";
 import { archiveKeys } from "./archive-queries";
-import { useUpdateMyAvatarMutation } from "./profile-queries";
+import { useUpdateMyProfileMutation } from "./profile-queries";
 
 const savedProfile: MemberProfileResponse = {
   membershipId: "membership-1",
@@ -73,20 +73,34 @@ describe("profile mutations", () => {
     );
   });
 
-  it("waits for a successful authoritative avatar response before invalidating archive data", async () => {
+  it("sends one combined profile PUT and waits for success before invalidating archive data", async () => {
     const pendingResponse = deferred<Response>();
     vi.mocked(readmatesFetchResponse).mockReturnValue(pendingResponse.promise);
     const { client, Wrapper } = createWrapper();
     const invalidateQueries = vi.spyOn(client, "invalidateQueries");
     client.setQueryData([...archiveKeys.all, "profile"], { displayName: "기존 이름" });
-    const { result } = renderHook(() => useUpdateMyAvatarMutation(), { wrapper: Wrapper });
+    const { result } = renderHook(
+      () => useUpdateMyProfileMutation({ clubSlug: "reading-sai" }),
+      { wrapper: Wrapper },
+    );
 
     let save!: Promise<MemberProfileResponse>;
     act(() => {
-      save = result.current.mutateAsync("cloud-green-book");
+      save = result.current.mutateAsync({
+        displayName: "새이름",
+        avatarKey: "cloud-green-book",
+      });
     });
 
     await waitFor(() => expect(readmatesFetchResponse).toHaveBeenCalledOnce());
+    expect(readmatesFetchResponse).toHaveBeenCalledWith(
+      "/api/me/profile",
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({ displayName: "새이름", avatarKey: "cloud-green-book" }),
+      }),
+      { clubSlug: "reading-sai" },
+    );
     expect(invalidateQueries).not.toHaveBeenCalled();
 
     pendingResponse.resolve(profileResponse(savedProfile));
@@ -99,13 +113,16 @@ describe("profile mutations", () => {
     expect(client.getQueryState([...archiveKeys.all, "profile"])?.isInvalidated).toBe(true);
   });
 
-  it("does not invalidate archive data when the avatar update is rejected", async () => {
+  it("does not invalidate archive data when the combined profile update is rejected", async () => {
     vi.mocked(readmatesFetchResponse).mockResolvedValue(profileResponse(savedProfile, 400));
     const { client, Wrapper } = createWrapper();
     const invalidateQueries = vi.spyOn(client, "invalidateQueries");
-    const { result } = renderHook(() => useUpdateMyAvatarMutation(), { wrapper: Wrapper });
+    const { result } = renderHook(() => useUpdateMyProfileMutation(), { wrapper: Wrapper });
 
-    await expect(result.current.mutateAsync("cloud-green-book")).rejects.toMatchObject({ status: 400 });
+    await expect(result.current.mutateAsync({
+      displayName: "새이름",
+      avatarKey: "cloud-green-book",
+    })).rejects.toMatchObject({ status: 400 });
 
     expect(invalidateQueries).not.toHaveBeenCalled();
   });
