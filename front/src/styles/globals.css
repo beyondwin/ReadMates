@@ -8,11 +8,6 @@
   --font-sans: var(--f-sans);
   --text-1: var(--text);
   --bg-softer: var(--bg-sub);
-  --avatar-picker-selected-badge: var(--accent);
-}
-
-[data-theme="dark"] {
-  --avatar-picker-selected-badge: oklch(0.64 0.11 255);
 }
 
 .rm-app-shell {
@@ -6516,30 +6511,6 @@ a.rm-recent-record__destination:hover {
   opacity: 0.7;
 }
 
-.rm-avatar-picker__check {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 22px;
-  height: 22px;
-  display: inline-grid;
-  place-items: center;
-  border: 1px solid var(--accent);
-  border-radius: 50%;
-  background: var(--bg-raised);
-  color: var(--accent);
-}
-
-.rm-avatar-picker__check svg {
-  width: 15px;
-  height: 15px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2.25;
-}
-
 .rm-avatar-picker__footer {
   min-height: 76px;
   padding: 14px 24px;
@@ -6929,8 +6900,8 @@ a.rm-recent-record__destination:hover {
 }
 
 .rm-profile-editor .rm-avatar-picker__tile {
-  min-height: 154px;
-  padding: 40px 4px 12px;
+  min-height: 132px;
+  padding: 12px 4px;
   display: grid;
   grid-template-rows: auto minmax(2.7em, auto);
   align-content: center;
@@ -6938,6 +6909,7 @@ a.rm-recent-record__destination:hover {
   gap: 8px;
   border: 1px solid transparent;
   background: transparent;
+  font-size: 0.75rem;
 }
 
 .rm-profile-editor .rm-avatar-picker__tile[aria-pressed="true"] {
@@ -6953,24 +6925,6 @@ a.rm-recent-record__destination:hover {
   line-height: 1.35;
   text-align: center;
   overflow-wrap: anywhere;
-}
-
-.rm-avatar-picker__check--filled {
-  top: 8px;
-  right: 8px;
-  width: 30px;
-  height: 30px;
-  border: 0;
-  background: var(--avatar-picker-selected-badge);
-  color: var(--on-accent);
-  box-shadow: 0 3px 7px oklch(0.35 0.08 255 / 0.2);
-}
-
-.rm-avatar-picker__check--filled svg {
-  width: 18px;
-  height: 18px;
-  stroke: currentColor;
-  stroke-width: 2.5;
 }
 
 .rm-profile-editor .rm-avatar-picker__tile:focus-visible {

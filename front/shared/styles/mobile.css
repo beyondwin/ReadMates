@@ -126,8 +126,8 @@
 
   html .rm-profile-editor .rm-avatar-picker__tile {
     min-width: 44px;
-    min-height: 148px;
-    padding: 38px 6px 10px;
+    min-height: 122px;
+    padding: 10px 6px;
   }
 }
 
