@@ -10,10 +10,28 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - **Google 로그인 복구:** 종료된 멤버십 또는 Google 인증 실패 뒤에는 다른 Google 계정을 명시적으로 선택해 다시 로그인할 수 있습니다. 카카오톡 인앱 브라우저에서는 외부 브라우저 안내와 로그인 주소 복사를 제공하며, 안전한 멤버 복귀 경로와 기존 OAuth·세션 보안 경계는 유지합니다. 로컬 dev-login은 명시적으로 활성화된 Google OAuth 설정이 없으면 깨진 provider 링크를 노출하지 않고, macOS Keychain의 localhost 전용 credential을 backend에만 주입하는 공개 저장소 안전 실행 경로를 제공합니다.
 One-command local OAuth stack + redacted smoke verifier로 기존 서비스 보존 상태에서 localhost 기반 Google login 회귀 점검을 반복 가능하게 했습니다.
+- **게스트 read/cache 경계:** guest browse 응답은 항상 `no-store`이며 Pages BFF가 `No-Store`와 `Private` 같은 혼합 대소문자 Cache-Control directive도 cache 금지로 해석합니다. Guest cursor는 다른 club에서 재사용할 수 없고 429는 bounded `Retry-After`와 복구 가능한 공개 오류 UI를 유지합니다.
+- **세션 만료 복구:** 보호 API의 기본 401 login redirect를 유지하면서, 이미 성공한 current/archive/notes read와 작성 중 current-session mutation만 명시적으로 in-place recovery를 사용합니다. Read는 exact public resource가 다시 확인될 때만 게스트 전환을 제공하고 write는 입력을 보존한 채 재로그인만 허용합니다.
 
 ### Highlights
 
+- **로그인 없는 게스트 앱:** 공개 클럽의 `/clubs/:slug/app/**`에서 현재·예정 세션, 노트, 아카이브와 회차 상세를 로그인 없이 둘러볼 수 있습니다. 개인 공간은 preview로, 설정·알림·피드백은 정식 멤버 전용 안내로 보여주고 호스트 route와 모든 write를 차단합니다.
 - **반응형 계정·내 공간·북클럽 아바타:** 모바일과 데스크톱에서 계정 접근과 호스트 공간 전환을 명시적으로 구분하고, 알림·계정 설정에 고정된 `내 공간` 상위 동선을 제공합니다. 멤버 식별은 외부 프로필 사진 대신 클럽 가입 시 고정되는 privacy-safe 중성적 독서 도구 아바타를 사용합니다.
+
+### Changed
+
+- **독립 exposure 모델:** app access의 canonical field를 `sessions.access_scope(HOST_ONLY|GUEST_READABLE)`, public marketing placement를 `public_session_publications.site_visibility(HIDDEN|PUBLIC_RECORD)`로 분리했습니다. 기존 `visibility`와 `is_public`은 rolling deploy/rollback을 위해 한 릴리즈 dual-write하고 새 host UI와 API는 canonical field를 사용합니다.
+- **공개 진입과 target-club join:** 공개 홈·소개·기록·회차와 scoped login에 `둘러보기`와 `멤버로 시작`을 제공합니다. `멤버로 시작`은 서명된 exact raw scoped return path와 같은 `ACTIVE + PUBLIC` club에서만 `VIEWER` membership을 만들며 기존 membership과 초대 흐름을 우선·보존합니다.
+- **Guest-safe records:** guest DTO는 참석자 표시 이름, RSVP·실제 참석 상태, 질문의 `draftThought`, 작성자 이름이 붙은 질문·서평을 허용합니다. Membership/account ID, email/account name, 정확한 장소, 접속 URL·비밀번호, 읽은 분량, 피드백 본문은 제외합니다. 새 한줄평·장문 서평은 guest-readable record에 공개되며 기존 private/session 예외 row는 일괄 재작성하지 않습니다.
+
+### Database
+
+- **Flyway V44:** `sessions.access_scope`와 `public_session_publications.site_visibility`를 additive하게 추가하고 기존 member/public exposure를 canonical 두 축으로 backfill합니다. Compatibility column은 이번 릴리즈에서 제거하지 않으며 rollback은 V44 schema를 보존한 호환 image 또는 forward-fix를 사용합니다.
+
+### Deployment Notes
+
+- V44를 포함한 backend를 먼저 배포해 Flyway와 dual-write를 활성화한 뒤 같은 commit의 Pages Functions/frontend를 배포합니다. 한 릴리즈 동안 old `{visibility}` request와 compatibility read/write를 유지하고, 다음 릴리즈에서 old frontend가 남지 않았다는 운영 증거를 확인한 뒤 별도 migration으로 제거합니다.
+- Production smoke는 anonymous public/guest reads, exact scoped OAuth start marker, viewer/member/host route 경계, guest 429/no-store를 확인합니다. Live Google OAuth 완료, 실제 이메일, AI provider 호출과 production data mutation은 별도 승인 없이 실행하지 않습니다.
 
 ## v2.1.0 - 2026-07-31
 
