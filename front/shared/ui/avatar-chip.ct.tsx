@@ -9,7 +9,7 @@ const expectedAvatarRoleSizes = [
   { role: "dense", desktop: 30, mobile: 30 },
   { role: "author", desktop: 36, mobile: 36 },
   { role: "member", desktop: 38, mobile: 34 },
-  { role: "roster", desktop: 42, mobile: 38 },
+  { role: "roster", desktop: 32, mobile: 38 },
   { role: "profile", desktop: 88, mobile: 64 },
   { role: "editor", desktop: 72, mobile: 72 },
   { role: "picker", desktop: 64, mobile: 58 },

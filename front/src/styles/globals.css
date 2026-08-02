@@ -7678,6 +7678,19 @@ a.rm-recent-record__destination:hover {
   min-height: 44px;
 }
 
+.rm-member-home-roster {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 12px 0;
+  margin-top: 14px;
+}
+
+.rm-member-home-roster__item {
+  min-width: 0;
+  display: grid;
+  place-items: center;
+}
+
 .rm-account-settings-page__boundary {
   padding-top: 28px;
   border-top: 1px solid var(--line);

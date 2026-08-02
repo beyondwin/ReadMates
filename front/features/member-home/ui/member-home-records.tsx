@@ -345,15 +345,16 @@ export function RosterSummary({ current }: { current: CurrentSessionReadPageData
             미응답 <span className="ledger-number">{noResponseCount}</span>
           </div>
         </div>
-        <div className="row" style={{ gap: "8px", marginTop: "14px", flexWrap: "wrap" }}>
+        <div className="rm-member-home-roster" role="list" aria-label="RSVP 참석자">
           {attendees.map((member) => (
-            <AvatarChip
-              key={member.renderKey}
-              avatarKey={member.avatarKey}
-              name={member.displayName}
-              label={`${member.displayName} · ${rsvpLabel(member.rsvpStatus)}`}
-              sizeRole="roster"
-            />
+            <span className="rm-member-home-roster__item" role="listitem" key={member.renderKey}>
+              <AvatarChip
+                avatarKey={member.avatarKey}
+                name={member.displayName}
+                label={`${member.displayName} · ${rsvpLabel(member.rsvpStatus)}`}
+                sizeRole="roster"
+              />
+            </span>
           ))}
         </div>
       </div>

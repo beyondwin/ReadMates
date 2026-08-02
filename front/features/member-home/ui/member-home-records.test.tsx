@@ -233,4 +233,72 @@ describe("member home record reflection cards", () => {
     expect(noResponse.querySelector(".ledger-number")).toHaveTextContent("1");
     expect(container.querySelector(".rm-avatar-chip")).toHaveAttribute("data-avatar-size-role", "roster");
   });
+
+  it("renders nine RSVP members as an ordered semantic roster", () => {
+    const attendees = Array.from({ length: 9 }, (_, index) => ({
+      renderKey: `membership-${index + 1}`,
+      avatarKey: index % 2 === 0 ? "cloud-green-book" : "banana-green-book",
+      displayName: `참석자 ${index + 1}`,
+      role: "MEMBER" as const,
+      rsvpStatus: index < 6 ? "GOING" as const : "NO_RESPONSE" as const,
+      attendanceStatus: "UNKNOWN" as const,
+      participationStatus: "ACTIVE" as const,
+    }));
+    const { container } = render(
+      <RosterSummary
+        current={{
+          currentSession: {
+            sessionId: "session-9",
+            sessionNumber: 9,
+            title: "9회차 모임",
+            bookTitle: "공개 테스트 도서",
+            bookAuthor: "저자",
+            bookLink: null,
+            bookImageUrl: null,
+            date: "2026-08-09",
+            startTime: "19:00",
+            endTime: "21:00",
+            locationLabel: "모임 공간",
+            meetingUrl: null,
+            meetingPasscode: null,
+            questionDeadlineAt: "2026-08-08T12:00:00Z",
+            myRsvpStatus: "GOING",
+            myCheckin: null,
+            myQuestions: [],
+            myOneLineReview: null,
+            myLongReview: null,
+            board: { questions: [], longReviews: [] },
+            attendees,
+            capabilities: {
+              canWrite: true,
+              canReadFeedback: true,
+              canViewPersonalState: true,
+            },
+          },
+        }}
+      />,
+    );
+
+    const roster = container.querySelector(".rm-member-home-roster");
+    expect(roster).toBeInTheDocument();
+    expect(roster).toHaveAttribute("role", "list");
+    expect(roster).toHaveAttribute("aria-label", "RSVP 참석자");
+    expect(roster?.querySelectorAll(".rm-member-home-roster__item")).toHaveLength(9);
+    expect(
+      Array.from(
+        roster!.querySelectorAll(".rm-avatar-chip"),
+        (node) => node.getAttribute("title"),
+      ),
+    ).toEqual([
+      "참석자 1 · 참석",
+      "참석자 2 · 참석",
+      "참석자 3 · 참석",
+      "참석자 4 · 참석",
+      "참석자 5 · 참석",
+      "참석자 6 · 참석",
+      "참석자 7 · 미응답",
+      "참석자 8 · 미응답",
+      "참석자 9 · 미응답",
+    ]);
+  });
 });
