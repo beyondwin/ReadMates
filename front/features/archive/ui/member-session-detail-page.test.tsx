@@ -40,7 +40,7 @@ const session: MemberArchiveSessionDetailResponse = {
 };
 
 const sessionView = memberSessionDetailReadView(
-  { ...session, clubLongReviews: [] },
+  session,
   MEMBER_READ_SURFACE_CAPABILITIES,
 );
 

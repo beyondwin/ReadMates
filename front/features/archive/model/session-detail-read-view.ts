@@ -92,13 +92,12 @@ export type GuestSessionDetailReadSource = {
   }>;
 };
 
-export type MemberSessionDetailReadSource = MemberArchiveSessionDetailResponse & {
-  clubLongReviews: SessionDetailLongReview[];
-};
+export type MemberSessionDetailReadSource = MemberArchiveSessionDetailResponse;
 
 export function memberSessionDetailReadView(
   source: MemberSessionDetailReadSource,
   capabilities: ReadSurfaceCapabilities,
+  publicLongReviews: readonly SessionDetailLongReview[] = [],
 ): SessionDetailReadView {
   return {
     sessionId: source.sessionId,
@@ -118,7 +117,7 @@ export function memberSessionDetailReadView(
     publicHighlights: source.publicHighlights.map((item) => ({ ...item })),
     clubQuestions: source.clubQuestions.map((item) => ({ ...item })),
     clubOneLiners: source.clubOneLiners.map((item) => ({ ...item })),
-    publicLongReviews: source.clubLongReviews.map((item) => ({ ...item })),
+    publicLongReviews: publicLongReviews.map((item) => ({ ...item })),
     myQuestions: source.myQuestions.map((item) => ({ ...item })),
     myCheckin: source.myCheckin ? { ...source.myCheckin } : null,
     myOneLineReview: source.myOneLineReview ? { ...source.myOneLineReview } : null,

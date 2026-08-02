@@ -67,61 +67,37 @@ describe("combineArchiveListPages", () => {
 });
 
 describe("fetchMemberArchiveSessionQueryData", () => {
-  it("always enriches an existing session with authored LONG_REVIEW notes", async () => {
+  it("does not derive public long reviews from one protected notes page", async () => {
     archiveApi.fetchMemberArchiveSession.mockResolvedValue(session);
     archiveApi.fetchNotesFeed.mockResolvedValue({
-      items: [
-        {
+      items: Array.from({ length: 60 }, (_, index) => ({
           sessionId: "session-7",
           sessionNumber: 7,
           bookTitle: "기록 책",
           date: "2026-07-01",
-          authorName: "서평 작성자",
-          authorShortName: "서평",
+          authorName: `서평 작성자 ${index + 1}`,
+          authorShortName: `서평 ${index + 1}`,
           avatarKey: "turtle",
           kind: "LONG_REVIEW",
-          text: "공개 서평",
-        },
-        {
-          sessionId: "session-7",
-          sessionNumber: 7,
-          bookTitle: "기록 책",
-          date: "2026-07-01",
-          authorName: null,
-          authorShortName: null,
-          avatarKey: "fox",
-          kind: "LONG_REVIEW",
-          text: "작성자가 없는 서평",
-        },
-      ],
-      nextCursor: null,
+          text: `보호 피드의 서평 ${index + 1}`,
+      })),
+      nextCursor: "protected-notes-page-2",
     });
 
     const result = await fetchMemberArchiveSessionQueryData("session-7", { clubSlug: "reading-sai" });
 
-    expect(result?.clubLongReviews).toEqual([
-      {
-        authorName: "서평 작성자",
-        authorShortName: "서평",
-        avatarKey: "turtle",
-        body: "공개 서평",
-      },
-    ]);
-    expect(archiveApi.fetchNotesFeed).toHaveBeenCalledWith(
-      "session-7",
-      { clubSlug: "reading-sai" },
-      { limit: 60 },
-      undefined,
-    );
+    expect(result).not.toHaveProperty("clubLongReviews");
   });
 
-  it("returns an enriched empty long-review collection when notes fail", async () => {
-    archiveApi.fetchMemberArchiveSession.mockResolvedValue(session);
+  it("keeps protected session detail available when optional notes enrichment fails", async () => {
+    archiveApi.fetchMemberArchiveSession.mockResolvedValue({
+      ...session,
+      publicHighlights: [{ ...session.publicHighlights[0], authorName: null, authorShortName: null }],
+    });
     archiveApi.fetchNotesFeed.mockRejectedValue(new Error("notes unavailable"));
 
     await expect(fetchMemberArchiveSessionQueryData("session-7")).resolves.toMatchObject({
       sessionId: "session-7",
-      clubLongReviews: [],
     });
   });
 });

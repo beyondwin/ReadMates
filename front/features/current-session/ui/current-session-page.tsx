@@ -9,6 +9,7 @@ import {
   CheckinPanel,
   LongReviewPanel,
   MyStatusCard,
+  OneLineReviewPanel,
   RosterList,
   RsvpPanel,
   SessionMeta,
@@ -144,7 +145,7 @@ export function CurrentSessionBoard({
   const [questionInputs, setQuestionInputs] = useState<QuestionInput[]>(() => initialQuestionInputs(session.myQuestions));
   const [questionValidationMessage, setQuestionValidationMessage] = useState("");
   const [longReview, setLongReview] = useState(session.myLongReview?.body ?? "");
-  const oneLineReview = session.myOneLineReview?.text ?? "";
+  const [oneLineReview, setOneLineReview] = useState(session.myOneLineReview?.text ?? "");
   const [saveStatuses, setSaveStatuses] = useState<Record<SaveScope, SaveState>>(emptySaveStatuses);
   const [boardTab, setBoardTab] = useState<CurrentSessionBoardTab>("questions");
   const [mobileTab, setMobileTab] = useState<MobileSessionTab>("prep");
@@ -336,6 +337,15 @@ export function CurrentSessionBoard({
     setLongReview(value);
   };
 
+  const handleOneLineReviewChange = (value: string) => {
+    if (!canWrite) {
+      return;
+    }
+
+    resetSaveStatus("oneLineReview");
+    setOneLineReview(value);
+  };
+
   const handleSaveCheckin = () => {
     if (blockReadOnlyWrite()) {
       return;
@@ -350,6 +360,14 @@ export function CurrentSessionBoard({
     }
 
     void runSave("longReview", () => actions?.saveLongReview(longReview));
+  };
+
+  const handleSaveOneLineReview = () => {
+    if (blockReadOnlyWrite()) {
+      return;
+    }
+
+    void runSave("oneLineReview", () => actions?.saveOneLineReview(oneLineReview));
   };
 
   return (
@@ -368,15 +386,19 @@ export function CurrentSessionBoard({
         writtenQuestionCount={writtenQuestionCount}
         longReview={longReview}
         onLongReviewChange={handleLongReviewChange}
+        oneLineReview={oneLineReview}
+        onOneLineReviewChange={handleOneLineReviewChange}
         checkinSaveStatus={saveStatuses.checkin}
         questionSaveStatus={saveStatuses.question}
         longReviewSaveStatus={saveStatuses.longReview}
+        oneLineReviewSaveStatus={saveStatuses.oneLineReview}
         rsvpSaveStatus={saveStatuses.rsvp}
         onRsvpChange={handleRsvp}
         mobileTab={mobileTab}
         onMobileTabChange={handleMobileTab}
         onSaveCheckin={handleSaveCheckin}
         onSaveLongReview={handleSaveLongReview}
+        onSaveOneLineReview={handleSaveOneLineReview}
         memberNotice={memberNotice}
         canWrite={canWrite}
         canReadFeedback={canReadFeedback}
@@ -471,6 +493,19 @@ export function CurrentSessionBoard({
                       onAddQuestion={addQuestionInput}
                       onRemoveQuestion={removeQuestionInput}
                       onSaveQuestions={handleSaveQuestions}
+                      disabled={!canWrite}
+                    />
+                  </section>
+
+                  <section aria-labelledby="one-line-review-heading">
+                    <div className="eyebrow" id="one-line-review-heading" style={{ marginBottom: "10px" }}>
+                      한줄평
+                    </div>
+                    <OneLineReviewPanel
+                      oneLineReview={oneLineReview}
+                      saveStatus={saveStatuses.oneLineReview}
+                      onChange={handleOneLineReviewChange}
+                      onSave={handleSaveOneLineReview}
                       disabled={!canWrite}
                     />
                   </section>

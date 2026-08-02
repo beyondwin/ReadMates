@@ -34,15 +34,6 @@ export type ArchiveListQueryData = {
   reports: FeedbackDocumentListPage;
 };
 
-export type MemberArchiveSessionQueryData = MemberArchiveSessionDetailResponse & {
-  clubLongReviews: Array<{
-    authorName: string;
-    authorShortName: string | null;
-    avatarKey: string | null;
-    body: string;
-  }>;
-};
-
 function scopeKey(context?: ReadmatesApiContext): string | null {
   return context?.clubSlug ?? null;
 }
@@ -121,32 +112,22 @@ export async function fetchMemberArchiveSessionQueryData(
   sessionId: string,
   context?: ReadmatesApiContext,
   policy?: ReadmatesRequestPolicy,
-): Promise<MemberArchiveSessionQueryData | null> {
+): Promise<MemberArchiveSessionDetailResponse | null> {
   const session = await fetchMemberArchiveSession(sessionId, context, policy);
 
   if (!session) {
     return null;
   }
 
+  if (session.publicHighlights.every((highlight) => highlight.authorName)) {
+    return session;
+  }
+
   try {
     const notesFeed = await fetchNotesFeed(session.sessionId, context, { limit: 60 }, policy);
-    return {
-      ...enrichSessionDetailHighlightAuthors(session, notesFeed.items),
-      clubLongReviews: notesFeed.items.flatMap((item) => {
-        if (item.kind !== "LONG_REVIEW" || !item.authorName) {
-          return [];
-        }
-
-        return [{
-          authorName: item.authorName,
-          authorShortName: item.authorShortName,
-          avatarKey: item.avatarKey,
-          body: item.text,
-        }];
-      }),
-    };
+    return enrichSessionDetailHighlightAuthors(session, notesFeed.items);
   } catch {
-    return { ...session, clubLongReviews: [] };
+    return session;
   }
 }
 
@@ -172,7 +153,7 @@ export function memberArchiveSessionQuery(
   context?: ReadmatesApiContext,
   policy?: ReadmatesRequestPolicy,
 ) {
-  return queryOptions<MemberArchiveSessionQueryData | null>({
+  return queryOptions<MemberArchiveSessionDetailResponse | null>({
     queryKey: archiveKeys.detail(sessionId, context),
     queryFn: () => fetchMemberArchiveSessionQueryData(sessionId, context, policy),
   });

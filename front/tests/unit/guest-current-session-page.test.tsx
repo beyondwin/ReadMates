@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { RouterProvider, createMemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { GuestScopedAppRoute } from "@/features/guest-browse/route/guest-scoped-app-route";
 import { GuestCurrentSessionContent } from "@/src/pages/guest-current-session";
 
@@ -29,6 +30,9 @@ const guestCurrentSession = {
 
 describe("guest current session page", () => {
   it("renders the regular current-session page with guest controls disabled", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
     const router = createMemoryRouter([{
       path: "/clubs/:clubSlug/app/session/current",
       loader: () => ({ guestRoute: true, guestData: guestCurrentSession }),
@@ -48,9 +52,19 @@ describe("guest current session page", () => {
     for (const label of ["참석", "아직 미정", "불참", "진행률 저장", "질문 저장", "서평 저장"]) {
       expect(desktop.getByRole("button", { name: label })).toBeDisabled();
     }
+    expect(desktop.getByRole("textbox", { name: "한줄평 내용" })).toHaveValue("");
+    expect(desktop.getByRole("textbox", { name: "한줄평 내용" })).toBeDisabled();
+    expect(desktop.getByRole("button", { name: "한줄평 저장" })).toBeDisabled();
     expect(desktop.getByRole("slider", { name: "읽기 진행률" })).toBeDisabled();
     expect(screen.queryByText(/Passcode|모임 링크 열기/)).not.toBeInTheDocument();
     expect(container.querySelector(".rm-current-session-desktop")).toBeInTheDocument();
     expect(screen.getByTestId("current-session-mobile")).toBeInTheDocument();
+
+    const mobile = within(screen.getByTestId("current-session-mobile"));
+    await user.click(mobile.getByRole("button", { name: "내 기록" }));
+    expect(mobile.getByRole("textbox", { name: "한줄평 내용" })).toHaveValue("");
+    expect(mobile.getByRole("textbox", { name: "한줄평 내용" })).toBeDisabled();
+    expect(mobile.getByRole("button", { name: "한줄평 저장" })).toBeDisabled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

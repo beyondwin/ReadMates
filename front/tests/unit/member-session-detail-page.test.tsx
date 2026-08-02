@@ -60,7 +60,7 @@ function memberDetailView(
   session: MemberArchiveSessionDetailResponse = readableSession,
 ): SessionDetailReadView {
   return memberSessionDetailReadView(
-    { ...session, clubLongReviews: [] },
+    session,
     MEMBER_READ_SURFACE_CAPABILITIES,
   );
 }
@@ -127,11 +127,9 @@ function LocationStateEcho() {
 describe("MemberSessionDetailPage", () => {
   it("keeps member and guest public section heading order identical", () => {
     const member = memberSessionDetailReadView(
-      {
-        ...readableSession,
-        clubLongReviews: [{ authorName: "서평 작성자", authorShortName: "서평", avatarKey: "book", body: "공개 서평" }],
-      },
+      readableSession,
       MEMBER_READ_SURFACE_CAPABILITIES,
+      [{ authorName: "서평 작성자", authorShortName: "서평", avatarKey: "book", body: "공개 서평" }],
     );
     const guest = guestSessionDetailReadView({
       sessionId: "guest-session-7",
@@ -191,7 +189,7 @@ describe("MemberSessionDetailPage", () => {
 
   it("renders generic locked feedback for viewers without reading feedback metadata", () => {
     const viewer = memberSessionDetailReadView(
-      { ...readableSession, clubLongReviews: [] },
+      readableSession,
       VIEWER_READ_SURFACE_CAPABILITIES,
     );
     Object.defineProperty(viewer, "feedbackDocument", {

@@ -12,8 +12,8 @@ import type {
 } from "@/features/archive/api/archive-contracts";
 import type { PagedResponse } from "@/shared/model/paging";
 import {
-  GUEST_READ_SURFACE_CAPABILITIES,
   MEMBER_READ_SURFACE_CAPABILITIES,
+  VIEWER_READ_SURFACE_CAPABILITIES,
 } from "@/shared/model/read-surface-capabilities";
 
 const ARCHIVE_SCROLL_KEY = "readmates:archive-scroll";
@@ -248,7 +248,7 @@ describe("ArchivePage", () => {
     consoleError.mockRestore();
   });
 
-  it("keeps every archive tab selectable while feedback is generically locked without metadata", async () => {
+  it("keeps every viewer archive tab selectable while feedback is generically locked without metadata", async () => {
     const user = userEvent.setup();
     const sessionFeedbackRead = vi.fn(() => {
       throw new Error("guest archive must not inspect session feedback metadata");
@@ -271,7 +271,7 @@ describe("ArchivePage", () => {
         questions={pageOf([])}
         reviews={pageOf([])}
         reports={protectedReports}
-        capabilities={GUEST_READ_SURFACE_CAPABILITIES}
+        capabilities={VIEWER_READ_SURFACE_CAPABILITIES}
         feedbackLockedAction={<a href="/login?returnTo=%2Fclubs%2Falpha%2Fapp%2Farchive%3Fview%3Dreport">멤버로 시작</a>}
       />,
     );

@@ -5,7 +5,7 @@ import { MEMBER_READ_SURFACE_CAPABILITIES } from "@/shared/model/read-surface-ca
 import MemberSessionDetailPage from "./member-session-detail-page";
 
 const session = memberSessionDetailReadView(
-  { ...archiveSessionDetailContractFixture, clubLongReviews: [] },
+  archiveSessionDetailContractFixture,
   MEMBER_READ_SURFACE_CAPABILITIES,
 );
 

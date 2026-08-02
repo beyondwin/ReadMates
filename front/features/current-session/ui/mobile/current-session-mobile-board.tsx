@@ -102,15 +102,19 @@ export function MobileCurrentSessionBoard({
   writtenQuestionCount,
   longReview,
   onLongReviewChange,
+  oneLineReview,
+  onOneLineReviewChange,
   checkinSaveStatus,
   questionSaveStatus,
   longReviewSaveStatus,
+  oneLineReviewSaveStatus,
   rsvpSaveStatus,
   onRsvpChange,
   mobileTab,
   onMobileTabChange,
   onSaveCheckin,
   onSaveLongReview,
+  onSaveOneLineReview,
   memberNotice,
   canWrite,
   canReadFeedback,
@@ -130,15 +134,19 @@ export function MobileCurrentSessionBoard({
   writtenQuestionCount: number;
   longReview: string;
   onLongReviewChange: (value: string) => void;
+  oneLineReview: string;
+  onOneLineReviewChange: (value: string) => void;
   checkinSaveStatus: SaveState;
   questionSaveStatus: SaveState;
   longReviewSaveStatus: SaveState;
+  oneLineReviewSaveStatus: SaveState;
   rsvpSaveStatus: SaveState;
   onRsvpChange: (status: RsvpUpdateStatus) => void;
   mobileTab: MobileSessionTab;
   onMobileTabChange: (tab: MobileSessionTab) => void;
   onSaveCheckin: () => void;
   onSaveLongReview: () => void;
+  onSaveOneLineReview: () => void;
   memberNotice: ReturnType<typeof getCurrentSessionMemberNotice>;
   canWrite: boolean;
   canReadFeedback: boolean;
@@ -248,8 +256,12 @@ export function MobileCurrentSessionBoard({
           <MobileRecordsSegment
             longReview={longReview}
             onLongReviewChange={onLongReviewChange}
+            oneLineReview={oneLineReview}
+            onOneLineReviewChange={onOneLineReviewChange}
             longReviewSaveStatus={longReviewSaveStatus}
+            oneLineReviewSaveStatus={oneLineReviewSaveStatus}
             onSaveLongReview={onSaveLongReview}
+            onSaveOneLineReview={onSaveOneLineReview}
             isViewer={isViewer}
             isSuspended={isSuspended}
             canWrite={canWrite}

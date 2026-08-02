@@ -44,7 +44,6 @@ const memberDetail: MemberSessionDetailReadSource = {
   clubQuestions: guestDetail.questions.map((item) => ({ ...item, avatarKey: item.avatarKey ?? "fox" })),
   clubOneLiners: guestDetail.oneLiners.map((item) => ({ ...item, avatarKey: item.avatarKey ?? "owl" })),
   publicOneLiners: guestDetail.oneLiners.map((item) => ({ ...item, avatarKey: item.avatarKey ?? "owl" })),
-  clubLongReviews: [{ authorName: "서평 작성자", authorShortName: "서평", avatarKey: "turtle", body: "공개 서평" }],
   myQuestions: [],
   myCheckin: { readingProgress: 100 },
   myOneLineReview: { text: "내 한줄평" },
@@ -89,16 +88,29 @@ describe("session detail read views", () => {
     expect(guestSessionDetailReadView({ ...guestDetail, state: "ARCHIVED" })).toBeNull();
   });
 
-  it("maps enriched member long reviews without dropping protected state", () => {
-    const memberView = memberSessionDetailReadView(memberDetail, MEMBER_READ_SURFACE_CAPABILITIES);
+  it.each([
+    ["member", MEMBER_READ_SURFACE_CAPABILITIES],
+    ["viewer", VIEWER_READ_SURFACE_CAPABILITIES],
+  ])("maps every public-detail long review for a %s without dropping protected state", (_audience, capabilities) => {
+    const publicLongReviews = Array.from({ length: 61 }, (_, index) => ({
+      authorName: `공개 작성자 ${index + 1}`,
+      authorShortName: `작성자 ${index + 1}`,
+      avatarKey: "turtle",
+      body: `공개 서평 ${index + 1}`,
+    }));
+    const memberView = memberSessionDetailReadView(memberDetail, capabilities, publicLongReviews);
 
     expect(memberView).toMatchObject({
       locationLabel: "Room 7",
       myCheckin: { readingProgress: 100 },
-      feedbackDocument: { title: "내부 피드백" },
-      publicLongReviews: [{ body: "공개 서평", authorName: "서평 작성자" }],
-      capabilities: MEMBER_READ_SURFACE_CAPABILITIES,
+      myOneLineReview: { text: "내 한줄평" },
+      capabilities,
     });
+    expect(memberView.publicLongReviews).toHaveLength(61);
+    expect(memberView.publicLongReviews.at(-1)).toMatchObject({ body: "공개 서평 61" });
+    expect(memberView.feedbackDocument).toEqual(
+      capabilities.canReadFeedback ? expect.objectContaining({ title: "내부 피드백" }) : null,
+    );
   });
 
   it("omits member feedback metadata without reading it when feedback is forbidden", () => {

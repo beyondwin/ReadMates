@@ -10,9 +10,13 @@ describe("member review visibility helper", () => {
         <LongReviewPanel longReview="" saveStatus="idle" onChange={() => undefined} onSave={() => undefined} />
         <MobileRecordsSegment
           longReview=""
+          oneLineReview=""
           longReviewSaveStatus="idle"
+          oneLineReviewSaveStatus="idle"
           onLongReviewChange={() => undefined}
+          onOneLineReviewChange={() => undefined}
           onSaveLongReview={() => undefined}
+          onSaveOneLineReview={() => undefined}
           isViewer={false}
           isSuspended={false}
           canWrite
