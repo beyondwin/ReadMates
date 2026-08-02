@@ -474,23 +474,13 @@ function QuickLinks({ LinkComponent }: { LinkComponent: MemberHomeLinkComponent 
       <div className="eyebrow" style={{ marginBottom: "10px" }}>
         바로가기
       </div>
-      <div className="surface" style={{ padding: "4px", overflow: "hidden" }}>
-        {quickLinks.map((item, index) => (
+      <div className="surface rm-member-home-shortcuts">
+        {quickLinks.map((item) => (
           <Link
             key={item.label}
             to={item.href}
+            className="rm-member-home-shortcuts__link"
             LinkComponent={LinkComponent}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-              width: "100%",
-              padding: "14px 16px",
-              borderRadius: "6px",
-              borderTop: index > 0 ? "1px solid var(--line-soft)" : "none",
-              textAlign: "left",
-              color: "var(--text)",
-            }}
           >
             <span style={{ flex: 1 }}>
               <span className="body" style={{ display: "block", fontWeight: 500 }}>

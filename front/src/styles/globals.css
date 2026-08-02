@@ -7764,6 +7764,32 @@ a.rm-recent-record__destination:hover {
   place-items: center;
 }
 
+.rm-member-home-shortcuts {
+  padding: 4px;
+  overflow: hidden;
+}
+
+.rm-member-home-shortcuts__link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 6px;
+  color: var(--text);
+  text-align: left;
+}
+
+.rm-member-home-shortcuts__link + .rm-member-home-shortcuts__link::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 16px;
+  left: 16px;
+  border-top: 1px solid var(--line-soft);
+}
+
 .rm-account-settings-page__boundary {
   padding-top: 28px;
   border-top: 1px solid var(--line);
