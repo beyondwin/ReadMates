@@ -14,8 +14,8 @@ class ArchiveWebMapperTest {
 
     @Test
     fun `my page falls back for missing or unknown avatar keys`() {
-        assertEquals("globe-notebook", myPageResult(null).toWebDto().avatarKey)
-        assertEquals("globe-notebook", myPageResult("future-avatar").toWebDto().avatarKey)
+        assertEquals("cloud-green-book", myPageResult(null).toWebDto().avatarKey)
+        assertEquals("cloud-green-book", myPageResult("future-avatar").toWebDto().avatarKey)
     }
 }
 

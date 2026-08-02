@@ -22,6 +22,7 @@ import java.util.Locale
 import java.util.UUID
 
 @Service
+@Suppress("TooManyFunctions")
 class MemberProfileService(
     private val memberProfileStore: MemberProfileStorePort,
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
@@ -41,18 +42,8 @@ class MemberProfileService(
                 ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
         val displayName = validateDisplayName(command.displayName)
         val avatarKey = validateAvatarKey(command.avatarKey)
-        if (!memberProfileStore.lockClubProfileNames(currentClubId)) {
-            throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
-        }
-        val lockedMember =
-            memberProfileStore.findProfileMemberInClubForUpdate(currentClubId, member.membershipId)
-                ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
-        if (!lockedMember.toCurrentMember().canEditOwnProfile) {
-            throw MemberProfileException(MemberProfileError.MEMBERSHIP_NOT_ALLOWED)
-        }
-        if (memberProfileStore.displayNameExistsInClub(currentClubId, displayName, member.membershipId)) {
-            throw MemberProfileException(MemberProfileError.DISPLAY_NAME_DUPLICATE)
-        }
+        val lockedMember = lockOwnProfileForUpdate(currentClubId, member.membershipId)
+        requireEditableUniqueProfile(currentClubId, lockedMember, displayName)
         if (!memberProfileStore.updateOwnProfile(currentClubId, member.membershipId, displayName, avatarKey)) {
             memberProfileStore.recheckOwnProfileUpdateFailure(currentClubId, member.membershipId)
         }
@@ -63,6 +54,30 @@ class MemberProfileService(
                 ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
         cacheInvalidation.evictClubContentAfterCommit(currentClubId)
         return profile
+    }
+
+    private fun lockOwnProfileForUpdate(
+        clubId: UUID,
+        membershipId: UUID,
+    ): MemberProfileRow {
+        if (!memberProfileStore.lockClubProfileNames(clubId)) {
+            throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+        }
+        return memberProfileStore.findProfileMemberInClubForUpdate(clubId, membershipId)
+            ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+    }
+
+    private fun requireEditableUniqueProfile(
+        clubId: UUID,
+        member: MemberProfileRow,
+        displayName: String,
+    ) {
+        if (!member.toCurrentMember().canEditOwnProfile) {
+            throw MemberProfileException(MemberProfileError.MEMBERSHIP_NOT_ALLOWED)
+        }
+        if (memberProfileStore.displayNameExistsInClub(clubId, displayName, member.membershipId)) {
+            throw MemberProfileException(MemberProfileError.DISPLAY_NAME_DUPLICATE)
+        }
     }
 
     @Transactional

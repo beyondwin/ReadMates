@@ -341,6 +341,7 @@ class MySqlFlywayMigrationTest(
     }
 
     @Test
+    @Suppress("LongMethod")
     fun `mysql upgrades populated v44 schema to integrated membership avatar keys`() {
         FlywayUpgradeMySqlContainer().use { database ->
             database.start()
@@ -400,24 +401,29 @@ class MySqlFlywayMigrationTest(
 
             val migrationSql =
                 checkNotNull(javaClass.classLoader.getResourceAsStream(V45_INTEGRATED_AVATARS))
-                    .bufferedReader().use { it.readText() }
-            val jsonKeys = Regex("\\\"([a-z0-9-]+)\\\"").findAll(migrationSql.substringBefore("'$[*]'"))
-                .map { it.groupValues[1] }.toList()
-            val checkKeys = Regex("'([a-z0-9-]+)'").findAll(
-                migrationSql.substringAfter("add constraint memberships_avatar_key_check"),
-            ).map { it.groupValues[1] }.toList()
+                    .bufferedReader()
+                    .use { it.readText() }
+            val jsonKeys =
+                Regex("\\\"([a-z0-9-]+)\\\"")
+                    .findAll(migrationSql.substringBefore("'$[*]'"))
+                    .map { it.groupValues[1] }
+                    .toList()
+            val checkKeys =
+                Regex("'([a-z0-9-]+)'")
+                    .findAll(
+                        migrationSql.substringAfter("add constraint memberships_avatar_key_check"),
+                    ).map { it.groupValues[1] }
+                    .toList()
             val expectedKeys = BookClubAvatarKey.ordered.map { it.wireValue }
             assertThat(jsonKeys).containsExactlyElementsOf(expectedKeys)
             assertThat(checkKeys).containsExactlyElementsOf(expectedKeys)
 
             assertThat(
                 assertInvalidAvatarKeyRejected(upgradeJdbc, "hedgehog-green-book").mostSpecificCause.message,
-            )
-                .contains("memberships_avatar_key_check")
+            ).contains("memberships_avatar_key_check")
             assertThat(
                 assertInvalidAvatarKeyRejected(upgradeJdbc, "HEDGEHOG-GREEN-BOOK").mostSpecificCause.message,
-            )
-                .contains("memberships_avatar_key_check")
+            ).contains("memberships_avatar_key_check")
             assertThat(assertInvalidAvatarKeyRejected(upgradeJdbc, "member-id").mostSpecificCause.message)
                 .contains("memberships_avatar_key_check")
             assertThrows(DataIntegrityViolationException::class.java) {
@@ -527,9 +533,12 @@ class MySqlFlywayMigrationTest(
     private fun v44AvatarKeys(): List<String> {
         val migrationSql =
             checkNotNull(javaClass.classLoader.getResourceAsStream(V44_ANIMAL_AVATARS))
-                .bufferedReader().use { it.readText() }
-        return V43_AVATAR_KEY_REGEX.findAll(migrationSql.substringAfter("add constraint memberships_avatar_key_check"))
-            .map { it.groupValues[1] }.toList()
+                .bufferedReader()
+                .use { it.readText() }
+        return V43_AVATAR_KEY_REGEX
+            .findAll(migrationSql.substringAfter("add constraint memberships_avatar_key_check"))
+            .map { it.groupValues[1] }
+            .toList()
     }
 
     private fun v43AvatarKeys(): List<String> {

@@ -43,7 +43,7 @@ class AcceptInvitationUseCaseTest {
         val invitationId = UUID.randomUUID()
         val userId = UUID.randomUUID()
         val membershipId = UUID.randomUUID()
-        val allocatedKey = BookClubAvatarKey.FOX_GLASSES_MUG
+        val allocatedKey = BookClubAvatarKey.STARFISH_NOTEBOOK
         val invitation =
             InvitationTokenRow(
                 id = invitationId,

@@ -79,7 +79,9 @@ class HostMemberLifecycleControllerTest(
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.items[?(@.membershipId == '$activeMembershipId')].status") { value("ACTIVE") }
-                jsonPath("$.items[?(@.membershipId == '$activeMembershipId')].avatarKey") { value("mushroom-green-book") }
+                jsonPath("$.items[?(@.membershipId == '$activeMembershipId')].avatarKey") {
+                    value("mushroom-green-book")
+                }
                 jsonPath("$.items[?(@.membershipId == '$activeMembershipId')].currentSessionParticipationStatus") {
                     value("ACTIVE")
                 }

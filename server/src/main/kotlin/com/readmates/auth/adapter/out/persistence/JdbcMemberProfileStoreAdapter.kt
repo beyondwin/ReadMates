@@ -17,6 +17,7 @@ import java.util.Locale
 import java.util.UUID
 
 @Repository
+@Suppress("TooManyFunctions")
 class JdbcMemberProfileStoreAdapter(
     private val jdbcTemplate: JdbcTemplate,
 ) : MemberProfileStorePort {

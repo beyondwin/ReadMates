@@ -75,17 +75,17 @@ class JdbcMemberAvatarAllocationAdapterTest(
         persistMembership(userId = userId(0), status = MembershipStatus.ACTIVE, avatarKey = first)
         val second = adapter.allocate(CLUB_ID)
 
-        assertThat(first).isEqualTo(BookClubAvatarKey.SQUIRREL_ACORN)
-        assertThat(second).isEqualTo(BookClubAvatarKey.HEDGEHOG_GREEN_BOOK)
+        assertThat(first).isEqualTo(BookClubAvatarKey.MUSHROOM_GREEN_BOOK)
+        assertThat(second).isEqualTo(BookClubAvatarKey.GLOBE_NOTEBOOK)
         assertThat(second).isNotEqualTo(first)
     }
 
     @Test
-    fun `first forty visible memberships receive every avatar key regardless of selection order`() {
+    fun `first thirty visible memberships receive every avatar key regardless of selection order`() {
         whenever(randomIndex.nextIndex(anyInt())).thenAnswer { invocation -> invocation.getArgument<Int>(0) - 1 }
 
         val assigned =
-            (0 until 40).map { index ->
+            (0 until AVATAR_KEY_COUNT).map { index ->
                 val key = adapter.allocate(CLUB_ID)
                 persistMembership(userId = userId(index), status = MembershipStatus.ACTIVE, avatarKey = key)
                 key
@@ -96,7 +96,7 @@ class JdbcMemberAvatarAllocationAdapterTest(
     }
 
     @Test
-    fun `exhaustion selects from all forty avatar keys`() {
+    fun `exhaustion selects from all thirty avatar keys`() {
         val assigned =
             (0 until AVATAR_KEY_COUNT).map { index ->
                 val key = adapter.allocate(CLUB_ID)
@@ -104,11 +104,11 @@ class JdbcMemberAvatarAllocationAdapterTest(
                 key
             }
 
-        val fortyFirst = adapter.allocate(CLUB_ID)
+        val thirtyFirst = adapter.allocate(CLUB_ID)
 
         assertThat(assigned).containsExactlyInAnyOrderElementsOf(BookClubAvatarKey.ordered)
         verify(randomIndex, times(2)).nextIndex(AVATAR_KEY_COUNT)
-        assertThat(fortyFirst).isEqualTo(BookClubAvatarKey.HEDGEHOG_GREEN_BOOK)
+        assertThat(thirtyFirst).isEqualTo(BookClubAvatarKey.GLOBE_NOTEBOOK)
     }
 
     @Test
@@ -121,32 +121,32 @@ class JdbcMemberAvatarAllocationAdapterTest(
         ).forEachIndexed { index, status ->
             persistMembership(userId(index), status, BookClubAvatarKey.ordered[index])
         }
-        persistMembership(userId(10), MembershipStatus.LEFT, BookClubAvatarKey.POLAR_BEAR_SNOWFLAKE_MUG)
-        persistMembership(userId(11), MembershipStatus.INACTIVE, BookClubAvatarKey.PENGUIN_BERET_BOOK)
+        persistMembership(userId(10), MembershipStatus.LEFT, BookClubAvatarKey.PEACH_GREEN_BOOK)
+        persistMembership(userId(11), MembershipStatus.INACTIVE, BookClubAvatarKey.RADISH_NOTEBOOK)
         whenever(randomIndex.nextIndex(anyInt())).thenReturn(2)
 
-        assertThat(adapter.allocate(CLUB_ID)).isEqualTo(BookClubAvatarKey.PENGUIN_BERET_BOOK)
+        assertThat(adapter.allocate(CLUB_ID)).isEqualTo(BookClubAvatarKey.APPLE_GREEN_BOOK)
     }
 
     @Test
     fun `left membership frees its key and rejoin retains a free previous key`() {
-        persistMembership(REJOINING_USER_ID, MembershipStatus.LEFT, BookClubAvatarKey.HEDGEHOG_GREEN_BOOK)
+        persistMembership(REJOINING_USER_ID, MembershipStatus.LEFT, BookClubAvatarKey.MUSHROOM_GREEN_BOOK)
 
-        assertThat(adapter.allocate(CLUB_ID, REJOINING_USER_ID)).isEqualTo(BookClubAvatarKey.HEDGEHOG_GREEN_BOOK)
+        assertThat(adapter.allocate(CLUB_ID, REJOINING_USER_ID)).isEqualTo(BookClubAvatarKey.MUSHROOM_GREEN_BOOK)
     }
 
     @Test
     fun `rejoining member retains a valid previous key even when it is already used`() {
-        persistMembership(REJOINING_USER_ID, MembershipStatus.LEFT, BookClubAvatarKey.HEDGEHOG_GREEN_BOOK)
-        persistMembership(OTHER_USER_ID, MembershipStatus.ACTIVE, BookClubAvatarKey.HEDGEHOG_GREEN_BOOK)
+        persistMembership(REJOINING_USER_ID, MembershipStatus.LEFT, BookClubAvatarKey.MUSHROOM_GREEN_BOOK)
+        persistMembership(OTHER_USER_ID, MembershipStatus.ACTIVE, BookClubAvatarKey.MUSHROOM_GREEN_BOOK)
 
-        assertThat(adapter.allocate(CLUB_ID, REJOINING_USER_ID)).isEqualTo(BookClubAvatarKey.HEDGEHOG_GREEN_BOOK)
+        assertThat(adapter.allocate(CLUB_ID, REJOINING_USER_ID)).isEqualTo(BookClubAvatarKey.MUSHROOM_GREEN_BOOK)
         verifyNoInteractions(randomIndex)
     }
 
     @Test
     fun `club slug allocation resolves the exact club and missing clubs fail`() {
-        assertThat(adapter.allocateForClubSlug(CLUB_SLUG)).isEqualTo(BookClubAvatarKey.HEDGEHOG_GREEN_BOOK)
+        assertThat(adapter.allocateForClubSlug(CLUB_SLUG)).isEqualTo(BookClubAvatarKey.GLOBE_NOTEBOOK)
         assertThatThrownBy { adapter.allocateForClubSlug("missing-avatar-club") }
             .isInstanceOf(IllegalArgumentException::class.java)
     }
@@ -245,7 +245,7 @@ class JdbcMemberAvatarAllocationAdapterTest(
     private fun userId(index: Int): UUID = UUID(0, (index + 1).toLong())
 
     private companion object {
-        const val AVATAR_KEY_COUNT = 40
+        const val AVATAR_KEY_COUNT = 30
         val CLUB_ID: UUID = UUID.fromString("10000000-0000-0000-0000-000000000001")
         const val CLUB_SLUG = "avatar-allocation-test"
         val REJOINING_USER_ID: UUID = UUID(0, 1_001)

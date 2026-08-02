@@ -47,6 +47,8 @@ async function allImagesHaveTransparentCorners(images: Locator) {
 type AvatarRasterMetric = {
   key: string;
   edgeLightP90: number;
+  edgeOpaqueCoverage: number;
+  edgeWhitePixelCount: number;
   maxSubjectRadius: number;
   subjectCenterX: number;
   subjectCenterY: number;
@@ -64,6 +66,9 @@ async function avatarRasterMetrics(images: Locator): Promise<AvatarRasterMetric[
     const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
     const edgeLightValues: number[] = [];
     const subjectPoints: Array<[number, number]> = [];
+    let edgeOpaquePixels = 0;
+    let edgePixelCount = 0;
+    let edgeWhitePixelCount = 0;
     let maxSubjectRadius = 0;
     const background = [243, 230, 217] as const;
 
@@ -71,8 +76,15 @@ async function avatarRasterMetrics(images: Locator): Promise<AvatarRasterMetric[
       for (let x = 0; x < canvas.width; x += 1) {
         const offset = (y * canvas.width + x) * 4;
         const [red, green, blue, alpha] = pixels.slice(offset, offset + 4);
-        if (alpha <= 250) continue;
         const radius = Math.sqrt(((x - 128) / 77) ** 2 + ((y - 128) / 105) ** 2);
+        if (radius > 0.82 && radius < 0.94) {
+          edgePixelCount += 1;
+          if (alpha > 250) {
+            edgeOpaquePixels += 1;
+            if ((red + green + blue) / 3 > 247) edgeWhitePixelCount += 1;
+          }
+        }
+        if (alpha <= 250) continue;
         const backgroundDistance = Math.sqrt(
           (red - background[0]) ** 2 + (green - background[1]) ** 2 + (blue - background[2]) ** 2,
         );
@@ -80,7 +92,9 @@ async function avatarRasterMetrics(images: Locator): Promise<AvatarRasterMetric[
           edgeLightValues.push(Math.max(red, green, blue));
         }
         if (backgroundDistance > 45) maxSubjectRadius = Math.max(maxSubjectRadius, radius);
-        if (radius < 0.78 && backgroundDistance > 35) subjectPoints.push([x, y]);
+        // Dark ink is independent of the beige fill and WebP edge compression, so
+        // its un-clipped bounding box exposes genuine horizontal/vertical drift.
+        if ((red + green + blue) / 3 < 205) subjectPoints.push([x, y]);
       }
     }
 
@@ -94,6 +108,8 @@ async function avatarRasterMetrics(images: Locator): Promise<AvatarRasterMetric[
     return {
       key,
       edgeLightP90: edgeLightValues[Math.floor((edgeLightValues.length - 1) * 0.9)],
+      edgeOpaqueCoverage: edgeOpaquePixels / edgePixelCount,
+      edgeWhitePixelCount,
       maxSubjectRadius,
       subjectCenterX,
       subjectCenterY,
@@ -103,15 +119,18 @@ async function avatarRasterMetrics(images: Locator): Promise<AvatarRasterMetric[
 
 test("AvatarChip renders every local avatar at all approved small sizes", async ({ mount }, testInfo) => {
   const component = await mount(
-    <div
-      className="avatar-contact-sheet"
-      style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(15, max-content)", padding: 16 }}
-    >
-      {avatarSizes.flatMap((size) =>
-        BOOK_CLUB_AVATAR_KEYS.map((avatarKey) => (
-          <AvatarChip avatarKey={avatarKey} key={`${size}-${avatarKey}`} label="" name="회원" size={size} />
-        )),
-      )}
+    <div className="avatar-contact-sheet" style={{ display: "grid", gap: 12, padding: 16 }}>
+      {avatarSizes.map((size) => (
+        <div
+          data-avatar-size={size}
+          key={size}
+          style={{ display: "grid", gap: 8, gridTemplateColumns: `repeat(15, ${size}px)` }}
+        >
+          {BOOK_CLUB_AVATAR_KEYS.map((avatarKey) => (
+            <AvatarChip avatarKey={avatarKey} key={`${size}-${avatarKey}`} label="" name="회원" size={size} />
+          ))}
+        </div>
+      ))}
     </div>,
   );
 
@@ -134,12 +153,17 @@ test("AvatarChip renders every local avatar at all approved small sizes", async 
     ),
   ).toBe(true);
   await expect.poll(() => allImagesHaveTransparentCorners(images)).toBe(true);
+  for (const size of avatarSizes) {
+    await component.locator(`[data-avatar-size="${size}"]`).screenshot({
+      path: testInfo.outputPath(`avatar-chip-size-${size}.png`),
+    });
+  }
   await component.screenshot({ path: testInfo.outputPath("avatar-chip-all-sizes.png") });
 });
 
 test("AvatarChip exposes every asset for full-size crop inspection", async ({ mount }, testInfo) => {
   const component = await mount(
-    <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(6, 256px)", padding: 16 }}>
+    <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(4, 256px)", padding: 16 }}>
       {BOOK_CLUB_AVATAR_KEYS.map((avatarKey) => (
         <AvatarChip avatarKey={avatarKey} key={avatarKey} label="" name="회원" size={256} />
       ))}
@@ -148,10 +172,16 @@ test("AvatarChip exposes every asset for full-size crop inspection", async ({ mo
 
   const images = component.locator("img");
   await expect(images).toHaveCount(30);
+  const sheetBounds = await component.boundingBox();
+  expect(sheetBounds?.width, "full-size contact sheet fits the capture viewport").toBeLessThanOrEqual(1280);
+  const sheetWidth = await component.evaluate((element) => ({ client: element.clientWidth, scroll: element.scrollWidth }));
+  expect(sheetWidth.scroll, "full-size contact sheet has no clipped columns").toBeLessThanOrEqual(sheetWidth.client);
   await expect.poll(() => allImagesHaveTransparentCorners(images)).toBe(true);
   const rasterMetrics = await avatarRasterMetrics(images);
   for (const metric of rasterMetrics) {
     expect.soft(metric.edgeLightP90, `${metric.key} keeps beige through the oval edge`).toBeLessThanOrEqual(247);
+    expect.soft(metric.edgeOpaqueCoverage, `${metric.key} has no transparent holes in the beige edge`).toBe(1);
+    expect.soft(metric.edgeWhitePixelCount, `${metric.key} has no white pixels in the beige edge`).toBe(0);
     expect.soft(metric.maxSubjectRadius, `${metric.key} keeps the subject inside the oval`).toBeLessThanOrEqual(0.98);
     expect.soft(metric.subjectCenterX, `${metric.key} centers the subject horizontally`).toBeGreaterThanOrEqual(124);
     expect.soft(metric.subjectCenterX, `${metric.key} centers the subject horizontally`).toBeLessThanOrEqual(132);
@@ -159,6 +189,31 @@ test("AvatarChip exposes every asset for full-size crop inspection", async ({ mo
     expect.soft(metric.subjectCenterY, `${metric.key} centers the subject vertically`).toBeLessThanOrEqual(132);
   }
   await component.screenshot({ path: testInfo.outputPath("avatar-chip-crop-inspection.png") });
+});
+
+test("avatar raster guard detects small white and transparent edge defects", async ({ mount, page }) => {
+  const defectiveRaster = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 256;
+    canvas.height = 256;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("avatar mutation canvas is unavailable");
+    context.fillStyle = "rgb(243, 230, 217)";
+    context.beginPath();
+    context.ellipse(128, 128, 79, 107, 0, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = "rgb(100, 90, 80)";
+    context.fillRect(118, 118, 20, 20);
+    context.fillStyle = "white";
+    context.fillRect(195, 124, 6, 8);
+    context.clearRect(55, 124, 6, 8);
+    return canvas.toDataURL("image/png");
+  });
+  const component = await mount(<img alt="" src={defectiveRaster} />);
+
+  const [metric] = await avatarRasterMetrics(component);
+  expect(metric.edgeOpaqueCoverage).toBeLessThan(1);
+  expect(metric.edgeWhitePixelCount).toBeGreaterThan(0);
 });
 
 test("AvatarChip keeps requested and default artwork frame-free through image fallback", async ({ mount, page }) => {

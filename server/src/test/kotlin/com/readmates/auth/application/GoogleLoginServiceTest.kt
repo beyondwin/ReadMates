@@ -48,7 +48,7 @@ class GoogleLoginServiceTest(
         val googleAccountStore = mock(GoogleAccountStorePort::class.java)
         val platformAdminLookup = mock(PlatformAdminLookupPort::class.java)
         val avatarAllocation = mock(MemberAvatarAllocationPort::class.java)
-        val allocatedKey = BookClubAvatarKey.DEER_BROWN_BOOK
+        val allocatedKey = BookClubAvatarKey.SHEEP_NOTEBOOK
         val userId = UUID.randomUUID()
         val clubId = UUID.randomUUID()
         val createdMember =

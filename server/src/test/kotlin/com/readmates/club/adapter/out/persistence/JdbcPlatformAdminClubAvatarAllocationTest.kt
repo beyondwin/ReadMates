@@ -46,7 +46,7 @@ class JdbcPlatformAdminClubAvatarAllocationTest(
             """.trimIndent(),
             USER_ID.dbString(),
         )
-        whenever(randomIndex.nextIndex(40)).thenReturn(7)
+        whenever(randomIndex.nextIndex(BookClubAvatarKey.ordered.size)).thenReturn(7)
     }
 
     @AfterEach
@@ -64,7 +64,7 @@ class JdbcPlatformAdminClubAvatarAllocationTest(
                 String::class.java,
                 membershipId.dbString(),
             )
-        assertThat(persistedAvatarKey).isEqualTo(BookClubAvatarKey.CAT_FLOWER_MUG.wireValue)
+        assertThat(persistedAvatarKey).isEqualTo(BookClubAvatarKey.SAILBOAT_GREEN_BOOK.wireValue)
     }
 
     private fun cleanup() {

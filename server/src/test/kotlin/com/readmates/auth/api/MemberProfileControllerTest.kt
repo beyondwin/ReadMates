@@ -53,20 +53,21 @@ class MemberProfileControllerTest(
         val otherMembershipId = insertSecondClubMembership(email, "starfish-notebook")
         val cookie = sessionCookieForEmail(email)
 
-        mockMvc.put("/api/me/profile") {
-            cookie(cookie)
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("X-Readmates-Club-Slug", "reading-sai")
-            header("Origin", "http://localhost:3000")
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"displayName":"After","avatarKey":"cloud-green-book"}"""
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.membershipId") { value(primaryMembershipId) }
-            jsonPath("$.displayName") { value("After") }
-            jsonPath("$.avatarKey") { value("cloud-green-book") }
-        }
+        mockMvc
+            .put("/api/me/profile") {
+                cookie(cookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("X-Readmates-Club-Slug", "reading-sai")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"displayName":"After","avatarKey":"cloud-green-book"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.membershipId") { value(primaryMembershipId) }
+                jsonPath("$.displayName") { value("After") }
+                jsonPath("$.avatarKey") { value("cloud-green-book") }
+            }
 
         assertEquals("After", shortNameForMembership(primaryMembershipId))
         assertEquals("cloud-green-book", avatarKeyForMembership(primaryMembershipId))
@@ -89,18 +90,19 @@ class MemberProfileControllerTest(
 
         cases.forEach { (clubSlug, avatarAndCode) ->
             val (avatarKey, code) = avatarAndCode
-            mockMvc.put("/api/me/profile") {
-                cookie(cookie)
-                header("X-Readmates-Bff-Secret", "test-bff-secret")
-                clubSlug?.let { header("X-Readmates-Club-Slug", it) }
-                header("Origin", "http://localhost:3000")
-                with(csrf())
-                contentType = MediaType.APPLICATION_JSON
-                content = """{"displayName":"After","avatarKey":"$avatarKey"}"""
-            }.andExpect {
-                if (code == "MEMBER_NOT_FOUND") status { isNotFound() } else status { isBadRequest() }
-                jsonPath("$.code") { value(code) }
-            }
+            mockMvc
+                .put("/api/me/profile") {
+                    cookie(cookie)
+                    header("X-Readmates-Bff-Secret", "test-bff-secret")
+                    clubSlug?.let { header("X-Readmates-Club-Slug", it) }
+                    header("Origin", "http://localhost:3000")
+                    with(csrf())
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"displayName":"After","avatarKey":"$avatarKey"}"""
+                }.andExpect {
+                    if (code == "MEMBER_NOT_FOUND") status { isNotFound() } else status { isBadRequest() }
+                    jsonPath("$.code") { value(code) }
+                }
             assertEquals("Before", shortNameForMembership(membershipId))
             assertEquals("mushroom-green-book", avatarKeyForMembership(membershipId))
         }
@@ -112,18 +114,19 @@ class MemberProfileControllerTest(
         insertProfileMember("self.replace.taken", "ACTIVE", shortName = "Taken")
         val membershipId = membershipIdForEmail(email)
 
-        mockMvc.put("/api/me/profile") {
-            cookie(sessionCookieForEmail(email))
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("X-Readmates-Club-Slug", "reading-sai")
-            header("Origin", "http://localhost:3000")
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"displayName":"Taken","avatarKey":"cloud-green-book"}"""
-        }.andExpect {
-            status { isConflict() }
-            jsonPath("$.code") { value("DISPLAY_NAME_DUPLICATE") }
-        }
+        mockMvc
+            .put("/api/me/profile") {
+                cookie(sessionCookieForEmail(email))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("X-Readmates-Club-Slug", "reading-sai")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"displayName":"Taken","avatarKey":"cloud-green-book"}"""
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("DISPLAY_NAME_DUPLICATE") }
+            }
 
         assertEquals("Before", shortNameForMembership(membershipId))
         assertEquals("mushroom-green-book", avatarKeyForMembership(membershipId))
@@ -161,26 +164,28 @@ class MemberProfileControllerTest(
             )
 
         cases.forEach { (body, code, message) ->
-            mockMvc.put("/api/me/profile") {
-                cookie(cookie)
-                header("X-Readmates-Bff-Secret", "test-bff-secret")
-                header("X-Readmates-Club-Slug", "reading-sai")
-                header("Origin", "http://localhost:3000")
-                with(csrf())
-                contentType = MediaType.APPLICATION_JSON
-                content = body
-            }.andExpect {
-                status { isBadRequest() }
-                jsonPath("$.code") { value(code) }
-                jsonPath("$.status") { value(400) }
-                jsonPath("$.message") { value(message) }
-            }
+            mockMvc
+                .put("/api/me/profile") {
+                    cookie(cookie)
+                    header("X-Readmates-Bff-Secret", "test-bff-secret")
+                    header("X-Readmates-Club-Slug", "reading-sai")
+                    header("Origin", "http://localhost:3000")
+                    with(csrf())
+                    contentType = MediaType.APPLICATION_JSON
+                    content = body
+                }.andExpect {
+                    status { isBadRequest() }
+                    jsonPath("$.code") { value(code) }
+                    jsonPath("$.status") { value(400) }
+                    jsonPath("$.message") { value(message) }
+                }
             assertEquals("Before", shortNameForMembership(membershipId))
             assertEquals("mushroom-green-book", avatarKeyForMembership(membershipId))
         }
     }
 
     @Test
+    @Suppress("LongMethod")
     fun `simultaneous PUT loses duplicate-name race without changing either profile field`() {
         val email = insertProfileMember("self.replace.race", "ACTIVE", shortName = "Before")
         val membershipId = membershipIdForEmail(email)
@@ -209,15 +214,16 @@ class MemberProfileControllerTest(
                 val putResult =
                     executor.submit<Pair<Int, String>> {
                         val response =
-                            mockMvc.put("/api/me/profile") {
-                                cookie(cookie)
-                                header("X-Readmates-Bff-Secret", "test-bff-secret")
-                                header("X-Readmates-Club-Slug", "reading-sai")
-                                header("Origin", "http://localhost:3000")
-                                with(csrf())
-                                contentType = MediaType.APPLICATION_JSON
-                                content = """{"displayName":"RaceTaken","avatarKey":"cloud-green-book"}"""
-                            }.andReturn()
+                            mockMvc
+                                .put("/api/me/profile") {
+                                    cookie(cookie)
+                                    header("X-Readmates-Bff-Secret", "test-bff-secret")
+                                    header("X-Readmates-Club-Slug", "reading-sai")
+                                    header("Origin", "http://localhost:3000")
+                                    with(csrf())
+                                    contentType = MediaType.APPLICATION_JSON
+                                    content = """{"displayName":"RaceTaken","avatarKey":"cloud-green-book"}"""
+                                }.andReturn()
                                 .response
                         response.status to response.contentAsString
                     }
@@ -241,7 +247,10 @@ class MemberProfileControllerTest(
 
                 val (status, body) = putResult.get(5, TimeUnit.SECONDS)
                 assertEquals(409, status)
-                org.hamcrest.MatcherAssert.assertThat(body, org.hamcrest.Matchers.containsString("DISPLAY_NAME_DUPLICATE"))
+                org.hamcrest.MatcherAssert.assertThat(
+                    body,
+                    org.hamcrest.Matchers.containsString("DISPLAY_NAME_DUPLICATE"),
+                )
             } finally {
                 runCatching { connection.rollback() }
                 executor.shutdownNow()
@@ -275,15 +284,16 @@ class MemberProfileControllerTest(
                         ready.countDown()
                         start.await(5, TimeUnit.SECONDS)
                         val response =
-                            mockMvc.put("/api/me/profile") {
-                                cookie(cookie)
-                                header("X-Readmates-Bff-Secret", "test-bff-secret")
-                                header("X-Readmates-Club-Slug", "reading-sai")
-                                header("Origin", "http://localhost:3000")
-                                with(csrf())
-                                contentType = MediaType.APPLICATION_JSON
-                                content = """{"displayName":"ConcurrentWinner","avatarKey":"$avatarKey"}"""
-                            }.andReturn()
+                            mockMvc
+                                .put("/api/me/profile") {
+                                    cookie(cookie)
+                                    header("X-Readmates-Bff-Secret", "test-bff-secret")
+                                    header("X-Readmates-Club-Slug", "reading-sai")
+                                    header("Origin", "http://localhost:3000")
+                                    with(csrf())
+                                    contentType = MediaType.APPLICATION_JSON
+                                    content = """{"displayName":"ConcurrentWinner","avatarKey":"$avatarKey"}"""
+                                }.andReturn()
                                 .response
                         Triple(response.status, membershipId, avatarKey)
                     }
@@ -312,20 +322,26 @@ class MemberProfileControllerTest(
     @Test
     fun `atomic profile replacement rejects blocked memberships without partial writes`() {
         listOf("LEFT", "INACTIVE").forEach { membershipStatus ->
-            val email = insertProfileMember("self.replace.${membershipStatus.lowercase()}", membershipStatus, shortName = "Before")
+            val email =
+                insertProfileMember(
+                    "self.replace.${membershipStatus.lowercase()}",
+                    membershipStatus,
+                    shortName = "Before",
+                )
             val membershipId = membershipIdForEmail(email)
-            mockMvc.put("/api/me/profile") {
-                cookie(sessionCookieForEmail(email))
-                header("X-Readmates-Bff-Secret", "test-bff-secret")
-                header("X-Readmates-Club-Slug", "reading-sai")
-                header("Origin", "http://localhost:3000")
-                with(csrf())
-                contentType = MediaType.APPLICATION_JSON
-                content = """{"displayName":"After","avatarKey":"cloud-green-book"}"""
-            }.andExpect {
-                status { isForbidden() }
-                jsonPath("$.code") { value("MEMBERSHIP_NOT_ALLOWED") }
-            }
+            mockMvc
+                .put("/api/me/profile") {
+                    cookie(sessionCookieForEmail(email))
+                    header("X-Readmates-Bff-Secret", "test-bff-secret")
+                    header("X-Readmates-Club-Slug", "reading-sai")
+                    header("Origin", "http://localhost:3000")
+                    with(csrf())
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"displayName":"After","avatarKey":"cloud-green-book"}"""
+                }.andExpect {
+                    status { isForbidden() }
+                    jsonPath("$.code") { value("MEMBERSHIP_NOT_ALLOWED") }
+                }
             assertEquals("Before", shortNameForMembership(membershipId))
             assertEquals("mushroom-green-book", avatarKeyForMembership(membershipId))
         }
@@ -335,17 +351,18 @@ class MemberProfileControllerTest(
     fun `atomic profile replacement requires Spring Security authentication`() {
         val email = insertProfileMember("self.replace.unauthenticated", "ACTIVE", shortName = "Before")
         val membershipId = membershipIdForEmail(email)
-        mockMvc.put("/api/me/profile") {
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("X-Readmates-Club-Slug", "reading-sai")
-            header("Origin", "http://localhost:3000")
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"displayName":"After","avatarKey":"cloud-green-book"}"""
-        }.andExpect {
-            status { isUnauthorized() }
-            content { string("") }
-        }
+        mockMvc
+            .put("/api/me/profile") {
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("X-Readmates-Club-Slug", "reading-sai")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"displayName":"After","avatarKey":"cloud-green-book"}"""
+            }.andExpect {
+                status { isUnauthorized() }
+                content { string("") }
+            }
         assertEquals("Before", shortNameForMembership(membershipId))
         assertEquals("mushroom-green-book", avatarKeyForMembership(membershipId))
     }
