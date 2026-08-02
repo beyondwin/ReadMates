@@ -4,6 +4,7 @@ import type {
   MemberArchiveSessionDetailResponse,
   SessionState,
 } from "@/features/archive/model/archive-model";
+import { parseSessionState } from "@/features/archive/model/archive-model";
 import {
   GUEST_READ_SURFACE_CAPABILITIES,
   type ReadSurfaceCapabilities,
@@ -95,14 +96,6 @@ export type MemberSessionDetailReadSource = MemberArchiveSessionDetailResponse &
   clubLongReviews: SessionDetailLongReview[];
 };
 
-function sessionState(value: string): SessionState | null {
-  if (value === "DRAFT" || value === "OPEN" || value === "CLOSED" || value === "PUBLISHED") {
-    return value;
-  }
-
-  return null;
-}
-
 export function memberSessionDetailReadView(
   source: MemberSessionDetailReadSource,
   capabilities: ReadSurfaceCapabilities,
@@ -138,7 +131,7 @@ export function memberSessionDetailReadView(
 export function guestSessionDetailReadView(
   source: GuestSessionDetailReadSource,
 ): SessionDetailReadView | null {
-  const state = sessionState(source.state);
+  const state = parseSessionState(source.state);
 
   if (!state) {
     return null;

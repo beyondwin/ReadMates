@@ -3,8 +3,8 @@ import type {
   ArchiveReviewItem,
   ArchiveSessionItemLike,
   FeedbackDocumentListItem,
-  SessionState,
 } from "@/features/archive/model/archive-model";
+import { parseSessionState } from "@/features/archive/model/archive-model";
 import type { PagedResponse } from "@/shared/model/paging";
 import {
   GUEST_READ_SURFACE_CAPABILITIES,
@@ -35,14 +35,6 @@ export type GuestArchiveReadSource = {
   nextCursor: string | null;
 };
 
-function sessionState(value: string): SessionState | null {
-  if (value === "DRAFT" || value === "OPEN" || value === "CLOSED" || value === "PUBLISHED") {
-    return value;
-  }
-
-  return null;
-}
-
 function emptyPage<T>(): PagedResponse<T> {
   return { items: [], nextCursor: null };
 }
@@ -51,7 +43,7 @@ export function guestArchiveReadView(page: GuestArchiveReadSource): ArchivePageR
   return {
     sessions: {
       items: page.items.flatMap((session): ArchiveSessionItemLike[] => {
-        const state = sessionState(session.state);
+        const state = parseSessionState(session.state);
 
         if (!state) {
           return [];
