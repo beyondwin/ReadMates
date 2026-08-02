@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { MemberProfileResponse, MyPageResponse } from "@/features/archive/api/archive-contracts";
 import { profileSaveErrorMessage } from "@/features/archive/model/archive-model";
 import {
@@ -54,6 +54,7 @@ export function useProfileUpdateController({
     clubSlug: string | null | undefined;
     override: SavedProfileOverride;
   } | null>(null);
+  const latestRequestGeneration = useRef(0);
   const savedOverride = savedState?.clubSlug === clubSlug ? savedState.override : null;
   const source = editableProfile(sourceProfile);
 
@@ -71,11 +72,15 @@ export function useProfileUpdateController({
     if (code) {
       throw new ProfileUpdateFailure(profileSaveErrorMessage(code), code, "form");
     }
+    const requestGeneration = latestRequestGeneration.current + 1;
+    latestRequestGeneration.current = requestGeneration;
 
     try {
       const updated = await updateMyProfile(editable);
+      if (requestGeneration !== latestRequestGeneration.current) return updated;
       const saved = editableProfile(updated as MyPageResponse);
       await onProfileUpdated();
+      if (requestGeneration !== latestRequestGeneration.current) return updated;
       setSavedState((currentState) => {
         const current = currentState?.clubSlug === clubSlug ? currentState.override : null;
         return {
@@ -83,7 +88,7 @@ export function useProfileUpdateController({
           override: {
             source: editableProfile(sourceProfile),
             saved,
-            generation: (current?.generation ?? 0) + 1,
+            generation: requestGeneration,
             staleSources: current
               ? [...current.staleSources, { ...current.saved, generation: current.generation }]
               : [],

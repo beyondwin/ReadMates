@@ -37,6 +37,14 @@ const saved: MemberProfileResponse = {
   avatarKey: "cloud-green-book",
 };
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 function renderController(sourceProfile = profile, clubSlug = "reading-sai", canEditProfile = true) {
   const onProfileUpdated = vi.fn().mockResolvedValue(undefined);
   const onRevalidate = vi.fn();
@@ -99,6 +107,35 @@ describe("useProfileUpdateController", () => {
 
     rerender({ sourceProfile: { ...profile }, clubSlug: "reading-sai" });
     expect(result.current.profile).toMatchObject({ displayName: "기존 이름", avatarKey: "banana-green-book" });
+  });
+
+  it("keeps the newest invoked profile when overlapping saves resolve newest first", async () => {
+    const first = deferred<MemberProfileResponse>();
+    const second = deferred<MemberProfileResponse>();
+    const firstSaved = { ...saved, displayName: "첫 번째 이름", avatarKey: "cloud-green-book" };
+    const secondSaved = { ...saved, displayName: "두 번째 이름", avatarKey: "sun-green-book" };
+    mutations.updateMyProfile
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+    const { result, onProfileUpdated, onRevalidate } = renderController();
+
+    let firstRequest!: Promise<MemberProfileResponse>;
+    let secondRequest!: Promise<MemberProfileResponse>;
+    act(() => {
+      firstRequest = result.current.saveProfile({ displayName: "첫 번째 이름", avatarKey: "cloud-green-book" });
+      secondRequest = result.current.saveProfile({ displayName: "두 번째 이름", avatarKey: "sun-green-book" });
+    });
+
+    second.resolve(secondSaved);
+    await act(async () => { await secondRequest; });
+    expect(result.current.profile).toMatchObject({ displayName: "두 번째 이름", avatarKey: "sun-green-book" });
+
+    first.resolve(firstSaved);
+    await act(async () => { await firstRequest; });
+
+    expect(result.current.profile).toMatchObject({ displayName: "두 번째 이름", avatarKey: "sun-green-book" });
+    expect(onProfileUpdated).toHaveBeenCalledOnce();
+    expect(onRevalidate).toHaveBeenCalledOnce();
   });
 
   it("prevents an old-club response from replacing the current club profile", async () => {

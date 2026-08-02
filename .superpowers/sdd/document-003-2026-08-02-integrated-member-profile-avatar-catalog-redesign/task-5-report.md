@@ -79,3 +79,34 @@ Result: exit 0.
 
 - `corepack pnpm --dir front test:e2e` was not run because this focused data-flow task did not start the external application/server/database/browser environment required by the E2E suite. Unit route coverage exercises the changed user interactions and callback assembly.
 - Corepack could not be used after the initial attempt because the restricted environment could not fetch missing packages. All subsequent checks used the repository's existing `front/node_modules/.bin` binaries; the package manager pin remains unchanged.
+
+## Fix round 1: invocation-ordered overlapping saves
+
+Reviewer finding: generation was allocated when a request completed. If two saves overlapped and the newer invocation resolved first, the older invocation could resolve last, receive a higher generation, run duplicate callbacks, and replace the newer combined profile.
+
+RED command:
+
+```text
+./node_modules/.bin/vitest run features/archive/route/profile-update-controller.test.tsx
+```
+
+Observed RED: 1 of 6 tests failed. The overlapping-save regression invoked profiles one and two, resolved profile two first and profile one last, and observed profile one incorrectly replacing profile two.
+
+Fix: allocate the monotonically increasing request generation synchronously at `saveProfile` invocation. A completion whose request generation is no longer latest resolves to its caller without refreshing auth, revalidating, or applying saved override state. The accepted completion retains the combined-profile stale-source fence.
+
+Focused GREEN command:
+
+```text
+./node_modules/.bin/vitest run features/archive/route/profile-update-controller.test.tsx features/archive/queries/profile-queries.test.tsx features/archive/route/my-page-route.test.tsx
+```
+
+Result: 3 files passed, 13 tests passed. The regression also verifies that the newest invocation remains visible after the older response completes and that auth refresh/revalidation each run once.
+
+Additional checks:
+
+```text
+./node_modules/.bin/eslint features/archive/route/profile-update-controller.ts features/archive/route/profile-update-controller.test.tsx
+git diff --check
+```
+
+Result: both commands exited 0 with no findings. The reviewer’s minor `MemberProfileErrorCode` ownership observation is intentionally deferred and unchanged in this fix round.
