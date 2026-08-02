@@ -8,13 +8,16 @@ import {
   combineArchiveListPages,
 } from "@/features/archive/queries/archive-queries";
 import ArchivePage from "@/features/archive/ui/archive-page";
+import { RECOVER_READ_SESSION_EXPIRY } from "@/shared/api/client";
 
 export function ArchiveListRoute({ reviewAuthorName = null }: { reviewAuthorName?: string | null }) {
   const queryClient = useQueryClient();
   const location = useLocation();
   const { clubSlug } = useParams();
   const context = useMemo(() => ({ clubSlug }), [clubSlug]);
-  const archiveQuery = useQuery(archiveListQuery(context));
+  const archiveQuery = useQuery(
+    archiveListQuery(context, undefined, RECOVER_READ_SESSION_EXPIRY),
+  );
   const pages = archiveQuery.data;
   const [searchParams, setSearchParams] = useSearchParams();
   const initialView = archiveViewFromSearchParam(searchParams.get("view"));
@@ -38,7 +41,11 @@ export function ArchiveListRoute({ reviewAuthorName = null }: { reviewAuthorName
       }
 
       const nextPage = await queryClient.fetchQuery(
-        archiveListQuery(context, { limit: ARCHIVE_NEXT_PAGE_LIMIT, cursor }),
+        archiveListQuery(
+          context,
+          { limit: ARCHIVE_NEXT_PAGE_LIMIT, cursor },
+          RECOVER_READ_SESSION_EXPIRY,
+        ),
       );
       queryClient.setQueryData(archiveListQuery(context).queryKey, combineArchiveListPages([pages, nextPage]));
     },

@@ -174,10 +174,10 @@ function renderScopedExpiryLayout({
   queryClient.setQueryData(["member-private", "reading-sai"], { title: "cached member data" });
   const markLoggedOut = vi.fn();
 
-  render(
+  const tree = (authState: AuthState) => (
     <QueryClientProvider client={queryClient}>
       <AuthActionsContext.Provider value={{ markLoggedOut, refreshAuth: vi.fn() }}>
-        <AuthContext.Provider value={state}>
+        <AuthContext.Provider value={authState}>
           <MemoryRouter initialEntries={[initialEntry]}>
             <Routes>
               <Route
@@ -190,10 +190,15 @@ function renderScopedExpiryLayout({
           </MemoryRouter>
         </AuthContext.Provider>
       </AuthActionsContext.Provider>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+  const rendered = render(tree(state));
 
-  return { queryClient, markLoggedOut };
+  return {
+    queryClient,
+    markLoggedOut,
+    rerenderState: (nextState: AuthState) => rendered.rerender(tree(nextState)),
+  };
 }
 
 afterEach(() => {
@@ -352,7 +357,7 @@ describe("AppRouteLayout session expiry recovery", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     const { queryClient, markLoggedOut } = renderScopedExpiryLayout({
-      state: { status: "session_expired", cause: "read", lastAuth: memberAuth },
+      state: { status: "session_expired", cause: "read", episode: 1, lastAuth: memberAuth } as AuthState,
       child: (
         <>
           <main data-testid="cached-read">cached member data</main>
@@ -380,7 +385,7 @@ describe("AppRouteLayout session expiry recovery", () => {
   it("keeps an unsaved write draft mounted and offers only explicit reauthentication", async () => {
     const user = userEvent.setup();
     renderScopedExpiryLayout({
-      state: { status: "session_expired", cause: "write", lastAuth: memberAuth },
+      state: { status: "session_expired", cause: "write", episode: 1, lastAuth: memberAuth } as AuthState,
       child: <textarea aria-label="작성 중인 질문" defaultValue="지워지면 안 되는 질문" />,
     });
 
@@ -407,7 +412,7 @@ describe("AppRouteLayout session expiry recovery", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     renderScopedExpiryLayout({
-      state: { status: "session_expired", cause: "read", lastAuth: memberAuth },
+      state: { status: "session_expired", cause: "read", episode: 1, lastAuth: memberAuth } as AuthState,
       child: <main>private member session detail</main>,
       initialEntry: "/clubs/reading-sai/app/sessions/private-session",
       routePath: "/clubs/:clubSlug/app/sessions/:sessionId",
@@ -421,5 +426,173 @@ describe("AppRouteLayout session expiry recovery", () => {
     });
     expect(screen.queryByRole("button", { name: "게스트로 계속 보기" })).not.toBeInTheDocument();
     expect(screen.getByText("private member session detail")).toBeVisible();
+    expect(await screen.findByText(/게스트로 이어볼 수 없어 다시 로그인/)).toBeVisible();
+  });
+
+  it("verifies the exact notes session and cursor before enabling guest continuation", async () => {
+    const noteSession = {
+      sessionId: "session-7",
+      sessionNumber: 7,
+      bookTitle: "검증할 책",
+      date: "2026-08-02",
+      questionCount: 1,
+      oneLinerCount: 0,
+      longReviewCount: 0,
+      highlightCount: 0,
+      totalCount: 1,
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const path = input.toString();
+      if (path === "/api/bff/api/public/clubs/reading-sai/browse") {
+        return Promise.resolve(jsonResponse(guestShell));
+      }
+      if (path === "/api/bff/api/public/clubs/reading-sai/browse/notes/sessions?limit=20&cursor=cursor-2") {
+        return Promise.resolve(jsonResponse({ items: [noteSession], nextCursor: null }));
+      }
+      if (path === "/api/bff/api/public/clubs/reading-sai/browse/notes/feed?limit=20&cursor=cursor-2") {
+        return Promise.resolve(jsonResponse({
+          items: [{
+            sessionId: "session-7",
+            sessionNumber: 7,
+            bookTitle: "검증할 책",
+            date: "2026-08-02",
+            authorName: "공개 작성자",
+            authorShortName: "공",
+            avatarKey: "book",
+            kind: "QUESTION",
+            text: "공개 질문",
+          }],
+          nextCursor: null,
+        }));
+      }
+      if (path === "/api/bff/api/public/clubs/reading-sai/browse/archive/session-7") {
+        return Promise.resolve(jsonResponse({
+          sessionId: "session-7",
+          sessionNumber: 7,
+          title: "검증할 세션",
+          bookTitle: "검증할 책",
+          bookAuthor: "작가",
+          bookImageUrl: null,
+          date: "2026-08-02",
+          attendance: 1,
+          total: 1,
+          state: "CLOSED",
+          summary: null,
+          highlights: [],
+          questions: [],
+          oneLiners: [],
+          longReviews: [],
+        }));
+      }
+      return Promise.reject(new Error(`Unexpected fetch: ${path}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderScopedExpiryLayout({
+      state: { status: "session_expired", cause: "read", episode: 7, lastAuth: memberAuth } as AuthState,
+      child: <main>기존 노트 데이터</main>,
+      initialEntry: "/clubs/reading-sai/app/notes?sessionId=session-7&cursor=cursor-2#question",
+      routePath: "/clubs/:clubSlug/app/notes",
+    });
+
+    expect(await screen.findByRole("button", { name: "게스트로 계속 보기" })).toBeVisible();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/public/clubs/reading-sai/browse/notes/sessions?limit=20&cursor=cursor-2",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+    expect(screen.getByText("기존 노트 데이터")).toBeVisible();
+  });
+
+  it("rechecks publication at click time and never logs out into a newly private route", async () => {
+    const user = userEvent.setup();
+    let detailChecks = 0;
+    const detail = {
+      sessionId: "session-7",
+      sessionNumber: 7,
+      title: "공개 세션",
+      bookTitle: "책",
+      bookAuthor: "작가",
+      bookImageUrl: null,
+      date: "2026-08-02",
+      attendance: 1,
+      total: 1,
+      state: "CLOSED",
+      summary: "요약",
+      highlights: [],
+      questions: [],
+      oneLiners: [],
+      longReviews: [],
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const path = input.toString();
+      if (path === "/api/bff/api/public/clubs/reading-sai/browse") {
+        return Promise.resolve(jsonResponse(guestShell));
+      }
+      if (path === "/api/bff/api/public/clubs/reading-sai/browse/archive/session-7") {
+        detailChecks += 1;
+        return Promise.resolve(
+          detailChecks === 1 ? jsonResponse(detail) : new Response(null, { status: 404 }),
+        );
+      }
+      if (path === "/api/bff/api/auth/logout") {
+        return Promise.resolve(new Response(null, { status: 204 }));
+      }
+      return Promise.reject(new Error(`Unexpected fetch: ${path}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { markLoggedOut } = renderScopedExpiryLayout({
+      state: { status: "session_expired", cause: "read", episode: 9, lastAuth: memberAuth } as AuthState,
+      child: <main>멤버 전용 성공 데이터</main>,
+      initialEntry: "/clubs/reading-sai/app/sessions/session-7?view=summary#questions",
+      routePath: "/clubs/:clubSlug/app/sessions/:sessionId",
+    });
+
+    await user.click(await screen.findByRole("button", { name: "게스트로 계속 보기" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("게스트 화면으로 전환하지 못했습니다");
+    expect(markLoggedOut).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      "/api/bff/api/auth/logout",
+      expect.anything(),
+    );
+    expect(screen.getByText("멤버 전용 성공 데이터")).toBeVisible();
+  });
+
+  it("does not reuse a successful verification from a previous expiry episode", async () => {
+    let shellChecks = 0;
+    const secondShell = deferred<Response>();
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const path = input.toString();
+      if (path === "/api/bff/api/public/clubs/reading-sai/browse") {
+        shellChecks += 1;
+        return shellChecks === 1 ? Promise.resolve(jsonResponse(guestShell)) : secondShell.promise;
+      }
+      if (path === "/api/bff/api/public/clubs/reading-sai/browse/sessions/current") {
+        return Promise.resolve(jsonResponse(guestCurrentSession));
+      }
+      return Promise.reject(new Error(`Unexpected fetch: ${path}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { rerenderState } = renderScopedExpiryLayout({
+      state: { status: "session_expired", cause: "read", episode: 1, lastAuth: memberAuth } as AuthState,
+      child: <main>성공 데이터</main>,
+    });
+
+    expect(await screen.findByRole("button", { name: "게스트로 계속 보기" })).toBeVisible();
+    rerenderState({
+      status: "session_expired",
+      cause: "read",
+      episode: 2,
+      lastAuth: memberAuth,
+    } as AuthState);
+
+    expect(screen.queryByRole("button", { name: "게스트로 계속 보기" })).not.toBeInTheDocument();
+    expect(screen.getByText(/공개 화면으로 이어볼 수 있는지 확인/)).toBeVisible();
+
+    await act(async () => {
+      secondShell.resolve(new Response(null, { status: 404 }));
+      await secondShell.promise;
+    });
+    expect(await screen.findByText(/게스트로 이어볼 수 없어 다시 로그인/)).toBeVisible();
   });
 });

@@ -12,7 +12,10 @@ import {
 import type { CurrentSessionRouteData } from "@/features/current-session/route/current-session-data";
 import { CurrentSessionPage, type CurrentSessionSaveActions } from "@/features/current-session/ui/current-session-page";
 import type { CurrentSessionInternalLinkProps, InternalLinkComponent } from "@/features/current-session/ui/current-session-types";
-import type { ReadmatesApiContext } from "@/shared/api/client";
+import {
+  RECOVER_READ_SESSION_EXPIRY,
+  type ReadmatesApiContext,
+} from "@/shared/api/client";
 export { CurrentSessionRouteError } from "./current-session-route-error";
 
 function contextFromClubSlug(clubSlug?: string): ReadmatesApiContext | undefined {
@@ -35,7 +38,7 @@ export function CurrentSessionRoute({
   const loaderData = useLoaderData() as CurrentSessionRouteData;
   const params = useParams();
   const context = useMemo(() => contextFromClubSlug(params.clubSlug), [params.clubSlug]);
-  const currentQuery = useQuery(currentSessionQuery(context));
+  const currentQuery = useQuery(currentSessionQuery(context, RECOVER_READ_SESSION_EXPIRY));
   const updateRsvpMutation = useUpdateCurrentSessionRsvpMutation(context);
   const saveCheckinMutation = useSaveCurrentSessionCheckinMutation(context);
   const saveQuestionsMutation = useSaveCurrentSessionQuestionsMutation(context);

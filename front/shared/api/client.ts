@@ -1,6 +1,7 @@
 import { apiErrorFromResponse } from "@/shared/api/errors";
 import { parseReadmatesResponse } from "@/shared/api/response";
 import { signalSessionExpired } from "@/shared/auth/session-expiry";
+import { currentRelativeReturnTo, loginPathForReturnTo } from "@/shared/auth/login-return";
 import { recordFrontendApiFailure } from "@/shared/observability/frontend-observability";
 
 export class ReadMatesSessionExpiredError extends Error {
@@ -11,16 +12,30 @@ export class ReadMatesSessionExpiredError extends Error {
 }
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+let lastLoginRedirectAt = 0;
+const REDIRECT_COOL_OFF_MS = 1500;
 const HOST_WRITE_CLIENT_CONTRACT_HEADER = "X-Readmates-Client-Contract";
 const HOST_WRITE_CLIENT_CONTRACT = "v2";
 
 export function __resetRedirectGuardForTest() {
-  // Kept as a test compatibility seam while session expiry is handled in-app.
+  lastLoginRedirectAt = 0;
 }
 
 export type ReadmatesApiContext = {
   clubSlug?: string;
 };
+
+export type ReadmatesRequestPolicy = {
+  sessionExpiry: "recover-read" | "recover-write";
+};
+
+export const RECOVER_READ_SESSION_EXPIRY = {
+  sessionExpiry: "recover-read",
+} as const satisfies ReadmatesRequestPolicy;
+
+export const RECOVER_WRITE_SESSION_EXPIRY = {
+  sessionExpiry: "recover-write",
+} as const satisfies ReadmatesRequestPolicy;
 
 function currentAppClubSlug() {
   if (typeof globalThis.location?.pathname !== "string") {
@@ -48,7 +63,12 @@ export function readmatesApiPath(path: string, context?: ReadmatesApiContext) {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
-export async function readmatesFetchResponse(path: string, init?: RequestInit, context?: ReadmatesApiContext): Promise<Response> {
+export async function readmatesFetchResponse(
+  path: string,
+  init?: RequestInit,
+  context?: ReadmatesApiContext,
+  policy?: ReadmatesRequestPolicy,
+): Promise<Response> {
   const headers = new Headers(init?.headers);
   const bodyIsFormData = typeof FormData !== "undefined" && init?.body instanceof FormData;
   const method = init?.method?.toUpperCase() ?? "GET";
@@ -70,15 +90,29 @@ export async function readmatesFetchResponse(path: string, init?: RequestInit, c
   });
 
   if (response.status === 401) {
-    signalSessionExpired(MUTATING_METHODS.has(method) ? "write" : "read");
+    if (policy?.sessionExpiry) {
+      signalSessionExpired(policy.sessionExpiry === "recover-write" ? "write" : "read");
+    } else {
+      const now = Date.now();
+      const inCoolOff = now - lastLoginRedirectAt < REDIRECT_COOL_OFF_MS;
+      if (typeof window !== "undefined" && !inCoolOff) {
+        lastLoginRedirectAt = now;
+        window.location.assign(loginPathForReturnTo(currentRelativeReturnTo()));
+      }
+    }
     throw new ReadMatesSessionExpiredError();
   }
 
   return response;
 }
 
-export async function readmatesFetch<T>(path: string, init?: RequestInit, context?: ReadmatesApiContext): Promise<T> {
-  const response = await readmatesFetchResponse(path, init, context);
+export async function readmatesFetch<T>(
+  path: string,
+  init?: RequestInit,
+  context?: ReadmatesApiContext,
+  policy?: ReadmatesRequestPolicy,
+): Promise<T> {
+  const response = await readmatesFetchResponse(path, init, context, policy);
 
   if (!response.ok) {
     const error = await apiErrorFromResponse(response);

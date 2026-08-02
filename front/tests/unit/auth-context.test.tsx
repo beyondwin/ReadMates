@@ -227,7 +227,7 @@ describe("AuthProvider", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/auth/me", { cache: "no-store" });
   });
 
-  it("transitions to session_expired when /auth/me returns 401", async () => {
+  it("treats the first anonymous /auth/me 401 as anonymous instead of a recoverable expiry", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 401 }));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -238,7 +238,7 @@ describe("AuthProvider", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("auth-state")).toHaveTextContent("session_expired");
+      expect(screen.getByTestId("auth-state")).toHaveTextContent("ANONYMOUS");
     });
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/auth/me", { cache: "no-store" });
   });
@@ -256,11 +256,13 @@ describe("AuthProvider", () => {
       expect(screen.getByTestId("auth-state")).toHaveTextContent("ACTIVE");
     });
 
-    window.dispatchEvent(
-      new CustomEvent("readmates:session-expired", {
-        detail: { cause: "read" },
-      }),
-    );
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent("readmates:session-expired", {
+          detail: { cause: "read" },
+        }),
+      );
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId("auth-state")).toHaveTextContent(
@@ -282,11 +284,13 @@ describe("AuthProvider", () => {
       expect(screen.getByTestId("auth-state")).toHaveTextContent("ACTIVE");
     });
 
-    window.dispatchEvent(
-      new CustomEvent("readmates:session-expired", {
-        detail: { cause: "write" },
-      }),
-    );
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent("readmates:session-expired", {
+          detail: { cause: "write" },
+        }),
+      );
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId("auth-state")).toHaveTextContent(
@@ -350,6 +354,132 @@ describe("AuthProvider", () => {
       expect(screen.getByTestId("auth-state")).toHaveTextContent(
         `session_expired:write:${activeMemberAuth.displayName}`,
       );
+    });
+  });
+
+  it("invalidates an in-flight initial auth request when a mounted write expires", async () => {
+    const initialFetch = createDeferred<Response>();
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(initialFetch.promise));
+
+    render(
+      <AuthProvider>
+        <AuthProbe />
+      </AuthProvider>,
+    );
+
+    expect(screen.getByTestId("auth-state")).toHaveTextContent("loading");
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent("readmates:session-expired", { detail: { cause: "write" } }),
+      );
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-state")).toHaveTextContent("session_expired:write:anonymous");
+    });
+
+    await resolveAuthRequest(initialFetch, activeMemberAuth);
+    expect(screen.getByTestId("auth-state")).toHaveTextContent("session_expired:write:anonymous");
+  });
+
+  it("turns a refresh 401 after authenticated state into recoverable read expiry", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(authResponse(activeMemberAuth))
+      .mockResolvedValueOnce(new Response(null, { status: 401 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AuthProvider>
+        <AuthRefreshProbe />
+        <AuthProbe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("auth-state")).toHaveTextContent("ACTIVE"));
+    await user.click(screen.getByRole("button", { name: "refresh auth" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-state")).toHaveTextContent(
+        `session_expired:read:${activeMemberAuth.displayName}`,
+      );
+    });
+  });
+
+  it("does not let an in-flight refresh 401 downgrade a newer write expiry", async () => {
+    const user = userEvent.setup();
+    const refreshFetch = createDeferred<Response>();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(authResponse(activeMemberAuth))
+      .mockReturnValueOnce(refreshFetch.promise);
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AuthProvider>
+        <AuthRefreshProbe />
+        <AuthProbe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("auth-state")).toHaveTextContent("ACTIVE"));
+    await user.click(screen.getByRole("button", { name: "refresh auth" }));
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent("readmates:session-expired", { detail: { cause: "write" } }),
+      );
+    });
+    await act(async () => {
+      refreshFetch.resolve(new Response(null, { status: 401 }));
+      await refreshFetch.promise;
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId("auth-state")).toHaveTextContent(
+      `session_expired:write:${activeMemberAuth.displayName}`,
+    );
+  });
+
+  it("keeps write expiry through failed or anonymous refresh and clears it only after successful reauth", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(authResponse(activeMemberAuth))
+      .mockResolvedValueOnce(new Response(null, { status: 500 }))
+      .mockResolvedValueOnce(authResponse(anonymousAuth))
+      .mockResolvedValueOnce(authResponse({ ...activeMemberAuth, displayName: "다시 로그인" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AuthProvider>
+        <AuthRefreshProbe />
+        <AuthProbe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("auth-state")).toHaveTextContent("ACTIVE"));
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent("readmates:session-expired", { detail: { cause: "write" } }),
+      );
+    });
+    await user.click(screen.getByRole("button", { name: "refresh auth" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-state")).toHaveTextContent(
+        `session_expired:write:${activeMemberAuth.displayName}`,
+      );
+    });
+
+    await user.click(screen.getByRole("button", { name: "refresh auth" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-state")).toHaveTextContent(
+        `session_expired:write:${activeMemberAuth.displayName}`,
+      );
+    });
+
+    await user.click(screen.getByRole("button", { name: "refresh auth" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-state")).toHaveTextContent("ACTIVE");
     });
   });
 

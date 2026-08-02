@@ -16,7 +16,7 @@ import type {
   MyArchiveReviewPage,
   NoteFeedItem,
 } from "@/features/archive/api/archive-contracts";
-import type { ReadmatesApiContext } from "@/shared/api/client";
+import type { ReadmatesApiContext, ReadmatesRequestPolicy } from "@/shared/api/client";
 import type { PageRequest } from "@/shared/model/paging";
 import {
   combineCursorPages,
@@ -96,12 +96,13 @@ export function enrichSessionDetailHighlightAuthors(
 export async function fetchArchiveListQueryData(
   context?: ReadmatesApiContext,
   page: PageRequest = { limit: ARCHIVE_FIRST_PAGE_LIMIT },
+  policy?: ReadmatesRequestPolicy,
 ): Promise<ArchiveListQueryData> {
   const [sessions, questions, reviews, reports] = await Promise.all([
-    fetchArchiveSessions(context, page),
-    fetchMyArchiveQuestions(context, page),
-    fetchMyArchiveReviews(context, page),
-    fetchMyFeedbackDocuments(context, page),
+    fetchArchiveSessions(context, page, policy),
+    fetchMyArchiveQuestions(context, page, policy),
+    fetchMyArchiveReviews(context, page, policy),
+    fetchMyFeedbackDocuments(context, page, policy),
   ]);
 
   return { sessions, questions, reviews, reports };
@@ -110,34 +111,47 @@ export async function fetchArchiveListQueryData(
 export async function fetchMemberArchiveSessionQueryData(
   sessionId: string,
   context?: ReadmatesApiContext,
+  policy?: ReadmatesRequestPolicy,
 ): Promise<MemberArchiveSessionDetailResponse | null> {
-  const session = await fetchMemberArchiveSession(sessionId, context);
+  const session = await fetchMemberArchiveSession(sessionId, context, policy);
 
   if (!session || session.publicHighlights.every((highlight) => highlight.authorName)) {
     return session;
   }
 
   try {
-    const notesFeed = await fetchNotesFeed(session.sessionId, context, { limit: 60 });
+    const notesFeed = await fetchNotesFeed(session.sessionId, context, { limit: 60 }, policy);
     return enrichSessionDetailHighlightAuthors(session, notesFeed.items);
   } catch {
     return session;
   }
 }
 
-export function archiveListQuery(context?: ReadmatesApiContext, page?: PageRequest) {
+export function archiveListQuery(
+  context?: ReadmatesApiContext,
+  page?: PageRequest,
+  policy?: ReadmatesRequestPolicy,
+) {
   const normalized = normalizePageRequest(page);
 
   return queryOptions<ArchiveListQueryData>({
     queryKey: archiveKeys.list(context, page),
-    queryFn: () => fetchArchiveListQueryData(context, pageFromNormalizedPageRequest(normalized) ?? { limit: ARCHIVE_FIRST_PAGE_LIMIT }),
+    queryFn: () => fetchArchiveListQueryData(
+      context,
+      pageFromNormalizedPageRequest(normalized) ?? { limit: ARCHIVE_FIRST_PAGE_LIMIT },
+      policy,
+    ),
   });
 }
 
-export function memberArchiveSessionQuery(sessionId: string, context?: ReadmatesApiContext) {
+export function memberArchiveSessionQuery(
+  sessionId: string,
+  context?: ReadmatesApiContext,
+  policy?: ReadmatesRequestPolicy,
+) {
   return queryOptions<MemberArchiveSessionDetailResponse | null>({
     queryKey: archiveKeys.detail(sessionId, context),
-    queryFn: () => fetchMemberArchiveSessionQueryData(sessionId, context),
+    queryFn: () => fetchMemberArchiveSessionQueryData(sessionId, context, policy),
   });
 }
 

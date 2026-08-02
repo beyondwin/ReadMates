@@ -1,4 +1,9 @@
-import { readmatesFetch, readmatesFetchResponse, type ReadmatesApiContext } from "@/shared/api/client";
+import {
+  readmatesFetch,
+  readmatesFetchResponse,
+  type ReadmatesApiContext,
+  type ReadmatesRequestPolicy,
+} from "@/shared/api/client";
 import { apiErrorFromResponse } from "@/shared/api/errors";
 import type {
   ArchiveSessionPage,
@@ -24,20 +29,56 @@ function jsonRequest(init: Omit<RequestInit, "headers" | "body">, body: unknown)
   };
 }
 
-export async function fetchArchiveSessions(context?: ReadmatesApiContext, page?: PageRequest) {
-  return readmatesFetch<ArchiveSessionPage>(`/api/archive/sessions${pagingSearchParams(page)}`, undefined, context);
+export async function fetchArchiveSessions(
+  context?: ReadmatesApiContext,
+  page?: PageRequest,
+  policy?: ReadmatesRequestPolicy,
+) {
+  return readmatesFetch<ArchiveSessionPage>(
+    `/api/archive/sessions${pagingSearchParams(page)}`,
+    undefined,
+    context,
+    policy,
+  );
 }
 
-export async function fetchMyArchiveQuestions(context?: ReadmatesApiContext, page?: PageRequest) {
-  return readmatesFetch<MyArchiveQuestionPage>(`/api/archive/me/questions${pagingSearchParams(page)}`, undefined, context);
+export async function fetchMyArchiveQuestions(
+  context?: ReadmatesApiContext,
+  page?: PageRequest,
+  policy?: ReadmatesRequestPolicy,
+) {
+  return readmatesFetch<MyArchiveQuestionPage>(
+    `/api/archive/me/questions${pagingSearchParams(page)}`,
+    undefined,
+    context,
+    policy,
+  );
 }
 
-export async function fetchMyArchiveReviews(context?: ReadmatesApiContext, page?: PageRequest) {
-  return readmatesFetch<MyArchiveReviewPage>(`/api/archive/me/reviews${pagingSearchParams(page)}`, undefined, context);
+export async function fetchMyArchiveReviews(
+  context?: ReadmatesApiContext,
+  page?: PageRequest,
+  policy?: ReadmatesRequestPolicy,
+) {
+  return readmatesFetch<MyArchiveReviewPage>(
+    `/api/archive/me/reviews${pagingSearchParams(page)}`,
+    undefined,
+    context,
+    policy,
+  );
 }
 
-export async function fetchMyFeedbackDocuments(context?: ReadmatesApiContext, page?: PageRequest): Promise<FeedbackDocumentListPage> {
-  const response = await readmatesFetchResponse(`/api/feedback-documents/me${pagingSearchParams(page)}`, undefined, context);
+export async function fetchMyFeedbackDocuments(
+  context?: ReadmatesApiContext,
+  page?: PageRequest,
+  policy?: ReadmatesRequestPolicy,
+): Promise<FeedbackDocumentListPage> {
+  const response = await readmatesFetchResponse(
+    `/api/feedback-documents/me${pagingSearchParams(page)}`,
+    undefined,
+    context,
+    policy,
+  );
 
   if (response.status === 403) {
     return { items: [], nextCursor: null };
@@ -50,8 +91,17 @@ export async function fetchMyFeedbackDocuments(context?: ReadmatesApiContext, pa
   return response.json() as Promise<FeedbackDocumentListPage>;
 }
 
-export async function fetchMemberArchiveSession(sessionId: string, context?: ReadmatesApiContext) {
-  const response = await readmatesFetchResponse(`/api/archive/sessions/${encodeURIComponent(sessionId)}`, undefined, context);
+export async function fetchMemberArchiveSession(
+  sessionId: string,
+  context?: ReadmatesApiContext,
+  policy?: ReadmatesRequestPolicy,
+) {
+  const response = await readmatesFetchResponse(
+    `/api/archive/sessions/${encodeURIComponent(sessionId)}`,
+    undefined,
+    context,
+    policy,
+  );
 
   if (response.status === 404) {
     return null;
@@ -81,11 +131,25 @@ export async function updateMyProfile(displayName: string) {
   ) as Promise<Response & { json(): Promise<MemberProfileResponse> }>;
 }
 
-export async function fetchNoteSessions(context?: ReadmatesApiContext, page?: PageRequest) {
-  return readmatesFetch<NoteSessionPage>(`/api/notes/sessions${pagingSearchParams(page)}`, undefined, context);
+export async function fetchNoteSessions(
+  context?: ReadmatesApiContext,
+  page?: PageRequest,
+  policy?: ReadmatesRequestPolicy,
+) {
+  return readmatesFetch<NoteSessionPage>(
+    `/api/notes/sessions${pagingSearchParams(page)}`,
+    undefined,
+    context,
+    policy,
+  );
 }
 
-export async function fetchNotesFeed(sessionId: string, context?: ReadmatesApiContext, page?: PageRequest) {
+export async function fetchNotesFeed(
+  sessionId: string,
+  context?: ReadmatesApiContext,
+  page?: PageRequest,
+  policy?: ReadmatesRequestPolicy,
+) {
   const params = new URLSearchParams({ sessionId });
 
   if (page?.limit !== undefined) {
@@ -95,7 +159,12 @@ export async function fetchNotesFeed(sessionId: string, context?: ReadmatesApiCo
     params.set("cursor", page.cursor);
   }
 
-  return readmatesFetch<NoteFeedPage>(`/api/notes/feed?${params.toString()}`, undefined, context);
+  return readmatesFetch<NoteFeedPage>(
+    `/api/notes/feed?${params.toString()}`,
+    undefined,
+    context,
+    policy,
+  );
 }
 
 export async function leaveMembership(currentSessionPolicy: CurrentSessionPolicy = "APPLY_NOW") {

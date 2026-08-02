@@ -38,8 +38,28 @@ async function expectTapTarget(locator: Locator) {
   expect(box!.height).toBeGreaterThanOrEqual(44);
 }
 
+async function expectWithinViewport(locator: Locator, page: Page) {
+  await expect(locator).toBeVisible();
+  await expect
+    .poll(async () => locator.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return rect.left >= 0 && rect.right <= window.innerWidth + 1;
+    }))
+    .toBe(true);
+  await expectNoHorizontalOverflow(page);
+}
+
+async function expectMobileNavigationClearance(page: Page) {
+  const tabbar = page.locator(".m-tabbar");
+  await expect(tabbar).toBeVisible();
+  const tabbarBox = await tabbar.boundingBox();
+  expect(tabbarBox).not.toBeNull();
+  expect(tabbarBox!.y + tabbarBox!.height).toBeLessThanOrEqual((await page.viewportSize())!.height + 1);
+  for (const tab of await tabbar.locator(".m-tab").all()) await expectTapTarget(tab);
+}
+
 test("anonymous visitors enter from public surfaces and browse guest-readable club records", async ({ page }) => {
-  const protectedRequests: string[] = [];
+  const nonPublicRequests: string[] = [];
   const runtimeErrors: string[] = [];
   const failedResponses: string[] = [];
   page.on("pageerror", (error) => runtimeErrors.push(error.stack ?? error.message));
@@ -48,12 +68,10 @@ test("anonymous visitors enter from public surfaces and browse guest-readable cl
   });
   page.on("request", (request) => {
     const path = new URL(request.url()).pathname;
-    if (
-      path.startsWith("/api/bff/api/host/")
-      || path.startsWith("/api/bff/api/feedback-documents/")
-      || /\/api\/bff\/api\/sessions\/[^/]+\/feedback-document$/.test(path)
-    ) {
-      protectedRequests.push(request.url());
+    if (path.startsWith("/api/bff/api/")) {
+      const allowed = path.startsWith("/api/bff/api/public/")
+        || path === "/api/bff/api/auth/me";
+      if (!allowed) nonPublicRequests.push(request.url());
     }
   });
 
@@ -101,7 +119,7 @@ test("anonymous visitors enter from public surfaces and browse guest-readable cl
 
   await page.goto(`/clubs/sample-book-club/app/sessions/${seededArchiveSessionId}`);
   await expect(page.getByRole("heading", { name: "페이지를 찾을 수 없습니다." })).toBeVisible();
-  expect(protectedRequests).toEqual([]);
+  expect(nonPublicRequests).toEqual([]);
 
   const navBox = await page.locator(".nav-links").boundingBox();
   const accountBox = await page.locator(".topnav-account-actions").boundingBox();
@@ -165,28 +183,56 @@ test("mobile guest lock sheet traps and restores focus without hiding conversion
   }
 });
 
-test("read expiry preserves content and offers exact-route guest continuation", async ({ page }) => {
+test("public entry and every guest reading surface remain responsive at mobile and desktop widths", async ({ page }) => {
+  const surfaces = [
+    { path: clubBase, target: () => page.getByRole("link", { name: "둘러보기", exact: true }).first(), app: false },
+    { path: appBase, target: () => page.getByRole("heading", { name: "함께 읽어 온 장면들" }), app: true },
+    { path: `${appBase}/session/current`, target: () => page.getByRole("heading", { name: "E2E 현재 세션 책" }), app: true },
+    { path: `${appBase}/notes`, target: () => page.getByText("공개된 하이라이트·한줄평·질문을 세션별로 읽어 볼 수 있습니다."), app: true },
+    { path: `${appBase}/archive`, target: () => page.getByRole("heading", { name: "읽어 온 자리" }), app: true },
+    { path: seededArchivePath, target: () => page.getByRole("button", { name: "피드백 보기, 정식 멤버 전용" }), app: true },
+  ];
+
+  for (const width of [320, 390, 1366]) {
+    await page.setViewportSize({ width, height: width < 720 ? 844 : 900 });
+    for (const surface of surfaces) {
+      await page.goto(surface.path);
+      const target = surface.target();
+      await expectWithinViewport(target, page);
+      const tagName = await target.evaluate((element) => element.tagName);
+      if (tagName === "A" || tagName === "BUTTON") {
+        await target.focus();
+        expect(await target.evaluate((element) => getComputedStyle(element).outlineWidth)).not.toBe("0px");
+      }
+      if (surface.app && width < 720) await expectMobileNavigationClearance(page);
+    }
+  }
+});
+
+test("a mounted production read expiry preserves content and offers exact-route guest continuation", async ({ page }) => {
   await loginWithGoogleFixture(page, "member1@example.com");
   const returnPath = `${appBase}/sessions/${seededArchiveSessionId}?view=summary#questions`;
   await page.goto(returnPath);
   await expect(page.getByRole("heading", { name: "요약" })).toBeVisible();
 
+  let expiredMountedReads = 0;
   await page.route(
     new RegExp(`/api/bff/api/archive/sessions/${seededArchiveSessionId}(?:\\?|$)`),
-    (route) => route.fulfill({ status: 401, contentType: "application/json", body: '{"error":"session expired"}' }),
+    (route) => {
+      expiredMountedReads += 1;
+      return route.fulfill({ status: 401, contentType: "application/json", body: '{"error":"session expired"}' });
+    },
   );
-  await page.evaluate(async (sessionId) => {
-    const clientModulePath = "/shared/api/client.ts";
-    const client = await import(/* @vite-ignore */ clientModulePath);
-    try {
-      await client.readmatesFetchResponse(`/api/archive/sessions/${sessionId}`);
-    } catch {
-      // The rejected request is the expiry signal under test.
-    }
-  }, seededArchiveSessionId);
+  await page.evaluate(() => {
+    const now = Date.now();
+    Date.now = () => now + 31_000;
+    window.dispatchEvent(new Event("offline"));
+    window.dispatchEvent(new Event("online"));
+  });
 
   const recovery = page.getByRole("status").filter({ hasText: "로그인 시간이 만료되었습니다" });
   await expect(recovery).toBeVisible();
+  expect(expiredMountedReads).toBeGreaterThan(0);
   await expect(page.getByRole("heading", { name: "요약" })).toBeVisible();
   await expect(recovery.getByRole("link", { name: "재로그인" })).toHaveAttribute(
     "href",
@@ -194,12 +240,38 @@ test("read expiry preserves content and offers exact-route guest continuation", 
   );
   const continueAsGuest = recovery.getByRole("button", { name: "게스트로 계속 보기" });
   await expect(continueAsGuest).toBeVisible();
+  for (const width of [320, 390, 1366]) {
+    await page.setViewportSize({ width, height: width < 720 ? 844 : 900 });
+    await expectWithinViewport(recovery, page);
+    await expectTapTarget(recovery.getByRole("link", { name: "재로그인" }));
+    await expectTapTarget(continueAsGuest);
+    if (width < 720) await expectMobileNavigationClearance(page);
+  }
   await continueAsGuest.click();
 
   await expect(page).toHaveURL(new RegExp(`${seededArchiveSessionId}\\?view=summary#questions$`));
   await expect(page.getByRole("heading", { name: "요약" })).toBeVisible();
   await expect(page.getByText("게스트", { exact: true }).first()).toBeVisible();
   await expect(recovery).toBeHidden();
+});
+
+test("a default protected loader 401 forces login recovery with the exact return target", async ({ page }) => {
+  await loginWithGoogleFixture(page, "member1@example.com");
+  let expiredLoaderReads = 0;
+  await page.route(/\/api\/bff\/api\/archive\/sessions(?:\?|$)/, async (route) => {
+    expiredLoaderReads += 1;
+    await route.fulfill({
+      status: 401,
+      contentType: "application/json",
+      body: '{"error":"session expired"}',
+    });
+  });
+
+  const target = `${appBase}/archive?view=reviews#latest`;
+  await page.goto(target);
+
+  await expect(page).toHaveURL(`/login?returnTo=${encodeURIComponent(target)}`);
+  expect(expiredLoaderReads).toBeGreaterThan(0);
 });
 
 test("write 401 preserves the current-session draft and only offers reauthentication", async ({ page }) => {
@@ -225,6 +297,10 @@ test("write 401 preserves the current-session draft and only offers reauthentica
   await expect(question).toHaveValue("만료 뒤에도 남아야 하는 질문");
   await expect(recovery.getByRole("link", { name: "재로그인" })).toBeVisible();
   await expect(recovery.getByRole("button", { name: "게스트로 계속 보기" })).toHaveCount(0);
-  await expectTapTarget(recovery.getByRole("link", { name: "재로그인" }));
-  await expectNoHorizontalOverflow(page);
+  for (const width of [320, 390, 1366]) {
+    await page.setViewportSize({ width, height: width < 720 ? 844 : 900 });
+    await expectWithinViewport(recovery, page);
+    await expectTapTarget(recovery.getByRole("link", { name: "재로그인" }));
+    if (width < 720) await expectMobileNavigationClearance(page);
+  }
 });

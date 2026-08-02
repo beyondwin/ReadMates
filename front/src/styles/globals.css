@@ -197,7 +197,6 @@
   margin: 16px auto 0;
   padding: 14px 16px;
   border: 1px solid var(--line);
-  border-left: 4px solid var(--accent);
   border-radius: var(--r-2);
   background: var(--bg-sub);
   display: flex;

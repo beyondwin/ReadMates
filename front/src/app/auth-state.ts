@@ -5,7 +5,12 @@ import type { SessionExpiryCause } from "@/shared/auth/session-expiry";
 export type AuthState =
   | { status: "loading" }
   | { status: "ready"; auth: AuthMeResponse }
-  | { status: "session_expired"; lastAuth?: AuthMeResponse; cause?: SessionExpiryCause };
+  | {
+      status: "session_expired";
+      lastAuth?: AuthMeResponse;
+      cause?: SessionExpiryCause;
+      episode?: number;
+    };
 
 export type AuthActions = {
   markLoggedOut: () => void;

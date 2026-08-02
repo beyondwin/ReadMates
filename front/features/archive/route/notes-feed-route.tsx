@@ -4,6 +4,7 @@ import { fetchNotesFeed, fetchNoteSessions } from "@/features/archive/api/archiv
 import type { NotesFeedRouteData } from "@/features/archive/route/notes-feed-data";
 import { feedFilterFromSearchParam, type FeedFilter } from "@/features/archive/model/notes-feed-model";
 import NotesFeedPage from "@/features/archive/ui/notes-feed-page";
+import { RECOVER_READ_SESSION_EXPIRY } from "@/shared/api/client";
 
 const NOTES_SESSIONS_NEXT_PAGE_LIMIT = 30;
 const NOTES_FEED_NEXT_PAGE_LIMIT = 60;
@@ -42,7 +43,11 @@ export function NotesFeedRoute() {
       return;
     }
 
-    const nextPage = await fetchNoteSessions(clubSlug ? { clubSlug } : undefined, { limit: NOTES_SESSIONS_NEXT_PAGE_LIMIT, cursor });
+    const nextPage = await fetchNoteSessions(
+      clubSlug ? { clubSlug } : undefined,
+      { limit: NOTES_SESSIONS_NEXT_PAGE_LIMIT, cursor },
+      RECOVER_READ_SESSION_EXPIRY,
+    );
     setPageState((current) => {
       const currentPages = current.source === data ? current.pages : data;
 
@@ -66,7 +71,12 @@ export function NotesFeedRoute() {
       return;
     }
 
-    const nextPage = await fetchNotesFeed(sessionId, clubSlug ? { clubSlug } : undefined, { limit: NOTES_FEED_NEXT_PAGE_LIMIT, cursor });
+    const nextPage = await fetchNotesFeed(
+      sessionId,
+      clubSlug ? { clubSlug } : undefined,
+      { limit: NOTES_FEED_NEXT_PAGE_LIMIT, cursor },
+      RECOVER_READ_SESSION_EXPIRY,
+    );
     setPageState((current) => {
       const currentPages = current.source === data ? current.pages : data;
 

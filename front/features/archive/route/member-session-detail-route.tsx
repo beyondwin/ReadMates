@@ -9,12 +9,17 @@ import type { MemberSessionDetailRouteData } from "@/features/archive/route/memb
 import MemberSessionDetailPage, {
   MemberSessionDetailUnavailablePage,
 } from "@/features/archive/ui/member-session-detail-page";
+import { RECOVER_READ_SESSION_EXPIRY } from "@/shared/api/client";
 
 export function MemberSessionDetailRoute() {
   const { sessionId } = useLoaderData() as MemberSessionDetailRouteData;
   const { clubSlug } = useParams();
   const sessionQuery = useQuery({
-    ...memberArchiveSessionQuery(sessionId ?? "", { clubSlug }),
+    ...memberArchiveSessionQuery(
+      sessionId ?? "",
+      { clubSlug },
+      RECOVER_READ_SESSION_EXPIRY,
+    ),
     enabled: Boolean(sessionId),
   });
   const session = sessionQuery.data ?? null;

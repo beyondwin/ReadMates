@@ -19,7 +19,7 @@ describe("readmatesFetchResponse", () => {
     expect(normalizedClubSlug(null)).toBe("");
   });
 
-  it("signals read expiry without leaving the current route when the BFF returns 401", async () => {
+  it("redirects to login with the exact return target by default when the BFF returns 401", async () => {
     const assignMock = vi.fn();
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 401 }));
     const causes: string[] = [];
@@ -47,8 +47,10 @@ describe("readmatesFetchResponse", () => {
     const headers = fetchMock.mock.calls[0]?.[1]?.headers;
     expect(headers).toBeInstanceOf(Headers);
     expect((headers as Headers).get("Content-Type")).toBe("application/json");
-    expect(assignMock).not.toHaveBeenCalled();
-    expect(causes).toEqual(["read"]);
+    expect(assignMock).toHaveBeenCalledWith(
+      "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp%2Ffeedback%2Fsession-1%3Ffrom%3Demail",
+    );
+    expect(causes).toEqual([]);
   });
 
   it("preserves FormData uploads by leaving Content-Type unset", async () => {

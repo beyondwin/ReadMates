@@ -57,7 +57,7 @@ describe("host invitation actions", () => {
 
     await expect(listInvitations()).rejects.toThrow(ReadMatesSessionExpiredError);
 
-    expect(assignMock).not.toHaveBeenCalled();
-    expect(causes).toEqual(["read"]);
+    expect(assignMock).toHaveBeenCalledWith("/login");
+    expect(causes).toEqual([]);
   });
 });

@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { logout } from "@/features/auth/api/auth-api";
 import { SessionExpiryRecovery } from "@/features/auth/ui/session-expiry-recovery";
@@ -10,13 +10,15 @@ import { GuestNavigationLink } from "@/features/guest-browse/ui/guest-navigation
 import type { ClubAppAudience } from "@/features/guest-browse/model/club-app-audience";
 import { guestNavigationCapability } from "@/features/guest-browse/model/club-app-audience";
 import {
-  guestArchiveDetailQuery,
-  guestArchiveQuery,
-  guestBrowseShellQuery,
-  guestCurrentSessionQuery,
-  guestNoteFeedQuery,
-  guestNoteSessionsQuery,
-} from "@/features/guest-browse/queries/guest-browse-queries";
+  fetchGuestArchive,
+  fetchGuestArchiveDetail,
+  fetchGuestBrowseShell,
+  fetchGuestCurrentSession,
+  fetchGuestNoteFeed,
+  fetchGuestNoteSessions,
+  fetchGuestUpcomingSessions,
+  type GuestBrowsePage,
+} from "@/features/guest-browse/api/guest-browse-api";
 import { hostCurrentSessionQuery } from "@/features/host/queries/host-session-queries";
 import { useAuth, useAuthActions } from "@/src/app/auth-state";
 import {
@@ -78,38 +80,70 @@ function appClubSlug(pathname: string) {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
-async function verifyGuestReadableRoute(
-  queryClient: QueryClient,
-  clubSlug: string,
+type GuestContinuationTarget = {
+  pathname: string;
+  search: string;
+  hash: string;
+  href: string;
+};
+
+function normalizedGuestContinuationTarget(
   pathname: string,
-) {
-  await queryClient.fetchQuery(guestBrowseShellQuery(clubSlug));
-  const path = appPathname(pathname);
+  search: string,
+  hash: string,
+): GuestContinuationTarget {
+  const url = new URL(`${pathname}${search}${hash}`, "https://readmates.local");
+  return {
+    pathname: url.pathname,
+    search: url.search,
+    hash: url.hash,
+    href: `${url.pathname}${url.search}${url.hash}`,
+  };
+}
+
+function guestPageFromSearch(search: string): GuestBrowsePage | undefined {
+  const params = new URLSearchParams(search);
+  const cursor = params.get("cursor");
+  const rawLimit = params.get("limit");
+  const limit = rawLimit === null ? undefined : Number(rawLimit);
+
+  return cursor || limit !== undefined ? { cursor, limit } : undefined;
+}
+
+async function verifyGuestReadableRoute(clubSlug: string, target: GuestContinuationTarget) {
+  await fetchGuestBrowseShell(clubSlug);
+  const path = appPathname(target.pathname);
+  const page = guestPageFromSearch(target.search);
 
   if (path === "/app") {
+    await Promise.all([
+      fetchGuestCurrentSession(clubSlug),
+      fetchGuestUpcomingSessions(clubSlug, page),
+      fetchGuestNoteFeed(clubSlug, page),
+    ]);
     return;
   }
   if (path === "/app/session/current") {
-    await queryClient.fetchQuery(guestCurrentSessionQuery(clubSlug));
+    await fetchGuestCurrentSession(clubSlug);
     return;
   }
   if (path === "/app/notes") {
+    const sessionId = new URLSearchParams(target.search).get("sessionId");
     await Promise.all([
-      queryClient.fetchQuery(guestNoteSessionsQuery(clubSlug)),
-      queryClient.fetchQuery(guestNoteFeedQuery(clubSlug)),
+      fetchGuestNoteSessions(clubSlug, page),
+      fetchGuestNoteFeed(clubSlug, page),
+      ...(sessionId ? [fetchGuestArchiveDetail(clubSlug, sessionId)] : []),
     ]);
     return;
   }
   if (path === "/app/archive") {
-    await queryClient.fetchQuery(guestArchiveQuery(clubSlug));
+    await fetchGuestArchive(clubSlug, page);
     return;
   }
 
   const detailMatch = /^\/app\/sessions\/([^/]+)$/.exec(path);
   if (detailMatch) {
-    await queryClient.fetchQuery(
-      guestArchiveDetailQuery(clubSlug, decodeURIComponent(detailMatch[1])),
-    );
+    await fetchGuestArchiveDetail(clubSlug, decodeURIComponent(detailMatch[1]));
     return;
   }
 
@@ -205,7 +239,11 @@ export function AppRouteLayout({
   const navigate = useNavigate();
   const pathname = location.pathname;
   const appPath = appPathname(pathname);
-  const returnTo = `${location.pathname}${location.search}${location.hash}`;
+  const guestTarget = useMemo(
+    () => normalizedGuestContinuationTarget(location.pathname, location.search, location.hash),
+    [location.hash, location.pathname, location.search],
+  );
+  const returnTo = guestTarget.href;
   const basePath = appBasePath(pathname);
   const clubSlug = appClubSlug(pathname);
   const auth = clubSlug
@@ -238,7 +276,11 @@ export function AppRouteLayout({
     enabled: activeHostKey !== null,
   });
   const [isRetryingCurrentSession, setIsRetryingCurrentSession] = useState(false);
-  const [verifiedGuestContinuationKey, setVerifiedGuestContinuationKey] = useState<string | null>(null);
+  const [guestVerification, setGuestVerification] = useState<{
+    key: string | null;
+    status: "not-applicable" | "pending" | "available" | "unavailable";
+  }>({ key: null, status: "not-applicable" });
+  const latestGuestContinuationKey = useRef<string | null>(null);
   const currentSessionStatus =
     activeHostKey === null
       ? "ready"
@@ -279,10 +321,25 @@ export function AppRouteLayout({
       && clubSlug
       && guestNavigationCapability(pathname) === "OPEN",
   );
-  const guestContinuationKey = guestReadableExpiry && clubSlug ? `${clubSlug}:${pathname}` : null;
-  const guestContinuationAvailable = Boolean(
-    guestContinuationKey && verifiedGuestContinuationKey === guestContinuationKey,
-  );
+  const guestContinuationKey =
+    guestReadableExpiry && clubSlug && sessionExpiry?.episode
+      ? JSON.stringify({
+          episode: sessionExpiry.episode,
+          clubSlug,
+          target: guestTarget.href,
+          resource: appPath,
+        })
+      : null;
+  const guestContinuationStatus = !guestContinuationKey
+    ? "not-applicable"
+    : guestVerification.key === guestContinuationKey
+      ? guestVerification.status
+      : "pending";
+  const guestContinuationAvailable = guestContinuationStatus === "available";
+
+  useEffect(() => {
+    latestGuestContinuationKey.current = guestContinuationKey;
+  }, [guestContinuationKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -293,13 +350,15 @@ export function AppRouteLayout({
       };
     }
 
-    void verifyGuestReadableRoute(queryClient, clubSlug, pathname).then(
+    void verifyGuestReadableRoute(clubSlug, guestTarget).then(
       () => {
-        if (!cancelled) setVerifiedGuestContinuationKey(guestContinuationKey);
+        if (!cancelled && latestGuestContinuationKey.current === guestContinuationKey) {
+          setGuestVerification({ key: guestContinuationKey, status: "available" });
+        }
       },
       () => {
-        if (!cancelled) {
-          setVerifiedGuestContinuationKey((current) => current === guestContinuationKey ? null : current);
+        if (!cancelled && latestGuestContinuationKey.current === guestContinuationKey) {
+          setGuestVerification({ key: guestContinuationKey, status: "unavailable" });
         }
       },
     );
@@ -307,9 +366,26 @@ export function AppRouteLayout({
     return () => {
       cancelled = true;
     };
-  }, [clubSlug, guestContinuationKey, pathname, queryClient]);
+  }, [clubSlug, guestContinuationKey, guestTarget]);
 
   const continueAsGuest = async () => {
+    const continuationKey = guestContinuationKey;
+    if (!continuationKey || !clubSlug || guestContinuationStatus !== "available") {
+      throw new Error("Guest continuation is no longer available.");
+    }
+
+    try {
+      await verifyGuestReadableRoute(clubSlug, guestTarget);
+    } catch (error) {
+      if (latestGuestContinuationKey.current === continuationKey) {
+        setGuestVerification({ key: continuationKey, status: "unavailable" });
+      }
+      throw error;
+    }
+    if (latestGuestContinuationKey.current !== continuationKey) {
+      throw new Error("Guest continuation route changed during verification.");
+    }
+
     const response = await logout();
     if (!response.ok && response.status !== 401) {
       throw new Error(`Guest continuation logout failed: ${response.status}`);
@@ -375,6 +451,7 @@ export function AppRouteLayout({
           <SessionExpiryRecovery
             cause={sessionExpiry.cause}
             loginHref={loginPathForReturnTo(returnTo)}
+            guestContinuationStatus={guestContinuationStatus}
             canContinueAsGuest={guestContinuationAvailable}
             onContinueAsGuest={continueAsGuest}
           />

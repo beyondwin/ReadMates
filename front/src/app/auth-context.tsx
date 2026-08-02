@@ -25,6 +25,7 @@ async function fetchAuthMeOutcome(): Promise<FetchAuthMeOutcome> {
 export function AuthProvider({ children }: PropsWithChildren) {
   const [state, setState] = useState<AuthState>({ status: "loading" });
   const latestAuthRequestId = useRef(0);
+  const latestExpiryEpisode = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,7 +37,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         if (outcome.kind === "ok") {
           setState({ status: "ready", auth: outcome.auth });
         } else if (outcome.kind === "expired") {
-          setState({ status: "session_expired" });
+          setState({ status: "ready", auth: anonymousAuth });
         } else {
           setState({ status: "ready", auth: anonymousAuth });
         }
@@ -55,8 +56,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
         return;
       }
 
+      latestAuthRequestId.current += 1;
+      latestExpiryEpisode.current += 1;
+      const episode = latestExpiryEpisode.current;
       setState((previous) => ({
         status: "session_expired",
+        episode,
         cause:
           previous.status === "session_expired" && previous.cause === "write"
             ? "write"
@@ -86,14 +91,34 @@ export function AuthProvider({ children }: PropsWithChildren) {
     const outcome = await fetchAuthMeOutcome();
     if (latestAuthRequestId.current === requestId) {
       if (outcome.kind === "ok") {
-        setState({ status: "ready", auth: outcome.auth });
+        setState((prev) =>
+          prev.status === "session_expired"
+          && prev.cause === "write"
+          && !outcome.auth.authenticated
+            ? prev
+            : { status: "ready", auth: outcome.auth },
+        );
       } else if (outcome.kind === "expired") {
+        latestExpiryEpisode.current += 1;
+        const episode = latestExpiryEpisode.current;
         setState((prev) => ({
-          status: "session_expired",
-          lastAuth: prev.status === "ready" ? prev.auth : undefined,
+          ...(prev.status === "session_expired"
+            ? prev
+            : prev.status === "ready" && prev.auth.authenticated
+              ? {
+                  status: "session_expired" as const,
+                  cause: "read" as const,
+                  episode,
+                  lastAuth: prev.auth,
+                }
+              : { status: "ready" as const, auth: anonymousAuth }),
         }));
       } else {
-        setState({ status: "ready", auth: anonymousAuth });
+        setState((prev) =>
+          prev.status === "session_expired"
+            ? prev
+            : { status: "ready", auth: anonymousAuth },
+        );
       }
     }
   }, []);
