@@ -13,11 +13,14 @@ describe("AvatarPicker", () => {
 
     const choices = screen.getAllByRole("button", { name: /선택$/ });
     expect(choices).toHaveLength(30);
-    expect(screen.getByRole("button", { name: "초록 책을 읽는 바나나 선택" }))
-      .toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", {
+      name: "한 장 더 읽는 바나나, 초록 책을 읽는 바나나 선택",
+    })).toHaveAttribute("aria-pressed", "true");
     expect(container.querySelectorAll(".rm-avatar-picker__check")).toHaveLength(1);
 
-    await user.click(screen.getByRole("button", { name: "초록 책을 읽는 구름 선택" }));
+    await user.click(screen.getByRole("button", {
+      name: "문장 사이의 구름, 초록 책을 읽는 구름 선택",
+    }));
     expect(onChange).toHaveBeenCalledWith("cloud-green-book");
   });
 

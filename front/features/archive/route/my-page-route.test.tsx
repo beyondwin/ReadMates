@@ -173,7 +173,7 @@ describe("MyPageRoute", () => {
     await user.click(screen.getByRole("button", { name: "아바타 선택" }));
     const dialog = screen.getByRole("dialog", { name: "아바타 선택" });
     await user.click(within(dialog).getByRole("button", {
-      name: "초록 책을 읽는 바나나 선택",
+      name: "한 장 더 읽는 바나나, 초록 책을 읽는 바나나 선택",
     }));
     expect(mutations.profile).not.toHaveBeenCalled();
     await user.click(within(dialog).getByRole("button", { name: "프로필로 돌아가기" }));

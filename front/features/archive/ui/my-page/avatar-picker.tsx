@@ -11,14 +11,14 @@ export type AvatarPickerProps = {
 export function AvatarPicker({ value, onChange, disabled, errorId }: AvatarPickerProps) {
   return (
     <div className="rm-avatar-picker__grid" role="group" aria-label="아바타 목록" aria-describedby={errorId}>
-      {BOOK_CLUB_AVATARS.map(({ key, label }) => {
+      {BOOK_CLUB_AVATARS.map(({ key, label, description }) => {
         const selected = key === value;
         return (
           <button
             key={key}
             type="button"
             className="rm-avatar-picker__tile"
-            aria-label={`${label} 선택`}
+            aria-label={`${label}, ${description} 선택`}
             aria-pressed={selected}
             aria-describedby={errorId}
             disabled={disabled}

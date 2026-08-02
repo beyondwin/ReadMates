@@ -13,7 +13,7 @@ for (const viewport of [{ width: 320, height: 700 }, { width: 390, height: 844 }
     );
     const avatarButtons = component.getByRole("button", { name: /선택$/ });
     await expect(avatarButtons).toHaveCount(30);
-    const selected = component.getByRole("button", { name: "초록 책을 읽는 바나나 선택" });
+    const selected = component.getByRole("button", { name: "한 장 더 읽는 바나나, 초록 책을 읽는 바나나 선택" });
     await expect(selected.locator(".rm-avatar-picker__check")).toHaveCount(1);
     await selected.focus();
     expect(await selected.evaluate((element) => getComputedStyle(element, "::after").borderTopWidth)).toBe("2px");

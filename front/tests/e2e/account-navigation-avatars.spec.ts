@@ -435,7 +435,7 @@ test("My Space avatar save refreshes the account identity and persists at mobile
       fullPage: true,
     });
     await expectVisibleLocalArtwork(page, imageEvidence);
-    await picker.getByRole("button", { name: "초록 책을 읽는 찻잔 선택" }).click();
+    await picker.getByRole("button", { name: "책 곁에 머문 찻잔, 초록 책을 읽는 찻잔 선택" }).click();
 
     await expect(account.locator("img")).toHaveAttribute(
       "src",
