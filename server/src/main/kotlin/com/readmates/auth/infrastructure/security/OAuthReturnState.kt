@@ -17,6 +17,7 @@ import java.util.Locale
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
+@Suppress("TooManyFunctions")
 @Component
 class OAuthReturnState(
     @Value("\${readmates.auth.return-state-secret}")
@@ -28,7 +29,7 @@ class OAuthReturnState(
     @Value("\${readmates.auth.session-cookie-domain:}")
     sessionCookieDomain: String,
     private val trustedReturnHostPort: TrustedReturnHostPort,
-) {
+) : OAuthReturnStateContract {
     private val normalizedSecret =
         secret.trim().also {
             require(it.isNotEmpty()) {
@@ -48,7 +49,7 @@ class OAuthReturnState(
     private val decoder = Base64.getUrlDecoder()
     private val signingKey = SecretKeySpec(normalizedSecret.toByteArray(Charsets.UTF_8), HMAC_ALGORITHM)
 
-    fun signReturnTarget(returnTo: String?): String? = signReturnTarget(returnTo, Instant.now().plus(ttl))
+    override fun signReturnTarget(returnTo: String?): String? = signReturnTarget(returnTo, Instant.now().plus(ttl))
 
     fun signReturnTarget(
         returnTo: String?,
@@ -86,7 +87,7 @@ class OAuthReturnState(
         inviteToken: String,
     ): String = "/clubs/$clubSlug/invite/$inviteToken"
 
-    fun scopedAppClubSlugFromState(signedState: String?): String? =
+    override fun scopedAppClubSlugFromState(signedState: String?): String? =
         verifiedReturnTarget(signedState)
             ?.takeIf { it.startsWith("/") }
             ?.let(::rawScopedAppClubSlug)
@@ -343,6 +344,12 @@ class OAuthReturnState(
         private val CLUB_INVITE_PATH = Regex("^/clubs/([^/]+)/invite/([^/]+)$")
         private val LEGACY_INVITE_PATH = Regex("^/invite/([^/]+)$")
     }
+}
+
+interface OAuthReturnStateContract {
+    fun signReturnTarget(returnTo: String?): String?
+
+    fun scopedAppClubSlugFromState(signedState: String?): String?
 }
 
 private fun rawScopedAppClubSlug(returnTarget: String): String? {

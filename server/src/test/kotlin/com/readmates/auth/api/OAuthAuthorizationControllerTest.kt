@@ -1,6 +1,6 @@
 package com.readmates.auth.api
 
-import com.readmates.auth.infrastructure.security.OAuthInviteTokenSession
+import com.readmates.auth.infrastructure.security.OAuthFlowContextRepository
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
@@ -11,9 +11,18 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.HttpHeaders
+import org.springframework.http.MediaType
+import org.springframework.mock.web.MockHttpServletRequest
+import org.springframework.mock.web.MockHttpServletResponse
+import org.springframework.mock.web.MockHttpSession
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders
 import org.springframework.web.util.UriComponentsBuilder
+import tools.jackson.databind.ObjectMapper
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
 
 @SpringBootTest(
     properties = [
@@ -28,6 +37,8 @@ import org.springframework.web.util.UriComponentsBuilder
 @Tag("integration")
 class OAuthAuthorizationControllerTest(
     @param:Autowired private val mockMvc: MockMvc,
+    @param:Autowired private val flowRepository: OAuthFlowContextRepository,
+    @param:Autowired private val objectMapper: ObjectMapper,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `google authorization endpoint redirects to provider when client registration is configured`() {
@@ -111,7 +122,7 @@ class OAuthAuthorizationControllerTest(
     }
 
     @Test
-    fun `google authorization captures invite token before provider redirect`() {
+    fun `google authorization captures invite token in the exact oauth state context`() {
         val result =
             mockMvc
                 .get("/oauth2/authorization/google") {
@@ -120,11 +131,81 @@ class OAuthAuthorizationControllerTest(
                     status { is3xxRedirection() }
                 }.andReturn()
 
+        val state = oauthState(result.response.getHeader(HttpHeaders.LOCATION)!!)
+        val session = result.request.getSession(false) as MockHttpSession
+        val callback = callback(session, state)
+        flowRepository.removeAuthorizationRequest(callback, MockHttpServletResponse())
         assertEquals(
             "inviteCaptureToken00000000000000000000000000",
-            result.request.getSession(false)!!.getAttribute(
-                OAuthInviteTokenSession.INVITE_TOKEN_SESSION_ATTRIBUTE,
-            ),
+            OAuthFlowContextRepository.consumedContext(callback)?.inviteToken,
         )
     }
+
+    @Test
+    fun `join intent requires same session POST and binds to the provider state`() {
+        val issued =
+            mockMvc
+                .post("/api/auth/oauth/join-intent") {
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"clubSlug":"reading-sai","returnTo":"/clubs/reading-sai/app"}"""
+                }.andExpect { status { isOk() } }
+                .andReturn()
+        val session = issued.request.getSession(false) as MockHttpSession
+        val intent = objectMapper.readTree(issued.response.contentAsString).get("intent").asText()
+        val started =
+            mockMvc
+                .perform(
+                    MockMvcRequestBuilders
+                        .get("/oauth2/authorization/google")
+                        .session(session)
+                        .param("returnTo", "/clubs/reading-sai/app")
+                        .param("joinClub", "reading-sai")
+                        .param("joinIntent", intent),
+                ).andExpect(
+                    org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .status()
+                        .is3xxRedirection,
+                ).andReturn()
+        val callback = callback(session, oauthState(started.response.getHeader(HttpHeaders.LOCATION)!!))
+        flowRepository.removeAuthorizationRequest(callback, MockHttpServletResponse())
+
+        assertEquals("reading-sai", OAuthFlowContextRepository.consumedContext(callback)?.joinClubSlug)
+    }
+
+    @Test
+    fun `crafted top level join GET without intent cannot bind membership creation`() {
+        val started =
+            mockMvc
+                .get("/oauth2/authorization/google") {
+                    param("returnTo", "/clubs/reading-sai/app")
+                    param("joinClub", "reading-sai")
+                }.andExpect { status { is3xxRedirection() } }
+                .andReturn()
+        val callback =
+            callback(
+                started.request.getSession(false) as MockHttpSession,
+                oauthState(started.response.getHeader(HttpHeaders.LOCATION)!!),
+            )
+        flowRepository.removeAuthorizationRequest(callback, MockHttpServletResponse())
+
+        assertNull(OAuthFlowContextRepository.consumedContext(callback)?.joinClubSlug)
+    }
+
+    private fun callback(
+        session: MockHttpSession,
+        state: String,
+    ) = MockHttpServletRequest("GET", "/login/oauth2/code/google").apply {
+        setSession(session)
+        setParameter("state", state)
+    }
+
+    private fun oauthState(location: String): String =
+        URLDecoder.decode(
+            UriComponentsBuilder
+                .fromUriString(location)
+                .build()
+                .queryParams
+                .getFirst("state")!!,
+            StandardCharsets.UTF_8,
+        )
 }

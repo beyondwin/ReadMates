@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.inOrder
@@ -177,7 +178,7 @@ class GoogleLoginServiceTest(
     }
 
     @Test
-    fun `target viewer creation keeps membership display names unique`() {
+    fun `target viewer creation keeps neutral membership display names unique`() {
         insertTargetMember("display.owner@example.com", "google-display-owner", "VIEWER", "Same Name")
 
         val result =
@@ -190,19 +191,22 @@ class GoogleLoginServiceTest(
             )
 
         assertEquals(MembershipStatus.VIEWER, result.currentMember?.membershipStatus)
-        assertEquals(
-            2,
-            jdbcTemplate.queryForObject(
-                """
-                select count(distinct memberships.short_name)
-                from memberships
-                join clubs on clubs.id = memberships.club_id
-                where clubs.slug = 'sample-book-club'
-                  and memberships.short_name like 'Same Name%'
-                """.trimIndent(),
-                Int::class.java,
-            ),
-        )
+        val displayNames =
+            jdbcTemplate
+                .queryForList(
+                    """
+                    select memberships.short_name
+                    from memberships
+                    join clubs on clubs.id = memberships.club_id
+                    join users on users.id = memberships.user_id
+                    where clubs.slug = 'sample-book-club'
+                      and users.email in ('display.owner@example.com', 'display.joiner@example.com')
+                    """.trimIndent(),
+                    String::class.java,
+                ).filterNotNull()
+        assertEquals(2, displayNames.distinct().size)
+        assertTrue(displayNames.contains("Same Name"))
+        assertTrue(displayNames.any { it.startsWith("둘러보기-") })
     }
 
     @Test

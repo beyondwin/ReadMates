@@ -75,7 +75,7 @@ class JdbcMemberAccountAdapter(
     }
 
     companion object {
-        private const val DISPLAY_NAME_COLLISION_PREFIX_LENGTH = 13
+        private const val VIEWER_ALIAS_SUFFIX_LENGTH = 8
 
         @JvmField
         internal val DEV_SEED_EMAILS: Set<String> =
@@ -436,13 +436,7 @@ class JdbcMemberAccountAdapter(
         val clubId = findActivePublicClubIdBySlug(clubSlug)
         if (user == null || clubId == null) return null
 
-        val accountName =
-            jdbcTemplate.queryForObject(
-                "select name from users where id = ?",
-                String::class.java,
-                userId.dbString(),
-            ) ?: user.email.substringBefore('@')
-        val displayName = defaultDisplayNameFor(accountName)
+        val displayName = neutralViewerDisplayName()
         val inserted =
             try {
                 insertViewerMembership(userId, clubSlug, displayName, avatarKey)
@@ -450,7 +444,7 @@ class JdbcMemberAccountAdapter(
                 if (findMembershipStatusByUserIdAndClubId(userId, clubId) != null) {
                     throw MembershipDuplicateException(exception)
                 }
-                val collisionSafeName = "${displayName.take(DISPLAY_NAME_COLLISION_PREFIX_LENGTH)}-$userId"
+                val collisionSafeName = neutralViewerDisplayName()
                 try {
                     insertViewerMembership(userId, clubSlug, collisionSafeName, avatarKey)
                 } catch (retryException: DuplicateKeyException) {
@@ -480,6 +474,11 @@ class JdbcMemberAccountAdapter(
             avatarKey.wireValue,
             clubSlug,
         )
+
+    private fun neutralViewerDisplayName(): String {
+        val suffix = UUID.randomUUID().toString().take(VIEWER_ALIAS_SUFFIX_LENGTH)
+        return "둘러보기-$suffix"
+    }
 
     override fun findMemberByUserIdIncludingViewer(userId: UUID): CurrentMember? =
         jdbcTemplate

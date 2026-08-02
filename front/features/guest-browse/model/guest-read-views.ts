@@ -146,10 +146,11 @@ export type GuestNotesReadView = {
 };
 type GuestNoteFeedInput = Omit<GuestNoteFeedItemReadView, "kind"> & { kind: string };
 
-type GuestCurrentSessionInput = { currentSession: Omit<GuestSessionReadView, "capabilities" | "board"> & { board: { questions: GuestQuestionReadView[]; longReviews: GuestLongReviewReadView[] } } };
+type GuestCurrentSessionInput = { currentSession: (Omit<GuestSessionReadView, "capabilities" | "board"> & { board: { questions: GuestQuestionReadView[]; longReviews: GuestLongReviewReadView[] } }) | null };
 
-export function guestSessionReadView(response: GuestCurrentSessionInput): { currentSession: GuestSessionReadView } {
+export function guestSessionReadView(response: GuestCurrentSessionInput): { currentSession: GuestSessionReadView | null } {
   const session = response.currentSession;
+  if (!session) return { currentSession: null };
   return {
     currentSession: {
       sessionId: session.sessionId,

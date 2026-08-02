@@ -117,7 +117,7 @@ describe("PublicClub", () => {
     expect(screen.getByRole("link", { name: "둘러보기" })).toHaveAttribute("href", "/clubs/reading-sai/app");
     expect(screen.getByRole("link", { name: "멤버로 시작" })).toHaveAttribute(
       "href",
-      "/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp&joinClub=reading-sai",
+      "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp",
     );
     expect(screen.getByRole("link", { name: "공개 기록 전체 보기" })).toHaveAttribute("href", "/records");
     expect(screen.queryByText("멤버십")).not.toBeInTheDocument();
@@ -161,7 +161,7 @@ describe("PublicClub", () => {
     expect(screen.getByRole("link", { name: "둘러보기" })).toHaveAttribute("href", "/clubs/reading-sai/app");
     expect(screen.getByRole("link", { name: "멤버로 시작" })).toHaveAttribute(
       "href",
-      "/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp&joinClub=reading-sai",
+      "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp",
     );
   });
 

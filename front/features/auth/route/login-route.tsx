@@ -84,6 +84,9 @@ export function LoginRouteContent() {
       copyStatus={copyStatus}
       onCopyLoginUrl={isKakaoBrowser ? copyLoginUrl : undefined}
       onDevLogin={loginAsDevAccount}
+      joinClub={joinClub ?? undefined}
+      joinReturnTo={joinClub ? returnTo ?? undefined : undefined}
+      chooseAccount={recovery.chooseAccount}
     />
   );
 }

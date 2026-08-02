@@ -38,11 +38,11 @@ class ReadmatesOAuthSuccessHandler(
         authentication: Authentication,
     ) {
         val oidcUser = authentication.principal as OidcUser
-        val inviteToken = capturedInviteToken(request)
-        val signedReturnState = capturedReturnState(request)
-        val capturedTargetClubSlug = capturedGuestJoinClub(request)
+        val context = capturedFlowContext(request)
+        val inviteToken = context.inviteToken
+        val signedReturnState = context.signedReturnState
         val targetClubSlug =
-            capturedTargetClubSlug?.takeIf {
+            context.joinClubSlug?.takeIf {
                 it == oauthReturnState.scopedAppClubSlugFromState(signedReturnState)
             }
         try {
@@ -100,9 +100,7 @@ class ReadmatesOAuthSuccessHandler(
         response: HttpServletResponse,
         exception: AuthenticationException,
     ) {
-        val signedReturnState = capturedReturnState(request)
-        capturedGuestJoinClub(request)
-        capturedInviteToken(request)
+        val signedReturnState = capturedFlowContext(request).signedReturnState
         redirectToLoginError(
             request,
             response,
@@ -181,6 +179,20 @@ class ReadmatesOAuthSuccessHandler(
             )
         session.removeAttribute(OAuthGuestJoinSession.CLUB_SLUG_ATTRIBUTE)
         return clubSlug
+    }
+
+    private fun capturedFlowContext(request: HttpServletRequest): OAuthFlowContext {
+        val consumed = OAuthFlowContextRepository.consumedContext(request)
+        return when {
+            consumed != null -> consumed
+            request.getParameter("state") != null -> OAuthFlowContext(null, null, null)
+            else ->
+                OAuthFlowContext(
+                    signedReturnState = capturedReturnState(request),
+                    inviteToken = capturedInviteToken(request),
+                    joinClubSlug = capturedGuestJoinClub(request),
+                )
+        }
     }
 
     private fun clearServletAuthenticationState(request: HttpServletRequest) {

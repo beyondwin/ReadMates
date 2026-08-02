@@ -162,6 +162,22 @@ class GoogleOAuthLoginSessionTest(
             listOf("sample-book-club:VIEWER"),
             membershipStates("oauth.guest.join.target@example.com"),
         )
+        val names =
+            jdbcTemplate.queryForMap(
+                """
+                select users.id as user_id, users.name as account_name, memberships.short_name as membership_name
+                from users
+                join memberships on memberships.user_id = users.id
+                join clubs on clubs.id = memberships.club_id
+                where users.email = ? and clubs.slug = ?
+                """.trimIndent(),
+                "oauth.guest.join.target@example.com",
+                "sample-book-club",
+            )
+        assertEquals("Guest Target", names["account_name"])
+        assertTrue(names["membership_name"] != names["account_name"])
+        assertTrue(names["membership_name"].toString().startsWith("둘러보기-"))
+        assertTrue(!names["membership_name"].toString().contains(names["user_id"].toString().take(8)))
         assertTrue(servletSession.isInvalid)
     }
 

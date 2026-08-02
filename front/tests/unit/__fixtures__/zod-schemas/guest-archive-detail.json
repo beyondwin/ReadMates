@@ -1,0 +1,49 @@
+{
+  "sessionId": "00000000-0000-0000-0000-000000000301",
+  "sessionNumber": 1,
+  "title": "1회차 · 팩트풀니스",
+  "bookTitle": "팩트풀니스",
+  "bookAuthor": "한스 로슬링",
+  "bookImageUrl": null,
+  "date": "2025-11-26",
+  "attendance": 1,
+  "total": 1,
+  "state": "PUBLISHED",
+  "summary": "공개 요약",
+  "highlights": [
+    {
+      "text": "공개 하이라이트",
+      "sortOrder": 1,
+      "authorName": null,
+      "authorShortName": null,
+      "avatarKey": null
+    }
+  ],
+  "questions": [
+    {
+      "priority": 1,
+      "text": "공개 질문",
+      "draftThought": null,
+      "authorName": "가람",
+      "authorShortName": "가람",
+      "avatarKey": "open-book"
+    }
+  ],
+  "oneLiners": [
+    {
+      "text": "공개 한줄평",
+      "authorName": "가람",
+      "authorShortName": "가람",
+      "avatarKey": "open-book"
+    }
+  ],
+  "longReviews": [
+    {
+      "title": "가람의 서평",
+      "content": "공개 서평",
+      "authorName": "가람",
+      "authorShortName": "가람",
+      "avatarKey": "open-book"
+    }
+  ]
+}

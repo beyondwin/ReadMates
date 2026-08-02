@@ -9,6 +9,7 @@ import {
 const clubSlug = "reading-sai";
 const clubBase = `/clubs/${clubSlug}`;
 const appBase = `${clubBase}/app`;
+const emptyClubAppBase = "/clubs/sample-book-club/app";
 const seededArchiveSessionId = "00000000-0000-0000-0000-000000000301";
 const seededArchivePath = `${appBase}/sessions/${seededArchiveSessionId}`;
 
@@ -85,7 +86,7 @@ test("anonymous visitors enter from public surfaces and browse guest-readable cl
   await expect(page.getByRole("link", { name: "둘러보기", exact: true }).first()).toHaveAttribute("href", appBase);
   await expect(page.getByRole("link", { name: "멤버로 시작", exact: true }).first()).toHaveAttribute(
     "href",
-    new RegExp(`^/oauth2/authorization/google\\?.*joinClub=${clubSlug}`),
+    `/login?returnTo=${encodeURIComponent(appBase)}`,
   );
 
   await page.getByRole("link", { name: "둘러보기", exact: true }).first().click();
@@ -132,6 +133,44 @@ test("anonymous visitors enter from public surfaces and browse guest-readable cl
   expect(accountBox).not.toBeNull();
   expect(navBox!.x + navBox!.width).toBeLessThanOrEqual(accountBox!.x);
   await expectNoHorizontalOverflow(page);
+});
+
+test("public club without an open guest session renders the normal empty state", async ({ page }) => {
+  await page.goto(`${emptyClubAppBase}/session/current`);
+
+  await expect(page.getByRole("heading", { name: "현재 공개된 세션이 없습니다" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "클럽 둘러보기" })).toHaveAttribute("href", emptyClubAppBase);
+  await expect(page.getByText("페이지를 불러오지 못했습니다")).toHaveCount(0);
+});
+
+test("authenticated users keep public browse and explicit target join actions", async ({ page }) => {
+  await loginWithGoogleFixture(page, "member1@example.com");
+  let issuedIntentRequests = 0;
+  let oauthStartUrl = "";
+  await page.route("**/api/bff/api/auth/oauth/join-intent", async (route) => {
+    issuedIntentRequests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ intent: "browser-issued-intent-000000000000000", expiresAt: "2026-08-02T02:00:00Z" }),
+    });
+  });
+  await page.route("**/oauth2/authorization/google**", async (route) => {
+    oauthStartUrl = route.request().url();
+    await route.fulfill({ status: 204 });
+  });
+
+  for (const path of ["/clubs/sample-book-club", `${clubBase}/about`, `${clubBase}/records`, `${clubBase}/sessions/${seededArchiveSessionId}`]) {
+    await page.goto(path);
+    await expect(page.getByRole("link", { name: "둘러보기", exact: true }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: "멤버로 시작", exact: true }).first()).toBeVisible();
+  }
+
+  await page.goto("/clubs/sample-book-club");
+  await page.getByRole("link", { name: "멤버로 시작", exact: true }).first().click();
+  await expect.poll(() => issuedIntentRequests).toBe(1);
+  await expect.poll(() => oauthStartUrl).toContain("joinClub=sample-book-club");
+  expect(oauthStartUrl).toContain("joinIntent=browser-issued-intent-000000000000000");
 });
 
 test("mobile guest lock sheet traps and restores focus without hiding conversion controls", async ({ page }) => {

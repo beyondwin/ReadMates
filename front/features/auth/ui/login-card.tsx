@@ -1,5 +1,6 @@
 
 import { useState } from "react";
+import { MemberStartLink } from "@/shared/ui/member-start-link";
 
 export type DevAccount = {
   label: string;
@@ -19,6 +20,9 @@ export function LoginCard({
   copyStatus = null,
   onCopyLoginUrl,
   onDevLogin,
+  joinClub,
+  joinReturnTo,
+  chooseAccount = false,
 }: {
   devAccounts?: DevAccount[];
   browseHref?: string;
@@ -31,6 +35,9 @@ export function LoginCard({
   copyStatus?: string | null;
   onCopyLoginUrl?: () => Promise<void>;
   onDevLogin?: (email: string, defaultRedirectPath?: string) => Promise<void>;
+  joinClub?: string;
+  joinReturnTo?: string;
+  chooseAccount?: boolean;
 }) {
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(initialError);
@@ -87,9 +94,11 @@ export function LoginCard({
                 둘러보기
               </a>
             ) : null}
-            <a className="btn btn-ghost btn-lg" href={googleLoginHref}>
-              {googleLoginLabel}
-            </a>
+            {joinClub && joinReturnTo ? (
+              <MemberStartLink className="btn btn-ghost btn-lg" returnTo={joinReturnTo} clubSlug={joinClub} chooseAccount={chooseAccount}>
+                {googleLoginLabel}
+              </MemberStartLink>
+            ) : <a className="btn btn-ghost btn-lg" href={googleLoginHref}>{googleLoginLabel}</a>}
           </div>
           {copyStatus ? (
             <p className="small auth-browser-guidance__status" role="status" aria-live="polite">
@@ -104,9 +113,11 @@ export function LoginCard({
               둘러보기
             </a>
           ) : null}
-          <a className={browseHref ? "btn btn-ghost btn-lg" : "btn btn-primary btn-lg"} href={googleLoginHref}>
-            {googleLoginLabel}
-          </a>
+          {joinClub && joinReturnTo ? (
+            <MemberStartLink className={browseHref ? "btn btn-ghost btn-lg" : "btn btn-primary btn-lg"} returnTo={joinReturnTo} clubSlug={joinClub} chooseAccount={chooseAccount}>
+              {googleLoginLabel}
+            </MemberStartLink>
+          ) : <a className={browseHref ? "btn btn-ghost btn-lg" : "btn btn-primary btn-lg"} href={googleLoginHref}>{googleLoginLabel}</a>}
         </div>
       )}
       {showDevLogin ? (

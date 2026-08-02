@@ -38,7 +38,7 @@ data class GuestBrowseNavigationResponse(
 )
 
 data class GuestCurrentSessionResponse(
-    val currentSession: GuestCurrentSession,
+    val currentSession: GuestCurrentSession?,
 )
 
 data class GuestCurrentSession(

@@ -1,33 +1,29 @@
 import { useEffect } from "react";
 import type { ClubAppAudience } from "@/features/guest-browse/model/club-app-audience";
 
-const guestRobotsSelector = 'meta[name="robots"][data-readmates-guest-app="true"]';
-let guestMetaConsumers = 0;
-let guestMeta: HTMLMetaElement | null = null;
+const clubAppRobotsSelector = 'meta[name="robots"][data-readmates-club-app="true"]';
+let clubAppMetaConsumers = 0;
+let clubAppMeta: HTMLMetaElement | null = null;
 
 export function GuestAppHead({ audience }: { audience: ClubAppAudience }) {
   useEffect(() => {
-    if (audience !== "GUEST") {
-      return;
-    }
-
-    guestMetaConsumers += 1;
-    if (!guestMeta) {
-      const existing = document.head.querySelector<HTMLMetaElement>(guestRobotsSelector);
-      guestMeta = existing ?? document.createElement("meta");
-      guestMeta.name = "robots";
-      guestMeta.content = "noindex";
-      guestMeta.dataset.readmatesGuestApp = "true";
+    clubAppMetaConsumers += 1;
+    if (!clubAppMeta) {
+      const existing = document.head.querySelector<HTMLMetaElement>(clubAppRobotsSelector);
+      clubAppMeta = existing ?? document.createElement("meta");
+      clubAppMeta.name = "robots";
+      clubAppMeta.content = "noindex";
+      clubAppMeta.dataset.readmatesClubApp = "true";
       if (!existing) {
-        document.head.append(guestMeta);
+        document.head.append(clubAppMeta);
       }
     }
 
     return () => {
-      guestMetaConsumers -= 1;
-      if (guestMetaConsumers === 0) {
-        guestMeta?.remove();
-        guestMeta = null;
+      clubAppMetaConsumers -= 1;
+      if (clubAppMetaConsumers === 0) {
+        clubAppMeta?.remove();
+        clubAppMeta = null;
       }
     };
   }, [audience]);

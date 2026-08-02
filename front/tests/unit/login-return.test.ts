@@ -85,8 +85,11 @@ describe("login return helpers", () => {
   });
 
   it("builds a same-club explicit member-start intent only for a scoped app return", () => {
+    expect(oauthHrefForReturnTo("/clubs/reading-sai/app/archive", { joinClub: "reading-sai", joinIntent: "issued-nonce-00000000000000000000" })).toBe(
+      "/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp%2Farchive&joinClub=reading-sai&joinIntent=issued-nonce-00000000000000000000",
+    );
     expect(oauthHrefForReturnTo("/clubs/reading-sai/app/archive", { joinClub: "reading-sai" })).toBe(
-      "/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp%2Farchive&joinClub=reading-sai",
+      "/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp%2Farchive",
     );
     expect(oauthHrefForReturnTo("/clubs/other/app", { joinClub: "reading-sai" })).toBe(
       "/oauth2/authorization/google?returnTo=%2Fclubs%2Fother%2Fapp",
@@ -115,7 +118,7 @@ describe("login return helpers", () => {
     ];
 
     noncanonicalReturnTargets.forEach((returnTo) => {
-      const href = oauthHrefForReturnTo(returnTo, { joinClub: "reading-sai" });
+      const href = oauthHrefForReturnTo(returnTo, { joinClub: "reading-sai", joinIntent: "issued-nonce-00000000000000000000" });
       const query = new URL(href, "https://readmates.example").searchParams;
       expect(query.get("returnTo")).toBe(returnTo);
       expect(query.has("joinClub")).toBe(false);
@@ -128,8 +131,8 @@ describe("login return helpers", () => {
 
   it("authorizes an exact canonical raw scoped path with query and hash", () => {
     const returnTo = "/clubs/reading-sai/app/archive?tab=all#session-1";
-    expect(oauthHrefForReturnTo(returnTo, { joinClub: "reading-sai" })).toBe(
-      `/oauth2/authorization/google?returnTo=${encodeURIComponent(returnTo)}&joinClub=reading-sai`,
+    expect(oauthHrefForReturnTo(returnTo, { joinClub: "reading-sai", joinIntent: "issued-nonce-00000000000000000000" })).toBe(
+      `/oauth2/authorization/google?returnTo=${encodeURIComponent(returnTo)}&joinClub=reading-sai&joinIntent=issued-nonce-00000000000000000000`,
     );
   });
 });

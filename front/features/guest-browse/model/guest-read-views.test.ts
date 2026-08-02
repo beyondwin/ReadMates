@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { guestNoteKind, guestNotesReadView } from "./guest-read-views";
+import { guestNoteKind, guestNotesReadView, guestSessionReadView } from "./guest-read-views";
 
 describe("guest read view allowlists", () => {
+  it("keeps a missing current session as a normal empty view", () => {
+    expect(guestSessionReadView({ currentSession: null })).toEqual({ currentSession: null });
+  });
+
   it("omits unknown note kinds instead of displaying them as highlights", () => {
     expect(guestNoteKind("PRIVATE_DRAFT")).toBeNull();
 

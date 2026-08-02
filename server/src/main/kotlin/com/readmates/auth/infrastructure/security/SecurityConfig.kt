@@ -34,7 +34,7 @@ class SecurityConfig(
     private val rateLimitFilter: RateLimitFilter,
     private val memberAuthoritiesFilter: MemberAuthoritiesFilter,
     private val platformAdminAuthoritiesFilter: PlatformAdminAuthoritiesFilter,
-    private val oAuthInviteTokenCaptureFilter: OAuthInviteTokenCaptureFilter,
+    private val oAuthFlowContextRepository: OAuthFlowContextRepository,
     private val googleOidcUserService: GoogleOidcUserService,
     private val readmatesOAuthSuccessHandler: ReadmatesOAuthSuccessHandler,
     private val clientRegistrationRepository: ObjectProvider<ClientRegistrationRepository>,
@@ -54,6 +54,7 @@ class SecurityConfig(
                     "/api/dev/logout",
                     "/api/auth/login",
                     "/api/auth/logout",
+                    "/api/auth/oauth/join-intent",
                     "/api/sessions/current/rsvp",
                     "/api/sessions/current/checkin",
                     "/api/sessions/current/questions",
@@ -130,6 +131,7 @@ class SecurityConfig(
                         "/internal/health",
                         "/api/auth/login",
                         "/api/auth/logout",
+                        "/api/auth/oauth/join-intent",
                         "/api/dev/login",
                         "/api/dev/logout",
                         "/oauth2/**",
@@ -193,7 +195,6 @@ class SecurityConfig(
             .addFilterAfter(platformAdminAuthoritiesFilter, SessionCookieAuthenticationFilter::class.java)
             .addFilterAfter(rateLimitFilter, SessionCookieAuthenticationFilter::class.java)
             .addFilterBefore(oAuthForwardedHeaderFilter, OAuth2AuthorizationRequestRedirectFilter::class.java)
-            .addFilterBefore(oAuthInviteTokenCaptureFilter, OAuth2AuthorizationRequestRedirectFilter::class.java)
             .addFilterAfter(memberAuthoritiesFilter, AnonymousAuthenticationFilter::class.java)
 
         val registrations = clientRegistrationRepository.ifAvailable
@@ -203,6 +204,7 @@ class SecurityConfig(
                     endpoint.authorizationRequestResolver(
                         PrimaryOriginOAuthAuthorizationRequestResolver(registrations, authBaseUrl),
                     )
+                    endpoint.authorizationRequestRepository(oAuthFlowContextRepository)
                 }
                 it.userInfoEndpoint { endpoint ->
                     endpoint.oidcUserService(googleOidcUserService)

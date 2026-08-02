@@ -46,7 +46,7 @@ export function loginPathForReturnTo(rawValue: string | null | undefined) {
 
 export function oauthHrefForReturnTo(
   rawValue: string | null | undefined,
-  { chooseAccount = false, joinClub }: { chooseAccount?: boolean; joinClub?: string } = {},
+  { chooseAccount = false, joinClub, joinIntent }: { chooseAccount?: boolean; joinClub?: string; joinIntent?: string } = {},
 ) {
   const returnTo = safeRelativeReturnTo(rawValue);
   const query = new URLSearchParams();
@@ -54,7 +54,10 @@ export function oauthHrefForReturnTo(
   if (chooseAccount) query.set("chooseAccount", "true");
   const scopedClubSlug = scopedAppClubSlug(returnTo);
   const normalizedJoinClub = normalizedClubSlug(joinClub);
-  if (scopedClubSlug && normalizedJoinClub === scopedClubSlug) query.set("joinClub", scopedClubSlug);
+  if (scopedClubSlug && normalizedJoinClub === scopedClubSlug && joinIntent && /^[A-Za-z0-9_-]{32,128}$/.test(joinIntent)) {
+    query.set("joinClub", scopedClubSlug);
+    query.set("joinIntent", joinIntent);
+  }
   const search = query.toString();
   return `/oauth2/authorization/google${search ? `?${search}` : ""}`;
 }

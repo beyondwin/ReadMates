@@ -22,8 +22,10 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
 import org.springframework.web.server.ResponseStatusException
 
+@Suppress("TooManyFunctions")
 @RestController
 @RequestMapping("/api/public/clubs/{clubSlug}/browse")
 class GuestBrowseController(
@@ -47,6 +49,9 @@ class GuestBrowseController(
         @PathVariable clubSlug: String,
     ): ResponseEntity<GuestCurrentSessionResponse> =
         getGuestCurrentSessionUseCase.getCurrentSession(clubSlug)?.toResponse()?.let(::noStore)
+            ?: getGuestBrowseShellUseCase.getShell(clubSlug)?.let {
+                noStore(GuestCurrentSessionResponse(currentSession = null))
+            }
             ?: notFound()
 
     @GetMapping("/sessions/upcoming")
@@ -126,6 +131,15 @@ class GuestBrowseController(
             .status(status)
             .header(HttpHeaders.CACHE_CONTROL, "no-store")
             .body(body)
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException::class)
+    fun handleGuestBrowseBindingError(): ResponseEntity<ApiErrorResponse> {
+        val status = HttpStatus.BAD_REQUEST
+        return ResponseEntity
+            .status(status)
+            .header(HttpHeaders.CACHE_CONTROL, "no-store")
+            .body(apiErrorResponse(status, status.defaultApiErrorCode()).body)
     }
 
     private fun notFound(): Nothing = throw ResponseStatusException(HttpStatus.NOT_FOUND)

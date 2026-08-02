@@ -27,6 +27,7 @@ import org.springframework.test.web.servlet.get
     ],
 )
 @AutoConfigureMockMvc
+@Suppress("LargeClass")
 @Tag("integration")
 class GuestBrowseControllerDbTest(
     @param:Autowired private val mockMvc: MockMvc,
@@ -363,10 +364,16 @@ class GuestBrowseControllerDbTest(
 
     @Test
     fun `current browse isolates club access scope and lifecycle`() {
-        mockMvc.get("/api/public/clubs/guest-outside/browse/sessions/current").andExpect {
-            status { isNotFound() }
-            jsonPath("$.code") { value("RESOURCE_NOT_FOUND") }
-        }
+        val emptyResponse =
+            mockMvc
+                .get("/api/public/clubs/guest-outside/browse/sessions/current")
+                .andExpect {
+                    status { isOk() }
+                    header { string("Cache-Control", "no-store") }
+                    jsonPath("$.currentSession") { value(null) }
+                }.andReturn()
+                .response
+        assertGuestResponseHeaders(emptyResponse)
         mockMvc.get("/api/public/clubs/guest-private/browse/sessions/current").andExpect {
             status { isNotFound() }
         }
@@ -417,6 +424,21 @@ class GuestBrowseControllerDbTest(
                     jsonPath("$.status") { value(400) }
                 }.andReturn()
                 .response
+        assertGuestResponseHeaders(errorResponse)
+    }
+
+    @Test
+    fun `malformed guest query binding errors are never cacheable`() {
+        val errorResponse =
+            mockMvc
+                .get("/api/public/clubs/guest-test/browse/sessions/upcoming?limit=abc")
+                .andExpect {
+                    status { isBadRequest() }
+                    header { string("Cache-Control", "no-store") }
+                    jsonPath("$.code") { value("INVALID_REQUEST") }
+                }.andReturn()
+                .response
+
         assertGuestResponseHeaders(errorResponse)
     }
 

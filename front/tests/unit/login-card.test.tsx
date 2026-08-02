@@ -48,7 +48,7 @@ describe("LoginRoute", () => {
     );
     expect(screen.getByRole("link", { name: "멤버로 시작" })).toHaveAttribute(
       "href",
-      "/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp%2Ffeedback%2Fsession-1%3Ffrom%3Demail&joinClub=reading-sai",
+      "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp%2Ffeedback%2Fsession-1%3Ffrom%3Demail",
     );
   });
 
@@ -194,7 +194,7 @@ describe("LoginRoute", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("이전 멤버십이 종료된 계정입니다.");
     expect(screen.getByRole("link", { name: "다른 Google 계정으로 로그인" })).toHaveAttribute(
       "href",
-      "/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp&chooseAccount=true&joinClub=reading-sai",
+      "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp",
     );
   });
 
@@ -223,7 +223,7 @@ describe("LoginRoute", () => {
     expect(screen.getByRole("link", { name: "둘러보기" })).toHaveAttribute("href", "/clubs/reading-sai/app");
     expect(screen.getByRole("link", { name: "Google 로그인 시도" })).toHaveAttribute(
       "href",
-      "/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp&chooseAccount=true&joinClub=reading-sai",
+      "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp",
     );
   });
 

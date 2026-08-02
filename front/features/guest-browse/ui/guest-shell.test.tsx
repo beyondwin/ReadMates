@@ -12,7 +12,7 @@ import { GuestNavigationLink, GuestNavigationProvider } from "./guest-navigation
 
 afterEach(() => {
   cleanup();
-  document.head.querySelectorAll('[data-readmates-guest-app="true"]').forEach((node) => node.remove());
+  document.head.querySelectorAll('[data-readmates-club-app="true"]').forEach((node) => node.remove());
 });
 
 function TestLink({ to, children, ...props }: { to: string; children: ReactNode; className?: string }) {
@@ -37,7 +37,16 @@ describe("guest shell UI", () => {
     expect(document.head.querySelectorAll('meta[name="robots"][content="noindex"]')).toHaveLength(1);
 
     view.unmount();
-    expect(document.head.querySelectorAll('[data-readmates-guest-app="true"]')).toHaveLength(0);
+    expect(document.head.querySelectorAll('[data-readmates-club-app="true"]')).toHaveLength(0);
+  });
+
+  it.each(["VIEWER", "MEMBER", "HOST"] as const)("keeps every %s club app audience out of search indexes", (audience) => {
+    const view = render(<GuestAppHead audience={audience} />);
+
+    expect(document.head.querySelectorAll('meta[name="robots"][content="noindex"]')).toHaveLength(1);
+
+    view.unmount();
+    expect(document.head.querySelector('meta[name="robots"][data-readmates-club-app="true"]')).toBeNull();
   });
 
   it("renders a personal preview without fabricated data and preserves the full conversion return target", () => {

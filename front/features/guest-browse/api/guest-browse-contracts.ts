@@ -79,7 +79,7 @@ export const GuestCurrentSessionSchema = z
 
 export const GuestCurrentSessionResponseSchema = z
   .object({
-    currentSession: GuestCurrentSessionSchema,
+    currentSession: GuestCurrentSessionSchema.nullable(),
   })
   .strict();
 

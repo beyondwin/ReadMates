@@ -205,7 +205,7 @@ describe("PublicSession", () => {
     expect(screen.getByRole("link", { name: "둘러보기" })).toHaveAttribute("href", "/clubs/reading-sai/app");
     expect(screen.getByRole("link", { name: "멤버로 시작" })).toHaveAttribute(
       "href",
-      "/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp&joinClub=reading-sai",
+      "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp",
     );
     expect(screen.queryByRole("button", { name: /초대 수락하기/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /초대 수락하기/ })).not.toBeInTheDocument();
