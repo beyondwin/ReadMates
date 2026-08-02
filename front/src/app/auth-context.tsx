@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PropsWithChildren } from "react";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import {
+  READMATES_SESSION_EXPIRED_EVENT,
+  sessionExpiryCause,
+} from "@/shared/auth/session-expiry";
 import { anonymousAuth, AuthActionsContext, AuthContext, type AuthState } from "@/src/app/auth-state";
 
 type FetchAuthMeOutcome =
@@ -42,6 +46,32 @@ export function AuthProvider({ children }: PropsWithChildren) {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    const onSessionExpired = (event: Event) => {
+      const cause = sessionExpiryCause(event);
+      if (!cause) {
+        return;
+      }
+
+      setState((previous) => ({
+        status: "session_expired",
+        cause:
+          previous.status === "session_expired" && previous.cause === "write"
+            ? "write"
+            : cause,
+        lastAuth:
+          previous.status === "ready"
+            ? previous.auth
+            : previous.status === "session_expired"
+              ? previous.lastAuth
+              : undefined,
+      }));
+    };
+
+    globalThis.addEventListener(READMATES_SESSION_EXPIRED_EVENT, onSessionExpired);
+    return () => globalThis.removeEventListener(READMATES_SESSION_EXPIRED_EVENT, onSessionExpired);
   }, []);
 
   const markLoggedOut = useCallback(() => {

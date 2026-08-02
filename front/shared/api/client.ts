@@ -1,6 +1,6 @@
 import { apiErrorFromResponse } from "@/shared/api/errors";
 import { parseReadmatesResponse } from "@/shared/api/response";
-import { currentRelativeReturnTo, loginPathForReturnTo } from "@/shared/auth/login-return";
+import { signalSessionExpired } from "@/shared/auth/session-expiry";
 import { recordFrontendApiFailure } from "@/shared/observability/frontend-observability";
 
 export class ReadMatesSessionExpiredError extends Error {
@@ -10,14 +10,12 @@ export class ReadMatesSessionExpiredError extends Error {
   }
 }
 
-let lastLoginRedirectAt = 0;
-const REDIRECT_COOL_OFF_MS = 1500;
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const HOST_WRITE_CLIENT_CONTRACT_HEADER = "X-Readmates-Client-Contract";
 const HOST_WRITE_CLIENT_CONTRACT = "v2";
 
 export function __resetRedirectGuardForTest() {
-  lastLoginRedirectAt = 0;
+  // Kept as a test compatibility seam while session expiry is handled in-app.
 }
 
 export type ReadmatesApiContext = {
@@ -72,12 +70,7 @@ export async function readmatesFetchResponse(path: string, init?: RequestInit, c
   });
 
   if (response.status === 401) {
-    const now = Date.now();
-    const inCoolOff = now - lastLoginRedirectAt < REDIRECT_COOL_OFF_MS;
-    if (typeof window !== "undefined" && !inCoolOff) {
-      lastLoginRedirectAt = now;
-      window.location.assign(loginPathForReturnTo(currentRelativeReturnTo()));
-    }
+    signalSessionExpired(MUTATING_METHODS.has(method) ? "write" : "read");
     throw new ReadMatesSessionExpiredError();
   }
 

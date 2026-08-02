@@ -67,6 +67,10 @@ describe("guest browse surfaces", () => {
     expect(screen.getByText("한 줄 감상")).toBeVisible();
     expect(screen.getByText("전체 이름")).toBeVisible();
     expect(screen.getByTitle("전체 이름")).toBeVisible();
+    expect(screen.getByRole("link", { name: "피드백 보기, 정식 멤버 전용" })).toHaveAttribute(
+      "href",
+      "/app/feedback/closed-1",
+    );
   });
 
   it("shows upcoming sessions on guest home without placing them on public home", () => {

@@ -48,11 +48,16 @@ describe("host invitation actions", () => {
   it("uses centralized 401 handling for invitation responses", async () => {
     const assignMock = vi.fn();
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 401 }));
+    const causes: string[] = [];
+    window.addEventListener("readmates:session-expired", ((event: CustomEvent) => {
+      causes.push(event.detail.cause);
+    }) as EventListener, { once: true });
     vi.stubGlobal("fetch", fetchMock);
     vi.stubGlobal("location", { assign: assignMock });
 
     await expect(listInvitations()).rejects.toThrow(ReadMatesSessionExpiredError);
 
-    expect(assignMock).toHaveBeenCalledWith("/login");
+    expect(assignMock).not.toHaveBeenCalled();
+    expect(causes).toEqual(["read"]);
   });
 });

@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import {
   useCloseHostSessionMutation,
   useDeleteHostSessionMutation,
@@ -13,6 +13,7 @@ import {
   AuthContext,
 } from "@/src/app/auth-state";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import type { AuthState } from "@/src/app/auth-state";
 import { AppRouteLayout } from "./app-route-layout";
 
 const hostAuth: AuthMeResponse = {
@@ -26,6 +27,16 @@ const hostAuth: AuthMeResponse = {
   role: "HOST",
   membershipStatus: "ACTIVE",
   approvalState: "ACTIVE",
+};
+
+const memberAuth: AuthMeResponse = {
+  ...hostAuth,
+  userId: "member-1",
+  membershipId: "membership-member",
+  email: "member@example.com",
+  displayName: "김멤버",
+  accountName: "멤버",
+  role: "MEMBER",
 };
 
 type Deferred<T> = {
@@ -100,6 +111,89 @@ function expectSessionLinks(href: string) {
   for (const link of links) {
     expect(link).toHaveAttribute("href", href);
   }
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  return <output aria-label="현재 경로">{`${location.pathname}${location.search}${location.hash}`}</output>;
+}
+
+const guestShell = {
+  clubName: "읽는사이",
+  tagline: "함께 읽습니다",
+  navigation: {
+    home: "OPEN",
+    current: "OPEN",
+    notes: "OPEN",
+    archive: "OPEN",
+    sessionDetail: "OPEN",
+    personalSpace: "PREVIEW",
+    personalRecords: "PREVIEW",
+    settings: "LOCKED",
+    notifications: "LOCKED",
+    feedback: "LOCKED",
+    host: "DENY",
+  },
+};
+
+const guestCurrentSession = {
+  currentSession: {
+    sessionId: "current-session",
+    sessionNumber: 7,
+    title: "현재 모임",
+    bookTitle: "현재 책",
+    bookAuthor: "현재 작가",
+    bookLink: null,
+    bookImageUrl: null,
+    date: "2026-08-02",
+    startTime: "19:00",
+    endTime: "21:00",
+    questionDeadlineAt: "2026-08-01T19:00:00+09:00",
+    attendees: [],
+    board: { questions: [], longReviews: [] },
+  },
+};
+
+function renderScopedExpiryLayout({
+  state,
+  child,
+  initialEntry = "/clubs/reading-sai/app/session/current?tab=questions#draft",
+  routePath = "/clubs/:clubSlug/app/session/current",
+}: {
+  state: AuthState;
+  child: React.ReactNode;
+  initialEntry?: string;
+  routePath?: string;
+}) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, staleTime: Infinity },
+      mutations: { retry: false },
+    },
+  });
+  queryClient.setQueryData(["member-private", "reading-sai"], { title: "cached member data" });
+  const markLoggedOut = vi.fn();
+
+  render(
+    <QueryClientProvider client={queryClient}>
+      <AuthActionsContext.Provider value={{ markLoggedOut, refreshAuth: vi.fn() }}>
+        <AuthContext.Provider value={state}>
+          <MemoryRouter initialEntries={[initialEntry]}>
+            <Routes>
+              <Route
+                path={routePath}
+                element={<AppRouteLayout scopedAuth={memberAuth} audience="MEMBER" />}
+              >
+                <Route index element={child} />
+              </Route>
+            </Routes>
+          </MemoryRouter>
+        </AuthContext.Provider>
+      </AuthActionsContext.Provider>
+    </QueryClientProvider>,
+  );
+
+  return { queryClient, markLoggedOut };
 }
 
 afterEach(() => {
@@ -237,5 +331,95 @@ describe("AppRouteLayout host session navigation", () => {
 
     await waitFor(() => expectSessionLinks("/app/host/sessions/session-9/edit"));
     expect(currentRequest).toBe(2);
+  });
+});
+
+describe("AppRouteLayout session expiry recovery", () => {
+  it("retains successful read content and offers exact-route reauth or guest continuation", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const path = input.toString();
+      if (path === "/api/bff/api/public/clubs/reading-sai/browse") {
+        return Promise.resolve(jsonResponse(guestShell));
+      }
+      if (path === "/api/bff/api/public/clubs/reading-sai/browse/sessions/current") {
+        return Promise.resolve(jsonResponse(guestCurrentSession));
+      }
+      if (path === "/api/bff/api/auth/logout") {
+        return Promise.resolve(new Response(null, { status: 204 }));
+      }
+      return Promise.reject(new Error(`Unexpected fetch: ${path}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { queryClient, markLoggedOut } = renderScopedExpiryLayout({
+      state: { status: "session_expired", cause: "read", lastAuth: memberAuth },
+      child: (
+        <>
+          <main data-testid="cached-read">cached member data</main>
+          <LocationProbe />
+        </>
+      ),
+    });
+
+    expect(screen.getByTestId("cached-read")).toBeVisible();
+    expect(screen.getByRole("status", { name: "로그인 세션 만료" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "재로그인" })).toHaveAttribute(
+      "href",
+      "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp%2Fsession%2Fcurrent%3Ftab%3Dquestions%23draft",
+    );
+    const continueButton = await screen.findByRole("button", { name: "게스트로 계속 보기" });
+    await user.click(continueButton);
+
+    await waitFor(() => expect(markLoggedOut).toHaveBeenCalledTimes(1));
+    expect(queryClient.getQueryData(["member-private", "reading-sai"])).toBeUndefined();
+    expect(screen.getByRole("status", { name: "현재 경로" })).toHaveTextContent(
+      "/clubs/reading-sai/app/session/current?tab=questions#draft",
+    );
+  });
+
+  it("keeps an unsaved write draft mounted and offers only explicit reauthentication", async () => {
+    const user = userEvent.setup();
+    renderScopedExpiryLayout({
+      state: { status: "session_expired", cause: "write", lastAuth: memberAuth },
+      child: <textarea aria-label="작성 중인 질문" defaultValue="지워지면 안 되는 질문" />,
+    });
+
+    const draft = screen.getByRole("textbox", { name: "작성 중인 질문" });
+    await user.type(draft, " 이어쓰기");
+
+    expect(draft).toHaveValue("지워지면 안 되는 질문 이어쓰기");
+    expect(screen.getByRole("status", { name: "로그인 세션 만료" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "재로그인" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "게스트로 계속 보기" })).not.toBeInTheDocument();
+  });
+
+  it("does not offer guest continuation until the exact session detail is guest-readable", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const path = input.toString();
+      if (path === "/api/bff/api/public/clubs/reading-sai/browse") {
+        return Promise.resolve(jsonResponse(guestShell));
+      }
+      if (path === "/api/bff/api/public/clubs/reading-sai/browse/archive/private-session") {
+        return Promise.resolve(new Response(null, { status: 404 }));
+      }
+      return Promise.reject(new Error(`Unexpected fetch: ${path}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderScopedExpiryLayout({
+      state: { status: "session_expired", cause: "read", lastAuth: memberAuth },
+      child: <main>private member session detail</main>,
+      initialEntry: "/clubs/reading-sai/app/sessions/private-session",
+      routePath: "/clubs/:clubSlug/app/sessions/:sessionId",
+    });
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/bff/api/public/clubs/reading-sai/browse/archive/private-session",
+        expect.objectContaining({ cache: "no-store" }),
+      );
+    });
+    expect(screen.queryByRole("button", { name: "게스트로 계속 보기" })).not.toBeInTheDocument();
+    expect(screen.getByText("private member session detail")).toBeVisible();
   });
 });

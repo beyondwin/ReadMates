@@ -19,9 +19,13 @@ describe("readmatesFetchResponse", () => {
     expect(normalizedClubSlug(null)).toBe("");
   });
 
-  it("redirects to login and rejects when the BFF returns 401", async () => {
+  it("signals read expiry without leaving the current route when the BFF returns 401", async () => {
     const assignMock = vi.fn();
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 401 }));
+    const causes: string[] = [];
+    window.addEventListener("readmates:session-expired", ((event: CustomEvent) => {
+      causes.push(event.detail.cause);
+    }) as EventListener, { once: true });
     vi.stubGlobal("fetch", fetchMock);
     vi.stubGlobal("location", {
       assign: assignMock,
@@ -43,9 +47,8 @@ describe("readmatesFetchResponse", () => {
     const headers = fetchMock.mock.calls[0]?.[1]?.headers;
     expect(headers).toBeInstanceOf(Headers);
     expect((headers as Headers).get("Content-Type")).toBe("application/json");
-    expect(assignMock).toHaveBeenCalledWith(
-      "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp%2Ffeedback%2Fsession-1%3Ffrom%3Demail",
-    );
+    expect(assignMock).not.toHaveBeenCalled();
+    expect(causes).toEqual(["read"]);
   });
 
   it("preserves FormData uploads by leaving Content-Type unset", async () => {

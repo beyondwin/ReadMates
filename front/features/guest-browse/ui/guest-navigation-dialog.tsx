@@ -55,6 +55,8 @@ function GuestLockedDialog({
   }, [onClose, target.opener]);
 
   useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     closeButtonRef.current?.focus();
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -86,18 +88,21 @@ function GuestLockedDialog({
     };
 
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
   }, [closeAndRestoreFocus]);
 
   return (
-    <div className="rm-guest-lock-dialog-backdrop" role="presentation" onMouseDown={closeAndRestoreFocus}>
+    <div className="rm-guest-lock-dialog-backdrop" role="presentation" onClick={closeAndRestoreFocus}>
       <section
         ref={dialogRef}
         className="surface rm-guest-lock-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="guest-lock-dialog-title"
-        onMouseDown={(event) => event.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
       >
         <button ref={closeButtonRef} type="button" className="rm-guest-lock-dialog__close" onClick={closeAndRestoreFocus}>
           닫기

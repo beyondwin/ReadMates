@@ -22,6 +22,7 @@ import {
   guestNotesLoader,
 } from "@/features/guest-browse/route/guest-route-data";
 import { GuestScopedAppRoute } from "@/features/guest-browse/route/guest-scoped-app-route";
+import { GuestNavigationLink } from "@/features/guest-browse/ui/guest-navigation-dialog";
 import { AppRouteLayout } from "@/src/app/layouts/app-route-layout";
 import { memoizeRouteModule } from "@/src/app/routes/route-module-loader";
 import { ClubMemberAppRouteLayout } from "@/src/app/layouts/club-app-route-layout";
@@ -74,7 +75,7 @@ function scopedMemberRoute({
     const data = useLoaderData();
 
     return isGuestScopedRouteData(data) ? (
-      <GuestScopedAppRoute LinkComponent={Link} />
+      <GuestScopedAppRoute LinkComponent={GuestNavigationLink} />
     ) : (
       <Suspense fallback={fallback}>
         <ProtectedComponent />
@@ -99,7 +100,7 @@ function scopedMemberRoute({
 function ScopedAudienceNotFoundRoute() {
   const data = useLoaderData();
 
-  return isGuestScopedRouteData(data) ? <GuestScopedAppRoute LinkComponent={Link} /> : <NotFoundRoute variant="member" />;
+  return isGuestScopedRouteData(data) ? <GuestScopedAppRoute LinkComponent={GuestNavigationLink} /> : <NotFoundRoute variant="member" />;
 }
 
 function memberHomeRoute(scoped: boolean): RouteObject {

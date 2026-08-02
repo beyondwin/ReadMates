@@ -96,7 +96,11 @@ function AuthProbe() {
   }
 
   if (state.status === "session_expired") {
-    return <div data-testid="auth-state">session_expired</div>;
+    return (
+      <div data-testid="auth-state">
+        session_expired:{state.cause ?? "unknown"}:{state.lastAuth?.displayName ?? "anonymous"}
+      </div>
+    );
   }
 
   return <div data-testid="auth-state">{state.auth.approvalState}</div>;
@@ -237,6 +241,116 @@ describe("AuthProvider", () => {
       expect(screen.getByTestId("auth-state")).toHaveTextContent("session_expired");
     });
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/auth/me", { cache: "no-store" });
+  });
+
+  it("retains the signed-in member and distinguishes a read expiry signal", async () => {
+    mockAuthFetch(activeMemberAuth);
+
+    render(
+      <AuthProvider>
+        <AuthProbe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-state")).toHaveTextContent("ACTIVE");
+    });
+
+    window.dispatchEvent(
+      new CustomEvent("readmates:session-expired", {
+        detail: { cause: "read" },
+      }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-state")).toHaveTextContent(
+        `session_expired:read:${activeMemberAuth.displayName}`,
+      );
+    });
+  });
+
+  it("retains the signed-in member and distinguishes a write expiry signal", async () => {
+    mockAuthFetch(activeMemberAuth);
+
+    render(
+      <AuthProvider>
+        <AuthProbe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-state")).toHaveTextContent("ACTIVE");
+    });
+
+    window.dispatchEvent(
+      new CustomEvent("readmates:session-expired", {
+        detail: { cause: "write" },
+      }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-state")).toHaveTextContent(
+        `session_expired:write:${activeMemberAuth.displayName}`,
+      );
+    });
+  });
+
+  it("keeps write expiry sticky when a later background read also returns 401", async () => {
+    mockAuthFetch(activeMemberAuth);
+
+    render(
+      <AuthProvider>
+        <AuthProbe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-state")).toHaveTextContent("ACTIVE");
+    });
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent("readmates:session-expired", { detail: { cause: "write" } }),
+      );
+      window.dispatchEvent(
+        new CustomEvent("readmates:session-expired", { detail: { cause: "read" } }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-state")).toHaveTextContent(
+        `session_expired:write:${activeMemberAuth.displayName}`,
+      );
+    });
+  });
+
+  it("upgrades read expiry to sticky write expiry when the mutation failure arrives later", async () => {
+    mockAuthFetch(activeMemberAuth);
+
+    render(
+      <AuthProvider>
+        <AuthProbe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-state")).toHaveTextContent("ACTIVE");
+    });
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent("readmates:session-expired", { detail: { cause: "read" } }),
+      );
+      window.dispatchEvent(
+        new CustomEvent("readmates:session-expired", { detail: { cause: "write" } }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-state")).toHaveTextContent(
+        `session_expired:write:${activeMemberAuth.displayName}`,
+      );
+    });
   });
 
   it("falls back to ready with anonymous auth when /auth/me returns a 500 error", async () => {

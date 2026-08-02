@@ -116,17 +116,20 @@ describe("guest shell UI", () => {
 
     fireEvent.click(opener);
     expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(document.body.style.overflow).toBe("hidden");
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(opener).toHaveFocus();
+    expect(document.body.style.overflow).toBe("");
 
     fireEvent.click(opener);
     fireEvent.click(screen.getByRole("button", { name: "닫기" }));
     expect(opener).toHaveFocus();
 
     fireEvent.click(opener);
-    fireEvent.mouseDown(document.querySelector(".rm-guest-lock-dialog-backdrop")!);
+    fireEvent.click(document.querySelector(".rm-guest-lock-dialog-backdrop")!);
     expect(opener).toHaveFocus();
+    expect(document.body.style.overflow).toBe("");
   });
 
   it("traps Tab and Shift+Tab within the guest lock dialog", () => {

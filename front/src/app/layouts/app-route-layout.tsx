@@ -1,11 +1,22 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { logout } from "@/features/auth/api/auth-api";
+import { SessionExpiryRecovery } from "@/features/auth/ui/session-expiry-recovery";
 import { usableJoinedClubs } from "@/features/club-selection/model/club-entry";
 import { AccountMenuController } from "@/features/auth/route/account-menu-controller";
 import { GuestAccountControl } from "@/features/guest-browse/ui/guest-account-control";
 import { GuestNavigationLink } from "@/features/guest-browse/ui/guest-navigation-dialog";
 import type { ClubAppAudience } from "@/features/guest-browse/model/club-app-audience";
+import { guestNavigationCapability } from "@/features/guest-browse/model/club-app-audience";
+import {
+  guestArchiveDetailQuery,
+  guestArchiveQuery,
+  guestBrowseShellQuery,
+  guestCurrentSessionQuery,
+  guestNoteFeedQuery,
+  guestNoteSessionsQuery,
+} from "@/features/guest-browse/queries/guest-browse-queries";
 import { hostCurrentSessionQuery } from "@/features/host/queries/host-session-queries";
 import { useAuth, useAuthActions } from "@/src/app/auth-state";
 import {
@@ -24,6 +35,7 @@ import {
 import { Link } from "@/src/app/router-link";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { canUseHostApp } from "@/shared/auth/member-app-access";
+import { loginPathForReturnTo } from "@/shared/auth/login-return";
 import { MobileHeader } from "@/shared/ui/mobile-header";
 import { MobileTabBar } from "@/shared/ui/mobile-tab-bar";
 import { PublicFooter } from "@/shared/ui/public-footer";
@@ -64,6 +76,44 @@ function appBasePath(pathname: string) {
 function appClubSlug(pathname: string) {
   const match = /^\/clubs\/([^/]+)\/app(?:\/|$)/.exec(pathname);
   return match ? decodeURIComponent(match[1]) : null;
+}
+
+async function verifyGuestReadableRoute(
+  queryClient: QueryClient,
+  clubSlug: string,
+  pathname: string,
+) {
+  await queryClient.fetchQuery(guestBrowseShellQuery(clubSlug));
+  const path = appPathname(pathname);
+
+  if (path === "/app") {
+    return;
+  }
+  if (path === "/app/session/current") {
+    await queryClient.fetchQuery(guestCurrentSessionQuery(clubSlug));
+    return;
+  }
+  if (path === "/app/notes") {
+    await Promise.all([
+      queryClient.fetchQuery(guestNoteSessionsQuery(clubSlug)),
+      queryClient.fetchQuery(guestNoteFeedQuery(clubSlug)),
+    ]);
+    return;
+  }
+  if (path === "/app/archive") {
+    await queryClient.fetchQuery(guestArchiveQuery(clubSlug));
+    return;
+  }
+
+  const detailMatch = /^\/app\/sessions\/([^/]+)$/.exec(path);
+  if (detailMatch) {
+    await queryClient.fetchQuery(
+      guestArchiveDetailQuery(clubSlug, decodeURIComponent(detailMatch[1])),
+    );
+    return;
+  }
+
+  throw new Error("Guest continuation route is not verifiable.");
 }
 
 function clubSwitcherTargetPath({
@@ -150,7 +200,9 @@ export function AppRouteLayout({
 } = {}) {
   const state = useAuth();
   const { markLoggedOut } = useAuthActions();
+  const queryClient = useQueryClient();
   const location = useLocation();
+  const navigate = useNavigate();
   const pathname = location.pathname;
   const appPath = appPathname(pathname);
   const returnTo = `${location.pathname}${location.search}${location.hash}`;
@@ -186,6 +238,7 @@ export function AppRouteLayout({
     enabled: activeHostKey !== null,
   });
   const [isRetryingCurrentSession, setIsRetryingCurrentSession] = useState(false);
+  const [verifiedGuestContinuationKey, setVerifiedGuestContinuationKey] = useState<string | null>(null);
   const currentSessionStatus =
     activeHostKey === null
       ? "ready"
@@ -216,6 +269,58 @@ export function AppRouteLayout({
 
     rememberReadmatesMobileWorkspace(mobileWorkspace);
   }, [isActiveHost, mobileWorkspace]);
+
+  const sessionExpiry =
+    !isGuestAudience && state.status === "session_expired" && state.cause
+      ? state
+      : null;
+  const guestReadableExpiry = Boolean(
+    sessionExpiry?.cause === "read"
+      && clubSlug
+      && guestNavigationCapability(pathname) === "OPEN",
+  );
+  const guestContinuationKey = guestReadableExpiry && clubSlug ? `${clubSlug}:${pathname}` : null;
+  const guestContinuationAvailable = Boolean(
+    guestContinuationKey && verifiedGuestContinuationKey === guestContinuationKey,
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!guestContinuationKey || !clubSlug) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void verifyGuestReadableRoute(queryClient, clubSlug, pathname).then(
+      () => {
+        if (!cancelled) setVerifiedGuestContinuationKey(guestContinuationKey);
+      },
+      () => {
+        if (!cancelled) {
+          setVerifiedGuestContinuationKey((current) => current === guestContinuationKey ? null : current);
+        }
+      },
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clubSlug, guestContinuationKey, pathname, queryClient]);
+
+  const continueAsGuest = async () => {
+    const response = await logout();
+    if (!response.ok && response.status !== 401) {
+      throw new Error(`Guest continuation logout failed: ${response.status}`);
+    }
+
+    await queryClient.cancelQueries();
+    queryClient.clear();
+    markLoggedOut();
+    await navigate(returnTo, { replace: true });
+    navigate(0);
+  };
 
   return (
     <div className="app-shell">
@@ -266,6 +371,14 @@ export function AppRouteLayout({
         />
       </div>
       <div className="app-content">
+        {sessionExpiry ? (
+          <SessionExpiryRecovery
+            cause={sessionExpiry.cause}
+            loginHref={loginPathForReturnTo(returnTo)}
+            canContinueAsGuest={guestContinuationAvailable}
+            onContinueAsGuest={continueAsGuest}
+          />
+        ) : null}
         <ClubSwitcher
           auth={auth}
           currentClubSlug={clubSlug ?? auth?.currentMembership?.clubSlug ?? null}
