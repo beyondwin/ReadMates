@@ -29,3 +29,15 @@
 ## Residual Risk
 
 Computed-style CT and complete synthetic browser journeys could not execute in this sandbox. The local build, lint, design-system tests, architecture boundary, and all Task 7 named unit consumers passed; runtime visual and network assertions remain to be confirmed in an environment that permits loopback listeners and the E2E service stack.
+
+## Fix Round 1
+
+- Expanded `account-navigation-avatars.spec.ts` to cover the complete Step 6 evidence matrix at both 390px and 1280px: profile editor and saved identity, current-session roster, host attendance, host member list, and public session.
+- Added synthetic host member, host session detail, record editor, history, and manual-dispatch fixtures. Host attendance and host member list are now explicit tested surfaces rather than inferred coverage.
+- Every matrix surface asserts computed zero-width artwork borders and derives its expected visible avatar paths from the rendered artwork before checking that image requests and responses are same-origin `/assets/avatars/book-club/*.webp` resources only.
+- Corrected the retired `이름 변경` assertion in `tests/unit/my-page.test.tsx` to the integrated `프로필 편집` contract.
+- PASS: full frontend Vitest — 233 files, 1,880 tests.
+- PASS: focused profile and architecture Vitest — 2 files, 9 tests.
+- PASS: targeted ESLint and Playwright test discovery (`--list`) — 5 tests discovered in the avatar E2E file.
+- The E2E execution attempt remains environment-blocked before test startup: MySQL refused `127.0.0.1:3306`, and Gradle could not open its user-home distribution lock due to sandbox permissions.
+- A standalone `tsc --noEmit` was also attempted but is not a clean repository gate in the current integrated branch; it reports numerous pre-existing cross-feature test typing failures. No diagnostic referenced the two files changed in this fix round.

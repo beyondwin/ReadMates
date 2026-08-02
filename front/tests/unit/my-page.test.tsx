@@ -67,7 +67,7 @@ describe("MyPage", () => {
     const achievementSection = screen.getByRole("region", { name: "9번의 모임에서 7권을 끝까지 읽었어요." });
 
     expect(screen.queryByRole("link", { name: "계정 관리" })).toBeNull();
-    expect(screen.getByRole("button", { name: "이름 변경" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "프로필 편집" })).toBeVisible();
     expect(profileSection.compareDocumentPosition(achievementSection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(
       overview.compareDocumentPosition(recent) &

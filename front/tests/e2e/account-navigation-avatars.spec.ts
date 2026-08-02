@@ -159,6 +159,75 @@ function journeyResponse() {
   };
 }
 
+function hostMembersResponse() {
+  return {
+    items: sameSurnameMembers.map((member, index) => ({
+      membershipId: member.membershipId,
+      userId: `synthetic-user-${index + 1}`,
+      email: `avatar-member-${index + 1}@example.test`,
+      displayName: member.displayName,
+      accountName: member.accountName,
+      profileImageUrl: null,
+      avatarKey: member.avatarKey,
+      role: member.role,
+      status: "ACTIVE",
+      joinedAt: "2026-01-01T00:00:00Z",
+      createdAt: "2026-01-01T00:00:00Z",
+      currentSessionParticipationStatus: "ACTIVE",
+      canSuspend: member.role !== "HOST",
+      canRestore: false,
+      canDeactivate: member.role !== "HOST",
+      canAddToCurrentSession: false,
+      canRemoveFromCurrentSession: member.role !== "HOST",
+    })),
+    nextCursor: null,
+  };
+}
+
+function hostSessionDetailResponse() {
+  return {
+    sessionId: "session-avatar-roster",
+    sessionNumber: 8,
+    title: "아바타 확인 모임",
+    bookTitle: "같이 읽는 책",
+    bookAuthor: "합성 저자",
+    bookLink: null,
+    bookImageUrl: null,
+    locationLabel: "온라인",
+    meetingUrl: null,
+    meetingPasscode: null,
+    date: "2026-08-01",
+    startTime: "19:30",
+    endTime: "21:30",
+    questionDeadlineAt: "2026-08-01T10:00:00Z",
+    visibility: "HOST_ONLY",
+    publication: null,
+    state: "OPEN",
+    attendees: sameSurnameMembers.map((member) => ({ ...member, participationStatus: "ACTIVE" })),
+    feedbackDocument: { uploaded: false, fileName: null, uploadedAt: null },
+  };
+}
+
+function hostRecordEditorResponse() {
+  const liveSnapshot = {
+    schema: "readmates-session-record:v1",
+    visibility: "HOST_ONLY",
+    publicationSummary: "",
+    highlights: [],
+    oneLineReviews: [],
+    feedbackDocument: { fileName: "", title: "", markdown: "" },
+  };
+  return {
+    sessionId: "session-avatar-roster",
+    liveRevision: 0,
+    liveSessionUpdatedAt: "2026-08-01T00:00:00Z",
+    liveSnapshot,
+    draft: null,
+    draftLiveBaseStale: false,
+    validationSummary: { valid: true, issues: [] },
+  };
+}
+
 async function routeSyntheticApp(page: Page, role: FixtureRole = "HOST") {
   let savedAvatarKey = "banana-green-book";
 
@@ -184,6 +253,11 @@ async function routeSyntheticApp(page: Page, role: FixtureRole = "HOST") {
     if (path.endsWith("/api/app/me")) return json(route, memberProfile(role, savedAvatarKey));
     if (path.endsWith("/api/archive/me/journey")) return json(route, journeyResponse());
     if (path.endsWith("/api/sessions/current")) return json(route, currentSessionResponse());
+    if (path.endsWith("/api/host/members")) return json(route, hostMembersResponse());
+    if (path.endsWith("/api/host/sessions/session-avatar-roster")) return json(route, hostSessionDetailResponse());
+    if (path.endsWith("/api/host/sessions/session-avatar-roster/record-editor")) return json(route, hostRecordEditorResponse());
+    if (path.endsWith("/api/host/sessions/session-avatar-roster/history")) return json(route, { items: [], nextCursor: null });
+    if (path.endsWith("/api/host/notifications/manual/dispatches")) return json(route, { items: [], nextCursor: null });
 
     if (path.endsWith("/api/host/dashboard")) {
       return json(route, {
@@ -274,15 +348,15 @@ function resetImageNetwork(evidence: ImageNetworkEvidence) {
 }
 
 async function assertVisibleAvatarNetwork(evidence: ImageNetworkEvidence, localHost: string, expectedPaths: string[]) {
-  await expect.poll(() => new Set(evidence.responses.map(({ url }) => new URL(url).pathname)).size).toBe(expectedPaths.length);
+  const uniqueExpectedPaths = new Set(expectedPaths);
+  await expect.poll(() => new Set(evidence.responses.map(({ url }) => new URL(url).pathname)).size).toBe(uniqueExpectedPaths.size);
   const requested = evidence.requests.map((url) => new URL(url));
   const responded = evidence.responses.map(({ url }) => new URL(url));
   expect(requested.length).toBeGreaterThan(0);
   expect(new Set(requested.map((url) => url.host))).toEqual(new Set([localHost]));
   expect(requested.every((url) => url.pathname.startsWith("/assets/avatars/book-club/") && url.pathname.endsWith(".webp"))).toBe(true);
-  expect(new Set(requested.map((url) => url.pathname))).toEqual(new Set(expectedPaths));
-  expect(new Set(requested.map((url) => url.pathname)).size).toBeLessThan(20);
-  expect(new Set(responded.map((url) => url.pathname))).toEqual(new Set(expectedPaths));
+  expect(new Set(requested.map((url) => url.pathname))).toEqual(uniqueExpectedPaths);
+  expect(new Set(responded.map((url) => url.pathname))).toEqual(uniqueExpectedPaths);
   expect(evidence.responses.every(({ contentType }) => contentType.startsWith("image/webp"))).toBe(true);
 }
 
@@ -304,6 +378,16 @@ async function expectFrameFreeArtwork(locator: Locator) {
   })).toEqual(["0px", "0px", "rgba(0, 0, 0, 0)", "visible"]);
 }
 
+async function expectVisibleLocalArtwork(page: Page, evidence: ImageNetworkEvidence) {
+  const artwork = page.locator(".rm-avatar-chip--artwork:visible");
+  await expect(artwork.first()).toBeVisible();
+  await expectFrameFreeArtwork(artwork.first());
+  const expectedPaths = await artwork.locator("img").evaluateAll((images) =>
+    images.map((image) => new URL((image as HTMLImageElement).src).pathname),
+  );
+  await assertVisibleAvatarNetwork(evidence, new URL(page.url()).host, expectedPaths);
+}
+
 test("non-host member keeps the explicit account action without a workspace switch on mobile", async ({ page }, testInfo) => {
   await routeSyntheticApp(page, "MEMBER");
 
@@ -322,7 +406,11 @@ test("My Space avatar save refreshes the account identity and persists at mobile
   for (const width of [390, 1280]) {
     const context = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 } });
     const page = await context.newPage();
+    const imageEvidence = observeImageNetwork(page);
     await routeSyntheticApp(page);
+    const cdp = await context.newCDPSession(page);
+    await cdp.send("Network.setCacheDisabled", { cacheDisabled: true });
+    resetImageNetwork(imageEvidence);
     await page.goto(`${APP_BASE}/me`);
 
     const profileAvatar = page.locator(".rm-member-profile__avatar");
@@ -345,6 +433,7 @@ test("My Space avatar save refreshes the account identity and persists at mobile
       path: testInfo.outputPath(`${width}-my-space-avatar-picker.png`),
       fullPage: true,
     });
+    await expectVisibleLocalArtwork(page, imageEvidence);
     await dialog.getByRole("button", { name: "초록 책을 읽는 찻잔 선택" }).click();
 
     await expect(account.locator("img")).toHaveAttribute(
@@ -354,12 +443,14 @@ test("My Space avatar save refreshes the account identity and persists at mobile
 
     await dialog.getByRole("button", { name: "선택 완료" }).click();
     await expectFrameFreeArtwork(dialog.locator(".rm-profile-editor__avatar-action .rm-avatar-chip"));
+    resetImageNetwork(imageEvidence);
     await dialog.getByRole("button", { name: "변경사항 저장" }).click();
 
     await expect(dialog).toHaveCount(0);
     await expect(profileAvatar).toHaveAttribute("src", savedAvatarSrc);
     await expect(account.locator("img")).toHaveAttribute("src", savedAvatarSrc);
     await expectFrameFreeArtwork(account.locator(".rm-avatar-chip"));
+    await expectVisibleLocalArtwork(page, imageEvidence);
     await page.screenshot({
       path: testInfo.outputPath(`${width}-my-space-avatar-saved.png`),
       fullPage: true,
@@ -478,26 +569,59 @@ test("scoped account navigation preserves local avatar identity across mobile an
   await expect(page.getByRole("dialog", { name: MEMBER_NAME }).getByRole("button", { name: "로그아웃" })).toBeVisible();
 });
 
-test("public record requests exactly its visible local WebP avatars", async ({ page }, testInfo) => {
-  const imageEvidence = observeImageNetwork(page);
-  await routeSyntheticPublicRecord(page);
-  await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto(`/clubs/${CLUB_SLUG}/sessions/${PUBLIC_AVATAR_SESSION_ID}`);
+test("member roster and host attendance/member artwork stay frame-free at mobile and desktop widths", async ({ browser }, testInfo) => {
+  for (const width of [390, 1280]) {
+    const context = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 } });
+    const page = await context.newPage();
+    const imageEvidence = observeImageNetwork(page);
+    await routeSyntheticApp(page);
+    const cdp = await context.newCDPSession(page);
+    await cdp.send("Network.setCacheDisabled", { cacheDisabled: true });
 
-  await expect(page.getByRole("heading", { name: "공개 아바타 기록" })).toBeVisible();
-  await expect(page.getByText("공개 독자", { exact: true })).toBeVisible();
-  await expect(page.getByText("안전 독자", { exact: true })).toBeVisible();
-  await expect(page.getByText("공개 한줄평", { exact: true })).toBeVisible();
-  expect(await page.locator("main img").evaluateAll((images) => images.map((image) => image.getAttribute("src")))).toEqual([
-    "/assets/avatars/book-club/cloud-green-book.webp",
-    "/assets/avatars/book-club/cloud-green-book.webp",
-    "/assets/avatars/book-club/cloud-green-book.webp",
-  ]);
-  await expectFrameFreeArtwork(page.locator("main .rm-avatar-chip").first());
-  await assertVisibleAvatarNetwork(imageEvidence, new URL(page.url()).host, [
-    "/assets/avatars/book-club/cloud-green-book.webp",
-    "/assets/avatars/book-club/cloud-green-book.webp",
-    "/assets/avatars/book-club/cloud-green-book.webp",
-  ]);
-  await page.screenshot({ path: testInfo.outputPath("1280-public-record-avatars.png"), fullPage: true });
+    resetImageNetwork(imageEvidence);
+    await page.goto(`${APP_BASE}/session/current`);
+    await expect(page.getByText("김책가방", { exact: true })).toBeVisible();
+    await expect(page.getByText("김달력책", { exact: true })).toBeVisible();
+    await expectVisibleLocalArtwork(page, imageEvidence);
+    await page.screenshot({ path: testInfo.outputPath(`${width}-current-session-roster.png`), fullPage: true });
+
+    resetImageNetwork(imageEvidence);
+    await page.goto(`${APP_BASE}/host/sessions/session-avatar-roster/edit?section=attendance`);
+    await expect(page.getByRole("heading", { name: "출석 확정 명단" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "김책가방 참석" })).toBeVisible();
+    await expectVisibleLocalArtwork(page, imageEvidence);
+    await page.screenshot({ path: testInfo.outputPath(`${width}-host-attendance.png`), fullPage: true });
+
+    resetImageNetwork(imageEvidence);
+    await page.goto(`${APP_BASE}/host/members`);
+    await expect(page.getByRole("tablist", { name: "멤버 관리" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "김책가방" })).toBeVisible();
+    await expectVisibleLocalArtwork(page, imageEvidence);
+    await page.screenshot({ path: testInfo.outputPath(`${width}-host-members.png`), fullPage: true });
+
+    await context.close();
+  }
+});
+
+test("public record requests exactly its visible local WebP avatars at mobile and desktop widths", async ({ browser }, testInfo) => {
+  for (const width of [390, 1280]) {
+    const context = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 } });
+    const page = await context.newPage();
+    const imageEvidence = observeImageNetwork(page);
+    await routeSyntheticPublicRecord(page);
+    await page.goto(`/clubs/${CLUB_SLUG}/sessions/${PUBLIC_AVATAR_SESSION_ID}`);
+
+    await expect(page.getByRole("heading", { name: "공개 아바타 기록" })).toBeVisible();
+    await expect(page.getByText("공개 독자", { exact: true })).toBeVisible();
+    await expect(page.getByText("안전 독자", { exact: true })).toBeVisible();
+    await expect(page.getByText("공개 한줄평", { exact: true })).toBeVisible();
+    expect(await page.locator("main img").evaluateAll((images) => images.map((image) => image.getAttribute("src")))).toEqual([
+      "/assets/avatars/book-club/cloud-green-book.webp",
+      "/assets/avatars/book-club/cloud-green-book.webp",
+      "/assets/avatars/book-club/cloud-green-book.webp",
+    ]);
+    await expectVisibleLocalArtwork(page, imageEvidence);
+    await page.screenshot({ path: testInfo.outputPath(`${width}-public-record-avatars.png`), fullPage: true });
+    await context.close();
+  }
 });
