@@ -11,7 +11,8 @@ for (const viewport of [{ width: 320, height: 700 }, { width: 390, height: 844 }
         </div>
       </div>,
     );
-    await expect(component.getByRole("button", { name: /선택$/ })).toHaveCount(30);
+    const avatarButtons = component.getByRole("button", { name: /선택$/ });
+    await expect(avatarButtons).toHaveCount(30);
     const selected = component.getByRole("button", { name: "초록 책을 읽는 바나나 선택" });
     await expect(selected.locator(".rm-avatar-picker__check")).toHaveCount(1);
     await selected.focus();
@@ -20,6 +21,9 @@ for (const viewport of [{ width: 320, height: 700 }, { width: 390, height: 844 }
     const box = await selected.boundingBox();
     expect(box!.width).toBeGreaterThanOrEqual(44);
     expect(box!.height).toBeGreaterThanOrEqual(44);
-    await page.screenshot({ path: testInfo.outputPath(`avatar-picker-${viewport.width}.png`), fullPage: true });
+    await page.screenshot({ path: testInfo.outputPath(`avatar-picker-${viewport.width}-top.png`), fullPage: true });
+    await avatarButtons.last().scrollIntoViewIfNeeded();
+    await expect(avatarButtons.last()).toBeInViewport();
+    await page.screenshot({ path: testInfo.outputPath(`avatar-picker-${viewport.width}-bottom.png`), fullPage: true });
   });
 }
