@@ -35,14 +35,14 @@ const currentSession = {
         draftThought: null,
         authorName: "호스트",
         authorShortName: "호스트",
-        avatarKey: "deer-brown-book",
+        avatarKey: "star-notebook",
       }],
       longReviews: [],
     },
     attendees: [
       {
         membershipId: "membership-host",
-        avatarKey: "deer-brown-book",
+        avatarKey: "star-notebook",
         displayName: "호스트",
         accountName: "호스트",
         role: "HOST" as const,
@@ -51,7 +51,7 @@ const currentSession = {
       },
       {
         membershipId: "membership-member",
-        avatarKey: "squirrel-acorn",
+        avatarKey: "banana-green-book",
         displayName: "멤버",
         accountName: "멤버",
         role: "MEMBER" as const,

@@ -19,7 +19,7 @@ const savedProfile: MemberProfileResponse = {
   displayName: "기존 이름",
   accountName: "book-friend",
   profileImageUrl: null,
-  avatarKey: "hedgehog-green-mug",
+  avatarKey: "cloud-green-book",
 };
 
 function createWrapper() {
@@ -61,13 +61,13 @@ describe("profile mutations", () => {
   it("sends an avatar update to the own-avatar endpoint", async () => {
     vi.mocked(readmatesFetchResponse).mockResolvedValue(profileResponse(savedProfile));
 
-    await updateMyAvatar("hedgehog-green-mug", { clubSlug: "reading-sai" });
+    await updateMyAvatar("cloud-green-book", { clubSlug: "reading-sai" });
 
     expect(readmatesFetchResponse).toHaveBeenCalledWith(
       "/api/me/avatar",
       expect.objectContaining({
         method: "PATCH",
-        body: JSON.stringify({ avatarKey: "hedgehog-green-mug" }),
+        body: JSON.stringify({ avatarKey: "cloud-green-book" }),
       }),
       { clubSlug: "reading-sai" },
     );
@@ -83,7 +83,7 @@ describe("profile mutations", () => {
 
     let save!: Promise<MemberProfileResponse>;
     act(() => {
-      save = result.current.mutateAsync("hedgehog-green-mug");
+      save = result.current.mutateAsync("cloud-green-book");
     });
 
     await waitFor(() => expect(readmatesFetchResponse).toHaveBeenCalledOnce());
@@ -105,7 +105,7 @@ describe("profile mutations", () => {
     const invalidateQueries = vi.spyOn(client, "invalidateQueries");
     const { result } = renderHook(() => useUpdateMyAvatarMutation(), { wrapper: Wrapper });
 
-    await expect(result.current.mutateAsync("hedgehog-green-mug")).rejects.toMatchObject({ status: 400 });
+    await expect(result.current.mutateAsync("cloud-green-book")).rejects.toMatchObject({ status: 400 });
 
     expect(invalidateQueries).not.toHaveBeenCalled();
   });

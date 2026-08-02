@@ -41,7 +41,7 @@ export const authMeContractFixture = {
     role: "MEMBER",
     membershipStatus: "ACTIVE",
     approvalState: "ACTIVE",
-    avatarKey: "squirrel-acorn",
+    avatarKey: "banana-green-book",
   },
 } satisfies AuthMeResponse;
 
@@ -120,7 +120,7 @@ export const currentSessionContractFixture = {
         draftThought: "API에서 온 내 초안",
         authorName: "이멤버5",
         authorShortName: "수",
-        avatarKey: "squirrel-acorn",
+        avatarKey: "banana-green-book",
       },
       {
         priority: 2,
@@ -128,7 +128,7 @@ export const currentSessionContractFixture = {
         draftThought: "API에서 온 내 초안 2",
         authorName: "이멤버5",
         authorShortName: "수",
-        avatarKey: "squirrel-acorn",
+        avatarKey: "banana-green-book",
       },
     ],
     myOneLineReview: {
@@ -145,14 +145,14 @@ export const currentSessionContractFixture = {
           draftThought: "API에서 온 질문 초안",
           authorName: "김호스트",
           authorShortName: "우",
-          avatarKey: "fennec-heart-mug",
+          avatarKey: "cloud-green-book",
         },
       ],
       longReviews: [
         {
           authorName: "김호스트",
           authorShortName: "우",
-          avatarKey: "fennec-heart-mug",
+          avatarKey: "cloud-green-book",
           body: "API에서 온 공동 서평",
         },
       ],
@@ -160,7 +160,7 @@ export const currentSessionContractFixture = {
     attendees: [
       {
         membershipId: "member-host",
-        avatarKey: "fennec-heart-mug",
+        avatarKey: "cloud-green-book",
         displayName: "우",
         accountName: "김호스트",
         role: "HOST",
@@ -170,7 +170,7 @@ export const currentSessionContractFixture = {
       },
       {
         membershipId: "member-guest",
-        avatarKey: "squirrel-acorn",
+        avatarKey: "banana-green-book",
         displayName: "수",
         accountName: "이멤버5",
         role: "MEMBER",
@@ -205,7 +205,7 @@ export const archiveSessionDetailContractFixture = {
       sortOrder: 1,
       authorName: "안멤버1",
       authorShortName: "멤버1",
-      avatarKey: "turtle-winter-book",
+      avatarKey: "cloud-green-book",
     },
   ],
   clubQuestions: [
@@ -215,14 +215,14 @@ export const archiveSessionDetailContractFixture = {
       draftThought: "데이터 기반 사고가 일상 판단과 멀어지는 순간을 묻는다.",
       authorName: "이멤버5",
       authorShortName: "수",
-      avatarKey: "squirrel-acorn",
+      avatarKey: "banana-green-book",
     },
   ],
   clubOneLiners: [
     {
       authorName: "김호스트",
       authorShortName: "우",
-      avatarKey: "fennec-heart-mug",
+      avatarKey: "cloud-green-book",
       text: "낙관이 아니라 정확함의 문제였다.",
     },
   ],
@@ -230,7 +230,7 @@ export const archiveSessionDetailContractFixture = {
     {
       authorName: "김호스트",
       authorShortName: "우",
-      avatarKey: "fennec-heart-mug",
+      avatarKey: "cloud-green-book",
       text: "낙관이 아니라 정확함의 문제였다.",
     },
   ],
@@ -241,7 +241,7 @@ export const archiveSessionDetailContractFixture = {
       draftThought: null,
       authorName: "이멤버5",
       authorShortName: "수",
-      avatarKey: "squirrel-acorn",
+      avatarKey: "banana-green-book",
     },
   ],
   myCheckin: {
@@ -343,7 +343,7 @@ export const noteFeedPageContractFixture = {
       date: "2025-11-26",
       authorName: "이멤버5",
       authorShortName: "수",
-      avatarKey: "squirrel-acorn",
+      avatarKey: "banana-green-book",
       kind: "QUESTION",
       text: "데이터를 믿는 기준은 어디서 시작되나요?",
     },
@@ -392,7 +392,7 @@ export const hostSessionDetailContractFixture = {
   attendees: [
     {
       membershipId: "membership-host",
-      avatarKey: "fennec-heart-mug",
+      avatarKey: "cloud-green-book",
       displayName: "우",
       accountName: "김호스트",
       rsvpStatus: "GOING",
@@ -401,7 +401,7 @@ export const hostSessionDetailContractFixture = {
     },
     {
       membershipId: "membership-suhan",
-      avatarKey: "squirrel-acorn",
+      avatarKey: "banana-green-book",
       displayName: "수",
       accountName: "이멤버5",
       rsvpStatus: "GOING",

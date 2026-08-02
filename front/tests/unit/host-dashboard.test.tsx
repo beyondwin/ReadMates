@@ -134,7 +134,7 @@ const current: CurrentSessionResponse = {
           draftThought: null,
           authorName: "안멤버1",
           authorShortName: "멤버1",
-          avatarKey: "squirrel-acorn",
+          avatarKey: "banana-green-book",
         },
         {
           priority: 2,
@@ -142,14 +142,14 @@ const current: CurrentSessionResponse = {
           draftThought: null,
           authorName: "김호스트",
           authorShortName: "우",
-          avatarKey: "fennec-heart-mug",
+          avatarKey: "cloud-green-book",
         },
       ],
       longReviews: [
         {
           authorName: "안멤버1",
           authorShortName: "멤버1",
-          avatarKey: "squirrel-acorn",
+          avatarKey: "banana-green-book",
           body: "호스트 화면 계약용 서평",
         },
       ],
@@ -157,7 +157,7 @@ const current: CurrentSessionResponse = {
     attendees: [
       {
         membershipId: "membership-host",
-        avatarKey: "fennec-heart-mug",
+        avatarKey: "cloud-green-book",
         displayName: "김호스트",
         accountName: "우",
         role: "HOST",
@@ -166,7 +166,7 @@ const current: CurrentSessionResponse = {
       },
       {
         membershipId: "membership-member",
-        avatarKey: "squirrel-acorn",
+        avatarKey: "banana-green-book",
         displayName: "안멤버1",
         accountName: "멤버1",
         role: "MEMBER",

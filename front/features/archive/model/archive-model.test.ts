@@ -18,7 +18,7 @@ describe("inactiveMyPageProfile", () => {
     };
 
     expect(inactiveMyPageProfile(auth)).toEqual({
-      avatarKey: "hedgehog-green-book",
+      avatarKey: "cloud-green-book",
       displayName: "독자",
       accountName: "book-friend",
       email: "reader@example.com",

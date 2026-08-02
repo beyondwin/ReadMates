@@ -158,7 +158,7 @@ export function MemberList({
             <div style={{ minWidth: 0 }}>
               <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                 <AvatarChip
-                  avatarKey={member.status === "LEFT" ? "hedgehog-green-book" : member.avatarKey}
+                  avatarKey={member.status === "LEFT" ? "cloud-green-book" : member.avatarKey}
                   name={member.displayName}
                   label=""
                   size={32}

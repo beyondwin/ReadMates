@@ -16,7 +16,7 @@ for (const { width, height, screenshot } of viewports) {
     const component = await mount(
       <div style={{ padding: "32px" }}>
         <AvatarPicker
-          avatarKey="squirrel-acorn"
+          avatarKey="banana-green-book"
           canEditProfile
           onUpdateAvatar={async (avatarKey) => ({ avatarKey })}
         />

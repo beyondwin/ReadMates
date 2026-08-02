@@ -27,7 +27,7 @@ const members: HostMemberListItem[] = [
     displayName: "멤버1",
     accountName: "안멤버1",
     profileImageUrl: null,
-    avatarKey: "squirrel-acorn",
+    avatarKey: "banana-green-book",
     role: "MEMBER",
     status: "ACTIVE",
     joinedAt: "2026-04-18T12:00:00Z",
@@ -64,7 +64,7 @@ const members: HostMemberListItem[] = [
     displayName: "정",
     accountName: "정지 멤버",
     profileImageUrl: null,
-    avatarKey: "turtle-winter-book",
+    avatarKey: "cloud-green-book",
     role: "MEMBER",
     status: "SUSPENDED",
     joinedAt: "2026-04-14T12:00:00Z",
@@ -83,7 +83,7 @@ const members: HostMemberListItem[] = [
     displayName: "탈",
     accountName: "탈퇴 멤버",
     profileImageUrl: null,
-    avatarKey: "fennec-heart-mug",
+    avatarKey: "cloud-green-book",
     role: "MEMBER",
     status: "LEFT",
     joinedAt: "2026-04-10T12:00:00Z",
@@ -272,7 +272,7 @@ describe("HostMembersPage", () => {
     expect(activeRow.getByRole("heading", { name: "멤버1" })).toBeInTheDocument();
     expect(activeArticle.querySelector(".rm-avatar-chip img")).toHaveAttribute(
       "src",
-      "/assets/avatars/book-club/squirrel-acorn.webp",
+      "/assets/avatars/book-club/banana-green-book.webp",
     );
     expect(activeRow.queryByText("@멤버1")).not.toBeInTheDocument();
     expect(activeRow.getByText("active@example.com · 정식 멤버")).toBeInTheDocument();
@@ -283,7 +283,7 @@ describe("HostMembersPage", () => {
     const outsideRow = within(outsideArticle);
     expect(outsideArticle.querySelector(".rm-avatar-chip img")).toHaveAttribute(
       "src",
-      "/assets/avatars/book-club/hedgehog-green-book.webp",
+      "/assets/avatars/book-club/cloud-green-book.webp",
     );
     expect(outsideRow.queryByText("@새")).not.toBeInTheDocument();
     expect(outsideRow.getByText("new@example.com · 정식 멤버")).toBeInTheDocument();
@@ -300,7 +300,7 @@ describe("HostMembersPage", () => {
     const pendingArticle = screen.getByText("둘").closest("article") as HTMLElement;
     expect(pendingArticle.querySelector(".rm-avatar-chip img")).toHaveAttribute(
       "src",
-      "/assets/avatars/book-club/hedgehog-green-book.webp",
+      "/assets/avatars/book-club/cloud-green-book.webp",
     );
 
     await user.click(screen.getByRole("tab", { name: "탈퇴/비활성" }));
@@ -308,7 +308,7 @@ describe("HostMembersPage", () => {
     const inactiveRow = within(inactiveArticle);
     expect(inactiveArticle.querySelector(".rm-avatar-chip img")).toHaveAttribute(
       "src",
-      "/assets/avatars/book-club/hedgehog-green-book.webp",
+      "/assets/avatars/book-club/cloud-green-book.webp",
     );
     expect(inactiveRow.getByText("left@example.com · 참여 2026.04.10")).toBeInTheDocument();
     expect(inactiveRow.getByText("탈퇴")).toBeInTheDocument();

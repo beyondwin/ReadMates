@@ -57,7 +57,7 @@ test("TopNav shows the desktop avatar and preserves a long account name in its a
         accountControl={
           <button type="button" className="rm-account-menu__trigger" aria-label={`${memberName} 계정 메뉴`}>
             <span className="rm-account-menu__trigger-avatar" aria-hidden="true">
-              <span className="rm-avatar-chip"><img src="/assets/avatars/book-club/fennec-heart-mug.webp" alt="" /></span>
+              <span className="rm-avatar-chip"><img src="/assets/avatars/book-club/cloud-green-book.webp" alt="" /></span>
             </span>
             <span className="rm-account-menu__trigger-name">{memberName}</span>
             <span className="rm-account-menu__trigger-mobile-label">계정</span>
@@ -71,7 +71,7 @@ test("TopNav shows the desktop avatar and preserves a long account name in its a
   const account = navigation.getByRole("button", { name: `${memberName} 계정 메뉴` });
   await expect(account.locator(".rm-account-menu__trigger-avatar img")).toHaveAttribute(
     "src",
-    "/assets/avatars/book-club/fennec-heart-mug.webp",
+    "/assets/avatars/book-club/cloud-green-book.webp",
   );
   await expect(account.locator(".rm-account-menu__trigger-name")).toHaveText(memberName);
   await expect(account.locator(".rm-account-menu__trigger-name")).toHaveCSS("text-overflow", "ellipsis");

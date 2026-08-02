@@ -202,11 +202,11 @@ test("active members save an allowlisted avatar from My Space and refresh accoun
   expect((await saved).status()).toBe(200);
   await expect(opener.locator("img")).toHaveAttribute(
     "src",
-    "/assets/avatars/book-club/hedgehog-green-mug.webp",
+    "/assets/avatars/book-club/cloud-green-book.webp",
   );
   await expect(page.getByRole("button", { name: "E2E Active Avatar 계정 메뉴" }).locator("img")).toHaveAttribute(
     "src",
-    "/assets/avatars/book-club/hedgehog-green-mug.webp",
+    "/assets/avatars/book-club/cloud-green-book.webp",
   );
   expect(mysqlScalar(`
 select avatar_key
@@ -214,7 +214,7 @@ from memberships
 join users on users.id = memberships.user_id
 where lower(users.email) = ${sqlString(email)}
   and memberships.club_id = '00000000-0000-0000-0000-000000000001';
-`)).toBe("hedgehog-green-mug");
+`)).toBe("cloud-green-book");
 });
 
 test("suspended members omit account navigation and profile editing from member space", async ({ page }) => {
@@ -240,9 +240,9 @@ test("suspended members omit account navigation and profile editing from member 
     name: "최근 독서 기록",
   })).toBeVisible();
 
-  const directUpdate = await updateAvatarDirect(page, "hedgehog-green-mug", "reading-sai");
+  const directUpdate = await updateAvatarDirect(page, "cloud-green-book", "reading-sai");
   expect(directUpdate.status).toBe(200);
-  expect(directUpdate.body?.avatarKey).toBe("hedgehog-green-mug");
+  expect(directUpdate.body?.avatarKey).toBe("cloud-green-book");
 });
 
 test("left and inactive members cannot open or directly mutate the avatar picker", async ({ page }) => {
@@ -253,7 +253,7 @@ test("left and inactive members cannot open or directly mutate the avatar picker
     setMembershipStatus(email, status);
     await page.goto("/");
 
-    const directUpdate = await updateAvatarDirect(page, "hedgehog-green-mug", "reading-sai");
+    const directUpdate = await updateAvatarDirect(page, "cloud-green-book", "reading-sai");
     expect(directUpdate.status).toBe(403);
     expect(directUpdate.body?.code).toBe("MEMBERSHIP_NOT_ALLOWED");
 
@@ -272,9 +272,9 @@ test("two active members may store the same avatar key in one club", async ({ pa
     setMembershipStatus(email, "ACTIVE");
     await page.goto("/");
 
-    const directUpdate = await updateAvatarDirect(page, "hedgehog-green-mug", "reading-sai");
+    const directUpdate = await updateAvatarDirect(page, "cloud-green-book", "reading-sai");
     expect(directUpdate.status).toBe(200);
-    expect(directUpdate.body?.avatarKey).toBe("hedgehog-green-mug");
+    expect(directUpdate.body?.avatarKey).toBe("cloud-green-book");
     await logout(page);
   }
 
@@ -284,7 +284,7 @@ from memberships
 join users on users.id = memberships.user_id
 where memberships.club_id = '00000000-0000-0000-0000-000000000001'
   and lower(users.email) in (${emails.map(sqlString).join(", ")})
-  and memberships.avatar_key = 'hedgehog-green-mug';
+  and memberships.avatar_key = 'cloud-green-book';
 `)).toBe("2");
 });
 
@@ -296,13 +296,13 @@ test("mixed membership edit gates and avatar updates remain independent across c
   ensureSecondClubFixture();
   runMysql(`
 insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
-select uuid(), clubs.id, users.id, 'MEMBER', 'VIEWER', utc_timestamp(6), users.short_name, 'turtle-winter-book'
+select uuid(), clubs.id, users.id, 'MEMBER', 'VIEWER', utc_timestamp(6), users.short_name, 'cloud-green-book'
 from users
 join clubs on clubs.slug = 'sample-book-club'
 where lower(users.email) = ${sqlString(email)}
 on duplicate key update
   status = 'VIEWER',
-  avatar_key = 'turtle-winter-book',
+  avatar_key = 'cloud-green-book',
   updated_at = utc_timestamp(6);
 `);
   await page.goto("/");
@@ -312,20 +312,20 @@ on duplicate key update
   await page.goto("/clubs/sample-book-club/app/me");
   await expect(page.getByRole("button", { name: "아바타 바꾸기" })).toHaveCount(0);
 
-  const readingSaiUpdate = await updateAvatarDirect(page, "hedgehog-green-mug", "reading-sai");
+  const readingSaiUpdate = await updateAvatarDirect(page, "cloud-green-book", "reading-sai");
   expect(readingSaiUpdate.status).toBe(200);
-  const sampleClubUpdate = await updateAvatarDirect(page, "fox-glasses-mug", "sample-book-club");
+  const sampleClubUpdate = await updateAvatarDirect(page, "moon-green-book", "sample-book-club");
   expect(sampleClubUpdate.status).toBe(200);
 
   const readingSaiProfile = await scopedProfile(page, "reading-sai");
   const sampleClubProfile = await scopedProfile(page, "sample-book-club");
   expect(readingSaiProfile).toEqual({
     status: 200,
-    body: expect.objectContaining({ avatarKey: "hedgehog-green-mug" }),
+    body: expect.objectContaining({ avatarKey: "cloud-green-book" }),
   });
   expect(sampleClubProfile).toEqual({
     status: 200,
-    body: expect.objectContaining({ avatarKey: "fox-glasses-mug" }),
+    body: expect.objectContaining({ avatarKey: "moon-green-book" }),
   });
 });
 
@@ -416,9 +416,9 @@ test("viewer can read member routes but cannot use current-session write actions
   await expect(viewerShelf.getByRole("list", {
     name: "최근 독서 기록",
   })).toBeVisible();
-  const directUpdate = await updateAvatarDirect(page, "hedgehog-green-mug", "reading-sai");
+  const directUpdate = await updateAvatarDirect(page, "cloud-green-book", "reading-sai");
   expect(directUpdate.status).toBe(200);
-  expect(directUpdate.body?.avatarKey).toBe("hedgehog-green-mug");
+  expect(directUpdate.body?.avatarKey).toBe("cloud-green-book");
 
   await page.goto("/app/me/settings");
 

@@ -33,7 +33,7 @@ describe("member home record reflection cards", () => {
       text: "같은 문장을 서로 다른 경험으로 읽은 기록입니다.",
       authorName: null,
       authorShortName: null,
-      avatarKey: "hedgehog-green-book",
+      avatarKey: "cloud-green-book",
       bookTitle: "긴 제목의 다음 책",
       createdAt: "2026-06-18T12:00:00Z",
     };
@@ -57,7 +57,7 @@ describe("member home record reflection cards", () => {
       text: "이름 없이 보존된 하이라이트입니다.",
       authorName: null,
       authorShortName: null,
-      avatarKey: "hedgehog-green-book",
+      avatarKey: "cloud-green-book",
       bookTitle: "긴 제목의 다음 책",
     };
 
@@ -65,7 +65,7 @@ describe("member home record reflection cards", () => {
 
     expect(container.querySelector(".rm-member-activity-card__author .rm-avatar-chip img")).toHaveAttribute(
       "src",
-      "/assets/avatars/book-club/hedgehog-green-book.webp",
+      "/assets/avatars/book-club/cloud-green-book.webp",
     );
     expect(screen.getByText("회차 하이라이트")).toBeVisible();
   });
@@ -188,7 +188,7 @@ describe("member home record reflection cards", () => {
             attendees: [
               {
                 membershipId: "membership-1",
-                avatarKey: "hedgehog-green-book",
+                avatarKey: "cloud-green-book",
                 displayName: "응답 전 멤버",
                 accountName: "member@example.com",
                 role: "MEMBER",

@@ -17,7 +17,7 @@ const memberAuth: AuthMeResponse = {
     clubId: "club-one",
     clubSlug: "club-one",
     displayName: "멤버",
-    avatarKey: "fennec-heart-mug",
+    avatarKey: "cloud-green-book",
     role: "MEMBER",
     membershipStatus: "ACTIVE",
     approvalState: "ACTIVE",

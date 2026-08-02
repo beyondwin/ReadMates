@@ -29,7 +29,7 @@ vi.mock("@/features/archive/queries/profile-queries", () => ({
 
 const data: MyPageRouteData = {
   profile: {
-    avatarKey: "fennec-heart-mug",
+    avatarKey: "cloud-green-book",
     displayName: "샘플 멤버",
     accountName: "sample-member",
     email: "member@example.com",
@@ -131,7 +131,7 @@ describe("MyPageRoute", () => {
     expect(screen.getByRole("heading", { level: 1, name: "샘플 멤버" })).toBeVisible();
     expect(screen.getByRole("button", { name: "아바타 바꾸기" }).querySelector("img")).toHaveAttribute(
       "src",
-      "/assets/avatars/book-club/fennec-heart-mug.webp",
+      "/assets/avatars/book-club/cloud-green-book.webp",
     );
     expect(screen.getByText("9번의 모임에서 7권을 끝까지 읽었어요.")).toBeVisible();
     expect(screen.queryByRole("link", { name: "계정 관리" })).toBeNull();
@@ -185,11 +185,11 @@ describe("MyPageRoute", () => {
     await user.click(screen.getByRole("button", { name: "아바타 바꾸기" }));
     const dialog = screen.getByRole("dialog", { name: "나의 아바타 선택" });
     await user.click(within(dialog).getByRole("button", {
-      name: "초록 찻잔을 든 고슴도치 선택",
+      name: "초록 책을 읽는 바나나 선택",
     }));
     await user.click(within(dialog).getByRole("button", { name: "이 아바타로 변경" }));
 
-    expect(mutations.avatar).toHaveBeenCalledWith("hedgehog-green-mug");
+    expect(mutations.avatar).toHaveBeenCalledWith("banana-green-book");
     expect(onProfileUpdated).toHaveBeenCalledTimes(2);
     expect(route.revalidate).toHaveBeenCalledTimes(2);
   });

@@ -50,7 +50,7 @@ describe("TopNav responsive variants", () => {
   it("renders member desktop navigation with the current app section marked", () => {
     const { container } = renderAt(
       "/app/session/current",
-      <TopNav variant="member" memberName="이멤버5" memberAvatarKey="squirrel-acorn" />,
+      <TopNav variant="member" memberName="이멤버5" memberAvatarKey="banana-green-book" />,
     );
 
     const nav = screen.getByRole("navigation", { name: "앱 내비게이션" });
@@ -66,7 +66,7 @@ describe("TopNav responsive variants", () => {
     expect(within(nav).getByRole("link", { name: "내 공간" })).toHaveAttribute("href", "/app/me");
     expect(within(nav).getByRole("link", { name: "오늘" })).toHaveAttribute("aria-current", "page");
     expect(screen.queryByRole("link", { name: "호스트 화면" })).not.toBeInTheDocument();
-    expect(container.querySelector(".rm-avatar-chip img")).toHaveAttribute("src", "/assets/avatars/book-club/squirrel-acorn.webp");
+    expect(container.querySelector(".rm-avatar-chip img")).toHaveAttribute("src", "/assets/avatars/book-club/banana-green-book.webp");
   });
 
   it.each([
@@ -124,7 +124,7 @@ describe("TopNav responsive variants", () => {
   it("renders host desktop workspace navigation with the required labels and member return action", () => {
     const { container } = renderAt(
       "/app/host/sessions/new",
-      <TopNav variant="host" memberName="김호스트" memberAvatarKey="fennec-heart-mug" currentSessionId="session-6" />,
+      <TopNav variant="host" memberName="김호스트" memberAvatarKey="cloud-green-book" currentSessionId="session-6" />,
     );
 
     const nav = screen.getByRole("navigation", { name: "앱 내비게이션" });
@@ -147,7 +147,7 @@ describe("TopNav responsive variants", () => {
     expect(memberReturn).toHaveClass("rm-workspace-switch");
     expect(memberReturn.textContent).toBe("");
     expect(screen.getByRole("link", { name: /읽는사이/ })).toHaveAttribute("href", "/app/host");
-    expect(container.querySelector(".rm-avatar-chip img")).toHaveAttribute("src", "/assets/avatars/book-club/fennec-heart-mug.webp");
+    expect(container.querySelector(".rm-avatar-chip img")).toHaveAttribute("src", "/assets/avatars/book-club/cloud-green-book.webp");
   });
 
   it.each([

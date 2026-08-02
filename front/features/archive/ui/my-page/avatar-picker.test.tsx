@@ -14,9 +14,9 @@ function deferred<T>() {
 }
 
 function renderPicker({
-  avatarKey = "squirrel-acorn",
+  avatarKey = "banana-green-book",
   canEditProfile = true,
-  onUpdateAvatar = vi.fn().mockResolvedValue({ avatarKey: "hedgehog-green-mug" }),
+  onUpdateAvatar = vi.fn().mockResolvedValue({ avatarKey: "cloud-green-book" }),
 }: {
   avatarKey?: string;
   canEditProfile?: boolean;
@@ -53,25 +53,25 @@ describe("AvatarPicker", () => {
     expect(opener).toHaveTextContent("아바타 바꾸기");
     expect(opener.querySelector("img")).toHaveAttribute(
       "src",
-      "/assets/avatars/book-club/squirrel-acorn.webp",
+      "/assets/avatars/book-club/banana-green-book.webp",
     );
     expect(opener.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
     expect(container.querySelectorAll("button")).toHaveLength(1);
   });
 
-  it("renders 40 labelled choices and keeps selection local until an explicit changed-key save", async () => {
-    const onUpdateAvatar = vi.fn().mockResolvedValue({ avatarKey: "hedgehog-green-mug" });
+  it("renders 30 labelled choices and keeps selection local until an explicit changed-key save", async () => {
+    const onUpdateAvatar = vi.fn().mockResolvedValue({ avatarKey: "cloud-green-book" });
     renderPicker({ onUpdateAvatar });
     const { user, opener, dialog } = await openPicker();
     const choices = within(dialog).getByRole("group", { name: "아바타 목록" });
     const save = within(dialog).getByRole("button", { name: "이 아바타로 변경" });
 
-    expect(within(choices).getAllByRole("button", { name: /선택$/ })).toHaveLength(40);
+    expect(within(choices).getAllByRole("button", { name: /선택$/ })).toHaveLength(30);
     expect(save).toBeDisabled();
 
     await user.click(
       within(dialog).getByRole("button", {
-        name: "초록 찻잔을 든 고슴도치 선택",
+        name: "초록 책을 읽는 구름 선택",
       }),
     );
 
@@ -79,13 +79,13 @@ describe("AvatarPicker", () => {
     expect(onUpdateAvatar).not.toHaveBeenCalled();
     expect(opener.querySelector("img")).toHaveAttribute(
       "src",
-      "/assets/avatars/book-club/squirrel-acorn.webp",
+      "/assets/avatars/book-club/banana-green-book.webp",
     );
 
     await user.click(save);
 
     expect(onUpdateAvatar).toHaveBeenCalledTimes(1);
-    expect(onUpdateAvatar).toHaveBeenCalledWith("hedgehog-green-mug");
+    expect(onUpdateAvatar).toHaveBeenCalledWith("cloud-green-book");
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(opener).toHaveFocus();
   });
@@ -94,10 +94,10 @@ describe("AvatarPicker", () => {
     renderPicker();
     const { user, dialog } = await openPicker();
     const current = within(dialog).getByRole("button", {
-      name: "도토리를 든 다람쥐 선택",
+      name: "초록 책을 읽는 바나나 선택",
     });
     const next = within(dialog).getByRole("button", {
-      name: "초록 찻잔을 든 고슴도치 선택",
+      name: "초록 책을 읽는 구름 선택",
     });
 
     expect(current).toHaveFocus();
@@ -130,7 +130,7 @@ describe("AvatarPicker", () => {
 
     await user.click(
       within(dialog).getByRole("button", {
-        name: "초록 찻잔을 든 고슴도치 선택",
+        name: "초록 책을 읽는 구름 선택",
       }),
     );
     await dismiss(user, dialog);
@@ -165,7 +165,7 @@ describe("AvatarPicker", () => {
     const { user, dialog } = await openPicker();
     await user.click(
       within(dialog).getByRole("button", {
-        name: "초록 찻잔을 든 고슴도치 선택",
+        name: "초록 책을 읽는 구름 선택",
       }),
     );
     const save = within(dialog).getByRole("button", { name: "이 아바타로 변경" });
@@ -187,7 +187,7 @@ describe("AvatarPicker", () => {
       expect(tile).toBeDisabled();
     }
 
-    pendingSave.resolve({ avatarKey: "hedgehog-green-mug" });
+    pendingSave.resolve({ avatarKey: "cloud-green-book" });
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
@@ -195,11 +195,11 @@ describe("AvatarPicker", () => {
     const onUpdateAvatar = vi
       .fn()
       .mockRejectedValueOnce(new Error("temporary failure"))
-      .mockResolvedValueOnce({ avatarKey: "hedgehog-green-mug" });
+      .mockResolvedValueOnce({ avatarKey: "cloud-green-book" });
     renderPicker({ onUpdateAvatar });
     const { user, opener, dialog } = await openPicker();
     const next = within(dialog).getByRole("button", {
-      name: "초록 찻잔을 든 고슴도치 선택",
+      name: "초록 책을 읽는 구름 선택",
     });
 
     await user.click(next);
@@ -210,7 +210,7 @@ describe("AvatarPicker", () => {
     expect(next).toHaveAttribute("aria-pressed", "true");
     expect(opener.querySelector("img")).toHaveAttribute(
       "src",
-      "/assets/avatars/book-club/squirrel-acorn.webp",
+      "/assets/avatars/book-club/banana-green-book.webp",
     );
 
     await user.click(within(dialog).getByRole("button", { name: "이 아바타로 변경" }));
@@ -228,7 +228,7 @@ describe("AvatarPicker", () => {
     const { dialog } = await openPicker(user);
     await user.click(
       within(dialog).getByRole("button", {
-        name: "초록 찻잔을 든 고슴도치 선택",
+        name: "초록 책을 읽는 구름 선택",
       }),
     );
 
@@ -248,7 +248,7 @@ describe("AvatarPicker", () => {
     expect(screen.queryByRole("button", { name: "아바타 바꾸기" })).toBeNull();
     expect(container.querySelector(".rm-avatar-picker--decorative .rm-avatar-chip img")).toHaveAttribute(
       "src",
-      "/assets/avatars/book-club/squirrel-acorn.webp",
+      "/assets/avatars/book-club/banana-green-book.webp",
     );
   });
 });

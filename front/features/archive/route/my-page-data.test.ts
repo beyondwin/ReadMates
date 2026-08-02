@@ -17,7 +17,7 @@ vi.mock("@/features/archive/api/archive-api", () => api);
 vi.mock("@/features/archive/route/archive-loader-auth", () => auth);
 
 const profile: MyPageResponse = {
-  avatarKey: "squirrel-acorn",
+  avatarKey: "banana-green-book",
   displayName: "독자",
   accountName: "책친구",
   email: "reader@example.com",
@@ -107,7 +107,7 @@ describe("myPageLoader", () => {
   it("keeps an inactive shelf membership-aware without starting profile requests", async () => {
     const inactiveProfile = {
       ...profile,
-      avatarKey: "hedgehog-green-book",
+      avatarKey: "cloud-green-book",
       membershipStatus: "INACTIVE" as const,
       clubName: null,
       joinedAt: "",

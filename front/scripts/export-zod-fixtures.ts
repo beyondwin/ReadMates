@@ -134,16 +134,16 @@ const currentSession = {
         draftThought: "계약 테스트 초안",
         authorName: "멤버5",
         authorShortName: "멤버5",
-        avatarKey: "penguin-beret-book",
+        avatarKey: "cloud-green-book",
       },
     ],
     myOneLineReview: {
       text: "계약 테스트 한줄평",
-      avatarKey: "penguin-beret-book",
+      avatarKey: "cloud-green-book",
     },
     myLongReview: {
       body: "계약 테스트 내 서평",
-      avatarKey: "penguin-beret-book",
+      avatarKey: "cloud-green-book",
     },
     board: {
       questions: [
@@ -153,14 +153,14 @@ const currentSession = {
           draftThought: "계약 테스트 초안",
           authorName: "멤버5",
           authorShortName: "멤버5",
-          avatarKey: "penguin-beret-book",
+          avatarKey: "cloud-green-book",
         },
       ],
       longReviews: [
         {
           authorName: "멤버5",
           authorShortName: "멤버5",
-          avatarKey: "penguin-beret-book",
+          avatarKey: "cloud-green-book",
           body: "계약 테스트 내 서평",
         },
       ],
@@ -174,7 +174,7 @@ const currentSession = {
         rsvpStatus: "GOING",
         attendanceStatus: "UNKNOWN",
         participationStatus: "ACTIVE",
-        avatarKey: "squirrel-acorn",
+        avatarKey: "banana-green-book",
       },
     ],
   },

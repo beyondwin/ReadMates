@@ -43,7 +43,7 @@ function memberAuth(membershipStatus: MembershipStatus): AuthMeResponse {
       role: "MEMBER",
       membershipStatus,
       approvalState: membershipStatus,
-      avatarKey: "squirrel-acorn",
+      avatarKey: "banana-green-book",
     },
   };
 }

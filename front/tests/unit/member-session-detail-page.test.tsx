@@ -146,7 +146,7 @@ describe("MemberSessionDetailPage", () => {
             sortOrder: 0,
             authorName: null,
             authorShortName: null,
-            avatarKey: "hedgehog-green-book",
+            avatarKey: "cloud-green-book",
           },
         ],
       },
@@ -160,7 +160,7 @@ describe("MemberSessionDetailPage", () => {
           text: "작성자 보강이 필요한 하이라이트",
           authorName: "이멤버5",
           authorShortName: "수",
-          avatarKey: "fennec-heart-mug",
+          avatarKey: "cloud-green-book",
         },
       ],
     );
@@ -209,7 +209,7 @@ describe("MemberSessionDetailPage", () => {
     expect(within(desktopHighlightRow as HTMLElement).getByText("안멤버1")).toBeInTheDocument();
     expect((desktopHighlightRow as HTMLElement).querySelector(".rm-avatar-chip img")).toHaveAttribute(
       "src",
-      "/assets/avatars/book-club/turtle-winter-book.webp",
+      "/assets/avatars/book-club/cloud-green-book.webp",
     );
     expect(desktop.getByRole("heading", { name: "한줄평 · 1" })).toBeInTheDocument();
     expect(desktop.getByRole("heading", { name: "함께 남긴 질문" })).toBeInTheDocument();
@@ -250,7 +250,7 @@ describe("MemberSessionDetailPage", () => {
     expect(within(mobileHighlightRow as HTMLElement).getByText("안멤버1")).toBeInTheDocument();
     expect((mobileHighlightRow as HTMLElement).querySelector(".rm-avatar-chip img")).toHaveAttribute(
       "src",
-      "/assets/avatars/book-club/turtle-winter-book.webp",
+      "/assets/avatars/book-club/cloud-green-book.webp",
     );
     const mobileOneLinerHeading = mobile.getByRole("heading", { name: "한줄평 · 1" });
     expect(mobileOneLinerHeading).toHaveClass("h4");
@@ -537,7 +537,7 @@ describe("MemberSessionDetailPage", () => {
           draftThought: null,
           authorName: "이멤버5",
           authorShortName: "수",
-          avatarKey: "fennec-heart-mug",
+          avatarKey: "cloud-green-book",
         },
       ],
     });
@@ -567,7 +567,7 @@ describe("MemberSessionDetailPage", () => {
         {
           authorName: "김호스트",
           authorShortName: "호스트",
-          avatarKey: "fennec-heart-mug",
+          avatarKey: "cloud-green-book",
           text: "낙관이 아니라 정확함의 문제였다.",
         },
       ],
@@ -575,7 +575,7 @@ describe("MemberSessionDetailPage", () => {
         {
           authorName: "김호스트",
           authorShortName: "호스트",
-          avatarKey: "fennec-heart-mug",
+          avatarKey: "cloud-green-book",
           text: "정확함의 문제였다.",
         },
       ],
@@ -585,7 +585,7 @@ describe("MemberSessionDetailPage", () => {
     expect(screen.getAllByText("낙관이 아니라 정확함의 문제였다.").length).toBeGreaterThan(0);
     const authorAvatars = screen.getAllByText("김호스트").map((name) => name.parentElement?.querySelector(".rm-avatar-chip img"));
     expect(authorAvatars.length).toBeGreaterThan(0);
-    expect(authorAvatars.every((avatar) => avatar?.getAttribute("src") === "/assets/avatars/book-club/fennec-heart-mug.webp")).toBe(true);
+    expect(authorAvatars.every((avatar) => avatar?.getAttribute("src") === "/assets/avatars/book-club/cloud-green-book.webp")).toBe(true);
   });
 
   it("shows a host edit link in the desktop rail for hosts", () => {

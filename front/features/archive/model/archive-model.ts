@@ -100,7 +100,7 @@ export type MyPageProfile = {
 
 export function inactiveMyPageProfile(auth: AuthMeResponse): MyPageProfile {
   return {
-    avatarKey: auth.currentMembership?.avatarKey ?? auth.avatarKey ?? "hedgehog-green-book",
+    avatarKey: auth.currentMembership?.avatarKey ?? auth.avatarKey ?? "cloud-green-book",
     displayName: auth.displayName ?? "",
     accountName: auth.accountName ?? "",
     email: auth.email ?? "",

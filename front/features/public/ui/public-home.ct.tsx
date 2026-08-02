@@ -42,7 +42,7 @@ const publicSessionView: PublicSessionDetailView = {
       sortOrder: 1,
       authorName: "테스트 독자",
       authorShortName: "테",
-      avatarKey: "hedgehog-green-book",
+      avatarKey: "cloud-green-book",
     },
   ],
   oneLiners: [
@@ -50,7 +50,7 @@ const publicSessionView: PublicSessionDetailView = {
       text: "긴 한줄평도 같은 본문 크기 범위 안에서 자연스럽게 줄바꿈됩니다.",
       authorName: "테스트 멤버",
       authorShortName: "테",
-      avatarKey: "hedgehog-green-book",
+      avatarKey: "cloud-green-book",
     },
   ],
 };

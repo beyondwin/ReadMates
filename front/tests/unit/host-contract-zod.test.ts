@@ -29,7 +29,7 @@ const validHostSessionDetail = {
   attendees: [
     {
       membershipId: "m-1",
-      avatarKey: "squirrel-acorn",
+      avatarKey: "banana-green-book",
       displayName: "Alice",
       accountName: "alice",
       rsvpStatus: "GOING" as const,

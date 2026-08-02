@@ -17,7 +17,7 @@ function renderMenu(memberName = "멤버1") {
     <>
       <AccountMenu
         memberName={memberName}
-        avatarKey="squirrel-acorn"
+        avatarKey="banana-green-book"
         membershipLabel="정식 멤버"
         notificationsHref="/app/notifications"
         settingsHref="/app/me/settings"
@@ -74,7 +74,7 @@ describe("AccountMenu", () => {
     expect(trigger).toHaveTextContent("▾");
     expect(trigger.querySelector(".rm-avatar-chip img")).toHaveAttribute(
       "src",
-      "/assets/avatars/book-club/squirrel-acorn.webp",
+      "/assets/avatars/book-club/banana-green-book.webp",
     );
 
     await user.click(trigger);

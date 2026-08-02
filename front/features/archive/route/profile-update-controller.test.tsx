@@ -17,7 +17,7 @@ vi.mock("@/features/archive/queries/profile-queries", () => ({
 }));
 
 const profile: MyPageResponse = {
-  avatarKey: "squirrel-acorn",
+  avatarKey: "banana-green-book",
   displayName: "기존 이름",
   accountName: "book-friend",
   email: "reader@example.com",
@@ -37,7 +37,7 @@ const updatedProfile: MemberProfileResponse = {
   displayName: "새 이름",
   accountName: "book-friend",
   profileImageUrl: null,
-  avatarKey: "squirrel-acorn",
+  avatarKey: "banana-green-book",
 };
 
 const updatedAvatar: MemberProfileResponse = {
@@ -45,7 +45,7 @@ const updatedAvatar: MemberProfileResponse = {
   displayName: "기존 이름",
   accountName: "book-friend",
   profileImageUrl: null,
-  avatarKey: "hedgehog-green-mug",
+  avatarKey: "cloud-green-book",
 };
 
 function deferred<T>() {
@@ -269,11 +269,11 @@ describe("useProfileUpdateController", () => {
     );
 
     await act(async () => {
-      await expect(result.current.updateAvatar("hedgehog-green-mug")).resolves.toEqual(updatedAvatar);
+      await expect(result.current.updateAvatar("cloud-green-book")).resolves.toEqual(updatedAvatar);
     });
 
-    expect(mutations.updateMyAvatar).toHaveBeenCalledWith("hedgehog-green-mug");
-    expect(result.current.profile.avatarKey).toBe("hedgehog-green-mug");
+    expect(mutations.updateMyAvatar).toHaveBeenCalledWith("cloud-green-book");
+    expect(result.current.profile.avatarKey).toBe("cloud-green-book");
     expect(result.current.profile.displayName).toBe("기존 이름");
     expect(callbackOrder).toEqual(["auth-refresh", "revalidate"]);
   });
@@ -305,11 +305,11 @@ describe("useProfileUpdateController", () => {
     let saveFirst!: Promise<MemberProfileResponse>;
     let saveSecond!: Promise<MemberProfileResponse>;
     act(() => {
-      saveFirst = result.current.updateAvatar("hedgehog-green-book");
-      saveSecond = result.current.updateAvatar("hedgehog-green-mug");
+      saveFirst = result.current.updateAvatar("cloud-green-book");
+      saveSecond = result.current.updateAvatar("cloud-green-book");
     });
 
-    firstSave.resolve({ ...updatedAvatar, avatarKey: "hedgehog-green-book" });
+    firstSave.resolve({ ...updatedAvatar, avatarKey: "cloud-green-book" });
     await act(async () => {
       await saveFirst;
     });
@@ -317,11 +317,11 @@ describe("useProfileUpdateController", () => {
     await act(async () => {
       await saveSecond;
     });
-    expect(result.current.profile.avatarKey).toBe("hedgehog-green-mug");
+    expect(result.current.profile.avatarKey).toBe("cloud-green-book");
 
-    rerender({ sourceProfile: { ...profile, avatarKey: "hedgehog-green-book" } });
+    rerender({ sourceProfile: { ...profile, avatarKey: "cloud-green-book" } });
 
-    expect(result.current.profile.avatarKey).toBe("hedgehog-green-mug");
+    expect(result.current.profile.avatarKey).toBe("cloud-green-book");
     expect(callbackOrder).toEqual(["auth-refresh", "revalidate", "auth-refresh", "revalidate"]);
   });
 
@@ -343,15 +343,15 @@ describe("useProfileUpdateController", () => {
 
     await act(async () => {
       await result.current.updateProfile("새 이름");
-      await result.current.updateAvatar("hedgehog-green-mug");
+      await result.current.updateAvatar("cloud-green-book");
     });
-    expect(result.current.profile).toMatchObject({ displayName: "새 이름", avatarKey: "hedgehog-green-mug" });
+    expect(result.current.profile).toMatchObject({ displayName: "새 이름", avatarKey: "cloud-green-book" });
 
     rerender({ sourceProfile: { ...profile, displayName: "권위 이름" } });
-    expect(result.current.profile).toMatchObject({ displayName: "권위 이름", avatarKey: "hedgehog-green-mug" });
+    expect(result.current.profile).toMatchObject({ displayName: "권위 이름", avatarKey: "cloud-green-book" });
 
     rerender({ sourceProfile: { ...profile } });
-    expect(result.current.profile).toMatchObject({ displayName: "기존 이름", avatarKey: "hedgehog-green-mug" });
+    expect(result.current.profile).toMatchObject({ displayName: "기존 이름", avatarKey: "cloud-green-book" });
 
     rerender({ sourceProfile: { ...profile, avatarKey: "권위 아바타" } });
     expect(result.current.profile).toMatchObject({ displayName: "기존 이름", avatarKey: "권위 아바타" });
@@ -370,9 +370,9 @@ describe("useProfileUpdateController", () => {
       }),
     );
 
-    await expect(result.current.updateAvatar("hedgehog-green-mug")).rejects.toThrow("이름 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    await expect(result.current.updateAvatar("cloud-green-book")).rejects.toThrow("이름 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
 
-    expect(result.current.profile.avatarKey).toBe("squirrel-acorn");
+    expect(result.current.profile.avatarKey).toBe("banana-green-book");
     expect(onProfileUpdated).not.toHaveBeenCalled();
     expect(onRevalidate).not.toHaveBeenCalled();
   });

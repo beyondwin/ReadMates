@@ -18,7 +18,7 @@ vi.mock("react-router-dom", async (importOriginal) => ({
 vi.mock("@/features/archive/api/archive-api", () => api);
 
 const profile: MyPageResponse = {
-  avatarKey: "squirrel-acorn",
+  avatarKey: "banana-green-book",
   displayName: "기존 이름",
   accountName: "book-friend",
   email: "reader@example.com",

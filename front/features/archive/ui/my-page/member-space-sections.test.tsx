@@ -12,7 +12,7 @@ import type { RecentReadingListItem } from "./recent-reading-list";
 import type { AvatarUpdateResult, ProfileUpdateResult } from "./types";
 
 const profile: MyPageProfile = {
-  avatarKey: "squirrel-acorn",
+  avatarKey: "banana-green-book",
   displayName: "멤버1",
   accountName: "member-one",
   email: "member1@example.com",
@@ -66,8 +66,8 @@ function renderProfileSummary(canEditProfile = true) {
 
 describe("member-space presentation sections", () => {
   it.each([
-    ["squirrel-acorn", "/assets/avatars/book-club/squirrel-acorn.webp"],
-    ["future-avatar", "/assets/avatars/book-club/hedgehog-green-book.webp"],
+    ["banana-green-book", "/assets/avatars/book-club/banana-green-book.webp"],
+    ["future-avatar", "/assets/avatars/book-club/cloud-green-book.webp"],
   ])("renders the stored %s profile key through AvatarChip", (avatarKey, expectedSrc) => {
     const { container } = render(
       <MemberProfileSummary
@@ -109,7 +109,7 @@ describe("member-space presentation sections", () => {
     expect(screen.queryByRole("button", { name: "아바타 바꾸기" })).toBeNull();
     expect(container.querySelector(".rm-avatar-picker--decorative .rm-avatar-chip img")).toHaveAttribute(
       "src",
-      "/assets/avatars/book-club/squirrel-acorn.webp",
+      "/assets/avatars/book-club/banana-green-book.webp",
     );
     expect(screen.queryByLabelText("이름 변경 준비 중")).toBeNull();
     expect(screen.queryByRole("link", { name: /계정 (관리|설정)/ })).toBeNull();
@@ -150,27 +150,27 @@ describe("member-space presentation sections", () => {
 
     expect(opener.querySelector("img")).toHaveAttribute(
       "src",
-      "/assets/avatars/book-club/squirrel-acorn.webp",
+      "/assets/avatars/book-club/banana-green-book.webp",
     );
     await user.click(opener);
     const dialog = screen.getByRole("dialog", { name: "나의 아바타 선택" });
     await user.click(within(dialog).getByRole("button", {
-      name: "초록 찻잔을 든 고슴도치 선택",
+      name: "초록 책을 읽는 구름 선택",
     }));
 
     expect(onUpdateAvatar).not.toHaveBeenCalled();
     expect(opener.querySelector("img")).toHaveAttribute(
       "src",
-      "/assets/avatars/book-club/squirrel-acorn.webp",
+      "/assets/avatars/book-club/banana-green-book.webp",
     );
 
     await user.click(within(dialog).getByRole("button", { name: "이 아바타로 변경" }));
 
-    expect(onUpdateAvatar).toHaveBeenCalledWith("hedgehog-green-mug");
+    expect(onUpdateAvatar).toHaveBeenCalledWith("cloud-green-book");
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "아바타 바꾸기" }).querySelector("img")).toHaveAttribute(
         "src",
-        "/assets/avatars/book-club/hedgehog-green-mug.webp",
+        "/assets/avatars/book-club/cloud-green-book.webp",
       );
     });
   });

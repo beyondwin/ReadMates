@@ -10,10 +10,10 @@ const appOrigin = `http://localhost:${process.env.PLAYWRIGHT_PORT ?? 3100}`;
 
 // Stable synthetic mappings are fixture-role based, never derived from member identity or UUIDs.
 const fixtureAvatarKeys = {
-  secondClubHost: "squirrel-acorn",
-  googleViewer: "hedgehog-green-book",
-  acceptedGoogleInvite: "deer-brown-book",
-  standaloneViewer: "mouse-blue-book",
+  secondClubHost: "banana-green-book",
+  googleViewer: "cloud-green-book",
+  acceptedGoogleInvite: "star-notebook",
+  standaloneViewer: "cloud-green-book",
 } as const;
 
 const devGoogleSubjects: Record<string, string> = {
