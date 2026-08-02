@@ -23,5 +23,10 @@ export function ClubMemberAppRouteLayout() {
 export function ClubHostAppRouteLayout() {
   const auth = useLoaderData() as AuthMeResponse;
 
-  return <AppRouteLayout scopedAuth={auth} />;
+  return (
+    <>
+      <GuestAppHead audience="HOST" />
+      <AppRouteLayout scopedAuth={auth} />
+    </>
+  );
 }

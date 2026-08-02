@@ -344,7 +344,7 @@ describe("SPA router", () => {
     expect(await screen.findByRole("heading", { name: heading })).toBeInTheDocument();
   });
 
-  it("keeps scoped host access when the unscoped session role is only member", async () => {
+  it("keeps scoped host access noindex and restores indexable public marketing on navigation", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = input.toString();
 
@@ -382,6 +382,10 @@ describe("SPA router", () => {
         );
       }
 
+      if (url === "/api/bff/api/public/clubs/reading-sai") {
+        return Promise.resolve(jsonResponse(publicClubResponse));
+      }
+
       return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -398,6 +402,15 @@ describe("SPA router", () => {
 
     expect(await screen.findByRole("heading", { name: "페이지를 찾을 수 없습니다." })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/clubs/reading-sai/app/host/missing-page");
+    expect(document.head.querySelector('meta[name="robots"][data-readmates-club-app="true"]')).toHaveAttribute(
+      "content",
+      "noindex",
+    );
+
+    await router.navigate("/clubs/reading-sai");
+
+    expect(await screen.findByRole("heading", { name: "읽는사이" })).toBeInTheDocument();
+    expect(document.head.querySelector('meta[name="robots"][data-readmates-club-app="true"]')).toBeNull();
   });
 
   it("returns a private scoped club as not found when the authenticated membership is inactive", async () => {

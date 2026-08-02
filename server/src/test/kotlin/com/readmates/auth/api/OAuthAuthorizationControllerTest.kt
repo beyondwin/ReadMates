@@ -173,6 +173,42 @@ class OAuthAuthorizationControllerTest(
     }
 
     @Test
+    fun `present invite parameter suppresses real state bound join even when invalid`() {
+        listOf("", "   ", "malformed").forEach { inviteToken ->
+            val issued =
+                mockMvc
+                    .post("/api/auth/oauth/join-intent") {
+                        contentType = MediaType.APPLICATION_JSON
+                        content = """{"clubSlug":"reading-sai","returnTo":"/clubs/reading-sai/app"}"""
+                    }.andExpect { status { isOk() } }
+                    .andReturn()
+            val session = issued.request.getSession(false) as MockHttpSession
+            val intent = objectMapper.readTree(issued.response.contentAsString).get("intent").asText()
+            val started =
+                mockMvc
+                    .perform(
+                        MockMvcRequestBuilders
+                            .get("/oauth2/authorization/google")
+                            .session(session)
+                            .param("returnTo", "/clubs/reading-sai/app")
+                            .param("joinClub", "reading-sai")
+                            .param("joinIntent", intent)
+                            .param("inviteToken", inviteToken),
+                    ).andExpect(
+                        org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                            .status()
+                            .is3xxRedirection,
+                    ).andReturn()
+            val callback = callback(session, oauthState(started.response.getHeader(HttpHeaders.LOCATION)!!))
+            flowRepository.removeAuthorizationRequest(callback, MockHttpServletResponse())
+
+            val context = OAuthFlowContextRepository.consumedContext(callback)
+            assertNull(context?.inviteToken)
+            assertNull(context?.joinClubSlug)
+        }
+    }
+
+    @Test
     fun `crafted top level join GET without intent cannot bind membership creation`() {
         val started =
             mockMvc

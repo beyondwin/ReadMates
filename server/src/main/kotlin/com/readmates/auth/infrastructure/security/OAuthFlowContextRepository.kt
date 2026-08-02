@@ -43,12 +43,13 @@ class OAuthFlowContextRepository(
         val state = authorizationRequest.state?.takeIf { it.isNotBlank() } ?: return
         val signedReturnState = oauthReturnState.signReturnTarget(request.getParameter("returnTo"))
         val rawReturnTo = request.getParameter("returnTo")?.trim()
+        val inviteParameterPresent = request.parameterMap.containsKey("inviteToken")
         val inviteToken = InviteTokenFormat.normalize(request.getParameter("inviteToken"))
         val requestedClub = OAuthGuestJoinSession.normalize(request.getParameter("joinClub"))
         val signedClub = oauthReturnState.scopedAppClubSlugFromState(signedReturnState)
         val joinClub =
             requestedClub
-                ?.takeIf { inviteToken == null && it == signedClub && rawReturnTo != null }
+                ?.takeIf { !inviteParameterPresent && it == signedClub && rawReturnTo != null }
                 ?.takeIf {
                     joinIntentStore.consume(
                         request = request,
@@ -126,5 +127,8 @@ class OAuthFlowContextRepository(
 
         fun consumedContext(request: HttpServletRequest): OAuthFlowContext? =
             request.getAttribute(CONSUMED_CONTEXT_ATTRIBUTE) as? OAuthFlowContext
+
+        fun consumeContext(request: HttpServletRequest): OAuthFlowContext? =
+            consumedContext(request).also { request.removeAttribute(CONSUMED_CONTEXT_ATTRIBUTE) }
     }
 }

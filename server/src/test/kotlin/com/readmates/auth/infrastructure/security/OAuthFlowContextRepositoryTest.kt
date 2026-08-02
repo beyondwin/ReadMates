@@ -56,6 +56,27 @@ class OAuthFlowContextRepositoryTest {
     }
 
     @Test
+    fun `raw invite parameter presence suppresses join even when blank or malformed`() {
+        listOf("", "   ", "malformed").forEachIndexed { index, inviteToken ->
+            val owner = MockHttpServletRequest("POST", "/api/auth/oauth/join-intent")
+            val intent = intentStore.issue(owner, "reading-sai", "/clubs/reading-sai/app", Instant.now())
+            val state = "state-invite-present-$index"
+            val start =
+                startRequest(state, "/clubs/reading-sai/app", "reading-sai", intent.token)
+                    .also {
+                        it.setSession(owner.session!!)
+                        it.setParameter("inviteToken", inviteToken)
+                    }
+
+            repository.saveAuthorizationRequest(authorization(state), start, MockHttpServletResponse())
+
+            val context = callbackContext(start, state)
+            assertNull(context?.inviteToken)
+            assertNull(context?.joinClubSlug)
+        }
+    }
+
+    @Test
     fun `two tab contexts survive reverse callbacks and each state is consumed once`() {
         val owner = MockHttpServletRequest("POST", "/api/auth/oauth/join-intent")
         val alpha = intentStore.issue(owner, "reading-sai", "/clubs/reading-sai/app", Instant.now())

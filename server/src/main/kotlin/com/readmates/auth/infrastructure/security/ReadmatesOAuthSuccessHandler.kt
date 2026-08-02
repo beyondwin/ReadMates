@@ -13,8 +13,10 @@ import org.springframework.security.core.Authentication
 import org.springframework.security.core.AuthenticationException
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.oauth2.core.oidc.user.OidcUser
+import org.springframework.security.web.WebAttributes
 import org.springframework.security.web.authentication.AuthenticationFailureHandler
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository
 import org.springframework.stereotype.Component
 import org.springframework.web.util.UriComponentsBuilder
 import java.net.URI
@@ -182,7 +184,7 @@ class ReadmatesOAuthSuccessHandler(
     }
 
     private fun capturedFlowContext(request: HttpServletRequest): OAuthFlowContext {
-        val consumed = OAuthFlowContextRepository.consumedContext(request)
+        val consumed = OAuthFlowContextRepository.consumeContext(request)
         return when {
             consumed != null -> consumed
             request.getParameter("state") != null -> OAuthFlowContext(null, null, null)
@@ -197,7 +199,10 @@ class ReadmatesOAuthSuccessHandler(
 
     private fun clearServletAuthenticationState(request: HttpServletRequest) {
         SecurityContextHolder.clearContext()
-        request.getSession(false)?.invalidate()
+        val session = request.getSession(false) ?: return
+        session.removeAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY)
+        session.removeAttribute(WebAttributes.AUTHENTICATION_EXCEPTION)
+        request.changeSessionId()
     }
 }
 
