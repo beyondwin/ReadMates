@@ -43,17 +43,22 @@ function mysqlScalar(sql: string) {
   return runMysql(sql).trim().split(/\s+/).at(-1) ?? "";
 }
 
-async function updateAvatarDirect(page: Page, avatarKey: string, clubSlug: string) {
-  return page.evaluate(async ({ avatarKey: selectedAvatarKey, clubSlug: selectedClubSlug }) => {
-    const query = `?clubSlug=${encodeURIComponent(selectedClubSlug)}`;
-    const response = await fetch(`/api/bff/api/me/avatar${query}`, {
-      method: "PATCH",
+async function replaceProfileDirect(
+  page: Page,
+  displayName: string,
+  avatarKey: string,
+  clubSlug?: string,
+) {
+  return page.evaluate(async ({ displayName: selectedDisplayName, avatarKey: selectedAvatarKey, clubSlug: selectedClubSlug }) => {
+    const query = selectedClubSlug === undefined ? "" : `?clubSlug=${encodeURIComponent(selectedClubSlug)}`;
+    const response = await fetch(`/api/bff/api/me/profile${query}`, {
+      method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ avatarKey: selectedAvatarKey }),
+      body: JSON.stringify({ displayName: selectedDisplayName, avatarKey: selectedAvatarKey }),
     });
     const body = await response.json().catch(() => null) as Record<string, unknown> | null;
     return { status: response.status, body };
-  }, { avatarKey, clubSlug });
+  }, { displayName, avatarKey, clubSlug });
 }
 
 async function scopedProfile(page: Page, clubSlug: string) {
@@ -64,9 +69,35 @@ async function scopedProfile(page: Page, clubSlug: string) {
     );
     return {
       status: response.status,
-      body: await response.json() as { avatarKey?: string },
+      body: await response.json() as { displayName?: string; avatarKey?: string },
     };
   }, clubSlug);
+}
+
+async function scopedAuthProfile(page: Page, clubSlug: string) {
+  return page.evaluate(async (selectedClubSlug) => {
+    const response = await fetch(
+      `/api/bff/api/auth/me?clubSlug=${encodeURIComponent(selectedClubSlug)}`,
+      { cache: "no-store" },
+    );
+    return {
+      status: response.status,
+      body: await response.json() as { displayName?: string; avatarKey?: string },
+    };
+  }, clubSlug);
+}
+
+function membershipProfile(email: string, clubSlug: string) {
+  const value = mysqlScalar(`
+select concat(memberships.short_name, '|', memberships.avatar_key)
+from memberships
+join users on users.id = memberships.user_id
+join clubs on clubs.id = memberships.club_id
+where lower(users.email) = ${sqlString(email)}
+  and clubs.slug = ${sqlString(clubSlug)};
+`);
+  const [displayName, avatarKey] = value.split("|");
+  return { displayName, avatarKey };
 }
 
 function resetSeededProfiles() {
@@ -124,6 +155,149 @@ where clubs.slug = 'sample-book-club'
   cleanupSecondClubFixture();
   cleanupGeneratedSessions();
   resetSeededProfiles();
+});
+
+test("updates name and avatar atomically in the selected club", async ({ page }) => {
+  const updatedDisplayName = uniqueDisplayName("Atomic");
+  ensureSecondClubFixture();
+  runMysql(`
+insert into clubs (id, slug, name, tagline, about, status)
+values ('00000000-0000-0000-0000-000000000099', 'other-book-club', '다른 북클럽', '테스트 클럽', '테스트 클럽입니다.', 'ACTIVE')
+on duplicate key update updated_at = utc_timestamp(6);
+
+insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+select uuid(), clubs.id, users.id, 'MEMBER', 'ACTIVE', utc_timestamp(6), '두번째멤버5', 'moon-green-book'
+from users
+join clubs on clubs.slug = 'sample-book-club'
+where lower(users.email) = ${sqlString(selfEditMemberEmail)}
+on duplicate key update
+  status = 'ACTIVE',
+  short_name = '두번째멤버5',
+  avatar_key = 'moon-green-book',
+  updated_at = utc_timestamp(6);
+`);
+  const originalSelectedProfile = membershipProfile(selfEditMemberEmail, "reading-sai");
+  const originalSecondProfile = membershipProfile(selfEditMemberEmail, "sample-book-club");
+
+  try {
+    await loginWithGoogleFixture(page, selfEditMemberEmail);
+    await page.goto("/");
+
+    const saved = await replaceProfileDirect(
+      page,
+      updatedDisplayName,
+      "cloud-green-book",
+      "reading-sai",
+    );
+    expect(saved).toEqual({
+      status: 200,
+      body: expect.objectContaining({
+        displayName: updatedDisplayName,
+        avatarKey: "cloud-green-book",
+      }),
+    });
+    await expect.poll(() => membershipProfile(selfEditMemberEmail, "reading-sai")).toEqual({
+      displayName: updatedDisplayName,
+      avatarKey: "cloud-green-book",
+    });
+
+    const appProfile = await scopedProfile(page, "reading-sai");
+    expect(appProfile).toEqual({
+      status: 200,
+      body: expect.objectContaining({
+        displayName: updatedDisplayName,
+        avatarKey: "cloud-green-book",
+      }),
+    });
+    const authProfile = await scopedAuthProfile(page, "reading-sai");
+    expect(authProfile).toEqual({
+      status: 200,
+      body: expect.objectContaining({
+        displayName: updatedDisplayName,
+        avatarKey: "cloud-green-book",
+      }),
+    });
+    expect(membershipProfile(selfEditMemberEmail, "sample-book-club")).toEqual(originalSecondProfile);
+
+    const assertRejectedWithoutMutation = async (
+      request: () => Promise<{ status: number; body: Record<string, unknown> | null }>,
+      expectedStatus: number,
+      expectedCode: string,
+    ) => {
+      const beforeSelected = membershipProfile(selfEditMemberEmail, "reading-sai");
+      const beforeSecond = membershipProfile(selfEditMemberEmail, "sample-book-club");
+      const response = await request();
+      expect(response.status).toBe(expectedStatus);
+      expect(response.body?.code).toBe(expectedCode);
+      expect(membershipProfile(selfEditMemberEmail, "reading-sai")).toEqual(beforeSelected);
+      expect(membershipProfile(selfEditMemberEmail, "sample-book-club")).toEqual(beforeSecond);
+    };
+
+    await assertRejectedWithoutMutation(
+      () => replaceProfileDirect(page, uniqueDisplayName("Missing"), "moon-green-book"),
+      404,
+      "MEMBER_NOT_FOUND",
+    );
+    await assertRejectedWithoutMutation(
+      () => replaceProfileDirect(page, uniqueDisplayName("Invalid"), "moon-green-book", "bad--slug"),
+      404,
+      "MEMBER_NOT_FOUND",
+    );
+    await assertRejectedWithoutMutation(
+      () => replaceProfileDirect(page, uniqueDisplayName("Other"), "moon-green-book", "other-book-club"),
+      404,
+      "MEMBER_NOT_FOUND",
+    );
+
+    await logout(page);
+    await assertRejectedWithoutMutation(
+      () => replaceProfileDirect(page, uniqueDisplayName("Anonymous"), "moon-green-book", "reading-sai"),
+      401,
+      "AUTHENTICATION_REQUIRED",
+    );
+    await loginWithGoogleFixture(page, selfEditMemberEmail);
+    await page.goto("/");
+
+    setMembershipStatus(selfEditMemberEmail, "LEFT");
+    await assertRejectedWithoutMutation(
+      () => replaceProfileDirect(page, uniqueDisplayName("Blocked"), "moon-green-book", "reading-sai"),
+      403,
+      "MEMBERSHIP_NOT_ALLOWED",
+    );
+    setMembershipStatus(selfEditMemberEmail, "ACTIVE");
+
+    await assertRejectedWithoutMutation(
+      () => replaceProfileDirect(page, uniqueDisplayName("Legacy"), "hedgehog-green-book", "reading-sai"),
+      400,
+      "AVATAR_KEY_INVALID",
+    );
+    await assertRejectedWithoutMutation(
+      () => replaceProfileDirect(page, "멤버4", "moon-green-book", "reading-sai"),
+      409,
+      "DISPLAY_NAME_DUPLICATE",
+    );
+  } finally {
+    runMysql(`
+update memberships
+join users on users.id = memberships.user_id
+join clubs on clubs.id = memberships.club_id
+set memberships.short_name = ${sqlString(originalSelectedProfile.displayName)},
+    memberships.avatar_key = ${sqlString(originalSelectedProfile.avatarKey)},
+    memberships.status = 'ACTIVE',
+    memberships.updated_at = utc_timestamp(6)
+where lower(users.email) = ${sqlString(selfEditMemberEmail)}
+  and clubs.slug = 'reading-sai';
+
+delete memberships
+from memberships
+join users on users.id = memberships.user_id
+join clubs on clubs.id = memberships.club_id
+where lower(users.email) = ${sqlString(selfEditMemberEmail)}
+  and clubs.slug = 'sample-book-club';
+
+delete from clubs where slug = 'other-book-club';
+`);
+  }
 });
 
 test("active member account settings expose read-only profile identity", async ({ page }) => {
@@ -240,7 +414,7 @@ test("suspended members omit account navigation and profile editing from member 
     name: "최근 독서 기록",
   })).toBeVisible();
 
-  const directUpdate = await updateAvatarDirect(page, "cloud-green-book", "reading-sai");
+  const directUpdate = await replaceProfileDirect(page, "E2E Suspended Avatar", "cloud-green-book", "reading-sai");
   expect(directUpdate.status).toBe(200);
   expect(directUpdate.body?.avatarKey).toBe("cloud-green-book");
 });
@@ -253,7 +427,7 @@ test("left and inactive members cannot open or directly mutate the avatar picker
     setMembershipStatus(email, status);
     await page.goto("/");
 
-    const directUpdate = await updateAvatarDirect(page, "cloud-green-book", "reading-sai");
+    const directUpdate = await replaceProfileDirect(page, `E2E ${status} Avatar`, "cloud-green-book", "reading-sai");
     expect(directUpdate.status).toBe(403);
     expect(directUpdate.body?.code).toBe("MEMBERSHIP_NOT_ALLOWED");
 
@@ -272,7 +446,7 @@ test("two active members may store the same avatar key in one club", async ({ pa
     setMembershipStatus(email, "ACTIVE");
     await page.goto("/");
 
-    const directUpdate = await updateAvatarDirect(page, "cloud-green-book", "reading-sai");
+    const directUpdate = await replaceProfileDirect(page, `E2E Duplicate ${index + 1}`, "cloud-green-book", "reading-sai");
     expect(directUpdate.status).toBe(200);
     expect(directUpdate.body?.avatarKey).toBe("cloud-green-book");
     await logout(page);
@@ -312,9 +486,9 @@ on duplicate key update
   await page.goto("/clubs/sample-book-club/app/me");
   await expect(page.getByRole("button", { name: "아바타 바꾸기" })).toHaveCount(0);
 
-  const readingSaiUpdate = await updateAvatarDirect(page, "cloud-green-book", "reading-sai");
+  const readingSaiUpdate = await replaceProfileDirect(page, "E2E Cross Club Avatar", "cloud-green-book", "reading-sai");
   expect(readingSaiUpdate.status).toBe(200);
-  const sampleClubUpdate = await updateAvatarDirect(page, "moon-green-book", "sample-book-club");
+  const sampleClubUpdate = await replaceProfileDirect(page, "E2E Cross Club Avatar", "moon-green-book", "sample-book-club");
   expect(sampleClubUpdate.status).toBe(200);
 
   const readingSaiProfile = await scopedProfile(page, "reading-sai");
@@ -416,7 +590,7 @@ test("viewer can read member routes but cannot use current-session write actions
   await expect(viewerShelf.getByRole("list", {
     name: "최근 독서 기록",
   })).toBeVisible();
-  const directUpdate = await updateAvatarDirect(page, "cloud-green-book", "reading-sai");
+  const directUpdate = await replaceProfileDirect(page, "E2E Profile Viewer", "cloud-green-book", "reading-sai");
   expect(directUpdate.status).toBe(200);
   expect(directUpdate.body?.avatarKey).toBe("cloud-green-book");
 

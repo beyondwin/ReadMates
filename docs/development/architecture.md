@@ -352,22 +352,22 @@ Canonical source of truth는 `access_scope`와 `site_visibility`입니다. V44�
 
 Archive JDBC adapter는 요청마다 page query와 전체 summary query를 정확히 하나씩, 합계 두 statement로 실행하며 page 크기나 item 수에 따라 query 수가 늘지 않습니다. 이 projection은 기존 테이블만 읽으므로 Flyway migration이나 새 영속 상태를 추가하지 않습니다.
 
-`/app/me` loader는 profile과 `limit=3` journey를 병렬 로드하며, 누적 `summary`는 page 크기와 무관하게 유지됩니다. 화면은 표시 이름과 inline `이름 변경`, 현재 클럽 멤버십 맥락, 누적 독서 성취가 이어지는 하나의 overview와 서버 정렬 순서를 따르는 최근 개인 기록을 최대 3건 보여줍니다. 최근 row는 club scope를 유지한 회차 상세로 연결되고, section의 `전체 보기`는 canonical `/app/archive?view=sessions`로 이어집니다.
+`/app/me` loader는 profile과 `limit=3` journey를 병렬 로드하며, 누적 `summary`는 page 크기와 무관하게 유지됩니다. 화면은 읽기 전용 프로필 요약, 현재 클럽 멤버십 맥락, 누적 독서 성취가 이어지는 하나의 overview와 서버 정렬 순서를 따르는 최근 개인 기록을 최대 3건 보여줍니다. 프로필 요약의 단일 진입점은 표시 이름과 아바타를 함께 편집하는 adaptive dialog/bottom sheet를 열며, 최근 row는 club scope를 유지한 회차 상세로 연결되고 section의 `전체 보기`는 canonical `/app/archive?view=sessions`로 이어집니다.
 
 `/app/me/records`는 `limit=12`부터 cursor continuation을 누적하는 개인 활동 기반 전체 목록으로 직접 접근과 기존 deep link를 유지하지만 `/app/me`의 새 사용자 진입점으로 노출하지 않습니다. 개인 journey와 archive sessions의 포함 조건이 다르므로 이 route를 삭제하거나 archive로 redirect하지 않습니다.
 
-계정·멤버십 정보와 탈퇴는 `/app/me/settings`, 알림 수신 설정은 알림함과 나란한 `/app/notifications/settings`가 소유합니다. `/app/me`는 `알림`과 `계정 설정` utility를 제공하고, 두 알림 route와 `/app/me/settings`는 scoped `내 공간`을 고정 상위 경로로 사용합니다. 전역 계정 메뉴는 identity, `알림`, `계정 설정`, `로그아웃`을 소유하며 `알림`은 club-scoped 알림함으로 연결합니다. 호스트 권한이 있을 때만 계정 control과 분리된 작업 공간 전환 control을 노출합니다. 표시 이름 편집은 `/app/me`만 소유하며 profile update controller, auth refresh, route revalidation 계약을 유지합니다. `/app/me/settings`에는 이름 편집과 로그아웃을 중복하지 않습니다.
+계정·멤버십 정보와 탈퇴는 `/app/me/settings`, 알림 수신 설정은 알림함과 나란한 `/app/notifications/settings`가 소유합니다. `/app/me`는 `알림`과 `계정 설정` utility를 제공하고, 두 알림 route와 `/app/me/settings`는 scoped `내 공간`을 고정 상위 경로로 사용합니다. 전역 계정 메뉴는 identity, `알림`, `계정 설정`, `로그아웃`을 소유하며 `알림`은 club-scoped 알림함으로 연결합니다. 호스트 권한이 있을 때만 계정 control과 분리된 작업 공간 전환 control을 노출합니다. 표시 이름과 아바타의 통합 편집은 `/app/me`만 소유하며 atomic profile update controller, auth refresh, route revalidation 계약을 유지합니다. `/app/me/settings`에는 프로필 편집과 로그아웃을 중복하지 않습니다.
 
 ## 멤버 프로필과 표시 이름
 
 ReadMates에서 멤버를 부르는 앱 표시 이름은 `displayName`입니다. `displayName`은 현재 클럽 membership에 붙은 이름이며, 현재 스키마에서는 기존 `memberships.short_name` 컬럼에 저장합니다. Google 계정이나 초대에서 온 원본 이름은 `accountName`으로만 다루고, 멤버를 식별할 때는 `email`을 우선 보여줍니다.
 
-멤버 아바타는 `memberships.avatar_key`에 저장한 40개 allowlist 로컬 동물 key 중 하나입니다. V44는 기존 membership을 클럽별 안정적 순서에 따라 새 40개 key로 결정적 재배정합니다. Membership 생성 또는 재활성화 transaction은 유효한 이전 저장 key를 우선 보존하고, 그렇지 않으면 현재 노출 대상 멤버가 쓰지 않는 key 중 하나를 무작위로 배정해 영속화합니다. 40개가 모두 사용 중이면 전체 후보에서 무작위로 고릅니다. `/app/me`의 아바타 선택기는 명시적으로 해석된 현재 클럽 context와 `PATCH /api/me/avatar`를 사용해 본인 membership만 변경하며, 현재 클럽 context가 없으면 fail closed합니다. 수동 선택은 같은 클럽 안의 아바타 key 중복을 허용합니다. 서버의 auth, 현재·호스트 세션, archive, notes, public record projection은 필요한 멤버 표시 이름과 함께 `avatarKey`를 전달합니다. 프런트엔드는 이를 privacy-safe 로컬 `/assets/avatars/book-club/*.webp`로만 해석하고, 누락·알 수 없는 key·이미지 decode 실패는 로컬 기본 아바타로 정규화합니다. Google 프로필 이미지 URL은 멤버 아바타 렌더링에 사용하지 않습니다.
+멤버 아바타는 `memberships.avatar_key`에 저장한 30개 allowlist 로컬 book-club key 중 하나입니다. Forward-only V45는 V44를 수정하지 않고 기존 membership을 클럽별 안정적 순서에 따라 30개 key로 결정적 재배정하며 named check constraint를 새 집합으로 교체합니다. Membership 생성 또는 재활성화 transaction은 유효한 이전 저장 key를 우선 보존하고, 그렇지 않으면 현재 노출 대상 멤버가 쓰지 않는 key 중 하나를 무작위로 배정해 영속화합니다. 30개가 모두 사용 중이면 전체 후보에서 무작위로 고릅니다. `/app/me`의 adaptive 프로필 편집기는 명시적으로 해석된 현재 클럽 context와 `PUT /api/me/profile`을 사용해 본인 membership의 표시 이름과 아바타를 한 transaction에서 함께 변경하며, 현재 클럽 context가 없으면 fail closed합니다. 수동 선택은 같은 클럽 안의 아바타 key 중복을 허용합니다. 서버의 auth, 현재·호스트 세션, archive, notes, public record projection은 필요한 멤버 표시 이름과 함께 `avatarKey`를 전달합니다. 프런트엔드는 이를 privacy-safe 로컬 `/assets/avatars/book-club/*.webp`로만 해석하고, 누락·알 수 없는 key·이미지 decode 실패는 로컬 기본 아바타로 정규화합니다. Google 프로필 이미지 URL은 멤버 아바타 렌더링에 사용하지 않습니다.
 
-프로필 수정 API는 세 개입니다.
+프로필 수정 API는 atomic 본인 편집 endpoint와 호환성 window, 호스트 endpoint로 구성됩니다.
 
-- `PATCH /api/me/profile`: 인증된 사용자가 본인 membership의 `displayName`을 수정합니다. `VIEWER`, `ACTIVE`, `SUSPENDED`처럼 멤버 앱을 읽을 수 있는 상태에서만 허용합니다.
-- `PATCH /api/me/avatar`: 인증된 사용자가 명시적인 현재 클럽 context에 속한 본인 membership의 `avatarKey`를 40개 allowlist 안에서 수정합니다. 자동 배정과 달리 같은 클럽 멤버 간 key 중복을 허용합니다.
+- `PUT /api/me/profile`: 인증된 사용자가 명시적인 현재 클럽 context에 속한 본인 membership의 `displayName`과 30-key `avatarKey`를 원자적으로 교체합니다. 둘 중 하나라도 validation, 중복, 권한 검사를 통과하지 못하면 두 DB 컬럼 모두 유지합니다. `VIEWER`, `ACTIVE`, `SUSPENDED`처럼 멤버 앱을 읽을 수 있는 상태에서만 허용합니다.
+- `PATCH /api/me/profile`과 `PATCH /api/me/avatar`: cached old client를 위한 제한된 호환성 window입니다. 각각 기존 단일 필드 contract를 유지하지만 새 frontend는 사용하지 않으며 후속 release에서 제거할 수 있습니다. Avatar PATCH도 명시적인 현재 클럽 context와 30-key allowlist를 요구합니다.
 - `PATCH /api/host/members/{membershipId}/profile`: 활성 호스트가 같은 클럽 멤버의 `displayName`을 수정합니다. 호스트 멤버 목록 row를 갱신할 수 있도록 `HostMemberListItem` 형태를 반환합니다.
 
 서버는 표시 이름을 trim한 뒤 필수값, 20자 이하, 제어문자, 이메일 형태, URL/domain 형태, 예약어(`탈퇴한 멤버`, `관리자`, `호스트`, `운영자`)를 검증합니다. 같은 클럽 안의 `displayName` 중복은 현재 `memberships(club_id, short_name)` unique constraint와 application-level lock/check로 막습니다. 공개 문서와 seed에는 실제 멤버 이름 대신 public-safe sample name만 둡니다.

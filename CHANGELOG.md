@@ -8,6 +8,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Changed
 
+- **통합 멤버 프로필 편집:** `/app/me`의 읽기 전용 프로필 요약에서 표시 이름과 book-club 아바타를 하나의 adaptive dialog/bottom sheet로 함께 편집합니다. 로컬 아바타 catalog를 30개 key로 정리하고, 저장은 선택한 클럽 membership의 두 필드를 `PUT /api/me/profile` 한 번으로 원자적으로 반영해 전역 계정 메뉴, 멤버·호스트 roster와 공개 기록 identity가 같은 값을 읽습니다.
 - **전역 활자 가독성:** Pretendard 단일 서체 안에서 제목·본문·보조 정보의 위계를 정리하고, 실제 표시 텍스트의 크기 하한을 12px로 보호하며, 모바일과 좁은 화면에서 본문 행간과 운영 보드의 단일 열 가독성을 강화했습니다. Pretendard 가변 웹폰트를 앱에 자체 번들링하고 모든 CT baseline 갱신을 Docker renderer로 고정해 macOS/Linux 폴백 차이도 제거했습니다.
 - **프론트 성능 예산:** 세션 편집기의 AI 기록 도구를 필요할 때만 로드하도록 분리하고, 반복적인 웹폰트 unicode-range 선언이 포함된 전역 CSS는 gzip 전송 크기로 하드 게이트하면서 raw 크기도 보고서에 함께 남기도록 조정했습니다.
 
@@ -22,14 +23,14 @@ One-command local OAuth stack + redacted smoke verifier로 기존 서비스 보�
 ### Highlights
 
 - **로그인 없는 게스트 앱:** 공개 클럽의 `/clubs/:slug/app/**`에서 현재·예정 세션, 노트, 아카이브와 회차 상세를 로그인 없이 둘러볼 수 있습니다. 개인 공간은 preview로, 설정·알림·피드백은 정식 멤버 전용 안내로 보여주고 호스트 route와 모든 write를 차단합니다.
-- **반응형 계정·내 공간·북클럽 아바타:** 모바일과 데스크톱에서 계정 접근과 호스트 공간 전환을 명시적으로 구분하고, 알림·계정 설정에 고정된 `내 공간` 상위 동선을 제공합니다. 멤버 식별은 외부 프로필 사진 대신 privacy-safe 로컬 동물 캐릭터 40종을 사용하며, 미사용 아바타 우선 자동 배정 후에도 멤버가 `내 공간`에서 원하는 캐릭터로 변경할 수 있습니다.
+- **반응형 계정·내 공간·북클럽 아바타:** 모바일과 데스크톱에서 계정 접근과 호스트 공간 전환을 명시적으로 구분하고, 알림·계정 설정에 고정된 `내 공간` 상위 동선을 제공합니다. 멤버 식별은 외부 프로필 사진 대신 privacy-safe 로컬 book-club 아바타 30종을 사용하며, 미사용 아바타 우선 자동 배정 후에도 멤버가 `내 공간`의 통합 편집기에서 표시 이름과 함께 변경할 수 있습니다.
 
 ### Deployment Notes
 
-- 배포 전 최근 DB backup과 backend readiness 기준을 확인합니다. V43은 수정하지 않으며, V44는 forward-only로 모든 기존 membership의 avatar key를 새 40-key 집합으로 한 번 다시 쓰고 named check constraint를 새 집합으로 교체합니다.
-- `PATCH /api/me/avatar`는 인증된 현재 club membership의 avatar key만 바꾸는 additive scoped API입니다. V44 이후 구 backend는 제거된 legacy key를 다시 쓸 수 있고 새 constraint가 이를 거절하므로, 같은 release tag의 server image를 먼저 배포해 Flyway V44와 backend health를 확인한 뒤 frontend를 배포합니다. 반대로 구 frontend는 새 key를 알 수 없어도 안전한 기본 avatar로 normalize합니다.
-- 배포 후에는 현재 club의 avatar 변경·재조회와 허용된 public author avatar 표시를 smoke하고, 권한과 `LEFT`/anonymous masking이 유지되는지 확인합니다. 실제 member data나 private identifier는 공개 release evidence에 기록하지 않습니다.
-- Rollback은 V44가 바꾼 schema와 이미 migration된 data를 보존합니다. Migration을 되돌리지 않고 V44와 호환되는 server/frontend image로 전환하거나 새 forward-fix release를 발행합니다.
+- 배포 전 최근 DB backup과 backend readiness 기준을 확인합니다. V43과 V44는 수정하지 않으며, forward-only V45가 모든 기존 membership의 avatar key를 30-key 집합으로 한 번 다시 쓰고 named check constraint를 새 집합으로 교체합니다.
+- 같은 release tag의 새 backend를 먼저 배포해 Flyway V45와 backend health가 모두 정상임을 확인한 뒤에만 새 frontend를 배포합니다. `PUT /api/me/profile`은 현재 club membership의 표시 이름과 avatar key를 한 transaction에서 교체하며, `PATCH /api/me/profile`과 `PATCH /api/me/avatar`는 cached old client를 위한 제한된 호환성 window로 남습니다. Cached old client가 제거된 key를 보내면 `AVATAR_KEY_INVALID`를 받을 수 있습니다.
+- 배포 후에는 현재 club의 atomic profile 변경과 `/api/app/me`·`/api/auth/me` 재조회, 다른 club 격리, 허용된 public author avatar 표시를 smoke하고 권한과 `LEFT`/anonymous masking이 유지되는지 확인합니다. 실제 member data나 private identifier는 공개 release evidence에 기록하지 않습니다. Production deployment는 이 구현 범위에 포함되지 않습니다.
+- Rollback은 V45가 바꾼 schema와 이미 migration된 data를 보존합니다. Migration을 되돌리지 않고 V45와 호환되는 server/frontend image로 전환하거나 새 forward-fix release를 발행합니다.
 
 ### Changed
 
@@ -57,7 +58,7 @@ One-command local OAuth stack + redacted smoke verifier로 기존 서비스 보�
 
 ### Changed
 
-- **멤버 내 공간·계정·기록 동선:** `/app/me`는 표시 이름과 inline `이름 변경`, 현재 클럽 맥락, 누적 성취가 한 지면에서 이어지며 프로필 안의 중복 계정 설정 action을 제거합니다. 전역 계정 메뉴는 `알림`, `계정 설정`, `로그아웃`을 제공하고, `/app/me/settings`는 읽기 전용 계정·멤버십 정보와 `← 내 공간`, 단계형 클럽 탈퇴를 제공합니다. 최근 개인 기록의 `전체 보기`는 `/app/archive?view=sessions`로 연결하며 `/app/me/records` direct deep link와 cursor pagination은 유지합니다.
+- **멤버 내 공간·계정·기록 동선:** `/app/me`는 표시 이름과 프로필 편집 action, 현재 클럽 맥락, 누적 성취가 한 지면에서 이어지며 프로필 안의 중복 계정 설정 action을 제거합니다. 전역 계정 메뉴는 `알림`, `계정 설정`, `로그아웃`을 제공하고, `/app/me/settings`는 읽기 전용 계정·멤버십 정보와 `← 내 공간`, 단계형 클럽 탈퇴를 제공합니다. 최근 개인 기록의 `전체 보기`는 `/app/archive?view=sessions`로 연결하며 `/app/me/records` direct deep link와 cursor pagination은 유지합니다.
 - **멤버 알림함:** 큰 문서 패널과 중첩 카드를 간결한 편집형 목록으로 바꾸고, 영어 액션·회고 배지를 제거했습니다. 행 전체 이동, 읽지 않음 상태, 오류·빈 상태, 더 보기 흐름을 데스크톱과 모바일에서 같은 한국어 인터페이스로 제공합니다.
 - **프런트엔드 디자인 하드닝:** 멤버·호스트 기본 탐색을 역할별 핵심 4개 목적지로 정리했습니다. 공개 화면은 범위가 유지되는 복구 링크와 재시도·대기 상태를 구분하고, 호스트 보조 원장과 운영 도구는 접힌 disclosure 및 실행 가능한 실패 상태로 제공합니다. 공개 기록과 멤버 회고의 제목·요약·인용·감상은 데스크톱과 모바일에서 읽기 서체와 행간을 사용합니다.
 - **개인 독서 여정 API:** 현재 멤버의 열람 가능한 전체 기록 summary와 cursor page를 함께 반환하는 additive `GET /api/archive/me/journey` projection을 추가했습니다. Page 크기와 무관한 두 개의 고정 query로 계산하며 DB migration이나 BFF 계약 변경은 없습니다.
