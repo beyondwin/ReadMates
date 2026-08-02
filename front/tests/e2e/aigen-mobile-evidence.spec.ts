@@ -52,7 +52,9 @@ test("mobile review keeps the ledger and editor usable and shows evidence in a f
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
   const evidenceButton = page.getByRole("button", { name: "요약 문단 1 근거 보기" });
-  await evidenceButton.click();
+  await evidenceButton.focus();
+  await expect(evidenceButton).toBeFocused();
+  await page.keyboard.press("Enter");
   const drawer = page.getByRole("dialog", { name: "요약 1 근거" });
   await expect(drawer).toBeVisible();
   await expect(page.getByRole("button", { name: "근거 닫기" })).toBeFocused();

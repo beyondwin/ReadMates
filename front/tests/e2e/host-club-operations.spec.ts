@@ -332,7 +332,7 @@ test("host dashboard captures public-safe operating-signal and priority-ledger v
           exact: true,
         }),
         upcomingSection.getByRole("button", {
-          name: "멤버 공개로 변경 · E2E 예정 세션 책",
+          name: "E2E 예정 세션 책 게스트 접근을 게스트 공개로 변경",
           exact: true,
         }),
         upcomingSection.getByRole("link", {
