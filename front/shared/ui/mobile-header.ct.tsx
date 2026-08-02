@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/experimental-ct-react";
 import type { Locator } from "@playwright/test";
 import { MemoryRouter } from "react-router-dom";
+import { AvatarChip } from "./avatar-chip";
 import { MobileHeader } from "./mobile-header";
 
 const fontMetrics = async (locator: Locator) =>
@@ -23,7 +24,7 @@ test("MobileHeader keeps host workspace switching and the explicit account trigg
         accountControl={
           <button type="button" className="rm-account-menu__trigger" aria-label="아주 긴 호스트 이름 계정 메뉴">
             <span className="rm-account-menu__trigger-avatar" aria-hidden="true">
-              <span className="rm-avatar-chip"><img src="/assets/avatars/book-club/banana-green-book.webp" alt="" /></span>
+              <AvatarChip avatarKey="banana-green-book" label="" name="아주 긴 호스트 이름" sizeRole="navigation" />
             </span>
             <span className="rm-account-menu__trigger-name">아주 긴 호스트 이름</span>
             <span className="rm-account-menu__trigger-mobile-label">계정</span>
@@ -38,6 +39,8 @@ test("MobileHeader keeps host workspace switching and the explicit account trigg
   await expect(account).toContainText("계정");
   await expect(header.getByRole("link", { name: "멤버 화면으로" })).toBeVisible();
   await expect(account).toHaveCSS("min-height", "44px");
+  await expect(account.locator(".rm-avatar-chip")).toHaveAttribute("data-avatar-size-role", "navigation");
+  expect((await account.locator(".rm-avatar-chip").boundingBox())?.width).toBe(36);
   expect((await fontMetrics(header.locator(".m-hdr-kicker"))).size).toBeGreaterThanOrEqual(12);
   expect((await fontMetrics(header.locator(".m-hdr-title"))).size).toBeGreaterThanOrEqual(15);
   expect((await account.boundingBox())!.x + (await account.boundingBox())!.width).toBeLessThanOrEqual(320);
@@ -53,7 +56,7 @@ test("MobileHeader keeps the member account label visible without reserving a ho
         accountControl={
           <button type="button" className="rm-account-menu__trigger" aria-label="멤버1 계정 메뉴">
             <span className="rm-account-menu__trigger-avatar" aria-hidden="true">
-              <span className="rm-avatar-chip"><img src="/assets/avatars/book-club/banana-green-book.webp" alt="" /></span>
+              <AvatarChip avatarKey="banana-green-book" label="" name="멤버1" sizeRole="navigation" />
             </span>
             <span className="rm-account-menu__trigger-name">멤버1</span>
             <span className="rm-account-menu__trigger-mobile-label">계정</span>
@@ -68,6 +71,8 @@ test("MobileHeader keeps the member account label visible without reserving a ho
   await expect(account).toContainText("계정");
   await expect(header.getByRole("link", { name: "호스트 화면" })).toHaveCount(0);
   await expect(header.getByRole("link", { name: "멤버 화면으로" })).toHaveCount(0);
+  await expect(account.locator(".rm-avatar-chip")).toHaveAttribute("data-avatar-size-role", "navigation");
+  expect((await account.locator(".rm-avatar-chip").boundingBox())?.width).toBe(36);
   expect((await account.boundingBox())!.x + (await account.boundingBox())!.width).toBeLessThanOrEqual(390);
   await expect(header).toHaveScreenshot("mobile-header-member-390.png");
 });

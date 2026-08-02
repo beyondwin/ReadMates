@@ -310,7 +310,6 @@
   gap: 4px;
 }
 
-.m-hdr-side--right .rm-account-menu__trigger-avatar,
 .m-hdr-side--right .rm-account-menu__trigger-name {
   display: none;
 }
