@@ -5,7 +5,18 @@ export type MembershipStatus = "INVITED" | "VIEWER" | "ACTIVE" | "SUSPENDED" | "
 export type AttendanceStatus = "UNKNOWN" | "ATTENDED" | "ABSENT";
 export type SessionState = "DRAFT" | "OPEN" | "PUBLISHED" | "CLOSED";
 export type CurrentSessionPolicy = "APPLY_NOW" | "NEXT_SESSION";
-export type { MemberProfileErrorCode } from "@/features/archive/model/profile-update";
+
+export type MemberProfileErrorCode =
+  | "DISPLAY_NAME_DUPLICATE"
+  | "DISPLAY_NAME_REQUIRED"
+  | "DISPLAY_NAME_TOO_LONG"
+  | "DISPLAY_NAME_INVALID"
+  | "DISPLAY_NAME_RESERVED"
+  | "AVATAR_KEY_REQUIRED"
+  | "AVATAR_KEY_INVALID"
+  | "AUTHENTICATION_REQUIRED"
+  | "MEMBER_NOT_FOUND"
+  | "MEMBERSHIP_NOT_ALLOWED";
 
 export type UpdateMemberProfileRequest = {
   displayName: string;

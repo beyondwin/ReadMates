@@ -1,16 +1,7 @@
+import type { MemberProfileErrorCode } from "@/features/archive/api/archive-contracts";
 import type { BookClubAvatarKey } from "@/shared/ui/book-club-avatar";
 
-export type MemberProfileErrorCode =
-  | "DISPLAY_NAME_DUPLICATE"
-  | "DISPLAY_NAME_REQUIRED"
-  | "DISPLAY_NAME_TOO_LONG"
-  | "DISPLAY_NAME_INVALID"
-  | "DISPLAY_NAME_RESERVED"
-  | "AVATAR_KEY_REQUIRED"
-  | "AVATAR_KEY_INVALID"
-  | "AUTHENTICATION_REQUIRED"
-  | "MEMBER_NOT_FOUND"
-  | "MEMBERSHIP_NOT_ALLOWED";
+export type { MemberProfileErrorCode };
 
 export type EditableMemberProfile = {
   displayName: string;

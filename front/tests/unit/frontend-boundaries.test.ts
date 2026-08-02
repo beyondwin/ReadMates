@@ -37,7 +37,10 @@ type SourceFile = {
 type ImportSpecifier = {
   rawSpecifier: string;
   projectPath: string | null;
+  isTypeOnly: boolean;
 };
+
+type StaticImportSpecifier = Pick<ImportSpecifier, "rawSpecifier" | "isTypeOnly">;
 
 function toPosixPath(filePath: string) {
   return filePath.split(path.sep).join("/");
@@ -93,11 +96,18 @@ function parseStaticImportSpecifiers(source: string) {
     false,
     ts.ScriptKind.TSX,
   );
-  const specifiers: string[] = [];
+  const specifiers: StaticImportSpecifier[] = [];
 
   function visit(node: ts.Node) {
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
-      specifiers.push(node.moduleSpecifier.text);
+      const clause = node.importClause;
+      const namedBindings = clause?.namedBindings;
+      const namedImportsAreTypeOnly = namedBindings !== undefined && ts.isNamedImports(namedBindings) &&
+        namedBindings.elements.length > 0 && namedBindings.elements.every((element) => element.isTypeOnly);
+      specifiers.push({
+        rawSpecifier: node.moduleSpecifier.text,
+        isTypeOnly: clause?.isTypeOnly === true || namedImportsAreTypeOnly,
+      });
     }
 
     if (
@@ -105,7 +115,13 @@ function parseStaticImportSpecifiers(source: string) {
       node.moduleSpecifier !== undefined &&
       ts.isStringLiteral(node.moduleSpecifier)
     ) {
-      specifiers.push(node.moduleSpecifier.text);
+      const exportClause = node.exportClause;
+      const namedExportsAreTypeOnly = exportClause !== undefined && ts.isNamedExports(exportClause) &&
+        exportClause.elements.length > 0 && exportClause.elements.every((element) => element.isTypeOnly);
+      specifiers.push({
+        rawSpecifier: node.moduleSpecifier.text,
+        isTypeOnly: node.isTypeOnly || namedExportsAreTypeOnly,
+      });
     }
 
     if (
@@ -113,7 +129,7 @@ function parseStaticImportSpecifiers(source: string) {
       ts.isLiteralTypeNode(node.argument) &&
       ts.isStringLiteral(node.argument.literal)
     ) {
-      specifiers.push(node.argument.literal.text);
+      specifiers.push({ rawSpecifier: node.argument.literal.text, isTypeOnly: true });
     }
 
     ts.forEachChild(node, visit);
@@ -188,24 +204,32 @@ function hasRouteOwnedActionTypeExport(source: string) {
   return hasRouteOwnedActionExport;
 }
 
-function normalizeImportSpecifier(sourceFile: SourceFile, specifier: string): ImportSpecifier {
-  if (specifier.startsWith("@/")) {
+function normalizeImportSpecifier(
+  sourceFile: SourceFile,
+  specifier: string | StaticImportSpecifier,
+): ImportSpecifier {
+  const rawSpecifier = typeof specifier === "string" ? specifier : specifier.rawSpecifier;
+  const isTypeOnly = typeof specifier === "string" ? false : specifier.isTypeOnly;
+  if (rawSpecifier.startsWith("@/")) {
     return {
-      rawSpecifier: specifier,
-      projectPath: path.posix.normalize(specifier.slice(2)),
+      rawSpecifier,
+      projectPath: path.posix.normalize(rawSpecifier.slice(2)),
+      isTypeOnly,
     };
   }
 
-  if (specifier.startsWith(".")) {
+  if (rawSpecifier.startsWith(".")) {
     return {
-      rawSpecifier: specifier,
-      projectPath: path.posix.normalize(path.posix.join(path.posix.dirname(sourceFile.relativePath), specifier)),
+      rawSpecifier,
+      projectPath: path.posix.normalize(path.posix.join(path.posix.dirname(sourceFile.relativePath), rawSpecifier)),
+      isTypeOnly,
     };
   }
 
   return {
-    rawSpecifier: specifier,
+    rawSpecifier,
     projectPath: null,
+    isTypeOnly,
   };
 }
 
@@ -347,6 +371,12 @@ function isFeatureModelBoundaryImport(sourceFile: SourceFile, importSpecifier: I
     return false;
   }
 
+  const currentFeature = getFeatureName(sourceFile.relativePath);
+  const contractOwner = /^features\/([^/]+)\/api\/[^/]+-contracts$/.exec(importSpecifier.projectPath)?.[1] ?? null;
+  if (importSpecifier.isTypeOnly && currentFeature !== null && contractOwner === currentFeature) {
+    return false;
+  }
+
   return (
     isSharedApiImport(importSpecifier.projectPath) ||
     isFeatureLayerImport(importSpecifier.projectPath, "api") ||
@@ -455,10 +485,10 @@ describe("frontend architecture boundaries", () => {
     `;
 
     expect(parseStaticImportSpecifiers(source)).toEqual([
-      "@/styles/global.css",
-      "@/features/reader/normal-import",
-      "@/features/reader/model",
-      "@/shared/lib/reader-helper",
+      { rawSpecifier: "@/styles/global.css", isTypeOnly: false },
+      { rawSpecifier: "@/features/reader/normal-import", isTypeOnly: false },
+      { rawSpecifier: "@/features/reader/model", isTypeOnly: true },
+      { rawSpecifier: "@/shared/lib/reader-helper", isTypeOnly: false },
     ]);
   });
 
@@ -479,7 +509,10 @@ describe("frontend architecture boundaries", () => {
     }
     const importSpecifier = normalizeImportSpecifier(sourceFile, specifier);
 
-    expect(specifier).toBe("@/features/current-session/api/current-session-contracts");
+    expect(specifier).toEqual({
+      rawSpecifier: "@/features/current-session/api/current-session-contracts",
+      isTypeOnly: true,
+    });
     expect(importSpecifier.projectPath).toBe("features/current-session/api/current-session-contracts");
     expect(isSharedToFeaturePageOrAppImport(sourceFile, importSpecifier.projectPath)).toBe(true);
   });
@@ -496,6 +529,21 @@ describe("frontend architecture boundaries", () => {
 
     expect(isFeatureModelBoundaryImport(sourceFile, appImport)).toBe(true);
     expect(isFeatureModelBoundaryImport(sourceFile, pageImport)).toBe(true);
+  });
+
+  it("allows same-feature wire contracts into models only through type-only imports", () => {
+    const sourceFile: SourceFile = {
+      absolutePath: "/unused/features/archive/model/profile-update.ts",
+      displayPath: "front/features/archive/model/profile-update.ts",
+      relativePath: "features/archive/model/profile-update.ts",
+    };
+    const contractPath = "@/features/archive/api/archive-contracts";
+
+    const typeImport = normalizeImportSpecifier(sourceFile, { rawSpecifier: contractPath, isTypeOnly: true });
+    const runtimeImport = normalizeImportSpecifier(sourceFile, { rawSpecifier: contractPath, isTypeOnly: false });
+
+    expect(isFeatureModelBoundaryImport(sourceFile, typeImport)).toBe(false);
+    expect(isFeatureModelBoundaryImport(sourceFile, runtimeImport)).toBe(true);
   });
 
   it("detects route-owned action type exports from host UI modules", () => {
@@ -658,7 +706,7 @@ describe("frontend architecture boundaries", () => {
       const source = fs.readFileSync(absolutePath, "utf8");
       const specifiers = parseStaticImportSpecifiers(source);
 
-      expect(specifiers, `${relativePath} must not import host API helpers`).not.toContain(
+      expect(specifiers.map((specifier) => specifier.rawSpecifier), `${relativePath} must not import host API helpers`).not.toContain(
         "@/features/host/api/host-api",
       );
       expect(source, `${relativePath} must not call fetch directly`).not.toMatch(/\bfetch\s*\(/);

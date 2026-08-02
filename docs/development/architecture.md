@@ -367,6 +367,7 @@ ReadMates에서 멤버를 부르는 앱 표시 이름은 `displayName`입니다.
 프로필 수정 API는 atomic 본인 편집 endpoint와 호환성 window, 호스트 endpoint로 구성됩니다.
 
 - `PUT /api/me/profile`: 인증된 사용자가 명시적인 현재 클럽 context에 속한 본인 membership의 `displayName`과 30-key `avatarKey`를 원자적으로 교체합니다. 둘 중 하나라도 validation, 중복, 권한 검사를 통과하지 못하면 두 DB 컬럼 모두 유지합니다. `VIEWER`, `ACTIVE`, `SUSPENDED`처럼 멤버 앱을 읽을 수 있는 상태에서만 허용합니다.
+- 현재 클럽 context가 없거나 membership을 해석할 수 없으면 fail closed하며, `MEMBER_NOT_FOUND`는 클럽 또는 membership 존재 여부를 구분해 노출하지 않는 의도적인 오류 계약입니다.
 - `PATCH /api/me/profile`과 `PATCH /api/me/avatar`: cached old client를 위한 제한된 호환성 window입니다. 각각 기존 단일 필드 contract를 유지하지만 새 frontend는 사용하지 않으며 후속 release에서 제거할 수 있습니다. Avatar PATCH도 명시적인 현재 클럽 context와 30-key allowlist를 요구합니다.
 - `PATCH /api/host/members/{membershipId}/profile`: 활성 호스트가 같은 클럽 멤버의 `displayName`을 수정합니다. 호스트 멤버 목록 row를 갱신할 수 있도록 `HostMemberListItem` 형태를 반환합니다.
 

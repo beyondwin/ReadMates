@@ -28,7 +28,7 @@ src/app -> src/pages -> features -> shared
 - `src/pages`: thin route compatibility shells; delegate to feature route modules.
 - `features/<name>/api`: BFF calls and request/response contracts.
 - `features/<name>/queries`: TanStack Query keys, `queryOptions`, mutation hooks, and invalidation policy; do not import UI, route, app, or page modules.
-- `features/<name>/model`: pure calculation/mapping; no React, router, fetch, or API client imports.
+- `features/<name>/model`: pure calculation/mapping; no React, router, fetch, or API client imports. A model may use a type-only import from its own feature's `api/*-contracts` module when a pure mapper or typed failure consumes a wire-owned union; runtime API imports remain forbidden.
 - `features/<name>/route`: loader/action behavior, API/model calls, route state, UI prop assembly.
 - `features/<name>/ui`: render from props/callbacks only; no `fetch`, `shared/api`, feature API, feature queries, or route imports.
 - `shared`: reusable primitives; do not import feature/page/app code.

@@ -60,10 +60,11 @@ export function useProfileUpdateController({
 
   const sourceIsAuthoritative = savedOverride !== null && profilesEqual(source, savedOverride.saved);
   const overrideCurrent = savedOverride !== null && overrideIsCurrent(savedOverride, source);
-  if (savedOverride && (sourceIsAuthoritative || !overrideCurrent)) {
+  const sourceReconcilesWithOverride = sourceIsAuthoritative || overrideCurrent;
+  if (savedOverride && !sourceReconcilesWithOverride) {
     setSavedState(null);
   }
-  const profile = overrideCurrent
+  const profile = sourceReconcilesWithOverride
     ? { ...sourceProfile, ...savedOverride.saved }
     : sourceProfile;
 

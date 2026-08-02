@@ -91,7 +91,7 @@ describe("useProfileUpdateController", () => {
     });
   });
 
-  it("retains one saved profile while an older loader response arrives and clears it on the authoritative profile", async () => {
+  it("retains the saved profile across stale, authoritative, then stale loader snapshots", async () => {
     mutations.updateMyProfile.mockResolvedValue(saved);
     const { result, rerender } = renderController();
 
@@ -106,7 +106,7 @@ describe("useProfileUpdateController", () => {
     expect(result.current.profile).toMatchObject({ displayName: "새 이름", avatarKey: "cloud-green-book" });
 
     rerender({ sourceProfile: { ...profile }, clubSlug: "reading-sai" });
-    expect(result.current.profile).toMatchObject({ displayName: "기존 이름", avatarKey: "banana-green-book" });
+    expect(result.current.profile).toMatchObject({ displayName: "새 이름", avatarKey: "cloud-green-book" });
   });
 
   it("keeps the newest invoked profile when overlapping saves resolve newest first", async () => {
@@ -136,6 +136,25 @@ describe("useProfileUpdateController", () => {
     expect(result.current.profile).toMatchObject({ displayName: "두 번째 이름", avatarKey: "sun-green-book" });
     expect(onProfileUpdated).toHaveBeenCalledOnce();
     expect(onRevalidate).toHaveBeenCalledOnce();
+  });
+
+  it("advances to a later accepted save and accepts an unrelated newer loader identity", async () => {
+    const laterSaved = { ...saved, displayName: "두 번째 이름", avatarKey: "sun-green-book" };
+    mutations.updateMyProfile
+      .mockResolvedValueOnce(saved)
+      .mockResolvedValueOnce(laterSaved);
+    const { result, rerender } = renderController();
+
+    await act(async () => { await result.current.saveProfile({ displayName: "새 이름", avatarKey: "cloud-green-book" }); });
+    rerender({ sourceProfile: { ...profile, ...saved }, clubSlug: "reading-sai" });
+    await act(async () => { await result.current.saveProfile({ displayName: "두 번째 이름", avatarKey: "sun-green-book" }); });
+
+    rerender({ sourceProfile: { ...profile, ...saved }, clubSlug: "reading-sai" });
+    expect(result.current.profile).toMatchObject({ displayName: "두 번째 이름", avatarKey: "sun-green-book" });
+
+    const newerLoaderProfile = { ...profile, displayName: "서버의 새 이름", avatarKey: "moon-green-book" };
+    rerender({ sourceProfile: newerLoaderProfile, clubSlug: "reading-sai" });
+    expect(result.current.profile).toMatchObject(newerLoaderProfile);
   });
 
   it("prevents an old-club response from replacing the current club profile", async () => {
