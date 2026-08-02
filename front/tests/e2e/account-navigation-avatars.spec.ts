@@ -378,6 +378,17 @@ async function expectFrameFreeArtwork(locator: Locator) {
   })).toEqual(["0px", "0px", "rgba(0, 0, 0, 0)", "visible"]);
 }
 
+async function expectAvatarRoleSize(
+  avatar: Locator,
+  role: string,
+  expectedSize: number,
+) {
+  await expect(avatar).toHaveAttribute("data-avatar-size-role", role);
+  await expect.poll(
+    () => avatar.evaluate((element) => element.getBoundingClientRect().width),
+  ).toBe(expectedSize);
+}
+
 async function expectVisibleLocalArtwork(page: Page, evidence: ImageNetworkEvidence) {
   const artwork = page.locator(".rm-avatar-chip--artwork:visible");
   await expect(artwork.first()).toBeVisible();
@@ -416,6 +427,13 @@ test("My Space avatar save refreshes the account identity and persists at mobile
     const profileAvatar = page.locator(".rm-member-profile__avatar img");
     const opener = page.getByRole("button", { name: "프로필 편집" });
     const account = page.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` });
+    await expectAvatarRoleSize(
+      page.locator(".rm-member-profile__avatar"),
+      "profile",
+      width === 390 ? 64 : 88,
+    );
+    await expectAvatarRoleSize(account.locator(".rm-avatar-chip"), "navigation", 36);
+    await expect(page.getByText("나의 아바타 · 한 장 더 읽는 바나나")).toBeVisible();
     await expect(profileAvatar).toHaveAttribute(
       "src",
       "/assets/avatars/book-club/banana-green-book.webp",
@@ -430,6 +448,26 @@ test("My Space avatar save refreshes the account identity and persists at mobile
     await expect(dialog).toBeVisible();
     await dialog.getByRole("button", { name: "아바타 선택, 현재 한 장 더 읽는 바나나" }).click();
     const picker = page.getByRole("dialog", { name: "아바타 선택" });
+    await expect(picker.locator(".rm-avatar-picker__label")).toHaveCount(30);
+    const selectedTile = picker.getByRole("button", {
+      name: "한 장 더 읽는 바나나, 초록 책을 읽는 바나나 선택",
+    });
+    const selectedArtwork = selectedTile.locator(".rm-avatar-chip");
+    await expectAvatarRoleSize(selectedArtwork, "picker", width === 390 ? 58 : 64);
+    const selectedTileBox = await selectedTile.boundingBox();
+    const selectedArtworkBox = await selectedArtwork.boundingBox();
+    const selectedCheckBox = await selectedTile.locator(".rm-avatar-picker__check").boundingBox();
+    expect(selectedTileBox).not.toBeNull();
+    expect(selectedArtworkBox).not.toBeNull();
+    expect(selectedCheckBox).not.toBeNull();
+    expect(selectedCheckBox!.x).toBeGreaterThanOrEqual(selectedTileBox!.x + 8);
+    expect(selectedCheckBox!.y).toBeGreaterThanOrEqual(selectedTileBox!.y + 8);
+    expect(selectedCheckBox!.x + selectedCheckBox!.width).toBeLessThanOrEqual(
+      selectedTileBox!.x + selectedTileBox!.width - 8,
+    );
+    expect(selectedCheckBox!.y + selectedCheckBox!.height).toBeLessThanOrEqual(
+      selectedArtworkBox!.y,
+    );
     await page.screenshot({
       path: testInfo.outputPath(`${width}-my-space-avatar-picker.png`),
       fullPage: true,
@@ -450,6 +488,7 @@ test("My Space avatar save refreshes the account identity and persists at mobile
     await expect(dialog).toHaveCount(0);
     await expect(profileAvatar).toHaveAttribute("src", savedAvatarSrc);
     await expect(account.locator("img")).toHaveAttribute("src", savedAvatarSrc);
+    await expect(page.getByText("나의 아바타 · 책 곁에 머문 찻잔")).toBeVisible();
     await expectFrameFreeArtwork(account.locator(".rm-avatar-chip"));
     await expectVisibleLocalArtwork(page, imageEvidence);
     await page.screenshot({
@@ -460,6 +499,7 @@ test("My Space avatar save refreshes the account identity and persists at mobile
     await page.reload();
 
     await expect(page.locator(".rm-member-profile__avatar img")).toHaveAttribute("src", savedAvatarSrc);
+    await expect(page.getByText("나의 아바타 · 책 곁에 머문 찻잔")).toBeVisible();
     await expect(page.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` }).locator("img")).toHaveAttribute(
       "src",
       savedAvatarSrc,
@@ -511,7 +551,9 @@ test("scoped account navigation preserves local avatar identity across mobile an
 
   await page.setViewportSize({ width: 320, height: 700 });
   await expect(page.getByRole("link", { name: "호스트 화면" })).toBeVisible();
-  await expect(page.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` })).toBeVisible();
+  const narrowAccount = page.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` });
+  await expect(narrowAccount).toBeVisible();
+  await expectAvatarRoleSize(narrowAccount.locator(".rm-avatar-chip"), "navigation", 36);
   await page.screenshot({ path: testInfo.outputPath("320-member-header.png"), fullPage: true });
   await page.getByRole("link", { name: "호스트 화면" }).click();
   await expect(page).toHaveURL(`${APP_BASE}/host`);
@@ -520,7 +562,10 @@ test("scoped account navigation preserves local avatar identity across mobile an
   await expect(hostHeader.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` })).toBeVisible();
   await hostHeader.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` }).click();
   await expect(page.getByRole("dialog", { name: MEMBER_NAME }).getByRole("button", { name: "로그아웃" })).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath("320-host-account-popover.png"), fullPage: true });
+  await page.screenshot({
+    path: testInfo.outputPath("320-host-account-popover.png"),
+    animations: "disabled",
+  });
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`${APP_BASE}/notifications`);
@@ -584,6 +629,11 @@ test("member roster and host attendance/member artwork stay frame-free at mobile
     const roster = page.getByRole("main").filter({ hasText: "참석자 · 3/3" });
     await expect(roster.getByText("김책가방", { exact: true })).toBeVisible();
     await expect(roster.getByText("김달력책", { exact: true })).toBeVisible();
+    await expectAvatarRoleSize(
+      roster.locator(".rm-avatar-chip").first(),
+      "member",
+      width === 390 ? 34 : 38,
+    );
     await expectVisibleLocalArtwork(page, imageEvidence);
     await page.screenshot({ path: testInfo.outputPath(`${width}-current-session-roster.png`), fullPage: true });
 
@@ -591,6 +641,11 @@ test("member roster and host attendance/member artwork stay frame-free at mobile
     await page.goto(`${APP_BASE}/host/sessions/session-avatar-roster/edit?section=attendance`);
     await expect(page.getByRole("heading", { name: "출석 확정 명단" })).toBeVisible();
     await expect(page.getByRole("button", { name: "김책가방 참석" })).toBeVisible();
+    await expectAvatarRoleSize(
+      page.locator("#host-editor-panel-attendance .rm-avatar-chip").first(),
+      "member",
+      width === 390 ? 34 : 38,
+    );
     await expectVisibleLocalArtwork(page, imageEvidence);
     await page.screenshot({ path: testInfo.outputPath(`${width}-host-attendance.png`), fullPage: true });
 
@@ -598,6 +653,14 @@ test("member roster and host attendance/member artwork stay frame-free at mobile
     await page.goto(`${APP_BASE}/host/members`);
     await expect(page.getByRole("tablist", { name: "멤버 관리" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "김책가방" })).toBeVisible();
+    const memberCard = page.locator(".rm-host-members-page__body article", {
+      has: page.getByRole("heading", { name: "김책가방" }),
+    });
+    await expectAvatarRoleSize(
+      memberCard.locator(".rm-avatar-chip"),
+      "member",
+      width === 390 ? 34 : 38,
+    );
     await expectVisibleLocalArtwork(page, imageEvidence);
     await page.screenshot({ path: testInfo.outputPath(`${width}-host-members.png`), fullPage: true });
 
@@ -622,6 +685,11 @@ test("public record requests exactly its visible local WebP avatars at mobile an
       "/assets/avatars/book-club/cloud-green-book.webp",
       "/assets/avatars/book-club/cloud-green-book.webp",
     ]);
+    await expectAvatarRoleSize(
+      page.locator(".public-note-author-row .rm-avatar-chip").first(),
+      "dense",
+      30,
+    );
     await expectVisibleLocalArtwork(page, imageEvidence);
     await page.screenshot({ path: testInfo.outputPath(`${width}-public-record-avatars.png`), fullPage: true });
     await context.close();

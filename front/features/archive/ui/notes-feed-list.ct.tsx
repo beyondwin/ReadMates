@@ -68,10 +68,12 @@ test("FeedSections keeps the mobile section heading in the semantic eyebrow role
 
   expect(typography.fontSize).toBe(12);
   expect(typography.lineHeight / typography.fontSize).toBeGreaterThanOrEqual(1.4);
-  const avatarSizes = await component.locator(".rm-avatar-chip").evaluateAll((avatars) =>
-    avatars.map((avatar) => avatar.getBoundingClientRect().width),
+  const avatars = component.locator(".rm-avatar-chip");
+  await expect(avatars).toHaveCount(3);
+  await expect(avatars.first()).toHaveAttribute("data-avatar-size-role", "author");
+  const avatarSizes = await avatars.evaluateAll((avatarNodes) =>
+    avatarNodes.map((avatar) => avatar.getBoundingClientRect().width),
   );
-  expect(avatarSizes).toHaveLength(3);
-  expect(avatarSizes.every((size) => size === 30)).toBe(true);
+  expect(avatarSizes.every((size) => size === 36)).toBe(true);
   expect(await component.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
 });

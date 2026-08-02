@@ -1,13 +1,19 @@
 import { expect, test } from "@playwright/experimental-ct-react";
 import type { Locator } from "@playwright/test";
-import {
-  AvatarChip,
-  AVATAR_SIZE_ROLES,
-  type AvatarSizeRole,
-} from "@/shared/ui/avatar-chip";
+import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { BOOK_CLUB_AVATAR_KEYS } from "./book-club-avatar";
 
 const avatarSizes = [20, 22, 24, 26, 28, 32, 46, 52, 72];
+const expectedAvatarRoleSizes = [
+  { role: "navigation", desktop: 36, mobile: 36 },
+  { role: "dense", desktop: 30, mobile: 30 },
+  { role: "author", desktop: 36, mobile: 36 },
+  { role: "member", desktop: 38, mobile: 34 },
+  { role: "roster", desktop: 42, mobile: 38 },
+  { role: "profile", desktop: 88, mobile: 64 },
+  { role: "editor", desktop: 72, mobile: 72 },
+  { role: "picker", desktop: 64, mobile: 58 },
+] as const;
 
 async function expectFrameFreeArtwork(avatar: Locator) {
   await expect(avatar).toHaveClass(/rm-avatar-chip--artwork/);
@@ -62,13 +68,13 @@ test("AvatarChip resolves every semantic role responsively", async ({ mount, pag
   await page.setViewportSize({ width: 1280, height: 720 });
   const component = await mount(
     <div style={{ display: "flex", alignItems: "center", gap: 12, padding: 16 }}>
-      {Object.entries(AVATAR_SIZE_ROLES).map(([role]) => (
+      {expectedAvatarRoleSizes.map(({ role }) => (
         <AvatarChip
           avatarKey="banana-green-book"
           key={role}
           label=""
           name="회원"
-          sizeRole={role as AvatarSizeRole}
+          sizeRole={role}
         />
       ))}
     </div>,
@@ -79,7 +85,7 @@ test("AvatarChip resolves every semantic role responsively", async ({ mount, pag
     { width: 390, height: 844 },
   ]) {
     await page.setViewportSize(viewport);
-    for (const [role, sizes] of Object.entries(AVATAR_SIZE_ROLES)) {
+    for (const { role, ...sizes } of expectedAvatarRoleSizes) {
       const avatar = component.locator('[data-avatar-size-role="' + role + '"]');
       await expect(avatar).toHaveAttribute("data-avatar-size-role", role);
       expect((await avatar.boundingBox())?.width).toBe(

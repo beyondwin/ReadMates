@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/experimental-ct-react";
 import type { Locator } from "@playwright/test";
 import { MemoryRouter } from "react-router-dom";
+import { AvatarChip } from "./avatar-chip";
 import { TopNav } from "./top-nav";
 
 const fontMetrics = async (locator: Locator) =>
@@ -57,7 +58,7 @@ test("TopNav shows the desktop avatar and preserves a long account name in its a
         accountControl={
           <button type="button" className="rm-account-menu__trigger" aria-label={`${memberName} 계정 메뉴`}>
             <span className="rm-account-menu__trigger-avatar" aria-hidden="true">
-              <span className="rm-avatar-chip"><img src="/assets/avatars/book-club/cloud-green-book.webp" alt="" /></span>
+              <AvatarChip avatarKey="cloud-green-book" label="" name={memberName} sizeRole="navigation" />
             </span>
             <span className="rm-account-menu__trigger-name">{memberName}</span>
             <span className="rm-account-menu__trigger-mobile-label">계정</span>
@@ -75,6 +76,8 @@ test("TopNav shows the desktop avatar and preserves a long account name in its a
   );
   await expect(account.locator(".rm-account-menu__trigger-name")).toHaveText(memberName);
   await expect(account.locator(".rm-account-menu__trigger-name")).toHaveCSS("text-overflow", "ellipsis");
+  await expect(account.locator(".rm-avatar-chip")).toHaveAttribute("data-avatar-size-role", "navigation");
+  expect((await account.locator(".rm-avatar-chip").boundingBox())?.width).toBe(36);
   const accountName = account.locator(".rm-account-menu__trigger-name");
   expect((await fontMetrics(accountName)).size).toBeGreaterThanOrEqual(14);
   await expect(navigation).toHaveScreenshot("top-nav-long-account-name-1280.png");
