@@ -5,7 +5,7 @@ test("ReadmatesBrandMark renders the brand glyph", async ({ mount }) => {
   const component = await mount(<ReadmatesBrandMark />);
   const box = await component.boundingBox();
 
-  expect(box?.width).toBe(34);
-  expect(box?.height).toBe(34);
+  expect(box?.width).toBe(32);
+  expect(box?.height).toBe(32);
   await expect(component).toHaveScreenshot("brand-mark.png");
 });

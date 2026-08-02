@@ -1,6 +1,10 @@
 import { expect, test } from "@playwright/experimental-ct-react";
 import type { Locator } from "@playwright/test";
-import { AvatarChip } from "@/shared/ui/avatar-chip";
+import {
+  AvatarChip,
+  AVATAR_SIZE_ROLES,
+  type AvatarSizeRole,
+} from "@/shared/ui/avatar-chip";
 import { BOOK_CLUB_AVATAR_KEYS } from "./book-club-avatar";
 
 const avatarSizes = [20, 22, 24, 26, 28, 32, 46, 52, 72];
@@ -53,6 +57,37 @@ type AvatarRasterMetric = {
   subjectCenterX: number;
   subjectCenterY: number;
 };
+
+test("AvatarChip resolves every semantic role responsively", async ({ mount, page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  const component = await mount(
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: 16 }}>
+      {Object.entries(AVATAR_SIZE_ROLES).map(([role]) => (
+        <AvatarChip
+          avatarKey="banana-green-book"
+          key={role}
+          label=""
+          name="회원"
+          sizeRole={role as AvatarSizeRole}
+        />
+      ))}
+    </div>,
+  );
+
+  for (const viewport of [
+    { width: 1280, height: 720 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    for (const [role, sizes] of Object.entries(AVATAR_SIZE_ROLES)) {
+      const avatar = component.locator('[data-avatar-size-role="' + role + '"]');
+      await expect(avatar).toHaveAttribute("data-avatar-size-role", role);
+      expect((await avatar.boundingBox())?.width).toBe(
+        viewport.width <= 768 ? sizes.mobile : sizes.desktop,
+      );
+    }
+  }
+});
 
 async function avatarRasterMetrics(images: Locator): Promise<AvatarRasterMetric[]> {
   return images.evaluateAll((nodes) => nodes.map((node) => {

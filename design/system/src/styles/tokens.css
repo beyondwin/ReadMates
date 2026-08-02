@@ -525,6 +525,12 @@ img { max-width: 100%; display: block; }
   object-fit: contain;
 }
 
+@media (max-width: 768px) {
+  .rm-avatar-chip[data-avatar-size-role] {
+    --avatar-size: var(--avatar-mobile-size) !important;
+  }
+}
+
 .rm-avatar-chip-group {
   display: inline-flex;
   align-items: center;

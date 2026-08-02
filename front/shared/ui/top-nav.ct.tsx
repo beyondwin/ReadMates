@@ -91,4 +91,5 @@ test("TopNav gives the workspace switch the approved desktop icon scale", async 
   const switchIcon = navigation.locator(".rm-workspace-switch svg");
   expect((await switchIcon.boundingBox())?.width).toBe(22);
   expect((await navigation.locator(".rm-workspace-switch").boundingBox())?.width).toBe(36);
+  expect((await navigation.locator('.rm-avatar-chip[data-avatar-size-role="navigation"]').boundingBox())?.width).toBe(36);
 });

@@ -313,7 +313,7 @@ function TopNavFrame({
                   <WorkspaceSwitchIcon size={22} />
                 </LinkComponent>
               ) : null}
-              {accountControl ?? (memberName ? <AvatarChip avatarKey={memberAvatarKey} name={memberName} label="" size={32} /> : null)}
+              {accountControl ?? (memberName ? <AvatarChip avatarKey={memberAvatarKey} name={memberName} label="" sizeRole="navigation" /> : null)}
             </div>
           ) : null}
         </div>
