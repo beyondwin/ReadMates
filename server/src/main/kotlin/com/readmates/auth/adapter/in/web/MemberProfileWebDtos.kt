@@ -2,6 +2,11 @@ package com.readmates.auth.adapter.`in`.web
 
 import com.readmates.auth.application.model.MemberProfile
 
+data class OwnMemberProfileReplaceRequest(
+    val displayName: String? = null,
+    val avatarKey: String? = null,
+)
+
 data class MemberProfileUpdateRequest(
     val displayName: String? = null,
 )

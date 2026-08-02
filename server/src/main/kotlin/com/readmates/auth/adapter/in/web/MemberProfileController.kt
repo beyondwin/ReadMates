@@ -1,7 +1,9 @@
 package com.readmates.auth.adapter.`in`.web
 
+import com.readmates.auth.application.model.ReplaceOwnMemberProfileCommand
 import com.readmates.auth.application.model.UpdateMemberAvatarCommand
 import com.readmates.auth.application.model.UpdateMemberProfileCommand
+import com.readmates.auth.application.port.`in`.ReplaceOwnMemberProfileUseCase
 import com.readmates.auth.application.port.`in`.UpdateHostMemberProfileUseCase
 import com.readmates.auth.application.port.`in`.UpdateOwnMemberAvatarUseCase
 import com.readmates.auth.application.port.`in`.UpdateOwnMemberProfileUseCase
@@ -19,6 +21,7 @@ import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
@@ -27,11 +30,36 @@ import java.util.UUID
 @RestController
 @RequestMapping("/api")
 class MemberProfileController(
+    private val replaceOwnMemberProfile: ReplaceOwnMemberProfileUseCase,
     private val updateOwnMemberProfile: UpdateOwnMemberProfileUseCase,
     private val updateOwnMemberAvatar: UpdateOwnMemberAvatarUseCase,
     private val updateHostMemberProfileUseCase: UpdateHostMemberProfileUseCase,
     private val resolveClubContextUseCase: ResolveClubContextUseCase,
 ) {
+    @PutMapping("/me/profile")
+    fun replaceOwnProfile(
+        authentication: Authentication?,
+        request: HttpServletRequest,
+        @RequestBody payload: OwnMemberProfileReplaceRequest,
+    ): MemberProfileResponse {
+        val currentClubId =
+            request
+                .resolveClubContext(resolveClubContextUseCase)
+                .context
+                ?.clubId
+                ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+        val profile =
+            replaceOwnMemberProfile.replaceOwnProfile(
+                authentication.emailOrNull(),
+                currentClubId,
+                ReplaceOwnMemberProfileCommand(
+                    displayName = payload.displayName,
+                    avatarKey = payload.avatarKey,
+                ),
+            )
+        return MemberProfileResponse.from(profile)
+    }
+
     @PatchMapping("/me/profile")
     fun updateOwnProfile(
         authentication: Authentication?,

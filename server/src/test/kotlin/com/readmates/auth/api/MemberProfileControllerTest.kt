@@ -16,6 +16,7 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.patch
+import org.springframework.test.web.servlet.put
 import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -43,6 +44,126 @@ class MemberProfileControllerTest(
     private val createdMembershipIds = linkedSetOf<String>()
     private val createdUserIds = linkedSetOf<String>()
     private val createdClubIds = linkedSetOf<String>()
+
+    @Test
+    fun `member atomically replaces own profile in the trusted club context`() {
+        val email = insertProfileMember("self.replace.multi", "ACTIVE", shortName = "Before")
+        val primaryMembershipId = membershipIdForEmail(email)
+        val otherMembershipId = insertSecondClubMembership(email, "starfish-notebook")
+        val cookie = sessionCookieForEmail(email)
+
+        mockMvc.put("/api/me/profile") {
+            cookie(cookie)
+            header("X-Readmates-Bff-Secret", "test-bff-secret")
+            header("X-Readmates-Club-Slug", "reading-sai")
+            header("Origin", "http://localhost:3000")
+            with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"displayName":"After","avatarKey":"cloud-green-book"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.membershipId") { value(primaryMembershipId) }
+            jsonPath("$.displayName") { value("After") }
+            jsonPath("$.avatarKey") { value("cloud-green-book") }
+        }
+
+        assertEquals("After", shortNameForMembership(primaryMembershipId))
+        assertEquals("cloud-green-book", avatarKeyForMembership(primaryMembershipId))
+        assertEquals("OtherAvatar", shortNameForMembership(otherMembershipId))
+        assertEquals("starfish-notebook", avatarKeyForMembership(otherMembershipId))
+    }
+
+    @Test
+    fun `atomic profile replacement rejects untrusted context and invalid avatars without partial writes`() {
+        val email = insertProfileMember("self.replace.rejected", "ACTIVE", shortName = "Before")
+        val membershipId = membershipIdForEmail(email)
+        val cookie = sessionCookieForEmail(email)
+        val cases =
+            listOf(
+                null to ("cloud-green-book" to "MEMBER_NOT_FOUND"),
+                "bad--slug" to ("cloud-green-book" to "MEMBER_NOT_FOUND"),
+                "reading-sai" to ("hedgehog-green-mug" to "AVATAR_KEY_INVALID"),
+                "reading-sai" to ("CLOUD-GREEN-BOOK" to "AVATAR_KEY_INVALID"),
+            )
+
+        cases.forEach { (clubSlug, avatarAndCode) ->
+            val (avatarKey, code) = avatarAndCode
+            mockMvc.put("/api/me/profile") {
+                cookie(cookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                clubSlug?.let { header("X-Readmates-Club-Slug", it) }
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"displayName":"After","avatarKey":"$avatarKey"}"""
+            }.andExpect {
+                if (code == "MEMBER_NOT_FOUND") status { isNotFound() } else status { isBadRequest() }
+                jsonPath("$.code") { value(code) }
+            }
+            assertEquals("Before", shortNameForMembership(membershipId))
+            assertEquals("mushroom-green-book", avatarKeyForMembership(membershipId))
+        }
+    }
+
+    @Test
+    fun `atomic profile replacement rejects duplicate name without changing either field`() {
+        val email = insertProfileMember("self.replace.duplicate", "ACTIVE", shortName = "Before")
+        insertProfileMember("self.replace.taken", "ACTIVE", shortName = "Taken")
+        val membershipId = membershipIdForEmail(email)
+
+        mockMvc.put("/api/me/profile") {
+            cookie(sessionCookieForEmail(email))
+            header("X-Readmates-Bff-Secret", "test-bff-secret")
+            header("X-Readmates-Club-Slug", "reading-sai")
+            header("Origin", "http://localhost:3000")
+            with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"displayName":"Taken","avatarKey":"cloud-green-book"}"""
+        }.andExpect {
+            status { isConflict() }
+            jsonPath("$.code") { value("DISPLAY_NAME_DUPLICATE") }
+        }
+
+        assertEquals("Before", shortNameForMembership(membershipId))
+        assertEquals("mushroom-green-book", avatarKeyForMembership(membershipId))
+    }
+
+    @Test
+    fun `atomic profile replacement rejects blocked memberships without partial writes`() {
+        listOf("LEFT", "INACTIVE").forEach { membershipStatus ->
+            val email = insertProfileMember("self.replace.${membershipStatus.lowercase()}", membershipStatus, shortName = "Before")
+            val membershipId = membershipIdForEmail(email)
+            mockMvc.put("/api/me/profile") {
+                cookie(sessionCookieForEmail(email))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("X-Readmates-Club-Slug", "reading-sai")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"displayName":"After","avatarKey":"cloud-green-book"}"""
+            }.andExpect {
+                status { isForbidden() }
+                jsonPath("$.code") { value("MEMBERSHIP_NOT_ALLOWED") }
+            }
+            assertEquals("Before", shortNameForMembership(membershipId))
+            assertEquals("mushroom-green-book", avatarKeyForMembership(membershipId))
+        }
+    }
+
+    @Test
+    fun `atomic profile replacement requires Spring Security authentication`() {
+        mockMvc.put("/api/me/profile") {
+            header("X-Readmates-Bff-Secret", "test-bff-secret")
+            header("X-Readmates-Club-Slug", "reading-sai")
+            header("Origin", "http://localhost:3000")
+            with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"displayName":"After","avatarKey":"cloud-green-book"}"""
+        }.andExpect {
+            status { isUnauthorized() }
+            content { string("") }
+        }
+    }
 
     @AfterEach
     fun cleanupCreatedRows() {

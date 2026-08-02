@@ -223,6 +223,36 @@ describe("Cloudflare BFF function", () => {
     expect((init.headers as Headers).get("X-Readmates-Club-Slug")).toBe("reading-sai");
   });
 
+  it("forwards atomic profile replacement with only normalized trusted club context", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const body = JSON.stringify({ displayName: "After", avatarKey: "cloud-green-book" });
+
+    await onRequest(
+      context(
+        new Request(
+          "https://readmates.pages.dev/api/bff/api/me/profile?clubSlug=reading-sai",
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Origin: "https://readmates.pages.dev",
+              "X-Readmates-Club-Slug": "attacker-club",
+            },
+            body,
+          },
+        ),
+        { path: ["api", "me", "profile"] },
+      ),
+    );
+
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("https://api.example.com/api/me/profile?clubSlug=reading-sai");
+    expect(init.method).toBe("PUT");
+    expect(new TextDecoder().decode(init.body as ArrayBuffer)).toBe(body);
+    expect((init.headers as Headers).get("X-Readmates-Club-Slug")).toBe("reading-sai");
+  });
+
   it("normalizes a route-selected club slug before trusting it as server context", async () => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
