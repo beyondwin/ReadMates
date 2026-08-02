@@ -22,7 +22,7 @@ One-command local OAuth stack + redacted smoke verifier로 기존 서비스 보�
 
 - **독립 exposure 모델:** app access의 canonical field를 `sessions.access_scope(HOST_ONLY|GUEST_READABLE)`, public marketing placement를 `public_session_publications.site_visibility(HIDDEN|PUBLIC_RECORD)`로 분리했습니다. 기존 `visibility`와 `is_public`은 rolling deploy/rollback을 위해 한 릴리즈 dual-write하고 새 host UI와 API는 canonical field를 사용합니다.
 - **공개 진입과 target-club join:** 공개 홈·소개·기록·회차와 scoped login에 `둘러보기`와 `멤버로 시작`을 제공합니다. `멤버로 시작`은 서명된 exact raw scoped return path와 같은 `ACTIVE + PUBLIC` club에서만 `VIEWER` membership을 만들며 기존 membership과 초대 흐름을 우선·보존합니다.
-- **OAuth 가입 의도·CI 재실행 경계:** target-club `VIEWER` 생성은 same-origin JSON POST가 발급한 만료·1회용 의도를 실제 OAuth `state`에 결합한 경우에만 수행합니다. 역순 multi-tab callback은 성공·실패 모두 소비한 state만 정리하고 session ID를 회전해 나머지 pending flow를 보존하며, raw `inviteToken`이 있으면 blank·malformed도 join보다 우선합니다. 서버 PR gate는 stale Gradle 산출물에 의존하지 않도록 `--no-build-cache --rerun-tasks check`를 실행하므로, 로컬 반복 실행도 전체 품질 검사를 새로 수행합니다.
+- **OAuth 가입 의도·CI 재실행 경계:** target-club `VIEWER` 생성은 same-origin JSON POST가 발급한 만료·1회용 의도를 실제 OAuth `state`에 결합한 경우에만 수행합니다. 역순 multi-tab callback은 성공·실패와 예상 밖 처리 예외에서도 소비한 state만 정리하고 session ID를 정확히 한 번 회전해 나머지 pending flow를 보존합니다. Provider 취소와 인지된 도메인 오류는 유효한 기존 앱 세션을 유지하고 서버가 invalid/stale로 확인한 cookie만 만료합니다. raw `inviteToken`이 있으면 blank·malformed도 join보다 우선합니다. 서버 PR gate는 stale Gradle 산출물에 의존하지 않도록 `--no-build-cache --rerun-tasks check`를 실행하므로, 로컬 반복 실행도 전체 품질 검사를 새로 수행합니다.
 - **Guest-safe records:** guest DTO는 참석자 표시 이름, RSVP·실제 참석 상태, 질문의 `draftThought`, 작성자 이름이 붙은 질문·서평을 허용합니다. Membership/account ID, email/account name, 정확한 장소, 접속 URL·비밀번호, 읽은 분량, 피드백 본문은 제외합니다. 새 한줄평·장문 서평은 guest-readable record에 공개되며 기존 private/session 예외 row는 일괄 재작성하지 않습니다.
 
 ### Database
