@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useLoaderData, useLocation, useRevalidator } from "react-router-dom";
+import { useLoaderData, useLocation, useRevalidator } from "react-router";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 import { saveNotificationPreferences } from "../api/notification-preferences-api";
 import type {

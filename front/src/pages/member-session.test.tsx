@@ -11,7 +11,7 @@ const query = vi.hoisted(() => ({
 const route = vi.hoisted(() => ({ MemberSessionDetailRoute: vi.fn(() => null) }));
 
 vi.mock("@tanstack/react-query", () => ({ useQuery: query.useQuery }));
-vi.mock("react-router-dom", () => ({
+vi.mock("react-router", () => ({
   useParams: () => ({ clubSlug: "reader-club", sessionId: "closed-session" }),
 }));
 vi.mock("@/features/guest-browse/queries/guest-browse-queries", () => ({

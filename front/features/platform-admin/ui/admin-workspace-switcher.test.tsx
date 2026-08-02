@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import type { ComponentProps } from "react";
 import type { AdminWorkspaceDestination } from "@/features/platform-admin/model/admin-workspace-switcher-model";

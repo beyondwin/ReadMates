@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Link, Navigate, useLocation, useParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useParams } from "react-router";
 import { LogoutButton } from "@/features/auth/route/logout-button";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
 import { loginPathForReturnTo } from "@/shared/auth/login-return";

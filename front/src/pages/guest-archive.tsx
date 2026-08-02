@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router";
 import { archiveViewFromSearchParam, type ArchiveView } from "@/features/archive/model/archive-model";
 import { guestArchiveReadView } from "@/features/archive/model/archive-read-view";
 import ArchivePage from "@/features/archive/ui/archive-page";

@@ -16,7 +16,7 @@ permissions:
   packages: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ inputs.image_tag || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -30,21 +30,35 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ inputs.image_tag || github.ref }}
+          fetch-depth: 0
 
-      - name: Set image name
+      - name: Resolve and verify release tag
         id: image
         env:
           DISPATCH_IMAGE_TAG: ${{ inputs.image_tag || '' }}
         run: |
           image_name="ghcr.io/${GITHUB_REPOSITORY,,}/readmates-server"
-          image_tag="${DISPATCH_IMAGE_TAG:-${GITHUB_REF_NAME}}"
-          if [[ ! "$image_tag" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
-            echo "Invalid Docker image tag: $image_tag" >&2
+          release_tag="${DISPATCH_IMAGE_TAG:-${GITHUB_REF_NAME}}"
+          if [[ ! "$release_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid release tag: $release_tag" >&2
             exit 1
           fi
+
+          if [[ "$(git cat-file -t "$release_tag" 2>/dev/null || true)" != "tag" ]]; then
+            echo "Release tag must be annotated: $release_tag" >&2
+            exit 1
+          fi
+
+          tag_commit="$(git rev-list -n 1 "$release_tag")"
+          head_commit="$(git rev-parse HEAD)"
+          if [[ "$tag_commit" != "$head_commit" ]]; then
+            echo "Checked out commit does not match release tag: $release_tag" >&2
+            exit 1
+          fi
+
           echo "name=$image_name" >> "$GITHUB_OUTPUT"
-          echo "tag=$image_tag" >> "$GITHUB_OUTPUT"
+          echo "tag=$release_tag" >> "$GITHUB_OUTPUT"
 
       - name: Set up Java
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0

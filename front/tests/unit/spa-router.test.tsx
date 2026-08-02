@@ -1,7 +1,8 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { createMemoryRouter, RouterProvider, type RouteObject } from "react-router-dom";
+import { createMemoryRouter, type RouteObject } from "react-router";
+import { RouterProvider } from "react-router/dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "@/src/app/auth-context";
 import { routes, routesQueryClient } from "@/src/app/router";

@@ -1,15 +1,16 @@
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createMemoryRouter, MemoryRouter, Route, RouterProvider, Routes } from "react-router-dom";
+import { createMemoryRouter, MemoryRouter, Route, Routes } from "react-router";
+import { RouterProvider } from "react-router/dom";
 import type { MyJourneyItem, MyJourneyPage } from "@/features/archive/model/my-reading-shelf-model";
 import { MyRecordsRoute } from "./my-records-route";
 
 const route = vi.hoisted(() => ({ loaderData: null as unknown }));
 const api = vi.hoisted(() => ({ fetchMyJourney: vi.fn() }));
 
-vi.mock("react-router-dom", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("react-router-dom")>()),
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("react-router")>()),
   useLoaderData: () => route.loaderData,
 }));
 vi.mock("@/features/archive/api/archive-api", () => api);

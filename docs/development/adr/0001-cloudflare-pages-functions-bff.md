@@ -14,7 +14,7 @@ ReadMates는 운영 비용 0원 제약에서 시작했다. SPA 정적 호스팅,
 
 ### 기술 스택 전제
 
-- **프런트엔드**: Vite + React + React Router 7 SPA. 서버 렌더링 없음. 정적 자산 배포.
+- **프런트엔드**: Vite + React + React Router 8 SPA. 서버 렌더링 없음. 정적 자산 배포.
 - **백엔드**: Spring Boot (Kotlin). OCI Always Free Compute에 단일 프로세스로 배포.
 - **DB**: OCI MySQL HeatWave Always Free. Spring만 직접 연결. BFF는 DB를 인식하지 않는다.
 - **인증**: Google OAuth 2.0. Spring이 callback을 처리하고 `readmates_session` cookie를 발급.
@@ -143,7 +143,7 @@ Pages Functions 코드가 순수한 TypeScript(Web API 의존)로 작성되어 V
 | nginx/Caddy self-host (동일 OCI 서버) | OCI Always Free에서 추가 nginx 프로세스는 메모리와 관리 부담을 추가한다. Spring 프로세스가 이미 하나다. 두 프로세스 간 cookie forwarding과 헤더 처리가 nginx.conf에 분산된다. CI/CD에서 nginx 설정 배포 파이프라인이 추가로 필요하다. |
 | Cloudflare Workers (별도 worker 프로젝트) | Pages와 Workers는 별도 Cloudflare 프로젝트다. SPA 정적 자산은 Pages, API 프록시는 Workers에 두면 두 프로젝트의 배포를 동기화해야 한다. 배포 원자성이 없고, Workers의 origin은 `workers.dev` 도메인이 되어 SPA origin과 달라진다. 쿠키 domain 문제가 해결되지 않는다. |
 | Direct browser → Spring API (no BFF) | Spring API가 공개 origin이 된다. BFF secret이 없으므로 요청 출처 신뢰가 불가능하다. 모든 요청이 동등하게 취급된다. `readmates_session` 쿠키는 `SameSite=None; Secure`가 필요해 third-party cookie 제한 브라우저에서 문제가 생긴다. Spring이 OAuth redirect URI를 직접 처리해야 해 공개 노출이 불가피하다. |
-| Next.js Route Handlers (서버 컴포넌트) | React Router 7 SPA에서 Next.js SSR로의 전환이다. 번들 크기, hydration 전략, 라우팅 모델, 빌드 파이프라인이 전면 교체된다. BFF 문제 하나를 해결하기 위해 전체 프레임워크를 바꾸는 것은 과잉이다. |
+| Next.js Route Handlers (서버 컴포넌트) | React Router SPA에서 Next.js SSR로의 전환이다. 번들 크기, hydration 전략, 라우팅 모델, 빌드 파이프라인이 전면 교체된다. BFF 문제 하나를 해결하기 위해 전체 프레임워크를 바꾸는 것은 과잉이다. |
 | Express / Hono on Cloudflare Workers | node:server 런타임이 필요하거나 edge-compatible API를 직접 구현해야 한다. Pages Functions가 이미 edge runtime(web-compatible API)을 제공하므로 추가 서버 레이어가 불필요하다. 별도 서버를 Cloudflare 외에 운영하면 비용 제약에 위배된다. |
 
 ## 결과

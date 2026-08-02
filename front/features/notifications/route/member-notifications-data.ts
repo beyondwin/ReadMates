@@ -4,7 +4,7 @@ import {
   markMemberNotificationRead,
 } from "../api/notifications-api";
 import type { MemberNotificationListResponse } from "../api/notifications-contracts";
-import type { LoaderFunctionArgs } from "react-router-dom";
+import type { LoaderFunctionArgs } from "react-router";
 import { clubSlugFromLoaderArgs, loadMemberAppAuth } from "@/shared/auth/member-app-loader";
 
 export type MemberNotificationsRouteData = MemberNotificationListResponse;

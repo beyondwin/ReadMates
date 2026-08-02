@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import type { LoaderFunctionArgs } from "react-router-dom";
+import type { LoaderFunctionArgs } from "react-router";
 import { getCurrentSession } from "@/features/current-session/api/current-session-api";
 import { currentSessionQuery } from "@/features/current-session/queries/current-session-queries";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";

@@ -1,7 +1,7 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type ComponentProps, useState } from "react";
-import { MemoryRouter, Route, Routes, useLocation, useSearchParams } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation, useSearchParams } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ArchivePageComponent from "@/features/archive/ui/archive-page";
 import type {

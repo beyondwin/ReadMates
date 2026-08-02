@@ -131,7 +131,7 @@ ssh -i ~/.ssh/readmates_oci ubuntu@<vm-public-ip> 'bash -s' < deploy/oci/02-conf
 - `/opt/readmates` 디렉터리 생성
 - Caddy reverse proxy 설정, `${CADDY_SITE} -> 127.0.0.1:8080`
 
-스크립트는 secret을 더 이상 직접 쓰지 않습니다. `/etc/readmates/readmates.env`(Spring 운영 변수)와 `/etc/readmates/caddy.env`는 GitHub Actions의 `sync-config` 워크플로가 GitHub Secrets/Variables 값을 렌더링해 scp로 배포합니다. 변수 inventory, 추가/회전 절차, 비상 복구 절차는 [secrets management runbook](../operations/runbooks/secrets-management.md), 초기 VM 배포키 부트스트랩은 [VM deploy key bootstrap](../operations/runbooks/vm-deploy-key-bootstrap.md)을 따릅니다.
+`sync-config` 워크플로는 GitHub Secrets/Variables로 `/etc/readmates/readmates.env`(Spring 운영 변수)만 렌더링해 scp로 배포합니다. `/etc/readmates/caddy.env`는 `05-deploy-compose-stack.sh`가 운영자 입력 `CADDY_SITE`로 만들고, 같은 script가 `READMATES_SERVER_IMAGE`를 `/opt/readmates/.env`에 기록합니다. 변수 inventory, 추가/회전 절차, 비상 복구 절차는 [secrets management runbook](../operations/runbooks/secrets-management.md), 초기 VM 배포키 부트스트랩은 [VM deploy key bootstrap](../operations/runbooks/vm-deploy-key-bootstrap.md)을 따릅니다.
 
 알림 발송, AI 생성, BFF secret rotation처럼 위 환경 변수 블록의 `READMATES_NOTIFICATIONS_ENABLED`, `READMATES_KAFKA_*`, `READMATES_NOTIFICATION_SENDER_*`, `READMATES_NOTIFICATION_RETRY_DELAY_MINUTES`, `READMATES_NOTIFICATION_MAX_DELIVERY_ATTEMPTS`, `SPRING_MAIL_*`, `READMATES_AIGEN_*`, `READMATES_BFF_SECRETS` 값을 바꾸는 배포는 GitHub Secrets/Variables를 갱신한 뒤 `sync-config` 워크플로를 실행하고, 마지막에 compose stack의 `readmates-api`를 재시작합니다.
 

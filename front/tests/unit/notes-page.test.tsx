@@ -1,5 +1,6 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import { createMemoryRouter, RouterProvider } from "react-router-dom";
+import { createMemoryRouter } from "react-router";
+import { RouterProvider } from "react-router/dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { NoteFeedItem, NoteSessionItem } from "@/features/archive/api/archive-contracts";
 import type { FeedFilter } from "@/features/archive/model/notes-feed-model";

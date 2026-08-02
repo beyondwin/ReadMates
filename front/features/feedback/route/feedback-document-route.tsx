@@ -1,4 +1,4 @@
-import { useLoaderData, useLocation, useParams } from "react-router-dom";
+import { useLoaderData, useLocation, useParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   feedbackDocumentQuery,

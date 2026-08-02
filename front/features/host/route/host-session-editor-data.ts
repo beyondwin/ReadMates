@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import type { LoaderFunctionArgs } from "react-router-dom";
+import type { LoaderFunctionArgs } from "react-router";
 import { previewHostSessionImport } from "@/features/host/api/host-api";
 import type { HostSessionEditorActions } from "@/features/host/route/host-session-editor-actions";
 import {

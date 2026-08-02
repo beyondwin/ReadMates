@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/experimental-ct-react";
 import type { Locator } from "@playwright/test";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import { MobileTabBar } from "./mobile-tab-bar";
 
 const fontMetrics = async (locator: Locator) =>

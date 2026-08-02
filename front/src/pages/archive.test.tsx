@@ -11,7 +11,7 @@ const auth = vi.hoisted(() => ({
 const route = vi.hoisted(() => ({ ArchiveListRoute: vi.fn(() => null) }));
 
 vi.mock("@/src/app/auth-state", () => ({ useAuth: () => auth.state }));
-vi.mock("react-router-dom", () => ({
+vi.mock("react-router", () => ({
   useRouteLoaderData: (routeId: string) => routeId === "club-app" ? auth.clubAppAccess : undefined,
 }));
 vi.mock("@/features/archive/route/archive-list-route", () => route);

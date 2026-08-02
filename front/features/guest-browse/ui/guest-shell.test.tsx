@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 import { MobileTabBar } from "@/shared/ui/mobile-tab-bar";
 import { TopNav } from "@/shared/ui/top-nav";

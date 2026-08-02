@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import type { RouteObject } from "react-router-dom";
+import type { RouteObject } from "react-router";
 import { RequireAuth } from "@/src/app/route-guards";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
 

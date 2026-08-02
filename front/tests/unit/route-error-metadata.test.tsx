@@ -1,6 +1,7 @@
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router-dom";
+import { createMemoryRouter, MemoryRouter } from "react-router";
+import { RouterProvider } from "react-router/dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NotFoundRoute, RouteErrorBoundary, RouteErrorPage } from "@/src/app/route-error";
 

@@ -122,6 +122,11 @@ findings를 우선순위별로 보고합니다.
 - Active ruleset이 없고 branch protection도 확인되지 않아 `POLICY_MISMATCH`입니다. Release PR과 두 단계 CI를 수동 강제합니다.
 - Builder fixture와 scanner가 nested `.tmp`, local path, token형 값, private member/transcript/deploy state를 거절합니다.
 
+### Remote status — 2026-08-03 read-only refresh
+
+- `v2.1.0` annotated tag와 같은 tag의 server image build/scan/promote는 확인됐습니다.
+- Same-tag frontend와 GitHub Release는 확인되지 않았고, OCI/production 상태는 workflow 목록에서 추론하지 않습니다.
+
 ### Local verification
 
 | Evidence | Result |
@@ -137,7 +142,7 @@ findings를 우선순위별로 보고합니다.
 
 ### Production-only pending and residual risk
 
-- Release PR CI, merge SHA CI, tag-triggered GHCR build/scan/promote, OCI backend promotion and health, same-tag frontend dispatch, GitHub Release, production smoke는 로컬 evidence로 대체하지 않고 실제 실행 결과로 닫습니다.
+- Release PR/main CI와 tag-triggered GHCR build/scan/promote는 완료됐습니다. OCI backend promotion과 health, credential-free SMTP hostname probe, same-tag frontend dispatch, GitHub Release, production smoke는 아직 별도 실제 실행 결과로 닫아야 합니다.
 - 기본 로컬 E2E 포트와 MySQL CLI는 개발 머신의 관련 없는 SSH tunnel/서비스와 충돌했습니다. 관련 없는 프로세스를 종료하지 않고 전용 Docker MySQL과 격리 포트로 동일 Chromium suite를 통과시켰으며 이 환경 차이를 release evidence에 보존합니다.
 - Spring Boot 4.0.7은 SMTP hostname verification을 새로 기본 적용합니다. Tag image의 production promotion 전에 운영 SMTP host의 STARTTLS certificate hostname을 자격 증명·메일 발송 없이 검사하고, mismatch 또는 handshake 실패는 `CHECK_FAILURE`로 분류해 backend promotion을 중단합니다.
 - Live provider account retention/paid-tier와 실제 member/host write는 CI가 증명하지 않습니다. 기존 fail-closed allowlist를 유지하고, 인증된 smoke는 read-only 또는 no-send 경로로 제한하며 private value를 Git이나 GitHub Release에 기록하지 않습니다.

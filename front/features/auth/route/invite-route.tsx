@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams } from "react-router";
 import { fetchInvitationPreview, parseInvitationPreview } from "@/features/auth/api/auth-api";
 import InviteAcceptanceCard, { type InvitePreviewState } from "@/features/auth/ui/invite-acceptance-card";
 

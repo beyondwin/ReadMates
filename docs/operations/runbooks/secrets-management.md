@@ -81,8 +81,8 @@ GitHub Variables 로 관리하는 것 — 환경 의존적인 값:
 | `READMATES_AIGEN_ENABLED` | `true`/`false` (kill-switch) |
 | `READMATES_AIGEN_ENABLED_PROVIDERS` | 화이트리스트, 예: `OPENAI` |
 | `READMATES_AIGEN_GOOGLE_PAID_TIER_RETENTION_CONFIRMED` | 기본 `false`; Gemini key의 active billing/paid terms를 운영자가 확인한 뒤에만 `true` |
-| `CADDY_SITE` | Caddy 도메인 |
-| `READMATES_SERVER_IMAGE` | GHCR image ref |
+
+`sync-config`가 render하지 않는 compose 배포 입력은 GitHub Variables inventory와 분리합니다. 운영자는 `deploy/oci/05-deploy-compose-stack.sh` 실행 시 `CADDY_SITE`와 `READMATES_SERVER_IMAGE`를 주입합니다. Script가 각각 `/etc/readmates/caddy.env`와 `/opt/readmates/.env`에 기록하며, `/etc/readmates/readmates.env`의 secret rendering에는 사용하지 않습니다.
 
 워크플로 YAML 에 인라인된 값들 — GitHub 등록 불필요. 변경하려면 워크플로 PR:
 

@@ -1,6 +1,6 @@
 # 새 버전 발행과 운영 배포 Runbook
 
-검토일: 2026-07-25
+검토일: 2026-08-03
 
 이 문서는 ReadMates 새 제품 버전을 발행하고, 같은 tag로 Cloudflare Pages 프론트엔드와 OCI Compose 백엔드를 운영에 반영하는 절차입니다. 세부 설정 기준은 [Cloudflare Pages](cloudflare-pages.md), [OCI Compose Stack](compose-stack.md), [버저닝](../development/versioning.md)을 우선합니다.
 
@@ -48,6 +48,8 @@ pnpm --dir front test
 pnpm --dir front build
 ./scripts/server-ci-check.sh
 ./server/gradlew -p server integrationTest
+python3 -B scripts/check-deploy-workflow-contract.py --self-test
+python3 -B scripts/check-deploy-workflow-contract.py
 ./scripts/build-public-release-candidate.sh
 ./scripts/public-release-check.sh .tmp/public-release-candidate
 ```
@@ -72,7 +74,7 @@ git tag -a vX.Y.Z -m "ReadMates vX.Y.Z"
 git push origin vX.Y.Z
 ```
 
-`main` push는 production 배포를 시작하지 않습니다. `v*` tag push는 GHCR server image publish workflow만 시작합니다. Cloudflare Pages production은 server image scan/promote와 OCI backend health 확인 뒤 같은 tag를 `release_tag`로 입력해 수동 배포합니다.
+`main` push는 production 배포를 시작하지 않습니다. exact `vMAJOR.MINOR.PATCH` tag push는 GHCR server image publish workflow만 시작합니다. Server workflow는 annotated tag 자체를 checkout하고 tag가 가리키는 commit과 `HEAD`가 일치하는지 build 전에 검증합니다. Cloudflare Pages production은 server image scan/promote와 OCI backend health 확인 뒤 같은 tag를 `release_tag`로 입력해 수동 배포합니다.
 
 Branch protection bypass 정책은 [release-management.md#branch-protection-bypass-policy](../development/release-management.md#branch-protection-bypass-policy)를 참조합니다. `main` direct push (admin bypass) 허용 조건, release PR 강제 조건, emergency bypass ledger 기록 기준이 그 절에 정리되어 있습니다. Release tag push 직전에는 `./scripts/pre-push-check.sh --release`를 실행해 `CHANGELOG Unreleased` 가드를 통과시키고, 통과가 어려운 emergency 상황에서만 `--no-changelog-check`로 우회합니다.
 
@@ -86,6 +88,14 @@ gh run watch <deploy-server-run-id> --exit-status
 ```
 
 `Deploy Server Image`는 scan candidate digest를 Trivy로 검사한 뒤 같은 digest를 `ghcr.io/<owner>/<repo>/readmates-server:vX.Y.Z`로 promote합니다. 성공 후 [Backend OCI Promotion](#backend-oci-promotion)을 먼저 완료합니다.
+
+같은 release tag의 server image workflow를 수동으로 다시 실행할 때도 branch source와 image tag를 섞지 않습니다. Workflow definition과 checkout source가 모두 같은 annotated tag를 가리키도록 `--ref`와 `image_tag`에 같은 값을 사용합니다.
+
+```bash
+gh workflow run "Deploy Server Image" --ref vX.Y.Z -f image_tag=vX.Y.Z
+```
+
+Workflow는 generic Docker tag, lightweight tag, tag commit과 checkout `HEAD` 불일치를 build 전에 거절합니다. Pushed tag와 manual dispatch는 같은 release-tag concurrency key를 사용하고, Trivy가 검사한 digest와 release tag로 promote하는 digest가 다르면 실패해야 합니다. 실패한 source tag는 이동하거나 덮어쓰지 않고 수정한 commit에서 새 patch tag를 발행합니다.
 
 Backend health와 BFF contract를 확인한 뒤 frontend workflow를 같은 release tag로 수동 실행합니다.
 

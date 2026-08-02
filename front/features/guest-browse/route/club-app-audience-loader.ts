@@ -1,4 +1,4 @@
-import type { LoaderFunction, LoaderFunctionArgs } from "react-router-dom";
+import type { LoaderFunction, LoaderFunctionArgs } from "react-router";
 import { fetchGuestBrowseShell } from "@/features/guest-browse/api/guest-browse-api";
 import type { GuestBrowseShell } from "@/features/guest-browse/api/guest-browse-contracts";
 import { deriveClubAppAudience, type ClubAppAudience } from "@/features/guest-browse/model/club-app-audience";

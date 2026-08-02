@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useLoaderData, useParams } from "react-router-dom";
+import { useLoaderData, useParams } from "react-router";
 import { useIsFetching, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { HostNotificationsPage } from "@/features/host/ui/host-notifications-page";
 import type {

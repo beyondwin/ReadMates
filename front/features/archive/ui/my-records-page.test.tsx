@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import type { MyJourneyItem } from "@/features/archive/model/my-reading-shelf-model";
 import { MyRecordsPage } from "./my-records-page";

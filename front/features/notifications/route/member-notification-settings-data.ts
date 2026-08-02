@@ -1,4 +1,4 @@
-import type { LoaderFunctionArgs } from "react-router-dom";
+import type { LoaderFunctionArgs } from "react-router";
 import { clubSlugFromLoaderArgs, loadMemberAppAuth } from "@/shared/auth/member-app-loader";
 import { fetchNotificationPreferences } from "../api/notification-preferences-api";
 import type { NotificationPreferencesLoadState } from "../model/notification-preferences-model";

@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useLoaderData, useParams } from "react-router-dom";
+import { useLoaderData, useParams } from "react-router";
 import { fetchMyJourney } from "@/features/archive/api/archive-api";
 import {
   appendUniqueJourneyItems,

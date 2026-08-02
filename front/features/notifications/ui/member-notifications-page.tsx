@@ -1,5 +1,5 @@
 import type { MouseEvent } from "react";
-import { useInRouterContext, useLocation } from "react-router-dom";
+import { useInRouterContext, useLocation } from "react-router";
 import { getMemberNotificationLinkView } from "@/features/notifications/model/notification-link-model";
 import type { ReadmatesReturnState } from "@/shared/routing/readmates-route-state";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";

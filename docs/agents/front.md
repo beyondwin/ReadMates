@@ -2,7 +2,7 @@
 
 Read this for work under `front/`.
 
-The frontend is a Vite React SPA with React Router 7 and Cloudflare Pages Functions for BFF/OAuth proxy routes.
+The frontend is a Vite React SPA with React Router 8 and Cloudflare Pages Functions for BFF/OAuth proxy routes.
 
 Successful frontend changes keep route modules in charge of data flow, keep UI components prop/callback driven, and avoid leaking server-only configuration into the browser bundle.
 

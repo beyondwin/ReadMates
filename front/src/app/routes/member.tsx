@@ -1,6 +1,6 @@
 import { lazy, Suspense, type ComponentType, type ReactNode } from "react";
 import type { QueryClient } from "@tanstack/react-query";
-import { useLoaderData, type LoaderFunction, type RouteObject } from "react-router-dom";
+import { useLoaderData, type LoaderFunction, type RouteObject } from "react-router";
 import type { InternalLinkComponent } from "@/features/current-session";
 import { CurrentSessionRouteError } from "@/features/current-session/route/current-session-route-error";
 import { notesFeedShouldRevalidate } from "@/features/archive/route/notes-feed-revalidation";

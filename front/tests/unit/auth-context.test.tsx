@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { AuthProvider } from "@/src/app/auth-context";
 import { useAuth, useAuthActions } from "@/src/app/auth-state";
 import { RequireAuth, RequireHost, RequireMemberApp } from "@/src/app/route-guards";

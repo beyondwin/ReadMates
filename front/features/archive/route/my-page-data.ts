@@ -10,7 +10,7 @@ import { inactiveMyPageProfile } from "@/features/archive/model/archive-model";
 import { emptyMyJourneyPage } from "@/features/archive/model/my-reading-shelf-model";
 import { loadArchiveMemberAuth } from "@/features/archive/route/archive-loader-auth";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
-import type { LoaderFunctionArgs } from "react-router-dom";
+import type { LoaderFunctionArgs } from "react-router";
 
 export type MyPageRouteData = {
   profile: MyPageResponse;

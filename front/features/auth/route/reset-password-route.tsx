@@ -1,4 +1,4 @@
-import { useParams } from "react-router-dom";
+import { useParams } from "react-router";
 import { PasswordResetCard } from "@/features/auth/ui/password-reset-card";
 import { PageMetadataHead } from "@/shared/ui/page-metadata-head";
 

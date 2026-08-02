@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import type { LoaderFunctionArgs } from "react-router-dom";
+import type { LoaderFunctionArgs } from "react-router";
 import { platformAdminClubsQuery } from "@/features/platform-admin/queries/platform-admin-queries";
 import { platformAdminSupportLedgerQuery } from "@/features/platform-admin/queries/platform-admin-support-queries";
 

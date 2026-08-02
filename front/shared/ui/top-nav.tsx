@@ -1,6 +1,6 @@
 
 import type { ComponentType, CSSProperties, ReactNode } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation } from "react-router";
 import { AvatarChip } from "./avatar-chip";
 import { usePublicAuthAction, type PublicAuthAction } from "./public-auth-action-state";
 import { ReadmatesBrandMark } from "./readmates-brand-mark";
