@@ -92,10 +92,26 @@ describe("isCacheableUpstreamResponse", () => {
     expect(isCacheableUpstreamResponse(response)).toBe(false);
   });
 
+  it("returns false when Cache-Control uses mixed-case No-Store", () => {
+    const response = new Response("{}", {
+      status: 200,
+      headers: { "Cache-Control": "public, max-age=120, No-Store" },
+    });
+    expect(isCacheableUpstreamResponse(response)).toBe(false);
+  });
+
   it("returns false when Cache-Control contains private", () => {
     const response = new Response("{}", {
       status: 200,
       headers: { "Cache-Control": "private, max-age=120" },
+    });
+    expect(isCacheableUpstreamResponse(response)).toBe(false);
+  });
+
+  it("returns false when Cache-Control uses mixed-case Private", () => {
+    const response = new Response("{}", {
+      status: 200,
+      headers: { "Cache-Control": "public, max-age=120, Private" },
     });
     expect(isCacheableUpstreamResponse(response)).toBe(false);
   });
