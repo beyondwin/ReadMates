@@ -12,7 +12,6 @@ import {
   guestArchiveReadView,
   guestHomeReadView,
   guestNotesReadView,
-  guestSessionReadView,
 } from "@/features/guest-browse/model/guest-read-views";
 import { clubSlugFromLoaderArgs, type ClubScopedLoaderArgs } from "@/shared/auth/member-app-loader";
 import { isReadmatesApiError } from "@/shared/api/errors";
@@ -70,7 +69,7 @@ function boundedRetryAfterSeconds(value: string | null, now: number) {
 }
 
 export async function guestCurrentSessionLoader(args?: Pick<LoaderFunctionArgs, "params">) {
-  return guestSessionReadView(await fetchGuestCurrentSession(requiredClubSlug(args)));
+  return fetchGuestCurrentSession(requiredClubSlug(args));
 }
 
 export async function guestNotesLoader(args?: Pick<LoaderFunctionArgs, "params">) {

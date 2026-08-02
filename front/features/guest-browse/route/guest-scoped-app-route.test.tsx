@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { RouterProvider, createMemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { scopedGuestRouteLoader } from "./club-app-audience-loader";
-import { GuestArchiveRoute, GuestHomeRoute, GuestNotesRoute, GuestScopedAppRoute } from "./guest-scoped-app-route";
+import { GuestArchiveRoute, GuestHomeRoute, GuestNotesRoute, GuestScopedAppRoute, type GuestCurrentSessionContentProps } from "./guest-scoped-app-route";
 
 const LinkComponent = ({ to, children, ...props }: { to: string; children: React.ReactNode; className?: string; style?: React.CSSProperties }) => <a {...props} href={to}>{children}</a>;
 const anonymousAuth = { authenticated: false, userId: null, membershipId: null, clubId: null, email: null, displayName: null, accountName: null, role: null, membershipStatus: null, approvalState: "ANONYMOUS" };
@@ -14,6 +14,27 @@ const notes = (text = "처음") => ({
   feed: { items: [{ sessionId: "s1", sessionNumber: 1, bookTitle: "책", date: "2026-08-02", authorName: "이름", authorShortName: "이", avatarKey: "book", kind: "HIGHLIGHT" as const, text }], nextCursor: "cursor-1" },
   capabilities: { canWrite: false as const },
 });
+
+const guestCurrentSession = {
+  currentSession: {
+    sessionId: "session-open",
+    sessionNumber: 12,
+    title: "여름의 독서",
+    bookTitle: "파도",
+    bookAuthor: "작가",
+    bookLink: null,
+    bookImageUrl: null,
+    date: "2026-08-09",
+    startTime: "19:00",
+    endTime: "21:00",
+    questionDeadlineAt: "2026-08-08T23:59:00",
+    attendees: [{ displayName: "읽는이", avatarKey: "book", rsvpStatus: "GOING", attendanceStatus: "UNKNOWN" }],
+    board: {
+      questions: [{ priority: 1, text: "다가오는 질문", draftThought: "초안 생각", authorName: "읽는이", authorShortName: "읽는", avatarKey: "book" }],
+      longReviews: [{ title: "서평", content: "공개 서평", authorName: "읽는이", authorShortName: "읽는", avatarKey: "book" }],
+    },
+  },
+} as const;
 
 function mount(initialData = notes(), clubSlug = "alpha") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -126,6 +147,23 @@ describe("guest public route errors", () => {
     }], { initialEntries: ["/clubs/alpha/app/notes"] });
     render(<RouterProvider router={router} />);
     expect(await screen.findByText("normal route boundary")).toBeVisible();
+  });
+});
+
+describe("guest current session route", () => {
+  it("delegates guest current-session loader data to the route-composed reader", async () => {
+    const GuestCurrentSessionContent = ({ data }: GuestCurrentSessionContentProps) => (
+      <p>{(data as typeof guestCurrentSession).currentSession.bookTitle}</p>
+    );
+    const router = createMemoryRouter([{
+      path: "/clubs/:clubSlug/app/session/current",
+      loader: () => ({ guestRoute: true, guestData: guestCurrentSession }),
+      element: <GuestScopedAppRoute LinkComponent={LinkComponent} GuestCurrentSessionContent={GuestCurrentSessionContent} />,
+    }], { initialEntries: ["/clubs/alpha/app/session/current"] });
+
+    render(<RouterProvider router={router} />);
+
+    expect(await screen.findByText("파도")).toBeVisible();
   });
 });
 

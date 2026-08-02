@@ -21,7 +21,7 @@ import {
   guestHomeLoader,
   guestNotesLoader,
 } from "@/features/guest-browse/route/guest-route-data";
-import { GuestScopedAppRoute } from "@/features/guest-browse/route/guest-scoped-app-route";
+import { GuestScopedAppRoute, type GuestCurrentSessionContentProps } from "@/features/guest-browse/route/guest-scoped-app-route";
 import { GuestNavigationLink } from "@/features/guest-browse/ui/guest-navigation-dialog";
 import { AppRouteLayout } from "@/src/app/layouts/app-route-layout";
 import { memoizeRouteModule } from "@/src/app/routes/route-module-loader";
@@ -29,6 +29,7 @@ import { ClubMemberAppRouteLayout } from "@/src/app/layouts/club-app-route-layou
 import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
 import { RequireAuth, RequireMemberApp } from "@/src/app/route-guards";
 import { Link } from "@/src/app/router-link";
+import { GuestCurrentSessionContent } from "@/src/pages/guest-current-session";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
 
 const currentSessionInternalLink: InternalLinkComponent = ({ href, children, ...props }) => {
@@ -58,6 +59,7 @@ function scopedMemberRoute({
   fallback,
   load,
   guestLoader,
+  GuestCurrentSessionContent: GuestCurrentSessionContentOverride,
 }: {
   path?: string;
   index?: true;
@@ -67,6 +69,7 @@ function scopedMemberRoute({
   fallback: ReactNode;
   load: () => Promise<ScopedRouteModule>;
   guestLoader?: LoaderFunction;
+  GuestCurrentSessionContent?: ComponentType<GuestCurrentSessionContentProps>;
 }): RouteObject {
   const loadOnce = memoizeRouteModule(load);
   const ProtectedComponent = lazy(async () => ({ default: (await loadOnce()).Component }));
@@ -75,7 +78,10 @@ function scopedMemberRoute({
     const data = useLoaderData();
 
     return isGuestScopedRouteData(data) ? (
-      <GuestScopedAppRoute LinkComponent={GuestNavigationLink} />
+      <GuestScopedAppRoute
+        LinkComponent={GuestNavigationLink}
+        GuestCurrentSessionContent={GuestCurrentSessionContentOverride}
+      />
     ) : (
       <Suspense fallback={fallback}>
         <ProtectedComponent />
@@ -141,8 +147,15 @@ function scopedMemberAppRoutes(queryClient: QueryClient): RouteObject[] {
       ErrorBoundary: CurrentSessionRouteError,
       fallback: <ReadmatesRouteLoading label="세션을 불러오는 중" variant="member" />,
       guestLoader: guestCurrentSessionLoader,
+      GuestCurrentSessionContent,
       load: async () => {
-        const { CurrentSessionRoute, currentSessionLoaderFactory } = await import("@/features/current-session");
+        const [
+          { CurrentSessionRoute },
+          { currentSessionLoaderFactory },
+        ] = await Promise.all([
+          import("@/features/current-session/route/current-session-route"),
+          import("@/features/current-session/route/current-session-data"),
+        ]);
         return {
           Component: () => <CurrentSessionRoute internalLinkComponent={currentSessionInternalLink} />,
           loader: currentSessionLoaderFactory(queryClient),

@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { GuestArchive, GuestCurrentSession, GuestHome, GuestNotes } from "./guest-surfaces";
+import { GuestArchive, GuestHome, GuestNotes } from "./guest-surfaces";
 
 const guestSessionFixture = {
   sessionId: "session-open",
@@ -37,19 +37,6 @@ const guestSessionFixture = {
 } as const;
 
 describe("guest browse surfaces", () => {
-  it("shows real guest session data but no participation controls", () => {
-    render(<GuestCurrentSession data={{ currentSession: guestSessionFixture }} />);
-
-    expect(screen.getByText("다가오는 질문")).toBeVisible();
-    expect(screen.getByText("초안 생각")).toBeVisible();
-    expect(screen.getByText("여름의 독서")).toBeVisible();
-    expect(screen.getAllByText("읽는이")).toHaveLength(3);
-    expect(screen.getByText((_, element) => element?.textContent === "RSVP · 참석출석 · 미확인")).toBeVisible();
-    expect(screen.getByText("참석 현황")).toBeVisible();
-    expect(screen.queryByRole("button", { name: /RSVP|저장|질문 추가/ })).not.toBeInTheDocument();
-    expect(screen.queryByText(/접속 링크|비밀번호|정확한 장소/)).not.toBeInTheDocument();
-  });
-
   it("renders public archive one-liners with full author and avatar semantics", async () => {
     const { GuestArchiveDetail } = await import("./guest-surfaces");
     render(

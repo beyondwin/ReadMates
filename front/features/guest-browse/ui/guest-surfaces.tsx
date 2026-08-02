@@ -1,4 +1,4 @@
-import { useState, type ComponentType, type ReactNode } from "react";
+import { useState, type ComponentType, type CSSProperties, type ReactNode } from "react";
 import type {
   GuestArchiveDetailReadView,
   GuestArchiveSessionReadView,
@@ -8,15 +8,15 @@ import type {
   GuestPage,
   GuestSessionReadView,
 } from "@/features/guest-browse/model/guest-read-views";
-import { guestAttendanceLabel, guestNoteKindLabel, guestRsvpLabel } from "@/features/guest-browse/model/guest-read-views";
+import { guestNoteKindLabel } from "@/features/guest-browse/model/guest-read-views";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { BookCover } from "@/shared/ui/book-cover";
-import { formatDateLabel, formatDeadlineLabel } from "@/shared/ui/readmates-display";
+import { formatDateLabel } from "@/shared/ui/readmates-display";
 import { loginPathForReturnTo } from "@/shared/auth/login-return";
 import SharedNotesFeedPage from "@/shared/ui/notes-feed-page";
 
 type LoadMore = () => Promise<void>;
-export type GuestSurfaceLinkProps = { to: string; className?: string; style?: Record<string, string | number>; children: ReactNode; "aria-label"?: string };
+export type GuestSurfaceLinkProps = { to: string; className?: string; style?: CSSProperties; children: ReactNode; "aria-label"?: string };
 type GuestSurfaceProps = { appBasePath?: string; returnTo?: string; LinkComponent?: ComponentType<GuestSurfaceLinkProps> };
 
 function BrowserLink({ to, children, ...props }: GuestSurfaceLinkProps) {
@@ -100,35 +100,6 @@ function GuestSessionCard({ session, href, LinkComponent = BrowserLink }: { sess
   );
 }
 
-export function GuestCurrentSession({ data, appBasePath = "/app", returnTo = appBasePath, LinkComponent = BrowserLink }: { data: { currentSession: GuestSessionReadView | null } } & GuestSurfaceProps) {
-  const session = data.currentSession;
-  if (!session) return <GuestUnavailable title="현재 공개된 세션이 없습니다" appBasePath={appBasePath} LinkComponent={LinkComponent} />;
-  return (
-    <main>
-      <section className="page-header-compact"><div className="container">
-        <p className="eyebrow" style={{ margin: 0 }}>현재 세션 · 읽기 전용</p>
-        <div className="row" style={{ gap: 16, alignItems: "flex-start", marginTop: 12 }}>
-          <BookCover title={session.bookTitle} author={session.bookAuthor} imageUrl={session.bookImageUrl} width={72} />
-          <div><p className="eyebrow" style={{ margin: 0 }}>{session.title}</p><h1 className="h1 editorial" style={{ margin: "4px 0 0" }}>{session.bookTitle}</h1><p className="small" style={{ color: "var(--text-2)", margin: "6px 0 0" }}>{session.bookAuthor} · {formatDateLabel(session.date)} · {session.startTime} – {session.endTime}</p></div>
-        </div>
-        <p className="small" style={{ color: "var(--text-2)", margin: "16px 0 0" }}>질문 마감 · {formatDeadlineLabel(session.questionDeadlineAt)}</p>
-      </div></section>
-      <section style={{ padding: "30px 0 80px" }}><div className="container stack" style={{ "--stack": "30px" }}>
-        <section className="surface-quiet" role="note" style={{ padding: 18 }}><p className="eyebrow" style={{ margin: 0 }}>게스트 둘러보기</p><p className="small" style={{ color: "var(--text-2)", margin: "7px 0 0" }}>세션 내용과 공동 보드는 읽을 수 있습니다. 참여와 작성은 정식 멤버에게 열립니다.</p></section>
-        <section><h2 className="h3 editorial" style={{ margin: "0 0 12px" }}>참석 현황</h2><GuestRoster session={session} /></section>
-        <section><h2 className="h3 editorial" style={{ margin: "0 0 12px" }}>함께 남긴 질문</h2><GuestQuestions questions={session.board.questions} /></section>
-        <section><h2 className="h3 editorial" style={{ margin: "0 0 12px" }}>공개 서평</h2><GuestLongReviews reviews={session.board.longReviews} /></section>
-        <ConversionPrompt returnTo={returnTo} LinkComponent={LinkComponent} />
-      </div></section>
-    </main>
-  );
-}
-
-function GuestRoster({ session }: { session: GuestSessionReadView }) {
-  if (!session.attendees.length) return <Empty message="공개된 참석 현황이 없습니다." />;
-  return <div className="surface" style={{ padding: 18 }}>{session.attendees.map((attendee) => <div key={`${attendee.displayName}-${attendee.avatarKey}`} className="row-between" style={{ padding: "10px 0", borderBottom: "1px solid var(--line-soft)" }}><span className="row" style={{ gap: 9 }}><AvatarChip avatarKey={attendee.avatarKey} name={attendee.displayName} /><span className="small">{attendee.displayName}</span></span><span className="tiny" style={{ color: "var(--text-3)", textAlign: "right" }}>RSVP · {guestRsvpLabel(attendee.rsvpStatus)}<br />출석 · {guestAttendanceLabel(attendee.attendanceStatus)}</span></div>)}</div>;
-}
-
 function GuestQuestions({ questions }: { questions: GuestSessionReadView["board"]["questions"] }) {
   return questions.length ? <div className="stack" style={{ "--stack": "10px" }}>{questions.map((question) => <article key={`${question.priority}-${question.text}`} className="surface" style={{ padding: 18 }}><div className="tiny mono" style={{ color: "var(--text-3)" }}>Q{question.priority}</div><p className="body editorial" style={{ margin: "8px 0 0" }}>{question.text}</p>{question.draftThought ? <p className="small" style={{ color: "var(--text-2)", margin: "10px 0 0", whiteSpace: "pre-wrap" }}>{question.draftThought}</p> : null}<p className="tiny" style={{ color: "var(--text-3)", margin: "10px 0 0" }}>{question.authorName}</p></article>)}</div> : <Empty message="공개된 질문이 없습니다." />;
 }
@@ -157,7 +128,6 @@ export function GuestArchiveDetail({ data, appBasePath = "/app", returnTo = appB
   return <main><section className="page-header-compact"><div className="container"><LinkComponent className="eyebrow" to={appHref(appBasePath, "/archive")}>← 아카이브</LinkComponent><h1 className="h1 editorial" style={{ margin: "10px 0 0" }}>{data.bookTitle}</h1><p className="small" style={{ color: "var(--text-2)", margin: "7px 0 0" }}>{data.bookAuthor} · {formatDateLabel(data.date)} · 참석 {data.attendance}/{data.total}</p></div></section><section style={{ padding: "28px 0 80px" }}><div className="container stack" style={{ "--stack": "30px" }}><section><h2 className="h3 editorial" style={{ margin: "0 0 12px" }}>요약</h2><div className="surface" style={{ padding: 18 }}><p className="body" style={{ margin: 0, whiteSpace: "pre-wrap" }}>{data.summary ?? "아직 공개된 요약이 없습니다."}</p></div></section><section><h2 className="h3 editorial" style={{ margin: "0 0 12px" }}>회차 기록</h2>{data.highlights.length ? <GuestNoteList items={data.highlights.map((item) => ({ sessionId: data.sessionId, sessionNumber: data.sessionNumber, bookTitle: data.bookTitle, date: data.date, authorName: item.authorName, authorShortName: item.authorShortName, avatarKey: item.avatarKey, kind: "HIGHLIGHT", text: item.text }))} /> : <Empty message="공개된 하이라이트가 없습니다." />}</section><section><h2 className="h3 editorial" style={{ margin: "0 0 12px" }}>함께 남긴 질문</h2><GuestQuestions questions={data.questions} /></section><section><h2 className="h3 editorial" style={{ margin: "0 0 12px" }}>한줄평</h2>{data.oneLiners.length ? <div className="stack" style={{ "--stack": "10px" }}>{data.oneLiners.map((item, index) => <article key={`${item.authorName}-${item.text}-${index}`} className="surface" style={{ padding: 18 }}><p className="body editorial" style={{ margin: 0 }}>{item.text}</p><div className="row" style={{ gap: 8, marginTop: 10 }}><AvatarChip avatarKey={item.avatarKey} name={item.authorName} /><span className="tiny" style={{ color: "var(--text-3)" }}>{item.authorName}</span></div></article>)}</div> : <Empty message="공개된 한줄평이 없습니다." />}</section><section><h2 className="h3 editorial" style={{ margin: "0 0 12px" }}>공개 서평</h2><GuestLongReviews reviews={data.longReviews} /></section><section className="surface-quiet" role="note" style={{ padding: 18 }}><p className="eyebrow" style={{ margin: 0 }}>피드백 문서</p><p className="small" style={{ color: "var(--text-2)", margin: "7px 0 12px" }}>피드백 문서는 정식 멤버에게만 열립니다.</p><LinkComponent className="btn btn-quiet btn-sm" to={appHref(appBasePath, `/feedback/${encodeURIComponent(data.sessionId)}`)} aria-label="피드백 보기, 정식 멤버 전용">피드백 보기</LinkComponent></section><ConversionPrompt returnTo={returnTo} LinkComponent={LinkComponent} /></div></section></main>;
 }
 
-function GuestUnavailable({ title, appBasePath, LinkComponent = BrowserLink }: { title: string; appBasePath: string; LinkComponent?: ComponentType<GuestSurfaceLinkProps> }) { return <main><section className="page-header-compact"><div className="container"><div className="surface-quiet" style={{ padding: 28 }}><h1 className="h2 editorial" style={{ margin: 0 }}>{title}</h1><LinkComponent className="btn btn-quiet btn-sm" to={appBasePath} style={{ marginTop: 16 }}>클럽 둘러보기</LinkComponent></div></div></section></main>; }
 function Empty({ message }: { message: string }) { return <div className="surface-quiet" role="status" style={{ padding: 18, color: "var(--text-2)" }}>{message}</div>; }
 function WidgetFailure({ error, onRetry }: { error: { status?: number; retryAfterSeconds?: number }; onRetry?: LoadMore }) { return <div className="surface-quiet" role="status" style={{ padding: 18, color: "var(--text-2)" }}><p style={{ margin: 0 }}>{error.status === 429 ? error.retryAfterSeconds ? `${error.retryAfterSeconds}초 뒤에 다시 시도해 주세요.` : "요청이 많습니다. 잠시 뒤에 다시 시도해 주세요." : "기록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."}</p>{onRetry ? <LoadMore visible onLoadMore={onRetry} /> : null}</div>; }
 function LoadMore({ visible, onLoadMore }: { visible: boolean; onLoadMore?: LoadMore }) {

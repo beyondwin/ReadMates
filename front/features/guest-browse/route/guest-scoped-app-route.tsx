@@ -8,9 +8,13 @@ import { guestArchiveQuery, guestCurrentSessionQuery, guestNoteFeedQuery, guestN
 import type { GuestScopedRouteData, GuestScopedRouteFailureData } from "@/features/guest-browse/route/club-app-audience-loader";
 import { GuestLockedPage, type GuestLockKind } from "@/features/guest-browse/ui/guest-locked-page";
 import { GuestMySpace } from "@/features/guest-browse/ui/guest-my-space";
-import { GuestArchive, GuestArchiveDetail, GuestCurrentSession, GuestHome, GuestNotes, type GuestSurfaceLinkProps } from "@/features/guest-browse/ui/guest-surfaces";
+import { GuestArchive, GuestArchiveDetail, GuestHome, GuestNotes, type GuestSurfaceLinkProps } from "@/features/guest-browse/ui/guest-surfaces";
 
 type GuestLinkProps = GuestSurfaceLinkProps;
+export type GuestCurrentSessionContentProps = {
+  data: unknown;
+  LinkComponent: ComponentType<GuestLinkProps>;
+};
 function requestedAppPath(pathname: string) {
   return pathname.replace(/^\/clubs\/[^/]+(?=\/app(?:\/|$))/, "");
 }
@@ -22,7 +26,13 @@ function lockKind(path: string): GuestLockKind {
   return "member";
 }
 
-export function GuestScopedAppRoute({ LinkComponent }: { LinkComponent: ComponentType<GuestLinkProps> }) {
+export function GuestScopedAppRoute({
+  LinkComponent,
+  GuestCurrentSessionContent,
+}: {
+  LinkComponent: ComponentType<GuestLinkProps>;
+  GuestCurrentSessionContent?: ComponentType<GuestCurrentSessionContentProps>;
+}) {
   const location = useLocation();
   const { clubSlug } = useParams();
   const loaderData = useLoaderData() as GuestScopedRouteData;
@@ -47,7 +57,7 @@ export function GuestScopedAppRoute({ LinkComponent }: { LinkComponent: Componen
   }
 
   const appBasePath = `/clubs/${encodeURIComponent(clubSlug ?? "")}/app`;
-  const content = guestBrowseContent(appPath, loaderData.guestData, clubSlug, appBasePath, returnTo, LinkComponent, new URLSearchParams(location.search).get("sessionId"));
+  const content = guestBrowseContent(appPath, loaderData.guestData, clubSlug, appBasePath, returnTo, LinkComponent, GuestCurrentSessionContent, new URLSearchParams(location.search).get("sessionId"));
 
   if (content) {
     return content;
@@ -78,6 +88,7 @@ function guestBrowseContent(
   appBasePath: string,
   returnTo: string,
   LinkComponent: ComponentType<GuestLinkProps>,
+  GuestCurrentSessionContent: ComponentType<GuestCurrentSessionContentProps> | undefined,
   selectedSessionId: string | null,
 ) {
   if (appPath === "/app") {
@@ -85,7 +96,7 @@ function guestBrowseContent(
   }
 
   if (appPath === "/app/session/current") {
-    return <GuestCurrentSession data={data as { currentSession: GuestHomeReadView["current"]["currentSession"] }} appBasePath={appBasePath} returnTo={returnTo} LinkComponent={LinkComponent} />;
+    return GuestCurrentSessionContent ? <GuestCurrentSessionContent data={data} LinkComponent={LinkComponent} /> : null;
   }
 
   if (appPath === "/app/notes" && clubSlug) {
