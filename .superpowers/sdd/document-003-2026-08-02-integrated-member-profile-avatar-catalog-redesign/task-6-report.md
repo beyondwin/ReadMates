@@ -48,3 +48,14 @@ It reported eight pre-existing `side-tab` warnings in unrelated legacy sections 
 - Acceptance-matrix row selected: UI/runtime state (error, wrapping, desktop/mobile, focus and saving states).
 - Authorization, API, persistence, BFF, cache, and session rows are excluded because Task 6 consumes the existing Task 5 callback and changes no boundary or data contract.
 - Remaining risk: actual browser geometry at required viewports is encoded but not runtime-confirmed because the sandbox denied the CT server socket. Unit, lint, and production build evidence are local and complete.
+
+## Review fix round 1
+
+- Preserved the active profile step and body scroll position for avatar failures; the inline avatar error remains linked to and focuses the profile avatar control.
+- Made discard transitions deterministic: entry focuses `계속 편집`, continuing restores the prior logical control, and the focus trap recovers when focus is temporarily outside after DOM replacement.
+- Added labelled `취소` and mobile-back controls. Dirty cancel, backdrop, mobile-back, close, and Escape all enter the sole discard path; pristine dismissal still closes directly.
+- Restored unaffected `MemberSpaceOverview`, `MyReadingShelf`, achievement metric, and recent-reading regression coverage in `member-space-regressions.test.tsx`.
+- RED evidence: the added focused suite failed 5 tests for missing mobile-back/cancel, discard focus, avatar-step retention, and transition trap recovery.
+- GREEN evidence: focused suite now passes 5 files / 26 tests; full frontend ESLint and Vite production build pass.
+- Component test retry compiled the seven cases, then remained sandbox-blocked by `listen EPERM: operation not permitted ::1:3100`; 7 did not run.
+- The Impeccable detector was not rerun: this was a targeted state/focus correction and the one required detector pass had already completed. This preserves the bounded-pass ceiling.

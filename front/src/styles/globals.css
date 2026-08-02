@@ -6828,6 +6828,10 @@ a.rm-recent-record__destination:hover {
   cursor: pointer;
 }
 
+.rm-profile-editor__mobile-back {
+  visibility: hidden;
+}
+
 .rm-profile-editor__icon-action svg {
   width: 21px;
   fill: none;

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ProfileUpdateFailure } from "@/features/archive/model/profile-update";
@@ -75,12 +75,26 @@ describe("ProfileEditorDialog", () => {
     const { onClose } = renderEditor();
     await user.type(screen.getByRole("textbox", { name: "표시 이름" }), " 변경");
     await user.keyboard("{Escape}");
-    expect(screen.getByRole("heading", { name: "변경사항을 버릴까요?" })).toBeVisible();
+    const discardHeading = screen.getByRole("heading", { name: "변경사항을 버릴까요?" });
+    expect(discardHeading).toBeVisible();
+    expect(screen.getByRole("button", { name: "계속 편집" })).toHaveFocus();
     await user.click(screen.getByRole("button", { name: "계속 편집" }));
     expect(screen.getByRole("textbox", { name: "표시 이름" })).toHaveValue("멤버1 변경");
+    expect(screen.getByRole("textbox", { name: "표시 이름" })).toHaveFocus();
     await user.click(screen.getByRole("button", { name: "프로필 편집 닫기" }));
     await user.click(screen.getByRole("button", { name: "변경사항 버리기" }));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["backdrop", "mobile-back", "cancel"])("routes dirty %s dismissal through discard", async (method) => {
+    const user = userEvent.setup();
+    const { onClose } = renderEditor();
+    await user.type(screen.getByRole("textbox", { name: "표시 이름" }), " 변경");
+    if (method === "backdrop") await user.click(screen.getByTestId("profile-editor-scrim"));
+    if (method === "mobile-back") await user.click(screen.getByRole("button", { name: "프로필 편집 뒤로" }));
+    if (method === "cancel") await user.click(screen.getByRole("button", { name: "취소" }));
+    expect(screen.getByRole("heading", { name: "변경사항을 버릴까요?" })).toBeVisible();
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -91,6 +105,8 @@ describe("ProfileEditorDialog", () => {
     const user = userEvent.setup();
     renderEditor({ onSaveProfile: vi.fn().mockRejectedValue(new ProfileUpdateFailure(message, null, field)) });
     const input = screen.getByRole("textbox", { name: "표시 이름" });
+    const scrollBody = document.querySelector<HTMLElement>(".rm-profile-editor__body")!;
+    scrollBody.scrollTop = 48;
     await user.clear(input);
     await user.type(input, "새 멤버");
     await user.click(screen.getByRole("button", { name: "변경사항 저장" }));
@@ -99,7 +115,12 @@ describe("ProfileEditorDialog", () => {
     expect(input).toHaveValue("새 멤버");
     if (target === "textbox") expect(input).toHaveAttribute("aria-describedby", alert.id);
     if (target === "form") expect(screen.getByRole("button", { name: "변경사항 저장" })).toHaveFocus();
-    if (target === "avatar") expect(screen.getByRole("group", { name: "아바타 목록" })).toHaveAttribute("aria-describedby", alert.id);
+    if (target === "avatar") {
+      expect(screen.getByRole("dialog", { name: "프로필 편집" })).toBeVisible();
+      expect(screen.getByRole("button", { name: "아바타 선택" })).toHaveAttribute("aria-describedby", alert.id);
+      expect(screen.getByRole("button", { name: "아바타 선택" })).toHaveFocus();
+      expect(scrollBody.scrollTop).toBe(48);
+    }
   });
 
   it("wraps keyboard focus inside the dialog", async () => {
@@ -113,5 +134,17 @@ describe("ProfileEditorDialog", () => {
     expect(dialog.contains(document.activeElement)).toBe(true);
     await user.tab({ shift: true });
     expect(dialog.contains(document.activeElement)).toBe(true);
+  });
+
+  it("recovers focus when a DOM transition leaves focus outside the dialog", async () => {
+    const user = userEvent.setup();
+    renderEditor();
+    await user.type(screen.getByRole("textbox", { name: "표시 이름" }), " 변경");
+    await user.keyboard("{Escape}");
+    const outsider = document.createElement("button");
+    document.body.append(outsider);
+    outsider.focus();
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Tab" });
+    expect(screen.getByRole("button", { name: "계속 편집" })).toHaveFocus();
   });
 });

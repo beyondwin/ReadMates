@@ -119,6 +119,10 @@
     scrollbar-gutter: auto;
   }
 
+  html .rm-profile-editor__mobile-back {
+    visibility: visible;
+  }
+
   html .rm-profile-editor__footer {
     position: sticky;
     bottom: 0;

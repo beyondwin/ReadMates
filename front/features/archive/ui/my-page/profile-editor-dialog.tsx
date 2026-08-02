@@ -18,10 +18,23 @@ export type ProfileEditorDialogProps = {
   onSaveProfile: SaveProfile;
 };
 
-const focusableSelector = "button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex='-1'])";
+const focusableSelector = [
+  "button:not([disabled])",
+  "input:not([disabled])",
+  "[href]",
+  "[tabindex]:not([tabindex='-1'])",
+].join(", ");
 
-export function ProfileEditorDialog({ profile, opener, onClose, onSaveProfile }: ProfileEditorDialogProps) {
-  const initial = { displayName: profile.displayName, avatarKey: normalizeBookClubAvatarKey(profile.avatarKey) };
+export function ProfileEditorDialog({
+  profile,
+  opener,
+  onClose,
+  onSaveProfile,
+}: ProfileEditorDialogProps) {
+  const initial = {
+    displayName: profile.displayName,
+    avatarKey: normalizeBookClubAvatarKey(profile.avatarKey),
+  };
   const [draft, setDraft] = useState<ProfileDraft>(initial);
   const [step, setStep] = useState<ProfileEditorStep>("profile");
   const [errors, setErrors] = useState<ProfileFieldErrors>({});
@@ -29,6 +42,12 @@ export function ProfileEditorDialog({ profile, opener, onClose, onSaveProfile }:
   const savingRef = useRef(false);
   const dialogRef = useRef<HTMLElement>(null);
   const saveRef = useRef<HTMLButtonElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const avatarControlRef = useRef<HTMLButtonElement>(null);
+  const discardContinueRef = useRef<HTMLButtonElement>(null);
+  const focusBeforeDiscardRef = useRef<HTMLElement | null>(null);
+  const stepBeforeDiscardRef = useRef<Exclude<ProfileEditorStep, "discard">>("profile");
+  const restoreAfterDiscardRef = useRef(false);
   const titleId = useId();
   const descriptionId = useId();
   const nameErrorId = useId();
@@ -51,10 +70,42 @@ export function ProfileEditorDialog({ profile, opener, onClose, onSaveProfile }:
     };
   }, [opener]);
 
+  useEffect(() => {
+    if (step === "discard") {
+      discardContinueRef.current?.focus();
+      return;
+    }
+    if (restoreAfterDiscardRef.current) {
+      restoreAfterDiscardRef.current = false;
+      const focusTarget = focusBeforeDiscardRef.current;
+      if (focusTarget?.isConnected) focusTarget.focus();
+      else if (focusTarget?.id) document.getElementById(focusTarget.id)?.focus();
+      else dialogRef.current?.querySelector<HTMLElement>(focusableSelector)?.focus();
+    }
+  }, [step]);
+
+  useEffect(() => {
+    if (saving) return;
+    if (errors.displayName) nameRef.current?.focus();
+    else if (errors.avatarKey) avatarControlRef.current?.focus();
+    else if (errors.form) saveRef.current?.focus();
+  }, [errors, saving]);
+
   function requestClose() {
     if (savingRef.current) return;
-    if (dirty) setStep("discard");
+    if (dirty) {
+      focusBeforeDiscardRef.current = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+      if (step !== "discard") stepBeforeDiscardRef.current = step;
+      setStep("discard");
+    }
     else closeNow();
+  }
+
+  function continueEditing() {
+    restoreAfterDiscardRef.current = true;
+    setStep(stepBeforeDiscardRef.current);
   }
 
   function handleBackdrop(event: MouseEvent<HTMLDivElement>) {
@@ -74,6 +125,12 @@ export function ProfileEditorDialog({ profile, opener, onClose, onSaveProfile }:
     const first = controls[0];
     const last = controls.at(-1);
     if (!first || !last) return;
+    const focusIsInside = document.activeElement instanceof Node && dialog.contains(document.activeElement);
+    if (!focusIsInside) {
+      event.preventDefault();
+      first.focus();
+      return;
+    }
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
   }
@@ -90,11 +147,6 @@ export function ProfileEditorDialog({ profile, opener, onClose, onSaveProfile }:
       const failure = error instanceof ProfileUpdateFailure ? error : null;
       const field = failure?.field ?? "form";
       setErrors({ [field]: failure?.message ?? "프로필을 저장하지 못했습니다. 다시 시도해 주세요." });
-      if (field === "avatarKey") setStep("avatar");
-      requestAnimationFrame(() => {
-        if (field === "displayName") dialogRef.current?.querySelector<HTMLInputElement>("#profile-display-name")?.focus();
-        else saveRef.current?.focus();
-      });
     } finally {
       savingRef.current = false;
       setSaving(false);
@@ -103,10 +155,21 @@ export function ProfileEditorDialog({ profile, opener, onClose, onSaveProfile }:
 
   return createPortal(
     <div className="rm-profile-editor__scrim" role="presentation" data-testid="profile-editor-scrim" onMouseDown={handleBackdrop}>
-      <section ref={dialogRef} className="rm-profile-editor" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} tabIndex={-1} onKeyDown={handleKeyDown}>
+      <section
+        ref={dialogRef}
+        className="rm-profile-editor"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        tabIndex={-1}
+        onKeyDown={handleKeyDown}
+      >
         <header className="rm-profile-editor__header">
           {step === "avatar" ? (
             <button type="button" className="rm-profile-editor__icon-action" aria-label="프로필로 돌아가기" disabled={saving} onClick={() => setStep("profile")}><BackIcon /></button>
+          ) : step === "profile" ? (
+            <button type="button" className="rm-profile-editor__icon-action rm-profile-editor__mobile-back" aria-label="프로필 편집 뒤로" disabled={saving} onClick={requestClose}><BackIcon /></button>
           ) : <span />}
           <div>
             <h2 id={titleId}>{step === "discard" ? "변경사항을 버릴까요?" : step === "avatar" ? "아바타 선택" : "프로필 편집"}</h2>
@@ -120,13 +183,13 @@ export function ProfileEditorDialog({ profile, opener, onClose, onSaveProfile }:
             <>
               <div className="rm-profile-editor__field">
                 <label htmlFor="profile-display-name">표시 이름</label>
-                <input id="profile-display-name" className="input" value={draft.displayName} maxLength={20} disabled={saving} aria-invalid={Boolean(errors.displayName)} aria-describedby={errors.displayName ? nameErrorId : "profile-name-help"} onChange={(event) => { setDraft({ ...draft, displayName: event.target.value }); setErrors({ ...errors, displayName: undefined }); }} />
+                <input ref={nameRef} id="profile-display-name" className="input" value={draft.displayName} maxLength={20} disabled={saving} aria-invalid={Boolean(errors.displayName)} aria-describedby={errors.displayName ? nameErrorId : "profile-name-help"} onChange={(event) => { setDraft({ ...draft, displayName: event.target.value }); setErrors({ ...errors, displayName: undefined }); }} />
                 <small id="profile-name-help">20자 이내로 입력해 주세요.</small>
               </div>
               {errors.displayName ? <p className="rm-profile-editor__error" id={nameErrorId} role="alert">{errors.displayName}</p> : null}
               <div className="rm-profile-editor__avatar-field">
                 <span>아바타</span>
-                <button type="button" className="rm-profile-editor__avatar-action" aria-label="아바타 선택" disabled={saving} aria-describedby={errors.avatarKey ? avatarErrorId : undefined} onClick={() => setStep("avatar")}>
+                <button ref={avatarControlRef} type="button" className="rm-profile-editor__avatar-action" aria-label="아바타 선택" disabled={saving} aria-describedby={errors.avatarKey ? avatarErrorId : undefined} onClick={() => setStep("avatar")}>
                   <AvatarChip avatarKey={draft.avatarKey} name={null} label="" size={64} />
                   <span><strong>{bookClubAvatarLabel(draft.avatarKey)}</strong><small>아바타 선택</small></span>
                 </button>
@@ -141,7 +204,19 @@ export function ProfileEditorDialog({ profile, opener, onClose, onSaveProfile }:
 
         <footer className="rm-profile-editor__footer">
           {errors.form ? <p className="rm-profile-editor__error" id={formErrorId} role="alert">{errors.form}</p> : null}
-          {step === "discard" ? <div className="rm-profile-editor__footer-actions"><button type="button" className="button button--secondary" onClick={() => setStep("profile")}>계속 편집</button><button type="button" className="button button--danger" onClick={closeNow}>변경사항 버리기</button></div> : step === "profile" ? <button ref={saveRef} type="button" className="button button--primary rm-profile-editor__save" aria-busy={saving} disabled={saving} onClick={save}>{saving ? "저장 중…" : "변경사항 저장"}</button> : <button type="button" className="button button--primary rm-profile-editor__save" disabled={saving} onClick={() => setStep("profile")}>선택 완료</button>}
+          {step === "discard" ? (
+            <div className="rm-profile-editor__footer-actions">
+              <button ref={discardContinueRef} type="button" className="button button--secondary" onClick={continueEditing}>계속 편집</button>
+              <button type="button" className="button button--danger" onClick={closeNow}>변경사항 버리기</button>
+            </div>
+          ) : step === "profile" ? (
+            <div className="rm-profile-editor__footer-actions">
+              <button type="button" className="button button--secondary" disabled={saving} onClick={requestClose}>취소</button>
+              <button ref={saveRef} type="button" className="button button--primary rm-profile-editor__save" aria-busy={saving} disabled={saving} onClick={save}>{saving ? "저장 중…" : "변경사항 저장"}</button>
+            </div>
+          ) : (
+            <button type="button" className="button button--primary rm-profile-editor__save" disabled={saving} onClick={() => setStep("profile")}>선택 완료</button>
+          )}
         </footer>
       </section>
     </div>, document.body,
