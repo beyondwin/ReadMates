@@ -244,12 +244,12 @@ test("AvatarChip keeps a borderless neutral box after requested and fallback ima
 test("AvatarPicker alone owns the selected and focus ring", async ({ mount }) => {
   const component = await mount(
     <div className="rm-profile-editor">
-      <button type="button" className="rm-avatar-picker__tile" aria-label="초록 책을 읽는 바나나 선택" aria-pressed="true">
+      <button type="button" className="rm-avatar-picker__tile" aria-label="한 장 더 읽는 바나나, 초록 책을 읽는 바나나 선택" aria-pressed="true">
         <AvatarChip avatarKey="banana-green-book" name={null} label="" size={52} />
       </button>
     </div>,
   );
-  const selected = component.getByRole("button", { name: "초록 책을 읽는 바나나 선택" });
+  const selected = component.getByRole("button", { name: "한 장 더 읽는 바나나, 초록 책을 읽는 바나나 선택" });
   const avatar = selected.locator(".rm-avatar-chip");
 
   await selected.focus();
