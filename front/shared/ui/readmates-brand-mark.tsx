@@ -5,8 +5,8 @@ export function ReadmatesBrandMark() {
       aria-hidden
       className="rm-brand-mark"
       style={{
-        width: "30px",
-        height: "30px",
+        width: "34px",
+        height: "34px",
         borderRadius: "6px",
         background: "var(--accent)",
         display: "inline-flex",

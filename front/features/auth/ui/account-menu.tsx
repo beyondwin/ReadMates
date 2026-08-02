@@ -113,7 +113,7 @@ export function AccountMenu({
         onClick={() => setOpen((current) => !current)}
       >
         <span className="rm-account-menu__trigger-avatar" aria-hidden="true">
-          <AvatarChip avatarKey={avatarKey} name={memberName} label="" size={28} />
+          <AvatarChip avatarKey={avatarKey} name={memberName} label="" size={32} />
         </span>
         <span className="rm-account-menu__trigger-name">{memberName}</span>
         <span className="rm-account-menu__trigger-mobile-label">계정</span>

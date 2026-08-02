@@ -25,6 +25,10 @@ test("MobileTabBar wraps deliberately long Korean and English labels at a narrow
   );
 
   const labels = tabBar.locator(".m-tab-label");
+  const iconSizes = await tabBar.locator(".m-tab svg").evaluateAll((icons) =>
+    icons.map((icon) => icon.getBoundingClientRect().width),
+  );
+  expect(iconSizes.every((size) => size === 24)).toBe(true);
   expect((await fontMetrics(labels.first())).size).toBeGreaterThanOrEqual(12);
   await labels.evaluateAll((elements) => {
     elements[0].textContent = "회원이 함께 읽고 남긴 독서 기록 보관함";

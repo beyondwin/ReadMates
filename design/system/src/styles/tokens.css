@@ -947,8 +947,8 @@ button.rm-record-row:hover {
   background: var(--accent);
 }
 .rm-workspace-switch {
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   border: 1px solid var(--line);
   border-radius: var(--r-2);
   color: var(--text-2);

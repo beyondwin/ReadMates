@@ -310,10 +310,10 @@ function TopNavFrame({
                   aria-label={workspaceAction.label}
                   title={workspaceAction.label}
                 >
-                  <WorkspaceSwitchIcon size={17} />
+                  <WorkspaceSwitchIcon size={22} />
                 </LinkComponent>
               ) : null}
-              {accountControl ?? (memberName ? <AvatarChip avatarKey={memberAvatarKey} name={memberName} label="" size={28} /> : null)}
+              {accountControl ?? (memberName ? <AvatarChip avatarKey={memberAvatarKey} name={memberName} label="" size={32} /> : null)}
             </div>
           ) : null}
         </div>

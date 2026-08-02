@@ -79,3 +79,16 @@ test("TopNav shows the desktop avatar and preserves a long account name in its a
   expect((await fontMetrics(accountName)).size).toBeGreaterThanOrEqual(14);
   await expect(navigation).toHaveScreenshot("top-nav-long-account-name-1280.png");
 });
+
+test("TopNav gives the workspace switch the approved desktop icon scale", async ({ mount, page }) => {
+  await page.setViewportSize({ width: 1280, height: 480 });
+  const navigation = await mount(
+    <MemoryRouter initialEntries={["/app"]}>
+      <TopNav variant="member" memberName="멤버1" showHostEntry />
+    </MemoryRouter>,
+  );
+
+  const switchIcon = navigation.locator(".rm-workspace-switch svg");
+  expect((await switchIcon.boundingBox())?.width).toBe(22);
+  expect((await navigation.locator(".rm-workspace-switch").boundingBox())?.width).toBe(36);
+});
