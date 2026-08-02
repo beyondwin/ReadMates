@@ -1,6 +1,6 @@
 # ReadMates 배포 문서
 
-검토일: 2026-05-15
+검토일: 2026-08-03
 
 이 디렉터리는 ReadMates의 공개 안전 배포 문서 허브입니다. 운영 환경의 목표 구조, 신뢰 경계, secret 보관 원칙, 공개 릴리즈 후보 검증 흐름을 설명하되 계정별 값과 private deployment state는 Git에 두지 않습니다.
 
@@ -187,6 +187,8 @@ VM_PUBLIC_IP='<vm-public-ip>' ./deploy/oci/03-deploy.sh
 OCI helper script는 placeholder 기반이며 운영자가 값을 주입하는 전제를 둡니다. script와 문서에는 실제 tenancy ID, API key, database password, private IP, 배포 상태 값을 넣지 않습니다.
 
 백엔드 release image 생성은 GitHub Actions `Deploy Server Image` workflow가 담당합니다. 실제 OCI compose stack promotion은 여전히 운영자가 `deploy/oci/05-deploy-compose-stack.sh`를 실행하는 수동 절차이며, VM 접속 credential이나 self-hosted runner가 GitHub Actions에 구성되어 있다고 가정하지 않습니다.
+
+DB migration이 포함된 릴리즈는 같은 tag의 backend를 먼저 올리고 Spring startup Flyway와 health를 확인한 뒤에만 frontend를 배포합니다. `v2.2.0`은 V43–V46을 순서대로 적용하며 최종 schema는 guest exposure의 `access_scope`/`site_visibility`와 30-key membership avatar catalog를 사용합니다. 실패 시 migration을 되돌리지 않고 schema를 보존한 호환 image 또는 새 forward-fix tag로 복구합니다.
 
 Server workflow의 tag checkout, exact semver, annotated-tag/HEAD 일치, same-digest scan/promote 계약은 배포 전에 repository checker로 검증합니다.
 

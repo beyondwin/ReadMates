@@ -6,6 +6,12 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ## Unreleased
 
+### Highlights
+
+- 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
+
+## v2.2.0 - 2026-08-03
+
 ### Changed
 
 - **멤버 공간 UI 밀도:** 참석 명단을 화면 폭에 따라 데스크톱 8열·중간 5열·소형 모바일 4열로 정리하고, 프로필 아바타의 서정 이름을 그림 아래 캡션으로 배치했습니다. 누적 성취는 모임·완독·질문·서평 숫자를 한 번씩 읽는 `독서 여정 장부`와 단일 `기록 보기` 동선으로 다듬고, 알림 설정은 중복 상단 문구와 저장 버튼 아래 마지막 경계선을 제거했으며 데스크톱 홈 바로가기 두 행의 구분선을 행 너비에 맞췄습니다.
@@ -34,7 +40,7 @@ One-command local OAuth stack + redacted smoke verifier로 기존 서비스 보�
 - `Deploy Server Image`는 push와 manual dispatch 모두 exact `vMAJOR.MINOR.PATCH` annotated tag를 checkout하고 tag commit과 `HEAD`가 일치해야 build를 시작합니다. Trivy가 검사한 digest와 같은 digest만 release tag로 promote하며, repository checker가 CI·pre-push·public release candidate에서 이 계약을 fail closed로 검증합니다. 이 source 변경 자체는 workflow dispatch, image publish, OCI/Cloudflare 배포를 실행하지 않습니다.
 - 배포 전 최근 DB backup과 backend readiness 기준을 확인합니다. V43과 V44는 수정하지 않으며, forward-only V46이 모든 기존 membership의 avatar key를 30-key 집합으로 한 번 다시 쓰고 named check constraint를 새 집합으로 교체합니다.
 - 같은 release tag의 새 backend를 먼저 배포해 Flyway V45 guest exposure와 V46 avatar catalog, backend health가 모두 정상임을 확인한 뒤에만 새 frontend를 배포합니다. `PUT /api/me/profile`은 현재 club membership의 표시 이름과 avatar key를 한 transaction에서 교체하며, `PATCH /api/me/profile`과 `PATCH /api/me/avatar`는 cached old client를 위한 제한된 호환성 window로 남습니다. Cached old client가 제거된 key를 보내면 `AVATAR_KEY_INVALID`를 받을 수 있습니다.
-- 배포 후에는 현재 club의 atomic profile 변경과 `/api/app/me`·`/api/auth/me` 재조회, 다른 club 격리, 허용된 public author avatar 표시를 smoke하고 권한과 `LEFT`/anonymous masking이 유지되는지 확인합니다. 실제 member data나 private identifier는 공개 release evidence에 기록하지 않습니다. Production deployment는 이 구현 범위에 포함되지 않습니다.
+- 배포 후에는 현재 club의 atomic profile 변경과 `/api/app/me`·`/api/auth/me` 재조회, 다른 club 격리, 허용된 public author avatar 표시를 smoke하고 권한과 `LEFT`/anonymous masking이 유지되는지 확인합니다. 실제 member data나 private identifier는 공개 release evidence에 기록하지 않으며, 운영 배포의 공개 가능한 완료 증거는 같은 태그의 GitHub Release에 기록합니다.
 - Rollback은 V45/V46이 바꾼 schema와 이미 migration된 data를 보존합니다. Migration을 되돌리지 않고 V45/V46과 호환되는 server/frontend image로 전환하거나 새 forward-fix release를 발행합니다.
 
 ### Changed
@@ -46,12 +52,21 @@ One-command local OAuth stack + redacted smoke verifier로 기존 서비스 보�
 
 ### Database
 
+- **Flyway V43–V44:** `memberships.avatar_key`를 추가해 클럽 membership의 로컬 아바타를 영속화하고, 후속 migration에서 초기 catalog를 확장·재배정했습니다. 두 migration은 이미 배포된 적 없는 이번 릴리즈의 순차 schema history이며 수정하거나 합치지 않습니다.
 - **Flyway V45:** `sessions.access_scope`와 `public_session_publications.site_visibility`를 additive하게 추가하고 기존 member/public exposure를 canonical 두 축으로 backfill합니다. Compatibility column은 이번 릴리즈에서 제거하지 않으며 rollback은 V45 schema를 보존한 호환 image 또는 forward-fix를 사용합니다.
+- **Flyway V46:** 모든 기존 membership을 최종 30-key book-club avatar catalog로 결정적으로 재배정하고 `memberships_avatar_key_check`를 같은 집합으로 교체합니다. V43/V44를 수정하지 않으며 rollback은 V46 schema와 이미 변환된 key를 보존합니다.
 
 ### Deployment Notes
 
 - V45를 포함한 backend를 먼저 배포해 Flyway와 dual-write를 활성화한 뒤 같은 commit의 Pages Functions/frontend를 배포합니다. 한 릴리즈 동안 old `{visibility}` request와 compatibility read/write를 유지하고, 다음 릴리즈에서 old frontend가 남지 않았다는 운영 증거를 확인한 뒤 별도 migration으로 제거합니다.
 - Production smoke는 anonymous public/guest reads, exact scoped OAuth start marker, viewer/member/host route 경계, guest 429/no-store를 확인합니다. Live Google OAuth 완료, 실제 이메일, AI provider 호출과 production data mutation은 별도 승인 없이 실행하지 않습니다.
+
+### Verification
+
+- Release candidate gate: repository-pinned `pnpm@11.13.1`로 frontend lint, 265 files / 2,049 tests와 coverage(83.68% statements, 78.88% branches, 83.72% functions, 84.54% lines), production build와 Zod fixture freshness를 확인했습니다.
+- Server evidence: PR quality gate에서 unit 1,024 tests(1 skipped)와 architecture 26 tests가 통과했고, MySQL/Testcontainers integration 839 tests가 통과했습니다.
+- Browser/design evidence: 격리된 backend/frontend 포트로 Chromium E2E 136/136, Docker Playwright component tests 55/55, design system 14/14와 design docs 2/2가 통과했습니다.
+- Release safety: deploy workflow contract self-tests/current check, ShellCheck/actionlint, pnpm HIGH audit 0건, public release candidate/gitleaks, AI production config와 Prometheus/Tempo/Grafana/Alertmanager 검증이 통과했습니다.
 
 ## v2.1.0 - 2026-07-31
 
