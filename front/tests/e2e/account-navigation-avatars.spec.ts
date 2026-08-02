@@ -17,12 +17,12 @@ type AvatarMember = {
   role: "HOST" | "MEMBER";
   rsvpStatus: "GOING";
   attendanceStatus: "ATTENDED";
-  avatarKey?: "banana-green-book" | "cloud-green-book" | "cloud-green-book";
+  avatarKey?: "banana-green-book" | "star-notebook" | "moon-green-book";
 };
 
 const sameSurnameMembers: AvatarMember[] = [
   {
-    membershipId: "member-banana-green-book",
+    membershipId: "member-squirrel-acorn",
     displayName: "김독서",
     accountName: "김독서",
     role: "HOST",
@@ -31,22 +31,22 @@ const sameSurnameMembers: AvatarMember[] = [
     avatarKey: "banana-green-book",
   },
   {
-    membershipId: "member-cloud-green-book",
+    membershipId: "member-fennec-heart-mug",
     displayName: "김책가방",
     accountName: "김책가방",
     role: "MEMBER",
     rsvpStatus: "GOING",
     attendanceStatus: "ATTENDED",
-    avatarKey: "cloud-green-book",
+    avatarKey: "star-notebook",
   },
   {
-    membershipId: "member-cloud-green-book",
+    membershipId: "member-turtle-winter-book",
     displayName: "김달력책",
     accountName: "김달력책",
     role: "MEMBER",
     rsvpStatus: "GOING",
     attendanceStatus: "ATTENDED",
-    avatarKey: "cloud-green-book",
+    avatarKey: "moon-green-book",
   },
 ];
 
@@ -98,7 +98,7 @@ function currentSessionResponse() {
 
 function authResponse(role: FixtureRole = "HOST", avatarKey = "banana-green-book") {
   const currentMembership = avatarKeyFor({
-    membershipId: "member-banana-green-book",
+    membershipId: "member-squirrel-acorn",
     clubId: "club-reading-sai",
     clubSlug: CLUB_SLUG,
     displayName: MEMBER_NAME,
@@ -111,7 +111,7 @@ function authResponse(role: FixtureRole = "HOST", avatarKey = "banana-green-book
   return {
     authenticated: true,
     userId: "synthetic-reader",
-    membershipId: "member-banana-green-book",
+    membershipId: "member-squirrel-acorn",
     clubId: "club-reading-sai",
     email: "reader@example.test",
     displayName: MEMBER_NAME,
@@ -126,7 +126,7 @@ function authResponse(role: FixtureRole = "HOST", avatarKey = "banana-green-book
         clubId: "club-reading-sai",
         clubSlug: CLUB_SLUG,
         clubName: "읽는사이",
-        membershipId: "member-banana-green-book",
+        membershipId: "member-squirrel-acorn",
         role,
         status: "ACTIVE",
         primaryHost: null,
@@ -179,7 +179,7 @@ async function routeSyntheticApp(page: Page, role: FixtureRole = "HOST") {
       const body = route.request().postDataJSON() as { avatarKey: string };
       savedAvatarKey = body.avatarKey;
       return json(route, {
-        membershipId: "member-banana-green-book",
+        membershipId: "member-squirrel-acorn",
         displayName: MEMBER_NAME,
         accountName: MEMBER_NAME,
         profileImageUrl: null,
@@ -457,14 +457,14 @@ test("scoped account navigation preserves local avatar identity across mobile an
   await expect(rosterImages).toHaveCount(3);
   expect(await rosterImages.evaluateAll((images) => images.map((image) => image.getAttribute("src")))).toEqual([
     "/assets/avatars/book-club/banana-green-book.webp",
-    "/assets/avatars/book-club/cloud-green-book.webp",
-    "/assets/avatars/book-club/cloud-green-book.webp",
+    "/assets/avatars/book-club/star-notebook.webp",
+    "/assets/avatars/book-club/moon-green-book.webp",
   ]);
   await page.screenshot({ path: testInfo.outputPath("1280-desktop-account-roster.png"), fullPage: true });
   await assertVisibleAvatarNetwork(imageEvidence, new URL(page.url()).host, [
     "/assets/avatars/book-club/banana-green-book.webp",
-    "/assets/avatars/book-club/cloud-green-book.webp",
-    "/assets/avatars/book-club/cloud-green-book.webp",
+    "/assets/avatars/book-club/star-notebook.webp",
+    "/assets/avatars/book-club/moon-green-book.webp",
   ]);
 
   resetImageNetwork(imageEvidence);
