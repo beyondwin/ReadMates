@@ -464,7 +464,7 @@ test("My Space keeps a long poetic avatar caption wrapped below its artwork", as
   }
 });
 
-test("desktop member-home shortcut divider stays inset and clear of link content", async ({ page }) => {
+test("member-home shortcuts keep the desktop divider inset and mobile cards divider-free", async ({ page }) => {
   await routeSyntheticApp(page, "MEMBER");
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(APP_BASE);
@@ -490,7 +490,9 @@ test("desktop member-home shortcut divider stays inset and clear of link content
     return {
       content: divider.content,
       borderTopWidth: divider.borderTopWidth,
-      dividerInsideSurface: dividerLeft >= surfaceBox.left && dividerRight <= surfaceBox.right,
+      leftInset: dividerLeft - secondBox.left,
+      rightInset: secondBox.right - dividerRight,
+      dividerInsideSurface: dividerLeft > surfaceBox.left && dividerRight < surfaceBox.right,
       dividerClearsLabel: dividerY < labelBox.top,
       dividerClearsChevron: dividerY < chevronBox.top,
       surfaceContainsLinks: linkElements.every((link) => {
@@ -502,10 +504,53 @@ test("desktop member-home shortcut divider stays inset and clear of link content
 
   expect(dividerGeometry.content).not.toBe("none");
   expect(dividerGeometry.borderTopWidth).toBe("1px");
+  expect(dividerGeometry.leftInset).toBeGreaterThanOrEqual(16);
+  expect(dividerGeometry.rightInset).toBeGreaterThanOrEqual(16);
   expect(dividerGeometry.dividerInsideSurface).toBe(true);
   expect(dividerGeometry.dividerClearsLabel).toBe(true);
   expect(dividerGeometry.dividerClearsChevron).toBe(true);
   expect(dividerGeometry.surfaceContainsLinks).toBe(true);
+
+  for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 320, height: 700 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto(APP_BASE);
+
+    const mobileHome = page.locator(".rm-member-home-mobile");
+    const mobileShortcutSection = mobileHome.locator("section.m-sec").filter({ hasText: "바로가기" });
+    const mobileShortcutGrid = mobileShortcutSection.locator(".rm-mobile-shortcuts");
+    const mobileCards = mobileShortcutGrid.locator(":scope > a.m-card-quiet");
+    await expect(mobileHome).toBeVisible();
+    await expect(page.locator(".rm-member-home-desktop .rm-member-home-shortcuts")).toBeHidden();
+    await expect(mobileShortcutSection).toHaveCount(1);
+    await expect(mobileCards).toHaveCount(2);
+    await expect(mobileShortcutGrid.locator(".rm-member-home-shortcuts__link")).toHaveCount(0);
+    await expect(mobileShortcutGrid.locator(".rm-mobile-shortcuts__icon")).toHaveCount(2);
+    await expect(mobileCards.nth(0)).toHaveAttribute("href", `${APP_BASE}/archive?view=report`);
+    await expect(mobileCards.nth(1)).toHaveAttribute("href", "/about");
+
+    const mobileGeometry = await mobileShortcutGrid.evaluate((element) => {
+      const cards = Array.from(element.querySelectorAll<HTMLElement>(":scope > a.m-card-quiet"));
+      const boxes = cards.map((card) => card.getBoundingClientRect());
+      return {
+        columnCount: getComputedStyle(element).gridTemplateColumns.trim().split(/\s+/).length,
+        pseudoContents: cards.map((card) => getComputedStyle(card, "::before").content),
+        cardHeights: boxes.map((box) => box.height),
+        sameRow: boxes.length === 2 && Math.abs(boxes[0].top - boxes[1].top) <= 1,
+        nonOverlapping: boxes.length === 2 && boxes[0].right <= boxes[1].left,
+        noOverflow: element.scrollWidth <= element.clientWidth + 1,
+      };
+    });
+
+    expect(mobileGeometry.columnCount).toBe(2);
+    expect(mobileGeometry.pseudoContents).toEqual(["none", "none"]);
+    expect(mobileGeometry.cardHeights.every((height) => height >= 110)).toBe(true);
+    expect(mobileGeometry.sameRow).toBe(true);
+    expect(mobileGeometry.nonOverlapping).toBe(true);
+    expect(mobileGeometry.noOverflow).toBe(true);
+  }
 });
 
 test("My Space avatar save refreshes the account identity and persists at mobile and desktop widths", async ({ browser }, testInfo) => {
