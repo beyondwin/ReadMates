@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useLoaderData } from "react-router-dom";
+import { useLoaderData } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import type { HostInvitationListPage } from "@/features/host/api/host-contracts";
 import HostInvitations from "@/features/host/ui/host-invitations";

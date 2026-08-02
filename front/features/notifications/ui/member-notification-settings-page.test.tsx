@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import type { NotificationPreferences } from "../model/notification-preferences-model";
 import { MemberNotificationSettingsPage } from "./member-notification-settings-page";
@@ -22,7 +22,6 @@ function renderPage(
   const props: Parameters<typeof MemberNotificationSettingsPage>[0] = {
     state,
     basePath: "/app",
-    mySpaceHref: "/app/me",
     saving: false,
     saveError: null,
     onEmailEnabledChange: vi.fn(),
@@ -45,10 +44,10 @@ describe("MemberNotificationSettingsPage", () => {
     const user = userEvent.setup();
     const props = renderPage({ status: "ready", preferences });
 
-    const breadcrumb = screen.getByRole("navigation", { name: "현재 위치" });
-    expect(breadcrumb).toHaveClass("desktop-only");
-    expect(screen.getByRole("link", { name: "내 공간" })).toHaveAttribute("href", "/app/me");
-    expect(screen.getByText("알림", { selector: "[aria-current=page]" })).toBeVisible();
+    expect(screen.queryByRole("navigation", { name: "현재 위치" })).toBeNull();
+    expect(screen.queryByText("읽는사이 · 알림")).toBeNull();
+    expect(screen.getByRole("heading", { level: 1, name: "알림" })).toBeVisible();
+    expect(screen.getByText("받고 싶은 이메일 알림을 직접 선택합니다.")).toBeVisible();
     expect(screen.getByRole("link", { name: "수신 설정" })).toHaveAttribute("aria-current", "page");
     expect(screen.getAllByRole("switch")).toHaveLength(5);
     await user.click(screen.getByRole("switch", { name: "이메일 알림" }));

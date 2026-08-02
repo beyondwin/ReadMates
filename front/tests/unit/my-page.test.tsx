@@ -25,11 +25,14 @@ const profile: MyPageProfile = {
 
 const viewModel: MemberSpaceViewModel = {
   profileMetaLabel: "샘플 독서모임 · 멤버 · 2024.11부터 함께",
-  achievementHeading: "9번의 모임에서 7권을 끝까지 읽었어요.",
-  achievementBody: "함께 읽는 시간이 차분히 쌓이고 있습니다.",
-  metrics: [
-    { label: "함께한 모임", value: "9" },
-    { label: "완독", value: "7" },
+  achievementHeading: "읽고, 묻고, 기록해 온 시간",
+  journeyStats: [
+    { kind: "sessions", label: "함께한 모임", value: "9", unit: "회" },
+    { kind: "completed", label: "함께 완독한 책", value: "7", unit: "권" },
+  ],
+  recordTraces: [
+    { kind: "questions", label: "대화를 연 질문", description: "책에서 시작된 생각의 기록", value: "0", unit: "개" },
+    { kind: "reviews", label: "남긴 서평", description: "읽고 난 마음을 풀어낸 기록", value: "0", unit: "편" },
   ],
 };
 
@@ -64,7 +67,7 @@ describe("MyPage", () => {
     const overview = container.querySelector(".rm-member-space__overview")!;
     const recent = screen.getByRole("region", { name: "최근 독서 기록" });
     const profileSection = screen.getByRole("region", { name: "샘플 멤버" });
-    const achievementSection = screen.getByRole("region", { name: "9번의 모임에서 7권을 끝까지 읽었어요." });
+    const achievementSection = screen.getByRole("region", { name: "읽고, 묻고, 기록해 온 시간" });
 
     expect(screen.queryByRole("link", { name: "계정 관리" })).toBeNull();
     expect(screen.getByRole("button", { name: "프로필 편집" })).toBeVisible();

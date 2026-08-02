@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { createMemoryRouter, RouterProvider, useLocation } from "react-router-dom";
+import { createMemoryRouter, useLocation } from "react-router";
+import { RouterProvider } from "react-router/dom";
 import { describe, expect, it } from "vitest";
 import type { MemberArchiveSessionDetailResponse } from "@/features/archive/model/archive-model";
 import { memberSessionDetailReadView } from "@/features/archive/model/session-detail-read-view";

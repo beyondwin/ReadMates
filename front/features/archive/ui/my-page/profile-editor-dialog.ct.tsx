@@ -127,15 +127,22 @@ for (const viewport of pickerViewports) {
       name: "한 장 더 읽는 바나나, 초록 책을 읽는 바나나 선택",
     });
     await expect(selected).toHaveAttribute("aria-pressed", "true");
-    await expect(selected.locator(".rm-avatar-picker__check--filled")).toHaveCount(1);
+    await expect(selected.locator(".rm-avatar-picker__check")).toHaveCount(0);
+    const selectedBox = await selected.boundingBox();
+    expect(selectedBox!.height).toBeLessThanOrEqual(viewport.width < 768 ? 126 : 136);
     await selected.focus();
     await expect(selected).toBeFocused();
     const focusStyle = await selected.evaluate((element) => {
       const style = getComputedStyle(element);
-      return { outlineStyle: style.outlineStyle, outlineWidth: style.outlineWidth };
+      return {
+        borderTopWidth: style.borderTopWidth,
+        outlineStyle: style.outlineStyle,
+        outlineWidth: style.outlineWidth,
+      };
     });
     expect(focusStyle.outlineStyle).not.toBe("none");
     expect(focusStyle.outlineWidth).toBe("2px");
+    expect(focusStyle.borderTopWidth).toBe("2px");
 
     const [dialogBox, footerBox, footerStyle] = await Promise.all([
       dialog.boundingBox(),

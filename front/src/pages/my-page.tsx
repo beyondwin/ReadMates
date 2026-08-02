@@ -1,4 +1,4 @@
-import { useRouteLoaderData } from "react-router-dom";
+import { useRouteLoaderData } from "react-router";
 import { MyPageRoute } from "@/features/archive/route/my-page-route";
 import type { MemberAppAccess } from "@/shared/auth/member-app-loader";
 import { useAuth, useAuthActions } from "@/src/app/auth-state";

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useParams } from "react-router-dom";
+import { useParams } from "react-router";
 import { guestSessionDetailReadView } from "@/features/archive/model/session-detail-read-view";
 import { MemberSessionDetailRoute } from "@/features/archive/route/member-session-detail-route";
 import MemberSessionDetailPage, {

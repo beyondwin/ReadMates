@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useLoaderData, useNavigate, useRevalidator } from "react-router-dom";
+import { useLoaderData, useNavigate, useRevalidator } from "react-router";
 import type { ReadmatesReturnState } from "@/shared/routing/readmates-route-state";
 import { MemberNotificationsPage } from "../ui/member-notifications-page";
 import { memberNotificationsActions, type MemberNotificationsRouteData } from "./member-notifications-data";

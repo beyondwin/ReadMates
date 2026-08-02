@@ -1,6 +1,7 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { createMemoryRouter, Link, MemoryRouter, RouterProvider, useLocation } from "react-router-dom";
+import { createMemoryRouter, Link, MemoryRouter, useLocation } from "react-router";
+import { RouterProvider } from "react-router/dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MemberNotificationListResponse } from "@/features/notifications/api/notifications-contracts";
 import { memberNotificationsActions, memberNotificationsLoader } from "@/features/notifications/route/member-notifications-data";

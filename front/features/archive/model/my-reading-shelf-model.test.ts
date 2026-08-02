@@ -108,53 +108,48 @@ describe("my reading shelf model", () => {
   it("builds a cumulative member-space profile and achievement summary", () => {
     expect(memberSpaceViewModel()).toEqual({
       profileMetaLabel: "읽는사이 · 멤버 · 2025.11부터 함께",
-      achievementHeading: "세 번의 모임에서 세 권을 끝까지 읽었어요.",
-      achievementBody: "함께 읽는 시간이 차분히 쌓이고 있습니다.",
-      metrics: [
-        { label: "함께한 모임", value: "3" },
-        { label: "완독", value: "3" },
-        { label: "질문", value: "12" },
+      achievementHeading: "읽고, 묻고, 기록해 온 시간",
+      journeyStats: [
+        { kind: "sessions", label: "참여한 모임", value: "3", unit: "회" },
+        { kind: "completed", label: "완독한 책", value: "3", unit: "권" },
+      ],
+      recordTraces: [
+        {
+          kind: "questions",
+          label: "대화를 연 질문",
+          description: "책에서 시작된 생각의 기록",
+          value: "12",
+          unit: "개",
+        },
+        {
+          kind: "reviews",
+          label: "남긴 서평",
+          description: "아직 남긴 서평이 없어요",
+          value: "0",
+          unit: "편",
+        },
       ],
     });
   });
 
-  it.each([
-    [0, 0, "첫 모임부터 이곳에 독서 기록이 쌓여요."],
-    [3, 0, "세 번의 모임을 함께했어요."],
-    [9, 7, "9번의 모임에서 7권을 끝까지 읽었어요."],
-  ])("uses the cumulative narrative for %i sessions and %i completed books", (attended, completed, heading) => {
-    expect(memberSpaceViewModel({ summary: {
-      attendedSessionCount: attended,
-      completedReadingCount: completed,
-      questionCount: 0,
-      reviewCount: 0,
-      readableFeedbackDocumentCount: 0,
-    } }).achievementHeading).toBe(heading);
-  });
-
-  it("keeps the required metrics first when optional metrics are empty", () => {
+  it("keeps all journey stats and record traces visible when counts are zero", () => {
     expect(memberSpaceViewModel({ summary: {
       attendedSessionCount: 0,
       completedReadingCount: 0,
       questionCount: 0,
       reviewCount: 0,
       readableFeedbackDocumentCount: 0,
-    } }).metrics.map(({ label }) => label)).toEqual(["함께한 모임", "완독"]);
-  });
-
-  it("appends positive question and review metrics in semantic order", () => {
-    expect(memberSpaceViewModel({ summary: {
-      attendedSessionCount: 3,
-      completedReadingCount: 2,
-      questionCount: 12,
-      reviewCount: 4,
-      readableFeedbackDocumentCount: 0,
-    } }).metrics).toEqual([
-      { label: "함께한 모임", value: "3" },
-      { label: "완독", value: "2" },
-      { label: "질문", value: "12" },
-      { label: "서평", value: "4" },
-    ]);
+    } })).toMatchObject({
+      achievementHeading: "읽고, 묻고, 기록해 온 시간",
+      journeyStats: [
+        { kind: "sessions", label: "참여한 모임", value: "0", unit: "회" },
+        { kind: "completed", label: "완독한 책", value: "0", unit: "권" },
+      ],
+      recordTraces: [
+        { kind: "questions", value: "0", unit: "개" },
+        { kind: "reviews", description: "아직 남긴 서평이 없어요", value: "0", unit: "편" },
+      ],
+    });
   });
 
   it("uses an exact valid joined month once and omits invalid or future months", () => {

@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import type { LoaderFunctionArgs } from "react-router-dom";
+import type { LoaderFunctionArgs } from "react-router";
 import type { FeedbackLoadResult } from "@/features/feedback/api/feedback-api";
 import { feedbackDocumentQuery } from "@/features/feedback/queries/feedback-queries";
 import { clubSlugFromLoaderArgs, loadMemberAppAuth } from "@/shared/auth/member-app-loader";

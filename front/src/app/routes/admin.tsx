@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { Navigate, type RouteObject, useLoaderData } from "react-router-dom";
+import { Navigate, type RouteObject, useLoaderData } from "react-router";
 import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
 import { RequirePlatformAdmin } from "@/src/app/route-guards";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";

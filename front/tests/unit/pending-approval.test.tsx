@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router";
 import PendingApprovalPage from "@/src/pages/pending-approval";
 import { AuthContext } from "@/src/app/auth-state";
 import { PendingApprovalRoute } from "@/features/auth/route/pending-approval-route";

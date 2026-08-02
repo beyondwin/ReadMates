@@ -1,4 +1,4 @@
-import { useLocation } from "react-router-dom";
+import { useLocation } from "react-router";
 import { NewHostSessionRoute } from "@/features/host/route/host-session-editor-route";
 import { useSessionRecordsChangedInvalidation } from "@/src/app/host-route-invalidation";
 import { hostDashboardReturnTarget, readmatesReturnState, readReadmatesReturnTarget } from "@/src/app/route-continuity";

@@ -3,7 +3,7 @@ import {
   useInRouterContext,
   useLocation,
   type LinkProps as RouterLinkProps,
-} from "react-router-dom";
+} from "react-router";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 
 type FeedbackLinkProps = RouterLinkProps & {

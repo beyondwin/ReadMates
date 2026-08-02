@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { MemoryRouter, Routes, Route } from "react-router";
 import { describe, expect, it } from "vitest";
 import { platformAdminClubsQuery } from "@/features/platform-admin/queries/platform-admin-queries";
 import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";

@@ -7,7 +7,7 @@ const expected = [
   ["dense", 30, 30],
   ["author", 36, 36],
   ["member", 38, 34],
-  ["roster", 42, 38],
+  ["roster", 32, 38],
   ["profile", 88, 64],
   ["editor", 72, 72],
   ["picker", 64, 58],

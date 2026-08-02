@@ -47,7 +47,7 @@ Caddy 포함 최종 backend runtime은 [compose-stack.md](compose-stack.md)를 �
 1. `04-install-docker.sh`로 VM Docker runtime을 준비합니다.
 2. server test를 통과시키고, 릴리즈 배포라면 `Deploy Server Image` workflow가 scan-candidate digest를 Trivy로 검사한 뒤 같은 digest를 release tag로 promote했는지 확인합니다.
 3. DB backup을 만들고 최근 48시간 이내 파일이 Git 밖의 운영 backup 위치에 있음을 확인합니다.
-4. Migration이 포함된 릴리즈는 `server/src/main/resources/db/mysql/migration` diff와 forward compatibility를 확인합니다. V42 릴리즈는 알림 flag를 끈 상태에서 target image를 시작하고, Spring startup Flyway가 V42를 성공시킨 뒤에만 server image를 serving traffic으로 승격합니다. 별도 migration job 없이 application startup Flyway를 사용하므로 Flyway 실패 상태의 container는 승격하지 않습니다.
+4. Migration이 포함된 릴리즈는 `server/src/main/resources/db/mysql/migration` diff와 forward compatibility를 확인합니다. 별도 migration job 없이 application startup Flyway를 사용하므로 target image가 기대 migration까지 적용하고 health를 통과한 뒤에만 serving traffic으로 승격하며, Flyway 실패 상태의 container는 승격하지 않습니다.
 5. `05-deploy-compose-stack.sh`로 image, compose file, Caddyfile, systemd unit을 배포합니다. `READMATES_SERVER_IMAGE`가 `ghcr.io/`로 시작하면 VM에서 해당 이미지를 pull하고, 그 외 로컬 검증 tag는 script가 이미지를 빌드해 전송합니다. 이 script는 compose 시작 전에 legacy host `readmates-server`와 host `caddy`를 중지하고 disable합니다.
 6. Flyway history와 `/internal/health`, BFF auth smoke, OAuth redirect smoke를 확인합니다.
 7. Redis feature flag를 단계적으로 켭니다.
@@ -131,7 +131,7 @@ ssh -i ~/.ssh/readmates_oci ubuntu@<vm-public-ip> 'bash -s' < deploy/oci/02-conf
 - `/opt/readmates` 디렉터리 생성
 - Caddy reverse proxy 설정, `${CADDY_SITE} -> 127.0.0.1:8080`
 
-스크립트는 secret을 더 이상 직접 쓰지 않습니다. `/etc/readmates/readmates.env`(Spring 운영 변수)와 `/etc/readmates/caddy.env`는 GitHub Actions의 `sync-config` 워크플로가 GitHub Secrets/Variables 값을 렌더링해 scp로 배포합니다. 변수 inventory, 추가/회전 절차, 비상 복구 절차는 [secrets management runbook](../operations/runbooks/secrets-management.md), 초기 VM 배포키 부트스트랩은 [VM deploy key bootstrap](../operations/runbooks/vm-deploy-key-bootstrap.md)을 따릅니다.
+`sync-config` 워크플로는 GitHub Secrets/Variables로 `/etc/readmates/readmates.env`(Spring 운영 변수)만 렌더링해 scp로 배포합니다. `/etc/readmates/caddy.env`는 `05-deploy-compose-stack.sh`가 운영자 입력 `CADDY_SITE`로 만들고, 같은 script가 `READMATES_SERVER_IMAGE`를 `/opt/readmates/.env`에 기록합니다. 변수 inventory, 추가/회전 절차, 비상 복구 절차는 [secrets management runbook](../operations/runbooks/secrets-management.md), 초기 VM 배포키 부트스트랩은 [VM deploy key bootstrap](../operations/runbooks/vm-deploy-key-bootstrap.md)을 따릅니다.
 
 알림 발송, AI 생성, BFF secret rotation처럼 위 환경 변수 블록의 `READMATES_NOTIFICATIONS_ENABLED`, `READMATES_KAFKA_*`, `READMATES_NOTIFICATION_SENDER_*`, `READMATES_NOTIFICATION_RETRY_DELAY_MINUTES`, `READMATES_NOTIFICATION_MAX_DELIVERY_ATTEMPTS`, `SPRING_MAIL_*`, `READMATES_AIGEN_*`, `READMATES_BFF_SECRETS` 값을 바꾸는 배포는 GitHub Secrets/Variables를 갱신한 뒤 `sync-config` 워크플로를 실행하고, 마지막에 compose stack의 `readmates-api`를 재시작합니다.
 
@@ -396,7 +396,8 @@ SMTP까지 실제 발송으로 확인할 때만 `SPRING_MAIL_HOST`, `SPRING_MAIL
 - OCI Email Delivery SMTP credential과 sender 값은 `/etc/readmates/readmates.env`에만 둡니다. Git에는 `<oci-region>`, `<oci-smtp-username>`, `<oci-smtp-password>`, `no-reply@example.com` 같은 placeholder만 기록합니다.
 - DB migration은 Spring 시작 시 Flyway가 `db/mysql/migration`을 적용합니다.
 - 서버 시작 중 Flyway가 적용하는 운영 migration 위치는 `classpath:db/mysql/migration`입니다. 배포 전 migration diff를 확인할 때는 `server/src/main/resources/db/mysql/migration`만 기준으로 봅니다.
-- V42는 `session_record_apply_receipts`, `club_notification_policies`, 수동 dispatch의 nullable `content_revision`/`SELECTED_MEMBERS`만 추가하는 forward-only migration입니다. V39–V41 파일을 수정하지 말고, backup → target image startup/Flyway V42 성공 → Flyway history 확인 → serving traffic 승격 → frontend 배포 → 알림 flag와 opt-in policy 확인 순서를 지킵니다. Schema downgrade는 지원하지 않으며 rollback은 V42를 남긴 채 호환 image로 전환합니다.
+- V42는 `session_record_apply_receipts`, `club_notification_policies`, 수동 dispatch의 nullable `content_revision`/`SELECTED_MEMBERS`를 추가한 과거 forward-only migration입니다. V39–V42 파일은 수정하지 않으며 schema downgrade를 지원하지 않습니다.
+- V43–V46 릴리즈는 backup → target image startup → Flyway V43/V44 membership avatar history → V45 guest exposure backfill → V46 최종 30-key avatar catalog 적용 → Flyway history와 health 확인 → serving traffic 승격 → 같은 tag frontend 배포 순서를 지킵니다. V45의 legacy exposure column dual-write는 한 릴리즈 호환 창 동안 유지하고, rollback은 V43–V46 schema와 변환된 데이터를 남긴 채 호환 image로 전환하거나 새 forward-fix tag를 발행합니다.
 - `readmates.host-action-confirmation.required`는 staged session-record capability 노출만 제어하고 알림 dispatch 여부는 제어하지 않습니다. 알림은 manual composer confirm 또는 클럽별 opt-in reminder policy에서만 생성합니다.
 - 백엔드 release image 생성은 GitHub Actions `Deploy Server Image` workflow가 담당합니다. 실제 OCI compose stack promotion은 운영자가 `deploy/oci/05-deploy-compose-stack.sh`를 실행하는 수동 절차입니다. VM 접속 credential이나 self-hosted runner가 GitHub Actions에 구성되어 있다고 가정하지 않습니다.
 - Compose Caddy 로그는 container stdout으로 확인합니다. Legacy host Caddy rollback에서는 `/var/log/caddy/readmates.log`를 확인합니다. Caddy access log 설정은 request URI와 `Authorization`, `Cookie`, `X-Readmates-Bff-Secret` request header를 기록하지 않아야 합니다.

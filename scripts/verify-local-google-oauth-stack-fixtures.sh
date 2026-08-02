@@ -9,7 +9,9 @@ fixture_root="$(mktemp -d -t readmates-google-oauth-stack-fixture-XXXXXX)"
 listener_pid=""
 
 cleanup() {
-  [[ -n "$listener_pid" ]] && kill "$listener_pid" >/dev/null 2>&1 || true
+  if [[ -n "$listener_pid" ]]; then
+    kill "$listener_pid" >/dev/null 2>&1 || true
+  fi
   [[ -d "$fixture_root" ]] && rm -rf -- "$fixture_root"
 }
 trap cleanup EXIT
@@ -369,9 +371,8 @@ run_stack_case_interrupt() {
   stack_pid=$!
   sleep 1
   kill -INT "$stack_pid" >/dev/null 2>&1 || true
-  local attempt
 
-  for attempt in 1 2 3 4 5; do
+  for _ in 1 2 3 4 5; do
     if ! kill -0 "$stack_pid" >/dev/null 2>&1; then
       return 0
     fi
@@ -379,7 +380,7 @@ run_stack_case_interrupt() {
   done
 
   kill -TERM "$stack_pid" >/dev/null 2>&1 || true
-  for attempt in 1 2 3 4; do
+  for _ in 1 2 3 4; do
     if ! kill -0 "$stack_pid" >/dev/null 2>&1; then
       return 0
     fi
@@ -399,7 +400,6 @@ run_stack_case_with_verifier() {
   local verify_output_file="$fixture_root/$case_name.verify.out"
   local state_dir="${fixture_root}/state/$case_name"
   local stack_pid=""
-  local attempt
 
   mkdir -p "$state_dir"
   : >"$output_file"
@@ -415,7 +415,7 @@ run_stack_case_with_verifier() {
   ) &
   stack_pid=$!
 
-  for attempt in 1 2 3 4 5 6 7 8 9 10; do
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
     [[ -f "$state_dir/frontend.ready" ]] && break
     kill -0 "$stack_pid" >/dev/null 2>&1 || break
     sleep 1
@@ -433,7 +433,7 @@ run_stack_case_with_verifier() {
   fi
 
   kill -INT "$stack_pid" >/dev/null 2>&1 || true
-  for attempt in 1 2 3 4 5; do
+  for _ in 1 2 3 4 5; do
     if ! kill -0 "$stack_pid" >/dev/null 2>&1; then
       return 0
     fi

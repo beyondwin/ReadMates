@@ -2,12 +2,8 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import {
-  createMemoryRouter,
-  MemoryRouter,
-  RouterProvider,
-  useLocation,
-  useSearchParams,
-} from "react-router-dom";
+  createMemoryRouter, MemoryRouter, useLocation, useSearchParams } from "react-router";
+import { RouterProvider } from "react-router/dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { NoteFeedItem, NoteSessionItem } from "@/shared/model/notes-feed-model";
 import {

@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { RouterProvider, createMemoryRouter } from "react-router-dom";
+import { createMemoryRouter } from "react-router";
+import { RouterProvider } from "react-router/dom";
 import { describe, expect, it, vi } from "vitest";
 import { GuestScopedAppRoute } from "@/features/guest-browse/route/guest-scoped-app-route";
 import { GuestCurrentSessionContent } from "@/src/pages/guest-current-session";

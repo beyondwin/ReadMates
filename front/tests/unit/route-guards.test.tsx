@@ -14,7 +14,7 @@
 import { cleanup } from "@testing-library/react";
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { AuthContext, AuthActionsContext } from "@/src/app/auth-state";
 import { RequireMemberApp, RequireHost } from "@/src/app/route-guards";
 import type { AuthState } from "@/src/app/auth-state";

@@ -1,4 +1,4 @@
-import { useRouteLoaderData } from "react-router-dom";
+import { useRouteLoaderData } from "react-router";
 import { ArchiveListRoute } from "@/features/archive/route/archive-list-route";
 import type { MemberAppAccess } from "@/shared/auth/member-app-loader";
 import { readSurfaceCapabilitiesForAuth } from "@/shared/model/read-surface-capabilities";

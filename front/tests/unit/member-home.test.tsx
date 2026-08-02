@@ -748,6 +748,13 @@ describe("MemberHome", () => {
     expect(desktop.getByText("RSVP · 참석 명단")).toBeInTheDocument();
     expect(desktop.getByText("다음 달 선정")).toBeInTheDocument();
     expect(desktop.getByText("바로가기")).toBeInTheDocument();
+    const shortcuts = container.querySelector(".rm-member-home-shortcuts");
+    expect(shortcuts).toBeInTheDocument();
+    const shortcutLinks = shortcuts!.querySelectorAll(".rm-member-home-shortcuts__link");
+    expect(shortcutLinks).toHaveLength(2);
+    expect(shortcutLinks[0]).toHaveTextContent("피드백 문서회차 피드백");
+    expect(shortcutLinks[1]).toHaveTextContent("안내문모임 가이드");
+    expect((shortcutLinks[1] as HTMLElement).style.borderTop).toBe("");
     expect(desktop.getByRole("link", { name: "전체 보기" })).toHaveAttribute("href", "/app/notes");
     const feedbackQuickLink = desktop.getByRole("link", { name: "피드백 문서 회차 피드백" });
     expect(feedbackQuickLink).toHaveAttribute(

@@ -1,5 +1,5 @@
 import { type CSSProperties, useMemo, useRef, useState } from "react";
-import { useInRouterContext, useLocation } from "react-router-dom";
+import { useInRouterContext, useLocation } from "react-router";
 import type {
   CurrentSessionPolicy,
   HostMemberProfileErrorCode,

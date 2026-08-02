@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router";
 import type { PlatformAdminRole } from "@/features/platform-admin/model/platform-admin-domain-types";
 import { canDo } from "@/features/platform-admin/model/platform-admin-permissions";
 import {

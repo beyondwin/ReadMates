@@ -1,10 +1,8 @@
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
-  createMemoryRouter,
-  MemoryRouter,
-  RouterProvider,
-} from "react-router-dom";
+  createMemoryRouter, MemoryRouter } from "react-router";
+import { RouterProvider } from "react-router/dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { NotificationPreferences } from "../model/notification-preferences-model";
 import { MemberNotificationSettingsRoute } from "./member-notification-settings-route";
@@ -17,8 +15,8 @@ const api = vi.hoisted(() => ({
   saveNotificationPreferences: vi.fn(),
 }));
 
-vi.mock("react-router-dom", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("react-router-dom")>()),
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("react-router")>()),
   useLoaderData: () => route.loaderData,
   useRevalidator: () => ({ revalidate: route.revalidate }),
 }));

@@ -1,4 +1,4 @@
-import { useLoaderData } from "react-router-dom";
+import { useLoaderData } from "react-router";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import type { ClubAppAccess } from "@/features/guest-browse/route/club-app-audience-loader";
 import { ClubAppAudienceProvider } from "@/features/guest-browse/route/club-app-audience-context";

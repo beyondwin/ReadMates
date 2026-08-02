@@ -9,7 +9,18 @@ import { ReadingAchievementSummary } from "./reading-achievement-summary";
 import type { RecentReadingListItem } from "./recent-reading-list";
 
 const profile: MyPageProfile = { avatarKey: "banana-green-book", displayName: "멤버1", accountName: "member-one", email: "member1@example.com", role: "MEMBER", membershipStatus: "ACTIVE", clubName: "읽는사이", joinedAt: "2025-11", sessionCount: 7, totalSessionCount: 7, completedReadingCount: 3, currentSessionId: null, recentAttendances: [] };
-const viewModel: MemberSpaceViewModel = { profileMetaLabel: "읽는사이 · 멤버 · 2025.11부터 함께", achievementHeading: "일곱 번의 모임에서 세 권을 끝까지 읽었어요.", achievementBody: "함께 읽는 시간이 차분히 쌓이고 있습니다.", metrics: [{ label: "함께한 모임", value: "7" }, { label: "완독", value: "3" }, { label: "질문", value: "5" }, { label: "서평", value: "2" }] };
+const viewModel: MemberSpaceViewModel = {
+  profileMetaLabel: "읽는사이 · 멤버 · 2025.11부터 함께",
+  achievementHeading: "읽고, 묻고, 기록해 온 시간",
+  journeyStats: [
+    { kind: "sessions", label: "참여한 모임", value: "7", unit: "회" },
+    { kind: "completed", label: "완독한 책", value: "3", unit: "권" },
+  ],
+  recordTraces: [
+    { kind: "questions", label: "대화를 연 질문", description: "책에서 시작된 생각의 기록", value: "5", unit: "개" },
+    { kind: "reviews", label: "남긴 서평", description: "아직 남긴 서평이 없어요", value: "0", unit: "편" },
+  ],
+};
 const recentReadings: RecentReadingListItem[] = [{ sessionId: "session-7", sessionNumberLabel: "7차", dateLabel: "2026.07.20", bookTitle: "최근 함께 읽은 책", bookAuthor: "테스트 저자", bookImageUrl: null, coverFallbackLabel: "최", activityLabels: ["질문 2"], feedbackStatus: "피드백 O", href: "/app/sessions/session-7" }];
 const save = vi.fn(async (editable) => ({ ...editable, accountName: profile.accountName }));
 
@@ -35,12 +46,30 @@ describe("member-space unaffected presentation", () => {
     expect(screen.getByText("테스트 저자")).toBeVisible();
   });
 
-  it("presents cumulative achievements as ordered definition-list metrics only", () => {
+  it("presents cumulative stats and non-interactive record traces without a duplicate archive link", () => {
     const { container } = render(<ReadingAchievementSummary viewModel={viewModel} />);
     const section = screen.getByRole("region", { name: viewModel.achievementHeading });
-    expect(Array.from(section.querySelectorAll("dt"), (item) => item.textContent)).toEqual(["함께한 모임", "완독", "질문", "서평"]);
-    expect(Array.from(section.querySelectorAll("dd"), (item) => item.textContent)).toEqual(["7", "3", "5", "2"]);
-    expect(container.querySelectorAll("ol, ul, [role='img'], svg")).toHaveLength(0);
-    expect(within(section).queryByText("멤버십 시작")).toBeNull();
+    const heading = within(section).getByRole("heading", { level: 2, name: viewModel.achievementHeading });
+    const journeyGroup = within(section).getByRole("region", { name: "독서 여정" });
+    const traceGroup = within(section).getByRole("region", { name: "기록의 흔적" });
+    const journeyStats = Array.from(section.querySelectorAll<HTMLElement>(".rm-reading-achievement__stat"));
+    const recordTraces = Array.from(section.querySelectorAll<HTMLElement>(".rm-reading-achievement__trace"));
+
+    expect(within(section).queryByRole("link", { name: "기록 보기" })).toBeNull();
+    expect(within(section).queryAllByRole("link")).toHaveLength(0);
+    expect(section.querySelectorAll("svg")).toHaveLength(0);
+    expect(journeyGroup.querySelector("dl")).not.toBeNull();
+    expect(traceGroup.querySelector("dl")).not.toBeNull();
+    expect(within(section).getByText("책에서 시작된 생각의 기록")).toBeVisible();
+    expect(within(section).getByText("아직 남긴 서평이 없어요")).toBeVisible();
+    for (const value of ["7", "3", "5", "0"]) {
+      expect(within(section).getAllByText(value, { exact: true })).toHaveLength(1);
+    }
+    expect(within(section).queryByText(/완독률/)).toBeNull();
+    expect(Array.from(section.querySelectorAll(".rm-reading-achievement__stat-label"), (item) => item.textContent)).toEqual(["참여한 모임", "완독한 책"]);
+    expect(container.querySelectorAll(".rm-reading-achievement__trace a, .rm-reading-achievement__trace button")).toHaveLength(0);
+    expect([heading, ...journeyStats, ...recordTraces].every((item, index, items) => (
+      index === 0 || Boolean(items[index - 1].compareDocumentPosition(item) & Node.DOCUMENT_POSITION_FOLLOWING)
+    ))).toBe(true);
   });
 });

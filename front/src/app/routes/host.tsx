@@ -1,6 +1,6 @@
 import { lazy, Suspense, type ComponentType, type ReactNode } from "react";
 import type { QueryClient } from "@tanstack/react-query";
-import { type LoaderFunction, type RouteObject } from "react-router-dom";
+import { type LoaderFunction, type RouteObject } from "react-router";
 import { requireHostLoaderAuth } from "@/features/host/route/host-loader-auth";
 import { HostRouteError } from "@/features/host/route/host-route-error";
 import { AppRouteLayout } from "@/src/app/layouts/app-route-layout";

@@ -24,11 +24,9 @@ describe("AvatarPicker", () => {
       "data-avatar-size-role",
       "picker",
     );
-    expect(selected.querySelector(".rm-avatar-picker__check")).toHaveClass(
-      "rm-avatar-picker__check--filled",
-    );
+    expect(selected.querySelector(".rm-avatar-picker__check")).toBeNull();
+    expect(container.querySelector("svg")).toBeNull();
     expect(screen.getAllByText(/./, { selector: ".rm-avatar-picker__label" })).toHaveLength(30);
-    expect(container.querySelectorAll(".rm-avatar-picker__check")).toHaveLength(1);
 
     await user.click(screen.getByRole("button", {
       name: "문장 사이의 구름, 초록 책을 읽는 구름 선택",

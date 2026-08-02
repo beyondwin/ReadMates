@@ -1,4 +1,4 @@
-import { useLoaderData } from "react-router-dom";
+import { useLoaderData } from "react-router";
 import { AdminComingSoon } from "@/features/platform-admin/ui/admin-coming-soon";
 import type { AdminRouteDescriptor } from "@/features/platform-admin/model/admin-route-catalog";
 

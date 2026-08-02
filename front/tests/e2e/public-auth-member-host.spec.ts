@@ -27,12 +27,55 @@ test.afterEach(() => {
   resetSeedGoogleLogins(["host@example.com"]);
 });
 
+test("bare login member action issues a reading-sai join intent before OAuth", async ({ page }) => {
+  let issuedIntentRequests = 0;
+  let issuedIntentBody: unknown;
+  let oauthStartUrl = "";
+  await page.route("**/api/bff/api/auth/oauth/join-intent", async (route) => {
+    issuedIntentRequests += 1;
+    issuedIntentBody = route.request().postDataJSON();
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        intent: "bare-login-intent-00000000000000000000",
+        expiresAt: "2026-08-03T12:00:00Z",
+      }),
+    });
+  });
+  await page.route("**/oauth2/authorization/google**", async (route) => {
+    oauthStartUrl = route.request().url();
+    await route.fulfill({ status: 204 });
+  });
+
+  await page.goto("/login");
+  await page.getByRole("link", { name: "멤버로 시작" }).click();
+
+  await expect.poll(() => issuedIntentRequests).toBe(1);
+  expect(issuedIntentBody).toEqual({
+    clubSlug: "reading-sai",
+    returnTo: "/clubs/reading-sai/app",
+  });
+  await expect.poll(() => oauthStartUrl).toContain("/oauth2/authorization/google");
+  const oauthStart = new URL(oauthStartUrl);
+  expect(oauthStart.searchParams.get("returnTo")).toBe("/clubs/reading-sai/app");
+  expect(oauthStart.searchParams.get("joinClub")).toBe("reading-sai");
+  expect(oauthStart.searchParams.get("joinIntent")).toBe("bare-login-intent-00000000000000000000");
+});
+
 test("public to Google fixture login to host smoke flow", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "읽는사이", level: 1 })).toBeVisible();
 
   await page.goto("/login");
-  await expect(page.getByRole("link", { name: "Google로 시작하기" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "둘러보기" })).toHaveAttribute(
+    "href",
+    "/clubs/reading-sai/app",
+  );
+  await expect(page.getByRole("link", { name: "멤버로 시작" })).toHaveAttribute(
+    "href",
+    "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp",
+  );
   await expect(page.getByLabel("비밀번호", { exact: true })).toHaveCount(0);
 
   await loginWithGoogleFixture(page, "host@example.com");

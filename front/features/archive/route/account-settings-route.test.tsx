@@ -11,8 +11,8 @@ const api = vi.hoisted(() => ({
   leaveMembership: vi.fn(),
 }));
 
-vi.mock("react-router-dom", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("react-router-dom")>()),
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("react-router")>()),
   useLoaderData: () => route.loaderData,
 }));
 vi.mock("@/features/archive/api/archive-api", () => api);

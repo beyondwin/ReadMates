@@ -126,8 +126,18 @@
 
   html .rm-profile-editor .rm-avatar-picker__tile {
     min-width: 44px;
-    min-height: 148px;
-    padding: 38px 6px 10px;
+    min-height: 122px;
+    padding: 10px 6px;
+  }
+
+  html .rm-member-home-roster {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 360px) {
+  html .rm-member-home-roster {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 

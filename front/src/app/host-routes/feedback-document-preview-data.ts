@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import type { LoaderFunctionArgs } from "react-router-dom";
+import type { LoaderFunctionArgs } from "react-router";
 import type { FeedbackLoadResult } from "@/features/feedback/api/feedback-api";
 import { hostFeedbackDocumentPreviewQuery } from "@/features/feedback/queries/feedback-queries";
 import { requireHostLoaderAuth } from "@/features/host/route/host-loader-auth";

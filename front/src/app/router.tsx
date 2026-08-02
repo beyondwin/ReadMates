@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { createBrowserRouter, type RouteObject } from "react-router-dom";
+import { createBrowserRouter, type RouteObject } from "react-router";
 import { adminRoutes } from "@/src/app/routes/admin";
 import { authRoutes } from "@/src/app/routes/auth";
 import { hostRoutes } from "@/src/app/routes/host";

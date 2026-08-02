@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import { useLocation, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useParams, useSearchParams } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { archiveViewFromSearchParam, type ArchiveView } from "@/features/archive/model/archive-model";
 import {

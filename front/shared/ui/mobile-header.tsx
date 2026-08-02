@@ -1,6 +1,6 @@
 
 import type { ComponentType, CSSProperties, ReactNode } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation } from "react-router";
 import { usePublicAuthAction } from "./public-auth-action-state";
 import { ReadmatesBrandMark } from "./readmates-brand-mark";
 import { READMATES_MOBILE_TAB_LABELS, READMATES_NAV_LABELS, READMATES_WORKSPACE_LABELS } from "./readmates-copy";

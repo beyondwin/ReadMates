@@ -9,6 +9,8 @@ const sourceRoots = ["src", "features", "shared"];
 const sourceExtensions = new Set([".js", ".jsx", ".ts", ".tsx"]);
 const featuresWithUiPublicSurface = collectFeaturesWithUiPublicSurface();
 const removedReadmatesApiCompatibilityPath = ["shared", "api", "readmates"].join("/");
+const legacyRouterPackage = ["react", "router", "dom"].join("-");
+const routerPackage = "react-router";
 
 type BoundaryRuleId =
   | "shared-boundary"
@@ -75,6 +77,18 @@ function collectSourceFiles(directory: string): SourceFile[] {
 
 function collectAllSourceFiles() {
   return sourceRoots.flatMap((root) => collectSourceFiles(path.join(projectRoot, root)));
+}
+
+function collectRouterContractFiles() {
+  return [
+    ...collectAllSourceFiles(),
+    ...collectSourceFiles(path.join(projectRoot, "tests")),
+    {
+      absolutePath: path.join(projectRoot, "vite.config.ts"),
+      displayPath: "front/vite.config.ts",
+      relativePath: "vite.config.ts",
+    },
+  ];
 }
 
 function collectFeaturesWithUiPublicSurface() {
@@ -362,7 +376,7 @@ function isFeatureModelBoundaryImport(sourceFile: SourceFile, importSpecifier: I
   if (
     isPackageImport(importSpecifier.rawSpecifier, "react") ||
     isPackageImport(importSpecifier.rawSpecifier, "react-dom") ||
-    isPackageImport(importSpecifier.rawSpecifier, "react-router-dom")
+    isPackageImport(importSpecifier.rawSpecifier, "react-router")
   ) {
     return true;
   }
@@ -475,6 +489,20 @@ function addFeatureToFeatureViolation(
 }
 
 describe("frontend architecture boundaries", () => {
+  it("uses the React Router v8 package split without the legacy DOM wrapper", () => {
+    const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, "package.json"), "utf8")) as {
+      dependencies?: Record<string, string>;
+    };
+    expect(packageJson.dependencies?.[routerPackage]).toBe("8.3.0");
+    expect(packageJson.dependencies).not.toHaveProperty(legacyRouterPackage);
+
+    const violations = collectRouterContractFiles()
+      .filter((sourceFile) => fs.readFileSync(sourceFile.absolutePath, "utf8").includes(legacyRouterPackage))
+      .map((sourceFile) => sourceFile.displayPath);
+
+    expect(violations, violations.join("\n")).toEqual([]);
+  });
+
   it("parses static side-effect, value, type, and export-from specifiers without crossing statements", () => {
     const source = `
       import "@/styles/global.css";

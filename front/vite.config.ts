@@ -26,7 +26,7 @@ export default defineConfig({
             },
             {
               name: "vendor-router",
-              test: /node_modules[\\/](react-router|react-router-dom)[\\/]/,
+              test: /node_modules[\\/]react-router[\\/]/,
             },
             {
               name: "vendor-query",

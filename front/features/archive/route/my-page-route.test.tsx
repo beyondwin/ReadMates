@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import type { MyPageRouteData } from "./my-page-data";
 import { MyPageRoute } from "./my-page-route";
 
@@ -15,8 +15,8 @@ const mutations = vi.hoisted(() => ({
   profile: vi.fn(),
 }));
 
-vi.mock("react-router-dom", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("react-router-dom")>()),
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("react-router")>()),
   useLoaderData: () => route.loaderData,
   useRevalidator: () => ({ revalidate: route.revalidate }),
 }));
@@ -126,7 +126,8 @@ describe("MyPageRoute", () => {
       "/assets/avatars/book-club/cloud-green-book.webp",
     );
     expect(avatar).toHaveAttribute("aria-hidden", "true");
-    expect(screen.getByText("9번의 모임에서 7권을 끝까지 읽었어요.")).toBeVisible();
+    expect(screen.getByText("읽고, 묻고, 기록해 온 시간")).toBeVisible();
+    expect(screen.queryByRole("link", { name: "기록 보기" })).toBeNull();
     expect(screen.queryByRole("link", { name: "계정 관리" })).toBeNull();
     expect(screen.getByRole("link", {
       name: "전체 보기",

@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import type { RouteObject } from "react-router-dom";
+import type { RouteObject } from "react-router";
 import { PublicRouteError } from "@/features/public/route/public-route-state";
 import { PublicRouteLayout } from "@/src/app/layouts/public-route-layout";
 import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";

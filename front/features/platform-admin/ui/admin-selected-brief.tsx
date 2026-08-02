@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import type { PlatformAdminSelectedBrief } from "@/features/platform-admin/model/platform-admin-workbench-model";
 
 type Props = {

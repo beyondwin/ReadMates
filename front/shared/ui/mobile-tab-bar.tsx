@@ -1,6 +1,6 @@
 
 import type { ComponentType, ReactNode } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation } from "react-router";
 import {
   READMATES_MOBILE_TAB_LABELS,
   READMATES_PRIMARY_NAV_LABELS,

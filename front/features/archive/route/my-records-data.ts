@@ -1,4 +1,4 @@
-import type { LoaderFunctionArgs } from "react-router-dom";
+import type { LoaderFunctionArgs } from "react-router";
 import { fetchMyJourney } from "@/features/archive/api/archive-api";
 import type { MyJourneyPage } from "@/features/archive/model/my-reading-shelf-model";
 import { emptyMyJourneyPage } from "@/features/archive/model/my-reading-shelf-model";

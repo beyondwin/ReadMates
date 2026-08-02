@@ -12,8 +12,16 @@ const profile: MyPageProfile = {
   currentSessionId: null, recentAttendances: [],
 };
 const viewModel: MemberSpaceViewModel = {
-  profileMetaLabel: "읽는사이 · 멤버 · 2025.11부터 함께", achievementHeading: "함께 읽은 기록",
-  achievementBody: "차분히 쌓이고 있습니다.", metrics: [],
+  profileMetaLabel: "읽는사이 · 멤버 · 2025.11부터 함께",
+  achievementHeading: "읽고, 묻고, 기록해 온 시간",
+  journeyStats: [
+    { kind: "sessions", label: "참여한 모임", value: "7", unit: "회" },
+    { kind: "completed", label: "완독한 책", value: "3", unit: "권" },
+  ],
+  recordTraces: [
+    { kind: "questions", label: "대화를 연 질문", description: "책에서 시작된 생각의 기록", value: "5", unit: "개" },
+    { kind: "reviews", label: "남긴 서평", description: "아직 남긴 서평이 없어요", value: "0", unit: "편" },
+  ],
 };
 
 describe("MemberProfileSummary", () => {
@@ -21,21 +29,32 @@ describe("MemberProfileSummary", () => {
     const { container } = render(<MemberProfileSummary profile={profile} viewModel={viewModel} canEditProfile onSaveProfile={vi.fn()} />);
     const section = screen.getByRole("region", { name: profile.displayName });
     expect(within(section).getAllByRole("heading", { level: 1, name: profile.displayName })).toHaveLength(1);
-    const artwork = container.querySelector(".rm-member-profile__avatar.rm-avatar-chip--artwork");
+    const figure = container.querySelector(".rm-member-profile__avatar-figure");
+    const artwork = figure?.querySelector(".rm-member-profile__avatar.rm-avatar-chip--artwork");
     expect(artwork).toHaveClass("rm-avatar-chip");
     expect(artwork).toHaveAttribute("data-avatar-size-role", "profile");
     expect(artwork?.querySelector("img")).toHaveAttribute("alt", "");
     expect(artwork?.querySelector("img")).toHaveAttribute("aria-hidden", "true");
-    expect(within(section).getByText(viewModel.profileMetaLabel)).toBeVisible();
-    expect(within(section).getByText("나의 아바타 · 한 장 더 읽는 바나나")).toBeVisible();
-    expect(within(section).getAllByRole("button", { name: "프로필 편집" })).toHaveLength(1);
+    expect(Array.from(section.querySelectorAll(".rm-member-profile__meta-line"), (line) => line.textContent)).toEqual([
+      "읽는사이 · 멤버",
+      "2025.11부터 함께",
+    ]);
+    expect(figure?.querySelector("figcaption")).toHaveTextContent("한 장 더 읽는 바나나");
+    expect(section).not.toHaveTextContent("나의 아바타 ·");
+    const identity = section.querySelector(".rm-member-profile__identity");
+    expect(identity).not.toBeNull();
+    const editButton = within(identity as HTMLElement).getByRole("button", { name: "프로필 편집" });
+    expect(editButton).toHaveTextContent("프로필 편집");
+    expect(editButton.querySelector("svg")).toBeNull();
+    expect(section.querySelector(".rm-member-profile__actions")).toBeNull();
     expect(within(section).queryByRole("button", { name: "이름 변경" })).toBeNull();
     expect(within(section).queryByRole("button", { name: "아바타 바꾸기" })).toBeNull();
   });
 
   it("omits the action container when membership cannot edit", () => {
     const { container } = render(<MemberProfileSummary profile={profile} viewModel={viewModel} canEditProfile={false} onSaveProfile={vi.fn()} />);
-    expect(screen.getByText("나의 아바타 · 한 장 더 읽는 바나나")).toBeVisible();
+    expect(container.querySelector("figcaption")).toHaveTextContent("한 장 더 읽는 바나나");
+    expect(screen.queryByText(/나의 아바타 ·/)).toBeNull();
     expect(screen.queryByRole("button", { name: "프로필 편집" })).toBeNull();
     expect(container.querySelector(".rm-member-profile__actions")).toBeNull();
   });

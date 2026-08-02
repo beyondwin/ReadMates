@@ -1,7 +1,8 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { createMemoryRouter, RouterProvider, type RouteObject } from "react-router-dom";
+import { createMemoryRouter, type RouteObject } from "react-router";
+import { RouterProvider } from "react-router/dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "@/src/app/auth-context";
 import { routes, routesQueryClient } from "@/src/app/router";
@@ -516,9 +517,13 @@ describe("SPA router", () => {
     renderWithRoutesQueryClient(<RouterProvider router={router} />);
 
     expect(await screen.findByRole("heading", { name: "읽는사이 들어가기" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Google로 시작하기" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "둘러보기" })).toHaveAttribute(
       "href",
-      "/oauth2/authorization/google",
+      "/clubs/reading-sai/app",
+    );
+    expect(screen.getByRole("link", { name: "멤버로 시작" })).toHaveAttribute(
+      "href",
+      "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp",
     );
   });
 

@@ -9,6 +9,8 @@ import { LoginCard, type DevAccount } from "@/features/auth/ui/login-card";
 import { oauthHrefForReturnTo, safeRelativeReturnTo, scopedAppClubSlug } from "@/shared/auth/login-return";
 import { PageMetadataHead } from "@/shared/ui/page-metadata-head";
 
+const DEFAULT_CLUB_ENTRY_RETURN_TO = "/clubs/reading-sai/app";
+
 const devAccounts: DevAccount[] = [
   { label: "김호스트 · 호스트", email: "host@example.com" },
   { label: "플랫폼 관리자 · OWNER", email: "admin-owner@example.com", defaultRedirectPath: "/admin" },
@@ -36,14 +38,24 @@ function isGoogleLoginEnabled(showDevLogin: boolean) {
   return !showDevLogin || import.meta.env.VITE_ENABLE_GOOGLE_LOGIN === "true";
 }
 
-function loginReturnTo(search: string) {
+function requestedLoginReturnTo(search: string) {
   return safeRelativeReturnTo(new URLSearchParams(search).get("returnTo"));
+}
+
+function loginEntryReturnTo(search: string, requestedReturnTo: string | null) {
+  const params = new URLSearchParams(search);
+  if (params.has("returnTo") || params.has("error")) {
+    return requestedReturnTo;
+  }
+
+  return DEFAULT_CLUB_ENTRY_RETURN_TO;
 }
 
 export function LoginRouteContent() {
   const search = globalThis.location.search;
   const recovery = loginRecoveryFromSearch(search);
-  const returnTo = loginReturnTo(globalThis.location.search);
+  const requestedReturnTo = requestedLoginReturnTo(search);
+  const returnTo = loginEntryReturnTo(search, requestedReturnTo);
   const joinClub = scopedAppClubSlug(returnTo);
   const isKakaoBrowser = isKakaoInAppBrowser(globalThis.navigator.userAgent);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
@@ -68,7 +80,7 @@ export function LoginRouteContent() {
       throw new Error(`Dev login failed: ${response.status}`);
     }
 
-    globalThis.location.assign(returnTo ?? defaultRedirectPath ?? "/app");
+    globalThis.location.assign(requestedReturnTo ?? defaultRedirectPath ?? "/app");
   };
 
   return (

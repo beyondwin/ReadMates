@@ -13,7 +13,7 @@ export const AVATAR_SIZE_ROLES = {
   dense: { desktop: 30, mobile: 30 },
   author: { desktop: 36, mobile: 36 },
   member: { desktop: 38, mobile: 34 },
-  roster: { desktop: 42, mobile: 38 },
+  roster: { desktop: 32, mobile: 38 },
   profile: { desktop: 88, mobile: 64 },
   editor: { desktop: 72, mobile: 72 },
   picker: { desktop: 64, mobile: 58 },

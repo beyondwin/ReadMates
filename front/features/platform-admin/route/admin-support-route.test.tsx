@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 import { platformAdminClubsQuery, platformAdminSummaryQuery } from "@/features/platform-admin/queries/platform-admin-queries";
 import { platformAdminSupportLedgerQuery } from "@/features/platform-admin/queries/platform-admin-support-queries";
