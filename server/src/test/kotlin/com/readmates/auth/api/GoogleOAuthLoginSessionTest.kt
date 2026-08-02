@@ -10,6 +10,7 @@ import com.readmates.auth.infrastructure.security.OAuthReturnState
 import com.readmates.auth.infrastructure.security.ReadmatesOAuthSuccessHandler
 import com.readmates.auth.infrastructure.security.readmatesAppOrigin
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.HttpHeaders
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.mock.web.MockHttpServletRequest
@@ -37,6 +39,8 @@ import org.springframework.security.oauth2.core.oidc.StandardClaimNames
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository
 import org.springframework.test.context.jdbc.Sql
+import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.get
 import org.springframework.web.util.UriComponentsBuilder
 import org.springframework.web.util.UriUtils
 import java.nio.charset.StandardCharsets
@@ -53,6 +57,7 @@ import java.time.Instant
         "spring.security.oauth2.client.registration.google.scope=openid,email,profile",
     ],
 )
+@AutoConfigureMockMvc
 @Sql(statements = [GoogleOAuthLoginSessionTest.CLEANUP_SQL], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 @Sql(statements = [GoogleOAuthLoginSessionTest.CLEANUP_SQL], executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
 @Tag("integration")
@@ -61,6 +66,8 @@ class GoogleOAuthLoginSessionTest(
     @param:Autowired private val oauthReturnState: OAuthReturnState,
     @param:Autowired private val flowRepository: OAuthFlowContextRepository,
     @param:Autowired private val joinIntentStore: OAuthJoinIntentStore,
+    @param:Autowired private val authSessionService: AuthSessionService,
+    @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val invitationTokenService: InvitationTokenService,
 ) : ReadmatesMySqlIntegrationTestSupport() {
@@ -362,35 +369,101 @@ class GoogleOAuthLoginSessionTest(
     }
 
     @Test
-    fun `expected google account link failure redirects to login error and clears auth state`() {
+    fun `unexpected principal failure cleans exactly once and preserves another pending oauth state`() {
+        val session = securitySession()
+        saveJoinFlow(session, "state-alpha", "reading-sai")
+        saveJoinFlow(session, "state-beta", "sample-book-club")
+        val callback = countingCallback(session, "state-beta")
+        assertNotNull(flowRepository.removeAuthorizationRequest(callback, MockHttpServletResponse()))
+        val authentication = TestingAuthenticationToken("not-an-oidc-user", "credentials")
+        SecurityContextHolder.getContext().authentication = authentication
+        val response = MockHttpServletResponse()
+
+        assertThrows<ClassCastException> {
+            successHandler.onAuthenticationSuccess(callback, response, authentication)
+        }
+
+        assertEquals(1, callback.sessionIdChangeCount)
+        assertNull(SecurityContextHolder.getContext().authentication)
+        assertNull(session.getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY))
+        assertNull(OAuthFlowContextRepository.consumedContext(callback))
+        assertNotNull(loadFlow(session, "state-alpha"))
+        assertNull(removeFlow(session, "state-beta"))
+        assertNull(response.getHeader(HttpHeaders.SET_COOKIE))
+    }
+
+    @Test
+    fun `unexpected success body failure rethrows after one cleanup without issuing a cookie`() {
+        createGoogleMember(
+            googleSubjectId = "google-oauth-unexpected-body",
+            email = "oauth.unexpected.body@example.com",
+            displayName = "OAuth Unexpected Body",
+        )
+        val session = securitySession()
+        saveJoinFlow(session, "state-alpha", "reading-sai")
+        saveJoinFlow(session, "state-beta", "sample-book-club")
+        val callback = countingCallback(session, "state-beta")
+        assertNotNull(flowRepository.removeAuthorizationRequest(callback, MockHttpServletResponse()))
+        val authentication =
+            TestingAuthenticationToken(
+                googleOidcUser(
+                    "google-oauth-unexpected-body",
+                    "oauth.unexpected.body@example.com",
+                    "OAuth Unexpected Body",
+                ),
+                "credentials",
+            )
+        SecurityContextHolder.getContext().authentication = authentication
+        val response = RejectingSetCookieResponse()
+
+        assertThrows<IllegalStateException> {
+            successHandler.onAuthenticationSuccess(callback, response, authentication)
+        }
+
+        assertEquals(1, callback.sessionIdChangeCount)
+        assertNull(SecurityContextHolder.getContext().authentication)
+        assertNull(session.getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY))
+        assertNull(OAuthFlowContextRepository.consumedContext(callback))
+        assertNotNull(loadFlow(session, "state-alpha"))
+        assertNull(removeFlow(session, "state-beta"))
+        assertNull(response.getHeader(HttpHeaders.SET_COOKIE))
+    }
+
+    @Test
+    fun `expected google account link failure preserves a valid existing app session`() {
         createGoogleMember(
             googleSubjectId = "google-oauth-conflict-subject",
             email = "oauth.owner@example.com",
             displayName = "OAuth Owner",
         )
-        val servletSession = securitySession()
-        val request = MockHttpServletRequest("GET", "/login/oauth2/code/google")
-        request.setSession(servletSession)
-        val response = MockHttpServletResponse()
-        val authentication =
-            TestingAuthenticationToken(
-                googleOidcUser(
-                    googleSubjectId = "google-oauth-conflict-subject",
-                    email = "oauth.other@example.com",
-                    name = "OAuth Other",
-                ),
-                "credentials",
-            )
-        SecurityContextHolder.getContext().authentication = authentication
+        val existing = issueSeededHostSession()
+        try {
+            val servletSession = securitySession()
+            val request = MockHttpServletRequest("GET", "/login/oauth2/code/google")
+            request.setSession(servletSession)
+            request.setCookies(existing.cookie)
+            val response = MockHttpServletResponse()
+            val authentication =
+                TestingAuthenticationToken(
+                    googleOidcUser(
+                        googleSubjectId = "google-oauth-conflict-subject",
+                        email = "oauth.other@example.com",
+                        name = "OAuth Other",
+                    ),
+                    "credentials",
+                )
+            SecurityContextHolder.getContext().authentication = authentication
 
-        successHandler.onAuthenticationSuccess(request, response, authentication)
+            successHandler.onAuthenticationSuccess(request, response, authentication)
 
-        assertEquals("https://readmates.pages.dev/login?error=google", response.redirectedUrl)
-        val setCookie = response.getHeader(HttpHeaders.SET_COOKIE)
-        assertNotNull(setCookie)
-        assertTrue(setCookie!!.startsWith("${AuthSessionService.COOKIE_NAME}=;"))
-        assertFalse(servletSession.isInvalid)
-        assertNull(SecurityContextHolder.getContext().authentication)
+            assertEquals("https://readmates.pages.dev/login?error=google", response.redirectedUrl)
+            assertNull(response.getHeader(HttpHeaders.SET_COOKIE))
+            assertFalse(servletSession.isInvalid)
+            assertNull(SecurityContextHolder.getContext().authentication)
+            assertSeededHostSessionRemainsAuthenticated(existing.cookie)
+        } finally {
+            authSessionService.revokeSession(existing.rawToken)
+        }
     }
 
     @Test
@@ -425,9 +498,7 @@ class GoogleOAuthLoginSessionTest(
         val redirect = UriComponentsBuilder.fromUriString(response.redirectedUrl!!).build()
         assertEquals("membership-left", redirect.queryParams.getFirst("error"))
         assertEquals("/clubs/reading-sai/app/sessions/current", redirect.queryParams.getFirst("returnTo"))
-        val setCookie = response.getHeader(HttpHeaders.SET_COOKIE)
-        assertNotNull(setCookie)
-        assertTrue(setCookie!!.startsWith("${AuthSessionService.COOKIE_NAME}=;"))
+        assertNull(response.getHeader(HttpHeaders.SET_COOKIE))
         assertFalse(servletSession.isInvalid)
         assertNull(SecurityContextHolder.getContext().authentication)
     }
@@ -486,6 +557,111 @@ class GoogleOAuthLoginSessionTest(
             assertTrue(response.redirectedUrl!!.contains("provider detail").not())
             assertFalse(servletSession.isInvalid)
         }
+    }
+
+    @Test
+    fun `provider cancel for another club preserves a valid existing app session`() {
+        val existing = issueSeededHostSession()
+        try {
+            val session = securitySession()
+            saveJoinFlow(session, "state-target", "sample-book-club")
+            val callback = consumeFlow(session, "state-target").apply { setCookies(existing.cookie) }
+            val response = MockHttpServletResponse()
+
+            successHandler.onAuthenticationFailure(
+                callback,
+                response,
+                BadCredentialsException("provider cancel"),
+            )
+
+            assertNull(response.getHeader(HttpHeaders.SET_COOKIE))
+            assertNotNull(authSessionService.findValidSession(existing.rawToken))
+            assertSeededHostSessionRemainsAuthenticated(existing.cookie)
+        } finally {
+            authSessionService.revokeSession(existing.rawToken)
+        }
+    }
+
+    @Test
+    fun `anonymous provider failure stays anonymous while stale cookie is explicitly expired`() {
+        val anonymousSession = securitySession()
+        val anonymousRequest = MockHttpServletRequest("GET", "/login/oauth2/code/google").apply {
+            setSession(anonymousSession)
+        }
+        val anonymousResponse = MockHttpServletResponse()
+
+        successHandler.onAuthenticationFailure(
+            anonymousRequest,
+            anonymousResponse,
+            BadCredentialsException("provider cancel"),
+        )
+
+        assertNull(anonymousResponse.getHeader(HttpHeaders.SET_COOKIE))
+        assertAuthMeAnonymous()
+
+        val staleCookie = Cookie(AuthSessionService.COOKIE_NAME, "stale-test-token")
+        val staleSession = securitySession()
+        val staleRequest = MockHttpServletRequest("GET", "/login/oauth2/code/google").apply {
+            setSession(staleSession)
+            setCookies(staleCookie)
+        }
+        val staleResponse = MockHttpServletResponse()
+
+        successHandler.onAuthenticationFailure(
+            staleRequest,
+            staleResponse,
+            BadCredentialsException("provider cancel"),
+        )
+
+        assertTrue(
+            staleResponse
+                .getHeader(HttpHeaders.SET_COOKIE)
+                ?.startsWith("${AuthSessionService.COOKIE_NAME}=;") == true,
+        )
+        assertAuthMeAnonymous(staleCookie)
+    }
+
+    @Test
+    fun `oauth success then another tab failure preserves the newly issued app session`() {
+        val session = securitySession()
+        saveJoinFlow(session, "state-alpha", "reading-sai")
+        saveJoinFlow(session, "state-beta", "sample-book-club")
+        val authentication =
+            TestingAuthenticationToken(
+                googleOidcUser(
+                    "google-oauth-success-then-failure",
+                    "oauth.success.then.failure@example.com",
+                    "OAuth Success Then Failure",
+                ),
+                "credentials",
+            )
+
+        val betaCallback = consumeFlow(session, "state-beta")
+        val betaResponse = MockHttpServletResponse()
+        successHandler.onAuthenticationSuccess(betaCallback, betaResponse, authentication)
+        val issuedRawToken = readmatesCookieValue(betaResponse)
+        val issuedCookie = Cookie(AuthSessionService.COOKIE_NAME, issuedRawToken)
+        assertNotNull(authSessionService.findValidSession(issuedRawToken))
+
+        val alphaCallback = consumeFlow(session, "state-alpha").apply { setCookies(issuedCookie) }
+        val alphaResponse = MockHttpServletResponse()
+        successHandler.onAuthenticationFailure(
+            alphaCallback,
+            alphaResponse,
+            BadCredentialsException("provider cancel"),
+        )
+
+        assertNull(alphaResponse.getHeader(HttpHeaders.SET_COOKIE))
+        assertNotNull(authSessionService.findValidSession(issuedRawToken))
+        mockMvc
+            .get("/api/auth/me") {
+                cookie(issuedCookie)
+                param("clubSlug", "sample-book-club")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.authenticated") { value(true) }
+                jsonPath("$.membershipStatus") { value("VIEWER") }
+            }
     }
 
     @Test
@@ -698,9 +874,7 @@ class GoogleOAuthLoginSessionTest(
         successHandler.onAuthenticationSuccess(request, response, authentication)
 
         assertEquals("https://readmates.pages.dev/login?error=google", response.redirectedUrl)
-        val setCookie = response.getHeader(HttpHeaders.SET_COOKIE)
-        assertNotNull(setCookie)
-        assertTrue(setCookie!!.startsWith("${AuthSessionService.COOKIE_NAME}=;"))
+        assertNull(response.getHeader(HttpHeaders.SET_COOKIE))
         assertFalse(servletSession.isInvalid)
         assertNull(SecurityContextHolder.getContext().authentication)
 
@@ -831,9 +1005,7 @@ class GoogleOAuthLoginSessionTest(
         successHandler.onAuthenticationSuccess(request, response, authentication)
 
         assertEquals("https://readmates.pages.dev/login?error=google", response.redirectedUrl)
-        val setCookie = response.getHeader(HttpHeaders.SET_COOKIE)
-        assertNotNull(setCookie)
-        assertTrue(setCookie!!.startsWith("${AuthSessionService.COOKIE_NAME}=;"))
+        assertNull(response.getHeader(HttpHeaders.SET_COOKIE))
         assertFalse(servletSession.isInvalid)
         assertNull(SecurityContextHolder.getContext().authentication)
 
@@ -894,7 +1066,9 @@ class GoogleOAuthLoginSessionTest(
                 'oauth.guest.join.dot.path@example.com',
                 'oauth.guest.join.encoded.path@example.com',
                 'oauth.multitab.success@example.com',
-                'oauth.multitab.failure@example.com'
+                'oauth.multitab.failure@example.com',
+                'oauth.unexpected.body@example.com',
+                'oauth.success.then.failure@example.com'
               )
                  or google_subject_id in (
                    'google-oauth-session-existing',
@@ -908,7 +1082,9 @@ class GoogleOAuthLoginSessionTest(
                    'google-oauth-invite-domain',
                    'google-oauth-invite-mismatch',
                    'google-oauth-multitab-success',
-                   'google-oauth-multitab-failure'
+                   'google-oauth-multitab-failure',
+                   'google-oauth-unexpected-body',
+                   'google-oauth-success-then-failure'
                  )
             );
 
@@ -948,7 +1124,9 @@ class GoogleOAuthLoginSessionTest(
                 'oauth.guest.join.dot.path@example.com',
                 'oauth.guest.join.encoded.path@example.com',
                 'oauth.multitab.success@example.com',
-                'oauth.multitab.failure@example.com'
+                'oauth.multitab.failure@example.com',
+                'oauth.unexpected.body@example.com',
+                'oauth.success.then.failure@example.com'
               )
                  or users.google_subject_id in (
                    'google-oauth-session-existing',
@@ -962,7 +1140,9 @@ class GoogleOAuthLoginSessionTest(
                    'google-oauth-invite-domain',
                    'google-oauth-invite-mismatch',
                    'google-oauth-multitab-success',
-                   'google-oauth-multitab-failure'
+                   'google-oauth-multitab-failure',
+                   'google-oauth-unexpected-body',
+                   'google-oauth-success-then-failure'
                  )
             );
 
@@ -1003,7 +1183,9 @@ class GoogleOAuthLoginSessionTest(
                 'oauth.guest.join.dot.path@example.com',
                 'oauth.guest.join.encoded.path@example.com',
                 'oauth.multitab.success@example.com',
-                'oauth.multitab.failure@example.com'
+                'oauth.multitab.failure@example.com',
+                'oauth.unexpected.body@example.com',
+                'oauth.success.then.failure@example.com'
               )
                  or google_subject_id in (
                    'google-oauth-session-existing',
@@ -1017,7 +1199,9 @@ class GoogleOAuthLoginSessionTest(
                    'google-oauth-invite-domain',
                    'google-oauth-invite-mismatch',
                    'google-oauth-multitab-success',
-                   'google-oauth-multitab-failure'
+                   'google-oauth-multitab-failure',
+                   'google-oauth-unexpected-body',
+                   'google-oauth-success-then-failure'
                  )
             );
 
@@ -1041,7 +1225,9 @@ class GoogleOAuthLoginSessionTest(
               'oauth.guest.join.dot.path@example.com',
               'oauth.guest.join.encoded.path@example.com',
               'oauth.multitab.success@example.com',
-              'oauth.multitab.failure@example.com'
+              'oauth.multitab.failure@example.com',
+              'oauth.unexpected.body@example.com',
+              'oauth.success.then.failure@example.com'
             )
                or google_subject_id in (
                  'google-oauth-session-existing',
@@ -1055,7 +1241,9 @@ class GoogleOAuthLoginSessionTest(
                  'google-oauth-invite-domain',
                  'google-oauth-invite-mismatch',
                  'google-oauth-multitab-success',
-                 'google-oauth-multitab-failure'
+                 'google-oauth-multitab-failure',
+                 'google-oauth-unexpected-body',
+                 'google-oauth-success-then-failure'
                );
         """
     }
@@ -1112,6 +1300,51 @@ class GoogleOAuthLoginSessionTest(
                 email,
             ).filterNotNull()
 
+    private fun issueSeededHostSession(): ExistingAppSession {
+        val issued =
+            authSessionService.issueSession(
+                userId = "00000000-0000-0000-0000-000000000101",
+                userAgent = "GoogleOAuthLoginSessionTest",
+                ipAddress = "127.0.0.1",
+            )
+        return ExistingAppSession(
+            rawToken = issued.rawToken,
+            cookie = Cookie(AuthSessionService.COOKIE_NAME, issued.rawToken),
+        )
+    }
+
+    private fun assertSeededHostSessionRemainsAuthenticated(cookie: Cookie) {
+        mockMvc
+            .get("/api/auth/me") {
+                cookie(cookie)
+                param("clubSlug", "reading-sai")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.authenticated") { value(true) }
+                jsonPath("$.userId") { value("00000000-0000-0000-0000-000000000101") }
+                jsonPath("$.role") { value("HOST") }
+            }
+    }
+
+    private fun assertAuthMeAnonymous(sessionCookie: Cookie? = null) {
+        mockMvc
+            .get("/api/auth/me") {
+                sessionCookie?.let { cookie(it) }
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.authenticated") { value(false) }
+            }
+    }
+
+    private fun readmatesCookieValue(response: MockHttpServletResponse): String {
+        val prefix = "${AuthSessionService.COOKIE_NAME}="
+        return response
+            .getHeaders(HttpHeaders.SET_COOKIE)
+            .first { it.startsWith(prefix) }
+            .substringAfter(prefix)
+            .substringBefore(';')
+    }
+
     private fun saveJoinFlow(
         session: MockHttpSession,
         state: String,
@@ -1154,6 +1387,15 @@ class GoogleOAuthLoginSessionTest(
     ): MockHttpServletRequest =
         oauthCallback(session, state).also {
             assertNotNull(flowRepository.removeAuthorizationRequest(it, MockHttpServletResponse()))
+        }
+
+    private fun countingCallback(
+        session: MockHttpSession,
+        state: String,
+    ): CountingMockHttpServletRequest =
+        CountingMockHttpServletRequest("GET", "/login/oauth2/code/google").apply {
+            setSession(session)
+            setParameter("state", state)
         }
 
     private fun createPlatformAdminUser(
@@ -1263,6 +1505,36 @@ class GoogleOAuthLoginSessionTest(
             where clubs.slug = 'reading-sai'
             """.trimIndent(),
         )
+    }
+}
+
+private data class ExistingAppSession(
+    val rawToken: String,
+    val cookie: Cookie,
+)
+
+private class CountingMockHttpServletRequest(
+    method: String,
+    requestUri: String,
+) : MockHttpServletRequest(method, requestUri) {
+    var sessionIdChangeCount: Int = 0
+        private set
+
+    override fun changeSessionId(): String {
+        sessionIdChangeCount += 1
+        return super.changeSessionId()
+    }
+}
+
+private class RejectingSetCookieResponse : MockHttpServletResponse() {
+    override fun addHeader(
+        name: String?,
+        value: String?,
+    ) {
+        if (name.equals(HttpHeaders.SET_COOKIE, ignoreCase = true)) {
+            throw IllegalStateException("simulated response failure")
+        }
+        super.addHeader(name, value)
     }
 }
 

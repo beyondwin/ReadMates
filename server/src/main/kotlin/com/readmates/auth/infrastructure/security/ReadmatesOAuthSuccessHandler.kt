@@ -39,15 +39,16 @@ class ReadmatesOAuthSuccessHandler(
         response: HttpServletResponse,
         authentication: Authentication,
     ) {
-        val oidcUser = authentication.principal as OidcUser
-        val context = capturedFlowContext(request)
-        val inviteToken = context.inviteToken
-        val signedReturnState = context.signedReturnState
-        val targetClubSlug =
-            context.joinClubSlug?.takeIf {
-                it == oauthReturnState.scopedAppClubSlugFromState(signedReturnState)
-            }
+        var signedReturnState: String? = null
         try {
+            val oidcUser = authentication.principal as OidcUser
+            val context = capturedFlowContext(request)
+            val inviteToken = context.inviteToken
+            signedReturnState = context.signedReturnState
+            val targetClubSlug =
+                context.joinClubSlug?.takeIf {
+                    it == oauthReturnState.scopedAppClubSlugFromState(signedReturnState)
+                }
             val login =
                 if (inviteToken != null) {
                     val acceptedMember =
@@ -90,10 +91,11 @@ class ReadmatesOAuthSuccessHandler(
                 )
 
             response.addHeader(HttpHeaders.SET_COOKIE, authSessionService.sessionCookie(issuedSession.rawToken))
-            clearServletAuthenticationState(request)
             response.sendRedirect(oauthReturnState.redirectUrl(login.returnTarget))
         } catch (exception: RuntimeException) {
             redirectDomainLoginError(request, response, exception, signedReturnState)
+        } finally {
+            clearServletAuthenticationState(request)
         }
     }
 
@@ -102,13 +104,17 @@ class ReadmatesOAuthSuccessHandler(
         response: HttpServletResponse,
         exception: AuthenticationException,
     ) {
-        val signedReturnState = capturedFlowContext(request).signedReturnState
-        redirectToLoginError(
-            request,
-            response,
-            "google",
-            oauthReturnState.loginRetryReturnTarget(signedReturnState),
-        )
+        try {
+            val signedReturnState = capturedFlowContext(request).signedReturnState
+            redirectToLoginError(
+                request,
+                response,
+                "google",
+                oauthReturnState.loginRetryReturnTarget(signedReturnState),
+            )
+        } finally {
+            clearServletAuthenticationState(request)
+        }
     }
 
     private fun redirectDomainLoginError(
@@ -140,8 +146,7 @@ class ReadmatesOAuthSuccessHandler(
         error: String,
         returnTarget: String? = null,
     ) {
-        response.addHeader(HttpHeaders.SET_COOKIE, authSessionService.clearedSessionCookie())
-        clearServletAuthenticationState(request)
+        clearStaleAppSessionCookie(request, response)
         val redirect =
             UriComponentsBuilder
                 .fromUriString("$appOrigin/login")
@@ -152,6 +157,20 @@ class ReadmatesOAuthSuccessHandler(
                 .encode()
                 .toUriString()
         response.sendRedirect(redirect)
+    }
+
+    private fun clearStaleAppSessionCookie(
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+    ) {
+        val rawToken =
+            request.cookies
+                ?.firstOrNull { it.name == AuthSessionService.COOKIE_NAME }
+                ?.value
+                ?: return
+        if (authSessionService.findValidSession(rawToken) == null) {
+            response.addHeader(HttpHeaders.SET_COOKIE, authSessionService.clearedSessionCookie())
+        }
     }
 
     private fun capturedInviteToken(request: HttpServletRequest): String? {
@@ -198,11 +217,18 @@ class ReadmatesOAuthSuccessHandler(
     }
 
     private fun clearServletAuthenticationState(request: HttpServletRequest) {
-        SecurityContextHolder.clearContext()
-        val session = request.getSession(false) ?: return
-        session.removeAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY)
-        session.removeAttribute(WebAttributes.AUTHENTICATION_EXCEPTION)
-        request.changeSessionId()
+        try {
+            OAuthFlowContextRepository.consumeContext(request)
+        } finally {
+            try {
+                SecurityContextHolder.clearContext()
+            } finally {
+                val session = request.getSession(false) ?: return
+                session.removeAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY)
+                session.removeAttribute(WebAttributes.AUTHENTICATION_EXCEPTION)
+                request.changeSessionId()
+            }
+        }
     }
 }
 
