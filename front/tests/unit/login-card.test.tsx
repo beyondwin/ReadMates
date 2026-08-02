@@ -22,16 +22,21 @@ describe("LoginRoute", () => {
     );
   });
 
-  it("shows only the Google login action outside dev login mode", () => {
+  it("offers reading-sai browse and member entry actions on bare login", () => {
     render(<LoginRoute />);
 
     expect(screen.getByText("둘러보기부터 멤버 참여까지")).toBeVisible();
     expect(screen.getByRole("heading", { name: "읽는사이 들어가기" })).toBeVisible();
     expect(screen.getByText(/로그인 없이 공개된 클럽 기록을 둘러볼 수 있습니다/)).toBeVisible();
-    expect(screen.getByRole("link", { name: "Google로 시작하기" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "둘러보기" })).toHaveAttribute(
       "href",
-      "/oauth2/authorization/google",
+      "/clubs/reading-sai/app",
     );
+    expect(screen.getByRole("link", { name: "멤버로 시작" })).toHaveAttribute(
+      "href",
+      "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp",
+    );
+    expect(screen.queryByRole("link", { name: "Google로 시작하기" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "김호스트 · 호스트" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("이메일")).toBeNull();
     expect(screen.queryByLabelText("비밀번호")).toBeNull();
@@ -52,16 +57,6 @@ describe("LoginRoute", () => {
     );
   });
 
-  it("keeps generic login unscoped and without an implicit club join", () => {
-    render(<LoginRoute />);
-
-    expect(screen.queryByRole("link", { name: "둘러보기" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Google로 시작하기" })).toHaveAttribute(
-      "href",
-      "/oauth2/authorization/google",
-    );
-  });
-
   it("ignores unsafe returnTo values on the login route", () => {
     window.history.pushState({}, "", "/login?returnTo=https%3A%2F%2Fevil.example%2Fapp");
 
@@ -77,7 +72,10 @@ describe("LoginRoute", () => {
 
     render(<LoginRoute />);
 
-    expect(screen.getByRole("link", { name: "Google로 시작하기" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "멤버로 시작" })).toHaveAttribute(
+      "href",
+      "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp",
+    );
     expect(screen.queryByText("Local development only")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "김호스트 · 호스트" })).not.toBeInTheDocument();
   });
@@ -110,15 +108,15 @@ describe("LoginRoute", () => {
     );
   });
 
-  it("offers Google OAuth in local dev mode only after the explicit public flag is enabled", () => {
+  it("offers the member entry action in local dev mode only after the explicit public flag is enabled", () => {
     vi.stubEnv("VITE_ENABLE_DEV_LOGIN", "true");
     vi.stubEnv("VITE_ENABLE_GOOGLE_LOGIN", "true");
 
     render(<LoginRoute />);
 
-    expect(screen.getByRole("link", { name: "Google로 시작하기" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "멤버로 시작" })).toHaveAttribute(
       "href",
-      "/oauth2/authorization/google",
+      "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp",
     );
     expect(screen.queryByRole("note", { name: "로컬 Google 로그인 설정 안내" })).not.toBeInTheDocument();
   });

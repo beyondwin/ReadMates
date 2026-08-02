@@ -32,7 +32,14 @@ test("public to Google fixture login to host smoke flow", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "읽는사이", level: 1 })).toBeVisible();
 
   await page.goto("/login");
-  await expect(page.getByRole("link", { name: "Google로 시작하기" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "둘러보기" })).toHaveAttribute(
+    "href",
+    "/clubs/reading-sai/app",
+  );
+  await expect(page.getByRole("link", { name: "멤버로 시작" })).toHaveAttribute(
+    "href",
+    "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp",
+  );
   await expect(page.getByLabel("비밀번호", { exact: true })).toHaveCount(0);
 
   await loginWithGoogleFixture(page, "host@example.com");
