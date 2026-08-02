@@ -5,7 +5,7 @@ import {
   useLocation,
   useRevalidator,
   useRouteError,
-} from "react-router-dom";
+} from "react-router";
 import { isReadmatesApiError } from "@/shared/api/errors";
 import { recordFrontendRuntimeError } from "@/shared/observability/frontend-observability";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Link, useLoaderData, useLocation, useParams } from "react-router-dom";
+import { Link, useLoaderData, useLocation, useParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { getSessionClosingBoardView } from "@/features/host/model/session-closing-model";
 import { hostSessionClosingStatusQuery } from "@/features/host/queries/host-session-queries";

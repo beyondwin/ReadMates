@@ -133,7 +133,7 @@ ReadMates는 기능을 설계하고 구현하는 과정에서 작성한 계획�
 
 | 영역 | 기술 |
 | --- | --- |
-| Frontend | `React 19`, `React Router 7`, `TanStack Query v5`, `TypeScript`, `Vite` |
+| Frontend | `React 19`, `React Router 8`, `TanStack Query v5`, `TypeScript`, `Vite` |
 | Design system | `@readmates/design-system`, `design/docs` static catalog |
 | Frontend tests | `Vitest`, `Testing Library`, `Playwright E2E`, `Playwright CT`, `Lighthouse` diagnostic |
 | Edge/BFF | `Cloudflare Pages Functions` |

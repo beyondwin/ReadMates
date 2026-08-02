@@ -1,4 +1,4 @@
-import { useLoaderData } from "react-router-dom";
+import { useLoaderData } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { buildPublicClubPageMetadata } from "@/features/public/model/public-page-metadata";
 import { publicClubQuery } from "@/features/public/queries/public-queries";

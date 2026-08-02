@@ -1,4 +1,4 @@
-import { Link, useLoaderData } from "react-router-dom";
+import { Link, useLoaderData } from "react-router";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { ClubSelectionPage } from "@/features/club-selection/ui/club-selection-page";
 

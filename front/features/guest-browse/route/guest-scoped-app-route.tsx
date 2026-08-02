@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useLoaderData, useLocation, useParams, useRevalidator, useSearchParams } from "react-router-dom";
+import { useLoaderData, useLocation, useParams, useRevalidator, useSearchParams } from "react-router";
 import { guestNavigationCapability } from "@/features/guest-browse/model/club-app-audience";
 import { guestLoaderSourceKey } from "@/features/guest-browse/model/guest-loader-source-key";
 import type { GuestArchiveDetail } from "@/features/guest-browse/api/guest-browse-contracts";

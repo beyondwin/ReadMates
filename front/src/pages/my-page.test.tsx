@@ -18,7 +18,7 @@ vi.mock("@/src/app/auth-state", () => ({
 vi.mock("@/shared/auth/member-app-access", () => ({
   canEditOwnProfile: auth.canEditOwnProfile,
 }));
-vi.mock("react-router-dom", () => ({
+vi.mock("react-router", () => ({
   useRouteLoaderData: (routeId: string) => routeId === "club-app" ? auth.clubAppAccess : undefined,
 }));
 vi.mock("@/features/archive/route/my-page-route", () => route);

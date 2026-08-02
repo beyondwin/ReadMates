@@ -103,11 +103,10 @@ record_process_group() {
 
 terminate_process_group() {
   local pgid="$1"
-  local attempt
 
   [[ "$pgid" =~ ^[0-9]+$ && "$pgid" -gt 1 ]] || return 0
   kill -TERM -- "-$pgid" >/dev/null 2>&1 || return 0
-  for attempt in 1 2 3 4 5; do
+  for _ in 1 2 3 4 5; do
     if ! kill -0 -- "-$pgid" >/dev/null 2>&1; then
       return 0
     fi
@@ -142,7 +141,6 @@ wait_for_http() {
   local url="$2"
   local child_pid="$3"
   local deadline
-  local now
 
   deadline=$((SECONDS + timeout_seconds))
 

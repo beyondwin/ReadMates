@@ -1,6 +1,6 @@
 import { type MouseEvent, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, Outlet, useLocation, useNavigate, useSearchParams } from "react-router";
 import {
   adminOtherAccountLoginPath,
   adminWorkspaceAccountLabel,

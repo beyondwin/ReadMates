@@ -1,4 +1,4 @@
-import { useLoaderData, useLocation, useRevalidator } from "react-router-dom";
+import { useLoaderData, useLocation, useRevalidator } from "react-router";
 import {
   buildMemberSpaceViewModel,
   buildRecentReadingPreview,

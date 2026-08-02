@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import type { HealthCard } from "@/features/platform-admin/model/platform-admin-health-model";
 
 const STATUS_LABEL: Record<HealthCard["status"], string> = {

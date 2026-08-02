@@ -4,14 +4,8 @@ import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  createMemoryRouter,
-  MemoryRouter,
-  Route,
-  RouterProvider,
-  Routes,
-  useLocation,
-  useLoaderData,
-} from "react-router-dom";
+  createMemoryRouter, MemoryRouter, Route, Routes, useLocation, useLoaderData } from "react-router";
+import { RouterProvider } from "react-router/dom";
 import { AuthProvider } from "@/src/app/auth-context";
 import { AppRouteLayout, PublicRouteLayout } from "@/src/app/layouts";
 import { ClubMemberAppRouteLayout } from "@/src/app/layouts/club-app-route-layout";

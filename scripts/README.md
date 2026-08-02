@@ -14,6 +14,17 @@ A full source checkout can provide repository-local contributor routing, preflig
 
 The clean public release candidate intentionally omits contributor-only guidance. Its shipped release helpers are self-contained and do not require a particular local agent tool.
 
+## `check-deploy-workflow-contract.py`
+
+`Deploy Server Image` workflow가 exact release semver의 annotated tag를 checkout하고, tag commit과 `HEAD`를 일치시킨 뒤, Trivy가 검사한 digest와 같은 digest만 release tag로 promote하는지 fail closed로 검사합니다. CI와 `pre-push-check.sh`, public release candidate가 같은 checker를 사용합니다.
+
+```bash
+python3 -B scripts/check-deploy-workflow-contract.py --self-test
+python3 -B scripts/check-deploy-workflow-contract.py
+```
+
+다른 candidate나 fixture의 workflow를 검사할 때만 `--workflow <path>`를 사용합니다. 이 검사는 workflow를 실행하거나 image를 publish하지 않습니다.
+
 ## `run-local-google-oauth.sh`
 
 macOS 로컬 Google OAuth credential을 Git이나 `.env`에 저장하지 않고 Keychain에서 Spring backend 프로세스로만 주입합니다. 운영 OAuth client와 분리된 localhost 전용 Web client를 사용하고, 등록과 frontend 비민감 switch 절차는 [로컬 개발 환경](../docs/development/local-setup.md#macos-keychain으로-로컬-google-oauth-실행)을 따릅니다.

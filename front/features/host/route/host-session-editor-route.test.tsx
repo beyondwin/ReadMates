@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, vi, describe, expect, it } from "vitest";
-import { createMemoryRouter, MemoryRouter, Router, RouterProvider } from "react-router-dom";
+import { createMemoryRouter, MemoryRouter, Router } from "react-router";
+import { RouterProvider } from "react-router/dom";
 import { StrictMode, useState } from "react";
 
 const routeMocks = vi.hoisted(() => ({
@@ -33,8 +34,8 @@ const routeMocks = vi.hoisted(() => ({
   capturedProps: null as Record<string, unknown> | null,
 }));
 
-vi.mock("react-router-dom", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("react-router-dom")>()),
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("react-router")>()),
   useBlocker: (predicate: typeof routeMocks.blockerPredicate) => {
     routeMocks.blockerPredicate = predicate;
     return routeMocks.blocker;

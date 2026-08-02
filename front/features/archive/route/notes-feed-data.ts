@@ -1,4 +1,4 @@
-import type { LoaderFunctionArgs } from "react-router-dom";
+import type { LoaderFunctionArgs } from "react-router";
 import { fetchNoteSessions, fetchNotesFeed } from "@/features/archive/api/archive-api";
 import type { NoteFeedPage, NoteSessionItem, NoteSessionPage } from "@/features/archive/api/archive-contracts";
 import { selectNoteSession } from "@/features/archive/model/notes-feed-model";

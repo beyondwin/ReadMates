@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import type { LoaderFunctionArgs } from "react-router-dom";
+import type { LoaderFunctionArgs } from "react-router";
 import type { HostSessionRecordLedgerPage } from "@/features/host/api/host-contracts";
 import type { HostSessionLedgerFilters } from "@/features/host/model/host-session-ledger-model";
 import { normalizeHostSessionLedgerFilters } from "@/features/host/model/host-session-ledger-model";

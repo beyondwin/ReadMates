@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import type { LoaderFunctionArgs } from "react-router-dom";
+import type { LoaderFunctionArgs } from "react-router";
 import { BASELINE_PUBLIC_CLUB_SLUG } from "@/features/public/model/public-url-policy";
 import { publicClubQuery, publicSessionQuery } from "@/features/public/queries/public-queries";
 

@@ -1,4 +1,4 @@
-import { useLoaderData } from "react-router-dom";
+import { useLoaderData } from "react-router";
 import { memberHomeReadViewFromRouteData } from "@/features/member-home/model/member-home-read-view";
 import MemberHome from "@/features/member-home/ui/member-home";
 import type { MemberHomeRouteData } from "@/features/member-home/route/member-home-data";

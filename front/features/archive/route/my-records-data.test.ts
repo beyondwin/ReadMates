@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { LoaderFunctionArgs } from "react-router-dom";
+import type { LoaderFunctionArgs } from "react-router";
 import type { MyJourneyPage } from "@/features/archive/api/archive-contracts";
 import { emptyMyJourneyPage } from "@/features/archive/model/my-reading-shelf-model";
 import { myRecordsLoader } from "./my-records-data";

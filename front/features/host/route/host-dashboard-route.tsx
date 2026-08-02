@@ -7,7 +7,7 @@
 // - locallyOpenedSessionId: KEPT (transient UX state).
 // - pendingUpcomingAction / upcomingMessage: KEPT (pure UI affordances).
 import { useMemo, useState } from "react";
-import { useLoaderData, useParams } from "react-router-dom";
+import { useLoaderData, useParams } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import HostDashboard, { type HostDashboardLinkComponent } from "@/features/host/ui/host-dashboard";
 import { ClubAiDefaultsSection } from "@/features/host/club/ui/ClubAiDefaultsSection";

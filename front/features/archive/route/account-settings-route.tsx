@@ -1,4 +1,4 @@
-import { useLoaderData } from "react-router-dom";
+import { useLoaderData } from "react-router";
 import { leaveMembership } from "@/features/archive/api/archive-api";
 import type { MyPageResponse } from "@/features/archive/api/archive-contracts";
 import { AccountSettingsPage } from "@/features/archive/ui/account-settings-page";

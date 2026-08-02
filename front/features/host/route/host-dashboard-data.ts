@@ -19,7 +19,7 @@ import type {
   HostSessionListPage,
   HostSessionRecordLedgerPage,
 } from "@/features/host/api/host-contracts";
-import type { LoaderFunctionArgs } from "react-router-dom";
+import type { LoaderFunctionArgs } from "react-router";
 import { requireHostLoaderAuth } from "./host-loader-auth";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 

@@ -222,6 +222,7 @@ if [[ -f "AGENTS.md" || -f "scripts/check-agent-guidance.py" ]]; then
 else
   printf '\n==> Agent guidance contract skipped (public candidate excludes private guidance)\n'
 fi
+run_step "Deploy workflow contract" python3 -B scripts/check-deploy-workflow-contract.py
 run_step "Activate repo package manager" activate_repo_pnpm
 run_step "Git whitespace check" check_whitespace
 run_step "Frontend lint" "${pnpm_cmd[@]}" --dir front lint

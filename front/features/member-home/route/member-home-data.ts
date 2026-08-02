@@ -8,7 +8,7 @@ import type {
   MemberHomeNoteFeedItemView,
   MemberHomeUpcomingSessionView,
 } from "@/features/member-home/model/member-home-view-model";
-import type { LoaderFunctionArgs } from "react-router-dom";
+import type { LoaderFunctionArgs } from "react-router";
 import { clubSlugFromLoaderArgs, loadMemberAppAuth } from "@/shared/auth/member-app-loader";
 
 const MEMBER_HOME_NOTE_FEED_LIMIT = 60;

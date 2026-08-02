@@ -51,11 +51,11 @@ feature가 늘어나면서 다음 문제가 명확히 드러났다:
 
 어떤 화면은 route loader에서, 어떤 화면은 component `useEffect`에서, 어떤 화면은 custom hook에서 API를 호출했다. 일관성이 없어 caching, error handling, loading state 처리 방식이 화면마다 달랐다.
 
-### React Router 7 도입과의 연계
+### React Router data router 도입과의 연계
 
-React Router 7을 도입하면서 route module 개념이 강화됐다. `loader`, `action`, `Component`를 하나의 route 파일에서 export하는 구조가 "이 route는 어떤 데이터를 필요로 하고, 어떤 mutation을 처리하는가"를 단일 파일에서 파악할 수 있게 한다.
+React Router data router를 도입하면서 route module 개념이 강화됐다. `loader`, `action`, `Component`를 하나의 route 파일에서 export하는 구조가 "이 route는 어떤 데이터를 필요로 하고, 어떤 mutation을 처리하는가"를 단일 파일에서 파악할 수 있게 한다.
 
-이 결정은 React Router 7 도입과 함께 내려진 frontend 전면 재구조화다.
+이 결정은 React Router data router 도입과 함께 내려진 frontend 전면 재구조화다.
 
 ## 결정
 
@@ -142,11 +142,11 @@ front/shared/       — api/, auth/, config/, ui/, model/, security/, routing/
 
 | 대안 | 기각 이유 |
 |------|----------|
-| Feature-Sliced Design (FSD) 그대로 도입 | FSD는 `entities/`, `widgets/`, `processes/` 같은 추가 레이어를 정의한다. ReadMates의 규모에서는 레이어가 너무 많다. React Router 7의 route module 개념과 FSD의 경계가 겹쳐 혼동을 줄 수 있다. FSD는 Next.js 기반 프로젝트에서 더 자연스럽다. |
+| Feature-Sliced Design (FSD) 그대로 도입 | FSD는 `entities/`, `widgets/`, `processes/` 같은 추가 레이어를 정의한다. ReadMates의 규모에서는 레이어가 너무 많다. React Router의 route module 개념과 FSD의 경계가 겹쳐 혼동을 줄 수 있다. FSD는 Next.js 기반 프로젝트에서 더 자연스럽다. |
 | 기존 기술 레이어 유지 (components/hooks/utils) | 이미 cross-import 문제가 드러났다. feature가 늘수록 악화된다. 근본 원인(레이어 간 결합)을 해결하지 않는다. |
 | Atomic Design (atoms/molecules/organisms/templates/pages) | UI 계층화에 특화된 패턴이다. 데이터 fetching, 권한 처리, routing 같은 non-UI 코드의 위치를 결정하지 않는다. ReadMates의 핵심 복잡도(권한, 멤버십, 세션 상태)를 처리하기에 부족한 절반의 해결책이다. |
 | 도메인 레이어 없이 route-level 코드만 | route 파일이 api 호출 + model 변환 + UI 정의를 모두 담으면 파일이 커진다. 여러 route에서 공유하는 model/api 코드의 위치가 모호해진다. |
-| Remix / TanStack Start로 전환 | 전면 프레임워크 교체다. 현재 React Router 7 마이그레이션이 진행 중인 상황에서 추가 교체는 너무 큰 비용이다. |
+| Remix / TanStack Start로 전환 | 전면 프레임워크 교체다. 현재 route-first/data-router 구조 위에 추가 프레임워크 전환을 겹치는 것은 비용이 너무 크다. |
 
 ## 결과
 
@@ -157,7 +157,7 @@ front/shared/       — api/, auth/, config/, ui/, model/, security/, routing/
 - `frontend-boundaries.test.ts`가 CI에서 import 방향을 강제한다.
 - presentational component(`ui/`)가 API 호출을 직접 하지 않으므로 UI 단위 테스트에서 실제 API mock이 불필요하다.
 - feature 별 Zod schema(`api/`)가 feature 경계 안에 있어 schema 변경 영향 범위가 명확하다.
-- React Router 7의 route module pattern(loader/action/component/ErrorBoundary/HydrateFallback export)이 feature 아키텍처와 자연스럽게 일치한다. route file이 feature의 진입점이자 data contract가 된다.
+- React Router의 route module pattern(loader/action/component/ErrorBoundary/HydrateFallback export)이 feature 아키텍처와 자연스럽게 일치한다. route file이 feature의 진입점이자 data contract가 된다.
 - `shared/` 경계가 명확해 cross-cutting utility(인증 상태, API client, URL helper)가 feature로 누수되지 않는다.
 
 부정적/감수한 비용:
@@ -195,13 +195,13 @@ pnpm --dir front test
 - feature 코드 분할 전략: 각 feature의 route module은 lazy load 대상이다. feature 번들 크기 모니터링 기준과 code splitting 설정 문서화.
 - `shared/` 패키지 성장 기준: 두 개 이상의 feature가 같은 코드를 사용할 때 `shared/`로 올리는 게 맞는가, 아니면 각 feature에 복사본을 두는 게 맞는가를 판단하는 기준 명문화.
 - TypeScript strict mode 경계 강화: 현재 `strict: true`가 전체 frontend에 적용되어 있으나, feature별로 추가 lint rule(import direction, 순환 의존 감지)을 eslint-plugin-import로 강제하는 방안 검토.
-- Suspense + Error boundary 패턴 표준화: React Router 7의 loader를 사용할 때 loading state와 error state가 feature마다 다르게 처리된다. feature route module의 `HydrateFallback`, `ErrorBoundary` export 표준 구현 가이드 필요.
+- Suspense + Error boundary 패턴 표준화: React Router loader를 사용할 때 loading state와 error state가 feature마다 다르게 처리된다. feature route module의 `HydrateFallback`, `ErrorBoundary` export 표준 구현 가이드 필요.
 - feature 내 상태 관리 패턴 결정: URL state(React Router search params), URL-independent local state(useState), server state(loader data) 각각의 사용 기준을 명문화. 현재 암묵적 관례로만 유지.
 - feature 별 Zod schema와 `FrontendZodSchemaContractTest` 커버리지 확대 (ADR-0009 연계).
-- optimistic UI 패턴 표준화: React Router 7 action/fetcher API를 사용한 optimistic update가 어느 feature에 적용되었는지 목록화하고, 실패 시 rollback 패턴을 feature 간에 통일.
+- optimistic UI 패턴 표준화: React Router action/fetcher API를 사용한 optimistic update가 어느 feature에 적용되었는지 목록화하고, 실패 시 rollback 패턴을 feature 간에 통일.
 - `frontend-boundaries.test.ts` 커버리지 확장: 현재 `shared`/`features` 간 import 방향과 feature 내부 `model`/`queries`/`ui`/`route` 경계를 검증한다. route TSX render-only 예외를 더 줄이고, legacy host query/UI 예외를 제거하는 후속 migration이 필요하다.
 - feature 단위 번들 크기 모니터링: 각 feature route module의 chunk 크기를 빌드 산출물에서 추적해 의도치 않은 bundle bloat를 조기 발견하는 CI check 추가 검토.
 - shared/auth 세션 상태 갱신 전략: 멤버십 상태가 서버에서 변경된 경우 프런트엔드의 `shared/auth` 캐시된 세션 상태가 stale 될 수 있다. polling 또는 server-sent event로 갱신하는 패턴 결정 필요.
 - accessibility 표준화: feature 별 UI 컴포넌트가 WCAG 기준을 따르는지 검증. feature 아키텍처에서 `ui/` 컴포넌트가 독립적이어서 accessibility 테스트 대상이 명확하다.
 - storybook 도입 검토: `features/<name>/ui/` 내 presentational component가 pure props 기반이어서 story 작성에 적합하다. feature별 UI 문서화 및 시각적 회귀 테스트 방안으로 검토 가능.
-- `features/<name>/route/` 파일의 loader 캐시 전략: React Router 7의 clientLoader와 serverLoader 분리 패턴이 도입되면, 각 feature에서 data freshness 정책(stale-while-revalidate, no-cache)을 명시하는 기준 문서화 필요.
+- `features/<name>/route/` 파일의 loader 캐시 전략: React Router의 clientLoader와 serverLoader 분리 패턴이 도입되면, 각 feature에서 data freshness 정책(stale-while-revalidate, no-cache)을 명시하는 기준 문서화 필요.

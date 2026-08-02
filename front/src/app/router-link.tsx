@@ -4,7 +4,7 @@ import {
   useInRouterContext,
   useLocation,
   type LinkProps as RouterLinkProps,
-} from "react-router-dom";
+} from "react-router";
 import { rememberReadmatesListScroll, resetReadmatesNavigationScroll } from "@/src/app/route-continuity";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router";
 import { logout } from "@/features/auth/api/auth-api";
 import { SessionExpiryRecovery } from "@/features/auth/ui/session-expiry-recovery";
 import { usableJoinedClubs } from "@/features/club-selection/model/club-entry";

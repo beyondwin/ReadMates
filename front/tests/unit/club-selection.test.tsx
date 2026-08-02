@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { Link, MemoryRouter } from "react-router-dom";
+import { Link, MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 import { recommendedClubEntryUrl } from "@/features/club-selection/model/club-entry";
 import { ClubSelectionPage } from "@/features/club-selection/ui/club-selection-page";

@@ -45,7 +45,7 @@ MySQL과 Flyway가 durable source of truth입니다. Redis는 기본 off인 보�
 
 ## 프론트엔드
 
-ReadMates 프론트엔드는 Next.js가 아니라 `React 19 + TypeScript + Vite + React Router 7` SPA입니다. 서버 렌더링이나 React Server Component 구조가 아니므로 `"use client"` 같은 Next/React Server Component 지시어를 추가하지 않습니다.
+ReadMates 프론트엔드는 Next.js가 아니라 `React 19 + TypeScript + Vite + React Router 8` SPA입니다. 서버 렌더링이나 React Server Component 구조가 아니므로 `"use client"` 같은 Next/React Server Component 지시어를 추가하지 않습니다.
 
 핵심 책임은 route-first 구조입니다.
 
@@ -275,7 +275,7 @@ host transcript upload
 | 기술 | 선택 이유 | 감수하는 점 |
 | --- | --- | --- |
 | React/Vite SPA | 정적 배포와 Cloudflare Pages에 단순하게 맞고, route-first 구조로 멤버/호스트/admin 화면을 명확히 나눌 수 있습니다. | Next.js SSR/RSC 이점은 쓰지 않습니다. SEO나 server rendering 요구가 생기면 별도 결정이 필요합니다. |
-| React Router 7 | loader/action과 route module로 화면의 데이터 요구사항을 route 근처에 둘 수 있습니다. | route, model, UI 경계를 지키지 않으면 route 파일이 비대해질 수 있습니다. |
+| React Router 8 | loader/action과 route module로 화면의 데이터 요구사항을 route 근처에 둘 수 있습니다. | route, model, UI 경계를 지키지 않으면 route 파일이 비대해질 수 있습니다. |
 | TanStack Query | server state cache, invalidation, polling을 feature별 query key로 관리할 수 있습니다. | mutation 후 invalidation 정책을 빠뜨리면 오래된 화면이 남습니다. |
 | Cloudflare Pages Functions BFF | same-origin API/OAuth proxy, trusted header 조립, secret 보호를 edge에서 통제합니다. | BFF helper 회귀가 모든 API 호출에 영향을 주므로 단위 테스트와 smoke가 중요합니다. |
 | Kotlin/Spring Boot | Spring Security, OAuth, JDBC, Kafka, validation, actuator 같은 서버 기능을 안정적으로 묶습니다. | layer 경계를 두지 않으면 controller/service가 쉽게 비대해집니다. |

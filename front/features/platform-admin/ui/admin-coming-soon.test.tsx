@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 import type { AdminRouteDescriptor } from "@/features/platform-admin/model/admin-route-catalog";
 import { AdminComingSoon } from "./admin-coming-soon";

@@ -1,4 +1,4 @@
-import { useLoaderData, useLocation } from "react-router-dom";
+import { useLoaderData, useLocation } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   PUBLIC_MISSING_SESSION_METADATA,

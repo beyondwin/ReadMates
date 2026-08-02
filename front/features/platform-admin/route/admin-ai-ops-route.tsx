@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router";
 import { PlatformAdminAiOps } from "@/features/platform-admin/ui/platform-admin-ai-ops";
 import {
   platformAdminAiOpsJobsQuery,

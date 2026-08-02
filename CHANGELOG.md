@@ -17,6 +17,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Fixed
 
+- **릴리즈 전 CI·의존성 보안 하드닝:** 로컬 Google OAuth stack fixture의 ShellCheck 경고를 제거해 Scripts CI blocker를 닫고, frontend를 React Router `8.3.0`의 `react-router`/`react-router/dom` package split으로 전환했습니다. Workspace override는 `brace-expansion 5.0.8`, `postcss 8.5.25` 이상을 강제하며 active source/test/config가 제거된 `react-router-dom` wrapper를 다시 참조하지 못하도록 architecture test를 추가했습니다.
 - 호스트 모바일 대시보드의 현재 세션 여백과 3열 운영 수치를 복구하고, 처리 항목·예정 세션 행동을 더 명확한 단일 primary action 흐름으로 정돈했습니다.
 - **Google 로그인 복구:** 종료된 멤버십 또는 Google 인증 실패 뒤에는 다른 Google 계정을 명시적으로 선택해 다시 로그인할 수 있습니다. 카카오톡 인앱 브라우저에서는 외부 브라우저 안내와 로그인 주소 복사를 제공하며, 안전한 멤버 복귀 경로와 기존 OAuth·세션 보안 경계는 유지합니다. 로컬 dev-login은 명시적으로 활성화된 Google OAuth 설정이 없으면 깨진 provider 링크를 노출하지 않고, macOS Keychain의 localhost 전용 credential을 backend에만 주입하는 공개 저장소 안전 실행 경로를 제공합니다.
 One-command local OAuth stack + redacted smoke verifier로 기존 서비스 보존 상태에서 localhost 기반 Google login 회귀 점검을 반복 가능하게 했습니다.
@@ -30,6 +31,7 @@ One-command local OAuth stack + redacted smoke verifier로 기존 서비스 보�
 
 ### Deployment Notes
 
+- `Deploy Server Image`는 push와 manual dispatch 모두 exact `vMAJOR.MINOR.PATCH` annotated tag를 checkout하고 tag commit과 `HEAD`가 일치해야 build를 시작합니다. Trivy가 검사한 digest와 같은 digest만 release tag로 promote하며, repository checker가 CI·pre-push·public release candidate에서 이 계약을 fail closed로 검증합니다. 이 source 변경 자체는 workflow dispatch, image publish, OCI/Cloudflare 배포를 실행하지 않습니다.
 - 배포 전 최근 DB backup과 backend readiness 기준을 확인합니다. V43과 V44는 수정하지 않으며, forward-only V46이 모든 기존 membership의 avatar key를 30-key 집합으로 한 번 다시 쓰고 named check constraint를 새 집합으로 교체합니다.
 - 같은 release tag의 새 backend를 먼저 배포해 Flyway V45 guest exposure와 V46 avatar catalog, backend health가 모두 정상임을 확인한 뒤에만 새 frontend를 배포합니다. `PUT /api/me/profile`은 현재 club membership의 표시 이름과 avatar key를 한 transaction에서 교체하며, `PATCH /api/me/profile`과 `PATCH /api/me/avatar`는 cached old client를 위한 제한된 호환성 window로 남습니다. Cached old client가 제거된 key를 보내면 `AVATAR_KEY_INVALID`를 받을 수 있습니다.
 - 배포 후에는 현재 club의 atomic profile 변경과 `/api/app/me`·`/api/auth/me` 재조회, 다른 club 격리, 허용된 public author avatar 표시를 smoke하고 권한과 `LEFT`/anonymous masking이 유지되는지 확인합니다. 실제 member data나 private identifier는 공개 release evidence에 기록하지 않습니다. Production deployment는 이 구현 범위에 포함되지 않습니다.

@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { useInRouterContext, useLocation } from "react-router-dom";
+import { useInRouterContext, useLocation } from "react-router";
 
 export type ReadmatesLoadingVariant = "public" | "member" | "host" | "auth";
 

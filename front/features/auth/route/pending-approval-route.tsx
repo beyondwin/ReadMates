@@ -1,4 +1,4 @@
-import { Navigate } from "react-router-dom";
+import { Navigate } from "react-router";
 import type { AuthMeResponse } from "@/features/auth/api/auth-contracts";
 import { AuthRouteLoading } from "@/features/auth/ui/auth-route-loading";
 import { PendingApprovalPage } from "@/features/auth/ui/pending-approval-page";

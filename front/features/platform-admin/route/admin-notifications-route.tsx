@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router";
 import { platformAdminSummaryQuery } from "@/features/platform-admin/queries/platform-admin-queries";
 import {
   platformAdminNotificationDeliveriesQuery,

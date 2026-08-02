@@ -298,12 +298,14 @@ fi
 
 for required_workspace_file in \
   ".node-version" \
+  ".github/workflows/deploy-server.yml" \
   "package.json" \
   "pnpm-lock.yaml" \
   "pnpm-workspace.yaml" \
   "front/package.json" \
   "design/system/package.json" \
   "design/docs/package.json" \
+  "scripts/check-deploy-workflow-contract.py" \
   "scripts/fixtures/public-release-candidate-coverage.txt"
 do
   if [[ ! -f "$candidate_dir/$required_workspace_file" ]]; then

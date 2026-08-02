@@ -4,7 +4,7 @@ import {
   useInRouterContext,
   useLocation,
   type LinkProps as RouterLinkProps,
-} from "react-router-dom";
+} from "react-router";
 import { rememberReadmatesPublicRecordsScroll } from "@/features/public/ui/public-route-continuity";
 
 type PublicLinkProps = RouterLinkProps & {

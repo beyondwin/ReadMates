@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useInRouterContext, useLocation } from "react-router-dom";
+import { useInRouterContext, useLocation } from "react-router";
 import type {
   CurrentSessionResponse,
   HostDashboardResponse,
