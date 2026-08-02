@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/experimental-ct-react";
 import type { NoteFeedItem, NoteSessionItem } from "@/features/archive/model/notes-feed-model";
-import { FeedSections } from "./notes-feed-list";
+import { FeedSections } from "@/shared/ui/notes-feed-list";
 
 const selectedSession: NoteSessionItem = {
   sessionId: "session-notes-typography",
