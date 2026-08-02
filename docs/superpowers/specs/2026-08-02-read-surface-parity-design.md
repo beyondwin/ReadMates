@@ -1,7 +1,7 @@
 # ReadMates 둘러보기·정식 멤버 읽기 화면 통합 설계
 
 작성일: 2026-08-02
-상태: DESIGN APPROVED — WRITTEN SPEC AWAITING USER REVIEW
+상태: APPROVED — IMPLEMENTATION PLAN READY
 대상 표면: frontend route, view model, UI, responsive navigation, authorization presentation
 
 ## 1. 요약
