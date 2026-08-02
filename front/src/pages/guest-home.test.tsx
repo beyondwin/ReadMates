@@ -22,6 +22,34 @@ afterEach(() => {
 });
 
 describe("guest member-home composition", () => {
+  it("maps the public About shortcut outside the scoped app namespace", () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={client}>
+        <GuestHomeRoute
+          initialData={{
+            current: { currentSession: null },
+            upcoming: { items: [], nextCursor: null },
+            recentNotes: { items: [], nextCursor: null },
+            capabilities: { canWrite: false },
+          }}
+          clubSlug="alpha"
+          appBasePath="/clubs/alpha/app"
+          returnTo="/clubs/alpha/app"
+          LinkComponent={LinkComponent}
+          GuestHomeContent={GuestHomeContent}
+        />
+      </QueryClientProvider>,
+    );
+
+    const aboutLinks = screen.getAllByRole("link", { name: /안내문/ });
+    expect(aboutLinks.length).toBeGreaterThan(0);
+    aboutLinks.forEach((link) => {
+      expect(link).toHaveAttribute("href", "/clubs/alpha/about");
+    });
+  });
+
   it("keeps successful widgets, leaves a failed retry recoverable, then updates only the retried widget", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn()

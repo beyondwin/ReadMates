@@ -12,9 +12,15 @@ export function GuestHomeContent({
   LinkComponent,
   onRetry,
 }: GuestHomeContentProps) {
-  const GuestMemberHomeLink: MemberHomeLinkComponent = ({ to, ...props }) => (
-    <LinkComponent {...props} to={`${appBasePath}${to.replace(/^\/app/, "")}`} />
-  );
+  const GuestMemberHomeLink: MemberHomeLinkComponent = ({ to, ...props }) => {
+    const scopedTo = to === "/about"
+      ? `${appBasePath.replace(/\/app$/, "")}/about`
+      : to === "/app" || to.startsWith("/app/")
+        ? `${appBasePath}${to.replace(/^\/app/, "")}`
+        : to;
+
+    return <LinkComponent {...props} to={scopedTo} />;
+  };
   const current: GuestMemberHomeReadSource["current"] = {
     currentSession: data.current.currentSession
       ? { ...data.current.currentSession, bookLink: null }
