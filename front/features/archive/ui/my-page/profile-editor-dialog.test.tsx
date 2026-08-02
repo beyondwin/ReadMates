@@ -23,6 +23,17 @@ function renderEditor(overrides: Partial<React.ComponentProps<typeof ProfileEdit
   return { opener, onClose, onSaveProfile };
 }
 
+function mockDesktopFocusGeometry() {
+  const dialog = screen.getByRole("dialog");
+  const mobileBack = screen.getByRole("button", { name: "프로필 편집 뒤로" });
+  for (const control of dialog.querySelectorAll<HTMLElement>("button, input")) {
+    Object.defineProperty(control, "getClientRects", {
+      configurable: true,
+      value: () => control === mobileBack ? [] : [{ width: 44, height: 44 }],
+    });
+  }
+}
+
 describe("ProfileEditorDialog", () => {
   it("focuses the name input initially even when mobile-back is CSS-hidden", () => {
     renderEditor();
@@ -168,5 +179,24 @@ describe("ProfileEditorDialog", () => {
     outsider.focus();
     fireEvent.keyDown(document, { key: "Tab" });
     expect(screen.getByRole("button", { name: "계속 편집" })).toHaveFocus();
+  });
+
+  it("recovers profile-step focus to the first visible desktop control", () => {
+    renderEditor();
+    mockDesktopFocusGeometry();
+    const outsider = document.createElement("button");
+    document.body.append(outsider);
+    outsider.focus();
+    fireEvent.keyDown(document, { key: "Tab" });
+    expect(screen.getByRole("button", { name: "프로필 편집 닫기" })).toHaveFocus();
+  });
+
+  it("wraps Shift+Tab from the first visible desktop control without targeting mobile-back", () => {
+    renderEditor();
+    mockDesktopFocusGeometry();
+    screen.getByRole("button", { name: "프로필 편집 닫기" }).focus();
+    fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
+    expect(screen.getByRole("button", { name: "변경사항 저장" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "프로필 편집 뒤로" })).not.toHaveFocus();
   });
 });

@@ -67,11 +67,30 @@ export function ProfileEditorDialog({
       ?.focus();
   }
 
+  function getFocusableControls(dialog: HTMLElement) {
+    const candidates = Array.from(
+      dialog.querySelectorAll<HTMLElement>(focusableSelector),
+    ).filter((element) => {
+      const style = getComputedStyle(element);
+      return !element.hidden
+        && element.getAttribute("aria-hidden") !== "true"
+        && !element.closest('[aria-hidden="true"]')
+        && style.display !== "none"
+        && style.visibility !== "hidden";
+    });
+    const layoutIsAvailable = candidates.some(
+      (element) => element.getClientRects().length > 0,
+    );
+    return layoutIsAvailable
+      ? candidates.filter((element) => element.getClientRects().length > 0)
+      : candidates;
+  }
+
   function containTabFocus(event: Pick<globalThis.KeyboardEvent, "key" | "shiftKey" | "preventDefault">) {
     if (event.key !== "Tab") return;
     const dialog = dialogRef.current;
     if (!dialog) return;
-    const controls = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelector));
+    const controls = getFocusableControls(dialog);
     const first = controls[0];
     const last = controls.at(-1);
     if (!first || !last) return;

@@ -69,3 +69,12 @@ It reported eight pre-existing `side-tab` warnings in unrelated legacy sections 
 - GREEN evidence: focused suite passes 5 files / 30 tests; full frontend ESLint and Vite production build pass.
 - Component tests compiled all seven cases, then remained sandbox-blocked by `listen EPERM: operation not permitted ::1:3100`; 7 did not run.
 - Detector was not rerun because this correction changed focus mechanics only and the bounded detector pass had already completed.
+
+## Review fix round 3
+
+- Focus-trap candidates now exclude hidden and `aria-hidden` controls, computed `display:none` / `visibility:hidden`, and zero-rectangle controls whenever layout geometry is available.
+- Added desktop-like geometry tests proving outside recovery targets the first visible close control and Shift+Tab wraps from it to save without focusing the hidden mobile-back.
+- RED evidence: both new desktop focus tests failed by targeting or retaining focus around the hidden mobile-back.
+- GREEN evidence: focused suite passes 5 files / 32 tests; full frontend ESLint and Vite production build pass.
+- Component tests compiled all seven cases, then remained sandbox-blocked by `listen EPERM: operation not permitted ::1:3100`; 7 did not run.
+- Detector was not rerun because this was a bounded focus-candidate correction with no new visual direction.
