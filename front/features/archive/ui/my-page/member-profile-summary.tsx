@@ -15,13 +15,13 @@ export function MemberProfileSummary({ profile, viewModel, canEditProfile, onSav
   const avatarLabel = bookClubAvatarLabel(avatarKey);
   return (
     <section className="rm-member-profile" aria-labelledby="member-profile-name">
-      <AvatarChip className="rm-member-profile__avatar" avatarKey={avatarKey} label="" name={profile.displayName} sizeRole="profile" />
+      <figure className="rm-member-profile__avatar-figure">
+        <AvatarChip className="rm-member-profile__avatar" avatarKey={avatarKey} label="" name={profile.displayName} sizeRole="profile" />
+        <figcaption className="rm-member-profile__avatar-name">{avatarLabel}</figcaption>
+      </figure>
       <div className="rm-member-profile__identity">
         <h1 id="member-profile-name">{profile.displayName}</h1>
         <p className="rm-member-profile__meta">{viewModel.profileMetaLabel}</p>
-        <p className="rm-member-profile__avatar-name">
-          나의 아바타 · {avatarLabel}
-        </p>
       </div>
       {canEditProfile ? <div className="rm-member-profile__actions"><button type="button" className="button button--secondary rm-member-profile__edit" onClick={(event) => { setOpener(event.currentTarget); setEditing(true); }}>프로필 편집</button></div> : null}
       {editing ? <ProfileEditorDialog profile={{ displayName: profile.displayName, avatarKey }} opener={opener} onClose={() => setEditing(false)} onSaveProfile={onSaveProfile} /> : null}

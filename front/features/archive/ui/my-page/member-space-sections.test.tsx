@@ -29,13 +29,15 @@ describe("MemberProfileSummary", () => {
     const { container } = render(<MemberProfileSummary profile={profile} viewModel={viewModel} canEditProfile onSaveProfile={vi.fn()} />);
     const section = screen.getByRole("region", { name: profile.displayName });
     expect(within(section).getAllByRole("heading", { level: 1, name: profile.displayName })).toHaveLength(1);
-    const artwork = container.querySelector(".rm-member-profile__avatar.rm-avatar-chip--artwork");
+    const figure = container.querySelector(".rm-member-profile__avatar-figure");
+    const artwork = figure?.querySelector(".rm-member-profile__avatar.rm-avatar-chip--artwork");
     expect(artwork).toHaveClass("rm-avatar-chip");
     expect(artwork).toHaveAttribute("data-avatar-size-role", "profile");
     expect(artwork?.querySelector("img")).toHaveAttribute("alt", "");
     expect(artwork?.querySelector("img")).toHaveAttribute("aria-hidden", "true");
     expect(within(section).getByText(viewModel.profileMetaLabel)).toBeVisible();
-    expect(within(section).getByText("나의 아바타 · 한 장 더 읽는 바나나")).toBeVisible();
+    expect(figure?.querySelector("figcaption")).toHaveTextContent("한 장 더 읽는 바나나");
+    expect(section).not.toHaveTextContent("나의 아바타 ·");
     expect(within(section).getAllByRole("button", { name: "프로필 편집" })).toHaveLength(1);
     expect(within(section).queryByRole("button", { name: "이름 변경" })).toBeNull();
     expect(within(section).queryByRole("button", { name: "아바타 바꾸기" })).toBeNull();
@@ -43,7 +45,8 @@ describe("MemberProfileSummary", () => {
 
   it("omits the action container when membership cannot edit", () => {
     const { container } = render(<MemberProfileSummary profile={profile} viewModel={viewModel} canEditProfile={false} onSaveProfile={vi.fn()} />);
-    expect(screen.getByText("나의 아바타 · 한 장 더 읽는 바나나")).toBeVisible();
+    expect(container.querySelector("figcaption")).toHaveTextContent("한 장 더 읽는 바나나");
+    expect(screen.queryByText(/나의 아바타 ·/)).toBeNull();
     expect(screen.queryByRole("button", { name: "프로필 편집" })).toBeNull();
     expect(container.querySelector(".rm-member-profile__actions")).toBeNull();
   });

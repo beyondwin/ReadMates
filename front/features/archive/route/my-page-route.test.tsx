@@ -126,7 +126,11 @@ describe("MyPageRoute", () => {
       "/assets/avatars/book-club/cloud-green-book.webp",
     );
     expect(avatar).toHaveAttribute("aria-hidden", "true");
-    expect(screen.getByText("9번의 모임에서 7권을 끝까지 읽었어요.")).toBeVisible();
+    expect(screen.getByText("읽고, 묻고, 기록해 온 시간")).toBeVisible();
+    expect(screen.getByRole("link", { name: "기록 보기" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/archive?view=sessions",
+    );
     expect(screen.queryByRole("link", { name: "계정 관리" })).toBeNull();
     expect(screen.getByRole("link", {
       name: "전체 보기",

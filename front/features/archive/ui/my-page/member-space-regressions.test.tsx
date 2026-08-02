@@ -26,7 +26,7 @@ const save = vi.fn(async (editable) => ({ ...editable, accountName: profile.acco
 
 describe("member-space unaffected presentation", () => {
   it("places the profile before achievements inside the overview", () => {
-    const { container } = render(<MemberSpaceOverview><MemberProfileSummary profile={profile} viewModel={viewModel} canEditProfile onSaveProfile={save} /><ReadingAchievementSummary viewModel={viewModel} /></MemberSpaceOverview>);
+    const { container } = render(<MemberSpaceOverview><MemberProfileSummary profile={profile} viewModel={viewModel} canEditProfile onSaveProfile={save} /><ReadingAchievementSummary viewModel={viewModel} archiveSessionsHref="/app/archive?view=sessions" /></MemberSpaceOverview>);
     const overview = container.querySelector(".rm-member-space__overview")!;
     const profileSection = within(overview).getByRole("region", { name: "멤버1" });
     const achievement = within(overview).getByRole("region", { name: viewModel.achievementHeading });
@@ -46,12 +46,26 @@ describe("member-space unaffected presentation", () => {
     expect(screen.getByText("테스트 저자")).toBeVisible();
   });
 
-  it("presents cumulative achievements as ordered definition-list metrics only", () => {
-    const { container } = render(<ReadingAchievementSummary viewModel={viewModel} />);
+  it("presents cumulative stats and non-interactive record traces with one archive link", () => {
+    const { container } = render(<ReadingAchievementSummary viewModel={viewModel} archiveSessionsHref="/app/archive?view=sessions" />);
     const section = screen.getByRole("region", { name: viewModel.achievementHeading });
-    expect(Array.from(section.querySelectorAll("dt"), (item) => item.textContent)).toEqual(["함께한 모임", "완독", "질문", "서평"]);
-    expect(Array.from(section.querySelectorAll("dd"), (item) => item.textContent)).toEqual(["7", "3", "5", "2"]);
-    expect(container.querySelectorAll("ol, ul, [role='img'], svg")).toHaveLength(0);
-    expect(within(section).queryByText("멤버십 시작")).toBeNull();
+    const heading = within(section).getByRole("heading", { level: 2, name: viewModel.achievementHeading });
+    const recordsLink = within(section).getByRole("link", { name: "기록 보기" });
+    const journeyStats = Array.from(section.querySelectorAll<HTMLElement>(".rm-reading-achievement__stat"));
+    const recordTraces = Array.from(section.querySelectorAll<HTMLElement>(".rm-reading-achievement__trace"));
+
+    expect(recordsLink).toHaveAttribute("href", "/app/archive?view=sessions");
+    expect(within(section).getAllByRole("link")).toHaveLength(1);
+    expect(within(section).getByText("책에서 시작된 생각의 기록")).toBeVisible();
+    expect(within(section).getByText("읽고 난 마음을 풀어낸 기록")).toBeVisible();
+    for (const value of ["7", "3", "5", "0"]) {
+      expect(within(section).getAllByText(value, { exact: true })).toHaveLength(1);
+    }
+    expect(within(section).queryByText(/완독률/)).toBeNull();
+    expect(Array.from(section.querySelectorAll(".rm-reading-achievement__stat-label"), (item) => item.textContent)).toEqual(["함께한 모임", "함께 완독한 책"]);
+    expect(container.querySelectorAll(".rm-reading-achievement__trace a, .rm-reading-achievement__trace button")).toHaveLength(0);
+    expect([heading, ...journeyStats, recordsLink, ...recordTraces].every((item, index, items) => (
+      index === 0 || Boolean(items[index - 1].compareDocumentPosition(item) & Node.DOCUMENT_POSITION_FOLLOWING)
+    ))).toBe(true);
   });
 });
