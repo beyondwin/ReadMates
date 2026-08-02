@@ -211,6 +211,7 @@ describe("MemberSessionDetailPage", () => {
       "src",
       "/assets/avatars/book-club/cloud-green-book.webp",
     );
+    expect((desktopHighlightRow as HTMLElement).querySelector(".rm-avatar-chip")).toHaveClass("rm-avatar-chip--artwork");
     expect(desktop.getByRole("heading", { name: "한줄평 · 1" })).toBeInTheDocument();
     expect(desktop.getByRole("heading", { name: "함께 남긴 질문" })).toBeInTheDocument();
     expect(desktop.getByText("Q1 · 이멤버5")).toHaveStyle({ color: "var(--text-3)" });

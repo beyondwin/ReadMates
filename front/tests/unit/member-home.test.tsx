@@ -797,7 +797,7 @@ describe("MemberHome", () => {
     const attendingChip = screen.getByTitle("수 · 참석");
     const pendingChip = screen.getByTitle("멤버3 · 미응답");
 
-    expect(attendingChip).toHaveAttribute("data-rsvp-status", "GOING");
+    expect(attendingChip).not.toHaveAttribute("data-rsvp-status");
     expect(attendingChip.querySelector("img")).toHaveAttribute("src", "/assets/avatars/book-club/banana-green-book.webp");
     expect(pendingChip.querySelector("img")).toHaveAttribute("src", "/assets/avatars/book-club/cloud-green-book.webp");
   });
@@ -827,7 +827,7 @@ describe("MemberHome", () => {
       />,
     );
 
-    expect(screen.getByTitle("미 · 미정")).toHaveAttribute("data-rsvp-status", "MAYBE");
+    expect(screen.getByTitle("미 · 미정")).not.toHaveAttribute("data-rsvp-status");
   });
 
   it("does not show the host session operations shortcut inside member home content", () => {

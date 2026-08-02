@@ -274,6 +274,7 @@ describe("HostMembersPage", () => {
       "src",
       "/assets/avatars/book-club/banana-green-book.webp",
     );
+    expect(activeArticle.querySelector(".rm-avatar-chip")).toHaveClass("rm-avatar-chip--artwork");
     expect(activeRow.queryByText("@멤버1")).not.toBeInTheDocument();
     expect(activeRow.getByText("active@example.com · 정식 멤버")).toBeInTheDocument();
     expect(activeRow.getByText("활성")).toBeInTheDocument();

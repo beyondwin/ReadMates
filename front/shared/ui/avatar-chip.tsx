@@ -1,5 +1,4 @@
 import { useEffect, useState, type CSSProperties } from "react";
-import type { RsvpStatus } from "@/shared/model/readmates-types";
 import {
   bookClubAvatarSrc,
   DEFAULT_BOOK_CLUB_AVATAR_KEY,
@@ -12,13 +11,11 @@ export function AvatarChip({
   avatarKey,
   name,
   label,
-  rsvpStatus,
   size = 24,
 }: {
   avatarKey?: unknown;
   name: string | null | undefined;
   label?: string;
-  rsvpStatus?: RsvpStatus;
   size?: number;
 }) {
   const requestedKey = normalizeBookClubAvatarKey(avatarKey);
@@ -39,8 +36,7 @@ export function AvatarChip({
 
   return (
     <span
-      className="rm-avatar-chip"
-      data-rsvp-status={rsvpStatus}
+      className="rm-avatar-chip rm-avatar-chip--artwork"
       title={safeLabel || undefined}
       style={{ "--avatar-size": `${size}px` } as CSSProperties}
     >

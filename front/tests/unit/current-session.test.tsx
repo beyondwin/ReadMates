@@ -596,6 +596,8 @@ describe("CurrentSession", () => {
     expect([...container.querySelectorAll(".desktop-only .rm-avatar-chip img")].map((image) => image.getAttribute("src"))).toContain(
       "/assets/avatars/book-club/cloud-green-book.webp",
     );
+    expect(container.querySelector(".desktop-only .rm-avatar-chip")).toHaveClass("rm-avatar-chip--artwork");
+    expect(container.querySelector(".desktop-only .rm-avatar-chip")).not.toHaveAttribute("data-rsvp-status");
     expect(desktopScope.getByText("우")).toBeVisible();
     expect(desktopScope.getByText("수")).toBeVisible();
   });

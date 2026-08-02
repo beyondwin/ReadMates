@@ -76,6 +76,7 @@ describe("AccountMenu", () => {
       "src",
       "/assets/avatars/book-club/banana-green-book.webp",
     );
+    expect(trigger.querySelector(".rm-avatar-chip")).toHaveClass("rm-avatar-chip--artwork");
 
     await user.click(trigger);
 

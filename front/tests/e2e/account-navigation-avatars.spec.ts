@@ -1,14 +1,10 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Locator, type Page, type Route } from "@playwright/test";
 
 const CLUB_SLUG = "reading-sai";
 const APP_BASE = `/clubs/${CLUB_SLUG}/app`;
 const MEMBER_NAME = "김독서";
 const PUBLIC_AVATAR_SESSION_ID = "public-avatar-record";
 type FixtureRole = "HOST" | "MEMBER";
-
-// The initial RED run used false here, proving that a fixture missing these
-// contract fields cannot complete the member-space journey.
-const WIRE_AVATAR_KEYS = true;
 
 type AvatarMember = {
   membershipId: string;
@@ -51,12 +47,6 @@ const sameSurnameMembers: AvatarMember[] = [
 ];
 
 function avatarKeyFor<T extends { avatarKey?: string }>(value: T) {
-  if (!WIRE_AVATAR_KEYS) {
-    const withoutAvatarKey = { ...value };
-    delete withoutAvatarKey.avatarKey;
-    return withoutAvatarKey;
-  }
-
   return value;
 }
 
@@ -175,8 +165,9 @@ async function routeSyntheticApp(page: Page, role: FixtureRole = "HOST") {
   await page.route("**/api/bff/api/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
 
-    if (path.endsWith("/api/me/avatar") && route.request().method() === "PATCH") {
-      const body = route.request().postDataJSON() as { avatarKey: string };
+    if (path.endsWith("/api/me/profile") && route.request().method() === "PUT") {
+      const body = route.request().postDataJSON() as { displayName: string; avatarKey: string };
+      expect(body.displayName).toBe(MEMBER_NAME);
       savedAvatarKey = body.avatarKey;
       return json(route, {
         membershipId: "member-host",
@@ -304,6 +295,15 @@ async function expectVisibleUnclippedMobileAccount(page: Page, width: number) {
   expect(box!.x + box!.width).toBeLessThanOrEqual(width);
 }
 
+async function expectFrameFreeArtwork(locator: Locator) {
+  await expect(locator).toHaveClass(/rm-avatar-chip--artwork/);
+  await expect(locator).not.toHaveAttribute("data-rsvp-status");
+  await expect.poll(() => locator.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return [style.borderWidth, style.borderRadius, style.backgroundColor, style.overflow];
+  })).toEqual(["0px", "0px", "rgba(0, 0, 0, 0)", "visible"]);
+}
+
 test("non-host member keeps the explicit account action without a workspace switch on mobile", async ({ page }, testInfo) => {
   await routeSyntheticApp(page, "MEMBER");
 
@@ -317,7 +317,7 @@ test("non-host member keeps the explicit account action without a workspace swit
 });
 
 test("My Space avatar save refreshes the account identity and persists at mobile and desktop widths", async ({ browser }, testInfo) => {
-  const savedAvatarSrc = "/assets/avatars/book-club/cloud-green-book.webp";
+  const savedAvatarSrc = "/assets/avatars/book-club/teacup-green-book.webp";
 
   for (const width of [390, 1280]) {
     const context = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 } });
@@ -325,9 +325,10 @@ test("My Space avatar save refreshes the account identity and persists at mobile
     await routeSyntheticApp(page);
     await page.goto(`${APP_BASE}/me`);
 
-    const opener = page.getByRole("button", { name: "아바타 바꾸기" });
+    const profileAvatar = page.locator(".rm-member-profile__avatar");
+    const opener = page.getByRole("button", { name: "프로필 편집" });
     const account = page.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` });
-    await expect(opener.locator("img")).toHaveAttribute(
+    await expect(profileAvatar).toHaveAttribute(
       "src",
       "/assets/avatars/book-club/banana-green-book.webp",
     );
@@ -337,28 +338,28 @@ test("My Space avatar save refreshes the account identity and persists at mobile
     );
 
     await opener.click();
-    const dialog = page.getByRole("dialog", { name: "나의 아바타 선택" });
+    const dialog = page.getByRole("dialog", { name: "프로필 편집" });
     await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "아바타 선택" }).click();
     await page.screenshot({
       path: testInfo.outputPath(`${width}-my-space-avatar-picker.png`),
       fullPage: true,
     });
-    await dialog.getByRole("button", { name: "초록 찻잔을 든 고슴도치 선택" }).click();
+    await dialog.getByRole("button", { name: "초록 책을 읽는 찻잔 선택" }).click();
 
-    await expect(opener.locator("img")).toHaveAttribute(
-      "src",
-      "/assets/avatars/book-club/banana-green-book.webp",
-    );
     await expect(account.locator("img")).toHaveAttribute(
       "src",
       "/assets/avatars/book-club/banana-green-book.webp",
     );
 
-    await dialog.getByRole("button", { name: "이 아바타로 변경" }).click();
+    await dialog.getByRole("button", { name: "선택 완료" }).click();
+    await expectFrameFreeArtwork(dialog.locator(".rm-profile-editor__avatar-action .rm-avatar-chip"));
+    await dialog.getByRole("button", { name: "변경사항 저장" }).click();
 
     await expect(dialog).toHaveCount(0);
-    await expect(opener.locator("img")).toHaveAttribute("src", savedAvatarSrc);
+    await expect(profileAvatar).toHaveAttribute("src", savedAvatarSrc);
     await expect(account.locator("img")).toHaveAttribute("src", savedAvatarSrc);
+    await expectFrameFreeArtwork(account.locator(".rm-avatar-chip"));
     await page.screenshot({
       path: testInfo.outputPath(`${width}-my-space-avatar-saved.png`),
       fullPage: true,
@@ -366,10 +367,7 @@ test("My Space avatar save refreshes the account identity and persists at mobile
 
     await page.reload();
 
-    await expect(page.getByRole("button", { name: "아바타 바꾸기" }).locator("img")).toHaveAttribute(
-      "src",
-      savedAvatarSrc,
-    );
+    await expect(page.locator(".rm-member-profile__avatar")).toHaveAttribute("src", savedAvatarSrc);
     await expect(page.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` }).locator("img")).toHaveAttribute(
       "src",
       savedAvatarSrc,
@@ -460,6 +458,7 @@ test("scoped account navigation preserves local avatar identity across mobile an
     "/assets/avatars/book-club/star-notebook.webp",
     "/assets/avatars/book-club/moon-green-book.webp",
   ]);
+  await expectFrameFreeArtwork(roster.locator(".rm-avatar-chip").first());
   await page.screenshot({ path: testInfo.outputPath("1280-desktop-account-roster.png"), fullPage: true });
   await assertVisibleAvatarNetwork(imageEvidence, new URL(page.url()).host, [
     "/assets/avatars/book-club/banana-green-book.webp",
@@ -494,6 +493,7 @@ test("public record requests exactly its visible local WebP avatars", async ({ p
     "/assets/avatars/book-club/cloud-green-book.webp",
     "/assets/avatars/book-club/cloud-green-book.webp",
   ]);
+  await expectFrameFreeArtwork(page.locator("main .rm-avatar-chip").first());
   await assertVisibleAvatarNetwork(imageEvidence, new URL(page.url()).host, [
     "/assets/avatars/book-club/cloud-green-book.webp",
     "/assets/avatars/book-club/cloud-green-book.webp",

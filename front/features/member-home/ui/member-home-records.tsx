@@ -352,7 +352,6 @@ export function RosterSummary({ current }: { current: CurrentSessionResponse }) 
               avatarKey={member.avatarKey}
               name={member.displayName}
               label={`${member.displayName} · ${rsvpLabel(member.rsvpStatus)}`}
-              rsvpStatus={member.rsvpStatus}
               size={26}
             />
           ))}

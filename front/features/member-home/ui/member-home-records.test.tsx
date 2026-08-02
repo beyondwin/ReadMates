@@ -67,6 +67,7 @@ describe("member home record reflection cards", () => {
       "src",
       "/assets/avatars/book-club/cloud-green-book.webp",
     );
+    expect(container.querySelector(".rm-member-activity-card__author .rm-avatar-chip")).toHaveClass("rm-avatar-chip--artwork");
     expect(screen.getByText("회차 하이라이트")).toBeVisible();
   });
 

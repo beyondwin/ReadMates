@@ -70,5 +70,6 @@ describe("PublicSession showcase", () => {
       "/assets/avatars/book-club/cloud-green-book.webp",
       "/assets/avatars/book-club/cloud-green-book.webp",
     ]);
+    expect(container.querySelector(".rm-avatar-chip")).toHaveClass("rm-avatar-chip--artwork");
   });
 });

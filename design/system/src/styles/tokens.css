@@ -513,10 +513,16 @@ img { max-width: 100%; display: block; }
   object-fit: cover;
 }
 
-.rm-avatar-chip[data-rsvp-status="NO_RESPONSE"] {
-  background: var(--bg-deep);
-  border-color: var(--line-strong);
-  color: var(--text-3);
+.rm-avatar-chip.rm-avatar-chip--artwork {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  overflow: visible;
+}
+
+.rm-avatar-chip--artwork img {
+  object-fit: contain;
 }
 
 .rm-avatar-chip-group {

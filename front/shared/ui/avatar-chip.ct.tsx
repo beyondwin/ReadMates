@@ -5,6 +5,25 @@ import { BOOK_CLUB_AVATAR_KEYS } from "./book-club-avatar";
 
 const avatarSizes = [20, 22, 24, 26, 28, 32, 46, 52, 72];
 
+async function expectFrameFreeArtwork(avatar: Locator) {
+  await expect(avatar).toHaveClass(/rm-avatar-chip--artwork/);
+  await expect(avatar).not.toHaveAttribute("data-rsvp-status");
+  await expect.poll(() => avatar.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      backgroundColor: style.backgroundColor,
+      borderRadius: style.borderRadius,
+      borderWidth: style.borderWidth,
+      overflow: style.overflow,
+    };
+  })).toEqual({
+    backgroundColor: "rgba(0, 0, 0, 0)",
+    borderRadius: "0px",
+    borderWidth: "0px",
+    overflow: "visible",
+  });
+}
+
 async function allImagesHaveTransparentCorners(images: Locator) {
   return images.evaluateAll((nodes) =>
     nodes.every((node) => {
@@ -40,7 +59,11 @@ test("AvatarChip renders every local avatar at all approved small sizes", async 
   );
 
   const images = component.locator("img");
+  const avatars = component.locator(".rm-avatar-chip");
   await expect(images).toHaveCount(BOOK_CLUB_AVATAR_KEYS.length * avatarSizes.length);
+  await expectFrameFreeArtwork(avatars.first());
+  await expect.poll(() => avatars.evaluateAll((nodes) => nodes.every((node) => getComputedStyle(node).borderWidth === "0px"))).toBe(true);
+  await expect.poll(() => images.evaluateAll((nodes) => nodes.every((node) => getComputedStyle(node).objectFit === "contain"))).toBe(true);
   await expect.poll(() =>
     images.evaluateAll((nodes) =>
       nodes.every(
@@ -72,7 +95,19 @@ test("AvatarChip exposes every asset for full-size crop inspection", async ({ mo
   await component.screenshot({ path: testInfo.outputPath("avatar-chip-crop-inspection.png") });
 });
 
-test("AvatarChip falls back once and keeps its tile after both image failures", async ({ mount, page }) => {
+test("AvatarChip keeps requested and default artwork frame-free through image fallback", async ({ mount, page }) => {
+  await page.route("**/banana-green-book.webp", (route) => route.fulfill({ status: 404 }));
+
+  const component = await mount(
+    <AvatarChip avatarKey="banana-green-book" label="" name="회원" size={24} />,
+  );
+
+  await expect(component.locator("img")).toHaveAttribute("src", /cloud-green-book\.webp$/);
+  await expectFrameFreeArtwork(component);
+  await expect.poll(() => component.locator("img").evaluate((image) => getComputedStyle(image).objectFit)).toBe("contain");
+});
+
+test("AvatarChip keeps a borderless neutral box after requested and fallback images fail", async ({ mount, page }) => {
   await page.route("**/banana-green-book.webp", (route) => route.fulfill({ status: 404 }));
   await page.route("**/cloud-green-book.webp", (route) => route.fulfill({ status: 404 }));
 
@@ -80,7 +115,25 @@ test("AvatarChip falls back once and keeps its tile after both image failures", 
     <AvatarChip avatarKey="banana-green-book" label="" name="회원" size={24} />,
   );
 
-  await expect(component.locator("img")).toHaveAttribute("src", /cloud-green-book\.webp$/);
   await expect(component.locator("img")).toHaveCount(0);
   await expect(component).toBeVisible();
+  await expectFrameFreeArtwork(component);
+});
+
+test("AvatarPicker alone owns the selected and focus ring", async ({ mount }) => {
+  const component = await mount(
+    <div className="rm-profile-editor">
+      <button type="button" className="rm-avatar-picker__tile" aria-label="초록 책을 읽는 바나나 선택" aria-pressed="true">
+        <AvatarChip avatarKey="banana-green-book" name={null} label="" size={52} />
+      </button>
+    </div>,
+  );
+  const selected = component.getByRole("button", { name: "초록 책을 읽는 바나나 선택" });
+  const avatar = selected.locator(".rm-avatar-chip");
+
+  await selected.focus();
+  await expect(selected).toBeFocused();
+  await expectFrameFreeArtwork(avatar);
+  expect(await selected.evaluate((element) => getComputedStyle(element, "::after").borderTopWidth)).toBe("2px");
+  expect(await selected.evaluate((element) => getComputedStyle(element, "::after").borderTopColor)).not.toBe("rgba(0, 0, 0, 0)");
 });
