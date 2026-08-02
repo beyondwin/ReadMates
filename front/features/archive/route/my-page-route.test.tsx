@@ -127,10 +127,7 @@ describe("MyPageRoute", () => {
     );
     expect(avatar).toHaveAttribute("aria-hidden", "true");
     expect(screen.getByText("읽고, 묻고, 기록해 온 시간")).toBeVisible();
-    expect(screen.getByRole("link", { name: "기록 보기" })).toHaveAttribute(
-      "href",
-      "/clubs/reading-sai/app/archive?view=sessions",
-    );
+    expect(screen.queryByRole("link", { name: "기록 보기" })).toBeNull();
     expect(screen.queryByRole("link", { name: "계정 관리" })).toBeNull();
     expect(screen.getByRole("link", {
       name: "전체 보기",

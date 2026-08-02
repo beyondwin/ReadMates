@@ -15,12 +15,12 @@ const viewModel: MemberSpaceViewModel = {
   profileMetaLabel: "읽는사이 · 멤버 · 2025.11부터 함께",
   achievementHeading: "읽고, 묻고, 기록해 온 시간",
   journeyStats: [
-    { kind: "sessions", label: "함께한 모임", value: "7", unit: "회" },
-    { kind: "completed", label: "함께 완독한 책", value: "3", unit: "권" },
+    { kind: "sessions", label: "참여한 모임", value: "7", unit: "회" },
+    { kind: "completed", label: "완독한 책", value: "3", unit: "권" },
   ],
   recordTraces: [
     { kind: "questions", label: "대화를 연 질문", description: "책에서 시작된 생각의 기록", value: "5", unit: "개" },
-    { kind: "reviews", label: "남긴 서평", description: "읽고 난 마음을 풀어낸 기록", value: "0", unit: "편" },
+    { kind: "reviews", label: "남긴 서평", description: "아직 남긴 서평이 없어요", value: "0", unit: "편" },
   ],
 };
 
@@ -35,10 +35,18 @@ describe("MemberProfileSummary", () => {
     expect(artwork).toHaveAttribute("data-avatar-size-role", "profile");
     expect(artwork?.querySelector("img")).toHaveAttribute("alt", "");
     expect(artwork?.querySelector("img")).toHaveAttribute("aria-hidden", "true");
-    expect(within(section).getByText(viewModel.profileMetaLabel)).toBeVisible();
+    expect(Array.from(section.querySelectorAll(".rm-member-profile__meta-line"), (line) => line.textContent)).toEqual([
+      "읽는사이 · 멤버",
+      "2025.11부터 함께",
+    ]);
     expect(figure?.querySelector("figcaption")).toHaveTextContent("한 장 더 읽는 바나나");
     expect(section).not.toHaveTextContent("나의 아바타 ·");
-    expect(within(section).getAllByRole("button", { name: "프로필 편집" })).toHaveLength(1);
+    const identity = section.querySelector(".rm-member-profile__identity");
+    expect(identity).not.toBeNull();
+    const editButton = within(identity as HTMLElement).getByRole("button", { name: "프로필 편집" });
+    expect(editButton).toHaveTextContent("프로필 편집");
+    expect(editButton.querySelector("svg")).toBeNull();
+    expect(section.querySelector(".rm-member-profile__actions")).toBeNull();
     expect(within(section).queryByRole("button", { name: "이름 변경" })).toBeNull();
     expect(within(section).queryByRole("button", { name: "아바타 바꾸기" })).toBeNull();
   });

@@ -40,10 +40,7 @@ export function MyReadingShelf({
           canEditProfile={canEditProfile}
           onSaveProfile={onSaveProfile}
         />
-        <ReadingAchievementSummary
-          viewModel={viewModel}
-          archiveSessionsHref={archiveSessionsHref}
-        />
+        <ReadingAchievementSummary viewModel={viewModel} />
       </MemberSpaceOverview>
       <MemberSpaceUtilityNav
         notificationsHref={notificationsHref}

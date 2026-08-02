@@ -110,8 +110,8 @@ describe("my reading shelf model", () => {
       profileMetaLabel: "읽는사이 · 멤버 · 2025.11부터 함께",
       achievementHeading: "읽고, 묻고, 기록해 온 시간",
       journeyStats: [
-        { kind: "sessions", label: "함께한 모임", value: "3", unit: "회" },
-        { kind: "completed", label: "함께 완독한 책", value: "3", unit: "권" },
+        { kind: "sessions", label: "참여한 모임", value: "3", unit: "회" },
+        { kind: "completed", label: "완독한 책", value: "3", unit: "권" },
       ],
       recordTraces: [
         {
@@ -124,7 +124,7 @@ describe("my reading shelf model", () => {
         {
           kind: "reviews",
           label: "남긴 서평",
-          description: "읽고 난 마음을 풀어낸 기록",
+          description: "아직 남긴 서평이 없어요",
           value: "0",
           unit: "편",
         },
@@ -142,12 +142,12 @@ describe("my reading shelf model", () => {
     } })).toMatchObject({
       achievementHeading: "읽고, 묻고, 기록해 온 시간",
       journeyStats: [
-        { kind: "sessions", label: "함께한 모임", value: "0", unit: "회" },
-        { kind: "completed", label: "함께 완독한 책", value: "0", unit: "권" },
+        { kind: "sessions", label: "참여한 모임", value: "0", unit: "회" },
+        { kind: "completed", label: "완독한 책", value: "0", unit: "권" },
       ],
       recordTraces: [
         { kind: "questions", value: "0", unit: "개" },
-        { kind: "reviews", value: "0", unit: "편" },
+        { kind: "reviews", description: "아직 남긴 서평이 없어요", value: "0", unit: "편" },
       ],
     });
   });

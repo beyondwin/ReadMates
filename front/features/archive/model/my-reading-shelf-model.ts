@@ -47,7 +47,7 @@ export type JourneyYearGroup = {
 
 export type MemberSpaceJourneyStat = {
   kind: "sessions" | "completed";
-  label: "함께한 모임" | "함께 완독한 책";
+  label: "참여한 모임" | "완독한 책";
   value: string;
   unit: "회" | "권";
 };
@@ -55,7 +55,7 @@ export type MemberSpaceJourneyStat = {
 export type MemberSpaceRecordTrace = {
   kind: "questions" | "reviews";
   label: "대화를 연 질문" | "남긴 서평";
-  description: "책에서 시작된 생각의 기록" | "읽고 난 마음을 풀어낸 기록";
+  description: "책에서 시작된 생각의 기록" | "읽고 난 마음을 풀어낸 기록" | "아직 남긴 서평이 없어요";
   value: string;
   unit: "개" | "편";
 };
@@ -213,13 +213,13 @@ export function buildMemberSpaceViewModel(input: {
     journeyStats: [
       {
         kind: "sessions",
-        label: "함께한 모임",
+        label: "참여한 모임",
         value: String(input.summary.attendedSessionCount),
         unit: "회",
       },
       {
         kind: "completed",
-        label: "함께 완독한 책",
+        label: "완독한 책",
         value: String(input.summary.completedReadingCount),
         unit: "권",
       },
@@ -235,7 +235,9 @@ export function buildMemberSpaceViewModel(input: {
       {
         kind: "reviews",
         label: "남긴 서평",
-        description: "읽고 난 마음을 풀어낸 기록",
+        description: input.summary.reviewCount === 0
+          ? "아직 남긴 서평이 없어요"
+          : "읽고 난 마음을 풀어낸 기록",
         value: String(input.summary.reviewCount),
         unit: "편",
       },

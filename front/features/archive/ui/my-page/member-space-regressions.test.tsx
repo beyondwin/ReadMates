@@ -13,12 +13,12 @@ const viewModel: MemberSpaceViewModel = {
   profileMetaLabel: "읽는사이 · 멤버 · 2025.11부터 함께",
   achievementHeading: "읽고, 묻고, 기록해 온 시간",
   journeyStats: [
-    { kind: "sessions", label: "함께한 모임", value: "7", unit: "회" },
-    { kind: "completed", label: "함께 완독한 책", value: "3", unit: "권" },
+    { kind: "sessions", label: "참여한 모임", value: "7", unit: "회" },
+    { kind: "completed", label: "완독한 책", value: "3", unit: "권" },
   ],
   recordTraces: [
     { kind: "questions", label: "대화를 연 질문", description: "책에서 시작된 생각의 기록", value: "5", unit: "개" },
-    { kind: "reviews", label: "남긴 서평", description: "읽고 난 마음을 풀어낸 기록", value: "0", unit: "편" },
+    { kind: "reviews", label: "남긴 서평", description: "아직 남긴 서평이 없어요", value: "0", unit: "편" },
   ],
 };
 const recentReadings: RecentReadingListItem[] = [{ sessionId: "session-7", sessionNumberLabel: "7차", dateLabel: "2026.07.20", bookTitle: "최근 함께 읽은 책", bookAuthor: "테스트 저자", bookImageUrl: null, coverFallbackLabel: "최", activityLabels: ["질문 2"], feedbackStatus: "피드백 O", href: "/app/sessions/session-7" }];
@@ -26,7 +26,7 @@ const save = vi.fn(async (editable) => ({ ...editable, accountName: profile.acco
 
 describe("member-space unaffected presentation", () => {
   it("places the profile before achievements inside the overview", () => {
-    const { container } = render(<MemberSpaceOverview><MemberProfileSummary profile={profile} viewModel={viewModel} canEditProfile onSaveProfile={save} /><ReadingAchievementSummary viewModel={viewModel} archiveSessionsHref="/app/archive?view=sessions" /></MemberSpaceOverview>);
+    const { container } = render(<MemberSpaceOverview><MemberProfileSummary profile={profile} viewModel={viewModel} canEditProfile onSaveProfile={save} /><ReadingAchievementSummary viewModel={viewModel} /></MemberSpaceOverview>);
     const overview = container.querySelector(".rm-member-space__overview")!;
     const profileSection = within(overview).getByRole("region", { name: "멤버1" });
     const achievement = within(overview).getByRole("region", { name: viewModel.achievementHeading });
@@ -46,25 +46,29 @@ describe("member-space unaffected presentation", () => {
     expect(screen.getByText("테스트 저자")).toBeVisible();
   });
 
-  it("presents cumulative stats and non-interactive record traces with one archive link", () => {
-    const { container } = render(<ReadingAchievementSummary viewModel={viewModel} archiveSessionsHref="/app/archive?view=sessions" />);
+  it("presents cumulative stats and non-interactive record traces without a duplicate archive link", () => {
+    const { container } = render(<ReadingAchievementSummary viewModel={viewModel} />);
     const section = screen.getByRole("region", { name: viewModel.achievementHeading });
     const heading = within(section).getByRole("heading", { level: 2, name: viewModel.achievementHeading });
-    const recordsLink = within(section).getByRole("link", { name: "기록 보기" });
+    const journeyGroup = within(section).getByRole("region", { name: "독서 여정" });
+    const traceGroup = within(section).getByRole("region", { name: "기록의 흔적" });
     const journeyStats = Array.from(section.querySelectorAll<HTMLElement>(".rm-reading-achievement__stat"));
     const recordTraces = Array.from(section.querySelectorAll<HTMLElement>(".rm-reading-achievement__trace"));
 
-    expect(recordsLink).toHaveAttribute("href", "/app/archive?view=sessions");
-    expect(within(section).getAllByRole("link")).toHaveLength(1);
+    expect(within(section).queryByRole("link", { name: "기록 보기" })).toBeNull();
+    expect(within(section).queryAllByRole("link")).toHaveLength(0);
+    expect(section.querySelectorAll("svg")).toHaveLength(0);
+    expect(journeyGroup.querySelector("dl")).not.toBeNull();
+    expect(traceGroup.querySelector("dl")).not.toBeNull();
     expect(within(section).getByText("책에서 시작된 생각의 기록")).toBeVisible();
-    expect(within(section).getByText("읽고 난 마음을 풀어낸 기록")).toBeVisible();
+    expect(within(section).getByText("아직 남긴 서평이 없어요")).toBeVisible();
     for (const value of ["7", "3", "5", "0"]) {
       expect(within(section).getAllByText(value, { exact: true })).toHaveLength(1);
     }
     expect(within(section).queryByText(/완독률/)).toBeNull();
-    expect(Array.from(section.querySelectorAll(".rm-reading-achievement__stat-label"), (item) => item.textContent)).toEqual(["함께한 모임", "함께 완독한 책"]);
+    expect(Array.from(section.querySelectorAll(".rm-reading-achievement__stat-label"), (item) => item.textContent)).toEqual(["참여한 모임", "완독한 책"]);
     expect(container.querySelectorAll(".rm-reading-achievement__trace a, .rm-reading-achievement__trace button")).toHaveLength(0);
-    expect([heading, ...journeyStats, recordsLink, ...recordTraces].every((item, index, items) => (
+    expect([heading, ...journeyStats, ...recordTraces].every((item, index, items) => (
       index === 0 || Boolean(items[index - 1].compareDocumentPosition(item) & Node.DOCUMENT_POSITION_FOLLOWING)
     ))).toBe(true);
   });

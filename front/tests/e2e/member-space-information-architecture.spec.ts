@@ -103,13 +103,13 @@ async function expectMemberSpaceSemanticOrder(page: Page) {
   await expectDomOrder(
     overview,
     shelf.getByRole("heading", { level: 1, name: "멤버1" }),
-    shelf.getByText("읽는사이 · 멤버 · 2025.11부터 함께"),
+    shelf.getByText("읽는사이 · 멤버", { exact: true }),
+    shelf.getByText("2025.11부터 함께", { exact: true }),
     shelf.getByRole("button", { name: "프로필 편집" }),
     shelf.getByRole("heading", { level: 2, name: "읽고, 묻고, 기록해 온 시간" }),
-    shelf.getByText("함께한 모임", { exact: true }),
-    shelf.getByText("함께 완독한 책", { exact: true }),
+    shelf.getByText("참여한 모임", { exact: true }),
+    shelf.getByText("완독한 책", { exact: true }),
     shelf.getByRole("heading", { level: 3, name: "기록의 흔적" }),
-    shelf.getByRole("link", { name: "기록 보기" }),
     shelf.getByText("대화를 연 질문", { exact: true }),
     shelf.getByText("남긴 서평", { exact: true }),
     utilities,
@@ -119,6 +119,7 @@ async function expectMemberSpaceSemanticOrder(page: Page) {
       name: /responsive reading shelf 회차 기록/,
     }),
   );
+  await expect(shelf.getByRole("link", { name: "기록 보기" })).toHaveCount(0);
 }
 
 test.beforeEach(() => {
@@ -239,6 +240,22 @@ test("member space keeps the profile-first semantic order and usable actions acr
 
     const editProfile = shelf.getByRole("button", { name: "프로필 편집" });
     await expectPracticalTapTarget(editProfile);
+    const editPresentation = await editProfile.evaluate((button) => {
+      const identity = button.closest(".rm-member-profile__identity");
+      const meta = identity?.querySelector(".rm-member-profile__meta");
+      const heading = identity?.querySelector("h1");
+      const buttonStyle = getComputedStyle(button);
+      return {
+        color: buttonStyle.color,
+        metaColor: meta ? getComputedStyle(meta).color : null,
+        textColor: heading ? getComputedStyle(heading).color : null,
+        borderTopWidth: buttonStyle.borderTopWidth,
+        textDecorationLine: buttonStyle.textDecorationLine,
+      };
+    });
+    expect([editPresentation.metaColor, editPresentation.textColor]).toContain(editPresentation.color);
+    expect(editPresentation.borderTopWidth).toBe("0px");
+    expect(editPresentation.textDecorationLine).toBe("none");
 
     await page.evaluate(() => {
       (document.activeElement as HTMLElement | null)?.blur();
@@ -356,8 +373,8 @@ test("unknown latest attendance stays visible without a current streak claim", a
   await expect(shelf).not.toContainText("미확인");
   await expect(shelf.locator(".rm-reading-achievement")).not.toContainText("최근");
   await expect(shelf).not.toContainText("연속");
-  await expect(shelf.getByText("함께한 모임")).toBeVisible();
-  await expect(shelf.getByText("함께 완독한 책")).toBeVisible();
+  await expect(shelf.getByText("참여한 모임")).toBeVisible();
+  await expect(shelf.getByText("완독한 책")).toBeVisible();
 });
 
 test("zero-question and review summaries keep useful empty record traces", async ({
@@ -369,10 +386,10 @@ test("zero-question and review summaries keep useful empty record traces", async
   await page.goto("/app/me");
 
   const ledger = page.locator(".rm-reading-achievement");
-  await expect(ledger.getByText("함께한 모임")).toBeVisible();
-  await expect(ledger.getByText("함께 완독한 책")).toBeVisible();
+  await expect(ledger.getByText("참여한 모임")).toBeVisible();
+  await expect(ledger.getByText("완독한 책")).toBeVisible();
   await expect(ledger.getByText("대화를 연 질문")).toBeVisible();
-  await expect(ledger.getByText("남긴 서평")).toBeVisible();
+  await expect(ledger.getByText("남긴 서평", { exact: true })).toBeVisible();
   await expect(ledger.locator(".rm-reading-achievement__trace-value")).toHaveText(["0개", "0편"]);
 });
 
