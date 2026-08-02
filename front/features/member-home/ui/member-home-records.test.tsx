@@ -23,7 +23,37 @@ const entry: MemberHomeRecentRecordEntry = {
   summary: "긴 제목의 다음 책의 기록과 피드백을 이어 읽을 수 있어요.",
 };
 
+const authoredQuestion = {
+  sessionId: "session-8",
+  sessionNumber: 8,
+  date: "2026-06-18",
+  kind: "QUESTION" as const,
+  text: "같이 이야기하고 싶은 질문입니다.",
+  authorName: "질문한 멤버",
+  authorShortName: "질문",
+  avatarKey: "cloud-green-book",
+  bookTitle: "긴 제목의 다음 책",
+  createdAt: "2026-06-18T12:00:00Z",
+};
+
 describe("member home record reflection cards", () => {
+  it("uses the approved desktop and mobile activity avatar scales", () => {
+    const pulse = render(<ClubPulse items={[authoredQuestion]} />);
+    expect(
+      pulse.container
+        .querySelector<HTMLElement>(".rm-club-pulse-entry__author .rm-avatar-chip")
+        ?.style.getPropertyValue("--avatar-size"),
+    ).toBe("30px");
+    pulse.unmount();
+
+    const mobile = render(<MobileMemberActivity items={[authoredQuestion]} />);
+    expect(
+      mobile.container
+        .querySelector<HTMLElement>(".rm-member-activity-card__author .rm-avatar-chip")
+        ?.style.getPropertyValue("--avatar-size"),
+    ).toBe("32px");
+  });
+
   it("scopes the reading face to desktop and mobile reflection content", () => {
     const reflection = {
       sessionId: "session-8",
@@ -162,7 +192,7 @@ describe("member home record reflection cards", () => {
   });
 
   it("keeps unanswered RSVP prose sans while retaining numeric count semantics", () => {
-    render(
+    const { container } = render(
       <RosterSummary
         current={{
           currentSession: {
@@ -205,5 +235,8 @@ describe("member home record reflection cards", () => {
 
     expect(noResponse).not.toHaveClass("mono");
     expect(noResponse.querySelector(".ledger-number")).toHaveTextContent("1");
+    expect(
+      container.querySelector<HTMLElement>(".rm-avatar-chip")?.style.getPropertyValue("--avatar-size"),
+    ).toBe("34px");
   });
 });

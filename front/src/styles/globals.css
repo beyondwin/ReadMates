@@ -918,7 +918,7 @@ a.rm-recent-record__destination:hover {
 .rm-recent-record__destination-chevron {
   flex: 0 0 auto;
   color: var(--accent);
-  font-size: 16px;
+  font-size: 18px;
   line-height: 1;
 }
 

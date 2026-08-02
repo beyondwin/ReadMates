@@ -11,10 +11,10 @@ const reflection = {
   sessionId: "session-8",
   sessionNumber: 8,
   date: "2026-06-18",
-  kind: "HIGHLIGHT" as const,
+  kind: "QUESTION" as const,
   text: "긴 한국어 회고와 deliberately expansive English reflection이 작은 화면에서도 자연스럽게 이어집니다.",
-  authorName: null,
-  authorShortName: null,
+  authorName: "아주 긴 이름의 멤버",
+  authorShortName: "긴 이름",
   avatarKey: "cloud-green-book",
   bookTitle: "긴 제목의 다음 책",
   createdAt: "2026-06-18T12:00:00Z",
@@ -55,6 +55,8 @@ test("member reflection keeps the reading stack and rhythm on desktop", async ({
   expect(metrics.fontSize).toBeGreaterThanOrEqual(16);
   expect(metrics.lineHeight / metrics.fontSize).toBeGreaterThanOrEqual(1.6);
   expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth);
+  expect((await component.locator(".rm-avatar-chip").boundingBox())?.width).toBe(30);
+  expect(await component.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
 });
 
 test("member reflection keeps the reading stack and rhythm on mobile", async ({ mount, page }) => {
@@ -82,6 +84,8 @@ test("member reflection keeps the reading stack and rhythm on mobile", async ({ 
   expect(metrics.fontSize).toBeGreaterThanOrEqual(16);
   expect(metrics.lineHeight / metrics.fontSize).toBeGreaterThanOrEqual(1.6);
   expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth);
+  expect((await component.locator(".rm-avatar-chip").boundingBox())?.width).toBe(32);
+  expect(await component.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
 });
 
 test("recent record separates copy and document rows on desktop", async ({ mount, page }) => {

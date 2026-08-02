@@ -285,6 +285,11 @@ describe("MemberHome", () => {
     );
     expect(mobileElement.querySelector(".m-timeline-dot")).not.toBeInTheDocument();
     expect(mobileElement.querySelectorAll(".rm-mobile-shortcuts__icon")).toHaveLength(2);
+    expect(
+      Array.from(mobileElement.querySelectorAll(".rm-mobile-shortcuts__icon svg")).every(
+        (icon) => icon.getAttribute("width") === "22" && icon.getAttribute("height") === "22",
+      ),
+    ).toBe(true);
     expect(screen.queryByRole("link", { name: "호스트 화면" })).not.toBeInTheDocument();
     expect(mobileView.getByRole("link", { name: "피드백 문서 회차 피드백" })).toHaveAttribute(
       "href",

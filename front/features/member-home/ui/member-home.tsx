@@ -290,7 +290,7 @@ function MobileQuickLinks({ LinkComponent }: { LinkComponent: MemberHomeLinkComp
         {quickLinks.map((item) => (
           <Link key={item.label} to={item.href} className="m-card-quiet" LinkComponent={LinkComponent}>
             <span className="rm-mobile-shortcuts__icon" aria-hidden>
-              <MobileIcon name={item.icon} size={18} />
+              <MobileIcon name={item.icon} size={22} />
             </span>
             <span className="small" style={{ display: "block", color: "var(--text)", fontWeight: 500 }}>
               {item.label}

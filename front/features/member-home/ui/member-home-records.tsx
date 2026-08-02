@@ -169,7 +169,7 @@ export function ClubPulse({
                 <div className="rm-club-pulse-entry__author">
                   {authorName ? (
                     <>
-                      <AvatarChip avatarKey={item.avatarKey} name={authorName} label="" size={22} />
+                      <AvatarChip avatarKey={item.avatarKey} name={authorName} label="" size={30} />
                       <span className="small rm-club-pulse-entry__author-name">{authorName}</span>
                     </>
                   ) : null}
@@ -270,7 +270,7 @@ export function MobileMemberActivity({
               >
                 <div className="rm-member-activity-card__top">
                   <div className="rm-member-activity-card__author">
-                    <AvatarChip avatarKey={item.avatarKey} name={authorName} label="" size={26} />
+                    <AvatarChip avatarKey={item.avatarKey} name={authorName} label="" size={32} />
                     <div className="rm-member-activity-card__author-copy">
                       <div className="rm-member-activity-card__author-name">{authorName ?? "회차 하이라이트"}</div>
                       <div className="rm-member-activity-card__book">{item.bookTitle}</div>
@@ -352,7 +352,7 @@ export function RosterSummary({ current }: { current: CurrentSessionResponse }) 
               avatarKey={member.avatarKey}
               name={member.displayName}
               label={`${member.displayName} · ${rsvpLabel(member.rsvpStatus)}`}
-              size={26}
+              size={34}
             />
           ))}
         </div>
