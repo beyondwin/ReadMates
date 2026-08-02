@@ -105,10 +105,13 @@ async function expectMemberSpaceSemanticOrder(page: Page) {
     shelf.getByRole("heading", { level: 1, name: "멤버1" }),
     shelf.getByText("읽는사이 · 멤버 · 2025.11부터 함께"),
     shelf.getByRole("button", { name: "프로필 편집" }),
-    shelf.getByRole("heading", { level: 2, name: "세 번의 모임에서 세 권을 끝까지 읽었어요." }),
+    shelf.getByRole("heading", { level: 2, name: "읽고, 묻고, 기록해 온 시간" }),
     shelf.getByText("함께한 모임", { exact: true }),
-    shelf.getByText("완독", { exact: true }),
-    shelf.getByText("질문", { exact: true }),
+    shelf.getByText("함께 완독한 책", { exact: true }),
+    shelf.getByRole("heading", { level: 3, name: "기록의 흔적" }),
+    shelf.getByRole("link", { name: "기록 보기" }),
+    shelf.getByText("대화를 연 질문", { exact: true }),
+    shelf.getByText("남긴 서평", { exact: true }),
     utilities,
     recentReadings,
     shelf.getByRole("heading", { level: 2, name: "최근 독서 기록" }),
@@ -164,7 +167,7 @@ test("member space keeps the profile-first semantic order and usable actions acr
     const shelf = page.locator(".rm-member-space");
     const overview = shelf.locator(".rm-member-space__overview");
     await expect(overview).toHaveCount(1);
-    await expect(shelf.locator(".rm-reading-achievement__metrics")).toHaveCount(1);
+    await expect(shelf.locator(".rm-reading-achievement__journey")).toHaveCount(1);
     await expect(shelf.getByRole("list", {
       name: "최근 독서 기록",
     }).getByRole("listitem")).toHaveCount(3);
@@ -334,7 +337,9 @@ test("mid-join member history starts with the first eligible participation", asy
   await loginWithGoogleFixture(page, memberEmail);
   await page.goto("/app/me");
 
-  await expect(page.getByRole("heading", { level: 2, name: "세 번의 모임에서 세 권을 끝까지 읽었어요." })).toBeVisible();
+  const ledger = page.locator(".rm-reading-achievement");
+  await expect(ledger.getByRole("heading", { level: 2, name: "읽고, 묻고, 기록해 온 시간" })).toBeVisible();
+  await expect(ledger.locator(".rm-reading-achievement__journey dd")).toHaveText(["3회", "3권"]);
   await expect(page.getByText("최근", { exact: true })).toHaveCount(0);
 });
 
@@ -352,10 +357,10 @@ test("unknown latest attendance stays visible without a current streak claim", a
   await expect(shelf.locator(".rm-reading-achievement")).not.toContainText("최근");
   await expect(shelf).not.toContainText("연속");
   await expect(shelf.getByText("함께한 모임")).toBeVisible();
-  await expect(shelf.getByText("완독")).toBeVisible();
+  await expect(shelf.getByText("함께 완독한 책")).toBeVisible();
 });
 
-test("zero-question and review summaries omit empty metrics", async ({
+test("zero-question and review summaries keep useful empty record traces", async ({
   page,
 }) => {
   await mockMemberParticipationProfile(page, "history");
@@ -363,11 +368,12 @@ test("zero-question and review summaries omit empty metrics", async ({
   await loginWithGoogleFixture(page, memberEmail);
   await page.goto("/app/me");
 
-  const metrics = page.locator(".rm-reading-achievement__metrics");
-  await expect(metrics.getByText("함께한 모임")).toBeVisible();
-  await expect(metrics.getByText("완독")).toBeVisible();
-  await expect(metrics.getByText("질문")).toHaveCount(0);
-  await expect(metrics.getByText("서평")).toHaveCount(0);
+  const ledger = page.locator(".rm-reading-achievement");
+  await expect(ledger.getByText("함께한 모임")).toBeVisible();
+  await expect(ledger.getByText("함께 완독한 책")).toBeVisible();
+  await expect(ledger.getByText("대화를 연 질문")).toBeVisible();
+  await expect(ledger.getByText("남긴 서평")).toBeVisible();
+  await expect(ledger.locator(".rm-reading-achievement__trace-value")).toHaveText(["0개", "0편"]);
 });
 
 test("club-scoped account and notification routes preserve navigation current state and history", async ({
@@ -463,12 +469,7 @@ test("club-scoped account and notification routes preserve navigation current st
   await expect(appNavigation.getByRole("link", {
     name: "내 공간",
   })).toHaveAttribute("aria-current", "page");
-  await expect(page.getByRole("navigation", {
-    name: "현재 위치",
-  }).getByRole("link", { name: "내 공간" })).toHaveAttribute(
-    "href",
-    `${scopedAppPath}/me`,
-  );
+  await expect(page.getByRole("navigation", { name: "현재 위치" })).toHaveCount(0);
 
   await page.goBack();
   await expect(page).toHaveURL(new RegExp(`${scopedAppPath}/notifications$`));

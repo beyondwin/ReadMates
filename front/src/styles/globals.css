@@ -7039,6 +7039,9 @@ a.rm-recent-record__destination:hover {
   grid-template-columns: 34px minmax(0, 1fr) auto;
   align-items: center;
   gap: 11px;
+}
+
+.rm-reading-achievement__trace + .rm-reading-achievement__trace {
   border-top: 1px solid var(--line-soft);
 }
 

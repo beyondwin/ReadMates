@@ -53,6 +53,29 @@ for (const viewport of [{ width: 1280, height: 700 }, { width: 390, height: 700 
     expect(recordsLinkBox).not.toBeNull();
     expect(recordsLinkBox!.width).toBeGreaterThanOrEqual(44);
     expect(recordsLinkBox!.height).toBeGreaterThanOrEqual(44);
+    const tracesHeadGeometry = await component.locator(".rm-reading-achievement__traces-head").evaluate((element) => {
+      const heading = element.querySelector("h3");
+      const link = element.querySelector("a");
+      if (!heading || !link) throw new Error("reading ledger trace header is incomplete");
+      const textBottom = (node: Element) => {
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        return range.getBoundingClientRect().bottom;
+      };
+      return {
+        alignItems: getComputedStyle(element).alignItems,
+        headingTextBottom: textBottom(heading),
+        linkTextBottom: textBottom(link),
+      };
+    });
+    expect(tracesHeadGeometry.alignItems).toBe("baseline");
+    expect(Math.abs(tracesHeadGeometry.headingTextBottom - tracesHeadGeometry.linkTextBottom)).toBeLessThanOrEqual(1);
+    const traceRows = component.locator(".rm-reading-achievement__trace");
+    await expect(traceRows).toHaveCount(2);
+    await expect(traceRows.locator("a, button, [role='link'], [role='button']")).toHaveCount(0);
+    expect(await traceRows.evaluateAll((rows) =>
+      rows.map((row) => getComputedStyle(row).borderTopWidth),
+    )).toEqual(["0px", "1px"]);
     expect(await component.locator(".rm-reading-achievement__journey > div").evaluateAll((groups) =>
       groups.every((group) => Array.from(group.children).map((child) => child.tagName).join(",") === "DT,DD"),
     )).toBe(true);

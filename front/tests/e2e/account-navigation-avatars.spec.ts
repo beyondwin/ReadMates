@@ -228,8 +228,12 @@ function hostRecordEditorResponse() {
   };
 }
 
-async function routeSyntheticApp(page: Page, role: FixtureRole = "HOST") {
-  let savedAvatarKey = "banana-green-book";
+async function routeSyntheticApp(
+  page: Page,
+  role: FixtureRole = "HOST",
+  initialAvatarKey = "banana-green-book",
+) {
+  let savedAvatarKey = initialAvatarKey;
 
   await page.route("**/api/bff/api/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
@@ -253,6 +257,8 @@ async function routeSyntheticApp(page: Page, role: FixtureRole = "HOST") {
     if (path.endsWith("/api/app/me")) return json(route, memberProfile(role, savedAvatarKey));
     if (path.endsWith("/api/archive/me/journey")) return json(route, journeyResponse());
     if (path.endsWith("/api/sessions/current")) return json(route, currentSessionResponse());
+    if (path.endsWith("/api/notes/feed")) return json(route, { items: [], nextCursor: null });
+    if (path.endsWith("/api/sessions/upcoming")) return json(route, []);
     if (path.endsWith("/api/host/members")) return json(route, hostMembersResponse());
     if (path.endsWith("/api/host/sessions/session-avatar-roster")) return json(route, hostSessionDetailResponse());
     if (path.endsWith("/api/host/sessions/session-avatar-roster/record-editor")) return json(route, hostRecordEditorResponse());
@@ -411,6 +417,97 @@ test("non-host member keeps the explicit account action without a workspace swit
   }
 });
 
+test("My Space keeps a long poetic avatar caption wrapped below its artwork", async ({ page }) => {
+  await routeSyntheticApp(page, "MEMBER", "moon-green-book");
+
+  for (const viewport of [
+    { width: 1280, height: 900 },
+    { width: 390, height: 844 },
+    { width: 320, height: 700 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto(`${APP_BASE}/me`);
+
+    const figure = page.locator(".rm-member-profile__avatar-figure");
+    const artwork = figure.locator(".rm-member-profile__avatar");
+    const caption = figure.locator("figcaption");
+    await expect(caption).toHaveText("밤의 페이지를 지키는 초승달");
+    const geometry = await figure.evaluate((element) => {
+      const artworkElement = element.querySelector(".rm-member-profile__avatar");
+      const captionElement = element.querySelector("figcaption");
+      if (!artworkElement || !captionElement) throw new Error("avatar figure is incomplete");
+      const figureBox = element.getBoundingClientRect();
+      const artworkBox = artworkElement.getBoundingClientRect();
+      const captionBox = captionElement.getBoundingClientRect();
+      const range = document.createRange();
+      range.selectNodeContents(captionElement);
+      return {
+        lineCount: range.getClientRects().length,
+        overflowWrap: getComputedStyle(captionElement).overflowWrap,
+        horizontalContentFits: captionElement.scrollWidth <= captionElement.clientWidth + 1,
+        verticalContentFits: captionElement.scrollHeight <= captionElement.clientHeight + 1,
+        captionBelowArtwork: captionBox.top >= artworkBox.bottom - 1,
+        captionInsideFigure:
+          captionBox.left >= figureBox.left - 1
+          && captionBox.right <= figureBox.right + 1
+          && captionBox.bottom <= figureBox.bottom + 1,
+      };
+    });
+
+    await expect(artwork).toBeVisible();
+    expect(geometry.lineCount).toBeGreaterThanOrEqual(2);
+    expect(geometry.overflowWrap).toBe("anywhere");
+    expect(geometry.horizontalContentFits).toBe(true);
+    expect(geometry.verticalContentFits).toBe(true);
+    expect(geometry.captionBelowArtwork).toBe(true);
+    expect(geometry.captionInsideFigure).toBe(true);
+  }
+});
+
+test("desktop member-home shortcut divider stays inset and clear of link content", async ({ page }) => {
+  await routeSyntheticApp(page, "MEMBER");
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(APP_BASE);
+
+  const shortcuts = page.locator(".rm-member-home-desktop .rm-member-home-shortcuts");
+  const links = shortcuts.locator(".rm-member-home-shortcuts__link");
+  await expect(shortcuts).toBeVisible();
+  await expect(links).toHaveCount(2);
+  const dividerGeometry = await shortcuts.evaluate((element) => {
+    const linkElements = Array.from(element.querySelectorAll<HTMLElement>(".rm-member-home-shortcuts__link"));
+    const second = linkElements[1];
+    const label = second?.querySelector<HTMLElement>(".body");
+    const chevron = second?.querySelector<HTMLElement>(".rm-recent-record__destination-chevron");
+    if (!second || !label || !chevron) throw new Error("shortcut divider fixture is incomplete");
+    const surfaceBox = element.getBoundingClientRect();
+    const secondBox = second.getBoundingClientRect();
+    const labelBox = label.getBoundingClientRect();
+    const chevronBox = chevron.getBoundingClientRect();
+    const divider = getComputedStyle(second, "::before");
+    const dividerLeft = secondBox.left + Number.parseFloat(divider.left);
+    const dividerRight = secondBox.right - Number.parseFloat(divider.right);
+    const dividerY = secondBox.top + Number.parseFloat(divider.top);
+    return {
+      content: divider.content,
+      borderTopWidth: divider.borderTopWidth,
+      dividerInsideSurface: dividerLeft >= surfaceBox.left && dividerRight <= surfaceBox.right,
+      dividerClearsLabel: dividerY < labelBox.top,
+      dividerClearsChevron: dividerY < chevronBox.top,
+      surfaceContainsLinks: linkElements.every((link) => {
+        const box = link.getBoundingClientRect();
+        return box.left >= surfaceBox.left && box.right <= surfaceBox.right;
+      }),
+    };
+  });
+
+  expect(dividerGeometry.content).not.toBe("none");
+  expect(dividerGeometry.borderTopWidth).toBe("1px");
+  expect(dividerGeometry.dividerInsideSurface).toBe(true);
+  expect(dividerGeometry.dividerClearsLabel).toBe(true);
+  expect(dividerGeometry.dividerClearsChevron).toBe(true);
+  expect(dividerGeometry.surfaceContainsLinks).toBe(true);
+});
+
 test("My Space avatar save refreshes the account identity and persists at mobile and desktop widths", async ({ browser }, testInfo) => {
   const savedAvatarSrc = "/assets/avatars/book-club/teacup-green-book.webp";
 
@@ -433,7 +530,7 @@ test("My Space avatar save refreshes the account identity and persists at mobile
       width === 390 ? 64 : 88,
     );
     await expectAvatarRoleSize(account.locator(".rm-avatar-chip"), "navigation", 36);
-    await expect(page.getByText("나의 아바타 · 한 장 더 읽는 바나나")).toBeVisible();
+    await expect(page.locator(".rm-member-profile__avatar-figure figcaption")).toHaveText("한 장 더 읽는 바나나");
     await expect(profileAvatar).toHaveAttribute(
       "src",
       "/assets/avatars/book-club/banana-green-book.webp",
@@ -455,19 +552,9 @@ test("My Space avatar save refreshes the account identity and persists at mobile
     const selectedArtwork = selectedTile.locator(".rm-avatar-chip");
     await expectAvatarRoleSize(selectedArtwork, "picker", width === 390 ? 58 : 64);
     const selectedTileBox = await selectedTile.boundingBox();
-    const selectedArtworkBox = await selectedArtwork.boundingBox();
-    const selectedCheckBox = await selectedTile.locator(".rm-avatar-picker__check").boundingBox();
     expect(selectedTileBox).not.toBeNull();
-    expect(selectedArtworkBox).not.toBeNull();
-    expect(selectedCheckBox).not.toBeNull();
-    expect(selectedCheckBox!.x).toBeGreaterThanOrEqual(selectedTileBox!.x + 8);
-    expect(selectedCheckBox!.y).toBeGreaterThanOrEqual(selectedTileBox!.y + 8);
-    expect(selectedCheckBox!.x + selectedCheckBox!.width).toBeLessThanOrEqual(
-      selectedTileBox!.x + selectedTileBox!.width - 8,
-    );
-    expect(selectedCheckBox!.y + selectedCheckBox!.height).toBeLessThanOrEqual(
-      selectedArtworkBox!.y,
-    );
+    await expect(selectedTile.locator(".rm-avatar-picker__check")).toHaveCount(0);
+    expect(selectedTileBox!.height).toBeLessThanOrEqual(width === 390 ? 126 : 136);
     await page.screenshot({
       path: testInfo.outputPath(`${width}-my-space-avatar-picker.png`),
       fullPage: true,
@@ -488,7 +575,7 @@ test("My Space avatar save refreshes the account identity and persists at mobile
     await expect(dialog).toHaveCount(0);
     await expect(profileAvatar).toHaveAttribute("src", savedAvatarSrc);
     await expect(account.locator("img")).toHaveAttribute("src", savedAvatarSrc);
-    await expect(page.getByText("나의 아바타 · 책 곁에 머문 찻잔")).toBeVisible();
+    await expect(page.locator(".rm-member-profile__avatar-figure figcaption")).toHaveText("책 곁에 머문 찻잔");
     await expectFrameFreeArtwork(account.locator(".rm-avatar-chip"));
     await expectVisibleLocalArtwork(page, imageEvidence);
     await page.screenshot({
@@ -499,7 +586,7 @@ test("My Space avatar save refreshes the account identity and persists at mobile
     await page.reload();
 
     await expect(page.locator(".rm-member-profile__avatar img")).toHaveAttribute("src", savedAvatarSrc);
-    await expect(page.getByText("나의 아바타 · 책 곁에 머문 찻잔")).toBeVisible();
+    await expect(page.locator(".rm-member-profile__avatar-figure figcaption")).toHaveText("책 곁에 머문 찻잔");
     await expect(page.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` }).locator("img")).toHaveAttribute(
       "src",
       savedAvatarSrc,

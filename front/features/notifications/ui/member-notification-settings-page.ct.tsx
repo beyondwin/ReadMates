@@ -36,6 +36,11 @@ for (const width of [880, 390] as const) {
     const saveBox = await saveButton.boundingBox();
     const saveRowBox = await component.locator(".rm-member-notification-settings__save").boundingBox();
 
+    await expect(component.getByRole("heading", { level: 1, name: "알림" })).toBeVisible();
+    await expect(component.getByText("받고 싶은 이메일 알림을 직접 선택합니다.")).toBeVisible();
+    await expect(component.getByRole("heading", { level: 2, name: "수신 설정" })).toBeVisible();
+    await expect(component.getByRole("navigation", { name: "현재 위치" })).toHaveCount(0);
+    await expect(component.getByText("읽는사이 · 알림")).toHaveCount(0);
     expect(borders).toEqual({ top: "1px", bottom: "0px" });
     expect(saveBox!.height).toBeGreaterThanOrEqual(44);
     if (width <= 600) {
