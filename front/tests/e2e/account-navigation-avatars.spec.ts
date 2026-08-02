@@ -22,7 +22,7 @@ type AvatarMember = {
 
 const sameSurnameMembers: AvatarMember[] = [
   {
-    membershipId: "member-squirrel-acorn",
+    membershipId: "member-host",
     displayName: "김독서",
     accountName: "김독서",
     role: "HOST",
@@ -31,7 +31,7 @@ const sameSurnameMembers: AvatarMember[] = [
     avatarKey: "banana-green-book",
   },
   {
-    membershipId: "member-fennec-heart-mug",
+    membershipId: "member-reader-2",
     displayName: "김책가방",
     accountName: "김책가방",
     role: "MEMBER",
@@ -40,7 +40,7 @@ const sameSurnameMembers: AvatarMember[] = [
     avatarKey: "star-notebook",
   },
   {
-    membershipId: "member-turtle-winter-book",
+    membershipId: "member-reader-3",
     displayName: "김달력책",
     accountName: "김달력책",
     role: "MEMBER",
@@ -98,7 +98,7 @@ function currentSessionResponse() {
 
 function authResponse(role: FixtureRole = "HOST", avatarKey = "banana-green-book") {
   const currentMembership = avatarKeyFor({
-    membershipId: "member-squirrel-acorn",
+    membershipId: "member-host",
     clubId: "club-reading-sai",
     clubSlug: CLUB_SLUG,
     displayName: MEMBER_NAME,
@@ -111,7 +111,7 @@ function authResponse(role: FixtureRole = "HOST", avatarKey = "banana-green-book
   return {
     authenticated: true,
     userId: "synthetic-reader",
-    membershipId: "member-squirrel-acorn",
+    membershipId: "member-host",
     clubId: "club-reading-sai",
     email: "reader@example.test",
     displayName: MEMBER_NAME,
@@ -126,7 +126,7 @@ function authResponse(role: FixtureRole = "HOST", avatarKey = "banana-green-book
         clubId: "club-reading-sai",
         clubSlug: CLUB_SLUG,
         clubName: "읽는사이",
-        membershipId: "member-squirrel-acorn",
+        membershipId: "member-host",
         role,
         status: "ACTIVE",
         primaryHost: null,
@@ -179,7 +179,7 @@ async function routeSyntheticApp(page: Page, role: FixtureRole = "HOST") {
       const body = route.request().postDataJSON() as { avatarKey: string };
       savedAvatarKey = body.avatarKey;
       return json(route, {
-        membershipId: "member-squirrel-acorn",
+        membershipId: "member-host",
         displayName: MEMBER_NAME,
         accountName: MEMBER_NAME,
         profileImageUrl: null,
