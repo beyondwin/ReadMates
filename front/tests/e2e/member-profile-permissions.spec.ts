@@ -309,13 +309,14 @@ test("active member account settings expose read-only profile identity", async (
   await expect(page.getByText(selfEditMemberEmail)).toBeVisible();
   await expect(page.getByText("멤버5", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("@멤버5")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "이름 변경" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "프로필 편집" })).toHaveCount(0);
   await expect(page.getByRole("textbox", { name: "이름" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "클럽 탈퇴…" })).toBeVisible();
 });
 
 test("active members edit their profile from member space and refresh the account-menu name", async ({ page }) => {
   const updatedDisplayName = uniqueDisplayName("Member");
+  const originalProfile = membershipProfile(selfEditMemberEmail, "reading-sai");
   let refreshedDisplayName: string | null = null;
   let authPayload: Record<string, unknown> | null = null;
 
@@ -329,9 +330,12 @@ test("active members edit their profile from member space and refresh the accoun
       json: { ...authPayload, displayName: refreshedDisplayName ?? authPayload.displayName },
     });
   });
-  await page.route("**/api/bff/api/me/profile", async (route) => {
-    expect(route.request().method()).toBe("PATCH");
-    expect(route.request().postDataJSON()).toEqual({ displayName: updatedDisplayName });
+  await page.route("**/api/bff/api/me/profile**", async (route) => {
+    expect(route.request().method()).toBe("PUT");
+    expect(route.request().postDataJSON()).toEqual({
+      displayName: updatedDisplayName,
+      avatarKey: originalProfile.avatarKey,
+    });
     refreshedDisplayName = updatedDisplayName;
     await route.fulfill({
       status: 200,
@@ -341,6 +345,7 @@ test("active members edit their profile from member space and refresh the accoun
         displayName: updatedDisplayName,
         accountName: selfEditMemberEmail,
         profileImageUrl: null,
+        avatarKey: originalProfile.avatarKey,
       }),
     });
   });
@@ -348,9 +353,10 @@ test("active members edit their profile from member space and refresh the accoun
   await loginWithGoogleFixture(page, selfEditMemberEmail);
   await page.goto("/app/me");
 
-  await page.getByRole("button", { name: "이름 변경" }).click();
-  await page.getByRole("textbox", { name: "표시 이름" }).fill(updatedDisplayName);
-  await page.getByRole("button", { name: "이름 저장" }).click();
+  await page.getByRole("button", { name: "프로필 편집" }).click();
+  const dialog = page.getByRole("dialog", { name: "프로필 편집" });
+  await dialog.getByRole("textbox", { name: "표시 이름" }).fill(updatedDisplayName);
+  await dialog.getByRole("button", { name: "변경사항 저장" }).click();
 
   await expect(page.getByRole("heading", { level: 1, name: updatedDisplayName })).toBeVisible();
   await expect(page.getByRole("button", { name: `${updatedDisplayName} 계정 메뉴` })).toBeVisible();
@@ -364,17 +370,19 @@ test("active members save an allowlisted avatar from My Space and refresh accoun
   setMembershipStatus(email, "ACTIVE");
   await page.goto("/app/me");
 
-  const opener = page.getByRole("button", { name: "아바타 바꾸기" });
+  const opener = page.getByRole("button", { name: "프로필 편집" });
   await opener.click();
-  const dialog = page.getByRole("dialog", { name: "나의 아바타 선택" });
-  await dialog.getByRole("button", { name: "초록 찻잔을 든 고슴도치 선택" }).click();
+  const dialog = page.getByRole("dialog", { name: "프로필 편집" });
+  await dialog.getByRole("button", { name: "아바타 선택" }).click();
+  await dialog.getByRole("button", { name: "초록 책을 읽는 구름 선택" }).click();
+  await dialog.getByRole("button", { name: "선택 완료" }).click();
   const saved = page.waitForResponse(
-    (response) => response.request().method() === "PATCH" && response.url().includes("/api/bff/api/me/avatar"),
+    (response) => response.request().method() === "PUT" && response.url().includes("/api/bff/api/me/profile"),
   );
-  await dialog.getByRole("button", { name: "이 아바타로 변경" }).click();
+  await dialog.getByRole("button", { name: "변경사항 저장" }).click();
 
   expect((await saved).status()).toBe(200);
-  await expect(opener.locator("img")).toHaveAttribute(
+  await expect(page.locator(".rm-member-profile__avatar")).toHaveAttribute(
     "src",
     "/assets/avatars/book-club/cloud-green-book.webp",
   );
@@ -383,12 +391,12 @@ test("active members save an allowlisted avatar from My Space and refresh accoun
     "/assets/avatars/book-club/cloud-green-book.webp",
   );
   expect(mysqlScalar(`
-select avatar_key
+select concat(short_name, '|', avatar_key)
 from memberships
 join users on users.id = memberships.user_id
 where lower(users.email) = ${sqlString(email)}
   and memberships.club_id = '00000000-0000-0000-0000-000000000001';
-`)).toBe("cloud-green-book");
+`)).toBe("E2E Active Avatar|cloud-green-book");
 });
 
 test("suspended members omit account navigation and profile editing from member space", async ({ page }) => {
@@ -400,16 +408,14 @@ test("suspended members omit account navigation and profile editing from member 
   await page.goto("/app/me");
 
   const shelf = page.locator(".rm-member-space");
-  await expect(shelf.getByRole("button", { name: "이름 변경" })).toHaveCount(0);
-  await expect(shelf.getByRole("button", { name: "아바타 바꾸기" })).toHaveCount(0);
+  await expect(shelf.getByRole("button", { name: "프로필 편집" })).toHaveCount(0);
   await expect(shelf.getByRole("link", {
     name: /계정 (관리|설정)/,
   })).toHaveCount(0);
-  const decorativeAvatar = shelf.locator(".rm-avatar-picker--decorative");
-  await expect(decorativeAvatar).toHaveCSS("grid-column-start", "1");
-  await expect(decorativeAvatar).toHaveCSS("grid-row-start", "1");
-  await expect(decorativeAvatar).toHaveCSS("grid-row-end", "span 2");
-  await expect(decorativeAvatar).toHaveCSS("align-self", "start");
+  await expect(shelf.locator(".rm-member-profile__avatar")).toHaveAttribute(
+    "src",
+    /\/assets\/avatars\/book-club\/[a-z0-9-]+\.webp$/,
+  );
   await expect(shelf.getByRole("list", {
     name: "최근 독서 기록",
   })).toBeVisible();
@@ -432,7 +438,7 @@ test("left and inactive members cannot open or directly mutate the avatar picker
     expect(directUpdate.body?.code).toBe("MEMBERSHIP_NOT_ALLOWED");
 
     await page.goto("/app/me");
-    await expect(page.getByRole("button", { name: "아바타 바꾸기" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "프로필 편집" })).toHaveCount(0);
     await logout(page);
   }
 });
@@ -482,9 +488,9 @@ on duplicate key update
   await page.goto("/");
 
   await page.goto("/clubs/reading-sai/app/me");
-  await expect(page.getByRole("button", { name: "아바타 바꾸기" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "프로필 편집" })).toBeVisible();
   await page.goto("/clubs/sample-book-club/app/me");
-  await expect(page.getByRole("button", { name: "아바타 바꾸기" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "프로필 편집" })).toHaveCount(0);
 
   const readingSaiUpdate = await replaceProfileDirect(page, "E2E Cross Club Avatar", "cloud-green-book", "reading-sai");
   expect(readingSaiUpdate.status).toBe(200);
@@ -538,7 +544,7 @@ test("host edits a same-club member display name and sees the row update", async
 
   await expect(page.getByRole("heading", { name: "계정 설정", level: 1 })).toBeVisible();
   await expect(page.getByText("호스트", { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "이름 변경" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "프로필 편집" })).toHaveCount(0);
   await expect(page.getByRole("textbox", { name: "이름" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "클럽 탈퇴…" })).toBeVisible();
 
@@ -582,8 +588,7 @@ test("viewer can read member routes but cannot use current-session write actions
   await page.goto("/app/me");
 
   const viewerShelf = page.locator(".rm-member-space");
-  await expect(viewerShelf.getByRole("button", { name: "이름 변경" })).toHaveCount(0);
-  await expect(viewerShelf.getByRole("button", { name: "아바타 바꾸기" })).toHaveCount(0);
+  await expect(viewerShelf.getByRole("button", { name: "프로필 편집" })).toHaveCount(0);
   await expect(viewerShelf.getByRole("link", {
     name: /계정 (관리|설정)/,
   })).toHaveCount(0);
@@ -598,7 +603,7 @@ test("viewer can read member routes but cannot use current-session write actions
 
   await expect(page.getByRole("heading", { name: "계정 설정", level: 1 })).toBeVisible();
   await expect(page.getByText("둘러보기 멤버").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "이름 변경" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "프로필 편집" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "클럽 탈퇴…" })).toBeVisible();
   await expect(page.getByRole("button", { name: "로그아웃" })).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 844 });
