@@ -26,3 +26,11 @@
 ## Residual risk
 
 Kotlin compilation and Testcontainers behavior were not executable in this sandbox. The controller integration tests require CI or an unrestricted local Gradle run for runtime confirmation.
+
+## Review fix round 1
+
+- Added HTTP-boundary simultaneous-request coverage: two PUT requests race for the same display name, exactly one succeeds, and the 409 loser preserves both columns. A deterministic lock-mediated PUT race additionally verifies the typed duplicate response.
+- Added six PUT DTO/error-handler cases for missing, explicit `null`, and blank `displayName`/`avatarKey`. Each asserts status 400, exact error code/message, and no partial write.
+- Strengthened unauthenticated PUT coverage with a persisted baseline membership and assertions that display name and avatar key remain unchanged.
+- BLOCKED: `./server/gradlew -p server integrationTest --tests com.readmates.auth.api.MemberProfileControllerTest` — `FileNotFoundException` opening the Gradle wrapper `.zip.lck` (`Operation not permitted`).
+- PASS: `git diff --check`.

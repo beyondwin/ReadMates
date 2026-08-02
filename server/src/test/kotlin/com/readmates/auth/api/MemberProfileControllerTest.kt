@@ -18,6 +18,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.put
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
@@ -129,6 +130,186 @@ class MemberProfileControllerTest(
     }
 
     @Test
+    fun `atomic profile replacement maps required fields without partial writes`() {
+        val email = insertProfileMember("self.replace.required", "ACTIVE", shortName = "Before")
+        val membershipId = membershipIdForEmail(email)
+        val cookie = sessionCookieForEmail(email)
+        val cases =
+            listOf(
+                Triple("""{"avatarKey":"cloud-green-book"}""", "DISPLAY_NAME_REQUIRED", "Display name is required"),
+                Triple(
+                    """{"displayName":null,"avatarKey":"cloud-green-book"}""",
+                    "DISPLAY_NAME_REQUIRED",
+                    "Display name is required",
+                ),
+                Triple(
+                    """{"displayName":"   ","avatarKey":"cloud-green-book"}""",
+                    "DISPLAY_NAME_REQUIRED",
+                    "Display name is required",
+                ),
+                Triple("""{"displayName":"After"}""", "AVATAR_KEY_REQUIRED", "Avatar key is required"),
+                Triple(
+                    """{"displayName":"After","avatarKey":null}""",
+                    "AVATAR_KEY_REQUIRED",
+                    "Avatar key is required",
+                ),
+                Triple(
+                    """{"displayName":"After","avatarKey":"   "}""",
+                    "AVATAR_KEY_REQUIRED",
+                    "Avatar key is required",
+                ),
+            )
+
+        cases.forEach { (body, code, message) ->
+            mockMvc.put("/api/me/profile") {
+                cookie(cookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("X-Readmates-Club-Slug", "reading-sai")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = body
+            }.andExpect {
+                status { isBadRequest() }
+                jsonPath("$.code") { value(code) }
+                jsonPath("$.status") { value(400) }
+                jsonPath("$.message") { value(message) }
+            }
+            assertEquals("Before", shortNameForMembership(membershipId))
+            assertEquals("mushroom-green-book", avatarKeyForMembership(membershipId))
+        }
+    }
+
+    @Test
+    fun `simultaneous PUT loses duplicate-name race without changing either profile field`() {
+        val email = insertProfileMember("self.replace.race", "ACTIVE", shortName = "Before")
+        val membershipId = membershipIdForEmail(email)
+        val otherMembershipId =
+            membershipIdForEmail(
+                insertProfileMember("self.replace.race.other", "ACTIVE", shortName = "Other"),
+            )
+        val cookie = sessionCookieForEmail(email)
+        val executor = Executors.newSingleThreadExecutor()
+
+        dataSource.connection.use { connection ->
+            connection.autoCommit = false
+            try {
+                connection
+                    .prepareStatement(
+                        """
+                        select id
+                        from clubs
+                        where id = '00000000-0000-0000-0000-000000000001'
+                        for update
+                        """.trimIndent(),
+                    ).use { statement ->
+                        statement.executeQuery().use { resultSet -> resultSet.next() }
+                    }
+
+                val putResult =
+                    executor.submit<Pair<Int, String>> {
+                        val response =
+                            mockMvc.put("/api/me/profile") {
+                                cookie(cookie)
+                                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                                header("X-Readmates-Club-Slug", "reading-sai")
+                                header("Origin", "http://localhost:3000")
+                                with(csrf())
+                                contentType = MediaType.APPLICATION_JSON
+                                content = """{"displayName":"RaceTaken","avatarKey":"cloud-green-book"}"""
+                            }.andReturn()
+                                .response
+                        response.status to response.contentAsString
+                    }
+
+                assertThrows(TimeoutException::class.java) {
+                    putResult.get(300, TimeUnit.MILLISECONDS)
+                }
+                connection
+                    .prepareStatement(
+                        """
+                        update memberships
+                        set short_name = 'RaceTaken',
+                            updated_at = utc_timestamp(6)
+                        where id = ?
+                        """.trimIndent(),
+                    ).use { statement ->
+                        statement.setString(1, otherMembershipId)
+                        statement.executeUpdate()
+                    }
+                connection.commit()
+
+                val (status, body) = putResult.get(5, TimeUnit.SECONDS)
+                assertEquals(409, status)
+                org.hamcrest.MatcherAssert.assertThat(body, org.hamcrest.Matchers.containsString("DISPLAY_NAME_DUPLICATE"))
+            } finally {
+                runCatching { connection.rollback() }
+                executor.shutdownNow()
+            }
+        }
+
+        assertEquals("Before", shortNameForMembership(membershipId))
+        assertEquals("mushroom-green-book", avatarKeyForMembership(membershipId))
+        assertEquals("RaceTaken", shortNameForMembership(otherMembershipId))
+    }
+
+    @Test
+    fun `simultaneous PUT requests allow one atomic winner and preserve both loser fields`() {
+        val firstEmail = insertProfileMember("self.replace.concurrent.first", "ACTIVE", shortName = "FirstBefore")
+        val secondEmail = insertProfileMember("self.replace.concurrent.second", "ACTIVE", shortName = "SecondBefore")
+        val firstMembershipId = membershipIdForEmail(firstEmail)
+        val secondMembershipId = membershipIdForEmail(secondEmail)
+        val requests =
+            listOf(
+                Triple(sessionCookieForEmail(firstEmail), firstMembershipId, "cloud-green-book"),
+                Triple(sessionCookieForEmail(secondEmail), secondMembershipId, "sun-green-book"),
+            )
+        val ready = CountDownLatch(requests.size)
+        val start = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(requests.size)
+
+        try {
+            val results =
+                requests.map { (cookie, membershipId, avatarKey) ->
+                    executor.submit<Triple<Int, String, String>> {
+                        ready.countDown()
+                        start.await(5, TimeUnit.SECONDS)
+                        val response =
+                            mockMvc.put("/api/me/profile") {
+                                cookie(cookie)
+                                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                                header("X-Readmates-Club-Slug", "reading-sai")
+                                header("Origin", "http://localhost:3000")
+                                with(csrf())
+                                contentType = MediaType.APPLICATION_JSON
+                                content = """{"displayName":"ConcurrentWinner","avatarKey":"$avatarKey"}"""
+                            }.andReturn()
+                                .response
+                        Triple(response.status, membershipId, avatarKey)
+                    }
+                }
+            ready.await(5, TimeUnit.SECONDS)
+            start.countDown()
+            val completed = results.map { it.get(10, TimeUnit.SECONDS) }
+
+            assertEquals(listOf(200, 409), completed.map { it.first }.sorted())
+            completed.forEach { (status, membershipId, requestedAvatarKey) ->
+                if (status == 200) {
+                    assertEquals("ConcurrentWinner", shortNameForMembership(membershipId))
+                    assertEquals(requestedAvatarKey, avatarKeyForMembership(membershipId))
+                } else {
+                    val expectedName = if (membershipId == firstMembershipId) "FirstBefore" else "SecondBefore"
+                    assertEquals(expectedName, shortNameForMembership(membershipId))
+                    assertEquals("mushroom-green-book", avatarKeyForMembership(membershipId))
+                }
+            }
+        } finally {
+            start.countDown()
+            executor.shutdownNow()
+        }
+    }
+
+    @Test
     fun `atomic profile replacement rejects blocked memberships without partial writes`() {
         listOf("LEFT", "INACTIVE").forEach { membershipStatus ->
             val email = insertProfileMember("self.replace.${membershipStatus.lowercase()}", membershipStatus, shortName = "Before")
@@ -152,6 +333,8 @@ class MemberProfileControllerTest(
 
     @Test
     fun `atomic profile replacement requires Spring Security authentication`() {
+        val email = insertProfileMember("self.replace.unauthenticated", "ACTIVE", shortName = "Before")
+        val membershipId = membershipIdForEmail(email)
         mockMvc.put("/api/me/profile") {
             header("X-Readmates-Bff-Secret", "test-bff-secret")
             header("X-Readmates-Club-Slug", "reading-sai")
@@ -163,6 +346,8 @@ class MemberProfileControllerTest(
             status { isUnauthorized() }
             content { string("") }
         }
+        assertEquals("Before", shortNameForMembership(membershipId))
+        assertEquals("mushroom-green-book", avatarKeyForMembership(membershipId))
     }
 
     @AfterEach
