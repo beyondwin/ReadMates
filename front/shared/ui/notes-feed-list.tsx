@@ -126,7 +126,7 @@ function FeedQuestions({ items, label }: { items: NoteFeedItem[]; label: string 
               borderTop: index === 0 ? "1px solid var(--line)" : "1px solid var(--line-soft)",
             }}
           >
-            <FeedAuthorRow item={item} rightLabel={formatDateOnlyLabel(item.date)} markerSize={22} style={{ gap: "10px", marginBottom: "12px" }} />
+            <FeedAuthorRow item={item} rightLabel={formatDateOnlyLabel(item.date)} markerSize={30} style={{ gap: "10px", marginBottom: "12px" }} />
             <div className="body editorial rm-notes-question-text">
               {item.text}
             </div>
@@ -144,7 +144,7 @@ function FeedOneLiners({ items, label }: { items: NoteFeedItem[]; label: string 
         {items.map((item) => (
           <article key={itemKey(item)} className="rm-notes-oneliner-card">
             <p className="rm-notes-oneliner-card__quote body-lg editorial">{item.text}</p>
-            <FeedAuthorRow item={item} markerSize={22} style={{ gap: "10px", marginTop: "12px", paddingLeft: "34px" }} />
+            <FeedAuthorRow item={item} markerSize={30} style={{ gap: "10px", marginTop: "12px", paddingLeft: "34px" }} />
           </article>
         ))}
       </div>
@@ -159,7 +159,7 @@ function FeedHighlights({ items }: { items: NoteFeedItem[] }) {
         {items.map((item) => (
           <article key={itemKey(item)} className="rm-notes-highlight-row">
             <p className="rm-notes-highlight-row__quote body-lg editorial">{item.text}</p>
-            <FeedAuthorRow item={item} markerSize={20} style={{ gap: "10px", marginTop: "10px", paddingLeft: "34px" }} />
+            <FeedAuthorRow item={item} markerSize={30} style={{ gap: "10px", marginTop: "10px", paddingLeft: "34px" }} />
           </article>
         ))}
       </div>

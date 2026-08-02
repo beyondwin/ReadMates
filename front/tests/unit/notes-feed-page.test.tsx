@@ -338,7 +338,7 @@ describe("NotesFeedPage", () => {
   });
 
   it("renders the selected session header, count summary, and selected desktop rail row", () => {
-    renderNotesFeedPage();
+    const { container } = renderNotesFeedPage();
 
     expect(screen.getByRole("heading", { name: "가난한 찰리의 연감" })).toBeInTheDocument();
     const selectedHeaderMeta = screen.getByLabelText("No.06 · 2026.04.15");
@@ -377,6 +377,14 @@ describe("NotesFeedPage", () => {
     expect(within(oneLinerCard as HTMLElement).getByText("이멤버5")).toBeInTheDocument();
     expect(within(oneLinerCard as HTMLElement).queryByText("No.06 · 2026.04.15")).not.toBeInTheDocument();
     expect(screen.queryByText("문장마다 판단의 습관을 되묻게 만드는 장문 기록을 남겼다.")).not.toBeInTheDocument();
+    const avatars = Array.from(container.querySelectorAll<HTMLElement>(".rm-avatar-chip"));
+    expect(avatars.length).toBeGreaterThan(0);
+    expect(
+      avatars.every((avatar) => avatar.style.getPropertyValue("--avatar-size") === "30px"),
+    ).toBe(true);
+    const searchIcon = screen.getByLabelText("세션 검색").parentElement?.querySelector("svg");
+    expect(searchIcon).toHaveAttribute("width", "20");
+    expect(searchIcon).toHaveAttribute("height", "20");
     expect(screen.getByRole("heading", { name: "내 질문 · 1" })).toBeInTheDocument();
     expect(screen.getByText("읽으며 붙든 질문")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "이번 달의 질문들" })).not.toBeInTheDocument();

@@ -89,7 +89,7 @@ export function SessionRail({
             lineHeight: 0,
           }}
         >
-          <SearchIcon size={14} />
+          <SearchIcon size={20} />
         </span>
         <input
           id="notes-session-search"
@@ -100,7 +100,7 @@ export function SessionRail({
           style={{
             width: "100%",
             height: "38px",
-            padding: "0 12px 0 34px",
+            padding: "0 12px 0 40px",
             border: "1px solid var(--line)",
             borderRadius: "var(--r-2)",
             background: "var(--bg)",
