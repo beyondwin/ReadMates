@@ -86,7 +86,7 @@ class MemberProfileControllerTest(
                 jsonPath("$.membershipId") { value(membershipId) }
                 jsonPath("$.displayName") { value("After") }
                 jsonPath("$.accountName") { value("self.active") }
-                jsonPath("$.avatarKey") { value("squirrel-acorn") }
+                jsonPath("$.avatarKey") { value("mushroom-green-book") }
                 jsonPath("$.shortName") { doesNotExist() }
                 jsonPath("$.profileImageUrl") { value("https://cdn.example.test/profiles/self-active.png") }
                 jsonPath("$.authenticated") { doesNotExist() }
@@ -95,7 +95,7 @@ class MemberProfileControllerTest(
             }
 
         assertEquals("After", shortNameForEmail(email))
-        assertEquals("squirrel-acorn", avatarKeyForMembership(membershipId))
+        assertEquals("mushroom-green-book", avatarKeyForMembership(membershipId))
     }
 
     @Test
@@ -112,22 +112,22 @@ class MemberProfileControllerTest(
                 header("Origin", "http://localhost:3000")
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"avatarKey":"  hedgehog-green-mug  "}"""
+                content = """{"avatarKey":"  balloon-green-book  "}"""
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.membershipId") { value(membershipId) }
-                jsonPath("$.avatarKey") { value("hedgehog-green-mug") }
+                jsonPath("$.avatarKey") { value("balloon-green-book") }
                 jsonPath("$.email") { doesNotExist() }
             }
 
-        assertEquals("hedgehog-green-mug", avatarKeyForMembership(membershipId))
+        assertEquals("balloon-green-book", avatarKeyForMembership(membershipId))
     }
 
     @Test
     fun `own avatar update uses the membership selected by request club context`() {
         val email = insertProfileMember("self.avatar.multi", "ACTIVE", shortName = "PrimaryAvatar")
         val primaryMembershipId = membershipIdForEmail(email)
-        val otherMembershipId = insertSecondClubMembership(email, "turtle-winter-book")
+        val otherMembershipId = insertSecondClubMembership(email, "starfish-notebook")
         val cookie = sessionCookieForEmail(email)
 
         mockMvc
@@ -138,22 +138,22 @@ class MemberProfileControllerTest(
                 header("Origin", "http://localhost:3000")
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"avatarKey":"hedgehog-green-mug"}"""
+                content = """{"avatarKey":"balloon-green-book"}"""
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.membershipId") { value(primaryMembershipId) }
-                jsonPath("$.avatarKey") { value("hedgehog-green-mug") }
+                jsonPath("$.avatarKey") { value("balloon-green-book") }
             }
 
-        assertEquals("hedgehog-green-mug", avatarKeyForMembership(primaryMembershipId))
-        assertEquals("turtle-winter-book", avatarKeyForMembership(otherMembershipId))
+        assertEquals("balloon-green-book", avatarKeyForMembership(primaryMembershipId))
+        assertEquals("starfish-notebook", avatarKeyForMembership(otherMembershipId))
     }
 
     @Test
     fun `own avatar update rejects missing trusted club context for a multi club identity`() {
         val email = insertProfileMember("self.avatar.missing.context", "ACTIVE", shortName = "PrimaryAvatar")
         val primaryMembershipId = membershipIdForEmail(email)
-        val otherMembershipId = insertSecondClubMembership(email, "turtle-winter-book")
+        val otherMembershipId = insertSecondClubMembership(email, "starfish-notebook")
         val cookie = sessionCookieForEmail(email)
 
         mockMvc
@@ -163,14 +163,14 @@ class MemberProfileControllerTest(
                 header("Origin", "http://localhost:3000")
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"avatarKey":"hedgehog-green-mug"}"""
+                content = """{"avatarKey":"balloon-green-book"}"""
             }.andExpect {
                 status { isNotFound() }
                 jsonPath("$.code") { value("MEMBER_NOT_FOUND") }
             }
 
-        assertEquals("squirrel-acorn", avatarKeyForMembership(primaryMembershipId))
-        assertEquals("turtle-winter-book", avatarKeyForMembership(otherMembershipId))
+        assertEquals("mushroom-green-book", avatarKeyForMembership(primaryMembershipId))
+        assertEquals("starfish-notebook", avatarKeyForMembership(otherMembershipId))
     }
 
     @Test
@@ -187,13 +187,13 @@ class MemberProfileControllerTest(
                 header("Origin", "http://localhost:3000")
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"avatarKey":"hedgehog-green-mug"}"""
+                content = """{"avatarKey":"balloon-green-book"}"""
             }.andExpect {
                 status { isOk() }
-                jsonPath("$.avatarKey") { value("hedgehog-green-mug") }
+                jsonPath("$.avatarKey") { value("balloon-green-book") }
             }
 
-        assertEquals("hedgehog-green-mug", avatarKeyForMembership(membershipId))
+        assertEquals("balloon-green-book", avatarKeyForMembership(membershipId))
     }
 
     @Test
@@ -205,7 +205,7 @@ class MemberProfileControllerTest(
                 header("Origin", "http://localhost:3000")
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"avatarKey":"hedgehog-green-mug"}"""
+                content = """{"avatarKey":"balloon-green-book"}"""
             }.andExpect {
                 status { isUnauthorized() }
                 content { string("") }
@@ -227,13 +227,13 @@ class MemberProfileControllerTest(
                     header("Origin", "http://localhost:3000")
                     with(csrf())
                     contentType = MediaType.APPLICATION_JSON
-                    content = """{"avatarKey":"hedgehog-green-mug"}"""
+                    content = """{"avatarKey":"balloon-green-book"}"""
                 }.andExpect {
                     status { isForbidden() }
                     jsonPath("$.code") { value("MEMBERSHIP_NOT_ALLOWED") }
                 }
 
-            assertEquals("squirrel-acorn", avatarKeyForMembership(membershipId))
+            assertEquals("mushroom-green-book", avatarKeyForMembership(membershipId))
         }
     }
 
@@ -264,7 +264,7 @@ class MemberProfileControllerTest(
                 "self.avatar.duplicate",
                 "ACTIVE",
                 shortName = "AvatarDuplicate",
-                avatarKey = "hedgehog-green-mug",
+                avatarKey = "balloon-green-book",
             )
         insertProfileMember("self.avatar.taken", "ACTIVE", shortName = "AvatarTaken")
         val cookie = sessionCookieForEmail(email)
@@ -278,13 +278,13 @@ class MemberProfileControllerTest(
                 header("Origin", "http://localhost:3000")
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"avatarKey":"squirrel-acorn"}"""
+                content = """{"avatarKey":"mushroom-green-book"}"""
             }.andExpect {
                 status { isOk() }
-                jsonPath("$.avatarKey") { value("squirrel-acorn") }
+                jsonPath("$.avatarKey") { value("mushroom-green-book") }
             }
 
-        assertEquals("squirrel-acorn", avatarKeyForMembership(membershipId))
+        assertEquals("mushroom-green-book", avatarKeyForMembership(membershipId))
     }
 
     @Test
@@ -577,14 +577,14 @@ class MemberProfileControllerTest(
                     status { isOk() }
                     jsonPath("$.membershipId") { value(membershipId) }
                     jsonPath("$.displayName") { value(newShortName) }
-                    jsonPath("$.avatarKey") { value("squirrel-acorn") }
+                    jsonPath("$.avatarKey") { value("mushroom-green-book") }
                     jsonPath("$.shortName") { doesNotExist() }
                     jsonPath("$.status") { value(status) }
                     jsonPath("$.canDeactivate") { exists() }
                 }
 
             assertEquals(newShortName, shortNameForMembership(membershipId))
-            assertEquals("squirrel-acorn", avatarKeyForMembership(membershipId))
+            assertEquals("mushroom-green-book", avatarKeyForMembership(membershipId))
         }
     }
 
@@ -657,7 +657,7 @@ class MemberProfileControllerTest(
         status: String,
         shortName: String = prefix,
         profileImageUrl: String? = null,
-        avatarKey: String = "squirrel-acorn",
+        avatarKey: String = "mushroom-green-book",
     ): String {
         val userId = UUID.randomUUID().toString()
         val membershipId = UUID.randomUUID().toString()
@@ -724,7 +724,7 @@ class MemberProfileControllerTest(
         jdbcTemplate.update(
             """
             insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
-            values (?, ?, ?, 'MEMBER', ?, utc_timestamp(6), ?, 'squirrel-acorn')
+            values (?, ?, ?, 'MEMBER', ?, utc_timestamp(6), ?, 'mushroom-green-book')
             """.trimIndent(),
             membershipId,
             clubId,

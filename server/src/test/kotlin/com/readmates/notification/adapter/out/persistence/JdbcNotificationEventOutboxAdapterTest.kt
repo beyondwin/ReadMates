@@ -762,7 +762,7 @@ private fun JdbcTemplate.insertReminderHost(
     update(
         """
         insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
-        values (?, ?, ?, 'HOST', 'ACTIVE', utc_timestamp(6), 'Host', 'hedgehog-green-book')
+        values (?, ?, ?, 'HOST', 'ACTIVE', utc_timestamp(6), 'Host', 'globe-notebook')
         """.trimIndent(),
         membershipId,
         clubId,

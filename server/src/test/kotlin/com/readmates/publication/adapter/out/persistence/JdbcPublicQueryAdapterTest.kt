@@ -164,7 +164,7 @@ class JdbcPublicQueryAdapterTest(
         assertThat(result.highlights)
             .anySatisfy { highlight ->
                 assertThat(highlight.authorName).isEqualTo("이멤버5")
-                assertThat(highlight.avatarKey).isEqualTo("penguin-beret-book")
+                assertThat(highlight.avatarKey).isEqualTo("apple-green-book")
             }
         assertThat(result.highlights.filter { it.authorName == "탈퇴한 멤버" })
             .isNotEmpty

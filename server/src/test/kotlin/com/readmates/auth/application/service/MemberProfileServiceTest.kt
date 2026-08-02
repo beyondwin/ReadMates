@@ -39,14 +39,14 @@ class MemberProfileServiceTest {
             service.updateOwnAvatar(
                 "member@example.com",
                 clubId,
-                UpdateMemberAvatarCommand("  hedgehog-green-mug  "),
+                UpdateMemberAvatarCommand("  balloon-green-book  "),
             )
 
         assertEquals(
-            listOf(AvatarUpdate(clubId, membershipId, "hedgehog-green-mug")),
+            listOf(AvatarUpdate(clubId, membershipId, "balloon-green-book")),
             store.avatarUpdates,
         )
-        assertEquals("hedgehog-green-mug", profile.avatarKey)
+        assertEquals("balloon-green-book", profile.avatarKey)
         assertEquals(listOf(clubId), invalidation.clubs)
     }
 
@@ -68,7 +68,7 @@ class MemberProfileServiceTest {
 
     @Test
     fun `rejects unknown traversal and uppercase avatar keys`() {
-        listOf("unknown-avatar-key", "../hedgehog-green-mug", "HEDGEHOG-GREEN-MUG").forEach { avatarKey ->
+        listOf("unknown-avatar-key", "../balloon-green-book", "HEDGEHOG-GREEN-MUG").forEach { avatarKey ->
             val exception =
                 assertThrows(MemberProfileException::class.java) {
                     MemberProfileService(RecordingMemberProfileStorePort()).updateOwnAvatar(
@@ -90,7 +90,7 @@ class MemberProfileServiceTest {
                     MemberProfileService(RecordingMemberProfileStorePort(status = status)).updateOwnAvatar(
                         "member@example.com",
                         clubId,
-                        UpdateMemberAvatarCommand("hedgehog-green-mug"),
+                        UpdateMemberAvatarCommand("balloon-green-book"),
                     )
                 }
 
@@ -106,10 +106,10 @@ class MemberProfileServiceTest {
             MemberProfileService(store).updateOwnAvatar(
                 "member@example.com",
                 clubId,
-                UpdateMemberAvatarCommand("hedgehog-green-mug"),
+                UpdateMemberAvatarCommand("balloon-green-book"),
             )
 
-        assertEquals("hedgehog-green-mug", profile.avatarKey)
+        assertEquals("balloon-green-book", profile.avatarKey)
     }
 
     @Test
@@ -122,7 +122,7 @@ class MemberProfileServiceTest {
                 service.updateOwnAvatar(
                     "member@example.com",
                     clubId,
-                    UpdateMemberAvatarCommand("hedgehog-green-mug"),
+                    UpdateMemberAvatarCommand("balloon-green-book"),
                 )
             }
 
@@ -144,7 +144,7 @@ class MemberProfileServiceTest {
                 service.updateOwnAvatar(
                     "member@example.com",
                     clubId,
-                    UpdateMemberAvatarCommand("hedgehog-green-mug"),
+                    UpdateMemberAvatarCommand("balloon-green-book"),
                 )
             }
 
@@ -170,7 +170,7 @@ class MemberProfileServiceTest {
                 displayName = "멤버",
                 accountName = "계정",
                 profileImageUrl = null,
-                avatarKey = "squirrel-acorn",
+                avatarKey = "mushroom-green-book",
                 role = MembershipRole.MEMBER,
                 status = status,
             )

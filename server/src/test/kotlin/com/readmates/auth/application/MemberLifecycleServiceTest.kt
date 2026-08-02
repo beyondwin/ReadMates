@@ -120,7 +120,7 @@ class MemberLifecycleServiceTest {
                     displayName = "멤버",
                     accountName = "멤버계정",
                     profileImageUrl = null,
-                    avatarKey = "squirrel-acorn",
+                    avatarKey = "mushroom-green-book",
                     role = MembershipRole.MEMBER,
                     status = targetStatus,
                 )
@@ -149,7 +149,7 @@ class MemberLifecycleServiceTest {
                 displayName = "멤버",
                 accountName = "멤버계정",
                 profileImageUrl = null,
-                avatarKey = "squirrel-acorn",
+                avatarKey = "mushroom-green-book",
                 role = MembershipRole.MEMBER,
                 status = targetStatus,
                 joinedAt = null,

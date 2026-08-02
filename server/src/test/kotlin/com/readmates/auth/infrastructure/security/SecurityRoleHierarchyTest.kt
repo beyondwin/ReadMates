@@ -165,7 +165,7 @@ class SecurityRoleHierarchyTest(
         jdbcTemplate.update(
             """
             insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
-            values (?, '00000000-0000-0000-0000-000000000001', ?, 'MEMBER', 'VIEWER', null, 'Viewer', 'squirrel-acorn')
+            values (?, '00000000-0000-0000-0000-000000000001', ?, 'MEMBER', 'VIEWER', null, 'Viewer', 'mushroom-green-book')
             """.trimIndent(),
             membershipId,
             userId,

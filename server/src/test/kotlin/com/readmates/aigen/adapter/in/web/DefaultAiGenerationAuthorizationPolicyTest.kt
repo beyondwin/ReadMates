@@ -44,8 +44,8 @@ private const val SEED_SQL = """
       ('$MEMBER_USER_ID', 'authz-member@example.test', 'Authz Member', 'AuthzMember', 'PASSWORD');
     insert into memberships (id, club_id, user_id, role, status, short_name, joined_at, avatar_key)
     values
-      ('$HOST_MEMBERSHIP_ID', '$CLUB_ID', '$HOST_USER_ID', 'HOST', 'ACTIVE', 'AuthzHost', '2026-05-01 00:00:00.000000', 'hedgehog-green-book'),
-      ('$MEMBER_MEMBERSHIP_ID', '$CLUB_ID', '$MEMBER_USER_ID', 'MEMBER', 'ACTIVE', 'AuthzMember', '2026-05-01 00:00:00.000000', 'hedgehog-green-book');
+      ('$HOST_MEMBERSHIP_ID', '$CLUB_ID', '$HOST_USER_ID', 'HOST', 'ACTIVE', 'AuthzHost', '2026-05-01 00:00:00.000000', 'globe-notebook'),
+      ('$MEMBER_MEMBERSHIP_ID', '$CLUB_ID', '$MEMBER_USER_ID', 'MEMBER', 'ACTIVE', 'AuthzMember', '2026-05-01 00:00:00.000000', 'globe-notebook');
     insert into sessions (
       id, club_id, number, title, book_title, book_author, book_translator, book_link, book_image_url,
       session_date, start_time, end_time, location_label, meeting_url, meeting_passcode,

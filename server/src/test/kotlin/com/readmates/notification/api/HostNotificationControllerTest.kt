@@ -1206,7 +1206,7 @@ class HostNotificationControllerTest(
               'ACTIVE',
               utc_timestamp(6),
               'Other',
-              'hedgehog-green-book'
+              'globe-notebook'
             )
             """.trimIndent(),
         )

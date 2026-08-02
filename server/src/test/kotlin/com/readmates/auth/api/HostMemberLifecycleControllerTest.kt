@@ -79,7 +79,7 @@ class HostMemberLifecycleControllerTest(
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.items[?(@.membershipId == '$activeMembershipId')].status") { value("ACTIVE") }
-                jsonPath("$.items[?(@.membershipId == '$activeMembershipId')].avatarKey") { value("squirrel-acorn") }
+                jsonPath("$.items[?(@.membershipId == '$activeMembershipId')].avatarKey") { value("mushroom-green-book") }
                 jsonPath("$.items[?(@.membershipId == '$activeMembershipId')].currentSessionParticipationStatus") {
                     value("ACTIVE")
                 }
@@ -125,12 +125,12 @@ class HostMemberLifecycleControllerTest(
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.member.status") { value("SUSPENDED") }
-                jsonPath("$.member.avatarKey") { value("squirrel-acorn") }
+                jsonPath("$.member.avatarKey") { value("mushroom-green-book") }
                 jsonPath("$.currentSessionPolicyResult") { value("APPLIED") }
             }
 
         assertEquals("SUSPENDED", membershipStatus(membershipId))
-        assertEquals("squirrel-acorn", avatarKey(membershipId))
+        assertEquals("mushroom-green-book", avatarKey(membershipId))
         assertEquals("REMOVED", participationStatus(sessionId, membershipId))
     }
 
@@ -174,13 +174,13 @@ class HostMemberLifecycleControllerTest(
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.member.status") { value("ACTIVE") }
-                jsonPath("$.member.avatarKey") { value("squirrel-acorn") }
+                jsonPath("$.member.avatarKey") { value("mushroom-green-book") }
                 jsonPath("$.member.currentSessionParticipationStatus") { doesNotExist() }
                 jsonPath("$.currentSessionPolicyResult") { value("NOT_APPLICABLE") }
             }
 
         assertEquals("ACTIVE", membershipStatus(membershipId))
-        assertEquals("squirrel-acorn", avatarKey(membershipId))
+        assertEquals("mushroom-green-book", avatarKey(membershipId))
         assertEquals(null, participationStatusOrNull(sessionId, membershipId))
     }
 
@@ -504,7 +504,7 @@ class HostMemberLifecycleControllerTest(
         jdbcTemplate.update(
             """
             insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
-            values (?, '00000000-0000-0000-0000-000000000001', ?, ?, ?, utc_timestamp(6), ?, 'squirrel-acorn')
+            values (?, '00000000-0000-0000-0000-000000000001', ?, ?, ?, utc_timestamp(6), ?, 'mushroom-green-book')
             """.trimIndent(),
             membershipId,
             userId,
@@ -550,7 +550,7 @@ class HostMemberLifecycleControllerTest(
         jdbcTemplate.update(
             """
             insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
-            values (?, ?, ?, 'MEMBER', ?, utc_timestamp(6), ?, 'squirrel-acorn')
+            values (?, ?, ?, 'MEMBER', ?, utc_timestamp(6), ?, 'mushroom-green-book')
             """.trimIndent(),
             membershipId,
             clubId,

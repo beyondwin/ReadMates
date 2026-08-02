@@ -86,9 +86,9 @@ private const val GROUNDED_SEED_SQL = """
       ('$GROUNDED_MEMBER_B_USER_ID', 'grounded-b@example.test', 'PublicMemberB', 'PublicMemberB', 'PASSWORD');
     insert into memberships (id, club_id, user_id, role, status, short_name, joined_at, avatar_key)
     values
-      ('$GROUNDED_HOST_MEMBERSHIP_ID', '$GROUNDED_CLUB_ID', '$GROUNDED_HOST_USER_ID', 'HOST', 'ACTIVE', 'PublicHost', '2026-07-01 00:00:00.000000', 'hedgehog-green-book'),
-      ('$GROUNDED_MEMBER_A_MEMBERSHIP_ID', '$GROUNDED_CLUB_ID', '$GROUNDED_MEMBER_A_USER_ID', 'MEMBER', 'ACTIVE', 'PublicMemberA', '2026-07-01 00:00:00.000000', 'hedgehog-green-book'),
-      ('$GROUNDED_MEMBER_B_MEMBERSHIP_ID', '$GROUNDED_CLUB_ID', '$GROUNDED_MEMBER_B_USER_ID', 'MEMBER', 'ACTIVE', 'PublicMemberB', '2026-07-01 00:00:00.000000', 'hedgehog-green-book');
+      ('$GROUNDED_HOST_MEMBERSHIP_ID', '$GROUNDED_CLUB_ID', '$GROUNDED_HOST_USER_ID', 'HOST', 'ACTIVE', 'PublicHost', '2026-07-01 00:00:00.000000', 'globe-notebook'),
+      ('$GROUNDED_MEMBER_A_MEMBERSHIP_ID', '$GROUNDED_CLUB_ID', '$GROUNDED_MEMBER_A_USER_ID', 'MEMBER', 'ACTIVE', 'PublicMemberA', '2026-07-01 00:00:00.000000', 'globe-notebook'),
+      ('$GROUNDED_MEMBER_B_MEMBERSHIP_ID', '$GROUNDED_CLUB_ID', '$GROUNDED_MEMBER_B_USER_ID', 'MEMBER', 'ACTIVE', 'PublicMemberB', '2026-07-01 00:00:00.000000', 'globe-notebook');
     insert into sessions (
       id, club_id, number, title, book_title, book_author, book_translator, book_link, book_image_url,
       session_date, start_time, end_time, location_label, meeting_url, meeting_passcode,

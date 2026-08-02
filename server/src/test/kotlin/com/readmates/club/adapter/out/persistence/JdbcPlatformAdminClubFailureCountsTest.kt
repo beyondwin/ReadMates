@@ -91,7 +91,7 @@ class JdbcPlatformAdminClubFailureCountsTest(
         )
         jdbcTemplate.update(
             "insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key) " +
-                "values (?, ?, ?, 'MEMBER', 'ACTIVE', utc_timestamp(6), 'FC', 'hedgehog-green-book')",
+                "values (?, ?, ?, 'MEMBER', 'ACTIVE', utc_timestamp(6), 'FC', 'globe-notebook')",
             MEMBERSHIP_ID,
             CLUB_ID,
             USER_ID,

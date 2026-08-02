@@ -1278,7 +1278,7 @@ class GoogleOAuthLoginSessionTest(
               ?,
               utc_timestamp(6),
               users.short_name,
-              'squirrel-acorn'
+              'mushroom-green-book'
             from clubs
             join users on users.email = ?
             where clubs.slug = 'reading-sai'

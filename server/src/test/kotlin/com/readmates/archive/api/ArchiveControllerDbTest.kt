@@ -509,7 +509,7 @@ class ArchiveControllerDbTest(
               'ACTIVE',
               '2026-01-01 00:00:00.000000',
               '샘플멤버5',
-              'hedgehog-green-book'
+              'globe-notebook'
             from clubs
             join users on users.email = 'member5@example.com'
             where clubs.slug = 'sample-book-club';

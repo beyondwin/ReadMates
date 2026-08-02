@@ -561,7 +561,7 @@ class PlatformAdminControllerTest(
         jdbcTemplate.update(
             """
             insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
-            values (?, ?, ?, 'HOST', 'ACTIVE', utc_timestamp(6), 'Host', 'squirrel-acorn')
+            values (?, ?, ?, 'HOST', 'ACTIVE', utc_timestamp(6), 'Host', 'mushroom-green-book')
             """.trimIndent(),
             membershipId,
             clubId,

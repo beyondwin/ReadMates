@@ -55,17 +55,17 @@ on duplicate key update
 
 insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
 with seed as (
-  select 201 as id_suffix, 'host@example.com' as email, 'HOST' as role, 'squirrel-acorn' as avatar_key
+  select 201 as id_suffix, 'host@example.com' as email, 'HOST' as role, 'mushroom-green-book' as avatar_key
   union all
-  select 202, 'member1@example.com', 'MEMBER', 'deer-brown-book'
+  select 202, 'member1@example.com', 'MEMBER', 'lemon-green-book'
   union all
-  select 203, 'member2@example.com', 'MEMBER', 'fox-glasses-mug'
+  select 203, 'member2@example.com', 'MEMBER', 'pudding-notebook'
   union all
-  select 204, 'member3@example.com', 'MEMBER', 'koala-book-sprig'
+  select 204, 'member3@example.com', 'MEMBER', 'peach-green-book'
   union all
-  select 205, 'member4@example.com', 'MEMBER', 'polar-bear-snowflake-mug'
+  select 205, 'member4@example.com', 'MEMBER', 'radish-notebook'
   union all
-  select 206, 'member5@example.com', 'MEMBER', 'penguin-beret-book'
+  select 206, 'member5@example.com', 'MEMBER', 'apple-green-book'
 ),
 resolved as (
   select

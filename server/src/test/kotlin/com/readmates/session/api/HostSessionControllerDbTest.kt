@@ -194,7 +194,7 @@ private const val CLEANUP_GENERATED_SESSIONS_SQL = """
 private const val RESET_HOST_AVATAR_KEY_SQL = """
     update memberships
     join users on users.id = memberships.user_id
-    set memberships.avatar_key = 'squirrel-acorn'
+    set memberships.avatar_key = 'mushroom-green-book'
     where memberships.club_id = '00000000-0000-0000-0000-000000000001'
       and users.email = 'host@example.com';
 """
@@ -203,7 +203,7 @@ private const val RESET_MEMBER1_ACTIVE_AVATAR_KEY_SQL = """
     update memberships
     join users on users.id = memberships.user_id
     set memberships.status = 'ACTIVE',
-        memberships.avatar_key = 'deer-brown-book'
+        memberships.avatar_key = 'lemon-green-book'
     where memberships.club_id = '00000000-0000-0000-0000-000000000001'
       and users.email = 'member1@example.com';
 """
@@ -849,7 +849,7 @@ class HostSessionControllerDbTest(
             """
             update memberships
             join users on users.id = memberships.user_id
-            set memberships.avatar_key = 'fennec-heart-mug'
+            set memberships.avatar_key = 'toast-brown-book'
             where memberships.club_id = '00000000-0000-0000-0000-000000000001'
               and users.email = 'host@example.com'
             """.trimIndent(),
@@ -860,7 +860,7 @@ class HostSessionControllerDbTest(
                 with(user("host@example.com"))
             }.andExpect {
                 status { isOk() }
-                jsonPath("$.attendees[0].avatarKey") { value("fennec-heart-mug") }
+                jsonPath("$.attendees[0].avatarKey") { value("toast-brown-book") }
                 jsonPath("$.attendees[0].profileImageUrl") { doesNotExist() }
             }
     }
@@ -879,7 +879,7 @@ class HostSessionControllerDbTest(
             update memberships
             join users on users.id = memberships.user_id
             set memberships.status = 'LEFT',
-                memberships.avatar_key = 'hedgehog-glasses-book'
+                memberships.avatar_key = 'snowglobe-green-book'
             where memberships.club_id = '00000000-0000-0000-0000-000000000001'
               and users.email = 'member1@example.com'
             """.trimIndent(),
@@ -891,7 +891,7 @@ class HostSessionControllerDbTest(
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.attendees[?(@.membershipId == '00000000-0000-0000-0000-000000000202')].avatarKey") {
-                    value(hasItem("hedgehog-green-book"))
+                    value(hasItem("globe-notebook"))
                 }
             }
     }
@@ -1953,7 +1953,7 @@ class HostSessionControllerDbTest(
                 'SUSPENDED',
                 utc_timestamp(6),
                 '정지',
-                'squirrel-acorn'
+                'mushroom-green-book'
               ),
               (
                 '00000000-0000-0000-0000-000000019212',
@@ -1963,7 +1963,7 @@ class HostSessionControllerDbTest(
                 'LEFT',
                 utc_timestamp(6),
                 '탈퇴',
-                'fennec-heart-mug'
+                'toast-brown-book'
               ),
               (
                 '00000000-0000-0000-0000-000000019213',
@@ -1973,7 +1973,7 @@ class HostSessionControllerDbTest(
                 'INACTIVE',
                 utc_timestamp(6),
                 '비활성',
-                'fox-glasses-mug'
+                'pudding-notebook'
               )
             """.trimIndent(),
         )
@@ -2070,7 +2070,7 @@ class HostSessionControllerDbTest(
               'ACTIVE',
               utc_timestamp(6),
               '외부',
-              'squirrel-acorn'
+              'mushroom-green-book'
             )
             """.trimIndent(),
         )

@@ -150,7 +150,7 @@ class JdbcHostSessionHistoryAdapterDbTest(
         jdbcTemplate.update(
             """
             insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
-            values (?, ?, ?, 'HOST', 'ACTIVE', utc_timestamp(6), 'Outside', 'hedgehog-green-book')
+            values (?, ?, ?, 'HOST', 'ACTIVE', utc_timestamp(6), 'Outside', 'globe-notebook')
             """.trimIndent(),
             OUTSIDE_MEMBERSHIP_ID.toString(),
             OUTSIDE_CLUB_ID.toString(),
