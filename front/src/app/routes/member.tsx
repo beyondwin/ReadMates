@@ -21,7 +21,7 @@ import {
   guestHomeLoader,
   guestNotesLoader,
 } from "@/features/guest-browse/route/guest-route-data";
-import { GuestScopedAppRoute, type GuestCurrentSessionContentProps } from "@/features/guest-browse/route/guest-scoped-app-route";
+import { GuestScopedAppRoute, type GuestCurrentSessionContentProps, type GuestHomeContentProps } from "@/features/guest-browse/route/guest-scoped-app-route";
 import { GuestNavigationLink } from "@/features/guest-browse/ui/guest-navigation-dialog";
 import { AppRouteLayout } from "@/src/app/layouts/app-route-layout";
 import { memoizeRouteModule } from "@/src/app/routes/route-module-loader";
@@ -30,6 +30,7 @@ import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
 import { RequireAuth, RequireMemberApp } from "@/src/app/route-guards";
 import { Link } from "@/src/app/router-link";
 import { GuestCurrentSessionContent } from "@/src/pages/guest-current-session";
+import { GuestHomeContent } from "@/src/pages/guest-home";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
 
 const currentSessionInternalLink: InternalLinkComponent = ({ href, children, ...props }) => {
@@ -59,6 +60,7 @@ function scopedMemberRoute({
   fallback,
   load,
   guestLoader,
+  GuestHomeContent: GuestHomeContentOverride,
   GuestCurrentSessionContent: GuestCurrentSessionContentOverride,
 }: {
   path?: string;
@@ -69,6 +71,7 @@ function scopedMemberRoute({
   fallback: ReactNode;
   load: () => Promise<ScopedRouteModule>;
   guestLoader?: LoaderFunction;
+  GuestHomeContent?: ComponentType<GuestHomeContentProps>;
   GuestCurrentSessionContent?: ComponentType<GuestCurrentSessionContentProps>;
 }): RouteObject {
   const loadOnce = memoizeRouteModule(load);
@@ -80,6 +83,7 @@ function scopedMemberRoute({
     return isGuestScopedRouteData(data) ? (
       <GuestScopedAppRoute
         LinkComponent={GuestNavigationLink}
+        GuestHomeContent={GuestHomeContentOverride}
         GuestCurrentSessionContent={GuestCurrentSessionContentOverride}
       />
     ) : (
@@ -134,6 +138,7 @@ function scopedMemberAppRoutes(queryClient: QueryClient): RouteObject[] {
       errorElement: <ArchiveRouteError />,
       fallback: <ReadmatesRouteLoading label="멤버 홈을 불러오는 중" variant="member" />,
       guestLoader: guestHomeLoader,
+      GuestHomeContent,
       load: async () => {
         const [{ default: Component }, { memberHomeLoader: loader }] = await Promise.all([
           import("@/src/pages/app-home"),

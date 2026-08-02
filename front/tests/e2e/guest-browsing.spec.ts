@@ -93,8 +93,8 @@ test("anonymous visitors enter from public surfaces and browse guest-readable cl
   await expect(page).toHaveURL(new RegExp(`${appBase}/?$`));
   await expect.poll(() => runtimeErrors).toEqual([]);
   await expect(failedResponses).toEqual([]);
-  await expect(page.getByRole("heading", { name: "함께 읽어 온 장면들" })).toBeVisible();
-  await expect(page.getByText("다가오는 세션", { exact: true })).toBeVisible();
+  await expect(page.locator(".rm-member-home-desktop").getByRole("heading", { name: /게스트님,.*E2E 현재 세션 책.*함께 읽어요/ })).toBeVisible();
+  await expect(page.locator(".rm-member-home-desktop").getByText("다음 달 선정", { exact: true })).toBeVisible();
   await expect(page.getByText("게스트", { exact: true }).first()).toBeVisible();
 
   const nav = page.getByRole("navigation", { name: "앱 내비게이션" });
@@ -103,7 +103,7 @@ test("anonymous visitors enter from public surfaces and browse guest-readable cl
 
   await page.goto(`${appBase}/session/current`);
   await expect(page.getByRole("heading", { name: "E2E 현재 세션 책" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "참석 현황" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "세션 준비" })).toBeVisible();
 
   await page.goto(`${appBase}/notes`);
   await expect(page.getByText("세션을 먼저 고르고, 하이라이트·한줄평·질문을 작성자와 함께 훑는 클럽 기록장입니다.")).toBeVisible();
@@ -121,7 +121,7 @@ test("anonymous visitors enter from public surfaces and browse guest-readable cl
 
   await page.goto(`${appBase}/host`);
   await expect(page).toHaveURL(new RegExp(`${appBase}/?$`));
-  await expect(page.getByRole("heading", { name: "함께 읽어 온 장면들" })).toBeVisible();
+  await expect(page.locator(".rm-member-home-desktop").getByRole("heading", { name: /게스트님,.*E2E 현재 세션 책.*함께 읽어요/ })).toBeVisible();
 
   await page.goto(`/clubs/sample-book-club/app/sessions/${seededArchiveSessionId}`);
   await expect(page.getByRole("heading", { name: "페이지를 찾을 수 없습니다." })).toBeVisible();
@@ -138,8 +138,7 @@ test("anonymous visitors enter from public surfaces and browse guest-readable cl
 test("public club without an open guest session renders the normal empty state", async ({ page }) => {
   await page.goto(`${emptyClubAppBase}/session/current`);
 
-  await expect(page.getByRole("heading", { name: "현재 공개된 세션이 없습니다" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "클럽 둘러보기" })).toHaveAttribute("href", emptyClubAppBase);
+  await expect(page.getByRole("heading", { name: "아직 열린 세션이 없습니다" })).toBeVisible();
   await expect(page.getByText("페이지를 불러오지 못했습니다")).toHaveCount(0);
 });
 
@@ -230,7 +229,7 @@ test("mobile guest lock sheet traps and restores focus without hiding conversion
 test("public entry and every guest reading surface remain responsive at mobile and desktop widths", async ({ page }) => {
   const surfaces = [
     { path: clubBase, target: () => page.getByRole("link", { name: "둘러보기", exact: true }).first(), clearanceTarget: () => page.getByRole("link", { name: "둘러보기", exact: true }).first(), app: false },
-    { path: appBase, target: () => page.getByRole("heading", { name: "함께 읽어 온 장면들" }), clearanceTarget: () => page.getByRole("link", { name: "멤버로 시작", exact: true }).last(), app: true },
+    { path: appBase, target: () => page.locator(".rm-member-home-desktop:visible h1, .rm-member-home-mobile:visible h1").first(), clearanceTarget: () => page.getByRole("link", { name: "멤버로 시작", exact: true }).last(), app: true },
     { path: `${appBase}/session/current`, target: () => page.getByRole("heading", { name: "E2E 현재 세션 책" }), clearanceTarget: () => page.getByRole("link", { name: "멤버로 시작", exact: true }).last(), app: true },
     { path: `${appBase}/notes`, target: () => page.getByText("세션을 먼저 고르고, 하이라이트·한줄평·질문을 작성자와 함께 훑는 클럽 기록장입니다."), clearanceTarget: () => page.getByRole("button", { name: /^전체/ }).first(), app: true },
     { path: `${appBase}/archive`, target: () => page.getByRole("heading", { name: "읽어 온 자리" }), clearanceTarget: () => page.locator("main a.surface").last(), app: true },

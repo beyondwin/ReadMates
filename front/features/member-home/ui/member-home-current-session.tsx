@@ -1,13 +1,13 @@
 import { type CSSProperties } from "react";
 import { Link, PlainMemberHomeLink, type MemberHomeLinkComponent } from "@/features/member-home/ui/member-home-link";
-import type { MemberHomeCurrentSessionView as CurrentSessionResponse } from "@/features/member-home/model/member-home-view-model";
+import type { CurrentSessionReadPageData } from "@/shared/model/current-session-read-view";
 import type { ReadingPace, ReadingPaceTier } from "@/shared/model/reading-pace";
 import { safeExternalHttpsUrl } from "@/shared/security/safe-external-url";
 import { BookCover } from "@/shared/ui/book-cover";
 import { displayText, formatDateLabel, formatDeadlineLabel, rsvpLabel } from "@/shared/ui/readmates-display";
 import { SessionTimingIdentity } from "@/shared/ui/session-identity";
 
-type CurrentSession = NonNullable<CurrentSessionResponse["currentSession"]>;
+type CurrentSession = NonNullable<CurrentSessionReadPageData["currentSession"]>;
 
 export type MobileIconName = "archive" | "arrow-right" | "arrow-up-right" | "book" | "check" | "host" | "link" | "notes" | "sparkle";
 
@@ -54,7 +54,16 @@ function activeAttendees(session: CurrentSession) {
   return session.attendees.filter((attendee) => (attendee.participationStatus ?? "ACTIVE") === "ACTIVE");
 }
 
-function mobilePrepStepsFor(session: CurrentSession) {
+function mobilePrepStepsFor(session: CurrentSession, canViewPersonalState: boolean) {
+  if (!canViewPersonalState) {
+    return [
+      { id: "rsvp", label: "참석", done: false, hint: "멤버 전용" },
+      { id: "read", label: "읽기", done: false, hint: "멤버 전용" },
+      { id: "q", label: "질문", done: false, hint: "멤버 전용" },
+      { id: "feedback", label: "피드백", done: false, hint: "멤버 전용" },
+    ];
+  }
+
   return [
     {
       id: "rsvp",
@@ -177,11 +186,15 @@ export function MobileCurrentSessionCard({
   session,
   isHost,
   isViewer = false,
+  canWrite = true,
+  canViewPersonalState = true,
   LinkComponent = PlainMemberHomeLink,
 }: {
   session: CurrentSession | null;
   isHost: boolean;
   isViewer?: boolean;
+  canWrite?: boolean;
+  canViewPersonalState?: boolean;
   LinkComponent?: MemberHomeLinkComponent;
 }) {
   if (!session) {
@@ -212,7 +225,7 @@ export function MobileCurrentSessionCard({
   const bookAuthor = displayText(session.bookAuthor, "저자 미정");
   const dateLabel = formatDateLabel(session.date, "일정 미정");
   const deadlineLabel = formatDeadlineLabel(session.questionDeadlineAt, "마감 미정");
-  const locationLabel = displayText(session.locationLabel, "장소 미정");
+  const locationLabel = session.locationLabel ? displayText(session.locationLabel, "") : null;
   const meetingUrl = safeExternalHttpsUrl(session.meetingUrl);
   const attendees = activeAttendees(session);
   const attendance = {
@@ -234,9 +247,11 @@ export function MobileCurrentSessionCard({
           <div className="tiny rm-member-session-card__meta">
             {dateLabel} · {session.startTime} – {session.endTime}
           </div>
-          <div className="tiny" style={{ color: "var(--text-3)", marginTop: 2 }}>
-            {locationLabel}
-          </div>
+          {locationLabel ? (
+            <div className="tiny" style={{ color: "var(--text-3)", marginTop: 2 }}>
+              {locationLabel}
+            </div>
+          ) : null}
         </div>
         <BookCover title={bookTitle} author={bookAuthor} imageUrl={session.bookImageUrl} width={92} className="rm-member-session-card__cover" />
       </div>
@@ -244,14 +259,14 @@ export function MobileCurrentSessionCard({
       <div className="rm-member-session-card__body">
         <div className="m-row-between" style={{ alignItems: "baseline", gap: 10 }}>
           <div className="eyebrow">
-            내 준비
+            {canViewPersonalState ? "내 준비" : "준비 현황"}
           </div>
           <div className="tiny mono" style={{ color: "var(--text-3)" }}>
             질문 마감 {deadlineLabel}
           </div>
         </div>
         <div className="m-chips rm-member-session-card__prep">
-          {mobilePrepStepsFor(session).map((step) => (
+          {mobilePrepStepsFor(session, canViewPersonalState).map((step) => (
             <span key={step.id} className={`m-chip${step.done ? " m-chip-done" : ""}`}>
               {step.done ? <MobileIcon name="check" size={11} /> : null}
               {step.label}
@@ -260,7 +275,8 @@ export function MobileCurrentSessionCard({
           ))}
         </div>
         <div className="small" style={{ color: "var(--text-3)", marginTop: 12 }}>
-          참석 {attendance.attended}/{attendance.total} · 현재 RSVP {rsvpLabel(session.myRsvpStatus)}
+          참석 {attendance.attended}/{attendance.total}
+          {canViewPersonalState ? ` · 현재 RSVP ${rsvpLabel(session.myRsvpStatus)}` : ""}
         </div>
         {isViewer ? (
           <div className="m-card-quiet" role="note" style={{ marginTop: 12 }}>
@@ -272,7 +288,7 @@ export function MobileCurrentSessionCard({
         ) : null}
         <Link
           to="/app/session/current"
-          className="btn btn-primary rm-member-session-card__primary"
+          className={`btn ${canWrite ? "btn-primary" : "btn-quiet"} rm-member-session-card__primary`}
           LinkComponent={LinkComponent}
         >
           세션 열기 <MobileIcon name="arrow-right" size={14} />
@@ -331,7 +347,7 @@ export function MobileTodayActions({
   const readingProgress = session.myCheckin?.readingProgress ?? 0;
   const meetingUrl = safeExternalHttpsUrl(session.meetingUrl);
   const meetingHref = meetingUrl ?? "/app/session/current";
-  const meetingSub = session.meetingPasscode ?? session.locationLabel;
+  const meetingSub = session.meetingPasscode ?? session.locationLabel ?? "멤버 전용";
 
   if (isViewer || !canWrite) {
     return (

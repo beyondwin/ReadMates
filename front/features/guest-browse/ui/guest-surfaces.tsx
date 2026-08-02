@@ -2,7 +2,6 @@ import { useState, type ComponentType, type CSSProperties, type ReactNode } from
 import type {
   GuestArchiveDetailReadView,
   GuestArchiveSessionReadView,
-  GuestHomeReadView,
   GuestNoteFeedItemReadView,
   GuestPage,
   GuestSessionReadView,
@@ -38,66 +37,6 @@ function ConversionPrompt({ returnTo, LinkComponent = BrowserLink }: { returnTo:
   );
 }
 
-export function GuestHome({ data, appBasePath = "/app", returnTo = appBasePath, LinkComponent = BrowserLink, onRetry }: { data: GuestHomeReadView; onRetry?: Partial<Record<"current" | "upcoming" | "recentNotes", LoadMore>> } & GuestSurfaceProps) {
-  const current = data.current.currentSession;
-  return (
-    <main>
-      <section className="page-header-compact">
-        <div className="container">
-          <p className="eyebrow" style={{ margin: 0 }}>게스트 · 클럽 기록</p>
-          <h1 className="h1 editorial" style={{ margin: "8px 0 0" }}>함께 읽어 온 장면들</h1>
-          <p className="body" style={{ color: "var(--text-2)", margin: "10px 0 0", maxWidth: 620 }}>
-            공개된 세션과 기록을 읽어 보세요. 작성과 참여 기능은 정식 멤버에게 열립니다.
-          </p>
-        </div>
-      </section>
-      <section style={{ padding: "28px 0 72px" }}>
-        <div className="container stack" style={{ "--stack": "32px" }}>
-          <section aria-labelledby="guest-home-current">
-            <p id="guest-home-current" className="eyebrow" style={{ margin: "0 0 10px" }}>현재 세션</p>
-            {data.widgetErrors?.current ? <WidgetFailure error={data.widgetErrors.current} onRetry={onRetry?.current} /> : current ? <GuestSessionCard session={current} href={appHref(appBasePath, "/session/current")} LinkComponent={LinkComponent} /> : <Empty message="현재 공개된 세션이 없습니다." />}
-          </section>
-          <section aria-labelledby="guest-home-upcoming">
-            <h2 id="guest-home-upcoming" className="h3 editorial" style={{ margin: "0 0 14px" }}>다가오는 세션</h2>
-            {data.upcoming.items.length ? (
-              <div className="stack" style={{ "--stack": "10px" }}>
-                {data.upcoming.items.map((session) => (
-                  <article key={session.sessionId} className="surface" style={{ padding: 18 }}>
-                    <div className="tiny mono" style={{ color: "var(--text-3)" }}>No.{String(session.sessionNumber).padStart(2, "0")} · {formatDateLabel(session.date)}</div>
-                    <div className="body editorial" style={{ marginTop: 6 }}>{session.bookTitle}</div>
-                    <div className="small" style={{ color: "var(--text-2)", marginTop: 4 }}>{session.bookAuthor} · {session.startTime} – {session.endTime}</div>
-                  </article>
-                ))}
-              </div>
-            ) : data.widgetErrors?.upcoming ? <WidgetFailure error={data.widgetErrors.upcoming} onRetry={onRetry?.upcoming} /> : <Empty message="공개된 예정 세션이 없습니다." />}
-          </section>
-          <section aria-labelledby="guest-home-notes">
-            <div className="row-between" style={{ gap: 16, alignItems: "baseline", marginBottom: 14 }}>
-              <h2 id="guest-home-notes" className="h3 editorial" style={{ margin: 0 }}>최근 노트 활동</h2>
-              <LinkComponent className="small" to={appHref(appBasePath, "/notes")}>노트 더 보기</LinkComponent>
-            </div>
-            {data.recentNotes.items.length ? <GuestNoteList items={data.recentNotes.items.slice(0, 5)} /> : data.widgetErrors?.recentNotes ? <WidgetFailure error={data.widgetErrors.recentNotes} onRetry={onRetry?.recentNotes} /> : <Empty message="아직 공개된 노트가 없습니다." />}
-          </section>
-          <ConversionPrompt returnTo={returnTo} LinkComponent={LinkComponent} />
-        </div>
-      </section>
-    </main>
-  );
-}
-
-function GuestSessionCard({ session, href, LinkComponent = BrowserLink }: { session: GuestSessionReadView; href: string; LinkComponent?: ComponentType<GuestSurfaceLinkProps> }) {
-  return (
-    <LinkComponent to={href} className="surface" style={{ display: "grid", gridTemplateColumns: "72px minmax(0, 1fr)", gap: 16, padding: 20, color: "inherit", textDecoration: "none" }}>
-      <BookCover title={session.bookTitle} author={session.bookAuthor} imageUrl={session.bookImageUrl} width={72} decorative />
-      <div>
-        <div className="tiny mono" style={{ color: "var(--text-3)" }}>No.{String(session.sessionNumber).padStart(2, "0")} · {formatDateLabel(session.date)}</div>
-        <h2 className="h3 editorial" style={{ margin: "6px 0 0" }}>{session.bookTitle}</h2>
-        <p className="small" style={{ color: "var(--text-2)", margin: "5px 0 0" }}>{session.bookAuthor} · {session.startTime} – {session.endTime}</p>
-      </div>
-    </LinkComponent>
-  );
-}
-
 function GuestQuestions({ questions }: { questions: GuestSessionReadView["board"]["questions"] }) {
   return questions.length ? <div className="stack" style={{ "--stack": "10px" }}>{questions.map((question) => <article key={`${question.priority}-${question.text}`} className="surface" style={{ padding: 18 }}><div className="tiny mono" style={{ color: "var(--text-3)" }}>Q{question.priority}</div><p className="body editorial" style={{ margin: "8px 0 0" }}>{question.text}</p>{question.draftThought ? <p className="small" style={{ color: "var(--text-2)", margin: "10px 0 0", whiteSpace: "pre-wrap" }}>{question.draftThought}</p> : null}<p className="tiny" style={{ color: "var(--text-3)", margin: "10px 0 0" }}>{question.authorName}</p></article>)}</div> : <Empty message="공개된 질문이 없습니다." />;
 }
@@ -119,7 +58,6 @@ export function GuestArchiveDetail({ data, appBasePath = "/app", returnTo = appB
 }
 
 function Empty({ message }: { message: string }) { return <div className="surface-quiet" role="status" style={{ padding: 18, color: "var(--text-2)" }}>{message}</div>; }
-function WidgetFailure({ error, onRetry }: { error: { status?: number; retryAfterSeconds?: number }; onRetry?: LoadMore }) { return <div className="surface-quiet" role="status" style={{ padding: 18, color: "var(--text-2)" }}><p style={{ margin: 0 }}>{error.status === 429 ? error.retryAfterSeconds ? `${error.retryAfterSeconds}초 뒤에 다시 시도해 주세요.` : "요청이 많습니다. 잠시 뒤에 다시 시도해 주세요." : "기록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."}</p>{onRetry ? <LoadMore visible onLoadMore={onRetry} /> : null}</div>; }
 function LoadMore({ visible, onLoadMore }: { visible: boolean; onLoadMore?: LoadMore }) {
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);

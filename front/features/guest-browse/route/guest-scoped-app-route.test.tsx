@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, RouterProvider, createMemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { scopedGuestRouteLoader } from "./club-app-audience-loader";
-import { GuestArchiveRoute, GuestHomeRoute, GuestNotesRoute, GuestScopedAppRoute, type GuestCurrentSessionContentProps } from "./guest-scoped-app-route";
+import { GuestArchiveRoute, GuestNotesRoute, GuestScopedAppRoute, type GuestCurrentSessionContentProps } from "./guest-scoped-app-route";
 
 const LinkComponent = ({ to, children, ...props }: { to: string; children: React.ReactNode; className?: string; style?: React.CSSProperties }) => <a {...props} href={to}>{children}</a>;
 const anonymousAuth = { authenticated: false, userId: null, membershipId: null, clubId: null, email: null, displayName: null, accountName: null, role: null, membershipStatus: null, approvalState: "ANONYMOUS" };
@@ -202,25 +202,5 @@ describe("guest archive route pagination", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     resolve(new Response(JSON.stringify({ items: [{ sessionId: "a2", sessionNumber: 2, title: "둘", bookTitle: "다음 책", bookAuthor: "작가", bookImageUrl: null, date: "2026-08-09", attendance: 2, total: 2, state: "CLOSED" }], nextCursor: null }), { status: 200, headers: { "Content-Type": "application/json" } }));
     expect((await screen.findAllByText("다음 책")).length).toBe(2);
-  });
-});
-
-describe("guest home route recovery", () => {
-  it("keeps successful widgets, leaves a failed retry recoverable, then updates only the retried widget", async () => {
-    const user = userEvent.setup();
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response("unavailable", { status: 503 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ items: [{ sessionId: "u1", sessionNumber: 2, title: "다음", bookTitle: "복구된 예정 책", bookAuthor: "작가", bookLink: null, bookImageUrl: null, date: "2026-08-09", startTime: "19:00", endTime: "21:00", questionDeadlineAt: "2026-08-08", state: "OPEN" }], nextCursor: null }), { status: 200, headers: { "Content-Type": "application/json" } }));
-    vi.stubGlobal("fetch", fetchMock);
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(<QueryClientProvider client={client}><GuestHomeRoute initialData={{ current: { currentSession: null }, upcoming: { items: [], nextCursor: null }, recentNotes: { items: [{ sessionId: "s1", sessionNumber: 1, bookTitle: "책", date: "2026-08-02", authorName: "이름", authorShortName: "이", avatarKey: "book", kind: "HIGHLIGHT", text: "성공한 노트" }], nextCursor: null }, widgetErrors: { upcoming: { status: 503 } }, capabilities: { canWrite: false } }} clubSlug="alpha" appBasePath="/clubs/alpha/app" returnTo="/clubs/alpha/app" LinkComponent={LinkComponent} /></QueryClientProvider>);
-    expect(screen.getByText("성공한 노트")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "더 보기" }));
-    expect(await screen.findByRole("button", { name: "다시 시도" })).toBeVisible();
-    expect(screen.getByText("성공한 노트")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "다시 시도" }));
-    expect(await screen.findByText("복구된 예정 책")).toBeVisible();
-    expect(screen.getByText("성공한 노트")).toBeVisible();
-    expect(screen.queryByText("기록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.")).not.toBeInTheDocument();
   });
 });
