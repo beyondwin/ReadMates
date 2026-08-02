@@ -585,9 +585,10 @@ class GoogleOAuthLoginSessionTest(
     @Test
     fun `anonymous provider failure stays anonymous while stale cookie is explicitly expired`() {
         val anonymousSession = securitySession()
-        val anonymousRequest = MockHttpServletRequest("GET", "/login/oauth2/code/google").apply {
-            setSession(anonymousSession)
-        }
+        val anonymousRequest =
+            MockHttpServletRequest("GET", "/login/oauth2/code/google").apply {
+                setSession(anonymousSession)
+            }
         val anonymousResponse = MockHttpServletResponse()
 
         successHandler.onAuthenticationFailure(
@@ -601,10 +602,11 @@ class GoogleOAuthLoginSessionTest(
 
         val staleCookie = Cookie(AuthSessionService.COOKIE_NAME, "stale-test-token")
         val staleSession = securitySession()
-        val staleRequest = MockHttpServletRequest("GET", "/login/oauth2/code/google").apply {
-            setSession(staleSession)
-            setCookies(staleCookie)
-        }
+        val staleRequest =
+            MockHttpServletRequest("GET", "/login/oauth2/code/google").apply {
+                setSession(staleSession)
+                setCookies(staleCookie)
+            }
         val staleResponse = MockHttpServletResponse()
 
         successHandler.onAuthenticationFailure(
