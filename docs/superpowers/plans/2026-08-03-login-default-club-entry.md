@@ -151,4 +151,4 @@ git diff --check -- CHANGELOG.md front/features/auth/route/login-route.tsx front
 git status --short --branch --untracked-files=all
 ```
 
-Expected: no whitespace errors; only the auth/test files and the two new design/plan documents belong to this task. Existing archive, member-space, global-style, and release-readiness changes remain untouched.
+Expected: no whitespace errors; only `CHANGELOG.md`, the auth/test files, and the two new design/plan documents belong to this task. Existing archive, member-space, global-style, and release-readiness changes remain untouched.
