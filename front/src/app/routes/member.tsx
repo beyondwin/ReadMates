@@ -21,7 +21,7 @@ import {
   guestHomeLoader,
   guestNotesLoader,
 } from "@/features/guest-browse/route/guest-route-data";
-import { GuestScopedAppRoute, type GuestArchiveContentProps, type GuestCurrentSessionContentProps, type GuestHomeContentProps } from "@/features/guest-browse/route/guest-scoped-app-route";
+import { GuestScopedAppRoute, type GuestArchiveContentProps, type GuestCurrentSessionContentProps, type GuestHomeContentProps, type GuestSessionDetailContentProps } from "@/features/guest-browse/route/guest-scoped-app-route";
 import { GuestNavigationLink } from "@/features/guest-browse/ui/guest-navigation-dialog";
 import { AppRouteLayout } from "@/src/app/layouts/app-route-layout";
 import { memoizeRouteModule } from "@/src/app/routes/route-module-loader";
@@ -44,6 +44,21 @@ function GuestArchiveContentBoundary(props: GuestArchiveContentProps) {
   return (
     <Suspense fallback={<ArchiveRouteLoading label="아카이브를 불러오는 중" />}>
       <LazyGuestArchiveContent {...props} />
+    </Suspense>
+  );
+}
+
+// This route-only boundary keeps the protected session-detail chunk lazy.
+// eslint-disable-next-line react-refresh/only-export-components
+const LazyGuestSessionDetailContent = lazy(async () => ({
+  default: (await import("@/src/pages/member-session")).GuestSessionDetailContent,
+}));
+
+// eslint-disable-next-line react-refresh/only-export-components
+function GuestSessionDetailContentBoundary(props: GuestSessionDetailContentProps) {
+  return (
+    <Suspense fallback={<ArchiveRouteLoading label="지난 세션 기록을 불러오는 중" />}>
+      <LazyGuestSessionDetailContent {...props} />
     </Suspense>
   );
 }
@@ -78,6 +93,7 @@ function scopedMemberRoute({
   GuestHomeContent: GuestHomeContentOverride,
   GuestCurrentSessionContent: GuestCurrentSessionContentOverride,
   GuestArchiveContent: GuestArchiveContentOverride,
+  GuestSessionDetailContent: GuestSessionDetailContentOverride,
 }: {
   path?: string;
   index?: true;
@@ -90,6 +106,7 @@ function scopedMemberRoute({
   GuestHomeContent?: ComponentType<GuestHomeContentProps>;
   GuestCurrentSessionContent?: ComponentType<GuestCurrentSessionContentProps>;
   GuestArchiveContent?: ComponentType<GuestArchiveContentProps>;
+  GuestSessionDetailContent?: ComponentType<GuestSessionDetailContentProps>;
 }): RouteObject {
   const loadOnce = memoizeRouteModule(load);
   const ProtectedComponent = lazy(async () => ({ default: (await loadOnce()).Component }));
@@ -103,6 +120,7 @@ function scopedMemberRoute({
         GuestHomeContent={GuestHomeContentOverride}
         GuestCurrentSessionContent={GuestCurrentSessionContentOverride}
         GuestArchiveContent={GuestArchiveContentOverride}
+        GuestSessionDetailContent={GuestSessionDetailContentOverride}
       />
     ) : (
       <Suspense fallback={fallback}>
@@ -278,6 +296,7 @@ function scopedMemberAppRoutes(queryClient: QueryClient): RouteObject[] {
       errorElement: <ArchiveRouteError />,
       fallback: <ArchiveRouteLoading label="지난 세션 기록을 불러오는 중" />,
       guestLoader: guestArchiveDetailLoader,
+      GuestSessionDetailContent: GuestSessionDetailContentBoundary,
       load: async () => {
         const [{ default: Component }, { memberSessionDetailLoaderFactory }] = await Promise.all([
           import("@/src/pages/member-session"),

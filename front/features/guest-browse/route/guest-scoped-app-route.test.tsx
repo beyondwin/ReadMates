@@ -5,7 +5,7 @@ import { useState } from "react";
 import { MemoryRouter, RouterProvider, createMemoryRouter, useLocation, useSearchParams } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { scopedGuestRouteLoader } from "./club-app-audience-loader";
-import { GuestArchiveRoute, GuestNotesRoute, GuestScopedAppRoute, type GuestArchiveContentProps, type GuestCurrentSessionContentProps } from "./guest-scoped-app-route";
+import { GuestArchiveRoute, GuestNotesRoute, GuestScopedAppRoute, type GuestArchiveContentProps, type GuestCurrentSessionContentProps, type GuestSessionDetailContentProps } from "./guest-scoped-app-route";
 
 const LinkComponent = ({ to, children, ...props }: { to: string; children: React.ReactNode; className?: string; style?: React.CSSProperties }) => <a {...props} href={to}>{children}</a>;
 const anonymousAuth = { authenticated: false, userId: null, membershipId: null, clubId: null, email: null, displayName: null, accountName: null, role: null, membershipStatus: null, approvalState: "ANONYMOUS" };
@@ -187,6 +187,47 @@ describe("guest current session route", () => {
     render(<RouterProvider router={router} />);
 
     expect(await screen.findByText("파도")).toBeVisible();
+  });
+});
+
+describe("guest historical session detail route", () => {
+  it("delegates public detail data and a scoped feedback action to the regular reader", async () => {
+    const detail = {
+      sessionId: "closed-1",
+      sessionNumber: 1,
+      title: "지난 모임",
+      bookTitle: "기록 책",
+      bookAuthor: "작가",
+      bookImageUrl: null,
+      date: "2026-07-01",
+      attendance: 4,
+      total: 5,
+      state: "CLOSED",
+      summary: "공개 요약",
+      highlights: [],
+      questions: [],
+      oneLiners: [],
+      longReviews: [],
+    };
+    const GuestSessionDetailContent = ({ data, feedbackLockedAction }: GuestSessionDetailContentProps) => (
+      <main>
+        <h1>정규 상세 · {data.bookTitle}</h1>
+        {feedbackLockedAction}
+      </main>
+    );
+    const router = createMemoryRouter([{
+      path: "/clubs/:clubSlug/app/sessions/:sessionId",
+      loader: () => ({ guestRoute: true, guestData: detail }),
+      element: <GuestScopedAppRoute LinkComponent={LinkComponent} GuestSessionDetailContent={GuestSessionDetailContent} />,
+    }], { initialEntries: ["/clubs/reading-sai/app/sessions/closed-1"] });
+
+    render(<RouterProvider router={router} />);
+
+    expect(await screen.findByRole("heading", { name: "정규 상세 · 기록 책" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "피드백 보기" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/feedback/closed-1",
+    );
   });
 });
 

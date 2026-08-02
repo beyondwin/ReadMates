@@ -5,12 +5,14 @@ import {
   memberArchiveSessionQuery,
 } from "@/features/archive/queries/archive-queries";
 import { loadArchiveMemberAuth } from "@/features/archive/route/archive-loader-auth";
+import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 
 export { enrichSessionDetailHighlightAuthors };
 
 export type MemberSessionDetailRouteData = {
   sessionId: string | null;
+  auth: AuthMeResponse;
 };
 
 function contextFromArgs(args: LoaderFunctionArgs) {
@@ -24,11 +26,11 @@ export function memberSessionDetailLoaderFactory(queryClient: QueryClient) {
     const sessionId = params.sessionId ?? null;
 
     if (!access.allowed || !sessionId) {
-      return { sessionId };
+      return { sessionId, auth: access.auth };
     }
 
     await queryClient.ensureQueryData(memberArchiveSessionQuery(sessionId, contextFromArgs(args)));
 
-    return { sessionId };
+    return { sessionId, auth: access.auth };
   };
 }

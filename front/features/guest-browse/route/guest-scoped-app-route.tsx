@@ -3,12 +3,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useLoaderData, useLocation, useParams, useRevalidator, useSearchParams } from "react-router-dom";
 import { guestNavigationCapability } from "@/features/guest-browse/model/club-app-audience";
 import { guestLoaderSourceKey } from "@/features/guest-browse/model/guest-loader-source-key";
-import { guestArchivePageReadView, guestHomeReadView, guestNoteFeedReadPage, guestNoteSessionsReadPage, guestSessionReadView, guestUpcomingPageReadView, type GuestArchiveDetailReadView, type GuestArchiveSessionReadView, type GuestHomeReadView, type GuestNotesReadView, type GuestPage } from "@/features/guest-browse/model/guest-read-views";
+import type { GuestArchiveDetail } from "@/features/guest-browse/api/guest-browse-contracts";
+import { guestArchivePageReadView, guestHomeReadView, guestNoteFeedReadPage, guestNoteSessionsReadPage, guestSessionReadView, guestUpcomingPageReadView, type GuestArchiveSessionReadView, type GuestHomeReadView, type GuestNotesReadView, type GuestPage } from "@/features/guest-browse/model/guest-read-views";
 import { guestArchiveQuery, guestCurrentSessionQuery, guestNoteFeedQuery, guestNoteSessionsQuery, guestUpcomingSessionsQuery } from "@/features/guest-browse/queries/guest-browse-queries";
 import type { GuestScopedRouteData, GuestScopedRouteFailureData } from "@/features/guest-browse/route/club-app-audience-loader";
 import { GuestLockedPage, type GuestLockKind } from "@/features/guest-browse/ui/guest-locked-page";
 import { GuestMySpace } from "@/features/guest-browse/ui/guest-my-space";
-import { GuestArchiveDetail, type GuestSurfaceLinkProps } from "@/features/guest-browse/ui/guest-surfaces";
+import type { GuestSurfaceLinkProps } from "@/features/guest-browse/ui/guest-surfaces";
 import { loginPathForReturnTo } from "@/shared/auth/login-return";
 import { feedFilterFromSearchParam, type FeedFilter } from "@/shared/model/notes-feed-model";
 import NotesFeedPage from "@/shared/ui/notes-feed-page";
@@ -31,6 +32,11 @@ export type GuestArchiveContentProps = {
   feedbackLockedAction: ReactNode;
   onLoadMoreSessions: () => Promise<void>;
 };
+export type GuestSessionDetailContentProps = {
+  data: GuestArchiveDetail;
+  appBasePath: string;
+  feedbackLockedAction: ReactNode;
+};
 function requestedAppPath(pathname: string) {
   return pathname.replace(/^\/clubs\/[^/]+(?=\/app(?:\/|$))/, "");
 }
@@ -47,11 +53,13 @@ export function GuestScopedAppRoute({
   GuestHomeContent,
   GuestCurrentSessionContent,
   GuestArchiveContent,
+  GuestSessionDetailContent,
 }: {
   LinkComponent: ComponentType<GuestLinkProps>;
   GuestHomeContent?: ComponentType<GuestHomeContentProps>;
   GuestCurrentSessionContent?: ComponentType<GuestCurrentSessionContentProps>;
   GuestArchiveContent?: ComponentType<GuestArchiveContentProps>;
+  GuestSessionDetailContent?: ComponentType<GuestSessionDetailContentProps>;
 }) {
   const location = useLocation();
   const { clubSlug } = useParams();
@@ -77,7 +85,7 @@ export function GuestScopedAppRoute({
   }
 
   const appBasePath = `/clubs/${encodeURIComponent(clubSlug ?? "")}/app`;
-  const content = guestBrowseContent(appPath, loaderData.guestData, clubSlug, appBasePath, returnTo, LinkComponent, GuestHomeContent, GuestCurrentSessionContent, GuestArchiveContent, new URLSearchParams(location.search).get("sessionId"));
+  const content = guestBrowseContent(appPath, loaderData.guestData, clubSlug, appBasePath, returnTo, LinkComponent, GuestHomeContent, GuestCurrentSessionContent, GuestArchiveContent, GuestSessionDetailContent, new URLSearchParams(location.search).get("sessionId"));
 
   if (content) {
     return content;
@@ -111,6 +119,7 @@ function guestBrowseContent(
   GuestHomeContent: ComponentType<GuestHomeContentProps> | undefined,
   GuestCurrentSessionContent: ComponentType<GuestCurrentSessionContentProps> | undefined,
   GuestArchiveContent: ComponentType<GuestArchiveContentProps> | undefined,
+  GuestSessionDetailContent: ComponentType<GuestSessionDetailContentProps> | undefined,
   selectedSessionId: string | null,
 ) {
   if (appPath === "/app") {
@@ -132,7 +141,21 @@ function guestBrowseContent(
   }
 
   if (appPath.startsWith("/app/sessions/")) {
-    return <GuestArchiveDetail data={data as GuestArchiveDetailReadView} appBasePath={appBasePath} returnTo={returnTo} LinkComponent={LinkComponent} />;
+    const detail = data as GuestArchiveDetail;
+    return GuestSessionDetailContent ? (
+      <GuestSessionDetailContent
+        data={detail}
+        appBasePath={appBasePath}
+        feedbackLockedAction={(
+          <LinkComponent
+            className="btn btn-quiet btn-sm"
+            to={`${appBasePath}/feedback/${encodeURIComponent(detail.sessionId)}`}
+          >
+            피드백 보기
+          </LinkComponent>
+        )}
+      />
+    ) : null;
   }
 
   return null;

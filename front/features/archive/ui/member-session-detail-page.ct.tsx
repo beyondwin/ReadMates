@@ -1,6 +1,13 @@
 import { expect, test } from "@playwright/experimental-ct-react";
 import { archiveSessionDetailContractFixture } from "@/tests/unit/api-contract-fixtures";
+import { memberSessionDetailReadView } from "@/features/archive/model/session-detail-read-view";
+import { MEMBER_READ_SURFACE_CAPABILITIES } from "@/shared/model/read-surface-capabilities";
 import MemberSessionDetailPage from "./member-session-detail-page";
+
+const session = memberSessionDetailReadView(
+  { ...archiveSessionDetailContractFixture, clubLongReviews: [] },
+  MEMBER_READ_SURFACE_CAPABILITIES,
+);
 
 for (const viewport of [
   { name: "desktop", width: 1200, scope: ".desktop-only" },
@@ -9,7 +16,7 @@ for (const viewport of [
   test(`MemberSessionDetailPage scopes reading typography on ${viewport.name}`, async ({ mount, page }) => {
     await page.setViewportSize({ width: viewport.width, height: 900 });
     const component = await mount(
-      <MemberSessionDetailPage session={archiveSessionDetailContractFixture} />,
+      <MemberSessionDetailPage session={session} />,
     );
     const scope = component.locator(viewport.scope);
     const summary = scope.getByText("데이터로 세상을 더 정확하게 보는 태도를 이야기했습니다.");

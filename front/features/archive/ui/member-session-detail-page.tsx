@@ -1,9 +1,13 @@
 import type { CSSProperties, ReactNode } from "react";
 import type {
-  MemberArchiveOneLinerItem,
-  MemberArchiveQuestionItem,
-  MemberArchiveSessionDetailResponse,
+  ArchiveFeedbackDocumentStatus,
 } from "@/features/archive/model/archive-model";
+import type {
+  SessionDetailHighlight,
+  SessionDetailOneLiner,
+  SessionDetailQuestion,
+  SessionDetailReadView,
+} from "@/features/archive/model/session-detail-read-view";
 import {
   attendanceText,
   feedbackArchiveBadgeClass,
@@ -29,6 +33,7 @@ const segmentLinks = [
   { key: "summary", desktopLabel: "요약", mobileLabel: "요약" },
   { key: "highlights", desktopLabel: "회차 기록", mobileLabel: "회차 기록" },
   { key: "questions", desktopLabel: "함께 남긴 질문", mobileLabel: "질문" },
+  { key: "long-reviews", desktopLabel: "공개 서평", mobileLabel: "공개 서평" },
 ];
 
 function returnLinkAriaLabel(label: string) {
@@ -48,7 +53,7 @@ function sessionDetailBackLabel(returnTarget: ReadmatesReturnTarget) {
     return "내 공간";
   }
 
-  if (returnTarget.href.startsWith("/app/archive")) {
+  if (returnTarget.href.startsWith("/app/archive") || returnTarget.href.endsWith("/app/archive")) {
     return "아카이브";
   }
 
@@ -58,18 +63,20 @@ function sessionDetailBackLabel(returnTarget: ReadmatesReturnTarget) {
 export default function MemberSessionDetailPage({
   session,
   returnTarget = archiveSessionsReturnTarget,
+  feedbackLockedAction,
 }: {
-  session: MemberArchiveSessionDetailResponse;
+  session: SessionDetailReadView;
   returnTarget?: ReadmatesReturnTarget;
+  feedbackLockedAction?: ReactNode;
 }) {
   return (
     <main className="rm-member-session-detail-page">
       <MemberSessionDetailStyles />
       <div className="desktop-only">
-        <MemberSessionDetailDesktop session={session} returnTarget={returnTarget} />
+        <MemberSessionDetailDesktop session={session} returnTarget={returnTarget} feedbackLockedAction={feedbackLockedAction} />
       </div>
       <div className="mobile-only">
-        <MemberSessionDetailMobile session={session} returnTarget={returnTarget} />
+        <MemberSessionDetailMobile session={session} returnTarget={returnTarget} feedbackLockedAction={feedbackLockedAction} />
       </div>
     </main>
   );
@@ -125,12 +132,15 @@ export function MemberSessionDetailUnavailablePage({
 function MemberSessionDetailDesktop({
   session,
   returnTarget,
+  feedbackLockedAction,
 }: {
-  session: MemberArchiveSessionDetailResponse;
+  session: SessionDetailReadView;
   returnTarget: ReadmatesReturnTarget;
+  feedbackLockedAction?: ReactNode;
 }) {
   const date = formatDateOnlyLabel(session.date);
   const published = session.state === "PUBLISHED";
+  const canReadFeedback = session.capabilities.canReadFeedback;
 
   return (
     <>
@@ -164,7 +174,7 @@ function MemberSessionDetailDesktop({
                   state={session.state}
                   date={session.date}
                   published={published}
-                  feedbackDocumentAvailable={session.feedbackDocument.available}
+                  feedbackDocumentAvailable={canReadFeedback && session.feedbackDocument ? session.feedbackDocument.available : false}
                   hidePastPhaseLabel
                   hideFeedbackDocumentLabel
                 />
@@ -181,7 +191,9 @@ function MemberSessionDetailDesktop({
                 <span className="badge">
                   참석 {session.attendance}/{session.total}
                 </span>
-                <FeedbackMetaBadge feedbackDocument={session.feedbackDocument} />
+                {canReadFeedback && session.feedbackDocument ? (
+                  <FeedbackMetaBadge feedbackDocument={session.feedbackDocument} />
+                ) : null}
               </div>
               <nav className="rm-session-detail-section-nav" aria-label="세션 상세 섹션">
                 {segmentLinks.map((link) => (
@@ -214,12 +226,18 @@ function MemberSessionDetailDesktop({
               <DesktopSection id="questions" title="함께 남긴 질문">
                 <SessionQuestions session={session} />
               </DesktopSection>
+
+              <DesktopSection id="long-reviews" title="공개 서평">
+                <SessionLongReviews session={session} />
+              </DesktopSection>
             </div>
 
             <aside className="stack" style={{ "--stack": "14px", position: "sticky", top: 86 } as CSSProperties}>
-              <RailCard title="내 참석 상태" value={attendanceText(session.myAttendanceStatus)} />
-              <FeedbackStatusCard session={session} returnTarget={returnTarget} />
-              {session.isHost ? (
+              {session.capabilities.canViewPersonalState && session.myAttendanceStatus ? (
+                <RailCard title="내 참석 상태" value={attendanceText(session.myAttendanceStatus)} />
+              ) : null}
+              <FeedbackStatusCard session={session} returnTarget={returnTarget} feedbackLockedAction={feedbackLockedAction} />
+              {session.capabilities.canViewPersonalState && session.isHost ? (
                 <Link to={`/app/host/sessions/${encodeURIComponent(session.sessionId)}/edit`} className="btn btn-quiet btn-sm">
                   세션 문서 편집
                 </Link>
@@ -235,12 +253,15 @@ function MemberSessionDetailDesktop({
 function MemberSessionDetailMobile({
   session,
   returnTarget,
+  feedbackLockedAction,
 }: {
-  session: MemberArchiveSessionDetailResponse;
+  session: SessionDetailReadView;
   returnTarget: ReadmatesReturnTarget;
+  feedbackLockedAction?: ReactNode;
 }) {
   const date = formatDateOnlyLabel(session.date);
   const published = session.state === "PUBLISHED";
+  const canReadFeedback = session.capabilities.canReadFeedback;
 
   return (
     <div className="m-body">
@@ -267,7 +288,7 @@ function MemberSessionDetailMobile({
                 state={session.state}
                 date={session.date}
                 published={published}
-                feedbackDocumentAvailable={session.feedbackDocument.available}
+                feedbackDocumentAvailable={canReadFeedback && session.feedbackDocument ? session.feedbackDocument.available : false}
                 compact
                 hidePastPhaseLabel
                 hideFeedbackDocumentLabel
@@ -284,14 +305,16 @@ function MemberSessionDetailMobile({
               <span className="badge">
                 참석 {session.attendance}/{session.total}
               </span>
-              <FeedbackMetaBadge feedbackDocument={session.feedbackDocument} />
+              {canReadFeedback && session.feedbackDocument ? (
+                <FeedbackMetaBadge feedbackDocument={session.feedbackDocument} />
+              ) : null}
             </div>
           </div>
         </div>
       </section>
 
       <section className="m-sec">
-        <FeedbackStatusCard session={session} returnTarget={returnTarget} mobile />
+        <FeedbackStatusCard session={session} returnTarget={returnTarget} feedbackLockedAction={feedbackLockedAction} mobile />
       </section>
 
       <nav className="m-hscroll rm-session-detail-mobile-tabs" aria-label="세션 상세 모바일 섹션">
@@ -317,6 +340,11 @@ function MemberSessionDetailMobile({
       <section id="mobile-questions" className="m-sec">
         <MobileSectionTitle title="함께 남긴 질문" />
         <SessionQuestions session={session} mobile />
+      </section>
+
+      <section id="mobile-long-reviews" className="m-sec">
+        <MobileSectionTitle title="공개 서평" />
+        <SessionLongReviews session={session} mobile />
       </section>
 
     </div>
@@ -364,7 +392,7 @@ function SummaryBlock({ summary }: { summary: string | null }) {
   );
 }
 
-function FeedbackMetaBadge({ feedbackDocument }: { feedbackDocument: MemberArchiveSessionDetailResponse["feedbackDocument"] }) {
+function FeedbackMetaBadge({ feedbackDocument }: { feedbackDocument: ArchiveFeedbackDocumentStatus }) {
   const feedbackCopy = feedbackDocumentCopy(feedbackDocument);
 
   return (
@@ -378,7 +406,7 @@ function FeedbackMetaBadge({ feedbackDocument }: { feedbackDocument: MemberArchi
   );
 }
 
-function SessionHighlights({ session, mobile = false }: { session: MemberArchiveSessionDetailResponse; mobile?: boolean }) {
+function SessionHighlights({ session, mobile = false }: { session: SessionDetailReadView; mobile?: boolean }) {
   const hasHighlights = session.publicHighlights.length > 0;
   const hasOneLiners = session.clubOneLiners.length > 0;
 
@@ -425,7 +453,7 @@ function SessionHighlights({ session, mobile = false }: { session: MemberArchive
   );
 }
 
-function SessionQuestions({ session, mobile = false }: { session: MemberArchiveSessionDetailResponse; mobile?: boolean }) {
+function SessionQuestions({ session, mobile = false }: { session: SessionDetailReadView; mobile?: boolean }) {
   if (session.clubQuestions.length === 0) {
     return mobile ? (
       <div className="m-card-quiet">
@@ -441,6 +469,38 @@ function SessionQuestions({ session, mobile = false }: { session: MemberArchiveS
   }
 
   return <QuestionList questions={session.clubQuestions} />;
+}
+
+function SessionLongReviews({ session, mobile = false }: { session: SessionDetailReadView; mobile?: boolean }) {
+  if (session.publicLongReviews.length === 0) {
+    return mobile ? (
+      <div className="m-card-quiet">
+        <EmptyText message="아직 이 회차에 공개된 서평이 없습니다." />
+      </div>
+    ) : (
+      <EmptyPanel message="아직 이 회차에 공개된 서평이 없습니다." />
+    );
+  }
+
+  return (
+    <div className={mobile ? "rm-mobile-record-list" : "stack"} style={mobile ? undefined : ({ "--stack": "12px" } as CSSProperties)}>
+      {session.publicLongReviews.map((review, index) => (
+        <article
+          key={`${review.authorName}-${review.body}-${index}`}
+          className={mobile ? "m-card" : "surface"}
+          style={mobile ? undefined : { padding: 20 }}
+        >
+          <p className="body-lg editorial" style={{ margin: 0, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+            {review.body}
+          </p>
+          <div className="row tiny" style={{ marginTop: 10, gap: 8, color: "var(--text-3)" }}>
+            <AvatarChip avatarKey={review.avatarKey} name={review.authorName} label="" size={22} />
+            {review.authorName}
+          </div>
+        </article>
+      ))}
+    </div>
+  );
 }
 
 function RecordGroup({ title, count, mobile = false, children }: { title: string; count?: number; mobile?: boolean; children: ReactNode }) {
@@ -460,7 +520,7 @@ function HighlightsList({
   highlights,
   mobile = false,
 }: {
-  highlights: MemberArchiveSessionDetailResponse["publicHighlights"];
+  highlights: SessionDetailHighlight[];
   mobile?: boolean;
 }) {
   if (highlights.length === 0) {
@@ -627,7 +687,7 @@ function QuestionList({
   questions,
   mobile = false,
 }: {
-  questions: MemberArchiveQuestionItem[];
+  questions: SessionDetailQuestion[];
   mobile?: boolean;
 }) {
   if (questions.length === 0) {
@@ -666,7 +726,7 @@ function QuestionList({
   );
 }
 
-function OneLinerList({ oneLiners, mobile = false }: { oneLiners: MemberArchiveOneLinerItem[]; mobile?: boolean }) {
+function OneLinerList({ oneLiners, mobile = false }: { oneLiners: SessionDetailOneLiner[]; mobile?: boolean }) {
   if (oneLiners.length === 0) {
     return null;
   }
@@ -700,13 +760,36 @@ function OneLinerList({ oneLiners, mobile = false }: { oneLiners: MemberArchiveO
 function FeedbackStatusCard({
   session,
   returnTarget,
+  feedbackLockedAction,
   mobile = false,
 }: {
-  session: MemberArchiveSessionDetailResponse;
+  session: SessionDetailReadView;
   returnTarget: ReadmatesReturnTarget;
+  feedbackLockedAction?: ReactNode;
   mobile?: boolean;
 }) {
+  if (!session.capabilities.canReadFeedback) {
+    return (
+      <article className={mobile ? "m-card-quiet" : "surface-quiet"} style={mobile ? undefined : { padding: 18 }}>
+        <div className="tiny mono" style={{ color: "var(--text-3)" }}>
+          피드백 문서
+        </div>
+        <div className="h4 editorial" style={{ marginTop: 6 }}>
+          정식 멤버 전용
+        </div>
+        <p className="small" style={{ margin: "10px 0 0", color: "var(--text-3)" }}>
+          피드백 문서는 정식 멤버에게만 열립니다.
+        </p>
+        {feedbackLockedAction ? <div style={{ marginTop: 12 }}>{feedbackLockedAction}</div> : null}
+      </article>
+    );
+  }
+
   const feedback = session.feedbackDocument;
+
+  if (!feedback) {
+    return null;
+  }
   const feedbackCopy = feedbackDocumentCopy(feedback);
   const className = mobile ? feedbackDocumentCardClassName({ feedback, compact: true, mobile }) : feedbackRailCardClassName(feedback);
   const style = mobile ? undefined : { padding: 18 };

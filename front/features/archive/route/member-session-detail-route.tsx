@@ -1,6 +1,7 @@
 import { useLoaderData, useLocation, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { memberArchiveSessionQuery } from "@/features/archive/queries/archive-queries";
+import { memberSessionDetailReadView } from "@/features/archive/model/session-detail-read-view";
 import {
   archiveSessionsReturnTarget,
   readReadmatesReturnTarget,
@@ -10,9 +11,11 @@ import MemberSessionDetailPage, {
   MemberSessionDetailUnavailablePage,
 } from "@/features/archive/ui/member-session-detail-page";
 import { RECOVER_READ_SESSION_EXPIRY } from "@/shared/api/client";
+import { readSurfaceCapabilitiesForAuth } from "@/shared/model/read-surface-capabilities";
 
 export function MemberSessionDetailRoute() {
-  const { sessionId } = useLoaderData() as MemberSessionDetailRouteData;
+  const loaderData = useLoaderData() as MemberSessionDetailRouteData;
+  const { sessionId } = loaderData;
   const { clubSlug } = useParams();
   const sessionQuery = useQuery({
     ...memberArchiveSessionQuery(
@@ -22,7 +25,12 @@ export function MemberSessionDetailRoute() {
     ),
     enabled: Boolean(sessionId),
   });
-  const session = sessionQuery.data ?? null;
+  const session = sessionQuery.data
+    ? memberSessionDetailReadView(
+        sessionQuery.data,
+        readSurfaceCapabilitiesForAuth(loaderData.auth),
+      )
+    : null;
   const location = useLocation();
   const returnTarget = readReadmatesReturnTarget(location.state, archiveSessionsReturnTarget);
 

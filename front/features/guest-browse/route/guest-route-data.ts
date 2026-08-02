@@ -8,7 +8,6 @@ import {
   fetchGuestUpcomingSessions,
 } from "@/features/guest-browse/api/guest-browse-api";
 import {
-  guestArchiveDetailReadView,
   guestArchivePageReadView,
   guestHomeReadView,
   guestNotesReadView,
@@ -83,5 +82,5 @@ export async function guestArchiveLoader(args?: Pick<LoaderFunctionArgs, "params
 }
 
 export async function guestArchiveDetailLoader(args?: Pick<LoaderFunctionArgs, "params">) {
-  return guestArchiveDetailReadView(await fetchGuestArchiveDetail(requiredClubSlug(args), requiredSessionId(args)));
+  return fetchGuestArchiveDetail(requiredClubSlug(args), requiredSessionId(args));
 }

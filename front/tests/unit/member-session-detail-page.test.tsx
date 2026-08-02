@@ -5,12 +5,23 @@ import { createMemoryRouter, RouterProvider, useLocation } from "react-router-do
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MemberArchiveSessionDetailResponse } from "@/features/archive/api/archive-contracts";
 import {
+  guestSessionDetailReadView,
+  memberSessionDetailReadView,
+  type GuestSessionDetailReadSource,
+  type SessionDetailReadView,
+} from "@/features/archive/model/session-detail-read-view";
+import {
   enrichSessionDetailHighlightAuthors,
   memberSessionDetailLoaderFactory,
 } from "@/features/archive/route/member-session-detail-data";
 import MemberSessionDetailPage from "@/features/archive/ui/member-session-detail-page";
-import MemberSessionDetailRoutePage from "@/src/pages/member-session";
+import MemberSessionDetailRoutePage, { GuestSessionDetailContent } from "@/src/pages/member-session";
 import { archiveSessionDetailContractFixture } from "./api-contract-fixtures";
+import {
+  GUEST_READ_SURFACE_CAPABILITIES,
+  MEMBER_READ_SURFACE_CAPABILITIES,
+  VIEWER_READ_SURFACE_CAPABILITIES,
+} from "@/shared/model/read-surface-capabilities";
 
 afterEach(() => {
   cleanup();
@@ -45,8 +56,17 @@ function installRouterRequestShim() {
   );
 }
 
+function memberDetailView(
+  session: MemberArchiveSessionDetailResponse = readableSession,
+): SessionDetailReadView {
+  return memberSessionDetailReadView(
+    { ...session, clubLongReviews: [] },
+    MEMBER_READ_SURFACE_CAPABILITIES,
+  );
+}
+
 function renderDetail(session: MemberArchiveSessionDetailResponse = readableSession) {
-  return render(<MemberSessionDetailPage session={session} />);
+  return render(<MemberSessionDetailPage session={memberDetailView(session)} />);
 }
 
 function createTestQueryClient() {
@@ -105,6 +125,127 @@ function LocationStateEcho() {
 }
 
 describe("MemberSessionDetailPage", () => {
+  it("keeps member and guest public section heading order identical", () => {
+    const member = memberSessionDetailReadView(
+      {
+        ...readableSession,
+        clubLongReviews: [{ authorName: "서평 작성자", authorShortName: "서평", avatarKey: "book", body: "공개 서평" }],
+      },
+      MEMBER_READ_SURFACE_CAPABILITIES,
+    );
+    const guest = guestSessionDetailReadView({
+      sessionId: "guest-session-7",
+      sessionNumber: 7,
+      title: "지난 모임",
+      bookTitle: "기록 책",
+      bookAuthor: "기록 작가",
+      bookImageUrl: null,
+      date: "2026-07-01",
+      attendance: 4,
+      total: 5,
+      state: "CLOSED",
+      summary: "공개 요약",
+      highlights: [],
+      questions: [],
+      oneLiners: [],
+      longReviews: [{ title: "공개 서평 제목", content: "공개 서평", authorName: "서평 작성자", authorShortName: "서평", avatarKey: "book" }],
+    } satisfies GuestSessionDetailReadSource);
+    expect(guest).not.toBeNull();
+
+    const memberRender = render(<MemberSessionDetailPage session={member} />);
+    const memberDesktop = memberRender.container.querySelector(".desktop-only");
+    expect(memberDesktop).not.toBeNull();
+    const memberHeadings = Array.from(
+      (memberDesktop as HTMLElement).querySelectorAll("#summary > h2, #highlights > h2, #questions > h2, #long-reviews > h2"),
+    )
+      .map((heading) => heading.textContent);
+    const memberMobileHeadings = Array.from(
+      memberRender.container.querySelectorAll("#mobile-summary h2, #mobile-highlights h2, #mobile-questions h2, #mobile-long-reviews h2"),
+    ).map((heading) => heading.textContent);
+    expect(within(memberDesktop as HTMLElement).getByText("공개 서평", { selector: "p" })).toBeVisible();
+    memberRender.unmount();
+
+    const guestRender = render(
+      <MemberSessionDetailPage
+        session={guest as SessionDetailReadView}
+        feedbackLockedAction={<button type="button">피드백 보기</button>}
+      />,
+    );
+    const guestDesktop = guestRender.container.querySelector(".desktop-only");
+    expect(guestDesktop).not.toBeNull();
+    const guestHeadings = Array.from(
+      (guestDesktop as HTMLElement).querySelectorAll("#summary > h2, #highlights > h2, #questions > h2, #long-reviews > h2"),
+    )
+      .map((heading) => heading.textContent);
+    const guestMobileHeadings = Array.from(
+      guestRender.container.querySelectorAll("#mobile-summary h2, #mobile-highlights h2, #mobile-questions h2, #mobile-long-reviews h2"),
+    ).map((heading) => heading.textContent);
+    expect(within(guestDesktop as HTMLElement).getByText("공개 서평", { selector: "p" })).toBeVisible();
+
+    expect(memberHeadings).toEqual(["요약", "회차 기록", "함께 남긴 질문", "공개 서평"]);
+    expect(guestHeadings).toEqual(memberHeadings);
+    expect(memberMobileHeadings).toEqual(memberHeadings);
+    expect(guestMobileHeadings).toEqual(memberHeadings);
+    expect(guest?.capabilities).toBe(GUEST_READ_SURFACE_CAPABILITIES);
+  });
+
+  it("renders generic locked feedback for viewers without reading feedback metadata", () => {
+    const viewer = memberSessionDetailReadView(
+      { ...readableSession, clubLongReviews: [] },
+      VIEWER_READ_SURFACE_CAPABILITIES,
+    );
+    Object.defineProperty(viewer, "feedbackDocument", {
+      configurable: true,
+      get() {
+        throw new Error("feedback metadata must stay unread");
+      },
+    });
+
+    const { container } = render(
+      <MemberSessionDetailPage
+        session={viewer}
+        feedbackLockedAction={<button type="button">피드백 보기</button>}
+      />,
+    );
+
+    for (const scope of [getDesktop(container), getMobile(container)]) {
+      expect(scope.getByText("정식 멤버 전용")).toBeVisible();
+      expect(scope.getByText("피드백 문서는 정식 멤버에게만 열립니다.")).toBeVisible();
+      expect(scope.getByRole("button", { name: "피드백 보기" })).toBeVisible();
+      expect(scope.queryByText("내부 피드백")).not.toBeInTheDocument();
+      expect(scope.queryByText(/등록$/)).not.toBeInTheDocument();
+      expect(scope.queryByText(/피드백 O|피드백 잠김|피드백 없음/)).not.toBeInTheDocument();
+    }
+  });
+
+  it("renders the existing unavailable boundary for an invalid guest session state", () => {
+    render(
+      <GuestSessionDetailContent
+        data={{
+          sessionId: "guest-invalid",
+          sessionNumber: 7,
+          title: "지난 모임",
+          bookTitle: "기록 책",
+          bookAuthor: "기록 작가",
+          bookImageUrl: null,
+          date: "2026-07-01",
+          attendance: 4,
+          total: 5,
+          state: "ARCHIVED",
+          summary: "공개 요약",
+          highlights: [],
+          questions: [],
+          oneLiners: [],
+          longReviews: [],
+        }}
+        appBasePath="/clubs/reading-sai/app"
+        feedbackLockedAction={<button type="button">피드백 보기</button>}
+      />,
+    );
+
+    expect(screen.getAllByText("지난 세션을 찾을 수 없습니다.")).toHaveLength(2);
+  });
+
   it("redirects anonymous direct session-detail navigation to login with returnTo", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       if (input.toString() === "/api/bff/api/auth/me?clubSlug=reading-sai") {

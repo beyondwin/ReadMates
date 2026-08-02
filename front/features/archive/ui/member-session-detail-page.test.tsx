@@ -3,7 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider, useLocation } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import type { MemberArchiveSessionDetailResponse } from "@/features/archive/model/archive-model";
+import { memberSessionDetailReadView } from "@/features/archive/model/session-detail-read-view";
 import MemberSessionDetailPage, { MemberSessionDetailUnavailablePage } from "@/features/archive/ui/member-session-detail-page";
+import { MEMBER_READ_SURFACE_CAPABILITIES } from "@/shared/model/read-surface-capabilities";
 
 const session: MemberArchiveSessionDetailResponse = {
   sessionId: "session-1",
@@ -36,6 +38,11 @@ const session: MemberArchiveSessionDetailResponse = {
     uploadedAt: "2026-06-18T10:00:00Z",
   },
 };
+
+const sessionView = memberSessionDetailReadView(
+  { ...session, clubLongReviews: [] },
+  MEMBER_READ_SURFACE_CAPABILITIES,
+);
 
 function ReturnStateProbe() {
   const location = useLocation();
@@ -72,7 +79,7 @@ describe("MemberSessionDetailUnavailablePage return context", () => {
           path: "/app/sessions/session-1",
           element: (
             <MemberSessionDetailPage
-              session={session}
+              session={sessionView}
               returnTarget={{
                 href: "/app/notifications",
                 label: "지난 모임 회고",

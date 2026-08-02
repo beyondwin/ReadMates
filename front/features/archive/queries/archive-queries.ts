@@ -34,6 +34,15 @@ export type ArchiveListQueryData = {
   reports: FeedbackDocumentListPage;
 };
 
+export type MemberArchiveSessionQueryData = MemberArchiveSessionDetailResponse & {
+  clubLongReviews: Array<{
+    authorName: string;
+    authorShortName: string | null;
+    avatarKey: string | null;
+    body: string;
+  }>;
+};
+
 function scopeKey(context?: ReadmatesApiContext): string | null {
   return context?.clubSlug ?? null;
 }
@@ -112,18 +121,32 @@ export async function fetchMemberArchiveSessionQueryData(
   sessionId: string,
   context?: ReadmatesApiContext,
   policy?: ReadmatesRequestPolicy,
-): Promise<MemberArchiveSessionDetailResponse | null> {
+): Promise<MemberArchiveSessionQueryData | null> {
   const session = await fetchMemberArchiveSession(sessionId, context, policy);
 
-  if (!session || session.publicHighlights.every((highlight) => highlight.authorName)) {
-    return session;
+  if (!session) {
+    return null;
   }
 
   try {
     const notesFeed = await fetchNotesFeed(session.sessionId, context, { limit: 60 }, policy);
-    return enrichSessionDetailHighlightAuthors(session, notesFeed.items);
+    return {
+      ...enrichSessionDetailHighlightAuthors(session, notesFeed.items),
+      clubLongReviews: notesFeed.items.flatMap((item) => {
+        if (item.kind !== "LONG_REVIEW" || !item.authorName) {
+          return [];
+        }
+
+        return [{
+          authorName: item.authorName,
+          authorShortName: item.authorShortName,
+          avatarKey: item.avatarKey,
+          body: item.text,
+        }];
+      }),
+    };
   } catch {
-    return session;
+    return { ...session, clubLongReviews: [] };
   }
 }
 
@@ -149,7 +172,7 @@ export function memberArchiveSessionQuery(
   context?: ReadmatesApiContext,
   policy?: ReadmatesRequestPolicy,
 ) {
-  return queryOptions<MemberArchiveSessionDetailResponse | null>({
+  return queryOptions<MemberArchiveSessionQueryData | null>({
     queryKey: archiveKeys.detail(sessionId, context),
     queryFn: () => fetchMemberArchiveSessionQueryData(sessionId, context, policy),
   });

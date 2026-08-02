@@ -126,14 +126,6 @@ export type GuestArchiveSessionReadView = {
   state: string;
 };
 
-export type GuestArchiveDetailReadView = GuestArchiveSessionReadView & {
-  summary: string | null;
-  highlights: Array<{ text: string; sortOrder: number; authorName: string | null; authorShortName: string | null; avatarKey: string | null }>;
-  questions: GuestQuestionReadView[];
-  oneLiners: Array<{ text: string; authorName: string; authorShortName: string; avatarKey: string }>;
-  longReviews: GuestLongReviewReadView[];
-};
-
 export type GuestHomeReadView = {
   current: { currentSession: GuestSessionReadView | null };
   upcoming: GuestPage<GuestUpcomingSessionReadView>;
@@ -257,15 +249,4 @@ export function guestNoteFeedReadPage(feed: GuestPage<GuestNoteFeedInput>): Page
 
 export function guestArchivePageReadView(page: GuestPage<GuestArchiveSessionReadView>): GuestPage<GuestArchiveSessionReadView> {
   return { items: page.items.map((session) => ({ sessionId: session.sessionId, sessionNumber: session.sessionNumber, title: session.title, bookTitle: session.bookTitle, bookAuthor: session.bookAuthor, bookImageUrl: session.bookImageUrl, date: session.date, attendance: session.attendance, total: session.total, state: session.state })), nextCursor: page.nextCursor };
-}
-
-export function guestArchiveDetailReadView(detail: GuestArchiveDetailReadView): GuestArchiveDetailReadView & { capabilities: GuestCapabilities } {
-  return {
-    sessionId: detail.sessionId, sessionNumber: detail.sessionNumber, title: detail.title, bookTitle: detail.bookTitle, bookAuthor: detail.bookAuthor, bookImageUrl: detail.bookImageUrl, date: detail.date, attendance: detail.attendance, total: detail.total, state: detail.state, summary: detail.summary,
-    highlights: detail.highlights.map((item) => ({ text: item.text, sortOrder: item.sortOrder, authorName: item.authorName, authorShortName: item.authorShortName, avatarKey: item.avatarKey })),
-    questions: detail.questions.map((item) => ({ priority: item.priority, text: item.text, draftThought: item.draftThought, authorName: item.authorName, authorShortName: item.authorShortName, avatarKey: item.avatarKey })),
-    oneLiners: detail.oneLiners.map((item) => ({ text: item.text, authorName: item.authorName, authorShortName: item.authorShortName, avatarKey: item.avatarKey })),
-    longReviews: detail.longReviews.map((item) => ({ title: item.title, content: item.content, authorName: item.authorName, authorShortName: item.authorShortName, avatarKey: item.avatarKey })),
-    capabilities: { canWrite: false },
-  };
 }
