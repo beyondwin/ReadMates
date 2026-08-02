@@ -513,7 +513,7 @@ class CurrentSessionControllerDbTest(
                 }
                 jsonPath("$.currentSession.board.questions[*].authorShortName") { value(not(hasItem("멤버1"))) }
                 jsonPath("$.currentSession.board.questions[?(@.text == '탈퇴 회원 기존 질문')].avatarKey") {
-                    value(hasItem("globe-notebook"))
+                    value(hasItem("cloud-green-book"))
                 }
                 jsonPath("$.currentSession.board.longReviews[?(@.body == '탈퇴 회원 기존 서평')].authorName") {
                     value(hasItem("탈퇴한 멤버"))
@@ -524,7 +524,7 @@ class CurrentSessionControllerDbTest(
                 }
                 jsonPath("$.currentSession.board.longReviews[*].authorShortName") { value(not(hasItem("멤버1"))) }
                 jsonPath("$.currentSession.board.longReviews[?(@.body == '탈퇴 회원 기존 서평')].avatarKey") {
-                    value(hasItem("globe-notebook"))
+                    value(hasItem("cloud-green-book"))
                 }
                 jsonPath("$.currentSession.board.longReviews[*].avatarKey") { value(not(hasItem("lemon-green-book"))) }
                 jsonPath("$.currentSession.attendees[*].displayName") { value(hasItem("탈퇴한 멤버")) }
@@ -534,7 +534,7 @@ class CurrentSessionControllerDbTest(
                 jsonPath(
                     "$.currentSession.attendees[?(@.membershipId == '00000000-0000-0000-0000-000000000202')].avatarKey",
                 ) {
-                    value(hasItem("globe-notebook"))
+                    value(hasItem("cloud-green-book"))
                 }
                 jsonPath("$.currentSession.attendees[*].shortName") { doesNotExist() }
             }

@@ -164,14 +164,14 @@ class PublicControllerDbTest(
                 jsonPath("$.highlights[*].authorShortName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.highlights[*].authorShortName") { value(not(hasItem("멤버1"))) }
                 jsonPath("$.highlights[?(@.authorName == '탈퇴한 멤버')].avatarKey") {
-                    value(hasItem("globe-notebook"))
+                    value(hasItem("cloud-green-book"))
                 }
                 jsonPath("$.highlights[*].avatarKey") { value(not(hasItem("lemon-green-book"))) }
                 jsonPath("$.oneLiners[*].authorName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.oneLiners[*].authorName") { value(not(hasItem("안멤버1"))) }
                 jsonPath("$.oneLiners[*].authorShortName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.oneLiners[*].authorShortName") { value(not(hasItem("멤버1"))) }
-                jsonPath("$.oneLiners[?(@.authorName == '탈퇴한 멤버')].avatarKey") { value(hasItem("globe-notebook")) }
+                jsonPath("$.oneLiners[?(@.authorName == '탈퇴한 멤버')].avatarKey") { value(hasItem("cloud-green-book")) }
                 jsonPath("$.oneLiners[*].avatarKey") { value(not(hasItem("lemon-green-book"))) }
             }
     }

@@ -1148,7 +1148,7 @@ class ArchiveAndNotesDbTest(
                 jsonPath("$.clubQuestions[*].authorShortName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.clubQuestions[*].authorShortName") { value(not(hasItem("멤버1"))) }
                 jsonPath("$.clubQuestions[?(@.authorName == '탈퇴한 멤버')].avatarKey") {
-                    value(hasItem("globe-notebook"))
+                    value(hasItem("cloud-green-book"))
                 }
                 jsonPath("$.clubQuestions[*].avatarKey") { value(not(hasItem("lemon-green-book"))) }
                 jsonPath(removedJsonPath("$.", "club", "Checkins")) { doesNotExist() }
@@ -1157,7 +1157,7 @@ class ArchiveAndNotesDbTest(
                 jsonPath("$.clubOneLiners[*].authorShortName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.clubOneLiners[*].authorShortName") { value(not(hasItem("멤버1"))) }
                 jsonPath("$.clubOneLiners[?(@.authorName == '탈퇴한 멤버')].avatarKey") {
-                    value(hasItem("globe-notebook"))
+                    value(hasItem("cloud-green-book"))
                 }
                 jsonPath("$.clubOneLiners[*].avatarKey") { value(not(hasItem("lemon-green-book"))) }
                 jsonPath("$.publicOneLiners[*].authorName") { value(hasItem("탈퇴한 멤버")) }
@@ -1165,7 +1165,7 @@ class ArchiveAndNotesDbTest(
                 jsonPath("$.publicOneLiners[*].authorShortName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.publicOneLiners[*].authorShortName") { value(not(hasItem("멤버1"))) }
                 jsonPath("$.publicOneLiners[?(@.authorName == '탈퇴한 멤버')].avatarKey") {
-                    value(hasItem("globe-notebook"))
+                    value(hasItem("cloud-green-book"))
                 }
                 jsonPath("$.publicOneLiners[*].avatarKey") { value(not(hasItem("lemon-green-book"))) }
             }
@@ -1184,7 +1184,7 @@ class ArchiveAndNotesDbTest(
                 }
                 jsonPath("$.items[*].authorName") { value(not(hasItem("안멤버1"))) }
                 jsonPath("$.items[*].authorShortName") { value(not(hasItem("멤버1"))) }
-                jsonPath("$.items[?(@.authorName == '탈퇴한 멤버')].avatarKey") { value(hasItems("globe-notebook")) }
+                jsonPath("$.items[?(@.authorName == '탈퇴한 멤버')].avatarKey") { value(hasItems("cloud-green-book")) }
                 jsonPath("$.items[*].avatarKey") { value(not(hasItem("lemon-green-book"))) }
             }
     }

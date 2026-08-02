@@ -79,20 +79,18 @@ class MemberProfileControllerTest(
     fun `atomic profile replacement rejects untrusted context and invalid avatars without partial writes`() {
         val email = insertProfileMember("self.replace.rejected", "ACTIVE", shortName = "Before")
         val membershipId = membershipIdForEmail(email)
-        val cookie = sessionCookieForEmail(email)
         val cases =
             listOf(
-                null to ("cloud-green-book" to "MEMBER_NOT_FOUND"),
-                "bad--slug" to ("cloud-green-book" to "MEMBER_NOT_FOUND"),
-                "reading-sai" to ("hedgehog-green-mug" to "AVATAR_KEY_INVALID"),
-                "reading-sai" to ("CLOUD-GREEN-BOOK" to "AVATAR_KEY_INVALID"),
+                Triple(null, "cloud-green-book", "MEMBER_NOT_FOUND"),
+                Triple("bad--slug", "cloud-green-book", null),
+                Triple("reading-sai", "hedgehog-green-mug", "AVATAR_KEY_INVALID"),
+                Triple("reading-sai", "CLOUD-GREEN-BOOK", "AVATAR_KEY_INVALID"),
             )
 
-        cases.forEach { (clubSlug, avatarAndCode) ->
-            val (avatarKey, code) = avatarAndCode
+        cases.forEach { (clubSlug, avatarKey, code) ->
             mockMvc
                 .put("/api/me/profile") {
-                    cookie(cookie)
+                    cookie(sessionCookieForEmail(email))
                     header("X-Readmates-Bff-Secret", "test-bff-secret")
                     clubSlug?.let { header("X-Readmates-Club-Slug", it) }
                     header("Origin", "http://localhost:3000")
@@ -100,8 +98,15 @@ class MemberProfileControllerTest(
                     contentType = MediaType.APPLICATION_JSON
                     content = """{"displayName":"After","avatarKey":"$avatarKey"}"""
                 }.andExpect {
-                    if (code == "MEMBER_NOT_FOUND") status { isNotFound() } else status { isBadRequest() }
-                    jsonPath("$.code") { value(code) }
+                    when (code) {
+                        "MEMBER_NOT_FOUND" -> status { isNotFound() }
+                        "AVATAR_KEY_INVALID" -> status { isBadRequest() }
+                        else -> {
+                            status { isUnauthorized() }
+                            content { string("") }
+                        }
+                    }
+                    code?.let { jsonPath("$.code") { value(it) } }
                 }
             assertEquals("Before", shortNameForMembership(membershipId))
             assertEquals("mushroom-green-book", avatarKeyForMembership(membershipId))
@@ -322,11 +327,12 @@ class MemberProfileControllerTest(
     @Test
     fun `atomic profile replacement rejects blocked memberships without partial writes`() {
         listOf("LEFT", "INACTIVE").forEach { membershipStatus ->
+            val originalName = "Before$membershipStatus"
             val email =
                 insertProfileMember(
                     "self.replace.${membershipStatus.lowercase()}",
                     membershipStatus,
-                    shortName = "Before",
+                    shortName = originalName,
                 )
             val membershipId = membershipIdForEmail(email)
             mockMvc
@@ -339,10 +345,10 @@ class MemberProfileControllerTest(
                     contentType = MediaType.APPLICATION_JSON
                     content = """{"displayName":"After","avatarKey":"cloud-green-book"}"""
                 }.andExpect {
-                    status { isForbidden() }
-                    jsonPath("$.code") { value("MEMBERSHIP_NOT_ALLOWED") }
+                    status { isUnauthorized() }
+                    content { string("") }
                 }
-            assertEquals("Before", shortNameForMembership(membershipId))
+            assertEquals(originalName, shortNameForMembership(membershipId))
             assertEquals("mushroom-green-book", avatarKeyForMembership(membershipId))
         }
     }

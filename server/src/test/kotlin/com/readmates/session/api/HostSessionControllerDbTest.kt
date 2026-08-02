@@ -891,7 +891,7 @@ class HostSessionControllerDbTest(
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.attendees[?(@.membershipId == '00000000-0000-0000-0000-000000000202')].avatarKey") {
-                    value(hasItem("globe-notebook"))
+                    value(hasItem("cloud-green-book"))
                 }
             }
     }
