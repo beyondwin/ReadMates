@@ -384,7 +384,7 @@ class MySqlFlywayMigrationTest(
                 val assignments = integratedAvatarAssignmentsForClub(upgradeJdbc, clubId)
                 val keys = assignments.map { it.substringAfterLast(':') }
                 assertThat(keys.take(30).distinct()).hasSize(30)
-                assertThat(keys[30]).isIn(BookClubAvatarKey.ordered.map { it.wireValue })
+                assertThat(keys[30]).isEqualTo(keys[0])
                 assertThat(keys).allMatch(::isWireValue)
             }
             assertThat(
