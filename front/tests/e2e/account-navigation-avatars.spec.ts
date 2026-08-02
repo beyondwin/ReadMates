@@ -413,7 +413,7 @@ test("My Space avatar save refreshes the account identity and persists at mobile
     resetImageNetwork(imageEvidence);
     await page.goto(`${APP_BASE}/me`);
 
-    const profileAvatar = page.locator(".rm-member-profile__avatar");
+    const profileAvatar = page.locator(".rm-member-profile__avatar img");
     const opener = page.getByRole("button", { name: "프로필 편집" });
     const account = page.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` });
     await expect(profileAvatar).toHaveAttribute(
@@ -429,19 +429,20 @@ test("My Space avatar save refreshes the account identity and persists at mobile
     const dialog = page.getByRole("dialog", { name: "프로필 편집" });
     await expect(dialog).toBeVisible();
     await dialog.getByRole("button", { name: "아바타 선택" }).click();
+    const picker = page.getByRole("dialog", { name: "아바타 선택" });
     await page.screenshot({
       path: testInfo.outputPath(`${width}-my-space-avatar-picker.png`),
       fullPage: true,
     });
     await expectVisibleLocalArtwork(page, imageEvidence);
-    await dialog.getByRole("button", { name: "초록 책을 읽는 찻잔 선택" }).click();
+    await picker.getByRole("button", { name: "초록 책을 읽는 찻잔 선택" }).click();
 
     await expect(account.locator("img")).toHaveAttribute(
       "src",
       "/assets/avatars/book-club/banana-green-book.webp",
     );
 
-    await dialog.getByRole("button", { name: "선택 완료" }).click();
+    await picker.getByRole("button", { name: "선택 완료" }).click();
     await expectFrameFreeArtwork(dialog.locator(".rm-profile-editor__avatar-action .rm-avatar-chip"));
     resetImageNetwork(imageEvidence);
     await dialog.getByRole("button", { name: "변경사항 저장" }).click();
@@ -458,7 +459,7 @@ test("My Space avatar save refreshes the account identity and persists at mobile
 
     await page.reload();
 
-    await expect(page.locator(".rm-member-profile__avatar")).toHaveAttribute("src", savedAvatarSrc);
+    await expect(page.locator(".rm-member-profile__avatar img")).toHaveAttribute("src", savedAvatarSrc);
     await expect(page.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` }).locator("img")).toHaveAttribute(
       "src",
       savedAvatarSrc,
@@ -580,8 +581,9 @@ test("member roster and host attendance/member artwork stay frame-free at mobile
 
     resetImageNetwork(imageEvidence);
     await page.goto(`${APP_BASE}/session/current`);
-    await expect(page.getByText("김책가방", { exact: true })).toBeVisible();
-    await expect(page.getByText("김달력책", { exact: true })).toBeVisible();
+    const roster = page.getByRole("main").filter({ hasText: "참석자 · 3/3" });
+    await expect(roster.getByText("김책가방", { exact: true })).toBeVisible();
+    await expect(roster.getByText("김달력책", { exact: true })).toBeVisible();
     await expectVisibleLocalArtwork(page, imageEvidence);
     await page.screenshot({ path: testInfo.outputPath(`${width}-current-session-roster.png`), fullPage: true });
 

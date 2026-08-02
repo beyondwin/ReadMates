@@ -178,10 +178,10 @@ on duplicate key update
   updated_at = utc_timestamp(6);
 `);
   const originalSelectedProfile = membershipProfile(selfEditMemberEmail, "reading-sai");
-  const originalSecondProfile = membershipProfile(selfEditMemberEmail, "sample-book-club");
 
   try {
     await loginWithGoogleFixture(page, selfEditMemberEmail);
+    const originalSecondProfile = membershipProfile(selfEditMemberEmail, "sample-book-club");
     await page.goto("/");
 
     const saved = await replaceProfileDirect(
@@ -369,21 +369,23 @@ test("active members save an allowlisted avatar from My Space and refresh accoun
   await mockMyReadingShelfJourney(page, "three-recent-readings");
   await loginWithGoogleFixture(page, email, { displayName: "E2E Active Avatar" });
   setMembershipStatus(email, "ACTIVE");
+  const originalProfile = membershipProfile(email, "reading-sai");
   await page.goto("/app/me");
 
   const opener = page.getByRole("button", { name: "프로필 편집" });
   await opener.click();
   const dialog = page.getByRole("dialog", { name: "프로필 편집" });
   await dialog.getByRole("button", { name: "아바타 선택" }).click();
-  await dialog.getByRole("button", { name: "초록 책을 읽는 구름 선택" }).click();
-  await dialog.getByRole("button", { name: "선택 완료" }).click();
+  const picker = page.getByRole("dialog", { name: "아바타 선택" });
+  await picker.getByRole("button", { name: "초록 책을 읽는 구름 선택" }).click();
+  await picker.getByRole("button", { name: "선택 완료" }).click();
   const saved = page.waitForResponse(
     (response) => response.request().method() === "PUT" && response.url().includes("/api/bff/api/me/profile"),
   );
   await dialog.getByRole("button", { name: "변경사항 저장" }).click();
 
   expect((await saved).status()).toBe(200);
-  await expect(page.locator(".rm-member-profile__avatar")).toHaveAttribute(
+  await expect(page.locator(".rm-member-profile__avatar img")).toHaveAttribute(
     "src",
     "/assets/avatars/book-club/cloud-green-book.webp",
   );
@@ -392,12 +394,12 @@ test("active members save an allowlisted avatar from My Space and refresh accoun
     "/assets/avatars/book-club/cloud-green-book.webp",
   );
   expect(mysqlScalar(`
-select concat(short_name, '|', avatar_key)
+select concat(memberships.short_name, '|', memberships.avatar_key)
 from memberships
 join users on users.id = memberships.user_id
 where lower(users.email) = ${sqlString(email)}
   and memberships.club_id = '00000000-0000-0000-0000-000000000001';
-`)).toBe("E2E Active Avatar|cloud-green-book");
+`)).toBe(`${originalProfile.displayName}|cloud-green-book`);
 });
 
 test("suspended members omit account navigation and profile editing from member space", async ({ page }) => {
@@ -413,7 +415,7 @@ test("suspended members omit account navigation and profile editing from member 
   await expect(shelf.getByRole("link", {
     name: /계정 (관리|설정)/,
   })).toHaveCount(0);
-  await expect(shelf.locator(".rm-member-profile__avatar")).toHaveAttribute(
+  await expect(shelf.locator(".rm-member-profile__avatar img")).toHaveAttribute(
     "src",
     /\/assets\/avatars\/book-club\/[a-z0-9-]+\.webp$/,
   );
@@ -471,8 +473,9 @@ where memberships.club_id = '00000000-0000-0000-0000-000000000001'
 
 test("mixed membership edit gates and avatar updates remain independent across clubs", async ({ page }) => {
   const email = uniqueViewerEmail("cross-club-avatar");
+  const displayName = "Cross Club Avatar";
   fixtureEmails.push(email);
-  await loginWithGoogleFixture(page, email, { displayName: "E2E Cross Club Avatar" });
+  await loginWithGoogleFixture(page, email, { displayName });
   setMembershipStatus(email, "ACTIVE");
   ensureSecondClubFixture();
   runMysql(`
@@ -493,9 +496,9 @@ on duplicate key update
   await page.goto("/clubs/sample-book-club/app/me");
   await expect(page.getByRole("button", { name: "프로필 편집" })).toHaveCount(0);
 
-  const readingSaiUpdate = await replaceProfileDirect(page, "E2E Cross Club Avatar", "cloud-green-book", "reading-sai");
+  const readingSaiUpdate = await replaceProfileDirect(page, displayName, "cloud-green-book", "reading-sai");
   expect(readingSaiUpdate.status).toBe(200);
-  const sampleClubUpdate = await replaceProfileDirect(page, "E2E Cross Club Avatar", "moon-green-book", "sample-book-club");
+  const sampleClubUpdate = await replaceProfileDirect(page, displayName, "moon-green-book", "sample-book-club");
   expect(sampleClubUpdate.status).toBe(200);
 
   const readingSaiProfile = await scopedProfile(page, "reading-sai");
