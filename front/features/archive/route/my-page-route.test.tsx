@@ -170,7 +170,7 @@ describe("MyPageRoute", () => {
     const displayName = screen.getByRole("textbox", { name: "표시 이름" });
     await user.clear(displayName);
     await user.type(displayName, "변경한 멤버");
-    await user.click(screen.getByRole("button", { name: "아바타 선택" }));
+    await user.click(screen.getByRole("button", { name: "아바타 선택, 현재 문장 사이의 구름" }));
     const dialog = screen.getByRole("dialog", { name: "아바타 선택" });
     await user.click(within(dialog).getByRole("button", {
       name: "한 장 더 읽는 바나나, 초록 책을 읽는 바나나 선택",

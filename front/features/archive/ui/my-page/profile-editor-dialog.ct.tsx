@@ -9,12 +9,22 @@ for (const viewport of viewports) {
     await mount(<ProfileEditorDialog profile={{ displayName: "여러 줄로 이어지는 긴 표시 이름", avatarKey: "banana-green-book" }} opener={null} onClose={() => undefined} onSaveProfile={async (profile) => ({ ...profile, accountName: "member-one" })} />);
     const dialog = page.getByRole("dialog", { name: "프로필 편집" });
     const input = dialog.getByRole("textbox", { name: "표시 이름" });
+    const action = dialog.getByRole("button", {
+      name: "아바타 선택, 현재 한 장 더 읽는 바나나",
+    });
+    const avatar = action.locator('.rm-avatar-chip[data-avatar-size-role="editor"]');
     await input.focus();
     const box = await dialog.boundingBox();
     expect(box).not.toBeNull();
     expect(box!.height).toBe(viewport.height);
     if (viewport.width <= 768) expect(box!.width).toBe(viewport.width);
     else expect(box!.x + box!.width).toBe(viewport.width);
+    expect((await avatar.boundingBox())?.width).toBe(72);
+    const [actionBox, dialogBox] = await Promise.all([action.boundingBox(), dialog.boundingBox()]);
+    expect(actionBox!.x).toBeGreaterThanOrEqual(dialogBox!.x);
+    expect(actionBox!.x + actionBox!.width).toBeLessThanOrEqual(
+      dialogBox!.x + dialogBox!.width,
+    );
     await expect(dialog.locator(".rm-profile-editor__footer")).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
     await page.screenshot({ path: testInfo.outputPath(`profile-editor-${viewport.width}.png`), fullPage: true });
@@ -25,6 +35,17 @@ test("profile editor remains contained at 200 percent zoom", async ({ mount, pag
   // A 640×700 screen at 200% browser zoom exposes a 320×350 CSS layout viewport.
   await page.setViewportSize({ width: 320, height: 350 });
   await mount(<ProfileEditorDialog profile={{ displayName: "멤버", avatarKey: "banana-green-book" }} opener={null} onClose={() => undefined} onSaveProfile={async (profile) => ({ ...profile, accountName: "member-one" })} />);
+  const dialog = page.getByRole("dialog", { name: "프로필 편집" });
+  const action = dialog.getByRole("button", {
+    name: "아바타 선택, 현재 한 장 더 읽는 바나나",
+  });
+  const avatar = action.locator('.rm-avatar-chip[data-avatar-size-role="editor"]');
+  expect((await avatar.boundingBox())?.width).toBe(72);
+  const [actionBox, dialogBox] = await Promise.all([action.boundingBox(), dialog.boundingBox()]);
+  expect(actionBox!.x).toBeGreaterThanOrEqual(dialogBox!.x);
+  expect(actionBox!.x + actionBox!.width).toBeLessThanOrEqual(
+    dialogBox!.x + dialogBox!.width,
+  );
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   const saveButton = page.getByRole("button", { name: "변경사항 저장" });
   await expect(saveButton).toBeVisible();

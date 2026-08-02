@@ -55,6 +55,7 @@ export function ProfileEditorDialog({
   const avatarErrorId = useId();
   const formErrorId = useId();
   const dirty = draft.displayName.trim() !== initial.displayName.trim() || draft.avatarKey !== initial.avatarKey;
+  const currentAvatarLabel = bookClubAvatarLabel(draft.avatarKey);
 
   function closeNow() {
     onClose();
@@ -224,9 +225,22 @@ export function ProfileEditorDialog({
               {errors.displayName ? <p className="rm-profile-editor__error" id={nameErrorId} role="alert">{errors.displayName}</p> : null}
               <div className="rm-profile-editor__avatar-field">
                 <span>아바타</span>
-                <button ref={avatarControlRef} data-focus-target="avatar" type="button" className="rm-profile-editor__avatar-action" aria-label="아바타 선택" disabled={saving} aria-describedby={errors.avatarKey ? avatarErrorId : undefined} onClick={() => setStep("avatar")}>
-                  <AvatarChip avatarKey={draft.avatarKey} name={null} label="" size={64} />
-                  <span><strong>{bookClubAvatarLabel(draft.avatarKey)}</strong><small>아바타 선택</small></span>
+                <button
+                  ref={avatarControlRef}
+                  data-focus-target="avatar"
+                  type="button"
+                  className="rm-profile-editor__avatar-action"
+                  aria-label={"아바타 선택, 현재 " + currentAvatarLabel}
+                  disabled={saving}
+                  aria-describedby={errors.avatarKey ? avatarErrorId : undefined}
+                  onClick={() => setStep("avatar")}
+                >
+                  <AvatarChip avatarKey={draft.avatarKey} name={null} label="" sizeRole="editor" />
+                  <span className="rm-profile-editor__avatar-copy">
+                    <strong>{currentAvatarLabel}</strong>
+                    <small>눌러서 다른 아바타 선택</small>
+                  </span>
+                  <ChevronIcon />
                 </button>
               </div>
               {errors.avatarKey ? <p className="rm-profile-editor__error" id={avatarErrorId} role="alert">{errors.avatarKey}</p> : null}
@@ -260,3 +274,10 @@ export function ProfileEditorDialog({
 
 function CloseIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>; }
 function BackIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>; }
+function ChevronIcon() {
+  return (
+    <svg className="rm-profile-editor__avatar-chevron" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m9 6 6 6-6 6" />
+    </svg>
+  );
+}

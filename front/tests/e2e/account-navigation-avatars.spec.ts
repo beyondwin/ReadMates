@@ -428,7 +428,7 @@ test("My Space avatar save refreshes the account identity and persists at mobile
     await opener.click();
     const dialog = page.getByRole("dialog", { name: "프로필 편집" });
     await expect(dialog).toBeVisible();
-    await dialog.getByRole("button", { name: "아바타 선택" }).click();
+    await dialog.getByRole("button", { name: "아바타 선택, 현재 한 장 더 읽는 바나나" }).click();
     const picker = page.getByRole("dialog", { name: "아바타 선택" });
     await page.screenshot({
       path: testInfo.outputPath(`${width}-my-space-avatar-picker.png`),

@@ -375,7 +375,7 @@ test("active members save an allowlisted avatar from My Space and refresh accoun
   const opener = page.getByRole("button", { name: "프로필 편집" });
   await opener.click();
   const dialog = page.getByRole("dialog", { name: "프로필 편집" });
-  await dialog.getByRole("button", { name: "아바타 선택" }).click();
+  await dialog.getByRole("button", { name: "아바타 선택, 현재 문장 사이의 구름" }).click();
   const picker = page.getByRole("dialog", { name: "아바타 선택" });
   await picker.getByRole("button", { name: "문장 사이의 구름, 초록 책을 읽는 구름 선택" }).click();
   await picker.getByRole("button", { name: "선택 완료" }).click();

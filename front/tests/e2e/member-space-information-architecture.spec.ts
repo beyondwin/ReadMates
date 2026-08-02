@@ -22,7 +22,7 @@ async function expectPracticalTapTarget(locator: Locator) {
 async function expectProfileEditorDialog(page: Page, viewportWidth: number) {
   const dialog = page.getByRole("dialog", { name: "프로필 편집" });
   const input = dialog.getByRole("textbox", { name: "표시 이름" });
-  const avatar = dialog.getByRole("button", { name: "아바타 선택" });
+  const avatar = dialog.getByRole("button", { name: /^아바타 선택, 현재 / });
   const save = dialog.getByRole("button", { name: "변경사항 저장" });
   const cancel = dialog.getByRole("button", { name: "취소" });
 

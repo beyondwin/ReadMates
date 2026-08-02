@@ -52,8 +52,20 @@ describe("ProfileEditorDialog", () => {
     expect(input).toHaveValue("멤버1");
     await user.clear(input);
     await user.type(input, "새 멤버");
-    expect(within(dialog).getByText("한 장 더 읽는 바나나")).toBeVisible();
-    await user.click(within(dialog).getByRole("button", { name: "아바타 선택" }));
+    const avatarAction = within(dialog).getByRole("button", {
+      name: "아바타 선택, 현재 한 장 더 읽는 바나나",
+    });
+    expect(avatarAction).toHaveTextContent("한 장 더 읽는 바나나");
+    expect(avatarAction).toHaveTextContent("눌러서 다른 아바타 선택");
+    expect(avatarAction.querySelector(".rm-avatar-chip")).toHaveAttribute(
+      "data-avatar-size-role",
+      "editor",
+    );
+    expect(avatarAction.querySelector(".rm-profile-editor__avatar-chevron")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    await user.click(avatarAction);
     await user.click(within(dialog).getByRole("button", {
       name: "문장 사이의 구름, 초록 책을 읽는 구름 선택",
     }));
@@ -175,8 +187,8 @@ describe("ProfileEditorDialog", () => {
     if (target === "form") expect(screen.getByRole("button", { name: "변경사항 저장" })).toHaveFocus();
     if (target === "avatar") {
       expect(screen.getByRole("dialog", { name: "프로필 편집" })).toBeVisible();
-      expect(screen.getByRole("button", { name: "아바타 선택" })).toHaveAttribute("aria-describedby", alert.id);
-      expect(screen.getByRole("button", { name: "아바타 선택" })).toHaveFocus();
+      expect(screen.getByRole("button", { name: "아바타 선택, 현재 한 장 더 읽는 바나나" })).toHaveAttribute("aria-describedby", alert.id);
+      expect(screen.getByRole("button", { name: "아바타 선택, 현재 한 장 더 읽는 바나나" })).toHaveFocus();
       expect(scrollBody.scrollTop).toBe(48);
     }
   });
