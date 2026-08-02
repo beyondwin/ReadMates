@@ -58,7 +58,7 @@ One-command local OAuth stack + redacted smoke verifier로 기존 서비스 보�
 
 ### Changed
 
-- **멤버 내 공간·계정·기록 동선:** `/app/me`는 표시 이름과 inline `이름 변경`, 현재 클럽 맥락, 누적 성취가 한 지면에서 이어지며 프로필 안의 중복 계정 설정 action을 제거합니다. 전역 계정 메뉴는 `알림`, `계정 설정`, `로그아웃`을 제공하고, `/app/me/settings`는 읽기 전용 계정·멤버십 정보와 `← 내 공간`, 단계형 클럽 탈퇴를 제공합니다. 최근 개인 기록의 `전체 보기`는 `/app/archive?view=sessions`로 연결하며 `/app/me/records` direct deep link와 cursor pagination은 유지합니다.
+- **멤버 내 공간·계정·기록 동선:** `/app/me`는 표시 이름과 페이지 안의 `이름 변경`, 현재 클럽 맥락, 누적 성취가 한 지면에서 이어지며 프로필 안의 중복 계정 설정 action을 제거합니다. 전역 계정 메뉴는 `알림`, `계정 설정`, `로그아웃`을 제공하고, `/app/me/settings`는 읽기 전용 계정·멤버십 정보와 `← 내 공간`, 단계형 클럽 탈퇴를 제공합니다. 최근 개인 기록의 `전체 보기`는 `/app/archive?view=sessions`로 연결하며 `/app/me/records` direct deep link와 cursor pagination은 유지합니다.
 - **멤버 알림함:** 큰 문서 패널과 중첩 카드를 간결한 편집형 목록으로 바꾸고, 영어 액션·회고 배지를 제거했습니다. 행 전체 이동, 읽지 않음 상태, 오류·빈 상태, 더 보기 흐름을 데스크톱과 모바일에서 같은 한국어 인터페이스로 제공합니다.
 - **프런트엔드 디자인 하드닝:** 멤버·호스트 기본 탐색을 역할별 핵심 4개 목적지로 정리했습니다. 공개 화면은 범위가 유지되는 복구 링크와 재시도·대기 상태를 구분하고, 호스트 보조 원장과 운영 도구는 접힌 disclosure 및 실행 가능한 실패 상태로 제공합니다. 공개 기록과 멤버 회고의 제목·요약·인용·감상은 데스크톱과 모바일에서 읽기 서체와 행간을 사용합니다.
 - **개인 독서 여정 API:** 현재 멤버의 열람 가능한 전체 기록 summary와 cursor page를 함께 반환하는 additive `GET /api/archive/me/journey` projection을 추가했습니다. Page 크기와 무관한 두 개의 고정 query로 계산하며 DB migration이나 BFF 계약 변경은 없습니다.
