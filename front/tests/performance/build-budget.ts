@@ -8,6 +8,7 @@ export type BudgetBucket =
   | "uncategorized";
 
 export type BudgetSeverity = "error" | "warn" | "measure";
+export type BudgetMetric = "raw" | "gzip";
 
 export type BuildAssetInput = {
   fileName: string;
@@ -19,12 +20,15 @@ export type BudgetRule = {
   bucket: BudgetBucket;
   limitBytes: number | null;
   severity: BudgetSeverity;
+  metric: BudgetMetric;
 };
 
 export type ClassifiedBuildAsset = BuildAssetInput & {
   bucket: BudgetBucket;
   limitBytes: number | null;
   severity: BudgetSeverity;
+  metric: BudgetMetric;
+  measuredBytes: number;
 };
 
 export type BudgetFinding = {
@@ -34,6 +38,8 @@ export type BudgetFinding = {
   gzipBytes: number | null;
   limitBytes: number;
   severity: Exclude<BudgetSeverity, "measure">;
+  metric: BudgetMetric;
+  measuredBytes: number;
 };
 
 export type BuildBudgetReport = {
@@ -47,13 +53,13 @@ export type BuildBudgetReport = {
 const jsChunkLimit = 350_000;
 
 export const defaultBudgetRules: BudgetRule[] = [
-  { bucket: "vendor-framework", limitBytes: jsChunkLimit, severity: "error" },
-  { bucket: "vendor-misc", limitBytes: jsChunkLimit, severity: "error" },
-  { bucket: "host-route", limitBytes: 120_000, severity: "error" },
-  { bucket: "route", limitBytes: 80_000, severity: "warn" },
-  { bucket: "app-entry", limitBytes: jsChunkLimit, severity: "error" },
-  { bucket: "css-global", limitBytes: 110_000, severity: "error" },
-  { bucket: "uncategorized", limitBytes: jsChunkLimit, severity: "measure" },
+  { bucket: "vendor-framework", limitBytes: jsChunkLimit, severity: "error", metric: "raw" },
+  { bucket: "vendor-misc", limitBytes: jsChunkLimit, severity: "error", metric: "raw" },
+  { bucket: "host-route", limitBytes: 120_000, severity: "error", metric: "raw" },
+  { bucket: "route", limitBytes: 80_000, severity: "warn", metric: "raw" },
+  { bucket: "app-entry", limitBytes: jsChunkLimit, severity: "error", metric: "raw" },
+  { bucket: "css-global", limitBytes: 50_000, severity: "error", metric: "gzip" },
+  { bucket: "uncategorized", limitBytes: jsChunkLimit, severity: "measure", metric: "raw" },
 ];
 
 const routeChunkPrefixes = [
@@ -109,7 +115,17 @@ function toFinding(asset: ClassifiedBuildAsset): BudgetFinding {
     gzipBytes: asset.gzipBytes,
     limitBytes: asset.limitBytes,
     severity: asset.severity,
+    metric: asset.metric,
+    measuredBytes: asset.measuredBytes,
   };
+}
+
+function measuredBytesFor(asset: BuildAssetInput, rule: BudgetRule): number {
+  if (rule.metric === "raw") return asset.bytes;
+  if (asset.gzipBytes === null) {
+    throw new Error(`Missing gzip size for ${asset.fileName} governed by a gzip budget`);
+  }
+  return asset.gzipBytes;
 }
 
 export function formatBytes(bytes: number): string {
@@ -132,11 +148,15 @@ export function analyzeBuildAssets(
         bucket,
         limitBytes: rule.limitBytes,
         severity: rule.severity,
+        metric: rule.metric,
+        measuredBytes: measuredBytesFor(file, rule),
       };
     })
     .sort((a, b) => b.bytes - a.bytes || a.fileName.localeCompare(b.fileName));
 
-  const overBudget = assets.filter((asset) => asset.limitBytes !== null && asset.bytes > asset.limitBytes);
+  const overBudget = assets.filter(
+    (asset) => asset.limitBytes !== null && asset.measuredBytes > asset.limitBytes,
+  );
   const violations = overBudget.filter((asset) => asset.severity === "error").map(toFinding);
   const warnings = overBudget.filter((asset) => asset.severity === "warn").map(toFinding);
 
@@ -155,6 +175,7 @@ function findingRow(finding: BudgetFinding): string {
     finding.fileName,
     formatBytes(finding.bytes),
     finding.gzipBytes === null ? "n/a" : formatBytes(finding.gzipBytes),
+    finding.metric,
     formatBytes(finding.limitBytes),
     finding.severity,
   ].join(" | ");
@@ -166,6 +187,7 @@ function assetRow(asset: ClassifiedBuildAsset): string {
     asset.fileName,
     formatBytes(asset.bytes),
     asset.gzipBytes === null ? "n/a" : formatBytes(asset.gzipBytes),
+    asset.metric,
     asset.limitBytes === null ? "n/a" : formatBytes(asset.limitBytes),
     asset.severity,
   ].join(" | ");
@@ -173,7 +195,9 @@ function assetRow(asset: ClassifiedBuildAsset): string {
 
 export function renderBuildBudgetMarkdown(report: BuildBudgetReport): string {
   const findingRows = [...report.violations, ...report.warnings].map((finding) => `| ${findingRow(finding)} |`);
-  const budgetRows = findingRows.length ? findingRows : ["| none | none | n/a | n/a | n/a | passed |"];
+  const budgetRows = findingRows.length
+    ? findingRows
+    : ["| none | none | n/a | n/a | n/a | n/a | passed |"];
   const assetRows = report.assets.map((asset) => `| ${assetRow(asset)} |`);
 
   return [
@@ -183,13 +207,13 @@ export function renderBuildBudgetMarkdown(report: BuildBudgetReport): string {
     `- status: ${report.status}`,
     "",
     "## Budget Results",
-    "| bucket | file | bytes | gzip | limit | severity |",
-    "| --- | --- | --- | --- | --- | --- |",
+    "| bucket | file | bytes | gzip | metric | limit | severity |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
     ...budgetRows,
     "",
     "## Largest Assets",
-    "| bucket | file | bytes | gzip | limit | policy |",
-    "| --- | --- | --- | --- | --- | --- |",
+    "| bucket | file | bytes | gzip | metric | limit | policy |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
     ...assetRows,
     "",
   ].join("\n");

@@ -44,7 +44,7 @@ async function run() {
   if (report.status === "failed") {
     for (const violation of report.violations) {
       console.error(
-        `Budget error: ${violation.fileName} in ${violation.bucket} is ${violation.bytes} bytes, limit ${violation.limitBytes}`,
+        `Budget error: ${violation.fileName} in ${violation.bucket} is ${violation.measuredBytes} ${violation.metric} bytes, limit ${violation.limitBytes}`,
       );
     }
     process.exitCode = 1;

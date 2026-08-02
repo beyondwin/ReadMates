@@ -42,9 +42,9 @@ These files are local evidence only and should not be committed.
 
 ## Budget Meaning
 
-Hard-gated JavaScript and CSS buckets fail the command when a chunk exceeds its limit. The current implementation gates split vendor chunks, host route chunks, app entry, ordinary route chunks, and the global CSS bundle according to the source-controlled budget config.
+Hard-gated JavaScript and CSS buckets fail the command when a chunk exceeds its limit. JavaScript budgets use raw bytes to keep parse and execution cost visible. Global CSS uses gzip transfer bytes because bundled font-face unicode ranges are repetitive on disk but compress substantially over the network.
 
-The global CSS bundle is hard-gated at 110 kB. The 2026-06-28 closeout measured `front/dist/assets/index-CZWTFmii.css` at about 104.5 kB, leaving a small guard band without requiring a page-level CSS split in this branch.
+The global CSS bundle is hard-gated at 50 kB gzip. Raw and gzip sizes remain visible together in the generated report, so both parse volume and transfer cost can be reviewed while the gate protects the user-facing download boundary.
 
 Preview Lighthouse starts a local public-safe API mock upstream and points the Vite preview proxy at that mock through `READMATES_API_BASE_URL`. The smoke therefore does not require a running local Spring API for public routes, and expected preview shutdown is treated as cleanup instead of a command failure.
 

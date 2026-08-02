@@ -1,4 +1,5 @@
 /* Runtime style entry: keep app-only aliases here; add reusable tokens in @readmates/design-system. */
+@import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 @import "@readmates/design-system/styles.css";
 @import "../../shared/styles/mobile.css";
 

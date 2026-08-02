@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
@@ -16,7 +16,8 @@ const rootPackageJson = JSON.parse(
 ) as { packageManager?: string; engines?: { node?: string; pnpm?: string } };
 const frontPackageJson = JSON.parse(
   readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
-) as { packageManager?: string };
+) as { packageManager?: string; scripts?: Record<string, string> };
+const pretendardLicenseUrl = new URL("../../public/licenses/Pretendard-OFL-1.1.txt", import.meta.url);
 
 describe("CT Docker command helpers", () => {
   it("parses a pnpm packageManager string", () => {
@@ -77,5 +78,19 @@ describe("CT Docker command helpers", () => {
     expect(command.args.join(" ")).toContain(
       "pnpm exec playwright test --config=playwright-ct.config.ts --update-snapshots",
     );
+  });
+
+  it("routes every visual verification and committed baseline update through the canonical Docker renderer", () => {
+    expect(frontPackageJson.scripts?.["test:ct"]).toBe("pnpm test:ct:docker");
+    expect(frontPackageJson.scripts?.["test:ct:update"]).toBe("pnpm test:ct:update:docker");
+    expect(frontPackageJson.scripts?.["test:ct:update:docker"]).toBe("tsx scripts/run-ct-docker.ts --update");
+  });
+
+  it("ships the Pretendard license with the public font assets", () => {
+    expect(existsSync(pretendardLicenseUrl)).toBe(true);
+    const license = readFileSync(pretendardLicenseUrl, "utf8");
+    expect(license).toContain("Copyright (c) 2021, Kil Hyung-jin");
+    expect(license).toContain("SIL OPEN FONT LICENSE Version 1.1");
+    expect(license).toContain("Reserved Font Name Pretendard");
   });
 });

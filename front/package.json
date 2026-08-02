@@ -14,9 +14,9 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "test:ct": "playwright test --config=playwright-ct.config.ts",
+    "test:ct": "pnpm test:ct:docker",
     "test:ct:docker": "tsx scripts/run-ct-docker.ts",
-    "test:ct:update": "playwright test --config=playwright-ct.config.ts --update-snapshots",
+    "test:ct:update": "pnpm test:ct:update:docker",
     "test:ct:update:docker": "tsx scripts/run-ct-docker.ts --update",
     "test:watch": "vitest",
     "zod:export-fixtures": "tsx scripts/export-zod-fixtures.ts"
@@ -24,6 +24,7 @@
   "dependencies": {
     "@readmates/design-system": "workspace:*",
     "@tanstack/react-query": "^5.101.2",
+    "pretendard": "1.3.9",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "react-router-dom": "7.18.1"

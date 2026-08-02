@@ -36,7 +36,7 @@ describe("build budget analyzer", () => {
     ]);
   });
 
-  it("fails hard-gated buckets including global CSS", () => {
+  it("gates JavaScript by raw bytes and global CSS by compressed transfer bytes", () => {
     const report = analyzeBuildAssets(assets, defaultBudgetRules);
 
     expect(report.status).toBe("failed");
@@ -48,17 +48,16 @@ describe("build budget analyzer", () => {
         gzipBytes: 41_000,
         limitBytes: 120_000,
         severity: "error",
-      },
-      {
-        bucket: "css-global",
-        fileName: "index-style.css",
-        bytes: 114_000,
-        gzipBytes: 18_000,
-        limitBytes: 110_000,
-        severity: "error",
+        metric: "raw",
+        measuredBytes: 135_000,
       },
     ]);
     expect(report.warnings).toEqual([]);
+    expect(report.assets.find((asset) => asset.fileName === "index-style.css")).toMatchObject({
+      metric: "gzip",
+      measuredBytes: 18_000,
+      limitBytes: 50_000,
+    });
   });
 
   it("renders a markdown report with largest assets and budget results", () => {
@@ -67,10 +66,36 @@ describe("build budget analyzer", () => {
 
     expect(markdown).toContain("# ReadMates Build Budget");
     expect(markdown).toContain(
-      "| host-route | host-session-editor-route-bbb.js | 135.0 kB | 41.0 kB | 120.0 kB | error |",
+      "| host-route | host-session-editor-route-bbb.js | 135.0 kB | 41.0 kB | raw | 120.0 kB | error |",
     );
-    expect(markdown).toContain("| css-global | index-style.css | 114.0 kB | 18.0 kB | 110.0 kB | error |");
+    expect(markdown).toContain("| css-global | index-style.css | 114.0 kB | 18.0 kB | gzip | 50.0 kB | error |");
     expect(markdown).toContain("unexpected-worker.js");
+  });
+
+  it("renders an aligned empty result row when every hard budget passes", () => {
+    const report = analyzeBuildAssets(
+      [{ fileName: "index-style.css", bytes: 220_000, gzipBytes: 44_000 }],
+      defaultBudgetRules,
+    );
+
+    expect(renderBuildBudgetMarkdown(report)).toContain(
+      "| none | none | n/a | n/a | n/a | n/a | passed |",
+    );
+  });
+
+  it("fails the global CSS gate when compressed transfer bytes exceed the limit", () => {
+    const report = analyzeBuildAssets(
+      [{ fileName: "index-style.css", bytes: 230_000, gzipBytes: 51_000 }],
+      defaultBudgetRules,
+    );
+
+    expect(report.status).toBe("failed");
+    expect(report.violations[0]).toMatchObject({
+      bucket: "css-global",
+      metric: "gzip",
+      measuredBytes: 51_000,
+      limitBytes: 50_000,
+    });
   });
 
   it("formats bytes in stable base-10 units", () => {

@@ -1,5 +1,5 @@
-import type { ChangeEvent, ComponentProps, JSX } from "react";
-import { AiGenerateTab } from "@/features/host/aigen/ui/AiGenerateTab";
+import { lazy, Suspense, type ChangeEvent, type JSX } from "react";
+import type { AiCommitResponse } from "@/features/host/aigen/api/aigen-contracts";
 import type { HostSessionDraftSource } from "@/features/host/model/host-session-editor-navigation";
 import type {
   SessionImportPreviewResponse,
@@ -8,9 +8,12 @@ import type {
 import { SessionImportPanelBody } from "./session-import-panel";
 
 export type SessionRecordCompletionMode = Exclude<HostSessionDraftSource, "manual">;
-export type AiGenerateCommitResult = Parameters<
-  ComponentProps<typeof AiGenerateTab>["onCommitted"]
->[0];
+export type AiGenerateCommitResult = AiCommitResponse | null;
+
+const AiGenerateTab = lazy(async () => {
+  const module = await import("@/features/host/aigen/ui/AiGenerateTab");
+  return { default: module.AiGenerateTab };
+});
 
 type SessionRecordCompletionPanelProps = {
   sessionId: string | undefined;
@@ -51,12 +54,14 @@ export function SessionRecordCompletionPanel({
     }
 
     return (
-      <AiGenerateTab
-        sessionId={sessionId}
-        clubSlug={clubSlug}
-        expectedDraftRevision={expectedDraftRevision}
-        onCommitted={onAigenCommitted}
-      />
+      <Suspense fallback={<p role="status">AI 기록 도구를 불러오는 중입니다.</p>}>
+        <AiGenerateTab
+          sessionId={sessionId}
+          clubSlug={clubSlug}
+          expectedDraftRevision={expectedDraftRevision}
+          onCommitted={onAigenCommitted}
+        />
+      </Suspense>
     );
   }
 
