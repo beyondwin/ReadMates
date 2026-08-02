@@ -82,7 +82,7 @@ class MemberProfileControllerTest(
         val cases =
             listOf(
                 Triple(null, "cloud-green-book", "MEMBER_NOT_FOUND"),
-                Triple("bad--slug", "cloud-green-book", null),
+                Triple("bad--slug", "cloud-green-book", "MEMBER_NOT_FOUND"),
                 Triple("reading-sai", "hedgehog-green-mug", "AVATAR_KEY_INVALID"),
                 Triple("reading-sai", "CLOUD-GREEN-BOOK", "AVATAR_KEY_INVALID"),
             )
@@ -101,12 +101,9 @@ class MemberProfileControllerTest(
                     when (code) {
                         "MEMBER_NOT_FOUND" -> status { isNotFound() }
                         "AVATAR_KEY_INVALID" -> status { isBadRequest() }
-                        else -> {
-                            status { isUnauthorized() }
-                            content { string("") }
-                        }
+                        else -> error("Unexpected profile rejection code")
                     }
-                    code?.let { jsonPath("$.code") { value(it) } }
+                    jsonPath("$.code") { value(code) }
                 }
             assertEquals("Before", shortNameForMembership(membershipId))
             assertEquals("mushroom-green-book", avatarKeyForMembership(membershipId))
@@ -345,8 +342,8 @@ class MemberProfileControllerTest(
                     contentType = MediaType.APPLICATION_JSON
                     content = """{"displayName":"After","avatarKey":"cloud-green-book"}"""
                 }.andExpect {
-                    status { isUnauthorized() }
-                    content { string("") }
+                    status { isForbidden() }
+                    jsonPath("$.code") { value("MEMBERSHIP_NOT_ALLOWED") }
                 }
             assertEquals(originalName, shortNameForMembership(membershipId))
             assertEquals("mushroom-green-book", avatarKeyForMembership(membershipId))

@@ -103,6 +103,7 @@ class SecurityConfig(
                     methodAndPath("POST", Regex("^/api/host/notifications/items/[^/]+/(retry|restore)$")),
                     methodAndPath("PUT", Regex("^/api/archive/sessions/[^/]+/my-long-review$")),
                     methodAndPath("POST", Regex("^/api/me/membership/leave$")),
+                    methodAndPath("PUT", Regex("^/api/me/profile$")),
                     methodAndPath("PATCH", Regex("^/api/me/profile$")),
                     methodAndPath("PATCH", Regex("^/api/me/avatar$")),
                     methodAndPath("PUT", Regex("^/api/me/notifications/preferences$")),
@@ -172,6 +173,8 @@ class SecurityConfig(
                     .requestMatchers(HttpMethod.GET, "/api/app/pending", "/api/app/viewer")
                     .hasAuthority("ROLE_VIEWER")
                     .requestMatchers(methodAndPath("PATCH", Regex("^/api/me/profile$")))
+                    .authenticated()
+                    .requestMatchers(methodAndPath("PUT", Regex("^/api/me/profile$")))
                     .authenticated()
                     .requestMatchers(methodAndPath("PATCH", Regex("^/api/me/avatar$")))
                     .authenticated()

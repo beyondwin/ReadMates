@@ -130,6 +130,7 @@ async function logout(page: Page) {
       throw new Error(`Logout failed: ${response.status}`);
     }
   });
+  await page.goto("/login");
   await page.context().clearCookies();
 }
 
@@ -222,13 +223,13 @@ on duplicate key update
     const assertRejectedWithoutMutation = async (
       request: () => Promise<{ status: number; body: Record<string, unknown> | null }>,
       expectedStatus: number,
-      expectedCode: string,
+      expectedCode: string | null,
     ) => {
       const beforeSelected = membershipProfile(selfEditMemberEmail, "reading-sai");
       const beforeSecond = membershipProfile(selfEditMemberEmail, "sample-book-club");
       const response = await request();
       expect(response.status).toBe(expectedStatus);
-      expect(response.body?.code).toBe(expectedCode);
+      if (expectedCode !== null) expect(response.body?.code).toBe(expectedCode);
       expect(membershipProfile(selfEditMemberEmail, "reading-sai")).toEqual(beforeSelected);
       expect(membershipProfile(selfEditMemberEmail, "sample-book-club")).toEqual(beforeSecond);
     };
@@ -253,7 +254,7 @@ on duplicate key update
     await assertRejectedWithoutMutation(
       () => replaceProfileDirect(page, uniqueDisplayName("Anonymous"), "moon-green-book", "reading-sai"),
       401,
-      "AUTHENTICATION_REQUIRED",
+      null,
     );
     await loginWithGoogleFixture(page, selfEditMemberEmail);
     await page.goto("/");

@@ -32,10 +32,10 @@ export function ProfileEditorDialog({
   onClose,
   onSaveProfile,
 }: ProfileEditorDialogProps) {
-  const initial = {
+  const [initial] = useState<ProfileDraft>(() => ({
     displayName: profile.displayName,
     avatarKey: normalizeBookClubAvatarKey(profile.avatarKey),
-  };
+  }));
   const [draft, setDraft] = useState<ProfileDraft>(initial);
   const [step, setStep] = useState<ProfileEditorStep>("profile");
   const [errors, setErrors] = useState<ProfileFieldErrors>({});

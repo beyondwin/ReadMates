@@ -21,12 +21,14 @@ describe("MemberProfileSummary", () => {
     const { container } = render(<MemberProfileSummary profile={profile} viewModel={viewModel} canEditProfile onSaveProfile={vi.fn()} />);
     const section = screen.getByRole("region", { name: profile.displayName });
     expect(within(section).getAllByRole("heading", { level: 1, name: profile.displayName })).toHaveLength(1);
-    expect(within(section).getByRole("img", { name: /아바타/ })).toHaveAttribute("width", "72");
+    const artwork = container.querySelector(".rm-member-profile__avatar.rm-avatar-chip--artwork");
+    expect(artwork).toHaveClass("rm-avatar-chip");
+    expect(artwork?.querySelector("img")).toHaveAttribute("alt", "");
+    expect(artwork?.querySelector("img")).toHaveAttribute("aria-hidden", "true");
     expect(within(section).getByText(viewModel.profileMetaLabel)).toBeVisible();
     expect(within(section).getAllByRole("button", { name: "프로필 편집" })).toHaveLength(1);
     expect(within(section).queryByRole("button", { name: "이름 변경" })).toBeNull();
     expect(within(section).queryByRole("button", { name: "아바타 바꾸기" })).toBeNull();
-    expect(container.querySelector(".rm-member-profile__avatar")).not.toHaveClass("rm-avatar-chip");
   });
 
   it("omits the action container when membership cannot edit", () => {

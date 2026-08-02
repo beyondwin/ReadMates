@@ -63,6 +63,28 @@ describe("ProfileEditorDialog", () => {
     expect(opener).toHaveFocus();
   });
 
+  it("keeps the opening baseline when loader props refresh while the editor is open", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const props = {
+      opener: null,
+      onClose,
+      onSaveProfile: vi.fn(async (draft) => ({ ...draft, accountName: "member-one" })),
+    };
+    const { rerender } = render(<ProfileEditorDialog profile={profile} {...props} />);
+
+    rerender(
+      <ProfileEditorDialog
+        profile={{ displayName: "서버에서 갱신된 이름", avatarKey: "cloud-green-book" }}
+        {...props}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "프로필 편집 닫기" }));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("heading", { name: "변경사항을 버릴까요?" })).toBeNull();
+  });
+
   it("locks controls and prevents duplicate saves", async () => {
     const pending = deferred<{ displayName: string; avatarKey: "banana-green-book"; accountName: string }>();
     const save = vi.fn(() => pending.promise);

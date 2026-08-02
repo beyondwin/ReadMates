@@ -12,11 +12,13 @@ export function AvatarChip({
   name,
   label,
   size = 24,
+  className,
 }: {
   avatarKey?: unknown;
   name: string | null | undefined;
   label?: string;
   size?: number;
+  className?: string;
 }) {
   const requestedKey = normalizeBookClubAvatarKey(avatarKey);
   const [renderedKey, setRenderedKey] = useState<BookClubAvatarKey | null>(requestedKey);
@@ -36,7 +38,7 @@ export function AvatarChip({
 
   return (
     <span
-      className="rm-avatar-chip rm-avatar-chip--artwork"
+      className={["rm-avatar-chip", "rm-avatar-chip--artwork", className].filter(Boolean).join(" ")}
       title={safeLabel || undefined}
       style={{ "--avatar-size": `${size}px` } as CSSProperties}
     >

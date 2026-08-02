@@ -118,7 +118,8 @@ class SessionCookieAuthenticationFilter(
         }
 
     private fun HttpServletRequest.isOwnProfileMutation(): Boolean =
-        method == "PATCH" && requestURI in setOf("/api/me/profile", "/api/me/avatar")
+        (method == "PATCH" && requestURI in setOf("/api/me/profile", "/api/me/avatar")) ||
+            (method == "PUT" && requestURI == "/api/me/profile")
 
     private fun HttpServletRequest.isAuthMeGet(): Boolean = method == "GET" && requestURI == "/api/auth/me"
 
