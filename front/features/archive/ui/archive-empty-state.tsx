@@ -4,27 +4,37 @@ export type LoadMoreCallback = () => Promise<void>;
 
 export function LoadMoreButton({ visible, onLoadMore }: { visible: boolean; onLoadMore?: LoadMoreCallback }) {
   const [pending, setPending] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   if (!visible || !onLoadMore) {
     return null;
   }
 
   return (
-    <div style={{ display: "flex", justifyContent: "center", paddingTop: "24px" }}>
+    <div style={{ display: "grid", justifyItems: "center", gap: "12px", paddingTop: "24px" }}>
+      {failed ? (
+        <p role="status" className="small" style={{ color: "var(--text-2)", margin: 0 }}>
+          기록을 더 불러오지 못했습니다. 다시 시도해 주세요.
+        </p>
+      ) : null}
       <button
         type="button"
         className="btn btn-quiet"
         disabled={pending}
+        aria-busy={pending}
         onClick={async () => {
           setPending(true);
+          setFailed(false);
           try {
             await onLoadMore();
+          } catch {
+            setFailed(true);
           } finally {
             setPending(false);
           }
         }}
       >
-        더 보기
+        {pending ? "불러오는 중" : failed ? "다시 시도" : "더 보기"}
       </button>
     </div>
   );
@@ -32,6 +42,7 @@ export function LoadMoreButton({ visible, onLoadMore }: { visible: boolean; onLo
 
 export function MobileLoadMoreButton({ visible, onLoadMore }: { visible: boolean; onLoadMore?: LoadMoreCallback }) {
   const [pending, setPending] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   if (!visible || !onLoadMore) {
     return null;
@@ -39,21 +50,30 @@ export function MobileLoadMoreButton({ visible, onLoadMore }: { visible: boolean
 
   return (
     <section className="m-sec" style={{ paddingTop: 0 }}>
+      {failed ? (
+        <p role="status" className="small" style={{ color: "var(--text-2)", margin: "0 0 12px" }}>
+          기록을 더 불러오지 못했습니다. 다시 시도해 주세요.
+        </p>
+      ) : null}
       <button
         type="button"
         className="btn btn-quiet"
-        style={{ width: "100%", minHeight: 42 }}
+        style={{ width: "100%", minHeight: 44 }}
         disabled={pending}
+        aria-busy={pending}
         onClick={async () => {
           setPending(true);
+          setFailed(false);
           try {
             await onLoadMore();
+          } catch {
+            setFailed(true);
           } finally {
             setPending(false);
           }
         }}
       >
-        더 보기
+        {pending ? "불러오는 중" : failed ? "다시 시도" : "더 보기"}
       </button>
     </section>
   );

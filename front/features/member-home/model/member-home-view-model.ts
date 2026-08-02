@@ -1,5 +1,7 @@
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import type { CurrentSessionResponse } from "@/shared/model/current-session-contracts";
+import type { CurrentSessionReadPageData } from "@/shared/model/current-session-read-view";
+import type { NoteFeedItem } from "@/shared/model/notes-feed-model";
 import {
   READING_LOOP_LABELS,
   deriveReadingLoopState,
@@ -57,10 +59,10 @@ export type MemberHomeNextReadingAction = {
 };
 
 export type MemberHomeNextReadingActionInput = {
-  session: MemberHomeCurrentSessionView["currentSession"];
+  session: CurrentSessionReadPageData["currentSession"];
   isViewer: boolean;
   canWrite: boolean;
-  noteFeedItems?: MemberHomeNoteFeedItemView[];
+  noteFeedItems?: NoteFeedItem[];
   today?: Date;
 };
 
@@ -84,9 +86,10 @@ export type MemberHomeRecentRecordEntryOptions = {
   feedbackStates?: ReadonlyMap<string, MemberHomeFeedbackState>;
 };
 
-const NOTE_KIND_LABELS: Record<MemberHomeNoteFeedItemView["kind"], string> = {
+const NOTE_KIND_LABELS: Record<NoteFeedItem["kind"], string> = {
   QUESTION: "질문",
   ONE_LINE_REVIEW: "한줄평",
+  LONG_REVIEW: "서평",
   HIGHLIGHT: "하이라이트",
 };
 
@@ -98,7 +101,7 @@ const MEMBER_HOME_FEEDBACK_STATUS_LABELS: Record<MemberHomeFeedbackState, string
 };
 
 export function getMemberHomeRecentRecordEntry(
-  noteFeedItems: MemberHomeNoteFeedItemView[],
+  noteFeedItems: NoteFeedItem[],
   options: MemberHomeRecentRecordEntryOptions = {},
 ): MemberHomeRecentRecordEntry | null {
   const first = noteFeedItems[0];
@@ -130,7 +133,7 @@ export function memberHomeViewFromRouteData(view: MemberHomeView): MemberHomeVie
 }
 
 function missingWorkForMemberHome(
-  session: NonNullable<MemberHomeCurrentSessionView["currentSession"]>,
+  session: NonNullable<CurrentSessionReadPageData["currentSession"]>,
 ): ReadingLoopMissingWork {
   if (session.myRsvpStatus === "NO_RESPONSE") {
     return "RSVP";

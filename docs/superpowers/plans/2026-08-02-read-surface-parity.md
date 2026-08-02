@@ -153,7 +153,7 @@
   - `memberCurrentSessionReadPage(response, capabilities)`
   - `guestCurrentSessionReadPage(response)`
 
-- [ ] **Step 1: Write failing capability tests**
+- [x] **Step 1: Write failing capability tests**
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -195,7 +195,7 @@ describe("read surface capabilities", () => {
 });
 ```
 
-- [ ] **Step 2: Run the capability test and verify RED**
+- [x] **Step 2: Run the capability test and verify RED**
 
 Run:
 
@@ -205,7 +205,7 @@ corepack pnpm --dir front exec vitest run shared/model/read-surface-capabilities
 
 Expected: FAIL because `read-surface-capabilities.ts` does not exist.
 
-- [ ] **Step 3: Implement the immutable capability contract**
+- [x] **Step 3: Implement the immutable capability contract**
 
 ```ts
 export type ReadSurfaceCapabilities = Readonly<{
@@ -246,7 +246,7 @@ export function readSurfaceCapabilitiesForAuth(auth: {
 }
 ```
 
-- [ ] **Step 4: Write failing member/guest current-session adapter tests**
+- [x] **Step 4: Write failing member/guest current-session adapter tests**
 
 Add tests that construct one protected response and one guest response with the same public book, attendee, question, and review content. Assert:
 
@@ -274,7 +274,7 @@ for (const protectedValue of ["Room 7", "https://meet.example.com/secret", "2468
 expect(guestView.currentSession?.attendees[0].renderKey).toBe("guest-0-읽는이-book");
 ```
 
-- [ ] **Step 5: Run the adapter test and verify RED**
+- [x] **Step 5: Run the adapter test and verify RED**
 
 Run:
 
@@ -284,7 +284,7 @@ corepack pnpm --dir front exec vitest run features/current-session/model/current
 
 Expected: FAIL because the read-view types and adapter functions do not exist.
 
-- [ ] **Step 6: Implement the read-view types and adapters**
+- [x] **Step 6: Implement the read-view types and adapters**
 
 Define the presentation contract with nullable protected values and response-local attendee keys:
 
@@ -391,7 +391,7 @@ export type GuestCurrentSessionReadPage = (
 
 Export concrete `memberCurrentSessionReadPage` and `guestCurrentSessionReadPage` functions satisfying those signatures. The member adapter uses `membershipId` only to populate `renderKey` and never retains account data. The guest adapter uses `guest-${index}-${displayName}-${avatarKey}`, maps unknown RSVP/attendance strings through guards to `NO_RESPONSE`/`UNKNOWN`, sets guest participation to `ACTIVE`, and sets protected/personal fields to `null` or empty arrays. Add invalid guest status fixtures to the adapter test so no unchecked `as RsvpStatus`/`as AttendanceStatus` cast is accepted.
 
-- [ ] **Step 7: Re-export the read-view types for existing UI imports**
+- [x] **Step 7: Re-export the read-view types for existing UI imports**
 
 Change `current-session-types.ts` to import and re-export `CurrentSessionReadView` as `CurrentSession` and derive `RsvpUpdateStatus` from non-null RSVP values:
 
@@ -400,7 +400,7 @@ export type { CurrentSessionReadView as CurrentSession } from "@/features/curren
 export type RsvpUpdateStatus = "GOING" | "MAYBE" | "DECLINED";
 ```
 
-- [ ] **Step 8: Run focused GREEN tests and type checking through the frontend test runner**
+- [x] **Step 8: Run focused GREEN tests and type checking through the frontend test runner**
 
 Run:
 
@@ -412,7 +412,7 @@ corepack pnpm --dir front exec vitest run \
 
 Expected: PASS.
 
-- [ ] **Step 9: Commit Task 1**
+- [x] **Step 9: Commit Task 1**
 
 ```bash
 git add \
@@ -446,7 +446,7 @@ git commit -m "refactor(frontend): define shared read surface contracts"
   - One desktop and one mobile current-session renderer with visible disabled controls for `canWrite=false`.
   - No `ViewerSessionReadOnly`, `MobileViewerPrepSegment`, or `MobileViewerRecordsSegment` export.
 
-- [ ] **Step 1: Replace viewer unit expectations with disabled-control expectations**
+- [x] **Step 1: Replace viewer unit expectations with disabled-control expectations**
 
 In `front/tests/unit/current-session.test.tsx`, update the viewer desktop and mobile tests to assert the regular controls exist and are disabled:
 
@@ -462,7 +462,7 @@ expect(fetchMock).not.toHaveBeenCalled();
 
 Seed the viewer fixture with an RSVP, non-zero progress, questions, and a long review, then assert those actual values appear in the disabled controls. For mobile, switch to `내 준비` and `내 기록` and assert the same input/button labels and stored values are present and disabled.
 
-- [ ] **Step 2: Run the current-session test and verify RED**
+- [x] **Step 2: Run the current-session test and verify RED**
 
 Run:
 
@@ -472,7 +472,7 @@ corepack pnpm --dir front exec vitest run tests/unit/current-session.test.tsx
 
 Expected: FAIL because viewer-only renderers omit the regular controls.
 
-- [ ] **Step 3: Extend access-state calculation with explicit capabilities**
+- [x] **Step 3: Extend access-state calculation with explicit capabilities**
 
 Use this signature in `current-session-view-model.ts`:
 
@@ -503,7 +503,7 @@ const canWrite = accessState.canWrite && actions !== undefined;
 
 Each save handler returns before mutation when `!canWrite`, then invokes its action with optional chaining (`await actions?.saveCheckin(...)`, etc.). This makes the guest route safe without a fabricated no-op action object and prevents a future route with missing actions from enabling inputs.
 
-- [ ] **Step 4: Remove the desktop viewer-only branch**
+- [x] **Step 4: Remove the desktop viewer-only branch**
 
 Replace the `isViewer ? <ViewerSessionReadOnly /> : <fieldset>` branch with one fieldset for all audiences:
 
@@ -544,7 +544,7 @@ Replace the `isViewer ? <ViewerSessionReadOnly /> : <fieldset>` branch with one 
 
 Keep one short `읽기 전용` note above the fieldset and delete `ViewerSessionReadOnly` and `ReadOnlyMetric`.
 
-- [ ] **Step 5: Make state initialization null-safe without inventing saved values**
+- [x] **Step 5: Make state initialization null-safe without inventing saved values**
 
 Use UI defaults only:
 
@@ -558,7 +558,7 @@ const [questionInputs, setQuestionInputs] = useState<QuestionInput[]>(
 
 The model retains `null`; only the disabled control receives `NO_RESPONSE`/`0` as a display value. Change `RsvpPanel`, `MobileCurrentSessionBoard`, and mobile segment RSVP props to explicit non-null `RsvpStatus` rather than deriving them from nullable `CurrentSession["myRsvpStatus"]`.
 
-- [ ] **Step 6: Remove mobile viewer-only branches**
+- [x] **Step 6: Remove mobile viewer-only branches**
 
 Render `MobilePrepSegment` and `MobileRecordsSegment` for every audience and wrap their controls in the existing disabled fieldset path:
 
@@ -586,11 +586,11 @@ Render `MobilePrepSegment` and `MobileRecordsSegment` for every audience and wra
 
 Delete `MobileViewerPrepSegment` and `MobileViewerRecordsSegment` after their imports and tests are removed.
 
-- [ ] **Step 7: Replace membership-key rendering with `renderKey` and omit protected empty metadata**
+- [x] **Step 7: Replace membership-key rendering with `renderKey` and omit protected empty metadata**
 
 Update roster keys to `member.renderKey`. Render location and meeting rows only when their nullable values are present; keep the surrounding session metadata component unchanged.
 
-- [ ] **Step 8: Run focused current-session tests**
+- [x] **Step 8: Run focused current-session tests**
 
 Run:
 
@@ -603,7 +603,7 @@ corepack pnpm --dir front exec vitest run \
 
 Expected: PASS, with viewer controls present/disabled and no fetch/mutation call.
 
-- [ ] **Step 9: Commit Task 2**
+- [x] **Step 9: Commit Task 2**
 
 ```bash
 git add front/features/current-session front/tests/unit/current-session.test.tsx
@@ -628,7 +628,7 @@ git commit -m "feat(frontend): keep viewer session controls read only"
   - Protected current-session route passes member-normalized data and capabilities.
   - Guest current-session route passes guest-normalized data, no mutation actions, and `GUEST_READ_SURFACE_CAPABILITIES`.
 
-- [ ] **Step 1: Write failing guest current-session parity tests**
+- [x] **Step 1: Write failing guest current-session parity tests**
 
 Replace the existing “no participation controls” assertion with:
 
@@ -644,7 +644,7 @@ expect(screen.queryByText(/Passcode|모임 링크 열기/)).not.toBeInTheDocumen
 
 Assert the guest route renders `.rm-current-session-desktop` and `data-testid="current-session-mobile"`, the same markers used by the member page.
 
-- [ ] **Step 2: Run guest surface/route tests and verify RED**
+- [x] **Step 2: Run guest surface/route tests and verify RED**
 
 Run:
 
@@ -656,11 +656,11 @@ corepack pnpm --dir front exec vitest run \
 
 Expected: FAIL because `GuestCurrentSession` still uses the separate guest renderer.
 
-- [ ] **Step 3: Normalize protected route data before rendering**
+- [x] **Step 3: Normalize protected route data before rendering**
 
 In `CurrentSessionRoute`, call `readSurfaceCapabilitiesForAuth(loaderData.auth)` and pass `memberCurrentSessionReadPage(currentData, capabilities)` to `CurrentSessionPage`. Keep the existing mutation hooks only in this protected route.
 
-- [ ] **Step 4: Normalize guest route data and render `CurrentSessionPage`**
+- [x] **Step 4: Normalize guest route data and render `CurrentSessionPage`**
 
 Replace the guest branch with:
 
@@ -680,11 +680,11 @@ if (appPath === "/app/session/current") {
 
 `CurrentSessionPage` reads capabilities only from `data.currentSession.capabilities`; do not add a second capabilities prop. It accepts optional mutation actions and throws no error when actions are absent because `canWrite=false` guards every mutation path. The protected route embeds its auth-derived capabilities in `memberCurrentSessionReadPage` and remains the only route that supplies mutation actions.
 
-- [ ] **Step 5: Delete only the replaced guest current-session renderer**
+- [x] **Step 5: Delete only the replaced guest current-session renderer**
 
 Remove `GuestCurrentSession`, `GuestSessionCard`, `GuestRoster`, `GuestQuestions`, and `GuestLongReviews` if no other guest page imports them. Keep guest error and pagination behavior used by remaining routes.
 
-- [ ] **Step 6: Run focused GREEN tests**
+- [x] **Step 6: Run focused GREEN tests**
 
 Run:
 
@@ -698,7 +698,7 @@ corepack pnpm --dir front exec vitest run \
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit Task 3**
+- [x] **Step 7: Commit Task 3**
 
 ```bash
 git add \
@@ -731,7 +731,7 @@ git commit -m "feat(frontend): share current session with guests"
   - `guestNoteFeedReadPage(page): PagedResponse<NoteFeedItem>`
   - `GuestNotesRoute` renders `NotesFeedPage` with guest pagination and URL filters.
 
-- [ ] **Step 1: Write failing adapter and parity assertions**
+- [x] **Step 1: Write failing adapter and parity assertions**
 
 Add to `guest-read-views.test.ts`:
 
@@ -752,7 +752,7 @@ expect(guestNoteFeedReadPage(guestFeed).items[0]).toEqual({
 
 In route/UI tests assert the regular description, session rail/picker, filter buttons, and selected-session link are present. Remove the old guest-only copy assertion.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run:
 
@@ -765,7 +765,7 @@ corepack pnpm --dir front exec vitest run \
 
 Expected: FAIL because guest notes still render `NotesReadPage` and `NoteFeedItem.avatarKey` rejects `null`.
 
-- [ ] **Step 3: Make avatar keys nullable in the shared notes read model**
+- [x] **Step 3: Make avatar keys nullable in the shared notes read model**
 
 Change only the presentation type:
 
@@ -785,11 +785,11 @@ export type NoteFeedItem = {
 
 `AvatarChip` already accepts unknown/nullable keys and safely renders no fabricated asset key.
 
-- [ ] **Step 4: Implement guest-to-shared note adapters**
+- [x] **Step 4: Implement guest-to-shared note adapters**
 
 Use explicit field mapping and filter unsupported kinds with the existing `guestNoteKind` guard. Do not cast the guest page wholesale.
 
-- [ ] **Step 5: Render `NotesFeedPage` from `GuestNotesRoute`**
+- [x] **Step 5: Render `NotesFeedPage` from `GuestNotesRoute`**
 
 Pass:
 
@@ -809,11 +809,11 @@ Pass:
 
 Keep filter and `sessionId` query parameters when either changes. Continue using `guestNoteFeedQuery` and `guestNoteSessionsQuery`; do not reuse member query keys.
 
-- [ ] **Step 6: Remove the replaced `GuestNotes` and `GuestNoteList` renderers**
+- [x] **Step 6: Remove the replaced `GuestNotes` and `GuestNoteList` renderers**
 
 Delete those exports after every route/test import uses `NotesFeedPage`.
 
-- [ ] **Step 7: Run focused GREEN tests**
+- [x] **Step 7: Run focused GREEN tests**
 
 Run:
 
@@ -826,7 +826,7 @@ corepack pnpm --dir front exec vitest run \
 
 Expected: PASS, including cursor accumulation and retry behavior.
 
-- [ ] **Step 8: Commit Task 4**
+- [x] **Step 8: Commit Task 4**
 
 ```bash
 git add \
@@ -869,7 +869,7 @@ git commit -m "feat(frontend): share notes feed with guests"
   - `MemberHomeRetryHandlers`
   - `MemberHome` accepts `{ view, LinkComponent, widgetErrors?, onRetry? }` without importing the guest feature.
 
-- [ ] **Step 1: Write failing home adapter tests**
+- [x] **Step 1: Write failing home adapter tests**
 
 Define the shared view contract in the test expectations:
 
@@ -892,7 +892,7 @@ expect(JSON.stringify(guestMemberHomeReadView(guestHome))).not.toContain("Room 7
 
 Add a component test proving both guest/member views contain the same `홈 요약`, `이번 세션`, `최근 기록`, and `예정 세션` section markers.
 
-- [ ] **Step 2: Run focused home tests and verify RED**
+- [x] **Step 2: Run focused home tests and verify RED**
 
 Run:
 
@@ -904,7 +904,7 @@ corepack pnpm --dir front exec vitest run \
 
 Expected: FAIL because the new view model and prop contract do not exist.
 
-- [ ] **Step 3: Implement `MemberHomeReadView`**
+- [x] **Step 3: Implement `MemberHomeReadView`**
 
 Use this top-level contract:
 
@@ -965,7 +965,7 @@ Define `GuestMemberHomeReadSource` locally as the structural subset of the publi
 
 The member adapter preserves actual personal values. The guest adapter reuses `guestCurrentSessionReadPage`, maps public notes/upcoming sessions, and sets location/personal fields to `null`.
 
-- [ ] **Step 4: Refactor `MemberHome` to render from `view`**
+- [x] **Step 4: Refactor `MemberHome` to render from `view`**
 
 Replace raw `auth/current/noteFeedItems/upcomingSessions` props with:
 
@@ -989,19 +989,19 @@ export default function MemberHome({
 
 Keep the exact desktop/mobile structure. For guest private values, render regular controls/status cards in disabled or neutral display form; omit protected location/meeting text rather than substituting a fake value.
 
-- [ ] **Step 5: Preserve partial widget error boundaries inside the shared home**
+- [x] **Step 5: Preserve partial widget error boundaries inside the shared home**
 
 Move the existing guest widget error/retry wrappers around the corresponding shared home sections. A failed upcoming widget must not remove the current-session or recent-record sections.
 
-- [ ] **Step 6: Adapt protected and guest routes**
+- [x] **Step 6: Adapt protected and guest routes**
 
 `app-home.tsx` calls `memberHomeReadViewFromRouteData(loaderData)`. `GuestHomeRoute` calls `guestMemberHomeReadView(initialData)` and passes the existing retry handlers.
 
-- [ ] **Step 7: Remove the replaced `GuestHome` renderer and page-level `ConversionPrompt`**
+- [x] **Step 7: Remove the replaced `GuestHome` renderer and page-level `ConversionPrompt`**
 
 Delete `GuestHome`, `GuestSessionCard`, and the general home conversion card after route/tests use `MemberHome`.
 
-- [ ] **Step 8: Run focused GREEN tests**
+- [x] **Step 8: Run focused GREEN tests**
 
 Run:
 
@@ -1016,7 +1016,7 @@ corepack pnpm --dir front exec vitest run \
 
 Expected: PASS, including partial 429 handling.
 
-- [ ] **Step 9: Commit Task 5**
+- [x] **Step 9: Commit Task 5**
 
 ```bash
 git add \
@@ -1053,7 +1053,7 @@ git commit -m "feat(frontend): share member home with guests"
   - `ArchivePage` props add `capabilities` and `feedbackLockedAction`.
   - Guest archive keeps all regular tabs visible; personal tabs have empty pages because no guest identity, and feedback shows a generic lock without metadata.
 
-- [ ] **Step 1: Write failing archive adapter tests**
+- [x] **Step 1: Write failing archive adapter tests**
 
 ```ts
 const view = guestArchiveReadView(guestArchivePage);
@@ -1071,7 +1071,7 @@ expect(JSON.stringify(view)).not.toMatch(/fileName|uploadedAt|feedbackDocument/)
 
 Add component assertions that `세션`, `피드백 문서`, `내 질문`, and `내 서평` tabs remain visible, while the report panel says `피드백 문서는 정식 멤버에게 열립니다` and does not render a document title/file name.
 
-- [ ] **Step 2: Run focused archive tests and verify RED**
+- [x] **Step 2: Run focused archive tests and verify RED**
 
 Run:
 
@@ -1083,7 +1083,7 @@ corepack pnpm --dir front exec vitest run \
 
 Expected: FAIL because guest archive data cannot drive `ArchivePage` and feedback locking is data-derived.
 
-- [ ] **Step 3: Implement the archive read adapter**
+- [x] **Step 3: Implement the archive read adapter**
 
 Define the complete adapter output:
 
@@ -1151,7 +1151,7 @@ export function guestArchiveReadView(page: GuestArchiveReadSource): ArchivePageR
 }
 ```
 
-- [ ] **Step 4: Make archive feedback locking capability-driven**
+- [x] **Step 4: Make archive feedback locking capability-driven**
 
 Add props:
 
@@ -1164,15 +1164,15 @@ type ArchivePageAccessProps = {
 
 When `canReadFeedback=false`, do not inspect `reports` or per-session feedback fields. Render a generic lock card and the route-provided action. Keep the tab visible and keyboard-selectable.
 
-- [ ] **Step 5: Render `ArchivePage` from `GuestArchiveRoute`**
+- [x] **Step 5: Render `ArchivePage` from `GuestArchiveRoute`**
 
 Pass the guest adapter result, route pathname/search, session load-more callback, and one route-provided login link as `feedbackLockedAction`. Build its `to` with `loginPathForReturnTo(currentScopedArchiveUrl)`; the action appears only after the guest explicitly selects the locked feedback tab. Do not fabricate a feedback session ID merely to open the lock dialog.
 
-- [ ] **Step 6: Remove the replaced `GuestArchive` renderer**
+- [x] **Step 6: Remove the replaced `GuestArchive` renderer**
 
 Delete it after route and tests use `ArchivePage`. Preserve cursor double-click protection in `GuestArchiveRoute` and its route test.
 
-- [ ] **Step 7: Run focused GREEN tests**
+- [x] **Step 7: Run focused GREEN tests**
 
 Run:
 
@@ -1185,7 +1185,7 @@ corepack pnpm --dir front exec vitest run \
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit Task 6**
+- [x] **Step 8: Commit Task 6**
 
 ```bash
 git add \
@@ -1229,7 +1229,7 @@ git commit -m "feat(frontend): share archive presentation with guests"
   - `guestSessionDetailReadView(response)`
   - `MemberSessionDetailPage` accepts `SessionDetailReadView` and `feedbackLockedAction`.
 
-- [ ] **Step 1: Write failing detail adapter tests**
+- [x] **Step 1: Write failing detail adapter tests**
 
 ```ts
 const guestView = guestSessionDetailReadView(guestDetail);
@@ -1254,7 +1254,7 @@ expect(JSON.stringify(guestView)).not.toContain("Room 7");
 
 Add a query test proving member `LONG_REVIEW` note items become `clubLongReviews` without changing the server DTO. Add a component test rendering member and guest views and comparing their public heading order: `요약`, `회차 기록`, `함께 남긴 질문`, `공개 서평`.
 
-- [ ] **Step 2: Run focused detail tests and verify RED**
+- [x] **Step 2: Run focused detail tests and verify RED**
 
 Run:
 
@@ -1267,7 +1267,7 @@ corepack pnpm --dir front exec vitest run \
 
 Expected: FAIL because the shared detail contract and guest adapter do not exist.
 
-- [ ] **Step 3: Enrich protected detail query data with public long reviews**
+- [x] **Step 3: Enrich protected detail query data with public long reviews**
 
 Define a frontend-only query result without changing `MemberArchiveSessionDetailResponse`:
 
@@ -1284,7 +1284,7 @@ export type MemberArchiveSessionQueryData = MemberArchiveSessionDetailResponse &
 
 Change `fetchMemberArchiveSessionQueryData` and `memberArchiveSessionQuery` to return `MemberArchiveSessionQueryData | null`. Fetch the notes page whenever a session exists, because long-review enrichment is needed even when every highlight already has an author. When notes succeed, map `LONG_REVIEW` items with non-null authors into `clubLongReviews` and continue enriching missing highlight authors. When notes fail, return `{ ...session, clubLongReviews: [] }`; never return the raw server DTO under the enriched query type. Do not add this field to the API/Zod contract.
 
-- [ ] **Step 4: Implement explicit member and guest detail adapters**
+- [x] **Step 4: Implement explicit member and guest detail adapters**
 
 Define the presentation contract in `session-detail-read-view.ts`:
 
@@ -1383,19 +1383,19 @@ export function guestSessionDetailReadView(
 
 Keep `GuestSessionDetailReadSource` structural and local to the archive feature; do not import guest feature model types. The member adapter maps `clubLongReviews` to `publicLongReviews`. The guest adapter validates `state` with the same explicit state guard used by the list adapter and returns `null` for an invalid value. For valid input it maps guest `longReviews[].content` to `publicLongReviews[].body`, sets protected location, personal state, and feedback document to `null`, and retains public author/avatar values exactly as delivered. The adapter test includes an invalid state fixture and expects `null` rather than accepting a cast.
 
-- [ ] **Step 5: Make the existing detail page consume `SessionDetailReadView`**
+- [x] **Step 5: Make the existing detail page consume `SessionDetailReadView`**
 
 Keep desktop/mobile layout and section primitives. Add a `공개 서평` section backed by `publicLongReviews` for member and guest views. Guard protected fields with null checks. When `canReadFeedback=false`, render one generic locked card and the injected `feedbackLockedAction`; do not render `FeedbackMetaBadge` or inspect feedback availability.
 
-- [ ] **Step 6: Adapt member and guest routes**
+- [x] **Step 6: Adapt member and guest routes**
 
 The protected route calls `memberSessionDetailReadView`. The guest route calls `guestSessionDetailReadView`, renders its existing not-found boundary when the adapter returns `null`, and otherwise injects a `GuestNavigationLink` to `/app/feedback/:sessionId`, which opens the existing lock dialog without navigating.
 
-- [ ] **Step 7: Remove the replaced `GuestArchiveDetail` renderer and bottom conversion card**
+- [x] **Step 7: Remove the replaced `GuestArchiveDetail` renderer and bottom conversion card**
 
 Delete the guest-only detail JSX and `ConversionPrompt`. Keep locked feedback conversion through `GuestNavigationLink` only.
 
-- [ ] **Step 8: Run focused GREEN tests**
+- [x] **Step 8: Run focused GREEN tests**
 
 Run:
 
@@ -1409,7 +1409,7 @@ corepack pnpm --dir front exec vitest run \
 
 Expected: PASS with no feedback metadata in guest presentation.
 
-- [ ] **Step 9: Commit Task 7**
+- [x] **Step 9: Commit Task 7**
 
 ```bash
 git add \
@@ -1449,7 +1449,7 @@ git commit -m "feat(frontend): share session detail with guests"
   - `GuestMySpace` retains its contextual `멤버로 시작` action and exact `returnTo`.
   - Explicit feedback/account lock dialog retains focus trap, Escape, backdrop close, focus restore, and one conversion action.
 
-- [ ] **Step 1: Rewrite shell tests for the approved conversion policy**
+- [x] **Step 1: Rewrite shell tests for the approved conversion policy**
 
 Delete the direct `GuestAccountControl` render test. In the layout test assert:
 
@@ -1461,7 +1461,7 @@ expect(screen.queryByRole("link", { name: "멤버로 시작" })).not.toBeInTheDo
 
 Keep separate tests proving `GuestMySpace` and an opened lock dialog each contain exactly one `멤버로 시작` link with the full encoded return path.
 
-- [ ] **Step 2: Run shell/layout tests and verify RED**
+- [x] **Step 2: Run shell/layout tests and verify RED**
 
 Run:
 
@@ -1474,7 +1474,7 @@ corepack pnpm --dir front exec vitest run \
 
 Expected: FAIL because desktop/mobile shell still inject `GuestAccountControl`.
 
-- [ ] **Step 3: Remove guest account-control injection**
+- [x] **Step 3: Remove guest account-control injection**
 
 Use the authenticated account controller only:
 
@@ -1493,15 +1493,15 @@ accountControl={
 
 Apply this to both `TopNav` and `MobileHeader`. Remove the `GuestAccountControl` import and delete its file.
 
-- [ ] **Step 4: Remove unused account-control CSS only**
+- [x] **Step 4: Remove unused account-control CSS only**
 
 Delete `.rm-guest-account-control`, `__badge`, `__action`, and their media/focus rules. Retain `.rm-guest-lock*`, `.rm-guest-my-space*`, dialog, and reduced-motion styles.
 
-- [ ] **Step 5: Preserve contextual conversion behavior**
+- [x] **Step 5: Preserve contextual conversion behavior**
 
 Do not change the `GuestMySpace` route selection in `GuestScopedAppRoute`. Keep the current safe `loginPathForReturnTo(returnTo)` call. Keep explicit feedback/account lock behavior in `GuestNavigationDialog` and `GuestLockedPage`.
 
-- [ ] **Step 6: Run focused GREEN tests**
+- [x] **Step 6: Run focused GREEN tests**
 
 Run:
 
@@ -1514,7 +1514,7 @@ corepack pnpm --dir front exec vitest run \
 
 Expected: PASS.
 
-- [ ] **Step 7: Run the frontend boundary test after guest UI removals**
+- [x] **Step 7: Run the frontend boundary test after guest UI removals**
 
 Run:
 
@@ -1524,7 +1524,7 @@ corepack pnpm --dir front exec vitest run tests/unit/frontend-boundaries.test.ts
 
 Expected: PASS with no UI-to-route/API dependency violation.
 
-- [ ] **Step 8: Commit Task 8**
+- [x] **Step 8: Commit Task 8**
 
 ```bash
 git add -A \
@@ -1550,7 +1550,7 @@ git commit -m "fix(frontend): remove persistent guest conversion actions"
 - Consumes: final guest/viewer/member UI, existing public-request inventory, viewer login fixtures, direct denied-write probes, responsive helpers.
 - Produces: end-to-end evidence for selected acceptance-matrix rows and an `Unreleased` behavior note.
 
-- [ ] **Step 1: Update the guest journey expectations**
+- [x] **Step 1: Update the guest journey expectations**
 
 Replace guest-only headings/copy with regular-member structure markers. For current session assert regular controls exist and are disabled:
 
@@ -1570,11 +1570,11 @@ await expect(page.getByRole("link", { name: "멤버로 시작", exact: true })).
 
 After explicitly opening feedback, assert the dialog contains exactly one conversion link. On `/app/me`, assert `GuestMySpace` still contains exactly one conversion link.
 
-- [ ] **Step 2: Update viewer E2E expectations**
+- [x] **Step 2: Update viewer E2E expectations**
 
 In both viewer specs, replace “control count 0” assertions with visible/disabled assertions. Keep direct PATCH/feedback probes and their expected `403` responses unchanged.
 
-- [ ] **Step 3: Run targeted E2E and verify behavior**
+- [x] **Step 3: Run targeted E2E and verify behavior**
 
 Run:
 
@@ -1587,7 +1587,7 @@ corepack pnpm --dir front exec playwright test \
 
 Expected: PASS. Guest browser request inventory contains only `/api/bff/api/public/**` and `/api/bff/api/auth/me`; viewer direct writes and feedback reads return `403`.
 
-- [ ] **Step 4: Capture responsive browser evidence**
+- [x] **Step 4: Capture responsive browser evidence**
 
 Use the existing Playwright fixtures at 1280×900 and 390×844 to inspect:
 
@@ -1602,7 +1602,7 @@ Use the existing Playwright fixtures at 1280×900 and 390×844 to inspect:
 
 Store screenshots only in Playwright output or existing ignored evidence paths; do not add new tracked generated images unless the repository contract explicitly requires them.
 
-- [ ] **Step 5: Update `CHANGELOG.md`**
+- [x] **Step 5: Update `CHANGELOG.md`**
 
 Under `Unreleased`, add one public-safe bullet:
 
@@ -1610,7 +1610,7 @@ Under `Unreleased`, add one public-safe bullet:
 - 둘러보기 사용자도 정식 멤버와 같은 홈·세션·노트·아카이브·기록 화면을 사용하며, 입력 영역은 읽기 전용으로 비활성화되고 피드백 문서는 정식 멤버에게만 열리도록 정리했습니다.
 ```
 
-- [ ] **Step 6: Run the canonical frontend gates**
+- [x] **Step 6: Run the canonical frontend gates at the Task 9 snapshot**
 
 Run:
 
@@ -1623,7 +1623,7 @@ corepack pnpm --dir front test:e2e
 
 Expected: all commands PASS.
 
-- [ ] **Step 7: Run repository diff and public-safety checks**
+- [x] **Step 7: Run repository diff and public-safety checks**
 
 Run:
 
@@ -1642,7 +1642,7 @@ rg -n "(^|[^A-Za-z0-9_])([o]cid1\.|/[U]sers/|/[Hh]ome/[^[:space:]]+|[s]k-[A-Za-z
 
 Expected: `git diff --check` exits 0 and the safety scan reports no introduced private-looking value. Existing public-safe fixture emails such as `member@example.com` must be reviewed as test placeholders rather than reported as secrets.
 
-- [ ] **Step 8: Review the final branch against the approved spec**
+- [x] **Step 8: Review the final branch against the approved spec**
 
 Confirm every acceptance statement:
 
@@ -1654,7 +1654,7 @@ Confirm every acceptance statement:
 - Explicit feedback lock and `GuestMySpace` conversion remain.
 - Guest partial errors, pagination, filters, route continuity, and reduced motion remain covered.
 
-- [ ] **Step 9: Commit Task 9**
+- [x] **Step 9: Commit Task 9**
 
 ```bash
 git add \
@@ -1664,6 +1664,25 @@ git add \
   CHANGELOG.md
 git commit -m "test(frontend): prove guest member surface parity"
 ```
+
+Task 9's canonical snapshot was `d2f5087c`: lint and build passed, the full
+frontend unit suite passed 2,038/2,038, and the full E2E suite passed 131/131.
+The later whole-branch review fix wave changed runtime code, so this checked
+step is historical Task 9 evidence rather than final-HEAD recertification.
+
+---
+
+## Final closeout status
+
+- [x] Independent whole-branch review completed; three Important findings were recorded.
+- [x] One fix wave resolved all three findings with RED/GREEN evidence in `8fea0e17`.
+- [x] The single scoped re-review of the fix diff was clean.
+- [x] Fix-wave focused regression (103/103), frontend boundary (8/8), full unit (2,041/2,041), lint, build, diff, and targeted public-safety checks passed.
+- [x] Tracked implementation report and Task 1-9 checkbox closeout prepared in one docs-only commit.
+- [x] Controller: rerun targeted guest/viewer/member E2E at the exact final docs HEAD.
+- [x] Controller: rerun full frontend E2E at the exact final docs HEAD.
+- [x] Controller: recapture or revalidate desktop/mobile/reduced-motion browser evidence at the exact final docs HEAD.
+- [x] Controller: record one exact final-HEAD lint, full unit, build, diff, and public-safety snapshot after the docs commit.
 
 ---
 

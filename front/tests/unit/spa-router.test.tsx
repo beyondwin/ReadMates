@@ -871,7 +871,7 @@ describe("SPA router", () => {
 
     const router = renderGuestRouter("/clubs/reading-sai/app/host/members");
 
-    expect(await screen.findByRole("heading", { name: "함께 읽어 온 장면들" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /게스트님,.*게스트 책.*함께 읽어요/ })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/clubs/reading-sai/app");
     expect(protectedApiCalls(fetchMock)).toEqual([]);
   });

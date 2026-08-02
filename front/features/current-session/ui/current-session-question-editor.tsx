@@ -22,6 +22,7 @@ export function QuestionEditor({
   onAddQuestion,
   onRemoveQuestion,
   onSaveQuestions,
+  disabled = false,
 }: {
   variant: "desktop" | "mobile";
   questionInputs: QuestionInput[];
@@ -32,6 +33,7 @@ export function QuestionEditor({
   onAddQuestion: () => void;
   onRemoveQuestion: (index: number) => void;
   onSaveQuestions: () => void;
+  disabled?: boolean;
 }) {
   const isMobile = variant === "mobile";
   const canAddQuestion = canAddQuestionInput(questionInputs);
@@ -65,6 +67,7 @@ export function QuestionEditor({
                     type="button"
                     className="btn btn-quiet btn-sm"
                     aria-label={`질문 ${index + 1} 삭제`}
+                    disabled={disabled}
                     onClick={() => onRemoveQuestion(index)}
                   >
                     삭제
@@ -77,6 +80,7 @@ export function QuestionEditor({
                 className={textareaClassName}
                 rows={isMobile ? 2 : 3}
                 value={input.text}
+                disabled={disabled}
                 onChange={(event) => onChangeQuestion(index, event.target.value)}
                 placeholder="모임에서 나누고 싶은 질문을 적어 주세요."
                 style={inputStyle}
@@ -93,13 +97,13 @@ export function QuestionEditor({
         <div className={isMobile ? "m-row rm-current-session-mobile__question-actions" : "row"} style={{ gap: "10px", justifyContent: "flex-end" }}>
           <SaveFeedback scope="question" status={saveStatus} />
           {canAddQuestion ? (
-            <button type="button" className="btn btn-ghost btn-sm" onClick={onAddQuestion}>
+            <button type="button" className="btn btn-ghost btn-sm" disabled={disabled} onClick={onAddQuestion}>
               + 질문 추가
             </button>
           ) : (
             <span className="badge">최대 {MAX_QUESTION_INPUT_COUNT}개까지 작성했어요</span>
           )}
-          <button type="button" className="btn btn-primary btn-sm" disabled={saveStatus === "saving"} onClick={onSaveQuestions}>
+          <button type="button" className="btn btn-primary btn-sm" disabled={disabled || saveStatus === "saving"} onClick={onSaveQuestions}>
             질문 저장
           </button>
         </div>

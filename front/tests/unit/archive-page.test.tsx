@@ -1,9 +1,9 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useState } from "react";
+import { type ComponentProps, useState } from "react";
 import { MemoryRouter, Route, Routes, useLocation, useSearchParams } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import ArchivePage from "@/features/archive/ui/archive-page";
+import ArchivePageComponent from "@/features/archive/ui/archive-page";
 import type {
   ArchiveSessionItem,
   FeedbackDocumentListItem,
@@ -11,8 +11,19 @@ import type {
   MyArchiveReviewItem,
 } from "@/features/archive/api/archive-contracts";
 import type { PagedResponse } from "@/shared/model/paging";
+import {
+  MEMBER_READ_SURFACE_CAPABILITIES,
+  VIEWER_READ_SURFACE_CAPABILITIES,
+} from "@/shared/model/read-surface-capabilities";
 
 const ARCHIVE_SCROLL_KEY = "readmates:archive-scroll";
+
+type TestArchivePageProps = Omit<ComponentProps<typeof ArchivePageComponent>, "capabilities"> &
+  Partial<Pick<ComponentProps<typeof ArchivePageComponent>, "capabilities">>;
+
+function ArchivePage(props: TestArchivePageProps) {
+  return <ArchivePageComponent capabilities={MEMBER_READ_SURFACE_CAPABILITIES} {...props} />;
+}
 
 function pageOf<T>(items: T[], nextCursor: string | null = null): PagedResponse<T> {
   return { items, nextCursor };
@@ -213,6 +224,73 @@ function LocationStateEcho() {
 }
 
 describe("ArchivePage", () => {
+  it("fails closed without inspecting reports when archive capabilities are omitted at runtime", () => {
+    const reportsRead = vi.fn(() => {
+      throw new Error("missing capabilities must not open feedback reports");
+    });
+    const protectedReports = Object.defineProperty(
+      { nextCursor: null } as PagedResponse<FeedbackDocumentListItem>,
+      "items",
+      { get: reportsRead },
+    );
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    expect(() => render(
+      <ArchivePage
+        sessions={pageOf([])}
+        questions={pageOf([])}
+        reviews={pageOf([])}
+        reports={protectedReports}
+        capabilities={undefined as never}
+      />,
+    )).toThrow();
+    expect(reportsRead).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it("keeps every viewer archive tab selectable while feedback is generically locked without metadata", async () => {
+    const user = userEvent.setup();
+    const sessionFeedbackRead = vi.fn(() => {
+      throw new Error("guest archive must not inspect session feedback metadata");
+    });
+    const reportsRead = vi.fn(() => {
+      throw new Error("guest archive must not inspect feedback reports");
+    });
+    const lockedSession: ArchiveSessionItem = {
+      ...seededSessions[0],
+    };
+    Object.defineProperty(lockedSession, "feedbackDocument", { get: sessionFeedbackRead });
+    const protectedReports = Object.defineProperty(
+      { nextCursor: null } as PagedResponse<FeedbackDocumentListItem>,
+      "items",
+      { get: reportsRead },
+    );
+    const { container } = render(
+      <ArchivePage
+        sessions={pageOf([lockedSession])}
+        questions={pageOf([])}
+        reviews={pageOf([])}
+        reports={protectedReports}
+        capabilities={VIEWER_READ_SURFACE_CAPABILITIES}
+        feedbackLockedAction={<a href="/login?returnTo=%2Fclubs%2Falpha%2Fapp%2Farchive%3Fview%3Dreport">멤버로 시작</a>}
+      />,
+    );
+    const desktop = getDesktop(container);
+
+    for (const tabName of ["세션", "피드백 문서", "내 질문", "내 서평"]) {
+      expect(desktop.getByRole("button", { name: tabName })).toBeVisible();
+    }
+    expect(screen.queryByText("피드백 문서는 정식 멤버에게 열립니다")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "멤버로 시작" })).not.toBeInTheDocument();
+
+    await user.click(desktop.getByRole("button", { name: "피드백 문서" }));
+
+    expect(screen.getAllByText("피드백 문서는 정식 멤버에게 열립니다")).toHaveLength(2);
+    expect(screen.getAllByRole("link", { name: "멤버로 시작" })).toHaveLength(2);
+    expect(sessionFeedbackRead).not.toHaveBeenCalled();
+    expect(reportsRead).not.toHaveBeenCalled();
+  });
+
   it("shows the record storage title and session archive controls", () => {
     const { container } = render(
       <ArchivePage sessions={seededSessionPage} questions={seededQuestionPage} reviews={seededReviewPage} reports={seededReportPage} />,

@@ -2,6 +2,10 @@ import { useLoaderData, useLocation, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { memberArchiveSessionQuery } from "@/features/archive/queries/archive-queries";
 import {
+  memberSessionDetailReadView,
+  type SessionDetailLongReview,
+} from "@/features/archive/model/session-detail-read-view";
+import {
   archiveSessionsReturnTarget,
   readReadmatesReturnTarget,
 } from "@/features/archive/ui/archive-route-continuity";
@@ -10,9 +14,15 @@ import MemberSessionDetailPage, {
   MemberSessionDetailUnavailablePage,
 } from "@/features/archive/ui/member-session-detail-page";
 import { RECOVER_READ_SESSION_EXPIRY } from "@/shared/api/client";
+import { readSurfaceCapabilitiesForAuth } from "@/shared/model/read-surface-capabilities";
 
-export function MemberSessionDetailRoute() {
-  const { sessionId } = useLoaderData() as MemberSessionDetailRouteData;
+export function MemberSessionDetailRoute({
+  publicLongReviews = [],
+}: {
+  publicLongReviews?: readonly SessionDetailLongReview[];
+}) {
+  const loaderData = useLoaderData() as MemberSessionDetailRouteData;
+  const { sessionId } = loaderData;
   const { clubSlug } = useParams();
   const sessionQuery = useQuery({
     ...memberArchiveSessionQuery(
@@ -22,7 +32,13 @@ export function MemberSessionDetailRoute() {
     ),
     enabled: Boolean(sessionId),
   });
-  const session = sessionQuery.data ?? null;
+  const session = sessionQuery.data
+    ? memberSessionDetailReadView(
+        sessionQuery.data,
+        readSurfaceCapabilitiesForAuth(loaderData.auth),
+        publicLongReviews,
+      )
+    : null;
   const location = useLocation();
   const returnTarget = readReadmatesReturnTarget(location.state, archiveSessionsReturnTarget);
 

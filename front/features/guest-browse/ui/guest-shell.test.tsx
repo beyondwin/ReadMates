@@ -4,7 +4,6 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 import { MobileTabBar } from "@/shared/ui/mobile-tab-bar";
 import { TopNav } from "@/shared/ui/top-nav";
-import { GuestAccountControl } from "./guest-account-control";
 import { GuestAppHead } from "./guest-app-head";
 import { GuestLockedPage } from "./guest-locked-page";
 import { GuestMySpace } from "./guest-my-space";
@@ -54,7 +53,9 @@ describe("guest shell UI", () => {
 
     expect(screen.getByRole("heading", { name: "내 공간" })).toBeInTheDocument();
     expect(screen.getByText("멤버로 시작하면 내가 참석한 모임, 질문과 서평, 알림 설정을 이곳에서 이어볼 수 있어요.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "멤버로 시작" })).toHaveAttribute(
+    const conversionLinks = screen.getAllByRole("link", { name: "멤버로 시작" });
+    expect(conversionLinks).toHaveLength(1);
+    expect(conversionLinks[0]).toHaveAttribute(
       "href",
       "/login?returnTo=%2Fclubs%2Falpha%2Fapp%2Fme%3Ftab%3Dhistory%23section",
     );
@@ -70,28 +71,12 @@ describe("guest shell UI", () => {
     );
 
     expect(screen.getByText("Google로 시작한 뒤 호스트의 정식 멤버 승인이 필요합니다.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "멤버로 시작" })).toHaveAttribute(
+    const conversionLinks = screen.getAllByRole("link", { name: "멤버로 시작" });
+    expect(conversionLinks).toHaveLength(1);
+    expect(conversionLinks[0]).toHaveAttribute(
       "href",
       "/login?returnTo=%2Fclubs%2Falpha%2Fapp%2Ffeedback%2Fs1%3Ffrom%3Darchive%23document",
     );
-  });
-
-  it("renders guest account conversion and public-home controls without logout", () => {
-    render(
-      <GuestAccountControl
-        clubSlug="alpha"
-        returnTo="/clubs/alpha/app/feedback/s1?print=true#top"
-        LinkComponent={TestLink}
-      />,
-    );
-
-    expect(screen.getByText("게스트")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "멤버로 시작" })).toHaveAttribute(
-      "href",
-      "/login?returnTo=%2Fclubs%2Falpha%2Fapp%2Ffeedback%2Fs1%3Fprint%3Dtrue%23top",
-    );
-    expect(screen.getByRole("link", { name: "공개 홈으로 나가기" })).toHaveAttribute("href", "/clubs/alpha");
-    expect(screen.queryByRole("button", { name: /로그아웃/ })).not.toBeInTheDocument();
   });
 
   it("keeps the regular desktop and mobile member navigation while omitting host entry for guests", () => {
@@ -101,7 +86,7 @@ describe("guest shell UI", () => {
           variant="member"
           appBasePath="/clubs/alpha/app"
           LinkComponent={TestLink}
-          accountControl={<GuestAccountControl clubSlug="alpha" returnTo="/clubs/alpha/app/me" LinkComponent={TestLink} />}
+          accountControl={null}
         />
         <MobileTabBar variant="member" appBasePath="/clubs/alpha/app" LinkComponent={TestLink} />
       </MemoryRouter>,
@@ -112,19 +97,27 @@ describe("guest shell UI", () => {
     expect(screen.getAllByRole("link", { name: "기록" })).not.toHaveLength(0);
     expect(screen.getAllByRole("link", { name: "내 공간" })).not.toHaveLength(0);
     expect(screen.queryByRole("link", { name: "운영" })).not.toBeInTheDocument();
-    expect(screen.getByText("게스트")).toBeInTheDocument();
+    expect(screen.queryByLabelText("게스트 계정")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "공개 홈으로 나가기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "멤버로 시작" })).not.toBeInTheDocument();
   });
 
   it("opens a guest lock dialog and restores focus for Escape, close, and backdrop dismissal", () => {
     render(
       <GuestNavigationProvider LinkComponent={TestLink}>
-        <GuestNavigationLink to="/clubs/alpha/app/feedback/s1">피드백</GuestNavigationLink>
+        <GuestNavigationLink to="/clubs/alpha/app/feedback/s1?from=archive#document">피드백</GuestNavigationLink>
       </GuestNavigationProvider>,
     );
     const opener = screen.getByRole("button", { name: "피드백" });
 
     fireEvent.click(opener);
     expect(screen.getByRole("dialog")).toBeInTheDocument();
+    const conversionLinks = screen.getAllByRole("link", { name: "멤버로 시작" });
+    expect(conversionLinks).toHaveLength(1);
+    expect(conversionLinks[0]).toHaveAttribute(
+      "href",
+      "/login?returnTo=%2Fclubs%2Falpha%2Fapp%2Ffeedback%2Fs1%3Ffrom%3Darchive%23document",
+    );
     expect(document.body.style.overflow).toBe("hidden");
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();

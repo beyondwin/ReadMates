@@ -1,5 +1,5 @@
 import { useLoaderData } from "react-router-dom";
-import { memberHomeViewFromRouteData } from "@/features/member-home/model/member-home-view-model";
+import { memberHomeReadViewFromRouteData } from "@/features/member-home/model/member-home-read-view";
 import MemberHome from "@/features/member-home/ui/member-home";
 import type { MemberHomeRouteData } from "@/features/member-home/route/member-home-data";
 import { useAuth } from "@/src/app/auth-state";
@@ -14,12 +14,12 @@ export default function AppHomePage() {
     return <ReadmatesRouteLoading label="계정 상태를 확인하는 중" variant="member" />;
   }
 
-  const view = memberHomeViewFromRouteData({
+  const view = memberHomeReadViewFromRouteData({
     auth: authState.auth,
     current: data.current,
     noteFeedItems: data.noteFeedItems,
     upcomingSessions: data.upcomingSessions,
   });
 
-  return <MemberHome {...view} LinkComponent={AppRouterLink} />;
+  return <MemberHome view={view} LinkComponent={AppRouterLink} />;
 }

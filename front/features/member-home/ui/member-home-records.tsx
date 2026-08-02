@@ -1,10 +1,10 @@
 import { type CSSProperties, type ReactNode } from "react";
 import { Link, PlainMemberHomeLink, type MemberHomeLinkComponent } from "@/features/member-home/ui/member-home-link";
 import type {
-  MemberHomeCurrentSessionView as CurrentSessionResponse,
-  MemberHomeNoteFeedItemView as NoteFeedItem,
   MemberHomeRecentRecordEntry,
 } from "@/features/member-home/model/member-home-view-model";
+import type { CurrentSessionReadPageData } from "@/shared/model/current-session-read-view";
+import type { NoteFeedItem } from "@/shared/model/notes-feed-model";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { rsvpLabel } from "@/shared/ui/readmates-display";
 
@@ -293,7 +293,7 @@ export function MobileMemberActivity({
   );
 }
 
-export function RosterSummary({ current }: { current: CurrentSessionResponse }) {
+export function RosterSummary({ current }: { current: CurrentSessionReadPageData }) {
   const session = current.currentSession;
 
   if (!session) {
@@ -348,7 +348,7 @@ export function RosterSummary({ current }: { current: CurrentSessionResponse }) 
         <div className="row" style={{ gap: "8px", marginTop: "14px", flexWrap: "wrap" }}>
           {attendees.map((member) => (
             <AvatarChip
-              key={member.membershipId}
+              key={member.renderKey}
               avatarKey={member.avatarKey}
               name={member.displayName}
               label={`${member.displayName} · ${rsvpLabel(member.rsvpStatus)}`}

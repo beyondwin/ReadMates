@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import type { CurrentSessionReadView } from "@/features/current-session/model/current-session-read-view";
 
 export {
   SUSPENDED_MEMBER_NOTICE,
@@ -17,72 +18,13 @@ export type AttendanceStatus = "UNKNOWN" | "ATTENDED" | "ABSENT";
 export type SessionParticipationStatus = "ACTIVE" | "REMOVED";
 export type CurrentSessionMemberRole = "HOST" | "MEMBER";
 
-export type CurrentSession = {
-  sessionId: string;
-  sessionNumber: number;
-  title: string;
-  bookTitle: string;
-  bookAuthor: string;
-  bookLink: string | null;
-  bookImageUrl: string | null;
-  date: string;
-  startTime: string;
-  endTime: string;
-  locationLabel: string;
-  meetingUrl: string | null;
-  meetingPasscode: string | null;
-  questionDeadlineAt: string;
-  myRsvpStatus: RsvpStatus;
-  myCheckin: null | {
-    readingProgress: number;
-  };
-  myQuestions: Array<{
-    priority: number;
-    text: string;
-    draftThought: string | null;
-    authorName: string;
-    authorShortName: string;
-    avatarKey: string;
-  }>;
-  myOneLineReview: null | {
-    text: string;
-  };
-  myLongReview: null | {
-    body: string;
-  };
-  board: {
-    questions: Array<{
-      priority: number;
-      text: string;
-      draftThought: string | null;
-      authorName: string;
-      authorShortName: string;
-      avatarKey: string;
-    }>;
-    longReviews: Array<{
-      authorName: string;
-      authorShortName: string;
-      avatarKey: string;
-      body: string;
-    }>;
-  };
-  attendees: Array<{
-    membershipId: string;
-    avatarKey: string;
-    displayName: string;
-    accountName: string;
-    role: CurrentSessionMemberRole;
-    rsvpStatus: RsvpStatus;
-    attendanceStatus: AttendanceStatus;
-    participationStatus?: SessionParticipationStatus;
-  }>;
-};
+export type { CurrentSessionReadView as CurrentSession };
 
 export type CurrentSessionPageData = {
   currentSession: CurrentSession | null;
 };
 
-export type RsvpUpdateStatus = Exclude<CurrentSession["myRsvpStatus"], "NO_RESPONSE">;
+export type RsvpUpdateStatus = "GOING" | "MAYBE" | "DECLINED";
 export type BoardQuestion = CurrentSession["board"]["questions"][number];
 export type BoardLongReview = CurrentSession["board"]["longReviews"][number];
 export type SaveScope = "rsvp" | "checkin" | "question" | "longReview" | "oneLineReview";

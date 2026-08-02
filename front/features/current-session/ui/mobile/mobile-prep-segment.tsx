@@ -2,7 +2,7 @@ import { Icon, SaveFeedback } from "@/features/current-session/ui/current-sessio
 import { ReadingPaceNote } from "@/features/current-session/ui/current-session-panels";
 import { QuestionEditor, type QuestionInput } from "@/features/current-session/ui/current-session-question-editor";
 import { MAX_QUESTION_INPUT_COUNT } from "@/features/current-session/model/current-session-form-model";
-import type { CurrentSession, RsvpUpdateStatus, SaveState } from "@/features/current-session/ui/current-session-types";
+import type { CurrentSession, RsvpStatus, RsvpUpdateStatus, SaveState } from "@/features/current-session/ui/current-session-types";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { formatDateLabel, formatDeadlineLabel, rsvpLabel } from "@/shared/ui/readmates-display";
 
@@ -18,67 +18,6 @@ function activeAttendees(session: CurrentSession) {
 
 function goingCount(session: CurrentSession) {
   return activeAttendees(session).filter((attendee) => attendee.rsvpStatus === "GOING").length;
-}
-
-function MobileReadOnlyStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="m-card-quiet">
-      <div className="tiny mono" style={{ color: "var(--text-3)", marginBottom: 6 }}>
-        {label}
-      </div>
-      <div className="small" style={{ color: "var(--text)", fontWeight: 500 }}>
-        {value}
-      </div>
-    </div>
-  );
-}
-
-export function MobileViewerPrepSegment({
-  session,
-  rsvp,
-  readingProgress,
-  writtenQuestionCount,
-}: {
-  session: CurrentSession;
-  rsvp: CurrentSession["myRsvpStatus"];
-  readingProgress: number;
-  writtenQuestionCount: number;
-}) {
-  return (
-    <>
-      <section className="m-sec">
-        <div className="m-card">
-          <div className="eyebrow">읽기 전용 세션 상세</div>
-          <div className="h4 editorial" style={{ marginTop: 6 }}>
-            기록은 읽을 수 있고, 새 참여 기록은 정식 멤버만 남길 수 있습니다
-          </div>
-          <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
-            둘러보기 멤버는 기존 기록과 공동 보드를 읽기 전용으로 확인합니다.
-          </p>
-          <div className="rm-current-session-mobile__meta-grid" style={{ marginTop: 14 }}>
-            <MobileReadOnlyStat label="RSVP" value={rsvpLabel(rsvp)} />
-            <MobileReadOnlyStat label="읽기 진행률" value={`${readingProgress}%`} />
-            <MobileReadOnlyStat label="토론 질문" value={`${writtenQuestionCount}/${MAX_QUESTION_INPUT_COUNT}`} />
-            <MobileReadOnlyStat label="피드백 문서" value="정식 멤버 전환 후" />
-          </div>
-        </div>
-      </section>
-
-      <section className="m-sec">
-        <div className="m-card-quiet">
-          <div className="eyebrow">읽기 진행률</div>
-          <div className="h4 editorial" style={{ marginTop: 6 }}>
-            {readingProgress}%
-          </div>
-          <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0", whiteSpace: "pre-wrap" }}>
-            진행률은 내 준비 상태와 호스트 운영 확인에 사용됩니다.
-          </p>
-        </div>
-      </section>
-
-      <MobilePrepMeta session={session} rsvp={rsvp} readingProgress={readingProgress} writtenQuestionCount={writtenQuestionCount} />
-    </>
-  );
 }
 
 export function MobilePrepSegment({
@@ -101,7 +40,7 @@ export function MobilePrepSegment({
   canWrite,
 }: {
   session: CurrentSession;
-  rsvp: CurrentSession["myRsvpStatus"];
+  rsvp: RsvpStatus;
   readingProgress: number;
   onReadingProgressChange: (value: number) => void;
   questionInputs: QuestionInput[];
@@ -223,6 +162,7 @@ export function MobilePrepSegment({
         onAddQuestion={onAddQuestion}
         onRemoveQuestion={onRemoveQuestion}
         onSaveQuestions={onSaveQuestions}
+        disabled={!canWrite}
       />
 
       <MobilePrepMeta session={session} rsvp={rsvp} readingProgress={readingProgress} writtenQuestionCount={writtenQuestionCount} />
@@ -237,7 +177,7 @@ function MobilePrepMeta({
   writtenQuestionCount,
 }: {
   session: CurrentSession;
-  rsvp: CurrentSession["myRsvpStatus"];
+  rsvp: RsvpStatus;
   readingProgress: number;
   writtenQuestionCount: number;
 }) {
@@ -292,8 +232,12 @@ function MobilePrepMeta({
             <dd>
               {session.startTime} – {session.endTime}
             </dd>
-            <dt>장소</dt>
-            <dd>{session.locationLabel}</dd>
+            {session.locationLabel ? (
+              <>
+                <dt>장소</dt>
+                <dd>{session.locationLabel}</dd>
+              </>
+            ) : null}
             {session.meetingPasscode ? (
               <>
                 <dt>Passcode</dt>
@@ -319,7 +263,7 @@ function MobilePrepMeta({
         </div>
         <div className="rm-current-session-mobile__member-list">
           {attendees.map((member) => (
-            <div key={member.membershipId} className="m-row-between">
+            <div key={member.renderKey} className="m-row-between">
               <span className="m-row" style={{ gap: 10 }}>
                 <AvatarChip avatarKey={member.avatarKey} name={member.displayName} label="" sizeRole="member" />
                 <span className="small" style={{ color: "var(--text)" }}>

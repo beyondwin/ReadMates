@@ -229,6 +229,12 @@ describe("guest route loaders", () => {
     expect(fetchMock.mock.calls.every(([path]) => String(path).includes("/api/public/clubs/alpha/browse"))).toBe(true);
   });
 
+  it("keeps the current-session loader response in the public API shape for the shared page normalizer", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(currentSession)));
+
+    await expect(guestCurrentSessionLoader({ params: { clubSlug: "alpha" } })).resolves.toEqual(currentSession);
+  });
+
   it("keeps successful home widgets visible when another public widget is rate limited", async () => {
     const fetchMock = vi.fn((path: string) => {
       if (path.includes("/sessions/current")) return Promise.resolve(jsonResponse(currentSession));

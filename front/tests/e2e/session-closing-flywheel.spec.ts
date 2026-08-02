@@ -113,6 +113,10 @@ async function routeMemberNotifications(page: Page): Promise<{ readRequestIds: s
 }
 
 async function routeMemberReflectionSurfaces(page: Page): Promise<void> {
+  await page.route("**/api/bff/api/notes/feed**", async (route) => {
+    await json(route, 200, { items: [], nextCursor: null });
+  });
+
   await page.route(`**/api/bff/api/archive/sessions/${SESSION_ID}**`, async (route) => {
     await json(route, 200, {
       sessionId: SESSION_ID,

@@ -9,7 +9,7 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { NoteFeedItem, NoteSessionItem } from "@/features/archive/api/archive-contracts";
+import type { NoteFeedItem, NoteSessionItem } from "@/shared/model/notes-feed-model";
 import {
   feedFilterFromSearchParam,
   resolveSelectedSession,
@@ -355,6 +355,23 @@ describe("NotesFeedPage", () => {
       "한줄평 5",
       "질문 4",
     ]);
+    const noteFilters = within(screen.getByLabelText("클럽 노트 필터"));
+    const allFilter = noteFilters.getByRole("button", { name: "전체 12" });
+    const highlightFilter = noteFilters.getByRole("button", { name: "하이라이트 3" });
+
+    expect(allFilter).toHaveStyle({
+      height: "32px",
+      padding: "0 14px",
+      borderRadius: "999px",
+      border: "1px solid var(--text)",
+      background: "var(--text)",
+      color: "var(--bg)",
+    });
+    expect(highlightFilter).toHaveStyle({
+      border: "1px solid var(--line)",
+      background: "transparent",
+      color: "var(--text-2)",
+    });
     expect(screen.queryByRole("button", { name: removedLabel("읽기 ", "흔적") })).not.toBeInTheDocument();
     expect(screen.queryByText(removedLabel("읽기 ", "흔적 5"))).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "하이라이트 · 1" })).toBeInTheDocument();
@@ -399,6 +416,29 @@ describe("NotesFeedPage", () => {
     expect(selectedLink).toHaveAttribute("aria-current", "page");
     expect(selectedLink).toHaveTextContent("선택됨");
     expect(selectedLink).toHaveTextContent("2026.04.15 · 기록 12");
+  });
+
+  it("moves the archive-style selected state with the active notes filter", async () => {
+    const user = userEvent.setup();
+    renderNotesFeedPage();
+    const filters = within(screen.getByLabelText("클럽 노트 필터"));
+    const allFilter = filters.getByRole("button", { name: "전체 12" });
+    const questionFilter = filters.getByRole("button", { name: "질문 4" });
+
+    await user.click(questionFilter);
+
+    expect(allFilter).toHaveAttribute("aria-pressed", "false");
+    expect(allFilter).toHaveStyle({
+      border: "1px solid var(--line)",
+      background: "transparent",
+      color: "var(--text-2)",
+    });
+    expect(questionFilter).toHaveAttribute("aria-pressed", "true");
+    expect(questionFilter).toHaveStyle({
+      border: "1px solid var(--text)",
+      background: "var(--text)",
+      color: "var(--bg)",
+    });
   });
 
   it("appends selected-session feed items when 더 보기 is clicked", async () => {

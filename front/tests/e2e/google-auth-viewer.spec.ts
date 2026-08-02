@@ -117,8 +117,12 @@ test("uninvited google login becomes read-only viewer who can browse sessions", 
   await expect(page.getByText("No.06").first()).toBeVisible();
 
   await page.goto("/app/session/current");
-  await expect(page.getByText("정식 멤버가 되면 RSVP와 질문 작성 기능이 열립니다.").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "참석" })).toHaveCount(0);
+  const currentSession = page.locator(".rm-current-session-desktop");
+  await expect(currentSession.getByText("정식 멤버가 되면 참여 기능과 작성 기능이 열립니다.")).toBeVisible();
+  for (const label of ["참석", "아직 미정", "불참", "진행률 저장", "질문 저장", "서평 저장"]) {
+    await expect(currentSession.getByRole("button", { name: label })).toBeDisabled();
+  }
+  await expect(currentSession.getByRole("slider", { name: "읽기 진행률" })).toBeDisabled();
 
   const hostDashboardStatus = await page.evaluate(async () => {
     const response = await fetch("/api/bff/api/host/dashboard", { cache: "no-store" });

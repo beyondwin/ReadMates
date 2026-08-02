@@ -6,6 +6,14 @@ export type SessionState = "DRAFT" | "OPEN" | "PUBLISHED" | "CLOSED";
 export type MembershipStatus = "INVITED" | "VIEWER" | "ACTIVE" | "SUSPENDED" | "LEFT" | "INACTIVE";
 export type MemberRole = "HOST" | "MEMBER";
 
+export function parseSessionState(value: string): SessionState | null {
+  if (value === "DRAFT" || value === "OPEN" || value === "CLOSED" || value === "PUBLISHED") {
+    return value;
+  }
+
+  return null;
+}
+
 export type MyRecentAttendanceStatus = "ATTENDED" | "ABSENT" | "UNKNOWN";
 
 export type MyRecentAttendance = {

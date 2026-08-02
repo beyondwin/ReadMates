@@ -56,6 +56,15 @@ const viewerAuthFixture = {
   approvalState: "VIEWER",
 } satisfies CurrentSessionAuth;
 
+const viewerCurrentSessionData: CurrentSessionResponse = {
+  currentSession: currentSessionData.currentSession
+    ? {
+        ...currentSessionData.currentSession,
+        myRsvpStatus: "GOING",
+      }
+    : null,
+};
+
 const routeAuthFixture = {
   authenticated: true,
   userId: "user-active-member",
@@ -403,8 +412,8 @@ describe("CurrentSession", () => {
     expect(within(desktop).queryByRole("textbox", { name: "새 질문 내용" })).not.toBeInTheDocument();
     expect(within(desktop).queryByText("초안 생각 · 선택")).not.toBeInTheDocument();
     expect(within(desktop).getByDisplayValue("API에서 온 장문 서평")).toBeInTheDocument();
-    expect(within(desktop).queryByRole("textbox", { name: "한줄평 내용" })).not.toBeInTheDocument();
-    expect(within(desktop).queryByRole("button", { name: "한줄평 저장" })).not.toBeInTheDocument();
+    expect(within(desktop).getByRole("textbox", { name: "한줄평 내용" })).toHaveValue("API에서 온 한줄평");
+    expect(within(desktop).getByRole("button", { name: "한줄평 저장" })).toBeEnabled();
   });
 
   it("shows the reading-loop summary on desktop and mobile current session", async () => {
@@ -430,39 +439,33 @@ describe("CurrentSession", () => {
     expect(desktopScope.getByText("멤버십이 일시 정지되어 새 기록을 남길 수 없습니다.")).toBeInTheDocument();
     expect(desktopScope.getByRole("button", { name: "진행률 저장" })).toBeDisabled();
     expect(desktopScope.getByRole("button", { name: "질문 저장" })).toBeDisabled();
+    expect(desktopScope.getByRole("button", { name: "한줄평 저장" })).toBeDisabled();
     expect(desktopScope.getByRole("button", { name: "서평 저장" })).toBeDisabled();
   });
 
-  it("renders viewer members as read-only on current session", () => {
+  it("keeps saved viewer values in disabled desktop member controls without mutations", () => {
+    // Production break caught: a viewer-only renderer removes the ordinary member controls,
+    // or a control remains enabled and permits a save request.
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
     vi.stubGlobal("fetch", fetchMock);
 
-    const { container } = render(<CurrentSession auth={viewerAuthFixture} data={currentSessionData} />);
+    const { container } = render(<CurrentSession auth={viewerAuthFixture} data={viewerCurrentSessionData} />);
     const desktopScope = within(getDesktop(container));
 
-    expect(desktopScope.getByText("둘러보기 멤버")).toBeVisible();
+    expect(desktopScope.getByText("읽기 전용")).toBeVisible();
     expect(desktopScope.getByText("세션 준비됨")).toBeVisible();
     expect(desktopScope.getByText("세션 내용을 읽고 공동 보드를 확인할 수 있습니다.")).toBeVisible();
-    expect(desktopScope.getByText("기록은 읽을 수 있고, 새 참여 기록은 정식 멤버만 남길 수 있습니다")).toBeVisible();
-    expect(
-      desktopScope.getByText(
-        "둘러보기 멤버는 RSVP, 읽기 진행률, 질문, 서평을 저장할 수 없습니다. 기존 기록과 공동 보드, 피드백 문서 접근 상태는 읽기 전용으로 확인할 수 있어요.",
-      ),
-    ).toBeVisible();
-    expect(desktopScope.getAllByText("읽기 진행률").length).toBeGreaterThan(0);
-    expect(desktopScope.getByText("보존된 질문")).toBeVisible();
-    expect(desktopScope.getAllByText("보존된 서평").length).toBeGreaterThan(0);
-    expect(desktopScope.getAllByText("피드백 문서 접근").length).toBeGreaterThan(0);
-    expect(desktopScope.getAllByText("72%").length).toBeGreaterThan(0);
-    expect(desktopScope.getByText("API에서 온 내 질문")).toHaveClass("body", "editorial");
-    expect(desktopScope.getByText("API에서 온 장문 서평")).toHaveClass("body", "editorial");
-    expect(desktopScope.queryByRole("button", { name: "참석" })).not.toBeInTheDocument();
-    expect(desktopScope.queryByRole("button", { name: "진행률 저장" })).not.toBeInTheDocument();
-    expect(desktopScope.queryByRole("button", { name: "질문 저장" })).not.toBeInTheDocument();
-    expect(desktopScope.queryByRole("button", { name: "한줄평 저장" })).not.toBeInTheDocument();
-    expect(desktopScope.queryByRole("button", { name: "서평 저장" })).not.toBeInTheDocument();
-    expect(desktopScope.queryByRole("textbox")).not.toBeInTheDocument();
-    expect(desktopScope.queryByRole("slider")).not.toBeInTheDocument();
+    for (const label of ["참석", "아직 미정", "불참", "진행률 저장", "질문 저장", "한줄평 저장", "서평 저장"]) {
+      expect(desktopScope.getByRole("button", { name: label })).toBeDisabled();
+    }
+    expect(desktopScope.getByRole("slider", { name: "읽기 진행률" })).toBeDisabled();
+    expect(desktopScope.getAllByRole("textbox").every((input) => input.hasAttribute("disabled"))).toBe(true);
+    expect(desktopScope.getByRole("button", { name: "참석" })).toHaveStyle({ background: "var(--accent-soft)" });
+    expect(desktopScope.getByDisplayValue("72")).toBeDisabled();
+    expect(desktopScope.getByRole("textbox", { name: "질문 1 내용" })).toHaveValue("API에서 온 내 질문");
+    expect(desktopScope.getByRole("textbox", { name: "한줄평 내용" })).toHaveValue("API에서 온 한줄평");
+    expect(desktopScope.getByRole("textbox", { name: "서평 내용" })).toHaveValue("API에서 온 장문 서평");
+    expect(desktopScope.queryByText("읽기 전용 세션 상세")).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -478,38 +481,44 @@ describe("CurrentSession", () => {
     expect(screen.queryByRole("link", { name: "세션 운영으로" })).not.toBeInTheDocument();
   });
 
-  it("mirrors viewer read-only controls on mobile current session", async () => {
+  it("keeps saved viewer values in disabled mobile member controls without mutations", async () => {
+    // Production break caught: mobile viewer-only segments omit ordinary controls,
+    // or a visible control is enabled and can invoke a save request.
     const user = userEvent.setup();
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<CurrentSession auth={viewerAuthFixture} data={currentSessionData} />);
+    render(<CurrentSession auth={viewerAuthFixture} data={viewerCurrentSessionData} />);
 
     const mobileScope = within(await screen.findByTestId("current-session-mobile"));
 
-    expect(mobileScope.getByText("둘러보기 멤버")).toBeVisible();
+    expect(mobileScope.getByText("읽기 전용")).toBeVisible();
     expect(mobileScope.getByText("세션 준비됨")).toBeVisible();
     expect(mobileScope.getByText("세션 내용을 읽고 공동 보드를 확인할 수 있습니다.")).toBeVisible();
-    expect(
-      mobileScope.getByText("세션 기록은 읽을 수 있어요. RSVP, 진행률, 질문, 서평 작성은 정식 멤버에게 열립니다."),
-    ).toBeVisible();
-    expect(mobileScope.getByText("기록은 읽을 수 있고, 새 참여 기록은 정식 멤버만 남길 수 있습니다")).toBeVisible();
-    expect(mobileScope.getAllByText("읽기 진행률").length).toBeGreaterThan(0);
-    expect(mobileScope.getAllByText("72%").length).toBeGreaterThan(0);
-    expect(mobileScope.queryByRole("button", { name: "참석" })).not.toBeInTheDocument();
-    expect(mobileScope.queryByRole("button", { name: "진행률 저장" })).not.toBeInTheDocument();
-    expect(mobileScope.queryByRole("button", { name: "질문 저장" })).not.toBeInTheDocument();
-    expect(mobileScope.queryByRole("textbox")).not.toBeInTheDocument();
-    expect(mobileScope.queryByRole("slider")).not.toBeInTheDocument();
+    for (const label of ["참석", "아직 미정", "불참", "진행률 저장", "질문 저장"]) {
+      expect(mobileScope.getByRole("button", { name: label })).toBeDisabled();
+    }
+    expect(mobileScope.getByRole("slider", { name: "읽기 진행률" })).toBeDisabled();
+    // Production break caught: replacing the saved progress with a default value hides a viewer's actual check-in.
+    expect(mobileScope.getByDisplayValue("72")).toBeDisabled();
+    expect(mobileScope.getAllByRole("textbox").every((input) => input.hasAttribute("disabled"))).toBe(true);
+    expect(mobileScope.getByRole("button", { name: "참석" })).toHaveStyle({ background: "var(--text)" });
+    expect(mobileScope.getByRole("textbox", { name: "질문 1 내용" })).toHaveValue("API에서 온 내 질문");
+    expect(mobileScope.queryByText("읽기 전용 세션 상세")).not.toBeInTheDocument();
 
     await user.click(mobileScope.getByRole("button", { name: "내 기록" }));
 
-    expect(mobileScope.getByText("내 기록은 읽기 전용입니다")).toBeVisible();
-    expect(mobileScope.getByText("API에서 온 한줄평")).toHaveClass("body", "editorial");
-    expect(mobileScope.getByText("API에서 온 장문 서평")).toHaveClass("body", "editorial");
-    expect(mobileScope.queryByRole("button", { name: "한줄평 저장" })).not.toBeInTheDocument();
-    expect(mobileScope.queryByRole("button", { name: "서평 저장" })).not.toBeInTheDocument();
-    expect(mobileScope.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(mobileScope.getByRole("textbox", { name: "한줄평 내용" })).toHaveValue("API에서 온 한줄평");
+    expect(mobileScope.getByRole("textbox", { name: "한줄평 내용" })).toBeDisabled();
+    expect(mobileScope.getByRole("button", { name: "한줄평 저장" })).toBeDisabled();
+    expect(mobileScope.getByRole("textbox", { name: "서평 내용" })).toHaveValue("API에서 온 장문 서평");
+    expect(mobileScope.getByRole("textbox", { name: "서평 내용" })).toBeDisabled();
+    expect(mobileScope.getByRole("button", { name: "서평 저장" })).toBeDisabled();
+    expect(mobileScope.getAllByRole("textbox").every((input) => input.hasAttribute("disabled"))).toBe(true);
+    expect(
+      mobileScope.getByText("둘러보기 멤버는 현재 세션 내용은 읽을 수 있지만, 참석자 피드백 문서와 작성 기능은 제한됩니다."),
+    ).toBeVisible();
+    expect(mobileScope.queryByText("세션 후 호스트가 피드백 문서를 업로드하면 active 정식 멤버에게 열립니다.")).not.toBeInTheDocument();
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -667,7 +676,7 @@ describe("CurrentSession", () => {
     expect(desktopScope().getByRole("textbox", { name: "질문 1 내용" })).toHaveValue("새 세션 질문");
     expect(desktopScope().getByRole("textbox", { name: "질문 2 내용" })).toHaveValue("");
     expect(desktopScope().getByDisplayValue("새 세션 장문 서평")).toBeInTheDocument();
-    expect(desktopScope().queryByDisplayValue("새 세션 한줄평")).not.toBeInTheDocument();
+    expect(desktopScope().getByRole("textbox", { name: "한줄평 내용" })).toHaveValue("새 세션 한줄평");
   });
 
   it("shows post-session prep, roster, and shared board layers", async () => {
@@ -678,16 +687,17 @@ describe("CurrentSession", () => {
 
     const longReviewHeading = desktopScope.getByText("이 책에 남기고 싶은 글");
     expect(desktopScope.getByText("서평 작성")).toBeInTheDocument();
-    expect(desktopScope.queryByText("이 책을 한 문장으로")).not.toBeInTheDocument();
+    expect(desktopScope.getByText("이 책을 한 문장으로")).toBeInTheDocument();
     expect(longReviewHeading).toBeInTheDocument();
     expect(desktopScope.getByText("참석자 · 1/2")).toBeInTheDocument();
     expect(desktopScope.getByText("단계 02")).toBeInTheDocument();
     expect(desktopScope.getByText("공동 보드 · 다른 멤버의 기록")).toBeInTheDocument();
-    expect(desktopScope.getByRole("button", { name: /질문 · 1/ })).toBeInTheDocument();
+    const boardTabs = within(desktopScope.getByLabelText("공동 보드"));
+    expect(boardTabs.getByRole("button", { name: /질문 · 1/ })).toBeInTheDocument();
     expect(desktopScope.queryByText(removedLabel("읽기 ", "흔적"))).not.toBeInTheDocument();
-    expect(desktopScope.getByRole("button", { name: /서평 · 1/ })).toBeInTheDocument();
-    expect(desktopScope.queryByRole("button", { name: /한줄평/ })).not.toBeInTheDocument();
-    expect(desktopScope.queryByRole("button", { name: /하이라이트/ })).not.toBeInTheDocument();
+    expect(boardTabs.getByRole("button", { name: /서평 · 1/ })).toBeInTheDocument();
+    expect(boardTabs.queryByRole("button", { name: /한줄평/ })).not.toBeInTheDocument();
+    expect(boardTabs.queryByRole("button", { name: /하이라이트/ })).not.toBeInTheDocument();
     expect(desktopScope.getByText("API에서 온 질문")).toBeInTheDocument();
     expect(
       desktopScope.getByText("API에서 온 질문").closest("article")?.querySelector(".rm-avatar-chip"),
@@ -752,9 +762,9 @@ describe("CurrentSession", () => {
     await user.click(mobileScope.getByRole("button", { name: "내 기록" }));
 
     expect(mobileScope.getByRole("button", { name: "내 기록" })).toHaveAttribute("aria-pressed", "true");
+    expect(mobileScope.getByRole("textbox", { name: "한줄평 내용" })).toHaveValue("API에서 온 한줄평");
+    expect(mobileScope.getByRole("button", { name: "한줄평 저장" })).toBeEnabled();
     expect(mobileScope.getByRole("textbox", { name: "서평 내용" })).toHaveValue("API에서 온 장문 서평");
-    expect(mobileScope.queryByRole("textbox", { name: "한줄평 내용" })).not.toBeInTheDocument();
-    expect(mobileScope.queryByRole("button", { name: "한줄평 저장" })).not.toBeInTheDocument();
     expect(mobileScope.queryByText("API에서 온 공동 한줄평")).not.toBeInTheDocument();
   });
 
@@ -798,6 +808,10 @@ describe("CurrentSession", () => {
 
     await user.click(mobileScope.getByRole("button", { name: "내 기록" }));
     expect(mobileScope.getByText("모임 전후로 떠오른 생각을 자유롭게 남겨 주세요.")).toHaveClass("small");
+    await user.clear(mobileScope.getByRole("textbox", { name: "한줄평 내용" }));
+    await user.type(mobileScope.getByRole("textbox", { name: "한줄평 내용" }), "모바일에서 고친 한줄평");
+    await user.click(mobileScope.getByRole("button", { name: "한줄평 저장" }));
+    expect(await mobileScope.findByText("한줄평 저장됨")).toHaveClass("small");
     await user.click(mobileScope.getByRole("button", { name: "서평 저장" }));
     expect(await mobileScope.findByText("서평 저장됨")).toHaveClass("small");
 
@@ -806,6 +820,13 @@ describe("CurrentSession", () => {
       expect.objectContaining({
         body: JSON.stringify({ readingProgress: 72 }),
         method: "PUT",
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/sessions/current/one-line-reviews",
+      expect.objectContaining({
+        body: JSON.stringify({ text: "모바일에서 고친 한줄평" }),
+        method: "POST",
       }),
     );
     expect(fetchMock).toHaveBeenCalledWith(
@@ -867,11 +888,11 @@ describe("CurrentSession", () => {
     expect(desktopScope.getByRole("textbox", { name: "질문 2 내용" })).toBeInTheDocument();
     expect(desktopScope.queryByRole("textbox", { name: /초안 생각/ })).not.toBeInTheDocument();
     expect(desktopScope.getByRole("textbox", { name: "서평 내용" })).toBeInTheDocument();
-    expect(desktopScope.queryByRole("textbox", { name: "한줄평 내용" })).not.toBeInTheDocument();
+    expect(desktopScope.getByRole("textbox", { name: "한줄평 내용" })).toBeEnabled();
     expect(desktopScope.getByRole("button", { name: "진행률 저장" })).toBeInTheDocument();
     expect(desktopScope.getByRole("button", { name: "질문 저장" })).toBeInTheDocument();
     expect(desktopScope.getByRole("button", { name: "서평 저장" })).toBeInTheDocument();
-    expect(desktopScope.queryByRole("button", { name: "한줄평 저장" })).not.toBeInTheDocument();
+    expect(desktopScope.getByRole("button", { name: "한줄평 저장" })).toBeEnabled();
   });
 
   it("edits question rows inline and adds blank rows", async () => {
