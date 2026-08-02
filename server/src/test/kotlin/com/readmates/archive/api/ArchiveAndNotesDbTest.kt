@@ -1500,7 +1500,7 @@ class ArchiveAndNotesDbTest(
             insert into sessions (
               id, club_id, number, title, book_title, book_author,
               session_date, start_time, end_time, location_label,
-              question_deadline_at, state, visibility
+              question_deadline_at, state, visibility, access_scope
             )
             values
               (
@@ -1508,50 +1508,50 @@ class ArchiveAndNotesDbTest(
                 '00000000-0000-0000-0000-000000000001',
                 921, '921회차 · 공개 actor matrix', '공개 actor matrix 책', '검증 저자',
                 '2026-12-21', '20:00:00', '22:00:00', '온라인',
-                '2026-12-20 14:59:00.000000', 'PUBLISHED', 'PUBLIC'
+                '2026-12-20 14:59:00.000000', 'PUBLISHED', 'PUBLIC', 'GUEST_READABLE'
               ),
               (
                 '00000000-0000-0000-0000-0000000092b2',
                 '00000000-0000-0000-0000-000000000001',
                 922, '922회차 · 멤버 actor matrix', '멤버 actor matrix 책', '검증 저자',
                 '2026-12-22', '20:00:00', '22:00:00', '온라인',
-                '2026-12-21 14:59:00.000000', 'CLOSED', 'MEMBER'
+                '2026-12-21 14:59:00.000000', 'CLOSED', 'MEMBER', 'GUEST_READABLE'
               ),
               (
                 '00000000-0000-0000-0000-0000000092b3',
                 '00000000-0000-0000-0000-000000000001',
                 923, '923회차 · 호스트 actor matrix', '호스트 actor matrix 책', '검증 저자',
                 '2026-12-23', '20:00:00', '22:00:00', '온라인',
-                '2026-12-22 14:59:00.000000', 'CLOSED', 'HOST_ONLY'
+                '2026-12-22 14:59:00.000000', 'CLOSED', 'HOST_ONLY', 'HOST_ONLY'
               ),
               (
                 '00000000-0000-0000-0000-0000000092bb',
                 '00000000-0000-0000-0000-000000000002',
                 924, '924회차 · 다른 클럽 actor matrix', '다른 클럽 actor matrix 책', '검증 저자',
                 '2026-12-24', '20:00:00', '22:00:00', '온라인',
-                '2026-12-23 14:59:00.000000', 'PUBLISHED', 'PUBLIC'
+                '2026-12-23 14:59:00.000000', 'PUBLISHED', 'PUBLIC', 'GUEST_READABLE'
               );
             insert into public_session_publications (
-              id, club_id, session_id, public_summary, is_public, visibility, published_at
+              id, club_id, session_id, public_summary, is_public, visibility, site_visibility, published_at
             )
             values
               (
                 '00000000-0000-0000-0000-0000000092b4',
                 '00000000-0000-0000-0000-000000000001',
                 '00000000-0000-0000-0000-0000000092b1',
-                '공개 actor matrix 요약입니다.', true, 'PUBLIC', '2026-12-24 00:00:00.000000'
+                '공개 actor matrix 요약입니다.', true, 'PUBLIC', 'PUBLIC_RECORD', '2026-12-24 00:00:00.000000'
               ),
               (
                 '00000000-0000-0000-0000-0000000092b5',
                 '00000000-0000-0000-0000-000000000001',
                 '00000000-0000-0000-0000-0000000092b2',
-                '멤버 actor matrix 요약입니다.', false, 'MEMBER', null
+                '멤버 actor matrix 요약입니다.', false, 'MEMBER', 'HIDDEN', null
               ),
               (
                 '00000000-0000-0000-0000-0000000092b6',
                 '00000000-0000-0000-0000-000000000001',
                 '00000000-0000-0000-0000-0000000092b3',
-                '호스트 actor matrix 요약입니다.', false, 'HOST_ONLY', null
+                '호스트 actor matrix 요약입니다.', false, 'HOST_ONLY', 'HIDDEN', null
               );
             insert into session_participants (
               id, club_id, session_id, membership_id,

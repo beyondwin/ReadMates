@@ -471,7 +471,7 @@ class HostDashboardControllerTest(
                 status { isOk() }
                 jsonPath("$.sessionId") { value(sessionId) }
                 jsonPath("$.publicSummary") { value("7회차 공개 요약입니다.") }
-                jsonPath("$.visibility") { value("PUBLIC") }
+                jsonPath("$.visibility") { value("MEMBER") }
                 jsonPath("$.isPublic") { doesNotExist() }
                 jsonPath("$.published") { doesNotExist() }
             }
@@ -482,7 +482,7 @@ class HostDashboardControllerTest(
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.publication.publicSummary") { value("7회차 공개 요약입니다.") }
-                jsonPath("$.publication.visibility") { value("PUBLIC") }
+                jsonPath("$.publication.visibility") { value("MEMBER") }
                 jsonPath("$.publication.isPublic") { doesNotExist() }
             }
 

@@ -398,17 +398,17 @@ class JdbcSessionRecordAdapterTest(
         jdbcTemplate.update(
             """
             insert into sessions (id, club_id, number, title, book_title, book_author, session_date, start_time, end_time,
-                                  location_label, question_deadline_at, state, visibility)
+                                  location_label, question_deadline_at, state, visibility, access_scope)
             values (?, ?, 1, '테스트 회차', '테스트 책', '테스트 저자', '2026-07-20', '19:00:00', '21:00:00',
-                    '테스트 장소', '2026-07-19 00:00:00', 'CLOSED', 'MEMBER')
+                    '테스트 장소', '2026-07-19 00:00:00', 'CLOSED', 'MEMBER', 'GUEST_READABLE')
             """.trimIndent(),
             sessionId.toString(),
             clubId.toString(),
         )
         jdbcTemplate.update(
             """
-            insert into public_session_publications (id, club_id, session_id, public_summary, is_public, visibility)
-            values (?, ?, ?, '요약', false, 'MEMBER')
+            insert into public_session_publications (id, club_id, session_id, public_summary, is_public, visibility, site_visibility)
+            values (?, ?, ?, '요약', false, 'MEMBER', 'HIDDEN')
             """.trimIndent(),
             UUID.randomUUID().toString(),
             clubId.toString(),
@@ -478,9 +478,9 @@ class JdbcSessionRecordAdapterTest(
         jdbcTemplate.update(
             """
             insert into sessions (id, club_id, number, title, book_title, book_author, session_date, start_time, end_time,
-                                  location_label, question_deadline_at, state, visibility)
+                                  location_label, question_deadline_at, state, visibility, access_scope)
             values (?, ?, 2, ?, '테스트 책 2', '테스트 저자', '2026-07-21', '19:00:00', '21:00:00',
-                    '테스트 장소', '2026-07-20 00:00:00', 'CLOSED', 'MEMBER')
+                    '테스트 장소', '2026-07-20 00:00:00', 'CLOSED', 'MEMBER', 'GUEST_READABLE')
             """.trimIndent(),
             sessionId.toString(),
             host.clubId.toString(),
@@ -488,8 +488,8 @@ class JdbcSessionRecordAdapterTest(
         )
         jdbcTemplate.update(
             """
-            insert into public_session_publications (id, club_id, session_id, public_summary, is_public, visibility)
-            values (?, ?, ?, '요약 2', false, 'MEMBER')
+            insert into public_session_publications (id, club_id, session_id, public_summary, is_public, visibility, site_visibility)
+            values (?, ?, ?, '요약 2', false, 'MEMBER', 'HIDDEN')
             """.trimIndent(),
             UUID.randomUUID().toString(),
             host.clubId.toString(),

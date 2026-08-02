@@ -623,9 +623,9 @@ class HostSessionControllerDbTest(
                 content = """{"accessScope":"GUEST_READABLE"}"""
             }.andExpect {
                 status { isOk() }
-                jsonPath("$.accessScope") { value("GUEST_READABLE") }
-                jsonPath("$.siteVisibility") { value("HIDDEN") }
-                jsonPath("$.visibility") { value("MEMBER") }
+                jsonPath("$.session.accessScope") { value("GUEST_READABLE") }
+                jsonPath("$.session.siteVisibility") { value("HIDDEN") }
+                jsonPath("$.session.visibility") { value("MEMBER") }
             }
 
         assertExposureColumns(sessionId, "GUEST_READABLE", "MEMBER", "HIDDEN", "MEMBER", "0")

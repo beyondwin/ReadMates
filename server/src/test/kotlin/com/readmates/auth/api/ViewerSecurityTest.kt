@@ -260,7 +260,8 @@ class ViewerSecurityTest(
               location_label,
               question_deadline_at,
               state,
-              visibility
+              visibility,
+              access_scope
             )
             values (
               ?,
@@ -275,6 +276,7 @@ class ViewerSecurityTest(
               '온라인',
               '2026-08-19 14:59:00',
               'DRAFT',
+              ?,
               ?
             )
             """.trimIndent(),
@@ -283,6 +285,7 @@ class ViewerSecurityTest(
             "${number}회차 · Viewer Upcoming $visibility",
             if (visibility == "HOST_ONLY") "Viewer Upcoming Host Book" else "Viewer Upcoming Member Book",
             visibility,
+            if (visibility == "HOST_ONLY") "HOST_ONLY" else "GUEST_READABLE",
         )
         createdSessionIds += sessionId
         return sessionId
