@@ -21,8 +21,32 @@ export type NotesReadItem<K extends string> = {
 type Page<T> = { items: T[]; nextCursor: string | null };
 type LoadMore = () => Promise<void>;
 
+function notesFilterChoiceStyle(selected: boolean): CSSProperties {
+  return {
+    height: "32px",
+    padding: "0 14px",
+    fontSize: "var(--type-size-control)",
+    borderRadius: "999px",
+    border: `1px solid ${selected ? "var(--text)" : "var(--line)"}`,
+    background: selected ? "var(--text)" : "transparent",
+    color: selected ? "var(--bg)" : "var(--text-2)",
+  };
+}
+
 export function NotesFilterChoices<F extends string>({ filters, selected, onSelect, className, style }: { filters: readonly { id: F; label: string }[]; selected: F; onSelect: (filter: F) => void; className?: string; style?: CSSProperties }) {
-  return <div className={className} style={style} aria-label="클럽 노트 필터">{filters.map(({ id, label }) => <button key={id} type="button" className="btn btn-quiet btn-sm" aria-pressed={selected === id} onClick={() => onSelect(id)}>{label}</button>)}</div>;
+  return (
+    <div className={className} style={style} aria-label="클럽 노트 필터">
+      {filters.map(({ id, label }) => {
+        const isSelected = selected === id;
+
+        return (
+          <button key={id} type="button" aria-pressed={isSelected} style={notesFilterChoiceStyle(isSelected)} onClick={() => onSelect(id)}>
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 /**
