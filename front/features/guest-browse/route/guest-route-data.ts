@@ -9,7 +9,7 @@ import {
 } from "@/features/guest-browse/api/guest-browse-api";
 import {
   guestArchiveDetailReadView,
-  guestArchiveReadView,
+  guestArchivePageReadView,
   guestHomeReadView,
   guestNotesReadView,
 } from "@/features/guest-browse/model/guest-read-views";
@@ -79,7 +79,7 @@ export async function guestNotesLoader(args?: Pick<LoaderFunctionArgs, "params">
 }
 
 export async function guestArchiveLoader(args?: Pick<LoaderFunctionArgs, "params">) {
-  return guestArchiveReadView(await fetchGuestArchive(requiredClubSlug(args)));
+  return guestArchivePageReadView(await fetchGuestArchive(requiredClubSlug(args)));
 }
 
 export async function guestArchiveDetailLoader(args?: Pick<LoaderFunctionArgs, "params">) {

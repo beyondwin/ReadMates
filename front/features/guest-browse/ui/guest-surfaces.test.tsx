@@ -1,7 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
-import { GuestArchive } from "./guest-surfaces";
+import { describe, expect, it } from "vitest";
 
 describe("guest browse surfaces", () => {
   it("renders public archive one-liners with full author and avatar semantics", async () => {
@@ -26,13 +24,4 @@ describe("guest browse surfaces", () => {
       "/app/feedback/closed-1",
     );
   });
-
-  it("disables archive pagination during rapid clicks", async () => {
-    const user = userEvent.setup();
-    const onLoadMore = vi.fn(() => new Promise<void>(() => {}));
-    render(<GuestArchive data={{ items: [{ sessionId: "s1", sessionNumber: 1, title: "기록", bookTitle: "책", bookAuthor: "작가", bookImageUrl: null, date: "2026-08-02", attendance: 1, total: 2, state: "CLOSED" }], nextCursor: "next" }} onLoadMore={onLoadMore} />);
-    await user.dblClick(screen.getByRole("button", { name: "더 보기" }));
-    expect(onLoadMore).toHaveBeenCalledTimes(1);
-  });
-
 });

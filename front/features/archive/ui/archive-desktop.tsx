@@ -81,6 +81,8 @@ export function ArchiveDesktop({
   questions,
   reviews,
   reports,
+  canReadFeedback,
+  feedbackLockedAction,
   reviewAuthorName,
   hasMoreSessions,
   hasMoreQuestions,
@@ -99,6 +101,8 @@ export function ArchiveDesktop({
   questions: ArchiveQuestionItem[];
   reviews: ArchiveReviewItem[];
   reports: FeedbackDocumentListItem[];
+  canReadFeedback: boolean;
+  feedbackLockedAction?: ReactNode;
   reviewAuthorName?: string | null;
   hasMoreSessions: boolean;
   hasMoreQuestions: boolean;
@@ -161,7 +165,7 @@ export function ArchiveDesktop({
           <SelectedSection view={view}>
             {view === "sessions" ? (
               <>
-                <ArchiveSessions sessions={sessions} />
+                <ArchiveSessions sessions={sessions} canReadFeedback={canReadFeedback} />
                 <LoadMoreButton visible={hasMoreSessions} onLoadMore={onLoadMoreSessions} />
               </>
             ) : null}
@@ -178,10 +182,14 @@ export function ArchiveDesktop({
               </>
             ) : null}
             {view === "report" ? (
-              <>
-                <ArchiveReports reports={reports} sessions={sessions} />
-                <LoadMoreButton visible={hasMoreReports} onLoadMore={onLoadMoreReports} />
-              </>
+              canReadFeedback ? (
+                <>
+                  <ArchiveReports reports={reports} sessions={sessions} />
+                  <LoadMoreButton visible={hasMoreReports} onLoadMore={onLoadMoreReports} />
+                </>
+              ) : (
+                <ArchiveFeedbackLocked action={feedbackLockedAction} />
+              )
             ) : null}
           </SelectedSection>
         </div>
@@ -199,7 +207,7 @@ function reportBookCoverMeta(report: FeedbackDocumentListItem, sessions: Archive
   };
 }
 
-function ArchiveSessions({ sessions }: { sessions: ArchiveSessionRecord[] }) {
+function ArchiveSessions({ sessions, canReadFeedback }: { sessions: ArchiveSessionRecord[]; canReadFeedback: boolean }) {
   if (sessions.length === 0) {
     return <EmptyState message="아직 저장된 모임 기록이 없습니다." />;
   }
@@ -222,10 +230,7 @@ function ArchiveSessions({ sessions }: { sessions: ArchiveSessionRecord[] }) {
             </span>
           </div>
           <div className="stack" style={{ "--stack": "0px" } as CSSProperties}>
-            {group.list.map((session) => {
-              const feedbackCopy = feedbackDocumentCopy(session.feedbackDocument);
-
-              return (
+            {group.list.map((session) => (
                 <Link
                   key={session.id}
                   className="rm-record-row"
@@ -268,22 +273,40 @@ function ArchiveSessions({ sessions }: { sessions: ArchiveSessionRecord[] }) {
                     <span className={session.published ? "badge badge-ok badge-dot" : "badge badge-readonly badge-dot"}>
                       {publicationLabel(session.published)}
                     </span>
-                    <span
-                      className={feedbackArchiveBadgeClass(session.feedbackDocument)}
-                      title={feedbackCopy.ariaLabel}
-                      aria-label={feedbackCopy.ariaLabel}
-                    >
-                      {feedbackArchiveLabel(session.feedbackDocument)}
-                    </span>
+                    {canReadFeedback ? <ArchiveSessionFeedbackBadge session={session} /> : null}
                   </div>
                   <SessionAction />
                 </Link>
-              );
-            })}
+            ))}
           </div>
         </section>
       ))}
     </div>
+  );
+}
+
+function ArchiveSessionFeedbackBadge({ session }: { session: ArchiveSessionRecord }) {
+  const feedbackCopy = feedbackDocumentCopy(session.feedbackDocument);
+
+  return (
+    <span
+      className={feedbackArchiveBadgeClass(session.feedbackDocument)}
+      title={feedbackCopy.ariaLabel}
+      aria-label={feedbackCopy.ariaLabel}
+    >
+      {feedbackArchiveLabel(session.feedbackDocument)}
+    </span>
+  );
+}
+
+function ArchiveFeedbackLocked({ action }: { action?: ReactNode }) {
+  return (
+    <section className="surface-quiet" role="note" style={{ padding: "24px", marginTop: "18px" }}>
+      <p className="body editorial" style={{ margin: 0, overflowWrap: "anywhere" }}>
+        피드백 문서는 정식 멤버에게 열립니다
+      </p>
+      {action ? <div style={{ marginTop: "16px" }}>{action}</div> : null}
+    </section>
   );
 }
 

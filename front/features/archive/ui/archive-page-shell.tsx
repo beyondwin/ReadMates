@@ -3,12 +3,17 @@ import type {
   ArchiveQuestionItem,
   ArchiveReviewItem,
   ArchiveSessionItemLike,
+  ArchiveSessionRecord,
   ArchiveView,
   FeedbackDocumentListItem,
 } from "@/features/archive/model/archive-model";
 import { archiveTabs, selectedArchiveSectionMeta, toArchiveSessionRecords } from "@/features/archive/model/archive-model";
 import { restoreReadmatesArchiveScroll } from "@/features/archive/ui/archive-route-continuity";
 import type { PagedResponse } from "@/shared/model/paging";
+import {
+  MEMBER_READ_SURFACE_CAPABILITIES,
+  type ReadSurfaceCapabilities,
+} from "@/shared/model/read-surface-capabilities";
 import { ArchiveDesktop } from "./archive-desktop";
 import type { LoadMoreCallback } from "./archive-empty-state";
 import { ArchiveMobile } from "./archive-mobile";
@@ -51,11 +56,40 @@ function handleArchiveTabKeyDown(
   moveArchiveTabFocus(nextView, targetPrefix);
 }
 
+type ArchivePageAccessProps = {
+  capabilities?: ReadSurfaceCapabilities;
+  feedbackLockedAction?: ReactNode;
+};
+
+function feedbackHiddenSessionRecord(session: ArchiveSessionItemLike): ArchiveSessionRecord {
+  return {
+    id: session.sessionId,
+    number: session.sessionNumber,
+    date: session.date,
+    book: session.bookTitle,
+    author: session.bookAuthor,
+    bookImageUrl: session.bookImageUrl,
+    attendance: session.attendance,
+    total: session.total,
+    published: session.published,
+    state: session.state,
+    feedbackDocument: {
+      available: false,
+      readable: false,
+      lockedReason: "ACTIVE_MEMBERSHIP_REQUIRED",
+      title: null,
+      uploadedAt: null,
+    },
+  };
+}
+
 function ArchivePage({
   sessions,
   questions,
   reviews,
   reports,
+  capabilities = MEMBER_READ_SURFACE_CAPABILITIES,
+  feedbackLockedAction,
   initialView = "sessions",
   onViewChange,
   routePathname,
@@ -79,14 +113,17 @@ function ArchivePage({
   onLoadMoreQuestions?: LoadMoreCallback;
   onLoadMoreReviews?: LoadMoreCallback;
   onLoadMoreReports?: LoadMoreCallback;
-}) {
+} & ArchivePageAccessProps) {
   const [fallbackView, setFallbackView] = useState<ArchiveView>(initialView);
   const view = onViewChange ? initialView : fallbackView;
   const sessionItems = sessions.items;
   const questionItems = questions.items;
   const reviewItems = reviews.items;
-  const reportItems = reports.items;
-  const archiveSessions = toArchiveSessionRecords(sessionItems, reportItems);
+  const canReadFeedback = capabilities.canReadFeedback;
+  const reportItems = canReadFeedback ? reports.items : [];
+  const archiveSessions = canReadFeedback
+    ? toArchiveSessionRecords(sessionItems, reportItems)
+    : sessionItems.map(feedbackHiddenSessionRecord);
   const archivePathname = routePathname ?? (typeof window === "undefined" ? "" : window.location.pathname);
   const archiveSearch = routeSearch ?? (typeof window === "undefined" ? "" : window.location.search);
 
@@ -123,11 +160,13 @@ function ArchivePage({
           questions={questionItems}
           reviews={reviewItems}
           reports={reportItems}
+          canReadFeedback={canReadFeedback}
+          feedbackLockedAction={feedbackLockedAction}
           reviewAuthorName={reviewAuthorName}
           hasMoreSessions={Boolean(sessions.nextCursor)}
           hasMoreQuestions={Boolean(questions.nextCursor)}
           hasMoreReviews={Boolean(reviews.nextCursor)}
-          hasMoreReports={Boolean(reports.nextCursor)}
+          hasMoreReports={canReadFeedback && Boolean(reports.nextCursor)}
           onLoadMoreSessions={onLoadMoreSessions}
           onLoadMoreQuestions={onLoadMoreQuestions}
           onLoadMoreReviews={onLoadMoreReviews}
@@ -143,10 +182,12 @@ function ArchivePage({
           questions={questionItems}
           reviews={reviewItems}
           reports={reportItems}
+          canReadFeedback={canReadFeedback}
+          feedbackLockedAction={feedbackLockedAction}
           hasMoreSessions={Boolean(sessions.nextCursor)}
           hasMoreQuestions={Boolean(questions.nextCursor)}
           hasMoreReviews={Boolean(reviews.nextCursor)}
-          hasMoreReports={Boolean(reports.nextCursor)}
+          hasMoreReports={canReadFeedback && Boolean(reports.nextCursor)}
           onLoadMoreSessions={onLoadMoreSessions}
           onLoadMoreQuestions={onLoadMoreQuestions}
           onLoadMoreReviews={onLoadMoreReviews}

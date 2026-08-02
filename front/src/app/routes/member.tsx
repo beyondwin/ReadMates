@@ -21,7 +21,7 @@ import {
   guestHomeLoader,
   guestNotesLoader,
 } from "@/features/guest-browse/route/guest-route-data";
-import { GuestScopedAppRoute, type GuestCurrentSessionContentProps, type GuestHomeContentProps } from "@/features/guest-browse/route/guest-scoped-app-route";
+import { GuestScopedAppRoute, type GuestArchiveContentProps, type GuestCurrentSessionContentProps, type GuestHomeContentProps } from "@/features/guest-browse/route/guest-scoped-app-route";
 import { GuestNavigationLink } from "@/features/guest-browse/ui/guest-navigation-dialog";
 import { AppRouteLayout } from "@/src/app/layouts/app-route-layout";
 import { memoizeRouteModule } from "@/src/app/routes/route-module-loader";
@@ -31,6 +31,7 @@ import { RequireAuth, RequireMemberApp } from "@/src/app/route-guards";
 import { Link } from "@/src/app/router-link";
 import { GuestCurrentSessionContent } from "@/src/pages/guest-current-session";
 import { GuestHomeContent } from "@/src/pages/guest-home";
+import { GuestArchiveContent } from "@/src/pages/guest-archive";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
 
 const currentSessionInternalLink: InternalLinkComponent = ({ href, children, ...props }) => {
@@ -62,6 +63,7 @@ function scopedMemberRoute({
   guestLoader,
   GuestHomeContent: GuestHomeContentOverride,
   GuestCurrentSessionContent: GuestCurrentSessionContentOverride,
+  GuestArchiveContent: GuestArchiveContentOverride,
 }: {
   path?: string;
   index?: true;
@@ -73,6 +75,7 @@ function scopedMemberRoute({
   guestLoader?: LoaderFunction;
   GuestHomeContent?: ComponentType<GuestHomeContentProps>;
   GuestCurrentSessionContent?: ComponentType<GuestCurrentSessionContentProps>;
+  GuestArchiveContent?: ComponentType<GuestArchiveContentProps>;
 }): RouteObject {
   const loadOnce = memoizeRouteModule(load);
   const ProtectedComponent = lazy(async () => ({ default: (await loadOnce()).Component }));
@@ -85,6 +88,7 @@ function scopedMemberRoute({
         LinkComponent={GuestNavigationLink}
         GuestHomeContent={GuestHomeContentOverride}
         GuestCurrentSessionContent={GuestCurrentSessionContentOverride}
+        GuestArchiveContent={GuestArchiveContentOverride}
       />
     ) : (
       <Suspense fallback={fallback}>
@@ -186,6 +190,7 @@ function scopedMemberAppRoutes(queryClient: QueryClient): RouteObject[] {
       errorElement: <ArchiveRouteError />,
       fallback: <ArchiveRouteLoading label="아카이브를 불러오는 중" />,
       guestLoader: guestArchiveLoader,
+      GuestArchiveContent,
       load: async () => {
         const [{ default: Component }, { archiveListLoaderFactory }] = await Promise.all([
           import("@/src/pages/archive"),

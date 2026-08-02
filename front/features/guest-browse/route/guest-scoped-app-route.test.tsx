@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, RouterProvider, createMemoryRouter, useLocation } from "react-router-dom";
+import { useState } from "react";
+import { MemoryRouter, RouterProvider, createMemoryRouter, useLocation, useSearchParams } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { scopedGuestRouteLoader } from "./club-app-audience-loader";
-import { GuestArchiveRoute, GuestNotesRoute, GuestScopedAppRoute, type GuestCurrentSessionContentProps } from "./guest-scoped-app-route";
+import { GuestArchiveRoute, GuestNotesRoute, GuestScopedAppRoute, type GuestArchiveContentProps, type GuestCurrentSessionContentProps } from "./guest-scoped-app-route";
 
 const LinkComponent = ({ to, children, ...props }: { to: string; children: React.ReactNode; className?: string; style?: React.CSSProperties }) => <a {...props} href={to}>{children}</a>;
 const anonymousAuth = { authenticated: false, userId: null, membershipId: null, clubId: null, email: null, displayName: null, accountName: null, role: null, membershipStatus: null, approvalState: "ANONYMOUS" };
@@ -190,17 +191,63 @@ describe("guest current session route", () => {
 });
 
 describe("guest archive route pagination", () => {
+  const archivePage = (nextCursor: string | null = "cursor") => ({
+    items: [{ sessionId: "a1", sessionNumber: 1, title: "첫", bookTitle: "첫 책", bookAuthor: "작가", bookImageUrl: null, date: "2026-08-02", attendance: 1, total: 2, state: "CLOSED" }],
+    nextCursor,
+  });
+  function TestGuestArchiveContent({ data, feedbackLockedAction, onLoadMoreSessions }: GuestArchiveContentProps) {
+    const [showFeedback, setShowFeedback] = useState(false);
+    const [, setSearchParams] = useSearchParams();
+
+    return <main>
+      {["세션", "피드백 문서", "내 질문", "내 서평"].map((tab) => <button key={tab} type="button" onClick={() => {
+        if (tab === "피드백 문서") {
+          setSearchParams({ view: "report" }, { replace: true });
+          setShowFeedback(true);
+        }
+      }}>{tab}</button>)}
+      {data.items.map((session) => <a key={session.sessionId} href={`/app/sessions/${session.sessionId}`} aria-label={`No.${session.sessionNumber} ${session.bookTitle} 열기`}>{session.bookTitle}</a>)}
+      {showFeedback ? feedbackLockedAction : null}
+      {data.nextCursor ? <button type="button" onClick={() => void onLoadMoreSessions()}>더 보기</button> : null}
+    </main>;
+  }
+
+  it("uses all regular tabs and injects the scoped login action only after feedback selection", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <MemoryRouter initialEntries={["/clubs/alpha/app/archive?source=guest"]}>
+        <QueryClientProvider client={client}>
+          <GuestArchiveRoute initialData={archivePage(null)} clubSlug="alpha" appBasePath="/clubs/alpha/app" LinkComponent={LinkComponent} GuestArchiveContent={TestGuestArchiveContent} />
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+
+    for (const tabName of ["세션", "피드백 문서", "내 질문", "내 서평"]) {
+      expect(screen.getByRole("button", { name: tabName })).toBeVisible();
+    }
+    expect(screen.queryByRole("link", { name: "멤버로 시작" })).not.toBeInTheDocument();
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "피드백 문서" }));
+
+    for (const action of screen.getAllByRole("link", { name: "멤버로 시작" })) {
+      expect(action).toHaveAttribute(
+        "href",
+        "/login?returnTo=%2Fclubs%2Falpha%2Fapp%2Farchive%3Fview%3Dreport",
+      );
+    }
+  });
+
   it("deduplicates rapid clicks and maps one successful appended page", async () => {
     let resolve!: (value: Response) => void;
     const fetchMock = vi.fn(() => new Promise<Response>((done) => { resolve = done; }));
     vi.stubGlobal("fetch", fetchMock);
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(<QueryClientProvider client={client}><GuestArchiveRoute initialData={{ items: [{ sessionId: "a1", sessionNumber: 1, title: "첫", bookTitle: "첫 책", bookAuthor: "작가", bookImageUrl: null, date: "2026-08-02", attendance: 1, total: 2, state: "CLOSED" }], nextCursor: "cursor" }} clubSlug="alpha" appBasePath="/clubs/alpha/app" LinkComponent={LinkComponent} /></QueryClientProvider>);
+    render(<MemoryRouter initialEntries={["/clubs/alpha/app/archive"]}><QueryClientProvider client={client}><GuestArchiveRoute initialData={archivePage()} clubSlug="alpha" appBasePath="/clubs/alpha/app" LinkComponent={LinkComponent} GuestArchiveContent={TestGuestArchiveContent} /></QueryClientProvider></MemoryRouter>);
     const loadMore = screen.getByRole("button", { name: "더 보기" });
     fireEvent.click(loadMore);
     fireEvent.click(loadMore);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     resolve(new Response(JSON.stringify({ items: [{ sessionId: "a2", sessionNumber: 2, title: "둘", bookTitle: "다음 책", bookAuthor: "작가", bookImageUrl: null, date: "2026-08-09", attendance: 2, total: 2, state: "CLOSED" }], nextCursor: null }), { status: 200, headers: { "Content-Type": "application/json" } }));
-    expect((await screen.findAllByText("다음 책")).length).toBe(2);
+    expect(await screen.findByRole("link", { name: "No.2 다음 책 열기" })).toBeVisible();
   });
 });

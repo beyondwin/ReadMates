@@ -9,6 +9,7 @@ import {
 } from "@/features/archive/queries/archive-queries";
 import ArchivePage from "@/features/archive/ui/archive-page";
 import { RECOVER_READ_SESSION_EXPIRY } from "@/shared/api/client";
+import { MEMBER_READ_SURFACE_CAPABILITIES } from "@/shared/model/read-surface-capabilities";
 
 export function ArchiveListRoute({ reviewAuthorName = null }: { reviewAuthorName?: string | null }) {
   const queryClient = useQueryClient();
@@ -59,6 +60,7 @@ export function ArchiveListRoute({ reviewAuthorName = null }: { reviewAuthorName
   return (
     <ArchivePage
       {...pages}
+      capabilities={MEMBER_READ_SURFACE_CAPABILITIES}
       initialView={initialView}
       onViewChange={handleViewChange}
       routePathname={location.pathname}

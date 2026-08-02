@@ -11,6 +11,7 @@ import type {
   MyArchiveReviewItem,
 } from "@/features/archive/api/archive-contracts";
 import type { PagedResponse } from "@/shared/model/paging";
+import { GUEST_READ_SURFACE_CAPABILITIES } from "@/shared/model/read-surface-capabilities";
 
 const ARCHIVE_SCROLL_KEY = "readmates:archive-scroll";
 
@@ -213,6 +214,49 @@ function LocationStateEcho() {
 }
 
 describe("ArchivePage", () => {
+  it("keeps every archive tab selectable while feedback is generically locked without metadata", async () => {
+    const user = userEvent.setup();
+    const sessionFeedbackRead = vi.fn(() => {
+      throw new Error("guest archive must not inspect session feedback metadata");
+    });
+    const reportsRead = vi.fn(() => {
+      throw new Error("guest archive must not inspect feedback reports");
+    });
+    const lockedSession: ArchiveSessionItem = {
+      ...seededSessions[0],
+    };
+    Object.defineProperty(lockedSession, "feedbackDocument", { get: sessionFeedbackRead });
+    const protectedReports = Object.defineProperty(
+      { nextCursor: null } as PagedResponse<FeedbackDocumentListItem>,
+      "items",
+      { get: reportsRead },
+    );
+    const { container } = render(
+      <ArchivePage
+        sessions={pageOf([lockedSession])}
+        questions={pageOf([])}
+        reviews={pageOf([])}
+        reports={protectedReports}
+        capabilities={GUEST_READ_SURFACE_CAPABILITIES}
+        feedbackLockedAction={<a href="/login?returnTo=%2Fclubs%2Falpha%2Fapp%2Farchive%3Fview%3Dreport">멤버로 시작</a>}
+      />,
+    );
+    const desktop = getDesktop(container);
+
+    for (const tabName of ["세션", "피드백 문서", "내 질문", "내 서평"]) {
+      expect(desktop.getByRole("button", { name: tabName })).toBeVisible();
+    }
+    expect(screen.queryByText("피드백 문서는 정식 멤버에게 열립니다")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "멤버로 시작" })).not.toBeInTheDocument();
+
+    await user.click(desktop.getByRole("button", { name: "피드백 문서" }));
+
+    expect(screen.getAllByText("피드백 문서는 정식 멤버에게 열립니다")).toHaveLength(2);
+    expect(screen.getAllByRole("link", { name: "멤버로 시작" })).toHaveLength(2);
+    expect(sessionFeedbackRead).not.toHaveBeenCalled();
+    expect(reportsRead).not.toHaveBeenCalled();
+  });
+
   it("shows the record storage title and session archive controls", () => {
     const { container } = render(
       <ArchivePage sessions={seededSessionPage} questions={seededQuestionPage} reviews={seededReviewPage} reports={seededReportPage} />,

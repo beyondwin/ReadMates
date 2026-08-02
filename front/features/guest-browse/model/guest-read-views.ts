@@ -259,10 +259,6 @@ export function guestArchivePageReadView(page: GuestPage<GuestArchiveSessionRead
   return { items: page.items.map((session) => ({ sessionId: session.sessionId, sessionNumber: session.sessionNumber, title: session.title, bookTitle: session.bookTitle, bookAuthor: session.bookAuthor, bookImageUrl: session.bookImageUrl, date: session.date, attendance: session.attendance, total: session.total, state: session.state })), nextCursor: page.nextCursor };
 }
 
-export function guestArchiveReadView(page: GuestPage<GuestArchiveSessionReadView>): GuestPage<GuestArchiveSessionReadView> & { capabilities: GuestCapabilities } {
-  return { ...guestArchivePageReadView(page), capabilities: { canWrite: false } };
-}
-
 export function guestArchiveDetailReadView(detail: GuestArchiveDetailReadView): GuestArchiveDetailReadView & { capabilities: GuestCapabilities } {
   return {
     sessionId: detail.sessionId, sessionNumber: detail.sessionNumber, title: detail.title, bookTitle: detail.bookTitle, bookAuthor: detail.bookAuthor, bookImageUrl: detail.bookImageUrl, date: detail.date, attendance: detail.attendance, total: detail.total, state: detail.state, summary: detail.summary,

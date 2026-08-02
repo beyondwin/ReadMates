@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type ComponentType } from "react";
+import { useCallback, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLoaderData, useLocation, useParams, useRevalidator, useSearchParams } from "react-router-dom";
 import { guestNavigationCapability } from "@/features/guest-browse/model/club-app-audience";
@@ -8,7 +8,8 @@ import { guestArchiveQuery, guestCurrentSessionQuery, guestNoteFeedQuery, guestN
 import type { GuestScopedRouteData, GuestScopedRouteFailureData } from "@/features/guest-browse/route/club-app-audience-loader";
 import { GuestLockedPage, type GuestLockKind } from "@/features/guest-browse/ui/guest-locked-page";
 import { GuestMySpace } from "@/features/guest-browse/ui/guest-my-space";
-import { GuestArchive, GuestArchiveDetail, type GuestSurfaceLinkProps } from "@/features/guest-browse/ui/guest-surfaces";
+import { GuestArchiveDetail, type GuestSurfaceLinkProps } from "@/features/guest-browse/ui/guest-surfaces";
+import { loginPathForReturnTo } from "@/shared/auth/login-return";
 import { feedFilterFromSearchParam, type FeedFilter } from "@/shared/model/notes-feed-model";
 import NotesFeedPage from "@/shared/ui/notes-feed-page";
 
@@ -22,6 +23,13 @@ export type GuestHomeContentProps = {
   appBasePath: string;
   LinkComponent: ComponentType<GuestLinkProps>;
   onRetry: Partial<Record<"current" | "upcoming" | "recentNotes", () => Promise<void>>>;
+};
+export type GuestArchiveContentProps = {
+  data: GuestPage<GuestArchiveSessionReadView>;
+  routePathname: string;
+  routeSearch: string;
+  feedbackLockedAction: ReactNode;
+  onLoadMoreSessions: () => Promise<void>;
 };
 function requestedAppPath(pathname: string) {
   return pathname.replace(/^\/clubs\/[^/]+(?=\/app(?:\/|$))/, "");
@@ -38,10 +46,12 @@ export function GuestScopedAppRoute({
   LinkComponent,
   GuestHomeContent,
   GuestCurrentSessionContent,
+  GuestArchiveContent,
 }: {
   LinkComponent: ComponentType<GuestLinkProps>;
   GuestHomeContent?: ComponentType<GuestHomeContentProps>;
   GuestCurrentSessionContent?: ComponentType<GuestCurrentSessionContentProps>;
+  GuestArchiveContent?: ComponentType<GuestArchiveContentProps>;
 }) {
   const location = useLocation();
   const { clubSlug } = useParams();
@@ -67,7 +77,7 @@ export function GuestScopedAppRoute({
   }
 
   const appBasePath = `/clubs/${encodeURIComponent(clubSlug ?? "")}/app`;
-  const content = guestBrowseContent(appPath, loaderData.guestData, clubSlug, appBasePath, returnTo, LinkComponent, GuestHomeContent, GuestCurrentSessionContent, new URLSearchParams(location.search).get("sessionId"));
+  const content = guestBrowseContent(appPath, loaderData.guestData, clubSlug, appBasePath, returnTo, LinkComponent, GuestHomeContent, GuestCurrentSessionContent, GuestArchiveContent, new URLSearchParams(location.search).get("sessionId"));
 
   if (content) {
     return content;
@@ -100,6 +110,7 @@ function guestBrowseContent(
   LinkComponent: ComponentType<GuestLinkProps>,
   GuestHomeContent: ComponentType<GuestHomeContentProps> | undefined,
   GuestCurrentSessionContent: ComponentType<GuestCurrentSessionContentProps> | undefined,
+  GuestArchiveContent: ComponentType<GuestArchiveContentProps> | undefined,
   selectedSessionId: string | null,
 ) {
   if (appPath === "/app") {
@@ -117,7 +128,7 @@ function guestBrowseContent(
 
   if (appPath === "/app/archive" && clubSlug) {
     const initialData = data as GuestPage<GuestArchiveSessionReadView>;
-    return <GuestArchiveRoute key={guestLoaderSourceKey(clubSlug, initialData)} initialData={initialData} clubSlug={clubSlug} appBasePath={appBasePath} LinkComponent={LinkComponent} />;
+    return GuestArchiveContent ? <GuestArchiveRoute key={guestLoaderSourceKey(clubSlug, initialData)} initialData={initialData} clubSlug={clubSlug} appBasePath={appBasePath} LinkComponent={LinkComponent} GuestArchiveContent={GuestArchiveContent} /> : null;
   }
 
   if (appPath.startsWith("/app/sessions/")) {
@@ -197,8 +208,9 @@ export function GuestNotesRoute({ initialData, clubSlug, appBasePath, LinkCompon
   );
 }
 
-export function GuestArchiveRoute({ initialData, clubSlug, appBasePath, LinkComponent }: { initialData: GuestPage<GuestArchiveSessionReadView>; clubSlug: string; appBasePath: string; LinkComponent: ComponentType<GuestLinkProps> }) {
+export function GuestArchiveRoute({ initialData, clubSlug, LinkComponent, GuestArchiveContent }: { initialData: GuestPage<GuestArchiveSessionReadView>; clubSlug: string; appBasePath: string; LinkComponent: ComponentType<GuestLinkProps>; GuestArchiveContent: ComponentType<GuestArchiveContentProps> }) {
   const queryClient = useQueryClient();
+  const location = useLocation();
   const [data, setData] = useState(initialData);
   const inFlight = useRef<string | null>(null);
   const loadMore = useCallback(async () => {
@@ -210,7 +222,21 @@ export function GuestArchiveRoute({ initialData, clubSlug, appBasePath, LinkComp
       setData((current) => current.nextCursor === cursor ? appendPage(current, guestArchivePageReadView(next)) : current);
     } finally { inFlight.current = null; }
   }, [clubSlug, data.nextCursor, queryClient]);
-  return <GuestArchive data={data} appBasePath={appBasePath} onLoadMore={loadMore} LinkComponent={LinkComponent} />;
+  const currentScopedArchiveUrl = `${location.pathname}${location.search}`;
+
+  return (
+    <GuestArchiveContent
+      data={data}
+      routePathname={location.pathname}
+      routeSearch={location.search}
+      onLoadMoreSessions={loadMore}
+      feedbackLockedAction={(
+        <LinkComponent className="btn btn-primary btn-sm" to={loginPathForReturnTo(currentScopedArchiveUrl)}>
+          멤버로 시작
+        </LinkComponent>
+      )}
+    />
+  );
 }
 
 function appendPage<T>(current: GuestPage<T>, next: GuestPage<T>): GuestPage<T> {
