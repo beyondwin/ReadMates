@@ -34,8 +34,9 @@ export function deriveClubAppAudience(auth: AuthMeResponse): ClubAppAudience {
 }
 
 function appPath(path: string) {
-  const scoped = /^\/clubs\/[^/]+(\/app(?:\/.*)?$)/.exec(path);
-  return scoped?.[1] ?? path;
+  const pathname = path.split(/[?#]/, 1)[0];
+  const scoped = /^\/clubs\/[^/]+(\/app(?:\/.*)?$)/.exec(pathname);
+  return scoped?.[1] ?? pathname;
 }
 
 export function guestNavigationCapability(path: string): GuestNavigationCapability {

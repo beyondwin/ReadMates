@@ -441,11 +441,12 @@ test("viewer can read member routes but cannot use current-session write actions
 
   await page.goto("/app/session/current");
   await expect(page.getByRole("heading", { level: 1, name: "E2E 현재 세션 책" })).toBeVisible();
-  await expect(page.getByText("둘러보기 멤버는 RSVP, 읽기 진행률, 질문, 서평을 저장할 수 없습니다.").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "참석" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "진행률 저장" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "질문 저장" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "서평 저장" })).toHaveCount(0);
+  const currentSession = page.locator(".rm-current-session-desktop");
+  await expect(currentSession.getByText("정식 멤버가 되면 참여 기능과 작성 기능이 열립니다.")).toBeVisible();
+  for (const label of ["참석", "아직 미정", "불참", "진행률 저장", "질문 저장", "서평 저장"]) {
+    await expect(currentSession.getByRole("button", { name: label })).toBeDisabled();
+  }
+  await expect(currentSession.getByRole("slider", { name: "읽기 진행률" })).toBeDisabled();
 
   await page.goto("/app/host/members");
   await expect(page).toHaveURL(/\/app\/?$/);
