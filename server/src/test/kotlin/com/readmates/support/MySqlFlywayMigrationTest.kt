@@ -80,7 +80,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(3)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(4)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -92,7 +92,7 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("45")
+            assertThat(latestVersion).isEqualTo("46")
             assertThat(
                 upgradeJdbc.queryForObject(
                     """
@@ -363,11 +363,10 @@ class MySqlFlywayMigrationTest(
                     .configure()
                     .dataSource(dataSource)
                     .locations("classpath:db/mysql/migration")
-                    .target("44")
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(1)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(2)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -379,7 +378,7 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("45")
+            assertThat(latestVersion).isEqualTo("46")
 
             listOf(AVATAR_FIXTURE_FIRST_CLUB_ID, avatarFixtureClubId(clubNumber = 2)).forEach { clubId ->
                 val assignments = integratedAvatarAssignmentsForClub(upgradeJdbc, clubId)
@@ -400,7 +399,7 @@ class MySqlFlywayMigrationTest(
             ).isZero()
 
             val migrationSql =
-                checkNotNull(javaClass.classLoader.getResourceAsStream(V45_INTEGRATED_AVATARS))
+                checkNotNull(javaClass.classLoader.getResourceAsStream(V46_INTEGRATED_AVATARS))
                     .bufferedReader()
                     .use { it.readText() }
             val jsonKeys =
@@ -1779,8 +1778,8 @@ class MySqlFlywayMigrationTest(
             "db/mysql/migration/V43__membership_book_club_avatars.sql"
         private const val V44_ANIMAL_AVATARS =
             "db/mysql/migration/V44__animal_avatar_selection.sql"
-        private const val V45_INTEGRATED_AVATARS =
-            "db/mysql/migration/V45__integrated_member_profile_avatar_catalog.sql"
+        private const val V46_INTEGRATED_AVATARS =
+            "db/mysql/migration/V46__integrated_member_profile_avatar_catalog.sql"
         private val ADD_COLUMN_NAME_REGEX = Regex("(?i)\\bADD\\s+COLUMN\\s+`?([a-z0-9_]+)`?")
         private val V43_AVATAR_KEY_REGEX = Regex("'([a-z0-9-]+)'")
     }

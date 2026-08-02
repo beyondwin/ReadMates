@@ -115,7 +115,7 @@ class JdbcGuestBrowseQueryBudgetTest(
             jdbcTemplate.update(
                 """
                 insert into memberships (id, club_id, user_id, role, status, short_name, avatar_key)
-                values (?, ?, ?, 'MEMBER', 'ACTIVE', ?, 'hedgehog-green-book')
+                values (?, ?, ?, 'MEMBER', 'ACTIVE', ?, 'globe-notebook')
                 """.trimIndent(),
                 membershipId(index),
                 CLUB_ID,

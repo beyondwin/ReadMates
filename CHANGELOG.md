@@ -27,10 +27,10 @@ One-command local OAuth stack + redacted smoke verifier로 기존 서비스 보�
 
 ### Deployment Notes
 
-- 배포 전 최근 DB backup과 backend readiness 기준을 확인합니다. V43과 V44는 수정하지 않으며, forward-only V45가 모든 기존 membership의 avatar key를 30-key 집합으로 한 번 다시 쓰고 named check constraint를 새 집합으로 교체합니다.
-- 같은 release tag의 새 backend를 먼저 배포해 Flyway V45와 backend health가 모두 정상임을 확인한 뒤에만 새 frontend를 배포합니다. `PUT /api/me/profile`은 현재 club membership의 표시 이름과 avatar key를 한 transaction에서 교체하며, `PATCH /api/me/profile`과 `PATCH /api/me/avatar`는 cached old client를 위한 제한된 호환성 window로 남습니다. Cached old client가 제거된 key를 보내면 `AVATAR_KEY_INVALID`를 받을 수 있습니다.
+- 배포 전 최근 DB backup과 backend readiness 기준을 확인합니다. V43과 V44는 수정하지 않으며, forward-only V46이 모든 기존 membership의 avatar key를 30-key 집합으로 한 번 다시 쓰고 named check constraint를 새 집합으로 교체합니다.
+- 같은 release tag의 새 backend를 먼저 배포해 Flyway V45 guest exposure와 V46 avatar catalog, backend health가 모두 정상임을 확인한 뒤에만 새 frontend를 배포합니다. `PUT /api/me/profile`은 현재 club membership의 표시 이름과 avatar key를 한 transaction에서 교체하며, `PATCH /api/me/profile`과 `PATCH /api/me/avatar`는 cached old client를 위한 제한된 호환성 window로 남습니다. Cached old client가 제거된 key를 보내면 `AVATAR_KEY_INVALID`를 받을 수 있습니다.
 - 배포 후에는 현재 club의 atomic profile 변경과 `/api/app/me`·`/api/auth/me` 재조회, 다른 club 격리, 허용된 public author avatar 표시를 smoke하고 권한과 `LEFT`/anonymous masking이 유지되는지 확인합니다. 실제 member data나 private identifier는 공개 release evidence에 기록하지 않습니다. Production deployment는 이 구현 범위에 포함되지 않습니다.
-- Rollback은 V45가 바꾼 schema와 이미 migration된 data를 보존합니다. Migration을 되돌리지 않고 V45와 호환되는 server/frontend image로 전환하거나 새 forward-fix release를 발행합니다.
+- Rollback은 V45/V46이 바꾼 schema와 이미 migration된 data를 보존합니다. Migration을 되돌리지 않고 V45/V46과 호환되는 server/frontend image로 전환하거나 새 forward-fix release를 발행합니다.
 
 ### Changed
 
