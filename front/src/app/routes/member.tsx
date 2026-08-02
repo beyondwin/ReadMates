@@ -31,8 +31,22 @@ import { RequireAuth, RequireMemberApp } from "@/src/app/route-guards";
 import { Link } from "@/src/app/router-link";
 import { GuestCurrentSessionContent } from "@/src/pages/guest-current-session";
 import { GuestHomeContent } from "@/src/pages/guest-home";
-import { GuestArchiveContent } from "@/src/pages/guest-archive";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
+
+// This route-only boundary is intentionally colocated with the router configuration.
+// eslint-disable-next-line react-refresh/only-export-components
+const LazyGuestArchiveContent = lazy(async () => ({
+  default: (await import("@/src/pages/guest-archive")).GuestArchiveContent,
+}));
+
+// eslint-disable-next-line react-refresh/only-export-components
+function GuestArchiveContentBoundary(props: GuestArchiveContentProps) {
+  return (
+    <Suspense fallback={<ArchiveRouteLoading label="아카이브를 불러오는 중" />}>
+      <LazyGuestArchiveContent {...props} />
+    </Suspense>
+  );
+}
 
 const currentSessionInternalLink: InternalLinkComponent = ({ href, children, ...props }) => {
   return (
@@ -190,7 +204,7 @@ function scopedMemberAppRoutes(queryClient: QueryClient): RouteObject[] {
       errorElement: <ArchiveRouteError />,
       fallback: <ArchiveRouteLoading label="아카이브를 불러오는 중" />,
       guestLoader: guestArchiveLoader,
-      GuestArchiveContent,
+      GuestArchiveContent: GuestArchiveContentBoundary,
       load: async () => {
         const [{ default: Component }, { archiveListLoaderFactory }] = await Promise.all([
           import("@/src/pages/archive"),

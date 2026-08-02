@@ -1,9 +1,9 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useState } from "react";
+import { type ComponentProps, useState } from "react";
 import { MemoryRouter, Route, Routes, useLocation, useSearchParams } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import ArchivePage from "@/features/archive/ui/archive-page";
+import ArchivePageComponent from "@/features/archive/ui/archive-page";
 import type {
   ArchiveSessionItem,
   FeedbackDocumentListItem,
@@ -11,9 +11,19 @@ import type {
   MyArchiveReviewItem,
 } from "@/features/archive/api/archive-contracts";
 import type { PagedResponse } from "@/shared/model/paging";
-import { GUEST_READ_SURFACE_CAPABILITIES } from "@/shared/model/read-surface-capabilities";
+import {
+  GUEST_READ_SURFACE_CAPABILITIES,
+  MEMBER_READ_SURFACE_CAPABILITIES,
+} from "@/shared/model/read-surface-capabilities";
 
 const ARCHIVE_SCROLL_KEY = "readmates:archive-scroll";
+
+type TestArchivePageProps = Omit<ComponentProps<typeof ArchivePageComponent>, "capabilities"> &
+  Partial<Pick<ComponentProps<typeof ArchivePageComponent>, "capabilities">>;
+
+function ArchivePage(props: TestArchivePageProps) {
+  return <ArchivePageComponent capabilities={MEMBER_READ_SURFACE_CAPABILITIES} {...props} />;
+}
 
 function pageOf<T>(items: T[], nextCursor: string | null = null): PagedResponse<T> {
   return { items, nextCursor };
@@ -214,6 +224,30 @@ function LocationStateEcho() {
 }
 
 describe("ArchivePage", () => {
+  it("fails closed without inspecting reports when archive capabilities are omitted at runtime", () => {
+    const reportsRead = vi.fn(() => {
+      throw new Error("missing capabilities must not open feedback reports");
+    });
+    const protectedReports = Object.defineProperty(
+      { nextCursor: null } as PagedResponse<FeedbackDocumentListItem>,
+      "items",
+      { get: reportsRead },
+    );
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    expect(() => render(
+      <ArchivePage
+        sessions={pageOf([])}
+        questions={pageOf([])}
+        reviews={pageOf([])}
+        reports={protectedReports}
+        capabilities={undefined as never}
+      />,
+    )).toThrow();
+    expect(reportsRead).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
   it("keeps every archive tab selectable while feedback is generically locked without metadata", async () => {
     const user = userEvent.setup();
     const sessionFeedbackRead = vi.fn(() => {

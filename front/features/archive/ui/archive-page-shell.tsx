@@ -10,10 +10,7 @@ import type {
 import { archiveTabs, selectedArchiveSectionMeta, toArchiveSessionRecords } from "@/features/archive/model/archive-model";
 import { restoreReadmatesArchiveScroll } from "@/features/archive/ui/archive-route-continuity";
 import type { PagedResponse } from "@/shared/model/paging";
-import {
-  MEMBER_READ_SURFACE_CAPABILITIES,
-  type ReadSurfaceCapabilities,
-} from "@/shared/model/read-surface-capabilities";
+import type { ReadSurfaceCapabilities } from "@/shared/model/read-surface-capabilities";
 import { ArchiveDesktop } from "./archive-desktop";
 import type { LoadMoreCallback } from "./archive-empty-state";
 import { ArchiveMobile } from "./archive-mobile";
@@ -57,7 +54,7 @@ function handleArchiveTabKeyDown(
 }
 
 type ArchivePageAccessProps = {
-  capabilities?: ReadSurfaceCapabilities;
+  capabilities: ReadSurfaceCapabilities;
   feedbackLockedAction?: ReactNode;
 };
 
@@ -88,7 +85,7 @@ function ArchivePage({
   questions,
   reviews,
   reports,
-  capabilities = MEMBER_READ_SURFACE_CAPABILITIES,
+  capabilities,
   feedbackLockedAction,
   initialView = "sessions",
   onViewChange,
