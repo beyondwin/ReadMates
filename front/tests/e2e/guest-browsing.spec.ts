@@ -49,11 +49,16 @@ async function expectWithinViewport(locator: Locator, page: Page) {
   await expectNoHorizontalOverflow(page);
 }
 
-async function expectMobileNavigationClearance(page: Page) {
+async function expectMobileNavigationClearance(page: Page, target: Locator) {
+  await expect(target).toBeVisible();
+  await target.evaluate((element) => element.scrollIntoView({ block: "center" }));
   const tabbar = page.locator(".m-tabbar");
   await expect(tabbar).toBeVisible();
+  const targetBox = await target.boundingBox();
   const tabbarBox = await tabbar.boundingBox();
+  expect(targetBox).not.toBeNull();
   expect(tabbarBox).not.toBeNull();
+  expect(targetBox!.y + targetBox!.height).toBeLessThanOrEqual(tabbarBox!.y);
   expect(tabbarBox!.y + tabbarBox!.height).toBeLessThanOrEqual((await page.viewportSize())!.height + 1);
   for (const tab of await tabbar.locator(".m-tab").all()) await expectTapTarget(tab);
 }
@@ -185,12 +190,12 @@ test("mobile guest lock sheet traps and restores focus without hiding conversion
 
 test("public entry and every guest reading surface remain responsive at mobile and desktop widths", async ({ page }) => {
   const surfaces = [
-    { path: clubBase, target: () => page.getByRole("link", { name: "둘러보기", exact: true }).first(), app: false },
-    { path: appBase, target: () => page.getByRole("heading", { name: "함께 읽어 온 장면들" }), app: true },
-    { path: `${appBase}/session/current`, target: () => page.getByRole("heading", { name: "E2E 현재 세션 책" }), app: true },
-    { path: `${appBase}/notes`, target: () => page.getByText("공개된 하이라이트·한줄평·질문을 세션별로 읽어 볼 수 있습니다."), app: true },
-    { path: `${appBase}/archive`, target: () => page.getByRole("heading", { name: "읽어 온 자리" }), app: true },
-    { path: seededArchivePath, target: () => page.getByRole("button", { name: "피드백 보기, 정식 멤버 전용" }), app: true },
+    { path: clubBase, target: () => page.getByRole("link", { name: "둘러보기", exact: true }).first(), clearanceTarget: () => page.getByRole("link", { name: "둘러보기", exact: true }).first(), app: false },
+    { path: appBase, target: () => page.getByRole("heading", { name: "함께 읽어 온 장면들" }), clearanceTarget: () => page.getByRole("link", { name: "멤버로 시작", exact: true }).last(), app: true },
+    { path: `${appBase}/session/current`, target: () => page.getByRole("heading", { name: "E2E 현재 세션 책" }), clearanceTarget: () => page.getByRole("link", { name: "멤버로 시작", exact: true }).last(), app: true },
+    { path: `${appBase}/notes`, target: () => page.getByText("공개된 하이라이트·한줄평·질문을 세션별로 읽어 볼 수 있습니다."), clearanceTarget: () => page.getByRole("button", { name: /^전체/ }).first(), app: true },
+    { path: `${appBase}/archive`, target: () => page.getByRole("heading", { name: "읽어 온 자리" }), clearanceTarget: () => page.locator("main a.surface").last(), app: true },
+    { path: seededArchivePath, target: () => page.getByRole("button", { name: "피드백 보기, 정식 멤버 전용" }), clearanceTarget: () => page.getByRole("link", { name: "멤버로 시작", exact: true }).last(), app: true },
   ];
 
   for (const width of [320, 390, 1366]) {
@@ -204,7 +209,9 @@ test("public entry and every guest reading surface remain responsive at mobile a
         await target.focus();
         expect(await target.evaluate((element) => getComputedStyle(element).outlineWidth)).not.toBe("0px");
       }
-      if (surface.app && width < 720) await expectMobileNavigationClearance(page);
+      if (surface.app && width < 720) {
+        await expectMobileNavigationClearance(page, surface.clearanceTarget());
+      }
     }
   }
 });
@@ -245,7 +252,7 @@ test("a mounted production read expiry preserves content and offers exact-route 
     await expectWithinViewport(recovery, page);
     await expectTapTarget(recovery.getByRole("link", { name: "재로그인" }));
     await expectTapTarget(continueAsGuest);
-    if (width < 720) await expectMobileNavigationClearance(page);
+    if (width < 720) await expectMobileNavigationClearance(page, recovery);
   }
   await continueAsGuest.click();
 
@@ -272,6 +279,47 @@ test("a default protected loader 401 forces login recovery with the exact return
 
   await expect(page).toHaveURL(`/login?returnTo=${encodeURIComponent(target)}`);
   expect(expiredLoaderReads).toBeGreaterThan(0);
+});
+
+test("failed guest conversion places its desktop error on a clean full-width row", async ({ page }) => {
+  await loginWithGoogleFixture(page, "member1@example.com");
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await page.goto(seededArchivePath);
+  await expect(page.getByRole("heading", { name: "요약" })).toBeVisible();
+
+  await page.route(
+    new RegExp(`/api/bff/api/archive/sessions/${seededArchiveSessionId}(?:\\?|$)`),
+    (route) => route.fulfill({ status: 401, contentType: "application/json", body: '{"error":"session expired"}' }),
+  );
+  await page.route(/\/api\/bff\/api\/auth\/logout$/, (route) =>
+    route.fulfill({ status: 500, contentType: "application/json", body: '{"error":"logout failed"}' }),
+  );
+  await page.evaluate(() => {
+    const now = Date.now();
+    Date.now = () => now + 31_000;
+    window.dispatchEvent(new Event("offline"));
+    window.dispatchEvent(new Event("online"));
+  });
+
+  const recovery = page.getByRole("status", { name: "로그인 세션 만료" });
+  await recovery.getByRole("button", { name: "게스트로 계속 보기" }).click();
+  const error = recovery.getByRole("alert");
+  await expect(error).toBeVisible();
+
+  const [bannerBox, copyBox, actionsBox, errorBox] = await Promise.all([
+    recovery.boundingBox(),
+    recovery.locator(".rm-session-expiry__copy").boundingBox(),
+    recovery.locator(".rm-session-expiry__actions").boundingBox(),
+    error.boundingBox(),
+  ]);
+  expect(bannerBox).not.toBeNull();
+  expect(copyBox).not.toBeNull();
+  expect(actionsBox).not.toBeNull();
+  expect(errorBox).not.toBeNull();
+  expect(errorBox!.y).toBeGreaterThanOrEqual(
+    Math.max(copyBox!.y + copyBox!.height, actionsBox!.y + actionsBox!.height) - 1,
+  );
+  expect(errorBox!.width).toBeGreaterThanOrEqual(bannerBox!.width - 40);
 });
 
 test("write 401 preserves the current-session draft and only offers reauthentication", async ({ page }) => {
@@ -301,6 +349,6 @@ test("write 401 preserves the current-session draft and only offers reauthentica
     await page.setViewportSize({ width, height: width < 720 ? 844 : 900 });
     await expectWithinViewport(recovery, page);
     await expectTapTarget(recovery.getByRole("link", { name: "재로그인" }));
-    if (width < 720) await expectMobileNavigationClearance(page);
+    if (width < 720) await expectMobileNavigationClearance(page, recovery);
   }
 });
