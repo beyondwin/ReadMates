@@ -23,6 +23,7 @@
 ### Task 1: Default the bare login entry actions
 
 **Files:**
+- Modify: `CHANGELOG.md`
 - Modify: `front/tests/unit/login-card.test.tsx`
 - Modify: `front/tests/unit/spa-router.test.tsx`
 - Modify: `front/features/auth/route/login-route.tsx`
@@ -123,6 +124,10 @@ Do not change `google-auth-invite-flow.spec.ts`: its unsafe absolute `returnTo` 
 
 Update the existing `renders the login route` SPA router smoke with the same two literal link expectations so the route integration contract matches the focused login-card contract.
 
+Add a focused bare-login browser test that intercepts the join-intent POST and OAuth start, clicks `멤버로 시작`, and verifies exactly one reading-sai intent with the expected `returnTo`, `joinClub`, and one-time `joinIntent` query values.
+
+Record the user-visible bare-login default under `CHANGELOG.md` `Unreleased`, including explicit-return precedence and fail-closed recovery/unsafe-return behavior.
+
 - [x] **Step 6: Run focused and canonical frontend verification**
 
 Run in order:
@@ -142,7 +147,7 @@ Expected: every command exits 0. If the focused Playwright command cannot run be
 Run:
 
 ```bash
-git diff --check -- front/features/auth/route/login-route.tsx front/tests/unit/login-card.test.tsx front/tests/e2e/public-auth-member-host.spec.ts docs/superpowers/specs/2026-08-03-login-default-club-entry-design.md docs/superpowers/plans/2026-08-03-login-default-club-entry.md
+git diff --check -- CHANGELOG.md front/features/auth/route/login-route.tsx front/tests/unit/login-card.test.tsx front/tests/unit/spa-router.test.tsx front/tests/e2e/public-auth-member-host.spec.ts docs/superpowers/specs/2026-08-03-login-default-club-entry-design.md docs/superpowers/plans/2026-08-03-login-default-club-entry.md
 git status --short --branch --untracked-files=all
 ```
 
