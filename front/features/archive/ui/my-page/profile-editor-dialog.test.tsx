@@ -52,8 +52,11 @@ describe("ProfileEditorDialog", () => {
     expect(input).toHaveValue("멤버1");
     await user.clear(input);
     await user.type(input, "새 멤버");
+    expect(within(dialog).getByText("한 장 더 읽는 바나나")).toBeVisible();
     await user.click(within(dialog).getByRole("button", { name: "아바타 선택" }));
-    await user.click(within(dialog).getByRole("button", { name: "초록 책을 읽는 구름 선택" }));
+    await user.click(within(dialog).getByRole("button", {
+      name: "문장 사이의 구름, 초록 책을 읽는 구름 선택",
+    }));
     expect(onSaveProfile).not.toHaveBeenCalled();
     await user.click(within(dialog).getByRole("button", { name: "프로필로 돌아가기" }));
     await user.click(within(dialog).getByRole("button", { name: "변경사항 저장" }));
