@@ -127,6 +127,47 @@ class PlatformAdminOperationsApiIntegrationTest(
     }
 
     @Test
+    fun `mutation preserves shared authentication and authorization status semantics`() {
+        seedCase(caseId = AUTH_CASE_ID, sourceKey = "AI_JOB:$AUTH_CASE_ID", version = 0)
+
+        mockMvc
+            .post("/api/admin/operations/cases/$AUTH_CASE_ID/acknowledge") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"expectedVersion":0}"""
+                header(BFF_SECRET_HEADER, BFF_SECRET)
+                header("Origin", ALLOWED_ORIGIN)
+            }.andExpect {
+                status { isUnauthorized() }
+            }
+
+        mockMvc
+            .post("/api/admin/operations/cases/$AUTH_CASE_ID/acknowledge") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"expectedVersion":0}"""
+                header(BFF_SECRET_HEADER, BFF_SECRET)
+                header("Origin", ALLOWED_ORIGIN)
+                cookie(sessionCookieForUser(HOST_USER_ID))
+            }.andExpect {
+                status { isForbidden() }
+            }
+
+        seedDisabledAdmin()
+        mockMvc
+            .post("/api/admin/operations/cases/$AUTH_CASE_ID/acknowledge") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"expectedVersion":0}"""
+                header(BFF_SECRET_HEADER, BFF_SECRET)
+                header("Origin", ALLOWED_ORIGIN)
+                cookie(sessionCookieForUser(DISABLED_ADMIN_ID))
+            }.andExpect {
+                status { isForbidden() }
+            }
+
+        assertThat(caseVersion(AUTH_CASE_ID)).isZero()
+        assertThat(eventCount(AUTH_CASE_ID)).isZero()
+    }
+
+    @Test
     fun `mutation still requires trusted BFF secret and allowed origin`() {
         seedCase(caseId = BFF_CASE_ID, sourceKey = "AI_JOB:$BFF_CASE_ID", version = 0)
         val ownerCookie = sessionCookieForUser(OWNER_USER_ID)
@@ -153,6 +194,31 @@ class PlatformAdminOperationsApiIntegrationTest(
 
         assertThat(caseVersion(BFF_CASE_ID)).isZero()
         assertThat(eventCount(BFF_CASE_ID)).isZero()
+    }
+
+    @Test
+    fun `near miss operation POST paths remain protected by csrf`() {
+        seedCase(caseId = CSRF_CASE_ID, sourceKey = "AI_JOB:$CSRF_CASE_ID", version = 0)
+        val ownerCookie = sessionCookieForUser(OWNER_USER_ID)
+
+        listOf(
+            "/api/admin/operations/cases/$CSRF_CASE_ID/execute",
+            "/api/admin/operations/cases/$CSRF_CASE_ID/acknowledge/trailing",
+        ).forEach { path ->
+            mockMvc
+                .post(path) {
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"expectedVersion":0}"""
+                    header(BFF_SECRET_HEADER, BFF_SECRET)
+                    header("Origin", ALLOWED_ORIGIN)
+                    cookie(ownerCookie)
+                }.andExpect {
+                    status { isForbidden() }
+                }
+        }
+
+        assertThat(caseVersion(CSRF_CASE_ID)).isZero()
+        assertThat(eventCount(CSRF_CASE_ID)).isZero()
     }
 
     @Test
@@ -343,6 +409,8 @@ class PlatformAdminOperationsApiIntegrationTest(
         const val VERSION_CASE_ID = "00000000-0000-0000-0000-00000000c614"
         const val UNAVAILABLE_CASE_ID = "00000000-0000-0000-0000-00000000c615"
         const val BFF_CASE_ID = "00000000-0000-0000-0000-00000000c616"
+        const val AUTH_CASE_ID = "00000000-0000-0000-0000-00000000c617"
+        const val CSRF_CASE_ID = "00000000-0000-0000-0000-00000000c618"
         const val INTERNAL_SOURCE_SENTINEL = "AI_JOB:INTERNAL_SOURCE_SENTINEL"
     }
 }

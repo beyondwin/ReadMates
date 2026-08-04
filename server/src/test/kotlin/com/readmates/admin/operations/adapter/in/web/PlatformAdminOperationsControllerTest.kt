@@ -143,7 +143,7 @@ class PlatformAdminOperationsControllerTest {
             CursorCodec.encode(
                 mapOf(
                     "severityRank" to "0",
-                    "firstObservedAt" to "2026-08-04T00:00:00Z",
+                    "firstObservedAt" to "2026-08-04T00:00Z",
                     "id" to CASE_ID.toString(),
                 ),
             )
@@ -156,6 +156,49 @@ class PlatformAdminOperationsControllerTest {
 
         assertThat(useCases.lastPageRequest?.cursor)
             .containsExactlyInAnyOrderEntriesOf(CursorCodec.decodeStrict(cursor))
+    }
+
+    @Test
+    fun `list rejects noncanonical operation case cursor values and extra keys`() {
+        useCases.page = samplePage()
+        val invalidCursors =
+            listOf(
+                mapOf(
+                    "severityRank" to "+0",
+                    "firstObservedAt" to "2026-08-04T00:00Z",
+                    "id" to CASE_ID.toString(),
+                ),
+                mapOf(
+                    "severityRank" to "0",
+                    "firstObservedAt" to "2026-08-04T00:00+00:00",
+                    "id" to CASE_ID.toString(),
+                ),
+                mapOf(
+                    "severityRank" to "0",
+                    "firstObservedAt" to "2026-08-04T00:00Z",
+                    "id" to "0-0-0-0-1",
+                ),
+                mapOf(
+                    "severityRank" to "0",
+                    "firstObservedAt" to "2026-08-04T00:00Z",
+                    "id" to CASE_ID.toString(),
+                    "sourceKey" to INTERNAL_SOURCE_SENTINEL,
+                ),
+            )
+
+        invalidCursors.forEach { values ->
+            val cursor = requireNotNull(CursorCodec.encode(values))
+            mockMvc
+                .get("/api/admin/operations/cases?cursor=$cursor")
+                .andExpect {
+                    status { isBadRequest() }
+                    jsonPath("$.code") { value("INVALID_CURSOR") }
+                    jsonPath("$.message") { value("페이지 정보를 다시 확인해 주세요.") }
+                    jsonPath("$.status") { value(400) }
+                }
+        }
+
+        assertThat(useCases.lastPageRequest).isNull()
     }
 
     @Test
@@ -221,8 +264,15 @@ class PlatformAdminOperationsControllerTest {
     }
 
     @Test
-    fun `acknowledge requires expected version and returns safe case projection`() {
-        arrangeMutationResult(sampleCase().copy(state = AdminOperationCaseState.ACKNOWLEDGED, version = 4))
+    fun `acknowledge returns the exact safe write result without a detail query`() {
+        arrangeMutationResult(
+            sampleCase().copy(
+                state = AdminOperationCaseState.ACKNOWLEDGED,
+                assigneeAdminId = ADMIN_ID,
+                lastObservedAt = OffsetDateTime.parse("2026-08-04T00:02:00Z"),
+                version = 4,
+            ),
+        )
 
         mockMvc
             .post("/api/admin/operations/cases/$CASE_ID/acknowledge") {
@@ -233,13 +283,17 @@ class PlatformAdminOperationsControllerTest {
                 jsonPath("$.schema") { value("admin.operation_cases.v1") }
                 jsonPath("$.state") { value("ACKNOWLEDGED") }
                 jsonPath("$.version") { value(4) }
-                jsonPath("$.allowedActions[0]") { value("ACKNOWLEDGE") }
-                jsonPath("$.source.status") { value("AVAILABLE") }
+                jsonPath("$.lastObservedAt") { value("2026-08-04T00:02:00Z") }
+                jsonPath("$.assignedToMe") { value(true) }
+                jsonPath("$.allowedActions") { doesNotExist() }
+                jsonPath("$.source") { doesNotExist() }
                 jsonPath("$.sourceKey") { doesNotExist() }
+                jsonPath("$.assigneeAdminId") { doesNotExist() }
             }
 
         assertThat(useCases.lastAcknowledge)
             .isEqualTo(AdminOperationMutationCommand(CASE_ID, expectedVersion = 3))
+        assertThat(useCases.lastCaseId).isNull()
     }
 
     @Test
@@ -257,6 +311,7 @@ class PlatformAdminOperationsControllerTest {
 
         assertThat(useCases.lastResolve)
             .isEqualTo(AdminOperationMutationCommand(CASE_ID, expectedVersion = 3))
+        assertThat(useCases.lastCaseId).isNull()
     }
 
     @Test
@@ -287,6 +342,7 @@ class PlatformAdminOperationsControllerTest {
                     snoozedUntil = OffsetDateTime.parse("2026-08-05T09:30:00+09:00"),
                 ),
             )
+        assertThat(useCases.lastCaseId).isNull()
 
         mockMvc
             .post("/api/admin/operations/cases/$CASE_ID/snooze") {
@@ -397,7 +453,16 @@ class PlatformAdminOperationsControllerTest {
         useCases.mutationResult = case
         useCases.detail =
             AdminOperationCaseDetail(
-                case = sampleView().copy(case = case),
+                case =
+                    sampleView().copy(
+                        case =
+                            case.copy(
+                                state = AdminOperationCaseState.OPEN,
+                                lastObservedAt = OffsetDateTime.parse("2026-08-04T03:00:00Z"),
+                                assigneeAdminId = OTHER_ADMIN_ID,
+                                version = 99,
+                            ),
+                    ),
                 history = emptyList(),
             )
     }
