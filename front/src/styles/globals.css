@@ -811,6 +811,10 @@
   color: var(--text-3);
 }
 
+.rm-club-pulse {
+  margin-top: 32px;
+}
+
 .rm-club-pulse-entry__author {
   display: flex;
   align-items: center;

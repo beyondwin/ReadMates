@@ -120,7 +120,7 @@ export function ClubPulse({
   LinkComponent?: MemberHomeLinkComponent;
 }) {
   return (
-    <section>
+    <section className="rm-club-pulse">
       <SectionHeader
         eyebrow="클럽 흐름"
         title="최근 클럽 흐름"

@@ -50,6 +50,12 @@ const authoredLongReview = {
 };
 
 describe("member home record reflection cards", () => {
+  it("marks the desktop club pulse as a separate home section", () => {
+    const { container } = render(<ClubPulse items={[authoredQuestion]} />);
+
+    expect(container.firstElementChild).toHaveClass("rm-club-pulse");
+  });
+
   it("renders a long review with the localized kind label on desktop and mobile", () => {
     const desktop = render(<ClubPulse items={[authoredLongReview]} />);
 
