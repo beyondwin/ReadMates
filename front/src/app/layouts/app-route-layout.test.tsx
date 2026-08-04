@@ -497,7 +497,7 @@ describe("AppRouteLayout session expiry recovery", () => {
       if (path === "/api/bff/api/public/clubs/reading-sai/browse/notes/sessions?limit=20&cursor=cursor-2") {
         return Promise.resolve(jsonResponse({ items: [noteSession], nextCursor: null }));
       }
-      if (path === "/api/bff/api/public/clubs/reading-sai/browse/notes/feed?limit=20&cursor=cursor-2") {
+      if (path === "/api/bff/api/public/clubs/reading-sai/browse/notes/feed?limit=20&cursor=cursor-2&sessionId=session-7") {
         return Promise.resolve(jsonResponse({
           items: [{
             sessionId: "session-7",
@@ -546,6 +546,10 @@ describe("AppRouteLayout session expiry recovery", () => {
     expect(await screen.findByRole("button", { name: "게스트로 계속 보기" })).toBeVisible();
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/bff/api/public/clubs/reading-sai/browse/notes/sessions?limit=20&cursor=cursor-2",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/public/clubs/reading-sai/browse/notes/feed?limit=20&cursor=cursor-2&sessionId=session-7",
       expect.objectContaining({ cache: "no-store" }),
     );
     expect(screen.getByText("기존 노트 데이터")).toBeVisible();
