@@ -1,16 +1,15 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Route } from "@playwright/test";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 
-const CLUB_ID = "club-ready";
-const SESSION_ID = "11111111-2222-3333-4444-555555555555";
+const GENERATED_AT = "2026-08-04T10:00:00Z";
 
 function platformAdminAuth(): AuthMeResponse {
   return {
     authenticated: true,
-    userId: "platform-owner-user",
+    userId: "platform-owner",
     membershipId: null,
     clubId: null,
-    email: "owner@example.com",
+    email: "owner@example.test",
     displayName: "OWNER admin",
     accountName: "OWNER admin",
     role: null,
@@ -18,7 +17,7 @@ function platformAdminAuth(): AuthMeResponse {
     approvalState: "INACTIVE",
     currentMembership: null,
     joinedClubs: [],
-    platformAdmin: { userId: "platform-owner-user", email: "owner@example.com", role: "OWNER" },
+    platformAdmin: { userId: "platform-owner", email: "owner@example.test", role: "OWNER" },
     recommendedAppEntryUrl: "/admin",
   };
 }
@@ -27,105 +26,75 @@ async function json(route: Route, status: number, body: unknown): Promise<void> 
   await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
 }
 
-async function routeAdminTodayClosingRisks(page: Page): Promise<void> {
-  await page.route("**/api/bff/api/auth/me**", async (route) => {
-    await json(route, 200, platformAdminAuth());
-  });
-  await page.route("**/api/bff/api/admin/summary", async (route) => {
-    await json(route, 200, {
-      platformRole: "OWNER",
-      activeClubCount: 1,
-      domainActionRequiredCount: 0,
-      domains: [],
-      domainsRequiringAction: [],
-    });
-  });
-  await page.route("**/api/bff/api/admin/clubs", async (route) => {
-    await json(route, 200, {
-      items: [{
-        clubId: CLUB_ID,
-        slug: "ready-club",
-        name: "Ready Club",
-        tagline: "읽는 힘",
-        about: "함께 읽는 공간",
-        status: "ACTIVE",
-        publicVisibility: "PUBLIC",
-        domainCount: 0,
-        domainActionRequiredCount: 0,
-        firstHostOnboardingState: "ASSIGNED",
-      }],
-    });
-  });
-  await page.route("**/api/bff/api/admin/notifications/snapshot", async (route) => {
-    await json(route, 200, {
-      generatedAt: "2026-06-20T00:00:00Z",
-      outboxSummary: { pending: 0, active: 0, failed: 0, dead: 0, sentOrPublishedLast24h: 1 },
-      deliverySummary: { pending: 0, active: 0, failed: 0, dead: 0, sentOrPublishedLast24h: 1 },
-      relaySummary: { publishing: 0, sending: 0, stalePublishing: 0, staleSending: 0 },
-      failureClusters: [],
-      clubHealth: [],
-      recentManualDispatches: [],
-    });
-  });
-  await page.route("**/api/bff/api/admin/ai-generation/capabilities", async (route) => {
-    await json(route, 200, { enabled: true });
-  });
-  await page.route("**/api/bff/api/admin/ai-generation/summary", async (route) => {
-    await json(route, 200, {
-      activeJobCount: 0,
-      failedLast24h: 0,
-      monthToDateCostEstimateUsd: "0.0000",
-      failureCodes: [],
-      providerCosts: [],
-      staleCandidateCount: 0,
-    });
-  });
-  await page.route("**/api/bff/api/admin/ai-generation/jobs**", async (route) => {
-    await json(route, 200, { items: [], nextCursor: null });
-  });
-  await page.route("**/api/bff/api/admin/today/closing-risks", async (route) => {
-    await json(route, 200, {
-      schema: "admin.today_closing_risks.v1",
-      generatedAt: "2026-06-20T00:00:00Z",
-      trackingUnavailable: false,
-      items: [{
-        clubId: CLUB_ID,
-        clubSlug: "ready-club",
-        clubName: "Ready Club",
-        sessionId: SESSION_ID,
-        sessionNumber: 12,
-        bookTitle: "모던 자바스크립트",
-        meetingDate: "2026-06-20",
-        overallState: "BLOCKED",
-        primaryBlocker: "UNKNOWN_PRIVATE_BLOCKER_CODE",
-        firstDetectedAt: "2026-06-18T00:00:00Z",
-        lastSeenAt: "2026-06-21T00:00:00Z",
-        resolvedAt: null,
-        ageDays: 3,
-        occurrenceCount: 2,
-        ledgerState: "ACTIVE",
-        hostClosingHref: `/clubs/ready-club/app/host/sessions/${SESSION_ID}/closing`,
-      }],
-    });
-  });
-}
+test("owner sees a safe closing-risk case and follows its host board link", async ({ page }) => {
+  const source = {
+    sourceType: "CLOSING_RISK",
+    status: "AVAILABLE",
+    generatedAt: GENERATED_AT,
+    lastSuccessfulAt: GENERATED_AT,
+    authoritative: true,
+  } as const;
+  const item = {
+    id: "case-closing-risk",
+    sourceType: "CLOSING_RISK",
+    clubId: "club-reading-room",
+    state: "OPEN",
+    severity: "WARNING",
+    summaryCode: "SESSION_CLOSING_BLOCKED",
+    firstObservedAt: "2026-08-01T10:00:00Z",
+    lastObservedAt: GENERATED_AT,
+    snoozedUntil: null,
+    resolvedAt: null,
+    assignedToMe: true,
+    reopenCount: 0,
+    version: 2,
+    impactCount: 1,
+    detailHref: "/clubs/reading-room/app/host/sessions/session-closing/closing",
+    allowedActions: ["ACKNOWLEDGE", "SNOOZE", "RESOLVE"],
+    source,
+  };
 
-test("owner sees safe admin today closing risk row with host closing board link", async ({ page }) => {
-  await routeAdminTodayClosingRisks(page);
+  await page.route("**/api/bff/api/auth/me**", (route) => json(route, 200, platformAdminAuth()));
+  await page.route("**/api/bff/api/admin/summary", (route) => json(route, 200, {
+    platformRole: "OWNER",
+    activeClubCount: 1,
+    domainActionRequiredCount: 0,
+    domains: [],
+    domainsRequiringAction: [],
+  }));
+  await page.route("**/api/bff/api/admin/clubs", (route) => json(route, 200, { items: [] }));
+  await page.route("**/api/bff/api/admin/operations/cases**", (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    if (pathname.endsWith("/cases/case-closing-risk")) {
+      return json(route, 200, {
+        schema: "admin.operation_cases.v1",
+        item,
+        history: [{
+          fromState: null,
+          toState: "OPEN",
+          action: null,
+          reasonCode: "SIGNAL_OPENED",
+          occurredAt: "2026-08-01T10:00:00Z",
+          caseVersion: 1,
+        }],
+      });
+    }
+    return json(route, 200, {
+      schema: "admin.operation_cases.v1",
+      generatedAt: GENERATED_AT,
+      counts: { open: 1, critical: 0, assignedToMe: 1, snoozed: 0 },
+      sources: [source],
+      items: [item],
+      nextCursor: null,
+    });
+  });
 
-  await page.goto(`/admin/today?selected=closing-risk-${SESSION_ID}`);
+  await page.goto("/admin/today?case=case-closing-risk");
 
-  await expect(page.getByRole("heading", { name: "오늘 할 일" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /모던 자바스크립트/ })).toBeVisible();
-  await expect(page.getByText("확인 필요").first()).toBeVisible();
-  await expect(page.getByText("3일째 차단").first()).toBeVisible();
-  await expect(page.getByText("반복 2회").first()).toBeVisible();
-  await expect(page.getByText("UNKNOWN_PRIVATE_BLOCKER_CODE")).toHaveCount(0);
-
-  const brief = page.getByRole("region", { name: "선택 항목 브리프" });
-  await expect(brief.getByRole("heading", { name: "Ready Club · No.12" })).toBeVisible();
-  await expect(brief.getByRole("link", { name: "호스트 클로징 보드" }).first()).toHaveAttribute(
+  await expect(page.getByRole("button", { name: /회차 마감이 완료되지 않았습니다/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: "마감 운영에서 확인" })).toHaveAttribute(
     "href",
-    `/clubs/ready-club/app/host/sessions/${SESSION_ID}/closing`,
+    "/clubs/reading-room/app/host/sessions/session-closing/closing",
   );
+  await expect(page.getByText("UNKNOWN_PRIVATE_BLOCKER_CODE")).toHaveCount(0);
 });

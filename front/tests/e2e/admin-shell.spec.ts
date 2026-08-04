@@ -71,42 +71,17 @@ async function routePlatformAdminHostWorkspace(page: Page) {
       body: JSON.stringify({ items: [] }),
     });
   });
-  await page.route("**/api/bff/api/admin/ai-generation/capabilities", async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ enabled: true }),
-    });
-  });
-  await page.route("**/api/bff/api/admin/ai-generation/summary", async (route) => {
+  await page.route("**/api/bff/api/admin/operations/cases**", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        activeJobCount: 0,
-        failedLast24h: 0,
-        monthToDateCostEstimateUsd: "0.0000",
-        failureCodes: [],
-        providerCosts: [],
-        staleCandidateCount: 0,
-      }),
-    });
-  });
-  await page.route("**/api/bff/api/admin/ai-generation/jobs", async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ items: [], nextCursor: null }),
-    });
-  });
-  await page.route("**/api/bff/api/admin/today/closing-risks", async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        schema: "admin.today_closing_risks.v1",
-        generatedAt: "2026-06-30T00:00:00.000Z",
+        schema: "admin.operation_cases.v1",
+        generatedAt: "2026-08-04T10:00:00Z",
+        counts: { open: 0, critical: 0, assignedToMe: 0, snoozed: 0 },
+        sources: [],
         items: [],
+        nextCursor: null,
       }),
     });
   });
@@ -180,8 +155,8 @@ test.describe("/admin shell", () => {
     await page.waitForURL(/\/admin/);
 
     await page.goto("/admin");
-    await expect(page).toHaveURL(/\/admin\/today$/);
-    await expect(page.getByRole("heading", { name: /오늘 할 일/ })).toBeVisible();
+    await expect(page).toHaveURL(/\/admin\/today(?:\?.*)?$/);
+    await expect(page.getByRole("heading", { name: "오늘의 운영 케이스" })).toBeVisible();
 
     await page.getByRole("link", { name: "클럽", exact: true }).click();
     await expect(page).toHaveURL(/\/admin\/clubs$/);
