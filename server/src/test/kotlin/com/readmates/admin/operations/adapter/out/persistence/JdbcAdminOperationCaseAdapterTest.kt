@@ -168,6 +168,70 @@ class JdbcAdminOperationCaseAdapterTest(
     }
 
     @Test
+    fun `authoritative available omission resolves an existing case`() {
+        val observedAt = instant(hour = 4)
+        val opened = adapter.reconcile(batch(signal(observedAt = observedAt)), observedAt).single()
+        val clearedAt = observedAt.plusHours(1)
+
+        adapter.reconcile(
+            batch(generatedAt = clearedAt, authoritative = true),
+            clearedAt,
+        )
+
+        assertThat(adapter.get(opened.id)?.state).isEqualTo(AdminOperationCaseState.RESOLVED)
+        assertThat(adapter.get(opened.id)?.resolvedAt).isEqualTo(clearedAt)
+        assertThat(adapter.history(opened.id, 10).map { it.reasonCode })
+            .containsExactly("SIGNAL_CLEARED", "SIGNAL_OPENED")
+    }
+
+    @Test
+    fun `partial omission does not resolve an existing case`() {
+        val observedAt = instant(hour = 4)
+        val opened = adapter.reconcile(batch(signal(observedAt = observedAt)), observedAt).single()
+
+        adapter.reconcile(
+            batch(
+                status = AdminOperationSourceStatus.PARTIAL,
+                generatedAt = observedAt.plusHours(1),
+                authoritative = true,
+            ),
+            observedAt.plusHours(1),
+        )
+
+        assertThat(adapter.get(opened.id)?.state).isEqualTo(AdminOperationCaseState.OPEN)
+        assertThat(adapter.history(opened.id, 10).map { it.reasonCode }).containsExactly("SIGNAL_OPENED")
+    }
+
+    @Test
+    fun `non-authoritative available omission does not resolve an existing case`() {
+        val observedAt = instant(hour = 4)
+        val opened = adapter.reconcile(batch(signal(observedAt = observedAt)), observedAt).single()
+
+        adapter.reconcile(
+            batch(generatedAt = observedAt.plusHours(1), authoritative = false),
+            observedAt.plusHours(1),
+        )
+
+        assertThat(adapter.get(opened.id)?.state).isEqualTo(AdminOperationCaseState.OPEN)
+        assertThat(adapter.history(opened.id, 10).map { it.reasonCode }).containsExactly("SIGNAL_OPENED")
+    }
+
+    @Test
+    fun `older authoritative omission does not resolve a newer observation`() {
+        val newerObservedAt = instant(hour = 5)
+        val opened = adapter.reconcile(batch(signal(observedAt = newerObservedAt)), newerObservedAt).single()
+
+        adapter.reconcile(
+            batch(generatedAt = newerObservedAt.minusHours(1), authoritative = true),
+            newerObservedAt.plusHours(1),
+        )
+
+        assertThat(adapter.get(opened.id)?.state).isEqualTo(AdminOperationCaseState.OPEN)
+        assertThat(adapter.get(opened.id)?.lastObservedAt).isEqualTo(newerObservedAt)
+        assertThat(adapter.history(opened.id, 10).map { it.reasonCode }).containsExactly("SIGNAL_OPENED")
+    }
+
+    @Test
     fun `optimistic transition rejects stale expected version without event`() {
         seedActor()
         val observedAt = instant(hour = 5)
@@ -250,6 +314,33 @@ class JdbcAdminOperationCaseAdapterTest(
         assertThat(firstPage.items.map { it.sourceKey }).containsExactly("critical-later", "warning-early")
         assertThat(secondPage.items.map { it.sourceKey }).containsExactly("warning-later", "info-early")
         assertThat(cursor.keys).containsExactlyInAnyOrder("severityRank", "firstObservedAt", "id")
+        assertThat(secondPage.nextCursor).isNull()
+    }
+
+    @Test
+    fun `cursor uses id as tie-break for equal severity and first observed time`() {
+        val observedAt = instant(hour = 6)
+        insertCase("00000000-0000-0000-0000-00000000c003", "id-third", observedAt)
+        insertCase("00000000-0000-0000-0000-00000000c001", "id-first", observedAt)
+        insertCase("00000000-0000-0000-0000-00000000c002", "id-second", observedAt)
+
+        val firstPage =
+            adapter.list(
+                AdminOperationCaseFilter(),
+                PageRequest(limit = 2, cursor = emptyMap()),
+                UUID.fromString(ACTOR_ID),
+            )
+        val cursor = CursorCodec.decode(firstPage.nextCursor).orEmpty()
+        val secondPage =
+            adapter.list(
+                AdminOperationCaseFilter(),
+                PageRequest(limit = 2, cursor = cursor),
+                UUID.fromString(ACTOR_ID),
+            )
+
+        assertThat(firstPage.items.map { it.sourceKey }).containsExactly("id-first", "id-second")
+        assertThat(cursor["id"]).isEqualTo("00000000-0000-0000-0000-00000000c002")
+        assertThat(secondPage.items.map { it.sourceKey }).containsExactly("id-third")
         assertThat(secondPage.nextCursor).isNull()
     }
 
@@ -364,6 +455,58 @@ class JdbcAdminOperationCaseAdapterTest(
     }
 
     @Test
+    fun `out-of-order concurrent source attempts preserve the newest freshness`() {
+        val olderAt = instant(hour = 8)
+        val newerAt = olderAt.plusHours(1)
+        val newerCommitted = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(2)
+        try {
+            val newer =
+                CompletableFuture.runAsync(
+                    {
+                        adapter.recordSourceFreshness(
+                            AdminOperationSourceFreshness(
+                                sourceType = AdminOperationSourceType.NOTIFICATION,
+                                status = AdminOperationSourceStatus.AVAILABLE,
+                                generatedAt = newerAt,
+                                lastSuccessfulAt = newerAt,
+                                authoritative = true,
+                            ),
+                        )
+                        newerCommitted.countDown()
+                    },
+                    executor,
+                )
+            val older =
+                CompletableFuture.runAsync(
+                    {
+                        check(newerCommitted.await(10, TimeUnit.SECONDS))
+                        adapter.recordSourceFreshness(
+                            AdminOperationSourceFreshness(
+                                sourceType = AdminOperationSourceType.NOTIFICATION,
+                                status = AdminOperationSourceStatus.UNAVAILABLE,
+                                generatedAt = olderAt,
+                                lastSuccessfulAt = olderAt,
+                                authoritative = false,
+                            ),
+                        )
+                    },
+                    executor,
+                )
+
+            CompletableFuture.allOf(newer, older).get(10, TimeUnit.SECONDS)
+
+            val freshness = adapter.sourceFreshness().single()
+            assertThat(freshness.status).isEqualTo(AdminOperationSourceStatus.AVAILABLE)
+            assertThat(freshness.generatedAt).isEqualTo(newerAt)
+            assertThat(freshness.lastSuccessfulAt).isEqualTo(newerAt)
+            assertThat(freshness.authoritative).isTrue()
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
+    @Test
     fun `concurrent reconciliation preserves one source identity`() {
         val observedAt = instant(hour = 9)
         val start = CountDownLatch(1)
@@ -392,6 +535,68 @@ class JdbcAdminOperationCaseAdapterTest(
         }
     }
 
+    @Test
+    fun `out-of-order concurrent observations preserve the newest case projection`() {
+        val olderAt = instant(hour = 9)
+        val newerAt = olderAt.plusHours(1)
+        val newerCommitted = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(2)
+        try {
+            val newer =
+                CompletableFuture.runAsync(
+                    {
+                        adapter.reconcile(
+                            batch(
+                                signal(
+                                    severity = AdminOperationSeverity.CRITICAL,
+                                    impactCount = 11,
+                                    detailHref = "/admin/notifications/newer",
+                                    observedAt = newerAt,
+                                ),
+                                generatedAt = newerAt,
+                            ),
+                            newerAt,
+                        )
+                        newerCommitted.countDown()
+                    },
+                    executor,
+                )
+            val older =
+                CompletableFuture.runAsync(
+                    {
+                        check(newerCommitted.await(10, TimeUnit.SECONDS))
+                        adapter.reconcile(
+                            batch(
+                                signal(
+                                    severity = AdminOperationSeverity.INFO,
+                                    impactCount = 1,
+                                    detailHref = "/admin/notifications/older",
+                                    observedAt = olderAt,
+                                ),
+                                generatedAt = olderAt,
+                            ),
+                            newerAt.plusHours(1),
+                        )
+                    },
+                    executor,
+                )
+
+            CompletableFuture.allOf(newer, older).get(10, TimeUnit.SECONDS)
+
+            val persisted =
+                adapter
+                    .list(AdminOperationCaseFilter(), PageRequest(10, emptyMap()), UUID.fromString(ACTOR_ID))
+                    .items
+                    .single()
+            assertThat(persisted.lastObservedAt).isEqualTo(newerAt)
+            assertThat(persisted.severity).isEqualTo(AdminOperationSeverity.CRITICAL)
+            assertThat(persisted.impactCount).isEqualTo(11)
+            assertThat(persisted.detailHref).isEqualTo("/admin/notifications/newer")
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
     private fun seedActor() {
         seedActor(ACTOR_ID, "admin-operation-actor@example.invalid")
     }
@@ -407,6 +612,27 @@ class JdbcAdminOperationCaseAdapterTest(
             """.trimIndent(),
             actorId,
             email,
+        )
+    }
+
+    private fun insertCase(
+        id: String,
+        sourceKey: String,
+        observedAt: OffsetDateTime,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into admin_operation_cases (
+              id, source_type, source_key, state, severity, safe_summary_code,
+              first_observed_at, last_observed_at, impact_count, detail_href
+            )
+            values (?, 'NOTIFICATION', ?, 'OPEN', 'WARNING', 'NOTIFICATION_DELIVERY_BACKLOG', ?, ?, 1, ?)
+            """.trimIndent(),
+            id,
+            sourceKey,
+            observedAt.toLocalDateTime(),
+            observedAt.toLocalDateTime(),
+            "/admin/notifications/$sourceKey",
         )
     }
 
@@ -450,6 +676,7 @@ class JdbcAdminOperationCaseAdapterTest(
         sourceKey: String = "delivery-backlog:test",
         severity: AdminOperationSeverity = AdminOperationSeverity.WARNING,
         impactCount: Int = 2,
+        detailHref: String = "/admin/notifications",
         observedAt: OffsetDateTime = instant(),
     ) = AdminOperationSignal(
         sourceType = AdminOperationSourceType.NOTIFICATION,
@@ -458,7 +685,7 @@ class JdbcAdminOperationCaseAdapterTest(
         severity = severity,
         summaryCode = "NOTIFICATION_DELIVERY_BACKLOG",
         impactCount = impactCount,
-        detailHref = "/admin/notifications",
+        detailHref = detailHref,
         observedAt = observedAt,
     )
 
