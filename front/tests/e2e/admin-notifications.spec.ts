@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import type { PlatformAdminRole } from "@/features/platform-admin/api/platform-admin-contracts";
+import { routeEmptyAdminOperations } from "./admin-operations-e2e-fixtures";
 
 function platformAdminAuth(role: PlatformAdminRole): AuthMeResponse {
   const email = `${role.toLowerCase()}@example.com`;
@@ -31,6 +32,7 @@ async function json(route: Route, status: number, body: unknown): Promise<void> 
 }
 
 async function routePlatformAdminShell(page: Page, role: PlatformAdminRole): Promise<void> {
+  await routeEmptyAdminOperations(page);
   await page.route("**/api/bff/api/auth/me**", async (route) => {
     await json(route, 200, platformAdminAuth(role));
   });

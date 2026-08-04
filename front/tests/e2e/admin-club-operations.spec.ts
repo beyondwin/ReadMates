@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import type { PlatformAdminRole } from "@/features/platform-admin/api/platform-admin-contracts";
+import { routeEmptyAdminOperations } from "./admin-operations-e2e-fixtures";
 
 const CLUB_ID = "club-1";
 
@@ -29,6 +30,7 @@ async function json(route: Route, status: number, body: unknown): Promise<void> 
 }
 
 async function routePlatformAdminShell(page: Page): Promise<void> {
+  await routeEmptyAdminOperations(page);
   await page.route("**/api/bff/api/auth/me**", async (route) => {
     await json(route, 200, platformAdminAuth("OWNER"));
   });

@@ -80,7 +80,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(4)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(5)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -92,7 +92,7 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("46")
+            assertThat(latestVersion).isEqualTo("47")
             assertThat(
                 upgradeJdbc.queryForObject(
                     """
@@ -366,7 +366,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(2)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(3)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -378,7 +378,7 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("46")
+            assertThat(latestVersion).isEqualTo("47")
 
             listOf(AVATAR_FIXTURE_FIRST_CLUB_ID, avatarFixtureClubId(clubNumber = 2)).forEach { clubId ->
                 val assignments = integratedAvatarAssignmentsForClub(upgradeJdbc, clubId)
