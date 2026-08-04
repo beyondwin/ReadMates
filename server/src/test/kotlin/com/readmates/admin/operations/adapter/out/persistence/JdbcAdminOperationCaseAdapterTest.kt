@@ -265,6 +265,20 @@ class JdbcAdminOperationCaseAdapterTest(
     }
 
     @Test
+    fun `open count includes every active lifecycle state`() {
+        val observedAt = instant(hour = 5)
+        insertCase("00000000-0000-0000-0000-00000000c011", "count-open", observedAt, state = "OPEN")
+        insertCase("00000000-0000-0000-0000-00000000c012", "count-acknowledged", observedAt, state = "ACKNOWLEDGED")
+        insertCase("00000000-0000-0000-0000-00000000c013", "count-snoozed", observedAt, state = "SNOOZED")
+        insertCase("00000000-0000-0000-0000-00000000c014", "count-resolved", observedAt, state = "RESOLVED")
+
+        val counts = adapter.counts(UUID.fromString(ACTOR_ID))
+
+        assertThat(counts.open).isEqualTo(3)
+        assertThat(counts.snoozed).isEqualTo(1)
+    }
+
+    @Test
     fun `cursor order is severity then first observed then id`() {
         val early = instant(hour = 6)
         val later = early.plusHours(1)
@@ -619,19 +633,23 @@ class JdbcAdminOperationCaseAdapterTest(
         id: String,
         sourceKey: String,
         observedAt: OffsetDateTime,
+        state: String = "OPEN",
     ) {
         jdbcTemplate.update(
             """
             insert into admin_operation_cases (
               id, source_type, source_key, state, severity, safe_summary_code,
-              first_observed_at, last_observed_at, impact_count, detail_href
+              first_observed_at, last_observed_at, snoozed_until, resolved_at, impact_count, detail_href
             )
-            values (?, 'NOTIFICATION', ?, 'OPEN', 'WARNING', 'NOTIFICATION_DELIVERY_BACKLOG', ?, ?, 1, ?)
+            values (?, 'NOTIFICATION', ?, ?, 'WARNING', 'NOTIFICATION_DELIVERY_BACKLOG', ?, ?, ?, ?, 1, ?)
             """.trimIndent(),
             id,
             sourceKey,
+            state,
             observedAt.toLocalDateTime(),
             observedAt.toLocalDateTime(),
+            if (state == "SNOOZED") observedAt.plusHours(1).toLocalDateTime() else null,
+            if (state == "RESOLVED") observedAt.plusHours(1).toLocalDateTime() else null,
             "/admin/notifications/$sourceKey",
         )
     }

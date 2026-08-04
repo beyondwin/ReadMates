@@ -19,7 +19,10 @@ type Props = {
   detailLoading?: boolean;
   detailUnavailable?: boolean;
   permissionDenied?: boolean;
+  hasNextPage?: boolean;
+  loadingMore?: boolean;
   onSelectCase: (caseId: string) => void;
+  onLoadMore?: () => void;
 };
 
 export function AdminOperationMobileDetail({
@@ -29,7 +32,10 @@ export function AdminOperationMobileDetail({
   detailLoading = false,
   detailUnavailable = false,
   permissionDenied = false,
+  hasNextPage = false,
+  loadingMore = false,
   onSelectCase,
+  onLoadMore,
 }: Props) {
   const [detailCaseId, setDetailCaseId] = useState<string | null>(null);
   const listContainerRef = useRef<HTMLDivElement>(null);
@@ -92,6 +98,9 @@ export function AdminOperationMobileDetail({
           onSelectCase(caseId);
           setDetailCaseId(caseId);
         }}
+        hasNextPage={hasNextPage}
+        loadingMore={loadingMore}
+        onLoadMore={onLoadMore}
       />
     </div>
   );

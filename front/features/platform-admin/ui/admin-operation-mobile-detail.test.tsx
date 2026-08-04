@@ -61,11 +61,11 @@ function operationsView(
     selectionFellBack: false,
     sources: [],
     mobileSummary: {
-      open: `열림 ${items.length}건`,
+      open: `활성 ${items.length}건`,
       critical: "긴급 0건",
       assignedToMe: `내 담당 ${items.length}건`,
       snoozed: "보류 0건",
-      label: `열림 ${items.length}건 · 긴급 0건 · 내 담당 ${items.length}건 · 보류 0건`,
+      label: `활성 ${items.length}건 · 긴급 0건 · 내 담당 ${items.length}건 · 보류 0건`,
     },
     allSourcesAvailable: true,
     sourceStatusLabel: "전체 신호 정상",

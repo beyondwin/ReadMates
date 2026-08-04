@@ -35,7 +35,7 @@ export function AdminCommandStatus(props: AdminCommandStatusProps) {
     >
       <span className="admin-command-status__source">{props.sourceStatusLabel}</span>
       <Separator />
-      <span>{props.openCount}건 열림</span>
+      <span>{props.openCount}건 활성</span>
       <Separator />
       <span>{props.generatedAtLabel} 기준</span>
     </div>

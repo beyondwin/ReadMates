@@ -1,5 +1,6 @@
 package com.readmates.admin.operations.api
 
+import com.jayway.jsonpath.JsonPath
 import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
@@ -264,6 +265,51 @@ class PlatformAdminOperationsApiIntegrationTest(
     }
 
     @Test
+    fun `list reports every non-resolved case as open work`() {
+        seedCase(caseId = COUNT_OPEN_CASE_ID, sourceKey = "AI_JOB:$COUNT_OPEN_CASE_ID", version = 0)
+        seedCase(
+            caseId = COUNT_ACKNOWLEDGED_CASE_ID,
+            sourceKey = "AI_JOB:$COUNT_ACKNOWLEDGED_CASE_ID",
+            version = 0,
+            state = "ACKNOWLEDGED",
+        )
+        seedCase(
+            caseId = COUNT_SNOOZED_CASE_ID,
+            sourceKey = "AI_JOB:$COUNT_SNOOZED_CASE_ID",
+            version = 0,
+            state = "SNOOZED",
+        )
+        seedCase(
+            caseId = COUNT_RESOLVED_CASE_ID,
+            sourceKey = "AI_JOB:$COUNT_RESOLVED_CASE_ID",
+            version = 0,
+            state = "RESOLVED",
+        )
+        seedSourceFreshness()
+
+        val response =
+            mockMvc
+                .get("/api/admin/operations/cases") {
+                    header(BFF_SECRET_HEADER, BFF_SECRET)
+                    cookie(sessionCookieForUser(OWNER_USER_ID))
+                }.andExpect {
+                    status { isOk() }
+                }.andReturn()
+                .response
+                .contentAsString
+        val activeCount =
+            jdbcTemplate.queryForObject(
+                "select count(*) from admin_operation_cases where state <> 'RESOLVED'",
+                Int::class.java,
+            ) ?: -1
+
+        assertThat(JsonPath.read<Int>(response, "$.counts.open")).isEqualTo(activeCount)
+        assertThat(caseState(COUNT_ACKNOWLEDGED_CASE_ID)).isEqualTo("ACKNOWLEDGED")
+        assertThat(caseState(COUNT_SNOOZED_CASE_ID)).isEqualTo("SNOOZED")
+        assertThat(caseState(COUNT_RESOLVED_CASE_ID)).isEqualTo("RESOLVED")
+    }
+
+    @Test
     fun `stale mutation returns version conflict without writing an event`() {
         seedCase(caseId = VERSION_CASE_ID, sourceKey = "AI_JOB:$VERSION_CASE_ID", version = 2)
 
@@ -326,21 +372,25 @@ class PlatformAdminOperationsApiIntegrationTest(
         caseId: String,
         sourceKey: String,
         version: Long,
+        state: String = "OPEN",
     ) {
         jdbcTemplate.update(
             """
             insert into admin_operation_cases (
               id, source_type, source_key, club_id, state, severity, safe_summary_code,
               first_observed_at, last_observed_at, assignee_admin_id, reopen_count, version,
-              impact_count, detail_href
+              impact_count, detail_href, snoozed_until, resolved_at
             )
-            values (?, 'AI_JOB', ?, null, 'OPEN', 'CRITICAL', 'AI_JOB_STALE',
+            values (?, 'AI_JOB', ?, null, ?, 'CRITICAL', 'AI_JOB_STALE',
                     '2026-08-04 00:00:00.000000', '2026-08-04 00:05:00.000000', null, 0, ?, 1,
-                    '/admin/ai-ops')
+                    '/admin/ai-ops', ?, ?)
             """.trimIndent(),
             caseId,
             sourceKey,
+            state,
             version,
+            if (state == "SNOOZED") "2026-08-04 01:05:00.000000" else null,
+            if (state == "RESOLVED") "2026-08-04 01:05:00.000000" else null,
         )
     }
 
@@ -411,6 +461,10 @@ class PlatformAdminOperationsApiIntegrationTest(
         const val BFF_CASE_ID = "00000000-0000-0000-0000-00000000c616"
         const val AUTH_CASE_ID = "00000000-0000-0000-0000-00000000c617"
         const val CSRF_CASE_ID = "00000000-0000-0000-0000-00000000c618"
+        const val COUNT_OPEN_CASE_ID = "00000000-0000-0000-0000-00000000c621"
+        const val COUNT_ACKNOWLEDGED_CASE_ID = "00000000-0000-0000-0000-00000000c622"
+        const val COUNT_SNOOZED_CASE_ID = "00000000-0000-0000-0000-00000000c623"
+        const val COUNT_RESOLVED_CASE_ID = "00000000-0000-0000-0000-00000000c624"
         const val INTERNAL_SOURCE_SENTINEL = "AI_JOB:INTERNAL_SOURCE_SENTINEL"
     }
 }

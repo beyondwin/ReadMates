@@ -11,6 +11,7 @@ import type {
 import {
   adminOperationsKeys,
   platformAdminOperationCaseQuery,
+  platformAdminOperationCasePagesQuery,
   platformAdminOperationCasesQuery,
 } from "@/features/platform-admin/queries/platform-admin-operations-queries";
 import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
@@ -97,10 +98,24 @@ function seededClient(items = [operationCase()]) {
   });
   client.setQueryData(platformAdminOperationCasesQuery().queryKey, listResponse(items));
   client.setQueryData(platformAdminOperationCasesQuery({ states: ["OPEN"] }).queryKey, listResponse(items));
+  client.setQueryData(platformAdminOperationCasePagesQuery().queryKey, {
+    pages: [listResponse(items)],
+    pageParams: [null],
+  });
+  client.setQueryData(platformAdminOperationCasePagesQuery({ states: ["OPEN"] }).queryKey, {
+    pages: [listResponse(items)],
+    pageParams: [null],
+  });
   for (const item of items) {
     client.setQueryData(platformAdminOperationCaseQuery(item.id).queryKey, detailResponse(item));
   }
   return client;
+}
+
+function freshClient() {
+  return new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
+  });
 }
 
 function LocationProbe() {
@@ -187,6 +202,76 @@ describe("AdminTodayRoute", () => {
     expect(client.getQueryState(adminOperationsKeys.detail("case-notification"))?.fetchStatus).toBe("idle");
   });
 
+  it("never lets an older detail version overwrite a newer polled list lifecycle", async () => {
+    const user = userEvent.setup();
+    const currentListCase = operationCase({
+      state: "ACKNOWLEDGED",
+      version: 5,
+      allowedActions: ["SNOOZE", "RESOLVE"],
+    });
+    const staleDetailCase = operationCase({ state: "OPEN", version: 4 });
+    operationsApi.acknowledge.mockResolvedValue({
+      schema: "admin.operation_cases.v1",
+      ...currentListCase,
+      state: "ACKNOWLEDGED",
+      version: 6,
+    });
+    const client = seededClient([currentListCase]);
+    client.setQueryData(
+      platformAdminOperationCaseQuery(currentListCase.id).queryKey,
+      detailResponse(staleDetailCase),
+    );
+
+    renderRoute(client, "/admin/today?case=case-notification");
+
+    expect(await screen.findAllByText("현재 상태 · 확인됨")).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "확인 처리" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "4시간 보류", exact: true }));
+
+    await waitFor(() => {
+      expect(operationsApi.snooze).toHaveBeenCalledWith(
+        "case-notification",
+        5,
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+      );
+    });
+  });
+
+  it("loads cursor continuations into one queue while preserving filters and selection", async () => {
+    const user = userEvent.setup();
+    const first = operationCase({ id: "case-first", severity: "CRITICAL" });
+    const second = operationCase({ id: "case-second", severity: "WARNING" });
+    operationsApi.fetchList.mockImplementation(async (filter: { cursor?: string }) => {
+      if (filter.cursor === "cursor-page-2") return listResponse([second]);
+      return { ...listResponse([first]), nextCursor: "cursor-page-2" };
+    });
+    const client = freshClient();
+
+    renderRoute(client, "/admin/today?case=case-first&state=open&source=notification");
+
+    expect(await screen.findByRole("button", { name: /case-first|알림 전달 실패/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await user.click(screen.getByRole("button", { name: "운영 케이스 더 보기" }));
+
+    expect(await screen.findAllByRole("button", { name: /알림 전달 실패/ })).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "운영 케이스 더 보기" })).not.toBeInTheDocument();
+    expect(operationsApi.fetchList).toHaveBeenNthCalledWith(1, {
+      states: ["OPEN"],
+      sources: ["NOTIFICATION"],
+    });
+    expect(operationsApi.fetchList).toHaveBeenNthCalledWith(2, {
+      states: ["OPEN"],
+      sources: ["NOTIFICATION"],
+      cursor: "cursor-page-2",
+    });
+    expect(screen.getByLabelText("current location")).toHaveTextContent(
+      "/admin/today?case=case-first&state=open&source=notification",
+    );
+    expect(screen.getByRole("button", { name: /알림 전달 실패/, pressed: true })).toBeInTheDocument();
+  });
+
   it("explains an active signal without mislabeling it as a version conflict", async () => {
     const user = userEvent.setup();
     operationsApi.resolve.mockRejectedValue(
@@ -236,6 +321,10 @@ describe("AdminTodayRoute", () => {
     const response = { ...listResponse(), sources: [operationCase().source, unavailable] };
     const client = seededClient();
     client.setQueryData(platformAdminOperationCasesQuery().queryKey, response);
+    client.setQueryData(platformAdminOperationCasePagesQuery().queryKey, {
+      pages: [response],
+      pageParams: [null],
+    });
     operationsApi.fetchList.mockResolvedValue(response);
     renderRoute(client, "/admin/today?case=case-notification");
 

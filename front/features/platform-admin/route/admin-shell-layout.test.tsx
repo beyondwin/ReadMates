@@ -124,7 +124,7 @@ describe("AdminShellLayout", () => {
     const { container } = renderShell("/admin/today");
     expect(screen.getAllByText("OWNER").length).toBeGreaterThan(0);
     expect(container.querySelector(".admin-command-status")).toHaveTextContent(
-      "전체 신호 정상 · 8건 열림 · 19:00 기준",
+      "전체 신호 정상 · 8건 활성 · 19:00 기준",
     );
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(screen.getByText("Command")).toBeInTheDocument();

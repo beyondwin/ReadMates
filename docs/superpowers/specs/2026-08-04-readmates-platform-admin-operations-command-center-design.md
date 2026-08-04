@@ -526,7 +526,7 @@ corepack pnpm --dir front test:e2e
 
 필요한 운영 지표:
 
-- open case count by source/severity
+- active case count by source/severity (`RESOLVED`를 제외한 모든 lifecycle state)
 - source reconciliation success/failure
 - case age
 - acknowledge time

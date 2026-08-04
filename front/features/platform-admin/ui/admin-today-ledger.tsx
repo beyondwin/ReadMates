@@ -29,8 +29,11 @@ type Props = {
   detailUnavailable?: boolean;
   permissionDenied?: boolean;
   refreshing?: boolean;
+  hasNextPage?: boolean;
+  loadingMore?: boolean;
   onFilterChange: (key: keyof AdminTodayFilters, value: string) => void;
   onSelectCase: (caseId: string) => void;
+  onLoadMore?: () => void;
   onRetrySource?: (sourceType: AdminOperationsView["sources"][number]["sourceType"]) => void;
 };
 
@@ -43,8 +46,11 @@ export function AdminTodayLedger({
   detailUnavailable = false,
   permissionDenied = false,
   refreshing = false,
+  hasNextPage = false,
+  loadingMore = false,
   onFilterChange,
   onSelectCase,
+  onLoadMore,
   onRetrySource,
 }: Props) {
   const mobileLayout = useMobileOperationsLayout();
@@ -148,6 +154,9 @@ export function AdminTodayLedger({
           detailUnavailable={detailUnavailable}
           permissionDenied={permissionDenied}
           onSelectCase={onSelectCase}
+          hasNextPage={hasNextPage}
+          loadingMore={loadingMore}
+          onLoadMore={onLoadMore}
         />
       ) : (
         <div className="admin-today-ledger__columns">
@@ -155,6 +164,9 @@ export function AdminTodayLedger({
             items={view.items}
             selectedCaseId={view.selectedCaseId}
             onSelectCase={onSelectCase}
+            hasNextPage={hasNextPage}
+            loadingMore={loadingMore}
+            onLoadMore={onLoadMore}
           />
           <AdminOperationsInspector
             selectedCase={view.selectedCase}

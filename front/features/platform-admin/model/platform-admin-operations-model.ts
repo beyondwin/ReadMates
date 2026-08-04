@@ -258,7 +258,7 @@ function buildSourceFreshnessView(
 }
 
 function buildMobileSummary(response: AdminOperationCasesResponse): AdminOperationMobileSummary {
-  const open = `열림 ${response.counts.open}건`;
+  const open = `활성 ${response.counts.open}건`;
   const critical = `긴급 ${response.counts.critical}건`;
   const assignedToMe = `내 담당 ${response.counts.assignedToMe}건`;
   const snoozed = `보류 ${response.counts.snoozed}건`;

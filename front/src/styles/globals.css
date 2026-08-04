@@ -1835,6 +1835,11 @@ a.rm-recent-record__destination:hover {
   border-top: 1px solid var(--line);
 }
 
+.admin-operations-queue__more {
+  width: 100%;
+  margin-top: 14px;
+}
+
 .admin-operations-queue__row {
   display: grid;
   gap: 9px;

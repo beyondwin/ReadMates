@@ -4,9 +4,19 @@ type Props = {
   items: readonly AdminOperationCaseView[];
   selectedCaseId: string | null;
   onSelectCase: (caseId: string) => void;
+  hasNextPage?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
 };
 
-export function AdminOperationsQueue({ items, selectedCaseId, onSelectCase }: Props) {
+export function AdminOperationsQueue({
+  items,
+  selectedCaseId,
+  onSelectCase,
+  hasNextPage = false,
+  loadingMore = false,
+  onLoadMore,
+}: Props) {
   return (
     <section className="admin-operations-queue" aria-label="운영 케이스 큐">
       <div className="admin-operations-queue__header">
@@ -41,6 +51,16 @@ export function AdminOperationsQueue({ items, selectedCaseId, onSelectCase }: Pr
               </span>
             </button>
           ))}
+          {hasNextPage && onLoadMore ? (
+            <button
+              type="button"
+              className="btn btn-secondary admin-operations-queue__more admin-operation-control--touch"
+              disabled={loadingMore}
+              onClick={onLoadMore}
+            >
+              {loadingMore ? "다음 케이스를 불러오는 중" : "운영 케이스 더 보기"}
+            </button>
+          ) : null}
         </div>
       )}
     </section>

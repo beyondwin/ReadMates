@@ -942,7 +942,7 @@ Assert:
 
 - nav groups are `Command`, `Operations`, `Review` with Korean item labels;
 - active route keeps `aria-current=page`;
-- status says `전체 신호 정상 · 8건 열림 · HH:mm 기준` when all sources are available;
+- status says `전체 신호 정상 · 8건 활성 · HH:mm 기준` when all sources are available; `counts.open` means every non-`RESOLVED` lifecycle state;
 - partial source says `일부 신호 확인 불가` with `role=status`;
 - command status contains no four-card metric strip;
 - workspace switcher, skip link, role badge, and new-club action still work.

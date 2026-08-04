@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import type {
+  AdminOperationCase,
   AdminOperationCaseFilter,
+  AdminOperationCasesResponse,
   AdminOperationCaseState,
   AdminOperationSeverity,
   AdminOperationSourceType,
@@ -15,7 +17,7 @@ import {
 import {
   adminOperationsKeys,
   platformAdminOperationCaseQuery,
-  platformAdminOperationCasesQuery,
+  platformAdminOperationCasePagesQuery,
   useAcknowledgeAdminOperationCaseMutation,
   useResolveAdminOperationCaseMutation,
   useSnoozeAdminOperationCaseMutation,
@@ -33,10 +35,14 @@ export function AdminTodayRoute() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const searchState = useMemo(() => parseAdminOperationsSearch(searchParams), [searchParams]);
-  const listQuery = useQuery(platformAdminOperationCasesQuery(searchState.filter, { active: true }));
+  const listQuery = useInfiniteQuery(platformAdminOperationCasePagesQuery(searchState.filter, { active: true }));
+  const listResponse = useMemo(
+    () => combineCasePages(listQuery.data?.pages ?? []),
+    [listQuery.data?.pages],
+  );
   const listView = useMemo(
-    () => listQuery.data ? buildAdminOperationsView(listQuery.data, searchState.caseId) : null,
-    [listQuery.data, searchState.caseId],
+    () => listResponse ? buildAdminOperationsView(listResponse, searchState.caseId) : null,
+    [listResponse, searchState.caseId],
   );
   const selectedCaseId = listView?.selectedCaseId ?? null;
   const detailQuery = useQuery({
@@ -50,13 +56,32 @@ export function AdminTodayRoute() {
   const [mutationPermissionDenied, setMutationPermissionDenied] = useState(false);
 
   const view = useMemo(() => {
-    if (!listQuery.data || !listView) return null;
+    if (!listResponse || !listView) return null;
     if (!detailQuery.data || detailQuery.data.item.id !== listView.selectedCaseId) return listView;
+    const listedCase = listResponse.items.find((item) => item.id === detailQuery.data.item.id);
+    const selectedItem = listedCase && listedCase.version > detailQuery.data.item.version
+      ? listedCase
+      : detailQuery.data.item;
     return buildAdminOperationsView(
-      { ...listQuery.data, items: listQuery.data.items.map((item) => item.id === detailQuery.data.item.id ? detailQuery.data.item : item) },
-      detailQuery.data.item.id,
+      { ...listResponse, items: listResponse.items.map((item) => item.id === selectedItem.id ? selectedItem : item) },
+      selectedItem.id,
     );
-  }, [detailQuery.data, listQuery.data, listView]);
+  }, [detailQuery.data, listResponse, listView]);
+
+  const detailBehindList = Boolean(
+    detailQuery.data &&
+    view?.selectedCase &&
+    detailQuery.data.item.id === view.selectedCase.id &&
+    detailQuery.data.item.version < view.selectedCase.version,
+  );
+
+  useEffect(() => {
+    if (!detailBehindList || !selectedCaseId) return;
+    void queryClient.refetchQueries({
+      queryKey: adminOperationsKeys.detail(selectedCaseId),
+      exact: true,
+    });
+  }, [detailBehindList, detailQuery.data?.item.version, queryClient, selectedCaseId, view?.selectedCase?.version]);
 
   useEffect(() => {
     if (!view || view.selectedCaseId === searchState.caseId) return;
@@ -84,9 +109,7 @@ export function AdminTodayRoute() {
     );
   }
 
-  const currentCase = detailQuery.data?.item.id === view.selectedCaseId
-    ? detailQuery.data.item
-    : view.selectedCase;
+  const currentCase = view.selectedCase;
   const pending = detailQuery.isPending || acknowledgeMutation.isPending || snoozeMutation.isPending || resolveMutation.isPending;
 
   async function runMutation(operation: () => Promise<unknown>) {
@@ -159,9 +182,9 @@ export function AdminTodayRoute() {
     <AdminTodayLedger
       view={view}
       filters={filtersFrom(searchState.filter)}
-      history={detailQuery.data?.item.id === view.selectedCaseId ? detailQuery.data.history : []}
+      history={!detailBehindList && detailQuery.data?.item.id === view.selectedCaseId ? detailQuery.data.history : []}
       lifecycleControls={lifecycleControls}
-      detailLoading={detailQuery.isPending}
+      detailLoading={detailQuery.isPending || detailBehindList}
       detailUnavailable={detailQuery.isError && !permissionDenied}
       permissionDenied={permissionDenied}
       refreshing={listQuery.isFetching && !listQuery.isPending}
@@ -170,11 +193,33 @@ export function AdminTodayRoute() {
         setActionMessage(null);
         setSearchParams(serializeAdminOperationsSearch({ caseId, filter: searchState.filter }));
       }}
+      hasNextPage={listQuery.hasNextPage}
+      loadingMore={listQuery.isFetchingNextPage}
+      onLoadMore={() => {
+        void listQuery.fetchNextPage();
+      }}
       onRetrySource={() => {
         void listQuery.refetch();
       }}
     />
   );
+}
+
+function combineCasePages(pages: readonly AdminOperationCasesResponse[]): AdminOperationCasesResponse | null {
+  const firstPage = pages[0];
+  if (!firstPage) return null;
+  const cases = new Map<string, AdminOperationCase>();
+  for (const page of pages) {
+    for (const item of page.items) {
+      const current = cases.get(item.id);
+      if (!current || item.version > current.version) cases.set(item.id, item);
+    }
+  }
+  return {
+    ...firstPage,
+    items: [...cases.values()],
+    nextCursor: pages.at(-1)?.nextCursor ?? null,
+  };
 }
 
 function filtersFrom(filter: AdminOperationCaseFilter): AdminTodayFilters {

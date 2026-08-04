@@ -233,11 +233,11 @@ describe("platform admin operations model", () => {
     );
 
     expect(view.mobileSummary).toEqual({
-      open: "열림 2건",
+      open: "활성 2건",
       critical: "긴급 1건",
       assignedToMe: "내 담당 1건",
       snoozed: "보류 1건",
-      label: "열림 2건 · 긴급 1건 · 내 담당 1건 · 보류 1건",
+      label: "활성 2건 · 긴급 1건 · 내 담당 1건 · 보류 1건",
     });
     expect(view.sources.map(({ sourceType, message, canRetry }) => ({ sourceType, message, canRetry }))).toEqual([
       { sourceType: "NOTIFICATION", message: "정상 · 19:00 기준", canRetry: false },

@@ -15,11 +15,11 @@ const emptyView: AdminOperationsView = {
   selectionFellBack: false,
   sources: [],
   mobileSummary: {
-    open: "열림 0건",
+    open: "활성 0건",
     critical: "긴급 0건",
     assignedToMe: "내 담당 0건",
     snoozed: "보류 0건",
-    label: "열림 0건 · 긴급 0건 · 내 담당 0건 · 보류 0건",
+    label: "활성 0건 · 긴급 0건 · 내 담당 0건 · 보류 0건",
   },
   allSourcesAvailable: true,
   sourceStatusLabel: "전체 신호 정상",
@@ -46,7 +46,7 @@ describe("AdminTodayLedger", () => {
     );
 
     expect(screen.getByRole("heading", { name: "오늘의 운영 케이스" })).toBeInTheDocument();
-    expect(screen.getByLabelText("운영 케이스 요약")).toHaveTextContent("열림 0건 · 긴급 0건 · 내 담당 0건");
+    expect(screen.getByLabelText("운영 케이스 요약")).toHaveTextContent("활성 0건 · 긴급 0건 · 내 담당 0건");
     expect(screen.getByRole("combobox", { name: "상태 필터" })).toBeInTheDocument();
     expect(screen.getByText("현재 조건에 맞는 운영 케이스가 없습니다.")).toBeInTheDocument();
     expect(container.querySelector(".admin-today-ledger__columns")).toBeInTheDocument();

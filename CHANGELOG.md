@@ -12,7 +12,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Changed
 
-- **운영 케이스 lifecycle과 권한:** case는 `OPEN`, `ACKNOWLEDGED`, `SNOOZED`, `RESOLVED` 상태와 optimistic version, immutable event history를 가집니다. OWNER와 OPERATOR만 acknowledge·최대 7일 snooze·resolve 검증을 실행하고 SUPPORT는 safe projection만 읽습니다. Resolve는 exact source identity가 authoritative하게 사라진 경우에만 성공하며 active·부분 조회·source unavailable은 fail closed합니다.
+- **운영 케이스 lifecycle과 권한:** case는 `OPEN`, `ACKNOWLEDGED`, `SNOOZED`, `RESOLVED` 상태와 optimistic version, immutable event history를 가집니다. 운영 화면의 활성 건수는 `RESOLVED`를 제외한 모든 상태를 포함합니다. OWNER와 OPERATOR만 acknowledge·최대 7일 snooze·resolve 검증을 실행하고 SUPPORT는 safe projection만 읽습니다. Resolve는 exact source identity가 authoritative하게 사라진 경우에만 성공하며 active·부분 조회·source unavailable은 fail closed합니다.
 - **운영 shell과 안전 경계:** admin 탐색을 Command·Operations·Review 업무 그룹과 compact source status로 정리했습니다. Case API는 allowlist summary, aggregate impact, freshness와 canonical detail link만 제공하며 기존 club publication, notification replay, AI recovery, support grant mutation route를 변경하지 않고 범용 execute endpoint도 추가하지 않습니다.
 
 ### Database

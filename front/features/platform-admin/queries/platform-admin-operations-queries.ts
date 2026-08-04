@@ -1,4 +1,4 @@
-import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
+import { infiniteQueryOptions, queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   acknowledgeAdminOperationCase,
   fetchAdminOperationCase,
@@ -53,6 +53,8 @@ export const adminOperationsKeys = {
   lists: () => [...adminOperationsKeys.cases(), "list"] as const,
   list: (filter: AdminOperationCaseFilter = {}) =>
     [...adminOperationsKeys.lists(), normalizeFilter(filter)] as const,
+  pages: (filter: AdminOperationCaseFilter = {}) =>
+    [...adminOperationsKeys.lists(), "pages", normalizeFilter(filter)] as const,
   details: () => [...adminOperationsKeys.cases(), "detail"] as const,
   detail: (caseId: string) => [...adminOperationsKeys.details(), caseId] as const,
 } as const;
@@ -65,6 +67,24 @@ export function platformAdminOperationCasesQuery(
   return queryOptions({
     queryKey: adminOperationsKeys.list(filter),
     queryFn: () => fetchAdminOperationCases(filter),
+    refetchInterval: () => (active && documentIsVisible() ? OPERATIONS_POLL_INTERVAL_MS : false),
+    refetchIntervalInBackground: false,
+  });
+}
+
+export function platformAdminOperationCasePagesQuery(
+  filter: AdminOperationCaseFilter = {},
+  polling: OperationsPolling = {},
+) {
+  const active = polling.active ?? false;
+  return infiniteQueryOptions({
+    queryKey: adminOperationsKeys.pages(filter),
+    queryFn: ({ pageParam }) => fetchAdminOperationCases({
+      ...filter,
+      ...(pageParam ? { cursor: pageParam } : {}),
+    }),
+    initialPageParam: filter.cursor ?? null as string | null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     refetchInterval: () => (active && documentIsVisible() ? OPERATIONS_POLL_INTERVAL_MS : false),
     refetchIntervalInBackground: false,
   });

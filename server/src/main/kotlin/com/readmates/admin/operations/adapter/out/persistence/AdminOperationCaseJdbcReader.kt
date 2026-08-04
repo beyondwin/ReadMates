@@ -63,7 +63,7 @@ internal class AdminOperationCaseJdbcReader(
             jdbcTemplate.queryForObject(
                 """
                 select
-                  sum(case when state = 'OPEN' then 1 else 0 end) as open_count,
+                  sum(case when state <> 'RESOLVED' then 1 else 0 end) as open_count,
                   sum(case when state <> 'RESOLVED' and severity = 'CRITICAL' then 1 else 0 end) as critical_count,
                   sum(case when state <> 'RESOLVED' and assignee_admin_id = ? then 1 else 0 end) as assigned_count,
                   sum(case when state = 'SNOOZED' then 1 else 0 end) as snoozed_count

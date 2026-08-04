@@ -14,7 +14,7 @@ describe("AdminCommandStatus", () => {
     );
 
     expect(container.querySelector(".admin-command-status")).toHaveTextContent(
-      "전체 신호 정상 · 8건 열림 · 19:05 기준",
+      "전체 신호 정상 · 8건 활성 · 19:05 기준",
     );
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(container.querySelectorAll("a")).toHaveLength(0);
@@ -31,7 +31,7 @@ describe("AdminCommandStatus", () => {
     );
 
     expect(screen.getByRole("status")).toHaveTextContent(
-      "일부 신호 확인 불가 · 3건 열림 · 19:05 기준",
+      "일부 신호 확인 불가 · 3건 활성 · 19:05 기준",
     );
   });
 
