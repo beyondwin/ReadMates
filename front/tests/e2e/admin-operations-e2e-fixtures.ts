@@ -3,6 +3,12 @@ import type { Page, Route } from "@playwright/test";
 const GENERATED_AT = "2026-08-04T00:00:00Z";
 
 async function fulfillEmptyOperations(route: Route): Promise<void> {
+  const request = route.request();
+  if (request.method() !== "GET" || new URL(request.url()).pathname !== "/api/bff/api/admin/operations/cases") {
+    await route.fallback();
+    return;
+  }
+
   await route.fulfill({
     status: 200,
     contentType: "application/json",
