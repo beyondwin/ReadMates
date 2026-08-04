@@ -17,6 +17,7 @@ type Props = {
   lifecycleControls: ReactNode;
   detailLoading?: boolean;
   detailUnavailable?: boolean;
+  permissionDenied?: boolean;
 };
 
 const HISTORY_LABELS: Record<string, string> = {
@@ -61,6 +62,7 @@ export function AdminOperationsInspector({
   lifecycleControls,
   detailLoading = false,
   detailUnavailable = false,
+  permissionDenied = false,
 }: Props) {
   if (!selectedCase) {
     return (
@@ -82,11 +84,12 @@ export function AdminOperationsInspector({
     <section className="admin-operations-inspector" aria-label="운영 케이스 상세">
       <header className="admin-operations-inspector__header">
         <div className="admin-operations-inspector__state-line">
-          <span>{selectedCase.severityLabel}</span>
-          <span>{selectedCase.stateLabel}</span>
+          <span>심각도 · {selectedCase.severityLabel}</span>
+          <span>현재 상태 · {selectedCase.stateLabel}</span>
+          {selectedCase.reopenCount > 0 ? <span>해결 후 재개방 {selectedCase.reopenCount}회</span> : null}
         </div>
-        <h2 className="h2">{selectedCase.summary.title}</h2>
-        <p>{selectedCase.summary.description}</p>
+        <h2 className="h2 admin-operation-wrap">{selectedCase.summary.title}</h2>
+        <p className="admin-operation-wrap">{selectedCase.summary.description}</p>
       </header>
 
       <dl className="admin-operations-inspector__facts">
@@ -106,19 +109,27 @@ export function AdminOperationsInspector({
           <dt>최초 관측</dt>
           <dd>{selectedCase.ageLabel}</dd>
         </div>
+        <div>
+          <dt>케이스 식별자</dt>
+          <dd><code className="admin-operation-wrap">{selectedCase.id}</code></dd>
+        </div>
       </dl>
 
-      <Link className="btn btn-primary admin-operations-inspector__detail-link" to={selectedCase.detailHref}>
+      <Link className="btn btn-primary admin-operations-inspector__detail-link admin-operation-control--touch" to={selectedCase.detailHref}>
         {SOURCE_DETAIL_LABELS[selectedCase.sourceType] ?? "운영 상세에서 확인"}
       </Link>
 
       <div className="admin-operations-inspector__lifecycle" aria-label="케이스 상태 관리">
         <h3 className="h3">상태 관리</h3>
         {detailLoading ? <p role="status">최신 상태를 확인하고 있습니다.</p> : null}
-        {detailUnavailable ? (
+        {detailUnavailable && !permissionDenied ? (
           <p role="alert">상세 이력을 불러오지 못했습니다. 목록 정보는 계속 확인할 수 있습니다.</p>
         ) : null}
-        {lifecycleControls ?? (
+        {permissionDenied ? (
+          <p className="admin-operations-inspector__permission" role="alert">
+            상태 변경 권한이 더 이상 유효하지 않습니다. 새로고침 후 권한을 확인해 주세요.
+          </p>
+        ) : lifecycleControls ?? (
           <p className="admin-operations-inspector__permission">
             현재 역할은 상태 변경 없이 운영 근거만 확인할 수 있습니다.
           </p>

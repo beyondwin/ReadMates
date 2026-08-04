@@ -47,6 +47,7 @@ export function AdminTodayRoute() {
   const snoozeMutation = useSnoozeAdminOperationCaseMutation();
   const resolveMutation = useResolveAdminOperationCaseMutation();
   const [actionMessage, setActionMessage] = useState<AdminOperationActionMessage | null>(null);
+  const [mutationPermissionDenied, setMutationPermissionDenied] = useState(false);
 
   const view = useMemo(() => {
     if (!listQuery.data || !listView) return null;
@@ -70,11 +71,14 @@ export function AdminTodayRoute() {
   }
 
   if (listQuery.isError || !view) {
+    const permissionDenied = hasHttpStatus(listQuery.error, 403);
     return (
       <section className="admin-today-ledger" aria-labelledby="admin-today-title">
         <h1 id="admin-today-title" className="h1 editorial">오늘의 운영 케이스</h1>
         <p className="admin-today-ledger__error" role="alert">
-          운영 케이스를 불러오지 못했습니다. 잠시 뒤 다시 시도해 주세요.
+          {permissionDenied
+            ? "현재 역할로 운영 케이스를 확인할 수 없습니다. 권한을 확인해 주세요."
+            : "운영 케이스를 불러오지 못했습니다. 잠시 뒤 다시 시도해 주세요."}
         </p>
       </section>
     );
@@ -91,6 +95,10 @@ export function AdminTodayRoute() {
       await operation();
       setActionMessage({ kind: "success", text: "케이스 상태를 반영했습니다." });
     } catch (error) {
+      if (hasHttpStatus(error, 403)) {
+        setMutationPermissionDenied(true);
+        return;
+      }
       if (hasAdminOperationErrorCode(error, "CASE_VERSION_CONFLICT")) {
         setActionMessage({ kind: "conflict", text: "최신 상태 확인이 필요합니다." });
         if (selectedCaseId) {
@@ -125,7 +133,8 @@ export function AdminTodayRoute() {
     setSearchParams(serializeAdminOperationsSearch({ caseId: view.selectedCaseId, filter }));
   }
 
-  const lifecycleControls = currentCase && currentCase.allowedActions.length > 0 ? (
+  const permissionDenied = mutationPermissionDenied || hasHttpStatus(detailQuery.error, 403);
+  const lifecycleControls = !permissionDenied && currentCase && currentCase.allowedActions.length > 0 ? (
     <AdminOperationStateActions
       allowedActions={currentCase.allowedActions}
       pending={pending}
@@ -153,12 +162,16 @@ export function AdminTodayRoute() {
       history={detailQuery.data?.item.id === view.selectedCaseId ? detailQuery.data.history : []}
       lifecycleControls={lifecycleControls}
       detailLoading={detailQuery.isPending}
-      detailUnavailable={detailQuery.isError}
+      detailUnavailable={detailQuery.isError && !permissionDenied}
+      permissionDenied={permissionDenied}
       refreshing={listQuery.isFetching && !listQuery.isPending}
       onFilterChange={changeFilter}
       onSelectCase={(caseId) => {
         setActionMessage(null);
         setSearchParams(serializeAdminOperationsSearch({ caseId, filter: searchState.filter }));
+      }}
+      onRetrySource={() => {
+        void listQuery.refetch();
       }}
     />
   );
@@ -182,4 +195,8 @@ function hasAdminOperationErrorCode(error: unknown, code: string): boolean {
     "code" in error &&
     error.code === code
   );
+}
+
+function hasHttpStatus(error: unknown, status: number): boolean {
+  return typeof error === "object" && error !== null && "status" in error && error.status === status;
 }

@@ -17,6 +17,7 @@ import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-c
 import { AdminTodayRoute } from "./admin-today-route";
 
 const operationsApi = vi.hoisted(() => ({
+  fetchList: vi.fn(),
   acknowledge: vi.fn(),
   snooze: vi.fn(),
   resolve: vi.fn(),
@@ -25,6 +26,7 @@ const operationsApi = vi.hoisted(() => ({
 
 vi.mock("@/features/platform-admin/api/platform-admin-operations-api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/features/platform-admin/api/platform-admin-operations-api")>()),
+  fetchAdminOperationCases: operationsApi.fetchList,
   acknowledgeAdminOperationCase: operationsApi.acknowledge,
   snoozeAdminOperationCase: operationsApi.snooze,
   resolveAdminOperationCase: operationsApi.resolve,
@@ -125,6 +127,7 @@ function renderRoute(client: QueryClient, initialEntry = "/admin/today") {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  operationsApi.fetchList.mockResolvedValue(listResponse());
   operationsApi.fetchDetail.mockResolvedValue(detailResponse());
 });
 
@@ -219,5 +222,69 @@ describe("AdminTodayRoute", () => {
       );
       expect(filter).toHaveValue("");
     });
+  });
+
+  it("retries an unavailable source through the list query without running a lifecycle mutation", async () => {
+    const user = userEvent.setup();
+    const unavailable = {
+      ...operationCase().source,
+      sourceType: "AI_JOB" as const,
+      status: "UNAVAILABLE" as const,
+      lastSuccessfulAt: "2026-08-04T09:20:00Z",
+      authoritative: false,
+    };
+    const response = { ...listResponse(), sources: [operationCase().source, unavailable] };
+    const client = seededClient();
+    client.setQueryData(platformAdminOperationCasesQuery().queryKey, response);
+    operationsApi.fetchList.mockResolvedValue(response);
+    renderRoute(client, "/admin/today?case=case-notification");
+
+    await user.click(await screen.findByRole("button", { name: "AI 작업 다시 확인" }));
+
+    await waitFor(() => expect(operationsApi.fetchList).toHaveBeenCalledTimes(1));
+    expect(operationsApi.acknowledge).not.toHaveBeenCalled();
+    expect(operationsApi.snooze).not.toHaveBeenCalled();
+    expect(operationsApi.resolve).not.toHaveBeenCalled();
+  });
+
+  it("replaces the command surface with a safe alert when list access is denied", async () => {
+    operationsApi.fetchList.mockRejectedValue(
+      Object.assign(new Error("forbidden"), { status: 403, code: "FORBIDDEN" }),
+    );
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    renderRoute(client);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "현재 역할로 운영 케이스를 확인할 수 없습니다. 권한을 확인해 주세요.",
+    );
+    expect(screen.queryByRole("region", { name: "운영 케이스 큐" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "확인 처리" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "해결 확인" })).not.toBeInTheDocument();
+  });
+
+  it("removes stale lifecycle actions when a mutation is denied", async () => {
+    const user = userEvent.setup();
+    operationsApi.acknowledge.mockRejectedValue(
+      Object.assign(new Error("forbidden"), { status: 403, code: "FORBIDDEN" }),
+    );
+    renderRoute(seededClient(), "/admin/today?case=case-notification");
+
+    await user.click(await screen.findByRole("button", { name: "확인 처리" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "상태 변경 권한이 더 이상 유효하지 않습니다. 새로고침 후 권한을 확인해 주세요.",
+    );
+    expect(screen.queryByRole("button", { name: "확인 처리" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "해결 확인" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /알림 전달 실패/ }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "상태 변경 권한이 더 이상 유효하지 않습니다. 새로고침 후 권한을 확인해 주세요.",
+    );
+    expect(screen.queryByRole("button", { name: "확인 처리" })).not.toBeInTheDocument();
   });
 });

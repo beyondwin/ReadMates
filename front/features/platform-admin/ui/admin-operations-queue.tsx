@@ -21,17 +21,20 @@ export function AdminOperationsQueue({ items, selectedCaseId, onSelectCase }: Pr
           {items.map((item) => (
             <button
               type="button"
-              className="admin-operations-queue__row"
+              className="admin-operations-queue__row admin-operation-control--touch"
               data-severity={item.severity.toLowerCase()}
+              data-scroll-marker={item.id === selectedCaseId ? "selected" : undefined}
               key={item.id}
               aria-pressed={item.id === selectedCaseId}
+              aria-current={item.id === selectedCaseId ? "true" : undefined}
               onClick={() => onSelectCase(item.id)}
             >
               <span className="admin-operations-queue__headline">
-                <strong>{item.summary.title}</strong>
+                <strong className="admin-operation-wrap">{item.summary.title}</strong>
                 <span className="admin-operations-queue__severity">{item.severityLabel}</span>
               </span>
               <span className="admin-operations-queue__context">
+                <span>현재 상태 · {item.stateLabel}</span>
                 <span>{item.sourceLabel}</span>
                 <span>{item.impactLabel}</span>
                 <span>{item.ageLabel}</span>
