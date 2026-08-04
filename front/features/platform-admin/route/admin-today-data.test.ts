@@ -1,61 +1,38 @@
 import { QueryClient } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  platformAdminClubsQuery,
-  platformAdminSummaryQuery,
-  platformAdminTodayClosingRisksQuery,
-} from "@/features/platform-admin/queries/platform-admin-queries";
 import { adminTodayLoaderFactory } from "./admin-today-data";
 
-const api = vi.hoisted(() => ({
-  fetchCapabilities: vi.fn(),
-  fetchAiSummary: vi.fn(),
-  fetchAiJobs: vi.fn(),
-}));
+const operationsApi = vi.hoisted(() => ({ fetchCases: vi.fn() }));
 
-vi.mock("@/features/platform-admin/api/platform-admin-api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/features/platform-admin/api/platform-admin-api")>()),
-  fetchPlatformAdminAiGenerationCapabilities: api.fetchCapabilities,
-  fetchPlatformAdminAiOpsSummary: api.fetchAiSummary,
-  fetchPlatformAdminAiOpsJobs: api.fetchAiJobs,
+vi.mock("@/features/platform-admin/api/platform-admin-operations-api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/platform-admin/api/platform-admin-operations-api")>()),
+  fetchAdminOperationCases: operationsApi.fetchCases,
 }));
-
-function seededClient() {
-  const client = new QueryClient({
-    defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
-  });
-  client.setQueryData(platformAdminSummaryQuery().queryKey, {
-    platformRole: "OWNER",
-    activeClubCount: 0,
-    domainActionRequiredCount: 0,
-    domains: [],
-    domainsRequiringAction: [],
-  });
-  client.setQueryData(platformAdminClubsQuery().queryKey, { items: [] });
-  client.setQueryData(platformAdminTodayClosingRisksQuery().queryKey, {
-    schema: "admin.today_closing_risks.v1",
-    generatedAt: "2026-08-01T00:00:00Z",
-    items: [],
-  });
-  return client;
-}
 
 beforeEach(() => {
-  api.fetchCapabilities.mockReset();
-  api.fetchAiSummary.mockReset();
-  api.fetchAiJobs.mockReset();
+  vi.clearAllMocks();
+  operationsApi.fetchCases.mockResolvedValue({
+    schema: "admin.operation_cases.v1",
+    generatedAt: "2026-08-04T10:00:00Z",
+    counts: { open: 0, critical: 0, assignedToMe: 0, snoozed: 0 },
+    sources: [],
+    items: [],
+    nextCursor: null,
+  });
 });
 
 describe("adminTodayLoaderFactory", () => {
-  it("does not request disabled AI Ops summary or jobs", async () => {
-    api.fetchCapabilities.mockResolvedValue({ enabled: false });
-    api.fetchAiSummary.mockResolvedValue({});
-    api.fetchAiJobs.mockResolvedValue({ items: [], nextCursor: null });
+  it("prefetches only the operation case list for the parsed URL filter", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
-    await adminTodayLoaderFactory(seededClient())();
+    await adminTodayLoaderFactory(client)({
+      request: new Request("https://readmates.example/admin/today?state=open&source=notification&unknown=raw"),
+    } as never);
 
-    expect(api.fetchCapabilities).toHaveBeenCalledOnce();
-    expect(api.fetchAiSummary).not.toHaveBeenCalled();
-    expect(api.fetchAiJobs).not.toHaveBeenCalled();
+    expect(operationsApi.fetchCases).toHaveBeenCalledOnce();
+    expect(operationsApi.fetchCases).toHaveBeenCalledWith({
+      states: ["OPEN"],
+      sources: ["NOTIFICATION"],
+    });
   });
 });

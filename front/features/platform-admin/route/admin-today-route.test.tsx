@@ -1,174 +1,223 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter } from "react-router";
-import { describe, expect, it } from "vitest";
+import { MemoryRouter, useLocation, useNavigate } from "react-router";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type {
+  AdminOperationCase,
+  AdminOperationCaseDetailResponse,
+  AdminOperationCasesResponse,
+} from "@/features/platform-admin/api/platform-admin-operations-contracts";
 import {
-  platformAdminAiGenerationCapabilitiesQuery,
-  platformAdminAiOpsJobsQuery,
-  platformAdminAiOpsSummaryQuery,
-} from "@/features/platform-admin/queries/platform-admin-ai-ops-queries";
-import { platformAdminNotificationSnapshotQuery } from "@/features/platform-admin/queries/platform-admin-notifications-queries";
-import {
-  platformAdminClubsQuery,
-  platformAdminKeys,
-  platformAdminSummaryQuery,
-  platformAdminTodayClosingRisksQuery,
-} from "@/features/platform-admin/queries/platform-admin-queries";
+  adminOperationsKeys,
+  platformAdminOperationCaseQuery,
+  platformAdminOperationCasesQuery,
+} from "@/features/platform-admin/queries/platform-admin-operations-queries";
 import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
 import { AdminTodayRoute } from "./admin-today-route";
+
+const operationsApi = vi.hoisted(() => ({
+  acknowledge: vi.fn(),
+  snooze: vi.fn(),
+  resolve: vi.fn(),
+  fetchDetail: vi.fn(),
+}));
+
+vi.mock("@/features/platform-admin/api/platform-admin-operations-api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/platform-admin/api/platform-admin-operations-api")>()),
+  acknowledgeAdminOperationCase: operationsApi.acknowledge,
+  snoozeAdminOperationCase: operationsApi.snooze,
+  resolveAdminOperationCase: operationsApi.resolve,
+  fetchAdminOperationCase: operationsApi.fetchDetail,
+}));
+
+const generatedAt = "2026-08-04T10:00:00Z";
+
+function operationCase(overrides: Partial<AdminOperationCase> = {}): AdminOperationCase {
+  const sourceType = overrides.sourceType ?? "NOTIFICATION";
+  return {
+    id: "case-notification",
+    sourceType,
+    clubId: null,
+    state: "OPEN",
+    severity: "WARNING",
+    summaryCode: "NOTIFICATION_DELIVERY_FAILURE",
+    firstObservedAt: "2026-08-04T08:00:00Z",
+    lastObservedAt: "2026-08-04T09:55:00Z",
+    snoozedUntil: null,
+    resolvedAt: null,
+    assignedToMe: true,
+    reopenCount: 0,
+    version: 3,
+    impactCount: 2,
+    detailHref: "/admin/notifications?focus=delivery",
+    allowedActions: ["ACKNOWLEDGE", "SNOOZE", "RESOLVE"],
+    source: {
+      sourceType,
+      status: "AVAILABLE",
+      generatedAt,
+      lastSuccessfulAt: generatedAt,
+      authoritative: true,
+    },
+    ...overrides,
+  };
+}
+
+function listResponse(items = [operationCase()]): AdminOperationCasesResponse {
+  return {
+    schema: "admin.operation_cases.v1",
+    generatedAt,
+    counts: { open: items.filter((item) => item.state !== "RESOLVED").length, critical: 0, assignedToMe: 1, snoozed: 0 },
+    sources: [operationCase().source],
+    items,
+    nextCursor: null,
+  };
+}
+
+function detailResponse(item = operationCase()): AdminOperationCaseDetailResponse {
+  return {
+    schema: "admin.operation_cases.v1",
+    item,
+    history: [{
+      fromState: null,
+      toState: "OPEN",
+      action: null,
+      reasonCode: "SIGNAL_OPENED",
+      occurredAt: "2026-08-04T08:00:00Z",
+      caseVersion: 1,
+    }],
+  };
+}
+
+function seededClient(items = [operationCase()]) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
+  });
+  client.setQueryData(platformAdminOperationCasesQuery().queryKey, listResponse(items));
+  client.setQueryData(platformAdminOperationCasesQuery({ states: ["OPEN"] }).queryKey, listResponse(items));
+  for (const item of items) {
+    client.setQueryData(platformAdminOperationCaseQuery(item.id).queryKey, detailResponse(item));
+  }
+  return client;
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  return (
+    <>
+      <output aria-label="current location">{location.pathname}{location.search}</output>
+      <button type="button" onClick={() => navigate(-1)}>뒤로</button>
+    </>
+  );
+}
 
 function renderRoute(client: QueryClient, initialEntry = "/admin/today") {
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[initialEntry]}>
         <AdminTodayRoute />
+        <LocationProbe />
       </MemoryRouter>
     </QueryClientProvider>,
   );
 }
 
-function seededClient() {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  queryClient.setQueryData(platformAdminSummaryQuery().queryKey, {
-    platformRole: "OWNER",
-    activeClubCount: 1,
-    domainActionRequiredCount: 0,
-    domains: [],
-    domainsRequiringAction: [],
-  });
-  queryClient.setQueryData(platformAdminClubsQuery().queryKey, {
-    items: [{
-      clubId: "club-ready",
-      slug: "ready-club",
-      name: "Ready Club",
-      tagline: "함께 읽는 클럽",
-      about: "공개 소개가 입력되어 있습니다.",
-      status: "ACTIVE",
-      publicVisibility: "PRIVATE",
-      domainCount: 0,
-      domainActionRequiredCount: 0,
-      notificationFailureCount: 0,
-      aiFailureCount: 0,
-      firstHostOnboardingState: "ASSIGNED",
-    }],
-  });
-  queryClient.setQueryData(platformAdminNotificationSnapshotQuery().queryKey, {
-    generatedAt: "2026-05-27T00:00:00Z",
-    outboxSummary: { pending: 0, active: 0, failed: 0, dead: 0, sentOrPublishedLast24h: 1 },
-    deliverySummary: { pending: 0, active: 0, failed: 0, dead: 0, sentOrPublishedLast24h: 1 },
-    relaySummary: { publishing: 0, sending: 0, stalePublishing: 0, staleSending: 0 },
-    failureClusters: [],
-    clubHealth: [],
-    recentManualDispatches: [],
-  });
-  queryClient.setQueryData(platformAdminAiGenerationCapabilitiesQuery().queryKey, { enabled: true });
-  queryClient.setQueryData(platformAdminAiOpsSummaryQuery().queryKey, {
-    activeJobCount: 0,
-    failedLast24h: 0,
-    monthToDateCostEstimateUsd: "0.0000",
-    failureCodes: [],
-    providerCosts: [],
-    staleCandidateCount: 0,
-  });
-  queryClient.setQueryData(platformAdminAiOpsJobsQuery().queryKey, { items: [], nextCursor: null });
-  queryClient.setQueryData(platformAdminTodayClosingRisksQuery().queryKey, {
-    schema: "admin.today_closing_risks.v1",
-    generatedAt: "2026-06-20T00:00:00Z",
-    items: [{
-      clubId: "club-ready",
-      clubSlug: "ready-club",
-      clubName: "Ready Club",
-      sessionId: "session-risk-1",
-      sessionNumber: 12,
-      bookTitle: "모던 자바스크립트",
-      meetingDate: "2026-06-20",
-      overallState: "BLOCKED",
-      primaryBlocker: "PRIVATE_SENTINEL_TOKEN",
-      hostClosingHref: "/clubs/ready-club/app/host/sessions/session-risk-1/closing",
-      firstDetectedAt: "2026-06-18T00:00:00Z",
-      lastSeenAt: "2026-06-21T00:00:00Z",
-      resolvedAt: null,
-      ageDays: 3,
-      occurrenceCount: 2,
-      ledgerState: "ACTIVE",
-    }],
-  });
-  return queryClient;
-}
+beforeEach(() => {
+  vi.clearAllMocks();
+  operationsApi.fetchDetail.mockResolvedValue(detailResponse());
+});
 
 describe("AdminTodayRoute", () => {
-  it("renders the operations ledger from seeded admin queries", () => {
-    const { container } = renderRoute(seededClient(), "/admin/today?selected=club-club-ready");
+  it("restores a seeded case selection and renders the queue and inspector", async () => {
+    const { container } = renderRoute(seededClient(), "/admin/today?case=case-notification");
 
-    expect(screen.getByRole("heading", { name: "오늘 할 일" })).toBeInTheDocument();
-    expect(screen.getAllByRole("heading").length).toBeGreaterThan(0);
+    expect(await screen.findByRole("heading", { name: "오늘의 운영 케이스" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "운영 케이스 큐" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "운영 케이스 상세" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ })).toHaveAttribute("aria-pressed", "true");
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
-    expect(screen.getByRole("region", { name: "운영 작업 큐" })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "선택 항목 브리프" })).toBeInTheDocument();
-    expect(screen.getAllByText("Ready Club").length).toBeGreaterThan(0);
   });
 
-  it("renders seeded closing-risk query data without leaking raw blocker codes", () => {
-    renderRoute(seededClient(), "/admin/today?selected=closing-risk-session-risk-1");
+  it("preserves a visible selected case when a filter changes", async () => {
+    const user = userEvent.setup();
+    renderRoute(seededClient(), "/admin/today?case=case-notification");
 
-    expect(screen.getByRole("region", { name: "운영 작업 큐" })).toBeInTheDocument();
-    expect(screen.getAllByText(/모던 자바스크립트/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("호스트 클로징 보드").length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/3일째 차단/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/반복 2회/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("확인 필요").length).toBeGreaterThan(0);
-    expect(screen.queryByText("PRIVATE_SENTINEL_TOKEN")).not.toBeInTheDocument();
-  });
+    await user.selectOptions(await screen.findByRole("combobox", { name: "상태 필터" }), "open");
 
-  it("renders a partial warning when the optional closing-risk query is unavailable", () => {
-    const client = seededClient();
-    client.setQueryData(platformAdminTodayClosingRisksQuery().queryKey, {
-      schema: "admin.today_closing_risks.v1",
-      generatedAt: "2026-06-20T00:00:00Z",
-      items: [],
+    await waitFor(() => {
+      expect(screen.getByLabelText("current location")).toHaveTextContent(
+        "/admin/today?case=case-notification&state=open",
+      );
     });
-    client.setQueryData(platformAdminKeys.todayClosingRisksUnavailable(), true);
-
-    renderRoute(client);
-
-    expect(screen.getByRole("button", { name: /클로징 리스크/ })).toBeInTheDocument();
-    expect(screen.getByText("오늘 클로징 리스크 큐를 확인하지 못했습니다.")).toBeInTheDocument();
-    expect(screen.getByText("클로징 확인 불가")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ })).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("renders notification risk from the notification snapshot", () => {
+  it("does not expose lifecycle mutation buttons to support", async () => {
+    renderRoute(
+      seededClient([operationCase({ allowedActions: [] })]),
+      "/admin/today?case=case-notification",
+    );
+
+    expect(await screen.findByText("현재 역할은 상태 변경 없이 운영 근거만 확인할 수 있습니다.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "확인 처리" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "해결 확인" })).not.toBeInTheDocument();
+  });
+
+  it("recovers from a 409 by announcing refresh-required copy and refetching detail", async () => {
+    const user = userEvent.setup();
+    operationsApi.acknowledge.mockRejectedValue(
+      Object.assign(new Error("다른 운영자가 먼저 상태를 변경했습니다."), {
+        status: 409,
+        code: "CASE_VERSION_CONFLICT",
+      }),
+    );
     const client = seededClient();
-    client.setQueryData(platformAdminNotificationSnapshotQuery().queryKey, {
-      generatedAt: "2026-05-27T00:00:00Z",
-      outboxSummary: { pending: 0, active: 0, failed: 1, dead: 0, sentOrPublishedLast24h: 1 },
-      deliverySummary: { pending: 0, active: 0, failed: 0, dead: 1, sentOrPublishedLast24h: 1 },
-      relaySummary: { publishing: 0, sending: 0, stalePublishing: 0, staleSending: 0 },
-      failureClusters: [],
-      clubHealth: [{
-        clubId: "club-ready",
-        slug: "ready-club",
-        name: "Ready Club",
-        pending: 0,
-        failed: 1,
-        dead: 1,
-        lastSuccessAt: null,
-      }],
-      recentManualDispatches: [],
+    renderRoute(client, "/admin/today?case=case-notification");
+
+    await user.click(await screen.findByRole("button", { name: "확인 처리" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "최신 상태를 다시 불러왔습니다. 내용을 확인한 뒤 다시 시도해 주세요.",
+    );
+    await waitFor(() => expect(operationsApi.fetchDetail).toHaveBeenCalledWith("case-notification"));
+    expect(client.getQueryState(adminOperationsKeys.detail("case-notification"))?.fetchStatus).toBe("idle");
+  });
+
+  it("explains an active signal without mislabeling it as a version conflict", async () => {
+    const user = userEvent.setup();
+    operationsApi.resolve.mockRejectedValue(
+      Object.assign(new Error("현재 신호가 여전히 활성 상태입니다."), {
+        status: 409,
+        code: "CASE_STILL_ACTIVE",
+      }),
+    );
+    renderRoute(seededClient(), "/admin/today?case=case-notification");
+
+    await user.click(await screen.findByRole("button", { name: "해결 확인" }));
+    await user.click(screen.getByRole("button", { name: "신호 재검증 후 해결" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "신호가 아직 활성 상태입니다. 운영 상세에서 원인을 해소한 뒤 다시 확인해 주세요.",
+    );
+    expect(operationsApi.fetchDetail).not.toHaveBeenCalled();
+  });
+
+  it("restores user-selected filters through browser history", async () => {
+    const user = userEvent.setup();
+    renderRoute(seededClient(), "/admin/today?case=case-notification");
+
+    const filter = await screen.findByRole("combobox", { name: "상태 필터" });
+    await user.selectOptions(filter, "open");
+    await waitFor(() => expect(filter).toHaveValue("open"));
+
+    await user.click(screen.getByRole("button", { name: "뒤로" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("current location")).toHaveTextContent(
+        "/admin/today?case=case-notification",
+      );
+      expect(filter).toHaveValue("");
     });
-
-    renderRoute(client);
-
-    expect(screen.getAllByText("Ready Club").length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/알림 실패 1건/).length).toBeGreaterThan(0);
-  });
-
-  it("renders AI disabled state from the capability query", () => {
-    const client = seededClient();
-    client.setQueryData(platformAdminAiGenerationCapabilitiesQuery().queryKey, { enabled: false });
-
-    renderRoute(client);
-
-    expect(screen.getByText("AI generation이 비활성 상태입니다.")).toBeInTheDocument();
-    expect(screen.getByText("AI 비활성")).toBeInTheDocument();
   });
 });

@@ -1,56 +1,146 @@
-import type { PlatformAdminWorkbenchView } from "@/features/platform-admin/model/platform-admin-workbench-model";
-import { AdminSelectedBrief } from "@/features/platform-admin/ui/admin-selected-brief";
-import { AdminWorkQueue } from "@/features/platform-admin/ui/admin-work-queue";
+import type { ReactNode } from "react";
+import type { AdminOperationsView } from "@/features/platform-admin/model/platform-admin-operations-model";
+import { AdminOperationsInspector } from "./admin-operations-inspector";
+import { AdminOperationsQueue } from "./admin-operations-queue";
+
+export type AdminTodayFilters = {
+  state: string;
+  severity: string;
+  source: string;
+  assignee: string;
+};
+
+type HistoryEvent = {
+  fromState: string | null;
+  toState: string;
+  action: string | null;
+  reasonCode: string;
+  occurredAt: string;
+  caseVersion: number;
+};
 
 type Props = {
-  workbench: PlatformAdminWorkbenchView;
-  selectedItemId: string | null;
-  filterLabel?: string | null;
-  onClearFilter?: () => void;
-  onSelectItem: (itemId: string) => void;
+  view: AdminOperationsView;
+  filters: AdminTodayFilters;
+  history: readonly HistoryEvent[];
+  lifecycleControls: ReactNode;
+  detailLoading?: boolean;
+  detailUnavailable?: boolean;
+  refreshing?: boolean;
+  onFilterChange: (key: keyof AdminTodayFilters, value: string) => void;
+  onSelectCase: (caseId: string) => void;
 };
 
 export function AdminTodayLedger({
-  workbench,
-  selectedItemId,
-  filterLabel = null,
-  onClearFilter,
-  onSelectItem,
+  view,
+  filters,
+  history,
+  lifecycleControls,
+  detailLoading = false,
+  detailUnavailable = false,
+  refreshing = false,
+  onFilterChange,
+  onSelectCase,
 }: Props) {
-  const activeItemId = workbench.selectedBrief?.item.id ?? selectedItemId;
-
   return (
     <section className="admin-today-ledger" aria-labelledby="admin-today-title">
       <header className="admin-today-ledger__header">
         <div>
-          <p className="eyebrow">Platform operations</p>
-          <h1 id="admin-today-title" className="h1 editorial">오늘 할 일</h1>
+          <h1 id="admin-today-title" className="h1 editorial">오늘의 운영 케이스</h1>
           <p className="admin-today-ledger__lede">
-            공개 준비, 도메인 조치, 알림 실패, AI 작업 이상을 오늘 처리할 순서로 정리합니다.
+            감지된 운영 신호를 영향과 최신성에 따라 확인하고 상태를 기록합니다.
           </p>
         </div>
-        <div className="admin-today-ledger__metrics" aria-label="오늘 운영 요약">
-          <span>조치 필요 {workbench.metrics.needsActionCount}</span>
-          <span>공개 준비 {workbench.metrics.publishReadyCount}</span>
-          <span>운영 경고 {workbench.metrics.operationsWarningCount}</span>
-        </div>
+        <p className="admin-today-ledger__summary" aria-label="운영 케이스 요약">
+          {view.mobileSummary.open} · {view.mobileSummary.critical} · {view.mobileSummary.assignedToMe}
+        </p>
       </header>
 
-      {filterLabel ? (
-        <p className="admin-today-ledger__filter">
-          필터: {filterLabel}
-          {onClearFilter ? (
-            <button type="button" onClick={onClearFilter}>
-              해제
-            </button>
-          ) : null}
-        </p>
-      ) : null}
+      <div className="admin-today-ledger__toolbar" aria-label="운영 케이스 필터">
+        <FilterSelect
+          label="상태 필터"
+          value={filters.state}
+          onChange={(value) => onFilterChange("state", value)}
+          options={[
+            ["", "모든 상태"],
+            ["open", "미확인"],
+            ["acknowledged", "확인됨"],
+            ["snoozed", "보류됨"],
+            ["resolved", "해결됨"],
+          ]}
+        />
+        <FilterSelect
+          label="심각도 필터"
+          value={filters.severity}
+          onChange={(value) => onFilterChange("severity", value)}
+          options={[
+            ["", "모든 심각도"],
+            ["critical", "긴급"],
+            ["warning", "경고"],
+            ["ready", "준비"],
+            ["info", "정보"],
+          ]}
+        />
+        <FilterSelect
+          label="Source 필터"
+          value={filters.source}
+          onChange={(value) => onFilterChange("source", value)}
+          options={[
+            ["", "모든 source"],
+            ["club_readiness", "클럽 준비"],
+            ["notification", "알림"],
+            ["ai_job", "AI 작업"],
+            ["closing_risk", "회차 마감"],
+          ]}
+        />
+        <label className="admin-today-ledger__assignee">
+          <input
+            type="checkbox"
+            checked={filters.assignee === "me"}
+            onChange={(event) => onFilterChange("assignee", event.target.checked ? "me" : "")}
+          />
+          내 담당만
+        </label>
+        {refreshing ? <span className="admin-today-ledger__refresh" role="status">새 신호 확인 중</span> : null}
+      </div>
 
       <div className="admin-today-ledger__columns">
-        <AdminWorkQueue items={workbench.queueItems} selectedItemId={activeItemId} onSelectItem={onSelectItem} />
-        <AdminSelectedBrief brief={workbench.selectedBrief} />
+        <AdminOperationsQueue
+          items={view.items}
+          selectedCaseId={view.selectedCaseId}
+          onSelectCase={onSelectCase}
+        />
+        <AdminOperationsInspector
+          selectedCase={view.selectedCase}
+          history={history}
+          lifecycleControls={lifecycleControls}
+          detailLoading={detailLoading}
+          detailUnavailable={detailUnavailable}
+        />
       </div>
     </section>
+  );
+}
+
+function FilterSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: ReadonlyArray<readonly [string, string]>;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="admin-today-ledger__filter">
+      <span>{label}</span>
+      <select aria-label={label} value={value} onChange={(event) => onChange(event.target.value)}>
+        {options.map(([optionValue, optionLabel]) => (
+          <option value={optionValue} key={optionValue || "all"}>{optionLabel}</option>
+        ))}
+      </select>
+    </label>
   );
 }
