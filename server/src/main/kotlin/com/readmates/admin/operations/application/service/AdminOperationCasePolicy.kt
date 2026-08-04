@@ -1,6 +1,7 @@
 package com.readmates.admin.operations.application.service
 
 import com.readmates.admin.operations.application.AdminOperationError.INVALID_SNOOZE_WINDOW
+import com.readmates.admin.operations.application.AdminOperationError.INVALID_REASON_CODE
 import com.readmates.admin.operations.application.AdminOperationException
 import com.readmates.admin.operations.application.model.AdminOperationAction
 import com.readmates.admin.operations.application.model.AdminOperationCaseState
@@ -39,7 +40,22 @@ class AdminOperationCasePolicy {
         }
     }
 
+    fun validateReasonCode(reasonCode: String) {
+        if (reasonCode !in ALLOWED_REASON_CODES) {
+            throw AdminOperationException(INVALID_REASON_CODE)
+        }
+    }
+
     private companion object {
         const val MAX_SNOOZE_DAYS = 7L
+        val ALLOWED_REASON_CODES =
+            setOf(
+                "OPERATOR_ACKNOWLEDGED",
+                "OPERATOR_SNOOZED",
+                "OPERATOR_RESOLVED",
+                "SIGNAL_OPENED",
+                "SIGNAL_REOPENED",
+                "SIGNAL_CLEARED",
+            )
     }
 }
