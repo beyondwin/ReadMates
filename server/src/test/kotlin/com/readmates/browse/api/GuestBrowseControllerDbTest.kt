@@ -490,6 +490,57 @@ class GuestBrowseControllerDbTest(
     }
 
     @Test
+    fun `guest notes feed scopes records and cursor pages to the selected session`() {
+        val firstPage =
+            mockMvc
+                .get("/api/public/clubs/guest-test/browse/notes/feed") {
+                    param("sessionId", PUBLISHED_ID)
+                    param("limit", "1")
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.items.length()") { value(1) }
+                    jsonPath("$.items[*].sessionId") { value(hasItem(PUBLISHED_ID)) }
+                    jsonPath("$.nextCursor") { isString() }
+                }.andReturn()
+                .response
+        val cursor = objectMapper.readTree(firstPage.contentAsString).get("nextCursor").asText()
+
+        mockMvc
+            .get("/api/public/clubs/guest-test/browse/notes/feed") {
+                param("sessionId", PUBLISHED_ID)
+                param("limit", "20")
+                param("cursor", cursor)
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items[*].sessionId") { value(hasItem(PUBLISHED_ID)) }
+                jsonPath("$.items[*].text") { value(not(hasItem(ARCHIVE_QUESTION))) }
+                jsonPath("$.nextCursor") { value(null) }
+            }
+    }
+
+    @Test
+    fun `guest notes feed rejects malformed session ids and hides unavailable sessions`() {
+        mockMvc
+            .get("/api/public/clubs/guest-test/browse/notes/feed") {
+                param("sessionId", "not-a-uuid")
+            }.andExpect {
+                status { isBadRequest() }
+                jsonPath("$.code") { value("INVALID_REQUEST") }
+            }
+
+        listOf(OPEN_ID, CLOSED_ID, DRAFT_ID, OUTSIDE_DRAFT_ID, HOST_ONLY_CLOSED_ID).forEach { sessionId ->
+            mockMvc
+                .get("/api/public/clubs/guest-test/browse/notes/feed") {
+                    param("sessionId", sessionId)
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.items.length()") { value(0) }
+                    jsonPath("$.nextCursor") { value(null) }
+                }
+        }
+    }
+
+    @Test
     fun `guest notes feed composite cursor preserves mixed kind order without duplicates`() {
         val seen = mutableListOf<String>()
         var cursor: String? = null

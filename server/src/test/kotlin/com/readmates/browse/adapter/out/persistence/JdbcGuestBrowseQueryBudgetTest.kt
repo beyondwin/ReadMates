@@ -79,7 +79,7 @@ class JdbcGuestBrowseQueryBudgetTest(
     @Test
     fun `guest note and archive lists use one query independent of fixture size`() {
         val smallNoteSessions = measured { recordAdapter.loadNoteSessions(CLUB_SLUG, null, 21) }
-        val smallFeed = measured { recordAdapter.loadNotesFeed(CLUB_SLUG, null, 51) }
+        val smallFeed = measured { recordAdapter.loadNotesFeed(CLUB_SLUG, null, null, 51) }
         val smallArchive = measured { recordAdapter.loadArchiveSessions(CLUB_SLUG, null, 21) }
 
         (1..40).forEach { index ->
@@ -89,7 +89,7 @@ class JdbcGuestBrowseQueryBudgetTest(
         seedContent(1..100)
 
         val largeNoteSessions = measured { recordAdapter.loadNoteSessions(CLUB_SLUG, null, 21) }
-        val largeFeed = measured { recordAdapter.loadNotesFeed(CLUB_SLUG, null, 51) }
+        val largeFeed = measured { recordAdapter.loadNotesFeed(CLUB_SLUG, null, null, 51) }
         val largeArchive = measured { recordAdapter.loadArchiveSessions(CLUB_SLUG, null, 21) }
 
         listOf(smallNoteSessions.queryCount, smallFeed.queryCount, smallArchive.queryCount).forEach {
