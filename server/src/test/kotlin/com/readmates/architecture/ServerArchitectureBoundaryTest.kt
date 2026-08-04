@@ -5,6 +5,7 @@ import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.core.importer.ImportOption
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -111,6 +112,12 @@ private val serverSlices =
             applicationPackages = listOf("com.readmates.admin.health.application.."),
         ),
         ServerSlice(
+            name = "admin.operations",
+            type = ServerSliceType.WORKFLOW,
+            webAdapterPackages = listOf("com.readmates.admin.operations.adapter.in.web.."),
+            applicationPackages = listOf("com.readmates.admin.operations.application.."),
+        ),
+        ServerSlice(
             name = "observability",
             type = ServerSliceType.OPS_READ,
             webAdapterPackages = listOf("com.readmates.observability.adapter.in.web.."),
@@ -153,6 +160,37 @@ private val migratedWebAdapterPackages =
 
 @Tag("architecture")
 class ServerArchitectureBoundaryTest {
+    @Test
+    fun `admin operations is registered as workflow slice`() {
+        val adminOperations = serverSlices.single { slice -> slice.name == "admin.operations" }
+
+        assertEquals(ServerSliceType.WORKFLOW, adminOperations.type)
+        assertEquals(
+            listOf("com.readmates.admin.operations.adapter.in.web.."),
+            adminOperations.webAdapterPackages,
+        )
+        assertEquals(
+            listOf("com.readmates.admin.operations.application.."),
+            adminOperations.applicationPackages,
+        )
+    }
+
+    @Test
+    fun `admin operations application does not depend on adapters jdbc or spring web`() {
+        noClasses()
+            .that()
+            .resideInAnyPackage("com.readmates.admin.operations.application..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage(
+                "..adapter..",
+                "org.springframework.jdbc..",
+                "org.springframework.dao..",
+                "org.springframework.http..",
+                "org.springframework.web..",
+            ).check(importedClasses)
+    }
+
     @Test
     fun `server architecture registry includes recent workflow and migrated slices`() {
         val registered = serverSlices.map(ServerSlice::name).toSet()
