@@ -29,7 +29,7 @@ function findDescriptor(routePath: string): AdminRouteDescriptor | null {
 
 function buildParts(descriptor: AdminRouteDescriptor, extra?: string | null): string[] {
   const parts: string[] = [];
-  if (descriptor.group !== "today" || descriptor.path !== "today") {
+  if (descriptor.path !== "today") {
     parts.push(descriptor.groupLabel);
   }
   parts.push(descriptor.label === "오늘" ? "오늘 할 일" : descriptor.label);

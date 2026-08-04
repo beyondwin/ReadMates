@@ -6,18 +6,28 @@ import type {
   PlatformAdminClubListResponse,
   PlatformAdminSummaryResponse,
 } from "@/features/platform-admin/model/platform-admin-domain-types";
+import type { AdminOperationCasesResponse } from "@/features/platform-admin/api/platform-admin-operations-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import {
   platformAdminClubsQuery,
   platformAdminSummaryQuery,
 } from "@/features/platform-admin/queries/platform-admin-queries";
+import { platformAdminOperationCasesQuery } from "@/features/platform-admin/queries/platform-admin-operations-queries";
 import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
 
 vi.mock("@/shared/auth/session-api", () => ({
   logoutCurrentSession: vi.fn(),
 }));
 
+vi.mock("@/features/platform-admin/api/platform-admin-operations-api", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("@/features/platform-admin/api/platform-admin-operations-api")
+  >()),
+  fetchAdminOperationCases: vi.fn(),
+}));
+
 import { logoutCurrentSession } from "@/shared/auth/session-api";
+import { fetchAdminOperationCases } from "@/features/platform-admin/api/platform-admin-operations-api";
 import { AdminShellLayout } from "./admin-shell-layout";
 
 const summary: PlatformAdminSummaryResponse = {
@@ -28,6 +38,23 @@ const summary: PlatformAdminSummaryResponse = {
 };
 
 const clubs: PlatformAdminClubListResponse = { items: [] };
+
+const operations: AdminOperationCasesResponse = {
+  schema: "admin.operation_cases.v1",
+  generatedAt: "2026-08-04T10:00:00Z",
+  counts: { open: 8, critical: 1, assignedToMe: 2, snoozed: 1 },
+  sources: [
+    {
+      sourceType: "NOTIFICATION",
+      status: "AVAILABLE",
+      generatedAt: "2026-08-04T10:00:00Z",
+      lastSuccessfulAt: "2026-08-04T10:00:00Z",
+      authoritative: true,
+    },
+  ],
+  items: [],
+  nextCursor: null,
+};
 
 const auth = {
   authenticated: true,
@@ -56,10 +83,19 @@ const auth = {
   recommendedAppEntryUrl: "/admin",
 } satisfies AuthMeResponse;
 
-function renderShell(initialEntry: string, opts: { auth?: typeof auth | null } = {}) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function renderShell(
+  initialEntry: string,
+  opts: { auth?: typeof auth | null; operations?: AdminOperationCasesResponse } = {},
+) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
+  });
   queryClient.setQueryData(platformAdminSummaryQuery().queryKey, summary);
   queryClient.setQueryData(platformAdminClubsQuery().queryKey, clubs);
+  queryClient.setQueryData(
+    platformAdminOperationCasesQuery().queryKey,
+    opts.operations ?? operations,
+  );
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initialEntry]}>
@@ -77,22 +113,65 @@ function renderShell(initialEntry: string, opts: { auth?: typeof auth | null } =
 describe("AdminShellLayout", () => {
   beforeEach(() => {
     vi.mocked(logoutCurrentSession).mockReset();
+    vi.mocked(fetchAdminOperationCases).mockReset();
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("renders status strip, leftnav, and breadcrumb", () => {
-    renderShell("/admin/today");
+  it("renders the command status, ledger navigation, and breadcrumb", () => {
+    const { container } = renderShell("/admin/today");
     expect(screen.getAllByText("OWNER").length).toBeGreaterThan(0);
-    expect(screen.getByText("오늘/헬스")).toBeInTheDocument();
+    expect(container.querySelector(".admin-command-status")).toHaveTextContent(
+      "전체 신호 정상 · 8건 열림 · 19:00 기준",
+    );
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.getByText("Command")).toBeInTheDocument();
     expect(screen.getByText("today content")).toBeInTheDocument();
+    expect(screen.queryByText("조치 필요 클럽")).not.toBeInTheDocument();
+    expect(screen.queryByText("공개 준비")).not.toBeInTheDocument();
+    expect(screen.queryByText("도메인 조치")).not.toBeInTheDocument();
+  });
+
+  it("preserves the shell and route content when an operations summary is unavailable", async () => {
+    vi.mocked(fetchAdminOperationCases).mockRejectedValue(new Error("operations unavailable"));
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    queryClient.setQueryData(platformAdminSummaryQuery().queryKey, summary);
+    queryClient.setQueryData(platformAdminClubsQuery().queryKey, clubs);
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/admin/today"]}>
+          <Routes>
+            <Route path="/admin/*" element={<AdminShellLayout auth={auth} />}>
+              <Route path="today" element={<div>today content</div>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("today content")).toBeInTheDocument();
+    expect(screen.getByText("Command")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "운영 신호 확인 불가 · 잠시 후 다시 확인",
+      );
+    });
   });
 
   it("renders the new-club button for OWNER role", () => {
     renderShell("/admin/today");
     expect(screen.getByRole("link", { name: /새 클럽/ })).toBeInTheDocument();
+  });
+
+  it("keeps the operating wordmark and role badge", () => {
+    renderShell("/admin/today");
+    expect(screen.getByText("ReadMates · 운영")).toBeInTheDocument();
+    expect(screen.getByText("OWNER", { selector: ".admin-shell__role-badge" })).toBeInTheDocument();
   });
 
   it("shows the onboarding modal when ?onboarding=1 is present", () => {

@@ -10,18 +10,23 @@ import {
   platformAdminClubsQuery,
   platformAdminSummaryQuery,
 } from "@/features/platform-admin/queries/platform-admin-queries";
+import { platformAdminOperationCasesQuery } from "@/features/platform-admin/queries/platform-admin-operations-queries";
 import { canDo } from "@/features/platform-admin/model/platform-admin-permissions";
-import { deriveStripMetrics } from "@/features/platform-admin/model/admin-status-strip-model";
+import { buildAdminOperationsView } from "@/features/platform-admin/model/platform-admin-operations-model";
 import { AdminBreadcrumb } from "@/features/platform-admin/ui/admin-breadcrumb";
+import {
+  AdminCommandStatus,
+  type AdminCommandStatusProps,
+} from "@/features/platform-admin/ui/admin-command-status";
 import { AdminLayoutNav } from "@/features/platform-admin/ui/admin-layout-nav";
 import { AdminOnboardingModal } from "@/features/platform-admin/ui/admin-onboarding-modal";
-import { AdminStatusStrip } from "@/features/platform-admin/ui/admin-status-strip";
 import { AdminWorkspaceSwitcher } from "@/features/platform-admin/ui/admin-workspace-switcher";
 import { PlatformAdminOnboardingWizard } from "@/features/platform-admin/ui/platform-admin-onboarding-wizard";
 import {
   commitPlatformAdminOnboarding,
   previewPlatformAdminOnboarding,
 } from "@/features/platform-admin/api/platform-admin-api";
+import type { AdminOperationCasesResponse } from "@/features/platform-admin/api/platform-admin-operations-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { logoutCurrentSession } from "@/shared/auth/session-api";
 import { AdminBreadcrumbProvider } from "./admin-breadcrumb-context";
@@ -37,7 +42,8 @@ export function AdminShellLayout({ auth = null }: { auth?: AuthMeResponse | null
 
 function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
   const summaryQuery = useQuery(platformAdminSummaryQuery());
-  const clubsQuery = useQuery(platformAdminClubsQuery());
+  useQuery(platformAdminClubsQuery());
+  const operationsQuery = useQuery(platformAdminOperationCasesQuery({}, { active: true }));
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -48,18 +54,11 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
   const otherAccountLoginPath = adminOtherAccountLoginPath(location.pathname, location.search, location.hash);
 
   const summary = summaryQuery.data;
-  const clubs = clubsQuery.data;
   const role = summary?.platformRole ?? "SUPPORT";
-  const stripError = summaryQuery.isError || clubsQuery.isError;
-  const stripMetrics =
-    summary && clubs
-      ? deriveStripMetrics(summary, clubs)
-      : {
-          platformRole: role,
-          setupRequiredCount: 0,
-          readyToPublishCount: 0,
-          domainActionRequiredCount: 0,
-        };
+  const commandStatus = deriveCommandStatus(
+    operationsQuery.data,
+    operationsQuery.isError,
+  );
 
   const routePath = derivePathSegment(location.pathname);
   const onboardingOpen = searchParams.get("onboarding") === "1" && canDo(role, "create_club");
@@ -89,7 +88,7 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
         본문으로 건너뛰기
       </a>
       <header className="admin-shell__header">
-        <span className="admin-shell__wordmark">ReadMates Admin</span>
+        <span className="admin-shell__wordmark">ReadMates · 운영</span>
         <AdminBreadcrumb routePath={routePath} extra={extra} />
         <div className="admin-shell__header-actions">
           {canDo(role, "create_club") ? (
@@ -111,7 +110,7 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
           />
         </div>
       </header>
-      <AdminStatusStrip metrics={stripMetrics} error={stripError} />
+      <AdminCommandStatus {...commandStatus} />
       <div className="admin-shell__body">
         <aside className="admin-shell__nav">
           <AdminLayoutNav role={role} ariaLabel="Admin 콘솔" />
@@ -135,6 +134,21 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
       ) : null}
     </div>
   );
+}
+
+function deriveCommandStatus(
+  operations: AdminOperationCasesResponse | undefined,
+  isError: boolean,
+): AdminCommandStatusProps {
+  if (isError) return { state: "unavailable" };
+  if (!operations) return { state: "loading" };
+  const view = buildAdminOperationsView(operations, null);
+  return {
+    state: "ready",
+    sourceStatusLabel: view.sourceStatusLabel,
+    openCount: operations.counts.open,
+    generatedAtLabel: view.generatedAtLabel,
+  };
 }
 
 function focusAdminMain(event: MouseEvent<HTMLAnchorElement>) {

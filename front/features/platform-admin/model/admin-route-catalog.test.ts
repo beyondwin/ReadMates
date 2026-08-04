@@ -34,6 +34,26 @@ describe("ADMIN_ROUTES catalog", () => {
     }
   });
 
+  it("groups the operating ledger by command operations and review work", () => {
+    expect(
+      ADMIN_ROUTES.map(({ path, label, group, groupLabel }) => ({
+        path,
+        label,
+        group,
+        groupLabel,
+      })),
+    ).toEqual([
+      { path: "today", label: "오늘", group: "command", groupLabel: "Command" },
+      { path: "clubs", label: "클럽", group: "command", groupLabel: "Command" },
+      { path: "health", label: "사건", group: "operations", groupLabel: "Operations" },
+      { path: "notifications", label: "알림", group: "operations", groupLabel: "Operations" },
+      { path: "ai-ops", label: "AI 작업", group: "operations", groupLabel: "Operations" },
+      { path: "support", label: "지원", group: "operations", groupLabel: "Operations" },
+      { path: "audit", label: "감사", group: "review", groupLabel: "Review" },
+      { path: "analytics", label: "분석", group: "review", groupLabel: "Review" },
+    ]);
+  });
+
   it("requires comingSoon block when status is coming_soon", () => {
     for (const route of ADMIN_ROUTES) {
       if (route.status === "coming_soon") {

@@ -10,7 +10,7 @@ describe("AdminBreadcrumb", () => {
 
   it("renders 'clubs' breadcrumb as group · label", () => {
     render(<AdminBreadcrumb routePath="clubs" />);
-    expect(screen.getByText(/운영/)).toBeInTheDocument();
+    expect(screen.getByText(/Command/)).toBeInTheDocument();
     expect(screen.getByText(/클럽/)).toBeInTheDocument();
   });
 

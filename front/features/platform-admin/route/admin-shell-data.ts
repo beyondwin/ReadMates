@@ -4,6 +4,7 @@ import {
   platformAdminClubsQuery,
   platformAdminSummaryQuery,
 } from "@/features/platform-admin/queries/platform-admin-queries";
+import { platformAdminOperationCasesQuery } from "@/features/platform-admin/queries/platform-admin-operations-queries";
 import { requirePlatformAdminLoaderAuth } from "@/shared/auth/platform-admin-loader";
 
 export function adminShellLoaderFactory(queryClient: QueryClient) {
@@ -13,6 +14,7 @@ export function adminShellLoaderFactory(queryClient: QueryClient) {
       queryClient.fetchQuery(platformAdminSummaryQuery()),
       queryClient.fetchQuery(platformAdminClubsQuery()),
     ]);
+    await queryClient.prefetchQuery(platformAdminOperationCasesQuery());
     return auth;
   };
 }

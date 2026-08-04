@@ -14,14 +14,14 @@ function renderNav(opts: { role?: "OWNER" | "OPERATOR" | "SUPPORT"; activePath?:
 describe("AdminLayoutNav", () => {
   it("renders the 3 group headers", () => {
     renderNav({});
-    expect(screen.getByText("오늘/헬스")).toBeInTheDocument();
-    expect(screen.getByText("운영")).toBeInTheDocument();
-    expect(screen.getByText("감사/분석")).toBeInTheDocument();
+    expect(screen.getByText("Command")).toBeInTheDocument();
+    expect(screen.getByText("Operations")).toBeInTheDocument();
+    expect(screen.getByText("Review")).toBeInTheDocument();
   });
 
   it("renders all 8 nav items", () => {
     renderNav({});
-    for (const label of ["오늘", "헬스", "클럽", "지원", "알림", "AI Ops", "감사", "분석"]) {
+    for (const label of ["오늘", "클럽", "사건", "알림", "AI 작업", "지원", "감사", "분석"]) {
       expect(screen.getByRole("link", { name: new RegExp(label) })).toBeInTheDocument();
     }
   });

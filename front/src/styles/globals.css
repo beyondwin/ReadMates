@@ -1052,18 +1052,18 @@ a.rm-recent-record__destination:hover {
   z-index: 20;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 18px;
+  gap: 24px;
   align-items: center;
   border-bottom: 1px solid var(--line);
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
-  padding: 14px 24px;
-  backdrop-filter: blur(14px);
+  background: var(--surface);
+  padding: 12px 28px;
 }
 
 .admin-shell__wordmark {
-  font-size: 14px;
-  font-weight: 900;
-  letter-spacing: 0;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
   white-space: nowrap;
 }
 
@@ -1170,69 +1170,58 @@ a.rm-recent-record__destination:hover {
   color: var(--danger);
 }
 
-.admin-status-strip {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+.admin-command-status {
+  display: flex;
+  min-height: 39px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
   border-bottom: 1px solid var(--line);
   background: var(--bg-sub);
-  padding: 12px 24px;
+  padding: 8px 28px;
+  color: var(--text-2);
+  font: 650 var(--type-size-label)/var(--type-leading-label) var(--f-sans);
 }
 
-.admin-status-strip__card {
-  display: grid;
-  min-width: 0;
-  gap: 2px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-  padding: 10px 12px;
+.admin-command-status__source {
   color: var(--text);
-  text-decoration: none;
+  font-weight: 800;
 }
 
-.admin-status-strip__card--highlight {
-  border-color: var(--accent);
+.admin-command-status__separator {
+  color: var(--text-4);
 }
 
-.admin-status-strip--error .admin-status-strip__card {
-  border-color: var(--danger);
+.admin-command-status--degraded,
+.admin-command-status--unavailable {
   color: var(--danger);
 }
 
-.admin-status-strip__label {
+.admin-command-status--loading {
   color: var(--text-3);
-  text-transform: uppercase;
-}
-
-.admin-status-strip__value {
-  font-size: 20px;
-  line-height: 1.05;
-  font-weight: 900;
 }
 
 .admin-shell__body {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
-  gap: 22px;
-  width: min(100% - 48px, 1280px);
+  gap: 32px;
+  width: min(100% - 56px, 1360px);
   margin: 0 auto;
-  padding: 24px 0 72px;
+  padding: 28px 0 72px;
 }
 
 .admin-shell__nav {
   position: sticky;
-  top: 88px;
+  top: 92px;
   align-self: start;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-  padding: 14px;
+  min-height: calc(100vh - 120px);
+  border-right: 1px solid var(--line);
+  padding: 4px 20px 32px 0;
 }
 
 .admin-layout-nav {
   display: grid;
-  gap: 18px;
+  gap: 24px;
 }
 
 .admin-layout-nav__group {
@@ -1243,6 +1232,7 @@ a.rm-recent-record__destination:hover {
 .admin-layout-nav__group-header {
   color: var(--text-4);
   text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .admin-layout-nav__items {
@@ -1255,21 +1245,32 @@ a.rm-recent-record__destination:hover {
 
 .admin-layout-nav__item {
   display: flex;
+  min-height: 40px;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  border-radius: 8px;
+  border-bottom: 1px solid transparent;
   color: var(--text-2);
-  padding: 9px 10px;
+  padding: 9px 2px;
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 700;
   text-decoration: none;
 }
 
-.admin-layout-nav__item:hover,
-.admin-layout-nav__item--active {
-  background: var(--bg-raised);
+.admin-layout-nav__item:hover {
   color: var(--text);
+}
+
+.admin-layout-nav__item--active {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+  font-weight: 850;
+}
+
+.admin-layout-nav__item:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
 }
 
 .admin-layout-nav__pill {
@@ -4876,9 +4877,8 @@ a.rm-recent-record__destination:hover {
     flex-wrap: wrap;
   }
 
-  .admin-status-strip {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    padding: 10px 16px;
+  .admin-command-status {
+    padding: 8px 16px;
   }
 
   .admin-shell__body {
@@ -4890,8 +4890,11 @@ a.rm-recent-record__destination:hover {
 
   .admin-shell__nav {
     position: static;
+    min-height: auto;
     overflow-x: auto;
-    padding: 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    padding: 0 0 14px;
   }
 
   .admin-layout-nav {
@@ -5089,8 +5092,9 @@ a.rm-recent-record__destination:hover {
       width: 100%;
     }
 
-    .admin-status-strip {
-      grid-template-columns: 1fr;
+    .admin-command-status {
+      align-items: flex-start;
+      gap: 4px 7px;
     }
 
     .admin-layout-nav {
@@ -5724,7 +5728,6 @@ a.rm-recent-record__destination:hover {
 
 .admin-shell__role-badge,
 .admin-workspace-switcher__meta,
-.admin-status-strip__label,
 .admin-layout-nav__group-header,
 .admin-layout-nav__pill,
 .platform-admin-domain-status,
