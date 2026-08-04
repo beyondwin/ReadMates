@@ -103,6 +103,17 @@ describe("guest browse API", () => {
     ]);
   });
 
+  it("scopes guest note feed pages to the selected session", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ items: [], nextCursor: null }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchGuestNoteFeed("alpha", { sessionId: "session-3" });
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "/api/bff/api/public/clubs/alpha/browse/notes/feed?limit=20&sessionId=session-3",
+    );
+  });
+
   it("rejects guest response keys outside the server allowlist", () => {
     expect(
       GuestBrowseShellSchema.safeParse({

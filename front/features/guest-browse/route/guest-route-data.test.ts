@@ -220,13 +220,37 @@ describe("guest route loaders", () => {
 
     await Promise.all([guestCurrentSessionLoader(args), guestNotesLoader(args), guestArchiveLoader(args)]);
 
-    expect(fetchMock.mock.calls.map(([path]) => path)).toEqual([
+    expect(fetchMock.mock.calls.map(([path]) => path)).toEqual(expect.arrayContaining([
       "/api/bff/api/public/clubs/alpha/browse/sessions/current",
       "/api/bff/api/public/clubs/alpha/browse/notes/sessions?limit=20",
       "/api/bff/api/public/clubs/alpha/browse/notes/feed?limit=20",
       "/api/bff/api/public/clubs/alpha/browse/archive?limit=20",
-    ]);
+    ]));
+    expect(fetchMock).toHaveBeenCalledTimes(4);
     expect(fetchMock.mock.calls.every(([path]) => String(path).includes("/api/public/clubs/alpha/browse"))).toBe(true);
+  });
+
+  it("loads the guest notes feed for the explicitly selected session", async () => {
+    const fetchMock = vi.fn((path: string) => {
+      if (path.includes("/notes/sessions")) {
+        return Promise.resolve(jsonResponse({
+          items: [{ sessionId: "session-3", sessionNumber: 3, bookTitle: "선택한 책", date: "2026-08-02", questionCount: 1, oneLinerCount: 0, longReviewCount: 0, highlightCount: 0, totalCount: 1 }],
+          nextCursor: null,
+        }));
+      }
+      return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await guestNotesLoader({
+      params: { clubSlug: "alpha" },
+      request: new Request("https://readmates.local/clubs/alpha/app/notes?sessionId=session-3"),
+    });
+
+    expect(fetchMock.mock.calls.map(([path]) => path)).toEqual([
+      "/api/bff/api/public/clubs/alpha/browse/notes/sessions?limit=20",
+      "/api/bff/api/public/clubs/alpha/browse/notes/feed?limit=20&sessionId=session-3",
+    ]);
   });
 
   it("keeps the current-session loader response in the public API shape for the shared page normalizer", async () => {

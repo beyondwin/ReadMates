@@ -10,10 +10,12 @@ import {
 import {
   guestArchivePageReadView,
   guestHomeReadView,
+  guestNoteSessionsReadPage,
   guestNotesReadView,
 } from "@/features/guest-browse/model/guest-read-views";
 import { clubSlugFromLoaderArgs, type ClubScopedLoaderArgs } from "@/shared/auth/member-app-loader";
 import { isReadmatesApiError } from "@/shared/api/errors";
+import { selectNoteSession } from "@/shared/model/notes-feed-model";
 
 function requiredClubSlug(args?: ClubScopedLoaderArgs) {
   const clubSlug = clubSlugFromLoaderArgs(args);
@@ -71,9 +73,13 @@ export async function guestCurrentSessionLoader(args?: Pick<LoaderFunctionArgs, 
   return fetchGuestCurrentSession(requiredClubSlug(args));
 }
 
-export async function guestNotesLoader(args?: Pick<LoaderFunctionArgs, "params">) {
+export async function guestNotesLoader(args?: Pick<LoaderFunctionArgs, "params" | "request">) {
   const clubSlug = requiredClubSlug(args);
-  const [sessions, feed] = await Promise.all([fetchGuestNoteSessions(clubSlug), fetchGuestNoteFeed(clubSlug)]);
+  const sessions = await fetchGuestNoteSessions(clubSlug);
+  const requestedSessionId = args?.request ? new URL(args.request.url).searchParams.get("sessionId") : null;
+  const defaultSessionId = selectNoteSession(guestNoteSessionsReadPage(sessions).items, null)?.sessionId ?? null;
+  const feedSessionId = requestedSessionId ?? defaultSessionId;
+  const feed = await fetchGuestNoteFeed(clubSlug, { sessionId: feedSessionId });
   return guestNotesReadView(sessions, feed);
 }
 

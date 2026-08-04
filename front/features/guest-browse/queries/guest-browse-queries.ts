@@ -8,6 +8,7 @@ import {
   fetchGuestNoteSessions,
   fetchGuestUpcomingSessions,
   type GuestBrowsePage,
+  type GuestNoteFeedPageRequest,
 } from "@/features/guest-browse/api/guest-browse-api";
 
 export const guestBrowseKeys = {
@@ -19,8 +20,14 @@ export const guestBrowseKeys = {
     [...guestBrowseKeys.club(clubSlug), "upcoming", page?.limit ?? 20, page?.cursor ?? null] as const,
   noteSessions: (clubSlug: string, page?: GuestBrowsePage) =>
     [...guestBrowseKeys.club(clubSlug), "note-sessions", page?.limit ?? 20, page?.cursor ?? null] as const,
-  noteFeed: (clubSlug: string, page?: GuestBrowsePage) =>
-    [...guestBrowseKeys.club(clubSlug), "note-feed", page?.limit ?? 20, page?.cursor ?? null] as const,
+  noteFeed: (clubSlug: string, page?: GuestNoteFeedPageRequest) =>
+    [
+      ...guestBrowseKeys.club(clubSlug),
+      "note-feed",
+      page?.limit ?? 20,
+      page?.cursor ?? null,
+      page?.sessionId ?? null,
+    ] as const,
   archive: (clubSlug: string, page?: GuestBrowsePage) =>
     [...guestBrowseKeys.club(clubSlug), "archive", page?.limit ?? 20, page?.cursor ?? null] as const,
   archiveDetail: (clubSlug: string, sessionId: string) =>
@@ -37,7 +44,7 @@ export const guestUpcomingSessionsQuery = (clubSlug: string, page?: GuestBrowseP
   queryOptions({ queryKey: guestBrowseKeys.upcoming(clubSlug, page), queryFn: () => fetchGuestUpcomingSessions(clubSlug, page), ...guestBrowseQueryPolicy });
 export const guestNoteSessionsQuery = (clubSlug: string, page?: GuestBrowsePage) =>
   queryOptions({ queryKey: guestBrowseKeys.noteSessions(clubSlug, page), queryFn: () => fetchGuestNoteSessions(clubSlug, page), ...guestBrowseQueryPolicy });
-export const guestNoteFeedQuery = (clubSlug: string, page?: GuestBrowsePage) =>
+export const guestNoteFeedQuery = (clubSlug: string, page?: GuestNoteFeedPageRequest) =>
   queryOptions({ queryKey: guestBrowseKeys.noteFeed(clubSlug, page), queryFn: () => fetchGuestNoteFeed(clubSlug, page), ...guestBrowseQueryPolicy });
 export const guestArchiveQuery = (clubSlug: string, page?: GuestBrowsePage) =>
   queryOptions({ queryKey: guestBrowseKeys.archive(clubSlug, page), queryFn: () => fetchGuestArchive(clubSlug, page), ...guestBrowseQueryPolicy });
