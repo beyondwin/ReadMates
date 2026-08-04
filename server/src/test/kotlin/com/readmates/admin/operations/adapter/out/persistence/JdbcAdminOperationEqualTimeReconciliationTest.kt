@@ -182,6 +182,13 @@ class JdbcAdminOperationEqualTimeReconciliationTest(
         assertThat(persisted.state).isEqualTo(AdminOperationCaseState.RESOLVED)
         assertThat(persisted.reopenCount).isZero()
         assertThat(persisted.version).isEqualTo(resolved.case.version + 1)
+        assertThat(
+            jdbcTemplate.queryForObject(
+                "select resolution_code from admin_operation_cases where id = ?",
+                String::class.java,
+                opened.id.toString(),
+            ),
+        ).isEqualTo("OPERATOR_RESOLVED")
         assertThat(adapter.history(opened.id, 10).map { it.reasonCode })
             .containsExactly("OPERATOR_RESOLVED", "SIGNAL_OPENED")
     }
