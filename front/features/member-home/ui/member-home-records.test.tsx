@@ -36,7 +36,34 @@ const authoredQuestion = {
   createdAt: "2026-06-18T12:00:00Z",
 };
 
+const authoredLongReview = {
+  sessionId: "session-9",
+  sessionNumber: 9,
+  date: "2026-07-22",
+  kind: "LONG_REVIEW" as const,
+  text: "돈의 심리를 읽고 남긴 긴 서평입니다.",
+  authorName: "서평 멤버",
+  authorShortName: "서평",
+  avatarKey: "cloud-green-book",
+  bookTitle: "돈의 심리학",
+  createdAt: "2026-07-22T12:00:00Z",
+};
+
 describe("member home record reflection cards", () => {
+  it("renders a long review with the localized kind label on desktop and mobile", () => {
+    const desktop = render(<ClubPulse items={[authoredLongReview]} />);
+
+    expect(screen.getByText("No.09 · 서평")).toBeVisible();
+    expect(desktop.container).not.toHaveTextContent("LONG_REVIEW");
+    desktop.unmount();
+
+    const mobile = render(<MobileMemberActivity items={[authoredLongReview]} />);
+
+    expect(screen.getByText("No.09")).toBeVisible();
+    expect(screen.getByText("서평")).toBeVisible();
+    expect(mobile.container).not.toHaveTextContent("LONG_REVIEW");
+  });
+
   it("uses the author role for desktop and mobile activity avatars", () => {
     const pulse = render(<ClubPulse items={[authoredQuestion]} />);
     expect(
