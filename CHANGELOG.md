@@ -8,7 +8,20 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Highlights
 
-- 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
+- **플랫폼 운영 지휘대:** `/admin/today`를 클럽 readiness·domain·첫 호스트, 알림 실패·backlog, AI failed/stale job, 회차 마감 위험을 하나의 내구 운영 케이스 queue와 inspector로 처리하는 command center로 전환했습니다. Desktop은 queue와 상세를 함께 제공하고 mobile은 목록 → 상세 → 목록 흐름을 사용하며, source 일부 장애가 나도 확인 가능한 case는 계속 처리할 수 있습니다.
+
+### Changed
+
+- **운영 케이스 lifecycle과 권한:** case는 `OPEN`, `ACKNOWLEDGED`, `SNOOZED`, `RESOLVED` 상태와 optimistic version, immutable event history를 가집니다. OWNER와 OPERATOR만 acknowledge·최대 7일 snooze·resolve 검증을 실행하고 SUPPORT는 safe projection만 읽습니다. Resolve는 exact source identity가 authoritative하게 사라진 경우에만 성공하며 active·부분 조회·source unavailable은 fail closed합니다.
+- **운영 shell과 안전 경계:** admin 탐색을 Command·Operations·Review 업무 그룹과 compact source status로 정리했습니다. Case API는 allowlist summary, aggregate impact, freshness와 canonical detail link만 제공하며 기존 club publication, notification replay, AI recovery, support grant mutation route를 변경하지 않고 범용 execute endpoint도 추가하지 않습니다.
+
+### Database
+
+- **Flyway V47:** `admin_operation_cases`, immutable `admin_operation_case_events`, one-row-per-source `admin_operation_source_status`를 additive하게 추가합니다. Source identity unique key, lifecycle/severity check, optimistic version과 source freshness를 영속화하며 private content나 provider raw error를 저장하지 않습니다. Migration rollback 대신 V47 schema를 보존한 compatible image 또는 forward-fix를 사용합니다.
+
+### Deployment Notes
+
+- 이 변경은 저장소 구현과 로컬 검증이며 production 배포나 live provider·이메일 호출을 수행하지 않았습니다. 별도 release가 승인되면 V47과 operations API를 포함한 backend를 먼저 배포해 Flyway·health·authorization을 확인한 뒤 같은 tag의 frontend를 배포하고 desktop/mobile smoke를 수행합니다.
 
 ## v2.2.0 - 2026-08-03
 
