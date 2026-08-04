@@ -151,7 +151,7 @@ internal class AdminOperationCaseJdbcReconciler(
                 resolved_at = ?,
                 resolution_code = case when ? then null else resolution_code end,
                 reopen_count = reopen_count + ?,
-                version = version + 1,
+                version = version + ?,
                 impact_count = ?,
                 detail_href = ?
             where id = ?
@@ -166,6 +166,7 @@ internal class AdminOperationCaseJdbcReconciler(
             if (reopens) null else locked.resolvedAt?.toUtcLocalDateTime(),
             reopens,
             if (reopensResolved) 1 else 0,
+            if (reopens) 1 else 0,
             signal.impactCount,
             signal.detailHref,
             locked.id.dbString(),

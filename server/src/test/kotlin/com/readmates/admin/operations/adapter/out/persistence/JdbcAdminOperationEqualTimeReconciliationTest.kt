@@ -181,7 +181,7 @@ class JdbcAdminOperationEqualTimeReconciliationTest(
         val persisted = requireNotNull(adapter.get(opened.id))
         assertThat(persisted.state).isEqualTo(AdminOperationCaseState.RESOLVED)
         assertThat(persisted.reopenCount).isZero()
-        assertThat(persisted.version).isEqualTo(resolved.case.version + 1)
+        assertThat(persisted.version).isEqualTo(resolved.case.version)
         assertThat(
             jdbcTemplate.queryForObject(
                 "select resolution_code from admin_operation_cases where id = ?",
@@ -253,7 +253,7 @@ class JdbcAdminOperationEqualTimeReconciliationTest(
             assertThat(persisted.impactCount).isEqualTo(preferred.impactCount)
             assertThat(persisted.summaryCode).isEqualTo(preferred.summaryCode)
             assertThat(persisted.detailHref).isEqualTo(preferred.detailHref)
-            assertThat(persisted.version).isEqualTo(1)
+            assertThat(persisted.version).isZero()
             assertThat(adapter.history(persisted.id, 10).map { it.reasonCode }).containsExactly("SIGNAL_OPENED")
         }
     }

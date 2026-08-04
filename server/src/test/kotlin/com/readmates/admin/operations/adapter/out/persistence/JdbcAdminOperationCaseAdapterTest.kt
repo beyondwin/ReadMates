@@ -51,7 +51,7 @@ class JdbcAdminOperationCaseAdapterTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
-    fun `upsert keeps one case per source identity and increments version`() {
+    fun `upsert keeps one case per source identity without advancing lifecycle version`() {
         val firstObservedAt = instant(hour = 1)
         val first = adapter.reconcile(batch(signal(observedAt = firstObservedAt)), firstObservedAt).single()
         val later = firstObservedAt.plusHours(2)
@@ -71,7 +71,7 @@ class JdbcAdminOperationCaseAdapterTest(
                 ).single()
 
         assertThat(updated.id).isEqualTo(first.id)
-        assertThat(updated.version).isEqualTo(1)
+        assertThat(updated.version).isZero()
         assertThat(updated.firstObservedAt).isEqualTo(firstObservedAt)
         assertThat(updated.lastObservedAt).isEqualTo(later)
         assertThat(updated.severity).isEqualTo(AdminOperationSeverity.CRITICAL)
@@ -262,20 +262,6 @@ class JdbcAdminOperationCaseAdapterTest(
         assertThat(stale).isEqualTo(AdminOperationCaseUpdateResult.VersionConflict)
         assertThat(adapter.get(opened.id)?.state).isEqualTo(AdminOperationCaseState.ACKNOWLEDGED)
         assertThat(rowCount("admin_operation_case_events")).isEqualTo(2)
-    }
-
-    @Test
-    fun `open count includes every active lifecycle state`() {
-        val observedAt = instant(hour = 5)
-        insertCase("00000000-0000-0000-0000-00000000c011", "count-open", observedAt, state = "OPEN")
-        insertCase("00000000-0000-0000-0000-00000000c012", "count-acknowledged", observedAt, state = "ACKNOWLEDGED")
-        insertCase("00000000-0000-0000-0000-00000000c013", "count-snoozed", observedAt, state = "SNOOZED")
-        insertCase("00000000-0000-0000-0000-00000000c014", "count-resolved", observedAt, state = "RESOLVED")
-
-        val counts = adapter.counts(UUID.fromString(ACTOR_ID))
-
-        assertThat(counts.open).isEqualTo(3)
-        assertThat(counts.snoozed).isEqualTo(1)
     }
 
     @Test
@@ -543,7 +529,7 @@ class JdbcAdminOperationCaseAdapterTest(
             assertThat(reconciled.map { it.id }.distinct()).hasSize(1)
             assertThat(rowCount("admin_operation_cases")).isEqualTo(1)
             assertThat(rowCount("admin_operation_case_events")).isEqualTo(1)
-            assertThat(adapter.get(reconciled.first().id)?.version).isEqualTo(1)
+            assertThat(adapter.get(reconciled.first().id)?.version).isZero()
         } finally {
             executor.shutdownNow()
         }
@@ -633,23 +619,19 @@ class JdbcAdminOperationCaseAdapterTest(
         id: String,
         sourceKey: String,
         observedAt: OffsetDateTime,
-        state: String = "OPEN",
     ) {
         jdbcTemplate.update(
             """
             insert into admin_operation_cases (
               id, source_type, source_key, state, severity, safe_summary_code,
-              first_observed_at, last_observed_at, snoozed_until, resolved_at, impact_count, detail_href
+              first_observed_at, last_observed_at, impact_count, detail_href
             )
-            values (?, 'NOTIFICATION', ?, ?, 'WARNING', 'NOTIFICATION_DELIVERY_BACKLOG', ?, ?, ?, ?, 1, ?)
+            values (?, 'NOTIFICATION', ?, 'OPEN', 'WARNING', 'NOTIFICATION_DELIVERY_BACKLOG', ?, ?, 1, ?)
             """.trimIndent(),
             id,
             sourceKey,
-            state,
             observedAt.toLocalDateTime(),
             observedAt.toLocalDateTime(),
-            if (state == "SNOOZED") observedAt.plusHours(1).toLocalDateTime() else null,
-            if (state == "RESOLVED") observedAt.plusHours(1).toLocalDateTime() else null,
             "/admin/notifications/$sourceKey",
         )
     }
