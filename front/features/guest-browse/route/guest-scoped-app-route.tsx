@@ -148,10 +148,20 @@ function guestBrowseContent(
         appBasePath={appBasePath}
         feedbackLockedAction={(
           <LinkComponent
-            className="btn btn-quiet btn-sm"
+            className="btn btn-quiet btn-sm rm-feedback-lock-trigger"
             to={`${appBasePath}/feedback/${encodeURIComponent(detail.sessionId)}`}
           >
-            피드백 보기
+            <span>피드백 보기</span>
+            <svg
+              className="rm-feedback-lock-trigger__icon"
+              aria-hidden="true"
+              viewBox="0 0 20 20"
+              width="18"
+              height="18"
+              fill="none"
+            >
+              <path d="m7 4.5 5 5.5-5 5.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </LinkComponent>
         )}
       />

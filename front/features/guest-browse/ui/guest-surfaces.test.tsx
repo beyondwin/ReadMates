@@ -14,7 +14,9 @@ function LocationProbe() {
 }
 
 describe("guest feedback lock action", () => {
-  it("opens the existing feedback lock without navigating", async () => {
+  it("opens a clear feedback lock dialog without navigating and restores focus on close", async () => {
+    const user = userEvent.setup();
+
     render(
       <MemoryRouter initialEntries={["/clubs/reading-sai/app/sessions/closed-1"]}>
         <GuestNavigationProvider LinkComponent={AnchorLink}>
@@ -26,9 +28,21 @@ describe("guest feedback lock action", () => {
       </MemoryRouter>,
     );
 
-    await userEvent.setup().click(screen.getByRole("button", { name: "피드백 보기" }));
+    const trigger = screen.getByRole("button", { name: "피드백 보기" });
+    await user.click(trigger);
 
     expect(screen.getByRole("dialog", { name: "정식 멤버에게 열립니다" })).toBeVisible();
+    expect(screen.getByText("멤버십 안내")).toBeVisible();
+    expect(screen.getByRole("button", { name: "닫기" })).toHaveFocus();
+    expect(screen.getByRole("link", { name: "멤버로 시작" })).toHaveAttribute(
+      "href",
+      "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp%2Ffeedback%2Fclosed-1",
+    );
     expect(screen.getByLabelText("current location")).toHaveTextContent("/clubs/reading-sai/app/sessions/closed-1");
+
+    await user.click(screen.getByRole("button", { name: "닫기" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
   });
 });

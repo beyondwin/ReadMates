@@ -225,10 +225,13 @@ describe("guest historical session detail route", () => {
     render(<RouterProvider router={router} />);
 
     expect(await screen.findByRole("heading", { name: "정규 상세 · 기록 책" })).toBeVisible();
-    expect(screen.getByRole("link", { name: "피드백 보기" })).toHaveAttribute(
+    const feedbackAction = screen.getByRole("link", { name: "피드백 보기" });
+
+    expect(feedbackAction).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/feedback/closed-1",
     );
+    expect(feedbackAction).toHaveClass("rm-feedback-lock-trigger");
   });
 });
 
