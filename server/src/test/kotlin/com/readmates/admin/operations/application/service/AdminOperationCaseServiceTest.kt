@@ -32,7 +32,10 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import java.time.Clock
+import java.time.Duration
+import java.time.Instant
 import java.time.OffsetDateTime
+import java.time.ZoneId
 import java.time.ZoneOffset
 import java.util.UUID
 
@@ -129,6 +132,24 @@ class AdminOperationCaseServiceTest {
     }
 
     @Test
+    fun `snooze persists the same server time used to validate its deadline`() {
+        val store = RecordingCaseStore(case())
+        val advancingClock = AdvancingClock(NOW.toInstant(), Duration.ofSeconds(2))
+        val service = service(store = store, clock = advancingClock)
+
+        val result =
+            service.snooze(
+                operator,
+                SnoozeAdminOperationCommand(CASE_ID, 4, NOW.plusSeconds(1)),
+            )
+
+        assertThat(result.state).isEqualTo(AdminOperationCaseState.SNOOZED)
+        val transition = store.transitions.single()
+        assertThat(transition.now).isEqualTo(NOW)
+        assertThat(transition.snoozedUntil).isAfter(transition.now)
+    }
+
+    @Test
     fun `resolve verifies exact provider identity before transition`() {
         val store = RecordingCaseStore(case(sourceType = AdminOperationSourceType.NOTIFICATION))
         val unrelated = VerifyingProvider(AdminOperationSourceType.AI_JOB, AdminOperationSignalVerification.ACTIVE)
@@ -180,6 +201,36 @@ class AdminOperationCaseServiceTest {
         assertThat(metrics.lifecycle).containsExactly(
             AdminOperationAction.RESOLVE to AdminOperationLifecycleResult.SOURCE_UNAVAILABLE,
         )
+    }
+
+    @Test
+    fun `missing matching provider returns CASE_SOURCE_UNAVAILABLE without transition`() {
+        val store = RecordingCaseStore(case())
+        val service = service(store = store, providers = emptyList())
+
+        assertError(AdminOperationError.CASE_SOURCE_UNAVAILABLE) {
+            service.resolve(operator, AdminOperationMutationCommand(CASE_ID, 4))
+        }
+
+        assertThat(store.transitions).isEmpty()
+        assertThat(store.events).isEmpty()
+    }
+
+    @Test
+    fun `duplicate matching providers return CASE_SOURCE_UNAVAILABLE without verification or transition`() {
+        val store = RecordingCaseStore(case())
+        val first = VerifyingProvider(AdminOperationSourceType.NOTIFICATION, AdminOperationSignalVerification.ABSENT)
+        val second = VerifyingProvider(AdminOperationSourceType.NOTIFICATION, AdminOperationSignalVerification.ABSENT)
+        val service = service(store = store, providers = listOf(first, second))
+
+        assertError(AdminOperationError.CASE_SOURCE_UNAVAILABLE) {
+            service.resolve(operator, AdminOperationMutationCommand(CASE_ID, 4))
+        }
+
+        assertThat(first.verifications).isEmpty()
+        assertThat(second.verifications).isEmpty()
+        assertThat(store.transitions).isEmpty()
+        assertThat(store.events).isEmpty()
     }
 
     @Test
@@ -287,16 +338,32 @@ class AdminOperationCaseServiceTest {
         assertThat(store.transitions).isEmpty()
     }
 
+    @Test
+    fun `throwing age and lifecycle metrics remain best effort`() {
+        val store = RecordingCaseStore(case(), freshness = listOf(freshness()))
+        val metrics = ThrowingMetrics()
+        val service = service(store = store, metrics = metrics)
+
+        val page = service.list(owner, AdminOperationCaseFilter(), PAGE)
+        val acknowledged = service.acknowledge(operator, AdminOperationMutationCommand(CASE_ID, 4))
+
+        assertThat(page.cases.items).hasSize(1)
+        assertThat(acknowledged.state).isEqualTo(AdminOperationCaseState.ACKNOWLEDGED)
+        assertThat(metrics.ageAttempts).isEqualTo(1)
+        assertThat(metrics.lifecycleAttempts).isEqualTo(1)
+    }
+
     private fun service(
         store: RecordingCaseStore,
         providers: List<AdminOperationSignalProvider> = emptyList(),
         metrics: AdminOperationMetricsPort = RecordingMetrics(),
+        clock: Clock = CLOCK,
     ): AdminOperationCaseService {
         val reconciliation =
             AdminOperationReconciliationService(
                 providers = providers,
                 cases = store,
-                clock = CLOCK,
+                clock = clock,
                 metrics = metrics,
             )
         return AdminOperationCaseService(
@@ -304,7 +371,7 @@ class AdminOperationCaseServiceTest {
             providers = providers,
             caseReader = store,
             caseWriter = store,
-            clock = CLOCK,
+            clock = clock,
             metrics = metrics,
         )
     }
@@ -541,4 +608,45 @@ private class RecordingMetrics : AdminOperationMetricsPort {
     }
 
     override fun toString(): String = "RecordingMetrics(lifecycle=$lifecycle)"
+}
+
+private class ThrowingMetrics : AdminOperationMetricsPort {
+    var ageAttempts = 0
+    var lifecycleAttempts = 0
+
+    override fun recordReconciliation(
+        source: AdminOperationSourceType,
+        status: AdminOperationSourceStatus,
+    ) = Unit
+
+    override fun recordLifecycle(
+        action: AdminOperationAction,
+        result: AdminOperationLifecycleResult,
+    ) {
+        lifecycleAttempts += 1
+        error("lifecycle-metrics-unavailable")
+    }
+
+    override fun recordCaseAge(
+        source: AdminOperationSourceType,
+        severity: AdminOperationSeverity,
+        seconds: Long,
+    ) {
+        ageAttempts += 1
+        error("age-metrics-unavailable")
+    }
+}
+
+private class AdvancingClock(
+    initial: Instant,
+    private val step: Duration,
+    private val zoneId: ZoneId = ZoneOffset.UTC,
+) : Clock() {
+    private var current = initial
+
+    override fun getZone(): ZoneId = zoneId
+
+    override fun withZone(zone: ZoneId): Clock = AdvancingClock(current, step, zone)
+
+    override fun instant(): Instant = current.also { current = current.plus(step) }
 }

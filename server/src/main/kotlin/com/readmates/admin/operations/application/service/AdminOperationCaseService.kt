@@ -107,8 +107,9 @@ class AdminOperationCaseService(
         val mutation = AdminOperationMutationCommand(command.caseId, command.expectedVersion)
         val current = loadMutableCase(admin, mutation, AdminOperationAction.SNOOZE)
         requireAction(admin, current, AdminOperationAction.SNOOZE)
+        val now = OffsetDateTime.now(clock)
         try {
-            policy.validateSnooze(OffsetDateTime.now(clock), command.snoozedUntil)
+            policy.validateSnooze(now, command.snoozedUntil)
         } catch (exception: AdminOperationException) {
             caseMetrics.recordLifecycle(AdminOperationAction.SNOOZE, AdminOperationLifecycleResult.INVALID_REQUEST)
             throw exception
@@ -119,6 +120,7 @@ class AdminOperationCaseService(
             action = AdminOperationAction.SNOOZE,
             snoozedUntil = command.snoozedUntil,
             reasonCode = OPERATOR_SNOOZED,
+            now = now,
         )
     }
 
@@ -210,6 +212,7 @@ class AdminOperationCaseService(
         action: AdminOperationAction,
         snoozedUntil: OffsetDateTime?,
         reasonCode: String,
+        now: OffsetDateTime = OffsetDateTime.now(clock),
     ): AdminOperationCase {
         policy.validateReasonCode(reasonCode)
         val result =
@@ -221,7 +224,7 @@ class AdminOperationCaseService(
                     actorAdminId = admin.userId,
                     snoozedUntil = snoozedUntil,
                     reasonCode = reasonCode,
-                    now = OffsetDateTime.now(clock),
+                    now = now,
                 ),
             )
         return when (result) {
