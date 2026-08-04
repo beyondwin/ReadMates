@@ -67,7 +67,14 @@ internal class AdminOperationCaseJdbcReconciler(
                 locked
             }
             signal.observedAt.isBefore(locked.lastObservedAt) -> locked
-            else -> reconcileExisting(locked, signal, now)
+            signal.observedAt.isEqual(locked.lastObservedAt) ->
+                reconcileExisting(
+                    locked = locked,
+                    signal = AdminOperationSignalProjectionOrder.preferred(locked, signal),
+                    now = now,
+                    mayReopen = false,
+                )
+            else -> reconcileExisting(locked, signal, now, mayReopen = true)
         }
     }
 
@@ -100,10 +107,12 @@ internal class AdminOperationCaseJdbcReconciler(
         locked: AdminOperationCase,
         signal: AdminOperationSignal,
         now: OffsetDateTime,
+        mayReopen: Boolean,
     ): AdminOperationCase {
-        val reopensResolved = locked.state == AdminOperationCaseState.RESOLVED
+        val reopensResolved = mayReopen && locked.state == AdminOperationCaseState.RESOLVED
         val reopensExpiredSnooze =
-            locked.state == AdminOperationCaseState.SNOOZED &&
+            mayReopen &&
+                locked.state == AdminOperationCaseState.SNOOZED &&
                 locked.snoozedUntil?.let { !it.isAfter(now) } == true
         val reopens = reopensResolved || reopensExpiredSnooze
         updateProjection(locked, signal, reopens, reopensResolved)
@@ -178,7 +187,7 @@ internal class AdminOperationCaseJdbcReconciler(
                 for update
                 """.trimIndent(),
                 listOf(sourceType.name),
-            ).filterNot { it.sourceKey in activeKeys || it.lastObservedAt.isAfter(generatedAt) }
+            ).filterNot { it.sourceKey in activeKeys || !it.lastObservedAt.isBefore(generatedAt) }
             .forEach { candidate -> resolveCandidate(candidate, now) }
     }
 
