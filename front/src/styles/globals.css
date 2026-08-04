@@ -2068,6 +2068,16 @@ a.rm-recent-record__destination:hover {
   color: var(--danger);
 }
 
+@media (max-width: 1120px) {
+  .admin-today-ledger__columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-operations-inspector {
+    position: static;
+  }
+}
+
 @media (max-width: 600px) {
   .admin-today-ledger {
     gap: 18px;

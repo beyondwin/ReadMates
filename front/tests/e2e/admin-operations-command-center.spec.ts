@@ -397,6 +397,19 @@ test("responsive command-center screenshots are non-empty and public-safe", asyn
     await page.goto("/admin/today?case=case-notification");
     await expect(page.getByRole("heading", { name: "오늘의 운영 케이스" })).toBeVisible();
     await expectNoUnsafeText(page);
+    const layout = await page.evaluate(() => {
+      const commandCenter = document.querySelector<HTMLElement>(".admin-today-ledger");
+      const bounds = commandCenter?.getBoundingClientRect();
+      return {
+        documentWidth: document.documentElement.scrollWidth,
+        viewportWidth: window.innerWidth,
+        commandCenterLeft: bounds?.left ?? 0,
+        commandCenterRight: bounds?.right ?? 0,
+      };
+    });
+    expect(layout.documentWidth).toBeLessThanOrEqual(layout.viewportWidth);
+    expect(layout.commandCenterLeft).toBeGreaterThanOrEqual(0);
+    expect(layout.commandCenterRight).toBeLessThanOrEqual(layout.viewportWidth);
     const screenshot = await page.screenshot({
       path: `../output/playwright/task-13/admin-operations-${viewport.width}x${viewport.height}.png`,
       fullPage: true,
