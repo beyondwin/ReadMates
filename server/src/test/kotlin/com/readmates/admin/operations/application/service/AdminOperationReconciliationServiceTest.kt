@@ -18,7 +18,10 @@ import com.readmates.admin.operations.application.port.out.WriteAdminOperationCa
 import com.readmates.club.domain.PlatformAdminRole
 import com.readmates.shared.security.CurrentPlatformAdmin
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.EnumSource
 import java.time.Clock
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -214,67 +217,85 @@ class AdminOperationReconciliationServiceTest {
     }
 
     @Test
-    fun `invalid or unsafe signal batches fail closed before case persistence`() {
-        val valid = signal(AdminOperationSourceType.CLUB_READINESS)
-        val invalidBatches =
-            listOf(
-                batch(
-                    source = AdminOperationSourceType.CLUB_READINESS,
-                    signals = listOf(valid.copy(sourceType = AdminOperationSourceType.NOTIFICATION)),
-                ),
-                batch(
-                    source = AdminOperationSourceType.CLUB_READINESS,
-                    signals = listOf(valid.copy(sourceKey = " ")),
-                ),
-                batch(
-                    source = AdminOperationSourceType.CLUB_READINESS,
-                    signals = listOf(valid.copy(sourceKey = "CLUB_READINESS:not-a-uuid")),
-                ),
-                batch(
-                    source = AdminOperationSourceType.CLUB_READINESS,
-                    signals = listOf(valid.copy(summaryCode = " ")),
-                ),
-                batch(
-                    source = AdminOperationSourceType.CLUB_READINESS,
-                    signals = listOf(valid.copy(summaryCode = "RAW_PROVIDER_ERROR")),
-                ),
-                batch(
-                    source = AdminOperationSourceType.CLUB_READINESS,
-                    signals = listOf(valid.copy(impactCount = -1)),
-                ),
-                batch(
-                    source = AdminOperationSourceType.CLUB_READINESS,
-                    signals = listOf(valid.copy(detailHref = "https://private.invalid/admin")),
-                ),
-                batch(
-                    source = AdminOperationSourceType.CLUB_READINESS,
-                    signals = listOf(valid.copy(detailHref = "//private.invalid/admin")),
-                ),
-                batch(
-                    source = AdminOperationSourceType.CLUB_READINESS,
-                    signals = listOf(valid.copy(detailHref = "/admin/../private")),
-                ),
-                batch(
-                    source = AdminOperationSourceType.CLUB_READINESS,
-                    status = AdminOperationSourceStatus.UNAVAILABLE,
-                    authoritative = false,
-                    signals = listOf(valid),
-                ),
+    fun `case reconciliation failure propagates after durable successful source freshness`() {
+        val failure = IllegalStateException("case-write-failed")
+        val writer = RecordingWriter(reconciliationFailure = failure)
+        val metrics = RecordingMetrics()
+        val service =
+            service(
+                providers =
+                    listOf(
+                        StubProvider(
+                            sourceType = AdminOperationSourceType.CLUB_READINESS,
+                            batch =
+                                batch(
+                                    source = AdminOperationSourceType.CLUB_READINESS,
+                                    signals = listOf(signal(AdminOperationSourceType.CLUB_READINESS)),
+                                ),
+                        ),
+                    ),
+                writer = writer,
+                metrics = metrics,
             )
 
-        invalidBatches.forEach { invalid ->
-            val writer = RecordingWriter()
-            val service =
-                service(
-                    listOf(StubProvider(AdminOperationSourceType.CLUB_READINESS, batch = invalid)),
-                    writer,
-                )
+        assertThatThrownBy { service.reconcile(admin) }.isSameAs(failure)
 
-            val result = service.reconcile(admin)
+        assertThat(writer.persistenceEvents).containsExactly("freshness:CLUB_READINESS", "reconcile:CLUB_READINESS")
+        assertThat(writer.freshnessBySource.getValue(AdminOperationSourceType.CLUB_READINESS)).isEqualTo(
+            freshness(
+                source = AdminOperationSourceType.CLUB_READINESS,
+                status = AdminOperationSourceStatus.AVAILABLE,
+                generatedAt = now,
+                lastSuccessfulAt = now,
+                authoritative = true,
+            ),
+        )
+        assertThat(metrics.reconciliations).isEmpty()
+    }
 
-            assertThat(result.sources.single().status).isEqualTo(AdminOperationSourceStatus.UNAVAILABLE)
-            assertThat(writer.reconciled).describedAs("invalid batch: $invalid").isEmpty()
-        }
+    @Test
+    fun `freshness write failure propagates before case reconciliation`() {
+        val failure = IllegalStateException("freshness-write-failed")
+        val writer = RecordingWriter(freshnessFailure = failure)
+        val metrics = RecordingMetrics()
+        val service =
+            service(
+                providers =
+                    listOf(
+                        StubProvider(
+                            sourceType = AdminOperationSourceType.CLUB_READINESS,
+                            batch = batch(source = AdminOperationSourceType.CLUB_READINESS),
+                        ),
+                    ),
+                writer = writer,
+                metrics = metrics,
+            )
+
+        assertThatThrownBy { service.reconcile(admin) }.isSameAs(failure)
+
+        assertThat(writer.persistenceEvents).containsExactly("freshness:CLUB_READINESS")
+        assertThat(writer.reconciled).isEmpty()
+        assertThat(writer.freshnessBySource).isEmpty()
+        assertThat(metrics.reconciliations).isEmpty()
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(InvalidBatchKind::class)
+    fun `invalid or unsafe signal batches fail closed before case persistence`(kind: InvalidBatchKind) {
+        val invalid = invalidBatch(kind)
+        val writer = RecordingWriter()
+        val service =
+            service(
+                listOf(StubProvider(AdminOperationSourceType.CLUB_READINESS, batch = invalid)),
+                writer,
+            )
+
+        val result = service.reconcile(admin)
+
+        assertThat(result.sources.single().status).isEqualTo(AdminOperationSourceStatus.UNAVAILABLE)
+        assertThat(writer.reconciled).describedAs("invalid batch kind: $kind").isEmpty()
+        assertThat(writer.freshnessBySource.getValue(AdminOperationSourceType.CLUB_READINESS).status)
+            .isEqualTo(AdminOperationSourceStatus.UNAVAILABLE)
     }
 
     private fun service(
@@ -350,6 +371,52 @@ class AdminOperationReconciliationServiceTest {
         signals = signals,
     )
 
+    private fun invalidBatch(kind: InvalidBatchKind): AdminOperationSignalBatch {
+        val valid = signal(AdminOperationSourceType.CLUB_READINESS)
+        return when (kind) {
+            InvalidBatchKind.BATCH_SOURCE_MISMATCH -> batch(source = AdminOperationSourceType.NOTIFICATION)
+            InvalidBatchKind.SIGNAL_SOURCE_MISMATCH ->
+                batch(
+                    source = AdminOperationSourceType.CLUB_READINESS,
+                    signals = listOf(valid.copy(sourceType = AdminOperationSourceType.NOTIFICATION)),
+                )
+            InvalidBatchKind.BLANK_SOURCE_KEY -> batchWith(valid.copy(sourceKey = " "))
+            InvalidBatchKind.INVALID_SOURCE_KEY -> batchWith(valid.copy(sourceKey = "CLUB_READINESS:not-a-uuid"))
+            InvalidBatchKind.BLANK_SUMMARY_CODE -> batchWith(valid.copy(summaryCode = " "))
+            InvalidBatchKind.INVALID_SUMMARY_CODE -> batchWith(valid.copy(summaryCode = "RAW_PROVIDER_ERROR"))
+            InvalidBatchKind.NEGATIVE_IMPACT -> batchWith(valid.copy(impactCount = -1))
+            InvalidBatchKind.ABSOLUTE_HREF -> batchWith(valid.copy(detailHref = "https://private.invalid/admin"))
+            InvalidBatchKind.PROTOCOL_RELATIVE_HREF -> batchWith(valid.copy(detailHref = "//private.invalid/admin"))
+            InvalidBatchKind.TRAVERSAL_HREF -> batchWith(valid.copy(detailHref = "/admin/../private"))
+            InvalidBatchKind.NONEMPTY_UNAVAILABLE ->
+                batch(
+                    source = AdminOperationSourceType.CLUB_READINESS,
+                    status = AdminOperationSourceStatus.UNAVAILABLE,
+                    authoritative = false,
+                    signals = listOf(valid),
+                )
+            InvalidBatchKind.AUTHORITATIVE_PARTIAL ->
+                batch(
+                    source = AdminOperationSourceType.CLUB_READINESS,
+                    status = AdminOperationSourceStatus.PARTIAL,
+                    authoritative = true,
+                )
+            InvalidBatchKind.NONEMPTY_DISABLED ->
+                batch(
+                    source = AdminOperationSourceType.CLUB_READINESS,
+                    status = AdminOperationSourceStatus.DISABLED,
+                    authoritative = false,
+                    signals = listOf(valid),
+                )
+        }
+    }
+
+    private fun batchWith(signal: AdminOperationSignal): AdminOperationSignalBatch =
+        batch(
+            source = AdminOperationSourceType.CLUB_READINESS,
+            signals = listOf(signal),
+        )
+
     private fun freshness(
         source: AdminOperationSourceType,
         status: AdminOperationSourceStatus,
@@ -387,16 +454,21 @@ class AdminOperationReconciliationServiceTest {
 
     private class RecordingWriter(
         initialFreshness: List<AdminOperationSourceFreshness> = emptyList(),
+        private val reconciliationFailure: RuntimeException? = null,
+        private val freshnessFailure: RuntimeException? = null,
     ) : WriteAdminOperationCasesPort {
         val reconciled = mutableListOf<AdminOperationSignalBatch>()
         val activeKeys = mutableMapOf<AdminOperationSourceType, LinkedHashSet<String>>()
         val freshnessBySource = initialFreshness.associateByTo(mutableMapOf()) { it.sourceType }
+        val persistenceEvents = mutableListOf<String>()
 
         override fun reconcile(
             batch: AdminOperationSignalBatch,
             now: OffsetDateTime,
         ): List<AdminOperationCase> {
+            persistenceEvents += "reconcile:${batch.sourceType}"
             reconciled += batch
+            reconciliationFailure?.let { throw it }
             val keys = activeKeys.getOrPut(batch.sourceType) { linkedSetOf() }
             keys += batch.signals.map { it.sourceKey }
             if (batch.status == AdminOperationSourceStatus.AVAILABLE && batch.authoritative) {
@@ -406,6 +478,8 @@ class AdminOperationReconciliationServiceTest {
         }
 
         override fun recordSourceFreshness(freshness: AdminOperationSourceFreshness) {
+            persistenceEvents += "freshness:${freshness.sourceType}"
+            freshnessFailure?.let { throw it }
             val previous = freshnessBySource[freshness.sourceType]
             freshnessBySource[freshness.sourceType] =
                 freshness.copy(
@@ -446,5 +520,21 @@ class AdminOperationReconciliationServiceTest {
     private companion object {
         const val UUID_1 = "20000000-0000-0000-0000-000000000001"
         const val UUID_2 = "20000000-0000-0000-0000-000000000002"
+    }
+
+    enum class InvalidBatchKind {
+        BATCH_SOURCE_MISMATCH,
+        SIGNAL_SOURCE_MISMATCH,
+        BLANK_SOURCE_KEY,
+        INVALID_SOURCE_KEY,
+        BLANK_SUMMARY_CODE,
+        INVALID_SUMMARY_CODE,
+        NEGATIVE_IMPACT,
+        ABSOLUTE_HREF,
+        PROTOCOL_RELATIVE_HREF,
+        TRAVERSAL_HREF,
+        NONEMPTY_UNAVAILABLE,
+        AUTHORITATIVE_PARTIAL,
+        NONEMPTY_DISABLED,
     }
 }

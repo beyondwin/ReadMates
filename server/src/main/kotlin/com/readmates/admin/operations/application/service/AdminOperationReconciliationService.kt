@@ -45,37 +45,41 @@ class AdminOperationReconciliationService(
         provider: AdminOperationSignalProvider,
         admin: CurrentPlatformAdmin,
     ): AdminOperationSourceFreshness {
-        val freshness =
+        val batch =
             runCatching {
-                reconcileBatch(
-                    provider = provider,
-                    batch = provider.collect(admin),
-                )
+                provider.collect(admin).also { collected ->
+                    AdminOperationSignalBatchValidator.validate(provider.sourceType, collected)
+                }
             }.getOrElse {
-                unavailable(provider.sourceType)
+                return recordFreshness(unavailable(provider.sourceType))
             }
+        return reconcileBatch(batch)
+    }
 
-        runCatching { cases.recordSourceFreshness(freshness) }
+    private fun reconcileBatch(batch: AdminOperationSignalBatch): AdminOperationSourceFreshness {
+        val freshness = batch.toFreshness()
+        cases.recordSourceFreshness(freshness)
+        if (batch.status in SUCCESSFUL_SOURCE_STATUSES) {
+            cases.reconcile(batch, OffsetDateTime.now(clock))
+        }
         runCatching { metrics.recordReconciliation(freshness.sourceType, freshness.status) }
         return freshness
     }
 
-    private fun reconcileBatch(
-        provider: AdminOperationSignalProvider,
-        batch: AdminOperationSignalBatch,
-    ): AdminOperationSourceFreshness {
-        AdminOperationSignalBatchValidator.validate(provider.sourceType, batch)
-        if (batch.status in SUCCESSFUL_SOURCE_STATUSES) {
-            cases.reconcile(batch, OffsetDateTime.now(clock))
-        }
-        return AdminOperationSourceFreshness(
-            sourceType = batch.sourceType,
-            status = batch.status,
-            generatedAt = batch.generatedAt,
-            lastSuccessfulAt = batch.generatedAt.takeIf { batch.status in SUCCESSFUL_SOURCE_STATUSES },
-            authoritative = batch.authoritative,
-        )
+    private fun recordFreshness(freshness: AdminOperationSourceFreshness): AdminOperationSourceFreshness {
+        cases.recordSourceFreshness(freshness)
+        runCatching { metrics.recordReconciliation(freshness.sourceType, freshness.status) }
+        return freshness
     }
+
+    private fun AdminOperationSignalBatch.toFreshness(): AdminOperationSourceFreshness =
+        AdminOperationSourceFreshness(
+            sourceType = sourceType,
+            status = status,
+            generatedAt = generatedAt,
+            lastSuccessfulAt = generatedAt.takeIf { status in SUCCESSFUL_SOURCE_STATUSES },
+            authoritative = authoritative,
+        )
 
     private fun unavailable(sourceType: AdminOperationSourceType): AdminOperationSourceFreshness =
         AdminOperationSourceFreshness(
