@@ -1047,7 +1047,16 @@
   box-shadow: 1px 1px 0 var(--line-soft), 2px 2px 0 var(--line-soft), 0 18px 36px -24px oklch(0 0 0 / 0.36) !important;
 }
 .mobile-only .rm-member-session-card__body {
-  padding: 0 22px 22px;
+  padding: 0 22px 14px;
+}
+.mobile-only .rm-member-session-card__prep-heading {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+}
+.mobile-only .rm-member-session-card__deadline {
+  color: var(--text-3);
+  text-align: left;
 }
 .mobile-only .rm-member-session-card__prep {
   margin-top: 14px;
@@ -1055,7 +1064,8 @@
 .mobile-only .rm-member-session-card__primary {
   width: 100%;
   height: 44px;
-  margin-top: 16px;
+  min-height: 44px;
+  margin-top: 10px;
   border-radius: var(--r-3);
   justify-content: center;
   gap: 6px;

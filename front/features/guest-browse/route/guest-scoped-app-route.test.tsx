@@ -90,6 +90,9 @@ describe("guest notes route pagination", () => {
     mount();
     await user.dblClick(screen.getByRole("button", { name: "더 보기" }));
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "/api/bff/api/public/clubs/alpha/browse/notes/feed?limit=20&cursor=cursor-1&sessionId=s1",
+    );
     resolve(new Response(JSON.stringify({ items: [{ sessionId: "s1", sessionNumber: 1, bookTitle: "책", date: "2026-08-02", authorName: "다음", authorShortName: "다", avatarKey: "book", kind: "HIGHLIGHT", text: "다음 기록" }], nextCursor: null }), { status: 200, headers: { "Content-Type": "application/json" } }));
     expect(await screen.findByText("다음 기록")).toBeVisible();
     expect(screen.getAllByText("다음 기록")).toHaveLength(1);
@@ -225,10 +228,13 @@ describe("guest historical session detail route", () => {
     render(<RouterProvider router={router} />);
 
     expect(await screen.findByRole("heading", { name: "정규 상세 · 기록 책" })).toBeVisible();
-    expect(screen.getByRole("link", { name: "피드백 보기" })).toHaveAttribute(
+    const feedbackAction = screen.getByRole("link", { name: "피드백 보기" });
+
+    expect(feedbackAction).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/feedback/closed-1",
     );
+    expect(feedbackAction).toHaveClass("rm-feedback-lock-trigger");
   });
 });
 

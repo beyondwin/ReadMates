@@ -187,7 +187,7 @@ export function noteKindLabel(item: Pick<NoteFeedItem, "kind">) {
   }
 
   if (item.kind === "LONG_REVIEW") {
-    return "기록";
+    return "서평";
   }
 
   return "기록";

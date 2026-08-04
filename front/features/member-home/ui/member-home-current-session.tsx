@@ -9,7 +9,7 @@ import { SessionTimingIdentity } from "@/shared/ui/session-identity";
 
 type CurrentSession = NonNullable<CurrentSessionReadPageData["currentSession"]>;
 
-export type MobileIconName = "archive" | "arrow-right" | "arrow-up-right" | "book" | "check" | "host" | "link" | "notes" | "sparkle";
+export type MobileIconName = "archive" | "arrow-right" | "arrow-up-right" | "book" | "check" | "chevron-right" | "host" | "link" | "notes" | "sparkle";
 
 const PACE_ACCENT: Record<ReadingPaceTier, string> = {
   COMPLETED: "var(--ok)",
@@ -148,6 +148,14 @@ export function MobileIcon({ name, size = 18, style }: { name: MobileIconName; s
     );
   }
 
+  if (name === "chevron-right") {
+    return (
+      <svg {...common}>
+        <path d="M9 5l7 7-7 7" />
+      </svg>
+    );
+  }
+
   if (name === "host") {
     return (
       <svg {...common}>
@@ -257,11 +265,11 @@ export function MobileCurrentSessionCard({
       </div>
 
       <div className="rm-member-session-card__body">
-        <div className="m-row-between" style={{ alignItems: "baseline", gap: 10 }}>
+        <div className="rm-member-session-card__prep-heading">
           <div className="eyebrow">
             {canViewPersonalState ? "내 준비" : "준비 현황"}
           </div>
-          <div className="tiny mono" style={{ color: "var(--text-3)" }}>
+          <div className="tiny mono rm-member-session-card__deadline">
             질문 마감 {deadlineLabel}
           </div>
         </div>
@@ -291,7 +299,7 @@ export function MobileCurrentSessionCard({
           className={`btn ${canWrite ? "btn-primary" : "btn-quiet"} rm-member-session-card__primary`}
           LinkComponent={LinkComponent}
         >
-          세션 열기 <MobileIcon name="arrow-right" size={14} />
+          세션 열기 <MobileIcon name="chevron-right" size={14} />
         </Link>
         {meetingUrl ? (
           <a className="rm-member-session-card__meeting" href={meetingUrl} target="_blank" rel="noreferrer">

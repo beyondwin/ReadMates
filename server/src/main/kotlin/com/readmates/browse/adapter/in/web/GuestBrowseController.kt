@@ -80,10 +80,11 @@ class GuestBrowseController(
     @GetMapping("/notes/feed")
     fun notesFeed(
         @PathVariable clubSlug: String,
+        @RequestParam(required = false) sessionId: String?,
         @RequestParam(required = false) limit: Int?,
         @RequestParam(required = false) cursor: String?,
     ): ResponseEntity<GuestCursorPageResponse<GuestNoteFeedItemResponse>> =
-        paged { listGuestNotesFeedUseCase.listNotesFeed(clubSlug, limit, cursor)?.toNotesFeedResponse() }
+        paged { listGuestNotesFeedUseCase.listNotesFeed(clubSlug, sessionId, limit, cursor)?.toNotesFeedResponse() }
 
     @GetMapping("/archive")
     fun archive(

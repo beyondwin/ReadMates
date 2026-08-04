@@ -224,9 +224,10 @@ test("authenticated users keep public browse and explicit target join actions", 
   expect(oauthStartUrl).toContain("joinIntent=browser-issued-intent-000000000000000");
 });
 
-test("mobile guest lock sheet traps and restores focus while keeping one contextual conversion action", async ({ page }) => {
-  for (const width of [320, 390]) {
-    await page.setViewportSize({ width, height: 844 });
+test("guest lock dialog stays compact and accessible across mobile and desktop", async ({ page }) => {
+  for (const width of [320, 390, 1366]) {
+    const height = width < 720 ? 844 : 900;
+    await page.setViewportSize({ width, height });
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto(seededArchivePath);
 
@@ -235,13 +236,21 @@ test("mobile guest lock sheet traps and restores focus while keeping one context
     await expect(feedbackAction).toBeVisible();
     await expectTapTarget(feedbackAction);
     await expectNoHorizontalOverflow(page);
+    expect(await feedbackAction.evaluate((element) => getComputedStyle(element).textAlign)).toBe("left");
 
-    const tabbar = page.locator(".m-tabbar");
-    const actionBox = await feedbackAction.boundingBox();
-    const tabbarBox = await tabbar.boundingBox();
-    expect(actionBox).not.toBeNull();
-    expect(tabbarBox).not.toBeNull();
-    expect(actionBox!.y + actionBox!.height).toBeLessThanOrEqual(tabbarBox!.y);
+    if (width < 720) {
+      const tabbar = page.locator(".m-tabbar");
+      const actionBox = await feedbackAction.boundingBox();
+      const tabbarBox = await tabbar.boundingBox();
+      expect(actionBox).not.toBeNull();
+      expect(tabbarBox).not.toBeNull();
+      expect(actionBox!.y + actionBox!.height).toBeLessThanOrEqual(tabbarBox!.y);
+      expect(await feedbackAction.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        const parentRect = element.parentElement!.getBoundingClientRect();
+        return Math.abs(rect.width - parentRect.width);
+      })).toBeLessThanOrEqual(1);
+    }
 
     await feedbackAction.focus();
     await page.keyboard.press("Enter");
@@ -250,6 +259,17 @@ test("mobile guest lock sheet traps and restores focus while keeping one context
     await expect(dialog).toBeVisible();
     await expect(close).toBeFocused();
     await expectTapTarget(close);
+    const dialogBox = await dialog.boundingBox();
+    expect(dialogBox).not.toBeNull();
+    if (width < 720) {
+      expect(Math.abs(dialogBox!.width - width)).toBeLessThanOrEqual(1);
+      expect(Math.abs(dialogBox!.y + dialogBox!.height - height)).toBeLessThanOrEqual(1);
+      expect(dialogBox!.height).toBeLessThan(360);
+    } else {
+      expect(dialogBox!.width).toBeLessThanOrEqual(420);
+      expect(dialogBox!.height).toBeLessThan(320);
+      expect(Math.abs(dialogBox!.x + dialogBox!.width / 2 - width / 2)).toBeLessThanOrEqual(1);
+    }
     await expect.poll(() => page.evaluate(() => document.body.style.overflow)).toBe("hidden");
     expect(await close.evaluate((element) => getComputedStyle(element).outlineWidth)).not.toBe("0px");
     const animationDurationSeconds = await dialog.evaluate((element) =>

@@ -10,10 +10,12 @@ import {
 import {
   guestArchivePageReadView,
   guestHomeReadView,
+  guestNoteSessionsReadPage,
   guestNotesReadView,
 } from "@/features/guest-browse/model/guest-read-views";
 import { clubSlugFromLoaderArgs, type ClubScopedLoaderArgs } from "@/shared/auth/member-app-loader";
 import { isReadmatesApiError } from "@/shared/api/errors";
+import { selectNoteSession } from "@/shared/model/notes-feed-model";
 
 function requiredClubSlug(args?: ClubScopedLoaderArgs) {
   const clubSlug = clubSlugFromLoaderArgs(args);
@@ -71,9 +73,35 @@ export async function guestCurrentSessionLoader(args?: Pick<LoaderFunctionArgs, 
   return fetchGuestCurrentSession(requiredClubSlug(args));
 }
 
-export async function guestNotesLoader(args?: Pick<LoaderFunctionArgs, "params">) {
+async function loadGuestNoteSessionsThroughSelection(
+  clubSlug: string,
+  initialPage: Awaited<ReturnType<typeof fetchGuestNoteSessions>>,
+  selectedSessionId: string,
+) {
+  const items = [...initialPage.items];
+  let nextCursor = initialPage.nextCursor;
+  const seenCursors = new Set<string>();
+
+  while (!items.some((session) => session.sessionId === selectedSessionId) && nextCursor && !seenCursors.has(nextCursor)) {
+    seenCursors.add(nextCursor);
+    const nextPage = await fetchGuestNoteSessions(clubSlug, { cursor: nextCursor });
+    items.push(...nextPage.items);
+    nextCursor = nextPage.nextCursor;
+  }
+
+  return { items, nextCursor };
+}
+
+export async function guestNotesLoader(args?: Pick<LoaderFunctionArgs, "params" | "request">) {
   const clubSlug = requiredClubSlug(args);
-  const [sessions, feed] = await Promise.all([fetchGuestNoteSessions(clubSlug), fetchGuestNoteFeed(clubSlug)]);
+  const initialSessions = await fetchGuestNoteSessions(clubSlug);
+  const requestedSessionId = args?.request ? new URL(args.request.url).searchParams.get("sessionId") : null;
+  const sessions = requestedSessionId
+    ? await loadGuestNoteSessionsThroughSelection(clubSlug, initialSessions, requestedSessionId)
+    : initialSessions;
+  const defaultSessionId = selectNoteSession(guestNoteSessionsReadPage(sessions).items, null)?.sessionId ?? null;
+  const feedSessionId = requestedSessionId ?? defaultSessionId;
+  const feed = await fetchGuestNoteFeed(clubSlug, { sessionId: feedSessionId });
   return guestNotesReadView(sessions, feed);
 }
 

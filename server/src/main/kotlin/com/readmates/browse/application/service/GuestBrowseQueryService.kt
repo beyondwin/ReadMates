@@ -92,13 +92,15 @@ class GuestBrowseQueryService(
 
     override fun listNotesFeed(
         clubSlug: String,
+        sessionId: String?,
         requestedLimit: Int?,
         rawCursor: String?,
     ): GuestCursorPage<GuestNoteFeedResult>? {
         if (loadGuestSessionBrowsePort.loadShell(clubSlug) == null) return null
+        val normalizedSessionId = normalizeOptionalSessionId(sessionId)
         val pageLimit = validatedLimit(requestedLimit)
-        val cursor = parseNoteFeedCursor(clubSlug, rawCursor)
-        val rows = loadGuestRecordBrowsePort.loadNotesFeed(clubSlug, cursor, pageLimit + 1)
+        val cursor = parseNoteFeedCursor(clubSlug, normalizedSessionId, rawCursor)
+        val rows = loadGuestRecordBrowsePort.loadNotesFeed(clubSlug, normalizedSessionId, cursor, pageLimit + 1)
         val visibleRows = rows.take(pageLimit)
         return GuestCursorPage(
             items = visibleRows,
@@ -108,6 +110,7 @@ class GuestBrowseQueryService(
                         CursorCodec.encode(
                             mapOf(
                                 "clubSlug" to clubSlug,
+                                "feedSessionId" to normalizedSessionId.orEmpty(),
                                 "sessionNumber" to item.sessionNumber.toString(),
                                 "createdAt" to item.createdAt,
                                 "sourceOrder" to item.sourceOrder.toString(),
@@ -167,11 +170,18 @@ class GuestBrowseQueryService(
 
     private fun parseNoteFeedCursor(
         clubSlug: String,
+        sessionId: String?,
         rawCursor: String?,
     ): GuestNoteFeedCursor? {
         if (rawCursor == null) return null
         val values = decodeCursor(rawCursor)
-        if (values.keys != NOTE_FEED_CURSOR_KEYS || values["clubSlug"] != clubSlug) invalidCursor()
+        if (
+            values.keys != NOTE_FEED_CURSOR_KEYS ||
+            values["clubSlug"] != clubSlug ||
+            values["feedSessionId"] != sessionId.orEmpty()
+        ) {
+            invalidCursor()
+        }
         val sessionNumber = values["sessionNumber"]?.toIntOrNull()?.takeIf { it > 0 } ?: invalidCursor()
         val createdAt =
             values["createdAt"]?.takeIf { runCatching { OffsetDateTime.parse(it) }.isSuccess }
@@ -181,6 +191,12 @@ class GuestBrowseQueryService(
         val itemId = values["itemId"]?.takeIf { runCatching { UUID.fromString(it) }.isSuccess } ?: invalidCursor()
         return GuestNoteFeedCursor(sessionNumber, createdAt, sourceOrder, itemOrder, itemId)
     }
+
+    private fun normalizeOptionalSessionId(sessionId: String?): String? =
+        sessionId?.let { value ->
+            runCatching { UUID.fromString(value).toString() }
+                .getOrElse { invalidCursor() }
+        }
 
     private fun decodeCursor(rawCursor: String): Map<String, String> =
         runCatching { CursorCodec.decodeStrict(rawCursor) }
@@ -239,6 +255,6 @@ class GuestBrowseQueryService(
         val CURSOR_KEYS = setOf("clubSlug", "date", "startTime", "sessionId")
         val RECORD_CURSOR_KEYS = setOf("clubSlug", "sessionNumber", "sessionId")
         val NOTE_FEED_CURSOR_KEYS =
-            setOf("clubSlug", "sessionNumber", "createdAt", "sourceOrder", "itemOrder", "itemId")
+            setOf("clubSlug", "feedSessionId", "sessionNumber", "createdAt", "sourceOrder", "itemOrder", "itemId")
     }
 }

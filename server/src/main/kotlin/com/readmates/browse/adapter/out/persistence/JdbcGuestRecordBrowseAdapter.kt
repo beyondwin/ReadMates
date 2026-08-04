@@ -109,9 +109,11 @@ class JdbcGuestRecordBrowseAdapter(
 
     override fun loadNotesFeed(
         clubSlug: String,
+        sessionId: String?,
         cursor: GuestNoteFeedCursor?,
         limit: Int,
     ): List<GuestNoteFeedResult> {
+        val sessionClause = if (sessionId == null) "" else "and sessions.id = ?"
         val cursorClause =
             if (cursor == null) {
                 ""
@@ -129,6 +131,9 @@ class JdbcGuestRecordBrowseAdapter(
         val arguments =
             buildList<Any> {
                 add(clubSlug)
+                if (sessionId != null) {
+                    add(sessionId)
+                }
                 if (cursor != null) {
                     val createdAt = Timestamp.from(OffsetDateTime.parse(cursor.createdAt).toInstant())
                     add(cursor.sessionNumber)
@@ -160,6 +165,7 @@ class JdbcGuestRecordBrowseAdapter(
                 and clubs.public_visibility = 'PUBLIC'
                 and sessions.access_scope = 'GUEST_READABLE'
                 and sessions.state = 'PUBLISHED'
+                $sessionClause
             )
             select
               id, session_id, session_number, book_title,

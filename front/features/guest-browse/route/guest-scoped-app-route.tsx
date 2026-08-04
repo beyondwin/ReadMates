@@ -11,7 +11,7 @@ import { GuestLockedPage, type GuestLockKind } from "@/features/guest-browse/ui/
 import { GuestMySpace } from "@/features/guest-browse/ui/guest-my-space";
 import type { GuestSurfaceLinkProps } from "@/features/guest-browse/ui/guest-surfaces";
 import { loginPathForReturnTo } from "@/shared/auth/login-return";
-import { feedFilterFromSearchParam, type FeedFilter } from "@/shared/model/notes-feed-model";
+import { feedFilterFromSearchParam, resolveSelectedSession, type FeedFilter } from "@/shared/model/notes-feed-model";
 import NotesFeedPage from "@/shared/ui/notes-feed-page";
 
 type GuestLinkProps = GuestSurfaceLinkProps;
@@ -148,10 +148,20 @@ function guestBrowseContent(
         appBasePath={appBasePath}
         feedbackLockedAction={(
           <LinkComponent
-            className="btn btn-quiet btn-sm"
+            className="btn btn-quiet btn-sm rm-feedback-lock-trigger"
             to={`${appBasePath}/feedback/${encodeURIComponent(detail.sessionId)}`}
           >
-            피드백 보기
+            <span>피드백 보기</span>
+            <svg
+              className="rm-feedback-lock-trigger__icon"
+              aria-hidden="true"
+              viewBox="0 0 20 20"
+              width="18"
+              height="18"
+              fill="none"
+            >
+              <path d="m7 4.5 5 5.5-5 5.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </LinkComponent>
         )}
       />
@@ -182,7 +192,12 @@ export function GuestNotesRoute({ initialData, clubSlug, appBasePath, LinkCompon
   const [searchParams, setSearchParams] = useSearchParams();
   const feedInFlight = useRef<string | null>(null);
   const sessionsInFlight = useRef<string | null>(null);
-  const selectedSession = data.sessions.items.find((session) => session.sessionId === selectedSessionId) ?? null;
+  const selectedSession = resolveSelectedSession({
+    noteSessions: data.sessions.items,
+    selectedSessionId,
+    selectedSession: null,
+  });
+  const activeSessionId = selectedSession?.sessionId ?? selectedSessionId;
   const handleFilterChange = useCallback((filter: FeedFilter) => {
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
@@ -201,10 +216,12 @@ export function GuestNotesRoute({ initialData, clubSlug, appBasePath, LinkCompon
     if (!cursor || feedInFlight.current === cursor) return;
     feedInFlight.current = cursor;
     try {
-      const next = await queryClient.fetchQuery(guestNoteFeedQuery(clubSlug, { limit: 20, cursor }));
+      const next = await queryClient.fetchQuery(
+        guestNoteFeedQuery(clubSlug, { limit: 20, cursor, sessionId: activeSessionId }),
+      );
       setData((current) => current.feed.nextCursor === cursor ? { ...current, feed: appendPage(current.feed, guestNoteFeedReadPage(next)) } : current);
     } finally { feedInFlight.current = null; }
-  }, [clubSlug, data.feed.nextCursor, queryClient]);
+  }, [activeSessionId, clubSlug, data.feed.nextCursor, queryClient]);
   const loadMoreSessions = useCallback(async () => {
     const cursor = data.sessions.nextCursor;
     if (!cursor || sessionsInFlight.current === cursor) return;

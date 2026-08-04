@@ -4,25 +4,9 @@ import type {
   MemberHomeRecentRecordEntry,
 } from "@/features/member-home/model/member-home-view-model";
 import type { CurrentSessionReadPageData } from "@/shared/model/current-session-read-view";
-import type { NoteFeedItem } from "@/shared/model/notes-feed-model";
+import { noteKindLabel, type NoteFeedItem } from "@/shared/model/notes-feed-model";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { rsvpLabel } from "@/shared/ui/readmates-display";
-
-function noteKindLabel(kind: string) {
-  if (kind === "QUESTION") {
-    return "질문";
-  }
-
-  if (kind === "ONE_LINE_REVIEW") {
-    return "한줄평";
-  }
-
-  if (kind === "HIGHLIGHT") {
-    return "하이라이트";
-  }
-
-  return kind;
-}
 
 function SectionHeader({
   eyebrow,
@@ -59,7 +43,7 @@ function RecentRecordDestination({
 }) {
   const content = (
     <>
-      <span className="rm-recent-record__destination-copy">
+      <span className="rm-recent-record__destination-copy rm-recent-record__destination-copy--start">
         <strong>{label}</strong>
         <span>{description}</span>
       </span>
@@ -136,7 +120,7 @@ export function ClubPulse({
   LinkComponent?: MemberHomeLinkComponent;
 }) {
   return (
-    <section>
+    <section className="rm-club-pulse">
       <SectionHeader
         eyebrow="클럽 흐름"
         title="최근 클럽 흐름"
@@ -175,7 +159,7 @@ export function ClubPulse({
                   ) : null}
                 </div>
                 <span className="tiny mono rm-club-pulse-entry__meta">
-                  No.{String(item.sessionNumber).padStart(2, "0")} · {noteKindLabel(item.kind)}
+                  No.{String(item.sessionNumber).padStart(2, "0")} · {noteKindLabel(item)}
                 </span>
               </div>
               <div className="body-lg editorial" style={{ lineHeight: 1.65 }}>
@@ -261,7 +245,7 @@ export function MobileMemberActivity({
         <div className="rm-member-activity-list">
           {items.map((item) => {
             const authorName = item.kind === "HIGHLIGHT" ? null : item.authorName;
-            const kindLabel = noteKindLabel(item.kind);
+            const kindLabel = noteKindLabel(item);
 
             return (
               <article

@@ -127,6 +127,46 @@ class GuestBrowseQueryServiceTest {
             )
     }
 
+    @Test
+    fun `notes feed binds the selected session into its cursor scope`() {
+        val selectedSessionId = sessionId(3)
+        val rows = noteFeedRows(21, selectedSessionId, sessionNumber = 3)
+        val recordPort = FakeGuestRecordBrowsePort(notesFeed = rows)
+        val service = GuestBrowseQueryService(FakeGuestSessionBrowsePort(), recordPort)
+
+        val page = requireNotNull(service.listNotesFeed("guest-test", selectedSessionId, null, null))
+
+        assertThat(page.items).hasSize(20)
+        assertThat(recordPort.requestedNoteSessionIds).containsExactly(selectedSessionId)
+        assertThat(CursorCodec.decodeStrict(page.nextCursor))
+            .containsExactlyInAnyOrderEntriesOf(
+                mapOf(
+                    "clubSlug" to "guest-test",
+                    "feedSessionId" to selectedSessionId,
+                    "sessionNumber" to "3",
+                    "createdAt" to rows[19].createdAt,
+                    "sourceOrder" to rows[19].sourceOrder.toString(),
+                    "itemOrder" to rows[19].itemOrder.toString(),
+                    "itemId" to rows[19].itemId,
+                ),
+            )
+
+        assertThatThrownBy {
+            service.listNotesFeed("guest-test", sessionId(4), null, page.nextCursor)
+        }.isInstanceOf(GuestBrowseInvalidCursorException::class.java)
+    }
+
+    @Test
+    fun `notes feed rejects a malformed selected session before reading records`() {
+        val recordPort = FakeGuestRecordBrowsePort()
+        val service = GuestBrowseQueryService(FakeGuestSessionBrowsePort(), recordPort)
+
+        assertThatThrownBy {
+            service.listNotesFeed("guest-test", "not-a-uuid", null, null)
+        }.isInstanceOf(GuestBrowseInvalidCursorException::class.java)
+        assertThat(recordPort.requestedNoteSessionIds).isEmpty()
+    }
+
     private class FakeGuestSessionBrowsePort(
         private val shell: GuestBrowseShellResult? = sampleShell(),
         private val current: GuestCurrentSessionResult? = null,
@@ -145,7 +185,10 @@ class GuestBrowseQueryServiceTest {
 
     private class FakeGuestRecordBrowsePort(
         private val archive: List<GuestArchiveSessionResult> = emptyList(),
+        private val notesFeed: List<GuestNoteFeedResult> = emptyList(),
     ) : LoadGuestRecordBrowsePort {
+        val requestedNoteSessionIds = mutableListOf<String?>()
+
         override fun loadNoteSessions(
             clubSlug: String,
             cursor: GuestRecordCursor?,
@@ -154,9 +197,13 @@ class GuestBrowseQueryServiceTest {
 
         override fun loadNotesFeed(
             clubSlug: String,
+            sessionId: String?,
             cursor: GuestNoteFeedCursor?,
             limit: Int,
-        ): List<GuestNoteFeedResult> = emptyList()
+        ): List<GuestNoteFeedResult> {
+            requestedNoteSessionIds += sessionId
+            return notesFeed.take(limit)
+        }
 
         override fun loadArchiveSessions(
             clubSlug: String,
@@ -197,5 +244,28 @@ class GuestBrowseQueryServiceTest {
             }
 
         fun sessionId(number: Int): String = "00000000-0000-0000-0000-${number.toString().padStart(12, '0')}"
+
+        fun noteFeedRows(
+            count: Int,
+            selectedSessionId: String,
+            sessionNumber: Int,
+        ): List<GuestNoteFeedResult> =
+            (1..count).map { number ->
+                GuestNoteFeedResult(
+                    itemId = sessionId(100 + number),
+                    createdAt = "2026-08-04T10:${number.toString().padStart(2, '0')}:00.000000Z",
+                    sourceOrder = 10,
+                    itemOrder = number,
+                    sessionId = selectedSessionId,
+                    sessionNumber = sessionNumber,
+                    bookTitle = "선택한 책",
+                    date = "2026-08-04",
+                    authorName = "게스트 멤버",
+                    authorShortName = "게스트",
+                    avatarKey = "book",
+                    kind = "QUESTION",
+                    text = "$number 번째 질문",
+                )
+            }
     }
 }

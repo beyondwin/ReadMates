@@ -220,13 +220,90 @@ describe("guest route loaders", () => {
 
     await Promise.all([guestCurrentSessionLoader(args), guestNotesLoader(args), guestArchiveLoader(args)]);
 
-    expect(fetchMock.mock.calls.map(([path]) => path)).toEqual([
+    expect(fetchMock.mock.calls.map(([path]) => path)).toEqual(expect.arrayContaining([
       "/api/bff/api/public/clubs/alpha/browse/sessions/current",
       "/api/bff/api/public/clubs/alpha/browse/notes/sessions?limit=20",
       "/api/bff/api/public/clubs/alpha/browse/notes/feed?limit=20",
       "/api/bff/api/public/clubs/alpha/browse/archive?limit=20",
-    ]);
+    ]));
+    expect(fetchMock).toHaveBeenCalledTimes(4);
     expect(fetchMock.mock.calls.every(([path]) => String(path).includes("/api/public/clubs/alpha/browse"))).toBe(true);
+  });
+
+  it("loads the guest notes feed for the explicitly selected session", async () => {
+    const fetchMock = vi.fn((path: string) => {
+      if (path.includes("/notes/sessions")) {
+        return Promise.resolve(jsonResponse({
+          items: [{ sessionId: "session-3", sessionNumber: 3, bookTitle: "선택한 책", date: "2026-08-02", questionCount: 1, oneLinerCount: 0, longReviewCount: 0, highlightCount: 0, totalCount: 1 }],
+          nextCursor: null,
+        }));
+      }
+      return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await guestNotesLoader({
+      params: { clubSlug: "alpha" },
+      request: new Request("https://readmates.local/clubs/alpha/app/notes?sessionId=session-3"),
+    });
+
+    expect(fetchMock.mock.calls.map(([path]) => path)).toEqual([
+      "/api/bff/api/public/clubs/alpha/browse/notes/sessions?limit=20",
+      "/api/bff/api/public/clubs/alpha/browse/notes/feed?limit=20&sessionId=session-3",
+    ]);
+  });
+
+  it("retains an explicitly selected session beyond the first session page", async () => {
+    const selectedSession = {
+      sessionId: "session-21",
+      sessionNumber: 21,
+      bookTitle: "오래된 선택 책",
+      date: "2025-12-01",
+      questionCount: 1,
+      oneLinerCount: 0,
+      longReviewCount: 0,
+      highlightCount: 0,
+      totalCount: 1,
+    };
+    const fetchMock = vi.fn((path: string) => {
+      if (path === "/api/bff/api/public/clubs/alpha/browse/notes/sessions?limit=20") {
+        return Promise.resolve(jsonResponse({ items: [], nextCursor: "sessions-cursor-1" }));
+      }
+      if (path === "/api/bff/api/public/clubs/alpha/browse/notes/sessions?limit=20&cursor=sessions-cursor-1") {
+        return Promise.resolve(jsonResponse({ items: [selectedSession], nextCursor: null }));
+      }
+      if (path === "/api/bff/api/public/clubs/alpha/browse/notes/feed?limit=20&sessionId=session-21") {
+        return Promise.resolve(jsonResponse({
+          items: [{
+            sessionId: "session-21",
+            sessionNumber: 21,
+            bookTitle: "오래된 선택 책",
+            date: "2025-12-01",
+            authorName: "공개 작성자",
+            authorShortName: "공",
+            avatarKey: "book",
+            kind: "QUESTION",
+            text: "오래된 세션 질문",
+          }],
+          nextCursor: null,
+        }));
+      }
+      return Promise.reject(new Error(`Unexpected fetch: ${path}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await guestNotesLoader({
+      params: { clubSlug: "alpha" },
+      request: new Request("https://readmates.local/clubs/alpha/app/notes?sessionId=session-21"),
+    });
+
+    expect(result.sessions.items).toContainEqual(selectedSession);
+    expect(result.feed.items).toHaveLength(1);
+    expect(fetchMock.mock.calls.map(([path]) => path)).toEqual([
+      "/api/bff/api/public/clubs/alpha/browse/notes/sessions?limit=20",
+      "/api/bff/api/public/clubs/alpha/browse/notes/sessions?limit=20&cursor=sessions-cursor-1",
+      "/api/bff/api/public/clubs/alpha/browse/notes/feed?limit=20&sessionId=session-21",
+    ]);
   });
 
   it("keeps the current-session loader response in the public API shape for the shared page normalizer", async () => {

@@ -21,6 +21,10 @@ export type GuestBrowsePage = {
   cursor?: string | null;
 };
 
+export type GuestNoteFeedPageRequest = GuestBrowsePage & {
+  sessionId?: string | null;
+};
+
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 50;
 
@@ -37,6 +41,14 @@ function pageSearchParams(page: GuestBrowsePage = {}) {
   const search = new URLSearchParams({ limit: String(limit) });
   if (page.cursor) {
     search.set("cursor", page.cursor);
+  }
+  return `?${search.toString()}`;
+}
+
+function noteFeedSearchParams(page: GuestNoteFeedPageRequest = {}) {
+  const search = new URLSearchParams(pageSearchParams(page).slice(1));
+  if (page.sessionId) {
+    search.set("sessionId", page.sessionId);
   }
   return `?${search.toString()}`;
 }
@@ -61,8 +73,8 @@ export function fetchGuestNoteSessions(clubSlug: string, page?: GuestBrowsePage)
   );
 }
 
-export function fetchGuestNoteFeed(clubSlug: string, page?: GuestBrowsePage): Promise<GuestNoteFeedPage> {
-  return readmatesPublicFetch<unknown>(browsePath(clubSlug, `/notes/feed${pageSearchParams(page)}`)).then(parseGuestNoteFeed);
+export function fetchGuestNoteFeed(clubSlug: string, page?: GuestNoteFeedPageRequest): Promise<GuestNoteFeedPage> {
+  return readmatesPublicFetch<unknown>(browsePath(clubSlug, `/notes/feed${noteFeedSearchParams(page)}`)).then(parseGuestNoteFeed);
 }
 
 export function fetchGuestArchive(clubSlug: string, page?: GuestBrowsePage): Promise<GuestArchivePage> {

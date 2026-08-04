@@ -38,6 +38,7 @@ interface ListGuestNoteSessionsUseCase {
 interface ListGuestNotesFeedUseCase {
     fun listNotesFeed(
         clubSlug: String,
+        sessionId: String?,
         requestedLimit: Int?,
         rawCursor: String?,
     ): GuestCursorPage<GuestNoteFeedResult>?

@@ -16,6 +16,7 @@ interface LoadGuestRecordBrowsePort {
 
     fun loadNotesFeed(
         clubSlug: String,
+        sessionId: String?,
         cursor: GuestNoteFeedCursor?,
         limit: Int,
     ): List<GuestNoteFeedResult>

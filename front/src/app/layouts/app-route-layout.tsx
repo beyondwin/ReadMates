@@ -130,7 +130,7 @@ async function verifyGuestReadableRoute(clubSlug: string, target: GuestContinuat
     const sessionId = new URLSearchParams(target.search).get("sessionId");
     await Promise.all([
       fetchGuestNoteSessions(clubSlug, page),
-      fetchGuestNoteFeed(clubSlug, page),
+      fetchGuestNoteFeed(clubSlug, { ...page, sessionId }),
       ...(sessionId ? [fetchGuestArchiveDetail(clubSlug, sessionId)] : []),
     ]);
     return;

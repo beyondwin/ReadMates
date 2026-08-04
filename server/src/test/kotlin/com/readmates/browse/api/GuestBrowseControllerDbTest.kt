@@ -93,6 +93,7 @@ class GuestBrowseControllerDbTest(
         insertSession(HOST_ONLY_OPEN_ID, CLUB_ID, 43, "OPEN", "HOST_ONLY", "HOST_ONLY", "숨은 현재 세션")
         insertSession(HOST_ONLY_DRAFT_ID, CLUB_ID, 44, "DRAFT", "HOST_ONLY", "HOST_ONLY", "숨은 예정 세션")
         insertSession(OUTSIDE_DRAFT_ID, OUTSIDE_CLUB_ID, 41, "DRAFT", "GUEST_READABLE", "MEMBER", "다른 클럽 예정 세션")
+        insertSession(OUTSIDE_PUBLISHED_ID, OUTSIDE_CLUB_ID, 40, "PUBLISHED", "GUEST_READABLE", "PUBLIC", "다른 클럽 발행 세션")
         jdbcTemplate.update(
             """
             insert into session_participants (
@@ -200,6 +201,15 @@ class GuestBrowseControllerDbTest(
         )
         jdbcTemplate.update(
             """
+            insert into highlights (id, club_id, session_id, membership_id, text, sort_order)
+            values (?, ?, ?, null, '다른 클럽 공개 하이라이트', 1)
+            """.trimIndent(),
+            OUTSIDE_HIGHLIGHT_ID,
+            OUTSIDE_CLUB_ID,
+            OUTSIDE_PUBLISHED_ID,
+        )
+        jdbcTemplate.update(
+            """
             insert into long_reviews (id, club_id, session_id, membership_id, body, visibility)
             values
               (?, ?, ?, ?, ?, 'PUBLIC'),
@@ -253,7 +263,7 @@ class GuestBrowseControllerDbTest(
     @AfterEach
     fun cleanupGuestBrowseMatrix() {
         jdbcTemplate.update("delete from public_session_publications where id = ?", PUBLICATION_ID)
-        jdbcTemplate.update("delete from highlights where id = ?", HIGHLIGHT_ID)
+        jdbcTemplate.update("delete from highlights where id in (?, ?)", HIGHLIGHT_ID, OUTSIDE_HIGHLIGHT_ID)
         jdbcTemplate.update(
             "delete from one_line_reviews where id in (?, ?)",
             PUBLIC_ONE_LINE_REVIEW_ID,
@@ -280,7 +290,7 @@ class GuestBrowseControllerDbTest(
             PUBLISHED_PARTICIPANT_TWO_ID,
         )
         jdbcTemplate.update(
-            "delete from sessions where id in (?, ?, ?, ?, ?, ?, ?, ?)",
+            "delete from sessions where id in (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             OPEN_ID,
             DRAFT_ID,
             CLOSED_ID,
@@ -289,6 +299,7 @@ class GuestBrowseControllerDbTest(
             HOST_ONLY_OPEN_ID,
             HOST_ONLY_DRAFT_ID,
             OUTSIDE_DRAFT_ID,
+            OUTSIDE_PUBLISHED_ID,
         )
         jdbcTemplate.update(
             "delete from memberships where id in (?, ?)",
@@ -487,6 +498,57 @@ class GuestBrowseControllerDbTest(
         assertForbiddenKeysAbsent(feedResponse.contentAsString, FORBIDDEN_GUEST_KEYS)
         assertGuestResponseHeaders(sessionsResponse)
         assertGuestResponseHeaders(feedResponse)
+    }
+
+    @Test
+    fun `guest notes feed scopes records and cursor pages to the selected session`() {
+        val firstPage =
+            mockMvc
+                .get("/api/public/clubs/guest-test/browse/notes/feed") {
+                    param("sessionId", PUBLISHED_ID)
+                    param("limit", "1")
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.items.length()") { value(1) }
+                    jsonPath("$.items[*].sessionId") { value(hasItem(PUBLISHED_ID)) }
+                    jsonPath("$.nextCursor") { isString() }
+                }.andReturn()
+                .response
+        val cursor = objectMapper.readTree(firstPage.contentAsString).get("nextCursor").asText()
+
+        mockMvc
+            .get("/api/public/clubs/guest-test/browse/notes/feed") {
+                param("sessionId", PUBLISHED_ID)
+                param("limit", "20")
+                param("cursor", cursor)
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items[*].sessionId") { value(hasItem(PUBLISHED_ID)) }
+                jsonPath("$.items[*].text") { value(not(hasItem(ARCHIVE_QUESTION))) }
+                jsonPath("$.nextCursor") { value(null) }
+            }
+    }
+
+    @Test
+    fun `guest notes feed rejects malformed session ids and hides unavailable sessions`() {
+        mockMvc
+            .get("/api/public/clubs/guest-test/browse/notes/feed") {
+                param("sessionId", "not-a-uuid")
+            }.andExpect {
+                status { isBadRequest() }
+                jsonPath("$.code") { value("INVALID_REQUEST") }
+            }
+
+        listOf(OPEN_ID, CLOSED_ID, DRAFT_ID, OUTSIDE_PUBLISHED_ID, HOST_ONLY_CLOSED_ID).forEach { sessionId ->
+            mockMvc
+                .get("/api/public/clubs/guest-test/browse/notes/feed") {
+                    param("sessionId", sessionId)
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.items.length()") { value(0) }
+                    jsonPath("$.nextCursor") { value(null) }
+                }
+        }
     }
 
     @Test
@@ -691,6 +753,7 @@ class GuestBrowseControllerDbTest(
         const val HOST_ONLY_OPEN_ID = "00000000-0000-0000-0000-000000007432"
         const val HOST_ONLY_DRAFT_ID = "00000000-0000-0000-0000-000000007433"
         const val OUTSIDE_DRAFT_ID = "00000000-0000-0000-0000-000000007434"
+        const val OUTSIDE_PUBLISHED_ID = "00000000-0000-0000-0000-000000007438"
         const val PARTICIPANT_ONE_ID = "00000000-0000-0000-0000-000000007440"
         const val PARTICIPANT_TWO_ID = "00000000-0000-0000-0000-000000007441"
         const val PUBLISHED_PARTICIPANT_ONE_ID = "00000000-0000-0000-0000-000000007442"
@@ -705,6 +768,7 @@ class GuestBrowseControllerDbTest(
         const val ARCHIVE_PUBLIC_LONG_REVIEW_ID = "00000000-0000-0000-0000-000000007464"
         const val ARCHIVE_PRIVATE_LONG_REVIEW_ID = "00000000-0000-0000-0000-000000007465"
         const val HIGHLIGHT_ID = "00000000-0000-0000-0000-000000007470"
+        const val OUTSIDE_HIGHLIGHT_ID = "00000000-0000-0000-0000-000000007471"
         const val PUBLICATION_ID = "00000000-0000-0000-0000-000000007480"
         const val ARCHIVE_QUESTION = "기록에서 보이는 질문"
         const val REMOVED_QUESTION = "제외된 참가자의 숨겨야 하는 질문"
