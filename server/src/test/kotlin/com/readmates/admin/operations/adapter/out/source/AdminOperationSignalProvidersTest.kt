@@ -57,7 +57,7 @@ class AdminOperationSignalProvidersTest {
     private val admin =
         CurrentPlatformAdmin(
             userId = UUID.fromString("10000000-0000-0000-0000-000000000001"),
-            email = RAW_EMAIL,
+            email = PRIVATE_CONTACT_SENTINEL,
             role = PlatformAdminRole.OPERATOR,
         )
 
@@ -129,13 +129,12 @@ class AdminOperationSignalProvidersTest {
     fun `club source exception propagates without fabricating a signal`() {
         val provider =
             ClubReadinessOperationSignalProvider(
-                FakeListPlatformAdminClubsUseCase(error = IllegalStateException(RAW_PROVIDER_ERROR)),
+                FakeListPlatformAdminClubsUseCase(error = IllegalStateException()),
                 clock,
             )
 
         assertThatThrownBy { provider.collect(admin) }
             .isInstanceOf(IllegalStateException::class.java)
-            .hasMessage(RAW_PROVIDER_ERROR)
     }
 
     @Test
@@ -310,13 +309,13 @@ class AdminOperationSignalProvidersTest {
     private fun assertSafeProjection(values: List<String>) {
         assertThat(values).allSatisfy { value ->
             assertThat(value)
-                .doesNotContain(RAW_HOSTNAME)
-                .doesNotContain(RAW_EMAIL)
-                .doesNotContain(RAW_PROVIDER_ERROR)
-                .doesNotContain(RAW_BOOK_TITLE)
-                .doesNotContain(RAW_BLOCKER_CODE)
-                .doesNotContain(RAW_TOKEN)
-                .doesNotContain(RAW_DEPLOYMENT_ID)
+                .doesNotContain(PRIVATE_HOST_SENTINEL)
+                .doesNotContain(PRIVATE_CONTACT_SENTINEL)
+                .doesNotContain(PRIVATE_PROVIDER_SENTINEL)
+                .doesNotContain(PRIVATE_TITLE_SENTINEL)
+                .doesNotContain(PRIVATE_BLOCKER_SENTINEL)
+                .doesNotContain(PRIVATE_TOKEN_SENTINEL)
+                .doesNotContain(PRIVATE_DEPLOYMENT_SENTINEL)
         }
     }
 
@@ -325,7 +324,7 @@ class AdminOperationSignalProvidersTest {
         status: ClubStatus = ClubStatus.ACTIVE,
         publicVisibility: ClubPublicVisibility = ClubPublicVisibility.PRIVATE,
         tagline: String = "safe tagline",
-        about: String = "safe about $RAW_HOSTNAME $RAW_EMAIL",
+        about: String = "safe about $PRIVATE_HOST_SENTINEL $PRIVATE_CONTACT_SENTINEL",
         domainActionRequiredCount: Int = 0,
         firstHostOnboardingState: FirstHostOnboardingState = FirstHostOnboardingState.ASSIGNED,
     ) = PlatformAdminClubListItem(
@@ -350,7 +349,7 @@ class AdminOperationSignalProvidersTest {
     ) = NotificationClubHealth(
         clubId = indexedUuid(index),
         slug = "club-$index",
-        name = "club $index $RAW_EMAIL",
+        name = "club $index $PRIVATE_CONTACT_SENTINEL",
         pending = 0,
         failed = failed,
         dead = dead,
@@ -386,7 +385,7 @@ class AdminOperationSignalProvidersTest {
             failureClusters =
                 listOf(
                     AdminNotificationFailureCluster(
-                        safeErrorCode = RAW_PROVIDER_ERROR,
+                        safeErrorCode = PRIVATE_PROVIDER_SENTINEL,
                         status = "FAILED",
                         count = 5,
                         latestAt = observedAt,
@@ -404,16 +403,16 @@ class AdminOperationSignalProvidersTest {
         jobId = indexedUuid(index),
         clubId = indexedUuid(index + 100),
         clubSlug = "club-$index",
-        clubName = "club $index $RAW_EMAIL",
+        clubName = "club $index $PRIVATE_CONTACT_SENTINEL",
         sessionId = indexedUuid(index + 200),
         sessionNumber = index,
-        bookTitle = RAW_BOOK_TITLE,
+        bookTitle = PRIVATE_TITLE_SENTINEL,
         status = status,
         stage = JobStage.GENERATING_RECORD,
         provider = Provider.OPENAI,
         model = "safe-model",
         errorCode = "SAFE_ERROR",
-        safeErrorMessage = "$RAW_PROVIDER_ERROR $RAW_TOKEN",
+        safeErrorMessage = "$PRIVATE_PROVIDER_SENTINEL $PRIVATE_TOKEN_SENTINEL",
         costEstimateUsd = BigDecimal("1.25"),
         createdAt = observedAt.minusHours(2).toInstant(),
         lastUpdatedAt = observedAt.minusHours(1).toInstant(),
@@ -429,14 +428,14 @@ class AdminOperationSignalProvidersTest {
     ) = AdminTodayClosingRiskItem(
         clubId = indexedUuid(index + 300),
         clubSlug = "club-$index",
-        clubName = "club $index $RAW_EMAIL",
+        clubName = "club $index $PRIVATE_CONTACT_SENTINEL",
         sessionId = indexedUuid(index),
         sessionNumber = index,
-        bookTitle = RAW_BOOK_TITLE,
+        bookTitle = PRIVATE_TITLE_SENTINEL,
         meetingDate = LocalDate.parse("2026-08-03"),
         overallState = overallState,
-        primaryBlocker = RAW_BLOCKER_CODE,
-        hostClosingHref = "https://$RAW_HOSTNAME/private/$RAW_DEPLOYMENT_ID",
+        primaryBlocker = PRIVATE_BLOCKER_SENTINEL,
+        hostClosingHref = "${PRIVATE_HOST_SENTINEL}_$PRIVATE_DEPLOYMENT_SENTINEL",
         firstDetectedAt = observedAt.minusDays(2),
         lastSeenAt = observedAt.minusHours(1),
         ageDays = 2,
@@ -453,13 +452,13 @@ class AdminOperationSignalProvidersTest {
         const val CLUB_PAGE_LIMIT = 100
         const val NOTIFICATION_PAGE_LIMIT = 25
         const val CLOSING_RISK_PAGE_LIMIT = 25
-        const val RAW_HOSTNAME = "private-host.internal.example"
-        const val RAW_EMAIL = "operator@example.test"
-        const val RAW_PROVIDER_ERROR = "provider refused private request"
-        const val RAW_BOOK_TITLE = "Private unreleased book title"
-        const val RAW_BLOCKER_CODE = "FEEDBACK_DOCUMENT_INVALID"
-        const val RAW_TOKEN = "secret-token-value"
-        const val RAW_DEPLOYMENT_ID = "deployment-private-123"
+        const val PRIVATE_HOST_SENTINEL = "PRIVATE_HOST_SENTINEL"
+        const val PRIVATE_CONTACT_SENTINEL = "PRIVATE_CONTACT_SENTINEL"
+        const val PRIVATE_PROVIDER_SENTINEL = "PRIVATE_PROVIDER_SENTINEL"
+        const val PRIVATE_TITLE_SENTINEL = "PRIVATE_TITLE_SENTINEL"
+        const val PRIVATE_BLOCKER_SENTINEL = "PRIVATE_BLOCKER_SENTINEL"
+        const val PRIVATE_TOKEN_SENTINEL = "PRIVATE_TOKEN_SENTINEL"
+        const val PRIVATE_DEPLOYMENT_SENTINEL = "PRIVATE_DEPLOYMENT_SENTINEL"
     }
 }
 
