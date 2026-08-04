@@ -210,6 +210,9 @@ describe("member home record reflection cards", () => {
       "href",
       "/app/feedback/session-8",
     );
+    expect(within(documents).getByText("피드백 문서 보기").parentElement).toHaveClass(
+      "rm-recent-record__destination-copy--start",
+    );
   });
 
   it("renders nothing when no reflection entry exists", () => {

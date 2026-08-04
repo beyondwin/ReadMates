@@ -910,6 +910,13 @@ a.rm-recent-record__destination:hover {
   gap: 4px;
 }
 
+.rm-recent-record__destination-copy--start {
+  flex: 1 1 auto;
+  width: 100%;
+  justify-items: start;
+  text-align: left;
+}
+
 .rm-recent-record__destination-copy strong {
   color: var(--text);
   font-size: var(--type-size-control);

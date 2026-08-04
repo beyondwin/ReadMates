@@ -43,7 +43,7 @@ function RecentRecordDestination({
 }) {
   const content = (
     <>
-      <span className="rm-recent-record__destination-copy">
+      <span className="rm-recent-record__destination-copy rm-recent-record__destination-copy--start">
         <strong>{label}</strong>
         <span>{description}</span>
       </span>
