@@ -142,7 +142,7 @@ describe("PublicSessionPage", () => {
 
     renderPublicSessionRoute("service-error");
 
-    expect(await screen.findByRole("heading", { name: "페이지를 불러오지 못했습니다." })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "서비스 연결이 원활하지 않습니다." })).toBeInTheDocument();
   });
 });
 

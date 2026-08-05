@@ -24,7 +24,7 @@ describe("CurrentSessionRouteError", () => {
     );
     render(<RouterProvider router={router} />);
 
-    expect(await screen.findByText("페이지를 불러오지 못했습니다.")).toBeInTheDocument();
+    expect(await screen.findByText("요청을 마치지 못했습니다.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "내 클럽으로" })).toHaveAttribute("href", "/app");
   });
 });

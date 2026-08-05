@@ -289,7 +289,7 @@ describe("Feedback document routes", () => {
 
     renderFeedbackRoute("/app/feedback/service-error");
 
-    expect(await screen.findByRole("heading", { name: "페이지를 불러오지 못했습니다." })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "요청을 마치지 못했습니다." })).toBeInTheDocument();
   });
 
   it("renders print-route access errors without calling print", async () => {
