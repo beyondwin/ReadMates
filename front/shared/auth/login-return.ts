@@ -1,4 +1,4 @@
-import { normalizedClubSlug } from "@/shared/security/club-slug";
+import { normalizedClubSlug } from "../security/club-slug";
 
 const excludedReturnPathPatterns = [
   /^\/login(?:[/?#]|$)/i,

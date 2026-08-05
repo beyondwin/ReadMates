@@ -1,12 +1,15 @@
 import {
   apiBaseUrlFromEnv,
-  copyUpstreamHeaders,
   forwardedOAuthRequestHeaders,
   READMATES_REQUEST_ID_HEADER,
   requestIdForUpstream,
   safeRouteSegment,
 } from "../../../_shared/proxy";
-import { bffErrorResponse } from "../../../_shared/errors";
+import {
+  invalidOAuthRouteResponse,
+  oauthProxyNetworkErrorResponse,
+  oauthProxyResponse,
+} from "../../../_shared/oauth-error-response";
 
 type Env = {
   READMATES_API_BASE_URL: string;
@@ -21,30 +24,27 @@ type PagesFunction<Env> = (context: {
 }) => Response | Promise<Response>;
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env, params }) => {
+  const requestId = requestIdForUpstream(request);
   const registrationId = safeRouteSegment(params.registrationId);
   if (!registrationId) {
-    return bffErrorResponse(404, "RESOURCE_NOT_FOUND");
+    return invalidOAuthRouteResponse(request, "callback", requestId);
   }
 
   const sourceUrl = new URL(request.url);
   const upstreamUrl = new URL(`/login/oauth2/code/${registrationId}`, apiBaseUrlFromEnv(env));
   upstreamUrl.search = sourceUrl.search;
 
-  const requestId = requestIdForUpstream(request);
   const forwardHeaders = forwardedOAuthRequestHeaders(request, env);
   forwardHeaders.set(READMATES_REQUEST_ID_HEADER, requestId);
 
-  const upstream = await fetch(upstreamUrl.toString(), {
-    method: "GET",
-    headers: forwardHeaders,
-    redirect: "manual",
-  });
-
-  const responseBody = [204, 304].includes(upstream.status) ? null : upstream.body;
-  const outboundResponse = new Response(responseBody, {
-    status: upstream.status,
-    headers: copyUpstreamHeaders(upstream.headers),
-  });
-  outboundResponse.headers.set(READMATES_REQUEST_ID_HEADER, requestId);
-  return outboundResponse;
+  try {
+    const upstream = await fetch(upstreamUrl.toString(), {
+      method: "GET",
+      headers: forwardHeaders,
+      redirect: "manual",
+    });
+    return oauthProxyResponse(request, upstream, "callback", requestId);
+  } catch {
+    return oauthProxyNetworkErrorResponse(request, "callback", requestId);
+  }
 };

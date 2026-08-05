@@ -416,4 +416,156 @@ describe("Cloudflare OAuth proxy functions", () => {
     await expectApiErrorBody(response, { status: 404, code: "RESOURCE_NOT_FOUND" });
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("redirects an HTML authorization 404 to the safe OAuth unavailable route", async () => {
+    const upstream = new Response("provider detail must stay upstream", {
+      status: 404,
+      headers: {
+        "Content-Type": "application/json",
+        "Set-Cookie": "oauth_state=expired; Path=/; Domain=api.example.com; Max-Age=0; HttpOnly",
+        "X-Readmates-Bff-Secret": "upstream-secret-placeholder",
+      },
+    });
+    vi.stubGlobal("fetch", vi.fn(async () => upstream));
+
+    const response = await authorizationGet(
+      context(
+        new Request(
+          "https://readmates.pages.dev/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp&joinClub=reading-sai&joinIntent=issued-placeholder&state=opaque-placeholder&inviteToken=invite-placeholder",
+          {
+            headers: {
+              Accept: "text/html,application/xhtml+xml",
+              "Sec-Fetch-Dest": "document",
+            },
+          },
+        ),
+        "google",
+      ),
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe(
+      "/auth/error?kind=oauth_unavailable&returnTo=%2Fclubs%2Freading-sai%2Fapp",
+    );
+    expect(response.headers.get("set-cookie")).toBe(
+      "oauth_state=expired; Path=/; Max-Age=0; HttpOnly",
+    );
+    expect(response.headers.get("x-readmates-bff-secret")).toBeNull();
+    expect(await response.text()).toBe("");
+    expect(response.headers.get("location")).not.toMatch(
+      /joinIntent|state|inviteToken|issued-placeholder|opaque-placeholder|provider detail/,
+    );
+  });
+
+  it.each([
+    { handler: authorizationGet as OAuthHandler, phase: "authorization", status: 429, kind: "rate_limited" },
+    { handler: authorizationGet as OAuthHandler, phase: "authorization", status: 500, kind: "internal_error" },
+    { handler: authorizationGet as OAuthHandler, phase: "authorization", status: 503, kind: "service_unavailable" },
+    { handler: callbackGet as OAuthHandler, phase: "callback", status: 410, kind: "request_expired" },
+    { handler: callbackGet as OAuthHandler, phase: "callback", status: 500, kind: "internal_error" },
+  ] as const)(
+    "maps HTML $phase $status responses to $kind",
+    async ({ handler, phase, status, kind }) => {
+      vi.stubGlobal("fetch", vi.fn(async () => new Response("upstream failure", { status })));
+      const requestUrl =
+        phase === "authorization"
+          ? "https://readmates.pages.dev/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp"
+          : "https://readmates.pages.dev/login/oauth2/code/google?code=provider-placeholder&state=opaque-placeholder";
+
+      const response = await handler(
+        context(
+          new Request(requestUrl, { headers: { Accept: "text/html", "Sec-Fetch-Dest": "document" } }),
+          "google",
+        ),
+      );
+
+      expect(response.status).toBe(302);
+      expect(response.headers.get("location")).toBe(`/auth/error?kind=${kind}` + (
+        phase === "authorization" ? "&returnTo=%2Fclubs%2Freading-sai%2Fapp" : ""
+      ));
+      expect(response.headers.get("location")).not.toMatch(/provider-placeholder|opaque-placeholder/);
+    },
+  );
+
+  it("preserves an upstream error response for JSON clients", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ code: "UPSTREAM_NOT_FOUND" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      })),
+    );
+
+    const response = await authorizationGet(
+      context(
+        new Request("https://readmates.pages.dev/oauth2/authorization/google?returnTo=/app", {
+          headers: { Accept: "application/json" },
+        }),
+        "google",
+      ),
+    );
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get("location")).toBeNull();
+    await expect(response.json()).resolves.toEqual({ code: "UPSTREAM_NOT_FOUND" });
+  });
+
+  it("translates an HTML upstream connection failure without exposing the exception", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      throw new Error("connect ECONNREFUSED private-upstream-placeholder");
+    }));
+
+    const response = await authorizationGet(
+      context(
+        new Request(
+          "https://readmates.pages.dev/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp&joinIntent=issued-placeholder",
+          { headers: { Accept: "text/html", "Sec-Fetch-Dest": "document" } },
+        ),
+        "google",
+      ),
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe(
+      "/auth/error?kind=service_unavailable&returnTo=%2Fclubs%2Freading-sai%2Fapp",
+    );
+    expect(await response.text()).not.toContain("ECONNREFUSED");
+  });
+
+  it("returns a sanitized JSON service error for a programmatic connection failure", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      throw new Error("connect ECONNREFUSED private-upstream-placeholder");
+    }));
+
+    const response = await callbackGet(
+      context(
+        new Request("https://readmates.pages.dev/login/oauth2/code/google?state=opaque-placeholder", {
+          headers: { Accept: "application/json" },
+        }),
+        "google",
+      ),
+    );
+
+    const publicCopy = response.clone();
+    await expectApiErrorBody(response, { status: 503, code: "OAUTH_UPSTREAM_UNAVAILABLE" });
+    expect(await publicCopy.text()).not.toContain("private-upstream-placeholder");
+  });
+
+  it("turns an unsafe document registration id into a fixed invalid-request route", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 302 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await authorizationGet(
+      context(
+        new Request("https://readmates.pages.dev/oauth2/authorization/google%2fextra", {
+          headers: { Accept: "text/html", "Sec-Fetch-Dest": "document" },
+        }),
+        "google%2fextra",
+      ),
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe("/auth/error?kind=request_invalid");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

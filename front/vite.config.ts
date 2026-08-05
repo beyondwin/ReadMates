@@ -2,6 +2,7 @@ import path from "node:path";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { rewriteFrontendObservabilityProxyPath } from "./shared/observability/frontend-observability-paths";
+import { configureOAuthNavigationProxy } from "./shared/auth/oauth-vite-proxy";
 import { normalizedClubSlug } from "./shared/security/club-slug";
 
 function normalizedClubSlugFromProxyPath(proxyPath: string | undefined) {
@@ -79,12 +80,14 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
         xfwd: true,
+        configure: configureOAuthNavigationProxy("authorization"),
       },
       "/login/oauth2/code": {
         target: process.env.READMATES_API_BASE_URL ?? "http://127.0.0.1:18080",
         changeOrigin: true,
         secure: false,
         xfwd: true,
+        configure: configureOAuthNavigationProxy("callback"),
       },
     },
   },
