@@ -1,14 +1,9 @@
 import { useEffect } from "react";
-import {
-  isRouteErrorResponse,
-  Link,
-  useLocation,
-  useRevalidator,
-  useRouteError,
-} from "react-router";
+import { isRouteErrorResponse, useLocation, useRevalidator, useRouteError } from "react-router";
 import { isReadmatesApiError } from "@/shared/api/errors";
 import { recordFrontendRuntimeError } from "@/shared/observability/frontend-observability";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
+import { ErrorExperience, type ErrorExperienceAction } from "@/shared/ui/error-experience";
 import { PageMetadataHead, type PageMetadata } from "@/shared/ui/page-metadata-head";
 
 export type RouteErrorVariant = "public" | "member" | "host" | "auth";
@@ -20,6 +15,7 @@ type RouteErrorView = {
   reassurance?: string;
   actionHref: string;
   actionLabel: string;
+  helpText?: string;
 };
 
 type RouteErrorPageProps = {
@@ -66,6 +62,17 @@ function classifyStatus(
 ): RouteErrorView {
   const actionHref = fallbackPathForVariant(variant);
   const actionLabel = actionLabelForVariant(variant);
+
+  if (status === 401) {
+    return {
+      eyebrow: "로그인 필요",
+      heading: "로그인을 다시 시작해 주세요.",
+      body: "인증 흐름이 끝났거나 현재 세션을 확인할 수 없습니다.",
+      reassurance: "기존 기록과 입력한 내용은 그대로 유지됩니다.",
+      actionHref,
+      actionLabel,
+    };
+  }
 
   if (status === 403) {
     return {
@@ -118,6 +125,28 @@ function classifyStatus(
           ? "요청이 잠시 많습니다. 공개 기록에서 다른 기록을 확인해 주세요."
           : "요청이 잠시 많습니다. 잠시 기다린 뒤 다시 시도해 주세요.",
       reassurance: isPublic ? "입력하거나 변경한 내용은 없습니다." : undefined,
+      actionHref,
+      actionLabel,
+    };
+  }
+
+  if (status === 500 || status === 501) {
+    return {
+      eyebrow: "서비스 오류",
+      heading: "요청을 마치지 못했습니다.",
+      body: "서비스 내부에서 문제가 발생했습니다. 안전한 화면으로 돌아가 다시 시작해 주세요.",
+      reassurance: "입력하거나 변경한 내용은 없습니다.",
+      actionHref,
+      actionLabel,
+    };
+  }
+
+  if (status >= 502 && status <= 599) {
+    return {
+      eyebrow: "연결 지연",
+      heading: "서비스 연결이 원활하지 않습니다.",
+      body: "일시적인 연결 문제일 수 있습니다. 잠시 후 안전한 화면에서 다시 시도해 주세요.",
+      reassurance: "입력하거나 변경한 내용은 없습니다.",
       actionHref,
       actionLabel,
     };
@@ -178,47 +207,31 @@ export function RouteErrorPage({
   const view = classifyStatus(status, variant, canRetryPublicLoad);
   const metadata = metadataForRouteError(variant, status);
   const actionHref = scopedAppLinkTarget(location.pathname, view.actionHref);
+  const primaryAction: ErrorExperienceAction = canRetryPublicLoad
+    ? {
+        label: retryState === "loading" ? "다시 불러오는 중" : "다시 시도",
+        disabled: retryState === "loading",
+        onClick: onRetry,
+      }
+    : { href: actionHref, label: view.actionLabel };
+  const secondaryAction: ErrorExperienceAction | undefined =
+    variant === "public"
+      ? { href: publicRecordsTarget(location.pathname), label: "공개 기록으로 이동" }
+      : undefined;
 
   return (
     <>
       {metadata ? <PageMetadataHead metadata={metadata} /> : null}
-      <main className="container">
-        <section className="surface" style={{ margin: "48px 0", padding: 28 }}>
-          <p className="eyebrow">{view.eyebrow}</p>
-          <h1 className="h2 editorial" style={{ margin: "8px 0 0" }}>
-            {view.heading}
-          </h1>
-          <p className="body" style={{ color: "var(--text-2)" }}>
-            {view.body}
-          </p>
-          {view.reassurance ? (
-            <p className="small" style={{ color: "var(--text-3)" }}>
-              {view.reassurance}
-            </p>
-          ) : null}
-          <div className="auth-card__actions auth-card__actions--primary">
-            {canRetryPublicLoad ? (
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={retryState === "loading"}
-                onClick={onRetry}
-              >
-                {retryState === "loading" ? "다시 불러오는 중" : "다시 시도"}
-              </button>
-            ) : (
-              <Link className="btn btn-primary" to={actionHref}>
-                {view.actionLabel}
-              </Link>
-            )}
-            {variant === "public" ? (
-              <Link className="btn btn-quiet" to={publicRecordsTarget(location.pathname)}>
-                공개 기록으로 이동
-              </Link>
-            ) : null}
-          </div>
-        </section>
-      </main>
+      <ErrorExperience
+        variant={variant}
+        eyebrow={view.eyebrow}
+        heading={view.heading}
+        body={view.body}
+        reassurance={view.reassurance}
+        primaryAction={primaryAction}
+        secondaryAction={secondaryAction}
+        helpText={view.helpText}
+      />
     </>
   );
 }

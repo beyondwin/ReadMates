@@ -5031,6 +5031,157 @@ a.rm-recent-record__destination:hover {
   margin-bottom: 24px;
 }
 
+.rm-error-experience {
+  min-height: clamp(560px, 76vh, 820px);
+  padding: clamp(48px, 8vw, 104px) 0 clamp(72px, 10vw, 128px);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.rm-error-experience--public,
+.rm-error-experience--member,
+.rm-error-experience--host {
+  background: transparent;
+}
+
+.rm-error-experience__frame {
+  display: flex;
+  justify-content: center;
+}
+
+.rm-error-experience__sheet {
+  width: min(100%, 760px);
+  padding: clamp(32px, 6vw, 64px);
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  background: var(--bg-raised);
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+
+.rm-error-experience__folio {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 20px;
+  color: var(--text-4);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  line-height: 1.4;
+  letter-spacing: 0.12em;
+}
+
+.rm-error-experience__rule {
+  width: 44px;
+  height: 1px;
+  margin: clamp(30px, 5vw, 48px) 0 22px;
+  background: var(--accent);
+}
+
+.rm-error-experience__eyebrow {
+  margin: 0;
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: 0.08em;
+}
+
+.rm-error-experience__title {
+  max-width: 18ch;
+  margin: 12px 0 0;
+  color: var(--text);
+  font-size: clamp(2rem, 4.6vw, 3.5rem);
+  font-weight: 620;
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.rm-error-experience__body {
+  max-width: 68ch;
+  margin: 24px 0 0;
+  color: var(--text-2);
+  font-size: 1rem;
+  line-height: 1.78;
+}
+
+.rm-error-experience__reassurance {
+  max-width: 68ch;
+  margin: 20px 0 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--line-soft);
+  color: var(--text-3);
+  font-size: 0.875rem;
+  line-height: 1.65;
+}
+
+.rm-error-experience__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 10px;
+  margin-top: 32px;
+}
+
+.rm-error-experience__actions .btn {
+  min-height: 46px;
+  justify-content: center;
+  white-space: normal;
+  text-align: center;
+}
+
+.rm-error-experience__actions .btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.rm-error-experience__help {
+  max-width: 68ch;
+  margin: 28px 0 0;
+  color: var(--text-4);
+  font-size: 0.8125rem;
+  line-height: 1.65;
+}
+
+@media (max-width: 639px) {
+  .rm-error-experience {
+    min-height: calc(100svh - 64px);
+    padding: 24px 0 64px;
+  }
+
+  .rm-error-experience__frame {
+    padding-inline: 16px;
+  }
+
+  .rm-error-experience__sheet {
+    padding: 28px 22px 30px;
+  }
+
+  .rm-error-experience__title {
+    max-width: none;
+    font-size: clamp(1.9rem, 9vw, 2.45rem);
+    line-height: 1.16;
+  }
+
+  .rm-error-experience__body {
+    margin-top: 20px;
+    line-height: 1.7;
+  }
+
+  .rm-error-experience__actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    margin-top: 28px;
+  }
+
+  .rm-error-experience__actions .btn {
+    width: 100%;
+    min-height: 48px;
+  }
+}
+
 .auth-dev-panel {
   margin-top: 30px;
   padding-top: 20px;

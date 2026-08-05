@@ -7,6 +7,14 @@ export function authRoutes(_queryClient: QueryClient): RouteObject[] {
   void _queryClient;
   return [
     {
+      path: "/auth/error",
+      hydrateFallbackElement: <ReadmatesRouteLoading label="로그인 안내를 준비하는 중" variant="auth" />,
+      lazy: async () => {
+        const { default: OAuthErrorPage } = await import("@/src/pages/oauth-error");
+        return { Component: OAuthErrorPage };
+      },
+    },
+    {
       path: "/app/pending",
       hydrateFallbackElement: <ReadmatesRouteLoading label="승인 상태를 확인하는 중" variant="member" />,
       lazy: async () => {

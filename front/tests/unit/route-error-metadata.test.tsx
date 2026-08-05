@@ -20,6 +20,43 @@ afterEach(() => {
 });
 
 describe("route error metadata", () => {
+  it.each([
+    [401, "로그인 필요", "로그인을 다시 시작해 주세요."],
+    [403, "권한 필요", "접근할 수 없습니다."],
+    [404, "찾을 수 없음", "페이지를 찾을 수 없습니다."],
+    [409, "상태 변경", "지금은 처리할 수 없습니다."],
+    [410, "사용 종료", "더 이상 사용할 수 없는 경로입니다."],
+    [429, "잠시 후 다시", "요청이 잠시 제한되었습니다."],
+    [500, "서비스 오류", "요청을 마치지 못했습니다."],
+    [503, "연결 지연", "서비스 연결이 원활하지 않습니다."],
+  ])("renders status %i as a semantic recovery document", (status, eyebrow, heading) => {
+    render(
+      <MemoryRouter>
+        <RouteErrorPage variant="auth" status={status} />
+      </MemoryRouter>,
+    );
+
+    const main = screen.getByRole("main");
+    expect(main).toHaveClass("rm-error-experience");
+    expect(screen.getByText(eyebrow)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: heading })).toBeInTheDocument();
+    expect(heading).not.toMatch(/\b(?:401|403|404|409|410|429|500|503)\b/);
+    expect(screen.getByRole("link", { name: "로그인" })).toHaveAttribute("href", "/login");
+  });
+
+  it("exposes stable wrapping and action hooks without inline layout styles", () => {
+    render(
+      <MemoryRouter>
+        <RouteErrorPage variant="public" status={404} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("main")).toHaveClass("rm-error-experience--public");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveClass("rm-error-experience__title");
+    expect(screen.getByRole("group", { name: "다음 단계" })).toHaveClass("rm-error-experience__actions");
+    expect(screen.getByRole("link", { name: "공개 홈" })).toHaveClass("rm-error-experience__primary");
+  });
+
   it("sets public not-found metadata for Lighthouse and browser tabs", () => {
     render(
       <MemoryRouter>

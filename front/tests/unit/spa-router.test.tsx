@@ -527,6 +527,38 @@ describe("SPA router", () => {
     );
   });
 
+  it("renders an OAuth unavailable route with a safe scoped recovery action", async () => {
+    installRouterRequestShim();
+    renderRouterAt(
+      "/auth/error?kind=oauth_unavailable&returnTo=%2Fclubs%2Freading-sai%2Fapp&joinIntent=issued-placeholder&state=opaque-placeholder",
+    );
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "로그인을 시작할 수 없습니다." }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "클럽으로 돌아가기" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app",
+    );
+    expect(screen.getByRole("link", { name: "공개 홈" })).toHaveAttribute("href", "/");
+    expect(screen.getByText("입력하거나 변경한 내용은 없습니다.")).toBeInTheDocument();
+    expect(document.title).toBe("로그인을 시작할 수 없습니다 | ReadMates");
+    expect(document.body).not.toHaveTextContent(/issued-placeholder|opaque-placeholder|joinIntent|state=/);
+  });
+
+  it("falls back unknown OAuth errors and rejects an external recovery destination", async () => {
+    installRouterRequestShim();
+    renderRouterAt(
+      "/auth/error?kind=provider_internal_detail&returnTo=https%3A%2F%2Fother.example.test%2Faccount",
+    );
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "요청을 계속할 수 없습니다." }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "클럽으로 돌아가기" })).toHaveAttribute("href", "/");
+    expect(document.body).not.toHaveTextContent(/provider_internal_detail|other\.example\.test/);
+  });
+
   it("renders the reset password route", async () => {
     installRouterRequestShim();
     const router = createMemoryRouter(routes, { initialEntries: ["/reset-password/reset-token"] });
