@@ -194,6 +194,61 @@ test("public club without an open guest session renders the normal empty state",
   await expect(page.getByText("페이지를 불러오지 못했습니다")).toHaveCount(0);
 });
 
+test("멤버로 시작 OAuth 오류가 안전한 ReadMates 복구 화면으로 이어진다", async ({ page }) => {
+  await page.route("**/api/bff/api/auth/oauth/join-intent", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        intent: "browser-issued-intent-000000000000000",
+        expiresAt: "2026-08-02T02:00:00Z",
+      }),
+    });
+  });
+  await page.route("**/oauth2/authorization/google**", async (route) => {
+    await route.fulfill({
+      status: 302,
+      headers: {
+        Location:
+          "/auth/error?kind=oauth_unavailable&returnTo=%2Fclubs%2Fsample-book-club%2Fapp",
+      },
+    });
+  });
+
+  for (const width of [320, 1366]) {
+    await page.setViewportSize({ width, height: width < 720 ? 844 : 900 });
+    await page.goto("/clubs/sample-book-club");
+    await page.getByRole("link", { name: "멤버로 시작", exact: true }).first().click();
+
+    await expect(page).toHaveURL(
+      "/auth/error?kind=oauth_unavailable&returnTo=%2Fclubs%2Fsample-book-club%2Fapp",
+    );
+    await expect(
+      page.getByRole("heading", { level: 1, name: "로그인을 시작할 수 없습니다." }),
+    ).toBeVisible();
+    await expect(page.getByText("입력하거나 변경한 내용은 없습니다.")).toBeVisible();
+    const primaryAction = page.getByRole("link", { name: "클럽으로 돌아가기" });
+    await expect(primaryAction).toHaveAttribute("href", "/clubs/sample-book-club/app");
+    await expect(page.getByRole("link", { name: "공개 홈" })).toHaveAttribute("href", "/");
+    await expectTapTarget(primaryAction);
+    await expectNoHorizontalOverflow(page);
+
+    await primaryAction.focus();
+    const focusStyle = await primaryAction.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        outlineStyle: style.outlineStyle,
+        outlineWidth: Number.parseFloat(style.outlineWidth),
+      };
+    });
+    expect(focusStyle.outlineStyle).toBe("solid");
+    expect(focusStyle.outlineWidth).toBeGreaterThanOrEqual(2);
+    await expect(page.locator("body")).not.toContainText(
+      /\{\s*"|Whitelabel|ECONNREFUSED|joinIntent|browser-issued-intent/,
+    );
+  }
+});
+
 test("authenticated users keep public browse and explicit target join actions", async ({ page }) => {
   await loginWithGoogleFixture(page, "member1@example.com");
   let issuedIntentRequests = 0;
