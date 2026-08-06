@@ -102,10 +102,10 @@ export function ClubAiDefaultsSection({
   return (
     <section
       aria-labelledby="club-ai-defaults-heading"
-      className={variant === "compact" ? "rm-host-ai-tool" : "stack"}
+      className={variant === "compact" ? "rm-host-ai-tool rm-host-ai-tool--ledger" : "stack"}
       style={variant === "compact" ? undefined : ({ "--stack": "12px" } as CSSProperties)}
     >
-      <header>
+      <header className={variant === "compact" ? "rm-host-ai-tool__header" : undefined}>
         <h2 id="club-ai-defaults-heading" style={{ margin: 0 }}>
           {variant === "compact" ? "AI 기본 모델" : "AI 기본 모델 설정"}
         </h2>

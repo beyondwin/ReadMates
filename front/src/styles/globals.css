@@ -3598,21 +3598,32 @@ a.rm-recent-record__destination:hover {
 }
 
 .rm-host-dashboard-ai-tool {
+  padding-top: 0;
   padding-bottom: 48px;
 }
 
-.rm-host-ai-tool {
+.rm-host-ai-tool--ledger {
   display: grid;
   grid-template-columns: minmax(180px, 0.8fr) minmax(240px, 1fr) auto;
-  gap: 18px;
-  align-items: end;
-  padding: 18px 20px;
-  border-block: 1px solid var(--line);
-  background: var(--bg-sub);
+  column-gap: 24px;
+  row-gap: 12px;
+  align-items: center;
+  padding: 24px 0 26px;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
 }
 
-.rm-host-ai-tool h2 {
+.rm-host-ai-tool__header {
+  min-width: 0;
+}
+
+.rm-host-ai-tool__header h2 {
   font-size: 16px;
+}
+
+.rm-host-ai-tool__header p {
+  max-width: 34ch;
+  line-height: 1.5;
 }
 
 .rm-host-ai-tool__field .field-label {
@@ -3624,9 +3635,10 @@ a.rm-recent-record__destination:hover {
   min-height: 42px;
 }
 
-.rm-host-ai-tool > [role="alert"],
-.rm-host-ai-tool > [aria-live] {
-  grid-column: 1 / -1;
+.rm-host-ai-tool--ledger > [role="alert"],
+.rm-host-ai-tool--ledger > [role="status"],
+.rm-host-ai-tool--ledger > [aria-live] {
+  grid-column: 2 / -1;
   min-height: 0 !important;
 }
 
@@ -3839,11 +3851,17 @@ a.rm-recent-record__destination:hover {
     width: 100%;
   }
 
-  .rm-host-ai-tool {
+  .rm-host-ai-tool--ledger {
     grid-template-columns: 1fr 1fr;
   }
 
   .rm-host-ai-tool__actions {
+    grid-column: 2;
+  }
+
+  .rm-host-ai-tool--ledger > [role="alert"],
+  .rm-host-ai-tool--ledger > [role="status"],
+  .rm-host-ai-tool--ledger > [aria-live] {
     grid-column: 2;
   }
 
@@ -3902,14 +3920,24 @@ a.rm-recent-record__destination:hover {
     padding: 0 16px 28px;
   }
 
-  .rm-host-ai-tool {
+  .rm-host-ai-tool--ledger {
     grid-template-columns: 1fr;
-    gap: 12px;
-    padding: 16px;
+    gap: 14px;
+    padding: 22px 0 24px;
   }
 
   .rm-host-ai-tool__actions {
     grid-column: auto;
+  }
+
+  .rm-host-ai-tool--ledger > [role="alert"],
+  .rm-host-ai-tool--ledger > [role="status"],
+  .rm-host-ai-tool--ledger > [aria-live] {
+    grid-column: auto;
+  }
+
+  .rm-host-ai-tool__actions .btn {
+    min-height: 44px;
   }
 
   .rm-host-dashboard-mobile .btn {

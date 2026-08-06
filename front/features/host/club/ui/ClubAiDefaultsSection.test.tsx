@@ -147,6 +147,9 @@ describe("ClubAiDefaultsSection", () => {
 
     expect(await screen.findByRole("heading", { name: "AI 기본 모델" })).toBeInTheDocument();
     expect(await screen.findByRole("combobox", { name: "기본 모델" })).toBeInTheDocument();
+    const section = screen.getByRole("region", { name: "AI 기본 모델" });
+    expect(section).toHaveClass("rm-host-ai-tool", "rm-host-ai-tool--ledger");
+    expect(section.querySelector(".rm-host-ai-tool__header")).toBeInTheDocument();
     expect(screen.queryByText(/호스트가 업로드 시/)).not.toBeInTheDocument();
   });
 
