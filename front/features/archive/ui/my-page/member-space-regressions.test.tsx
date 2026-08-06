@@ -21,7 +21,7 @@ const viewModel: MemberSpaceViewModel = {
     { kind: "reviews", label: "남긴 서평", description: "아직 남긴 서평이 없어요", value: "0", unit: "편" },
   ],
 };
-const recentReadings: RecentReadingListItem[] = [{ sessionId: "session-7", sessionNumberLabel: "7차", dateLabel: "2026.07.20", bookTitle: "최근 함께 읽은 책", bookAuthor: "테스트 저자", bookImageUrl: null, coverFallbackLabel: "최", activityLabels: ["질문 2"], feedbackStatus: "피드백 O", href: "/app/sessions/session-7" }];
+const recentReadings: RecentReadingListItem[] = [{ sessionId: "session-7", sessionNumberLabel: "No.07", dateLabel: "2026.07.20", bookTitle: "최근 함께 읽은 책", bookAuthor: "테스트 저자", bookImageUrl: null, coverFallbackLabel: "최", activityLabels: ["질문 2"], feedbackStatus: "피드백 O", href: "/app/sessions/session-7" }];
 const save = vi.fn(async (editable) => ({ ...editable, accountName: profile.accountName }));
 
 describe("member-space unaffected presentation", () => {

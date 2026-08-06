@@ -9,7 +9,7 @@ function recentItem(
 ): RecentReadingListItem {
   return {
     sessionId: "session-9",
-    sessionNumberLabel: "9차",
+    sessionNumberLabel: "No.09",
     dateLabel: "2026.07.22",
     bookTitle: "샘플 도서",
     bookAuthor: "샘플 저자",
@@ -72,6 +72,13 @@ describe("RecentReadingList", () => {
     const readableRow = screen.getByRole("link", {
       name: "샘플 도서 회차 기록",
     });
+    expect(readableRow).toHaveClass(
+      "rm-recent-reading-row",
+      "rm-recent-reading-row--archive-aligned",
+    );
+    expect(readableRow.querySelector(
+      ".rm-recent-reading-row__cover-frame",
+    )).toBeInTheDocument();
     expect(within(readableRow).getByText("질문 2")).toHaveClass("badge");
     expect(within(readableRow).getByText("서평 1")).toHaveClass("badge");
     expect(within(readableRow).getByText("피드백 O")).toHaveClass(
@@ -79,6 +86,8 @@ describe("RecentReadingList", () => {
       "badge-ok",
       "badge-dot",
     );
+    expect(within(readableRow).queryByText(/참석/)).toBeNull();
+    expect(within(readableRow).queryByText("비공개")).toBeNull();
     expect(screen.getByText("피드백 제한")).toBeVisible();
     expect(screen.getByText("피드백 준비중")).toHaveClass(
       "badge",

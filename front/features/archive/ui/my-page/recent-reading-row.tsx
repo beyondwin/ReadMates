@@ -7,16 +7,18 @@ export function RecentReadingRow(
 ): JSX.Element {
   return (
     <a
-      className="rm-recent-reading-row"
+      className="rm-recent-reading-row rm-recent-reading-row--archive-aligned"
       href={item.href}
       aria-label={`${item.bookTitle} 회차 기록`}
     >
-      <RecentReadingCover item={item} />
+      <span className="rm-recent-reading-row__cover-frame">
+        <RecentReadingCover item={item} />
+      </span>
       <div className="rm-recent-reading-row__book">
         <span className="rm-recent-reading-row__meta">
           {item.sessionNumberLabel} · {item.dateLabel}
         </span>
-        <h3>{item.bookTitle}</h3>
+        <h3 className="editorial">{item.bookTitle}</h3>
         {item.bookAuthor ? (
           <span className="rm-recent-reading-row__author">
             {item.bookAuthor}
