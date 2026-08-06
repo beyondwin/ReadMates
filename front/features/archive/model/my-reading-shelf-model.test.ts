@@ -189,7 +189,7 @@ describe("my reading shelf model", () => {
     ])).toEqual([
       {
         sessionId: "first",
-        sessionNumberLabel: "12차",
+        sessionNumberLabel: "No.12",
         dateLabel: "2026.07.20",
         bookTitle: "첫 번째 책",
         bookAuthor: "첫 저자",
@@ -207,6 +207,12 @@ describe("my reading shelf model", () => {
         feedbackStatus: "피드백 준비중",
       }),
     ]);
+  });
+
+  it("formats a single-digit recent session with the archive number identity", () => {
+    expect(buildRecentReadingPreview([
+      journeyItem({ sessionNumber: 7 }),
+    ])[0]?.sessionNumberLabel).toBe("No.07");
   });
 
   it("uses safe title, author, cover, date, and empty-activity fallbacks", () => {

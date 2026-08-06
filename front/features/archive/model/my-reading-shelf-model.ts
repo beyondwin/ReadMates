@@ -143,7 +143,7 @@ export function buildRecentReadingPreview(
 
     return {
       sessionId: item.sessionId,
-      sessionNumberLabel: `${item.sessionNumber}차`,
+      sessionNumberLabel: `No.${String(item.sessionNumber).padStart(2, "0")}`,
       dateLabel: journeyDateLabel(item.date),
       bookTitle,
       bookAuthor: item.bookAuthor.trim() || null,
